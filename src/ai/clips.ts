@@ -22,7 +22,10 @@ const TAU = Math.PI * 2;
 const sin = Math.sin;
 const cos = Math.cos;
 /** smooth positive lobe used for knee/ankle curves */
-interface PoseWriter { d(name: string, x: number, y: number, z: number): void; hip(x: number, y: number, z: number): void }
+interface PoseWriter {
+  d(name: string, x: number, y: number, z: number): void;
+  hip(x: number, y: number, z: number): void;
+}
 type GaitParams = typeof WALK;
 const lobe = (x: number, k = 1.4): number => {
   const s = sin(x);
@@ -103,7 +106,11 @@ function gait(P: PoseWriter, ph: number, k: GaitParams): void {
     // thigh: swings forward through the air, back through stance
     const thigh = k.thigh * sin(a) + k.thighBias;
     // knee: heavy flexion just after toe-off, small at heel strike
-    const knee = -(k.kneeBase + k.knee * lobe(a - 0.55, 1.5) + k.kneeStance * lobe(a + Math.PI + 0.4, 2));
+    const knee = -(
+      k.kneeBase +
+      k.knee * lobe(a - 0.55, 1.5) +
+      k.kneeStance * lobe(a + Math.PI + 0.4, 2)
+    );
     // ankle: toe-off push then dorsiflexion to clear the ground
     const ankle = k.ankle * sin(a - 1.9) + k.ankleBias;
     P.d(`UpLeg${s}`, thigh, side * k.thighTwist, side * k.splay);
@@ -126,30 +133,69 @@ function gait(P: PoseWriter, ph: number, k: GaitParams): void {
 }
 
 const WALK = {
-  thigh: 21, thighBias: -2, thighTwist: 1.5, splay: 1.5,
-  kneeBase: 7, knee: 46, kneeStance: 8,
-  ankle: 12, ankleBias: 2, toe: 16,
-  sway: 0.014, bob: 0.014, bobBias: -0.014,
-  pelvisTilt: -1, pelvisYaw: 4.5, pelvisRoll: 3.2,
-  lean: 4, spineYaw: 3.4, armSwing: 3.5,
+  thigh: 21,
+  thighBias: -2,
+  thighTwist: 1.5,
+  splay: 1.5,
+  kneeBase: 7,
+  knee: 46,
+  kneeStance: 8,
+  ankle: 12,
+  ankleBias: 2,
+  toe: 16,
+  sway: 0.014,
+  bob: 0.014,
+  bobBias: -0.014,
+  pelvisTilt: -1,
+  pelvisYaw: 4.5,
+  pelvisRoll: 3.2,
+  lean: 4,
+  spineYaw: 3.4,
+  armSwing: 3.5,
 };
 
 const RUN = {
-  thigh: 34, thighBias: 2, thighTwist: 2, splay: 2,
-  kneeBase: 14, knee: 86, kneeStance: 22,
-  ankle: 20, ankleBias: 4, toe: 26,
-  sway: 0.02, bob: 0.03, bobBias: -0.03,
-  pelvisTilt: -3, pelvisYaw: 7, pelvisRoll: 5,
-  lean: 13, spineYaw: 6, armSwing: 7,
+  thigh: 34,
+  thighBias: 2,
+  thighTwist: 2,
+  splay: 2,
+  kneeBase: 14,
+  knee: 86,
+  kneeStance: 22,
+  ankle: 20,
+  ankleBias: 4,
+  toe: 26,
+  sway: 0.02,
+  bob: 0.03,
+  bobBias: -0.03,
+  pelvisTilt: -3,
+  pelvisYaw: 7,
+  pelvisRoll: 5,
+  lean: 13,
+  spineYaw: 6,
+  armSwing: 7,
 };
 
 const CROUCH = {
-  thigh: 13, thighBias: 38, thighTwist: 2, splay: 4,
-  kneeBase: 74, knee: 26, kneeStance: 6,
-  ankle: 8, ankleBias: 26, toe: 8,
-  sway: 0.01, bob: 0.008, bobBias: -0.008,
-  pelvisTilt: 6, pelvisYaw: 3, pelvisRoll: 2,
-  lean: 16, spineYaw: 2.4, armSwing: 2,
+  thigh: 13,
+  thighBias: 38,
+  thighTwist: 2,
+  splay: 4,
+  kneeBase: 74,
+  knee: 26,
+  kneeStance: 6,
+  ankle: 8,
+  ankleBias: 26,
+  toe: 8,
+  sway: 0.01,
+  bob: 0.008,
+  bobBias: -0.008,
+  pelvisTilt: 6,
+  pelvisYaw: 3,
+  pelvisRoll: 2,
+  lean: 16,
+  spineYaw: 2.4,
+  armSwing: 2,
 };
 
 export function walk(P: PoseWriter, ph: number): void {
@@ -164,7 +210,7 @@ export function run(P: PoseWriter, ph: number): void {
 
 export function crouchWalk(P: PoseWriter, ph: number): void {
   gait(P, ph, CROUCH);
-  P.hip(0, -0.30, -0.02);
+  P.hip(0, -0.3, -0.02);
   P.d('Spine2', 4, 0, 0);
 }
 
@@ -191,7 +237,7 @@ export function crouchIdle(P: PoseWriter, ph: number): void {
 /** Prone-ish crawl is out of scope; a wounded low stance stands in for it. */
 export function hurtIdle(P: PoseWriter, ph: number): void {
   const t = ph * TAU;
-  P.hip(0, -0.10, -0.03);
+  P.hip(0, -0.1, -0.03);
   P.d('Hips', 10, 0, 4);
   P.d('Spine', 12, 0, -3);
   P.d('Spine1', 9, 0, -2);
@@ -209,8 +255,13 @@ export function hurtIdle(P: PoseWriter, ph: number): void {
  * The rifle is skinned to HandR: only the left hand reaches; the right carries
  * muzzle-down, not a fictitious stow or a second free climbing hand.
  */
-export function climb(P: PoseWriter, travel: number, direction: LadderDirection, phase: LadderPhase): void {
-  const t = (travel % 0.6) / 0.6 * TAU * (direction === 'up' ? 1 : -1);
+export function climb(
+  P: PoseWriter,
+  travel: number,
+  direction: LadderDirection,
+  phase: LadderPhase
+): void {
+  const t = ((travel % 0.6) / 0.6) * TAU * (direction === 'up' ? 1 : -1);
   const s = sin(t) * (phase === 'shaft' ? 1 : 0.45);
   P.d('Hips', 0, 0, 1.5 * s);
   P.d('Spine', -2, 0, -s);
@@ -256,7 +307,7 @@ export function vault(P: PoseWriter, t: number): void {
   const rise = Math.sin(Math.PI * Math.min(1, t * 1.05));
   const tuck = Math.sin(Math.PI * Math.min(1, Math.max(0, (t - 0.12) * 1.3)));
   const land = Math.max(0, (t - 0.7) / 0.3);
-  P.hip(0, 0.10 * rise, 0.02 * rise);
+  P.hip(0, 0.1 * rise, 0.02 * rise);
   P.d('Hips', 26 * rise - 16 * land, 0, 0);
   P.d('Spine', 20 * rise, 0, -4 * rise);
   P.d('Spine1', 14 * rise, 0, -3 * rise);
@@ -361,7 +412,7 @@ export function suppressAdd(P: PoseWriter, w: number): void {
   P.d('LegR', -26 * w, 0, 0);
   P.d('UpLegL', 14 * w, 0, 0);
   P.d('LegL', -24 * w, 0, 0);
-  P.hip(0, -0.10 * w, 0);
+  P.hip(0, -0.1 * w, 0);
 }
 
 /**

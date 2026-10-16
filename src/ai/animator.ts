@@ -24,9 +24,10 @@
  */
 
 import * as THREE from 'three';
+
 import * as C from './clips.ts';
-import { BORE_DIR, Rig } from './rig.ts';
 import type { LadderDirection, LadderPhase } from './ladder.ts';
+import { BORE_DIR, Rig } from './rig.ts';
 
 const DEG = Math.PI / 180;
 
@@ -71,21 +72,103 @@ class Poser {
   }
 }
 
-interface WeaponAnchors { muzzle: [number, number, number]; foregrip: [number, number, number]; magBottom: [number, number, number]; ejection: [number, number, number] }
+interface WeaponAnchors {
+  muzzle: [number, number, number];
+  foregrip: [number, number, number];
+  magBottom: [number, number, number];
+  ejection: [number, number, number];
+}
 type ClipName = keyof typeof C.CLIPS;
-interface AnimatorState { clip: ClipName; speed: number; crouch: boolean; aimTarget: THREE.Vector3 | null; lookTarget: THREE.Vector3 | null; aimWeight: number; suppress: number; hurt: number }
-interface AnimatorOptions { weapon?: WeaponAnchors | null; rng?: unknown; probe?: ((x: number, z: number, y: number, out: { y: number; nx: number; ny: number; nz: number; hit: boolean }) => boolean) | null; scale?: number }
+interface AnimatorState {
+  clip: ClipName;
+  speed: number;
+  crouch: boolean;
+  aimTarget: THREE.Vector3 | null;
+  lookTarget: THREE.Vector3 | null;
+  aimWeight: number;
+  suppress: number;
+  hurt: number;
+}
+interface AnimatorOptions {
+  weapon?: WeaponAnchors | null;
+  rng?: unknown;
+  probe?:
+    | ((
+        x: number,
+        z: number,
+        y: number,
+        out: { y: number; nx: number; ny: number; nz: number; hit: boolean }
+      ) => boolean)
+    | null;
+  scale?: number;
+}
 export class Animator {
-  rig!: Rig; bones!: THREE.Bone[]; weapon!: WeaponAnchors | null; rng: unknown; probe!: AnimatorOptions['probe']; scale!: number; enabled!: boolean;
-  P!: Poser; state!: AnimatorState; phase!: number; footfall!: boolean; _stepClock!: number; prevClip!: ClipName; blend!: number; time!: number;
-  recoilT!: number; recoilK!: number; hitT!: number; hitRegion!: string; hitSide!: number; hitK!: number; reloadT!: number; reloadDur!: number; vaultT!: number; vaultDur!: number; turnT!: number; turnDir!: number; footIk!: boolean;
-  iHips!: number; iSpine!: number; iSpine1!: number; iSpine2!: number; iNeck!: number; iHead!: number; iHandR!: number;
-  armL!: [number, number, number]; armR!: [number, number, number]; legs!: [[number, number, number], [number, number, number]];
-  boreLocal!: THREE.Vector3; muzzleLocal!: THREE.Vector3; foregripLocal!: THREE.Vector3; magLocal!: THREE.Vector3; ejectLocal!: THREE.Vector3;
-  _q!: THREE.Quaternion; _q2!: THREE.Quaternion; _q3!: THREE.Quaternion; _qa!: THREE.Quaternion; _qb!: THREE.Quaternion; _qc!: THREE.Quaternion; _qd!: THREE.Quaternion; _e!: THREE.Euler;
-  _v!: THREE.Vector3; _v2!: THREE.Vector3; _v3!: THREE.Vector3; _v4!: THREE.Vector3; _v5!: THREE.Vector3; _pole!: THREE.Vector3; _elbow!: THREE.Vector3; _target!: THREE.Vector3; _up!: THREE.Vector3;
-  _probeOut!: { y: number; nx: number; ny: number; nz: number; hit: boolean }; _footY!: [number, number]; _footN!: [THREE.Vector3, THREE.Vector3];
-  muzzleWorld!: THREE.Vector3; muzzleDir!: THREE.Vector3; ejectWorld!: THREE.Vector3;
+  rig!: Rig;
+  bones!: THREE.Bone[];
+  weapon!: WeaponAnchors | null;
+  rng: unknown;
+  probe!: AnimatorOptions['probe'];
+  scale!: number;
+  enabled!: boolean;
+  P!: Poser;
+  state!: AnimatorState;
+  phase!: number;
+  footfall!: boolean;
+  _stepClock!: number;
+  prevClip!: ClipName;
+  blend!: number;
+  time!: number;
+  recoilT!: number;
+  recoilK!: number;
+  hitT!: number;
+  hitRegion!: string;
+  hitSide!: number;
+  hitK!: number;
+  reloadT!: number;
+  reloadDur!: number;
+  vaultT!: number;
+  vaultDur!: number;
+  turnT!: number;
+  turnDir!: number;
+  footIk!: boolean;
+  iHips!: number;
+  iSpine!: number;
+  iSpine1!: number;
+  iSpine2!: number;
+  iNeck!: number;
+  iHead!: number;
+  iHandR!: number;
+  armL!: [number, number, number];
+  armR!: [number, number, number];
+  legs!: [[number, number, number], [number, number, number]];
+  boreLocal!: THREE.Vector3;
+  muzzleLocal!: THREE.Vector3;
+  foregripLocal!: THREE.Vector3;
+  magLocal!: THREE.Vector3;
+  ejectLocal!: THREE.Vector3;
+  _q!: THREE.Quaternion;
+  _q2!: THREE.Quaternion;
+  _q3!: THREE.Quaternion;
+  _qa!: THREE.Quaternion;
+  _qb!: THREE.Quaternion;
+  _qc!: THREE.Quaternion;
+  _qd!: THREE.Quaternion;
+  _e!: THREE.Euler;
+  _v!: THREE.Vector3;
+  _v2!: THREE.Vector3;
+  _v3!: THREE.Vector3;
+  _v4!: THREE.Vector3;
+  _v5!: THREE.Vector3;
+  _pole!: THREE.Vector3;
+  _elbow!: THREE.Vector3;
+  _target!: THREE.Vector3;
+  _up!: THREE.Vector3;
+  _probeOut!: { y: number; nx: number; ny: number; nz: number; hit: boolean };
+  _footY!: [number, number];
+  _footN!: [THREE.Vector3, THREE.Vector3];
+  muzzleWorld!: THREE.Vector3;
+  muzzleDir!: THREE.Vector3;
+  ejectWorld!: THREE.Vector3;
   climbing = false;
   climbTravel = 0;
   climbDirection: LadderDirection = 'up';
@@ -213,7 +296,8 @@ export class Animator {
    * Existing one-shots are cancelled, not resumed from a stale climbing pose.
    */
   setClimb(active: boolean, travel: number, direction: LadderDirection, phase: LadderPhase): void {
-    if (active && (!Number.isFinite(travel) || travel < 0)) throw new Error('[ai] invalid climb travel');
+    if (active && (!Number.isFinite(travel) || travel < 0))
+      throw new Error('[ai] invalid climb travel');
     this.climbing = active;
     this.climbTravel = active ? travel : 0;
     this.climbDirection = active ? direction : 'up';
@@ -289,9 +373,12 @@ export class Animator {
     /* --- phase advance: stride length keeps the feet stuck to the ground --- */
     const clip = st.clip;
     const strideHz =
-      clip === 'run' ? Math.max(1.1, st.speed / 2.05)
-        : clip === 'walk' ? Math.max(0.55, st.speed / 1.42)
-          : clip === 'crouchWalk' ? Math.max(0.4, st.speed / 0.95)
+      clip === 'run'
+        ? Math.max(1.1, st.speed / 2.05)
+        : clip === 'walk'
+          ? Math.max(0.55, st.speed / 1.42)
+          : clip === 'crouchWalk'
+            ? Math.max(0.4, st.speed / 0.95)
             : 0.19; // idle breathing rate
     const advance = dt * strideHz;
     this.phase = (this.phase + advance) % 1;
@@ -326,7 +413,8 @@ export class Animator {
 
     /* --- layer 2: additives --- */
     P.w = 1;
-    if (st.aimWeight > 0 && !this.vaulting) C.aimAdd(P, st.aimWeight * (1 - (this.reloadT >= 0 ? 0.6 : 0)));
+    if (st.aimWeight > 0 && !this.vaulting)
+      C.aimAdd(P, st.aimWeight * (1 - (this.reloadT >= 0 ? 0.6 : 0)));
     if (st.suppress > 0) C.suppressAdd(P, Math.min(1, st.suppress));
     if (this.recoilT >= 0) {
       C.recoilAdd(P, this.recoilT, this.recoilK);
@@ -364,7 +452,8 @@ export class Animator {
     root.updateMatrixWorld(true);
 
     if (this.footIk && !this.vaulting) this._footIk();
-    if (st.aimTarget && st.aimWeight > 0.01 && !this.vaulting) this._aimIk(st.aimTarget, st.aimWeight);
+    if (st.aimTarget && st.aimWeight > 0.01 && !this.vaulting)
+      this._aimIk(st.aimTarget, st.aimWeight);
     if (st.lookTarget) this._lookAt(st.lookTarget, Math.max(0.35, st.aimWeight));
     this._supportHandIk();
     this._updateMuzzle();
@@ -377,7 +466,9 @@ export class Animator {
     const e = this._e;
     const q = this._q;
     for (let i = 0; i < rig.count; i++) {
-      const x = d3[i * 3], y = d3[i * 3 + 1], z = d3[i * 3 + 2];
+      const x = d3[i * 3],
+        y = d3[i * 3 + 1],
+        z = d3[i * 3 + 2];
       const b = bones[i];
       if (x || y || z) {
         e.set(x * DEG, y * DEG, z * DEG, 'XYZ');
@@ -442,7 +533,10 @@ export class Animator {
     ];
     for (let iter = 0; iter < 2; iter++) {
       const hand = this.bones[this.iHandR];
-      const bore = this._v.copy(this.boreLocal).applyQuaternion(this._wq(this.iHandR, this._q2)).normalize();
+      const bore = this._v
+        .copy(this.boreLocal)
+        .applyQuaternion(this._wq(this.iHandR, this._q2))
+        .normalize();
       const muzzle = this._v2.copy(this.muzzleLocal).applyMatrix4(hand.matrixWorld);
       const want = this._v3.copy(target).sub(muzzle);
       if (want.lengthSq() < 1e-6) return;
@@ -506,7 +600,7 @@ export class Animator {
       const chest = this._v3.set(0.02, 1.19, 0.17).applyMatrix4(bodyRoot.matrixWorld);
       if (p < 0.18) t.copy(grip).lerp(mag, p / 0.18);
       else if (p < 0.42) t.copy(mag).lerp(chest, (p - 0.18) / 0.24);
-      else if (p < 0.62) t.copy(chest).lerp(mag, (p - 0.42) / 0.20);
+      else if (p < 0.62) t.copy(chest).lerp(mag, (p - 0.42) / 0.2);
       else if (p < 0.78) t.copy(mag);
       else t.copy(mag).lerp(grip, (p - 0.78) / 0.22);
     } else {

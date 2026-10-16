@@ -7,12 +7,17 @@
  *   node tests/smoke/smoke-ai-fire.mjs
  */
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
-import { AiSystem } from '../../src/ai/index.ts';
+
 import {
-  STATE, FIRE_BLOCK, PATH_OUTCOME,
-  RELOCATE_GIVE_UP, PEEK_WAIT_GIVE_UP,
+  STATE,
+  FIRE_BLOCK,
+  PATH_OUTCOME,
+  RELOCATE_GIVE_UP,
+  PEEK_WAIT_GIVE_UP,
 } from '../../src/ai/agent.ts';
+import { AiSystem } from '../../src/ai/index.ts';
 import { Squad } from '../../src/ai/squad.ts';
 import { COMBAT } from '../../src/ai/tuning.ts';
 import { makeAgent, makeAi } from '../../tools/lib/agent-fixture.mjs';
@@ -20,43 +25,92 @@ import { testNav } from '../../tools/lib/test-nav.mjs';
 
 const DT = 1 / 60;
 const rng = {
-  float: () => 0.5, range: (a, b) => (a + b) * 0.5,
-  int: (a) => a, gauss: () => 0,
+  float: () => 0.5,
+  range: (a, b) => (a + b) * 0.5,
+  int: (a) => a,
+  gauss: () => 0,
 };
 
 function stubAgent(over = {}) {
   const a = makeAgent();
-  Object.assign(a, {
-    id: 1, alive: true, state: STATE.COMBAT, stateTime: 2,
-    hasTarget: true, targetVisible: true,
-    // Navigation wait contracts apply outside the new close-defense interrupt.
-    lastKnown: new THREE.Vector3(0, 1.1, -10), lastKnownAge: 0.2,
-    lastKnownKind: 'visual',
-    position: new THREE.Vector3(0, 0, 10),
-    yaw: Math.PI, targetYaw: Math.PI,
-    peekTimer: 9,
-    wantFire: false, crouch: false, aimWeight: 1, desiredSpeed: 0, speed: 0,
-    aimTarget: new THREE.Vector3(0, 1.1, -10),
-    health: 100, weaponRange: COMBAT.viewRange, fireRate: COMBAT.fireRate,
-    spread: 0, magSize: 30, ammo: 30,
-    burstLeft: 0, fireCooldown: 0, burstCooldown: 0, suppression: 0,
-    hasGrenade: false, grenadeCooldown: 99, role: 'pin', wrapWait: 0, _wrapDone: true,
-    repathTimer: 5, eyeHeight: 1.62, squad: null, rng,
-    ctx: { time: { elapsed: 0, dt: DT, frame: 0 } },
-    ai: {
-      cover: { pick() { return null; }, protects() { return true; }, release() {}, peekOffset(_c, _t, _e, out) { out.copy(a.coverPos); return 0; } },
-      stats: { grenadeHolds: 0, friendlyHolds: 0, pathsDeferred: 0 },
-      agents: [],
-      onAgentFire() {},
-      grid: null,
+  Object.assign(
+    a,
+    {
+      id: 1,
+      alive: true,
+      state: STATE.COMBAT,
+      stateTime: 2,
+      hasTarget: true,
+      targetVisible: true,
+      // Navigation wait contracts apply outside the new close-defense interrupt.
+      lastKnown: new THREE.Vector3(0, 1.1, -10),
+      lastKnownAge: 0.2,
+      lastKnownKind: 'visual',
+      position: new THREE.Vector3(0, 0, 10),
+      yaw: Math.PI,
+      targetYaw: Math.PI,
+      peekTimer: 9,
+      wantFire: false,
+      crouch: false,
+      aimWeight: 1,
+      desiredSpeed: 0,
+      speed: 0,
+      aimTarget: new THREE.Vector3(0, 1.1, -10),
+      health: 100,
+      weaponRange: COMBAT.viewRange,
+      fireRate: COMBAT.fireRate,
+      spread: 0,
+      magSize: 30,
+      ammo: 30,
+      burstLeft: 0,
+      fireCooldown: 0,
+      burstCooldown: 0,
+      suppression: 0,
+      hasGrenade: false,
+      grenadeCooldown: 99,
+      role: 'pin',
+      wrapWait: 0,
+      _wrapDone: true,
+      repathTimer: 5,
+      eyeHeight: 1.62,
+      squad: null,
+      rng,
+      ctx: { time: { elapsed: 0, dt: DT, frame: 0 } },
+      ai: {
+        cover: {
+          pick() {
+            return null;
+          },
+          protects() {
+            return true;
+          },
+          release() {},
+          peekOffset(_c, _t, _e, out) {
+            out.copy(a.coverPos);
+            return 0;
+          },
+        },
+        stats: { grenadeHolds: 0, friendlyHolds: 0, pathsDeferred: 0 },
+        agents: [],
+        onAgentFire() {},
+        grid: null,
+      },
+      phys: {
+        lineOfSight: () => true,
+        raycast: () => ({ hit: false }),
+        MASK: { SIGHT: 1, WORLD: 2 },
+      },
+      animator: {
+        muzzleWorld: new THREE.Vector3(0.15, 1.42, 10),
+        muzzleDir: new THREE.Vector3(0, 0, -1),
+        reloading: false,
+        vaulting: false,
+        fire() {},
+        turn() {},
+      },
     },
-    phys: { lineOfSight: () => true, raycast: () => ({ hit: false }), MASK: { SIGHT: 1, WORLD: 2 } },
-    animator: {
-      muzzleWorld: new THREE.Vector3(0.15, 1.42, 10),
-      muzzleDir: new THREE.Vector3(0, 0, -1),
-      reloading: false, vaulting: false, fire() {}, turn() {},
-    },
-  }, over);
+    over
+  );
   if (over.cover) a.coverPos.set(over.cover.x, over.cover.y, over.cover.z);
   a.ai.agents = [a];
   return a;
@@ -174,7 +228,10 @@ function run(a, seconds, tick = tickAgent) {
     tickStarved(a);
     t += DT;
   }
-  assert.ok(shots.length >= 1, `deferred nav never fell back (t=${t.toFixed(3)} block=${a.fireBlock})`);
+  assert.ok(
+    shots.length >= 1,
+    `deferred nav never fell back (t=${t.toFixed(3)} block=${a.fireBlock})`
+  );
   assert.ok(t < RELOCATE_GIVE_UP + 0.15, `fallback waited ${t.toFixed(3)}s`);
   assert.notEqual(a.fireBlock, FIRE_BLOCK.RELOCATING);
 }
@@ -183,7 +240,11 @@ function run(a, seconds, tick = tickAgent) {
 {
   const cover = farCover();
   const a = stubAgent({
-    cover, repathTimer: 9, hasMoveTarget: true, desiredSpeed: 4.3, speed: 4.3,
+    cover,
+    repathTimer: 9,
+    hasMoveTarget: true,
+    desiredSpeed: 4.3,
+    speed: 4.3,
   });
   a.moveTarget.copy(a.coverPos);
   a.path[0] = a.coverPos.clone();
@@ -198,7 +259,10 @@ function run(a, seconds, tick = tickAgent) {
   const cover = { x: 0, y: 0, z: 10, dx: 0, dz: -1, high: false };
   const a = stubAgent({ cover, peekTimer: 0, repathTimer: 9 });
   a.firePos.set(0.95, 0, 10);
-  a.ai.cover.peekOffset = (_c, _t, _e, out) => { out.set(0.95, 0, 10); return 1; };
+  a.ai.cover.peekOffset = (_c, _t, _e, out) => {
+    out.set(0.95, 0, 10);
+    return 1;
+  };
   a.phys.lineOfSight = () => false;
   a._combat(DT);
   a.position.copy(a.firePos);
@@ -257,8 +321,12 @@ function run(a, seconds, tick = tickAgent) {
 
 /* 7. suppression and reload */
 {
-  const sup = stubAgent({ state: STATE.SUPPRESSED, suppression: 1.4, scale: 1,
-    cover: { x: 0, y: 0, z: 10, high: false } });
+  const sup = stubAgent({
+    state: STATE.SUPPRESSED,
+    suppression: 1.4,
+    scale: 1,
+    cover: { x: 0, y: 0, z: 10, high: false },
+  });
   const sShots = attachShots(sup);
   tickAgent(sup);
   assert.equal(sShots.length, 0);
@@ -282,7 +350,8 @@ for (const state of [STATE.COMBAT, STATE.FLANK, STATE.RETREAT]) {
   tickAgent(a);
   assert.ok(shots.length > 0, `${state}: exposed suppressed soldier must return fire`);
   assert.equal(a.fireBlock, null, 'diagnostics must not claim shooting is suppressed');
-  if (state !== STATE.COMBAT) assert.equal(a.hasMoveTarget, true, 'defensive fire preserves escape route');
+  if (state !== STATE.COMBAT)
+    assert.equal(a.hasMoveTarget, true, 'defensive fire preserves escape route');
 }
 {
   const a = stubAgent({ suppression: 1.6, cover: farCover(), hasMoveTarget: true });
@@ -303,7 +372,7 @@ for (const state of [STATE.COMBAT, STATE.FLANK, STATE.RETREAT]) {
   assert.equal(a.fireBlock, FIRE_BLOCK.SUPPRESSED);
   assert.equal(a.combatAction, 'suppressed-hide');
   assert.equal(shots.length, fired, 'duck only after reaching verified protection');
-  a.suppression = .4;
+  a.suppression = 0.4;
   tickAgent(a);
   assert.equal(a.state, STATE.COMBAT, 'resume normal combat after pressure subsides');
 }
@@ -326,16 +395,26 @@ for (const state of [STATE.COMBAT, STATE.FLANK, STATE.RETREAT]) {
   assert.ok(a.desiredSpeed > 0);
   assert.ok(shots.length > 0, 'selecting cover must not silence defensive fire');
 }
-for (const reason of ['unacquired', 'stale', 'report', 'muzzle', 'alignment', 'friendly', 'reload', 'vault']) {
+for (const reason of [
+  'unacquired',
+  'stale',
+  'report',
+  'muzzle',
+  'alignment',
+  'friendly',
+  'reload',
+  'vault',
+]) {
   const a = stubAgent({ suppression: 1.6 });
   if (reason === 'unacquired') a.hasTarget = false;
   if (reason === 'stale' || reason === 'report') {
     a.targetVisible = false;
-    a.lastKnownAge = reason === 'stale' ? 2 : .1;
+    a.lastKnownAge = reason === 'stale' ? 2 : 0.1;
     if (reason === 'report') a.lastKnownKind = 'report';
   }
   if (reason === 'muzzle') a.phys.lineOfSight = () => false;
-  if (reason === 'friendly') a.ai.agents.push(stubAgent({ id: 2, position: new THREE.Vector3(0, 0, 5) }));
+  if (reason === 'friendly')
+    a.ai.agents.push(stubAgent({ id: 2, position: new THREE.Vector3(0, 0, 5) }));
   if (reason === 'reload') a.animator.reloading = true;
   if (reason === 'vault') a.animator.vaulting = true;
   const shots = attachShots(a);
@@ -351,10 +430,10 @@ for (const reason of ['unacquired', 'stale', 'report', 'muzzle', 'alignment', 'f
 }
 {
   const cover = { x: 0, y: 0, z: 10, high: false };
-  const a = stubAgent({ cover, suppression: .8, peeking: true, peekTimer: .5 });
+  const a = stubAgent({ cover, suppression: 0.8, peeking: true, peekTimer: 0.5 });
   a.firePos.copy(a.position);
-  a._updatePeek(null, a.lastKnown, 20, .2);
-  assert.ok(a.peekTimer < .5, 'light suppression shortens an arrived exposure');
+  a._updatePeek(null, a.lastKnown, 20, 0.2);
+  assert.ok(a.peekTimer < 0.5, 'light suppression shortens an arrived exposure');
   assert.equal(a.wantFire, true, 'light suppression retains safe fire during exposure');
   a.suppression = 1.6;
   tickAgent(a);
@@ -389,7 +468,11 @@ for (const reason of ['unacquired', 'stale', 'report', 'muzzle', 'alignment', 'f
   const sq = new Squad(rng);
   sq.ai = { grid: null, cover: null };
   const a = stubAgent({
-    role: 'wrap', _wrapDone: false, squad: sq, repathTimer: 9, cover: farCover(4),
+    role: 'wrap',
+    _wrapDone: false,
+    squad: sq,
+    repathTimer: 9,
+    cover: farCover(4),
   });
   sq.add(a);
   wirePath(a);
@@ -439,7 +522,11 @@ for (const reason of ['unacquired', 'stale', 'report', 'muzzle', 'alignment', 'f
   const sq = new Squad(rng);
   sq.ai = { grid: null, cover: null };
   const a = stubAgent({
-    role: 'wrap', _wrapDone: false, squad: sq, repathTimer: 9, cover: farCover(4),
+    role: 'wrap',
+    _wrapDone: false,
+    squad: sq,
+    repathTimer: 9,
+    cover: farCover(4),
     pathPending: true,
   });
   a._pendingDest.set(20, 0, 20);
@@ -463,10 +550,17 @@ for (const reason of ['unacquired', 'stale', 'report', 'muzzle', 'alignment', 'f
   const a = stubAgent({ cover: point, repathTimer: 9 });
   wirePath(a);
   a.ai.cover = {
-    pick() { return point; },
-    protects() { return true; },
+    pick() {
+      return point;
+    },
+    protects() {
+      return true;
+    },
     release() {},
-    peekOffset(_c, _t, _e, out) { out.copy(a.coverPos); return 0; },
+    peekOffset(_c, _t, _e, out) {
+      out.copy(a.coverPos);
+      return 0;
+    },
   };
   a.ai.requestPath = function () {
     this.lastPathOutcome = PATH_OUTCOME.DEFERRED;
@@ -489,16 +583,27 @@ for (const reason of ['unacquired', 'stale', 'report', 'muzzle', 'alignment', 'f
 /* 13. a deferred wrap route must enter flank and actually move */
 {
   const nav = await testNav();
-  const start = new THREE.Vector3(1, .008, 1);
-  const dest = new THREE.Vector3(8, .008, 1);
+  const start = new THREE.Vector3(1, 0.008, 1);
+  const dest = new THREE.Vector3(8, 0.008, 1);
   const moved = {};
   for (const deferred of [false, true]) {
     const ai = makeAi(nav);
     const a = makeAgent({
-      ai, position: start.clone(), state: STATE.COMBAT, stateTime: 2,
-      hasTarget: true, targetVisible: true, lastKnown: new THREE.Vector3(1, 1, 25),
-      lastKnownAge: 0, lastKnownKind: 'visual', role: 'wrap', wrapWait: 0,
-      _wrapDone: false, desiredSpeed: 0, phys: nav.physics, animator: { turn() {} },
+      ai,
+      position: start.clone(),
+      state: STATE.COMBAT,
+      stateTime: 2,
+      hasTarget: true,
+      targetVisible: true,
+      lastKnown: new THREE.Vector3(1, 1, 25),
+      lastKnownAge: 0,
+      lastKnownKind: 'visual',
+      role: 'wrap',
+      wrapWait: 0,
+      _wrapDone: false,
+      desiredSpeed: 0,
+      phys: nav.physics,
+      animator: { turn() {} },
     });
     ai.agents = [a];
     const sq = new Squad(a.rng);
@@ -507,7 +612,11 @@ for (const reason of ['unacquired', 'stale', 'report', 'muzzle', 'alignment', 'f
     a.role = 'wrap';
     sq.hasWrapDest = true;
     sq.wrapDest.copy(dest);
-    a.controller = nav.physics.createCharacter({ radius: a.radius, height: a.height, stepHeight: .38 });
+    a.controller = nav.physics.createCharacter({
+      radius: a.radius,
+      height: a.height,
+      stepHeight: 0.38,
+    });
     a.controller.setPosition(start.x, start.y, start.z);
     ai._pathBudget = deferred ? 0 : 2;
     a._think(DT);
@@ -520,14 +629,19 @@ for (const reason of ['unacquired', 'stale', 'report', 'muzzle', 'alignment', 'f
       a._tickNoProgress(DT);
       flanked = flanked || a.state === STATE.FLANK;
     }
-    moved[deferred ? 'deferred' : 'immediate'] = Math.hypot(a.position.x - start.x, a.position.z - start.z);
+    moved[deferred ? 'deferred' : 'immediate'] = Math.hypot(
+      a.position.x - start.x,
+      a.position.z - start.z
+    );
     assert.equal(flanked, true, `${deferred ? 'deferred' : 'immediate'} wrap never entered flank`);
     assert.equal(a.recoveryAttempts, 0);
     nav.physics.removeCharacter(a.controller);
   }
   assert.ok(moved.immediate > 5, `immediate wrap moved ${moved.immediate.toFixed(3)} m`);
-  assert.ok(Math.abs(moved.deferred - moved.immediate) < 0.5,
-    `deferred ${moved.deferred.toFixed(3)} m vs immediate ${moved.immediate.toFixed(3)} m`);
+  assert.ok(
+    Math.abs(moved.deferred - moved.immediate) < 0.5,
+    `deferred ${moved.deferred.toFixed(3)} m vs immediate ${moved.immediate.toFixed(3)} m`
+  );
   nav.dispose();
 }
 
