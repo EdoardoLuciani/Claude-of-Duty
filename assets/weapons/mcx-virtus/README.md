@@ -3,7 +3,7 @@
 Gray 9-inch VIRTUS, short factory M-LOK guard, folding/telescoping stock,
 direct-thread SRD762Ti, TA31F/TA51 and black MAG800 magazine.
 Original art, not CAD/scan or an endorsed/licensed replica.
-**Human visual sign-off remains pending.**
+Visual review remains separate from technical validation.
 History: [#334](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/334).
 
 ## Reference authority
@@ -22,8 +22,10 @@ floorplate/feed lips, not world-Z height. No copied serial or real 5.56 BDC.
 
 ## Source/runtime contract
 
-`mcx-virtus.blend/.glb`: packed editable source/runtime; `manifest.json`:
-counts/events; `textures/`: generated 1024² maps.
+Python under [`tools/blender/mcx/`](../../../tools/blender/mcx/README.md) is the
+sole authoring source. `mcx-virtus.blend/.glb` are generated preview/runtime
+products; `manifest.json` records counts/events; `textures/` holds generated
+1024² maps. Do not author changes in the generated files.
 `src/weapons/mcx.ts` converts +X-forward/+Y-up and samples six native clips.
 Draw/holster remain procedural, stock fold showcase-only. Shared arms/IK,
 scope/reticle, sound and live pooled cases are runtime-owned; hide baked cases.
@@ -32,10 +34,10 @@ Normal builds need no Blender.
 Caps: <110k triangles, ≤40 primitives, ≤16 materials, three 1024² maps, ≤10 MiB.
 Preserve complete-magazine bounds, vents/trigger, charging stem, cap/spine seating,
 hinge/handle clearance throughout reload/fold and the seated TA51 foot/rail.
-Keep matching NLA tracks and STEP magazine visibility without reload blending.
+Keep matching clip names and STEP magazine visibility without reload blending.
 Materials borrow textures; counts aren't GPU timings.
 
-## Rebuild/check (root, Blender 5.2)
+## Rebuild/check (root, Blender 5.2.2)
 
 ```sh
 blender -b --python-exit-code 1 --python tools/blender/mcx_virtus.py
@@ -46,6 +48,19 @@ node tests/smoke/smoke-mcx-game.mjs
 node tests/e2e/check-mcx-game.mjs
 ```
 
-Regeneration overwrites source/export/maps. `--render` adds stills;
-`mcx_review.py` reviews saved source/reels. Compare frozen uniform registration
-and matched Eevee settings, not historical Cycles or independent X/Y warps.
+The single command starts from an empty factory scene, not a saved asset.
+Regeneration overwrites preview/export/maps. `-- --output /tmp/mcx-review`
+builds elsewhere; add `--render --quick` for optional review stills.
+`mcx_review.py` can inspect generated preview scenes/reels.
+
+The recipe is separated into materials, named geometry assemblies, animations,
+studio and export. Fixed physical-scale UV projection replaces automatic island
+packing. Motion is authored as 60 Hz LINEAR keys and visibility as CONSTANT keys;
+Blender's stock Actions exporter emits the correct glTF interpolation directly.
+There is no post-export repair or alternate saved-source material-update path.
+See the linked authoring guide for stage order and which file to edit.
+
+This pilot preserves the develop finish values; it does not incorporate the
+separate satin-finish proposal. UV layout/triangle order are intentionally rebuilt,
+not represented as a byte-identical geometry-buffer update. Compare frozen
+registration and matched lighting, not independently rescaled screenshots.
