@@ -25,7 +25,13 @@ returned 403. Exact photo registration/URLs remain in the review JSONs.
 Eight native clips preserve events/durations, shared IK/ADS/sway/reactive recoil.
 Keep invertible rest seats, matching NLA tracks, visible spare descendants and
 empty-reload latch/stock/deformed-arm clearance. No duplicate arms/live cases.
-Caps: <110k triangles, ≤40 primitives, ≤16 materials, three 1024² maps, ≤10 MiB.
+Caps: <110k triangles, ≤40 primitives, ≤16 materials, four 1024² maps, ≤10 MiB.
+The selected balanced finish adds a receiver-only albedo map with 25% of the
+original variation around the same mean. The other three maps remain shared.
+Receiver linear RGB is .041/.043/.046, roughness .44, normal strength .08;
+FDE .56/.16, polymer .80/.55, phosphate steel .56/.16, magazine .67/.18
+(roughness/normal). Metalness is unchanged; no added clearcoat. Source generation
+and exported-material smoke checks own these settings, not runtime overrides.
 
 The rear hole is restored to its original 2.2 mm bore and 7.6 mm outer cup;
 the original sight centre and 2.60 mm post are unchanged. The upper 1.4 mm
