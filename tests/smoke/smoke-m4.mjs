@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+import { PNG } from 'pngjs';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
@@ -37,7 +38,33 @@ assert(
     json.materials.length <= 16 &&
     bytes.length <= 10 * 1024 * 1024
 );
-assert.equal(json.images.length, 3);
+assert.equal(json.images.length, 4, 'three shared maps plus the selected receiver albedo');
+// Selected balanced finish: preserve metal/dielectric separation and authored maps.
+for (const [prefix, roughness, normal, metal] of [
+  ['01', 0.44, 0.08, 1],
+  ['02', 0.56, 0.16, 1],
+  ['03', 0.8, 0.55, 0],
+  ['05', 0.56, 0.16, 1],
+  ['07', 0.67, 0.18, 1],
+]) {
+  const material = json.materials.find((m) => m.name.startsWith(`${prefix} |`));
+  assert(material, `${prefix}: missing finish`);
+  const pbr = material.pbrMetallicRoughness;
+  assert(Math.abs(pbr.roughnessFactor - roughness) < 1e-6);
+  assert(Math.abs(material.normalTexture.scale - normal) < 1e-6);
+  assert.equal(pbr.metallicFactor ?? 1, metal);
+  assert.equal(material.extensions?.KHR_materials_clearcoat?.clearcoatFactor ?? 0, 0);
+}
+const receiverMaterial = json.materials.find((m) => m.name.startsWith('01 |'));
+const polymerMaterial = json.materials.find((m) => m.name.startsWith('03 |'));
+const imageFor = (texture) => json.textures[texture.index].source;
+assert.notEqual(
+  imageFor(receiverMaterial.pbrMetallicRoughness.baseColorTexture),
+  imageFor(polymerMaterial.pbrMetallicRoughness.baseColorTexture),
+  'receiver-only albedo, not a global texture replacement'
+);
+for (const [i, value] of [0.041, 0.043, 0.046].entries())
+  assert(Math.abs(receiverMaterial.pbrMetallicRoughness.baseColorFactor[i] - value) < 1e-6);
 assert(
   json.buffers.every((b) => !b.uri) && json.images.every((i) => i.bufferView !== undefined),
   'local self-contained GLB'
@@ -51,6 +78,30 @@ for (const image of json.images) {
   assert.equal(bytes.readUInt32BE(offset + 20), 1024);
 }
 assert.equal(json.animations.length, 8);
+const albedoStats = (material) => {
+  const image = json.images[imageFor(material.pbrMetallicRoughness.baseColorTexture)];
+  const view = json.bufferViews[image.bufferView];
+  const start = binaryStart + (view.byteOffset ?? 0);
+  const pixels = PNG.sync.read(bytes.subarray(start, start + view.byteLength)).data;
+  let sum = 0;
+  let squares = 0;
+  for (let i = 0; i < pixels.length; i += 4) {
+    sum += pixels[i];
+    squares += pixels[i] ** 2;
+  }
+  const mean = sum / (pixels.length / 4);
+  return { mean, sd: Math.sqrt(squares / (pixels.length / 4) - mean ** 2) };
+};
+const receiverAlbedo = albedoStats(receiverMaterial);
+const sharedAlbedo = albedoStats(polymerMaterial);
+assert(
+  Math.abs(receiverAlbedo.mean - sharedAlbedo.mean) < 1,
+  'preserve mean albedo within PNG quantization'
+);
+assert(
+  Math.abs(receiverAlbedo.sd / sharedAlbedo.sd - 0.25) < 0.02,
+  'selected 25% receiver albedo variation'
+);
 for (const clip of json.animations) {
   const names = clip.channels.map((c) => json.nodes[c.target.node].name);
   for (const name of [

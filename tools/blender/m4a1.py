@@ -41,7 +41,8 @@ case=empty('spent_case',parent=rig)
 round_live=empty('magazine_round',parent=mag);round_spare=empty('magazine_spare_round',parent=spare)
 bpy.context.view_layer.update()
 
-# Deterministic, authored microstructure; three shared maps, no duplicate arm maps.
+# Deterministic microstructure: three shared maps and one receiver albedo.
+# No duplicate arm maps.
 rng=np.random.default_rng(556);N=1024
 def field(grid):
     a=rng.random((grid,grid)).astype(np.float32);t=np.arange(N)*grid/N;i=t.astype(int);t=t-i;t=t*t*(3-2*t)
@@ -66,23 +67,28 @@ h=pyramid*mask*.00018
 gx=(np.roll(h,-1,1)-np.roll(h,1,1))/(2*.048/(N//2));gy=(np.roll(h,-1,0)-np.roll(h,1,0))/(2*.063/N)
 patch=np.dstack((-gx,-gy,np.ones_like(gx)));patch/=np.linalg.norm(patch,axis=2,keepdims=True);normal[:,:N//2]=patch
 nmap=image('m4_normal',normal*.5+.5)
-def material(name,color,metal=0,roughness=.6,detail=.2):
+# Selected balanced study: keep the receiver's mean tint, reduce cloudy albedo
+# variation to 25%. Work from the stored image pixels, as in the Blender study.
+receiver_pixels=np.array(albedo.pixels[:],dtype=np.float32).reshape((N,N,4))[:,:,:3]
+receiver_mean=receiver_pixels.reshape((-1,3)).mean(axis=0)
+receiver_albedo=image('m4_receiver_surface',receiver_mean+(receiver_pixels-receiver_mean)*.25,True)
+def material(name,color,metal=0,roughness=.6,detail=.2,surface=albedo):
     m=bpy.data.materials.new(name);m.diffuse_color=(*color,1);m.use_nodes=True
     n,l=m.node_tree.nodes,m.node_tree.links;p=n.get('Principled BSDF')
     p.inputs['Base Color'].default_value=(*color,1);p.inputs['Metallic'].default_value=metal;p.inputs['Roughness'].default_value=roughness
-    t=n.new('ShaderNodeTexImage');t.image=albedo
+    t=n.new('ShaderNodeTexImage');t.image=surface
     mix=n.new('ShaderNodeMix');mix.data_type='RGBA';mix.blend_type='MULTIPLY';mix.inputs[0].default_value=1;mix.inputs[7].default_value=(*color,1)
     l.new(t.outputs[0],mix.inputs[6]);l.new(mix.outputs[2],p.inputs['Base Color'])
     t=n.new('ShaderNodeTexImage');t.image=rough;s=n.new('ShaderNodeSeparateColor');l.new(t.outputs[0],s.inputs[0])
     mul=n.new('ShaderNodeMath');mul.operation='MULTIPLY';mul.inputs[1].default_value=roughness;l.new(s.outputs[1],mul.inputs[0]);l.new(mul.outputs[0],p.inputs['Roughness'])
     t=n.new('ShaderNodeTexImage');t.image=nmap;nm=n.new('ShaderNodeNormalMap');nm.inputs['Strength'].default_value=detail;l.new(t.outputs[0],nm.inputs['Color']);l.new(nm.outputs[0],p.inputs['Normal']);return m
-anodized=material('01 | black anodized receiver',(.041,.047,.053),1,.68,.12)
-fde=material('02 | RIS II FDE anodizing',(.235,.150,.084),1,.68,.18)
-polymer=material('03 | moulded black furniture',(.026,.029,.032),0,.80,.65)
+anodized=material('01 | black anodized receiver',(.041,.043,.046),1,.44,.08,receiver_albedo)
+fde=material('02 | RIS II FDE anodizing',(.235,.150,.084),1,.56,.16)
+polymer=material('03 | moulded black furniture',(.026,.029,.032),0,.80,.55)
 rubber=material('04 | SOPMOD rubber pad',(.022,.024,.026),0,.92,.9)
-steel=material('05 | phosphate steel',(.071,.078,.086),1,.65,.18)
+steel=material('05 | phosphate steel',(.071,.078,.086),1,.56,.16)
 burnished=material('06 | restrained steel wear',(.115,.125,.137),1,.48,.10)
-magmat=material('07 | aluminum dry film',(.145,.155,.164),1,.76,.22)
+magmat=material('07 | aluminum dry film',(.145,.155,.164),1,.67,.18)
 brass=material('08 | brass case',(.49,.285,.084),1,.35,.10)
 copper=material('09 | copper projectile',(.43,.16,.066),1,.39,.10)
 marking=material('10 | subdued markings',(.115,.122,.129),0,.72,.05)
@@ -561,6 +567,6 @@ path.write_bytes(struct.pack('<4sII',b'glTF',2,20+len(encoded)+len(binary))+stru
 # Count both magazines/cartridge instances even when glTF deduplicates buffers.
 primitives=[p for node in doc['nodes'] if 'mesh' in node for p in doc['meshes'][node['mesh']]['primitives']]
 stats={'triangles':sum(doc['accessors'][p['indices']]['count']//3 for p in primitives),'primitives':len(primitives),'materials':len(doc['materials']),'meshes':len(doc['meshes']),'bytes':path.stat().st_size,'images':len(doc['images'])}
-assert stats['triangles']<110000 and stats['primitives']<=40 and stats['materials']<=16 and stats['bytes']<=10*1024*1024 and stats['images']==3,stats
+assert stats['triangles']<110000 and stats['primitives']<=40 and stats['materials']<=16 and stats['bytes']<=10*1024*1024 and stats['images']==4,stats
 manifest={'asset':'M4A1 Block II | RIS II FSP / MaTech / FH556RC / LMT SOPMOD','units':'metres','clips':clips,'stats':stats,'textureResolution':1024,'source':'tools/blender/m4a1.py + m4_actions.py + tools/m4-hand-reference.mjs','notes':['Visual reconstruction, not manufacturing geometry or a scan.','See README.md for unknown datums and the FH556RC unit conflict.','Weapon/wrist/finger trajectories are Blender-authored; shared runtime skins/IK and existing reactive recoil remain.']}
 (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n');print('M4_EXPORT_COMPLETE',json.dumps(stats))
