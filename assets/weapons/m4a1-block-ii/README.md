@@ -27,9 +27,10 @@ Keep invertible rest seats, matching NLA tracks, visible spare descendants and
 empty-reload latch/stock/deformed-arm clearance. No duplicate arms/live cases.
 Caps: <110k triangles, ≤40 primitives, ≤16 materials, three 1024² maps, ≤10 MiB.
 
-Approved H is a gameplay adaptation, not factory hardware: 5.6 mm rear hole in
-the original 7.6 mm cup, original sight centre and 2.60 mm post, upper 1.4 mm
-neon-green tip. Fixed lower support joins the cup below the inner edge.
+The rear hole is restored to its original 2.2 mm bore and 7.6 mm outer cup;
+the original sight centre and 2.60 mm post are unchanged. The upper 1.4 mm
+neon-green tip is retained. The lower support clears the opening by 0.1 mm
+while remaining attached; the historical untrimmed support occluded the bore.
 Preserve paint/opacity, aperture rays, aim datum and solid attachment checks.
 No camera/FOV/ballistic retuning.
 
