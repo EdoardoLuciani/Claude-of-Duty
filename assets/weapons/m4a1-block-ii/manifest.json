@@ -159,8 +159,8 @@
     "primitives": 32,
     "materials": 12,
     "meshes": 16,
-    "bytes": 7642316,
-    "images": 3
+    "bytes": 8119992,
+    "images": 4
   },
   "textureResolution": 1024,
   "source": "tools/blender/m4a1.py + m4_actions.py + tools/m4-hand-reference.mjs",
