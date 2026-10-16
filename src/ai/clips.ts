@@ -267,9 +267,14 @@ export function climb(
   P.d('Spine', -2, 0, -s);
   P.d('Spine1', -2, 0, 0);
   P.d('Head', -5, 0, 0);
-  // Keep the actual glove in front of the wall/conduit at the .46 m catch inset.
-  P.d('UpperArmL', 75 + 4 * s, 0, 0);
-  P.d('ForearmL', 20 - 10 * s, 0, 0);
+  // Fold before lowering the shoulder, then reach with the elbow still retracted.
+  // The raised reach pose keeps the actual glove clear at the .46 m catch inset.
+  const armWeight = phase === 'shaft' ? 1 : 0.45;
+  const release = (1 - cos(t)) * 0.5 * armWeight;
+  const fold = (1 - cos(t + 0.7)) * 0.5 * armWeight;
+  P.d('UpperArmL', 75 + 4 * s - 12 * release * fold, 20 * fold, 25 * fold);
+  P.d('ForearmL', 20 - 85 * fold, 0, -25 * fold);
+  P.d('HandL', -10 * fold, 0, 0);
   P.d('UpperArmR', -1, 0, -40);
   P.d('ForearmR', 6, -5, -77);
   P.d('HandR', -2, -13, 34);

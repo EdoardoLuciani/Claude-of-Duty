@@ -59,6 +59,13 @@ assert.ok(
 );
 near(rest, at(a, 0.6));
 near(raised, at(a, 0.45, 'down'));
+// Whole-pose periodicity/reversal must also hold between the old sine extrema.
+for (const phase of ['align', 'shaft', 'dismount'])
+  for (const travel of [0.013, 0.173, 0.317, 0.599999]) {
+    const sample = at(a, travel, 'up', phase);
+    near(sample, at(a, travel + 1.2, 'up', phase));
+    near(sample, at(a, 0.6 - travel, 'down', phase));
+  }
 at(a, 0.15, 'down');
 assert.ok(
   a.bonePos('FootL', new THREE.Vector3()).y > a.bonePos('FootR', new THREE.Vector3()).y + 0.15

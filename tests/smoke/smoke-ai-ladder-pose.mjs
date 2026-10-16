@@ -55,14 +55,17 @@ for (const name of ['vanguard', 'irregular', 'breacher']) {
   let forward = -Infinity;
   for (const direction of ['up', 'down'])
     for (const phase of ['align', 'shaft', 'dismount']) {
+      const centers = [];
       for (let k = 0; k <= 120; k++) {
         animator.setClimb(true, k * 0.005, direction, phase);
         animator.update(0, 0);
         group.updateMatrixWorld(true);
+        const center = new THREE.Vector3();
         for (const i of vertices) {
           point.fromBufferAttribute(pos, i);
           mesh.applyBoneTransform(i, point);
           mesh.localToWorld(point);
+          center.add(point);
           forward = Math.max(forward, point.z);
           // Bounded reach for the .46 m catch inset: keep room for warped plaster
           // and the surface conduit. Native W4/E5 evidence owns actual geometry clearance.
@@ -71,8 +74,35 @@ for (const name of ['vanguard', 'irregular', 'breacher']) {
             `${name}/${direction}/${phase}/${k}/${i}: glove reach ${point.z}`
           );
         }
+        centers.push(center.multiplyScalar(1 / vertices.length));
         assert.ok(animator.muzzleDir.y < -0.95, 'unchanged downward rifle carry');
       }
+      const low = centers.reduce((a, b) => (a.y < b.y ? a : b));
+      const high = centers.reduce((a, b) => (a.y > b.y ? a : b));
+      const shaft = phase === 'shaft';
+      assert.ok(
+        high.y - low.y > (shaft ? 0.2 : 0.04),
+        'visible glove lowering, not a fixed overhead pose'
+      );
+      assert.ok(high.z - low.z > (shaft ? 0.025 : 0.008), 'lowered glove retracts before reaching');
+      assert.ok(centers[0].distanceTo(centers[120]) < 1e-6, 'actual glove repeats without a seam');
+      for (let k = 0; k < 120; k++) {
+        const next = centers[(k + 1) % 120],
+          prev = centers[(k + 119) % 120];
+        assert.ok(
+          next.distanceTo(centers[k]) < 0.018,
+          'bounded glove speed through the entire cycle'
+        );
+        assert.ok(
+          next.clone().add(prev).addScaledVector(centers[k], -2).length() < 0.0025,
+          'smooth glove acceleration, including the periodic seam'
+        );
+      }
+      if (shaft)
+        assert.ok(
+          centers.filter((p) => p.y < high.y - 0.15).length > 25,
+          'release/reset lasts a readable part of the cycle'
+        );
     }
   assert.ok(forward > 0.3, 'hand still reaches toward nearby rungs, not arbitrarily retracted');
   const frozen = bones.map((b) => b.matrix.elements.slice());
