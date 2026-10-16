@@ -6,7 +6,6 @@ import argparse
 import json
 import math
 from pathlib import Path
-import struct
 import sys
 
 import bpy
@@ -15,6 +14,9 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'assets/weapons/mcx-virtus'
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from mcx_export import export_mcx
+from mcx_materials import POLYMER_FINISH, SUPPRESSOR_FINISH, COATING_FINISH
 ARGS = argparse.ArgumentParser()
 ARGS.add_argument('--render', action='store_true')
 ARGS.add_argument('--quick', action='store_true')
@@ -154,10 +156,10 @@ def material(name, color, metal=0, roughness=.5, detail=.2):
 
 anodized = material('01 | graphite anodized alloy', (.047, .053, .060), 1, .72, .09)
 edge = material('02 | subtly burnished edges', (.081, .087, .095), 1, .59, .08)
-polymer = material('03 | injection-moulded polymer', (.027, .031, .035), 0, .79, .65)
+polymer = material(*POLYMER_FINISH)
 rubber = material('04 | stippled rubber', (.016, .019, .022), 0, .91, .9)
 steel = material('05 | dark nitrided steel', (.083, .091, .105), 1, .44, .16)
-ceramic = material('06 | suppressor graphite ceramic', (.054, .056, .060), 0, .66, .35)
+ceramic = material(*SUPPRESSOR_FINISH)
 brass = material('07 | fired brass', (.49, .285, .084), 1, .35, .14)
 copper = material('08 | copper projectile', (.43, .16, .066), 1, .39, .1)
 marking = material('09 | subdued laser markings', (.37, .39, .40), 0, .65, .02)
@@ -172,8 +174,9 @@ fiber = material('12 | red fiber-optic collector', (.48, .025, .008), 0, .28, .0
 fiber_bsdf = fiber.node_tree.nodes.get('Principled BSDF')
 fiber_bsdf.inputs['Emission Color'].default_value = (.48, .025, .008, 1)
 fiber_bsdf.inputs['Emission Strength'].default_value = .7
-# Painted rifle surfaces are distinct from the optic's black anodizing.
-coating = material('13 | Elite Concrete gray coating', (.195, .208, .222), 0, .69, .10)
+# Satin dielectric coating: linear pigment, not bare-metal F0 or a clearcoat.
+# Shared optic anodizing/steel and all three detail maps stay unchanged.
+coating = material(*COATING_FINISH)
 
 
 def finish(obj, name, mat, parent=body, bevel=.0006):
@@ -814,51 +817,7 @@ if args.render:
     for name,cam in [('hero',hero),('right-profile',side_cam),('left-profile',left_cam),('receiver-detail',detail_cam),('first-person',first_cam)]:
         scene.camera=cam;scene.render.filepath=str(OUT/'renders'/f'{name}.png');bpy.ops.render.render(write_still=True)
     scene.camera=hero
-# Export copy in-memory: apply bevels, UV unwrap, merge static geometry by
-# animation parent. Source .blend remains editable, with named components.
-select_clip('Idle',0)
-# Hidden animated parts must have invertible transforms while joining meshes.
-for obj in parts:
-    for track in obj.animation_data.nla_tracks: track.mute=True
-    obj.location, obj.rotation_euler, obj.scale = rest[obj.name]
-bpy.context.view_layer.update()
-for obj in list(asset.objects):
-    if obj.type not in {'MESH','FONT'}:continue
-    active(obj)
-    bpy.ops.object.convert(target='MESH')
-    # Smart unwrap keeps every bevel/boolean face textured in Blender and glTF.
-    bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT')
-    bpy.ops.uv.smart_project(angle_limit=math.radians(66),island_margin=.006)
-    bpy.ops.object.mode_set(mode='OBJECT')
-# Consolidate draw calls without destroying articulated pivots or named sockets.
-for parent in [body,mag,spare,bolt,handle,trigger,cover,stock,case,release]:
-    meshes=[o for o in asset.objects if o.type=='MESH' and o.parent==parent]
-    if not meshes:continue
-    active(meshes[0])
-    for obj in meshes:obj.select_set(True)
-    bpy.ops.object.join();bpy.context.object.name=parent.name+'_mesh'
-# Enable all tracks for the NLA exporter; it isolates tracks by matching names.
-for obj in parts:
-    for track in obj.animation_data.nla_tracks:track.mute=False
-bpy.ops.object.select_all(action='DESELECT')
-for obj in asset.objects:obj.select_set(True)
-bpy.ops.export_scene.gltf(filepath=str(OUT/'mcx-virtus.glb'),export_format='GLB',use_selection=True,export_animations=True,export_animation_mode='NLA_TRACKS',export_nla_strips=True,export_frame_range=False,export_force_sampling=True,export_optimize_animation_keep_anim_object=True,export_sampling_interpolation_fallback='LINEAR',export_extras=True,export_yup=True,export_materials='EXPORT',export_cameras=False,export_lights=False)
-# Blender's forced NLA sampler labels changing scale channels LINEAR even
-# when their source keys are CONSTANT. Preserve stepped visibility explicitly
-# so fractional playback times never shrink both seated magazines together.
-glb_path = OUT / 'mcx-virtus.glb'
-glb = glb_path.read_bytes()
-json_length = struct.unpack_from('<I', glb, 12)[0]
-document = json.loads(glb[20:20+json_length])
-for animation in document['animations']:
-    for channel in animation['channels']:
-        if channel['target']['path'] == 'scale':
-            animation['samplers'][channel['sampler']]['interpolation'] = 'STEP'
-encoded = json.dumps(document, separators=(',', ':')).encode()
-encoded += b' ' * (-len(encoded) % 4)
-binary_chunk = glb[20+json_length:]
-glb_path.write_bytes(struct.pack('<4sII', b'glTF', 2, 20+len(encoded)+len(binary_chunk))
-                     + struct.pack('<I4s', len(encoded), b'JSON') + encoded + binary_chunk)
+export_mcx(asset, parts, rest, OUT)
 stats={'triangles':0,'vertices':0,'meshes':0,'material_slots':0}
 for obj in asset.objects:
     if obj.type=='MESH':

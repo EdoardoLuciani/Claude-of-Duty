@@ -51,6 +51,24 @@ for (const material of gltf.materials) {
   assert.ok(pbr.baseColorFactor.slice(0, 3).every((v) => v > 0 && v < 0.6));
 }
 
+// Material-only satin finish: inspect exported factors, not linked Blender defaults.
+for (const [name, color, roughness, normalScale] of [
+  ['13 | Elite Concrete gray coating', [0.145, 0.155, 0.168], 0.57, 0.1],
+  ['03 | injection-moulded polymer', [0.027, 0.031, 0.035], 0.73, 0.5],
+  ['06 | suppressor graphite ceramic', [0.054, 0.056, 0.06], 0.72, 0.25],
+]) {
+  const material = gltf.materials.find((m) => m.name === name);
+  assert.ok(material, `${name}: authored finish exists`);
+  const pbr = material.pbrMetallicRoughness;
+  color.forEach((value, i) =>
+    assert.ok(Math.abs(pbr.baseColorFactor[i] - value) < 1e-6, `${name}: linear pigment`)
+  );
+  assert.equal(pbr.metallicFactor, 0, `${name}: coated/polymer dielectric, not bare metal`);
+  assert.ok(Math.abs(pbr.roughnessFactor - roughness) < 1e-6, `${name}: roughness multiplier`);
+  assert.ok(Math.abs(material.normalTexture.scale - normalScale) < 1e-6, `${name}: normal scale`);
+  assert.equal(material.extensions?.KHR_materials_clearcoat, undefined, `${name}: no clearcoat`);
+}
+
 const widths = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 };
 const formats = { 5126: ['readFloatLE', 4], 5125: ['readUInt32LE', 4], 5123: ['readUInt16LE', 2] };
 function accessor(index) {

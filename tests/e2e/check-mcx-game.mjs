@@ -147,6 +147,13 @@ try {
     ctx.input.frozen = false;
     w.debugMode = null;
   });
+  // Enabled input still requires canvas gameplay focus. Middle-click acquires
+  // it through the real mouse handler without firing or entering ADS.
+  await page.locator('#game').click({ button: 'middle' });
+  assert(
+    await page.evaluate(() => window.mcxReview.ctx.input._gameplayInputActive()),
+    'canvas owns gameplay keyboard input before inspect'
+  );
   await page.keyboard.down('Shift');
   await page.keyboard.down('KeyI');
   await pump(1);

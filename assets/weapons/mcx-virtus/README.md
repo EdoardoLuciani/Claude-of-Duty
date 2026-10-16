@@ -35,7 +35,41 @@ hinge/handle clearance throughout reload/fold and the seated TA51 foot/rail.
 Keep matching NLA tracks and STEP magazine visibility without reload blending.
 Materials borrow textures; counts aren't GPU timings.
 
+## Materials
+
+The gray receiver/handguard is a satin dielectric coating, not bare metal or a
+clearcoat. Its linear pigment is `(0.145, 0.155, 0.168)`, roughness multiplier
+`0.57`, normal strength `0.10`. Black polymer keeps its pigment with roughness
+`0.73` / normal `0.50`; the graphite suppressor uses `0.72` / `0.25`.
+All three remain metalness zero with default IOR 1.5 (F0 0.04). These are
+photo-informed art approximations, not measured proprietary finishes.
+`tools/blender/mcx_materials.py` owns these settings for both authoring paths.
+
+The same three 1024² maps remain byte-identical; roughness-map green averages
+0.916, giving mean evaluated roughness about 0.522 / 0.669 / 0.660 respectively.
+No new maps, material slots or shader features. Shared anodized/steel optic
+hardware, glass, fiber, markings and other finishes remain unchanged. Geometry
+faceting and native indoor darkness/bright outdoor lighting are not material fixes.
+
 ## Rebuild/check (root, Blender 5.2)
+
+For **material-only maintenance**, preserve the packed source's geometry/UVs:
+
+```sh
+blender -b --python-exit-code 1 --python tools/blender/mcx_materials.py
+```
+
+This opens the existing packed source, validates the three target node graphs,
+updates linked factors, saves before in-memory mesh conversion, and uses the
+same `mcx_export.py` exporter as the full recipe. Export fails without replacing
+the GLB if any nonmaterial JSON/binary or untouched material changes. The source
+is saved first; on failure review/restore it before retrying. Full procedural
+reconstruction has a pre-existing magazine UV/index reproducibility difference
+in Blender 5.2.2, even with unchanged settings; do not use it for a material-only
+patch or accept its geometry drift. Both paths retain the original export flags
+and STEP visibility postprocess, with no geometry-buffer replacement.
+
+For a deliberate **full procedural rebuild**, followed by checks:
 
 ```sh
 blender -b --python-exit-code 1 --python tools/blender/mcx_virtus.py
