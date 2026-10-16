@@ -1,6 +1,6 @@
-import { Noise, clamp01, smoothstep, encodeSrgb } from '../../src/fx/noise.ts';
-import { makeTexture } from '../../src/fx/atlas.ts';
 import type { Rng } from '../../src/core/rng.ts';
+import { makeTexture } from '../../src/fx/atlas.ts';
+import { Noise, clamp01, smoothstep, encodeSrgb } from '../../src/fx/noise.ts';
 
 /** Offline particle/decal atlas authoring; never imported by runtime systems. */
 const ATLAS_COLS = 4;
@@ -159,7 +159,9 @@ const PARTICLE_PAINTERS: ParticlePainter[] = [
   (n, x, y, r, out) => {
     const ang = Math.atan2(y, x);
     const shape =
-      0.52 + 0.34 * n.fbm(Math.cos(ang) * 1.8 + 5.5, Math.sin(ang) * 1.8 + 2.9, 2) - 0.1 * Math.abs(Math.sin(ang * 2.5));
+      0.52 +
+      0.34 * n.fbm(Math.cos(ang) * 1.8 + 5.5, Math.sin(ang) * 1.8 + 2.9, 2) -
+      0.1 * Math.abs(Math.sin(ang * 2.5));
     const a = smoothstep(shape, shape - 0.09, r);
     const facet = n.fbm(x * 3.4 - 4.2, y * 3.4 + 1.1, 3);
     const l = 0.34 + 0.5 * facet + 0.22 * clamp01(0.5 - y);
@@ -368,7 +370,7 @@ const DECAL_PAINTERS: DecalPainter[] = [
     const crumb = Math.pow(n.fbm(x * 5.2 + 2.2, y * 5.2 - 1.1, 4), 1.4);
     const rimT = (r - rb * 1.3) / (0.11 + 0.05 * (jit + 0.5));
     const rim = clamp01(Math.exp(-rimT * rimT * 1.4) * (0.3 + 1.25 * crumb)) * (1 - bore);
-    const ao = contactAo(r, rb, 0.40 + 0.12 * crumb) * (1 - bore);
+    const ao = contactAo(r, rb, 0.4 + 0.12 * crumb) * (1 - bore);
     const crack = radialSpall(n, ang, r, 3.7, 4) * smoothstep(rb * 0.8, rb * 1.25, r);
     const grit =
       Math.pow(clamp01(1 - n.worley(x * 12.5 + 8.8, y * 12.5 - 3.3) * 2.1), 2) *
@@ -402,7 +404,7 @@ const DECAL_PAINTERS: DecalPainter[] = [
     const floorAo = crater * 0.34;
     const ao = contactAo(r, lobes * 0.92, 0.34 + 0.14 * chips) * (1 - bore) * (1 - crater * 0.6);
     mixReset();
-    mixAdd(bore, 0.020, 0.0185, 0.017);
+    mixAdd(bore, 0.02, 0.0185, 0.017);
     mixAdd(crater * 0.64, 0.205 + 0.05 * chips, 0.195 + 0.045 * chips, 0.175 + 0.04 * chips);
     mixAdd(crack * 0.78, 0.042, 0.039, 0.035);
     mixAdd(clamp01(floorAo + ao), 0, 0, 0);
@@ -424,11 +426,13 @@ const DECAL_PAINTERS: DecalPainter[] = [
     const grain = n.fbm(x * 9.5 + 1.3, y * 9.5 - 5.6, 3);
     const lip = Math.exp(-lipT * lipT * 2.4) * (0.45 + 1.05 * grain);
     const scuff = smoothstep(0.9, 0.2, r) * n.fbm(x * 7.5 + 6.1, y * 7.5 - 2.2, 3);
-    const scratch = Math.pow(clamp01(1 - n.worleyEdge(x * 6 + 2, y * 6 - 8) * 9), 2) * smoothstep(0.85, 0.1, r);
+    const scratch =
+      Math.pow(clamp01(1 - n.worleyEdge(x * 6 + 2, y * 6 - 8) * 9), 2) * smoothstep(0.85, 0.1, r);
     // Same contact annulus as the masonry tiles: a punched plate has a shadow in
     // the hole, and torn petals throw one on the paint around them.
     const ao = contactAo(r, rh, 0.34) * (1 - hole);
-    const a = clamp01(hole + lip * 0.7 + scuff * 0.5 + scratch * 0.3 + ao) * smoothstep(1.0, 0.75, r);
+    const a =
+      clamp01(hole + lip * 0.7 + scuff * 0.5 + scratch * 0.3 + ao) * smoothstep(1.0, 0.75, r);
     const bare = clamp01(lip * 0.85 + scratch * 0.45);
     // 0.24, not 0.4: bare torn steel IS bright, but at 0.4 the petal ring came out
     // paler than any plate it could be punched through and read as a white donut.
@@ -459,7 +463,7 @@ const DECAL_PAINTERS: DecalPainter[] = [
     const ao = contactAo(r, rb, 0.44 + 0.1 * fib) * (1 - bore);
     const crack = radialSpall(n, ang, r, 5.9, 3) * smoothstep(rb * 0.8, rb * 1.3, r);
     mixReset();
-    mixAdd(bore, 0.015, 0.0125, 0.010);
+    mixAdd(bore, 0.015, 0.0125, 0.01);
     mixAdd(clamp01(lip * 0.85 + splinter * 0.6), 0.125, 0.088, 0.052);
     mixAdd(crack * 0.7, 0.03, 0.022, 0.014);
     mixAdd(ao, 0, 0, 0);
@@ -485,14 +489,14 @@ const DECAL_PAINTERS: DecalPainter[] = [
     const rim = clamp01(Math.exp(-rimT * rimT * 1.35) * (0.32 + 1.2 * crumb)) * (1 - bore);
     // A thin veil of powder that has drifted further out, still under the host.
     const powder = smoothstep(0.9, 0.18, r) * n.fbm(x * 3.1 + 8.2, y * 3.1 - 4.4, 4) * 0.3;
-    const ao = contactAo(r, rb, 0.40 + 0.12 * crumb) * (1 - bore);
+    const ao = contactAo(r, rb, 0.4 + 0.12 * crumb) * (1 - bore);
     const crack = radialSpall(n, ang, r, 1.9, 4) * smoothstep(rb * 0.8, rb * 1.25, r);
     mixReset();
     mixAdd(bore, 0.018, 0.0165, 0.015);
     // Lime plaster over mud brick: the pulverised rim keeps the host's ochre
     // hue and is capped at ~1.2x its luminance (0.29 against a 0.24 wall).
     mixAdd(rim * 0.94, 0.305, 0.278, 0.234);
-    mixAdd(powder, 0.26, 0.238, 0.20);
+    mixAdd(powder, 0.26, 0.238, 0.2);
     mixAdd(crack * 0.8, 0.04, 0.036, 0.03);
     mixAdd(ao, 0, 0, 0);
     mixInto(out, smoothstep(1.0, 0.75, r));
@@ -503,12 +507,22 @@ const DECAL_PAINTERS: DecalPainter[] = [
   // 5 — glass: radial + concentric crack web, almost no fill
   (n, x, y, r, out) => {
     const ang = Math.atan2(y, x);
-    const radial = Math.pow(clamp01(1 - Math.abs(Math.sin(ang * 5.5 + n.fbm(r * 3 + 2, ang + 4, 3) * 6)) * 1.6), 6);
-    const conc = Math.pow(clamp01(1 - Math.abs(Math.sin(r * 17 + n.fbm(x * 2, y * 2, 2) * 4)) * 1.9), 5);
-    const web = clamp01(radial * smoothstep(0.98, 0.05, r) + conc * smoothstep(0.95, 0.12, r) * 0.7);
+    const radial = Math.pow(
+      clamp01(1 - Math.abs(Math.sin(ang * 5.5 + n.fbm(r * 3 + 2, ang + 4, 3) * 6)) * 1.6),
+      6
+    );
+    const conc = Math.pow(
+      clamp01(1 - Math.abs(Math.sin(r * 17 + n.fbm(x * 2, y * 2, 2) * 4)) * 1.9),
+      5
+    );
+    const web = clamp01(
+      radial * smoothstep(0.98, 0.05, r) + conc * smoothstep(0.95, 0.12, r) * 0.7
+    );
     const rh = 0.055;
     const hole = smoothstep(rh + 0.02, rh - 0.01, r);
-    const shatter = Math.pow(clamp01(1 - n.worleyEdge(x * 4.4 + 1.1, y * 4.4 - 6.6) * 8), 3) * smoothstep(0.7, 0.1, r);
+    const shatter =
+      Math.pow(clamp01(1 - n.worleyEdge(x * 4.4 + 1.1, y * 4.4 - 6.6) * 8), 3) *
+      smoothstep(0.7, 0.1, r);
     const a = clamp01(web * 0.95 + hole + shatter * 0.8);
     const l = hole > 0.5 ? 0.02 : clamp01(0.5 + 0.45 * web);
     out[0] = l * 0.94;
@@ -556,7 +570,9 @@ const DECAL_PAINTERS: DecalPainter[] = [
         ? inLane * under * (1 - t * 0.65) * smoothstep(0.0, 0.06, t) * smoothstep(1.0, 0.86, t)
         : 0;
     a = clamp01(a + run * 0.9);
-    const bead = Math.exp(-(Math.pow((x - (lane - 0.5) * 0.12) * 26, 2) + Math.pow((y - (y0 - runLen)) * 22, 2)));
+    const bead = Math.exp(
+      -(Math.pow((x - (lane - 0.5) * 0.12) * 26, 2) + Math.pow((y - (y0 - runLen)) * 22, 2))
+    );
     a = clamp01(a + bead * inLane * under * 0.85);
     const thick = a * (0.5 + 0.8 * n.fbm(x * 4.4 + 7.7, y * 4.4 - 1.1, 3));
     out[0] = clamp01(0.07 + 0.08 * thick);
@@ -609,8 +625,14 @@ const DECAL_PAINTERS: DecalPainter[] = [
     const grain = n.fbm(x * 11 + 3.3, y * 11 - 6.6, 3);
     // Ejecta rays break the collar so it stops reading as a painted ring.
     const rays =
-      Math.pow(clamp01(1 - Math.abs(Math.sin(ang * 4.5 + n.fbm(Math.cos(ang) * 2, Math.sin(ang) * 2, 3) * 6)) * 1.15), 2.5) *
-      collar;
+      Math.pow(
+        clamp01(
+          1 -
+            Math.abs(Math.sin(ang * 4.5 + n.fbm(Math.cos(ang) * 2, Math.sin(ang) * 2, 3) * 6)) *
+              1.15
+        ),
+        2.5
+      ) * collar;
     const a = clamp01(crater * 0.8 + collar * 0.45 + rays * 0.45 + smoothstep(1.0, 0.3, r) * 0.3);
     const l = clamp01(0.3 + 0.1 * collar + 0.1 * rays - 0.16 * crater + 0.08 * grain);
     out[0] = l * 1.0;
@@ -649,7 +671,7 @@ const DECAL_PAINTERS: DecalPainter[] = [
   // 12 — water ripple: normal-dominated concentric rings
   (n, x, y, r, out) => {
     const wob = 1 + 0.06 * (n.fbm(x * 3 + 6, y * 3 - 2, 3) - 0.5);
-    const rings = Math.sin((r * wob) * 22) * Math.exp(-r * r * 2.6);
+    const rings = Math.sin(r * wob * 22) * Math.exp(-r * r * 2.6);
     const a = clamp01(Math.exp(-r * r * 2.2) * 0.6) * smoothstep(1.0, 0.85, r);
     out[0] = 0.42;
     out[1] = 0.46;
@@ -662,7 +684,10 @@ const DECAL_PAINTERS: DecalPainter[] = [
   // 13 — small glass punch-through
   (n, x, y, r, out) => {
     const ang = Math.atan2(y, x);
-    const rad = Math.pow(clamp01(1 - Math.abs(Math.sin(ang * 4.5 + n.fbm(r * 4 + 1, ang * 2, 3) * 5)) * 1.5), 7);
+    const rad = Math.pow(
+      clamp01(1 - Math.abs(Math.sin(ang * 4.5 + n.fbm(r * 4 + 1, ang * 2, 3) * 5)) * 1.5),
+      7
+    );
     const web = rad * smoothstep(0.72, 0.04, r);
     const hole = smoothstep(0.08, 0.05, r);
     const frost = Math.pow(1 - n.worley(x * 7 + 2.2, y * 7 - 3.3), 3) * smoothstep(0.34, 0.04, r);
@@ -679,7 +704,7 @@ const DECAL_PAINTERS: DecalPainter[] = [
   // 14 — generic dust smudge (explosion soiling, sandbag hits, scuffs)
   (n, x, y, r, out) => {
     const w = n.warped(x * 2.2 + 18.8, y * 2.2 - 5.5, 0.8, 5);
-    const a = clamp01(smoothstep(0.05, 0.75, (1 - r) + (w - 0.5) * 0.9)) * 0.7;
+    const a = clamp01(smoothstep(0.05, 0.75, 1 - r + (w - 0.5) * 0.9)) * 0.7;
     const l = clamp01(0.22 + 0.22 * w);
     out[0] = l;
     out[1] = l * 0.96;
@@ -692,10 +717,19 @@ const DECAL_PAINTERS: DecalPainter[] = [
   // 15 — torn fabric / foliage puncture
   (n, x, y, r, out) => {
     const ang = Math.atan2(y, x);
-    const rip = Math.pow(clamp01(1 - Math.abs(Math.sin(ang * 2.5 + n.fbm(Math.cos(ang) * 2 + 3, Math.sin(ang) * 2, 2) * 4)) * 1.2), 3);
+    const rip = Math.pow(
+      clamp01(
+        1 -
+          Math.abs(Math.sin(ang * 2.5 + n.fbm(Math.cos(ang) * 2 + 3, Math.sin(ang) * 2, 2) * 4)) *
+            1.2
+      ),
+      3
+    );
     const rh = 0.1 + 0.14 * rip;
     const hole = smoothstep(rh + 0.05, rh - 0.02, r);
-    const fray = Math.pow(clamp01(1 - n.worleyEdge(x * 8 + 4.4, y * 8 - 1.1) * 9), 2) * smoothstep(0.5, 0.1, r);
+    const fray =
+      Math.pow(clamp01(1 - n.worleyEdge(x * 8 + 4.4, y * 8 - 1.1) * 9), 2) *
+      smoothstep(0.5, 0.1, r);
     const a = clamp01(hole + fray * 0.9);
     const l = hole > 0.5 ? 0.02 : clamp01(0.18 + 0.3 * fray);
     out[0] = l;
@@ -713,7 +747,9 @@ const DECAL_PAINTERS: DecalPainter[] = [
 /* ========================================================================= */
 
 /** Relief strength per decal tile — how hard the derived normal map pushes. */
-const DECAL_RELIEF = [2.6, 3.0, 2.2, 2.4, 2.3, 1.4, 0.8, 0.7, 0.35, 2.4, 1.9, 1.6, 1.1, 1.5, 0.2, 1.7];
+const DECAL_RELIEF = [
+  2.6, 3.0, 2.2, 2.4, 2.3, 1.4, 0.8, 0.7, 0.35, 2.4, 1.9, 1.6, 1.1, 1.5, 0.2, 1.7,
+];
 
 export function buildParticleAtlas(rng: Rng, size = 1024) {
   const n = new Noise(rng);
@@ -732,8 +768,7 @@ export function buildParticleAtlas(rng: Rng, size = 1024) {
         out[0] = out[1] = out[2] = out[3] = 0;
         if (r < 1.45) paint(n, x, y, r, out);
         // A 1px transparent gutter stops bilinear/mip bleed between tiles.
-        const gutter =
-          px < 1 || py < 1 || px > tile - 2 || py > tile - 2 ? 0 : 1;
+        const gutter = px < 1 || py < 1 || px > tile - 2 || py > tile - 2 ? 0 : 1;
         const i = ((oy + py) * size + ox + px) * 4;
         data[i] = encodeSrgb(out[0]) * 255;
         data[i + 1] = encodeSrgb(out[1]) * 255;
@@ -742,7 +777,11 @@ export function buildParticleAtlas(rng: Rng, size = 1024) {
       }
     }
   }
-  return { texture: makeTexture(data, size, { srgb: true, name: 'fx-particles' }), cols: ATLAS_COLS, size };
+  return {
+    texture: makeTexture(data, size, { srgb: true, name: 'fx-particles' }),
+    cols: ATLAS_COLS,
+    size,
+  };
 }
 
 /**

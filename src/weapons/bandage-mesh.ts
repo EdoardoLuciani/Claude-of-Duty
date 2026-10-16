@@ -1,26 +1,37 @@
 /// <reference types="vite/client" />
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { BANDAGE_SEGMENTS } from './bandage-path.ts';
-import { createWeaponMaterial } from './asset-material.ts';
 import type { Material } from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { MeshPhysicalNodeMaterial } from 'three/webgpu';
+
+import { createWeaponMaterial } from './asset-material.ts';
+import { BANDAGE_SEGMENTS } from './bandage-path.ts';
 
 /** Authored with the player arms in assets/player/arms/player-arms.blend. */
 export async function loadBandage() {
-  const gltf = await new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}models/player/bandage.glb`);
+  const gltf = await new GLTFLoader().loadAsync(
+    `${import.meta.env.BASE_URL}models/player/bandage.glb`
+  );
   type BandageMesh = THREE.Mesh<THREE.BufferGeometry, Material>;
   const wrap = gltf.scene.getObjectByName('Bandage_wrap') as BandageMesh | undefined;
   const body = gltf.scene.getObjectByName('Bandage_roll') as BandageMesh | undefined;
   const cap = gltf.scene.getObjectByName('Bandage_cap') as BandageMesh | undefined;
-  if (!wrap?.isMesh || !body?.isMesh || !cap?.isMesh || wrap.geometry.index?.count !== BANDAGE_SEGMENTS * 24) {
+  if (
+    !wrap?.isMesh ||
+    !body?.isMesh ||
+    !cap?.isMesh ||
+    wrap.geometry.index?.count !== BANDAGE_SEGMENTS * 24
+  ) {
     throw new Error('Bandage: stale Blender export (run tools/blender/player_bandage.py)');
   }
   const replacements = new Map<Material, MeshPhysicalNodeMaterial>();
   for (const mesh of [wrap, body, cap]) {
     const source = mesh.material;
     let replacement = replacements.get(source);
-    if (!replacement) { replacement = createWeaponMaterial(source); replacements.set(source, replacement); }
+    if (!replacement) {
+      replacement = createWeaponMaterial(source);
+      replacements.set(source, replacement);
+    }
     mesh.material = replacement;
   }
   for (const source of replacements.keys()) source.dispose();
@@ -43,8 +54,10 @@ export async function loadBandage() {
   const uv = new Float32Array(26 * 2);
   const index: number[] = [];
   for (let i = 0; i <= 12; i++) {
-    uv[i * 4] = 0; uv[i * 4 + 1] = i / 6;
-    uv[i * 4 + 2] = 1; uv[i * 4 + 3] = i / 6;
+    uv[i * 4] = 0;
+    uv[i * 4 + 1] = i / 6;
+    uv[i * 4 + 2] = 1;
+    uv[i * 4 + 3] = i / 6;
     if (i < 12) {
       const k = i * 2;
       index.push(k, k + 1, k + 2, k + 1, k + 3, k + 2);
@@ -57,16 +70,28 @@ export async function loadBandage() {
   const tail = new THREE.Mesh(geometry, wrap.material);
   tail.frustumCulled = false;
   tail.visible = false;
-  return { wrap, roll, body, cap, tail, dispose() {
-    const textures = new Set<THREE.Texture>();
-    for (const mat of new Set([wrap.material, body.material, cap.material])) {
-      for (const value of Object.values(mat as object)) if (value instanceof THREE.Texture) textures.add(value as THREE.Texture<unknown, THREE.TextureEventMap>);
-      mat.dispose();
-    }
-    for (const tex of textures) { (tex.source?.data as { close?: () => void } | undefined)?.close?.(); tex.dispose(); }
-    wrap.geometry.dispose();
-    body.geometry.dispose();
-    cap.geometry.dispose();
-    geometry.dispose();
-  } };
+  return {
+    wrap,
+    roll,
+    body,
+    cap,
+    tail,
+    dispose() {
+      const textures = new Set<THREE.Texture>();
+      for (const mat of new Set([wrap.material, body.material, cap.material])) {
+        for (const value of Object.values(mat as object))
+          if (value instanceof THREE.Texture)
+            textures.add(value as THREE.Texture<unknown, THREE.TextureEventMap>);
+        mat.dispose();
+      }
+      for (const tex of textures) {
+        (tex.source?.data as { close?: () => void } | undefined)?.close?.();
+        tex.dispose();
+      }
+      wrap.geometry.dispose();
+      body.geometry.dispose();
+      cap.geometry.dispose();
+      geometry.dispose();
+    },
+  };
 }

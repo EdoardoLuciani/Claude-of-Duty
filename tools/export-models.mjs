@@ -35,8 +35,16 @@
  *  - each mesh carries `userData.mat` (its material slot) via glTF extras.
  */
 
-import { writeFileSync, mkdirSync, statSync, renameSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
+import {
+  writeFileSync,
+  mkdirSync,
+  statSync,
+  renameSync,
+  readFileSync,
+  rmSync,
+  existsSync,
+} from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -57,9 +65,9 @@ if (typeof globalThis.FileReader === 'undefined') {
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 
-import { Rng } from '../src/core/rng.ts';
-import { buildSoldier, VARIANTS } from '../src/ai/soldier.ts';
 import { RIG } from '../src/ai/rig.ts';
+import { buildSoldier, VARIANTS } from '../src/ai/soldier.ts';
+import { Rng } from '../src/core/rng.ts';
 import { buildSpentHull } from './lib/spent-hull.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -138,10 +146,7 @@ async function withLock(fn) {
   for (;;) {
     try {
       mkdirSync(LOCK_DIR); // non-recursive: atomic, throws EEXIST on contention
-      writeFileSync(
-        LOCK_OWNER,
-        JSON.stringify({ pid: process.pid, token, createdAt: Date.now() })
-      );
+      writeFileSync(LOCK_OWNER, JSON.stringify({ pid: process.pid, token, createdAt: Date.now() }));
       break;
     } catch (err) {
       if (err.code !== 'EEXIST') throw err;
@@ -154,9 +159,7 @@ async function withLock(fn) {
       }
       const waitingMs = Date.now() - t0;
       const stale =
-        !owner || !Number.isFinite(owner.pid)
-          ? waitingMs > LOCK_GRACE_MS
-          : !pidAlive(owner.pid);
+        !owner || !Number.isFinite(owner.pid) ? waitingMs > LOCK_GRACE_MS : !pidAlive(owner.pid);
       if (stale) {
         rmSync(LOCK_DIR, { recursive: true, force: true });
         continue;
@@ -265,8 +268,10 @@ function modelSourceHash() {
 
 function outputsPresent() {
   const stems = Object.keys(VARIANTS).map((name) => `soldiers/${name}`);
-  return existsSync(join(OUT, 'fx/spent12g.glb')) &&
-    stems.every((p) => existsSync(join(OUT, `${p}.glb`)) && existsSync(join(OUT, `${p}.json`)));
+  return (
+    existsSync(join(OUT, 'fx/spent12g.glb')) &&
+    stems.every((p) => existsSync(join(OUT, `${p}.glb`)) && existsSync(join(OUT, `${p}.json`)))
+  );
 }
 
 /* ====================================================================== */
@@ -280,10 +285,16 @@ console.log('[models] exporting to', OUT);
 await withLock(async () => {
   // Authored replacements must remove stale procedural outputs on cache hits.
   for (const id of ['lmg', 'smg', 'sniper', 'shotgun']) {
-    for (const ext of ['glb', 'json']) rmSync(join(OUT, 'weapons', `${id}.${ext}`), { force: true });
+    for (const ext of ['glb', 'json'])
+      rmSync(join(OUT, 'weapons', `${id}.${ext}`), { force: true });
   }
   const hash = modelSourceHash();
-  if (!FORCE && outputsPresent() && existsSync(HASH_STAMP) && readFileSync(HASH_STAMP, 'utf8').trim() === hash) {
+  if (
+    !FORCE &&
+    outputsPresent() &&
+    existsSync(HASH_STAMP) &&
+    readFileSync(HASH_STAMP, 'utf8').trim() === hash
+  ) {
     console.log(`[models] up to date (${hash})`);
     return;
   }
@@ -292,7 +303,8 @@ await withLock(async () => {
   for (const name of Object.keys(VARIANTS)) await exportSoldier(name);
   const hull = buildSpentHull();
   await writeGLB(hull, join(OUT, 'fx/spent12g.glb'));
-  hull.geometry.dispose(); hull.material.dispose();
+  hull.geometry.dispose();
+  hull.material.dispose();
 
   // Bone order is load-bearing (agents bind the exported geometry to their own
   // RIG skeleton by index); assert it once at export time.

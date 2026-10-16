@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+
 import {
   box,
   blob,
@@ -28,12 +29,30 @@ import {
 const TAU = Math.PI * 2;
 
 type Axis = 'x' | 'y' | 'z';
-interface Rotation { rx?: number; ry?: number; rz?: number }
-interface CarbineStockOptions extends PartOptions { bore: number; zRear: number; zFront: number }
+interface Rotation {
+  rx?: number;
+  ry?: number;
+  rz?: number;
+}
+interface CarbineStockOptions extends PartOptions {
+  bore: number;
+  zRear: number;
+  zFront: number;
+}
 interface PartOptions {
-  angle?: number; count?: number; depth?: number; h?: number; len?: number;
-  pattern?: readonly number[]; pitch?: number; stroke?: number; sx?: number;
-  w?: number; x?: number; y?: number; z?: number;
+  angle?: number;
+  count?: number;
+  depth?: number;
+  h?: number;
+  len?: number;
+  pattern?: readonly number[];
+  pitch?: number;
+  stroke?: number;
+  sx?: number;
+  w?: number;
+  x?: number;
+  y?: number;
+  z?: number;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -41,14 +60,31 @@ interface PartOptions {
 /* -------------------------------------------------------------------------- */
 
 /** Cross pin with a domed head (takedown pins, trigger/hammer pins). */
-export function addPin(asm: Assembly, mat: string, x: number, y: number, z: number, r = 0.0022, len = 0.02): void {
+export function addPin(
+  asm: Assembly,
+  mat: string,
+  x: number,
+  y: number,
+  z: number,
+  r = 0.0022,
+  len = 0.02
+): void {
   asm.add(rodZ(r, r, len, 12, 0.0004), mat, { x, y, z, ry: Math.PI / 2 });
   asm.add(dome(r * 1.25, 10, 0.5), mat, { x: x + len / 2, y, z, ry: -Math.PI / 2 });
   asm.add(dome(r * 1.25, 10, 0.5), mat, { x: x - len / 2, y, z, ry: Math.PI / 2 });
 }
 
 /** Hex-socket screw, head facing +axis. */
-export function addScrew(asm: Assembly, mat: string, x: number, y: number, z: number, rHead = 0.0022, axis: Axis = 'y', len = 0.008): void {
+export function addScrew(
+  asm: Assembly,
+  mat: string,
+  x: number,
+  y: number,
+  z: number,
+  rHead = 0.0022,
+  axis: Axis = 'y',
+  len = 0.008
+): void {
   const g = screw(rHead, rHead * 0.55, rHead * 0.5, len, 10);
   const rot = axis === 'y' ? { rx: Math.PI / 2 } : axis === 'x' ? { ry: -Math.PI / 2 } : {};
   asm.add(g, mat, { x, y, z, ...rot });
@@ -56,7 +92,16 @@ export function addScrew(asm: Assembly, mat: string, x: number, y: number, z: nu
 }
 
 /** QD sling swivel socket: a countersunk cup with a steel insert. */
-export function addQdSocket(asm: Assembly, matBody: string, matSteel: string, x: number, y: number, z: number, axis: Axis = 'x', r = 0.0055): void {
+export function addQdSocket(
+  asm: Assembly,
+  matBody: string,
+  matSteel: string,
+  x: number,
+  y: number,
+  z: number,
+  axis: Axis = 'x',
+  r = 0.0055
+): void {
   const cup = latheZ(
     [
       [0, r * 0.55],
@@ -83,14 +128,26 @@ export function addQdSocket(asm: Assembly, matBody: string, matSteel: string, x:
 }
 
 /** Fixed sling loop — a flat steel eye. */
-export function addSlingLoop(asm: Assembly, mat: string, x: number, y: number, z: number, radius = 0.008, rot: Rotation = {}): void {
+export function addSlingLoop(
+  asm: Assembly,
+  mat: string,
+  x: number,
+  y: number,
+  z: number,
+  radius = 0.008,
+  rot: Rotation = {}
+): void {
   const g = ring(radius, 0.0016, 14, 6);
   asm.add(g, mat, { x, y, z, ...rot });
   g.dispose();
 }
 
 /** A live cartridge: brass case, shoulder, neck, copper FMJ tip. */
-export function cartridge(caseLen = 0.0446, rimR = 0.00495, bulletLen = 0.019): { brass: THREE.BufferGeometry; bullet: THREE.BufferGeometry; length: number } {
+export function cartridge(
+  caseLen = 0.0446,
+  rimR = 0.00495,
+  bulletLen = 0.019
+): { brass: THREE.BufferGeometry; bullet: THREE.BufferGeometry; length: number } {
   const neckR = rimR * 0.72;
   const brass = latheZ(
     [
@@ -162,7 +219,12 @@ export function triggerPart(matSteel: string): { geo: THREE.BufferGeometry; mat:
  * Pistol grip with a palm swell, finger grooves, a beavertail and moulded
  * texture panels. Built along its own axis then rotated by `angle`.
  */
-export function addPistolGrip(asm: Assembly, matPoly: string, matRubber: string, o: PartOptions): void {
+export function addPistolGrip(
+  asm: Assembly,
+  matPoly: string,
+  matRubber: string,
+  o: PartOptions
+): void {
   const len = o.len ?? 0.108;
   const w = o.w ?? 0.031;
   const angle = o.angle ?? 0.38; // rake: positive tilts the BOTTOM rearward
@@ -248,7 +310,13 @@ export function addPistolGrip(asm: Assembly, matPoly: string, matRubber: string,
  * Collapsible carbine stock on a mil-spec receiver extension: 6 detent
  * positions, cheek weld, sling loop, adjustment lever and a rubber butt pad.
  */
-export function addCarbineStock(asm: Assembly, matAlu: string, matPoly: string, matRubber: string, o: CarbineStockOptions): void {
+export function addCarbineStock(
+  asm: Assembly,
+  matAlu: string,
+  matPoly: string,
+  matRubber: string,
+  o: CarbineStockOptions
+): void {
   const bore = o.bore;
   const zRear = o.zRear; // butt
   const zFront = o.zFront; // receiver face

@@ -22,27 +22,63 @@
  * correctly in one step.
  */
 
-import { makeHitRecord } from './math.ts';
 import type { StaticWorld } from './bvh.ts';
+import { makeHitRecord } from './math.ts';
 import { MASK, SURFACE_PROPS, surfaceName } from './surfaces.ts';
 
 interface CharacterOptions {
-  id?: string; owner?: unknown; radius?: number; height?: number; stepHeight?: number;
-  slopeLimit?: number; snapDistance?: number; mask?: number; maxIterations?: number;
+  id?: string;
+  owner?: unknown;
+  radius?: number;
+  height?: number;
+  stepHeight?: number;
+  slopeLimit?: number;
+  snapDistance?: number;
+  mask?: number;
+  maxIterations?: number;
   position?: { x: number; y: number; z: number };
 }
-interface CharacterVector { x: number; y: number; z: number }
+interface CharacterVector {
+  x: number;
+  y: number;
+  z: number;
+}
 
 const MAX_PLANES = 5;
 const SKIN = 0.008;
 
 export class CharacterController {
-  declare world: StaticWorld; declare id: string; declare owner: unknown;
-  declare radius: number; declare height: number; declare stepHeight: number; declare slopeLimit: number; declare snapDistance: number; declare mask: number; declare maxIterations: number;
-  declare position: CharacterVector; declare velocity: CharacterVector; declare groundNormal: CharacterVector; declare wallNormal: CharacterVector;
-  declare grounded: boolean; declare wasGrounded: boolean; declare groundSurface: number; declare groundDistance: number; declare groundObject: number;
-  declare onSteepSlope: boolean; declare touchingCeiling: boolean; declare touchingWall: boolean; declare lastMoveBlocked: boolean; declare steppedUp: number; declare landingSpeed: number; declare enabled: boolean;
-  declare _hit: ReturnType<typeof makeHitRecord>; declare _hit2: ReturnType<typeof makeHitRecord>; declare _planes: Float32Array; declare _planeCount: number; declare _startPos: CharacterVector;
+  declare world: StaticWorld;
+  declare id: string;
+  declare owner: unknown;
+  declare radius: number;
+  declare height: number;
+  declare stepHeight: number;
+  declare slopeLimit: number;
+  declare snapDistance: number;
+  declare mask: number;
+  declare maxIterations: number;
+  declare position: CharacterVector;
+  declare velocity: CharacterVector;
+  declare groundNormal: CharacterVector;
+  declare wallNormal: CharacterVector;
+  declare grounded: boolean;
+  declare wasGrounded: boolean;
+  declare groundSurface: number;
+  declare groundDistance: number;
+  declare groundObject: number;
+  declare onSteepSlope: boolean;
+  declare touchingCeiling: boolean;
+  declare touchingWall: boolean;
+  declare lastMoveBlocked: boolean;
+  declare steppedUp: number;
+  declare landingSpeed: number;
+  declare enabled: boolean;
+  declare _hit: ReturnType<typeof makeHitRecord>;
+  declare _hit2: ReturnType<typeof makeHitRecord>;
+  declare _planes: Float32Array;
+  declare _planeCount: number;
+  declare _startPos: CharacterVector;
 
   constructor(world: StaticWorld, opts: CharacterOptions = {}) {
     this.world = world;
@@ -135,9 +171,15 @@ export class CharacterController {
     const p1y = this.position.y + h - r;
     if (p1y < p0y) return true;
     const n = this.world.overlapCapsule(
-      this.position.x, p0y, this.position.z,
-      this.position.x, p1y, this.position.z,
-      r - 0.01, this.mask, 0
+      this.position.x,
+      p0y,
+      this.position.z,
+      this.position.x,
+      p1y,
+      this.position.z,
+      r - 0.01,
+      this.mask,
+      0
     );
     return n === 0;
   }
@@ -156,7 +198,9 @@ export class CharacterController {
   move(dx: number, dy: number, dz: number): number {
     if (!this.enabled) return 0;
     const st = this._startPos;
-    st.x = this.position.x; st.y = this.position.y; st.z = this.position.z;
+    st.x = this.position.x;
+    st.y = this.position.y;
+    st.z = this.position.z;
     this.wasGrounded = this.grounded;
     this.touchingCeiling = false;
     this.touchingWall = false;
@@ -167,8 +211,7 @@ export class CharacterController {
 
     const jumping = dy > 1e-6;
     const useStepOffset =
-      this.wasGrounded && !jumping && this.stepHeight > 1e-4 &&
-      (dx * dx + dz * dz) > 1e-10;
+      this.wasGrounded && !jumping && this.stepHeight > 1e-4 && dx * dx + dz * dz > 1e-10;
 
     if (!useStepOffset) {
       this._slide(dx, dy, dz);
@@ -213,14 +256,26 @@ export class CharacterController {
       const dist = Math.hypot(dx, dy, dz);
       if (dist < 1e-6) break;
       const inv = 1 / dist;
-      const ux = dx * inv, uy = dy * inv, uz = dz * inv;
+      const ux = dx * inv,
+        uy = dy * inv,
+        uz = dz * inv;
 
       const hit = this._hit;
       const r = this.radius;
       const ok = this.world.sweepCapsule(
-        this.position.x, this.p0y, this.position.z,
-        this.position.x, this.p1y, this.position.z,
-        r, ux, uy, uz, dist + SKIN, this.mask, hit
+        this.position.x,
+        this.p0y,
+        this.position.z,
+        this.position.x,
+        this.p1y,
+        this.position.z,
+        r,
+        ux,
+        uy,
+        uz,
+        dist + SKIN,
+        this.mask,
+        hit
       );
 
       if (!ok) {
@@ -238,9 +293,13 @@ export class CharacterController {
 
       // remaining motion
       const rem = dist - advance;
-      dx = ux * rem; dy = uy * rem; dz = uz * rem;
+      dx = ux * rem;
+      dy = uy * rem;
+      dz = uz * rem;
 
-      const nx = hit.nx, ny = hit.ny, nz = hit.nz;
+      const nx = hit.nx,
+        ny = hit.ny,
+        nz = hit.nz;
       this._classifyContact(nx, ny, nz, hit);
       // Note: steep contacts keep their vertical component on purpose. Zeroing
       // it (the usual "don't ramp up cliffs" hack) turns every stair nose into
@@ -257,45 +316,79 @@ export class CharacterController {
 
       // Clip against every plane collected so far; if a single-plane projection
       // still violates another plane, slide along the crease of the two.
-      let cx = dx, cy = dy, cz = dz;
+      let cx = dx,
+        cy = dy,
+        cz = dz;
       let resolved = false;
       for (let i = 0; i < planeCount && !resolved; i++) {
-        const px = planes[i * 3], py = planes[i * 3 + 1], pz = planes[i * 3 + 2];
+        const px = planes[i * 3],
+          py = planes[i * 3 + 1],
+          pz = planes[i * 3 + 2];
         if (dx * px + dy * py + dz * pz >= 0) continue;
-        let tx = dx, ty = dy, tz = dz;
+        let tx = dx,
+          ty = dy,
+          tz = dz;
         const into = tx * px + ty * py + tz * pz;
-        tx -= px * into; ty -= py * into; tz -= pz * into;
+        tx -= px * into;
+        ty -= py * into;
+        tz -= pz * into;
         let violates = -1;
         for (let j = 0; j < planeCount; j++) {
           if (j === i) continue;
-          const qx = planes[j * 3], qy = planes[j * 3 + 1], qz = planes[j * 3 + 2];
-          if (tx * qx + ty * qy + tz * qz < 0) { violates = j; break; }
+          const qx = planes[j * 3],
+            qy = planes[j * 3 + 1],
+            qz = planes[j * 3 + 2];
+          if (tx * qx + ty * qy + tz * qz < 0) {
+            violates = j;
+            break;
+          }
         }
         if (violates < 0) {
-          cx = tx; cy = ty; cz = tz;
+          cx = tx;
+          cy = ty;
+          cz = tz;
           resolved = true;
         } else {
           // crease: travel along the intersection of the two planes
-          const qx = planes[violates * 3], qy = planes[violates * 3 + 1], qz = planes[violates * 3 + 2];
+          const qx = planes[violates * 3],
+            qy = planes[violates * 3 + 1],
+            qz = planes[violates * 3 + 2];
           let ex = py * qz - pz * qy;
           let ey = pz * qx - px * qz;
           let ez = px * qy - py * qx;
           const el = Math.hypot(ex, ey, ez);
-          if (el < 1e-6) { cx = cy = cz = 0; resolved = true; break; }
-          ex /= el; ey /= el; ez /= el;
+          if (el < 1e-6) {
+            cx = cy = cz = 0;
+            resolved = true;
+            break;
+          }
+          ex /= el;
+          ey /= el;
+          ez /= el;
           const along = dx * ex + dy * ey + dz * ez;
-          cx = ex * along; cy = ey * along; cz = ez * along;
+          cx = ex * along;
+          cy = ey * along;
+          cz = ez * along;
           // Reject if the crease direction is blocked by a third plane.
           let bad = false;
           for (let j = 0; j < planeCount; j++) {
-            const rx = planes[j * 3], ry = planes[j * 3 + 1], rz = planes[j * 3 + 2];
-            if (cx * rx + cy * ry + cz * rz < -1e-6) { bad = true; break; }
+            const rx = planes[j * 3],
+              ry = planes[j * 3 + 1],
+              rz = planes[j * 3 + 2];
+            if (cx * rx + cy * ry + cz * rz < -1e-6) {
+              bad = true;
+              break;
+            }
           }
-          if (bad) { cx = cy = cz = 0; }
+          if (bad) {
+            cx = cy = cz = 0;
+          }
           resolved = true;
         }
       }
-      dx = cx; dy = cy; dz = cz;
+      dx = cx;
+      dy = cy;
+      dz = cz;
 
       // Clip the caller's velocity the same way so accumulated speed doesn't
       // survive a wall impact.
@@ -308,10 +401,17 @@ export class CharacterController {
     return blocked;
   }
 
-  _classifyContact(nx: number, ny: number, nz: number, hit: ReturnType<typeof makeHitRecord>): void {
+  _classifyContact(
+    nx: number,
+    ny: number,
+    nz: number,
+    hit: ReturnType<typeof makeHitRecord>
+  ): void {
     if (ny >= this.cosSlope) {
       this.grounded = true;
-      this.groundNormal.x = nx; this.groundNormal.y = ny; this.groundNormal.z = nz;
+      this.groundNormal.x = nx;
+      this.groundNormal.y = ny;
+      this.groundNormal.z = nz;
       this.groundSurface = hit.surface;
       this.groundObject = hit.object;
       this.onSteepSlope = false;
@@ -319,7 +419,9 @@ export class CharacterController {
       this.touchingCeiling = true;
     } else {
       this.touchingWall = true;
-      this.wallNormal.x = nx; this.wallNormal.y = ny; this.wallNormal.z = nz;
+      this.wallNormal.x = nx;
+      this.wallNormal.y = ny;
+      this.wallNormal.z = nz;
       if (ny > 0.05) this.onSteepSlope = true;
     }
   }
@@ -339,12 +441,24 @@ export class CharacterController {
     const dist = Math.hypot(dx, dy, dz);
     if (dist < 1e-7) return 0;
     const inv = 1 / dist;
-    const ux = dx * inv, uy = dy * inv, uz = dz * inv;
+    const ux = dx * inv,
+      uy = dy * inv,
+      uz = dz * inv;
     const hit = this._hit2;
     const ok = this.world.sweepCapsule(
-      this.position.x, this.p0y, this.position.z,
-      this.position.x, this.p1y, this.position.z,
-      this.radius, ux, uy, uz, dist + SKIN, this.mask, hit
+      this.position.x,
+      this.p0y,
+      this.position.z,
+      this.position.x,
+      this.p1y,
+      this.position.z,
+      this.radius,
+      ux,
+      uy,
+      uz,
+      dist + SKIN,
+      this.mask,
+      hit
     );
     const adv = ok ? Math.max(0, Math.min(hit.t - SKIN, dist)) : dist;
     this.position.x += ux * adv;
@@ -364,9 +478,19 @@ export class CharacterController {
     const hit = this._hit2;
     const r = this.radius * radiusScale;
     const ok = this.world.sweepCapsule(
-      this.position.x, this.position.y + r, this.position.z,
-      this.position.x, this.position.y + this.height - r, this.position.z,
-      r, 0, -1, 0, dist + SKIN, this.mask, hit
+      this.position.x,
+      this.position.y + r,
+      this.position.z,
+      this.position.x,
+      this.position.y + this.height - r,
+      this.position.z,
+      r,
+      0,
+      -1,
+      0,
+      dist + SKIN,
+      this.mask,
+      hit
     );
     if (!ok) return -1;
     const adv = Math.max(0, Math.min(hit.t - SKIN, dist));
@@ -381,19 +505,29 @@ export class CharacterController {
     let moved = 0;
     for (let it = 0; it < iterations; it++) {
       const n = w.overlapCapsule(
-        this.position.x, this.p0y, this.position.z,
-        this.position.x, this.p1y, this.position.z,
-        this.radius, this.mask, 0
+        this.position.x,
+        this.p0y,
+        this.position.z,
+        this.position.x,
+        this.p1y,
+        this.position.z,
+        this.radius,
+        this.mask,
+        0
       );
       if (n === 0) break;
       const c = w.contacts;
       // Accumulate the maximum push along each distinct normal rather than the
       // sum — summing over a tessellated wall ejects the capsule across the map.
-      let px = 0, py = 0, pz = 0;
+      let px = 0,
+        py = 0,
+        pz = 0;
       for (let i = 0; i < n; i++) {
         const d = c.depth[i];
         if (d <= 1e-5) continue;
-        const nx = c.nx[i], ny = c.ny[i], nz = c.nz[i];
+        const nx = c.nx[i],
+          ny = c.ny[i],
+          nz = c.nz[i];
         const already = px * nx + py * ny + pz * nz;
         const extra = d - already;
         if (extra > 0) {
@@ -434,17 +568,37 @@ export class CharacterController {
     const w = this.world;
 
     const thin = w.sweepCapsule(
-      this.position.x, this.position.y + this.radius * 0.6, this.position.z,
-      this.position.x, this.position.y + this.height - this.radius * 0.6, this.position.z,
-      this.radius * 0.6, 0, -1, 0, probe, this.mask, hit
+      this.position.x,
+      this.position.y + this.radius * 0.6,
+      this.position.z,
+      this.position.x,
+      this.position.y + this.height - this.radius * 0.6,
+      this.position.z,
+      this.radius * 0.6,
+      0,
+      -1,
+      0,
+      probe,
+      this.mask,
+      hit
     );
 
     let found = thin && hit.ny >= cos;
     if (!found) {
       const wide = w.sweepCapsule(
-        this.position.x, this.p0y, this.position.z,
-        this.position.x, this.p1y, this.position.z,
-        this.radius * 0.98, 0, -1, 0, probe, this.mask, hit
+        this.position.x,
+        this.p0y,
+        this.position.z,
+        this.position.x,
+        this.p1y,
+        this.position.z,
+        this.radius * 0.98,
+        0,
+        -1,
+        0,
+        probe,
+        this.mask,
+        hit
       );
       // A surface with any meaningful upward component supports us even if it
       // is too steep to be "walkable" — that is what a stair nose is.
@@ -474,11 +628,22 @@ export class CharacterController {
 
     // Ceiling probe — the movement machine needs this to cancel a jump.
     const ch = this._hit2;
-    this.touchingCeiling = this.world.sweepCapsule(
-      this.position.x, this.p0y, this.position.z,
-      this.position.x, this.p1y, this.position.z,
-      this.radius * 0.98, 0, 1, 0, 0.06, this.mask, ch
-    ) && ch.ny < -0.4;
+    this.touchingCeiling =
+      this.world.sweepCapsule(
+        this.position.x,
+        this.p0y,
+        this.position.z,
+        this.position.x,
+        this.p1y,
+        this.position.z,
+        this.radius * 0.98,
+        0,
+        1,
+        0,
+        0.06,
+        this.mask,
+        ch
+      ) && ch.ny < -0.4;
 
     return this.grounded;
   }
@@ -499,9 +664,15 @@ export class CharacterController {
   checkCapsule(x: number, y: number, z: number, height = this.height): boolean {
     return (
       this.world.overlapCapsule(
-        x, y + this.radius, z,
-        x, y + height - this.radius, z,
-        this.radius - 0.005, this.mask, 0
+        x,
+        y + this.radius,
+        z,
+        x,
+        y + height - this.radius,
+        z,
+        this.radius - 0.005,
+        this.mask,
+        0
       ) === 0
     );
   }

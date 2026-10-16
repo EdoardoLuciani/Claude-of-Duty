@@ -1,16 +1,23 @@
 import assert from 'node:assert/strict';
-import * as THREE from 'three';
-import { setCaseScale } from '../../src/fx/shells.ts';
-import { WEAPON_DEFS, WEAPON_IDS, PRIMARY_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
-import { Rng } from '../../src/core/rng.ts';
-import { WeaponSystem } from '../../src/weapons/index.ts';
 import { readFileSync } from 'node:fs';
+
+import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { makeAX338Model, AX338Animation, AX338_URL } from '../../src/weapons/ax338.ts';
-import { Viewmodel } from '../../src/weapons/viewmodel.ts';
-import { ProjectileSim } from '../../src/weapons/ballistics.ts';
-import { PhysicsSystem } from '../../src/physics/index.ts';
+
 import { EventBus } from '../../src/core/registry.ts';
+import { Rng } from '../../src/core/rng.ts';
+import { setCaseScale } from '../../src/fx/shells.ts';
+import { PhysicsSystem } from '../../src/physics/index.ts';
+import { makeAX338Model, AX338Animation, AX338_URL } from '../../src/weapons/ax338.ts';
+import { ProjectileSim } from '../../src/weapons/ballistics.ts';
+import {
+  WEAPON_DEFS,
+  WEAPON_IDS,
+  PRIMARY_IDS,
+  buildRecoilPattern,
+} from '../../src/weapons/defs.ts';
+import { WeaponSystem } from '../../src/weapons/index.ts';
+import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 
 assert(WEAPON_IDS.includes('sniper'));
 assert.deepEqual(PRIMARY_IDS, ['rifle', 'lmg', 'sniper', 'mcx']);
@@ -30,8 +37,16 @@ assert(recoil.every(Number.isFinite));
 assert(recoil.every((n, i) => i % 2 || n > 0));
 
 const bytes = readFileSync(new URL(AX338_URL));
-const loader = new GLTFLoader().register(() => ({ name: 'SMOKE_TEXTURE', loadTexture: () => Promise.resolve(new THREE.Texture()) }));
-const model = makeAX338Model(await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), ''));
+const loader = new GLTFLoader().register(() => ({
+  name: 'SMOKE_TEXTURE',
+  loadTexture: () => Promise.resolve(new THREE.Texture()),
+}));
+const model = makeAX338Model(
+  await loader.parseAsync(
+    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+    ''
+  )
+);
 const animation = new AX338Animation(model);
 assert.equal(model.id, 'sniper');
 assert.equal(model.nodes.opticGlass.kind, 'scope');
@@ -50,9 +65,12 @@ assert.equal(clips.cycle.duration, def.boltTime);
 
 const scopedWeapon = { optic: { kind: 'scope' }, group: { visible: true } };
 const scopeVm = {
-  active: scopedWeapon, _grenadeState: 0, _radioState: 0,
+  active: scopedWeapon,
+  _grenadeState: 0,
+  _radioState: 0,
   scopeOverlay: { visible: false },
-  armL: { root: { visible: true } }, armR: { root: { visible: true } },
+  armL: { root: { visible: true } },
+  armR: { root: { visible: true } },
 };
 Viewmodel.prototype._updateScope.call(scopeVm, scopedWeapon, 1);
 assert(!scopeVm.armL.root.visible && !scopeVm.armR.root.visible, 'scope hides arms');
@@ -70,19 +88,37 @@ const vm = {
   adsT: 0,
   adsTarget: 0,
   active: 'rifle',
-  setActive(id) { this.active = id; return id; },
-  play(name) { this.clip = { name, duration: 1 }; this.clipName = name; this.clipT = 0; return 1; },
-  stopClip() { this.clip = null; this.clipName = null; this.clipT = 0; },
+  setActive(id) {
+    this.active = id;
+    return id;
+  },
+  play(name) {
+    this.clip = { name, duration: 1 };
+    this.clipName = name;
+    this.clipT = 0;
+    return 1;
+  },
+  stopClip() {
+    this.clip = null;
+    this.clipName = null;
+    this.clipT = 0;
+  },
   endGrenade() {},
   endRadio() {},
-  muzzleWorld() { return { x: 0, y: 0, z: 0 }; },
+  muzzleWorld() {
+    return { x: 0, y: 0, z: 0 };
+  },
   addRecoil() {},
 };
 
 const wp = new WeaponSystem();
 wp.ctx = {
   time: { elapsed: 0, scale: 1 },
-  camera: { position: new THREE.Vector3(), quaternion: new THREE.Quaternion(), updateMatrixWorld() {} },
+  camera: {
+    position: new THREE.Vector3(),
+    quaternion: new THREE.Quaternion(),
+    updateMatrixWorld() {},
+  },
   config: { adsFovScale: 0.62, adsSensScale: 0.62 },
 };
 wp.rng = new Rng(0x3381a9);
@@ -148,20 +184,32 @@ assert.notEqual(vm.clipName, 'cycle');
 
 let resolved;
 const actor = { id: 9 };
-const physics = new PhysicsSystem(), dealt = [];
+const physics = new PhysicsSystem(),
+  dealt = [];
 const events = new EventBus();
-events.on('shot:resolved', e => { resolved = { ...e, to: e.to.clone() }; });
-events.on('damage:dealt', e => dealt.push({ ...e, point: e.point.clone(), from: e.from.clone() }));
+events.on('shot:resolved', (e) => {
+  resolved = { ...e, to: e.to.clone() };
+});
+events.on('damage:dealt', (e) =>
+  dealt.push({ ...e, point: e.point.clone(), from: e.from.clone() })
+);
 physics.ctx = { events, time: { elapsed: 0 } };
-const cover = physics.addCollider({ shape: 'box', surface: 'wood', hx: .025, hy: 1, hz: 1 });
+const cover = physics.addCollider({ shape: 'box', surface: 'wood', hx: 0.025, hy: 1, hz: 1 });
 cover.setMatrix(new THREE.Matrix4().makeTranslation(1, 0, 0));
-const target = physics.addCollider({ owner: actor, part: 'torso', surface: 'flesh', radius: .1 });
-target.setSegment(2, -.5, 0, 2, .5, 0, .1);
-const stop = physics.addCollider({ shape: 'box', surface: 'concrete', hx: .1, hy: 1, hz: 1 });
+const target = physics.addCollider({ owner: actor, part: 'torso', surface: 'flesh', radius: 0.1 });
+target.setSegment(2, -0.5, 0, 2, 0.5, 0, 0.1);
+const stop = physics.addCollider({ shape: 'box', surface: 'concrete', hx: 0.1, hy: 1, hz: 1 });
 stop.setMatrix(new THREE.Matrix4().makeTranslation(3, 0, 0));
 const sim = new ProjectileSim({ peek: () => physics, has: () => true, events });
-sim.spawn({ origin: new THREE.Vector3(), dir: new THREE.Vector3(1, 0, 0),
-  speed: 100, damage: 20, penetration: 2, maxRange: 20, weapon: def });
+sim.spawn({
+  origin: new THREE.Vector3(),
+  dir: new THREE.Vector3(1, 0, 0),
+  speed: 100,
+  damage: 20,
+  penetration: 2,
+  maxRange: 20,
+  weapon: def,
+});
 for (let i = 0; i < 120 && sim.live.length; i++) sim.fixedUpdate(1 / 120);
 assert.equal(resolved.target, actor, 'telemetry resolves a penetrating actor hit');
 assert.equal(resolved.part, 'torso');

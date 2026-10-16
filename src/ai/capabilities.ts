@@ -16,13 +16,13 @@ export const INFANTRY = Object.freeze({
   recoveryTimeout: 3,
   recoveryAttempts: 3,
   recoveryResetDistance: 3.6,
-  avoidanceYieldAfter: .2,
-  avoidanceYieldScale: .2,
+  avoidanceYieldAfter: 0.2,
+  avoidanceYieldScale: 0.2,
   vaultDistance: 1.5,
   vaultDuration: 0.8,
   vaultRise: 0.42,
   slopeDegrees,
-  slopeRadians: slopeDegrees * Math.PI / 180,
+  slopeRadians: (slopeDegrees * Math.PI) / 180,
 });
 
 // Shared by the detached feasibility probe and live collision-swept execution.

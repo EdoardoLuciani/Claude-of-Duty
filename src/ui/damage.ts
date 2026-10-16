@@ -1,5 +1,5 @@
-import { el, svg, setStyle, Pool, ease, clamp01 } from './util.ts';
 import type { ElementPool, PoolRecord } from './pool-types.ts';
+import { el, svg, setStyle, Pool, ease, clamp01 } from './util.ts';
 
 const SEG = 7;
 const SEG_STEP = 8.2; // degrees between segment centres

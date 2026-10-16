@@ -5,12 +5,24 @@ import { el, damp, ease, setStyle } from './util.ts';
  * crane before becoming interactive; simulation keeps running underneath, so
  * the ragdoll and final shot never freeze halfway through.
  */
-interface RunSummary { score?: number; wave?: number }
+interface RunSummary {
+  score?: number;
+  wave?: number;
+}
 export class GameOverScreen {
-  declare ctx: unknown; declare onRestart: (() => void) | null; declare root: HTMLElement; declare eyebrow: HTMLElement;
-  declare title: HTMLElement; declare summary: HTMLElement; declare button: HTMLButtonElement;
-  declare active: boolean; declare elapsed: number; declare shown: number; declare delay: number;
-  declare _click: () => void; declare _key: (event: KeyboardEvent) => void;
+  declare ctx: unknown;
+  declare onRestart: (() => void) | null;
+  declare root: HTMLElement;
+  declare eyebrow: HTMLElement;
+  declare title: HTMLElement;
+  declare summary: HTMLElement;
+  declare button: HTMLButtonElement;
+  declare active: boolean;
+  declare elapsed: number;
+  declare shown: number;
+  declare delay: number;
+  declare _click: () => void;
+  declare _key: (event: KeyboardEvent) => void;
   constructor(parent: HTMLElement, ctx: unknown, onRestart: (() => void) | null) {
     this.ctx = ctx;
     this.onRestart = onRestart;

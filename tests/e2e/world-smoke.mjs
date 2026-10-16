@@ -1,8 +1,13 @@
 #!/usr/bin/env node
-import { waitForGame } from '../../tools/lib/native-render.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { ensureViteServer, launchChromium, stopViteServer } from '../../tools/lib/browser-harness.mjs';
+
+import {
+  ensureViteServer,
+  launchChromium,
+  stopViteServer,
+} from '../../tools/lib/browser-harness.mjs';
+import { waitForGame } from '../../tools/lib/native-render.mjs';
 
 const port = Number(process.env.PORT ?? 5173);
 const server = await ensureViteServer({ port, attempts: 120 });
@@ -17,18 +22,27 @@ page.on('console', (message) => message.type() === 'error' && errors.push(messag
 
 try {
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`, {
-    waitUntil: 'domcontentloaded', timeout: 90000,
+    waitUntil: 'domcontentloaded',
+    timeout: 90000,
   });
   await waitForGame(page, { timeout: 90000 });
-  const expected = JSON.parse(readFileSync(new URL('../../public/models/world/level.json', import.meta.url)));
-  const assets = await page.evaluate(async () => (await window.__ENGINE__.ctx.get('models').worldPrefetch).meta.assets);
+  const expected = JSON.parse(
+    readFileSync(new URL('../../public/models/world/level.json', import.meta.url))
+  );
+  const assets = await page.evaluate(
+    async () => (await window.__ENGINE__.ctx.get('models').worldPrefetch).meta.assets
+  );
   assert.deepEqual(assets, expected.assets, 'world smoke must exercise this checkout’s assets');
   const result = await page.evaluate(() => {
     const engine = window.__ENGINE__;
     const world = engine.ctx.get('world');
     const physics = engine.ctx.get('physics');
     const spawns = world.spawnPoints.map((spawn) => {
-      const ground = physics.groundHeight(spawn.position.x, spawn.position.z, spawn.position.y + 0.5);
+      const ground = physics.groundHeight(
+        spawn.position.x,
+        spawn.position.z,
+        spawn.position.y + 0.5
+      );
       return {
         tag: spawn.tag,
         ground,
@@ -40,7 +54,8 @@ try {
 
     // Wave jitter used to land inside the gate/stalls and fall through the street.
     const ai = engine.ctx.get('ai');
-    let pickFail = 0, pickUnder = 0;
+    let pickFail = 0,
+      pickUnder = 0;
     for (const spawn of world.spawnPoints) {
       for (let i = 0; i < 24; i++) {
         const p = ai._pickSpawnNear(spawn);
@@ -99,11 +114,15 @@ try {
         const inside = world.levelToWorld(...opening.to);
         // Stay on the authored floor: the old +2 m ray incorrectly selected the
         // W2 shop counter top instead of testing its obstructed ground target.
-        const ground = physics.groundHeight(inside.x, inside.z, inside.y + .5);
+        const ground = physics.groundHeight(inside.x, inside.z, inside.y + 0.5);
         inside.y = ground;
         const walkable = !!ai.grid.project(inside, inside, null, true);
         const expected = !(building.spec.id === 'W2' && opening.kind === 'shop' && index === 0);
-        aiOpenings.push({ name: `${building.spec.id} ${opening.kind} ${index}`, walkable, expected });
+        aiOpenings.push({
+          name: `${building.spec.id} ${opening.kind} ${index}`,
+          walkable,
+          expected,
+        });
       }
     }
 
@@ -122,12 +141,15 @@ try {
   });
 
   const failures = [...errors];
-  if (result.stats.drawCalls !== 211 || result.stats.instances !== 7802) failures.push('world draw/instance budget changed');
+  if (result.stats.drawCalls !== 211 || result.stats.instances !== 7802)
+    failures.push('world draw/instance budget changed');
   if (result.physicsTris < 300000 || result.physicsTris > 340000) {
     failures.push(`physics triangle budget changed: ${result.physicsTris}`);
   }
-  if (result.buildings !== 20 || result.bulbs !== 15 || result.lamps !== 5) failures.push('manifest marker counts changed');
-  if (result.roundTripError > 1e-5) failures.push(`level transform round-trip error ${result.roundTripError}`);
+  if (result.buildings !== 20 || result.bulbs !== 15 || result.lamps !== 5)
+    failures.push('manifest marker counts changed');
+  if (result.roundTripError > 1e-5)
+    failures.push(`level transform round-trip error ${result.roundTripError}`);
   for (const spawn of result.spawns) {
     if (!Number.isFinite(spawn.ground) || spawn.delta > 0.5) {
       failures.push(`spawn ${spawn.tag} has invalid ground/collision`);
@@ -140,7 +162,10 @@ try {
     if (!door.passed) failures.push(`${door.name} blocked at ${door.progress.toFixed(2)} m`);
   }
   for (const opening of result.aiOpenings) {
-    if (opening.walkable !== opening.expected) failures.push(`${opening.name} physical attachment was ${opening.walkable}, expected ${opening.expected}`);
+    if (opening.walkable !== opening.expected)
+      failures.push(
+        `${opening.name} physical attachment was ${opening.walkable}, expected ${opening.expected}`
+      );
   }
   console.log(JSON.stringify({ ok: failures.length === 0, ...result, errors: failures }, null, 2));
   if (failures.length) process.exitCode = 1;

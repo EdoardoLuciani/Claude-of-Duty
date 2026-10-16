@@ -1,7 +1,7 @@
-import { el, svg, setStyle, Pool, ease, clamp01 } from './util.ts';
 import type { ElementPool, PoolRecord } from './pool-types.ts';
+import { el, svg, setStyle, Pool, ease, clamp01 } from './util.ts';
 
-const R_IN = 13;  // well outside the reticle blades, so the two never merge
+const R_IN = 13; // well outside the reticle blades, so the two never merge
 const R_OUT = 28.5;
 const D = Math.SQRT1_2;
 

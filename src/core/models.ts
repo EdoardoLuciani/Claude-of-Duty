@@ -23,10 +23,29 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
 import type { EngineContext } from './context.ts';
-import { parseWeaponMetadata, parseSoldierMetadata, parseWorldManifest, parseWorldAssets } from './model-metadata.ts';
+import {
+  parseWeaponMetadata,
+  parseSoldierMetadata,
+  parseWorldManifest,
+  parseWorldAssets,
+} from './model-metadata.ts';
 import type { WeaponRecord, SoldierRecord, WorldPrefetch } from './model-metadata.ts';
-export type { WeaponRecord, WeaponMetadata, WeaponNodes, SoldierRecord, SoldierMetadata, SoldierWeapon, SoldierVariant, WorldManifest, WorldPrefetch, WorldBuilding, WorldLadder, ModelVec3 } from './model-metadata.ts';
+export type {
+  WeaponRecord,
+  WeaponMetadata,
+  WeaponNodes,
+  SoldierRecord,
+  SoldierMetadata,
+  SoldierWeapon,
+  SoldierVariant,
+  WorldManifest,
+  WorldPrefetch,
+  WorldBuilding,
+  WorldLadder,
+  ModelVec3,
+} from './model-metadata.ts';
 
 const BASE = 'models';
 
@@ -37,8 +56,12 @@ function watch<T>(promise: Promise<T>): Promise<T> {
 }
 
 export class ModelSystem {
-  declare ctx: EngineContext; declare loader: GLTFLoader; declare _weapons: Map<string, Promise<WeaponRecord>>;
-  declare _soldiers: Map<string, Promise<SoldierRecord>>; declare worldPrefetch: Promise<WorldPrefetch>; declare worldNav: ArrayBuffer;
+  declare ctx: EngineContext;
+  declare loader: GLTFLoader;
+  declare _weapons: Map<string, Promise<WeaponRecord>>;
+  declare _soldiers: Map<string, Promise<SoldierRecord>>;
+  declare worldPrefetch: Promise<WorldPrefetch>;
+  declare worldNav: ArrayBuffer;
 
   static id = 'models';
   static deps = [];
@@ -82,7 +105,9 @@ export class ModelSystem {
     }
     return alreadyDecoded
       ? await response.arrayBuffer()
-      : await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+      : await new Response(
+          response.body.pipeThrough(new DecompressionStream('gzip'))
+        ).arrayBuffer();
   }
 
   async _loadWorldGLB(url: string): Promise<GLTF> {
@@ -93,7 +118,8 @@ export class ModelSystem {
   async _loadGLB(url: string): Promise<GLTF> {
     return new Promise<GLTF>((resolve, reject) => {
       this.loader.load(url, resolve, undefined, (err: unknown) => {
-        const message = typeof err === 'object' && err !== null && 'message' in err ? err.message : err;
+        const message =
+          typeof err === 'object' && err !== null && 'message' in err ? err.message : err;
         reject(new Error(`[models] failed to load ${url}: ${String(message ?? err)}`));
       });
     });

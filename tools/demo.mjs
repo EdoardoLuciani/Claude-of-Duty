@@ -22,6 +22,7 @@
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
+
 import {
   ensureViteServer,
   launchChromium,
@@ -93,10 +94,10 @@ try {
   const installed = await page.evaluate(readFileSync(join(ROOT, 'tools/demo-driver.js'), 'utf8'));
   log('[demo] driver:', JSON.stringify(installed));
 
-  const begun = await page.evaluate(
-    (o) => window.__DEMO__.begin(o),
-    { frames: FRAMES, time: TIME_OF_DAY }
-  );
+  const begun = await page.evaluate((o) => window.__DEMO__.begin(o), {
+    frames: FRAMES,
+    time: TIME_OF_DAY,
+  });
   log('[demo] begin:', JSON.stringify(begun));
 
   const pad = (n) => String(n).padStart(5, '0');
@@ -177,14 +178,22 @@ const FADE = 0.5;
 const durSec = nFrames / FPS;
 ff([
   '-y',
-  '-framerate', String(FPS),
-  '-i', join(TMP, 'f%05d.jpg'),
-  '-vf', `fade=t=in:st=0:d=${FADE},fade=t=out:st=${(durSec - FADE).toFixed(3)}:d=${FADE}`,
-  '-c:v', 'libx264',
-  '-preset', 'slow',
-  '-crf', '18',
-  '-pix_fmt', 'yuv420p',
-  '-movflags', '+faststart',
+  '-framerate',
+  String(FPS),
+  '-i',
+  join(TMP, 'f%05d.jpg'),
+  '-vf',
+  `fade=t=in:st=0:d=${FADE},fade=t=out:st=${(durSec - FADE).toFixed(3)}:d=${FADE}`,
+  '-c:v',
+  'libx264',
+  '-preset',
+  'slow',
+  '-crf',
+  '18',
+  '-pix_fmt',
+  'yuv420p',
+  '-movflags',
+  '+faststart',
   silent,
 ]);
 log(`[demo] video -> ${silent}`);
@@ -197,8 +206,13 @@ if (args['no-audio']) {
 } else {
   const r = spawnSync(
     process.execPath,
-    [join(ROOT, 'tools/demo-audio.mjs'), `--events=${join(TMP, 'events.json')}`,
-     `--frames=${nFrames}`, `--fps=${FPS}`, `--out=${join(TMP, 'track.wav')}`],
+    [
+      join(ROOT, 'tools/demo-audio.mjs'),
+      `--events=${join(TMP, 'events.json')}`,
+      `--frames=${nFrames}`,
+      `--fps=${FPS}`,
+      `--out=${join(TMP, 'track.wav')}`,
+    ],
     { stdio: 'inherit' }
   );
   if (r.status !== 0) {
@@ -206,9 +220,12 @@ if (args['no-audio']) {
   } else {
     ff([
       '-y',
-      '-i', silent,
-      '-i', join(TMP, 'track.wav'),
-      '-c:v', 'copy',
+      '-i',
+      silent,
+      '-i',
+      join(TMP, 'track.wav'),
+      '-c:v',
+      'copy',
       // loudnorm first: the raw synthesized track measures about -22 LUFS, which
       // is ~8 dB under what anything that plays this back will expect, so it came
       // out sounding thin. Then match the picture fades. The track is deliberately
@@ -224,9 +241,13 @@ if (args['no-audio']) {
       // track is ~1900 transients in 40 s, and at 256k the encoder's quantization
       // ringing overshot the limiter by 2 dB, decoding to +0.97 dBFS. At 320k the
       // same limiter setting decodes to -0.98 dBFS.
-      '-c:a', 'aac', '-b:a', '320k',
+      '-c:a',
+      'aac',
+      '-b:a',
+      '320k',
       '-shortest',
-      '-movflags', '+faststart',
+      '-movflags',
+      '+faststart',
       OUT,
     ]);
     rmSync(silent, { force: true });
@@ -237,9 +258,15 @@ if (args['no-audio']) {
 if (!args.keep) rmSync(TMP, { recursive: true, force: true });
 
 const probe = spawnSync('ffprobe', [
-  '-v', 'error', '-show_entries', 'format=duration,size',
-  '-show_entries', 'stream=codec_name,width,height,r_frame_rate',
-  '-of', 'default=nw=1', finalOut,
+  '-v',
+  'error',
+  '-show_entries',
+  'format=duration,size',
+  '-show_entries',
+  'stream=codec_name,width,height,r_frame_rate',
+  '-of',
+  'default=nw=1',
+  finalOut,
 ]);
 log('\n[demo] DONE ->', finalOut);
 log(probe.stdout?.toString().trim());

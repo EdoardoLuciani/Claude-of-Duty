@@ -1,5 +1,5 @@
-import { el, svg, setText, setStyle, setClass, Pool, ease, clamp01 } from './util.ts';
 import type { ElementPool, PoolRecord } from './pool-types.ts';
+import { el, svg, setText, setStyle, setClass, Pool, ease, clamp01 } from './util.ts';
 
 function rifleIcon(parent: HTMLElement): SVGSVGElement {
   const s = svg('svg', { viewBox: '0 0 28 11', fill: 'rgba(240,246,250,.9)' }, parent);
@@ -15,7 +15,13 @@ function rifleIcon(parent: HTMLElement): SVGSVGElement {
 
 function skullIcon(parent: HTMLElement): SVGSVGElement {
   const s = svg('svg', { viewBox: '0 0 11 11', fill: 'rgba(255,194,71,.95)' }, parent);
-  svg('path', { d: 'M5.5.8c2.4 0 4.1 1.7 4.1 4 0 1.5-.7 2.4-1.5 3v1.3H3v-1.3c-.9-.6-1.6-1.5-1.6-3 0-2.3 1.7-4 4.1-4z' }, s);
+  svg(
+    'path',
+    {
+      d: 'M5.5.8c2.4 0 4.1 1.7 4.1 4 0 1.5-.7 2.4-1.5 3v1.3H3v-1.3c-.9-.6-1.6-1.5-1.6-3 0-2.3 1.7-4 4.1-4z',
+    },
+    s
+  );
   svg('circle', { cx: 3.9, cy: 4.6, r: 1.15, fill: 'rgba(10,12,14,.9)' }, s);
   svg('circle', { cx: 7.1, cy: 4.6, r: 1.15, fill: 'rgba(10,12,14,.9)' }, s);
   svg('rect', { x: 5.05, y: 6.1, width: 0.9, height: 1.3, fill: 'rgba(10,12,14,.9)' }, s);

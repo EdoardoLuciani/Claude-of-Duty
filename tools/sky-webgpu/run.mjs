@@ -17,21 +17,33 @@
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+
 import { ensureViteServer, launchChromium, stopViteServer } from '../lib/browser-harness.mjs';
 
 const cache = join(process.env.HOME ?? '', '.cache/ms-playwright');
-const executablePath = process.env.CHROMIUM_PATH ?? (existsSync(cache) ?
-  readdirSync(cache).filter((name) => /^chromium-\d+$/.test(name))
-    .sort((a, b) => Number(b.slice(9)) - Number(a.slice(9)))
-    .map((name) => join(cache, name, 'chrome-linux64/chrome')).find(existsSync) : null);
+const executablePath =
+  process.env.CHROMIUM_PATH ??
+  (existsSync(cache)
+    ? readdirSync(cache)
+        .filter((name) => /^chromium-\d+$/.test(name))
+        .sort((a, b) => Number(b.slice(9)) - Number(a.slice(9)))
+        .map((name) => join(cache, name, 'chrome-linux64/chrome'))
+        .find(existsSync)
+    : null);
 if (!executablePath) throw new Error('Full Chromium required for hardware WebGPU testing');
 
 const port = 5199;
 const server = await ensureViteServer({ port, root: process.cwd() });
 const browser = await launchChromium({
-  executablePath, headless: true,
-  args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=vulkan',
-    '--ignore-gpu-blocklist', '--mute-audio'],
+  executablePath,
+  headless: true,
+  args: [
+    '--enable-unsafe-webgpu',
+    '--enable-features=Vulkan',
+    '--use-angle=vulkan',
+    '--ignore-gpu-blocklist',
+    '--mute-audio',
+  ],
 });
 
 // The page already decodes half-float targets to numbers; this just normalises.
@@ -42,12 +54,17 @@ try {
   const page = await browser.newPage({ viewport: { width: 320, height: 180 } });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text());
+  });
   await page.goto(`http://127.0.0.1:${port}/tools/sky-webgpu/index.html`);
   await page.waitForFunction(() => window.__SKY_WEBGPU__ !== undefined, null, { timeout: 120000 });
-  const boot = await page.evaluate(() => ({ ok: window.__SKY_WEBGPU__.ok,
-    error: window.__SKY_WEBGPU__.error, stack: window.__SKY_WEBGPU__.stack,
-    backend: window.__SKY_WEBGPU__.backend }));
+  const boot = await page.evaluate(() => ({
+    ok: window.__SKY_WEBGPU__.ok,
+    error: window.__SKY_WEBGPU__.error,
+    stack: window.__SKY_WEBGPU__.stack,
+    backend: window.__SKY_WEBGPU__.backend,
+  }));
   assert.equal(boot.ok, true, `${boot.error}\n${boot.stack ?? ''}`);
   assert.equal(boot.backend, 'WebGPUBackend');
 
@@ -64,24 +81,32 @@ try {
   const cloudFrame = await page.evaluate(() => window.__SKY_WEBGPU__.clouds());
   const cloudLumas = cloudFrame.samples.map((s) => luma(half(s)));
   const cloudSpread = Math.max(...cloudLumas) - Math.min(...cloudLumas);
-  assert.ok(cloudSpread > 0.005,
-    `clouds should vary across a day frame: ${JSON.stringify(cloudFrame.samples)}`);
+  assert.ok(
+    cloudSpread > 0.005,
+    `clouds should vary across a day frame: ${JSON.stringify(cloudFrame.samples)}`
+  );
 
   const sun = await page.evaluate(() => window.__SKY_WEBGPU__.sunDisc());
   const onSun = half(sun.onSun);
   const offSun = half(sun.offSun);
-  assert.ok(luma(onSun) > luma(offSun) * 20 && luma(onSun) > 20,
-    `solar disc missing: on ${onSun} off ${offSun}`);
+  assert.ok(
+    luma(onSun) > luma(offSun) * 20 && luma(onSun) > 20,
+    `solar disc missing: on ${onSun} off ${offSun}`
+  );
 
   const stars = await page.evaluate(() => window.__SKY_WEBGPU__.stars());
-  assert.ok(stars.withStars.max > stars.withoutStars.max * 1.3 &&
-    stars.withStars.sum > stars.withoutStars.sum,
-  `star/milky-way field missing: ${JSON.stringify(stars)}`);
+  assert.ok(
+    stars.withStars.max > stars.withoutStars.max * 1.3 &&
+      stars.withStars.sum > stars.withoutStars.sum,
+    `star/milky-way field missing: ${JSON.stringify(stars)}`
+  );
 
   const lut = await page.evaluate(() => window.__SKY_WEBGPU__.lutProbe());
   const trans = half(lut.transmittance);
-  assert.ok(trans[0] > 0 && trans[0] <= 1 && trans[1] > 0 && trans[1] <= 1,
-    `transmittance out of range: ${trans}`);
+  assert.ok(
+    trans[0] > 0 && trans[0] <= 1 && trans[1] > 0 && trans[1] <= 1,
+    `transmittance out of range: ${trans}`
+  );
   const sv = half(lut.skyView);
   assert.ok(luma(sv) > 1e-5, `sky-view LUT is black: ${sv}`);
   const amb = half(lut.ambient);
@@ -97,14 +122,20 @@ try {
   const fogColor = half(fog.color);
   const fogged = half(fog.fogged);
   const fogDelta = Math.abs(luma(fogged) - luma(fogColor));
-  assert.ok(fogDelta > 1e-4 && fogged.every((v) => Number.isFinite(v)),
-    `fog node did not alter the colour: ${fogColor} -> ${fogged}`);
+  assert.ok(
+    fogDelta > 1e-4 && fogged.every((v) => Number.isFinite(v)),
+    `fog node did not alter the colour: ${fogColor} -> ${fogged}`
+  );
 
   const cloud = await page.evaluate(() => window.__SKY_WEBGPU__.cloudShadow());
-  assert.ok(cloud.values.every((v) => v >= 0 && v <= 1),
-    `cloud occlusion out of range: ${cloud.values}`);
-  assert.ok(cloud.values.some((v) => Math.abs(v - cloud.values[0]) > 0.02),
-    `cloud occlusion field is uniform: ${cloud.values}`);
+  assert.ok(
+    cloud.values.every((v) => v >= 0 && v <= 1),
+    `cloud occlusion out of range: ${cloud.values}`
+  );
+  assert.ok(
+    cloud.values.some((v) => Math.abs(v - cloud.values[0]) > 0.02),
+    `cloud occlusion field is uniform: ${cloud.values}`
+  );
 
   const api = await page.evaluate(() => window.__SKY_WEBGPU__.api());
   assert.equal(api.envMap, true, 'sky did not publish an env map');
@@ -116,17 +147,24 @@ try {
   if (errors.length) console.error('Sky WebGPU console:', errors);
   assert.deepEqual(errors, []);
 
-  console.log(JSON.stringify({
-    ok: true, backend: boot.backend,
-    identity: { day, golden, night },
-    sun: { onSun, offSun },
-    stars,
-    transmittance: trans,
-    env: { hasEnv: env.hasEnv, mapping: env.mapping, equirect },
-    fog: { color: fogColor, fogged },
-    cloud: cloud.values,
-    api,
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        ok: true,
+        backend: boot.backend,
+        identity: { day, golden, night },
+        sun: { onSun, offSun },
+        stars,
+        transmittance: trans,
+        env: { hasEnv: env.hasEnv, mapping: env.mapping, equirect },
+        fog: { color: fogColor, fogged },
+        cloud: cloud.values,
+        api,
+      },
+      null,
+      2
+    )
+  );
 } finally {
   await browser.close();
   stopViteServer(server);

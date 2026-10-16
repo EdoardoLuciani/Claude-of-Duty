@@ -30,7 +30,8 @@ npm run dev            # local server; not needed for CI-only work
 - Tests and build must pass from a clean install: no missing imports/exports or
   assets available only on another branch. Do not weaken/delete tests to pass CI.
   If a test is wrong, fix it and explain why in the PR.
-- No formatter; match surrounding style. ES modules: `.ts` in bundled runtime source,
+- Use `npm run format` and `npm run format:check` (Oxfmt); scope and exclusions
+  are documented in README.md. ES modules: `.ts` in bundled runtime source,
   `.mjs` for directly executed Node scripts.
 - No new runtime dependencies without approval. Approved: `three` and pinned
   `@recast-navigation/core` + `@recast-navigation/wasm` for offline-baked navigation.
