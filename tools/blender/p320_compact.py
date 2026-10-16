@@ -66,7 +66,7 @@ coords = empty('Surface_coordinates')
 # Source shaders are baked to one shared unique-UV atlas: colour, ORM, normal.
 # The atlas costs three 1024-square images, no more than the MCX surface maps.
 materials = []
-def material(name, color, rough=.6, metal=0, grain=0, stipple=False):
+def material(name, color, rough=.6, metal=0, grain=0, stipple=False, rough_variation=.075):
     m = bpy.data.materials.new(name); m.use_nodes = True
     m.diffuse_color = (*color,1)
     n, l = m.node_tree.nodes, m.node_tree.links
@@ -84,8 +84,8 @@ def material(name, color, rough=.6, metal=0, grain=0, stipple=False):
     l.new(noise.outputs['Fac'],ramp.inputs[0]); l.new(ramp.outputs[0],p.inputs['Base Color'])
     rough_ramp = n.new('ShaderNodeMapRange')
     rough_ramp.inputs['From Min'].default_value = 0; rough_ramp.inputs['From Max'].default_value = 1
-    rough_ramp.inputs['To Min'].default_value = rough-.075
-    rough_ramp.inputs['To Max'].default_value = min(1,rough+.075)
+    rough_ramp.inputs['To Min'].default_value = rough-rough_variation
+    rough_ramp.inputs['To Max'].default_value = min(1,rough+rough_variation)
     l.new(noise.outputs['Fac'],rough_ramp.inputs[0]); l.new(rough_ramp.outputs[0],p.inputs['Roughness'])
     micro = n.new('ShaderNodeTexNoise'); micro.inputs['Scale'].default_value = 4300 if not stipple else 1700
     micro.inputs['Detail'].default_value = 2.8; micro.inputs['Roughness'].default_value = .72
@@ -101,8 +101,9 @@ def material(name, color, rough=.6, metal=0, grain=0, stipple=False):
     materials.append(m)
     return m
 
-nitron = material('Nitron | satin coated steel',(.033,.036,.039),.53,0,.24)
-polymer = material('Frame | fine injection moulding',(.026,.028,.030),.72,0,.48)
+# Dark dielectric coating, not exposed polished steel; linear pigment values.
+nitron = material('Nitron | satin coated steel',(.025,.027,.029),.44,0,.24,rough_variation=.045)
+polymer = material('Frame | fine injection moulding',(.021,.023,.025),.76,0,.48,rough_variation=.045)
 stipple = material('Grip | moulded pebbled texture',(.017,.019,.020),.86,0,.8,True)
 steel = material('Controls | blackened steel',(.041,.043,.045),.52,.38,.18)
 barrel_mat = material('Barrel | polished nitriding',(.061,.065,.070),.29,.72,.12)
@@ -360,7 +361,9 @@ for o in weapon_meshes:
     source=o.data.materials[0]
     if source.name not in letter_materials:
         m=bpy.data.materials.new('Lettering | '+source.name);m.use_nodes=True
-        p=m.node_tree.nodes.get('Principled BSDF');p.inputs['Base Color'].default_value=source.diffuse_color
+        p=m.node_tree.nodes.get('Principled BSDF')
+        # Molded markings keep their original pigment, independent of frame tuning.
+        p.inputs['Base Color'].default_value=(.026,.028,.030,1) if source==polymer else source.diffuse_color
         p.inputs['Roughness'].default_value=.65;p.inputs['Metallic'].default_value=.1
         letter_materials[source.name]=m
     o.data.materials.clear();o.data.materials.append(letter_materials[source.name])

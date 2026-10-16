@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
+import { PNG } from 'pngjs';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
@@ -23,7 +25,58 @@ assert(
 const bytes = readFileSync(new URL(P320_URL));
 const json = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)));
 assert.equal(json.animations.length, 8);
+// Visibility belongs to the authored STEP tracks, not a collapsed export rest pose.
+for (const name of [
+  'magazine_spare',
+  'magazine_spare_round',
+  'magazine_spare_mesh',
+  'magazine_spare_round_mesh',
+]) {
+  const node = json.nodes.find((entry) => entry.name === name);
+  assert(node, `missing ${name}`);
+  assert.deepEqual(node.scale ?? [1, 1, 1], [1, 1, 1], `${name}: non-collapsed export rest pose`);
+}
 assert.equal(json.images.length, 3, 'one shared unique UV PBR atlas, no duplicated arm textures');
+const atlas = {};
+for (const image of json.images) {
+  const view = json.bufferViews[image.bufferView];
+  const start = 28 + bytes.readUInt32LE(12) + view.byteOffset;
+  const payload = bytes.subarray(start, start + view.byteLength);
+  assert.deepEqual(payload, readFileSync(new URL(`textures/${image.name}.png`, dir)));
+  const png = PNG.sync.read(payload);
+  assert.equal(png.width, 1024);
+  assert.equal(png.height, 1024);
+  atlas[image.name] = png;
+  if (image.name === 'p320-normal')
+    assert.equal(
+      createHash('sha256').update(payload).digest('hex'),
+      '20829f64debf9589b5b10086e9011d26e00812c73889e54d97313956fcea08e5',
+      'material-only revision preserves the original micro-normal payload'
+    );
+}
+// Interior UV texels check evaluated exports, not ignored linked-node defaults.
+for (const [finish, x, y, base, orm] of [
+  ['slide', 523, 653, [44, 46, 47], [255, 113, 0]],
+  ['smooth frame', 237, 774, [40, 42, 44], [255, 195, 0]],
+  ['unchanged stipple', 58, 739, [35, 38, 39], [255, 222, 0]],
+  ['unchanged controls', 656, 287, [57, 58, 60], [255, 132, 97]],
+  ['unchanged barrel', 605, 592, [70, 72, 74], [255, 73, 184]],
+  ['unchanged magazine', 228, 591, [41, 45, 49], [255, 93, 191]],
+  ['unchanged brass', 812, 833, [165, 129, 75], [255, 90, 255]],
+  ['unchanged copper', 820, 382, [149, 91, 60], [255, 86, 255]],
+]) {
+  for (const [map, expected] of [
+    ['base', base],
+    ['orm', orm],
+  ]) {
+    const offset = (y * 1024 + x) * 4;
+    assert.deepEqual(
+      [...atlas[`p320-${map}`].data.subarray(offset, offset + 3)],
+      expected,
+      `${finish} ${map}`
+    );
+  }
+}
 assert(
   json.buffers.every((b) => !b.uri) && json.images.every((i) => i.bufferView !== undefined),
   'self-contained offline GLB'
