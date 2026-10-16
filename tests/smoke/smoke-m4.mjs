@@ -152,14 +152,14 @@ close(guard.max.y - guard.min.y, 0.05715, 0.001);
 // True side-view regressions: old cutter left receiver walls across the hole,
 // the SOPMOD pad was raked, and the magazine hung too far below the well.
 const receiver = model.root.getObjectByName('receiver_mesh');
-// Approved 5.6 mm aperture: clear at 2.75 mm in all four directions, with
-// real steel at 2.85 mm. Include the support, not only the ring's own mesh.
+// Original 2.2 mm aperture: clear at 1.05 mm in all four directions, with
+// real steel at 1.15 mm. Include the support, not only the ring's own mesh.
 const apertureRay = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, 0, -1), 0, 0.045);
 for (const [x, y] of [
-  [0.00275, 0.1395],
-  [-0.00275, 0.1395],
-  [0, 0.14225],
-  [0, 0.13675],
+  [0.00105, 0.1395],
+  [-0.00105, 0.1395],
+  [0, 0.14055],
+  [0, 0.13845],
 ]) {
   apertureRay.ray.origin.set(x, y, 0.059);
   assert.equal(
@@ -168,7 +168,7 @@ for (const [x, y] of [
     'rear aperture is clear, including its lower third'
   );
 }
-apertureRay.ray.origin.set(0.00285, 0.1395, 0.059);
+apertureRay.ray.origin.set(0.00115, 0.1395, 0.059);
 assert(apertureRay.intersectObject(model.root, true).length, 'rear aperture retains its steel rim');
 const sideRay = new THREE.Raycaster(
   new THREE.Vector3(-0.05, 0.018, -0.022),

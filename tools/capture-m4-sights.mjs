@@ -12,6 +12,7 @@ import {
   parseArgs,
   stopViteServer,
 } from './lib/browser-harness.mjs';
+import { captureNative, installDevicePolicy, waitForGame } from './lib/native-render.mjs';
 
 const args = parseArgs(),
   port = Number(args.port ?? 5208);
@@ -40,6 +41,7 @@ try {
     ],
   });
   const page = await browser.newPage({ deviceScaleFactor: 1 });
+  await installDevicePolicy(page);
   const errors = [],
     captures = [];
   page.on('pageerror', (e) => errors.push(e.stack));
@@ -55,7 +57,7 @@ try {
     await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`, {
       waitUntil: 'domcontentloaded',
     });
-    await page.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
+    const device = await waitForGame(page);
     const metrics = await page.evaluate(async (time) => {
       window.__APPLY_SHOT__('weapon');
       const ctx = window.__ENGINE__.ctx,
@@ -79,8 +81,8 @@ try {
     assert.equal(metrics.reticle, false);
     assert.equal(metrics.frame, 103);
     const file = `${scene.id}.png`;
-    await page.screenshot({ path: `${out}/${file}` });
-    captures.push({ scene: scene.id, file, ...metrics });
+    await captureNative(page, `${out}/${file}`);
+    captures.push({ scene: scene.id, file, device, ...metrics });
     console.log(`Captured ${file}`);
   }
   assert.deepEqual(errors, []);

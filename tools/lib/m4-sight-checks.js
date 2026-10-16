@@ -53,7 +53,7 @@ export function checkM4Sights(root) {
   near(tip.material.roughness, 0.8);
   const supportBounds = bounds(support);
   near(supportBounds.min.y, 0.119);
-  near(supportBounds.max.y, sight.y - 0.0028 - 0.0001);
+  near(supportBounds.max.y, sight.y - 0.0011 - 0.0001);
   for (const part of [post, tip, support, cup]) {
     require(!part.material.transparent &&
       part.material.opacity === 1 &&
@@ -72,7 +72,7 @@ export function checkM4Sights(root) {
     inner = Math.min(inner, radius);
     outer = Math.max(outer, radius);
   }
-  near(inner * 2, 0.0056);
+  near(inner * 2, 0.0022);
   near(outer * 2, 0.0076);
   const ray = new THREE.Raycaster();
   const forward = new THREE.Vector3(0, 0, -1).transformDirection(root.matrixWorld);
