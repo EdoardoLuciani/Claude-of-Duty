@@ -21,7 +21,7 @@ const args = parseArgs(),
   out = resolve(args.out ?? '/tmp/m4-framing');
 mkdirSync(out, { recursive: true });
 const variants = [
-  { id: 'a-stock', label: 'A · Shipped baseline', eyeRelief: 0.115, viewFov: 0.86 },
+  { id: 'a-stock', label: 'A · Original baseline', eyeRelief: 0.115, viewFov: 0.86 },
   { id: 'b-fov', label: 'B · FOV only', eyeRelief: 0.115, viewFov: 0.6 },
   { id: 'c-eye', label: 'C · Eye distance only', eyeRelief: 0.075, viewFov: 0.86 },
   { id: 'd-combined', label: 'D · Moderate combination', eyeRelief: 0.085, viewFov: 0.65 },
@@ -90,8 +90,7 @@ try {
             w = ctx.get('weapons'),
             vm = w.viewmodel;
           const shipped = vm.active.def;
-          if (shipped.eyeRelief !== 0.115 || shipped.viewFov !== 0.86)
-            throw new Error('Review baseline no longer matches shipped M4');
+          if (shipped.id !== 'rifle') throw new Error('Expected M4 for framing review');
           vm.active.def = { ...shipped, eyeRelief: variant.eyeRelief, viewFov: variant.viewFov };
           ctx.get('sky').setTimeOfDay(scene.time);
           ctx.get('player').setControlEnabled(true);
@@ -280,7 +279,7 @@ try {
         .image{position:relative;width:${width}px;height:${height}px;overflow:hidden}
         img{position:absolute;max-width:none;width:${crop ? scene.width : width}px;left:50%;top:50%;transform:translate(-50%,-50%)}
       </style><h1>M4 ADS framing · ${scene.id} · ${crop ? 'native-size centre crops (no scaling)' : 'full views at identical 50% scale'}</h1>
-        <p>World zoom, geometry, aim datum and blur unchanged. Draft experiments, not selected defaults.</p><section>${cards}</section>`);
+        <p>World zoom, geometry, aim datum and blur unchanged. Historical A–H comparison; F selected.</p><section>${cards}</section>`);
       await board.evaluate(() => Promise.all([...document.images].map((img) => img.decode())));
       await board.screenshot({
         path: `${out}/${scene.id}-${crop ? 'crops' : 'overview'}.png`,

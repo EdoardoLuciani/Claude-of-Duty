@@ -1,10 +1,11 @@
 # M4 ADS framing experiments — issue #367
 
-**Review only. No new gameplay default is selected.** The capture tool temporarily
-replaces the active viewmodel's definition in an isolated browser page; it never
-edits weapon definitions, assets, materials, aim sockets, recoil, or ballistics.
-This is the framing phase of [#367](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/367),
-not the focus/blur implementation or a fix for the entire roster.
+**Historical A–H experiment: the owner selected F (60 mm / 42°).** Production
+settings now include F and the [roster framing pass](ads-framing-review.md).
+This tool preserves the original A–H comparison with temporary browser-only
+overrides, including A's old 115 mm / 51.6° baseline; it never edits assets,
+materials, aim sockets, recoil, or ballistics. Focus/blur remains outside this
+framing phase of [#367](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/367).
 
 ## Reproduce
 
@@ -63,10 +64,10 @@ approximately two-thirds of the listed pixel sizes.
    FOV should not simply be copied to iron sights.
 3. **F versus G:** similar opening sizes, but G preserves a smaller aiming post.
    This motivated the second iteration's G/H eye-only probes.
-4. **G is the suggested starting point for human review**, not an approved default:
-   about 2.3× the baseline nominal opening, with only about 17% more post width.
-   H explores a still larger opening but also makes the sharp rear cup and nearby
-   receiver very dominant. F is an alternative if a larger front post is preferred.
+4. G was the initial suggestion: about 2.3× the baseline nominal opening, with
+   only about 17% more post width. **The owner preferred and selected F's larger
+   front post instead.** H explores a still larger opening but also makes the
+   sharp rear cup and nearby receiver very dominant.
 5. Closer eye placement also changes receiver/hand perspective and muzzle-flash
    presentation. Judge the full frames and firing images, not only centre crops.
    Sharp rear metal remains deliberately unchanged; this experiment cannot settle
@@ -113,7 +114,7 @@ and separate weapon/world cameras remain existing readability compromises.
 The issue's [iron-sight photographs](https://www.thearmorylife.com/how-to-use-iron-sights/)
 illustrate focus relationships, not numerical framing targets.
 
-Before applying this approach elsewhere, choose a preferred M4 picture and test
-it in moving combat. Tune each weapon's eye distance and FOV independently;
+F is now the selected M4 picture. The roster pass tunes other weapons independently;
 pistols, collimated dots and fullscreen scope overlays have different constraints.
-Keep housing softness and peripheral-world blur as separate later experiments.
+Moving-combat review remains necessary. Keep housing softness and peripheral-world
+blur as separate later experiments.
