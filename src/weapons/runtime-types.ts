@@ -6,7 +6,6 @@ import type { loadAX338 } from './ax338.ts';
 import type { Clip, ClipSample } from './clips.ts';
 import type { WEAPON_DEFS } from './defs.ts';
 import type { loadEvolys } from './evolys.ts';
-import type { Assembly } from './geometry.ts';
 import type { Arm } from './hands.ts';
 import type { loadM4 } from './m4.ts';
 import type { loadM590 } from './m590.ts';
@@ -52,7 +51,6 @@ export type AuthoredModels = {
   shotgun: Awaited<ReturnType<typeof loadM590>>;
 };
 export type AuthoredWeaponModel = AuthoredModels[keyof AuthoredModels];
-export type WeaponAssembly = Assembly | THREE.Object3D;
 export interface GripData {
   pos: number[];
   finger?: number[];
@@ -97,24 +95,13 @@ export interface WeaponNodes {
   supportContact?: CylinderContact;
   handguard?: { axis: number[]; dir: number[]; r: number; z0: number; z1: number };
 }
-export interface ProceduralWeaponModel {
-  id: string;
-  body: WeaponAssembly;
-  moving?: Record<string, WeaponAssembly>;
-  nodes: WeaponNodes;
-  shell?: { caseLen: number; rimR: number };
-  magSize?: { len: number };
-}
-export type WeaponModelRecord = AuthoredWeaponModel | ProceduralWeaponModel;
-export function isAuthoredWeapon(model: WeaponModelRecord): model is AuthoredWeaponModel {
-  return 'animations' in model;
-}
-/** Each authored loader owns one adapter identity; procedural records have no clips. */
+export type WeaponModelRecord = AuthoredWeaponModel;
+/** Each authored loader owns one adapter identity. */
 export function isWeaponAdapter<K extends keyof AuthoredModels>(
   model: WeaponModelRecord,
   id: K
 ): model is AuthoredModels[K] {
-  return isAuthoredWeapon(model) && model.id === id;
+  return model.id === id;
 }
 export interface WeaponEntry {
   id: string;
@@ -124,20 +111,15 @@ export interface WeaponEntry {
   parts: Record<string, THREE.Object3D | undefined>;
   meshes: THREE.Mesh[];
   tris: number;
-  animation: WeaponAnimation | null;
+  animation: WeaponAnimation;
   clips: Record<string, Clip>;
   sight: THREE.Vector3;
   muzzle: THREE.Vector3;
   eject: THREE.Vector3;
   ejectDir: THREE.Vector3;
   optic: OpticData | null;
-  magSeatPos: THREE.Vector3;
-  magSeatQuat: THREE.Quaternion;
   gripR: GripData;
   gripL: GripData;
-  chargePull: THREE.Vector3;
-  boltTravel: THREE.Vector3;
-  triggerPull: number;
   magLen: number;
   shell?: { caseLen: number; rimR: number };
   lhandPose: string;
@@ -191,14 +173,6 @@ export type ViewmodelContext = Pick<
 > & {
   get(id: 'render'): Pick<EngineSystems['render'], 'screenSize'> | null;
 };
-export interface MaskShapeOptions {
-  wearAmp?: number;
-  grimeAmp?: number;
-  aoAmp?: number;
-  wearExp?: number;
-  grimeExp?: number;
-  aoExp?: number;
-}
 export interface WeaponRuntimeDependencies {
   rng: Rng;
   mats: WeaponMaterialsNode;

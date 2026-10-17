@@ -3,13 +3,13 @@ import { readFileSync } from 'node:fs';
 
 import { PNG } from 'pngjs';
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import { Rng } from '../../src/core/rng.ts';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
+import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
 import { checkM4Sights } from '../../tools/lib/m4-sight-checks.js';
 
 const dir = new URL('../../assets/weapons/m4a1-block-ii/', import.meta.url);
@@ -124,16 +124,7 @@ for (const clip of json.animations) {
     if (channel.target.path === 'scale')
       assert.equal(clip.samplers[channel.sampler].interpolation, 'STEP');
 }
-const loader = new GLTFLoader().register(() => ({
-  name: 'NODE_TEXTURE_STUB',
-  loadTexture: () => Promise.resolve(new THREE.Texture()),
-}));
-const model = makeM4Model(
-  await loader.parseAsync(
-    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-    ''
-  )
-);
+const model = makeM4Model(await parseGLB(bytes));
 assert.equal(model.id, 'rifle');
 assert.equal(model.label, 'M4A1');
 assert.equal(model.nodes.opticGlass, undefined);
@@ -377,10 +368,7 @@ anim.reset();
 // envelope is conservative: no deformed triangle may enter even its empty space.
 const stockEnvelope = new THREE.Box3().setFromObject(model.root.getObjectByName('stock'));
 const armBytes = readFileSync(new URL('../../public/models/player/arms.glb', import.meta.url));
-const armGltf = await loader.parseAsync(
-  armBytes.buffer.slice(armBytes.byteOffset, armBytes.byteOffset + armBytes.byteLength),
-  ''
-);
+const armGltf = await parseGLB(armBytes);
 armGltf.scene.updateMatrixWorld(true);
 const armMeshes = [];
 armGltf.scene.traverse((o) => {

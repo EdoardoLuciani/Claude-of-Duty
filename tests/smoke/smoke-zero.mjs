@@ -6,7 +6,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import { FIXED_DT } from '../../src/core/config.ts';
 import { Rng } from '../../src/core/rng.ts';
@@ -21,49 +20,22 @@ import { makeMCXModel, MCX_URL } from '../../src/weapons/mcx.ts';
 import { makeMPXModel, MPX_URL } from '../../src/weapons/mpx.ts';
 import { makeP320Model, P320_URL } from '../../src/weapons/p320.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
+import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
 
 const bytes = readFileSync(new URL(MCX_URL));
-const loader = new GLTFLoader().register(() => ({
-  name: 'SMOKE_TEXTURE',
-  loadTexture: () => Promise.resolve(new THREE.Texture()),
-}));
-const gltf = await loader.parseAsync(
-  bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-  ''
-);
+const gltf = await parseGLB(bytes);
 const pistolBytes = readFileSync(new URL(P320_URL));
-const pistolGltf = await loader.parseAsync(
-  pistolBytes.buffer.slice(pistolBytes.byteOffset, pistolBytes.byteOffset + pistolBytes.byteLength),
-  ''
-);
+const pistolGltf = await parseGLB(pistolBytes);
 const rifleBytes = readFileSync(new URL(M4_URL));
-const rifleGltf = await loader.parseAsync(
-  rifleBytes.buffer.slice(rifleBytes.byteOffset, rifleBytes.byteOffset + rifleBytes.byteLength),
-  ''
-);
+const rifleGltf = await parseGLB(rifleBytes);
 const lmgBytes = readFileSync(new URL(EVOLYS_URL));
-const lmgGltf = await loader.parseAsync(
-  lmgBytes.buffer.slice(lmgBytes.byteOffset, lmgBytes.byteOffset + lmgBytes.byteLength),
-  ''
-);
+const lmgGltf = await parseGLB(lmgBytes);
 const sniperBytes = readFileSync(new URL(AX338_URL));
-const sniperGltf = await loader.parseAsync(
-  sniperBytes.buffer.slice(sniperBytes.byteOffset, sniperBytes.byteOffset + sniperBytes.byteLength),
-  ''
-);
+const sniperGltf = await parseGLB(sniperBytes);
 const smgBytes = readFileSync(new URL(MPX_URL));
-const smgGltf = await loader.parseAsync(
-  smgBytes.buffer.slice(smgBytes.byteOffset, smgBytes.byteOffset + smgBytes.byteLength),
-  ''
-);
+const smgGltf = await parseGLB(smgBytes);
 const shotgunBytes = readFileSync(new URL(M590_URL));
-const shotgunGltf = await loader.parseAsync(
-  shotgunBytes.buffer.slice(
-    shotgunBytes.byteOffset,
-    shotgunBytes.byteOffset + shotgunBytes.byteLength
-  ),
-  ''
-);
+const shotgunGltf = await parseGLB(shotgunBytes);
 const MODELS = {
   mcx: makeMCXModel(gltf),
   rifle: makeM4Model(rifleGltf),

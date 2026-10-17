@@ -758,7 +758,6 @@ export class WeaponSystem {
       this.viewmodel.anchor.visible = true;
       this.viewmodel.stopClip();
       this.viewmodel.setActive(this.activeId);
-      this.viewmodel.boltHold = 0;
       this.viewmodel.adsT = 0;
       this.viewmodel.adsTarget = 0;
       this.viewmodel.play('draw');
@@ -892,7 +891,6 @@ export class WeaponSystem {
     if (this.grenadeEquipped || this.radioEquipped || this.healing) return false;
     if (!s.chambered) {
       // Dry: lock the bolt back and let the player know by feel.
-      this.viewmodel.boltHold = 1;
       this._fireTimer = 0.25;
       return false;
     }
@@ -908,7 +906,6 @@ export class WeaponSystem {
       s.mag--;
       s.chambered = true;
     } else if (s.mag === 0) {
-      this.viewmodel.boltHold = 1;
     }
 
     // ---- deterministic recoil pattern ----
@@ -1067,7 +1064,6 @@ export class WeaponSystem {
       case 'boltrelease':
       case 'bolt:close':
         if (s?.def.id === 'pistol') this._emitReload('slide');
-        this.viewmodel.boltHold = 0;
         break;
       case 'bolt:open':
         this._queueShell(0);
@@ -1105,7 +1101,6 @@ export class WeaponSystem {
       case 'end':
         if (isReload) {
           this._emitReload('end');
-          this.viewmodel.boltHold = 0;
           if (this._tubeLoop) this._continueTubeReload();
         }
         if (clipName === 'holster' && this._switchTo) {
@@ -1155,7 +1150,6 @@ export class WeaponSystem {
     if (!s.chambered) {
       s.reserve--;
       s.chambered = true;
-      this.viewmodel.boltHold = 0;
       this._shotIndex = 0;
       return true;
     }
@@ -1820,8 +1814,6 @@ export class WeaponSystem {
     vm.settle.reset();
     vm.lag.reset();
     vm.lagRot.reset();
-    vm.boltHold = 0;
-    vm.boltCycle = 0;
     vm.sprintT = 0;
     vm.lowReadyT = 0;
     vm.bobPhase = 0;

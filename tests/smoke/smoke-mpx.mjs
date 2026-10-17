@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import ref from '../../assets/weapons/sig-mpx/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: 'json' };
@@ -12,15 +11,9 @@ import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import { Arm } from '../../src/weapons/hands.ts';
 import { makeMPXModel, MPXAnimation, MPX_URL, MPX_EJECT_DELAY } from '../../src/weapons/mpx.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
+import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
 const bytes = readFileSync(new URL(MPX_URL));
-const loader = new GLTFLoader().register(() => ({
-  name: 'SMOKE_TEXTURE',
-  loadTexture: () => Promise.resolve(new THREE.Texture()),
-}));
-const gltf = await loader.parseAsync(
-  bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-  ''
-);
+const gltf = await parseGLB(bytes);
 const model = makeMPXModel(gltf),
   anim = new MPXAnimation(model),
   def = WEAPON_DEFS.smg;
@@ -379,10 +372,7 @@ const posedVM = new Viewmodel(
   }
 );
 const armBytes = readFileSync(new URL('../../public/models/player/arms.glb', import.meta.url));
-const skin = await loader.parseAsync(
-  armBytes.buffer.slice(armBytes.byteOffset, armBytes.byteOffset + armBytes.byteLength),
-  ''
-);
+const skin = await parseGLB(armBytes);
 skin.scene.updateMatrixWorld(true);
 const meshes = [];
 skin.scene.traverse((o) => {

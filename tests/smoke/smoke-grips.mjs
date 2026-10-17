@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 import m590Hands from '../../assets/weapons/m590/hand-reference.json' with { type: 'json' };
 import mpxHands from '../../assets/weapons/sig-mpx/hand-reference.json' with { type: 'json' };
@@ -18,14 +17,11 @@ import { makeMCXModel, MCX_URL } from '../../src/weapons/mcx.ts';
 import { makeMPXModel, MPX_URL } from '../../src/weapons/mpx.ts';
 import { makeP320Model, P320_URL } from '../../src/weapons/p320.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
+import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
 
-const loader = new GLTFLoader().register(() => ({
-  name: 'NODE_TEXTURE_STUB',
-  loadTexture: () => Promise.resolve(new THREE.Texture()),
-}));
 async function load(url) {
   const b = readFileSync(url);
-  return loader.parseAsync(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength), '');
+  return parseGLB(b);
 }
 const skin = await load(new URL('../../public/models/player/arms.glb', import.meta.url));
 skin.scene.updateMatrixWorld(true);

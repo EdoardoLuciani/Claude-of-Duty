@@ -6,38 +6,15 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import {
-  ensureViteServer,
-  launchChromium,
-  parseArgs,
-  stopViteServer,
-} from '../../tools/lib/browser-harness.mjs';
-import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
+import { parseArgs } from '../../tools/lib/browser-harness.mjs';
+import { openGameReview, setWeaponMode } from '../../tools/lib/game-review.mjs';
+import { captureNative } from '../../tools/lib/native-render.mjs';
 const args = parseArgs(),
   port = Number(args.port ?? 5214),
   out = resolve(args.out ?? '.tmp-rend/mpx/game');
-mkdirSync(out, { recursive: true });
-const server = await ensureViteServer({ port });
-const browser = await launchChromium({
-  webgpu: true,
-  headless: true,
-  args: ['--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
-});
-const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-const errors = [];
-page.on('pageerror', (e) => errors.push(e.stack));
-page.on('console', (m) => {
-  if (m.type() === 'error') errors.push(m.text());
-});
-page.on('response', (r) => {
-  if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`);
-});
-const pump = (n) => page.evaluate((n) => window.__PUMP__(n), n);
+const { page, errors, warnings, pump, capture, boot, close } = await openGameReview({ port, out });
 const query = (fn) => page.evaluate(fn);
-async function capture(name) {
-  await page.evaluate(() => window.__PRESENT__(2));
-  await captureNative(page, `${out}/${name}.png`);
-}
+
 async function opticPlacement() {
   return query(() => {
     const { ctx, w } = window.mpxReview,
@@ -103,11 +80,7 @@ async function opticPlacement() {
   });
 }
 try {
-  await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`, {
-    waitUntil: 'domcontentloaded',
-  });
-  await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
-  await verifyNative(page);
+  await boot();
   await page.waitForFunction(
     async () => {
       await window.__ENGINE__.ctx.get('weapons')._restTask;
@@ -149,9 +122,7 @@ try {
     'actual authored MPX meets the same hip wrist limits as other weapons'
   );
   const aimPoses = [];
-  await page.evaluate(() => {
-    window.mpxReview.w.debugMode = 'ads';
-  });
+  await setWeaponMode(page, 'mpxReview', 'ads');
   for (let i = 0; i < 60; i++) {
     await pump(1);
     const pose = await opticPlacement();
@@ -301,9 +272,7 @@ try {
     drawPoses.length > 20 && drawPoses.some((p) => p.adsT > 0 && p.adsT < 1),
     'held-aim regression must exercise native draw during aim-in'
   );
-  await page.evaluate(() => {
-    window.mpxReview.w.debugMode = 'idle';
-  });
+  await setWeaponMode(page, 'mpxReview', 'idle');
   await pump(40);
   assert(
     await query(() => {
@@ -387,9 +356,7 @@ try {
   await capture('inspect-left');
   assert(await query(() => window.mpxReview.w.tryFire()), 'firing interrupts inspection');
   await pump(8);
-  await page.evaluate(() => {
-    window.mpxReview.w.debugMode = 'ads';
-  });
+  await setWeaponMode(page, 'mpxReview', 'ads');
   const firingPoses = [];
   for (let i = 0; i < 8; i++) {
     assert(await query(() => window.mpxReview.w.tryFire()));
@@ -415,9 +382,7 @@ try {
     }),
     'ADS firing retains dot-only presentation without changing recoil'
   );
-  await page.evaluate(() => {
-    window.mpxReview.w.debugMode = null;
-  });
+  await setWeaponMode(page, 'mpxReview', null);
   assert.equal(await query(() => window.mpxReview.shots), 9);
   assert.equal(await query(() => window.mpxReview.shells), 9);
   await page.evaluate(() => {
@@ -613,10 +578,10 @@ try {
     playbackCounts: args.reel ? finalCounts : null,
     render: await query(() => window.__RENDER_INFO__),
     errors,
+    warnings,
   };
   writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
 } finally {
-  await browser.close();
-  stopViteServer(server);
+  await close();
 }

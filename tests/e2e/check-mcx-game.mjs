@@ -3,44 +3,23 @@
  * node tests/e2e/check-mcx-game.mjs --port=5197 --out=.tmp-rend/mcx-game
  */
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { parseArgs } from '../../tools/lib/browser-harness.mjs';
 import {
-  ensureViteServer,
-  launchChromium,
-  parseArgs,
-  stopViteServer,
-} from '../../tools/lib/browser-harness.mjs';
-import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
+  openGameReview,
+  setWeaponMode,
+  requestReload,
+  checkFireBurst,
+} from '../../tools/lib/game-review.mjs';
 const args = parseArgs();
 const port = Number(args.port ?? 5197),
   out = resolve(args.out ?? '.tmp-rend/mcx-game');
-mkdirSync(out, { recursive: true });
-const server = await ensureViteServer({ port });
-const browser = await launchChromium({
-  headless: true,
-  args: ['--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
-});
-const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-const errors = [];
-page.on('pageerror', (e) => errors.push(e.stack));
-page.on('console', (m) => {
-  if (m.type() === 'error') errors.push(m.text());
-});
-page.on('response', (r) => {
-  if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`);
-});
-const pump = (n) => page.evaluate((n) => window.__PUMP__(n), n);
-const capture = async (name) => {
-  await page.evaluate(() => window.__PRESENT__(2));
-  await captureNative(page, `${out}/${name}.png`);
-};
+const { page, errors, warnings, pump, capture, boot, close } = await openGameReview({ port, out });
+
 try {
-  await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`, {
-    waitUntil: 'domcontentloaded',
-  });
-  await waitForGame(page, { timeout: 90000 });
+  await boot(90000);
   await page.evaluate(() => {
     window.__APPLY_SHOT__('weapon');
     const ctx = window.__ENGINE__.ctx;
@@ -112,30 +91,15 @@ try {
     4 / 3
   );
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.evaluate(() => {
-    window.mcxReview.w.debugMode = 'idle';
-  });
+  await setWeaponMode(page, 'mcxReview', 'idle');
   await pump(40);
 
-  assert(
-    await page.evaluate(() => {
-      const { w } = window.mcxReview;
-      w.state.mag = 8;
-      return w.reload();
-    })
-  );
+  await requestReload(page, 'mcxReview', { mag: 8 });
   await pump(43);
   await capture('reload-tactical');
   await pump(120);
   assert.equal(await page.evaluate(() => window.mcxReview.w.state.mag), 30);
-  assert(
-    await page.evaluate(() => {
-      const { w } = window.mcxReview;
-      w.state.mag = 0;
-      w.state.chambered = false;
-      return w.reload();
-    })
-  );
+  await requestReload(page, 'mcxReview', { mag: 0, chambered: false });
   await pump(146);
   await capture('reload-empty');
   await pump(60);
@@ -147,6 +111,8 @@ try {
     ctx.input.frozen = false;
     w.debugMode = null;
   });
+  // Acquire gameplay focus without firing or requesting pointer lock.
+  await page.locator('canvas').first().click({ button: 'middle' });
   await page.keyboard.down('Shift');
   await page.keyboard.down('KeyI');
   await pump(1);
@@ -169,21 +135,7 @@ try {
   assert(await page.evaluate(() => window.mcxReview.w.tryFire()), 'fire cancels inspect');
   await pump(30);
 
-  const before = await page.evaluate(() => ({
-    shots: window.mcxReview.shots,
-    shells: window.mcxReview.shells,
-  }));
-  for (let i = 0; i < 8; i++) {
-    assert(await page.evaluate(() => window.mcxReview.w.tryFire()));
-    await pump(5);
-  }
-  await capture('fire');
-  const after = await page.evaluate(() => ({
-    shots: window.mcxReview.shots,
-    shells: window.mcxReview.shells,
-  }));
-  assert.equal(after.shots - before.shots, 8);
-  assert.equal(after.shells - before.shells, 8);
+  const after = await checkFireBurst(page, pump, capture, 'mcxReview');
 
   // Audition the actual sample + procedural reinforcement pipeline, with a
   // quiet single shot then an 800 rpm burst. Dry preview, not scene reverb.
@@ -256,12 +208,12 @@ try {
         decodedSamples: audio.loaded,
         render: await page.evaluate(() => window.__RENDER_INFO__),
         errors,
+        warnings,
       },
       null,
       2
     )
   );
 } finally {
-  await browser.close();
-  stopViteServer(server);
+  await close();
 }

@@ -3,12 +3,11 @@ import assert from 'node:assert/strict';
 import { Vector3 } from 'three';
 
 import { AttachmentQueries } from '../../src/ai/attachment-queries.js';
-import { INFANTRY } from '../../src/ai/capabilities.ts';
 import { createLadderDescriptors, ladderMoveBudget } from '../../src/ai/ladder.ts';
-import { unpackNav, packNav, NAV_PROFILE, NAV_LINK_RADIUS } from '../../src/ai/nav-format.ts';
+import { unpackNav, packNav, NAV_LINK_RADIUS } from '../../src/ai/nav-format.ts';
 import { SurfaceNav, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/nav.ts';
-import { VARIANTS } from '../../src/ai/soldier.ts';
 import { NativeWorker } from '../../tools/lib/attachment-worker-fixture.mjs';
+import { ladderProfiles } from '../../tools/lib/ladder-fixture.mjs';
 import { loadMap } from '../../tools/nav240/fixtures.mjs';
 
 // Browser transport only: all route proofs use the production module worker.
@@ -63,13 +62,7 @@ const service = (nav.worker = new AttachmentQueries(nav, {
   profile: true,
   workerFactory: () => new NativeWorker(),
 }));
-const profiles = [
-  NAV_PROFILE,
-  ...Object.values(VARIANTS).map((a) => ({
-    radius: INFANTRY.radius * a.scale,
-    height: INFANTRY.height * a.scale,
-  })),
-];
+const profiles = ladderProfiles();
 let proofCount = 0;
 const nativeSolve = nav.query.findPath.bind(nav.query);
 let graphSolves = 0;

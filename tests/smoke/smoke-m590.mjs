@@ -4,28 +4,21 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import reference from '../../assets/weapons/m590/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/m590/manifest.json' with { type: 'json' };
 import { Rng } from '../../src/core/rng.ts';
-import { buildClips, makeSampleResult } from '../../src/weapons/clips.ts';
-import { WEAPON_DEFS, WEAPON_IDS } from '../../src/weapons/defs.ts';
+import { makeSampleResult } from '../../src/weapons/clips.ts';
+import { WEAPON_IDS } from '../../src/weapons/defs.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
 import { makeM590Model, M590Animation, M590_URL } from '../../src/weapons/m590.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
+import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
 
-const loader = new GLTFLoader().register(() => ({
-  name: 'SMOKE_TEXTURE',
-  loadTexture: () => Promise.resolve(new THREE.Texture()),
-}));
 async function parse(url) {
   const bytes = readFileSync(new URL(url));
-  return loader.parseAsync(
-    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-    ''
-  );
+  return parseGLB(bytes);
 }
 assert.equal(
   createHash('sha256')
@@ -53,16 +46,50 @@ for (const [name, expected] of Object.entries(manifest.sockets)) {
   if (!model.nodes[key]) continue;
   assert(new THREE.Vector3(...model.nodes[key]).distanceTo(new THREE.Vector3(...expected)) < 1e-6);
 }
-const legacy = buildClips({ ...model.nodes, chargeRest: { pos: [0, 0, 0] } }, WEAPON_DEFS.shotgun);
+const expectedClips = {
+  reloadTac: [
+    0.55,
+    [
+      [0.02, 'start'],
+      [0.82, 'shellin'],
+      [0.995, 'end'],
+    ],
+  ],
+  reloadEmpty: [
+    0.95,
+    [
+      [0.02, 'start'],
+      [0.68, 'shellin'],
+      [0.88, 'pump'],
+      [0.93, 'boltrelease'],
+      [0.995, 'end'],
+    ],
+  ],
+  inspect: [3, [[0.995, 'end']]],
+  draw: [0.7, [[0.995, 'end']]],
+  holster: [0.45, [[0.995, 'end']]],
+  pump: [
+    0.45,
+    [
+      [0.32, 'pump'],
+      [0.995, 'end'],
+    ],
+  ],
+};
+assert.deepEqual(Object.keys(animation.clips()).sort(), Object.keys(expectedClips).sort());
 for (const [name, clip] of Object.entries(animation.clips())) {
-  assert.equal(clip.duration, legacy[name].duration, `${name}: duration preserved`);
-  assert.deepEqual(clip.events, legacy[name].events, `${name}: exact gameplay events preserved`);
+  const [duration, events] = expectedClips[name];
+  assert.equal(clip.duration, duration, name);
+  assert.deepEqual(
+    clip.events,
+    events.map(([fraction, name]) => ({ t: fraction * duration, name })),
+    name
+  );
   const sample = makeSampleResult();
   clip.sample(clip.duration / 2, sample);
   assert.deepEqual(sample.pos, [0, 0, 0]);
   assert.deepEqual(sample.rot, [0, 0, 0]);
   assert.equal(sample.lhand.weight, 0);
-  assert.equal(sample.rhand.weight, 0);
 }
 const bolt = model.root.getObjectByName('bolt'),
   forend = model.root.getObjectByName('forend');

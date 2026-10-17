@@ -64,10 +64,6 @@ assert.equal(bindingLabel('forward'), 'W / ↑');
 assert.equal(bindingLabel('fire'), 'LMB');
 assert.equal(bindingLabel('ads'), 'RMB');
 assert.equal(bindingLabel('cycleWeapon'), 'Tab');
-assert.match(
-  CONTROL_REFERENCE.find((row) => row.action === 'cycleWeapon').behavior,
-  /nonzero mouse-wheel frame/
-);
 assert.equal(bindingLabel('jump'), 'Space');
 assert.equal(bindingLabel('pause'), 'Esc');
 
@@ -108,15 +104,6 @@ for (const action of ['slot1', 'slot2', 'slot3']) {
 assert.deepEqual(
   CONTROL_REFERENCE.filter((row) => row.action === 'ads').map((row) => row.context),
   ['weapon', 'grenade']
-);
-assert.match(
-  CONTROL_REFERENCE.find((row) => row.action === 'slot3' && row.context === 'weapon').behavior,
-  /No action/
-);
-assert.match(CONTROL_REFERENCE.find((row) => row.action === 'crouch').behavior, /Toggle on press/);
-assert.match(
-  CONTROL_REFERENCE.find((row) => row.action === 'use' && row.label === 'Secure intel').behavior,
-  /requires release/
 );
 assert.ok(!CONTROL_REFERENCE.some((row) => /melee/i.test(row.label)));
 

@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import manifest from '../../assets/weapons/fn-evolys-762/manifest.json' with { type: 'json' };
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import { makeEvolysModel, EvolysAnimation, EVOLYS_URL } from '../../src/weapons/evolys.ts';
+import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
 const bytes = readFileSync(new URL(EVOLYS_URL));
 const json = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)).toString());
 const primitives = json.nodes
@@ -56,14 +56,7 @@ assert(
   !json.nodes.some((n) => /bipod|spent_case|EVOLYS_arm/.test(n.name)),
   'no bipod, duplicate cases or duplicate exported arms'
 );
-const loader = new GLTFLoader().register(() => ({
-  name: 'SMOKE_TEXTURE',
-  loadTexture: () => Promise.resolve(new THREE.Texture()),
-}));
-const gltf = await loader.parseAsync(
-  bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-  ''
-);
+const gltf = await parseGLB(bytes);
 const model = makeEvolysModel(gltf),
   anim = new EvolysAnimation(model);
 for (const material of model.materials) {

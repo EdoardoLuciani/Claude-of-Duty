@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import { ACTIONS } from '../../src/core/input.ts';
 import { Rng } from '../../src/core/rng.ts';
@@ -16,6 +15,7 @@ import {
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
 import { makeM590Model, M590Animation, M590_URL } from '../../src/weapons/m590.ts';
+import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
 
 assert.deepEqual(WEAPON_IDS, ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx']);
 assert(WEAPON_IDS.every((id) => WEAPON_DEFS[id]));
@@ -53,16 +53,7 @@ assert(scale.radiusScale > 2, '12g hull is fatter than 5.56');
 
 async function shotgunModel() {
   const bytes = readFileSync(new URL(M590_URL));
-  const loader = new GLTFLoader().register(() => ({
-    name: 'NODE_TEXTURE_STUB',
-    loadTexture: () => Promise.resolve(new THREE.Texture()),
-  }));
-  return makeM590Model(
-    await loader.parseAsync(
-      bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-      ''
-    )
-  );
+  return makeM590Model(await parseGLB(bytes));
 }
 const model = await shotgunModel();
 assert.equal(model.id, 'shotgun');
@@ -295,19 +286,7 @@ assert.equal(wp._insertShell(), false, 'tube full');
   const rifleDef = { ...WEAPON_DEFS.rifle, cycleTime: 60 / WEAPON_DEFS.rifle.rpm };
   const sgDef = { ...sg, cycleTime: 60 / sg.rpm };
   const bytes = readFileSync(new URL(M4_URL));
-  const loader = new GLTFLoader().register(() => ({
-    name: 'NODE_TEXTURE_STUB',
-    loadTexture: () => Promise.resolve(new THREE.Texture()),
-  }));
-  vm4.addWeapon(
-    makeM4Model(
-      await loader.parseAsync(
-        bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-        ''
-      )
-    ),
-    rifleDef
-  );
+  vm4.addWeapon(makeM4Model(await parseGLB(bytes)), rifleDef);
   vm4.addWeapon(await shotgunModel(), sgDef);
   vm4.setActive('rifle');
   vm4.onClipEvent = (name, clipName) => {
