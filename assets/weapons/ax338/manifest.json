@@ -175,7 +175,7 @@
     "primitives": 30,
     "materials": 8,
     "images": 3,
-    "bytes": 9989960
+    "bytes": 10143988
   },
   "textureResolution": 1024,
   "contactGeometry": {
@@ -734,5 +734,5 @@
     "magazineThickness": 0.034,
     "magazineHeight": 0.1125
   },
-  "source": "tools/blender/ax338.py + ax338_actions.py + tools/ax338-hand-reference.mjs"
+  "source": "tools/blender/ax338.py + tools/blender/ax338_actions.py + tools/blender/ax338/export.py; calibration stage: tools/ax338-hand-reference.mjs"
 }
