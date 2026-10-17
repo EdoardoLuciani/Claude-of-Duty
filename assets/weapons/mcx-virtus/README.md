@@ -60,7 +60,17 @@ Blender's stock Actions exporter emits the correct glTF interpolation directly.
 There is no post-export repair or alternate saved-source material-update path.
 See the linked authoring guide for stage order and which file to edit.
 
-This pilot preserves the develop finish values; it does not incorporate the
-separate satin-finish proposal. UV layout/triangle order are intentionally rebuilt,
-not represented as a byte-identical geometry-buffer update. Compare frozen
-registration and matched lighting, not independently rescaled screenshots.
+The finish uses a warmer medium-gray coating, smoother surface detail, matte
+polymer and a darker charcoal suppressor. This is an artistic alternative to the
+previous cool satin proposal, not a measured factory finish. In `FINISHES`, the
+coating is linear RGB (.135, .130, .123), roughness .44, normal strength .025;
+polymer retains its pigment with roughness .84 / normal .50; the suppressor is
+RGB (.045, .046, .049), roughness .76 / normal .15. Other finishes are unchanged.
+
+The authoring pilot intentionally rebuilt UVs/triangle order. This subsequent
+finish-only revision preserves that pilot's complete nonmaterial GLB JSON and
+binary chunk, including maps, geometry, UVs, sockets and animations. Compare
+frozen registration and matched lighting, not independently rescaled screenshots.
+The appearance change is clearer in studio lighting; bright outdoor gameplay
+still compresses the coating's tonal differences, and the indoor view stays dark.
+No renderer or exposure compensation is included.
