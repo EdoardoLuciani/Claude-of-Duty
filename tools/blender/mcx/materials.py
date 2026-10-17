@@ -15,17 +15,17 @@ TEXTURE_SEED = 300
 FINISHES = {
     'anodized': ('01 | graphite anodized alloy', (.047, .053, .060), 1, .72, .09),
     'edge': ('02 | subtly burnished edges', (.081, .087, .095), 1, .59, .08),
-    'polymer': ('03 | injection-moulded polymer', (.027, .031, .035), 0, .79, .65),
+    'polymer': ('03 | injection-moulded polymer', (.027, .031, .035), 0, .84, .50),
     'rubber': ('04 | stippled rubber', (.016, .019, .022), 0, .91, .9),
     'steel': ('05 | dark nitrided steel', (.083, .091, .105), 1, .44, .16),
-    'ceramic': ('06 | suppressor graphite ceramic', (.054, .056, .060), 0, .66, .35),
+    'ceramic': ('06 | suppressor graphite ceramic', (.045, .046, .049), 0, .76, .15),
     'brass': ('07 | fired brass', (.49, .285, .084), 1, .35, .14),
     'copper': ('08 | copper projectile', (.43, .16, .066), 1, .39, .1),
     'marking': ('09 | subdued laser markings', (.37, .39, .40), 0, .65, .02),
     'red': ('10 | selector red', (.32, .025, .012), 0, .62, .02),
     'glass': ('11 | coated optic lens', (.48, .56, .59), 0, .08, 0),
     'fiber': ('12 | red fiber-optic collector', (.48, .025, .008), 0, .28, .03),
-    'coating': ('13 | Elite Concrete gray coating', (.195, .208, .222), 0, .69, .10),
+    'coating': ('13 | Elite Concrete gray coating', (.135, .130, .123), 0, .44, .025),
 }
 
 
