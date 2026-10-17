@@ -428,7 +428,7 @@ assert.ok(live.canStand(w5.from) && entry.probeGround(), 'W5 starts supported an
 map.physics.removeCharacter(entry);
 assert.equal(
   map.meta.navigation.sha256,
-  'd5d274f76cd217734d45450e9edddd1b48618c2496a2f49c4da207f775244d6b',
+  '447a12dee9bd97f6badc44f800018f9713118deddbc135fe37ef7bb9918838bf',
   're-measure recorded fixture outcomes after changing baked assets'
 );
 let arrivals = 0;
