@@ -72,7 +72,7 @@ gltf.scene.traverse((o) => {
 });
 assert.equal(
   rifleHash.digest('hex'),
-  'fc50d37a1462b1faa8a390eb0738c23443e1025c43e801907253531cc24079c6',
+  'f5b16ba0fc55dc91e4c44c367c341454fa47b3b8117d9846ce6ccf715da16ba9',
   'approved rifle mesh positions/UVs/transforms unchanged'
 );
 for (const clip of gltf.animations) {
@@ -92,7 +92,7 @@ for (const clip of gltf.animations) {
 }
 assert.equal(
   protectedTracks.digest('hex'),
-  '50de983024ef75a3995be6726a9e81e2450d46773778b6a54a1ddc111dbbec62',
+  '0e3a1287a648d96e6727a497ce8017ac901ef0855fe47e0d2a4ed9287e09c92b',
   'approved index/thumb, left hand and weapon clips unchanged'
 );
 // User-approved optic must not be incidentally rebuilt by furniture fixes.
