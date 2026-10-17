@@ -2322,8 +2322,8 @@ export class Agent {
       c.stepHeight = step;
       c.snapDistance = snap;
     }
-    this.ladder!.travel += Math.abs(p.y - y);
-    this.position.copy(p);
+    this.ladder!.travel += Math.abs(c.position.y - y);
+    this.position.copy(c.position);
     this.grounded = c.grounded;
     return this.position.distanceTo(to) <= 1e-6;
   }
