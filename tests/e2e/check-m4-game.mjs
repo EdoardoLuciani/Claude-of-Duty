@@ -3,40 +3,21 @@
  * node tests/e2e/check-m4-game.mjs --port=5199 --out=.tmp-rend/m4-game
  */
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { parseArgs } from '../../tools/lib/browser-harness.mjs';
 import {
-  ensureViteServer,
-  launchChromium,
-  parseArgs,
-  stopViteServer,
-} from '../../tools/lib/browser-harness.mjs';
-import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
+  openGameReview,
+  setWeaponMode,
+  requestReload,
+  checkFireBurst,
+} from '../../tools/lib/game-review.mjs';
 const args = parseArgs(),
   port = Number(args.port ?? 5199),
   out = resolve(args.out ?? '.tmp-rend/m4-game');
-mkdirSync(out, { recursive: true });
-const server = await ensureViteServer({ port });
-const browser = await launchChromium({
-  webgpu: true,
-  headless: true,
-  args: ['--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
-});
-const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-const errors = [];
-page.on('pageerror', (e) => errors.push(e.stack));
-page.on('console', (m) => {
-  if (m.type() === 'error') errors.push(m.text());
-});
-page.on('response', (r) => {
-  if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`);
-});
-const pump = (n) => page.evaluate((n) => window.__PUMP__(n), n);
-async function capture(name) {
-  await page.evaluate(() => window.__PRESENT__(2));
-  await captureNative(page, `${out}/${name}.png`);
-}
+const { page, errors, warnings, pump, capture, boot, close } = await openGameReview({ port, out });
+
 async function checkVisibleSpare() {
   assert(
     await page.evaluate(() => {
@@ -55,11 +36,7 @@ async function checkVisibleSpare() {
   );
 }
 try {
-  await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`, {
-    waitUntil: 'domcontentloaded',
-  });
-  await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
-  await verifyNative(page);
+  await boot();
   await page.evaluate(() => {
     window.__APPLY_SHOT__('weapon');
     const ctx = window.__ENGINE__.ctx,
@@ -76,9 +53,7 @@ try {
     'M4Animation'
   );
   await capture('hip');
-  await page.evaluate(() => {
-    window.m4Review.w.debugMode = 'ads';
-  });
+  await setWeaponMode(page, 'm4Review', 'ads');
   await pump(60);
   assert(
     await page.evaluate(() => {
@@ -95,17 +70,9 @@ try {
     return checkM4Sights(window.m4Review.w.viewmodel.active.animation.root);
   });
   await capture('iron-ads');
-  await page.evaluate(() => {
-    window.m4Review.w.debugMode = 'idle';
-  });
+  await setWeaponMode(page, 'm4Review', 'idle');
   await pump(40);
-  assert(
-    await page.evaluate(() => {
-      const { w } = window.m4Review;
-      w.state.mag = 8;
-      return w.reload();
-    })
-  );
+  await requestReload(page, 'm4Review', { mag: 8 });
   await pump(43);
   await capture('reload-tactical');
   await pump(47);
@@ -113,14 +80,7 @@ try {
   await capture('spare-tactical');
   await pump(53);
   assert.equal(await page.evaluate(() => window.m4Review.w.state.mag), 30);
-  assert(
-    await page.evaluate(() => {
-      const { w } = window.m4Review;
-      w.state.mag = 0;
-      w.state.chambered = false;
-      return w.reload();
-    })
-  );
+  await requestReload(page, 'm4Review', { mag: 0, chambered: false });
   await pump(90);
   await checkVisibleSpare();
   await capture('spare-empty');
@@ -138,21 +98,7 @@ try {
   await capture('inspect');
   assert(await page.evaluate(() => window.m4Review.w.tryFire()), 'shot interrupts inspect');
   await pump(12);
-  const before = await page.evaluate(() => ({
-    shots: window.m4Review.shots,
-    shells: window.m4Review.shells,
-  }));
-  for (let i = 0; i < 8; i++) {
-    assert(await page.evaluate(() => window.m4Review.w.tryFire()));
-    await pump(6);
-  }
-  await capture('fire');
-  const after = await page.evaluate(() => ({
-    shots: window.m4Review.shots,
-    shells: window.m4Review.shells,
-  }));
-  assert.equal(after.shots - before.shots, 8);
-  assert.equal(after.shells - before.shells, 8);
+  await checkFireBurst(page, pump, capture, 'm4Review');
   assert(
     await page.evaluate(() => {
       const a = window.m4Review.w.viewmodel.active.animation;
@@ -214,10 +160,10 @@ try {
     shells: await page.evaluate(() => window.m4Review.shells),
     render: await page.evaluate(() => window.__RENDER_INFO__),
     errors,
+    warnings,
   };
   writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
 } finally {
-  await browser.close();
-  stopViteServer(server);
+  await close();
 }

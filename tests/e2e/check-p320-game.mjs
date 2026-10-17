@@ -1,49 +1,33 @@
 #!/usr/bin/env node
 // Real GLB / GPU / gameplay review at the agreed native 1440p high preset.
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import {
-  ensureViteServer,
-  launchChromium,
-  parseArgs,
-  stopViteServer,
-} from '../../tools/lib/browser-harness.mjs';
-import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
+import { parseArgs } from '../../tools/lib/browser-harness.mjs';
+import { openGameReview, setWeaponMode, requestReload } from '../../tools/lib/game-review.mjs';
 const args = parseArgs(),
   port = Number(args.port ?? 5198);
 const frames = Number(args.frames ?? 120);
 assert(frames >= 30, 'use --frames=120 (at least 30 frames per run)');
 const out = resolve(args.out ?? '/tmp/cod-p320-review');
-mkdirSync(out, { recursive: true });
-const server = await ensureViteServer({ port });
-const browser = await launchChromium({
-  headless: true,
+const {
+  page,
+  errors,
+  warnings,
+  pump,
+  capture: shot,
+  boot,
+  close,
+} = await openGameReview({
+  port,
+  out,
+  viewport: { width: 2560, height: 1440 },
   args: ['--ignore-gpu-blocklist', '--disable-frame-rate-limit', '--disable-gpu-vsync'],
 });
-const page = await browser.newPage({
-  viewport: { width: 2560, height: 1440 },
-  deviceScaleFactor: 1,
-});
-const errors = [];
-page.on('pageerror', (e) => errors.push(e.stack));
-page.on('console', (m) => {
-  if (m.type() === 'error') errors.push(m.text());
-});
-page.on('response', (r) => {
-  if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`);
-});
-const pump = (n) => page.evaluate((n) => window.__PUMP__(n), n);
-const shot = async (name) => {
-  await page.evaluate(() => window.__PRESENT__(2));
-  await captureNative(page, `${out}/${name}.png`);
-};
+
 try {
-  await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`, {
-    waitUntil: 'domcontentloaded',
-  });
-  await waitForGame(page, { timeout: 120000 });
+  await boot(120000);
   await page.evaluate(() => {
     window.__APPLY_SHOT__('weapon');
     const ctx = window.__ENGINE__.ctx,
@@ -60,9 +44,7 @@ try {
     console.log({ out, errors });
   } else {
     assert.equal(await page.evaluate(() => window.p320Review.w.current.label), 'P320 Compact');
-    await page.evaluate(() => {
-      window.p320Review.w.debugMode = 'ads';
-    });
+    await setWeaponMode(page, 'p320Review', 'ads');
     await pump(50);
     await shot('ads');
     assert(
@@ -71,29 +53,14 @@ try {
         return !vm.reticle.visible && !vm.scopeOverlay.visible;
       })
     );
-    await page.evaluate(() => {
-      window.p320Review.w.debugMode = 'idle';
-    });
+    await setWeaponMode(page, 'p320Review', 'idle');
     await pump(35);
-    assert(
-      await page.evaluate(() => {
-        const w = window.p320Review.w;
-        w.state.mag = 8;
-        return w.reload();
-      })
-    );
+    await requestReload(page, 'p320Review', { mag: 8 });
     await pump(38);
     await shot('reload-tactical');
     await pump(115);
     assert.equal(await page.evaluate(() => window.p320Review.w.state.mag), 15);
-    assert(
-      await page.evaluate(() => {
-        const w = window.p320Review.w;
-        w.state.mag = 0;
-        w.state.chambered = false;
-        return w.reload();
-      })
-    );
+    await requestReload(page, 'p320Review', { mag: 0, chambered: false });
     await pump(123);
     await shot('reload-empty');
     await pump(45);
@@ -303,6 +270,7 @@ try {
         }, frames);
     report.audio = audio;
     report.errors = errors;
+    report.warnings = warnings;
     writeFileSync(
       `${out}/${args['checks-only'] ? 'checks' : 'report'}.json`,
       JSON.stringify(report, null, 2) + '\n'
@@ -311,6 +279,5 @@ try {
     console.log(JSON.stringify(report, null, 2));
   }
 } finally {
-  await browser.close();
-  stopViteServer(server);
+  await close();
 }

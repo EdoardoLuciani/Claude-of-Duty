@@ -25,11 +25,8 @@ History: [#360](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/360).
 
 ## Source/runtime contract
 
-`tools/blender/mpx.py` owns geometry/PBR and the guarded whole-asset build;
-`mpx_actions.py` owns clips. The blend, GLB, maps and manifest are generated
-products, not authoring inputs. Versioned `hand-reference.json` is a declared
-read-only calibration input; shared review skins are also read-only inputs.
-See the [source-first edit/build guide](../../../tools/blender/mpx/README.md).
+The [source-first edit/build guide](../../../tools/blender/mpx/README.md) owns
+geometry/PBR, action stages and declared read-only calibration/review-arm inputs.
 `src/weapons/mpx.ts` converts +X-forward/+Z-up/−Y-right once; copy shared sampler
 arrays before conversion. Eight native clips preserve shared IK/ADS/sway/recoil.
 No duplicate arms, root recoil or review casing; all DCC controls need NLA tracks.
@@ -60,16 +57,11 @@ node tests/smoke/smoke-mpx.mjs
 node tests/e2e/check-mpx-game.mjs --optic-review
 ```
 
-Regeneration overwrites generated products, not calibration. `--render` writes
-fixed-camera source PNGs under the output directory; `--quick` only reduces
-preview resolution/samples. Previews use Eevee without ray tracing.
+Previews use Eevee without ray tracing; common flags follow the shared workflow.
 `--reel` records gameplay; `tools/mpx-photo-review.py` needs the 2019 PDF p.25
 rasterized with `pdftoppm -scale-to 1800 -singlefile -png` under `.tmp-rend/mpx/`.
-The original atlas is intentionally retained. Fresh Blender 5.2.2 builds have
-measured evaluated-bevel UV variation up to 1.1920928955078125e-7 UV
-(0.0001220703125 texel at 1024); source UVs stay identical. The user-approved
-preservation exception explicitly leaves GLB byte-repeatability unmet for those
-UV bytes; maps/manifest and other payloads still require exact comparison. See
-the source-first guide for the boundary; do not round/repack to hide it.
+The [approved UV-repeatability limitation](../../../tools/blender/mpx/README.md#approved-repeatability-limit)
+retains the atlas and explicitly leaves GLB byte-repeatability unmet for evaluated
+UV bytes. Maps/manifest and non-UV payloads still require exact comparison.
 Technical gates don't certify all-triangle clearance or final appearance;
 Gate 3 human approval, finish/highlight/FX/audio review remain outstanding.

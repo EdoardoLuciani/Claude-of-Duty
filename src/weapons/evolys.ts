@@ -13,6 +13,7 @@ import {
   type HandRig,
   type HandSide,
 } from './authored-hands.ts';
+import { authoredModel, requiredNode } from './authored-model.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 
 export const EVOLYS_URL = new URL(
@@ -30,20 +31,7 @@ const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
 
 export function makeEvolysModel(gltf: GLTF) {
   const scene = gltf.scene;
-  scene.updateMatrixWorld(true);
-  const root = scene.getObjectByName('EVOLYS_RIG');
-  if (!root) throw new Error('[evolys] missing EVOLYS_RIG');
-  const animations = REQUIRED.map((name: string) => {
-    const clip = gltf.animations.find((c) => c.name === name);
-    if (!clip) throw new Error(`[evolys] missing ${name}`);
-    return clip;
-  });
-  const point = (name: string): [number, number, number] => {
-    const o = root.getObjectByName(name);
-    if (!o) throw new Error(`[evolys] missing ${name}`);
-    const p = o.getWorldPosition(new THREE.Vector3());
-    return [p.x, p.y, p.z];
-  };
+  const { root, animations, point } = authoredModel(gltf, 'EVOLYS_RIG', REQUIRED, scene);
   const sight = point('SOCKET_sight');
   const model = {
     id: 'lmg',
@@ -119,11 +107,7 @@ export class EvolysAnimation {
     this.root = model.root;
     this.mixer = new THREE.AnimationMixer(this.root);
     this.actions = createAuthoredActions(this.mixer, model.animations);
-    const node = (name: string): THREE.Object3D => {
-      const o = this.root.getObjectByName(name);
-      if (!o) throw new Error(`[evolys] missing ${name}`);
-      return o;
-    };
+    const node = (name: string) => requiredNode(this.root, name);
     this.pouch = node('pouch');
     this.spare = node('pouch_spare');
     this.cover = node('feed_cover');

@@ -13,6 +13,7 @@ import {
   type HandRig,
   type HandSide,
 } from './authored-hands.ts';
+import { authoredModel, requiredNode } from './authored-model.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 
 export const AX338_URL = new URL('../../assets/weapons/ax338/ax338.glb', import.meta.url).href;
@@ -28,20 +29,7 @@ const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
 
 export function makeAX338Model(gltf: GLTF) {
   const scene = gltf.scene;
-  scene.updateMatrixWorld(true);
-  const root = scene.getObjectByName('AX338_RIG');
-  if (!root) throw new Error('[ax338] missing AX338_RIG');
-  const animations = REQUIRED.map((name: string) => {
-    const clip = gltf.animations.find((c) => c.name === name);
-    if (!clip) throw new Error(`[ax338] missing ${name} clip`);
-    return clip;
-  });
-  const point = (name: string): [number, number, number] => {
-    const node = root.getObjectByName(name);
-    if (!node) throw new Error(`[ax338] missing ${name}`);
-    const p = node.getWorldPosition(new THREE.Vector3());
-    return [p.x, p.y, p.z];
-  };
+  const { root, animations, point } = authoredModel(gltf, 'AX338_RIG', REQUIRED, scene);
   const model = {
     id: 'sniper',
     label: 'AX-338',
@@ -113,11 +101,7 @@ export class AX338Animation {
     this.root = model.root;
     this.mixer = new THREE.AnimationMixer(this.root);
     this.actions = createAuthoredActions(this.mixer, model.animations);
-    const node = (name: string): THREE.Object3D => {
-      const o = this.root.getObjectByName(name);
-      if (!o) throw new Error(`[ax338] missing ${name}`);
-      return o;
-    };
+    const node = (name: string) => requiredNode(this.root, name);
     this.bolt = node('bolt');
     this.magazine = node('magazine');
     this.spare = node('magazine_spare');

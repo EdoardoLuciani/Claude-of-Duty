@@ -41,9 +41,7 @@ photo for a verified left reference.
 
 ## Source and rebuild
 
-Python is geometry authority; builds start factory-empty and do not read previous
-weapon products. `m590.blend` is a generated editable preview, not a build input.
-Normal game builds use committed assets and require no Blender.
+Follow the [shared authoring workflow](../../../tools/blender/README.md).
 
 | File | Purpose |
 | --- | --- |
@@ -73,9 +71,6 @@ node tests/smoke/smoke-m590.mjs
 node tests/smoke/smoke-m590-ads.mjs
 ```
 
-`--output` redirects blend/GLB/manifest/renders together; rendering is optional.
-`--quick` changes preview samples/resolution only. Preserve original component
-modifiers and actions in the saved preview; evaluate/join runtime copies only.
 The native Actions exporter retains the 120 Hz lattice, fractional endpoints,
 constant-channel reduction and STEP resets. Hull visibility uses four exact
 fractional keys and direct TRS curves, including orientation at zero scale.
@@ -88,9 +83,7 @@ from the committed stock by at most `2.9802322387695312e-8 m`, normals by
 oriented topology/winding/bounds matched. Those reviewed rounding observations
 are not new tolerances or permission to repair geometry/UVs.
 
-Blender needs compatible OCIO with AgX; use a process-local compatible profile,
-not fallback color management or lighting/exposure compensation. Preserve the
-preview World Background node RGB `0.05087608844041824`, strength 1;
+Preserve the preview World Background node RGB `0.05087608844041824`, strength 1;
 `World.color` alone is insufficient. Optional Draco/meshoptimizer bridge warnings
 are harmless because this asset requests neither extension.
 

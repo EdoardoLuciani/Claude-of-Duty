@@ -7,6 +7,7 @@ import {
   launchChromium,
   parseArgs,
 } from './lib/browser-harness.mjs';
+import { routeSourceMutation } from './lib/source-mutation.mjs';
 
 const args = parseArgs(),
   port = Number(args.port ?? 5270);
@@ -45,44 +46,33 @@ try {
     if (m.type() === 'error') errors.push(m.text());
   });
   if (args.control) {
-    const file = ['csm-expression', 'shadow-fields', 'pcf-samples', 'pcf-values'].includes(
-      args.control
-    )
-      ? 'csm-webgpu.js'
-      : args.control === 'rooms'
-        ? 'indirect-webgpu.js'
-        : args.control === 'viewport'
-          ? 'webgpu-pipeline.js'
-          : 'index-webgpu.js';
-    await page.route(`**/src/render/${file}*`, async (route) => {
-      const response = await route.fetch(),
-        original = await response.text();
-      const body =
-        args.control === 'rooms'
-          ? original.replace(
-              "sharedUniformGroup('owRooms', 1, 'none')",
-              "sharedUniformGroup('owRooms', 1, 'object')"
-            )
-          : args.control === 'viewport'
-            ? original.replace('.sample(screenCoordinate.div(aoSize))', '.sample(screenUV)')
-            : args.control === 'csm-expression'
-              ? original.replace('if (!this._stableOutput ||', 'if (true || !this._stableOutput ||')
-              : args.control === 'shadow-fields'
-                ? original.replace('let fields = shadowFields.get(shadow);', 'let fields;')
-                : args.control === 'pcf-samples'
-                  ? original.replace('mul(1 / 5)', 'mul(1 / 4)')
-                  : args.control === 'pcf-values'
-                    ? original.replace(
-                        'shadowFields.set(shadow, fields);',
-                        'shadowFields.set(shadow, fields); fields.radius.updateType = "none";'
-                      )
-                    : original.replace(
-                        'node.setGroup(this._lightPositionGroup);',
-                        '/* negative: retain original group */'
-                      );
-      assert.notEqual(body, original, 'negative control marker');
-      await route.fulfill({ response, body });
-    });
+    const mutations = {
+      rooms: [
+        'indirect-webgpu',
+        /sharedUniformGroup\((['"])owRooms\1,\s*1,\s*(['"])none\2\)/g,
+        "sharedUniformGroup('owRooms', 1, 'object')",
+      ],
+      viewport: ['webgpu-pipeline', '.sample(screenCoordinate.div(aoSize))', '.sample(screenUV)'],
+      lights: [
+        'index-webgpu',
+        'grouped.setGroup(this._lightPositionGroup);',
+        '/* retain original group */',
+      ],
+      'csm-expression': [
+        'csm-webgpu',
+        'if (!this._stableOutput ||',
+        'if (true || !this._stableOutput ||',
+      ],
+      'shadow-fields': ['csm-webgpu', 'let fields = shadowFields.get(shadow);', 'let fields;'],
+      'pcf-samples': ['csm-webgpu', 'mul(1 / 5)', 'mul(1 / 4)'],
+      'pcf-values': [
+        'csm-webgpu',
+        'shadowFields.set(shadow, fields);',
+        'shadowFields.set(shadow, fields); fields.radius.updateType = "none";',
+      ],
+    };
+    const [file, before, after] = mutations[args.control];
+    await routeSourceMutation(page, `src/render/${file}.ts`, before, after);
   }
   await page.goto(
     `http://localhost:${port}/?capture=1&lockstep=1&shot=combat&q=${args.quality ?? 'high'}`
@@ -103,9 +93,13 @@ try {
       throw new Error('RX 9070 XT hardware adapter required');
     if (!fill._roomsReady) throw new Error('rooms must be initialized before graph warmup');
     await window.__PUMP__(60); // same initial settling window as the benchmark
-    const shadowTargets = new Set(
-      r.activeSun.shadow.shadowNode._shadowNodes.map((node) => node.shadowMap)
-    );
+    const csm = r.activeSun.shadow.shadowNode;
+    const expression = csm.setup({ renderer, camera: e.ctx.camera });
+    if (csm.setup({ renderer, camera: e.ctx.camera }) !== expression)
+      throw Error('CSM expression must be shared across material layouts');
+    const shadowTargets = new Set(csm._shadowNodes.map((node) => node.shadowMap));
+    const shadowSizes = new Set(csm.lights.map((light) => light.shadow.mapSize));
+    const pcfSizeNodes = new Set();
     let roomUploads = 0,
       builders = 0;
     const utils = renderer.backend.bindingUtils,
@@ -122,61 +116,47 @@ try {
     };
     const shadowGroups = new Set(),
       lightGroups = new Set();
-    const coefficients = new Set(),
-      wrapped = new WeakSet();
-    let coefficientChecks = 0,
-      pointNode;
-    const updateForRender = renderer._bindings.updateForRender;
-    renderer._bindings.updateForRender = function (object) {
-      if (object.scene === e.ctx.scene) {
-        for (const light of object.getNodeBuilderState().updateNodes) {
-          if (!light.isAnalyticLightNode) continue;
-          if (light.light.isPointLight) pointNode ??= light;
-          for (const node of [
-            light.light.colorNode ? null : (light.baseColorNode ?? light.colorNode),
-            light.cutoffDistanceNode,
-            light.decayExponentNode,
-          ]) {
-            if (node?.isUniformNode) coefficients.add(node);
-          }
-        }
-      }
-      return updateForRender.call(this, object);
-    };
+    const worldLights = r._graph.worldPass.lighting.getNode(e.ctx.scene);
+    // Lighting.finishRender restores the prior (empty) list. Capture native
+    // membership during the pass; the packed texture/sort order survive it.
+    let clusteredPoints = [];
     const update = renderer._bindings._update;
     renderer._bindings._update = function (group, all) {
+      if (!clusteredPoints.length && worldLights.clusteredLights.length)
+        clusteredPoints = worldLights.clusteredLights.slice();
       if (group.name === 'render' && shadowTargets.has(renderer.getRenderTarget()))
         shadowGroups.add(group.id);
-      if (group.name === 'owLightPositions' && renderer.getRenderTarget() === r.hdrRt)
-        lightGroups.add(group.id);
-      for (const binding of group.bindings) {
-        if (!binding.isUniformsGroup || wrapped.has(binding)) continue;
-        wrapped.add(binding);
-        const compare = binding.update;
-        binding.update = function () {
-          if (renderer.getRenderTarget() === r.hdrRt) {
-            for (const field of this.uniforms)
-              if (coefficients.has(field.nodeUniform.node)) coefficientChecks++;
-          }
-          return compare.call(this);
-        };
+      if (renderer.getRenderTarget() === r.hdrRt) {
+        if (group.name === 'owLightPositions') lightGroups.add(group.id);
+        for (const binding of group.bindings)
+          for (const field of binding.uniforms ?? [])
+            if (shadowSizes.has(field.nodeUniform?.value)) pcfSizeNodes.add(field.nodeUniform.node);
       }
       return update.call(this, group, all);
     };
     await window.__PUMP__(12);
+    if (!clusteredPoints.length) throw Error('clustered world point lights required');
     if (roomUploads) throw new Error('immutable room buffers uploaded during steady gameplay');
     if (builders) throw new Error('steady gameplay rebuilt authored shaders');
     if (!lightGroups.size || lightGroups.size > 4)
       throw new Error('light position bindings must be shared');
     if (!shadowGroups.size || shadowGroups.size > 8)
       throw new Error('AO viewport fragmented CSM camera bindings');
-    const steadyCoefficientChecks = coefficientChecks;
-    if (!pointNode || !coefficientChecks || coefficientChecks > coefficients.size * 4 * 12)
-      throw new Error('light coefficients still compared per material layout');
+    if (!pcfSizeNodes.size || pcfSizeNodes.size > shadowSizes.size * 2)
+      throw Error(`PCF parameter identities fragmented: ${pcfSizeNodes.size}`);
     const { RenderTarget, RenderPipeline, FloatType, RGBAFormat, Vector2 } =
       await import('/node_modules/.vite/deps/three_webgpu.js');
-    const { PCFShadowFilter, screenCoordinate, screenUV, uniform, int, vec3, vec4 } =
-      await import('/node_modules/.vite/deps/three_tsl.js');
+    const {
+      PCFShadowFilter,
+      screenCoordinate,
+      screenUV,
+      uniform,
+      int,
+      ivec2,
+      textureLoad,
+      vec3,
+      vec4,
+    } = await import('/node_modules/.vite/deps/three_tsl.js');
     const target = new RenderTarget(fill.rooms.length * 2, 1, {
       type: FloatType,
       format: RGBAFormat,
@@ -228,9 +208,9 @@ try {
     pipeline.dispose();
     target.dispose();
     await window.__PUMP__(4); // publish restored values to the world context
-    // Read the actual native light uniform nodes on the GPU after a real world
-    // render. No replacement update callbacks, CPU-only value test, or recompile
-    // is allowed to hide a frozen color/intensity/range/decay coefficient.
+    // World points are clustered, not AnalyticLightNodes. Read their actual
+    // native packed texture after a real world render; never copy expected
+    // coefficients into substitute uniforms or override update callbacks.
     const lightTarget = new RenderTarget(2, 1, {
       type: FloatType,
       format: RGBAFormat,
@@ -238,13 +218,13 @@ try {
     });
     const lightProbe = new RenderPipeline(renderer);
     lightProbe.outputColorTransform = false;
+    const lightIndex = uniform(0, 'int');
+    const dataA = textureLoad(worldLights._lightsTexture, ivec2(lightIndex, 0));
+    const dataB = textureLoad(worldLights._lightsTexture, ivec2(lightIndex, 1));
     lightProbe.outputNode = screenCoordinate.x
       .lessThan(1)
-      .select(
-        vec4(pointNode.baseColorNode ?? pointNode.colorNode, 1),
-        vec4(pointNode.cutoffDistanceNode, pointNode.decayExponentNode, 0, 1)
-      );
-    const light = pointNode.light,
+      .select(vec4(dataB.rgb, 1), vec4(dataA.w, dataB.w, 0, 1));
+    const light = clusteredPoints[0],
       saved = {
         color: light.color.clone(),
         intensity: light.intensity,
@@ -254,6 +234,8 @@ try {
     async function readLight() {
       await new Promise(requestAnimationFrame);
       r.render(e.ctx);
+      lightIndex.value = worldLights._lightSortOrder.indexOf(clusteredPoints.indexOf(light));
+      if (lightIndex.value < 0) throw Error('live clustered light vanished');
       const previous = renderer.getRenderTarget();
       try {
         renderer.setRenderTarget(lightTarget);
@@ -377,8 +359,8 @@ try {
       steadyBuilders: 0,
       shadowGroups: shadowGroups.size,
       lightGroups: lightGroups.size,
-      coefficientNodes: coefficients.size,
-      steadyCoefficientChecks,
+      clusteredPointLights: clusteredPoints.length,
+      pcfParameterNodes: pcfSizeNodes.size,
       lightReads,
       pcfCases,
       filteredPixels,

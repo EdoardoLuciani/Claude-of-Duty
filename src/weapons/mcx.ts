@@ -3,7 +3,8 @@ import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
 import manifest from '../../assets/weapons/mcx-virtus/manifest.json' with { type: 'json' };
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
-import { Clip, buildEquipClips } from './clips.ts';
+import { authoredModel } from './authored-model.ts';
+import { buildEquipClips, buildMagazineClips } from './clips.ts';
 import { smootherstep } from './mathx.ts';
 
 // Vite bundles the committed Blender export; never rebuild Blender at game boot.
@@ -26,20 +27,12 @@ export function makeMCXModel(gltf: GLTF) {
   scene.rotation.y = Math.PI / 2;
   scene.position.set(0, 0.07, -0.14);
   scene.add(gltf.scene);
-  scene.updateMatrixWorld(true);
-  const root = scene.getObjectByName('MCX_RIG');
-  if (!root) throw new Error('[mcx] missing MCX_RIG');
-  const animations = ['Idle', 'Fire', ...Object.values(ALIASES)].map((name: string) => {
-    const clip = gltf.animations.find((c) => c.name === name);
-    if (!clip) throw new Error(`[mcx] missing ${name} clip`);
-    return clip;
-  });
-  const point = (name: string): [number, number, number] => {
-    const node = scene.getObjectByName(name);
-    if (!node) throw new Error(`[mcx] missing ${name}`);
-    const p = node.getWorldPosition(new THREE.Vector3());
-    return [p.x, p.y, p.z];
-  };
+  const { root, animations, point } = authoredModel(
+    gltf,
+    'MCX_RIG',
+    ['Idle', 'Fire', ...Object.values(ALIASES)],
+    scene
+  );
   const sight = point('SOCKET_sight');
   const model = {
     id: 'mcx',
@@ -195,25 +188,14 @@ export class MCXAnimation {
   }
 
   clips() {
-    const result = buildEquipClips(this.model.nodes, this.def);
-    for (const [name, source] of Object.entries(ALIASES)) {
-      const duration = this.actions[source].getClip().duration;
-      const events = name.startsWith('reload') ? [{ t: 0, name: 'start' }] : [];
-      for (const ev of manifest.clips[source as keyof typeof manifest.clips].events) {
-        const event = (
-          { magazine_out: 'magout', magazine_in: 'magin', bolt_forward: 'boltrelease' } as Record<
-            string,
-            string
-          >
-        )[ev.event];
-        if (event) events.push({ t: ev.time, name: event });
-      }
-      events.push({ t: duration - 0.0001, name: 'end' });
-      // Shared viewmodel handles event crossing/interruption; pose/parts come
-      // solely from Blender, not the old procedural reload offsets.
-      result[name] = new Clip(name, duration, { events });
-    }
-    return result;
+    return {
+      ...buildEquipClips(this.model.nodes, this.def),
+      ...buildMagazineClips(
+        ALIASES,
+        manifest.clips,
+        (source) => this.actions[source].getClip().duration
+      ),
+    };
   }
 
   _sample(name: string, time: number): void {

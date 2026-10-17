@@ -4,12 +4,13 @@ import { Object3D } from 'three';
 
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 
-// Missing assemblies must fail explicitly, not fall into the GLB child loop.
+// Retired procedural records must fail explicitly before mounting anything.
 for (const body of [null, undefined]) {
   const vm = Object.create(Viewmodel.prototype);
   vm.rig = new Object3D();
   vm.mats = {};
-  assert.throws(() => vm.addWeapon({ id: 'broken', body }, {}), /broken: missing weapon assembly/);
+  assert.throws(() => vm.addWeapon({ id: 'broken', body }, {}), /broken: missing authored weapon/);
+  assert.equal(vm.rig.children.length, 0);
 }
 
 // The active weapon is checked at entry; use that snapshot throughout recoil.
@@ -24,15 +25,24 @@ Object.assign(vm, {
   settle: { ...spring(), f: 1 },
 });
 for (const boltAction of [false, true]) {
+  let authoredShots = 0;
   vm.active = {
+    model: { reactiveFire: true },
+    animation: {
+      fire() {
+        authoredShots++;
+      },
+    },
     def: {
       boltAction,
       recoil: { freq: 1, damping: 1, kickBack: 0, kickUp: 0, pitch: 0, yaw: 0, roll: 0 },
     },
   };
-  vm.boltCycle = 0.4;
+  let impulses = 0;
+  vm.recPos.kick = vm.recRot.kick = () => impulses++;
   vm.addRecoil(0, 0);
-  assert.equal(vm.boltCycle, boltAction ? 0.4 : 1);
+  assert.equal(authoredShots, 1);
+  assert.equal(impulses, 2, 'reactive recoil remains independent of the bolt mechanism');
 }
 
 // Teardown tolerates an absent radio and still releases instance-owned geometry.
@@ -62,4 +72,4 @@ for (const withRadio of [false, true]) {
   assert.equal(geometryDisposals, withRadio ? 1 : 0);
   assert.equal(owned.parent, withRadio ? null : parent);
 }
-console.log('viewmodel missing-assembly diagnostics, recoil and radio teardown guards passed');
+console.log('viewmodel authored-model diagnostics, recoil and radio teardown guards passed');

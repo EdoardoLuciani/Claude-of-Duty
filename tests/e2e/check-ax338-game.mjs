@@ -1,46 +1,22 @@
 #!/usr/bin/env node
 // Real game HDR rendering, scope, bolt/chamber events, reloads and interruptions.
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import {
-  ensureViteServer,
-  launchChromium,
-  parseArgs,
-  stopViteServer,
-} from '../../tools/lib/browser-harness.mjs';
-import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
+import { parseArgs } from '../../tools/lib/browser-harness.mjs';
+import { openGameReview, setWeaponMode, requestReload } from '../../tools/lib/game-review.mjs';
 const args = parseArgs(),
   port = Number(args.port ?? 5221),
   out = resolve(args.out ?? '.tmp-rend/ax338/game');
-mkdirSync(out, { recursive: true });
-const server = await ensureViteServer({ port });
-const browser = await launchChromium({
-  webgpu: true,
-  headless: true,
-  args: ['--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
+const { page, errors, warnings, pump, capture, boot, close } = await openGameReview({
+  port,
+  out,
+  viewport: { width: 1920, height: 1080 },
 });
-const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
-const errors = [];
-page.on('pageerror', (e) => errors.push(e.stack));
-page.on('console', (m) => {
-  if (m.type() === 'error') errors.push(m.text());
-});
-page.on('response', (r) => {
-  if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`);
-});
-const pump = (n) => page.evaluate((n) => window.__PUMP__(n), n);
-async function capture(name) {
-  await page.evaluate(() => window.__PRESENT__(2));
-  await captureNative(page, `${out}/${name}.png`);
-}
+
 try {
-  await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`, {
-    waitUntil: 'domcontentloaded',
-  });
-  await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
-  await verifyNative(page);
+  await boot();
   await page.waitForFunction(
     async () => {
       await window.__ENGINE__.ctx.get('weapons')._restTask;
@@ -66,9 +42,7 @@ try {
     'AX338Animation'
   );
   await capture('hip-day');
-  await page.evaluate(() => {
-    window.ax338Review.w.debugMode = 'ads';
-  });
+  await setWeaponMode(page, 'ax338Review', 'ads');
   await pump(60);
   assert(
     await page.evaluate(() => {
@@ -77,18 +51,9 @@ try {
     })
   );
   await capture('scope-ads');
-  await page.evaluate(() => {
-    window.ax338Review.w.debugMode = 'idle';
-  });
+  await setWeaponMode(page, 'ax338Review', 'idle');
   await pump(40);
-  assert(
-    await page.evaluate(() => {
-      const { w } = window.ax338Review;
-      w.state.mag = 3;
-      w.state.reserve = 30;
-      return w.reload();
-    })
-  );
+  await requestReload(page, 'ax338Review', { mag: 3, reserve: 30 });
   await pump(82);
   await capture('reload-tactical');
   assert(
@@ -99,23 +64,14 @@ try {
   );
   await pump(95);
   assert.equal(await page.evaluate(() => window.ax338Review.w.ammo.mag), 11);
-  assert(
-    await page.evaluate(() => {
-      const { w } = window.ax338Review;
-      w.state.mag = 0;
-      w.state.chambered = false;
-      return w.reload();
-    })
-  );
+  await requestReload(page, 'ax338Review', { mag: 0, chambered: false });
   await pump(110);
   await capture('reload-empty-magazine');
   await pump(80);
   await capture('reload-empty-bolt');
   await pump(35);
   assert.equal(await page.evaluate(() => window.ax338Review.w.ammo.mag), 10);
-  await page.evaluate(() => {
-    window.ax338Review.w.debugMode = null;
-  });
+  await setWeaponMode(page, 'ax338Review', null);
   assert(await page.evaluate(() => window.ax338Review.w.tryFire()));
   await pump(10);
   await capture('bolt-cycle');
@@ -190,10 +146,10 @@ try {
     shells: 3,
     render: await page.evaluate(() => window.__RENDER_INFO__),
     errors,
+    warnings,
   };
   writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
 } finally {
-  await browser.close();
-  stopViteServer(server);
+  await close();
 }

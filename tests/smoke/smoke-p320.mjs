@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import { resolveProfile, WEAPON_PROFILES } from '../../src/audio/weapons.ts';
 import { Rng } from '../../src/core/rng.ts';
@@ -11,6 +10,7 @@ import { WeaponSystem } from '../../src/weapons/index.ts';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
 import { makeP320Model, P320_URL } from '../../src/weapons/p320.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
+import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
 
 const dir = new URL('../../assets/weapons/p320-compact/', import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', dir)));
@@ -52,14 +52,7 @@ for (const clip of json.animations) {
       );
     }
 }
-const loader = new GLTFLoader().register(() => ({
-  name: 'NODE_TEXTURE_STUB',
-  loadTexture: () => Promise.resolve(new THREE.Texture()),
-}));
-const gltf = await loader.parseAsync(
-  bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-  ''
-);
+const gltf = await parseGLB(bytes);
 const model = makeP320Model(gltf);
 for (const m of model.materials) {
   const source = json.materials.find((a) => a.name === m.name).pbrMetallicRoughness;
@@ -93,12 +86,7 @@ const vm = new Viewmodel(ctx, {
   reticleOutline: () => new THREE.MeshBasicMaterial(),
 });
 const rifleBytes = readFileSync(new URL(M4_URL));
-const rifle = makeM4Model(
-  await loader.parseAsync(
-    rifleBytes.buffer.slice(rifleBytes.byteOffset, rifleBytes.byteOffset + rifleBytes.byteLength),
-    ''
-  )
-);
+const rifle = makeM4Model(await parseGLB(rifleBytes));
 vm.addWeapon(rifle, { ...WEAPON_DEFS.rifle, cycleTime: 60 / WEAPON_DEFS.rifle.rpm });
 const entry = vm.addWeapon(model, { ...WEAPON_DEFS.pistol, cycleTime: 60 / 460 });
 const anim = entry.animation;
