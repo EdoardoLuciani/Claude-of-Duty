@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 
 import { Engine } from '../../src/core/engine.ts';
 
@@ -50,18 +49,6 @@ for (const failure of [null, 'update', 'render', 'missing']) {
     assert.equal(renders, 2, 'one gameplay render per step');
   }
 }
-const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
-assert(html.indexOf('id="startup"') < html.indexOf('src="/src/bootstrap.ts"'));
-assert.match(html, /role="status" aria-live="polite" aria-atomic="true">Initializing…/);
-assert.match(html, /prefers-reduced-motion: reduce/);
-assert.match(html, /\.startup-dots span \{ animation: none; \}/);
-assert.match(html, /class="startup-dots" aria-hidden="true"/);
-assert.doesNotMatch(html, /role="progressbar"|<progress|<img|@import|https?:\/\//);
-const main = readFileSync(new URL('../../src/main.ts', import.meta.url), 'utf8');
-assert(main.indexOf("stage('Loading world and assets…')") < main.indexOf('await engine.init()'));
-assert(main.indexOf("stage('Preparing graphics…')") > main.indexOf('await engine.init()'));
-assert(main.indexOf("stage('Preparing graphics…')") < main.indexOf('await prewarm(engine)'));
-assert.match(main, /const BOOT_FRAMES = 3;/);
-console.log(
-  'HTML-first startup, stage wiring and one-shot successful gameplay render boundary passed'
-);
+// HTML, stage ordering, ARIA and reduced motion are exercised against the live
+// DOM by loading-shell-e2e / loading-screen-e2e, not by matching source spelling.
+console.log('one-shot successful gameplay render boundary passed');

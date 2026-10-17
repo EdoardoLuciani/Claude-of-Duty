@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { Worker } from 'node:worker_threads';
 
 import * as THREE from 'three';
 
@@ -10,6 +9,7 @@ import { TACTICS, acquireSeconds } from '../../src/ai/tuning.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { PlayerSystem } from '../../src/player/index.ts';
 import { makeAgent, makeAi } from '../../tools/lib/agent-fixture.mjs';
+import { NativeWorker } from '../../tools/lib/attachment-worker-fixture.mjs';
 import { loadMap, physicsFor } from '../../tools/nav240/fixtures.mjs';
 import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
 
@@ -298,26 +298,6 @@ for (const width of [1, 14]) {
 }
 
 // Only adapt browser transport; route eligibility uses the production worker.
-class NativeWorker {
-  constructor() {
-    this.thread = new Worker(
-      `const { parentPort } = require('node:worker_threads');
-      globalThis.self = { postMessage: m => parentPort.postMessage(m) };
-      import(${JSON.stringify(new URL('../../src/ai/attachment-worker.js', import.meta.url).href)}).then(() => {
-        parentPort.on('message', data => self.onmessage({ data }));
-      });`,
-      { eval: true }
-    );
-    this.thread.on('message', (data) => this.onmessage?.({ data }));
-    this.thread.on('error', (error) => this.onerror?.({ message: error.message }));
-  }
-  postMessage(message, transfer) {
-    this.thread.postMessage(message, transfer);
-  }
-  terminate() {
-    void this.thread.terminate();
-  }
-}
 
 // Exact September 27 eye-height clues. Native v2 connects only the first roof;
 // the second remains disconnected and must retain visible observation alternatives.
