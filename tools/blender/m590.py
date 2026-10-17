@@ -335,7 +335,13 @@ def build(output, render=False, quick=False):
         d=bpy.data.lights.new(name,'AREA');d.energy=power;d.color=color;d.size=size
         o=bpy.data.objects.new(name,d);studio.objects.link(o);o.location=xyz(pos);aim(o,xyz((0,.03,-.12)))
     scene.world=bpy.data.worlds.new('World')
-    scene.world.color=(.12,.12,.12);scene.render.engine='BLENDER_EEVEE';scene.eevee.taa_render_samples=32
+    scene.world.color=(.12,.12,.12)
+    # Preserve the original preview's effective node background after factory reset.
+    scene.world.use_nodes=True
+    background=scene.world.node_tree.nodes.get('Background')
+    background.inputs['Color'].default_value=(0.05087608844041824,)*3+(1,)
+    background.inputs['Strength'].default_value=1
+    scene.render.engine='BLENDER_EEVEE';scene.eevee.taa_render_samples=32
     scene.render.resolution_x=1600;scene.render.resolution_y=900;scene.render.resolution_percentage=100
     scene.render.image_settings.file_format='PNG';scene.render.film_transparent=False;scene.view_settings.view_transform='AgX';scene.view_settings.exposure=-1.8
     if quick:

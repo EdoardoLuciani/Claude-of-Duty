@@ -113,6 +113,12 @@ blender -b -t 4 --python-exit-code 1 --python tools/blender/m590.py -- \
 geometry, maps, actions or runtime export. No render is required to build.
 Normal game builds use committed assets and require no Blender.
 
+Factory-empty builds explicitly preserve the original saved preview's effective
+World Background node: linear RGB `0.05087608844041824` per component, strength
+`1`. `World.color` alone does not establish that node setting. This restores the
+baseline DCC environment, not a material/light/exposure/camera retune; the runtime
+GLB and manifest are unchanged by this preview-only correction.
+
 ### Local editing map and build stages
 
 | Concern | Source location |
