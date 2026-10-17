@@ -128,10 +128,31 @@ try {
         for (let y = cy - 8; y < cy + 8; y++) coverage += darkness(x, y);
         return coverage;
       };
+      const fineWidth = widthAt(fineX);
+      // Integrate the whole hash, then subtract the continuous axis underneath.
+      // A single off-axis sample can miss a short minor at 720p pixel phase.
+      const hashExcess = (mrad, horizontal) => {
+        const alongCenter = Math.floor((horizontal ? cx : cy) + mrad * pixelsPerMrad);
+        let coverage = 0;
+        for (let along = alongCenter - 2; along <= alongCenter + 2; along++)
+          for (let across = -8; across < 8; across++)
+            coverage += horizontal ? darkness(along, cy + across) : darkness(cx + across, along);
+        return coverage - 5 * fineWidth;
+      };
+      const hashPair = (mrad, horizontal) => ({
+        minor: hashExcess(mrad, horizontal),
+        major: hashExcess(mrad - Math.sign(mrad) * 2.5, horizontal),
+      });
+      const minorTicks = [-12.5, -7.5, 7.5, 12.5].map((mrad) => ({
+        mrad,
+        horizontal: hashPair(mrad, true),
+        vertical: hashPair(mrad, false),
+      }));
       return {
         ticks,
+        minorTicks,
         pixelsPerMrad,
-        fineWidth: widthAt(fineX),
+        fineWidth,
         postWidth: widthAt(postX),
         outside: darkness(cx + height * 0.4, cy),
       };
@@ -141,6 +162,15 @@ try {
         assert(tick[side] > 0.45, `${scene.id}: ${tick.mrad} mrad ${side}`);
       assert(tick.between < 0.15, `${scene.id}: ticks must remain separate`);
     }
+    for (const tick of probe.minorTicks)
+      for (const axis of ['horizontal', 'vertical']) {
+        const { minor, major } = tick[axis];
+        assert(minor > 0.5, `${scene.id}: ${tick.mrad} mrad ${axis} minor must extend beyond axis`);
+        assert(
+          major > minor * 1.5,
+          `${scene.id}: ${tick.mrad} mrad ${axis} minor must be shorter than major`
+        );
+      }
     assert(probe.fineWidth >= 0.9 && probe.fineWidth < 1.6, 'readable pixel-width center');
     assert(probe.postWidth > probe.fineWidth * 2, 'heavier outer posts');
     assert(probe.outside < 0.01, 'reticle clipped to aperture');
