@@ -36,6 +36,7 @@ type MarketItemId =
   | 'grenade'
   | 'armour'
   | 'bandage'
+  | 'pistol'
   | 'smg'
   | 'shotgun'
   | 'rifle'
@@ -109,6 +110,15 @@ const CATALOG = [
     max: 4,
     slot: 'kit',
     blurb: 'Dressing · hold H · +50 HP',
+  },
+  {
+    id: 'pistol',
+    label: 'P320 Compact',
+    cost: 400,
+    step: 1,
+    max: 1,
+    slot: 'secondary',
+    blurb: 'Semi-auto · 9×19',
   },
   { id: 'smg', label: 'MPX-9', cost: 800, step: 1, max: 1, slot: 'secondary', blurb: 'SMG · 9×19' },
   {
@@ -291,7 +301,7 @@ export class MarketSystem {
       if (!this.player.addBandages?.(item.step)) return false;
     } else if (itemId === 'ammo') this.weapons.refillAmmo();
     else if (itemId === 'carpet') this.weapons.addCarpetBombs(item.step);
-    else if (itemId === 'shotgun' || itemId === 'smg') {
+    else if (itemId === 'pistol' || itemId === 'shotgun' || itemId === 'smg') {
       if (!this.weapons.equipSecondary(itemId)) return false;
     } else if (!this.weapons.equipPrimary(itemId)) return false;
     this.credits -= item.cost;

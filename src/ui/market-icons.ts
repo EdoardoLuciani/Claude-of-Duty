@@ -81,6 +81,17 @@ function ammo(parent: HTMLElement): void {
   });
 }
 
+function pistol(parent: HTMLElement): void {
+  icon(parent, '0 0 32 24', (s) => {
+    r(s, 4, 3, 25, 6, 0.8); // slide
+    r(s, 5, 1.5, 2, 1.5); // rear sight
+    r(s, 26, 1.5, 1.5, 1.5); // front sight
+    poly(s, '5,9 15,9 12,23 3,23'); // grip
+    p(s, 'M14 9h10v7H13l.5-2H22v-3h-8z'); // trigger guard
+    r(s, 16, 9, 2, 4); // trigger
+  });
+}
+
 function smg(parent: HTMLElement): void {
   icon(parent, '0 0 64 20', (s) => {
     // Short PDW, left-of-centre so the missing barrel is the read.
@@ -193,7 +204,20 @@ function carpet(parent: HTMLElement): void {
   });
 }
 
-const DRAW = { grenade, armour, bandage, ammo, smg, rifle, mcx, shotgun, lmg, sniper, carpet };
+const DRAW = {
+  grenade,
+  armour,
+  bandage,
+  ammo,
+  pistol,
+  smg,
+  rifle,
+  mcx,
+  shotgun,
+  lmg,
+  sniper,
+  carpet,
+};
 
 export function marketIcon(id: keyof typeof DRAW, parent: HTMLElement): void {
   DRAW[id](parent);

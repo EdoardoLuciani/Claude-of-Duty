@@ -122,7 +122,7 @@ check(
   market
     .getHudState()
     .items.map((it) => it.id)
-    .join() === 'ammo,grenade,armour,bandage,smg,shotgun,rifle,mcx,lmg,sniper,carpet'
+    .join() === 'ammo,grenade,armour,bandage,pistol,smg,shotgun,rifle,mcx,lmg,sniper,carpet'
 );
 check(
   'every row has a blurb and slot',
@@ -276,7 +276,7 @@ check(
   market.buy('rifle') && fakeCtx.weapons.owns('rifle') && !fakeCtx.weapons.owns('lmg')
 );
 check('M4 purchase rejected when equipped again', !market.buy('rifle'));
-check('carpet is the last catalog row', market.getHudState().items[10].id === 'carpet');
+check('carpet is the last catalog row', market.getHudState().items.at(-1).id === 'carpet');
 check(
   'buy AX-338 replaces M4 and deducts 1500',
   market.buy('sniper') &&
@@ -324,6 +324,20 @@ check(
   'spawn loadout: pistol owned, SMG and shotgun not',
   fakeCtx.weapons.owns('pistol') && !fakeCtx.weapons.owns('smg') && !fakeCtx.weapons.owns('shotgun')
 );
+check(
+  'P320 offered as a 400-credit secondary',
+  item('pistol').label === 'P320 Compact' &&
+    item('pistol').cost === 400 &&
+    item('pistol').slot === 'secondary'
+);
+const beforeOwnedPistol = market.credits;
+check(
+  'starting pistol is equipped and cannot be repurchased',
+  item('pistol').action === 'equipped' &&
+    !item('pistol').affordable &&
+    !market.buy('pistol') &&
+    market.credits === beforeOwnedPistol
+);
 check('MPX buyable while pistol equipped', item('smg').affordable && item('smg').action === 'swap');
 const beforeSmg = market.credits;
 check(
@@ -350,6 +364,66 @@ check(
   'buy MPX replaces shotgun',
   market.buy('smg') && fakeCtx.weapons.owns('smg') && !fakeCtx.weapons.owns('shotgun')
 );
+
+// ---- pistol can be bought back after either secondary upgrade ------------
+for (const previous of ['smg', 'shotgun']) {
+  if (!fakeCtx.weapons.owns(previous)) fakeCtx.weapons.equipSecondary(previous);
+  const primary = ['rifle', 'mcx', 'lmg', 'sniper'].find((id) => fakeCtx.weapons.owns(id));
+  const pistol = fakeCtx.weapons.states.get('pistol');
+  pistol.mag = 0;
+  pistol.chambered = false;
+  pistol.reserve = 0;
+  market.credits = 399;
+  check(
+    'P320 unaffordable below 400 without charging or swapping',
+    item('pistol').action === 'swap' &&
+      !item('pistol').affordable &&
+      !market.buy('pistol') &&
+      market.credits === 399 &&
+      fakeCtx.weapons.owns(previous) &&
+      !fakeCtx.weapons.owns('pistol')
+  );
+  market.credits = 400;
+  check('P320 buyable at exactly 400', item('pistol').affordable);
+  check(
+    `buy P320 replaces ${previous}, preserves primary, and deducts 400`,
+    market.buy('pistol') &&
+      fakeCtx.weapons.owns('pistol') &&
+      !fakeCtx.weapons.owns('smg') &&
+      !fakeCtx.weapons.owns('shotgun') &&
+      fakeCtx.weapons.owns(primary) &&
+      market.credits === 0
+  );
+  check(
+    'P320 purchase refreshes ammo and disables duplicate purchase',
+    pistol.mag === pistol.def.magSize &&
+      pistol.chambered &&
+      pistol.reserve === pistol.def.reserve &&
+      item('pistol').action === 'equipped' &&
+      !item('pistol').affordable &&
+      !market.buy('pistol')
+  );
+}
+fakeCtx.weapons.equipSecondary('smg');
+market.credits = 400;
+{
+  const real = fakeCtx.weapons.equipSecondary;
+  fakeCtx.weapons.equipSecondary = () => false;
+  check(
+    'failed pistol equip does not charge or change ownership',
+    !market.buy('pistol') &&
+      market.credits === 400 &&
+      fakeCtx.weapons.owns('smg') &&
+      !fakeCtx.weapons.owns('pistol')
+  );
+  fakeCtx.weapons.equipSecondary = real;
+}
+market.closeShop();
+check(
+  'pistol cannot be bought with the market closed',
+  !market.buy('pistol') && market.credits === 400
+);
+market.openShop(2);
 
 // ---- carpet-bomb strike charges (radio request 1) ------------------------
 check('carpet sits in ordnance, last in the catalog', item('carpet').slot === 'strike');
