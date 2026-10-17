@@ -3,7 +3,7 @@
 Gray 9-inch VIRTUS, short factory M-LOK guard, folding/telescoping stock,
 direct-thread SRD762Ti, TA31F/TA51 and black MAG800 magazine.
 Original art, not CAD/scan or an endorsed/licensed replica.
-**Human visual sign-off remains pending.**
+Visual review remains separate from technical validation.
 History: [#334](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/334).
 
 ## Reference authority
@@ -22,8 +22,10 @@ floorplate/feed lips, not world-Z height. No copied serial or real 5.56 BDC.
 
 ## Source/runtime contract
 
-`mcx-virtus.blend/.glb`: packed editable source/runtime; `manifest.json`:
-counts/events; `textures/`: generated 1024² maps.
+Python under [`tools/blender/mcx/`](../../../tools/blender/mcx/README.md) is the
+sole authoring source. `mcx-virtus.blend/.glb` are generated preview/runtime
+products; `manifest.json` records counts/events; `textures/` holds generated
+1024² maps. Do not author changes in the generated files.
 `src/weapons/mcx.ts` converts +X-forward/+Y-up and samples six native clips.
 Draw/holster remain procedural, stock fold showcase-only. Shared arms/IK,
 scope/reticle, sound and live pooled cases are runtime-owned; hide baked cases.
@@ -32,10 +34,10 @@ Normal builds need no Blender.
 Caps: <110k triangles, ≤40 primitives, ≤16 materials, three 1024² maps, ≤10 MiB.
 Preserve complete-magazine bounds, vents/trigger, charging stem, cap/spine seating,
 hinge/handle clearance throughout reload/fold and the seated TA51 foot/rail.
-Keep matching NLA tracks and STEP magazine visibility without reload blending.
+Keep matching clip names and STEP magazine visibility without reload blending.
 Materials borrow textures; counts aren't GPU timings.
 
-## Rebuild/check (root, Blender 5.2)
+## Rebuild/check (root, Blender 5.2.2)
 
 ```sh
 blender -b --python-exit-code 1 --python tools/blender/mcx_virtus.py
@@ -46,6 +48,22 @@ node tests/smoke/smoke-mcx-game.mjs
 node tests/e2e/check-mcx-game.mjs
 ```
 
-Regeneration overwrites source/export/maps. `--render` adds stills;
-`mcx_review.py` reviews saved source/reels. Compare frozen uniform registration
-and matched Eevee settings, not historical Cycles or independent X/Y warps.
+Follow the [shared authoring workflow](../../../tools/blender/README.md).
+`-- --output /tmp/mcx-review` builds elsewhere; add `--render --quick` for stills.
+`mcx_review.py` inspects generated previews/reels. The local source map owns
+physical-scale UV projection and 60 Hz/STEP export details.
+
+The finish uses a warmer medium-gray coating, smoother surface detail, matte
+polymer and a darker charcoal suppressor. This is an artistic alternative to the
+previous cool satin proposal, not a measured factory finish. In `FINISHES`, the
+coating is linear RGB (.135, .130, .123), roughness .44, normal strength .025;
+polymer retains its pigment with roughness .84 / normal .50; the suppressor is
+RGB (.045, .046, .049), roughness .76 / normal .15. Other finishes are unchanged.
+
+The authoring pilot intentionally rebuilt UVs/triangle order. This subsequent
+finish-only revision preserves that pilot's complete nonmaterial GLB JSON and
+binary chunk, including maps, geometry, UVs, sockets and animations. Compare
+frozen registration and matched lighting, not independently rescaled screenshots.
+The appearance change is clearer in studio lighting; bright outdoor gameplay
+still compresses the coating's tonal differences, and the indoor view stays dark.
+No renderer or exposure compensation is included.

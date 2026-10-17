@@ -47,7 +47,7 @@ export const WEAPON_MATERIALS = {
       ...BASE,
       bake: { size: 1024, seed: 733, relief: 0.0025 },
       scale: 0.038,
-       tint: c(0.135, 0.144, 0.165),
+      tint: c(0.135, 0.144, 0.165),
       roughness: [0.56, 0.07, 0.26],
       normalStrength: 1.15,
       detail: [30, 0.85, 0.6, 4],

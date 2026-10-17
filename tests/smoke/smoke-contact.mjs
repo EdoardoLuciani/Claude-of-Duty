@@ -4,16 +4,20 @@
  *   node tests/smoke/smoke-contact.mjs
  */
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
+
+import { FIRE_JITTER, LOS_RANGE, hudContact, fireJitter } from '../../src/ai/contact.ts';
 import { AiSystem } from '../../src/ai/index.ts';
-import {
-  FIRE_JITTER, LOS_RANGE, hudContact, fireJitter,
-} from '../../src/ai/contact.ts';
 
 function agent(partial = {}) {
   return {
-    lastSeen: -Infinity, lastFired: -Infinity,
-    lastSeenX: 0, lastSeenZ: 10, fireX: 1, fireZ: 11,
+    lastSeen: -Infinity,
+    lastFired: -Infinity,
+    lastSeenX: 0,
+    lastSeenZ: 10,
+    fireX: 1,
+    fireZ: 11,
     ...partial,
   };
 }
@@ -43,30 +47,58 @@ const fireFade = hudContact(12.6, agent({ lastFired: 10, fireX: 1, fireZ: 1 }));
 assert.ok(Math.abs(fireFade.fade - 0.5) < 1e-9, 'fire fades across the last 0.8 s');
 assert.equal(hudContact(13, agent({ lastFired: 10 })), null, 'gone after 3 s');
 
-const newerShot = hudContact(10, agent({
-  lastSeen: 9.5, lastSeenX: 2, lastSeenZ: 3,
-  lastFired: 10, fireX: 9, fireZ: 9,
-}));
+const newerShot = hudContact(
+  10,
+  agent({
+    lastSeen: 9.5,
+    lastSeenX: 2,
+    lastSeenZ: 3,
+    lastFired: 10,
+    fireX: 9,
+    fireZ: 9,
+  })
+);
 assert.equal(newerShot.x, 9, 'a newer shot replaces a stale sighting');
 assert.equal(newerShot.z, 9);
 
-const newerSight = hudContact(10.5, agent({
-  lastSeen: 10, lastSeenX: 2, lastSeenZ: 3,
-  lastFired: 9, fireX: 9, fireZ: 9,
-}));
+const newerSight = hudContact(
+  10.5,
+  agent({
+    lastSeen: 10,
+    lastSeenX: 2,
+    lastSeenZ: 3,
+    lastFired: 9,
+    fireX: 9,
+    fireZ: 9,
+  })
+);
 assert.equal(newerSight.x, 2, 'a newer sighting replaces an older shot');
 assert.ok(Math.abs(newerSight.fade - 1) < 1e-9, 'either live signal keeps the contact');
 
-const fireSurvives = hudContact(12, agent({
-  lastSeen: 10, lastSeenX: 2, lastSeenZ: 3,
-  lastFired: 9.9, fireX: 9, fireZ: 9,
-}));
+const fireSurvives = hudContact(
+  12,
+  agent({
+    lastSeen: 10,
+    lastSeenX: 2,
+    lastSeenZ: 3,
+    lastFired: 9.9,
+    fireX: 9,
+    fireZ: 9,
+  })
+);
 assert.equal(fireSurvives.x, 9, 'fire remains after the newer sighting expires');
 
-const simultaneous = hudContact(10, agent({
-  lastSeen: 10, lastSeenX: 2, lastSeenZ: 3,
-  lastFired: 10, fireX: 9, fireZ: 9,
-}));
+const simultaneous = hudContact(
+  10,
+  agent({
+    lastSeen: 10,
+    lastSeenX: 2,
+    lastSeenZ: 3,
+    lastFired: 10,
+    fireX: 9,
+    fireZ: 9,
+  })
+);
 assert.equal(simultaneous.x, 2, 'exact sighting wins when visible while firing');
 
 const j0 = fireJitter(7, {});
@@ -84,10 +116,17 @@ const frustum = new THREE.Frustum().setFromProjectionMatrix(
   new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
 );
 const hudAgent = (x, z, extra = {}) => ({
-  alive: true, team: 1, crouch: true, scale: 1, speed: 0, state: 'combat',
+  alive: true,
+  team: 1,
+  crouch: true,
+  scale: 1,
+  speed: 0,
+  state: 'combat',
   position: new THREE.Vector3(x, 0, z),
-  lastSeen: -Infinity, lastFired: -Infinity,
-  lastSeenX: x, lastSeenZ: z,
+  lastSeen: -Infinity,
+  lastFired: -Infinity,
+  lastSeenX: x,
+  lastSeenZ: z,
   ...extra,
 });
 const front = hudAgent(0, -10);
@@ -104,13 +143,18 @@ const ctx = {
   camera,
   config: { deterministic: false },
   time: { elapsed: 10 },
-  peek: (id) => id === 'player' ? { position: new THREE.Vector3() } : null,
+  peek: (id) => (id === 'player' ? { position: new THREE.Vector3() } : null),
   events: { emit: (type, payload) => heard.push({ type, payload }) },
 };
 const ai = Object.assign(Object.create(AiSystem.prototype), {
   ctx,
   agents: [front, behind, fartherBehind, farFront, idleFront, alertFront],
-  _phys: { lineOfSight: (_from, to) => { sampleY.push(to.y); return true; } },
+  _phys: {
+    lineOfSight: (_from, to) => {
+      sampleY.push(to.y);
+      return true;
+    },
+  },
   _frustum: frustum,
   _v: new THREE.Vector3(),
   _v2: new THREE.Vector3(),

@@ -1,12 +1,15 @@
 import * as THREE from 'three';
-import { rendererCounters } from './render-info.ts';
+
 import type { Engine } from '../core/engine.ts';
-import type { ViewModel } from '../weapons/viewmodel.ts';
 import type { WeaponSystem } from '../weapons/index.ts';
+import type { ViewModel } from '../weapons/viewmodel.ts';
 import { field } from './diagnostic-values.ts';
+import { rendererCounters } from './render-info.ts';
 
 type ShotOptions = NonNullable<Parameters<WeaponSystem['debugPose']>[1]>;
-type ShotResult = { error: string; available: string[] } | { applied: string; pos: number[]; fov: number };
+type ShotResult =
+  | { error: string; available: string[] }
+  | { applied: string; pos: number[]; fov: number };
 
 // Browser automation supplies JSON, not a trusted WeaponSystem options object.
 function readShotOptions(value: unknown): ShotOptions {
@@ -228,7 +231,10 @@ declare global {
   }
 }
 
-export function installShotApi(engine: Engine, { capture = false, lockstep = false }: { capture?: boolean; lockstep?: boolean } = {}) {
+export function installShotApi(
+  engine: Engine,
+  { capture = false, lockstep = false }: { capture?: boolean; lockstep?: boolean } = {}
+) {
   window.__SHOTS__ = SHOTS;
 
   /**
@@ -293,7 +299,9 @@ export function installShotApi(engine: Engine, { capture = false, lockstep = fal
 
   window.__RENDER_INFO__ = null;
   engine.events.on('resize', () => {});
-  const snapInfo = () => { window.__RENDER_INFO__ = shotRenderInfo(engine); };
+  const snapInfo = () => {
+    window.__RENDER_INFO__ = shotRenderInfo(engine);
+  };
 
   /**
    * LOCKSTEP CAPTURE (`?capture=1&lockstep=1`) — the determinism fix.
@@ -316,44 +324,62 @@ export function installShotApi(engine: Engine, { capture = false, lockstep = fal
    * the screenshot is being taken.
    */
   if (lockstep) {
-    engine.start = function () { this._running = true; };
+    engine.start = function () {
+      this._running = true;
+    };
     window.__LOCKSTEP__ = true;
 
     /** Advance exactly `n` engine frames, one per rAF so each is presented. */
-    window.__PUMP__ = (n = 1) => new Promise((resolve, reject) => {
-      let i = 0;
-      const tick = () => {
-        try { engine.step(); }
-        catch (err) { reject(err); return; }
-        if (engine.error) { reject(new Error(`engine failure: ${JSON.stringify(engine.error)}`)); return; }
-        snapInfo();
-        if (++i >= n) resolve(engine.time.frame);
-        else requestAnimationFrame(tick);
-      };
-      requestAnimationFrame(tick);
-    });
+    window.__PUMP__ = (n = 1) =>
+      new Promise((resolve, reject) => {
+        let i = 0;
+        const tick = () => {
+          try {
+            engine.step();
+          } catch (err) {
+            reject(err);
+            return;
+          }
+          if (engine.error) {
+            reject(new Error(`engine failure: ${JSON.stringify(engine.error)}`));
+            return;
+          }
+          snapInfo();
+          if (++i >= n) resolve(engine.time.frame);
+          else requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
 
     /** Yield `n` rAFs WITHOUT stepping, so the compositor picks up the last
      *  rendered frame before the screenshot. Advances no simulation state. */
-    window.__PRESENT__ = (n = 2) => new Promise((resolve) => {
-      let i = 0;
-      const tick = () => (++i >= n ? resolve(engine.time.frame) : requestAnimationFrame(tick));
-      requestAnimationFrame(tick);
-    });
+    window.__PRESENT__ = (n = 2) =>
+      new Promise((resolve) => {
+        let i = 0;
+        const tick = () => (++i >= n ? resolve(engine.time.frame) : requestAnimationFrame(tick));
+        requestAnimationFrame(tick);
+      });
   } else {
     window.__LOCKSTEP__ = false;
     // Free-running: the engine drives itself, __PUMP__ just waits out n frames.
-    window.__PUMP__ = (n = 1) => new Promise((resolve, reject) => {
-      let i = 0;
-      const tick = () => {
-        if (engine.error) { reject(new Error(`engine failure: ${JSON.stringify(engine.error)}`)); return; }
-        if (++i >= n) resolve(engine.time.frame);
-        else requestAnimationFrame(tick);
-      };
-      requestAnimationFrame(tick);
-    });
+    window.__PUMP__ = (n = 1) =>
+      new Promise((resolve, reject) => {
+        let i = 0;
+        const tick = () => {
+          if (engine.error) {
+            reject(new Error(`engine failure: ${JSON.stringify(engine.error)}`));
+            return;
+          }
+          if (++i >= n) resolve(engine.time.frame);
+          else requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
     window.__PRESENT__ = window.__PUMP__;
-    const info = () => { snapInfo(); requestAnimationFrame(info); };
+    const info = () => {
+      snapInfo();
+      requestAnimationFrame(info);
+    };
     requestAnimationFrame(info);
   }
 

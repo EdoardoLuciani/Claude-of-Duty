@@ -22,23 +22,27 @@
  */
 
 import * as THREE from 'three';
+
+import type { EngineContext } from '../core/context.ts';
+import type { Rng } from '../core/rng.ts';
+import type { PhysicsSystem } from '../physics/index.ts';
+import { makeHitRecord } from '../physics/math.ts';
+import { MASK } from '../physics/surfaces.ts';
 import { GRENADE_FUSE, GRENADE_RADIUS } from '../weapons/index.ts';
-import { RIG } from './rig.ts';
-import { INFANTRY, vaultPoint } from './capabilities.ts';
 import { Animator } from './animator.ts';
 import { NAV_PENDING, NAV_CANCELLED } from './attachment-queries.js';
-import {
-  isBannedCover, FRIENDLY_HOLD, GRENADE_CLOSE_SPEED, LONG_RANGE,
-} from './intent.ts';
-import { COMBAT, TACTICS, acquireSeconds, applySpread } from './tuning.ts';
+import { LADDER_QUERY_MAX_ITERATIONS } from './attachment-types.ts';
+import { INFANTRY, vaultPoint } from './capabilities.ts';
 import type { AiSystem } from './index.ts';
-import type { EngineContext } from '../core/context.ts';
 import type { AiVariant } from './index.ts';
+import { isBannedCover, FRIENDLY_HOLD, GRENADE_CLOSE_SPEED, LONG_RANGE } from './intent.ts';
+import { LADDER, LadderMotor, ladderMoveBudget } from './ladder.ts';
+import type { LadderDescriptor, LadderCursor } from './ladder.ts';
 import type { BakedCoverPoint } from './nav-format.ts';
-import type { CoverMap, NavCache, SurfaceNav } from './nav.ts';
-import type { Rng } from '../core/rng.ts';
+import type { CoverMap, NavCache, SurfaceNav, NavRoute, NavLadderStep } from './nav.ts';
+import { RIG } from './rig.ts';
 import type { Squad } from './squad.ts';
-import type { PhysicsSystem } from '../physics/index.ts';
+import { COMBAT, TACTICS, acquireSeconds, applySpread } from './tuning.ts';
 
 const STATE = {
   IDLE: 'idle',
@@ -121,61 +125,255 @@ const HITBOXES: Array<[string, string, string, number, number]> = [
 let _nextId = 1;
 
 export interface StagedAgent {
-  crouch?: boolean; speed?: number; fire?: boolean; noDamage?: boolean;
-  heading: THREE.Vector3; aimWeight?: number; reloadEvery?: number; suppression?: number;
+  crouch?: boolean;
+  speed?: number;
+  fire?: boolean;
+  noDamage?: boolean;
+  heading: THREE.Vector3;
+  aimWeight?: number;
+  reloadEvery?: number;
+  suppression?: number;
 }
 export interface AgentOptions {
-  variant?: string; position?: THREE.Vector3; yaw?: number; silentDeath?: boolean;
-  team?: number; friendly?: boolean; name?: string; staged?: StagedAgent;
-  squad?: Squad | null; patrol?: THREE.Vector3[] | null;
+  variant?: string;
+  position?: THREE.Vector3;
+  yaw?: number;
+  silentDeath?: boolean;
+  team?: number;
+  friendly?: boolean;
+  name?: string;
+  staged?: StagedAgent;
+  squad?: Squad | null;
+  patrol?: THREE.Vector3[] | null;
+}
+
+interface LiveLadder {
+  step: NavLadderStep;
+  descriptor: LadderDescriptor;
+  nav: SurfaceNav;
+  motor: LadderMotor | null;
+  cursor: LadderCursor;
+  travel: number;
+  retry: number;
+  wait: number;
+  claimed: boolean;
+  deferred: boolean;
+  aligned: boolean;
+  finished: boolean;
+  hold: THREE.Vector3 | null;
+  status: 'approach' | 'waiting' | 'proof' | 'climbing' | 'blocked';
 }
 
 export class Agent {
-  declare ai: AiSystem; declare ctx: EngineContext; declare id: number; declare pathPending: boolean; declare hasMoveTarget: boolean;
-  declare _searchUntil: number; declare _firingSearch: boolean; declare _observationSearch: boolean; declare _searchLaneTime: number;
-  declare _searchCount: number; declare _searchIndex: number; declare _searchDwell: number; declare _searchTravelUntil: number;
-  declare pathReason: string | null; declare pathStartSurface: number; declare pathGoalSurface: number; declare vaultVersion: number;
-  declare ragdoll: ReturnType<PhysicsSystem['createRagdoll']> | null; declare deadTime: number;
-  declare rng: Rng; declare variantName: string; declare def: AiVariant; declare scale: number;
-  declare bones: ReturnType<typeof RIG.createSkeleton>['bones']; declare skeleton: THREE.Skeleton; declare mesh: THREE.SkinnedMesh; declare group: THREE.Group; declare skinnedMesh: THREE.SkinnedMesh;
-  declare mass: number; declare position: THREE.Vector3; declare yaw: number; declare targetYaw: number; declare animator: Animator; declare phys: PhysicsSystem;
-  declare height: number; declare radius: number; declare controller: ReturnType<PhysicsSystem['createCharacter']> | null; declare velocity: THREE.Vector3; declare grounded: boolean; declare colliders: ReturnType<PhysicsSystem['addCollider']>[];
-  declare health: number; declare maxHealth: number; declare alive: boolean; declare state: string; declare stateTime: number; declare squad: Squad | null; declare team: number;
-  declare silentDeath: boolean; declare eyeHeight: number; declare viewRange: number; declare viewCos: number; declare awareness: number;
-  declare hasTarget: boolean; declare targetVisible: boolean; declare targetSample: number; declare target: THREE.Vector3 | null; declare lastKnown: THREE.Vector3;
-  declare lastKnownAge: number; declare lastKnownKind: string | null; declare visualAge: number; declare lastSeen: number; declare lastFired: number;
-  declare lastSeenX: number; declare lastSeenZ: number; declare fireX: number; declare fireZ: number; declare searchPoint: THREE.Vector3;
-  declare _searchCand: THREE.Vector3[]; declare _searchOrigin: THREE.Vector3; declare _searchReached: boolean; declare searchOutcome: string | null;
-  declare suppression: number; declare _suppressedShots: Float64Array; declare _suppressedCursor: number; declare alertness: number;
-  declare _impactCooldown: number; declare _positionScores: Float64Array; declare _laneBlockedTime: number; declare _repositioning: boolean;
-  declare _repositionUntil: number; declare _positionRetry: number; declare weaponRange: number; declare fireRate: number; declare burstLeft: number;
-  declare fireCooldown: number; declare burstCooldown: number; declare magSize: number; declare ammo: number; declare spread: number; declare weaponDamage: number;
-  declare aimTarget: THREE.Vector3; declare aimActual: THREE.Vector3; declare aimWeight: number; declare wantFire: boolean; declare peeking: boolean;
-  declare peekTimer: number; declare grenadeCooldown: number; declare hasGrenade: boolean; declare role: string; declare wrapWait: number; declare _wrapDone: boolean;
-  declare _friendlyBlock: number; declare _muzzleBlocked: boolean; declare fireBlock: string | null; declare _relocWait: number; declare _peekWait: number;
-  declare _coverHold: number; declare _coverCheck: number; declare _engaging: boolean; declare _engageHold: number; declare _engageCooldown: number;
-  declare combatAction: string | null; declare coverFailure: string | null; declare _combatClock: number; declare _failedCoverIndex: number; declare _failedCovers: { x: number; y: number; z: number; until: number; threat: THREE.Vector3 }[];
-  declare _peekTravel: number; declare _elevatedRouteChecked: boolean; declare _peekSettle: number; declare path: THREE.Vector3[]; declare pathLen: number;
-  declare pathIndex: number; declare repathTimer: number; declare moveTarget: THREE.Vector3; declare desiredSpeed: number; declare speed: number;
-  declare crouch: boolean; declare cover: BakedCoverPoint | null; declare coverPos: THREE.Vector3; declare _coverPathMax: number; declare firePos: THREE.Vector3;
-  declare _returning: boolean; declare _peekFail: number; declare patrolPoints: THREE.Vector3[] | null; declare patrolIndex: number;
-  declare stuckTimer: number; declare stuckHits: number; declare noProgressTime: number; declare _progressPos: THREE.Vector3;
-  declare vaultCooldown: number; declare vaultT: number; declare vaultFrom: THREE.Vector3; declare vaultTo: THREE.Vector3; declare vaultOutcome: string | null;
-  declare recoveryOutcome: string | null; declare recoveryAttempts: number; declare _recovering: boolean; declare _recoveryTime: number; declare _recoveryWait: number;
-  declare _noRouteTime: number; declare _recoveryCount: number; declare _recoveryOrigin: THREE.Vector3; declare _safePosition: THREE.Vector3;
-  declare _safeNav: SurfaceNav | null; declare _safeSurface: number; declare _safeVersion: number; declare relocations: number; declare lastRollback: { t: number; from: THREE.Vector3Tuple; to: THREE.Vector3Tuple } | null;
-  declare _pendingDest: THREE.Vector3; declare pathOutcome: string | null; declare pathObjective: string | null; declare pathReqFloor: number; declare pathResFloor: number;
-  declare _failWait: number; declare _failStreak: number; declare _holdMove: boolean; declare lodIrrelevant: boolean; declare _animSkip: number;
-  declare _animAccum: number; declare _v: THREE.Vector3; declare _v2: THREE.Vector3; declare _v3: THREE.Vector3; declare _eye: THREE.Vector3;
-  declare _dir: THREE.Vector3; declare _steer: THREE.Vector3; declare _boneA: THREE.Vector3; declare _boneB: THREE.Vector3; declare _muzzleDir: THREE.Vector3;
-  declare _stepPayload: { position: THREE.Vector3; surface: string; gait: string }; declare clip: string;
-  declare _searchPending: boolean; declare _searchGeometry: Float64Array; declare _searchGeometryCount: number;
-  declare _waitingNav: boolean; declare _repositionAdmitted: boolean;
-  declare _positionPlan: { investigate: boolean; state: string; center: THREE.Vector3; retryAt?: number } | null | undefined;
+  declare route: NavRoute;
+  declare ladder: LiveLadder | null;
+  private readonly _ladderHit = makeHitRecord();
+  private readonly _ladderPath = [new THREE.Vector3(), new THREE.Vector3()] as const;
+  declare ai: AiSystem;
+  declare ctx: EngineContext;
+  declare id: number;
+  declare pathPending: boolean;
+  declare hasMoveTarget: boolean;
+  declare _searchUntil: number;
+  declare _firingSearch: boolean;
+  declare _observationSearch: boolean;
+  declare _searchLaneTime: number;
+  declare _searchCount: number;
+  declare _searchIndex: number;
+  declare _searchDwell: number;
+  declare _searchTravelUntil: number;
+  declare pathReason: string | null;
+  declare pathStartSurface: number;
+  declare pathGoalSurface: number;
+  declare vaultVersion: number;
+  declare ragdoll: ReturnType<PhysicsSystem['createRagdoll']> | null;
+  declare deadTime: number;
+  declare rng: Rng;
+  declare variantName: string;
+  declare def: AiVariant;
+  declare scale: number;
+  declare bones: ReturnType<typeof RIG.createSkeleton>['bones'];
+  declare skeleton: THREE.Skeleton;
+  declare mesh: THREE.SkinnedMesh;
+  declare group: THREE.Group;
+  declare skinnedMesh: THREE.SkinnedMesh;
+  declare mass: number;
+  declare position: THREE.Vector3;
+  declare yaw: number;
+  declare targetYaw: number;
+  declare animator: Animator;
+  declare phys: PhysicsSystem;
+  declare height: number;
+  declare radius: number;
+  declare controller: ReturnType<PhysicsSystem['createCharacter']> | null;
+  declare velocity: THREE.Vector3;
+  declare grounded: boolean;
+  declare colliders: ReturnType<PhysicsSystem['addCollider']>[];
+  declare health: number;
+  declare maxHealth: number;
+  declare alive: boolean;
+  declare state: string;
+  declare stateTime: number;
+  declare squad: Squad | null;
+  declare team: number;
+  declare silentDeath: boolean;
+  declare eyeHeight: number;
+  declare viewRange: number;
+  declare viewCos: number;
+  declare awareness: number;
+  declare hasTarget: boolean;
+  declare targetVisible: boolean;
+  declare targetSample: number;
+  declare target: THREE.Vector3 | null;
+  declare lastKnown: THREE.Vector3;
+  declare lastKnownAge: number;
+  declare lastKnownKind: string | null;
+  declare visualAge: number;
+  declare lastSeen: number;
+  declare lastFired: number;
+  declare lastSeenX: number;
+  declare lastSeenZ: number;
+  declare fireX: number;
+  declare fireZ: number;
+  declare searchPoint: THREE.Vector3;
+  declare _searchCand: THREE.Vector3[];
+  declare _searchOrigin: THREE.Vector3;
+  declare _searchReached: boolean;
+  declare searchOutcome: string | null;
+  declare suppression: number;
+  declare _suppressedShots: Float64Array;
+  declare _suppressedCursor: number;
+  declare alertness: number;
+  declare _impactCooldown: number;
+  declare _positionScores: Float64Array;
+  declare _laneBlockedTime: number;
+  declare _repositioning: boolean;
+  declare _repositionUntil: number;
+  declare _positionRetry: number;
+  declare weaponRange: number;
+  declare fireRate: number;
+  declare burstLeft: number;
+  declare fireCooldown: number;
+  declare burstCooldown: number;
+  declare magSize: number;
+  declare ammo: number;
+  declare spread: number;
+  declare weaponDamage: number;
+  declare aimTarget: THREE.Vector3;
+  declare aimActual: THREE.Vector3;
+  declare aimWeight: number;
+  declare wantFire: boolean;
+  declare peeking: boolean;
+  declare peekTimer: number;
+  declare grenadeCooldown: number;
+  declare hasGrenade: boolean;
+  declare role: string;
+  declare wrapWait: number;
+  declare _wrapDone: boolean;
+  declare _friendlyBlock: number;
+  declare _muzzleBlocked: boolean;
+  declare fireBlock: string | null;
+  declare _relocWait: number;
+  declare _peekWait: number;
+  declare _coverHold: number;
+  declare _coverCheck: number;
+  declare _engaging: boolean;
+  declare _engageHold: number;
+  declare _engageCooldown: number;
+  declare combatAction: string | null;
+  declare coverFailure: string | null;
+  declare _combatClock: number;
+  declare _failedCoverIndex: number;
+  declare _failedCovers: {
+    x: number;
+    y: number;
+    z: number;
+    until: number;
+    threat: THREE.Vector3;
+  }[];
+  declare _peekTravel: number;
+  declare _elevatedRouteChecked: boolean;
+  declare _peekSettle: number;
+  declare path: THREE.Vector3[];
+  declare pathLen: number;
+  declare pathIndex: number;
+  declare repathTimer: number;
+  declare moveTarget: THREE.Vector3;
+  declare desiredSpeed: number;
+  declare speed: number;
+  declare crouch: boolean;
+  declare cover: BakedCoverPoint | null;
+  declare coverPos: THREE.Vector3;
+  declare _coverPathMax: number;
+  declare firePos: THREE.Vector3;
+  declare _returning: boolean;
+  declare _peekFail: number;
+  declare patrolPoints: THREE.Vector3[] | null;
+  declare patrolIndex: number;
+  declare stuckTimer: number;
+  declare stuckHits: number;
+  declare noProgressTime: number;
+  declare _progressPos: THREE.Vector3;
+  declare vaultCooldown: number;
+  declare vaultT: number;
+  declare vaultFrom: THREE.Vector3;
+  declare vaultTo: THREE.Vector3;
+  declare vaultOutcome: string | null;
+  declare recoveryOutcome: string | null;
+  declare recoveryAttempts: number;
+  declare _recovering: boolean;
+  declare _recoveryTime: number;
+  declare _recoveryWait: number;
+  declare _noRouteTime: number;
+  declare _recoveryCount: number;
+  declare _recoveryOrigin: THREE.Vector3;
+  declare _safePosition: THREE.Vector3;
+  declare _safeNav: SurfaceNav | null;
+  declare _safeSurface: number;
+  declare _safeVersion: number;
+  declare relocations: number;
+  declare lastRollback: { t: number; from: THREE.Vector3Tuple; to: THREE.Vector3Tuple } | null;
+  declare _pendingDest: THREE.Vector3;
+  declare pathOutcome: string | null;
+  declare pathObjective: string | null;
+  declare pathReqFloor: number;
+  declare pathResFloor: number;
+  declare _failWait: number;
+  declare _failStreak: number;
+  declare _holdMove: boolean;
+  declare lodIrrelevant: boolean;
+  declare _animSkip: number;
+  declare _animAccum: number;
+  declare _v: THREE.Vector3;
+  declare _v2: THREE.Vector3;
+  declare _v3: THREE.Vector3;
+  declare _eye: THREE.Vector3;
+  declare _dir: THREE.Vector3;
+  declare _steer: THREE.Vector3;
+  declare _boneA: THREE.Vector3;
+  declare _boneB: THREE.Vector3;
+  declare _muzzleDir: THREE.Vector3;
+  declare _stepPayload: { position: THREE.Vector3; surface: string; gait: string };
+  declare clip: string;
+  declare _searchPending: boolean;
+  declare _searchGeometry: Float64Array;
+  declare _searchGeometryCount: number;
+  declare _waitingNav: boolean;
+  declare _repositionAdmitted: boolean;
+  declare _positionPlan:
+    | { investigate: boolean; state: string; center: THREE.Vector3; retryAt?: number }
+    | null
+    | undefined;
   declare navStart: NavCache;
   declare navGoal: NavCache;
-  declare name?: string; declare friendly?: boolean; declare isPlayerCorpse?: boolean;
-  declare staged?: StagedAgent; declare hudX?: number; declare hudZ?: number; declare hudFade?: number; declare _loggedDoll?: boolean;
+  declare name?: string;
+  declare friendly?: boolean;
+  declare isPlayerCorpse?: boolean;
+  declare staged?: StagedAgent;
+  declare hudX?: number;
+  declare hudZ?: number;
+  declare hudFade?: number;
+  declare _loggedDoll?: boolean;
 
   constructor(ai: AiSystem, opts: AgentOptions = {}) {
     this.ai = ai;
@@ -234,18 +432,23 @@ export class Agent {
     this.radius = INFANTRY.radius * this.scale;
     this.controller = phys
       ? phys.createCharacter({
-        radius: this.radius,
-        height: this.height,
-        position: this.position,
-        stepHeight: INFANTRY.stepHeight,
-        slopeLimit: INFANTRY.slopeRadians,
-      })
+          radius: this.radius,
+          height: this.height,
+          position: this.position,
+          stepHeight: INFANTRY.stepHeight,
+          slopeLimit: INFANTRY.slopeRadians,
+        })
       : null;
     this.velocity = new THREE.Vector3();
     this.grounded = true;
     const navCache = () => ({
-      nav: null, version: -1, ref: 0, radius: this.radius, height: this.height,
-      position: new THREE.Vector3(), point: new THREE.Vector3(),
+      nav: null,
+      version: -1,
+      ref: 0,
+      radius: this.radius,
+      height: this.height,
+      position: new THREE.Vector3(),
+      point: new THREE.Vector3(),
     });
     this.navStart = navCache();
     this.navGoal = navCache();
@@ -352,13 +555,21 @@ export class Agent {
     this.coverFailure = null;
     this._combatClock = 0;
     this._failedCoverIndex = 0;
-    this._failedCovers = Array.from({ length: 6 }, () => ({ x: 0, y: 0, z: 0, until: 0, threat: new THREE.Vector3() }));
+    this._failedCovers = Array.from({ length: 6 }, () => ({
+      x: 0,
+      y: 0,
+      z: 0,
+      until: 0,
+      threat: new THREE.Vector3(),
+    }));
     this._peekTravel = 0;
     this._elevatedRouteChecked = false;
     this._peekSettle = 0;
 
     /* ---------------- navigation ---------------- */
     this.path = [];
+    this.route = { points: this.path, ladderSteps: [] };
+    this.ladder = null;
     this.pathLen = 0;
     this.pathIndex = 0;
     this.repathTimer = 0;
@@ -446,6 +657,15 @@ export class Agent {
 
   update(dt: number) {
     if (!this.alive) return;
+    if (dt <= 0) {
+      this._drive(0);
+      return;
+    }
+    if (this.ladder) {
+      this._moveLadder(dt);
+      this._drive(dt);
+      return;
+    }
     // Under the map they stay on the minimap and cannot be damaged, so the wave never ends.
     if (this.position.y < -3) {
       this.silentDeath = true;
@@ -495,8 +715,10 @@ export class Agent {
       return;
     }
     const eye = this.eye;
-    let dist = 0, visible = false;
-    const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
+    let dist = 0,
+      visible = false;
+    const fx = Math.sin(this.yaw),
+      fz = Math.cos(this.yaw);
     const cone = this.hasTarget ? -0.2 : this.viewCos - this.alertness * 0.25;
     // Chest first: the common open-combat case still needs only one ray.
     // Each fallback must pass its own cone/range/LOS; awareness advances ONCE.
@@ -505,10 +727,13 @@ export class Agent {
       if (!player) break;
       const to = this._dir.copy(player).sub(eye);
       dist = to.length();
-      const dot = (fx * to.x + fz * to.z) / Math.max(dist, .001);
+      const dot = (fx * to.x + fz * to.z) / Math.max(dist, 0.001);
       if (dist >= this.viewRange || (dot <= cone && dist >= COMBAT.closeAcquire)) continue;
       visible = !this.phys || this.phys.lineOfSight(eye, player, this.phys.MASK.SIGHT);
-      if (visible) { this.targetSample = sample; break; }
+      if (visible) {
+        this.targetSample = sample;
+        break;
+      }
     }
     this.targetVisible = visible;
 
@@ -548,9 +773,9 @@ export class Agent {
   hearImpact(pos: THREE.Vector3) {
     const d = this.position.distanceTo(pos);
     if (d >= 12) return;
-    this.alertness = Math.max(this.alertness, .5);
+    this.alertness = Math.max(this.alertness, 0.5);
     if (d < 3.2 && this._impactCooldown <= 0) {
-      this.suppress(.5 * (1 - d / 3.2));
+      this.suppress(0.5 * (1 - d / 3.2));
       this._impactCooldown = TACTICS.impactInterval;
     }
   }
@@ -561,14 +786,19 @@ export class Agent {
     if (kind === EVIDENCE.REPORT) {
       if (had && this.lastKnownAge < EVIDENCE_TTL) return false;
     } else {
-      if (this.lastKnownKind === EVIDENCE.GUNFIRE && kind === EVIDENCE.SOUND
-        && this.lastKnownAge < TACTICS.gunfireLock) return false;
+      if (
+        this.lastKnownKind === EVIDENCE.GUNFIRE &&
+        kind === EVIDENCE.SOUND &&
+        this.lastKnownAge < TACTICS.gunfireLock
+      )
+        return false;
       if (had && age > this.lastKnownAge) return false;
       if (
         this.lastKnownKind === EVIDENCE.VISUAL &&
         this.lastKnownAge < VISUAL_LOCK &&
         kind !== EVIDENCE.VISUAL
-      ) return false;
+      )
+        return false;
     }
 
     const jump = !had || this.lastKnown.distanceToSquared(pos) > 4;
@@ -580,9 +810,14 @@ export class Agent {
     if (kind === EVIDENCE.REPORT) return true;
     if (this.state === STATE.ALERT) {
       if (this._searchUntil <= 0) this._beginSearch();
-      else if (jump && !this._recovering && !(this.vaultT >= 0)
-        && ((!this.hasMoveTarget && !this.pathPending)
-          || this._searchOrigin.distanceToSquared(pos) > (SEARCH_RADIUS * 2) ** 2)) {
+      else if (
+        jump &&
+        !this.ladder &&
+        !this._recovering &&
+        !(this.vaultT >= 0) &&
+        ((!this.hasMoveTarget && !this.pathPending) ||
+          this._searchOrigin.distanceToSquared(pos) > (SEARCH_RADIUS * 2) ** 2)
+      ) {
         // Noisy nearby sounds update evidence without cancelling a valid route.
         if (age < 0.25) this._searchUntil = this.stateTime + SEARCH_DURATION;
         this._rebuildSearch();
@@ -603,6 +838,7 @@ export class Agent {
   /* ================================================================== */
 
   _setState(s: string) {
+    if (this.ladder) return;
     if (this.state === s) return;
     const prev = this.state;
     this.state = s;
@@ -626,6 +862,7 @@ export class Agent {
   }
 
   _clearSearch() {
+    if (this.ladder) return;
     if (this._searchPending) this.ai.grid?.worker?.cancel(`${this.id}:observation`);
     this._searchPending = false;
     this._searchGeometryCount = 0;
@@ -655,6 +892,7 @@ export class Agent {
   }
 
   _rebuildSearch() {
+    if (this.ladder) return;
     this.ai.grid?.worker?.cancel(`${this.id}:observation`);
     this._searchTravelUntil = 0;
     this._searchReached = false;
@@ -669,7 +907,8 @@ export class Agent {
 
   _buildSearchCandidates() {
     const worker = this.ai.grid?.worker;
-    return worker ? worker.run(this.id, 'observation', () => this._scanSearchCandidates(), this.position)
+    return worker
+      ? worker.run(this.id, 'observation', () => this._scanSearchCandidates(), this.position)
       : this._scanSearchCandidates();
   }
 
@@ -680,11 +919,15 @@ export class Agent {
     const start = grid?.project(this.position, this._v2);
     const direct = grid?.sampleGround(origin.x, origin.z, origin.y, this._v);
     if (grid?.worker?.pending) return;
-    this._observationSearch = !!(grid && start
-      && (!direct || grid.components.get(direct) !== grid.components.get(start)));
+    this._observationSearch = !!(
+      grid &&
+      start &&
+      (!direct || grid.components.get(direct) !== grid.components.get(start))
+    );
     if (this._observationSearch) {
       // Candidate construction already owns the observation scope.
-      const result = grid?.worker?.active ? this._scanObservationPoints(origin, false, this.position)
+      const result = grid?.worker?.active
+        ? this._scanObservationPoints(origin, false, this.position)
         : this._pickObservationPoints(origin, false);
       if (result === NAV_PENDING || result === NAV_CANCELLED) return result;
       if (grid?.worker?.pending) return;
@@ -701,7 +944,9 @@ export class Agent {
       if (grid) {
         const goal = grid.sampleGround(x, z, y, this._v);
         if (!goal || (start && grid.components.get(goal) !== grid.components.get(start))) return;
-        x = this._v.x; y = this._v.y; z = this._v.z;
+        x = this._v.x;
+        y = this._v.y;
+        z = this._v.z;
       }
       for (let k = 0; k < this._searchCount; k++) {
         if (Math.hypot(this._searchCand[k].x - x, this._searchCand[k].z - z) < 1.6) return;
@@ -719,7 +964,8 @@ export class Agent {
         this._searchGeometry[i * 2 + 1] = SEARCH_RADIUS * (0.45 + 0.55 * this.rng.float());
         this._searchGeometryCount++;
       }
-      const ang = this._searchGeometry[i * 2], d = this._searchGeometry[i * 2 + 1];
+      const ang = this._searchGeometry[i * 2],
+        d = this._searchGeometry[i * 2 + 1];
       push(origin.x + Math.cos(ang) * d, origin.y, origin.z + Math.sin(ang) * d);
     }
   }
@@ -742,8 +988,10 @@ export class Agent {
   }
 
   _tickSearch(dt: number) {
-    const deadline = !this._searchReached && this._searchTravelUntil > 0
-      ? this._searchTravelUntil : this._searchUntil;
+    const deadline =
+      !this._searchReached && this._searchTravelUntil > 0
+        ? this._searchTravelUntil
+        : this._searchUntil;
     if (this.stateTime >= deadline) {
       this._finishSearch(this._searchReached ? SEARCH_OUTCOME.COMPLETE : SEARCH_OUTCOME.FAILED);
       return;
@@ -751,7 +999,10 @@ export class Agent {
     if (this._searchPending) {
       const result = this._buildSearchCandidates();
       this._searchPending = result === NAV_PENDING || result === NAV_CANCELLED;
-      if (this._searchPending) { this.desiredSpeed = 0; return; }
+      if (this._searchPending) {
+        this.desiredSpeed = 0;
+        return;
+      }
       this._goSearchCandidate();
     }
     if (this._searchIndex >= this._searchCount) {
@@ -768,7 +1019,7 @@ export class Agent {
       this._searchDwell -= dt;
       this.targetYaw = Math.atan2(
         this.lastKnown.x - this.position.x,
-        this.lastKnown.z - this.position.z,
+        this.lastKnown.z - this.position.z
       );
       if (this._searchDwell <= 0) {
         if (this._observationSearch) this._rememberFailedPosition(this.position);
@@ -789,7 +1040,7 @@ export class Agent {
       this.hasMoveTarget = false;
       this.targetYaw = Math.atan2(
         this.lastKnown.x - this.position.x,
-        this.lastKnown.z - this.position.z,
+        this.lastKnown.z - this.position.z
       );
       return;
     }
@@ -802,12 +1053,20 @@ export class Agent {
   }
 
   _think(dt: number) {
+    if (this.ladder) {
+      this.wantFire = false;
+      return;
+    }
     this.wantFire = false;
     this.combatAction = null;
     this._combatClock += dt;
     // Incoming fire sends a covered fighter back to protection before another
     // peek. Without cover, keep fighting while the normal picker finds shelter.
-    if (this.state === STATE.COMBAT && this.cover && this.suppression >= TACTICS.strongSuppression) {
+    if (
+      this.state === STATE.COMBAT &&
+      this.cover &&
+      this.suppression >= TACTICS.strongSuppression
+    ) {
       this._setState(STATE.SUPPRESSED);
     }
     if (this._updateReposition()) return;
@@ -866,8 +1125,11 @@ export class Agent {
         this.crouch = false;
         // Seeing over a roof edge is not a firing position. Finish the useful
         // approach until the rifle lane clears instead of cancelling the climb.
-        const ready = this.hasTarget && this._canFireAtLastKnown()
-          && (!(this.hasMoveTarget || this.pathPending || this._firingSearch) || this._firingLaneClear(this.lastKnown));
+        const ready =
+          this.hasTarget &&
+          this._canFireAtLastKnown() &&
+          (!(this.hasMoveTarget || this.pathPending || this._firingSearch) ||
+            this._firingLaneClear(this.lastKnown));
         this._searchLaneTime = ready ? this._searchLaneTime + dt : 0;
         // Recovery needs a stable lane, not one clear animation frame that
         // abandons the approach at the same ineffective position again.
@@ -901,16 +1163,21 @@ export class Agent {
           this._combat(dt);
           break;
         }
-        const safe = this.position.distanceTo(this.coverPos) < COVER_ARRIVE
-          && this._coverMap.protects(this.position, this.lastKnown, height);
+        const safe =
+          this.position.distanceTo(this.coverPos) < COVER_ARRIVE &&
+          this._coverMap.protects(this.position, this.lastKnown, height);
         this.crouch = safe;
-        this.aimWeight = safe ? .55 : 1;
+        this.aimWeight = safe ? 0.55 : 1;
         this.combatAction = safe ? 'suppressed-hide' : 'suppressed-move';
         this.desiredSpeed = safe ? 0 : TACTICS.suppressedMoveSpeed;
-        if (!safe && !this.pathPending && this.repathTimer <= 0
-          && (!this.hasMoveTarget || this.moveTarget.distanceToSquared(this.coverPos) > .01)) {
+        if (
+          !safe &&
+          !this.pathPending &&
+          this.repathTimer <= 0 &&
+          (!this.hasMoveTarget || this.moveTarget.distanceToSquared(this.coverPos) > 0.01)
+        ) {
           this._goTo(this.coverPos);
-          this.repathTimer = .5;
+          this.repathTimer = 0.5;
         }
         if (this.suppression < TACTICS.suppressionRelease) this._setState(STATE.COMBAT);
         break;
@@ -948,30 +1215,45 @@ export class Agent {
 
     // Suppression is not a firing veto. Outside verified protection, retain
     // acquired defensive fire without cancelling the route to shelter/retreat.
-    if ((this.state === STATE.SUPPRESSED && !this.crouch)
-      || (this.suppression >= TACTICS.strongSuppression
-        && (this.state === STATE.COMBAT || this.state === STATE.FLANK || this.state === STATE.RETREAT))) {
-      this.wantFire = this.hasTarget && this.position.distanceTo(this.lastKnown) < this.weaponRange
-        && this._canFireAtLastKnown();
-      this.aimWeight = this.wantFire ? 1 : .55;
-      this.combatAction = this.desiredSpeed > 0 && (this.hasMoveTarget || this.pathPending)
-        ? 'suppressed-move' : 'suppressed-engage';
+    if (
+      (this.state === STATE.SUPPRESSED && !this.crouch) ||
+      (this.suppression >= TACTICS.strongSuppression &&
+        (this.state === STATE.COMBAT || this.state === STATE.FLANK || this.state === STATE.RETREAT))
+    ) {
+      this.wantFire =
+        this.hasTarget &&
+        this.position.distanceTo(this.lastKnown) < this.weaponRange &&
+        this._canFireAtLastKnown();
+      this.aimWeight = this.wantFire ? 1 : 0.55;
+      this.combatAction =
+        this.desiredSpeed > 0 && (this.hasMoveTarget || this.pathPending)
+          ? 'suppressed-move'
+          : 'suppressed-engage';
     }
   }
 
   // Pause the existing route/state rather than inventing a second movement
   // executor. Hysteresis keeps a nearby visible opponent from toggling run/aim.
   _engageClose(dt: number) {
+    if (this.ladder) return false;
     this._engageCooldown = Math.max(0, this._engageCooldown - dt);
     this._engageHold = Math.max(0, this._engageHold - dt);
-    const eligible = (this.state === STATE.COMBAT || this.state === STATE.FLANK || this.state === STATE.RETREAT)
-      && this.hasTarget && this.suppression < TACTICS.strongSuppression
-      && !this.animator.reloading && !this.animator.vaulting && this.vaultT < 0 && !this._recovering;
+    const eligible =
+      (this.state === STATE.COMBAT || this.state === STATE.FLANK || this.state === STATE.RETREAT) &&
+      this.hasTarget &&
+      this.suppression < TACTICS.strongSuppression &&
+      !this.animator.reloading &&
+      !this.animator.vaulting &&
+      this.vaultT < 0 &&
+      !this._recovering;
     const distance = this.position.distanceTo(this.lastKnown);
     const holding = this.squad?.holder === this && this.state === STATE.COMBAT;
-    const visible = eligible && this.targetVisible
-      && distance < (holding ? LONG_RANGE : this._engaging ? TACTICS.closeRelease : TACTICS.closeEngage)
-      && this._firingLaneClear(this.lastKnown);
+    const visible =
+      eligible &&
+      this.targetVisible &&
+      distance <
+        (holding ? LONG_RANGE : this._engaging ? TACTICS.closeRelease : TACTICS.closeEngage) &&
+      this._firingLaneClear(this.lastKnown);
     if (visible && (this._engaging || this._engageCooldown <= 0)) {
       if (!this._engaging) {
         this._endPeek();
@@ -986,8 +1268,14 @@ export class Agent {
         this._engageHold = TACTICS.engageHold;
       }
       this._engaging = true;
-    } else if (!(this._engaging && eligible && this._engageHold > 0
-      && this.visualAge < TACTICS.engageLostGrace)) {
+    } else if (
+      !(
+        this._engaging &&
+        eligible &&
+        this._engageHold > 0 &&
+        this.visualAge < TACTICS.engageLostGrace
+      )
+    ) {
       if (this._engaging) this._engageCooldown = TACTICS.engageCooldown;
       this._engaging = false;
       return false;
@@ -996,7 +1284,8 @@ export class Agent {
     this.crouch = false;
     this.aimWeight = 1;
     this.wantFire = visible;
-    this.combatAction = holding && distance >= TACTICS.closeEngage ? 'hold-pressure' : 'close-engage';
+    this.combatAction =
+      holding && distance >= TACTICS.closeEngage ? 'hold-pressure' : 'close-engage';
     if (this.state === STATE.COMBAT) this._tryGrenade(this.lastKnown, distance);
     return true;
   }
@@ -1004,29 +1293,46 @@ export class Agent {
   _tryElevation(dt: number) {
     const sq = this.squad;
     if (sq?.elevated !== this || !this.cover || this.state === STATE.SUPPRESSED) return false;
-    const target = this.hasTarget && this.lastKnownKind === EVIDENCE.VISUAL ? this.lastKnown : sq.contact;
+    const target =
+      this.hasTarget && this.lastKnownKind === EVIDENCE.VISUAL ? this.lastKnown : sq.contact;
     if (this.suppression >= TACTICS.strongSuppression) {
       this._setState(STATE.SUPPRESSED);
       return false;
     }
     if (!this._elevatedRouteChecked && this.hasMoveTarget && !this.pathPending) {
       let length = this.position.distanceTo(this.path[this.pathIndex]);
-      for (let i = this.pathIndex + 1; i < this.pathLen; i++) length += this.path[i - 1].distanceTo(this.path[i]);
+      for (let i = this.pathIndex + 1; i < this.pathLen; i++)
+        length += this.path[i - 1].distanceTo(this.path[i]);
       this._elevatedRouteChecked = true;
-      if (length > TACTICS.elevatedPathMax) { this._rejectCover('elevated-route-cost'); return false; }
+      if (length > TACTICS.elevatedPathMax) {
+        this._rejectCover('elevated-route-cost');
+        return false;
+      }
     }
     const atHide = this.position.distanceTo(this.coverPos) < COVER_ARRIVE;
     if (!atHide && !this.peeking && !this._returning) {
-      if (!this.hasMoveTarget && !this.pathPending) { this._rejectCover('elevated-route-failed'); return false; }
-      this.desiredSpeed = 3.5; this.crouch = false; this.aimWeight = .35;
+      if (!this.hasMoveTarget && !this.pathPending) {
+        this._rejectCover('elevated-route-failed');
+        return false;
+      }
+      this.desiredSpeed = 3.5;
+      this.crouch = false;
+      this.aimWeight = 0.35;
       this.combatAction = 'elevated-travel';
       return true;
     }
     this._coverCheck -= dt;
     if (this._coverCheck <= 0) {
-      this._coverCheck = .35;
-      if (!this._coverMap.protects(this.coverPos, target, this.cover.high ? this.height : INFANTRY.crouchHeight * this.scale)) {
-        this._rejectCover('elevated-exposed'); return false;
+      this._coverCheck = 0.35;
+      if (
+        !this._coverMap.protects(
+          this.coverPos,
+          target,
+          this.cover.high ? this.height : INFANTRY.crouchHeight * this.scale
+        )
+      ) {
+        this._rejectCover('elevated-exposed');
+        return false;
       }
     }
     this.combatAction = 'elevated-peek';
@@ -1035,8 +1341,9 @@ export class Agent {
   }
 
   _canFireAtLastKnown() {
-    return this.targetVisible || (
-      this.lastKnownKind === EVIDENCE.VISUAL && this.lastKnownAge < TACTICS.suppressFireAge
+    return (
+      this.targetVisible ||
+      (this.lastKnownKind === EVIDENCE.VISUAL && this.lastKnownAge < TACTICS.suppressFireAge)
     );
   }
 
@@ -1052,9 +1359,13 @@ export class Agent {
   }
 
   _abandonMove(target: THREE.Vector3, dist: number) {
-    const expose = this.hasTarget && dist < this.weaponRange && this._canFireAtLastKnown()
-      && !this.animator.reloading && !this.animator.vaulting
-      && this._muzzleClear(target);
+    const expose =
+      this.hasTarget &&
+      dist < this.weaponRange &&
+      this._canFireAtLastKnown() &&
+      !this.animator.reloading &&
+      !this.animator.vaulting &&
+      this._muzzleClear(target);
     this._rejectCover('relocate-timeout');
     this._coverHold = this.rng.range(1.4, 2.4);
     this._relocWait = 0;
@@ -1078,7 +1389,9 @@ export class Agent {
     if (!this._muzzleClear(target)) return false;
     const from = this.animator.muzzleWorld;
     const dir = this.animator.muzzleDir;
-    const dx = target.x - from.x, dy = target.y - from.y, dz = target.z - from.z;
+    const dx = target.x - from.x,
+      dy = target.y - from.y,
+      dz = target.z - from.z;
     const len = Math.hypot(dx, dy, dz) || 1;
     return (dir.x * dx + dir.y * dy + dir.z * dz) / len >= MUZZLE_AIM_DOT;
   }
@@ -1090,8 +1403,11 @@ export class Agent {
   }
 
   _combat(dt: number) {
-    const target = this.hasTarget || (this.lastKnownAge < 5 && this.lastKnownKind === EVIDENCE.VISUAL)
-      ? this.lastKnown : null;
+    if (this.ladder) return;
+    const target =
+      this.hasTarget || (this.lastKnownAge < 5 && this.lastKnownKind === EVIDENCE.VISUAL)
+        ? this.lastKnown
+        : null;
     if (!target) {
       this._setState(STATE.ALERT);
       return;
@@ -1099,8 +1415,10 @@ export class Agent {
     const sq = this.squad;
     const dist = this.position.distanceTo(target);
     if (this._positionPlan) {
-      this.desiredSpeed = 0; this.combatAction = 'planning-position';
-      this.wantFire = this._canFireAtLastKnown(); return;
+      this.desiredSpeed = 0;
+      this.combatAction = 'planning-position';
+      this.wantFire = this._canFireAtLastKnown();
+      return;
     }
 
     const pressured = this.suppression >= TACTICS.strongSuppression;
@@ -1108,11 +1426,15 @@ export class Agent {
 
     this._coverCheck = Math.max(0, this._coverCheck - dt);
     const height = this.cover?.high ? this.height : INFANTRY.crouchHeight * this.scale;
-    const exposed = this.cover && this._coverCheck <= 0
-      && (!this._coverMap.protects(this.coverPos, target, height)
-        || (!this.peeking && !this._returning && this.position.distanceTo(this.coverPos) < COVER_ARRIVE
-          && !this._coverMap.protects(this.position, target, height)));
-    if (this._coverCheck <= 0) this._coverCheck = .35;
+    const exposed =
+      this.cover &&
+      this._coverCheck <= 0 &&
+      (!this._coverMap.protects(this.coverPos, target, height) ||
+        (!this.peeking &&
+          !this._returning &&
+          this.position.distanceTo(this.coverPos) < COVER_ARRIVE &&
+          !this._coverMap.protects(this.position, target, height)));
+    if (this._coverCheck <= 0) this._coverCheck = 0.35;
     // A claim/normal does not establish protection from the current 3D threat.
     if (exposed || (sq && isBannedCover(this.cover, sq.banned))) this._rejectCover('exposed');
 
@@ -1143,7 +1465,8 @@ export class Agent {
         maxTravel,
         avoid: sq?.banned ?? null,
         eyeHeight: this.eyeHeight,
-        failed: this._failedCovers, now: this._combatClock,
+        failed: this._failedCovers,
+        now: this._combatClock,
       });
       if (pick !== NAV_PENDING) this.repathTimer = this.rng.range(2.2, 4.5);
       if (pick !== NAV_PENDING && pick !== NAV_CANCELLED && pick && pick !== this.cover) {
@@ -1155,8 +1478,11 @@ export class Agent {
         this.firePos.copy(this.coverPos);
         // Check the actual solved route, including deferred requests. A nearby
         // point on another roof is not a cheap combat reposition.
-        this._coverPathMax = Math.min(maxTravel,
-          this.position.distanceTo(this.coverPos) * TACTICS.coverDetourRatio + TACTICS.coverDetourSlack);
+        this._coverPathMax = Math.min(
+          maxTravel,
+          this.position.distanceTo(this.coverPos) * TACTICS.coverDetourRatio +
+            TACTICS.coverDetourSlack
+        );
         this._goTo(this.coverPos);
       } else if (pick === null && !this.cover && dist > LONG_RANGE) {
         this.desiredSpeed = 4.3;
@@ -1202,7 +1528,7 @@ export class Agent {
           this.combatAction = 'contact-travel';
           this.desiredSpeed = 4.3;
           this.crouch = false;
-          this.aimWeight = .35;
+          this.aimWeight = 0.35;
         } else {
           this._setState(STATE.ALERT);
           this._tickSearch(dt);
@@ -1219,7 +1545,8 @@ export class Agent {
     // Opportunistic lateral relocate — skipped while the squad is wrapping so
     // the designated man owns the only flank slot.
     if (
-      !pressured && sq &&
+      !pressured &&
+      sq &&
       this.role === 'pin' &&
       this.stateTime > 4 &&
       sq.canFlank(this) &&
@@ -1245,10 +1572,13 @@ export class Agent {
   }
 
   _tryGrenade(target: THREE.Vector3, dist: number) {
+    if (this.ladder) return;
     const sq = this.squad;
     const flush = !!(sq?.wantFlush && this.hasGrenade);
     if (
-      this.hasGrenade && this.hasTarget && this.lastKnownKind === EVIDENCE.VISUAL &&
+      this.hasGrenade &&
+      this.hasTarget &&
+      this.lastKnownKind === EVIDENCE.VISUAL &&
       this.grenadeCooldown <= 0 &&
       dist > (flush ? 6 : 8) &&
       dist < (flush ? 30 : 26) &&
@@ -1277,15 +1607,20 @@ export class Agent {
     this._v2.set(
       this.position.x + (-lz / len) * side * 14 + (lx / len) * 6,
       this.position.y,
-      this.position.z + (lx / len) * side * 14 + (lz / len) * 6,
+      this.position.z + (lx / len) * side * 14 + (lz / len) * 6
     );
     return this._goTo(this._v2);
   }
 
   _tryWrap(dt: number, sq: Squad | null, target: THREE.Vector3) {
     if (!sq || this.role !== 'wrap' || this._wrapDone) return false;
-    if (sq.alive > 1 && sq.contactAge < TACTICS.elevatedContactAge
-      && sq.why !== 'unseen-deaths' && !sq.canFlank(this)) return false;
+    if (
+      sq.alive > 1 &&
+      sq.contactAge < TACTICS.elevatedContactAge &&
+      sq.why !== 'unseen-deaths' &&
+      !sq.canFlank(this)
+    )
+      return false;
     if (this.wrapWait > 0) {
       this.wrapWait -= dt;
       return false;
@@ -1335,8 +1670,11 @@ export class Agent {
   _rememberFailedPosition(p: THREE.Vector3Like) {
     const f = this._failedCovers[this._failedCoverIndex];
     this._failedCoverIndex = (this._failedCoverIndex + 1) % this._failedCovers.length;
-    f.x = p.x; f.y = p.y; f.z = p.z;
-    f.threat.copy(this.lastKnown); f.until = this._combatClock + TACTICS.failedCoverAge;
+    f.x = p.x;
+    f.y = p.y;
+    f.z = p.z;
+    f.threat.copy(this.lastKnown);
+    f.until = this._combatClock + TACTICS.failedCoverAge;
   }
 
   _rejectCover(reason: string) {
@@ -1348,7 +1686,7 @@ export class Agent {
     this.cover = null;
     this.hasMoveTarget = this.pathPending = false;
     this.pathLen = 0;
-    this.repathTimer = .6;
+    this.repathTimer = 0.6;
   }
 
   // One bounded scan, no path solves. Actual routes still pass through _goTo
@@ -1356,7 +1694,13 @@ export class Agent {
   _pickObservationPoints(target: THREE.Vector3, local: boolean) {
     const grid = this.ai.grid;
     const from = local ? (this._positionPlan?.center ?? this.position) : this.position;
-    return grid?.worker ? grid.worker.run(this.id, 'observation', () => this._scanObservationPoints(target, local, from), from)
+    return grid?.worker
+      ? grid.worker.run(
+          this.id,
+          'observation',
+          () => this._scanObservationPoints(target, local, from),
+          from
+        )
       : this._scanObservationPoints(target, local, from);
   }
 
@@ -1372,23 +1716,42 @@ export class Agent {
     // settling/separation shifts all 24 probes before their proofs can return.
     const center = local ? from : target;
     for (let i = local ? 0 : -1; i < TACTICS.observationProbes; i++) {
-      const ring = Math.floor(i / 8), angle = (i % 8) * Math.PI / 4 + (this.id % 8) * Math.PI / 16;
+      const ring = Math.floor(i / 8),
+        angle = ((i % 8) * Math.PI) / 4 + ((this.id % 8) * Math.PI) / 16;
       const radius = local ? TACTICS.firingStepRadii[ring] : TACTICS.observationRadii[ring];
       // A useful current position calls for looking, not an unnecessary detour.
       const x = i < 0 ? this.position.x : center.x + Math.sin(angle) * radius;
       const z = i < 0 ? this.position.z : center.z + Math.cos(angle) * radius;
-      let ref = grid.sampleGround(x, z, local ? center.y : i < 0 ? this.position.y : target.y, this._v);
-      if (!ref || grid.components.get(ref) !== component) ref = grid.sampleGround(x, z, local ? center.y : this.position.y, this._v);
+      let ref = grid.sampleGround(
+        x,
+        z,
+        local ? center.y : i < 0 ? this.position.y : target.y,
+        this._v
+      );
+      if (!ref || grid.components.get(ref) !== component)
+        ref = grid.sampleGround(x, z, local ? center.y : this.position.y, this._v);
       if (!ref || grid.components.get(ref) !== component) continue;
-      const p = this._v, travel = p.distanceTo(this.position);
-      if ((i >= 0 && travel < .5) || travel > (local ? TACTICS.firingStepTravel : TACTICS.observationTravel)) continue;
+      const p = this._v,
+        travel = p.distanceTo(this.position);
+      if (
+        (i >= 0 && travel < 0.5) ||
+        travel > (local ? TACTICS.firingStepTravel : TACTICS.observationTravel)
+      )
+        continue;
       let failed = false;
       for (const f of this._failedCovers) {
-        if (f.until > this._combatClock && f.threat.distanceToSquared(target) < TACTICS.failedThreatMove ** 2
-          && Math.hypot(p.x - f.x, p.y - f.y, p.z - f.z) < TACTICS.firingPositionRadius) { failed = true; break; }
+        if (
+          f.until > this._combatClock &&
+          f.threat.distanceToSquared(target) < TACTICS.failedThreatMove ** 2 &&
+          Math.hypot(p.x - f.x, p.y - f.y, p.z - f.z) < TACTICS.firingPositionRadius
+        ) {
+          failed = true;
+          break;
+        }
       }
       if (failed) continue;
-      this._v2.copy(p); this._v2.y += this.eyeHeight;
+      this._v2.copy(p);
+      this._v2.y += this.eyeHeight;
       if (!this.phys.lineOfSight(this._v2, target, this.phys.MASK.SIGHT)) continue;
       this._dir.copy(target).sub(p).setY(0).normalize();
       this._v3.copy(this._v2).addScaledVector(this._dir, TACTICS.muzzleForward);
@@ -1399,31 +1762,54 @@ export class Agent {
       let slot = this._searchCount < SEARCH_CANDIDATES ? this._searchCount : 0;
       let crowded = false;
       for (let k = 0; k < this._searchCount; k++) {
-        if (this._searchCand[k].distanceTo(p) < 1.6) { crowded = true; break; }
-        if (this._searchCount === SEARCH_CANDIDATES && this._positionScores[k] > this._positionScores[slot]) slot = k;
+        if (this._searchCand[k].distanceTo(p) < 1.6) {
+          crowded = true;
+          break;
+        }
+        if (
+          this._searchCount === SEARCH_CANDIDATES &&
+          this._positionScores[k] > this._positionScores[slot]
+        )
+          slot = k;
       }
       if (crowded || travel >= this._positionScores[slot]) continue;
       // This proves the request's original local step. _goTo independently
       // proves a complete route from the live foot before movement may start.
       if (local && !grid.lineOfWalk(from, p)) continue;
-      this._searchCand[slot].copy(p); this._positionScores[slot] = travel;
+      this._searchCand[slot].copy(p);
+      this._positionScores[slot] = travel;
       this._searchCount = Math.min(SEARCH_CANDIDATES, this._searchCount + 1);
     }
     for (let i = 0; i < this._searchCount; i++) {
       for (let j = i + 1; j < this._searchCount; j++) {
         if (this._positionScores[j] >= this._positionScores[i]) continue;
-        const p = this._searchCand[i]; this._searchCand[i] = this._searchCand[j]; this._searchCand[j] = p;
-        const score = this._positionScores[i]; this._positionScores[i] = this._positionScores[j]; this._positionScores[j] = score;
+        const p = this._searchCand[i];
+        this._searchCand[i] = this._searchCand[j];
+        this._searchCand[j] = p;
+        const score = this._positionScores[i];
+        this._positionScores[i] = this._positionScores[j];
+        this._positionScores[j] = score;
       }
     }
   }
 
   _startReposition(reason: string) {
-    if (this._positionPlan || this._repositioning || this._combatClock < this._positionRetry || !this.hasTarget
-      || (this.state !== STATE.COMBAT && this.state !== STATE.SUPPRESSED)
-      || !this._canFireAtLastKnown() || this._recovering || this.vaultT >= 0) return;
-    const investigate = reason === 'blocked-firing-position' && !this.cover
-      && !this.hasMoveTarget && !this.pathPending;
+    if (
+      this._positionPlan ||
+      this._repositioning ||
+      this._combatClock < this._positionRetry ||
+      !this.hasTarget ||
+      (this.state !== STATE.COMBAT && this.state !== STATE.SUPPRESSED) ||
+      !this._canFireAtLastKnown() ||
+      this._recovering ||
+      this.vaultT >= 0
+    )
+      return;
+    const investigate =
+      reason === 'blocked-firing-position' &&
+      !this.cover &&
+      !this.hasMoveTarget &&
+      !this.pathPending;
     this._positionRetry = this._combatClock + TACTICS.positionRetry;
     this._rememberFailedPosition(this.position);
     this._rejectCover(reason);
@@ -1436,20 +1822,30 @@ export class Agent {
   _finishRepositionPlan() {
     if (!this._positionPlan) return;
     const { investigate, state } = this._positionPlan;
-    if (!this.hasTarget || this.state !== state || this._recovering || this.vaultT >= 0 || !this._canFireAtLastKnown()) {
-      this._positionPlan = null; return;
+    if (
+      !this.hasTarget ||
+      this.state !== state ||
+      this._recovering ||
+      this.vaultT >= 0 ||
+      !this._canFireAtLastKnown()
+    ) {
+      this._positionPlan = null;
+      return;
     }
     if (this._combatClock < (this._positionPlan.retryAt ?? 0)) return;
     const result = this._pickObservationPoints(this.lastKnown, true);
     if (result === NAV_PENDING) return;
     if (result === NAV_CANCELLED) {
-      this._positionPlan.retryAt = this._combatClock + TACTICS.firingLaneSettle; return;
+      this._positionPlan.retryAt = this._combatClock + TACTICS.firingLaneSettle;
+      return;
     }
     this._positionPlan = null;
     if (this._searchCount && (this._goTo(this._searchCand[0]) || this.pathPending)) {
       this._repositioning = true;
       this._repositionAdmitted = !this.pathPending;
-      this._repositionUntil = this._repositionAdmitted ? this._combatClock + TACTICS.firingStepTime : Infinity;
+      this._repositionUntil = this._repositionAdmitted
+        ? this._combatClock + TACTICS.firingStepTime
+        : Infinity;
     } else if (investigate) {
       // No local firing step: let the normal navigator investigate the stored
       // contact. This works around any obstruction, not a particular terrain.
@@ -1462,15 +1858,32 @@ export class Agent {
 
   _updateReposition() {
     if (!this._repositioning) return false;
-    const arrived = !this.pathPending && this._repositionAdmitted && this.position.distanceTo(this.moveTarget) < COVER_ARRIVE;
-    const failed = !this.pathPending && !arrived && (!this._repositionAdmitted || this._combatClock >= this._repositionUntil || !this.hasMoveTarget);
+    const arrived =
+      !this.pathPending &&
+      this._repositionAdmitted &&
+      this.position.distanceTo(this.moveTarget) < COVER_ARRIVE;
+    const failed =
+      !this.pathPending &&
+      !arrived &&
+      (!this._repositionAdmitted ||
+        this._combatClock >= this._repositionUntil ||
+        !this.hasMoveTarget);
     if (!this.hasTarget || !this._canFireAtLastKnown() || failed || arrived) {
-      if (failed) this._rememberFailedPosition(this._repositionAdmitted ? this.moveTarget : this._pendingDest);
+      if (failed)
+        this._rememberFailedPosition(
+          this._repositionAdmitted ? this.moveTarget : this._pendingDest
+        );
       this._repositioning = false;
       this.hasMoveTarget = this.pathPending = false;
       this.pathLen = 0;
       this.repathTimer = 0;
-      if (failed && this.hasTarget && this._canFireAtLastKnown() && this.state === STATE.COMBAT && !this.cover) {
+      if (
+        failed &&
+        this.hasTarget &&
+        this._canFireAtLastKnown() &&
+        this.state === STATE.COMBAT &&
+        !this.cover
+      ) {
         this._setState(STATE.ALERT);
         this._firingSearch = true;
       }
@@ -1496,6 +1909,8 @@ export class Agent {
 
   /** Local 1-metre step — does not spend the A* budget. */
   _stepTo(dest: THREE.Vector3, objective: string | null = 'local') {
+    if (this.ladder) return;
+    this.route.ladderSteps.length = 0;
     if (!this.path[0]) this.path[0] = new THREE.Vector3();
     this.path[0].copy(dest);
     this.pathLen = 1;
@@ -1511,9 +1926,13 @@ export class Agent {
   }
 
   _updatePeek(sq: Squad | null, target: THREE.Vector3, dist: number, dt: number) {
-    const recent = this.lastKnownAge < 2.8 || (sq?.elevated === this && sq.contactAge < TACTICS.elevatedContactAge);
-    const atFire = Math.hypot(this.position.x - this.firePos.x, this.position.z - this.firePos.z) < INFANTRY.precisionRadius + .01
-      && Math.abs(this.position.y - this.firePos.y) <= INFANTRY.arrivalHeight;
+    const recent =
+      this.lastKnownAge < 2.8 ||
+      (sq?.elevated === this && sq.contactAge < TACTICS.elevatedContactAge);
+    const atFire =
+      Math.hypot(this.position.x - this.firePos.x, this.position.z - this.firePos.z) <
+        INFANTRY.precisionRadius + 0.01 &&
+      Math.abs(this.position.y - this.firePos.y) <= INFANTRY.arrivalHeight;
     const atHide = this.position.distanceTo(this.coverPos) < COVER_ARRIVE;
 
     if (this.peeking) {
@@ -1539,7 +1958,10 @@ export class Agent {
         if (!expired) {
           // The animated rifle needs time to rise after the exposure step.
           this._peekSettle += dt;
-          if (this._peekSettle < TACTICS.peekSettleTime) { this.wantFire = false; return; }
+          if (this._peekSettle < TACTICS.peekSettleTime) {
+            this.wantFire = false;
+            return;
+          }
           this._muzzleBlocked = true;
           this._peekFail++;
         }
@@ -1592,9 +2014,18 @@ export class Agent {
     if (this.peekTimer > 0 || !recent) return;
     if (this.ai.cover) {
       if (!this.cover) throw new Error('[ai] peek requires a claimed cover point');
-      const peek = this.ai.cover.peekOffset(this.cover, target, this.eyeHeight, this.firePos, this.id);
+      const peek = this.ai.cover.peekOffset(
+        this.cover,
+        target,
+        this.eyeHeight,
+        this.firePos,
+        this.id
+      );
       if (peek === NAV_PENDING || peek === NAV_CANCELLED) return;
-      if (peek === null) { this._rejectCover('no-firing-peek'); return; }
+      if (peek === null) {
+        this._rejectCover('no-firing-peek');
+        return;
+      }
     } else this.firePos.copy(this.coverPos);
     // Pending proof must not consume a token or start the squad's peek cooldown.
     const allowed = !sq || sq.requestPeek(this);
@@ -1635,20 +2066,26 @@ export class Agent {
       this._goTo(alt);
       return true;
     }
-    this._goTo(pts[(this.patrolIndex++) % n]);
+    this._goTo(pts[this.patrolIndex++ % n]);
     return true;
   }
 
   _pickLocalAlt(out: THREE.Vector3) {
     const grid = this.ai.grid;
     if (!grid) return null;
-    const origin = this._v, ref = grid.project(this.position, origin);
+    const origin = this._v,
+      ref = grid.project(this.position, origin);
     if (!ref) return null;
     const component = grid.components.get(ref);
     for (let tries = 0; tries < 8; tries++) {
       const ang = this.rng.float() * Math.PI * 2;
       const d = 2.4 + this.rng.float() * 4;
-      const goal = grid.sampleGround(origin.x + Math.cos(ang) * d, origin.z + Math.sin(ang) * d, origin.y, out);
+      const goal = grid.sampleGround(
+        origin.x + Math.cos(ang) * d,
+        origin.z + Math.sin(ang) * d,
+        origin.y,
+        out
+      );
       if (!goal || grid.components.get(goal) !== component) continue;
       if (Math.hypot(out.x - origin.x, out.z - origin.z) < 1.6) continue;
       return out;
@@ -1657,21 +2094,36 @@ export class Agent {
   }
 
   _goTo(dest: THREE.Vector3) {
+    if (this.ladder) {
+      this._pendingDest.copy(dest);
+      this.ladder.deferred = true;
+      return false;
+    }
+    this.navStart.radius = this.navGoal.radius = this.radius;
+    this.navStart.height = this.navGoal.height = this.height;
     if (!this.pathPending) this._waitingNav = false;
-    this.pathObjective = PATH_OBJECTIVE[this.state]
-      ?? (this.cover ? 'cover' : this.role === 'wrap' ? 'wrap' : 'move');
+    this.pathObjective =
+      PATH_OBJECTIVE[this.state] ?? (this.cover ? 'cover' : this.role === 'wrap' ? 'wrap' : 'move');
     const dy = dest.y;
-    if (!this.cover || this.coverPos.distanceToSquared(dest) > .01 || this.squad?.elevated === this) {
+    if (
+      !this.cover ||
+      this.coverPos.distanceToSquared(dest) > 0.01 ||
+      this.squad?.elevated === this
+    ) {
       this._coverPathMax = Infinity;
     }
     this._pendingDest.copy(dest);
     const grid = this.ai.grid;
     if (!grid) {
-      this.pathOutcome = PATH_OUTCOME.INVALID; this.pathReason = 'nav-unavailable';
-      this.pathReqFloor = dy; this.pathResFloor = NaN;
+      this.pathOutcome = PATH_OUTCOME.INVALID;
+      this.pathReason = 'nav-unavailable';
+      this.pathReqFloor = dy;
+      this.pathResFloor = NaN;
       this.pathStartSurface = this.pathGoalSurface = 0;
-      this.hasMoveTarget = this.pathPending = false; this.pathLen = 0;
-      this._notePathFail(); return false;
+      this.hasMoveTarget = this.pathPending = false;
+      this.pathLen = 0;
+      this._notePathFail();
+      return false;
     }
     // Every objective submits actual feet and the actual goal. The shared
     // navigator validates attachments; callers must not hide a bad start by snapping it.
@@ -1690,13 +2142,17 @@ export class Agent {
       if (this.ai.lastPathReason === 'attachment-pending') this._waitingNav = true;
       return false;
     }
-    this.pathPending = false; this._waitingNav = false;
+    this.pathPending = false;
+    this._waitingNav = false;
     const coverPathMax = this._coverPathMax;
     this._coverPathMax = Infinity;
     if (n > 0 && Number.isFinite(coverPathMax)) {
       let length = this.position.distanceTo(this.path[0]);
       for (let i = 1; i < n; i++) length += this.path[i - 1].distanceTo(this.path[i]);
-      if (length > coverPathMax) { this._rejectCover('cover-route-cost'); return false; }
+      if (length > coverPathMax) {
+        this._rejectCover('cover-route-cost');
+        return false;
+      }
     }
     if (n === 0) {
       this.hasMoveTarget = false;
@@ -1718,17 +2174,459 @@ export class Agent {
     if (this.state === STATE.ALERT && !this._searchReached && !(this._searchTravelUntil > 0)) {
       let distance = this.position.distanceTo(this.path[0]);
       for (let i = 1; i < n; i++) distance += this.path[i - 1].distanceTo(this.path[i]);
-      this._searchTravelUntil = Math.max(this._searchUntil,
-        this.stateTime + Math.min(SEARCH_TRAVEL_MAX, distance / 1.5 * 1.4 + 2));
+      this._searchTravelUntil = Math.max(
+        this._searchUntil,
+        this.stateTime + Math.min(SEARCH_TRAVEL_MAX, (distance / 1.5) * 1.4 + 2)
+      );
     }
     return true;
   }
 
+  _cancelRouteProof() {
+    this.ai.grid?.worker?.cancel(`${this.id}:path`);
+  }
+
+  _releaseLadder() {
+    const l = this.ladder;
+    if (!l) return;
+    l.motor?.cancel();
+    l.nav.worker?.cancel(`${this.id}:ladder`);
+    this.ai.releaseLadder(this);
+    this.ladder = null;
+    this.animator.setClimb(false, 0, 'up', 'align');
+  }
+
+  /** Never infer a resume from a failed motor's stale cursor. */
+  _ladderCursor(l: LiveLadder): boolean {
+    const c = this.controller;
+    if (!c) return false;
+    for (let segment = 0; segment < 3; segment++) {
+      const i = l.step.direction === 'up' ? segment : 3 - segment;
+      const a = l.descriptor.points[i],
+        b = l.descriptor.points[l.step.direction === 'up' ? i + 1 : i - 1];
+      const dx = b.x - a.x,
+        dy = b.y - a.y,
+        dz = b.z - a.z;
+      const span = Math.hypot(dx, dy, dz),
+        p = c.position;
+      const distance = ((p.x - a.x) * dx + (p.y - a.y) * dy + (p.z - a.z) * dz) / span;
+      if (distance < 0 || distance > span) continue;
+      if (
+        Math.hypot(
+          p.x - a.x - (dx * distance) / span,
+          p.y - a.y - (dy * distance) / span,
+          p.z - a.z - (dz * distance) / span
+        ) > 1e-6
+      )
+        continue;
+      l.cursor = { segment, distance, pendingTime: 0, moves: 0 };
+      return true;
+    }
+    return false;
+  }
+
+  _ladderSupported(
+    x = this.controller!.position.x,
+    y = this.controller!.position.y,
+    z = this.controller!.position.z
+  ): boolean {
+    const c = this.controller;
+    if (!c) return false;
+    return (
+      c.world.overlapCapsule(
+        x,
+        y + c.radius,
+        z,
+        x,
+        y + c.height - c.radius,
+        z,
+        c.radius,
+        c.mask,
+        0
+      ) === 0 &&
+      c.world.sweepCapsule(
+        x,
+        y + c.radius,
+        z,
+        x,
+        y + c.height - c.radius,
+        z,
+        c.radius,
+        0,
+        -1,
+        0,
+        LADDER.supportDistance,
+        c.mask,
+        this._ladderHit
+      ) &&
+      this._ladderHit.ny >= c.cosSlope
+    );
+  }
+
+  /** Supported landing motion only; the shaft still belongs exclusively to LadderMotor. */
+  _landingClear(to: THREE.Vector3): boolean {
+    const c = this.controller!,
+      p = c.position;
+    const dx = to.x - p.x,
+      dy = to.y - p.y,
+      dz = to.z - p.z;
+    const distance = Math.hypot(dx, dy, dz);
+    if (distance > 2.5 || !this._ladderSupported()) return false;
+    this._ladderPath[0].copy(p);
+    this._ladderPath[1].copy(to);
+    if (!this.ai.capsulePathClear(this, this._ladderPath)) return false;
+    if (
+      distance > 1e-6 &&
+      c.world.sweepCapsule(
+        p.x,
+        c.p0y,
+        p.z,
+        p.x,
+        c.p1y,
+        p.z,
+        c.radius,
+        dx / distance,
+        dy / distance,
+        dz / distance,
+        distance,
+        c.mask,
+        this._ladderHit
+      )
+    )
+      return false;
+    const samples = Math.max(1, Math.ceil(distance / 0.08));
+    for (let i = 1; i <= samples; i++) {
+      const t = i / samples;
+      if (!this._ladderSupported(p.x + dx * t, p.y + dy * t, p.z + dz * t)) return false;
+    }
+    return true;
+  }
+
+  _moveLanding(to: THREE.Vector3, dt: number): boolean {
+    const c = this.controller!,
+      p = c.position;
+    const dx = to.x - p.x,
+      dy = to.y - p.y,
+      dz = to.z - p.z;
+    const distance = Math.hypot(dx, dy, dz);
+    if (distance <= 1e-6) return true;
+    if (!this._landingClear(to)) return false;
+    const step = c.stepHeight,
+      snap = c.snapDistance,
+      y = p.y;
+    c.stepHeight = c.snapDistance = 0;
+    try {
+      const t = Math.min(1, (1.5 * Math.min(dt, 0.1)) / distance);
+      c.move(dx * t, dy * t, dz * t);
+    } finally {
+      c.stepHeight = step;
+      c.snapDistance = snap;
+    }
+    this.ladder!.travel += Math.abs(c.position.y - y);
+    this.position.copy(c.position);
+    this.grounded = c.grounded;
+    return this.position.distanceTo(to) <= 1e-6;
+  }
+
+  _ladderHold(l: LiveLadder): THREE.Vector3 | null {
+    const p = l.descriptor.points[(l.step.direction === 'up') !== l.finished ? 0 : 3];
+    const { x, z } = l.descriptor.normal;
+    const to = this._ladderPath[1];
+    // Wait farther out than an exiting owner, leaving room for both on narrow landings.
+    for (const distance of l.finished ? [1, 0.8] : [2, 1.6]) {
+      for (const inset of [0, -0.4, 0.4, 0.8, 1.2]) {
+        for (let side = 0; side < 3; side++) {
+          const dx = side === 0 ? z : side === 1 ? -z : x;
+          const dz = side === 0 ? -x : side === 1 ? x : z;
+          to.set(p.x + dx * distance + x * inset, this.position.y, p.z + dz * distance + z * inset);
+          if (this.ai.ladderHoldingClear(this, l.descriptor, to) && this._landingClear(to))
+            return to.clone();
+        }
+      }
+    }
+    return null;
+  }
+
+  _finishLadder(l: LiveLadder) {
+    this.pathIndex = l.step.exitIndex + 1;
+    this._releaseLadder();
+    this._safeSurface = 0;
+    this._safeNav = null;
+    this._progressPos.copy(this.position);
+    this.noProgressTime = this._noRouteTime = this.stuckTimer = this.stuckHits = 0;
+    this._recoveryCount = this._failStreak = 0;
+    this.navStart.nav = this.navGoal.nav = null;
+    this._rememberSafePosition();
+    this.hasMoveTarget = this.pathIndex < this.pathLen;
+    this.repathTimer = 0;
+    if (l.deferred) this._goTo(this._pendingDest);
+  }
+
+  _poseLadder(l: LiveLadder) {
+    this.animator.setClimb(
+      !l.hold && !l.finished,
+      l.travel,
+      l.step.direction,
+      l.motor?.phase ??
+        (l.cursor.segment === 1 ? 'shaft' : l.cursor.segment === 2 ? 'dismount' : 'align')
+    );
+  }
+
+  _moveLadder(dt: number) {
+    const l = this.ladder,
+      c = this.controller;
+    if (!l || !c || dt <= 0) return;
+    this.position.copy(c.position);
+    this.wantFire = false;
+    this.aimWeight = 0;
+    this.crouch = false;
+    this.speed = this.desiredSpeed = 0;
+    this.velocity.set(0, 0, 0);
+    this.fireBlock = 'ladder';
+    this.combatAction = 'ladder';
+    this.yaw = this.targetYaw = Math.atan2(-l.descriptor.normal.x, -l.descriptor.normal.z);
+    this._poseLadder(l);
+    // A replacement navigator cannot authorize this retained route/descriptor.
+    if (
+      this.ai.grid !== l.nav ||
+      c.world !== l.nav.physics.staticWorld ||
+      c.world.dirty ||
+      !c.world.nodeCount ||
+      !c.world.triCount
+    ) {
+      l.motor?.cancel();
+      l.nav.worker?.cancel(`${this.id}:ladder`);
+      l.status = 'blocked';
+      return;
+    }
+    if (
+      !c.enabled ||
+      c.mask !== MASK.CHARACTER ||
+      c.radius !== this.radius ||
+      !Number.isFinite(c.stepHeight) ||
+      c.stepHeight < 0 ||
+      !Number.isFinite(c.snapDistance) ||
+      c.snapDistance < 0 ||
+      !Number.isFinite(c.slopeLimit) ||
+      c.slopeLimit < 0 ||
+      c.slopeLimit > Math.PI / 2 ||
+      !Number.isInteger(c.maxIterations) ||
+      c.maxIterations < 1 ||
+      c.maxIterations > LADDER_QUERY_MAX_ITERATIONS
+    ) {
+      l.motor?.cancel();
+      l.status = 'blocked';
+      return;
+    }
+    l.retry = Math.max(0, l.retry - dt);
+    if (l.finished) {
+      l.status = 'waiting';
+      if (!this.ai.ladderBusy(this, l.descriptor)) {
+        const exit = this._ladderPath[1].copy(
+          l.descriptor.points[l.step.direction === 'up' ? 3 : 0]
+        );
+        if (!l.hold || this._moveLanding(exit, dt)) this._finishLadder(l);
+        return;
+      }
+      if (!l.hold) {
+        if (l.retry > 0) return;
+        l.hold = this._ladderHold(l);
+        l.retry = PATH_FAIL_WAIT;
+      }
+      l.deferred = true;
+      if (!l.hold || !this._moveLanding(l.hold, dt)) return;
+      if (l.claimed) {
+        this.ai.releaseLadder(this);
+        l.claimed = false;
+      }
+      return;
+    }
+    if (l.hold && !this._moveLanding(l.hold, dt)) return;
+    if (!l.claimed) {
+      if (l.retry > 0) return;
+      l.retry = PATH_FAIL_WAIT;
+      if (!this.ai.claimLadder(this, l.descriptor)) {
+        l.status = 'waiting';
+        if (
+          !l.hold &&
+          this.ai.ladderBusy(this, l.descriptor) &&
+          !this.ai.ladderHoldingClear(this, l.descriptor, this.position)
+        ) {
+          l.hold = this._ladderHold(l);
+          if (!l.hold) {
+            // Unmounted and supported: abandon this approach, never strand a shaft owner.
+            this._releaseLadder();
+            this.hasMoveTarget = this.pathPending = false;
+            this.pathLen = 0;
+            this._notePathFail();
+            this._recoveryWait = PATH_FAIL_WAIT;
+          }
+        }
+        return;
+      }
+      l.hold = null;
+      l.claimed = true;
+      l.status = 'approach';
+      l.retry = 0;
+    }
+    // Live height-aware occupancy covers the whole corridor before each synchronous
+    // bounded native-motor batch (and each fine-alignment move).
+    // No time is fed to the motor while blocked; cursor and pose remain frozen.
+    if (!this.ai.ladderClear(this, l.descriptor)) {
+      l.wait = Math.min(PATH_FAIL_WAIT_MAX, l.wait + dt);
+      if (l.wait >= PATH_FAIL_WAIT_MAX) l.status = 'blocked';
+      return;
+    }
+    l.wait = 0;
+    if (!l.motor && !l.aligned) {
+      if (l.retry > 0) return;
+      c.setHeight(this.height);
+      if (c.height !== this.height || c.radius !== this.radius || !this._ladderSupported()) {
+        l.status = 'blocked';
+        l.retry = PATH_FAIL_WAIT;
+        return;
+      }
+      const p = l.descriptor.points[l.step.direction === 'up' ? 0 : 3];
+      const dx = p.x - c.position.x,
+        dy = p.y - c.position.y,
+        dz = p.z - c.position.z;
+      const distance = Math.hypot(dx, dy, dz);
+      if (distance > 1e-6) {
+        this._ladderPath[1].copy(p);
+        this._moveLanding(this._ladderPath[1], dt);
+        if (this.position.distanceTo(this._ladderPath[1]) >= distance - 1e-9)
+          l.retry = PATH_FAIL_WAIT;
+        this._poseLadder(l);
+        return;
+      }
+      l.aligned = true;
+      l.status = 'proof';
+    }
+    if (l.motor?.status === 'active') {
+      const y = c.position.y,
+        status = l.motor.advance(dt);
+      l.travel += Math.abs(c.position.y - y);
+      this.position.copy(c.position);
+      this.grounded = c.grounded;
+      this._poseLadder(l);
+      if (status === 'complete') {
+        l.finished = true;
+        if (!this.ai.ladderBusy(this, l.descriptor)) this._finishLadder(l);
+        return;
+      }
+      if (status === 'active') {
+        l.status = 'climbing';
+        return;
+      }
+      l.cursor = { ...l.motor.cursor };
+      l.motor = null;
+      l.status = 'blocked';
+      l.retry = PATH_FAIL_WAIT;
+      return;
+    }
+    if (l.motor) {
+      l.cursor = { ...l.motor.cursor };
+      l.motor = null;
+    }
+    if (l.retry > 0) return;
+    l.retry = PATH_FAIL_WAIT;
+    // Fresh full-budget proof from actual foot, exact geometry and current
+    // settings. Off-trajectory native failures remain explicitly fail-closed.
+    if (!this._ladderCursor(l)) {
+      l.status = 'blocked';
+      return;
+    }
+    const worker = l.nav.worker;
+    if (!worker || c.height !== this.height || c.radius !== this.radius) {
+      l.status = 'blocked';
+      return;
+    }
+    const maxMoves = ladderMoveBudget(l.descriptor);
+    const result = worker.run(
+      this.id,
+      'ladder',
+      () =>
+        worker.checkLadder(l.descriptor, l.step.direction, this.position, l.cursor, {
+          radius: c.radius,
+          height: c.height,
+          maxMoves,
+          stepHeight: c.stepHeight,
+          snapDistance: c.snapDistance,
+          slopeLimit: c.slopeLimit,
+          maxIterations: c.maxIterations,
+          mask: c.mask,
+          enabled: c.enabled,
+        }),
+      this.position
+    );
+    if (result === NAV_PENDING || result === NAV_CANCELLED) {
+      l.status = 'proof';
+      return;
+    }
+    if (!result) {
+      l.status = 'blocked';
+      return;
+    }
+    l.motor = new LadderMotor(c, l.descriptor, l.step.direction, maxMoves, l.cursor);
+    l.status = l.motor.status === 'active' ? 'climbing' : 'blocked';
+    this._poseLadder(l);
+  }
+
   _move(dt: number) {
-    if (this.vaultT >= 0) { this._moveVault(dt); return; }
-    const wp = this.hasMoveTarget && this.pathIndex < this.pathLen ? this.path[this.pathIndex] : null;
+    if (this.ladder) {
+      this._moveLadder(dt);
+      return;
+    }
+    if (this.vaultT >= 0) {
+      this._moveVault(dt);
+      return;
+    }
+    let step: NavLadderStep | null = null;
+    if (this.hasMoveTarget)
+      for (const candidate of this.route.ladderSteps) {
+        if (candidate.entryIndex === this.pathIndex) {
+          step = candidate;
+          break;
+        }
+      }
+    if (step && (this.pathPending || dt <= 0)) return;
+    if (step) {
+      const nav = this.ai.grid,
+        descriptor = nav?.ladders[step.ladderId - 1];
+      if (!nav || !descriptor || !this.controller) {
+        this.hasMoveTarget = false;
+        return;
+      }
+      this.ladder = {
+        step,
+        descriptor,
+        nav,
+        motor: null,
+        cursor: { segment: 0, distance: 0, moves: 0, pendingTime: 0 },
+        travel: 0,
+        retry: 0,
+        wait: 0,
+        claimed: false,
+        deferred: false,
+        aligned: false,
+        finished: false,
+        hold: null,
+        status: 'approach',
+      };
+      this._endPeek();
+      this.ai.cover?.release(this.id);
+      this.cover = null;
+      this._engaging = false;
+      this._recovering = false;
+      this.pathPending = false;
+      this._moveLadder(dt);
+      return;
+    }
+    const wp =
+      this.hasMoveTarget && this.pathIndex < this.pathLen ? this.path[this.pathIndex] : null;
     this._steer.set(0, 0, 0);
-    let want = 0, distance = Infinity;
+    let want = 0,
+      distance = Infinity;
 
     if (wp) {
       const to = this._v.copy(wp).sub(this.position);
@@ -1737,14 +2635,20 @@ export class Agent {
       distance = d;
       const final = this.pathIndex === this.pathLen - 1;
       // Descending soldiers must reach the floor, not stop on the last tread.
-      const radius = final ? (this.cover || this._recovering || this.pathObjective === 'local'
-        ? INFANTRY.precisionRadius : INFANTRY.arrivalRadius)
-        : Math.min(INFANTRY.cornerRadius, Math.max(.01, wp.distanceTo(this.path[this.pathIndex + 1]) / 2));
+      const radius = final
+        ? this.cover || this._recovering || this.pathObjective === 'local'
+          ? INFANTRY.precisionRadius
+          : INFANTRY.arrivalRadius
+        : Math.min(
+            INFANTRY.cornerRadius,
+            Math.max(0.01, wp.distanceTo(this.path[this.pathIndex + 1]) / 2)
+          );
       if (d < radius && (!final || Math.abs(wp.y - this.position.y) <= INFANTRY.arrivalHeight)) {
         this.pathIndex++;
         if (this.pathIndex >= this.pathLen) {
           this.hasMoveTarget = false;
-          if (!this._recovering && this.pathObjective !== 'local') this._recoveryCount = this._failStreak = 0;
+          if (!this._recovering && this.pathObjective !== 'local')
+            this._recoveryCount = this._failStreak = 0;
         }
       } else if (d > 1e-6) {
         to.multiplyScalar(1 / d);
@@ -1755,13 +2659,17 @@ export class Agent {
 
     // Stop the old path from leaving the pending proof's origin; collision,
     // gravity and emergency local separation remain live.
-    if (this.pathPending && this._waitingNav) { want = 0; this._steer.set(0, 0, 0); }
+    if (this.pathPending && this._waitingNav) {
+      want = 0;
+      this._steer.set(0, 0, 0);
+    }
 
     // local avoidance: push off squadmates and steer around them
     const others = this.ai.agents;
     for (let i = 0; i < others.length; i++) {
       const o = others[i];
-      if (o === this || !o.alive || Math.abs(o.position.y - this.position.y) > this.height) continue;
+      if (o === this || !o.alive || Math.abs(o.position.y - this.position.y) > this.height)
+        continue;
       const dx = this.position.x - o.position.x;
       const dz = this.position.z - o.position.z;
       const d2 = dx * dx + dz * dz;
@@ -1769,8 +2677,9 @@ export class Agent {
       if (d2 > rr || d2 < 1e-6) continue;
       const d = Math.sqrt(d2);
       // Yield extra spacing at a blocked doorway, not body-contact separation.
-      const yieldSpace = (this.stuckTimer > INFANTRY.avoidanceYieldAfter || this.controller?.touchingWall)
-        && d > this.radius + o.radius;
+      const yieldSpace =
+        (this.stuckTimer > INFANTRY.avoidanceYieldAfter || this.controller?.touchingWall) &&
+        d > this.radius + o.radius;
       const push = (1 - d / Math.sqrt(rr)) * 1.5 * (yieldSpace ? INFANTRY.avoidanceYieldScale : 1);
       this._steer.x += (dx / d) * push;
       this._steer.z += (dz / d) * push;
@@ -1789,11 +2698,15 @@ export class Agent {
 
     // facing: look where we are going, or at the threat when engaged
     const engaged =
-      this.state === STATE.COMBAT || this.state === STATE.SUPPRESSED || this.hasTarget
-      || (this.state === STATE.ALERT && this.lastKnownKind === EVIDENCE.GUNFIRE
-        && this.lastKnownAge < TACTICS.gunfireLock);
+      this.state === STATE.COMBAT ||
+      this.state === STATE.SUPPRESSED ||
+      this.hasTarget ||
+      (this.state === STATE.ALERT &&
+        this.lastKnownKind === EVIDENCE.GUNFIRE &&
+        this.lastKnownAge < TACTICS.gunfireLock);
     const sq = this.squad;
-    const reported = sq?.elevated === this && (!this.hasTarget || this.lastKnownKind !== EVIDENCE.VISUAL);
+    const reported =
+      sq?.elevated === this && (!this.hasTarget || this.lastKnownKind !== EVIDENCE.VISUAL);
     const look = reported && sq ? sq.contact : this.lastKnown;
     if (engaged && (reported && sq ? sq.contactAge : this.lastKnownAge) < 8) {
       this.targetYaw = Math.atan2(look.x - this.position.x, look.z - this.position.z);
@@ -1852,27 +2765,43 @@ export class Agent {
     const grid = this.ai.grid;
     if (!grid) return null;
     const start = grid.project(this.position, this._v2);
-    const heading = this._steer.lengthSq() > .01 ? Math.atan2(this._steer.x, this._steer.z) : this.yaw;
+    const heading =
+      this._steer.lengthSq() > 0.01 ? Math.atan2(this._steer.x, this._steer.z) : this.yaw;
     const side = this.id % 2 ? 1 : -1;
     for (let i = 0; i < 8; i++) {
-      const angle = heading + side * (Math.PI / 2 + i * Math.PI / 4);
-      const goal = grid.sampleGround(this.position.x + Math.sin(angle) * INFANTRY.recoveryDistance,
-        this.position.z + Math.cos(angle) * INFANTRY.recoveryDistance, this.position.y, out);
+      const angle = heading + side * (Math.PI / 2 + (i * Math.PI) / 4);
+      const goal = grid.sampleGround(
+        this.position.x + Math.sin(angle) * INFANTRY.recoveryDistance,
+        this.position.z + Math.cos(angle) * INFANTRY.recoveryDistance,
+        this.position.y,
+        out
+      );
       if (!goal || (start && grid.components.get(start) !== grid.components.get(goal))) continue;
-      if (Math.hypot(out.x - this.position.x, out.z - this.position.z) < .4) continue;
+      if (Math.hypot(out.x - this.position.x, out.z - this.position.z) < 0.4) continue;
       if (grid.canAttach(this.position, out)) return out;
     }
     return null;
   }
 
   _rememberSafePosition() {
+    if (this.ladder) return;
     const grid = this.ai.grid;
-    if (!grid || !this.grounded || this._recoveryCount > 0 || this._recovering || this.vaultT >= 0) return;
-    if (this._safeSurface && this.position.distanceToSquared(this._safePosition) < (INFANTRY.recoveryDistance * 2) ** 2) return;
+    if (!grid || !this.grounded || this._recoveryCount > 0 || this._recovering || this.vaultT >= 0)
+      return;
+    if (
+      this._safeSurface &&
+      this.position.distanceToSquared(this._safePosition) < (INFANTRY.recoveryDistance * 2) ** 2
+    )
+      return;
     if (!grid.canStand(this.position, this.radius, this.height)) return;
     const ref = grid.project(this.position, this._v2);
-    if (!ref || (this._safeSurface && (this._safeNav !== grid
-      || grid.components.get(ref) !== grid.components.get(this._safeSurface)))) return;
+    if (
+      !ref ||
+      (this._safeSurface &&
+        (this._safeNav !== grid ||
+          grid.components.get(ref) !== grid.components.get(this._safeSurface)))
+    )
+      return;
     this._safePosition.copy(this.position);
     this._safeSurface = ref;
     this._safeNav = grid;
@@ -1880,14 +2809,21 @@ export class Agent {
   }
 
   _rollback() {
+    if (this.ladder) return false;
     const grid = this.ai.grid;
     // A rebuilt collision scene invalidates the checkpoint. Surface overlap
     // alone cannot prove a capsule isn't wholly enclosed by a new solid.
-    if (!grid || !this._safeSurface || this._safeNav !== grid || !this.controller
-      || this._safeVersion !== grid.physics.staticWorld.version
-      || this.position.distanceToSquared(this._safePosition) < .25
-      || !this.ai.canRollback?.(this, this._safePosition)
-      || !grid.canStand(this._safePosition, this.radius, this.height)) return false;
+    if (
+      !grid ||
+      !this._safeSurface ||
+      this._safeNav !== grid ||
+      !this.controller ||
+      this._safeVersion !== grid.physics.staticWorld.version ||
+      this.position.distanceToSquared(this._safePosition) < 0.25 ||
+      !this.ai.canRollback?.(this, this._safePosition) ||
+      !grid.canStand(this._safePosition, this.radius, this.height)
+    )
+      return false;
     const ref = grid.project(this._safePosition, this._v2);
     if (!ref || grid.components.get(ref) !== grid.components.get(this._safeSurface)) return false;
     // Exceptional, explicitly recorded repositioning. Never normal traversal.
@@ -1895,9 +2831,12 @@ export class Agent {
     this.controller.teleport(this._safePosition.x, this._safePosition.y, this._safePosition.z);
     this.position.copy(this.controller.position);
     this.lastRollback = { t: this.ctx.time.elapsed, from, to: this.position.toArray() };
-    this.velocity.set(0, 0, 0); this.speed = 0;
+    this.velocity.set(0, 0, 0);
+    this.speed = 0;
     this.grounded = this.controller.grounded;
-    this._endPeek(); this.ai.cover?.release(this.id); this.cover = null;
+    this._endPeek();
+    this.ai.cover?.release(this.id);
+    this.cover = null;
     this._recoveryCount = 0;
     this.relocations++;
     this.recoveryOutcome = 'relocated';
@@ -1907,6 +2846,7 @@ export class Agent {
   }
 
   _recoverMove() {
+    if (this.ladder) return;
     if (this._recovering || this.pathPending || this._recoveryWait > 0 || this.vaultT >= 0) return;
     if (!this._recoveryCount) this._recoveryOrigin.copy(this.position);
     this._recoveryCount++;
@@ -1918,9 +2858,11 @@ export class Agent {
       // Stop retrying an unexecutable objective. The brain may choose another;
       // stranded actors keep the bounded watchdog, including visibility checks.
       this.recoveryOutcome = 'failed';
-      this.pathOutcome = PATH_OUTCOME.INVALID; this.pathReason = 'execution-blocked';
+      this.pathOutcome = PATH_OUTCOME.INVALID;
+      this.pathReason = 'execution-blocked';
       if (this.pathObjective === 'local') this.pathObjective = 'move';
-      this.hasMoveTarget = false; this.pathLen = 0;
+      this.hasMoveTarget = false;
+      this.pathLen = 0;
       this._notePathFail();
       return;
     }
@@ -1938,16 +2880,26 @@ export class Agent {
 
   /** Include failed starts with no remaining movement target in the watchdog. */
   _tickNoProgress(dt: number) {
+    if (this.ladder) return;
     this._recoveryWait = Math.max(0, this._recoveryWait - dt);
     if (this.vaultT >= 0) return;
-    if (this._engaging) { this.noProgressTime = this._noRouteTime = 0; return; }
-    if (this._recoveryCount > 0 && !this._recovering
-      && this.position.distanceToSquared(this._recoveryOrigin) >= INFANTRY.recoveryResetDistance ** 2) this._recoveryCount = this._failStreak = 0;
-    if (!this._safeSurface || this.position.distanceToSquared(this._progressPos) >= .25) this._rememberSafePosition();
+    if (this._engaging) {
+      this.noProgressTime = this._noRouteTime = 0;
+      return;
+    }
+    if (
+      this._recoveryCount > 0 &&
+      !this._recovering &&
+      this.position.distanceToSquared(this._recoveryOrigin) >= INFANTRY.recoveryResetDistance ** 2
+    )
+      this._recoveryCount = this._failStreak = 0;
+    if (!this._safeSurface || this.position.distanceToSquared(this._progressPos) >= 0.25)
+      this._rememberSafePosition();
     if (this._recovering) {
       this._recoveryTime += dt;
       if (!this.hasMoveTarget || this._recoveryTime >= INFANTRY.recoveryTimeout) {
-        this.recoveryOutcome = this.position.distanceTo(this.moveTarget) < .25 ? 'arrived' : 'blocked';
+        this.recoveryOutcome =
+          this.position.distanceTo(this.moveTarget) < 0.25 ? 'arrived' : 'blocked';
         this._recovering = false;
         this.hasMoveTarget = false;
         this.pathLen = 0;
@@ -1957,38 +2909,59 @@ export class Agent {
       }
       return;
     }
-    const stranded = this.state !== STATE.IDLE && !this.hasMoveTarget && this.pathObjective !== 'local'
-      && (this.pathReason === 'start-attachment' || this.pathReason === 'disconnected' || this.pathReason === 'execution-blocked');
+    const stranded =
+      this.state !== STATE.IDLE &&
+      !this.hasMoveTarget &&
+      this.pathObjective !== 'local' &&
+      (this.pathReason === 'start-attachment' ||
+        this.pathReason === 'disconnected' ||
+        this.pathReason === 'execution-blocked');
     if (!stranded) this._noRouteTime = 0;
     else if (!this.pathPending) this._noRouteTime += dt;
     if (this.position.distanceToSquared(this._progressPos) >= 0.25) {
       this.noProgressTime = 0;
       this._progressPos.copy(this.position);
-    } else if (this.hasMoveTarget && this.desiredSpeed > .5) {
+    } else if (this.hasMoveTarget && this.desiredSpeed > 0.5) {
       // Consuming a corner or briefly waiting for steering must not erase a
       // sustained stall. Actual displacement, not nominal speed, is progress.
       this.noProgressTime += dt;
     } else if (!this.pathPending) this.noProgressTime = 0;
-    if (this.noProgressTime >= INFANTRY.recoveryTimeout || this._noRouteTime >= INFANTRY.recoveryTimeout) {
+    if (
+      this.noProgressTime >= INFANTRY.recoveryTimeout ||
+      this._noRouteTime >= INFANTRY.recoveryTimeout
+    ) {
       this._recoverMove();
       this._progressPos.copy(this.position);
     }
   }
 
   _tryVault() {
+    if (this.ladder) return;
     if (!this.hasMoveTarget || this.pathPending || !this.ai.grid || !this.controller) return;
     this.vaultCooldown = 2.5;
     this.vaultOutcome = 'rejected';
     const phys = this.phys;
     const fwd = this._v.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
     const low = phys.raycast(
-      this.position.x, this.position.y + 0.35, this.position.z,
-      fwd.x, 0, fwd.z, 0.85, phys.MASK.WORLD
+      this.position.x,
+      this.position.y + 0.35,
+      this.position.z,
+      fwd.x,
+      0,
+      fwd.z,
+      0.85,
+      phys.MASK.WORLD
     );
     if (!low.hit) return;
     const high = phys.raycastAny(
-      this.position.x, this.position.y + 1.25, this.position.z,
-      fwd.x, 0, fwd.z, 1.1, phys.MASK.WORLD
+      this.position.x,
+      this.position.y + 1.25,
+      this.position.z,
+      fwd.x,
+      0,
+      fwd.z,
+      1.1,
+      phys.MASK.WORLD
     );
     if (high) return; // a wall, not a ledge
     // landing spot on the other side
@@ -2010,7 +2983,8 @@ export class Agent {
   _moveVault(dt: number) {
     const c = this.controller;
     if (!c) throw new Error('[ai] vault requires a live controller');
-    let blocked = this.phys.staticWorld.dirty || this.phys.staticWorld.version !== this.vaultVersion;
+    let blocked =
+      this.phys.staticWorld.dirty || this.phys.staticWorld.version !== this.vaultVersion;
     // Match the feasibility probe; every live segment still uses collision.
     while (!blocked && dt > 1e-8 && this.vaultT < 1) {
       const step = Math.min(dt, 1 / 60);
@@ -2020,7 +2994,7 @@ export class Agent {
       c.move(this._v.x - c.position.x, this._v.y - c.position.y, this._v.z - c.position.z);
       this.position.copy(c.position);
       this.grounded = c.grounded;
-      blocked = this._v.distanceToSquared(this.position) > .05 ** 2;
+      blocked = this._v.distanceToSquared(this.position) > 0.05 ** 2;
       dt -= step;
     }
     this.velocity.y = 0;
@@ -2039,22 +3013,33 @@ export class Agent {
   /* ================================================================== */
 
   _updateFireBlock() {
+    if (this.ladder) {
+      this.fireBlock = 'ladder';
+      return;
+    }
     let reason = null;
     const state = this.state;
-    if (!this._engaging && (state === STATE.FLANK || state === STATE.RETREAT) && !this.wantFire) reason = FIRE_BLOCK.RELOCATING;
-    else if (this._engaging || state === STATE.COMBAT || state === STATE.SUPPRESSED || this.wantFire) {
+    if (!this._engaging && (state === STATE.FLANK || state === STATE.RETREAT) && !this.wantFire)
+      reason = FIRE_BLOCK.RELOCATING;
+    else if (
+      this._engaging ||
+      state === STATE.COMBAT ||
+      state === STATE.SUPPRESSED ||
+      this.wantFire
+    ) {
       if (!this._engaging && this.animator.reloading) reason = FIRE_BLOCK.RELOAD;
       else if (this._friendlyBlock > 0) reason = FIRE_BLOCK.FRIENDLY;
-      else if (!this._engaging && state === STATE.SUPPRESSED && this.crouch) reason = FIRE_BLOCK.SUPPRESSED;
+      else if (!this._engaging && state === STATE.SUPPRESSED && this.crouch)
+        reason = FIRE_BLOCK.SUPPRESSED;
       else if (this._muzzleBlocked) reason = FIRE_BLOCK.MUZZLE;
       else if (this.wantFire) {
         if (this.burstLeft <= 0 && this.burstCooldown > 0) reason = FIRE_BLOCK.BURST;
-      }
-      else if (this._engaging) reason = FIRE_BLOCK.ACQUIRING;
+      } else if (this._engaging) reason = FIRE_BLOCK.ACQUIRING;
       else if (this.cover && !this.peeking && !this._returning) {
         const dx = this.position.x - this.coverPos.x;
         const dz = this.position.z - this.coverPos.z;
-        reason = dx * dx + dz * dz > COVER_ARRIVE ** 2 ? FIRE_BLOCK.RELOCATING : FIRE_BLOCK.PEEK_WAIT;
+        reason =
+          dx * dx + dz * dz > COVER_ARRIVE ** 2 ? FIRE_BLOCK.RELOCATING : FIRE_BLOCK.PEEK_WAIT;
       } else if (this._returning) reason = FIRE_BLOCK.RELOCATING;
       else if (this.peeking) {
         const dx = this.position.x - this.firePos.x;
@@ -2067,9 +3052,20 @@ export class Agent {
   }
 
   _shoot(dt: number) {
+    if (this.ladder) {
+      this.wantFire = false;
+      this.fireBlock = 'ladder';
+      return;
+    }
     // where the gun is pointing: lead toward the target with human error
-    const reported = this.squad?.elevated === this && (!this.hasTarget || this.lastKnownKind !== EVIDENCE.VISUAL);
-    const t = reported && this.squad ? this.squad.contact : this.hasTarget || this.lastKnownAge < 3 ? this.lastKnown : null;
+    const reported =
+      this.squad?.elevated === this && (!this.hasTarget || this.lastKnownKind !== EVIDENCE.VISUAL);
+    const t =
+      reported && this.squad
+        ? this.squad.contact
+        : this.hasTarget || this.lastKnownAge < 3
+          ? this.lastKnown
+          : null;
     if (t) {
       // Track the exposed body sample (or the remembered/reported cue).
       this._v.set(t.x, t.y + COMBAT.aimChest, t.z);
@@ -2092,12 +3088,17 @@ export class Agent {
     // Brief clear/settling frames bleed off obstruction history rather than
     // erasing it. Reloads, traversal and actual movement still reset it.
     const blockedTime = this._laneBlockedTime;
-    this._laneBlockedTime = this.animator.reloading || this.animator.vaulting || this.speed >= .2
-      ? 0 : Math.max(0, blockedTime - dt);
+    this._laneBlockedTime =
+      this.animator.reloading || this.animator.vaulting || this.speed >= 0.2
+        ? 0
+        : Math.max(0, blockedTime - dt);
     if (
       !this.wantFire ||
-      (this.state !== STATE.COMBAT && this.state !== STATE.SUPPRESSED
-        && this.state !== STATE.FLANK && this.state !== STATE.RETREAT && !this._engaging) ||
+      (this.state !== STATE.COMBAT &&
+        this.state !== STATE.SUPPRESSED &&
+        this.state !== STATE.FLANK &&
+        this.state !== STATE.RETREAT &&
+        !this._engaging) ||
       this.animator.reloading ||
       this.animator.vaulting
     ) {
@@ -2110,9 +3111,10 @@ export class Agent {
       this._friendlyBlock = 0;
       // Alignment/raising is not a bad position. Count only sustained actual
       // world obstruction while stationary, not a route already being followed.
-      if (!this._repositioning && this.speed < .2 && !this._muzzleClear(t)) {
+      if (!this._repositioning && this.speed < 0.2 && !this._muzzleClear(t)) {
         this._laneBlockedTime = Math.min(TACTICS.blockedFireTime, blockedTime + dt);
-        if (this._laneBlockedTime >= TACTICS.blockedFireTime) this._startReposition('blocked-firing-position');
+        if (this._laneBlockedTime >= TACTICS.blockedFireTime)
+          this._startReposition('blocked-firing-position');
       }
       return;
     }
@@ -2126,8 +3128,9 @@ export class Agent {
     if (this.burstLeft <= 0) {
       if (this.burstCooldown > 0) return;
       this.burstLeft = this.rng.int(COMBAT.burstMin, COMBAT.burstMax);
-      this.burstCooldown = this.rng.range(COMBAT.burstGapMin, COMBAT.burstGapMax)
-        + this.suppression * COMBAT.burstGapSuppress;
+      this.burstCooldown =
+        this.rng.range(COMBAT.burstGapMin, COMBAT.burstGapMax) +
+        this.suppression * COMBAT.burstGapSuppress;
     }
     if (this.fireCooldown > 0) return;
 
@@ -2135,7 +3138,10 @@ export class Agent {
     const origin = an.muzzleWorld;
     const dir = this._muzzleDir.copy(an.muzzleDir);
     applySpread(dir, this.rng, this.spread * (1 + this.suppression * COMBAT.suppressSpread));
-    if (this._shotBlockedByFriend(origin, dir) || this.ai.onAgentFire(this, origin, dir) === false) {
+    if (
+      this._shotBlockedByFriend(origin, dir) ||
+      this.ai.onAgentFire(this, origin, dir) === false
+    ) {
       this.ai.stats.friendlyHolds++;
       this._friendlyBlock += dt;
       if (this._friendlyBlock >= FRIENDLY_HOLD) this._breakFriendlyPeek();
@@ -2157,7 +3163,9 @@ export class Agent {
     let bestT = 80;
     if (this.targetVisible && this.hasTarget) {
       const p = this.lastKnown;
-      const px = p.x - origin.x, py = p.y - origin.y, pz = p.z - origin.z;
+      const px = p.x - origin.x,
+        py = p.y - origin.y,
+        pz = p.z - origin.z;
       const t = px * dir.x + py * dir.y + pz * dir.z;
       const miss = Math.hypot(px - dir.x * t, py - dir.y * t, pz - dir.z * t);
       if (t > 0.4 && miss < 0.42) bestT = t;
@@ -2180,7 +3188,14 @@ export class Agent {
     if (!blocked) return false;
     if (phys) {
       const wall = phys.raycast(
-        origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, bestT - 0.08, phys.MASK.WORLD
+        origin.x,
+        origin.y,
+        origin.z,
+        dir.x,
+        dir.y,
+        dir.z,
+        bestT - 0.08,
+        phys.MASK.WORLD
       );
       if (wall.hit) return false;
     }
@@ -2254,9 +3269,16 @@ export class Agent {
     // hit reaction by region, with the side the round came from
     const side = dir ? Math.sign(dir.x * Math.cos(this.yaw) - dir.z * Math.sin(this.yaw)) || 1 : 1;
     const region =
-      part === 'head' ? 'head'
-        : part === 'arm' ? (this._sideOf(point) < 0 ? 'armR' : 'armL')
-          : part === 'leg' ? (this._sideOf(point) < 0 ? 'legR' : 'legL')
+      part === 'head'
+        ? 'head'
+        : part === 'arm'
+          ? this._sideOf(point) < 0
+            ? 'armR'
+            : 'armL'
+          : part === 'leg'
+            ? this._sideOf(point) < 0
+              ? 'legR'
+              : 'legL'
             : 'torso';
     this.animator.hit(region, side, Math.min(1.4, 0.5 + amount / 45));
     if (part === 'leg') this.speed *= 0.4;
@@ -2271,6 +3293,13 @@ export class Agent {
 
   die(point: THREE.Vector3, dir: THREE.Vector3 | null, amount = 30) {
     if (!this.alive) return;
+    // Evaluate the current controller-rooted pose before handing it to ragdoll.
+    if (this.ladder) {
+      this.lodIrrelevant = false;
+      this._drive(0);
+    }
+    this._releaseLadder();
+    this._cancelRouteProof();
     this._endPeek();
     this._clearSearch();
     this.squad?.noteDeath(this);
@@ -2374,7 +3403,10 @@ export class Agent {
       speed: this.speed,
       crouch: this.crouch,
       aimTarget: this.aimTarget,
-      lookTarget: this.hasTarget || this.lastKnownAge < 4 || this._searchUntil > 0 ? this.lastKnown : this.aimTarget,
+      lookTarget:
+        this.hasTarget || this.lastKnownAge < 4 || this._searchUntil > 0
+          ? this.lastKnown
+          : this.aimTarget,
       aimWeight: this.aimWeight,
       suppress: Math.min(1, this.suppression * 0.8),
     });
@@ -2417,26 +3449,38 @@ export class Agent {
     for (let i = 0; i < this.colliders.length; i++) {
       const c = this.colliders[i];
       const data = c.userData;
-      if (!data || typeof data.a !== 'string' || typeof data.b !== 'string') throw new Error('[ai] invalid bone hitbox');
+      if (!data || typeof data.a !== 'string' || typeof data.b !== 'string')
+        throw new Error('[ai] invalid bone hitbox');
       const { a, b } = data;
       an.bonePos(a, this._boneA);
       an.bonePos(b, this._boneB);
       c.setSegment(
-        this._boneA.x, this._boneA.y, this._boneA.z,
-        this._boneB.x, this._boneB.y, this._boneB.z
+        this._boneA.x,
+        this._boneA.y,
+        this._boneA.z,
+        this._boneB.x,
+        this._boneB.y,
+        this._boneB.z
       );
     }
   }
 
   dispose() {
+    this._releaseLadder();
+    this._cancelRouteProof();
     this._endPeek();
     this._clearSearch();
     this.ai?.cover?.release(this.id);
     this.cover = null;
+    this.alive = false;
+    this.wantFire = false;
+    this.hasMoveTarget = this.pathPending = false;
     if (this.controller) this.phys?.removeCharacter(this.controller);
+    this.controller = null;
     for (const c of this.colliders) this.phys?.removeCollider(c);
     this.colliders.length = 0;
     if (this.ragdoll) this.phys?.removeRagdoll(this.ragdoll);
+    this.ragdoll = null;
     this.group.parent?.remove(this.group);
   }
 }

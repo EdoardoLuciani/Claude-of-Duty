@@ -1,31 +1,21 @@
 /**
- * Input aggregation: keyboard, mouse (pointer-locked), and gamepad, exposed as
+ * Input aggregation: keyboard, mouse (pointer-locked), and movement/look gamepad axes, exposed as
  * a stable per-frame snapshot so gameplay never touches raw DOM events.
  *
  * Edge queries (`pressed`, `released`) are valid only during the frame in which
  * the transition happened — read them in update(), not fixedUpdate().
  */
 
+import { DEFAULT_BINDINGS } from './bindings.ts';
+
+/** Temporary compatibility group for healing/telemetry; not another binding authority. */
 export const ACTIONS = {
-  forward: ['KeyW', 'ArrowUp'],
-  back: ['KeyS', 'ArrowDown'],
-  left: ['KeyA', 'ArrowLeft'],
-  right: ['KeyD', 'ArrowRight'],
-  jump: ['Space'],
-  crouch: ['ControlLeft', 'ControlRight', 'KeyC'],
-  prone: ['KeyZ'],
-  sprint: ['ShiftLeft'],
-  reload: ['KeyR'],
-  use: ['KeyF'],
-  melee: ['KeyV'],
-  leanLeft: ['KeyQ'],
-  leanRight: ['KeyE'],
-  swapWeapon: ['Digit1', 'Digit2', 'Tab'],
-  grenade: ['KeyG'],
-  radio: ['KeyX'],
-  heal: ['KeyH'],
-  flashlight: ['KeyT'],
-  pause: ['Escape'],
+  ...DEFAULT_BINDINGS,
+  swapWeapon: [
+    ...DEFAULT_BINDINGS.slot1,
+    ...DEFAULT_BINDINGS.slot2,
+    ...DEFAULT_BINDINGS.cycleWeapon,
+  ],
 } as const;
 
 /**
@@ -37,25 +27,46 @@ export const ACTIONS = {
  * unrelated browser shortcuts such as Ctrl+N keep working, and the menu
  * (pointer unlocked) keeps its normal modified shortcuts.
  */
-// Digit3 is a radio request selector only while the accessory is active.
-const GAME_KEYS = new Set([...Object.values(ACTIONS).flat(), 'Digit3', 'KeyB', 'KeyI']);
+const GAME_KEYS: ReadonlySet<string> = new Set(
+  Object.values(DEFAULT_BINDINGS)
+    .flat()
+    .filter((binding) => !binding.startsWith('Mouse'))
+);
 
 type InputConfig = { sensitivity: number; invertY: boolean };
 type Point2 = { x: number; y: number };
 type InputHandlers = {
-  keydown: (event: KeyboardEvent) => void; keyup: (event: KeyboardEvent) => void;
-  mousedown: (event: MouseEvent) => void; mouseup: (event: MouseEvent) => void;
-  mousemove: (event: MouseEvent) => void; wheel: (event: WheelEvent) => void;
-  lockchange: () => void; blur: () => void; contextmenu: (event: MouseEvent) => void;
+  keydown: (event: KeyboardEvent) => void;
+  keyup: (event: KeyboardEvent) => void;
+  mousedown: (event: MouseEvent) => void;
+  mouseup: (event: MouseEvent) => void;
+  mousemove: (event: MouseEvent) => void;
+  wheel: (event: WheelEvent) => void;
+  lockchange: () => void;
+  blur: () => void;
+  contextmenu: (event: MouseEvent) => void;
 };
 
 export class Input {
-  declare canvas: HTMLCanvasElement; declare config: InputConfig; declare down: Set<string>;
-  declare _pressed: Set<string>; declare _released: Set<string>; declare _pendingDown: Set<string>; declare _pendingUp: Set<string>;
-  declare look: Point2; declare _rawLook: Point2; declare wheel: number; declare _pendingWheel: number;
-  declare pointerLocked: boolean; declare _gameplayFocus: boolean; declare enabled: boolean; declare frozen: boolean;
-  declare gamepadIndex: number | null; declare stick: { moveX: number; moveY: number; lookX: number; lookY: number };
-  declare _bound: InputHandlers; declare _keyboardCapture: AddEventListenerOptions;
+  declare canvas: HTMLCanvasElement;
+  declare config: InputConfig;
+  declare down: Set<string>;
+  declare _pressed: Set<string>;
+  declare _released: Set<string>;
+  declare _pendingDown: Set<string>;
+  declare _pendingUp: Set<string>;
+  declare look: Point2;
+  declare _rawLook: Point2;
+  declare wheel: number;
+  declare _pendingWheel: number;
+  declare pointerLocked: boolean;
+  declare _gameplayFocus: boolean;
+  declare enabled: boolean;
+  declare frozen: boolean;
+  declare gamepadIndex: number | null;
+  declare stick: { moveX: number; moveY: number; lookX: number; lookY: number };
+  declare _bound: InputHandlers;
+  declare _keyboardCapture: AddEventListenerOptions;
 
   constructor(canvas: HTMLCanvasElement, config: InputConfig) {
     this.canvas = canvas;
@@ -151,20 +162,21 @@ export class Input {
   }
 
   /** Stop browser defaults for keys the game consumes. */
-  _preventBrowserShortcut(e: KeyboardEvent, swallowPlain = false): void {
-    if (!GAME_KEYS.has(e.code)) return;
-    // Shop/pause need native Tab (focus) and Space (button activation).
-    if (!this._gameplayInputActive() && (e.code === 'Tab' || e.code === 'Space')) return;
-    const modified = e.ctrlKey || e.metaKey || e.altKey;
-    if (this._gameplayInputActive() || (swallowPlain && !modified)) e.preventDefault();
+  _preventBrowserShortcut(e: KeyboardEvent): void {
+    // Unlocked DOM controls keep all native keys (including arrows/range
+    // sliders), not just Tab/Space.
+    if (GAME_KEYS.has(e.code) && this._gameplayInputActive()) e.preventDefault();
   }
 
   _onKeyDown(e: KeyboardEvent): void {
     if (!this.enabled) return;
-    // Plain game keys are also cancelled while in the menu (e.g. Space and
-    // Tab), but modifier shortcuts are only cancelled once the game owns input.
-    this._preventBrowserShortcut(e, true);
-    if (e.code === 'Escape') this._gameplayFocus = false;
+    this._preventBrowserShortcut(e);
+    if (this.frozen) return;
+    if (e.code === DEFAULT_BINDINGS.pause[0]) {
+      this._onBlur();
+    } else if (!this._gameplayInputActive()) {
+      return;
+    }
     if (e.repeat) return;
     this._pendingDown.add(e.code);
   }
@@ -175,20 +187,25 @@ export class Input {
     // the matching release while the game is active, rather than relying only
     // on keydown.
     this._preventBrowserShortcut(e);
+    if (this.frozen) return;
     this._pendingUp.add(e.code);
   }
 
   _onMouseDown(e: MouseEvent): void {
-    if (!this.enabled || (!this.pointerLocked && e.target !== this.canvas)) return;
-    if (e.target === this.canvas) this._gameplayFocus = true;
+    if (!this.enabled || this.frozen) return;
+    if (e.target !== this.canvas) {
+      if (!this.pointerLocked) this._onBlur();
+      return;
+    }
+    this._gameplayFocus = true;
     // Only the game canvas re-locks the pointer: clicking DOM UI (menus, the
     // supply market) must not grab the cursor mid-interaction.
-    if (!this.pointerLocked && e.button === 0 && e.target === this.canvas) this.requestPointerLock();
+    if (!this.pointerLocked && e.button === 0) this.requestPointerLock();
     this._pendingDown.add(`Mouse${e.button}`);
   }
 
   _onMouseUp(e: MouseEvent): void {
-    if (!this.enabled) return;
+    if (!this.enabled || this.frozen) return;
     this._pendingUp.add(`Mouse${e.button}`);
   }
 
@@ -200,7 +217,9 @@ export class Input {
   }
 
   _onWheel(e: WheelEvent): void {
-    if (!this.enabled) return;
+    // Native DOM scrolling never queues a weapon switch, even during resume.
+    if (!this.enabled || this.frozen || !this._gameplayInputActive() || e.target !== this.canvas)
+      return;
     this._pendingWheel += Math.sign(e.deltaY);
   }
 
@@ -212,7 +231,14 @@ export class Input {
   /** Losing focus must release every held key, or the player runs forever. */
   _onBlur() {
     this._gameplayFocus = false;
+    // Discard not-yet-snapshotted gameplay presses, but keep the modal Escape
+    // intent if the browser delivers pointerlockchange before beginFrame().
+    const pause = DEFAULT_BINDINGS.pause[0];
+    const pausePending = this._pendingDown.has(pause);
+    this._pendingDown.clear();
+    if (pausePending) this._pendingDown.add(pause);
     for (const code of this.down) this._pendingUp.add(code);
+    this._pendingWheel = 0;
     this._rawLook.x = 0;
     this._rawLook.y = 0;
   }
@@ -248,8 +274,14 @@ export class Input {
   endFrame(): void {}
 
   _pollGamepad(): void {
+    if (!this.enabled) {
+      this.stick.moveX = this.stick.moveY = this.stick.lookX = this.stick.lookY = 0;
+      return;
+    }
     const pads = navigator.getGamepads?.() ?? [];
-    const pad = pads[this.gamepadIndex ?? 0] ?? pads.find((candidate): candidate is Gamepad => candidate !== null);
+    const pad =
+      pads[this.gamepadIndex ?? 0] ??
+      pads.find((candidate): candidate is Gamepad => candidate !== null);
     if (!pad) {
       this.stick.moveX = this.stick.moveY = this.stick.lookX = this.stick.lookY = 0;
       return;
@@ -263,19 +295,26 @@ export class Input {
     this.stick.lookY = curve(dz(pad.axes[3] ?? 0));
   }
 
-  /** True while any key bound to `action` is held. */
-  action(name: keyof typeof ACTIONS): boolean {
+  _actionIn(name: keyof typeof ACTIONS, snapshot: ReadonlySet<string>): boolean {
     const codes = ACTIONS[name];
     if (!codes) return false;
-    for (const c of codes) if (this.down.has(c)) return true;
+    for (const code of codes) if (snapshot.has(code)) return true;
     return false;
   }
 
+  /** True while any key/button bound to the action is held. Wheel remains Input.wheel. */
+  action(name: keyof typeof ACTIONS): boolean {
+    return this._actionIn(name, this.down);
+  }
+
+  /** Per-physical-binding edges, preserving alias behavior; movement owns union-held stance edges. */
   actionPressed(name: keyof typeof ACTIONS): boolean {
-    const codes = ACTIONS[name];
-    if (!codes) return false;
-    for (const c of codes) if (this._pressed.has(c)) return true;
-    return false;
+    return this._actionIn(name, this._pressed);
+  }
+
+  /** Any bound key/button released this frame. */
+  actionReleased(name: keyof typeof ACTIONS): boolean {
+    return this._actionIn(name, this._released);
   }
 
   held(code: string): boolean {
@@ -291,15 +330,15 @@ export class Input {
   }
 
   get fire() {
-    return this.down.has('Mouse0');
+    return this.action('fire');
   }
 
   get firePressed() {
-    return this._pressed.has('Mouse0');
+    return this.actionPressed('fire');
   }
 
   get ads() {
-    return this.down.has('Mouse2');
+    return this.action('ads');
   }
 
   /** Normalised WASD + left-stick movement, clamped to the unit disc so

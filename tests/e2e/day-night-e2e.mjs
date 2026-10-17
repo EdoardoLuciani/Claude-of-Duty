@@ -1,69 +1,120 @@
 import assert from 'node:assert/strict';
-import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { ensureViteServer, launchChromium, stopViteServer, parseArgs } from '../../tools/lib/browser-harness.mjs';
+
+import {
+  ensureViteServer,
+  launchChromium,
+  stopViteServer,
+  parseArgs,
+} from '../../tools/lib/browser-harness.mjs';
+import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
 
 // node tests/e2e/day-night-e2e.mjs --out=shots/day-night --port=5185
-const args = parseArgs(), port = Number(args.port ?? 5185), out = resolve(args.out ?? 'shots/day-night');
+const args = parseArgs(),
+  port = Number(args.port ?? 5185),
+  out = resolve(args.out ?? 'shots/day-night');
 mkdirSync(out, { recursive: true });
 const server = await ensureViteServer({ port });
-const browser = await launchChromium({ webgpu: true, headless: true, args: [ '--ignore-gpu-blocklist',
-  '--force-color-profile=srgb', '--force-device-scale-factor=1', '--hide-scrollbars',
-  '--mute-audio', '--disable-frame-rate-limit'] });
-const errors = [], report = [];
+const browser = await launchChromium({
+  webgpu: true,
+  headless: true,
+  args: [
+    '--ignore-gpu-blocklist',
+    '--force-color-profile=srgb',
+    '--force-device-scale-factor=1',
+    '--hide-scrollbars',
+    '--mute-audio',
+    '--disable-frame-rate-limit',
+  ],
+});
+const errors = [],
+  report = [];
 try {
   for (const shot of [
-    { name: 'afternoon', hour: 16.5 }, { name: 'sunset', hour: 19.2 },
-    { name: 'early-night', hour: 21 }, { name: 'night-powered', hour: 1.5 },
+    { name: 'afternoon', hour: 16.5 },
+    { name: 'sunset', hour: 19.2 },
+    { name: 'early-night', hour: 21 },
+    { name: 'night-powered', hour: 1.5 },
     { name: 'night-outage', hour: 1.5, power: 0 },
     { name: 'night-flashlight', hour: 1.5, power: 0, flashlight: true },
-    { name: 'dawn', hour: 4.5 }, { name: 'morning', hour: 6 },
+    { name: 'dawn', hour: 4.5 },
+    { name: 'morning', hour: 6 },
   ]) {
-    const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
-    page.on('pageerror', e => errors.push(e.message));
-    page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+    const page = await browser.newPage({
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 1,
+    });
+    page.on('pageerror', (e) => errors.push(e.message));
+    page.on('console', (m) => {
+      if (m.type() === 'error') errors.push(m.text());
+    });
     await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1&shot=night`);
     await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
     await verifyNative(page);
-    await page.evaluate(async s => {
+    await page.evaluate(async (s) => {
       window.__APPLY_SHOT__('night');
       const ctx = window.__ENGINE__.ctx;
       ctx.get('sky').setTimeOfDay(s.hour);
       ctx.get('world').setStreetlightPower(s.power ?? 1);
       ctx.get('player').setFlashlightEnabled(s.flashlight ?? false);
-      const r = ctx.get('render'); await r._meterTask;
-      r._exposure = 1; r._meterReady = false;
+      const r = ctx.get('render');
+      await r._meterTask;
+      r._exposure = 1;
+      r._meterReady = false;
     }, shot);
     await page.evaluate(() => window.__PUMP__(240));
     await page.evaluate(() => window.__PRESENT__(2));
     await captureNative(page, `${out}/${shot.name}.png`);
     const info = await page.evaluate(() => {
-      const ctx = window.__ENGINE__.ctx, sky = ctx.get('sky'), r = ctx.get('render');
+      const ctx = window.__ENGINE__.ctx,
+        sky = ctx.get('sky'),
+        r = ctx.get('render');
       const nativeSkinWarm = window.__PREWARM__.hooks.player.skinnedShadowDraws > 0;
-      return { hour: sky.hour, moon: sky.moonLight.intensity, sun: sky.sunLight.intensity,
-        nativeSkinWarm, fallback: 'sun' in r, builds: window.__NATIVE_BUILDS__,
-        hooks: window.__PREWARM__.hooks };
+      return {
+        hour: sky.hour,
+        moon: sky.moonLight.intensity,
+        sun: sky.sunLight.intensity,
+        nativeSkinWarm,
+        fallback: 'sun' in r,
+        builds: window.__NATIVE_BUILDS__,
+        hooks: window.__PREWARM__.hooks,
+      };
     });
-    assert.ok(Math.abs(info.hour - shot.hour) < 1e-10, 'deterministic captures freeze automatic clock');
+    assert.ok(
+      Math.abs(info.hour - shot.hour) < 1e-10,
+      'deterministic captures freeze automatic clock'
+    );
     assert.equal(info.fallback, false, 'dim or absent moon never restores daylight');
     assert.equal(info.hooks.player.ok, true, 'native flashlight shadows warmed at boot');
-    assert.equal(info.nativeSkinWarm, true, 'skinned native depth is warm even without combat actors');
+    assert.equal(
+      info.nativeSkinWarm,
+      true,
+      'skinned native depth is warm even without combat actors'
+    );
     report.push({ ...shot, ...info });
     console.log(shot.name, JSON.stringify(info));
     await page.close();
   }
-  const night = report.filter(s => s.name.startsWith('night-'));
-  assert.equal(new Set(night.map(s => s.builds)).size, 1, 'power/toggle do not compile shader permutations');
+  const night = report.filter((s) => s.name.startsWith('night-'));
+  assert.equal(
+    new Set(night.map((s) => s.builds)).size,
+    1,
+    'power/toggle do not compile shader permutations'
+  );
 
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-  page.on('pageerror', e => errors.push(e.message));
+  page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`);
   await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
   await verifyNative(page);
   const checks = await page.evaluate(async () => {
-    const e = window.__ENGINE__, ctx = e.ctx, sky = ctx.get('sky'), world = ctx.get('world');
-    const player = ctx.get('player'), r = ctx.get('render');
+    const e = window.__ENGINE__,
+      ctx = e.ctx,
+      sky = ctx.get('sky'),
+      world = ctx.get('world');
+    const player = ctx.get('player'),
+      r = ctx.get('render');
     const result = {};
     // Opt into live lighting without spawning combat actors in this probe.
     ctx.config.deterministic = false;
@@ -72,7 +123,10 @@ try {
     sky.setTimeRate(9 / 600);
     let skyBakes = 0;
     const bakeSky = sky._bakeSky.bind(sky);
-    sky._bakeSky = () => { skyBakes++; bakeSky(); };
+    sky._bakeSky = () => {
+      skyBakes++;
+      bakeSky();
+    };
     await window.__PUMP__(60);
     result.liveHour = sky.hour;
     result.firstSecondSkyBakes = skyBakes;
@@ -85,13 +139,15 @@ try {
     result.outageTriggered = world._outage.elapsed >= 0;
     world.update(2.1, ctx);
     result.powerCut = world._streetlightPower;
-    const pauseHour = sky.hour, pauseAge = world._outage.elapsed;
+    const pauseHour = sky.hour,
+      pauseAge = world._outage.elapsed;
     ctx.get('ui').pause();
     await window.__PUMP__(30);
     result.pauseFrozen = sky.hour === pauseHour && world._outage.elapsed === pauseAge;
     ctx.get('ui').resume();
     ctx.get('market').openShop();
-    const shopHour = sky.hour, shopAge = world._outage.elapsed;
+    const shopHour = sky.hour,
+      shopAge = world._outage.elapsed;
     await window.__PUMP__(30);
     result.shopFrozen = sky.hour === shopHour && world._outage.elapsed === shopAge;
     ctx.get('market').closeShop();
@@ -101,38 +157,47 @@ try {
     world.update(1, ctx);
     result.noSecondCut = world._streetlightPower === 1;
     // Real input path and pause guard, without pointer-lock requirements.
-    e.input.enabled = true; e.input.frozen = false;
+    e.input.enabled = true;
+    e.input.frozen = false;
     player.controlEnabled = true;
-    e.input._pendingDown.add('KeyT');
+    e.input._pendingDown.add('KeyF');
     await window.__PUMP__(1);
     result.keyToggleOn = player.flashlightOn;
-    e.input._pendingUp.add('KeyT');
+    e.input._pendingUp.add('KeyF');
     await window.__PUMP__(1);
     ctx.get('ui').pause();
-    e.input._pendingDown.add('KeyT');
+    e.input._pendingDown.add('KeyF');
     await window.__PUMP__(1);
     result.pausedToggleIgnored = player.flashlightOn;
-    e.input._pendingUp.add('KeyT');
+    e.input._pendingUp.add('KeyF');
     await window.__PUMP__(1);
     ctx.get('ui').resume();
-    e.input.enabled = true; e.input.frozen = false;
-    e.input._pendingDown.add('KeyT');
+    e.input.enabled = true;
+    e.input.frozen = false;
+    e.input._pendingDown.add('KeyF');
     await window.__PUMP__(1);
     result.keyToggleOff = !player.flashlightOn;
-    e.input._pendingUp.add('KeyT');
+    e.input._pendingUp.add('KeyF');
     await window.__PUMP__(1);
     player.setFlashlightEnabled(true);
     ctx.events.emit('game:restart', { source: 'test' });
-    result.restart = { hour: sky.hour, triggered: world._outage.elapsed >= 0,
-      power: world._streetlightPower, flashlight: player.flashlightOn };
+    result.restart = {
+      hour: sky.hour,
+      triggered: world._outage.elapsed >= 0,
+      power: world._streetlightPower,
+      flashlight: player.flashlightOn,
+    };
 
     // Inspect native-shadow update ordering against the real render pipeline.
     const shadowCalls = [];
     const nativeRender = r.renderer.render;
-    r.renderer.render = function(scene, camera) {
+    r.renderer.render = function (scene, camera) {
       if (camera === player.flashlight.shadow.camera) {
-        shadowCalls.push({ shadowMaterial: !!scene.overrideMaterial?.isNodeMaterial,
-          fullWorld: world.root.visible, litManager: this.lighting.enabled !== false });
+        shadowCalls.push({
+          shadowMaterial: !!scene.overrideMaterial?.isNodeMaterial,
+          fullWorld: world.root.visible,
+          litManager: this.lighting.enabled !== false,
+        });
       }
       return nativeRender.call(this, scene, camera);
     };
@@ -146,21 +211,25 @@ try {
     const { THREE: T } = await import('/tools/arm-material-fixture.js');
     const probe = new T.Scene();
     const wall = new T.Mesh(new T.BoxGeometry(1, 4, 0.15), new T.MeshStandardNodeMaterial());
-    wall.position.set(0, 2, -2); wall.castShadow = true;
+    wall.position.set(0, 2, -2);
+    wall.castShadow = true;
     const receiver = new T.Mesh(new T.PlaneGeometry(4, 4), new T.MeshStandardNodeMaterial());
-    receiver.position.set(0, 2, -4); receiver.receiveShadow = true;
+    receiver.position.set(0, 2, -4);
+    receiver.receiveShadow = true;
     probe.add(wall, receiver, player.flashlight, player.flashlight.target);
     player.flashlight.position.set(0, 2, 0);
     player.flashlight.target.position.set(0, 2, -4);
     const observer = new T.PerspectiveCamera(40, 1, 0.1, 30);
-    observer.position.set(4, 2, 0); observer.lookAt(0, 2, -4);
+    observer.position.set(4, 2, 0);
+    observer.lookAt(0, 2, -4);
     const target = new T.RenderTarget(32, 32);
     const previousTarget = r.renderer.getRenderTarget();
     const sample = async () => {
       await new Promise(requestAnimationFrame);
       player.flashlight.shadow.needsUpdate = true;
       r.renderer.setRenderTarget(target);
-      r.renderer.clear(); r.renderer.render(probe, observer);
+      r.renderer.clear();
+      r.renderer.render(probe, observer);
       const pixels = await r.renderer.readRenderTargetPixelsAsync(target, 0, 0, 32, 32);
       const i = (16 * 32 + 16) * 4;
       return pixels[i] + pixels[i + 1] + pixels[i + 2];
@@ -172,13 +241,18 @@ try {
     ctx.scene.add(player.flashlight, player.flashlight.target);
     player.lateUpdate();
     r.renderer.setRenderTarget(previousTarget);
-    target.dispose(); wall.geometry.dispose(); wall.material.dispose();
-    receiver.geometry.dispose(); receiver.material.dispose();
+    target.dispose();
+    wall.geometry.dispose();
+    wall.material.dispose();
+    receiver.geometry.dispose();
+    receiver.material.dispose();
 
     player.health.dead = true;
-    const deathHour = sky.hour, deathAge = world._outage.elapsed;
+    const deathHour = sky.hour,
+      deathAge = world._outage.elapsed;
     await window.__PUMP__(2);
-    result.deadFrozen = sky.hour === deathHour && world._outage.elapsed === deathAge && !player.flashlightOn;
+    result.deadFrozen =
+      sky.hour === deathHour && world._outage.elapsed === deathAge && !player.flashlightOn;
     result.engineError = e.error;
     return result;
   });
@@ -187,55 +261,98 @@ try {
   assert.equal(checks.firstSecondSkyBakes, 0, 'incremental clock does not rebake sky every frame');
   assert.ok(Math.abs(checks.tenMinuteHour - 1.5) < 1e-9);
   assert.ok(Math.abs(checks.continuesAfterNight - 3) < 1e-9);
-  for (const key of ['outageTriggered', 'pauseFrozen', 'shopFrozen', 'noSecondCut',
-    'keyToggleOn', 'pausedToggleIgnored', 'keyToggleOff', 'deadFrozen']) assert.equal(checks[key], true, key);
+  for (const key of [
+    'outageTriggered',
+    'pauseFrozen',
+    'shopFrozen',
+    'noSecondCut',
+    'keyToggleOn',
+    'pausedToggleIgnored',
+    'keyToggleOff',
+    'deadFrozen',
+  ])
+    assert.equal(checks[key], true, key);
   assert.equal(checks.powerCut, 0);
   assert.equal(checks.restored, 1);
   assert.deepEqual(checks.restart, { hour: 16.5, triggered: false, power: 1, flashlight: false });
   assert.equal(checks.engineError, null);
   assert.ok(checks.shadowCalls.length > 0);
-  assert.ok(checks.shadowCalls.every(s => s.shadowMaterial && s.fullWorld && s.litManager), 'spot shadows use full forward scene');
-  assert.ok(checks.wallOcclusion.clear > 10 && checks.wallOcclusion.blocked < checks.wallOcclusion.clear * 0.05,
-    'opaque wall blocks flashlight illumination behind it');
+  assert.ok(
+    checks.shadowCalls.every((s) => s.shadowMaterial && s.fullWorld && s.litManager),
+    'spot shadows use full forward scene'
+  );
+  assert.ok(
+    checks.wallOcclusion.clear > 10 &&
+      checks.wallOcclusion.blocked < checks.wallOcclusion.clear * 0.05,
+    'opaque wall blocks flashlight illumination behind it'
+  );
   assert.deepEqual(errors, []);
   await page.close();
 
   // Real non-capture boot: initial soldiers can be outside the 19m beam.
   const live = await browser.newPage({ viewport: { width: 640, height: 360 } });
-  live.on('pageerror', e => errors.push(e.message));
+  live.on('pageerror', (e) => errors.push(e.message));
   await live.goto(`http://127.0.0.1:${port}/`);
   await live.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
   await verifyNative(live);
   const livePrewarm = await live.evaluate(async () => {
-    const e = window.__ENGINE__; e.stop();
-    const ctx = e.ctx, r = ctx.get('render'), player = ctx.get('player'), ai = ctx.get('ai');
+    const e = window.__ENGINE__;
+    e.stop();
+    const ctx = e.ctx,
+      r = ctx.get('render'),
+      player = ctx.get('player'),
+      ai = ctx.get('ai');
     const { THREE: T } = await import('/tools/arm-material-fixture.js');
-    const actor = ai.agents.find(a => a.alive);
+    const actor = ai.agents.find((a) => a.alive);
     if (!actor) throw new Error('live boot did not spawn a soldier');
-    const ahead = new T.Vector3(0, 0, -5).applyQuaternion(ctx.camera.quaternion).add(ctx.camera.position);
+    const ahead = new T.Vector3(0, 0, -5)
+      .applyQuaternion(ctx.camera.quaternion)
+      .add(ctx.camera.position);
     ahead.y -= 1.6;
-    const move = position => {
-      actor.position.copy(position); actor.group.position.copy(position);
-      actor.group.visible = true; actor.mesh.frustumCulled = true;
+    const move = (position) => {
+      actor.position.copy(position);
+      actor.group.position.copy(position);
+      actor.group.visible = true;
+      actor.mesh.frustumCulled = true;
       actor.group.updateMatrixWorld(true);
     };
-    const draw = () => { player.lateUpdate(); r.render(ctx); };
+    const draw = () => {
+      player.lateUpdate();
+      r.render(ctx);
+    };
     move(ahead);
     player.setFlashlightEnabled(false);
     for (let i = 0; i < 10; i++) draw(); // settle non-native-shadow programs
     move(ctx.camera.position.clone().add(new T.Vector3(0, 0, 100)));
-    player.setFlashlightEnabled(true); draw(); draw();
+    player.setFlashlightEnabled(true);
+    draw();
+    draw();
     const before = window.__NATIVE_BUILDS__;
-    move(ahead); draw(); draw(); draw();
-    return { before, after: window.__NATIVE_BUILDS__, compiles: window.__NATIVE_BUILDS__ - before, error: e.error };
+    move(ahead);
+    draw();
+    draw();
+    draw();
+    return {
+      before,
+      after: window.__NATIVE_BUILDS__,
+      compiles: window.__NATIVE_BUILDS__ - before,
+      error: e.error,
+    };
   });
   console.log('live flashlight prewarm', JSON.stringify(livePrewarm));
-  assert.equal(livePrewarm.after, livePrewarm.before, 'soldier entering enabled beam does not add a program');
+  assert.equal(
+    livePrewarm.after,
+    livePrewarm.before,
+    'soldier entering enabled beam does not add a program'
+  );
   assert.equal(livePrewarm.compiles, 0, 'soldier entering enabled beam does not compile shaders');
   assert.equal(livePrewarm.error, null);
   assert.deepEqual(errors, []);
   await live.close();
-  writeFileSync(`${out}/report.json`, JSON.stringify({ ok: true, shots: report, checks, livePrewarm }, null, 2));
+  writeFileSync(
+    `${out}/report.json`,
+    JSON.stringify({ ok: true, shots: report, checks, livePrewarm }, null, 2)
+  );
   console.log('day/night e2e passed');
 } finally {
   await browser.close();

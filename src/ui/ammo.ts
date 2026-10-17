@@ -16,8 +16,7 @@ function fragIcon(parent: HTMLElement): SVGSVGElement {
   svg(
     'path',
     {
-      d:
-        'M8 4.6c3.1 0 5.6 2.9 5.6 7.1S11.1 20 8 20 2.4 15.9 2.4 11.7 4.9 4.6 8 4.6z',
+      d: 'M8 4.6c3.1 0 5.6 2.9 5.6 7.1S11.1 20 8 20 2.4 15.9 2.4 11.7 4.9 4.6 8 4.6z',
     },
     s
   );
@@ -41,7 +40,8 @@ function radioIcon(parent: HTMLElement): SVGSVGElement {
   svg('rect', { x: 2.6, y: 4.4, width: 10.8, height: 13.6, rx: 1.6 }, s);
   svg('rect', { x: 4.4, y: 7, width: 7.2, height: 4.4, rx: 0.5, fill: 'rgba(0,0,0,.55)' }, s);
   const g = svg('g', { fill: 'rgba(0,0,0,.4)' }, s);
-  for (let i = 0; i < 3; i++) svg('rect', { x: 5, y: 13.4 + i * 1.4, width: 6, height: 0.7, rx: 0.35 }, g);
+  for (let i = 0; i < 3; i++)
+    svg('rect', { x: 5, y: 13.4 + i * 1.4, width: 6, height: 0.7, rx: 0.35 }, g);
   svg('rect', { x: 12.2, y: 4.6, width: 1.4, height: 2.6, rx: 0.6 }, s);
   return s;
 }
@@ -63,11 +63,48 @@ function radioIcon(parent: HTMLElement): SVGSVGElement {
  * Deliberately understated: three ink levels, no boxes, no icons bigger than
  * the type. The only colour is the low-ammo amber and the empty-mag red.
  */
-interface AmmoState { ammo: number; magSize: number; reserve: number; weaponName?: string; name?: string; fireMode?: string; reloading?: boolean; reloadProgress?: number; time?: number; bandages?: number; healing?: boolean; lethalCount?: number; cooking?: boolean; grenadeEquipped?: boolean; carpetCount?: number; radioEquipped?: boolean }
+interface AmmoState {
+  ammo: number;
+  magSize: number;
+  reserve: number;
+  weaponName?: string;
+  name?: string;
+  fireMode?: string;
+  reloading?: boolean;
+  reloadProgress?: number;
+  time?: number;
+  bandages?: number;
+  healing?: boolean;
+  lethalCount?: number;
+  cooking?: boolean;
+  grenadeEquipped?: boolean;
+  carpetCount?: number;
+  radioEquipped?: boolean;
+}
 export class AmmoPanel {
-  declare root: HTMLElement; declare equip: HTMLElement; declare slotB: HTMLElement; declare slotBn: HTMLElement; declare slotL: HTMLElement; declare slotLn: HTMLElement; declare slotR: HTMLElement; declare slotRn: HTMLElement;
-  declare mode: HTMLElement; declare name: HTMLElement; declare cur: HTMLElement; declare sep: HTMLElement; declare res: HTMLElement; declare mag: HTMLElement; declare pips: HTMLElement[];
-  declare reload: HTMLElement; declare reloadFill: HTMLElement; declare reloadBar: HTMLElement; declare punch: number; declare _lastAmmo: number; declare _lastPips: number; declare _lastCount: number; declare _lastName: string | null;
+  declare root: HTMLElement;
+  declare equip: HTMLElement;
+  declare slotB: HTMLElement;
+  declare slotBn: HTMLElement;
+  declare slotL: HTMLElement;
+  declare slotLn: HTMLElement;
+  declare slotR: HTMLElement;
+  declare slotRn: HTMLElement;
+  declare mode: HTMLElement;
+  declare name: HTMLElement;
+  declare cur: HTMLElement;
+  declare sep: HTMLElement;
+  declare res: HTMLElement;
+  declare mag: HTMLElement;
+  declare pips: HTMLElement[];
+  declare reload: HTMLElement;
+  declare reloadFill: HTMLElement;
+  declare reloadBar: HTMLElement;
+  declare punch: number;
+  declare _lastAmmo: number;
+  declare _lastPips: number;
+  declare _lastCount: number;
+  declare _lastName: string | null;
   constructor(parent: HTMLElement) {
     this.root = el('div', 'ow-ammo', parent);
 
@@ -157,10 +194,7 @@ export class AmmoPanel {
           ? ammo * (1 - reloadP / 0.45) // mag out
           : after * ((reloadP - 0.45) / 0.55); // mag in
     }
-    const filled =
-      pipAmmo <= 0.001
-        ? 0
-        : Math.max(1, Math.round((pipAmmo / magSize) * pipCount));
+    const filled = pipAmmo <= 0.001 ? 0 : Math.max(1, Math.round((pipAmmo / magSize) * pipCount));
     if (filled !== this._lastCount) {
       this._lastCount = filled;
       for (let i = 0; i < pipCount; i++) {

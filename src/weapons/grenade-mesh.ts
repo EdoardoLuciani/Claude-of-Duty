@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
+
 import { box, latheZ, rodZ, ring, extrude, mergeAll } from './geometry.ts';
 
 /**
@@ -16,7 +17,15 @@ const _e = new THREE.Euler();
 const _p = new THREE.Vector3();
 const _s = new THREE.Vector3(1, 1, 1);
 
-function xf(geo: THREE.BufferGeometry, x: number, y: number, z: number, rx = 0, ry = 0, rz = 0): THREE.BufferGeometry {
+function xf(
+  geo: THREE.BufferGeometry,
+  x: number,
+  y: number,
+  z: number,
+  rx = 0,
+  ry = 0,
+  rz = 0
+): THREE.BufferGeometry {
   const g = geo.clone();
   _e.set(rx, ry, rz, 'XYZ');
   _q.setFromEuler(_e);
@@ -64,14 +73,14 @@ function spoonOutline() {
   const a0 = 0.32;
   const a1 = 1.68;
   const rIn = 0.0484;
-  const rOut = 0.0550;
+  const rOut = 0.055;
   const ox = (a: number, r: number): number => -Math.sin(a) * r;
   const oy = (a: number, r: number): number => Math.cos(a) * r;
 
-  pts.push([0.010, 0.0864]);
+  pts.push([0.01, 0.0864]);
   pts.push([-0.015, 0.0864]);
   pts.push([-0.019, 0.0836]);
-  pts.push([ox(a0, rOut) * 0.55 - 0.008, 0.070]);
+  pts.push([ox(a0, rOut) * 0.55 - 0.008, 0.07]);
   pts.push([ox(a0, rOut), oy(a0, rOut)]);
 
   for (let i = 1; i <= n; i++) {
@@ -86,9 +95,9 @@ function spoonOutline() {
     pts.push([ox(a, rIn), oy(a, rIn)]);
   }
 
-  pts.push([ox(a0, rIn) * 0.55 - 0.006, 0.070]);
+  pts.push([ox(a0, rIn) * 0.55 - 0.006, 0.07]);
   pts.push([-0.011, 0.0832]);
-  pts.push([0.010, 0.0832]);
+  pts.push([0.01, 0.0832]);
   return pts;
 }
 
@@ -96,14 +105,14 @@ function spoonOutline() {
 const bodyGeo = (() => {
   const shell = latheZ(
     [
-      [-0.040, 0.0001],
+      [-0.04, 0.0001],
       [-0.038, 0.016],
-      [-0.030, 0.034],
+      [-0.03, 0.034],
       [-0.016, 0.043],
-      [0.000, 0.045],
+      [0.0, 0.045],
       [0.014, 0.043],
       [0.026, 0.034],
-      [0.032, 0.020],
+      [0.032, 0.02],
       [0.034, 0.016],
       [0.036, 0.015],
       [0.036, 0.0001],
@@ -128,13 +137,13 @@ const bodyGeo = (() => {
 const fuzeGeo = (() => {
   const fuze = latheZ(
     [
-      [0.000, 0.0001],
-      [0.000, 0.0146],
+      [0.0, 0.0001],
+      [0.0, 0.0146],
       [0.0024, 0.0146],
       [0.0034, 0.0132],
-      [0.020, 0.0130],
+      [0.02, 0.013],
       [0.022, 0.0104],
-      [0.036, 0.0100],
+      [0.036, 0.01],
       [0.038, 0.0088],
       [0.044, 0.0086],
       [0.046, 0.0068],
@@ -173,10 +182,10 @@ const steelGeo = (() => {
   const parts = [];
   const pin = rodZ(0.0018, 0.0018, 0.028, 8, 0.0003);
   pin.rotateY(Math.PI / 2);
-  pin.translate(-0.004, 0.0880, 0);
+  pin.translate(-0.004, 0.088, 0);
   parts.push(pin);
-  parts.push(xf(box(0.0044, 0.0044, 0.0026, 0.0004), -0.019, 0.0880, 0));
-  parts.push(xf(box(0.010, 0.0024, 0.006, 0.0004), -0.015, 0.080, 0, 0, 0, 0.32));
+  parts.push(xf(box(0.0044, 0.0044, 0.0026, 0.0004), -0.019, 0.088, 0));
+  parts.push(xf(box(0.01, 0.0024, 0.006, 0.0004), -0.015, 0.08, 0, 0, 0, 0.32));
   return mergeAll(parts)!;
 })();
 

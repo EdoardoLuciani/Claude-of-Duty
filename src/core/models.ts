@@ -1,32 +1,22 @@
-/**
- * MODELS — runtime loader for the exported GLB assets.
- *
- * The weapon and soldier meshes are no longer built procedurally at boot: the
- * same builders run offline in `tools/export-models.mjs` and write GLB files
- * under `public/models/`. This system loads them (and their metadata JSON) and
- * hands out ready-to-use records.
- *
- * Load contract (see the exporter header for the round-trip guarantees):
- *  - weapon records keep the exact shape the viewmodel consumed from the
- *    builders: `{ id, label, fxClass, body, moving, nodes, shell, magSize }`
- *    where `body`/`moving` are Groups of one mesh per material slot, each
- *    carrying `userData.mat`.
- *  - soldier records are one merged, skinned BufferGeometry with material
- *    groups in slot order, plus the slot names, bone order and weapon anchors
- *    the animator needs. Agents bind this geometry to their own RIG skeleton
- *    (same bone order — asserted at load), so animation and ragdoll code is
- *    untouched.
- *
- * Everything is cached; the weapon and soldier APIs are async, so subsystems
- * preload during `init()`.
- */
+/** Loads cached soldier GLBs/metadata and the cooked world; player weapons own their adapters. */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
 import type { EngineContext } from './context.ts';
-import { parseWeaponMetadata, parseSoldierMetadata, parseWorldManifest, parseWorldAssets } from './model-metadata.ts';
-import type { WeaponRecord, SoldierRecord, WorldPrefetch } from './model-metadata.ts';
-export type { WeaponRecord, WeaponMetadata, WeaponNodes, SoldierRecord, SoldierMetadata, SoldierWeapon, SoldierVariant, WorldManifest, WorldPrefetch, WorldBuilding, WorldLadder, ModelVec3 } from './model-metadata.ts';
+import { parseSoldierMetadata, parseWorldManifest, parseWorldAssets } from './model-metadata.ts';
+import type { SoldierRecord, WorldPrefetch } from './model-metadata.ts';
+export type {
+  SoldierRecord,
+  SoldierMetadata,
+  SoldierWeapon,
+  SoldierVariant,
+  WorldManifest,
+  WorldPrefetch,
+  WorldBuilding,
+  WorldLadder,
+  ModelVec3,
+} from './model-metadata.ts';
 
 const BASE = 'models';
 
@@ -37,8 +27,11 @@ function watch<T>(promise: Promise<T>): Promise<T> {
 }
 
 export class ModelSystem {
-  declare ctx: EngineContext; declare loader: GLTFLoader; declare _weapons: Map<string, Promise<WeaponRecord>>;
-  declare _soldiers: Map<string, Promise<SoldierRecord>>; declare worldPrefetch: Promise<WorldPrefetch>; declare worldNav: ArrayBuffer;
+  declare ctx: EngineContext;
+  declare loader: GLTFLoader;
+  declare _soldiers: Map<string, Promise<SoldierRecord>>;
+  declare worldPrefetch: Promise<WorldPrefetch>;
+  declare worldNav: ArrayBuffer;
 
   static id = 'models';
   static deps = [];
@@ -46,11 +39,9 @@ export class ModelSystem {
   async init(ctx: EngineContext) {
     this.ctx = ctx;
     this.loader = new GLTFLoader();
-    this._weapons = new Map();
     this._soldiers = new Map();
     this.worldPrefetch = watch(this._prefetchWorld());
-    // All other weapons are weapon-owned, committed Blender assets.
-    for (const id of ['shotgun']) void watch(this.getWeapon(id));
+    // All player weapons are weapon-owned, committed Blender assets.
     for (const name of ['vanguard', 'irregular', 'breacher']) void watch(this.getSoldier(name));
   }
 
@@ -83,7 +74,9 @@ export class ModelSystem {
     }
     return alreadyDecoded
       ? await response.arrayBuffer()
-      : await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+      : await new Response(
+          response.body.pipeThrough(new DecompressionStream('gzip'))
+        ).arrayBuffer();
   }
 
   async _loadWorldGLB(url: string): Promise<GLTF> {
@@ -94,7 +87,8 @@ export class ModelSystem {
   async _loadGLB(url: string): Promise<GLTF> {
     return new Promise<GLTF>((resolve, reject) => {
       this.loader.load(url, resolve, undefined, (err: unknown) => {
-        const message = typeof err === 'object' && err !== null && 'message' in err ? err.message : err;
+        const message =
+          typeof err === 'object' && err !== null && 'message' in err ? err.message : err;
         reject(new Error(`[models] failed to load ${url}: ${String(message ?? err)}`));
       });
     });
@@ -104,51 +98,6 @@ export class ModelSystem {
     const r = await fetch(url);
     if (!r.ok) throw new Error(`[models] failed to fetch ${url}: HTTP ${r.status}`);
     return r.json();
-  }
-
-  /* ================================================================== */
-  /*  weapons                                                            */
-  /* ================================================================== */
-
-  /**
-   * @returns {Promise<object>} weapon record — see the header contract.
-   */
-  getWeapon(id: string): Promise<WeaponRecord> {
-    const cached = this._weapons.get(id);
-    if (cached) return cached;
-    const pending = this._loadWeapon(id);
-    this._weapons.set(id, pending);
-    return pending;
-  }
-
-  async _loadWeapon(id: string): Promise<WeaponRecord> {
-    const [gltf, metadata] = await Promise.all([
-      this._loadGLB(`${BASE}/weapons/${id}.glb`),
-      this._loadJSON(`${BASE}/weapons/${id}.json`),
-    ]);
-    const meta = parseWeaponMetadata(metadata);
-    const record: Omit<WeaponRecord, 'body'> & { body: THREE.Object3D | null } = {
-      id,
-      label: meta.label,
-      fxClass: meta.fxClass,
-      body: null,
-      moving: {},
-      nodes: meta.nodes,
-      shell: meta.shell,
-      magSize: meta.magSize,
-    };
-    // The exporter writes `root -> {id}-body`, `{id}-<movingPart>` groups.
-    // GLTFLoader imports empty groups as plain Object3D, so match by name.
-    const root = gltf.scene;
-    root.traverse((o: THREE.Object3D) => {
-      if (o instanceof THREE.Mesh) return;
-      if (o.name === `${id}-body`) record.body = o;
-      else if (o.name.startsWith(`${id}-`) && o.name !== `${id}-model`) {
-        record.moving[o.name.slice(id.length + 1)] = o;
-      }
-    });
-    if (!record.body) throw new Error(`[models] ${id}.glb: no "${id}-body" group`);
-    return { ...record, body: record.body };
   }
 
   /* ================================================================== */

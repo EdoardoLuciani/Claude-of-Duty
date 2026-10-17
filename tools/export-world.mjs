@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 /** Compile the authoritative JS world and cook meshoptimizer collision. */
+import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   existsSync,
@@ -10,26 +11,30 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { spawn } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
+
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
+
+import { NAV_VERSION } from '../src/ai/nav-format.ts';
 import { Rng } from '../src/core/rng.ts';
-import { Assembler } from './worldgen/builder.js';
 import { buildWorld } from './worldgen/build.js';
+import { Assembler } from './worldgen/builder.js';
 import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from './worldgen/config.js';
 import { worldMetadata } from './worldgen/metadata.js';
+import { bakeNav } from './worldgen/nav-bake.js';
 import { buildCollision } from './worldgen/pack.js';
 import { worldSourceHash } from './worldgen/source-hash.js';
-import { bakeNav } from './worldgen/nav-bake.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const args = Object.fromEntries(process.argv.slice(2).map((arg) => {
-  const match = arg.match(/^--([^=]+)(?:=(.*))?$/);
-  return match ? [match[1], match[2] ?? true] : [arg, true];
-}));
+const args = Object.fromEntries(
+  process.argv.slice(2).map((arg) => {
+    const match = arg.match(/^--([^=]+)(?:=(.*))?$/);
+    return match ? [match[1], match[2] ?? true] : [arg, true];
+  })
+);
 const OUT = resolve(ROOT, String(args.out ?? 'public/models/world'));
 const CACHE = resolve(ROOT, 'node_modules/.cache');
 const LOCK = join(CACHE, 'claude-of-duty-world.lock');
@@ -47,9 +52,8 @@ if (typeof globalThis.FileReader === 'undefined') {
   };
 }
 
-const exportGlb = (scene) => new GLTFExporter()
-  .parseAsync(scene, { binary: true })
-  .then((value) => Buffer.from(value));
+const exportGlb = (scene) =>
+  new GLTFExporter().parseAsync(scene, { binary: true }).then((value) => Buffer.from(value));
 
 function writeAtomic(file, data) {
   mkdirSync(dirname(file), { recursive: true });
@@ -64,14 +68,21 @@ async function withLock(fn) {
   while (true) {
     try {
       mkdirSync(LOCK);
-      writeFileSync(join(LOCK, 'owner.json'), JSON.stringify({ pid: process.pid, started: Date.now() }));
+      writeFileSync(
+        join(LOCK, 'owner.json'),
+        JSON.stringify({ pid: process.pid, started: Date.now() })
+      );
       break;
     } catch (error) {
       if (error.code !== 'EEXIST') throw error;
       let stale = false;
       try {
         const owner = JSON.parse(readFileSync(join(LOCK, 'owner.json'), 'utf8'));
-        try { process.kill(owner.pid, 0); } catch (signalError) { stale = signalError.code === 'ESRCH'; }
+        try {
+          process.kill(owner.pid, 0);
+        } catch (signalError) {
+          stale = signalError.code === 'ESRCH';
+        }
       } catch {
         stale = Date.now() - started > 10000;
       }
@@ -79,7 +90,8 @@ async function withLock(fn) {
         rmSync(LOCK, { recursive: true, force: true });
         continue;
       }
-      if (Date.now() - started > 120000) throw new Error('[world] timed out waiting for export lock');
+      if (Date.now() - started > 120000)
+        throw new Error('[world] timed out waiting for export lock');
       await sleep(150);
     }
   }
@@ -94,7 +106,9 @@ function run(command, commandArgs) {
   return new Promise((done, reject) => {
     const child = spawn(command, commandArgs, { cwd: ROOT, stdio: 'inherit' });
     child.on('error', reject);
-    child.on('exit', (code) => code === 0 ? done() : reject(new Error(`${command} exited with ${code}`)));
+    child.on('exit', (code) =>
+      code === 0 ? done() : reject(new Error(`${command} exited with ${code}`))
+    );
   });
 }
 
@@ -149,18 +163,33 @@ async function compileWorld() {
     const metadata = worldMetadata(A, buildings, worldSourceHash(ROOT));
     const navBounds = new THREE.Box3(
       new THREE.Vector3().fromArray(metadata.bounds.min),
-      new THREE.Vector3().fromArray(metadata.bounds.max),
+      new THREE.Vector3().fromArray(metadata.bounds.max)
     );
-    const nav = await bakeNav(collision.scene, navBounds, { sourceHash: metadata.sourceHash, collisionAsset: collisionFile });
+    const nav = await bakeNav(
+      collision.scene,
+      navBounds,
+      { sourceHash: metadata.sourceHash, collisionAsset: collisionFile },
+      metadata.volumes
+    );
     const navGzip = gzipSync(Buffer.from(nav.buffer), { level: 9 });
     const navFile = assetName('nav', navGzip, 'bin.gz');
-    const manifestData = JSON.stringify({
-      ...metadata,
-      assets: { visual: visualFile, collision: collisionFile, nav: navFile },
-      navigation: { version: 1, sha256: createHash('sha256').update(nav.buffer).digest('hex'),
-        polygons: nav.polygons, components: nav.components, coverPoints: nav.coverCount },
-      stats,
-    }, null, 2) + '\n';
+    const manifestData =
+      JSON.stringify(
+        {
+          ...metadata,
+          assets: { visual: visualFile, collision: collisionFile, nav: navFile },
+          navigation: {
+            version: NAV_VERSION,
+            sha256: createHash('sha256').update(nav.buffer).digest('hex'),
+            polygons: nav.polygons,
+            components: nav.components,
+            coverPoints: nav.coverCount,
+          },
+          stats,
+        },
+        null,
+        2
+      ) + '\n';
 
     if (args.check) {
       const expected = [
@@ -181,7 +210,11 @@ async function compileWorld() {
       writeAtomic(join(OUT, navFile), navGzip);
       writeAtomic(join(OUT, 'level.json'), manifestData);
       for (const file of readdirSync(OUT)) {
-        if (/^level-(visual|collision)\./.test(file) && file !== visualFile && file !== collisionFile) {
+        if (
+          /^level-(visual|collision)\./.test(file) &&
+          file !== visualFile &&
+          file !== collisionFile
+        ) {
           rmSync(join(OUT, file));
         }
         if (file.startsWith('level-nav.') && file !== navFile) rmSync(join(OUT, file));
@@ -190,11 +223,11 @@ async function compileWorld() {
 
     console.log(
       `[world] ${args.check ? 'verified' : 'exported'} ${stats.drawCalls} draws / ${stats.instances} instances, ` +
-      `${stats.collideTris} collision tris, ${(visualGzip.length / 1048576).toFixed(1)} + ` +
-      `${(collisionGzip.length / 1048576).toFixed(1)} MiB, nav ${nav.polygons} polygons / ` +
-      `${nav.components} components / ${nav.coverCount} cover (bvh ${nav.bvhMs.toFixed(0)}ms + ` +
-      `bake ${nav.bakeMs.toFixed(0)}ms) in ` +
-      `${(performance.now() - started).toFixed(0)}ms`
+        `${stats.collideTris} collision tris, ${(visualGzip.length / 1048576).toFixed(1)} + ` +
+        `${(collisionGzip.length / 1048576).toFixed(1)} MiB, nav ${nav.polygons} polygons / ` +
+        `${nav.components} components / ${nav.coverCount} cover (bvh ${nav.bvhMs.toFixed(0)}ms + ` +
+        `bake ${nav.bakeMs.toFixed(0)}ms) in ` +
+        `${(performance.now() - started).toFixed(0)}ms`
     );
   } finally {
     A.dispose();

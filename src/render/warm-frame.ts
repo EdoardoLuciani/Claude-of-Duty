@@ -9,21 +9,35 @@ export function warmFrame(draw: () => void, signal: AbortSignal, deadline: numbe
       cancelAnimationFrame(raf!);
       clearTimeout(timer);
       signal.removeEventListener('abort', abort);
-      if (error) reject(error); else resolve();
+      if (error) reject(error);
+      else resolve();
     };
     const abort = (): void => finish(signal.reason);
-    if (signal.aborted) { reject(signal.reason); return; }
+    if (signal.aborted) {
+      reject(signal.reason);
+      return;
+    }
     signal.addEventListener('abort', abort, { once: true });
-    const timeout = (): void => finish(new Error('Native warmup timed out; keep this tab visible and reload'));
+    const timeout = (): void =>
+      finish(new Error('Native warmup timed out; keep this tab visible and reload'));
     const remaining = deadline - performance.now();
-    if (remaining <= 0) { timeout(); return; }
+    if (remaining <= 0) {
+      timeout();
+      return;
+    }
     timer = setTimeout(timeout, remaining);
     raf = requestAnimationFrame(() => {
-      if (performance.now() >= deadline) { timeout(); return; }
+      if (performance.now() >= deadline) {
+        timeout();
+        return;
+      }
       try {
         draw();
-        if (performance.now() >= deadline) timeout(); else finish();
-      } catch (error) { finish(error); }
+        if (performance.now() >= deadline) timeout();
+        else finish();
+      } catch (error) {
+        finish(error);
+      }
     });
   });
 }

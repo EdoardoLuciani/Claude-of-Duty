@@ -44,64 +44,186 @@
  */
 
 import * as THREE from 'three';
-import { grenadeMesh } from '../weapons/grenade-mesh.ts';
-import { GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../weapons/index.ts';
-import { isVector3Like } from './validation.ts';
-import { isAliveTeammate } from './actor.ts';
-import { SoldierMaterialsNode } from './textures-tsl.ts';
-import { resolveMaterials, resolveVariantName, MATERIAL_SLOTS, VARIANTS } from './soldier.ts';
-import { RIG } from './rig.ts';
-import { SurfaceNav, CoverMap, NAV_PENDING, NAV_CANCELLED } from './nav.ts';
-import { AttachmentQueries } from './attachment-queries.js';
-import { Agent, STATE, PATH_OUTCOME } from './agent.ts';
-import { Squad } from './squad.ts';
-import { pickSquadAnchors } from './intent.ts';
-import { GroundShadows } from './grounding.ts';
-import { COMBAT, GRENADE } from './tuning.ts';
-import type { Rng } from '../core/rng.ts';
+
 import type { EngineContext, EngineSystems } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
-import type { AgentOptions } from './agent.ts';
 import type { SoldierRecord } from '../core/model-metadata.ts';
+import type { Rng } from '../core/rng.ts';
 import type { PhysicsSystem } from '../physics/index.ts';
 import type { SkySystem } from '../sky/index.ts';
+import { grenadeMesh } from '../weapons/grenade-mesh.ts';
+import { GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../weapons/index.ts';
+import { isAliveTeammate } from './actor.ts';
+import { Agent, STATE, PATH_OUTCOME } from './agent.ts';
+import type { AgentOptions } from './agent.ts';
+import { AttachmentQueries } from './attachment-queries.js';
+import { GroundShadows } from './grounding.ts';
+import { pickSquadAnchors } from './intent.ts';
+import { createLadderDescriptors } from './ladder.ts';
+import type { LadderDescriptor } from './ladder.ts';
+import { NAV_VERSION } from './nav-format.ts';
+import { SurfaceNav, CoverMap, NAV_PENDING, NAV_CANCELLED } from './nav.ts';
+import { RIG } from './rig.ts';
+import { resolveMaterials, resolveVariantName, MATERIAL_SLOTS, VARIANTS } from './soldier.ts';
+import { Squad } from './squad.ts';
+import { SoldierMaterialsNode } from './textures-tsl.ts';
+import { COMBAT, GRENADE } from './tuning.ts';
+import { isVector3Like } from './validation.ts';
 
-export type AiVariant = Pick<SoldierRecord, 'geometry' | 'weapon' | 'stats' | 'variant'> & { materials: THREE.Material[]; parts: null };
+export type AiVariant = Pick<SoldierRecord, 'geometry' | 'weapon' | 'stats' | 'variant'> & {
+  materials: THREE.Material[];
+  parts: null;
+};
 export interface AiStats {
-  agents: number; alive: number; navMs: number; coverPts: number; walkable: number;
-  friendlyHolds: number; grenadeHolds: number; pathsDeferred: number; lodIrrelevant?: number;
+  agents: number;
+  alive: number;
+  navMs: number;
+  coverPts: number;
+  walkable: number;
+  friendlyHolds: number;
+  grenadeHolds: number;
+  pathsDeferred: number;
+  lodIrrelevant?: number;
 }
-interface GroundProbe { y: number; nx: number; ny: number; nz: number; hit: boolean }
-interface GrenadeArc { dx: number; dz: number; dist: number; vy: number; vh: number; tAir: number; y: number; valid: boolean }
-interface WaveConfig { squads: number; perSquad: number }
-interface SpawnAnchor { position: THREE.Vector3; yaw: number }
-interface AiPrewarm { ok: boolean; materials: number; programs: null; ms: number; graphWarm?: Awaited<ReturnType<EngineSystems['render']['_warmGraph']>>; error?: string }
+interface GroundProbe {
+  y: number;
+  nx: number;
+  ny: number;
+  nz: number;
+  hit: boolean;
+}
+interface GrenadeArc {
+  dx: number;
+  dz: number;
+  dist: number;
+  vy: number;
+  vh: number;
+  tAir: number;
+  y: number;
+  valid: boolean;
+}
+interface WaveConfig {
+  squads: number;
+  perSquad: number;
+}
+interface SpawnAnchor {
+  position: THREE.Vector3;
+  yaw: number;
+}
+interface AiPrewarm {
+  ok: boolean;
+  materials: number;
+  programs: null;
+  ms: number;
+  graphWarm?: Awaited<ReturnType<EngineSystems['render']['_warmGraph']>>;
+  error?: string;
+}
 import {
-  fireJitter, hudContact,
-  FIRE_RANGE, FIRE_TTL, HEAR_CADENCE, HEAR_RANGE, HEAR_SPEED, LOS_GRACE, LOS_RANGE,
+  fireJitter,
+  hudContact,
+  FIRE_RANGE,
+  FIRE_TTL,
+  HEAR_CADENCE,
+  HEAR_RANGE,
+  HEAR_SPEED,
+  LOS_GRACE,
+  LOS_RANGE,
 } from './contact.ts';
 
 function isPlayerActor(actor: unknown): boolean {
   return typeof actor === 'object' && actor !== null && 'isPlayer' in actor && !!actor.isPlayer;
 }
 
+function segmentDistanceSq(
+  x: number,
+  z: number,
+  px: number,
+  pz: number,
+  qx: number,
+  qz: number
+): number {
+  const dx = qx - px,
+    dz = qz - pz,
+    span = dx * dx + dz * dz;
+  const t = span ? Math.max(0, Math.min(1, ((x - px) * dx + (z - pz) * dz) / span)) : 0;
+  return (x - px - dx * t) ** 2 + (z - pz - dz * t) ** 2;
+}
+
 export type AiActor = Agent;
 
 export class AiSystem {
-  declare ctx: EngineContext; declare rng: Rng; declare root: THREE.Group; declare materials: SoldierMaterialsNode; declare ground: GroundShadows;
-  declare _variants: Map<string, AiVariant>; declare agents: AiActor[]; declare squads: Squad[]; declare grid: SurfaceNav | null; declare cover: CoverMap | null;
-  declare inspect: boolean; declare debugLog: boolean; declare forcePopulate: boolean; declare _wave: number; declare _waveTotal: number;
-  declare _waveRemaining: number; declare _wavePending: boolean; declare _nextWaveAt: number;
-  declare _waveState: { number: number; remaining: number; total: number; incoming: boolean; nextIn: number };
-  declare waveDelay: number; declare _hudList: AiActor[]; declare _lastHeardPing: number; declare corpseTtl: number; declare stats: AiStats;
-  declare _v: THREE.Vector3; declare _v2: THREE.Vector3; declare _v3: THREE.Vector3; declare _probe: GroundProbe; declare _fireEvent: EngineEventMap['weapon:fire'] & { intensity: number; light: number; flashScale: number }; declare _shellEvent: EngineEventMap['weapon:shell'];
-  declare _grenades: { body: ReturnType<PhysicsSystem['addRigidBody']>; mesh: ReturnType<typeof grenadeMesh>; fuse: number; agent: Agent }[]; declare _grenadeArc: GrenadeArc; declare _grenadePoint: THREE.Vector3; declare _grenadeStep: THREE.Vector3;
-  declare _pathBudget: number; declare pathsPerFrame: number; declare lastPathOutcome: string | null; declare lastPathResFloor: number;
-  declare lastPathReason: string | null; declare lastPathStartSurface: number; declare lastPathGoalSurface: number; declare _pathCursor: number;
-  declare _frustum: THREE.Frustum; declare _mvp: THREE.Matrix4; declare _sphere: THREE.Sphere; declare _sweep: THREE.Sphere; declare _sun: THREE.Vector3;
-  declare _lodStats: { irrelevant: number }; declare _loadedVariants: Map<string, SoldierRecord>; declare _prewarmed: AiPrewarm | null; declare _off: Array<() => void>;
+  readonly ladderClaims = new Map<number, Agent>();
+  private readonly _ladderQueue = new Map<number, Agent[]>();
+  declare ctx: EngineContext;
+  declare rng: Rng;
+  declare root: THREE.Group;
+  declare materials: SoldierMaterialsNode;
+  declare ground: GroundShadows;
+  declare _variants: Map<string, AiVariant>;
+  declare agents: AiActor[];
+  declare squads: Squad[];
+  declare grid: SurfaceNav | null;
+  declare cover: CoverMap | null;
+  declare inspect: boolean;
+  declare debugLog: boolean;
+  declare forcePopulate: boolean;
+  declare _wave: number;
+  declare _waveTotal: number;
+  declare _waveRemaining: number;
+  declare _wavePending: boolean;
+  declare _nextWaveAt: number;
+  declare _waveState: {
+    number: number;
+    remaining: number;
+    total: number;
+    incoming: boolean;
+    nextIn: number;
+  };
+  declare waveDelay: number;
+  declare _hudList: AiActor[];
+  declare _lastHeardPing: number;
+  declare corpseTtl: number;
+  declare stats: AiStats;
+  declare _v: THREE.Vector3;
+  declare _v2: THREE.Vector3;
+  declare _v3: THREE.Vector3;
+  declare _probe: GroundProbe;
+  declare _fireEvent: EngineEventMap['weapon:fire'] & {
+    intensity: number;
+    light: number;
+    flashScale: number;
+  };
+  declare _shellEvent: EngineEventMap['weapon:shell'];
+  declare _grenades: {
+    body: ReturnType<PhysicsSystem['addRigidBody']>;
+    mesh: ReturnType<typeof grenadeMesh>;
+    fuse: number;
+    agent: Agent;
+  }[];
+  declare _grenadeArc: GrenadeArc;
+  declare _grenadePoint: THREE.Vector3;
+  declare _grenadeStep: THREE.Vector3;
+  declare _pathBudget: number;
+  declare pathsPerFrame: number;
+  declare lastPathOutcome: string | null;
+  declare lastPathResFloor: number;
+  declare lastPathReason: string | null;
+  declare lastPathStartSurface: number;
+  declare lastPathGoalSurface: number;
+  declare _pathCursor: number;
+  declare _frustum: THREE.Frustum;
+  declare _mvp: THREE.Matrix4;
+  declare _sphere: THREE.Sphere;
+  declare _sweep: THREE.Sphere;
+  declare _sun: THREE.Vector3;
+  declare _lodStats: { irrelevant: number };
+  declare _loadedVariants: Map<string, SoldierRecord>;
+  declare _prewarmed: AiPrewarm | null;
+  declare _off: Array<() => void>;
   declare _planningAlive?: Set<number>;
-  declare _sky: SkySystem | null; declare _stagedAgents: AiActor[]; declare _phys: PhysicsSystem | null;
+  declare _sky: SkySystem | null;
+  declare _stagedAgents: AiActor[];
+  declare _phys: PhysicsSystem | null;
 
   static id = 'ai';
   static deps = ['physics', 'world', 'models'];
@@ -117,7 +239,8 @@ export class AiSystem {
     const matOpts = { anisotropy: ctx.config.q.anisotropy ?? 8 };
     this.rng.fork(); // Reserve the offline texture stream; keep actor RNG unchanged.
     this.materials = await SoldierMaterialsNode.fromCache({
-      base: 'models/proc', anisotropy: matOpts.anisotropy,
+      base: 'models/proc',
+      anisotropy: matOpts.anisotropy,
     });
     // Contact occlusion under every actor. Without it the cast shadow alone
     // leaves them hovering: see grounding.js.
@@ -154,8 +277,14 @@ export class AiSystem {
     /** Seconds a corpse stays before it despawns (shrinks and is removed). */
     this.corpseTtl = 30;
     this.stats = {
-      agents: 0, alive: 0, navMs: 0, coverPts: 0, walkable: 0,
-      friendlyHolds: 0, grenadeHolds: 0, pathsDeferred: 0,
+      agents: 0,
+      alive: 0,
+      navMs: 0,
+      coverPts: 0,
+      walkable: 0,
+      friendlyHolds: 0,
+      grenadeHolds: 0,
+      pathsDeferred: 0,
     };
 
     /* scratch */
@@ -226,9 +355,7 @@ export class AiSystem {
       const rec = loaded[i];
       this._validateSoldierRecord(name, rec);
       this._loadedVariants.set(name, rec);
-      console.info(
-        `[ai] model "${name}" ${(rec.stats.triangles ?? 0) | 0} tris loaded from GLB`
-      );
+      console.info(`[ai] model "${name}" ${(rec.stats.triangles ?? 0) | 0} tris loaded from GLB`);
     }
     // The albedo budget is only real if it is measured. Print what every camo
     // bake actually landed on, so a drift out of 0.09-0.32 is visible in the
@@ -280,7 +407,11 @@ export class AiSystem {
     try {
       const seen = new Set();
       for (const name in VARIANTS) {
-        for (const m of resolveMaterials(resolveVariantName(name), MATERIAL_SLOTS, this.materials)) {
+        for (const m of resolveMaterials(
+          resolveVariantName(name),
+          MATERIAL_SLOTS,
+          this.materials
+        )) {
           if (m) seen.add(m);
         }
       }
@@ -291,7 +422,10 @@ export class AiSystem {
       const r = this.ctx.peek('render');
       // init() runs before render's production graph exists. Keep material
       // creation order, but let the later engine hook warm the real variants.
-      if (!r?.renderer || !r._graph) { this._prewarmed = null; return out; }
+      if (!r?.renderer || !r._graph) {
+        this._prewarmed = null;
+        return out;
+      }
       const scene = new THREE.Group();
       const { skeleton, root } = RIG.createSkeleton();
       scene.add(root);
@@ -354,7 +488,10 @@ export class AiSystem {
     const g = new THREE.BufferGeometry();
     const n = 3;
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
-    g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]), 3));
+    g.setAttribute(
+      'normal',
+      new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]), 3)
+    );
     g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 2), 2));
     g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3).fill(1), 3));
     g.setAttribute('skinIndex', new THREE.BufferAttribute(new Uint16Array(n * 4), 4));
@@ -371,7 +508,8 @@ export class AiSystem {
 
   _wireEvents(ctx: EngineContext) {
     this._off = [];
-    const on = <K extends keyof EngineEventMap>(t: K, fn: (event: EngineEventMap[K]) => void) => this._off.push(ctx.events.on(t, fn));
+    const on = <K extends keyof EngineEventMap>(t: K, fn: (event: EngineEventMap[K]) => void) =>
+      this._off.push(ctx.events.on(t, fn));
 
     on('weapon:fire', (e) => {
       if (!e || !e.origin || e.weapon === 'ai_rifle') return; // ignore our own
@@ -384,10 +522,12 @@ export class AiSystem {
 
     on('bullet:segment', (e) => {
       for (const a of this.agents) {
-        if (!a.alive || a === e.shooter || (e.shot && a._suppressedShots.includes(e.shot))) continue;
+        if (!a.alive || a === e.shooter || (e.shot && a._suppressedShots.includes(e.shot)))
+          continue;
         const d = this._distanceToSegment(a.position, e.from, e.to, a.eyeHeight);
         if (d < 2.6) {
-          if (e.shot) a._suppressedShots[a._suppressedCursor++ % a._suppressedShots.length] = e.shot;
+          if (e.shot)
+            a._suppressedShots[a._suppressedCursor++ % a._suppressedShots.length] = e.shot;
           a.suppress(0.45 * (1 - d / 2.6) + 0.12);
         }
       }
@@ -406,7 +546,12 @@ export class AiSystem {
       const a = e.target;
       if (!a.alive) return;
       // Incoming damage is already resolved; targets own health, not ballistics.
-      a.applyDamage(e.amount, e.headshot ? 'head' : e.part ?? 'torso', e.point ?? a.position, e.incident);
+      a.applyDamage(
+        e.amount,
+        e.headshot ? 'head' : (e.part ?? 'torso'),
+        e.point ?? a.position,
+        e.incident
+      );
       if (!a.alive) e.killed = true;
     });
 
@@ -454,9 +599,18 @@ export class AiSystem {
     on('game:restart', () => this.resetForNewGame());
   }
 
-  _distanceToSegment(point: THREE.Vector3Like, from: THREE.Vector3Like, to: THREE.Vector3Like, eyeH: number) {
-    const px = point.x - from.x, py = point.y + eyeH * 0.7 - from.y, pz = point.z - from.z;
-    const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
+  _distanceToSegment(
+    point: THREE.Vector3Like,
+    from: THREE.Vector3Like,
+    to: THREE.Vector3Like,
+    eyeH: number
+  ) {
+    const px = point.x - from.x,
+      py = point.y + eyeH * 0.7 - from.y,
+      pz = point.z - from.z;
+    const dx = to.x - from.x,
+      dy = to.y - from.y,
+      dz = to.z - from.z;
     const length2 = dx * dx + dy * dy + dz * dz;
     const t = length2 > 0 ? Math.max(0, Math.min(1, (px * dx + py * dy + pz * dz) / length2)) : 0;
     return Math.hypot(px - dx * t, py - dy * t, pz - dz * t);
@@ -563,24 +717,39 @@ export class AiSystem {
   /* ================================================================== */
 
   async _buildNav() {
-    const phys = this.phys, models = this.ctx.peek('models');
+    const phys = this.phys,
+      models = this.ctx.peek('models');
     if (!phys || !models?.worldNav) throw new Error('[ai] missing cooked collision/navigation');
     if (phys.staticWorld.dirty) phys.rebuildStatic();
     if (phys.triangleCount <= 0) throw new Error('[ai] no collision for navigation');
     const { meta } = await models.worldPrefetch;
-    if (meta.navigation?.version !== 1 || !/^[a-f0-9]{64}$/.test(meta.navigation.sha256)) throw new Error('[ai] missing navigation binding');
+    if (meta.navigation?.version !== NAV_VERSION || !/^[a-f0-9]{64}$/.test(meta.navigation.sha256))
+      throw new Error('[ai] missing navigation binding');
     const t0 = performance.now();
-    const nav = await SurfaceNav.load(models.worldNav, phys, { sha256: meta.navigation.sha256,
-      sourceHash: meta.sourceHash, collisionAsset: meta.assets.collision });
-    nav.worker = new AttachmentQueries(nav, { profile: new URLSearchParams(globalThis.location?.search ?? '').has('aiWorkerProfile') });
-    try { await nav.worker.start(); }
-    catch (error) { nav.dispose(); throw error; }
-    this.grid?.dispose(); this.grid = nav;
+    const nav = await SurfaceNav.load(models.worldNav, phys, {
+      ladders: createLadderDescriptors(meta.volumes ?? []),
+      sha256: meta.navigation.sha256,
+      sourceHash: meta.sourceHash,
+      collisionAsset: meta.assets.collision,
+    });
+    nav.worker = new AttachmentQueries(nav, {
+      profile: new URLSearchParams(globalThis.location?.search ?? '').has('aiWorkerProfile'),
+    });
+    try {
+      await nav.worker.start();
+    } catch (error) {
+      nav.dispose();
+      throw error;
+    }
+    this.grid?.dispose();
+    this.grid = nav;
     this.cover = new CoverMap(nav, phys);
     this.stats.navMs = performance.now() - t0;
     this.stats.coverPts = this.cover.points.length;
     this.stats.walkable = nav.stats.polygons;
-    console.info(`[ai] nav ${nav.stats.polygons} polygons · ${this.cover.points.length} cover points · ${this.stats.navMs.toFixed(0)}ms`);
+    console.info(
+      `[ai] nav ${nav.stats.polygons} polygons · ${this.cover.points.length} cover points · ${this.stats.navMs.toFixed(0)}ms`
+    );
   }
 
   /** Floor probe used by foot IK and spawning. */
@@ -613,14 +782,18 @@ export class AiSystem {
     if (p && src && Number.isFinite(src.x)) {
       const h = Number.isFinite(p.height) ? p.height : 1.78;
       const c = p.hitbox;
-      const y = sample === 1 ? h - .12 : sample === 2 ? h * .8
-        : Math.max(.32, Math.min(h - .22, h * .62));
+      const y =
+        sample === 1
+          ? h - 0.12
+          : sample === 2
+            ? h * 0.8
+            : Math.max(0.32, Math.min(h - 0.22, h * 0.62));
       // Sample the actual damage capsule, including its leaning upper end.
       // Camera recoil, bob and death-camera motion must not create fake targets.
       if (c && Number.isFinite(c.by)) {
         const top = c.by + c.radius;
-        const py = sample === 1 ? top - .12 : Math.min(src.y + y, top - .12);
-        const t = Math.max(0, Math.min(1, (py - c.ay) / Math.max(.01, c.by - c.ay)));
+        const py = sample === 1 ? top - 0.12 : Math.min(src.y + y, top - 0.12);
+        const t = Math.max(0, Math.min(1, (py - c.ay) / Math.max(0.01, c.by - c.ay)));
         return out.set(c.ax + (c.bx - c.ax) * t, py, c.az + (c.bz - c.az) * t);
       }
       return out.set(src.x, src.y + y, src.z);
@@ -674,9 +847,11 @@ export class AiSystem {
     if (!spawns.length || !this.grid) return 0;
     const player = this.playerPosition(this._v3).clone();
     const ranked = spawns
-      .map((s, i)  => ({ s, i, d: s.position.distanceTo(player) }))
+      .map((s, i) => ({ s, i, d: s.position.distanceTo(player) }))
       .sort((a, b) => b.d - a.d)
-      .filter((e: { s: { position: THREE.Vector3; yaw: number }; i: number; d: number }) => e.d > 18);
+      .filter(
+        (e: { s: { position: THREE.Vector3; yaw: number }; i: number; d: number }) => e.d > 18
+      );
     if (!ranked.length) return 0;
 
     const variants = ['vanguard', 'irregular', 'breacher'];
@@ -693,7 +868,8 @@ export class AiSystem {
       const others = spawns
         .filter((s: { position: THREE.Vector3; yaw: number }) => s !== anchor)
         .sort(
-          (a: { position: THREE.Vector3 }, b: { position: THREE.Vector3 }) => a.position.distanceTo(anchor.position) - b.position.distanceTo(anchor.position)
+          (a: { position: THREE.Vector3 }, b: { position: THREE.Vector3 }) =>
+            a.position.distanceTo(anchor.position) - b.position.distanceTo(anchor.position)
         )
         .slice(0, 2);
       for (const o of others) route.push(o.position.clone());
@@ -704,9 +880,14 @@ export class AiSystem {
         const usable = this._usablePatrol(p, route, reachCache);
         if (!usable.length) continue;
         squad ??= this.createSquad();
-        const a = this.spawn(variants[(q * per + m) % variants.length], p, anchor.yaw + this.rng.signed() * 0.7, {
-          patrol: usable,
-        });
+        const a = this.spawn(
+          variants[(q * per + m) % variants.length],
+          p,
+          anchor.yaw + this.rng.signed() * 0.7,
+          {
+            patrol: usable,
+          }
+        );
         squad.add(a);
         made++;
       }
@@ -715,14 +896,20 @@ export class AiSystem {
   }
 
   /** Physically attached, connected patrol candidates. Actual solves stay budgeted. */
-  _usablePatrol(from: THREE.Vector3, route: THREE.Vector3[] | null, cache: Map<THREE.Vector3, number> | null) {
+  _usablePatrol(
+    from: THREE.Vector3,
+    route: THREE.Vector3[] | null,
+    cache: Map<THREE.Vector3, number> | null
+  ) {
     const nav = this.grid;
     if (!nav || !route?.length) return [];
     const ref = nav.project(from, this._v);
     if (!ref) return [];
-    const component = nav.components.get(ref), out = [];
+    const component = nav.components.get(ref),
+      out = [];
     for (const dest of route) {
-      if (Math.hypot(dest.x - from.x, dest.z - from.z) < .8 && Math.abs(dest.y - from.y) < .18) continue;
+      if (Math.hypot(dest.x - from.x, dest.z - from.z) < 0.8 && Math.abs(dest.y - from.y) < 0.18)
+        continue;
       let goal = cache?.get(dest);
       if (goal === undefined) {
         goal = nav.project(dest, this._v2, null, true);
@@ -734,7 +921,11 @@ export class AiSystem {
   }
 
   /** Jittered walkable point near `anchor` that can actually reach `route`. */
-  _pickSpawnNear(anchor: SpawnAnchor, route: THREE.Vector3[] | null = null, cache: Map<THREE.Vector3, number> | null = null) {
+  _pickSpawnNear(
+    anchor: SpawnAnchor,
+    route: THREE.Vector3[] | null = null,
+    cache: Map<THREE.Vector3, number> | null = null
+  ) {
     const grid = this.grid;
     const phys = this.phys;
     if (!anchor || !grid || !phys) return null;
@@ -749,7 +940,8 @@ export class AiSystem {
     for (let i = 0; i < 10; i++) {
       const a = this.rng.range(0, Math.PI * 2);
       const rad = this.rng.range(0.8, 3.2);
-      if (place(anchor.position.x + Math.cos(a) * rad, anchor.position.z + Math.sin(a) * rad)) return p;
+      if (place(anchor.position.x + Math.cos(a) * rad, anchor.position.z + Math.sin(a) * rad))
+        return p;
     }
     return place(anchor.position.x, anchor.position.z) ? p : null;
   }
@@ -810,16 +1002,20 @@ export class AiSystem {
       const dx = a.position.x - player.x;
       const dz = a.position.z - player.z;
       const distSq = dx * dx + dz * dz;
-      const fighting = a.state === 'combat' || a.state === 'suppressed'
-        || a.state === 'flank' || a.state === 'retreat';
+      const fighting =
+        a.state === 'combat' ||
+        a.state === 'suppressed' ||
+        a.state === 'flank' ||
+        a.state === 'retreat';
       if (distSq <= losRangeSq && fighting) {
         const crouchDrop = a.crouch ? 0.31 * a.scale : 0;
         chest.set(a.position.x, a.position.y + 1.25 * a.scale - crouchDrop, a.position.z);
         head.set(a.position.x, a.position.y + 1.62 * a.scale - crouchDrop, a.position.z);
-        const visible = !!(phys && (
-          (this._frustum.containsPoint(chest) && phys.lineOfSight(cam, chest)) ||
-          (this._frustum.containsPoint(head) && phys.lineOfSight(cam, head))
-        ));
+        const visible = !!(
+          phys &&
+          ((this._frustum.containsPoint(chest) && phys.lineOfSight(cam, chest)) ||
+            (this._frustum.containsPoint(head) && phys.lineOfSight(cam, head)))
+        );
         if (visible) {
           if (now - a.lastSeen >= LOS_GRACE) {
             a.lastSeenX = a.position.x;
@@ -868,6 +1064,8 @@ export class AiSystem {
     this.grid?.worker?.clear();
     for (const a of this.agents) a.dispose();
     this.agents.length = 0;
+    this.ladderClaims?.clear();
+    this._ladderQueue?.clear();
     this.squads.length = 0;
     for (const g of this._grenades) {
       this.phys?.removeRigidBody(g.body);
@@ -930,14 +1128,24 @@ export class AiSystem {
     // Resolve once, including penetration scatter, before committing fire, FX or
     // damage. Rejected rounds consume no ammo and publish no partial trajectory.
     const shot = phys?.fireBullet({
-      origin, dir, shooter: agent, weapon: 'ai_rifle',
-      damage: agent.weaponDamage, penetration: COMBAT.penetration,
-      maxDist: COMBAT.maxRange, dropoff: COMBAT.dropoff, speed: COMBAT.muzzleVelocity,
+      origin,
+      dir,
+      shooter: agent,
+      weapon: 'ai_rifle',
+      damage: agent.weaponDamage,
+      penetration: COMBAT.penetration,
+      maxDist: COMBAT.maxRange,
+      dropoff: COMBAT.dropoff,
+      speed: COMBAT.muzzleVelocity,
       mask: agent.staged?.noDamage ? phys.MASK.BULLET & ~phys.LAYER.PLAYER : phys.MASK.BULLET,
       emit: false,
     });
-    if (shot?.impacts.some((hit) => !hit.exit && hit.actor !== agent &&
-      isAliveTeammate(hit.actor, agent.team))) return false;
+    if (
+      shot?.impacts.some(
+        (hit) => !hit.exit && hit.actor !== agent && isAliveTeammate(hit.actor, agent.team)
+      )
+    )
+      return false;
 
     if (!ctx.config.deterministic && !agent.staged && !agent.silentDeath && agent.team !== 0) {
       const p = this.playerPosition(this._v);
@@ -973,10 +1181,16 @@ export class AiSystem {
     if (ctx.has('telemetry')) {
       const hit = shot.impacts.find((i) => !i.exit && i.actor) ?? shot.impacts[0];
       ctx.events.emit('shot:resolved', {
-        shooter: agent, weapon: 'ai_rifle', from: origin, to: hit?.point ?? shot.end,
+        shooter: agent,
+        weapon: 'ai_rifle',
+        from: origin,
+        to: hit?.point ?? shot.end,
         result: isPlayerActor(hit?.actor) ? 'player' : hit ? 'impact' : 'range',
-        target: hit?.actor ?? null, part: hit?.part ?? null,
-        damage: hit?.amount ?? 0, shot: shot.shot, stopReason: shot.stopReason,
+        target: hit?.actor ?? null,
+        part: hit?.part ?? null,
+        damage: hit?.amount ?? 0,
+        shot: shot.shot,
+        stopReason: shot.stopReason,
       });
     }
     return true;
@@ -989,7 +1203,8 @@ export class AiSystem {
   _grenadeLob(from: THREE.Vector3, target: THREE.Vector3) {
     const arc = this._grenadeArc;
     arc.valid = false;
-    arc.dx = target.x - from.x; arc.dz = target.z - from.z;
+    arc.dx = target.x - from.x;
+    arc.dz = target.z - from.z;
     arc.dist = Math.hypot(arc.dx, arc.dz);
     // Probe from the target's elevation, not the thrower's floor/roof.
     const floor = this.groundAt(target.x, target.z, target.y + GRENADE.radius);
@@ -997,8 +1212,10 @@ export class AiSystem {
     const dy = arc.y - from.y;
     const g = Math.abs(this.phys.gravity);
     if (arc.dist < 0.5 || g <= 0) return arc;
-    const speed2 = Math.min(GRENADE.maxSpeed ** 2, Math.max(GRENADE.minSpeed ** 2,
-      g * (dy + Math.hypot(arc.dist, dy)) / GRENADE.rangeMargin));
+    const speed2 = Math.min(
+      GRENADE.maxSpeed ** 2,
+      Math.max(GRENADE.minSpeed ** 2, (g * (dy + Math.hypot(arc.dist, dy))) / GRENADE.rangeMargin)
+    );
     const discriminant = speed2 * speed2 - g * (g * arc.dist * arc.dist + 2 * dy * speed2);
     if (discriminant < 0) return arc;
     // The lofted solution lands on the selected surface on its descending leg.
@@ -1014,11 +1231,15 @@ export class AiSystem {
    * Refuse blocked arcs rather than pretend a bounce has a safe landing. */
   predictGrenadeLand(from: THREE.Vector3, target: THREE.Vector3, out: THREE.Vector3) {
     const arc = this._grenadeLob(from, target);
-    out.x = target.x; out.y = arc.y; out.z = target.z;
+    out.x = target.x;
+    out.y = arc.y;
+    out.z = target.z;
     if (!arc.valid) return -1;
-    const p = this._grenadePoint.copy(from), step = this._grenadeStep;
+    const p = this._grenadePoint.copy(from),
+      step = this._grenadeStep;
     const h = this.ctx.time.fixed;
-    const vx = (arc.dx / arc.dist) * arc.vh, vz = (arc.dz / arc.dist) * arc.vh;
+    const vx = (arc.dx / arc.dist) * arc.vh,
+      vz = (arc.dz / arc.dist) * arc.vh;
     let vy = arc.vy;
     const steps = Math.ceil(arc.tAir / h);
     const radius = Math.fround(GRENADE.radius); // Rigid-body probes use Float32.
@@ -1085,7 +1306,8 @@ export class AiSystem {
   /* ================================================================== */
 
   update(dt: number, ctx: EngineContext) {
-    this._planningAlive ??= new Set(); this._planningAlive.clear();
+    this._planningAlive ??= new Set();
+    this._planningAlive.clear();
     for (const a of this.agents) if (a.alive && !a.staged) this._planningAlive.add(a.id);
     if (this.grid?.worker) {
       this.grid.worker.paused = dt <= 0;
@@ -1213,25 +1435,36 @@ export class AiSystem {
    * frame, which is invisible at 60 Hz and turns a squad-wide repath (six solves,
    * ~5 ms, on the frame the player opens fire) into two solves per frame.
    */
-  requestPath(from: THREE.Vector3, dest: THREE.Vector3, out: THREE.Vector3[], actor: Agent | null = null) {
+  requestPath(
+    from: THREE.Vector3,
+    dest: THREE.Vector3,
+    out: THREE.Vector3[],
+    actor: Agent | null = null
+  ) {
     if (!this.grid) {
       this.lastPathOutcome = PATH_OUTCOME.INVALID;
-      this.lastPathReason = 'nav-unavailable'; this.lastPathResFloor = NaN;
+      this.lastPathReason = 'nav-unavailable';
+      this.lastPathResFloor = NaN;
       this.lastPathStartSurface = this.lastPathGoalSurface = 0;
       return 0;
     }
     if (this._pathBudget <= 0) {
       this.stats.pathsDeferred++;
       this.lastPathOutcome = PATH_OUTCOME.DEFERRED;
-      this.lastPathReason = 'frame-budget'; return -1;
+      this.lastPathReason = 'frame-budget';
+      return -1;
     }
     const grid = this.grid;
-    const n = grid.worker
-      ? grid.worker.run(actor?.id ?? -1, 'path', () => grid.findPath(from, dest, out, actor), from)
-      : grid.findPath(from, dest, out, actor);
+    const solve = () =>
+      actor && out === actor.path
+        ? grid.findRoute(from, dest, actor.route, actor)
+        : grid.findPath(from, dest, out, actor);
+    const n = grid.worker ? grid.worker.run(actor?.id ?? -1, 'path', solve, from) : solve();
     if (n === NAV_PENDING || n === NAV_CANCELLED) {
-      this.stats.pathsDeferred++; this.lastPathOutcome = PATH_OUTCOME.DEFERRED;
-      this.lastPathReason = n === NAV_PENDING ? 'attachment-pending' : 'attachment-superseded'; return -1;
+      this.stats.pathsDeferred++;
+      this.lastPathOutcome = PATH_OUTCOME.DEFERRED;
+      this.lastPathReason = n === NAV_PENDING ? 'attachment-pending' : 'attachment-superseded';
+      return -1;
     }
     this._pathBudget--;
     this.lastPathOutcome = this.grid.lastOutcome;
@@ -1243,13 +1476,156 @@ export class AiSystem {
   }
 
   _servePendingPaths() {
-    const count = this.agents.length, start = this._pathCursor % Math.max(1, count);
+    if (this.grid?.worker?.paused) return;
+    const count = this.agents.length,
+      start = this._pathCursor % Math.max(1, count);
     for (let i = 0; i < count && this._pathBudget > 0; i++) {
-      const index = (start + i) % count, a = this.agents[index];
-      if (!a.alive || !a.pathPending || a.staged) continue;
+      const index = (start + i) % count,
+        a = this.agents[index];
+      if (!a.alive || !a.pathPending || a.staged || a.ladder) continue;
       a._goTo(a._pendingDest);
       this._pathCursor = (index + 1) % count;
     }
+  }
+
+  /** One FIFO claim for both directions; queued actors never own the shaft. */
+  claimLadder(a: Agent, descriptor: LadderDescriptor): boolean {
+    const id = descriptor.id,
+      owner = this.ladderClaims.get(id);
+    if (owner === a) return true;
+    let queue = this._ladderQueue.get(id);
+    if (!queue) {
+      queue = [];
+      this._ladderQueue.set(id, queue);
+    }
+    for (let i = queue.length - 1; i >= 0; i--) {
+      if (!queue[i].alive || queue[i].ladder?.descriptor.id !== id) queue.splice(i, 1);
+    }
+    if (!queue.includes(a)) queue.push(a);
+    if (owner || queue[0] !== a || !this.ladderClear(a, descriptor)) return false;
+    queue.shift();
+    this.ladderClaims.set(id, a);
+    return true;
+  }
+
+  releaseLadder(a: Agent) {
+    for (const [id, owner] of this.ladderClaims) if (owner === a) this.ladderClaims.delete(id);
+    for (const [id, queue] of this._ladderQueue) {
+      const index = queue.indexOf(a);
+      if (index >= 0) queue.splice(index, 1);
+      if (!queue.length) this._ladderQueue.delete(id);
+    }
+  }
+
+  ladderBusy(a: Agent, descriptor: LadderDescriptor): boolean {
+    const owner = this.ladderClaims.get(descriptor.id);
+    return (
+      (!!owner && owner !== a) ||
+      (this._ladderQueue.get(descriptor.id)?.some((other) => other !== a && other.alive) ?? false)
+    );
+  }
+
+  ladderHoldingClear(a: Agent, descriptor: LadderDescriptor, p: THREE.Vector3): boolean {
+    // Leave the corridor clear for live actors of every size, not just this owner.
+    if (
+      this.agents.some(
+        (other) =>
+          other.alive &&
+          this._pathOccupied(other, descriptor.points, p.x, p.y, p.z, a.radius, a.height)
+      )
+    )
+      return false;
+    // A dismounted owner must not park across the next claimant's return to entry.
+    return !(this._ladderQueue.get(descriptor.id) ?? []).some((other) => {
+      const l = other.ladder;
+      return (
+        other !== a &&
+        other.alive &&
+        l &&
+        this._pathOccupied(
+          other,
+          [other.position, descriptor.points[l.step.direction === 'up' ? 0 : 3]],
+          p.x,
+          p.y,
+          p.z,
+          a.radius,
+          a.height
+        )
+      );
+    });
+  }
+
+  /** Capsule-height occupancy of the full shaft AND both supported landings. */
+  ladderClear(a: Agent, descriptor: LadderDescriptor): boolean {
+    return this.capsulePathClear(a, descriptor.points);
+  }
+
+  capsulePathClear(
+    a: Agent,
+    points: readonly Readonly<{ x: number; y: number; z: number }>[]
+  ): boolean {
+    for (const other of this.agents) {
+      if (other === a || !other.alive) continue;
+      const p = other.controller?.position ?? other.position;
+      if (
+        this._pathOccupied(
+          a,
+          points,
+          p.x,
+          p.y,
+          p.z,
+          other.controller?.radius ?? other.radius,
+          other.controller?.height ?? other.height
+        )
+      )
+        return false;
+    }
+    const player = this.ctx?.peek?.('player'),
+      capsule = player?.hitbox;
+    if (capsule?.enabled) {
+      const r = capsule.radius,
+        y = Math.min(capsule.ay, capsule.by) - r;
+      const h = Math.abs(capsule.by - capsule.ay) + r * 2;
+      if (this._pathOccupied(a, points, capsule.ax, y, capsule.az, r, h, capsule.bx, capsule.bz))
+        return false;
+    }
+    return true;
+  }
+
+  private _pathOccupied(
+    a: Agent,
+    points: readonly Readonly<{ x: number; y: number; z: number }>[],
+    x: number,
+    y: number,
+    z: number,
+    radius: number,
+    height: number,
+    bx = x,
+    bz = z
+  ): boolean {
+    for (let i = 0; i + 1 < points.length; i++) {
+      const p = points[i],
+        q = points[i + 1];
+      if (y >= Math.max(p.y, q.y) + a.height || y + height <= Math.min(p.y, q.y)) continue;
+      const dx = q.x - p.x,
+        dz = q.z - p.z,
+        ex = bx - x,
+        ez = bz - z;
+      const cross = dx * ez - dz * ex;
+      if (cross) {
+        const t = ((x - p.x) * ez - (z - p.z) * ex) / cross;
+        const u = ((x - p.x) * dz - (z - p.z) * dx) / cross;
+        if (t >= 0 && t <= 1 && u >= 0 && u <= 1) return true;
+      }
+      const distanceSq = Math.min(
+        segmentDistanceSq(x, z, p.x, p.z, q.x, q.z),
+        segmentDistanceSq(bx, bz, p.x, p.z, q.x, q.z),
+        segmentDistanceSq(p.x, p.z, x, z, bx, bz),
+        segmentDistanceSq(q.x, q.z, x, z, bx, bz)
+      );
+      if (distanceSq < (a.radius + radius + 0.12) ** 2) return true;
+    }
+    return false;
   }
 
   /** Emergency rollback may neither pop into view nor overlap another actor. */
@@ -1258,23 +1634,33 @@ export class AiSystem {
     if (!cam || this.phys.staticWorld.dirty) return false;
     cam.updateMatrixWorld(true);
     for (const other of this.agents) {
-      if (other === a || !other.alive || other.position.y >= destination.y + a.height
-        || other.position.y + other.height <= destination.y) continue;
-      if (Math.hypot(other.position.x - destination.x, other.position.z - destination.z)
-        < a.radius + other.radius + .25) return false;
+      if (
+        other === a ||
+        !other.alive ||
+        other.position.y >= destination.y + a.height ||
+        other.position.y + other.height <= destination.y
+      )
+        continue;
+      if (
+        Math.hypot(other.position.x - destination.x, other.position.z - destination.z) <
+        a.radius + other.radius + 0.25
+      )
+        return false;
     }
     this._mvp.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
     this._frustum.setFromProjectionMatrix(this._mvp);
-    const sun = this._sunDirection(), s = this._sphere;
+    const sun = this._sunDirection(),
+      s = this._sphere;
     // The same conservative animation/shadow padding as actor relevance culling.
     s.radius = a.height + 4;
     for (let i = 0; i < 2; i++) {
       const p = i ? destination : a.position;
-      s.center.copy(p); s.center.y += a.height / 2;
+      s.center.copy(p);
+      s.center.y += a.height / 2;
       if (this._frustum.intersectsSphere(s)) return false;
-      const max = Math.min(320, (s.center.y + 6) / Math.max(.06, sun.y));
+      const max = Math.min(320, (s.center.y + 6) / Math.max(0.06, sun.y));
       this._sweep.radius = s.radius;
-      for (let t = Math.max(2, s.radius * .9); t <= max; t += Math.max(2, s.radius * .9)) {
+      for (let t = Math.max(2, s.radius * 0.9); t <= max; t += Math.max(2, s.radius * 0.9)) {
         this._sweep.center.copy(s.center).addScaledVector(sun, -t);
         if (this._frustum.intersectsSphere(this._sweep)) return false;
       }
@@ -1326,7 +1712,11 @@ export class AiSystem {
       const a = this.agents[i];
       const geo = a.mesh.geometry;
       const bs = geo.boundingSphere;
-      if (!bs) { a.lodIrrelevant = false; a.mesh.castShadow = true; continue; }
+      if (!bs) {
+        a.lodIrrelevant = false;
+        a.mesh.castShadow = true;
+        continue;
+      }
       const s = this._sphere.copy(bs).applyMatrix4(a.mesh.matrixWorld);
       s.radius += 4;
       let visible = this._frustum.intersectsSphere(s);
@@ -1337,7 +1727,10 @@ export class AiSystem {
         sweep.radius = s.radius;
         for (let t = step; t <= tMax; t += step) {
           sweep.center.copy(s.center).addScaledVector(sun, -t);
-          if (this._frustum.intersectsSphere(sweep)) { visible = true; break; }
+          if (this._frustum.intersectsSphere(sweep)) {
+            visible = true;
+            break;
+          }
         }
       }
       a.lodIrrelevant = !visible;
@@ -1399,12 +1792,18 @@ export class AiSystem {
    * that has cover nearby. Occlusion is checked at chest and head height, which
    * is what stops a soldier being placed behind a market stall.
    */
-  _stageSlot(cam: THREE.PerspectiveCamera, ndcX: number, wantDepth: number, placed: THREE.Vector3[]) {
+  _stageSlot(
+    cam: THREE.PerspectiveCamera,
+    ndcX: number,
+    wantDepth: number,
+    placed: THREE.Vector3[]
+  ) {
     const g = this.grid;
     const F = this._v.set(0, 0, -1).applyQuaternion(cam.quaternion);
     F.y = 0;
     F.normalize();
-    const rx = F.z, rz = -F.x; // camera right, flattened
+    const rx = F.z,
+      rz = -F.x; // camera right, flattened
     const tanH = Math.tan((cam.fov * Math.PI) / 360) * cam.aspect;
     const ideal = new THREE.Vector3()
       .copy(cam.position)
@@ -1417,21 +1816,31 @@ export class AiSystem {
       return out;
     }
     const chest = this._v3;
-    const spacing = .8, span = Math.ceil(7 / spacing);
-    let bestScore = Infinity, bestX = 0, bestY = 0, bestZ = 0;
+    const spacing = 0.8,
+      span = Math.ceil(7 / spacing);
+    let bestScore = Infinity,
+      bestX = 0,
+      bestY = 0,
+      bestZ = 0;
     for (let dz = -span; dz <= span; dz++) {
       for (let dx = -span; dx <= span; dx++) {
         if (!g.sampleGround(ideal.x + dx * spacing, ideal.z + dz * spacing, yRef, out)) continue;
-        const x = out.x, fy = out.y, z = out.z;
+        const x = out.x,
+          fy = out.y,
+          z = out.z;
         if (Math.abs(fy - yRef) > 1.0) continue;
         // spacing from the men already placed
         let tooClose = false;
         for (const q of placed) {
-          if (Math.hypot(q.x - x, q.z - z) < 2.4) { tooClose = true; break; }
+          if (Math.hypot(q.x - x, q.z - z) < 2.4) {
+            tooClose = true;
+            break;
+          }
         }
         if (tooClose) continue;
         // project
-        const ex = x - cam.position.x, ez = z - cam.position.z;
+        const ex = x - cam.position.x,
+          ez = z - cam.position.z;
         const depth = ex * F.x + ez * F.z;
         if (depth < 3) continue;
         const lateral = ex * rx + ez * rz;
@@ -1445,13 +1854,28 @@ export class AiSystem {
         }
         let score = Math.abs(ndc - ndcX) * 9 + Math.abs(depth - wantDepth) * 0.5;
         // Same cover preference, sampled only for competitive staging slots.
-        if (score > bestScore + 8 * .35) continue;
+        if (score > bestScore + 8 * 0.35) continue;
         for (let k = 0; k < 8; k++) {
-          const angle = k * Math.PI / 4;
-          if (this.phys.raycastAny(x, fy + 1.2, z, Math.cos(angle), 0, Math.sin(angle), 1.3, this.phys.MASK.WORLD)) score -= .35;
+          const angle = (k * Math.PI) / 4;
+          if (
+            this.phys.raycastAny(
+              x,
+              fy + 1.2,
+              z,
+              Math.cos(angle),
+              0,
+              Math.sin(angle),
+              1.3,
+              this.phys.MASK.WORLD
+            )
+          )
+            score -= 0.35;
         }
         if (score < bestScore) {
-          bestScore = score; bestX = x; bestY = fy; bestZ = z;
+          bestScore = score;
+          bestX = x;
+          bestY = fy;
+          bestZ = z;
         }
       }
     }
@@ -1486,11 +1910,11 @@ export class AiSystem {
       // hero: up and firing, left of frame, close enough to read the kit
       ['vanguard', -0.44, 8.0, false, 0, true, 0],
       // second man crouched in cover, right of frame
-      ['breacher', 0.30, 12.0, true, 0, true, 0],
+      ['breacher', 0.3, 12.0, true, 0, true, 0],
       // one caught mid-stride between positions
       ['irregular', -0.14, 16.0, false, 4.1, false, 0],
       // one reloading behind cover on the far right
-      ['vanguard', 0.60, 9.5, true, 0, true, 3.4],
+      ['vanguard', 0.6, 9.5, true, 0, true, 3.4],
       // depth: a fifth man well down the street
       ['irregular', -0.26, 22.0, false, 0, true, 0],
     ];
@@ -1518,7 +1942,7 @@ export class AiSystem {
       a.aimTarget.copy(this.playerPosition(this._v3));
       a.animator.update(0.016, 0);
       placedPositions.push(pos.clone());
-      this._stagedAgents = (this._stagedAgents ?? []);
+      this._stagedAgents = this._stagedAgents ?? [];
       this._stagedAgents.push(a);
       if (this.debugLog) {
         console.info(
@@ -1531,7 +1955,11 @@ export class AiSystem {
     // One man already down, handed to the ragdoll solver with the round's
     // impulse — it dresses the tableau and it exercises the death path.
     const dPos = this._stageSlot(cam, -0.58, 9.4, placedPositions);
-    const casualty = this.spawn('breacher', dPos, Math.atan2(cam.position.x - dPos.x, cam.position.z - dPos.z));
+    const casualty = this.spawn(
+      'breacher',
+      dPos,
+      Math.atan2(cam.position.x - dPos.x, cam.position.z - dPos.z)
+    );
     squad.add(casualty);
     casualty.animator.update(0.016, 0);
     const hit = new THREE.Vector3(dPos.x, dPos.y + 1.35, dPos.z);
@@ -1555,7 +1983,10 @@ export class AiSystem {
       ['breacher', 3.6, 1.15, -0.7],
     ];
     for (const [nm, d, s2, extraYaw] of layout) {
-      const p = new THREE.Vector3().copy(cam.position).addScaledVector(F, d).addScaledVector(right, s2);
+      const p = new THREE.Vector3()
+        .copy(cam.position)
+        .addScaledVector(F, d)
+        .addScaledVector(right, s2);
       p.y = this.groundAt(p.x, p.z, cam.position.y + 1.0);
       const toCam = Math.atan2(cam.position.x - p.x, cam.position.z - p.z);
       const a = this.spawn(nm, p, toCam + extraYaw);
@@ -1576,6 +2007,8 @@ export class AiSystem {
     for (const off of this._off ?? []) off();
     for (const a of this.agents) a.dispose();
     this.agents.length = 0;
+    this.ladderClaims?.clear();
+    this._ladderQueue?.clear();
     this.squads.length = 0;
     for (const g of this._grenades) {
       this.phys?.removeRigidBody(g.body);
@@ -1583,7 +2016,9 @@ export class AiSystem {
     }
     this._grenades.length = 0;
     this.ground?.dispose();
-    this.grid?.dispose(); this.grid = null; this.cover = null;
+    this.grid?.dispose();
+    this.grid = null;
+    this.cover = null;
     for (const v of this._variants.values()) v.geometry.dispose();
     this._variants.clear();
     this.materials?.dispose();

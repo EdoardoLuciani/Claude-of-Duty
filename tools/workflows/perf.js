@@ -1,6 +1,7 @@
 export const meta = {
   name: 'fps-perf',
-  description: 'Make the FPS fast with zero visual change: fix wall-clock determinism, then optimize behind a pixel gate',
+  description:
+    'Make the FPS fast with zero visual change: fix wall-clock determinism, then optimize behind a pixel gate',
   phases: [
     { title: 'Determinism' },
     { title: 'Verify gate' },
@@ -70,9 +71,10 @@ log('Phase 1: route wall-clock animation through ctx.time');
 const DIRS_WITH_CLOCK = ['materials', 'fx', 'weapons', 'ai', 'world', 'physics'];
 
 const determinism = await parallel(
-  DIRS_WITH_CLOCK.map((dir, i) => () =>
-    agent(
-      `You are fixing a determinism bug in src/${dir}/ of the FPS at ${ROOT}.
+  DIRS_WITH_CLOCK.map(
+    (dir, i) => () =>
+      agent(
+        `You are fixing a determinism bug in src/${dir}/ of the FPS at ${ROOT}.
 
 THE BUG — visual output depends on wall-clock time. Subsystems call
 performance.now() (or otherwise read real time) to drive animation, instead of using
@@ -103,23 +105,23 @@ ${GATE}
 
 Your port is ${PORT(i)}. Read ${ROOT}/ARCHITECTURE.md first. Do not edit outside
 src/${dir}/.`,
-      {
-        label: `determinism:${dir}`,
-        phase: 'Determinism',
-        agentType: 'general-purpose',
-        schema: {
-          type: 'object',
-          required: ['dir', 'sitesFixed', 'gatePasses'],
-          properties: {
-            dir: { type: 'string' },
-            sitesFixed: { type: 'array', items: { type: 'string' } },
-            sitesLeftAlone: { type: 'array', items: { type: 'string' } },
-            gatePasses: { type: 'boolean' },
-            notes: { type: 'string' },
+        {
+          label: `determinism:${dir}`,
+          phase: 'Determinism',
+          agentType: 'general-purpose',
+          schema: {
+            type: 'object',
+            required: ['dir', 'sitesFixed', 'gatePasses'],
+            properties: {
+              dir: { type: 'string' },
+              sitesFixed: { type: 'array', items: { type: 'string' } },
+              sitesLeftAlone: { type: 'array', items: { type: 'string' } },
+              gatePasses: { type: 'boolean' },
+              notes: { type: 'string' },
+            },
           },
-        },
-      }
-    )
+        }
+      )
   )
 );
 
@@ -281,7 +283,11 @@ and after, at least 3 runs each, plus the imagediff verdict.`,
           properties: {
             dir: { type: 'string' },
             changes: { type: 'array', items: { type: 'string' } },
-            reverted: { type: 'array', items: { type: 'string' }, description: 'Optimizations abandoned because they failed the pixel gate' },
+            reverted: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Optimizations abandoned because they failed the pixel gate',
+            },
             gatePasses: { type: 'boolean' },
             before: { type: 'string', description: 'profiler numbers before' },
             after: { type: 'string', description: 'profiler numbers after' },
@@ -302,7 +308,21 @@ Either make it pixel-identical or revert it. A faster build that changes the ima
 not acceptable — the user's requirement is exact visual parity. Verify with
 tools/baseline.mjs + tools/imagediff.mjs on port ${PORT(40)} and report which
 optimizations survived.`,
-          { label: `repair:${t.dir}`, phase: 'Optimize', agentType: 'general-purpose', schema: { type: 'object', properties: { dir: { type: 'string' }, survived: { type: 'array', items: { type: 'string' } }, reverted: { type: 'array', items: { type: 'string' } }, gatePasses: { type: 'boolean' } }, required: ['gatePasses'] } }
+          {
+            label: `repair:${t.dir}`,
+            phase: 'Optimize',
+            agentType: 'general-purpose',
+            schema: {
+              type: 'object',
+              properties: {
+                dir: { type: 'string' },
+                survived: { type: 'array', items: { type: 'string' } },
+                reverted: { type: 'array', items: { type: 'string' } },
+                gatePasses: { type: 'boolean' },
+              },
+              required: ['gatePasses'],
+            },
+          }
         ).then((r) => ({ ...res, repair: r }))
       : res
 );
@@ -313,7 +333,17 @@ const final = await agent(
   `Final integration and measurement for the FPS at ${ROOT}.
 
 The optimization fleet edited render, world, fx, ai, materials concurrently:
-${JSON.stringify(optimized.filter(Boolean).map((o) => ({ dir: o.dir, changes: o.changes, gate: o.gatePasses, needs: o.needsElsewhere, reverted: o.reverted })), null, 2)}
+${JSON.stringify(
+  optimized.filter(Boolean).map((o) => ({
+    dir: o.dir,
+    changes: o.changes,
+    gate: o.gatePasses,
+    needs: o.needsElsewhere,
+    reverted: o.reverted,
+  })),
+  null,
+  2
+)}
 
 You may edit any file. Apply any sound cross-cutting changes the agents requested
 (needsElsewhere), especially prewarmMaterials() hooks into src/core/prewarm.ts so
@@ -363,4 +393,9 @@ no frame > 30 ms, zero pixel change) was met, partially met, or missed.`,
   }
 );
 
-return { determinism: determinism.filter(Boolean), gateCheck, optimized: optimized.filter(Boolean), final };
+return {
+  determinism: determinism.filter(Boolean),
+  gateCheck,
+  optimized: optimized.filter(Boolean),
+  final,
+};

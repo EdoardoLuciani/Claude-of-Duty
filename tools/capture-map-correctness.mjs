@@ -2,7 +2,13 @@
 /** Capture the telemetry fixes and every newly accessible facade from fixed poses. */
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { ensureViteServer, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
+
+import {
+  ensureViteServer,
+  launchChromium,
+  parseArgs,
+  stopViteServer,
+} from './lib/browser-harness.mjs';
 
 const args = parseArgs();
 const port = Number(args.port ?? 5173);
@@ -42,11 +48,19 @@ const levelShots = [
 const server = await ensureViteServer({ port, attempts: 120 });
 const browser = await launchChromium({
   headless: true,
-  args: ['--ignore-gpu-blocklist', '--enable-gpu-rasterization', '--force-color-profile=srgb', '--mute-audio'],
+  args: [
+    '--ignore-gpu-blocklist',
+    '--enable-gpu-rasterization',
+    '--force-color-profile=srgb',
+    '--mute-audio',
+  ],
 });
 const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
 try {
-  await page.goto(`http://127.0.0.1:${port}/?capture=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });
+  await page.goto(`http://127.0.0.1:${port}/?capture=1`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 90000,
+  });
   await page.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
   for (const shot of [...telemetry, ...levelShots]) {
     await page.evaluate((value) => {
@@ -73,11 +87,15 @@ try {
       player?.teleport?.(camera.position, camera.rotation);
       engine.ctx.peek('sky')?.setTimeOfDay?.(16.5);
     }, shot);
-    await page.evaluate((frames) => new Promise((done) => {
-      let frame = 0;
-      const tick = () => (++frame >= frames ? done() : requestAnimationFrame(tick));
-      requestAnimationFrame(tick);
-    }), settle);
+    await page.evaluate(
+      (frames) =>
+        new Promise((done) => {
+          let frame = 0;
+          const tick = () => (++frame >= frames ? done() : requestAnimationFrame(tick));
+          requestAnimationFrame(tick);
+        }),
+      settle
+    );
     await page.screenshot({ path: resolve(outDir, `${shot.name}.png`), type: 'png' });
     console.log(`${shot.name}.png`);
   }

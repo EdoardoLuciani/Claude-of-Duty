@@ -20,24 +20,38 @@ returned 403. Exact photo registration/URLs remain in the review JSONs.
 
 ## Source/runtime and approved sights
 
-`m4a1-block-ii.blend/.glb`, `manifest.json`, `hand-reference.json`,
-`photo-review.json` and `side-review.json` are maintained inputs/exports.
+The [M4 source map](../../../tools/blender/m4/README.md) owns edit locations,
+read-only calibration/review-arm inputs and native 120 Hz/STEP export details.
+Follow the [shared workflow](../../../tools/blender/README.md): Python is authority,
+blend/GLB/maps/manifest are generated. `photo-review.json` and `side-review.json`
+record reference limitations.
 Eight native clips preserve events/durations, shared IK/ADS/sway/reactive recoil.
 Keep invertible rest seats, matching NLA tracks, visible spare descendants and
 empty-reload latch/stock/deformed-arm clearance. No duplicate arms/live cases.
-Caps: <110k triangles, ≤40 primitives, ≤16 materials, three 1024² maps, ≤10 MiB.
+Caps: <110k triangles, ≤40 primitives, ≤16 materials, four 1024² maps, ≤10 MiB.
+The selected balanced finish adds a receiver-only albedo map with 25% of the
+original variation around the same mean. The other three maps remain shared.
+Receiver linear RGB is .041/.043/.046, roughness .44, normal strength .08;
+FDE .56/.16, polymer .80/.55, phosphate steel .56/.16, magazine .67/.18
+(roughness/normal). Metalness is unchanged; no added clearcoat. Source generation
+and exported-material smoke checks own these settings, not runtime overrides.
 
-Approved H is a gameplay adaptation, not factory hardware: 5.6 mm rear hole in
-the original 7.6 mm cup, original sight centre and 2.60 mm post, upper 1.4 mm
-neon-green tip. Fixed lower support joins the cup below the inner edge.
+The rear hole is restored to its original 2.2 mm bore and 7.6 mm outer cup;
+the original sight centre and 2.60 mm post are unchanged. The upper 1.4 mm
+neon-green tip is retained. The lower support clears the opening by 0.1 mm
+while remaining attached; the historical untrimmed support occluded the bore.
 Preserve paint/opacity, aperture rays, aim datum and solid attachment checks.
 No camera/FOV/ballistic retuning.
 
 ## Rebuild/check (root, Blender 5.2.2)
 
 ```sh
-node tools/m4-hand-reference.mjs
+# Only when intentionally changing shared hand calibration:
+# node tools/m4-hand-reference.mjs
 blender -b --threads 8 --python-exit-code 1 --python tools/blender/m4a1.py -- --quick
+# Non-destructive scratch build:
+blender -b --threads 8 --python-exit-code 1 --python tools/blender/m4a1.py -- \
+  --output /tmp/m4-authoring-review --quick
 blender -b assets/weapons/m4a1-block-ii/m4a1-block-ii.blend \
   --python-exit-code 1 --python tools/blender/m4_check.py
 node tests/smoke/smoke-m4.mjs
@@ -45,7 +59,6 @@ node tests/e2e/check-m4-game.mjs --out=.tmp-rend/m4-game
 node tools/capture-m4-sights.mjs --out=.tmp-rend/m4-sights
 ```
 
-Regeneration overwrites source/exports; normal builds need no Blender.
 `m4_review.py` / `m4_photo_review.py` use Eevee and frozen uniform registration.
 No after-only reframing or independent X/Y warp; final native frames are authority.
 History: [#339](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/339),

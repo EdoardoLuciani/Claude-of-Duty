@@ -25,8 +25,17 @@ export const SURFACE_NAMES = [
   'rubber',
   'plaster',
 ] as const;
-type SurfaceName = typeof SURFACE_NAMES[number];
-interface SurfaceProps { penDepth: number; energyLoss: number; deflect: number; friction: number; restitution: number; density: number; hardness: number; shatters: boolean }
+type SurfaceName = (typeof SURFACE_NAMES)[number];
+interface SurfaceProps {
+  penDepth: number;
+  energyLoss: number;
+  deflect: number;
+  friction: number;
+  restitution: number;
+  density: number;
+  hardness: number;
+  shatters: boolean;
+}
 
 export const SURFACE: Record<SurfaceName, number> = {} as Record<SurfaceName, number>;
 for (let i = 0; i < SURFACE_NAMES.length; i++) SURFACE[SURFACE_NAMES[i]] = i;
@@ -45,29 +54,137 @@ for (let i = 0; i < SURFACE_NAMES.length; i++) SURFACE[SURFACE_NAMES[i]] = i;
  */
 export const SURFACE_PROPS: SurfaceProps[] = [
   // concrete
-  { penDepth: 0.055, energyLoss: 0.62, deflect: 0.055, friction: 0.92, restitution: 0.26, density: 2400, hardness: 0.95, shatters: false },
+  {
+    penDepth: 0.055,
+    energyLoss: 0.62,
+    deflect: 0.055,
+    friction: 0.92,
+    restitution: 0.26,
+    density: 2400,
+    hardness: 0.95,
+    shatters: false,
+  },
   // metal (structural steel / vehicle panel)
-  { penDepth: 0.022, energyLoss: 0.7, deflect: 0.075, friction: 0.52, restitution: 0.44, density: 7800, hardness: 1.0, shatters: false },
+  {
+    penDepth: 0.022,
+    energyLoss: 0.7,
+    deflect: 0.075,
+    friction: 0.52,
+    restitution: 0.44,
+    density: 7800,
+    hardness: 1.0,
+    shatters: false,
+  },
   // wood
-  { penDepth: 0.32, energyLoss: 0.3, deflect: 0.03, friction: 0.72, restitution: 0.3, density: 620, hardness: 0.4, shatters: false },
+  {
+    penDepth: 0.32,
+    energyLoss: 0.3,
+    deflect: 0.03,
+    friction: 0.72,
+    restitution: 0.3,
+    density: 620,
+    hardness: 0.4,
+    shatters: false,
+  },
   // dirt
-  { penDepth: 0.26, energyLoss: 0.45, deflect: 0.05, friction: 0.96, restitution: 0.09, density: 1500, hardness: 0.2, shatters: false },
+  {
+    penDepth: 0.26,
+    energyLoss: 0.45,
+    deflect: 0.05,
+    friction: 0.96,
+    restitution: 0.09,
+    density: 1500,
+    hardness: 0.2,
+    shatters: false,
+  },
   // sand
-  { penDepth: 0.19, energyLoss: 0.55, deflect: 0.06, friction: 1.05, restitution: 0.04, density: 1600, hardness: 0.12, shatters: false },
+  {
+    penDepth: 0.19,
+    energyLoss: 0.55,
+    deflect: 0.06,
+    friction: 1.05,
+    restitution: 0.04,
+    density: 1600,
+    hardness: 0.12,
+    shatters: false,
+  },
   // glass
-  { penDepth: 0.45, energyLoss: 0.12, deflect: 0.012, friction: 0.32, restitution: 0.2, density: 2500, hardness: 0.85, shatters: true },
+  {
+    penDepth: 0.45,
+    energyLoss: 0.12,
+    deflect: 0.012,
+    friction: 0.32,
+    restitution: 0.2,
+    density: 2500,
+    hardness: 0.85,
+    shatters: true,
+  },
   // water
-  { penDepth: 1.1, energyLoss: 0.5, deflect: 0.09, friction: 0.3, restitution: 0.0, density: 1000, hardness: 0.0, shatters: false },
+  {
+    penDepth: 1.1,
+    energyLoss: 0.5,
+    deflect: 0.09,
+    friction: 0.3,
+    restitution: 0.0,
+    density: 1000,
+    hardness: 0.0,
+    shatters: false,
+  },
   // foliage
-  { penDepth: 3.0, energyLoss: 0.05, deflect: 0.008, friction: 0.62, restitution: 0.06, density: 300, hardness: 0.05, shatters: false },
+  {
+    penDepth: 3.0,
+    energyLoss: 0.05,
+    deflect: 0.008,
+    friction: 0.62,
+    restitution: 0.06,
+    density: 300,
+    hardness: 0.05,
+    shatters: false,
+  },
   // fabric
-  { penDepth: 2.2, energyLoss: 0.06, deflect: 0.01, friction: 0.8, restitution: 0.05, density: 400, hardness: 0.02, shatters: false },
+  {
+    penDepth: 2.2,
+    energyLoss: 0.06,
+    deflect: 0.01,
+    friction: 0.8,
+    restitution: 0.05,
+    density: 400,
+    hardness: 0.02,
+    shatters: false,
+  },
   // flesh
-  { penDepth: 0.55, energyLoss: 0.35, deflect: 0.02, friction: 0.9, restitution: 0.05, density: 1050, hardness: 0.05, shatters: false },
+  {
+    penDepth: 0.55,
+    energyLoss: 0.35,
+    deflect: 0.02,
+    friction: 0.9,
+    restitution: 0.05,
+    density: 1050,
+    hardness: 0.05,
+    shatters: false,
+  },
   // rubber
-  { penDepth: 0.28, energyLoss: 0.4, deflect: 0.04, friction: 1.25, restitution: 0.72, density: 1200, hardness: 0.1, shatters: false },
+  {
+    penDepth: 0.28,
+    energyLoss: 0.4,
+    deflect: 0.04,
+    friction: 1.25,
+    restitution: 0.72,
+    density: 1200,
+    hardness: 0.1,
+    shatters: false,
+  },
   // plaster / drywall
-  { penDepth: 0.7, energyLoss: 0.12, deflect: 0.02, friction: 0.86, restitution: 0.14, density: 800, hardness: 0.25, shatters: false },
+  {
+    penDepth: 0.7,
+    energyLoss: 0.12,
+    deflect: 0.02,
+    friction: 0.86,
+    restitution: 0.14,
+    density: 800,
+    hardness: 0.25,
+    shatters: false,
+  },
 ];
 
 /** Resolve a surface name (or index, or undefined) to a valid index. */
@@ -83,7 +200,10 @@ export function surfaceIndex(s: unknown, fallback = SURFACE.concrete): number {
 
 const GUESS: [RegExp, number][] = [
   [/concrete|cement|stone|brick|rock|asphalt|tarmac|road|kerb|curb|marble|tile/i, SURFACE.concrete],
-  [/metal|steel|iron|alu|aluminium|aluminum|tin|pipe|rail|grate|vent|car|vehicle|chassis|barrel|drum|sign/i, SURFACE.metal],
+  [
+    /metal|steel|iron|alu|aluminium|aluminum|tin|pipe|rail|grate|vent|car|vehicle|chassis|barrel|drum|sign/i,
+    SURFACE.metal,
+  ],
   [/wood|timber|plank|crate|pallet|door|plywood|fence|log|furnit/i, SURFACE.wood],
   [/dirt|mud|soil|earth|ground|terrain|gravel|rubble/i, SURFACE.dirt],
   [/sand|dune|beach/i, SURFACE.sand],
@@ -132,8 +252,15 @@ export const MASK = {
   CHARACTER: LAYER.STATIC | LAYER.PROP | LAYER.CLIP,
   /** Everything a bullet can strike. */
   BULLET:
-    LAYER.STATIC | LAYER.PROP | LAYER.DEBRIS | LAYER.PLAYER | LAYER.ACTOR | LAYER.RAGDOLL |
-    LAYER.GLASS | LAYER.SHOOT_ONLY | LAYER.FOLIAGE,
+    LAYER.STATIC |
+    LAYER.PROP |
+    LAYER.DEBRIS |
+    LAYER.PLAYER |
+    LAYER.ACTOR |
+    LAYER.RAGDOLL |
+    LAYER.GLASS |
+    LAYER.SHOOT_ONLY |
+    LAYER.FOLIAGE,
   /** Static-only: camera collision, cover queries, decal projection. */
   WORLD: LAYER.STATIC | LAYER.PROP,
   /** Line of sight — glass and foliage do not block vision. */

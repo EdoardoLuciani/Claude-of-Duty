@@ -1,8 +1,12 @@
 import { RenderTarget } from 'three/webgpu';
+
 import type { Engine } from './engine.ts';
 
 /** Strict-WebGPU material warmup; never creates or requests a WebGL context. */
-export async function prewarm(engine: Engine, { onProgress = () => {} }: { onProgress?: (progress: number) => void } = {}) {
+export async function prewarm(
+  engine: Engine,
+  { onProgress = () => {} }: { onProgress?: (progress: number) => void } = {}
+) {
   const render = engine.ctx.peek('render');
   const renderer = render?.renderer;
   if (!renderer) return { ok: false, reason: 'no renderer' };
@@ -10,7 +14,9 @@ export async function prewarm(engine: Engine, { onProgress = () => {} }: { onPro
   const scratch = new RenderTarget(1, 1, { depthBuffer: false });
   const target = renderer.getRenderTarget();
   const camera = engine.camera;
-  const pos = camera.position.clone(), quat = camera.quaternion.clone(), fov = camera.fov;
+  const pos = camera.position.clone(),
+    quat = camera.quaternion.clone(),
+    fov = camera.fov;
   const hooks: Record<string, unknown> = {};
   try {
     // Register materials before their owning hooks warm the actual native graph.
@@ -29,7 +35,8 @@ export async function prewarm(engine: Engine, { onProgress = () => {} }: { onPro
       try {
         hooks[id] = (await system.prewarmMaterials(engine.ctx)) ?? { ok: true };
       } catch (error) {
-        const message = typeof error === 'object' && error !== null && 'message' in error ? error.message : error;
+        const message =
+          typeof error === 'object' && error !== null && 'message' in error ? error.message : error;
         hooks[id] = { ok: false, reason: String(message ?? error) };
       }
     }
@@ -43,6 +50,11 @@ export async function prewarm(engine: Engine, { onProgress = () => {} }: { onPro
     renderer.setRenderTarget(target ?? null);
     scratch.dispose();
   }
-  return { ok: Object.values(hooks).every(hook => !(typeof hook === 'object' && hook !== null && 'ok' in hook && hook.ok === false)),
-    hooks, ms: Math.round(performance.now() - start) };
+  return {
+    ok: Object.values(hooks).every(
+      (hook) => !(typeof hook === 'object' && hook !== null && 'ok' in hook && hook.ok === false)
+    ),
+    hooks,
+    ms: Math.round(performance.now() - start),
+  };
 }

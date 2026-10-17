@@ -18,17 +18,77 @@
  */
 
 import * as THREE from 'three';
-import { MASK, SURFACE_PROPS } from './surfaces.ts';
+
 import { closestPtSegSeg, makeClosest } from './math.ts';
+import { MASK, SURFACE_PROPS } from './surfaces.ts';
 
 const DEG = Math.PI / 180;
 type XYZ = readonly [number, number, number];
-interface BoneSpec { name: string; head: XYZ; tail: XYZ; radius?: number; mass?: number; parent?: number; cone?: number; twist?: number }
-interface RagdollOptions { gravity?: number; iterations?: number; mask?: number; damping?: number; friction?: number; userData?: unknown; actor?: unknown; bones?: BoneSpec[]; height?: number; mass?: number; transform?: THREE.Matrix4 }
-interface RagdollWorld { triCount: number; surface: Uint8Array; overlapCapsule(...args: number[]): number; contacts: { count: number; capacity: number; nx: Float32Array; ny: Float32Array; nz: Float32Array; px: Float32Array; py: Float32Array; pz: Float32Array; depth: Float32Array; s: Float32Array; tri: Int32Array } }
-interface RagdollBounds { minx: number; miny: number; minz: number; maxx: number; maxy: number; maxz: number }
-interface CapsuleOut { ax: number; ay: number; az: number; bx: number; by: number; bz: number; r: number }
-interface SkeletonSpecOptions { mass?: number; stubLength?: number; radiusRatio?: number; cone?: number; twist?: number }
+interface BoneSpec {
+  name: string;
+  head: XYZ;
+  tail: XYZ;
+  radius?: number;
+  mass?: number;
+  parent?: number;
+  cone?: number;
+  twist?: number;
+}
+interface RagdollOptions {
+  gravity?: number;
+  iterations?: number;
+  mask?: number;
+  damping?: number;
+  friction?: number;
+  userData?: unknown;
+  actor?: unknown;
+  bones?: BoneSpec[];
+  height?: number;
+  mass?: number;
+  transform?: THREE.Matrix4;
+}
+interface RagdollWorld {
+  triCount: number;
+  surface: Uint8Array;
+  overlapCapsule(...args: number[]): number;
+  contacts: {
+    count: number;
+    capacity: number;
+    nx: Float32Array;
+    ny: Float32Array;
+    nz: Float32Array;
+    px: Float32Array;
+    py: Float32Array;
+    pz: Float32Array;
+    depth: Float32Array;
+    s: Float32Array;
+    tri: Int32Array;
+  };
+}
+interface RagdollBounds {
+  minx: number;
+  miny: number;
+  minz: number;
+  maxx: number;
+  maxy: number;
+  maxz: number;
+}
+interface CapsuleOut {
+  ax: number;
+  ay: number;
+  az: number;
+  bx: number;
+  by: number;
+  bz: number;
+  r: number;
+}
+interface SkeletonSpecOptions {
+  mass?: number;
+  stubLength?: number;
+  radiusRatio?: number;
+  cone?: number;
+  twist?: number;
+}
 function isBone(object: THREE.Object3D | null): object is THREE.Bone {
   return object instanceof THREE.Bone;
 }
@@ -45,7 +105,20 @@ export function humanoidSpec(height = 1.8, scaleMass = 82): BoneSpec[] {
   const h = height;
   const M = scaleMass;
   const y = (f: number) => h * f;
-  const b = (name: string, hx: number, hy: number, hz: number, tx: number, ty: number, tz: number, r: number, m: number, parent: number, cone: number, twist: number): BoneSpec => ({
+  const b = (
+    name: string,
+    hx: number,
+    hy: number,
+    hz: number,
+    tx: number,
+    ty: number,
+    tz: number,
+    r: number,
+    m: number,
+    parent: number,
+    cone: number,
+    twist: number
+  ): BoneSpec => ({
     name,
     head: [hx, hy, hz],
     tail: [tx, ty, tz],
@@ -64,14 +137,66 @@ export function humanoidSpec(height = 1.8, scaleMass = 82): BoneSpec[] {
     /* 3 */ b('neck', 0, y(0.83), 0, 0, y(0.875), 0, 0.042, 0.02, 2, 30, 25),
     /* 4 */ b('head', 0, y(0.875), 0, 0, y(0.97), 0.01, 0.062, 0.07, 3, 42, 30),
     /* 5 */ b('upperArmL', -sh, y(0.815), 0, -sh - h * 0.015, y(0.65), 0, 0.045, 0.027, 2, 85, 60),
-    /* 6 */ b('forearmL', -sh - h * 0.015, y(0.65), 0, -sh - h * 0.02, y(0.50), 0, 0.037, 0.018, 5, 80, 45),
-    /* 7 */ b('handL', -sh - h * 0.02, y(0.50), 0, -sh - h * 0.02, y(0.44), 0, 0.032, 0.006, 6, 55, 40),
+    /* 6 */ b(
+      'forearmL',
+      -sh - h * 0.015,
+      y(0.65),
+      0,
+      -sh - h * 0.02,
+      y(0.5),
+      0,
+      0.037,
+      0.018,
+      5,
+      80,
+      45
+    ),
+    /* 7 */ b(
+      'handL',
+      -sh - h * 0.02,
+      y(0.5),
+      0,
+      -sh - h * 0.02,
+      y(0.44),
+      0,
+      0.032,
+      0.006,
+      6,
+      55,
+      40
+    ),
     /* 8 */ b('upperArmR', sh, y(0.815), 0, sh + h * 0.015, y(0.65), 0, 0.045, 0.027, 2, 85, 60),
-    /* 9 */ b('forearmR', sh + h * 0.015, y(0.65), 0, sh + h * 0.02, y(0.50), 0, 0.037, 0.018, 8, 80, 45),
-    /*10 */ b('handR', sh + h * 0.02, y(0.50), 0, sh + h * 0.02, y(0.44), 0, 0.032, 0.006, 9, 55, 40),
-    /*11 */ b('thighL', -hip, y(0.53), 0, -hip * 1.05, y(0.29), 0, 0.062, 0.10, 0, 75, 35),
+    /* 9 */ b(
+      'forearmR',
+      sh + h * 0.015,
+      y(0.65),
+      0,
+      sh + h * 0.02,
+      y(0.5),
+      0,
+      0.037,
+      0.018,
+      8,
+      80,
+      45
+    ),
+    /*10 */ b(
+      'handR',
+      sh + h * 0.02,
+      y(0.5),
+      0,
+      sh + h * 0.02,
+      y(0.44),
+      0,
+      0.032,
+      0.006,
+      9,
+      55,
+      40
+    ),
+    /*11 */ b('thighL', -hip, y(0.53), 0, -hip * 1.05, y(0.29), 0, 0.062, 0.1, 0, 75, 35),
     /*12 */ b('shinL', -hip * 1.05, y(0.29), 0, -hip * 1.05, y(0.055), 0, 0.048, 0.045, 11, 70, 20),
-    /*13 */ b('thighR', hip, y(0.53), 0, hip * 1.05, y(0.29), 0, 0.062, 0.10, 0, 75, 35),
+    /*13 */ b('thighR', hip, y(0.53), 0, hip * 1.05, y(0.29), 0, 0.062, 0.1, 0, 75, 35),
     /*14 */ b('shinR', hip * 1.05, y(0.29), 0, hip * 1.05, y(0.055), 0, 0.048, 0.045, 13, 70, 20),
   ];
 }
@@ -85,14 +210,56 @@ const SLEEP_TIME = 0.6;
 let _nextRagdollId = 1;
 
 export class Ragdoll {
-  declare id: number; declare world: RagdollWorld | null; declare gravity: number; declare iterations: number; declare mask: number; declare linearDamping: number; declare friction: number;
-  declare userData: unknown; declare actor: unknown; declare alive: boolean; declare sleeping: boolean; declare sleepTimer: number; declare age: number;
-  declare spec: BoneSpec[]; declare boneCount: number; declare particleCount: number;
-  declare boneHead: Int32Array; declare boneTail: Int32Array; declare boneLen: Float32Array; declare boneRadius: Float32Array; declare boneMass: Float32Array; declare boneParent: Int32Array; declare boneCone: Float32Array; declare boneTwist: Float32Array; declare boneUp: Float32Array;
-  declare px: Float64Array; declare py: Float64Array; declare pz: Float64Array; declare qx: Float64Array; declare qy: Float64Array; declare qz: Float64Array; declare invMass: Float64Array;
-  declare bones3D: Array<THREE.Bone | null> | null; declare boneBind: unknown; declare rootObject: THREE.Object3D | null; declare skeleton: THREE.Skeleton | null; declare boneLocalOffset: Float64Array;
-  declare boneRestDirection: Float64Array; declare boneRestOffset: Float64Array; declare attachmentBones: Int32Array; declare aabb: RagdollBounds; declare selfPairs: Uint16Array | Int32Array;
-  declare _m4: THREE.Matrix4; declare _m4b: THREE.Matrix4; declare _q: THREE.Quaternion; declare _v3: THREE.Vector3; declare _v3b: THREE.Vector3; declare _scale: THREE.Vector3; declare _ss: ReturnType<typeof makeClosest>; declare _sleepWritten: boolean;
+  declare id: number;
+  declare world: RagdollWorld | null;
+  declare gravity: number;
+  declare iterations: number;
+  declare mask: number;
+  declare linearDamping: number;
+  declare friction: number;
+  declare userData: unknown;
+  declare actor: unknown;
+  declare alive: boolean;
+  declare sleeping: boolean;
+  declare sleepTimer: number;
+  declare age: number;
+  declare spec: BoneSpec[];
+  declare boneCount: number;
+  declare particleCount: number;
+  declare boneHead: Int32Array;
+  declare boneTail: Int32Array;
+  declare boneLen: Float32Array;
+  declare boneRadius: Float32Array;
+  declare boneMass: Float32Array;
+  declare boneParent: Int32Array;
+  declare boneCone: Float32Array;
+  declare boneTwist: Float32Array;
+  declare boneUp: Float32Array;
+  declare px: Float64Array;
+  declare py: Float64Array;
+  declare pz: Float64Array;
+  declare qx: Float64Array;
+  declare qy: Float64Array;
+  declare qz: Float64Array;
+  declare invMass: Float64Array;
+  declare bones3D: Array<THREE.Bone | null> | null;
+  declare boneBind: unknown;
+  declare rootObject: THREE.Object3D | null;
+  declare skeleton: THREE.Skeleton | null;
+  declare boneLocalOffset: Float64Array;
+  declare boneRestDirection: Float64Array;
+  declare boneRestOffset: Float64Array;
+  declare attachmentBones: Int32Array;
+  declare aabb: RagdollBounds;
+  declare selfPairs: Uint16Array | Int32Array;
+  declare _m4: THREE.Matrix4;
+  declare _m4b: THREE.Matrix4;
+  declare _q: THREE.Quaternion;
+  declare _v3: THREE.Vector3;
+  declare _v3b: THREE.Vector3;
+  declare _scale: THREE.Vector3;
+  declare _ss: ReturnType<typeof makeClosest>;
+  declare _sleepWritten: boolean;
   /**
    * @param {StaticWorld} world
    * @param {object} opts
@@ -122,7 +289,10 @@ export class Ragdoll {
     this.boneCount = nb;
 
     // --- particle set with shared joints ---
-    const px: number[] = [], py: number[] = [], pz: number[] = [], pm: number[] = [];
+    const px: number[] = [],
+      py: number[] = [],
+      pz: number[] = [],
+      pm: number[] = [];
     const key = (x: number, y: number, z: number): string =>
       `${Math.round(x * 1000)},${Math.round(y * 1000)},${Math.round(z * 1000)}`;
     const map = new Map<string, number>();
@@ -135,7 +305,10 @@ export class Ragdoll {
       let i = map.get(k);
       if (i === undefined) {
         i = px.length;
-        px.push(_v.x); py.push(_v.y); pz.push(_v.z); pm.push(0);
+        px.push(_v.x);
+        py.push(_v.y);
+        pz.push(_v.z);
+        pm.push(0);
         map.set(k, i);
       }
       return i;
@@ -182,8 +355,13 @@ export class Ragdoll {
     for (let i = 0; i < np; i++) this.invMass[i] = pm[i] > 0 ? 1 / pm[i] : 0;
 
     for (let i = 0; i < nb; i++) {
-      const a = this.boneHead[i], c = this.boneTail[i];
-      this.boneLen[i] = Math.hypot(this.px[c] - this.px[a], this.py[c] - this.py[a], this.pz[c] - this.pz[a]);
+      const a = this.boneHead[i],
+        c = this.boneTail[i];
+      this.boneLen[i] = Math.hypot(
+        this.px[c] - this.px[a],
+        this.py[c] - this.py[a],
+        this.pz[c] - this.pz[a]
+      );
       if (this.boneLen[i] < 1e-4) this.boneLen[i] = 1e-4;
       this._initUp(i);
     }
@@ -207,11 +385,15 @@ export class Ragdoll {
     for (let i = 0; i < nb; i++) {
       const p = this.boneParent[i];
       if (p < 0) continue;
-      const a = this.boneHead[i], c = this.boneTail[i];
+      const a = this.boneHead[i],
+        c = this.boneTail[i];
       this.getBoneTransform(p, this._v3, this._q);
       this._q.invert();
       this._v3b.set(this.px[c] - this.px[a], this.py[c] - this.py[a], this.pz[c] - this.pz[a]);
-      this._v3b.normalize().applyQuaternion(this._q).toArray(this.boneRestDirection, i * 3);
+      this._v3b
+        .normalize()
+        .applyQuaternion(this._q)
+        .toArray(this.boneRestDirection, i * 3);
       this._v3b.set(this.px[a], this.py[a], this.pz[a]).sub(this._v3);
       this._v3b.applyQuaternion(this._q).toArray(this.boneRestOffset, i * 3);
       if (a !== this.boneHead[p] && a !== this.boneTail[p]) attachments.push(i);
@@ -235,13 +417,25 @@ export class Ragdoll {
     const pairs = [];
     for (let i = 0; i < this.boneCount; i++) {
       for (let j = i + 1; j < this.boneCount; j++) {
-        const ai = this.boneHead[i], bi = this.boneTail[i];
-        const aj = this.boneHead[j], bj = this.boneTail[j];
+        const ai = this.boneHead[i],
+          bi = this.boneTail[i];
+        const aj = this.boneHead[j],
+          bj = this.boneTail[j];
         if (ai === aj || ai === bj || bi === aj || bi === bj) continue;
         const rad = this.boneRadius[i] + this.boneRadius[j];
         closestPtSegSeg(
-          this.px[ai], this.py[ai], this.pz[ai], this.px[bi], this.py[bi], this.pz[bi],
-          this.px[aj], this.py[aj], this.pz[aj], this.px[bj], this.py[bj], this.pz[bj],
+          this.px[ai],
+          this.py[ai],
+          this.pz[ai],
+          this.px[bi],
+          this.py[bi],
+          this.pz[bi],
+          this.px[aj],
+          this.py[aj],
+          this.pz[aj],
+          this.px[bj],
+          this.py[bj],
+          this.pz[bj],
           this._ss ?? (this._ss = makeClosest())
         );
         if (this._ss.d2 < rad * rad * 0.95) continue;
@@ -252,15 +446,28 @@ export class Ragdoll {
   }
 
   _initUp(i: number): void {
-    const a = this.boneHead[i], c = this.boneTail[i];
-    let dx = this.px[c] - this.px[a], dy = this.py[c] - this.py[a], dz = this.pz[c] - this.pz[a];
+    const a = this.boneHead[i],
+      c = this.boneTail[i];
+    let dx = this.px[c] - this.px[a],
+      dy = this.py[c] - this.py[a],
+      dz = this.pz[c] - this.pz[a];
     const l = Math.hypot(dx, dy, dz) || 1;
-    dx /= l; dy /= l; dz /= l;
+    dx /= l;
+    dy /= l;
+    dz /= l;
     // pick any axis not parallel to the bone
-    let ux = 0, uy = 0, uz = 1;
-    if (Math.abs(dz) > 0.9) { ux = 1; uy = 0; uz = 0; }
+    let ux = 0,
+      uy = 0,
+      uz = 1;
+    if (Math.abs(dz) > 0.9) {
+      ux = 1;
+      uy = 0;
+      uz = 0;
+    }
     const d = ux * dx + uy * dy + uz * dz;
-    ux -= dx * d; uy -= dy * d; uz -= dz * d;
+    ux -= dx * d;
+    uy -= dy * d;
+    uz -= dz * d;
     const ul = Math.hypot(ux, uy, uz) || 1;
     this.boneUp[i * 3] = ux / ul;
     this.boneUp[i * 3 + 1] = uy / ul;
@@ -282,9 +489,20 @@ export class Ragdoll {
    * Falloff is 1/(1+d^2) so a headshot snaps the head without teleporting the
    * whole body.
    */
-  applyImpulse(x: number, y: number, z: number, ix: number, iy: number, iz: number, radius = 0.45, dt = 1 / 120): void {
+  applyImpulse(
+    x: number,
+    y: number,
+    z: number,
+    ix: number,
+    iy: number,
+    iz: number,
+    radius = 0.45,
+    dt = 1 / 120
+  ): void {
     for (let i = 0; i < this.particleCount; i++) {
-      const dx = this.px[i] - x, dy = this.py[i] - y, dz = this.pz[i] - z;
+      const dx = this.px[i] - x,
+        dy = this.py[i] - y,
+        dz = this.pz[i] - z;
       const d2 = dx * dx + dy * dy + dz * dz;
       const w = 1 / (1 + d2 / (radius * radius));
       const im = this.invMass[i];
@@ -317,7 +535,9 @@ export class Ragdoll {
       const vl = Math.hypot(vx, vy, vz);
       if (vl > MAX_PARTICLE_STEP) {
         const s = MAX_PARTICLE_STEP / vl;
-        vx *= s; vy *= s; vz *= s;
+        vx *= s;
+        vy *= s;
+        vz *= s;
       }
       this.qx[i] = this.px[i];
       this.qy[i] = this.py[i];
@@ -366,8 +586,10 @@ export class Ragdoll {
 
   _solveDistance(): void {
     for (let i = 0; i < this.boneCount; i++) {
-      const a = this.boneHead[i], c = this.boneTail[i];
-      const wa = this.invMass[a], wc = this.invMass[c];
+      const a = this.boneHead[i],
+        c = this.boneTail[i];
+      const wa = this.invMass[a],
+        wc = this.invMass[c];
       const w = wa + wc;
       if (w === 0) continue;
       const dx = this.px[c] - this.px[a];
@@ -388,23 +610,38 @@ export class Ragdoll {
   /** Hold offset joints in the parent's rotating frame, sharing the correction. */
   _solveAttachments(): void {
     for (let k = 0; k < this.attachmentBones.length; k++) {
-      const i = this.attachmentBones[k], p = this.boneParent[i];
-      const a = this.boneHead[i], pa = this.boneHead[p], pc = this.boneTail[p];
+      const i = this.attachmentBones[k],
+        p = this.boneParent[i];
+      const a = this.boneHead[i],
+        pa = this.boneHead[p],
+        pc = this.boneTail[p];
       this.getBoneTransform(p, this._v3, this._q);
-      this._v3b.fromArray(this.boneRestOffset, i * 3).applyQuaternion(this._q).add(this._v3);
+      this._v3b
+        .fromArray(this.boneRestOffset, i * 3)
+        .applyQuaternion(this._q)
+        .add(this._v3);
       const dx = this.px[a] - this._v3b.x;
       const dy = this.py[a] - this._v3b.y;
       const dz = this.pz[a] - this._v3b.z;
-      const wa = this.invMass[a], wp = this.invMass[pa], wc = this.invMass[pc];
+      const wa = this.invMass[a],
+        wp = this.invMass[pa],
+        wc = this.invMass[pc];
       // Translate the parent as a unit: unequal endpoint corrections rotate
       // its frame and can amplify the attachment error.
-      const parentWeight = wp > 0 && wc > 0 ? wp * wc / (wp + wc) : 0;
+      const parentWeight = wp > 0 && wc > 0 ? (wp * wc) / (wp + wc) : 0;
       const w = wa + parentWeight;
       if (w === 0) continue;
-      const ka = wa / w, kp = parentWeight / w;
-      this.px[a] -= dx * ka; this.py[a] -= dy * ka; this.pz[a] -= dz * ka;
-      this.px[pa] += dx * kp; this.py[pa] += dy * kp; this.pz[pa] += dz * kp;
-      this.px[pc] += dx * kp; this.py[pc] += dy * kp; this.pz[pc] += dz * kp;
+      const ka = wa / w,
+        kp = parentWeight / w;
+      this.px[a] -= dx * ka;
+      this.py[a] -= dy * ka;
+      this.pz[a] -= dz * ka;
+      this.px[pa] += dx * kp;
+      this.py[pa] += dy * kp;
+      this.pz[pa] += dz * kp;
+      this.px[pc] += dx * kp;
+      this.py[pc] += dy * kp;
+      this.pz[pc] += dz * kp;
     }
   }
 
@@ -422,18 +659,24 @@ export class Ragdoll {
 
       this.getBoneTransform(p, this._v3, this._q);
       this._v3b.fromArray(this.boneRestDirection, i * 3).applyQuaternion(this._q);
-      const ax = this._v3b.x, ay = this._v3b.y, az = this._v3b.z;
+      const ax = this._v3b.x,
+        ay = this._v3b.y,
+        az = this._v3b.z;
 
-      const a = this.boneHead[i], c = this.boneTail[i];
+      const a = this.boneHead[i],
+        c = this.boneTail[i];
       let bx = this.px[c] - this.px[a];
       let by = this.py[c] - this.py[a];
       let bz = this.pz[c] - this.pz[a];
       const bl = Math.hypot(bx, by, bz);
       if (bl < 1e-9) continue;
-      bx /= bl; by /= bl; bz /= bl;
+      bx /= bl;
+      by /= bl;
+      bz /= bl;
 
       let dot = ax * bx + ay * by + az * bz;
-      if (dot > 1) dot = 1; else if (dot < -1) dot = -1;
+      if (dot > 1) dot = 1;
+      else if (dot < -1) dot = -1;
       const angle = Math.acos(dot);
       if (angle <= cone) continue;
 
@@ -443,14 +686,24 @@ export class Ragdoll {
       let kz = ax * by - ay * bx;
       let kl = Math.hypot(kx, ky, kz);
       if (kl < 1e-7) {
-        kx = -ay; ky = ax; kz = 0;
+        kx = -ay;
+        ky = ax;
+        kz = 0;
         kl = Math.hypot(kx, ky, kz);
-        if (kl < 1e-7) { kx = 1; ky = 0; kz = 0; kl = 1; }
+        if (kl < 1e-7) {
+          kx = 1;
+          ky = 0;
+          kz = 0;
+          kl = 1;
+        }
       }
-      kx /= kl; ky /= kl; kz /= kl;
+      kx /= kl;
+      ky /= kl;
+      kz /= kl;
 
       // Rodrigues: rotate the parent direction by `cone` about k -> target dir
-      const ca = Math.cos(cone), sa = Math.sin(cone);
+      const ca = Math.cos(cone),
+        sa = Math.sin(cone);
       const cross_x = ky * az - kz * ay;
       const cross_y = kz * ax - kx * az;
       const cross_z = kx * ay - ky * ax;
@@ -464,7 +717,8 @@ export class Ragdoll {
       const gx = this.px[a] + tx * bl;
       const gy = this.py[a] + ty * bl;
       const gz = this.pz[a] + tz * bl;
-      const wa = this.invMass[a], wc = this.invMass[c];
+      const wa = this.invMass[a],
+        wc = this.invMass[c];
       const w = wa + wc;
       if (w === 0) continue;
       const ex = (gx - this.px[c]) * stiff;
@@ -484,23 +738,34 @@ export class Ragdoll {
     const w = this.world;
     if (!w || w.triCount === 0) return;
     for (let i = 0; i < this.boneCount; i++) {
-      const a = this.boneHead[i], c = this.boneTail[i];
+      const a = this.boneHead[i],
+        c = this.boneTail[i];
       const r = this.boneRadius[i];
       const n = w.overlapCapsule(
-        this.px[a], this.py[a], this.pz[a],
-        this.px[c], this.py[c], this.pz[c],
-        r, this.mask, 0
+        this.px[a],
+        this.py[a],
+        this.pz[a],
+        this.px[c],
+        this.py[c],
+        this.pz[c],
+        r,
+        this.mask,
+        0
       );
       if (n === 0) continue;
       const cts = w.contacts;
-      let pushx = 0, pushy = 0, pushz = 0;
+      let pushx = 0,
+        pushy = 0,
+        pushz = 0;
       let fric = 0.7;
       let param = 0;
       let wsum = 0;
       for (let k = 0; k < n; k++) {
         const d = cts.depth[k];
         if (d <= 1e-5) continue;
-        const nx = cts.nx[k], ny = cts.ny[k], nz = cts.nz[k];
+        const nx = cts.nx[k],
+          ny = cts.ny[k],
+          nz = cts.nz[k];
         // Accumulate the *maximum* push along each normal instead of the sum:
         // a tessellated floor would otherwise eject the bone into orbit.
         const already = pushx * nx + pushy * ny + pushz * nz;
@@ -520,19 +785,27 @@ export class Ragdoll {
       const cap = 0.2;
       if (pl > cap) {
         const s = cap / pl;
-        pushx *= s; pushy *= s; pushz *= s;
+        pushx *= s;
+        pushy *= s;
+        pushz *= s;
       }
       // Distribute along the capsule so the *contact point* clears the surface
       // rather than the midpoint: classic PBD segment weighting.
       const sPar = wsum > 0 ? param / wsum : 0.5;
-      const w0 = 1 - sPar, w1 = sPar;
-      const wa = this.invMass[a], wc = this.invMass[c];
+      const w0 = 1 - sPar,
+        w1 = sPar;
+      const wa = this.invMass[a],
+        wc = this.invMass[c];
       const denom = w0 * w0 * wa + w1 * w1 * wc;
       if (denom < 1e-12) continue;
       const k0 = (w0 * wa) / denom;
       const k1 = (w1 * wc) / denom;
-      this.px[a] += pushx * k0; this.py[a] += pushy * k0; this.pz[a] += pushz * k0;
-      this.px[c] += pushx * k1; this.py[c] += pushy * k1; this.pz[c] += pushz * k1;
+      this.px[a] += pushx * k0;
+      this.py[a] += pushy * k0;
+      this.pz[a] += pushz * k0;
+      this.px[c] += pushx * k1;
+      this.py[c] += pushy * k1;
+      this.pz[c] += pushz * k1;
 
       if (applyFriction) {
         const mu = Math.min(1, this.friction * fric);
@@ -547,46 +820,78 @@ export class Ragdoll {
     const pairs = this.selfPairs;
     const cl = this._ss;
     for (let k = 0; k < pairs.length; k += 2) {
-      const i = pairs[k], j = pairs[k + 1];
-      const a0 = this.boneHead[i], a1 = this.boneTail[i];
-      const b0 = this.boneHead[j], b1 = this.boneTail[j];
+      const i = pairs[k],
+        j = pairs[k + 1];
+      const a0 = this.boneHead[i],
+        a1 = this.boneTail[i];
+      const b0 = this.boneHead[j],
+        b1 = this.boneTail[j];
       const rad = (this.boneRadius[i] + this.boneRadius[j]) * 0.92;
       const d2 = closestPtSegSeg(
-        this.px[a0], this.py[a0], this.pz[a0], this.px[a1], this.py[a1], this.pz[a1],
-        this.px[b0], this.py[b0], this.pz[b0], this.px[b1], this.py[b1], this.pz[b1],
+        this.px[a0],
+        this.py[a0],
+        this.pz[a0],
+        this.px[a1],
+        this.py[a1],
+        this.pz[a1],
+        this.px[b0],
+        this.py[b0],
+        this.pz[b0],
+        this.px[b1],
+        this.py[b1],
+        this.pz[b1],
         cl
       );
       if (d2 >= rad * rad) continue;
       const d = Math.sqrt(d2);
       let nx, ny, nz;
       if (d > 1e-6) {
-        nx = (cl.ax - cl.bx) / d; ny = (cl.ay - cl.by) / d; nz = (cl.az - cl.bz) / d;
+        nx = (cl.ax - cl.bx) / d;
+        ny = (cl.ay - cl.by) / d;
+        nz = (cl.az - cl.bz) / d;
       } else {
-        nx = 0; ny = 1; nz = 0;
+        nx = 0;
+        ny = 1;
+        nz = 0;
       }
       const push = (rad - d) * 0.5;
-      const s = cl.s, t = cl.t;
-      const wa0 = this.invMass[a0] * (1 - s), wa1 = this.invMass[a1] * s;
-      const wb0 = this.invMass[b0] * (1 - t), wb1 = this.invMass[b1] * t;
+      const s = cl.s,
+        t = cl.t;
+      const wa0 = this.invMass[a0] * (1 - s),
+        wa1 = this.invMass[a1] * s;
+      const wb0 = this.invMass[b0] * (1 - t),
+        wb1 = this.invMass[b1] * t;
       const wsum = wa0 + wa1 + wb0 + wb1;
       if (wsum < 1e-12) continue;
       const k1 = push / wsum;
-      this.px[a0] += nx * wa0 * k1; this.py[a0] += ny * wa0 * k1; this.pz[a0] += nz * wa0 * k1;
-      this.px[a1] += nx * wa1 * k1; this.py[a1] += ny * wa1 * k1; this.pz[a1] += nz * wa1 * k1;
-      this.px[b0] -= nx * wb0 * k1; this.py[b0] -= ny * wb0 * k1; this.pz[b0] -= nz * wb0 * k1;
-      this.px[b1] -= nx * wb1 * k1; this.py[b1] -= ny * wb1 * k1; this.pz[b1] -= nz * wb1 * k1;
+      this.px[a0] += nx * wa0 * k1;
+      this.py[a0] += ny * wa0 * k1;
+      this.pz[a0] += nz * wa0 * k1;
+      this.px[a1] += nx * wa1 * k1;
+      this.py[a1] += ny * wa1 * k1;
+      this.pz[a1] += nz * wa1 * k1;
+      this.px[b0] -= nx * wb0 * k1;
+      this.py[b0] -= ny * wb0 * k1;
+      this.pz[b0] -= nz * wb0 * k1;
+      this.px[b1] -= nx * wb1 * k1;
+      this.py[b1] -= ny * wb1 * k1;
+      this.pz[b1] -= nz * wb1 * k1;
     }
   }
 
   _frictionAt(i: number, nx: number, ny: number, nz: number, mu: number): void {
     const nl = Math.hypot(nx, ny, nz);
     if (nl < 1e-9) return;
-    nx /= nl; ny /= nl; nz /= nl;
+    nx /= nl;
+    ny /= nl;
+    nz /= nl;
     let vx = this.px[i] - this.qx[i];
     let vy = this.py[i] - this.qy[i];
     let vz = this.pz[i] - this.qz[i];
     const vn = vx * nx + vy * ny + vz * nz;
-    let tx = vx - nx * vn, ty = vy - ny * vn, tz = vz - nz * vn;
+    let tx = vx - nx * vn,
+      ty = vy - ny * vn,
+      tz = vz - nz * vn;
     // Kill the tangential component; PBD friction is applied by moving the
     // previous position towards the current one.
     this.qx[i] += tx * mu;
@@ -600,42 +905,62 @@ export class Ragdoll {
    */
   _transportUp(): void {
     for (let i = 0; i < this.boneCount; i++) {
-      const a = this.boneHead[i], c = this.boneTail[i];
+      const a = this.boneHead[i],
+        c = this.boneTail[i];
       let dx = this.px[c] - this.px[a];
       let dy = this.py[c] - this.py[a];
       let dz = this.pz[c] - this.pz[a];
       const l = Math.hypot(dx, dy, dz);
       if (l < 1e-9) continue;
-      dx /= l; dy /= l; dz /= l;
-      let ux = this.boneUp[i * 3], uy = this.boneUp[i * 3 + 1], uz = this.boneUp[i * 3 + 2];
+      dx /= l;
+      dy /= l;
+      dz /= l;
+      let ux = this.boneUp[i * 3],
+        uy = this.boneUp[i * 3 + 1],
+        uz = this.boneUp[i * 3 + 2];
       const d = ux * dx + uy * dy + uz * dz;
-      ux -= dx * d; uy -= dy * d; uz -= dz * d;
+      ux -= dx * d;
+      uy -= dy * d;
+      uz -= dz * d;
       let ul = Math.hypot(ux, uy, uz);
       if (ul < 1e-5) {
         this._initUp(i);
         continue;
       }
-      ux /= ul; uy /= ul; uz /= ul;
+      ux /= ul;
+      uy /= ul;
+      uz /= ul;
 
       // twist limit against the parent's frame
       const p = this.boneParent[i];
       const lim = this.boneTwist[i];
       if (p >= 0 && lim < Math.PI - 1e-3) {
-        let rx = this.boneUp[p * 3], ry = this.boneUp[p * 3 + 1], rz = this.boneUp[p * 3 + 2];
+        let rx = this.boneUp[p * 3],
+          ry = this.boneUp[p * 3 + 1],
+          rz = this.boneUp[p * 3 + 2];
         const rd = rx * dx + ry * dy + rz * dz;
-        rx -= dx * rd; ry -= dy * rd; rz -= dz * rd;
+        rx -= dx * rd;
+        ry -= dy * rd;
+        rz -= dz * rd;
         const rl = Math.hypot(rx, ry, rz);
         if (rl > 1e-5) {
-          rx /= rl; ry /= rl; rz /= rl;
+          rx /= rl;
+          ry /= rl;
+          rz /= rl;
           let cs = ux * rx + uy * ry + uz * rz;
-          if (cs > 1) cs = 1; else if (cs < -1) cs = -1;
+          if (cs > 1) cs = 1;
+          else if (cs < -1) cs = -1;
           const ang = Math.acos(cs);
           if (ang > lim) {
             // rotate u back towards r by (ang - lim)
             const t = (ang - lim) / ang;
-            ux += (rx - ux) * t; uy += (ry - uy) * t; uz += (rz - uz) * t;
+            ux += (rx - ux) * t;
+            uy += (ry - uy) * t;
+            uz += (rz - uz) * t;
             const nl2 = Math.hypot(ux, uy, uz) || 1;
-            ux /= nl2; uy /= nl2; uz /= nl2;
+            ux /= nl2;
+            uy /= nl2;
+            uz /= nl2;
           }
         }
       }
@@ -646,8 +971,12 @@ export class Ragdoll {
   }
 
   _updateAabb(): void {
-    let minx = Infinity, miny = Infinity, minz = Infinity;
-    let maxx = -Infinity, maxy = -Infinity, maxz = -Infinity;
+    let minx = Infinity,
+      miny = Infinity,
+      minz = Infinity;
+    let maxx = -Infinity,
+      maxy = -Infinity,
+      maxz = -Infinity;
     for (let i = 0; i < this.particleCount; i++) {
       if (this.px[i] < minx) minx = this.px[i];
       if (this.py[i] < miny) miny = this.py[i];
@@ -657,8 +986,12 @@ export class Ragdoll {
       if (this.pz[i] > maxz) maxz = this.pz[i];
     }
     const a = this.aabb;
-    a.minx = minx; a.miny = miny; a.minz = minz;
-    a.maxx = maxx; a.maxy = maxy; a.maxz = maxz;
+    a.minx = minx;
+    a.miny = miny;
+    a.minz = minz;
+    a.maxx = maxx;
+    a.maxy = maxy;
+    a.maxz = maxz;
   }
 
   /* ---------------------------------------------------------------- */
@@ -667,9 +1000,14 @@ export class Ragdoll {
 
   /** World-space capsule of bone i: writes head/tail/radius into `out`. */
   getBoneCapsule(i: number, out: CapsuleOut): CapsuleOut {
-    const a = this.boneHead[i], c = this.boneTail[i];
-    out.ax = this.px[a]; out.ay = this.py[a]; out.az = this.pz[a];
-    out.bx = this.px[c]; out.by = this.py[c]; out.bz = this.pz[c];
+    const a = this.boneHead[i],
+      c = this.boneTail[i];
+    out.ax = this.px[a];
+    out.ay = this.py[a];
+    out.az = this.pz[a];
+    out.bx = this.px[c];
+    out.by = this.py[c];
+    out.bz = this.pz[c];
     out.r = this.boneRadius[i];
     return out;
   }
@@ -679,29 +1017,31 @@ export class Ragdoll {
    * bone — THREE bones conventionally point along +Y.
    */
   getBoneTransform(i: number, outPos: THREE.Vector3, outQuat: THREE.Quaternion): THREE.Vector3 {
-    const a = this.boneHead[i], c = this.boneTail[i];
+    const a = this.boneHead[i],
+      c = this.boneTail[i];
     outPos.set(this.px[a], this.py[a], this.pz[a]);
     let dx = this.px[c] - this.px[a];
     let dy = this.py[c] - this.py[a];
     let dz = this.pz[c] - this.pz[a];
     const l = Math.hypot(dx, dy, dz) || 1;
-    dx /= l; dy /= l; dz /= l;
-    const ux = this.boneUp[i * 3], uy = this.boneUp[i * 3 + 1], uz = this.boneUp[i * 3 + 2];
+    dx /= l;
+    dy /= l;
+    dz /= l;
+    const ux = this.boneUp[i * 3],
+      uy = this.boneUp[i * 3 + 1],
+      uz = this.boneUp[i * 3 + 2];
     // basis: Y = bone dir, Z = up-ish, X = Y x Z
     let xx = dy * uz - dz * uy;
     let xy = dz * ux - dx * uz;
     let xz = dx * uy - dy * ux;
     const xl = Math.hypot(xx, xy, xz) || 1;
-    xx /= xl; xy /= xl; xz /= xl;
+    xx /= xl;
+    xy /= xl;
+    xz /= xl;
     const zx = xy * dz - xz * dy;
     const zy = xz * dx - xx * dz;
     const zz = xx * dy - xy * dx;
-    this._m4.set(
-      xx, dx, zx, 0,
-      xy, dy, zy, 0,
-      xz, dz, zz, 0,
-      0, 0, 0, 1
-    );
+    this._m4.set(xx, dx, zx, 0, xy, dy, zy, 0, xz, dz, zz, 0, 0, 0, 0, 1);
     outQuat.setFromRotationMatrix(this._m4);
     return outPos;
   }
@@ -710,22 +1050,29 @@ export class Ragdoll {
    * Take ownership of a THREE.Skeleton. `boneMap` maps our bone index to a
    * THREE.Bone (or a name). After this, writeToSkeleton() drives the mesh.
    */
-  adoptSkeleton(skeleton: THREE.Skeleton, boneMap: Array<THREE.Bone | string | null> | Record<string, THREE.Bone | string | null>): this {
+  adoptSkeleton(
+    skeleton: THREE.Skeleton,
+    boneMap: Array<THREE.Bone | string | null> | Record<string, THREE.Bone | string | null>
+  ): this {
     const bones = new Array<THREE.Bone | null>(this.boneCount).fill(null);
     for (let i = 0; i < this.boneCount; i++) {
       const entries = boneMap as Record<string, THREE.Bone | string | null | undefined>;
       const entry = entries?.[i] ?? entries?.[this.spec[i].name] ?? null;
       if (!entry) continue;
-      bones[i] = typeof entry === 'string' ? skeleton.getBoneByName(entry) ?? null : entry;
+      bones[i] = typeof entry === 'string' ? (skeleton.getBoneByName(entry) ?? null) : entry;
     }
     this.bones3D = bones;
     this.boneLocalOffset = new Float64Array(this.boneCount * 3);
     for (let i = 0; i < this.boneCount; i++) {
-      const bone = bones[i], p = this.boneParent[i];
+      const bone = bones[i],
+        p = this.boneParent[i];
       const parent = bone?.parent;
       if (!bone || p < 0 || !parent || parent !== bones[p]) continue;
       parent.getWorldScale(this._v3b);
-      this._v3.fromArray(this.boneRestOffset, i * 3).divide(this._v3b).toArray(this.boneLocalOffset, i * 3);
+      this._v3
+        .fromArray(this.boneRestOffset, i * 3)
+        .divide(this._v3b)
+        .toArray(this.boneLocalOffset, i * 3);
     }
     this.skeleton = skeleton;
     return this;
@@ -781,7 +1128,10 @@ export class Ragdoll {
  * links. Bones with no children get a short stub along their local +Y.
  * Returns { spec, boneMap } ready for `new Ragdoll(...).adoptSkeleton(...)`.
  */
-export function specFromSkeleton(skeleton: THREE.Skeleton, opts: SkeletonSpecOptions = {}): { spec: BoneSpec[]; boneMap: Array<THREE.Bone | undefined> } {
+export function specFromSkeleton(
+  skeleton: THREE.Skeleton,
+  opts: SkeletonSpecOptions = {}
+): { spec: BoneSpec[]; boneMap: Array<THREE.Bone | undefined> } {
   const bones = skeleton.bones;
   const spec: Array<BoneSpec & { radius: number; mass: number }> = [];
   const boneMap: Array<THREE.Bone | undefined> = [];
@@ -812,7 +1162,9 @@ export function specFromSkeleton(skeleton: THREE.Skeleton, opts: SkeletonSpecOpt
     const si = spec.length;
     specIndexOfBone.set(bone, si);
     const parentSpec =
-      isBone(bone.parent) && specIndexOfBone.has(bone.parent) ? specIndexOfBone.get(bone.parent) : -1;
+      isBone(bone.parent) && specIndexOfBone.has(bone.parent)
+        ? specIndexOfBone.get(bone.parent)
+        : -1;
     spec.push({
       name: bone.name || `bone${i}`,
       head: [v.x, v.y, v.z] as const,

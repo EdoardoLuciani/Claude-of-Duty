@@ -1,19 +1,59 @@
-import { el, setText, setStyle, setClass, damp } from './util.ts';
-import { marketIcon } from './market-icons.ts';
 import type { EngineContext } from '../core/context.ts';
 import type { MarketSystem } from '../market/index.ts';
+import { marketIcon } from './market-icons.ts';
+import { el, setText, setStyle, setClass, damp } from './util.ts';
 
-type MarketId = 'ammo' | 'grenade' | 'armour' | 'bandage' | 'smg' | 'rifle' | 'mcx' | 'shotgun' | 'lmg' | 'sniper' | 'carpet';
+type MarketId =
+  | 'ammo'
+  | 'grenade'
+  | 'armour'
+  | 'bandage'
+  | 'pistol'
+  | 'smg'
+  | 'rifle'
+  | 'mcx'
+  | 'shotgun'
+  | 'lmg'
+  | 'sniper'
+  | 'carpet';
 type MarketAction = 'buy' | 'swap' | 'equipped' | 'max';
 type MarketSlot = 'kit' | 'secondary' | 'primary' | 'strike';
-interface MarketItem { id: MarketId; label: string; blurb: string; cost: number; max: number; step: number; unit: string; slot: MarketSlot; level: number; affordable: boolean; action: MarketAction }
+interface MarketItem {
+  id: MarketId;
+  label: string;
+  blurb: string;
+  cost: number;
+  max: number;
+  step: number;
+  unit: string;
+  slot: MarketSlot;
+  level: number;
+  affordable: boolean;
+  action: MarketAction;
+}
 type MarketApi = MarketSystem;
 type MarketContext = Pick<EngineContext, 'get' | 'peek'>;
-interface MarketCard { card: HTMLElement; btn: HTMLButtonElement; count: HTMLElement; pips: HTMLElement[]; fill: HTMLElement | null }
-const ACTION_LABEL: Record<MarketAction, string> = { buy: 'BUY', swap: 'SWAP', equipped: 'EQUIPPED', max: 'MAX' };
-const SECTION: Record<MarketSlot, string> = { kit: 'RESUPPLY', secondary: 'SECONDARY', primary: 'PRIMARY', strike: 'ORDNANCE' };
+interface MarketCard {
+  card: HTMLElement;
+  btn: HTMLButtonElement;
+  count: HTMLElement;
+  pips: HTMLElement[];
+  fill: HTMLElement | null;
+}
+const ACTION_LABEL: Record<MarketAction, string> = {
+  buy: 'BUY',
+  swap: 'SWAP',
+  equipped: 'EQUIPPED',
+  max: 'MAX',
+};
+const SECTION: Record<MarketSlot, string> = {
+  kit: 'RESUPPLY',
+  secondary: 'SECONDARY',
+  primary: 'PRIMARY',
+  strike: 'ORDNANCE',
+};
 function targetCard(target: EventTarget | null): HTMLElement | null {
-  return target instanceof Element ? target.closest('[data-item]') as HTMLElement | null : null;
+  return target instanceof Element ? (target.closest('[data-item]') as HTMLElement | null) : null;
 }
 
 /**
@@ -28,9 +68,20 @@ function targetCard(target: EventTarget | null): HTMLElement | null {
  * until the player explicitly leaves (SKIP or Esc). Number keys do not buy.
  */
 export class MarketOverlay {
-  ctx: MarketContext; market: MarketApi; root: HTMLElement; waveLine: HTMLElement; credits: HTMLElement; cards: MarketCard[];
-  active: boolean; shown: number; wave: number; _pulse: number; _hoverId: string | null;
-  _onClick: (event: MouseEvent) => void; _onOver: (event: MouseEvent) => void; _onKey: (event: KeyboardEvent) => void;
+  ctx: MarketContext;
+  market: MarketApi;
+  root: HTMLElement;
+  waveLine: HTMLElement;
+  credits: HTMLElement;
+  cards: MarketCard[];
+  active: boolean;
+  shown: number;
+  wave: number;
+  _pulse: number;
+  _hoverId: string | null;
+  _onClick: (event: MouseEvent) => void;
+  _onOver: (event: MouseEvent) => void;
+  _onKey: (event: KeyboardEvent) => void;
   constructor(parent: HTMLElement, ctx: MarketContext) {
     this.ctx = ctx;
     this.market = ctx.get('market');
@@ -47,7 +98,9 @@ export class MarketOverlay {
 
     this.cards = [];
     const items = this.market.getHudState().items;
-    let secN = 1, lastSlot: MarketSlot | '' = '', grid: HTMLElement | null = null;
+    let secN = 1,
+      lastSlot: MarketSlot | '' = '',
+      grid: HTMLElement | null = null;
     for (const item of items) {
       if (item.slot !== lastSlot) {
         lastSlot = item.slot;
@@ -110,7 +163,7 @@ export class MarketOverlay {
     const meta = el('div', 'ow-market-meta', card);
     const stock = el('div', 'ow-market-stock', meta);
     const gun = item.action === 'equipped' || item.action === 'swap';
-    const pipMax = (item.unit === 'pct' || gun) ? 0 : Math.floor(item.max / item.step);
+    const pipMax = item.unit === 'pct' || gun ? 0 : Math.floor(item.max / item.step);
     const pips: HTMLElement[] = [];
     if (pipMax > 0) {
       const row = el('div', 'ow-market-pips', stock);
@@ -146,7 +199,7 @@ export class MarketOverlay {
   }
 
   _buy(itemId: string | undefined): void {
-    const id = this.market.getHudState().items.find(item => item.id === itemId)?.id;
+    const id = this.market.getHudState().items.find((item) => item.id === itemId)?.id;
     if (id === undefined || !this.market.buy(id)) {
       this.ctx.peek('ui')?.sfx?.('market_deny', 0.75);
       return;
@@ -188,7 +241,11 @@ export class MarketOverlay {
       row.btn.disabled = !it.affordable;
       setClass(row.card, 'on', it.action === 'equipped');
       setClass(row.card, 'capped', it.action === 'max');
-      setClass(row.card, 'broke', !it.affordable && it.action !== 'equipped' && it.action !== 'max');
+      setClass(
+        row.card,
+        'broke',
+        !it.affordable && it.action !== 'equipped' && it.action !== 'max'
+      );
     }
   }
 
@@ -208,7 +265,11 @@ export class MarketOverlay {
  * and would overwrite a shared one at the interaction-prompt anchor.
  */
 export class MarketCountdown {
-  root: HTMLElement; key: HTMLElement; fill: HTMLElement; shown: number; delay: number;
+  root: HTMLElement;
+  key: HTMLElement;
+  fill: HTMLElement;
+  shown: number;
+  delay: number;
   constructor(parent: HTMLElement, delay: number) {
     this.root = el('div', 'ow-mkt-count', parent);
     this.key = el('div', 'ow-mkt-count-key', this.root, '10');

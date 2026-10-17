@@ -1,12 +1,20 @@
-import { el, setText, setStyle, setClass, damp } from './util.ts';
+import { bindingLabel } from '../core/bindings.ts';
 import type { EngineContext } from '../core/context.ts';
+import { el, setText, setStyle, setClass, damp } from './util.ts';
 
 /** Field-radio request panel — shown while the radio is equipped. */
 type RadioContext = Pick<EngineContext, 'peek'>;
-interface RadioRow { row: HTMLElement; charge: HTMLElement }
+interface RadioRow {
+  row: HTMLElement;
+  charge: HTMLElement;
+}
 export class RadioPanel {
-  declare ctx: RadioContext; declare root: HTMLElement; declare panel: HTMLElement; declare rows: RadioRow[];
-  declare shown: number; declare _lastCount: number;
+  declare ctx: RadioContext;
+  declare root: HTMLElement;
+  declare panel: HTMLElement;
+  declare rows: RadioRow[];
+  declare shown: number;
+  declare _lastCount: number;
   constructor(parent: HTMLElement, ctx: RadioContext) {
     this.ctx = ctx;
 
@@ -14,13 +22,13 @@ export class RadioPanel {
     this.panel = el('div', 'ow-radio-panel', this.root);
     const head = el('div', 'ow-radio-head', this.panel);
     el('div', 'ow-radio-title', head, 'FIELD RADIO');
-    el('div', 'ow-radio-hint', head, 'X STOWS');
+    el('div', 'ow-radio-hint', head, `${bindingLabel('radio')} STOWS`);
 
     this.rows = [];
     const defs = [
-      { key: '1', name: 'CARPET BOMB', secret: false },
-      { key: '2', name: 'REQUEST', secret: true },
-      { key: '3', name: 'REQUEST', secret: true },
+      { key: bindingLabel('slot1'), name: 'CARPET BOMB', secret: false },
+      { key: bindingLabel('slot2'), name: 'REQUEST', secret: true },
+      { key: bindingLabel('slot3'), name: 'REQUEST', secret: true },
     ];
     for (const d of defs) {
       const row = el('div', 'ow-radio-row', this.panel);

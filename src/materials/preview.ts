@@ -1,3 +1,4 @@
+import { dot, mix, normalize, positionLocal, pow, smoothstep, vec3 } from 'three/tsl';
 /**
  * Standalone visual harness for the materials subsystem.
  *
@@ -9,12 +10,17 @@
  *   /src/materials/preview.html?view=board|wall|street|closeup|grazing
  */
 import * as THREE from 'three/webgpu';
-import { dot, mix, normalize, positionLocal, pow, smoothstep, vec3 } from 'three/tsl';
+
+import { rendererCounters } from '../dev/render-info.ts';
 import { createWebGpuRenderer } from '../render/webgpu-device.ts';
 import { MaterialSystem } from './index.ts';
-import { rendererCounters } from '../dev/render-info.ts';
 
-interface PreviewInfo { calls: number; tris: number; textures: number; programs: number | null }
+interface PreviewInfo {
+  calls: number;
+  tris: number;
+  textures: number;
+  programs: number | null;
+}
 declare global {
   interface Window {
     __PREVIEW_RENDERER__?: THREE.Renderer;
@@ -47,12 +53,16 @@ const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 4
 const skyMat = new THREE.MeshBasicNodeMaterial({ side: THREE.BackSide, depthWrite: false });
 const direction = normalize(positionLocal);
 const sunDir = vec3(0.42, 0.42, 0.8).normalize();
-const horizon = mix(vec3(0.19, 0.16, 0.13),
-  mix(vec3(0.72, 0.74, 0.72), vec3(0.16, 0.31, 0.62),
-    smoothstep(0, 0.55, direction.y)), smoothstep(-0.12, 0.02, direction.y));
+const horizon = mix(
+  vec3(0.19, 0.16, 0.13),
+  mix(vec3(0.72, 0.74, 0.72), vec3(0.16, 0.31, 0.62), smoothstep(0, 0.55, direction.y)),
+  smoothstep(-0.12, 0.02, direction.y)
+);
 const sunSpot = dot(direction, sunDir).max(0);
-skyMat.colorNode = horizon.add(vec3(1, 0.82, 0.6).mul(pow(sunSpot, 8).mul(0.6)))
-  .add(vec3(1, 0.95, 0.85).mul(pow(sunSpot, 900).mul(40))).mul(1.35);
+skyMat.colorNode = horizon
+  .add(vec3(1, 0.82, 0.6).mul(pow(sunSpot, 8).mul(0.6)))
+  .add(vec3(1, 0.95, 0.85).mul(pow(sunSpot, 900).mul(40)))
+  .mul(1.35);
 const sky = new THREE.Mesh(new THREE.SphereGeometry(200, 32, 16), skyMat);
 sky.frustumCulled = false;
 scene.add(sky);
@@ -90,7 +100,12 @@ scene.environmentIntensity = 1.0;
 
 // --------------------------------------------------------------- scenes ----
 const disposables: THREE.BufferGeometry[] = [];
-function mesh(geo: THREE.BufferGeometry, mat: THREE.Material, pos?: [number, number, number], rot?: [number, number, number]): THREE.Mesh {
+function mesh(
+  geo: THREE.BufferGeometry,
+  mat: THREE.Material,
+  pos?: [number, number, number],
+  rot?: [number, number, number]
+): THREE.Mesh {
   const m = new THREE.Mesh(geo, mat);
   if (pos) m.position.fromArray(pos);
   if (rot) m.rotation.fromArray(rot);
@@ -111,9 +126,13 @@ if (VIEW === 'board') {
   const cols = 5;
   const rows = Math.ceil(materials.names().length / cols);
   materials.names().forEach((name, index) => {
-    const col = index % cols, row = Math.floor(index / cols);
-    mesh(new THREE.SphereGeometry(0.49, 32, 20), materials.get(name),
-      [(col - (cols - 1) / 2) * 1.35, 0.85 + (rows - 1 - row) * 1.35, 0]);
+    const col = index % cols,
+      row = Math.floor(index / cols);
+    mesh(new THREE.SphereGeometry(0.49, 32, 20), materials.get(name), [
+      (col - (cols - 1) / 2) * 1.35,
+      0.85 + (rows - 1 - row) * 1.35,
+      0,
+    ]);
   });
   groundPlane('concrete_floor', 40);
   camera.position.set(0, 0.85 + ((rows - 1) * 1.35) / 2, 7.6);
@@ -150,8 +169,11 @@ if (VIEW === 'board') {
   if (dbg.includes('plain')) {
     const set = materials.getTextureSet('brick');
     brick = new THREE.MeshStandardNodeMaterial({
-      map: set.albedo, normalMap: set.normal, roughnessMap: set.orm,
-      roughness: 1, metalness: 1,
+      map: set.albedo,
+      normalMap: set.normal,
+      roughnessMap: set.orm,
+      roughness: 1,
+      metalness: 1,
     });
     brick.map!.repeat.set(1, 1);
   }
@@ -272,7 +294,8 @@ function tick(): void {
       calls: renderer.info.render.calls, // retained cumulative alias
       tris: renderer.info.render.triangles,
       textures: renderer.info.memory.textures,
-      programs: (renderer.info as typeof renderer.info & { programs?: unknown[] }).programs?.length ?? null,
+      programs:
+        (renderer.info as typeof renderer.info & { programs?: unknown[] }).programs?.length ?? null,
     };
   }
   requestAnimationFrame(tick);

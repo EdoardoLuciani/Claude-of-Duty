@@ -67,7 +67,9 @@
     mark(onPlayer ? 'hurt' : 'hit', { hs: !!p?.headshot });
   });
   E.events.on('actor:death', (p) => mark('kill', { d: +camDist(p?.point).toFixed(2) }));
-  E.events.on('explosion', (p) => mark('boom', { d: +camDist(p?.position).toFixed(2), r: p?.radius ?? 6 }));
+  E.events.on('explosion', (p) =>
+    mark('boom', { d: +camDist(p?.position).toFixed(2), r: p?.radius ?? 6 })
+  );
   E.events.on('player:footstep', (p) => mark('step', { run: !!p?.running }));
   E.events.on('player:land', () => mark('land', {}));
 
@@ -215,7 +217,11 @@
       const d = lerp(minD, maxD, t);
       // Fan them out and alternate sides so they never spawn in a line.
       const lat = (i % 2 === 0 ? 1 : -1) * (2.5 + 2.4 * ((i * 7) % 3));
-      const p = placeOn(cam.position.x + _f.x * d + _r.x * lat, cam.position.z + _f.z * d + _r.z * lat, cam.position.y);
+      const p = placeOn(
+        cam.position.x + _f.x * d + _r.x * lat,
+        cam.position.z + _f.z * d + _r.z * lat,
+        cam.position.y
+      );
       if (!p) continue;
       const yaw = Math.atan2(cam.position.x - p.x, cam.position.z - p.z);
       const a = ai.spawn(VARIANTS[(bot.waveNo + i) % 3], p, yaw);
@@ -279,7 +285,7 @@
     host.innerHTML = `
       <div id="dc-open" style="position:absolute;left:6.5%;bottom:17%;opacity:0;
            text-shadow:0 2px 22px rgba(0,0,0,.85);">
-        <div style="font-size:5.4vh;font-weight:200;letter-spacing:.42em;line-height:1;">OVERWATCH</div>
+        <div style="font-size:5.4vh;font-weight:200;letter-spacing:.42em;line-height:1;">Claude of Duty</div>
         <div style="height:1px;background:linear-gradient(90deg,#fff,rgba(255,255,255,0));
                     margin:2.1vh 0 1.5vh;width:33vw;"></div>
         <div style="font-size:1.32vh;font-weight:500;letter-spacing:.34em;color:#c9d2d8;">
@@ -369,8 +375,8 @@
       const a = bot.target;
       const d = cam.position.distanceTo(a.position);
       // Go for the head once the track has settled and the shot is worth it.
-      const headshot = bot.lockFrames > 22 && d < 26 && (bot.kills % 2 === 0);
-      _p.set(a.position.x, a.position.y + (headshot ? a.eyeHeight ?? 1.6 : 1.24), a.position.z);
+      const headshot = bot.lockFrames > 22 && d < 26 && bot.kills % 2 === 0;
+      _p.set(a.position.x, a.position.y + (headshot ? (a.eyeHeight ?? 1.6) : 1.24), a.position.z);
       // Lead the target: they are moving, and a perfect track looks robotic.
       if (a.velocity) _p.addScaledVector(a.velocity, 0.055);
       const gain = bot.lockFrames < 6 ? 0.34 : 0.19; // fast snap, then settle
@@ -452,7 +458,8 @@
       // levels have door frames and crate corners that a naive seek walks into.
       if (++bot.stuckCheck >= 40) {
         bot.stuckCheck = 0;
-        if (bot.stuckRef.lengthSq() > 0 && cam.position.distanceTo(bot.stuckRef) < 0.75) bot.shimmy = 45;
+        if (bot.stuckRef.lengthSq() > 0 && cam.position.distanceTo(bot.stuckRef) < 0.75)
+          bot.shimmy = 45;
         bot.stuckRef.copy(cam.position);
       }
       if (bot.shimmy > 0) {
@@ -684,7 +691,12 @@
     },
 
     events: () => rec,
-    stats: () => ({ frames: bot.frame, kills: bot.kills, waves: bot.waveNo, alive: livingEnemies().length }),
+    stats: () => ({
+      frames: bot.frame,
+      kills: bot.kills,
+      waves: bot.waveNo,
+      alive: livingEnemies().length,
+    }),
   };
 
   /* ==================================================================== */
@@ -741,7 +753,10 @@
         }
         if (best) return _p.set(best.position.x, best.position.y + 0.7, best.position.z);
         _f.set(0, 0, -1).applyQuaternion(cam.quaternion);
-        return _p.copy(cam.position).addScaledVector(_f, 22).setY(cam.position.y - 0.6);
+        return _p
+          .copy(cam.position)
+          .addScaledVector(_f, 22)
+          .setY(cam.position.y - 0.6);
       },
       /** Opening title: up over the intro pan, gone before the first contact. */
       openCard: (f) => envelope(f, 14, Math.max(intro + 78, 150), 26),

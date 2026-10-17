@@ -3,8 +3,11 @@ import { packedReadback } from './native-readback.js';
 
 /** Fail on the actual boot dialog, rather than spending the readiness timeout. */
 export async function waitForGame(page, { timeout = 120000 } = {}) {
-  await page.waitForFunction(() => window.__READY__ === true ||
-    !!document.getElementById('engine-failure'), null, { timeout });
+  await page.waitForFunction(
+    () => window.__READY__ === true || !!document.getElementById('engine-failure'),
+    null,
+    { timeout }
+  );
   const error = await page.evaluate(() => document.getElementById('engine-failure')?.textContent);
   if (error) throw new Error(error);
   return verifyNative(page);
@@ -20,8 +23,10 @@ export function assertHardwareDevice(device, selected = '') {
 
 /** The same policy also runs before analytic browser fixtures draw anything. */
 export async function installDevicePolicy(page) {
-  await page.addInitScript({ content: `window.__ASSERT_HARDWARE_DEVICE__ = device =>
-    (${assertHardwareDevice.toString()})(device, ${JSON.stringify(process.env.MESA_VK_DEVICE_SELECT ?? '')});` });
+  await page.addInitScript({
+    content: `window.__ASSERT_HARDWARE_DEVICE__ = device =>
+    (${assertHardwareDevice.toString()})(device, ${JSON.stringify(process.env.MESA_VK_DEVICE_SELECT ?? '')});`,
+  });
 }
 
 export async function verifyPreviewNative(page) {
@@ -85,6 +90,9 @@ export async function captureNative(page, path, options = {}) {
     overlay.getContext('2d').putImageData(new ImageData(packed, w, h), 0, 0);
     document.body.append(overlay);
   })()`);
-  try { await page.screenshot({ ...options, path }); }
-  finally { await page.evaluate(() => document.getElementById('native-test-capture')?.remove()); }
+  try {
+    await page.screenshot({ ...options, path });
+  } finally {
+    await page.evaluate(() => document.getElementById('native-test-capture')?.remove());
+  }
 }

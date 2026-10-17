@@ -13,8 +13,18 @@ import * as THREE from 'three';
  * lights the wall for two or three frames and a fireball for a third of a
  * second.
  */
-interface LightEntry { light: THREE.PointLight; peak: number; age: number; duration: number; rise: number; decay: number; priority: number }
-interface LightRegistrar { addLight?(light: THREE.PointLight, options: { range: number; priority: number }): void }
+interface LightEntry {
+  light: THREE.PointLight;
+  peak: number;
+  age: number;
+  duration: number;
+  rise: number;
+  decay: number;
+  priority: number;
+}
+interface LightRegistrar {
+  addLight?(light: THREE.PointLight, options: { range: number; priority: number }): void;
+}
 export class LightPool {
   lights: LightEntry[];
   constructor(scene: THREE.Scene, count = 4) {
@@ -55,7 +65,19 @@ export class LightPool {
    * @param {number} distance  falloff cutoff, metres
    * @param {number} priority  higher wins when the pool is full
    */
-  flash(x: number, y: number, z: number, r: number, g: number, b: number, peak: number, duration: number, decay: number, distance: number, priority = 1): LightEntry | null {
+  flash(
+    x: number,
+    y: number,
+    z: number,
+    r: number,
+    g: number,
+    b: number,
+    peak: number,
+    duration: number,
+    decay: number,
+    distance: number,
+    priority = 1
+  ): LightEntry | null {
     let best: LightEntry | null = null;
     let bestScore = -Infinity;
     for (const e of this.lights) {

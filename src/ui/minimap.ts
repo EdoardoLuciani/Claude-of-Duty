@@ -1,26 +1,75 @@
 import * as THREE from 'three';
-import { el, clamp, clamp01, lerp, FONT_STACK } from './util.ts';
-import type { Rng } from '../core/rng.ts';
+
 import type { EngineContext } from '../core/context.ts';
-interface Traversable { from: [number, number, number]; to: [number, number, number]; w?: number; kind?: string }
+import type { Rng } from '../core/rng.ts';
+import { el, clamp, clamp01, lerp, FONT_STACK } from './util.ts';
+interface Traversable {
+  from: [number, number, number];
+  to: [number, number, number];
+  w?: number;
+  kind?: string;
+}
 function buildingTraversables(info: unknown): Traversable[] {
-  if (typeof info !== 'object' || info === null || !('traversable' in info) || !Array.isArray(info.traversable)) return [];
+  if (
+    typeof info !== 'object' ||
+    info === null ||
+    !('traversable' in info) ||
+    !Array.isArray(info.traversable)
+  )
+    return [];
   return info.traversable.filter((value: unknown): value is Traversable => {
-    if (typeof value !== 'object' || value === null || !('from' in value) || !('to' in value)) return false;
-    return isPointTuple(value.from) && isPointTuple(value.to) &&
+    if (typeof value !== 'object' || value === null || !('from' in value) || !('to' in value))
+      return false;
+    return (
+      isPointTuple(value.from) &&
+      isPointTuple(value.to) &&
       (!('w' in value) || value.w === undefined || typeof value.w === 'number') &&
-      (!('kind' in value) || value.kind === undefined || typeof value.kind === 'string');
+      (!('kind' in value) || value.kind === undefined || typeof value.kind === 'string')
+    );
   });
 }
 function isPointTuple(value: unknown): value is [number, number, number] {
-  return Array.isArray(value) && value.length === 3 && value.every((n: unknown) => typeof n === 'number');
+  return (
+    Array.isArray(value) && value.length === 3 && value.every((n: unknown) => typeof n === 'number')
+  );
 }
 type MinimapContext = Pick<EngineContext, 'peek'>;
-interface MapLabel { x: number; z: number; code: string; w: number; text: string | null }
-interface MapObjective { x: number; z: number; label?: string }
-interface MapBlip { x: number; z: number; kind: string; heading?: number; fade?: number }
-interface MapPulse { x: number; z: number; y?: number; radius?: number }
-interface MinimapState { x?: number; z?: number; heading?: number; fov?: number; objectives?: MapObjective[] | null; blips?: MapBlip[] | null; pulses?: MapPulse[] | null; pulseTime?: number; playerY?: number }
+interface MapLabel {
+  x: number;
+  z: number;
+  code: string;
+  w: number;
+  text: string | null;
+}
+interface MapObjective {
+  x: number;
+  z: number;
+  label?: string;
+}
+interface MapBlip {
+  x: number;
+  z: number;
+  kind: string;
+  heading?: number;
+  fade?: number;
+}
+interface MapPulse {
+  x: number;
+  z: number;
+  y?: number;
+  radius?: number;
+}
+interface MinimapState {
+  x?: number;
+  z?: number;
+  heading?: number;
+  fov?: number;
+  objectives?: MapObjective[] | null;
+  blips?: MapBlip[] | null;
+  pulses?: MapPulse[] | null;
+  pulseTime?: number;
+  playerY?: number;
+}
 
 const VBAKE = 1024; // vector layout map: CPU-drawn once, so detail is nearly free
 
@@ -55,8 +104,14 @@ const NAME_INK = 'rgba(12,19,25,.92)'; // the loud line of a label
 const CODE_INK = 'rgba(12,19,25,.60)'; // its building code, under the name
 const BARE_INK = 'rgba(196,214,226,.28)'; // a code on a mass too dark for it
 
-const ramp = (a: readonly number[], b: readonly number[], t: number): string => 'rgb(' + Math.round(lerp(a[0], b[0], t)) + ',' +
-  Math.round(lerp(a[1], b[1], t)) + ',' + Math.round(lerp(a[2], b[2], t)) + ')';
+const ramp = (a: readonly number[], b: readonly number[], t: number): string =>
+  'rgb(' +
+  Math.round(lerp(a[0], b[0], t)) +
+  ',' +
+  Math.round(lerp(a[1], b[1], t)) +
+  ',' +
+  Math.round(lerp(a[2], b[2], t)) +
+  ')';
 
 /**
  * What the player would call the building: the first furnish rectangle is the
@@ -68,7 +123,13 @@ function labelKind(spec: object): string | null {
   if ('ruin' in spec && spec.ruin) return 'RUIN';
   if (!('rooms' in spec) || !Array.isArray(spec.rooms)) return null;
   const room: unknown = spec.rooms[0];
-  if (typeof room !== 'object' || room === null || !('furnish' in room) || !Array.isArray(room.furnish)) return null;
+  if (
+    typeof room !== 'object' ||
+    room === null ||
+    !('furnish' in room) ||
+    !Array.isArray(room.furnish)
+  )
+    return null;
   const furnish: unknown = room.furnish[0];
   if (typeof furnish !== 'object' || furnish === null || !('kind' in furnish)) return null;
   return typeof furnish.kind === 'string' && furnish.kind ? furnish.kind.toUpperCase() : null;
@@ -88,9 +149,22 @@ function labelKind(spec: object): string | null {
  * compass strip); enemy blips come from `getHudActors()` (LOS / recent shot).
  */
 export class Minimap {
-  root: HTMLElement; canvas: HTMLCanvasElement; g: CanvasRenderingContext2D; scaleTag: HTMLElement; rng: Rng;
-  k: number; cssSize: number; span: number; viewSpan: number; centre: THREE.Vector2; baked: HTMLCanvasElement | null;
-  labels: MapLabel[]; bakeTries: number; bakeDone: boolean; _probe: THREE.Vector3; px!: number;
+  root: HTMLElement;
+  canvas: HTMLCanvasElement;
+  g: CanvasRenderingContext2D;
+  scaleTag: HTMLElement;
+  rng: Rng;
+  k: number;
+  cssSize: number;
+  span: number;
+  viewSpan: number;
+  centre: THREE.Vector2;
+  baked: HTMLCanvasElement | null;
+  labels: MapLabel[];
+  bakeTries: number;
+  bakeDone: boolean;
+  _probe: THREE.Vector3;
+  px!: number;
   constructor(parent: HTMLElement, rng: Rng) {
     this.root = el('div', 'ow-minimap', parent);
     this.canvas = el('canvas', null, this.root);
@@ -217,9 +291,7 @@ export class Minimap {
       // taller mass reads slightly lighter, so the skyline is legible on the map
       const floors = 'floors' in spec && typeof spec.floors === 'number' ? spec.floors : 2;
       const t = clamp01((floors - 1) / 3);
-      g.fillStyle = enterable
-        ? ramp(OPEN_LO, OPEN_HI, t)
-        : ramp(MASS_LO, MASS_HI, t);
+      g.fillStyle = enterable ? ramp(OPEN_LO, OPEN_HI, t) : ramp(MASS_LO, MASS_HI, t);
       g.fillRect(x0, z0, spec.w, spec.d);
       // a light return on the north and west edges: a cheap key-light cue that
       // separates two footprints sharing a wall
@@ -284,7 +356,9 @@ export class Minimap {
       // come out within a couple of px of each other.
       const wv = world.levelToWorld(spec.x, 0, spec.z, p);
       labels.push({
-        x: wv.x, z: wv.z, code: 'id' in spec && typeof spec.id === 'string' ? spec.id : '',
+        x: wv.x,
+        z: wv.z,
+        code: 'id' in spec && typeof spec.id === 'string' ? spec.id : '',
         text: enterable ? labelKind(spec) : null,
         w: spec.w * Math.abs(xx) + spec.d * Math.abs(zx),
       });
@@ -386,7 +460,7 @@ export class Minimap {
 
     // view cone
     const heading = ((s.heading ?? 0) * Math.PI) / 180;
-    const fov = (((s.fov ?? 80) * 0.5) * Math.PI) / 180;
+    const fov = ((s.fov ?? 80) * 0.5 * Math.PI) / 180;
     const coneR = S * 0.42;
     const grad = g.createRadialGradient(half, half, 2, half, half, coneR);
     grad.addColorStop(0, 'rgba(222,242,255,.26)');
@@ -544,7 +618,14 @@ export class Minimap {
    * chopped in half. Both are why this runs live rather than in the bake: the
    * map pans underneath the labels.
    */
-  _drawLabels(g: CanvasRenderingContext2D, s: MinimapState, ppm: number, half: number, S: number, u: number): void {
+  _drawLabels(
+    g: CanvasRenderingContext2D,
+    s: MinimapState,
+    ppm: number,
+    half: number,
+    S: number,
+    u: number
+  ): void {
     const cx = s.x ?? 0;
     const cz = s.z ?? 0;
     const SIZE = 9; // name, css px at k=1

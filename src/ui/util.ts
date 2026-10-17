@@ -38,9 +38,24 @@ type CachedElement = Element & {
 };
 type PoolRecord<Node extends HTMLElement = HTMLElement> = BasePoolRecord<Node>;
 
-export function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string | null, parent?: Node | null, text?: string | number): HTMLElementTagNameMap[K];
-export function el(tag: string, cls?: string | null, parent?: Node | null, text?: string | number): HTMLElement;
-export function el(tag: string, cls?: string | null, parent?: Node | null, text?: string | number): HTMLElement {
+export function el<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  cls?: string | null,
+  parent?: Node | null,
+  text?: string | number
+): HTMLElementTagNameMap[K];
+export function el(
+  tag: string,
+  cls?: string | null,
+  parent?: Node | null,
+  text?: string | number
+): HTMLElement;
+export function el(
+  tag: string,
+  cls?: string | null,
+  parent?: Node | null,
+  text?: string | number
+): HTMLElement {
   const n = document.createElement(tag);
   if (cls) n.className = cls;
   if (text !== undefined) n.textContent = String(text);
@@ -48,9 +63,21 @@ export function el(tag: string, cls?: string | null, parent?: Node | null, text?
   return n;
 }
 
-export function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs?: Record<string, string | number> | null, parent?: Node | null): SVGElementTagNameMap[K];
-export function svg(tag: string, attrs?: Record<string, string | number> | null, parent?: Node | null): SVGElement;
-export function svg(tag: string, attrs?: Record<string, string | number> | null, parent?: Node | null): SVGElement {
+export function svg<K extends keyof SVGElementTagNameMap>(
+  tag: K,
+  attrs?: Record<string, string | number> | null,
+  parent?: Node | null
+): SVGElementTagNameMap[K];
+export function svg(
+  tag: string,
+  attrs?: Record<string, string | number> | null,
+  parent?: Node | null
+): SVGElement;
+export function svg(
+  tag: string,
+  attrs?: Record<string, string | number> | null,
+  parent?: Node | null
+): SVGElement {
   const n = document.createElementNS('http://www.w3.org/2000/svg', tag);
   if (attrs) for (const k in attrs) n.setAttribute(k, String(attrs[k]));
   if (parent) parent.appendChild(n);
@@ -135,7 +162,9 @@ export function metres(d: number): string {
  * animation state. Nothing is allocated after construction.
  */
 export class Pool<Node extends HTMLElement = HTMLElement> {
-  items: PoolRecord<Node>[]; count: number; _next: number;
+  items: PoolRecord<Node>[];
+  count: number;
+  _next: number;
   constructor(count: number, make: (index: number) => Node, parent?: HTMLElement | null) {
     this.items = new Array<PoolRecord<Node>>(count);
     for (let i = 0; i < count; i++) {

@@ -20,34 +20,76 @@
  */
 
 import { Rng } from '../core/rng.ts';
-import { NoiseBank } from './dsp.ts';
-import { Mixer } from './mixer.ts';
-import { WEAPON_PROFILES, weaponShot, weaponPunch, bulletWhizz, dryFire } from './weapons.ts';
-import {
-  surfaceImpact, footstep, shellCasing, reloadPhase, explosion, bodyFall, uiSound,
-  heartbeat, cloth,
-} from './foley.ts';
-import { bark, BARKS } from './vox.ts';
 import { ambientOneShot, ONE_SHOTS } from './ambience.ts';
+import { NoiseBank } from './dsp.ts';
+import {
+  surfaceImpact,
+  footstep,
+  shellCasing,
+  reloadPhase,
+  explosion,
+  bodyFall,
+  uiSound,
+  heartbeat,
+  cloth,
+} from './foley.ts';
 import { IR_SPECS, generateIR, classifySpace } from './ir.ts';
+import { Mixer } from './mixer.ts';
+import { bark, BARKS } from './vox.ts';
+import { WEAPON_PROFILES, weaponShot, weaponPunch, bulletWhizz, dryFire } from './weapons.ts';
 
-interface AudioMetrics { peak: number; rms: number; dc: number; nan: number; centroid: number }
-interface SelfTestResult { name: string; ms?: number; seconds?: number; error?: string; peak?: number; rms?: number; dc?: number; nan?: number; centroid?: number }
-interface AudioFixture { ctx: OfflineAudioContext; rng: Rng; bank: NoiseBank; mixer: Mixer; t: number }
-interface AudioVoice { node: AudioNode; send?: number }
-interface RenderOptions { reverb?: boolean; space?: Record<string, number> }
+interface AudioMetrics {
+  peak: number;
+  rms: number;
+  dc: number;
+  nan: number;
+  centroid: number;
+}
+interface SelfTestResult {
+  name: string;
+  ms?: number;
+  seconds?: number;
+  error?: string;
+  peak?: number;
+  rms?: number;
+  dc?: number;
+  nan?: number;
+  centroid?: number;
+}
+interface AudioFixture {
+  ctx: OfflineAudioContext;
+  rng: Rng;
+  bank: NoiseBank;
+  mixer: Mixer;
+  t: number;
+}
+interface AudioVoice {
+  node: AudioNode;
+  send?: number;
+}
+interface RenderOptions {
+  reverb?: boolean;
+  space?: Record<string, number>;
+}
 
 const SR = 48000;
 
 function measure(buf: AudioBuffer): AudioMetrics {
   const n = buf.length;
-  let peak = 0, sum = 0, sumSq = 0, nan = 0, crossings = 0;
+  let peak = 0,
+    sum = 0,
+    sumSq = 0,
+    nan = 0,
+    crossings = 0;
   let prev = 0;
   for (let ch = 0; ch < buf.numberOfChannels; ch++) {
     const d = buf.getChannelData(ch);
     for (let i = 0; i < n; i++) {
       const v = d[i];
-      if (!Number.isFinite(v)) { nan++; continue; }
+      if (!Number.isFinite(v)) {
+        nan++;
+        continue;
+      }
       const a = Math.abs(v);
       if (a > peak) peak = a;
       sum += v;
@@ -72,7 +114,12 @@ function measure(buf: AudioBuffer): AudioMetrics {
 }
 
 /** One offline render: build a fresh mixer, run `fn`, measure the master out. */
-async function renderCase(seconds: number, seed: number, fn: (fixture: AudioFixture) => void | Promise<void>, opts: RenderOptions = {}): Promise<AudioMetrics> {
+async function renderCase(
+  seconds: number,
+  seed: number,
+  fn: (fixture: AudioFixture) => void | Promise<void>,
+  opts: RenderOptions = {}
+): Promise<AudioMetrics> {
   const ctx = new OfflineAudioContext(2, Math.ceil(SR * seconds), SR);
   const rng = new Rng(seed);
   const bank = new NoiseBank(ctx, rng.fork(), 1.2);
@@ -98,10 +145,15 @@ function route(mixer: Mixer, voice: AudioVoice, busName = 'weapons', sendScale =
 
 export async function runAudioSelfTest(opts: { verbose?: boolean } = {}) {
   const results: SelfTestResult[] = [];
-  const push = async (name: string, seconds: number, fn: (fixture: AudioFixture) => void | Promise<void>, o: RenderOptions = {}): Promise<void> => {
+  const push = async (
+    name: string,
+    seconds: number,
+    fn: (fixture: AudioFixture) => void | Promise<void>,
+    o: RenderOptions = {}
+  ): Promise<void> => {
     const t0 = performance.now();
     try {
-      const m = await renderCase(seconds, 0xA0D10 + results.length * 7919, fn, o);
+      const m = await renderCase(seconds, 0xa0d10 + results.length * 7919, fn, o);
       results.push({ name, ms: Math.round(performance.now() - t0), ...m });
     } catch (err) {
       results.push({ name, error: err instanceof Error ? err.message : String(err) });
@@ -115,7 +167,12 @@ export async function runAudioSelfTest(opts: { verbose?: boolean } = {}) {
       const ctx = new OfflineAudioContext(2, SR * 0.05, SR);
       const buf = generateIR(ctx, new Rng(0x1234 + key.length), IR_SPECS[key]);
       const m = measure(buf);
-      results.push({ name: `ir:${key}`, ms: Math.round(performance.now() - t0), seconds: +buf.duration.toFixed(2), ...m });
+      results.push({
+        name: `ir:${key}`,
+        ms: Math.round(performance.now() - t0),
+        seconds: +buf.duration.toFixed(2),
+        ...m,
+      });
     } catch (err) {
       results.push({ name: `ir:${key}`, error: err instanceof Error ? err.message : String(err) });
     }
@@ -124,40 +181,85 @@ export async function runAudioSelfTest(opts: { verbose?: boolean } = {}) {
   /* ---- weapons, near and far ------------------------------------ */
   for (const key of Object.keys(WEAPON_PROFILES) as Array<keyof typeof WEAPON_PROFILES>) {
     await push(`shot:${key}@2m`, 3.5, ({ bank, rng, mixer, t }) => {
-      route(mixer, weaponShot(mixer.actx, bank, rng, WEAPON_PROFILES[key], { when: t, distance: 2, firstPerson: true }));
+      route(
+        mixer,
+        weaponShot(mixer.actx, bank, rng, WEAPON_PROFILES[key], {
+          when: t,
+          distance: 2,
+          firstPerson: true,
+        })
+      );
     });
   }
   await push('shot:rifle:punch', 1.2, ({ bank, rng, mixer, t }) => {
-    route(mixer, weaponPunch(mixer.actx, bank, rng, WEAPON_PROFILES.rifle, {
-      when: t, distance: 0, firstPerson: true,
-    }));
+    route(
+      mixer,
+      weaponPunch(mixer.actx, bank, rng, WEAPON_PROFILES.rifle, {
+        when: t,
+        distance: 0,
+        firstPerson: true,
+      })
+    );
   });
   await push('shot:suppressed:punch', 1.2, ({ bank, rng, mixer, t }) => {
-    route(mixer, weaponPunch(mixer.actx, bank, rng, WEAPON_PROFILES.suppressed, {
-      when: t, distance: 0, firstPerson: true,
-    }));
+    route(
+      mixer,
+      weaponPunch(mixer.actx, bank, rng, WEAPON_PROFILES.suppressed, {
+        when: t,
+        distance: 0,
+        firstPerson: true,
+      })
+    );
   });
   await push('shot:rifle@120m', 4.5, ({ bank, rng, mixer, t }) => {
-    route(mixer, weaponShot(mixer.actx, bank, rng, WEAPON_PROFILES.rifle, { when: t, distance: 120 }));
+    route(
+      mixer,
+      weaponShot(mixer.actx, bank, rng, WEAPON_PROFILES.rifle, { when: t, distance: 120 })
+    );
   });
   await push('shot:rifle@300m', 5.5, ({ bank, rng, mixer, t }) => {
-    route(mixer, weaponShot(mixer.actx, bank, rng, WEAPON_PROFILES.rifle, { when: t, distance: 300 }));
+    route(
+      mixer,
+      weaponShot(mixer.actx, bank, rng, WEAPON_PROFILES.rifle, { when: t, distance: 300 })
+    );
   });
 
   /* round-robin variation: 8 rounds of automatic fire must not be identical */
   await push('auto:8rounds', 2.5, ({ bank, rng, mixer, t }) => {
     for (let i = 0; i < 8; i++) {
-      route(mixer, weaponShot(mixer.actx, bank, rng, WEAPON_PROFILES.rifle, {
-        when: t + i * 0.085, distance: 2, firstPerson: true,
-      }));
+      route(
+        mixer,
+        weaponShot(mixer.actx, bank, rng, WEAPON_PROFILES.rifle, {
+          when: t + i * 0.085,
+          distance: 2,
+          firstPerson: true,
+        })
+      );
     }
   });
 
   /* ---- foley ----------------------------------------------------- */
-  const surfaces = ['concrete', 'metal', 'wood', 'dirt', 'sand', 'glass', 'water', 'foliage', 'fabric', 'flesh', 'rubber', 'plaster'] as const;
+  const surfaces = [
+    'concrete',
+    'metal',
+    'wood',
+    'dirt',
+    'sand',
+    'glass',
+    'water',
+    'foliage',
+    'fabric',
+    'flesh',
+    'rubber',
+    'plaster',
+  ] as const;
   for (const s of surfaces) {
     await push(`impact:${s}`, 2.2, ({ bank, rng, mixer, t }) => {
-      route(mixer, surfaceImpact(mixer.actx, bank, rng, { when: t, surface: s, energy: 1 }), 'foley');
+      route(
+        mixer,
+        surfaceImpact(mixer.actx, bank, rng, { when: t, surface: s, energy: 1 }),
+        'foley'
+      );
     });
     await push(`step:${s}`, 2.2, ({ bank, rng, mixer, t }) => {
       route(mixer, footstep(mixer.actx, bank, rng, { when: t, surface: s, gait: 'run' }), 'foley');
@@ -165,7 +267,11 @@ export async function runAudioSelfTest(opts: { verbose?: boolean } = {}) {
   }
   for (const gait of ['walk', 'run', 'sprint', 'crouch', 'land'] as const) {
     await push(`step:concrete:${gait}`, 2.2, ({ bank, rng, mixer, t }) => {
-      route(mixer, footstep(mixer.actx, bank, rng, { when: t, surface: 'concrete', gait }), 'foley');
+      route(
+        mixer,
+        footstep(mixer.actx, bank, rng, { when: t, surface: 'concrete', gait }),
+        'foley'
+      );
     });
   }
   await push('shell:concrete', 3, ({ bank, rng, mixer, t }) => {
@@ -204,9 +310,14 @@ export async function runAudioSelfTest(opts: { verbose?: boolean } = {}) {
     route(mixer, heartbeat(mixer.actx, { when: t, level: 0.74, buffer }), 'ui');
   });
   for (const k of ['hitmarker', 'headshot', 'kill', 'damage', 'lowhealth']) {
-    await push(`ui:${k}`, 1.5, ({ bank, rng, mixer, t }) => {
-      route(mixer, uiSound(mixer.actx, bank, rng, k, { when: t }), 'ui');
-    }, { reverb: false });
+    await push(
+      `ui:${k}`,
+      1.5,
+      ({ bank, rng, mixer, t }) => {
+        route(mixer, uiSound(mixer.actx, bank, rng, k, { when: t }), 'ui');
+      },
+      { reverb: false }
+    );
   }
 
   /* ---- voice ----------------------------------------------------- */
@@ -230,28 +341,50 @@ export async function runAudioSelfTest(opts: { verbose?: boolean } = {}) {
   for (const space of ['tight', 'street', 'open', 'tunnel']) {
     const w: Record<string, number> = { tight: 0, room: 0, street: 0, tunnel: 0, open: 0 };
     w[space] = 1;
-    await push(`tail:${space}`, 5, ({ bank, rng, mixer, t }) => {
-      route(mixer, weaponShot(mixer.actx, bank, rng, WEAPON_PROFILES.rifle, {
-        when: t, distance: 2, firstPerson: true, echoBoost: 2,
-      }), 'weapons', 1.4);
-    }, { space: w });
+    await push(
+      `tail:${space}`,
+      5,
+      ({ bank, rng, mixer, t }) => {
+        route(
+          mixer,
+          weaponShot(mixer.actx, bank, rng, WEAPON_PROFILES.rifle, {
+            when: t,
+            distance: 2,
+            firstPerson: true,
+            echoBoost: 2,
+          }),
+          'weapons',
+          1.4
+        );
+      },
+      { space: w }
+    );
   }
 
   /* ---- limiter stress: everything at once ----------------------- */
   await push('stress:limiter', 4, ({ bank, rng, mixer, t }) => {
     for (let i = 0; i < 14; i++) {
-      route(mixer, weaponShot(mixer.actx, bank, rng, WEAPON_PROFILES.sniper, {
-        when: t + i * 0.004, distance: 1, firstPerson: true,
-      }));
+      route(
+        mixer,
+        weaponShot(mixer.actx, bank, rng, WEAPON_PROFILES.sniper, {
+          when: t + i * 0.004,
+          distance: 1,
+          firstPerson: true,
+        })
+      );
     }
     for (let i = 0; i < 6; i++) {
-      route(mixer, explosion(mixer.actx, bank, rng, { when: t + i * 0.01, distance: 1, radius: 14 }));
+      route(
+        mixer,
+        explosion(mixer.actx, bank, rng, { when: t + i * 0.01, distance: 1, radius: 14 })
+      );
     }
   });
 
   /* ---- space classifier (pure function, no audio) ---------------- */
   const spaces: Record<string, ReturnType<typeof classifySpace>> = {};
-  const box = new Array(9).fill(3.5); box[8] = 2.6;
+  const box = new Array(9).fill(3.5);
+  box[8] = 2.6;
   spaces.smallRoom = classifySpace(box, 40);
   const street = [4, 30, 40, 30, 4, 30, 40, 30, 40];
   spaces.street = classifySpace(street, 40);
@@ -260,8 +393,13 @@ export async function runAudioSelfTest(opts: { verbose?: boolean } = {}) {
   const corridor = [1.8, 12, 38, 12, 1.8, 12, 38, 12, 2.4];
   spaces.corridor = classifySpace(corridor, 40);
 
-  const failures = results.filter((r) =>
-    r.error || (r.nan ?? 0) > 0 || (r.peak ?? 0) >= 1.0 || (r.rms ?? 0) <= 0.00002 || Math.abs(r.dc ?? 0) > 0.02
+  const failures = results.filter(
+    (r) =>
+      r.error ||
+      (r.nan ?? 0) > 0 ||
+      (r.peak ?? 0) >= 1.0 ||
+      (r.rms ?? 0) <= 0.00002 ||
+      Math.abs(r.dc ?? 0) > 0.02
   );
 
   return {
@@ -273,4 +411,6 @@ export async function runAudioSelfTest(opts: { verbose?: boolean } = {}) {
   };
 }
 
-if (typeof window !== 'undefined') (window as Window & { __AUDIO_SELFTEST__?: typeof runAudioSelfTest }).__AUDIO_SELFTEST__ = runAudioSelfTest;
+if (typeof window !== 'undefined')
+  (window as Window & { __AUDIO_SELFTEST__?: typeof runAudioSelfTest }).__AUDIO_SELFTEST__ =
+    runAudioSelfTest;

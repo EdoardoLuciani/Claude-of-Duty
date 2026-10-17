@@ -1,27 +1,29 @@
 import * as THREE from 'three';
-import { MeshBasicNodeMaterial, MeshPhysicalNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { Arm } from './hands.ts';
-import { loadArmAsset } from './arm-asset.ts';
-import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from './grip-contacts.ts';
-import { MCXAnimation } from './mcx.ts';
-import { P320Animation } from './p320.ts';
-import { M4Animation } from './m4.ts';
-import { EvolysAnimation } from './evolys.ts';
-import { AX338Animation } from './ax338.ts';
-import { MPXAnimation } from './mpx.ts';
-import { buildClips, makeSampleResult } from './clips.ts';
-import { triCount, mergeAll, Assembly } from './geometry.ts';
-import { grenadeMesh } from './grenade-mesh.ts';
-import { radioMesh, radioScreenTexture } from './radio-mesh.ts';
-import { createWeaponMaterial } from './asset-material.ts';
-import { loadBandage } from './bandage-mesh.ts';
-import { BANDAGE_PATH, BANDAGE_CONTACT, BANDAGE_POSES, BANDAGE_SEGMENTS, BANDAGE_WIDTH, BANDAGE_ELBOW_R } from './bandage-path.ts';
-import type { MaterialSystemNode } from '../materials/index.ts';
+import { MeshBasicNodeMaterial, MeshPhysicalNodeMaterial } from 'three/webgpu';
 import type { Node, UniformNode } from 'three/webgpu';
-import { isAuthoredWeapon, isWeaponAdapter } from './runtime-types.ts';
-import type { ClipResult, MaskShapeOptions, ViewPoseKey, ViewState, WeaponDef, WeaponEntry, WeaponModelRecord, WeaponNodes, WeaponAnimation, WeaponAssembly, ViewmodelContext } from './runtime-types.ts';
+
+import { loadArmAsset } from './arm-asset.ts';
+import { createWeaponMaterial } from './asset-material.ts';
+import { AX338Animation } from './ax338.ts';
+import { loadBandage } from './bandage-mesh.ts';
+import {
+  BANDAGE_PATH,
+  BANDAGE_CONTACT,
+  BANDAGE_POSES,
+  BANDAGE_SEGMENTS,
+  BANDAGE_WIDTH,
+  BANDAGE_ELBOW_R,
+} from './bandage-path.ts';
+import { makeSampleResult } from './clips.ts';
 import type { Clip } from './clips.ts';
+import { EvolysAnimation } from './evolys.ts';
+import { triCount, mergeAll } from './geometry.ts';
+import { grenadeMesh } from './grenade-mesh.ts';
+import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from './grip-contacts.ts';
+import { Arm } from './hands.ts';
+import { M4Animation } from './m4.ts';
+import { M590Animation } from './m590.ts';
 import type { WeaponMaterialsNode } from './materials-tsl.ts';
 import {
   Spring,
@@ -35,6 +37,22 @@ import {
   wrapPi,
   TAU,
 } from './mathx.ts';
+import { MCXAnimation } from './mcx.ts';
+import { MPXAnimation } from './mpx.ts';
+import { P320Animation } from './p320.ts';
+import { radioMesh, radioScreenTexture } from './radio-mesh.ts';
+import { isWeaponAdapter } from './runtime-types.ts';
+import type {
+  ClipResult,
+  ViewPoseKey,
+  ViewState,
+  WeaponDef,
+  WeaponEntry,
+  WeaponModelRecord,
+  WeaponNodes,
+  WeaponAnimation,
+  ViewmodelContext,
+} from './runtime-types.ts';
 
 /**
  * THE VIEWMODEL RIG.
@@ -86,17 +104,17 @@ const GRENADE_COOK_BLEND_T = 0.16;
 /** Camera-space utility staging, independent of the equipped weapon's hip
  *  transform. The bent left arm presents a stationary, horizontal forearm. */
 const BANDAGE_L = {
-  hand: [-.015, -.13, -.48],
-  elbow: [-.306, -.13, -.48],
-  shoulder: [-.23, -.22, -.18236262],
+  hand: [-0.015, -0.13, -0.48],
+  elbow: [-0.306, -0.13, -0.48],
+  shoulder: [-0.23, -0.22, -0.18236262],
   // Tuck the fist out of the fixed elbow's forearm sweep.
-  finger: [.5, 0, -.866025],
-  back: [.866025, 0, .5],
+  finger: [0.5, 0, -0.866025],
+  back: [0.866025, 0, 0.5],
 };
 const BANDAGE_R = {
-  shoulder: [.42, -.24, -.25135399],
-  tensionSettle: .10,
-  release: .12,
+  shoulder: [0.42, -0.24, -0.25135399],
+  tensionSettle: 0.1,
+  release: 0.12,
 };
 
 /** Radio hold: walkie at chest height, screen toward the eye. Left hand hangs. */
@@ -112,11 +130,11 @@ const RADIO_HOLD = {
 /** Idle hold at chest height. Left hand stays off — two gloves cannot wrap it. */
 const GRENADE_HOLD = {
   hand: [0.07, 0.04, -0.13],
-  finger: [0.06, 0.60, -0.80],
+  finger: [0.06, 0.6, -0.8],
   back: [0.58, 0.38, -0.72],
   lhand: [-0.11, 0.01, -0.04],
   lfinger: [0.32, 0.34, -0.88],
-  lback: [-0.48, 0.70, -0.53],
+  lback: [-0.48, 0.7, -0.53],
 };
 
 /** Long cook: cocked high-right, palm toward the eye. */
@@ -124,7 +142,7 @@ const GRENADE_COOK_LONG = {
   t: 0,
   hand: [0.0131, 0.2084, 0.0136],
   finger: [0.05, 0.67, -0.74],
-  back: [0.61, 0.40, -0.68],
+  back: [0.61, 0.4, -0.68],
   lhand: [-0.182, 0.1174, 0.0741],
   lfinger: [0.19, 0.38, -0.91],
   lback: [-0.56, 0.67, -0.48],
@@ -135,10 +153,10 @@ const GRENADE_COOK_SHORT = {
   t: 0,
   hand: [0.06, 0.12, -0.06],
   finger: [0.08, 0.58, -0.81],
-  back: [0.58, 0.40, -0.71],
-  lhand: [-0.15, 0.04, 0.00],
-  lfinger: [0.20, 0.32, -0.93],
-  lback: [-0.52, 0.70, -0.49],
+  back: [0.58, 0.4, -0.71],
+  lhand: [-0.15, 0.04, 0.0],
+  lfinger: [0.2, 0.32, -0.93],
+  lback: [-0.52, 0.7, -0.49],
 };
 
 /** Long throw: wind up above the cook, then heave forward. */
@@ -148,19 +166,19 @@ const GRENADE_THROW_KEYS = [
     t: 0.28,
     hand: [0.05, 0.26, 0.02],
     finger: [0.02, 0.78, -0.63],
-    back: [0.64, 0.32, -0.70],
-    lhand: [-0.18, 0.10, 0.08],
+    back: [0.64, 0.32, -0.7],
+    lhand: [-0.18, 0.1, 0.08],
     lfinger: [0.16, 0.36, -0.92],
-    lback: [-0.56, 0.66, -0.50],
+    lback: [-0.56, 0.66, -0.5],
   },
   {
     t: 0.58,
-    hand: [0.05, 0.20, -0.08],
+    hand: [0.05, 0.2, -0.08],
     finger: [0.04, 0.48, -0.88],
     back: [0.54, 0.48, -0.69],
     lhand: [-0.16, 0.08, 0.05],
-    lfinger: [0.18, 0.30, -0.94],
-    lback: [-0.52, 0.70, -0.49],
+    lfinger: [0.18, 0.3, -0.94],
+    lback: [-0.52, 0.7, -0.49],
   },
   {
     t: 0.78,
@@ -168,8 +186,8 @@ const GRENADE_THROW_KEYS = [
     finger: [0.05, 0.12, -0.99],
     back: [0.42, 0.66, -0.62],
     lhand: [-0.14, 0.02, 0.02],
-    lfinger: [0.20, 0.24, -0.95],
-    lback: [-0.50, 0.72, -0.48],
+    lfinger: [0.2, 0.24, -0.95],
+    lback: [-0.5, 0.72, -0.48],
     rpose: 'open',
   },
   { ...GRENADE_HOLD, t: 1, rpose: 'open' },
@@ -184,59 +202,30 @@ const GRENADE_THROW_SHORT_KEYS = [
     finger: [0.08, 0.52, -0.85],
     back: [0.56, 0.42, -0.71],
     lhand: [-0.15, 0.04, 0.02],
-    lfinger: [0.20, 0.30, -0.93],
-    lback: [-0.52, 0.70, -0.49],
+    lfinger: [0.2, 0.3, -0.93],
+    lback: [-0.52, 0.7, -0.49],
   },
   {
     t: 0.55,
-    hand: [0.07, 0.15, -0.10],
+    hand: [0.07, 0.15, -0.1],
     finger: [0.08, 0.38, -0.92],
-    back: [0.50, 0.52, -0.69],
+    back: [0.5, 0.52, -0.69],
     lhand: [-0.14, 0.04, 0.02],
     lfinger: [0.22, 0.26, -0.94],
-    lback: [-0.50, 0.72, -0.48],
+    lback: [-0.5, 0.72, -0.48],
   },
   {
     t: 0.76,
     hand: [0.05, 0.08, -0.14],
-    finger: [0.08, 0.10, -0.99],
-    back: [0.40, 0.68, -0.62],
-    lhand: [-0.12, 0.00, 0.00],
+    finger: [0.08, 0.1, -0.99],
+    back: [0.4, 0.68, -0.62],
+    lhand: [-0.12, 0.0, 0.0],
     lfinger: [0.24, 0.22, -0.95],
     lback: [-0.48, 0.72, -0.48],
     rpose: 'open',
   },
   { ...GRENADE_HOLD, t: 1, rpose: 'open' },
 ];
-
-/**
- * Re-shape the curvature vertex masks baked by `materials.bakeMasks`.
- *
- * bakeMasks writes a LINEAR convexity ramp into vColor.rgb (wear / grime / AO).
- * On architecture that is right — a wall has interior vertices for the ramp to
- * fall off against. On chamfered hard-surface geometry there are none, so the
- * ramp runs from the chamfer to the middle of the panel and the whole face
- * reads as worn metal. Raising the exponent collapses that ramp back onto the
- * chamfer's own vertices, which is the outer 1-2 mm of the edge — the only place
- * a rifle actually polishes through.
- *
- * @param {THREE.BufferGeometry} geo   must already carry a `color` attribute
- */
-export function shapeMasks(geo: THREE.BufferGeometry, o: MaskShapeOptions) {
-  const col = geo.getAttribute('color');
-  if (!col) return geo;
-  const a = col.array;
-  const amp = [o.wearAmp ?? 1, o.grimeAmp ?? 1, o.aoAmp ?? 1];
-  const exp = [o.wearExp ?? 1, o.grimeExp ?? 1, o.aoExp ?? 1];
-  for (let i = 0; i < a.length; i += 3) {
-    for (let k = 0; k < 3; k++) {
-      const v = a[i + k];
-      a[i + k] = v <= 0 ? 0 : amp[k] * Math.pow(v > 1 ? 1 : v, exp[k]);
-    }
-  }
-  col.needsUpdate = true;
-  return geo;
-}
 
 /** Right-handed hand basis from a finger direction and a back-of-hand direction. */
 function handBasis(out: THREE.Quaternion, finger: ArrayLike<number>, back: ArrayLike<number>) {
@@ -253,24 +242,99 @@ function handBasis(out: THREE.Quaternion, finger: ArrayLike<number>, back: Array
 export class Viewmodel {
   declare ctx: ViewmodelContext;
   declare radioScreen: THREE.Mesh<THREE.BufferGeometry, MeshPhysicalNodeMaterial> | null;
-  declare maskUniforms: { uAlpha: UniformNode<'float', number>; uAspect: UniformNode<'float', number> };
-  declare reticleUniforms: { uAlpha: UniformNode<'float', number>; uAspect: UniformNode<'float', number>; uChevron: UniformNode<'float', number> };
-  declare mats: WeaponMaterialsNode; declare rng: import('../core/rng.ts').Rng; declare anchor: THREE.Object3D; declare rig: THREE.Object3D; declare armAsset: import('./arm-asset.ts').ArmAsset;
-  declare armR: Arm; declare armL: Arm; declare grenade: THREE.Object3D; declare radio: THREE.Object3D; declare active: WeaponEntry | null;
-  declare _grenadeState: 0 | 1 | 2; declare _throwT: number; declare _throwReleased: boolean; declare _throwKeys: (ViewPoseKey & { t: number })[]; declare _throwDuration: number; declare _throwReleaseAt: number;
-  declare _cookType: string | null; declare _cookBlend: number; declare _grenadeFingerR: Float32Array; declare _grenadeBackR: Float32Array; declare _grenadeFingerL: Float32Array; declare _grenadeBackL: Float32Array;
-  declare _propMaterials: Map<THREE.Material, THREE.Material>; declare _radioState: number; declare bandageAsset: Awaited<ReturnType<typeof loadBandage>> | null; declare _bandageState: number; declare _bandageProgress: number;
-  declare _bandageFinger: Float32Array; declare _bandageBack: Float32Array; declare _bandageElbowL: THREE.Vector3; declare _bandageElbowR: THREE.Vector3; declare shoulderR: THREE.Vector3; declare shoulderL: THREE.Vector3;
-  declare reticle: THREE.Object3D; declare _reticleGeo: THREE.BufferGeometry[]; declare dotCore: THREE.Mesh<THREE.BufferGeometry, THREE.Material>; declare dotHalo: THREE.Mesh<THREE.BufferGeometry, THREE.Material>; declare dotRim: THREE.Mesh<THREE.BufferGeometry, THREE.Material>; declare dotRing: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
-  declare scopeOverlay: THREE.Object3D; declare scopeMask: THREE.Mesh<THREE.BufferGeometry, MeshBasicNodeMaterial>; declare scopeReticle: THREE.Mesh<THREE.BufferGeometry, MeshBasicNodeMaterial>; declare _adsPos: THREE.Vector3; declare _adsQuat: THREE.Quaternion; declare _sightLocal: THREE.Vector3;
-  declare weapons: Map<string, WeaponEntry>; declare _basePos: THREE.Vector3; declare _baseQuat: THREE.Quaternion; declare _handPos: THREE.Vector3; declare _handQuat: THREE.Quaternion; declare _handPosL: THREE.Vector3; declare _handQuatL: THREE.Quaternion;
-  declare _tmpPos: THREE.Vector3; declare _tmpQuat: THREE.Quaternion; declare _angVel: { yaw: number; pitch: number }; declare _hasPrev: boolean; declare _prevPitch: number; declare _prevYaw: number;
-  declare _adsTarget: number; declare adsT: number; declare adsTarget: number; declare bobPhase: number; declare bolt: THREE.Object3D | null; declare boltCycle: number; declare boltHold: number;
-  declare charging: boolean; declare clip: Clip | null; declare clipPrevT: number; declare clipResult: ClipResult; declare clipT: number;
-  declare debugFrozen: boolean; declare jumpSpring: Spring; declare landSpring: Spring; declare lag: Spring3; declare lagRot: Spring3; declare lowReadyT: number;
-  declare magazine: THREE.Object3D | null; declare magazineBody: THREE.Object3D | null; declare magVisible: boolean; declare noise: Noise1[]; declare noiseRates: number[]; declare noiseT: number;
-  declare onClipEvent: ((name: string, clipName: string) => void) | null; declare recPos: Spring3; declare recRot: Spring3; declare rigOverride: { position: THREE.Vector3; quaternion: THREE.Quaternion } | null; declare selector: THREE.Object3D | null; declare selectorLive: number;
-  declare settle: Spring3; declare sprintT: number; declare stepT: number; declare trackCamera: boolean; declare trigger: THREE.Object3D | null; declare triggerT: number; declare triggerTarget: number;
+  declare maskUniforms: {
+    uAlpha: UniformNode<'float', number>;
+    uAspect: UniformNode<'float', number>;
+  };
+  declare reticleUniforms: {
+    uAlpha: UniformNode<'float', number>;
+    uAspect: UniformNode<'float', number>;
+    uChevron: UniformNode<'float', number>;
+  };
+  declare mats: WeaponMaterialsNode;
+  declare rng: import('../core/rng.ts').Rng;
+  declare anchor: THREE.Object3D;
+  declare rig: THREE.Object3D;
+  declare armAsset: import('./arm-asset.ts').ArmAsset;
+  declare armR: Arm;
+  declare armL: Arm;
+  declare grenade: THREE.Object3D;
+  declare radio: THREE.Object3D;
+  declare active: WeaponEntry | null;
+  declare _grenadeState: 0 | 1 | 2;
+  declare _throwT: number;
+  declare _throwReleased: boolean;
+  declare _throwKeys: (ViewPoseKey & { t: number })[];
+  declare _throwDuration: number;
+  declare _throwReleaseAt: number;
+  declare _cookType: string | null;
+  declare _cookBlend: number;
+  declare _grenadeFingerR: Float32Array;
+  declare _grenadeBackR: Float32Array;
+  declare _grenadeFingerL: Float32Array;
+  declare _grenadeBackL: Float32Array;
+  declare _propMaterials: Map<THREE.Material, THREE.Material>;
+  declare _radioState: number;
+  declare bandageAsset: Awaited<ReturnType<typeof loadBandage>> | null;
+  declare _bandageState: number;
+  declare _bandageProgress: number;
+  declare _bandageFinger: Float32Array;
+  declare _bandageBack: Float32Array;
+  declare _bandageElbowL: THREE.Vector3;
+  declare _bandageElbowR: THREE.Vector3;
+  declare shoulderR: THREE.Vector3;
+  declare shoulderL: THREE.Vector3;
+  declare reticle: THREE.Object3D;
+  declare _reticleGeo: THREE.BufferGeometry[];
+  declare dotCore: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
+  declare dotHalo: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
+  declare dotRim: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
+  declare dotRing: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
+  declare scopeOverlay: THREE.Object3D;
+  declare scopeMask: THREE.Mesh<THREE.BufferGeometry, MeshBasicNodeMaterial>;
+  declare scopeReticle: THREE.Mesh<THREE.BufferGeometry, MeshBasicNodeMaterial>;
+  declare _adsPos: THREE.Vector3;
+  declare _adsQuat: THREE.Quaternion;
+  declare _sightLocal: THREE.Vector3;
+  declare weapons: Map<string, WeaponEntry>;
+  declare _basePos: THREE.Vector3;
+  declare _baseQuat: THREE.Quaternion;
+  declare _handPos: THREE.Vector3;
+  declare _handQuat: THREE.Quaternion;
+  declare _handPosL: THREE.Vector3;
+  declare _handQuatL: THREE.Quaternion;
+  declare _tmpPos: THREE.Vector3;
+  declare _tmpQuat: THREE.Quaternion;
+  declare _angVel: { yaw: number; pitch: number };
+  declare _hasPrev: boolean;
+  declare _prevPitch: number;
+  declare _prevYaw: number;
+  declare adsT: number;
+  declare adsTarget: number;
+  declare bobPhase: number;
+  declare clip: Clip | null;
+  declare clipPrevT: number;
+  declare clipResult: ClipResult;
+  declare clipT: number;
+  declare debugFrozen: boolean;
+  declare jumpSpring: Spring;
+  declare landSpring: Spring;
+  declare lag: Spring3;
+  declare lagRot: Spring3;
+  declare lowReadyT: number;
+  declare noise: Noise1[];
+  declare noiseRates: number[];
+  declare noiseT: number;
+  declare onClipEvent: ((name: string, clipName: string) => void) | null;
+  declare recPos: Spring3;
+  declare recRot: Spring3;
+  declare rigOverride: { position: THREE.Vector3; quaternion: THREE.Quaternion } | null;
+  declare settle: Spring3;
+  declare sprintT: number;
+  declare stepT: number;
+  declare trackCamera: boolean;
+  declare triggerT: number;
+  declare triggerTarget: number;
 
   constructor(ctx: ViewmodelContext, mats: WeaponMaterialsNode) {
     this.ctx = ctx;
@@ -316,7 +380,7 @@ export class Viewmodel {
     this.grenade.scale.setScalar(1.35);
     // Palm-local: fingers -Z, palm -Y. Fuze on camera, spoon on the 3/4.
     this.grenade.position.set(0.0, -0.032, -0.068);
-    this.grenade.rotation.set(Math.PI + 0.28, 0.78, 0.10);
+    this.grenade.rotation.set(Math.PI + 0.28, 0.78, 0.1);
     this.grenade.visible = false;
     this.armR.hand.add(this.grenade);
     // 0 = none, 1 = held / cooking, 2 = throwing. The throw is a short
@@ -339,20 +403,22 @@ export class Viewmodel {
 
     this.radio = radioMesh();
     this.radio.name = 'ow-radio';
-    this.radio.position.set(0.0, -0.052, -0.050);
+    this.radio.position.set(0.0, -0.052, -0.05);
     this.radio.rotation.set(-Math.PI / 2, Math.PI, 0);
     this.radio.visible = false;
     this.armR.hand.add(this.radio);
     // The templates also serve world projectiles/standalone previews. Own only
     // native view copies, never patch or dispose their global shared materials.
     this._propMaterials = new Map();
-    for (const root of [this.grenade, this.radio]) root.traverse((o) => {
-      if (!isMesh(o) || !(o.material instanceof THREE.MeshStandardMaterial)) return;
-      const source = o.material;
-      if (!this._propMaterials.has(source)) this._propMaterials.set(source, createWeaponMaterial(source));
-      const material = this._propMaterials.get(source);
-      if (material) o.material = material;
-    });
+    for (const root of [this.grenade, this.radio])
+      root.traverse((o) => {
+        if (!isMesh(o) || !(o.material instanceof THREE.MeshStandardMaterial)) return;
+        const source = o.material;
+        if (!this._propMaterials.has(source))
+          this._propMaterials.set(source, createWeaponMaterial(source));
+        const material = this._propMaterials.get(source);
+        if (material) o.material = material;
+      });
     const screen: unknown = this.radio.userData.screen;
     this.radioScreen = isRadioScreen(screen) ? screen : null;
     this._radioState = 0; // 0 = stowed, 1 = held
@@ -444,15 +510,19 @@ export class Viewmodel {
     // Fullscreen ADS overlays. The scene draws them at a fixed clip-space
     // position (vertexNode), so they do not depend on the world camera, and they
     // are authored in TSL like every other production material.
-    const maskU = this.maskUniforms = { uAlpha: TSL.uniform(1), uAspect: TSL.uniform(16 / 9) };
+    const maskU = (this.maskUniforms = { uAlpha: TSL.uniform(1), uAspect: TSL.uniform(16 / 9) });
     const mp = TSL.uv().mul(2).sub(1).toVar();
     const mr = TSL.length(TSL.vec2(mp.x.mul(maskU.uAspect), mp.y));
     const maskHole = TSL.float(0.72);
     const maskEdge = TSL.smoothstep(maskHole, maskHole.add(0.08), mr);
-    const maskRim = TSL.smoothstep(maskHole.sub(0.012), maskHole, mr)
-      .mul(TSL.smoothstep(maskHole, maskHole.add(0.018), mr).oneMinus());
+    const maskRim = TSL.smoothstep(maskHole.sub(0.012), maskHole, mr).mul(
+      TSL.smoothstep(maskHole, maskHole.add(0.018), mr).oneMinus()
+    );
     const maskMat = new MeshBasicNodeMaterial({
-      transparent: true, depthTest: false, depthWrite: false, toneMapped: false,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
     });
     maskMat.vertexNode = TSL.vec4(TSL.positionLocal.xy, 0, 1);
     maskMat.colorNode = TSL.mix(TSL.vec3(0), TSL.vec3(0.02, 0.02, 0.018), maskRim.mul(0.35));
@@ -474,15 +544,17 @@ export class Viewmodel {
       const h = TSL.clamp(TSL.dot(pa, ba).div(TSL.dot(ba, ba)), 0, 1);
       return TSL.smoothstep(0, w, TSL.length(pa.sub(ba.mul(h)))).oneMinus();
     };
-    const retU = this.reticleUniforms = {
-      uAlpha: TSL.uniform(1), uChevron: TSL.uniform(0), uAspect: TSL.uniform(16 / 9),
-    };
+    const retU = (this.reticleUniforms = {
+      uAlpha: TSL.uniform(1),
+      uChevron: TSL.uniform(0),
+      uAspect: TSL.uniform(16 / 9),
+    });
     const rp = TSL.uv().mul(2).sub(1).toVar();
     const rc = TSL.vec2(rp.x.mul(retU.uAspect), rp.y);
     let chevron = line(rc, -0.07, -0.07, 0, 0, 0.012).add(line(rc, 0, 0, 0.07, -0.07, 0.012));
     let stadia = line(rc, 0, -0.13, 0, -0.63, 0.006);
     for (let i = 1; i <= 4; i++) {
-      const y = -0.14 - i * 0.10;
+      const y = -0.14 - i * 0.1;
       const w = 0.12 - i * 0.018;
       stadia = stadia.add(line(rc, -w, y, w, y, 0.006));
     }
@@ -494,18 +566,25 @@ export class Viewmodel {
       .add(line(rp, 0, -0.018, 0, 0.018, 0.006));
     for (let i = 1; i <= 4; i++) {
       const x = i * 0.14;
-      mil = mil.add(line(rp, x, -0.018, x, 0.018, 0.0065))
+      mil = mil
+        .add(line(rp, x, -0.018, x, 0.018, 0.0065))
         .add(line(rp, -x, -0.018, -x, 0.018, 0.0065))
         .add(line(rp, -0.018, x, 0.018, x, 0.0065))
         .add(line(rp, -0.018, -x, 0.018, -x, 0.0065));
     }
-    const chevronCol = TSL.mix(TSL.vec3(0.015), TSL.vec3(0.85, 0.04, 0.012),
-      TSL.clamp(chevron, 0, 1));
+    const chevronCol = TSL.mix(
+      TSL.vec3(0.015),
+      TSL.vec3(0.85, 0.04, 0.012),
+      TSL.clamp(chevron, 0, 1)
+    );
     const chevronAlpha = TSL.clamp(chevron.add(stadia), 0, 1).mul(retU.uAlpha);
     const milAlpha = TSL.clamp(mil, 0, 1).mul(retU.uAlpha);
     const useChevron = retU.uChevron.greaterThan(0.5);
     const reticleMat = new MeshBasicNodeMaterial({
-      transparent: true, depthTest: false, depthWrite: false, toneMapped: false,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
     });
     reticleMat.vertexNode = TSL.vec4(TSL.positionLocal.xy.mul(0.55), 0, 1);
     reticleMat.colorNode = useChevron.select(chevronCol, TSL.vec3(0));
@@ -557,11 +636,6 @@ export class Viewmodel {
     this.clipResult = makeSampleResult();
     this.onClipEvent = null;
 
-    // moving-part drive
-    this.boltCycle = 0; // 0..1, driven by firing
-    this.boltHold = 0; // 1 = locked back (empty)
-    this.magVisible = true;
-
     // preallocated working state
     this._basePos = new THREE.Vector3();
     this._baseQuat = new THREE.Quaternion();
@@ -585,122 +659,41 @@ export class Viewmodel {
   /*  construction                                                          */
   /* ====================================================================== */
 
-  /**
-   * Turn a model record into meshes. One mesh per material per assembly: a
-   * whole rifle lands in 7-9 draw calls.
-   *
-   * `model.body` / `model.moving` are either the procedural Assemblies the dev
-   * preview harness builds, or Groups of ready-made meshes loaded from GLB by
-   * the models system (each mesh carrying `userData.mat`). Both end up as the
-   * same rig: body meshes under the weapon group, moving-part groups under it.
-   */
+  /** Mount a required authored GLB and its weapon-local animation adapter. */
   addWeapon(model: WeaponModelRecord, def: WeaponDef): WeaponEntry {
+    if (!model?.scene || !model.root || !model.animations)
+      throw new Error(`[weapons] ${model?.id}: missing authored weapon scene/rig/clips`);
+    let tris = 0;
+    const meshes: THREE.Mesh[] = [];
+    const animation: WeaponAnimation | null = isWeaponAdapter(model, 'rifle')
+      ? new M4Animation(model)
+      : isWeaponAdapter(model, 'pistol')
+        ? new P320Animation(model)
+        : isWeaponAdapter(model, 'lmg')
+          ? new EvolysAnimation(model)
+          : isWeaponAdapter(model, 'smg')
+            ? new MPXAnimation(model)
+            : isWeaponAdapter(model, 'sniper')
+              ? new AX338Animation(model)
+              : isWeaponAdapter(model, 'shotgun')
+                ? new M590Animation(model)
+                : isWeaponAdapter(model, 'mcx')
+                  ? new MCXAnimation(model, def)
+                  : null;
+    if (!animation) throw new Error(`[weapons] unsupported authored weapon ${model.id}`);
     const group = new THREE.Object3D();
     group.name = `weapon-${model.id}`;
     group.visible = false;
     this.rig.add(group);
-
-    let tris = 0;
-    const meshes: THREE.Mesh[] = [];
-    const library = this.mats.lib;
-    const bake = library && hasMaskBaker(library) ? library.bakeMasks.bind(library) : null;
-
-    /** Curvature masks: convex chamfers wear to bright metal, creases fill
-     *  with grime. This is what stops the gun reading as clean plastic. */
-    const bakeGeo = (geo: THREE.BufferGeometry, matKey: string, wearScale: number) => {
-      if (!bake) return;
-      const soft = matKey === 'polymer' || matKey === 'rubber' || matKey === 'polymer_tan';
-      bake(geo, { wear: 1, grime: 1, ao: 1, edgeThreshold: 0.16, rng: this.rng });
-      shapeMasks(geo, {
-        wearAmp: (soft ? 0.42 : 0.62) * wearScale,
-        wearExp: soft ? 3.4 : 2.8,
-        grimeAmp: 1.15,
-        grimeExp: 1.25,
-        aoAmp: 1.0,
-        aoExp: 1.15,
-      });
-    };
-
-    const build = (asm: WeaponAssembly, parent: THREE.Object3D, wearScale = 1) => {
-      // GLB-loaded model: meshes already merged per material, masks baked here
-      // so the loaded geometry is indistinguishable from a procedural build.
-      // (GLTFLoader imports empty exporter groups as plain Object3D, so detect
-      // the procedural Assembly by its class instead of isGroup.)
-      if (!asm) throw new Error(`[weapons] ${model.id}: missing weapon assembly`);
-      if (!(asm instanceof Assembly)) {
-        for (const child of Array.from(asm.children)) {
-          if (!isMesh(child)) continue;
-          const authoredKey: unknown = child.userData.mat;
-          const matKey = typeof authoredKey === 'string' ? authoredKey : (Array.isArray(child.material) ? undefined : child.material?.name) ?? 'polymer';
-          bakeGeo(child.geometry, matKey, wearScale);
-          child.material = this.mats.get(matKey);
-          // World-key visibility is a camera-position proxy in the separate view
-          // pass, not per-fragment CSM or viewmodel self-shadowing.
-          child.castShadow = false;
-          child.receiveShadow = true;
-          child.frustumCulled = false;
-          parent.add(child);
-          meshes.push(child);
-          tris += triCount(child.geometry);
-        }
-        return;
-      }
-      const map = asm.build();
-      for (const [matKey, geo] of map) {
-        bakeGeo(geo, matKey, wearScale);
-        const mesh = new THREE.Mesh(geo, this.mats.get(matKey));
-        mesh.name = `${asm.name}-${matKey}`;
-        // World-key visibility is a camera-position proxy in the separate view
-        // pass, not per-fragment CSM or viewmodel self-shadowing.
-        mesh.castShadow = false;
-        mesh.receiveShadow = true;
-        mesh.frustumCulled = false;
-        parent.add(mesh);
-        meshes.push(mesh);
-        tris += triCount(geo);
-      }
-    };
-
-    const animation: WeaponAnimation | null = isWeaponAdapter(model, 'rifle') ? new M4Animation(model)
-      : isWeaponAdapter(model, 'pistol') ? new P320Animation(model)
-      : isWeaponAdapter(model, 'lmg') ? new EvolysAnimation(model)
-      : isWeaponAdapter(model, 'smg') ? new MPXAnimation(model)
-      : isWeaponAdapter(model, 'sniper') ? new AX338Animation(model)
-      : isWeaponAdapter(model, 'mcx') ? new MCXAnimation(model, def) : null;
-    if (isAuthoredWeapon(model)) {
-      group.add(model.scene);
-      model.scene.traverse((node: THREE.Object3D) => {
-        if (!isMesh(node)) return;
-        const child = node;
-        meshes.push(child);
-        tris += triCount(child.geometry);
-      });
-    } else build(model.body, group);
-
-    const parts: Record<string, THREE.Object3D | undefined> = {};
-    for (const [name, asm] of Object.entries('moving' in model ? model.moving ?? {} : {})) {
-      const sub = new THREE.Object3D();
-      sub.name = `${model.id}-${name}`;
-      group.add(sub);
-      build(asm, sub, name === 'magazine' ? 0.8 : 1);
-      parts[name] = sub;
-    }
-
-    // Seat the moving parts at their rest transforms.
+    group.add(model.scene);
+    model.scene.traverse((node: THREE.Object3D) => {
+      if (!isMesh(node)) return;
+      meshes.push(node);
+      tris += triCount(node.geometry);
+    });
     const n: WeaponNodes = model.nodes;
-    if (parts.magazine && n.magSeat) {
-      applyNode(parts.magazine, n.magSeat);
-      if (def.reloadStyle === 'tube') parts.magazine.visible = false;
-    }
-    if (parts.charging && n.chargeRest) applyNode(parts.charging, n.chargeRest);
-    if (parts.bolt && n.boltRest) applyNode(parts.bolt, n.boltRest);
-    if (parts.trigger && n.triggerPivot) applyNode(parts.trigger, n.triggerPivot);
-    if (parts.selector && n.selectorPivot) applyNode(parts.selector, n.selectorPivot);
-    // Preserve the rifle's existing physical-magazine drop path. The authored
-    // shell has its own parent animation and already contains world-local
-    // geometry: do not apply the procedural seat transform a second time or
-    // clone the separate loaded-cartridge controls into a discarded magazine.
-    if (animation && (model.id === 'rifle' || model.id === 'smg' || model.id === 'sniper')) parts.magazine = animation.magazineBody;
+    // Adapters expose only detachable, cartridge-free magazine shells here.
+    const parts = { magazine: animation.magazineBody };
 
     const entry: WeaponEntry = {
       id: model.id,
@@ -711,28 +704,22 @@ export class Viewmodel {
       meshes,
       tris,
       animation,
-      clips: animation ? animation.clips() : buildClips(clipNodes(n), def),
+      clips: animation.clips(),
       // the sight point and its axis, in weapon space
       sight: new THREE.Vector3().fromArray(model.nodes.sight),
       muzzle: new THREE.Vector3().fromArray(model.nodes.muzzle),
       eject: new THREE.Vector3().fromArray(model.nodes.eject),
       ejectDir: new THREE.Vector3().fromArray(model.nodes.ejectDir ?? [1, 0.4, 0.2]).normalize(),
       optic: n.opticGlass ?? null,
-      magSeatPos: new THREE.Vector3().fromArray(model.nodes.magSeat.pos),
-      magSeatQuat: new THREE.Quaternion().setFromEuler(
-        new THREE.Euler().fromArray(vec3(n.magSeat.rot))
-      ),
       gripR: model.nodes.gripR,
       gripL: model.nodes.gripL,
-      chargePull: new THREE.Vector3().fromArray(n.chargePull ?? [0, 0, 0]),
-      boltTravel: new THREE.Vector3().fromArray(n.boltTravel ?? [0, 0, 0]),
-      triggerPull: n.triggerPull ?? -0.3,
       magLen: model.magSize?.len ?? 0.2,
       shell: model.shell,
       lhandPose: model.id === 'lmg' ? 'wrap' : 'clamp',
-      rhandPose: model.id === 'lmg' ? 'gripLmg' : model.id === 'shotgun' ? 'gripShotgun' : 'gripRifle',
+      rhandPose:
+        model.id === 'lmg' ? 'gripLmg' : model.id === 'shotgun' ? 'gripShotgun' : 'gripRifle',
     };
-    if (isAuthoredWeapon(model) && 'handPoses' in model) {
+    if ('handPoses' in model) {
       entry.rhandPose = `grip:${model.id}`;
       entry.lhandPose = `support:${model.id}`;
       this.armR.poses[entry.rhandPose] = model.handPoses.right;
@@ -750,14 +737,32 @@ export class Viewmodel {
     const contact = GRIP_CONTACTS[w.id as keyof typeof GRIP_CONTACTS];
     if (!contact) return;
     this.armR.hand.position.fromArray(w.gripR.pos);
-    handBasis(this.armR.hand.quaternion, w.gripR.finger ?? [0, -0.35, -0.94], w.gripR.back ?? [0.95, 0.25, 0.18]);
+    handBasis(
+      this.armR.hand.quaternion,
+      w.gripR.finger ?? [0, -0.35, -0.94],
+      w.gripR.back ?? [0.95, 0.25, 0.18]
+    );
     this.armR.setPose(w.rhandPose);
     w.rhandPose = `grip:${w.id}`;
-    this.armR.fitGrip(w.rhandPose, {thumb:vec3(contact.rightThumb), index:vec3(contact.trigger), fingers:'rightFingers' in contact ? contact.rightFingers : undefined, spread:FIRING_FINGER_SPREAD});
+    this.armR.fitGrip(w.rhandPose, {
+      thumb: vec3(contact.rightThumb),
+      index: vec3(contact.trigger),
+      fingers: 'rightFingers' in contact ? contact.rightFingers : undefined,
+      spread: FIRING_FINGER_SPREAD,
+    });
     this.armL.hand.position.fromArray(w.gripL.pos);
-    handBasis(this.armL.hand.quaternion, w.gripL.finger ?? [0.82, 0.5, -0.28], w.gripL.back ?? [-0.5, 0.32, -0.8]);
+    handBasis(
+      this.armL.hand.quaternion,
+      w.gripL.finger ?? [0.82, 0.5, -0.28],
+      w.gripL.back ?? [-0.5, 0.32, -0.8]
+    );
     this.armL.setPose(w.lhandPose);
-    this.armL.fitGrip(w.lhandPose, {thumb:vec3(contact.leftThumb), thumbPole:'leftThumbPole' in contact ? vec3(contact.leftThumbPole) : [-1, 0, 0], fingers:'leftFingers' in contact ? contact.leftFingers : undefined, spread:'leftSpread' in contact ? contact.leftSpread : undefined});
+    this.armL.fitGrip(w.lhandPose, {
+      thumb: vec3(contact.leftThumb),
+      thumbPole: 'leftThumbPole' in contact ? vec3(contact.leftThumbPole) : [-1, 0, 0],
+      fingers: 'leftFingers' in contact ? contact.leftFingers : undefined,
+      spread: 'leftSpread' in contact ? contact.leftSpread : undefined,
+    });
   }
 
   // Fit the support wrap and bake its contacts into weapon AO. The glove itself
@@ -824,18 +829,15 @@ export class Viewmodel {
     if (!w || w === this.active) return this.active;
     if (this.active) {
       this.active.group.visible = false;
-      this.active.animation?.reset();
+      this.active.animation.reset();
     }
     this.active = w;
-    w.animation?.reset();
+    w.animation.reset();
     w.group.visible = true;
     this.recPos.reset();
     this.recRot.reset();
     this.settle.reset();
-    this.boltCycle = 0;
-    this.boltHold = 0;
-    this.magVisible = w.def.reloadStyle !== 'tube';
-    if (w.parts.magazine) w.parts.magazine.visible = this.magVisible;
+    if (w.parts.magazine) w.parts.magazine.visible = true;
     this.armR.setPose(w.rhandPose ?? 'grip');
     // The FITTED clamp for this weapon, not the authored one — see _fitSupportHand.
     this.armL.setPose(w.lhandPose ?? 'clamp');
@@ -851,7 +853,7 @@ export class Viewmodel {
     if (!w) return 0;
     const clip = w.clips[name];
     if (!clip) return 0;
-    w.animation?.reset();
+    w.animation.reset();
     this.clip = clip;
     this.clipT = 0;
     this.clipPrevT = -1;
@@ -859,11 +861,10 @@ export class Viewmodel {
   }
 
   stopClip() {
-    this.active?.animation?.reset();
+    this.active?.animation.reset();
     this.clip = null;
     this.clipResult.active = false;
     this.clipResult.lhand.weight = 0;
-    this.clipResult.rhand.weight = 0;
   }
 
   get clipPlaying() {
@@ -1018,7 +1019,7 @@ export class Viewmodel {
     back[2] = a.back[2] + (b.back[2] - a.back[2]) * w;
     handBasis(this._handQuat, finger, back);
     const rpose = w < 0.45 ? (a.rpose ?? 'grenade') : (b.rpose ?? 'grenade');
-    if (this.armR.pose !== rpose) this.armR.setPose(rpose, 0.10);
+    if (this.armR.pose !== rpose) this.armR.setPose(rpose, 0.1);
     this.armR.solve(this._handPos, this._handQuat);
     const lpose = w < 0.45 ? (a.lpose ?? 'open') : (b.lpose ?? 'open');
     this._handPosL.set(
@@ -1035,7 +1036,7 @@ export class Viewmodel {
     lback[1] = a.lback[1] + (b.lback[1] - a.lback[1]) * w;
     lback[2] = a.lback[2] + (b.lback[2] - a.lback[2]) * w;
     handBasis(this._handQuatL, lfinger, lback);
-    if (this.armL.pose !== lpose) this.armL.setPose(lpose, 0.10);
+    if (this.armL.pose !== lpose) this.armL.setPose(lpose, 0.1);
     this.armL.solve(this._handPosL, this._handQuatL);
   }
 
@@ -1085,20 +1086,21 @@ export class Viewmodel {
   /** Left forearm presented; right hand winds the bandage as progress advances. */
   _solveBandageHands() {
     const p = this._bandageProgress;
-    const wind = clamp01((p - .20) / .62);
-    const finish = smootherstep(0, 1, (p - .93) / .07);
-    const press = Math.sin(Math.PI * clamp01((p - .82) / .08)) ** 2;
+    const wind = clamp01((p - 0.2) / 0.62);
+    const finish = smootherstep(0, 1, (p - 0.93) / 0.07);
+    const press = Math.sin(Math.PI * clamp01((p - 0.82) / 0.08)) ** 2;
     this._handPosL.fromArray(BANDAGE_L.hand);
     this._bandageElbowL.fromArray(BANDAGE_L.elbow);
     handBasis(this._handQuatL, BANDAGE_L.finger, BANDAGE_L.back);
-    if (this.armL.pose !== 'bandageFist') this.armL.setPose('bandageFist', .12);
+    if (this.armL.pose !== 'bandageFist') this.armL.setPose('bandageFist', 0.12);
     this.armL.solve(this._handPosL, this._handQuatL, this._bandageElbowL);
 
     // Sample the authored guide in the solved left forearm's space.
     const at = wind * (BANDAGE_PATH.length - 1);
     const i = Math.min(BANDAGE_PATH.length - 2, Math.floor(at));
     const f = at - i;
-    const a = BANDAGE_PATH[i], b = BANDAGE_PATH[i + 1];
+    const a = BANDAGE_PATH[i],
+      b = BANDAGE_PATH[i + 1];
     this.armL.forePivot.updateWorldMatrix(true, false);
     _v.set(lerp(a[0], b[0], f), lerp(a[1], b[1], f), lerp(a[2], b[2], f));
     // Restore the circular radius lost by linear guide interpolation. Both
@@ -1125,25 +1127,37 @@ export class Viewmodel {
     const finger = this._bandageFinger;
     const back = this._bandageBack;
     _v.copy(this._handPos).sub(this._bandageElbowR).normalize();
-    finger[0] = _v.x; finger[1] = _v.y; finger[2] = _v.z;
+    finger[0] = _v.x;
+    finger[1] = _v.y;
+    finger[2] = _v.z;
     _v.set(lerp(a[6], b[6], f), lerp(a[7], b[7], f), lerp(a[8], b[8], f))
-      .applyQuaternion(_q2).normalize();
-    back[0] = _v.x; back[1] = _v.y; back[2] = _v.z;
+      .applyQuaternion(_q2)
+      .normalize();
+    back[0] = _v.x;
+    back[1] = _v.y;
+    back[2] = _v.z;
     handBasis(this._handQuat, finger, back);
-    const pose = p < .15 || p > .90 ? 'bandageLoose' : 'bandage';
-    if (this.armR.pose !== pose) this.armR.setPose(pose, .12);
-    if (p >= .12) {
+    const pose = p < 0.15 || p > 0.9 ? 'bandageLoose' : 'bandage';
+    if (this.armR.pose !== pose) this.armR.setPose(pose, 0.12);
+    if (p >= 0.12) {
       // Authored pressure beats: tighten on the pull, soften to feed the roll.
       // Keep a firm cylinder hold, with slightly different pressure per finger.
-      const grip = clamp01(lerp(a[10], b[10], f) + .15 * press)
-        * smootherstep(0, 1, (p - .12) / .08)
-        * (1 - smootherstep(0, 1, (p - .90) / .08));
-      const soft = BANDAGE_POSES.bandageLoose, firm = BANDAGE_POSES.bandage;
-      for (let k = 0; k < 4; k++) for (let j = 0; j < 3; j++) {
-        this.armR.fingers[k].joints[j].rotation.x = -lerp(soft.fingers[k][j], firm.fingers[k][j],
-          clamp01(grip * (1.06 - .04 * k)));
-      }
-      for (let j = 0; j < 2; j++) this.armR.thumb.joints[j].rotation.x = -lerp(soft.thumb[j], firm.thumb[j], grip);
+      const grip =
+        clamp01(lerp(a[10], b[10], f) + 0.15 * press) *
+        smootherstep(0, 1, (p - 0.12) / 0.08) *
+        (1 - smootherstep(0, 1, (p - 0.9) / 0.08));
+      const soft = BANDAGE_POSES.bandageLoose,
+        firm = BANDAGE_POSES.bandage;
+      for (let k = 0; k < 4; k++)
+        for (let j = 0; j < 3; j++) {
+          this.armR.fingers[k].joints[j].rotation.x = -lerp(
+            soft.fingers[k][j],
+            firm.fingers[k][j],
+            clamp01(grip * (1.06 - 0.04 * k))
+          );
+        }
+      for (let j = 0; j < 2; j++)
+        this.armR.thumb.joints[j].rotation.x = -lerp(soft.thumb[j], firm.thumb[j], grip);
       this.armR.updateFlex();
     }
     this.armR.solve(this._handPos, this._handQuat, this._bandageElbowR);
@@ -1157,42 +1171,49 @@ export class Viewmodel {
     const section = Math.floor(feed * BANDAGE_SEGMENTS);
     asset.wrap.geometry.setDrawRange(0, section * 24);
     // A roll actually pays out cloth: its diameter and face angle change.
-    const radius = 1 - feed * .38;
+    const radius = 1 - feed * 0.38;
     asset.body.scale.set(1, radius, radius);
     asset.cap.scale.copy(asset.body.scale);
     asset.body.rotation.x = feed * Math.PI * 4.8;
     asset.cap.rotation.x = asset.body.rotation.x;
-    asset.tail.visible = this._bandageState === 1 && feed > 0 && this._bandageProgress < .90;
+    asset.tail.visible = this._bandageState === 1 && feed > 0 && this._bandageProgress < 0.9;
     if (!asset.tail.visible) return;
     const contact = BANDAGE_CONTACT[section];
     this.armR.hand.updateWorldMatrix(true, false);
-    _v.set(0, -.019 * radius, 0); // inner lip: the free span must not run through the roll
-    _v2.set(1, -.019 * radius, 0); // axle supplies the free end's width
+    _v.set(0, -0.019 * radius, 0); // inner lip: the free span must not run through the roll
+    _v2.set(1, -0.019 * radius, 0); // axle supplies the free end's width
     asset.roll.localToWorld(_v);
     asset.roll.localToWorld(_v2);
     asset.wrap.worldToLocal(_v);
     asset.wrap.worldToLocal(_v2);
     _v2.sub(_v).normalize();
     const pos = asset.tail.geometry.attributes.position;
-    const x0 = _v.x, y0 = _v.y, z0 = _v.z;
-    const x1 = Math.hypot(contact[0], contact[1]), z1 = contact[2];
+    const x0 = _v.x,
+      y0 = _v.y,
+      z0 = _v.z;
+    const x1 = Math.hypot(contact[0], contact[1]),
+      z1 = contact[2];
     // Join the roll to the CURRENT contact, not a fixed +X waypoint. The
     // tensioned span stays outside the sleeve even across the azimuth seam.
     const angle0 = Math.atan2(y0, x0);
-    const delta = Math.atan2(Math.sin(Math.atan2(contact[1], contact[0]) - angle0),
-      Math.cos(Math.atan2(contact[1], contact[0]) - angle0));
+    const delta = Math.atan2(
+      Math.sin(Math.atan2(contact[1], contact[0]) - angle0),
+      Math.cos(Math.atan2(contact[1], contact[0]) - angle0)
+    );
     const r0 = Math.hypot(x0, y0);
     for (let i = 0; i <= 12; i++) {
       const blend = i / 12;
       const free = Math.min(1, blend * 2);
       const seated = Math.max(0, blend * 2 - 1);
       const angle = angle0 + delta * seated;
-      const r = blend <= .5 ? lerp(r0, x1 + .006, free)
-        : x1 + .006 * (1 - seated);
-      const x = r * Math.cos(angle), y = r * Math.sin(angle);
+      const r = blend <= 0.5 ? lerp(r0, x1 + 0.006, free) : x1 + 0.006 * (1 - seated);
+      const x = r * Math.cos(angle),
+        y = r * Math.sin(angle);
       const z = lerp(z0, z1, free);
-      _v3.set(_v2.x * (1 - blend), _v2.y * (1 - blend),
-        _v2.z * (1 - blend) + blend).normalize().multiplyScalar(BANDAGE_WIDTH * .5);
+      _v3
+        .set(_v2.x * (1 - blend), _v2.y * (1 - blend), _v2.z * (1 - blend) + blend)
+        .normalize()
+        .multiplyScalar(BANDAGE_WIDTH * 0.5);
       pos.setXYZ(i * 2, x - _v3.x, y - _v3.y, z - _v3.z);
       pos.setXYZ(i * 2 + 1, x + _v3.x, y + _v3.y, z + _v3.z);
     }
@@ -1212,12 +1233,9 @@ export class Viewmodel {
   addRecoil(pitch: number, yaw: number, first = false) {
     const w = this.active;
     if (!w) return;
-    if (w.animation) {
-      w.animation.fire();
-      // MCX/P320 bake the shot kick. M4/EVOLYS author mechanisms only and keep their
-      // original reactive kick, including ADS scaling and deterministic RNG.
-      if (!('reactiveFire' in w.model && w.model.reactiveFire)) return;
-    }
+    w.animation.fire();
+    // MCX/P320 bake the kick; mechanism-only assets retain reactive recoil.
+    if (!('reactiveFire' in w.model && w.model.reactiveFire)) return;
     const r = w.def.recoil;
     const ads = this.adsT;
     // Aiming braces the weapon: less travel, faster return.
@@ -1248,7 +1266,6 @@ export class Viewmodel {
       0.0018 * scale * ws,
       this.rng.signed() * 0.003 * scale * ws
     );
-    if (!w.def.boltAction) this.boltCycle = 1;
   }
 
   jump() {
@@ -1313,7 +1330,9 @@ export class Viewmodel {
 
     /* -------- blends --------------------------------------------------- */
     const adsRate = 1 / Math.max(0.05, def.adsTime);
-    const wantAds = this.clip && this.clip.name !== 'draw' ? 0 : s.ads ? 1 : 0;
+    // Pumping keeps held ADS; its authored handling motion remains additive.
+    const wantAds =
+      this.clip && this.clip.name !== 'draw' && this.clip.name !== 'pump' ? 0 : s.ads ? 1 : 0;
     this.adsTarget = wantAds;
     // Linear rate with a smootherstep shaping: a spring here reads as mushy.
     this.adsT = clamp01(this.adsT + (wantAds ? adsRate : -adsRate * 1.25) * dt);
@@ -1488,20 +1507,16 @@ export class Viewmodel {
     }
 
     /* -------- compose -------------------------------------------------- */
-    this.rig.position.set(
-      this._basePos.x + px,
-      this._basePos.y + py,
-      this._basePos.z + pz
-    );
+    this.rig.position.set(this._basePos.x + px, this._basePos.y + py, this._basePos.z + pz);
     _e.set(rx, ry, rz, 'XYZ');
     _q.setFromEuler(_e);
     this.rig.quaternion.copy(this._baseQuat).multiply(_q);
     if (this._bandageState) {
       // No idle sway, weapon recoil or weapon-specific hip transform can move
       // the braced left forearm while the other hand winds around it.
-      const present = smootherstep(0, 1, this._bandageProgress / .16);
-      const stow = smootherstep(0, 1, (this._bandageProgress - .93) / .07);
-      this.rig.position.set(0, -.35 * (1 - present + stow), 0);
+      const present = smootherstep(0, 1, this._bandageProgress / 0.16);
+      const stow = smootherstep(0, 1, (this._bandageProgress - 0.93) / 0.07);
+      this.rig.position.set(0, -0.35 * (1 - present + stow), 0);
       this.rig.quaternion.identity();
     }
     // The standalone preview harness pins the rig so the weapon can be framed
@@ -1514,12 +1529,9 @@ export class Viewmodel {
     this.rig.updateMatrixWorld(true);
 
     // Baked parts must be sampled before solving arms and querying sockets.
-    w.animation?.update(dt, this.clipName, this.clipT, s.empty, s.magazineLoaded, s.remainingRounds);
+    w.animation.update(dt, this.clipName, this.clipT, s.empty, s.magazineLoaded, s.remainingRounds);
     /* -------- hands (first: the magazine can be held by one) ---------- */
     this._solveHands(w, res);
-
-    /* -------- moving parts -------------------------------------------- */
-    this._updateParts(w, dt, s, res);
 
     /* -------- viewmodel FOV ------------------------------------------- */
     const fovBase = 60;
@@ -1536,76 +1548,6 @@ export class Viewmodel {
 
   /* ---------------------------------------------------------------------- */
 
-  _updateParts(w: WeaponEntry, dt: number, s: ViewState, res: ClipResult) {
-    if (w.animation) return;
-    const p = w.parts;
-
-    // Bolt cycle: a fast rearward stroke and a slightly slower return.
-    if (this.boltCycle > 0) {
-      const cycle = Math.max(0.045, (w.def.cycleTime ?? 60 / w.def.rpm) * 0.62);
-      this.boltCycle = Math.max(0, this.boltCycle - dt / cycle);
-    }
-    const cyc = this.boltCycle;
-    // 1 -> 0 over the cycle: out fast, back with a small bounce.
-    const stroke = cyc > 0.55 ? (1 - cyc) / 0.45 : cyc / 0.55;
-    const clipBolt = res.active ? res.parts.bolt : 0;
-    const boltOff = Math.max(stroke, this.boltHold, clipBolt);
-
-    if (p.bolt && 'boltRest' in w.model.nodes && w.model.nodes.boltRest) {
-      p.bolt.position.set(
-        w.model.nodes.boltRest.pos[0] + w.boltTravel.x * boltOff,
-        w.model.nodes.boltRest.pos[1] + w.boltTravel.y * boltOff,
-        w.model.nodes.boltRest.pos[2] + w.boltTravel.z * boltOff
-      );
-    }
-    if (p.charging && 'chargeRest' in w.model.nodes && w.model.nodes.chargeRest) {
-      const pull = res.active ? res.parts.charge : 0;
-      const rest = w.model.nodes.chargeRest.pos;
-      p.charging.position.set(
-        rest[0] + w.chargePull.x * pull,
-        rest[1] + w.chargePull.y * pull,
-        rest[2] + w.chargePull.z * pull
-      );
-    }
-    if (p.trigger) {
-      p.trigger.rotation.x = w.triggerPull * this.triggerT;
-    }
-    if (p.selector) {
-      p.selector.rotation.x = lerp(-0.95, 0, clamp01(this.selectorLive ?? 1));
-    }
-
-    // Magazine: seated, in the support hand, or hidden.
-    if (p.magazine) {
-      const inHand = res.active ? res.parts.mag : 0;
-      const seating = res.active && (this.clipName === 'reloadTac' || this.clipName === 'reloadEmpty');
-      const show = w.def.reloadStyle === 'tube'
-        ? seating && res.parts.magVisible && inHand > 1e-4
-        : (res.active ? res.parts.magVisible : true);
-      this.magVisible = show;
-      p.magazine.visible = show;
-      if (show && inHand > 1e-4) {
-        this._magFromHand(w, p.magazine, inHand);
-      } else {
-        p.magazine.position.copy(w.magSeatPos);
-        p.magazine.quaternion.copy(w.magSeatQuat);
-      }
-    }
-  }
-
-  _magFromHand(w: WeaponEntry, magGroup: THREE.Object3D, weight: number) {
-    // The hand target is a WRIST in weapon space, so the magazine has to be
-    // offset into the palm (about 62 mm along the hand's -Z, the metacarpal
-    // axis) before the along-the-magazine offset — otherwise the mag is gripped
-    // by thin air behind the hand.
-    _q.copy(this._handQuatL);
-    _v.copy(this._handPosL);
-    _v2.set(0, w.magLen * 0.62, -0.062).applyQuaternion(_q);
-    _v.add(_v2);
-    magGroup.position.lerpVectors(w.magSeatPos, _v, weight);
-    _q2.copy(w.magSeatQuat).slerp(_q, weight);
-    magGroup.quaternion.copy(_q2);
-  }
-
   _solveHands(w: WeaponEntry, res: ClipResult) {
     if (this._bandageState) {
       // Raise/stow the authored pose as a unit. Neither elbow nor upper arm
@@ -1620,7 +1562,11 @@ export class Viewmodel {
     // Weapon shoulders are body-fixed: express camera-space anchors in rig space.
     _q.copy(this.rig.quaternion).invert();
     const hipShoulderZ = w.def.firingShoulderZ ?? 0.28;
-    this.shoulderR.z = lerp(hipShoulderZ, w.def.adsFiringShoulderZ ?? hipShoulderZ, smootherstep(0, 1, this.adsT));
+    this.shoulderR.z = lerp(
+      hipShoulderZ,
+      w.def.adsFiringShoulderZ ?? hipShoulderZ,
+      smootherstep(0, 1, this.adsT)
+    );
     _v.copy(this.shoulderR).sub(this.rig.position).applyQuaternion(_q);
     this.armR.shoulder.copy(_v);
     this.shoulderL.z = w.def.supportShoulderZ ?? 0.02;
@@ -1630,8 +1576,8 @@ export class Viewmodel {
     this.armL.bodyUp.copy(this.armR.bodyUp);
     this.armR.bodyRight.set(1, 0, 0).applyQuaternion(_q);
     this.armL.bodyRight.copy(this.armR.bodyRight);
-    this.armR.pole.set(.46, -.86, .22).normalize().applyQuaternion(_q);
-    this.armL.pole.set(-.46, -.86, .22).normalize().applyQuaternion(_q);
+    this.armR.pole.set(0.46, -0.86, 0.22).normalize().applyQuaternion(_q);
+    this.armL.pole.set(-0.46, -0.86, 0.22).normalize().applyQuaternion(_q);
 
     // Grenade state: both arms leave the weapon and work the grenade.
     if (this._grenadeState) {
@@ -1651,15 +1597,9 @@ export class Viewmodel {
     this._handPos.fromArray(gR.pos);
     handBasis(this._handQuat, gR.finger ?? [0, -0.35, -0.94], gR.back ?? [0.95, 0.25, 0.18]);
     let poseR = w.rhandPose ?? 'grip';
-    if (res.active && res.rhand.weight > 0) {
-      // Clip.sample already blends grip/interaction endpoints. Weight selects
-      // ownership and the finger pose; applying it again bends the wrist path.
-      this._handPos.fromArray(res.rhand.pos);
-      handBasis(this._handQuat, res.rhand.finger, res.rhand.back);
-      if (res.rhand.weight > 0.5) poseR = res.rhand.pose ?? poseR;
-    }
-    if (poseR !== this.armR.pose) this.armR.setPose(poseR, 0.10);
-    w.animation?.handTarget?.('right', this._handPos, this._handQuat);
+
+    if (poseR !== this.armR.pose) this.armR.setPose(poseR, 0.1);
+    w.animation.handTarget?.('right', this._handPos, this._handQuat);
     this.armR.solve(this._handPos, this._handQuat);
     this.armR.setTrigger(this.triggerT);
 
@@ -1678,20 +1618,23 @@ export class Viewmodel {
       // carry the generic wrap label; restore the fitted contact pose whenever the
       // hand is on the support grip — at rest, or riding the forend's travel.
       if (pose === 'wrap' || pose === 'clamp') {
-        const ride = res.parts.charge * w.chargePull.z;
-        if (Math.abs(pos[0] - gL.pos[0]) + Math.abs(pos[1] - gL.pos[1]) +
-            Math.abs(pos[2] - (gL.pos[2] + ride)) < 1e-5) {
+        if (
+          Math.abs(pos[0] - gL.pos[0]) +
+            Math.abs(pos[1] - gL.pos[1]) +
+            Math.abs(pos[2] - gL.pos[2]) <
+          1e-5
+        ) {
           pose = w.lhandPose;
         }
       }
     }
     this._handPosL.set(pos[0], pos[1], pos[2]);
     handBasis(this._handQuatL, finger, back);
-    w.animation?.handTarget?.('left', this._handPosL, this._handQuatL);
-    pose = w.animation?.leftPose ?? pose;
-    if (pose !== this.armL.pose) this.armL.setPose(pose, 0.10);
+    w.animation.handTarget?.('left', this._handPosL, this._handQuatL);
+    pose = w.animation.leftPose ?? pose;
+    if (pose !== this.armL.pose) this.armL.setPose(pose, 0.1);
     this.armL.solve(this._handPosL, this._handQuatL);
-    w.animation?.applyHands?.(this.armL, this.armR);
+    w.animation.applyHands?.(this.armL, this.armR);
   }
 
   /**
@@ -1748,11 +1691,13 @@ export class Viewmodel {
       // the legacy halo, black outline or oversized segmented ring.
       // MOA belongs to the target/world view, not the independently framed
       // weapon camera. Narrowing weapon FOV must not magnify the dot.
-      const worldTan = Math.tan(this.ctx.camera.fov * Math.PI / 360);
-      const viewTan = Math.tan(this.ctx.viewCamera.fov * Math.PI / 360);
-      const angularR = Math.tan((optic.dotMoa ?? 0) * Math.PI / (180 * 120)) / worldTan;
+      const worldTan = Math.tan((this.ctx.camera.fov * Math.PI) / 360);
+      const viewTan = Math.tan((this.ctx.viewCamera.fov * Math.PI) / 360);
+      const angularR = Math.tan(((optic.dotMoa ?? 0) * Math.PI) / (180 * 120)) / worldTan;
       const height = this.ctx.get('render')?.screenSize.height ?? this.ctx.canvas.height;
-      this.dotCore.scale.setScalar(s * viewTan * Math.max(angularR, (optic.minDotPixels ?? 0) / height));
+      this.dotCore.scale.setScalar(
+        s * viewTan * Math.max(angularR, (optic.minDotPixels ?? 0) / height)
+      );
       this.dotCore.material.opacity = alpha * (optic.dotOpacity ?? 1);
       return;
     }
@@ -1848,26 +1793,21 @@ export class Viewmodel {
     const w = this.active;
     if (!w) return out.set(0, 0, 0);
     w.group.updateMatrixWorld();
-    if (isAuthoredWeapon(w.model)) return requiredSocket(w.model.root, 'SOCKET_muzzle').getWorldPosition(out);
-    out.copy(w.muzzle).applyMatrix4(w.group.matrixWorld);
-    // viewScene space == world space because the anchor tracks the camera.
-    return out;
+    return requiredSocket(w.model.root, 'SOCKET_muzzle').getWorldPosition(out);
   }
 
   ejectWorld(out: THREE.Vector3) {
     const w = this.active;
     if (!w) return out.set(0, 0, 0);
     w.group.updateMatrixWorld();
-    if (isAuthoredWeapon(w.model)) return requiredSocket(w.model.root, 'SOCKET_ejection').getWorldPosition(out);
-    out.copy(w.eject).applyMatrix4(w.group.matrixWorld);
-    return out;
+    return requiredSocket(w.model.root, 'SOCKET_ejection').getWorldPosition(out);
   }
 
   ejectVelocity(out: THREE.Vector3, speed = 2.6) {
     const w = this.active;
     if (!w) return out.set(0, 0, 0);
     out.copy(w.ejectDir);
-    if (w.animation) out.applyQuaternion(w.animation.poseQ);
+    out.applyQuaternion(w.animation.poseQ);
     out.transformDirection(w.group.matrixWorld).multiplyScalar(speed);
     return out;
   }
@@ -1877,14 +1817,14 @@ export class Viewmodel {
     const w = this.active;
     if (!w) return out.set(0, 0, -1);
     out.set(0, 0, -1);
-    if (w.animation) out.applyQuaternion(w.animation.poseQ);
+    out.applyQuaternion(w.animation.poseQ);
     out.transformDirection(w.group.matrixWorld).normalize();
     return out;
   }
 
   dispose() {
     for (const w of this.weapons.values()) {
-      w.animation?.dispose();
+      w.animation.dispose();
       for (const m of w.meshes) m.geometry.dispose();
     }
     this.weapons.clear();
@@ -1893,7 +1833,9 @@ export class Viewmodel {
     this.armAsset?.dispose();
     // Radio geometry is instance-owned; the grenade's geometry is shared with
     // world projectiles and must not be released with the arm skin.
-    this.radio?.traverse((o) => { if (isMesh(o)) o.geometry.dispose(); });
+    this.radio?.traverse((o) => {
+      if (isMesh(o)) o.geometry.dispose();
+    });
     for (const material of this._propMaterials.values()) material.dispose();
     this._propMaterials.clear();
     this.bandageAsset?.dispose();
@@ -1912,22 +1854,18 @@ export class Viewmodel {
 
 export type ViewModel = Viewmodel;
 
-function applyNode(obj: THREE.Object3D, node: { pos: number[]; rot?: number[] }) {
-  obj.position.fromArray(node.pos);
-  if (node.rot) obj.rotation.fromArray(vec3(node.rot));
-}
-
 function isMesh(object: THREE.Object3D): object is THREE.Mesh {
   return 'isMesh' in object && object.isMesh === true;
 }
 
-function isRadioScreen(screen: unknown): screen is THREE.Mesh<THREE.BufferGeometry, MeshPhysicalNodeMaterial> {
-  return screen instanceof THREE.Mesh && screen.geometry instanceof THREE.BufferGeometry
-    && screen.material instanceof MeshPhysicalNodeMaterial;
-}
-
-function hasMaskBaker(library: WeaponMaterialsNode['lib']): library is WeaponMaterialsNode['lib'] & Pick<MaterialSystemNode, 'bakeMasks'> {
-  return 'bakeMasks' in library && typeof library.bakeMasks === 'function';
+function isRadioScreen(
+  screen: unknown
+): screen is THREE.Mesh<THREE.BufferGeometry, MeshPhysicalNodeMaterial> {
+  return (
+    screen instanceof THREE.Mesh &&
+    screen.geometry instanceof THREE.BufferGeometry &&
+    screen.material instanceof MeshPhysicalNodeMaterial
+  );
 }
 
 function requiredSocket(root: THREE.Object3D, name: string): THREE.Object3D {
@@ -1939,16 +1877,4 @@ function requiredSocket(root: THREE.Object3D, name: string): THREE.Object3D {
 function vec3(value: readonly number[]): [number, number, number] {
   if (value.length !== 3) throw new Error('[weapons] expected a three-component node');
   return [value[0], value[1], value[2]];
-}
-
-function clipNodes(nodes: WeaponNodes): Parameters<typeof buildClips>[0] {
-  const grip = (node: WeaponNodes['gripR']) => ({
-    pos: vec3(node.pos), finger: node.finger ? vec3(node.finger) : undefined,
-    back: node.back ? vec3(node.back) : undefined,
-  });
-  return {
-    gripR: grip(nodes.gripR), gripL: grip(nodes.gripL), magSeat: { pos: vec3(nodes.magSeat.pos) },
-    chargeRest: { pos: vec3(nodes.chargeRest?.pos ?? [0, 0, 0]) },
-    chargePull: nodes.chargePull ? vec3(nodes.chargePull) : undefined,
-  };
 }

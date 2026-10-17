@@ -1,6 +1,10 @@
 {
   "name": "claude-of-duty",
   "version": "1.0.0",
+  "private": true,
+  "license": "ISC",
+  "author": "",
+  "type": "module",
   "scripts": {
     "postinstall": "node tools/compensate-three.mjs",
     "assets": "npm run models && npm run world:validate",
@@ -10,6 +14,8 @@
     "world:smoke": "node tests/e2e/world-smoke.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "format": "oxfmt --write src tools tests docs README.md ARCHITECTURE.md prompt.md index.html vite.config.js tsconfig.json .oxlintrc.json .oxfmtrc.json package.json",
+    "format:check": "oxfmt --check src tools tests docs README.md ARCHITECTURE.md prompt.md index.html vite.config.js tsconfig.json .oxlintrc.json .oxfmtrc.json package.json",
     "lint": "oxlint src tools tests --deny-warnings && oxlint --type-aware src --ignore-pattern '**/*.js' --ignore-pattern '**/*.mjs' --deny-warnings",
     "dev": "vite",
     "prebuild": "npm run typecheck && npm run lint",
@@ -18,18 +24,16 @@
     "preview": "vite preview --port 4173",
     "shot": "node tools/capture.mjs"
   },
-  "author": "",
-  "license": "ISC",
-  "type": "module",
   "dependencies": {
     "@recast-navigation/core": "0.43.1",
     "@recast-navigation/wasm": "0.43.1",
-    "three": "github:mrdoob/three.js#9681657f760197afa0a680b1e522a4340a6a53f8"
+    "three": "github:mrdoob/three.js#313f1f582b61af64f76ffaa4f23b3abb3ff298a1"
   },
   "devDependencies": {
     "@recast-navigation/generators": "0.43.1",
     "@types/three": "0.186.0",
     "meshoptimizer": "^1.3.0",
+    "oxfmt": "0.73.0",
     "oxlint": "^1.87.0",
     "oxlint-tsgolint": "^7.0.2003",
     "playwright": "^1.64.0",
@@ -40,6 +44,5 @@
   },
   "engines": {
     "node": "24.x"
-  },
-  "private": true
+  }
 }

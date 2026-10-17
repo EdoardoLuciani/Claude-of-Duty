@@ -1,5 +1,9 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { attribute } from 'three/tsl';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
+
+import type { EventWeapon } from '../core/events.ts';
 import { P, buildBrassTextures } from './atlas.ts';
 import { resetSpawn } from './particles.ts';
 
@@ -10,7 +14,8 @@ import { resetSpawn } from './particles.ts';
  * tumble on a proper inertia tensor, bounce off the world's BVH, come to rest,
  * and report their impacts so audio can ping and a puff of dust can lift off
  * the floor. One InstancedMesh draws all of them, so a firefight's worth of
- * brass costs one draw call.
+ * brass costs one draw call. Shotgun hulls use one additional instanced draw
+ * when both variants are live, sharing the same bounded slots and bodies.
  *
  * The casing itself is a lathed 5.56-profile case — rim, body taper, shoulder,
  * neck and a hollow mouth — in brass (metalness 1, F0 tinted, roughness map with
@@ -28,30 +33,92 @@ const CASE_LEN = 0.045;
  * enough between the NATO calibres). */
 const CASE_RIM = 0.00495;
 
-interface CaseScale { lengthScale: number; radiusScale: number }
-interface ShellSlot extends CaseScale {
-  alive: boolean; age: number; body: ShellRigidBody | null; proxy: THREE.Object3D;
-  pos: THREE.Vector3; vel: THREE.Vector3; quat: THREE.Quaternion; spin: THREE.Vector3; fade: number;
+interface CaseScale {
+  lengthScale: number;
+  radiusScale: number;
 }
-interface ShellRigidBody { userData?: unknown }
+interface ShellSlot extends CaseScale {
+  shotgun: boolean;
+  alive: boolean;
+  age: number;
+  body: ShellRigidBody | null;
+  proxy: THREE.Object3D;
+  pos: THREE.Vector3;
+  vel: THREE.Vector3;
+  quat: THREE.Quaternion;
+  spin: THREE.Vector3;
+  fade: number;
+}
+interface ShellRigidBody {
+  userData?: unknown;
+}
 interface ShellPhysics {
-  addRigidBody?: ((options: {
-    shape: 'box'; halfExtents: { x: number; y: number; z: number }; radius: number; mass: number;
-    position: THREE.Vector3; quaternion: THREE.Quaternion; velocity: THREE.Vector3; angularVelocity: THREE.Vector3;
-    restitution: number; friction: number; linearDamping: number; angularDamping: number; lifetime: number;
-    surfaceType: 'metal'; object3D: THREE.Object3D;
-    onImpact: (body: ShellRigidBody, px: number, py: number, pz: number, nx: number, ny: number, nz: number, speed: number) => void;
-  }) => ShellRigidBody | null) | null;
+  addRigidBody?:
+    | ((options: {
+        shape: 'box';
+        halfExtents: { x: number; y: number; z: number };
+        radius: number;
+        mass: number;
+        position: THREE.Vector3;
+        quaternion: THREE.Quaternion;
+        velocity: THREE.Vector3;
+        angularVelocity: THREE.Vector3;
+        restitution: number;
+        friction: number;
+        linearDamping: number;
+        angularDamping: number;
+        lifetime: number;
+        surfaceType: 'metal';
+        object3D: THREE.Object3D;
+        onImpact: (
+          body: ShellRigidBody,
+          px: number,
+          py: number,
+          pz: number,
+          nx: number,
+          ny: number,
+          nz: number,
+          speed: number
+        ) => void;
+      }) => ShellRigidBody | null)
+    | null;
   removeRigidBody?(body: ShellRigidBody): void;
 }
 interface ShellFx {
-  rng: import('../core/rng.ts').Rng; gravity: number; physics?: ShellPhysics;
+  rng: import('../core/rng.ts').Rng;
+  gravity: number;
+  physics?: ShellPhysics;
   audioPing(x: number, y: number, z: number, gain: number): void;
   emitLit(spawn: ReturnType<typeof resetSpawn>): void;
 }
-interface ShellOptions { caseLen?: number; caseRadius?: number; spin?: number }
+export interface ShellOptions {
+  caseLen?: number;
+  caseRadius?: number;
+  spin?: number;
+  fxClass?: string;
+  weapon?: EventWeapon;
+}
 
-export function setCaseScale<T extends CaseScale>(out: T, caseLen?: number, caseRadius?: number): T {
+export async function loadSpentHullGeometry(): Promise<THREE.BufferGeometry> {
+  const gltf = await new GLTFLoader().loadAsync('/models/fx/spent12g.glb');
+  const mesh = gltf.scene.getObjectByName('spent12g') as THREE.Mesh;
+  if (
+    !mesh?.isMesh ||
+    !mesh.geometry.hasAttribute('_shellpbr') ||
+    !mesh.geometry.hasAttribute('color')
+  ) {
+    throw new Error('[fx] spent12g.glb: missing hull geometry/PBR attributes');
+  }
+  const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+  for (const material of materials) material.dispose();
+  return mesh.geometry;
+}
+
+export function setCaseScale<T extends CaseScale>(
+  out: T,
+  caseLen?: number,
+  caseRadius?: number
+): T {
   out.lengthScale = (caseLen !== undefined && caseLen > 0 ? caseLen : CASE_LEN) / CASE_LEN;
   out.radiusScale = (caseRadius !== undefined && caseRadius > 0 ? caseRadius : CASE_RIM) / CASE_RIM;
   return out;
@@ -77,10 +144,21 @@ function caseProfile() {
 }
 
 export class ShellSystem {
-  fx: ShellFx; geometry: THREE.LatheGeometry; textures: ReturnType<typeof buildBrassTextures>; material: MeshStandardNodeMaterial;
-  mesh: THREE.InstancedMesh & { dispose(): void }; slots: ShellSlot[]; cursor: number; _lastCount: number;
-  _m: THREE.Matrix4; _q: THREE.Quaternion; _e: THREE.Euler; _s: THREE.Vector3;
-  constructor(fx: ShellFx) {
+  fx: ShellFx;
+  geometry: THREE.LatheGeometry;
+  textures: ReturnType<typeof buildBrassTextures>;
+  material: MeshStandardNodeMaterial;
+  mesh: THREE.InstancedMesh;
+  hullMesh: THREE.InstancedMesh;
+  hullMaterial: MeshStandardNodeMaterial;
+  slots: ShellSlot[];
+  cursor: number;
+  _lastCount: number;
+  _m: THREE.Matrix4;
+  _q: THREE.Quaternion;
+  _e: THREE.Euler;
+  _s: THREE.Vector3;
+  constructor(fx: ShellFx, hullGeometry: THREE.BufferGeometry) {
     this.fx = fx;
     const geo = new THREE.LatheGeometry(caseProfile(), 16);
     geo.translate(0, -0.0225, 0); // origin at the centre of mass
@@ -103,7 +181,9 @@ export class ShellSystem {
     mat.name = 'fx-brass';
     this.material = mat;
 
-    this.mesh = new THREE.InstancedMesh(geo, mat, CAPACITY) as THREE.InstancedMesh & { dispose(): void };
+    this.mesh = new THREE.InstancedMesh(geo, mat, CAPACITY) as THREE.InstancedMesh & {
+      dispose(): void;
+    };
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.frustumCulled = false;
     this.mesh.castShadow = false;
@@ -112,9 +192,24 @@ export class ShellSystem {
     this.mesh.name = 'fx-shells';
     this.mesh.userData.owProbe = true;
 
+    this.hullMaterial = new MeshStandardNodeMaterial({ vertexColors: true, dithering: true });
+    this.hullMaterial.name = 'fx-spent12g-plastic-brass';
+    const pbr = attribute('_shellpbr', 'vec2');
+    this.hullMaterial.metalnessNode = pbr.x;
+    this.hullMaterial.roughnessNode = pbr.y;
+    this.hullMesh = new THREE.InstancedMesh(hullGeometry, this.hullMaterial, CAPACITY);
+    this.hullMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.hullMesh.frustumCulled = false;
+    this.hullMesh.castShadow = false;
+    this.hullMesh.receiveShadow = false;
+    this.hullMesh.count = 0;
+    this.hullMesh.name = 'fx-spent12g';
+    this.hullMesh.userData.owProbe = true;
+
     this.slots = [];
     for (let i = 0; i < CAPACITY; i++) {
       this.slots.push({
+        shotgun: false,
         alive: false,
         age: 0,
         body: null,
@@ -138,13 +233,26 @@ export class ShellSystem {
     this._s = new THREE.Vector3(1, 1, 1);
   }
 
-  spawn(position: THREE.Vector3, velocity?: Partial<THREE.Vector3> | null, opts: ShellOptions = {}): ShellSlot {
+  spawn(
+    position: THREE.Vector3,
+    velocity?: Partial<THREE.Vector3> | null,
+    opts: ShellOptions = {}
+  ): ShellSlot {
     const fx = this.fx;
     const rng = fx.rng;
-    const slot = this.slots[this.cursor];
+    const index = this.cursor;
+    const slot = this.slots[index];
     this.cursor = (this.cursor + 1) % CAPACITY;
     if (slot.alive) this._release(slot);
+    // A recycled slot must not retain its old variant before the next update.
+    this._m.makeScale(0, 0, 0);
+    this.mesh.setMatrixAt(index, this._m);
+    this.hullMesh.setMatrixAt(index, this._m);
+    this.mesh.instanceMatrix.needsUpdate = true;
+    this.hullMesh.instanceMatrix.needsUpdate = true;
 
+    const weaponClass = typeof opts.weapon === 'string' ? opts.weapon : opts.weapon?.class;
+    slot.shotgun = (opts.fxClass ?? weaponClass) === 'shotgun';
     slot.alive = true;
     slot.age = 0;
     // The lathe is a 5.56x45 case. `weapons` publishes the real case dimensions
@@ -205,7 +313,16 @@ export class ShellSystem {
     slot.alive = false;
   }
 
-  _onImpact = (_body: ShellRigidBody, px: number, py: number, pz: number, nx: number, ny: number, nz: number, speed: number): void => {
+  _onImpact = (
+    _body: ShellRigidBody,
+    px: number,
+    py: number,
+    pz: number,
+    nx: number,
+    ny: number,
+    nz: number,
+    speed: number
+  ): void => {
     const fx = this.fx;
     if (speed < 0.7) return;
     const rng = fx.rng;
@@ -213,21 +330,38 @@ export class ShellSystem {
     fx.audioPing(px, py, pz, gain);
     // a tick of dust and a metallic glint where it struck
     const s = resetSpawn();
-    s.x = px; s.y = py + 0.005; s.z = pz;
-    s.vx = nx * 0.25; s.vy = ny * 0.3 + 0.15; s.vz = nz * 0.25;
+    s.x = px;
+    s.y = py + 0.005;
+    s.z = pz;
+    s.vx = nx * 0.25;
+    s.vy = ny * 0.3 + 0.15;
+    s.vz = nz * 0.25;
     s.tile = P.DUST;
-    s.size0 = 0.012; s.size1 = 0.07; s.sizeCurve = 0.5;
-    s.life = 0.3; s.drag = 5; s.gravity = -0.4;
+    s.size0 = 0.012;
+    s.size1 = 0.07;
+    s.sizeCurve = 0.5;
+    s.life = 0.3;
+    s.drag = 5;
+    s.gravity = -0.4;
     s.rot = rng.float() * 6.28;
-    s.r0 = 0.55; s.g0 = 0.53; s.b0 = 0.5;
-    s.r1 = 0.5; s.g1 = 0.48; s.b1 = 0.46;
-    s.alpha = 0.3 * gain; s.alphaCurve = 1.6; s.soft = 0.1; s.seed = rng.float();
+    s.r0 = 0.55;
+    s.g0 = 0.53;
+    s.b0 = 0.5;
+    s.r1 = 0.5;
+    s.g1 = 0.48;
+    s.b1 = 0.46;
+    s.alpha = 0.3 * gain;
+    s.alphaCurve = 1.6;
+    s.soft = 0.1;
+    s.seed = rng.float();
     fx.emitLit(s);
-  }
+  };
 
   update(dt: number): void {
     const gravity = this.fx.gravity;
     let count = 0;
+    let brassCount = 0,
+      hullCount = 0;
     for (let i = 0; i < this.slots.length; i++) {
       const slot = this.slots[i];
       if (!slot.alive) continue;
@@ -251,23 +385,33 @@ export class ShellSystem {
       const fadeAt = LIFETIME - FADE;
       slot.fade = slot.age > fadeAt ? Math.max(0, 1 - (slot.age - fadeAt) / FADE) : 1;
       count = i + 1;
+      if (slot.shotgun) hullCount = count;
+      else brassCount = count;
     }
     if (count === 0 && this._lastCount === 0) {
       this.mesh.visible = false;
+      this.hullMesh.visible = false;
       return;
     }
     this._lastCount = count;
     // Write instance matrices; dead slots collapse to zero scale.
     for (let i = 0; i < this.slots.length; i++) {
       const slot = this.slots[i];
-      const fade = slot.alive ? slot.fade : 0;
-      this._s.set(fade * slot.radiusScale, fade * slot.lengthScale, fade * slot.radiusScale);
-      this._m.compose(slot.pos, slot.quat, this._s);
-      this.mesh.setMatrixAt(i, this._m);
+      // Overwrite BOTH matrices, including a recycled slot's former variant.
+      for (let variant = 0; variant < 2; variant++) {
+        const mesh = variant === 0 ? this.mesh : this.hullMesh;
+        const fade = slot.alive && slot.shotgun === (mesh === this.hullMesh) ? slot.fade : 0;
+        this._s.set(fade * slot.radiusScale, fade * slot.lengthScale, fade * slot.radiusScale);
+        this._m.compose(slot.pos, slot.quat, this._s);
+        mesh.setMatrixAt(i, this._m);
+      }
     }
-    this.mesh.count = count;
+    this.mesh.count = brassCount;
+    this.hullMesh.count = hullCount;
+    this.hullMesh.instanceMatrix.needsUpdate = true;
+    this.hullMesh.visible = hullCount > 0;
     this.mesh.instanceMatrix.needsUpdate = true;
-    this.mesh.visible = count > 0;
+    this.mesh.visible = brassCount > 0;
   }
 
   dispose(): void {
@@ -277,5 +421,8 @@ export class ShellSystem {
     this.textures.normal.dispose();
     this.textures.orm.dispose();
     this.mesh.dispose();
+    this.hullMesh.geometry.dispose();
+    this.hullMaterial.dispose();
+    this.hullMesh.dispose();
   }
 }

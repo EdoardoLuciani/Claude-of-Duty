@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
+
 import { FxSystem } from '../../src/fx/index.ts';
 
 const camera = new THREE.PerspectiveCamera(80, 16 / 9, 0.05, 1200);
@@ -34,25 +36,34 @@ assert.equal(spawned.length, 3, 'staged tracer emits core, afterglow and head');
 assert.ok(Math.abs(fx._tmpB.x - 0.45) < 1e-9, 'horizontal spread stays on the target');
 assert.ok(Math.abs(fx._tmpB.y + 0.0875) < 1e-9, 'vertical spread stays on the target');
 assert.equal(fx._tmpB.z, -5, 'tracer stops on the wall instead of overshooting behind it');
-for (const s of spawned) assert.ok(Math.abs(s.life - 0.1) < 1e-9, 'wall flight remains visible for 100 ms');
+for (const s of spawned)
+  assert.ok(Math.abs(s.life - 0.1) < 1e-9, 'wall flight remains visible for 100 ms');
 const speed = Math.hypot(spawned[0].vx, spawned[0].vy, spawned[0].vz);
 assert.ok(speed < 55, 'capture timing can bypass the gameplay tracer speed floor');
 
 let shellCalls = 0;
 fx.ctx.peek = () => null;
-fx.audioPing(1, 2, 3, .4); // Audio is still optional in FX-only scenes.
+fx.audioPing(1, 2, 3, 0.4); // Audio is still optional in FX-only scenes.
 fx.ctx.peek = () => ({
   playShell(position, gain) {
-    assert.equal(position, fx._tmpA); assert.deepEqual(position.toArray(), [1, 2, 3]);
-    assert.equal(gain, .4); shellCalls++;
+    assert.equal(position, fx._tmpA);
+    assert.deepEqual(position.toArray(), [1, 2, 3]);
+    assert.equal(gain, 0.4);
+    shellCalls++;
   },
-  play() { assert.fail('FX must use the canonical shell adapter'); },
+  play() {
+    assert.fail('FX must use the canonical shell adapter');
+  },
 });
-fx.audioPing(1, 2, 3, .4);
+fx.audioPing(1, 2, 3, 0.4);
 assert.equal(shellCalls, 1);
 let legacyCalls = 0;
 fx._audio = null;
-fx.ctx.peek = () => ({ play() { legacyCalls++; } });
-assert.throws(() => fx.audioPing(1, 2, 3, .4), /playShell/);
+fx.ctx.peek = () => ({
+  play() {
+    legacyCalls++;
+  },
+});
+assert.throws(() => fx.audioPing(1, 2, 3, 0.4), /playShell/);
 assert.equal(legacyCalls, 0, 'a present audio service must implement playShell');
 console.log('  ok  staged wall tracer visibility and optional canonical shell audio');

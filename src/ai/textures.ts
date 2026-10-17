@@ -23,20 +23,38 @@
  */
 
 import * as THREE from 'three';
-interface NoiseRandom { float(): number; int(min: number, max: number): number }
+interface NoiseRandom {
+  float(): number;
+  int(min: number, max: number): number;
+}
 type Color3 = [number, number, number];
-interface Texel { r: number; g: number; b: number; h: number; rough: number; metal: number; ao: number }
-interface DetailTexel { h: number; rough: number }
+interface Texel {
+  r: number;
+  g: number;
+  b: number;
+  h: number;
+  rough: number;
+  metal: number;
+  ao: number;
+}
+interface DetailTexel {
+  h: number;
+  rough: number;
+}
 type TextureSet = { albedo: THREE.DataTexture; orm: THREE.DataTexture; normal: THREE.DataTexture };
-interface MaterialsOptions { size?: number; anisotropy?: number; camo?: string[] }
-
+interface MaterialsOptions {
+  size?: number;
+  anisotropy?: number;
+  camo?: string[];
+}
 
 /* ------------------------------------------------------------------ */
 /* Tileable value noise                                                */
 /* ------------------------------------------------------------------ */
 
 export class TileNoise {
-  tab!: Float32Array; perm!: Uint16Array;
+  tab!: Float32Array;
+  perm!: Uint16Array;
   constructor(rng: NoiseRandom) {
     this.tab = new Float32Array(4096);
     for (let i = 0; i < 4096; i++) this.tab[i] = rng.float();
@@ -53,18 +71,26 @@ export class TileNoise {
 
   /** Value noise on a lattice of `period` cells over the unit tile. */
   n2(u: number, v: number, period: number): number {
-    const x = u * period, y = v * period;
-    const ix = Math.floor(x), iy = Math.floor(y);
-    const fx = x - ix, fy = y - iy;
+    const x = u * period,
+      y = v * period;
+    const ix = Math.floor(x),
+      iy = Math.floor(y);
+    const fx = x - ix,
+      fy = y - iy;
     const sx = fx * fx * (3 - 2 * fx);
     const sy = fy * fy * (3 - 2 * fy);
-    const a = this._h(ix, iy, period), b = this._h(ix + 1, iy, period);
-    const c = this._h(ix, iy + 1, period), d = this._h(ix + 1, iy + 1, period);
+    const a = this._h(ix, iy, period),
+      b = this._h(ix + 1, iy, period);
+    const c = this._h(ix, iy + 1, period),
+      d = this._h(ix + 1, iy + 1, period);
     return (a + (b - a) * sx) * (1 - sy) + (c + (d - c) * sx) * sy;
   }
 
   fbm(u: number, v: number, period: number, oct = 4, gain = 0.5): number {
-    let a = 1, s = 0, norm = 0, p = period;
+    let a = 1,
+      s = 0,
+      norm = 0,
+      p = period;
     for (let i = 0; i < oct; i++) {
       s += a * this.n2(u, v, p);
       norm += a;
@@ -76,7 +102,10 @@ export class TileNoise {
 
   /** Ridged noise for fibre and scratch structure. */
   ridge(u: number, v: number, period: number, oct = 3): number {
-    let a = 1, s = 0, norm = 0, p = period;
+    let a = 1,
+      s = 0,
+      norm = 0,
+      p = period;
     for (let i = 0; i < oct; i++) {
       s += a * (1 - Math.abs(this.n2(u, v, p) * 2 - 1));
       norm += a;
@@ -102,9 +131,18 @@ const smooth = (e0: number, e1: number, x: number): number => {
 };
 
 const mix = (a: number, b: number, t: number): number => a + (b - a) * t;
-const mix3 = (a: number[], b: number[], t: number): Color3 => [mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2], t)];
+const mix3 = (a: number[], b: number[], t: number): Color3 => [
+  mix(a[0], b[0], t),
+  mix(a[1], b[1], t),
+  mix(a[2], b[2], t),
+];
 
-function dataTexture(buf: Uint8Array, size: number, srgbSpace: boolean, aniso: number): THREE.DataTexture {
+function dataTexture(
+  buf: Uint8Array,
+  size: number,
+  srgbSpace: boolean,
+  aniso: number
+): THREE.DataTexture {
   const t = new THREE.DataTexture(buf, size, size, THREE.RGBAFormat);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.colorSpace = srgbSpace ? THREE.SRGBColorSpace : THREE.NoColorSpace;
@@ -121,7 +159,12 @@ function dataTexture(buf: Uint8Array, size: number, srgbSpace: boolean, aniso: n
  * fn(u, v, out) fills out.rgb (linear albedo), out.h (height, metres-ish),
  * out.rough, out.metal, out.ao.
  */
-function bake(size: number, fn: (u: number, v: number, out: Texel, x: number, y: number) => void, aniso: number, normalScale = 1): TextureSet {
+function bake(
+  size: number,
+  fn: (u: number, v: number, out: Texel, x: number, y: number) => void,
+  aniso: number,
+  normalScale = 1
+): TextureSet {
   const alb = new Uint8Array(size * size * 4);
   const orm = new Uint8Array(size * size * 4);
   const nrm = new Uint8Array(size * size * 4);
@@ -148,21 +191,34 @@ function bake(size: number, fn: (u: number, v: number, out: Texel, x: number, y:
     }
   }
   // Sobel -> tangent normal, wrapping so the tile stays seamless
-  const at = (x: number, y: number): number => height[(((y % size) + size) % size) * size + (((x % size) + size) % size)];
+  const at = (x: number, y: number): number =>
+    height[(((y % size) + size) % size) * size + (((x % size) + size) % size)];
   // the Sobel kernel already sums ~8 neighbour deltas; keep the slope sane or
   // every fabric turns to corduroy
   const k = normalScale * 0.17;
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const dx =
-        at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1) -
-        at(x - 1, y - 1) - 2 * at(x - 1, y) - at(x - 1, y + 1);
+        at(x + 1, y - 1) +
+        2 * at(x + 1, y) +
+        at(x + 1, y + 1) -
+        at(x - 1, y - 1) -
+        2 * at(x - 1, y) -
+        at(x - 1, y + 1);
       const dy =
-        at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1) -
-        at(x - 1, y - 1) - 2 * at(x, y - 1) - at(x + 1, y - 1);
-      let nx = -dx * k, ny = -dy * k, nz = 1;
+        at(x - 1, y + 1) +
+        2 * at(x, y + 1) +
+        at(x + 1, y + 1) -
+        at(x - 1, y - 1) -
+        2 * at(x, y - 1) -
+        at(x + 1, y - 1);
+      let nx = -dx * k,
+        ny = -dy * k,
+        nz = 1;
       const l = Math.hypot(nx, ny, nz);
-      nx /= l; ny /= l; nz /= l;
+      nx /= l;
+      ny /= l;
+      nz /= l;
       const i = y * size + x;
       nrm[i * 4] = (nx * 0.5 + 0.5) * 255;
       nrm[i * 4 + 1] = (ny * 0.5 + 0.5) * 255;
@@ -183,7 +239,12 @@ function bake(size: number, fn: (u: number, v: number, out: Texel, x: number, y:
  * of the two-scale system — 5 cm of cloth over 512 px, so a 1.5 mm thread is
  * 15 texels wide and still there when the base tile has run out of resolution.
  */
-function bakeDetail(size: number, fn: (u: number, v: number, out: DetailTexel) => void, aniso: number, normalScale = 1): THREE.DataTexture {
+function bakeDetail(
+  size: number,
+  fn: (u: number, v: number, out: DetailTexel) => void,
+  aniso: number,
+  normalScale = 1
+): THREE.DataTexture {
   const height = new Float32Array(size * size);
   const rough = new Float32Array(size * size);
   const out = { h: 0, rough: 0 };
@@ -198,22 +259,33 @@ function bakeDetail(size: number, fn: (u: number, v: number, out: DetailTexel) =
     }
   }
   const buf = new Uint8Array(size * size * 4);
-  const at = (x: number, y: number): number => height[(((y % size) + size) % size) * size + (((x % size) + size) % size)];
+  const at = (x: number, y: number): number =>
+    height[(((y % size) + size) % size) * size + (((x % size) + size) % size)];
   const k = normalScale * 0.17;
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const dx =
-        at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1) -
-        at(x - 1, y - 1) - 2 * at(x - 1, y) - at(x - 1, y + 1);
+        at(x + 1, y - 1) +
+        2 * at(x + 1, y) +
+        at(x + 1, y + 1) -
+        at(x - 1, y - 1) -
+        2 * at(x - 1, y) -
+        at(x - 1, y + 1);
       const dy =
-        at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1) -
-        at(x - 1, y - 1) - 2 * at(x, y - 1) - at(x + 1, y - 1);
-      let nx = -dx * k, ny = -dy * k, nz = 1;
+        at(x - 1, y + 1) +
+        2 * at(x, y + 1) +
+        at(x + 1, y + 1) -
+        at(x - 1, y - 1) -
+        2 * at(x, y - 1) -
+        at(x + 1, y - 1);
+      let nx = -dx * k,
+        ny = -dy * k,
+        nz = 1;
       const l = Math.hypot(nx, ny, nz);
       const i = y * size + x;
-      buf[i * 4] = (nx / l * 0.5 + 0.5) * 255;
-      buf[i * 4 + 1] = (ny / l * 0.5 + 0.5) * 255;
-      buf[i * 4 + 2] = (nz / l * 0.5 + 0.5) * 255;
+      buf[i * 4] = ((nx / l) * 0.5 + 0.5) * 255;
+      buf[i * 4 + 1] = ((ny / l) * 0.5 + 0.5) * 255;
+      buf[i * 4 + 2] = ((nz / l) * 0.5 + 0.5) * 255;
       buf[i * 4 + 3] = Math.max(0, Math.min(255, (rough[i] * 0.5 + 0.5) * 255));
     }
   }
@@ -246,21 +318,21 @@ export const CAMO = {
     // desert multicam is the pale one: it gets the top of the window
     budget: 0.104,
     pale: [0.382, 0.318, 0.212],
-    base: [0.320, 0.256, 0.163],
+    base: [0.32, 0.256, 0.163],
     mid: [0.241, 0.186, 0.116],
     dark: [0.146, 0.111, 0.072],
-    olive: [0.176, 0.190, 0.116],
+    olive: [0.176, 0.19, 0.116],
     macro: 2,
     warp: 0.15,
   },
   woodland: {
     // olive drab in the field sits well under desert tan
     budget: 0.092,
-    pale: [0.354, 0.340, 0.230],
-    base: [0.246, 0.259, 0.170],
-    mid: [0.174, 0.190, 0.126],
-    dark: [0.104, 0.110, 0.083],
-    olive: [0.210, 0.196, 0.132],
+    pale: [0.354, 0.34, 0.23],
+    base: [0.246, 0.259, 0.17],
+    mid: [0.174, 0.19, 0.126],
+    dark: [0.104, 0.11, 0.083],
+    olive: [0.21, 0.196, 0.132],
     macro: 3,
     warp: 0.17,
   },
@@ -268,11 +340,11 @@ export const CAMO = {
     // wolf grey / near-black urban kit: the darkest of the three, and the one
     // that reads as a plaster mannequin if it is allowed anywhere near 0.2
     budget: 0.083,
-    pale: [0.330, 0.334, 0.342],
-    base: [0.226, 0.230, 0.239],
-    mid: [0.150, 0.154, 0.163],
+    pale: [0.33, 0.334, 0.342],
+    base: [0.226, 0.23, 0.239],
+    mid: [0.15, 0.154, 0.163],
     dark: [0.078, 0.079, 0.088],
-    olive: [0.190, 0.188, 0.182],
+    olive: [0.19, 0.188, 0.182],
     macro: 2,
     warp: 0.14,
   },
@@ -299,13 +371,13 @@ function garmentRelief(nz: TileNoise, u: number, v: number): number {
   // 4 mm raised felled lip beside it
   const drift = (nz.fbm(u, v, 3, 2) - 0.5) * 0.22;
   const sa = cellDist(v * 4 + drift);
-  let h = -ridgeLine(sa, 0.013) * 0.62 + (ridgeLine(sa, 0.030) - ridgeLine(sa, 0.016)) * 0.34;
+  let h = -ridgeLine(sa, 0.013) * 0.62 + (ridgeLine(sa, 0.03) - ridgeLine(sa, 0.016)) * 0.34;
   // vertical seams, sparser (~31 cm)
   const drift2 = (nz.fbm(v + 4.1, u, 3, 2) - 0.5) * 0.26;
   const sb = cellDist(u * 2.5 + drift2);
   h += -ridgeLine(sb, 0.009) * 0.46 + (ridgeLine(sb, 0.022) - ridgeLine(sb, 0.011)) * 0.22;
   // stitch beads, only on the seams themselves, 9 mm apart
-  const onSeam = Math.max(ridgeLine(sa, 0.020), ridgeLine(sb, 0.014));
+  const onSeam = Math.max(ridgeLine(sa, 0.02), ridgeLine(sb, 0.014));
   h += onSeam * (0.5 + 0.5 * Math.sin((u + v) * 520)) * 0.26;
   // pocket-edge creases: a coarse rectangular lattice, only sometimes present
   const gate = smooth(0.55, 0.72, nz.fbm(u + 1.7, v + 2.3, 3, 2));
@@ -371,7 +443,7 @@ function garmentRelief(nz: TileNoise, u: number, v: number): number {
  * the environment albedo to physical values, these four numbers plus `KIT_CAL`
  * are the only thing that has to move.
  */
-export const CLOTH_BUDGET = { mean: 0.104, min: 0.040, max: 0.152, contrast: 1.5, sat: 1.35 };
+export const CLOTH_BUDGET = { mean: 0.104, min: 0.04, max: 0.152, contrast: 1.5, sat: 1.35 };
 
 /**
  * Per-pattern budget. Only the MEAN moves: the 0.085-0.325 window, the contrast
@@ -392,7 +464,7 @@ export const CLOTH_BUDGET = { mean: 0.104, min: 0.040, max: 0.152, contrast: 1.5
  */
 export const KIT_CAL = 0.51;
 
-type CamoConfig = typeof CAMO[keyof typeof CAMO];
+type CamoConfig = (typeof CAMO)[keyof typeof CAMO];
 type CamoBudget = typeof CLOTH_BUDGET;
 export function budgetFor(cfg?: CamoConfig): CamoBudget {
   const mean = cfg?.budget ?? CLOTH_BUDGET.mean;
@@ -403,7 +475,11 @@ export function budgetFor(cfg?: CamoConfig): CamoBudget {
 const lum3 = (r: number, g: number, b: number): number => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
 /** Mean/sd of a camo pattern's linear luminance, sampled on a coarse grid. */
-export function measureCamo(nz: TileNoise, cfg: CamoConfig, n = 96): { mean: number; sd: number; min: number; max: number } {
+export function measureCamo(
+  nz: TileNoise,
+  cfg: CamoConfig,
+  n = 96
+): { mean: number; sd: number; min: number; max: number } {
   const out = { r: 0, g: 0, b: 0, h: 0, rough: 0, metal: 0, ao: 1 };
   let s = 0;
   let s2 = 0;
@@ -434,7 +510,11 @@ export function measureCamo(nz: TileNoise, cfg: CamoConfig, n = 96): { mean: num
  * that actually ships rather than the pattern before it was remapped.
  */
 type CamoSampler = ((u: number, v: number, out: Texel) => void) & { srcMean: number };
-export function makeCamoSampler(nz: TileNoise, cfg: CamoConfig, B: CamoBudget = budgetFor(cfg)): CamoSampler {
+export function makeCamoSampler(
+  nz: TileNoise,
+  cfg: CamoConfig,
+  B: CamoBudget = budgetFor(cfg)
+): CamoSampler {
   const pre = measureCamo(nz, cfg);
   const fn = ((u: number, v: number, out: Texel): void => {
     camoTexel(nz, cfg, u, v, out);
@@ -471,8 +551,8 @@ export function camoTexel(nz: TileNoise, cfg: CamoConfig, u: number, v: number, 
   const mv = v + wy * cfg.warp;
 
   // ---- macro: four overlapping blotch fields, one per non-base family ------
-  const a = nz.fbm(mu + 0.11, mv, M, 2, 0.40);
-  const b = nz.fbm(mu, mv + 0.37, M, 2, 0.40);
+  const a = nz.fbm(mu + 0.11, mv, M, 2, 0.4);
+  const b = nz.fbm(mu, mv + 0.37, M, 2, 0.4);
   const c = nz.fbm(mu + 0.61, mv + 0.23, M + 1, 2, 0.44);
   const d = nz.fbm(mu + 0.29, mv + 0.83, M + 2, 2, 0.44);
 
@@ -485,8 +565,8 @@ export function camoTexel(nz: TileNoise, cfg: CamoConfig, u: number, v: number, 
   col = mix3(col, cfg.dark, smooth(0.605, 0.655, d));
 
   // ---- fine 3 cm pixel/dot layer, low amplitude ---------------------------
-  const f1 = smooth(0.40, 0.60, nz.fbm(u + 3.7, v + 1.3, 24, 2, 0.35));
-  const f2 = smooth(0.52, 0.70, nz.n2(u + 7.1, v + 2.9, 48));
+  const f1 = smooth(0.4, 0.6, nz.fbm(u + 3.7, v + 1.3, 24, 2, 0.35));
+  const f2 = smooth(0.52, 0.7, nz.n2(u + 7.1, v + 2.9, 48));
   const fine = 0.88 + 0.26 * f1 - 0.12 * f2;
 
   const h = garmentRelief(nz, u, v);
@@ -504,8 +584,11 @@ export function camoTexel(nz: TileNoise, cfg: CamoConfig, u: number, v: number, 
 
 /** Offline texture sets and their owned bake resources. */
 export class SoldierMaterials {
-  _disposables!: THREE.DataTexture[]; sets!: Record<string, TextureSet>; details!: Record<string, THREE.DataTexture>;
-  camoStats!: Record<string, { mean: number; sd: number; min: number; max: number; was: number }>; bakeMs!: number;
+  _disposables!: THREE.DataTexture[];
+  sets!: Record<string, TextureSet>;
+  details!: Record<string, THREE.DataTexture>;
+  camoStats!: Record<string, { mean: number; sd: number; min: number; max: number; was: number }>;
+  bakeMs!: number;
   /**
    * @param rng   deterministic Rng
    * @param opts  { size, anisotropy, camo: string[] }
@@ -518,7 +601,7 @@ export class SoldierMaterials {
     this.details = {};
     this.camoStats = {};
     const nz = new TileNoise(rng.fork());
-    const t0 = (typeof performance !== 'undefined' ? performance.now() : 0);
+    const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
 
     // ---- camouflage cloth, one bake per pattern ------------------------
     // Measure first, then bake through the budget remap, then report what the
@@ -568,34 +651,35 @@ export class SoldierMaterials {
       (u, v, out) => {
         // 1000D cordura at 0.26 m/tile: the basket weave is 1 mm, the binding
         // tape and bar-tacks are the things this tile actually has to carry
-        const tu = u * 26, tv = v * 26;
+        const tu = u * 26,
+          tv = v * 26;
         const cell = Math.sin(tu * Math.PI) * Math.sin(tv * Math.PI);
         let h = cell * 0.34;
-        h += (nz.fbm(u, v, 120, 2) - 0.5) * 0.30;
+        h += (nz.fbm(u, v, 120, 2) - 0.5) * 0.3;
         // PALS ribbing: 6 mm ribs, but only across the patches of the tile that
         // are webbing rather than plain cordura
         const rib = cellDist(v * 44);
-        const ribGate = smooth(0.52, 0.70, nz.fbm(u + 8.3, v, 5, 2));
-        h += ribGate * (ridgeLine(rib, 0.30) - 0.5) * 0.30;
+        const ribGate = smooth(0.52, 0.7, nz.fbm(u + 8.3, v, 5, 2));
+        h += ribGate * (ridgeLine(rib, 0.3) - 0.5) * 0.3;
         // binding tape + bar-tacks on the hem rows (every 1/3 tile ~ 87 mm)
         const st = cellDist(v * 3);
         const tape = ridgeLine(st, 0.045);
         h += tape * 0.14;
-        h += ridgeLine(st, 0.020) * (0.5 + 0.5 * Math.sin(u * 300)) * 0.30;
+        h += ridgeLine(st, 0.02) * (0.5 + 0.5 * Math.sin(u * 300)) * 0.3;
         out.h = h;
         const shade = 0.84 + 0.16 * nz.fbm(u, v, 7, 3);
-        const base = 0.300 * KIT_CAL * shade;
+        const base = 0.3 * KIT_CAL * shade;
         out.r = base * 1.05;
         out.g = base * 1.0;
-        out.b = base * 0.90;
+        out.b = base * 0.9;
         // thread is paler and shinier than the webbing
-        const thr = ridgeLine(st, 0.020) * (0.25 + 0.25 * Math.sin(u * 300));
+        const thr = ridgeLine(st, 0.02) * (0.25 + 0.25 * Math.sin(u * 300));
         out.r = mix(out.r, 0.335 * KIT_CAL, thr);
-        out.g = mix(out.g, 0.320 * KIT_CAL, thr);
+        out.g = mix(out.g, 0.32 * KIT_CAL, thr);
         out.b = mix(out.b, 0.278 * KIT_CAL, thr);
         out.rough = 0.79 - 0.13 * smooth(-0.4, 0.9, h) + 0.05 * (nz.fbm(u + 2, v, 11, 2) - 0.5);
         out.metal = 0;
-        out.ao = 0.80 + 0.20 * smooth(-0.5, 1.0, h);
+        out.ao = 0.8 + 0.2 * smooth(-0.5, 1.0, h);
       },
       aniso,
       1.15
@@ -613,7 +697,7 @@ export class SoldierMaterials {
         const qu = cellDist(u * 5 + v * 2.5);
         const qv = cellDist(u * -2.5 + v * 5);
         let h = -(ridgeLine(qu, 0.045) + ridgeLine(qv, 0.045)) * 0.42;
-        h += (1 - Math.max(ridgeLine(qu, 0.30), ridgeLine(qv, 0.30))) * 0.26;
+        h += (1 - Math.max(ridgeLine(qu, 0.3), ridgeLine(qv, 0.3))) * 0.26;
         // laminate grain + abrasion
         const grain = nz.fbm(u, v, 90, 3);
         h += (grain - 0.5) * 0.24;
@@ -627,7 +711,7 @@ export class SoldierMaterials {
         // sweat salt along the cummerbund.
         const fade = nz.fbm(u + 3.3, v, 3, 3);
         const soil = nz.fbm(u + 7.7, v + 2.1, 8, 3);
-        const shade = 0.74 + 0.40 * fade;
+        const shade = 0.74 + 0.4 * fade;
         const base = 0.212 * KIT_CAL * shade;
         out.r = base * 1.04;
         out.g = base * 1.0;
@@ -635,15 +719,19 @@ export class SoldierMaterials {
         // ground-in dust and grease darken the low panels
         out.r = mix(out.r, out.r * 0.66, smooth(0.44, 0.68, soil));
         out.g = mix(out.g, out.g * 0.64, smooth(0.44, 0.68, soil));
-        out.b = mix(out.b, out.b * 0.60, smooth(0.44, 0.68, soil));
+        out.b = mix(out.b, out.b * 0.6, smooth(0.44, 0.68, soil));
         // scuffs abrade to a paler, rougher grey
         out.r = mix(out.r, 0.283 * KIT_CAL, scuff * 0.7);
         out.g = mix(out.g, 0.274 * KIT_CAL, scuff * 0.7);
         out.b = mix(out.b, 0.258 * KIT_CAL, scuff * 0.7);
         // 0.55-0.72: laminate, markedly smoother than the 0.87-0.92 cloth
         // around it, and rougher again where it has been abraded
-        out.rough = 0.590 + 0.060 * smooth(-0.5, 0.7, -h) + 0.09 * scuff +
-          0.05 * smooth(0.44, 0.68, soil) + 0.025 * (nz.fbm(u, v + 5.1, 13, 2) - 0.5);
+        out.rough =
+          0.59 +
+          0.06 * smooth(-0.5, 0.7, -h) +
+          0.09 * scuff +
+          0.05 * smooth(0.44, 0.68, soil) +
+          0.025 * (nz.fbm(u, v + 5.1, 13, 2) - 0.5);
         out.metal = 0;
         out.ao = 0.82 + 0.18 * smooth(-0.7, 0.7, h);
       },
@@ -661,14 +749,16 @@ export class SoldierMaterials {
         out.h = (pores - 0.5) * 0.5 + (fine - 0.5) * 0.25;
         // Fitzpatrick IV base; per-instance tint shifts it
         const base = [0.295, 0.199, 0.148];
-        const flush = [0.330, 0.186, 0.142];
+        const flush = [0.33, 0.186, 0.142];
         let col = mix3(base, flush, smooth(0.4, 0.75, macro));
         // stubble / beard shadow band handled by vertex colour; here just
         // follicle speckle
         const st = nz.fbm(u * 1.3, v * 1.3, 110, 2);
         col = mix3(col, [0.115, 0.086, 0.074], smooth(0.62, 0.72, st) * 0.5);
-        out.r = col[0]; out.g = col[1]; out.b = col[2];
-        out.rough = 0.50 + 0.16 * macro - 0.10 * pores;
+        out.r = col[0];
+        out.g = col[1];
+        out.b = col[2];
+        out.rough = 0.5 + 0.16 * macro - 0.1 * pores;
         out.metal = 0;
         out.ao = 0.9 + 0.1 * pores;
       },
@@ -686,10 +776,10 @@ export class SoldierMaterials {
         out.h = (stip - 0.5) * 0.6 + peb * 0.35;
         const scr = smooth(0.86, 1.0, nz.ridge(u * 0.6, v * 3.0, 26, 2));
         const v0 = 0.052 * (0.9 + 0.2 * nz.fbm(u, v, 8, 2));
-        out.r = mix(v0 * 1.02, 0.20, scr * 0.5);
+        out.r = mix(v0 * 1.02, 0.2, scr * 0.5);
         out.g = mix(v0, 0.195, scr * 0.5);
         out.b = mix(v0 * 0.98, 0.19, scr * 0.5);
-        out.rough = 0.55 - 0.18 * peb + 0.10 * stip - 0.25 * scr;
+        out.rough = 0.55 - 0.18 * peb + 0.1 * stip - 0.25 * scr;
         out.metal = 0;
         out.ao = 0.88 + 0.12 * stip;
       },
@@ -702,7 +792,7 @@ export class SoldierMaterials {
       size,
       (u, v, out) => {
         const grain = nz.fbm(u * 0.25, v * 3.0, 90, 3);
-        const scratch = smooth(0.80, 1.0, nz.ridge(u * 0.3, v * 6.0, 40, 3));
+        const scratch = smooth(0.8, 1.0, nz.ridge(u * 0.3, v * 6.0, 40, 3));
         const pits = smooth(0.72, 0.9, nz.fbm(u, v, 190, 2));
         out.h = (grain - 0.5) * 0.35 + scratch * 0.5 - pits * 0.45;
         const base = 0.055 + 0.02 * grain;
@@ -711,7 +801,7 @@ export class SoldierMaterials {
         out.r = mix(base, 0.52, bare);
         out.g = mix(base, 0.53, bare);
         out.b = mix(base * 1.02, 0.55, bare);
-        out.rough = mix(0.46 + 0.14 * grain + 0.2 * pits, 0.20, bare);
+        out.rough = mix(0.46 + 0.14 * grain + 0.2 * pits, 0.2, bare);
         out.metal = 1;
         out.ao = 0.9 + 0.1 * grain - 0.2 * pits;
       },
@@ -724,11 +814,16 @@ export class SoldierMaterials {
       size,
       (u, v, out) => {
         // lug pattern: deep sipes cut between raised blocks
-        const lug = Math.max(ridgeLine(cellDist(u * 9), 0.085), ridgeLine(cellDist(v * 5.5), 0.095));
+        const lug = Math.max(
+          ridgeLine(cellDist(u * 9), 0.085),
+          ridgeLine(cellDist(v * 5.5), 0.095)
+        );
         const grain = nz.fbm(u, v, 160, 3);
         out.h = -lug * 1.1 + (grain - 0.5) * 0.4;
         const c = 0.036 + 0.016 * grain;
-        out.r = c; out.g = c * 0.99; out.b = c * 0.97;
+        out.r = c;
+        out.g = c * 0.99;
+        out.b = c * 0.97;
         out.rough = 0.82 - 0.1 * grain + 0.08 * lug;
         out.metal = 0;
         out.ao = 0.72 + 0.28 * (1 - lug);
@@ -749,13 +844,14 @@ export class SoldierMaterials {
       dsize,
       (u, v, out) => {
         const threads = 33; // 50 mm / 1.5 mm
-        const tu = u * threads, tv = v * threads;
+        const tu = u * threads,
+          tv = v * threads;
         const wu = Math.sin(tu * Math.PI * 2);
         const wv = Math.sin(tv * Math.PI * 2);
         const over = Math.sin((tu + tv) * Math.PI) > 0;
         let h = (over ? wu * 0.62 + wv * 0.22 : wv * 0.62 + wu * 0.22) * 0.5;
         // ripstop reinforcement lattice: a doubled thread every 8 mm
-        h += (ridgeLine(cellDist(u * 6), 0.055) + ridgeLine(cellDist(v * 6), 0.055)) * 0.30;
+        h += (ridgeLine(cellDist(u * 6), 0.055) + ridgeLine(cellDist(v * 6), 0.055)) * 0.3;
         // fibre fuzz
         h += (nz.fbm(u, v, 160, 2) - 0.5) * 0.26;
         out.h = h;
@@ -770,15 +866,16 @@ export class SoldierMaterials {
     this.details.nylon = bakeDetail(
       dsize,
       (u, v, out) => {
-        const cellsU = 25, cellsV = 25; // 2 mm basket
-        const cu = Math.abs((((u * cellsU) % 1) + 1) % 1 - 0.5);
-        const cv = Math.abs((((v * cellsV) % 1) + 1) % 1 - 0.5);
+        const cellsU = 25,
+          cellsV = 25; // 2 mm basket
+        const cu = Math.abs(((((u * cellsU) % 1) + 1) % 1) - 0.5);
+        const cv = Math.abs(((((v * cellsV) % 1) + 1) % 1) - 0.5);
         const over = Math.sin((u * cellsU + v * cellsV) * Math.PI) > 0;
         let h = (over ? smooth(0.5, 0.1, cu) : smooth(0.5, 0.1, cv)) * 0.7 - 0.25;
         h += (nz.fbm(u, v, 140, 2) - 0.5) * 0.22;
         out.h = h;
         // the resin on the crowns of the weave is markedly smoother
-        out.rough = -0.42 * h + 0.10 * (nz.fbm(u + 4.1, v, 70, 2) - 0.5);
+        out.rough = -0.42 * h + 0.1 * (nz.fbm(u + 4.1, v, 70, 2) - 0.5);
       },
       aniso,
       1.15

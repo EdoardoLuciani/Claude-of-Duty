@@ -6,9 +6,9 @@
  *
  *   node src/ai/shoot.mjs --view=front --variant=vanguard --out=/tmp/ai-front.png
  */
-import { diagnosticArgs } from './diagnostic-args.mjs';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+
 import {
   ensureViteServer,
   launchChromium,
@@ -16,13 +16,15 @@ import {
   stopViteServer,
 } from '../../tools/lib/browser-harness.mjs';
 import { capturePreview } from '../../tools/lib/webgpu-preview-shot.mjs';
+import { diagnosticArgs } from './diagnostic-args.mjs';
 
 const args = diagnosticArgs(parseArgs());
 
 const PORT = Number(args.port ?? 5211);
 const W = Number(args.w ?? 1280);
 const H = Number(args.h ?? 1600);
-if (args.out !== undefined && typeof args.out !== 'string') throw new Error('--out requires a path');
+if (args.out !== undefined && typeof args.out !== 'string')
+  throw new Error('--out requires a path');
 const OUT = resolve(args.out ?? `/tmp/ai-${args.view ?? 'front'}.png`);
 const SETTLE = Number(args.settle ?? 12);
 
@@ -31,7 +33,9 @@ const server = /** @type {unknown} */ (await ensureViteServer({ port: PORT, atte
 const browser = await launchChromium({
   headless: true,
   args: [
-    '--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=vulkan',
+    '--enable-unsafe-webgpu',
+    '--enable-features=Vulkan',
+    '--use-angle=vulkan',
     '--ignore-gpu-blocklist',
     '--enable-gpu-rasterization',
     '--force-color-profile=srgb',

@@ -19,8 +19,18 @@ Accessory loadout, unpublished depths/cloth and mechanism internals aren't certi
 
 ## Source/runtime contract
 
-`fn-evolys-762.blend/.glb` own packed source/export, `manifest.json` events/belt,
-`hand-reference.json` fitted hands, `photo-review.json` frozen registration.
+Python is the weapon-authoring authority; `fn-evolys-762.blend/.glb` are generated
+packed preview/runtime products, never build inputs. `manifest.json` records
+events/belt, `hand-reference.json` is read-only versioned hand calibration, and
+`photo-review.json` freezes review registration. Shared review-arm appearance is
+also read-only and excluded from export. See the [edit map and build stages](../../../tools/blender/evolys/README.md).
+
+The [approved UV exception](../../../tools/blender/evolys/README.md#approved-uv-precision-exception)
+rounds to 1/16384 after modifiers (maximum 0.03125 texel at 1024), collapsing seams
+and some UV triangles. It is **not exact seam/tangent-frame preservation**. The
+guide owns the measured counts, shading caveat and bounded six-view WebGPU review;
+none waive final human approval or establish all-state/device equivalence.
+
 Eight native clips in `src/weapons/evolys.ts`; shared skins/IK/ADS/recoil remain.
 Reloads open cover, replace pouch/belt and close; empty reload racks.
 Keep all event/balance/chamber/+1 values and one live pooled case per shot.
@@ -34,8 +44,12 @@ Caps: <150k triangles, ≤48 primitives, ≤18 materials, three 1024² maps, ≤
 ## Rebuild/check (root, Blender 5.2.2)
 
 ```sh
-node tools/evolys-hand-reference.mjs
-blender -b --threads 8 --python-exit-code 1 --python tools/blender/evolys_762.py
+# Only when intentionally changing shared calibration/contact inputs:
+# node tools/evolys-hand-reference.mjs
+blender -b -t 4 --python-exit-code 1 --python tools/blender/evolys_762.py
+# Full scratch build, without touching committed products/calibration:
+blender -b -t 4 --python-exit-code 1 --python tools/blender/evolys_762.py -- \
+  --output /tmp/evolys-review --quick
 blender -b assets/weapons/fn-evolys-762/fn-evolys-762.blend \
   --python-exit-code 1 --python tools/blender/evolys_check.py
 node tests/smoke/smoke-evolys.mjs
@@ -43,7 +57,8 @@ node tests/smoke/smoke-evolys-clearance.mjs
 node tests/e2e/check-evolys-game.mjs --out=.tmp-rend/evolys/game
 ```
 
-Regeneration overwrites manual edits; normal builds need no Blender.
+Follow the [shared authoring workflow](../../../tools/blender/README.md).
+`--render` writes five studio views; the local guide owns 120 Hz/STEP export details.
 `evolys_review.py` reviews saved source/photos/reels using Eevee, ray tracing off.
 Match cameras/uniform registration/ROI/exclusions; no independent axis fitting.
 Preserve stock joins, 120 mm head-envelope and sleeve/pouch clearance, pitch,

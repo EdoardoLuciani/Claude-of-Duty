@@ -1,8 +1,9 @@
+import type ComputeNode from 'three/src/nodes/gpgpu/ComputeNode.js';
+import { Fn, If, globalId, texture, textureStore, uniform, vec4 } from 'three/tsl';
 import { HalfFloatType, StorageTexture, Vector2 } from 'three/webgpu';
 import type { Node } from 'three/webgpu';
-import type ComputeNode from 'three/src/nodes/gpgpu/ComputeNode.js';
+
 import type { VolumetricBuildOptions } from '../sky/volumetrics.ts';
-import { Fn, If, globalId, texture, textureStore, uniform, vec4 } from 'three/tsl';
 
 type FogBuilder = (inputs: VolumetricBuildOptions) => Node<'vec3'> | Node<'vec4'>;
 
@@ -29,8 +30,17 @@ export function createFogCompute(fog: FogBuilder, inputs: VolumetricBuildOptions
       textureStore(output, globalId.xy, vec4(color, 1));
     });
   })();
-  const schedule = computeKernel.compute as unknown as (dispatch: number[], workgroupSize: number[]) => ComputeNode;
+  const schedule = computeKernel.compute as unknown as (
+    dispatch: number[],
+    workgroupSize: number[]
+  ) => ComputeNode;
   const computeNode = schedule.call(computeKernel, dispatch, [8, 8, 1]).setName('Volumetric fog');
-  return { computeNode, textureNode: texture(output),
-    dispose() { computeNode.dispose(); output.dispose(); } };
+  return {
+    computeNode,
+    textureNode: texture(output),
+    dispose() {
+      computeNode.dispose();
+      output.dispose();
+    },
+  };
 }

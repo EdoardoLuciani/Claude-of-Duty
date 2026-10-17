@@ -3,35 +3,91 @@
  */
 import * as THREE from 'three';
 import type { MeshBasicNodeMaterial } from 'three/webgpu';
-import type { Rng } from '../core/rng.ts';
+
+import type { AudioSystem } from '../audio/index.ts';
+import { bindingLabel } from '../core/bindings.ts';
 import type { EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
-import type { PlayerSystem } from '../player/index.ts';
+import type { Rng } from '../core/rng.ts';
 import type { MarketSystem } from '../market/index.ts';
 import type { PhysicsSystem } from '../physics/index.ts';
-import type { AudioSystem } from '../audio/index.ts';
+import type { PlayerSystem } from '../player/index.ts';
 import type { WorldSystem } from '../world/index.ts';
 import type { CardId } from './cards.ts';
-import { INTEL, lureInterval } from './tuning.ts';
 import { cardById, drawCard, shuffleDeck } from './cards.ts';
-import { randomMarker, rollBudget } from './spawn.ts';
 import { makeKit, makeCrate } from './prop.ts';
+import { randomMarker, rollBudget } from './spawn.ts';
+import { INTEL, lureInterval } from './tuning.ts';
 
 type IntelMarker = Pick<WorldSystem['intelMarkers'][number], 'id' | 'x' | 'y' | 'z'>;
-interface IntelCache { id: string; x: number; y: number; z: number; group: ReturnType<typeof makeCrate>; open: number }
-interface IntelPrompt { key: string; text: string; sub: string; progress: number }
-interface IntelHud { holding: boolean; progress: number; card: string; secured: number; pulses: Array<{ x: number; y: number; z: number; radius: number }>; pulseTime: number }
+interface IntelCache {
+  id: string;
+  x: number;
+  y: number;
+  z: number;
+  group: ReturnType<typeof makeCrate>;
+  open: number;
+}
+interface IntelPrompt {
+  key: string;
+  text: string;
+  sub: string;
+  progress: number;
+}
+interface IntelHud {
+  holding: boolean;
+  progress: number;
+  card: string;
+  secured: number;
+  pulses: Array<{ x: number; y: number; z: number; radius: number }>;
+  pulseTime: number;
+}
 type IntelContext = EngineContext;
 type IntelEventMap = EngineEventMap;
 
 export class IntelSystem {
-  declare ctx: IntelContext; declare rng: Rng; declare player: PlayerSystem; declare market: MarketSystem; declare physics: PhysicsSystem; declare markers: IntelMarker[];
-  declare _recent: string[]; declare _yaw: number; declare _deck: CardId[]; declare _drawn: CardId[]; declare _used: Set<string>; declare _alive: IntelCache[];
-  declare _aim: THREE.Vector3; declare _forward: THREE.Vector3; declare _anchor: THREE.Vector3; declare _soundAt: THREE.Vector3; declare _sparkOffset: THREE.Vector3;
-  declare _sparkPayload: IntelEventMap['intel:spark']; declare _operationPayload: IntelEventMap['intel:operation']; declare _prompt: IntelPrompt; declare _hud: IntelHud;
-  declare _pulseSlots: IntelHud['pulses']; declare _spawnPayload: IntelEventMap['intel:spawn']; declare _noisePayload: IntelEventMap['intel:noise']; declare _securePayload: IntelEventMap['intel:secured']; declare _availablePayload: IntelEventMap['intel:available'];
-  declare _beepOptions: Parameters<AudioSystem['play']>[2]; declare _kit: ReturnType<typeof makeKit>; declare _pool: IntelCache[]; declare _off: Array<() => void>;
-  declare _holding: IntelCache | null; declare _hold: number; declare _sparkAt: number; declare _noiseAt: number; declare _beepAt: number; declare _announceAt: number; declare _hitFrame: number; declare _lastWave: number; declare _awaitRelease: boolean; declare _prompting: boolean; declare secured: number; declare budget: number;
+  declare ctx: IntelContext;
+  declare rng: Rng;
+  declare player: PlayerSystem;
+  declare market: MarketSystem;
+  declare physics: PhysicsSystem;
+  declare markers: IntelMarker[];
+  declare _recent: string[];
+  declare _yaw: number;
+  declare _deck: CardId[];
+  declare _drawn: CardId[];
+  declare _used: Set<string>;
+  declare _alive: IntelCache[];
+  declare _aim: THREE.Vector3;
+  declare _forward: THREE.Vector3;
+  declare _anchor: THREE.Vector3;
+  declare _soundAt: THREE.Vector3;
+  declare _sparkOffset: THREE.Vector3;
+  declare _sparkPayload: IntelEventMap['intel:spark'];
+  declare _operationPayload: IntelEventMap['intel:operation'];
+  declare _prompt: IntelPrompt;
+  declare _hud: IntelHud;
+  declare _pulseSlots: IntelHud['pulses'];
+  declare _spawnPayload: IntelEventMap['intel:spawn'];
+  declare _noisePayload: IntelEventMap['intel:noise'];
+  declare _securePayload: IntelEventMap['intel:secured'];
+  declare _availablePayload: IntelEventMap['intel:available'];
+  declare _beepOptions: Parameters<AudioSystem['play']>[2];
+  declare _kit: ReturnType<typeof makeKit>;
+  declare _pool: IntelCache[];
+  declare _off: Array<() => void>;
+  declare _holding: IntelCache | null;
+  declare _hold: number;
+  declare _sparkAt: number;
+  declare _noiseAt: number;
+  declare _beepAt: number;
+  declare _announceAt: number;
+  declare _hitFrame: number;
+  declare _lastWave: number;
+  declare _awaitRelease: boolean;
+  declare _prompting: boolean;
+  declare secured: number;
+  declare budget: number;
 
   static id = 'intel';
   static deps = ['world', 'player', 'market', 'ui', 'ai'];
@@ -47,15 +103,24 @@ export class IntelSystem {
     this._recent = [];
     if (!ctx.config.deterministic) {
       try {
-        const saved: unknown = JSON.parse(globalThis.localStorage?.getItem('ow:intel-sites:v1') ?? '[]');
+        const saved: unknown = JSON.parse(
+          globalThis.localStorage?.getItem('ow:intel-sites:v1') ?? '[]'
+        );
         if (Array.isArray(saved)) {
           const ids: unknown[] = saved;
           for (const id of ids) {
-            if (typeof id === 'string' && this.markers.some((m) => m.id === id) && !this._recent.includes(id)) this._recent.push(id);
+            if (
+              typeof id === 'string' &&
+              this.markers.some((m) => m.id === id) &&
+              !this._recent.includes(id)
+            )
+              this._recent.push(id);
           }
           this._recent.splice(0, Math.max(0, this._recent.length - INTEL.recentSites));
         }
-      } catch { /* storage may be unavailable; in-session history still works */ }
+      } catch {
+        /* storage may be unavailable; in-session history still works */
+      }
     }
     const origin = world.levelToWorld(0, 0, 0);
     const forward = world.levelToWorld(0, 0, -1);
@@ -71,20 +136,45 @@ export class IntelSystem {
     this._sparkOffset = new THREE.Vector3(0.13, 0.245, 0.06);
     this._sparkPayload = { position: new THREE.Vector3() };
     this._operationPayload = { active: false, position: new THREE.Vector3() };
-    this._prompt = { key: 'F', text: 'Secure intel', sub: '', progress: 0 };
+    this._prompt = { key: bindingLabel('use'), text: 'Secure intel', sub: '', progress: 0 };
     this._hud = { holding: false, progress: 0, card: '', secured: 0, pulses: [], pulseTime: 0 };
-    this._pulseSlots = Array.from({ length: INTEL.aliveMax }, () => ({ x: 0, y: 0, z: 0, radius: INTEL.pulseRadius }));
+    this._pulseSlots = Array.from({ length: INTEL.aliveMax }, () => ({
+      x: 0,
+      y: 0,
+      z: 0,
+      radius: INTEL.pulseRadius,
+    }));
     this._spawnPayload = { id: '', position: new THREE.Vector3() };
     this._noisePayload = { position: new THREE.Vector3(), loudness: INTEL.pryLoudness };
-    this._securePayload = { id: '', position: new THREE.Vector3(), card: '', cardLabel: '', credits: INTEL.credits };
+    this._securePayload = {
+      id: '',
+      position: new THREE.Vector3(),
+      card: '',
+      cardLabel: '',
+      credits: INTEL.credits,
+    };
     this._availablePayload = { count: 0 };
-    this._beepOptions = { gain: INTEL.lureGain, occlusion: 0, maxDist: INTEL.lureRadius, bus: 'ui', priority: 0.5 };
+    this._beepOptions = {
+      gain: INTEL.lureGain,
+      occlusion: 0,
+      maxDist: INTEL.lureRadius,
+      bus: 'ui',
+      priority: 0.5,
+    };
     this._kit = makeKit(ctx.get('materials'));
     this._pool = Array.from({ length: INTEL.aliveMax }, () => ({
-      id: '', x: 0, y: 0, z: 0, group: makeCrate(this._kit), open: 0,
+      id: '',
+      x: 0,
+      y: 0,
+      z: 0,
+      group: makeCrate(this._kit),
+      open: 0,
     }));
     this._off = [];
-    const on = <K extends keyof IntelEventMap>(type: K, fn: (event: IntelEventMap[K]) => void): void => {
+    const on = <K extends keyof IntelEventMap>(
+      type: K,
+      fn: (event: IntelEventMap[K]) => void
+    ): void => {
       this._off.push(ctx.events.on(type, fn));
     };
     on('wave:complete', (e) => this._onWaveComplete(e));
@@ -107,13 +197,15 @@ export class IntelSystem {
     for (let i = 0; i < this._alive.length; i++) {
       const slot = this._pulseSlots[i];
       const cache = this._alive[i];
-      slot.x = cache.x; slot.y = cache.y; slot.z = cache.z;
+      slot.x = cache.x;
+      slot.y = cache.y;
+      slot.z = cache.z;
       h.pulses[i] = slot;
     }
     return h;
   }
 
-  /** Ammo pickups yield F to an aimed cache, even before this system's update. */
+  /** Ammo pickups yield interaction to an aimed cache, even before this system's update. */
   blocksUse(): boolean {
     return (this._awaitRelease && this.ctx.input.action('use')) || this._target() !== null;
   }
@@ -126,7 +218,7 @@ export class IntelSystem {
       return;
     }
     // HDR lens feeds the existing bloom; no extra point-light shader variants.
-    const pulse = 0.5 - 0.5 * Math.cos(ctx.time.elapsed * 2 * Math.PI / INTEL.beaconPeriod);
+    const pulse = 0.5 - 0.5 * Math.cos((ctx.time.elapsed * 2 * Math.PI) / INTEL.beaconPeriod);
     const glow = INTEL.beaconDim + (INTEL.beaconBright - INTEL.beaconDim) * pulse * pulse;
     (this._kit.mats.beacon as MeshBasicNodeMaterial).color.setRGB(glow, glow * 0.008, glow * 0.002);
     this._tickLure();
@@ -145,10 +237,19 @@ export class IntelSystem {
     }
     if (this._holding !== target) this._interrupt();
     const feet = this.player.feetPosition;
-    const moving = this.player.horizontalSpeed > INTEL.moveCancel || this.player.sprinting ||
-      this.player.tacticalSprint || this.player.sliding || this.player.airborne ||
+    const moving =
+      this.player.horizontalSpeed > INTEL.moveCancel ||
+      this.player.sprinting ||
+      this.player.tacticalSprint ||
+      this.player.sliding ||
+      this.player.airborne ||
       (this._holding && this._anchor.distanceToSquared(feet) > INTEL.driftCancel ** 2);
-    if (!ctx.input.action('use') || this._awaitRelease || moving || this._hitFrame === ctx.time.frame) {
+    if (
+      !ctx.input.action('use') ||
+      this._awaitRelease ||
+      moving ||
+      this._hitFrame === ctx.time.frame
+    ) {
       this._interrupt();
     } else {
       if (!this._holding) {
@@ -163,8 +264,11 @@ export class IntelSystem {
       this._pulseNoise(target);
     }
     this._prompt.text = this._holding ? 'Alarm active — securing intel' : 'Secure intel';
-    this._prompt.sub = moving ? 'Stand still to secure' : this._holding ?
-      `Attracting attention · +${INTEL.credits} credits` : `Hold ${INTEL.hold}s · +${INTEL.credits} credits · triggers alarm`;
+    this._prompt.sub = moving
+      ? 'Stand still to secure'
+      : this._holding
+        ? `Attracting attention · +${INTEL.credits} credits`
+        : `Hold ${INTEL.hold}s · +${INTEL.credits} credits · triggers alarm`;
     this._prompt.progress = this._hold / INTEL.hold;
     ctx.peek('ui')?.setPrompt(this._prompt, 'intel');
     this._prompting = true;
@@ -188,15 +292,28 @@ export class IntelSystem {
 
   _canDiscover(): boolean {
     const ctx = this.ctx;
-    return !this.player.dead && this.player.controlEnabled && ctx.time.scale > 0 &&
-      !ctx.input.frozen && ctx.input.enabled && !ctx.peek('ui')?.menu?.open && !this.market.open;
+    return (
+      !this.player.dead &&
+      this.player.controlEnabled &&
+      ctx.time.scale > 0 &&
+      !ctx.input.frozen &&
+      ctx.input.enabled &&
+      !ctx.peek('ui')?.menu?.open &&
+      !this.market.open
+    );
   }
 
   _canInteract(): boolean {
     const ctx = this.ctx;
     // Bandaging and cache operation share the weapon system's free-hands policy.
-    return this._canDiscover() && !this.player.mantling && !this.player.healCtrl?.active &&
-      !ctx.input.fire && !ctx.input.ads && (ctx.peek('weapons')?.canBeginHeal() ?? true);
+    return (
+      this._canDiscover() &&
+      !this.player.mantling &&
+      !this.player.healCtrl?.active &&
+      !ctx.input.fire &&
+      !ctx.input.ads &&
+      (ctx.peek('weapons')?.canBeginHeal() ?? true)
+    );
   }
 
   /** Pick the nearest *visible, aimed* case, not the nearest through a wall. */
@@ -208,11 +325,14 @@ export class IntelSystem {
     let best = null;
     let bestD = INTEL.radius ** 2;
     for (const cache of this._alive) {
-      const dx = cache.x - feet.x, dy = cache.y - feet.y, dz = cache.z - feet.z;
+      const dx = cache.x - feet.x,
+        dy = cache.y - feet.y,
+        dz = cache.z - feet.z;
       const d = dx * dx + dy * dy + dz * dz;
       if (d > bestD) continue;
       this._aim.set(cache.x, cache.y + INTEL.targetHeight, cache.z).sub(eye);
-      if (this._aim.lengthSq() < 0.0001 || this._aim.normalize().dot(this._forward) < INTEL.aimCos) continue;
+      if (this._aim.lengthSq() < 0.0001 || this._aim.normalize().dot(this._forward) < INTEL.aimCos)
+        continue;
       this._aim.set(cache.x, cache.y + INTEL.targetHeight, cache.z);
       if (!this.physics.lineOfSight(eye, this._aim)) continue;
       bestD = d;
@@ -222,10 +342,23 @@ export class IntelSystem {
   }
 
   _onWaveComplete(e: IntelEventMap['wave:complete']): void {
-    if (this.ctx.config.deterministic || this.player.dead || !Number.isInteger(e?.wave) || e.wave <= this._lastWave) return;
+    if (
+      this.ctx.config.deterministic ||
+      this.player.dead ||
+      !Number.isInteger(e?.wave) ||
+      e.wave <= this._lastWave
+    )
+      return;
     this._lastWave = e.wave;
     if (this._alive.length >= INTEL.aliveMax || this._used.size >= this.budget) return;
-    const marker = randomMarker(this.markers, this._used, this.player.feetPosition, this._alive, this.rng, this._recent);
+    const marker = randomMarker(
+      this.markers,
+      this._used,
+      this.player.feetPosition,
+      this._alive,
+      this.rng,
+      this._recent
+    );
     if (marker) this._spawn(marker);
   }
 
@@ -233,7 +366,9 @@ export class IntelSystem {
     const cache = this._pool.find((slot) => !this._alive.includes(slot));
     if (!cache || this._used.has(marker.id)) return null;
     cache.id = marker.id;
-    cache.x = marker.x; cache.y = marker.y; cache.z = marker.z;
+    cache.x = marker.x;
+    cache.y = marker.y;
+    cache.z = marker.z;
     cache.group.visible = true;
     cache.group.position.set(cache.x, cache.y, cache.z);
     // Keep the authored footprint; arbitrary yaw can put a corner through furniture.
@@ -248,7 +383,9 @@ export class IntelSystem {
       if (this._recent.length > INTEL.recentSites) this._recent.shift();
       try {
         globalThis.localStorage?.setItem('ow:intel-sites:v1', JSON.stringify(this._recent));
-      } catch { /* keep the same preference for restarts when storage is blocked */ }
+      } catch {
+        /* keep the same preference for restarts when storage is blocked */
+      }
     }
     this._spawnPayload.id = cache.id;
     this._spawnPayload.position.set(cache.x, cache.y, cache.z);
@@ -264,8 +401,10 @@ export class IntelSystem {
     this.secured++;
     this.market.addCredits(INTEL.credits);
     const e = this._securePayload;
-    e.id = cache.id; e.position.set(cache.x, cache.y + INTEL.targetHeight, cache.z);
-    e.card = card ?? ''; e.cardLabel = cardById(card ?? '')?.label ?? 'Intel';
+    e.id = cache.id;
+    e.position.set(cache.x, cache.y + INTEL.targetHeight, cache.z);
+    e.card = card ?? '';
+    e.cardLabel = cardById(card ?? '')?.label ?? 'Intel';
     this._despawn(cache);
     this._interrupt();
     this._clearPrompt();
@@ -299,9 +438,15 @@ export class IntelSystem {
     for (const cache of this._alive) {
       this._soundAt.set(cache.x, cache.y + INTEL.targetHeight, cache.z);
       const d = this._soundAt.distanceToSquared(eye);
-      if (d < distance) { nearest = cache; distance = d; }
+      if (d < distance) {
+        nearest = cache;
+        distance = d;
+      }
     }
-    if (!nearest) { this._beepAt = 0; return; }
+    if (!nearest) {
+      this._beepAt = 0;
+      return;
+    }
     if (this._holding || now < this._beepAt) return;
     this._beepAt = now + lureInterval(Math.sqrt(distance));
     this._soundAt.set(nearest.x, nearest.y + INTEL.targetHeight, nearest.z);
@@ -328,7 +473,8 @@ export class IntelSystem {
     this._interrupt();
     this._clearPrompt();
     while (this._alive.length) this._despawn(this._alive[this._alive.length - 1]);
-    this._used.clear(); this._drawn.length = 0;
+    this._used.clear();
+    this._drawn.length = 0;
     this.secured = 0;
     this._beepAt = this._announceAt = this._lastWave = 0;
     this._hitFrame = -1;
@@ -342,7 +488,8 @@ export class IntelSystem {
   async prewarmMaterials(ctx: IntelContext = this.ctx): Promise<{ ok: true }> {
     const render = ctx.get('render');
     const group = this._pool[0].group;
-    const parent = group.parent, visible = group.visible;
+    const parent = group.parent,
+      visible = group.visible;
     group.visible = true;
     ctx.scene.add(group);
     try {
@@ -359,7 +506,8 @@ export class IntelSystem {
   }
 
   dispose(): void {
-    this._interrupt(); this._clearPrompt();
+    this._interrupt();
+    this._clearPrompt();
     for (const cache of this._pool) cache.group.removeFromParent();
     this._alive.length = 0;
     this._kit.dispose();

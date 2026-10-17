@@ -1,0 +1,315 @@
+{
+  "asset": "Mossberg 590A1 Tactical SKU50774 (2016) / 18.5-inch / 6+1 / ghost ring / fixed synthetic stock / tri-rail",
+  "status": "Provisional runtime review prototype; strict 1:1 and final human visual/gameplay approval pending",
+  "units": "metres",
+  "blenderForward": "+Y",
+  "blenderUp": "+Z",
+  "runtimeBasis": "-Z forward / +Y up / +X right; no adapter basis transform",
+  "source": "tools/blender/m590.py + tools/blender/m590/ + tools/blender/m590_actions.py + tools/m590-hand-reference.mjs",
+  "stats": {
+    "triangleInstances": 93106,
+    "primitives": 13,
+    "materials": 7,
+    "images": 3,
+    "bytes": 9037044
+  },
+  "clips": {
+    "Idle": {
+      "frames": [
+        0,
+        240
+      ],
+      "duration": 2,
+      "loop": true,
+      "events": []
+    },
+    "Pump": {
+      "frames": [
+        0,
+        54.0
+      ],
+      "duration": 0.45,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.14400000000000002,
+          "event": "pump"
+        },
+        {
+          "time": 0.44775,
+          "event": "end"
+        }
+      ]
+    },
+    "Reload_Tactical": {
+      "frames": [
+        0,
+        66.0
+      ],
+      "duration": 0.55,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.011000000000000001,
+          "event": "start"
+        },
+        {
+          "time": 0.451,
+          "event": "shellin"
+        },
+        {
+          "time": 0.54725,
+          "event": "end"
+        }
+      ]
+    },
+    "Reload_Empty": {
+      "frames": [
+        0,
+        114.0
+      ],
+      "duration": 0.95,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.019,
+          "event": "start"
+        },
+        {
+          "time": 0.646,
+          "event": "shellin"
+        },
+        {
+          "time": 0.836,
+          "event": "pump"
+        },
+        {
+          "time": 0.8835,
+          "event": "boltrelease"
+        },
+        {
+          "time": 0.9452499999999999,
+          "event": "end"
+        }
+      ]
+    },
+    "Inspect": {
+      "frames": [
+        0,
+        360
+      ],
+      "duration": 3,
+      "loop": false,
+      "events": [
+        {
+          "time": 2.985,
+          "event": "end"
+        }
+      ]
+    },
+    "Draw": {
+      "frames": [
+        0,
+        84.0
+      ],
+      "duration": 0.7,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.6965,
+          "event": "end"
+        }
+      ]
+    },
+    "Holster": {
+      "frames": [
+        0,
+        54.0
+      ],
+      "duration": 0.45,
+      "loop": false,
+      "events": [
+        {
+          "time": 0.44775,
+          "event": "end"
+        }
+      ]
+    }
+  },
+  "aliases": {
+    "pump": "Pump",
+    "reloadTac": "Reload_Tactical",
+    "reloadEmpty": "Reload_Empty",
+    "inspect": "Inspect",
+    "draw": "Draw",
+    "holster": "Holster"
+  },
+  "textures": {
+    "resolution": 1024,
+    "packed": true,
+    "embedded": true,
+    "method": "original deterministic surface maps; no photographic inputs"
+  },
+  "dimensions": {
+    "sourceBounds": [
+      [
+        -0.02800000086426735,
+        -0.1136000007390976,
+        -0.6552884578704834
+      ],
+      [
+        0.02800000086426735,
+        0.11012499779462814,
+        0.3480115234851837
+      ]
+    ],
+    "caseLength": 0.07,
+    "rimRadius": 0.01105,
+    "barrelLength": 0.4699,
+    "exposedBarrelLength": 0.4612884763207476,
+    "overallLength": 1.0032999999999999,
+    "lengthOfPull": 0.352425,
+    "nominalBarrelInches": 18.5,
+    "triggerFace": [
+      0.0,
+      0.009999999776482582,
+      -0.006000000052154064
+    ],
+    "buttCenter": [
+      0,
+      -0.0456,
+      0.3420115236792522
+    ],
+    "closedBreech": [
+      0,
+      0.068,
+      -0.18538847632074762
+    ]
+  },
+  "reference": {
+    "manufacturer": "O.F. Mossberg & Sons",
+    "model": "590A1 Tactical",
+    "sku": "50774",
+    "year": 2016,
+    "stock": "fixed black synthetic, no positions",
+    "specification": "https://resources.mossberg.com/hubfs/press_releases/Mossberg-Introduces-7-Shot-Versions-of-590A1-and-590-PR-1-4-2016-FINAL.pdf",
+    "photoCatalog": "https://resources.mossberg.com/hubfs/eBook_PDF/Mossberg-2016-NewProducts.pdf",
+    "photoPage": 2,
+    "photoSide": "right/ejection"
+  },
+  "sockets": {
+    "muzzle": [
+      0,
+      0.068,
+      -0.6552884763207476
+    ],
+    "ejection": [
+      0.0205,
+      0.063,
+      -0.132
+    ],
+    "sight": [
+      0,
+      0.096,
+      -0.058
+    ],
+    "loading": [
+      0,
+      0.024,
+      -0.068
+    ],
+    "chamber": [
+      0,
+      0.068,
+      -0.18538847632074762
+    ]
+  },
+  "ejectionDirection": [
+    0.84,
+    0.42,
+    0.28
+  ],
+  "mechanism": {
+    "stroke": [
+      0,
+      0,
+      0.089
+    ],
+    "boltRest": [
+      0,
+      0.068,
+      -0.16138847632074763
+    ],
+    "triggerPivot": [
+      0,
+      0.022,
+      -0.002
+    ],
+    "triggerPull": -0.28
+  },
+  "shell": {
+    "caseLen": 0.07,
+    "rimR": 0.01105
+  },
+  "fxClass": "shotgun",
+  "opticGlass": null,
+  "contactWindows": {
+    "Pump": {
+      "forend": [
+        0,
+        0.45
+      ]
+    },
+    "Reload_Tactical": {
+      "shell": [
+        0.18700000000000003,
+        0.319
+      ],
+      "release": [
+        0.319,
+        0.385
+      ],
+      "thumb": [
+        0.385,
+        0.451
+      ],
+      "insertionClearance": [
+        0.319,
+        0.55
+      ]
+    },
+    "Reload_Empty": {
+      "shell": [
+        0.418,
+        0.475
+      ],
+      "release": [
+        0.475,
+        0.5509999999999999
+      ],
+      "thumb": [
+        0.5509999999999999,
+        0.646
+      ],
+      "insertionClearance": [
+        0.475,
+        0.95
+      ],
+      "forend": [
+        [
+          0,
+          0.209
+        ],
+        [
+          0.741,
+          0.95
+        ]
+      ]
+    }
+  },
+  "notes": [
+    "Manufacturer nominal barrel/OAL/LOP anchors; local exterior profile estimates from catalog photograph, not manufacturing CAD.",
+    "No exported arms, spent case, optic, baked shot recoil, or gameplay balance changes.",
+    "shell_insert is not a detachable magazine; adapter owns visibility from authored scale."
+  ]
+}

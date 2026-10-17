@@ -10,24 +10,24 @@ Own only your assigned subsystem. Shared/lead-owned: `src/core/`, `src/main.ts`,
 Use `ctx.get(id)` rather than importing other subsystems. Existing constant
 couplings (`ai` → `weapons`, `weapons/preview` → `materials`) are exceptions.
 
-| id / directory | responsibility |
-|---|---|
-| `models` (core/models.ts + tools/export-models.mjs) | Lead-owned GLB export/loading |
-| `render` | WebGPU renderer, TSL frame graph, CSM, composite |
-| `materials` | Procedural PBR texture forge, detail/triplanar materials |
-| `sky` | Atmosphere, day/night, environment, volumetric fog |
-| `world` + tools/worldgen | Level meshes, metadata, props, spawns |
-| `physics` | Collision, controllers, rigid bodies, ragdolls, penetration |
-| `player` | Movement, camera, health, armour, healing |
-| `weapons` | Definitions, GLB adapters, viewmodel, handling, ballistics |
-| `fx` | Particles, impacts, decals, tracers, blood, shells |
-| `ai` | Soldiers, squads, navigation, perception, waves |
-| `game` | Survival state, score/rewards, HUD threat cues |
-| `market` | Between-wave shop/economy |
-| `intel` | Cache spawning, interaction, credits and archive |
-| `radio` | Strike, bomber, bombs, blast chain |
-| `ui` | HUD, menus, overlays |
-| `audio` | Synthesis/recordings, spatialization, occlusion |
+| id / directory                                      | responsibility                                              |
+| --------------------------------------------------- | ----------------------------------------------------------- |
+| `models` (core/models.ts + tools/export-models.mjs) | Lead-owned GLB export/loading                               |
+| `render`                                            | WebGPU renderer, TSL frame graph, CSM, composite            |
+| `materials`                                         | Procedural PBR texture forge, detail/triplanar materials    |
+| `sky`                                               | Atmosphere, day/night, environment, volumetric fog          |
+| `world` + tools/worldgen                            | Level meshes, metadata, props, spawns                       |
+| `physics`                                           | Collision, controllers, rigid bodies, ragdolls, penetration |
+| `player`                                            | Movement, camera, health, armour, healing                   |
+| `weapons`                                           | Definitions, GLB adapters, viewmodel, handling, ballistics  |
+| `fx`                                                | Particles, impacts, decals, tracers, blood, shells          |
+| `ai`                                                | Soldiers, squads, navigation, perception, waves             |
+| `game`                                              | Survival state, score/rewards, HUD threat cues              |
+| `market`                                            | Between-wave shop/economy                                   |
+| `intel`                                             | Cache spawning, interaction, credits and archive            |
+| `radio`                                             | Strike, bomber, bombs, blast chain                          |
+| `ui`                                                | HUD, menus, overlays                                        |
+| `audio`                                             | Synthesis/recordings, spatialization, occlusion             |
 
 Each system declares `static id`, `static deps`, and implements needed hooks:
 `async init(ctx)`, `fixedUpdate(h, ctx)` (120 Hz), `update(dt, ctx)`,
@@ -38,6 +38,12 @@ Teardown is reverse-order and failure-isolated.
 `canvas`, `config`, `events`, `input`, `time`, `rng`, `get/peek/has(id)`.
 `src/core/context.ts` owns the provider-keyed `EngineContext`; subsystem types
 come from their implementations, not independently handwritten consumer APIs.
+`src/core/bindings.ts` owns static physical defaults, action IDs, binding labels and
+action-backed contextual control reference. Input snapshots actions; gameplay
+consumers own state machines. UI adapts this metadata into the existing pause
+reference and adds native DOM help. F toggles flashlight; hold T interacts.
+Tab and wheel are independent cycle requests, not guaranteed successful swaps.
+Rebinding is deferred.
 `src/core/events.ts` owns the typed event payload map used by `EventBus`.
 Time contains `elapsed, raw, dt, fixed, alpha, scale, frame`; interpolate with
 `alpha`. Respect `config.q` feature flags and particle/decal/shadow budgets.
@@ -46,65 +52,43 @@ state; dispose owned resources, not borrowed textures/geometry.
 
 ## Cross-subsystem events
 
-Emit and listen via `ctx.events`. Payloads are plain objects. The canonical set:
+Use `ctx.events`; [src/core/events.ts](src/core/events.ts) owns event names and
+typed plain-object payloads. Add/change the type and its producers/consumers
+together. Architectural semantics not captured by those types:
 
-| event | payload | emitted by |
-|---|---|---|
-| `weapon:fire` | `{ actor, weapon, origin: Vector3, dir: Vector3, seed }` | weapons / ai |
-| `weapon:reload` | `{ weapon, phase: 'start'\|'magout'\|'magin'\|'slide'\|'end', retained?: boolean }` | weapons |
-| `weapon:shell` | `{ position, velocity }` | weapons |
-| `bullet:impact` | `{ point, normal, surface, incident, damage, exit, shooter, shot }` | physics |
-| `bullet:segment` | `{ from, to, shooter, shot, weapon, speed, tracer }` | physics |
-| ↳ | Actual free-flight segments, clipped to collisions and range; material interiors are omitted. Audio, suppression and optional tracers consume these rather than reconstructing rays from `weapon:fire`. A round may emit several segments; near-miss consumers deduplicate by `shot`. Payload vectors are pooled: copy anything retained. | |
-| `bullet:tracer` | `{ from, to, speed }` | explicit dev staging only |
-| `shot:resolved` | `{ shooter, weapon, from, to, result, target, part, damage, pellet, shot, stopReason }` | weapons / ai (telemetry only) |
-| `damage:dealt` | `{ target, amount, headshot, killed, point, part?, incident?, from?, source?, weapon?, shot? }` | ai / physics |
-| ↳ | means *damage dealt **to** `target`*. `target` is the local player when an enemy round connects (`'player'`, the player system, or anything with `isPlayer === true`) — filter it out before drawing a hitmarker. Damage is applied by the target's own listener, never by the emitter as well. Physics emits at most one `damage:dealt` per actor per round, using the highest-scale hitbox the round intersects. Bullet range falloff, penetration loss and region scaling are already applied; receivers must not repeat them. `from` is the muzzle and `source` is the shooter. | |
-| `damage:taken` | `{ amount, from: Vector3, health, armourAbsorbed, armour, plateBreak }` | player |
-| ↳ | Incoming is halved while any plate remains, then leftover soaks into armour. `amount` is the damage that reached **health**; `armourAbsorbed` is what plates stopped. `plateBreak` is true when a 50 HP plate was fully consumed by this hit. |
-| `actor:death` | `{ actor, point, impulse }` | ai |
-| `sky:changed` | `{ hour, sunDir, sunIntensity, moonIntensity }` | sky (explicit time changes) |
-| `sky:env` | `{ envMap, sunDir }` | sky |
-| `wave:start` | `{ wave, enemies, squads, perSquad }` | ai |
-| `wave:complete` | `{ wave, nextWave, delay }` | ai |
-| `score:change` | `{ score, delta, reason, kills }` | game |
-| `market:open` | `{ wave }` | market |
-| `market:close` | `{}` | market |
-| ↳ | A wave clear arms a 10 s grace period (loot ammo, see `MARKET_DELAY`), then the shop opens and freezes the sim clock (`time.scale = 0`), holding the AI wave countdown (its `waveDelay` of 20 s outlives the grace window). It closes on player action only (Skip/Esc), one session per wave. |
-| `player:land` | `{ velocity, surface }` | player |
-| `player:footstep` | `{ position, surface, running, stance }` | player |
-| `ai:footstep` | `{ position, surface, gait }` | ai |
-| ↳ | One boot per foot plant, taken from the animator's stride phase, so the cadence follows the clip (`gait` is `'walk'`, `'run'` or `'crouch'`). A few per second per walking actor: cull it by distance rather than logging it. | |
-| `player:state` | `{ stance, sprinting, sliding, ads }` | player |
-| `player:death` | `{ position, from, amount }` | player |
-| `player:respawn` | `{ position }` | player |
-| `player:heal` | `{ phase: 'start'\|'cancel'\|'complete', amount, health, bandages, reason }` | player |
-| ↳ | Hold-to-heal bandage. Health is applied and one item consumed only on `complete`. Cancel/reset never heals. | |
-| `player:heartbeat` | `{ strength, fraction }` | player |
-| ↳ | Single low-health beat clock; audio plays one sound on the event, HUD renders the player's pulse. Starts below 50 HP and fades after injury settles. | |
-| `ammo:pickup` | `{ amount, weapon, position }` | weapons |
-| `intel:spawn` | `{ id, position }` | intel |
-| ↳ | Each eligible wave clear randomly picks an unused site at least 18 m horizontally from the player and 24 m from other live caches. Within each spacing tier prefer sites absent from the last five drops (history persists across runs/reloads; ignored in captures). If none qualify, allow recent sites, then halve/waive spacing; used sites never return. | |
-| `intel:available` | `{ count }` | intel |
-| `intel:noise` | `{ position, loudness }` | intel |
-| ↳ | The opening siren emits hearing evidence every 0.5 s within 75 m, starting immediately. Detector pings never alert AI. | |
-| `intel:operation` | `{ active, position }` | intel |
-| ↳ | Starts/stops the loud, looping fictional dual-tone alert (740+880 Hz, repeated double pulses; not the real government-alert signal). Claiming takes 4 s. Lid opens while held; interruptions close it and stop alarm/sparks. Audio also stops on shop, pause, death, restart and terminal error. | |
-| `intel:spark` | `{ position }` | intel |
-| ↳ | Small electrical arcs from the exposed electronics, every 0.16 s during operation. Uses the FX particle pool, no extra lights or decals. | |
-| `intel:secured` | `{ id, position, card, cardLabel, credits }` | intel |
-| ↳ | Pays +500 shop credits independently of score. Cards are unique archived names only; perk effects are deferred. Intel yields to busy hands and owns F over ammo when a case is aimed and visible. Prompt cleanup is owner-scoped via `ui.setPrompt(p, owner)` / `ui.clearPrompt(owner)`. |
-| `hud:heard` | `{ bearing }` | ai |
-| `hud:search` | `{ bearing, sector, remaining }` | game |
-| ↳ | Coarse 45° last-enemy sector after a quiet stretch. Pause/shop do not advance the timer. |
-| `game:restart` | `{ source }` | ui |
-| `radio:strike` | `{ position }` | radio |
-| `explosion` | `{ position, radius, damage }` | any |
-| `engine:error` | `{ system, method, message }` | engine |
-| ↳ | First subsystem exception (frame/resize hook or synchronous event listener), or explicit `ctx.engine.fail(system, method, error)`, is terminal: abort the failed dispatch, skip subsequent gameplay hooks, freeze gameplay/input and show a reload-required error. Continue rendering unless rendering itself fails. Exposed as `engine.error`; capture pumps reject it. Only `engine:error` listeners are isolated individually so the modal and recorder still receive the original failure. | |
-| `resize` | `{ width, height }` | engine |
-
-If you need an event that is not listed, add a row here in the same commit.
+- `bullet:segment` is reached free flight, clipped to collisions/range, excluding
+  material interiors. Audio/suppression/tracers consume it rather than rebuilding
+  rays from `weapon:fire`. Deduplicate near misses by shot; copy pooled vectors.
+  `shot:resolved` is telemetry, not another damage path; `bullet:tracer` is dev staging.
+- `damage:dealt` means damage **to** target; exclude player targets from hitmarkers.
+  Targets alone apply health damage. Physics emits once per actor/round using the
+  highest reached region, with range/penetration/region scaling already applied.
+  `from` is the muzzle; `source` is the shooter.
+- `damage:taken.amount` is health damage; plates halve incoming damage and absorb
+  the remainder first. `armourAbsorbed` records absorption; `plateBreak` records
+  consumption of a 50 HP plate. Healing consumes a bandage/applies health only
+  on `complete`, never cancellation. One player-owned heartbeat clock below
+  50 HP drives audio/HUD and fades after injury settles.
+- A wave clear allows 10 s ammo-looting grace, then one player-dismissed shop
+  session. The shop freezes scaled time and the longer AI wave countdown.
+- `ai:footstep` is one boot per animated stride plant; cull by distance.
+  `hud:search` is a coarse 45° last-enemy sector; pause/shop freeze its timer.
+- Intel chooses unused sites, initially 18 m from player / 24 m from live cases,
+  preferring sites absent from the last five drops. History survives reloads/runs
+  except captures; relax recency, then spacing, never reuse a consumed site.
+  Claiming takes 4 s; interruption closes the lid and stops alarm/sparks.
+  The fictional 740+880 Hz double-pulse siren emits immediate/0.5 s hearing
+  evidence within 75 m; detector pings never alert AI. Spark cadence is 0.16 s,
+  using pooled FX without lights/decals. Also stop audio on shop/pause/death/
+  restart/terminal error. Securing pays 500 shop credits independently of score;
+  cards are archived names, not implemented perks. Intel yields to busy hands
+  and has aimed-visible interaction priority over ammo. Prompts use owner-scoped
+  `ui.setPrompt(p, owner)` / `ui.clearPrompt(owner)`.
+- The first `engine:error` is terminal: abort the failed synchronous dispatch,
+  skip gameplay hooks, freeze input/gameplay and require reload. Rendering
+  continues unless it failed. Capture pumps reject `engine.error`. Only error
+  listeners are individually isolated so UI/recorder retain the original error.
+- `weapon:shell` uses pooled casings; shotgun FX selects the offline spent hull.
 
 ## Physics and world contracts
 
@@ -159,29 +143,16 @@ snapshot construction in `src/physics/query-snapshot.ts`. AI owns one module
 worker, its scratch/controller, revisions, bounded queues and lifetime. Initialize
 before AI readiness; transfer copies, never live collision buffers.
 
-Worker scopes cover route, cover, observation and search-candidate eligibility.
-Retreat, patrol alternatives, recovery sidesteps and squad destinations still
-have synchronous planning checks; rollback safety, vault admission, wave creation
-and diagnostic staging retain their same-tick/API contracts. The complete caller
-map and follow-up boundaries are in [docs/ai-worker.md](docs/ai-worker.md).
-Workers return exact static proofs, not tactical decisions. `NAV_PENDING` and
-`NAV_CANCELLED` are not unreachable/blocked answers. Reevaluate live visibility,
-threats, claims and scoring before committing. Local observation candidate geometry
-is frozen for its intent; movement still requires `_goTo`'s complete route from
-the live foot. A close live-origin prefix may execute at most one native motor
-move; unknown delegates the original full budget, never a shortened rejection.
-Exact repeated-state rejection may end a failed scratch simulation early, after
-arrival/prefix gates, without rounding state or shortening its physical budget.
-Unknown physical answers never become provisional success to discover dependent
-checks. Planning retains its pre-trial pending/retry flow; optimistic request
-batching was removed. Existing independent requests may still share a message.
-Failures are terminal rather than falling back to unbounded main-thread work.
-Async tactical admission is **not** same-tick seeded replay determinism; that
-contract and diagnostic/validation boundaries are in [docs/ai-worker.md](docs/ai-worker.md).
+[docs/ai-worker.md](docs/ai-worker.md) owns the caller map, exact proof/pending/
+cancellation semantics, bounded native budgets, tactical revalidation and timing
+limitations. Unknown is never provisional success or unreachable; failures are
+terminal, not unbounded main-thread fallback. Async admission is not same-tick
+seeded replay determinism.
 
 ## Render integration
 
 Public render surface:
+
 - `renderer`: initialized strict-WebGPU renderer.
 - `registerPass({ order, asNode(color, exposure), resize, dispose })`.
 - `addLight(light)`, `prewarmLightShadow(light)`.
@@ -239,7 +210,7 @@ vectors, for rendered lighting. Streetlight outage: first 21:00, 2.1 s flicker,
 180 s dark, then restoration; interiors unaffected. Restart resets it; deterministic
 captures disable automation and use `world.setStreetlightPower()`.
 
-Player owns one always-present shadowed spotlight. T/`setFlashlightEnabled()`
+Player owns one always-present shadowed spotlight. F/`setFlashlightEnabled()`
 changes intensity, not light count; shadow updates run only while on. Warm its
 skinned depth variants, then render shadows against the full forward scene.
 Death/restart switch it off; pause/shop preserve it. No AI modifier.
@@ -250,9 +221,10 @@ Detach owned callbacks/lights and finish failure-isolated teardown. Upstream now
 owns TRAA depth/history disposal; keep first-build and active-history lifetime
 regressions, not external disposal of its private textures. The Git dependency's
 ESM exports use source so committed stale bundles cannot hide the pinned fixes.
-Keep source-export/buffer-name corrections exact-commit/hash guarded; see README
-upgrade checks. Builder-local WGSL buffer names enable native program/pipeline reuse;
-never remove per-object instanced-buffer identity from shader-builder cache keys.
+Keep the source-export correction and upstream buffer-name verification
+exact-commit/hash guarded; see README upgrade checks. Builder-local WGSL buffer
+names enable native program/pipeline reuse; never remove per-object instanced-buffer
+identity from shader-builder cache keys.
 
 Bakes use native top-left texture UVs and shared `QuadMesh` geometry: no extra Y
 flip or disposal of borrowed geometry. Preview PNGs redirect the output target
@@ -268,8 +240,14 @@ transitive builder inputs invalidate naive per-file caches. Export uses atomic
 writes and a cache lock. Vite dev/build runs it; preview uses existing `dist`.
 Normal builds need no Blender.
 
-M4/MCX/P320/EVOLYS/MPX/AX338 use committed GLBs and weapon-owned adapters under
-`src/weapons/`; only shotgun remains a procedural weapon export.
+M4/MCX/P320/EVOLYS/MPX/AX338/M590 use committed GLBs and weapon-owned adapters
+under `src/weapons/`; procedural player-weapon exports are retired. M590 is a
+provisional in-game review prototype, not strict 1:1/final visual acceptance.
+Its seven event-only Clips sample one native mixer; `shell_insert` uses authored
+STEP-scale visibility owned/reset by the adapter, never detachable-magazine
+parts or drop pools. Native metres, sockets, grips and provisional 89 mm travel
+remain asset-owned; damage, 6+1 accounting and per-shell interruption remain in
+the common weapon system.
 Preserve shared IK, ADS/sway/recoil and pooled casings. Source/regen/reference
 contracts live beside each asset. Weapons force physical materials; arms select
 standard/physical from their source. Preserve authored maps/specular factors and
@@ -277,16 +255,12 @@ borrowed texture ownership. Native copy, clone/cache-safe soldier output and
 render-owned environment re-registration contracts are documented in
 [docs/material-calibration.md](docs/material-calibration.md).
 
-Procedural SMG/sniper builders are retired; gameplay and regression fixtures use
-MPX/AX338 adapters. FX particle/decal PNGs are required runtime assets; generation
+FX particle/decal PNGs are required runtime assets; generation
 lives in `tools/lib/fx-atlas.ts` and the offline texture exporter. Missing/invalid
 atlases reject FX initialization. Recorded audio fetch/decode failures disable the
 audio graph rather than substituting synthesis. Authored distant/sniper reports
 and reinforcement/foley remain synthesized by design.
 
-`models.getWeapon(id)` returns `{ id, label, fxClass, body, moving, nodes,
-shell, magSize }`. Groups contain meshes keyed by `userData.mat`; viewmodel
-curvature/wear masks are built from loaded geometry.
 `models.getSoldier(name)` returns `{ name, geometry, slots, boneNames, weapon,
 stats, variant }`. Merge GLTF primitives into one skinned geometry with slot
 groups, slicing shared accessors correctly. Bone order must match
