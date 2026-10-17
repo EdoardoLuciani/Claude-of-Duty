@@ -1,45 +1,7 @@
-import type { BufferGeometry, Object3D } from 'three';
+import type { BufferGeometry } from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 export type ModelVec3 = [number, number, number];
-export interface ModelHandNode {
-  pos: ModelVec3;
-  finger?: ModelVec3;
-  back?: ModelVec3;
-}
-export interface ModelTransform {
-  pos: ModelVec3;
-  rot: ModelVec3;
-}
-export interface WeaponNodes {
-  muzzle: ModelVec3;
-  chamber: ModelVec3;
-  eject: ModelVec3;
-  ejectDir?: ModelVec3;
-  sight: ModelVec3;
-  gripR: ModelHandNode;
-  gripL: ModelHandNode;
-  handguard: { axis: ModelVec3; dir: ModelVec3; r: number; z0: number; z1: number };
-  magSeat: ModelTransform;
-  chargeRest: ModelTransform;
-  chargePull?: ModelVec3;
-  boltRest: ModelTransform;
-  boltTravel?: ModelVec3;
-  triggerPivot: ModelTransform;
-  triggerPull?: number;
-}
-export interface WeaponMetadata {
-  label: string;
-  fxClass: string;
-  nodes: WeaponNodes;
-  shell: { caseLen: number; rimR: number };
-  magSize: { len: number };
-}
-export interface WeaponRecord extends WeaponMetadata {
-  id: string;
-  body: Object3D;
-  moving: Record<string, Object3D>;
-}
 export interface SoldierWeapon {
   muzzle: ModelVec3;
   foregrip: ModelVec3;
@@ -179,58 +141,6 @@ function vec3(value: unknown): ModelVec3 {
 }
 function optional<T>(value: unknown, parse: (item: unknown) => T): T | undefined {
   return value === undefined ? undefined : parse(value);
-}
-function transform(value: unknown): ModelTransform {
-  const source = object(value);
-  return { ...source, pos: vec3(source.pos), rot: vec3(source.rot) };
-}
-function hand(value: unknown): ModelHandNode {
-  const source = object(value);
-  return {
-    ...source,
-    pos: vec3(source.pos),
-    finger: optional(source.finger, vec3),
-    back: optional(source.back, vec3),
-  };
-}
-export function parseWeaponMetadata(value: unknown): WeaponMetadata {
-  const source = object(value),
-    nodes = object(source.nodes),
-    handguard = object(nodes.handguard);
-  const shell = object(source.shell),
-    magSize = object(source.magSize);
-  return {
-    ...source,
-    label: string(source.label),
-    fxClass: string(source.fxClass),
-    nodes: {
-      ...nodes,
-      muzzle: vec3(nodes.muzzle),
-      chamber: vec3(nodes.chamber),
-      eject: vec3(nodes.eject),
-      ejectDir: optional(nodes.ejectDir, vec3),
-      sight: vec3(nodes.sight),
-      gripR: hand(nodes.gripR),
-      gripL: hand(nodes.gripL),
-      handguard: {
-        ...handguard,
-        axis: vec3(handguard.axis),
-        dir: vec3(handguard.dir),
-        r: number(handguard.r),
-        z0: number(handguard.z0),
-        z1: number(handguard.z1),
-      },
-      magSeat: transform(nodes.magSeat),
-      chargeRest: transform(nodes.chargeRest),
-      chargePull: optional(nodes.chargePull, vec3),
-      boltRest: transform(nodes.boltRest),
-      boltTravel: optional(nodes.boltTravel, vec3),
-      triggerPivot: transform(nodes.triggerPivot),
-      triggerPull: optional(nodes.triggerPull, number),
-    },
-    shell: { ...shell, caseLen: number(shell.caseLen), rimR: number(shell.rimR) },
-    magSize: { ...magSize, len: number(magSize.len) },
-  };
 }
 export function parseSoldierMetadata(value: unknown): SoldierMetadata {
   const source = object(value),

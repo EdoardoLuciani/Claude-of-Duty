@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
-import { Worker } from 'node:worker_threads';
 
 import { Vector3 } from 'three';
 
@@ -23,41 +22,11 @@ import {
 import { NAV_PROFILE } from '../../src/ai/nav-format.ts';
 import { VARIANTS } from '../../src/ai/soldier.ts';
 import { CharacterController } from '../../src/physics/character.ts';
+import { NativeWorker } from '../../tools/lib/attachment-worker-fixture.mjs';
 import { loadMap } from '../../tools/nav240/fixtures.mjs';
 
 // Only the browser transport is adapted. This imports the actual module worker,
 // MessageChannel scheduler, snapshot, native BVH/controller and shared motor.
-class NativeWorker {
-  messages = [];
-  results = [];
-  constructor() {
-    this.thread = new Worker(
-      `const { parentPort } = require('node:worker_threads');
-      globalThis.self = { postMessage: m => parentPort.postMessage(m) };
-      import(${JSON.stringify(new URL('../../src/ai/attachment-worker.js', import.meta.url).href)}).then(() => {
-        parentPort.on('message', data => {
-          for (const message of data.__batch ?? [data]) self.onmessage({ data: message });
-        });
-      }).catch(e => { throw e; });`,
-      { eval: true }
-    );
-    this.thread.on('message', (data) => {
-      if (data.type === 'result') this.results.push(data);
-      this.onmessage?.({ data });
-    });
-    this.thread.on('error', (error) => this.onerror?.({ message: error.message }));
-  }
-  postMessage(message, transfer) {
-    this.messages.push(structuredClone(message));
-    this.thread.postMessage(message, transfer);
-  }
-  batch(messages) {
-    this.thread.postMessage({ __batch: messages });
-  }
-  terminate() {
-    void this.thread.terminate();
-  }
-}
 const sleep = () => new Promise((resolve) => setTimeout(resolve, 0));
 async function until(fn) {
   const end = performance.now() + 10000;
@@ -89,7 +58,7 @@ probe.move =
 let transport;
 const service = new AttachmentQueries(nav, {
   profile: true,
-  workerFactory: () => (transport = new NativeWorker()),
+  workerFactory: () => (transport = new NativeWorker({ record: true })),
 });
 const zero = () => ({ segment: 0, distance: 0, pendingTime: 0, moves: 0 });
 const options = (d, profile = profiles[0]) => ({

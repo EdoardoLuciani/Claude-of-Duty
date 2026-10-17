@@ -48,17 +48,10 @@ node tests/smoke/smoke-mcx-game.mjs
 node tests/e2e/check-mcx-game.mjs
 ```
 
-The single command starts from an empty factory scene, not a saved asset.
-Regeneration overwrites preview/export/maps. `-- --output /tmp/mcx-review`
-builds elsewhere; add `--render --quick` for optional review stills.
-`mcx_review.py` can inspect generated preview scenes/reels.
-
-The recipe is separated into materials, named geometry assemblies, animations,
-studio and export. Fixed physical-scale UV projection replaces automatic island
-packing. Motion is authored as 60 Hz LINEAR keys and visibility as CONSTANT keys;
-Blender's stock Actions exporter emits the correct glTF interpolation directly.
-There is no post-export repair or alternate saved-source material-update path.
-See the linked authoring guide for stage order and which file to edit.
+Follow the [shared authoring workflow](../../../tools/blender/README.md).
+`-- --output /tmp/mcx-review` builds elsewhere; add `--render --quick` for stills.
+`mcx_review.py` inspects generated previews/reels. The local source map owns
+physical-scale UV projection and 60 Hz/STEP export details.
 
 The finish uses a warmer medium-gray coating, smoother surface detail, matte
 polymer and a darker charcoal suppressor. This is an artistic alternative to the

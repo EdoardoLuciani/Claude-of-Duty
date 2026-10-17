@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { Worker } from 'node:worker_threads';
 
 import { Vector3 } from 'three';
 
@@ -9,29 +8,10 @@ import { createLadderDescriptors, ladderMoveBudget } from '../../src/ai/ladder.t
 import { unpackNav, packNav, NAV_PROFILE, NAV_LINK_RADIUS } from '../../src/ai/nav-format.ts';
 import { SurfaceNav, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/nav.ts';
 import { VARIANTS } from '../../src/ai/soldier.ts';
+import { NativeWorker } from '../../tools/lib/attachment-worker-fixture.mjs';
 import { loadMap } from '../../tools/nav240/fixtures.mjs';
 
 // Browser transport only: all route proofs use the production module worker.
-class NativeWorker {
-  constructor() {
-    this.thread = new Worker(
-      `const { parentPort } = require('node:worker_threads');
-      globalThis.self = { postMessage: m => parentPort.postMessage(m) };
-      import(${JSON.stringify(new URL('../../src/ai/attachment-worker.js', import.meta.url).href)}).then(() => {
-        parentPort.on('message', data => self.onmessage({ data }));
-      });`,
-      { eval: true }
-    );
-    this.thread.on('message', (data) => this.onmessage?.({ data }));
-    this.thread.on('error', (error) => this.onerror?.({ message: error.message }));
-  }
-  postMessage(message, transfer) {
-    this.thread.postMessage(message, transfer);
-  }
-  terminate() {
-    void this.thread.terminate();
-  }
-}
 const f = await loadMap(),
   descriptors = createLadderDescriptors(f.meta.volumes);
 const expected = { sha256: f.meta.navigation.sha256, ladders: descriptors };
