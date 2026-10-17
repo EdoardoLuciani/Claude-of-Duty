@@ -16,22 +16,7 @@ export const PLACEMENTS = [
   ...northStreet,
   ...southStreet,
   ...westSide,
-].map((row) => ({
-  ...row,
-  prototype: row.prototype ?? (typeof row.id === 'string' ? row.id.split('/')[0] : ''),
-  rotationDeg:
-    row.rotationDeg === undefined
-      ? [0, 0, 0]
-      : typeof row.rotationDeg === 'number'
-        ? [0, row.rotationDeg, 0]
-        : row.rotationDeg,
-  scale:
-    row.scale === undefined
-      ? [1, 1, 1]
-      : typeof row.scale === 'number'
-        ? [row.scale, row.scale, row.scale]
-        : row.scale,
-}));
+];
 
 const ids = new Set();
 for (const placement of PLACEMENTS) {
