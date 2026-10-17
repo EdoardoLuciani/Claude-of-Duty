@@ -6,8 +6,8 @@ stock and tri-rail forend. No invented pistol/M4 stock or SureFire furniture.
 **Provisional in-game review prototype, not strict 1:1/final visual acceptance.**
 Runtime now uses the reviewed native GLB through `src/weapons/m590.ts`, shared
 actions/hands/materials and unchanged gameplay tuning. Only the integration hold
-was relaxed for user review; geometry/contact/reference limits below remain. No combat definitions or
-seven gameplay durations/events changed.
+was relaxed for user review; geometry/contact/reference limits below remain. No combat definitions,
+seven native action schedules or six gameplay aliases changed.
 
 ## Manufacturer dimension / reference sheet
 
@@ -62,8 +62,9 @@ visual approval is required.
 
 ## Files and rebuild
 
-- `m590.blend`: editable component meshes/modifiers, packed original maps, seven
-  native NLA tracks and shared glove/sleeve review skins, plus an excluded studio.
+- `m590.blend`: **generated editable preview**, not a build input: component
+  meshes/modifiers, packed original maps, seven native NLA tracks and shared
+  glove/sleeve review skins, plus an excluded studio.
 - `m590.glb`: committed local runtime candidate; only rigid weapon meshes and
   mechanism/wrist/finger controls. No arms, spent cases, cameras or lights.
 - `manifest.json`: actual export statistics, basis, sockets, mechanism, exact
@@ -73,34 +74,98 @@ visual approval is required.
   patches (right index uses the common trigger patch); `thumb` is the common
   thumb-centre oracle and `thumbPad` is its palmar surface patch.
 
-From the repository root, after `npm ci`:
+Python is the weapon authority. Normal builds start from a factory-empty scene,
+regenerate the entire weapon, and never read an old M590 blend, GLB or map.
+Imports do not build a scene. Two declared, read-only inputs remain:
+
+- `hand-reference.json`: versioned shared `Arm` calibration and fitted contact
+  poses. Ordinary builds use it unchanged; **no automatic refit**.
+- `assets/player/arms/player-arms.blend`: shared appearance/bind data appended
+  only for excluded DCC review skins, never exported as duplicate runtime arms.
+
+The optional `tools/m590-hand-reference.mjs` stage **does read the committed
+M590 GLB's actual stock exterior**. Intentional geometry/calibration work therefore
+uses export → explicit fit → export, with contact review. That derived calibration
+stage is not part of a normal build and does not make an old weapon export a
+geometry authority. Missing declared inputs fail rather than loading old products.
+
+From the repository root, after `npm ci`, using Blender **5.2.2**:
 
 ```sh
-# Hand fitting reads the committed GLB's actual stock exterior.
-# If exterior geometry changed: export first, then refit and export again.
-node tools/m590-hand-reference.mjs
-blender -b --threads 8 --python-exit-code 1 --python tools/blender/m590.py
-blender -b assets/weapons/m590/m590.blend --threads 8 --python-exit-code 1 --python tools/blender/m590_check.py
+blender -b -t 4 --python-exit-code 1 --python tools/blender/m590.py
+# Scratch products; committed products/calibration remain untouched:
+blender -b -t 4 --python-exit-code 1 --python tools/blender/m590.py -- \
+  --output /tmp/m590-authoring-review
+blender -b -t 4 /tmp/m590-authoring-review/m590.blend \
+  --python-exit-code 1 --python tools/blender/m590_check.py
 node tests/smoke/smoke-shotgun-asset.mjs
-# Optional DCC stills/contact frames; images must stay outside the repository:
-blender -b --threads 8 --python-exit-code 1 --python tools/blender/m590.py -- --render-dir=/home/edoardo/Documents/Claude-of-Duty-recovery/issue410-corrections/boards/author-render
+node tests/smoke/smoke-m590.mjs
+node tests/smoke/smoke-m590-ads.mjs
+# Optional matched DCC stills/contact frames; requires an available GPU lane:
+blender -b -t 4 --python-exit-code 1 --python tools/blender/m590.py -- \
+  --output /tmp/m590-authoring-review --render --quick
+# ONLY for intentional, separately reviewed calibration work, between exports:
+# node tools/m590-hand-reference.mjs
 ```
 
-Geometry/actions live in `tools/blender/m590.py` and `m590_actions.py`. Rebuild
-source and export together after authoring changes; do not hand-patch the GLB.
-The scripts reuse the M4 native basis, rigid-parent export and shared review-skin
-patterns. Only evaluated export copies are merged. Planar UVs are deterministic;
-original source components retain editable bevels. Exact fractional endpoints
-and hull visibility keys are corrected in the exporter, including the quaternion
-lost by Blender's zero-scale decomposition. Two consecutive Blender 5.2.2
-rebuilds produced byte-identical GLBs. Normal game builds require no Blender.
+`--output` redirects blend/GLB/manifest and optional `renders/` together.
+`--render` is opt-in; `--quick` changes only preview resolution/samples, never
+geometry, maps, actions or runtime export. No render is required to build.
+Normal game builds use committed assets and require no Blender.
 
-Blender must have a compatible OCIO installation with AgX. The review host's
-Blender 5.2.2 shipped an OCIO 2.5 profile with a linked 2.4 library; authoring used
-an external `BLENDER_SYSTEM_DATAFILES` directory containing a compatible profile
-copy and original LUT links. No fallback transform or repository config change
-was used. Optional Draco/meshoptimizer bridge warnings are harmless here: this
-GLB does not request either extension.
+Factory-empty builds explicitly preserve the original saved preview's effective
+World Background node: linear RGB `0.05087608844041824` per component, strength
+`1`. `World.color` alone does not establish that node setting. This restores the
+baseline DCC environment, not a material/light/exposure/camera retune; the runtime
+GLB and manifest are unchanged by this preview-only correction.
+
+### Local editing map and build stages
+
+| Concern | Source location |
+|---|---|
+| Entry point, output, factory reset, stage order | `tools/blender/m590.py`: `main` / `build` |
+| Seeded packed maps and finish factors | `m590.py`: `rng`, `image`, `material`, named finishes |
+| Exterior assemblies, editable radii and datums | `m590.py`: corresponding named receiver/barrel/stock/rail sections |
+| Original local planar projection | `m590.py`: `surface_uv`, also reapplied to evaluated copies |
+| Seven actions, exact events, wrist/finger motion, excluded review skins | `tools/blender/m590_actions.py`: `author_actions` (unchanged) |
+| Frozen cameras/lights/exposure and optional previews | `m590.py`: `pose`, `cams`, studio settings |
+| Evaluated-copy separation, sorted rigid-parent joins | `m590.py`: `EXPORT` collection stage |
+| Historical runtime sampling, fractional STEP visibility, native assertions | `tools/blender/m590/export_actions.py` |
+| Native exporter call and generated metadata | End of `m590.py`: read-only output statistics, manifest |
+
+Build order is materials → geometry → original local UVs → actions/review hands
+→ saved editable preview → optional renders → evaluated runtime copies/UVs/sorted
+joins → runtime action preparation → stock native Actions export → read-only
+validation/manifest. Original components/modifiers and action authoring remain
+editable in the saved preview. Only runtime copies/actions are consolidated/baked.
+The existing 120 Hz integer-frame motion lattice, held fractional endpoints,
+constant-channel reduction and STEP resets are retained. Hull scale instead has
+its exact four fractional visibility keys; float32 seconds are converted to
+Blender frames before export to preserve those boundary timestamps. Direct TRS
+curve export preserves orientation even while hull scale is zero. No GLB bytes,
+JSON, accessors, quaternions or buffer lengths are rewritten after export; no
+exporter hooks or runtime compensation are involved.
+
+Two fresh Blender processes must build into empty external directories and match
+GLB, embedded map bytes and manifest hashes; this is a same-environment check, not
+a cross-platform identity claim. Blend path/metadata are not runtime identity.
+Compare against the committed baseline as well as a fresh original-source control.
+The migration's two original controls matched exactly. Relative to the committed
+asset, the unchanged source had two stock vertex rounding differences (maximum
+`2.9802322387695312e-8 m`), normal angle `0.005708665345738909°`, and six triangles'
+UV deltas at most `2.384185791015625e-7`. Oriented topology/winding/bounds matched;
+no triangulation/UV repair was added. Migration runtime geometry is byte-exact to
+those original controls. These observed, separately reviewed numerical differences
+are not new tolerances or permission to change the stock, UV strategy or contacts.
+
+Blender must have a compatible OCIO installation with AgX. Supply a compatible
+process-local `OCIO` path if the installation's profile/library versions disagree;
+do not disable color management, compensate with different lighting/exposure or
+change system configuration. Historical review authoring used an external
+`BLENDER_SYSTEM_DATAFILES` directory containing a compatible profile copy and
+original LUT links; the migration uses a compatible process-local OCIO profile.
+Optional Draco/meshoptimizer bridge warnings are harmless here: this GLB does
+not request either extension.
 
 ## Locked native contract
 
@@ -194,7 +259,7 @@ updates or second animation clock should overwrite native curves.
 ## Measurements and limits
 
 Actual GLB: **93,106 triangle instances, 13 primitives, 7 materials, 3 embedded
-1024² PBR maps, 8,920,320 bytes (8.51 MiB)**. No implicit fallback material.
+1024² PBR maps, 9,037,044 bytes (8.62 MiB)**. No implicit fallback material.
 Source:111 editable component meshes,46 animated controls and3 unanimated
 physical dimensional datums, plus excluded review arms/studio. The old806mm
 silhouette and445mm barrel are superseded, not stretched in a runtime adapter.
