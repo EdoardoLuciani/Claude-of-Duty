@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { Worker } from 'node:worker_threads';
 
 import { BoxGeometry, Group, Vector3 } from 'three';
 
@@ -10,29 +9,10 @@ import { SurfaceNav } from '../../src/ai/nav.ts';
 import { VARIANTS } from '../../src/ai/soldier.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { makeAi } from '../../tools/lib/agent-fixture.mjs';
+import { NativeWorker } from '../../tools/lib/attachment-worker-fixture.mjs';
 import { loadMap } from '../../tools/nav240/fixtures.mjs';
 
 // Browser transport adapter only; queries execute the actual production worker.
-class NativeWorker {
-  constructor() {
-    this.thread = new Worker(
-      `const { parentPort } = require('node:worker_threads');
-      globalThis.self = { postMessage: m => parentPort.postMessage(m) };
-      import(${JSON.stringify(new URL('../../src/ai/attachment-worker.js', import.meta.url).href)}).then(() => {
-        parentPort.on('message', data => self.onmessage({ data }));
-      });`,
-      { eval: true }
-    );
-    this.thread.on('message', (data) => this.onmessage?.({ data }));
-    this.thread.on('error', (error) => this.onerror?.({ message: error.message }));
-  }
-  postMessage(message, transfer) {
-    this.thread.postMessage(message, transfer);
-  }
-  terminate() {
-    void this.thread.terminate();
-  }
-}
 const f = await loadMap(),
   nav = await SurfaceNav.load(f.surfaceRaw, f.physics);
 const service = (nav.worker = new AttachmentQueries(nav, {
@@ -46,6 +26,7 @@ let player = null,
 Object.assign(ai, {
   grid: nav,
   root: new Group(),
+  playerPosition: () => null,
   rng: new Rng(347),
   ctx: {
     get: () => f.physics,
@@ -103,14 +84,13 @@ async function tick(a, { brain = false, search = false } = {}) {
   const live = a.ladder,
     travel = live?.travel,
     y = a.controller.position.y;
+  if (a.pathPending) a._goTo(a._pendingDest);
   if (brain) a.update(1 / 60);
   else if (search) {
-    if (a.pathPending) a._goTo(a._pendingDest);
     if (!a.ladder) a._think(1 / 60);
     a._move(1 / 60);
     a._drive(1 / 60);
   } else {
-    if (a.pathPending) a._goTo(a._pendingDest);
     a.desiredSpeed = 1.5;
     a._move(1 / 60);
     a._tickNoProgress(1 / 60);
@@ -334,22 +314,58 @@ try {
   assert.ok(a.position.distanceTo(changedGoal) < 0.5);
   remove(a);
 
-  // Opposite directions share exactly one FIFO claim; a cancelled waiter leaves
-  // neither a phantom claim nor a late proof capable of taking ownership.
-  a = start();
-  await until(a, () => shaft(a), 'first claim');
-  const b = start('down');
-  await until(b, () => !!b.ladder, 'opposite waiter');
-  assert.equal(ai.ladderClaims.get(d.id), a);
-  assert.equal(b.ladder.claimed, false);
-  const bFoot = b.position.clone();
-  for (let i = 0; i < 30; i++) await tick(b);
-  assert.deepEqual(b.position, bFoot);
-  remove(a);
-  await until(b, () => shaft(b), 'FIFO opposite claim after release');
-  assert.equal(ai.ladderClaims.get(d.id), b);
-  remove(b);
-  assert.equal(ai.ladderClaims.size, 0);
+  // Both live contenders must finish without deleting the owner to free its landing.
+  for (const d of nav.ladders)
+    for (const direction of ['up', 'down']) {
+      const normal = v(d.normal);
+      const entry = direction === 'up' ? 0 : 3,
+        exit = 3 - entry;
+      const first = actor(v(d.points[entry]).addScaledVector(normal, 0.2));
+      const firstGoal = v(d.points[exit]).addScaledVector(normal, 0.6);
+      first._goTo(firstGoal);
+      await until(first, () => shaft(first), 'contended owner enters shaft');
+      const second = actor(v(d.points[exit]).addScaledVector(normal, 0.2), 'breacher');
+      const secondGoal = v(d.points[entry]).addScaledVector(normal, 0.6);
+      second._goTo(secondGoal);
+      await until(second, () => !!second.ladder, 'opposite contender arrives');
+      assert.equal(ai.ladderClaims.get(d.id), first, 'waiter cannot steal the shaft');
+      assert.equal(second.ladder.claimed, false);
+      for (let frame = 0; frame < 1800; frame++) {
+        for (const agent of [first, second]) {
+          await tick(agent, { brain: true });
+          assert.ok(!(first.ladder?.claimed && second.ladder?.claimed), 'one shaft owner');
+          if (
+            Math.abs(first.position.y - second.position.y) < Math.min(first.height, second.height)
+          )
+            assert.ok(
+              Math.hypot(
+                first.position.x - second.position.x,
+                first.position.z - second.position.z
+              ) >=
+                first.radius + second.radius,
+              'contenders never pass through each other'
+            );
+        }
+        if (
+          !first.ladder &&
+          !second.ladder &&
+          !first.pathPending &&
+          !second.pathPending &&
+          first.position.distanceTo(firstGoal) < 0.5 &&
+          second.position.distanceTo(secondGoal) < 0.5
+        )
+          break;
+      }
+      for (const [agent, goal] of [
+        [first, firstGoal],
+        [second, secondGoal],
+      ]) {
+        assert.ok(!agent.ladder, 'contention resolves without deleting an actor');
+        assert.ok(agent.position.distanceTo(goal) < 0.5, 'original nearby objective is retained');
+        remove(agent);
+      }
+      assert.equal(ai.ladderClaims.size, 0);
+    }
 
   // Replacing a nonempty live route while fresh worker proofs are unresolved
   // leaves both arrays and every retained vector/step identity untouched.

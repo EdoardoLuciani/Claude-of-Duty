@@ -45,7 +45,7 @@ shortened environmental decay, end fade, 48 kHz PCM16, -4.5 dBFS peak.
 The dedicated `mcx` WebAudio profile adds short pressure/body and piston-action
 layers, round-robin takes and seeded pitch/level variation. It does not layer
 the revolver cock recording or the M4 buffer-spring twang. Failed sample loads
-fall back to the dedicated suppressed synthesis profile.
+disable the audio graph; there is no recorded-shot synthesis fallback.
 
 ## Additional layered recordings
 

@@ -1517,15 +1517,60 @@ export class AiSystem {
     }
   }
 
+  ladderBusy(a: Agent, descriptor: LadderDescriptor): boolean {
+    const owner = this.ladderClaims.get(descriptor.id);
+    return (
+      (!!owner && owner !== a) ||
+      (this._ladderQueue.get(descriptor.id)?.some((other) => other !== a && other.alive) ?? false)
+    );
+  }
+
+  ladderHoldingClear(a: Agent, descriptor: LadderDescriptor, p: THREE.Vector3): boolean {
+    // Leave the corridor clear for live actors of every size, not just this owner.
+    if (
+      this.agents.some(
+        (other) =>
+          other.alive &&
+          this._pathOccupied(other, descriptor.points, p.x, p.y, p.z, a.radius, a.height)
+      )
+    )
+      return false;
+    // A dismounted owner must not park across the next claimant's return to entry.
+    return !(this._ladderQueue.get(descriptor.id) ?? []).some((other) => {
+      const l = other.ladder;
+      return (
+        other !== a &&
+        other.alive &&
+        l &&
+        this._pathOccupied(
+          other,
+          [other.position, descriptor.points[l.step.direction === 'up' ? 0 : 3]],
+          p.x,
+          p.y,
+          p.z,
+          a.radius,
+          a.height
+        )
+      );
+    });
+  }
+
   /** Capsule-height occupancy of the full shaft AND both supported landings. */
   ladderClear(a: Agent, descriptor: LadderDescriptor): boolean {
+    return this.capsulePathClear(a, descriptor.points);
+  }
+
+  capsulePathClear(
+    a: Agent,
+    points: readonly Readonly<{ x: number; y: number; z: number }>[]
+  ): boolean {
     for (const other of this.agents) {
       if (other === a || !other.alive) continue;
       const p = other.controller?.position ?? other.position;
       if (
-        this._ladderOccupied(
+        this._pathOccupied(
           a,
-          descriptor,
+          points,
           p.x,
           p.y,
           p.z,
@@ -1541,17 +1586,15 @@ export class AiSystem {
       const r = capsule.radius,
         y = Math.min(capsule.ay, capsule.by) - r;
       const h = Math.abs(capsule.by - capsule.ay) + r * 2;
-      if (
-        this._ladderOccupied(a, descriptor, capsule.ax, y, capsule.az, r, h, capsule.bx, capsule.bz)
-      )
+      if (this._pathOccupied(a, points, capsule.ax, y, capsule.az, r, h, capsule.bx, capsule.bz))
         return false;
     }
     return true;
   }
 
-  private _ladderOccupied(
+  private _pathOccupied(
     a: Agent,
-    descriptor: LadderDescriptor,
+    points: readonly Readonly<{ x: number; y: number; z: number }>[],
     x: number,
     y: number,
     z: number,
@@ -1560,9 +1603,9 @@ export class AiSystem {
     bx = x,
     bz = z
   ): boolean {
-    for (let i = 0; i < 3; i++) {
-      const p = descriptor.points[i],
-        q = descriptor.points[i + 1];
+    for (let i = 0; i + 1 < points.length; i++) {
+      const p = points[i],
+        q = points[i + 1];
       if (y >= Math.max(p.y, q.y) + a.height || y + height <= Math.min(p.y, q.y)) continue;
       const dx = q.x - p.x,
         dz = q.z - p.z,
