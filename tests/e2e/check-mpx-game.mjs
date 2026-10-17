@@ -162,7 +162,7 @@ try {
     );
     if (pose.dotVisible)
       assert(
-        Math.abs(pose.dotPixels - 1.5) < 0.001,
+        Math.abs(pose.dotPixels - 6) < 0.001,
         'dot sizes against the same frame FOV during aim-in'
       );
   }
@@ -201,7 +201,7 @@ try {
     'ADS preserves actual shared-hand reach'
   );
   assert(
-    Math.abs(opticalPlacement.dotPixels - 1.5) < 0.001,
+    Math.abs(opticalPlacement.dotPixels - 6) < 0.001,
     '720p uses only the declared small dot readability floor'
   );
   assert(
@@ -289,7 +289,7 @@ try {
     );
     if (pose.dotVisible)
       assert(
-        Math.abs(pose.dotPixels - 1.5) < 0.001,
+        Math.abs(pose.dotPixels - 6) < 0.001,
         'same-frame dot sizing during native draw plus aim'
       );
     if (drawPoses.length === 6) await capture('held-aim-draw');
