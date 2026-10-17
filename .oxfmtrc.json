@@ -26,7 +26,6 @@
     "**/*.lock",
     "**/*.lock.*",
     "assets/**",
-    "tools/worldgen/placements/{east-side,interiors,market,mid-street,north-street,south-street,west-side}.js",
     "src/weapons/hand-poses.ts",
     "src/weapons/bandage-path.ts",
     "public/**",

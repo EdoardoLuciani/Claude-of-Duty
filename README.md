@@ -28,9 +28,7 @@ Run `npm run format` to write formatting; `npm run format:check` checks it in CI
 Both use the pinned [Oxfmt](https://oxc.rs/docs/guide/usage/formatter) from `npm ci`.
 The command scope is in `package.json`; style and exclusions are in `.oxfmtrc.json`.
 Generated files, assets, reports, lockfiles, shared skills and protected workflow/
-agent instructions are excluded. The seven world placement tables keep one compact
-record per line; `placements/index.js` expands omitted prototype/rotation/scale
-defaults to the full consumer contract. Python, shell and SVG are not formatted.
+agent instructions are excluded. Python, shell and SVG are not formatted.
 
 Import sorting respects comment partitions, but bound imports can cross bare
 side-effect imports. Preserve intentional evaluation boundaries and fix exposed
