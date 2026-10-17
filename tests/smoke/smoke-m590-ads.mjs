@@ -122,7 +122,7 @@ assert.equal(shots.length, 8);
 frame({ up: ['Mouse0'] });
 const animation = vm.active.animation,
   forend = animation.root.getObjectByName('forend');
-const forendRest = forend.position.z;
+const forendRest = forend.position.clone();
 let maxStroke = 0,
   maxRootTilt = 0,
   maxRecoil = 0;
@@ -130,7 +130,7 @@ while (wp.pumping) {
   settledADS();
   assert.equal(wp.canFire(), false);
   assert.equal(wp.tryFire(), false, 'pump remains busy even after fire timer expires');
-  maxStroke = Math.max(maxStroke, forend.position.z - forendRest);
+  maxStroke = Math.max(maxStroke, forend.position.z - forendRest.z);
   maxRootTilt = Math.max(maxRootTilt, animation.root.quaternion.angleTo(new THREE.Quaternion()));
   maxRecoil = Math.max(maxRecoil, Math.abs(vm.recPos.z));
   assert.equal(animation.mixer.time, 0, 'clip time is the only authored animation clock');
