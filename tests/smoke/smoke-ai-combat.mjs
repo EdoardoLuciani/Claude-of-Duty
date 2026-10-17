@@ -4,17 +4,19 @@
  *   node tests/smoke/smoke-ai-combat.mjs
  */
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
-import { EventBus } from '../../src/core/registry.ts';
-import { AiSystem } from '../../src/ai/index.ts';
+
 import { STATE } from '../../src/ai/agent.ts';
-import { makeAgent } from '../../tools/lib/agent-fixture.mjs';
-import { Squad } from '../../src/ai/squad.ts';
-import { CoverMap, SurfaceNav } from '../../src/ai/nav.ts';
-import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
-import { synthetic } from '../../tools/nav240/fixtures.mjs';
+import { AiSystem } from '../../src/ai/index.ts';
 import { INTENT, FLUSH_MAX_FAILS } from '../../src/ai/intent.ts';
+import { CoverMap, SurfaceNav } from '../../src/ai/nav.ts';
+import { Squad } from '../../src/ai/squad.ts';
+import { EventBus } from '../../src/core/registry.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
+import { makeAgent } from '../../tools/lib/agent-fixture.mjs';
+import { synthetic } from '../../tools/nav240/fixtures.mjs';
+import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
 
 const events = new EventBus();
 const phys = new PhysicsSystem();
@@ -28,8 +30,12 @@ function makePlayer({ height = 1.78, stance = 'stand' } = {}) {
     height,
     stance,
     hitbox: phys.addCollider({
-      shape: 'capsule', layer: phys.LAYER.PLAYER, surface: 'flesh',
-      owner: null, part: 'torso', radius: 0.3,
+      shape: 'capsule',
+      layer: phys.LAYER.PLAYER,
+      surface: 'flesh',
+      owner: null,
+      part: 'torso',
+      radius: 0.3,
     }),
   };
   player.hitbox.owner = player;
@@ -64,8 +70,10 @@ function fireAt(ai, y, endZ = null) {
   const dealt = [];
   const off = events.on('damage:dealt', (e) => dealt.push(e));
   const shot = phys.fireBullet({
-    origin: new THREE.Vector3(0, y, 8), dir: new THREE.Vector3(0, 0, -1),
-    damage: 17, maxDist: endZ == null ? 200 : 8 - endZ,
+    origin: new THREE.Vector3(0, y, 8),
+    dir: new THREE.Vector3(0, 0, -1),
+    damage: 17,
+    maxDist: endZ == null ? 200 : 8 - endZ,
   });
   const hit = shot.impacts.find((i) => !i.exit && i.actor === ai.ctx.peek('player'));
   off();
@@ -74,33 +82,63 @@ function fireAt(ai, y, endZ = null) {
 
 function stubAgent(over = {}) {
   const a = makeAgent();
-  Object.assign(a, {
-    id: 1, alive: true, state: STATE.COMBAT, stateTime: 2,
-    hasTarget: true, targetVisible: false,
-    lastKnown: new THREE.Vector3(0, 1, 12), lastKnownAge: 0.3,
-    lastKnownKind: 'visual',
-    position: new THREE.Vector3(),
-    cover: { x: 0, y: 0, z: 0, dx: 0, dz: 1, high: false },
-    peekTimer: 0,
-    wantFire: false, crouch: true, aimWeight: 0, desiredSpeed: 0,
-    health: 100, weaponRange: 80,
-    hasGrenade: false, grenadeCooldown: 99, role: 'pin', wrapWait: 0, _wrapDone: true,
-    repathTimer: 5, suppression: 0, eyeHeight: 1.5, squad: null, rng,
-    ai: {
-      cover: {
-        pick() { return a.cover; },
-        protects() { return true; },
-        release() {},
-        peekOffset(c, _t, _e, out) { out.set(c.x + 0.95, c.y, c.z); return 1; },
+  Object.assign(
+    a,
+    {
+      id: 1,
+      alive: true,
+      state: STATE.COMBAT,
+      stateTime: 2,
+      hasTarget: true,
+      targetVisible: false,
+      lastKnown: new THREE.Vector3(0, 1, 12),
+      lastKnownAge: 0.3,
+      lastKnownKind: 'visual',
+      position: new THREE.Vector3(),
+      cover: { x: 0, y: 0, z: 0, dx: 0, dz: 1, high: false },
+      peekTimer: 0,
+      wantFire: false,
+      crouch: true,
+      aimWeight: 0,
+      desiredSpeed: 0,
+      health: 100,
+      weaponRange: 80,
+      hasGrenade: false,
+      grenadeCooldown: 99,
+      role: 'pin',
+      wrapWait: 0,
+      _wrapDone: true,
+      repathTimer: 5,
+      suppression: 0,
+      eyeHeight: 1.5,
+      squad: null,
+      rng,
+      ai: {
+        cover: {
+          pick() {
+            return a.cover;
+          },
+          protects() {
+            return true;
+          },
+          release() {},
+          peekOffset(c, _t, _e, out) {
+            out.set(c.x + 0.95, c.y, c.z);
+            return 1;
+          },
+        },
+        stats: { grenadeHolds: 0 },
       },
-      stats: { grenadeHolds: 0 },
+      phys: { lineOfSight: () => true, MASK: { SIGHT: 1 } },
+      animator: {
+        muzzleWorld: new THREE.Vector3(0.95, 1.4, 0.2),
+        reloading: false,
+        vaulting: false,
+        turn() {},
+      },
     },
-    phys: { lineOfSight: () => true, MASK: { SIGHT: 1 } },
-    animator: {
-      muzzleWorld: new THREE.Vector3(0.95, 1.4, 0.2),
-      reloading: false, vaulting: false, turn() {},
-    },
-  }, over);
+    over
+  );
   if (over.cover) a.coverPos.set(over.cover.x, over.cover.y, over.cover.z);
   return a;
 }
@@ -128,7 +166,10 @@ for (const s of [
   { stance: 'prone', height: 0.7, through: 0.35, above: 1.35 },
   { stance: 'slide', height: 1.12, through: 0.55, above: 1.6 },
 ]) {
-  const player = makePlayer({ height: s.height, stance: s.stance === 'slide' ? 'crouch' : s.stance });
+  const player = makePlayer({
+    height: s.height,
+    stance: s.stance === 'slide' ? 'crouch' : s.stance,
+  });
   const ai = makeAi(player);
   const body = ai.playerPosition(new THREE.Vector3());
   assert.ok(body.y < s.height + 0.01, `${s.stance} body y=${body.y}`);
@@ -290,9 +331,11 @@ for (const s of [
 
 /* 5. string-pull keeps the corner-cut detour */
 {
-  const fixture = synthetic(), bake = await bakePhysicsNav(fixture.physics, fixture.bounds);
+  const fixture = synthetic(),
+    bake = await bakePhysicsNav(fixture.physics, fixture.bounds);
   const g = await SurfaceNav.load(bake.buffer, fixture.physics);
-  const from = new THREE.Vector3(-.6, 0, 2.8), to = new THREE.Vector3(.6, 0, 2.8);
+  const from = new THREE.Vector3(-0.6, 0, 2.8),
+    to = new THREE.Vector3(0.6, 0, 2.8);
   assert.equal(g.lineOfWalk(from, to), false, 'blocked diagonal is not a walk');
   assert.equal(g.canAttach(from, to), false, 'real collision must reject the direct shortcut');
   const out = [];
@@ -303,7 +346,7 @@ for (const s of [
   for (let i = 0; i < n; i++) {
     assert.ok(g.project(out[i], new THREE.Vector3()), `wp ${i} blocked`);
     // Execute short capsule links, rather than using a raster walkability oracle.
-    const steps = Math.max(1, Math.ceil(prev.distanceTo(out[i]) / .5));
+    const steps = Math.max(1, Math.ceil(prev.distanceTo(out[i]) / 0.5));
     let start = prev;
     for (let j = 1; j <= steps; j++) {
       const end = prev.clone().lerp(out[i], j / steps);
@@ -321,9 +364,13 @@ for (const s of [
   assert.ok(ai.requestPath(from, to, []) >= 0);
   assert.equal(ai.lastPathOutcome, 'success');
   ai._pathBudget = 2;
-  assert.ok(ai.requestPath(from, to.clone().setY(.1), []) >= 0);
-  assert.ok(Math.abs(floor) < .1, 'flat fixture resolves to its ground surface');
-  assert.equal(ai.lastPathResFloor, floor, 'resolved floor is the surface, not a small request-height error');
+  assert.ok(ai.requestPath(from, to.clone().setY(0.1), []) >= 0);
+  assert.ok(Math.abs(floor) < 0.1, 'flat fixture resolves to its ground surface');
+  assert.equal(
+    ai.lastPathResFloor,
+    floor,
+    'resolved floor is the surface, not a small request-height error'
+  );
   assert.ok(ai.requestPath(from, to, []) >= 0);
   assert.equal(ai.requestPath(from, to, []), -1);
   assert.equal(ai.lastPathOutcome, 'deferred');
@@ -360,12 +407,17 @@ for (const s of [
   const sq = new Squad(rng);
   sq.ai = { grid: null, cover: null };
   const a = stubAgent({
-    hasGrenade: true, grenadeCooldown: 0,
-    lastKnown: new THREE.Vector3(0, 0, 15), lastKnownAge: 0.2, squad: sq,
+    hasGrenade: true,
+    grenadeCooldown: 0,
+    lastKnown: new THREE.Vector3(0, 0, 15),
+    lastKnownAge: 0.2,
+    squad: sq,
   });
   let thrown = 0;
   a._grenadeUnsafe = () => true;
-  a._throwGrenade = () => { thrown++; };
+  a._throwGrenade = () => {
+    thrown++;
+  };
   sq.add(a);
   sq.wantFlush = true;
   sq.planted = true;
@@ -383,12 +435,17 @@ for (const s of [
   assert.equal(sq.intent, INTENT.WRAP, 'unsafe flush hands off to wrap');
 
   const g = stubAgent({
-    hasGrenade: true, grenadeCooldown: 0,
-    lastKnown: new THREE.Vector3(0, 0, 15), lastKnownAge: 0.2,
+    hasGrenade: true,
+    grenadeCooldown: 0,
+    lastKnown: new THREE.Vector3(0, 0, 15),
+    lastKnownAge: 0.2,
   });
   let didThrow = 0;
   g._grenadeUnsafe = () => false;
-  g._throwGrenade = () => { didThrow++; g.hasGrenade = false; };
+  g._throwGrenade = () => {
+    didThrow++;
+    g.hasGrenade = false;
+  };
   const sq2 = new Squad(rng);
   sq2.ai = { grid: null, cover: null };
   sq2.wantFlush = true;
@@ -400,22 +457,31 @@ for (const s of [
 
 // Suppression must not freeze a soldier three metres short of assigned cover.
 {
-  const a = stubAgent({ state: STATE.SUPPRESSED, suppression: 1.3, scale: 1,
-    cover: { x: 3, y: 0, z: 0, high: false }, repathTimer: 0 });
-  a._goTo = function (p) { this.moveTarget.copy(p); this.hasMoveTarget = true; return true; };
-  a._think(.1);
+  const a = stubAgent({
+    state: STATE.SUPPRESSED,
+    suppression: 1.3,
+    scale: 1,
+    cover: { x: 3, y: 0, z: 0, high: false },
+    repathTimer: 0,
+  });
+  a._goTo = function (p) {
+    this.moveTarget.copy(p);
+    this.hasMoveTarget = true;
+    return true;
+  };
+  a._think(0.1);
   assert.equal(a.state, STATE.SUPPRESSED);
   assert.ok(a.desiredSpeed > 0);
   assert.equal(a.crouch, false);
   assert.equal(a.wantFire, true, 'retain defensive fire on the route to shelter');
   assert.ok(a.moveTarget.distanceTo(a.coverPos) < 1e-8);
   a.position.copy(a.coverPos);
-  a._think(.1);
+  a._think(0.1);
   assert.equal(a.desiredSpeed, 0, 'only stop after reaching protected cover');
   assert.equal(a.crouch, true);
   assert.equal(a.wantFire, false, 'duck only when physically protected');
   a.ai.cover.protects = () => false;
-  a._think(.1);
+  a._think(0.1);
   assert.equal(a.cover, null, 'elevated exposure invalidates the cover claim');
   assert.equal(a.state, STATE.COMBAT);
   assert.equal(a.wantFire, true, 'lost protection restores defensive fire');

@@ -4,16 +4,18 @@
  *   node tests/smoke/smoke-ai-accuracy.mjs
  */
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
-import { EventBus } from '../../src/core/registry.ts';
-import { Rng } from '../../src/core/rng.ts';
-import { AiSystem } from '../../src/ai/index.ts';
+
 import { STATE } from '../../src/ai/agent.ts';
-import { makeAgent } from '../../tools/lib/agent-fixture.mjs';
 import { Animator } from '../../src/ai/animator.ts';
+import { AiSystem } from '../../src/ai/index.ts';
 import { RIG } from '../../src/ai/rig.ts';
 import { COMBAT, BASELINE, acquireSeconds } from '../../src/ai/tuning.ts';
+import { EventBus } from '../../src/core/registry.ts';
+import { Rng } from '../../src/core/rng.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
+import { makeAgent } from '../../tools/lib/agent-fixture.mjs';
 
 const DT = 1 / 60;
 const SEEDS = [0x51eed01, 0xa11e5, 0xc0ffee];
@@ -34,10 +36,17 @@ function mean(xs) {
 function makePlayer(stance = 'stand', world = phys) {
   const height = HEIGHT[stance];
   const player = {
-    isPlayer: true, position: new THREE.Vector3(), height, stance,
+    isPlayer: true,
+    position: new THREE.Vector3(),
+    height,
+    stance,
     hitbox: world.addCollider({
-      shape: 'capsule', layer: world.LAYER.PLAYER, surface: 'flesh',
-      owner: null, part: 'torso', radius: 0.3,
+      shape: 'capsule',
+      layer: world.LAYER.PLAYER,
+      surface: 'flesh',
+      owner: null,
+      part: 'torso',
+      radius: 0.3,
     }),
   };
   player.hitbox.owner = player;
@@ -46,7 +55,9 @@ function makePlayer(stance = 'stand', world = phys) {
 }
 
 function syncHitbox(player) {
-  const r = 0.3, h = player.height, p = player.position;
+  const r = 0.3,
+    h = player.height,
+    p = player.position;
   player.hitbox.setSegment(p.x, p.y + r, p.z, p.x, p.y + Math.max(r, h - r), p.z, r);
 }
 
@@ -54,8 +65,11 @@ function makeAi(player, world = phys) {
   const ai = Object.create(AiSystem.prototype);
   ai.ctx = {
     peek: (id) => (id === 'player' ? player : id === 'physics' ? world : null),
-    events, camera: { matrixWorld: new THREE.Matrix4() }, has: () => false,
-    config: { deterministic: true }, time: { elapsed: 0, dt: DT, frame: 0 },
+    events,
+    camera: { matrixWorld: new THREE.Matrix4() },
+    has: () => false,
+    config: { deterministic: true },
+    time: { elapsed: 0, dt: DT, frame: 0 },
   };
   ai._phys = world;
   ai._v = new THREE.Vector3();
@@ -70,24 +84,50 @@ function makeAi(player, world = phys) {
 
 function makeShooter(ai, dist, rng, over = {}) {
   const a = makeAgent({
-    id: 7, position: new THREE.Vector3(0, 0, dist),
-    yaw: Math.PI, targetYaw: Math.PI,
-    eyeHeight: 1.62, viewRange: COMBAT.viewRange,
+    id: 7,
+    position: new THREE.Vector3(0, 0, dist),
+    yaw: Math.PI,
+    targetYaw: Math.PI,
+    eyeHeight: 1.62,
+    viewRange: COMBAT.viewRange,
     viewCos: Math.cos((COMBAT.viewConeDeg * Math.PI) / 180 / 2),
-    suppression: 0, health: 100, weaponRange: COMBAT.viewRange,
-    fireRate: COMBAT.fireRate, spread: COMBAT.spread, weaponDamage: COMBAT.damage,
-    magSize: COMBAT.magSize, ammo: 200,
-    burstLeft: 0, fireCooldown: 0, burstCooldown: 0,
+    suppression: 0,
+    health: 100,
+    weaponRange: COMBAT.viewRange,
+    fireRate: COMBAT.fireRate,
+    spread: COMBAT.spread,
+    weaponDamage: COMBAT.damage,
+    magSize: COMBAT.magSize,
+    ammo: 200,
+    burstLeft: 0,
+    fireCooldown: 0,
+    burstCooldown: 0,
     aimTarget: new THREE.Vector3(0, 1.1, dist - 12),
-    aimWeight: 1, wantFire: false, crouch: false,
-    hasGrenade: false, grenadeCooldown: 99, role: 'pin',
-    wrapWait: 0, _wrapDone: true, cover: null, repathTimer: 5,
+    aimWeight: 1,
+    wantFire: false,
+    crouch: false,
+    hasGrenade: false,
+    grenadeCooldown: 99,
+    role: 'pin',
+    wrapWait: 0,
+    _wrapDone: true,
+    cover: null,
+    repathTimer: 5,
     peekTimer: 9,
-    squad: null, rng, ai, ctx: ai.ctx, phys: ai._phys, variantName: 'vanguard',
+    squad: null,
+    rng,
+    ai,
+    ctx: ai.ctx,
+    phys: ai._phys,
+    variantName: 'vanguard',
     animator: {
       muzzleWorld: new THREE.Vector3(0.15, 1.42, dist),
       muzzleDir: new THREE.Vector3(0, 0, -1),
-      reloading: false, vaulting: false, fire() {}, turn() {}, reload() {},
+      reloading: false,
+      vaulting: false,
+      fire() {},
+      turn() {},
+      reload() {},
     },
     ...over,
   });
@@ -112,9 +152,27 @@ function aimAt(a) {
 function recordShots(ai, world = phys) {
   const shots = [];
   ai.onAgentFire = (_a, origin, dir) => {
-    const wall = world.raycast(origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, 200, world.MASK.WORLD);
+    const wall = world.raycast(
+      origin.x,
+      origin.y,
+      origin.z,
+      dir.x,
+      dir.y,
+      dir.z,
+      200,
+      world.MASK.WORLD
+    );
     const cap = wall.hit ? wall.distance : 200;
-    const hit = world.raycast(origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, cap, world.LAYER.PLAYER);
+    const hit = world.raycast(
+      origin.x,
+      origin.y,
+      origin.z,
+      dir.x,
+      dir.y,
+      dir.z,
+      cap,
+      world.LAYER.PLAYER
+    );
     shots.push(!!hit.hit);
   };
   return shots;
@@ -172,8 +230,12 @@ function spreadRate(dist, stance, seed, { n = 220, ...over } = {}) {
   const player = makePlayer(stance);
   const ai = makeAi(player);
   const a = makeShooter(ai, dist, new Rng(seed), {
-    state: STATE.COMBAT, hasTarget: true, wantFire: true,
-    burstLeft: n + 2, ammo: n + 10, ...over,
+    state: STATE.COMBAT,
+    hasTarget: true,
+    wantFire: true,
+    burstLeft: n + 2,
+    ammo: n + 10,
+    ...over,
   });
   const shots = recordShots(ai);
   dumpShots(a, n);
@@ -184,8 +246,16 @@ function spreadRate(dist, stance, seed, { n = 220, ...over } = {}) {
 
 const stand10 = mean(SEEDS.map((s) => spreadRate(10, 'stand', s)));
 inRange('spread stand 10m', stand10, BASELINE.spread.stand[10]);
-inRange('spread stand 25m', mean(SEEDS.map((s) => spreadRate(25, 'stand', s))), BASELINE.spread.stand[25]);
-inRange('spread stand 50m', mean(SEEDS.map((s) => spreadRate(50, 'stand', s))), BASELINE.spread.stand[50]);
+inRange(
+  'spread stand 25m',
+  mean(SEEDS.map((s) => spreadRate(25, 'stand', s))),
+  BASELINE.spread.stand[25]
+);
+inRange(
+  'spread stand 50m',
+  mean(SEEDS.map((s) => spreadRate(50, 'stand', s))),
+  BASELINE.spread.stand[50]
+);
 const crouch10 = mean(SEEDS.map((s) => spreadRate(10, 'crouch', s)));
 const prone10 = mean(SEEDS.map((s) => spreadRate(10, 'prone', s)));
 inRange('spread crouch 10m', crouch10, BASELINE.spread.crouch[10]);
@@ -193,7 +263,7 @@ inRange('spread prone 10m', prone10, BASELINE.spread.prone[10]);
 assert.ok(prone10 < stand10, `prone ${prone10.toFixed(3)} !< stand ${stand10.toFixed(3)}`);
 assert.ok(
   spreadRate(10, 'stand', SEEDS[0], { suppression: 1 }) < stand10 - 0.04,
-  'suppression must widen dispersion',
+  'suppression must widen dispersion'
 );
 
 /* 3. aimed fire (lerp + wobble + spread) */
@@ -204,7 +274,8 @@ function runEncounter(dist, stance, move, seed, over = {}) {
   const a = makeShooter(ai, dist, rng, { burstCooldown: 0, ...over });
   const shots = recordShots(ai);
   alignMuzzle(a);
-  let t = 0, first = null;
+  let t = 0,
+    first = null;
   const vx = move ? 4.57 : 0;
   while (t < 2.4) {
     if (vx) {
@@ -238,19 +309,29 @@ for (const dist of [10, 25]) {
     ttfs10 = ttfs;
   }
 }
-inRange('aimed crouch 10m', mean(SEEDS.map((s) => runEncounter(10, 'crouch', false, s).rate)), BASELINE.aimed.crouchStill[10]);
-inRange('aimed prone 10m', mean(SEEDS.map((s) => runEncounter(10, 'prone', false, s).rate)), BASELINE.aimed.proneStill[10]);
+inRange(
+  'aimed crouch 10m',
+  mean(SEEDS.map((s) => runEncounter(10, 'crouch', false, s).rate)),
+  BASELINE.aimed.crouchStill[10]
+);
+inRange(
+  'aimed prone 10m',
+  mean(SEEDS.map((s) => runEncounter(10, 'prone', false, s).rate)),
+  BASELINE.aimed.proneStill[10]
+);
 const moving = mean(SEEDS.map((s) => runEncounter(10, 'stand', true, s).rate));
 inRange('aimed stand move 10m', moving, BASELINE.aimed.standMove[10]);
 assert.ok(moving < aimedStand10 - 0.08, 'relocation must cut the hit rate');
 assert.ok(ttfs10 - acquire10 <= 0.12, 'ready-weapon decision-to-fire is a beat, not a stall');
 
-const spawnTtfs = mean(SEEDS.map((s) => {
-  const gap = new Rng(s).range(COMBAT.firstBurstMin, COMBAT.firstBurstMax);
-  const r = runEncounter(10, 'stand', false, s, { burstCooldown: gap });
-  assert.ok(r.ttfs != null, 'spawn burst never fired');
-  return r.ttfs;
-}));
+const spawnTtfs = mean(
+  SEEDS.map((s) => {
+    const gap = new Rng(s).range(COMBAT.firstBurstMin, COMBAT.firstBurstMax);
+    const r = runEncounter(10, 'stand', false, s, { burstCooldown: gap });
+    assert.ok(r.ttfs != null, 'spawn burst never fired');
+    return r.ttfs;
+  })
+);
 inRange('ttfs 10m with firstBurst', spawnTtfs, BASELINE.ttfsSpawn[10]);
 
 /* 4. animated bore residual */
@@ -278,10 +359,13 @@ inRange('ttfs 10m with firstBurst', spawnTtfs, BASELINE.ttfsSpawn[10]);
 /* 5. world occlusion */
 {
   const world = new PhysicsSystem();
-  world.staticWorld.addTriangles(new Float32Array([
-    -2, 0, 5, 2, 0, 5, 2, 2.4, 5,
-    -2, 0, 5, 2, 2.4, 5, -2, 2.4, 5,
-  ]), 2, 'concrete', world.LAYER.STATIC, 'wall');
+  world.staticWorld.addTriangles(
+    new Float32Array([-2, 0, 5, 2, 0, 5, 2, 2.4, 5, -2, 0, 5, 2, 2.4, 5, -2, 2.4, 5]),
+    2,
+    'concrete',
+    world.LAYER.STATIC,
+    'wall'
+  );
   world.staticWorld.build();
   const player = makePlayer('stand', world);
   const ai = makeAi(player, world);
@@ -303,10 +387,13 @@ inRange('ttfs 10m with firstBurst', spawnTtfs, BASELINE.ttfsSpawn[10]);
 }
 
 assert.equal(COMBAT.damage, 17, 'do not inflate damage');
-assert.ok(COMBAT.spread >= 0.018 && COMBAT.spread <= 0.04, `spread ${COMBAT.spread} is laser or shotgun`);
+assert.ok(
+  COMBAT.spread >= 0.018 && COMBAT.spread <= 0.04,
+  `spread ${COMBAT.spread} is laser or shotgun`
+);
 
 console.log(
   `ok  smoke-ai-accuracy  acquire10=${acquire10.toFixed(3)} ttfs=${ttfs10.toFixed(3)} ` +
-  `spawnTtfs=${spawnTtfs.toFixed(3)} spread10=${stand10.toFixed(3)} ` +
-  `aimed10=${aimedStand10.toFixed(3)} move10=${moving.toFixed(3)}`,
+    `spawnTtfs=${spawnTtfs.toFixed(3)} spread10=${stand10.toFixed(3)} ` +
+    `aimed10=${aimedStand10.toFixed(3)} move10=${moving.toFixed(3)}`
 );

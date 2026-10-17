@@ -2,15 +2,23 @@
 import type { WorldManifest, WorldLadder } from '../core/model-metadata.ts';
 
 type BuildingFootprint = NonNullable<WorldManifest['buildings']>[number]['spec'];
-type WorldQueryMetadata = Pick<WorldManifest, 'query' | 'volumes'> & { buildings?: readonly (BuildingFootprint | { spec: BuildingFootprint })[] };
+type WorldQueryMetadata = Pick<WorldManifest, 'query' | 'volumes'> & {
+  buildings?: readonly (BuildingFootprint | { spec: BuildingFootprint })[];
+};
 type ClimbLadder = WorldLadder & { nx: number; nz: number };
 
 // Manifest data may lack exit normals; never publish an invalid climb.
 function isClimbLadder(ladder: WorldLadder): ladder is ClimbLadder {
-  return Number.isFinite(ladder.x) && Number.isFinite(ladder.z) &&
-    Number.isFinite(ladder.y0) && Number.isFinite(ladder.y1) &&
-    typeof ladder.nx === 'number' && Number.isFinite(ladder.nx) &&
-    typeof ladder.nz === 'number' && Number.isFinite(ladder.nz);
+  return (
+    Number.isFinite(ladder.x) &&
+    Number.isFinite(ladder.z) &&
+    Number.isFinite(ladder.y0) &&
+    Number.isFinite(ladder.y1) &&
+    typeof ladder.nx === 'number' &&
+    Number.isFinite(ladder.nx) &&
+    typeof ladder.nz === 'number' &&
+    Number.isFinite(ladder.nz)
+  );
 }
 
 export class WorldQueries {
@@ -20,7 +28,9 @@ export class WorldQueries {
   declare ladders: WorldLadder[];
 
   constructor(meta: WorldQueryMetadata) {
-    this.buildings = (meta.buildings ?? []).map((building) => 'spec' in building ? building.spec : building);
+    this.buildings = (meta.buildings ?? []).map((building) =>
+      'spec' in building ? building.spec : building
+    );
     const street = meta.query?.street;
     if (!street) throw new Error('[world] manifest is missing query.street metadata');
     this.street = street;
@@ -50,7 +60,8 @@ export class WorldQueries {
         x < building.x + building.w / 2 + margin &&
         z > building.z - building.d / 2 - margin &&
         z < building.z + building.d / 2 + margin
-      ) return true;
+      )
+        return true;
     }
     return false;
   }

@@ -1,20 +1,28 @@
 /** Authored sites, distance-gated random selection, run limits and interaction. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 import * as THREE from 'three';
-import { IntelSystem } from '../../src/intel/index.ts';
+
+import { AudioSystem } from '../../src/audio/index.ts';
+import { DEFAULT_BINDINGS, bindingLabel } from '../../src/core/bindings.ts';
+import { Input } from '../../src/core/input.ts';
+import { EventBus } from '../../src/core/registry.ts';
+import { Rng } from '../../src/core/rng.ts';
+import { spawnIntelSparks } from '../../src/fx/impacts.ts';
 import { shuffleDeck, drawCard, CARDS } from '../../src/intel/cards.ts';
+import { IntelSystem } from '../../src/intel/index.ts';
 import { randomMarker, rollBudget } from '../../src/intel/spawn.ts';
 import { INTEL, lureInterval } from '../../src/intel/tuning.ts';
-import { INTEL_POINTS } from '../../tools/worldgen/intel.js';
-import { Rng } from '../../src/core/rng.ts';
-import { EventBus } from '../../src/core/registry.ts';
+import { MarketSystem } from '../../src/market/index.ts';
+import { UiSystem } from '../../src/ui/index.ts';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
-import { UiSystem } from '../../src/ui/index.ts';
-import { MarketSystem } from '../../src/market/index.ts';
-import { spawnIntelSparks } from '../../src/fx/impacts.ts';
-import { AudioSystem } from '../../src/audio/index.ts';
+import { INTEL_POINTS } from '../../tools/worldgen/intel.js';
+
+assert.deepEqual(DEFAULT_BINDINGS.use, ['KeyT'], 'approved interact default is T');
+assert.deepEqual(DEFAULT_BINDINGS.flashlight, ['KeyF'], 'approved flashlight default is F');
+assert.equal(bindingLabel('use'), 'T');
 
 const market = Object.create(MarketSystem.prototype);
 market.credits = 20;
@@ -23,15 +31,23 @@ for (const invalid of [NaN, Infinity, -Infinity, 'invalid', -150, 0]) {
 }
 assert.equal(market.addCredits(150), 170);
 
-const manifest = JSON.parse(readFileSync(new URL('../../public/models/world/level.json', import.meta.url)));
+const manifest = JSON.parse(
+  readFileSync(new URL('../../public/models/world/level.json', import.meta.url))
+);
 const exported = manifest.WORLD.MARKERS.INTEL;
 assert.equal(INTEL_POINTS.length, 14);
 assert.equal(new Set(INTEL_POINTS.map((p) => p.id)).size, 14);
-assert.deepEqual(exported.map((p) => p.id), INTEL_POINTS.map((p) => p.id));
+assert.deepEqual(
+  exported.map((p) => p.id),
+  INTEL_POINTS.map((p) => p.id)
+);
 const transform = new THREE.Matrix4().fromArray(manifest.transform);
 for (let i = 0; i < exported.length; i++) {
   const p = INTEL_POINTS[i];
-  assert.deepEqual(new THREE.Vector3(p.x, p.y, p.z).applyMatrix4(transform).toArray(), exported[i].position);
+  assert.deepEqual(
+    new THREE.Vector3(p.x, p.y, p.z).applyMatrix4(transform).toArray(),
+    exported[i].position
+  );
 }
 assert(INTEL_POINTS.some((p) => p.y > 2));
 assert(INTEL_POINTS.some((p) => p.id.endsWith('roof')));
@@ -48,31 +64,70 @@ const zero = new THREE.Vector3();
 const firstRng = { float: () => 0.99 };
 const lastRng = { float: () => 0 };
 assert.equal(randomMarker(markers, new Set(), zero, [], firstRng).id, 'far');
-assert.equal(randomMarker(markers, new Set(), zero, [], lastRng).id, 'upper', 'not always the farthest site');
+assert.equal(
+  randomMarker(markers, new Set(), zero, [], lastRng).id,
+  'upper',
+  'not always the farthest site'
+);
 assert.equal(randomMarker(markers, new Set(['far']), zero, [], firstRng).id, 'upper');
-const noDraw = { float() { throw new Error('empty candidate pool consumed RNG'); } };
+const noDraw = {
+  float() {
+    throw new Error('empty candidate pool consumed RNG');
+  },
+};
 assert.equal(randomMarker(markers, new Set(markers.map((m) => m.id)), zero, [], noDraw), null);
 assert.equal(randomMarker([], new Set(), zero, [], noDraw), null);
 const site = (id, x, y = 0, z = 0) => ({ id, x, y, z });
-assert.equal(randomMarker([site('upstairs', 0, 100), site('away', 20)], new Set(), zero, [], lastRng).id,
-  'away', 'vertical separation cannot bypass the player distance gate');
-assert.equal(randomMarker([site('full', 40), site('half', 10)], new Set(), zero, [], lastRng).id,
-  'full', 'full-distance candidates take precedence over fallback candidates');
-assert.equal(randomMarker([site('near', 1), site('half', 10)], new Set(), zero, [], firstRng).id,
-  'half', 'halve spacing before accepting a site at the player');
-assert.equal(randomMarker([site('near', 1)], new Set(), zero, [site('live', 1)], firstRng).id,
-  'near', 'waive spacing rather than withholding a drop when only close sites remain');
+assert.equal(
+  randomMarker([site('upstairs', 0, 100), site('away', 20)], new Set(), zero, [], lastRng).id,
+  'away',
+  'vertical separation cannot bypass the player distance gate'
+);
+assert.equal(
+  randomMarker([site('full', 40), site('half', 10)], new Set(), zero, [], lastRng).id,
+  'full',
+  'full-distance candidates take precedence over fallback candidates'
+);
+assert.equal(
+  randomMarker([site('near', 1), site('half', 10)], new Set(), zero, [], firstRng).id,
+  'half',
+  'halve spacing before accepting a site at the player'
+);
+assert.equal(
+  randomMarker([site('near', 1)], new Set(), zero, [site('live', 1)], firstRng).id,
+  'near',
+  'waive spacing rather than withholding a drop when only close sites remain'
+);
 const live = [site('live', 20, 100)];
-assert.equal(randomMarker([site('stacked', 20), site('spread', 70)], new Set(), zero, live, firstRng).id,
-  'spread', 'live-cache separation is horizontal too, and does not depend on used IDs');
-assert.equal(randomMarker([site('too-close', 22), site('half-separated', 33)], new Set(), zero, live, firstRng).id,
-  'half-separated', 'relax live-cache spacing to half before waiving it');
-assert.equal(randomMarker([site('boundary', INTEL.spawnPlayerDistance)], new Set(), zero,
-  [site('live', INTEL.spawnPlayerDistance + INTEL.spawnCacheDistance)], firstRng).id,
-  'boundary', 'distance boundaries are inclusive');
+assert.equal(
+  randomMarker([site('stacked', 20), site('spread', 70)], new Set(), zero, live, firstRng).id,
+  'spread',
+  'live-cache separation is horizontal too, and does not depend on used IDs'
+);
+assert.equal(
+  randomMarker([site('too-close', 22), site('half-separated', 33)], new Set(), zero, live, firstRng)
+    .id,
+  'half-separated',
+  'relax live-cache spacing to half before waiving it'
+);
+assert.equal(
+  randomMarker(
+    [site('boundary', INTEL.spawnPlayerDistance)],
+    new Set(),
+    zero,
+    [site('live', INTEL.spawnPlayerDistance + INTEL.spawnCacheDistance)],
+    firstRng
+  ).id,
+  'boundary',
+  'distance boundaries are inclusive'
+);
 const spent = new Set(['spent-far', 'spent-half']);
 const sparse = [site('spent-far', 40), site('spent-half', 10), site('unused-near', 1)];
-assert.equal(randomMarker(sparse, spent, zero, [], lastRng).id, 'unused-near', 'fallback never reuses spent sites');
+assert.equal(
+  randomMarker(sparse, spent, zero, [], lastRng).id,
+  'unused-near',
+  'fallback never reuses spent sites'
+);
 assert.deepEqual([...spent], ['spent-far', 'spent-half']);
 assert.deepEqual(live, [site('live', 20, 100)], 'selection does not mutate live caches');
 
@@ -80,11 +135,16 @@ const candidates = [site('a', 20), site('b', 40), site('c', 60)];
 const samples = new Rng(132);
 const counts = { a: 0, b: 0, c: 0 };
 for (let i = 0; i < 6000; i++) counts[randomMarker(candidates, new Set(), zero, [], samples).id]++;
-for (const count of Object.values(counts)) assert(Math.abs(count - 2000) < 240, 'eligible sites are sampled uniformly');
-const rngA = new Rng(44), rngB = new Rng(44);
+for (const count of Object.values(counts))
+  assert(Math.abs(count - 2000) < 240, 'eligible sites are sampled uniformly');
+const rngA = new Rng(44),
+  rngB = new Rng(44);
 for (let i = 0; i < 100; i++) {
-  assert.equal(randomMarker(candidates, new Set(), zero, [], rngA).id,
-    randomMarker(candidates, new Set(), zero, [], rngB).id, 'same seed and state reproduce selection');
+  assert.equal(
+    randomMarker(candidates, new Set(), zero, [], rngA).id,
+    randomMarker(candidates, new Set(), zero, [], rngB).id,
+    'same seed and state reproduce selection'
+  );
 }
 const deck = [];
 shuffleDeck(new Rng(1), deck);
@@ -96,27 +156,74 @@ assert.equal(drawCard(deck), null);
 
 async function harness(deterministic = false, markerList = markers) {
   const player = {
-    dead: false, controlEnabled: true, horizontalSpeed: 0, airborne: false,
-    feetPosition: new THREE.Vector3(), eyePosition: new THREE.Vector3(0, 1.65, 0),
+    dead: false,
+    controlEnabled: true,
+    horizontalSpeed: 0,
+    airborne: false,
+    feetPosition: new THREE.Vector3(),
+    eyePosition: new THREE.Vector3(0, 1.65, 0),
     healCtrl: { active: false },
   };
   const sounds = [];
   const emitted = [];
   const ui = Object.create(UiSystem.prototype);
-  ui.prompt = { active: false, set(p) { this.active = true; this.value = { ...p }; }, clear() { this.active = false; } };
+  ui.prompt = {
+    active: false,
+    set(p) {
+      this.active = true;
+      this.value = { ...p };
+    },
+    clear() {
+      this.active = false;
+    },
+  };
   const ctx = {
-    config: { deterministic }, time: { elapsed: 10, scale: 1, frame: 0 }, rng: new Rng(7),
-    scene: new THREE.Scene(), camera: new THREE.PerspectiveCamera(), events: new EventBus(),
-    input: { enabled: true, frozen: false, use: false, action(name) { return name === 'use' && this.use; } },
-    player, ui,
+    config: { deterministic },
+    time: { elapsed: 10, scale: 1, frame: 0 },
+    rng: new Rng(7),
+    scene: new THREE.Scene(),
+    camera: new THREE.PerspectiveCamera(),
+    events: new EventBus(),
+    input: {
+      enabled: true,
+      frozen: false,
+      use: false,
+      action(name) {
+        return name === 'use' && this.use;
+      },
+    },
+    player,
+    ui,
     materials: null,
-    audio: { play(kind) { sounds.push(kind); } },
-    market: { open: false, credits: 0, addCredits(n) { this.credits += n; } },
+    audio: {
+      play(kind) {
+        sounds.push(kind);
+      },
+    },
+    market: {
+      open: false,
+      credits: 0,
+      addCredits(n) {
+        this.credits += n;
+      },
+    },
     physics: { lineOfSight: () => true },
     world: { intelMarkers: markerList, levelToWorld: (x, y, z) => new THREE.Vector3(x, y, z) },
-    get(id) { return this[id]; }, peek(id) { return this[id]; },
+    get(id) {
+      return this[id];
+    },
+    peek(id) {
+      return this[id];
+    },
   };
-  for (const type of ['intel:spawn', 'intel:secured', 'intel:noise', 'intel:available', 'intel:operation', 'intel:spark']) {
+  for (const type of [
+    'intel:spawn',
+    'intel:secured',
+    'intel:noise',
+    'intel:available',
+    'intel:operation',
+    'intel:spark',
+  ]) {
     ctx.events.on(type, (e) => emitted.push({ type, ...e, position: e.position?.clone() }));
   }
   const intel = new IntelSystem();
@@ -146,7 +253,11 @@ assert.equal(run.intel._alive[0].id, 'far');
 run.ctx.events.emit('wave:complete', { wave: 1 });
 assert.equal(run.intel._alive.length, 1, 'duplicate wave events cannot spawn twice');
 run.ctx.events.emit('wave:complete', { wave: 2 });
-assert.equal(run.intel._alive[1].id, 'upper', 'wave spawning uses the half-spacing fallback when necessary');
+assert.equal(
+  run.intel._alive[1].id,
+  'upper',
+  'wave spawning uses the half-spacing fallback when necessary'
+);
 run.ctx.events.emit('wave:complete', { wave: 3 });
 assert.equal(run.intel._alive.length, 2);
 assert.equal(run.intel._spawn(markers[0]), null, 'no unpooled third prop');
@@ -172,6 +283,68 @@ assert.equal(det.intel._alive.length, 0);
 assert.equal(det.emitted.length, 0);
 det.intel.dispose();
 
+// Physical defaults through the real Input action resolver, including ammo priority.
+const controls = await harness();
+controls.ctx.input = new Input({}, { sensitivity: 0.002, invertY: false });
+const input = controls.ctx.input;
+const controlledCache = controls.intel._spawn(markers[0]);
+controls.aimAt(controlledCache);
+controls.step(0.01);
+assert.equal(
+  controls.ctx.ui.prompt.value.key,
+  bindingLabel('use'),
+  'intel prompt uses the canonical label'
+);
+const controlledOwner = {
+  ctx: controls.ctx,
+  rng: new Rng(1),
+  player: controls.player,
+  state: { reserve: 0, def: { reserve: 90, magSize: 30 } },
+  current: 'rifle',
+  addReserve(n) {
+    this.state.reserve += n;
+    return n;
+  },
+};
+const controlledPickups = new AmmoPickups(controlledOwner);
+controlledPickups.spawn(controls.player.feetPosition);
+input.down.add('KeyF');
+assert(input.action('flashlight'));
+assert(!input.action('use'), 'F flashlight must not dispatch interaction');
+controlledPickups.update(INTEL.hold);
+controls.step(INTEL.hold);
+assert.equal(controls.intel._hold, 0, 'F cannot start securing');
+assert.equal(controls.intel.secured, 0, 'held F cannot claim intel');
+assert.equal(controls.ctx.market.credits, 0, 'F cannot pay intel credits');
+assert.equal(controlledOwner.state.reserve, 0, 'F cannot collect ammunition');
+assert(!controls.emitted.some((e) => e.type === 'intel:operation' && e.active));
+input.down.delete('KeyF');
+input.down.add('KeyT');
+assert(input.action('use'));
+assert(!input.action('flashlight'), 'T must not dispatch flashlight');
+controlledPickups.update(0.5);
+controls.step(0.5);
+assert.equal(controls.intel._hold, 0.5, 'T starts the held operation');
+assert.equal(controlledOwner.state.reserve, 0, 'intel owns T before its update');
+controls.step(INTEL.hold - 0.5);
+assert.equal(controls.intel.secured, 1, 'held T claims intel');
+assert.equal(controls.ctx.market.credits, INTEL.credits);
+controlledPickups.update(1);
+assert.equal(controlledOwner.state.reserve, 0, 'held T cannot spill into ammo after completion');
+input.down.delete('KeyT');
+controls.step(0.01);
+assert(!controls.intel.blocksUse(), 'releasing T clears the completion barrier');
+input.down.add('KeyF');
+controlledPickups.update(1);
+assert.equal(controlledOwner.state.reserve, 0, 'F cannot collect ammo even without intel priority');
+input.down.delete('KeyF');
+input.down.add('KeyT');
+controls.ctx.camera.rotateY(Math.PI);
+controlledPickups.update(1);
+assert(controlledOwner.state.reserve > 0, 'a fresh T hold collects ammo even looking away');
+controlledPickups.dispose();
+controls.intel.dispose();
+
 const h = await harness();
 const { intel, ctx, player, step, aimAt, sounds, emitted } = h;
 const cache = intel._spawn(markers[0]);
@@ -180,10 +353,16 @@ assert(beacon, 'exterior beacon follows the hinged lid');
 beacon.geometry.computeBoundingBox();
 assert(beacon.geometry.boundingBox.min.y > 0.0475, 'lens clears the closed lid top');
 const oldTime = ctx.time.elapsed;
-for (const [time, red] of [[0, INTEL.beaconDim], [INTEL.beaconPeriod / 2, INTEL.beaconBright], [INTEL.beaconPeriod, INTEL.beaconDim]]) {
-  ctx.time.elapsed = time; intel.update(1 / 60, ctx);
+for (const [time, red] of [
+  [0, INTEL.beaconDim],
+  [INTEL.beaconPeriod / 2, INTEL.beaconBright],
+  [INTEL.beaconPeriod, INTEL.beaconDim],
+]) {
+  ctx.time.elapsed = time;
+  intel.update(1 / 60, ctx);
   assert(Math.abs(beacon.material.color.r - red) < 1e-6, `pulse at ${time}s`);
-  if (time === INTEL.beaconPeriod / 2) assert(beacon.material.color.r > 1 && beacon.material.color.g < .05, 'bright red HDR pulse');
+  if (time === INTEL.beaconPeriod / 2)
+    assert(beacon.material.color.r > 1 && beacon.material.color.g < 0.05, 'bright red HDR pulse');
 }
 ctx.time.elapsed = oldTime;
 aimAt(cache);
@@ -193,21 +372,38 @@ ctx.input.use = true;
 step(1);
 assert.equal(intel.getHudState().progress, 0.25);
 assert.equal(emitted.filter((e) => e.type === 'intel:noise').length, 1);
-assert(emitted.some((e) => e.type === 'intel:operation' && e.active), 'hold starts a continuous alarm');
+assert(
+  emitted.some((e) => e.type === 'intel:operation' && e.active),
+  'hold starts a continuous alarm'
+);
 assert.equal(cache.open, 1);
 assert.equal(cache.group.lid.rotation.x, -INTEL.lidAngle);
-assert(emitted.some((e) => e.type === 'intel:spark'), 'exposed electronics spark while operated');
+assert(
+  emitted.some((e) => e.type === 'intel:spark'),
+  'exposed electronics spark while operated'
+);
 step(0.1);
-assert.equal(emitted.filter((e) => e.type === 'intel:noise').length, 1, 'noise has its own cadence');
+assert.equal(
+  emitted.filter((e) => e.type === 'intel:noise').length,
+  1,
+  'noise has its own cadence'
+);
 ctx.input.use = false;
 step(0.1);
 assert.equal(intel._hold, 0, 'release wipes progress');
-assert(emitted.some((e) => e.type === 'intel:operation' && !e.active), 'release stops the siren');
+assert(
+  emitted.some((e) => e.type === 'intel:operation' && !e.active),
+  'release stops the siren'
+);
 const releaseSparks = emitted.filter((e) => e.type === 'intel:spark').length;
 step(INTEL.lidCloseTime);
 assert.equal(cache.open, 0, 'lid closes when the unlock is released');
 assert.equal(cache.group.lid.rotation.x, 0);
-assert.equal(emitted.filter((e) => e.type === 'intel:spark').length, releaseSparks, 'closing does not spark');
+assert.equal(
+  emitted.filter((e) => e.type === 'intel:spark').length,
+  releaseSparks,
+  'closing does not spark'
+);
 ctx.input.use = true;
 step(1);
 player.horizontalSpeed = 1;
@@ -242,33 +438,125 @@ ctx.physics.lineOfSight = () => true;
 
 // Busy hands interrupt operation, not discovery. Inactive gameplay suppresses both.
 for (const [reason, discovery, setBlock] of [
-  ['pause', false, () => { ctx.time.scale = 0; }],
-  ['shop', false, () => { ctx.market.open = true; }],
-  ['frozen input', false, () => { ctx.input.frozen = true; }],
-  ['disabled input', false, () => { ctx.input.enabled = false; }],
-  ['disabled controls', false, () => { player.controlEnabled = false; }],
-  ['death', false, () => { player.dead = true; }],
-  ['menu', false, () => { ctx.ui.menu = { open: true }; }],
-  ['healing', true, () => { player.healCtrl.active = true; }],
-  ['mantling', true, () => { player.mantling = true; }],
-  ['airborne', true, () => { player.airborne = true; }],
-  ['fire', true, () => { ctx.input.fire = true; }],
-  ['ADS', true, () => { ctx.input.ads = true; }],
-  ...['reloadTac', 'reloadEmpty', 'pump', 'cycle', 'inspect'].map((clipName) => [clipName, true, () => {
-    ctx.weapons = new WeaponSystem();
-    ctx.weapons.viewmodel = { clipName };
-  }]),
-  ...['disabled', 'healing', 'cooking', '_throwing', 'grenadeEquipped', 'radioEquipped'].map((flag) => [flag, true, () => {
-    ctx.weapons = new WeaponSystem();
-    ctx.weapons[flag] = true;
-  }]),
-  ['switching', true, () => { ctx.weapons = new WeaponSystem(); ctx.weapons._switchTo = 'smg'; }],
+  [
+    'pause',
+    false,
+    () => {
+      ctx.time.scale = 0;
+    },
+  ],
+  [
+    'shop',
+    false,
+    () => {
+      ctx.market.open = true;
+    },
+  ],
+  [
+    'frozen input',
+    false,
+    () => {
+      ctx.input.frozen = true;
+    },
+  ],
+  [
+    'disabled input',
+    false,
+    () => {
+      ctx.input.enabled = false;
+    },
+  ],
+  [
+    'disabled controls',
+    false,
+    () => {
+      player.controlEnabled = false;
+    },
+  ],
+  [
+    'death',
+    false,
+    () => {
+      player.dead = true;
+    },
+  ],
+  [
+    'menu',
+    false,
+    () => {
+      ctx.ui.menu = { open: true };
+    },
+  ],
+  [
+    'healing',
+    true,
+    () => {
+      player.healCtrl.active = true;
+    },
+  ],
+  [
+    'mantling',
+    true,
+    () => {
+      player.mantling = true;
+    },
+  ],
+  [
+    'airborne',
+    true,
+    () => {
+      player.airborne = true;
+    },
+  ],
+  [
+    'fire',
+    true,
+    () => {
+      ctx.input.fire = true;
+    },
+  ],
+  [
+    'ADS',
+    true,
+    () => {
+      ctx.input.ads = true;
+    },
+  ],
+  ...['reloadTac', 'reloadEmpty', 'pump', 'cycle', 'inspect'].map((clipName) => [
+    clipName,
+    true,
+    () => {
+      ctx.weapons = new WeaponSystem();
+      ctx.weapons.viewmodel = { clipName };
+    },
+  ]),
+  ...['disabled', 'healing', 'cooking', '_throwing', 'grenadeEquipped', 'radioEquipped'].map(
+    (flag) => [
+      flag,
+      true,
+      () => {
+        ctx.weapons = new WeaponSystem();
+        ctx.weapons[flag] = true;
+      },
+    ]
+  ),
+  [
+    'switching',
+    true,
+    () => {
+      ctx.weapons = new WeaponSystem();
+      ctx.weapons._switchTo = 'smg';
+    },
+  ],
 ]) {
   step(1);
-  const openingEvents = () => emitted.filter((e) => ['intel:noise', 'intel:spark', 'intel:secured'].includes(e.type)).length;
+  const openingEvents = () =>
+    emitted.filter((e) => ['intel:noise', 'intel:spark', 'intel:secured'].includes(e.type)).length;
   const announcements = () => emitted.filter((e) => e.type === 'intel:available').length;
   const beeps = () => sounds.filter((s) => s === 'intel_beep').length;
-  const before = openingEvents(), announced = announcements(), pinged = beeps();
+  const before = openingEvents(),
+    announced = announcements(),
+    pinged = beeps();
   intel._beepAt = 0;
   intel._announceAt = ctx.time.elapsed + 0.01;
   setBlock();
@@ -280,10 +568,16 @@ for (const [reason, discovery, setBlock] of [
   assert.equal(announcements(), announced + Number(discovery), `${reason}: discovery announcement`);
   assert.equal(beeps(), pinged + Number(discovery), `${reason}: detector ping`);
   assert.equal(emitted.filter((e) => e.type === 'intel:operation').at(-1).active, false, reason);
-  ctx.time.scale = 1; ctx.market.open = false; ctx.input.frozen = false; ctx.input.enabled = true;
-  player.controlEnabled = true; player.dead = player.mantling = player.airborne = false;
-  player.healCtrl.active = false; ctx.ui.menu = null;
-  ctx.input.fire = ctx.input.ads = false; ctx.weapons = null;
+  ctx.time.scale = 1;
+  ctx.market.open = false;
+  ctx.input.frozen = false;
+  ctx.input.enabled = true;
+  player.controlEnabled = true;
+  player.dead = player.mantling = player.airborne = false;
+  player.healCtrl.active = false;
+  ctx.ui.menu = null;
+  ctx.input.fire = ctx.input.ads = false;
+  ctx.weapons = null;
 }
 step(1);
 step(0);
@@ -299,7 +593,7 @@ assert.equal(intel.secured, 1);
 assert.equal(ctx.market.credits, 500);
 assert.equal(intel._drawn.length, 1);
 assert(emitted.some((e) => e.type === 'intel:secured' && e.cardLabel && e.credits === 500));
-assert(intel.blocksUse(), 'held F after completion cannot spill into ammunition');
+assert(intel.blocksUse(), 'held T after completion cannot spill into ammunition');
 intel._secure(cache);
 assert.equal(ctx.market.credits, 500, 'securing twice is harmless');
 ctx.input.use = false;
@@ -314,8 +608,15 @@ assert(ctx.ui.prompt.active, 'intel cleanup cannot clear an ammo prompt');
 ctx.ui.clearPrompt('ammo');
 assert(!ctx.ui.prompt.active);
 const owner = {
-  ctx, rng: new Rng(1), player, state: { reserve: 0, def: { reserve: 90, magSize: 30 } },
-  addReserve(n) { this.state.reserve += n; return n; }, current: 'rifle',
+  ctx,
+  rng: new Rng(1),
+  player,
+  state: { reserve: 0, def: { reserve: 90, magSize: 30 } },
+  addReserve(n) {
+    this.state.reserve += n;
+    return n;
+  },
+  current: 'rifle',
 };
 const pickups = new AmmoPickups(owner);
 const again = intel._spawn({ id: 'again', x: 0, y: 0, z: 0 });
@@ -373,7 +674,8 @@ lights[1].light.position.set(100, 0, 0);
 let calls = 0;
 let failCompile = false;
 warm.ctx.render = {
-  lights, patchMaterials() {},
+  lights,
+  patchMaterials() {},
   async _warmGraph() {
     // Native prewarm keeps the same light identities and delegates target /
     // zero-draw restoration to the renderer's real-variant graph warmup.
@@ -386,7 +688,9 @@ warm.ctx.render = {
   },
 };
 const clock = { ...warm.ctx.time };
-warm.intel.rng.u32 = () => { throw new Error('prewarm consumed gameplay RNG'); };
+warm.intel.rng.u32 = () => {
+  throw new Error('prewarm consumed gameplay RNG');
+};
 await warm.intel.prewarmMaterials();
 assert.equal(calls, 1);
 failCompile = true;
@@ -406,11 +710,24 @@ assert.equal(randomMarker(candidates, new Set(), zero, [], firstRng, ['a', 'b', 
 assert.equal(randomMarker(candidates, new Set(['a']), zero, [], firstRng, ['a', 'b', 'c']).id, 'b');
 const storageDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
 const saved = new Map();
-Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
-  getItem(key) { return saved.get(key) ?? null; }, setItem(key, value) { saved.set(key, value); },
-} });
+Object.defineProperty(globalThis, 'localStorage', {
+  configurable: true,
+  value: {
+    getItem(key) {
+      return saved.get(key) ?? null;
+    },
+    setItem(key, value) {
+      saved.set(key, value);
+    },
+  },
+});
 try {
-  const worldMarkers = exported.map((m) => ({ id: m.id, x: m.position[0], y: m.position[1], z: m.position[2] }));
+  const worldMarkers = exported.map((m) => ({
+    id: m.id,
+    x: m.position[0],
+    y: m.position[1],
+    z: m.position[2],
+  }));
   const starts = [];
   // Identical seed/player position on six fresh boots still yields fresh eligible sites.
   for (let i = 0; i < 6; i++) {
@@ -421,14 +738,23 @@ try {
     game.intel.dispose();
   }
   assert.equal(JSON.parse(saved.get('ow:intel-sites:v1')).length, INTEL.recentSites);
-  Object.defineProperty(globalThis, 'localStorage', { configurable: true, get() { throw new Error('blocked storage'); } });
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    get() {
+      throw new Error('blocked storage');
+    },
+  });
   const blocked = await harness();
   blocked.intel.rng.float = () => 0.99;
   blocked.ctx.events.emit('wave:complete', { wave: 1 });
   const previous = blocked.intel._alive[0].id;
   blocked.intel.reset();
   blocked.ctx.events.emit('wave:complete', { wave: 1 });
-  assert.notEqual(blocked.intel._alive[0].id, previous, 'in-session history works with blocked storage');
+  assert.notEqual(
+    blocked.intel._alive[0].id,
+    previous,
+    'in-session history works with blocked storage'
+  );
   blocked.intel.dispose();
   const capture = await harness(true);
   assert.equal(capture.intel._recent.length, 0, 'capture does not read player history');
@@ -442,12 +768,20 @@ const audioSystem = new AudioSystem();
 const audioCtx = { events: new EventBus() };
 audioSystem._wireEvents(audioCtx);
 for (const [type, payload] of [
-  ['intel:operation', { active: false }], ['game:restart', {}], ['player:death', {}],
-  ['market:open', {}], ['ui:pause', { paused: true }], ['engine:error', {}],
+  ['intel:operation', { active: false }],
+  ['game:restart', {}],
+  ['player:death', {}],
+  ['market:open', {}],
+  ['ui:pause', { paused: true }],
+  ['engine:error', {}],
 ]) {
   let stopped = 0;
   audioSystem._intelOperating = true;
-  audioSystem._intelAlarm = { stop() { stopped++; } };
+  audioSystem._intelAlarm = {
+    stop() {
+      stopped++;
+    },
+  };
   audioCtx.events.emit(type, payload);
   assert.equal(stopped, 1, type);
   assert.equal(audioSystem._intelAlarm, null, type);
@@ -455,7 +789,17 @@ for (const [type, payload] of [
 }
 audioSystem.dispose();
 const particles = [];
-spawnIntelSparks({ rng: new Rng(9), emitAdd(p) { particles.push({ ...p }); } }, { x: 1, y: 2, z: 3 });
+spawnIntelSparks(
+  {
+    rng: new Rng(9),
+    emitAdd(p) {
+      particles.push({ ...p });
+    },
+  },
+  { x: 1, y: 2, z: 3 }
+);
 assert.equal(particles.length, 4);
 assert(particles.every((p) => p.x === 1 && p.y === 2 && p.z === 3 && p.vy > 0 && p.life < 0.3));
-console.log('ok  smoke-intel: four-second claim, history, spacing, lid/sparks/alarm, credits, cancellation, lifecycle, prewarm');
+console.log(
+  'ok  smoke-intel: T interaction/F isolation, canonical prompt, ammo priority/release barrier, four-second claim, history, spacing, lid/sparks/alarm, credits, cancellation, lifecycle, prewarm'
+);

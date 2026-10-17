@@ -24,33 +24,109 @@ const MAX_VERTS = 120000;
 
 const COL = {
   tri: [0.32, 0.34, 0.38],
-  node: [0.10, 0.45, 0.55],
+  node: [0.1, 0.45, 0.55],
   charGrounded: [0.25, 0.95, 0.35],
-  charAir: [0.95, 0.35, 0.20],
+  charAir: [0.95, 0.35, 0.2],
   body: [1.0, 0.55, 0.12],
-  bodySleep: [0.35, 0.24, 0.10],
+  bodySleep: [0.35, 0.24, 0.1],
   ragdoll: [0.95, 0.25, 0.85],
   ray: [0.98, 0.92, 0.25],
   contact: [1.0, 0.12, 0.12],
   proxy: [0.35, 0.75, 1.0],
 } satisfies Record<string, DebugColor>;
 
-interface DebugCharacter { grounded: boolean; position: { x: number; y: number; z: number }; radius: number; height: number; groundNormal: { x: number; y: number; z: number } }
+interface DebugCharacter {
+  grounded: boolean;
+  position: { x: number; y: number; z: number };
+  radius: number;
+  height: number;
+  groundNormal: { x: number; y: number; z: number };
+}
 type DebugBody =
   | { shape: 'sphere'; position: THREE.Vector3; radius: number; sleeping: boolean }
-  | { shape: 'capsule'; position: THREE.Vector3; quaternion: THREE.Quaternion; halfHeight: number; radius: number; sleeping: boolean }
-  | { shape: 'box'; position: THREE.Vector3; quaternion: THREE.Quaternion; hx: number; hy: number; hz: number; sleeping: boolean };
+  | {
+      shape: 'capsule';
+      position: THREE.Vector3;
+      quaternion: THREE.Quaternion;
+      halfHeight: number;
+      radius: number;
+      sleeping: boolean;
+    }
+  | {
+      shape: 'box';
+      position: THREE.Vector3;
+      quaternion: THREE.Quaternion;
+      hx: number;
+      hy: number;
+      hz: number;
+      sleeping: boolean;
+    };
 type DebugCollider =
   | { enabled: boolean; shape: 'box'; matrix: THREE.Matrix4; hx: number; hy: number; hz: number }
-  | { enabled: boolean; shape: 'sphere' | 'capsule'; ax: number; ay: number; az: number; bx: number; by: number; bz: number; radius: number };
-interface DebugRagdoll { boneCount: number; boneHead: Int32Array; boneTail: Int32Array; boneRadius: Float32Array; px: Float64Array; py: Float64Array; pz: Float64Array }
-interface DebugStaticWorld { triCount: number; nodeCount: number; candidates: Int32Array; pos: Float32Array; nodeBounds: Float32Array; nodeMeta: Int32Array; queryAabb(minx: number, miny: number, minz: number, maxx: number, maxy: number, maxz: number, mask: number): number }
-interface DebugPhysicsApi { staticWorld: DebugStaticWorld; characters: DebugCharacter[]; bodies: { bodies: DebugBody[] }; ragdolls: DebugRagdoll[]; colliders: DebugCollider[] }
+  | {
+      enabled: boolean;
+      shape: 'sphere' | 'capsule';
+      ax: number;
+      ay: number;
+      az: number;
+      bx: number;
+      by: number;
+      bz: number;
+      radius: number;
+    };
+interface DebugRagdoll {
+  boneCount: number;
+  boneHead: Int32Array;
+  boneTail: Int32Array;
+  boneRadius: Float32Array;
+  px: Float64Array;
+  py: Float64Array;
+  pz: Float64Array;
+}
+interface DebugStaticWorld {
+  triCount: number;
+  nodeCount: number;
+  candidates: Int32Array;
+  pos: Float32Array;
+  nodeBounds: Float32Array;
+  nodeMeta: Int32Array;
+  queryAabb(
+    minx: number,
+    miny: number,
+    minz: number,
+    maxx: number,
+    maxy: number,
+    maxz: number,
+    mask: number
+  ): number;
+}
+interface DebugPhysicsApi {
+  staticWorld: DebugStaticWorld;
+  characters: DebugCharacter[];
+  bodies: { bodies: DebugBody[] };
+  ragdolls: DebugRagdoll[];
+  colliders: DebugCollider[];
+}
 
 export class PhysicsDebugView {
-  declare scene: THREE.Scene; declare enabled: boolean; declare showTriangles: boolean; declare showNodes: boolean; declare showRays: boolean; declare radius: number;
-  declare positions: Float32Array; declare colors: Float32Array; declare geometry: THREE.BufferGeometry; declare posAttr: THREE.BufferAttribute; declare colAttr: THREE.BufferAttribute;
-  declare material: THREE.LineBasicMaterial; declare object: THREE.LineSegments; declare _v: number; declare _corners: Float32Array; declare rays: Float32Array; declare rayHead: number; declare rayCount: number;
+  declare scene: THREE.Scene;
+  declare enabled: boolean;
+  declare showTriangles: boolean;
+  declare showNodes: boolean;
+  declare showRays: boolean;
+  declare radius: number;
+  declare positions: Float32Array;
+  declare colors: Float32Array;
+  declare geometry: THREE.BufferGeometry;
+  declare posAttr: THREE.BufferAttribute;
+  declare colAttr: THREE.BufferAttribute;
+  declare material: THREE.LineBasicMaterial;
+  declare object: THREE.LineSegments;
+  declare _v: number;
+  declare _corners: Float32Array;
+  declare rays: Float32Array;
+  declare rayHead: number;
+  declare rayCount: number;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -115,8 +191,12 @@ export class PhysicsDebugView {
     if (!this.enabled || !this.showRays) return;
     const i = this.rayHead * 7;
     const r = this.rays;
-    r[i] = x0; r[i + 1] = y0; r[i + 2] = z0;
-    r[i + 3] = x1; r[i + 4] = y1; r[i + 5] = z1;
+    r[i] = x0;
+    r[i + 1] = y0;
+    r[i + 2] = z0;
+    r[i + 3] = x1;
+    r[i + 4] = y1;
+    r[i + 5] = z1;
     r[i + 6] = ttl;
     this.rayHead = (this.rayHead + 1) % 256;
     if (this.rayCount < 256) this.rayCount++;
@@ -126,25 +206,61 @@ export class PhysicsDebugView {
     this._v = 0;
   }
 
-  line(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, c: DebugColor = COL.tri): void {
+  line(
+    x0: number,
+    y0: number,
+    z0: number,
+    x1: number,
+    y1: number,
+    z1: number,
+    c: DebugColor = COL.tri
+  ): void {
     if (this._v + 2 > MAX_VERTS) return;
-    const p = this.positions, col = this.colors;
+    const p = this.positions,
+      col = this.colors;
     let o = this._v * 3;
-    p[o] = x0; p[o + 1] = y0; p[o + 2] = z0;
-    col[o] = c[0]; col[o + 1] = c[1]; col[o + 2] = c[2];
+    p[o] = x0;
+    p[o + 1] = y0;
+    p[o + 2] = z0;
+    col[o] = c[0];
+    col[o + 1] = c[1];
+    col[o + 2] = c[2];
     o += 3;
-    p[o] = x1; p[o + 1] = y1; p[o + 2] = z1;
-    col[o] = c[0]; col[o + 1] = c[1]; col[o + 2] = c[2];
+    p[o] = x1;
+    p[o + 1] = y1;
+    p[o + 2] = z1;
+    col[o] = c[0];
+    col[o + 1] = c[1];
+    col[o + 2] = c[2];
     this._v += 2;
   }
 
-  triangle(ax: number, ay: number, az: number, bx: number, by: number, bz: number, cx: number, cy: number, cz: number, c: DebugColor): void {
+  triangle(
+    ax: number,
+    ay: number,
+    az: number,
+    bx: number,
+    by: number,
+    bz: number,
+    cx: number,
+    cy: number,
+    cz: number,
+    c: DebugColor
+  ): void {
     this.line(ax, ay, az, bx, by, bz, c);
     this.line(bx, by, bz, cx, cy, cz, c);
     this.line(cx, cy, cz, ax, ay, az, c);
   }
 
-  box(minx: number, miny: number, minz: number, maxx: number, maxy: number, maxz: number, c: DebugColor): void {
+  box(
+    minx: number,
+    miny: number,
+    minz: number,
+    maxx: number,
+    maxy: number,
+    maxz: number,
+    c: DebugColor
+  ): void {
     this.line(minx, miny, minz, maxx, miny, minz, c);
     this.line(maxx, miny, minz, maxx, miny, maxz, c);
     this.line(maxx, miny, maxz, minx, miny, maxz, c);
@@ -178,36 +294,69 @@ export class PhysicsDebugView {
     }
     const E = BOX_EDGES;
     for (let i = 0; i < E.length; i += 2) {
-      const a = E[i] * 3, b = E[i + 1] * 3;
+      const a = E[i] * 3,
+        b = E[i + 1] * 3;
       this.line(v[a], v[a + 1], v[a + 2], v[b], v[b + 1], v[b + 2], c);
     }
   }
 
   /** Capsule as three great rings plus four connecting lines. */
-  capsule(ax: number, ay: number, az: number, bx: number, by: number, bz: number, r: number, c: DebugColor = COL.proxy, segments = 12): void {
-    let dx = bx - ax, dy = by - ay, dz = bz - az;
+  capsule(
+    ax: number,
+    ay: number,
+    az: number,
+    bx: number,
+    by: number,
+    bz: number,
+    r: number,
+    c: DebugColor = COL.proxy,
+    segments = 12
+  ): void {
+    let dx = bx - ax,
+      dy = by - ay,
+      dz = bz - az;
     const l = Math.hypot(dx, dy, dz) || 1;
-    dx /= l; dy /= l; dz /= l;
+    dx /= l;
+    dy /= l;
+    dz /= l;
     // orthonormal basis
-    let ux = 0, uy = 0, uz = 1;
-    if (Math.abs(dz) > 0.9) { ux = 1; uz = 0; }
-    let px = uy * dz - uz * dy, py = uz * dx - ux * dz, pz = ux * dy - uy * dx;
+    let ux = 0,
+      uy = 0,
+      uz = 1;
+    if (Math.abs(dz) > 0.9) {
+      ux = 1;
+      uz = 0;
+    }
+    let px = uy * dz - uz * dy,
+      py = uz * dx - ux * dz,
+      pz = ux * dy - uy * dx;
     let pl = Math.hypot(px, py, pz) || 1;
-    px /= pl; py /= pl; pz /= pl;
-    const qx = dy * pz - dz * py, qy = dz * px - dx * pz, qz = dx * py - dy * px;
+    px /= pl;
+    py /= pl;
+    pz /= pl;
+    const qx = dy * pz - dz * py,
+      qy = dz * px - dx * pz,
+      qz = dx * py - dy * px;
 
     // rings around each cap
     for (let e = 0; e < 2; e++) {
-      const cxp = e === 0 ? ax : bx, cyp = e === 0 ? ay : by, czp = e === 0 ? az : bz;
-      let prx = 0, pry = 0, prz = 0;
+      const cxp = e === 0 ? ax : bx,
+        cyp = e === 0 ? ay : by,
+        czp = e === 0 ? az : bz;
+      let prx = 0,
+        pry = 0,
+        prz = 0;
       for (let i = 0; i <= segments; i++) {
         const t = (i / segments) * Math.PI * 2;
-        const s = Math.sin(t) * r, co = Math.cos(t) * r;
+        const s = Math.sin(t) * r,
+          co = Math.cos(t) * r;
         const x = cxp + px * co + qx * s;
         const y = cyp + py * co + qy * s;
         const z = czp + pz * co + qz * s;
         if (i > 0) this.line(prx, pry, prz, x, y, z, c);
-        prx = x; pry = y; prz = z;
+        prx = x;
+        pry = y;
+        prz = z;
       }
     }
     // side lines
@@ -218,16 +367,23 @@ export class PhysicsDebugView {
     // end caps (half rings in the plane of d/p)
     for (let e = 0; e < 2; e++) {
       const s = e === 0 ? -1 : 1;
-      const cxp = e === 0 ? ax : bx, cyp = e === 0 ? ay : by, czp = e === 0 ? az : bz;
-      let prx = 0, pry = 0, prz = 0;
+      const cxp = e === 0 ? ax : bx,
+        cyp = e === 0 ? ay : by,
+        czp = e === 0 ? az : bz;
+      let prx = 0,
+        pry = 0,
+        prz = 0;
       for (let i = 0; i <= segments / 2; i++) {
         const t = (i / (segments / 2)) * Math.PI;
-        const cc = Math.cos(t) * r, ss = Math.sin(t) * r * s;
+        const cc = Math.cos(t) * r,
+          ss = Math.sin(t) * r * s;
         const x = cxp + px * cc + dx * ss;
         const y = cyp + py * cc + dy * ss;
         const z = czp + pz * cc + dz * ss;
         if (i > 0) this.line(prx, pry, prz, x, y, z, c);
-        prx = x; pry = y; prz = z;
+        prx = x;
+        pry = y;
+        prz = z;
       }
     }
   }
@@ -251,9 +407,15 @@ export class PhysicsDebugView {
       for (let i = 0; i < limit; i++) {
         const p = cand[i] * 9;
         this.triangle(
-          pos[p], pos[p + 1], pos[p + 2],
-          pos[p + 3], pos[p + 4], pos[p + 5],
-          pos[p + 6], pos[p + 7], pos[p + 8],
+          pos[p],
+          pos[p + 1],
+          pos[p + 2],
+          pos[p + 3],
+          pos[p + 4],
+          pos[p + 5],
+          pos[p + 6],
+          pos[p + 7],
+          pos[p + 8],
           COL.tri
         );
       }
@@ -273,13 +435,20 @@ export class PhysicsDebugView {
     for (const ch of phys.characters) {
       const c = ch.grounded ? COL.charGrounded : COL.charAir;
       this.capsule(
-        ch.position.x, ch.position.y + ch.radius, ch.position.z,
-        ch.position.x, ch.position.y + ch.height - ch.radius, ch.position.z,
-        ch.radius, c
+        ch.position.x,
+        ch.position.y + ch.radius,
+        ch.position.z,
+        ch.position.x,
+        ch.position.y + ch.height - ch.radius,
+        ch.position.z,
+        ch.radius,
+        c
       );
       if (ch.grounded) {
         this.line(
-          ch.position.x, ch.position.y, ch.position.z,
+          ch.position.x,
+          ch.position.y,
+          ch.position.z,
           ch.position.x + ch.groundNormal.x * 0.4,
           ch.position.y + ch.groundNormal.y * 0.4,
           ch.position.z + ch.groundNormal.z * 0.4,
@@ -292,9 +461,15 @@ export class PhysicsDebugView {
       const c = b.sleeping ? COL.bodySleep : COL.body;
       if (b.shape === 'sphere') {
         this.capsule(
-          b.position.x, b.position.y - 1e-4, b.position.z,
-          b.position.x, b.position.y + 1e-4, b.position.z,
-          b.radius, c, 10
+          b.position.x,
+          b.position.y - 1e-4,
+          b.position.z,
+          b.position.x,
+          b.position.y + 1e-4,
+          b.position.z,
+          b.radius,
+          c,
+          10
         );
       } else if (b.shape === 'capsule') {
         const q = b.quaternion;
@@ -303,9 +478,15 @@ export class PhysicsDebugView {
         const az = 2 * (q.y * q.z + q.w * q.x);
         const h = b.halfHeight;
         this.capsule(
-          b.position.x - ax * h, b.position.y - ay * h, b.position.z - az * h,
-          b.position.x + ax * h, b.position.y + ay * h, b.position.z + az * h,
-          b.radius, c, 10
+          b.position.x - ax * h,
+          b.position.y - ay * h,
+          b.position.z - az * h,
+          b.position.x + ax * h,
+          b.position.y + ay * h,
+          b.position.z + az * h,
+          b.radius,
+          c,
+          10
         );
       } else {
         _m.compose(b.position, b.quaternion, _one);
@@ -315,11 +496,18 @@ export class PhysicsDebugView {
 
     for (const rd of phys.ragdolls) {
       for (let i = 0; i < rd.boneCount; i++) {
-        const a = rd.boneHead[i], t = rd.boneTail[i];
+        const a = rd.boneHead[i],
+          t = rd.boneTail[i];
         this.capsule(
-          rd.px[a], rd.py[a], rd.pz[a],
-          rd.px[t], rd.py[t], rd.pz[t],
-          rd.boneRadius[i], COL.ragdoll, 8
+          rd.px[a],
+          rd.py[a],
+          rd.pz[a],
+          rd.px[t],
+          rd.py[t],
+          rd.pz[t],
+          rd.boneRadius[i],
+          COL.ragdoll,
+          8
         );
       }
     }
@@ -357,4 +545,6 @@ export class PhysicsDebugView {
 
 const _m = new THREE.Matrix4();
 const _one = new THREE.Vector3(1, 1, 1);
-const BOX_EDGES = Uint8Array.from([0,1, 0,2, 0,4, 1,3, 1,5, 2,3, 2,6, 3,7, 4,5, 4,6, 5,7, 6,7]);
+const BOX_EDGES = Uint8Array.from([
+  0, 1, 0, 2, 0, 4, 1, 3, 1, 5, 2, 3, 2, 6, 3, 7, 4, 5, 4, 6, 5, 7, 6, 7,
+]);

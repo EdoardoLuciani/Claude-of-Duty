@@ -11,12 +11,29 @@ import { el, setStyle, clamp, clamp01, damp, ease } from './util.ts';
  *
  * ADS hides the whole reticle over 70ms (the optic reticle is the weapon's job).
  */
-interface CrosshairState { move?: number; sprint?: boolean; ads?: boolean; crouch?: boolean; airborne?: boolean; baseSpread?: number; hidden?: boolean }
+interface CrosshairState {
+  move?: number;
+  sprint?: boolean;
+  ads?: boolean;
+  crouch?: boolean;
+  airborne?: boolean;
+  baseSpread?: number;
+  hidden?: boolean;
+}
 
 export class Crosshair {
-  declare root: HTMLElement; declare blades: HTMLElement[]; declare dot: HTMLElement;
-  declare k: number; declare gap: number; declare kick: number; declare kickVel: number;
-  declare moveSpread: number; declare adsBlend: number; declare hitPulse: number; declare visible: number; declare _rot: number[];
+  declare root: HTMLElement;
+  declare blades: HTMLElement[];
+  declare dot: HTMLElement;
+  declare k: number;
+  declare gap: number;
+  declare kick: number;
+  declare kickVel: number;
+  declare moveSpread: number;
+  declare adsBlend: number;
+  declare hitPulse: number;
+  declare visible: number;
+  declare _rot: number[];
   constructor(parent: HTMLElement) {
     this.root = el('div', 'ow-cross', parent);
     this.blades = new Array<HTMLElement>(4);

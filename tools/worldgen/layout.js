@@ -49,25 +49,50 @@ export const BUILDINGS = [
     secondarySide: 0,
     damage: 0.15,
     balconies: 0.3,
+    // The full-width terrace is the street frontage; separate balcony rails
+    // inside it duplicate that form. Consume their dressing rolls only.
+    omitBalconies: {
+      1: {
+        0: { preserveDressing: true },
+        2.799999999999999: { preserveDressing: true },
+      },
+    },
     doorBays: { 0: 2, 1: 1 },
     enterable: true,
     interiorFloors: 1,
     roofProps: 3,
-    stairFlights: [{
-      floor: 0, x: 0.048, z: 0.10, w: 1.00,
-      railing: 'right', postEvery: 2, railKey: 'metal_rust', landing: false,
-    }],
+    stairFlights: [
+      {
+        floor: 0,
+        x: 0.048,
+        z: 0.1,
+        w: 1.0,
+        railing: 'right',
+        postEvery: 2,
+        railKey: 'metal_rust',
+        landing: false,
+      },
+    ],
     ladders: [{ floor: 1, wall: 'east', along: 0.18 }],
     stairHoles: {
       // Meet the last tread (z=30.347); the old 30.50 edge left a 15 cm gap.
-      1: { x0: -18.20, x1: -17.04, z0: 25.59, z1: 30.32, rails: ['east'], railKey: 'metal_rust' },
-      2: { x0: -9.82, x1: -9.04, z0: 26.34, z1: 27.14, rails: ['north', 'south'], railKey: 'metal_rust' },
+      1: { x0: -18.2, x1: -17.04, z0: 25.59, z1: 30.32, rails: ['east'], railKey: 'metal_rust' },
+      2: {
+        x0: -9.82,
+        x1: -9.04,
+        z0: 26.34,
+        z1: 27.14,
+        rails: ['north', 'south'],
+        railKey: 'metal_rust',
+      },
     },
-    rooms: [{
-      // Open-plan living — the old spine wall boxed off half the floor.
-      walls: [],
-      furnish: [{ kind: 'living', x0: 0.0, z0: 0.0, x1: 1.0, z1: 1.0 }],
-    }],
+    rooms: [
+      {
+        // Open-plan living — the old spine wall boxed off half the floor.
+        walls: [],
+        furnish: [{ kind: 'living', x0: 0.0, z0: 0.0, x1: 1.0, z1: 1.0 }],
+      },
+    ],
   },
   {
     id: 'W1',
@@ -90,18 +115,37 @@ export const BUILDINGS = [
     roofProps: 4,
     exteriorStairs: [
       {
-        side: 0, doorX: 1.55, w: 0.95, dir: -1, railing: 'left', postEvery: 2,
-        endRail: false, midRail: true, key: 'metal_rust', out: 0.24,
+        side: 0,
+        doorX: 1.55,
+        w: 0.95,
+        dir: -1,
+        railing: 'left',
+        postEvery: 2,
+        endRail: false,
+        midRail: true,
+        key: 'metal_rust',
+        out: 0.24,
       },
       {
-        side: 0, fromFloor: 1, toFloor: 2, doorX: -3.65, w: 0.95, dir: -1,
-        railing: 'left', postEvery: 2, midRail: true, key: 'metal_rust', out: 0.24,
+        side: 0,
+        fromFloor: 1,
+        toFloor: 2,
+        doorX: -3.65,
+        w: 0.95,
+        dir: -1,
+        railing: 'left',
+        postEvery: 2,
+        midRail: true,
+        key: 'metal_rust',
+        out: 0.24,
       },
     ],
-    rooms: [{
-      walls: [[0.42, 0.0, 0.42, 1.0]],
-      furnish: [{ kind: 'shop', x0: 0.42, z0: 0.0, x1: 1.0, z1: 1.0 }],
-    }],
+    rooms: [
+      {
+        walls: [[0.42, 0.0, 0.42, 1.0]],
+        furnish: [{ kind: 'shop', x0: 0.42, z0: 0.0, x1: 1.0, z1: 1.0 }],
+      },
+    ],
   },
   {
     id: 'W2',
@@ -121,23 +165,35 @@ export const BUILDINGS = [
     doorBays: { 1: 2 },
     // The interior camera stands in the shop and looks out through bay 1 of the
     // street facade, so that bay is an open shopfront by hand, not by dice.
-    bayKinds: { 1: {
-      0: { 1: { kind: 'shop', drop: 0 } },
-      // Join the inset apartment slab to its existing terrace doorway.
-      1: { 1: { kind: 'balconyDoor', floorBridge: true } },
-    } },
+    bayKinds: {
+      1: {
+        0: { 1: { kind: 'shop', drop: 0 } },
+        // Join the inset apartment slab to its existing terrace doorway.
+        1: { 1: { kind: 'balconyDoor', floorBridge: true } },
+      },
+    },
     enterable: true,
     roofAccess: false,
     roofProps: 5,
-    stairFlights: [{
-      floor: 0, x: 0.0425, z: 0.13, ry: 0, w: 1.05,
-      railing: 'right', postEvery: 1, midRail: true, railKey: 'wood_dark',
-      carriage: false, landing: false,
-    }],
+    stairFlights: [
+      {
+        floor: 0,
+        x: 0.0425,
+        z: 0.13,
+        ry: 0,
+        w: 1.05,
+        railing: 'right',
+        postEvery: 1,
+        midRail: true,
+        railKey: 'wood_dark',
+        carriage: false,
+        landing: false,
+      },
+    ],
     ladders: [{ floor: 1, along: 0.72, key: 'wood_dark' }],
     stairHoles: {
       // Meet the last tread (z=-1.6584), rather than relying on capsule bridging.
-      1: { x0: -21.16, x1: -19.90, z0: -7.60, z1: -1.69, rails: ['east'] },
+      1: { x0: -21.16, x1: -19.9, z0: -7.6, z1: -1.69, rails: ['east'] },
       2: { x0: -21.16, x1: -20.38, z0: 0.81, z1: 1.61, rails: ['north', 'south'] },
     },
     rooms: [
@@ -191,12 +247,26 @@ export const BUILDINGS = [
     doorBays: { 1: 0 },
     enterable: true, // walkable ruin; the dark shell had no collision
     wallCuts: [{ side: 2, f: 1, x: -1.625, w: 1.8, h: 2.36 }],
-    exteriorStairs: [{
-      side: 2, doorX: -1.625, w: 1.05, railing: 'right', postEvery: 2, railKey: 'metal_rust',
-    }],
+    exteriorStairs: [
+      {
+        side: 2,
+        doorX: -1.625,
+        w: 1.05,
+        railing: 'right',
+        postEvery: 2,
+        railKey: 'metal_rust',
+      },
+    ],
     ladders: [{ floor: 1, along: 0.35 }],
     stairHoles: {
-      2: { x0: -19.16, x1: -18.38, z0: -21.40, z1: -20.60, rails: ['north', 'south'], railKey: 'metal_rust' },
+      2: {
+        x0: -19.16,
+        x1: -18.38,
+        z0: -21.4,
+        z1: -20.6,
+        rails: ['north', 'south'],
+        railKey: 'metal_rust',
+      },
     },
     rooms: [
       {
@@ -228,7 +298,7 @@ export const BUILDINGS = [
     damage: 0.3,
     balconies: 0.5,
     // Same as W2 — both upper street balconies hang over the terrace.
-    omitBalconies: { 1: { '-1.5625': true, '1.5625': true } },
+    omitBalconies: { 1: { '-1.5625': true, 1.5625: true } },
     arches: true,
     doorBays: { 0: 3, 1: 3 },
     // This existing shop opening carries the stair route. Raise its shutter
@@ -237,18 +307,28 @@ export const BUILDINGS = [
     enterable: true,
     interiorFloors: 1,
     roofProps: 4,
-    stairFlights: [{
-      floor: 0, x: 0.065, z: 0.08, w: 1.10,
-      railing: 'both', postEvery: 2, railKey: 'wood_dark', landing: false,
-    }],
-    ladders: [{ floor: 1, wall: 'east', along: 0.50, key: 'wood_dark' }],
+    stairFlights: [
+      {
+        floor: 0,
+        x: 0.065,
+        z: 0.08,
+        w: 1.1,
+        railing: 'both',
+        postEvery: 2,
+        railKey: 'wood_dark',
+        landing: false,
+      },
+    ],
+    // Clear the retained ceiling conduit (wall inset .045, radius .016)
+    // with the .36 m standing capsule; widen only the inward hatch edge.
+    ladders: [{ floor: 1, wall: 'east', along: 0.5, key: 'wood_dark', catchInset: 0.46 }],
     stairHoles: {
       1: { x0: -21.79, x1: -20.53, z0: -38.29, z1: -33.54, rails: ['east'] },
-      2: { x0: -10.42, x1: -9.64, z0: -33.65, z1: -32.85, rails: ['north', 'south'] },
+      2: { x0: -10.5, x1: -9.64, z0: -33.65, z1: -32.85, rails: ['north', 'south'] },
     },
     // Workshop, back store and break-room nook on both floors. Move only the
     // upper partition back to leave a standing-width turn past the stair rail.
-    rooms: [0.55, 0.60].map(split => ({
+    rooms: [0.55, 0.6].map((split) => ({
       walls: [
         [0.42, 0.0, 0.42, 1.0, 0.5],
         [0.0, split, 0.42, split, 0.45],
@@ -276,23 +356,42 @@ export const BUILDINGS = [
     enterable: true,
     interiorFloors: 1,
     roofProps: 3,
-    stairFlights: [{
-      floor: 0, x: 0.090, z: 0.10, w: 1.15,
-      railing: 'both', postEvery: 2, railKey: 'wood_dark', landing: false,
-    }],
-    ladders: [{ floor: 1, wall: 'east', along: 0.18 }],
+    stairFlights: [
+      {
+        floor: 0,
+        x: 0.09,
+        z: 0.1,
+        w: 1.15,
+        railing: 'both',
+        postEvery: 2,
+        railKey: 'wood_dark',
+        landing: false,
+      },
+    ],
+    // Rungs project .075 m from the wall: .46 leaves .025 m beyond the
+    // .36 m standing radius. Match the inward hatch edge to that shaft.
+    ladders: [{ floor: 1, wall: 'east', along: 0.18, catchInset: 0.46 }],
     stairHoles: {
-      1: { x0: 7.20, x1: 8.51, z0: 27.59, z1: 32.35, rails: ['east'] },
-      2: { x0: 17.38, x1: 18.16, z0: 28.34, z1: 29.14, rails: ['north', 'south'], railKey: 'metal_rust' },
+      1: { x0: 7.2, x1: 8.51, z0: 27.59, z1: 32.35, rails: ['east'] },
+      2: {
+        x0: 17.3,
+        x1: 18.16,
+        z0: 28.34,
+        z1: 29.14,
+        rails: ['north', 'south'],
+        railKey: 'metal_rust',
+      },
     },
-    rooms: [{
-      // Storeroom on the street, apartment through a doorway in the spine.
-      walls: [[0.56, 0.0, 0.56, 1.0, 0.5]],
-      furnish: [
-        { kind: 'storage', detail: true, x0: 0.0, z0: 0.0, x1: 0.56, z1: 1.0 },
-        { kind: 'living', x0: 0.56, z0: 0.0, x1: 1.0, z1: 1.0 },
-      ],
-    }],
+    rooms: [
+      {
+        // Storeroom on the street, apartment through a doorway in the spine.
+        walls: [[0.56, 0.0, 0.56, 1.0, 0.5]],
+        furnish: [
+          { kind: 'storage', detail: true, x0: 0.0, z0: 0.0, x1: 0.56, z1: 1.0 },
+          { kind: 'living', x0: 0.56, z0: 0.0, x1: 1.0, z1: 1.0 },
+        ],
+      },
+    ],
   },
   {
     id: 'E1',
@@ -317,9 +416,30 @@ export const BUILDINGS = [
     ],
     stairHoles: {
       // Overlap both the next flight's first nosing (10.1544) and last tread.
-      1: { x0: 16.50, x1: 17.80, z0: 10.18, z1: 14.54, rails: ['east', 'west'], railKey: 'metal_rust' },
-      2: { x0: 16.50, x1: 17.80, z0: 10.18, z1: 14.54, rails: ['east', 'west'], railKey: 'metal_rust' },
-      3: { x0: 16.50, x1: 17.80, z0: 10.18, z1: 14.54, rails: ['east', 'west'], railKey: 'metal_rust' },
+      1: {
+        x0: 16.5,
+        x1: 17.8,
+        z0: 10.18,
+        z1: 14.54,
+        rails: ['east', 'west'],
+        railKey: 'metal_rust',
+      },
+      2: {
+        x0: 16.5,
+        x1: 17.8,
+        z0: 10.18,
+        z1: 14.54,
+        rails: ['east', 'west'],
+        railKey: 'metal_rust',
+      },
+      3: {
+        x0: 16.5,
+        x1: 17.8,
+        z0: 10.18,
+        z1: 14.54,
+        rails: ['east', 'west'],
+        railKey: 'metal_rust',
+      },
     },
     rooms: [
       {
@@ -361,27 +481,42 @@ export const BUILDINGS = [
     // the wall behind each diagonal can be left solid without burying a door.
     exteriorStairs: [
       {
-        side: 2, doorX: -0.4, w: 1.2, dir: 1, railing: 'right', postEvery: 2,
-        endRail: false, clearBalconies: true,
+        side: 2,
+        doorX: -0.4,
+        w: 1.2,
+        dir: 1,
+        railing: 'right',
+        postEvery: 2,
+        endRail: false,
+        clearBalconies: true,
       },
       {
-        side: 2, fromFloor: 1, toFloor: 3, doorX: 6.0, w: 1.2, dir: 1, run: 0.20,
-        railing: 'right', postEvery: 2,
+        side: 2,
+        fromFloor: 1,
+        toFloor: 3,
+        doorX: 6.0,
+        w: 1.2,
+        dir: 1,
+        run: 0.2,
+        railing: 'right',
+        postEvery: 2,
       },
     ],
-    rooms: [{
-      // Shop and ruin on the street, each with a door into a shared back store.
-      walls: [
-        [0.56, 0.0, 0.56, 0.56, 0.5],
-        [0.56, 0.56, 0.56, 1.0, 0.45],
-        [0.0, 0.56, 0.56, 0.56, 0.4],
-      ],
-      furnish: [
-        { kind: 'shop', x0: 0.0, z0: 0.0, x1: 0.56, z1: 0.56 },
-        { kind: 'ruin', x0: 0.0, z0: 0.56, x1: 0.56, z1: 1.0 },
-        { kind: 'storage', detail: true, x0: 0.56, z0: 0.0, x1: 1.0, z1: 1.0 },
-      ],
-    }],
+    rooms: [
+      {
+        // Shop and ruin on the street, each with a door into a shared back store.
+        walls: [
+          [0.56, 0.0, 0.56, 0.56, 0.5],
+          [0.56, 0.56, 0.56, 1.0, 0.45],
+          [0.0, 0.56, 0.56, 0.56, 0.4],
+        ],
+        furnish: [
+          { kind: 'shop', x0: 0.0, z0: 0.0, x1: 0.56, z1: 0.56 },
+          { kind: 'ruin', x0: 0.0, z0: 0.56, x1: 0.56, z1: 1.0 },
+          { kind: 'storage', detail: true, x0: 0.56, z0: 0.0, x1: 1.0, z1: 1.0 },
+        ],
+      },
+    ],
   },
   {
     id: 'E3',
@@ -401,9 +536,16 @@ export const BUILDINGS = [
     enterable: true,
     roofProps: 2,
     wallCuts: [{ side: 1, f: 1, x: 3.2, w: 1.8, h: 2.36 }],
-    exteriorStairs: [{
-      side: 1, doorX: 3.2, w: 1.1, railing: 'right', postEvery: 2, out: 0.24,
-    }],
+    exteriorStairs: [
+      {
+        side: 1,
+        doorX: 3.2,
+        w: 1.1,
+        railing: 'right',
+        postEvery: 2,
+        out: 0.24,
+      },
+    ],
     rooms: [
       {
         walls: [[0.45, 0.0, 0.45, 0.7, 0.4]],
@@ -438,21 +580,48 @@ export const BUILDINGS = [
     interiorFloors: 1,
     roofProps: 4,
     stairFlights: [
-      { floor: 0, x: 0.920, z: 0.10, w: 1.3, railing: 'both', postEvery: 2, railKey: 'wood_dark', landing: false },
-      { floor: 1, x: 0.920, z: 0.10, w: 1.3, railing: 'both', postEvery: 2, railKey: 'wood_dark', landing: false },
+      {
+        floor: 0,
+        x: 0.92,
+        z: 0.1,
+        w: 1.3,
+        railing: 'both',
+        postEvery: 2,
+        railKey: 'wood_dark',
+        landing: false,
+      },
+      {
+        floor: 1,
+        x: 0.92,
+        z: 0.1,
+        w: 1.3,
+        railing: 'both',
+        postEvery: 2,
+        railKey: 'wood_dark',
+        landing: false,
+      },
     ],
     ladders: [{ floor: 2, along: 0.18 }],
     stairHoles: {
       // Meet the next flight's first nosing (-44.352), not the empty gap behind it.
-      1: { x0: 18.36, x1: 19.82, z0: -44.32, z1: -39.70, rails: ['west'] },
+      1: { x0: 18.36, x1: 19.82, z0: -44.32, z1: -39.7, rails: ['west'] },
       2: { x0: 18.36, x1: 19.82, z0: -44.32, z1: -39.97, rails: ['west'] },
-      3: { x0: 6.84, x1: 7.62, z0: -43.66, z1: -42.86, rails: ['north', 'south'], railKey: 'metal_rust' },
+      3: {
+        x0: 6.84,
+        x1: 7.62,
+        z0: -43.66,
+        z1: -42.86,
+        rails: ['north', 'south'],
+        railKey: 'metal_rust',
+      },
     },
-    rooms: [{
-      // Open warehouse — the old spine wall boxed off half the floor.
-      walls: [],
-      furnish: [{ kind: 'storage', detail: true, x0: 0.0, z0: 0.0, x1: 1.0, z1: 1.0 }],
-    }],
+    rooms: [
+      {
+        // Open warehouse — the old spine wall boxed off half the floor.
+        walls: [],
+        furnish: [{ kind: 'storage', detail: true, x0: 0.0, z0: 0.0, x1: 1.0, z1: 1.0 }],
+      },
+    ],
   },
 
   // ------------------------------------------------- background / infill --
@@ -463,17 +632,133 @@ export const BUILDINGS = [
    * reading as a flat cut-out, and it is offset west so a slice of real sky
    * survives on the east side of the gap.
    */
-  { id: 'BS3', x: -4, z: -53, w: 9, d: 8, floors: 4, wallKey: 'plaster_sand', streetSide: 2, damage: 0.3, balconies: 0.2, roofProps: 4 },
-  { id: 'BW1', x: -30, z: 8, w: 16, d: 22, floors: 3, wallKey: 'plaster_sand', streetSide: 1, damage: 0.15, skipSides: [1], roofProps: 3 },
-  { id: 'BW2', x: -31.6, z: -18, w: 18, d: 24, floors: 2, wallKey: 'plaster_cream', streetSide: 1, damage: 0.2, skipSides: [1], roofProps: 2 },
-  { id: 'BE1', x: 31, z: 18, w: 18, d: 20, floors: 3, wallKey: 'plaster_pink', streetSide: 3, damage: 0.15, skipSides: [3], roofProps: 3 },
-  { id: 'BE2', x: 32, z: -8, w: 18, d: 20, floors: 2, wallKey: 'plaster_blue', streetSide: 3, damage: 0.2, skipSides: [3], roofProps: 2 },
-  { id: 'BE3', x: 30, z: -34, w: 16, d: 18, floors: 3, wallKey: 'plaster_cream', streetSide: 3, damage: 0.25, skipSides: [3], roofProps: 2 },
+  {
+    id: 'BS3',
+    x: -4,
+    z: -53,
+    w: 9,
+    d: 8,
+    floors: 4,
+    wallKey: 'plaster_sand',
+    streetSide: 2,
+    damage: 0.3,
+    balconies: 0.2,
+    roofProps: 4,
+  },
+  {
+    id: 'BW1',
+    x: -30,
+    z: 8,
+    w: 16,
+    d: 22,
+    floors: 3,
+    wallKey: 'plaster_sand',
+    streetSide: 1,
+    damage: 0.15,
+    skipSides: [1],
+    roofProps: 3,
+  },
+  {
+    id: 'BW2',
+    x: -31.6,
+    z: -18,
+    w: 18,
+    d: 24,
+    floors: 2,
+    wallKey: 'plaster_cream',
+    streetSide: 1,
+    damage: 0.2,
+    skipSides: [1],
+    roofProps: 2,
+  },
+  {
+    id: 'BE1',
+    x: 31,
+    z: 18,
+    w: 18,
+    d: 20,
+    floors: 3,
+    wallKey: 'plaster_pink',
+    streetSide: 3,
+    damage: 0.15,
+    skipSides: [3],
+    roofProps: 3,
+  },
+  {
+    id: 'BE2',
+    x: 32,
+    z: -8,
+    w: 18,
+    d: 20,
+    floors: 2,
+    wallKey: 'plaster_blue',
+    streetSide: 3,
+    damage: 0.2,
+    skipSides: [3],
+    roofProps: 2,
+  },
+  {
+    id: 'BE3',
+    x: 30,
+    z: -34,
+    w: 16,
+    d: 18,
+    floors: 3,
+    wallKey: 'plaster_cream',
+    streetSide: 3,
+    damage: 0.25,
+    skipSides: [3],
+    roofProps: 2,
+  },
   // BS1/BS2 pulled apart to make room for BS3 in the middle of the far skyline.
-  { id: 'BS1', x: -19, z: -58, w: 20, d: 14, floors: 3, wallKey: 'plaster_sand', streetSide: 2, damage: 0.2, roofProps: 2 },
-  { id: 'BS2', x: 14, z: -60, w: 24, d: 16, floors: 2, wallKey: 'plaster_blue', streetSide: 2, damage: 0.2, roofProps: 2 },
-  { id: 'BN1', x: -16, z: 50, w: 20, d: 14, floors: 2, wallKey: 'plaster_cream', streetSide: 0, damage: 0.15, roofProps: 2 },
-  { id: 'BN2', x: 14, z: 52, w: 22, d: 16, floors: 3, wallKey: 'plaster_pink', streetSide: 0, damage: 0.15, roofProps: 2 },
+  {
+    id: 'BS1',
+    x: -19,
+    z: -58,
+    w: 20,
+    d: 14,
+    floors: 3,
+    wallKey: 'plaster_sand',
+    streetSide: 2,
+    damage: 0.2,
+    roofProps: 2,
+  },
+  {
+    id: 'BS2',
+    x: 14,
+    z: -60,
+    w: 24,
+    d: 16,
+    floors: 2,
+    wallKey: 'plaster_blue',
+    streetSide: 2,
+    damage: 0.2,
+    roofProps: 2,
+  },
+  {
+    id: 'BN1',
+    x: -16,
+    z: 50,
+    w: 20,
+    d: 14,
+    floors: 2,
+    wallKey: 'plaster_cream',
+    streetSide: 0,
+    damage: 0.15,
+    roofProps: 2,
+  },
+  {
+    id: 'BN2',
+    x: 14,
+    z: 52,
+    w: 22,
+    d: 16,
+    floors: 3,
+    wallKey: 'plaster_pink',
+    streetSide: 0,
+    damage: 0.15,
+    roofProps: 2,
+  },
 ];
 
 /**

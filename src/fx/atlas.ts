@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { Noise, clamp01 } from './noise.ts';
+
 import { loadPngTexture } from '../core/pngtex.ts';
 import type { Rng } from '../core/rng.ts';
+import { Noise, clamp01 } from './noise.ts';
 
 /** Runtime atlas layout/loaders. Particle/decal generation lives in tools/lib. */
 // ---------------------------------------------------------------------------
@@ -50,7 +51,11 @@ export const D = {
 
 const ATLAS_COLS = 4;
 
-export function makeTexture(data: Uint8Array, size: number, { srgb, mips = true, name }: { srgb: boolean; mips?: boolean; name: string }): THREE.DataTexture {
+export function makeTexture(
+  data: Uint8Array,
+  size: number,
+  { srgb, mips = true, name }: { srgb: boolean; mips?: boolean; name: string }
+): THREE.DataTexture {
   const t = new THREE.DataTexture(data, size, size, THREE.RGBAFormat, THREE.UnsignedByteType);
   t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
@@ -72,8 +77,10 @@ export async function loadFxAtlases(size: number) {
     loadPngTexture(`/models/proc/fx-decals-${size}-normal.png`, { srgb: false, aniso, wrap }),
     loadPngTexture(`/models/proc/fx-decals-${size}-orm.png`, { srgb: false, aniso, wrap }),
   ]);
-  const textures = results.filter(result => result.status === 'fulfilled').map(result => result.value);
-  const failed = results.find(result => result.status === 'rejected');
+  const textures = results
+    .filter((result) => result.status === 'fulfilled')
+    .map((result) => result.value);
+  const failed = results.find((result) => result.status === 'rejected');
   if (failed) {
     for (const texture of textures) {
       texture.dispose();
@@ -116,7 +123,8 @@ export function buildBrassTextures(rng: Rng, size = 256) {
   }
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      const at = (dx: number, dy: number): number => h[(((y + dy) % size) + size) % size * size + ((((x + dx) % size) + size) % size)];
+      const at = (dx: number, dy: number): number =>
+        h[((((y + dy) % size) + size) % size) * size + ((((x + dx) % size) + size) % size)];
       const gx = (at(1, 0) - at(-1, 0)) * 5;
       const gy = (at(0, 1) - at(0, -1)) * 5;
       let nx = -gx;
@@ -124,9 +132,9 @@ export function buildBrassTextures(rng: Rng, size = 256) {
       let nz = 1;
       const l = Math.hypot(nx, ny, nz) || 1;
       const i = (y * size + x) * 4;
-      normal[i] = (nx / l * 0.5 + 0.5) * 255;
-      normal[i + 1] = (ny / l * 0.5 + 0.5) * 255;
-      normal[i + 2] = (nz / l * 0.5 + 0.5) * 255;
+      normal[i] = ((nx / l) * 0.5 + 0.5) * 255;
+      normal[i + 1] = ((ny / l) * 0.5 + 0.5) * 255;
+      normal[i + 2] = ((nz / l) * 0.5 + 0.5) * 255;
       normal[i + 3] = 255;
     }
   }

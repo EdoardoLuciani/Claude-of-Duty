@@ -8,20 +8,51 @@
  */
 
 import * as THREE from 'three';
+
 import type { MeshRecord, Noise, Vec3 } from './geo.ts';
 
 type LimbOptions = {
-  rings?: number; seg?: number; flat?: number; capStart?: boolean; capEnd?: boolean;
-  up?: Vec3; fold?: number; crease?: number; bend?: Vec3;
+  rings?: number;
+  seg?: number;
+  flat?: number;
+  capStart?: boolean;
+  capEnd?: boolean;
+  up?: Vec3;
+  fold?: number;
+  crease?: number;
+  bend?: Vec3;
 };
 type HeadOptions = { wide?: number; maskHard?: boolean };
 type HelmetOptions = { bulk?: number; helmetCover?: boolean };
 type CarrierOptions = { bulk?: number; fullCarrier?: boolean };
-type PouchOptions = { x?: number; y?: number; z?: number; hx?: number; hy?: number; hz?: number; lidTilt?: number; rx?: number; ry?: number; rz?: number; bend?: number };
+type PouchOptions = {
+  x?: number;
+  y?: number;
+  z?: number;
+  hx?: number;
+  hy?: number;
+  hz?: number;
+  lidTilt?: number;
+  rx?: number;
+  ry?: number;
+  rz?: number;
+  bend?: number;
+};
 
 import {
-  emptyMesh, loft, tube, ribbon, ellipsoid, boxRound, superEllipse,
-  ellipseProfile, appendMesh, computeNormals, displace, warp, transformMesh,
+  emptyMesh,
+  loft,
+  tube,
+  ribbon,
+  ellipsoid,
+  boxRound,
+  superEllipse,
+  ellipseProfile,
+  appendMesh,
+  computeNormals,
+  displace,
+  warp,
+  transformMesh,
 } from './geo.ts';
 
 /** Cylindrical wrap about the Y axis — bends flat slabs around the torso. */
@@ -34,7 +65,18 @@ export function bendY(mesh: MeshRecord, radius: number, centreZ = 0): MeshRecord
   });
 }
 
-export function place(mesh: MeshRecord, x: number, y: number, z: number, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1): MeshRecord {
+export function place(
+  mesh: MeshRecord,
+  x: number,
+  y: number,
+  z: number,
+  rx = 0,
+  ry = 0,
+  rz = 0,
+  sx = 1,
+  sy = 1,
+  sz = 1
+): MeshRecord {
   const m = new THREE.Matrix4().compose(
     new THREE.Vector3(x, y, z),
     new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz, 'YXZ')),
@@ -58,19 +100,19 @@ export function jacketTorso(nz: Noise, p: { flare?: number; bulk?: number } = {}
   const bulk = p.bulk ?? 1;
   // y, half-width, half-depth, z offset, corner exponent
   const S = [
-    [0.865, 0.150 * flare, 0.107 * flare, -0.004, 3.0],
-    [0.925, 0.156, 0.110, -0.008, 3.0],
+    [0.865, 0.15 * flare, 0.107 * flare, -0.004, 3.0],
+    [0.925, 0.156, 0.11, -0.008, 3.0],
     [0.985, 0.152, 0.105, -0.012, 3.1],
-    [1.055, 0.146, 0.100, -0.014, 3.2],
-    [1.120, 0.150, 0.104, -0.010, 3.2],
+    [1.055, 0.146, 0.1, -0.014, 3.2],
+    [1.12, 0.15, 0.104, -0.01, 3.2],
     [1.185, 0.161, 0.112, -0.004, 3.1],
-    [1.250, 0.172 * bulk, 0.113 * bulk, 0.002, 3.0],
-    [1.310, 0.184 * bulk, 0.117 * bulk, 0.005, 2.9],
+    [1.25, 0.172 * bulk, 0.113 * bulk, 0.002, 3.0],
+    [1.31, 0.184 * bulk, 0.117 * bulk, 0.005, 2.9],
     [1.365, 0.195 * bulk, 0.118 * bulk, 0.004, 2.8],
     [1.418, 0.198, 0.111, -0.002, 2.7],
     [1.452, 0.152, 0.096, -0.008, 2.6],
-    [1.482, 0.098, 0.080, -0.010, 2.4],
-    [1.505, 0.070, 0.066, -0.010, 2.3],
+    [1.482, 0.098, 0.08, -0.01, 2.4],
+    [1.505, 0.07, 0.066, -0.01, 2.3],
   ];
   const seg = 26;
   const rings = S.map(([y, hx, hz, zo, n]) => ({
@@ -86,7 +128,7 @@ export function jacketTorso(nz: Noise, p: { flare?: number; bulk?: number } = {}
     if (v.z > 0) v.z += 0.016 * t;
     else v.z -= 0.006 * t;
     // trapezius slope
-    if (v.y > 1.40) v.y -= 0.02 * Math.min(1, Math.abs(v.x) / 0.18) ** 2;
+    if (v.y > 1.4) v.y -= 0.02 * Math.min(1, Math.abs(v.x) / 0.18) ** 2;
   });
   computeNormals(m);
 
@@ -109,11 +151,11 @@ export function jacketTorso(nz: Noise, p: { flare?: number; bulk?: number } = {}
 export function pelvis(nz: Noise): MeshRecord {
   const seg = 22;
   const rings = [
-    [0.845, 0.140, 0.100],
+    [0.845, 0.14, 0.1],
     [0.885, 0.148, 0.106],
     [0.935, 0.152, 0.108],
-    [0.985, 0.150, 0.104],
-    [1.030, 0.144, 0.098],
+    [0.985, 0.15, 0.104],
+    [1.03, 0.144, 0.098],
   ].map(([y, hx, hz]) => ({ pts: superEllipse(hx, hz, 3.0, seg), o: [0, y, -0.006] }));
   const m = loft(rings, { capStart: true, capEnd: true });
   computeNormals(m);
@@ -126,9 +168,9 @@ export function collar(nz: Noise): MeshRecord {
   const seg = 22;
   const rings = [
     [1.435, 0.108, 0.092],
-    [1.470, 0.090, 0.082],
-    [1.500, 0.082, 0.076],
-    [1.516, 0.086, 0.080],
+    [1.47, 0.09, 0.082],
+    [1.5, 0.082, 0.076],
+    [1.516, 0.086, 0.08],
   ].map(([y, hx, hz]) => ({ pts: superEllipse(hx, hz, 2.6, seg), o: [0, y, -0.006] }));
   const m = loft(rings, { capStart: false, capEnd: true });
   computeNormals(m);
@@ -159,12 +201,21 @@ export function collar(nz: Noise): MeshRecord {
  * `opts.bend` is the direction the joint folds toward in bind space (default
  * -Z, i.e. behind the knee / inside the elbow for a figure facing +Z).
  */
-export function limbTube(nz: Noise, a: Vec3, b: Vec3, c: Vec3, radii: number[], opts: LimbOptions = {}): MeshRecord {
+export function limbTube(
+  nz: Noise,
+  a: Vec3,
+  b: Vec3,
+  c: Vec3,
+  radii: number[],
+  opts: LimbOptions = {}
+): MeshRecord {
   const pts: Vec3[] = [];
   const N = opts.rings ?? 11;
   const segs = opts.seg ?? 14;
   // sample the two-segment path with a smooth blend around the joint
-  const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b), C = new THREE.Vector3(...c);
+  const A = new THREE.Vector3(...a),
+    B = new THREE.Vector3(...b),
+    C = new THREE.Vector3(...c);
   const tmp = new THREE.Vector3();
   for (let i = 0; i < N; i++) {
     const t = i / (N - 1);
@@ -193,7 +244,8 @@ export function limbTube(nz: Noise, a: Vec3, b: Vec3, c: Vec3, radii: number[], 
     // arc-length parameterisation of the two-segment chain
     const AB = new THREE.Vector3().subVectors(B, A);
     const BC = new THREE.Vector3().subVectors(C, B);
-    const lAB = AB.length(), lBC = BC.length();
+    const lAB = AB.length(),
+      lBC = BC.length();
     const uAB = AB.clone().divideScalar(Math.max(1e-5, lAB));
     const uBC = BC.clone().divideScalar(Math.max(1e-5, lBC));
     const total = lAB + lBC;
@@ -258,16 +310,16 @@ export function shoulderCap(nz: Noise, shoulder: Vec3, side: number): MeshRecord
 export function headMesh(nz: Noise, base: Vec3, p: HeadOptions = {}): MeshRecord {
   const w = p.wide ?? 1;
   const S = [
-    [0.000, 0.038 * w, 0.050, 0.020, 2.6],
-    [0.020, 0.056 * w, 0.068, 0.014, 2.6],
+    [0.0, 0.038 * w, 0.05, 0.02, 2.6],
+    [0.02, 0.056 * w, 0.068, 0.014, 2.6],
     [0.044, 0.068 * w, 0.076, 0.007, 2.5],
-    [0.070, 0.077 * w, 0.083, 0.001, 2.4],
+    [0.07, 0.077 * w, 0.083, 0.001, 2.4],
     [0.095, 0.084 * w, 0.088, -0.002, 2.4],
-    [0.119, 0.086 * w, 0.090, -0.005, 2.4],
+    [0.119, 0.086 * w, 0.09, -0.005, 2.4],
     [0.146, 0.083 * w, 0.089, -0.009, 2.4],
     [0.176, 0.076 * w, 0.082, -0.012, 2.4],
     [0.205, 0.062 * w, 0.066, -0.014, 2.4],
-    [0.230, 0.038 * w, 0.041, -0.014, 2.4],
+    [0.23, 0.038 * w, 0.041, -0.014, 2.4],
     [0.244, 0.012 * w, 0.013, -0.014, 2.4],
   ];
   const seg = 24;
@@ -278,28 +330,35 @@ export function headMesh(nz: Noise, base: Vec3, p: HeadOptions = {}): MeshRecord
   const m = loft(rings, { capStart: true, capEnd: false });
   computeNormals(m);
 
-  const bx = base[0], by = base[1], bz = base[2];
+  const bx = base[0],
+    by = base[1],
+    bz = base[2];
   // features, all in head-local coordinates
   warp(m, (v) => {
-    const x = v.x - bx, y = v.y - by, z = v.z - bz;
+    const x = v.x - bx,
+      y = v.y - by,
+      z = v.z - bz;
     const front = Math.max(0, z / 0.09);
     // brow ridge
     const brow = Math.exp(-((y - 0.113) ** 2) / 0.00016) * front * Math.exp(-(x * x) / 0.006);
     // eye sockets
     const socket =
       Math.exp(-((Math.abs(x) - 0.033) ** 2) / 0.00035) *
-      Math.exp(-((y - 0.098) ** 2) / 0.00022) * front;
+      Math.exp(-((y - 0.098) ** 2) / 0.00022) *
+      front;
     // cheekbone
     const cheek =
       Math.exp(-((Math.abs(x) - 0.055) ** 2) / 0.0009) *
-      Math.exp(-((y - 0.070) ** 2) / 0.0007) * Math.max(0, z / 0.06);
+      Math.exp(-((y - 0.07) ** 2) / 0.0007) *
+      Math.max(0, z / 0.06);
     // temple flattening
-    const temple = Math.exp(-((y - 0.150) ** 2) / 0.0016) * Math.exp(-((Math.abs(x) - 0.082) ** 2) / 0.0006);
+    const temple =
+      Math.exp(-((y - 0.15) ** 2) / 0.0016) * Math.exp(-((Math.abs(x) - 0.082) ** 2) / 0.0006);
     // chin
     const chin = Math.exp(-(y * y) / 0.00035) * front;
     // occiput
     const occ = Math.exp(-((y - 0.165) ** 2) / 0.0018) * Math.max(0, -z / 0.09);
-    const scale = 1 + 0.05 * brow - 0.10 * socket + 0.05 * cheek - 0.06 * temple;
+    const scale = 1 + 0.05 * brow - 0.1 * socket + 0.05 * cheek - 0.06 * temple;
     v.x = bx + x * (1 - 0.05 * socket - 0.05 * temple);
     v.y = by + y;
     v.z = bz + z * scale + 0.006 * brow + 0.004 * chin + 0.008 * occ * -1;
@@ -311,13 +370,15 @@ export function headMesh(nz: Noise, base: Vec3, p: HeadOptions = {}): MeshRecord
 
 /** Nose wedge + nostrils. */
 export function nose(nz: Noise, base: Vec3): MeshRecord {
-  const bx = base[0], by = base[1], bz = base[2];
+  const bx = base[0],
+    by = base[1],
+    bz = base[2];
   const S = [
-    [0.118, 0.075, 0.009, 0.010],
+    [0.118, 0.075, 0.009, 0.01],
     [0.104, 0.084, 0.011, 0.016],
-    [0.088, 0.093, 0.014, 0.020],
-    [0.074, 0.100, 0.017, 0.021],
-    [0.064, 0.100, 0.020, 0.018],
+    [0.088, 0.093, 0.014, 0.02],
+    [0.074, 0.1, 0.017, 0.021],
+    [0.064, 0.1, 0.02, 0.018],
     [0.058, 0.092, 0.019, 0.012],
   ];
   const rings = S.map(([y, z, hx, hz]) => ({
@@ -331,11 +392,11 @@ export function nose(nz: Noise, base: Vec3): MeshRecord {
 
 /** Ear: a folded flattened ellipsoid. */
 export function ear(nz: Noise, base: Vec3, side: number): MeshRecord {
-  const m = ellipsoid(0.010, 0.030, 0.020, { seg: 12, rows: 9 });
+  const m = ellipsoid(0.01, 0.03, 0.02, { seg: 12, rows: 9 });
   computeNormals(m);
   warp(m, (v) => {
     v.z += v.y * 0.25;
-    v.x += Math.abs(v.y) * 0.10;
+    v.x += Math.abs(v.y) * 0.1;
   });
   place(m, base[0] + side * 0.083, base[1] + 0.098, base[2] - 0.008, 0.1, side * 0.25, 0);
   return m;
@@ -360,16 +421,18 @@ export function eyeball(base: Vec3, side: number): MeshRecord {
  * survive to whatever mip the diffuse ends up at.
  */
 export function faceWrap(nz: Noise, base: Vec3, p: HeadOptions = {}): MeshRecord {
-  const bx = base[0], by = base[1], bz = base[2];
+  const bx = base[0],
+    by = base[1],
+    bz = base[2];
   const S = [
-    [-0.075, 0.062, 0.062, -0.010, 2.6],
-    [-0.040, 0.070, 0.072, -0.006, 2.6],
-    [-0.010, 0.080, 0.084, 0.004, 2.5],
-    [0.014, 0.070, 0.082, 0.014, 2.5],
+    [-0.075, 0.062, 0.062, -0.01, 2.6],
+    [-0.04, 0.07, 0.072, -0.006, 2.6],
+    [-0.01, 0.08, 0.084, 0.004, 2.5],
+    [0.014, 0.07, 0.082, 0.014, 2.5],
     [0.038, 0.078, 0.086, 0.008, 2.5],
-    [0.060, 0.086, 0.092, 0.002, 2.4],
-    [0.076, 0.090, 0.094, -0.002, 2.4],
-    [0.086, 0.090, 0.093, -0.006, 2.4],
+    [0.06, 0.086, 0.092, 0.002, 2.4],
+    [0.076, 0.09, 0.094, -0.002, 2.4],
+    [0.086, 0.09, 0.093, -0.006, 2.4],
   ];
   const seg = 22;
   const rings = S.map(([y, hx, hz, zo, n]) => ({
@@ -398,9 +461,11 @@ export function faceWrap(nz: Noise, base: Vec3, p: HeadOptions = {}): MeshRecord
   const nHem = 26;
   for (let i = 0; i <= nHem; i++) {
     const a = (i / nHem) * Math.PI * 2;
-    const sx = Math.sin(a), sz = Math.cos(a);
+    const sx = Math.sin(a),
+      sz = Math.cos(a);
     // the hem rides higher over the cheeks and dips at the bridge of the nose
-    const y = 0.086 + Math.max(0, sz) * 0.006 - Math.exp(-(sx * sx) / 0.06) * Math.max(0, sz) * 0.010;
+    const y =
+      0.086 + Math.max(0, sz) * 0.006 - Math.exp(-(sx * sx) / 0.06) * Math.max(0, sz) * 0.01;
     hem.push([bx + sx * 0.092, by + y, bz + sz * 0.096 - 0.004]);
   }
   const roll = ribbon(hem, 0.015, 0.008, { seg: 6, up: [0, 1, 0], upright: true });
@@ -411,7 +476,7 @@ export function faceWrap(nz: Noise, base: Vec3, p: HeadOptions = {}): MeshRecord
   const seam = [];
   for (let i = 0; i <= 4; i++) {
     const t = i / 4;
-    seam.push([bx, by + 0.082 - t * 0.086, bz + 0.088 - t * 0.020]);
+    seam.push([bx, by + 0.082 - t * 0.086, bz + 0.088 - t * 0.02]);
   }
   const sm = ribbon(seam, 0.009, 0.004, { seg: 5, up: [1, 0, 0] });
   computeNormals(sm);
@@ -420,9 +485,9 @@ export function faceWrap(nz: Noise, base: Vec3, p: HeadOptions = {}): MeshRecord
   // --- bridge fold over the nose ----------------------------------------
   const bridge = ribbon(
     [
-      [bx - 0.042, by + 0.070, bz + 0.070],
+      [bx - 0.042, by + 0.07, bz + 0.07],
       [bx, by + 0.078, bz + 0.092],
-      [bx + 0.042, by + 0.070, bz + 0.070],
+      [bx + 0.042, by + 0.07, bz + 0.07],
     ],
     0.013,
     0.005,
@@ -442,18 +507,20 @@ export function faceWrap(nz: Noise, base: Vec3, p: HeadOptions = {}): MeshRecord
  * 35 m on a bare head.
  */
 export function sunglasses(base: Vec3): { lens: MeshRecord; frame: MeshRecord } {
-  const bx = base[0], by = base[1], bz = base[2];
+  const bx = base[0],
+    by = base[1],
+    bz = base[2];
   const lens = boxRound(0.072, 0.0155, 0.006, { n: 3.0, seg: 18, rows: 5, roundY: 0.6 });
-  place(lens, bx, by + 0.100, bz + 0.080, -0.06, 0, 0);
+  place(lens, bx, by + 0.1, bz + 0.08, -0.06, 0, 0);
   bendY(lens, 0.098, 0);
   computeNormals(lens);
   const frame = emptyMesh();
   for (const side of [-1, 1]) {
     const arm = ribbon(
       [
-        [bx + side * 0.070, by + 0.104, bz + 0.062],
-        [bx + side * 0.083, by + 0.104, bz + 0.010],
-        [bx + side * 0.080, by + 0.100, bz - 0.030],
+        [bx + side * 0.07, by + 0.104, bz + 0.062],
+        [bx + side * 0.083, by + 0.104, bz + 0.01],
+        [bx + side * 0.08, by + 0.1, bz - 0.03],
       ],
       0.008,
       0.004,
@@ -476,15 +543,20 @@ export function sunglasses(base: Vec3): { lens: MeshRecord; frame: MeshRecord } 
  */
 export function helmet(nz: Noise, base: Vec3, p: HelmetOptions = {}): MeshRecord {
   const out = emptyMesh();
-  const bx = base[0], by = base[1], bz = base[2];
-  const cy = by + 0.100; // shell centre (just above the brow)
+  const bx = base[0],
+    by = base[1],
+    bz = base[2];
+  const cy = by + 0.1; // shell centre (just above the brow)
   const bulk = p.bulk ?? 1;
   const cover = p.helmetCover ? 1.035 : 1;
   const s = bulk * cover;
-  const rx = 0.121 * s, ry = 0.158 * s, rz = 0.135 * s;
+  const rx = 0.121 * s,
+    ry = 0.158 * s,
+    rz = 0.135 * s;
 
   // --- shell: revolved dome, bottom edge scalloped per angle
-  const seg = 26, rows = 12;
+  const seg = 26,
+    rows = 12;
   const rings = [];
   for (let r = 0; r < rows; r++) {
     const t = r / (rows - 1);
@@ -503,7 +575,7 @@ export function helmet(nz: Noise, base: Vec3, p: HelmetOptions = {}): MeshRecord
     if (dy > 0.012) return;
     const ang = Math.atan2(v.x - bx, v.z - bz);
     const side = Math.abs(Math.sin(ang));
-    const lift = side ** 2 * 0.042 - Math.max(0, Math.cos(ang)) * 0.010;
+    const lift = side ** 2 * 0.042 - Math.max(0, Math.cos(ang)) * 0.01;
     const k = Math.min(1, Math.max(0, (0.012 - dy) / 0.06));
     v.y += lift * k;
   });
@@ -516,9 +588,10 @@ export function helmet(nz: Noise, base: Vec3, p: HelmetOptions = {}): MeshRecord
   const nLip = 30;
   for (let i = 0; i <= nLip; i++) {
     const a = (i / nLip) * Math.PI * 2;
-    const sx = Math.sin(a), sz = Math.cos(a);
+    const sx = Math.sin(a),
+      sz = Math.cos(a);
     const side = Math.abs(sx);
-    const lift = side ** 2 * 0.042 - Math.max(0, sz) * 0.010;
+    const lift = side ** 2 * 0.042 - Math.max(0, sz) * 0.01;
     lipPts.push([bx + sx * rx * 0.955, cy + lift - 0.001, bz - 0.004 + sz * rz * 0.955]);
   }
   const lip = ribbon(lipPts, 0.011, 0.006, { seg: 6, up: [0, 1, 0], upright: true });
@@ -531,15 +604,17 @@ export function helmet(nz: Noise, base: Vec3, p: HelmetOptions = {}): MeshRecord
 /** Side rails, NVG shroud and rear counterweight pouch — the helmet hardware. */
 export function helmetHardware(nz: Noise, base: Vec3): MeshRecord {
   const out = emptyMesh();
-  const bx = base[0], by = base[1], bz = base[2];
-  const cy = by + 0.100;
+  const bx = base[0],
+    by = base[1],
+    bz = base[2];
+  const cy = by + 0.1;
 
   // NVG shroud on the brow
-  const shroud = boxRound(0.030, 0.012, 0.022, { n: 4, seg: 12, rows: 5, roundY: 0.5 });
-  place(shroud, bx, cy + 0.062, bz + 0.120, -0.50, 0, 0);
+  const shroud = boxRound(0.03, 0.012, 0.022, { n: 4, seg: 12, rows: 5, roundY: 0.5 });
+  place(shroud, bx, cy + 0.062, bz + 0.12, -0.5, 0, 0);
   appendMesh(out, shroud);
   const lug = boxRound(0.009, 0.016, 0.007, { n: 4, seg: 8, rows: 4, roundY: 0.4 });
-  place(lug, bx, cy + 0.086, bz + 0.126, -0.50, 0, 0);
+  place(lug, bx, cy + 0.086, bz + 0.126, -0.5, 0, 0);
   appendMesh(out, lug);
 
   // ARC rails: a slotted strip down each side
@@ -571,8 +646,10 @@ export function helmetHardware(nz: Noise, base: Vec3): MeshRecord {
 /** Chin strap + nape pad. */
 export function chinStrap(base: Vec3): MeshRecord {
   const out = emptyMesh();
-  const bx = base[0], by = base[1], bz = base[2];
-  const cy = by + 0.100;
+  const bx = base[0],
+    by = base[1],
+    bz = base[2];
+  const cy = by + 0.1;
   for (const side of [-1, 1]) {
     const pts = [
       [bx + side * 0.104, cy + 0.004, bz + 0.036],
@@ -584,9 +661,9 @@ export function chinStrap(base: Vec3): MeshRecord {
     computeNormals(s);
     appendMesh(out, s);
     const rear = [
-      [bx + side * 0.106, cy + 0.000, bz - 0.024],
-      [bx + side * 0.090, cy - 0.058, bz - 0.058],
-      [bx + side * 0.040, cy - 0.078, bz - 0.082],
+      [bx + side * 0.106, cy + 0.0, bz - 0.024],
+      [bx + side * 0.09, cy - 0.058, bz - 0.058],
+      [bx + side * 0.04, cy - 0.078, bz - 0.082],
     ];
     const r = ribbon(rear, 0.014, 0.005, { seg: 6, up: [0, 1, 0] });
     computeNormals(r);
@@ -596,20 +673,25 @@ export function chinStrap(base: Vec3): MeshRecord {
 }
 
 /** Goggles: pushed up on the shell, or pulled down over the eyes. */
-export function goggles(base: Vec3, down = false): { frame: MeshRecord; strap: MeshRecord; down?: true } {
+export function goggles(
+  base: Vec3,
+  down = false
+): { frame: MeshRecord; strap: MeshRecord; down?: true } {
   if (down) return gogglesDown(base);
   const frame = boxRound(0.082, 0.026, 0.024, { n: 3.2, seg: 20, rows: 6, roundY: 0.5 });
-  const bx = base[0], by = base[1], bz = base[2];
+  const bx = base[0],
+    by = base[1],
+    bz = base[2];
   place(frame, bx, by + 0.176, bz + 0.098, -0.95, 0, 0);
   bendY(frame, 0.15, 0);
   computeNormals(frame);
   const strap = ribbon(
     [
       [bx - 0.098, by + 0.176, bz + 0.078],
-      [bx - 0.118, by + 0.198, bz - 0.020],
+      [bx - 0.118, by + 0.198, bz - 0.02],
       [bx - 0.072, by + 0.226, bz - 0.116],
       [bx + 0.072, by + 0.226, bz - 0.116],
-      [bx + 0.118, by + 0.198, bz - 0.020],
+      [bx + 0.118, by + 0.198, bz - 0.02],
       [bx + 0.098, by + 0.176, bz + 0.078],
     ],
     0.024,
@@ -621,19 +703,21 @@ export function goggles(base: Vec3, down = false): { frame: MeshRecord; strap: M
 }
 
 function gogglesDown(base: Vec3): { frame: MeshRecord; strap: MeshRecord; down: true } {
-  const bx = base[0], by = base[1], bz = base[2];
+  const bx = base[0],
+    by = base[1],
+    bz = base[2];
   const frame = boxRound(0.078, 0.028, 0.026, { n: 3.2, seg: 20, rows: 6, roundY: 0.5 });
-  place(frame, bx, by + 0.098, bz + 0.072, -0.10, 0, 0);
+  place(frame, bx, by + 0.098, bz + 0.072, -0.1, 0, 0);
   bendY(frame, 0.115, 0);
   computeNormals(frame);
   const strap = ribbon(
     [
-      [bx - 0.084, by + 0.100, bz + 0.058],
-      [bx - 0.106, by + 0.108, bz - 0.030],
+      [bx - 0.084, by + 0.1, bz + 0.058],
+      [bx - 0.106, by + 0.108, bz - 0.03],
       [bx - 0.062, by + 0.116, bz - 0.108],
       [bx + 0.062, by + 0.116, bz - 0.108],
-      [bx + 0.106, by + 0.108, bz - 0.030],
-      [bx + 0.084, by + 0.100, bz + 0.058],
+      [bx + 0.106, by + 0.108, bz - 0.03],
+      [bx + 0.084, by + 0.1, bz + 0.058],
     ],
     0.026,
     0.008,
@@ -646,15 +730,19 @@ function gogglesDown(base: Vec3): { frame: MeshRecord; strap: MeshRecord; down: 
 /** Goggle lens — a curved slab of smoked glass. */
 export function goggleLens(base: Vec3, down = false): MeshRecord {
   if (down) {
-    const bx = base[0], by = base[1], bz = base[2];
-    const lens = boxRound(0.071, 0.020, 0.008, { n: 3.0, seg: 18, rows: 5, roundY: 0.6 });
-    place(lens, bx, by + 0.098, bz + 0.090, -0.10, 0, 0);
+    const bx = base[0],
+      by = base[1],
+      bz = base[2];
+    const lens = boxRound(0.071, 0.02, 0.008, { n: 3.0, seg: 18, rows: 5, roundY: 0.6 });
+    place(lens, bx, by + 0.098, bz + 0.09, -0.1, 0, 0);
     bendY(lens, 0.105, 0);
     computeNormals(lens);
     return lens;
   }
   const lens = boxRound(0.074, 0.019, 0.008, { n: 3.0, seg: 18, rows: 5, roundY: 0.6 });
-  const bx = base[0], by = base[1], bz = base[2];
+  const bx = base[0],
+    by = base[1],
+    bz = base[2];
   place(lens, bx, by + 0.176, bz + 0.115, -0.95, 0, 0);
   bendY(lens, 0.14, 0);
   computeNormals(lens);
@@ -668,7 +756,9 @@ export function goggleLens(base: Vec3, down = false): MeshRecord {
  */
 export function headScarf(nz: Noise, base: Vec3): MeshRecord {
   const out = emptyMesh();
-  const bx = base[0], by = base[1], bz = base[2];
+  const bx = base[0],
+    by = base[1],
+    bz = base[2];
   // The skull crown sits at +0.244 in head-local space, so the dome has to reach
   // +0.250 or the bare scalp pokes through the top of the wrap — which is exactly
   // what it looked like: a pink patch on the crown at every distance.
@@ -684,22 +774,22 @@ export function headScarf(nz: Noise, base: Vec3): MeshRecord {
   const pts = [];
   for (let i = 0; i <= 24; i++) {
     const a = (i / 24) * Math.PI * 2;
-    pts.push([bx + Math.sin(a) * 0.099, by + 0.118 - Math.max(0, Math.cos(a)) * 0.012, bz - 0.008 + Math.cos(a) * 0.109]);
+    pts.push([
+      bx + Math.sin(a) * 0.099,
+      by + 0.118 - Math.max(0, Math.cos(a)) * 0.012,
+      bz - 0.008 + Math.cos(a) * 0.109,
+    ]);
   }
-  const brim = ribbon(pts, 0.030, 0.016, { seg: 7, up: [0, 1, 0], upright: true });
+  const brim = ribbon(pts, 0.03, 0.016, { seg: 7, up: [0, 1, 0], upright: true });
   computeNormals(brim);
   appendMesh(out, brim);
   // tail down the back
   const tail = [];
   for (let i = 0; i <= 5; i++) {
     const t = i / 5;
-    tail.push([
-      bx + 0.028 * t,
-      by + 0.115 - t * 0.20,
-      bz - 0.085 - Math.sin(t * 2.2) * 0.03,
-    ]);
+    tail.push([bx + 0.028 * t, by + 0.115 - t * 0.2, bz - 0.085 - Math.sin(t * 2.2) * 0.03]);
   }
-  const tl = tube(tail, (t) => superEllipse(0.052 - t * 0.012, 0.020 + t * 0.006, 3, 12), {
+  const tl = tube(tail, (t) => superEllipse(0.052 - t * 0.012, 0.02 + t * 0.006, 3, 12), {
     capStart: false,
     capEnd: true,
   });
@@ -714,12 +804,20 @@ export function headScarf(nz: Noise, base: Vec3): MeshRecord {
 /* ================================================================== */
 
 /** One plate: a curved slab with a soft edge. */
-function plate(hx: number, hy: number, hz: number, y: number, z: number, tilt: number, radius: number): MeshRecord {
+function plate(
+  hx: number,
+  hy: number,
+  hz: number,
+  y: number,
+  z: number,
+  tilt: number,
+  radius: number
+): MeshRecord {
   const m = boxRound(hx, hy, hz, { n: 3.6, seg: 22, rows: 11, roundY: 0.24 });
   // taper: a real plate narrows toward the waist and wraps in at the bottom
   warp(m, (v) => {
     const t = Math.max(0, -v.y / hy);
-    v.x *= 1 - 0.20 * t * t;
+    v.x *= 1 - 0.2 * t * t;
     v.z *= 1 - 0.35 * t * t;
   });
   computeNormals(m);
@@ -732,22 +830,24 @@ function plate(hx: number, hy: number, hz: number, y: number, z: number, tilt: n
 /** A pouch: rounded box with a lid, a pull tab and compression stitching. */
 export function pouch(nz: Noise, o: PouchOptions): MeshRecord {
   const out = emptyMesh();
-  const hx = o.hx ?? 0.038, hy = o.hy ?? 0.055, hz = o.hz ?? 0.030;
+  const hx = o.hx ?? 0.038,
+    hy = o.hy ?? 0.055,
+    hz = o.hz ?? 0.03;
   const body = boxRound(hx, hy, hz, { n: 5.5, seg: 18, rows: 8, roundY: 0.18 });
   computeNormals(body);
   displace(body, (x, y, z) => nz.fbm3(x * 40, y * 40, z * 40, 3) * 0.0022);
   appendMesh(out, body);
   // lid
-  const lid = boxRound(hx * 1.03, 0.010, hz * 0.98, { n: 5.5, seg: 18, rows: 4, roundY: 0.5 });
-  place(lid, 0, hy - 0.004, (o.lidTilt ? hz * 0.35 : 0) + hz * 0.10, (o.lidTilt ?? 0) - 0.18, 0, 0);
+  const lid = boxRound(hx * 1.03, 0.01, hz * 0.98, { n: 5.5, seg: 18, rows: 4, roundY: 0.5 });
+  place(lid, 0, hy - 0.004, (o.lidTilt ? hz * 0.35 : 0) + hz * 0.1, (o.lidTilt ?? 0) - 0.18, 0, 0);
   computeNormals(lid);
   appendMesh(out, lid);
   // pull tab
   const tab = ribbon(
     [
       [0, hy + 0.004, hz * 0.7],
-      [0, hy - 0.010, hz * 1.16],
-      [0, hy - 0.034, hz * 1.10],
+      [0, hy - 0.01, hz * 1.16],
+      [0, hy - 0.034, hz * 1.1],
     ],
     0.014,
     0.004,
@@ -766,10 +866,10 @@ export function plateCarrier(nz: Noise, p: CarrierOptions = {}): MeshRecord {
   const out = emptyMesh();
   const bulk = p.bulk ?? 1;
   const thick = p.fullCarrier === false ? 0.88 : 1;
-  const front = plate(0.152 * bulk, 0.140 * bulk, 0.030 * thick, 1.298, 0.126, -0.05, 0.20);
+  const front = plate(0.152 * bulk, 0.14 * bulk, 0.03 * thick, 1.298, 0.126, -0.05, 0.2);
   displace(front, (x, y, z) => nz.fbm3(x * 34, y * 34, z * 34, 3) * 0.0026);
   appendMesh(out, front);
-  const back = plate(0.154 * bulk, 0.148 * bulk, 0.026 * thick, 1.300, -0.116, 0.05, 0.21);
+  const back = plate(0.154 * bulk, 0.148 * bulk, 0.026 * thick, 1.3, -0.116, 0.05, 0.21);
   displace(back, (x, y, z) => nz.fbm3(x * 34, y * 34, z * 34, 3) * 0.0026);
   appendMesh(out, back);
 
@@ -778,9 +878,13 @@ export function plateCarrier(nz: Noise, p: CarrierOptions = {}): MeshRecord {
   const n = 26;
   for (let i = 0; i <= n; i++) {
     const a = (i / n) * Math.PI * 2;
-    cb.push([Math.sin(a) * 0.168 * bulk, 1.152 + Math.cos(a * 2) * 0.005, Math.cos(a) * 0.121 * bulk - 0.004]);
+    cb.push([
+      Math.sin(a) * 0.168 * bulk,
+      1.152 + Math.cos(a * 2) * 0.005,
+      Math.cos(a) * 0.121 * bulk - 0.004,
+    ]);
   }
-  const band = ribbon(cb, 0.100, 0.022, { seg: 8, up: [0, 1, 0], upright: true });
+  const band = ribbon(cb, 0.1, 0.022, { seg: 8, up: [0, 1, 0], upright: true });
   computeNormals(band);
   displace(band, (x, y, z) => nz.fbm3(x * 34, y * 34, z * 34, 3) * 0.002);
   appendMesh(out, band);
@@ -789,11 +893,11 @@ export function plateCarrier(nz: Noise, p: CarrierOptions = {}): MeshRecord {
   for (const side of [-1, 1]) {
     const pts = [
       [side * 0.082 * bulk, 1.418, 0.144],
-      [side * 0.100 * bulk, 1.468, 0.040],
+      [side * 0.1 * bulk, 1.468, 0.04],
       [side * 0.104 * bulk, 1.462, -0.036],
-      [side * 0.092 * bulk, 1.418, -0.120],
+      [side * 0.092 * bulk, 1.418, -0.12],
     ];
-    const s = ribbon(pts, 0.076, 0.030, { seg: 8, up: [0, 1, 0] });
+    const s = ribbon(pts, 0.076, 0.03, { seg: 8, up: [0, 1, 0] });
     computeNormals(s);
     displace(s, (x, y, z) => nz.fbm3(x * 34, y * 34, z * 34, 3) * 0.002);
     appendMesh(out, s);
@@ -810,8 +914,8 @@ export function carrierWebbing(): MeshRecord {
     const pts = [];
     for (let i = 0; i <= 8; i++) {
       const t = i / 8;
-      const x = (t - 0.5) * 0.150;
-      pts.push([x, y, 0.150 - (x * x) / 0.20]);
+      const x = (t - 0.5) * 0.15;
+      pts.push([x, y, 0.15 - (x * x) / 0.2]);
     }
     const row = ribbon(pts, 0.013, 0.0035, { seg: 5, up: [0, 1, 0], upright: true });
     computeNormals(row);
@@ -826,7 +930,7 @@ export function carrierWebbing(): MeshRecord {
       [0.052, 1.432, -0.132],
     ],
     0.028,
-    0.010,
+    0.01,
     { seg: 6, up: [0, 1, 0], upright: true }
   );
   computeNormals(drag);
@@ -838,12 +942,12 @@ export function carrierWebbing(): MeshRecord {
 export function sling(gripPoint: Vec3, stockPoint: Vec3): MeshRecord {
   const pts = [
     [stockPoint[0], stockPoint[1] + 0.02, stockPoint[2]],
-    [-0.130, 1.395, -0.010],
-    [-0.120, 1.430, -0.090],
-    [0.020, 1.430, -0.118],
-    [0.120, 1.330, -0.070],
-    [0.150, 1.250, 0.040],
-    [0.110, 1.235, 0.135],
+    [-0.13, 1.395, -0.01],
+    [-0.12, 1.43, -0.09],
+    [0.02, 1.43, -0.118],
+    [0.12, 1.33, -0.07],
+    [0.15, 1.25, 0.04],
+    [0.11, 1.235, 0.135],
     [gripPoint[0] + 0.02, gripPoint[1] + 0.03, gripPoint[2] + 0.02],
   ];
   const m = ribbon(pts, 0.032, 0.009, { seg: 6, up: [0, 1, 0] });
@@ -870,9 +974,14 @@ export function belt(nz: Noise): MeshRecord {
 /** Dump pouch / canteen hanging off the belt at the back. */
 export function hipPouch(nz: Noise, side: number): MeshRecord {
   const m = pouch(nz, {
-    hx: 0.048, hy: 0.062, hz: 0.038,
-    x: side * 0.142, y: 0.878, z: -0.070,
-    rz: side * 0.12, ry: side * 0.5,
+    hx: 0.048,
+    hy: 0.062,
+    hz: 0.038,
+    x: side * 0.142,
+    y: 0.878,
+    z: -0.07,
+    rz: side * 0.12,
+    ry: side * 0.5,
   });
   return m;
 }
@@ -880,7 +989,7 @@ export function hipPouch(nz: Noise, side: number): MeshRecord {
 /** Knee pad: a curved cap with two elastic straps. `side` is -1 right / +1 left. */
 export function kneePad(nz: Noise, knee: Vec3, side = 0): MeshRecord {
   const out = emptyMesh();
-  const cap = boxRound(0.064, 0.080, 0.026, { n: 4.5, seg: 18, rows: 9, roundY: 0.42 });
+  const cap = boxRound(0.064, 0.08, 0.026, { n: 4.5, seg: 18, rows: 9, roundY: 0.42 });
   place(cap, 0, 0, 0.052, 0, 0, 0);
   bendY(cap, 0.075, 0.052);
   computeNormals(cap);
@@ -896,7 +1005,7 @@ export function kneePad(nz: Noise, knee: Vec3, side = 0): MeshRecord {
     computeNormals(s);
     appendMesh(out, s);
   }
-  place(out, knee[0] + side * 0.008, knee[1] + 0.012, knee[2] + 0.004, 0.06, 0, side * 0.10);
+  place(out, knee[0] + side * 0.008, knee[1] + 0.012, knee[2] + 0.004, 0.06, 0, side * 0.1);
   computeNormals(out);
   return out;
 }
@@ -911,7 +1020,7 @@ function cantLast(mesh: MeshRecord, ankle: Vec3, side: number): MeshRecord {
   const az = ankle[2];
   warp(mesh, (v) => {
     const z = v.z - az;
-    if (z > 0) v.x += -side * z * 0.10;
+    if (z > 0) v.x += -side * z * 0.1;
   });
   computeNormals(mesh);
   return mesh;
@@ -920,15 +1029,17 @@ function cantLast(mesh: MeshRecord, ankle: Vec3, side: number): MeshRecord {
 /** Boot: sole, upper, ankle cuff, tongue and laces. `ankle` = FootR/L bone. `side` is -1 right / +1 left. */
 export function boot(nz: Noise, ankle: Vec3, side = 0): MeshRecord {
   const out = emptyMesh();
-  const ax = ankle[0], ay = ankle[1], az = ankle[2];
+  const ax = ankle[0],
+    ay = ankle[1],
+    az = ankle[2];
   // upper: lofted sections front to back
   const S = [
-    [-0.078, 0.036, 0.030, 0.052],
+    [-0.078, 0.036, 0.03, 0.052],
     [-0.052, 0.044, 0.038, 0.062],
     [-0.016, 0.048, 0.044, 0.058],
-    [0.030, 0.049, 0.046, 0.048],
+    [0.03, 0.049, 0.046, 0.048],
     [0.076, 0.046, 0.042, 0.038],
-    [0.112, 0.040, 0.034, 0.030],
+    [0.112, 0.04, 0.034, 0.03],
     [0.134, 0.028, 0.022, 0.024],
   ];
   const seg = 18;
@@ -946,11 +1057,11 @@ export function boot(nz: Noise, ankle: Vec3, side = 0): MeshRecord {
   // ankle cuff up the shin
   const cuff = tube(
     [
-      [ax, ay + 0.010, az - 0.004],
-      [ax, ay + 0.070, az - 0.002],
+      [ax, ay + 0.01, az - 0.004],
+      [ax, ay + 0.07, az - 0.002],
       [ax, ay + 0.125, az + 0.002],
     ],
-    (t) => ellipseProfile(0.056 - 0.004 * t, 0.050 - 0.002 * t, 16),
+    (t) => ellipseProfile(0.056 - 0.004 * t, 0.05 - 0.002 * t, 16),
     { capStart: false, capEnd: false }
   );
   computeNormals(cuff);
@@ -963,14 +1074,16 @@ export function boot(nz: Noise, ankle: Vec3, side = 0): MeshRecord {
 export function bootSole(ankle: Vec3, side = 0): MeshRecord {
   const S = [
     [-0.082, 0.033, 0.018],
-    [-0.055, 0.043, 0.020],
-    [-0.020, 0.047, 0.014],
-    [0.030, 0.049, 0.013],
-    [0.080, 0.046, 0.013],
+    [-0.055, 0.043, 0.02],
+    [-0.02, 0.047, 0.014],
+    [0.03, 0.049, 0.013],
+    [0.08, 0.046, 0.013],
     [0.118, 0.038, 0.013],
-    [0.140, 0.024, 0.012],
+    [0.14, 0.024, 0.012],
   ];
-  const ax = ankle[0], ay = ankle[1], az = ankle[2];
+  const ax = ankle[0],
+    ay = ankle[1],
+    az = ankle[2];
   const rings = S.map(([z, hx, hy]) => ({
     pts: superEllipse(hx, hy, 3.6, 16),
     o: [ax, ay - 0.088 + hy + 0.001, az + z],
@@ -979,7 +1092,7 @@ export function bootSole(ankle: Vec3, side = 0): MeshRecord {
   const m = loft(rings, { capStart: true, capEnd: true });
   computeNormals(m);
   // heel block
-  const heel = boxRound(0.036, 0.011, 0.030, { n: 4, seg: 12, rows: 4, roundY: 0.4 });
+  const heel = boxRound(0.036, 0.011, 0.03, { n: 4, seg: 12, rows: 4, roundY: 0.4 });
   place(heel, ax, ay - 0.082, az - 0.056);
   appendMesh(m, heel);
   computeNormals(m);
@@ -990,12 +1103,14 @@ export function bootSole(ankle: Vec3, side = 0): MeshRecord {
 /** Laces: cross-over ribbons up the boot tongue. */
 export function bootLaces(ankle: Vec3, side = 0): MeshRecord {
   const out = emptyMesh();
-  const ax = ankle[0], ay = ankle[1], az = ankle[2];
+  const ax = ankle[0],
+    ay = ankle[1],
+    az = ankle[2];
   for (let i = 0; i < 5; i++) {
     const t = i / 4;
     const z = az + 0.088 - t * 0.076;
-    const y = ay - 0.028 + t * 0.070;
-    const w = 0.030 - t * 0.004;
+    const y = ay - 0.028 + t * 0.07;
+    const w = 0.03 - t * 0.004;
     const s = ribbon(
       [
         [ax - w, y - 0.006, z + 0.006],
@@ -1017,7 +1132,13 @@ export function bootLaces(ankle: Vec3, side = 0): MeshRecord {
  * Gloved hand curled around a grip. `wrist` is the hand bone position, `dir`
  * the direction the fingers wrap about, `axis` the grip axis.
  */
-export function glove(nz: Noise, wrist: Vec3, gripAxis: Vec3, palmNormal: Vec3, side: number): MeshRecord {
+export function glove(
+  nz: Noise,
+  wrist: Vec3,
+  gripAxis: Vec3,
+  palmNormal: Vec3,
+  side: number
+): MeshRecord {
   const out = emptyMesh();
   const W = new THREE.Vector3(...wrist);
   const A = new THREE.Vector3(...gripAxis).normalize(); // along the grip
@@ -1025,9 +1146,9 @@ export function glove(nz: Noise, wrist: Vec3, gripAxis: Vec3, palmNormal: Vec3, 
   const S = new THREE.Vector3().crossVectors(A, N).normalize(); // across the hand
 
   // palm block
-  const palm = boxRound(0.030, 0.048, 0.022, { n: 3.2, seg: 16, rows: 7, roundY: 0.4 });
+  const palm = boxRound(0.03, 0.048, 0.022, { n: 3.2, seg: 16, rows: 7, roundY: 0.4 });
   const m = new THREE.Matrix4().makeBasis(S, A, N);
-  const pos = W.clone().addScaledVector(A, 0.030).addScaledVector(N, -0.006);
+  const pos = W.clone().addScaledVector(A, 0.03).addScaledVector(N, -0.006);
   m.setPosition(pos);
   computeNormals(palm);
   transformMesh(palm, m);
@@ -1037,15 +1158,15 @@ export function glove(nz: Noise, wrist: Vec3, gripAxis: Vec3, palmNormal: Vec3, 
   for (let f = 0; f < 4; f++) {
     const t = f / 3;
     const pts = [];
-    const startY = 0.052 - t * 0.030;
+    const startY = 0.052 - t * 0.03;
     for (let i = 0; i <= 4; i++) {
       const u = i / 4;
       const ang = u * 2.2;
-      const r = 0.030 - u * 0.004;
+      const r = 0.03 - u * 0.004;
       const p = W.clone()
         .addScaledVector(A, startY - 0.004 + Math.sin(ang) * r * 0.55)
-        .addScaledVector(N, -0.020 - (1 - Math.cos(ang)) * r * 0.9)
-        .addScaledVector(S, side * (0.020 - t * 0.019));
+        .addScaledVector(N, -0.02 - (1 - Math.cos(ang)) * r * 0.9)
+        .addScaledVector(S, side * (0.02 - t * 0.019));
       pts.push([p.x, p.y, p.z]);
     }
     const fin = tube(pts, (u) => ellipseProfile(0.0115 - u * 0.002, 0.0105 - u * 0.002, 10), {
@@ -1060,7 +1181,7 @@ export function glove(nz: Noise, wrist: Vec3, gripAxis: Vec3, palmNormal: Vec3, 
   for (let i = 0; i <= 4; i++) {
     const u = i / 4;
     const p = W.clone()
-      .addScaledVector(A, 0.030 + u * 0.036)
+      .addScaledVector(A, 0.03 + u * 0.036)
       .addScaledVector(N, 0.006 - u * 0.026)
       .addScaledVector(S, side * (-0.026 - u * 0.004));
     tp.push([p.x, p.y, p.z]);
@@ -1085,7 +1206,7 @@ export function knuckleGuard(wrist: Vec3, gripAxis: Vec3, palmNormal: Vec3): Mes
   const S = new THREE.Vector3().crossVectors(A, N).normalize();
   const g = boxRound(0.026, 0.024, 0.007, { n: 3.4, seg: 14, rows: 5, roundY: 0.5 });
   const m = new THREE.Matrix4().makeBasis(S, A, N);
-  m.setPosition(W.clone().addScaledVector(A, 0.050).addScaledVector(N, 0.020));
+  m.setPosition(W.clone().addScaledVector(A, 0.05).addScaledVector(N, 0.02));
   computeNormals(g);
   transformMesh(g, m);
   return g;

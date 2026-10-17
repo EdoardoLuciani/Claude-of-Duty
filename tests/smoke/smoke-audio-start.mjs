@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+
 import { AudioSystem } from '../../src/audio/index.ts';
 import { TentRadio } from '../../src/audio/music.ts';
 
@@ -9,14 +10,19 @@ assert.equal(globalThis.OfflineAudioContext, undefined);
 const warn = console.warn;
 let prefixedStarts = 0;
 globalThis.webkitAudioContext = globalThis.webkitOfflineAudioContext = class {
-  constructor() { prefixedStarts++; throw Error('obsolete prefixed constructor'); }
+  constructor() {
+    prefixedStarts++;
+    throw Error('obsolete prefixed constructor');
+  }
 };
 try {
   console.warn = () => {};
   const audio = new AudioSystem();
   assert.deepEqual(await Promise.all([audio.start(), audio.start()]), [false, false]);
-  assert.equal(audio.failed, true); assert.equal(audio.running, false);
-  assert.equal(audio.actx, null); assert.equal(audio._starting, null);
+  assert.equal(audio.failed, true);
+  assert.equal(audio.running, false);
+  assert.equal(audio.actx, null);
+  assert.equal(audio._starting, null);
   assert.equal(await audio.start(), false);
   audio.dispose();
   const radio = new TentRadio({ sampleRate: 48000 }, {}, {});

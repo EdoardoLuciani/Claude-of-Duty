@@ -36,7 +36,10 @@ page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
 let result = null;
 let failed = null;
 try {
-  await page.goto(`http://127.0.0.1:${PORT}/?capture=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });
+  await page.goto(`http://127.0.0.1:${PORT}/?capture=1`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 90000,
+  });
   await page.waitForFunction('window.__READY__ === true', null, { timeout: 90000 });
   result = await page.evaluate(runBench);
 } catch (e) {
@@ -64,7 +67,8 @@ function report(r) {
   const rows = [];
   const row = (name, got, want, ok, unit = '') =>
     rows.push({ test: name, measured: fmt(got) + unit, expected: want, ok: ok ? 'PASS' : 'FAIL' });
-  const fmt = (v) => (typeof v === 'number' ? (Math.abs(v) < 100 ? v.toFixed(3) : v.toFixed(1)) : String(v));
+  const fmt = (v) =>
+    typeof v === 'number' ? (Math.abs(v) < 100 ? v.toFixed(3) : v.toFixed(1)) : String(v);
   const near = (a, b, tol) => Math.abs(a - b) <= tol;
 
   row('walk top speed', r.walk.speed, '4.57 m/s', near(r.walk.speed, 4.57, 0.12));
@@ -82,11 +86,21 @@ function report(r) {
   row('sprint fov', r.sprint.fov, '> 82 deg', r.sprint.fov > 82);
   row('jump apex', r.jump.apex, '0.60 m', near(r.jump.apex, 0.6, 0.06));
   row('air time', r.jump.airTime, '~0.48 s', near(r.jump.airTime, 0.48, 0.08));
-  row('air control ratio', r.air.controlRatio, '0.15-0.40', r.air.controlRatio > 0.15 && r.air.controlRatio < 0.4);
+  row(
+    'air control ratio',
+    r.air.controlRatio,
+    '0.15-0.40',
+    r.air.controlRatio > 0.15 && r.air.controlRatio < 0.4
+  );
   row('slide entry speed', r.slide.entry, '~7.0 m/s', near(r.slide.entry, 7.01, 0.2));
   row('slide peak speed', r.slide.peak, '8.4-8.9 m/s', r.slide.peak > 8.4 && r.slide.peak < 8.95);
   row('slide blocked?', r.slide.blocked ? 'yes' : 'no', 'no', !r.slide.blocked);
-  row('slide duration', r.slide.duration, '0.75-0.95 s', r.slide.duration > 0.7 && r.slide.duration <= 0.95);
+  row(
+    'slide duration',
+    r.slide.duration,
+    '0.75-0.95 s',
+    r.slide.duration > 0.7 && r.slide.duration <= 0.95
+  );
   row('slide exit stance', r.slide.exitStance, 'crouch', r.slide.exitStance === 'crouch');
   row('slide camera dip', r.slide.dip, '< -0.05 m', r.slide.dip < -0.05);
   row('slide cancel airborne', r.slideCancel.airborne, 'true', r.slideCancel.airborne === true);
@@ -101,15 +115,35 @@ function report(r) {
   row('lean camera offset', r.lean.offset, '> 0.25 m', r.lean.offset > 0.25);
   row('lean roll', r.lean.roll, '> 8 deg', r.lean.roll > 8);
   row('auto-vault (0.55 m)', r.vault.ok, 'cleared', r.vault.ok);
-  row('auto-vault fired', r.vault.kinds.join(',') || 'none', 'vault', r.vault.kinds.includes('vault'));
+  row(
+    'auto-vault fired',
+    r.vault.kinds.join(',') || 'none',
+    'vault',
+    r.vault.kinds.includes('vault')
+  );
   row('mantle (1.15 m)', r.mantle.ok, 'on top', r.mantle.ok);
-  row('mantle duration', r.mantle.duration, '0.5-0.9 s', r.mantle.duration > 0.45 && r.mantle.duration < 0.95);
+  row(
+    'mantle duration',
+    r.mantle.duration,
+    '0.5-0.9 s',
+    r.mantle.duration > 0.45 && r.mantle.duration < 0.95
+  );
   row('high wall rejected', r.tooHigh.rejected, 'true', r.tooHigh.rejected === true);
   row('stairs climbed', r.stairs.climbed, '> 0.5 m', r.stairs.climbed > 0.5);
-  row('stairs not vaulted', r.stairs.ledgeEvents.join(',') || 'none', 'none', r.stairs.ledgeEvents.length === 0);
+  row(
+    'stairs not vaulted',
+    r.stairs.ledgeEvents.join(',') || 'none',
+    'none',
+    r.stairs.ledgeEvents.length === 0
+  );
   row('health does not regen', r.health.held, '~55', near(r.health.held, 55, 0.6));
   row('waited without refill', r.health.waited, '> 6 s', r.health.waited > 6);
-  row('damage direction', r.health.direction, '~1.57 rad', near(Math.abs(r.health.direction), 1.5708, 0.2));
+  row(
+    'damage direction',
+    r.health.direction,
+    '~1.57 rad',
+    near(Math.abs(r.health.direction), 1.5708, 0.2)
+  );
   row('low-health pass on', r.health.passEnabled, 'true', r.health.passEnabled === true);
   row('recoil immediate', r.recoil.immediate, '> 1.0 deg', r.recoil.immediate > 1.0);
   row('recoil holds', r.recoil.residual, '> 1.0 deg', r.recoil.residual > 1.0);
@@ -169,15 +203,21 @@ function runBench() {
     const sp = world?.spawn?.(index);
     // Face the way the spawn faces: that is the one direction with a long clear
     // runway. Walking on a world axis from here goes straight into a facade.
-    const yaw = pitchYaw ?? (sp?.yaw ?? 0);
-    const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
-    const rx = Math.cos(yaw), rz = -Math.sin(yaw);
+    const yaw = pitchYaw ?? sp?.yaw ?? 0;
+    const fx = -Math.sin(yaw),
+      fz = -Math.cos(yaw);
+    const rx = Math.cos(yaw),
+      rz = -Math.sin(yaw);
     const gx = (sp ? sp.position.x : 0) + rx * lane;
     const gz = (sp ? sp.position.z : 0) + rz * lane;
     const gy = phys.groundHeight(gx, gz, (sp ? sp.position.y : 0) + 8);
     const feet = Number.isFinite(gy) ? gy : 0;
-    base.x = gx; base.y = feet; base.z = gz;
-    base.yaw = yaw; base.fx = fx; base.fz = fz;
+    base.x = gx;
+    base.y = feet;
+    base.z = gz;
+    base.yaw = yaw;
+    base.fx = fx;
+    base.fz = fz;
     p.teleport({ x: gx, y: feet + 1.66, z: gz }, yaw);
     p.health.reset(true);
     p.health.effect = 0;
@@ -191,7 +231,14 @@ function runBench() {
     const c = p.character;
     const a = { x: c.position.x, y: c.position.y + 0.36, z: c.position.z };
     const b = { x: c.position.x, y: c.position.y + 1.62, z: c.position.z };
-    const hit = phys.capsuleCast(a, b, 0.3, { x: base.fx, y: 0, z: base.fz }, d, phys.MASK.CHARACTER);
+    const hit = phys.capsuleCast(
+      a,
+      b,
+      0.3,
+      { x: base.fx, y: 0, z: base.fz },
+      d,
+      phys.MASK.CHARACTER
+    );
     return !hit.hit;
   };
 
@@ -218,7 +265,9 @@ function runBench() {
   const AXIS_YAWS = [0, Math.PI, Math.PI / 2, -Math.PI / 2];
 
   const events = { steps: [], lands: [], states: [], mantles: [] };
-  eng.events.on('player:footstep', (e) => events.steps.push({ surface: e.surface, running: e.running, x: e.position.x, z: e.position.z }));
+  eng.events.on('player:footstep', (e) =>
+    events.steps.push({ surface: e.surface, running: e.running, x: e.position.x, z: e.position.z })
+  );
   eng.events.on('player:land', (e) => events.lands.push({ v: e.velocity, surface: e.surface }));
   eng.events.on('player:state', (e) => events.states.push(e.state));
   eng.events.on('player:mantle', (e) => events.mantles.push(e.kind));
@@ -240,23 +289,39 @@ function runBench() {
   /** Axis-aligned box registered straight into the collision world. */
   function addBox(cx, cy, cz, hx, hy, hz, name) {
     const v = [
-      [cx - hx, cy - hy, cz - hz], [cx + hx, cy - hy, cz - hz],
-      [cx + hx, cy + hy, cz - hz], [cx - hx, cy + hy, cz - hz],
-      [cx - hx, cy - hy, cz + hz], [cx + hx, cy - hy, cz + hz],
-      [cx + hx, cy + hy, cz + hz], [cx - hx, cy + hy, cz + hz],
+      [cx - hx, cy - hy, cz - hz],
+      [cx + hx, cy - hy, cz - hz],
+      [cx + hx, cy + hy, cz - hz],
+      [cx - hx, cy + hy, cz - hz],
+      [cx - hx, cy - hy, cz + hz],
+      [cx + hx, cy - hy, cz + hz],
+      [cx + hx, cy + hy, cz + hz],
+      [cx - hx, cy + hy, cz + hz],
     ];
     const q = [
-      [0, 1, 2, 3], [5, 4, 7, 6], [4, 0, 3, 7],
-      [1, 5, 6, 2], [3, 2, 6, 7], [4, 5, 1, 0],
+      [0, 1, 2, 3],
+      [5, 4, 7, 6],
+      [4, 0, 3, 7],
+      [1, 5, 6, 2],
+      [3, 2, 6, 7],
+      [4, 5, 1, 0],
     ];
     const tris = new Float32Array(q.length * 2 * 9);
     let o = 0;
     for (const [a, b, c, d] of q) {
       for (const idx of [a, b, c, a, c, d]) {
-        tris[o++] = v[idx][0]; tris[o++] = v[idx][1]; tris[o++] = v[idx][2];
+        tris[o++] = v[idx][0];
+        tris[o++] = v[idx][1];
+        tris[o++] = v[idx][2];
       }
     }
-    const id = phys.staticWorld.addTriangles(tris, q.length * 2, 'concrete', phys.LAYER.STATIC, name);
+    const id = phys.staticWorld.addTriangles(
+      tris,
+      q.length * 2,
+      'concrete',
+      phys.LAYER.STATIC,
+      name
+    );
     phys.rebuildStatic();
     return id;
   }
@@ -278,7 +343,10 @@ function runBench() {
     const t0 = eng.time.elapsed;
     for (let i = 0; i < 60; i++) {
       step(1);
-      if (p.horizontalSpeed < 0.15) { stopTime = eng.time.elapsed - t0; break; }
+      if (p.horizontalSpeed < 0.15) {
+        stopTime = eng.time.elapsed - t0;
+        break;
+      }
     }
     out.walk = { speed, t90, stopTime: stopTime || 1 };
   }
@@ -303,12 +371,18 @@ function runBench() {
   settle();
   place(0);
   {
-    dn('KeyW'); dn('ShiftLeft');
+    dn('KeyW');
+    dn('ShiftLeft');
     step(6);
-    up('ShiftLeft'); step(2);
-    dn('ShiftLeft'); step(2); // second tap inside the 0.32 s window
+    up('ShiftLeft');
+    step(2);
+    dn('ShiftLeft');
+    step(2); // second tap inside the 0.32 s window
     let peak = 0;
-    for (let i = 0; i < 130; i++) { step(1); peak = Math.max(peak, p.horizontalSpeed); }
+    for (let i = 0; i < 130; i++) {
+      step(1);
+      peak = Math.max(peak, p.horizontalSpeed);
+    }
     out.tacSprint = { speed: peak, state: p.state, tac: p.tacticalSprint };
   }
 
@@ -316,16 +390,28 @@ function runBench() {
   settle();
   place(0);
   {
-    dn('ControlLeft'); step(2); up('ControlLeft'); step(30);
+    dn('ControlLeft');
+    step(2);
+    up('ControlLeft');
+    step(30);
     const eye = p.eyeHeight;
     const speed = drive(['KeyW'], 70);
     out.crouch = { eye, speed, stance: p.stance };
     settle();
-    dn('KeyZ'); step(2); up('KeyZ'); step(60);
+    dn('KeyZ');
+    step(2);
+    up('KeyZ');
+    step(60);
     out.prone = { eye: p.eyeHeight, stance: p.stance };
     // back to standing
-    dn('KeyZ'); step(2); up('KeyZ'); step(20);
-    dn('ControlLeft'); step(2); up('ControlLeft'); step(30);
+    dn('KeyZ');
+    step(2);
+    up('KeyZ');
+    step(20);
+    dn('ControlLeft');
+    step(2);
+    up('ControlLeft');
+    step(30);
   }
 
   /* ---- ADS ------------------------------------------------------------- */
@@ -344,7 +430,9 @@ function runBench() {
   place(0);
   {
     const y0 = p.feetPosition.y;
-    dn('Space'); step(2); up('Space');
+    dn('Space');
+    step(2);
+    up('Space');
     let apex = 0;
     let air = 0;
     for (let i = 0; i < 90; i++) {
@@ -365,11 +453,16 @@ function runBench() {
     dn('KeyD');
     step(2);
     const groundGain = p.horizontalSpeed;
-    release(); step(30);
+    release();
+    step(30);
     // Air: same input, same window, from a standstill so `along` starts at 0.
-    dn('Space'); step(2); up('Space'); step(6);
+    dn('Space');
+    step(2);
+    up('Space');
+    step(6);
     const before = p.horizontalSpeed;
-    dn('KeyD'); step(2);
+    dn('KeyD');
+    step(2);
     const airGain = p.horizontalSpeed - before;
     out.air = { controlRatio: groundGain > 0 ? airGain / groundGain : 0 };
     settle(60);
@@ -379,7 +472,8 @@ function runBench() {
   settle();
   place(0);
   {
-    dn('KeyW'); dn('ShiftLeft');
+    dn('KeyW');
+    dn('ShiftLeft');
     step(70);
     const entry = p.horizontalSpeed;
     dn('ControlLeft');
@@ -404,11 +498,16 @@ function runBench() {
   settle(60);
   place(0);
   {
-    dn('KeyW'); dn('ShiftLeft');
+    dn('KeyW');
+    dn('ShiftLeft');
     step(70);
-    dn('ControlLeft'); step(1); up('ControlLeft');
+    dn('ControlLeft');
+    step(1);
+    up('ControlLeft');
     step(18);
-    dn('Space'); step(3); up('Space');
+    dn('Space');
+    step(3);
+    up('Space');
     step(6);
     out.slideCancel = { airborne: !p.grounded, speed: p.horizontalSpeed, state: p.state };
     settle(70);
@@ -440,8 +539,12 @@ function runBench() {
   place(0);
   {
     events.steps.length = 0;
-    const x0 = p.feetPosition.x, z0 = p.feetPosition.z;
-    let bobMinX = 1e9, bobMaxX = -1e9, bobMinY = 1e9, bobMaxY = -1e9;
+    const x0 = p.feetPosition.x,
+      z0 = p.feetPosition.z;
+    let bobMinX = 1e9,
+      bobMaxX = -1e9,
+      bobMinY = 1e9,
+      bobMaxY = -1e9;
     const xs = [];
     const ys = [];
     dn('KeyW');
@@ -449,19 +552,23 @@ function runBench() {
     for (let i = 0; i < 200; i++) {
       step(1);
       const rig = p.cameraRig;
-      bobMinX = Math.min(bobMinX, rig.bobOffset.x); bobMaxX = Math.max(bobMaxX, rig.bobOffset.x);
-      bobMinY = Math.min(bobMinY, rig.bobOffset.y); bobMaxY = Math.max(bobMaxY, rig.bobOffset.y);
-      xs.push(rig.bobOffset.x); ys.push(rig.bobOffset.y);
+      bobMinX = Math.min(bobMinX, rig.bobOffset.x);
+      bobMaxX = Math.max(bobMaxX, rig.bobOffset.x);
+      bobMinY = Math.min(bobMinY, rig.bobOffset.y);
+      bobMaxY = Math.max(bobMaxY, rig.bobOffset.y);
+      xs.push(rig.bobOffset.x);
+      ys.push(rig.bobOffset.y);
       dist = Math.hypot(p.feetPosition.x - x0, p.feetPosition.z - z0);
       if (dist > 10) break;
     }
     release();
     const zeroCross = (a) => {
       let n = 0;
-      for (let i = 30; i < a.length; i++) if ((a[i - 1] < 0) !== (a[i] < 0)) n++;
+      for (let i = 30; i < a.length; i++) if (a[i - 1] < 0 !== a[i] < 0) n++;
       return n;
     };
-    const cx = zeroCross(xs), cy = zeroCross(ys);
+    const cx = zeroCross(xs),
+      cy = zeroCross(ys);
     out.steps = {
       count: events.steps.length,
       dist,
@@ -478,13 +585,15 @@ function runBench() {
   settle();
   place(0);
   {
-    const x0 = p.eyePosition.x, z0 = p.eyePosition.z;
+    const x0 = p.eyePosition.x,
+      z0 = p.eyePosition.z;
     dn('KeyE');
     step(40);
     const off = Math.hypot(p.eyePosition.x - x0, p.eyePosition.z - z0);
-    const roll = Math.abs(p.cameraRig.rotation.z) * 180 / Math.PI;
+    const roll = (Math.abs(p.cameraRig.rotation.z) * 180) / Math.PI;
     out.lean = { offset: off, roll, amount: p.leanAmount };
-    up('KeyE'); step(30);
+    up('KeyE');
+    step(30);
   }
 
   /* ---- auto vault (0.55 m) --------------------------------------------- */
@@ -498,24 +607,33 @@ function runBench() {
     // beyond) rather than a mantle onto a top face.
     const alongZ = Math.abs(base.fz) > 0.5;
     const id = addBox(
-      at.x, base.y + 0.275, at.z,
-      alongZ ? 1.6 : 0.22, 0.275, alongZ ? 0.22 : 1.6,
+      at.x,
+      base.y + 0.275,
+      at.z,
+      alongZ ? 1.6 : 0.22,
+      0.275,
+      alongZ ? 0.22 : 1.6,
       'feeltest:vault'
     );
     events.mantles.length = 0;
-    dn('KeyW'); dn('ShiftLeft');
+    dn('KeyW');
+    dn('ShiftLeft');
     let cleared = false;
     for (let i = 0; i < 200; i++) {
       step(1);
       const d = (p.feetPosition.x - base.x) * base.fx + (p.feetPosition.z - base.z) * base.fz;
-      if (d > 5.4) { cleared = true; break; }
+      if (d > 5.4) {
+        cleared = true;
+        break;
+      }
     }
     out.vault = { ok: cleared, kinds: [...events.mantles] };
     notes.push(`auto-vault: kinds=${out.vault.kinds.join(',') || 'none'} cleared=${cleared}`);
     release();
     phys.removeStatic(id);
     phys.rebuildStatic();
-    if (phys.stats.triangles !== tri0) notes.push(`vault box not removed (${tri0} -> ${phys.stats.triangles})`);
+    if (phys.stats.triangles !== tri0)
+      notes.push(`vault box not removed (${tri0} -> ${phys.stats.triangles})`);
     step(4);
   }
 
@@ -527,7 +645,8 @@ function runBench() {
     const top = base.y + 1.15;
     const id = addBox(at.x, base.y + 0.575, at.z, 1.6, 0.575, 1.6, 'feeltest:mantle');
     events.mantles.length = 0;
-    dn('KeyW'); dn('Space');
+    dn('KeyW');
+    dn('Space');
     let dur = 0;
     let ok = false;
     for (let i = 0; i < 240; i++) {
@@ -539,7 +658,9 @@ function runBench() {
       }
     }
     out.mantle = { ok, duration: dur, kinds: [...events.mantles], y: p.feetPosition.y - base.y };
-    notes.push(`mantle: kinds=${out.mantle.kinds.join(',') || 'none'} rise above local ground=${(p.feetPosition.y - base.y).toFixed(2)}m (box top 1.15m)`);
+    notes.push(
+      `mantle: kinds=${out.mantle.kinds.join(',') || 'none'} rise above local ground=${(p.feetPosition.y - base.y).toFixed(2)}m (box top 1.15m)`
+    );
     release();
     phys.removeStatic(id);
     phys.rebuildStatic();
@@ -553,11 +674,15 @@ function runBench() {
     const at = ahead(2.6);
     const id = addBox(at.x, base.y + 1.6, at.z, 1.6, 1.6, 0.8, 'feeltest:wall');
     events.mantles.length = 0;
-    dn('KeyW'); dn('Space');
+    dn('KeyW');
+    dn('Space');
     let climbed = false;
     for (let i = 0; i < 180; i++) {
       step(1);
-      if (p.feetPosition.y > base.y + 0.9) { climbed = true; break; }
+      if (p.feetPosition.y > base.y + 0.9) {
+        climbed = true;
+        break;
+      }
     }
     out.tooHigh = { rejected: !climbed && events.mantles.length === 0 };
     release();
@@ -579,7 +704,8 @@ function runBench() {
       ids.push(addBox(at.x, base.y + top * 0.5, at.z, 1.5, top * 0.5, 0.16, `feeltest:stair${i}`));
     }
     const y0 = p.feetPosition.y;
-    const x0 = p.feetPosition.x, z0 = p.feetPosition.z;
+    const x0 = p.feetPosition.x,
+      z0 = p.feetPosition.z;
     events.mantles.length = 0;
     dn('KeyW');
     // Peak height, not final: a 6-step flight is 1.8 m deep, so walking on for
@@ -591,7 +717,9 @@ function runBench() {
     }
     const fwdTravel = (p.feetPosition.x - x0) * base.fx + (p.feetPosition.z - z0) * base.fz;
     out.stairs = { climbed: peak, travel: fwdTravel, ledgeEvents: [...events.mantles] };
-    notes.push(`stairs: climbed ${out.stairs.climbed.toFixed(2)}m of 1.08m, travelled ${fwdTravel.toFixed(2)}m`);
+    notes.push(
+      `stairs: climbed ${out.stairs.climbed.toFixed(2)}m of 1.08m, travelled ${fwdTravel.toFixed(2)}m`
+    );
     release();
     for (const id of ids) phys.removeStatic(id);
     phys.rebuildStatic();
@@ -643,15 +771,18 @@ function runBench() {
     p.movement.pitch = 0;
     p.movement.yaw = 0;
     const cameraPitch = eng.ctx.camera.rotation.x;
-    p.addRecoil(2.4 * Math.PI / 180, 0.6 * Math.PI / 180, 0.4 * Math.PI / 180, 0.01);
+    p.addRecoil((2.4 * Math.PI) / 180, (0.6 * Math.PI) / 180, (0.4 * Math.PI) / 180, 0.01);
     const immediate = Math.abs(eng.ctx.camera.rotation.x - cameraPitch);
     let peak = 0;
-    for (let i = 0; i < 8; i++) { step(1); peak = Math.max(peak, p.movement.pitch); }
+    for (let i = 0; i < 8; i++) {
+      step(1);
+      peak = Math.max(peak, p.movement.pitch);
+    }
     for (let i = 0; i < 60; i++) step(1);
     out.recoil = {
-      immediate: immediate * 180 / Math.PI,
-      peak: peak * 180 / Math.PI,
-      residual: Math.abs(p.movement.pitch) * 180 / Math.PI,
+      immediate: (immediate * 180) / Math.PI,
+      peak: (peak * 180) / Math.PI,
+      residual: (Math.abs(p.movement.pitch) * 180) / Math.PI,
     };
   }
 

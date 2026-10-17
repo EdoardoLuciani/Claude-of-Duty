@@ -25,8 +25,8 @@ History: [#360](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/360).
 
 ## Source/runtime contract
 
-`mpx.blend/.glb`, `manifest.json` and `hand-reference.json` own source/export,
-events/counts and fits. `mpx.py` owns geometry/PBR; `mpx_actions.py` owns clips.
+The [source-first edit/build guide](../../../tools/blender/mpx/README.md) owns
+geometry/PBR, action stages and declared read-only calibration/review-arm inputs.
 `src/weapons/mpx.ts` converts +X-forward/+Z-up/−Y-right once; copy shared sampler
 arrays before conversion. Eight native clips preserve shared IK/ADS/sway/recoil.
 No duplicate arms, root recoil or review casing; all DCC controls need NLA tracks.
@@ -37,16 +37,19 @@ Caps: <110k triangles, ≤40 primitives, ≤16 materials including glTF fallback
 three 1024² maps, ≤10 MiB. Normal builds need no Blender/network.
 
 Optics use absorptive inward faces and double-sided single-pass sheets, 2% lens/
-1% cover opacity. Dot is nominal 2 MOA in world-camera space with a 1.5-pixel
-minimum, no ring/halo; size after projection update. Weapon-only ADS FOV/shoulder
+1% cover opacity. Dot is nominal 2 MOA in world-camera space with a six-pixel
+minimum diameter, no ring/halo; size after projection update. Weapon-only ADS FOV/shoulder
 fit is explicit readability policy, not target magnification. Keep 20 mm aperture,
 mount axis, open caps, fixed battery rim, wrist/contact and eight-action reach gates.
 
-## Rebuild/check (root, Blender 5.2)
+## Rebuild/check (root, Blender 5.2.2)
 
 ```sh
-node tools/mpx-hand-reference.mjs
-blender -b --threads 8 --python-exit-code 1 --python tools/blender/mpx.py
+blender -b -t 4 --python-exit-code 1 --python tools/blender/mpx.py -- \
+  --output /tmp/mpx-review
+# Omit --output to regenerate committed products after review.
+# Refit calibration only as a separately approved change:
+# node tools/mpx-hand-reference.mjs
 blender -b assets/weapons/sig-mpx/mpx.blend --python-exit-code 1 \
   --python tools/blender/mpx_check.py
 node tests/smoke/smoke-mpx-asset.mjs
@@ -54,8 +57,11 @@ node tests/smoke/smoke-mpx.mjs
 node tests/e2e/check-mpx-game.mjs --optic-review
 ```
 
-Regeneration overwrites manual edits; previews use Eevee without ray tracing.
+Previews use Eevee without ray tracing; common flags follow the shared workflow.
 `--reel` records gameplay; `tools/mpx-photo-review.py` needs the 2019 PDF p.25
 rasterized with `pdftoppm -scale-to 1800 -singlefile -png` under `.tmp-rend/mpx/`.
+The [approved UV-repeatability limitation](../../../tools/blender/mpx/README.md#approved-repeatability-limit)
+retains the atlas and explicitly leaves GLB byte-repeatability unmet for evaluated
+UV bytes. Maps/manifest and non-UV payloads still require exact comparison.
 Technical gates don't certify all-triangle clearance or final appearance;
 Gate 3 human approval, finish/highlight/FX/audio review remain outstanding.

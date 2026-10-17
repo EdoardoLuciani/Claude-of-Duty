@@ -34,7 +34,7 @@ export function randomMarker(
   feet: HorizontalPoint,
   alive: readonly HorizontalPoint[],
   rng: MarkerRandomSource,
-  recent: readonly string[] | null = null,
+  recent: readonly string[] | null = null
 ): IntelMarker | null {
   for (let scale = 1; scale >= 0; scale -= 0.5) {
     const playerDistance2 = (INTEL.spawnPlayerDistance * scale) ** 2;
@@ -43,8 +43,12 @@ export function randomMarker(
       let pick: IntelMarker | null = null;
       let count = 0;
       for (const marker of markers) {
-        if (used.has(marker.id) || (!allowRecent && recent?.includes(marker.id)) ||
-            horizontalDistance2(marker, feet) < playerDistance2) continue;
+        if (
+          used.has(marker.id) ||
+          (!allowRecent && recent?.includes(marker.id)) ||
+          horizontalDistance2(marker, feet) < playerDistance2
+        )
+          continue;
         let separated = true;
         for (const cache of alive) {
           if (horizontalDistance2(marker, cache) < cacheDistance2) {

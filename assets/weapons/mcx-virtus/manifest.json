@@ -105,10 +105,9 @@
     "embedded_in_glb": true
   },
   "notes": [
-    "Standalone asset: no game integration, hands, audio or muzzle FX.",
-    "Reference-backed exterior with photo-inferred contours; see README.md. Not licensed by or affiliated with SIG SAUER.",
-    "Reload clips use two magazine meshes with visibility keyed by scale.",
-    "Fire casing path is baked; use SOCKET_ejection for runtime physics.",
-    "Optic uses KHR_materials_transmission; add a collimated reticle for gameplay."
+    "Generated from tools/blender/mcx/. Python is the authoring authority.",
+    "Reference-backed visual exterior, not manufacturing geometry or licensed SIG art.",
+    "Named sockets and rigid-part clips; hands, audio and live casing physics are runtime-owned.",
+    "Visibility is authored CONSTANT; motion LINEAR at 60 Hz. Stock Actions export, no GLB rewriting."
   ]
 }

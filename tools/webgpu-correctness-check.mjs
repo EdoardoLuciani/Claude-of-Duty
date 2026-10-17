@@ -2,179 +2,355 @@
 // Analytic coverage/surface/depth oracles plus the real AI shadow owner.
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
-import { collectBrowserErrors, ensureViteServer, launchChromium, parseArgs, stopViteServer } from './lib/browser-harness.mjs';
+
+import {
+  collectBrowserErrors,
+  ensureViteServer,
+  launchChromium,
+  parseArgs,
+  stopViteServer,
+} from './lib/browser-harness.mjs';
 import { waitForGame, installDevicePolicy } from './lib/native-render.mjs';
-const args = parseArgs(), port = Number(args.port ?? 5391);
+import { routeSourceMutation } from './lib/source-mutation.mjs';
+const args = parseArgs(),
+  port = Number(args.port ?? 5391);
 const server = await ensureViteServer({ port });
 let browser;
 try {
   browser = await launchChromium({ webgpu: true, headless: true });
-  const page = await browser.newPage({ viewport: { width: 640, height: 360 } }), errors = [];
+  const page = await browser.newPage({ viewport: { width: 640, height: 360 } }),
+    errors = [];
   collectBrowserErrors(page, errors, { echo: true });
   await installDevicePolicy(page);
   // Each negative restores one diagnosed regression, without a runtime toggle.
   const negatives = {
-    alpha: ['src/fx/particles.ts', 'material.blendSrcAlpha = additive || distort ? THREE.ZeroFactor : THREE.OneFactor;', 'material.blendSrcAlpha = null;'],
-    optics: ['src/weapons/materials-tsl.ts', 'blendSrcAlpha: ZeroFactor, blendDstAlpha: OneFactor,', 'blendSrcAlpha: OneFactor, blendDstAlpha: OneFactor,'],
-    surface: ['src/render/webgpu-pipeline.ts', 'channels.surface = vec4(roughness, metalness, 0, 1)', 'channels.surface = vec4(materialRoughness, materialMetalness, 0, 1)'],
-    order: ['src/render/webgpu-pipeline.ts', "prePass.getTextureNode('linearDepth').sample(screenUV).toVar();", ''],
-    shadow: ['src/ai/index.ts', 'a.mesh.castShadow = visible;', 'a.mesh.userData.owNoShadow = !visible;'],
-    parallax: ['src/materials/shader-tsl.ts', 'after.negate().div(max(before.sub(after), 0.0001))', 'after.div(max(after.sub(before), 0.0001))'],
+    alpha: [
+      'src/fx/particles.ts',
+      'material.blendSrcAlpha = additive || distort ? THREE.ZeroFactor : THREE.OneFactor;',
+      'material.blendSrcAlpha = null;',
+    ],
+    optics: [
+      'src/weapons/materials-tsl.ts',
+      'blendSrcAlpha: ZeroFactor, blendDstAlpha: OneFactor,',
+      'blendSrcAlpha: OneFactor, blendDstAlpha: OneFactor,',
+    ],
+    surface: [
+      'src/render/webgpu-pipeline.ts',
+      'channels.surface = vec4(roughness, metalness, 0, 1)',
+      'channels.surface = vec4(materialRoughness, materialMetalness, 0, 1)',
+    ],
+    order: [
+      'src/render/webgpu-pipeline.ts',
+      "prePass.getTextureNode('linearDepth').sample(screenUV).toVar();",
+      '',
+    ],
+    shadow: [
+      'src/ai/index.ts',
+      'a.mesh.castShadow = visible;',
+      'a.mesh.userData.owNoShadow = !visible;',
+    ],
+    parallax: [
+      'src/materials/shader-tsl.ts',
+      'after.negate().div(max(before.sub(after), 0.0001))',
+      'after.div(max(after.sub(before), 0.0001))',
+    ],
   };
   if (args.negative) {
     assert(Object.hasOwn(negatives, args.negative));
     const [file, before, after] = negatives[args.negative];
-    await page.route(`**/${file}*`, async route => {
-      const response = await route.fetch(), source = await response.text();
-      assert(source.includes(before), 'negative control must match current source');
-      let body = source.replaceAll(before, after);
-      if (args.negative === 'surface') body = body.replace('metalness, roughness,', 'materialMetalness, materialRoughness,');
-      await route.fulfill({ response, body });
-    });
+    await routeSourceMutation(page, file, before, after, (body) =>
+      args.negative === 'surface'
+        ? body.replace('metalness, roughness,', 'materialMetalness, materialRoughness,')
+        : body
+    );
   }
-  await page.route('**/correctness-fixture', route => route.fulfill({ contentType: 'text/html', body: '<canvas></canvas>' }));
+  await page.route('**/correctness-fixture', (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<canvas></canvas>' })
+  );
   await page.goto(`http://127.0.0.1:${port}/correctness-fixture`);
   const result = await page.evaluate(async () => {
-    const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
-    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.ts');
+    const {
+      THREE: T,
+      TSL: N,
+      createFixtureRenderer,
+    } = await import('/tools/arm-material-fixture.js');
     const { createWorldViewPipeline } = await import('/src/render/webgpu-pipeline.ts');
     const { ParticleLayer, resetSpawn } = await import('/src/fx/particles.ts');
     const { HazeSystem } = await import('/src/fx/haze.ts');
     const { WeaponMaterialsNode } = await import('/src/weapons/materials-tsl.ts');
     const { parallaxUV } = await import('/src/materials/shader-tsl.ts');
     const { packedReadback } = await import('/tools/lib/native-readback.js');
-    const check = (ok, message) => { if (!ok) throw Error(message); };
-    const close = (a, b, message) => check(Math.abs(a - b) < .003, `${message}: ${a} != ${b}`);
-    const renderer = await createWebGpuRenderer(document.querySelector('canvas'));
-    renderer.setSize(64, 64);
-    const info = renderer.backend.device.adapterInfo;
-    window.__ASSERT_HARDWARE_DEVICE__({ vendor: info.vendor, architecture: info.architecture, fallback: info.isFallbackAdapter });
-    const scene = new T.Scene(), view = new T.Scene(), camera = new T.PerspectiveCamera(60, 1, .1, 100);
-    scene.background = new T.Color(.5, .6, .7);
-    const atlas = new T.DataTexture(new Uint8Array([255,255,255,255]), 1, 1); atlas.needsUpdate = true;
+    const check = (ok, message) => {
+      if (!ok) throw Error(message);
+    };
+    const close = (a, b, message) => check(Math.abs(a - b) < 0.003, `${message}: ${a} != ${b}`);
+    const renderer = await createFixtureRenderer();
+    const scene = new T.Scene(),
+      view = new T.Scene(),
+      camera = new T.PerspectiveCamera(60, 1, 0.1, 100);
+    scene.background = new T.Color(0.5, 0.6, 0.7);
+    const atlas = new T.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
+    atlas.needsUpdate = true;
     const target = new T.RenderTarget(64, 64, { type: T.HalfFloatType, depthBuffer: false });
-    const read = async (rt, attachment = 0) => Array.from(await renderer.readRenderTargetPixelsAsync(rt, 32, 32, 1, 1, attachment), T.DataUtils.fromHalfFloat);
-    const geometry = new T.PlaneGeometry(10, 10), opaque = new T.MeshBasicNodeMaterial({ color: new T.Color(.2, .2, .2) });
-    const underlay = new T.Mesh(geometry, opaque); underlay.position.z = -3;
+    const read = async (rt, attachment = 0) =>
+      Array.from(
+        await renderer.readRenderTargetPixelsAsync(rt, 32, 32, 1, 1, attachment),
+        T.DataUtils.fromHalfFloat
+      );
+    const geometry = new T.PlaneGeometry(10, 10),
+      opaque = new T.MeshBasicNodeMaterial({ color: new T.Color(0.2, 0.2, 0.2) });
+    const underlay = new T.Mesh(geometry, opaque);
+    underlay.position.z = -3;
     const coverage = [];
-    for (const mode of ['additive', 'lit']) for (const covered of [false, true]) {
-      if (covered) view.add(underlay);
-      const layer = new ParticleLayer({ capacity: 16, mode, atlas, cols: 1 }); view.add(layer.mesh);
-      const s = resetSpawn(); s.z = -2; s.size0 = s.size1 = 2; s.life = 10; s.alpha = .5;
-      s.r0 = s.g0 = s.b0 = s.r1 = s.g1 = s.b1 = .1; s.i0 = s.i1 = 1;
-      layer.emit(s, 0); layer.flush(.5);
-      const graph = createWorldViewPipeline(renderer, scene, camera, view, camera, { gtao: false, bloomStrength: 0 });
-      graph.pipeline.outputColorTransform = false;
-      renderer.setRenderTarget(target); graph.render();
-      const rgba = await read(graph.viewPass.renderTarget), output = await read(target);
-      const alpha = covered ? 1 : mode === 'additive' ? 0 : .475;
-      close(rgba[3], alpha, `${mode}/${covered}: coverage alpha`);
-      for (let i = 0; i < 3; i++) close(output[i], [.5,.6,.7][i] * (1 - alpha) + rgba[i], 'premultiplied composition');
-      check(output.slice(0,3).every(x => x >= 0), 'negative composite RGB');
-      coverage.push({ mode, covered, rgba, output });
-      graph.dispose(); layer.mesh.removeFromParent(); layer.dispose(); underlay.removeFromParent();
-    }
+    for (const mode of ['additive', 'lit'])
+      for (const covered of [false, true]) {
+        if (covered) view.add(underlay);
+        const layer = new ParticleLayer({ capacity: 16, mode, atlas, cols: 1 });
+        view.add(layer.mesh);
+        const s = resetSpawn();
+        s.z = -2;
+        s.size0 = s.size1 = 2;
+        s.life = 10;
+        s.alpha = 0.5;
+        s.r0 = s.g0 = s.b0 = s.r1 = s.g1 = s.b1 = 0.1;
+        s.i0 = s.i1 = 1;
+        layer.emit(s, 0);
+        layer.flush(0.5);
+        const graph = createWorldViewPipeline(renderer, scene, camera, view, camera, {
+          gtao: false,
+          bloomStrength: 0,
+        });
+        graph.pipeline.outputColorTransform = false;
+        renderer.setRenderTarget(target);
+        graph.render();
+        const rgba = await read(graph.viewPass.renderTarget),
+          output = await read(target);
+        const alpha = covered ? 1 : mode === 'additive' ? 0 : 0.475;
+        close(rgba[3], alpha, `${mode}/${covered}: coverage alpha`);
+        for (let i = 0; i < 3; i++)
+          close(output[i], [0.5, 0.6, 0.7][i] * (1 - alpha) + rgba[i], 'premultiplied composition');
+        check(
+          output.slice(0, 3).every((x) => x >= 0),
+          'negative composite RGB'
+        );
+        coverage.push({ mode, covered, rgba, output });
+        graph.dispose();
+        layer.mesh.removeFromParent();
+        layer.dispose();
+        underlay.removeFromParent();
+      }
     const optics = new WeaponMaterialsNode({});
     for (const mat of [optics.reticle(), optics.lensRing(), optics.glass()]) {
-      const mesh = new T.Mesh(geometry, mat); mesh.position.z = -2; view.add(mesh);
-      const graph = createWorldViewPipeline(renderer, scene, camera, view, camera, { gtao: false, bloomStrength: 0 });
-      renderer.setRenderTarget(target); graph.render();
-      close((await read(graph.viewPass.renderTarget))[3], mat === optics.glass() ? .1 : 0, `${mat.name}: optical coverage`);
-      graph.dispose(); mesh.removeFromParent();
+      const mesh = new T.Mesh(geometry, mat);
+      mesh.position.z = -2;
+      view.add(mesh);
+      const graph = createWorldViewPipeline(renderer, scene, camera, view, camera, {
+        gtao: false,
+        bloomStrength: 0,
+      });
+      renderer.setRenderTarget(target);
+      graph.render();
+      close(
+        (await read(graph.viewPass.renderTarget))[3],
+        mat === optics.glass() ? 0.1 : 0,
+        `${mat.name}: optical coverage`
+      );
+      graph.dispose();
+      mesh.removeFromParent();
     }
     optics.dispose();
     const surface = new T.MeshStandardNodeMaterial({ roughness: 1, metalness: 1 });
-    surface.roughnessNode = N.float(.15); surface.metalnessNode = N.float(0);
-    const wall = new T.Mesh(geometry, surface); wall.position.z = -5; wall.layers.enable(1); scene.add(wall);
-    const graph = createWorldViewPipeline(renderer, scene, camera, view, camera, { gtao: false, ssrEnabled: true, bloomStrength: 0 });
-    const mapped = new T.DataTexture(new Uint8Array([255,128,64,255]), 1, 1); mapped.needsUpdate = true;
+    surface.roughnessNode = N.float(0.15);
+    surface.metalnessNode = N.float(0);
+    const wall = new T.Mesh(geometry, surface);
+    wall.position.z = -5;
+    wall.layers.enable(1);
+    scene.add(wall);
+    const graph = createWorldViewPipeline(renderer, scene, camera, view, camera, {
+      gtao: false,
+      ssrEnabled: true,
+      bloomStrength: 0,
+    });
+    const mapped = new T.DataTexture(new Uint8Array([255, 128, 64, 255]), 1, 1);
+    mapped.needsUpdate = true;
     const surfaces = [];
     for (const custom of [true, false]) {
-      if (!custom) { surface.roughnessNode = surface.metalnessNode = null; surface.roughness = .8; surface.metalness = .5; surface.roughnessMap = surface.metalnessMap = mapped; surface.needsUpdate = true; }
-      renderer.setRenderTarget(target); graph.render();
-      const rt = graph.prePass.renderTarget, index = rt.textures.findIndex(t => t.name === 'surface');
-      const values = await read(rt, index); surfaces.push(values);
-      close(values[0], custom ? .15 : .8 * 128 / 255, 'surface roughness');
-      close(values[1], custom ? 0 : .5 * 64 / 255, 'surface metalness');
+      if (!custom) {
+        surface.roughnessNode = surface.metalnessNode = null;
+        surface.roughness = 0.8;
+        surface.metalness = 0.5;
+        surface.roughnessMap = surface.metalnessMap = mapped;
+        surface.needsUpdate = true;
+      }
+      renderer.setRenderTarget(target);
+      graph.render();
+      const rt = graph.prePass.renderTarget,
+        index = rt.textures.findIndex((t) => t.name === 'surface');
+      const values = await read(rt, index);
+      surfaces.push(values);
+      close(values[0], custom ? 0.15 : (0.8 * 128) / 255, 'surface roughness');
+      close(values[1], custom ? 0 : (0.5 * 64) / 255, 'surface metalness');
     }
     graph.dispose();
     const depth = [];
     for (const gtao of [false, true]) {
-      const haze = new HazeSystem({ capacity: 16, atlas, cols: 1 }); haze.resize(64, 64);
+      const haze = new HazeSystem({ capacity: 16, atlas, cols: 1 });
+      haze.resize(64, 64);
       const order = [];
-      const graph = createWorldViewPipeline(renderer, scene, camera, view, camera, { gtao, bloomStrength: 0,
-        afterDepth: () => { order.push('haze'); haze.render(renderer, camera); } });
-      scene.onBeforeRender = (_r, _s, _c, rt) => order.push(rt === graph.prePass.renderTarget ? 'prepass' : 'world');
-      haze.emit(0, 0, 0, -3, 2, 1, 10, 1, 0); haze.update(.5, graph.linearDepth.value, camera);
+      const graph = createWorldViewPipeline(renderer, scene, camera, view, camera, {
+        gtao,
+        bloomStrength: 0,
+        afterDepth: () => {
+          order.push('haze');
+          haze.render(renderer, camera);
+        },
+      });
+      scene.onBeforeRender = (_r, _s, _c, rt) =>
+        order.push(rt === graph.prePass.renderTarget ? 'prepass' : 'world');
+      haze.emit(0, 0, 0, -3, 2, 1, 10, 1, 0);
+      haze.update(0.5, graph.linearDepth.value, camera);
       const counts = [];
       for (const z of [-5, -2, -5]) {
         // PassNode updates once per native animation frame, not per readback.
         await new Promise(requestAnimationFrame);
-        wall.position.z = z; order.length = 0;
-        renderer.setRenderTarget(target); graph.render();
-        check(order.join(',') === 'prepass,haze,world', `current-depth order (AO=${gtao}): ${order}`);
+        wall.position.z = z;
+        order.length = 0;
+        renderer.setRenderTarget(target);
+        graph.render();
+        check(
+          order.join(',') === 'prepass,haze,world',
+          `current-depth order (AO=${gtao}): ${order}`
+        );
         const raw = await renderer.readRenderTargetPixelsAsync(haze.rt, 0, 0, 32, 32);
-        const count = Array.from(raw, T.DataUtils.fromHalfFloat).filter(x => Math.abs(x) > .001).length;
-        counts.push(count); check(z === -2 ? count === 0 : count > 0, 'haze must occlude/reappear on the first moved-wall frame');
+        const count = Array.from(raw, T.DataUtils.fromHalfFloat).filter(
+          (x) => Math.abs(x) > 0.001
+        ).length;
+        counts.push(count);
+        check(
+          z === -2 ? count === 0 : count > 0,
+          'haze must occlude/reappear on the first moved-wall frame'
+        );
       }
-      depth.push({ gtao, counts }); graph.dispose(); haze.dispose();
+      depth.push({ gtao, counts });
+      graph.dispose();
+      haze.dispose();
     }
     scene.onBeforeRender = () => {};
     // Constant height has an analytic intersection between discrete march layers.
-    const height = new T.DataTexture(new Uint8Array([255,255,255,161]), 1, 1);
-    height.minFilter = height.magFilter = T.LinearFilter; height.needsUpdate = true;
+    const height = new T.DataTexture(new Uint8Array([255, 255, 255, 161]), 1, 1);
+    height.minFilter = height.magFilter = T.LinearFilter;
+    height.needsUpdate = true;
     const parallaxMaterial = new T.MeshBasicNodeMaterial();
-    parallaxMaterial.fragmentNode = N.Fn(() => N.vec4(parallaxUV(height, N.vec2(.5), N.vec3(.5,0,1), N.float(.2), N.float(1), 16), 0, 1))();
-    const quad = new T.QuadMesh(parallaxMaterial); renderer.setRenderTarget(target); quad.render(renderer);
+    parallaxMaterial.fragmentNode = N.Fn(() =>
+      N.vec4(parallaxUV(height, N.vec2(0.5), N.vec3(0.5, 0, 1), N.float(0.2), N.float(1), 16), 0, 1)
+    )();
+    const quad = new T.QuadMesh(parallaxMaterial);
+    renderer.setRenderTarget(target);
+    quad.render(renderer);
     const parallax = await read(target);
-    const intersection = .5 - .5 * .2 * (1 - 161 / 255);
+    const intersection = 0.5 - 0.5 * 0.2 * (1 - 161 / 255);
     // Tight enough to reject the full-layer endpoint (0.4625).
-    check(Math.abs(parallax[0] - intersection) < .0003, `parallax lost interpolation: ${parallax[0]} != ${intersection}`);
-    parallaxMaterial.dispose(); height.dispose();
+    check(
+      Math.abs(parallax[0] - intersection) < 0.0003,
+      `parallax lost interpolation: ${parallax[0]} != ${intersection}`
+    );
+    parallaxMaterial.dispose();
+    height.dispose();
     const readbacks = [];
-    for (const type of [T.UnsignedByteType, T.HalfFloatType, T.FloatType]) for (const h of [1, 3]) {
-      const w = 7, rt = new T.RenderTarget(w, h, { type, depthBuffer: false });
-      const m = new T.MeshBasicNodeMaterial({ toneMapped: false });
-      m.fragmentNode = N.vec4(N.screenCoordinate.x.div(w), N.screenCoordinate.y.div(h), .25, 1);
-      // QuadMesh geometry is borrowed; dispose only this target and material.
-      const probe = new T.QuadMesh(m), previous = renderer.getRenderTarget();
-      try {
-        renderer.setRenderTarget(rt); probe.render(renderer);
-        const raw = packedReadback(await renderer.readRenderTargetPixelsAsync(rt, 0, 0, w, h), w, h);
-        const values = Array.from(raw, v => type === T.HalfFloatType ? T.DataUtils.fromHalfFloat(v) :
-          type === T.UnsignedByteType ? v / 255 : v);
-        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-          const k = (y * w + x) * 4;
-          close(values[k], (x + .5) / w, 'packed readback x');
-          close(values[k + 1], (y + .5) / h, 'packed readback y');
-          close(values[k + 2], .25, 'packed readback blue'); close(values[k + 3], 1, 'packed readback alpha');
+    for (const type of [T.UnsignedByteType, T.HalfFloatType, T.FloatType])
+      for (const h of [1, 3]) {
+        const w = 7,
+          rt = new T.RenderTarget(w, h, { type, depthBuffer: false });
+        const m = new T.MeshBasicNodeMaterial({ toneMapped: false });
+        m.fragmentNode = N.vec4(N.screenCoordinate.x.div(w), N.screenCoordinate.y.div(h), 0.25, 1);
+        // QuadMesh geometry is borrowed; dispose only this target and material.
+        const probe = new T.QuadMesh(m),
+          previous = renderer.getRenderTarget();
+        try {
+          renderer.setRenderTarget(rt);
+          probe.render(renderer);
+          const raw = packedReadback(
+            await renderer.readRenderTargetPixelsAsync(rt, 0, 0, w, h),
+            w,
+            h
+          );
+          const values = Array.from(raw, (v) =>
+            type === T.HalfFloatType
+              ? T.DataUtils.fromHalfFloat(v)
+              : type === T.UnsignedByteType
+                ? v / 255
+                : v
+          );
+          for (let y = 0; y < h; y++)
+            for (let x = 0; x < w; x++) {
+              const k = (y * w + x) * 4;
+              close(values[k], (x + 0.5) / w, 'packed readback x');
+              close(values[k + 1], (y + 0.5) / h, 'packed readback y');
+              close(values[k + 2], 0.25, 'packed readback blue');
+              close(values[k + 3], 1, 'packed readback alpha');
+            }
+          readbacks.push({ type, size: [w, h], elements: raw.length });
+        } finally {
+          renderer.setRenderTarget(previous);
+          rt.dispose();
+          m.dispose();
         }
-        readbacks.push({ type, size: [w, h], elements: raw.length });
-      } finally { renderer.setRenderTarget(previous); rt.dispose(); m.dispose(); }
-    }
-    renderer.setRenderTarget(null); surface.dispose(); mapped.dispose(); opaque.dispose(); geometry.dispose(); atlas.dispose(); target.dispose(); await renderer.dispose();
+      }
+    renderer.setRenderTarget(null);
+    surface.dispose();
+    mapped.dispose();
+    opaque.dispose();
+    geometry.dispose();
+    atlas.dispose();
+    target.dispose();
+    await renderer.dispose();
     return { coverage, surfaces, depth, parallax, readbacks };
   });
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`);
   await waitForGame(page, { timeout: 180000 });
   result.shadows = await page.evaluate(async () => {
-    const e = window.__ENGINE__, ctx = e.ctx, ai = ctx.get('ai');
-    window.__APPLY_SHOT__('combat'); await window.__PUMP__(6);
-    const mesh = ai.agents[0].mesh, culled = mesh.frustumCulled, before = mesh.onBeforeShadow;
-    const far = ctx.camera.clone(); far.position.set(10000,10000,10000); far.updateMatrixWorld(true);
-    let draws = 0; mesh.frustumCulled = false; mesh.onBeforeShadow = () => draws++;
+    const e = window.__ENGINE__,
+      ctx = e.ctx,
+      ai = ctx.get('ai');
+    window.__APPLY_SHOT__('combat');
+    await window.__PUMP__(6);
+    const mesh = ai.agents[0].mesh,
+      culled = mesh.frustumCulled,
+      before = mesh.onBeforeShadow;
+    const far = ctx.camera.clone();
+    far.position.set(10000, 10000, 10000);
+    far.updateMatrixWorld(true);
+    let draws = 0;
+    mesh.frustumCulled = false;
+    mesh.onBeforeShadow = () => draws++;
     const counts = [];
     try {
       for (const camera of [ctx.camera, far, ctx.camera]) {
-        ai._updateRelevance({ ...ctx, camera }); draws = 0;
-        await window.__PRESENT__(1); ctx.get('render').render(ctx); counts.push(draws);
+        ai._updateRelevance({ ...ctx, camera });
+        draws = 0;
+        await window.__PRESENT__(1);
+        ctx.get('render').render(ctx);
+        counts.push(draws);
       }
-    } finally { mesh.onBeforeShadow = before; mesh.frustumCulled = culled; ai._updateRelevance(ctx); }
+    } finally {
+      mesh.onBeforeShadow = before;
+      mesh.frustumCulled = culled;
+      ai._updateRelevance(ctx);
+    }
     return counts;
   });
-  assert(result.shadows[0] > 0 && result.shadows[1] === 0 && result.shadows[2] > 0, `AI native shadow relevance: ${result.shadows}`);
+  assert(
+    result.shadows[0] > 0 && result.shadows[1] === 0 && result.shadows[2] > 0,
+    `AI native shadow relevance: ${result.shadows}`
+  );
   await page.evaluate(() => window.__ENGINE__.dispose());
   assert.deepEqual(errors, []);
   writeFileSync(args.out ?? '/tmp/webgpu-correctness.json', JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result, null, 2));
-} finally { try { await browser?.close(); } finally { stopViteServer(server); } }
+} finally {
+  try {
+    await browser?.close();
+  } finally {
+    stopViteServer(server);
+  }
+}

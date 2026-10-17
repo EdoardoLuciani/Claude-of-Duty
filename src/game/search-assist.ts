@@ -47,7 +47,7 @@ export function resetSearchState(state: SearchState): void {
 /** 0 = north (−Z), clockwise, snapped to 45°. */
 export function sectorBearing(dx: number, dz: number): number {
   if (dx * dx + dz * dz < 1e-8) return 0;
-  const wrapped = ((Math.atan2(dx, -dz) * (180 / Math.PI)) % 360 + 360) % 360;
+  const wrapped = (((Math.atan2(dx, -dz) * (180 / Math.PI)) % 360) + 360) % 360;
   return (Math.round(wrapped / 45) % 8) * 45;
 }
 
@@ -60,7 +60,7 @@ export function tickSearchAssist(
   state: SearchState,
   now: number,
   agents: readonly SearchAgent[],
-  origin: SearchOrigin,
+  origin: SearchOrigin
 ): SearchCue | null {
   let remaining = 0;
   let contact = false;
@@ -73,7 +73,10 @@ export function tickSearchAssist(
     const a = agents[i];
     if (!a.alive || a.staged || a.silentDeath || a.team === 0) continue;
     remaining++;
-    if (now - a.lastSeen < SEARCH_ASSIST.seenWindow || now - a.lastFired < SEARCH_ASSIST.firedWindow) {
+    if (
+      now - a.lastSeen < SEARCH_ASSIST.seenWindow ||
+      now - a.lastFired < SEARCH_ASSIST.firedWindow
+    ) {
       contact = true;
     }
     const dx = a.position.x - ox;

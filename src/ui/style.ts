@@ -550,17 +550,6 @@ const CSS = `
   text-shadow: var(--sh);
 }
 
-/* ======================================================== damage numbers */
-.ow-dn {
-  position:absolute; left:0; top:0; font-family: var(--fd);
-  font-size: calc(17px * var(--k)); font-weight:700; letter-spacing:.03em;
-  color: var(--ink); text-shadow: 0 1px 2px rgba(0,0,0,.95), 0 0 calc(8px * var(--k)) rgba(0,0,0,.6);
-  will-change: transform, opacity;
-}
-.ow-dn.hs   { color: var(--amber); font-size: calc(21px * var(--k)); }
-.ow-dn.kill { color: var(--red);   font-size: calc(23px * var(--k)); }
-.ow-dn.armour { color: var(--cyan); }
-
 /* ================================================================ prompt */
 .ow-prompt {
   position:absolute; left:50%; top:58%;
@@ -622,14 +611,19 @@ const CSS = `
 /* ================================================================== menu */
 .ow-menu {
   position:absolute; inset:0; pointer-events:auto;
+  display:flex; flex-direction:column; overflow:auto;
   background: linear-gradient(105deg, rgba(4,6,8,.90) 0%, rgba(4,6,8,.72) 46%, rgba(4,6,8,.42) 100%);
   backdrop-filter: blur(calc(9px * var(--k))) saturate(.7) brightness(.8);
   opacity:0; will-change: opacity;
 }
+.ow-menu-layout {
+  display:grid; grid-template-columns: minmax(400px, calc(430px * var(--k))) minmax(0, 1fr);
+  gap: max(28px, calc(40px * var(--k)));
+  width: min(calc(1520px * var(--k)), 100%);
+  padding:24px; margin:auto; flex-shrink:0;
+}
 .ow-menu-inner {
-  position:absolute; left: calc(var(--u) * 22); top:50%;
-  transform: translateY(-50%);
-  width: calc(430px * var(--k));
+  align-self:center; min-width:0;
   padding-left: calc(var(--u) * 4.5);
   border-left: calc(2px * var(--k)) solid var(--amber);
 }
@@ -697,6 +691,43 @@ const CSS = `
 .ow-menu .hint {
   margin-top: calc(var(--u) * 4); font-size: calc(9.5px * var(--k));
   letter-spacing:.2em; color: var(--ink-3);
+}
+
+/* Pause reference stays in normal flow: short/narrow viewports scroll rather
+   than clipping controls or shrinking text below a readable size. */
+.ow-menu .ow-row > .name { font-size:max(12px, calc(11.5px * var(--k))); }
+.ow-menu .ow-row > .val, .ow-menu .ow-btn { font-size:max(12px, calc(11px * var(--k))); }
+.ow-menu .ow-seg button { font-size:max(11px, calc(10px * var(--k))); }
+.ow-menu .hint { font-size:max(11px, calc(9.5px * var(--k))); color:#bdcbd3; letter-spacing:.08em; }
+.ow-menu :focus-visible { outline:2px solid var(--amber); outline-offset:4px; }
+.ow-controls {
+  min-width:0; max-height:calc(100vh - 48px); overflow:auto;
+  padding:max(18px, calc(24px * var(--k)));
+  background:rgba(7,11,15,.94); border:1px solid var(--hair);
+  text-transform:none; letter-spacing:.02em;
+}
+.ow-controls h2 { font-family:var(--fd); font-size:max(24px, calc(28px * var(--k))); letter-spacing:.16em; }
+.ow-controls-note { font-size:max(13px, calc(13px * var(--k))); line-height:1.5; color:#bdcbd3; margin-top:12px; }
+.ow-controls-groups { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:24px; margin:20px 0; }
+.ow-controls h3 { font-size:max(14px, calc(14px * var(--k))); color:var(--amber); margin-bottom:8px; }
+.ow-control {
+  display:grid; grid-template-columns:minmax(0, .4fr) minmax(0, 1fr); gap:12px;
+  padding:8px 0; border-top:1px solid var(--hair);
+  font-size:max(14px, calc(14px * var(--k))); line-height:1.4;
+}
+.ow-control dt { color:#f0f5f7; font-weight:800; }
+.ow-control dd { color:#bdcbd3; }
+@media (max-width:1400px) {
+  .ow-controls-groups { grid-template-columns:minmax(0, 1fr); }
+}
+@media (max-width:1000px) {
+  .ow-menu-layout { grid-template-columns:minmax(0, 1fr); max-width:760px; }
+  .ow-menu-inner { width:100%; }
+  .ow-controls { max-height:none; }
+}
+@media (max-width:560px) {
+  .ow-menu-layout { padding:16px; }
+  .ow-menu .ow-row { flex-wrap:wrap; }
 }
 
 /* ============================================================= game over */

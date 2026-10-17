@@ -25,31 +25,67 @@ export const SECONDARY_IDS = ['pistol', 'smg', 'shotgun'];
 
 export const WEAPON_DEFS = {
   mcx: {
-    id: 'mcx', label: 'MCX VIRTUS', class: 'carbine', caliber: '.300 BLK',
-    audio: 'mcx', suppressed: true,
-    rpm: 800, modes: ['auto', 'semi'], magSize: 30, reserve: 180,
+    id: 'mcx',
+    label: 'MCX VIRTUS',
+    class: 'carbine',
+    caliber: '.300 BLK',
+    audio: 'mcx',
+    suppressed: true,
+    rpm: 800,
+    modes: ['auto', 'semi'],
+    magSize: 30,
+    reserve: 180,
     fireAnimationSpeed: 2.5, // finish carrier return before the next 75 ms shot
     // Suppressed subsonic game load: more drop than the M4, not a reskinned 5.56.
-    muzzleVelocity: 305, damage: 39, penetration: .82, dropoff: .58,
-    maxRange: 260, dragK: .36,
+    muzzleVelocity: 305,
+    damage: 39,
+    penetration: 0.82,
+    dropoff: 0.58,
+    maxRange: 260,
+    dragK: 0.36,
     zeroRange: 50, // subsonic: 20 cm low at 100 m, 74 cm at 150 m
-    spreadHip: 2.0, spreadAds: .20, spreadPerShot: .25,
-    spreadMax: 3.2, spreadDecay: 3.8,
+    spreadHip: 2.0,
+    spreadAds: 0.2,
+    spreadPerShot: 0.25,
+    spreadMax: 3.2,
+    spreadDecay: 3.8,
     recoil: {
-      pitch: .0105, yaw: .0025, kickBack: .014, kickUp: .004,
-      roll: .026, punch: .32, freq: 9, damping: .48,
-      adsScale: .72, crouchScale: .86, patternLength: 30,
-      patternSeed: 0x300bc, climbShape: [1.3, 1.18, 1.08, 1], drift: .45,
+      pitch: 0.0105,
+      yaw: 0.0025,
+      kickBack: 0.014,
+      kickUp: 0.004,
+      roll: 0.026,
+      punch: 0.32,
+      freq: 9,
+      damping: 0.48,
+      adsScale: 0.72,
+      crouchScale: 0.86,
+      patternLength: 30,
+      patternSeed: 0x300bc,
+      climbShape: [1.3, 1.18, 1.08, 1],
+      drift: 0.45,
     },
     fireVibe: { amp: 0.82, duration: 0.055, adsScale: 0.38 },
-    adsTime: .26, adsFovScale: .28, adsSensScale: .28, viewFov: .86,
-    reloadTac: 2.6, reloadEmpty: 3.3, inspectTime: 4,
-    drawTime: .62, holsterTime: .4,
-    hipPos: [.118, -.192, -.30], hipRot: [-.05, .081, -.135],
-    adsCant: [0, 0, 0], eyeRelief: .11,
-    sprintPos: [.09, -.275, -.275], sprintRot: [-.4, .6, .2],
-    lowReadyPos: [.112, -.29, -.289], lowReadyRot: [-.46, .125, -.09],
-    swayScale: .85, bobScale: .95, magLen: .18,
+    adsTime: 0.26,
+    adsFovScale: 0.28,
+    adsSensScale: 0.28,
+    viewFov: 0.86,
+    reloadTac: 2.6,
+    reloadEmpty: 3.3,
+    inspectTime: 4,
+    drawTime: 0.62,
+    holsterTime: 0.4,
+    hipPos: [0.118, -0.192, -0.3],
+    hipRot: [-0.05, 0.081, -0.135],
+    adsCant: [0, 0, 0],
+    eyeRelief: 0.11,
+    sprintPos: [0.09, -0.275, -0.275],
+    sprintRot: [-0.4, 0.6, 0.2],
+    lowReadyPos: [0.112, -0.29, -0.289],
+    lowReadyRot: [-0.46, 0.125, -0.09],
+    swayScale: 0.85,
+    bobScale: 0.95,
+    magLen: 0.18,
   },
   rifle: {
     id: 'rifle',
@@ -132,7 +168,8 @@ export const WEAPON_DEFS = {
     id: 'smg',
     label: 'SIG MPX',
     class: 'smg',
-    audio: 'suppressed', suppressed: true,
+    audio: 'suppressed',
+    suppressed: true,
     caliber: '9x19',
     rpm: 950,
     modes: ['auto', 'semi'],
@@ -381,10 +418,11 @@ export const WEAPON_DEFS = {
     holsterTime: 0.45,
     action: 'pump',
     reloadStyle: 'tube',
-    // 40 mm forward of the roster default: just enough that the support arm spans
-    // this forend's station without stretching, and no further — every millimetre
-    // forward also bends that wrist further once the weapon is at the eye.
-    supportShoulderZ: -0.02,
+    // Provisional native M590 presentation: 25 mm forward of the old shotgun
+    // shoulder reduces measured support-forearm stretch without moving grips.
+    supportShoulderZ: -0.045,
+    // Prototype conventional-stock wrist: body shoulder only, native grip stays fixed.
+    firingShoulderZ: 0.45,
     hipPos: [0.118, -0.175, -0.3],
     hipRot: [-0.05, 0.078, -0.125],
     adsCant: [0, 0, 0.003],
@@ -447,11 +485,11 @@ export const WEAPON_DEFS = {
     inspectTime: 3.6,
     drawTime: 0.88,
     holsterTime: 0.56,
-    hipPos: [0.124, -0.200, -0.34],
+    hipPos: [0.124, -0.2, -0.34],
     hipRot: [-0.055, 0.078, -0.13],
     adsCant: [0, 0, 0],
     eyeRelief: 0.09,
-    sprintPos: [0.088, -0.31, -0.30],
+    sprintPos: [0.088, -0.31, -0.3],
     sprintRot: [-0.46, 0.66, 0.22],
     lowReadyPos: [0.11, -0.32, -0.31],
     lowReadyRot: [-0.52, 0.12, -0.09],
@@ -472,11 +510,24 @@ export const WEAPON_DEFS = {
  * @returns {Float32Array} pairs of [pitch, yaw] in radians, length n*2.
  */
 interface RecoilDefinition {
-  recoil: { patternLength: number; patternSeed: number; climbShape: number[]; pitch: number; yaw: number; drift: number };
+  recoil: {
+    patternLength: number;
+    patternSeed: number;
+    climbShape: number[];
+    pitch: number;
+    yaw: number;
+    drift: number;
+  };
 }
-interface PatternRng { float(): number; signed(): number }
+interface PatternRng {
+  float(): number;
+  signed(): number;
+}
 type PatternRngConstructor = new (seed: number) => PatternRng;
-export function buildRecoilPattern(def: RecoilDefinition, Rng: PatternRngConstructor): Float32Array {
+export function buildRecoilPattern(
+  def: RecoilDefinition,
+  Rng: PatternRngConstructor
+): Float32Array {
   const r = def.recoil;
   const n = r.patternLength;
   const rng = new Rng(r.patternSeed);

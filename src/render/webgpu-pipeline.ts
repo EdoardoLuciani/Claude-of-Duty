@@ -1,25 +1,46 @@
-import { Lighting, RenderPipeline, Vector2 } from 'three/webgpu';
-import { builtinAOContext, context, convertToTexture, metalness, roughness,
-  mrt, normalView, pass, positionView, renderGroup, renderOutput, screenCoordinate, screenUV, texture3D,
-  Fn, texture, uniform, vec4, velocity } from 'three/tsl';
+import type { Camera, Object3D, Scene } from 'three';
 import { ClusteredLighting } from 'three/addons/lighting/ClusteredLighting.js';
-import { ao } from 'three/addons/tsl/display/GTAONode.js';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
+import { ao } from 'three/addons/tsl/display/GTAONode.js';
+import { lut3D } from 'three/addons/tsl/display/Lut3DNode.js';
 import { ssr } from 'three/addons/tsl/display/SSRNode.js';
 import { traa } from 'three/addons/tsl/display/TRAANode.js';
-import { lut3D } from 'three/addons/tsl/display/Lut3DNode.js';
+import {
+  builtinAOContext,
+  context,
+  convertToTexture,
+  metalness,
+  roughness,
+  mrt,
+  normalView,
+  pass,
+  positionView,
+  renderGroup,
+  renderOutput,
+  screenCoordinate,
+  screenUV,
+  texture3D,
+  Fn,
+  texture,
+  uniform,
+  vec4,
+  velocity,
+} from 'three/tsl';
+import { Lighting, RenderPipeline, Vector2 } from 'three/webgpu';
 import { AgXToneMapping, Color, SRGBColorSpace } from 'three/webgpu';
-import type { Camera, Object3D, Scene } from 'three';
 import type { Renderer, Node } from 'three/webgpu';
-import type { createGradeLut } from './lut.ts';
+
 import type { VolumetricBuildOptions } from '../sky/volumetrics.ts';
 import { createAoBilateralBlur } from './ao-blur-webgpu.ts';
 import { createFogCompute } from './fog-compute-webgpu.ts';
+import type { createGradeLut } from './lut.ts';
 
 // Application art policy, not upstream defaults or a physical reflectance model.
 const SSR_ADDITIVE_GAIN = 0.16;
-const BLOOM_STRENGTH = 0.14, BLOOM_THRESHOLD = 1.6;
-const BLOOM_RADIUS = 0, BLOOM_INPUT_CEILING = 16;
+const BLOOM_STRENGTH = 0.14,
+  BLOOM_THRESHOLD = 1.6;
+const BLOOM_RADIUS = 0,
+  BLOOM_INPUT_CEILING = 16;
 
 export interface PostPass {
   order?: number;
@@ -30,10 +51,17 @@ export interface PostPass {
 export type FogInputs = VolumetricBuildOptions;
 type FogBuilder = (inputs: FogInputs) => Node<'vec3'> | Node<'vec4'>;
 export interface PipelineOptions {
-  gtao?: boolean; ssrEnabled?: boolean; taa?: boolean; bloomStrength?: number; bloomThreshold?: number;
-  grade?: ReturnType<typeof createGradeLut> | null; fog?: FogBuilder | null;
-  fogCompute?: boolean; warp?: ((node: Node<'vec4'>) => Node<'vec4'>) | null;
-  postPasses?: PostPass[]; afterDepth?: (() => void) | null;
+  gtao?: boolean;
+  ssrEnabled?: boolean;
+  taa?: boolean;
+  bloomStrength?: number;
+  bloomThreshold?: number;
+  grade?: ReturnType<typeof createGradeLut> | null;
+  fog?: FogBuilder | null;
+  fogCompute?: boolean;
+  warp?: ((node: Node<'vec4'>) => Node<'vec4'>) | null;
+  postPasses?: PostPass[];
+  afterDepth?: (() => void) | null;
 }
 
 /**
@@ -41,20 +69,44 @@ export interface PipelineOptions {
  * World and first-person
  * depth never mix; the latter has no MSAA and bypasses world TAA/SSR/fog.
  */
-export function createWorldViewPipeline(renderer: Renderer, scene: Scene, camera: Camera, viewScene: Scene, viewCamera: Camera,
-  { gtao = true, ssrEnabled = false, taa = false, bloomStrength = BLOOM_STRENGTH,
-    bloomThreshold = BLOOM_THRESHOLD, grade = null, fog = null, fogCompute = false, warp = null,
-    postPasses = [], afterDepth = null }: PipelineOptions = {}) {
-  let aoPass = null, aoBlur = null, ssrPass = null, taaPass = null;
+export function createWorldViewPipeline(
+  renderer: Renderer,
+  scene: Scene,
+  camera: Camera,
+  viewScene: Scene,
+  viewCamera: Camera,
+  {
+    gtao = true,
+    ssrEnabled = false,
+    taa = false,
+    bloomStrength = BLOOM_STRENGTH,
+    bloomThreshold = BLOOM_THRESHOLD,
+    grade = null,
+    fog = null,
+    fogCompute = false,
+    warp = null,
+    postPasses = [],
+    afterDepth = null,
+  }: PipelineOptions = {}
+) {
+  let aoPass = null,
+    aoBlur = null,
+    ssrPass = null,
+    taaPass = null;
   const intermediates: Array<{ dispose(): void }> = [];
   const asTexture = (node: Node<'vec4'>): Node<'vec4'> => {
-    const result = convertToTexture(node as never) as Node<'vec4'> & { isRTTNode?: boolean; dispose(): void };
+    const result = convertToTexture(node as never) as Node<'vec4'> & {
+      isRTTNode?: boolean;
+      dispose(): void;
+    };
     if (result !== node && result.isRTTNode) intermediates.push(result);
     return result; // Existing texture/pass outputs remain borrowed.
   };
   const worldPass = pass(scene, camera, { samples: 0 });
   worldPass.lighting = new ClusteredLighting();
-  const worldLights = worldPass.lighting.getNode(scene) as ReturnType<typeof worldPass.lighting.getNode> & { setSize(width: number, height: number): void };
+  const worldLights = worldPass.lighting.getNode(scene) as ReturnType<
+    typeof worldPass.lighting.getNode
+  > & { setSize(width: number, height: number): void };
   const clusterSize = new Vector2();
   const viewPass = pass(viewScene, viewCamera, { samples: 0 });
   // Environment hooks specialize by camera. Give the view pass an explicit
@@ -68,7 +120,13 @@ export function createWorldViewPipeline(renderer: Renderer, scene: Scene, camera
   const savedColor = new Color();
   let savedAlpha = 0;
   type ViewRenderHook = (renderer: Renderer, scene: Scene, camera: Camera, target: unknown) => void;
-  const callViewHook = (hook: typeof oldBefore, r: Renderer, s: Scene, c: Camera, target: unknown): void => {
+  const callViewHook = (
+    hook: typeof oldBefore,
+    r: Renderer,
+    s: Scene,
+    c: Camera,
+    target: unknown
+  ): void => {
     (hook as unknown as ViewRenderHook).call(viewScene, r, s, c, target);
   };
   const beforeRender: ViewRenderHook = (r, s, c, target) => {
@@ -104,17 +162,23 @@ export function createWorldViewPipeline(renderer: Renderer, scene: Scene, camera
   prePass.transparent = false;
   // GTAO sets a white clear before updating its depth dependency. With AO
   // scheduled outside world lighting, don't inherit that clear in normals.
-  const updatePrepass = Reflect.get(prePass, 'updateBefore') as (frame: { renderer: Renderer | null }) => void;
+  const updatePrepass = Reflect.get(prePass, 'updateBefore') as (frame: {
+    renderer: Renderer | null;
+  }) => void;
   const preClear = new Color();
-  prePass.updateBefore = (function (this: typeof prePass, frame: { renderer: Renderer | null }) {
-    const r = frame.renderer!, alpha = r.getClearAlpha();
-    r.getClearColor(preClear); r.setClearColor(0, 1);
+  prePass.updateBefore = function (this: typeof prePass, frame: { renderer: Renderer | null }) {
+    const r = frame.renderer!,
+      alpha = r.getClearAlpha();
+    r.getClearColor(preClear);
+    r.setClearColor(0, 1);
     try {
       updatePrepass.call(this, frame);
       afterDepth?.(); // Consumers now see this frame's opaque depth.
-    } finally { r.setClearColor(preClear, alpha); }
+    } finally {
+      r.setClearColor(preClear, alpha);
+    }
     return undefined;
-  }) as NonNullable<typeof prePass.updateBefore>;
+  } as NonNullable<typeof prePass.updateBefore>;
   const channels: Record<string, Node> = { output: normalView as Node };
   if (ssrEnabled) channels.surface = vec4(roughness, metalness, 0, 1);
   if (taa) channels.velocity = velocity;
@@ -125,39 +189,55 @@ export function createWorldViewPipeline(renderer: Renderer, scene: Scene, camera
     aoPass = ao(prePass.getTextureNode('depth'), prePass.getTextureNode(), camera);
     // Keep the existing half-resolution AO budget after the upstream sampling fix.
     aoPass.resolutionScale = 0.5;
-    aoBlur = createAoBilateralBlur(aoPass.getTextureNode(), prePass.getTextureNode('linearDepth'),
-      prePass.getTextureNode('depth'), camera);
+    aoBlur = createAoBilateralBlur(
+      aoPass.getTextureNode(),
+      prePass.getTextureNode('linearDepth'),
+      prePass.getTextureNode('depth'),
+      camera
+    );
     // World shaders only sample the published texture. Traversing the RTT/AO
     // graph in each new mesh builder resets its fullscreen materials' contexts.
     // ScreenNode creates a fresh size uniform in each builder. Its differing
     // ID fragments otherwise-identical shared camera groups, including CSM's
     // inherited AO context. One pass-aware uniform keeps the same native UVs.
-    const aoSize = uniform(new Vector2()).setGroup(renderGroup).onRenderUpdate(({ renderer }, self) => {
-      const target = renderer!.getRenderTarget();
-      if (target) self.value.set(target.width, target.height);
-      else renderer!.getDrawingBufferSize(self.value);
-    });
-    worldPass.contextNode = builtinAOContext(texture(aoBlur.textureNode.value)
-      .sample(screenCoordinate.div(aoSize)).r);
+    const aoSize = uniform(new Vector2())
+      .setGroup(renderGroup)
+      .onRenderUpdate(({ renderer }, self) => {
+        const target = renderer!.getRenderTarget();
+        if (target) self.value.set(target.width, target.height);
+        else renderer!.getDrawingBufferSize(self.value);
+      });
+    worldPass.contextNode = builtinAOContext(
+      texture(aoBlur.textureNode.value).sample(screenCoordinate.div(aoSize)).r
+    );
   }
   // TSL transitions among texture, variable, and vector nodes here; upstream
   // generic node types are not covariant across those equivalent color values.
   let world: Node<'vec4'> = worldPass.getTextureNode();
   if (ssrEnabled) {
     const surface = prePass.getTextureNode('surface');
-    ssrPass = ssr(world as never, prePass.getTextureNode('depth') as never, prePass.getTextureNode() as never,
-      { camera, roughnessNode: surface.r, metalnessNode: surface.g, reflectNonMetals: true });
+    ssrPass = ssr(
+      world as never,
+      prePass.getTextureNode('depth') as never,
+      prePass.getTextureNode() as never,
+      { camera, roughnessNode: surface.r, metalnessNode: surface.g, reflectNonMetals: true }
+    );
     ssrPass.intensity.value = SSR_ADDITIVE_GAIN;
     world = vec4(world.rgb.add(ssrPass.rgb), world.a);
   }
   // Resolve only the world. The weapon's ADS motion has no valid world velocity.
   if (taa) {
-    taaPass = traa(worldPass.getTextureNode() as never, prePass.getTextureNode('depth'),
-      prePass.getTextureNode('velocity'), camera);
+    taaPass = traa(
+      worldPass.getTextureNode() as never,
+      prePass.getTextureNode('depth'),
+      prePass.getTextureNode('velocity'),
+      camera
+    );
     // Use the published resolve texture instead of materializing an identity
     // RTT. Ultra still needs the pointwise TAA + SSR input before fog.
-    world = ssrPass ? vec4(taaPass.rgb.add(ssrPass.rgb), taaPass.a) :
-      (taaPass as typeof taaPass & { getTextureNode(): Node<'vec4'> }).getTextureNode();
+    world = ssrPass
+      ? vec4(taaPass.rgb.add(ssrPass.rgb), taaPass.a)
+      : (taaPass as typeof taaPass & { getTextureNode(): Node<'vec4'> }).getTextureNode();
   }
   // Apply aerial perspective to world pixels only; the viewmodel is held in
   // view space and must never inherit world fog or temporal reprojection.
@@ -177,19 +257,33 @@ export function createWorldViewPipeline(renderer: Renderer, scene: Scene, camera
   for (const post of postPasses) {
     // Pointwise effects consume this fragment's colour directly. Resampling
     // effects keep the texture input contract and its materialization boundary.
-    composite = post.asColorNode ? post.asColorNode(composite, exposure) :
-      post.asNode(asTexture(composite), exposure);
+    composite = post.asColorNode
+      ? post.asColorNode(composite, exposure)
+      : post.asNode(asTexture(composite), exposure);
   }
   const exposed = composite.mul(exposure);
   // A few viewmodel glints can hit RGBA16F's 65504 ceiling at glancing
   // angles. Cap only bloom's input; the original HDR colour stays intact,
   // while two anomalous pixels cannot light up half the screen.
-  const glow = bloomStrength > 0 ? bloom(vec4(exposed.rgb.min(BLOOM_INPUT_CEILING), exposed.a),
-    bloomStrength, BLOOM_RADIUS, bloomThreshold) : null;
+  const glow =
+    bloomStrength > 0
+      ? bloom(
+          vec4(exposed.rgb.min(BLOOM_INPUT_CEILING), exposed.a),
+          bloomStrength,
+          BLOOM_RADIUS,
+          bloomThreshold
+        )
+      : null;
   const lit = glow ? exposed.add(glow) : exposed;
   // The authored LUT is display-referred; grade AFTER AgX and sRGB encoding.
-  const final = grade ? lut3D(renderOutput(lit, AgXToneMapping, SRGBColorSpace),
-    texture3D(grade.texture), grade.size as never, 1 as never) : lit;
+  const final = grade
+    ? lut3D(
+        renderOutput(lit, AgXToneMapping, SRGBColorSpace),
+        texture3D(grade.texture),
+        grade.size as never,
+        1 as never
+      )
+    : lit;
   // Publish current depth before any world soft particles or haze, even without
   // AO. PassNode deduplicates this dependency: exactly one prepass per frame.
   const output = Fn(() => {
@@ -201,8 +295,17 @@ export function createWorldViewPipeline(renderer: Renderer, scene: Scene, camera
   const pipeline = new RenderPipeline(renderer, output);
   if (grade) pipeline.outputColorTransform = false;
   return {
-    pipeline, worldPass, viewPass, prePass, aoPass, aoBlur, ssrPass, taaPass, exposure,
-    linearDepth: prePass.getTextureNode('linearDepth'), detach,
+    pipeline,
+    worldPass,
+    viewPass,
+    prePass,
+    aoPass,
+    aoBlur,
+    ssrPass,
+    taaPass,
+    exposure,
+    linearDepth: prePass.getTextureNode('linearDepth'),
+    detach,
     render() {
       // Resize before any draw/binding lookup, not from the lights' late update.
       renderer.getDrawingBufferSize(clusterSize);

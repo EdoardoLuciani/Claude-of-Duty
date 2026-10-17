@@ -1,6 +1,13 @@
 import {
-  ClampToEdgeWrapping, FloatType, HalfFloatType, LinearFilter,
-  MeshBasicNodeMaterial, NoColorSpace, QuadMesh, RGBAFormat, RenderTarget,
+  ClampToEdgeWrapping,
+  FloatType,
+  HalfFloatType,
+  LinearFilter,
+  MeshBasicNodeMaterial,
+  NoColorSpace,
+  QuadMesh,
+  RGBAFormat,
+  RenderTarget,
 } from 'three/webgpu';
 
 // QuadMesh supplies native texture UVs and owns the shared fullscreen geometry.

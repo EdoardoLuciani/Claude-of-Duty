@@ -5,16 +5,23 @@
  *
  *   node tests/e2e/ai-gate-e2e.mjs
  */
+import {
+  ensureViteServer,
+  launchChromium,
+  stopViteServer,
+} from '../../tools/lib/browser-harness.mjs';
 import { waitForGame } from '../../tools/lib/native-render.mjs';
-import { ensureViteServer, launchChromium, stopViteServer } from '../../tools/lib/browser-harness.mjs';
 
 const PORT = Number(process.env.OW_E2E_PORT ?? 8094);
 const server = await ensureViteServer({ port: PORT });
 const browser = await launchChromium({
   headless: true,
   args: [
-    '--ignore-gpu-blocklist', '--force-color-profile=srgb',
-    '--force-device-scale-factor=1', '--hide-scrollbars', '--mute-audio',
+    '--ignore-gpu-blocklist',
+    '--force-color-profile=srgb',
+    '--force-device-scale-factor=1',
+    '--hide-scrollbars',
+    '--mute-audio',
     '--disable-frame-rate-limit',
   ],
 });
@@ -60,19 +67,24 @@ const setup = await page.evaluate(() => {
 
   ai.startWave(4, { squads: 3, perSquad: 4 });
   const p = player.position;
-  const agents = ai.agents.filter((a) => a.alive).map((a) => {
-    const d = Math.hypot(a.position.x - p.x, a.position.z - p.z);
-    const b = Math.atan2(a.position.x - p.x, a.position.z - p.z);
-    return { id: a.id, d: +d.toFixed(1), b: +b.toFixed(2), x: a.position.x, z: a.position.z };
-  });
+  const agents = ai.agents
+    .filter((a) => a.alive)
+    .map((a) => {
+      const d = Math.hypot(a.position.x - p.x, a.position.z - p.z);
+      const b = Math.atan2(a.position.x - p.x, a.position.z - p.z);
+      return { id: a.id, d: +d.toFixed(1), b: +b.toFixed(2), x: a.position.x, z: a.position.z };
+    });
   return { n: agents.length, agents, player: [p.x, p.z] };
 });
 
-console.log('spawn', JSON.stringify({
-  n: setup.n,
-  dists: setup.agents.map((a) => a.d),
-  bearings: setup.agents.map((a) => a.b),
-}));
+console.log(
+  'spawn',
+  JSON.stringify({
+    n: setup.n,
+    dists: setup.agents.map((a) => a.d),
+    bearings: setup.agents.map((a) => a.b),
+  })
+);
 
 const dists = setup.agents.map((a) => a.d);
 const near = dists.filter((d) => d < 50).length;
@@ -87,7 +99,11 @@ for (let i = 0; i < bearings.length; i++) {
   }
 }
 check('wave spawned', setup.n >= 8, `n=${setup.n}`);
-check('not everyone in the 58 m optic', near >= 3 || far < setup.n, `near<50=${near} far>58=${far}`);
+check(
+  'not everyone in the 58 m optic',
+  near >= 3 || far < setup.n,
+  `near<50=${near} far>58=${far}`
+);
 check('spawn bearings actually spread', maxAng > 0.25, `maxAng=${maxAng.toFixed(2)} rad`);
 
 await pump(2);
@@ -97,11 +113,13 @@ await page.evaluate(() => {
   const E = window.__ENGINE__;
   const ai = E.ctx.get('ai');
   const p = E.ctx.get('player').position;
-  const ranked = ai.agents.filter((a) => a.alive).sort((a, b) => {
-    const da = Math.hypot(a.position.x - p.x, a.position.z - p.z);
-    const db = Math.hypot(b.position.x - p.x, b.position.z - p.z);
-    return db - da;
-  });
+  const ranked = ai.agents
+    .filter((a) => a.alive)
+    .sort((a, b) => {
+      const da = Math.hypot(a.position.x - p.x, a.position.z - p.z);
+      const db = Math.hypot(b.position.x - p.x, b.position.z - p.z);
+      return db - da;
+    });
   for (let i = 0; i < 2 && i < ranked.length; i++) {
     ranked[i].applyDamage(200, 'torso', ranked[i].position, { x: 0, y: 0, z: 1 });
   }
@@ -111,7 +129,10 @@ await page.evaluate(() => {
     weapon: 'sniper',
     origin,
     dir: { x: -Math.sin(yaw), y: 0, z: -Math.cos(yaw) },
-    seed: 1, intensity: 1, light: 0.1, flashScale: 1,
+    seed: 1,
+    intensity: 1,
+    light: 0.1,
+    flashScale: 1,
   });
 });
 
@@ -121,20 +142,33 @@ const after = await page.evaluate(() => {
   const E = window.__ENGINE__;
   const ai = E.ctx.get('ai');
   const p = E.ctx.get('player').position;
-  const intel = ai.squads.map((s) => ({ intent: s.intent, why: s.why, peekDeaths: s.peekDeaths.length }));
-  const agents = ai.agents.filter((a) => a.alive).map((a) => {
-    const dx = a.position.x - p.x, dz = a.position.z - p.z;
-    const dist = Math.hypot(dx, dz) || 1;
-    const fx = -Math.sin(E.ctx.get('player').movement.yaw);
-    const fz = -Math.cos(E.ctx.get('player').movement.yaw);
-    const along = (dx * fx + dz * fz) / dist;
-    const cross = Math.abs(-fz * dx + fx * dz);
-    return {
-      id: a.id, state: a.state, role: a.role, speed: +a.desiredSpeed.toFixed(2),
-      dist: +dist.toFixed(1), cross: +cross.toFixed(1), along: +along.toFixed(2),
-      hasTarget: a.hasTarget, vis: a.targetVisible,
-    };
-  });
+  const intel = ai.squads.map((s) => ({
+    intent: s.intent,
+    why: s.why,
+    peekDeaths: s.peekDeaths.length,
+  }));
+  const agents = ai.agents
+    .filter((a) => a.alive)
+    .map((a) => {
+      const dx = a.position.x - p.x,
+        dz = a.position.z - p.z;
+      const dist = Math.hypot(dx, dz) || 1;
+      const fx = -Math.sin(E.ctx.get('player').movement.yaw);
+      const fz = -Math.cos(E.ctx.get('player').movement.yaw);
+      const along = (dx * fx + dz * fz) / dist;
+      const cross = Math.abs(-fz * dx + fx * dz);
+      return {
+        id: a.id,
+        state: a.state,
+        role: a.role,
+        speed: +a.desiredSpeed.toFixed(2),
+        dist: +dist.toFixed(1),
+        cross: +cross.toFixed(1),
+        along: +along.toFixed(2),
+        hasTarget: a.hasTarget,
+        vis: a.targetVisible,
+      };
+    });
   return { intel, agents };
 });
 console.log('after', JSON.stringify(after, null, 2));
@@ -142,13 +176,26 @@ console.log('after', JSON.stringify(after, null, 2));
 const wrapping = after.agents.filter((a) => a.role === 'wrap' || a.state === 'flank').length;
 const sprinting = after.agents.filter((a) => a.speed >= 4).length;
 const offAxis = after.agents.filter((a) => a.cross > 8).length;
-const standingFar = after.agents.filter((a) => a.speed < 0.2 && a.dist > 52 && a.state !== 'combat').length;
+const standingFar = after.agents.filter(
+  (a) => a.speed < 0.2 && a.dist > 52 && a.state !== 'combat'
+).length;
 const wrapped = after.intel.some((s) => s.intent === 'wrap');
 
-check('deaths recorded', after.intel.some((s) => s.peekDeaths >= 2), JSON.stringify(after.intel));
-check('squad wraps off the unseen nest', wrapped || wrapping >= 2, `wrap=${wrapped} wrapping=${wrapping}`);
-check('someone actually left the barrel', wrapping >= 1 || sprinting >= 1 || offAxis >= 2,
-  `wrapping=${wrapping} sprint=${sprinting} offAxis=${offAxis}`);
+check(
+  'deaths recorded',
+  after.intel.some((s) => s.peekDeaths >= 2),
+  JSON.stringify(after.intel)
+);
+check(
+  'squad wraps off the unseen nest',
+  wrapped || wrapping >= 2,
+  `wrap=${wrapped} wrapping=${wrapping}`
+);
+check(
+  'someone actually left the barrel',
+  wrapping >= 1 || sprinting >= 1 || offAxis >= 2,
+  `wrapping=${wrapping} sprint=${sprinting} offAxis=${offAxis}`
+);
 check('not a firing-line of statues at 58 m', standingFar <= 2, `standingFar=${standingFar}`);
 check('page errors', errors.length === 0, errors[0] ?? '');
 

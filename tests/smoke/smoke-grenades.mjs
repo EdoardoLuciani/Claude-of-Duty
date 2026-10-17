@@ -9,11 +9,18 @@
  *   node tests/smoke/smoke-grenades.mjs
  */
 import assert from 'node:assert/strict';
+
 import * as THREE from 'three';
-import { WeaponSystem, GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../../src/weapons/index.ts';
-import { WEAPON_IDS, WEAPON_DEFS, buildRecoilPattern } from '../../src/weapons/defs.ts';
-import { RadioSystem, CARPET } from '../../src/radio/index.ts';
+
 import { Rng } from '../../src/core/rng.ts';
+import { RadioSystem, CARPET } from '../../src/radio/index.ts';
+import { WEAPON_IDS, WEAPON_DEFS, buildRecoilPattern } from '../../src/weapons/defs.ts';
+import {
+  WeaponSystem,
+  GRENADE_RADIUS,
+  GRENADE_DAMAGE,
+  GRENADE_FUSE,
+} from '../../src/weapons/index.ts';
 
 // ---- fakes ---------------------------------------------------------------
 
@@ -30,18 +37,47 @@ const vm = {
   adsT: 0,
   adsTarget: 0,
   active: 'rifle',
-  setActive(id) { this.active = id; return id; },
-  play(name) { this.clip = { name, duration: 1 }; this.clipName = name; this.clipT = 0; return 1; },
-  stopClip() { this.clip = null; this.clipName = null; this.clipT = 0; },
-  holdGrenade() { calls.push('hold'); },
-  cookGrenade(type) { calls.push(`cook:${type}`); },
-  throwGrenade(type) { calls.push(`throw:${type}`); },
-  endGrenade() { calls.push('end'); },
-  holdRadio() { calls.push('holdRadio'); },
-  endRadio() { calls.push('endRadio'); },
+  setActive(id) {
+    this.active = id;
+    return id;
+  },
+  play(name) {
+    this.clip = { name, duration: 1 };
+    this.clipName = name;
+    this.clipT = 0;
+    return 1;
+  },
+  stopClip() {
+    this.clip = null;
+    this.clipName = null;
+    this.clipT = 0;
+  },
+  holdGrenade() {
+    calls.push('hold');
+  },
+  cookGrenade(type) {
+    calls.push(`cook:${type}`);
+  },
+  throwGrenade(type) {
+    calls.push(`throw:${type}`);
+  },
+  endGrenade() {
+    calls.push('end');
+  },
+  holdRadio() {
+    calls.push('holdRadio');
+  },
+  endRadio() {
+    calls.push('endRadio');
+  },
   setRadioScreen() {},
-  grenadeReleaseWorld(out) { out.set(0, 1.6, 0); return out; },
-  muzzleWorld() { return { x: 0, y: 0, z: 0 }; },
+  grenadeReleaseWorld(out) {
+    out.set(0, 1.6, 0);
+    return out;
+  },
+  muzzleWorld() {
+    return { x: 0, y: 0, z: 0 };
+  },
   addRecoil() {},
 };
 
@@ -60,16 +96,18 @@ const input = {
   actionPressed(name) {
     if (name === 'grenade') return this._gPressed;
     if (name === 'radio') return this._xPressed;
+    if (name === 'fire') return this.firePressed;
+    if (name === 'ads') return this._rmbPressed;
+    return name === `slot${this._digit}`;
+  },
+  action(name) {
+    if (name === 'fire') return this.down.has('Mouse0');
+    if (name === 'ads') return this.down.has('Mouse2');
     return false;
   },
-  pressed(code) {
-    if (this._rmbPressed && code === 'Mouse2') return true;
-    if (code === 'Digit1' && this._digit === 1) return true;
-    if (code === 'Digit2' && this._digit === 2) return true;
-    if (code === 'Digit3' && this._digit === 3) return true;
+  actionReleased() {
     return false;
   },
-  held(code) { return this.down.has(code); },
 };
 
 const player = {
@@ -108,8 +146,14 @@ wp.ctx = {
     updateMatrixWorld() {},
   },
   scene: { add() {} },
-  events: { emit(type, payload) { events.push({ type, payload }); } },
-  peek(id) { return id === 'player' ? player : undefined; },
+  events: {
+    emit(type, payload) {
+      events.push({ type, payload });
+    },
+  },
+  peek(id) {
+    return id === 'player' ? player : undefined;
+  },
 };
 wp.ctx.input = input;
 wp.rng = new Rng(0x1234abcd);
@@ -132,8 +176,16 @@ for (const id of WEAPON_IDS) {
 }
 
 const step = (dt = 1 / 60) => wp.update(dt, wp.ctx);
-const pressG = () => { input._gPressed = true; step(); input._gPressed = false; };
-const pressDigit = (n) => { input._digit = n; step(); input._digit = 0; };
+const pressG = () => {
+  input._gPressed = true;
+  step();
+  input._gPressed = false;
+};
+const pressDigit = (n) => {
+  input._digit = n;
+  step();
+  input._digit = 0;
+};
 const resetLive = () => {
   wp._grenades.length = 0;
   bodies.length = 0;
@@ -252,7 +304,10 @@ assert.equal(bodies.length, 1);
 const shortVel = bodies[0].velocity;
 assert.equal(shortVel.y, 1.2, 'short throw has the low arc (+1.2 m/s up)');
 const shortSpeed = Math.hypot(shortVel.x, shortVel.z);
-assert(shortSpeed > 10 && shortSpeed < 20, `short throw keeps roughly today reach (15 m/s, got ${shortSpeed})`);
+assert(
+  shortSpeed > 10 && shortSpeed < 20,
+  `short throw keeps roughly today reach (15 m/s, got ${shortSpeed})`
+);
 wp._onClipEvent('grenade:done', 'grenadeThrow');
 assert.equal(wp.grenadeEquipped, false);
 resetLive();
@@ -344,7 +399,11 @@ input.down.delete('Mouse0');
 input.fire = false;
 step(); // release commits
 assert.equal(wp._throwing, true);
-assert.equal(wp.setWeapon('pistol'), false, 'weapon switch is refused while the throw is committed');
+assert.equal(
+  wp.setWeapon('pistol'),
+  false,
+  'weapon switch is refused while the throw is committed'
+);
 assert.equal(wp.grenadeEquipped, true, 'the committed grenade stays in hand');
 assert.equal(wp.grenades, 1, 'the spent grenade is not restored');
 wp._onClipEvent('grenade:release', 'grenadeThrow');
@@ -429,9 +488,18 @@ resetLive();
 // ==========================================================================
 //  FIELD RADIO (accessory) — issue #99
 // ==========================================================================
-const pressX = () => { input._xPressed = true; step(); input._xPressed = false; };
+const pressX = () => {
+  input._xPressed = true;
+  step();
+  input._xPressed = false;
+};
 let strikeCalls = 0;
-wp.radioSys = { callStrike() { strikeCalls++; return true; } };
+wp.radioSys = {
+  callStrike() {
+    strikeCalls++;
+    return true;
+  },
+};
 
 // ---- X equips the radio; stowing is free ----------------------------------
 pressX();
@@ -511,7 +579,11 @@ assert.equal(strikeCalls, 2);
 assert.equal(wp.radioEquipped, false, 'the strike stowed the radio');
 
 // ---- a refused strike (one already airborne) keeps the charge ---------------
-wp.radioSys = { callStrike() { return false; } };
+wp.radioSys = {
+  callStrike() {
+    return false;
+  },
+};
 pressX();
 assert.equal(wp.radioEquipped, true, 'radio is out again');
 pressDigit(1);
@@ -522,7 +594,12 @@ pressX(); // stow
 
 // ---- the radio never leaves the weapon slot on a reset ---------------------
 wp.radioEquipped = true;
-wp.viewmodel = { ...wp.viewmodel, endRadio() { calls.push('endRadio'); } };
+wp.viewmodel = {
+  ...wp.viewmodel,
+  endRadio() {
+    calls.push('endRadio');
+  },
+};
 wp.resetForNewGame();
 assert.equal(wp.radioEquipped, false, 'reset stows the radio');
 assert.equal(wp.carpetBombs, 1, 'reset restores the spawn charge');
@@ -547,8 +624,16 @@ assert.equal(bodies.length, nBodies, 'hand reset does not drop another live gren
 const strikeEvents = [];
 const added = [];
 const radioCtx = {
-  scene: { add(o) { added.push(o); } },
-  events: { emit(type, payload) { strikeEvents.push({ type, payload }); } },
+  scene: {
+    add(o) {
+      added.push(o);
+    },
+  },
+  events: {
+    emit(type, payload) {
+      strikeEvents.push({ type, payload });
+    },
+  },
   peek(id) {
     if (id === 'world') {
       return {
@@ -578,7 +663,10 @@ assert.equal(radio.callStrike(), true, 'a strike starts');
 assert.equal(radio.active.length, 1, 'one bomber in the air');
 assert.equal(radio.callStrike(), false, 'no second bomber while one is airborne');
 assert.equal(added.length, 1, 'the bomber mesh entered the scene');
-assert(strikeEvents.some((e) => e.type === 'radio:strike'), 'a radio:strike event announces the strike');
+assert(
+  strikeEvents.some((e) => e.type === 'radio:strike'),
+  'a radio:strike event announces the strike'
+);
 // The bomber flies the street axis derived from the spawn yaw — the map's
 // north street (0.554, 0, 0.832), not the diagonal fallback.
 const flightDir = radio.active[0].dir;
@@ -593,18 +681,30 @@ while (radio.active.length && guard++ < 60 * 60) radio.update(1 / 60);
 assert(guard < 60 * 60, 'strike clears within 60 s of sim time');
 const strikeBooms = strikeEvents.filter((e) => e.type === 'explosion');
 assert(strikeBooms.length >= 40, `a carpet bomb drops a lot of bombs (got ${strikeBooms.length})`);
-assert(strikeBooms.every((e) => e.payload.radius === CARPET.radius), 'bombs carry the tuned radius');
-assert(strikeBooms.every((e) => e.payload.damage === CARPET.damage), 'bombs carry the tuned damage');
-assert(strikeBooms.every((e) => e.payload.position.y === CARPET.blastHeight),
-  'bomb blast origins sit above the ground collision surface');
+assert(
+  strikeBooms.every((e) => e.payload.radius === CARPET.radius),
+  'bombs carry the tuned radius'
+);
+assert(
+  strikeBooms.every((e) => e.payload.damage === CARPET.damage),
+  'bombs carry the tuned damage'
+);
+assert(
+  strikeBooms.every((e) => e.payload.position.y === CARPET.blastHeight),
+  'bomb blast origins sit above the ground collision surface'
+);
 // The blast line spans the whole town along the street axis (the map is a
 // rotated square; the town sits in a band along the street).
 const xs = strikeBooms.map((e) => e.payload.position.x);
 const zs = strikeBooms.map((e) => e.payload.position.z);
-assert(Math.min(...xs) < -55 && Math.max(...xs) > 50,
-  `blasts cover the street extent in x (${Math.min(...xs).toFixed(0)}..${Math.max(...xs).toFixed(0)})`);
-assert(Math.min(...zs) < -85 && Math.max(...zs) > 75,
-  `blasts cover the street extent in z (${Math.min(...zs).toFixed(0)}..${Math.max(...zs).toFixed(0)})`);
+assert(
+  Math.min(...xs) < -55 && Math.max(...xs) > 50,
+  `blasts cover the street extent in x (${Math.min(...xs).toFixed(0)}..${Math.max(...xs).toFixed(0)})`
+);
+assert(
+  Math.min(...zs) < -85 && Math.max(...zs) > 75,
+  `blasts cover the street extent in z (${Math.min(...zs).toFixed(0)}..${Math.max(...zs).toFixed(0)})`
+);
 assert.equal(radio.active.length, 0, 'the strike clears when the run is over');
 
 console.log('Grenade + radio smoke checks passed');

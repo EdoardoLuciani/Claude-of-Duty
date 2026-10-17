@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "3714e8eb580f5f7b",
+  "sourceHash": "1ae81fa350a230b3",
   "transform": [
     0.8322181104875284,
     0,
@@ -181,6 +181,16 @@
         "secondarySide": 0,
         "damage": 0.15,
         "balconies": 0.3,
+        "omitBalconies": {
+          "1": {
+            "0": {
+              "preserveDressing": true
+            },
+            "2.799999999999999": {
+              "preserveDressing": true
+            }
+          }
+        },
         "doorBays": {
           "0": 2,
           "1": 1
@@ -828,7 +838,8 @@
             "floor": 1,
             "wall": "east",
             "along": 0.5,
-            "key": "wood_dark"
+            "key": "wood_dark",
+            "catchInset": 0.46
           }
         ],
         "stairHoles": {
@@ -842,7 +853,7 @@
             ]
           },
           "2": {
-            "x0": -10.42,
+            "x0": -10.5,
             "x1": -9.64,
             "z0": -33.65,
             "z1": -32.85,
@@ -1009,7 +1020,8 @@
           {
             "floor": 1,
             "wall": "east",
-            "along": 0.18
+            "along": 0.18,
+            "catchInset": 0.46
           }
         ],
         "stairHoles": {
@@ -1023,7 +1035,7 @@
             ]
           },
           "2": {
-            "x0": 17.38,
+            "x0": 17.3,
             "x1": 18.16,
             "z0": 28.34,
             "z1": 29.14,
@@ -1932,9 +1944,9 @@
     },
     {
       "kind": "ladder",
-      "x": -25.874234416683414,
+      "x": -25.94081186552242,
       "y0": 3.45,
-      "z": -20.77567931130503,
+      "z": -20.731323440148103,
       "y1": 6.5,
       "radius": 0.42,
       "nx": -0.8322181104875284,
@@ -1942,9 +1954,9 @@
     },
     {
       "kind": "ladder",
-      "x": 31.630354041460084,
+      "x": 31.563776592621082,
       "y0": 3.45,
-      "z": 15.397858807319052,
+      "z": 15.442214678475983,
       "y1": 6.5,
       "radius": 0.42,
       "nx": -0.8322181104875284,
@@ -2521,22 +2533,22 @@
     }
   },
   "assets": {
-    "visual": "level-visual.ab7ec287aadf.glb.gz",
-    "collision": "level-collision.082b668119a4.glb.gz",
-    "nav": "level-nav.9b904a515e47.bin.gz"
+    "visual": "level-visual.4ec4e9490967.glb.gz",
+    "collision": "level-collision.4b294863a3f2.glb.gz",
+    "nav": "level-nav.37c4b0a4d9d3.bin.gz"
   },
   "navigation": {
-    "version": 1,
-    "sha256": "3926e474984c0a2f9ab79dbfa6f76b50e716a73ea2ef535c7dea2bf22197f334",
-    "polygons": 49271,
-    "components": 237,
-    "coverPoints": 16410
+    "version": 2,
+    "sha256": "d5d274f76cd217734d45450e9edddd1b48618c2496a2f49c4da207f775244d6b",
+    "polygons": 49334,
+    "components": 227,
+    "coverPoints": 16424
   },
   "stats": {
-    "staticTris": 621528,
-    "instTris": 1066196,
-    "instances": 7802,
+    "staticTris": 620328,
+    "instTris": 1065436,
+    "instances": 7797,
     "drawCalls": 211,
-    "collideTris": 330135
+    "collideTris": 329738
   }
 }

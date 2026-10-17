@@ -3,4 +3,4 @@ export const CLOCK = Object.freeze({
   startHour: 16.5,
   hoursPerSecond: 9 / 600,
 });
-export const SKY_REBAKE_COS = Math.cos(0.35 * Math.PI / 180);
+export const SKY_REBAKE_COS = Math.cos((0.35 * Math.PI) / 180);

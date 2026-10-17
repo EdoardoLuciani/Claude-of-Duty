@@ -14,7 +14,8 @@ import type { Node } from 'three/webgpu';
  * replaces.
  */
 
-const rot2 = (p: Node<'vec2'>) => vec2(p.x.mul(0.8).sub(p.y.mul(0.6)), p.x.mul(0.6).add(p.y.mul(0.8)));
+const rot2 = (p: Node<'vec2'>) =>
+  vec2(p.x.mul(0.8).sub(p.y.mul(0.6)), p.x.mul(0.6).add(p.y.mul(0.8)));
 
 // Share pure shader functions across octaves and consumers. Keep the authored
 // arithmetic and octave counts; only the TSL/WGSL expansion changes.
@@ -33,11 +34,7 @@ export const skHash13 = Fn<[Node<'vec3'>], Node<'float'>>(([p]) => {
 export const skHash33 = Fn<[Node<'vec3'>], Node<'vec3'>>(([p]) => {
   const q = fract(p.mul(vec3(0.1031, 0.11369, 0.13787))).toVar();
   q.addAssign(dot(q, q.yxz.add(19.19)));
-  return fract(vec3(
-    q.x.add(q.y).mul(q.z),
-    q.x.add(q.z).mul(q.y),
-    q.y.add(q.z).mul(q.x)
-  ));
+  return fract(vec3(q.x.add(q.y).mul(q.z), q.x.add(q.z).mul(q.y), q.y.add(q.z).mul(q.x)));
 }).setLayout({ name: 'ow_skHash33', type: 'vec3', inputs: [{ name: 'p', type: 'vec3' }] });
 
 /** Interleaved gradient noise (Jimenez) — the right dither for a raymarch. */
@@ -48,7 +45,10 @@ export const skIGN = Fn<[Node<'vec2'>], Node<'float'>>(([p]) =>
 export const skVal2 = Fn<[Node<'vec2'>], Node<'float'>>(([p]) => {
   const i = p.floor().toVar();
   const f0 = p.fract().toVar();
-  const f = f0.mul(f0).mul(float(3).sub(f0.mul(2))).toVar();
+  const f = f0
+    .mul(f0)
+    .mul(float(3).sub(f0.mul(2)))
+    .toVar();
   return mix(
     mix(skHash12(i), skHash12(i.add(vec2(1, 0))), f.x),
     mix(skHash12(i.add(vec2(0, 1))), skHash12(i.add(vec2(1, 1))), f.x),
@@ -59,7 +59,10 @@ export const skVal2 = Fn<[Node<'vec2'>], Node<'float'>>(([p]) => {
 export const skVal3 = Fn<[Node<'vec3'>], Node<'float'>>(([p]) => {
   const i = p.floor().toVar();
   const f0 = p.fract().toVar();
-  const f = f0.mul(f0).mul(float(3).sub(f0.mul(2))).toVar();
+  const f = f0
+    .mul(f0)
+    .mul(float(3).sub(f0.mul(2)))
+    .toVar();
   return mix(
     mix(
       mix(skHash13(i), skHash13(i.add(vec3(1, 0, 0))), f.x),
@@ -75,47 +78,50 @@ export const skVal3 = Fn<[Node<'vec3'>], Node<'float'>>(([p]) => {
   );
 }).setLayout({ name: 'ow_skVal3', type: 'float', inputs: [{ name: 'p', type: 'vec3' }] });
 
-export const fbm2 = (octaves: number) => Fn<[Node<'vec2'>], Node<'float'>>(([p]) => {
-  const a = float(0.5).toVar();
-  const s = float(0).toVar();
-  const n = float(0).toVar();
-  const q = p.toVar();
-  for (let i = 0; i < octaves; i++) {
-    s.addAssign(a.mul(skVal2(q)));
-    n.addAssign(a);
-    q.assign(rot2(q).mul(2.04).add(7.13));
-    a.mulAssign(0.5);
-  }
-  return s.div(max(n, 1e-4));
-});
+export const fbm2 = (octaves: number) =>
+  Fn<[Node<'vec2'>], Node<'float'>>(([p]) => {
+    const a = float(0.5).toVar();
+    const s = float(0).toVar();
+    const n = float(0).toVar();
+    const q = p.toVar();
+    for (let i = 0; i < octaves; i++) {
+      s.addAssign(a.mul(skVal2(q)));
+      n.addAssign(a);
+      q.assign(rot2(q).mul(2.04).add(7.13));
+      a.mulAssign(0.5);
+    }
+    return s.div(max(n, 1e-4));
+  });
 
 /** Ridged variant — fibrous cirrus streaks and wind-torn fog wisps. */
-export const ridge2 = (octaves: number) => Fn<[Node<'vec2'>], Node<'float'>>(([p]) => {
-  const a = float(0.5).toVar();
-  const s = float(0).toVar();
-  const n = float(0).toVar();
-  const q = p.toVar();
-  for (let i = 0; i < octaves; i++) {
-    s.addAssign(a.mul(skVal2(q).mul(2).sub(1).abs().oneMinus()));
-    n.addAssign(a);
-    q.assign(rot2(q).mul(2.11).add(3.71));
-    a.mulAssign(0.52);
-  }
-  return s.div(max(n, 1e-4));
-});
+export const ridge2 = (octaves: number) =>
+  Fn<[Node<'vec2'>], Node<'float'>>(([p]) => {
+    const a = float(0.5).toVar();
+    const s = float(0).toVar();
+    const n = float(0).toVar();
+    const q = p.toVar();
+    for (let i = 0; i < octaves; i++) {
+      s.addAssign(a.mul(skVal2(q).mul(2).sub(1).abs().oneMinus()));
+      n.addAssign(a);
+      q.assign(rot2(q).mul(2.11).add(3.71));
+      a.mulAssign(0.52);
+    }
+    return s.div(max(n, 1e-4));
+  });
 
-export const fbm3 = (octaves: number) => Fn<[Node<'vec3'>], Node<'float'>>(([p]) => {
-  const a = float(0.5).toVar();
-  const s = float(0).toVar();
-  const n = float(0).toVar();
-  const q = p.toVar();
-  for (let i = 0; i < octaves; i++) {
-    s.addAssign(a.mul(skVal3(q)));
-    n.addAssign(a);
-    q.assign(q.mul(2.07).add(vec3(11.3, 5.1, 7.7)));
-    a.mulAssign(0.5);
-  }
-  return s.div(max(n, 1e-4));
-});
+export const fbm3 = (octaves: number) =>
+  Fn<[Node<'vec3'>], Node<'float'>>(([p]) => {
+    const a = float(0.5).toVar();
+    const s = float(0).toVar();
+    const n = float(0).toVar();
+    const q = p.toVar();
+    for (let i = 0; i < octaves; i++) {
+      s.addAssign(a.mul(skVal3(q)));
+      n.addAssign(a);
+      q.assign(q.mul(2.07).add(vec3(11.3, 5.1, 7.7)));
+      a.mulAssign(0.5);
+    }
+    return s.div(max(n, 1e-4));
+  });
 
 export { rot2 };

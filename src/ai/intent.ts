@@ -8,7 +8,7 @@ export const INTENT = Object.freeze({
   WRAP: 'wrap',
   FLUSH: 'flush',
 });
-export type IntentName = typeof INTENT[keyof typeof INTENT];
+export type IntentName = (typeof INTENT)[keyof typeof INTENT];
 
 export const PLANT_HOLD = 3;
 export const PLANT_RADIUS = 8;
@@ -22,13 +22,33 @@ export const FRIENDLY_HOLD = 0.7;
 export const LONG_RANGE = 40;
 export const FLUSH_MAX_FAILS = 4;
 
-export interface DeathPoint { x: number; z: number; t: number }
-export interface CoverCluster { x: number; z: number; r: number; count: number }
-export interface IntentState {
-  peekDeathCount?: number; lastKnownAge: number; flushFails?: number; hasGrenade?: boolean;
-  cluster?: CoverCluster | null; planted?: boolean; anyVisual?: boolean; plantAge?: number;
+export interface DeathPoint {
+  x: number;
+  z: number;
+  t: number;
 }
-export function clusterPeekDeaths(deaths: readonly DeathPoint[] | null | undefined, now: number, maxAge = CLUSTER_MAX_AGE, radius = CLUSTER_RADIUS): CoverCluster | null {
+export interface CoverCluster {
+  x: number;
+  z: number;
+  r: number;
+  count: number;
+}
+export interface IntentState {
+  peekDeathCount?: number;
+  lastKnownAge: number;
+  flushFails?: number;
+  hasGrenade?: boolean;
+  cluster?: CoverCluster | null;
+  planted?: boolean;
+  anyVisual?: boolean;
+  plantAge?: number;
+}
+export function clusterPeekDeaths(
+  deaths: readonly DeathPoint[] | null | undefined,
+  now: number,
+  maxAge = CLUSTER_MAX_AGE,
+  radius = CLUSTER_RADIUS
+): CoverCluster | null {
   if (!deaths || deaths.length < PEEK_DEATHS_NEEDED) return null;
   const live = [];
   for (let i = 0; i < deaths.length; i++) {
@@ -37,7 +57,9 @@ export function clusterPeekDeaths(deaths: readonly DeathPoint[] | null | undefin
   if (live.length < PEEK_DEATHS_NEEDED) return null;
   let best = null;
   for (let i = 0; i < live.length; i++) {
-    let n = 0, sx = 0, sz = 0;
+    let n = 0,
+      sx = 0,
+      sz = 0;
     for (let j = 0; j < live.length; j++) {
       if (Math.hypot(live[j].x - live[i].x, live[j].z - live[i].z) <= radius) {
         n++;
@@ -52,12 +74,20 @@ export function clusterPeekDeaths(deaths: readonly DeathPoint[] | null | undefin
   return best;
 }
 
-export function isBannedCover(cover: { x: number; z: number } | null | undefined, banned: { x: number; z: number; r?: number } | null | undefined): boolean {
+export function isBannedCover(
+  cover: { x: number; z: number } | null | undefined,
+  banned: { x: number; z: number; r?: number } | null | undefined
+): boolean {
   if (!cover || !banned) return false;
   return Math.hypot(cover.x - banned.x, cover.z - banned.z) <= (banned.r ?? CLUSTER_RADIUS);
 }
 
-export function decideIntent(s: IntentState): { intent: IntentName; why: string; banned: CoverCluster | null | undefined; wantFlush: boolean } {
+export function decideIntent(s: IntentState): {
+  intent: IntentName;
+  why: string;
+  banned: CoverCluster | null | undefined;
+  wantFlush: boolean;
+} {
   const deaths = (s.peekDeathCount ?? 0) >= PEEK_DEATHS_NEEDED;
   const known = s.lastKnownAge < FLUSH_KNOWN;
   const flushBlocked = (s.flushFails ?? 0) >= FLUSH_MAX_FAILS;
@@ -81,10 +111,17 @@ export function decideIntent(s: IntentState): { intent: IntentName; why: string;
 }
 
 /** Farthest spawn first, then the rest by angular spread so one optic doesn't eat the wave. */
-export interface RankedAnchor { s: { position: { x: number; z: number } } }
-export function pickSquadAnchors<T extends RankedAnchor>(ranked: readonly T[], player: { x: number; z: number }, n: number): T[] {
+export interface RankedAnchor {
+  s: { position: { x: number; z: number } };
+}
+export function pickSquadAnchors<T extends RankedAnchor>(
+  ranked: readonly T[],
+  player: { x: number; z: number },
+  n: number
+): T[] {
   if (!ranked.length || n <= 0) return [];
-  const px = player.x, pz = player.z;
+  const px = player.x,
+    pz = player.z;
   const bearing = (e: T): number => Math.atan2(e.s.position.x - px, e.s.position.z - pz);
   const ang = (a: number, b: number): number => {
     let d = Math.abs(a - b) % (Math.PI * 2);
@@ -92,7 +129,8 @@ export function pickSquadAnchors<T extends RankedAnchor>(ranked: readonly T[], p
   };
   const picked = [ranked[0]];
   while (picked.length < n && picked.length < ranked.length) {
-    let bestI = -1, best = -1;
+    let bestI = -1,
+      best = -1;
     for (let i = 0; i < ranked.length; i++) {
       if (picked.includes(ranked[i])) continue;
       const b = bearing(ranked[i]);

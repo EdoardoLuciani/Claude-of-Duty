@@ -15,7 +15,6 @@ interface HealInput {
   wheel?: number;
   action(name: string): boolean;
   actionPressed?(name: string): boolean;
-  pressed?(key: string): boolean;
 }
 
 interface HealWeapons {
@@ -76,7 +75,11 @@ export class HealController {
     this.progress = 0;
     this.elapsed = 0;
     this._payload = {
-      phase: 'start', amount: 0, health: 0, bandages: HEALING.startCount, reason: '',
+      phase: 'start',
+      amount: 0,
+      health: 0,
+      bandages: HEALING.startCount,
+      reason: '',
     };
   }
 
@@ -160,9 +163,18 @@ export class HealController {
       input.enabled !== false;
 
     if (this.active) {
-      if (!live) { this.cancel('interrupt'); return; }
-      if (!input.action('heal')) { this.cancel('release'); return; }
-      if (this._motionCancel()) { this.cancel('move'); return; }
+      if (!live) {
+        this.cancel('interrupt');
+        return;
+      }
+      if (!input.action('heal')) {
+        this.cancel('release');
+        return;
+      }
+      if (this._motionCancel()) {
+        this.cancel('move');
+        return;
+      }
       this.elapsed += dt;
       this.progress = Math.min(1, this.elapsed / HEALING.duration);
       p.ctx.peek('weapons')?.setHealProgress?.(this.progress);
@@ -184,19 +196,30 @@ export class HealController {
 
   _motionCancel(): boolean {
     const p = this.player;
-    return !!(p.sprinting || p.tacticalSprint || p.sliding || p.mantling || p.airborne || p.movement?.jumped);
+    return !!(
+      p.sprinting ||
+      p.tacticalSprint ||
+      p.sliding ||
+      p.mantling ||
+      p.airborne ||
+      p.movement?.jumped
+    );
   }
 
   /** Combat/pause requests on this frame — player.update runs before weapons/ui. */
   _busyInput(input: HealInput): boolean {
-    return !!(input.fire || input.firePressed || input.ads
-      || input.actionPressed?.('reload')
-      || input.actionPressed?.('grenade')
-      || input.actionPressed?.('radio')
-      || input.actionPressed?.('pause')
-      || input.pressed?.('KeyI')
-      || input.actionPressed?.('swapWeapon')
-      || input.wheel);
+    return !!(
+      input.fire ||
+      input.firePressed ||
+      input.ads ||
+      input.actionPressed?.('reload') ||
+      input.actionPressed?.('grenade') ||
+      input.actionPressed?.('radio') ||
+      input.actionPressed?.('pause') ||
+      input.actionPressed?.('inspect') ||
+      input.actionPressed?.('swapWeapon') ||
+      input.wheel
+    );
   }
 
   _sfx(id: string, gain: number): void {

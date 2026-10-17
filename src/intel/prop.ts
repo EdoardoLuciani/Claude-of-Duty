@@ -1,15 +1,31 @@
-import * as THREE from 'three/webgpu';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import * as THREE from 'three/webgpu';
 
-interface IntelMaterials { get(name: string, options: { tint: number; scale: number; parallax: number }): THREE.Material; bakeMasks(geometry: THREE.BufferGeometry, options: { wear: number; grime: number; upWear: number }): void }
-interface IntelKit { geos: Record<string, THREE.BufferGeometry>; mats: Record<string, THREE.Material>; lidKinds: Set<string>; dispose(): void }
+interface IntelMaterials {
+  get(name: string, options: { tint: number; scale: number; parallax: number }): THREE.Material;
+  bakeMasks(
+    geometry: THREE.BufferGeometry,
+    options: { wear: number; grime: number; upWear: number }
+  ): void;
+}
+interface IntelKit {
+  geos: Record<string, THREE.BufferGeometry>;
+  mats: Record<string, THREE.Material>;
+  lidKinds: Set<string>;
+  dispose(): void;
+}
 type IntelCrate = THREE.Group & { lid: THREE.Group };
 
 /** Hollow instrument case with a hinged lid and a batched electronics tray. */
 export function makeKit(materials?: IntelMaterials): IntelKit {
   const owned: THREE.Material[] = [];
   const textures: THREE.Texture[] = [];
-  const surface = (name: string, color: number, roughness: number, metalness: number): THREE.Material => {
+  const surface = (
+    name: string,
+    color: number,
+    roughness: number,
+    metalness: number
+  ): THREE.Material => {
     if (materials) return materials.get(name, { tint: color, scale: 0.55, parallax: 0.001 });
     const mat = new THREE.MeshStandardNodeMaterial({ color, roughness, metalness });
     owned.push(mat);
@@ -29,10 +45,23 @@ export function makeKit(materials?: IntelMaterials): IntelKit {
   mats.lining = mats.components;
   owned.push(mats.beacon, mats.leds);
   const parts: Record<string, THREE.BufferGeometry[]> = {};
-  const add = (kind: string, geo: THREE.BufferGeometry): void => { (parts[kind] ??= []).push(geo); };
-  const box = (kind: string, w: number, h: number, d: number, x: number, y: number, z: number): void => {
+  const add = (kind: string, geo: THREE.BufferGeometry): void => {
+    (parts[kind] ??= []).push(geo);
+  };
+  const box = (
+    kind: string,
+    w: number,
+    h: number,
+    d: number,
+    x: number,
+    y: number,
+    z: number
+  ): void => {
     const segments = (size: number) => Math.max(2, Math.min(12, Math.ceil(size / 0.06)));
-    add(kind, new THREE.BoxGeometry(w, h, d, segments(w), segments(h), segments(d)).translate(x, y, z));
+    add(
+      kind,
+      new THREE.BoxGeometry(w, h, d, segments(w), segments(h), segments(d)).translate(x, y, z)
+    );
   };
   // Floor and walls, not a solid block: the tray remains inside the closed case.
   box('body', 0.72, 0.045, 0.46, 0, 0.075, 0);
@@ -82,15 +111,21 @@ export function makeKit(materials?: IntelMaterials): IntelKit {
   }
   if (typeof document !== 'undefined') {
     const label = document.createElement('canvas');
-    label.width = 512; label.height = 256;
+    label.width = 512;
+    label.height = 256;
     const g = label.getContext('2d')!;
-    g.fillStyle = '#c2b998'; g.fillRect(0, 0, 512, 256);
+    g.fillStyle = '#c2b998';
+    g.fillRect(0, 0, 512, 256);
     g.fillStyle = '#282d23';
-    g.font = 'bold 46px monospace'; g.fillText('AL-MAKTABA', 25, 65);
-    g.font = '24px monospace'; g.fillText('FIELD INTELLIGENCE', 25, 108);
+    g.font = 'bold 46px monospace';
+    g.fillText('AL-MAKTABA', 25, 65);
+    g.font = '24px monospace';
+    g.fillText('FIELD INTELLIGENCE', 25, 108);
     g.fillRect(25, 130, 462, 4);
-    g.font = 'bold 28px monospace'; g.fillText('SEALED / 0132', 25, 180);
-    g.font = '18px monospace'; g.fillText('AUTHORIZED PERSONNEL ONLY', 25, 224);
+    g.font = 'bold 28px monospace';
+    g.fillText('SEALED / 0132', 25, 180);
+    g.font = '18px monospace';
+    g.fillText('AUTHORIZED PERSONNEL ONLY', 25, 224);
     const texture = new THREE.CanvasTexture(label);
     texture.colorSpace = THREE.SRGBColorSpace;
     textures.push(texture);
@@ -100,7 +135,9 @@ export function makeKit(materials?: IntelMaterials): IntelKit {
     geos.label.rotateX(-Math.PI / 2).translate(-0.025, 0.049, 0.22);
   }
   return {
-    geos, mats, lidKinds,
+    geos,
+    mats,
+    lidKinds,
     dispose() {
       for (const geo of Object.values(geos)) geo.dispose();
       for (const mat of owned) mat.dispose();

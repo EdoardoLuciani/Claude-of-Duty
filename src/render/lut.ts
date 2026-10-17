@@ -15,7 +15,20 @@ import * as THREE from 'three';
 
 const SIZE = 33;
 type GradeVector = readonly [number, number, number];
-interface GradePreset { slope: GradeVector; offset: GradeVector; power: GradeVector; shadowTint: GradeVector; highlightTint: GradeVector; saturation: number; contrast: number; pivot: number; highlightDesat: number; toe: number; shoulder: number; shoulderSoft?: number }
+interface GradePreset {
+  slope: GradeVector;
+  offset: GradeVector;
+  power: GradeVector;
+  shadowTint: GradeVector;
+  highlightTint: GradeVector;
+  saturation: number;
+  contrast: number;
+  pivot: number;
+  highlightDesat: number;
+  toe: number;
+  shoulder: number;
+  shoulderSoft?: number;
+}
 
 function srgbToLinear(c: number): number {
   return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
@@ -34,13 +47,13 @@ export const GRADE_PRESETS: Record<string, GradePreset> = {
     offset: [-0.004, -0.002, 0.004],
     power: [1.0, 1.005, 1.02],
     shadowTint: [-0.001, 0.006, 0.022],
-    highlightTint: [0.030, 0.014, -0.006],
+    highlightTint: [0.03, 0.014, -0.006],
     // Display-space saturation. It has to be well over unity because AgX's
     // inset/outset pair is a *desaturating* transform by construction and the
     // shoulder takes another chunk out of anything bright: measured on the
     // 16:30 frame the zenith came out of the tone map at B-R = +15 code values
     // for a sky whose scene radiance is 3:1 blue over red.
-    saturation: 1.20,
+    saturation: 1.2,
     // Global contrast, as a power about a pivot.
     //
     // The pivot is the CODE VALUE that must not move, and it has to sit at
@@ -50,12 +63,12 @@ export const GRADE_PRESETS: Record<string, GradePreset> = {
     // frame read as a milky pastel wash with no blacks in it. AgX puts 18%
     // scene grey near 0.50 display, so that is where the pivot belongs.
     contrast: 1.28,
-    pivot: 0.50,
+    pivot: 0.5,
     // Film loses chroma in the shoulder, but 0.28 on top of AgX's own
     // desaturation is what turned the sunset into a cream void and the noon
     // zenith into grey. A tenth is enough to keep a specular hit from going
     // neon without bleaching the sky.
-    highlightDesat: 0.10,
+    highlightDesat: 0.1,
     // Toe lift, in code values / 255. A modern shooter frame does keep a couple
     // of code values of atmosphere in its darkest corner rather than a true
     // zero — but 0.017 (four and a half codes) added to a curve that was
@@ -66,7 +79,7 @@ export const GRADE_PRESETS: Record<string, GradePreset> = {
     // contrast power routinely pushes 0.8 up past 1.0 and *something* has to
     // roll it off; an exponential approach to 1.0 from this knee keeps cloud
     // and specular separation that a hard divide-by would flatten to 3 codes.
-    shoulder: 0.60,
+    shoulder: 0.6,
     // Shoulder softness, in the SAME post-contrast units as the knee. The
     // exponential is divided through by its own value at the largest output the
     // contrast power can produce — pivot * (1/pivot)^contrast — so that
@@ -82,7 +95,7 @@ export const GRADE_PRESETS: Record<string, GradePreset> = {
     // that reproduces the old curve to within 3 code values everywhere below
     // 0.83 — the mid-tones were never the problem — while the last fifth
     // continues to 255 instead of asymptoting 32 codes short of it.
-    shoulderSoft: 1.20,
+    shoulderSoft: 1.2,
   },
 };
 
@@ -99,7 +112,11 @@ function shoulderParams(g: GradePreset): { k: number; s: number; norm: number } 
   return { k, s, norm };
 }
 
-function applyGrade(rgb: GradeVector, g: GradePreset, sh: { k: number; s: number; norm: number }): [number, number, number] {
+function applyGrade(
+  rgb: GradeVector,
+  g: GradePreset,
+  sh: { k: number; s: number; norm: number }
+): [number, number, number] {
   let r = rgb[0];
   let gg = rgb[1];
   let b = rgb[2];

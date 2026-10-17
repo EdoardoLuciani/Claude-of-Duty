@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 
+import { bindingLabel } from '../core/bindings.ts';
+
 /**
  * Scripted mid-combat HUD state for `debugState('combat')`.
  *
@@ -7,18 +9,84 @@ import * as THREE from 'three';
  * so the timeline is keyed on *frame index*, not wall clock: the window around
  * frame 90 (where the screenshot lands) is deliberately the busiest moment —
  * a fresh headshot hitmarker, two decaying damage arcs at different ages,
- * three damage numbers mid-flight, a live grenade warning, an elimination
- * banner and a killfeed with staggered row ages.
+ * a live grenade warning, an elimination banner and a killfeed with staggered
+ * row ages.
  *
  * It then loops on a 240 frame cycle so the HUD also looks alive when a human
  * is watching it in the browser.
  */
 const CYCLE = 240;
-interface CombatUiState { health: number; pulse: number; maxHealth: number; armour: number; maxArmour: number; ammo: number; reserve: number; magSize: number; reloading: boolean; reloadProgress: number; weaponName: string; fireMode: string; lethalCount: number; bandages: number; move: number; sprint: boolean; crouch: boolean; ads: boolean; score: number; wave: number; enemiesRemaining: number; waveTotal: number; waveIncoming: boolean; nextWaveIn: number; simulate: boolean }
-interface CombatUi { state: CombatUiState; ctx: { camera: THREE.Camera }; health: { hurt: number }; killfeed: { clear(): void; push(item: { attacker: string; victim: string; headshot: boolean; age?: number; attackerFriendly?: boolean; mine?: boolean }): { t: number } }; arcs: { clear(): void; spawn(x: number, y: number, amount: number): void }; hit: { clear(): void }; markers: { clear(): void; spawnGrenade(position: THREE.Vector3, fuse: number): void }; setObjectives(items: { position: THREE.Vector3; label: string; name: string }[]): void; setBlips(items: { x?: number; z?: number; kind?: 'enemy' | 'friend'; heading?: number; position?: THREE.Vector3; friendly?: boolean; fade?: number }[]): void; setPrompt(prompt: { key: string; text: string; sub: string; progress: number }): void; clearPrompt(): void; crosshair: { onFire(amount: number): void }; sfx(kind: string, level: number): void; banner: { show(title: string, subtitle: string): void }; hurt(amount: number, x: number, y: number): void; hitmarker(kind: 'hit' | 'armour' | 'head' | 'kill'): void; damageNumber(position: THREE.Vector3, amount: number, kind: 'hit' | 'hs' | 'kill' | 'armour'): void }
+interface CombatUiState {
+  health: number;
+  pulse: number;
+  maxHealth: number;
+  armour: number;
+  maxArmour: number;
+  ammo: number;
+  reserve: number;
+  magSize: number;
+  reloading: boolean;
+  reloadProgress: number;
+  weaponName: string;
+  fireMode: string;
+  lethalCount: number;
+  bandages: number;
+  move: number;
+  sprint: boolean;
+  crouch: boolean;
+  ads: boolean;
+  score: number;
+  wave: number;
+  enemiesRemaining: number;
+  waveTotal: number;
+  waveIncoming: boolean;
+  nextWaveIn: number;
+  simulate: boolean;
+}
+interface CombatUi {
+  state: CombatUiState;
+  ctx: { camera: THREE.Camera };
+  health: { hurt: number };
+  killfeed: {
+    clear(): void;
+    push(item: {
+      attacker: string;
+      victim: string;
+      headshot: boolean;
+      age?: number;
+      attackerFriendly?: boolean;
+      mine?: boolean;
+    }): { t: number };
+  };
+  arcs: { clear(): void; spawn(x: number, y: number, amount: number): void };
+  hit: { clear(): void };
+  markers: { clear(): void; spawnGrenade(position: THREE.Vector3, fuse: number): void };
+  setObjectives(items: { position: THREE.Vector3; label: string; name: string }[]): void;
+  setBlips(
+    items: {
+      x?: number;
+      z?: number;
+      kind?: 'enemy' | 'friend';
+      heading?: number;
+      position?: THREE.Vector3;
+      friendly?: boolean;
+      fade?: number;
+    }[]
+  ): void;
+  setPrompt(prompt: { key: string; text: string; sub: string; progress: number }): void;
+  clearPrompt(): void;
+  crosshair: { onFire(amount: number): void };
+  sfx(kind: string, level: number): void;
+  banner: { show(title: string, subtitle: string): void };
+  hurt(amount: number, x: number, y: number): void;
+  hitmarker(kind: 'hit' | 'armour' | 'head' | 'kill'): void;
+}
 
 export class CombatDemo {
-  active: boolean; frame: number; _p: THREE.Vector3; _q: THREE.Vector3;
+  active: boolean;
+  frame: number;
+  _p: THREE.Vector3;
+  _q: THREE.Vector3;
   constructor() {
     this.active = false;
     this.frame = 0;
@@ -90,7 +158,7 @@ export class CombatDemo {
       { x: 8, z: 22, kind: 'friend', heading: 340 },
     ]);
 
-    ui.setPrompt({ key: 'F', text: 'Pick up ammo', sub: 'hold', progress: 0.42 });
+    ui.setPrompt({ key: bindingLabel('use'), text: 'Pick up ammo', sub: 'hold', progress: 0.42 });
   }
 
   stop(ui: CombatUi): void {
@@ -104,7 +172,10 @@ export class CombatDemo {
     const cam = ui.ctx.camera;
     this._p.set(0, 0, -1).applyQuaternion(cam.quaternion).multiplyScalar(forward);
     this._q.set(1, 0, 0).applyQuaternion(cam.quaternion).multiplyScalar(side);
-    return this._p.add(this._q).add(cam.position).setY(cam.position.y + up);
+    return this._p
+      .add(this._q)
+      .add(cam.position)
+      .setY(cam.position.y + up);
   }
 
   _fire(ui: CombatUi): void {
@@ -143,7 +214,6 @@ export class CombatDemo {
       case 128:
         ui.hitmarker('kill');
         ui.banner.show('Enemy Eliminated', '+100');
-        ui.damageNumber(this._worldPoint(ui, 13, 1.1, 0.2), 118, 'kill');
         break;
       case 150:
         s.reloading = true;
@@ -164,14 +234,11 @@ export class CombatDemo {
         this._fire(ui);
         if (shot === 2) {
           ui.hitmarker('hit');
-          ui.damageNumber(this._worldPoint(ui, 12.5, 2.4, 0.35), 33, 'hit');
         } else if (shot === 7) {
           ui.hitmarker('armour');
-          ui.damageNumber(this._worldPoint(ui, 12.8, -2.6, 0.05), 18, 'armour');
         } else if (shot === 8) {
           // the frame-86 headshot — this is what the critic shot lands on
           ui.hitmarker('head');
-          ui.damageNumber(this._worldPoint(ui, 12.2, 0.25, 0.8), 74, 'hs');
         }
       }
     }

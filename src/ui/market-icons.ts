@@ -7,11 +7,15 @@ import { svg } from './util.ts';
  */
 
 function icon(parent: HTMLElement, viewBox: string, draw: (node: SVGSVGElement) => void): void {
-  const s = svg('svg', {
-    viewBox,
-    fill: 'currentColor',
-    'aria-hidden': 'true',
-  }, parent);
+  const s = svg(
+    'svg',
+    {
+      viewBox,
+      fill: 'currentColor',
+      'aria-hidden': 'true',
+    },
+    parent
+  );
   draw(s);
 }
 
@@ -42,7 +46,10 @@ function grenade(parent: HTMLElement): void {
 function bandage(parent: HTMLElement): void {
   icon(parent, '0 0 22 24', (s) => {
     // Rolled dressing with a hanging tail.
-    p(s, 'M4.2 7.2h13.6c.9 0 1.6.7 1.6 1.6v6.4c0 .9-.7 1.6-1.6 1.6H4.2c-.9 0-1.6-.7-1.6-1.6V8.8c0-.9.7-1.6 1.6-1.6z');
+    p(
+      s,
+      'M4.2 7.2h13.6c.9 0 1.6.7 1.6 1.6v6.4c0 .9-.7 1.6-1.6 1.6H4.2c-.9 0-1.6-.7-1.6-1.6V8.8c0-.9.7-1.6 1.6-1.6z'
+    );
     r(s, 5.2, 9.4, 11.6, 5.2, 0.8);
     p(s, 'M8.4 16.6h2.2l1.4 5.2H9.2z');
     const g = svg('g', { fill: 'rgba(0,0,0,.4)' }, s);
@@ -74,13 +81,24 @@ function ammo(parent: HTMLElement): void {
   });
 }
 
+function pistol(parent: HTMLElement): void {
+  icon(parent, '0 0 32 24', (s) => {
+    r(s, 4, 3, 25, 6, 0.8); // slide
+    r(s, 5, 1.5, 2, 1.5); // rear sight
+    r(s, 26, 1.5, 1.5, 1.5); // front sight
+    poly(s, '5,9 15,9 12,23 3,23'); // grip
+    p(s, 'M14 9h10v7H13l.5-2H22v-3h-8z'); // trigger guard
+    r(s, 16, 9, 2, 4); // trigger
+  });
+}
+
 function smg(parent: HTMLElement): void {
   icon(parent, '0 0 64 20', (s) => {
     // Short PDW, left-of-centre so the missing barrel is the read.
     poly(s, '10,8.2 18,8.2 18,12.2 13,12.2');
     r(s, 17.6, 7.2, 12, 5.2);
     r(s, 29.4, 8, 8, 3.4);
-    r(s, 37.2, 8.6, 8.4, 2);          // stub barrel
+    r(s, 37.2, 8.6, 8.4, 2); // stub barrel
     r(s, 44.8, 7.4, 1.4, 2.4);
     poly(s, '21.2,12.2 26.4,12.2 25.4,19.2 21.6,19.2'); // hanging mag
     poly(s, '28.6,12.2 32,12.2 31,16.6 28.2,16.6');
@@ -94,18 +112,18 @@ function rifle(parent: HTMLElement): void {
     r(s, 26.2, 7.6, 11, 3.6);
     r(s, 37, 8.2, 20.4, 2.2);
     r(s, 55.6, 5.6, 1.6, 3);
-    r(s, 22.4, 3.6, 8, 3, 0.4);       // optic
+    r(s, 22.4, 3.6, 8, 3, 0.4); // optic
     poly(s, '18.4,12.2 24.2,12.2 23,19.4 18.8,19.4');
     poly(s, '26.4,12.2 30.2,12.2 29,16.8 26,16.8');
   });
 }
 
 function mcx(parent: HTMLElement): void {
-  icon(parent, '0 0 64 20', s => {
+  icon(parent, '0 0 64 20', (s) => {
     poly(s, '2,7 14,7 14,10 5,10 5,14 2,14'); // folding stock
     r(s, 14, 6.6, 14, 5.6);
     r(s, 28, 7, 14, 4);
-    r(s, 42, 7.2, 19, 4.2, .6); // suppressor
+    r(s, 42, 7.2, 19, 4.2, 0.6); // suppressor
     poly(s, '18,3 26,3 29,2 29,6 18,6'); // ACOG hood
     poly(s, '18,12 22,12 21,17 17,17');
     poly(s, '25,12 31,12 32,19 26,19');
@@ -117,10 +135,10 @@ function shotgun(parent: HTMLElement): void {
     // Pump: no box mag. Tube under the barrel is the tell.
     poly(s, '1,6.8 13,6.8 13,13.2 4,13.2');
     r(s, 12.6, 6.6, 12.4, 6, 0.5);
-    r(s, 24.6, 7.4, 10.4, 3.4);       // pump sleeve
-    r(s, 25, 11.6, 22, 2);            // mag tube
-    r(s, 34.6, 7.6, 26.2, 2.2);       // long barrel
-    r(s, 60.2, 5.8, 1.6, 2.4);        // bead
+    r(s, 24.6, 7.4, 10.4, 3.4); // pump sleeve
+    r(s, 25, 11.6, 22, 2); // mag tube
+    r(s, 34.6, 7.6, 26.2, 2.2); // long barrel
+    r(s, 60.2, 5.8, 1.6, 2.4); // bead
     poly(s, '16.6,12.6 21.4,12.6 20.4,19.2 16.8,19.2');
   });
 }
@@ -128,14 +146,38 @@ function shotgun(parent: HTMLElement): void {
 function lmg(parent: HTMLElement): void {
   icon(parent, '0 0 64 20', (s) => {
     poly(s, '1.2,6.4 12.2,6.4 12.2,13.4 3.4,13.4');
-    r(s, 11.8, 5.2, 16.8, 7.6);       // fat receiver
+    r(s, 11.8, 5.2, 16.8, 7.6); // fat receiver
     r(s, 28.4, 7.2, 9.2, 4);
     r(s, 37.4, 8, 20.6, 2.6);
     r(s, 21.4, 2.2, 8.6, 3.2, 0.3);
     poly(s, '15.2,12.6 26.2,12.6 25.4,19.6 15.6,19.6'); // box mag
     poly(s, '28.2,12.8 32.2,12.8 31.2,17.4 27.8,17.4');
-    svg('line', { x1: 42, y1: 10.4, x2: 40.2, y2: 19.2, stroke: 'currentColor', 'stroke-width': 1.4, 'stroke-linecap': 'square' }, s);
-    svg('line', { x1: 45.4, y1: 10.4, x2: 47.4, y2: 19.2, stroke: 'currentColor', 'stroke-width': 1.4, 'stroke-linecap': 'square' }, s);
+    svg(
+      'line',
+      {
+        x1: 42,
+        y1: 10.4,
+        x2: 40.2,
+        y2: 19.2,
+        stroke: 'currentColor',
+        'stroke-width': 1.4,
+        'stroke-linecap': 'square',
+      },
+      s
+    );
+    svg(
+      'line',
+      {
+        x1: 45.4,
+        y1: 10.4,
+        x2: 47.4,
+        y2: 19.2,
+        stroke: 'currentColor',
+        'stroke-width': 1.4,
+        'stroke-linecap': 'square',
+      },
+      s
+    );
   });
 }
 
@@ -144,9 +186,9 @@ function sniper(parent: HTMLElement): void {
     poly(s, '0.4,5.8 13.2,5.8 13.2,9.4 10.4,9.4 10.4,13 3.2,13'); // cheek rest
     r(s, 12.8, 6.6, 12.4, 5.2);
     r(s, 25, 7.8, 8.4, 3);
-    r(s, 33.2, 8.2, 24.4, 1.8);       // long barrel
-    r(s, 57.4, 7, 5.6, 3.4);          // muzzle brake
-    r(s, 18.4, 1.2, 14.2, 5.4, 1.6);  // fat optic
+    r(s, 33.2, 8.2, 24.4, 1.8); // long barrel
+    r(s, 57.4, 7, 5.6, 3.4); // muzzle brake
+    r(s, 18.4, 1.2, 14.2, 5.4, 1.6); // fat optic
     poly(s, '16.6,11.6 21.6,11.6 20.8,18.8 16.8,18.8');
     poly(s, '24.2,11.6 28,11.6 27,16.4 24,16.4');
   });
@@ -162,7 +204,20 @@ function carpet(parent: HTMLElement): void {
   });
 }
 
-const DRAW = { grenade, armour, bandage, ammo, smg, rifle, mcx, shotgun, lmg, sniper, carpet };
+const DRAW = {
+  grenade,
+  armour,
+  bandage,
+  ammo,
+  pistol,
+  smg,
+  rifle,
+  mcx,
+  shotgun,
+  lmg,
+  sniper,
+  carpet,
+};
 
 export function marketIcon(id: keyof typeof DRAW, parent: HTMLElement): void {
   DRAW[id](parent);

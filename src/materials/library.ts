@@ -9,8 +9,21 @@ import * as THREE from 'three';
  * `three` — properties applied straight to the THREE material.
  * `surface` — the shared physics/FX surface vocabulary from ARCHITECTURE.md.
  */
-interface BakeDefinition { size: number; worldSize: number; relief: number; seed: number; param?: number[]; tintA?: number; tintB?: number }
-interface MaterialDefinition { surface: string; bake: BakeDefinition; mat: Record<string, unknown>; three?: Record<string, unknown> }
+interface BakeDefinition {
+  size: number;
+  worldSize: number;
+  relief: number;
+  seed: number;
+  param?: number[];
+  tintA?: number;
+  tintB?: number;
+}
+interface MaterialDefinition {
+  surface: string;
+  bake: BakeDefinition;
+  mat: Record<string, unknown>;
+  three?: Record<string, unknown>;
+}
 
 export const LIBRARY: Record<string, MaterialDefinition> = {
   // ------------------------------------------------------------ masonry ----
@@ -25,7 +38,7 @@ export const LIBRARY: Record<string, MaterialDefinition> = {
       macro: [0.085, 0.62, 0.24, 0.45],
       // 3-4 m pour/wash variation at real contrast plus a 12 m band, so a long
       // retaining wall or a barrier run is not one value end to end.
-      macroBig: [2.05, 0.130, 0.028, 0],
+      macroBig: [2.05, 0.13, 0.028, 0],
       patch: [0.28, 2.0, 0.145, -0.08],
       weather: [0.42, 0.4, 0.55, 0.5],
       wearColor: 0x9a978f,
@@ -41,7 +54,7 @@ export const LIBRARY: Record<string, MaterialDefinition> = {
       scale: 3.2,
       parallax: 0.01,
       detile: 0,
-      detail: [9, 0.90, 0.52, 26],
+      detail: [9, 0.9, 0.52, 26],
       macro: [0.075, 0.48, 0.18, 0.3],
       macroRelief: 0.3,
       weather: [0.55, 0.1, 0.15, 0.5],
@@ -79,11 +92,11 @@ export const LIBRARY: Record<string, MaterialDefinition> = {
       // second band at 0.026 zones the facade at ~13 m. Between them a 12 m
       // elevation reads as damp/dry/bleached areas instead of one flat colour.
       macro: [0.085, 0.72, 0.26, 0.5],
-      macroBig: [2.15, 0.150, 0.026, 0],
+      macroBig: [2.15, 0.15, 0.026, 0],
       // ~18% of every facade is a replastered rectangle at +/-17% value.
       // A 12 m elevation seen at 3 m is mostly ONE surface, so the only thing
       // that can stop it reading as flat colour is structure at 1-4 m.
-      patch: [0.34, 2.2, 0.175, -0.10],
+      patch: [0.34, 2.2, 0.175, -0.1],
       // streaks are gated by the runoff model now, so the amplitude can be real
       weather: [0.34, 0.5, 0.6, 0.5],
       wearColor: 0xb0a692,
@@ -101,10 +114,10 @@ export const LIBRARY: Record<string, MaterialDefinition> = {
       parallax: 0.03,
       parallaxLayers: 20,
       detail: [8, 0.6, 0.36, 18],
-      macro: [0.09, 0.40, 0.16, 0.3],
+      macro: [0.09, 0.4, 0.16, 0.3],
       // tiled walls are laid in batches: whole areas came from a different kiln
       macroBig: [1.7, 0.075, 0.032, 0],
-      patch: [0.14, 1.7, 0.10, -0.05],
+      patch: [0.14, 1.7, 0.1, -0.05],
       weather: [0.3, 0.2, 0.3, 0.5],
       roughness: [0.9, -0.04, 0.16],
     },
@@ -131,13 +144,13 @@ export const LIBRARY: Record<string, MaterialDefinition> = {
   },
   sand: {
     surface: 'sand',
-    bake: { size: 1024, worldSize: 2.5, relief: 0.10, seed: 91 },
+    bake: { size: 1024, worldSize: 2.5, relief: 0.1, seed: 91 },
     mat: {
       uvMode: 'triplanar',
       scale: 2.5,
       detile: 0,
-      detail: [8, 0.7, 0.30, 18],
-      macro: [0.050, 0.44, 0.14, 0.35],
+      detail: [8, 0.7, 0.3, 18],
+      macro: [0.05, 0.44, 0.14, 0.35],
       macroRelief: 0.45,
       weather: [0.15, 0.0, 0.0, 0.18],
       dustColor: 0xa89066,
@@ -170,7 +183,7 @@ export const LIBRARY: Record<string, MaterialDefinition> = {
       uvMode: 'triplanar',
       scale: 1.6,
       detail: [6, 0.8, 0.34, 20],
-      macro: [0.070, 0.44, 0.2, 0.3],
+      macro: [0.07, 0.44, 0.2, 0.3],
       macroRelief: 0.7,
       // Cavity grime on a surface whose height field IS its aggregate turns
       // every gap between stones into a black pit; 0.5 was most of the
@@ -190,7 +203,7 @@ export const LIBRARY: Record<string, MaterialDefinition> = {
       scale: 1.2,
       parallax: 0.004,
       detail: [9, 0.7, 0.36, 16],
-      macro: [0.10, 0.30, 0.14, 0.4],
+      macro: [0.1, 0.3, 0.14, 0.4],
       weather: [0.25, 0.4, 0.5, 0.35],
       wearColor: 0x8c8f93,
       wearMaterial: [0.28, 1.0, 0, 0.85],
@@ -210,7 +223,7 @@ export const LIBRARY: Record<string, MaterialDefinition> = {
       scale: 1.5,
       parallax: 0.003,
       detail: [10, 0.6, 0.32, 16],
-      macro: [0.10, 0.28, 0.14, 0.35],
+      macro: [0.1, 0.28, 0.14, 0.35],
       weather: [0.3, 0.45, 0.35, 0.35],
       wearColor: 0x8f9296,
       wearMaterial: [0.3, 1.0, 0, 0.9],
@@ -279,7 +292,7 @@ export const LIBRARY: Record<string, MaterialDefinition> = {
        * top, and the drape structure is a 10 cm fold field. This is the whole
        * difference between fabric and painted cardboard.
        */
-      cloth: [0.20, 0.72, 0.26, 0],
+      cloth: [0.2, 0.72, 0.26, 0],
     },
     three: { physical: true, sheen: 0.55, sheenRoughness: 0.85, sheenColor: 0x8a8272 },
   },
@@ -297,7 +310,7 @@ export const LIBRARY: Record<string, MaterialDefinition> = {
       dustColor: 0x9c8760,
       normalStrength: 1.15,
       // a filled bag transmits far less than a stretched canvas
-      cloth: [0.06, 0.86, 0.10, 0],
+      cloth: [0.06, 0.86, 0.1, 0],
     },
     three: { physical: true, sheen: 0.4, sheenRoughness: 0.95, sheenColor: 0x9c8b68 },
   },
@@ -327,9 +340,9 @@ export const LIBRARY: Record<string, MaterialDefinition> = {
       // A tyre stack is a dark mass low in the frame, so it has nothing but its
       // own variation to read by: bleached crowns, damp black sidewalls and the
       // road dust that fills the tread. Without these it is a grey lozenge.
-      macro: [0.16, 0.36, 0.20, 0.18],
-      macroBig: [1.8, 0.10, 0.11, 0],
-      weather: [0.40, 0.18, 0.22, 0.45],
+      macro: [0.16, 0.36, 0.2, 0.18],
+      macroBig: [1.8, 0.1, 0.11, 0],
+      weather: [0.4, 0.18, 0.22, 0.45],
       dustColor: 0x8d8478,
       grimeColor: 0x181715,
       tint: 0xfffaf2,

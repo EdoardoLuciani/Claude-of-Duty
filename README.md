@@ -22,17 +22,38 @@ type-aware pass; regular rules also cover `src/`, `tools/`, and `tests/`.
 `npm run build` runs typecheck and lint first via `prebuild`. Remaining JavaScript
 helpers run alongside TypeScript; broad `checkJs` adoption is deferred.
 
+### Formatting
+
+Run `npm run format` to write formatting; `npm run format:check` checks it in CI.
+Both use the pinned [Oxfmt](https://oxc.rs/docs/guide/usage/formatter) from `npm ci`.
+The command scope is in `package.json`; style and exclusions are in `.oxfmtrc.json`.
+Generated files, assets, reports, lockfiles, shared skills and protected workflow/
+agent instructions are excluded. Python, shell and SVG are not formatted.
+
+Import sorting respects comment partitions, but bound imports can cross bare
+side-effect imports. Preserve intentional evaluation boundaries and fix exposed
+initialization dependencies. Package sorting preserves script order and conditional
+exports/imports precedence. Keep bulk formatting separate from functional changes.
+
+Source-byte caches can change after formatting: dev/build refresh procedural
+exports; shared physics/navigation inputs also require `npm run world`. Review and
+commit provenance refreshes separately, verifying unchanged geometry, collision and
+navigation topology. Never hand-edit generated assets or rebuild Blender assets
+just to format source.
+
 A WebGPU-capable browser/device is required. Normal builds use committed world
 and Blender assets, with no Blender requirement. Change world source in
 `tools/worldgen/`, regenerate with `npm run world`, then run `npm run world:validate`.
 
-**Three.js pin:** GitHub commit `9681657f760197afa0a680b1e522a4340a6a53f8`,
+**Three.js pin:** GitHub commit `313f1f582b61af64f76ffaa4f23b3abb3ff298a1`,
 not a moving `dev` dependency. Its package version still says `0.186.0`; runtime
 source reports `187dev`. `tools/compensate-three.mjs` selects the pinned ESM source
-exports because committed bundles lag the latest source fixes, and retains the
-unmerged builder-local WGSL buffer-name correction. Commit/version/hash guards
-validate all targets before writing; review them on every upgrade. Upstream now
-owns Fresnel and TRAA cleanup—those local corrections have been removed.
+exports because committed bundles still lag the latest source fixes (including
+[#34872](https://github.com/mrdoob/three.js/pull/34872), native builder-local buffer
+names and declaration collision handling). The local WGSL edit is retired; its
+reviewed upstream source remains hash-verified without modification. Commit, version
+and hash guards validate all targets before writing; review them on every upgrade.
+Upstream also owns Fresnel and TRAA cleanup—those local corrections remain removed.
 Preserve the material oracle (`node tools/arm-material-audit.mjs --strict=1`),
 buffer isolation/reuse probe (`node tests/e2e/buffer-names-e2e.mjs`), and native
 startup/first-use/lifetime/failure checks. Stable names share GPU programs/pipelines,
@@ -41,11 +62,34 @@ Other renderer follow-ups: [#370](https://github.com/EdoardoLuciani/Claude-of-Du
 
 ## Play
 
-Click to lock the cursor. WASD move; mouse aim; LMB fire; RMB ADS; R reload;
-F collect/interact; Shift sprint; Ctrl crouch; Space jump; Q/E lean; I inspect;
-Esc release cursor. 1/2 select primary/secondary; Tab/wheel cycle them.
-G equips/stows grenades; X equips/stows the radio (1–3 select requests);
-hold H for a bandage; T toggles the flashlight.
+Click the game canvas to lock/reacquire the cursor (also a fire press). The pause
+menu contains the full keyboard/mouse reference, including contextual behaviors.
+Static defaults come from `src/core/bindings.ts`; rebinding is a follow-up.
+
+| Keys                    | Action                                                 |
+| ----------------------- | ------------------------------------------------------ |
+| WASD / arrows, mouse    | Move and look; forward/back climb ladders              |
+| Space                   | Jump / mantle / vault / ladder jump-off                |
+| Left/Right Ctrl or C, Z | Toggle crouch/slide, prone                             |
+| Left Shift, Q / E       | Sprint (double-tap for tactical sprint), lean          |
+| LMB / RMB               | Fire / hold ADS                                        |
+| R / B / I               | Reload / fire mode / inspect                           |
+| 1 / 2, Tab / wheel      | Equipped primary/secondary, cycle pair                 |
+| Hold T, F               | Ammo/intel interaction, flashlight toggle              |
+| Hold H                  | Bandage (3 seconds; +50 HP on completion)              |
+| G, then LMB / RMB       | Equip grenade; cook long/short throw, release to throw |
+| X, then 1 / 2 / 3       | Radio; immediate carpet-bomb request / locked requests |
+| Esc                     | Pause/resume; closes the shop instead while shopping   |
+
+Intel takes priority over ammo and requires a four-second stationary, visible,
+hands-free hold; release after completion before collecting ammo. Equipment and
+movement can interrupt actions; the pause reference lists exact conditions.
+
+Unlocked menus use native mouse, Tab/Shift+Tab and Enter/Space navigation; arrow,
+Home/End and PageUp/Down keys adjust sliders or scroll the focused reference.
+After death, restart is available after 2.85 seconds. Terminal errors require
+Reload. Quality changes restart the run; Defaults resets settings, not bindings.
+Gamepad sticks move/look; no buttons are bound. F7/F8 are telemetry-only.
 
 Survive escalating squads, earn credits and shop between waves. M4/P320 are the
 starting weapons; MCX, EVOLYS, MPX and AX338 are shop options. The day/night clock

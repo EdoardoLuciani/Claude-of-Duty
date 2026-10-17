@@ -1,10 +1,15 @@
-import { waitForGame } from '../../tools/lib/native-render.mjs';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
+
 import { extractTar } from '../../src/dev/telemetry.ts';
-import { ensureViteServer, launchChromium, stopViteServer } from '../../tools/lib/browser-harness.mjs';
+import {
+  ensureViteServer,
+  launchChromium,
+  stopViteServer,
+} from '../../tools/lib/browser-harness.mjs';
+import { waitForGame } from '../../tools/lib/native-render.mjs';
 
 /**
  * End-to-end telemetry mark: screenshot + note + tgz export.
@@ -15,15 +20,20 @@ const server = await ensureViteServer({ port: 8088 });
 const browser = await launchChromium({
   headless: true,
   args: [
-    '--ignore-gpu-blocklist', '--force-color-profile=srgb',
-    '--force-device-scale-factor=1', '--hide-scrollbars', '--mute-audio',
+    '--ignore-gpu-blocklist',
+    '--force-color-profile=srgb',
+    '--force-device-scale-factor=1',
+    '--hide-scrollbars',
+    '--mute-audio',
     '--disable-frame-rate-limit',
   ],
 });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
-page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+page.on('console', (m) => {
+  if (m.type() === 'error') errors.push(m.text());
+});
 
 let failures = 0;
 const check = (name, cond, extra = '') => {
@@ -44,8 +54,14 @@ const counters = await page.evaluate(() => {
   const t = window.__ENGINE__.ctx.get('telemetry');
   return { snapshot: t._prevInfo, delta: t._frameDeltas().render, capture: window.__RENDER_INFO__ };
 });
-check('native telemetry does not invent WebGL program zeros', counters.snapshot.programs === null && counters.delta.dPrograms === null);
-check('native builder counter is available', Number.isInteger(counters.snapshot.nodeBuilders) && Number.isInteger(counters.delta.dNodeBuilders));
+check(
+  'native telemetry does not invent WebGL program zeros',
+  counters.snapshot.programs === null && counters.delta.dPrograms === null
+);
+check(
+  'native builder counter is available',
+  Number.isInteger(counters.snapshot.nodeBuilders) && Number.isInteger(counters.delta.dNodeBuilders)
+);
 check('native capture program count is unavailable', counters.capture.programs === null);
 
 const marked = await page.evaluate(() => {
@@ -94,23 +110,26 @@ const before = await page.evaluate(() => window.__TELEMETRY__.snapshot().hitches
 check('boot hitch already recorded', before >= 1, String(before));
 await page.evaluate(() => {
   const start = performance.now();
-  while (performance.now() - start < 260) { /* freeze the main thread */ }
+  while (performance.now() - start < 260) {
+    /* freeze the main thread */
+  }
 });
 await pump(2);
 const injected = await page.evaluate(
-  (n) => window.__TELEMETRY__.snapshot().hitches[n] ?? null, before,
+  (n) => window.__TELEMETRY__.snapshot().hitches[n] ?? null,
+  before
 );
 check('injected freeze recorded', injected?.wallMs >= 240, JSON.stringify(injected?.wallMs));
 check(
   'game clock does not see the freeze',
   injected?.gameDtMs <= 100.5,
-  String(injected?.gameDtMs),
+  String(injected?.gameDtMs)
 );
 check(
   'hitch carries resource deltas',
   ['dGeometries', 'dTextures'].every((k) => Number.isFinite(injected?.render?.[k])) &&
     injected?.render?.dPrograms === null, // WebGL programs are unavailable, not zero, on native.
-  JSON.stringify(injected?.render),
+  JSON.stringify(injected?.render)
 );
 
 const dir = mkdtempSync(join(tmpdir(), 'cod-telemetry-e2e-'));
@@ -130,29 +149,45 @@ const json = files['telemetry.json']
   : null;
 check('archive has telemetry.json', !!json);
 check('schema is 4', json?.schema === 4);
-check('freeze log in the archive', (json?.hitches?.length ?? 0) >= 1, JSON.stringify(json?.summary?.hitches));
+check(
+  'freeze log in the archive',
+  (json?.hitches?.length ?? 0) >= 1,
+  JSON.stringify(json?.summary?.hitches)
+);
 check(
   'samples left for the analyzer to join',
   (json?.playerSamples?.length ?? 0) > 0 && (json?.enemySamples?.length ?? 0) > 0,
-  `${json?.playerSamples?.length}/${json?.enemySamples?.length}`,
+  `${json?.playerSamples?.length}/${json?.enemySamples?.length}`
 );
 check(
   'worst hitch survived export',
   (json?.hitches ?? []).some((h) => h.wallMs >= 240),
-  JSON.stringify((json?.hitches ?? []).map((h) => h.wallMs)),
+  JSON.stringify((json?.hitches ?? []).map((h) => h.wallMs))
 );
 check(
   'observer running',
   ['long-animation-frame', 'longtask'].includes(json?.meta?.observers ?? ''),
-  String(json?.meta?.observers),
+  String(json?.meta?.observers)
 );
-check('long tasks recorded', (json?.longTasks?.length ?? 0) >= 1, JSON.stringify(json?.longTasks?.length));
+check(
+  'long tasks recorded',
+  (json?.longTasks?.length ?? 0) >= 1,
+  JSON.stringify(json?.longTasks?.length)
+);
 check('two markers', json?.markers?.length === 2);
 check('note saved', json?.markers?.[0]?.note === 'enemy stuck behind crate');
 check('second note saved', json?.markers?.[1]?.note === 'keep me');
 const mark = json?.markers?.[0];
-check('pose is world-space', Array.isArray(mark?.pose?.feet) && mark.pose.feet.length === 3 && Array.isArray(mark?.pose?.forward));
-check('meta has transform', Array.isArray(json?.meta?.transform) && json.meta.transform.length === 16);
+check(
+  'pose is world-space',
+  Array.isArray(mark?.pose?.feet) &&
+    mark.pose.feet.length === 3 &&
+    Array.isArray(mark?.pose?.forward)
+);
+check(
+  'meta has transform',
+  Array.isArray(json?.meta?.transform) && json.meta.transform.length === 16
+);
 check('aim probe present', !!mark?.aim);
 check('fit probe present', !!mark?.fit?.stand && !!mark?.fit?.opening);
 check('near probe present', Array.isArray(mark?.near?.instances));
@@ -160,7 +195,11 @@ const shot = json?.markers?.[0]?.screenshot;
 check('screenshot path set', shot === 'marks/001.jpg', String(shot));
 const jpeg = shot ? files[shot] : null;
 check('screenshot in archive', !!jpeg && jpeg.byteLength > 100);
-check('screenshot is jpeg', !!jpeg && jpeg[0] === 0xff && jpeg[1] === 0xd8, jpeg ? `${jpeg[0]} ${jpeg[1]}` : 'missing');
+check(
+  'screenshot is jpeg',
+  !!jpeg && jpeg[0] === 0xff && jpeg[1] === 0xd8,
+  jpeg ? `${jpeg[0]} ${jpeg[1]}` : 'missing'
+);
 const shot2 = json?.markers?.[1]?.screenshot;
 const jpeg2 = shot2 ? files[shot2] : null;
 check('second screenshot present', !!jpeg2 && jpeg2[0] === 0xff && jpeg2[1] === 0xd8);
@@ -172,28 +211,37 @@ check('no page errors', errors.length === 0, errors.join(' | '));
 // while the recorder's wall clock sees the whole thing.
 const play = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 play.on('pageerror', (e) => errors.push(`play: ${e.message}`));
-await play.goto('http://127.0.0.1:8088/?telemetry=1', { waitUntil: 'domcontentloaded', timeout: 120000 });
-await play.waitForFunction(
-  'window.__TELEMETRY__ && window.__PREWARM__ !== undefined', null, { timeout: 120000 },
+await play.goto('http://127.0.0.1:8088/?telemetry=1', {
+  waitUntil: 'domcontentloaded',
+  timeout: 120000,
+});
+await play.waitForFunction('window.__TELEMETRY__ && window.__PREWARM__ !== undefined', null, {
+  timeout: 120000,
+});
+const playFreeze = await play.evaluate(
+  () =>
+    new Promise((resolve) => {
+      let i = 0;
+      const frame = () => {
+        if (++i < 3) return requestAnimationFrame(frame);
+        const start = performance.now();
+        while (performance.now() - start < 700) {
+          /* play-mode freeze */
+        }
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve(null)));
+      };
+      requestAnimationFrame(frame);
+    })
 );
-const playFreeze = await play.evaluate(() => new Promise((resolve) => {
-  let i = 0;
-  const frame = () => {
-    if (++i < 3) return requestAnimationFrame(frame);
-    const start = performance.now();
-    while (performance.now() - start < 700) { /* play-mode freeze */ }
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve(null)));
-  };
-  requestAnimationFrame(frame);
-}));
 check('play-mode freeze ran', playFreeze === null);
-const playHitch = await play.evaluate(() =>
-  window.__TELEMETRY__.snapshot().hitches.sort((a, b) => b.wallMs - a.wallMs)[0] ?? null);
+const playHitch = await play.evaluate(
+  () => window.__TELEMETRY__.snapshot().hitches.sort((a, b) => b.wallMs - a.wallMs)[0] ?? null
+);
 check('play-mode freeze recorded', playHitch?.wallMs >= 600, JSON.stringify(playHitch?.wallMs));
 check(
   'play-mode game clock clamped to 100 ms',
   playHitch?.gameDtMs <= 100.5,
-  `wall ${playHitch?.wallMs} ms vs game ${playHitch?.gameDtMs} ms`,
+  `wall ${playHitch?.wallMs} ms vs game ${playHitch?.gameDtMs} ms`
 );
 await play.close();
 

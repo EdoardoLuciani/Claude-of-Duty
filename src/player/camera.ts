@@ -23,28 +23,63 @@
  */
 
 import * as THREE from 'three';
-import { CAMERA, MOVE } from './tuning.ts';
-import {
-  Spring, RecoilAxis, clamp, clamp01, lerp, approach, hashNoise, DEG,
-} from './springs.ts';
 
 import type { EngineContext } from '../core/context.ts';
-import type { Movement } from './movement.ts';
 import type { Health } from './health.ts';
+import type { Movement } from './movement.ts';
+import { Spring, RecoilAxis, clamp, clamp01, lerp, approach, hashNoise, DEG } from './springs.ts';
+import { CAMERA, MOVE } from './tuning.ts';
 
 type CameraContext = EngineContext;
 type MovementState = Movement;
 type HealthState = Pick<Health, 'fraction' | 'suppression'>;
-interface ViewKick { pitch: number; yaw: number; roll: number; punch: number }
+interface ViewKick {
+  pitch: number;
+  yaw: number;
+  roll: number;
+  punch: number;
+}
 
 export class CameraRig {
   ctx: CameraContext;
-  eye: number; crouchBlend: number; bobPhase: number; bobWeight: number; bobRoll: number; bobPitch: number;
-  dip: Spring; step: Spring; punch: Spring; kickPitch: RecoilAxis; kickYaw: RecoilAxis; kickRoll: RecoilAxis;
-  strafeRoll: number; turnRoll: number; slideRoll: number; airRoll: number; trauma: number; shakeTime: number;
-  fireVibe: number; fireVibeTime: number; fireVibeAmp: number; fireVibeDuration: number; fireVibeAdsScale: number; breathPhase: number;
-  baseFov: number; fov: number; fovMove: number; fovAds: number; slideBlend: number; slideSide: number; viewKick: ViewKick;
-  bobOffset: THREE.Vector3; offset: THREE.Vector3; eyePosition: THREE.Vector3; rotation: THREE.Euler; forward: THREE.Vector3; _fwd: THREE.Vector3; _right: THREE.Vector3;
+  eye: number;
+  crouchBlend: number;
+  bobPhase: number;
+  bobWeight: number;
+  bobRoll: number;
+  bobPitch: number;
+  dip: Spring;
+  step: Spring;
+  punch: Spring;
+  kickPitch: RecoilAxis;
+  kickYaw: RecoilAxis;
+  kickRoll: RecoilAxis;
+  strafeRoll: number;
+  turnRoll: number;
+  slideRoll: number;
+  airRoll: number;
+  trauma: number;
+  shakeTime: number;
+  fireVibe: number;
+  fireVibeTime: number;
+  fireVibeAmp: number;
+  fireVibeDuration: number;
+  fireVibeAdsScale: number;
+  breathPhase: number;
+  baseFov: number;
+  fov: number;
+  fovMove: number;
+  fovAds: number;
+  slideBlend: number;
+  slideSide: number;
+  viewKick: ViewKick;
+  bobOffset: THREE.Vector3;
+  offset: THREE.Vector3;
+  eyePosition: THREE.Vector3;
+  rotation: THREE.Euler;
+  forward: THREE.Vector3;
+  _fwd: THREE.Vector3;
+  _right: THREE.Vector3;
   constructor(ctx: CameraContext) {
     this.ctx = ctx;
     const C = CAMERA;
@@ -215,9 +250,12 @@ export class CameraRig {
     // ---- stance / eye height --------------------------------------------
     const targetEye = m.eyeHeight + (m.sliding ? -0.1 : 0);
     const growing = targetEye > this.eye;
-    const tau = m.stance === 'prone' || this.eye < 0.75
-      ? MOVE.stanceTau.prone
-      : growing ? MOVE.stanceTau.crouchStand : MOVE.stanceTau.standCrouch;
+    const tau =
+      m.stance === 'prone' || this.eye < 0.75
+        ? MOVE.stanceTau.prone
+        : growing
+          ? MOVE.stanceTau.crouchStand
+          : MOVE.stanceTau.standCrouch;
     this.eye = approach(this.eye, targetEye, tau, dt);
     this.crouchBlend = clamp01(1 - (this.eye - 1.0) / 0.66);
 
@@ -226,7 +264,8 @@ export class CameraRig {
     this.slideBlend = approach(this.slideBlend, slideTarget, m.sliding ? 0.045 : 0.09, dt);
 
     // ---- yaw basis -------------------------------------------------------
-    const sy = Math.sin(m.yaw), cy = Math.cos(m.yaw);
+    const sy = Math.sin(m.yaw),
+      cy = Math.cos(m.yaw);
     this._fwd.set(-sy, 0, -cy);
     this._right.set(cy, 0, -sy);
 
@@ -262,7 +301,11 @@ export class CameraRig {
       this.fireVibe = Math.max(0, this.fireVibe - dt / Math.max(1e-4, this.fireVibeDuration));
     }
     this.fireVibeTime += dt * C.fireVibe.freq;
-    let shakePitch = 0, shakeYaw = 0, shakeRoll = 0, shakeX = 0, shakeY = 0;
+    let shakePitch = 0,
+      shakeYaw = 0,
+      shakeRoll = 0,
+      shakeX = 0,
+      shakeY = 0;
     if (shake > 1e-4) {
       shakePitch = hashNoise(this.shakeTime, 11) * shake * S.rot * DEG;
       shakeYaw = hashNoise(this.shakeTime + 31.7, 23) * shake * S.rot * DEG;
@@ -302,8 +345,14 @@ export class CameraRig {
     // Lean is applied in world space further down (it comes from the validated
     // capsule probe, not from the bob basis).
     const lateral = bobX + shakeX;
-    const vertical = bobY + this.dip.value + this.step.value + shakeY + mantleY + breathPos
-      - this.slideBlend * 0.1;
+    const vertical =
+      bobY +
+      this.dip.value +
+      this.step.value +
+      shakeY +
+      mantleY +
+      breathPos -
+      this.slideBlend * 0.1;
     const forward = bobZ + this.punch.value + mantleFwd + this.slideBlend * 0.045;
 
     this.offset.set(0, 0, 0);
@@ -319,16 +368,21 @@ export class CameraRig {
 
     // ---- assemble rotation ----------------------------------------------
     const pitch = clamp(
-      m.pitch + this.kickPitch.value + breathPitch +
-        this.bobPitch + shakePitch + mantlePitch,
+      m.pitch + this.kickPitch.value + breathPitch + this.bobPitch + shakePitch + mantlePitch,
       -CAMERA.pitchLimit,
       CAMERA.pitchLimit
     );
     const yaw = m.yaw + this.kickYaw.value + breathYaw + shakeYaw;
     const roll =
-      this.strafeRoll + this.turnRoll + this.slideRoll + this.airRoll +
-      this.bobRoll + this.kickRoll.value + shakeRoll +
-      mantleRoll - m.leanAmount * MOVE.lean.roll;
+      this.strafeRoll +
+      this.turnRoll +
+      this.slideRoll +
+      this.airRoll +
+      this.bobRoll +
+      this.kickRoll.value +
+      shakeRoll +
+      mantleRoll -
+      m.leanAmount * MOVE.lean.roll;
 
     this.rotation.set(pitch, yaw, roll);
 
@@ -382,7 +436,13 @@ export class CameraRig {
   }
 
   /** Overlay onto the gameplay pose. Idempotent; does not touch `this.forward`. */
-  applyFireVibe(camera: THREE.PerspectiveCamera, viewCamera: THREE.Camera | null, anchor: THREE.Object3D | null, ads = 0, adsFovScale?: number): void {
+  applyFireVibe(
+    camera: THREE.PerspectiveCamera,
+    viewCamera: THREE.Camera | null,
+    anchor: THREE.Object3D | null,
+    ads = 0,
+    adsFovScale?: number
+  ): void {
     const F = CAMERA.fireVibe;
     const intensity = clamp01(this.ctx.config?.firingShake ?? 1);
     const e = this.fireVibe;
@@ -397,7 +457,8 @@ export class CameraRig {
     const p = (Math.sin(t * Math.PI * 2) * 0.72 + hashNoise(t, 11) * 0.28) * gain * F.pitch;
     const r =
       (Math.sin(t * Math.PI * 2 * 1.17 + 0.8) * 0.78 + hashNoise(t + 17.3, 41) * 0.22) *
-      gain * F.roll;
+      gain *
+      F.roll;
     const y = hashNoise(t + 29.1, 23) * gain * F.yaw;
     if (Math.abs(p) + Math.abs(y) + Math.abs(r) < 1e-8) return;
     camera.rotation.set(this.rotation.x + p, this.rotation.y + y, this.rotation.z + r);

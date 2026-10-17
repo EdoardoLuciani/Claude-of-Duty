@@ -21,11 +21,36 @@ import { el, setText, setStyle, setClass, clamp01, damp, ease } from './util.ts'
  * @param {HTMLElement} parent      full-screen layer for the hurt overlays
  * @param {HTMLElement} [chrome]    layer for the widget (fades with the HUD)
  */
-interface HealthState { health?: number; maxHealth?: number; armour?: number; maxArmour?: number; hurt?: number; pulse?: number; healing?: boolean; healProgress?: number }
+interface HealthState {
+  health?: number;
+  maxHealth?: number;
+  armour?: number;
+  maxArmour?: number;
+  hurt?: number;
+  pulse?: number;
+  healing?: boolean;
+  healProgress?: number;
+}
 export class HealthFx {
-  declare bloodWrap: HTMLElement; declare beat: HTMLElement; declare desat: HTMLElement; declare flash: HTMLElement;
-  declare vitals: HTMLElement; declare hpNum: HTMLElement; declare hpVal: HTMLElement; declare hpMax: HTMLElement; declare hpFill: HTMLElement; declare armour: HTMLElement; declare plates: HTMLElement[];
-  declare hpShown: number; declare _lastHp: number; declare hurt: number; declare flashT: number; declare flashPeak: number; declare beatEnergy: number; declare armourShown: number; declare armourFlash: number;
+  declare bloodWrap: HTMLElement;
+  declare beat: HTMLElement;
+  declare desat: HTMLElement;
+  declare flash: HTMLElement;
+  declare vitals: HTMLElement;
+  declare hpNum: HTMLElement;
+  declare hpVal: HTMLElement;
+  declare hpMax: HTMLElement;
+  declare hpFill: HTMLElement;
+  declare armour: HTMLElement;
+  declare plates: HTMLElement[];
+  declare hpShown: number;
+  declare _lastHp: number;
+  declare hurt: number;
+  declare flashT: number;
+  declare flashPeak: number;
+  declare beatEnergy: number;
+  declare armourShown: number;
+  declare armourFlash: number;
   constructor(parent: HTMLElement, chrome: HTMLElement = parent) {
     this.bloodWrap = el('div', 'ow-blood', parent);
     el('div', 'ow-blood-a', this.bloodWrap);
@@ -81,9 +106,7 @@ export class HealthFx {
   /** @param {object} s { health, maxHealth, armour, maxArmour, hurt, pulse } */
   update(dt: number, s: HealthState): void {
     const h = clamp01((s.health ?? 100) / (s.maxHealth || 100));
-    const targetHurt = s.hurt !== undefined
-      ? clamp01(s.hurt)
-      : clamp01((0.78 - h) / 0.78) ** 1.3;
+    const targetHurt = s.hurt !== undefined ? clamp01(s.hurt) : clamp01((0.78 - h) / 0.78) ** 1.3;
     this.hurt = damp(this.hurt, targetHurt, 7, dt);
     const hurt = this.hurt;
 
@@ -142,7 +165,11 @@ export class HealthFx {
     setStyle(this.armour, 'display', this.armourShown < 0.01 ? 'none' : '');
     if (this.armourShown > 0.01) {
       this.armourFlash = Math.max(0, this.armourFlash - dt * 3.2);
-      setStyle(this.armour, 'filter', this.armourFlash > 0.01 ? `brightness(${(1 + this.armourFlash * 0.9).toFixed(3)})` : '');
+      setStyle(
+        this.armour,
+        'filter',
+        this.armourFlash > 0.01 ? `brightness(${(1 + this.armourFlash * 0.9).toFixed(3)})` : ''
+      );
       const per = maxA / 3;
       for (let i = 0; i < 3; i++) {
         const f = clamp01((armour - i * per) / per);

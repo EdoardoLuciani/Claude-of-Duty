@@ -4,15 +4,40 @@
  * not create 60 Vector3s.
  */
 
-interface VectorTriple { x: number; y: number; z: number }
-interface BasisVectors { tx: number; ty: number; tz: number; bx: number; by: number; bz: number }
-interface RGB { r: number; g: number; b: number }
-interface FloatRng { float(): number }
+interface VectorTriple {
+  x: number;
+  y: number;
+  z: number;
+}
+interface BasisVectors {
+  tx: number;
+  ty: number;
+  tz: number;
+  bx: number;
+  by: number;
+  bz: number;
+}
+interface RGB {
+  r: number;
+  g: number;
+  b: number;
+}
+interface FloatRng {
+  float(): number;
+}
 
 export const V: VectorTriple = { x: 0, y: 0, z: 0 };
 export const V2: VectorTriple = { x: 0, y: 0, z: 0 };
 
-export function reflect<T extends VectorTriple>(out: T, dx: number, dy: number, dz: number, nx: number, ny: number, nz: number): T {
+export function reflect<T extends VectorTriple>(
+  out: T,
+  dx: number,
+  dy: number,
+  dz: number,
+  nx: number,
+  ny: number,
+  nz: number
+): T {
   const d = dx * nx + dy * ny + dz * nz;
   out.x = dx - 2 * d * nx;
   out.y = dy - 2 * d * ny;
@@ -51,7 +76,15 @@ const B: BasisVectors = { tx: 0, ty: 0, tz: 0, bx: 0, by: 0, bz: 0 };
  * Random unit direction inside a cone of half-angle `spread` (radians) around
  * a unit axis. `power` > 1 biases toward the axis.
  */
-export function cone<T extends VectorTriple>(out: T, rng: FloatRng, ax: number, ay: number, az: number, spread: number, power = 1): T {
+export function cone<T extends VectorTriple>(
+  out: T,
+  rng: FloatRng,
+  ax: number,
+  ay: number,
+  az: number,
+  spread: number,
+  power = 1
+): T {
   basis(B, ax, ay, az);
   const u = Math.pow(rng.float(), power);
   const cosT = Math.cos(spread * u);
@@ -74,7 +107,13 @@ export function cone<T extends VectorTriple>(out: T, rng: FloatRng, ax: number, 
  * only ever occupy the normal hemisphere, and sparks off a muzzle only ever
  * leave down-bore. `bias` is the minimum cosine kept against the axis.
  */
-export function towardHemi<T extends VectorTriple>(out: T, ax: number, ay: number, az: number, bias = 0.08): T {
+export function towardHemi<T extends VectorTriple>(
+  out: T,
+  ax: number,
+  ay: number,
+  az: number,
+  bias = 0.08
+): T {
   const d = out.x * ax + out.y * ay + out.z * az;
   if (d < bias) {
     // reflect back across the plane, then push it clear of the surface
@@ -102,7 +141,13 @@ export function towardHemi<T extends VectorTriple>(out: T, ax: number, ay: numbe
  *
  * @param {number} cosMax cosine of the half-angle, e.g. cos(55 deg) = 0.574
  */
-export function clampCone<T extends VectorTriple>(out: T, ax: number, ay: number, az: number, cosMax: number): T {
+export function clampCone<T extends VectorTriple>(
+  out: T,
+  ax: number,
+  ay: number,
+  az: number,
+  cosMax: number
+): T {
   const d = out.x * ax + out.y * ay + out.z * az;
   if (d >= cosMax) return out;
   let tx = out.x - ax * d;
@@ -152,7 +197,8 @@ export function blackbody<T extends RGB>(out: T, kelvin: number): T {
   g = clamp(g, 0, 255) / 255;
   b = clamp(b, 0, 255) / 255;
   // sRGB -> linear, then normalise on the peak so the caller controls radiance
-  const lin = (c: number): number => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  const lin = (c: number): number =>
+    c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
   r = lin(r);
   g = lin(g);
   b = lin(b);
@@ -168,7 +214,14 @@ export const C: RGB = { r: 1, g: 1, b: 1 };
 export const C2: RGB = { r: 1, g: 1, b: 1 };
 
 /** Random point inside a disc of radius r on the plane whose normal is (n). */
-export function discOn<T extends VectorTriple>(out: T, rng: FloatRng, nx: number, ny: number, nz: number, r: number): T {
+export function discOn<T extends VectorTriple>(
+  out: T,
+  rng: FloatRng,
+  nx: number,
+  ny: number,
+  nz: number,
+  r: number
+): T {
   basis(B, nx, ny, nz);
   const rr = Math.sqrt(rng.float()) * r;
   const a = rng.float() * Math.PI * 2;
