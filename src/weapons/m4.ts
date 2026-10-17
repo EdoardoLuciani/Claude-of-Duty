@@ -13,6 +13,7 @@ import {
   type HandRig,
   type HandSide,
 } from './authored-hands.ts';
+import { authoredModel, requiredNode } from './authored-model.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 
 export const M4_URL = new URL(
@@ -30,20 +31,7 @@ const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
 
 export function makeM4Model(gltf: GLTF) {
   const scene = gltf.scene;
-  scene.updateMatrixWorld(true);
-  const root = scene.getObjectByName('M4_RIG');
-  if (!root) throw new Error('[m4] missing M4_RIG');
-  const animations = REQUIRED.map((name: string) => {
-    const clip = gltf.animations.find((c) => c.name === name);
-    if (!clip) throw new Error(`[m4] missing ${name} clip`);
-    return clip;
-  });
-  const point = (name: string): [number, number, number] => {
-    const node = root.getObjectByName(name);
-    if (!node) throw new Error(`[m4] missing ${name}`);
-    const p = node.getWorldPosition(new THREE.Vector3());
-    return [p.x, p.y, p.z];
-  };
+  const { root, animations, point } = authoredModel(gltf, 'M4_RIG', REQUIRED, scene);
   const model = {
     id: 'rifle',
     label: 'M4A1',
@@ -116,11 +104,7 @@ export class M4Animation {
     this.root = model.root;
     this.mixer = new THREE.AnimationMixer(this.root);
     this.actions = createAuthoredActions(this.mixer, model.animations);
-    const node = (name: string): THREE.Object3D => {
-      const o = this.root.getObjectByName(name);
-      if (!o) throw new Error(`[m4] missing ${name}`);
-      return o;
-    };
+    const node = (name: string) => requiredNode(this.root, name);
     this.bolt = node('bolt');
     this.boltRest = this.bolt.position.clone();
     this.boltHead = node('bolt_head');

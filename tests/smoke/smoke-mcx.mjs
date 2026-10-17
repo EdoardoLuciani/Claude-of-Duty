@@ -3,19 +3,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { PNG } from 'pngjs';
 import * as THREE from 'three';
+
+import { inspectGLB } from '../../tools/lib/glb-fixture.mjs';
 
 const dir = new URL('../../assets/weapons/mcx-virtus/', import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', dir), 'utf8'));
 const file = readFileSync(new URL('mcx-virtus.glb', dir));
-assert.equal(file.readUInt32LE(0), 0x46546c67);
-assert.equal(file.readUInt32LE(4), 2);
-assert.equal(file.readUInt32LE(8), file.length);
-const jsonLength = file.readUInt32LE(12);
-const gltf = JSON.parse(file.subarray(20, 20 + jsonLength).toString());
-const bin = file.subarray(28 + jsonLength);
-assert.equal(gltf.asset.version, '2.0');
+const { json: gltf, accessor, imagePNG } = inspectGLB(file);
 assert.ok(file.length <= 10 * 1024 * 1024, 'approved MCX GLB size budget');
 assert.ok(gltf.materials.length <= 16, 'approved material budget');
 assert.ok(
@@ -31,8 +26,7 @@ assert.equal(gltf.images.length, 3);
 for (const image of gltf.images) {
   assert.ok(Number.isInteger(image.bufferView), 'textures must be embedded');
   assert.equal(image.uri, undefined);
-  const view = gltf.bufferViews[image.bufferView];
-  const png = PNG.sync.read(bin.subarray(view.byteOffset, view.byteOffset + view.byteLength));
+  const png = imagePNG(image);
   assert.equal(png.width, manifest.textures.resolution);
   assert.equal(png.height, manifest.textures.resolution);
   assert.equal(png.width, 1024, 'retain the approved map resolution');
@@ -51,26 +45,6 @@ for (const material of gltf.materials) {
   assert.ok(pbr.baseColorFactor.slice(0, 3).every((v) => v > 0 && v < 0.6));
 }
 
-const widths = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 };
-const formats = { 5126: ['readFloatLE', 4], 5125: ['readUInt32LE', 4], 5123: ['readUInt16LE', 2] };
-function accessor(index) {
-  const a = gltf.accessors[index];
-  const view = gltf.bufferViews[a.bufferView];
-  const [read, bytes] = formats[a.componentType];
-  const width = widths[a.type];
-  assert.ok(width && !a.sparse, 'supported dense accessor');
-  const data = new Float32Array(a.count * width);
-  const start = (view.byteOffset ?? 0) + (a.byteOffset ?? 0);
-  const stride = view.byteStride ?? width * bytes;
-  for (let i = 0; i < a.count; i++) {
-    for (let j = 0; j < width; j++) {
-      const value = bin[read](start + i * stride + j * bytes);
-      assert.ok(Number.isFinite(value));
-      data[i * width + j] = value;
-    }
-  }
-  return data;
-}
 let triangles = 0;
 for (const mesh of gltf.meshes) {
   for (const p of mesh.primitives) {

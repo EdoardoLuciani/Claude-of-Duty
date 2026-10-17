@@ -9,7 +9,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import { Rng } from '../../src/core/rng.ts';
 import { CameraRig } from '../../src/player/camera.ts';
@@ -18,6 +17,7 @@ import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/d
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import { makeMPXModel, MPX_URL } from '../../src/weapons/mpx.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
+import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
 
 let failures = 0;
 const check = (name, cond) => {
@@ -316,16 +316,7 @@ async function isolationShots(shake, ads) {
   });
   const def = { ...WEAPON_DEFS.smg, cycleTime: 60 / WEAPON_DEFS.smg.rpm };
   const bytes = readFileSync(new URL(MPX_URL));
-  const loader = new GLTFLoader().register(() => ({
-    name: 'SMOKE_TEXTURE',
-    loadTexture: () => Promise.resolve(new THREE.Texture()),
-  }));
-  const model = makeMPXModel(
-    await loader.parseAsync(
-      bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-      ''
-    )
-  );
+  const model = makeMPXModel(await parseGLB(bytes));
   vm.addWeapon(model, def);
   const got = [];
   const wp = new WeaponSystem();

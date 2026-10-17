@@ -26,11 +26,8 @@ animation datums, not mechanism certification. References aren't shipped texture
 
 ## Source/runtime contract
 
-Python (`tools/blender/ax338.py`, `ax338_actions.py` and local `ax338/export.py`)
-is the weapon source of truth. `ax338.blend` is a generated packed, editable
-review preview; `ax338.glb` and `manifest.json` are generated runtime products.
-Do not maintain manual edits to these products or repair exported GLB bytes.
-Normal Vite builds use the committed products and need no Blender.
+Follow the [shared authoring workflow](../../../tools/blender/README.md).
+Sources: `tools/blender/ax338.py`, `ax338_actions.py`, `ax338/export.py`.
 
 Declared read-only build inputs:
 

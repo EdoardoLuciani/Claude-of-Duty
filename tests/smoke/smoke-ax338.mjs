@@ -4,13 +4,12 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import manifest from '../../assets/weapons/ax338/manifest.json' with { type: 'json' };
 import { makeAX338Model, AX338Animation, AX338_URL } from '../../src/weapons/ax338.ts';
-import { buildClips } from '../../src/weapons/clips.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import { Arm } from '../../src/weapons/hands.ts';
+import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
 const bytes = readFileSync(new URL(AX338_URL));
 const json = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)).toString());
 const primitives = json.nodes
@@ -49,14 +48,7 @@ assert(
   !json.nodes.some((n) => /bipod|spent_case|AX338_arm/.test(n.name)),
   'no duplicate arms/cases or omitted accessories'
 );
-const loader = new GLTFLoader().register(() => ({
-  name: 'SMOKE_TEXTURE',
-  loadTexture: () => Promise.resolve(new THREE.Texture()),
-}));
-const gltf = await loader.parseAsync(
-  bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-  ''
-);
+const gltf = await parseGLB(bytes);
 // Freeze the approved rifle and hand channels. Only the three holding fingers
 // and an empty-reload wrist hold (preventing early drift) may change.
 gltf.scene.updateMatrixWorld(true);
@@ -119,12 +111,53 @@ assert(
 assert.equal(model.nodes.opticGlass.kind, 'scope');
 assert.equal(model.reactiveFire, true);
 assert.equal(Object.keys(anim.actions).length, 9);
-// Event timing is independent of geometry; neutral charge input keeps the
-// shared gameplay timeline oracle without a retired procedural model.
-const legacy = buildClips({ ...model.nodes, chargeRest: { pos: [0, 0, 0] } }, def);
+// Independent gameplay contract; do not retain a retired renderer as the oracle.
+const expectedClips = {
+  reloadTac: [
+    2.8,
+    [
+      [0.02, 'start'],
+      [0.2, 'magout'],
+      [0.34, 'magdrop'],
+      [0.81, 'magin'],
+      [0.88, 'slap'],
+      [0.995, 'end'],
+    ],
+  ],
+  reloadEmpty: [
+    3.6,
+    [
+      [0.02, 'start'],
+      [0.16, 'magout'],
+      [0.3, 'magdrop'],
+      [0.71, 'magin'],
+      [0.9, 'charge'],
+      [0.917, 'boltrelease'],
+      [0.995, 'end'],
+    ],
+  ],
+  inspect: [3.6, [[0.995, 'end']]],
+  draw: [0.88, [[0.995, 'end']]],
+  holster: [0.56, [[0.995, 'end']]],
+  cycle: [
+    1.1,
+    [
+      [0.22, 'bolt:open'],
+      [0.52, 'chamber'],
+      [0.74, 'bolt:close'],
+      [0.995, 'end'],
+    ],
+  ],
+};
+assert.deepEqual(Object.keys(anim.clips()).sort(), Object.keys(expectedClips).sort());
 for (const [name, clip] of Object.entries(anim.clips())) {
-  assert.equal(clip.duration, legacy[name].duration, `${name}: original gameplay timing`);
-  assert.deepEqual(clip.events, legacy[name].events, `${name}: exact existing event names/times`);
+  const [duration, events] = expectedClips[name];
+  assert.equal(clip.duration, duration, name);
+  assert.deepEqual(
+    clip.events,
+    events.map(([fraction, name]) => ({ t: fraction * duration, name })),
+    name
+  );
 }
 for (const action of Object.values(anim.actions)) {
   const clip = action.getClip();

@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import { resolveProfile, WEAPON_PROFILES } from '../../src/audio/weapons.ts';
 import { Rng } from '../../src/core/rng.ts';
@@ -17,6 +16,7 @@ import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
 import { makeMCXModel, MCX_URL } from '../../src/weapons/mcx.ts';
 import { makeMPXModel, MPX_URL } from '../../src/weapons/mpx.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
+import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
 
 const def = { ...WEAPON_DEFS.mcx, cycleTime: 60 / WEAPON_DEFS.mcx.rpm };
 assert(PRIMARY_IDS.includes('mcx'));
@@ -46,15 +46,8 @@ for (const n of [1, 2]) {
 // Exercise the REAL GLB hierarchy, animation samplers and runtime adapter.
 // Only PNG decoding is stubbed: WebGL/browser decoding is checked separately.
 const bytes = readFileSync(new URL(MCX_URL));
-const loader = new GLTFLoader().register(() => ({
-  name: 'NODE_TEXTURE_STUB',
-  loadTexture: () => Promise.resolve(new THREE.Texture()),
-}));
 const authored = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12))).materials;
-const gltf = await loader.parseAsync(
-  bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-  ''
-);
+const gltf = await parseGLB(bytes);
 const model = makeMCXModel(gltf);
 assert(model.nodes.muzzle[2] < -0.59 && Math.abs(model.nodes.muzzle[0]) < 1e-6, '-Z forward');
 assert(model.nodes.eject[0] > 0.02, 'ejection to shooter right');
@@ -97,20 +90,10 @@ const vm = new Viewmodel(ctx, {
   reticleOutline: () => new THREE.MeshBasicMaterial(),
 });
 const rifleBytes = readFileSync(new URL(M4_URL));
-const rifle = makeM4Model(
-  await loader.parseAsync(
-    rifleBytes.buffer.slice(rifleBytes.byteOffset, rifleBytes.byteOffset + rifleBytes.byteLength),
-    ''
-  )
-);
+const rifle = makeM4Model(await parseGLB(rifleBytes));
 vm.addWeapon(rifle, { ...WEAPON_DEFS.rifle, cycleTime: 60 / WEAPON_DEFS.rifle.rpm });
 const smgBytes = readFileSync(new URL(MPX_URL));
-const smg = makeMPXModel(
-  await loader.parseAsync(
-    smgBytes.buffer.slice(smgBytes.byteOffset, smgBytes.byteOffset + smgBytes.byteLength),
-    ''
-  )
-);
+const smg = makeMPXModel(await parseGLB(smgBytes));
 vm.addWeapon(smg, { ...WEAPON_DEFS.smg, cycleTime: 60 / WEAPON_DEFS.smg.rpm });
 const entry = vm.addWeapon(model, def);
 const rig = entry.animation;

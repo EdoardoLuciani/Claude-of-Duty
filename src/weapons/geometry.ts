@@ -2,8 +2,6 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
-type Vec2 = [number, number];
-type Vec3 = [number, number, number];
 interface ExtrudeOptions {
   bevel?: number;
   bevelSegments?: number;
@@ -11,43 +9,7 @@ interface ExtrudeOptions {
   steps?: number;
   holes?: number[][][];
 }
-interface Transform {
-  x?: number;
-  y?: number;
-  z?: number;
-  rx?: number;
-  ry?: number;
-  rz?: number;
-  sx?: number;
-  sy?: number;
-  sz?: number;
-}
-
-/**
- * Procedural hard-surface geometry kit for the weapons.
- *
- * Ground rules that come out of the quality bar:
- *
- *  - There is no such thing as a 90-degree edge on a real firearm. Every box
- *    here is a RoundedBoxGeometry with a 0.3-1.5 mm chamfer, every extrusion is
- *    bevelled, every tube end gets a crowned lathe profile. That single fact is
- *    what separates "modelled" from "blocked out": chamfers catch a specular
- *    line and give the silhouette its read.
- *  - Parts are authored in metres at real scale, in weapon-local space:
- *    +X right, +Y up, -Z toward the muzzle (the camera convention), origin at
- *    the shooting hand's anchor point (web of the thumb, top-rear of the grip).
- *  - Everything funnels through `Assembly`, which transforms each piece into
- *    weapon space, buckets it by material and merges the buckets. A whole rifle
- *    lands in 6-8 draw calls.
- */
-
-/** Axial primitives are authored along +Z, which is *rearward*, then mirrored. */
-const _m4 = new THREE.Matrix4();
-const _q = new THREE.Quaternion();
-const _e = new THREE.Euler();
-const _v = new THREE.Vector3();
-const _s = new THREE.Vector3(1, 1, 1);
-
+/** Offline grenade geometry and viewmodel optic primitives, in metres. */
 const KEEP_ATTRS = ['position', 'normal', 'uv'];
 
 /** Strip everything merge cannot reconcile; keep P/N/UV only. */
@@ -86,16 +48,6 @@ export function box(
 }
 
 /** A softly rounded block — grips, palm swells, butt pads. */
-export function blob(
-  w: number,
-  h: number,
-  d: number,
-  radius = 0.006,
-  seg = 3
-): THREE.BufferGeometry {
-  return box(w, h, d, radius, seg);
-}
-
 /**
  * Lathe around the Z axis. `profile` is a flat list of [axialZ, radius] pairs
  * from rear to front (or any order); radius 0 closes the form.
@@ -115,55 +67,6 @@ export function latheZ(
   // so the axis becomes +Z and the axial coordinates survive untouched.
   g.rotateX(Math.PI / 2);
   return normalizeAttributes(g);
-}
-
-function flipWinding(geo: THREE.BufferGeometry): THREE.BufferGeometry {
-  const idx = geo.getIndex();
-  if (idx) {
-    const a = idx.array;
-    for (let i = 0; i < a.length; i += 3) {
-      const t = a[i];
-      a[i] = a[i + 2];
-      a[i + 2] = t;
-    }
-    idx.needsUpdate = true;
-  }
-  const n = geo.getAttribute('normal');
-  if (n) {
-    const a = n.array;
-    for (let i = 0; i < a.length; i++) a[i] = -a[i];
-    n.needsUpdate = true;
-  }
-  return geo;
-}
-
-/**
- * Tube along Z with a real wall: outer surface, inner bore, and crowned ends.
- * Used for barrels, optic tubes, suppressors, buffer tubes.
- */
-export function tubeZ(
-  rOuter: number,
-  rInner: number,
-  len: number,
-  seg = 24,
-  crown = 0.0006
-): THREE.BufferGeometry {
-  const z0 = -len / 2;
-  const z1 = len / 2;
-  const c = Math.min(crown, (rOuter - rInner) * 0.4);
-  return latheZ(
-    [
-      [z0 + c, rInner],
-      [z0, rInner + c],
-      [z0, rOuter - c],
-      [z0 + c, rOuter],
-      [z1 - c, rOuter],
-      [z1, rOuter - c],
-      [z1, rInner + c],
-      [z1 - c, rInner],
-    ],
-    seg
-  );
 }
 
 /** Solid cylinder along Z with chamfered rims. */
@@ -188,21 +91,6 @@ export function rodZ(
     ],
     seg
   );
-}
-
-/** Sphere-ish detail blob (buttons, bosses, knuckle pads). */
-export function dome(r: number, seg = 16, cut = 0.6): THREE.BufferGeometry {
-  const g = new THREE.SphereGeometry(
-    r,
-    seg,
-    Math.max(4, Math.round(seg * 0.5)),
-    0,
-    Math.PI * 2,
-    0,
-    Math.PI * cut
-  );
-  g.rotateX(Math.PI / 2);
-  return normalizeAttributes(g);
 }
 
 /**
@@ -246,26 +134,6 @@ export function extrude(
   return normalizeAttributes(merged);
 }
 
-/** A rounded rectangle outline, for extruded plates that need soft corners. */
-export function roundRect(w: number, h: number, r: number, seg = 3): Vec2[] {
-  const pts: Vec2[] = [];
-  const hw = w / 2 - r;
-  const hh = h / 2 - r;
-  const corners = [
-    [hw, hh, 0],
-    [-hw, hh, Math.PI / 2],
-    [-hw, -hh, Math.PI],
-    [hw, -hh, -Math.PI / 2],
-  ];
-  for (const [cx, cy, a0] of corners) {
-    for (let i = 0; i <= seg; i++) {
-      const a = a0 + (i / seg) * (Math.PI / 2);
-      pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]);
-    }
-  }
-  return pts;
-}
-
 /** Torus in the XY plane (sling loops, trigger guard bows, QD rings). */
 export function ring(
   radius: number,
@@ -276,111 +144,6 @@ export function ring(
 ): THREE.BufferGeometry {
   const g = new THREE.TorusGeometry(radius, thickness, rings, seg, arc);
   return normalizeAttributes(g);
-}
-
-/**
- * Hex-socket cap screw, axis +Z, head at z=0 facing -Z.
- * The socket is a genuine counterbore (annular head + a plug at the bottom) so
- * it reads as a hole instead of a painted dot.
- */
-export function screw(
-  rHead: number,
-  rShank: number,
-  headH: number,
-  shankL: number,
-  seg = 12
-): THREE.BufferGeometry {
-  const rSocket = rHead * 0.52;
-  const g = [];
-  g.push(
-    latheZ(
-      [
-        [0, rSocket],
-        [0, rHead - 0.0002],
-        [0.0002, rHead],
-        [headH, rHead],
-        [headH, rShank],
-        [headH + shankL, rShank],
-        [headH + shankL, 0],
-      ],
-      seg
-    )
-  );
-  // counterbore wall + floor
-  const bore = latheZ(
-    [
-      [headH * 0.62, 0],
-      [headH * 0.62, rSocket],
-      [0, rSocket],
-    ],
-    6
-  );
-  g.push(bore);
-  return mergeAll(g)!;
-}
-
-/* ========================================================================== */
-/*  assembly                                                                  */
-/* ========================================================================== */
-
-/**
- * Collects transformed geometry per material, then merges each bucket into one
- * mesh. Also carries the named attachment nodes (muzzle, sight axis, grips,
- * moving parts) the animation rig drives.
- */
-export interface AssemblyNode {
-  pos: Vec3;
-  rot: Vec3;
-}
-export class Assembly {
-  name: string;
-  buckets: Map<string, THREE.BufferGeometry[]>;
-  nodes: Map<string, AssemblyNode>;
-
-  constructor(name: string) {
-    this.name = name;
-    this.buckets = new Map(); // matKey -> geometry[]
-    this.nodes = new Map(); // name -> { pos:[x,y,z], rot:[x,y,z] }
-  }
-
-  /**
-   * @param {THREE.BufferGeometry} geo    consumed (cloned internally)
-   * @param {string} mat                  material key
-   * @param {object} t   { x,y,z, rx,ry,rz, sx,sy,sz, mirror }
-   */
-  add(geo: THREE.BufferGeometry, mat: string, t: Transform | null = null): this {
-    const g = geo.clone();
-    if (t) {
-      _v.set(t.x ?? 0, t.y ?? 0, t.z ?? 0);
-      _e.set(t.rx ?? 0, t.ry ?? 0, t.rz ?? 0, 'XYZ');
-      _q.setFromEuler(_e);
-      _s.set(t.sx ?? 1, t.sy ?? 1, t.sz ?? 1);
-      _m4.compose(_v, _q, _s);
-      g.applyMatrix4(_m4);
-      if ((t.sx ?? 1) * (t.sy ?? 1) * (t.sz ?? 1) < 0) flipWinding(g);
-    }
-    normalizeAttributes(g);
-    let list = this.buckets.get(mat);
-    if (!list) this.buckets.set(mat, (list = []));
-    list.push(g);
-    return this;
-  }
-
-  node(name: string, x: number, y: number, z: number, rx = 0, ry = 0, rz = 0): this {
-    this.nodes.set(name, { pos: [x, y, z], rot: [rx, ry, rz] });
-    return this;
-  }
-
-  /** @returns Map<matKey, THREE.BufferGeometry> */
-  build(): Map<string, THREE.BufferGeometry> {
-    const out = new Map<string, THREE.BufferGeometry>();
-    for (const [mat, list] of this.buckets) {
-      const merged = mergeAll(list);
-      if (merged) out.set(mat, merged);
-    }
-    this.buckets.clear();
-    return out;
-  }
 }
 
 /** Merge a list of geometries, tolerating mixed indexed/non-indexed input. */

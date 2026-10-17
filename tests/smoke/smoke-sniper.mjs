@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
@@ -18,6 +17,7 @@ import {
 } from '../../src/weapons/defs.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
+import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
 
 assert(WEAPON_IDS.includes('sniper'));
 assert.deepEqual(PRIMARY_IDS, ['rifle', 'lmg', 'sniper', 'mcx']);
@@ -37,16 +37,7 @@ assert(recoil.every(Number.isFinite));
 assert(recoil.every((n, i) => i % 2 || n > 0));
 
 const bytes = readFileSync(new URL(AX338_URL));
-const loader = new GLTFLoader().register(() => ({
-  name: 'SMOKE_TEXTURE',
-  loadTexture: () => Promise.resolve(new THREE.Texture()),
-}));
-const model = makeAX338Model(
-  await loader.parseAsync(
-    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-    ''
-  )
-);
+const model = makeAX338Model(await parseGLB(bytes));
 const animation = new AX338Animation(model);
 assert.equal(model.id, 'sniper');
 assert.equal(model.nodes.opticGlass.kind, 'scope');
@@ -179,7 +170,7 @@ wp._fireTimer = 0;
 wp.state.mag = 0;
 wp.state.chambered = true;
 assert.equal(wp.tryFire(), true);
-assert.equal(wp.viewmodel.boltHold, 1);
+assert.equal(wp.state.chambered, false, 'last shot empties the chamber');
 assert.notEqual(vm.clipName, 'cycle');
 
 let resolved;

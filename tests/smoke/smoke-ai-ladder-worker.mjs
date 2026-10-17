@@ -20,9 +20,13 @@ import {
   LadderMotor,
 } from '../../src/ai/ladder.ts';
 import { NAV_PROFILE } from '../../src/ai/nav-format.ts';
-import { VARIANTS } from '../../src/ai/soldier.ts';
 import { CharacterController } from '../../src/physics/character.ts';
 import { NativeWorker } from '../../tools/lib/attachment-worker-fixture.mjs';
+import {
+  ladderProfiles,
+  ladderCursor as zero,
+  reverseCursor,
+} from '../../tools/lib/ladder-fixture.mjs';
 import { loadMap } from '../../tools/nav240/fixtures.mjs';
 
 // Only the browser transport is adapted. This imports the actual module worker,
@@ -38,14 +42,7 @@ async function until(fn) {
 const f = await loadMap(),
   descriptors = createLadderDescriptors(f.meta.volumes);
 assert.equal(descriptors.length, 6);
-const profiles = [
-  { name: 'NAV_PROFILE', radius: NAV_PROFILE.radius, height: NAV_PROFILE.height },
-  ...Object.entries(VARIANTS).map(([name, v]) => ({
-    name,
-    radius: INFANTRY.radius * v.scale,
-    height: INFANTRY.height * v.scale,
-  })),
-];
+const profiles = ladderProfiles();
 const probe = new CharacterController(f.physics.staticWorld, {
   stepHeight: INFANTRY.stepHeight,
   slopeLimit: INFANTRY.slopeRadians,
@@ -60,7 +57,6 @@ const service = new AttachmentQueries(nav, {
   profile: true,
   workerFactory: () => (transport = new NativeWorker({ record: true })),
 });
-const zero = () => ({ segment: 0, distance: 0, pendingTime: 0, moves: 0 });
 const options = (d, profile = profiles[0]) => ({
   radius: profile.radius,
   height: profile.height,
@@ -167,12 +163,7 @@ try {
         assert.deepEqual([motor.cursor, c.position], paused);
         motor.cancel();
         await parity({ ...query, foot, cursor }, `${d.id}/${profile.name}/${direction}/resume`);
-        const reverse = {
-          segment: 1,
-          distance: d.points[2].y - d.points[1].y - cursor.distance,
-          pendingTime: 0,
-          moves: 0,
-        };
+        const reverse = reverseCursor(d, cursor);
         await parity(
           { ...query, foot, direction: direction === 'up' ? 'down' : 'up', cursor: reverse },
           `${d.id}/${profile.name}/${direction}/return`

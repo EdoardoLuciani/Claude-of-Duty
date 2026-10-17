@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import manifest from '../../assets/weapons/m590/manifest.json' with { type: 'json' };
 import { Input } from '../../src/core/input.ts';
@@ -17,6 +16,7 @@ import { WeaponSystem } from '../../src/weapons/index.ts';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
 import { makeM590Model, M590_URL } from '../../src/weapons/m590.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
+import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
 
 const input = new Input({}, { sensitivity: 0.002, invertY: false });
 input._pollGamepad = () => {};
@@ -67,21 +67,12 @@ wp.sim = {
 };
 wp.stats = { tris: 0, fired: 0, live: 0, drawCalls: 0 };
 for (const id of WEAPON_IDS) wp.states.set(id, wp._makeState(id));
-const loader = new GLTFLoader().register(() => ({
-  name: 'SMOKE_TEXTURE',
-  loadTexture: () => Promise.resolve(new THREE.Texture()),
-}));
 for (const [url, makeModel] of [
   [M590_URL, makeM590Model],
   [M4_URL, makeM4Model],
 ]) {
   const bytes = readFileSync(new URL(url));
-  const model = makeModel(
-    await loader.parseAsync(
-      bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-      ''
-    )
-  );
+  const model = makeModel(await parseGLB(bytes));
   vm.addWeapon(model, wp.states.get(model.id).def);
 }
 wp.owned.add('shotgun');

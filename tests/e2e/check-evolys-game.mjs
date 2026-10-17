@@ -1,51 +1,28 @@
 #!/usr/bin/env node
 // Real startup, HDR weapon pass, shared arms, ammo, switching and shot events.
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { parseArgs } from '../../tools/lib/browser-harness.mjs';
 import {
-  ensureViteServer,
-  launchChromium,
-  parseArgs,
-  stopViteServer,
-} from '../../tools/lib/browser-harness.mjs';
-import { verifyNative, captureNative } from '../../tools/lib/native-render.mjs';
+  openGameReview,
+  setWeaponMode,
+  requestReload,
+  checkFireBurst,
+} from '../../tools/lib/game-review.mjs';
 const args = parseArgs(),
   port = Number(args.port ?? 5213),
   out = resolve(args.out ?? '.tmp-rend/evolys/game');
-mkdirSync(out, { recursive: true });
-const server = await ensureViteServer({ port });
-const browser = await launchChromium({
-  webgpu: true,
-  headless: true,
-  args: ['--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
-});
-const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-const errors = [];
-page.on('pageerror', (e) => errors.push(e.stack));
-page.on('console', (m) => {
-  if (m.type() === 'error') errors.push(m.text());
-});
-page.on('response', (r) => {
-  if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`);
-});
-const pump = (n) => page.evaluate((n) => window.__PUMP__(n), n);
-async function capture(name) {
-  await page.evaluate(() => window.__PRESENT__(2));
-  await captureNative(page, `${out}/${name}.png`);
-}
+const { page, errors, warnings, pump, capture, boot, close } = await openGameReview({ port, out });
+
 const beltCount = () =>
   page.evaluate(
     () =>
       window.evolysReview.w.viewmodel.active.animation.bones.filter((b) => b.scale.x > 0.5).length
   );
 try {
-  await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`, {
-    waitUntil: 'domcontentloaded',
-  });
-  await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
-  await verifyNative(page);
+  await boot();
   await page.waitForFunction(
     async () => {
       await window.__ENGINE__.ctx.get('weapons')._restTask;
@@ -71,9 +48,7 @@ try {
   );
   await capture('hip');
   assert.equal(await beltCount(), 8);
-  await page.evaluate(() => {
-    window.evolysReview.w.debugMode = 'ads';
-  });
+  await setWeaponMode(page, 'evolysReview', 'ads');
   await pump(60);
   assert(
     await page.evaluate(() => {
@@ -82,17 +57,9 @@ try {
     })
   );
   await capture('reflex-ads');
-  await page.evaluate(() => {
-    window.evolysReview.w.debugMode = 'idle';
-  });
+  await setWeaponMode(page, 'evolysReview', 'idle');
   await pump(40);
-  assert(
-    await page.evaluate(() => {
-      const { w } = window.evolysReview;
-      w.state.mag = 8;
-      return w.reload();
-    })
-  );
+  await requestReload(page, 'evolysReview', { mag: 8 });
   await pump(104);
   await capture('reload-tactical-pouch');
   assert(
@@ -106,15 +73,7 @@ try {
   assert.equal(await beltCount(), 8);
   await pump(70);
   assert.equal(await page.evaluate(() => window.evolysReview.w.state.mag), 100);
-  assert(
-    await page.evaluate(() => {
-      const { w } = window.evolysReview;
-      w.state.mag = 0;
-      w.state.chambered = false;
-      w.state.reserve = 150;
-      return w.reload();
-    })
-  );
+  await requestReload(page, 'evolysReview', { mag: 0, chambered: false, reserve: 150 });
   await pump(150);
   await capture('reload-empty-pouch');
   assert.equal(await beltCount(), 0);
@@ -136,21 +95,7 @@ try {
   await capture('inspect');
   assert(await page.evaluate(() => window.evolysReview.w.tryFire()), 'fire interrupts inspect');
   await pump(8);
-  const before = await page.evaluate(() => ({
-    shots: window.evolysReview.shots,
-    shells: window.evolysReview.shells,
-  }));
-  for (let i = 0; i < 8; i++) {
-    assert(await page.evaluate(() => window.evolysReview.w.tryFire()));
-    await pump(6);
-  }
-  await capture('fire');
-  const after = await page.evaluate(() => ({
-    shots: window.evolysReview.shots,
-    shells: window.evolysReview.shells,
-  }));
-  assert.equal(after.shots - before.shots, 8);
-  assert.equal(after.shells - before.shells, 8);
+  await checkFireBurst(page, pump, capture, 'evolysReview');
   await page.evaluate(() => {
     const { w } = window.evolysReview;
     w.state.mag = 2;
@@ -212,10 +157,10 @@ try {
     ...counts,
     render: await page.evaluate(() => window.__RENDER_INFO__),
     errors,
+    warnings,
   };
   writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
 } finally {
-  await browser.close();
-  stopViteServer(server);
+  await close();
 }
