@@ -53,6 +53,7 @@ import type {
   WeaponAnimation,
   ViewmodelContext,
 } from './runtime-types.ts';
+import { SNIPER_RETICLE, sniperMradScale, sniperReticleCoverage } from './sniper-reticle.ts';
 
 /**
  * THE VIEWMODEL RIG.
@@ -245,11 +246,13 @@ export class Viewmodel {
   declare maskUniforms: {
     uAlpha: UniformNode<'float', number>;
     uAspect: UniformNode<'float', number>;
+    uSniper: UniformNode<'float', number>;
   };
   declare reticleUniforms: {
     uAlpha: UniformNode<'float', number>;
     uAspect: UniformNode<'float', number>;
     uChevron: UniformNode<'float', number>;
+    uMradScale: UniformNode<'float', number>;
   };
   declare mats: WeaponMaterialsNode;
   declare rng: import('../core/rng.ts').Rng;
@@ -510,7 +513,11 @@ export class Viewmodel {
     // Fullscreen ADS overlays. The scene draws them at a fixed clip-space
     // position (vertexNode), so they do not depend on the world camera, and they
     // are authored in TSL like every other production material.
-    const maskU = (this.maskUniforms = { uAlpha: TSL.uniform(1), uAspect: TSL.uniform(16 / 9) });
+    const maskU = (this.maskUniforms = {
+      uAlpha: TSL.uniform(1),
+      uAspect: TSL.uniform(16 / 9),
+      uSniper: TSL.uniform(0),
+    });
     const mp = TSL.uv().mul(2).sub(1).toVar();
     const mr = TSL.length(TSL.vec2(mp.x.mul(maskU.uAspect), mp.y));
     const maskHole = TSL.float(0.72);
@@ -526,7 +533,20 @@ export class Viewmodel {
     });
     maskMat.vertexNode = TSL.vec4(TSL.positionLocal.xy, 0, 1);
     maskMat.colorNode = TSL.mix(TSL.vec3(0), TSL.vec3(0.02, 0.02, 0.018), maskRim.mul(0.35));
-    maskMat.opacityNode = maskEdge.mul(maskU.uAlpha);
+    // Sniper only: a defined aperture with restrained inner lens shadow. Keep
+    // the existing MCX mask, color and transition completely unchanged.
+    const sniperRadius = SNIPER_RETICLE.apertureRadius;
+    const edgeAA = TSL.fwidth(mr).max(0.0001);
+    const sniperEdge = TSL.smoothstep(
+      TSL.float(sniperRadius).sub(edgeAA.mul(0.5)),
+      TSL.float(sniperRadius).add(edgeAA.mul(0.5)),
+      mr
+    );
+    const lensShadow = TSL.smoothstep(sniperRadius - 0.045, sniperRadius, mr).mul(0.18);
+    maskMat.opacityNode = maskU.uSniper
+      .greaterThan(0.5)
+      .select(TSL.max(sniperEdge, lensShadow), maskEdge)
+      .mul(maskU.uAlpha);
     maskMat.userData.owUniforms = maskU;
     const mask = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), maskMat);
     mask.frustumCulled = false;
@@ -548,6 +568,7 @@ export class Viewmodel {
       uAlpha: TSL.uniform(1),
       uChevron: TSL.uniform(0),
       uAspect: TSL.uniform(16 / 9),
+      uMradScale: TSL.uniform(sniperMradScale(20)),
     });
     const rp = TSL.uv().mul(2).sub(1).toVar();
     const rc = TSL.vec2(rp.x.mul(retU.uAspect), rp.y);
@@ -558,27 +579,22 @@ export class Viewmodel {
       const w = 0.12 - i * 0.018;
       stadia = stadia.add(line(rc, -w, y, w, y, 0.006));
     }
-    let mil = line(rp, -0.72, 0, -0.045, 0, 0.009)
-      .add(line(rp, 0.045, 0, 0.72, 0, 0.009))
-      .add(line(rp, 0, -0.72, 0, -0.045, 0.009))
-      .add(line(rp, 0, 0.045, 0, 0.72, 0.009))
-      .add(line(rp, -0.018, 0, 0.018, 0, 0.006))
-      .add(line(rp, 0, -0.018, 0, 0.018, 0.006));
-    for (let i = 1; i <= 4; i++) {
-      const x = i * 0.14;
-      mil = mil
-        .add(line(rp, x, -0.018, x, 0.018, 0.0065))
-        .add(line(rp, -x, -0.018, -x, 0.018, 0.0065))
-        .add(line(rp, -0.018, x, 0.018, x, 0.0065))
-        .add(line(rp, -0.018, -x, 0.018, -x, 0.0065));
-    }
+    const mil = sniperReticleCoverage(rc.div(retU.uMradScale));
+    // The sniper quad reaches the aperture, unlike the original small overlay.
+    const milRadius = TSL.length(rc);
+    const milAA = TSL.fwidth(milRadius).max(0.0001);
+    const milClip = TSL.smoothstep(
+      TSL.float(sniperRadius).sub(milAA.mul(0.5)),
+      TSL.float(sniperRadius).add(milAA.mul(0.5)),
+      milRadius
+    ).oneMinus();
     const chevronCol = TSL.mix(
       TSL.vec3(0.015),
       TSL.vec3(0.85, 0.04, 0.012),
       TSL.clamp(chevron, 0, 1)
     );
     const chevronAlpha = TSL.clamp(chevron.add(stadia), 0, 1).mul(retU.uAlpha);
-    const milAlpha = TSL.clamp(mil, 0, 1).mul(retU.uAlpha);
+    const milAlpha = mil.mul(milClip).mul(retU.uAlpha);
     const useChevron = retU.uChevron.greaterThan(0.5);
     const reticleMat = new MeshBasicNodeMaterial({
       transparent: true,
@@ -586,7 +602,7 @@ export class Viewmodel {
       depthWrite: false,
       toneMapped: false,
     });
-    reticleMat.vertexNode = TSL.vec4(TSL.positionLocal.xy.mul(0.55), 0, 1);
+    reticleMat.vertexNode = TSL.vec4(TSL.positionLocal.xy.mul(useChevron.select(0.55, 1)), 0, 1);
     reticleMat.colorNode = useChevron.select(chevronCol, TSL.vec3(0));
     reticleMat.opacityNode = useChevron.select(chevronAlpha, milAlpha);
     reticleMat.userData.owUniforms = retU;
@@ -1760,12 +1776,14 @@ export class Viewmodel {
       const u = this.maskUniforms;
       u.uAlpha.value = smootherstep(0.82, 0.97, ads);
       u.uAspect.value = this.ctx.viewCamera.aspect;
+      u.uSniper.value = optic?.reticle === 'p4fl' ? 1 : 0;
     }
     if (this.scopeReticle) {
       const u = this.reticleUniforms;
       u.uAlpha.value = smootherstep(0.88, 0.99, ads);
       u.uChevron.value = optic?.reticle === 'chevron' ? 1 : 0;
       u.uAspect.value = this.ctx.viewCamera.aspect;
+      u.uMradScale.value = sniperMradScale(this.ctx.camera.fov, this.ctx.camera.zoom);
     }
   }
 

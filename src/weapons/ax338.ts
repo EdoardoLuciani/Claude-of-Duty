@@ -47,7 +47,7 @@ export function makeAX338Model(gltf: GLTF) {
       gripL: handReference.grips.left,
       magSeat: { pos: point('SOCKET_magazine'), rot: [0, 0, 0] },
       triggerPivot: { pos: point('trigger'), rot: [0, 0, 0] },
-      opticGlass: { kind: 'scope', center: point('SOCKET_sight'), reticle: 'mil' },
+      opticGlass: { kind: 'scope', center: point('SOCKET_sight'), reticle: 'p4fl' },
       handguard: { axis: [0, 0.075, 0], dir: [0, 0, 1], r: 0.027, z0: -0.175, z1: -0.581 },
     },
     shell: { caseLen: 0.0697, rimR: 0.0074 },
