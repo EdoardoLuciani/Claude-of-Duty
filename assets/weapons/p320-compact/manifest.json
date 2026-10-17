@@ -126,7 +126,7 @@
   },
   "textureResolution": 1024,
   "handAnimation": "Blender wrist and finger controls; shared runtime skins and shoulder IK",
-  "source": "tools/blender/p320_compact.py + p320_actions.py + tools/p320-hand-reference.mjs",
+  "source": "tools/blender/p320_compact.py + tools/blender/p320/ + tools/blender/p320_actions.py + tools/p320-hand-reference.mjs",
   "notes": [
     "Original non-functional game art, not a dimensionally exact replica.",
     "No downloaded models or textures.",
