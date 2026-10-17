@@ -9,7 +9,7 @@
     "primitives": 38,
     "materials": 15,
     "images": 3,
-    "bytes": 8368516
+    "bytes": 8516724
   },
   "clips": {
     "Idle": {
@@ -192,7 +192,7 @@
       ]
     }
   },
-  "source": "tools/blender/mpx.py + mpx_actions.py + tools/mpx-hand-reference.mjs",
+  "source": "tools/blender/mpx.py + tools/blender/mpx/animations.py + tools/blender/mpx_actions.py",
   "runtimeBasis": "GLB +X forward / +Y up / +Z right; adapter rotates basis +90 degrees around Y once",
   "textures": {
     "resolution": 1024,
