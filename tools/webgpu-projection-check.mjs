@@ -30,7 +30,7 @@ const fulfillMutation = async (route, response, source, mutated) => {
 };
 const browser = await launchChromium({ webgpu: true, headless: true });
 try {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 320 } }),
+  const page = await browser.newPage({ viewport: { width: 960, height: 540 } }),
     errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => {
@@ -296,8 +296,6 @@ try {
       writeFileSync(`${args.shots}-${name}.png`, Buffer.from(data, 'base64'));
   delete fixture.pictures;
   console.log('fixtures', JSON.stringify(fixture));
-  // Boot at the strike's final target size: resizing clustered-light storage
-  // invalidates shader contexts and is a separate regression from cold first use.
   await page.goto(`http://localhost:${port}/?capture=1&lockstep=1&q=${args.quality ?? 'high'}`);
   await page.waitForFunction('window.__READY__===true', null, { timeout: 120000 });
   await verifyNative(page);
@@ -320,6 +318,7 @@ try {
     for (const path of expectedPaths)
       assert(mutationRequests.get(path) >= 1, `${path} mutation must execute at least once`);
   }
+  await page.setViewportSize({ width: 1280, height: 320 });
   await page.evaluate(() => window.__PUMP__(2));
   const gameplay = await page.evaluate(async () => {
     const e = window.__ENGINE__,
