@@ -135,7 +135,7 @@ try {
   assert(await page.evaluate(() => window.mcxReview.w.tryFire()), 'fire cancels inspect');
   await pump(30);
 
-  const after = await checkFireBurst(page, pump, capture, 'mcxReview');
+  const after = await checkFireBurst(page, pump, capture, 'mcxReview', 5);
 
   // Audition the actual sample + procedural reinforcement pipeline, with a
   // quiet single shot then an 800 rpm burst. Dry preview, not scene reverb.

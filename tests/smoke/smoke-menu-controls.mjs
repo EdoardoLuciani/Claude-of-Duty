@@ -70,6 +70,24 @@ for (const label of [
 ]) {
   assert.ok(labels.has(label), `native/mouse reference: ${label}`);
 }
+const description = (label) =>
+  controls.find((control) => control.description.startsWith(`${label} —`)).description;
+assert.match(description('Pick up ammo'), /Hold 0.45 seconds in range.*Aimed intel has priority/);
+assert.match(
+  description('Secure intel'),
+  /Hold 4 seconds while aimed, visible, stationary.*requires release/
+);
+assert.match(description('Cycle equipped weapons'), /independently request.*guards/);
+assert.match(
+  description('Jump / mantle / vault'),
+  /stands up first.*ceiling fit.*Hold while moving forward.*Holding does not auto-repeat/
+);
+assert.ok(
+  controls.some(
+    (control) =>
+      control.keys.includes('↑') && /native keys.*reference when focused/.test(control.description)
+  )
+);
 // Gameplay eligibility belongs to smoke-intel; this suite
 // owns canonical labels, DOM accessibility, pause/focus and contextual prompts.
 globalThis.document = { createElement: makeEl, exitPointerLock() {} };
