@@ -1,7 +1,6 @@
 import type * as THREE from 'three';
 
 import type { EngineContext, EngineSystems } from '../core/context.ts';
-import type { WeaponRecord } from '../core/models.ts';
 import type { Rng } from '../core/rng.ts';
 import type { loadAX338 } from './ax338.ts';
 import type { Clip, ClipSample } from './clips.ts';
@@ -106,7 +105,7 @@ export interface ProceduralWeaponModel {
   shell?: { caseLen: number; rimR: number };
   magSize?: { len: number };
 }
-export type WeaponModelRecord = AuthoredWeaponModel | WeaponRecord | ProceduralWeaponModel;
+export type WeaponModelRecord = AuthoredWeaponModel | ProceduralWeaponModel;
 export function isAuthoredWeapon(model: WeaponModelRecord): model is AuthoredWeaponModel {
   return 'animations' in model;
 }

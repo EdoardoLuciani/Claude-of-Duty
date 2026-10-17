@@ -159,6 +159,8 @@ interface LiveLadder {
   claimed: boolean;
   deferred: boolean;
   aligned: boolean;
+  finished: boolean;
+  hold: THREE.Vector3 | null;
   status: 'approach' | 'waiting' | 'proof' | 'climbing' | 'blocked';
 }
 
@@ -166,6 +168,7 @@ export class Agent {
   declare route: NavRoute;
   declare ladder: LiveLadder | null;
   private readonly _ladderHit = makeHitRecord();
+  private readonly _ladderPath = [new THREE.Vector3(), new THREE.Vector3()] as const;
   declare ai: AiSystem;
   declare ctx: EngineContext;
   declare id: number;
@@ -2222,19 +2225,32 @@ export class Agent {
     return false;
   }
 
-  _ladderSupported(): boolean {
+  _ladderSupported(
+    x = this.controller!.position.x,
+    y = this.controller!.position.y,
+    z = this.controller!.position.z
+  ): boolean {
     const c = this.controller;
     if (!c) return false;
-    const p = c.position;
     return (
-      c.world.overlapCapsule(p.x, c.p0y, p.z, p.x, c.p1y, p.z, c.radius, c.mask, 0) === 0 &&
+      c.world.overlapCapsule(
+        x,
+        y + c.radius,
+        z,
+        x,
+        y + c.height - c.radius,
+        z,
+        c.radius,
+        c.mask,
+        0
+      ) === 0 &&
       c.world.sweepCapsule(
-        p.x,
-        c.p0y,
-        p.z,
-        p.x,
-        c.p1y,
-        p.z,
+        x,
+        y + c.radius,
+        z,
+        x,
+        y + c.height - c.radius,
+        z,
         c.radius,
         0,
         -1,
@@ -2247,9 +2263,108 @@ export class Agent {
     );
   }
 
+  /** Supported landing motion only; the shaft still belongs exclusively to LadderMotor. */
+  _landingClear(to: THREE.Vector3): boolean {
+    const c = this.controller!,
+      p = c.position;
+    const dx = to.x - p.x,
+      dy = to.y - p.y,
+      dz = to.z - p.z;
+    const distance = Math.hypot(dx, dy, dz);
+    if (distance > 2.5 || !this._ladderSupported()) return false;
+    this._ladderPath[0].copy(p);
+    this._ladderPath[1].copy(to);
+    if (!this.ai.capsulePathClear(this, this._ladderPath)) return false;
+    if (
+      distance > 1e-6 &&
+      c.world.sweepCapsule(
+        p.x,
+        c.p0y,
+        p.z,
+        p.x,
+        c.p1y,
+        p.z,
+        c.radius,
+        dx / distance,
+        dy / distance,
+        dz / distance,
+        distance,
+        c.mask,
+        this._ladderHit
+      )
+    )
+      return false;
+    const samples = Math.max(1, Math.ceil(distance / 0.08));
+    for (let i = 1; i <= samples; i++) {
+      const t = i / samples;
+      if (!this._ladderSupported(p.x + dx * t, p.y + dy * t, p.z + dz * t)) return false;
+    }
+    return true;
+  }
+
+  _moveLanding(to: THREE.Vector3, dt: number): boolean {
+    const c = this.controller!,
+      p = c.position;
+    const dx = to.x - p.x,
+      dy = to.y - p.y,
+      dz = to.z - p.z;
+    const distance = Math.hypot(dx, dy, dz);
+    if (distance <= 1e-6) return true;
+    if (!this._landingClear(to)) return false;
+    const step = c.stepHeight,
+      snap = c.snapDistance,
+      y = p.y;
+    c.stepHeight = c.snapDistance = 0;
+    try {
+      const t = Math.min(1, (1.5 * Math.min(dt, 0.1)) / distance);
+      c.move(dx * t, dy * t, dz * t);
+    } finally {
+      c.stepHeight = step;
+      c.snapDistance = snap;
+    }
+    this.ladder!.travel += Math.abs(p.y - y);
+    this.position.copy(p);
+    this.grounded = c.grounded;
+    return this.position.distanceTo(to) <= 1e-6;
+  }
+
+  _ladderHold(l: LiveLadder): THREE.Vector3 | null {
+    const p = l.descriptor.points[(l.step.direction === 'up') !== l.finished ? 0 : 3];
+    const { x, z } = l.descriptor.normal;
+    const to = this._ladderPath[1];
+    // Wait farther out than an exiting owner, leaving room for both on narrow landings.
+    for (const distance of l.finished ? [1, 0.8] : [2, 1.6]) {
+      for (const inset of [0, -0.4, 0.4, 0.8, 1.2]) {
+        for (let side = 0; side < 3; side++) {
+          const dx = side === 0 ? z : side === 1 ? -z : x;
+          const dz = side === 0 ? -x : side === 1 ? x : z;
+          to.set(p.x + dx * distance + x * inset, this.position.y, p.z + dz * distance + z * inset);
+          if (this.ai.ladderHoldingClear(this, l.descriptor, to) && this._landingClear(to))
+            return to.clone();
+        }
+      }
+    }
+    return null;
+  }
+
+  _finishLadder(l: LiveLadder) {
+    this.pathIndex = l.step.exitIndex + 1;
+    this._releaseLadder();
+    this._safeSurface = 0;
+    this._safeNav = null;
+    this._progressPos.copy(this.position);
+    this.noProgressTime = this._noRouteTime = this.stuckTimer = this.stuckHits = 0;
+    this._recoveryCount = this._failStreak = 0;
+    this.navStart.nav = this.navGoal.nav = null;
+    this._rememberSafePosition();
+    this.hasMoveTarget = this.pathIndex < this.pathLen;
+    this.repathTimer = 0;
+    if (l.deferred) this._goTo(this._pendingDest);
+  }
+
   _poseLadder(l: LiveLadder) {
     this.animator.setClimb(
-      true,
+      !l.hold && !l.finished,
       l.travel,
       l.step.direction,
       l.motor?.phase ??
@@ -2304,13 +2419,52 @@ export class Agent {
       return;
     }
     l.retry = Math.max(0, l.retry - dt);
+    if (l.finished) {
+      l.status = 'waiting';
+      if (!this.ai.ladderBusy(this, l.descriptor)) {
+        const exit = this._ladderPath[1].copy(
+          l.descriptor.points[l.step.direction === 'up' ? 3 : 0]
+        );
+        if (!l.hold || this._moveLanding(exit, dt)) this._finishLadder(l);
+        return;
+      }
+      if (!l.hold) {
+        if (l.retry > 0) return;
+        l.hold = this._ladderHold(l);
+        l.retry = PATH_FAIL_WAIT;
+      }
+      l.deferred = true;
+      if (!l.hold || !this._moveLanding(l.hold, dt)) return;
+      if (l.claimed) {
+        this.ai.releaseLadder(this);
+        l.claimed = false;
+      }
+      return;
+    }
+    if (l.hold && !this._moveLanding(l.hold, dt)) return;
     if (!l.claimed) {
       if (l.retry > 0) return;
       l.retry = PATH_FAIL_WAIT;
       if (!this.ai.claimLadder(this, l.descriptor)) {
         l.status = 'waiting';
+        if (
+          !l.hold &&
+          this.ai.ladderBusy(this, l.descriptor) &&
+          !this.ai.ladderHoldingClear(this, l.descriptor, this.position)
+        ) {
+          l.hold = this._ladderHold(l);
+          if (!l.hold) {
+            // Unmounted and supported: abandon this approach, never strand a shaft owner.
+            this._releaseLadder();
+            this.hasMoveTarget = this.pathPending = false;
+            this.pathLen = 0;
+            this._notePathFail();
+            this._recoveryWait = PATH_FAIL_WAIT;
+          }
+        }
         return;
       }
+      l.hold = null;
       l.claimed = true;
       l.status = 'approach';
       l.retry = 0;
@@ -2338,31 +2492,11 @@ export class Agent {
         dz = p.z - c.position.z;
       const distance = Math.hypot(dx, dy, dz);
       if (distance > 1e-6) {
-        // Native swept fine alignment, not corner tolerance or position repair.
-        const step = c.stepHeight,
-          snap = c.snapDistance,
-          t = Math.min(1, (1.5 * dt) / distance);
-        c.stepHeight = c.snapDistance = 0;
-        const y = c.position.y;
-        try {
-          c.move(dx * t, dy * t, dz * t);
-        } finally {
-          c.stepHeight = step;
-          c.snapDistance = snap;
-        }
-        l.travel += Math.abs(c.position.y - y);
-        this.position.copy(c.position);
-        this.grounded = c.grounded;
+        this._ladderPath[1].copy(p);
+        this._moveLanding(this._ladderPath[1], dt);
+        if (this.position.distanceTo(this._ladderPath[1]) >= distance - 1e-9)
+          l.retry = PATH_FAIL_WAIT;
         this._poseLadder(l);
-        if (!this._ladderSupported()) {
-          l.status = 'blocked';
-          l.retry = PATH_FAIL_WAIT;
-        } else if (
-          Math.hypot(p.x - c.position.x, p.y - c.position.y, p.z - c.position.z) >=
-          distance - 1e-9
-        ) {
-          l.retry = PATH_FAIL_WAIT;
-        }
         return;
       }
       l.aligned = true;
@@ -2376,21 +2510,8 @@ export class Agent {
       this.grounded = c.grounded;
       this._poseLadder(l);
       if (status === 'complete') {
-        // Native complete already proves standing/support; occupancy was checked
-        // immediately before this move. Only this boundary releases ownership.
-        this.pathIndex = l.step.exitIndex + 1;
-        const deferred = l.deferred;
-        this._releaseLadder();
-        this._safeSurface = 0;
-        this._safeNav = null;
-        this._progressPos.copy(this.position);
-        this.noProgressTime = this._noRouteTime = this.stuckTimer = this.stuckHits = 0;
-        this._recoveryCount = this._failStreak = 0;
-        this.navStart.nav = this.navGoal.nav = null;
-        this._rememberSafePosition();
-        this.hasMoveTarget = this.pathIndex < this.pathLen;
-        this.repathTimer = 0;
-        if (deferred) this._goTo(this._pendingDest);
+        l.finished = true;
+        if (!this.ai.ladderBusy(this, l.descriptor)) this._finishLadder(l);
         return;
       }
       if (status === 'active') {
@@ -2488,6 +2609,8 @@ export class Agent {
         claimed: false,
         deferred: false,
         aligned: false,
+        finished: false,
+        hold: null,
         status: 'approach',
       };
       this._endPeek();

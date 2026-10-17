@@ -298,9 +298,8 @@ atlases reject FX initialization. Recorded audio fetch/decode failures disable t
 audio graph rather than substituting synthesis. Authored distant/sniper reports
 and reinforcement/foley remain synthesized by design.
 
-`models.getWeapon(id)` returns `{ id, label, fxClass, body, moving, nodes,
-shell, magSize }`. Groups contain meshes keyed by `userData.mat`; viewmodel
-curvature/wear masks are built from loaded geometry.
+Player weapons load through weapon-owned authored adapters; viewmodel curvature/wear
+masks are built from their loaded geometry.
 `models.getSoldier(name)` returns `{ name, geometry, slots, boneNames, weapon,
 stats, variant }`. Merge GLTF primitives into one skinned geometry with slot
 groups, slicing shared accessors correctly. Bone order must match
