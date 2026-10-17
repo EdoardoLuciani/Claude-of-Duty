@@ -28,9 +28,27 @@ also read-only and excluded from export. See the [edit map and build stages](../
 The explicitly approved source UV precision exception rounds the existing atlas
 to nearest 1/16384 after modifiers: measured maximum displacement 0.03125 texel
 at 1024, with 34 subprecision seam groups collapsed and 132 duplicate-index
-substitutions. Atlas partitions/islands and oriented-corner geometry, normals,
-joints and weights remain. This is not exact seam preservation; details and
-host/version-local repeatability limits are documented in the edit map.
+substitutions. It also newly collapses 594 UV triangles to lines, including 530
+with nonzero 3D area totaling approximately 2.668 mm²; no UV orientation flips
+were found. Affected surfaces are belt brass/projectile jacket, coated lens,
+receiver rubber and already-zero-3D-area pouch/spare-pouch fabric. Atlas
+partitions/islands and oriented-corner geometry, normals, joints and weights
+remain. This is not exact seam or tangent-frame preservation: native normal-map
+UV derivatives can change locally despite unchanged normals/maps. The
+[edit map](../../../tools/blender/evolys/README.md) records per-surface counts,
+the derivative caveat and host/version-local repeatability limits.
+
+For the frozen migration asset, no visible regression was detected in six
+matched native AMD RDNA-4 WebGPU views: outdoor hip, belt side, belt projectile
+oblique, lens front, lens oblique and receiver-rubber close-up. The close-ups are
+staged diagnostic cameras using actual runtime materials/normal maps, full
+normal prewarm, matched lighting/exposure and fresh-frame GPU readback. Native
+central crops differ by at most 3/255 RGB levels; the complete belt-side image
+has two isolated edge pixels differing by 5/255 and 16/255. This is bounded
+visual evidence, not pixel identity or a guarantee for all lighting, poses,
+distances or devices. The edit map retains the warning/pose limitations; final
+human visual sign-off remains pending.
+
 Eight native clips in `src/weapons/evolys.ts`; shared skins/IK/ADS/recoil remain.
 Reloads open cover, replace pouch/belt and close; empty reload racks.
 Keep all event/balance/chamber/+1 values and one live pooled case per shot.

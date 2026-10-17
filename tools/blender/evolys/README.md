@@ -84,11 +84,55 @@ This is **not exact seam preservation**: 34 subprecision UV multiplicity groups
 collapse, and 132 index entries substitute equal-position/normal/skin duplicate
 vertices across the three belt primitives, optic rubber and receiver rubber.
 Vertex/index counts, oriented triangle-corner geometry, normals, joints, weights
-and bind ordering are unchanged. No authored tangent attribute exists. These
-measured changes are an explicit migration exception, not a relaxed test or
-permission to alter other surfaces. Rounding can straddle a boundary after a
+and bind ordering are unchanged.
+
+Triangle-level comparison also finds **594 newly zero-area UV triangles**
+(6,594 → 7,188 total), all collapsed to lines, with **no UV orientation flips**:
+
+| Surface                  | Newly collapsed UV triangles | With nonzero 3D area |
+| ------------------------ | ---------------------------: | -------------------: |
+| Belt cartridge brass     |                           37 |                   37 |
+| Belt projectile jacket   |                          452 |                  452 |
+| Optic coated lens        |                           11 |                    7 |
+| Pouch woven fabric       |                           30 |                    0 |
+| Spare-pouch woven fabric |                           30 |                    0 |
+| Receiver rubber          |                           34 |                   34 |
+| **Total**                |                      **594** |              **530** |
+
+The 530 nondegenerate 3D triangles total approximately **2.668 mm²** of local
+mesh surface; the other 64 already have zero 3D area. No authored tangent
+attribute exists. The native renderer derives its normal-map tangent frame
+from UV derivatives, so rank-one UVs can change local directional normal-map
+response even with identical vertex normals and map bytes. This is not exact
+tangent-frame or normal-map shading preservation.
+
+These measured changes are an explicit migration exception, not a relaxed test
+or permission to alter other surfaces. Rounding can straddle a boundary after a
 future source/environment change; repeat-build evidence is host/version-local,
 not a universal cross-platform determinism claim.
+
+### Bounded visual follow-up
+
+For the frozen migration GLB (`4761054b36677078af9a17fcf8befbf88be8a51b1b5975cb0c927d4770d1fbb8`),
+**no visible regression was detected in six tested native views**: outdoor hip,
+belt side, belt projectile oblique, lens front, lens oblique and receiver-rubber
+close-up. The five close-ups use explicitly staged diagnostic view cameras, not
+ordinary gameplay framing. Both assets ran through normal startup/full prewarm
+on AMD RDNA-4 WebGPU (`fallback=false`), using unchanged runtime normal maps and
+materials, matched cameras, lights and exposure, fresh rendered frames and GPU
+readback. Existing matched source-view crops were also inspected.
+
+This is not pixel identity: central 920×530 native crops differ by at most 3/255
+RGB levels (2/255 for hip/lens/rubber). The complete belt-side image has two
+isolated lower cartridge-edge pixels differing by 5/255 and 16/255; all other
+full-image pixels differ by at most 3/255. Tiny existing animation-rounding pose
+differences remain; these are not UV-only renders. No changed finish, broken
+highlight or visible seam was detected in the inspected comparisons. Both runs
+retained the same TSL inline-return and zero-count-draw console warnings, with
+no captured console errors or page exceptions. This bounded observation does
+not establish shading equivalence at every triangle, lighting direction,
+distance, animation state, device or future source revision, and does not
+replace final human visual sign-off.
 
 ## Preservation and review
 
