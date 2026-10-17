@@ -8,6 +8,7 @@ type MarketId =
   | 'grenade'
   | 'armour'
   | 'bandage'
+  | 'pistol'
   | 'smg'
   | 'rifle'
   | 'mcx'

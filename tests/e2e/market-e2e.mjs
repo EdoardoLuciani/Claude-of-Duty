@@ -11,6 +11,7 @@ import { waitForGame } from '../../tools/lib/native-render.mjs';
  *  - shop auto-opens when the window elapses
  *  - clicking BUY must NOT fire a shot or re-lock the pointer
  *  - ammo refill item: drains -> enables -> refills -> disables
+ *  - P320 card buys back the pistol after either secondary swap
  *  - countdown must not overlap the interaction prompt (ammo crates)
  *  - real button click purchases; Esc closes; time resumes
  *
@@ -205,7 +206,53 @@ check(
   JSON.stringify(ammoAfter)
 );
 
-// 8. SKIP must not leak Mouse0 into a re-locked semi-auto weapon.
+// 8. Restore the P320 through its real market card after either secondary swap.
+for (const previous of ['smg', 'shotgun']) {
+  await page.evaluate((id) => {
+    const ctx = window.__ENGINE__.ctx;
+    ctx.get('weapons').equipSecondary(id);
+    ctx.get('market').credits = 400;
+  }, previous);
+  await pump(1);
+  const pistolCard = page.locator('[data-item="pistol"]');
+  check('P320 card has its own icon', (await pistolCard.locator('svg path').count()) > 0);
+  check(
+    'P320 card displays 400',
+    (await pistolCard.locator('.ow-market-cost').textContent()) === '0400'
+  );
+  check('P320 offers SWAP', (await pistolCard.locator('button').textContent()) === 'SWAP');
+  await pistolCard.click();
+  await pump(2);
+  const restored = await page.evaluate(() => {
+    const ctx = window.__ENGINE__.ctx;
+    const weapons = ctx.get('weapons');
+    const state = weapons.states.get('pistol');
+    const button = document.querySelector('[data-item="pistol"] button');
+    return {
+      owns: weapons.owns('pistol') && !weapons.owns('smg') && !weapons.owns('shotgun'),
+      primary: weapons.owns('rifle'),
+      active: weapons.activeId,
+      full:
+        state.mag === state.def.magSize && state.chambered && state.reserve === state.def.reserve,
+      credits: ctx.get('market').credits,
+      equipped: button.disabled && button.textContent === 'EQUIPPED',
+      fires: window.__FIRES__,
+    };
+  });
+  check(
+    `P320 card restores pistol from ${previous} without firing`,
+    restored.owns &&
+      restored.primary &&
+      restored.active === 'pistol' &&
+      restored.full &&
+      restored.credits === 0 &&
+      restored.equipped &&
+      restored.fires === 0,
+    JSON.stringify(restored)
+  );
+}
+
+// 9. SKIP must not leak Mouse0 into a re-locked semi-auto weapon.
 await page.evaluate(() => {
   const e = window.__ENGINE__;
   e.ctx.get('weapons').setWeaponImmediate('pistol');
