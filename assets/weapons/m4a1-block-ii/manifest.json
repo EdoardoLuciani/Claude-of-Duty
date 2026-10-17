@@ -159,14 +159,16 @@
     "primitives": 32,
     "materials": 12,
     "meshes": 16,
-    "bytes": 8119992,
+    "bytes": 8270588,
     "images": 4
   },
   "textureResolution": 1024,
-  "source": "tools/blender/m4a1.py + m4_actions.py + tools/m4-hand-reference.mjs",
+  "source": "tools/blender/m4a1.py + m4/ + m4_actions.py + tools/m4-hand-reference.mjs",
   "notes": [
+    "Generated from Python; blend, GLB, maps and manifest are products.",
     "Visual reconstruction, not manufacturing geometry or a scan.",
     "See README.md for unknown datums and the FH556RC unit conflict.",
-    "Weapon/wrist/finger trajectories are Blender-authored; shared runtime skins/IK and existing reactive recoil remain."
+    "Weapon/wrist/finger trajectories are Blender-authored; shared runtime skins/IK and existing reactive recoil remain.",
+    "Native Actions export: 120 Hz LINEAR motion, STEP visibility, exact clip endpoints; no GLB rewriting."
   ]
 }
