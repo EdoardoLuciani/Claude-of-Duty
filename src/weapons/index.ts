@@ -890,7 +890,7 @@ export class WeaponSystem {
     this._interruptHeal('fire');
     if (this.grenadeEquipped || this.radioEquipped || this.healing) return false;
     if (!s.chambered) {
-      // Dry: lock the bolt back and let the player know by feel.
+      // Dry-fire cooldown.
       this._fireTimer = 0.25;
       return false;
     }
@@ -905,7 +905,6 @@ export class WeaponSystem {
     if (!boltAction && s.mag > 0) {
       s.mag--;
       s.chambered = true;
-    } else if (s.mag === 0) {
     }
 
     // ---- deterministic recoil pattern ----
