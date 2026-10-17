@@ -2,22 +2,14 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { PNG } from 'pngjs';
 import * as THREE from 'three';
+
+import { inspectGLB } from '../../tools/lib/glb-fixture.mjs';
 
 const dir = new URL('../../assets/weapons/sig-mpx/', import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', dir), 'utf8'));
 const file = readFileSync(new URL('mpx.glb', dir));
-assert.equal(file.readUInt32LE(0), 0x46546c67);
-assert.equal(file.readUInt32LE(4), 2);
-assert.equal(file.readUInt32LE(8), file.length);
-assert.equal(file.readUInt32LE(16), 0x4e4f534a);
-const jsonLength = file.readUInt32LE(12);
-const gltf = JSON.parse(file.subarray(20, 20 + jsonLength).toString());
-const binHeader = 20 + jsonLength;
-assert.equal(file.readUInt32LE(binHeader + 4), 0x004e4942);
-const bin = file.subarray(binHeader + 8);
-assert.equal(gltf.asset.version, '2.0');
+const { json: gltf, accessor, imagePNG } = inspectGLB(file);
 const required = [
   'Idle',
   'Fire',
@@ -59,8 +51,7 @@ assert.equal(gltf.images.length, manifest.stats.images);
 for (const image of gltf.images) {
   assert.equal(image.uri, undefined);
   assert.ok(Number.isInteger(image.bufferView));
-  const view = gltf.bufferViews[image.bufferView];
-  const png = PNG.sync.read(bin.subarray(view.byteOffset, view.byteOffset + view.byteLength));
+  const png = imagePNG(image);
   assert.equal(png.width, 1024);
   assert.equal(png.height, 1024);
   if (image.name === 'mpx-orm') {
@@ -81,26 +72,6 @@ for (const material of gltf.materials) {
   assert.ok([0, 1].includes(pbr.metallicFactor ?? 1), 'metals are binary');
 }
 
-const formats = { 5126: ['readFloatLE', 4], 5125: ['readUInt32LE', 4], 5123: ['readUInt16LE', 2] };
-const widths = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 };
-function accessor(index) {
-  const a = gltf.accessors[index];
-  assert.ok(a && !a.sparse);
-  const [read, bytes] = formats[a.componentType];
-  const width = widths[a.type];
-  const view = gltf.bufferViews[a.bufferView];
-  const start = (view.byteOffset ?? 0) + (a.byteOffset ?? 0);
-  const stride = view.byteStride ?? width * bytes;
-  const values = new Float64Array(a.count * width);
-  for (let i = 0; i < a.count; i++) {
-    for (let j = 0; j < width; j++) {
-      const value = bin[read](start + i * stride + j * bytes);
-      assert.ok(Number.isFinite(value));
-      values[i * width + j] = value;
-    }
-  }
-  return values;
-}
 const interiorMaterial = gltf.materials.findIndex((m) => m.name.startsWith('15 |'));
 assert.ok(interiorMaterial >= 0, 'dedicated absorptive optic finish exported');
 let interiorUsed = false;

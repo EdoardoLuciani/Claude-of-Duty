@@ -4,20 +4,16 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 import manifest from '../../assets/weapons/ax338/manifest.json' with { type: 'json' };
 import { Rng } from '../../src/core/rng.ts';
 import { makeAX338Model, AX338_URL } from '../../src/weapons/ax338.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
-const loader = new GLTFLoader().register(() => ({
-  name: 'TEXTURE_STUB',
-  loadTexture: () => Promise.resolve(new THREE.Texture()),
-}));
+import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
 async function load(url) {
   const b = readFileSync(url);
-  return loader.parseAsync(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength), '');
+  return parseGLB(b);
 }
 const skin = await load(new URL('../../public/models/player/arms.glb', import.meta.url));
 skin.scene.updateMatrixWorld(true);

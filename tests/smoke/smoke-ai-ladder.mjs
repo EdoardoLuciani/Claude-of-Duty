@@ -10,40 +10,26 @@ import {
   LADDER,
   ladderMoveBudget,
 } from '../../src/ai/ladder.ts';
-import { NAV_PROFILE } from '../../src/ai/nav-format.ts';
-import { VARIANTS } from '../../src/ai/soldier.ts';
 import { CharacterController } from '../../src/physics/character.ts';
+import {
+  ladderProfiles,
+  ladderController as controller,
+  assertLadderRestored as restored,
+  directedPoints,
+  segmentSpan,
+  reverseCursor,
+} from '../../tools/lib/ladder-fixture.mjs';
 import { loadMap, physicsFor } from '../../tools/nav240/fixtures.mjs';
 
 const f = await loadMap(),
   descriptors = createLadderDescriptors(f.meta.volumes);
 assert.equal(descriptors.length, 6);
-const profiles = [
-  { name: 'NAV_PROFILE', radius: NAV_PROFILE.radius, height: NAV_PROFILE.height },
-  ...Object.entries(VARIANTS).map(([name, v]) => ({
-    name,
-    radius: INFANTRY.radius * v.scale,
-    height: INFANTRY.height * v.scale,
-  })),
-];
+const profiles = ladderProfiles();
 const results = [],
   interruptions = [],
   corrections = [],
   boundaries = [],
   boundaryControls = [];
-function controller(world, descriptor, direction, profile) {
-  return new CharacterController(world, {
-    ...profile,
-    position: descriptor.points[direction === 'up' ? 0 : 3],
-    stepHeight: INFANTRY.stepHeight,
-    snapDistance: 0.32,
-    slopeLimit: INFANTRY.slopeRadians,
-  });
-}
-function restored(c) {
-  assert.equal(c.stepHeight, INFANTRY.stepHeight);
-  assert.equal(c.snapDistance, 0.32);
-}
 function run(c, d, direction, dt, cursor) {
   const motor = new LadderMotor(c, d, direction, ladderMoveBudget(d), cursor);
   let calls = 0,
@@ -172,12 +158,7 @@ for (const d of descriptors)
       assert.equal(resumed.status, 'complete');
       restored(clone);
       assert.deepEqual(c.position, position);
-      const reverse = {
-        segment: 1,
-        distance: d.points[2].y - d.points[1].y - cursor.distance,
-        pendingTime: 0,
-        moves: 0,
-      };
+      const reverse = reverseCursor(d, cursor);
       const returning = new LadderMotor(
         c,
         d,
@@ -201,15 +182,6 @@ for (const d of descriptors)
       });
     }
 
-function directedPoints(descriptor, direction) {
-  return direction === 'up' ? descriptor.points : descriptor.points.toReversed();
-}
-function segmentSpan(descriptor, direction, segment) {
-  const points = directedPoints(descriptor, direction),
-    a = points[segment],
-    b = points[segment + 1];
-  return Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
-}
 // Exact phase boundaries differ from the existing inside-shaft interrupts.
 for (const descriptor of descriptors)
   for (const profile of profiles)

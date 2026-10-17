@@ -339,8 +339,9 @@ controlledPickups.update(1);
 assert.equal(controlledOwner.state.reserve, 0, 'F cannot collect ammo even without intel priority');
 input.down.delete('KeyF');
 input.down.add('KeyT');
+controls.ctx.camera.rotateY(Math.PI);
 controlledPickups.update(1);
-assert(controlledOwner.state.reserve > 0, 'a fresh T hold can collect ammo');
+assert(controlledOwner.state.reserve > 0, 'a fresh T hold collects ammo even looking away');
 controlledPickups.dispose();
 controls.intel.dispose();
 

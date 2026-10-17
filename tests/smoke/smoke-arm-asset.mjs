@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { registerHooks, stripTypeScriptTypes } from 'node:module';
 
-import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
 
 // Supply Vite's BASE_URL in Node without replacing the production conversion.
 const assetURL = new URL('../../src/weapons/arm-asset.ts', import.meta.url);
@@ -23,16 +24,9 @@ const { loadArmAsset } = await import(assetURL.href);
 const { Arm } = await import('../../src/weapons/hands.ts');
 hooks.deregister();
 const bytes = readFileSync(new URL('../../public/models/player/arms.glb', import.meta.url));
-const loader = new GLTFLoader().register(() => ({
-  name: 'NODE_TEXTURE_STUB',
-  loadTexture: () => Promise.resolve(new THREE.Texture()),
-}));
 const originalLoad = GLTFLoader.prototype.loadAsync;
 for (const grouped of [false, true]) {
-  const gltf = await loader.parseAsync(
-    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-    ''
-  );
+  const gltf = await parseGLB(bytes);
   const sources = [];
   gltf.scene.traverse((o) => {
     if (o.isSkinnedMesh) sources.push(o);

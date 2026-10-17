@@ -13,6 +13,7 @@ import {
   type HandRig,
   type HandSide,
 } from './authored-hands.ts';
+import { authoredModel, requiredNode } from './authored-model.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 
 export const M590_URL = new URL('../../assets/weapons/m590/m590.glb', import.meta.url).href;
@@ -20,20 +21,12 @@ const ALIASES: Record<string, string> = manifest.aliases;
 
 export function makeM590Model(gltf: GLTF) {
   const scene = gltf.scene;
-  scene.updateMatrixWorld(true);
-  const root = scene.getObjectByName('M590_RIG');
-  if (!root) throw new Error('[m590] missing M590_RIG');
-  const animations = ['Idle', ...Object.values(ALIASES)].map((name) => {
-    const clip = gltf.animations.find((c) => c.name === name);
-    if (!clip) throw new Error(`[m590] missing ${name} clip`);
-    return clip;
-  });
-  const point = (name: string): [number, number, number] => {
-    const node = root.getObjectByName(name);
-    if (!node) throw new Error(`[m590] missing ${name}`);
-    const p = node.getWorldPosition(new THREE.Vector3());
-    return [p.x, p.y, p.z];
-  };
+  const { root, animations, point } = authoredModel(
+    gltf,
+    'M590_RIG',
+    ['Idle', ...Object.values(ALIASES)],
+    scene
+  );
   const converted = convertWeaponScene(scene, (_source, material) => {
     for (const value of Object.values(material as object)) {
       if (value instanceof THREE.Texture) value.anisotropy = 8;
@@ -89,11 +82,7 @@ export class M590Animation {
     this.poseMatrix = this.root.matrix;
     this.mixer = new THREE.AnimationMixer(this.root);
     this.actions = createAuthoredActions(this.mixer, model.animations);
-    const node = (name: string): THREE.Object3D => {
-      const object = this.root.getObjectByName(name);
-      if (!object) throw new Error(`[m590] missing ${name}`);
-      return object;
-    };
+    const node = (name: string) => requiredNode(this.root, name);
     this.shellInsert = node('shell_insert');
     this.hands = discoverAuthoredHands(node);
     this.reset();

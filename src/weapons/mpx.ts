@@ -13,6 +13,7 @@ import {
   type HandRig,
   type HandSide,
 } from './authored-hands.ts';
+import { authoredModel, requiredNode } from './authored-model.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 
 export const MPX_URL = new URL('../../assets/weapons/sig-mpx/mpx.glb', import.meta.url).href;
@@ -64,20 +65,7 @@ export function makeMPXModel(gltf: GLTF) {
         }
       }
     }
-  scene.updateMatrixWorld(true);
-  const root = scene.getObjectByName('MPX_RIG');
-  if (!root) throw new Error('[mpx] missing MPX_RIG');
-  const animations = REQUIRED.map((name: string) => {
-    const clip = gltf.animations.find((c) => c.name === name);
-    if (!clip) throw new Error(`[mpx] missing ${name} clip`);
-    return clip;
-  });
-  const point = (name: string): [number, number, number] => {
-    const node = root.getObjectByName(name);
-    if (!node) throw new Error(`[mpx] missing ${name}`);
-    const p = node.getWorldPosition(new THREE.Vector3());
-    return [p.x, p.y, p.z];
-  };
+  const { root, animations, point } = authoredModel(gltf, 'MPX_RIG', REQUIRED, scene);
   const model = {
     id: 'smg',
     label: 'SIG MPX',
@@ -169,11 +157,7 @@ export class MPXAnimation {
     this.root = model.root;
     this.mixer = new THREE.AnimationMixer(this.root);
     this.actions = createAuthoredActions(this.mixer, model.animations);
-    const node = (name: string): THREE.Object3D => {
-      const o = this.root.getObjectByName(name);
-      if (!o) throw new Error(`[mpx] missing ${name}`);
-      return o;
-    };
+    const node = (name: string) => requiredNode(this.root, name);
     this.bolt = node('bolt');
     this.boltRest = this.bolt.position.clone();
     this.poseMatrix = this.root.matrix;

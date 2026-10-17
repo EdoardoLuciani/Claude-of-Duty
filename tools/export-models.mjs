@@ -20,7 +20,7 @@
  * rebuild of an unchanged tree is byte-identical. A content hash over the
  * exporter and its authoring inputs skips the rebuild when outputs already
  * exist; `--force` ignores that cache. A per-file mtime check cannot see
- * shared inputs (parts.js, geometry.js, rig.js, geo.js, ...). Writes go
+ * shared inputs (geometry.ts, rig.ts, geo.ts, ...). Writes go
  * through a temp file + rename so a reader never observes a half-written
  * asset, and a pid lock (node_modules/.cache) serialises concurrent
  * invocations (the vite dev watcher and the predev/prebuild hooks can overlap).
@@ -245,7 +245,6 @@ function modelSourceHash() {
     'tools/export-models.mjs',
     'tools/lib/spent-hull.mjs',
     'src/weapons/geometry.ts',
-    'src/weapons/parts.ts',
     'src/weapons/defs.ts',
     'src/weapons/mathx.ts',
     'src/ai/soldier.ts',

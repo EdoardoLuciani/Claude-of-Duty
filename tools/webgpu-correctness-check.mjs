@@ -11,6 +11,7 @@ import {
   stopViteServer,
 } from './lib/browser-harness.mjs';
 import { waitForGame, installDevicePolicy } from './lib/native-render.mjs';
+import { routeSourceMutation } from './lib/source-mutation.mjs';
 const args = parseArgs(),
   port = Number(args.port ?? 5391);
 const server = await ensureViteServer({ port });
@@ -57,23 +58,22 @@ try {
   if (args.negative) {
     assert(Object.hasOwn(negatives, args.negative));
     const [file, before, after] = negatives[args.negative];
-    await page.route(`**/${file}*`, async (route) => {
-      const response = await route.fetch(),
-        source = await response.text();
-      assert(source.includes(before), 'negative control must match current source');
-      let body = source.replaceAll(before, after);
-      if (args.negative === 'surface')
-        body = body.replace('metalness, roughness,', 'materialMetalness, materialRoughness,');
-      await route.fulfill({ response, body });
-    });
+    await routeSourceMutation(page, file, before, after, (body) =>
+      args.negative === 'surface'
+        ? body.replace('metalness, roughness,', 'materialMetalness, materialRoughness,')
+        : body
+    );
   }
   await page.route('**/correctness-fixture', (route) =>
     route.fulfill({ contentType: 'text/html', body: '<canvas></canvas>' })
   );
   await page.goto(`http://127.0.0.1:${port}/correctness-fixture`);
   const result = await page.evaluate(async () => {
-    const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
-    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.ts');
+    const {
+      THREE: T,
+      TSL: N,
+      createFixtureRenderer,
+    } = await import('/tools/arm-material-fixture.js');
     const { createWorldViewPipeline } = await import('/src/render/webgpu-pipeline.ts');
     const { ParticleLayer, resetSpawn } = await import('/src/fx/particles.ts');
     const { HazeSystem } = await import('/src/fx/haze.ts');
@@ -84,14 +84,7 @@ try {
       if (!ok) throw Error(message);
     };
     const close = (a, b, message) => check(Math.abs(a - b) < 0.003, `${message}: ${a} != ${b}`);
-    const renderer = await createWebGpuRenderer(document.querySelector('canvas'));
-    renderer.setSize(64, 64);
-    const info = renderer.backend.device.adapterInfo;
-    window.__ASSERT_HARDWARE_DEVICE__({
-      vendor: info.vendor,
-      architecture: info.architecture,
-      fallback: info.isFallbackAdapter,
-    });
+    const renderer = await createFixtureRenderer();
     const scene = new T.Scene(),
       view = new T.Scene(),
       camera = new T.PerspectiveCamera(60, 1, 0.1, 100);

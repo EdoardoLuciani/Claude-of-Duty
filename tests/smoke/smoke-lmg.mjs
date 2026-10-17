@@ -140,11 +140,10 @@ assert.equal(wp.reloading, false);
 // Hand-pose regression (issue #62).
 import { readFileSync } from 'node:fs';
 
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-
 import { makeEvolysModel, EVOLYS_URL } from '../../src/weapons/evolys.ts';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
+import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
 
 const cam = new THREE.PerspectiveCamera(60, 16 / 9, 0.004, 60);
 const vm2 = new Viewmodel(
@@ -161,23 +160,9 @@ const vm2 = new Viewmodel(
   }
 );
 const rifleBytes = readFileSync(new URL(M4_URL));
-const loader = new GLTFLoader().register(() => ({
-  name: 'NODE_TEXTURE_STUB',
-  loadTexture: () => Promise.resolve(new THREE.Texture()),
-}));
-const rifleModel = makeM4Model(
-  await loader.parseAsync(
-    rifleBytes.buffer.slice(rifleBytes.byteOffset, rifleBytes.byteOffset + rifleBytes.byteLength),
-    ''
-  )
-);
+const rifleModel = makeM4Model(await parseGLB(rifleBytes));
 const lmgBytes = readFileSync(new URL(EVOLYS_URL));
-const lmgModel = makeEvolysModel(
-  await loader.parseAsync(
-    lmgBytes.buffer.slice(lmgBytes.byteOffset, lmgBytes.byteOffset + lmgBytes.byteLength),
-    ''
-  )
-);
+const lmgModel = makeEvolysModel(await parseGLB(lmgBytes));
 for (const id of ['rifle', 'lmg']) {
   const def = { ...WEAPON_DEFS[id], cycleTime: 60 / WEAPON_DEFS[id].rpm };
   vm2.addWeapon(id === 'rifle' ? rifleModel : lmgModel, def);

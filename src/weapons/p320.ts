@@ -13,7 +13,8 @@ import {
   type HandRig,
   type HandSide,
 } from './authored-hands.ts';
-import { Clip } from './clips.ts';
+import { authoredModel, requiredNode } from './authored-model.ts';
+import { buildMagazineClips, type Clip } from './clips.ts';
 
 export const P320_URL = new URL(
   '../../assets/weapons/p320-compact/p320-compact.glb',
@@ -31,20 +32,7 @@ const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
 
 export function makeP320Model(gltf: GLTF) {
   const scene = gltf.scene;
-  scene.updateMatrixWorld(true);
-  const root = scene.getObjectByName('P320_RIG');
-  if (!root) throw new Error('[p320] missing P320_RIG');
-  const animations = REQUIRED.map((name: string) => {
-    const clip = gltf.animations.find((c) => c.name === name);
-    if (!clip) throw new Error(`[p320] missing ${name} clip`);
-    return clip;
-  });
-  const point = (name: string): [number, number, number] => {
-    const node = root.getObjectByName(name);
-    if (!node) throw new Error(`[p320] missing ${name}`);
-    const p = node.getWorldPosition(new THREE.Vector3());
-    return [p.x, p.y, p.z];
-  };
+  const { root, animations, point } = authoredModel(gltf, 'P320_RIG', REQUIRED, scene);
   const model = {
     id: 'pistol',
     label: 'P320 Compact',
@@ -106,11 +94,7 @@ export class P320Animation {
     this.root = model.root;
     this.mixer = new THREE.AnimationMixer(this.root);
     this.actions = createAuthoredActions(this.mixer, model.animations);
-    const node = (name: string): THREE.Object3D => {
-      const o = this.root.getObjectByName(name);
-      if (!o) throw new Error(`[p320] missing ${name}`);
-      return o;
-    };
+    const node = (name: string) => requiredNode(this.root, name);
     this.slide = node('slide');
     this.barrel = node('barrel');
     this.slideRest = this.slide.position.clone();
@@ -126,23 +110,7 @@ export class P320Animation {
   }
 
   clips(): Record<string, Clip> {
-    const clips: Record<string, Clip> = {};
-    for (const [name, source] of Object.entries(ALIASES)) {
-      const info = manifest.clips[source as keyof typeof manifest.clips];
-      const events = name.startsWith('reload') ? [{ t: 0, name: 'start' }] : [];
-      for (const ev of info.events) {
-        const event = (
-          { magazine_out: 'magout', magazine_in: 'magin', bolt_forward: 'boltrelease' } as Record<
-            string,
-            string
-          >
-        )[ev.event];
-        if (event) events.push({ t: ev.time, name: event });
-      }
-      events.push({ t: info.duration - 0.0001, name: 'end' });
-      clips[name] = new Clip(name, info.duration, { events });
-    }
-    return clips;
+    return buildMagazineClips(ALIASES, manifest.clips);
   }
 
   _sample(name: string, time: number): void {

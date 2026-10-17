@@ -11,7 +11,6 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
-const partsPath = join(root, 'src/weapons/parts.ts');
 // All weapons are committed authored assets; exercise partial soldier writes.
 const firstSrcPath = join(root, 'src/ai/soldier.ts');
 const laterSrcPath = firstSrcPath;
@@ -42,7 +41,6 @@ const exportModels = () =>
     timeout: 20000,
   });
 
-const partsOrig = readFileSync(partsPath, 'utf8');
 const firstOrig = readFileSync(firstSrcPath, 'utf8');
 const laterOrig = readFileSync(laterSrcPath, 'utf8');
 const hullOrig = readFileSync(hullSourcePath, 'utf8');
@@ -93,19 +91,6 @@ try {
     retiredPaths.every((file) => !existsSync(file))
   );
 
-  writeFileSync(partsPath, partsOrig + marker);
-  run = exportModels();
-  check(
-    'parts.js change is a cache miss',
-    run.status === 0 && !/up to date/.test(run.stdout),
-    run.stdout
-  );
-  writeFileSync(partsPath, partsOrig);
-
-  run = exportModels();
-  check('restored parts.js rebuilds', run.status === 0);
-  check('vanguard matches the warm export', digest(firstGlbPath) === warmFirst);
-
   // Change actual vanguard geometry before the later soldier export throws.
   check(
     'geometry injection matches authoring source',
@@ -147,7 +132,6 @@ try {
 } finally {
   for (const file of retiredPaths) if (existsSync(file)) unlinkSync(file);
   writeFileSync(hullSourcePath, hullOrig);
-  writeFileSync(partsPath, partsOrig);
   writeFileSync(firstSrcPath, firstOrig);
   writeFileSync(laterSrcPath, laterOrig);
 }

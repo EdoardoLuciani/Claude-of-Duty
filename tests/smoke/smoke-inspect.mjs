@@ -1,9 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-
 import { makeAX338Model, AX338Animation, AX338_URL } from '../../src/weapons/ax338.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import { makeEvolysModel, EvolysAnimation, EVOLYS_URL } from '../../src/weapons/evolys.ts';
@@ -11,18 +8,10 @@ import { makeM4Model, M4Animation, M4_URL } from '../../src/weapons/m4.ts';
 import { makeM590Model, M590Animation, M590_URL } from '../../src/weapons/m590.ts';
 import { makeMPXModel, MPXAnimation, MPX_URL } from '../../src/weapons/mpx.ts';
 import { makeP320Model, P320Animation, P320_URL } from '../../src/weapons/p320.ts';
+import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
 
 const bytes = readFileSync(new URL(P320_URL));
-const loader = new GLTFLoader().register(() => ({
-  name: 'NODE_TEXTURE_STUB',
-  loadTexture: () => Promise.resolve(new THREE.Texture()),
-}));
-const model = makeP320Model(
-  await loader.parseAsync(
-    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-    ''
-  )
-);
+const model = makeP320Model(await parseGLB(bytes));
 const pistol = new P320Animation(model);
 const duration = pistol.clips().inspect.duration;
 assert.equal(duration, WEAPON_DEFS.pistol.inspectTime);
@@ -48,14 +37,7 @@ pistol.dispose();
 
 // M4 inspection is authored in the GLB, not a procedural rifle pose.
 const rifleBytes = readFileSync(new URL(M4_URL));
-const rifle = new M4Animation(
-  makeM4Model(
-    await loader.parseAsync(
-      rifleBytes.buffer.slice(rifleBytes.byteOffset, rifleBytes.byteOffset + rifleBytes.byteLength),
-      ''
-    )
-  )
-);
+const rifle = new M4Animation(makeM4Model(await parseGLB(rifleBytes)));
 const clips = rifle.clips();
 for (const action of Object.values(rifle.actions)) {
   const clip = action.getClip();
@@ -96,14 +78,7 @@ rifle.dispose();
 
 // LMG coverage moves to its actual Blender clips; it is not dropped.
 const lmgBytes = readFileSync(new URL(EVOLYS_URL));
-const lmg = new EvolysAnimation(
-  makeEvolysModel(
-    await loader.parseAsync(
-      lmgBytes.buffer.slice(lmgBytes.byteOffset, lmgBytes.byteOffset + lmgBytes.byteLength),
-      ''
-    )
-  )
-);
+const lmg = new EvolysAnimation(makeEvolysModel(await parseGLB(lmgBytes)));
 assert.equal(lmg.clips().inspect.duration, WEAPON_DEFS.lmg.inspectTime);
 let minYaw = 0,
   maxYaw = 0;
@@ -127,14 +102,7 @@ for (const [id, url, make, Animation] of [
   ['sniper', AX338_URL, makeAX338Model, AX338Animation],
 ]) {
   const bytes = readFileSync(new URL(url));
-  const animation = new Animation(
-    make(
-      await loader.parseAsync(
-        bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-        ''
-      )
-    )
-  );
+  const animation = new Animation(make(await parseGLB(bytes)));
   const duration = animation.clips().inspect.duration;
   assert.equal(duration, WEAPON_DEFS[id].inspectTime);
   for (const clip of Object.values(animation.clips())) {

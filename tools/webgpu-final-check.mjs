@@ -11,6 +11,7 @@ import {
   stopViteServer,
 } from './lib/browser-harness.mjs';
 import { waitForGame, captureNative, installDevicePolicy } from './lib/native-render.mjs';
+import { routeSourceMutation } from './lib/source-mutation.mjs';
 const args = parseArgs(),
   port = Number(args.port ?? 5395);
 const server = await ensureViteServer({ port });
@@ -77,12 +78,9 @@ try {
     fog: ['src/render/index-webgpu.ts', 'frame: this._fogFrame,', 'frame: nativeFrameId,'],
   };
   if (args.negative) {
+    assert(Object.hasOwn(controls, args.negative), 'known negative control');
     const [file, before, after] = controls[args.negative];
-    await page.route(`**/${file}*`, async (route) => {
-      const response = await route.fetch();
-      let body = await response.text();
-      assert(body.includes(before));
-      body = body.replaceAll(before, after);
+    await routeSourceMutation(page, file, before, after, (body) => {
       if (args.negative === 'sky')
         body = body.replaceAll('(cosS, -1, 1)', '(cosS)').replaceAll('(cosM, -1, 1)', '(cosM)');
       if (args.negative === 'placement')
@@ -95,7 +93,7 @@ try {
           'import { lightPosition,',
           'import { frameId as nativeFrameId, lightPosition,'
         );
-      await route.fulfill({ response, body });
+      return body;
     });
   }
   await page.route('**/final-fixture', (route) =>
@@ -103,8 +101,11 @@ try {
   );
   await page.goto(`http://127.0.0.1:${port}/final-fixture`);
   report.fixture = await page.evaluate(async () => {
-    const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
-    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.ts');
+    const {
+      THREE: T,
+      TSL: N,
+      createFixtureRenderer,
+    } = await import('/tools/arm-material-fixture.js');
     const { createSkySample } = await import('/src/sky/dome.ts');
     const { Celestial } = await import('/src/sky/celestial.ts');
     const { HazeSystem } = await import('/src/fx/haze.ts');
@@ -113,14 +114,7 @@ try {
       if (!ok) throw Error(message);
     };
     const close = (a, b, message) => check(Math.abs(a - b) < 0.002, `${message}: ${a} != ${b}`);
-    const r = await createWebGpuRenderer(document.querySelector('canvas'));
-    r.setSize(64, 64);
-    const info = r.backend.device.adapterInfo;
-    window.__ASSERT_HARDWARE_DEVICE__({
-      vendor: info.vendor,
-      architecture: info.architecture,
-      fallback: info.isFallbackAdapter,
-    });
+    const r = await createFixtureRenderer();
     const rt = new T.RenderTarget(64, 64, { type: T.HalfFloatType, depthBuffer: false });
     const draw = async (node) => {
       const p = new T.RenderPipeline(r, node);

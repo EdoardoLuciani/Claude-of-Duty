@@ -82,26 +82,12 @@ checks; restore targets/face/mip and never dispose shared QuadMesh geometry.
 
 ## Startup and lifetime checks
 
-The initial HTML owns the startup shell; it does not wait for the entry module,
-fonts, assets or runtime UI. `Initializing…` covers module loading/bootstrap.
-`Loading world and assets…` starts immediately before `engine.init()`: model
-prefetch, renderer creation and resource-consuming subsystem hooks interleave
-inside that boundary. It does **not** imply a separate download-only phase.
-`Preparing graphics…` starts before the awaited native prewarm hooks and remains
-until `Engine.step()` returns from the first successful gameplay render. Warmup
-renders do not call that one-shot completion hook, advance gameplay or dismiss
-the shell. There is no added frame, minimum delay or progress measurement; the
-ellipsis is only a loading cue and is static with reduced motion enabled.
-
-The canvas/UI are inert and DOM gameplay events are blocked during startup;
-`input.enabled = false` also skips native gamepad polling and clears all four
-stick axes each frame, including previously held values, until the first
-successful render. Script-injected key snapshots retain their capture contract.
-Entry-script load failures and rejected dynamic imports/top-level boot work show
-the HTML reload state. Engine/init errors retain the existing top-layer terminal
-dialog instead; the shell yields input and visibility to it. Errors remain logged
-and rejected, not swallowed. Capture readiness still uses its existing three
-boot frames, independently of shell dismissal at frame one.
+The HTML shell covers module load → init → prewarm → first successful gameplay
+render, without invented progress/minimum delays. Warmup does not dismiss it;
+capture readiness remains frame three. Startup disables DOM/gamepad gameplay
+input (including held axes), not script-injected capture snapshots. Entry/import
+failures show HTML reload state; engine errors retain their terminal dialog.
+See [architecture](../ARCHITECTURE.md#prewarm) for staging/cleanup invariants.
 
 After building, test emitted HTML entry/import failures with:
 
@@ -113,22 +99,16 @@ node tests/e2e/loading-screen-e2e.mjs --normal=1 # ordinary rAF startup, no capt
 node tests/e2e/loading-screen-e2e.mjs --failure=entry # also import/init/prewarm/render
 ```
 
-`loading-screen-e2e` uses a fresh browser/context, holds the entry download, pauses
-at actual init/prewarm boundaries, then runs real hardware-WebGPU warmup and boot
-frames. A held move/look gamepad checks the actual Player command and yaw/pitch:
-neutral under the shell at first render, resumed on the next frame after dismissal.
-It also checks DOM input, ARIA/reduced motion and the frame-three capture handshake.
-`--out=/absolute/path` saves HTML, stage, failure and native gameplay screenshots. The pauses are test instrumentation only, not
-runtime delays. Like the existing startup gates, success rejects console/page
-errors; it also rejects GPU/WGSL validation errors emitted as warnings. General
-TSL warnings are retained separately in the report rather than treated as GPU
-validation failures. These screenshots and headless hardware submissions do not
-prove physical display presentation timing or unrestricted gameplay performance.
+`loading-screen-e2e` holds actual entry/init/prewarm boundaries and checks
+neutral held-gamepad commands at first render, next-frame resumption, DOM/ARIA/
+reduced motion and frame-three readiness. `--out=/absolute/path` saves evidence.
+Controlled pauses are instrumentation, not runtime delays. Console/page and
+GPU/WGSL validation errors fail; general TSL warnings remain separate.
+Headless submissions/screenshots do not prove physical presentation timing.
 
 `window.__PREWARM__.hooks` is the canonical report, published before the terminal
 failure gate even if `__ENGINE__/__READY__` are not. `?prewarm=0` reports disabled.
-Warm real zero-range world/view variants plus hidden weapon/optic/grenade/ammo,
-AI flashlight, radio and private haze variants; don't remove distinct contexts.
+Preserve the distinct native contexts listed in the architecture's prewarm contract.
 
 ```sh
 node tests/e2e/production-boot.mjs
@@ -136,8 +116,10 @@ node tests/e2e/startup-e2e.mjs --quality=high # also low/ultra
 node tests/e2e/startup-e2e.mjs --negative=weapons # must fail on late builders
 node tests/e2e/startup-e2e.mjs --failure=prewarm # checks failed report/no readiness
 node tests/e2e/profile-failure-e2e.mjs
-node tools/webgpu-review-check.mjs
-node tools/webgpu-final-check.mjs --fixture=1
+# Canonical sequential render suites (uniforms requires RX 9070 XT Mesa selection):
+MESA_VK_DEVICE_SELECT=1002:7550! node tools/render-regression.mjs
+node tools/render-regression.mjs --suite=effects --fixture=1
+node tools/render-regression.mjs --suite=composition --negative=alpha # must fail
 node tools/ao-filter-check.mjs # selected filter; negatives: sky/noise/contact
 node tools/render-motion-check.mjs --phases=haze
 node tests/e2e/shader-noise-e2e.mjs

@@ -2,25 +2,17 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { PNG } from 'pngjs';
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 import { createAuthoredActions, sampleAuthoredAction } from '../../src/weapons/authored-actions.ts';
 import { discoverAuthoredHands, applyAuthoredHand } from '../../src/weapons/authored-hands.ts';
 import { Arm } from '../../src/weapons/hands.ts';
+import { parseGLB, inspectGLB } from '../../tools/lib/glb-fixture.mjs';
 const dir = new URL('../../assets/weapons/m590/', import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', dir)));
 const reference = JSON.parse(readFileSync(new URL('hand-reference.json', dir)));
 const file = readFileSync(new URL('m590.glb', dir));
-assert.equal(file.readUInt32LE(0), 0x46546c67);
-assert.equal(file.readUInt32LE(4), 2);
-assert.equal(file.readUInt32LE(8), file.length);
-assert.equal(file.readUInt32LE(16), 0x4e4f534a);
-const length = file.readUInt32LE(12),
-  gltf = JSON.parse(file.subarray(20, 20 + length));
-assert.equal(file.readUInt32LE(24 + length), 0x004e4942);
-const bin = file.subarray(28 + length);
+const { json: gltf, accessor: floats, imagePNG } = inspectGLB(file);
 const expected = {
   Idle: [2, []],
   Pump: [
@@ -109,8 +101,7 @@ assert.ok(
 assert.equal(gltf.images.length, 3);
 for (const image of gltf.images) {
   assert.equal(image.uri, undefined);
-  const v = gltf.bufferViews[image.bufferView];
-  const png = PNG.sync.read(bin.subarray(v.byteOffset, v.byteOffset + v.byteLength));
+  const png = imagePNG(image);
   assert.equal(png.width, 1024);
   assert.equal(png.height, 1024);
 }
@@ -145,22 +136,6 @@ assert.ok(
     16
 );
 assert.ok(file.length <= 10 * 1024 * 1024);
-function floats(i) {
-  const a = gltf.accessors[i],
-    v = gltf.bufferViews[a.bufferView];
-  assert.equal(a.componentType, 5126);
-  const width = { SCALAR: 1, VEC3: 3, VEC4: 4 }[a.type],
-    data = [];
-  for (let n = 0; n < a.count; n++)
-    for (let k = 0; k < width; k++) {
-      const f = bin.readFloatLE(
-        (v.byteOffset ?? 0) + (a.byteOffset ?? 0) + n * (v.byteStride ?? width * 4) + k * 4
-      );
-      assert.ok(Number.isFinite(f));
-      data.push(f);
-    }
-  return data;
-}
 for (const animation of gltf.animations) {
   const [d, events] = expected[animation.name];
   assert.equal(manifest.clips[animation.name].duration, d);
@@ -202,14 +177,7 @@ for (const animation of gltf.animations) {
       `${animation.name}/${name}: native channel`
     );
 }
-const loader = new GLTFLoader().register(() => ({
-  name: 'NODE_TEXTURE_STUB',
-  loadTexture: () => Promise.resolve(new THREE.Texture()),
-}));
-const model = await loader.parseAsync(
-  file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength),
-  ''
-);
+const model = await parseGLB(file);
 const node = (name) => {
   const o = model.scene.getObjectByName(name);
   assert.ok(o, name);

@@ -103,17 +103,13 @@ try {
     });
   await page.goto(`${url}/__fixture`);
   const lifetime = await page.evaluate(async () => {
-    const { THREE: T, TSL: N } = await import('/tools/arm-material-fixture.js');
-    const { createWebGpuRenderer } = await import('/src/render/webgpu-device.ts');
+    const {
+      THREE: T,
+      TSL: N,
+      createFixtureRenderer,
+    } = await import('/tools/arm-material-fixture.js');
     const { createWorldViewPipeline } = await import('/src/render/webgpu-pipeline.ts');
-    const renderer = await createWebGpuRenderer(document.querySelector('canvas'));
-    const info = renderer.backend.device.adapterInfo;
-    window.__ASSERT_HARDWARE_DEVICE__({
-      vendor: info.vendor,
-      architecture: info.architecture,
-      fallback: info.isFallbackAdapter,
-    });
-    renderer.setSize(480, 270);
+    const renderer = await createFixtureRenderer(480, 270);
     const liveTextures = new Set();
     const createTexture = renderer.info.createTexture.bind(renderer.info);
     const destroyTexture = renderer.info.destroyTexture.bind(renderer.info);
