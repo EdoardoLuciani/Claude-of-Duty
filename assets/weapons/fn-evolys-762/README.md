@@ -19,8 +19,36 @@ Accessory loadout, unpublished depths/cloth and mechanism internals aren't certi
 
 ## Source/runtime contract
 
-`fn-evolys-762.blend/.glb` own packed source/export, `manifest.json` events/belt,
-`hand-reference.json` fitted hands, `photo-review.json` frozen registration.
+Python is the weapon-authoring authority; `fn-evolys-762.blend/.glb` are generated
+packed preview/runtime products, never build inputs. `manifest.json` records
+events/belt, `hand-reference.json` is read-only versioned hand calibration, and
+`photo-review.json` freezes review registration. Shared review-arm appearance is
+also read-only and excluded from export. See the [edit map and build stages](../../../tools/blender/evolys/README.md).
+
+The explicitly approved source UV precision exception rounds the existing atlas
+to nearest 1/16384 after modifiers: measured maximum displacement 0.03125 texel
+at 1024, with 34 subprecision seam groups collapsed and 132 duplicate-index
+substitutions. It also newly collapses 594 UV triangles to lines, including 530
+with nonzero 3D area totaling approximately 2.668 mm²; no UV orientation flips
+were found. Affected surfaces are belt brass/projectile jacket, coated lens,
+receiver rubber and already-zero-3D-area pouch/spare-pouch fabric. Atlas
+partitions/islands and oriented-corner geometry, normals, joints and weights
+remain. This is not exact seam or tangent-frame preservation: native normal-map
+UV derivatives can change locally despite unchanged normals/maps. The
+[edit map](../../../tools/blender/evolys/README.md) records per-surface counts,
+the derivative caveat and host/version-local repeatability limits.
+
+For the frozen migration asset, no visible regression was detected in six
+matched native AMD RDNA-4 WebGPU views: outdoor hip, belt side, belt projectile
+oblique, lens front, lens oblique and receiver-rubber close-up. The close-ups are
+staged diagnostic cameras using actual runtime materials/normal maps, full
+normal prewarm, matched lighting/exposure and fresh-frame GPU readback. Native
+central crops differ by at most 3/255 RGB levels; the complete belt-side image
+has two isolated edge pixels differing by 5/255 and 16/255. This is bounded
+visual evidence, not pixel identity or a guarantee for all lighting, poses,
+distances or devices. The edit map retains the warning/pose limitations; final
+human visual sign-off remains pending.
+
 Eight native clips in `src/weapons/evolys.ts`; shared skins/IK/ADS/recoil remain.
 Reloads open cover, replace pouch/belt and close; empty reload racks.
 Keep all event/balance/chamber/+1 values and one live pooled case per shot.
@@ -34,8 +62,12 @@ Caps: <150k triangles, ≤48 primitives, ≤18 materials, three 1024² maps, ≤
 ## Rebuild/check (root, Blender 5.2.2)
 
 ```sh
-node tools/evolys-hand-reference.mjs
-blender -b --threads 8 --python-exit-code 1 --python tools/blender/evolys_762.py
+# Only when intentionally changing shared calibration/contact inputs:
+# node tools/evolys-hand-reference.mjs
+blender -b -t 4 --python-exit-code 1 --python tools/blender/evolys_762.py
+# Full scratch build, without touching committed products/calibration:
+blender -b -t 4 --python-exit-code 1 --python tools/blender/evolys_762.py -- \
+  --output /tmp/evolys-review --quick
 blender -b assets/weapons/fn-evolys-762/fn-evolys-762.blend \
   --python-exit-code 1 --python tools/blender/evolys_check.py
 node tests/smoke/smoke-evolys.mjs
@@ -43,6 +75,11 @@ node tests/smoke/smoke-evolys-clearance.mjs
 node tests/e2e/check-evolys-game.mjs --out=.tmp-rend/evolys/game
 ```
 
+Every build resets to a factory-empty scene and regenerates the whole weapon.
+`--render` optionally writes the five existing studio cameras; `--quick` reduces
+preview samples/resolution only. Original sparse actions stay in the saved
+preview; native Actions export uses source-prepared historical 120 Hz motion,
+exact fractional endpoints and STEP visibility. Output validation is read-only.
 Regeneration overwrites manual edits; normal builds need no Blender.
 `evolys_review.py` reviews saved source/photos/reels using Eevee, ray tracing off.
 Match cameras/uniform registration/ROI/exclusions; no independent axis fitting.
