@@ -4,7 +4,8 @@
  * quality scaler and the capture harness can drive everything from one place.
  *
  * `dprCap` caps the device-pixel-ratio multiplier on the internal render
- * target — the single biggest resolution lever on Retina-class displays.
+ * target. Every preset is 1, so a high-DPR display never renders above CSS
+ * resolution; `renderScale` is the remaining resolution lever.
  */
 
 export const PHYSICS_HZ = 120;
@@ -69,7 +70,7 @@ export const QUALITY_PRESETS = {
   },
   ultra: {
     renderScale: 1.0,
-    dprCap: 1.5,
+    dprCap: 1.0,
     shadowMapSize: 2048,
     cascades: 4,
     shadowDistance: 160,
