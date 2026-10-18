@@ -79,6 +79,34 @@ for matched results, rejected pilots, scope caveats, and forced-stop recovery.
 The standalone `batch-submission-probe.mjs` is a static development-module API toy;
 its rAF cadence may remain paced despite launch flags. It is not combat/FPS acceptance.
 
+## Refresh-policy and shader-dependency census
+
+```sh
+MESA_VK_DEVICE_SELECT=1002:7550! node tools/cpu-submission-trial.mjs \
+  --trial=refresh-census --id=census --out=/tmp/458-refresh
+MESA_VK_DEVICE_SELECT=1002:7550! node tools/cpu-submission-trial.mjs \
+  --trial=shadow-color-census --id=pruned-census --out=/tmp/458-refresh
+```
+
+These are off-by-default, exact-source-guarded **count-only** diagnostics. The
+collector is installed before boot/prewarm and records original short-circuit
+refresh witnesses, compiled creation causes, nested pass identity, unique logical
+objects versus RenderObjects/group visits, binding/upload counts and representative
+WGSL. Stateful observer predicates are not rerun. Missing metadata or mismatched
+frame/draw counts fail the report; diagnostic errors do not replace renderer errors.
+Do not compare these runs' throughput or combine them with CPU/GPU/detail timing.
+The profiler's internal `--refresh=1` requires matching instrumented native sources;
+use the runner rather than manually modifying dependencies.
+
+`shadow-color` is the separate, uninstrumented app-only dependency-removal control,
+not a shipped optimization or a blanket node-refresh bypass. The two exact-default
+shadow observer controls are retained as negative evidence. See
+[refresh/shadow findings](investigations/refresh-policy-458.md) for eligibility,
+limitations, nine natural-scheduler pairs and correctness checks. On forced stop,
+recover only in the disposable worktree: restore the guarded application shader
+and material files without losing unrelated work, reinstall dependencies, clear
+Vite cache, and rebuild production. Never run pristine-source tests during a trial.
+
 ## Native counters and readback
 
 `rendererCounters()` in `src/dev/render-info.ts` distinguishes native renderer

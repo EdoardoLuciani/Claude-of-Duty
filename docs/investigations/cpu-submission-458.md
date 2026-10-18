@@ -1,5 +1,10 @@
 # CPU submission follow-up: #458
 
+**Later follow-up:** [refresh policy and redundant shadow dependencies](refresh-policy-458.md)
+identifies an app-specific dependency cause and a repeatable natural-scheduler
+control. It supersedes any inference here that batching should be the next step;
+the historical measurements below remain separate and no runtime change is shipped.
+
 ## Decision
 
 **No application optimization or permanent Three.js patch is promoted.** The

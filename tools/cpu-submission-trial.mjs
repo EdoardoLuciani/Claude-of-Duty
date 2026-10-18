@@ -66,11 +66,19 @@ const manifest = {
   height: Number(args.h ?? 720),
   cpuSampled: !!args.cpu,
   submissionDiagnostic: !!args.submission,
+  refreshDiagnostic: trial.includes('census'),
   gpuDiagnostic: !!args.gpu,
   cpuCore: args['cpu-core'] !== undefined ? Number(args['cpu-core']) : null,
   started: new Date().toISOString(),
   completed: null,
   lockSha256: sha(lock),
+  toolSha256: Object.fromEntries(
+    [
+      'tools/profile.mjs',
+      'tools/lib/refresh-census.mjs',
+      'tools/lib/cpu-submission-trials.mjs',
+    ].map((path) => [path, sha(readFileSync(resolve(REPO_ROOT, path)))])
+  ),
   sources: Object.fromEntries(
     Object.keys(changed).map((path) => [
       path,
@@ -109,6 +117,7 @@ try {
       `--out=${resolve(out, `${id}.json`)}`,
       ...(args.cpu ? [`--cpu-profile=${resolve(out, `${id}.cpuprofile`)}`] : []),
       ...(args.submission ? ['--submission=1'] : []),
+      ...(trial.includes('census') ? ['--refresh=1'] : []),
       ...(args.gpu ? ['--gpu=1'] : []),
       ...(args['cpu-core'] !== undefined ? [`--cpu-core=${args['cpu-core']}`] : []),
     ],

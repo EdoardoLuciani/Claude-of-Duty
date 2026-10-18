@@ -15,6 +15,7 @@ import {
 import { combatLane } from './lib/combat-fixture.js';
 import { waitForGame } from './lib/native-render.mjs';
 import { createCombatProfile, validateCombatProfile } from './lib/profile-combat.js';
+import { installRefreshCensus } from './lib/refresh-census.mjs';
 
 const args = parseArgs();
 const out = String(args.out ?? '/tmp/combat-profile.json');
@@ -41,6 +42,7 @@ const options = [
   'production',
   'submission',
   'cpu-core',
+  'refresh',
 ];
 assert(
   Object.keys(args).every((key) => options.includes(key)),
@@ -111,6 +113,13 @@ try {
   page.on('console', (m) => {
     if (m.type() === 'error') errors.push(m.text());
   });
+  if (args.refresh) {
+    assert(
+      !args.detail && !args.gpu && !args['cpu-profile'],
+      'refresh census is a separate diagnostic'
+    );
+    await page.addInitScript({ content: `(${installRefreshCensus.toString()})()` });
+  }
   const start = performance.now();
   await page.goto(
     `http://127.0.0.1:${port}/?capture=1&lockstep=1&q=${quality}${args['worker-profile'] ? '&aiWorkerProfile=1' : ''}`,
@@ -159,7 +168,7 @@ try {
     await cdp.send('Profiler.start');
   }
   const result = await page.evaluate(
-    async ({ frames, warmup, detail, gpu, realtime, agents, submission }) => {
+    async ({ frames, warmup, detail, gpu, realtime, agents, submission, refresh }) => {
       const engine = window.__ENGINE__,
         r = engine.ctx.get('render'),
         renderer = r.renderer;
@@ -171,6 +180,7 @@ try {
       const samples = []; // waitForGame already installed __NATIVE_BUILDS__.
       const stages = [],
         restores = [];
+      const census = refresh ? window.__REFRESH_CENSUS__ : null;
       let sampleIndex = -1;
       const observe = (owner, id, phase, countOnly = false, onCall = null) => {
         const original = owner?.[phase];
@@ -234,6 +244,11 @@ try {
           );
         });
       try {
+        if (refresh) {
+          if (!census) throw new Error('refresh collector missing');
+          census.attach(renderer, engine.ctx);
+          restores.push(() => census.dispose());
+        }
         fixture = api.create(engine, api.combatLane, { realtime, agents });
         if (gpu && !renderer.backend.device.features.has('timestamp-query'))
           throw new Error('native GPU timestamp queries unavailable');
@@ -307,8 +322,10 @@ try {
             last.callbackIntervalMs = callbackAt - last.callbackAt;
           }
           sampleIndex = i;
+          census?.frame(i);
           if (i === frames) {
             sampleIndex = -1;
+            census?.frame(-1);
             break;
           } // collect the last measured frame's full interval
           if (i === 0) measuredElapsed = engine.time.elapsed;
@@ -404,6 +421,7 @@ try {
           gpuClosed = true;
           renderer.backend.trackTimestamp = tracked;
           sampleIndex = -1;
+          census?.frame(-1);
           if (r.render === observedRender) {
             if (renderOwned) r.render = render;
             else delete r.render;
@@ -417,8 +435,19 @@ try {
         measuredElapsed === null ? null : engine.time.elapsed - measuredElapsed;
       if (realtime && fixture) fixture.report.simulationSeconds = simulationSeconds;
       const a = renderer.backend.device.adapterInfo;
+      const refreshCensus = census?.snapshot() ?? null;
+      if (
+        refreshCensus &&
+        (refreshCensus.errors.length ||
+          refreshCensus.frames.length !== samples.length ||
+          refreshCensus.frames.some(
+            (f, i) => f.unknown || f.decisions !== f.draws || f.draws !== samples[i]?.draws
+          ))
+      )
+        failure ??= 'refresh census metadata/count reconciliation failed';
       return {
         samples,
+        refreshCensus,
         combat: fixture?.report ?? null,
         failure: failure ?? gpuFailure,
         gpuFailure,
@@ -496,6 +525,7 @@ try {
       gpu: !!args.gpu,
       realtime: !!args.realtime,
       submission: !!args.submission,
+      refresh: !!args.refresh,
     }
   );
   if (cdp) {
@@ -586,6 +616,7 @@ try {
     paced: !!args.paced,
     gpuDiagnostic: !!args.gpu,
     submissionDiagnostic: !!args.submission,
+    refreshDiagnostic: !!args.refresh,
     cpuAffinity,
     cpuSampled: !!args['cpu-profile'],
     bootMs,

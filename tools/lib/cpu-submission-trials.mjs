@@ -1,12 +1,21 @@
 /** Offline-only experiments for the exact Three.js pin. Not imported by runtime. */
 import assert from 'node:assert/strict';
 
+import {
+  instrumentRefreshSources,
+  refreshHashes,
+  shadowRefreshSources,
+  shadowColorSources,
+} from './refresh-census.mjs';
+
 const bindings = 'node_modules/three/src/renderers/common/Bindings.js';
 const renderObject = 'node_modules/three/src/renderers/common/RenderObject.js';
 const uniforms = 'node_modules/three/src/renderers/common/Uniform.js';
 const group = 'node_modules/three/src/renderers/common/UniformsGroup.js';
 const materials = 'src/materials/index.ts';
 export const pristineHashes = {
+  ...refreshHashes,
+  'src/materials/shader-tsl.ts': 'd8070e169bdc03655c9dfbad4a7b82a98fa6abdd1992845d11eb11bc58af0ac0',
   [bindings]: 'fc013766c37e8609787893bc959afb099787584bd4bbd3d172d331aa4f64140d',
   [renderObject]: '8b423e148a2f4293d9c06cad8cd7c93a56d393527a22942a3122da4a2b5cd466',
   [uniforms]: 'ae9852a3e4f8b3c5a7c5dce1c81c207ade66f307273778371344e7b825a8e079',
@@ -19,6 +28,13 @@ const replace = (source, before, after) => {
 };
 export const trialNames = [
   'base',
+  'refresh-census',
+  'shadow-color',
+  'shadow-color-census',
+  'shadow-constant',
+  'shadow-constant-census',
+  'shadow-unlit-ao',
+  'shadow-unlit-ao-census',
   'lazy-key',
   'group-epoch',
   'hoist-scope',
@@ -39,7 +55,16 @@ export function cpuSubmissionTrial(sources, name) {
   for (const trial of name.split('+')) {
     assert(trialNames.includes(trial), `unknown trial ${trial}`);
     if (trial === 'base') continue;
-    if (trial === 'lazy-key' || trial === 'lazy-resources') {
+    if (trial === 'refresh-census') {
+      sources = instrumentRefreshSources(sources);
+    } else if (trial === 'shadow-color' || trial === 'shadow-color-census') {
+      sources = shadowColorSources(sources, trial.endsWith('-census'));
+    } else if (trial.startsWith('shadow-')) {
+      sources = shadowRefreshSources(sources, {
+        census: trial.endsWith('-census'),
+        ao: trial.startsWith('shadow-unlit-ao'),
+      });
+    } else if (trial === 'lazy-key' || trial === 'lazy-resources') {
       let s = sources[bindings];
       s = replace(
         s,
