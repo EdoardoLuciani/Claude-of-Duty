@@ -28,35 +28,23 @@ const controls = {
   weatherNode: uniform(new Vector4(...DEFAULT_PARAMS.weather)),
 };
 let constructed = false;
-const options = new Proxy(
-  {
-    ...DEFAULT_PARAMS,
-    ...controls,
-    parallax: 0.035,
-    detile: 0.7,
-    macroRelief: 0.1,
-    vertexMasks: true,
-  },
-  {
+function constructionInput(label, record) {
+  return new Proxy(record, {
     get(target, key) {
-      assert.equal(constructed, false, `authoring option read after construction: ${String(key)}`);
+      assert.equal(constructed, false, `${label} read after construction: ${String(key)}`);
       return target[key];
     },
-  }
-);
-const set = new Proxy(
-  { albedo, normal, orm },
-  {
-    get(target, key) {
-      assert.equal(
-        constructed,
-        false,
-        `texture-set record read after construction: ${String(key)}`
-      );
-      return target[key];
-    },
-  }
-);
+  });
+}
+const options = constructionInput('authoring option', {
+  ...DEFAULT_PARAMS,
+  ...controls,
+  parallax: 0.035,
+  detile: 0.7,
+  macroRelief: 0.1,
+  vertexMasks: true,
+});
+const set = constructionInput('texture-set record', { albedo, normal, orm });
 const material = createSurfaceNodeMaterial(set, options, { detailAlbedo, detailNormal, macro });
 constructed = true;
 const source = material.colorNode;
@@ -84,7 +72,7 @@ function compile(root) {
         .map((b) => b.textureNode?.value)
         .filter(Boolean)
     ),
-    code: flow.code,
+    loops: (flow.code.match(/\bfor\s*\(/g) ?? []).length,
   };
 }
 const Channels = struct({
@@ -118,17 +106,16 @@ try {
     [source.a, all],
     [all, source.a],
   ]) {
-    const results = roots.map(compile);
-    const alpha = roots[0] === all ? results[1] : results[0];
-    const beauty = roots[0] === all ? results[0] : results[1];
-    assert.deepEqual(alpha.textures, new Set([albedo, orm, detailAlbedo, macro]));
-    assert.deepEqual(beauty.textures, new Set(textures));
-    assert.equal(
-      (beauty.code.match(/\bfor\s*\(/g) ?? []).length,
-      1,
-      'shared parallax must not duplicate per channel'
-    );
-    assert.equal(material.colorNode, source, 'building must not replace source graph identity');
+    for (const root of roots) {
+      const result = compile(root);
+      assert.deepEqual(
+        result.textures,
+        new Set(root === all ? textures : [albedo, orm, detailAlbedo, macro])
+      );
+      if (root === all)
+        assert.equal(result.loops, 1, 'shared parallax must not duplicate per channel');
+      assert.equal(material.colorNode, source, 'building must not replace source graph identity');
+    }
   }
   assert.deepEqual(compile(packed.get('color').a).textures, new Set(textures));
   controls.tintNode.value.setRGB(0.5, 0.7, 0.9);
