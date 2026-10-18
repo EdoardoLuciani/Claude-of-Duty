@@ -64,6 +64,14 @@ function compile(root) {
   builder.setShaderStage('fragment');
   const flow = builder.flowStagesNode(Fn(() => root)());
   builder.buildUpdateNodes();
+  // This fragment flow has no helper bodies: derivative calls must be at scope 0.
+  let scope = 0;
+  const gradientScopes = [];
+  for (const token of flow.code.matchAll(/[{}]|\b(dpdx|dpdy)\s*\(/g)) {
+    if (token[0] === '{') scope++;
+    else if (token[0] === '}') scope--;
+    else gradientScopes.push([token[1], scope]);
+  }
   return {
     textures: new Set(
       builder
@@ -73,6 +81,7 @@ function compile(root) {
         .filter(Boolean)
     ),
     loops: (flow.code.match(/\bfor\s*\(/g) ?? []).length,
+    gradientScopes,
   };
 }
 const Channels = struct({
@@ -111,6 +120,14 @@ try {
       assert.deepEqual(
         result.textures,
         new Set(root === all ? textures : [albedo, orm, detailAlbedo, macro])
+      );
+      assert.deepEqual(
+        result.gradientScopes,
+        [
+          ['dpdx', 0],
+          ['dpdy', 0],
+        ],
+        'parallax gradients must evaluate outside divergent control flow'
       );
       if (root === all)
         assert.equal(result.loops, 1, 'shared parallax must not duplicate per channel');

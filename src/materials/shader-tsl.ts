@@ -137,8 +137,11 @@ export function parallaxUV(
 ) {
   const depthNode = typeof depth === 'number' ? float(depth) : depth;
   const coords = uv0.toVar();
-  const dx = dFdx(uv0).toVar(),
-    dy = dFdy(uv0).toVar();
+  // Explicit assignments keep derivatives outside the non-uniform march branch.
+  const dx = vec2(0).toVar(),
+    dy = vec2(0).toVar();
+  dx.assign(dFdx(uv0));
+  dy.assign(dFdy(uv0));
   If(depthNode.greaterThan(0).and(fade.greaterThan(0.001)), () => {
     const nl = max(mix(float(maxLayers), 8, clamp(abs(vt.z), 0, 1)).mul(fade), 4).toVar();
     const layer = float(1).div(nl).toVar();
