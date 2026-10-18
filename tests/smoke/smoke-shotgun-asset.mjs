@@ -252,6 +252,20 @@ assert.ok(
   ) < 1e-6,
   'physical trigger/butt LOP datums'
 );
+// The frozen firing calibration must reach the runtime controls too: testing
+// reference points alone would still pass if export lost the finger channels.
+const rightPads = pads('right');
+for (const [i, pad] of rightPads.entries()) {
+  // pads() uses the ordinary distal patch; the index owns a trigger patch.
+  if (i === 0) pad.set(0, -0.006, -0.013).applyMatrix4(arms.right.fingers[0].joints[2].matrixWorld);
+  assert.ok(pad.distanceTo(new THREE.Vector3(...reference.sides.right.pads[i])) < 1e-7);
+}
+assert.ok(
+  new THREE.Vector3(0, -0.0078, -0.026)
+    .applyMatrix4(arms.right.thumb.joints[1].matrixWorld)
+    .distanceTo(new THREE.Vector3(...reference.sides.right.thumbPad)) < 1e-7,
+  'native thumb calibration, not just a reference-only contact claim'
+);
 const restPads = pads('left'),
   shell = node('shell_insert'),
   forend = node('forend');

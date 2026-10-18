@@ -1,45 +1,11 @@
 #!/usr/bin/env node
 // Offline shared Arm fitting, in game metres. Blender authors the actual paths.
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 import { Arm } from '../src/weapons/hands.ts';
-// Offline fitting reads the committed exterior, never changes runtime loading.
-const bytes = readFileSync(new URL('../assets/weapons/m590/m590.glb', import.meta.url));
-const loader = new GLTFLoader().register(() => ({
-  name: 'OFFLINE_TEXTURE_STUB',
-  loadTexture: () => Promise.resolve(new THREE.Texture()),
-}));
-const model = await loader.parseAsync(
-  bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-  ''
-);
-model.scene.updateMatrixWorld(true);
-const neckTriangles = [];
-model.scene.getObjectByName('receiver').traverse((o) => {
-  if (!o.isMesh || !o.material.name.startsWith('02')) return;
-  const p = o.geometry.attributes.position,
-    ix = o.geometry.index;
-  for (let i = 0; i < ix.count; i += 3)
-    neckTriangles.push(
-      new THREE.Triangle(
-        ...[0, 1, 2].map((k) =>
-          new THREE.Vector3().fromBufferAttribute(p, ix.getX(i + k)).applyMatrix4(o.matrixWorld)
-        )
-      )
-    );
-});
-assert(neckTriangles.length > 0, 'factory stock exterior required for offline hand fitting');
-const closest = new THREE.Vector3();
-function neckDistance(point) {
-  let best = Infinity;
-  for (const t of neckTriangles)
-    best = Math.min(best, t.closestPointToPoint(point, closest).distanceToSquared(point));
-  return Math.sqrt(best);
-}
 const basis = (finger, back) => {
   const z = new THREE.Vector3(...finger).negate().normalize();
   const y = new THREE.Vector3(...back)
@@ -50,7 +16,12 @@ const basis = (finger, back) => {
   );
 };
 const grips = {
-  right: { pos: [0.047, 0.05, 0.14], finger: [0.05, -0.65, -0.758], back: [1, 0, 0] },
+  // Conventional-stock wrist: palm alongside the neck, not folded over it.
+  right: {
+    pos: [0.064237, 0.009638, 0.165085],
+    finger: [-0.243755, -0.267814, -0.932126],
+    back: [0.967198, -0.137983, -0.213282],
+  },
   left: {
     pos: [-0.0504, 0.0279, -0.29],
     finger: [0.326, -0.3, -0.897],
@@ -133,64 +104,63 @@ for (const [side, g] of Object.entries(grips)) {
   const arm = new Arm(side === 'left' ? -1 : 1, { scale: side === 'left' ? 0.97 : 1 });
   arm.hand.position.fromArray(g.pos);
   arm.hand.quaternion.copy(basis(g.finger, g.back));
-  arm.setPose(side === 'left' ? 'clamp' : 'gripShotgun');
-  if (side === 'left')
-    arm.fitToCylinder(arm.hand.position, arm.hand.quaternion, [0, 0.0348, 0], [0, 0, 1], 0.0225, {
-      clearance: 0.001,
-      poseName: 'm590',
-    });
-  else arm.fitGrip('m590', { index: [0, 0.01, -0.006], spread: [0, 0.3, 0.3, 0.3] });
+  // Frozen full-skin-reviewed calibration. Do not independently refit distal
+  // patches: the old point-only fit buried the proximal glove and hooked the
+  // thumb. Keep roots nearly parallel and distribute thumb flex across hinges.
+  // m590_check.py sweeps the deformed shared surfaces, including the web/cuff.
+  if (side === 'right') {
+    arm.poses.m590 = {
+      fingers: [
+        [0.079118, 0.074675, 0.382091],
+        [0.252091, 1.478472, 1.027438],
+        [0.498948, 1.473239, 1.02409],
+        [1.499124, 0.935328, 0.245621],
+      ],
+      fingerSpread: [-0.2, 0.199483, 0.199316, 0.197615],
+      thumbBase: [-1.34945, -0.374667, 3.139841],
+      thumb: [0.511171, 0.305111],
+    };
+    arm.setPose('m590');
+    result.sides[side] = {
+      quaternion: arm.hand.quaternion.toArray(),
+      grip: structuredClone(arm.poses.m590),
+      ...measure(arm),
+    };
+    continue;
+  }
+  arm.setPose('clamp');
+  arm.fitToCylinder(arm.hand.position, arm.hand.quaternion, [0, 0.0348, 0], [0, 0, 1], 0.0225, {
+    clearance: 0.001,
+    poseName: 'm590',
+  });
   arm.setPose('m590');
-  if (side === 'left') {
-    for (const [i, p] of measure(arm).pads.entries()) {
-      if (i === 0) {
-        fitFinger(arm, i, [-0.001, 0.004, -0.457]);
-        continue;
-      }
-      const r = Math.hypot(p[0], p[1] - 0.0348);
-      fitFinger(
-        arm,
-        i,
-        [
-          (p[0] * 0.0225) / r,
-          0.0348 + ((p[1] - 0.0348) * 0.0225) / r,
-          THREE.MathUtils.clamp(p[2], -0.49, -0.298),
-        ],
-        false,
-        (point) => Math.abs(Math.hypot(point.x, point.y - 0.0348) - 0.0225)
-      );
+  for (const [i, p] of measure(arm).pads.entries()) {
+    if (i === 0) {
+      fitFinger(arm, i, [-0.001, 0.004, -0.457]);
+      continue;
     }
-  } else {
-    for (const [i, target] of [
-      [1, [0.006, -0.036, 0.066]],
-      [2, [0.006, -0.042, 0.085]],
-      [3, [0.006, -0.019, 0.108]],
-    ])
-      fitFinger(arm, i, target, false, neckDistance);
+    const r = Math.hypot(p[0], p[1] - 0.0348);
+    fitFinger(
+      arm,
+      i,
+      [
+        (p[0] * 0.0225) / r,
+        0.0348 + ((p[1] - 0.0348) * 0.0225) / r,
+        THREE.MathUtils.clamp(p[2], -0.49, -0.298),
+      ],
+      false,
+      (point) => Math.abs(Math.hypot(point.x, point.y - 0.0348) - 0.0225)
+    );
   }
   arm.poses.m590.fingers = arm.fingers.map((f) => f.joints.map((j) => -j.rotation.x));
   arm.poses.m590.fingerSpread = arm.fingers.map((f) => f.root.rotation.y);
-  // Palmar pad, not just thumb-centre: fit to the actual tri-rail/neck surface.
-  const goal = new THREE.Vector3(
-    ...(side === 'left' ? [-0.0223, 0.0378, -0.385] : [-0.0134, 0.041, 0.066])
-  );
-  if (side === 'right') {
-    let distance = Infinity;
-    const seed = goal.clone();
-    for (const triangle of neckTriangles) {
-      triangle.closestPointToPoint(seed, closest);
-      const candidate = closest.distanceToSquared(seed);
-      if (candidate < distance) {
-        distance = candidate;
-        goal.copy(closest);
-      }
-    }
-  }
+  // Palmar pad, not just thumb-centre: fit to the tri-rail surface.
+  const goal = new THREE.Vector3(-0.0223, 0.0378, -0.385);
   const centre = goal.clone().add(new THREE.Vector3(-0.006, 0.006, 0));
   for (let pass = 0; pass < 18; pass++) {
     arm.fitGrip('m590', {
       thumb: centre.toArray(),
-      thumbPole: side === 'left' ? [-1, 0, 0] : [0, 0, 1],
+      thumbPole: [-1, 0, 0],
     });
     const pad = new THREE.Vector3(...measure(arm).thumbPad);
     centre.add(goal.clone().sub(pad));
