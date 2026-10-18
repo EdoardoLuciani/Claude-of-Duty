@@ -153,7 +153,8 @@ try {
       const shadowObject = [...renderer._objects._renderObjects].find(
         (ro) => ro.object === caster && ro.material.isShadowPassMaterial === true
       );
-      check(!!shadowObject?._bindings, 'native shadow bindings must exist');
+      if (!shadowObject || !shadowObject._bindings)
+        throw new Error('native shadow bindings must exist');
       const bindings = shadowObject._bindings.reduce((n, group) => n + group.bindings.length, 0);
       return { color, depth, bindings };
     };
@@ -209,5 +210,5 @@ try {
   console.log(JSON.stringify(result, null, 2));
 } finally {
   await browser?.close();
-  await stopViteServer(server);
+  stopViteServer(server);
 }
