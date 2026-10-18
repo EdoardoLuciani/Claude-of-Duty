@@ -13,7 +13,7 @@ const root = resolve(
 );
 const review =
   'TEMP Three compensation: dependency changed; review/remove these corrections when upgrading Three.js';
-const commit = '313f1f582b61af64f76ffaa4f23b3abb3ff298a1';
+const commit = '0978e2b62e53654ebe1a2c3032ebee0a4981c701';
 const project = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const lock = JSON.parse(readFileSync(new URL('../package-lock.json', import.meta.url), 'utf8'));
 assert.equal(project.dependencies.three, `github:mrdoob/three.js#${commit}`, review);
@@ -51,7 +51,7 @@ const files = {
   // #34872 now owns stable buffer names and declaration collision handling.
   // Verify the reviewed source unchanged; only the package exports need editing.
   'src/renderers/webgpu/nodes/WGSLNodeBuilder.js': {
-    hash: '7d8899df43f18fc6dc59504f15b9f3fe63f19b12410a36671816666b15fa0480',
+    hash: 'bf625a89f40b9f38fea4dec56da1e38f28154f678696dbd32c3082b23aaf3d41',
     patches: [],
   },
 };
