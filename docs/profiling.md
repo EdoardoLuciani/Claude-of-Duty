@@ -1,5 +1,8 @@
 # Profiling and native diagnostics
 
+Measured investigation: [frame bottlenecks, #413](investigations/frame-bottlenecks-413.md)
+(records fixed conditions, baseline/diagnostic separation, raw captures and gaps).
+
 ```sh
 node tools/profile.mjs --port=5389 --frames=1800 --warmup=120 \
   --w=1280 --h=720 --dpr=1 --quality=high --out=/tmp/combat-profile.json

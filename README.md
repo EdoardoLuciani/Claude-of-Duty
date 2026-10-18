@@ -108,9 +108,11 @@ Tests are not final human visual acceptance; see each asset's remaining limits.
 - `node tools/baseline.mjs`: isolated native-readback captures. Verify repeatability
   before using `imagediff.mjs` as a strict pixel gate; shared-shot state can leak.
 - `node tools/profile.mjs`: sustained living-combat frame/CPU percentiles and hitches.
-  See [methodology and limitations](docs/profiling.md). GPU timestamps are unavailable;
-  node-builder activity is not GPU compilation time. Historical WebGL results are
-  not current WebGPU performance evidence.
+  See [methodology and limitations](docs/profiling.md) and the
+  [frame bottleneck investigation](docs/investigations/frame-bottlenecks-413.md).
+  Optional GPU timestamps measure render/compute pass sums, not complete GPU-frame
+  time; node-builder activity is not GPU compilation time. Historical WebGL results
+  are not current WebGPU performance evidence.
 - `node tools/webgpu-preview-check.mjs`: native preview composition, resize and lifetime.
   Use final-output captures, not old intermediate-target PNGs, for appearance review.
 - [AI behaviour and controlled validation](docs/ai-combat-pressure.md).
