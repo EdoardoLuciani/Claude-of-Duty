@@ -146,6 +146,7 @@ try {
       if (!ok) throw new Error(message);
     };
     const compare = (a, b) => {
+      check(a.length === b.length, 'readback size');
       let max = 0;
       for (let i = 0; i < a.length; i++) {
         check(Number.isFinite(a[i]) && Number.isFinite(b[i]), 'finite readback');
