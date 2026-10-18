@@ -11,6 +11,7 @@ import {
   parseArgs,
   stopViteServer,
 } from './lib/browser-harness.mjs';
+import { captureNative, installDevicePolicy, waitForGame } from './lib/native-render.mjs';
 const args = parseArgs();
 const port = Number(args.port ?? 5187);
 const out = resolve(args.out ?? '/tmp/player-arms-review');
@@ -24,8 +25,9 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 try {
+  await installDevicePolicy(page);
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1&shot=weapon`);
-  await page.waitForFunction('window.__READY__ === true', null, { timeout: 120000 });
+  await waitForGame(page);
   await page.evaluate(async () => {
     window.__APPLY_SHOT__('weapon');
     await window.__PUMP__(45);
@@ -63,21 +65,22 @@ try {
           'throwShort',
           'radio',
         ];
-    if (
-      !args.action &&
-      (await page.evaluate(
-        (id) => !!window.__ENGINE__.ctx.get('weapons').viewmodel.weapons.get(id).clips.cycle,
-        weapon
-      ))
-    )
-      actions.push('cycle');
+    if (!args.action)
+      for (const clip of ['cycle', 'pump'])
+        if (
+          await page.evaluate(
+            ({ id, clip }) =>
+              !!window.__ENGINE__.ctx.get('weapons').viewmodel.weapons.get(id).clips[clip],
+            { id: weapon, clip }
+          )
+        )
+          actions.push(clip);
     for (const action of actions) {
-      const samples =
-        action === 'cycle'
-          ? [0.04, 0.08, 0.12, 0.16, 0.5, 0.72, 0.76, 0.8, 0.84, 0.88]
-          : ['reloadTac', 'reloadEmpty', 'inspect'].includes(action)
-            ? [0.25, 0.55, 0.85]
-            : [0.5];
+      const samples = ['cycle', 'pump'].includes(action)
+        ? [0.04, 0.08, 0.12, 0.16, 0.5, 0.72, 0.76, 0.8, 0.84, 0.88]
+        : ['reloadTac', 'reloadEmpty', 'inspect'].includes(action)
+          ? [0.25, 0.55, 0.85]
+          : [0.5];
       for (const fraction of samples) {
         const report = await page.evaluate(
           ({ weapon, action, fraction }) => {
@@ -156,7 +159,7 @@ try {
           await window.__PRESENT__();
         });
         const name = `${weapon}-${action}-${Math.round(fraction * 100)}`;
-        await page.screenshot({ path: `${out}/${name}.png` });
+        await captureNative(page, `${out}/${name}.png`);
         assert.equal(report.skins, 10);
         reports.push(report);
       }
