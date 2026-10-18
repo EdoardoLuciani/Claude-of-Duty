@@ -39,7 +39,13 @@ import {
   vec4,
   vertexColor,
 } from 'three/tsl';
-import { Color, MeshPhysicalNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu';
+import {
+  Color,
+  MeshPhysicalNodeMaterial,
+  MeshStandardNodeMaterial,
+  NodeUpdateType,
+  UniformNode,
+} from 'three/webgpu';
 import type { Node, Texture } from 'three/webgpu';
 
 import { hash11 } from './noise-tsl.ts';
@@ -630,7 +636,56 @@ export function createSurfaceNodeMaterial(
           : normalize(cameraViewMatrix.mul(vec4(nP!, 0)).xyz);
     return MaterialChannels(alb.rgb, alb.a, normal, rough, clamp(orm.b, 0, 1), ao);
   })() as unknown as MaterialChannelOutput;
-  mat.colorNode = channels.get('color');
+  // This generated RGB function has implicit alpha one. Do not build all its
+  // surface channels just for Three's shadow colorNode.a extraction. Restrict
+  // specialization to ordinary opaque world surfaces with callback-free controls.
+  const record = mat as unknown as Record<string, unknown>;
+  const shadowEligible =
+    !p.alphaMask &&
+    !p.localSpace &&
+    !mat.transparent &&
+    mat.opacity === 1 &&
+    mat.alphaTest === 0 &&
+    !mat.alphaHash &&
+    !mat.alphaToCoverage &&
+    (record.transmission ?? 0) === 0 &&
+    [
+      'map',
+      'alphaMap',
+      'opacityNode',
+      'alphaTestNode',
+      'castShadowNode',
+      'maskShadowNode',
+      'maskNode',
+      'depthNode',
+      'positionNode',
+      'castShadowPositionNode',
+      'fragmentNode',
+      'outputNode',
+      'vertexNode',
+      'contextNode',
+      'transmissionNode',
+      'lightsNode',
+    ].every((key) => !record[key]) &&
+    [p.tileNode, p.tintNode, p.parallaxNode, p.normalAmpNode, p.groundNode, p.weatherNode].every(
+      (node) =>
+        node === undefined ||
+        typeof node === 'number' ||
+        (Object.getPrototypeOf(node) === UniformNode.prototype &&
+          node.updateType === NodeUpdateType.NONE &&
+          node.updateBeforeType === NodeUpdateType.NONE &&
+          node.updateAfterType === NodeUpdateType.NONE &&
+          !Object.hasOwn(node, 'updateReference'))
+    );
+  mat.colorNode = shadowEligible
+    ? Fn(
+        (_inputs: unknown, builder: NodeBuilder) =>
+          (builder.material as { isShadowPassMaterial?: boolean }).isShadowPassMaterial === true
+            ? vec3(0)
+            : channels.get('color'),
+        'vec3'
+      )()
+    : channels.get('color');
   if (p.alphaMask) mat.opacityNode = channels.get('opacity');
   mat.normalNode = channels.get('normal');
   mat.roughnessNode = channels.get('rough').mul(materialRoughness);
