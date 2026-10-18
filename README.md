@@ -45,7 +45,7 @@ A WebGPU-capable browser/device is required. Normal builds use committed world
 and Blender assets, with no Blender requirement. Change world source in
 `tools/worldgen/`, regenerate with `npm run world`, then run `npm run world:validate`.
 
-**Three.js pin:** GitHub commit `313f1f582b61af64f76ffaa4f23b3abb3ff298a1`,
+**Three.js pin:** GitHub commit `0978e2b62e53654ebe1a2c3032ebee0a4981c701`,
 not a moving `dev` dependency. Its package version still says `0.186.0`; runtime
 source reports `187dev`. `tools/compensate-three.mjs` selects the pinned ESM source
 exports because committed bundles still lag the latest source fixes (including
