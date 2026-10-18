@@ -51,7 +51,17 @@ export function makeEvolysModel(gltf: GLTF) {
       magSeat: { pos: point('SOCKET_pouch'), rot: [0, 0, 0] },
       triggerPivot: { pos: point('trigger'), rot: [0, 0, 0] },
       handguard: { axis: [0, 0.075, 0], dir: [0, 0, 1], r: 0.027, z0: -0.23, z1: -0.4 },
-      opticGlass: { center: sight, apertureR: 0.0055, windowW: 0.0098, windowH: 0.0058 },
+      opticGlass: {
+        center: sight,
+        apertureR: 0.0055,
+        windowW: 0.0098,
+        windowH: 0.0058,
+        // Size the RMR aiming dot against the world, not the enlarged weapon window.
+        reticle: 'dot',
+        dotMoa: 3.25,
+        minDotPixels: 5,
+        dotOpacity: 0.9,
+      },
     },
     shell: { caseLen: 0.051, rimR: 0.005975 },
     magSize: { len: 0.125 },
