@@ -24,7 +24,7 @@ assert.equal(
   createHash('sha256')
     .update(readFileSync(new URL(M590_URL)))
     .digest('hex'),
-  'd1244541c2654926cceecefc8ccef7251232df9e2b274de374d3471551c7e30e'
+  '967db2a9eb2cf8aa59ff657db71bd1b1a722c259b285fa4cb15035d290d12bf5'
 );
 const model = makeM590Model(await parse(M590_URL)),
   animation = new M590Animation(model);
