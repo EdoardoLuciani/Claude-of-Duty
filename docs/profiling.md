@@ -39,6 +39,8 @@ cross-hardware frame-time threshold is imposed.
 | `--paced=1`                  | Keep browser pacing/vsync flags; headless cadence is not physical display presentation.                                               |
 | `--detail=1`                 | Inclusive system/method costs and counts. Nested nav/controller costs overlap: do not sum.                                            |
 | `--cpu-profile=PATH`         | CDP sampling (500 μs, including warmup), with clock alignment metadata.                                                               |
+| `--submission=1`             | Count-only native binding/node/upload/draw-category diagnostics; keep separate from throughput acceptance.                            |
+| `--cpu-core=N`               | Optional Linux renderer-main-thread affinity after boot; existing workers/GPU threads retain their affinity.                          |
 | `--worker-profile=1`         | Nested worker kernel timing; don't pool with uninstrumented runs.                                                                     |
 | `--query-trial=base\|repeat` | Fresh worker/cache with exact-cycle rejection disabled/enabled; ordinary gameplay enables it.                                         |
 | `frameTimeMs`                | Nominal rAF timestamps; they can mask/shift CPU hitch attribution.                                                                    |
@@ -60,6 +62,22 @@ Worker round trips include dispatch, queueing and main-thread delivery; executio
 is separate. Returned proofs may wait for a caller retry while other combat runs.
 Keep gap frames, unfinished jobs/decisions and dropped samples in reports.
 Asynchronous admission is not seeded replay equivalence; see [ai-worker.md](ai-worker.md).
+
+## CPU submission experiments
+
+`tools/cpu-submission-profile.mjs` aligns CDP/document clocks and source maps,
+filters measured-frame render stacks, and reports overlapping inclusive/exclusive
+samples. Optional end-session Performance metrics include setup/warmup/export;
+`ThreadTime` is main-thread CPU, not GPU time or a steady-frame duration.
+
+`tools/cpu-submission-trial.mjs` applies exact-source-guarded offline prototypes,
+builds fresh production, and restores source **and build** in `finally`. Outputs
+must be outside the checkout. Never run trials concurrently or run pristine-source
+smoke tests during mutation. CPU affinity is a separate recorded protocol, not a
+runtime optimization. See [the #458 follow-up](investigations/cpu-submission-458.md)
+for matched results, rejected pilots, scope caveats, and forced-stop recovery.
+The standalone `batch-submission-probe.mjs` is a static development-module API toy;
+its rAF cadence may remain paced despite launch flags. It is not combat/FPS acceptance.
 
 ## Native counters and readback
 

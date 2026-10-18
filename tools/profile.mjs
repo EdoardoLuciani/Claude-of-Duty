@@ -39,6 +39,8 @@ const options = [
   'query-trial',
   'agents',
   'production',
+  'submission',
+  'cpu-core',
 ];
 assert(
   Object.keys(args).every((key) => options.includes(key)),
@@ -86,6 +88,7 @@ const full = existsSync(cache)
       .find(existsSync)
   : null;
 let server, browser, report;
+let cpuAffinity = null;
 try {
   server = await ensureViteServer({ port, preview: !!args.production });
   assert(
@@ -121,6 +124,27 @@ try {
       await nav.worker.start(); // both conditions start a fresh worker/proof cache
     }, args['query-trial']);
   const bootMs = performance.now() - start;
+  if (args['cpu-core'] !== undefined) {
+    const core = Number(args['cpu-core']);
+    assert(
+      process.platform === 'linux' && Number.isInteger(core) && core >= 0,
+      'invalid Linux CPU core'
+    );
+    const system = await browser.newBrowserCDPSession();
+    const { processInfo } = await system.send('SystemInfo.getProcessInfo');
+    const rendererPids = processInfo.filter((p) => p.type === 'renderer').map((p) => p.id);
+    assert(rendererPids.length > 0, 'renderer process not found');
+    // Only each renderer's main thread. Existing AI/compositor/GPU threads keep
+    // their original affinity. Workers are already started by waitForGame().
+    for (const pid of rendererPids) execFileSync('taskset', ['-pc', String(core), String(pid)]);
+    cpuAffinity = {
+      core,
+      rendererPids,
+      policy:
+        'Linux renderer main threads only, after boot and before warmup; other threads unchanged',
+    };
+    await system.detach();
+  }
   await page.addScriptTag({
     content: `window.__PROFILE__ = { combatLane: ${combatLane.toString()},
     create: ${createCombatProfile.toString()} };`,
@@ -135,7 +159,7 @@ try {
     await cdp.send('Profiler.start');
   }
   const result = await page.evaluate(
-    async ({ frames, warmup, detail, gpu, realtime, agents }) => {
+    async ({ frames, warmup, detail, gpu, realtime, agents, submission }) => {
       const engine = window.__ENGINE__,
         r = engine.ctx.get('render'),
         renderer = r.renderer;
@@ -148,7 +172,7 @@ try {
       const stages = [],
         restores = [];
       let sampleIndex = -1;
-      const observe = (owner, id, phase, countOnly = false) => {
+      const observe = (owner, id, phase, countOnly = false, onCall = null) => {
         const original = owner?.[phase];
         if (typeof original !== 'function') return;
         const owned = Object.hasOwn(owner, phase);
@@ -163,6 +187,7 @@ try {
             if (sampleIndex >= 0) {
               if (!countOnly) ms[sampleIndex] += performance.now() - start;
               calls[sampleIndex]++;
+              onCall?.(arguments[0], sampleIndex);
             }
           }
         };
@@ -227,6 +252,50 @@ try {
           observe(ai.grid._probe, 'attachment-controller', 'move', true);
           for (const actor of ai.agents)
             observe(actor, `actor-${actor.id}`, '_pickObservationPoints');
+        }
+        if (submission) {
+          // Count-only diagnostic wrappers, never throughput acceptance runs.
+          const backend = renderer.backend;
+          for (const [owner, id, phase] of [
+            [renderer._bindings, 'bindings', '_update'],
+            [renderer._nodes, 'nodes', 'updateGroup'],
+            [renderer._nodes, 'nodes', 'updateForRender'],
+            [backend, 'backend', 'updateBinding'],
+            [backend, 'backend', 'updateBindings'],
+            [backend.device, 'device', 'createBindGroup'],
+            [backend.device.queue, 'queue', 'writeBuffer'],
+            [backend.device.queue, 'queue', 'writeTexture'],
+          ])
+            observe(owner, id, phase, true);
+          const categories = [
+            'static-world-mesh',
+            'static-world-instanced',
+            'skinned',
+            'viewmodel',
+            'dynamic-world-rigid',
+            'post-other',
+          ];
+          const categorized = Object.fromEntries(
+            categories.map((phase) => {
+              const calls = new Uint16Array(frames);
+              stages.push({ id: 'draw-category', phase, countOnly: true, ms: null, calls });
+              return [phase, calls];
+            })
+          );
+          observe(backend, 'backend', 'draw', true, ({ object, scene }, index) => {
+            const category = object.userData?.owStatic
+              ? object.isInstancedMesh
+                ? 'static-world-instanced'
+                : 'static-world-mesh'
+              : object.isSkinnedMesh
+                ? 'skinned'
+                : scene === engine.ctx.viewScene
+                  ? 'viewmodel'
+                  : scene === engine.ctx.scene
+                    ? 'dynamic-world-rigid'
+                    : 'post-other';
+            categorized[category][index]++;
+          });
         }
         if (gpu) renderer.backend.trackTimestamp = true;
         r.render = observedRender;
@@ -391,13 +460,14 @@ try {
               }
             : null;
         })(),
-        stages: detail
-          ? stages.map((s) => ({
-              ...s,
-              ms: s.ms ? Array.from(s.ms) : null,
-              calls: Array.from(s.calls),
-            }))
-          : null,
+        stages:
+          detail || submission
+            ? stages.map((s) => ({
+                ...s,
+                ms: s.ms ? Array.from(s.ms) : null,
+                calls: Array.from(s.calls),
+              }))
+            : null,
         timeOrigin: performance.timeOrigin,
         simulationSeconds,
         hardware: {
@@ -418,13 +488,22 @@ try {
         prewarm: window.__PREWARM__,
       };
     },
-    { frames, warmup, agents, detail: !!args.detail, gpu: !!args.gpu, realtime: !!args.realtime }
+    {
+      frames,
+      warmup,
+      agents,
+      detail: !!args.detail,
+      gpu: !!args.gpu,
+      realtime: !!args.realtime,
+      submission: !!args.submission,
+    }
   );
   if (cdp) {
     const { profile } = await cdp.send('Profiler.stop');
+    const clockEnd = (await cdp.send('Performance.getMetrics')).metrics;
     writeFileSync(
       String(args['cpu-profile']),
-      JSON.stringify({ profile, clock, timeOrigin: result.timeOrigin })
+      JSON.stringify({ profile, clock, clockEnd, timeOrigin: result.timeOrigin })
     );
     await cdp.detach();
   }
@@ -506,6 +585,8 @@ try {
     realtime: !!args.realtime,
     paced: !!args.paced,
     gpuDiagnostic: !!args.gpu,
+    submissionDiagnostic: !!args.submission,
+    cpuAffinity,
     cpuSampled: !!args['cpu-profile'],
     bootMs,
     ...result,
