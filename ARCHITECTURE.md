@@ -165,10 +165,8 @@ Post passes normally consume textures through `asNode`; optional
 The graph owns RTTs it creates, not borrowed outputs. Pipeline disposal is not recursive.
 
 Graph order: opaque depth/normal/velocity → GTAO/world lighting → world TAA →
-optional additive SSR → fog/haze → separate transparent-black, non-MSAA first-person
-pass → low-health effects → exposure → bloom → AgX → optional LUT.
-SSR composition/temporal quality is deferred to #370. Exposure works without a LUT.
-SSR uses evaluated roughness/metalness, not overridden scalar material defaults.
+fog/haze → separate transparent-black, non-MSAA first-person pass → low-health
+effects → exposure → bloom → AgX → optional LUT. Exposure works without a LUT.
 First-person depth/history never merges with world depth/history or world haze.
 View-pass context identity prevents camera-specialized environment cache sharing.
 World beauty alone uses clustered point lighting; the unlit prepass and first-person
@@ -198,7 +196,7 @@ sky initialization. No synthetic sun/background/environment or no-sky fill exist
 an owned zero-intensity sky remains dark.
 
 HDR exposure samples unexposed world beauty asynchronously, at most one readback
-pending. It excludes fog, SSR/TAA, viewmodel and post effects. Elapsed-time smoothing
+pending. It excludes fog, TAA, viewmodel and post effects. Elapsed-time smoothing
 freezes with paused time. Camera/FOV can still affect metering. Keep approved
 key/limits/bias; this policy is not a WebGL visual-parity claim.
 

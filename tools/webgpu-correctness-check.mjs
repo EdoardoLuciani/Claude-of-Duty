@@ -168,9 +168,21 @@ try {
     scene.add(wall);
     const graph = createWorldViewPipeline(renderer, scene, camera, view, camera, {
       gtao: false,
-      ssrEnabled: true,
       bloomStrength: 0,
     });
+    check(
+      Object.keys(graph.prePass.getMRT().outputNodes).sort().join(',') === 'linearDepth,output',
+      'production prepass must not allocate an unused material-surface MRT'
+    );
+    // Keep the evaluated-material oracle as a fixture-owned diagnostic output;
+    // production only needs normals/depth (and velocity when TAA is enabled).
+    graph.prePass.setMRT(
+      N.mrt({
+        ...graph.prePass.getMRT().outputNodes,
+        surface: N.vec4(N.roughness, N.metalness, 0, 1),
+      })
+    );
+    graph.prePass.getTextureNode('surface');
     const mapped = new T.DataTexture(new Uint8Array([255, 128, 64, 255]), 1, 1);
     mapped.needsUpdate = true;
     const surfaces = [];

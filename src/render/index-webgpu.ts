@@ -234,7 +234,6 @@ export class RenderSystem {
       );
     const options: PipelineOptions = {
       gtao: this.q.gtao,
-      ssrEnabled: this.q.ssr,
       taa: this.q.taa,
       bloomStrength: this.q.bloom ? this.settings.bloomStrength : 0,
       bloomThreshold: this.settings.bloomThreshold,

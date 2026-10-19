@@ -47,14 +47,14 @@ try {
       let body = await response.text();
       const changes = [];
       if (args.variant !== 'post-copy')
-        changes.push(['taaPass.a) : taaPass.getTextureNode();', 'taaPass.a) : taaPass;']);
+        changes.push([/world = taaPass\.getTextureNode\(\);/, 'world = taaPass;']);
       if (args.variant !== 'taa-copy')
         changes.push([
-          'post.asColorNode ? post.asColorNode(composite, exposure) :\n      post.asNode(asTexture(composite), exposure)',
+          /post\.asColorNode\s*\?\s*post\.asColorNode\(composite,\s*exposure\)\s*:\s*post\.asNode\(asTexture\(composite\),\s*exposure\)/,
           'post.asNode(asTexture(composite), exposure)',
         ]);
       for (const [a, b] of changes) {
-        assert.ok(body.includes(a));
+        assert.ok(a.test(body));
         body = body.replace(a, b);
       }
       await route.fulfill({ response, body });
@@ -450,7 +450,7 @@ try {
   }
   if (args.verify === '1') {
     const expected =
-      { high: 18, medium: 18, low: 14, ultra: 25 }[quality] + (args.resample === '1' ? 1 : 0);
+      { high: 18, medium: 18, low: 14, ultra: 18 }[quality] + (args.resample === '1' ? 1 : 0);
     for (let frame = 0; frame < frames; frame++) {
       const fullscreen = report.passes.filter(
         (p) =>
