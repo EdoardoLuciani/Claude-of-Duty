@@ -68,7 +68,7 @@ globalThis.AudioWorkletNode = class {
   }
 };
 const mixer = new Mixer(actx, new Rng(1907));
-assert.equal(nodes.length - 1, 22, '22 nodes including complementary healthy/concussion routing');
+assert.equal(nodes.length - 1, 28, '22 existing nodes plus six category-controlled wet inputs');
 assert.equal(mixer.buses.weapons.comp, null, 'no weapon-bus compressor');
 assert.equal(
   nodes.filter((n) => n.type === 'compressor').length,
@@ -86,8 +86,10 @@ assert.equal('preGain' in mixer, false, 'energy controller replaces fixed attenu
 assert.equal(mixer.masterGain.gain.value, 1);
 assert.equal('softClip' in mixer || 'sampleCeiling' in mixer, false, 'no hidden clipping stages');
 for (const bus of Object.values(mixer.buses)) {
-  assert.equal('trim' in bus || 'duck' in bus, false, 'one gain per category');
+  assert.equal('trim' in bus || 'duck' in bus, false, 'no serial category gain stack');
   assert.equal(bus.level.gain.value, bus.baseTrim);
+  assert.equal(bus.send.gain.value, bus.baseTrim, 'wet shares the same logical reference');
+  assert.deepEqual([...bus.send.outputs], [mixer.reverbSend], 'convolution remains shared');
   assert.equal(bus.input, bus.comp ?? bus.level);
   if (bus.comp)
     assert.deepEqual(
@@ -134,12 +136,14 @@ mixer._startTinnitus = tinnitus;
 mixer.setBusVolume('ambience', 0.5);
 mixer.duck(0.6, 0.1);
 const ambience = mixer.buses.ambience;
-assert(Math.abs(ambience.level.gain.value - 0.07 * 0.5 * 0.4) < 1e-12);
+assert(Math.abs(ambience.level.gain.value - 0.06 * 0.5 * 0.4) < 1e-12);
 mixer.setBusVolume('ambience', 0);
 for (let i = 0; i < 100; i++) mixer.update(0.02);
 assert.equal(ambience.level.gain.value, 0, 'mute survives duck recovery');
+assert.equal(ambience.send.gain.value, 0, 'new wet feeds cannot bypass mute/duck recovery');
 mixer.setBusVolume('ambience', 1);
-assert.equal(ambience.level.gain.value, 0.07);
+assert.equal(ambience.level.gain.value, 0.06);
+assert.equal(ambience.send.gain.value, 0.06);
 mixer.setBusVolume('weapons', 0);
 mixer.duck(0.8);
 assert.equal(mixer.bus('weapons').gain.value, 0);
@@ -174,12 +178,16 @@ assert.equal(nodes.length, count + 2, 'non-unity routing and nonzero send still 
 assert.equal(audio._dry[0].node.gain.value, 0.5);
 assert.equal(audio._dry[0].send.gain.value, 0.06);
 assert(voice.node.outputs.has(audio._dry[0].node));
+assert(
+  audio._dry[0].send.outputs.has(mixer.sendBus('foley')),
+  'dry-voice wet feed honors its category'
+);
 // Dry positional reports must not connect an environmental branch, including
 // when a previously wet emitter is returned to the pool and reused.
 const field = new SpatialField(actx, mixer, null);
 const opts = { x: 20, y: 0, z: 0, when: 3, dist: 20, bus: 'weapons', endTime: 6 };
 const emitter = field.acquire({ ...opts, send: 0.2 });
-assert.equal(emitter._sendConnected, mixer.reverbSend);
+assert.equal(emitter._sendConnected, mixer.sendBus('weapons'));
 emitter.detach();
 assert.equal(field.acquire({ ...opts, send: 0 }), emitter);
 assert.equal(emitter._sendConnected, false, 'reused dry emitter has no reverb connection');

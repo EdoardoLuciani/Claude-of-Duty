@@ -40,7 +40,7 @@ try {
           split.connect(merge, 0, offset);
           split.connect(merge, 1, offset + 1);
           reverbSend.connect(merge, 0, sendChannel);
-          const field = new SpatialField(ctx, { bus: () => bus, reverbSend }, null);
+          const field = new SpatialField(ctx, { bus: () => bus, sendBus: () => reverbSend }, null);
           field.setListener(0, 0, 0, 0, 0, -1, 0, 1, 0);
           return field;
         };
@@ -86,7 +86,7 @@ try {
         // history in the control, but give it NO old future ownership events.
         if (mode === 'interrupted-target') {
           const em = reference.emitters[0];
-          em.connectOut(reference.mixer.bus('weapons'), reference.mixer.reverbSend);
+          em.connectOut(reference.mixer.bus('weapons'), reference.mixer.sendBus('weapons'));
           const source = ctx.createBufferSource();
           source.buffer = silence;
           reference.hold(em, source, oldArrival + silence.duration + 0.04);

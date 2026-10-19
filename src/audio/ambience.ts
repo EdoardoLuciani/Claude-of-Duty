@@ -160,6 +160,10 @@ export class Ambience {
 /* ------------------------------------------------------------------ */
 
 /** Weighted table used by the scheduler. */
+// Fixed event references, not per-file normalization. The sustained helicopter
+// must remain background even at the nearest random range and in a live room.
+export const AMBIENT_EVENT_GAIN = { near: 2.5, heli: 2.5, siren: 14 } as const;
+
 export const ONE_SHOTS = [
   'dog',
   'siren',

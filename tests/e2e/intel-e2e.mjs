@@ -471,7 +471,10 @@ try {
   }
   const siren = audio.find((s) => s.kind === 'intel_siren');
   assert(
-    siren.rms > 0.15 && siren.rms > audio[0].rms * 4,
+    // Preserve detector/siren priority without the obsolete 0.15 absolute
+    // floor that forced a sustained warning up to gunfire-like energy. The
+    // whole-mix benchmark separately bounds it below the approved report.
+    siren.rms > audio[0].rms * 4,
     `siren must dominate the detector: ${JSON.stringify(audio)}`
   );
   assert(siren.tail < 0.0001, `siren must stop promptly: ${JSON.stringify(siren)}`);
@@ -540,11 +543,11 @@ try {
   }, !!process.env.AUDIO_PREVIEW);
   assert.equal(alert.nan, 0);
   assert(
-    alert.peak > 0.5 && alert.peak < 1 && alert.rms > 0.15,
+    alert.peak > 0.01 && alert.peak < 1 && alert.rms > audio[0].rms * 4,
     JSON.stringify({ ...alert, pcm: null })
   );
   assert(
-    alert.pulses.every((rms) => rms > 0.2),
+    alert.pulses.every((rms) => rms > audio[0].rms * 4),
     'all six alert pulses must sound during a claim'
   );
   assert(

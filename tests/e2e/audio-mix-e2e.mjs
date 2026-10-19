@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -19,18 +19,20 @@ mkdirSync(evidence, { recursive: true });
 const rate = Number(process.env.AUDIO_MIX_RATE ?? 48000),
   seed = Number(process.env.AUDIO_MIX_SEED ?? 1907);
 const filter = process.env.AUDIO_MIX_CASES?.split(',');
-const cases = mixCases().filter((c) => !filter || filter.some((f) => c.id.includes(f)));
+const cases = mixCases().filter(
+  (c) =>
+    !filter || ['gun-rifle-0', 'air-bed'].includes(c.id) || filter.some((f) => c.id.includes(f))
+);
 assert(cases.length > 0, 'No matching benchmark cases');
 const rows = [],
   errors = [];
 const files = [
-  'src/audio/index.ts',
-  'src/audio/mixer.ts',
-  'src/audio/energy.ts',
-  'src/audio/energy-worklet.ts',
-  'src/audio/peak.ts',
-  'src/audio/weapons.ts',
-  'src/audio/samples.ts',
+  ...readdirSync(resolve(root, 'src/audio'))
+    .filter((name) => name.endsWith('.ts'))
+    .sort()
+    .map((name) => `src/audio/${name}`),
+  'src/core/rng.ts',
+  'src/weapons/defs.ts',
   'tests/e2e/audio-mix-scenes.mjs',
   'tests/e2e/audio-mix-e2e.mjs',
 ];
@@ -207,5 +209,29 @@ if (process.env.AUDIO_MIX_BASELINE) {
     assert(maxDifference <= 3e-7, `${row.scenario.id}: approved gun sound changed`);
   }
   save();
+}
+const bed = rows.find((r) => r.scenario.id === 'air-bed');
+if (bed) {
+  report.quietReadability = rows
+    .filter((r) =>
+      [
+        'own-step-concrete-walk',
+        'enemy-step-concrete-2',
+        'enemy-step-concrete-8',
+        'voice-near',
+        'ui-hitmarker',
+      ].includes(r.scenario.id)
+    )
+    .map((row) => {
+      const gap = row.loudness.maxMomentaryLUFS - bed.loudness.maxMomentaryLUFS;
+      const minimum = row.scenario.id.endsWith('-8') ? -3 : 6;
+      return { id: row.scenario.id, gap, minimum, pass: gap >= minimum };
+    });
+  save();
+  if (process.env.AUDIO_MIX_ENFORCE !== '0')
+    assert(
+      report.quietReadability.every((r) => r.pass),
+      'Important quiet-scene cues lost below the air bed'
+    );
 }
 console.log('Native mix benchmark captured; evidence:', evidence);

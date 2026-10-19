@@ -32,6 +32,7 @@ export function mixCases() {
     'grenade_warn',
     'lowhealth',
     'intel_call',
+    'intel_beep',
   ])
     add(
       `ui-${kind}`,
@@ -70,6 +71,12 @@ export function mixCases() {
     ['siren', 120],
   ])
     add(`ambient-${which}`, 'ambience', 'background', 'ambient', { which, distance });
+  for (const space of ['open', 'room'])
+    add(`ambient-heli-nearest-${space}`, 'ambience', 'background', 'ambient', {
+      which: 'heli',
+      distance: 90,
+      space,
+    });
   add('distant-volley', 'weapons', 'distant', 'distant-volley');
   add('distant-boom', 'weapons', 'distant', 'distant-boom');
   add('shop-radio', 'music', 'music', 'music');
@@ -93,7 +100,7 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
     { SpatialField },
     { EventBus },
     { WEAPON_DEFS },
-    { Ambience },
+    { Ambience, AMBIENT_EVENT_GAIN },
     { TentRadio },
   ] = await Promise.all([
     import('/src/audio/index.ts'),
@@ -281,7 +288,12 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
             s.distance,
             1.6,
             0,
-            { which: s.which, level: 1, gain: s.distance > 90 ? 14 : 2.5, occlusion: 0 },
+            {
+              which: s.which,
+              level: 1,
+              gain: AMBIENT_EVENT_GAIN[s.which] ?? AMBIENT_EVENT_GAIN.near,
+              occlusion: 0,
+            },
             'ambience',
             0.15
           )

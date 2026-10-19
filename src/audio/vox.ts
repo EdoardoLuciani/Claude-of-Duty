@@ -360,7 +360,9 @@ export function bark(
     const rbp2 = biquad(actx, 'lowpass', 3200, 0.9);
     const rdrv = shaper(actx, saturationCurve(7, 0.3), '2x');
     const rg = gain(actx, 1.1);
-    const radioOut = gain(actx, 1);
+    // The saturated narrow-band signal needs a communication-level reference,
+    // not the power of a nearby report. Keep its filtering/clicks/timing intact.
+    const radioOut = gain(actx, 0.16);
     series(out, rbp1, rbp2, rdrv, rg).connect(radioOut);
     // Squelch click at both ends of the transmission.
     for (const st of [Math.max(t0 - 0.05, 0), end - 0.2]) {

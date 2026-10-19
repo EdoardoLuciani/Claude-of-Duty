@@ -402,7 +402,7 @@ export class SpatialField {
     const send = (opts.send ?? 0.25) * (0.5 + Math.min(dist, 90) * 0.022) * (1 + occ * 0.7);
     em.sendGain.gain.setValueAtTime(clamp(send, 0, 3), t);
 
-    em.connectOut(this.mixer.bus(em.busName), send > 0 ? this.mixer.reverbSend : null);
+    em.connectOut(this.mixer.bus(em.busName), send > 0 ? this.mixer.sendBus(em.busName) : null);
     return em;
   }
 

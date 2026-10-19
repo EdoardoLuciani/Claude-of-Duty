@@ -21,7 +21,8 @@ Options: `PORT` (exclusive, default 5500), `AUDIO_MIX_RATE` (default 48000),
 measurements without calling them a passing mix. Set `AUDIO_MIX_BASELINE` to a
 previous evidence directory to compare all selected own/20 m/70 m gun renders
 at the same seed/sample rate. That comparison preserves the original 3e-7 native
-cross-context float bound, and reports bit-exact matches separately.
+cross-context float bound, and reports bit-exact matches separately. Filtered
+captures always include the own-M4 anchor and air bed so contrast is evaluated.
 
 ## What is measured
 
@@ -85,3 +86,30 @@ category automation and actual-game checks. Keep recordings, source windows,
 suppression identities, own stereo, positional mono/HRTF, timing and complete tails.
 Final human listening remains a milestone approval, not the repeated engineering
 feedback loop and not something a meter can claim to replace completely.
+
+## Implemented relative references
+
+Weapons/master remain1; gun recordings, +12 dB reference, distance blend and shared
+controller are unchanged. Category references are foley0.6 (was0.9), ambience0.06
+(was0.07), voice0.6 (was0.85), UI0.45 and music0.6 (both were1.6). The air bed stays
+close to its earlier quiet reference; a helicopter-specific reference2.5 (was14)
+addresses the environmental outlier without indiscriminately silencing ambience.
+Distant environmental booms use0.1 instead of6. Near blast gain0.8 is unchanged.
+
+Existing output references, not recordings, were adjusted for radio treatment
+(0.16 instead of1), heartbeat (remove4x boost), siren (0.22 instead of2.5) and
+magazine seating (0.7 instead of1). Content, cadence, pitches and complete tails
+remain. Six fixed category send gains bring the mixer constructor from22 to28
+nodes; convolver count, voice capacities and latency do not increase.
+
+The legacy self-test now compares unrounded measurements to its **unchanged**
+thresholds. Rounding0.0000226 RMS to0.00002 incorrectly failed its silence floor.
+Intel tests retain detector/siren RMS priority (4x), non-silence, ceiling, pulses,
+gaps and prompt stop. Obsolete absolute0.15 RMS /0.5 peak /0.2 pulse-RMS floors
+were replaced with detector-relative checks: those old floors demanded the very
+gunfire-like sustained alarm energy the new mix brief rejects. The separate
+whole-mix benchmark now also enforces the upper warning-to-gun contrast bound.
+
+Quiet-scene readability compares close own/enemy movement, nearby speech and a
+UI tick against the air bed; 8 m steps may approach the bed. This is a useful
+relative guard, not proof of intelligibility or audibility on every device.

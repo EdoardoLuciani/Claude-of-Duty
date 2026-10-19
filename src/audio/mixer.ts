@@ -29,6 +29,7 @@ type BusName = keyof typeof BUS_DEFS;
 interface MixerBus {
   input: AudioNode;
   level: GainNode;
+  send: GainNode;
   comp: DynamicsCompressorNode | null;
   baseTrim: number;
   volume: number;
@@ -68,20 +69,21 @@ const BUS_DEFS = {
   // The only authored weapon-level control. Sources have no separate profile
   // trim; shared summation headroom and output safety remain downstream.
   weapons: { trim: 1, comp: null },
-  foley: { trim: 0.9, comp: { threshold: -14, knee: 10, ratio: 2.0, attack: 0.004, release: 0.2 } },
+  foley: { trim: 0.6, comp: { threshold: -14, knee: 10, ratio: 2.0, attack: 0.004, release: 0.2 } },
   // Ambient bed deliberately quiet: it is a floor, not a lead vocal. A gunshot
   // should land 15+ dB above it or the street reads as the loudest thing in
   // the mix. Leave environmental detail audible, but below foley and weapons.
   ambience: {
-    trim: 0.07,
+    trim: 0.06,
     comp: { threshold: -24, knee: 12, ratio: 2.0, attack: 0.05, release: 0.5 },
   },
   voice: {
-    trim: 0.85,
+    trim: 0.6,
     comp: { threshold: -18, knee: 8, ratio: 3.0, attack: 0.006, release: 0.22 },
   },
-  ui: { trim: 1.6, comp: null },
-  music: { trim: 1.6, comp: null },
+  // Cues and the shop bed support the action rather than matching gunfire.
+  ui: { trim: 0.45, comp: null },
+  music: { trim: 0.6, comp: null },
 };
 const BUS_NAMES = Object.keys(BUS_DEFS) as BusName[];
 const preparedContexts = new WeakMap<BaseAudioContext, Promise<void>>();
@@ -196,6 +198,7 @@ export class Mixer {
       this.buses[name] = {
         input: comp ?? level,
         level,
+        send: gain(actx, def.trim),
         comp,
         baseTrim: def.trim,
         volume: 1,
@@ -208,6 +211,9 @@ export class Mixer {
     // between them. Sharing the send keeps the cost fixed no matter how many
     // voices are alive.
     this.reverbSend = gain(actx, 1);
+    // One small gain per category, not another convolver/processor per voice.
+    // Wet feeds must obey the same logical balance, volume and duck as dry.
+    for (const name of BUS_NAMES) this.buses[name].send.connect(this.reverbSend);
     // Pre-send shaping: no sub into the convolvers (muddy) and no fizz above
     // 9 kHz (real rooms do not reflect that back at you from 30 m away).
     this.sendHP = biquad(actx, 'highpass', 170, 0.7);
@@ -298,6 +304,11 @@ export class Mixer {
     return (this.buses[name as BusName] ?? this.buses.foley).input;
   }
 
+  /** Category-controlled input to the shared room field. */
+  sendBus(name: string): AudioNode {
+    return (this.buses[name as BusName] ?? this.buses.foley).send;
+  }
+
   /**
    * Sidechain duck. `amount` 0..1 of gain reduction, `hold` seconds before it
    * starts floating back. Called on every gunshot and explosion.
@@ -312,6 +323,7 @@ export class Mixer {
       b.duckAmount = a;
       b.duckHold = hold;
       b.level.gain.cancelScheduledValues(t);
+      b.send.gain.cancelScheduledValues(t);
       this._setBusLevel(b, 0.012);
     };
     apply('ambience', 1);
@@ -472,13 +484,12 @@ export class Mixer {
     this._setBusLevel(b, 0.05);
   }
 
-  /** Balance, user volume and ducking share one gain; a mute always wins. */
+  /** One logical category level drives dry and wet; a mute always wins. */
   _setBusLevel(b: MixerBus, smooth: number): void {
-    b.level.gain.setTargetAtTime(
-      b.baseTrim * b.volume * (1 - b.duckAmount),
-      this.actx.currentTime,
-      smooth
-    );
+    const value = b.baseTrim * b.volume * (1 - b.duckAmount);
+    const t = this.actx.currentTime;
+    b.level.gain.setTargetAtTime(value, t, smooth);
+    b.send.gain.setTargetAtTime(value, t, smooth);
   }
 
   dispose(): void {
@@ -506,6 +517,7 @@ export class Mixer {
     for (const name of Object.keys(this.buses) as BusName[]) {
       const b = this.buses[name];
       b.level.disconnect();
+      b.send.disconnect();
       b.comp?.disconnect();
     }
     this.reverbSend.disconnect();

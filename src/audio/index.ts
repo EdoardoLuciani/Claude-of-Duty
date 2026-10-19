@@ -33,7 +33,7 @@ import { Vector3 } from 'three';
 import type { EngineContext } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName, ReloadPhase } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
-import { Ambience, ambientOneShot, ONE_SHOTS } from './ambience.ts';
+import { Ambience, ambientOneShot, ONE_SHOTS, AMBIENT_EVENT_GAIN } from './ambience.ts';
 import { NoiseBank, SPEED_OF_SOUND, clamp, gain as mkGain } from './dsp.ts';
 import {
   surfaceImpact,
@@ -740,7 +740,7 @@ export class AudioSystem {
         dist,
         bus,
         priority,
-        // Chosen 0.5 m reference + measured distant-bank energy matching.
+        // Selected presentation reference + fixed digital-bank energy matching.
         // The sample selector and correction share the same perspective rule.
         atten:
           kind === 'shot' && (o.profile ?? WEAPON_PROFILES.rifle).samplePunch === false
@@ -787,7 +787,7 @@ export class AudioSystem {
       if (sendLevel > 0.001) {
         sendNode = mkGain(actx, sendLevel);
         g.connect(sendNode);
-        sendNode.connect(mixer.reverbSend);
+        sendNode.connect(mixer.sendBus(bus));
       }
       // Claim a bookkeeping slot; steal the oldest if all are busy.
       let slot = null;
@@ -1378,7 +1378,8 @@ export class AudioSystem {
         level: 1,
         maxDist: 400,
         occlusion: 0,
-        gain: 6,
+        // Distant environmental punctuation, not a second foreground blast.
+        gain: 0.1,
       },
       'weapons',
       0.25
@@ -1403,7 +1404,7 @@ export class AudioSystem {
         level: rng.range(0.55, 1),
         maxDist: 400,
         occlusion: far ? 0 : undefined,
-        gain: far ? 14 : 2.5,
+        gain: far ? AMBIENT_EVENT_GAIN[which] : AMBIENT_EVENT_GAIN.near,
       },
       'ambience',
       0.15

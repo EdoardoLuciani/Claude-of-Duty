@@ -37,7 +37,7 @@ function node() {
   };
 }
 Object.assign(ctx, { createGain: node, createBiquadFilter: node, createPanner: node });
-const field = new SpatialField(ctx, { bus: () => node(), reverbSend: node() }, null);
+const field = new SpatialField(ctx, { bus: () => node(), sendBus: () => node() }, null);
 const owned = (em) => [
   em.panner.positionX,
   em.panner.positionY,

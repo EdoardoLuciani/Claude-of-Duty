@@ -105,9 +105,11 @@ function measure(buf: AudioBuffer): AudioMetrics {
   // Zero crossing rate -> a crude but stable spectral centre indicator.
   const centroid = (crossings / (n / SR)) * 0.5;
   return {
-    peak: +peak.toFixed(4),
-    rms: +rms.toFixed(5),
-    dc: +(sum / total).toFixed(5),
+    // Thresholds below must use measured values, not display rounding. In
+    // particular 0.000024 rounds to the 0.00002 silence floor and falsely fails.
+    peak,
+    rms,
+    dc: sum / total,
     nan,
     centroid: Math.round(centroid),
   };
@@ -139,7 +141,7 @@ function route(mixer: Mixer, voice: AudioVoice, busName = 'weapons', sendScale =
     const g = mixer.actx.createGain();
     g.gain.value = voice.send! * sendScale;
     voice.node.connect(g);
-    g.connect(mixer.reverbSend);
+    g.connect(mixer.sendBus(busName));
   }
   return voice;
 }
