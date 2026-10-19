@@ -1,13 +1,9 @@
 /**
  * AUDIO / AMBIENCE
  *
- * A very quiet, high-passed air floor plus sparse positioned environmental
- * one-shots and distant combat. The air has no LFO or low-frequency content;
- * this avoids the anonymous pulsing loop that sounded like machinery.
- *
- * The beds also react to the space probe: walking inside drops the wind and
- * closes a lowpass over the outdoor content, which is a huge part of why a
- * doorway feels like a doorway.
+ * Sparse positioned environmental one-shots and distant combat, with silence
+ * between events. No continuous synthetic air/noise bed. Individual events keep
+ * their normal spatial filtering, room response and complete tails.
  */
 
 import type { Rng } from '../core/rng.ts';
@@ -22,8 +18,6 @@ import {
   sweep,
   type NoiseBank,
 } from './dsp.ts';
-import type { Mixer } from './mixer.ts';
-import type { SpatialField } from './spatial.ts';
 import type { AudioVoice } from './types.ts';
 interface AmbientTimers {
   volley: number;
@@ -43,54 +37,21 @@ interface AmbientOptions {
 }
 
 export class Ambience {
-  actx!: BaseAudioContext;
-  bank!: NoiseBank;
-  mixer!: Mixer;
-  field!: SpatialField;
   rng!: Rng;
-  nodes!: (AudioNode & { stop?: () => void })[];
   started!: boolean;
-  enclosure!: number;
   intensity!: number;
   _timers!: AmbientTimers;
-  _airLP?: BiquadFilterNode;
-  _airGain?: GainNode;
-  constructor(
-    actx: BaseAudioContext,
-    bank: NoiseBank,
-    mixer: Mixer,
-    field: SpatialField,
-    rng: Rng
-  ) {
-    this.actx = actx;
-    this.bank = bank;
-    this.mixer = mixer;
-    this.field = field;
+  constructor(rng: Rng) {
     this.rng = rng;
-    this.nodes = [];
     this.started = false;
-    this.enclosure = 0;
     this.intensity = 0.65; // distant detail, not a constant competing firefight
     this._timers = { volley: 4, boom: 18, oneshot: 6, chatter: 25 };
   }
 
-  /** Build the beds. Called once, after the graph is live. */
+  /** Start sparse event scheduling without creating a continuous audio source. */
   start(): void {
     if (this.started) return;
     this.started = true;
-    // Band-limit the pink-noise floor so it reads as soft air rather than hiss,
-    // while excluding sub content.
-    const src = this.bank.source('pink', this.rng, 1, true);
-    const hp = biquad(this.actx, 'highpass', 110, 0.65);
-    const lp = biquad(this.actx, 'lowpass', 2800, 0.55);
-    const g = gain(this.actx, 0.28);
-    series(src, hp, lp, g).connect(this.mixer.bus('ambience'));
-    src.start(0, src._offset);
-    this._airLP = lp;
-    this._airGain = g;
-    this.nodes.push(src, hp, lp, g);
-
-    // Identifiable events provide the actual environmental narrative.
     this._reseedTimers();
   }
 
@@ -100,15 +61,6 @@ export class Ambience {
     this._timers.boom = r.range(14, 44);
     this._timers.oneshot = r.range(5, 17);
     this._timers.chatter = r.range(18, 50);
-  }
-
-  /** Outdoor content is filtered and dropped when the listener is enclosed. */
-  setEnclosure(v: number): void {
-    this.enclosure = clamp(v, 0, 1);
-    if (!this.started) return;
-    const t = this.actx.currentTime;
-    this._airLP?.frequency.setTargetAtTime(2800 - 2400 * this.enclosure, t, 0.6);
-    this._airGain?.gain.setTargetAtTime(0.28 - 0.2 * this.enclosure, t, 0.8);
   }
 
   update(dt: number, api?: AmbientApi): void {
@@ -142,15 +94,6 @@ export class Ambience {
   }
 
   dispose(): void {
-    for (const n of this.nodes) {
-      try {
-        n.stop?.();
-      } catch {
-        /* not a source */
-      }
-      n.disconnect();
-    }
-    this.nodes.length = 0;
     this.started = false;
   }
 }

@@ -22,7 +22,7 @@ measurements without calling them a passing mix. Set `AUDIO_MIX_BASELINE` to a
 previous evidence directory to compare all selected own/20 m/70 m gun renders
 at the same seed/sample rate. That comparison preserves the original 3e-7 native
 cross-context float bound, and reports bit-exact matches separately. Filtered
-captures always include the own-M4 anchor and air bed so contrast is evaluated.
+captures always include the own-M4 anchor and idle-ambience silence regression.
 
 ## What is measured
 
@@ -91,9 +91,11 @@ feedback loop and not something a meter can claim to replace completely.
 
 Weapons/master remain1; gun recordings, +12 dB reference, distance blend and shared
 controller are unchanged. Category references are foley0.6 (was0.9), ambience0.06
-(was0.07), voice0.6 (was0.85), UI0.45 and music0.6 (both were1.6). The air bed stays
-close to its earlier quiet reference; a helicopter-specific reference2.5 (was14)
-addresses the environmental outlier without indiscriminately silencing ambience.
+(was0.07), voice0.6 (was0.85), UI0.45 and music0.6 (both were1.6). Following in-game
+acceptance, the user requested removal of the continuous synthetic air hiss. Idle
+ambience now creates no audio source; sparse environmental events, distant combat,
+spatial filtering, room tails and all approved references remain. A helicopter-
+specific reference2.5 (was14) handles that outlier without muting other ambience.
 Distant environmental booms use0.1 instead of6. Near blast gain0.8 is unchanged.
 
 Existing output references, not recordings, were adjusted for radio treatment
@@ -110,6 +112,9 @@ were replaced with detector-relative checks: those old floors demanded the very
 gunfire-like sustained alarm energy the new mix brief rejects. The separate
 whole-mix benchmark now also enforces the upper warning-to-gun contrast bound.
 
-Quiet-scene readability compares close own/enemy movement, nearby speech and a
-UI tick against the air bed; 8 m steps may approach the bed. This is a useful
-relative guard, not proof of intelligibility or audibility on every device.
+Idle ambience must produce exact digital zero at every captured stage, not merely
+fall below a silence threshold. Quiet-scene readability retains a fixed historical
+reference of -44 LUFS (the highest former bed across four approved rate/seed
+matrices), with the same 6 LU / distant-step -3 LU margins. Comparing cues against
+the newly silent bed would make that guard trivial. This is an artistic regression
+floor, not physical background SPL or proof of intelligibility on every device.

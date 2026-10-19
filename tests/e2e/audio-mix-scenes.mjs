@@ -63,7 +63,7 @@ export function mixCases() {
     space: 'room',
   });
   add('distant-boom-room', 'weapons', 'distant', 'distant-boom', { space: 'room' });
-  add('air-bed', 'ambience', 'background', 'air');
+  add('ambience-idle', 'ambience', 'silence', 'ambience-idle');
   for (const [which, distance] of [
     ['creak', 14],
     ['birds', 24],
@@ -206,9 +206,9 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
           gait,
         })
       );
-    const air = (time) =>
+    const startAmbience = (time) =>
       at(time, () => {
-        ambience = new Ambience(clock, bank, mixer, field, rng.fork());
+        ambience = new Ambience(rng.fork());
         ambience.start();
       });
     const s = scenario,
@@ -278,8 +278,8 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
           })
         );
         break;
-      case 'air':
-        air(t);
+      case 'ambience-idle':
+        startAmbience(t);
         break;
       case 'ambient':
         at(t, () =>
@@ -316,7 +316,7 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
         break;
       case 'street':
       case 'combat': {
-        air(t);
+        startAmbience(t);
         for (let i = 0; i < 10; i++)
           step(t + i * 0.42, false, 0, i % 2 ? 'metal' : 'concrete', 'run');
         for (let i = 0; i < 8; i++) step(t + 0.18 + i * 0.5, true, 5, 'dirt');

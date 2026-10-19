@@ -21,7 +21,9 @@ const rate = Number(process.env.AUDIO_MIX_RATE ?? 48000),
 const filter = process.env.AUDIO_MIX_CASES?.split(',');
 const cases = mixCases().filter(
   (c) =>
-    !filter || ['gun-rifle-0', 'air-bed'].includes(c.id) || filter.some((f) => c.id.includes(f))
+    !filter ||
+    ['gun-rifle-0', 'ambience-idle'].includes(c.id) ||
+    filter.some((f) => c.id.includes(f))
 );
 assert(cases.length > 0, 'No matching benchmark cases');
 const rows = [],
@@ -138,7 +140,12 @@ for (const row of rows) {
   assert.equal(row.dropped, 0, `${row.scenario.id}: dropped source`);
   assert.equal(row.stolen, 0, `${row.scenario.id}: stolen source`);
   assert(row.stages.final.peak <= 0.9900001, `${row.scenario.id}: sample ceiling exceeded`);
-  assert(row.stages.final.peak > 1e-7, `${row.scenario.id}: silent fixture`);
+  if (row.scenario.role === 'silence') {
+    for (const [name, stage] of Object.entries(row.stages)) {
+      assert.equal(stage.peak, 0, `${row.scenario.id}: ${name} emits idle noise`);
+      assert.equal(stage.rms, 0, `${row.scenario.id}: ${name} emits idle energy`);
+    }
+  } else assert(row.stages.final.peak > 1e-7, `${row.scenario.id}: silent fixture`);
   assert(row.stages.final.tailPeak < 1e-5, `${row.scenario.id}: render may truncate a tail`);
 }
 const anchor = rows.find((r) => r.scenario.id === 'gun-rifle-0');
@@ -210,8 +217,12 @@ if (process.env.AUDIO_MIX_BASELINE) {
   }
   save();
 }
-const bed = rows.find((r) => r.scenario.id === 'air-bed');
-if (bed) {
+// Keep the approved readability floor even without a live noise bed. Comparing
+// against digital silence would make this guard trivial. -44 LUFS is the highest
+// former bed measurement across the four approved rate/seed matrices.
+const quietReferenceLUFS = -44;
+if (rows.some((r) => r.scenario.id === 'ambience-idle')) {
+  report.quietReferenceLUFS = quietReferenceLUFS;
   report.quietReadability = rows
     .filter((r) =>
       [
@@ -223,7 +234,7 @@ if (bed) {
       ].includes(r.scenario.id)
     )
     .map((row) => {
-      const gap = row.loudness.maxMomentaryLUFS - bed.loudness.maxMomentaryLUFS;
+      const gap = row.loudness.maxMomentaryLUFS - quietReferenceLUFS;
       const minimum = row.scenario.id.endsWith('-8') ? -3 : 6;
       return { id: row.scenario.id, gap, minimum, pass: gap >= minimum };
     });
@@ -231,7 +242,7 @@ if (bed) {
   if (process.env.AUDIO_MIX_ENFORCE !== '0')
     assert(
       report.quietReadability.every((r) => r.pass),
-      'Important quiet-scene cues lost below the air bed'
+      'Important quiet-scene cues lost below the approved readability reference'
     );
 }
 console.log('Native mix benchmark captured; evidence:', evidence);

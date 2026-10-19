@@ -398,9 +398,8 @@ export class AudioSystem {
 
       await Mixer.prepare(actx);
 
-      // Long beds keep low-frequency random features from repeating every few
-      // seconds. The old 2.4 s loop was clearly audible in the wind as a rotor.
-      const bank = (this.bank = new NoiseBank(actx, this.rng.fork(), 9.6));
+      // Preserve the shared deterministic noise used by finite synthesized events.
+      this.bank = new NoiseBank(actx, this.rng.fork(), 9.6);
       const samples = (this.samples = new WeaponSampleBank(actx));
       await samples.load();
       const mixer = (this.mixer = new Mixer(actx, this.rng.fork(), {}));
@@ -411,8 +410,8 @@ export class AudioSystem {
         this._teardown();
       };
       mixer.buildReverbs();
-      const field = (this.field = new SpatialField(actx, mixer, this.ctx));
-      const ambience = (this.ambience = new Ambience(actx, bank, mixer, field, this.rng.fork()));
+      this.field = new SpatialField(actx, mixer, this.ctx);
+      const ambience = (this.ambience = new Ambience(this.rng.fork()));
       ambience.start();
       const tentRadio = (this.tentRadio = new TentRadio(actx, mixer, this.rng.fork()));
       void tentRadio.warm();
@@ -574,7 +573,6 @@ export class AudioSystem {
     }
     classifySpace(hits, PROBE_DIST, this._space);
     this.mixer!.setSpace(this._space, 0.4);
-    this.ambience!.setEnclosure(this._space.enclosure);
 
     let best = 'open',
       bv = -1;
