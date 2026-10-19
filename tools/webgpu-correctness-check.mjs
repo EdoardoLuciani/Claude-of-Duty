@@ -34,11 +34,6 @@ try {
       'blendSrcAlpha: ZeroFactor, blendDstAlpha: OneFactor,',
       'blendSrcAlpha: OneFactor, blendDstAlpha: OneFactor,',
     ],
-    surface: [
-      'src/render/webgpu-pipeline.ts',
-      'channels.surface = vec4(roughness, metalness, 0, 1)',
-      'channels.surface = vec4(materialRoughness, materialMetalness, 0, 1)',
-    ],
     order: [
       'src/render/webgpu-pipeline.ts',
       "prePass.getTextureNode('linearDepth').sample(screenUV).toVar();",
@@ -56,19 +51,17 @@ try {
     ],
   };
   if (args.negative) {
-    assert(Object.hasOwn(negatives, args.negative));
-    const [file, before, after] = negatives[args.negative];
-    await routeSourceMutation(page, file, before, after, (body) =>
-      args.negative === 'surface'
-        ? body.replace('metalness, roughness,', 'materialMetalness, materialRoughness,')
-        : body
-    );
+    assert(args.negative === 'surface' || Object.hasOwn(negatives, args.negative));
+    if (args.negative !== 'surface') {
+      const [file, before, after] = negatives[args.negative];
+      await routeSourceMutation(page, file, before, after);
+    }
   }
   await page.route('**/correctness-fixture', (route) =>
     route.fulfill({ contentType: 'text/html', body: '<canvas></canvas>' })
   );
   await page.goto(`http://127.0.0.1:${port}/correctness-fixture`);
-  const result = await page.evaluate(async () => {
+  const result = await page.evaluate(async (negative) => {
     const {
       THREE: T,
       TSL: N,
@@ -179,7 +172,10 @@ try {
     graph.prePass.setMRT(
       N.mrt({
         ...graph.prePass.getMRT().outputNodes,
-        surface: N.vec4(N.roughness, N.metalness, 0, 1),
+        surface:
+          negative === 'surface'
+            ? N.vec4(N.materialRoughness, N.materialMetalness, 0, 1)
+            : N.vec4(N.roughness, N.metalness, 0, 1),
       })
     );
     graph.prePass.getTextureNode('surface');
@@ -317,7 +313,7 @@ try {
     target.dispose();
     await renderer.dispose();
     return { coverage, surfaces, depth, parallax, readbacks };
-  });
+  }, args.negative);
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`);
   await waitForGame(page, { timeout: 180000 });
   result.shadows = await page.evaluate(async () => {
