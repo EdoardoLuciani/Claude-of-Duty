@@ -184,6 +184,10 @@ Prepass layer 1 contains opaque meshes/lights, not sky/transparent FX. Schedule 
 exactly once before world rendering at every quality, even without AO.
 `afterDepth` draws haze against current-frame depth; soft particles borrow it.
 Mesh opt-outs: `userData.owNoPrepass = true`, native `castShadow = false`.
+Layer 2 (`core/layers.ts`) is reserved for shadow-only soldier skins; render
+includes it in shadow cameras, never beauty/prepass cameras. AI owns identity-child
+casters borrowing the source geometry, skeleton and material. Compatible opaque
+skins cast once; changed/unsupported materials fall back to the grouped source.
 Refresh CSM frustums when the unjittered projection changes. Bias depends on slope/
 cascade texels. Fog borrows native cascade depth/matrices, adding no shadow draw.
 Hoist noise outside the fog march; its uniform uses application frames, not native

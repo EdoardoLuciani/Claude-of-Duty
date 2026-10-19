@@ -27,7 +27,16 @@ const render = {
     for (const mesh of skins) {
       assert.equal(mesh.geometry, geometry, 'borrow actual model geometry');
       assert.equal(mesh.material[0], material);
-      assert(mesh.castShadow && mesh.receiveShadow, 'compile actual receiving/casting variants');
+      const shadow = mesh.children.find((child) => child.isSkinnedMesh);
+      assert(
+        mesh.receiveShadow && !mesh.castShadow,
+        'beauty mesh receives but does not duplicate shadows'
+      );
+      assert(shadow?.castShadow, 'warm the actual one-draw shadow skin');
+      assert.equal(shadow.geometry, geometry);
+      assert.equal(shadow.material, material);
+      assert.equal(shadow.skeleton, mesh.skeleton);
+      assert.equal(shadow.frustumCulled, false);
       assert.equal(mesh.frustumCulled, false);
     }
     return { frameUnchanged: true };
@@ -36,7 +45,7 @@ const render = {
 const ai = Object.assign(Object.create(AiSystem.prototype), {
   ctx: { scene, camera: new THREE.PerspectiveCamera(), peek: () => render },
   materials: { get: () => material, glass: () => material },
-  variant: () => ({ geometry, materials: [material] }),
+  variant: () => ({ geometry, materials: geometry.groups.map(() => material) }),
   rng: { fork: () => assert.fail('warmup must not create an Agent or consume RNG') },
 });
 const early = await ai.prewarmMaterials();

@@ -116,6 +116,9 @@ node tests/e2e/startup-e2e.mjs --quality=high # also low/ultra
 node tests/e2e/startup-e2e.mjs --negative=weapons # must fail on late builders
 node tests/e2e/startup-e2e.mjs --failure=prewarm # checks failed report/no readiness
 node tests/e2e/profile-failure-e2e.mjs
+# Exact native CSM/flashlight depth parity, animated skins and ragdoll:
+MESA_VK_DEVICE_SELECT=1002:7550! node tests/e2e/soldier-shadow-e2e.mjs
+# --negative=layers and --negative=transform must fail the depth oracle.
 # Canonical sequential render suites (uniforms requires RX 9070 XT Mesa selection):
 MESA_VK_DEVICE_SELECT=1002:7550! node tools/render-regression.mjs
 node tools/render-regression.mjs --suite=effects --fixture=1

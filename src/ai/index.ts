@@ -64,6 +64,7 @@ import type { LadderDescriptor } from './ladder.ts';
 import { NAV_VERSION } from './nav-format.ts';
 import { SurfaceNav, CoverMap, NAV_PENDING, NAV_CANCELLED } from './nav.ts';
 import { RIG } from './rig.ts';
+import { SoldierShadowCaster } from './shadow-caster.ts';
 import { resolveMaterials, resolveVariantName, MATERIAL_SLOTS, VARIANTS } from './soldier.ts';
 import { Squad } from './squad.ts';
 import { SoldierMaterialsNode } from './textures-tsl.ts';
@@ -429,6 +430,7 @@ export class AiSystem {
       const scene = new THREE.Group();
       const { skeleton, root } = RIG.createSkeleton();
       scene.add(root);
+      const shadows: SoldierShadowCaster[] = [];
       try {
         // Borrow the exact loaded geometry/groups/materials. A synthetic
         // all-material triangle misses native shadow variants of real groups.
@@ -440,6 +442,7 @@ export class AiSystem {
           mesh.castShadow = mesh.receiveShadow = true;
           scene.add(mesh);
           mesh.bind(skeleton);
+          shadows.push(new SoldierShadowCaster(mesh));
         }
         scene.add(grenadeMesh());
         this.ctx.scene.add(scene);
@@ -448,6 +451,7 @@ export class AiSystem {
         out.ok = true;
       } finally {
         scene.removeFromParent();
+        for (const shadow of shadows) shadow.dispose();
         skeleton.dispose(); // borrowed model geometry/materials stay owned by models/AI
       }
     } catch (err: unknown) {
@@ -1715,6 +1719,7 @@ export class AiSystem {
       if (!bs) {
         a.lodIrrelevant = false;
         a.mesh.castShadow = true;
+        a.shadowCaster?.update(true);
         continue;
       }
       const s = this._sphere.copy(bs).applyMatrix4(a.mesh.matrixWorld);
@@ -1736,6 +1741,7 @@ export class AiSystem {
       a.lodIrrelevant = !visible;
       if (!visible) irrelevant++;
       a.mesh.castShadow = visible;
+      a.shadowCaster?.update(visible);
     }
     this._lodStats.irrelevant = irrelevant;
     this.stats.lodIrrelevant = irrelevant;

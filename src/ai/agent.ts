@@ -41,6 +41,7 @@ import type { LadderDescriptor, LadderCursor } from './ladder.ts';
 import type { BakedCoverPoint } from './nav-format.ts';
 import type { CoverMap, NavCache, SurfaceNav, NavRoute, NavLadderStep } from './nav.ts';
 import { RIG } from './rig.ts';
+import { SoldierShadowCaster } from './shadow-caster.ts';
 import type { Squad } from './squad.ts';
 import { COMBAT, TACTICS, acquireSeconds, applySpread } from './tuning.ts';
 
@@ -195,6 +196,7 @@ export class Agent {
   declare bones: ReturnType<typeof RIG.createSkeleton>['bones'];
   declare skeleton: THREE.Skeleton;
   declare mesh: THREE.SkinnedMesh;
+  declare shadowCaster: SoldierShadowCaster;
   declare group: THREE.Group;
   declare skinnedMesh: THREE.SkinnedMesh;
   declare mass: number;
@@ -399,6 +401,7 @@ export class Agent {
     this.group.add(root);
     this.group.add(this.mesh);
     this.mesh.bind(skeleton);
+    this.shadowCaster = new SoldierShadowCaster(this.mesh);
     this.group.scale.setScalar(this.scale);
     ai.root.add(this.group);
 
@@ -3481,6 +3484,7 @@ export class Agent {
     this.colliders.length = 0;
     if (this.ragdoll) this.phys?.removeRagdoll(this.ragdoll);
     this.ragdoll = null;
+    this.shadowCaster?.dispose();
     this.group.parent?.remove(this.group);
   }
 }

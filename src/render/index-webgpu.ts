@@ -16,6 +16,7 @@ import { Light, SpotLight } from 'three/webgpu';
 import type { Renderer, Node, UniformNode } from 'three/webgpu';
 
 import type { EngineContext } from '../core/context.ts';
+import { SHADOW_ONLY_LAYER } from '../core/layers.ts';
 import { StableCSMShadowNode } from './csm-webgpu.ts';
 import { IndirectFill } from './indirect-webgpu.ts';
 import { createGradeLut } from './lut.ts';
@@ -210,9 +211,10 @@ export class RenderSystem {
     // A cached CSM belongs to this light, but render() disables the old key
     // when day turns to night. Re-enable it every time that key comes back.
     light.castShadow = true;
-    // CSM now updates in the lit world pass, not the unlit prepass. Preserve
-    // its opaque layer-1 caster set instead of inheriting the world's layers.
+    // CSM updates in the lit world pass, not the unlit prepass. Include opaque
+    // layer-1 geometry and shadow-only skins, not the beauty camera's layers.
     light.shadow.camera.layers.set(1);
+    light.shadow.camera.layers.enable(SHADOW_ONLY_LAYER);
     if (light.shadow.shadowNode instanceof CSMShadowNode) return;
     light.shadow.mapSize.set(this.q.shadowMapSize, this.q.shadowMapSize);
     light.shadow.bias = -0.00008;
@@ -284,6 +286,13 @@ export class RenderSystem {
   }
 
   _tagLight(light: Light): void {
+    if (
+      light.castShadow &&
+      (light instanceof DirectionalLight ||
+        light instanceof SpotLight ||
+        light instanceof PointLight)
+    )
+      light.shadow.camera.layers.enable(SHADOW_ONLY_LAYER);
     if (light instanceof DirectionalLight || light instanceof SpotLight) {
       this._shareLightPosition(lightPosition(light));
       this._shareLightPosition(lightTargetPosition(light));
