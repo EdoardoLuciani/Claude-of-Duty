@@ -34,11 +34,6 @@ try {
       'blendSrcAlpha: ZeroFactor, blendDstAlpha: OneFactor,',
       'blendSrcAlpha: OneFactor, blendDstAlpha: OneFactor,',
     ],
-    surface: [
-      'src/render/webgpu-pipeline.ts',
-      'channels.surface = vec4(roughness, metalness, 0, 1)',
-      'channels.surface = vec4(materialRoughness, materialMetalness, 0, 1)',
-    ],
     order: [
       'src/render/webgpu-pipeline.ts',
       "prePass.getTextureNode('linearDepth').sample(screenUV).toVar();",
@@ -56,19 +51,17 @@ try {
     ],
   };
   if (args.negative) {
-    assert(Object.hasOwn(negatives, args.negative));
-    const [file, before, after] = negatives[args.negative];
-    await routeSourceMutation(page, file, before, after, (body) =>
-      args.negative === 'surface'
-        ? body.replace('metalness, roughness,', 'materialMetalness, materialRoughness,')
-        : body
-    );
+    assert(args.negative === 'surface' || Object.hasOwn(negatives, args.negative));
+    if (args.negative !== 'surface') {
+      const [file, before, after] = negatives[args.negative];
+      await routeSourceMutation(page, file, before, after);
+    }
   }
   await page.route('**/correctness-fixture', (route) =>
     route.fulfill({ contentType: 'text/html', body: '<canvas></canvas>' })
   );
   await page.goto(`http://127.0.0.1:${port}/correctness-fixture`);
-  const result = await page.evaluate(async () => {
+  const result = await page.evaluate(async (negative) => {
     const {
       THREE: T,
       TSL: N,
@@ -168,9 +161,24 @@ try {
     scene.add(wall);
     const graph = createWorldViewPipeline(renderer, scene, camera, view, camera, {
       gtao: false,
-      ssrEnabled: true,
       bloomStrength: 0,
     });
+    check(
+      Object.keys(graph.prePass.getMRT().outputNodes).sort().join(',') === 'linearDepth,output',
+      'production prepass must not allocate an unused material-surface MRT'
+    );
+    // Keep the evaluated-material oracle as a fixture-owned diagnostic output;
+    // production only needs normals/depth (and velocity when TAA is enabled).
+    graph.prePass.setMRT(
+      N.mrt({
+        ...graph.prePass.getMRT().outputNodes,
+        surface:
+          negative === 'surface'
+            ? N.vec4(N.materialRoughness, N.materialMetalness, 0, 1)
+            : N.vec4(N.roughness, N.metalness, 0, 1),
+      })
+    );
+    graph.prePass.getTextureNode('surface');
     const mapped = new T.DataTexture(new Uint8Array([255, 128, 64, 255]), 1, 1);
     mapped.needsUpdate = true;
     const surfaces = [];
@@ -305,7 +313,7 @@ try {
     target.dispose();
     await renderer.dispose();
     return { coverage, surfaces, depth, parallax, readbacks };
-  });
+  }, args.negative);
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`);
   await waitForGame(page, { timeout: 180000 });
   result.shadows = await page.evaluate(async () => {
