@@ -104,7 +104,7 @@ try {
     const response = await route.fetch();
     let body = await response.text();
     const marker =
-      /return\s*\{\s*pipeline\s*,\s*worldPass\s*,\s*viewPass\s*,\s*prePass\s*,\s*aoPass\s*,\s*aoBlur\s*,\s*ssrPass\s*,\s*taaPass\s*,\s*exposure\s*,/g;
+      /return\s*\{\s*pipeline\s*,\s*worldPass\s*,\s*viewPass\s*,\s*prePass\s*,\s*aoPass\s*,\s*aoBlur\s*,\s*taaPass\s*,\s*exposure\s*,/g;
     body = replaceOnce(
       body,
       marker,

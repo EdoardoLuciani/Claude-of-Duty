@@ -31,7 +31,6 @@ export const QUALITY_PRESETS = {
     shadowDistance: 60,
     taa: false,
     gtao: false,
-    ssr: false,
     volumetrics: false,
     bloom: true,
     anisotropy: 4,
@@ -46,7 +45,6 @@ export const QUALITY_PRESETS = {
     shadowDistance: 80,
     taa: true,
     gtao: true,
-    ssr: false,
     volumetrics: true,
     bloom: true,
     anisotropy: 8,
@@ -61,7 +59,6 @@ export const QUALITY_PRESETS = {
     shadowDistance: 130,
     taa: true,
     gtao: true,
-    ssr: false,
     volumetrics: true,
     bloom: true,
     anisotropy: 16,
@@ -76,7 +73,6 @@ export const QUALITY_PRESETS = {
     shadowDistance: 160,
     taa: true,
     gtao: true,
-    ssr: true,
     volumetrics: true,
     bloom: true,
     anisotropy: 16,
@@ -86,9 +82,8 @@ export const QUALITY_PRESETS = {
 };
 
 export const DEFAULTS = {
-  // 'ultra' was the default; it is a lot of GPU for a web shooter (4k shadows,
-  // SSR, 24k particles). 'high' keeps the full effect stack but runs at sane
-  // resolutions; ultra stays one click away.
+  // 'high' balances GPU cost; 'ultra' retains an extra shadow cascade and
+  // larger particle/decal budgets, one click away.
   quality: 'high',
   fov: 80, // horizontal-ish vertical FOV, CoD default feel
   // ADS magnification: hip 80 deg -> 49.6 deg while aiming = 1.61x, in line

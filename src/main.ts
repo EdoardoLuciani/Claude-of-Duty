@@ -37,7 +37,7 @@ const lockstep = capture && params.get('lockstep') === '1';
 
 const config = createConfig({
   // 'high' is the default (see src/core/config.ts); pass ?q=ultra for the
-  // full effect stack.
+  // larger shadow and FX budgets.
   quality: (params.get('q') as QualityName | null) ?? 'high',
   deterministic: capture || params.has('deterministic'),
 });

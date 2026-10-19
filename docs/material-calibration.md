@@ -43,7 +43,7 @@ camera-specific world/view identities, PMREM and shared render uniform groups.
 - Keep exported arm specular, world indirect/practical/exposure budgets, bounded
   10% first-person readability fill and soldier KIT_CAL/rim hierarchy.
   Cloth backlight is emissive orientation/AO approximation, not direct-shadow
-  sampling. Transparent windows use IBL rather than opaque SSR prepass surfaces.
+  sampling. Transparent windows use IBL for environment reflections.
 
 ## Validation
 
