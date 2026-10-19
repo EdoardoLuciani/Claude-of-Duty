@@ -25,8 +25,8 @@ try {
         bank.load(),
         failure === 'http' ? /smg-1.*HTTP 404/ : /invalid recording/
       );
-    else assert.equal(await bank.load(), 18);
-    assert.equal(decodes, failure === 'http' ? 17 : 18, 'all jobs settle before failure teardown');
+    else assert.equal(await bank.load(), 40);
+    assert.equal(decodes, failure === 'http' ? 39 : 40, 'all jobs settle before failure teardown');
     bank.dispose();
     assert(Object.values(bank.buffers).every((buffers) => buffers.length === 0));
     assert.equal(bank.heartbeatBuffer, null);

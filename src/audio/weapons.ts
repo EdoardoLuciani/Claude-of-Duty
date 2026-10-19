@@ -1,27 +1,15 @@
 /**
  * AUDIO / WEAPON FIRE
  *
- * A gunshot is not one sound. Every layer below exists in real recordings and
- * removing any one of them is immediately audible:
+ * Complete authored reports already contain their transient, body, action and
+ * natural tail. SampleBank rotates unmodified reports without pitch/level jitter;
+ * positional close/distant perspectives overlap only in the distance transition.
+ * Enemy direction, distance, air and obstruction belong to SpatialField.
  *
- *   1. TRANSIENT  sub-millisecond click — the pressure step. Gives the shot its
- *                 "instant" feel; without it the gun sounds like a firework.
- *   2. BODY       a fast downward-swept sine/triangle pair, saturated. This is
- *                 the chest thump, the layer people describe as "punch".
- *   3. CRACK      resonant band-passed noise around 1.5–3.5 kHz driven into
- *                 saturation. Calibre character lives here.
- *   4. MID        a short 500–900 Hz noise body that glues 2 and 3 together.
- *   5. TAIL       a broadband burst under a falling lowpass, fed hard into the
- *                 reverb send — this is what the *room* hears.
- *   6. MECH       the bolt/action: a separate, drier, later metallic layer. It
- *                 is what makes a weapon feel mechanical rather than sampled.
- *   7. BOOM       (distance only) a slow, dark, rolling low-frequency swell
- *                 plus a ground-bounce repeat.
- *
- * Variation: each profile owns a round-robin table of 6 timbre variants, and on
- * top of that every shot gets fresh pitch/level/decay jitter from ctx.rng. Two
- * consecutive rounds are never the same waveform, which is the single biggest
- * difference between "synthesized game audio" and "a looping sample".
+ * The synthesis below remains for legacy/fallback reports and ambient gunfire:
+ * transient, body, crack, mid, tail, mechanism and distant boom. Those paths
+ * still use their existing timbre variation and room/bounce treatment. They
+ * are not additional processors on the complete authored reports.
  */
 
 import type { Rng } from '../core/rng.ts';
@@ -41,22 +29,110 @@ import {
   sweep,
 } from './dsp.ts';
 import type { NoiseBank } from './dsp.ts';
-import type { AudioVoice, WeaponProfile, WeaponSoundOptions } from './types.ts';
+import type { AudioVoice, SampleKind, WeaponProfile, WeaponSoundOptions } from './types.ts';
+
+/** Approved +12 dB positional presentation vs the previous 0.5 reference.
+ * Own reports bypass this gain. Not a measured microphone distance or SPL. */
+export const REPORT_DISTANCE = {
+  reference: 0.5 * 10 ** (12 / 20),
+  blendStart: 20,
+  blendEnd: 140,
+} as const;
+
+/** sqrt(mean close mono report energy / mean distant mono report energy).
+ * Fixed bank-level reference matches, NOT per-take normalization or volume knobs.
+ * Full-tail measurement/provenance and limitations: docs/tactical-gunshots.md. */
+export const REPORT_DISTANT_MATCH: Readonly<Partial<Record<SampleKind, number>>> = {
+  'rifle-distant': 2.5059448946436964,
+  'pistol-distant': 1.749320949339822,
+  'lmg-distant': 2.5570276651449104,
+  'sniper-distant': 1.5367612937080013,
+  'shotgun-distant': 1.0058342240905216,
+};
+
+/** Equal-power perspective transition; own and same-source suppressed shots bypass it. */
+export function reportDistantMix(
+  distance: number,
+  profile?: WeaponProfile,
+  firstPerson = false
+): number {
+  if (firstPerson || !profile?.distantSample) return 0;
+  return clamp(
+    (distance - REPORT_DISTANCE.blendStart) /
+      (REPORT_DISTANCE.blendEnd - REPORT_DISTANCE.blendStart),
+    0,
+    1
+  );
+}
+
+/** True only for a wholly distant voice; intermediate distances use both banks. */
+export function usesDistantSample(
+  profile: WeaponProfile,
+  distance: number,
+  firstPerson = false
+): boolean {
+  return reportDistantMix(distance, profile, firstPerson) === 1;
+}
+
+export function reportDistanceGain(
+  distance: number,
+  profile?: WeaponProfile,
+  firstPerson = false
+): number {
+  const mix = reportDistantMix(distance, profile, firstPerson);
+  const match = profile?.distantSample ? (REPORT_DISTANT_MATCH[profile.distantSample] ?? 1) : 1;
+  // Factor the crossfade's level into the existing distance node so the source
+  // mix is convex, its output stays unity, and pure-bank routes stay unchanged.
+  const reference =
+    mix === 0
+      ? 1
+      : mix === 1
+        ? match
+        : Math.cos((mix * Math.PI) / 2) + match * Math.sin((mix * Math.PI) / 2);
+  return (REPORT_DISTANCE.reference / Math.max(REPORT_DISTANCE.reference, distance)) * reference;
+}
+
+const SMG_PROFILE: WeaponProfile = {
+  // Private curated report: no duplicate synthesized body or generic action.
+  sample: 'smg',
+  sampleSend: 0,
+  sampleAction: false,
+  samplePunch: false,
+  level: 0.84,
+  bodyF: 172,
+  bodyF2: 72,
+  bodyDecay: 0.06,
+  subF: 78,
+  subDecay: 0.08,
+  crackF: 3050,
+  crackQ: 1.05,
+  crackDecay: 0.04,
+  drive: 5,
+  asym: 0.3,
+  midF: 900,
+  midDecay: 0.035,
+  tailDecay: 0.19,
+  tailF: 6200,
+  tailEndF: 900,
+  mechDelay: 0.021,
+  mechLevel: 0.5,
+  mechPartials: [2200, 3900, 6300],
+  send: 0.26,
+};
 
 /**
  * Per-weapon character. Frequencies in Hz, times in seconds.
- * `level` is a linear trim; the mix expects ~1.0 for a 5.56 rifle.
+ * `level` and body/tail parameters tune legacy synthesis, not authored playback.
+ * Authored reports retain source level with unity voice output: no per-profile
+ * playback trim. The mixer's single shared weapon level defaults to 1.
  */
 export const WEAPON_PROFILES = {
   mcx: {
-    // Designed suppressed subsonic .300 BLK, not a claimed MCX field recording.
-    // Short piston-action pair, no AR buffer-spring twang or revolver cock layer.
+    // Private curated report: no duplicate synthesized body or generic action.
     sample: 'mcx',
-    sampleGain: 1.15,
-    sampleSend: 0.2,
-    firstPersonGain: 1.55,
-    sampleLowpass: 5200,
+    sampleSend: 0,
     sampleAction: false,
+    samplePunch: false,
     suppressed: true,
     level: 0.58,
     bodyF: 142,
@@ -80,10 +156,12 @@ export const WEAPON_PROFILES = {
     send: 0.16,
   },
   rifle: {
+    // Private curated report: no duplicate synthesized body or generic action.
     sample: 'rifle',
-    sampleGain: 1.9,
-    sampleSend: 0.5,
-    firstPersonGain: 1.18,
+    distantSample: 'rifle-distant',
+    sampleSend: 0,
+    sampleAction: false,
+    samplePunch: false,
     level: 1.0,
     bodyF: 148,
     bodyF2: 56,
@@ -130,39 +208,17 @@ export const WEAPON_PROFILES = {
     mechPartials: [1420, 2650, 4300],
     send: 0.34,
   },
-  smg: {
-    sample: 'smg',
-    sampleGain: 1.6,
-    sampleSend: 0.38,
-    firstPersonGain: 2.96,
-    level: 0.84,
-    bodyF: 172,
-    bodyF2: 72,
-    bodyDecay: 0.06,
-    subF: 78,
-    subDecay: 0.08,
-    crackF: 3050,
-    crackQ: 1.05,
-    crackDecay: 0.04,
-    drive: 5,
-    asym: 0.3,
-    midF: 900,
-    midDecay: 0.035,
-    tailDecay: 0.19,
-    tailF: 6200,
-    tailEndF: 900,
-    mechDelay: 0.021,
-    mechLevel: 0.5,
-    mechPartials: [2200, 3900, 6300],
-    send: 0.26,
+  smg: SMG_PROFILE,
+  mpx: {
+    ...SMG_PROFILE,
+    sample: 'mpx',
+    suppressed: true,
   },
   pistol: {
+    // Private curated report: no duplicate synthesized body or generic action.
     sample: 'pistol',
-    sampleGain: 1.45,
-    sampleSend: 0.2,
-    firstPersonGain: 2.64,
-    // Let the recorded report carry the shot. The shared revolver-cock sample
-    // and synthesized snap/body/action obscure this semi-auto's actual take.
+    distantSample: 'pistol-distant',
+    sampleSend: 0,
     sampleAction: false,
     samplePunch: false,
     level: 0.74,
@@ -187,11 +243,12 @@ export const WEAPON_PROFILES = {
     send: 0.24,
   },
   shotgun: {
+    // Private curated report: no duplicate synthesized body or generic action.
     sample: 'shotgun',
-    sampleGain: 2.7,
-    sampleSend: 0.55,
-    firstPersonGain: 2.55,
-    punchTail: 0.22,
+    distantSample: 'shotgun-distant',
+    sampleSend: 0,
+    sampleAction: false,
+    samplePunch: false,
     level: 1.32,
     bodyF: 112,
     bodyF2: 42,
@@ -215,9 +272,12 @@ export const WEAPON_PROFILES = {
     pellets: 8,
   },
   sniper: {
-    sample: null,
-    firstPersonGain: 2.85,
-    sampleSend: 0.62,
+    // Private curated report: no duplicate synthesized body or generic action.
+    sample: 'sniper',
+    distantSample: 'sniper-distant',
+    sampleSend: 0,
+    sampleAction: false,
+    samplePunch: false,
     level: 2.15,
     bodyF: 62,
     bodyF2: 24,
@@ -240,12 +300,12 @@ export const WEAPON_PROFILES = {
     send: 0.58,
   },
   lmg: {
-    // Tuned to the sample's ~75 Hz body and ~1.9 kHz crack.
+    // Private curated report: no duplicate synthesized body or generic action.
     sample: 'lmg',
-    sampleGain: 2.4,
-    sampleSend: 0.5,
-    firstPersonGain: 2.3,
-    punchTail: 0.34,
+    distantSample: 'lmg-distant',
+    sampleSend: 0,
+    sampleAction: false,
+    samplePunch: false,
     level: 1.22,
     bodyF: 88,
     bodyF2: 38,

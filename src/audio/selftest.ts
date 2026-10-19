@@ -123,6 +123,7 @@ async function renderCase(
   const ctx = new OfflineAudioContext(2, Math.ceil(SR * seconds), SR);
   const rng = new Rng(seed);
   const bank = new NoiseBank(ctx, rng.fork(), 1.2);
+  await Mixer.prepare(ctx);
   const mixer = new Mixer(ctx, rng.fork(), {});
   if (opts.reverb !== false) mixer.buildReverbs();
   if (opts.space) mixer.setSpace(opts.space, 0.001);

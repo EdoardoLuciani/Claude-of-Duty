@@ -438,6 +438,7 @@ try {
       const actx = new OfflineAudioContext(1, 48000, 48000);
       const rng = new Rng(132);
       const bank = new NoiseBank(actx, rng.fork(), 1.2);
+      await Mixer.prepare(actx);
       const mixer = new Mixer(actx, rng.fork());
       if (kind === 'intel_siren') {
         const siren = intelSiren(actx);
@@ -480,6 +481,7 @@ try {
     const { Mixer } = await import('/src/audio/mixer.ts');
     const { Rng } = await import('/src/core/rng.ts');
     const actx = new OfflineAudioContext(1, 4.25 * 48000, 48000);
+    await Mixer.prepare(actx);
     const mixer = new Mixer(actx, new Rng(132));
     const voice = intelSiren(actx);
     voice.node.connect(mixer.bus('ui'));

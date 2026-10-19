@@ -56,6 +56,7 @@ import type { WeaponProfile } from './types.ts';
 import { bark as voxBark, barkFor } from './vox.ts';
 import {
   WEAPON_PROFILES,
+  reportDistanceGain,
   resolveProfile,
   weaponShot,
   weaponPunch,
@@ -65,7 +66,8 @@ import {
 
 const PROBE_RAYS = 9;
 const PROBE_DIST = 40;
-const DRY_SLOTS = 48;
+// Private full-tail trial: full-tail player reports and compatibility SMG aliases can overlap.
+const DRY_SLOTS = 80;
 const GESTURES = ['pointerdown', 'mousedown', 'keydown', 'touchstart', 'wheel'];
 /** An enemy boot is at the edge of the mix here, and gone by the fade below it. */
 const AI_STEP_RANGE = 32;
@@ -394,12 +396,20 @@ export class AudioSystem {
       const actx = new AC({ latencyHint: 'interactive' });
       this.actx = actx;
 
+      await Mixer.prepare(actx);
+
       // Long beds keep low-frequency random features from repeating every few
       // seconds. The old 2.4 s loop was clearly audible in the wind as a rotor.
       const bank = (this.bank = new NoiseBank(actx, this.rng.fork(), 9.6));
       const samples = (this.samples = new WeaponSampleBank(actx));
       await samples.load();
       const mixer = (this.mixer = new Mixer(actx, this.rng.fork(), {}));
+      mixer.energyMix.onprocessorerror = () => {
+        console.error('[audio] energy processor failed; disabling audio');
+        this.stats.errors++;
+        this.failed = true;
+        this._teardown();
+      };
       mixer.buildReverbs();
       const field = (this.field = new SpatialField(actx, mixer, this.ctx));
       const ambience = (this.ambience = new Ambience(actx, bank, mixer, field, this.rng.fork()));
@@ -592,14 +602,10 @@ export class AudioSystem {
     switch (kind) {
       case 'shot': {
         const profile: WeaponProfile = o.profile ?? WEAPON_PROFILES.rifle;
-        // Close reports keep the authentic pressure crack from a field take,
-        // reinforced with a short, tightly filtered body/mechanical layer. The
-        // recordings alone are bright and abruptly gated; the reinforcement is
-        // what supplies the 70–180 Hz chest hit without adding a cloudy tail.
-        // Beyond 45 m, use the procedural distance model instead: a close-mic
-        // sample merely low-passed at long range sounds like a quiet nearby gun,
-        // not a report that has propagated across a city block.
-        if (dist <= 45 && profile.sample) {
+        // Complete authored reports carry their own decay. The sample bank selects
+        // distant enemy perspectives; MCX/MPX retain suppressed sources at range.
+        // Unmodified legacy profiles keep their procedural distant model.
+        if (profile.sample && (o.firstPerson || dist <= 45 || profile.samplePunch === false)) {
           const recorded = this.samples!.shot(profile, rng, {
             when,
             distance: dist,
@@ -734,6 +740,12 @@ export class AudioSystem {
         dist,
         bus,
         priority,
+        // Chosen 0.5 m reference + measured distant-bank energy matching.
+        // The sample selector and correction share the same perspective rule.
+        atten:
+          kind === 'shot' && (o.profile ?? WEAPON_PROFILES.rifle).samplePunch === false
+            ? reportDistanceGain(dist, o.profile ?? WEAPON_PROFILES.rifle, o.firstPerson)
+            : undefined,
         send: o.send ?? voice.send ?? 0.3,
         gain: o.gain ?? 1,
         endTime: voice.end,
@@ -765,8 +777,10 @@ export class AudioSystem {
     try {
       const when = actx.currentTime + (o.extraDelay ?? 0);
       const voice = this._build(kind, when, o.dist ?? 0, o);
-      const g = mkGain(actx, o.gain ?? 1);
-      voice.node.connect(g);
+      // Reuse the voice output at unity; it remains the teardown/steal handle.
+      const level = o.gain ?? 1;
+      const g = level === 1 ? voice.node : mkGain(actx, level);
+      if (g !== voice.node) voice.node.connect(g);
       g.connect(mixer.bus(bus));
       let sendNode = null;
       const sendLevel = (o.send ?? send) * (voice.send ?? 1);
@@ -980,6 +994,9 @@ export class AudioSystem {
     const w = p.weapon;
     const name = typeof w === 'string' ? w : (w?.audio ?? w?.id ?? w?.name ?? w?.kind);
     let profile = resolveProfile(name);
+    // The real MPX definition deliberately retains its generic suppressed tag.
+    // Select its dedicated 9mm report without changing unrelated suppressed guns.
+    if (w && typeof w === 'object' && w.id === 'smg' && w.suppressed) profile = WEAPON_PROFILES.mpx;
     if (w && typeof w === 'object' && w.suppressed && !profile.suppressed)
       profile = WEAPON_PROFILES.suppressed;
 
@@ -997,31 +1014,30 @@ export class AudioSystem {
     const firstPerson = p.firstPerson ?? dist < 2.6;
 
     if (firstPerson) {
-      // Own weapon: no propagation delay, mostly dry, and the send level is
-      // driven by the space probe so the *room* answers the shot — a tight slap
-      // indoors, a long crack down the street.
-      const echo =
-        0.35 +
-        this._space.tight * 0.5 +
-        this._space.street * 0.9 +
-        this._space.tunnel * 1.0 +
-        this._space.room * 0.75;
-      // Player weapons share a tight perceived-loudness corridor despite very
-      // different source durations. Short 9 mm reports need more gain than the
-      // long M4 field take; the master safety chain retains peak headroom.
+      // Complete reports already contain their decay: no extra room branch.
+      // Legacy isolated takes retain their separately tuned environment send.
+      const send =
+        profile.samplePunch === false
+          ? 0
+          : (0.35 +
+              this._space.tight * 0.5 +
+              this._space.street * 0.9 +
+              this._space.tunnel * 1.0 +
+              this._space.room * 0.75) *
+            0.6;
       this._playDry(
         'shot',
         {
           profile,
           firstPerson: true,
-          gain: profile.firstPersonGain ?? 1.18,
+          gain: profile.samplePunch === false ? 1 : (profile.firstPersonGain ?? 1.18),
         },
         'weapons',
-        echo * 0.6
+        send
       );
       mixer.duck(0.55, 0.1);
     } else {
-      this._playAt('shot', x, y, z, { profile, firstPerson: false, gain: 1.2 }, 'weapons', 0.95);
+      this._playAt('shot', x, y, z, { profile, firstPerson: false, gain: 1 }, 'weapons', 0.95);
       mixer.duck(clamp(0.5 - dist * 0.004, 0.12, 0.5), 0.08);
       // Enemies opening fire get occasional chatter, so firefights feel alive
       // even before `ai` grows its own bark logic.
@@ -1157,7 +1173,8 @@ export class AudioSystem {
         radius: p.radius ?? 6,
         level: 1,
         send: 0.62,
-        gain: 6.5,
+        // Calibrated below unity so ordinary blasts do not lean on the limiter.
+        gain: 0.8,
       },
       'weapons',
       1
@@ -1568,7 +1585,7 @@ export class AudioSystem {
       enclosure: this._space.enclosure,
       meanFree: this._space.meanFree,
       deafness: this.deafness,
-      limiterReduction: this.mixer?.reduction ?? 0,
+      outputSafety: 'lookahead-peak-limiter',
       events: this.stats.events,
       errors: this.stats.errors,
     };

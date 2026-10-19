@@ -28,19 +28,30 @@ assert(resolveProfile('mcx').suppressed && resolveProfile('mcx').sampleAction ==
 for (const n of [1, 2]) {
   const wav = readFileSync(new URL(`../../src/audio/samples/mcx-${n}.wav`, import.meta.url));
   assert.equal(wav.toString('ascii', 0, 4), 'RIFF');
-  assert.equal(wav.readUInt16LE(22), 1);
+  assert.equal(wav.readUInt16LE(20), 3, 'source-level IEEE float, no integer clipping');
+  assert.equal(wav.readUInt16LE(22), 2);
   assert.equal(wav.readUInt32LE(24), 48000);
-  assert.equal(wav.readUInt32LE(40) / 96000, 0.32);
+  assert.equal(wav.readUInt16LE(34), 32);
+  let offset = 12;
+  while (wav.toString('ascii', offset, offset + 4) !== 'data') {
+    const size = wav.readUInt32LE(offset + 4);
+    offset += 8 + size + (size & 1);
+    assert(offset + 8 <= wav.length);
+  }
+  const start = offset + 8;
+  assert.equal(wav.readUInt32LE(offset + 4) / 384000, n === 1 ? 3.2713125 : 2.458875);
   let peak = 0,
     energy = 0;
-  for (let i = 44; i < wav.length; i += 2) {
-    const x = wav.readInt16LE(i) / 32768;
+  for (let i = start; i < wav.length; i += 4) {
+    const x = wav.readFloatLE(i);
+    assert(Number.isFinite(x));
     peak = Math.max(peak, Math.abs(x));
     energy += x * x;
   }
-  assert(peak > 0.59 && peak < 0.6, '4.5 dB peak headroom');
+  assert(peak > 1.14 && peak < 1.2, 'unattenuated source peaks survive resampling');
+  assert.equal('sampleGain' in WEAPON_PROFILES.mcx, false, 'no separate suppressed profile trim');
   assert(energy > 0.1);
-  assert.equal(wav.readInt16LE(wav.length - 2), 0, 'clean end fade');
+  assert.equal(wav.readFloatLE(wav.length - 4), 0, '1ms boundary-only click protection');
 }
 
 // Exercise the REAL GLB hierarchy, animation samplers and runtime adapter.
