@@ -306,6 +306,18 @@ try {
   result.datasetSha256 = datasetSha256;
   result.rendererSha256 = rendererSha256;
   result.originalRendererSha256 = sha(args.mode === 'raw' ? original : originalThree);
+  if (args.mode === 'three') {
+    result.threeVersion = JSON.parse(
+      await readFile(join(root, 'node_modules/three/package.json'))
+    ).version;
+    result.threeBundlesSha256 = sha(
+      ...(await Promise.all(
+        ['three.webgpu.js', 'three.core.js', 'three.tsl.js'].map((f) =>
+          readFile(join(root, 'node_modules/three/build', f))
+        )
+      ))
+    );
+  }
   result.browser = browser.version();
   result.system = await session.send('SystemInfo.getInfo');
   result.errors = errors;
