@@ -12,7 +12,8 @@ This ports the _limited_ direct-WebGPU renderer in draft
 production backend, or a full-game FPS comparison**. Both implementations use
 that experiment's historical snapshots, not today's `develop` world/materials.
 
-Measured results and limitations: [RESULTS.md](RESULTS.md).
+Latest comparison: [native vs direct JS vs Three.js, VSync off](THREE-WAY.md).
+Original two-implementation series and limitations: [RESULTS.md](RESULTS.md).
 
 ## Build and run
 

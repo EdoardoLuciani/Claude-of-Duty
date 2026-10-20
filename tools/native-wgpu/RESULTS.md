@@ -1,5 +1,9 @@
 # Native renderer results — 2026-10-20
 
+**Newer: [three-way comparison with VSync off](THREE-WAY.md)** includes native,
+direct JS and Three.js in real desktop windows and fully matched offscreen targets.
+This page retains the original two-implementation series; do not pool the runs.
+
 **The Rust/WGPU desktop application works without a JavaScript runtime. Native
 CPU cost is low, but saturated throughput is only modestly higher than the JS
 prototype. Shallow-queue results are dominated by completion/scheduling policy,
