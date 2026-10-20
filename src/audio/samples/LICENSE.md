@@ -66,9 +66,8 @@ heartbeat; cadence is set by player health, not by looping the file.
 `T_27P.wav` takes above (`suppressed-[12].wav`), **not recordings of an actual
 MCX or verified recordings of this suppressor/load**. No new third-party sound
 is required. This is the historical recipe, NOT the current commercial MCX bank.
-`node tools/mcx-audio.mjs /private/legacy-masters /private/legacy-output`
-deterministically rebuilds the old prototype outside the repository:
-mono downmix, onset trim, 3.1/3.3 kHz Butterworth low-pass, 55 Hz high-pass,
+The retired prototype generator remains in local Git history: mono downmix,
+onset trim, 3.1/3.3 kHz Butterworth low-pass, 55 Hz high-pass,
 shortened environmental decay, end fade, 48 kHz PCM16, -4.5 dBFS peak.
 
 The dedicated `mcx` WebAudio profile adds short pressure/body and piston-action

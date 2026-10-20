@@ -56,16 +56,16 @@ and native decode/listening checks, not automatic baseline replacement. Never ov
 
 ```sh
 node tests/smoke/smoke-audio-opus.mjs
-OPUS_EVIDENCE_DIR=/outside/repository/opus-decode node tests/e2e/audio-opus-e2e.mjs
+AUDIO_EVIDENCE_DIR=/outside/repository/audio node tests/e2e/audio-e2e.mjs
 AUDIO_MIX_EVIDENCE_DIR=/outside/repository/mix node tests/e2e/audio-mix-e2e.mjs
 # Additional offline validation against every verified original master:
 AUDIO_MASTER_DIR=/private/wav-masters npm test
-AUDIO_MASTER_DIR=/private/wav-masters OPUS_EVIDENCE_DIR=/outside/repository/direct-master-check node tests/e2e/audio-opus-e2e.mjs
+AUDIO_MASTER_DIR=/private/wav-masters AUDIO_EVIDENCE_DIR=/outside/repository/direct-master-check node tests/e2e/audio-e2e.mjs
 ```
 
-`src/audio/samples/reference.json` preserves source checksums, original format,
+`src/audio/samples/reference.json` preserves source checksums, distant-bank
 full-tail mono energy, duration/layout, heartbeat pulse times and measured native
-master frames/RMS/peak at44.1/48/96k. It is authoring/test metadata, never imported
+master frames/RMS at44.1/48/96k. It is authoring/test metadata, never imported
 by the runtime. Frozen approved Opus payload hashes bind those references to the
 actual delivered recordings; tests do not silently rebaseline changed files.
 
@@ -76,10 +76,12 @@ all40 copies against those frozen master measurements at44.1/48/96k: exact
 frame/channel counts, finite float PCM and less than0.5dB total-energy drift.
 The delivered heartbeat's pulse timing is also checked. This common engineering
 margin is not per-file normalization or proof of transient/timbre transparency.
-The preparation/routing smokes use the frozen source statistics by default. With
-`AUDIO_MASTER_DIR`, the original full-sample WAV checks run additionally, after
-verifying every accessed master checksum; the native test then decodes both actual
-WAV and Opus files in that browser rather than using stored master measurements.
+One native runner covers hearing transparency/recovery, emitter ownership
+(including the unavailable-`cancelAndHoldAtTime` fallback), category automation
+and codec checks. Source-preparation scanners and the obsolete CC0 MCX generator
+are retired; verified masters and historical authoring evidence remain private.
+With `AUDIO_MASTER_DIR`, all40 master checksums are verified centrally; the native
+test then decodes both actual WAV and Opus files rather than using stored measurements.
 Missing/changed external masters fail explicitly when that mode is requested.
 The codec and actual-game tests validate what is loaded at runtime.
 

@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
+import { resolve } from 'node:path';
 
-import { audioReference } from '../helpers/audio-masters.mjs';
+import reference from '../../src/audio/samples/reference.json' with { type: 'json' };
 
 const module = readFileSync(new URL('../../src/audio/samples.ts', import.meta.url), 'utf8');
 const names = [...module.matchAll(/new URL\(['"]\.\/samples\/([a-z0-9-]+)\.opus['"]/g)].map(
@@ -19,13 +20,21 @@ assert(
 );
 let totalBytes = 0;
 for (const name of names) {
-  const reference = audioReference[name];
-  assert(reference, 'Frozen master baseline must exist');
+  const referenceFile = reference.files[name];
+  assert(referenceFile, 'Frozen master baseline must exist');
+  if (process.env.AUDIO_MASTER_DIR)
+    assert.equal(
+      createHash('sha256')
+        .update(readFileSync(resolve(process.env.AUDIO_MASTER_DIR, name + '.wav')))
+        .digest('hex'),
+      referenceFile.sha256,
+      name + ': archived master changed'
+    );
   const opus = readFileSync(new URL(`../../src/audio/samples/${name}.opus`, import.meta.url));
-  const frames = reference.frames;
+  const frames = referenceFile.frames;
   const head = opus.indexOf('OpusHead');
   assert(head >= 0, 'Required Opus header');
-  assert.equal(opus[head + 9], reference.channels, 'Preserve stereo/mono identity');
+  assert.equal(opus[head + 9], referenceFile.channels, 'Preserve stereo/mono identity');
   assert.equal(opus.readInt16LE(head + 16), 0, 'No header gain compensation');
   const skip = opus.readUInt16LE(head + 10);
   let granule;
@@ -42,7 +51,7 @@ for (const name of names) {
   assert.equal(Number(granule) - skip, frames, 'Granules retain the complete master duration');
   assert.equal(
     payloadHash.digest('hex'),
-    reference.opusPayloadSha256,
+    referenceFile.opusPayloadSha256,
     `${name}: approved codec payload changed`
   );
   totalBytes += opus.length;

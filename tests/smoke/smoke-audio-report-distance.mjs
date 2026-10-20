@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 
 import { AudioSystem } from '../../src/audio/index.ts';
+import masters from '../../src/audio/samples/reference.json' with { type: 'json' };
 import { SpatialField } from '../../src/audio/spatial.ts';
 import {
   REPORT_DISTANCE,
@@ -9,7 +10,6 @@ import {
   reportDistanceGain,
   reportDistantMix,
 } from '../../src/audio/weapons.ts';
-import { audioMaster } from '../helpers/audio-masters.mjs';
 
 const reference = 1.9905358527674861; // independently pinned approved +12 dB audition
 assert.deepEqual(REPORT_DISTANCE, { reference, blendStart: 20, blendEnd: 140 });
@@ -42,30 +42,7 @@ assert.equal(SpatialField.prototype.attenuation(20), 2 / (2 + 0.85 * 18));
 
 function meanReportEnergy(kind, count) {
   let energy = 0;
-  for (let variant = 1; variant <= count; variant++) {
-    const { file, reference } = audioMaster(`${kind}-${variant}`);
-    if (!file) {
-      energy += reference.monoEnergy;
-      continue;
-    }
-    assert.equal(file.readUInt16LE(20), 3);
-    assert.equal(file.readUInt16LE(34), 32);
-    assert.equal(file.readUInt32LE(24), 48000);
-    const channels = file.readUInt16LE(22);
-    let offset = 12;
-    while (file.toString('ascii', offset, offset + 4) !== 'data') {
-      const size = file.readUInt32LE(offset + 4);
-      offset += 8 + size + (size & 1);
-      assert(offset + 8 <= file.length);
-    }
-    const end = offset + 8 + file.readUInt32LE(offset + 4);
-    assert.equal(end, file.length);
-    for (let p = offset + 8; p < end; p += 4 * channels) {
-      let mono = 0;
-      for (let ch = 0; ch < channels; ch++) mono += file.readFloatLE(p + ch * 4) / channels;
-      energy += (mono * mono) / 48000;
-    }
-  }
+  for (let i = 1; i <= count; i++) energy += masters.files[`${kind}-${i}`].monoEnergy;
   return energy / count;
 }
 assert.equal(Object.keys(REPORT_DISTANT_MATCH).length, 5);

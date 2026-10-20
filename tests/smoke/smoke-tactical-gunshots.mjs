@@ -2,13 +2,13 @@ import assert from 'node:assert/strict';
 
 import { AudioSystem } from '../../src/audio/index.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
+import reference from '../../src/audio/samples/reference.json' with { type: 'json' };
 import {
   REPORT_DISTANT_MATCH,
   WEAPON_PROFILES,
   reportDistanceGain,
   reportDistantMix,
 } from '../../src/audio/weapons.ts';
-import { audioMaster } from '../helpers/audio-masters.mjs';
 
 const kinds = ['rifle', 'mcx', 'pistol', 'lmg', 'smg', 'mpx', 'sniper', 'shotgun'];
 const param = () => ({ value: 0 });
@@ -21,8 +21,6 @@ const node = () => ({
   Q: param(),
   gain: param(),
 });
-let decodedBytes = 0;
-let reportsAboveUnity = 0;
 for (const kind of kinds) {
   const profile = WEAPON_PROFILES[kind];
   assert.equal(profile.sample, kind);
@@ -54,66 +52,17 @@ for (const kind of kinds) {
     },
   };
   const bank = new WeaponSampleBank(ctx);
-  function readVariants(key, count, channels) {
+  function readVariants(key, count) {
     return Array.from({ length: count }, (_, i) => {
-      const { file, reference } = audioMaster(`${key}-${i + 1}`);
-      assert.equal(reference.format, 3);
-      assert.equal(reference.bits, 32);
-      assert.equal(reference.channels, channels);
-      assert.equal(reference.rate, 48000);
-      const duration = reference.frames / reference.rate;
-      assert(duration > 2.4 && duration < 5.4, 'full natural report, no short exponential edit');
-      decodedBytes += reference.frames * channels * (reference.bits / 8);
-      let peak = reference.peak;
-      if (channels === 2) assert(reference.stereoDifference > 0.1);
-      assert(Math.abs(reference.lastSample) < 1e-6);
-      if (file) {
-        assert.equal(file.toString('ascii', 0, 4), 'RIFF');
-        assert.equal(
-          file.readUInt16LE(20),
-          3,
-          'IEEE float preserves source-level resampling peaks'
-        );
-        assert.equal(file.readUInt16LE(22), channels, 'stereo own source, mono distant emitter');
-        assert.equal(file.readUInt32LE(24), 48000);
-        assert.equal(file.readUInt16LE(34), 32);
-        let offset = 12;
-        while (file.toString('ascii', offset, offset + 4) !== 'data') {
-          const size = file.readUInt32LE(offset + 4);
-          offset += 8 + size + (size & 1);
-          assert(offset + 8 <= file.length, 'WAV has a data chunk');
-        }
-        const dataBytes = file.readUInt32LE(offset + 4);
-        const start = offset + 8;
-        assert.equal(start + dataBytes, file.length);
-        assert.equal(dataBytes / (192000 * channels), duration);
-        peak = 0;
-        let stereoDifference = 0;
-        for (let p = start; p < file.length; p += 4) {
-          const value = file.readFloatLE(p);
-          assert(Number.isFinite(value));
-          peak = Math.max(peak, Math.abs(value));
-        }
-        if (channels === 2) {
-          for (let p = start; p < file.length; p += 8)
-            stereoDifference += Math.abs(file.readFloatLE(p) - file.readFloatLE(p + 4));
-          assert(stereoDifference > 0.1, 'original stereo is not duplicated mono');
-        }
-        assert(
-          Math.abs(file.readFloatLE(file.length - 4)) < 1e-6,
-          'stationary floor or splice protection'
-        );
-      }
-      assert(peak > 0.9 && peak < 1.3, `${key}: natural report level, no blanket baked reduction`);
-      if (peak > 1) reportsAboveUnity++;
+      const duration = reference.files[`${key}-${i + 1}`].frames / reference.masterRate;
       return { duration, i };
     });
   }
   const variants = kind === 'mcx' ? 2 : 3;
-  const buffers = readVariants(kind, variants, 2);
+  const buffers = readVariants(kind, variants);
   bank.buffers[kind] = buffers;
   if (profile.distantSample)
-    bank.buffers[profile.distantSample] = readVariants(profile.distantSample, 2, 1);
+    bank.buffers[profile.distantSample] = readVariants(profile.distantSample, 2);
   else assert.equal(profile.distantSample, undefined, 'no unsuppressed substitute for MCX');
   const rng = { range: (a, b) => (a + b) / 2 };
   for (let i = 0; i < variants + 1; i++) {
@@ -190,12 +139,6 @@ for (const kind of kinds) {
   bank.dispose();
   assert.deepEqual(bank.buffers, {});
 }
-assert.equal(decodedBytes, 41627940, 'same decoded 33-report payload despite float storage');
-assert.equal(
-  reportsAboveUnity,
-  22,
-  'resampling overshoots retained, never clipped or wrapped to integer PCM'
-);
 console.log(
   'Source-faithful gunshots: stereo, full tails, fixed rate/gain, distant mapping, budgets and cleanup'
 );

@@ -10,7 +10,8 @@ untouched WAV masters retained offline. Codec changes do not retune this mixer.
 
 Requires the normal game assets, Chromium/Playwright and local FFmpeg with its
 `ebur128` filter. No new runtime dependencies or network analysis services.
-Recording exports must remain outside the repository and must not be uploaded.
+Optional JSON evidence must remain outside the repository. The runner meters
+raw float PCM through FFmpeg stdin; it no longer writes recordings or meter logs.
 
 ```sh
 AUDIO_MIX_EVIDENCE_DIR=/outside/repository/mix-current \
@@ -19,11 +20,11 @@ AUDIO_MIX_EVIDENCE_DIR=/outside/repository/mix-current \
 
 Options: `PORT` (exclusive, default 5500), `AUDIO_MIX_RATE` (default 48000),
 `AUDIO_MIX_SEED` (default 1907), `AUDIO_MIX_CASES` (comma-separated ID substrings).
-`AUDIO_MIX_ENFORCE=0` is explicitly **audit-only**: it captures failing hierarchy
-measurements without calling them a passing mix. Set `AUDIO_MIX_BASELINE` to a
-previous evidence directory to compare all selected own/20 m/70 m gun renders
+All criteria are enforced. `AUDIO_MIX_EVIDENCE_DIR` optionally saves one JSON
+report. Set `AUDIO_MIX_BASELINE` to an archived approved Float32 WAV capture
+directory to compare all selected own/20 m/70 m gun renders
 at the same seed/sample rate. That comparison preserves the original 3e-7 native
-cross-context float bound, and reports bit-exact matches separately. Filtered
+cross-context float bound and reports maximum differences. Filtered
 captures always include the own-M4 anchor and idle-ambience silence regression.
 
 ## What is measured
@@ -35,16 +36,15 @@ per-file normalization or altered controller parameters. Controlled event timing
 uses the offline context's native clock; housekeeping follows the real audio
 ownership rules. These fixtures are not an organic AI/performance acceptance run.
 
-Parallel taps observe source feeds **before** category compression, category
-output, aggregate wet return, world input, master input and final output. The
-compressor node's output is not a pre-compression tap: native makeup gain matters.
-Dry and aggregate wet measurements must both be examined when diagnosing balance.
+Parallel taps observe aggregate wet return, world input, master input and final
+output. Source/category forensic taps and their global `AudioNode.connect` patch
+are retired; native category-envelope tests independently check shared dry/wet
+volume, mute and duck behavior.
 
-Reports include hotter-ear strongest 20/200/400 ms RMS windows, full-tail RMS,
-sample peaks, last-100-ms residuals, FFmpeg K-weighted maximum momentary/integrated
-LUFS, estimated true peak, and time-aligned common gain reduction. Final WAVs are
-full-length stereo Float32 at runtime amplitude. Peaks above unity upstream are
-valid. The sample ceiling is not a true-peak or hearing-safety guarantee.
+Reports retain hotter-ear strongest20/200ms RMS windows, full-tail RMS, sample
+peaks, last100ms residuals, FFmpeg K-weighted maximum momentary/integrated LUFS
+and estimated true peak. The metered signal is full-length stereo Float32 at
+runtime amplitude. Peaks above unity upstream are valid. The sample ceiling is not a true-peak or hearing-safety guarantee.
 
 Whole-clip averages alone bias comparisons toward duration and silence. LUFS is
 also not a complete model of short impulsive loudness: transient and body

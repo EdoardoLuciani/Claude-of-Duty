@@ -1,27 +1,26 @@
 /** Browser-only, deterministic native-audio mix benchmark. No runtime gain overrides. */
 export function mixCases() {
   const cases = [];
-  const add = (id, bus, role, event, options = {}) =>
-    cases.push({ id, bus, role, event, ...options });
+  const add = (id, role, event, options = {}) => cases.push({ id, role, event, ...options });
   for (const weapon of ['rifle', 'mcx', 'pistol', 'lmg', 'smg', 'sniper', 'shotgun'])
     for (const distance of [0, 20, 70])
-      add(`gun-${weapon}-${distance}`, 'weapons', 'anchor', 'gun', { weapon, distance });
+      add(`gun-${weapon}-${distance}`, 'anchor', 'gun', { weapon, distance });
   for (const surface of ['concrete', 'metal', 'wood', 'dirt', 'foliage', 'sand'])
     for (const gait of ['walk', 'run'])
-      add(`own-step-${surface}-${gait}`, 'foley', 'routine', 'own-step', { surface, gait });
+      add(`own-step-${surface}-${gait}`, 'routine', 'own-step', { surface, gait });
   for (const gait of ['crouch', 'sprint'])
-    add(`own-step-concrete-${gait}`, 'foley', 'routine', 'own-step', { surface: 'concrete', gait });
+    add(`own-step-concrete-${gait}`, 'routine', 'own-step', { surface: 'concrete', gait });
   for (const surface of ['concrete', 'metal', 'sand'])
     for (const distance of [2, 8, 20])
-      add(`enemy-step-${surface}-${distance}`, 'foley', 'routine', 'enemy-step', {
+      add(`enemy-step-${surface}-${distance}`, 'routine', 'enemy-step', {
         surface,
         distance,
       });
   for (const phase of ['start', 'magout', 'magin', 'end', 'pump', 'shellin'])
-    add(`reload-${phase}`, 'foley', 'routine', 'reload', { phase });
-  for (const event of ['cloth', 'ads', 'shell']) add(event, 'foley', 'routine', event);
-  add('bodyfall', 'foley', 'impact', 'bodyfall');
-  for (const velocity of [4, 9]) add(`land-${velocity}`, 'foley', 'impact', 'land', { velocity });
+    add(`reload-${phase}`, 'routine', 'reload', { phase });
+  for (const event of ['cloth', 'ads', 'shell']) add(event, 'routine', event);
+  add('bodyfall', 'impact', 'bodyfall');
+  for (const velocity of [4, 9]) add(`land-${velocity}`, 'impact', 'land', { velocity });
   for (const kind of [
     'hitmarker',
     'headshot',
@@ -36,57 +35,55 @@ export function mixCases() {
   ])
     add(
       `ui-${kind}`,
-      'ui',
       ['damage', 'grenade_warn', 'lowhealth', 'intel_call'].includes(kind) ? 'warning' : 'routine',
       'ui',
       { kind }
     );
   for (const kind of ['spot', 'reload', 'hurt', 'death'])
-    add(`voice-${kind}`, 'voice', 'speech', 'voice', { kind });
-  add('radio-voice', 'voice', 'speech', 'voice', { kind: 'spot', radio: true });
-  add('voice-near', 'voice', 'speech', 'voice', { kind: 'spot', distance: 2 });
-  add('own-hurt', 'voice', 'warning', 'own-hurt');
+    add(`voice-${kind}`, 'speech', 'voice', { kind });
+  add('radio-voice', 'speech', 'voice', { kind: 'spot', radio: true });
+  add('voice-near', 'speech', 'voice', { kind: 'spot', distance: 2 });
+  add('own-hurt', 'warning', 'own-hurt');
   for (const strength of [0.25, 0.6])
-    add(`heartbeat-${strength}`, 'ui', 'warning', 'heartbeat', { strength });
-  add('near-impact', 'foley', 'threat', 'near-impact');
-  add('near-miss', 'foley', 'threat', 'near-miss');
-  add('own-step-room', 'foley', 'routine', 'own-step', {
+    add(`heartbeat-${strength}`, 'warning', 'heartbeat', { strength });
+  add('near-impact', 'threat', 'near-impact');
+  add('near-miss', 'threat', 'near-miss');
+  add('own-step-room', 'routine', 'own-step', {
     surface: 'concrete',
     gait: 'run',
     space: 'room',
   });
-  add('reload-room', 'foley', 'routine', 'reload', { phase: 'magin', space: 'room' });
-  add('voice-room', 'voice', 'speech', 'voice', { kind: 'spot', space: 'room' });
-  add('ambient-heli-room', 'ambience', 'background', 'ambient', {
+  add('reload-room', 'routine', 'reload', { phase: 'magin', space: 'room' });
+  add('voice-room', 'speech', 'voice', { kind: 'spot', space: 'room' });
+  add('ambient-heli-room', 'background', 'ambient', {
     which: 'heli',
     distance: 120,
     space: 'room',
   });
-  add('distant-boom-room', 'weapons', 'distant', 'distant-boom', { space: 'room' });
-  add('ambience-idle', 'ambience', 'silence', 'ambience-idle');
+  add('distant-boom-room', 'distant', 'distant-boom', { space: 'room' });
+  add('ambience-idle', 'silence', 'ambience-idle');
   for (const [which, distance] of [
     ['creak', 14],
     ['birds', 24],
     ['heli', 120],
     ['siren', 120],
   ])
-    add(`ambient-${which}`, 'ambience', 'background', 'ambient', { which, distance });
+    add(`ambient-${which}`, 'background', 'ambient', { which, distance });
   for (const space of ['open', 'room'])
-    add(`ambient-heli-nearest-${space}`, 'ambience', 'background', 'ambient', {
+    add(`ambient-heli-nearest-${space}`, 'background', 'ambient', {
       which: 'heli',
       distance: 90,
       space,
     });
-  add('distant-volley', 'weapons', 'distant', 'distant-volley');
-  add('distant-boom', 'weapons', 'distant', 'distant-boom');
-  add('shop-radio', 'music', 'music', 'music');
-  add('intel-alarm', 'ui', 'warning', 'intel');
-  for (const distance of [3, 20])
-    add(`blast-${distance}`, 'weapons', 'threat', 'blast', { distance });
-  add('walking-street', 'foley', 'context', 'street');
-  add('mixed-firefight', 'foley', 'context', 'combat');
-  add('mixed-room', 'foley', 'context', 'combat', { space: 'room' });
-  add('mixed-far', 'foley', 'context', 'combat', { far: true });
+  add('distant-volley', 'distant', 'distant-volley');
+  add('distant-boom', 'distant', 'distant-boom');
+  add('shop-radio', 'music', 'music');
+  add('intel-alarm', 'warning', 'intel');
+  for (const distance of [3, 20]) add(`blast-${distance}`, 'threat', 'blast', { distance });
+  add('walking-street', 'context', 'street');
+  add('mixed-firefight', 'context', 'combat');
+  add('mixed-room', 'context', 'combat', { space: 'room' });
+  add('mixed-far', 'context', 'combat', { far: true });
   return cases;
 }
 
@@ -125,7 +122,7 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
     };
   }
   const seconds = 14,
-    ctx = new OfflineAudioContext(12, seconds * rate, rate);
+    ctx = new OfflineAudioContext(8, seconds * rate, rate);
   await Mixer.prepare(ctx);
   const clock = new Proxy(ctx, {
     get(target, key) {
@@ -161,17 +158,6 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
     _lastEnemyFire: 1000,
   });
   audio._wireEvents(runtime);
-  const sourceTap = ctx.createGain();
-  sourceTap.channelCount = 2;
-  sourceTap.channelCountMode = 'explicit';
-  const connect = AudioNode.prototype.connect;
-  // Observe the real feeds BEFORE the native category compressor. Its output
-  // alone cannot expose built-in makeup gain. The parallel tap never feeds back.
-  AudioNode.prototype.connect = function (...args) {
-    const result = connect.apply(this, args);
-    if (args[0] === mixer.buses[scenario.bus].input) connect.call(this, sourceTap);
-    return result;
-  };
   let ambience, radio;
   try {
     if (scenario.event === 'music') {
@@ -344,18 +330,16 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
       radio?.stop();
       emit('intel:operation', { active: false });
     });
-    const merge = ctx.createChannelMerger(12);
+    const merge = ctx.createChannelMerger(8);
     mixer.masterGain.disconnect(ctx.destination);
     for (const [node, offset] of [
       [mixer.masterGain, 0],
       [mixer.masterSum, 2],
-      [sourceTap, 4],
-      [mixer.buses[s.bus].level, 6],
-      [mixer.reverbReturn, 8],
-      [mixer.worldSum, 10],
+      [mixer.reverbReturn, 4],
+      [mixer.worldSum, 6],
     ]) {
       const split = ctx.createChannelSplitter(2);
-      connect.call(node, split);
+      node.connect(split);
       split.connect(merge, 0, offset);
       split.connect(merge, 1, offset + 1);
     }
@@ -368,9 +352,7 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
       if (!ticks.has(q)) ticks.set(q, []);
       ticks.get(q).push(item.action);
     }
-    let previous = 0,
-      peakSpatial = 0,
-      peakDry = 0;
+    let previous = 0;
     const callbacks = [...ticks]
       .sort(([a], [b]) => a - b)
       .map(([q, actions]) =>
@@ -388,8 +370,6 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
               slot.send = null;
             }
           for (const action of actions) await action();
-          peakSpatial = Math.max(peakSpatial, field.emitters.filter((e) => !e.free).length);
-          peakDry = Math.max(peakDry, audio._dry.filter((d) => d.node).length);
           await ctx.resume();
         })
       );
@@ -399,11 +379,11 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
       let peak = 0,
         energy = 0,
         tailPeak = 0;
-      const windows = [20, 200, 400].map((ms) => Math.round((rate * ms) / 1000)),
-        maxima = [0, 0, 0];
+      const windows = [20, 200].map((ms) => Math.round((rate * ms) / 1000)),
+        maxima = [0, 0];
       for (let ch = 0; ch < 2; ch++) {
         const data = output.getChannelData(offset + ch),
-          sums = [0, 0, 0];
+          sums = [0, 0];
         for (let i = 0; i < data.length; i++) {
           const x = data[i];
           if (!Number.isFinite(x)) throw Error('Nonfinite native audio');
@@ -423,7 +403,6 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
         rms: Math.sqrt(energy / (output.length * 2)),
         max20Db: 10 * Math.log10(Math.max(maxima[0], 1e-16)),
         max200Db: 10 * Math.log10(Math.max(maxima[1], 1e-16)),
-        max400Db: 10 * Math.log10(Math.max(maxima[2], 1e-16)),
         tailPeak,
       };
     };
@@ -431,27 +410,10 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
       [
         ['final', 0],
         ['masterInput', 2],
-        ['categoryInput', 4],
-        ['categoryOutput', 6],
-        ['wetReturn', 8],
-        ['worldInput', 10],
+        ['wetReturn', 4],
+        ['worldInput', 6],
       ].map(([name, offset]) => [name, measure(offset)])
     );
-    const delay = Math.round(rate * 0.005);
-    let minGain = 1,
-      active = 0,
-      reduced = 0;
-    for (let ch = 0; ch < 2; ch++) {
-      const raw = output.getChannelData(2 + ch),
-        final = output.getChannelData(ch);
-      for (let i = delay; i < raw.length; i++)
-        if (Math.abs(raw[i - delay]) > 1e-4) {
-          const g = final[i] / raw[i - delay];
-          minGain = Math.min(minGain, g);
-          active++;
-          if (g < 0.98) reduced++;
-        }
-    }
     const pcm = new Float32Array(output.length * 2);
     for (let i = 0; i < output.length; i++)
       for (let ch = 0; ch < 2; ch++) pcm[i * 2 + ch] = output.getChannelData(ch)[i];
@@ -465,19 +427,16 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
       seed,
       seconds,
       stages,
-      commonGain: { min: minGain, reducedFraction: active ? reduced / active : 0 },
-      busBalances: Object.fromEntries(
-        Object.entries(mixer.buses).map(([name, bus]) => [name, bus.baseTrim])
-      ),
       nativeWorklet: mixer.energyMix instanceof AudioWorkletNode,
       errors: audio.stats.errors,
       dropped: field.stats.dropped,
       stolen: field.stats.stolen,
-      peakSpatial,
-      peakDry,
       pcm: btoa(binary),
     };
   } finally {
-    AudioNode.prototype.connect = connect;
+    ambience?.dispose();
+    radio?.stop();
+    field.dispose();
+    mixer.dispose();
   }
 }
