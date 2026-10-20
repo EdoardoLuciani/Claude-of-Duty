@@ -76,6 +76,8 @@ world beauty, then a depth clear and view beauty. WGSL is copied from #476,
 renaming only the depth fragment entry point. Shadow passes retain the actual JS
 implementation's dummy RGBA8 attachments, despite its older README's depth-only
 wording. Main output is non-sRGB 1920×1080, shader gamma, depth32float, no MSAA.
+Offscreen defaults to `--format=rgba8unorm`; use `--format=bgra8unorm` if the
+reference browser prefers BGRA. The structural check rejects format mismatches.
 Culling, draw order, index ranges and instance counts are retained.
 
 Both omit full PBR/textures/alpha/transparent/sky/FX/post/history/full CSM policy.

@@ -24,6 +24,11 @@ enum Present {
     Immediate,
     Mailbox,
 }
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum OutputFormat {
+    Rgba8unorm,
+    Bgra8unorm,
+}
 #[derive(Parser, Debug)]
 #[command(
     about = "Native Rust/WGPU port of the recorded direct-WebGPU scene experiment. No JavaScript runtime."
@@ -45,6 +50,9 @@ struct Options {
     width: u32,
     #[arg(long, default_value_t = 1080)]
     height: u32,
+    /// Offscreen attachment format; must match the JS control. Desktop uses WSI capabilities.
+    #[arg(long, value_enum, default_value = "rgba8unorm")]
+    format: OutputFormat,
     /// Explicit queue-completion bound, not an unbounded enqueue-only benchmark.
     #[arg(long,default_value_t=2,value_parser=clap::value_parser!(u32).range(1..=16))]
     in_flight: u32,
@@ -107,7 +115,10 @@ fn benchmark(options: &Options) -> Result<()> {
         data,
         options.width,
         options.height,
-        wgpu::TextureFormat::Bgra8Unorm,
+        match options.format {
+            OutputFormat::Rgba8unorm => wgpu::TextureFormat::Rgba8Unorm,
+            OutputFormat::Bgra8unorm => wgpu::TextureFormat::Bgra8Unorm,
+        },
         options.gpu,
         options.freeze,
     )?;
