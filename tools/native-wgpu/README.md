@@ -37,9 +37,16 @@ target/release/cod-native-wgpu-lab --data=/absolute/path/to/recorded-scenes --ag
 target/release/cod-native-wgpu-lab --data=/absolute/path/to/recorded-scenes \
   --agents=12 --benchmark --warmup=120 --frames=900 --in-flight=2 --out=/tmp/native.json
 
-# Separately measure the desktop/presentation path (finite frame-step replay).
+# UNCAPPED desktop throughput: force X11/XWayland for this process only.
+# On this host Wayland exposes no Immediate mode; Mailbox still refresh-paces.
+# Immediate is explicit VSync-off, not a FIFO fallback.
+env -u WAYLAND_DISPLAY -u WAYLAND_SOCKET \
+  target/release/cod-native-wgpu-lab --data=/absolute/path/to/recorded-scenes \
+  --agents=12 --warmup=120 --frames=900 --present=immediate --out=/tmp/window-uncapped.json
+
+# Refresh-limited presentation control ONLY; not a throughput measurement.
 target/release/cod-native-wgpu-lab --data=/absolute/path/to/recorded-scenes \
-  --agents=12 --warmup=120 --frames=900 --present=fifo --out=/tmp/window.json
+  --agents=12 --warmup=120 --frames=900 --present=fifo --out=/tmp/window-vsync.json
 
 # GPU readback captures happen AFTER measurement. No rendered pixel-diff gates.
 target/release/cod-native-wgpu-lab --data=/absolute/path/to/recorded-scenes \
@@ -52,7 +59,11 @@ target/release/cod-native-wgpu-lab --data=/absolute/path/to/recorded-scenes \
 
 `--adapter=SUBSTRING` selects a hardware adapter; CPU fallback is refused.
 `--present=immediate` or `mailbox` is explicit: unsupported modes fail, not silently
-fall back. Normal timings keep WGPU's safe API validation; `--validation` requests
+fall back. For uncapped windowed measurements, use the X11/Immediate command
+above and verify `presentMode: "Immediate"` in the report. FIFO, and this host's
+Wayland Mailbox loop, measure refresh-limited presentation instead. No global
+compositor/monitor setting is changed. Rendered FPS above refresh does not mean
+the physical monitor displays every rendered frame. Normal timings keep WGPU's safe API validation; `--validation` requests
 additional Vulkan validation layers for separate diagnostic runs, if available.
 GPU loss/surface failures terminate with an error rather than fabricating results.
 `--freeze` is a negative control: freeze bone-local inputs, not cameras/visibility.

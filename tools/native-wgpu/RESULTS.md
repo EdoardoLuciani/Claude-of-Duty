@@ -10,7 +10,10 @@ not the full game. See [README](README.md) for scope and reproduction.
 
 Ryzen 9 9950X, Radeon RX 9070 XT / RADV GFX1201, Mesa 26.2.4, Fedora/Linux
 7.2.11-200.fc44, Rust/Cargo 1.99.1, WGPU 30.0.1. Browser: hardware, nonfallback
-Chrome 153.0.8010.12; headless compositing remains software. Desktop: Wayland.
+Chrome 153.0.8010.12; headless compositing remains software. Desktop session:
+Wayland; **uncapped native windowed tests use X11/XWayland with Immediate
+presentation (VSync off)**. Earlier Wayland FIFO/Mailbox runs are presentation
+controls only, not rendering-throughput measurements.
 No host-security changes, GPU API wrappers or timestamp queries in primary runs.
 WGPU safe-API validation stays enabled; Vulkan-layer checks are separate.
 RADV's nonconformant/testing warning is retained in the logs.
@@ -78,10 +81,37 @@ Separately serial GPU-timestamp runs give five-pass scope sums **0.903–0.914 m
 at 5 agents and **0.959–0.971 ms** at 12. These include neither full queue nor
 presentation duration, and differ from primary pacing; no GPU speedup is claimed.
 
-Real desktop FIFO runs give **5.556–5.563 ms/frame (~180 presented frames/s)**.
-Mailbox is also ~5.556 ms here: compositor/frame callbacks still pace the window.
-Immediate presentation is unsupported and correctly fails rather than falling
-back. Desktop results are not the throughput headline or a full-game FPS claim.
+### Uncapped native window — VSync explicitly disabled
+
+The earlier **~180 FPS was the monitor/Wayland refresh cap**, not native renderer
+throughput. Wayland exposes only FIFO/Mailbox here and its Mailbox event loop
+still refresh-paces. For the corrected test, unset `WAYLAND_DISPLAY` and
+`WAYLAND_SOCKET` **for the child process only**, selecting X11/XWayland, and
+request `--present=immediate`. The surface advertises and selects Vulkan
+`Immediate`; no FIFO fallback occurs. No global display setting is modified.
+
+Four runs per population, 900 frames + 120 warmup, 1920×1080, two outstanding
+submissions, same BGRA8 window target and identical per-frame/pass draw/triangle
+work as the FIFO controls. Same measured executable/fingerprints above. Median
+of run means, including actual window acquisition/presentation and final GPU drain:
+
+| Agents | VSync-off window ms/frame | Rendered frames/s |
+| -----: | ------------------------: | ----------------: |
+|      5 |                     0.870 |         **1,149** |
+|     12 |                     0.902 |         **1,109** |
+
+Both are far above 180, confirming that the render loop is no longer refresh-capped.
+These are completed rendering/present-request rates, not the number of unique
+frames physically displayed by a 180 Hz monitor. They are still this limited
+recorded renderer, **not full-game FPS**. Do not directly ratio a native window's
+BGRA8/XWayland presentation against an RGBA8/headless offscreen browser target;
+the matched offscreen comparison above remains the apples-to-apples work/target
+control and was already unpaced.
+
+The old Wayland FIFO/Mailbox ~5.56 ms results remain as **VSync-on controls only**.
+Immediate is unsupported on that Wayland surface, not on the machine generally.
+Raw corrected runs and backend/command/binary manifest are in
+`final/uncapped-window/`; their eight rows are appended to `measurements.csv`.
 
 ## Validation, negatives and retained limitations
 
