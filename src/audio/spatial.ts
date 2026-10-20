@@ -51,6 +51,13 @@ const MAX_EMITTERS = 40;
 /** Reference distance for the attenuation curve, in metres. */
 const REF = 2.0;
 
+/** Retire both future events and already-running targets at an ownership boundary. */
+function holdEmitterParam(param: AudioParam, time: number): void {
+  const value = param.value;
+  param.cancelScheduledValues(time);
+  param.setValueAtTime(value, time);
+}
+
 class Emitter {
   actx: BaseAudioContext;
   mixer: Mixer;
@@ -150,6 +157,20 @@ class Emitter {
   }
 
   detach(): void {
+    // Disconnecting a source does not remove automation on these pooled nodes.
+    // Hold NOW, not at the replacement's delayed arrival, so no old event/target
+    // can change the next voice's position, filters, distance gain or wet send.
+    const t = this.actx.currentTime;
+    if (this.panner.positionX) {
+      holdEmitterParam(this.panner.positionX, t);
+      holdEmitterParam(this.panner.positionY, t);
+      holdEmitterParam(this.panner.positionZ, t);
+    }
+    holdEmitterParam(this.airLP.frequency, t);
+    holdEmitterParam(this.occLP.frequency, t);
+    holdEmitterParam(this.occHS.gain, t);
+    holdEmitterParam(this.distGain.gain, t);
+    holdEmitterParam(this.sendGain.gain, t);
     if (this._connected) {
       try {
         this.panner.disconnect(this._connected);
@@ -381,7 +402,7 @@ export class SpatialField {
     const send = (opts.send ?? 0.25) * (0.5 + Math.min(dist, 90) * 0.022) * (1 + occ * 0.7);
     em.sendGain.gain.setValueAtTime(clamp(send, 0, 3), t);
 
-    em.connectOut(this.mixer.bus(em.busName), this.mixer.reverbSend);
+    em.connectOut(this.mixer.bus(em.busName), send > 0 ? this.mixer.sendBus(em.busName) : null);
     return em;
   }
 

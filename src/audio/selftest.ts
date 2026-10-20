@@ -105,9 +105,11 @@ function measure(buf: AudioBuffer): AudioMetrics {
   // Zero crossing rate -> a crude but stable spectral centre indicator.
   const centroid = (crossings / (n / SR)) * 0.5;
   return {
-    peak: +peak.toFixed(4),
-    rms: +rms.toFixed(5),
-    dc: +(sum / total).toFixed(5),
+    // Thresholds below must use measured values, not display rounding. In
+    // particular 0.000024 rounds to the 0.00002 silence floor and falsely fails.
+    peak,
+    rms,
+    dc: sum / total,
     nan,
     centroid: Math.round(centroid),
   };
@@ -123,6 +125,7 @@ async function renderCase(
   const ctx = new OfflineAudioContext(2, Math.ceil(SR * seconds), SR);
   const rng = new Rng(seed);
   const bank = new NoiseBank(ctx, rng.fork(), 1.2);
+  await Mixer.prepare(ctx);
   const mixer = new Mixer(ctx, rng.fork(), {});
   if (opts.reverb !== false) mixer.buildReverbs();
   if (opts.space) mixer.setSpace(opts.space, 0.001);
@@ -138,7 +141,7 @@ function route(mixer: Mixer, voice: AudioVoice, busName = 'weapons', sendScale =
     const g = mixer.actx.createGain();
     g.gain.value = voice.send! * sendScale;
     voice.node.connect(g);
-    g.connect(mixer.reverbSend);
+    g.connect(mixer.sendBus(busName));
   }
   return voice;
 }
@@ -304,7 +307,7 @@ export async function runAudioSelfTest(opts: { verbose?: boolean } = {}) {
     route(mixer, dryFire(mixer.actx, bank, rng, { when: t }), 'weapons');
   });
   await push('heartbeat', 1.5, async ({ mixer, t }) => {
-    const file = await fetch(new URL('./samples/heartbeat.wav', import.meta.url));
+    const file = await fetch(new URL('./samples/heartbeat.opus', import.meta.url));
     if (!file.ok) throw new Error(`heartbeat sample: ${file.status}`);
     const buffer = await mixer.actx.decodeAudioData(await file.arrayBuffer());
     route(mixer, heartbeat(mixer.actx, { when: t, level: 0.74, buffer }), 'ui');

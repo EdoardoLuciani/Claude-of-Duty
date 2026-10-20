@@ -133,6 +133,10 @@ events.on('not-an-event', () => {});
     config,
     JSON.stringify({
       extends: join(root, 'tsconfig.json'),
+      // Resolve the app's real type packages, not the temporary project's directory.
+      compilerOptions: {
+        typeRoots: [join(root, 'node_modules/@types'), join(root, 'node_modules')],
+      },
       include: [join(root, 'src'), file],
       exclude: [join(root, 'node_modules'), join(root, 'dist')],
     })
