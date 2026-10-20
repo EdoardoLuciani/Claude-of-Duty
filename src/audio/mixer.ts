@@ -70,9 +70,7 @@ const BUS_DEFS = {
   // trim; shared summation headroom and output safety remain downstream.
   weapons: { trim: 1, comp: null },
   foley: { trim: 0.6, comp: { threshold: -14, knee: 10, ratio: 2.0, attack: 0.004, release: 0.2 } },
-  // Ambient bed deliberately quiet: it is a floor, not a lead vocal. A gunshot
-  // should land 15+ dB above it or the street reads as the loudest thing in
-  // the mix. Leave environmental detail audible, but below foley and weapons.
+  // Sparse environmental events support the action, below foley and weapons.
   ambience: {
     trim: 0.06,
     comp: { threshold: -24, knee: 12, ratio: 2.0, attack: 0.05, release: 0.5 },

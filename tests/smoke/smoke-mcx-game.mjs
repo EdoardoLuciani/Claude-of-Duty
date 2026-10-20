@@ -32,7 +32,7 @@ for (const n of [1, 2]) {
   assert.equal(reference.channels, 2);
   assert.equal(reference.rate, 48000);
   assert.equal(reference.bits, 32);
-  assert.equal(reference.duration, n === 1 ? 3.2713125 : 2.458875);
+  assert.equal(reference.frames / reference.rate, n === 1 ? 3.2713125 : 2.458875);
   assert(
     reference.peak > 1.14 && reference.peak < 1.2,
     'unattenuated source peaks survive resampling'

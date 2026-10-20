@@ -1,7 +1,7 @@
 import type { Rng } from '../core/rng.ts';
 import { biquad, clamp, gain, series } from './dsp.ts';
 import type { AudioVoice, SampleKind, SampleOptions, WeaponProfile } from './types.ts';
-import { REPORT_DISTANT_MATCH, reportDistantMix, usesDistantSample } from './weapons.ts';
+import { REPORT_DISTANT_MATCH, reportDistantMix } from './weapons.ts';
 
 /*
  * PRIVATE local-only review: Opus delivery copies, bundled locally by Vite.
@@ -144,7 +144,7 @@ export class WeaponSampleBank {
    */
   shot(profile: WeaponProfile, rng: Rng, o: SampleOptions = {}): AudioVoice {
     const mix = reportDistantMix(o.distance ?? 0, profile, o.firstPerson);
-    const distant = usesDistantSample(profile, o.distance ?? 0, o.firstPerson);
+    const distant = mix === 1;
     const kind = distant ? profile.distantSample : profile.sample;
     if (!kind) throw new Error('[audio] profile has no recording');
     const choices = this.buffers[kind];

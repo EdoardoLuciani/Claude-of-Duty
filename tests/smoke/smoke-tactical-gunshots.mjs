@@ -61,9 +61,9 @@ for (const kind of kinds) {
       assert.equal(reference.bits, 32);
       assert.equal(reference.channels, channels);
       assert.equal(reference.rate, 48000);
-      const duration = reference.duration;
+      const duration = reference.frames / reference.rate;
       assert(duration > 2.4 && duration < 5.4, 'full natural report, no short exponential edit');
-      decodedBytes += reference.dataBytes;
+      decodedBytes += reference.frames * channels * (reference.bits / 8);
       let peak = reference.peak;
       if (channels === 2) assert(reference.stereoDifference > 0.1);
       assert(Math.abs(reference.lastSample) < 1e-6);

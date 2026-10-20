@@ -172,7 +172,7 @@ lookahead peak envelope now replaces both clipping stages.
 One weapon level1 replaces profile gain × category gain. The former fixed
 summation headroom0.22 is replaced by audio-thread, stereo-linked RMS gain.
 `src/audio/energy.ts` owns the shared20ms RMS window, target0.28, maximum
-gain1 (raised from0.7),3ms energy attack and250ms release. Actual summed stereo
+gain1,3ms energy attack and250ms release. Actual summed stereo
 energy includes wet/UI/music; the hotter ear controls both. There is no quiet
 loudness lift, per-voice estimate, count divisor or new per-weapon trim.
 This is intentional adaptive whole-mix compression, not merely an emergency
@@ -192,9 +192,6 @@ than multiplying two independent reductions. One audio-thread processor applies
 that common stereo gain; its second native output exposes the RMS-only signal
 for real inspection. No soft clip, oversampling, post-filter or emergency sample
 clamp remains. This is sample-peak control, not true-peak/intersample limiting.
-Quiet signals can be approximately3.1dB louder from the higher cap. Removing the
-old soft clip also removes its existing0.985 linear scale; this is not relocated
-elsewhere. Sustained-energy target and source/master/weapon levels are unchanged.
 
 All output retains approximately5ms added latency, NOT two cascaded lookaheads.
 Source/event/propagation timing and natural sample lengths are unchanged. The
@@ -216,18 +213,11 @@ smoothing rings, no render-loop allocations or messages. Module loading is
 awaited, and startup/native processor failure disables audio without a silent
 fallback. Source decoded memory is unchanged; DSP state/overhead are additional.
 
-The energy-based gain now varies with the whole mix; there is no fixed dB
-comparison to the preceding fixed-headroom candidate. In the earlier unity-level
-revision, ordinary shots rose4.26dB and MCX/MPX12.22dB versus the two-level version,
-nominally before shared output processing. Explosions/dryfire/legacy sounds sharing this level lose the
-former1.75 boost (-4.86dB); no compensating tuning is introduced. Legacy isolated
-source repair/synthesis parameters remain, not extra authored-report controls.
-Explosions retain the prior deliberate rebalance: event
-emitter gain0.8 replaces6.5. Removing compressors without addressing that boost
-failed the initial mixed-recording gate. Blast composition,
-radius/distance behavior, ducking and concussion timing remain as before. The
-separate ambient distant boom is now deliberately subordinate (gain0.1 instead
-of6); it must not drive a far-off environmental event up to foreground energy. Foley/ambience/voice category dynamics, shared room
+Legacy isolated source repair/synthesis remains, sharing the weapon/output path.
+Explosion emitter gain0.8 (previously6.5) and distant environmental boom gain0.1
+(previously6) correct oversized source references. Blast composition,
+radius/distance behavior, ducking and concussion timing remain unchanged.
+Foley/ambience/voice category dynamics, shared room
 responses for other sound types, UI/heartbeat hearing bypass and legacy report
 composition are retained; legacy sounds also experience the changed shared
 weapon/output path. Wet feeds now use the same logical category reference,
@@ -237,20 +227,15 @@ references and over-hot radio/heartbeat/alarm/helicopter sources were balanced
 against unchanged gunshots; see `docs/audio-mix.md`. This is mix hierarchy, not
 new detailed settings or any change to the approved shared controller.
 
-User explicitly authorized a **higher-resource private full-tail experiment**:
-40 loaded assets, **42,548,406 encoded bytes**, **43,462,716 decoded float32 bytes**
-(**43.463MB / 41.449MiB**), versus previous prototype 5,000,856 decoded bytes.
-Float WAV storage increases encoded size from 21,733,974 bytes; decoded memory,
-channel counts, sample rate, durations and voice budgets are unchanged.
-This includes the compatibility UZI bank; the earlier 39-buffer total and proposed
-37-buffer MPX replacement budget are not the implemented configuration. These are
-PCM payloads, excluding AudioBuffer/node/IR/noise and decode overhead. The dry
-bookkeeping pool is 80; spatial remains 40. The old 68-lifetime continuous UZI
-estimate does not describe the real MPX. The focused native MPX follow-up observed
-45 dry slots at peak and zero steals/drops in its bounded scenario; dense enemy
-tails may still exhaust 40 spatial slots. Historical six-enemy stress stole
-68 of 108 voices. This is not production-performance acceptance, nor permission
-to expand spatial capacity or shorten tails silently.
+The full-tail bank loads40 buffers: **43,462,716 decoded float32 bytes**
+(**43.463MB / 41.449MiB**), including the compatibility UZI bank. This excludes
+AudioBuffer/node/IR/noise and transient decode overhead. Opus reduces delivery to
+3,178,983bytes, not decoded memory; see [audio delivery](audio-delivery.md).
+The dry bookkeeping pool is80; spatial remains40. A bounded native MPX follow-up
+observed45 dry slots at peak with no steals/drops, but dense enemy tails may still
+exhaust the spatial pool: historical six-enemy stress stole68 of108 voices.
+This is not production-performance acceptance or permission to expand capacity
+or shorten tails silently.
 
 Spatial emitter retirement now cancels inherited future automation and anchors
 running targets at the current audio time for its eight position/filter/gain
@@ -291,52 +276,20 @@ circumvent the publication gate.
 
 ## Private reproduction and acceptance
 
-The current simplification recovery directory is
-`/home/edoardo/Documents/Claude-of-Duty-recovery/tactical-gunshots/reference-distance-audio/`.
-It contains the matching private overlay, actual node taps, before/after and
-mixed-recording renders, Oracle advice, validation and handoff. The current
-worktree is `reference-distance-audio`, branch `feat/reference-distance-audio`.
-The preceding game-level board remains in `runtime-level-audition`; its runtime
-is byte-identical to `spatial-emitter-reuse`. The hearing candidate remains in
-`transparent-hearing`; the prior
-limiter candidate remains in `lookahead-peak-mix`.
-The liked energy/soft-clip candidate remains in `energy-master-unity`.
-The preceding fixed-headroom candidate remains in worktree `unity-weapon-level`;
-the earlier two-level candidate remains in `simple-audio-pipeline`;
-the original pre-simplification candidate remains in `tactical-gunshot-overhaul`.
-Its `runtime-gain-20261017/` recovery holds the still-valid source-level asset
-recipe and before version; its old overlay must not overwrite the new code. The preceding
-rebase/native MPX evidence remains in sibling `recovery-20261017T202641/`;
-original isolated inputs/source intervals remain in `source-faithful-v2/`.
-Earlier handoffs/overlays describe earlier revisions and must not be reapplied
-to this changed candidate. No source library original was modified.
+The review branch is self-contained for install, tests, build and play; no private
+overlay is required. WAV authoring masters and historical evidence remain in the
+private recovery archive outside Git. Never apply older overlays over this branch
+or modify source library originals. [Audio delivery](audio-delivery.md) documents
+external-master encoding and both frozen-reference/direct-master codec checks;
+[audio mix](audio-mix.md) documents the native event/tap benchmark and its gates.
 
-All seven real definitions pass event routing and a fresh normal-prewarm native
-WebGPU game check:27 staged real fire events across own/20m/70m and an MPX burst,
-zero audio errors/drops/steals, expected stereo/mono/dry routing and complete
-retirement. This is not AI loadout or full-combat performance acceptance.
+Validation covers actual own/20m/70m weapon events, MPX routing, complete tails,
+hearing recovery/retrigger, emitter reuse, category duck/mute, codec frames/channels,
+and the shared controller. Native tests use actual graph stages, not randomized
+render gain estimates. Bounded no-drop/no-steal fixtures do not establish organic
+AI/combat capacity, arbitrary-volume headroom or all-browser compatibility.
 
-The private-review gates include134 tests, build/typecheck/lint/format, native
-44.1/48kHz event-time recorded mixes, isolated/overlapping blasts, a distance/radius
-matrix, legacy/distant-boom routes, UI/heartbeat/concussion, native duck/mute
-retrigger and unity/wet voice retirement. The designed dense fixture holds40
-spatial voices without drops/steals; no quiet render caused by stealing is used
-as headroom proof. Simultaneous raw/RMS-only/peak-controlled/final capture
-separates the energy and peak constraints without randomized-render gain estimates. At master1
-and category2, the tested candidate peak remains below unity. These are bounded
-numeric gates, not a guarantee of clean sound at every arbitrary configuration.
-
-The listening page at `http://127.0.0.1:8765/` now has current/before outputs for
-all seven weapons and source/step players, plus mixed-scene comparisons. Default
-Game-level mode undoes the export0.25 scale for final outputs; above-unity raw
-taps get explicitly labelled page-only safety reduction. Common-gain and
-RMS-matched comparison modes remain. The page slider still starts35%. The
-previous complex graph is explicitly historical. Audition volume/matching is
-outside the game; new step/compare exports are safe-scaled float WAVs. Runtime
-recordings are untouched. The original historical MPX harness assertion failure
-and its corrected evidence remain preserved in the earlier recovery directory.
-
-No listening is claimed by the implementing agent. Source fidelity, measured
-headroom and tests do not establish firearm authenticity or sonic preference.
-Human local acceptance remains required, particularly for MCX/MPX proxies and
-the45m perspective transition. All comparisons remain private.
+No subjective listening is claimed by the implementing agent. Source fidelity,
+measurements and tests do not establish firearm authenticity, calibrated SPL or
+sonic preference. Human milestone listening remains necessary, especially for
+MCX/MPX proxies and the20–140m perspective transition. All comparisons stay private.

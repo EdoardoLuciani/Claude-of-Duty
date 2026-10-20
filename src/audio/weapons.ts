@@ -65,15 +65,6 @@ export function reportDistantMix(
   );
 }
 
-/** True only for a wholly distant voice; intermediate distances use both banks. */
-export function usesDistantSample(
-  profile: WeaponProfile,
-  distance: number,
-  firstPerson = false
-): boolean {
-  return reportDistantMix(distance, profile, firstPerson) === 1;
-}
-
 export function reportDistanceGain(
   distance: number,
   profile?: WeaponProfile,

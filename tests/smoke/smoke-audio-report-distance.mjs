@@ -8,7 +8,6 @@ import {
   WEAPON_PROFILES,
   reportDistanceGain,
   reportDistantMix,
-  usesDistantSample,
 } from '../../src/audio/weapons.ts';
 import { audioMaster } from '../helpers/audio-masters.mjs';
 
@@ -144,8 +143,11 @@ for (const profile of Object.values(WEAPON_PROFILES)) {
     assert.equal(acquired.when, 2 + distance / 343);
     assert.equal(built.dist, distance);
     assert.equal(built.options.profile, profile);
-    assert.equal(usesDistantSample(profile, distance), distance >= 140 && !!profile.distantSample);
-    assert.equal(usesDistantSample(profile, distance, true), false);
+    assert.equal(
+      reportDistantMix(distance, profile) === 1,
+      distance >= 140 && !!profile.distantSample
+    );
+    assert.equal(reportDistantMix(distance, profile, true) === 1, false);
   }
 }
 for (const kind of ['step', 'explosion', 'bark', 'ambient', 'whizz']) {
