@@ -25,6 +25,11 @@ Soldier output subclasses native `setupOutput()` and calls super before fog/alph
 Declarative `rimNode` survives copy/clone and distinguishes shader cache keys;
 `outputNode` is not equivalent because it runs after that boundary.
 Skinned cloth/goggles remain FULL-refresh independently of declarative nodes.
+Runtime soldiers use one opaque material per variant: existing equal-size bakes
+are texture-array layers, with repeat/mips/anisotropy retained. A flat surface ID
+selects immutable tint/roughness/metalness/AO/detail parameters; GLB groups remain
+authoring labels, not separate draws. Goggle pigment, smoothness and half rim remain;
+the former 1.4 environment gain uses the shared material's default 1.0 instead.
 Clones must be registered with their render owner: the per-instance environment
 hook isn't copied. `IndirectFill` calls upstream environment setup first; keep
 camera-specific world/view identities, PMREM and shared render uniform groups.

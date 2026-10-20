@@ -263,7 +263,10 @@ and reinforcement/foley remain synthesized by design.
 stats, variant }`. Merge GLTF primitives into one skinned geometry with slot
 groups, slicing shared accessors correctly. Bone order must match
 `RIG.createSkeleton()`; models and AI validate names/order, groups, slots and skin
-attributes and fail boot on mismatches.
+attributes and fail boot on mismatches. AI annotates those disjoint surfaces once
+with `soldierSurface`; one native material per variant ignores the authoring groups
+when drawing. AI owns the shared texture arrays and immutable finish lookup textures;
+meshes retain ordinary Three.js skinning, history, culling and shadow ownership.
 
 ## Prewarm
 

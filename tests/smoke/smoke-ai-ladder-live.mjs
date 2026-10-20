@@ -35,7 +35,7 @@ Object.assign(ai, {
     events: { emit() {} },
   },
 });
-ai.variant = (name) => ({ geometry, materials: [], variant: VARIANTS[name], weapon: null });
+ai.variant = (name) => ({ geometry, material: undefined, variant: VARIANTS[name], weapon: null });
 const calls = [],
   checkLadder = service.checkLadder.bind(service);
 service.checkLadder = (descriptor, direction, foot, cursor, options) => {
