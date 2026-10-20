@@ -124,7 +124,7 @@ interface LiveGrenade {
  *   wp.weaponIds          equipped primary + secondary (spawn: rifle/pistol)
  *   wp.setWeapon(id)      draw/holster animated swap
  *   wp.nextWeapon()
- *   wp.cycleFireMode()
+ *   wp.cycleFireMode()    next supported mode; a held trigger is latched off
  *   wp.reload()           no-op if full or empty of reserve
  *   wp.inspect()
  *   wp.tryFire()          honours fire mode + rpm; returns true if a shot left
@@ -180,6 +180,9 @@ export class WeaponSystem {
   declare _fireTimer: number;
   declare _burstLeft: number;
   declare _burstCooldown: number;
+  /** Trigger-down state of the last assessed frame and its mode-change latch. */
+  declare _triggerHeld: boolean;
+  declare _triggerLatched: boolean;
   declare _spread: number;
   declare _shotIndex: number;
   declare _sinceShot: number;
@@ -262,6 +265,8 @@ export class WeaponSystem {
     this._fireTimer = 0;
     this._burstLeft = 0;
     this._burstCooldown = 0;
+    this._triggerHeld = false;
+    this._triggerLatched = false;
     this._spread = 0;
     this._shotIndex = 0;
     this._sinceShot = 10;
@@ -732,6 +737,8 @@ export class WeaponSystem {
     this._fireTimer = 0;
     this._burstLeft = 0;
     this._burstCooldown = 0;
+    this._triggerHeld = false;
+    this._triggerLatched = false;
     this._spread = 0;
     this._shotIndex = 0;
     this._sinceShot = 10;
@@ -775,6 +782,8 @@ export class WeaponSystem {
     if (this.radioEquipped) this._stowRadio();
     this._switchTo = id;
     this._tubeLoop = false;
+    // A burst queued on the outgoing gun must not resume when it comes back.
+    this._burstLeft = 0;
     this.player?.clearFireVibe?.();
     this.viewmodel.play('holster');
     return true;
@@ -791,7 +800,13 @@ export class WeaponSystem {
     if (this.disabled || !s || s.def.modes.length < 2) return s?.mode;
     s.modeIndex = (s.modeIndex + 1) % s.def.modes.length;
     s.mode = s.def.modes[s.modeIndex];
+    // No queue survives the selector: a burst in flight dies with the old
+    // mode, and a held trigger is latched so only a fresh press fires. Without
+    // the latch, AUTO -> SEMI would fire off the stale edge and SEMI -> AUTO
+    // would run away mid-pull.
     this._burstLeft = 0;
+    this._burstCooldown = 0;
+    if (this._triggerHeld) this._triggerLatched = true;
     return s.mode;
   }
 
@@ -1264,6 +1279,8 @@ export class WeaponSystem {
     this._viewmodel.anchor.visible = !this.disabled;
     if (this.disabled) {
       this._burstLeft = 0;
+      this._triggerHeld = false;
+      this._triggerLatched = false;
       this._pendingShots = 0;
       this._state.ads = false;
       this._state.trigger = false;
@@ -1690,6 +1707,11 @@ export class WeaponSystem {
     def: WeaponState['def'],
     s: WeaponState
   ) {
+    this._triggerHeld = held;
+    // A mode change latches a held trigger until it is released (see
+    // `cycleFireMode`): the new mode fires only on a fresh press.
+    if (!held) this._triggerLatched = false;
+    if (this._triggerLatched) return;
     switch (s.mode) {
       case 'auto':
         if (held) this.tryFire();
@@ -1911,6 +1933,7 @@ export class WeaponSystem {
     this._shotIndex = 0;
     this._spread = 0;
     this._fireTimer = 0;
+    this._burstLeft = 0;
     this._tubeLoop = false;
     return true;
   }

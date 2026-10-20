@@ -57,7 +57,17 @@ function makeHarness() {
     },
   };
   wp.rng = new Rng(372);
-  wp.sim = { spawn() {}, clear() {}, stats: { live: 0, fired: 0 } };
+  // A projectile spawn is the only per-pellet side effect of an accepted shot,
+  // so counting them measures real trigger output. `update()` copies
+  // `sim.stats.fired` back into `wp.stats.fired` every frame.
+  const shots = { live: 0, fired: 0 };
+  wp.sim = {
+    spawn() {
+      shots.fired++;
+    },
+    clear() {},
+    stats: shots,
+  };
   wp.stats = { tris: 0, drawCalls: 0, live: 0, fired: 0 };
   wp.physics = {
     addRigidBody(options) {
@@ -104,7 +114,7 @@ function makeHarness() {
     input.endFrame();
   };
   const tap = (...codes) => frame({ down: codes, up: codes });
-  return { wp, input, frame, tap, clips, prompts, cancellations, bodies, player };
+  return { wp, input, frame, tap, clips, prompts, cancellations, bodies, player, shots };
 }
 
 // Same-frame operations retain their order, independent of physical event order.
@@ -197,6 +207,167 @@ for (const accessory of ['KeyG', 'KeyX']) {
   const { wp, tap, clips } = makeHarness();
   tap('KeyI');
   assert(wp.inspecting && clips.includes('inspect'), 'inspect action starts the weapon clip');
+}
+
+/* ======================================================================== */
+/*  selectable fire modes (issue 471)                                       */
+/* ======================================================================== */
+
+// Every automatic weapon offers SEMI next to AUTO, and the real B binding
+// cycles the authored order without skipping or repeating a mode.
+for (const id of ['rifle', 'smg', 'mcx', 'lmg']) {
+  const { wp, tap } = makeHarness();
+  wp.activeId = id;
+  const modes = wp.state.def.modes;
+  assert.deepEqual(
+    [...modes].sort(),
+    id === 'rifle' ? ['auto', 'burst', 'semi'] : ['auto', 'semi'],
+    `${id} exposes the selectable fire modes`
+  );
+  const seen = [];
+  for (let i = 0; i < modes.length; i++) {
+    tap('KeyB');
+    seen.push(wp.fireMode);
+    assert.equal(wp.getHudState().mode, wp.fireMode, `${id} HUD follows the selector`);
+  }
+  assert.deepEqual(seen, [...modes.slice(1), modes[0]], `${id} cycles through every mode`);
+}
+
+// SEMI: one shot per distinct press, holding repeats nothing, and the weapon
+// cadence still gates a press that lands too early.
+{
+  const { wp, frame, tap, shots } = makeHarness();
+  wp.activeId = 'lmg';
+  tap('KeyB');
+  assert.equal(wp.fireMode, 'semi', 'EVOLYS selector reaches SEMI');
+  const total = () => wp.ammo.mag + wp.ammo.reserve;
+  const ammo0 = total();
+  frame({ down: ['Mouse0'] });
+  assert.equal(shots.fired, 1, 'the press frame fires exactly one round');
+  assert.equal(total(), ammo0 - 1, 'one round leaves the belt');
+  for (let i = 0; i < 120; i++) frame({ down: ['Mouse0'] });
+  assert.equal(shots.fired, 1, 'holding the trigger does not cycle the action in SEMI');
+  assert.equal(total(), ammo0 - 1, 'held fire spends no extra ammunition');
+  frame({ up: ['Mouse0'] });
+  frame({ down: ['Mouse0'] });
+  assert.equal(shots.fired, 2, 'a fresh press after release fires the next single shot');
+  assert.equal(total(), ammo0 - 2);
+  frame({ up: ['Mouse0'] });
+  frame({ down: ['Mouse0'] });
+  assert.equal(shots.fired, 2, 'a press inside the cadence window is refused');
+  for (let i = 0; i < 6; i++) frame({});
+  frame({ up: ['Mouse0'] });
+  frame({ down: ['Mouse0'] });
+  assert.equal(shots.fired, 3, 'the cadence window opens for a later press');
+}
+
+// AUTO keeps firing while held, and the ammo count follows the shot count.
+{
+  const { wp, frame, shots } = makeHarness();
+  wp.activeId = 'lmg';
+  assert.equal(wp.fireMode, 'auto');
+  const total = () => wp.ammo.mag + wp.ammo.reserve;
+  const ammo0 = total();
+  for (let i = 0; i < 60; i++) frame({ down: ['Mouse0'] });
+  // 700 rpm over one second: ~11 rounds, far above a single shot.
+  assert(shots.fired >= 10 && shots.fired <= 13, `AUTO stays continuous (${shots.fired} rounds)`);
+  assert.equal(total(), ammo0 - shots.fired, 'AUTO accounting matches the rounds fired');
+}
+
+// The M4A1 burst is unchanged: three rounds from one press, then silence.
+{
+  const { wp, frame, tap, shots } = makeHarness();
+  tap('KeyB');
+  assert.equal(wp.fireMode, 'burst');
+  frame({ down: ['Mouse0'] });
+  assert.equal(shots.fired, 1, 'the press frame starts the burst');
+  for (let i = 0; i < 30; i++) frame({ down: ['Mouse0'] });
+  assert.equal(shots.fired, 3, 'burst still delivers exactly three rounds');
+  assert.equal(wp._burstLeft, 0, 'the burst queue is drained');
+}
+
+// Cycling away mid-burst drops the queue: no rounds fire after the change.
+{
+  const { wp, frame, tap, shots } = makeHarness();
+  tap('KeyB'); // rifle: auto -> burst
+  frame({ down: ['Mouse0'] });
+  assert.equal(shots.fired, 1);
+  assert.equal(wp._burstLeft, 2, 'two rounds are still queued');
+  tap('KeyB'); // burst -> semi with the trigger down
+  assert.equal(wp.fireMode, 'semi');
+  assert.equal(wp._burstLeft, 0, 'the queued burst dies with the old mode');
+  for (let i = 0; i < 60; i++) frame({ down: ['Mouse0'] });
+  assert.equal(shots.fired, 1, 'no stale edge and no queued round fires in SEMI');
+}
+
+// AUTO -> SEMI while the trigger is down: the held pull cannot fire the new
+// mode; release and press again for the deliberate single shot.
+{
+  const { wp, frame, shots } = makeHarness();
+  wp.activeId = 'mcx'; // auto -> semi in one cycle
+  frame({ down: ['Mouse0'] });
+  for (let i = 0; i < 12; i++) frame({ down: ['Mouse0'] });
+  const auto = shots.fired;
+  assert(auto > 1, 'AUTO fired continuously before the switch');
+  frame({ down: ['Mouse0', 'KeyB'], up: ['KeyB'] });
+  assert.equal(wp.fireMode, 'semi');
+  for (let i = 0; i < 60; i++) frame({ down: ['Mouse0'] });
+  assert.equal(shots.fired, auto, 'the held pull does not fire the new SEMI mode');
+  frame({ up: ['Mouse0'] });
+  frame({ down: ['Mouse0'] });
+  assert.equal(shots.fired, auto + 1, 'a fresh press fires the SEMI shot');
+}
+
+// SEMI -> AUTO while the trigger is down: the fresh AUTO mode waits for its
+// own press instead of running away mid-pull.
+{
+  const { wp, frame, shots } = makeHarness();
+  wp.activeId = 'lmg';
+  frame({ down: ['KeyB'], up: ['KeyB'] }); // auto -> semi
+  assert.equal(wp.fireMode, 'semi');
+  frame({ down: ['Mouse0'] });
+  assert.equal(shots.fired, 1);
+  frame({ down: ['Mouse0', 'KeyB'], up: ['KeyB'] }); // semi -> auto
+  assert.equal(wp.fireMode, 'auto');
+  for (let i = 0; i < 60; i++) frame({ down: ['Mouse0'] });
+  assert.equal(shots.fired, 1, 'the held pull does not run away in AUTO');
+  frame({ up: ['Mouse0'] });
+  for (let i = 0; i < 60; i++) frame({ down: ['Mouse0'] });
+  assert(shots.fired > 5, 'release + press restores continuous AUTO fire');
+}
+
+// A queued burst dies at the holster: coming back to the same gun must not
+// resume it. The per-weapon selection survives the swap.
+{
+  const { wp, frame, tap, shots } = makeHarness();
+  tap('KeyB'); // rifle: auto -> burst
+  frame({ down: ['Mouse0'] });
+  assert.equal(shots.fired, 1);
+  assert.equal(wp._burstLeft, 2);
+  frame({ down: ['Tab'], up: ['Tab'] });
+  assert.equal(wp._switchTo, 'pistol');
+  assert.equal(wp._burstLeft, 0, 'switching drops the queued burst');
+  wp._onClipEvent('end', 'holster');
+  assert.equal(wp.activeId, 'pistol');
+  frame({ down: ['Tab'], up: ['Tab'] });
+  wp._onClipEvent('end', 'holster');
+  assert.equal(wp.activeId, 'rifle');
+  assert.equal(wp.fireMode, 'burst', 'the selection stays with the weapon');
+  for (let i = 0; i < 40; i++) frame({ down: ['Mouse0'] });
+  assert.equal(shots.fired, 1, 'the old burst does not resume on the way back up');
+}
+
+// A new run resets the selector, the burst queue and the trigger latch.
+{
+  const { wp, tap } = makeHarness();
+  wp.activeId = 'lmg';
+  tap('KeyB');
+  assert.equal(wp.fireMode, 'semi');
+  wp.resetForNewGame();
+  assert.equal(wp.activeId, 'rifle');
+  assert.equal(wp.fireMode, 'auto', 'a new run starts on the authored first mode');
+  assert.equal(wp._burstLeft, 0);
+  assert.equal(wp._triggerLatched, false);
 }
 
 // Radio owns 1/2/3 only while open, with request priority 1 > 2 > 3.
