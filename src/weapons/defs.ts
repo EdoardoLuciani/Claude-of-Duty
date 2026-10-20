@@ -240,9 +240,10 @@ export const WEAPON_DEFS = {
     label: 'EVOLYS-7.62',
     class: 'lmg',
     caliber: '7.62x51',
-    // Official EVOLYS 7.62 cyclic rate; auto-only for this loadout.
+    // Official EVOLYS 7.62 cyclic rate; selectable semi-auto for deliberate
+    // single shots, full-auto still the default (`cycleFireMode`).
     rpm: 700,
-    modes: ['auto'],
+    modes: ['auto', 'semi'],
     // FN technical data sheet: free belt or MINIMI pouch — 100 or 200 rounds.
     magSize: 100,
     // One spare 100-round pouch (keeps the 1.5x carry ratio of the 50/75 era).
