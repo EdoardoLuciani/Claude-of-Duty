@@ -23,7 +23,7 @@ SDL_VIDEODRIVER=x11 ./build/cod-bun-webgpu --data=/absolute/recordings --agents=
 # Uncapped native window, VSync explicitly OFF:
 SDL_VIDEODRIVER=x11 ./build/cod-bun-webgpu --data=/absolute/recordings \
   --agents=12 --windowed --frames=900 --warmup=120 --in-flight=8 --out=/tmp/bun-window.json
-# Matched offscreen RGBA8/depth32; no surface, rAF, timers or display pacing:
+# Matched offscreen RGBA8/depth32; no surface, rAF or display pacing:
 ./build/cod-bun-webgpu --data=/absolute/recordings \
   --agents=12 --frames=900 --warmup=120 --in-flight=8 --out=/tmp/bun-offscreen.json
 ```
@@ -87,6 +87,11 @@ primary timings. Actual GPU readbacks are qualitatively inspected, never compare
 pixel-by-pixel or used for pixel-diff gates. Device loss/API errors are terminal;
 there is no device-loss recovery. Startup/power/portability and exhaustive scene
 coverage are not established by a renderer throughput test.
+
+**Known window limitation:** sustained runs encounter two ~1-second waits in
+surface acquisition per 900 frames. Immediate mode is verified; this is not the
+180 Hz refresh cap. All waits remain in the results; root cause is unresolved.
+Do not infer sustained FPS from the much faster short startup pilots.
 
 Results: [RESULTS.md](RESULTS.md); all final run means: [measurements.csv](measurements.csv).
 Raw/rejected evidence, manifests, measurement driver and captures:
