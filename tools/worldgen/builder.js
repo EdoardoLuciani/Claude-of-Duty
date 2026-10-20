@@ -220,8 +220,10 @@ export class Assembler {
   }
 
   // ------------------------------------------------------------- finalize --
-  /** Build the visual meshes and add them to `root`. */
-  finalize(root) {
+  /** Build visuals; optionally emit the original batching for collision cooking.
+   * Collision/nav must not change when visual-only draw organization changes.
+   * Both outputs borrow this assembler's geometry/materials until disposal. */
+  finalize(root, collisionSource = null) {
     // --- merged static geometry ---
     for (const [key, acc] of this._static) {
       if (acc.empty) continue;
@@ -240,6 +242,7 @@ export class Assembler {
       mesh.userData.collision = false; // cooked into a separate derived asset
       mesh.updateMatrix();
       root.add(mesh);
+      collisionSource?.add(mesh.clone());
       this.meshes.push(mesh);
       this.stats.staticTris += geo.index.count / 3;
       this.stats.drawCalls++;
@@ -270,44 +273,81 @@ export class Assembler {
         buckets.set(0, [...Array(n).keys()]);
       }
 
-      const mat = this.mat(p.key);
-      for (const list of buckets.values()) {
-        const im = new THREE.InstancedMesh(p.geo, mat, list.length);
-        im.name = `prop_${p.id}`;
-        im.castShadow = p.castShadow;
-        im.receiveShadow = p.receiveShadow;
-        im.matrixAutoUpdate = false;
-        im.userData.surface = this.surfaceOf(p.key);
-        im.userData.palette = p.key;
-        im.userData.ballisticSurface = p.ballisticSurface;
-        im.userData.sheetThickness = p.sheetThickness;
-        im.userData.castShadow = p.castShadow;
-        im.userData.receiveShadow = p.receiveShadow;
-        im.userData.collision = false;
-        if (p.noPrepass) im.userData.owNoPrepass = true;
-        let needColor = false;
-        for (let j = 0; j < list.length; j++) if (p.masks[list[j]]) needColor = true;
-        if (needColor) {
-          const arr = new Float32Array(list.length * 3);
-          for (let j = 0; j < list.length; j++) {
-            const mk = p.masks[list[j]] ?? [1, 1, 1];
-            arr[j * 3] = mk[0];
-            arr[j * 3 + 1] = mk[1];
-            arr[j * 3 + 2] = mk[2];
+      // The fixed grid can split a compact cloud across cell boundaries. Join
+      // whole buckets only when their occupied X/Z span still fits one cell.
+      // Distance-LOD clouds keep their original bounds and visibility decisions.
+      const chunks = [...buckets.values()].map((list) => list.slice());
+      if (p.chunk && p.maxDist === 0 && chunks.length > 1) {
+        const bounds = chunks.map((list) => {
+          const box = new THREE.Box3();
+          for (const i of list) box.expandByPoint(_v.setFromMatrixPosition(p.matrices[i]));
+          return box;
+        });
+        for (let i = 0; i < chunks.length; i++) {
+          for (let j = i + 1; j < chunks.length; j++) {
+            const a = bounds[i];
+            const b = bounds[j];
+            if (
+              Math.max(a.max.x, b.max.x) - Math.min(a.min.x, b.min.x) > CHUNK ||
+              Math.max(a.max.z, b.max.z) - Math.min(a.min.z, b.min.z) > CHUNK
+            )
+              continue;
+            chunks[i].push(...chunks[j]);
+            a.union(b);
+            chunks.splice(j, 1);
+            bounds.splice(j, 1);
+            j--;
           }
-          im.instanceColor = new THREE.InstancedBufferAttribute(arr, 3);
         }
-        for (let j = 0; j < list.length; j++) im.setMatrixAt(j, p.matrices[list[j]]);
-        im.instanceMatrix.needsUpdate = true;
-        im.computeBoundingSphere();
-        im.updateMatrix();
-        root.add(im);
-        this.meshes.push(im);
-        this.stats.drawCalls++;
-        this.stats.instances += list.length;
-        const tri = (p.geo.index ? p.geo.index.count : p.geo.getAttribute('position').count) / 3;
-        this.stats.instTris += tri * list.length;
-        if (p.maxDist > 0) im.userData.owLodDist = p.maxDist;
+      }
+
+      const mat = this.mat(p.key);
+      for (const [target, lists] of [
+        [collisionSource, buckets.values()],
+        [root, chunks],
+      ]) {
+        if (!target) continue;
+        for (const list of lists) {
+          const im = new THREE.InstancedMesh(p.geo, mat, list.length);
+          im.name = `prop_${p.id}`;
+          im.castShadow = p.castShadow;
+          im.receiveShadow = p.receiveShadow;
+          im.matrixAutoUpdate = false;
+          im.userData.surface = this.surfaceOf(p.key);
+          im.userData.palette = p.key;
+          im.userData.ballisticSurface = p.ballisticSurface;
+          im.userData.sheetThickness = p.sheetThickness;
+          im.userData.castShadow = p.castShadow;
+          im.userData.receiveShadow = p.receiveShadow;
+          im.userData.collision = false;
+          if (p.noPrepass) im.userData.owNoPrepass = true;
+          let needColor = false;
+          for (let j = 0; j < list.length; j++) if (p.masks[list[j]]) needColor = true;
+          if (needColor) {
+            const arr = new Float32Array(list.length * 3);
+            for (let j = 0; j < list.length; j++) {
+              const mk = p.masks[list[j]] ?? [1, 1, 1];
+              arr[j * 3] = mk[0];
+              arr[j * 3 + 1] = mk[1];
+              arr[j * 3 + 2] = mk[2];
+            }
+            im.instanceColor = new THREE.InstancedBufferAttribute(arr, 3);
+          }
+          for (let j = 0; j < list.length; j++) im.setMatrixAt(j, p.matrices[list[j]]);
+          im.instanceMatrix.needsUpdate = true;
+          im.computeBoundingSphere();
+          im.updateMatrix();
+          target.add(im);
+          if (target === root) {
+            this.meshes.push(im);
+            this.stats.drawCalls++;
+            this.stats.instances += list.length;
+            const tri =
+              (p.geo.index ? p.geo.index.count : p.geo.getAttribute('position').count) / 3;
+            this.stats.instTris += tri * list.length;
+          }
+          if (p.maxDist > 0) im.userData.owLodDist = p.maxDist;
+        }
       }
       p.matrices.length = 0;
       p.masks.length = 0;
