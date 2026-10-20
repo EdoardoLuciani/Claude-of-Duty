@@ -12,6 +12,8 @@ This ports the _limited_ direct-WebGPU renderer in draft
 production backend, or a full-game FPS comparison**. Both implementations use
 that experiment's historical snapshots, not today's `develop` world/materials.
 
+Measured results and limitations: [RESULTS.md](RESULTS.md).
+
 ## Build and run
 
 Linux with a working hardware Vulkan driver and a recent Rust/Cargo toolchain
