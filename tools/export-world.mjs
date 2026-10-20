@@ -145,14 +145,16 @@ async function compileWorld() {
     const buildings = buildWorld(A, A.rng);
     const visualRoot = new THREE.Group();
     visualRoot.name = 'world';
-    A.finalize(visualRoot);
+    // Keep collision/nav on the canonical buckets, independent of visual compaction.
+    const collisionSource = new THREE.Scene();
+    A.finalize(visualRoot, collisionSource);
     A.releaseCache();
 
     const visualScene = new THREE.Scene();
     visualScene.add(visualRoot);
     const [visualBuffer, collision] = await Promise.all([
       exportGlb(visualScene),
-      buildCollision(visualScene),
+      buildCollision(collisionSource),
     ]);
     const collisionBuffer = await exportGlb(collision.scene);
     const visualGzip = gzipSync(visualBuffer, { level: 9 });

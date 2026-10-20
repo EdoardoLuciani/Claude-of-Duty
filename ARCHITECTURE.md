@@ -128,9 +128,12 @@ stop as `unknown-thickness`, overlapping solids as `overlapping-solids`.
 No nominal fallback or layered-solid approximation.
 
 JS in `tools/worldgen/` is world-authoring authority; `placements/` owns
-free-standing prop transforms. `npm run world` builds visual meshes, cooks
-collision from those same meshes with meshoptimizer, and exports manifest v2
-plus content-hashed GLBs under `public/models/world/`. Preserve instancing/masks.
+free-standing prop transforms. `npm run world` builds meshes and cooks collision
+with meshoptimizer from the canonical instance buckets. Visual-only bucket
+coalescing may join non-distance-LOD clouds within the existing 64 m X/Z span;
+it must not change collision inputs or navigation. Both transient outputs share
+assembler-owned geometry/materials. Manifest v2 and content-hashed GLBs live in
+`public/models/world/`. Preserve instancing/masks.
 Never author separate collision geometry or hand-edit generated files. Commit
 source + manifest + generated runtime assets together. Validate with
 `npm run world -- --check`, world/physics tests and screenshots.
