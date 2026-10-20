@@ -6,7 +6,9 @@ assert(nativePath && referencePath, 'node check.mjs NATIVE.json JS-OFFSCREEN.jso
 const native = JSON.parse(await readFile(nativePath));
 const reference = JSON.parse(await readFile(referencePath));
 assert.equal(native.mode, 'offscreen');
-assert.equal(reference.mode, 'raw-offscreen');
+assert(['raw-offscreen', 'three-offscreen'].includes(reference.mode));
+assert.equal(reference.pacing, 'completion-fences-no-rAF');
+assert.equal(reference.lateBuilds, 0);
 assert.equal(native.build, 'release');
 assert.equal(native.frozenPose, false);
 assert.equal(native.gpuDiagnostic, false);
