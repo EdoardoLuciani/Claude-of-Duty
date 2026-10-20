@@ -608,7 +608,7 @@ try {
   );
 } finally {
   await browser?.close();
-  await stopViteServer(server);
+  stopViteServer(server);
   if (process.env.AUDIO_EVIDENCE_DIR) {
     const out = resolve(process.env.AUDIO_EVIDENCE_DIR);
     assert(out !== resolve(root) && !out.startsWith(root), 'Keep evidence outside the repository');
