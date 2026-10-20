@@ -233,6 +233,8 @@ export class RenderSystem {
         this as Parameters<typeof createVolumetricShadow>[0]
       );
     const options: PipelineOptions = {
+      // World poses are ready; afterDepth renders haze's separate scene.
+      worldMatricesPerGraph: true,
       gtao: this.q.gtao,
       taa: this.q.taa,
       bloomStrength: this.q.bloom ? this.settings.bloomStrength : 0,

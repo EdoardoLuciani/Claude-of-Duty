@@ -57,6 +57,8 @@ export interface PipelineOptions {
   warp?: ((node: Node<'vec4'>) => Node<'vec4'>) | null;
   postPasses?: PostPass[];
   afterDepth?: (() => void) | null;
+  // Opt in only when pose producers finish before graph.render(), not in pass hooks.
+  worldMatricesPerGraph?: boolean;
 }
 
 /**
@@ -81,6 +83,7 @@ export function createWorldViewPipeline(
     warp = null,
     postPasses = [],
     afterDepth = null,
+    worldMatricesPerGraph = false,
   }: PipelineOptions = {}
 ) {
   let aoPass = null,
@@ -287,7 +290,16 @@ export function createWorldViewPipeline(
       // Resize before any draw/binding lookup, not from the lights' late update.
       renderer.getDrawingBufferSize(clusterSize);
       worldLights.setSize(clusterSize.x, clusterSize.y);
-      pipeline.render();
+      const worldAuto = scene.matrixWorldAutoUpdate;
+      if (worldMatricesPerGraph) {
+        if (worldAuto) scene.updateMatrixWorld();
+        scene.matrixWorldAutoUpdate = false;
+      }
+      try {
+        pipeline.render();
+      } finally {
+        if (worldMatricesPerGraph) scene.matrixWorldAutoUpdate = worldAuto;
+      }
     },
     dispose() {
       detach();

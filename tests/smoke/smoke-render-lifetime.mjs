@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 
 import { screenUV, texture } from 'three/tsl';
-import { Scene, PerspectiveCamera, RenderTarget } from 'three/webgpu';
+import { Scene, PerspectiveCamera, RenderTarget, Object3D } from 'three/webgpu';
 
 import { RenderSystem } from '../../src/render/index-webgpu.ts';
 import { createWorldViewPipeline } from '../../src/render/webgpu-pipeline.ts';
@@ -83,4 +83,52 @@ assert.equal(
 );
 next.dispose();
 assert.equal(view.onBeforeRender, original);
-console.log('frame graph owns converted RTTs, not borrowed textures or replacement callbacks');
+// The production graph owns transform publication, not an entire browser frame.
+// Generic/probe graphs retain native per-pass updates unless explicitly opted in.
+for (const worldMatricesPerGraph of [false, true]) {
+  const world = new Scene(),
+    first = new Scene(),
+    object = new Object3D();
+  world.add(object);
+  const renderer = { getDrawingBufferSize: (size) => size.set(32, 32) };
+  const graph = createWorldViewPipeline(renderer, world, camera, first, camera, {
+    gtao: false,
+    bloomStrength: 0,
+    worldMatricesPerGraph,
+  });
+  let updates = 0;
+  const update = world.updateMatrixWorld;
+  world.updateMatrixWorld = function (...args) {
+    updates++;
+    return update.apply(this, args);
+  };
+  graph.pipeline.render = () => {
+    for (let pass = 0; pass < 3; pass++) {
+      if (world.matrixWorldAutoUpdate) world.updateMatrixWorld();
+      assert.equal(object.matrixWorld.elements[12], object.position.x, 'publish before drawing');
+    }
+    assert.equal(first.matrixWorldAutoUpdate, true);
+  };
+  graph.render();
+  assert.equal(updates, worldMatricesPerGraph ? 1 : 3);
+  object.position.x = 7;
+  graph.render(); // No rAF or frame-number change: new publications must still be visible.
+  assert.equal(object.matrixWorld.elements[12], 7);
+  assert.equal(world.matrixWorldAutoUpdate, true);
+  assert.equal(first.matrixWorldAutoUpdate, true);
+  first.matrixWorldAutoUpdate = false; // Caller-owned transforms must remain caller-owned.
+  graph.pipeline.render = () => {
+    throw new Error('draw failure');
+  };
+  assert.throws(() => graph.render(), /draw failure/);
+  assert.equal(world.matrixWorldAutoUpdate, true);
+  assert.equal(first.matrixWorldAutoUpdate, false);
+  world.matrixWorldAutoUpdate = false;
+  const priorUpdates = updates;
+  graph.pipeline.render = () => assert.equal(world.matrixWorldAutoUpdate, false);
+  graph.render();
+  assert.equal(updates, priorUpdates, 'never publish transforms owned by the caller');
+  assert.equal(world.matrixWorldAutoUpdate, false);
+  graph.dispose();
+}
+console.log('frame graph owns RTTs, callbacks and scoped transform publication');
