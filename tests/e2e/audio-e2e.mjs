@@ -253,6 +253,7 @@ try {
           em.distGain.gain,
           em.sendGain.gain,
         ];
+        const oldPosition = [100, 10, -20];
         const oldArrival = 100 / 343;
         const silence = ctx.createBuffer(1, rate, rate);
         const oldEmitters = [];
@@ -261,9 +262,9 @@ try {
           source.buffer = silence;
           const endTime = oldArrival + silence.duration + 0.04;
           const em = field.acquire({
-            x: 100,
-            y: 0,
-            z: 0,
+            x: oldPosition[0],
+            y: oldPosition[1],
+            z: oldPosition[2],
             when: oldArrival,
             endTime,
             priority: 0.95,
@@ -278,7 +279,7 @@ try {
             for (const param of params(em)) param.cancelAndHoldAtTime = undefined;
           if (mode.startsWith('interrupted-target'))
             for (const [j, param] of params(em).entries())
-              param.setTargetAtTime(j < 3 ? (j === 0 ? 100 : 0) : j + 1, 0, 0.5);
+              param.setTargetAtTime(j < 3 ? oldPosition[j] : j + 1, 0, 0.5);
         }
         // A panner/filter with prior processing history is not equivalent to a
         // never-used node during its startup transition. Match that legitimate
@@ -291,7 +292,7 @@ try {
           reference.hold(em, source, oldArrival + silence.duration + 0.04);
           source.start(oldArrival);
           for (const [j, param] of params(em).entries())
-            param.setTargetAtTime(j < 3 ? (j === 0 ? 100 : 0) : j + 1, 0, 0.5);
+            param.setTargetAtTime(j < 3 ? oldPosition[j] : j + 1, 0, 0.5);
         }
         let replacement,
           fresh,
