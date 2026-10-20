@@ -1,3 +1,28 @@
+# PRIVATE candidate rights warning
+
+**This private local-only review branch contains commercial derivatives.**
+The operator explicitly authorized local commits of the prepared WAV masters and
+Opus delivery copies. This does NOT grant public distribution rights: do not push,
+upload, publish or open a public PR containing these assets without rights clearance.
+The legacy CC0/CC BY provenance below describes the branch baseline, NOT the
+replaced candidate files.
+
+Candidate `rifle-[123]`, `pistol-[123]`, `lmg-[123]`, `smg-[123]`,
+`sniper-[123]`, `shotgun-[123].wav` and the five gameplay families'
+`*-distant-[12].wav` counterparts derive from BOOM Tactical Guns Designed.
+The unsuppressed `smg` UZI close bank remains for legacy aliases only, not MPX;
+no UZI distant files are loaded. `mcx-[12].wav` and `mpx-[123].wav` derive from
+BOOM Silencers Designed (suppressed AR15 and suppressed HK MP5 respectively). Exact source mappings,
+caliber/action substitutions, the public-repository rights blocker and private
+reproduction references are in [tactical-gunshots.md](../../../docs/tactical-gunshots.md).
+All remaining files retain their baseline provenance below. Library originals
+were not modified or added. The `.opus` files derive from the corresponding local
+WAV masters using `node tools/encode-opus.mjs`: float input, audio mode, VBR,
+256kb/s stereo /128kb/s mono, complexity10,20ms frames. No normalization, gain
+adjustment, downmix or tail trimming. Opus is lossy; the float masters remain intact.
+
+---
+
 # Firearm recording provenance
 
 These WAV files are trimmed, high-pass-filtered, 48 kHz / 16-bit derivatives of

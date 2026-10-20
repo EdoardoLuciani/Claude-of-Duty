@@ -4,83 +4,85 @@ import type { AudioVoice, SampleKind, SampleOptions, WeaponProfile } from './typ
 import { REPORT_DISTANT_MATCH, reportDistantMix, usesDistantSample } from './weapons.ts';
 
 /*
- * PRIVATE review candidate: curated firearm reports, bundled locally by Vite.
- * Commercial derivatives are NOT cleared for public Git distribution.
+ * PRIVATE local-only review: Opus delivery copies, bundled locally by Vite.
+ * Float WAV masters remain offline authoring inputs, not runtime imports.
+ * Operator authorized local commits; commercial derivatives are NOT cleared
+ * for public Git distribution or upload.
  * See docs/tactical-gunshots.md and the private recovery recipe/provenance.
  */
 const URLS = {
   mpx: [
-    new URL('./samples/mpx-1.wav', import.meta.url).href,
-    new URL('./samples/mpx-2.wav', import.meta.url).href,
-    new URL('./samples/mpx-3.wav', import.meta.url).href,
+    new URL('./samples/mpx-1.opus', import.meta.url).href,
+    new URL('./samples/mpx-2.opus', import.meta.url).href,
+    new URL('./samples/mpx-3.opus', import.meta.url).href,
   ],
   'rifle-distant': [
-    new URL('./samples/rifle-distant-1.wav', import.meta.url).href,
-    new URL('./samples/rifle-distant-2.wav', import.meta.url).href,
+    new URL('./samples/rifle-distant-1.opus', import.meta.url).href,
+    new URL('./samples/rifle-distant-2.opus', import.meta.url).href,
   ],
   'pistol-distant': [
-    new URL('./samples/pistol-distant-1.wav', import.meta.url).href,
-    new URL('./samples/pistol-distant-2.wav', import.meta.url).href,
+    new URL('./samples/pistol-distant-1.opus', import.meta.url).href,
+    new URL('./samples/pistol-distant-2.opus', import.meta.url).href,
   ],
   'lmg-distant': [
-    new URL('./samples/lmg-distant-1.wav', import.meta.url).href,
-    new URL('./samples/lmg-distant-2.wav', import.meta.url).href,
+    new URL('./samples/lmg-distant-1.opus', import.meta.url).href,
+    new URL('./samples/lmg-distant-2.opus', import.meta.url).href,
   ],
   'sniper-distant': [
-    new URL('./samples/sniper-distant-1.wav', import.meta.url).href,
-    new URL('./samples/sniper-distant-2.wav', import.meta.url).href,
+    new URL('./samples/sniper-distant-1.opus', import.meta.url).href,
+    new URL('./samples/sniper-distant-2.opus', import.meta.url).href,
   ],
   'shotgun-distant': [
-    new URL('./samples/shotgun-distant-1.wav', import.meta.url).href,
-    new URL('./samples/shotgun-distant-2.wav', import.meta.url).href,
+    new URL('./samples/shotgun-distant-1.opus', import.meta.url).href,
+    new URL('./samples/shotgun-distant-2.opus', import.meta.url).href,
   ],
   mcx: [
-    new URL('./samples/mcx-1.wav', import.meta.url).href,
-    new URL('./samples/mcx-2.wav', import.meta.url).href,
+    new URL('./samples/mcx-1.opus', import.meta.url).href,
+    new URL('./samples/mcx-2.opus', import.meta.url).href,
   ],
   rifle: [
-    new URL('./samples/rifle-1.wav', import.meta.url).href,
-    new URL('./samples/rifle-2.wav', import.meta.url).href,
-    new URL('./samples/rifle-3.wav', import.meta.url).href,
+    new URL('./samples/rifle-1.opus', import.meta.url).href,
+    new URL('./samples/rifle-2.opus', import.meta.url).href,
+    new URL('./samples/rifle-3.opus', import.meta.url).href,
   ],
   sniper: [
-    new URL('./samples/sniper-1.wav', import.meta.url).href,
-    new URL('./samples/sniper-2.wav', import.meta.url).href,
-    new URL('./samples/sniper-3.wav', import.meta.url).href,
+    new URL('./samples/sniper-1.opus', import.meta.url).href,
+    new URL('./samples/sniper-2.opus', import.meta.url).href,
+    new URL('./samples/sniper-3.opus', import.meta.url).href,
   ],
   ak: [
-    new URL('./samples/ak-1.wav', import.meta.url).href,
-    new URL('./samples/ak-2.wav', import.meta.url).href,
+    new URL('./samples/ak-1.opus', import.meta.url).href,
+    new URL('./samples/ak-2.opus', import.meta.url).href,
   ],
   lmg: [
-    new URL('./samples/lmg-1.wav', import.meta.url).href,
-    new URL('./samples/lmg-2.wav', import.meta.url).href,
-    new URL('./samples/lmg-3.wav', import.meta.url).href,
+    new URL('./samples/lmg-1.opus', import.meta.url).href,
+    new URL('./samples/lmg-2.opus', import.meta.url).href,
+    new URL('./samples/lmg-3.opus', import.meta.url).href,
   ],
   smg: [
-    new URL('./samples/smg-1.wav', import.meta.url).href,
-    new URL('./samples/smg-2.wav', import.meta.url).href,
-    new URL('./samples/smg-3.wav', import.meta.url).href,
+    new URL('./samples/smg-1.opus', import.meta.url).href,
+    new URL('./samples/smg-2.opus', import.meta.url).href,
+    new URL('./samples/smg-3.opus', import.meta.url).href,
   ],
   pistol: [
-    new URL('./samples/pistol-1.wav', import.meta.url).href,
-    new URL('./samples/pistol-2.wav', import.meta.url).href,
-    new URL('./samples/pistol-3.wav', import.meta.url).href,
+    new URL('./samples/pistol-1.opus', import.meta.url).href,
+    new URL('./samples/pistol-2.opus', import.meta.url).href,
+    new URL('./samples/pistol-3.opus', import.meta.url).href,
   ],
   shotgun: [
-    new URL('./samples/shotgun-1.wav', import.meta.url).href,
-    new URL('./samples/shotgun-2.wav', import.meta.url).href,
-    new URL('./samples/shotgun-3.wav', import.meta.url).href,
+    new URL('./samples/shotgun-1.opus', import.meta.url).href,
+    new URL('./samples/shotgun-2.opus', import.meta.url).href,
+    new URL('./samples/shotgun-3.opus', import.meta.url).href,
   ],
   suppressed: [
-    new URL('./samples/suppressed-1.wav', import.meta.url).href,
-    new URL('./samples/suppressed-2.wav', import.meta.url).href,
+    new URL('./samples/suppressed-1.opus', import.meta.url).href,
+    new URL('./samples/suppressed-2.opus', import.meta.url).href,
   ],
 } satisfies Record<SampleKind, string[]>;
 
-const ACTION_URL = new URL('./samples/action.wav', import.meta.url).href;
-const EXPLOSION_URL = new URL('./samples/explosion.wav', import.meta.url).href;
-const HEARTBEAT_URL = new URL('./samples/heartbeat.wav', import.meta.url).href;
+const ACTION_URL = new URL('./samples/action.opus', import.meta.url).href;
+const EXPLOSION_URL = new URL('./samples/explosion.opus', import.meta.url).href;
+const HEARTBEAT_URL = new URL('./samples/heartbeat.opus', import.meta.url).href;
 
 /** Required decoded recordings. Any fetch/decode failure rejects the bank. */
 type SpecialBufferKey = 'actionBuffer' | 'explosionBuffer' | 'heartbeatBuffer';

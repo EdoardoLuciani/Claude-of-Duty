@@ -3,6 +3,8 @@
 The accepted gunshot sound and common +12 dB positional presentation reference
 are the anchor. This benchmark checks the **relative mix**, not microphone
 calibration, acoustic SPL, headphone loudness or universal subjective realism.
+Runtime recordings now use [high-quality Opus delivery](audio-delivery.md), with
+untouched WAV masters retained offline. Codec changes do not retune this mixer.
 
 ## Run locally
 
