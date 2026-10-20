@@ -124,7 +124,8 @@ interface LiveGrenade {
  *   wp.weaponIds          equipped primary + secondary (spawn: rifle/pistol)
  *   wp.setWeapon(id)      draw/holster animated swap
  *   wp.nextWeapon()
- *   wp.cycleFireMode()    next supported mode; a held trigger is latched off
+ *   wp.cycleFireMode()    next mode needs a fresh press; release/press clears the latch
+ *                        even if the release was missed while paused/frozen
  *   wp.reload()           no-op if full or empty of reserve
  *   wp.inspect()
  *   wp.tryFire()          honours fire mode + rpm; returns true if a shot left
@@ -180,8 +181,7 @@ export class WeaponSystem {
   declare _fireTimer: number;
   declare _burstLeft: number;
   declare _burstCooldown: number;
-  /** Trigger-down state of the last assessed frame and its mode-change latch. */
-  declare _triggerHeld: boolean;
+  /** Mode-change latch: the new mode needs a fresh trigger press. */
   declare _triggerLatched: boolean;
   declare _spread: number;
   declare _shotIndex: number;
@@ -265,7 +265,6 @@ export class WeaponSystem {
     this._fireTimer = 0;
     this._burstLeft = 0;
     this._burstCooldown = 0;
-    this._triggerHeld = false;
     this._triggerLatched = false;
     this._spread = 0;
     this._shotIndex = 0;
@@ -737,7 +736,6 @@ export class WeaponSystem {
     this._fireTimer = 0;
     this._burstLeft = 0;
     this._burstCooldown = 0;
-    this._triggerHeld = false;
     this._triggerLatched = false;
     this._spread = 0;
     this._shotIndex = 0;
@@ -800,13 +798,11 @@ export class WeaponSystem {
     if (this.disabled || !s || s.def.modes.length < 2) return s?.mode;
     s.modeIndex = (s.modeIndex + 1) % s.def.modes.length;
     s.mode = s.def.modes[s.modeIndex];
-    // No queue survives the selector: a burst in flight dies with the old
-    // mode, and a held trigger is latched so only a fresh press fires. Without
-    // the latch, AUTO -> SEMI would fire off the stale edge and SEMI -> AUTO
-    // would run away mid-pull.
+    // A burst in flight dies with the old mode; the new mode needs a fresh
+    // press, not an inherited held pull. Release or press clears the latch,
+    // even if the release happened while paused/frozen.
     this._burstLeft = 0;
-    this._burstCooldown = 0;
-    if (this._triggerHeld) this._triggerLatched = true;
+    this._triggerLatched = true;
     return s.mode;
   }
 
@@ -1279,7 +1275,6 @@ export class WeaponSystem {
     this._viewmodel.anchor.visible = !this.disabled;
     if (this.disabled) {
       this._burstLeft = 0;
-      this._triggerHeld = false;
       this._triggerLatched = false;
       this._pendingShots = 0;
       this._state.ads = false;
@@ -1634,6 +1629,11 @@ export class WeaponSystem {
       !input.frozen &&
       input.enabled !== false &&
       this.debugMode === null;
+    // The selector latch lives only while the pull is continuously live: a
+    // frozen/disabled input gate drops the physical release, so a non-live
+    // frame must break the pull instead of leaving the next press dead
+    // behind a latch that no edge can clear.
+    if (!live) this._triggerLatched = false;
     if (
       this.healing &&
       live &&
@@ -1707,10 +1707,10 @@ export class WeaponSystem {
     def: WeaponState['def'],
     s: WeaponState
   ) {
-    this._triggerHeld = held;
-    // A mode change latches a held trigger until it is released (see
-    // `cycleFireMode`): the new mode fires only on a fresh press.
-    if (!held) this._triggerLatched = false;
+    // A new mode needs a fresh press. Either release or press clears the latch,
+    // so a release missed while paused/frozen cannot strand the next press,
+    // even when another gate refuses that press's shot.
+    if (!held || pressed) this._triggerLatched = false;
     if (this._triggerLatched) return;
     switch (s.mode) {
       case 'auto':

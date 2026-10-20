@@ -357,17 +357,195 @@ for (const id of ['rifle', 'smg', 'mcx', 'lmg']) {
   assert.equal(shots.fired, 1, 'the old burst does not resume on the way back up');
 }
 
-// A new run resets the selector, the burst queue and the trigger latch.
+// A new run clears a dirty latch and the non-default selector on an inactive gun.
 {
-  const { wp, tap } = makeHarness();
+  const { wp, frame, tap, shots } = makeHarness();
   wp.activeId = 'lmg';
   tap('KeyB');
   assert.equal(wp.fireMode, 'semi');
+  frame({ down: ['Mouse0'] });
+  assert.equal(shots.fired, 1);
+  tap('KeyB'); // semi -> auto, still held
+  tap('KeyB'); // auto -> semi: leave the non-default selection dirty too
+  assert.equal(wp._triggerLatched, true, 'restart precondition: held selector is latched');
+  assert.equal(wp.states.get('lmg').mode, 'semi');
+  assert.equal(wp.states.get('lmg').modeIndex, 1);
   wp.resetForNewGame();
   assert.equal(wp.activeId, 'rifle');
   assert.equal(wp.fireMode, 'auto', 'a new run starts on the authored first mode');
+  assert.equal(wp._triggerLatched, false, 'restart clears the dirty latch');
   assert.equal(wp._burstLeft, 0);
+  assert.equal(wp.states.get('lmg').mode, 'auto', 'restart resets the inactive selector');
+  assert.equal(wp.states.get('lmg').modeIndex, 0, 'restart resets the inactive mode index');
+  frame({ up: ['Mouse0'] });
+  const before = shots.fired;
+  frame({ down: ['Mouse0'] });
+  assert.equal(shots.fired, before + 1, 'the reset loadout fires on its first fresh press');
+}
+
+// A partial burst independently dirties the restart queue (a selector clears it).
+{
+  const { wp, frame, tap, shots } = makeHarness();
+  tap('KeyB');
+  frame({ down: ['Mouse0'] });
+  frame();
+  assert(wp._burstLeft > 0, 'restart precondition: a partial burst is queued');
+  wp.resetForNewGame();
+  assert.equal(wp._burstLeft, 0, 'restart clears the dirty burst queue');
+  frame({ up: ['Mouse0'] });
+  tap('KeyB');
+  const before = shots.fired;
+  frame({ down: ['Mouse0'] });
+  for (let i = 0; i < 30; i++) frame();
+  assert.equal(shots.fired, before + 3, 'a fresh post-restart burst has exactly three rounds');
+}
+
+// Death clears a dirty mode-change latch without changing the selected mode.
+{
+  const { wp, frame, tap, shots } = makeHarness();
+  wp.activeId = 'mcx';
+  frame({ down: ['Mouse0'] });
+  tap('KeyB'); // auto -> semi while held
+  assert.equal(wp._triggerLatched, true, 'death precondition: held selector is latched');
+  wp._onPlayerDeath();
+  assert.equal(wp._triggerLatched, false, 'death clears the dirty latch');
+  assert.equal(wp._burstLeft, 0);
+  wp._setDeathDisabled(false);
+  frame({ up: ['Mouse0'] });
+  for (let i = 0; i < 10; i++) frame();
+  const before = shots.fired;
+  frame({ down: ['Mouse0'] });
+  assert.equal(wp.fireMode, 'semi');
+  assert.equal(shots.fired, before + 1, 'a fresh post-death SEMI press fires cleanly');
+}
+
+// Death independently clears a real partial M4A1 burst.
+{
+  const { wp, frame, tap, shots } = makeHarness();
+  tap('KeyB');
+  frame({ down: ['Mouse0'] });
+  frame();
+  assert(wp._burstLeft > 0, 'death precondition: a partial burst is queued');
+  wp._onPlayerDeath();
+  assert.equal(wp._burstLeft, 0, 'death clears the dirty burst queue');
   assert.equal(wp._triggerLatched, false);
+  wp._setDeathDisabled(false);
+  frame({ up: ['Mouse0'] });
+  for (let i = 0; i < 10; i++) frame();
+  const before = shots.fired;
+  frame({ down: ['Mouse0'] });
+  for (let i = 0; i < 30; i++) frame();
+  assert.equal(wp.fireMode, 'burst');
+  assert.equal(shots.fired, before + 3, 'a fresh post-death burst has exactly three rounds');
+}
+
+// A release hidden behind the pause/shop control gate cannot strand the next press.
+{
+  const { wp, player, frame, tap, shots } = makeHarness();
+  wp.activeId = 'lmg';
+  tap('KeyB');
+  frame({ down: ['Mouse0'] });
+  assert.equal(shots.fired, 1);
+  tap('KeyB'); // semi -> auto while held
+  assert.equal(wp._triggerLatched, true);
+  player.controlEnabled = false;
+  frame({ up: ['Mouse0'] });
+  for (let i = 0; i < 60; i++) frame();
+  // A paused frame breaks the pull even without observing its release.
+  assert.equal(wp._triggerLatched, false, 'the paused frame breaks the pull');
+  player.controlEnabled = true;
+  frame({ down: ['Mouse0'] });
+  assert.equal(shots.fired, 2, 'the first fresh post-pause press fires immediately');
+  for (let i = 0; i < 60; i++) frame();
+  assert(shots.fired > 8, 'holding after resume continues AUTO fire');
+  frame({ up: ['Mouse0'] });
+  tap('KeyB'); // auto -> semi with trigger up
+  for (let i = 0; i < 10; i++) frame();
+  const before = shots.fired;
+  frame({ down: ['Mouse0'] });
+  assert.equal(shots.fired, before + 1, 'a trigger-up mode change does not block the next press');
+}
+
+// A fresh press clears the latch even when reload refuses its shot.
+{
+  const { wp, player, frame, tap, shots } = makeHarness();
+  wp.activeId = 'lmg';
+  frame({ down: ['Mouse0'] });
+  tap('KeyB'); // auto -> semi
+  tap('KeyB'); // semi -> auto, still held
+  assert.equal(wp.fireMode, 'auto');
+  assert.equal(wp._triggerLatched, true);
+  assert.equal(wp.reload(), true, 'reload accepts the spent round');
+  player.controlEnabled = false;
+  frame({ up: ['Mouse0'] });
+  for (let i = 0; i < 10; i++) frame();
+  assert.equal(wp._triggerLatched, false, 'the non-live reload frame breaks the pull');
+  player.controlEnabled = true;
+  const before = shots.fired;
+  frame({ down: ['Mouse0'] });
+  assert.equal(wp._triggerLatched, false, 'the reload-blocked fresh press clears the latch');
+  assert.equal(shots.fired, before, 'reload still refuses the shot');
+  wp._onClipEvent('magin', 'reloadTac');
+  wp.viewmodel.stopClip(); // The stub has no mixer to finish the reload clip.
+  frame();
+  assert.equal(shots.fired, before + 1, 'held AUTO fires after reload without another press');
+}
+
+// Frozen/disabled handlers drop releases; the selector must survive the stuck hold.
+for (const gate of ['frozen', 'disabled']) {
+  const { wp, input, frame, tap, shots } = makeHarness();
+  wp.activeId = 'mcx';
+  tap('KeyB');
+  frame({ down: ['Mouse0'] });
+  assert.equal(shots.fired, 1);
+  tap('KeyB'); // semi -> auto while held
+  assert.equal(wp.fireMode, 'auto');
+  assert.equal(wp._triggerLatched, true);
+  if (gate === 'frozen') input.frozen = true;
+  else input.enabled = false;
+  input._onMouseUp({ button: 0 });
+  assert.equal(input.fire, true, `${gate} handler drops the physical release`);
+  for (let i = 0; i < 30; i++) frame();
+  assert.equal(wp._triggerLatched, false, `${gate} frames break the pull`);
+  input.frozen = false;
+  input.enabled = true;
+  const before = shots.fired;
+  for (let i = 0; i < 10; i++) frame({ down: ['Mouse0'] });
+  assert(shots.fired > before, `${gate} resume continues AUTO despite the stuck hold`);
+}
+
+// A same-frame selector and fresh fire press uses the newly selected mode.
+{
+  const { wp, frame, tap, shots } = makeHarness();
+  wp.activeId = 'lmg';
+  tap('KeyB');
+  assert.equal(wp.fireMode, 'semi');
+  frame({ down: ['Mouse0', 'KeyB'], up: ['KeyB'] });
+  assert.equal(wp.fireMode, 'auto', 'same-frame B advances to the next mode');
+  assert.equal(shots.fired, 1, 'same-frame B and fresh fire press fires exactly one round');
+}
+
+// A completed burst's authored delay survives a full selector round trip.
+{
+  const { wp, frame, tap, shots } = makeHarness();
+  tap('KeyB');
+  frame({ down: ['Mouse0'] });
+  for (let i = 0; i < 8; i++) frame();
+  assert.equal(shots.fired, 3);
+  assert.equal(wp._burstLeft, 0);
+  assert(wp._burstCooldown > 0, 'completed burst establishes an inter-burst delay');
+  tap('KeyB'); // burst -> semi
+  tap('KeyB'); // semi -> auto
+  tap('KeyB'); // auto -> burst
+  assert(wp._burstCooldown > 0, 'selector preserves the completed-burst delay');
+  frame({ up: ['Mouse0'] });
+  frame({ down: ['Mouse0'] });
+  assert.equal(shots.fired, 3, 'a press within the preserved burst delay is refused');
+  frame({ up: ['Mouse0'] });
+  for (let i = 0; i < 12; i++) frame();
+  frame({ down: ['Mouse0'] });
+  assert.equal(shots.fired, 4, 'a fresh press after the delay starts a new burst');
+  assert.equal(wp._burstLeft, 2);
 }
 
 // Radio owns 1/2/3 only while open, with request priority 1 > 2 > 3.

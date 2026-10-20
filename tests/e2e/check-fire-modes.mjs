@@ -101,6 +101,7 @@ try {
   const heldBurst = await hold(45);
   assert.equal(heldBurst - burst0, 3, 'one press still delivers a three-round burst');
 
+  assert.deepEqual(errors, []);
   const report = {
     ok: true,
     modes: await page.evaluate(() =>
@@ -116,7 +117,6 @@ try {
     warnings,
   };
   writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 2));
-  assert.deepEqual(errors, []);
   console.log(JSON.stringify(report, null, 2));
 } finally {
   await close();
