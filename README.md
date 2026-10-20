@@ -114,8 +114,6 @@ Tests are not final human visual acceptance; see each asset's remaining limits.
 - `node tools/webgpu-preview-check.mjs`: native preview composition, resize and lifetime.
   Use final-output captures, not old intermediate-target PNGs, for appearance review.
 - [AI behaviour and controlled validation](docs/ai-combat-pressure.md).
-- [Private Opus audio delivery and validation](docs/audio-delivery.md) ·
-  [whole-mix benchmark](docs/audio-mix.md).
 
 For local telemetry open `/?telemetry=1`: **F7** marks a moment (optional note),
 **F8** stops/downloads `cod-telemetry-<timestamp>.tgz`. It contains JSON and marked
