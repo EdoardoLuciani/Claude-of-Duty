@@ -105,7 +105,9 @@ those larger Bun/browser ratios are not the primary saturated comparison.
   windows, were qualitatively inspected alongside Rust. Frozen-bone control is
   retained. **No pixel-by-pixel comparisons, pixel gates or exact-parity claim.**
 - Four standalone math/decoder tests, 140 game smoke tests, clean `npm ci`, build,
-  lint and formatting pass. Production package manifests remain unchanged;
+  lint and formatting pass. A separate clean tool install/build/test/GPU run also
+  passes and reproduces the measured executable **byte-for-byte**, with identical
+  source and native-addon hashes. Production package manifests remain unchanged;
   the new isolated tool manifest intentionally pins experimental native bindings.
 - Host: RX 9070 XT / RADV GFX1201, Ryzen 9 9950X, Mesa 26.2.4, Linux
   7.2.11-200.fc44; Bun 1.4.3, Node 24.18.0, Chrome 153.0.8010.12. Browser offscreen
