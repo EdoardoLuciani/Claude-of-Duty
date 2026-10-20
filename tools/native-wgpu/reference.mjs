@@ -1,6 +1,7 @@
 // Offscreen control for the pinned #476 JavaScript renderer. Not used by the
-// native executable. Only change to rendering: a persistent offscreen output
-// view instead of GPUCanvasContext.getCurrentTexture(). No timed API wrappers.
+// native executable. Uses a persistent offscreen output view, and mirrors the
+// equivalent vertex-output constructor needed by native Naga/SPIR-V validation.
+// No shader arithmetic changes and no timed API wrappers.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -52,12 +53,13 @@ source = replace(
   '  return {\n    device,\n    errors,',
   '  return {\n    device,\n    errors,\n    outputTexture,'
 );
-const sha = (...chunks) => chunks.reduce((h, c) => h.update(c), createHash('sha256')).digest('hex');
-const rendererSha256 = sha(
-  source,
-  await readFile(join(here, 'math.js')),
-  await readFile(join(here, 'shaders.js'))
+const shaders = replace(
+  await readFile(join(here, 'shaders.js'), 'utf8'),
+  'var out:VertexOut;out.clip=frame.vp*world;out.world=world.xyz;out.normal=(object.normal*vec4<f32>(normal,0.0)).xyz;out.material=instance.y;return out;',
+  'return VertexOut(frame.vp*world,world.xyz,(object.normal*vec4<f32>(normal,0.0)).xyz,instance.y);'
 );
+const sha = (...chunks) => chunks.reduce((h, c) => h.update(c), createHash('sha256')).digest('hex');
+const rendererSha256 = sha(source, await readFile(join(here, 'math.js')), shaders);
 const datasetSha256 = sha(
   await readFile(join(data, `scene-${args.agents}.json`)),
   await readFile(join(data, `scene-${args.agents}.bin`))
@@ -85,7 +87,9 @@ const server = createServer(async (req, res) => {
             ? 'application/json'
             : 'application/octet-stream'
     );
-    res.end(path === '/raw-renderer.js' ? source : await readFile(file));
+    res.end(
+      path === '/raw-renderer.js' ? source : path === '/shaders.js' ? shaders : await readFile(file)
+    );
   } catch (e) {
     res.writeHead(404);
     res.end(String(e));

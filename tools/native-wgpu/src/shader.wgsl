@@ -1,4 +1,5 @@
-// Ported verbatim from prototype commit 11ebdca; depth entry point renamed.
+// Prototype 11ebdca: depth entry renamed; equivalent VertexOut constructor
+// avoids Naga 30 emitting invalid Function-storage layout for a local struct.
 
  struct Frame { vp:mat4x4<f32>, shadows:array<mat4x4<f32>,3>, light:vec4<f32> };
  struct ObjectData { world:mat4x4<f32>, normal:mat4x4<f32>, bind:mat4x4<f32>, bindInv:mat4x4<f32> };
@@ -17,7 +18,7 @@
    normal=(skin*vec4<f32>(n,0.0)).xyz;
   }
   let world=object.world*vec4<f32>(position,1.0);
-  var out:VertexOut;out.clip=frame.vp*world;out.world=world.xyz;out.normal=(object.normal*vec4<f32>(normal,0.0)).xyz;out.material=instance.y;return out;
+  return VertexOut(frame.vp*world,world.xyz,(object.normal*vec4<f32>(normal,0.0)).xyz,instance.y);
  }
 
  @group(2) @binding(0) var shadow0:texture_depth_2d;

@@ -24,6 +24,8 @@ cargo build --release --locked
 cargo test --locked
 cargo clippy --all-targets --locked -- -D warnings
 cargo fmt --check
+# Optional integration check: installed Vulkan SDK tools/validation layer required.
+bash validate.sh /absolute/path/to/recorded-scenes /tmp/native-validation
 
 # An animated, native desktop window. Replays the 120-frame recording at 60 Hz.
 # Escape closes it; resize rebuilds only the main depth target/surface.
@@ -73,7 +75,13 @@ depth range. Singular zero-scale objects publish zero inverses, not NaNs.
 The same geometry, material sides/colors, hierarchy, visibility, cameras, bone
 palettes and instance matrices drive five passes: three fixed 1024² shadows,
 world beauty, then a depth clear and view beauty. WGSL is copied from #476,
-renaming only the depth fragment entry point. Shadow passes retain the actual JS
+renaming the depth fragment entry point and returning `VertexOut(...)` directly
+instead of assigning a function-local output struct. The latter is an equivalent
+expression that avoids invalid SPIR-V Function-storage layout emitted for the
+original form on this WGPU/Naga version; the JS offscreen control mirrors it.
+Shader arithmetic and buffer layout are unchanged. `validate.sh` checks the
+Vulkan-layer log as well as process success: WGPU's `errors:[]` alone does not
+include all backend validation messages. Shadow passes retain the actual JS
 implementation's dummy RGBA8 attachments, despite its older README's depth-only
 wording. Main output is non-sRGB 1920×1080, shader gamma, depth32float, no MSAA.
 Offscreen defaults to `--format=rgba8unorm`; use `--format=bgra8unorm` if the
@@ -92,8 +100,8 @@ draws. No shared GPU destination is overwritten ahead of an older pending draw.
 requirement. Point it at a clean checkout of #476 with that checkout's npm
 prerequisites installed. It reuses the real JS renderer, shaders, loader and
 browser harness, serving source in memory without editing the reference branch.
-The only rendering change is a persistent offscreen output texture/view instead
-of the canvas current texture. Three.js is never imported. No GPU method wrappers
+It uses a persistent offscreen output texture/view instead of the canvas current
+texture and the identical equivalent vertex-output constructor described above. Three.js is never imported. No GPU method wrappers
 are installed in timed frames.
 
 ```sh
