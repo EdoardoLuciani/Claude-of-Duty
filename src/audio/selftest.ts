@@ -307,7 +307,7 @@ export async function runAudioSelfTest(opts: { verbose?: boolean } = {}) {
     route(mixer, dryFire(mixer.actx, bank, rng, { when: t }), 'weapons');
   });
   await push('heartbeat', 1.5, async ({ mixer, t }) => {
-    const file = await fetch(new URL('./samples/heartbeat.wav', import.meta.url));
+    const file = await fetch(new URL('./samples/heartbeat.opus', import.meta.url));
     if (!file.ok) throw new Error(`heartbeat sample: ${file.status}`);
     const buffer = await mixer.actx.decodeAudioData(await file.arrayBuffer());
     route(mixer, heartbeat(mixer.actx, { when: t, level: 0.74, buffer }), 'ui');

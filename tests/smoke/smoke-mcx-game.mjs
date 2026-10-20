@@ -17,6 +17,7 @@ import { makeMCXModel, MCX_URL } from '../../src/weapons/mcx.ts';
 import { makeMPXModel, MPX_URL } from '../../src/weapons/mpx.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
+import { audioMaster } from '../helpers/audio-masters.mjs';
 
 const def = { ...WEAPON_DEFS.mcx, cycleTime: 60 / WEAPON_DEFS.mcx.rpm };
 assert(PRIMARY_IDS.includes('mcx'));
@@ -26,32 +27,46 @@ assert.equal(resolveProfile('MCX VIRTUS'), WEAPON_PROFILES.mcx);
 assert.notEqual(resolveProfile('mcx'), resolveProfile('rifle'));
 assert(resolveProfile('mcx').suppressed && resolveProfile('mcx').sampleAction === false);
 for (const n of [1, 2]) {
-  const wav = readFileSync(new URL(`../../src/audio/samples/mcx-${n}.wav`, import.meta.url));
-  assert.equal(wav.toString('ascii', 0, 4), 'RIFF');
-  assert.equal(wav.readUInt16LE(20), 3, 'source-level IEEE float, no integer clipping');
-  assert.equal(wav.readUInt16LE(22), 2);
-  assert.equal(wav.readUInt32LE(24), 48000);
-  assert.equal(wav.readUInt16LE(34), 32);
-  let offset = 12;
-  while (wav.toString('ascii', offset, offset + 4) !== 'data') {
-    const size = wav.readUInt32LE(offset + 4);
-    offset += 8 + size + (size & 1);
-    assert(offset + 8 <= wav.length);
-  }
-  const start = offset + 8;
-  assert.equal(wav.readUInt32LE(offset + 4) / 384000, n === 1 ? 3.2713125 : 2.458875);
-  let peak = 0,
-    energy = 0;
-  for (let i = start; i < wav.length; i += 4) {
-    const x = wav.readFloatLE(i);
-    assert(Number.isFinite(x));
-    peak = Math.max(peak, Math.abs(x));
-    energy += x * x;
-  }
-  assert(peak > 1.14 && peak < 1.2, 'unattenuated source peaks survive resampling');
+  const { file: wav, reference } = audioMaster(`mcx-${n}`);
+  assert.equal(reference.format, 3, 'source-level IEEE float, no integer clipping');
+  assert.equal(reference.channels, 2);
+  assert.equal(reference.rate, 48000);
+  assert.equal(reference.bits, 32);
+  assert.equal(reference.duration, n === 1 ? 3.2713125 : 2.458875);
+  assert(
+    reference.peak > 1.14 && reference.peak < 1.2,
+    'unattenuated source peaks survive resampling'
+  );
   assert.equal('sampleGain' in WEAPON_PROFILES.mcx, false, 'no separate suppressed profile trim');
-  assert(energy > 0.1);
-  assert.equal(wav.readFloatLE(wav.length - 4), 0, '1ms boundary-only click protection');
+  assert(reference.native['48000'][1] ** 2 * reference.frames * reference.channels > 0.1);
+  assert.equal(reference.lastSample, 0, '1ms boundary-only click protection');
+  if (wav) {
+    assert.equal(wav.toString('ascii', 0, 4), 'RIFF');
+    assert.equal(wav.readUInt16LE(20), 3, 'source-level IEEE float, no integer clipping');
+    assert.equal(wav.readUInt16LE(22), 2);
+    assert.equal(wav.readUInt32LE(24), 48000);
+    assert.equal(wav.readUInt16LE(34), 32);
+    let offset = 12;
+    while (wav.toString('ascii', offset, offset + 4) !== 'data') {
+      const size = wav.readUInt32LE(offset + 4);
+      offset += 8 + size + (size & 1);
+      assert(offset + 8 <= wav.length);
+    }
+    const start = offset + 8;
+    assert.equal(wav.readUInt32LE(offset + 4) / 384000, n === 1 ? 3.2713125 : 2.458875);
+    let peak = 0,
+      energy = 0;
+    for (let i = start; i < wav.length; i += 4) {
+      const x = wav.readFloatLE(i);
+      assert(Number.isFinite(x));
+      peak = Math.max(peak, Math.abs(x));
+      energy += x * x;
+    }
+    assert(peak > 1.14 && peak < 1.2, 'unattenuated source peaks survive resampling');
+    assert.equal('sampleGain' in WEAPON_PROFILES.mcx, false, 'no separate suppressed profile trim');
+    assert(energy > 0.1);
+    assert.equal(wav.readFloatLE(wav.length - 4), 0, '1ms boundary-only click protection');
+  }
 }
 
 // Exercise the REAL GLB hierarchy, animation samplers and runtime adapter.

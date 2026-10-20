@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 
 import { AudioSystem } from '../../src/audio/index.ts';
 import { SpatialField } from '../../src/audio/spatial.ts';
@@ -11,6 +10,7 @@ import {
   reportDistantMix,
   usesDistantSample,
 } from '../../src/audio/weapons.ts';
+import { audioMaster } from '../helpers/audio-masters.mjs';
 
 const reference = 1.9905358527674861; // independently pinned approved +12 dB audition
 assert.deepEqual(REPORT_DISTANCE, { reference, blendStart: 20, blendEnd: 140 });
@@ -44,9 +44,11 @@ assert.equal(SpatialField.prototype.attenuation(20), 2 / (2 + 0.85 * 18));
 function meanReportEnergy(kind, count) {
   let energy = 0;
   for (let variant = 1; variant <= count; variant++) {
-    const file = readFileSync(
-      new URL(`../../src/audio/samples/${kind}-${variant}.wav`, import.meta.url)
-    );
+    const { file, reference } = audioMaster(`${kind}-${variant}`);
+    if (!file) {
+      energy += reference.monoEnergy;
+      continue;
+    }
     assert.equal(file.readUInt16LE(20), 3);
     assert.equal(file.readUInt16LE(34), 32);
     assert.equal(file.readUInt32LE(24), 48000);

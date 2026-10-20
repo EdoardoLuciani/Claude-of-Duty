@@ -1,10 +1,23 @@
 #!/usr/bin/env node
-/** Deterministic MCX game report, derived from the bundled CC0 .300 BLK takes.
- * Not an authentic MCX recording. Dry action/body layers are added by WebAudio.
- * Rebuild: node tools/mcx-audio.mjs (no ffmpeg/network/Blender required).
+/** Historical CC0 MCX prototype recipe, NOT the current commercial report bank.
+ * Input/output WAVs live outside the game repository. No runtime asset writes.
+ * Usage: node tools/mcx-audio.mjs <legacy-master-directory> <output-directory>
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+assert(process.argv[2] && process.argv[3], 'Provide external legacy input and output directories');
+const inputDirectory = resolve(process.argv[2]);
+const outputDirectory = resolve(process.argv[3]);
+const repo = fileURLToPath(new URL('../', import.meta.url));
+assert(
+  outputDirectory !== resolve(repo) && !outputDirectory.startsWith(repo),
+  'Keep generated WAVs outside the game repository'
+);
+assert.notEqual(inputDirectory, outputDirectory, 'Do not overwrite archived masters');
+mkdirSync(outputDirectory, { recursive: true });
 
 const SR = 48000;
 const LENGTH = 0.32;
@@ -64,8 +77,7 @@ function lowpass(cutoff) {
 }
 
 for (const n of [1, 2]) {
-  const dir = new URL('../src/audio/samples/', import.meta.url);
-  const input = readPCM(new URL(`suppressed-${n}.wav`, dir));
+  const input = readPCM(resolve(inputDirectory, `suppressed-${n}.wav`));
   let peak = 0;
   for (const x of input) peak = Math.max(peak, Math.abs(x));
   const onset = Math.max(0, input.findIndex((x) => Math.abs(x) > peak * 0.025) - 24);
@@ -101,9 +113,9 @@ for (const n of [1, 2]) {
   wav.writeUInt32LE(out.length * 2, 40);
   for (let i = 0; i < out.length; i++)
     wav.writeInt16LE(Math.round(((out[i] * PEAK) / max) * 32767), 44 + i * 2);
-  const dest = new URL(`mcx-${n}.wav`, dir);
+  const dest = resolve(outputDirectory, `mcx-${n}.wav`);
   writeFileSync(dest, wav);
   console.log(
-    `[mcx audio] ${fileURLToPath(dest)}: ${LENGTH}s mono PCM16, -4.5 dBFS peak, onset trim ${((onset / SR) * 1000).toFixed(2)}ms`
+    `[mcx audio] ${dest}: ${LENGTH}s mono PCM16, -4.5 dBFS peak, onset trim ${((onset / SR) * 1000).toFixed(2)}ms`
   );
 }

@@ -1,7 +1,8 @@
 # Tactical gunshot private review candidate
 
 **Not approved for public distribution.** The operator explicitly authorized a
-local-only review commit containing the prepared WAV masters and Opus derivatives.
+local-only review commit containing the prepared audio derivatives. The current
+tree contains only Opus delivery files; WAV masters are archived privately outside Git.
 Do not push, upload, publish or open a public PR containing these assets without
 separate rights clearance. Required runtime assets accompany the source changes;
 a clean checkout needs no private overlay or external commercial library.
@@ -15,6 +16,14 @@ distinct. MCX keeps the first/fourth of four reports in its already-suppressed
 source. MPX uses the first three isolated reports from a suppressed MP5 source.
 The three unsuppressed UZI close reports remain loaded only for legacy `smg`/`mp5`
 aliases, not the actual suppressed MPX definition; UZI distant reports are unused.
+
+For example, `lmg-1`, `lmg-2` and `lmg-3` isolate three different authored shot
+events from the SAME supplied M60 Close Single file, at approximately0.10–4.00s,
+5.00–9.00s and10.00–13.90s respectively. They are not duplicated or pitch-shifted
+copies. Their stereo PCM masters match those isolated48k inputs sample-exactly;
+no LMG preparation EQ, individual gain or boundary fade was added. The two distant
+variants come from separate events in the M60 Distant Single file, averaged to mono.
+The vendor's Designed processing is already part of the supplied source.
 
 | Game weapon | Exact close filename                              | Exact distant filename                                               | Proxy limitation                                             |
 | ----------- | ------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------ |
@@ -39,8 +48,8 @@ animation, handling or cadence code changed.
 The 33 authored masters use IEEE float32 WAV storage: resampling peaks above
 unity survive without integer clipping or normalization. Runtime delivery uses
 high-quality Opus copies of all40 loaded recordings (256kb/s stereo /128kb/s mono,
-VBR, float encoder input). The41 WAV masters remain intact and are not bundled by
-Vite. This is lossy delivery encoding, not a bit-exact change; browser decoding must
+VBR, float encoder input). The41 WAV masters remain intact in a verified external
+archive, not in the game repository. See [delivery and offline validation](audio-delivery.md). This is lossy delivery encoding, not a bit-exact change; browser decoding must
 retain channel counts, sample lengths and float headroom. Existing reference/bank
 factors and mixer parameters are not retuned to compensate for codec differences. No preparation EQ,
 exponential tail reshaping, per-clip loudness normalization, or duplicate

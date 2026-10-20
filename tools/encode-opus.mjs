@@ -5,10 +5,13 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Explicit offline authoring command, never part of normal startup/build.
-// Usage: node tools/encode-opus.mjs [output-directory]
+// Usage: node tools/encode-opus.mjs <external-master-directory> [output-directory]
 const root = fileURLToPath(new URL('../', import.meta.url));
 const samples = resolve(root, 'src/audio/samples');
-const output = resolve(process.argv[2] ?? samples);
+const masterDirectory = process.argv[2] ?? process.env.AUDIO_MASTER_DIR;
+assert(masterDirectory, 'Provide the external WAV master directory; see docs/audio-delivery.md');
+const masters = resolve(masterDirectory);
+const output = resolve(process.argv[3] ?? samples);
 const source = readFileSync(resolve(root, 'src/audio/samples.ts'), 'utf8');
 const names = [...source.matchAll(/new URL\(['"]\.\/samples\/([a-z0-9-]+)\.opus['"]/g)].map(
   (m) => m[1]
@@ -19,7 +22,7 @@ mkdirSync(output, { recursive: true });
 let inputBytes = 0,
   outputBytes = 0;
 for (const name of names) {
-  const input = resolve(samples, name + '.wav');
+  const input = resolve(masters, name + '.wav');
   const target = resolve(output, name + '.opus');
   const probe = JSON.parse(
     execFileSync('ffprobe', ['-v', 'error', '-show_streams', '-of', 'json', input], {

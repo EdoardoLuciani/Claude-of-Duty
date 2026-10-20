@@ -2,7 +2,9 @@
 
 **This private local-only review branch contains commercial derivatives.**
 The operator explicitly authorized local commits of the prepared WAV masters and
-Opus delivery copies. This does NOT grant public distribution rights: do not push,
+Opus delivery copies. The current tree keeps only Opus; the41 WAV masters are now
+preserved in a verified private archive outside Git (older local commits still
+contain them). This does NOT grant public distribution rights: do not push,
 upload, publish or open a public PR containing these assets without rights clearance.
 The legacy CC0/CC BY provenance below describes the branch baseline, NOT the
 replaced candidate files.
@@ -17,7 +19,7 @@ caliber/action substitutions, the public-repository rights blocker and private
 reproduction references are in [tactical-gunshots.md](../../../docs/tactical-gunshots.md).
 All remaining files retain their baseline provenance below. Library originals
 were not modified or added. The `.opus` files derive from the corresponding local
-WAV masters using `node tools/encode-opus.mjs`: float input, audio mode, VBR,
+external WAV masters using `node tools/encode-opus.mjs /private/wav-masters`: float input, audio mode, VBR,
 256kb/s stereo /128kb/s mono, complexity10,20ms frames. No normalization, gain
 adjustment, downmix or tail trimming. Opus is lossy; the float masters remain intact.
 
@@ -63,7 +65,9 @@ heartbeat; cadence is set by player health, not by looping the file.
 `mcx-[12].wav` are designed derivatives of the **CC0** Savage 10 .300 Blackout
 `T_27P.wav` takes above (`suppressed-[12].wav`), **not recordings of an actual
 MCX or verified recordings of this suppressor/load**. No new third-party sound
-is required. `node tools/mcx-audio.mjs` deterministically rebuilds them offline:
+is required. This is the historical recipe, NOT the current commercial MCX bank.
+`node tools/mcx-audio.mjs /private/legacy-masters /private/legacy-output`
+deterministically rebuilds the old prototype outside the repository:
 mono downmix, onset trim, 3.1/3.3 kHz Butterworth low-pass, 55 Hz high-pass,
 shortened environmental decay, end fade, 48 kHz PCM16, -4.5 dBFS peak.
 
