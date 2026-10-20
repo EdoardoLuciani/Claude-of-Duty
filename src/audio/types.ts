@@ -13,16 +13,25 @@ export interface RoundRobinVariant {
 /** Shared sound-tuning data for a weapon's synthesized/recorded audio. */
 export type SampleKind =
   | 'mcx'
+  | 'mpx'
   | 'rifle'
   | 'ak'
   | 'lmg'
   | 'smg'
   | 'pistol'
   | 'shotgun'
-  | 'suppressed';
+  | 'sniper'
+  | 'suppressed'
+  | 'rifle-distant'
+  | 'pistol-distant'
+  | 'lmg-distant'
+  | 'sniper-distant'
+  | 'shotgun-distant';
 
 export interface WeaponProfile {
   sample?: SampleKind | null;
+  /** Authored distant report; absent for the suppressed MCX close-source fallback. */
+  distantSample?: SampleKind;
   sampleGain?: number;
   sampleSend?: number;
   sampleLowpass?: number;

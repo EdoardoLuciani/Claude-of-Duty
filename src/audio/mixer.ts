@@ -4,33 +4,35 @@
  * The signal path, top down:
  *
  *   voices ──► bus (weapons | foley | ambience | voice | ui | music)
- *                │           each bus: trim ──► bus compressor
+ *                │           optional compressor for foley / ambience / voice
+ *                │           one category gain (balance × volume × duck)
  *                ▼
- *   ┌── worldSum ─► muffleLP ─► muffleGain ──┐        (deafening / concussion)
- *   │      ▲                                 │
- *   │   reverb returns                       ▼
- *   │      ▲                              masterSum ─► masterComp ─► softClip ─► out
+ *   ┌── worldSum ─┬─► dry weight ─────────┬─► hearing gain ─┐
+ *   │      ▲      └─► LP / shelf / wet ───┘                 │
+ *   │   reverb returns        (complementary hearing fade)  ▼
+ *   │      ▲                         masterSum ─► energy / peak gain ─► volume
  *   │   convolver x5 (space blend)           ▲
  *   │      ▲                                 │
  *   └── reverbSend ◄─ per-voice send    ui bus + tinnitus (bypass the muffle,
  *                                        so HUD and the ring stay audible)
  *
  * Ducking is a manual sidechain: gunfire pushes `ambience`/`foley` down with a
- * fast setTargetAtTime and lets them float back over ~400 ms. That is exactly
- * what a real game mix does, and it is far more predictable than trying to make
- * a DynamicsCompressor listen to another bus.
+ * fast setTargetAtTime and lets them float back over ~400 ms. The audible
+ * post-compressor level changes without altering compressor drive or forgetting
+ * the user's volume setting.
  */
 
 import type { Rng } from '../core/rng.ts';
-import { biquad, gain, limiterCurve, shaper, clamp, osc } from './dsp.ts';
+import { biquad, gain, clamp, osc } from './dsp.ts';
 import { IR_SPECS, generateIR, type SpaceName } from './ir.ts';
 type BusName = keyof typeof BUS_DEFS;
 interface MixerBus {
-  input: GainNode;
-  duck: GainNode;
-  trim: GainNode;
+  input: AudioNode;
+  level: GainNode;
+  send: GainNode;
   comp: DynamicsCompressorNode | null;
   baseTrim: number;
+  volume: number;
   duckAmount: number;
   duckHold?: number;
 }
@@ -51,47 +53,52 @@ interface PendingConcussion {
 }
 
 const TINNITUS_GAIN = 0.008;
+const HEARING_SETTLE_SECONDS = 0.03;
+
+// Anchor the rendered current value explicitly before replacing a target/ramp.
+// Native automation tests catch discontinuities when hold alone is followed by
+// a new ramp without a value event at its start.
+function holdHearingParam(param: AudioParam, time: number): void {
+  const value = param.value;
+  param.cancelAndHoldAtTime(time);
+  param.setValueAtTime(value, time);
+}
 const CONCUSSION_CUTOFF_RATIO = 0.075; // full concussion bottoms out at 1.5 kHz
 
 const BUS_DEFS = {
-  // Weapons ride ABOVE the bed: measured before the mix pass, a rifle shot
-  // peaked at -20 dBFS against an ambient bed at -31 dB mean with -20 dB peaks.
-  // The gentler compressor preserves the pressure transient from the field
-  // recordings instead of flattening every shot back into the street bed.
-  weapons: {
-    trim: 1.75,
-    comp: { threshold: -1, knee: 4, ratio: 1.5, attack: 0.0015, release: 0.12 },
-  },
-  foley: { trim: 0.9, comp: { threshold: -14, knee: 10, ratio: 2.0, attack: 0.004, release: 0.2 } },
-  // Ambient bed deliberately quiet: it is a floor, not a lead vocal. A gunshot
-  // should land 15+ dB above it or the street reads as the loudest thing in
-  // the mix. Leave environmental detail audible, but below foley and weapons.
+  // The only authored weapon-level control. Sources have no separate profile
+  // trim; shared summation headroom and output safety remain downstream.
+  weapons: { trim: 1, comp: null },
+  foley: { trim: 0.6, comp: { threshold: -14, knee: 10, ratio: 2.0, attack: 0.004, release: 0.2 } },
+  // Sparse environmental events support the action, below foley and weapons.
   ambience: {
-    trim: 0.07,
+    trim: 0.06,
     comp: { threshold: -24, knee: 12, ratio: 2.0, attack: 0.05, release: 0.5 },
   },
   voice: {
-    trim: 0.85,
+    trim: 0.6,
     comp: { threshold: -18, knee: 8, ratio: 3.0, attack: 0.006, release: 0.22 },
   },
-  ui: { trim: 1.6, comp: null },
-  music: { trim: 1.6, comp: null },
+  // Cues and the shop bed support the action rather than matching gunfire.
+  ui: { trim: 0.45, comp: null },
+  music: { trim: 0.6, comp: null },
 };
 const BUS_NAMES = Object.keys(BUS_DEFS) as BusName[];
+const preparedContexts = new WeakMap<BaseAudioContext, Promise<void>>();
 
 export class Mixer {
   actx!: BaseAudioContext;
   rng!: Rng;
   masterVolume!: number;
   masterSum!: GainNode;
-  preGain!: GainNode;
-  masterComp!: DynamicsCompressorNode;
-  softClip!: WaveShaperNode;
+  energyMix!: AudioWorkletNode;
   masterGain!: GainNode;
   worldSum!: GainNode;
   muffleLP!: BiquadFilterNode;
   muffleHS!: BiquadFilterNode;
   muffleGain!: GainNode;
+  muffleDry!: GainNode;
+  muffleWet!: GainNode;
   buses!: Record<BusName, MixerBus>;
   reverbSend!: GainNode;
   sendHP!: BiquadFilterNode;
@@ -105,6 +112,18 @@ export class Mixer {
   _pendingConcussion!: PendingConcussion | null;
   _concussionAttackUntil!: number;
   deafness!: number;
+  /** Load the local audio-thread processor once per context; no silent fallback. */
+  static prepare(actx: BaseAudioContext): Promise<void> {
+    let ready = preparedContexts.get(actx);
+    if (!ready) {
+      ready = import('./energy-worklet.ts?worker&url').then(({ default: url }) =>
+        actx.audioWorklet.addModule(url)
+      );
+      preparedContexts.set(actx, ready);
+    }
+    return ready;
+  }
+
   /**
    * @param {BaseAudioContext} actx
    * @param {import('../core/rng.ts').Rng} rng
@@ -112,32 +131,28 @@ export class Mixer {
   constructor(actx: BaseAudioContext, rng: Rng, opts: { masterVolume?: number } = {}) {
     this.actx = actx;
     this.rng = rng;
-    // Headroom matters more than loudness: at 0.62 a single gunshot peaks near
-    // -3 dBFS and the limiter is only reached by dense combat, so the mix keeps
-    // its dynamic range instead of being flattened.
-    this.masterVolume = opts.masterVolume ?? 0.95;
+    // User volume is last. Category balance and summation headroom belong
+    // upstream of the single shared peak-safety processor.
+    this.masterVolume = opts.masterVolume ?? 1;
 
     /* ---- master chain (built first, everything hangs off it) ------ */
     this.masterSum = gain(actx, 1);
-    // Headroom stage. It sits BEFORE the compressor/clipper on purpose: a
-    // post-limiter volume control only scales an already-squashed signal, and
-    // that is what destroys the difference between a footstep and a gunshot.
-    this.preGain = gain(actx, 0.22);
-    this.masterComp = actx.createDynamicsCompressor();
-    // Safety net only: a single gunshot should barely touch it, a firefight
-    // plus a grenade should be held together by it.
-    this.masterComp.threshold.value = -2;
-    this.masterComp.knee.value = 3;
-    this.masterComp.ratio.value = 4;
-    this.masterComp.attack.value = 0.0035;
-    this.masterComp.release.value = 0.14;
-    this.softClip = shaper(actx, limiterCurve(), '4x');
+    // Linked RMS and peak constraints share one lookahead and one applied
+    // gain. Output 1 exposes RMS-only audio for inspection, not another route.
+    this.energyMix = new AudioWorkletNode(actx, 'cod-energy-mix', {
+      numberOfInputs: 1,
+      numberOfOutputs: 2,
+      outputChannelCount: [2, 2],
+      channelCount: 2,
+      channelCountMode: 'explicit',
+      channelInterpretation: 'speakers',
+    });
     this.masterGain = gain(actx, this.masterVolume);
 
-    this.masterSum.connect(this.preGain);
-    this.preGain.connect(this.masterComp);
-    this.masterComp.connect(this.softClip);
-    this.softClip.connect(this.masterGain);
+    this.masterSum.connect(this.energyMix);
+    // Output 0: shared energy/peak-controlled mix. Output 1: RMS-only review
+    // tap, normally unconnected. Both use the SAME 5 ms audio delay.
+    this.energyMix.connect(this.masterGain);
     this.masterGain.connect(actx.destination);
 
     /* ---- concussion / deafening path ----------------------------- */
@@ -147,21 +162,23 @@ export class Mixer {
     this.muffleLP = biquad(actx, 'lowpass', 20000, 0.5);
     this.muffleHS = biquad(actx, 'highshelf', 3500, 0.7, 0);
     this.muffleGain = gain(actx, 1);
+    // Complementary routing weights, not additional volume controls. Healthy
+    // hearing is a true dry bypass; the live filters never touch that signal.
+    this.muffleDry = gain(actx, 1);
+    this.muffleWet = gain(actx, 0);
+    this.worldSum.connect(this.muffleDry);
+    this.muffleDry.connect(this.muffleGain);
     this.worldSum.connect(this.muffleLP);
     this.muffleLP.connect(this.muffleHS);
-    this.muffleHS.connect(this.muffleGain);
+    this.muffleHS.connect(this.muffleWet);
+    this.muffleWet.connect(this.muffleGain);
     this.muffleGain.connect(this.masterSum);
 
     /* ---- buses ---------------------------------------------------- */
     this.buses = {} as Record<BusName, MixerBus>;
     for (const name of BUS_NAMES) {
       const def = BUS_DEFS[name];
-      const input = gain(actx, 1); // voices connect here
-      const duck = gain(actx, 1); // sidechain victim
-      const trim = gain(actx, def.trim); // static balance
-      input.connect(duck);
-      duck.connect(trim);
-      let tail: AudioNode = trim;
+      const level = gain(actx, def.trim);
       let comp: DynamicsCompressorNode | null = null;
       if (def.comp) {
         comp = actx.createDynamicsCompressor();
@@ -170,12 +187,21 @@ export class Mixer {
         comp.ratio.value = def.comp.ratio;
         comp.attack.value = def.comp.attack;
         comp.release.value = def.comp.release;
-        trim.connect(comp);
-        tail = comp;
+        comp.connect(level);
       }
       // ui/music bypass the muffle so HUD ticks and the shop radio survive a grenade.
-      tail.connect(name === 'ui' || name === 'music' ? this.masterSum : this.worldSum);
-      this.buses[name] = { input, duck, trim, comp, baseTrim: def.trim, duckAmount: 0 };
+      // Keep category volume/balance out of the compressor detector. Ducking
+      // now controls the audible post-compressor level too, not its drive.
+      level.connect(name === 'ui' || name === 'music' ? this.masterSum : this.worldSum);
+      this.buses[name] = {
+        input: comp ?? level,
+        level,
+        send: gain(actx, def.trim),
+        comp,
+        baseTrim: def.trim,
+        volume: 1,
+        duckAmount: 0,
+      };
     }
 
     /* ---- reverb ---------------------------------------------------- */
@@ -183,6 +209,9 @@ export class Mixer {
     // between them. Sharing the send keeps the cost fixed no matter how many
     // voices are alive.
     this.reverbSend = gain(actx, 1);
+    // One small gain per category, not another convolver/processor per voice.
+    // Wet feeds must obey the same logical balance, volume and duck as dry.
+    for (const name of BUS_NAMES) this.buses[name].send.connect(this.reverbSend);
     // Pre-send shaping: no sub into the convolvers (muddy) and no fizz above
     // 9 kHz (real rooms do not reflect that back at you from 30 m away).
     this.sendHP = biquad(actx, 'highpass', 170, 0.7);
@@ -269,8 +298,13 @@ export class Mixer {
   }
 
   /** Bus input node a voice should connect to. */
-  bus(name: string): GainNode {
+  bus(name: string): AudioNode {
     return (this.buses[name as BusName] ?? this.buses.foley).input;
+  }
+
+  /** Category-controlled input to the shared room field. */
+  sendBus(name: string): AudioNode {
+    return (this.buses[name as BusName] ?? this.buses.foley).send;
   }
 
   /**
@@ -286,8 +320,9 @@ export class Mixer {
       if (a <= b.duckAmount + 0.01) return; // an existing deeper duck wins
       b.duckAmount = a;
       b.duckHold = hold;
-      b.duck.gain.cancelScheduledValues(t);
-      b.duck.gain.setTargetAtTime(1 - a, t, 0.012);
+      b.level.gain.cancelScheduledValues(t);
+      b.send.gain.cancelScheduledValues(t);
+      this._setBusLevel(b, 0.012);
     };
     apply('ambience', 1);
     apply('foley', 0.55);
@@ -313,12 +348,26 @@ export class Mixer {
     const t = this.actx.currentTime;
     const ramp = Math.max(0.001, attack);
     const cutoff = 20000 * Math.pow(CONCUSSION_CUTOFF_RATIO, level);
-    this.muffleLP.frequency.cancelScheduledValues(t);
+    // A retrigger can interrupt the finite healthy-settle ramp. Hold the actual
+    // current values before replacing automation, rather than jumping backward.
+    holdHearingParam(this.muffleLP.frequency, t);
+    holdHearingParam(this.muffleHS.gain, t);
+    holdHearingParam(this.muffleGain.gain, t);
     this.muffleLP.frequency.setTargetAtTime(clamp(cutoff, 320, 20000), t, ramp);
     this.muffleHS.gain.setTargetAtTime(-8 * level, t, ramp);
     this.muffleGain.gain.setTargetAtTime(1 - 0.3 * level, t, ramp);
+    this._fadeHearing(1, t + ramp * 3);
     this._concussionAttackUntil = t + ramp * 3;
     this._startTinnitus(level, Math.max(0.03, ramp));
+  }
+
+  /** Linear complementary fades: equal-power would boost these correlated paths. */
+  _fadeHearing(wet: number, end: number): void {
+    const t = this.actx.currentTime;
+    holdHearingParam(this.muffleDry.gain, t);
+    holdHearingParam(this.muffleWet.gain, t);
+    this.muffleDry.gain.linearRampToValueAtTime(1 - wet, end);
+    this.muffleWet.gain.linearRampToValueAtTime(wet, end);
   }
 
   _startTinnitus(level: number, attack = 0.03): void {
@@ -379,21 +428,29 @@ export class Mixer {
         continue;
       }
       b.duckAmount = Math.max(0, b.duckAmount - dt * 2.6);
-      b.duck.gain.setTargetAtTime(1 - b.duckAmount, t, 0.09);
-      if (b.duckAmount < 0.01) {
-        b.duckAmount = 0;
-        b.duck.gain.setTargetAtTime(1, t, 0.09);
-      }
+      if (b.duckAmount < 0.01) b.duckAmount = 0;
+      this._setBusLevel(b, 0.09);
     }
 
     if (this.deafness > 0 && t >= this._concussionAttackUntil) {
       // Recovery is slow at first then quick — matches how temporary threshold
       // shift actually behaves, and it feels dramatic.
       this.deafness = Math.max(0, this.deafness - dt * (0.1 + this.deafness * 0.22));
-      const cutoff = 20000 * Math.pow(CONCUSSION_CUTOFF_RATIO, this.deafness);
-      this.muffleLP.frequency.setTargetAtTime(clamp(cutoff, 1200, 20000), t, 0.25);
-      this.muffleHS.gain.setTargetAtTime(-8 * this.deafness, t, 0.25);
-      this.muffleGain.gain.setTargetAtTime(1 - 0.3 * this.deafness, t, 0.25);
+      if (this.deafness === 0) {
+        // Finish at EXACT dry/unity values in finite time. Keep filter state
+        // continuous in the muted branch; do not sweep poles through Nyquist.
+        const end = t + HEARING_SETTLE_SECONDS;
+        this._fadeHearing(0, end);
+        this.muffleLP.frequency.setTargetAtTime(20000, t, 0.25);
+        this.muffleHS.gain.setTargetAtTime(0, t, 0.25);
+        holdHearingParam(this.muffleGain.gain, t);
+        this.muffleGain.gain.linearRampToValueAtTime(1, end);
+      } else {
+        const cutoff = 20000 * Math.pow(CONCUSSION_CUTOFF_RATIO, this.deafness);
+        this.muffleLP.frequency.setTargetAtTime(clamp(cutoff, 1200, 20000), t, 0.25);
+        this.muffleHS.gain.setTargetAtTime(-8 * this.deafness, t, 0.25);
+        this.muffleGain.gain.setTargetAtTime(1 - 0.3 * this.deafness, t, 0.25);
+      }
     }
 
     if (this._tin) {
@@ -421,12 +478,16 @@ export class Mixer {
   setBusVolume(name: string, v: number): void {
     const b = this.buses[name as BusName];
     if (!b) return;
-    b.trim.gain.setTargetAtTime(clamp(v, 0, 2) * b.baseTrim, this.actx.currentTime, 0.05);
+    b.volume = clamp(v, 0, 2);
+    this._setBusLevel(b, 0.05);
   }
 
-  /** Rough gain-reduction readout, handy for the debug overlay. */
-  get reduction() {
-    return this.masterComp.reduction ?? 0;
+  /** One logical category level drives dry and wet; a mute always wins. */
+  _setBusLevel(b: MixerBus, smooth: number): void {
+    const value = b.baseTrim * b.volume * (1 - b.duckAmount);
+    const t = this.actx.currentTime;
+    b.level.gain.setTargetAtTime(value, t, smooth);
+    b.send.gain.setTargetAtTime(value, t, smooth);
   }
 
   dispose(): void {
@@ -453,9 +514,8 @@ export class Mixer {
     this.spaces = {};
     for (const name of Object.keys(this.buses) as BusName[]) {
       const b = this.buses[name];
-      b.input.disconnect();
-      b.duck.disconnect();
-      b.trim.disconnect();
+      b.level.disconnect();
+      b.send.disconnect();
       b.comp?.disconnect();
     }
     this.reverbSend.disconnect();
@@ -466,10 +526,13 @@ export class Mixer {
     this.muffleLP.disconnect();
     this.muffleHS.disconnect();
     this.muffleGain.disconnect();
+    this.muffleDry.disconnect();
+    this.muffleWet.disconnect();
     this.masterSum.disconnect();
-    this.preGain.disconnect();
-    this.masterComp.disconnect();
-    this.softClip.disconnect();
+    this.energyMix.onprocessorerror = null;
+    this.energyMix.port.postMessage('stop');
+    this.energyMix.disconnect();
+    this.energyMix.port.close();
     this.masterGain.disconnect();
   }
 }

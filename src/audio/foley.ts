@@ -852,7 +852,7 @@ export function shellCasing(
 const RELOAD_TRIM = {
   start: 3.2,
   magout: 3.0,
-  magin: 1.0,
+  magin: 0.7,
   slide: 1.5,
   end: 1.5,
   pump: 2.2,
@@ -1748,7 +1748,7 @@ const intelCadences = new WeakMap<BaseAudioContext, AudioBuffer>();
  */
 export function intelSiren(actx: BaseAudioContext): { node: GainNode; stop(when?: number): void } {
   const now = actx.currentTime;
-  const level = 2.5;
+  const level = 0.22; // audible warning, not gunfire-level sustained energy
   let envelope = intelCadences.get(actx);
   if (!envelope) {
     envelope = actx.createBuffer(1, Math.round(actx.sampleRate * 1.5), actx.sampleRate);
@@ -1805,7 +1805,7 @@ export function heartbeat(actx: BaseAudioContext, o: HeartbeatOptions): AudioVoi
   const t0 = o.when ?? actx.currentTime;
   const src = actx.createBufferSource();
   src.buffer = o.buffer;
-  const out = gain(actx, 4 * (o.level ?? 1));
+  const out = gain(actx, o.level ?? 1);
   src.connect(out);
   src.start(t0);
   return { node: out, end: t0 + o.buffer.duration + 0.05, send: 0 };

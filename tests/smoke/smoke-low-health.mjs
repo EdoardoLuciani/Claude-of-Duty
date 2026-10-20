@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 
 import { AudioSystem } from '../../src/audio/index.ts';
+import reference from '../../src/audio/samples/reference.json' with { type: 'json' };
 import { Health } from '../../src/player/health.ts';
 import { damp } from '../../src/ui/util.ts';
 
@@ -64,9 +64,6 @@ assert.equal(sounds.length, before, 'bandaging back to full health stops the bea
 assert.ok(hp.effect < 0.004 && hp.pulse === 0, 'the visual pulse also stops');
 
 // The visual lobes must stay aligned with the two recorded thumps at any BPM.
-const wav = readFileSync(new URL('../../src/audio/samples/heartbeat.wav', import.meta.url));
-const rate = wav.readUInt32LE(24);
-assert.equal(rate, 48000);
 function peakIn(samples, start, end, hz) {
   let best = -1,
     time = 0;
@@ -78,17 +75,7 @@ function peakIn(samples, start, end, hz) {
   }
   return time;
 }
-const window = rate / 100;
-const energy = [];
-for (let i = 44; i + window * 2 <= wav.length; i += window * 2) {
-  let sum = 0;
-  for (let j = i; j < i + window * 2; j += 2) {
-    const s = wav.readInt16LE(j) / 32768;
-    sum += s * s;
-  }
-  energy.push(sum);
-}
-const audioPeaks = [peakIn(energy, 0.02, 0.2, 100), peakIn(energy, 0.2, 0.45, 100)];
+const audioPeaks = reference.files.heartbeat.pulsePeaksSec;
 
 function visualPeaks(health) {
   hp.reset(true);
