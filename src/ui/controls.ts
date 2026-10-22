@@ -1,5 +1,5 @@
-import { CONTROL_REFERENCE, bindingLabels } from '../core/bindings.ts';
-import type { ActionId, ControlReferenceRow } from '../core/bindings.ts';
+import { bindingLabels } from '../core/bindings.ts';
+import type { ActionId } from '../core/bindings.ts';
 
 interface ControlReference {
   keys: readonly string[];
@@ -7,21 +7,10 @@ interface ControlReference {
 }
 interface ControlSection {
   title: string;
-  quickControls: ControlReference[];
   controls: ControlReference[];
 }
 
-/** Presentation adapter only: gameplay meanings and key labels come from core metadata. */
-function gameplayRows(contexts: readonly ControlReferenceRow['context'][]): ControlReference[] {
-  return CONTROL_REFERENCE.filter((row) => contexts.includes(row.context)).map((row) => ({
-    keys:
-      row.action === 'cycleWeapon'
-        ? [...bindingLabels(row.action), 'Mouse wheel']
-        : bindingLabels(row.action),
-    description: `${row.label} — ${row.behavior}`,
-  }));
-}
-
+/** Concise presentation only; physical key labels come from canonical bindings. */
 function quick(actions: readonly ActionId[], description: string): ControlReference {
   return { keys: actions.flatMap((action) => bindingLabels(action)), description };
 }
@@ -29,7 +18,7 @@ function quick(actions: readonly ActionId[], description: string): ControlRefere
 export const CONTROL_SECTIONS: ControlSection[] = [
   {
     title: 'Movement & look',
-    quickControls: [
+    controls: [
       {
         keys: [0, 1].map((alias) =>
           (['forward', 'left', 'back', 'right'] as const)
@@ -45,33 +34,25 @@ export const CONTROL_SECTIONS: ControlSection[] = [
       quick(['sprint'], 'Sprint (hold) · tactical sprint (double-tap + hold)'),
       quick(['leanLeft', 'leanRight'], 'Lean left / right (hold)'),
     ],
-    controls: [
-      ...gameplayRows(['movement']),
-      {
-        keys: ['Mouse'],
-        description: 'Look around; sensitivity and invert look are settings, not bindings.',
-      },
-    ],
   },
   {
     title: 'Weapons',
-    quickControls: [
-      quick(['fire'], 'Fire (weapon out)'),
+    controls: [
+      quick(['fire'], 'Fire: auto (hold) · semi (press) · burst (press starts burst); weapon out'),
       quick(['ads'], 'Aim down sights (hold; weapon out)'),
-      quick(['reload'], 'Reload'),
+      quick(['reload'], 'Reload (press; weapon out)'),
       quick(['fireMode'], 'Cycle fire mode'),
-      quick(['inspect'], 'Inspect (press)'),
+      quick(['inspect'], 'Inspect (press; weapon out)'),
       quick(['slot1', 'slot2'], 'Primary / secondary (weapon out)'),
       {
         keys: [...bindingLabels('cycleWeapon'), 'Mouse wheel'],
         description: 'Request weapon cycle',
       },
     ],
-    controls: gameplayRows(['weapon']),
   },
   {
     title: 'Equipment & interaction',
-    quickControls: [
+    controls: [
       quick(['use'], 'Interact (hold): ammo 0.45s / aimed intel 4s'),
       quick(['flashlight'], 'Flashlight (toggle)'),
       quick(['heal'], 'Bandage (hold 3s)'),
@@ -81,38 +62,9 @@ export const CONTROL_SECTIONS: ControlSection[] = [
       quick(['slot1'], 'Radio out: carpet-bomb request (immediate)'),
       quick(['slot2', 'slot3'], 'Radio out: locked requests'),
     ],
-    controls: gameplayRows(['gameplay', 'interaction', 'grenade', 'radio']),
   },
   {
     title: 'Menus',
-    quickControls: [quick(['pause'], 'Pause / resume · in shop: close shop')],
-    controls: [
-      ...gameplayRows(['menu']),
-      {
-        keys: ['Left mouse'],
-        description:
-          'Click menu buttons / shop purchases. DOM clicks do not fire or capture the cursor.',
-      },
-      {
-        keys: ['Tab', 'Shift + Tab'],
-        description:
-          'In menus: focus next / previous control (native navigation, not weapon cycling).',
-      },
-      {
-        keys: ['Enter', 'Space'],
-        description:
-          'Activate focused buttons; after death, start a new game when prompted (after 2.85 seconds).',
-      },
-      {
-        keys: ['↑', '↓', '←', '→', 'Home', 'End', 'PageUp', 'PageDown'],
-        description:
-          'Adjust focused settings sliders with native keys; arrows / PageUp / PageDown scroll this reference when focused (or use the mouse wheel).',
-      },
-      {
-        keys: ['Left mouse', 'Enter', 'Space'],
-        description:
-          'Terminal error: activate the focused Reload button; gameplay stays frozen until reload.',
-      },
-    ],
+    controls: [quick(['pause'], 'Pause / resume · in shop: close shop')],
   },
 ];

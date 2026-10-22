@@ -718,13 +718,6 @@ const CSS = `
 .ow-control dt { color:#f0f5f7; font-weight:800; }
 .ow-control dd { color:#bdcbd3; }
 .ow-control dt, .ow-control dd { overflow-wrap:anywhere; }
-.ow-controls-details { margin-top:10px; }
-.ow-controls-details summary {
-  cursor:pointer; color:var(--amber); font-size:max(14px, calc(14px * var(--k)));
-  line-height:1.5; padding:6px 0;
-}
-.ow-controls-details[open] summary { margin-bottom:8px; }
-.ow-controls-details .ow-control { grid-template-columns:minmax(0, .4fr) minmax(0, 1fr); }
 
 @media (max-width:1200px) {
   .ow-controls-groups { grid-template-columns:minmax(0, 1fr); }
