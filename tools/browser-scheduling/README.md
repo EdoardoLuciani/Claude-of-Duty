@@ -72,5 +72,7 @@ All input/harness hashes, launches/preferences, GPU status, process snapshots an
 warnings are retained. New native interfaces, production policies and quality
 settings are not introduced.
 
-Evidence: `/home/edoardo/Documents/browser-scheduling-lab/`; results/report and
-all run means are committed beside this README after measurement.
+Results: [RESULTS.md](RESULTS.md); all 140 completed run means:
+[measurements.csv](measurements.csv). Full evidence, raw traces, profiles,
+interrupted attempt and diagnostic/capture runs:
+`/home/edoardo/Documents/browser-scheduling-lab/`.
