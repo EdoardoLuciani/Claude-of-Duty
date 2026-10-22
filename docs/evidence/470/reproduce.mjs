@@ -125,7 +125,8 @@ try {
       } catch {
         c.blocker = 'No natural death within 90 s after movement; no forced death';
         r.trace = await page.evaluate(() => {
-          const { publication, ...p } = window.__PROBE__;
+          const p = { ...window.__PROBE__ };
+          delete p.publication;
           return p;
         });
         flush();
@@ -154,7 +155,8 @@ try {
       await page.waitForTimeout(1000);
       if (cycle === cycles - 1) await page.waitForTimeout(5000);
       r.trace = await page.evaluate(() => {
-        const { publication, ...p } = window.__PROBE__;
+        const p = { ...window.__PROBE__ };
+        delete p.publication;
         return p;
       });
       flush();

@@ -1,41 +1,42 @@
-# #470 bounded normal-play evidence
+# #470 normal-play evidence
 
-Companion to [the report](../../run-lifecycle-470.md). This is an investigation fixture, **not a gameplay regression test or a proposed fix**. No runtime algorithm or activation/control branch is changed: only RNG seed and observation statements/wrappers are added to served Vite responses. The second batch additionally calls the existing pure anchor selector on fresh reset coordinates as a counterfactual; it neither publishes those results nor consumes RNG.
+Companion to [the report](../../run-lifecycle-470.md). Investigation only: **16 added natural death/restart cycles did not reproduce front-visible camping**. Stale hitbox selection input and changed anchor choices are confirmed; camping causation remains open. The targeted repair and fail-before/pass-after evidence are in [#493](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/493), not this docs PR.
 
-## Reproduce from the repository root
+## External evidence and provenance
 
-Requires the repository's installed Node/Playwright/native GPU harness. It deliberately refuses an already occupied port5476, requires a hardware WebGPU adapter and normal prewarm, and does not use capture/deterministic mode. Close unrelated GPU work when comparing observations. A fixed RNG seed does not make async worker/combat admission deterministic.
+Runtime: `c3de4ec7fc1ac0cc7f9d8dc39b55ec896ac97592`; original investigation commit: `9c806cdc38d3cdd4ed43023cc8f1b0932b453f44`. Fedora 44, Chromium 155.0.8059.84, native AMD RDNA-4 WebGPU (`fallback=false`), 1280×720, normal `?q=high`, prewarm enabled, `deterministic=false`. Three seeds/five fresh contexts, forward/backward input routes. See the report for environment, timing and observation limits.
+
+Raw JSON and images are removed from the current tree, **not minified or discarded**. Originals were copied and SHA-256-verified outside the repository at `/home/edoardo/Documents/470-evidence-9c806cd/original/` before removal. JSON cannot be uploaded with `gh --attach` (images/videos only); the approved preservation path is the original full commit in this branch's history, not a new release/host. No history rewrite is part of this correction. [Original JSON (blob)](https://github.com/EdoardoLuciani/Claude-of-Duty/blob/9c806cdc38d3cdd4ed43023cc8f1b0932b453f44/docs/evidence/470/observations.json) · [raw download](https://raw.githubusercontent.com/EdoardoLuciani/Claude-of-Duty/9c806cdc38d3cdd4ed43023cc8f1b0932b453f44/docs/evidence/470/observations.json). Remote commit and downloaded JSON bytes/hash were verified before removal.
+
+Six screenshots were uploaded with `gh pr comment 492 --attach`: [attachment comment](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/492#issuecomment-6351207969). Each attachment was downloaded again and matched the original bytes/hash. SHA-256 values below hash the original unmodified files:
+
+| Artifact / download                                                                                                                                               | SHA-256                                                            |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| [observations.json](https://raw.githubusercontent.com/EdoardoLuciani/Claude-of-Duty/9c806cdc38d3cdd4ed43023cc8f1b0932b453f44/docs/evidence/470/observations.json) | `e715239d470097dfffb71ed01210c0c35ca40e19dc677ffd1ae59877bcc2a2f1` |
+| [forward-death.jpg](https://github.com/user-attachments/assets/583bdc60-3858-4ccd-8e2e-40c31b94276b)                                                              | `5d825bb9e89616333e6a4c619175baae9803ec43e6214885c9c32e1d986d13a0` |
+| [forward-restart1.jpg](https://github.com/user-attachments/assets/c8f414b6-3f6e-440d-8e5c-77516b17e2ae)                                                           | `5285573f23abd735bbcbdabcf1e0a091641a788066f39877635cd7808a59ceca` |
+| [forward-restart4.jpg](https://github.com/user-attachments/assets/ff681f1f-2f1b-4d5b-a43f-9f528d83f818)                                                           | `59dc6cc1c994615a7f732a45487c5d4762c96dc73bc1bcb6adb448ebde40770a` |
+| [backward-death.jpg](https://github.com/user-attachments/assets/500b3a4b-f3ab-4ef8-9fc0-821840c47622)                                                             | `c9c34313502326da6373412ec81dcdb6f954e41b3c945a2f0f303b0585c50b86` |
+| [backward-restart1.jpg](https://github.com/user-attachments/assets/f508761a-5daa-4b64-9a7c-cc40af8f0ffb)                                                          | `e7e211159bc93dcced1c421bca3e9cad5b47fba680395d54036d2d73e6f44bce` |
+| [backward-restart2.jpg](https://github.com/user-attachments/assets/86682fc5-f855-481d-8903-e9c7a8b9775d)                                                          | `5eb461bc6838e7f1da0027fe8d45be7decebc7641a8184e2a746536e3bbda1d6` |
+
+JSON retains actual selection origins/endpoints, published actor IDs/positions, restored camera/frustum/bearing and separate LOS, first AI/movement/fire/damage, DOM/cached lock/control boundaries and image brackets/`retainedAs` mappings. `generation` is observer-assigned, not a runtime mechanism. Native readback rerenders the running graph, adds overhead and is bracketed rather than exactly the first-render snapshot; it is not deterministic capture mode. Point frustum/LOS tests are not whole-mesh raster visibility. Behind-camera projections are not visible pixels. Missing damage means not observed, not immunity.
+
+## Reproduce using retained scripts
+
+`reproduce.mjs` and `observer.mjs` use only the repository's installed Node/Playwright and existing `tools/lib/{browser-harness,native-render}.mjs`; no scratch imports/dependencies. Keep these beside one another at their current paths. Run `npm ci` at the repository root first. The served-response markers target the pinned runtime above and must match once; use that runtime for comparisons. Requires native hardware WebGPU, normal prewarm and a free port 5476. Fixed seed does not make async combat deterministic.
 
 ```sh
-# Three fresh browser contexts, four natural deaths/restarts each.
-# Initial: 20 s unattended, canvas click, W for 8 s; later runs stationary.
-# Additional waits after observing enabled New Game: 0 / 5 / 12 / 0 seconds.
+# Three contexts × four natural restarts: idle 20 s, click, W 8 s; later stationary.
+# Extra waits after observing enabled New Game: 0 / 5 / 12 / 0 seconds.
 PROBE470_OUT=/tmp/470-forward node docs/evidence/470/reproduce.mjs
 
-# Two fresh contexts, two natural deaths/restarts each.
-# Initial: 3 s unattended, canvas click, S for 8 s; later run stationary.
+# Two contexts × two natural restarts: idle 3 s, click, S 8 s; later stationary.
 PROBE470_OUT=/tmp/470-backward PROBE470_SEEDS=4660,12648430 \
   PROBE470_CYCLES=2 PROBE470_MOVEMENT=KeyS PROBE470_INITIAL_WAIT_MS=3000 \
   node docs/evidence/470/reproduce.mjs
 ```
 
-No lethal-damage fallback exists. A run without a natural death within90 s after movement is recorded as blocked, not counted as a restart; the driver continues to the next bounded session. Counts are capped at three seeds × four cycles per invocation. Keyboard movement waits the full8 s even if death happens sooner: `enabledObservation.elapsed` records when the driver actually observed readiness, **not necessarily its first enabled instant**. The report identifies the one such late observation in the measured runs; the seven other zero-extra-delay cases used real Enter about one frame after the threshold. The driver does not click a disabled button or call restart directly.
+Only RNG seed and observation wrappers are injected into served responses; no on-disk runtime changes, placement/activation changes, forced deaths or invulnerability. The pure fresh-coordinate anchor counterfactual neither spawns actors nor consumes RNG. Outputs go outside the repo. No natural death within 90 s is recorded as blocked, not replaced by a lethal-damage fallback. Settings cap each invocation at three seeds × four cycles. Movement waits the full 8 s even if death occurs earlier; `enabledObservation.elapsed` is the actual observation time, not necessarily first eligibility.
 
-The checked-in observer includes exact control-setter/planar-movement/anchor-counterfactual observations added for the backward batch. The earlier forward batch lacks those extra fields; its control timing is bounded by nested respawn, and `first-movement` includes vertical settling. Seed replacement leaves `config.deterministic=false`; readiness records retain that value, prewarm and build revision. The only modified on-disk files during measurements were this investigation's docs/artifacts. Runtime source remains the report's pinned develop base.
-
-## Retained files
-
-- `observations.json`: bounded extraction of all16 added natural restarts across five fresh contexts/three seeds. Each restart has actual selection sample and hitbox endpoints, final published enemy positions and IDs, reset completion, first completed rendered camera state, later0.25/1/5 s samples, first AI/movement/fire/damage/HP events, actual DOM/cached lock state and wall/frame timestamps. `generation` is **observer-assigned**, not a claimed runtime generation mechanism. Old/new ID disjointness, six new actors and absence of page/route errors were independently checked during extraction. No full shot log is retained.
-- `forward-{death,restart1,restart4}.jpg`: first seed1592594996, first natural death/first restart/fourth restart. Native rendered pixels under the normal HUD.
-- `backward-{death,restart1,restart2}.jpg`: seed4660, natural death/first restart/second restart. Its first restart shows the changed [5,7] anchor choice, not a forward-visible enemy.
-- `reproduce.mjs`, `observer.mjs`: inspectable normal-input driver and served-response observer. Results and every captured frame go outside the repository by default. Only the six representative images above are committed.
-
-Screenshot records contain before/after frame/time brackets and `retainedAs` mappings. `captureNative` rerenders the native graph and overlays its asynchronous readback for a normal DOM screenshot; it does not freeze simulation or invoke the deterministic shot API. The readback image falls within the bracket, not necessarily the exact first-render snapshot. Screenshots and LOS/projection observations add overhead and do not establish a performance result.
-
-## Coordinate and timing cautions
-
-`publication` records the final created actor coordinates but can still have the death camera; use `firstRendered` for the actual restored view. Eye-point `bearing` is signed camera-relative degrees (zero forward). `eyeInFrustum`/`feetInFrustum` are point tests, not whole-mesh raster visibility. `los` is independently queried from the actual camera to the actor eye using default physics sight masking. Screen/NDC coordinates behind the camera are mathematical projections, **not visible pixels**. All measured reset eye bearings were at least144.659° off forward, so this negative result does not rely only on distance or an eye point just outside a frustum edge.
-
-`t` is scaled engine time, not reset on New Game; `wall` is browser `performance.now()/1000`. Same-frame event times can share `t`, so use wall and event order for subframe boundaries. Cached pointer lock can lag the actual DOM. Positive HP damage and armour-only `damage:taken.amount=0` are separate. Missing damage entries mean not observed within that run's window, not immunity. Actor `move` is 3D displacement from publication; backward-batch `moveXZ` and `first-planar-movement` exclude ground settling.
-
-The stale-hitbox defect and changed anchor choice are verified. The player's front-spawn/camping cause **remains open**; none of these negative views disproves their repeated observation or approves new placement policy.
+The forward batch predates exact control-setter, planar-movement and anchor-counterfactual fields in the retained observer; its control boundary is nested respawn and 3D movement includes ground settling. All sixteen completed resets removed prior actor/corpse IDs and published six fresh actors with empty worker maps. This is **not** a forced late-worker/projectile race test or a gameplay regression suite. Pending/denied capture policy is now frozen-with-retry, **no continue-without-lock fallback**; separate #488 implementation is underway and is not measured by these base-runtime observations.
