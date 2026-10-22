@@ -1,0 +1,10 @@
+{
+  "name": "cod-browser-scheduling-lab",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "pngjs": "7.0.0",
+    "puppeteer-core": "25.16.0"
+  }
+}
