@@ -37,6 +37,7 @@ function makeEl(tag = 'div') {
   };
 }
 const controls = CONTROL_SECTIONS.flatMap((section) => section.controls);
+const quickControls = CONTROL_SECTIONS.flatMap((section) => section.quickControls);
 const labels = new Set(controls.flatMap((control) => control.keys));
 for (const action of Object.keys(DEFAULT_BINDINGS)) {
   for (const label of bindingLabels(action))
@@ -119,7 +120,43 @@ const flatten = (node) => [node, ...node.children.flatMap(flatten)];
 const nodes = flatten(menu.root);
 const reference = nodes.find((node) => node.attributes['aria-label'] === 'Gameplay controls');
 assert.equal(reference.tabIndex, 0, 'reference is keyboard scrollable');
-assert.equal(nodes.filter((node) => node.tagName === 'DD').length, controls.length);
+assert.equal(
+  nodes.filter((node) => node.tagName === 'DD').length,
+  controls.length + quickControls.length
+);
+const disclosures = nodes.filter((node) => node.tagName === 'DETAILS');
+assert.equal(disclosures.length, CONTROL_SECTIONS.length);
+for (const [index, details] of disclosures.entries()) {
+  assert.ok(!details.open, 'full help collapsed by default');
+  assert.equal(details.children[0].tagName, 'SUMMARY', 'native named disclosure');
+  assert.match(details.children[0].textContent, /help/);
+  for (const control of CONTROL_SECTIONS[index].controls) {
+    assert.ok(
+      flatten(details).some((node) => node.textContent === control.description),
+      'complete meaning lives in its group disclosure'
+    );
+  }
+}
+assert.ok(quickControls.length < controls.length, 'related actions grouped');
+for (const control of quickControls) {
+  assert.ok(control.description.length < 80, 'quick descriptions stay concise');
+  assert.ok(nodes.some((node) => node.textContent === control.description));
+}
+const quickText = quickControls.map((control) => control.description).join(' ');
+assert.match(quickText, /Crouch \/ slide \(toggle\)/);
+assert.match(quickText, /Prone \(toggle\)/);
+assert.match(quickText, /Aim down sights \(hold; weapon out\)/);
+assert.match(quickText, /Interact \(hold\): ammo 0.45s \/ aimed intel 4s/);
+assert.match(quickText, /Bandage \(hold 3s\)/);
+assert.match(quickText, /Grenade out: cook long \/ short \(hold\); release to throw/);
+assert.match(quickText, /Radio out: carpet-bomb request \(immediate\)/);
+assert.match(quickText, /Radio out: locked requests/);
+assert.match(quickText, /in shop: close shop/);
+assert.ok(
+  disclosures.some((node) =>
+    flatten(node).some((child) => /Gamepad sticks/.test(child.textContent))
+  )
+);
 for (const control of controls) {
   assert.ok(
     nodes.some((node) => node.textContent === control.description),

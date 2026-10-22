@@ -22,6 +22,19 @@ try {
   await page.goto('http://127.0.0.1:5369/?capture=1&lockstep=1&shot=hud');
   await waitForGame(page, { timeout: 120000 });
   const pump = (frames = 60) => page.evaluate((n) => window.__PUMP__(n), frames);
+  const accessibility = await page.context().newCDPSession(page);
+  const assertDisclosureAccessible = async (summary, expanded) => {
+    const { nodes } = await accessibility.send('Accessibility.getFullAXTree');
+    const node = nodes.find(
+      (node) => node.role?.value === 'DisclosureTriangle' && node.name?.value === summary
+    );
+    assert.ok(node, `native named disclosure: ${summary}`);
+    assert.equal(
+      node.properties.find((property) => property.name === 'expanded')?.value.value,
+      expanded,
+      'accessible expanded state'
+    );
+  };
   // Drive the real pause key consumer, not a UI-only debug state.
   await page.evaluate(() => {
     const input = window.__ENGINE__.ctx.input;
@@ -33,7 +46,13 @@ try {
   assert.equal(await page.evaluate(() => window.__ENGINE__.ctx.time.scale), 0);
   assert.equal(
     await page.locator('.ow-controls dd').count(),
-    CONTROL_SECTIONS.flatMap((section) => section.controls).length
+    CONTROL_SECTIONS.flatMap((section) => [...section.quickControls, ...section.controls]).length
+  );
+  assert.equal(await page.locator('.ow-controls details[open]').count(), 0);
+  assert.equal(await page.locator('.ow-controls details dd:visible').count(), 0);
+  assert.equal(
+    await page.locator('.ow-controls > .ow-controls-groups > section > dl dd:visible').count(),
+    CONTROL_SECTIONS.flatMap((section) => section.quickControls).length
   );
   await page.evaluate(() => {
     const e = window.__ENGINE__,
@@ -82,38 +101,99 @@ try {
   ]) {
     await page.setViewportSize({ width, height });
     await pump(4);
-    const geometry = await page.locator('.ow-menu').evaluate((menu) => {
-      const controls = menu.querySelector('.ow-controls');
-      return {
-        width: menu.clientWidth,
-        scrollWidth: menu.scrollWidth,
-        referenceWidth: controls.clientWidth,
-        referenceScrollWidth: controls.scrollWidth,
-        fontSize: parseFloat(getComputedStyle(controls.querySelector('dd')).fontSize),
-      };
-    });
-    assert.ok(
-      geometry.scrollWidth <= geometry.width + 1,
-      `no horizontal menu overflow at ${width}`
-    );
-    assert.ok(
-      geometry.referenceScrollWidth <= geometry.referenceWidth + 1,
-      `no reference overflow at ${width}`
-    );
-    assert.ok(geometry.fontSize >= 14, `readable reference type at ${width}`);
-    await page.locator('.ow-menu').evaluate((el) => {
-      el.scrollTop = 0;
-    });
-    await page.locator('.ow-controls').evaluate((el) => {
-      el.scrollTop = 0;
-    });
-    if (out) await page.screenshot({ path: resolve(out, `browser-after-${width}x${height}.png`) });
-    const last = page.locator('.ow-controls-note').last();
-    await last.scrollIntoViewIfNeeded();
-    assert.ok(await last.isVisible(), 'all reference content reachable');
-    if (out && width === 1280)
-      await page.screenshot({ path: resolve(out, 'browser-after-1280x720-scrolled.png') });
+    for (const expanded of [false, true]) {
+      if (expanded) {
+        for (const summary of await page.locator('.ow-controls summary').all()) {
+          await summary.click();
+          assert.equal(
+            await summary.evaluate((el) => el.parentElement.open),
+            true,
+            'mouse expands help'
+          );
+          await summary.focus();
+          await page.keyboard.press('Space');
+          assert.equal(
+            await summary.evaluate((el) => el.parentElement.open),
+            false,
+            'Space collapses help'
+          );
+          await page.keyboard.press('Enter');
+          await assertDisclosureAccessible(await summary.textContent(), true);
+          assert.equal(
+            await summary.evaluate((el) => el.parentElement.open),
+            true,
+            'Enter expands help'
+          );
+          assert.ok(
+            await summary.evaluate(
+              (el) => el.matches(':focus-visible') && getComputedStyle(el).outlineStyle !== 'none'
+            ),
+            'visible keyboard focus'
+          );
+        }
+      }
+      assert.equal(
+        await page.locator('.ow-controls details[open]').count(),
+        expanded ? CONTROL_SECTIONS.length : 0
+      );
+      const geometry = await page.locator('.ow-menu').evaluate((menu) => {
+        const controls = menu.querySelector('.ow-controls');
+        const visible = [...controls.querySelectorAll('dt, dd, summary, h2, h3, p')].filter((el) =>
+          el.checkVisibility()
+        );
+        return {
+          width: menu.clientWidth,
+          scrollWidth: menu.scrollWidth,
+          referenceWidth: controls.clientWidth,
+          referenceScrollWidth: controls.scrollWidth,
+          fontSize: Math.min(...visible.map((el) => parseFloat(getComputedStyle(el).fontSize))),
+          overflowingRows: visible.filter((el) => el.scrollWidth > el.clientWidth + 1).length,
+        };
+      });
+      assert.ok(
+        geometry.scrollWidth <= geometry.width + 1,
+        `no horizontal menu overflow at ${width}`
+      );
+      assert.ok(
+        geometry.referenceScrollWidth <= geometry.referenceWidth + 1,
+        `no reference overflow at ${width}`
+      );
+      assert.equal(geometry.overflowingRows, 0, `no clipped text at ${width}`);
+      assert.ok(geometry.fontSize >= 14, `readable reference type at ${width}`);
+      await page.locator('.ow-menu').evaluate((el) => {
+        el.scrollTop = 0;
+      });
+      await page.locator('.ow-controls').evaluate((el) => {
+        el.scrollTop = 0;
+      });
+      if (out)
+        await page.screenshot({
+          path: resolve(out, `browser-after-${width}x${height}${expanded ? '-expanded' : ''}.png`),
+        });
+      const last = expanded
+        ? page.locator('.ow-controls-note').last()
+        : page.locator('.ow-controls summary').last();
+      await last.scrollIntoViewIfNeeded();
+      assert.ok(await last.isVisible(), 'all reference content reachable');
+      if (out && !expanded && width === 480)
+        await page.screenshot({ path: resolve(out, 'browser-after-480x720-scrolled.png') });
+      if (out && expanded && width === 1280)
+        await page.screenshot({ path: resolve(out, 'browser-after-1280x720-scrolled.png') });
+      await assertNoLeak();
+    }
+    // Reset disclosures before testing the next viewport.
+    for (const summary of await page.locator('.ow-controls summary').all()) await summary.click();
   }
+  // Disclosures participate in native Tab order, including reverse navigation.
+  const summaries = page.locator('.ow-controls summary');
+  await summaries.first().focus();
+  await page.keyboard.press('Tab');
+  assert.equal(await summaries.nth(1).evaluate((el) => el === document.activeElement), true);
+  await page.keyboard.press('Shift+Tab');
+  assert.equal(await summaries.first().evaluate((el) => el === document.activeElement), true);
+  await assertDisclosureAccessible(await summaries.first().textContent(), false);
+  // Expanded help remains independently keyboard/wheel scrollable.
+  for (const summary of await page.locator('.ow-controls summary').all()) await summary.click();
 
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.locator('.ow-controls').focus();

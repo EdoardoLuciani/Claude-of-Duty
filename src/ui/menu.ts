@@ -124,7 +124,7 @@ export class PauseMenu {
       'div',
       'hint',
       inner,
-      `${bindingLabel('pause').toUpperCase()} RESUME · SCROLL FOR ALL CONTROLS`
+      `${bindingLabel('pause').toUpperCase()} RESUME · EXPAND HELP FOR DETAILS`
     );
 
     const reference = el('section', 'ow-controls', layout);
@@ -135,25 +135,40 @@ export class PauseMenu {
       'p',
       'ow-controls-note',
       reference,
-      'Keyboard & mouse · Scroll for the full reference. Hold and toggle actions are noted below.'
+      'Keyboard & mouse · Quick reference. Expand help for full behavior and exceptions.'
     );
     const groups = el('div', 'ow-controls-groups', reference);
     for (const section of CONTROL_SECTIONS) {
       const group = el('section', 'ow-controls-group', groups);
       el('h3', null, group, section.title);
-      const list = el('dl', null, group);
-      for (const control of section.controls) {
-        const row = el('div', 'ow-control', list);
-        el('dt', null, row, control.keys.join(' / '));
-        el('dd', null, row, control.description);
+      const renderRows = (parent: HTMLElement, controls: typeof section.controls): void => {
+        const list = el('dl', null, parent);
+        for (const control of controls) {
+          const row = el('div', 'ow-control', list);
+          el('dt', null, row, control.keys.join(' / '));
+          el('dd', null, row, control.description);
+        }
+      };
+      renderRows(group, section.quickControls);
+      const details = el('details', 'ow-controls-details', group);
+      el(
+        'summary',
+        null,
+        details,
+        section.title === 'Menus'
+          ? 'Menu navigation, gamepad & recovery help'
+          : `Detailed ${section.title.toLowerCase()} help`
+      );
+      renderRows(details, section.controls);
+      if (section.title === 'Menus') {
+        el(
+          'p',
+          'ow-controls-note',
+          details,
+          'Gamepad sticks: left moves, right looks. No gamepad button actions are bound.'
+        );
       }
     }
-    el(
-      'p',
-      'ow-controls-note',
-      reference,
-      'Gamepad sticks: left moves, right looks. No gamepad button actions are bound.'
-    );
 
     this.open = false;
     this.shown = 0;
