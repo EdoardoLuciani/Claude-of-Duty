@@ -160,8 +160,9 @@ try {
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !window.__ENGINE__.ctx.get('market').open);
   assert.equal(await page.evaluate(() => window.__ENGINE__.ctx.get('ui').menu.open), false);
-  // Exercise the real New Game callback for three resets, including an already-held lock.
+  // Exercise the real New Game callback for three resets with an already-held lock.
   for (let cycle = 0; cycle < 3; cycle++) {
+    await page.waitForFunction(() => document.pointerLockElement === window.__ENGINE__.canvas);
     await page.evaluate(() => {
       const e = window.__ENGINE__,
         ui = e.ctx.get('ui');
@@ -176,9 +177,6 @@ try {
     // New Game's public keyboard consumer is the same synchronous path as its native button.
     await page.keyboard.press('Enter');
     await page.waitForFunction(() => window.__RESET_SUSPENDED__ === true);
-    if (await page.evaluate(() => window.__ENGINE__.gameplaySuspended)) {
-      await page.getByRole('button', { name: 'RETRY START' }).click();
-    }
     await page.waitForFunction(() => !window.__ENGINE__.gameplaySuspended);
     assert.equal(
       await page.evaluate(() => document.pointerLockElement === window.__ENGINE__.canvas),
