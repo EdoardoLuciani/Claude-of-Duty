@@ -62,8 +62,11 @@ Other renderer follow-ups: [#370](https://github.com/EdoardoLuciani/Claude-of-Du
 
 ## Play
 
-Click the game canvas to lock/reacquire the cursor (also a fire press). The pause
-menu contains the full keyboard/mouse reference, including contextual behaviors.
+After loading, select **Start** to capture the mouse and begin. Pending or denied
+mouse capture keeps the run frozen; select **Retry Start** to retry (there is no
+unlocked-play fallback). Once playing, click the game canvas to reacquire the
+cursor (also a fire press). The pause menu contains the full keyboard/mouse
+reference, including contextual behaviors.
 Static defaults come from `src/core/bindings.ts`; rebinding is a follow-up.
 
 | Keys                    | Action                                                 |
