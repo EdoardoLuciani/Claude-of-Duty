@@ -224,8 +224,10 @@ regressions, not external disposal of its private textures. The Git dependency's
 ESM exports use source so committed stale bundles cannot hide the pinned fixes.
 Keep the source-export correction and upstream buffer-name verification
 exact-commit/hash guarded; see README upgrade checks. Builder-local WGSL buffer
-names enable native program/pipeline reuse; never remove per-object instanced-buffer
-identity from shader-builder cache keys.
+names enable native program/pipeline reuse. Upstream reference attributes bind each
+instanced mesh's own buffers while compatible meshes share shader-builder state;
+object-specific builds remain uncached. Preserve pixel-level buffer isolation and
+reuse regressions rather than restoring obsolete per-object cache-key IDs.
 
 Bakes use native top-left texture UVs and shared `QuadMesh` geometry: no extra Y
 flip or disposal of borrowed geometry. Preview PNGs redirect the output target
