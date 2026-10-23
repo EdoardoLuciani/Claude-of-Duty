@@ -56,7 +56,7 @@ import { GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../weapons/index.t
 import { isAliveTeammate } from './actor.ts';
 import { Agent, STATE, PATH_OUTCOME } from './agent.ts';
 import type { AgentOptions } from './agent.ts';
-import { AttachmentQueries } from './attachment-queries.js';
+import { AttachmentQueries } from './attachment-queries.ts';
 import { GroundShadows } from './grounding.ts';
 import { pickSquadAnchors } from './intent.ts';
 import { createLadderDescriptors } from './ladder.ts';

@@ -1,84 +1,92 @@
+import type { Vector3, Vector3Like } from 'three';
+
+import type { StaticWorld } from '../physics/bvh.ts';
+import type { CharacterController } from '../physics/character.ts';
 import { querySnapshot } from '../physics/query-snapshot.js';
-import {
-  parseWorkerMessage,
-  parseSnapshotCopy,
-  parseQueryKey,
-  queryIdentity,
+import { AttachmentConnection, ATTACHMENT_DEADLINE_MS } from './attachment-connection.ts';
+import { parseSnapshotCopy, parseQueryKey, queryIdentity } from './attachment-types.ts';
+import type {
+  PlanningScope,
+  PlanningJob,
+  QuerySample,
+  QueryCosts,
+  QueryKey,
+  WorkerMessage,
+  LadderQueryOptions,
+  ClientMessage,
 } from './attachment-types.ts';
 import { LADDER_MOTOR_VERSION } from './ladder.ts';
+import type { LadderDescriptor, LadderDirection, LadderCursor } from './ladder.ts';
+import type { SurfaceNav } from './nav.ts';
 
 export const NAV_PENDING = Symbol('navigation pending');
 export const NAV_CANCELLED = Symbol('navigation superseded');
 const MAX_PROOFS = 512,
-  MAX_JOBS = 256,
-  DEADLINE = 10000;
+  MAX_JOBS = 256;
 
 // Only static boolean proofs cross the thread boundary. A pending attempt may
 // discover more independent checks, but callers MUST NOT commit its output.
 // Every retry runs current scoring, visibility, endpoints and claims again.
 export class AttachmentQueries {
-  /** @type {Map<string, import('./attachment-types.ts').PlanningScope>} */ scopes;
-  /** @type {Map<number, import('./attachment-types.ts').PlanningJob>} */ jobs;
-  /** @type {Map<string, boolean>} */ proofs;
-  /** @type {import('./attachment-types.ts').PlanningScope | null} */ current;
-  /** @type {Worker | null} */ worker;
-  /** @type {Error | null} */ error;
-  /** @type {(() => void) | null} */ abortInit = null;
-  /** @type {import('../physics/bvh.ts').StaticWorld | null} */ world = null;
-  /** @type {import('../physics/character.ts').CharacterController | null} */ probe = null;
-  /** @type {import('./attachment-types.ts').QuerySample[]} */ samples;
-  /** @type {import('./attachment-types.ts').QueryCosts | null} */ costs;
+  scopes = new Map<string, PlanningScope>();
+  jobs = new Map<number, PlanningJob>();
+  proofs = new Map<string, boolean>();
+  current: PlanningScope | null = null;
+  private connection: AttachmentConnection | null = null;
+  error: Error | null = null;
+  world: StaticWorld | null = null;
+  private sourceTriCount = 0;
+  probe: CharacterController | null = null;
+  samples: QuerySample[] = [];
+  costs: QueryCosts | null = null;
   rebuilding = false;
-  /** @type {string | null} */ config = null;
-  /** @param {import('./nav.ts').SurfaceNav} nav
-   * @param {{workerFactory?: () => Worker, profile?: boolean, collectSamples?: boolean}} [options] */
+  config: string | null = null;
+  nav: SurfaceNav;
+  workerFactory: () => Worker;
+  profile: boolean;
+  collectSamples: boolean;
+  nextId = 0;
+  generation = 0;
+  ready = false;
+  paused = false;
+  disposed = false;
+  frame = 0;
+  stats = {
+    submitted: 0,
+    completed: 0,
+    cancelled: 0,
+    stale: 0,
+    pending: 0,
+    maxPending: 0,
+    workerMs: 0,
+    motorMoves: 0,
+    proofHits: 0,
+    immediateChecks: 0,
+    superseded: 0,
+    droppedSamples: 0,
+    snapshotBytes: 0,
+    repeatedStates: 0,
+    savedMoves: 0,
+    decisions: 0,
+    maxDecisionMs: 0,
+    maxDecisionFrames: 0,
+  };
   constructor(
-    nav,
+    nav: SurfaceNav,
     {
       workerFactory = () =>
-        new Worker(new URL('./attachment-worker.js', import.meta.url), { type: 'module' }),
+        new Worker(new URL('./attachment-worker.ts', import.meta.url), { type: 'module' }),
       profile = false,
       collectSamples = profile,
-    } = {}
+    }: { workerFactory?: () => Worker; profile?: boolean; collectSamples?: boolean } = {}
   ) {
     this.nav = nav;
     this.workerFactory = workerFactory;
     this.profile = profile;
     this.collectSamples = collectSamples;
-    this.scopes = new Map();
-    this.jobs = new Map();
-    this.proofs = new Map();
-    this.nextId = 0;
-    this.current = null;
-    this.generation = 0;
-    this.worker = null;
-    this.ready = false;
-    this.paused = false;
-    this.disposed = false;
-    this.error = null;
-    this.stats = {
-      submitted: 0,
-      completed: 0,
-      cancelled: 0,
-      stale: 0,
-      pending: 0,
-      maxPending: 0,
-      workerMs: 0,
-      motorMoves: 0,
-      proofHits: 0,
-      immediateChecks: 0,
-      superseded: 0,
-      droppedSamples: 0,
-      snapshotBytes: 0,
-      repeatedStates: 0,
-      savedMoves: 0,
-      decisions: 0,
-      maxDecisionMs: 0,
-      maxDecisionFrames: 0,
-    };
-    this.samples = [];
-    this.costs = null;
-    this.frame = 0;
+  }
+  get worker() {
+    return this.connection?.worker ?? null;
   }
   get active() {
     return this.current !== null;
@@ -104,6 +112,8 @@ export class AttachmentQueries {
     if (!c) throw new Error('[ai worker] missing controller');
     return [
       p.staticWorld.version,
+      p.staticWorld.nodeCount,
+      p.staticWorld.triCount,
       p.gravity,
       p.MASK.CHARACTER,
       c.stepHeight,
@@ -115,62 +125,31 @@ export class AttachmentQueries {
     ].join(',');
   }
   async start() {
-    this.abortInit?.();
-    this.abortInit = null;
+    if (this.error) throw this.error;
+    if (this.disposed) return;
     const generation = ++this.generation;
-    this.ready = false;
-    this.worker?.terminate();
-    this.worker = null;
+    this.closeConnection();
     this.clear();
     const world = this.nav.physics.staticWorld,
       c = this.nav._probe;
-    if (!c || c.world !== world) throw new Error('[ai worker] controller collision world mismatch');
-    this.world = world;
-    this.probe = c;
-    this.config = this.signature();
-    const current = () => !this.disposed && generation === this.generation;
-    const data = parseSnapshotCopy(await querySnapshot(world, current));
-    if (!data || !current() || this.config !== this.signature()) return;
-    this.stats.snapshotBytes = data.bytes;
-    const worker = (this.worker = this.workerFactory());
-    /** @type {Promise<void>} */
-    const initialized = new Promise((resolve, reject) => {
-      const timer = setTimeout(
-        () => fail(new Error('[ai worker] initialization deadline exceeded')),
-        DEADLINE
-      );
-      this.abortInit = () => {
-        clearTimeout(timer);
-        resolve();
-      };
-      const fail = (/** @type {unknown} */ error) => {
-        if (!current()) return;
-        clearTimeout(timer);
-        this.abortInit = null;
-        reject(this.failure(error));
-      };
-      worker.onerror = (event) => fail(new Error(`[ai worker] ${event.message}`));
-      worker.onmessageerror = () => fail(new Error('[ai worker] invalid message'));
-      worker.onmessage = (/** @type {MessageEvent<unknown>} */ { data }) => {
-        if (!current()) return;
-        let message;
-        try {
-          message = parseWorkerMessage(data);
-        } catch (error) {
-          fail(error);
-          return;
-        }
-        if (message.type === 'error') {
-          fail(new Error(message.message));
-          return;
-        }
-        if (message.type === 'ready') {
-          clearTimeout(timer);
-          this.abortInit = null;
-          this.ready = true;
-          resolve();
-        } else this.receive(message);
-      };
+    try {
+      if (!c || c.world !== world)
+        throw new Error('[ai worker] controller collision world mismatch');
+      this.world = world;
+      this.sourceTriCount = world.triCount;
+      this.probe = c;
+      this.config = this.signature();
+      const current = () =>
+        !this.disposed &&
+        !this.error &&
+        generation === this.generation &&
+        this.nav.physics.staticWorld === world &&
+        this.nav._probe === c &&
+        c.world === world &&
+        this.config === this.signature();
+      const data = parseSnapshotCopy(await querySnapshot(world, current));
+      if (!data || !current()) return;
+      this.stats.snapshotBytes = data.bytes;
       const controller = {
         radius: c.radius,
         height: c.height,
@@ -181,7 +160,8 @@ export class AttachmentQueries {
         mask: c.mask,
         enabled: c.enabled,
       };
-      worker.postMessage(
+      const connection = (this.connection = new AttachmentConnection(
+        this.workerFactory(),
         {
           type: 'init',
           world: data.snapshot,
@@ -191,13 +171,27 @@ export class AttachmentQueries {
           profile: this.profile,
           repeatState: this.nav.repeatState !== false,
         },
-        data.transfer
-      );
-    });
-    await initialized;
+        data.transfer,
+        (message) => this.receive(message),
+        (error) => this.failure(error)
+      ));
+      await connection.initialized;
+      if (current() && this.connection === connection) this.ready = true;
+    } catch (error) {
+      if (!this.disposed && generation === this.generation) throw this.failure(error);
+    }
   }
-  /** @param {number} frame @param {Set<number>} alive */
-  update(frame, alive) {
+  private closeConnection() {
+    this.ready = false;
+    this.connection?.close();
+    this.connection = null;
+  }
+  private send(message: ClientMessage) {
+    if (!this.connection?.worker)
+      throw this.failure(new Error('[ai worker] missing initialized worker'));
+    this.connection.send(message);
+  }
+  update(frame: number, alive: Set<number>) {
     this.frame = frame;
     if (this.error) throw this.error;
     const p = this.nav.physics;
@@ -222,17 +216,28 @@ export class AttachmentQueries {
         this.cancel(key);
     }
     for (const job of this.jobs.values())
-      if (now - job.sent > DEADLINE)
+      if (now - job.sent > ATTACHMENT_DEADLINE_MS)
         throw this.failure(new Error('[ai worker] query deadline exceeded'));
   }
-  /** @template T
-   * @param {number} actor @param {string} kind @param {() => T} fn
-   * @param {import('three').Vector3 | null} [origin]
-   * @returns {T | typeof NAV_PENDING | typeof NAV_CANCELLED} */
-  run(actor, kind, fn, origin = null) {
+  run<T>(
+    actor: number,
+    kind: string,
+    fn: () => T,
+    origin: Vector3 | null = null
+  ): T | typeof NAV_PENDING | typeof NAV_CANCELLED {
     if (this.error) throw this.error;
     if (this.current) throw new Error('[ai worker] nested planning scope');
-    if (this.paused || !this.valid) return NAV_PENDING;
+    if (this.paused) return NAV_PENDING;
+    if (
+      this.ready &&
+      this.world === this.nav.physics.staticWorld &&
+      this.sourceTriCount > 0 &&
+      this.world.triCount === 0
+    ) {
+      this.invalidateCurrent();
+      return NAV_CANCELLED;
+    }
+    if (!this.valid) return NAV_PENDING;
     const key = `${actor}:${kind}`;
     let scope = this.scopes.get(key);
     if (!scope) {
@@ -296,11 +301,10 @@ export class AttachmentQueries {
         this.jobs.delete(id);
         scope.proofs.delete(job.identity);
       }
-    if (!this.worker) throw this.failure(new Error('[ai worker] missing initialized worker'));
-    if (obsolete.length) this.worker.postMessage({ type: 'cancel', ids: obsolete });
+    if (obsolete.length) this.send({ type: 'cancel', ids: obsolete });
     this.stats.cancelled += obsolete.length;
     this.stats.pending = this.jobs.size;
-    if (scope.unsent.length) this.worker.postMessage({ type: 'queries', jobs: scope.unsent });
+    if (scope.unsent.length) this.send({ type: 'queries', jobs: scope.unsent });
     if (scope.pending) {
       scope.waiting = true;
       return NAV_PENDING;
@@ -328,43 +332,36 @@ export class AttachmentQueries {
     scope.frame = this.frame;
     return value;
   }
-  /** @param {import('three').Vector3Like} from @param {import('three').Vector3Like} to
-   * @param {number} radius @param {number} height @param {number} maxSteps
-   * @param {(() => boolean | null) | null} [immediate] @returns {boolean} */
-  request(from, to, radius, height, maxSteps, immediate = null) {
+  request(
+    from: Vector3Like,
+    to: Vector3Like,
+    radius: number,
+    height: number,
+    maxSteps: number,
+    immediate: (() => boolean | null) | null = null
+  ): boolean {
     const scope = this.current;
     if (!scope) throw new Error('[ai worker] query outside planning scope');
     const key = [from.x, from.y, from.z, to.x, to.y, to.z, radius, height, maxSteps];
     if (!key.every(Number.isFinite)) return false;
     return this.submit(key, from === scope.origin, immediate);
   }
-  /** Static full ladder proof; no immediate/main-thread motor fallback.
-   * @param {import('./ladder.ts').LadderDescriptor} descriptor
-   * @param {import('./ladder.ts').LadderDirection} direction
-   * @param {import('three').Vector3Like} foot
-   * @param {Readonly<import('./ladder.ts').LadderCursor>} cursor
-   * @param {import('./attachment-types.ts').LadderQueryOptions} options @returns {boolean} */
-  checkLadder(descriptor, direction, foot, cursor, options) {
+  // Static full ladder proof; no immediate/main-thread motor fallback.
+  checkLadder(
+    descriptor: LadderDescriptor,
+    direction: LadderDirection,
+    foot: Vector3Like,
+    cursor: Readonly<LadderCursor>,
+    options: LadderQueryOptions
+  ): boolean {
     if (!this.current) throw new Error('[ai worker] query outside planning scope');
     const c = this.nav._probe;
     if (!c) throw new Error('[ai worker] missing controller');
     const world = this.nav.physics.staticWorld;
     // A copied worker BVH may still be alive after the owned source dies.
     // Cancel this attempt before even looking up a completed ladder proof.
-    if (
-      world !== this.world ||
-      c.world !== world ||
-      world.nodeCount === 0 ||
-      world.triCount === 0 ||
-      world.dirty ||
-      this.config !== this.signature()
-    ) {
-      this.current.cancelled = true;
-      this.generation++;
-      this.ready = false;
-      this.clear();
-      this.worker?.terminate();
-      this.worker = null;
+    if (!this.valid || world.nodeCount === 0 || world.triCount === 0) {
+      this.invalidateCurrent();
       return false;
     }
     const {
@@ -394,11 +391,23 @@ export class AttachmentQueries {
     });
     return this.submit(key, foot === this.current.origin);
   }
-  /** @param {import('./attachment-types.ts').QueryKey} key @param {boolean} liveOrigin
-   * @param {(() => boolean | null) | null} [immediate] @returns {boolean} */
-  submit(key, liveOrigin, immediate = null) {
+  private invalidateCurrent() {
+    if (this.current) this.current.cancelled = true;
+    this.generation++;
+    this.closeConnection();
+    this.clear();
+  }
+  submit(
+    key: QueryKey,
+    liveOrigin: boolean,
+    immediate: (() => boolean | null) | null = null
+  ): boolean {
     const scope = this.current;
     if (!scope) throw new Error('[ai worker] query outside planning scope');
+    if (!this.valid) {
+      this.invalidateCurrent();
+      return false;
+    }
     const identity = queryIdentity(key),
       known = this.proofs.get(identity),
       proof = scope.proofs.get(identity);
@@ -443,19 +452,8 @@ export class AttachmentQueries {
     this.stats.maxPending = Math.max(this.stats.maxPending, this.jobs.size);
     return false;
   }
-  /** @param {import('./attachment-types.ts').WorkerMessage} message */
-  receive(message) {
+  receive(message: WorkerMessage) {
     if (this.disposed || this.error || message.type !== 'result') return;
-    if (
-      typeof message.value !== 'boolean' ||
-      !Number.isFinite(message.ms) ||
-      message.ms < 0 ||
-      !Number.isInteger(message.moves) ||
-      message.moves < 0
-    ) {
-      this.failure(new Error('[ai worker] malformed query result'));
-      return;
-    }
     const job = this.jobs.get(message.id);
     this.stats.workerMs += message.ms;
     this.stats.motorMoves += message.moves;
@@ -484,24 +482,21 @@ export class AttachmentQueries {
     this.stats.completed++;
     this.stats.pending = this.jobs.size;
   }
-  /** @param {string} key @param {boolean} value */
-  remember(key, value) {
+  remember(key: string, value: boolean) {
     if (this.proofs.size === MAX_PROOFS && !this.proofs.has(key)) {
       const first = this.proofs.keys().next().value;
       if (first !== undefined) this.proofs.delete(first);
     }
     this.proofs.set(key, value);
   }
-  /** @param {import('./attachment-types.ts').QuerySample} sample */
-  record(sample) {
+  record(sample: QuerySample) {
     if (this.samples.length === 2048) {
       this.samples.shift();
       this.stats.droppedSamples++;
     }
     this.samples.push(sample);
   }
-  /** @param {string} key */
-  cancel(key) {
+  cancel(key: string) {
     const scope = this.scopes.get(key);
     if (!scope) return;
     const ids = [];
@@ -510,16 +505,14 @@ export class AttachmentQueries {
         ids.push(id);
         this.jobs.delete(id);
       }
-    if (ids.length) this.worker?.postMessage({ type: 'cancel', ids });
+    if (ids.length && this.connection) this.send({ type: 'cancel', ids });
     this.stats.cancelled += ids.length;
     this.stats.pending = this.jobs.size;
     this.scopes.delete(key);
   }
-  /** @param {unknown} error */
-  failure(error) {
+  failure(error: unknown) {
     this.error ??= error instanceof Error ? error : new Error(String(error));
-    this.ready = false;
-    this.worker?.terminate();
+    this.closeConnection();
     this.clear();
     return this.error;
   }
@@ -530,11 +523,7 @@ export class AttachmentQueries {
   dispose() {
     this.disposed = true;
     this.generation++;
-    this.abortInit?.();
-    this.abortInit = null;
+    this.closeConnection();
     this.clear();
-    this.worker?.terminate();
-    this.worker = null;
-    this.ready = false;
   }
 }

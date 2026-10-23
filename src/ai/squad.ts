@@ -13,7 +13,7 @@
 import * as THREE from 'three';
 
 import type { Agent } from './agent.ts';
-import { NAV_PENDING, NAV_CANCELLED } from './attachment-queries.js';
+import { NAV_PENDING, NAV_CANCELLED } from './attachment-queries.ts';
 import type { AiSystem } from './index.ts';
 import {
   INTENT,
