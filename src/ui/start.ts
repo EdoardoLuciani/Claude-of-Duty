@@ -74,8 +74,9 @@ export class StartGate {
     this.suspend();
     this.engine.events.emit('game:restart', { source: 'game-over' });
     if (this.ended || this.engine.error) return;
+    // A reset prepares a run, but does not authorize entering it. Keep the
+    // same explicit Start handoff as initial boot, even with a retained lock.
     this.ready();
-    this.requestControl();
   }
 
   private requestControl(): void {
