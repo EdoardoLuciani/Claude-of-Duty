@@ -1002,6 +1002,8 @@ export class PlayerSystem {
       this.movement.teleport(sp.position.x, feetY, sp.position.z);
       this.rig.reset(STANCE.stand.eye);
     }
+    // Restart observers and AI placement run before the next player update.
+    this._syncHitbox();
     this._endDeath();
   }
 
