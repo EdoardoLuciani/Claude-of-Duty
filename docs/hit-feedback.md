@@ -38,7 +38,15 @@ tracked separately in #497; remaining #473/#474 work is not closed by this slice
 ## Assets, authoring and rights
 
 Ten short, mono 48 kHz Opus assets live in `src/audio/samples/hits/`: four flesh,
-three armour and three breaks. The existing sample bank loads/caches all ten at
+three armour and three breaks. Mono describes the **source**, not the final mix:
+a point contact is positioned by the game's spatial panner and stereo room returns,
+rather than bringing a baked-in stereo width to a single hit location. Headlocked
+incoming feedback does not strictly require mono; the shared short-contact bank
+uses it for consistent source presentation and smaller delivery/decoded storage.
+Wide ambience and the stereo output are not downmixed. The selected source crops
+were checked for cancellation when averaged (largest energy loss: 2.3 dB).
+
+The existing sample bank loads/caches all ten at
 startup alongside its 40 legacy assets. Any required fetch/decode failure rejects
 startup; no per-hit fetch, decode or synthesis recovery. Disposal clears the new
 buffers and selection state. Selection is seeded, avoids immediate repeats and
@@ -60,7 +68,10 @@ clearance for the new edited assets during this implementation. That is an owner
 attestation, not an independent legal opinion or a transfer of the source-library
 copyrights. Retain applicable purchase/licence records; these commercial-derived
 media do not inherit any code licence. This approval does not change the separate
-restrictions on the existing legacy firearm assets.
+restrictions on the existing legacy firearm assets. The owner subsequently also
+explicitly cleared **mixed gameplay recordings** containing existing gunfire and
+explosions for public PR attachments. That permission is for mixed recordings,
+not additional distribution of raw firearm samples or library masters.
 
 Rebuild with installed FFmpeg/libopus and the original source libraries:
 
@@ -125,5 +136,35 @@ current health tuning. Health-controller fixtures derive plate exhaustion from
 For before/after evidence, run the same harness against a clean pre-change
 worktree with `--root=/path/to/baseline --port=5534 --baseline --out=/tmp/hits-before`.
 Evidence stays outside the repo; the harness does not publish recordings or
-collect library masters. Full firefight measurements/captures involving the
-legacy firearm recordings remain local, subject to their separate restrictions.
+collect library masters. Publishing mixed combat recordings requires the separate
+owner clearance recorded above; raw legacy assets remain subject to their restrictions.
+
+### Continuous combat listening comparison
+
+```sh
+node tools/capture-hit-combat.mjs --out=/tmp/hit-combat-after
+node tools/capture-hit-combat.mjs --root=/path/to/baseline --port=5534 --out=/tmp/hit-combat-before
+```
+
+This records 26 continuous seconds **after the actual game's master gain**, with
+normal player/AI weapon fire, physical bullet impacts and flight, health/armour
+hits and breaks, two input-driven live grenades, footsteps, and environmental
+one-shots. The normal real-time engine, navigation, physics, audio graph, room
+returns, concussion and finite voice budget run throughout. No source/bus/master
+gain overrides, per-clip loudness normalization or replacement soundtrack are used.
+
+It is a scripted listening fixture, not unassisted play: three real AI actors and
+the player receive high finite survival HP, start with three plates, and the player
+receives one additional plate at 12 seconds. Input scripts movement, counter-recoil,
+reloads, switching and grenade equip/cook/release. One ambient event is scheduled
+at the opening so it can be heard before combat fills the normal emitter budget;
+subsequent ambience scheduling and all source selection/gains are unchanged.
+Before/after use the same scenario and defaults, but real-time AI/navigation timing
+can vary: these are contextual listening comparisons, **not sample-aligned A/Bs**.
+
+The tool saves ordinary `combat.mp3`, original `combat.webm`, a native HUD snapshot
+and `report.json` outside the repo. It verifies actual events, accepted whizz and
+ambient voices, both explosions, and absence of engine/audio errors. Normal voice
+steals/drops under this load are retained and reported, not bypassed for the demo.
+PR video wrappers use a clearly labelled static snapshot with the continuous audio;
+they are not full-motion gameplay video.
