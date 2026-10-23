@@ -30,7 +30,7 @@ import { makeHitRecord } from '../physics/math.ts';
 import { MASK } from '../physics/surfaces.ts';
 import { GRENADE_FUSE, GRENADE_RADIUS } from '../weapons/index.ts';
 import { Animator } from './animator.ts';
-import { NAV_PENDING, NAV_CANCELLED } from './attachment-queries.js';
+import { NAV_PENDING, NAV_CANCELLED } from './attachment-queries.ts';
 import { LADDER_QUERY_MAX_ITERATIONS } from './attachment-types.ts';
 import { INFANTRY, vaultPoint } from './capabilities.ts';
 import type { AiSystem } from './index.ts';

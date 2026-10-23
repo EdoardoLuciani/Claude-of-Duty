@@ -1,29 +1,40 @@
 import * as THREE from 'three';
+import type { Vector3Like } from 'three';
 
 import { StaticWorld } from '../physics/bvh.ts';
 import { CharacterController } from '../physics/character.ts';
 import { instrument, parseClientMessage } from './attachment-types.ts';
+import type {
+  AttachmentOracle,
+  LadderQuery,
+  QueuedQuery,
+  QueryCosts,
+  WorkerMessage,
+} from './attachment-types.ts';
+
+// Keep worker globals local: the application tsconfig also includes DOM types.
+const worker = self as unknown as {
+  postMessage(message: WorkerMessage): void;
+  onmessage: ((event: MessageEvent<unknown>) => void) | null;
+};
 import { canStand, checkAttachment } from './attachment.js';
 import { LADDER, LadderMotor } from './ladder.ts';
 
-/** @type {import('./attachment-types.ts').AttachmentOracle | undefined} */
-let nav;
+let nav: AttachmentOracle | undefined;
 let scheduled = false,
   profiling = false,
   failed = false;
-/** @type {CharacterController | undefined} */
-let ladderController;
-function failure(/** @type {unknown} */ error) {
+let ladderController: CharacterController | undefined;
+function failure(error: unknown) {
   failed = true;
   queues.clear();
   actors.length = 0;
-  self.postMessage({
+  worker.postMessage({
     type: 'error',
     message: error instanceof Error ? (error.stack ?? error.message) : String(error),
   });
 }
-/** @param {import('./attachment-types.ts').LadderQuery} query */
-function checkLadder(query) {
+function checkLadder(query: LadderQuery) {
   const c = ladderController;
   if (!c) throw new Error('[ai worker] missing ladder scratch');
   c.radius = query.radius;
@@ -48,15 +59,11 @@ function checkLadder(query) {
     motor.cancel();
   }
 }
-/** @type {Map<number, import('./attachment-types.ts').QueuedQuery[]>} */
-const queues = new Map();
-/** @type {number[]} */
-const actors = [];
+const queues = new Map<number, QueuedQuery[]>();
+const actors: number[] = [];
 const channel = new MessageChannel();
-/** @type {import('./attachment-types.ts').QueryCosts} */
-const costs = {};
-/** @param {string} key */
-function timedCost(key) {
+const costs: QueryCosts = {};
+function timedCost(key: string) {
   return (costs[key] = { calls: 0, ms: 0 });
 }
 function schedule() {
@@ -92,9 +99,10 @@ channel.port1.onmessage = () => {
           k[8]
         )
       : checkLadder(k);
+    if (value === null) throw new Error('[ai worker] incomplete full query');
     const ended = performance.now();
     const result = {
-      type: 'result',
+      type: 'result' as const,
       id: job.id,
       value,
       ms: ended - start,
@@ -104,17 +112,18 @@ channel.port1.onmessage = () => {
       queueMs: start - job.queuedAt,
       costs: profiling ? costs : null,
     };
-    self.postMessage(result);
+    worker.postMessage(result);
   } catch (error) {
     failure(error);
   }
   schedule();
 };
-self.onmessage = (/** @type {MessageEvent<unknown>} */ { data: value }) => {
+worker.onmessage = ({ data: value }) => {
   if (failed) return;
   try {
     const data = parseClientMessage(value);
     if (data.type === 'init') {
+      if (nav) throw new Error('[ai worker] duplicate initialization');
       const world = new StaticWorld();
       Object.assign(world, data.world);
       world._stackNode = new Int32Array(data.world.stackSize);
@@ -125,12 +134,8 @@ self.onmessage = (/** @type {MessageEvent<unknown>} */ { data: value }) => {
         staticWorld: world,
         gravity: data.gravity,
         MASK: data.mask,
-        checkCapsule: (
-          /** @type {import('three').Vector3Like} */ a,
-          /** @type {import('three').Vector3Like} */ b,
-          /** @type {number} */ r,
-          /** @type {number} */ mask
-        ) => world.overlapCapsule(a.x, a.y, a.z, b.x, b.y, b.z, r, mask, 0) === 0,
+        checkCapsule: (a: Vector3Like, b: Vector3Like, r: number, mask: number) =>
+          world.overlapCapsule(a.x, a.y, a.z, b.x, b.y, b.z, r, mask, 0) === 0,
       };
       nav = {
         physics,
@@ -178,7 +183,7 @@ self.onmessage = (/** @type {MessageEvent<unknown>} */ { data: value }) => {
           timedCost('_sweepDown')
         );
       }
-      self.postMessage({ type: 'ready' });
+      worker.postMessage({ type: 'ready' });
     } else if (data.type === 'queries') {
       if (!nav || data.jobs.length + [...queues.values()].reduce((n, q) => n + q.length, 0) > 256)
         throw new Error('[ai worker] query queue limit');
