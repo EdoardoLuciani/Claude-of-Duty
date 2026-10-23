@@ -45,19 +45,22 @@ A WebGPU-capable browser/device is required. Normal builds use committed world
 and Blender assets, with no Blender requirement. Change world source in
 `tools/worldgen/`, regenerate with `npm run world`, then run `npm run world:validate`.
 
-**Three.js pin:** GitHub commit `0978e2b62e53654ebe1a2c3032ebee0a4981c701`,
+**Three.js pin:** GitHub commit `e27dfa95ae7f453b5d7a9a36ffdb563f7c9b529b`,
 not a moving `dev` dependency. Its package version still says `0.186.0`; runtime
 source reports `187dev`. `tools/compensate-three.mjs` selects the pinned ESM source
-exports because committed bundles still lag the latest source fixes (including
-[#34872](https://github.com/mrdoob/three.js/pull/34872), native builder-local buffer
-names and declaration collision handling). The local WGSL edit is retired; its
+exports because committed bundles still lag the latest source fixes. This pin
+includes native builder-local buffer names and declaration collision handling
+([#34872](https://github.com/mrdoob/three.js/pull/34872)), plus per-object reference
+attributes that let compatible instanced meshes safely share shader builds
+([#35007](https://github.com/mrdoob/three.js/pull/35007)). The local WGSL edit is retired; its
 reviewed upstream source remains hash-verified without modification. Commit, version
 and hash guards validate all targets before writing; review them on every upgrade.
 Upstream also owns Fresnel and TRAA cleanup—those local corrections remain removed.
 Preserve the material oracle (`node tools/arm-material-audit.mjs --strict=1`),
 buffer isolation/reuse probe (`node tests/e2e/buffer-names-e2e.mjs`), and native
-startup/first-use/lifetime/failure checks. Stable names share GPU programs/pipelines,
-not shader-builder state or object buffers.
+startup/first-use/lifetime/failure checks. Compatible native instancing now shares
+shader-builder state and GPU programs/pipelines, never object buffers. Upstream
+keeps builds that embed object-specific data out of the shared builder cache.
 Other renderer follow-ups: [#370](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/370).
 
 ## Play
