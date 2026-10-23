@@ -1,14 +1,16 @@
 import type { Rng } from '../core/rng.ts';
 import { biquad, clamp, gain, series } from './dsp.ts';
+import { HIT_MIX, HIT_URLS, type DamageSoundOptions, type HitKind } from './hits.ts';
 import type { AudioVoice, SampleKind, SampleOptions, WeaponProfile } from './types.ts';
 import { REPORT_DISTANT_MATCH, reportDistantMix } from './weapons.ts';
 
 /*
- * PRIVATE local-only review: Opus delivery copies, bundled locally by Vite.
+ * Legacy firearm bank: PRIVATE local-only review Opus delivery copies, bundled by Vite.
  * Float WAV masters remain offline authoring inputs, not runtime imports.
  * Operator authorized local commits; commercial derivatives are NOT cleared
  * for public Git distribution or upload.
- * See docs/tactical-gunshots.md and the private recovery recipe/provenance.
+ * See the private recovery recipe/provenance. Newly cleared contact recordings
+ * are separate: samples/hits/provenance.json and docs/hit-feedback.md.
  */
 const URLS = {
   mpx: [
@@ -93,6 +95,8 @@ export class WeaponSampleBank {
   actionBuffer: AudioBuffer | null;
   explosionBuffer: AudioBuffer | null;
   heartbeatBuffer: AudioBuffer | null;
+  hitBuffers: Partial<Record<HitKind, AudioBuffer[]>>;
+  hitIndices: Partial<Record<HitKind, number>>;
   loaded: number;
   constructor(actx: BaseAudioContext) {
     this.actx = actx;
@@ -101,6 +105,8 @@ export class WeaponSampleBank {
     this.actionBuffer = null;
     this.explosionBuffer = null;
     this.heartbeatBuffer = null;
+    this.hitBuffers = {};
+    this.hitIndices = {};
     this.loaded = 0;
   }
 
@@ -115,6 +121,11 @@ export class WeaponSampleBank {
     jobs.push(this._loadSpecial('actionBuffer', ACTION_URL));
     jobs.push(this._loadSpecial('explosionBuffer', EXPLOSION_URL));
     jobs.push(this._loadSpecial('heartbeatBuffer', HEARTBEAT_URL));
+    for (const kind of Object.keys(HIT_URLS) as HitKind[]) {
+      this.hitBuffers[kind] = new Array<AudioBuffer>(HIT_URLS[kind].length);
+      this.hitIndices[kind] = -1;
+      HIT_URLS[kind].forEach((url, index) => jobs.push(this._loadHit(kind, index, url)));
+    }
     // Finish all decodes before start() tears down a failed bank.
     for (const result of await Promise.allSettled(jobs))
       if (result.status === 'rejected') throw result.reason;
@@ -135,6 +146,60 @@ export class WeaponSampleBank {
   async _loadSpecial(field: SpecialBufferKey, url: string): Promise<void> {
     this[field] = await this._loadBuffer(url);
     this.loaded++;
+  }
+
+  async _loadHit(kind: HitKind, index: number, url: string): Promise<void> {
+    this.hitBuffers[kind]![index] = await this._loadBuffer(url);
+    this.loaded++;
+  }
+
+  /** No hot-path fetch/decode, and no immediate repeat within a contact family. */
+  hit(kind: HitKind, rng: Rng, o: { when?: number; level?: number } = {}): AudioVoice {
+    const choices = this.hitBuffers[kind];
+    if (!choices?.length) throw new Error(`[audio] ${kind} contact recordings are not loaded`);
+    const previous = this.hitIndices[kind] ?? -1;
+    const index =
+      previous < 0
+        ? rng.u32() % choices.length
+        : (previous + 1 + (rng.u32() % Math.max(1, choices.length - 1))) % choices.length;
+    this.hitIndices[kind] = index;
+    const src = this.actx.createBufferSource();
+    src.buffer = choices[index];
+    const rate = rng.range(HIT_MIX.rateMin, HIT_MIX.rateMax);
+    src.playbackRate.value = rate;
+    const out = gain(this.actx, (o.level ?? 1) * rng.range(HIT_MIX.gainMin, HIT_MIX.gainMax));
+    src.connect(out);
+    const when = o.when ?? this.actx.currentTime;
+    src.start(when);
+    return { node: out, end: when + src.buffer.duration / rate + 0.02, send: HIT_MIX.send };
+  }
+
+  /** One incoming event owns one voice, with only the intended physical layers. */
+  damage(rng: Rng, o: DamageSoundOptions): AudioVoice {
+    const when = o.when ?? this.actx.currentTime;
+    const mixed = o.amount > 0 && o.armourAbsorbed > 0;
+    // Severity belongs to the event total: splitting one hit across plates and
+    // health must not attenuate both components twice and bury mixed hits.
+    const severity = clamp((o.amount + o.armourAbsorbed) / 25, 0.45, 1.15);
+    const out = gain(this.actx, HIT_MIX.player * (o.level ?? 1) * severity);
+    let end = when;
+    if (o.armourAbsorbed > 0) {
+      const armour = this.hit(o.plateBreak ? 'break' : 'armour', rng, {
+        when,
+        level: mixed ? HIT_MIX.mixedArmour : 1,
+      });
+      armour.node.connect(out);
+      end = Math.max(end, armour.end);
+    }
+    if (o.amount > 0) {
+      const flesh = this.hit('flesh', rng, {
+        when,
+        level: mixed ? HIT_MIX.mixedHealth : 1,
+      });
+      flesh.node.connect(out);
+      end = Math.max(end, flesh.end);
+    }
+    return { node: out, end, send: 0 };
   }
 
   /**
@@ -368,6 +433,9 @@ export class WeaponSampleBank {
     for (const key of Object.keys(this.buffers) as SampleKind[]) this.buffers[key]!.length = 0;
     this.buffers = {};
     this.indices = {};
+    for (const key of Object.keys(this.hitBuffers) as HitKind[]) this.hitBuffers[key]!.length = 0;
+    this.hitBuffers = {};
+    this.hitIndices = {};
     this.actionBuffer = null;
     this.explosionBuffer = null;
     this.heartbeatBuffer = null;
