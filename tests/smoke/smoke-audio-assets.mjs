@@ -25,11 +25,13 @@ try {
         bank.load(),
         failure === 'http' ? /smg-1.*HTTP 404/ : /invalid recording/
       );
-    else assert.equal(await bank.load(), 40);
-    assert.equal(decodes, failure === 'http' ? 39 : 40, 'all jobs settle before failure teardown');
+    else assert.equal(await bank.load(), 50);
+    assert.equal(decodes, failure === 'http' ? 49 : 50, 'all jobs settle before failure teardown');
     bank.dispose();
     assert(Object.values(bank.buffers).every((buffers) => buffers.length === 0));
     assert.equal(bank.heartbeatBuffer, null);
+    assert.deepEqual(bank.hitBuffers, {});
+    assert.deepEqual(bank.hitIndices, {});
   }
   const missing = new WeaponSampleBank({});
   missing.buffers.rifle = [{ duration: 0.2 }];

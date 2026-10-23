@@ -168,6 +168,31 @@ try {
         row.scenario.id + ': quiet-scene readability'
       );
   }
+  // Meter the actual unducked incoming stem, not only the gun-dominated sum.
+  // A peak ceiling alone cannot prove that feedback survives sustained fire.
+  for (const row of rows.filter((r) => r.scenario.event === 'damage')) {
+    const ui = row.stages.uiFeedback;
+    assert(
+      ui.max20Db > -31 && ui.max20Db < -15,
+      row.scenario.id + ': incoming readability/headroom'
+    );
+    assert(ui.peak < 0.65, row.scenario.id + ': composite source headroom');
+    if (row.scenario.combat) {
+      const quiet = rows.find((r) => r.scenario.id === row.scenario.id.replace('-combat', ''));
+      if (quiet)
+        assert(
+          Math.abs(ui.max20Db - quiet.stages.uiFeedback.max20Db) < 3,
+          row.scenario.id + ': feedback is not gun-ducked'
+        );
+    }
+  }
+  const health = rows.find((r) => r.scenario.id === 'damage-health');
+  const concussed = rows.find((r) => r.scenario.id === 'damage-concussed');
+  if (health && concussed)
+    assert(
+      Math.abs(health.stages.uiFeedback.max20Db - concussed.stages.uiFeedback.max20Db) < 0.01,
+      'concussion must not bury player feedback'
+    );
   console.log(
     `PASS: ${rows.length} native mix scenarios; hierarchy, readability, silence, voices and tails.`
   );

@@ -1,8 +1,8 @@
 /**
- * AUDIO — recorded weapon fire, synthesized foley, spatialisation and mix
+ * AUDIO — recorded weapon fire/physical hits, spatialisation and mix
  *
  * Recorded assets are required. Synthesis supplies authored reinforcement,
- * distant reports, sniper fire, foley and ambience—not failed-load recovery.
+ * remaining movement/material foley and ambience—not failed-load recovery.
  *
  * ───────────────────────────────────────────────────────────────────────────
  * PUBLIC API   const audio = ctx.get('audio')
@@ -81,6 +81,9 @@ interface AudioOptions {
   gain?: number;
   surface?: string;
   energy?: number;
+  amount?: number;
+  armourAbsorbed?: number;
+  plateBreak?: boolean;
   gait?: string;
   level?: number;
   gear?: number;
@@ -640,7 +643,23 @@ export class AudioSystem {
         return bulletWhizz(actx, bank, rng, { when, miss: o.miss, gain: o.gain });
       case 'dryfire':
         return dryFire(actx, bank, rng, { when });
+      case 'damage':
+        return this.samples!.damage(rng, {
+          when,
+          amount: o.amount ?? 25,
+          armourAbsorbed: o.armourAbsorbed ?? 0,
+          plateBreak: o.plateBreak ?? false,
+          level: o.level,
+        });
+      case 'armour_hit':
+      case 'armour_break':
+        return this.samples!.hit(kind === 'armour_break' ? 'break' : 'armour', rng, {
+          when,
+          level: o.level,
+        });
       case 'impact':
+        if (o.surface === 'flesh')
+          return this.samples!.hit('flesh', rng, { when, level: o.energy });
         return surfaceImpact(actx, bank, rng, { when, surface: o.surface, energy: o.energy });
       case 'step':
         return footstep(actx, bank, rng, {
@@ -1103,6 +1122,10 @@ export class AudioSystem {
     if (!this.running || !p) return;
     const field = this.field!;
     if (p.exit) return; // only the entry side gets a sound
+    // Player contact precedes armour/health resolution. damage:taken owns the
+    // immediate headlocked feedback, including armour-only hits; never double it.
+    const player = this.ctx.peek('player');
+    if (isPlayerHandle(p.actor) || (player != null && p.actor === player)) return;
     if (this._budget.impact++ > 4) return;
     const pt = p.point;
     if (!pt) return;
@@ -1121,7 +1144,7 @@ export class AudioSystem {
       0.55
     );
     // The round cracking past you is a separate sound from the impact itself.
-    if (dist < 6) {
+    if (dist < 6 && p.surface !== 'flesh') {
       this._playAt('whizz', pt.x, pt.y, pt.z, { miss: dist, noDelay: true }, 'foley', 0.7);
     }
   }
@@ -1283,7 +1306,8 @@ export class AudioSystem {
     // damage is handled by _onDamageTaken.
     const t = p.target;
     if (t === 'player' || isPlayerHandle(t) || t === this.ctx.peek('player')) return;
-    this.ui(p.headshot ? 'headshot' : 'hitmarker', 1);
+    const armoured = p.part === 'armour' || ('armour' in p && p.armour === true);
+    this.ui(p.headshot ? 'headshot' : armoured ? 'armour' : 'hitmarker', 1);
     if (p.killed) this.ui('kill', 1);
     else if (p.point && p.target && this.rng.float() < 0.3) {
       this.bark('hurt', p.point, { level: 0.85 });
@@ -1292,12 +1316,13 @@ export class AudioSystem {
 
   _onDamageTaken(p: EngineEventMap['damage:taken']): void {
     if (!this.running || !p) return;
-    const amount = p.amount ?? 20;
-    if (amount <= 0) return;
-    this.ui('damage', clamp(amount / 25, 0.4, 1.4));
-    if (amount > 12 && this.rng.float() < 0.5) {
-      this._playDry('bark', { bark: 'hit', level: 0.5, f0: 108 }, 'voice', 0.1);
-    }
+    const amount = Number.isFinite(p.amount) ? Math.max(0, p.amount) : 0;
+    const armourAbsorbed = Number.isFinite(p.armourAbsorbed) ? Math.max(0, p.armourAbsorbed) : 0;
+    if (amount === 0 && armourAbsorbed === 0) return;
+    // Subjective bodily damage (also explosions), not another literal gunshot.
+    // UI is deliberately unducked/unmuffled; one composite has no propagation
+    // or room send. A break already includes its plate/gear contact.
+    this._playDry('damage', { amount, armourAbsorbed, plateBreak: p.plateBreak }, 'ui', 0);
   }
 
   _onDeath(p: EngineEventMap['actor:death']): void {
