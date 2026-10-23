@@ -428,9 +428,9 @@ assert.ok(live.canStand(w5.from) && entry.probeGround(), 'W5 starts supported an
 map.physics.removeCharacter(entry);
 assert.equal(
   map.meta.navigation.sha256,
-  // Visual batching changed only the envelope's sourceHash; the Detour,
-  // component and cover payloads are byte-identical to the preceding bake.
-  'bdd4f21d020f48d0a66fe8d1c3f1e783e981ff32730cede75fcebce3324990b9',
+  // Worker TypeScript/lifecycle changes refresh only source provenance. All
+  // 8,897,464 Detour/component/cover payload bytes match the preceding bake.
+  'a5aad0d8fa1eecb423589ad286ae78329b16fe7f68fdd762372a6e78829ff04d',
   're-measure recorded fixture outcomes after changing baked assets'
 );
 let arrivals = 0;

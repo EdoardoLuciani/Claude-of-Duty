@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { BoxGeometry, Group, Vector3 } from 'three';
 
 import { Agent, STATE, EVIDENCE } from '../../src/ai/agent.ts';
-import { AttachmentQueries } from '../../src/ai/attachment-queries.js';
+import { AttachmentQueries } from '../../src/ai/attachment-queries.ts';
 import { ladderMoveBudget } from '../../src/ai/ladder.ts';
 import { SurfaceNav } from '../../src/ai/nav.ts';
 import { VARIANTS } from '../../src/ai/soldier.ts';
