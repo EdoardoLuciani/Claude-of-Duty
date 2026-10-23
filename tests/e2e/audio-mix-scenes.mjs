@@ -46,6 +46,24 @@ export function mixCases() {
   add('own-hurt', 'warning', 'own-hurt');
   for (const strength of [0.25, 0.6])
     add(`heartbeat-${strength}`, 'warning', 'heartbeat', { strength });
+  for (const [id, amount, armourAbsorbed, plateBreak] of [
+    ['health', 25, 0, false],
+    ['armour', 0, 25, false],
+    ['mixed', 15, 15, false],
+    ['break', 15, 15, true],
+    ['break-armour-only', 0, 25, true],
+  ]) {
+    add(`damage-${id}`, 'warning', 'damage', { amount, armourAbsorbed, plateBreak });
+    add(`damage-${id}-combat`, 'context', 'damage', {
+      amount,
+      armourAbsorbed,
+      plateBreak,
+      combat: true,
+    });
+  }
+  add('damage-concussed', 'context', 'damage', { amount: 25, armourAbsorbed: 0, concussed: true });
+  add('damage-health-flight', 'threat', 'damage', { amount: 25, armourAbsorbed: 0, flight: true });
+  for (const distance of [2, 10, 25]) add(`flesh-${distance}`, 'impact', 'flesh', { distance });
   add('near-impact', 'threat', 'near-impact');
   add('near-miss', 'threat', 'near-miss');
   add('own-step-room', 'routine', 'own-step', {
@@ -119,10 +137,11 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
       actionBuffer: load.actionBuffer,
       explosionBuffer: load.explosionBuffer,
       heartbeatBuffer: load.heartbeatBuffer,
+      hitBuffers: load.hitBuffers,
     };
   }
   const seconds = 14,
-    ctx = new OfflineAudioContext(8, seconds * rate, rate);
+    ctx = new OfflineAudioContext(10, seconds * rate, rate);
   await Mixer.prepare(ctx);
   const clock = new Proxy(ctx, {
     get(target, key) {
@@ -249,6 +268,46 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
       case 'heartbeat':
         at(t, () => emit('player:heartbeat', { strength: s.strength }));
         break;
+      case 'damage':
+        if (s.flight)
+          at(t, () =>
+            emit('bullet:segment', {
+              from: { x: -9, y: 1.35, z: 0 },
+              to: { x: -0.3, y: 1.35, z: 0 },
+              shooter: 'enemy',
+              shot: 473,
+            })
+          );
+        if (s.concussed) at(t - 0.2, () => mixer.concuss(0.8));
+        if (s.combat) {
+          for (let i = 0; i < 20; i++) fire(t - 0.1 + i * 0.09, 'lmg');
+          for (let i = 0; i < 12; i++) fire(t + i * 0.13, 'rifle', 10);
+        }
+        for (const offset of s.combat ? [0, 0.36, 0.72, 1.08] : [0])
+          at(t + offset, () =>
+            emit('damage:taken', {
+              amount: s.amount,
+              armourAbsorbed: s.armourAbsorbed,
+              plateBreak: !!s.plateBreak,
+              health: 60,
+              armour: 25,
+              from: point(10, 1.6),
+            })
+          );
+        break;
+      case 'flesh':
+        at(t, () =>
+          emit('bullet:impact', {
+            point: point(s.distance, 1.6),
+            surface: 'flesh',
+            damage: 30,
+            actor: { id: 1 },
+            shooter: 'player',
+            shot: 1,
+            exit: false,
+          })
+        );
+        break;
       case 'near-impact':
         at(t, () =>
           emit('bullet:impact', { point: point(2, 1.6), damage: 30, surface: 'concrete' })
@@ -330,13 +389,14 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
       radio?.stop();
       emit('intel:operation', { active: false });
     });
-    const merge = ctx.createChannelMerger(8);
+    const merge = ctx.createChannelMerger(10);
     mixer.masterGain.disconnect(ctx.destination);
     for (const [node, offset] of [
       [mixer.masterGain, 0],
       [mixer.masterSum, 2],
       [mixer.reverbReturn, 4],
       [mixer.worldSum, 6],
+      [mixer.buses.ui.level, 8],
     ]) {
       const split = ctx.createChannelSplitter(2);
       node.connect(split);
@@ -412,6 +472,7 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
         ['masterInput', 2],
         ['wetReturn', 4],
         ['worldInput', 6],
+        ['uiFeedback', 8],
       ].map(([name, offset]) => [name, measure(offset)])
     );
     const pcm = new Float32Array(output.length * 2);

@@ -355,11 +355,10 @@ export class UiSystem {
         dx = this._tmp.x;
         dz = this._tmp.z;
       }
-      // Armour absorbs first: a plate strike clinks instead of alarming.
+      // HUD only: audio owns all health/armour sound layers from this event.
       const absorbed = e?.armourAbsorbed ?? 0;
       if (absorbed > 0) {
         this.health.onArmour(absorbed, e?.plateBreak);
-        this.sfx(e?.plateBreak ? 'armour_break' : 'armour_hit', e?.plateBreak ? 1.6 : 1.05);
       }
       if (amount > 0) this.hurt(amount, dx, dz);
     });
@@ -544,18 +543,9 @@ export class UiSystem {
   /* ---------------------------------------------------------------- api --- */
 
   hitmarker(kind: 'hit' | 'armour' | 'head' | 'kill' = 'hit'): void {
+    // Audio consumes damage:dealt once; this adapter owns only HUD feedback.
     this.hit.spawn(kind);
     this.crosshair.onHit();
-    this.sfx(
-      kind === 'kill'
-        ? 'hit_kill'
-        : kind === 'head'
-          ? 'hit_head'
-          : kind === 'armour'
-            ? 'hit_armour'
-            : 'hit_flesh',
-      kind === 'kill' ? 1 : 0.7
-    );
   }
 
   /** Incoming damage: arc toward the source, screen flash, reticle flinch. */
@@ -564,7 +554,6 @@ export class UiSystem {
     this.arcs.spawn(dirX, dirZ, 0.45 + i * 0.55);
     this.health.onDamage(i);
     this.crosshair.onFlinch(0.5 + i);
-    this.sfx('player_hurt', 0.6 + i * 0.4);
   }
 
   setPrompt(
