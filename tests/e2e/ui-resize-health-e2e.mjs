@@ -13,10 +13,11 @@ import {
 const args = parseArgs();
 const port = Number(args.port ?? 5496);
 const server = await ensureViteServer({ port });
-const browser = await launchChromium({ headless: true, webgpu: false, args: ['--disable-gpu'] });
-const out = args.out ? resolve(String(args.out)) : null;
-if (out) await mkdir(out, { recursive: true });
+let browser;
 try {
+  browser = await launchChromium({ headless: true, webgpu: false, args: ['--disable-gpu'] });
+  const out = args.out ? resolve(String(args.out)) : null;
+  if (out) await mkdir(out, { recursive: true });
   const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
   const errors = [];
   page.on('pageerror', (error) => {
@@ -128,6 +129,9 @@ try {
     'ui-resize-health-e2e: passed (live width/height resize, layout, low-health compositor)'
   );
 } finally {
-  await browser.close();
-  stopViteServer(server);
+  try {
+    await browser?.close();
+  } finally {
+    stopViteServer(server);
+  }
 }

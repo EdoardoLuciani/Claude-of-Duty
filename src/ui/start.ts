@@ -34,7 +34,12 @@ export class StartGate {
       'padding:.8rem 2.5rem;border:1px solid #65b9ab;background:#13231f;color:#e2eee9;font:inherit;letter-spacing:.12em;cursor:pointer';
     this.button.onclick = () => this.requestControl();
     this.panel.oncancel = (event) => event.preventDefault();
-    this.panel.onkeydown = (event) => event.stopPropagation();
+    this.panel.onkeydown = (event) => {
+      event.stopPropagation();
+      // A held New Game key must not activate the newly focused Start button.
+      if (event.repeat && (event.code === 'Enter' || event.code === 'Space'))
+        event.preventDefault();
+    };
     this.panel.onkeyup = (event) => event.stopPropagation();
     this.panel.append(title, this.status, this.button);
     document.body.append(this.panel);
