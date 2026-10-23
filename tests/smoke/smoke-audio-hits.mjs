@@ -106,7 +106,7 @@ Object.assign(audio, {
   samples: bank,
   rng,
   ctx: { peek: () => player },
-  field: { distanceTo: () => 2 },
+  field: { distanceTo: () => 2, listenerPos: { x: 0, y: 1.6, z: 0 } },
 });
 audio._playDry = (...args) => calls.push(['dry', ...args]);
 audio._playAt = (...args) => calls.push(['spatial', ...args]);
@@ -151,6 +151,28 @@ audio._budget.impact = 0;
 calls.length = 0;
 audio._onImpact({ ...contact, actor: null, surface: 'concrete' });
 assert.equal(calls.length, 2, 'actorless nearby world impact is not mistaken for absent player');
+calls.length = 0;
+const segment = {
+  from: { x: -9, y: 1.35, z: 0 },
+  to: { x: -0.3, y: 1.35, z: 0 },
+  shooter: 'enemy',
+  shot: 473,
+};
+audio._onBulletSegment(segment);
+assert.equal(calls.length, 1, 'direct incoming flight still produces a whizz');
+assert.equal(calls[0][1], 'whizz');
+audio._onBulletSegment(segment);
+assert.equal(calls.length, 1, 'same shot does not produce another flight whizz');
+audio._onImpact({ ...contact, actor: player });
+audio._onDamageTaken({ amount: 25, armourAbsorbed: 0, plateBreak: false });
+assert.deepEqual(
+  calls.map((v) => v[1]),
+  ['whizz', 'damage'],
+  'flight and physical injury remain distinct intended layers'
+);
+calls.length = 0;
+audio._onBulletSegment({ ...segment, shooter: player, shot: 474 });
+assert.equal(calls.length, 0, 'own bullet does not whizz past own ears');
 calls.length = 0;
 audio._onDamageDealt({
   target: { id: 1 },

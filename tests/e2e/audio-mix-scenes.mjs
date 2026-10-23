@@ -62,6 +62,7 @@ export function mixCases() {
     });
   }
   add('damage-concussed', 'context', 'damage', { amount: 25, armourAbsorbed: 0, concussed: true });
+  add('damage-health-flight', 'threat', 'damage', { amount: 25, armourAbsorbed: 0, flight: true });
   for (const distance of [2, 10, 25]) add(`flesh-${distance}`, 'impact', 'flesh', { distance });
   add('near-impact', 'threat', 'near-impact');
   add('near-miss', 'threat', 'near-miss');
@@ -268,6 +269,15 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
         at(t, () => emit('player:heartbeat', { strength: s.strength }));
         break;
       case 'damage':
+        if (s.flight)
+          at(t, () =>
+            emit('bullet:segment', {
+              from: { x: -9, y: 1.35, z: 0 },
+              to: { x: -0.3, y: 1.35, z: 0 },
+              shooter: 'enemy',
+              shot: 473,
+            })
+          );
         if (s.concussed) at(t - 0.2, () => mixer.concuss(0.8));
         if (s.combat) {
           for (let i = 0; i < 20; i++) fire(t - 0.1 + i * 0.09, 'lmg');

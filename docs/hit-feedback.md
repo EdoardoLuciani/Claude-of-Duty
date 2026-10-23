@@ -23,7 +23,9 @@ tracked separately in #497; remaining #473/#474 work is not closed by this slice
   foley, distance, occlusion and room sends. Exits stay silent. Physics already
   deduplicates overlapping live actor regions; no extra audio shot cache is added.
 - Flesh contact does not invent an impact-position near-miss/whizz. The existing
-  canonical bullet-segment near-miss path remains responsible for flybys.
+  canonical bullet-segment path remains responsible for flight, including rounds
+  that actually hit the player. Direct incoming hits retain **whizz + contact**;
+  near misses retain **whizz without contact**. Whizz synthesis/gain is unchanged.
 - Audio owns damage-dealt confirmation ticks too. HUD hitmarkers, health/armour
   flashes, direction arcs and reticle flinch remain visual consumers. Removing
   their SFX calls fixes both duplicate incoming stings and duplicate hitmarker
@@ -81,9 +83,9 @@ and existing weapon assets are unchanged. Measurements are necessary evidence,
 **not a claim of perceptual approval**; listen to the captures before final
 acceptance, especially for wetness, plate character and masking in combat.
 
-The native mix suite includes actual damage events, mixed hits, armour-only
-breaks, sustained own LMG plus nearby enemy rifle fire, concussion, and spatial
-flesh at 2/10/25 m. It measures the post-bus UI feedback stem separately from the
+The native mix suite includes actual damage events, flight plus health contact,
+near misses, mixed hits, armour-only breaks, sustained own LMG plus nearby enemy
+rifle fire, concussion, and spatial flesh at 2/10/25 m. It measures the post-bus UI feedback stem separately from the
 gun-dominated final sum, tests readability/headroom and verifies that gunfire or
 concussion do not bury the incoming stem. This is more informative than checking
 only a limiter ceiling or normalizing isolated samples.
@@ -106,9 +108,16 @@ node tests/e2e/audio-hit-feedback-e2e.mjs --out=/tmp/hit-feedback-after
 ```
 
 The last command boots the actual WebGPU game, uses the real UI/audio graph,
-records the six controlled incoming-event cases as WebM and MP3, then tests a
-real physics bullet against an enemy and real health-controller armour-break,
-explosion-derived and lethal damage. The mixed-without-break event is a contract
+records six contact-only contract cases and four real incoming-trajectory cases
+as WebM and MP3, then tests a real physics bullet against an enemy and real
+health-controller armour-break, explosion-derived and lethal damage. The incoming
+health/armour/break cases must each contain exactly one flight whizz and one damage
+voice; the near miss must contain exactly one whizz and no damage voice.
+
+The first PR preview showed isolated contact events, without bullet-flight
+segments. The baseline impact handler added an incidental whizz anyway; that made
+it sound as though this change removed flight audio. Use the `incoming-*` captures
+for a complete-shot comparison; the contact-only clips isolate damage routing. The mixed-without-break event is a contract
 fixture, not a claim that every damage combination is naturally produced by the
 current health tuning. Health-controller fixtures derive plate exhaustion from
 `HEALTH` tuning, not an assumed absorption percentage.

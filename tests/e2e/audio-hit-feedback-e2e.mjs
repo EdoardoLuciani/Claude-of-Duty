@@ -58,22 +58,52 @@ try {
     const dest = audio.actx.createMediaStreamDestination();
     audio.mixer.masterGain.connect(dest);
     window.hitCaptureStream = dest.stream;
+    const { combatLane } = await import('/tools/lib/combat-fixture.js');
+    const ai = ctx.get('ai');
+    for (const agent of ai.agents) agent.dispose();
+    ai.agents.length = 0;
+    window.incomingLane = combatLane(ai, ctx.get('world'), ctx.get('physics'), [[9, 0]]).positions;
   });
-  for (const [id, amount, armourAbsorbed, plateBreak] of [
+  for (const [id, amount, armourAbsorbed, plateBreak, trajectory] of [
     ['health', 25, 0, false],
     ['armour', 0, 25, false],
     ['mixed', 15, 15, false],
     ['break-mixed', 15, 15, true],
     ['break-armour-only', 0, 25, true],
     ['empty', 0, 0, false],
+    ['incoming-health', 25, 0, false, 'hit'],
+    ['incoming-armour', 0, 25, false, 'hit'],
+    ['incoming-break', 0, 25, true, 'hit'],
+    ['incoming-near-miss', 0, 0, false, 'miss'],
   ]) {
     const row = await page.evaluate(
-      async ({ id, amount, armourAbsorbed, plateBreak, capture }) => {
+      async ({ id, amount, armourAbsorbed, plateBreak, trajectory, capture }) => {
         const engine = window.__ENGINE__,
           ctx = engine.ctx;
         const audio = ctx.get('audio'),
           player = ctx.get('player'),
           ui = ctx.get('ui');
+        let origin, aim, damage;
+        if (trajectory) {
+          const { HEALTH, STANCE } = await import('/src/player/tuning.ts');
+          const V3 = engine.camera.position.constructor;
+          const eye = window.incomingLane[0].clone().add(new V3(0, STANCE.stand.eye, 0));
+          origin = window.incomingLane[1].clone().add(new V3(0, STANCE.stand.eye, 0));
+          player.health.reset(true);
+          player.health.armour = armourAbsorbed ? (plateBreak ? armourAbsorbed : 100) : 0;
+          player.teleport(eye, engine.camera.rotation);
+          player._syncHitbox();
+          engine.camera.position.copy(eye);
+          engine.camera.lookAt(origin);
+          audio.update(0, ctx);
+          aim = eye.clone();
+          if (trajectory === 'miss') {
+            const right = eye.clone().sub(origin).normalize();
+            right.set(right.z, 0, -right.x).normalize();
+            aim.addScaledVector(right, 1.2);
+          } else aim.y -= 0.3;
+          damage = armourAbsorbed ? armourAbsorbed / (1 - HEALTH.armourReduction) : amount;
+        }
         const chunks = [];
         let recorder;
         if (capture) {
@@ -89,29 +119,46 @@ try {
           await new Promise((ready) => setTimeout(ready, 80));
         }
         window.hitTrace.length = 0;
-        player.health.value = 100 - amount;
-        player.health.armour = plateBreak ? 0 : 50;
-        const from = engine.camera.position.clone();
-        from.x += 5;
-        // Real collider contacts publish before incoming resolution. Only the
-        // damage event should sound, even though the player collider is flesh.
-        ctx.events.emit('bullet:impact', {
-          point: engine.camera.position,
-          surface: 'flesh',
-          damage: 30,
-          actor: player,
-          shooter: 'enemy',
-          exit: false,
-          shot: 900,
-        });
-        ctx.events.emit('damage:taken', {
-          amount,
-          armourAbsorbed,
-          plateBreak,
-          from,
-          health: player.health.value,
-          armour: player.health.armour,
-        });
+        if (trajectory) {
+          // Real free-flight -> collider -> damage publication, not a synthetic
+          // impact-only fixture. A direct hit must retain its flight whizz too.
+          const dir = aim.clone().sub(origin);
+          const distance = dir.length();
+          ctx.get('physics').fireBullet({
+            origin,
+            dir: dir.normalize(),
+            shooter: 'enemy',
+            damage,
+            penetration: 0,
+            maxDist: distance + 0.5,
+            maxRange: distance + 0.5,
+            dropoff: 1,
+            weapon: 'rifle',
+          });
+        } else {
+          player.health.value = 100 - amount;
+          player.health.armour = plateBreak ? 0 : 50;
+          const from = engine.camera.position.clone();
+          from.x += 5;
+          // Contact-only contract fixture, intentionally without bullet flight.
+          ctx.events.emit('bullet:impact', {
+            point: engine.camera.position,
+            surface: 'flesh',
+            damage: 30,
+            actor: player,
+            shooter: 'enemy',
+            exit: false,
+            shot: 900,
+          });
+          ctx.events.emit('damage:taken', {
+            amount,
+            armourAbsorbed,
+            plateBreak,
+            from,
+            health: player.health.value,
+            armour: player.health.armour,
+          });
+        }
         ui.lateUpdate(1 / 60, ctx);
         const trace = window.hitTrace.slice();
         const health = ui.state.health;
@@ -140,7 +187,7 @@ try {
           pcm,
         };
       },
-      { id, amount, armourAbsorbed, plateBreak, capture: !!out }
+      { id, amount, armourAbsorbed, plateBreak, trajectory, capture: !!out }
     );
     if (out) {
       const path = resolve(out, `${id}.webm`);
@@ -165,15 +212,30 @@ try {
     assert.equal(row.report.errors, 0, id + ': actual graph errors');
     assert.equal(row.health, 100 - amount, id + ': HUD retains health');
     if (!args.baseline) {
+      const feedback = row.trace.filter((v) => v.kind === 'damage');
       assert.equal(
-        row.trace.length,
+        feedback.length,
         amount || armourAbsorbed ? 1 : 0,
-        id + ': one audio-owned incoming voice'
+        id + ': one incoming contact'
       );
-      if (row.trace.length) {
-        assert.equal(row.trace[0].kind, 'damage');
-        assert.equal(row.trace[0].method, '_playDry');
-      }
+      if (feedback.length) assert.equal(feedback[0].method, '_playDry');
+      if (trajectory) {
+        assert.equal(
+          row.trace.filter((v) => v.kind === 'whizz').length,
+          1,
+          id + ': real incoming flight retains exactly one whizz'
+        );
+        assert.equal(
+          row.trace.length,
+          feedback.length + 1,
+          id + ': no phantom impact/confirmation layers'
+        );
+      } else
+        assert.equal(
+          row.trace.length,
+          feedback.length,
+          id + ': contact-only fixture has no flight'
+        );
     }
     results.push(row);
   }
@@ -287,7 +349,7 @@ try {
   results.push(...healthPaths);
   assert.deepEqual(errors, []);
   console.log(
-    `PASS: actual gameplay HUD/audio, six incoming cases, real health/explosion/death and enemy bullet contact${args.baseline ? ' (baseline recorded)' : ''}`
+    `PASS: actual gameplay HUD/audio, six contact cases, four real incoming trajectories, real health/explosion/death and enemy bullet contact${args.baseline ? ' (baseline recorded)' : ''}`
   );
 } finally {
   await browser?.close();
