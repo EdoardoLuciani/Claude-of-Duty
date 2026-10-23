@@ -227,30 +227,34 @@ try {
   if (out) await page.screenshot({ path: resolve(out, 'after-death-new-game.png') });
   await page.getByRole('button', { name: 'START', exact: true }).click();
   await page.waitForFunction(() => !window.__ENGINE__.gameplaySuspended);
-  // Holding the New Game key must not autorepeat into the newly focused Start button.
-  await page.evaluate(() => window.__ENGINE__.ctx.get('player').applyDamage(10000, null));
-  await page.getByRole('button', { name: 'NEW GAME', exact: true }).waitFor();
-  await page.keyboard.down('Enter');
-  await page.getByRole('button', { name: 'START', exact: true }).waitFor();
-  const heldRestart = await snapshot();
-  await page.evaluate(() => {
-    document.addEventListener(
-      'keydown',
-      (event) => {
-        window.__START_REPEAT__ = event.repeat;
-      },
-      { once: true, capture: true }
-    );
-  });
-  await page.keyboard.down('Enter'); // No keyup: Playwright emits an actual repeated keydown.
-  assert.equal(await page.evaluate(() => window.__START_REPEAT__), true);
-  await page.waitForTimeout(300);
-  assert.deepEqual(await snapshot(), heldRestart, 'Enter autorepeat cannot authorize Start');
-  assert.equal(await page.evaluate(() => window.__ENGINE__.gameplaySuspended), true);
-  await page.keyboard.up('Enter');
-  assert.equal(await page.evaluate(() => window.__ENGINE__.gameplaySuspended), true);
-  await page.keyboard.press('Enter'); // A released, fresh activation still starts normally.
-  await page.waitForFunction(() => !window.__ENGINE__.gameplaySuspended);
+  // Neither Enter key may autorepeat from New Game into the newly focused Start button.
+  for (const key of ['Enter', 'NumpadEnter']) {
+    await page.evaluate(() => window.__ENGINE__.ctx.get('player').applyDamage(10000, null));
+    const newGame = page.getByRole('button', { name: 'NEW GAME', exact: true });
+    await newGame.waitFor();
+    await newGame.focus(); // Keypad Enter activates the native button, not the global key handler.
+    await page.keyboard.down(key);
+    await page.getByRole('button', { name: 'START', exact: true }).waitFor();
+    const heldRestart = await snapshot();
+    await page.evaluate(() => {
+      document.addEventListener(
+        'keydown',
+        (event) => {
+          window.__START_REPEAT__ = event.repeat;
+        },
+        { once: true, capture: true }
+      );
+    });
+    await page.keyboard.down(key); // No keyup: Playwright emits an actual repeated keydown.
+    assert.equal(await page.evaluate(() => window.__START_REPEAT__), true);
+    await page.waitForTimeout(300);
+    assert.deepEqual(await snapshot(), heldRestart, `${key} autorepeat cannot authorize Start`);
+    assert.equal(await page.evaluate(() => window.__ENGINE__.gameplaySuspended), true);
+    await page.keyboard.up(key);
+    assert.equal(await page.evaluate(() => window.__ENGINE__.gameplaySuspended), true);
+    await page.keyboard.press(key); // A released, fresh activation still starts normally.
+    await page.waitForFunction(() => !window.__ENGINE__.gameplaySuspended);
+  }
   assert.equal(
     await page.evaluate(() => {
       const e = window.__ENGINE__;
@@ -279,7 +283,7 @@ try {
   await page.evaluate(() => window.__ENGINE__.dispose());
   assert.equal(await page.locator('#run-start').count(), 0);
   console.log(
-    'start-gate-e2e: ok (normal wait, transparent view, pending/denied/retry, input flush, active pose/render, resize, pause/shop, 3 held-lock restarts, real death/new-game wait, held-Enter repeat, terminal/dispose)'
+    'start-gate-e2e: ok (normal wait, transparent view, pending/denied/retry, input flush, active pose/render, resize, pause/shop, 3 held-lock restarts, real death/new-game wait, held Enter/keypad Enter repeat, terminal/dispose)'
   );
 } finally {
   await browser.close();

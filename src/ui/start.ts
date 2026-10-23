@@ -37,8 +37,7 @@ export class StartGate {
     this.panel.onkeydown = (event) => {
       event.stopPropagation();
       // A held New Game key must not activate the newly focused Start button.
-      if (event.repeat && (event.code === 'Enter' || event.code === 'Space'))
-        event.preventDefault();
+      if (event.repeat && (event.key === 'Enter' || event.key === ' ')) event.preventDefault();
     };
     this.panel.onkeyup = (event) => event.stopPropagation();
     this.panel.append(title, this.status, this.button);
