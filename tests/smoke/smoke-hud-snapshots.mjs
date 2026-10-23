@@ -122,4 +122,29 @@ function makeUi(systems = {}) {
   assert.equal(ui._regenCue, undefined, 'HUD does not start its own regen');
 }
 
+{
+  const ui = makeUi();
+  const scales = {};
+  ui.root = { style: { setProperty: (name, value) => (scales[name] = Number(value)) } };
+  ui.crosshair = { setScale: (k) => (scales.crosshair = k) };
+  ui.compass = { setScale: (k) => (scales.compass = k) };
+  ui.minimap = { resize: (k) => (scales.minimap = k) };
+  for (const [width, height, expected] of [
+    [1920, 1080, 1],
+    [800, 900, 800 / 1920],
+    [1280, 720, 2 / 3],
+    [2560, 1080, 1],
+    [640, 480, 1 / 3],
+    [1, 1, 0.25],
+    [7680, 4320, 2.4],
+  ]) {
+    ui.resize(width, height);
+    assert.equal(ui.vw, width);
+    assert.equal(ui.vh, height);
+    assert.equal(ui.k, expected);
+    assert(Math.abs(scales['--k'] - expected) < 0.0001);
+    for (const key of ['crosshair', 'compass', 'minimap']) assert.equal(scales[key], expected);
+  }
+}
+
 console.log('smoke-hud-snapshots: ok');

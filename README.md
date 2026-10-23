@@ -93,9 +93,11 @@ movement can interrupt actions; the pause reference lists exact conditions.
 
 Unlocked menus use native mouse, Tab/Shift+Tab and Enter/Space navigation; arrow,
 Home/End and PageUp/Down keys adjust sliders or scroll the focused reference.
-After death, restart is available after 2.85 seconds. Terminal errors require
-Reload. Quality changes restart the run; Defaults resets settings, not bindings.
-Gamepad sticks move/look; no buttons are bound. F7/F8 are telemetry-only.
+After death, New Game is available after 2.85 seconds. It resets the run and
+returns to the Start dialog; gameplay stays frozen until you select Start and
+mouse capture succeeds. Terminal errors require Reload. Quality changes restart
+the run; Defaults resets settings, not bindings. Gamepad sticks move/look; no
+buttons are bound. F7/F8 are telemetry-only.
 
 Survive escalating squads, earn credits and shop between waves. M4/P320 are the
 starting weapons; MCX, EVOLYS, MPX and AX338 are shop options. The day/night clock

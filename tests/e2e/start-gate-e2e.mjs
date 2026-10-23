@@ -77,6 +77,28 @@ try {
         pose: e.ctx.get('weapons').__TEST_POSES__ ?? 0,
       };
     });
+  for (const [width, height] of [
+    [800, 900],
+    [1600, 700],
+    [1280, 720],
+  ]) {
+    await page.setViewportSize({ width, height });
+    await page.waitForFunction(
+      ([w, h]) => {
+        const e = window.__ENGINE__,
+          ui = e.ctx.get('ui');
+        const aspect = w / h;
+        return (
+          ui.vw === w &&
+          ui.vh === h &&
+          Math.abs(e.camera.aspect - aspect) < 0.002 &&
+          Math.abs(e.viewCamera.aspect - aspect) < 0.002 &&
+          Math.abs(ui.k - Math.min(w / 1920, h / 1080)) < 0.0001
+        );
+      },
+      [width, height]
+    );
+  }
   const before = await snapshot();
   await page.keyboard.down('KeyW');
   await page.keyboard.press('Escape');
@@ -160,7 +182,7 @@ try {
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !window.__ENGINE__.ctx.get('market').open);
   assert.equal(await page.evaluate(() => window.__ENGINE__.ctx.get('ui').menu.open), false);
-  // Exercise the real New Game callback for three resets with an already-held lock.
+  // Exercise New Game with a retained lock: resetting must still await explicit Start.
   for (let cycle = 0; cycle < 3; cycle++) {
     await page.waitForFunction(() => document.pointerLockElement === window.__ENGINE__.canvas);
     await page.evaluate(() => {
@@ -177,12 +199,61 @@ try {
     // New Game's public keyboard consumer is the same synchronous path as its native button.
     await page.keyboard.press('Enter');
     await page.waitForFunction(() => window.__RESET_SUSPENDED__ === true);
+    const reset = await snapshot();
+    await page.waitForTimeout(300);
+    assert.deepEqual(await snapshot(), reset, 'reset run stays frozen until Start');
+    assert.equal(await page.evaluate(() => window.__ENGINE__.gameplaySuspended), true);
+    await page.getByRole('button', { name: 'START', exact: true }).focus();
+    await page.keyboard.press('Space'); // Keyboard remains usable even with the retained lock.
     await page.waitForFunction(() => !window.__ENGINE__.gameplaySuspended);
     assert.equal(
       await page.evaluate(() => document.pointerLockElement === window.__ENGINE__.canvas),
       true
     );
     assert.equal(await page.evaluate(() => window.__ENGINE__.ctx.get('player').dead), false);
+  }
+  // Real death releases the lock, presents New Game, then waits at Start.
+  await page.evaluate(() => window.__ENGINE__.ctx.get('player').applyDamage(10000, null));
+  await page.getByRole('button', { name: 'NEW GAME', exact: true }).click();
+  await page.getByRole('button', { name: 'START', exact: true }).waitFor();
+  assert.equal(
+    await page.locator('.ow-gameover').isVisible(),
+    false,
+    'clear the old summary synchronously'
+  );
+  const afterDeath = await snapshot();
+  await page.waitForTimeout(300);
+  assert.deepEqual(await snapshot(), afterDeath);
+  if (out) await page.screenshot({ path: resolve(out, 'after-death-new-game.png') });
+  await page.getByRole('button', { name: 'START', exact: true }).click();
+  await page.waitForFunction(() => !window.__ENGINE__.gameplaySuspended);
+  // Neither Enter key may autorepeat from New Game into the newly focused Start button.
+  for (const key of ['Enter', 'NumpadEnter']) {
+    await page.evaluate(() => window.__ENGINE__.ctx.get('player').applyDamage(10000, null));
+    const newGame = page.getByRole('button', { name: 'NEW GAME', exact: true });
+    await newGame.waitFor();
+    await newGame.focus(); // Keypad Enter activates the native button, not the global key handler.
+    await page.keyboard.down(key);
+    await page.getByRole('button', { name: 'START', exact: true }).waitFor();
+    const heldRestart = await snapshot();
+    await page.evaluate(() => {
+      document.addEventListener(
+        'keydown',
+        (event) => {
+          window.__START_REPEAT__ = event.repeat;
+        },
+        { once: true, capture: true }
+      );
+    });
+    await page.keyboard.down(key); // No keyup: Playwright emits an actual repeated keydown.
+    assert.equal(await page.evaluate(() => window.__START_REPEAT__), true);
+    await page.waitForTimeout(300);
+    assert.deepEqual(await snapshot(), heldRestart, `${key} autorepeat cannot authorize Start`);
+    assert.equal(await page.evaluate(() => window.__ENGINE__.gameplaySuspended), true);
+    await page.keyboard.up(key);
+    assert.equal(await page.evaluate(() => window.__ENGINE__.gameplaySuspended), true);
+    await page.keyboard.press(key); // A released, fresh activation still starts normally.
+    await page.waitForFunction(() => !window.__ENGINE__.gameplaySuspended);
   }
   assert.equal(
     await page.evaluate(() => {
@@ -197,9 +268,11 @@ try {
   );
   assert.deepEqual(errors, []);
   // A queued held-lock restart followed synchronously by terminal failure may not activate.
+  await page.waitForFunction(() => document.pointerLockElement === window.__ENGINE__.canvas);
   await page.evaluate(() => {
     const e = window.__ENGINE__;
     e.ctx.get('ui').startGate.restart();
+    document.querySelector('#run-start button').click(); // Queues activation while lock is held.
     e.fail('start-gate-test', 'validation', Error('intentional terminal failure'));
   });
   await page.waitForTimeout(200);
@@ -210,7 +283,7 @@ try {
   await page.evaluate(() => window.__ENGINE__.dispose());
   assert.equal(await page.locator('#run-start').count(), 0);
   console.log(
-    'start-gate-e2e: ok (normal wait, transparent view, pending/denied/retry, input flush, active pose/render, pause/shop, 3 held-lock restarts, terminal/dispose)'
+    'start-gate-e2e: ok (normal wait, transparent view, pending/denied/retry, input flush, active pose/render, resize, pause/shop, 3 held-lock restarts, real death/new-game wait, held Enter/keypad Enter repeat, terminal/dispose)'
   );
 } finally {
   await browser.close();

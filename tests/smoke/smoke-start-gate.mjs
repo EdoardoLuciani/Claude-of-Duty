@@ -101,14 +101,23 @@ assert.equal(f.engine.viewScene.visible, false, 'keep hidden until normal pose h
 assert.equal(f.gate.afterPose(), true);
 assert.equal(f.engine.viewScene.visible, true);
 f.order.length = 0;
-f.gate.restart(); // Already-held-lock New Game must not wait for a new change event.
+f.gate.restart(); // Even a retained lock cannot bypass the new run's Start dialog.
 assert.deepEqual(f.order.slice(0, 3), ['suspend:true', 'control:false', 'reset']);
 assert.equal(f.engine.gameplaySuspended, true);
+flush();
+assert.equal(f.engine.gameplaySuspended, true, 'New Game is not implicit Start intent');
+assert.equal(f.engine.input.enabled, false);
+assert.equal(f.gate.afterPose(), false);
+f.lock();
+flush();
+assert.equal(f.engine.gameplaySuspended, true, 'lock changes alone still cannot start a reset run');
+f.click(); // Already-held lock can activate after explicit intent, without another lock event.
 flush();
 assert.equal(f.engine.gameplaySuspended, false);
 f.gate.afterPose();
 // A lock lost between confirmation and the next frame cannot authorize a run.
 f.gate.restart();
+f.click();
 document.pointerLockElement = null;
 flush();
 assert.equal(f.engine.gameplaySuspended, true);

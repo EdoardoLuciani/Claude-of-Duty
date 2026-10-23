@@ -6,8 +6,8 @@ import { FONT_STACK, FONT_DISPLAY, FONT_MONO } from './util.ts';
  * Design system
  * -------------
  *  scale     every dimension is `calc(N * var(--k))` where --k is set from the
- *            viewport height (1080p == 1.0). The HUD therefore holds its
- *            proportions from 720p to 4K without re-authoring.
+ *            fitted 1920x1080 reference size. Both viewport axes constrain
+ *            this uniform scale, preserving proportions in narrow windows.
  *  spacing   4px grid: --u. Screen margins are 6u (24px @1080p), the same
  *            margin CoD uses (~2.2% of height).
  *  type      one condensed system stack, uppercase, tabular figures, three
@@ -142,21 +142,18 @@ const CSS = `
   position:absolute; inset:0;
   background:
     radial-gradient(ellipse 78% 74% at 50% 50%, rgba(0,0,0,0) 62%, rgba(122,14,10,.55) 86%, rgba(74,8,5,.85) 100%);
-  filter: url(#ow-warp);
 }
 .ow-blood-b {
-  position:absolute; inset:0; opacity:.5; mix-blend-mode:multiply;
+  position:absolute; inset:0; opacity:.5;
   background:
     radial-gradient(circle at 2% 22%,  rgba(96,10,8,.75) 0, rgba(96,10,8,0) 17%),
     radial-gradient(circle at 99% 58%, rgba(96,10,8,.7) 0, rgba(96,10,8,0) 15%),
     radial-gradient(circle at 26% 101%,rgba(88,10,8,.75) 0, rgba(88,10,8,0) 19%),
     radial-gradient(circle at 74% -2%, rgba(88,10,8,.7) 0, rgba(88,10,8,0) 18%);
-  filter: url(#ow-warp);
 }
-.ow-desat { position:absolute; inset:0; backdrop-filter: saturate(.6) contrast(1.04) brightness(.97); }
 .ow-hitflash { position:absolute; inset:0;
   background: radial-gradient(ellipse 90% 86% at 50% 50%, rgba(150,16,10,.22) 40%, rgba(160,18,12,.62) 100%);
-  mix-blend-mode:screen; }
+}
 .ow-lowbeat {
   position:absolute; inset:0;
   background: radial-gradient(ellipse 76% 70% at 50% 50%, rgba(0,0,0,0) 64%, rgba(150,14,10,.34) 100%);
@@ -1000,18 +997,6 @@ const CSS = `
 .ow-radio-row.empty .ow-radio-charge { color:rgba(255,110,110,.85); }
 `;
 
-const DEFS = `
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <defs>
-    <!-- organic edge for the blood vignette: banded turbulence displacing the
-         gradient so the hurt overlay never reads as a clean radial ramp -->
-    <filter id="ow-warp" x="-12%" y="-12%" width="124%" height="124%" color-interpolation-filters="sRGB">
-      <feTurbulence type="fractalNoise" baseFrequency="0.006 0.011" numOctaves="4" seed="17" result="n"/>
-      <feDisplacementMap in="SourceGraphic" in2="n" scale="34" xChannelSelector="R" yChannelSelector="G"/>
-    </filter>
-  </defs>
-</svg>`;
-
 let installed = false;
 
 export function installStyles() {
@@ -1020,15 +1005,10 @@ export function installStyles() {
   s.id = 'ow-ui-style';
   s.textContent = CSS;
   document.head.appendChild(s);
-  const d = document.createElement('div');
-  d.id = 'ow-ui-defs';
-  d.innerHTML = DEFS;
-  document.body.appendChild(d);
   installed = true;
 }
 
 export function removeStyles() {
   document.getElementById('ow-ui-style')?.remove();
-  document.getElementById('ow-ui-defs')?.remove();
   installed = false;
 }
