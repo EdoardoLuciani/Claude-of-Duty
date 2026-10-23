@@ -18,6 +18,7 @@ import { PauseMenu } from './menu.ts';
 import { Minimap } from './minimap.ts';
 import { Prompt, Banner } from './prompts.ts';
 import { RadioPanel } from './radio.ts';
+import { StartGate } from './start.ts';
 import { installStyles, removeStyles } from './style.ts';
 import { el, clamp, clamp01, damp, setStyle } from './util.ts';
 
@@ -165,6 +166,7 @@ export class UiSystem {
   prompt!: Prompt;
   banner!: Banner;
   menu!: PauseMenu;
+  startGate: StartGate | null = null;
   gameOver!: GameOverScreen;
   shop!: MarketOverlay;
   marketCountdown!: MarketCountdown;
@@ -222,8 +224,11 @@ export class UiSystem {
     this.banner = new Banner(this.chromeLayer);
     this.menu = new PauseMenu(this.root, ctx);
     this.gameOver = new GameOverScreen(this.root, ctx, () => {
-      ctx.events.emit('game:restart', { source: 'game-over' });
-      ctx.input?.requestPointerLock?.();
+      if (this.startGate) this.startGate.restart();
+      else {
+        ctx.events.emit('game:restart', { source: 'game-over' });
+        ctx.input?.requestPointerLock?.();
+      }
     });
     this.shop = new MarketOverlay(this.root, ctx);
     this.marketCountdown = new MarketCountdown(this.chromeLayer, ctx.get('market').delay);
@@ -607,11 +612,17 @@ export class UiSystem {
     this.hudTarget = v ? 1 : 0;
   }
 
+  installStartGate(): void {
+    this.startGate = new StartGate(this.ctx.engine);
+  }
+
   pause() {
+    if (this.ctx.engine.gameplaySuspended) return;
     this.menu.show();
   }
 
   resume() {
+    if (this.ctx.engine.gameplaySuspended) return;
     this.menu.close();
   }
 
@@ -669,6 +680,12 @@ export class UiSystem {
     const t = ctx.time;
     const rawDt = clamp(t.raw - this._lastRaw, 0, 0.1);
     this._lastRaw = t.raw;
+    // The native Start dialog exclusively owns waiting input/presentation.
+    // Resume happens between frames; reveal only after normal active pose hooks.
+    if (this.startGate && !this.startGate.afterPose()) {
+      this._hadPointerLock = false;
+      return;
+    }
     const s = this.state;
     s.time = t.elapsed;
 
@@ -894,6 +911,7 @@ export class UiSystem {
   }
 
   dispose(): void {
+    this.startGate?.dispose();
     for (const off of this._unsubs) off();
     this._unsubs.length = 0;
     this.crosshair.dispose();
