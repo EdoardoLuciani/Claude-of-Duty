@@ -903,7 +903,9 @@ export class UiSystem {
     void _ctx;
     this.vw = w;
     this.vh = h;
-    this.k = clamp(h / 1080, 0.62, 2.4);
+    // Fit the 16:9 reference in both axes; never stretch or retain a tall
+    // window's oversized chrome after narrowing it.
+    this.k = clamp(Math.min(w / 1920, h / 1080), 0.25, 2.4);
     this.root.style.setProperty('--k', this.k.toFixed(4));
     this.crosshair.setScale(this.k);
     this.compass.setScale(this.k);
