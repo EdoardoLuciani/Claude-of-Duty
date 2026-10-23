@@ -120,23 +120,13 @@ export class PauseMenu {
       this.ctx.config.invertY = false;
       this.setQuality('high');
     });
-    el(
-      'div',
-      'hint',
-      inner,
-      `${bindingLabel('pause').toUpperCase()} RESUME · SCROLL FOR ALL CONTROLS`
-    );
+    el('div', 'hint', inner, `${bindingLabel('pause').toUpperCase()} RESUME`);
 
     const reference = el('section', 'ow-controls', layout);
     reference.setAttribute('aria-label', 'Gameplay controls');
     reference.tabIndex = 0; // Keyboard users can scroll the reference without leaving the game.
     el('h2', null, reference, 'CONTROLS');
-    el(
-      'p',
-      'ow-controls-note',
-      reference,
-      'Keyboard & mouse · Scroll for the full reference. Hold and toggle actions are noted below.'
-    );
+    el('p', 'ow-controls-note', reference, 'Keyboard & mouse · Quick reference.');
     const groups = el('div', 'ow-controls-groups', reference);
     for (const section of CONTROL_SECTIONS) {
       const group = el('section', 'ow-controls-group', groups);
@@ -148,12 +138,6 @@ export class PauseMenu {
         el('dd', null, row, control.description);
       }
     }
-    el(
-      'p',
-      'ow-controls-note',
-      reference,
-      'Gamepad sticks: left moves, right looks. No gamepad button actions are bound.'
-    );
 
     this.open = false;
     this.shown = 0;

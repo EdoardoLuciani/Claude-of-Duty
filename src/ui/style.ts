@@ -619,7 +619,7 @@ const CSS = `
 .ow-menu-layout {
   display:grid; grid-template-columns: minmax(400px, calc(430px * var(--k))) minmax(0, 1fr);
   gap: max(28px, calc(40px * var(--k)));
-  width: min(calc(1520px * var(--k)), 100%);
+  width: min(max(1520px, calc(1520px * var(--k))), 100%);
   padding:24px; margin:auto; flex-shrink:0;
 }
 .ow-menu-inner {
@@ -707,17 +707,19 @@ const CSS = `
   text-transform:none; letter-spacing:.02em;
 }
 .ow-controls h2 { font-family:var(--fd); font-size:max(24px, calc(28px * var(--k))); letter-spacing:.16em; }
-.ow-controls-note { font-size:max(13px, calc(13px * var(--k))); line-height:1.5; color:#bdcbd3; margin-top:12px; }
-.ow-controls-groups { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:24px; margin:20px 0; }
+.ow-controls-note { font-size:max(14px, calc(14px * var(--k))); line-height:1.5; color:#bdcbd3; margin-top:12px; }
+.ow-controls-groups { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:20px 28px; margin:16px 0; }
 .ow-controls h3 { font-size:max(14px, calc(14px * var(--k))); color:var(--amber); margin-bottom:8px; }
 .ow-control {
-  display:grid; grid-template-columns:minmax(0, .4fr) minmax(0, 1fr); gap:12px;
-  padding:8px 0; border-top:1px solid var(--hair);
+  display:grid; grid-template-columns:minmax(0, .65fr) minmax(0, 1fr); gap:12px;
+  padding:6px 0; border-top:1px solid var(--hair-2);
   font-size:max(14px, calc(14px * var(--k))); line-height:1.4;
 }
 .ow-control dt { color:#f0f5f7; font-weight:800; }
 .ow-control dd { color:#bdcbd3; }
-@media (max-width:1400px) {
+.ow-control dt, .ow-control dd { overflow-wrap:anywhere; }
+
+@media (max-width:1200px) {
   .ow-controls-groups { grid-template-columns:minmax(0, 1fr); }
 }
 @media (max-width:1000px) {
