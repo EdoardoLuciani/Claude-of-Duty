@@ -263,6 +263,9 @@ lives in `tools/lib/fx-atlas.ts` and the offline texture exporter. Missing/inval
 atlases reject FX initialization. Recorded audio fetch/decode failures disable the
 audio graph rather than substituting synthesis. Physical hits and movement/body/
 equipment foley use required recordings; see [docs/physical-foley.md](docs/physical-foley.md).
+Bomber engines use required recorded loops in the existing tracked spatial pool.
+Radio owns each handle's moving pose/pass lifetime; audio owns its source/pool
+cleanup. See [docs/aircraft-audio.md](docs/aircraft-audio.md).
 Remaining synthesis includes authored distant/sniper reports, reinforcement,
 shell casings/dry fire, voices, ambience and intentional UI cues.
 

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
+import { AIRCRAFT_URLS } from '../../src/audio/aircraft.ts';
 import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
 import { FALL_BANK, FOLEY_MIX, IMPACT_BANK, STEP_BANK } from '../../src/audio/physical.ts';
@@ -223,7 +224,8 @@ try {
     decodes,
     49 +
       Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0) +
-      Object.values(RELOAD_URLS).reduce((n, urls) => n + urls.length, 0),
+      Object.values(RELOAD_URLS).reduce((n, urls) => n + urls.length, 0) +
+      AIRCRAFT_URLS.length,
     'all other required jobs settle before failure teardown'
   );
   missing.dispose();

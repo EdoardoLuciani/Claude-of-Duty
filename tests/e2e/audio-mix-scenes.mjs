@@ -84,6 +84,10 @@ export function mixCases() {
   add('damage-concussed', 'context', 'damage', { amount: 25, armourAbsorbed: 0, concussed: true });
   add('damage-health-flight', 'threat', 'damage', { amount: 25, armourAbsorbed: 0, flight: true });
   for (const distance of [2, 10, 25]) add(`flesh-${distance}`, 'impact', 'flesh', { distance });
+  for (const variant of [0, 1])
+    add(`aircraft-flyby-${variant}`, 'aircraft', 'aircraft', { variant });
+  add('aircraft-room', 'aircraft', 'aircraft', { variant: 0, space: 'room' });
+  add('aircraft-cancel-before-arrival', 'silence', 'aircraft', { cancelEarly: true });
   add('near-impact', 'threat', 'near-impact');
   add('near-miss', 'threat', 'near-miss');
   add('own-step-room', 'routine', 'own-step', {
@@ -158,6 +162,7 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
       explosionBuffer: load.explosionBuffer,
       heartbeatBuffer: load.heartbeatBuffer,
       hitBuffers: load.hitBuffers,
+      aircraftBuffers: load.aircraftBuffers,
       reloadBuffers: load.reloadBuffers,
     };
   }
@@ -289,6 +294,20 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
       case 'heartbeat':
         at(t, () => emit('player:heartbeat', { strength: s.strength }));
         break;
+      case 'aircraft': {
+        let voice;
+        samples.aircraftIndex = s.variant === 1 ? 0 : 1;
+        at(t, () => {
+          voice = audio.startAircraft({ x: -180, y: 55, z: 0 });
+        });
+        if (s.cancelEarly) at(t + 0.05, () => voice?.stop());
+        else {
+          for (let i = 1; i <= 450; i++)
+            at(t + i * 0.02, () => voice?.move({ x: -180 + i * 0.8, y: 55, z: 0 }));
+          at(t + 9, () => voice?.stop());
+        }
+        break;
+      }
       case 'material':
         at(t, () =>
           emit('bullet:impact', {
@@ -536,6 +555,7 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
   } finally {
     ambience?.dispose();
     radio?.stop();
+    audio._stopAircraft(true);
     field.dispose();
     mixer.dispose();
   }

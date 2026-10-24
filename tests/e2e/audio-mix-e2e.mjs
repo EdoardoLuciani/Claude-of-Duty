@@ -144,6 +144,7 @@ try {
       speech: [8, 6, 6],
       warning: [6, 3, 6],
       background: [24, 18, 18],
+      aircraft: [18, 12, 10],
       music: [15, 12, 10],
       impact: [6, 3, 3],
       distant: [12, 10, 10],

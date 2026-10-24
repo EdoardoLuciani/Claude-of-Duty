@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 
+import { AIRCRAFT_URLS } from '../../src/audio/aircraft.ts';
 import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
 import { RELOAD_URLS } from '../../src/audio/reloads.ts';
@@ -9,7 +10,8 @@ import { WEAPON_PROFILES } from '../../src/audio/weapons.ts';
 const total =
   50 +
   Object.values(FOLEY_URLS).reduce((sum, urls) => sum + urls.length, 0) +
-  Object.values(RELOAD_URLS).reduce((sum, urls) => sum + urls.length, 0);
+  Object.values(RELOAD_URLS).reduce((sum, urls) => sum + urls.length, 0) +
+  AIRCRAFT_URLS.length;
 const fetch = globalThis.fetch;
 try {
   for (const failure of [null, 'http', 'reload-http', 'decode']) {
@@ -49,6 +51,8 @@ try {
     assert.equal(bank.heartbeatBuffer, null);
     assert.deepEqual(bank.hitBuffers, {});
     assert.deepEqual(bank.hitIndices, {});
+    assert.deepEqual(bank.aircraftBuffers, []);
+    assert.equal(bank.aircraftIndex, -1);
     assert.deepEqual(bank.reloadBuffers, {});
     assert.deepEqual(bank.reloadIndices, {});
   }

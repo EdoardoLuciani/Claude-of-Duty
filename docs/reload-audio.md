@@ -63,7 +63,7 @@ not entire multi-take reels. Short rearward contacts fit the existing close beat
 without pitch-shifting, time-stretching or moving gameplay milestones.
 
 The sample bank preloads/caches these alongside the 173 firearm/hit/physical-foley
-recordings (236 total). Every fetch/decode settles before startup failure teardown.
+and two aircraft recordings (238 total). Every fetch/decode settles before startup failure teardown.
 Missing recordings reject startup; an unsupported weapon/phase combination produces an
 explicit diagnostic, not a generic or synthetic substitute. Disposal clears the
 buffers and selection state. Playback has no asset I/O, avoids immediately
@@ -119,7 +119,7 @@ does not alter separate restrictions on legacy firearm samples.
   committed shell insertion, casing counts/times, delivery hashes/headers, stereo
   loss, bounded memory, variants, pump transient offsets and positioned routing.
   Missing/unknown cues must fail explicitly, never use synthesis.
-- Existing startup/contact tests account for all 236 required recordings and
+- Existing startup/contact tests account for all 238 required recordings and
   retain all-settled failure/disposal coverage. The native mix fixture now caches
   the loaded reload bank alongside its other recordings; omitting it caused a
   legitimate required-recording error, not a reason to restore synthesis. No tests
