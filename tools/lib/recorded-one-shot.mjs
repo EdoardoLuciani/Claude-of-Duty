@@ -15,8 +15,9 @@ export function ffmpeg(args, input) {
 }
 export function prepareOneShot(
   path,
-  { start, duration, rmsDb = -22, highpass = 90, lowpass = 10000 }
+  { start, duration, rmsDb = -22, highpass = 90, lowpass = 10000, fadeIn = 0.005, fadeOut = 0.025 }
 ) {
+  assert(start >= 0 && duration > fadeIn + fadeOut && fadeIn >= 0 && fadeOut >= 0);
   const info = JSON.parse(
     spawnSync('ffprobe', ['-v', 'error', '-show_streams', '-of', 'json', path]).stdout
   );
@@ -41,7 +42,7 @@ export function prepareOneShot(
   }
   const downmixLossDb = 10 * Math.log10(mono / stereo);
   assert(downmixLossDb > -6);
-  const filter = `${channels === 2 ? 'pan=mono|c0=0.5*c0+0.5*c1,' : ''}highpass=f=${highpass},lowpass=f=${lowpass},afade=t=in:d=0.005,afade=t=out:st=${duration - 0.025}:d=0.025`;
+  const filter = `${channels === 2 ? 'pan=mono|c0=0.5*c0+0.5*c1,' : ''}highpass=f=${highpass},lowpass=f=${lowpass},afade=t=in:d=${fadeIn},afade=t=out:st=${duration - fadeOut}:d=${fadeOut}`;
   const pcm = ffmpeg(
     [
       '-f',
