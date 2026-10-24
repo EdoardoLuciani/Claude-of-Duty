@@ -189,6 +189,9 @@ Prepass layer 1 contains opaque meshes/lights, not sky/transparent FX. Schedule 
 exactly once before world rendering at every quality, even without AO.
 `afterDepth` draws haze against current-frame depth; soft particles borrow it.
 Mesh opt-outs: `userData.owNoPrepass = true`, native `castShadow = false`.
+Pickup instances retain stable slots. Birth/reuse history is validated only by the
+live world camera's layer-1 prepass callback; preserve that camera/layer contract
+or update the pickup owner and rendered motion-transition tests together.
 Refresh CSM frustums when the unjittered projection changes. Bias depends on slope/
 cascade texels. Fog borrows native cascade depth/matrices, adding no shadow draw.
 Hoist noise outside the fog march; its uniform uses application frames, not native
@@ -256,10 +259,13 @@ parts or drop pools. Native metres, sockets, grips and provisional 89 mm travel
 remain asset-owned; damage, 6+1 accounting and per-shell interruption remain in
 the common weapon system.
 Preserve shared IK, ADS/sway/recoil and pooled casings. Source/regen/reference
-contracts live beside each asset. Weapons force physical materials; arms select
-standard/physical from their source. Preserve authored maps/specular factors and
-borrowed texture ownership. Native copy, clone/cache-safe soldier output and
-render-owned environment re-registration contracts are documented in
+contracts live beside each asset. Weapons force physical materials and borrow
+source maps. Arms consolidate authored Physical finishes into one opaque material
+per independent skeleton, accepting single and grouped indexed surfaces. Preserve
+UV0 AO, UV1 detail, weights, mirrored binding, specular factors and sleeve-only blood.
+The arm asset owns packed texture arrays and releases source images after packing.
+Native copy, clone/cache-safe soldier output and render-owned environment
+re-registration contracts are documented in
 [docs/material-calibration.md](docs/material-calibration.md).
 
 FX particle/decal PNGs are required runtime assets; generation
@@ -272,8 +278,14 @@ Radio owns each handle's moving pose/pass lifetime; audio owns its source/pool
 cleanup. See [docs/aircraft-audio.md](docs/aircraft-audio.md).
 Nonverbal hurt/death efforts use required identity-grouped recordings; see
 [docs/vocal-reactions.md](docs/vocal-reactions.md). Spoken tactical callouts remain
-separate in #497. Remaining synthesis includes authored distant/sniper reports,
-reinforcement, shell casings/dry fire, tactical speech, ambience and intentional UI cues.
+separate in #497.
+Sparse environmental one-shots use required recordings; see
+[docs/environment-audio.md](docs/environment-audio.md). Unsupported ambient human
+shouts/random tactical chatter are retired rather than inventing phantom actors.
+Radio switch/receive textures use required recordings composed with unchanged
+functional electronic tones; see [docs/radio-audio.md](docs/radio-audio.md).
+Remaining synthesis includes authored distant/sniper reports, reinforcement,
+shell casings/dry fire, tactical speech and intentional UI cues.
 
 `models.getSoldier(name)` returns `{ name, geometry, slots, boneNames, weapon,
 stats, variant }`. Merge GLTF primitives into one skinned geometry with slot

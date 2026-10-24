@@ -22,11 +22,12 @@
 import type { ReloadPhase } from '../core/events.ts';
 import { Rng } from '../core/rng.ts';
 import { AIRCRAFT_MIX } from './aircraft.ts';
-import { ambientOneShot, ONE_SHOTS } from './ambience.ts';
+import { ONE_SHOTS } from './ambience.ts';
 import { NoiseBank } from './dsp.ts';
 import { shellCasing, explosion, uiSound, heartbeat } from './foley.ts';
 import { IR_SPECS, generateIR, classifySpace } from './ir.ts';
 import { Mixer } from './mixer.ts';
+import { radioCue } from './radio.ts';
 import { RELOAD_CUES, reloadKind, type ReloadKind } from './reloads.ts';
 import { WeaponSampleBank } from './samples.ts';
 import { bark, BARKS } from './vox.ts';
@@ -390,8 +391,8 @@ async function runCases(loadedSamples: WeaponSampleBank, opts: { verbose?: boole
 
   /* ---- ambient one-shots ---------------------------------------- */
   for (const k of ONE_SHOTS) {
-    await push(`ambient:${k}`, 14, ({ bank, rng, mixer, t }) => {
-      route(mixer, ambientOneShot(mixer.actx, bank, rng, k, { when: t }), 'ambience');
+    await push(`ambient:${k}`, 14, ({ samples, rng, mixer, t }) => {
+      route(mixer, samples.environment(k, rng, { when: t }), 'ambience');
     });
   }
 
@@ -464,6 +465,22 @@ async function runCases(loadedSamples: WeaponSampleBank, opts: { verbose?: boole
     source.start(t);
     route(mixer, { node: source, send: AIRCRAFT_MIX.send }, 'ambience');
   });
+
+  // Append new cues without changing existing isolated-case seeds.
+  for (const kind of ['radio_open', 'radio_strike', 'intel_call'] as const) {
+    await push(
+      `radio:${kind}`,
+      2,
+      ({ samples, bank, rng, mixer, t }) => {
+        route(
+          mixer,
+          radioCue(mixer.actx, bank, rng, kind, samples.radio(kind, rng, { when: t }), t),
+          'ui'
+        );
+      },
+      { reverb: false }
+    );
+  }
 
   /* ---- space classifier (pure function, no audio) ---------------- */
   const spaces: Record<string, ReturnType<typeof classifySpace>> = {};
