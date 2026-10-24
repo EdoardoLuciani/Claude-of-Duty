@@ -428,9 +428,9 @@ assert.ok(live.canStand(w5.from) && entry.probeGround(), 'W5 starts supported an
 map.physics.removeCharacter(entry);
 assert.equal(
   map.meta.navigation.sha256,
-  // Reviewed small-clutter castShadow policy refreshes only source provenance.
+  // Reviewed shadow policy and render-only tyre geometry refresh provenance.
   // The physical payload assertion below also guards the preceding bake.
-  'db5489826f51f1af4d7066f0c18ba8bf581690c8354736589aca4ad8e3e2a104',
+  'cee02f72b2e98c154a772a9c07d24823e5a07f5ca57aabe0cf6d068f1bd605a2',
   're-measure recorded fixture outcomes after changing baked assets'
 );
 const physicalPayload = map.surfaceRaw.subarray(64 + map.surfaceRaw.readUInt32LE(8));
