@@ -102,8 +102,8 @@ try {
     });
   });
   for (const engineOnly of [true, false]) {
-    const options = { engineOnly, capture: !!out };
-    const row = await page.evaluate(async ({ engineOnly, capture }) => {
+    const options = { engineOnly, capture: !!out, baseline: !!args.baseline };
+    const row = await page.evaluate(async ({ engineOnly, capture, baseline }) => {
       const engine = window.__ENGINE__,
         ctx = engine.ctx,
         radio = ctx.get('radio'),
@@ -137,23 +137,51 @@ try {
       engine._last = performance.now();
       const started = performance.now();
       let pause = false,
-        resumed = false;
+        resumed = false,
+        pauseTravel,
+        pausePose;
       if (!radio.callStrike()) throw Error('Strike rejected');
+      const strike = radio.active[0],
+        voice = strike.engine,
+        source = voice?.source;
+      if (engineOnly && !baseline && !voice) throw Error('No aircraft voice for pause checks');
       try {
         while (performance.now() - started < 18000) {
           const now = await new Promise((ready) => requestAnimationFrame(ready));
           const elapsed = (performance.now() - started) / 1000;
           if (engineOnly && elapsed >= 3 && !pause) {
             pause = true;
+            pauseTravel = strike.travel;
+            pausePose = strike.plane.position.clone();
+            if (!baseline) report.beforePauseGain = voice.node.gain.value;
             engine.time.scale = 0;
             ctx.events.emit('ui:pause', { paused: true });
           }
           if (engineOnly && elapsed >= 3.5 && !resumed) {
             resumed = true;
+            if (!baseline)
+              report.paused = {
+                gain: voice.node.gain.value,
+                travel: strike.travel,
+                sameHandle: strike.engine === voice,
+                sameSource: voice.source === source,
+              };
             engine.time.scale = 1;
             ctx.events.emit('ui:pause', { paused: false });
           }
           engine.step(now);
+          if (engineOnly && pause && !resumed) {
+            if (strike.travel !== pauseTravel || !strike.plane.position.equals(pausePose))
+              throw Error('Aircraft moved while simulation was paused');
+            report.pausedFrames = (report.pausedFrames ?? 0) + 1;
+          }
+          if (engineOnly && !baseline && resumed && elapsed >= 3.75 && !report.resumed)
+            report.resumed = {
+              gain: voice.node.gain.value,
+              travel: strike.travel,
+              sameHandle: strike.engine === voice,
+              sameSource: voice.source === source,
+            };
           report.frames++;
           if (engine.error) throw Error(JSON.stringify(engine.error));
         }
@@ -172,6 +200,7 @@ try {
         }
         return {
           ...report,
+          pauseTravel,
           recording,
           engineError: engine.error ?? null,
           audio: audio.report(),
@@ -207,7 +236,24 @@ try {
     assert.equal(row.engineError, null);
     assert.equal(row.audio.errors, 0);
     assert.equal(row.explosions === 0, engineOnly, 'isolated/full-strike fixtures are distinct');
+    if (engineOnly) assert(row.pausedFrames > 0, 'sampled frozen plane during pause');
     if (!args.baseline) {
+      if (engineOnly) {
+        assert(Math.abs(row.beforePauseGain - 1) < 1e-6, 'source gain settled before pause');
+        assert(Math.abs(row.paused.gain) < 1e-6, 'source gain settles to silence during pause');
+        assert(Math.abs(row.resumed.gain - 1) < 1e-6, 'source gain recovers after resume');
+        assert.equal(row.paused.travel, row.pauseTravel, 'travel remains exactly frozen');
+        assert(row.resumed.travel > row.paused.travel, 'travel advances after resume');
+        assert.equal(row.paused.sameHandle && row.resumed.sameHandle, true);
+        assert.equal(row.paused.sameSource && row.resumed.sameSource, true);
+        console.log('Aircraft pause evidence:', {
+          beforeGain: row.beforePauseGain,
+          pauseTravel: row.pauseTravel,
+          pausedFrames: row.pausedFrames,
+          paused: row.paused,
+          resumed: row.resumed,
+        });
+      }
       assert.equal(row.starts, 1, 'one loop per aircraft pass');
       assert.equal(row.heliCalls, 0);
       assert.equal(row.stops, 1, 'one natural engine stop, independent of late bombs');

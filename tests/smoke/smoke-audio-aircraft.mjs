@@ -153,14 +153,57 @@ assert.equal(acquisitions.at(-1).gain, AIRCRAFT_MIX.gain);
 voice.move({ x: 30, y: 55, z: 10 });
 assert.deepEqual(voice.emitter.pos, { x: 30, y: 55, z: 10 });
 assert.equal(voice.emitter.smooth, AIRCRAFT_MIX.positionSmooth);
+const beforePause = voice.node.gain.events.length;
 voice.move({ x: 30, y: 55, z: 10 }, true);
 assert(voice.paused);
+assert.deepEqual(
+  voice.node.gain.events.slice(beforePause),
+  [
+    ['cancel', actx.currentTime],
+    ['set', 0, actx.currentTime],
+    ['ramp', 0, actx.currentTime + AIRCRAFT_MIX.pauseFade],
+  ],
+  'pause schedules a new fade to silence'
+);
+const beforeResume = voice.node.gain.events.length;
+voice.setPaused(true);
+assert.equal(voice.node.gain.events.length, beforeResume, 'repeated pause does not reschedule');
 voice.move({ x: 30, y: 55, z: 10 }, false);
 assert(!voice.paused);
-assert(
-  voice.node.gain.events.at(-1)[2] >= voice.startTime,
-  'resuming cannot finish attack before scheduled arrival'
+assert.deepEqual(
+  voice.node.gain.events.slice(beforeResume),
+  [
+    ['cancel', actx.currentTime],
+    ['set', 0, actx.currentTime],
+    ['set', 0, voice.startTime],
+    ['ramp', 1, voice.startTime + AIRCRAFT_MIX.pauseFade],
+  ],
+  'early resume schedules a new attack no earlier than source arrival'
 );
+const afterResume = voice.node.gain.events.length;
+voice.setPaused(false);
+assert.equal(voice.node.gain.events.length, afterResume, 'repeated resume does not reschedule');
+actx.currentTime = voice.startTime + 1;
+voice.node.gain.value = 1; // Stub the settled native gain after arrival.
+voice.setPaused(true);
+assert.deepEqual(voice.node.gain.events.slice(afterResume), [
+  ['cancel', actx.currentTime],
+  ['set', 1, actx.currentTime],
+  ['ramp', 0, actx.currentTime + AIRCRAFT_MIX.pauseFade],
+]);
+const lateResume = voice.node.gain.events.length;
+voice.node.gain.value = 0;
+voice.setPaused(false);
+assert.deepEqual(
+  voice.node.gain.events.slice(lateResume),
+  [
+    ['cancel', actx.currentTime],
+    ['set', 0, actx.currentTime],
+    ['ramp', 1, actx.currentTime + AIRCRAFT_MIX.pauseFade],
+  ],
+  'resume after arrival fades from current time'
+);
+assert.equal(voice.source.starts.length, 1, 'pause/resume never restarts the source');
 voice.stop();
 voice.stop();
 assert.equal(voice.source.stops.length, 1, 'idempotent fade stop');
