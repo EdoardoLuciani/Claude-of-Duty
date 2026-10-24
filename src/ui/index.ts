@@ -18,6 +18,7 @@ import { PauseMenu } from './menu.ts';
 import { Minimap } from './minimap.ts';
 import { Prompt, Banner } from './prompts.ts';
 import { RadioPanel } from './radio.ts';
+import { StartGate } from './start.ts';
 import { installStyles, removeStyles } from './style.ts';
 import { el, clamp, clamp01, damp, setStyle } from './util.ts';
 
@@ -51,7 +52,7 @@ const HEAL_KEY = bindingLabel('heal');
  *   ui.debugState('combat'|'menu'|'clean'|'market')
  *
  * ---------------------------------------------------------------------------
- * WHAT THIS SUBSYSTEM READS FROM OTHERS (all optional, all duck-typed)
+ * WHAT THIS SUBSYSTEM READS FROM OTHERS (optional providers, complete snapshots)
  * ---------------------------------------------------------------------------
  *   weapons.getHudState() -> { name, mode, ammo, reserve, magSize, reloading,
  *                              reloadProgress, ads, spread, lethalCount }
@@ -64,7 +65,7 @@ const HEAL_KEY = bindingLabel('heal');
  * Events consumed: weapon:fire, weapon:reload, damage:dealt, damage:taken,
  * player:state, score:change, wave:start, wave:complete, explosion, hud:heard,
  * hud:search, intel:secured, intel:available, resize.
- * Events emitted:  ui:pause, ui:sensitivity, ui:fov, ui:setting.
+ * Events emitted:  ui:pause.
  */
 interface HudState {
   health: number;
@@ -165,10 +166,14 @@ export class UiSystem {
   prompt!: Prompt;
   banner!: Banner;
   menu!: PauseMenu;
+  startGate: StartGate | null = null;
   gameOver!: GameOverScreen;
   shop!: MarketOverlay;
   marketCountdown!: MarketCountdown;
   radio!: RadioPanel;
+  fps!: HTMLElement;
+  _fpsSince: number | null = null;
+  _fpsFrames = 0;
   state!: HudState;
   k!: number;
   vw!: number;
@@ -222,12 +227,16 @@ export class UiSystem {
     this.banner = new Banner(this.chromeLayer);
     this.menu = new PauseMenu(this.root, ctx);
     this.gameOver = new GameOverScreen(this.root, ctx, () => {
-      ctx.events.emit('game:restart', { source: 'game-over' });
-      ctx.input?.requestPointerLock?.();
+      if (this.startGate) this.startGate.restart();
+      else {
+        ctx.events.emit('game:restart', { source: 'game-over' });
+        ctx.input?.requestPointerLock?.();
+      }
     });
     this.shop = new MarketOverlay(this.root, ctx);
     this.marketCountdown = new MarketCountdown(this.chromeLayer, ctx.get('market').delay);
     this.radio = new RadioPanel(this.chromeLayer, ctx);
+    this.fps = el('div', 'ow-fps', this.chromeLayer, '— FPS');
 
     /** Single source of truth for everything the HUD draws. */
     this.state = {
@@ -350,11 +359,10 @@ export class UiSystem {
         dx = this._tmp.x;
         dz = this._tmp.z;
       }
-      // Armour absorbs first: a plate strike clinks instead of alarming.
+      // HUD only: audio owns all health/armour sound layers from this event.
       const absorbed = e?.armourAbsorbed ?? 0;
       if (absorbed > 0) {
         this.health.onArmour(absorbed, e?.plateBreak);
-        this.sfx(e?.plateBreak ? 'armour_break' : 'armour_hit', e?.plateBreak ? 1.6 : 1.05);
       }
       if (amount > 0) this.hurt(amount, dx, dz);
     });
@@ -497,8 +505,7 @@ export class UiSystem {
   _weaponState() {
     const w = this.ctx.peek('weapons');
     if (!w || typeof w.getHudState !== 'function') return null;
-    const s = w.getHudState();
-    return s && typeof s === 'object' ? s : null;
+    return w.getHudState() ?? null;
   }
 
   /** True when a `damage:dealt` payload is aimed at the local player. */
@@ -514,8 +521,7 @@ export class UiSystem {
   _playerState() {
     const p = this.ctx.peek('player');
     if (!p || typeof p.getHudState !== 'function') return null;
-    const s = p.getHudState();
-    return s && typeof s === 'object' ? s : null;
+    return p.getHudState() ?? null;
   }
 
   _playerPos() {
@@ -539,18 +545,9 @@ export class UiSystem {
   /* ---------------------------------------------------------------- api --- */
 
   hitmarker(kind: 'hit' | 'armour' | 'head' | 'kill' = 'hit'): void {
+    // Audio consumes damage:dealt once; this adapter owns only HUD feedback.
     this.hit.spawn(kind);
     this.crosshair.onHit();
-    this.sfx(
-      kind === 'kill'
-        ? 'hit_kill'
-        : kind === 'head'
-          ? 'hit_head'
-          : kind === 'armour'
-            ? 'hit_armour'
-            : 'hit_flesh',
-      kind === 'kill' ? 1 : 0.7
-    );
   }
 
   /** Incoming damage: arc toward the source, screen flash, reticle flinch. */
@@ -559,7 +556,6 @@ export class UiSystem {
     this.arcs.spawn(dirX, dirZ, 0.45 + i * 0.55);
     this.health.onDamage(i);
     this.crosshair.onFlinch(0.5 + i);
-    this.sfx('player_hurt', 0.6 + i * 0.4);
   }
 
   setPrompt(
@@ -607,11 +603,17 @@ export class UiSystem {
     this.hudTarget = v ? 1 : 0;
   }
 
+  installStartGate(): void {
+    this.startGate = new StartGate(this.ctx.engine);
+  }
+
   pause() {
+    if (this.ctx.engine.gameplaySuspended) return;
     this.menu.show();
   }
 
   resume() {
+    if (this.ctx.engine.gameplaySuspended) return;
     this.menu.close();
   }
 
@@ -665,10 +667,31 @@ export class UiSystem {
 
   /* -------------------------------------------------------------- frame --- */
 
+  _updateFps(now = performance.now()): void {
+    if (this._fpsSince === null) {
+      this._fpsSince = now;
+      return;
+    }
+    this._fpsFrames++;
+    const elapsed = now - this._fpsSince;
+    if (elapsed < 500) return;
+    this.fps.textContent = `${Math.round((this._fpsFrames * 1000) / elapsed)} FPS`;
+    this._fpsSince = now;
+    this._fpsFrames = 0;
+  }
+
   lateUpdate(dt: number, ctx: UiContext): void {
+    // Wall time, not scaled/clamped gameplay time: accurate through pause and hitches.
+    this._updateFps();
     const t = ctx.time;
     const rawDt = clamp(t.raw - this._lastRaw, 0, 0.1);
     this._lastRaw = t.raw;
+    // The native Start dialog exclusively owns waiting input/presentation.
+    // Resume happens between frames; reveal only after normal active pose hooks.
+    if (this.startGate && !this.startGate.afterPose()) {
+      this._hadPointerLock = false;
+      return;
+    }
     const s = this.state;
     s.time = t.elapsed;
 
@@ -700,51 +723,51 @@ export class UiSystem {
     if (ws) {
       if (ws.name) s.weaponName = ws.name;
       if (ws.mode) s.fireMode = ws.mode;
-      if (ws.ammo !== undefined) s.ammo = ws.ammo;
-      if (ws.reserve !== undefined) s.reserve = ws.reserve;
-      if (ws.magSize !== undefined) s.magSize = ws.magSize;
-      if (ws.reloading !== undefined) s.reloading = !!ws.reloading;
-      if (ws.reloadProgress !== undefined) s.reloadProgress = ws.reloadProgress;
-      if (ws.ads !== undefined) s.ads = !!ws.ads;
-      if (ws.spread !== undefined) s.baseSpread = 4 + ws.spread * 40;
-      if (ws.lethalCount !== undefined) s.lethalCount = ws.lethalCount;
-      if (ws.cooking !== undefined) s.cooking = !!ws.cooking;
-      if (ws.grenadeEquipped !== undefined) s.grenadeEquipped = !!ws.grenadeEquipped;
-      if (ws.radioEquipped !== undefined) s.radioEquipped = !!ws.radioEquipped;
-      if (ws.carpetCount !== undefined) s.carpetCount = ws.carpetCount;
+      s.ammo = ws.ammo;
+      s.reserve = ws.reserve;
+      s.magSize = ws.magSize;
+      s.reloading = ws.reloading;
+      s.reloadProgress = ws.reloadProgress;
+      s.ads = ws.ads;
+      s.baseSpread = 4 + ws.spread * 40;
+      s.lethalCount = ws.lethalCount;
+      s.cooking = ws.cooking;
+      s.grenadeEquipped = ws.grenadeEquipped;
+      s.radioEquipped = ws.radioEquipped;
+      s.carpetCount = ws.carpetCount;
     }
 
     const gameState = s.simulate ? null : ctx.peek('game')?.getHudState?.();
     if (gameState) {
-      s.score = gameState.score ?? s.score;
-      s.wave = gameState.wave ?? s.wave;
-      s.enemiesRemaining = gameState.enemiesRemaining ?? s.enemiesRemaining;
-      s.waveTotal = gameState.waveTotal ?? s.waveTotal;
-      s.waveIncoming = gameState.waveIncoming ?? s.waveIncoming;
-      s.nextWaveIn = gameState.nextWaveIn ?? s.nextWaveIn;
+      s.score = gameState.score;
+      s.wave = gameState.wave;
+      s.enemiesRemaining = gameState.enemiesRemaining;
+      s.waveTotal = gameState.waveTotal;
+      s.waveIncoming = gameState.waveIncoming;
+      s.nextWaveIn = gameState.nextWaveIn;
     }
 
     const marketState = s.simulate ? null : ctx.peek('market')?.getHudState?.();
     if (marketState) {
-      s.credits = marketState.credits ?? s.credits;
-      s.marketIn = marketState.marketIn ?? s.marketIn;
+      s.credits = marketState.credits;
+      s.marketIn = marketState.marketIn;
     }
 
     const ps = s.simulate ? null : this._playerState();
     if (ps) {
-      if (ps.health !== undefined) s.health = ps.health;
-      if (ps.maxHealth !== undefined) s.maxHealth = ps.maxHealth;
-      if (ps.armour !== undefined) s.armour = ps.armour;
-      if (ps.bandages !== undefined) s.bandages = ps.bandages;
-      if (ps.healing !== undefined) s.healing = !!ps.healing;
-      if (ps.healProgress !== undefined) s.healProgress = ps.healProgress;
-      if (ps.hurt !== undefined) s.hurt = ps.hurt;
-      if (ps.pulse !== undefined) s.pulse = ps.pulse;
-      if (ps.move !== undefined) s.move = ps.move;
-      if (ps.sprint !== undefined) s.sprint = !!ps.sprint;
-      if (ps.crouch !== undefined) s.crouch = !!ps.crouch;
-      if (ps.ads !== undefined) s.ads = !!ps.ads;
-      if (ps.airborne !== undefined) s.airborne = !!ps.airborne;
+      s.health = ps.health;
+      s.maxHealth = ps.maxHealth;
+      s.armour = ps.armour;
+      s.bandages = ps.bandages;
+      s.healing = ps.healing;
+      s.healProgress = ps.healProgress;
+      s.hurt = ps.hurt;
+      s.pulse = ps.pulse;
+      s.move = ps.move;
+      s.sprint = ps.sprint;
+      s.crouch = ps.crouch;
+      s.ads = ps.ads;
+      s.airborne = ps.airborne;
     }
 
     const pos = this._playerPos();
@@ -886,7 +909,9 @@ export class UiSystem {
     void _ctx;
     this.vw = w;
     this.vh = h;
-    this.k = clamp(h / 1080, 0.62, 2.4);
+    // Fit the 16:9 reference in both axes; never stretch or retain a tall
+    // window's oversized chrome after narrowing it.
+    this.k = clamp(Math.min(w / 1920, h / 1080), 0.25, 2.4);
     this.root.style.setProperty('--k', this.k.toFixed(4));
     this.crosshair.setScale(this.k);
     this.compass.setScale(this.k);
@@ -894,6 +919,7 @@ export class UiSystem {
   }
 
   dispose(): void {
+    this.startGate?.dispose();
     for (const off of this._unsubs) off();
     this._unsubs.length = 0;
     this.crosshair.dispose();

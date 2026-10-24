@@ -69,7 +69,7 @@ const setup = await page.evaluate(async () => {
 
   // Keep a live target through both phases; a dead/disabled hitbox is no
   // longer valid visual contact and cannot exercise squad combat intent.
-  player.health.value = 10000;
+  player.health.setDebugValue(10000);
   player.health.armour = 150;
   player.health.dead = false;
   try {

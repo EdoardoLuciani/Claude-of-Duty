@@ -1,0 +1,63 @@
+import assert from 'node:assert/strict';
+
+import { WeaponSampleBank } from '../../src/audio/samples.ts';
+
+const sources = [];
+const context = {
+  currentTime: 0,
+  createGain: () => ({ gain: { value: 1 }, connect() {} }),
+  createBufferSource() {
+    const source = { playbackRate: { value: 1 }, connect() {}, start() {} };
+    sources.push(source);
+    return source;
+  },
+};
+const cases = [
+  ['reload', 'reloadBuffers', ['ar-out'], (bank, rng) => bank.reload('rifle', 'magout', rng)],
+  ['reaction', 'hitBuffers', ['reaction-0-hurt'], (bank, rng) => bank.reaction('hurt', 0, rng)],
+  ['environment', 'hitBuffers', ['environment-dog'], (bank, rng) => bank.environment('dog', rng)],
+  [
+    'radio',
+    'hitBuffers',
+    ['radio-click', 'radio-static'],
+    (bank, rng) => bank.radio('radio_open', rng),
+  ],
+  ['hit', 'hitBuffers', ['flesh'], (bank, rng) => bank.hit('flesh', rng)],
+];
+for (const count of [1, 2, 4]) {
+  for (const [name, field, keys, play] of cases) {
+    const bank = new WeaponSampleBank(context);
+    const previous = new Map();
+    let draws = 0;
+    const rng = { u32: () => ++draws * 997, range: (min, max) => (min + max) / 2 };
+    for (const key of keys)
+      bank[field][key] = Array.from({ length: count }, (_, index) => ({
+        key,
+        index,
+        duration: 0.5,
+      }));
+    for (let i = 0; i < 20; i++) {
+      const before = sources.length;
+      play(bank, rng);
+      const added = sources.slice(before);
+      assert.equal(added.length, keys.length, `${name}: retain voice layers`);
+      for (const source of added) {
+        assert(source.buffer, `${name}: single-take banks never select NaN`);
+        const { key, index } = source.buffer;
+        if (count > 1 && previous.has(key))
+          assert.notEqual(index, previous.get(key), `${name}: no immediate repeat`);
+        previous.set(key, index);
+      }
+      assert.equal(draws, (i + 1) * keys.length, `${name}: exactly one selection draw per layer`);
+    }
+    bank.dispose();
+    assert.throws(
+      () => play(bank, rng),
+      /recordings are not loaded/,
+      `${name}: missing required banks still fail closed`
+    );
+  }
+}
+console.log(
+  'sample selection: shared no-repeat policy, single-take safety, RNG draw counts and required-bank failures'
+);

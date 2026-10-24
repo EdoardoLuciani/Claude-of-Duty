@@ -9,7 +9,7 @@ export class NativeWorker {
     this.thread = new Worker(
       `const { parentPort } = require('node:worker_threads');
       globalThis.self = { postMessage: m => parentPort.postMessage(m) };
-      import(${JSON.stringify(new URL('../../src/ai/attachment-worker.js', import.meta.url).href)}).then(() => {
+      import(${JSON.stringify(new URL('../../src/ai/attachment-worker.ts', import.meta.url).href)}).then(() => {
         parentPort.on('message', data => {
           for (const message of data.__batch ?? [data]) self.onmessage({ data: message });
         });

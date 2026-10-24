@@ -3,7 +3,7 @@ import { test } from 'node:test';
 
 import { PerspectiveCamera } from 'three';
 
-import { bindingLabels, bindingLabel } from '../../src/core/bindings.ts';
+import { CONTROL_REFERENCE, bindingLabels, bindingLabel } from '../../src/core/bindings.ts';
 import { Input } from '../../src/core/input.ts';
 import { HealController } from '../../src/player/heal.ts';
 import { Health } from '../../src/player/health.ts';
@@ -105,6 +105,7 @@ for (const ending of ['release', 'complete', 'grenade'])
     const { weapons, player, input, ctx } = fixture();
     const ui = new UiSystem();
     ui.ctx = ctx;
+    ui.fps = { textContent: '— FPS' };
     ui.state = { healing: true, bandages: 2, healProgress: 0.3 };
     ui._lastRaw = 0;
     ui.hudTarget = ui.hudVisible = 1;
@@ -112,7 +113,21 @@ for (const ending of ['release', 'complete', 'grenade'])
     ui._blipView = [];
     ui._objectives = [];
     ui._weaponState = () => null;
-    ui._playerState = () => ({ healing: player.healCtrl.active });
+    ui._playerState = () => ({
+      health: player.health.value,
+      maxHealth: player.health.max,
+      armour: player.health.armour,
+      bandages: player.healCtrl.bandages,
+      healing: player.healCtrl.active,
+      healProgress: player.healCtrl.active ? 0.3 : 0,
+      hurt: 0,
+      pulse: 0,
+      move: 0,
+      sprint: false,
+      crouch: false,
+      ads: false,
+      airborne: false,
+    });
     ui._playerPos = () => ({ x: 0, z: 0 });
     ui._collectBlips = ui._buildCompassObjectives = noop;
     for (const name of [
@@ -216,13 +231,17 @@ for (const motion of ['sprinting', 'tacticalSprint', 'sliding', 'mantling', 'air
 
 test('menu advertises the actual heal binding', () => {
   const bandage = CONTROL_SECTIONS.flatMap((section) => section.controls).find((control) =>
-    control.description.startsWith('Bandage —')
+    control.description.startsWith('Bandage (')
   );
   assert.ok(bandage);
   assert.deepEqual(bandage.keys, bindingLabels('heal'));
   assert.ok(!bandage.keys.includes(bindingLabel('radio')));
+  assert.equal(bandage.description, `Bandage (hold ${HEALING.duration}s)`);
+});
+
+test('canonical bandage metadata describes movement interruptions', () => {
   assert.match(
-    bandage.description,
+    CONTROL_REFERENCE.find((row) => row.action === 'heal').behavior,
     /health damage.*sprint, jump\/fall, slide and mantle.*Walking alone is allowed/
   );
 });

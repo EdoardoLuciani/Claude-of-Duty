@@ -47,13 +47,11 @@ export function makeAX338Model(gltf: GLTF) {
       gripL: handReference.grips.left,
       magSeat: { pos: point('SOCKET_magazine'), rot: [0, 0, 0] },
       triggerPivot: { pos: point('trigger'), rot: [0, 0, 0] },
-      opticGlass: { kind: 'scope', center: point('SOCKET_sight'), reticle: 'mil' },
+      opticGlass: { kind: 'scope', center: point('SOCKET_sight'), reticle: 'p4fl' },
       handguard: { axis: [0, 0.075, 0], dir: [0, 0, 1], r: 0.027, z0: -0.175, z1: -0.581 },
     },
     shell: { caseLen: 0.0697, rimR: 0.0074 },
     magSize: { len: manifest.dimensions.magazineHeight },
-    materials: new Set<THREE.Material>(),
-    textures: new Set<THREE.Texture>(),
   };
   const converted = convertWeaponScene(scene, (source, material) => {
     if (source.name.startsWith('10 |')) {
@@ -66,9 +64,7 @@ export function makeAX338Model(gltf: GLTF) {
       if (value instanceof THREE.Texture) value.anisotropy = 8;
     }
   });
-  model.materials = converted.materials;
-  model.textures = converted.textures;
-  return model;
+  return { ...model, ...converted };
 }
 
 export async function loadAX338() {
@@ -91,10 +87,10 @@ export class AX338Animation {
   magazineRound!: THREE.Object3D;
   spareRound!: THREE.Object3D;
   hands!: Record<HandSide, AuthoredHand>;
-  poseQ!: THREE.Quaternion;
+  poseQ = new THREE.Quaternion();
   poseMatrix!: THREE.Matrix4;
-  idleTime!: number;
-  name!: string | null;
+  idleTime = 0;
+  name: string | null = null;
   fireTime!: number;
   constructor(model: AX338Model) {
     this.model = model;
@@ -109,10 +105,7 @@ export class AX338Animation {
     this.magazineRound = node('magazine_round');
     this.spareRound = node('magazine_spare_round');
     this.hands = discoverAuthoredHands(node);
-    this.poseQ = new THREE.Quaternion();
     this.poseMatrix = this.root.matrix;
-    this.idleTime = 0;
-    this.name = null;
     this.reset();
   }
 
