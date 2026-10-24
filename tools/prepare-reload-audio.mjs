@@ -156,27 +156,28 @@ const recipes = [
     'pump',
     gun('Pumpgun/Pumpgun Reload 01.wav'),
     [
-      [0.09, 0.33],
-      [1.85, 0.36],
-      [3.72, 0.34],
+      [0.15, 0.1],
+      [1.91, 0.1],
+      [3.78, 0.1],
     ],
   ],
-  // Empty-reload pump/return beats are 47.5 ms apart: split recorded contacts.
+  // Single-stop contacts for separate native rear/forward events. No full-cycle
+  // recording: its second clack would ignore cancellation and lag the animation.
   [
     'pump-open',
     gun('Pumpgun/Pumpgun Reload 01.wav'),
     [
-      [0.1, 0.045],
-      [1.9, 0.045],
+      [0.15, 0.1],
+      [1.91, 0.1],
     ],
   ],
   [
     'pump-close',
     gun('Pumpgun/Pumpgun Reload 01.wav'),
     [
-      [0.34, 0.12],
-      [2.12, 0.12],
-      [3.99, 0.12],
+      [0.35, 0.1],
+      [2.13, 0.1],
+      [4.0, 0.1],
     ],
   ],
   [
@@ -411,6 +412,24 @@ for (const [kind, source, crops, overlay] of recipes) {
       bytes: data.length,
       sha256: hash(data),
     };
+    if (kind === 'pump' || kind === 'pump-open' || kind === 'pump-close') {
+      // Bind transient alignment to the decoded delivery hash, not only a clip
+      // event name. A two-stroke reel could otherwise pass every routing test.
+      let energy = 0,
+        maxEnergy = 0,
+        peakFrame = 0;
+      for (let n = 0; n < decoded.length / 4; n++) {
+        energy += decoded.readFloatLE(n * 4) ** 2;
+        if (n >= 960) energy -= decoded.readFloatLE((n - 960) * 4) ** 2;
+        if (energy > maxEnergy) {
+          maxEnergy = energy;
+          peakFrame = n;
+        }
+      }
+      const contactPeakTime = Math.max(0, (peakFrame + 1 - 480) / 48000);
+      assert(contactPeakTime <= 0.02, `${name}: recorded contact lags its native stop`);
+      manifest.files[name].contactPeakTime = contactPeakTime;
+    }
     console.log(
       `${name}: ${data.length} bytes, ${(20 * Math.log10(decodedPeak)).toFixed(1)} dBFS peak`
     );

@@ -1048,7 +1048,7 @@ export class WeaponSystem {
         }
         break;
       case 'pump':
-        // The empty reload has a separate authored forward-return beat.
+        // Each native rear/forward stop owns a separate recorded contact.
         this._emitReload(isReload ? 'boltopen' : 'pump');
         if (!isReload) this._queueShell(0);
         break;

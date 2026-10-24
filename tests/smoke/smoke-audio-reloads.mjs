@@ -31,6 +31,10 @@ for (const urls of Object.values(RELOAD_URLS)) {
     const info = provenance.files[name];
     assert.equal(createHash('sha256').update(data).digest('hex'), info.sha256);
     assert(info.duration <= 0.53 && info.decodedPeak < 0.5, 'single actions, not source reels');
+    if (name.startsWith('pump-')) {
+      assert(info.duration <= 0.11, 'one pump contact per cue, not a pre-timed full cycle');
+      assert(info.contactPeakTime <= 0.02, 'contact energy must be near its native stop');
+    }
     for (const layer of info.layers) {
       assert(layer.description.length > 0, 'bank metadata identifies the recorded action');
       assert(layer.downmixLossDb < 6, 'stereo sources checked before mono averaging');
@@ -202,7 +206,13 @@ for (const id of WEAPON_IDS) {
     assert.deepEqual(
       trace.map((e) => e.phase),
       id === 'shotgun'
-        ? ['start', 'shellin', ...action, 'end']
+        ? [
+            'start',
+            ...(empty ? ['boltopen'] : []),
+            'shellin',
+            ...(empty ? ['boltclose'] : []),
+            'end',
+          ]
         : ['start', 'magout', 'magin', ...action, 'end'],
       `${id}/${clip.name}: exact audio beats`
     );
@@ -234,7 +244,7 @@ for (const id of WEAPON_IDS) {
   }
 }
 for (const [id, expected] of [
-  ['shotgun', ['pump']],
+  ['shotgun', ['pump', 'boltclose']],
   ['sniper', ['boltopen', 'boltclose']],
 ]) {
   setup(id, false);
@@ -248,6 +258,16 @@ for (const [id, expected] of [
   assert.equal(shells.length, 1, 'one spent casing');
   assert(Math.abs(shells[0].time - (id === 'shotgun' ? 0.144 : 0.242)) < 1 / 240);
 }
+setup('shotgun', false);
+assert(wp.tryFire());
+step(0.2);
+vm.stopClip();
+step(1);
+assert.deepEqual(
+  trace.map((e) => e.phase),
+  ['pump'],
+  'cancelled pump cannot play a future forward contact'
+);
 setup('shotgun', false);
 wp.state.reserve = 0;
 wp._onClipEvent('shellin', 'reloadTac');

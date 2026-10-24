@@ -88,14 +88,38 @@ try {
       window.reloadStream.getTracks().forEach((t) => t.stop());
       audio.mixer.masterGain.disconnect(dest);
     };
+    const pumpPeaks = {};
+    for (const kind of ['pump', 'pump-open', 'pump-close']) {
+      pumpPeaks[kind] = audio.samples.reloadBuffers[kind].map((buffer) => {
+        const data = buffer.getChannelData(0),
+          windowSize = Math.round(buffer.sampleRate * 0.02);
+        let energy = 0,
+          maximum = 0,
+          peakFrame = 0;
+        for (let n = 0; n < data.length; n++) {
+          energy += data[n] ** 2;
+          if (n >= windowSize) energy -= data[n - windowSize] ** 2;
+          if (energy > maximum) {
+            maximum = energy;
+            peakFrame = n;
+          }
+        }
+        return Math.max(0, (peakFrame + 1 - windowSize / 2) / buffer.sampleRate);
+      });
+    }
     window.reloadTrace = [];
-    ctx.events.on('weapon:reload', (p) =>
+    ctx.events.on('weapon:reload', (p) => {
+      const kind =
+        w.activeId === 'shotgun'
+          ? { pump: 'pump', boltopen: 'pump-open', boltclose: 'pump-close' }[p.phase]
+          : null;
       window.reloadTrace.push({
         phase: p.phase,
         clipTime: w.viewmodel.clipT,
         audioTime: audio.actx.currentTime,
-      })
-    );
+        contactPeakOffset: kind ? pumpPeaks[kind][audio.samples.reloadIndices[kind]] : null,
+      });
+    });
     ctx.events.on('weapon:shell', () =>
       window.reloadTrace.push({ phase: 'casing', clipTime: w.viewmodel.clipT })
     );
@@ -116,10 +140,11 @@ try {
       [id, 'empty'],
     ]),
     ['shotgun', 'fire'],
+    ['shotgun', 'pump-cancel'],
     ['sniper', 'fire'],
     ['rifle', 'cancel'],
     ['rifle', 'combat'],
-  ];
+  ].filter(([id]) => !args.weapon || args.weapon === id);
   for (const [id, mode] of cases) {
     const row = await page.evaluate(
       async ({ id, mode, capture, before }) => {
@@ -162,10 +187,10 @@ try {
           cancelled = false,
           nextEnemy = 0.1,
           worstFrame = 0;
-        const duration =
-          mode === 'fire'
-            ? 2
-            : (mode === 'empty' ? w.state.def.reloadEmpty : w.state.def.reloadTac) + 1;
+        const shooting = mode === 'fire' || mode === 'pump-cancel';
+        const duration = shooting
+          ? 2
+          : (mode === 'empty' ? w.state.def.reloadEmpty : w.state.def.reloadTac) + 1;
         const start = performance.now();
         let last = start;
         while ((performance.now() - start) / 1000 < duration) {
@@ -176,10 +201,14 @@ try {
           worstFrame = Math.max(worstFrame, dt);
           if (!fired && elapsed >= 0.25) {
             fired = true;
-            if (!(mode === 'fire' ? w.tryFire() : w.reload()))
+            if (!(shooting ? w.tryFire() : w.reload()))
               throw Error(`${id}/${mode}: action refused`);
           }
-          if (mode === 'cancel' && !cancelled && elapsed > 0.9) {
+          if (
+            !cancelled &&
+            ((mode === 'cancel' && elapsed > 0.9) ||
+              (mode === 'pump-cancel' && fired && w.viewmodel.clipT >= 0.2))
+          ) {
             w.viewmodel.stopClip();
             cancelled = true;
           }
@@ -245,17 +274,37 @@ try {
       if (mode === 'fire')
         assert.deepEqual(
           row.trace.filter((e) => e.phase !== 'casing').map((e) => e.phase),
-          id === 'shotgun' ? ['pump'] : ['boltopen', 'boltclose']
+          id === 'shotgun' ? ['pump', 'boltclose'] : ['boltopen', 'boltclose']
         );
       else if (mode === 'cancel')
         assert(!row.trace.some((e) => ['magin', 'charge', 'boltclose', 'end'].includes(e.phase)));
+      else if (mode === 'pump-cancel')
+        assert.deepEqual(
+          row.trace.filter((e) => e.phase !== 'casing').map((e) => e.phase),
+          ['pump'],
+          'cancelled pump has no forward cue'
+        );
       else
         assert(
           row.recorded.length >= (mode === 'empty' ? 3 : 2),
           `${id}/${mode}: real recorded routing`
         );
     }
-    if (mode === 'fire') assert.equal(row.trace.filter((e) => e.phase === 'casing').length, 1);
+    if (!args.before && id === 'shotgun') {
+      const stops =
+        mode === 'empty'
+          ? { boltopen: 0.209, boltclose: 0.893 }
+          : { pump: 0.144, boltclose: 0.369 };
+      for (const event of row.trace.filter((e) => e.contactPeakOffset != null)) {
+        assert(event.contactPeakOffset <= 0.02, 'decoded contact must be within 20 ms of cue');
+        assert(
+          Math.abs(event.clipTime - stops[event.phase]) <= row.worstFrame + 0.002,
+          'pump cue follows actual native movement stop'
+        );
+      }
+    }
+    if (mode === 'fire' || mode === 'pump-cancel')
+      assert.equal(row.trace.filter((e) => e.phase === 'casing').length, 1);
     if (out) writeFileSync(resolve(out, `${id}-${mode}.webm`), Buffer.from(row.data, 'base64'));
     delete row.data;
     results.push(row);
