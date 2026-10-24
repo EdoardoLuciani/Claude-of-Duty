@@ -18,7 +18,7 @@ import { waitForGame } from '../../tools/lib/native-render.mjs';
 const args = parseArgs();
 const port = Number(args.port ?? 5199);
 const out = resolve(args.out ?? '/tmp/bandage-intersections.json');
-const server = await ensureViteServer({ port });
+const server = await ensureViteServer({ port, ...(args.root ? { root: resolve(args.root) } : {}) });
 const browser = await launchChromium({ headless: true, args: ['--ignore-gpu-blocklist'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
@@ -199,10 +199,19 @@ try {
               }
             }
       }
-      return { hits, counts, examples, triangles: [left.length, right.length] };
+      return {
+        hits,
+        counts,
+        examples,
+        triangles: [left.length, right.length],
+        active: vm._bandageState,
+        progress: vm._bandageProgress,
+      };
     }
     window.__BANDAGE_MESH_INTERSECTIONS__ = sample;
   });
+  // Match native input ownership: focus without firing/aiming or pointer lock.
+  await page.locator('#game').click({ button: 'middle' });
   await page.evaluate(() => window.__PUMP__(25));
   await page.keyboard.down('KeyH');
   const samples = [];
@@ -210,7 +219,12 @@ try {
   for (let frame = stride; frame < 180; frame += stride) {
     await page.evaluate((n) => window.__PUMP__(n), stride);
     const result = await page.evaluate(() => window.__BANDAGE_MESH_INTERSECTIONS__());
-    samples.push({ frame, progress: frame / 180, ...result });
+    assert.equal(
+      result.active,
+      1,
+      `frame ${frame}: must sample the actual bandage action, not idle arms`
+    );
+    samples.push({ frame, ...result });
   }
   await page.keyboard.up('KeyH');
   assert.deepEqual(errors, []);

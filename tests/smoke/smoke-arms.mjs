@@ -82,7 +82,14 @@ const meshes = [];
 gltf.scene.traverse((o) => {
   if (o.isSkinnedMesh) meshes.push(o);
 });
-assert.equal(meshes.length, 5, 'five material submissions per arm');
+assert.equal(meshes.length, 5, 'five editable authored surfaces per arm');
+const triangles = meshes.reduce((sum, mesh) => sum + mesh.geometry.index.count / 3, 0);
+assert.equal(triangles, manifest.triangles, 'manifest counts the actual exported topology');
+assert(triangles <= 45000, 'authored glove/panel triangle budget (previously 75708)');
+assert(
+  manifest.gloveMaxDeviationMetres <= 0.0005,
+  'glove retains the prior contact silhouette within 0.5 mm'
+);
 let vertices = 0;
 for (const m of meshes) {
   const weights = m.geometry.getAttribute('skinWeight');

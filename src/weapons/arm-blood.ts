@@ -16,7 +16,7 @@ import {
   vec3,
   vec4,
 } from 'three/tsl';
-import type { MeshStandardNodeMaterial } from 'three/webgpu';
+import type { MeshStandardNodeMaterial, Node } from 'three/webgpu';
 
 // Cylindrical bind-space stains, in turns around the sleeve and metres from
 // the wrist. Fixed placement keeps captures reproducible without consuming RNG.
@@ -62,7 +62,12 @@ interface ArmBlood {
   texture: THREE.DataTexture;
   amount: ReturnType<typeof uniform>;
   setHealthFraction(fraction: number): void;
-  decorate(material: MeshStandardNodeMaterial): void;
+  decorate(
+    material: MeshStandardNodeMaterial,
+    base?: Node<'vec3'>,
+    roughness?: Node<'float'>,
+    eligible?: Node<'float'>
+  ): void;
 }
 export function createArmBlood(): ArmBlood {
   const stains = [...STAINS];
@@ -142,16 +147,30 @@ export function createArmBlood(): ArmBlood {
     setHealthFraction(fraction: number): void {
       if (Number.isFinite(fraction)) amount.value = 1 - Math.max(0, Math.min(1, fraction));
     },
-    decorate(material: MeshStandardNodeMaterial): void {
-      // materialColor/materialRoughness retain the authored maps and factors;
-      // the separate bind attribute survives the native skinning path.
-      const base = materialColor;
+    decorate(
+      material: MeshStandardNodeMaterial,
+      base = materialColor.rgb,
+      roughness = materialRoughness,
+      eligible = float(1)
+    ): void {
+      // Explicit bases let a consolidated surface retain its authored maps/factors.
+      // Eligibility excludes glove surfaces even where their bind positions overlap.
+      const localizedBlood = blood.mul(eligible);
+      const localizedSoaked = soaked.mul(eligible);
       const stained = mix(vec3(0.004, 0.0003, 0.00035), vec3(0.018, 0.0007, 0.0012), sample.g).mul(
         clamp(base.rgb.mul(12), vec3(0.55), vec3(1))
       );
-      const absorbed = mix(base.rgb, base.rgb.mul(vec3(0.32, 0.1, 0.08)), soaked.mul(0.65));
-      material.colorNode = vec4(mix(absorbed, stained, blood), 1);
-      material.roughnessNode = mix(materialRoughness, mix(0.88, 0.6, sample.b.mul(blood)), blood);
+      const absorbed = mix(
+        base.rgb,
+        base.rgb.mul(vec3(0.32, 0.1, 0.08)),
+        localizedSoaked.mul(0.65)
+      );
+      material.colorNode = vec4(mix(absorbed, stained, localizedBlood), 1);
+      material.roughnessNode = mix(
+        roughness,
+        mix(0.88, 0.6, sample.b.mul(localizedBlood)),
+        localizedBlood
+      );
       // Same graph at full health and injured: no mid-combat permutations.
       material.customProgramCacheKey = () => 'arm-blood-tsl-v2';
     },
