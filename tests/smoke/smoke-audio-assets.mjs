@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { AIRCRAFT_URLS } from '../../src/audio/aircraft.ts';
 import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
+import { RADIO_URLS } from '../../src/audio/radio.ts';
 import { RELOAD_URLS } from '../../src/audio/reloads.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import { WEAPON_PROFILES } from '../../src/audio/weapons.ts';
@@ -11,7 +12,7 @@ const total =
   50 +
   Object.values(FOLEY_URLS).reduce((sum, urls) => sum + urls.length, 0) +
   Object.values(RELOAD_URLS).reduce((sum, urls) => sum + urls.length, 0) +
-  AIRCRAFT_URLS.length;
+  (AIRCRAFT_URLS.length + Object.values(RADIO_URLS).reduce((n, urls) => n + urls.length, 0));
 const fetch = globalThis.fetch;
 try {
   for (const failure of [null, 'http', 'reload-http', 'decode']) {

@@ -59,6 +59,8 @@ export function mixCases() {
       'ui',
       { kind }
     );
+  for (const kind of ['radio_open', 'radio_strike', 'intel_call'])
+    add(`recorded-radio-${kind}`, 'warning', 'ui', { kind });
   for (const kind of ['spot', 'reload', 'hurt', 'death'])
     add(`voice-${kind}`, 'speech', 'voice', { kind });
   add('radio-voice', 'speech', 'voice', { kind: 'spot', radio: true });

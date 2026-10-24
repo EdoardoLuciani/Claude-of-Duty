@@ -41,6 +41,7 @@ import { shellCasing, explosion, uiSound, heartbeat, intelSiren } from './foley.
 import { classifySpace, SPACE_KEYS } from './ir.ts';
 import { Mixer } from './mixer.ts';
 import { TentRadio } from './music.ts';
+import { radioCue } from './radio.ts';
 import { WeaponSampleBank } from './samples.ts';
 import { SpatialField } from './spatial.ts';
 import type { WeaponProfile } from './types.ts';
@@ -740,6 +741,12 @@ export class AudioSystem {
         recorded.node.connect(out);
         synthetic.node.connect(out);
         return { node: out, end: synthetic.end, send: synthetic.send };
+      }
+      case 'radio_open':
+      case 'radio_strike':
+      case 'intel_call': {
+        const recorded = this.samples!.radio(kind, rng, { when, level: o.level });
+        return radioCue(actx, bank, rng, kind, recorded, when, o.level);
       }
       case 'bodyfall':
         return this.samples!.fall(rng, { when, surface: o.surface, level: o.level });
