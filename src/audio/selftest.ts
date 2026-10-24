@@ -283,7 +283,18 @@ export async function runAudioSelfTest(opts: { verbose?: boolean } = {}) {
   await push('shell:dirt', 3, ({ bank, rng, mixer, t }) => {
     route(mixer, shellCasing(mixer.actx, bank, rng, { when: t, surface: 'dirt' }), 'foley');
   });
-  for (const phase of ['start', 'magout', 'magin', 'end'] as const) {
+  for (const phase of [
+    'start',
+    'magout',
+    'magin',
+    'slide',
+    'charge',
+    'boltopen',
+    'boltclose',
+    'pump',
+    'shellin',
+    'end',
+  ] as const) {
     await push(`reload:${phase}`, 2.5, ({ bank, rng, mixer, t }) => {
       route(mixer, reloadPhase(mixer.actx, bank, rng, phase, { when: t }), 'foley');
     });

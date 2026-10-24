@@ -110,7 +110,6 @@ interface ReloadOptions {
   when?: number;
   heavy?: number;
   retained?: boolean;
-  settleOnly?: boolean;
 }
 interface ExplosionOptions extends VoiceOptions {
   distance?: number;
@@ -857,6 +856,9 @@ const RELOAD_TRIM = {
   end: 1.5,
   pump: 2.2,
   shellin: 1.4,
+  charge: 1.5,
+  boltopen: 1.5,
+  boltclose: 1.5,
 } as const;
 type ReloadPhase = keyof typeof RELOAD_TRIM;
 
@@ -995,6 +997,16 @@ export function reloadPhase(
       break;
     }
 
+    case 'charge':
+    case 'boltopen':
+      // Rearward movement only. Forward closure belongs to its own native beat.
+      rustle(t0, 0.06, 0.24 * heavy, 2600);
+      metal(t0, [
+        { f: 1450, q: 22, g: 0.3 * heavy, decay: 0.05 },
+        { f: 3100, q: 18, g: 0.16, decay: 0.022 },
+      ]);
+      break;
+    case 'boltclose':
     case 'slide':
       // Reuse the existing steel resonators at the authored slide-catch beat,
       // without a fictitious rearward rack or a second clack at reload end.
@@ -1005,54 +1017,10 @@ export function reloadPhase(
       metal(t0 + 0.008, [{ f: 4900, q: 46, g: 0.09, decay: 0.16 }], 0.002);
       break;
     case 'end':
-    default: {
-      if (o.settleOnly) {
-        rustle(t0, 0.08, 0.08, 1400);
-        break;
-      }
-      // Charging handle: scrape, hard rearward stop, spring-driven return, and
-      // the bolt slamming into battery.
-      const st = t0;
-      const src = bank.source('white', rng, rng.range(0.9, 1.25));
-      const bp = biquad(actx, 'bandpass', 2600, 1.6);
-      const g = gain(actx, 0);
-      series(src, bp, g).connect(out);
-      sweep(bp.frequency, st, 1800, 4200, 0.07);
-      ad(g.gain, st, 0.24, 0.008, 0.07);
-      src.start(st, src._offset, 0.2);
-      metal(st + 0.06, [
-        { f: 1450 * semis(rng.range(-2, 2)), q: 22, g: 0.3 * heavy, decay: 0.05 },
-        { f: 3100, q: 18, g: 0.16, decay: 0.022 },
-      ]);
-      // Spring ring — the metallic "zing" behind the clack.
-      metal(
-        st + 0.065,
-        [
-          { f: 4900 * semis(rng.range(-3, 3)), q: 46, g: 0.09, decay: 0.16 },
-          { f: 7200, q: 38, g: 0.05, decay: 0.1 },
-        ],
-        0.002
-      );
-      const bt = st + rng.range(0.1, 0.15);
-      const b = osc(actx, 'sine', 150 * heavy);
-      const bg = gain(actx, 0);
-      b.connect(bg);
-      bg.connect(out);
-      sweep(b.frequency, bt, 200 * heavy, 90 * heavy, 0.05);
-      ad(bg.gain, bt, 0.38 * heavy, 0.0015, 0.05);
-      b.start(bt);
-      b.stop(bt + 0.14);
-      metal(
-        bt,
-        [
-          { f: 1750, q: 20, g: 0.34 * heavy, decay: 0.05 },
-          { f: 3900, q: 15, g: 0.15, decay: 0.02 },
-          { f: 8200, q: 10, g: 0.05, decay: 0.008 },
-        ],
-        0.0035
-      );
+    default:
+      // A gesture ending is not a charging action, including tube reload loops.
+      rustle(t0, 0.08, 0.08, 1400);
       break;
-    }
   }
   return { node: out, end: end + 0.05, send: 0.3 };
 }

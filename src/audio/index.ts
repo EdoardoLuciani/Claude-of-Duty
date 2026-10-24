@@ -89,9 +89,9 @@ interface AudioOptions {
   gear?: number;
   flight?: number;
   phase?: ReloadPhase;
+  reloadWeapon?: string;
   heavy?: number;
   retained?: boolean;
-  settleOnly?: boolean;
   radius?: number;
   bark?: string;
   f0?: number;
@@ -677,12 +677,14 @@ export class AudioSystem {
           flight: o.flight,
         });
       case 'reload':
-        return reloadPhase(actx, bank, rng, o.phase, {
-          when,
-          heavy: o.heavy,
-          retained: o.retained,
-          settleOnly: o.settleOnly,
-        });
+        return (
+          this.samples!.reload(o.reloadWeapon ?? '', o.phase, rng, { when }) ??
+          reloadPhase(actx, bank, rng, o.phase, {
+            when,
+            heavy: o.heavy,
+            retained: o.retained,
+          })
+        );
       case 'explosion': {
         if (dist > 50)
           return explosion(actx, bank, rng, {
@@ -1074,9 +1076,9 @@ export class AudioSystem {
     const phase = p?.phase ?? 'end';
     const options = {
       phase,
+      reloadWeapon: typeof w === 'string' ? w : (w?.id ?? ''),
       heavy,
       retained: p?.retained === true,
-      settleOnly: typeof w === 'object' && w?.id === 'pistol',
     };
     if (p?.position) {
       this._playAt('reload', p.position.x, p.position.y, p.position.z, options, 'foley', 0.6);
