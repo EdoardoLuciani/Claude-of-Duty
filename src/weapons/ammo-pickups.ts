@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 
 import { bindingLabel } from '../core/bindings.ts';
@@ -61,7 +62,9 @@ export class AmmoPickups {
   _nearest!: AmmoPickup | null;
   _hold!: number;
   _prompting!: boolean;
-  geometries!: Record<'case' | 'lid' | 'band' | 'latch' | 'ring', THREE.BufferGeometry>;
+  geometries!: Record<'case' | 'edge' | 'latch' | 'ring', THREE.BufferGeometry>;
+  _visual: THREE.Group | null = null;
+  _batches: THREE.InstancedMesh[] = [];
   materials!: Record<'case' | 'edge' | 'latch' | 'glow', THREE.Material>;
   constructor(owner: AmmoOwner) {
     this.owner = owner;
@@ -77,13 +80,16 @@ export class AmmoPickups {
   }
 
   _makeAssets() {
+    const lid = new THREE.BoxGeometry(0.4, 0.045, 0.29).translate(0, 0.235, 0);
+    const band = new THREE.BoxGeometry(0.045, 0.205, 0.282).translate(0.1, 0.13, 0);
     this.geometries = {
-      case: new THREE.BoxGeometry(0.38, 0.19, 0.27),
-      lid: new THREE.BoxGeometry(0.4, 0.045, 0.29),
-      band: new THREE.BoxGeometry(0.045, 0.205, 0.282),
-      latch: new THREE.BoxGeometry(0.075, 0.065, 0.035),
-      ring: new THREE.TorusGeometry(0.29, 0.011, 6, 28),
+      case: new THREE.BoxGeometry(0.38, 0.19, 0.27).translate(0, 0.12, 0),
+      edge: mergeGeometries([lid, band]),
+      latch: new THREE.BoxGeometry(0.075, 0.065, 0.035).translate(0, 0.18, 0.155),
+      ring: new THREE.TorusGeometry(0.29, 0.011, 6, 28).rotateX(Math.PI / 2).translate(0, 0.035, 0),
     };
+    lid.dispose();
+    band.dispose();
     this.materials = {
       case: new MeshStandardNodeMaterial({ color: 0x3f4933, roughness: 0.72, metalness: 0.5 }),
       edge: new MeshStandardNodeMaterial({ color: 0x222921, roughness: 0.58, metalness: 0.72 }),
@@ -98,27 +104,41 @@ export class AmmoPickups {
     };
   }
 
+  // The boot hook borrows these same batches, warming the actual instanced
+  // variants without creating a pickup, consuming RNG or allocating a second pool.
   _makeVisual(): THREE.Group {
+    if (this._visual) return this._visual;
     const root = new THREE.Group();
-    root.name = 'ammo-pickup';
-    const add = (geo: THREE.BufferGeometry, mat: THREE.Material, y: number, z = 0): THREE.Mesh => {
-      const m = new THREE.Mesh(geo, mat);
-      m.position.set(0, y, z);
-      m.castShadow = mat !== this.materials.glow;
-      m.receiveShadow = mat !== this.materials.glow;
-      root.add(m);
-      return m;
-    };
-    add(this.geometries.case, this.materials.case, 0.12);
-    add(this.geometries.lid, this.materials.edge, 0.235);
-    const band = add(this.geometries.band, this.materials.edge, 0.13);
-    band.position.x = 0.1;
-    add(this.geometries.latch, this.materials.latch, 0.18, 0.155);
-    const ring = add(this.geometries.ring, this.materials.glow, 0.035);
-    ring.rotation.x = Math.PI / 2;
-    ring.userData.owNoPrepass = true;
-    ring.castShadow = false;
+    root.name = 'ammo-pickups';
+    for (const name of ['case', 'edge', 'latch', 'ring'] as const) {
+      const ring = name === 'ring';
+      const mesh = new THREE.InstancedMesh(
+        this.geometries[name],
+        this.materials[ring ? 'glow' : name],
+        MAX_PICKUPS
+      );
+      mesh.name = `ammo-pickups-${name}`;
+      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      mesh.count = 1;
+      mesh.castShadow = !ring;
+      mesh.receiveShadow = !ring;
+      if (ring) mesh.userData.owNoPrepass = true;
+      root.add(mesh);
+      this._batches.push(mesh);
+    }
+    this._visual = root;
     return root;
+  }
+
+  _syncVisuals(): void {
+    for (const item of this.items) item.group.updateMatrix();
+    for (const mesh of this._batches) {
+      mesh.count = this.items.length;
+      for (let i = 0; i < this.items.length; i++) mesh.setMatrixAt(i, this.items[i].group.matrix);
+      mesh.instanceMatrix.needsUpdate = true;
+      // Population bounds must follow bobbing, expiry and dense-slot compaction.
+      mesh.computeBoundingSphere();
+    }
   }
 
   onActorDeath(e: EngineEventMap['actor:death']): AmmoPickup | null {
@@ -143,10 +163,12 @@ export class AmmoPickups {
 
   spawn(position: Pick<THREE.Vector3, 'x' | 'y' | 'z'>): AmmoPickup {
     if (this.items.length >= MAX_PICKUPS) this._remove(this.items[0]);
-    const group = this._makeVisual();
+    // Retain each item's public transform/identity, but only the shared batches
+    // enter the scene. Dense instance slots follow the creation-ordered items.
+    const group = new THREE.Group();
     group.position.set(position.x, position.y + 0.035, position.z);
     group.rotation.y = this.rng.range(0, Math.PI * 2);
-    this.ctx.scene.add(group);
+    this.ctx.scene.add(this._makeVisual());
     const item = {
       id: this._nextId++,
       group,
@@ -156,6 +178,7 @@ export class AmmoPickups {
       phase: this.rng.range(0, Math.PI * 2),
     };
     this.items.push(item);
+    this._syncVisuals();
     return item;
   }
 
@@ -170,6 +193,8 @@ export class AmmoPickups {
       p.group.rotation.y += dt * 0.28;
       p.group.position.y = p.baseY + Math.sin(now * 1.8 + p.phase) * 0.025;
     }
+
+    this._syncVisuals();
 
     const player = this.owner.player ?? this.ctx.peek('player');
     if (
@@ -255,18 +280,20 @@ export class AmmoPickups {
   _remove(item: AmmoPickup): void {
     const i = this.items.indexOf(item);
     if (i >= 0) this.items.splice(i, 1);
-    item.group.removeFromParent();
-    if (this._nearest === item) this._nearest = null;
+    this._syncVisuals();
+    if (this._nearest === item) this._clearInteraction();
   }
 
   clear(): void {
     this._clearInteraction();
-    for (const p of this.items) p.group.removeFromParent();
     this.items.length = 0;
+    this._syncVisuals();
+    this._visual?.removeFromParent();
   }
 
   dispose(): void {
     this.clear();
+    for (const mesh of this._batches) mesh.dispose();
     for (const g of Object.values(this.geometries)) g.dispose();
     for (const m of Object.values(this.materials)) m.dispose();
   }
