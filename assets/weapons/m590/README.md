@@ -53,9 +53,12 @@ Follow the [shared authoring workflow](../../../tools/blender/README.md).
 
 Declared read-only inputs are `hand-reference.json` and shared
 `assets/player/arms/player-arms.blend` (excluded review skins only). Missing inputs
-fail; ordinary builds never refit hands. Intentional calibration uses **export →
-`node tools/m590-hand-reference.mjs` → export**, with contact review: that optional
-fit reads the exported stock, unlike normal geometry authoring.
+fail; ordinary builds never refit hands. `tools/m590-hand-reference.mjs` owns the
+frozen, surface-reviewed firing wrist/pose and the existing support/shell fits.
+Intentional calibration uses **edit calibration → `node tools/m590-hand-reference.mjs`
+→ export → source clearance checks → in-engine review**. Do not restore the old
+independent distal-pad stock fitting: it could satisfy pad distances while the
+proximal fingers and thumb web crossed the stock.
 
 From the repository root after `npm ci`, using Blender **5.2.2**:
 
@@ -100,6 +103,13 @@ shared event-only Clip bridge, never mixer listeners. Pump owns the trigger
 pulse; there is no separate Fire action or baked shot recoil. Retain common
 reactive recoil, pooled ejection, damage/spread and 6+1 accounting.
 
+The #337 pump-audio correction adds a post-shot `boltrelease` at the existing
+forward stop and places empty-reload `pump`/`boltrelease` at its real rear/forward
+stops. Only event metadata changes: the complete GLB BIN (mesh, maps and sampled
+motion) is byte-identical to the pre-correction export. Post-shot `pump` still owns
+one casing; reload markers never invent one. Recorded audio contacts are split
+so stopping an action cannot play a later return from inside a whole-cycle file.
+
 Use shared arm scales left `.97` / right `1`, authored wrist/finger/thumb controls
 and `hand-reference.json` contacts without adapter refits. Reload wraps, release,
 thumb/rim insertion, clearance and return are distinct phases. The asset owns
@@ -109,12 +119,23 @@ STEP scale alone drives visibility. Idle/reset must restore all channels and hid
 the insert on interruption, switch, death, restart and disposal.
 
 Prototype body anchors are support shoulder Z `-.045 m` and firing shoulder Z
-`.450 m` (including ADS), versus previous `-.020`/`.280 m`; shared arm lengths,
-grips and weapon mounts are unchanged. The 170 mm firing-shoulder offset is a
-presentation compromise, not anatomical validation. Offline reach margins are
-only about 3.58 mm firing / 7.67 mm support. Near-eye glove/cuff prominence and
-wrist posture still require human review; numeric wrist gates (59.0°/77.1°) do
-not certify unrestricted skin clearance or final lighting/ADS framing.
+`.450 m` (including ADS), versus previous `-.020`/`.280 m`; shared arm lengths
+and weapon mounts are retained. The 170 mm firing-shoulder offset is a
+presentation compromise, not anatomical validation. Historical reach/wrist-angle
+measurements predate the #447 firing calibration and are not acceptance gates.
+The #447 firing-hand recalibration lowers/straightens the wrist alongside the
+neck, keeps finger-root spreads within 11.5°, and distributes thumb flex across
+both hinges (29.3°/17.5°, instead of a 74.3° distal hook). Hand scale, shoulders,
+weapon framing, support/shell poses and all handling timings are unchanged.
+
+`m590_check.py` now sweeps all five full evaluated right-arm skin surfaces at
+120 Hz through all seven actions against the actual stock, receiver/tang and
+trigger guard, with zero triangle crossings allowed. The moving trigger is an
+intentional index contact and remains covered by the existing trigger-pad checks;
+the existing left-hand pump/loading skin sweeps are retained. The original #447
+pose fails the new full-surface gate at Idle frame 0. These gates do not certify
+finger-to-finger clearance, anatomy or final lighting; human visual acceptance
+of hip, ADS, inspect and transitions is still required.
 
 ## Review evidence
 
@@ -130,4 +151,8 @@ For play review, run `npm run dev`, buy M-590 as the secondary and equip with 2/
 For deterministic diagnostics in `/?capture=1`, await readiness then call
 `__ENGINE__.ctx.get('weapons').setWeaponImmediate('shotgun')`; this bypass is not
 shop/balance acceptance. Use normal fire/ADS/reload/switch/pause controls and
-`__ENGINE__.ctx.get('sky').setTimeOfDay(23)` for night.
+`__ENGINE__.ctx.get('sky').setTimeOfDay(23)` for night. Use
+`node tools/capture-arms.mjs --weapon=shotgun --out=/tmp/m590-review` for the
+in-engine action matrix (including pump, reload and draw/holster). It reads the
+native final output rather than trusting a possibly black headless swapchain.
+Before/after #447 hip/ADS/inspect images belong on the PR for human review.

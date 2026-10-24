@@ -281,9 +281,6 @@ export class MaterialSystemNode {
   get detailNormal() {
     return this._shared?.detailNormal ?? null;
   }
-  get macroTexture() {
-    return this._shared?.macro ?? null;
-  }
 
   tune(
     material: MeshStandardNodeMaterial,

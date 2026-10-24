@@ -1,7 +1,7 @@
 {
   "generator": "tools/blender/player_arms.py",
   "runtime": "public/models/player/arms.glb",
-  "vertices": 38440,
+  "vertices": 22980,
   "bones": [
     "upper",
     "fore",
@@ -46,13 +46,15 @@
     "open",
     "pinch"
   ],
+  "gloveMaxDeviationMetres": 7.782298780512065e-05,
+  "triangles": 44788,
   "thumbRestY": -0.95,
   "units": "metres",
   "scope": "deformation meshes and finger-pose actions; game-owned weapon trajectories",
   "sha256": {
-    "tools/blender/player_arms.py": "7f7a1dfc42b6574ea0313a68a47ba58d89f34b585c2e5760eb9db30e05489a3f",
+    "tools/blender/player_arms.py": "62448ec4950f8c476db7acbf157f9e3ad6a3541760e4ad8a53c65d90dfb54480",
     "assets/player/arms/pose-reference.json": "be3f6ba33e5dc89b62c58d1133fb39039baa3e2fdbdb100b3918e841a02ac548",
-    "public/models/player/arms.glb": "a1bc1d6fdba18fddfcecfc55be361f62f8b2c0a66655edac4f5ba52f06c93f82",
+    "public/models/player/arms.glb": "1feb96c6c2ca083c67f4c1543c68ef49b6637946a2ea21cdf3647dceb4debf9e",
     "src/weapons/hand-poses.ts": "24ee4f12ea043c1d761100741cb2bfc9a216abf191259660cf947a61c81cc8d2"
   }
 }

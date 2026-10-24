@@ -1,0 +1,1397 @@
+{
+  "authoring": "prepare-reload-audio.mjs; recorded-only source crops/overlays, explicit mono average, 48 kHz, 96 kb/s Opus; no header gain",
+  "publication": "Owner confirmed public redistribution of selected edited #337 samples and mixed gameplay captures, and explicitly approved recorded pouch/latch/charging donors for EVOLYS. Masters remain outside the repository; media do not inherit the code licence.",
+  "files": {
+    "ar-out-1": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/M16/M16 Mag Out 01.wav",
+          "channels": 1,
+          "description": "Colt M16 RIFLE MAGAZINE DETACH Detaching a magazine to the weapon. Gun, foley. Close, mono.",
+          "sourceSha256": "5752e7705d946be4d2da274d40f2640aca7f02f92f4f3cc1b7a39da2cf02aec8",
+          "start": 1.14,
+          "duration": 0.14,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.14,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.12000000000000001:d=0.02",
+      "target20Db": -19,
+      "level": 10.876324163778863,
+      "decodedPeak": 0.3935398757457733,
+      "bytes": 2468,
+      "sha256": "bed4c897db446424c8ead4676b64efe2a51bc660475dcd287a25ae268b331d61"
+    },
+    "ar-out-2": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/M16/M16 Mag Out 01.wav",
+          "channels": 1,
+          "description": "Colt M16 RIFLE MAGAZINE DETACH Detaching a magazine to the weapon. Gun, foley. Close, mono.",
+          "sourceSha256": "5752e7705d946be4d2da274d40f2640aca7f02f92f4f3cc1b7a39da2cf02aec8",
+          "start": 6.6,
+          "duration": 0.16,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.16,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.14:d=0.02",
+      "target20Db": -19,
+      "level": 1.9045732940691653,
+      "decodedPeak": 0.4007222652435303,
+      "bytes": 3332,
+      "sha256": "104220b5791d2e558e6ae30bc16940293750cb77c15c3894dfd049f36d5a6708"
+    },
+    "ar-out-3": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/M16/M16 Mag Out 01.wav",
+          "channels": 1,
+          "description": "Colt M16 RIFLE MAGAZINE DETACH Detaching a magazine to the weapon. Gun, foley. Close, mono.",
+          "sourceSha256": "5752e7705d946be4d2da274d40f2640aca7f02f92f4f3cc1b7a39da2cf02aec8",
+          "start": 9.38,
+          "duration": 0.18,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.18,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.16:d=0.02",
+      "target20Db": -19,
+      "level": 1.544421657854853,
+      "decodedPeak": 0.3488976061344147,
+      "bytes": 3417,
+      "sha256": "54f3cd2cd3fd4c715ea9ba2354e622aa755162464fed9c2333c807f11f3f64ee"
+    },
+    "ar-in-1": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/M16/M16 Mag In 01.wav",
+          "channels": 1,
+          "description": "Colt M16 RIFLE MAGAZINE ATTACH Attaching a magazine to the weapon. Gun, foley. Close, mono.",
+          "sourceSha256": "ce14a122e3d09b2c07f596f1b6452dce244f798c0cbf1a40d07dee09f4f8da37",
+          "start": 4.01,
+          "duration": 0.19,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.19,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.17:d=0.02",
+      "target20Db": -19,
+      "level": 0.437461190435118,
+      "decodedPeak": 0.3464198410511017,
+      "bytes": 3198,
+      "sha256": "6df7633c5c0859ea8cfc1af9b574f2ee379f43c370bd5d1824831aef32bd0fb4"
+    },
+    "ar-in-2": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/M16/M16 Mag In 01.wav",
+          "channels": 1,
+          "description": "Colt M16 RIFLE MAGAZINE ATTACH Attaching a magazine to the weapon. Gun, foley. Close, mono.",
+          "sourceSha256": "ce14a122e3d09b2c07f596f1b6452dce244f798c0cbf1a40d07dee09f4f8da37",
+          "start": 6.47,
+          "duration": 0.19,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.19,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.17:d=0.02",
+      "target20Db": -19,
+      "level": 0.38676966186930484,
+      "decodedPeak": 0.32555297017097473,
+      "bytes": 3012,
+      "sha256": "16a3b6304a68aa659e66fcc01653e90da910f6cac886818fb51e034d4c432ce3"
+    },
+    "ar-in-3": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/M16/M16 Mag In 01.wav",
+          "channels": 1,
+          "description": "Colt M16 RIFLE MAGAZINE ATTACH Attaching a magazine to the weapon. Gun, foley. Close, mono.",
+          "sourceSha256": "ce14a122e3d09b2c07f596f1b6452dce244f798c0cbf1a40d07dee09f4f8da37",
+          "start": 10.01,
+          "duration": 0.19,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.19,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.17:d=0.02",
+      "target20Db": -19,
+      "level": 0.5728565121020434,
+      "decodedPeak": 0.3950115442276001,
+      "bytes": 3327,
+      "sha256": "d0877d44c163dd4f7a2603cd0d1ac81743e10ede7ffa89c40f1459e8feabda87"
+    },
+    "ar-charge-1": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/M16/M16 Charging Handle 01.wav",
+          "channels": 1,
+          "description": "Colt M16 RIFLE CHARGING HANDLE Pulling back cocking handle to load weapon. Gun, foley. Close, mono.",
+          "sourceSha256": "bf445198d3027ac50f3d899df48970b7036c50722658bce397e0c3a75acad924",
+          "start": 0.5,
+          "duration": 0.045,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.045,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.024999999999999998:d=0.02",
+      "target20Db": -19,
+      "level": 8.044258811402129,
+      "decodedPeak": 0.39762166142463684,
+      "bytes": 1498,
+      "sha256": "6410011ac3bba567df7afb4eeca2be3f2f52e996ecd9aa0f3ce597642099fc20"
+    },
+    "ar-charge-2": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/M16/M16 Charging Handle 01.wav",
+          "channels": 1,
+          "description": "Colt M16 RIFLE CHARGING HANDLE Pulling back cocking handle to load weapon. Gun, foley. Close, mono.",
+          "sourceSha256": "bf445198d3027ac50f3d899df48970b7036c50722658bce397e0c3a75acad924",
+          "start": 3.84,
+          "duration": 0.045,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.045,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.024999999999999998:d=0.02",
+      "target20Db": -19,
+      "level": 7.213204682740848,
+      "decodedPeak": 0.39779916405677795,
+      "bytes": 1292,
+      "sha256": "255206848919bdb916f4300e73532145c723528e4985aa83f31044107e942401"
+    },
+    "ar-close-1": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/M16/M16 Charging Handle 01.wav",
+          "channels": 1,
+          "description": "Colt M16 RIFLE CHARGING HANDLE Pulling back cocking handle to load weapon. Gun, foley. Close, mono.",
+          "sourceSha256": "bf445198d3027ac50f3d899df48970b7036c50722658bce397e0c3a75acad924",
+          "start": 1.23,
+          "duration": 0.2,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.2,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.18000000000000002:d=0.02",
+      "target20Db": -19,
+      "level": 0.34127483255081015,
+      "decodedPeak": 0.2683786451816559,
+      "bytes": 3357,
+      "sha256": "8704e1ec37ea07b72656771e7533db46b7b304220abdbfd23bb2ec09f68d68f3"
+    },
+    "ar-close-2": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/M16/M16 Charging Handle 01.wav",
+          "channels": 1,
+          "description": "Colt M16 RIFLE CHARGING HANDLE Pulling back cocking handle to load weapon. Gun, foley. Close, mono.",
+          "sourceSha256": "bf445198d3027ac50f3d899df48970b7036c50722658bce397e0c3a75acad924",
+          "start": 6.43,
+          "duration": 0.18,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.18,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.16:d=0.02",
+      "target20Db": -19,
+      "level": 0.33011533373528307,
+      "decodedPeak": 0.2584059238433838,
+      "bytes": 3091,
+      "sha256": "e73bd6d35b0023063b9b7cb62abde81cb8030a8a21629b72d6ad2aed402ba14c"
+    },
+    "ar-close-3": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/M16/M16 Charging Handle 01.wav",
+          "channels": 1,
+          "description": "Colt M16 RIFLE CHARGING HANDLE Pulling back cocking handle to load weapon. Gun, foley. Close, mono.",
+          "sourceSha256": "bf445198d3027ac50f3d899df48970b7036c50722658bce397e0c3a75acad924",
+          "start": 11.21,
+          "duration": 0.18,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.18,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.16:d=0.02",
+      "target20Db": -19,
+      "level": 0.3279567216228033,
+      "decodedPeak": 0.26310843229293823,
+      "bytes": 3037,
+      "sha256": "4a17561dcba4b1b0c9992a8e0613eda1fe7e543f9b2e7dbf9e1ce0a67caddf80"
+    },
+    "pistol-out-1": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Walther P99/Walther P99 Mag Out Normal 01.wav",
+          "channels": 1,
+          "description": "Walther P 99 PISTOL MAGAZINE DETACH NORMAL Detaching a magazine from the weapon. Gun, foley. Close, mono.",
+          "sourceSha256": "90309466513e89b508fa7e4b06a3918f6b030879687d139ab7b566d9d7d369c9",
+          "start": 0.59,
+          "duration": 0.2,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.2,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.18000000000000002:d=0.02",
+      "target20Db": -19,
+      "level": 0.86456585070509,
+      "decodedPeak": 0.3973638117313385,
+      "bytes": 3934,
+      "sha256": "6b11e63dfabee362cbd24b7b12eee80847263c6e64e94675a02f57fd16d0cda1"
+    },
+    "pistol-out-2": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Walther P99/Walther P99 Mag Out Normal 01.wav",
+          "channels": 1,
+          "description": "Walther P 99 PISTOL MAGAZINE DETACH NORMAL Detaching a magazine from the weapon. Gun, foley. Close, mono.",
+          "sourceSha256": "90309466513e89b508fa7e4b06a3918f6b030879687d139ab7b566d9d7d369c9",
+          "start": 3.59,
+          "duration": 0.23,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.23,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.21000000000000002:d=0.02",
+      "target20Db": -19,
+      "level": 0.8637952972408507,
+      "decodedPeak": 0.39556288719177246,
+      "bytes": 4789,
+      "sha256": "db1c619d7c249c9b82bda5c8178dde2b546d889c721799a010e55b912734043a"
+    },
+    "pistol-out-3": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Walther P99/Walther P99 Mag Out Normal 01.wav",
+          "channels": 1,
+          "description": "Walther P 99 PISTOL MAGAZINE DETACH NORMAL Detaching a magazine from the weapon. Gun, foley. Close, mono.",
+          "sourceSha256": "90309466513e89b508fa7e4b06a3918f6b030879687d139ab7b566d9d7d369c9",
+          "start": 8.38,
+          "duration": 0.2,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.2,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.18000000000000002:d=0.02",
+      "target20Db": -19,
+      "level": 0.9300527332734563,
+      "decodedPeak": 0.39878755807876587,
+      "bytes": 4098,
+      "sha256": "347b4b493c73b7e3ff58f8cd6f67a7cfacc69095f053d15725a0915434a007c4"
+    },
+    "pistol-in-1": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Walther P99/Walther P99 Mag In Normal 01.wav",
+          "channels": 1,
+          "description": "Walther P 99 PISTOL MAGAZINE ATTACH NORMAL Attaching a magazine to the weapon. Gun, foley. Close, mono.",
+          "sourceSha256": "716d686080c7e8ee02311598d1be3ac8e982f6a3877271ff0777e902f01f8540",
+          "start": 6.87,
+          "duration": 0.18,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.18,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.16:d=0.02",
+      "target20Db": -19,
+      "level": 0.41488227433830466,
+      "decodedPeak": 0.4034534692764282,
+      "bytes": 3534,
+      "sha256": "559314d341795cc03c082699df7c48f37ff752a8166017a68da89b25f3a34d6a"
+    },
+    "pistol-in-2": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Walther P99/Walther P99 Mag In Normal 01.wav",
+          "channels": 1,
+          "description": "Walther P 99 PISTOL MAGAZINE ATTACH NORMAL Attaching a magazine to the weapon. Gun, foley. Close, mono.",
+          "sourceSha256": "716d686080c7e8ee02311598d1be3ac8e982f6a3877271ff0777e902f01f8540",
+          "start": 12.49,
+          "duration": 0.18,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.18,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.16:d=0.02",
+      "target20Db": -19,
+      "level": 0.3981071705534972,
+      "decodedPeak": 0.40771251916885376,
+      "bytes": 3543,
+      "sha256": "eed96a75f6e807f598e2dacea60afeb44bb6975176148d8e141ecd314a310169"
+    },
+    "pistol-in-3": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Walther P99/Walther P99 Mag In Normal 01.wav",
+          "channels": 1,
+          "description": "Walther P 99 PISTOL MAGAZINE ATTACH NORMAL Attaching a magazine to the weapon. Gun, foley. Close, mono.",
+          "sourceSha256": "716d686080c7e8ee02311598d1be3ac8e982f6a3877271ff0777e902f01f8540",
+          "start": 15.23,
+          "duration": 0.18,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.18,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.16:d=0.02",
+      "target20Db": -19,
+      "level": 0.5585831408792911,
+      "decodedPeak": 0.39996495842933655,
+      "bytes": 3234,
+      "sha256": "8a09574fb2d5500eff3c76856b8a24fede45cf581934604ecac08524f7846cb2"
+    },
+    "pistol-close-1": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Walther P99/Walther P99 Slide Snap 01.wav",
+          "channels": 1,
+          "description": "Walther P 99 PISTOL SLIDE SNAP Letting the slide snap forward from locked back position. Gun, foley. Close, mono.",
+          "sourceSha256": "0fecac6a2ba1e2ffe389369b0a1ca0c7318da7f1fe08015fe54969cabd45d87a",
+          "start": 2.22,
+          "duration": 0.18,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.18,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.16:d=0.02",
+      "target20Db": -19,
+      "level": 0.3981071705534972,
+      "decodedPeak": 0.40129220485687256,
+      "bytes": 3499,
+      "sha256": "26d6e40fc8075572d1f28af6a7b51ac1cc90c6f1c4bc1fbfe92e4f1a05097de7"
+    },
+    "pistol-close-2": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Walther P99/Walther P99 Slide Snap 01.wav",
+          "channels": 1,
+          "description": "Walther P 99 PISTOL SLIDE SNAP Letting the slide snap forward from locked back position. Gun, foley. Close, mono.",
+          "sourceSha256": "0fecac6a2ba1e2ffe389369b0a1ca0c7318da7f1fe08015fe54969cabd45d87a",
+          "start": 5.34,
+          "duration": 0.18,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.18,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.16:d=0.02",
+      "target20Db": -19,
+      "level": 0.40157638006801366,
+      "decodedPeak": 0.40149348974227905,
+      "bytes": 3488,
+      "sha256": "c1084defd3fd7970296c2e9d8a8433dc4ec2c99388c7e1f73a3e33d8b7daf3a3"
+    },
+    "pistol-close-3": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Walther P99/Walther P99 Slide Snap 01.wav",
+          "channels": 1,
+          "description": "Walther P 99 PISTOL SLIDE SNAP Letting the slide snap forward from locked back position. Gun, foley. Close, mono.",
+          "sourceSha256": "0fecac6a2ba1e2ffe389369b0a1ca0c7318da7f1fe08015fe54969cabd45d87a",
+          "start": 11.57,
+          "duration": 0.18,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.18,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.16:d=0.02",
+      "target20Db": -19,
+      "level": 0.3981071705534972,
+      "decodedPeak": 0.40351954102516174,
+      "bytes": 3593,
+      "sha256": "368fff4b94193263d70e6ffbeaeb1731e54c37c5257d0fa98be6a41b0cd89b0e"
+    },
+    "smg-out-1": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/HK MP5/HK MP5 Mag Out 01.wav",
+          "channels": 1,
+          "description": "Heckler & Koch MP 5 SUBMACHINE GUN MAGAZINE DETACH Detaching a magazine to the weapon. Rifle, foley. Close, mono.",
+          "sourceSha256": "b2948330971890490078308ed35b9a7678dfa4db5aed8108a2d6bc0eb8645943",
+          "start": 0.33,
+          "duration": 0.15,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.15,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.13:d=0.02",
+      "target20Db": -19,
+      "level": 1.5562708272178902,
+      "decodedPeak": 0.4029476046562195,
+      "bytes": 2666,
+      "sha256": "39b1d9f09f0395244c8329a474986bededaecdccd952add907de67891927b746"
+    },
+    "smg-out-2": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/HK MP5/HK MP5 Mag Out 01.wav",
+          "channels": 1,
+          "description": "Heckler & Koch MP 5 SUBMACHINE GUN MAGAZINE DETACH Detaching a magazine to the weapon. Rifle, foley. Close, mono.",
+          "sourceSha256": "b2948330971890490078308ed35b9a7678dfa4db5aed8108a2d6bc0eb8645943",
+          "start": 3.33,
+          "duration": 0.18,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.18,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.16:d=0.02",
+      "target20Db": -19,
+      "level": 1.3918464250675149,
+      "decodedPeak": 0.39794158935546875,
+      "bytes": 3903,
+      "sha256": "198c937a5ce131ddf11079db18fb18565d092e40cb6080e4faa9583caadbaead"
+    },
+    "smg-out-3": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/HK MP5/HK MP5 Mag Out 01.wav",
+          "channels": 1,
+          "description": "Heckler & Koch MP 5 SUBMACHINE GUN MAGAZINE DETACH Detaching a magazine to the weapon. Rifle, foley. Close, mono.",
+          "sourceSha256": "b2948330971890490078308ed35b9a7678dfa4db5aed8108a2d6bc0eb8645943",
+          "start": 6.11,
+          "duration": 0.16,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.16,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.14:d=0.02",
+      "target20Db": -19,
+      "level": 1.32176126881959,
+      "decodedPeak": 0.3975125551223755,
+      "bytes": 3109,
+      "sha256": "a22991f85d20198510e96d0b85d5cf1caec66fa4b15e3d528f8418b32cc86b22"
+    },
+    "smg-in-1": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/HK MP5/HK MP5 Mag In 01.wav",
+          "channels": 1,
+          "description": "Heckler & Koch MP 5 SUBMACHINE GUN MAGAZINE ATTACH Attaching a magazine to the weapon. Rifle, foley. Close, mono.",
+          "sourceSha256": "93ceca099a7717bf39dd4fcefe6ed10108395cdac1816c4376621f52c8d9fec2",
+          "start": 2.28,
+          "duration": 0.23,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.23,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.21000000000000002:d=0.02",
+      "target20Db": -19,
+      "level": 0.6454782410248342,
+      "decodedPeak": 0.4009624421596527,
+      "bytes": 4476,
+      "sha256": "b53545d3063583b1ba911bb900db40ca871d297d4ca7531f8b66358361a25ce2"
+    },
+    "smg-in-2": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/HK MP5/HK MP5 Mag In 01.wav",
+          "channels": 1,
+          "description": "Heckler & Koch MP 5 SUBMACHINE GUN MAGAZINE ATTACH Attaching a magazine to the weapon. Rifle, foley. Close, mono.",
+          "sourceSha256": "93ceca099a7717bf39dd4fcefe6ed10108395cdac1816c4376621f52c8d9fec2",
+          "start": 4.87,
+          "duration": 0.2,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.2,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.18000000000000002:d=0.02",
+      "target20Db": -19,
+      "level": 0.5636910413582953,
+      "decodedPeak": 0.3718816041946411,
+      "bytes": 3527,
+      "sha256": "5e8ff877608f8dec86139a96361f8586ab0c98ea5bf80c5bfac226284568763f"
+    },
+    "smg-in-3": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/HK MP5/HK MP5 Mag In 01.wav",
+          "channels": 1,
+          "description": "Heckler & Koch MP 5 SUBMACHINE GUN MAGAZINE ATTACH Attaching a magazine to the weapon. Rifle, foley. Close, mono.",
+          "sourceSha256": "93ceca099a7717bf39dd4fcefe6ed10108395cdac1816c4376621f52c8d9fec2",
+          "start": 8.22,
+          "duration": 0.21,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.21,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.19:d=0.02",
+      "target20Db": -19,
+      "level": 0.601992149786221,
+      "decodedPeak": 0.3980448842048645,
+      "bytes": 4044,
+      "sha256": "cbc0469cd279b6c823ef80a16f96c99f02098103af30675ef519f72dfac5c081"
+    },
+    "smg-close-1": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/HK MP5/HK MP5 Cocking Handle Release 01.wav",
+          "channels": 1,
+          "description": "Heckler & Koch MP 5 SUBMACHINE GUN COCKING HANDLE Snapping back cocking handle to load weapon. Rifle, foley. Close, mono.",
+          "sourceSha256": "80f61de7e13d800c3f3284547d8589ec067ad8e7cc2abef95d731170b4163411",
+          "start": 0.31,
+          "duration": 0.17,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.17,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.15000000000000002:d=0.02",
+      "target20Db": -19,
+      "level": 0.3503256582955895,
+      "decodedPeak": 0.30443865060806274,
+      "bytes": 3144,
+      "sha256": "013f94c6a1c111d4434b3c9fd0d9730edc29a51f340e350958f2ece36f0e7cb8"
+    },
+    "smg-close-2": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/HK MP5/HK MP5 Cocking Handle Release 01.wav",
+          "channels": 1,
+          "description": "Heckler & Koch MP 5 SUBMACHINE GUN COCKING HANDLE Snapping back cocking handle to load weapon. Rifle, foley. Close, mono.",
+          "sourceSha256": "80f61de7e13d800c3f3284547d8589ec067ad8e7cc2abef95d731170b4163411",
+          "start": 3.76,
+          "duration": 0.17,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.17,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.15000000000000002:d=0.02",
+      "target20Db": -19,
+      "level": 0.364798375756526,
+      "decodedPeak": 0.3225308954715729,
+      "bytes": 3222,
+      "sha256": "f127329bc46b461fb1f9e25729f198fbf4e5c879db488e6c17d50f64b8e22008"
+    },
+    "smg-close-3": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/HK MP5/HK MP5 Cocking Handle Release 01.wav",
+          "channels": 1,
+          "description": "Heckler & Koch MP 5 SUBMACHINE GUN COCKING HANDLE Snapping back cocking handle to load weapon. Rifle, foley. Close, mono.",
+          "sourceSha256": "80f61de7e13d800c3f3284547d8589ec067ad8e7cc2abef95d731170b4163411",
+          "start": 4.87,
+          "duration": 0.17,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.17,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.15000000000000002:d=0.02",
+      "target20Db": -19,
+      "level": 0.34072283049535085,
+      "decodedPeak": 0.28926360607147217,
+      "bytes": 2871,
+      "sha256": "d5fb27ad1ca95586a681f8b899563bf23f8a3c07d92770aa1cde68dc23a69585"
+    },
+    "sniper-out-1": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/HK G36/HK G36 Mag Out 01.wav",
+          "channels": 1,
+          "description": "Heckler & Koch G 36 RIFLE MAGAZINE DETACH Detaching a magazine to the weapon. Gun, foley. Close, mono.",
+          "sourceSha256": "c662aada2a2a846445ff5a6d50ff3280976896f19d4545dad1b969349ec026b5",
+          "start": 1.2,
+          "duration": 0.25,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.25,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.23:d=0.02",
+      "target20Db": -19,
+      "level": 0.6803536742992526,
+      "decodedPeak": 0.3995566666126251,
+      "bytes": 4742,
+      "sha256": "7e4c52e68d4073cabf367904891dcaf0c4e8d87e5818b3d61e276cc311190a78"
+    },
+    "sniper-out-2": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/HK G36/HK G36 Mag Out 01.wav",
+          "channels": 1,
+          "description": "Heckler & Koch G 36 RIFLE MAGAZINE DETACH Detaching a magazine to the weapon. Gun, foley. Close, mono.",
+          "sourceSha256": "c662aada2a2a846445ff5a6d50ff3280976896f19d4545dad1b969349ec026b5",
+          "start": 7.01,
+          "duration": 0.18,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.18,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.16:d=0.02",
+      "target20Db": -19,
+      "level": 0.7782859295686338,
+      "decodedPeak": 0.3954886496067047,
+      "bytes": 3996,
+      "sha256": "edf5b5b56edc3db2b81c35921a3e3f43fc5a6ccdb39df6ca4edeb128ce7ac01f"
+    },
+    "sniper-out-3": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/HK G36/HK G36 Mag Out 01.wav",
+          "channels": 1,
+          "description": "Heckler & Koch G 36 RIFLE MAGAZINE DETACH Detaching a magazine to the weapon. Gun, foley. Close, mono.",
+          "sourceSha256": "c662aada2a2a846445ff5a6d50ff3280976896f19d4545dad1b969349ec026b5",
+          "start": 10.8,
+          "duration": 0.2,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.2,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.18000000000000002:d=0.02",
+      "target20Db": -19,
+      "level": 1.1135746495263086,
+      "decodedPeak": 0.4003147482872009,
+      "bytes": 3869,
+      "sha256": "fc354a5a809480f10c0f78357d56aa953de7955bf09da717e8550eb20bc4b71e"
+    },
+    "sniper-in-1": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/HK G36/HK G36 Mag In 01.wav",
+          "channels": 1,
+          "description": "Heckler & Koch G 36 RIFLE MAGAZINE ATTACH Attaching a magazine to the weapon. Gun, foley. Close, mono.",
+          "sourceSha256": "641a12390647108dcb7b5df95654e1a18ae2472c5e4a34615c01edcc5fc4c71c",
+          "start": 0.58,
+          "duration": 0.18,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.18,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.16:d=0.02",
+      "target20Db": -19,
+      "level": 0.4121530130720656,
+      "decodedPeak": 0.40032368898391724,
+      "bytes": 3401,
+      "sha256": "efbe2c665e2be3a971bd9a1255d6b688bed6bdb5abb4105e49ed0e9f2553d6be"
+    },
+    "sniper-in-2": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/HK G36/HK G36 Mag In 01.wav",
+          "channels": 1,
+          "description": "Heckler & Koch G 36 RIFLE MAGAZINE ATTACH Attaching a magazine to the weapon. Gun, foley. Close, mono.",
+          "sourceSha256": "641a12390647108dcb7b5df95654e1a18ae2472c5e4a34615c01edcc5fc4c71c",
+          "start": 9.94,
+          "duration": 0.18,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.18,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.16:d=0.02",
+      "target20Db": -19,
+      "level": 0.4835244433250911,
+      "decodedPeak": 0.32396355271339417,
+      "bytes": 3612,
+      "sha256": "f7f006b1e5ddfbc61df0f3701864e019a8ca19edb1a3305bb1a505adcd1bc9f7"
+    },
+    "sniper-in-3": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/HK G36/HK G36 Mag In 01.wav",
+          "channels": 1,
+          "description": "Heckler & Koch G 36 RIFLE MAGAZINE ATTACH Attaching a magazine to the weapon. Gun, foley. Close, mono.",
+          "sourceSha256": "641a12390647108dcb7b5df95654e1a18ae2472c5e4a34615c01edcc5fc4c71c",
+          "start": 14.66,
+          "duration": 0.2,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.2,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.18000000000000002:d=0.02",
+      "target20Db": -19,
+      "level": 0.45053180306347024,
+      "decodedPeak": 0.3183300495147705,
+      "bytes": 3900,
+      "sha256": "050de54c7c8f9d74c464bc47330bcb7e0803fc64d01600ef345cb247788142ea"
+    },
+    "bolt-open-1": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Remington 700/Remington 700 Bolt Action Normal 01.wav",
+          "channels": 1,
+          "description": "Remington 700 RIFLE BOLT ACTION NORMAL Normally using bolt handle to open and close bolt action. Sniper, Gun, foley. Close, mono.",
+          "sourceSha256": "85e8f7c522907adc5f0fb4af42302c3f41ac95f6ef153a757dec32e452db6580",
+          "start": 0.7,
+          "duration": 0.45,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.45,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.43:d=0.02",
+      "target20Db": -19,
+      "level": 0.6582954993949754,
+      "decodedPeak": 0.39623475074768066,
+      "bytes": 6889,
+      "sha256": "67060ea751db02d5e014b3ddade36e4eeab02aca4f2ba7af86879bc3664d6057"
+    },
+    "bolt-open-2": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Remington 700/Remington 700 Bolt Action Normal 01.wav",
+          "channels": 1,
+          "description": "Remington 700 RIFLE BOLT ACTION NORMAL Normally using bolt handle to open and close bolt action. Sniper, Gun, foley. Close, mono.",
+          "sourceSha256": "85e8f7c522907adc5f0fb4af42302c3f41ac95f6ef153a757dec32e452db6580",
+          "start": 4.57,
+          "duration": 0.43,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.43,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.41:d=0.02",
+      "target20Db": -19,
+      "level": 0.6194640355237357,
+      "decodedPeak": 0.40083539485931396,
+      "bytes": 6328,
+      "sha256": "5df3e34c2f5090b7fe2578bf4e56a8801591caf5f21921c6e66393f1b43ff50c"
+    },
+    "bolt-open-3": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Remington 700/Remington 700 Bolt Action Normal 01.wav",
+          "channels": 1,
+          "description": "Remington 700 RIFLE BOLT ACTION NORMAL Normally using bolt handle to open and close bolt action. Sniper, Gun, foley. Close, mono.",
+          "sourceSha256": "85e8f7c522907adc5f0fb4af42302c3f41ac95f6ef153a757dec32e452db6580",
+          "start": 8.93,
+          "duration": 0.52,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.52,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.5:d=0.02",
+      "target20Db": -19,
+      "level": 0.5835167537010406,
+      "decodedPeak": 0.39771223068237305,
+      "bytes": 7821,
+      "sha256": "db2817e934dc91fb39af7e9bfb9773ce01faf36af9213d2e294622b6daf5bbce"
+    },
+    "bolt-close-1": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Remington 700/Remington 700 Bolt Action Quick 01.wav",
+          "channels": 1,
+          "description": "Remington 700 RIFLE BOLT ACTION QUICK Quickly using bolt handle to open and close bolt action. Sniper, Gun, foley. Close, mono.",
+          "sourceSha256": "f5c9a80d308ae353fb35a9325ce2bdf807cbb1de77dc5abdf9a9b3f4c4e991a9",
+          "start": 0.81,
+          "duration": 0.25,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.25,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.23:d=0.02",
+      "target20Db": -19,
+      "level": 0.5458531407826545,
+      "decodedPeak": 0.39563554525375366,
+      "bytes": 4703,
+      "sha256": "c9aba3831b9ef28186f8f5b4ff976bfea50a9c475efb9beca0ad15cc21e4fb1e"
+    },
+    "bolt-close-2": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Remington 700/Remington 700 Bolt Action Quick 01.wav",
+          "channels": 1,
+          "description": "Remington 700 RIFLE BOLT ACTION QUICK Quickly using bolt handle to open and close bolt action. Sniper, Gun, foley. Close, mono.",
+          "sourceSha256": "f5c9a80d308ae353fb35a9325ce2bdf807cbb1de77dc5abdf9a9b3f4c4e991a9",
+          "start": 3.76,
+          "duration": 0.24,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.24,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.22:d=0.02",
+      "target20Db": -19,
+      "level": 0.4837291913424127,
+      "decodedPeak": 0.4001784026622772,
+      "bytes": 4322,
+      "sha256": "ddcf8354ff275377d838ff89c948e4d6195769eb0947068127809f947d0a9515"
+    },
+    "bolt-close-3": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Remington 700/Remington 700 Bolt Action Quick 01.wav",
+          "channels": 1,
+          "description": "Remington 700 RIFLE BOLT ACTION QUICK Quickly using bolt handle to open and close bolt action. Sniper, Gun, foley. Close, mono.",
+          "sourceSha256": "f5c9a80d308ae353fb35a9325ce2bdf807cbb1de77dc5abdf9a9b3f4c4e991a9",
+          "start": 6.49,
+          "duration": 0.24,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.24,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.22:d=0.02",
+      "target20Db": -19,
+      "level": 0.5029126428501071,
+      "decodedPeak": 0.39774996042251587,
+      "bytes": 4762,
+      "sha256": "9cd645eae05797c99451ddbd64dd7c9069d937afae2dd0adedf440e89ded8eb0"
+    },
+    "bolt-charge-1": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Remington 700/Remington 700 Bolt Action Normal 01.wav",
+          "channels": 1,
+          "description": "Remington 700 RIFLE BOLT ACTION NORMAL Normally using bolt handle to open and close bolt action. Sniper, Gun, foley. Close, mono.",
+          "sourceSha256": "85e8f7c522907adc5f0fb4af42302c3f41ac95f6ef153a757dec32e452db6580",
+          "start": 0.7,
+          "duration": 0.055,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.055,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.035:d=0.02",
+      "target20Db": -19,
+      "level": 0.6930617856370034,
+      "decodedPeak": 0.39994868636131287,
+      "bytes": 1945,
+      "sha256": "2c46dfcbe9087bbbb2a489210621b07ba152b5f92b2abb35e44eafc64db152fa"
+    },
+    "bolt-charge-2": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Remington 700/Remington 700 Bolt Action Normal 01.wav",
+          "channels": 1,
+          "description": "Remington 700 RIFLE BOLT ACTION NORMAL Normally using bolt handle to open and close bolt action. Sniper, Gun, foley. Close, mono.",
+          "sourceSha256": "85e8f7c522907adc5f0fb4af42302c3f41ac95f6ef153a757dec32e452db6580",
+          "start": 4.57,
+          "duration": 0.055,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.055,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.035:d=0.02",
+      "target20Db": -19,
+      "level": 0.7718589329029538,
+      "decodedPeak": 0.39655211567878723,
+      "bytes": 1823,
+      "sha256": "00812e2ab9446bb757a5ef7f440ef0974992b01c9e872ea1b0c29848ea8cdf1e"
+    },
+    "pump-1": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Pumpgun/Pumpgun Reload 01.wav",
+          "channels": 1,
+          "description": "PUMP GUN COCKING HANDLE Pulling forend back and forth to load weapon. Rifle, Gun, Shotgun, foley. Close, mono.",
+          "sourceSha256": "f63958f1196729697c0a7be086e95a85bab14729c14b586d682d0a485c89f444",
+          "start": 0.15,
+          "duration": 0.1,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.1,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.08:d=0.02",
+      "target20Db": -19,
+      "level": 0.36741537820919995,
+      "decodedPeak": 0.3020015060901642,
+      "bytes": 2038,
+      "sha256": "f0450d8db09a3d0fa7a0de3616e7b0cb200fc8e9970e0ebd5ad70761753e55c3",
+      "contactPeakTime": 0.011
+    },
+    "pump-2": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Pumpgun/Pumpgun Reload 01.wav",
+          "channels": 1,
+          "description": "PUMP GUN COCKING HANDLE Pulling forend back and forth to load weapon. Rifle, Gun, Shotgun, foley. Close, mono.",
+          "sourceSha256": "f63958f1196729697c0a7be086e95a85bab14729c14b586d682d0a485c89f444",
+          "start": 1.91,
+          "duration": 0.1,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.1,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.08:d=0.02",
+      "target20Db": -19,
+      "level": 0.3917693515189463,
+      "decodedPeak": 0.32722172141075134,
+      "bytes": 2041,
+      "sha256": "e6e96c38008c2359d64336fb89d27c592d34f7932f2f6374d2224cf4889c3540",
+      "contactPeakTime": 0.010708333333333334
+    },
+    "pump-3": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Pumpgun/Pumpgun Reload 01.wav",
+          "channels": 1,
+          "description": "PUMP GUN COCKING HANDLE Pulling forend back and forth to load weapon. Rifle, Gun, Shotgun, foley. Close, mono.",
+          "sourceSha256": "f63958f1196729697c0a7be086e95a85bab14729c14b586d682d0a485c89f444",
+          "start": 3.78,
+          "duration": 0.1,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.1,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.08:d=0.02",
+      "target20Db": -19,
+      "level": 0.37294018590000444,
+      "decodedPeak": 0.32851308584213257,
+      "bytes": 2112,
+      "sha256": "bc69f436772a8f14b5b8f0f854e290b24b5fc2bb74618c9fef3e8179f4969f26",
+      "contactPeakTime": 0.012833333333333334
+    },
+    "pump-open-1": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Pumpgun/Pumpgun Reload 01.wav",
+          "channels": 1,
+          "description": "PUMP GUN COCKING HANDLE Pulling forend back and forth to load weapon. Rifle, Gun, Shotgun, foley. Close, mono.",
+          "sourceSha256": "f63958f1196729697c0a7be086e95a85bab14729c14b586d682d0a485c89f444",
+          "start": 0.15,
+          "duration": 0.1,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.1,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.08:d=0.02",
+      "target20Db": -19,
+      "level": 0.36741537820919995,
+      "decodedPeak": 0.3020015060901642,
+      "bytes": 2038,
+      "sha256": "f0450d8db09a3d0fa7a0de3616e7b0cb200fc8e9970e0ebd5ad70761753e55c3",
+      "contactPeakTime": 0.011
+    },
+    "pump-open-2": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Pumpgun/Pumpgun Reload 01.wav",
+          "channels": 1,
+          "description": "PUMP GUN COCKING HANDLE Pulling forend back and forth to load weapon. Rifle, Gun, Shotgun, foley. Close, mono.",
+          "sourceSha256": "f63958f1196729697c0a7be086e95a85bab14729c14b586d682d0a485c89f444",
+          "start": 1.91,
+          "duration": 0.1,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.1,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.08:d=0.02",
+      "target20Db": -19,
+      "level": 0.3917693515189463,
+      "decodedPeak": 0.32722172141075134,
+      "bytes": 2041,
+      "sha256": "e6e96c38008c2359d64336fb89d27c592d34f7932f2f6374d2224cf4889c3540",
+      "contactPeakTime": 0.010708333333333334
+    },
+    "pump-close-1": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Pumpgun/Pumpgun Reload 01.wav",
+          "channels": 1,
+          "description": "PUMP GUN COCKING HANDLE Pulling forend back and forth to load weapon. Rifle, Gun, Shotgun, foley. Close, mono.",
+          "sourceSha256": "f63958f1196729697c0a7be086e95a85bab14729c14b586d682d0a485c89f444",
+          "start": 0.35,
+          "duration": 0.1,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.1,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.08:d=0.02",
+      "target20Db": -19,
+      "level": 0.290279554501286,
+      "decodedPeak": 0.2507339417934418,
+      "bytes": 2072,
+      "sha256": "d097a4c829996510b2db659a76ce4a331be105908f5e38136f0384e2853c7847",
+      "contactPeakTime": 0.010583333333333333
+    },
+    "pump-close-2": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Pumpgun/Pumpgun Reload 01.wav",
+          "channels": 1,
+          "description": "PUMP GUN COCKING HANDLE Pulling forend back and forth to load weapon. Rifle, Gun, Shotgun, foley. Close, mono.",
+          "sourceSha256": "f63958f1196729697c0a7be086e95a85bab14729c14b586d682d0a485c89f444",
+          "start": 2.13,
+          "duration": 0.1,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.1,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.08:d=0.02",
+      "target20Db": -19,
+      "level": 0.2962398059580416,
+      "decodedPeak": 0.2559487819671631,
+      "bytes": 2122,
+      "sha256": "bdeb75ffdb98583f39449f4a4561445cba6e1ee070d330d5d3662471a1e30492",
+      "contactPeakTime": 0.010520833333333333
+    },
+    "pump-close-3": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Pumpgun/Pumpgun Reload 01.wav",
+          "channels": 1,
+          "description": "PUMP GUN COCKING HANDLE Pulling forend back and forth to load weapon. Rifle, Gun, Shotgun, foley. Close, mono.",
+          "sourceSha256": "f63958f1196729697c0a7be086e95a85bab14729c14b586d682d0a485c89f444",
+          "start": 4,
+          "duration": 0.1,
+          "downmixLossDb": 0,
+          "level": 1
+        }
+      ],
+      "duration": 0.1,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.08:d=0.02",
+      "target20Db": -19,
+      "level": 0.3302625752269845,
+      "decodedPeak": 0.2785046696662903,
+      "bytes": 2091,
+      "sha256": "e5b338bcbce31cb2cd77f618aad3bbfd45f05ba38d8d674d1016d11c4e4a2113",
+      "contactPeakTime": 0.010333333333333333
+    },
+    "shell-in-1": {
+      "layers": [
+        {
+          "source": "BOOM ONE Update/Update 24-02/GUNS/MECHANISM/GUNMech_Remington 870 Shotgun Load_B00M_ONE.wav",
+          "channels": 2,
+          "description": "Remington 870 shotgun being loaded. Weapon, Firearm, Mechanism, Fill, Pack, Place, Put.",
+          "sourceSha256": "f45486e543de74af15d07a8ef4b19d974f5e27457cbc85c6ceb39f1b4760ba2f",
+          "start": 0.76,
+          "duration": 0.18,
+          "downmixLossDb": 0.8211954044816948,
+          "level": 1
+        }
+      ],
+      "duration": 0.18,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.16:d=0.02",
+      "target20Db": -19,
+      "level": 0.5893306486053467,
+      "decodedPeak": 0.3968579173088074,
+      "bytes": 3594,
+      "sha256": "ef81719f4569f227105676aa57ebebf14d3a78d45055460349848ce5d2f4dae4"
+    },
+    "shell-in-2": {
+      "layers": [
+        {
+          "source": "BOOM ONE Update/Update 24-02/GUNS/MECHANISM/GUNMech_Remington 870 Shotgun Load_B00M_ONE.wav",
+          "channels": 2,
+          "description": "Remington 870 shotgun being loaded. Weapon, Firearm, Mechanism, Fill, Pack, Place, Put.",
+          "sourceSha256": "f45486e543de74af15d07a8ef4b19d974f5e27457cbc85c6ceb39f1b4760ba2f",
+          "start": 3.1,
+          "duration": 0.23,
+          "downmixLossDb": 0.8007088407537808,
+          "level": 1
+        }
+      ],
+      "duration": 0.23,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.21000000000000002:d=0.02",
+      "target20Db": -19,
+      "level": 0.6589226584012594,
+      "decodedPeak": 0.3962504267692566,
+      "bytes": 3955,
+      "sha256": "141beeeab3a85ed49526428805166cb050ad67a633a88355350649e140249e86"
+    },
+    "shell-in-3": {
+      "layers": [
+        {
+          "source": "BOOM ONE Update/Update 24-02/GUNS/MECHANISM/GUNMech_Remington 870 Shotgun Load_B00M_ONE.wav",
+          "channels": 2,
+          "description": "Remington 870 shotgun being loaded. Weapon, Firearm, Mechanism, Fill, Pack, Place, Put.",
+          "sourceSha256": "f45486e543de74af15d07a8ef4b19d974f5e27457cbc85c6ceb39f1b4760ba2f",
+          "start": 5.56,
+          "duration": 0.18,
+          "downmixLossDb": 1.1395133887142763,
+          "level": 1
+        }
+      ],
+      "duration": 0.18,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.16:d=0.02",
+      "target20Db": -19,
+      "level": 0.6752682914907198,
+      "decodedPeak": 0.4087991416454315,
+      "bytes": 3256,
+      "sha256": "d8713470deaa78013b03b5354ecbcde440cc00be369153b31bc93d06c23ad065"
+    },
+    "gear-1": {
+      "layers": [
+        {
+          "source": "BOOM ONE Update/Update 24-03/OBJECTS/BAG/OBJBag_Tactical Gear Vest Handle_B00M_ONE.wav",
+          "channels": 2,
+          "description": "Handling sequence of a tactical vest. Tactical, Gear, Equipment, Military, Police, SWAT, Soldier, Vest, Cloth, Jacket, Handle, Rattle, Take.",
+          "sourceSha256": "045aa2c3b8902a9dcd8f39a89148962d37967ce7d10c1d618a650d14af322565",
+          "start": 0.17,
+          "duration": 0.22,
+          "downmixLossDb": 0.34439966827118335,
+          "level": 1
+        }
+      ],
+      "duration": 0.22,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.2:d=0.02",
+      "target20Db": -29,
+      "level": 1.45866621622562,
+      "decodedPeak": 0.22625748813152313,
+      "bytes": 3596,
+      "sha256": "68c171a7bc30067e81cdf73213edacc4cd70e3af95a01d693acc87fc5318c212"
+    },
+    "gear-2": {
+      "layers": [
+        {
+          "source": "BOOM ONE Update/Update 24-03/OBJECTS/BAG/OBJBag_Tactical Gear Vest Handle_B00M_ONE.wav",
+          "channels": 2,
+          "description": "Handling sequence of a tactical vest. Tactical, Gear, Equipment, Military, Police, SWAT, Soldier, Vest, Cloth, Jacket, Handle, Rattle, Take.",
+          "sourceSha256": "045aa2c3b8902a9dcd8f39a89148962d37967ce7d10c1d618a650d14af322565",
+          "start": 0.78,
+          "duration": 0.19,
+          "downmixLossDb": 1.0119966592283727,
+          "level": 1
+        }
+      ],
+      "duration": 0.19,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.17:d=0.02",
+      "target20Db": -29,
+      "level": 1.0245563109855291,
+      "decodedPeak": 0.19353365898132324,
+      "bytes": 3111,
+      "sha256": "1cf5f41a4553680adbacfd7af3446c5c912321886383f06fe4bfb3f1a9b50025"
+    },
+    "gear-3": {
+      "layers": [
+        {
+          "source": "BOOM ONE Update/Update 24-03/OBJECTS/BAG/OBJBag_Tactical Gear Vest Handle_B00M_ONE.wav",
+          "channels": 2,
+          "description": "Handling sequence of a tactical vest. Tactical, Gear, Equipment, Military, Police, SWAT, Soldier, Vest, Cloth, Jacket, Handle, Rattle, Take.",
+          "sourceSha256": "045aa2c3b8902a9dcd8f39a89148962d37967ce7d10c1d618a650d14af322565",
+          "start": 6.06,
+          "duration": 0.25,
+          "downmixLossDb": 0.5595508892708901,
+          "level": 1
+        }
+      ],
+      "duration": 0.25,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.23:d=0.02",
+      "target20Db": -29,
+      "level": 3.922809307503265,
+      "decodedPeak": 0.2085942029953003,
+      "bytes": 3556,
+      "sha256": "b6c97fb916799d4ae9429918308e4a805cc49017614e017b3d0edbf36b19aa95"
+    },
+    "pouch-out-1": {
+      "layers": [
+        {
+          "source": "BOOM ONE Update/Update 24-03/OBJECTS/BAG/OBJBag_Tactical Gear Backpack Small Take Out 01_B00M_ONE.wav",
+          "channels": 2,
+          "description": "Taking stuff out of a small tactical backpack. Tactical, Gear, Equipment, Military, Police, SWAT, Soldier, Backpack, Small, Bag, Take, Out.",
+          "sourceSha256": "d32f64c4c7702fa9021ba08a0d1cc4b40ae0c1aa11a6f61d8332706d11ce81ad",
+          "start": 0.51,
+          "duration": 0.3,
+          "downmixLossDb": 0.28820126433889875,
+          "level": 1
+        },
+        {
+          "source": "Boom One Update/Update 23-12/EQUIPMENT/TACTICAL/EQUIPTact_Ammo Box Latch Opening Short_B00M_ONE.wav",
+          "channels": 2,
+          "description": "Metallic ammo box latch opening. Short performance. Weapon, Gun, Handling, Reload, Magazine, Ammo, Sweetener, Box, Latch.",
+          "sourceSha256": "d0b503edf839d57916d27c38f0edecd881840fe6508dd5475538c95eef0201c8",
+          "start": 0.2,
+          "duration": 0.14,
+          "downmixLossDb": 0.0005239166720724994,
+          "level": 0.2
+        }
+      ],
+      "duration": 0.3,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.27999999999999997:d=0.02",
+      "target20Db": -19,
+      "level": 1.1169308717759614,
+      "decodedPeak": 0.376392662525177,
+      "bytes": 4098,
+      "sha256": "9a7c8bf14f981bf27174857c4c54acf5607c9a11e8e7c9e7d2c155d31d472a42"
+    },
+    "pouch-out-2": {
+      "layers": [
+        {
+          "source": "BOOM ONE Update/Update 24-03/OBJECTS/BAG/OBJBag_Tactical Gear Backpack Small Take Out 01_B00M_ONE.wav",
+          "channels": 2,
+          "description": "Taking stuff out of a small tactical backpack. Tactical, Gear, Equipment, Military, Police, SWAT, Soldier, Backpack, Small, Bag, Take, Out.",
+          "sourceSha256": "d32f64c4c7702fa9021ba08a0d1cc4b40ae0c1aa11a6f61d8332706d11ce81ad",
+          "start": 2.32,
+          "duration": 0.3,
+          "downmixLossDb": 0.2441228760941228,
+          "level": 1
+        },
+        {
+          "source": "Boom One Update/Update 23-12/EQUIPMENT/TACTICAL/EQUIPTact_Ammo Box Latch Opening Short_B00M_ONE.wav",
+          "channels": 2,
+          "description": "Metallic ammo box latch opening. Short performance. Weapon, Gun, Handling, Reload, Magazine, Ammo, Sweetener, Box, Latch.",
+          "sourceSha256": "d0b503edf839d57916d27c38f0edecd881840fe6508dd5475538c95eef0201c8",
+          "start": 2.12,
+          "duration": 0.16,
+          "downmixLossDb": 0.0005522080999104633,
+          "level": 0.2
+        }
+      ],
+      "duration": 0.3,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.27999999999999997:d=0.02",
+      "target20Db": -19,
+      "level": 1.087282910508845,
+      "decodedPeak": 0.4003998935222626,
+      "bytes": 4212,
+      "sha256": "58ed867eee3c51a67971e70161566cc5457b6536593467821ae81ff0a58e2390"
+    },
+    "pouch-out-3": {
+      "layers": [
+        {
+          "source": "BOOM ONE Update/Update 24-03/OBJECTS/BAG/OBJBag_Tactical Gear Backpack Small Take Out 01_B00M_ONE.wav",
+          "channels": 2,
+          "description": "Taking stuff out of a small tactical backpack. Tactical, Gear, Equipment, Military, Police, SWAT, Soldier, Backpack, Small, Bag, Take, Out.",
+          "sourceSha256": "d32f64c4c7702fa9021ba08a0d1cc4b40ae0c1aa11a6f61d8332706d11ce81ad",
+          "start": 3.98,
+          "duration": 0.3,
+          "downmixLossDb": 0.3565480482874733,
+          "level": 1
+        },
+        {
+          "source": "Boom One Update/Update 23-12/EQUIPMENT/TACTICAL/EQUIPTact_Ammo Box Latch Opening Short_B00M_ONE.wav",
+          "channels": 2,
+          "description": "Metallic ammo box latch opening. Short performance. Weapon, Gun, Handling, Reload, Magazine, Ammo, Sweetener, Box, Latch.",
+          "sourceSha256": "d0b503edf839d57916d27c38f0edecd881840fe6508dd5475538c95eef0201c8",
+          "start": 3.91,
+          "duration": 0.18,
+          "downmixLossDb": 0.00045757075114741654,
+          "level": 0.2
+        }
+      ],
+      "duration": 0.3,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.27999999999999997:d=0.02",
+      "target20Db": -19,
+      "level": 1.1575424653363353,
+      "decodedPeak": 0.38669243454933167,
+      "bytes": 4076,
+      "sha256": "8782f825ca8d1c64fb71082dfac9049d20145371f9815d80c7435a12141d5d91"
+    },
+    "pouch-in-1": {
+      "layers": [
+        {
+          "source": "BOOM ONE Update/Update 24-03/OBJECTS/BAG/OBJBag_Tactical Gear Backpack Small Stow Heavy_B00M_ONE.wav",
+          "channels": 2,
+          "description": "Stowing stuff inside a small tactical backpack. Heavy. Tactical, Gear, Equipment, Military, Police, SWAT, Soldier, Backpack, Small, Bag, Stow, Put, In, Heavy, Loaded.",
+          "sourceSha256": "339e5bd559954f57885c2a8510a893509ca8a2600fcf181d4020d887c786adbb",
+          "start": 0.53,
+          "duration": 0.25,
+          "downmixLossDb": 0.0859189122506346,
+          "level": 1
+        },
+        {
+          "source": "BOOM ONE Update/Update 24-03/OBJECTS/BAG/OBJBag_Tactical Gear Vest Belt Clip_B00M_ONE.wav",
+          "channels": 2,
+          "description": "Tactical vest. Clipping belt together. Tactical, Gear, Equipment, Military, Police, SWAT, Soldier, Vest, Cloth, Jacket, Clip, Belt.",
+          "sourceSha256": "4412505c52676a49bbe6e6ec6756da7b64d942134c38e69d8258b379850801e7",
+          "start": 0.24,
+          "duration": 0.12,
+          "downmixLossDb": 0.35525673146828973,
+          "level": 0.25
+        }
+      ],
+      "duration": 0.25,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.23:d=0.02",
+      "target20Db": -19,
+      "level": 0.5735353792522058,
+      "decodedPeak": 0.356695294380188,
+      "bytes": 3440,
+      "sha256": "ce26b4b3f17c1e8e86ceb61b57262a9eb1fd0ffba1cebca60bfe77d8b54582e4"
+    },
+    "pouch-in-2": {
+      "layers": [
+        {
+          "source": "BOOM ONE Update/Update 24-03/OBJECTS/BAG/OBJBag_Tactical Gear Backpack Small Stow Heavy_B00M_ONE.wav",
+          "channels": 2,
+          "description": "Stowing stuff inside a small tactical backpack. Heavy. Tactical, Gear, Equipment, Military, Police, SWAT, Soldier, Backpack, Small, Bag, Stow, Put, In, Heavy, Loaded.",
+          "sourceSha256": "339e5bd559954f57885c2a8510a893509ca8a2600fcf181d4020d887c786adbb",
+          "start": 2.23,
+          "duration": 0.25,
+          "downmixLossDb": 0.13871066051876504,
+          "level": 1
+        },
+        {
+          "source": "BOOM ONE Update/Update 24-03/OBJECTS/BAG/OBJBag_Tactical Gear Vest Belt Clip_B00M_ONE.wav",
+          "channels": 2,
+          "description": "Tactical vest. Clipping belt together. Tactical, Gear, Equipment, Military, Police, SWAT, Soldier, Vest, Cloth, Jacket, Clip, Belt.",
+          "sourceSha256": "4412505c52676a49bbe6e6ec6756da7b64d942134c38e69d8258b379850801e7",
+          "start": 1.72,
+          "duration": 0.12,
+          "downmixLossDb": 0.39787600704302784,
+          "level": 0.25
+        }
+      ],
+      "duration": 0.25,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.23:d=0.02",
+      "target20Db": -19,
+      "level": 0.913327969092246,
+      "decodedPeak": 0.39280980825424194,
+      "bytes": 3726,
+      "sha256": "33f5d0435e384fcae4d213b5fb66c90c690a10ada693723f6401de80282e5ad4"
+    },
+    "pouch-in-3": {
+      "layers": [
+        {
+          "source": "BOOM ONE Update/Update 24-03/OBJECTS/BAG/OBJBag_Tactical Gear Backpack Small Stow Heavy_B00M_ONE.wav",
+          "channels": 2,
+          "description": "Stowing stuff inside a small tactical backpack. Heavy. Tactical, Gear, Equipment, Military, Police, SWAT, Soldier, Backpack, Small, Bag, Stow, Put, In, Heavy, Loaded.",
+          "sourceSha256": "339e5bd559954f57885c2a8510a893509ca8a2600fcf181d4020d887c786adbb",
+          "start": 5.91,
+          "duration": 0.25,
+          "downmixLossDb": 0.10179970717042117,
+          "level": 1
+        },
+        {
+          "source": "BOOM ONE Update/Update 24-03/OBJECTS/BAG/OBJBag_Tactical Gear Vest Belt Clip_B00M_ONE.wav",
+          "channels": 2,
+          "description": "Tactical vest. Clipping belt together. Tactical, Gear, Equipment, Military, Police, SWAT, Soldier, Vest, Cloth, Jacket, Clip, Belt.",
+          "sourceSha256": "4412505c52676a49bbe6e6ec6756da7b64d942134c38e69d8258b379850801e7",
+          "start": 3.18,
+          "duration": 0.12,
+          "downmixLossDb": 0.27066882465783515,
+          "level": 0.25
+        }
+      ],
+      "duration": 0.25,
+      "filter": "highpass=f=80,lowpass=f=11000,afade=t=in:d=0.002,afade=t=out:st=0.23:d=0.02",
+      "target20Db": -19,
+      "level": 0.6061275094172992,
+      "decodedPeak": 0.3743487298488617,
+      "bytes": 3559,
+      "sha256": "baf225029e14c401c593c9378843b364ab128f80fdc86cdf97888a2168bfa359"
+    }
+  }
+}

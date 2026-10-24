@@ -1,7 +1,6 @@
 import type * as THREE from 'three';
 
 import type { EngineContext, EngineSystems } from '../core/context.ts';
-import type { Rng } from '../core/rng.ts';
 import type { loadAX338 } from './ax338.ts';
 import type { Clip, ClipSample } from './clips.ts';
 import type { WEAPON_DEFS } from './defs.ts';
@@ -9,7 +8,6 @@ import type { loadEvolys } from './evolys.ts';
 import type { Arm } from './hands.ts';
 import type { loadM4 } from './m4.ts';
 import type { loadM590 } from './m590.ts';
-import type { WeaponMaterialsNode } from './materials-tsl.ts';
 import type { loadMCX } from './mcx.ts';
 import type { loadMPX } from './mpx.ts';
 import type { loadP320 } from './p320.ts';
@@ -30,7 +28,6 @@ export type WeaponDef = { [K in keyof Definitions]: Definitions[K] } & {
   adsFiringShoulderZ?: number;
   supportShoulderZ?: number;
 };
-type WeaponId = keyof typeof WEAPON_DEFS;
 type WeaponMode = WeaponDef['modes'][number];
 export interface WeaponState {
   def: WeaponDef;
@@ -173,10 +170,4 @@ export type ViewmodelContext = Pick<
 > & {
   get(id: 'render'): Pick<EngineSystems['render'], 'screenSize'> | null;
 };
-export interface WeaponRuntimeDependencies {
-  rng: Rng;
-  mats: WeaponMaterialsNode;
-}
-export type WeaponKey = WeaponId;
 export type ClipResult = ClipSample;
-export type WeaponAnimationModel = AuthoredWeaponModel;

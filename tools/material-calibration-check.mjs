@@ -128,7 +128,7 @@ try {
       const { DEFAULT_PARAMS } = await import('/src/materials/params.ts');
       const { MaterialSystemNode } = await import('/src/materials/index.ts');
       const { glassSurface } = await import('/src/materials/tsl/glass.ts');
-      const { WEAPON_MATERIALS } = await import('/src/weapons/materials.ts');
+      const { SURFACE_FIXTURES } = await import('/tools/lib/material-fixtures.ts');
       const { createSoldierNodeMaterial, SoldierMaterialsNode } =
         await import('/src/ai/textures-tsl.ts');
       const { createWeaponMaterial } = await import('/src/weapons/asset-material.ts');
@@ -328,7 +328,7 @@ try {
         await library.init({ config: { quality: 'low', q: { anisotropy: 2 } } });
         const recipeDryRoughness = {};
         for (const name of ['alu', 'polymer', 'steel']) {
-          const [surface, opts] = WEAPON_MATERIALS[name],
+          const [surface, opts] = SURFACE_FIXTURES[name],
             m = library.get(surface, opts);
           m.setupOutput = function () {
             return N.vec4(N.vec3(this.roughnessNode), 1);
@@ -345,7 +345,7 @@ try {
           );
         }
         move(0);
-        const [sootSurface, sootOpts] = WEAPON_MATERIALS.steel_soot;
+        const [sootSurface, sootOpts] = SURFACE_FIXTURES.steel_soot;
         const soot = library.get(sootSurface, sootOpts);
         soot.setupOutput = function () {
           return N.vec4(this.metalnessNode, 0, 0, 1);

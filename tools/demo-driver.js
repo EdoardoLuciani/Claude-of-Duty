@@ -134,19 +134,13 @@
   /* level knowledge                                                      */
   /* ==================================================================== */
 
-  /** Snap (x,z) onto the AI walkability grid so spawns never land inside a wall. */
-  function placeOn(x, z, fromY) {
-    const ai = sys('ai');
-    if (!ai) return null;
-    const g = ai.grid;
-    if (g) {
-      const ci = g.nearest(x, z, fromY, 8, 2.0);
-      if (ci >= 0) {
-        return new V3(g.worldX(ci % g.nx), g.floor[ci], g.worldZ((ci / g.nx) | 0));
-      }
-    }
-    const y = ai.groundAt(x, z, fromY + 5);
-    return Number.isFinite(y) ? new V3(x, y, z) : null;
+  /** Use the live surface authority; failed attachments are never spawn points. */
+  function placeOn(x, z) {
+    const nav = sys('ai')?.grid;
+    const feet = sys('player')?.feetPosition;
+    if (!nav || !feet) return null;
+    const point = new V3();
+    return nav.sampleGround(x, z, feet.y, point) ? point : null;
   }
 
   const world = sys('world');
@@ -219,8 +213,7 @@
       const lat = (i % 2 === 0 ? 1 : -1) * (2.5 + 2.4 * ((i * 7) % 3));
       const p = placeOn(
         cam.position.x + _f.x * d + _r.x * lat,
-        cam.position.z + _f.z * d + _r.z * lat,
-        cam.position.y
+        cam.position.z + _f.z * d + _r.z * lat
       );
       if (!p) continue;
       const yaw = Math.atan2(cam.position.x - p.x, cam.position.z - p.z);

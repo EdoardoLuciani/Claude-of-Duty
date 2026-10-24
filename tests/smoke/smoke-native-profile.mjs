@@ -286,7 +286,11 @@ for (const realtime of [false, true]) {
     position: new Vector3(),
     eyeHeight: 1.6,
     yaw: 0,
-    health: {},
+    health: {
+      setDebugValue(value) {
+        this.value = value;
+      },
+    },
     teleport(p, yaw) {
       this.position.copy(p);
       this.yaw = yaw;
@@ -327,6 +331,7 @@ for (const realtime of [false, true]) {
     () => ({ fx: 0, fz: 1, positions: Array.from({ length: 6 }, (_, i) => new Vector3(i, 0, 0)) }),
     { realtime }
   );
+  assert.equal(player.health.value, 10000, 'profiling uses the explicit diagnostic health API');
   const before = (frame, actionFrame) => {
     fixture.before(frame, actionFrame);
     const pressed = new Set(input._pendingDown);

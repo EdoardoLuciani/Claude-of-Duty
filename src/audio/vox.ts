@@ -1,7 +1,8 @@
 /**
- * AUDIO / VOICE — formant synthesis for enemy barks
+ * AUDIO / VOICE — deferred tactical speech synthesis (#497).
+ * Nonverbal hurt/death reactions use required recordings in reactions.ts.
  *
- * No speech samples, so barks are built the way a vocal tract works:
+ * Until spoken-callout authoring, speech is built the way a vocal tract works:
  *
  *   glottal pulse train (PeriodicWave, 1/n^1.15 harmonics)
  *     + aspiration noise
@@ -27,11 +28,10 @@ import {
   saturationCurve,
   series,
   shaper,
-  sweep,
   type NoiseBank,
 } from './dsp.ts';
 import type { AudioVoice } from './types.ts';
-type VowelName = 'a' | 'e' | 'i' | 'o' | 'u' | 'ah' | 'ehr' | 'ohh';
+type VowelName = 'a' | 'e' | 'i' | 'o' | 'u' | 'ohh';
 type BarkName = string;
 interface Syllable {
   v: VowelName;
@@ -44,9 +44,6 @@ interface Syllable {
 interface BarkSpec {
   f0: number;
   drive: number;
-  breath?: number;
-  tremolo?: number;
-  dying?: boolean;
   syl: Syllable[];
 }
 interface BarkOptions {
@@ -65,8 +62,6 @@ const VOWELS: Record<VowelName, number[]> = {
   i: [300, 2290, 3010, 70, 130, 190], // "see"
   o: [570, 840, 2410, 90, 110, 170], // "law"
   u: [325, 700, 2530, 70, 100, 170], // "boot"
-  ah: [640, 1200, 2500, 110, 140, 190],
-  ehr: [490, 1350, 1690, 100, 130, 180], // "her"
   ohh: [450, 900, 2300, 95, 115, 175],
 };
 
@@ -145,33 +140,6 @@ export const BARKS: Record<BarkName, BarkSpec> = {
       { v: 'a', d: 0.14, a: 0.9, p: 1.0, g: 0 },
     ],
   },
-  /* wordless taking-fire grunt */
-  hit: {
-    f0: 1.25,
-    drive: 1.6,
-    breath: 0.5,
-    syl: [{ v: 'ah', d: 0.16, a: 1.1, p: 1.2, on: 'p', g: 0 }],
-  },
-  /* pain, longer, wavering */
-  pain: {
-    f0: 1.15,
-    drive: 1.3,
-    breath: 0.65,
-    tremolo: 14,
-    syl: [{ v: 'ah', d: 0.34, a: 0.95, p: 1.0, g: 0 }],
-  },
-  /* death: pitch collapses, breath takes over, ends in an exhale */
-  death: {
-    f0: 1.05,
-    drive: 1.4,
-    breath: 1.0,
-    tremolo: 22,
-    dying: true,
-    syl: [
-      { v: 'ah', d: 0.3, a: 1.0, p: 1.15, g: 0.02 },
-      { v: 'ehr', d: 0.42, a: 0.6, p: 0.62, g: 0 },
-    ],
-  },
   /* short affirmative, for squad chatter */
   copy: {
     f0: 1.0,
@@ -213,13 +181,12 @@ export function bark(
   o: BarkOptions = {}
 ): AudioVoice {
   const t0 = o.when ?? actx.currentTime;
-  const spec = BARKS[o.bark ?? 'contact'] ?? BARKS.contact;
+  const spec = BARKS[o.bark ?? 'contact'];
+  if (!spec) throw new Error('[audio] unknown synthesized speech cue: ' + o.bark);
   const tract = o.tract ?? rng.range(0.94, 1.07);
   const f0 = (o.f0 ?? rng.range(96, 132)) * spec.f0;
   const level = o.level ?? 1;
   const out = gain(actx, 0.2); // VOICE TRIM
-
-  const total = spec.syl.reduce((s: number, x) => s + x.d + (x.g ?? 0), 0);
 
   /* ---- source ---------------------------------------------------- */
   const src = actx.createOscillator();
@@ -227,8 +194,8 @@ export function bark(
   const srcGain = gain(actx, 0);
   src.connect(srcGain);
 
-  // Aspiration: always a little, a lot when hurt or dying.
-  const breathLevel = (spec.breath ?? 0.16) * rng.range(0.8, 1.25);
+  // Speech aspiration; nonverbal reactions use required recordings.
+  const breathLevel = 0.16 * rng.range(0.8, 1.25);
   const noise = bank.source('white', rng, rng.range(0.9, 1.2));
   const noiseBP = biquad(actx, 'bandpass', 1400, 0.6);
   const noiseGain = gain(actx, 0);
@@ -260,19 +227,6 @@ export function bark(
   const bodyGain = gain(actx, 1.5 * level);
   for (const f of fs) f.g.connect(throat);
   series(throat, presence, hp, lp, drv, bodyGain).connect(out);
-
-  /* ---- tremolo (pain / death gargle) ----------------------------- */
-  let trem = null;
-  if (spec.tremolo) {
-    trem = actx.createOscillator();
-    trem.type = 'sine';
-    trem.frequency.value = spec.tremolo * rng.range(0.85, 1.15);
-    const tg = gain(actx, 0.35);
-    trem.connect(tg);
-    tg.connect(bodyGain.gain);
-    trem.start(t0);
-    trem.stop(t0 + total + 0.4);
-  }
 
   /* ---- per-syllable automation ----------------------------------- */
   let t = t0;
@@ -320,32 +274,15 @@ export function bark(
     /* pitch contour: rise into the stressed syllable, sag at the end */
     const pTarget = f0 * s.p;
     src.frequency.setTargetAtTime(pTarget, t, 0.03);
-    if (spec.dying && i === spec.syl.length - 1) {
-      sweep(src.frequency, t + 0.05, pTarget, pTarget * 0.45, s.d);
-    } else {
-      src.frequency.setTargetAtTime(pTarget * 0.94, t + s.d * 0.6, 0.06);
-    }
+    src.frequency.setTargetAtTime(pTarget * 0.94, t + s.d * 0.6, 0.06);
 
     /* amplitude: fast onset, held, quick release; last syllable decays longer */
     const last = i === spec.syl.length - 1;
-    const rel = last ? (spec.dying ? s.d * 0.9 : 0.055) : 0.028;
+    const rel = last ? 0.055 : 0.028;
     adsr(srcGain.gain, t, amp * level, 0.014, s.d * 0.22, s.d * 0.5, 0.72, rel);
     ad(noiseGain.gain, t, amp * breathLevel * level, 0.02, s.d + rel);
 
     t += s.d + (s.g ?? 0);
-  }
-
-  /* ---- dying exhale ---------------------------------------------- */
-  if (spec.dying) {
-    const et = t + 0.05;
-    const es = bank.source('white', rng, rng.range(0.6, 0.9));
-    const ebp = biquad(actx, 'bandpass', 700, 0.55);
-    const eg = gain(actx, 0);
-    series(es, ebp, eg).connect(out);
-    sweep(ebp.frequency, et, 900, 380, 0.6);
-    ad(eg.gain, et, 0.16 * level, 0.08, 0.6);
-    es.start(et, es._offset, 0.9);
-    t = et + 0.7;
   }
 
   const end = t + 0.35;
@@ -360,7 +297,9 @@ export function bark(
     const rbp2 = biquad(actx, 'lowpass', 3200, 0.9);
     const rdrv = shaper(actx, saturationCurve(7, 0.3), '2x');
     const rg = gain(actx, 1.1);
-    const radioOut = gain(actx, 1);
+    // The saturated narrow-band signal needs a communication-level reference,
+    // not the power of a nearby report. Keep its filtering/clicks/timing intact.
+    const radioOut = gain(actx, 0.16);
     series(out, rbp1, rbp2, rdrv, rg).connect(radioOut);
     // Squelch click at both ends of the transmission.
     for (const st of [Math.max(t0 - 0.05, 0), end - 0.2]) {
@@ -392,10 +331,6 @@ export function barkFor(kind: string, rng: Rng): BarkName {
       return 'suppressing';
     case 'advance':
       return 'moveup';
-    case 'hurt':
-      return rng.float() < 0.5 ? 'hit' : 'pain';
-    case 'death':
-      return 'death';
     case 'copy':
       return 'copy';
     default:

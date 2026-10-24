@@ -41,7 +41,8 @@ the original sight centre and 2.60 mm post are unchanged. The upper 1.4 mm
 neon-green tip is retained. The lower support clears the opening by 0.1 mm
 while remaining attached; the historical untrimmed support occluded the bore.
 Preserve paint/opacity, aperture rays, aim datum and solid attachment checks.
-No camera/FOV/ballistic retuning.
+The later [ADS framing pass](../../../docs/ads-framing-review.md) changes only
+runtime eye distance/weapon FOV, preserving these sight dimensions and ballistics.
 
 ## Rebuild/check (root, Blender 5.2.2)
 

@@ -21,7 +21,7 @@ const args = parseArgs();
 const port = Number(args.port ?? 5198),
   out = resolve(args.out ?? '/tmp/cod-bandage-capture');
 mkdirSync(out, { recursive: true });
-const server = await ensureViteServer({ port });
+const server = await ensureViteServer({ port, ...(args.root ? { root: resolve(args.root) } : {}) });
 const browser = await launchChromium({
   headless: true,
   args: ['--ignore-gpu-blocklist', '--hide-scrollbars'],
@@ -38,11 +38,14 @@ try {
   await page.evaluate(() => {
     window.__APPLY_SHOT__('weapon');
     const ctx = window.__ENGINE__.ctx;
-    ctx.get('player').health.value = 30;
+    ctx.get('player').health.setDebugValue(30);
     ctx.get('player').setControlEnabled(true);
     ctx.input.enabled = true;
     ctx.input.frozen = false;
   });
+  // Native keyboard input requires canvas ownership even in deterministic capture.
+  // Middle-click grants focus without firing, aiming or requesting pointer lock.
+  await page.locator('#game').click({ button: 'middle' });
   await page.evaluate(() => window.__PUMP__(25));
   await page.keyboard.down('KeyH');
   const frames = args.video ? 195 : 65;

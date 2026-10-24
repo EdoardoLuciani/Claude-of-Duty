@@ -1,8 +1,8 @@
 /**
- * AUDIO — recorded weapon fire, synthesized foley, spatialisation and mix
+ * AUDIO — recorded weapon fire/physical hits, spatialisation and mix
  *
  * Recorded assets are required. Synthesis supplies authored reinforcement,
- * distant reports, sniper fire, foley and ambience—not failed-load recovery.
+ * casings/dry fire, voices, ambience and UI—not failed-load recovery.
  *
  * ───────────────────────────────────────────────────────────────────────────
  * PUBLIC API   const audio = ctx.get('audio')
@@ -11,6 +11,7 @@
  *   audio.start()                      force-start (returns Promise<boolean>)
  *   audio.deafness                     0..1 concussion; UI/post may read this
  *   audio.play(kind, position, opts)   one-shot; position null = head-locked
+ *   audio.startAircraft(position)     tracked recorded loop handle: move/stop
  *   audio.bark(kind, position, opts)   enemy voice: 'spot' | 'reload' |
  *                                      'grenade' | 'flank' | 'suppress' |
  *                                      'advance' | 'hurt' | 'death' | 'copy'
@@ -33,29 +34,23 @@ import { Vector3 } from 'three';
 import type { EngineContext } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName, ReloadPhase } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
-import { Ambience, ambientOneShot, ONE_SHOTS } from './ambience.ts';
+import { AircraftVoice, AIRCRAFT_MIX, type AircraftPosition } from './aircraft.ts';
+import { Ambience, ONE_SHOTS, AMBIENT_EVENT_GAIN } from './ambience.ts';
 import { NoiseBank, SPEED_OF_SOUND, clamp, gain as mkGain } from './dsp.ts';
-import {
-  surfaceImpact,
-  footstep,
-  shellCasing,
-  reloadPhase,
-  explosion,
-  bodyFall,
-  uiSound,
-  heartbeat,
-  cloth,
-  intelSiren,
-} from './foley.ts';
+import type { EnvironmentKind } from './environment.ts';
+import { shellCasing, explosion, uiSound, heartbeat, intelSiren } from './foley.ts';
 import { classifySpace, SPACE_KEYS } from './ir.ts';
 import { Mixer } from './mixer.ts';
 import { TentRadio } from './music.ts';
+import { radioCue } from './radio.ts';
+import { reactionKind } from './reactions.ts';
 import { WeaponSampleBank } from './samples.ts';
 import { SpatialField } from './spatial.ts';
 import type { WeaponProfile } from './types.ts';
 import { bark as voxBark, barkFor } from './vox.ts';
 import {
   WEAPON_PROFILES,
+  reportDistanceGain,
   resolveProfile,
   weaponShot,
   weaponPunch,
@@ -65,7 +60,8 @@ import {
 
 const PROBE_RAYS = 9;
 const PROBE_DIST = 40;
-const DRY_SLOTS = 48;
+// Private full-tail trial: full-tail player reports and compatibility SMG aliases can overlap.
+const DRY_SLOTS = 80;
 const GESTURES = ['pointerdown', 'mousedown', 'keydown', 'touchstart', 'wheel'];
 /** An enemy boot is at the edge of the mix here, and gone by the fade below it. */
 const AI_STEP_RANGE = 32;
@@ -79,14 +75,15 @@ interface AudioOptions {
   gain?: number;
   surface?: string;
   energy?: number;
+  amount?: number;
+  armourAbsorbed?: number;
+  plateBreak?: boolean;
   gait?: string;
   level?: number;
   gear?: number;
   flight?: number;
   phase?: ReloadPhase;
-  heavy?: number;
-  retained?: boolean;
-  settleOnly?: boolean;
+  reloadWeapon?: string;
   radius?: number;
   bark?: string;
   f0?: number;
@@ -144,7 +141,6 @@ interface AmbienceApi {
   distantVolley(): void;
   distantBoom(): void;
   oneShot(): void;
-  distantChatter(): void;
 }
 declare global {
   interface Window {
@@ -258,6 +254,7 @@ export class AudioSystem {
   declare _intelAlarm: ReturnType<typeof intelSiren> | null;
   declare _budget: AudioBudget;
   declare _lastBarkTime: number;
+  declare _lastReactionEnd: number;
   declare _lastEnemyFire: number;
   declare _stance: string | null;
   declare _ads: boolean;
@@ -265,6 +262,7 @@ export class AudioSystem {
   declare _offs: Array<() => void>;
   declare _gestureHandler: (() => void) | null;
   declare _ambienceApi: AmbienceApi | null;
+  declare _aircraft: Set<AircraftVoice>;
 
   static id = 'audio';
   static deps = [];
@@ -315,6 +313,7 @@ export class AudioSystem {
     /* per-frame rate limits */
     this._budget = { impact: 0, step: 0, aiStep: 0, shell: 0, whizz: 0 };
     this._lastBarkTime = -99;
+    this._lastReactionEnd = -99;
     this._lastEnemyFire = -99;
 
     this._stance = null;
@@ -336,6 +335,7 @@ export class AudioSystem {
     this._offs = [];
     this._gestureHandler = null;
     this._ambienceApi = null;
+    this._aircraft = new Set();
   }
 
   /* ================================================================ */
@@ -394,15 +394,22 @@ export class AudioSystem {
       const actx = new AC({ latencyHint: 'interactive' });
       this.actx = actx;
 
-      // Long beds keep low-frequency random features from repeating every few
-      // seconds. The old 2.4 s loop was clearly audible in the wind as a rotor.
-      const bank = (this.bank = new NoiseBank(actx, this.rng.fork(), 9.6));
+      await Mixer.prepare(actx);
+
+      // Preserve the shared deterministic noise used by finite synthesized events.
+      this.bank = new NoiseBank(actx, this.rng.fork(), 9.6);
       const samples = (this.samples = new WeaponSampleBank(actx));
       await samples.load();
       const mixer = (this.mixer = new Mixer(actx, this.rng.fork(), {}));
+      mixer.energyMix.onprocessorerror = () => {
+        console.error('[audio] energy processor failed; disabling audio');
+        this.stats.errors++;
+        this.failed = true;
+        this._teardown();
+      };
       mixer.buildReverbs();
-      const field = (this.field = new SpatialField(actx, mixer, this.ctx));
-      const ambience = (this.ambience = new Ambience(actx, bank, mixer, field, this.rng.fork()));
+      this.field = new SpatialField(actx, mixer, this.ctx);
+      const ambience = (this.ambience = new Ambience(this.rng.fork()));
       ambience.start();
       const tentRadio = (this.tentRadio = new TentRadio(actx, mixer, this.rng.fork()));
       void tentRadio.warm();
@@ -424,6 +431,8 @@ export class AudioSystem {
 
   _teardown() {
     this._onIntelOperation({ active: false });
+    this._lastReactionEnd = -99;
+    this._stopAircraft(true);
     try {
       this.tentRadio?.dispose();
       this.ambience?.dispose();
@@ -482,13 +491,13 @@ export class AudioSystem {
       /* ---- subsystems -------------------------------------------- */
       this.mixer!.update(dt);
       this.field!.update();
+      for (const voice of this._aircraft) if (voice.ended) this._aircraft.delete(voice);
       this.deafness = this.mixer!.deafness;
       if (!this._ambienceApi) {
         this._ambienceApi = {
           distantVolley: () => this._distantVolley(),
           distantBoom: () => this._distantBoom(),
           oneShot: () => this._ambientOneShot(),
-          distantChatter: () => this._distantChatter(),
         };
       }
       this.ambience!.update(dt, this._ambienceApi);
@@ -542,6 +551,55 @@ export class AudioSystem {
     }
   }
 
+  /** Start one required recorded propeller loop in the existing tracked pool. */
+  startAircraft(position: AircraftPosition): AircraftVoice | null {
+    if (!this.running || this.actx?.state !== 'running' || !isVec(position)) return null;
+    const field = this.field!;
+    let emitter;
+    try {
+      const dist = field.distanceTo(position.x, position.y, position.z);
+      emitter = field.acquire({
+        x: position.x,
+        y: position.y,
+        z: position.z,
+        bus: 'ambience',
+        tracked: true,
+        priority: AIRCRAFT_MIX.priority,
+        gain: AIRCRAFT_MIX.gain,
+        send: AIRCRAFT_MIX.send,
+        endTime: Infinity,
+      });
+      if (!emitter) return null;
+      const buffer = this.samples!.nextAircraft(this.rng);
+      const voice = new AircraftVoice(
+        this.actx,
+        field,
+        emitter,
+        buffer,
+        this.actx.currentTime + dist / SPEED_OF_SOUND
+      );
+      this._aircraft.add(voice);
+      this.stats.events++;
+      return voice;
+    } catch (error) {
+      emitter?.detach();
+      this._error(error);
+      return null;
+    }
+  }
+
+  _stopAircraft(immediate = false): void {
+    for (const voice of this._aircraft) {
+      if (immediate) voice.dispose();
+      else voice.stop();
+    }
+    if (immediate) this._aircraft.clear();
+  }
+
+  _pauseAircraft(): void {
+    for (const voice of this._aircraft) voice.setPaused(true);
+  }
+
   /* ================================================================ */
   /* environment probe                                                */
   /* ================================================================ */
@@ -564,7 +622,6 @@ export class AudioSystem {
     }
     classifySpace(hits, PROBE_DIST, this._space);
     this.mixer!.setSpace(this._space, 0.4);
-    this.ambience!.setEnclosure(this._space.enclosure);
 
     let best = 'open',
       bv = -1;
@@ -592,14 +649,10 @@ export class AudioSystem {
     switch (kind) {
       case 'shot': {
         const profile: WeaponProfile = o.profile ?? WEAPON_PROFILES.rifle;
-        // Close reports keep the authentic pressure crack from a field take,
-        // reinforced with a short, tightly filtered body/mechanical layer. The
-        // recordings alone are bright and abruptly gated; the reinforcement is
-        // what supplies the 70–180 Hz chest hit without adding a cloudy tail.
-        // Beyond 45 m, use the procedural distance model instead: a close-mic
-        // sample merely low-passed at long range sounds like a quiet nearby gun,
-        // not a report that has propagated across a city block.
-        if (dist <= 45 && profile.sample) {
+        // Complete authored reports carry their own decay. The sample bank selects
+        // distant enemy perspectives; MCX/MPX retain suppressed sources at range.
+        // Unmodified legacy profiles keep their procedural distant model.
+        if (profile.sample && (o.firstPerson || dist <= 45 || profile.samplePunch === false)) {
           const recorded = this.samples!.shot(profile, rng, {
             when,
             distance: dist,
@@ -636,10 +689,26 @@ export class AudioSystem {
         return bulletWhizz(actx, bank, rng, { when, miss: o.miss, gain: o.gain });
       case 'dryfire':
         return dryFire(actx, bank, rng, { when });
+      case 'damage':
+        return this.samples!.damage(rng, {
+          when,
+          amount: o.amount ?? 25,
+          armourAbsorbed: o.armourAbsorbed ?? 0,
+          plateBreak: o.plateBreak ?? false,
+          level: o.level,
+        });
+      case 'armour_hit':
+      case 'armour_break':
+        return this.samples!.hit(kind === 'armour_break' ? 'break' : 'armour', rng, {
+          when,
+          level: o.level,
+        });
       case 'impact':
-        return surfaceImpact(actx, bank, rng, { when, surface: o.surface, energy: o.energy });
+        if (o.surface === 'flesh')
+          return this.samples!.hit('flesh', rng, { when, level: o.energy });
+        return this.samples!.impact(rng, { when, surface: o.surface, level: o.energy });
       case 'step':
-        return footstep(actx, bank, rng, {
+        return this.samples!.step(rng, {
           when,
           surface: o.surface,
           gait: o.gait,
@@ -654,12 +723,7 @@ export class AudioSystem {
           flight: o.flight,
         });
       case 'reload':
-        return reloadPhase(actx, bank, rng, o.phase, {
-          when,
-          heavy: o.heavy,
-          retained: o.retained,
-          settleOnly: o.settleOnly,
-        });
+        return this.samples!.reload(o.reloadWeapon ?? '', o.phase, rng, { when });
       case 'explosion': {
         if (dist > 50)
           return explosion(actx, bank, rng, {
@@ -681,13 +745,28 @@ export class AudioSystem {
         synthetic.node.connect(out);
         return { node: out, end: synthetic.end, send: synthetic.send };
       }
+      case 'radio_open':
+      case 'radio_strike':
+      case 'intel_call': {
+        const recorded = this.samples!.radio(kind, rng, { when, level: o.level });
+        return radioCue(actx, bank, rng, kind, recorded, when, o.level);
+      }
       case 'bodyfall':
-        return bodyFall(actx, bank, rng, { when, level: o.level });
+        return this.samples!.fall(rng, { when, surface: o.surface, level: o.level });
       case 'cloth':
-        return cloth(actx, bank, rng, { when, level: o.level });
+        return this.samples!.cloth(rng, { when, level: o.level });
       case 'heartbeat':
         return heartbeat(actx, { when, level: o.level, buffer: this.samples!.heartbeatBuffer! });
-      case 'bark':
+      case 'bark': {
+        const reaction = reactionKind(o.bark);
+        if (reaction) {
+          const voice = this.samples!.reaction(reaction, o.voice ?? 0, rng, {
+            when,
+            level: o.level,
+          });
+          this._lastReactionEnd = Math.max(this._lastReactionEnd, voice.end);
+          return voice;
+        }
         return voxBark(actx, bank, rng, {
           when,
           bark: o.bark,
@@ -696,8 +775,9 @@ export class AudioSystem {
           level: o.level,
           radio: o.radio,
         });
+      }
       case 'ambient':
-        return ambientOneShot(actx, bank, rng, o.which, { when, level: o.level });
+        return this.samples!.environment(o.which as EnvironmentKind, rng, { when, level: o.level });
       default:
         return uiSound(actx, bank, rng, kind, { when, level: o.level });
     }
@@ -734,6 +814,12 @@ export class AudioSystem {
         dist,
         bus,
         priority,
+        // Selected presentation reference + fixed digital-bank energy matching.
+        // The sample selector and correction share the same perspective rule.
+        atten:
+          kind === 'shot' && (o.profile ?? WEAPON_PROFILES.rifle).samplePunch === false
+            ? reportDistanceGain(dist, o.profile ?? WEAPON_PROFILES.rifle, o.firstPerson)
+            : undefined,
         send: o.send ?? voice.send ?? 0.3,
         gain: o.gain ?? 1,
         endTime: voice.end,
@@ -765,15 +851,17 @@ export class AudioSystem {
     try {
       const when = actx.currentTime + (o.extraDelay ?? 0);
       const voice = this._build(kind, when, o.dist ?? 0, o);
-      const g = mkGain(actx, o.gain ?? 1);
-      voice.node.connect(g);
+      // Reuse the voice output at unity; it remains the teardown/steal handle.
+      const level = o.gain ?? 1;
+      const g = level === 1 ? voice.node : mkGain(actx, level);
+      if (g !== voice.node) voice.node.connect(g);
       g.connect(mixer.bus(bus));
       let sendNode = null;
       const sendLevel = (o.send ?? send) * (voice.send ?? 1);
       if (sendLevel > 0.001) {
         sendNode = mkGain(actx, sendLevel);
         g.connect(sendNode);
-        sendNode.connect(mixer.reverbSend);
+        sendNode.connect(mixer.sendBus(bus));
       }
       // Claim a bookkeeping slot; steal the oldest if all are busy.
       let slot = null;
@@ -875,11 +963,17 @@ export class AudioSystem {
   bark(kind: string, position: Vec3Like | null = null, opts: AudioOptions = {}): boolean {
     if (!this.running) return false;
     const now = this.actx!.currentTime;
-    if (now - this._lastBarkTime < 0.42 && !opts.force) return false; // no mush
+    const reaction = reactionKind(kind);
+    if (
+      !opts.force &&
+      (now - this._lastBarkTime < 0.42 || (reaction && now < this._lastReactionEnd))
+    )
+      return false; // no overlapping recorded efforts
     this._lastBarkTime = now;
     const seed = (opts.voice ?? 0) | 0;
     const o = {
-      bark: barkFor(kind, this.rng),
+      bark: reaction ?? barkFor(kind, this.rng),
+      voice: seed,
       f0: 96 + ((seed * 37) % 41),
       tract: 0.95 + ((seed * 13) % 11) / 100,
       level: opts.level ?? 1,
@@ -952,14 +1046,25 @@ export class AudioSystem {
     on('ai:bark', (p) => this.bark(p?.kind ?? 'spot', p?.position, { voice: p?.voice ?? 0 }));
     on('intel:operation', (e) => this._onIntelOperation(e));
     const stopIntel = () => this._onIntelOperation({ active: false });
-    on('game:restart', stopIntel);
+    on('game:restart', () => {
+      stopIntel();
+      this._lastReactionEnd = -99;
+      this._stopAircraft();
+    });
     on('player:death', stopIntel);
-    on('engine:error', stopIntel);
+    on('engine:error', () => {
+      stopIntel();
+      this._stopAircraft(true);
+    });
     on('ui:pause', (e) => {
-      if (e.paused) stopIntel();
+      if (e.paused) {
+        stopIntel();
+        this._pauseAircraft();
+      }
     });
     on('market:open', () => {
       stopIntel();
+      this._pauseAircraft();
       if (!this.running) return;
       this.tentRadio?.start()?.catch?.(() => {});
       this.mixer?.setBusVolume('ambience', 0.28);
@@ -980,6 +1085,9 @@ export class AudioSystem {
     const w = p.weapon;
     const name = typeof w === 'string' ? w : (w?.audio ?? w?.id ?? w?.name ?? w?.kind);
     let profile = resolveProfile(name);
+    // The real MPX definition deliberately retains its generic suppressed tag.
+    // Select its dedicated 9mm report without changing unrelated suppressed guns.
+    if (w && typeof w === 'object' && w.id === 'smg' && w.suppressed) profile = WEAPON_PROFILES.mpx;
     if (w && typeof w === 'object' && w.suppressed && !profile.suppressed)
       profile = WEAPON_PROFILES.suppressed;
 
@@ -997,31 +1105,30 @@ export class AudioSystem {
     const firstPerson = p.firstPerson ?? dist < 2.6;
 
     if (firstPerson) {
-      // Own weapon: no propagation delay, mostly dry, and the send level is
-      // driven by the space probe so the *room* answers the shot — a tight slap
-      // indoors, a long crack down the street.
-      const echo =
-        0.35 +
-        this._space.tight * 0.5 +
-        this._space.street * 0.9 +
-        this._space.tunnel * 1.0 +
-        this._space.room * 0.75;
-      // Player weapons share a tight perceived-loudness corridor despite very
-      // different source durations. Short 9 mm reports need more gain than the
-      // long M4 field take; the master safety chain retains peak headroom.
+      // Complete reports already contain their decay: no extra room branch.
+      // Legacy isolated takes retain their separately tuned environment send.
+      const send =
+        profile.samplePunch === false
+          ? 0
+          : (0.35 +
+              this._space.tight * 0.5 +
+              this._space.street * 0.9 +
+              this._space.tunnel * 1.0 +
+              this._space.room * 0.75) *
+            0.6;
       this._playDry(
         'shot',
         {
           profile,
           firstPerson: true,
-          gain: profile.firstPersonGain ?? 1.18,
+          gain: profile.samplePunch === false ? 1 : (profile.firstPersonGain ?? 1.18),
         },
         'weapons',
-        echo * 0.6
+        send
       );
       mixer.duck(0.55, 0.1);
     } else {
-      this._playAt('shot', x, y, z, { profile, firstPerson: false, gain: 1.2 }, 'weapons', 0.95);
+      this._playAt('shot', x, y, z, { profile, firstPerson: false, gain: 1 }, 'weapons', 0.95);
       mixer.duck(clamp(0.5 - dist * 0.004, 0.12, 0.5), 0.08);
       // Enemies opening fire get occasional chatter, so firefights feel alive
       // even before `ai` grows its own bark logic.
@@ -1036,14 +1143,9 @@ export class AudioSystem {
   _onReload(p: EngineEventMap['weapon:reload']): void {
     if (!this.running) return;
     const w = p?.weapon;
-    const name = typeof w === 'string' ? w : (w?.audio ?? w?.id ?? w?.name);
-    const heavy = /lmg|shot|snip|m249|pkm/i.test(String(name ?? '')) ? 1.35 : 1;
-    const phase = p?.phase ?? 'end';
     const options = {
-      phase,
-      heavy,
-      retained: p?.retained === true,
-      settleOnly: typeof w === 'object' && w?.id === 'pistol',
+      phase: p?.phase ?? 'end',
+      reloadWeapon: typeof w === 'string' ? w : (w?.id ?? ''),
     };
     if (p?.position) {
       this._playAt('reload', p.position.x, p.position.y, p.position.z, options, 'foley', 0.6);
@@ -1089,6 +1191,10 @@ export class AudioSystem {
     if (!this.running || !p) return;
     const field = this.field!;
     if (p.exit) return; // only the entry side gets a sound
+    // Player contact precedes armour/health resolution. damage:taken owns the
+    // immediate headlocked feedback, including armour-only hits; never double it.
+    const player = this.ctx.peek('player');
+    if (isPlayerHandle(p.actor) || (player != null && p.actor === player)) return;
     if (this._budget.impact++ > 4) return;
     const pt = p.point;
     if (!pt) return;
@@ -1106,10 +1212,8 @@ export class AudioSystem {
       'foley',
       0.55
     );
-    // The round cracking past you is a separate sound from the impact itself.
-    if (dist < 6) {
-      this._playAt('whizz', pt.x, pt.y, pt.z, { miss: dist, noDelay: true }, 'foley', 0.7);
-    }
+    // Only reached bullet:segment flight owns the whizz, not a nearby wall
+    // contact (including the player's own rounds). Never duplicate the pass.
   }
 
   _onBulletSegment(p: EngineEventMap['bullet:segment']): void {
@@ -1157,7 +1261,8 @@ export class AudioSystem {
         radius: p.radius ?? 6,
         level: 1,
         send: 0.62,
-        gain: 6.5,
+        // Calibrated below unity so ordinary blasts do not lean on the limiter.
+        gain: 0.8,
       },
       'weapons',
       1
@@ -1231,12 +1336,13 @@ export class AudioSystem {
   _onLand(p: EngineEventMap['player:land']): void {
     if (!this.running) return;
     const lp = this.field!.listenerPos;
+    const pos = p?.position;
     const v = Math.abs(p?.velocity ?? 4);
     this._playAt(
       'step',
-      lp.x,
-      lp.y - 1.6,
-      lp.z,
+      pos?.x ?? lp.x,
+      pos?.y ?? lp.y - 1.6,
+      pos?.z ?? lp.z,
       {
         surface: p?.surface ?? 'concrete',
         gait: 'land',
@@ -1246,7 +1352,7 @@ export class AudioSystem {
       'foley',
       0.7
     );
-    if (v > 8.5) this._playDry('cloth', { level: 0.8 }, 'foley', 0.15);
+    // Landing gear is already part of this composite; do not add a second rustle.
   }
 
   _onPlayerState(p: EngineEventMap['player:state']): void {
@@ -1268,21 +1374,23 @@ export class AudioSystem {
     // damage is handled by _onDamageTaken.
     const t = p.target;
     if (t === 'player' || isPlayerHandle(t) || t === this.ctx.peek('player')) return;
-    this.ui(p.headshot ? 'headshot' : 'hitmarker', 1);
+    const armoured = p.part === 'armour' || ('armour' in p && p.armour === true);
+    this.ui(p.headshot ? 'headshot' : armoured ? 'armour' : 'hitmarker', 1);
     if (p.killed) this.ui('kill', 1);
     else if (p.point && p.target && this.rng.float() < 0.3) {
-      this.bark('hurt', p.point, { level: 0.85 });
+      this.bark('hurt', p.point, { level: 0.85, voice: actorVoice(t) });
     }
   }
 
   _onDamageTaken(p: EngineEventMap['damage:taken']): void {
     if (!this.running || !p) return;
-    const amount = p.amount ?? 20;
-    if (amount <= 0) return;
-    this.ui('damage', clamp(amount / 25, 0.4, 1.4));
-    if (amount > 12 && this.rng.float() < 0.5) {
-      this._playDry('bark', { bark: 'hit', level: 0.5, f0: 108 }, 'voice', 0.1);
-    }
+    const amount = Number.isFinite(p.amount) ? Math.max(0, p.amount) : 0;
+    const armourAbsorbed = Number.isFinite(p.armourAbsorbed) ? Math.max(0, p.armourAbsorbed) : 0;
+    if (amount === 0 && armourAbsorbed === 0) return;
+    // Subjective bodily damage (also explosions), not another literal gunshot.
+    // UI is deliberately unducked/unmuffled; one composite has no propagation
+    // or room send. A break already includes its plate/gear contact.
+    this._playDry('damage', { amount, armourAbsorbed, plateBreak: p.plateBreak }, 'ui', 0);
   }
 
   _onDeath(p: EngineEventMap['actor:death']): void {
@@ -1290,6 +1398,8 @@ export class AudioSystem {
     const pt = p?.point;
     if (!pt) return;
     this.bark('death', pt, { level: 1, force: true, voice: actorVoice(p?.actor) });
+    const phys = this.ctx.peek('physics');
+    const ground = phys?.raycast?.(pt.x, pt.y + 0.5, pt.z, 0, -1, 0, 4, phys.MASK?.WORLD);
     this._playAt(
       'bodyfall',
       pt.x,
@@ -1297,6 +1407,7 @@ export class AudioSystem {
       pt.z,
       {
         level: 1,
+        surface: ground?.hit ? ground.surface : 'concrete',
         extraDelay: 0.45 + this.rng.range(0, 0.4),
       },
       'foley',
@@ -1361,7 +1472,8 @@ export class AudioSystem {
         level: 1,
         maxDist: 400,
         occlusion: 0,
-        gain: 6,
+        // Distant environmental punctuation, not a second foreground blast.
+        gain: 0.1,
       },
       'weapons',
       0.25
@@ -1386,27 +1498,10 @@ export class AudioSystem {
         level: rng.range(0.55, 1),
         maxDist: 400,
         occlusion: far ? 0 : undefined,
-        gain: far ? 14 : 2.5,
+        gain: far ? AMBIENT_EVENT_GAIN[which] : AMBIENT_EVENT_GAIN.near,
       },
       'ambience',
       0.15
-    );
-  }
-
-  _distantChatter(): void {
-    if (!this.running) return;
-    const rng = this.rng;
-    const lp = this.field!.listenerPos;
-    const a = rng.range(0, Math.PI * 2);
-    const d = rng.range(25, 75);
-    this.bark(
-      rng.pick(['advance', 'flank', 'copy', 'spot'])!,
-      {
-        x: lp.x + Math.cos(a) * d,
-        y: lp.y,
-        z: lp.z + Math.sin(a) * d,
-      },
-      { level: 0.85, voice: rng.int(0, 9) }
     );
   }
 
@@ -1546,7 +1641,6 @@ export class AudioSystem {
     }
     this._distantVolley();
     this._distantBoom();
-    this._distantChatter();
     ev.emit('explosion', { position: at(6, 0, -7), radius: 8, damage: 120 });
     return { ok: true, voices: this.field!.stats.active, errors: this.stats.errors };
   }
@@ -1568,7 +1662,7 @@ export class AudioSystem {
       enclosure: this._space.enclosure,
       meanFree: this._space.meanFree,
       deafness: this.deafness,
-      limiterReduction: this.mixer?.reduction ?? 0,
+      outputSafety: 'lookahead-peak-limiter',
       events: this.stats.events,
       errors: this.stats.errors,
     };

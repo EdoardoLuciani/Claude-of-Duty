@@ -10,10 +10,10 @@ import { makeAX338Model, AX338_URL } from '../../src/weapons/ax338.ts';
 import { makeEvolysModel, EVOLYS_URL } from '../../src/weapons/evolys.ts';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
 import { makeM590Model, M590_URL } from '../../src/weapons/m590.ts';
-import { WEAPON_MATERIALS } from '../../src/weapons/materials.ts';
 import { makeMCXModel, MCX_URL } from '../../src/weapons/mcx.ts';
 import { makeMPXModel, MPX_URL } from '../../src/weapons/mpx.ts';
 import { makeP320Model, P320_URL } from '../../src/weapons/p320.ts';
+import { SURFACE_FIXTURES } from '../../tools/lib/material-fixtures.ts';
 
 // Actual committed GLBs and production loaders. Stub only browser image decode;
 // material factors/extensions, hierarchy and animation validation stay real.
@@ -116,9 +116,8 @@ assert.notEqual(library.glass([0.02, 0.02, 0.02]), library.glass([0.08, 0.06, 0.
 assert.equal(library.glass(), library.glass([0.06, 0.07, 0.08]));
 library.dispose();
 
-for (const key of ['glove', 'glove_pad', 'glove_seam', 'sleeve'])
-  assert(!WEAPON_MATERIALS[key], `${key}: gameplay arms must not have a second procedural recipe`);
-for (const [, p] of Object.values(WEAPON_MATERIALS)) {
+// Shader calibration recipes remain fixtures, not a second gameplay material path.
+for (const [, p] of Object.values(SURFACE_FIXTURES)) {
   assert.equal(p.localSpace, true);
   assert.deepEqual(
     p.weather.slice(0, 3),

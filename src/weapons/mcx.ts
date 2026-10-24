@@ -67,8 +67,6 @@ export function makeMCXModel(gltf: GLTF) {
     },
     shell: { caseLen: 0.0348, rimR: 0.0048 },
     magSize: { len: 0.18 },
-    materials: new Set<THREE.Material>(),
-    textures: new Set<THREE.Texture>(),
   };
   // Keep authored PBR instead of remapping the Blender material names to the
   // procedural weapon library. Thin alpha lenses avoid a second full-scene
@@ -92,9 +90,7 @@ export function makeMCXModel(gltf: GLTF) {
     },
     true
   );
-  model.materials = converted.materials;
-  model.textures = converted.textures;
-  return model;
+  return { ...model, ...converted };
 }
 
 export async function loadMCX() {
@@ -132,7 +128,7 @@ export class MCXAnimation {
   bolt!: THREE.Object3D;
   charging!: THREE.Object3D;
   poseMatrix!: THREE.Matrix4;
-  poseQ!: THREE.Quaternion;
+  poseQ = new THREE.Quaternion();
   partMatrix!: THREE.Matrix4;
   target!: THREE.Vector3;
   targetQ!: THREE.Quaternion;
@@ -140,8 +136,8 @@ export class MCXAnimation {
   chargePoint!: THREE.Vector3;
   magQ!: THREE.Quaternion;
   chargeQ!: THREE.Quaternion;
-  idleTime!: number;
-  name!: string | null;
+  idleTime = 0;
+  name: string | null = null;
   fireTime!: number;
   gesture!: string | null;
   gestureTime!: number;
@@ -173,7 +169,6 @@ export class MCXAnimation {
     this.charging = this.root.getObjectByName('charging_handle')!;
     this.root.getObjectByName('spent_case')!.visible = false;
     this.poseMatrix = new THREE.Matrix4();
-    this.poseQ = new THREE.Quaternion();
     this.partMatrix = new THREE.Matrix4();
     this.target = new THREE.Vector3();
     this.targetQ = new THREE.Quaternion();
@@ -182,8 +177,6 @@ export class MCXAnimation {
     this.chargePoint = new THREE.Vector3(-0.184, 0.02, -0.05);
     this.magQ = handQuaternion([0.1, 0.72, -0.68], [-0.86, 0.34, -0.38]);
     this.chargeQ = handQuaternion([0.55, 0.2, 0.81], [-0.2, 0.94, -0.27]);
-    this.idleTime = 0;
-    this.name = null;
     this.reset();
   }
 

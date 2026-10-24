@@ -24,7 +24,7 @@ assert.equal(
   createHash('sha256')
     .update(readFileSync(new URL(M590_URL)))
     .digest('hex'),
-  'd1244541c2654926cceecefc8ccef7251232df9e2b274de374d3471551c7e30e'
+  'c390de79ad122a71400e10a9395a96de231c8af5320d8f2b24c86bc02df8452a'
 );
 const model = makeM590Model(await parse(M590_URL)),
   animation = new M590Animation(model);
@@ -59,9 +59,9 @@ const expectedClips = {
     0.95,
     [
       [0.02, 'start'],
+      [0.22, 'pump'],
       [0.68, 'shellin'],
-      [0.88, 'pump'],
-      [0.93, 'boltrelease'],
+      [0.94, 'boltrelease'],
       [0.995, 'end'],
     ],
   ],
@@ -72,6 +72,7 @@ const expectedClips = {
     0.45,
     [
       [0.32, 'pump'],
+      [0.82, 'boltrelease'],
       [0.995, 'end'],
     ],
   ],

@@ -1,7 +1,7 @@
 {
   "version": 2,
   "coordinateSystem": "three-y-up-metres",
-  "sourceHash": "1ae81fa350a230b3",
+  "sourceHash": "b980bc5ec207ef86",
   "transform": [
     0.8322181104875284,
     0,
@@ -2533,22 +2533,22 @@
     }
   },
   "assets": {
-    "visual": "level-visual.4ec4e9490967.glb.gz",
+    "visual": "level-visual.a2e546f72b10.glb.gz",
     "collision": "level-collision.4b294863a3f2.glb.gz",
-    "nav": "level-nav.37c4b0a4d9d3.bin.gz"
+    "nav": "level-nav.6c2e09457e8c.bin.gz"
   },
   "navigation": {
     "version": 2,
-    "sha256": "d5d274f76cd217734d45450e9edddd1b48618c2496a2f49c4da207f775244d6b",
+    "sha256": "cee02f72b2e98c154a772a9c07d24823e5a07f5ca57aabe0cf6d068f1bd605a2",
     "polygons": 49334,
     "components": 227,
     "coverPoints": 16424
   },
   "stats": {
     "staticTris": 620328,
-    "instTris": 1065436,
+    "instTris": 932632,
     "instances": 7797,
-    "drawCalls": 211,
+    "drawCalls": 174,
     "collideTris": 329738
   }
 }
