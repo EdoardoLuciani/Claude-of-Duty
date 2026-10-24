@@ -1216,14 +1216,14 @@ export function registerProps(A, rng) {
   P('lamp_glass', 'lamp_lens', lampGlass(), { chunk: false, castShadow: false });
 
   // debris
-  P('brick_a', 'brick', brickChunk(rng));
-  P('brick_b', 'brick', brickChunk(rng));
-  P('rock_a', 'concrete_prop', rockGeometry(rng, 0.26, 0, 0.7), { maxDist: 90 });
+  P('brick_a', 'brick', brickChunk(rng), { castShadow: false });
+  P('brick_b', 'brick', brickChunk(rng), { castShadow: false });
+  P('rock_a', 'concrete_prop', rockGeometry(rng, 0.26, 0, 0.7), { maxDist: 90, castShadow: false });
   P('rock_b', 'concrete_dark', rockGeometry(rng, 0.17, 0, 0.8), { maxDist: 70, castShadow: false });
-  P('slab_shard', 'concrete_prop', slabShard(rng));
+  P('slab_shard', 'concrete_prop', slabShard(rng), { castShadow: false });
   P('rebar', 'metal_rust', rebarBundle(rng));
-  P('plank_a', 'wood_prop', plank(rng), { maxDist: 90 });
-  P('plank_b', 'wood_prop_dark', plank(rng), { maxDist: 90 });
+  P('plank_a', 'wood_prop', plank(rng), { maxDist: 90, castShadow: false });
+  P('plank_b', 'wood_prop_dark', plank(rng), { maxDist: 90, castShadow: false });
   P('litter', 'wood_pale', litterPaper(rng), { maxDist: 45, castShadow: false });
   /**
    * Contact fillets. Registered last so `put()` can find it, and never given a
