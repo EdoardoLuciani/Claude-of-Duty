@@ -334,7 +334,6 @@ export class Viewmodel {
   declare rigOverride: { position: THREE.Vector3; quaternion: THREE.Quaternion } | null;
   declare settle: Spring3;
   declare sprintT: number;
-  declare stepT: number;
   declare trackCamera: boolean;
   declare triggerT: number;
   declare triggerTarget: number;
@@ -623,7 +622,6 @@ export class Viewmodel {
     this.sprintT = 0;
     this.lowReadyT = 0;
     this.bobPhase = 0;
-    this.stepT = 0;
     this.noiseT = 0;
     this.triggerT = 0;
     this.triggerTarget = 0;

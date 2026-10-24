@@ -1,4 +1,4 @@
-import type { Texture, Vector3 } from 'three';
+import type { Vector3 } from 'three';
 
 import type { WEAPON_DEFS } from '../weapons/defs.ts';
 
@@ -119,8 +119,6 @@ export interface EngineEventMap {
     plateBreak: boolean;
   };
   'actor:death': { actor: unknown; point: Vector3; impulse: Vector3; headshot?: boolean };
-  'sky:changed': { hour: number; sunDir: Vector3; sunIntensity: number; moonIntensity: number };
-  'sky:env': { envMap: Texture | null; sunDir: Vector3 };
   'wave:start': { wave: number; enemies: number; squads: number; perSquad: number };
   'wave:complete': { wave: number; nextWave: number; delay: number };
   'score:change': { score: number; delta: number; reason: string; kills: number };
@@ -213,9 +211,6 @@ export interface EngineEventMap {
   'engine:error': EngineError;
   resize: { width: number; height: number };
   'ui:pause': { paused: boolean };
-  'ui:sensitivity': { value: number; multiplier: number };
-  'ui:fov': { value: number };
-  'ui:setting': { key: 'firingShake' | 'invertY'; value: number | boolean };
 }
 export type EngineEventName = keyof EngineEventMap;
 export type EventListener<K extends EngineEventName> = (payload: EngineEventMap[K]) => void;

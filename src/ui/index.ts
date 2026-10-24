@@ -65,7 +65,7 @@ const HEAL_KEY = bindingLabel('heal');
  * Events consumed: weapon:fire, weapon:reload, damage:dealt, damage:taken,
  * player:state, score:change, wave:start, wave:complete, explosion, hud:heard,
  * hud:search, intel:secured, intel:available, resize.
- * Events emitted:  ui:pause, ui:sensitivity, ui:fov, ui:setting.
+ * Events emitted:  ui:pause.
  */
 interface HudState {
   health: number;

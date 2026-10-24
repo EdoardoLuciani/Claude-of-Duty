@@ -96,8 +96,6 @@ export function makeMPXModel(gltf: GLTF) {
     },
     shell: { caseLen: 0.0192, rimR: 0.00478 },
     magSize: { len: 0.192 },
-    materials: new Set<THREE.Material>(),
-    textures: new Set<THREE.Texture>(),
   };
   const converted = convertWeaponScene(scene, (source, material) => {
     // Keep authored reflectance; only optical sheets/interior have view-pass policies.
@@ -122,9 +120,7 @@ export function makeMPXModel(gltf: GLTF) {
       if (value instanceof THREE.Texture) value.anisotropy = 8;
     }
   });
-  model.materials = converted.materials;
-  model.textures = converted.textures;
-  return model;
+  return { ...model, ...converted };
 }
 
 export async function loadMPX() {
@@ -148,9 +144,9 @@ export class MPXAnimation {
   magazineBody!: THREE.Object3D;
   rounds!: THREE.Object3D;
   hands!: Record<HandSide, AuthoredHand>;
-  poseQ!: THREE.Quaternion;
-  idleTime!: number;
-  name!: string | null;
+  poseQ = new THREE.Quaternion();
+  idleTime = 0;
+  name: string | null = null;
   fireTime!: number;
   constructor(model: MPXModel) {
     this.model = model;
@@ -166,9 +162,6 @@ export class MPXAnimation {
     this.magazineBody = node('magazine_mesh');
     this.rounds = node('magazine_rounds');
     this.hands = discoverAuthoredHands(node);
-    this.poseQ = new THREE.Quaternion();
-    this.idleTime = 0;
-    this.name = null;
     this.reset();
   }
 
