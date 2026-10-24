@@ -4,8 +4,6 @@
 
 Weapons preserve GLB base factors, maps, normal scales and physical extensions;
 pigment/finish edits belong in Blender, exposure/light budgets in render.
-Runtime weapon material helpers own reticles only. Frozen dry-surface recipes in
-`tools/lib/material-fixtures.ts` exercise shader calibration, not gameplay finishes.
 No blanket loader darkening/specular suppression. Arms have one source:
 `tools/blender/player_arms.py` and the committed arm GLB, not procedural recipes.
 
@@ -19,24 +17,14 @@ Preserve the authored approximation unless controlled evidence justifies a chang
 ## Copy, clone and ownership
 
 Use the pinned native `NodeMaterial.copy()`, not borrowed classic prototypes.
-Weapons force physical nodes and keep source maps borrowed. The arm source-copy
-utility retains standard/physical selection; runtime arms combine their authored
-Physical finishes into owned texture arrays per shared asset, with one draw per
-independently bound hand. Keep authored specular strength (approximately 0.16),
-UV0 AO / UV1 microdetail, grouped material selection and sleeve/stitch-only blood.
-Arm packing releases source textures/images; asset disposal frees its arrays.
-Colors/vectors, definitions, iridescence ranges and clipping planes must retain
-value ownership. Weapon material disposal must not destroy borrowed input maps.
+Weapons force physical nodes; arms retain standard/physical source selection.
+Maps stay borrowed; colors/vectors, definitions, iridescence ranges and clipping
+planes must retain their value ownership. Disposal must not destroy input maps.
 
 Soldier output subclasses native `setupOutput()` and calls super before fog/alpha.
 Declarative `rimNode` survives copy/clone and distinguishes shader cache keys;
 `outputNode` is not equivalent because it runs after that boundary.
 Skinned cloth/goggles remain FULL-refresh independently of declarative nodes.
-Runtime soldiers use one opaque material per variant: existing equal-size bakes
-are texture-array layers, with repeat/mips/anisotropy retained. A flat surface ID
-selects immutable tint/roughness/metalness/AO/detail parameters; GLB groups remain
-authoring labels, not separate draws. Goggle pigment, smoothness and half rim remain;
-the former 1.4 environment gain uses the shared material's default 1.0 instead.
 Clones must be registered with their render owner: the per-instance environment
 hook isn't copied. `IndirectFill` calls upstream environment setup first; keep
 camera-specific world/view identities, PMREM and shared render uniform groups.
@@ -55,7 +43,7 @@ camera-specific world/view identities, PMREM and shared render uniform groups.
 - Keep exported arm specular, world indirect/practical/exposure budgets, bounded
   10% first-person readability fill and soldier KIT_CAL/rim hierarchy.
   Cloth backlight is emissive orientation/AO approximation, not direct-shadow
-  sampling. Transparent windows use IBL for environment reflections.
+  sampling. Transparent windows use IBL rather than opaque SSR prepass surfaces.
 
 ## Validation
 

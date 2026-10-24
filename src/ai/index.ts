@@ -56,7 +56,7 @@ import { GRENADE_RADIUS, GRENADE_DAMAGE, GRENADE_FUSE } from '../weapons/index.t
 import { isAliveTeammate } from './actor.ts';
 import { Agent, STATE, PATH_OUTCOME } from './agent.ts';
 import type { AgentOptions } from './agent.ts';
-import { AttachmentQueries } from './attachment-queries.ts';
+import { AttachmentQueries } from './attachment-queries.js';
 import { GroundShadows } from './grounding.ts';
 import { pickSquadAnchors } from './intent.ts';
 import { createLadderDescriptors } from './ladder.ts';
@@ -64,14 +64,14 @@ import type { LadderDescriptor } from './ladder.ts';
 import { NAV_VERSION } from './nav-format.ts';
 import { SurfaceNav, CoverMap, NAV_PENDING, NAV_CANCELLED } from './nav.ts';
 import { RIG } from './rig.ts';
-import { prepareSoldierSurfaces, resolveVariantName, VARIANTS } from './soldier.ts';
+import { resolveMaterials, resolveVariantName, MATERIAL_SLOTS, VARIANTS } from './soldier.ts';
 import { Squad } from './squad.ts';
 import { SoldierMaterialsNode } from './textures-tsl.ts';
 import { COMBAT, GRENADE } from './tuning.ts';
 import { isVector3Like } from './validation.ts';
 
 export type AiVariant = Pick<SoldierRecord, 'geometry' | 'weapon' | 'stats' | 'variant'> & {
-  material: THREE.Material;
+  materials: THREE.Material[];
   parts: null;
 };
 export interface AiStats {
@@ -384,8 +384,14 @@ export class AiSystem {
    * pre-warm, which left actors and decals behind and blew the pixel gate.
    * Nothing here is a gameplay object.
    *
-   *  - One material per variant, with authored surface labels selecting texture
-   *    layers and finishes. Preparing it draws no random numbers or triangles.
+   *  - `resolveMaterials()` is a pure function of the variant name, so every
+   *    material every variant will ever ask for can be created now. It draws no
+   *    random numbers, so the RNG stream — and therefore the picture — is
+   *    untouched. It MUST be handed `MATERIAL_SLOTS` in the builder's own order:
+   *    three sorts opaque draws (including the nine groups inside one soldier) by
+   *    the global `Material.id` counter, so creating them in any other order
+   *    reorders those draws and flips the depth tie on coplanar surfaces. That is
+   *    a measured 2-pixel gate failure, not a theory — see MATERIAL_SLOTS.
    *  - use throwaway skinned meshes borrowing the actual model geometry/groups
    *    in the production graph (world MRT and native shadows), with zero draw
    *    ranges restored by render. Remove the meshes and owned skeleton afterward;
@@ -400,7 +406,15 @@ export class AiSystem {
     this._prewarmed = out;
     try {
       const seen = new Set();
-      for (const name in VARIANTS) seen.add(this.variant(name).material);
+      for (const name in VARIANTS) {
+        for (const m of resolveMaterials(
+          resolveVariantName(name),
+          MATERIAL_SLOTS,
+          this.materials
+        )) {
+          if (m) seen.add(m);
+        }
+      }
       // The shared grenade mesh is built lazily on the first throw; the
       // material is included here so its shader is warm when that happens.
       out.materials = seen.size + 1;
@@ -421,7 +435,7 @@ export class AiSystem {
         // No Agent is created: no actor IDs, physics, AI state or RNG advances.
         for (const name in VARIANTS) {
           const def = this.variant(name);
-          const mesh = new THREE.SkinnedMesh(def.geometry, def.material);
+          const mesh = new THREE.SkinnedMesh(def.geometry, def.materials);
           mesh.frustumCulled = false;
           mesh.castShadow = mesh.receiveShadow = true;
           scene.add(mesh);
@@ -448,7 +462,7 @@ export class AiSystem {
   async prewarmShadowCaster(light: THREE.SpotLight) {
     const { skeleton, root } = RIG.createSkeleton();
     const geo = this._dummySkinGeometry();
-    const mesh = new THREE.SkinnedMesh(geo, this.variant('vanguard').material);
+    const mesh = new THREE.SkinnedMesh(geo, this.variant('vanguard').materials[0]);
     mesh.bind(skeleton);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
@@ -479,7 +493,6 @@ export class AiSystem {
       new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]), 3)
     );
     g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 2), 2));
-    g.setAttribute('soldierSurface', new THREE.BufferAttribute(new Float32Array(n), 1));
     g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3).fill(1), 3));
     g.setAttribute('skinIndex', new THREE.BufferAttribute(new Uint16Array(n * 4), 4));
     const w = new Float32Array(n * 4);
@@ -675,12 +688,12 @@ export class AiSystem {
           `[ai] required soldier model "${name}" was not loaded; regenerate assets with: npm run models`
         );
       }
-      // One native material ignores the GLB's authoring groups when drawing.
-      // Surface IDs retain all their finishes without another render-only mesh.
-      prepareSoldierSurfaces(rec.geometry);
+      // Resolve the slot names against the shared soldier material set. The
+      // geometry itself comes from the mandatory, preloaded GLB.
+      const mats = resolveMaterials(resolveVariantName(name), rec.slots, this.materials);
       v = {
         geometry: rec.geometry,
-        material: this.materials.soldier(resolveVariantName(name), rec.slots),
+        materials: mats,
         parts: null,
         weapon: rec.weapon,
         stats: rec.stats,
@@ -688,7 +701,7 @@ export class AiSystem {
       };
       console.info(
         `[ai] variant "${name}" ${rec.stats.triangles | 0} tris / ${rec.stats.vertices} verts / ` +
-          `1 material in ${(performance.now() - t0).toFixed(0)}ms`
+          `${mats.length} materials in ${(performance.now() - t0).toFixed(0)}ms`
       );
       this._variants.set(name, v);
     }

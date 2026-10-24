@@ -15,7 +15,7 @@ import { Rng } from '../core/rng.ts';
 import { createWebGpuRenderer } from '../render/webgpu-device.ts';
 import { Animator } from './animator.ts';
 import { RIG } from './rig.ts';
-import { buildSoldier, prepareSoldierSurfaces, resolveVariantName, VARIANTS } from './soldier.ts';
+import { buildSoldier, resolveVariantName, VARIANTS } from './soldier.ts';
 import { SoldierMaterialsNode } from './textures-tsl.ts';
 
 const q = new URLSearchParams(location.search);
@@ -96,8 +96,7 @@ const actors: PreviewActor[] = [];
 for (let i = 0; i < names.length; i++) {
   const def = buildSoldier(names[i], { rng: rng.fork(), materials });
   const { bones, skeleton, root } = RIG.createSkeleton();
-  prepareSoldierSurfaces(def.geometry);
-  const mesh = new THREE.SkinnedMesh(def.geometry, materials.soldier(names[i], def.slots));
+  const mesh = new THREE.SkinnedMesh(def.geometry, def.materials);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   const group = new THREE.Group();

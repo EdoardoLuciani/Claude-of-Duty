@@ -53,13 +53,17 @@ export function makeM4Model(gltf: GLTF) {
     },
     shell: { caseLen: 0.0447, rimR: 0.00478 },
     magSize: { len: 0.16 },
+    materials: new Set<THREE.Material>(),
+    textures: new Set<THREE.Texture>(),
   };
   const converted = convertWeaponScene(scene, (_source, material) => {
     for (const value of Object.values(material as object)) {
       if (value instanceof THREE.Texture) value.anisotropy = 8;
     }
   });
-  return { ...model, ...converted };
+  model.materials = converted.materials;
+  model.textures = converted.textures;
+  return model;
 }
 
 export async function loadM4() {
@@ -88,10 +92,10 @@ export class M4Animation {
   spareRound!: THREE.Object3D;
   reviewCase!: THREE.Object3D;
   hands!: Record<HandSide, AuthoredHand>;
-  poseQ = new THREE.Quaternion();
+  poseQ!: THREE.Quaternion;
   poseMatrix!: THREE.Matrix4;
-  idleTime = 0;
-  name: string | null = null;
+  idleTime!: number;
+  name!: string | null;
   coverOpen!: boolean;
   wasOpen!: boolean;
   fireTime!: number;
@@ -125,7 +129,10 @@ export class M4Animation {
     // physical casing at its original scheduled event, never a duplicate mesh.
     this.reviewCase = node('spent_case');
     this.hands = discoverAuthoredHands(node);
+    this.poseQ = new THREE.Quaternion();
     this.poseMatrix = this.root.matrix;
+    this.idleTime = 0;
+    this.name = null;
     this.coverOpen = false;
     this.reset();
   }

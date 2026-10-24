@@ -190,7 +190,7 @@ export const CONTROL_REFERENCE: readonly ControlReferenceRow[] = [
     label: 'Fire mode',
     context: 'weapon',
     behavior:
-      'Press to cycle supported modes; single-mode weapons do nothing. A mode change needs a fresh trigger press, so a held trigger is never carried over. Still cycles the underlying weapon while grenade/radio are out.',
+      'Press to cycle supported modes; single-mode weapons do nothing. Still cycles the underlying weapon while grenade/radio are out.',
   },
   {
     action: 'inspect',

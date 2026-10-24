@@ -333,6 +333,7 @@ export class RigidBodyWorld {
   declare _cs: Int32Array;
   declare _hit: ReturnType<typeof makeHitRecord>;
   declare _awake: number;
+  declare _contactsLastStep: number;
 
   constructor(staticWorld: StaticCollisionWorld, gravity = -20.6) {
     this.world = staticWorld;
@@ -350,6 +351,7 @@ export class RigidBodyWorld {
     this._cs = new Int32Array(MAX_CONTACTS); // surface index
     this._hit = makeHitRecord();
     this._awake = 0;
+    this._contactsLastStep = 0;
   }
 
   add(body: RigidBody): RigidBody {
@@ -409,6 +411,7 @@ export class RigidBodyWorld {
   step(dt: number): void {
     const bodies = this.bodies;
     this._awake = 0;
+    this._contactsLastStep = 0;
     for (let i = bodies.length - 1; i >= 0; i--) {
       const b = bodies[i];
       b.age += dt;
@@ -526,6 +529,7 @@ export class RigidBodyWorld {
       b.updateInertiaWorld();
       const n = this._collect(b);
       if (n > 0) {
+        this._contactsLastStep += n;
         this._solve(b, n, h);
       }
     }

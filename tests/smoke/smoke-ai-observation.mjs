@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
 
-import { AttachmentQueries, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.ts';
+import { AttachmentQueries, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.js';
 import { AiSystem } from '../../src/ai/index.ts';
 import { SurfaceNav } from '../../src/ai/nav.ts';
 import { TACTICS, acquireSeconds } from '../../src/ai/tuning.ts';

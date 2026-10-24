@@ -105,12 +105,10 @@ export class DecalSystem {
     this.dec = new Float32Array(this.maxVerts * 4);
 
     const g = new THREE.BufferGeometry();
-    // Keep slot data resident between add()/flush() publications. Native WebGPU
-    // animates fading through uNow, without an unconditional dynamic upload.
-    this.aPos = new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.StaticDrawUsage);
-    this.aNrm = new THREE.BufferAttribute(this.nrm, 3).setUsage(THREE.StaticDrawUsage);
-    this.aUv = new THREE.BufferAttribute(this.uvs, 2).setUsage(THREE.StaticDrawUsage);
-    this.aDec = new THREE.BufferAttribute(this.dec, 4).setUsage(THREE.StaticDrawUsage);
+    this.aPos = new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage);
+    this.aNrm = new THREE.BufferAttribute(this.nrm, 3).setUsage(THREE.DynamicDrawUsage);
+    this.aUv = new THREE.BufferAttribute(this.uvs, 2).setUsage(THREE.DynamicDrawUsage);
+    this.aDec = new THREE.BufferAttribute(this.dec, 4).setUsage(THREE.DynamicDrawUsage);
     g.setAttribute('position', this.aPos);
     g.setAttribute('normal', this.aNrm);
     g.setAttribute('uv', this.aUv);
