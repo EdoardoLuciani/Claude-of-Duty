@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 
 import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
+import { RELOAD_URLS } from '../../src/audio/reloads.ts';
 import {
   ensureViteServer,
   launchChromium,
@@ -10,7 +11,10 @@ import {
 
 const server = await ensureViteServer({ root: REPO_ROOT, port: 5551 });
 assert(server, 'Refusing an occupied self-test server port');
-const required = 50 + Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0);
+const required =
+  50 +
+  Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0) +
+  Object.values(RELOAD_URLS).reduce((n, urls) => n + urls.length, 0);
 let browser,
   fault = null,
   requests = 0;
@@ -49,7 +53,7 @@ try {
         originals = new Map();
       let retained = [],
         loadedBank;
-      for (const method of ['load', 'impact', 'step', 'fall', 'cloth', 'damage', 'hit']) {
+      for (const method of ['load', 'impact', 'step', 'fall', 'cloth', 'damage', 'hit', 'reload']) {
         const original = WeaponSampleBank.prototype[method];
         originals.set(method, original);
         WeaponSampleBank.prototype[method] = function (...args) {
@@ -58,7 +62,7 @@ try {
           const value = original.apply(this, args);
           if (method === 'load') {
             loadedBank = this;
-            retained = Object.values(this.hitBuffers);
+            retained = [...Object.values(this.hitBuffers), ...Object.values(this.reloadBuffers)];
           }
           return value;
         };
@@ -71,6 +75,7 @@ try {
           kinds: [...kinds],
           cacheDisposed:
             Object.keys(loadedBank.hitBuffers).length === 0 &&
+            Object.keys(loadedBank.reloadBuffers).length === 0 &&
             retained.every((buffers) => buffers.length === 0),
         };
       } finally {
@@ -89,6 +94,7 @@ try {
       assert.equal(result.counts.fall, 1);
       assert.equal(result.counts.cloth, 1);
       assert.equal(result.counts.damage, 5);
+      assert.equal(result.counts.reload, Object.keys(RELOAD_URLS).length);
       for (const kind of [
         'flesh',
         'armour',
@@ -113,6 +119,7 @@ try {
         'damage:mixed',
         'damage:break-mixed',
         'damage:break-armour-only',
+        ...Object.keys(RELOAD_URLS).map((kind) => `reload:${kind}`),
       ]) {
         const row = result.report.results.find((row) => row.name === name);
         assert(

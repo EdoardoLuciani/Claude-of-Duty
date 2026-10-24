@@ -1,8 +1,10 @@
+import type { ReloadPhase } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
 import { biquad, clamp, gain, series } from './dsp.ts';
 import { FOLEY_URLS, type FoleyKind } from './foley-urls.ts';
 import { HIT_MIX, HIT_URLS, type DamageSoundOptions, type HitKind } from './hits.ts';
 import { FALL_BANK, FOLEY_MIX, IMPACT_BANK, STEP_BANK, type FoleyOptions } from './physical.ts';
+import { RELOAD_MIX, RELOAD_URLS, reloadKind, type ReloadKind } from './reloads.ts';
 import type { AudioVoice, SampleKind, SampleOptions, WeaponProfile } from './types.ts';
 import { REPORT_DISTANT_MATCH, reportDistantMix } from './weapons.ts';
 
@@ -11,8 +13,9 @@ import { REPORT_DISTANT_MATCH, reportDistantMix } from './weapons.ts';
  * Float WAV masters remain offline authoring inputs, not runtime imports.
  * Operator authorized local commits; commercial derivatives are NOT cleared
  * for public Git distribution or upload.
- * See the private recovery recipe/provenance. Newly cleared contact recordings
- * are separate: samples/hits/provenance.json and docs/hit-feedback.md.
+ * See the private recovery recipe/provenance. Newly cleared contact/reload
+ * recordings have separate provenance under samples/hits/ and samples/reloads/;
+ * see docs/hit-feedback.md and docs/reload-audio.md.
  */
 const URLS = {
   mpx: [
@@ -101,6 +104,8 @@ export class WeaponSampleBank {
   heartbeatBuffer: AudioBuffer | null;
   hitBuffers: Partial<Record<ContactKind, AudioBuffer[]>>;
   hitIndices: Partial<Record<ContactKind, number>>;
+  reloadBuffers: Partial<Record<ReloadKind, AudioBuffer[]>>;
+  reloadIndices: Partial<Record<ReloadKind, number>>;
   loaded: number;
   constructor(actx: BaseAudioContext) {
     this.actx = actx;
@@ -111,6 +116,8 @@ export class WeaponSampleBank {
     this.heartbeatBuffer = null;
     this.hitBuffers = {};
     this.hitIndices = {};
+    this.reloadBuffers = {};
+    this.reloadIndices = {};
     this.loaded = 0;
   }
 
@@ -129,6 +136,11 @@ export class WeaponSampleBank {
       this.hitBuffers[kind] = new Array<AudioBuffer>(CONTACT_URLS[kind].length);
       this.hitIndices[kind] = -1;
       CONTACT_URLS[kind].forEach((url, index) => jobs.push(this._loadHit(kind, index, url)));
+    }
+    for (const kind of Object.keys(RELOAD_URLS) as ReloadKind[]) {
+      this.reloadBuffers[kind] = new Array<AudioBuffer>(RELOAD_URLS[kind].length);
+      this.reloadIndices[kind] = -1;
+      RELOAD_URLS[kind].forEach((url, index) => jobs.push(this._loadReload(kind, index, url)));
     }
     // Finish all decodes before start() tears down a failed bank.
     for (const result of await Promise.allSettled(jobs))
@@ -155,6 +167,38 @@ export class WeaponSampleBank {
   async _loadHit(kind: ContactKind, index: number, url: string): Promise<void> {
     this.hitBuffers[kind]![index] = await this._loadBuffer(url);
     this.loaded++;
+  }
+
+  async _loadReload(kind: ReloadKind, index: number, url: string): Promise<void> {
+    this.reloadBuffers[kind]![index] = await this._loadBuffer(url);
+    this.loaded++;
+  }
+
+  /** Recorded handling only: unsupported cues and missing assets never synthesize. */
+  reload(
+    weapon: string,
+    phase: ReloadPhase | undefined,
+    rng: Rng,
+    o: Pick<SampleOptions, 'when'> = {}
+  ): AudioVoice {
+    const kind = reloadKind(weapon, phase);
+    if (!kind) throw new Error(`[audio] no recorded reload cue for ${weapon}/${phase}`);
+    const choices = this.reloadBuffers[kind];
+    if (!choices?.length) throw new Error(`[audio] ${kind} reload recordings are not loaded`);
+    const previous = this.reloadIndices[kind] ?? -1;
+    const index =
+      previous < 0
+        ? rng.u32() % choices.length
+        : (previous + 1 + (rng.u32() % (choices.length - 1))) % choices.length;
+    this.reloadIndices[kind] = index;
+    const src = this.actx.createBufferSource();
+    src.buffer = choices[index];
+    // Preserve authored attack timing and action duration; vary takes, not pitch.
+    const out = gain(this.actx, RELOAD_MIX.gain * rng.range(0.97, 1.03));
+    src.connect(out);
+    const when = o.when ?? this.actx.currentTime;
+    src.start(when);
+    return { node: out, end: when + src.buffer.duration + 0.02, send: RELOAD_MIX.send };
   }
 
   /** No hot-path fetch/decode, and no immediate repeat within a contact family. */
@@ -492,6 +536,10 @@ export class WeaponSampleBank {
       this.hitBuffers[key]!.length = 0;
     this.hitBuffers = {};
     this.hitIndices = {};
+    for (const key of Object.keys(this.reloadBuffers) as ReloadKind[])
+      this.reloadBuffers[key]!.length = 0;
+    this.reloadBuffers = {};
+    this.reloadIndices = {};
     this.actionBuffer = null;
     this.explosionBuffer = null;
     this.heartbeatBuffer = null;
