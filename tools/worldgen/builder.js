@@ -151,13 +151,16 @@ export class Assembler {
   // ------------------------------------------------------------ instanced --
   /**
    * @param {string} id
-   * @param {object} spec { geo, key, castShadow, chunk, maxDist, collide }
+   * @param {object} spec { geo, visualGeo?, key, castShadow, chunk, maxDist }
+   * geo is canonical for collision/support; optional visualGeo is an owned
+   * render-only derivative. Both geometries transfer ownership to the assembler.
    */
   proto(id, spec) {
     if (this._protos.has(id)) return id;
     this._protos.set(id, {
       id,
       geo: spec.geo,
+      visualGeo: spec.visualGeo ?? null,
       key: spec.key,
       ballisticSurface:
         spec.ballisticSurface ?? PALETTE[spec.key]?.ballisticSurface ?? this.surfaceOf(spec.key),
@@ -253,11 +256,20 @@ export class Assembler {
       const n = p.matrices.length;
       if (n === 0) {
         p.geo.dispose();
+        if (p.visualGeo !== p.geo) p.visualGeo?.dispose();
+        p.geo = p.visualGeo = null;
         continue;
       }
       const source = p.geo;
+      const visualSource = p.visualGeo;
       p.geo = mergeVertices(source);
+      p.visualGeo = visualSource
+        ? visualSource === source
+          ? p.geo
+          : mergeVertices(visualSource)
+        : null;
       source.dispose();
+      if (visualSource !== source) visualSource?.dispose();
       const buckets = new Map();
       if (p.chunk && n > 24) {
         for (let i = 0; i < n; i++) {
@@ -308,7 +320,8 @@ export class Assembler {
       ]) {
         if (!target) continue;
         for (const list of lists) {
-          const im = new THREE.InstancedMesh(p.geo, mat, list.length);
+          const geometry = target === root ? (p.visualGeo ?? p.geo) : p.geo;
+          const im = new THREE.InstancedMesh(geometry, mat, list.length);
           im.name = `prop_${p.id}`;
           im.castShadow = p.castShadow;
           im.receiveShadow = p.receiveShadow;
@@ -343,7 +356,7 @@ export class Assembler {
             this.stats.drawCalls++;
             this.stats.instances += list.length;
             const tri =
-              (p.geo.index ? p.geo.index.count : p.geo.getAttribute('position').count) / 3;
+              (geometry.index ? geometry.index.count : geometry.getAttribute('position').count) / 3;
             this.stats.instTris += tri * list.length;
           }
           if (p.maxDist > 0) im.userData.owLodDist = p.maxDist;
@@ -364,7 +377,10 @@ export class Assembler {
       m.parent?.remove(m);
     }
     this.meshes.length = 0;
-    for (const p of this._protos.values()) p.geo?.dispose();
+    for (const p of this._protos.values()) {
+      p.geo?.dispose();
+      if (p.visualGeo !== p.geo) p.visualGeo?.dispose();
+    }
     this._protos.clear();
     this._static.clear();
   }

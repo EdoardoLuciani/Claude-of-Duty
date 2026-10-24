@@ -131,8 +131,12 @@ JS in `tools/worldgen/` is world-authoring authority; `placements/` owns
 free-standing prop transforms. `npm run world` builds meshes and cooks collision
 with meshoptimizer from the canonical instance buckets. Visual-only bucket
 coalescing may join non-distance-LOD clouds within the existing 64 m X/Z span;
-it must not change collision inputs or navigation. Both transient outputs share
-assembler-owned geometry/materials. Manifest v2 and content-hashed GLBs live in
+it must not change collision inputs or navigation. Both transient outputs use
+assembler-owned materials and canonical `geo`. A prototype may supply an owned
+`visualGeo` derivative for visual output only; support, collision and navigation
+must retain canonical geometry, topology and RNG/instance inputs. The assembler
+owns both geometries and handles aliased/unused inputs without double disposal.
+Manifest v2 and content-hashed GLBs live in
 `public/models/world/`. Preserve instancing/masks.
 Never author separate collision geometry or hand-edit generated files. Commit
 source + manifest + generated runtime assets together. Validate with

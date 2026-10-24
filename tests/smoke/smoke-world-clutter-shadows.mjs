@@ -49,16 +49,21 @@ for (const id of [...small, ...cover]) {
   const meshes = [visual, canonical].map((root) =>
     root.children.find((m) => m.name === `prop_${id}`)
   );
-  for (const mesh of meshes) {
+  for (const [index, mesh] of meshes.entries()) {
     assert.ok(mesh, `${id}: assembled mesh`);
     assert.equal(mesh.castShadow, p.castShadow);
     assert.equal(mesh.userData.castShadow, p.castShadow, 'exported runtime policy');
-    assert.equal(mesh.geometry, p.geo, 'unmodified prototype geometry');
+    assert.equal(
+      mesh.geometry,
+      index === 0 ? (p.visualGeo ?? p.geo) : p.geo,
+      'exact visual derivative or canonical prototype geometry'
+    );
     assert.equal(mesh.receiveShadow, true);
     assert.equal(mesh.userData.owNoPrepass, undefined);
     assert.equal(mesh.userData.owLodDist ?? 0, p.maxDist);
     assert.deepEqual([...mesh.instanceColor.array], [0.25, 0.5, 0.75]);
   }
+  if (!p.visualGeo) assert.equal(meshes[0].geometry, meshes[1].geometry);
   assert.deepEqual(meshes[0].instanceMatrix.array, meshes[1].instanceMatrix.array);
 }
 // Collision is navigation's geometry input. Toggling shadow policy must not alter it.
