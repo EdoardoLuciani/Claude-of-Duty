@@ -336,7 +336,7 @@ const CSS = `
 
 /* ============================================================== killfeed */
 .ow-killfeed {
-  position:absolute; right:var(--pad); top:calc(var(--pad) + var(--u) * 2);
+  position:absolute; right:var(--pad); top:max(24px, calc(var(--pad) + var(--u) * 2));
   display:flex; flex-direction:column; align-items:flex-end;
   gap: calc(var(--u) * 1.1);
 }
