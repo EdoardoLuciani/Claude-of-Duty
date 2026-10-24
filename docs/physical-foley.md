@@ -31,8 +31,11 @@ there is no dedicated recorded medical-wrapper/bandage bank in this slice.
 Body falls query the physical ground under the death position; hard surfaces
 share the hard-floor bank, dirt/sand share earth, and fabric/rubber use soft cloth.
 The existing death-to-fall delay remains an approximation, **not a claim of a new
-ragdoll contact-synchronisation system**. Existing procedural helper exports remain
-for compatibility/reference, but these live game paths use required recordings.
+ragdoll contact-synchronisation system**. The replaced procedural generators and
+their material/gait tables are removed. The developer self-test exercises these
+same recorded sample-bank methods, loading required assets once per run and
+reporting load failure rather than synthesizing a substitute. Its unrelated
+isolated tests retain synthesis that still has legitimate runtime callers.
 
 ## Integration and mix
 
@@ -95,6 +98,7 @@ npm run lint
 npm run build
 npm run format:check
 node tests/e2e/audio-hit-feedback-e2e.mjs
+node tests/e2e/audio-selftest-e2e.mjs
 AUDIO_MIX_EVIDENCE_DIR=/tmp/physical-mix node tests/e2e/audio-mix-e2e.mjs
 node tools/capture-hit-combat.mjs --foley --out=/tmp/physical-combat
 ```

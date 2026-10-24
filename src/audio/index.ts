@@ -2,7 +2,7 @@
  * AUDIO — recorded weapon fire/physical hits, spatialisation and mix
  *
  * Recorded assets are required. Synthesis supplies authored reinforcement,
- * remaining movement/material foley and ambience—not failed-load recovery.
+ * weapon mechanics, voices, ambience and UI—not failed-load recovery.
  *
  * ───────────────────────────────────────────────────────────────────────────
  * PUBLIC API   const audio = ctx.get('audio')
