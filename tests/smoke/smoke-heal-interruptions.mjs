@@ -105,6 +105,7 @@ for (const ending of ['release', 'complete', 'grenade'])
     const { weapons, player, input, ctx } = fixture();
     const ui = new UiSystem();
     ui.ctx = ctx;
+    ui.fps = { textContent: '— FPS' };
     ui.state = { healing: true, bandages: 2, healProgress: 0.3 };
     ui._lastRaw = 0;
     ui.hudTarget = ui.hudVisible = 1;

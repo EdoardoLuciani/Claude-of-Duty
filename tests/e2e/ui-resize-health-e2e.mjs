@@ -38,6 +38,8 @@ try {
         import { Minimap } from '/src/ui/minimap.ts';
         import { AmmoPanel } from '/src/ui/ammo.ts';
         import { Crosshair } from '/src/ui/crosshair.ts';
+        import { Killfeed } from '/src/ui/killfeed.ts';
+        import { el } from '/src/ui/util.ts';
         import { Rng } from '/src/core/rng.ts';
         installStyles();
         const root = document.createElement('div');
@@ -47,6 +49,10 @@ try {
         Object.assign(ui, { root, crosshair:new Crosshair(root), compass:new Compass(root),
           minimap:new Minimap(root,new Rng(17)) });
         const health = new HealthFx(root), ammo = new AmmoPanel(root), score = new ScoreBar(root);
+        el('div', 'ow-fps', root, '60 FPS');
+        const killfeed = new Killfeed(root);
+        killfeed.push({ attacker:'YOU', victim:'ENEMY', mine:true });
+        killfeed.update(0.2);
         score.update({ score:1200, wave:3, credits:850, enemiesRemaining:6 });
         ammo.update(1/60,{ ammo:28,magSize:30,reserve:210,weaponName:'M4A1',bandages:2 });
         window.health = health;
@@ -92,15 +98,26 @@ try {
         compass: rect('.ow-compass'),
         vitals: rect('.ow-vitals'),
         ammo: rect('.ow-ammo'),
+        fps: rect('.ow-fps'),
+        kill: rect('.ow-kf-row'),
       };
     });
     assert(Math.abs(layout.k - Math.min(width / 1920, height / 1080, 2.4)) < 0.0001);
     assert(Math.abs(layout.map.width - layout.map.height) < 0.1, 'square minimap');
     assert(layout.map.right < layout.compass.x, 'narrowing must not overlap map and compass');
-    for (const rect of [layout.map, layout.compass, layout.vitals, layout.ammo]) {
+    assert(layout.fps.bottom <= layout.kill.y, 'FPS counter must sit above the killfeed');
+    for (const rect of [
+      layout.map,
+      layout.compass,
+      layout.vitals,
+      layout.ammo,
+      layout.fps,
+      layout.kill,
+    ]) {
       assert(rect.x >= 0 && rect.y >= 0 && rect.right <= width + 1 && rect.bottom <= height + 1);
     }
     if (out && width === 800) await page.screenshot({ path: resolve(out, 'narrow-hud.png') });
+    if (out && width === 640) await page.screenshot({ path: resolve(out, 'small-hud.png') });
   }
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.evaluate(() => {

@@ -93,6 +93,11 @@ const CSS = `
   text-shadow: var(--sh);
 }
 .ow-layer { position:absolute; inset:0; }
+.ow-fps {
+  position:absolute; top:4px; right:var(--pad);
+  font:600 max(10px, calc(12px * var(--k))) var(--fm);
+  text-shadow:var(--sh);
+}
 
 /* ============================================================== crosshair */
 .ow-cross { position:absolute; left:50%; top:50%; width:0; height:0; }
@@ -331,7 +336,7 @@ const CSS = `
 
 /* ============================================================== killfeed */
 .ow-killfeed {
-  position:absolute; right:var(--pad); top:calc(var(--pad) + var(--u) * 2);
+  position:absolute; right:var(--pad); top:max(24px, calc(var(--pad) + var(--u) * 2));
   display:flex; flex-direction:column; align-items:flex-end;
   gap: calc(var(--u) * 1.1);
 }
