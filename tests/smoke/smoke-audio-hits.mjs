@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
+import { AIRCRAFT_URLS } from '../../src/audio/aircraft.ts';
 import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
 import { HIT_URLS } from '../../src/audio/hits.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
@@ -242,7 +243,10 @@ try {
   const reloads = Object.values(RELOAD_URLS).reduce((sum, urls) => sum + urls.length, 0);
   assert.equal(
     decodes,
-    49 + reloads + Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0),
+    49 +
+      reloads +
+      Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0) +
+      AIRCRAFT_URLS.length,
     'missing contact participates in required all-settled startup'
   );
   missing.dispose();
