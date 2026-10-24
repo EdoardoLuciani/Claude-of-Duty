@@ -355,11 +355,13 @@ try {
         hx: 0.3,
         hy: 0.3,
         hz: 0.3,
-        layer: physics.LAYER.WORLD,
+        layer: physics.LAYER.STATIC,
         surface,
       });
       collider.setMatrix(new Matrix4().makeTranslation(at.x, at.y, at.z));
       try {
+        if (!(collider.layer & physics.MASK.WORLD))
+          throw Error(surface + ': material fixture must belong to the world mask');
         audio.update(0, ctx);
         window.hitTrace.length = 0;
         const result = physics.fireBullet({

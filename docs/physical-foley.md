@@ -123,8 +123,9 @@ node tools/capture-hit-combat.mjs --foley --out=/tmp/physical-combat
 - `--foley` extends the existing continuous combat capture with two ordinary jump
   inputs (verifying actual jump events and their subsequent landings), and one
   actor starting wounded at 40 HP so a real weapon hit produces a body fall. The
-  player and other actors retain high finite audition HP. Terrain step-down
-  landings are counted separately from jump/landing pairs. Normal emitter drops
+  player and other actors retain high finite audition HP. Each jump is consumed
+  by its first subsequent landing and qualifies only above velocity 2; later
+  terrain step-downs cannot inherit that jump. Normal emitter drops
   and steals are reported, not bypassed. Ambient opening scheduling, armour refill,
   movement/reload/switch/grenade scripting and unnormalised final-master capture
   remain as documented in `hit-feedback.md`.

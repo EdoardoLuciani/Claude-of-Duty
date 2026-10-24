@@ -119,10 +119,10 @@ try {
       }),
       ctx.events.on('player:land', (e) => {
         report.landings++;
-        if (jumpPending && e.velocity > 2) {
-          report.jumpLandings++;
-          jumpPending = false;
-        }
+        if (jumpPending && e.velocity > 2) report.jumpLandings++;
+        // The first landing consumes the jump even when it is too soft to
+        // qualify; a later terrain contact must not inherit that pending pair.
+        jumpPending = false;
       }),
       ctx.events.on('actor:death', () => report.bodyFalls++),
     ];
