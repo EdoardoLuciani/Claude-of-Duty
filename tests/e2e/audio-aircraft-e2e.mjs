@@ -1,8 +1,6 @@
 #!/usr/bin/env node
-/** Actual WebGPU bomber + actual master graph; optional local unnormalised audio. */
+/** Actual bomber/master graph: motion, pause/source ownership and cleanup. */
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import {
@@ -12,19 +10,15 @@ import {
   REPO_ROOT,
   stopViteServer,
 } from '../../tools/lib/browser-harness.mjs';
-import { captureNative, waitForGame } from '../../tools/lib/native-render.mjs';
+import { waitForGame } from '../../tools/lib/native-render.mjs';
 
 const args = parseArgs(),
   root = resolve(args.root ?? REPO_ROOT),
   port = Number(args.port ?? 5542);
-const out = args.out ? resolve(args.out) : null;
-assert(!out || (out !== root && !out.startsWith(root + '/')), 'Keep evidence outside repository');
-if (out) mkdirSync(out, { recursive: true });
 const server = await ensureViteServer({ root, port });
 assert(server, 'Refusing an occupied port');
 let browser;
-const errors = [],
-  rows = [];
+const errors = [];
 try {
   browser = await launchChromium({
     headless: true,
@@ -62,9 +56,6 @@ try {
     audio.update(0, ctx);
     engine.step = Object.getPrototypeOf(engine).step.bind(engine);
     engine._last = performance.now();
-    const dest = audio.actx.createMediaStreamDestination();
-    audio.mixer.masterGain.connect(dest);
-    window.airStream = dest.stream;
     const play = audio._playAt.bind(audio);
     audio._playAt = (...a) => {
       const accepted = play(...a);
@@ -102,8 +93,7 @@ try {
     });
   });
   for (const engineOnly of [true, false]) {
-    const options = { engineOnly, capture: !!out, baseline: !!args.baseline };
-    const row = await page.evaluate(async ({ engineOnly, capture, baseline }) => {
+    const row = await page.evaluate(async (engineOnly) => {
       const engine = window.__ENGINE__,
         ctx = engine.ctx,
         radio = ctx.get('radio'),
@@ -121,19 +111,6 @@ try {
         positions: [],
         frames: 0,
       });
-      const chunks = [];
-      let recorder;
-      if (capture) {
-        recorder = new MediaRecorder(window.airStream, {
-          mimeType: 'audio/webm;codecs=opus',
-          audioBitsPerSecond: 192000,
-        });
-        recorder.ondataavailable = (e) => chunks.push(e.data);
-        await new Promise((ready) => {
-          recorder.onstart = ready;
-          recorder.start();
-        });
-      }
       engine._last = performance.now();
       const started = performance.now();
       let pause = false,
@@ -144,7 +121,7 @@ try {
       const strike = radio.active[0],
         voice = strike.engine,
         source = voice?.source;
-      if (engineOnly && !baseline && !voice) throw Error('No aircraft voice for pause checks');
+      if (engineOnly && !voice) throw Error('No aircraft voice for pause checks');
       try {
         while (performance.now() - started < 18000) {
           const now = await new Promise((ready) => requestAnimationFrame(ready));
@@ -154,7 +131,7 @@ try {
             report.pauseAt = audio.actx.currentTime;
             pauseTravel = strike.travel;
             pausePose = strike.plane.position.clone();
-            if (!baseline) report.beforePauseGain = voice.node.gain.value;
+            report.beforePauseGain = voice.node.gain.value;
             engine.time.scale = 0;
             ctx.events.emit('ui:pause', { paused: true });
           }
@@ -166,13 +143,12 @@ try {
             audio.actx.currentTime - report.pauseAt >= 0.5
           ) {
             resumed = true;
-            if (!baseline)
-              report.paused = {
-                gain: voice.node.gain.value,
-                travel: strike.travel,
-                sameHandle: strike.engine === voice,
-                sameSource: voice.source === source,
-              };
+            report.paused = {
+              gain: voice.node.gain.value,
+              travel: strike.travel,
+              sameHandle: strike.engine === voice,
+              sameSource: voice.source === source,
+            };
             engine.time.scale = 1;
             ctx.events.emit('ui:pause', { paused: false });
           }
@@ -186,7 +162,6 @@ try {
           }
           if (
             engineOnly &&
-            !baseline &&
             resumed &&
             !report.resumed &&
             audio.actx.currentTime - report.resumeAt >= 0.25
@@ -200,23 +175,9 @@ try {
           report.frames++;
           if (engine.error) throw Error(JSON.stringify(engine.error));
         }
-        if (recorder)
-          await new Promise((ready) => {
-            recorder.onstop = ready;
-            recorder.stop();
-          });
-        let recording;
-        if (capture) {
-          const bytes = new Uint8Array(await new Blob(chunks).arrayBuffer());
-          let binary = '';
-          for (let i = 0; i < bytes.length; i += 32768)
-            binary += String.fromCharCode(...bytes.subarray(i, i + 32768));
-          recording = btoa(binary);
-        }
         return {
           ...report,
           pauseTravel,
-          recording,
           engineError: engine.error ?? null,
           audio: audio.report(),
           loops: audio._aircraft?.size ?? 0,
@@ -228,115 +189,74 @@ try {
         radio.clearStrike();
         window.airReport = null;
       }
-    }, options);
-    if (out) {
-      const path = resolve(out, row.id + '.webm');
-      writeFileSync(path, Buffer.from(row.recording, 'base64'));
-      const p = spawnSync('ffmpeg', [
-        '-nostdin',
-        '-v',
-        'error',
-        '-y',
-        '-i',
-        path,
-        '-c:a',
-        'libmp3lame',
-        '-q:a',
-        '2',
-        resolve(out, row.id + '.mp3'),
-      ]);
-      assert.equal(p.status, 0, p.stderr?.toString());
-    }
-    delete row.recording;
+    }, engineOnly);
     assert.equal(row.engineError, null);
     assert.equal(row.audio.errors, 0);
     assert.equal(row.explosions === 0, engineOnly, 'isolated/full-strike fixtures are distinct');
     if (engineOnly) assert(row.pausedFrames > 0, 'sampled frozen plane during pause');
-    if (!args.baseline) {
-      if (engineOnly) {
-        assert(Math.abs(row.beforePauseGain - 1) < 1e-6, 'source gain settled before pause');
-        assert(Math.abs(row.paused.gain) < 1e-6, 'source gain settles to silence during pause');
-        assert(Math.abs(row.resumed.gain - 1) < 1e-6, 'source gain recovers after resume');
-        assert.equal(row.paused.travel, row.pauseTravel, 'travel remains exactly frozen');
-        assert(row.resumed.travel > row.paused.travel, 'travel advances after resume');
-        assert.equal(row.paused.sameHandle && row.resumed.sameHandle, true);
-        assert.equal(row.paused.sameSource && row.resumed.sameSource, true);
-        console.log('Aircraft pause evidence:', {
-          beforeGain: row.beforePauseGain,
-          pauseTravel: row.pauseTravel,
-          pausedFrames: row.pausedFrames,
-          paused: row.paused,
-          resumed: row.resumed,
-        });
-      }
-      assert.equal(row.starts, 1, 'one loop per aircraft pass');
-      assert.equal(row.heliCalls, 0);
-      assert.equal(row.stops, 1, 'one natural engine stop, independent of late bombs');
-      assert.equal(row.loops, 0);
-      assert.equal(row.tracked, 0);
-      assert(row.moves > 50);
-      assert(
-        row.positions.at(-1)[0] !== row.positions[0][0] ||
-          row.positions.at(-1)[2] !== row.positions[0][2]
-      );
+    if (engineOnly) {
+      assert(Math.abs(row.beforePauseGain - 1) < 1e-6, 'source gain settled before pause');
+      assert(Math.abs(row.paused.gain) < 1e-6, 'source gain settles to silence during pause');
+      assert(Math.abs(row.resumed.gain - 1) < 1e-6, 'source gain recovers after resume');
+      assert.equal(row.paused.travel, row.pauseTravel, 'travel remains exactly frozen');
+      assert(row.resumed.travel > row.paused.travel, 'travel advances after resume');
+      assert.equal(row.paused.sameHandle && row.resumed.sameHandle, true);
+      assert.equal(row.paused.sameSource && row.resumed.sameSource, true);
+      console.log('Aircraft pause evidence:', {
+        beforeGain: row.beforePauseGain,
+        pauseTravel: row.pauseTravel,
+        pausedFrames: row.pausedFrames,
+        paused: row.paused,
+        resumed: row.resumed,
+      });
     }
-    rows.push(row);
+    assert.equal(row.starts, 1, 'one loop per aircraft pass');
+    assert.equal(row.heliCalls, 0);
+    assert.equal(row.stops, 1, 'one natural engine stop, independent of late bombs');
+    assert.equal(row.loops, 0);
+    assert.equal(row.tracked, 0);
+    assert(row.moves > 50);
+    assert(
+      row.positions.at(-1)[0] !== row.positions[0][0] ||
+        row.positions.at(-1)[2] !== row.positions[0][2]
+    );
   }
-  if (!args.baseline) {
-    const lifecycle = await page.evaluate(async () => {
-      const engine = window.__ENGINE__,
-        ctx = engine.ctx,
-        radio = ctx.get('radio'),
-        audio = ctx.get('audio');
-      radio.callStrike();
-      const first = radio.active[0].engine;
-      ctx.events.emit('game:restart', {});
-      const empty = radio.active.length === 0;
-      await new Promise((r) => setTimeout(r, 800));
-      audio.update(0, ctx);
-      const retiredBeforeRestart = first.ended && audio._aircraft.size === 0;
-      radio.callStrike();
-      const second = radio.active[0].engine;
-      audio.dispose();
-      radio.clearStrike();
-      return {
-        empty,
-        retiredBeforeRestart,
-        ended: first.ended,
-        disposed: second.ended,
-        loops: audio._aircraft.size,
-      };
-    });
-    assert.deepEqual(lifecycle, {
-      empty: true,
-      retiredBeforeRestart: true,
-      ended: true,
-      disposed: true,
-      loops: 0,
-    });
-  }
-  if (out) {
-    await page.evaluate(() => {
-      const engine = window.__ENGINE__,
-        ctx = engine.ctx,
-        radio = ctx.get('radio');
-      radio.callStrike();
-      const s = radio.active[0];
-      s.travel = s.drops[Math.floor(s.drops.length / 2)];
-      radio.update(0);
-      ctx.camera.lookAt(s.plane.position);
-      engine.setGameplaySuspended(true);
-    });
-    await page.evaluate(() => window.__PUMP__(1));
-    await captureNative(page, resolve(out, 'snapshot.png'));
-  }
+  const lifecycle = await page.evaluate(async () => {
+    const engine = window.__ENGINE__,
+      ctx = engine.ctx,
+      radio = ctx.get('radio'),
+      audio = ctx.get('audio');
+    radio.callStrike();
+    const first = radio.active[0].engine;
+    ctx.events.emit('game:restart', {});
+    const empty = radio.active.length === 0;
+    await new Promise((r) => setTimeout(r, 800));
+    audio.update(0, ctx);
+    const retiredBeforeRestart = first.ended && audio._aircraft.size === 0;
+    radio.callStrike();
+    const second = radio.active[0].engine;
+    audio.dispose();
+    radio.clearStrike();
+    return {
+      empty,
+      retiredBeforeRestart,
+      ended: first.ended,
+      disposed: second.ended,
+      loops: audio._aircraft.size,
+    };
+  });
+  assert.deepEqual(lifecycle, {
+    empty: true,
+    retiredBeforeRestart: true,
+    ended: true,
+    disposed: true,
+    loops: 0,
+  });
   assert.deepEqual(errors, []);
   console.log(
-    `PASS: actual bomber engine/full-strike, pause, source ownership, natural stop and restart/disposal${args.baseline ? ' (baseline capture)' : ''}.`
+    'PASS: actual bomber engine/full-strike, pause, source ownership, natural stop and restart/disposal.'
   );
 } finally {
   await browser?.close();
   stopViteServer(server);
-  if (out)
-    writeFileSync(resolve(out, 'report.json'), JSON.stringify({ rows, errors }, null, 2) + '\n');
 }

@@ -1,8 +1,6 @@
 #!/usr/bin/env node
-/** Actual game graph/HUD integration + optional local before/after audio capture. */
+/** Actual game graph/HUD integration: contact/flight, health and physical foley. */
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -16,17 +14,10 @@ import { waitForGame } from '../../tools/lib/native-render.mjs';
 
 const args = parseArgs();
 const root = resolve(args.root ?? fileURLToPath(new URL('../../', import.meta.url)));
-const out = args.out ? resolve(args.out) : null;
-assert(
-  !out || (out !== root && !out.startsWith(root + '/')),
-  'Audio evidence stays outside the repository'
-);
-if (out) mkdirSync(out, { recursive: true });
 const server = await ensureViteServer({ root, port: Number(args.port ?? 5533) });
 assert(server, 'Refusing an occupied server port');
 let browser;
-const errors = [],
-  results = [];
+const errors = [];
 try {
   browser = await launchChromium({
     headless: true,
@@ -58,9 +49,6 @@ try {
         return original(...args);
       };
     }
-    const dest = audio.actx.createMediaStreamDestination();
-    audio.mixer.masterGain.connect(dest);
-    window.hitCaptureStream = dest.stream;
     const { combatLane } = await import('/tools/lib/combat-fixture.js');
     const ai = ctx.get('ai');
     for (const agent of ai.agents) agent.dispose();
@@ -80,7 +68,7 @@ try {
     ['incoming-near-miss', 0, 0, false, 'miss'],
   ]) {
     const row = await page.evaluate(
-      async ({ id, amount, armourAbsorbed, plateBreak, trajectory, capture }) => {
+      async ({ id, amount, armourAbsorbed, plateBreak, trajectory }) => {
         const engine = window.__ENGINE__,
           ctx = engine.ctx;
         const audio = ctx.get('audio'),
@@ -106,20 +94,6 @@ try {
             aim.addScaledVector(right, 1.2);
           } else aim.y -= 0.3;
           damage = armourAbsorbed ? armourAbsorbed / (1 - HEALTH.armourReduction) : amount;
-        }
-        const chunks = [];
-        let recorder;
-        if (capture) {
-          recorder = new MediaRecorder(window.hitCaptureStream, {
-            mimeType: 'audio/webm;codecs=opus',
-          });
-          recorder.ondataavailable = (e) => chunks.push(e.data);
-          await new Promise((ready) => {
-            recorder.onstart = ready;
-            recorder.start();
-          });
-          // Establish capture before scheduling the contact's sharp attack.
-          await new Promise((ready) => setTimeout(ready, 80));
         }
         window.hitTrace.length = 0;
         if (trajectory) {
@@ -165,19 +139,7 @@ try {
         ui.lateUpdate(1 / 60, ctx);
         const trace = window.hitTrace.slice();
         const health = ui.state.health;
-        let pcm;
-        if (recorder) {
-          await new Promise((r) => setTimeout(r, 900));
-          await new Promise((r) => {
-            recorder.onstop = r;
-            recorder.stop();
-          });
-          const data = new Uint8Array(await new Blob(chunks).arrayBuffer());
-          let binary = '';
-          for (let i = 0; i < data.length; i += 32768)
-            binary += String.fromCharCode(...data.subarray(i, i + 32768));
-          pcm = btoa(binary);
-        } else await new Promise((r) => setTimeout(r, 450));
+        await new Promise((r) => setTimeout(r, 450));
         audio.update(0, ctx);
         return {
           id,
@@ -187,60 +149,28 @@ try {
           trace,
           health,
           report: audio.report(),
-          pcm,
         };
       },
-      { id, amount, armourAbsorbed, plateBreak, trajectory, capture: !!out }
+      { id, amount, armourAbsorbed, plateBreak, trajectory }
     );
-    if (out) {
-      const path = resolve(out, `${id}.webm`);
-      writeFileSync(path, Buffer.from(row.pcm, 'base64'));
-      const converted = spawnSync('ffmpeg', [
-        '-nostdin',
-        '-v',
-        'error',
-        '-y',
-        '-i',
-        path,
-        '-c:a',
-        'libmp3lame',
-        '-q:a',
-        '2',
-        resolve(out, `${id}.mp3`),
-      ]);
-      assert.equal(converted.status, 0, converted.stderr?.toString());
-      await page.screenshot({ path: resolve(out, `${id}.png`) });
-    }
-    delete row.pcm;
     assert.equal(row.report.errors, 0, id + ': actual graph errors');
     assert.equal(row.health, 100 - amount, id + ': HUD retains health');
-    if (!args.baseline) {
-      const feedback = row.trace.filter((v) => v.kind === 'damage');
+    const feedback = row.trace.filter((v) => v.kind === 'damage');
+    assert.equal(feedback.length, amount || armourAbsorbed ? 1 : 0, id + ': one incoming contact');
+    if (feedback.length) assert.equal(feedback[0].method, '_playDry');
+    if (trajectory) {
       assert.equal(
-        feedback.length,
-        amount || armourAbsorbed ? 1 : 0,
-        id + ': one incoming contact'
+        row.trace.filter((v) => v.kind === 'whizz').length,
+        1,
+        id + ': real incoming flight retains exactly one whizz'
       );
-      if (feedback.length) assert.equal(feedback[0].method, '_playDry');
-      if (trajectory) {
-        assert.equal(
-          row.trace.filter((v) => v.kind === 'whizz').length,
-          1,
-          id + ': real incoming flight retains exactly one whizz'
-        );
-        assert.equal(
-          row.trace.length,
-          feedback.length + 1,
-          id + ': no phantom impact/confirmation layers'
-        );
-      } else
-        assert.equal(
-          row.trace.length,
-          feedback.length,
-          id + ': contact-only fixture has no flight'
-        );
-    }
-    results.push(row);
+      assert.equal(
+        row.trace.length,
+        feedback.length + 1,
+        id + ': no phantom impact/confirmation layers'
+      );
+    } else
+      assert.equal(row.trace.length, feedback.length, id + ': contact-only fixture has no flight');
   }
   // Exercise the real bullet resolver against an actual soldier, not a second
   // fabricated damage path. Physics already deduplicates overlapping regions.
@@ -290,19 +220,16 @@ try {
     1,
     'one real enemy body contact'
   );
-  if (!args.baseline) {
-    assert.equal(
-      enemy.trace.filter((v) => v.kind === 'whizz').length,
-      0,
-      'own body hit is not a near-miss'
-    );
-    assert.equal(
-      enemy.trace.filter((v) => v.kind === 'hitmarker').length,
-      1,
-      'one confirmation UI tick, not a second copy from the HUD'
-    );
-  }
-  results.push({ id: 'real-enemy', ...enemy });
+  assert.equal(
+    enemy.trace.filter((v) => v.kind === 'whizz').length,
+    0,
+    'own body hit is not a near-miss'
+  );
+  assert.equal(
+    enemy.trace.filter((v) => v.kind === 'hitmarker').length,
+    1,
+    'one confirmation UI tick, not a second copy from the HUD'
+  );
   // Additional physical-foley paths: real world-layer contacts, actual actor
   // death, and controller-produced landing/stride plants (not emitted fixtures).
   const physical = await page.evaluate(async () => {
@@ -427,18 +354,16 @@ try {
         .length,
       1
     );
-    if (!args.baseline)
-      assert.equal(
-        material.trace.filter((p) => p.kind === 'whizz').length,
-        0,
-        'own world contact is not a flight pass'
-      );
+    assert.equal(
+      material.trace.filter((p) => p.kind === 'whizz').length,
+      0,
+      'own world contact is not a flight pass'
+    );
   }
   assert.equal(physical.landing.length, 1, 'one actual controller landing');
   assert(physical.walking.length > 0, 'actual controller stride plants');
   assert.equal(physical.report.errors, 0);
   assert.equal(physical.engineError, null);
-  results.push(physical);
   const healthPaths = await page.evaluate(async () => {
     const { HEALTH } = await import('/src/player/tuning.ts');
     const ctx = window.__ENGINE__.ctx,
@@ -469,34 +394,27 @@ try {
       };
     });
   });
-  if (!args.baseline)
-    for (const row of healthPaths) {
-      assert.equal(
-        row.trace.filter((v) => v.kind === 'damage').length,
-        1,
-        row.id + ': real health path has one incoming voice'
-      );
-      assert.equal(
-        row.trace.filter((v) => v.kind === 'armour_hit' || v.kind === 'armour_break').length,
-        0,
-        row.id + ': no extra HUD armour sound'
-      );
-    }
+  for (const row of healthPaths) {
+    assert.equal(
+      row.trace.filter((v) => v.kind === 'damage').length,
+      1,
+      row.id + ': real health path has one incoming voice'
+    );
+    assert.equal(
+      row.trace.filter((v) => v.kind === 'armour_hit' || v.kind === 'armour_break').length,
+      0,
+      row.id + ': no extra HUD armour sound'
+    );
+  }
   assert.equal(healthPaths[0].armour, 0);
   assert.equal(healthPaths[0].health, 100, 'real armour-only break leaves health intact');
   assert.equal(healthPaths[1].health, 75, 'explosion-derived health damage retains its route');
   assert.equal(healthPaths[2].health, 0, 'lethal damage still applies');
-  results.push(...healthPaths);
   assert.deepEqual(errors, []);
   console.log(
-    `PASS: actual game HUD/audio, incoming trajectories, health/explosion/death, enemy/material bullet contacts, controller steps/landing and body fall${args.baseline ? ' (baseline recorded)' : ''}`
+    'PASS: actual game HUD/audio, incoming trajectories, health/explosion/death, enemy/material bullet contacts, controller steps/landing and body fall'
   );
 } finally {
   await browser?.close();
   stopViteServer(server);
-  if (out)
-    writeFileSync(
-      resolve(out, 'routing.json'),
-      JSON.stringify({ results, errors }, null, 2) + '\n'
-    );
 }

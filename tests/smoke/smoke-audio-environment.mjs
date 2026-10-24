@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 import { AIRCRAFT_URLS } from '../../src/audio/aircraft.ts';
@@ -14,7 +15,6 @@ import { RELOAD_URLS } from '../../src/audio/reloads.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import provenance from '../../src/audio/samples/environment/provenance.json' with { type: 'json' };
 import { Rng } from '../../src/core/rng.ts';
-import { sha256 } from '../../tools/lib/recorded-one-shot.mjs';
 assert(!('ambientOneShot' in ambienceModule), 'replaced generators are removed');
 assert.deepEqual(
   [...ambienceModule.ONE_SHOTS],
@@ -27,7 +27,7 @@ for (const [key, urls] of Object.entries(ENVIRONMENT_URLS)) {
   for (const [i, url] of urls.entries()) {
     const data = readFileSync(new URL(url)),
       meta = provenance.files[`${key}-${i + 1}`];
-    assert.equal(sha256(data), meta.sha256);
+    assert.equal(createHash('sha256').update(data).digest('hex'), meta.sha256);
     const h = data.indexOf('OpusHead');
     assert(h >= 0);
     assert.equal(data[h + 9], 1);
