@@ -15,6 +15,7 @@ import {
 } from './authored-hands.ts';
 import { authoredModel, requiredNode } from './authored-model.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
+import { batchM4Finishes } from './m4-finishes.ts';
 
 export const M4_URL = new URL(
   '../../assets/weapons/m4a1-block-ii/m4a1-block-ii.glb',
@@ -59,6 +60,7 @@ export function makeM4Model(gltf: GLTF) {
       if (value instanceof THREE.Texture) value.anisotropy = 8;
     }
   });
+  batchM4Finishes(scene, converted);
   return { ...model, ...converted };
 }
 

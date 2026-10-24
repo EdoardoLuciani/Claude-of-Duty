@@ -11,6 +11,7 @@ import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
 import { checkM4Sights } from '../../tools/lib/m4-sight-checks.js';
+import { parseM4 } from './m4-fixture.mjs';
 
 const dir = new URL('../../assets/weapons/m4a1-block-ii/', import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', dir)));
@@ -124,7 +125,13 @@ for (const clip of json.animations) {
     if (channel.target.path === 'scale')
       assert.equal(clip.samplers[channel.sampler].interpolation, 'STEP');
 }
-const model = makeM4Model(await parseGLB(bytes));
+const model = makeM4Model(await parseM4(bytes));
+for (const name of ['receiver_mesh', 'handguard_mesh', 'stock_mesh']) {
+  const meshes = model.root.getObjectByName(name).children.filter((o) => o.isMesh);
+  assert.equal(meshes.length, 1, `${name}: sweep the actual batched runtime asset`);
+  assert(!Array.isArray(meshes[0].material));
+  assert.equal(meshes[0].geometry.groups.length, 0);
+}
 assert.equal(model.id, 'rifle');
 assert.equal(model.label, 'M4A1');
 assert.equal(model.nodes.opticGlass, undefined);

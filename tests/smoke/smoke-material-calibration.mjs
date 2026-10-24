@@ -14,6 +14,7 @@ import { WEAPON_MATERIALS } from '../../src/weapons/materials.ts';
 import { makeMCXModel, MCX_URL } from '../../src/weapons/mcx.ts';
 import { makeMPXModel, MPX_URL } from '../../src/weapons/mpx.ts';
 import { makeP320Model, P320_URL } from '../../src/weapons/p320.ts';
+import { parseM4 } from './m4-fixture.mjs';
 
 // Actual committed GLBs and production loaders. Stub only browser image decode;
 // material factors/extensions, hierarchy and animation validation stay real.
@@ -31,10 +32,13 @@ for (const [id, url, make] of [
     name: 'SMOKE_TEXTURE',
     loadTexture: () => Promise.resolve(new Texture()),
   }));
-  const gltf = await loader.parseAsync(
-    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-    ''
-  );
+  const gltf =
+    id === 'rifle'
+      ? await parseM4(bytes)
+      : await loader.parseAsync(
+          bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+          ''
+        );
   const sources = new Map();
   gltf.scene.traverse((o) => {
     if (o.isMesh) sources.set(o.material.name, o.material);
