@@ -8,6 +8,7 @@ import { AircraftVoice, AIRCRAFT_MIX, AIRCRAFT_URLS } from '../../src/audio/airc
 import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
 import { RADIO_URLS } from '../../src/audio/radio.ts';
+import { REACTION_URLS } from '../../src/audio/reactions.ts';
 import { RELOAD_URLS } from '../../src/audio/reloads.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import provenance from '../../src/audio/samples/aircraft/provenance.json' with { type: 'json' };
@@ -373,7 +374,8 @@ try {
   await assert.rejects(missing.load(), /propeller-2.*HTTP 404/);
   const required =
     50 +
-    (AIRCRAFT_URLS.length + Object.values(RADIO_URLS).reduce((n, urls) => n + urls.length, 0)) +
+    (AIRCRAFT_URLS.length +
+      Object.values({ ...REACTION_URLS, ...RADIO_URLS }).reduce((n, urls) => n + urls.length, 0)) +
     Object.values(FOLEY_URLS).reduce((sum, urls) => sum + urls.length, 0) +
     Object.values(RELOAD_URLS).reduce((sum, urls) => sum + urls.length, 0);
   assert.equal(decodes, required - 1, 'remaining required jobs settle before failure teardown');

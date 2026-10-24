@@ -63,6 +63,9 @@ export function mixCases() {
     add(`recorded-radio-${kind}`, 'warning', 'ui', { kind });
   for (const kind of ['spot', 'reload', 'hurt', 'death'])
     add(`voice-${kind}`, 'speech', 'voice', { kind });
+  for (const voice of [0, 1])
+    for (const kind of ['hurt', 'death'])
+      add(`reaction-${voice}-${kind}`, 'speech', 'voice', { kind, voice });
   add('radio-voice', 'speech', 'voice', { kind: 'spot', radio: true });
   add('voice-near', 'speech', 'voice', { kind: 'spot', distance: 2 });
   add('own-hurt', 'warning', 'own-hurt');
@@ -286,6 +289,7 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
         at(t, () =>
           audio.bark(s.kind, s.radio ? null : point(s.distance ?? 5, 1.6), {
             radio: !!s.radio,
+            voice: s.voice ?? 0,
             force: true,
           })
         );

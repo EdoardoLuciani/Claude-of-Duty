@@ -266,10 +266,13 @@ equipment foley use required recordings; see [docs/physical-foley.md](docs/physi
 Bomber engines use required recorded loops in the existing tracked spatial pool.
 Radio owns each handle's moving pose/pass lifetime; audio owns its source/pool
 cleanup. See [docs/aircraft-audio.md](docs/aircraft-audio.md).
+Nonverbal hurt/death efforts use required identity-grouped recordings; see
+[docs/vocal-reactions.md](docs/vocal-reactions.md). Spoken tactical callouts remain
+separate in #497.
 Radio switch/receive textures use required recordings composed with unchanged
 functional electronic tones; see [docs/radio-audio.md](docs/radio-audio.md).
 Remaining synthesis includes authored distant/sniper reports, reinforcement,
-shell casings/dry fire, voices, ambience and intentional UI cues.
+shell casings/dry fire, tactical speech, ambience and intentional UI cues.
 
 `models.getSoldier(name)` returns `{ name, geometry, slots, boneNames, weapon,
 stats, variant }`. Merge GLTF primitives into one skinned geometry with slot

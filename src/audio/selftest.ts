@@ -373,6 +373,13 @@ async function runCases(loadedSamples: WeaponSampleBank, opts: { verbose?: boole
   }
 
   /* ---- voice ----------------------------------------------------- */
+  for (const voice of [0, 1]) {
+    for (const kind of ['hurt', 'death'] as const) {
+      await push(`reaction:${voice}:${kind}`, 2, ({ samples, rng, mixer, t }) => {
+        route(mixer, samples.reaction(kind, voice, rng, { when: t }), 'voice');
+      });
+    }
+  }
   for (const key of Object.keys(BARKS)) {
     await push(`bark:${key}`, 3, ({ bank, rng, mixer, t }) => {
       route(mixer, bark(mixer.actx, bank, rng, { when: t, bark: key }), 'voice');

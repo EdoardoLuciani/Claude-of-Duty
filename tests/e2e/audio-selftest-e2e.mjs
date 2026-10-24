@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { AIRCRAFT_URLS } from '../../src/audio/aircraft.ts';
 import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
 import { RADIO_URLS } from '../../src/audio/radio.ts';
+import { REACTION_URLS } from '../../src/audio/reactions.ts';
 import { RELOAD_URLS } from '../../src/audio/reloads.ts';
 import {
   ensureViteServer,
@@ -17,7 +18,8 @@ const required =
   50 +
   Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0) +
   Object.values(RELOAD_URLS).reduce((n, urls) => n + urls.length, 0) +
-  (AIRCRAFT_URLS.length + Object.values(RADIO_URLS).reduce((n, urls) => n + urls.length, 0));
+  (AIRCRAFT_URLS.length +
+    Object.values({ ...REACTION_URLS, ...RADIO_URLS }).reduce((n, urls) => n + urls.length, 0));
 let browser,
   fault = null,
   requests = 0;
@@ -67,6 +69,7 @@ try {
         'reload',
         'nextAircraft',
         'radio',
+        'reaction',
       ]) {
         const original = WeaponSampleBank.prototype[method];
         originals.set(method, original);
@@ -108,6 +111,7 @@ try {
       );
       assert.equal(result.counts.nextAircraft, 1);
       assert.equal(result.counts.radio, 3);
+      assert.equal(result.counts.reaction, 4);
       assert.deepEqual(result.report.failures, []);
       assert.equal(result.counts.impact, 11);
       assert.equal(result.counts.step, 17);
@@ -143,6 +147,10 @@ try {
         'radio:radio_open',
         'radio:radio_strike',
         'radio:intel_call',
+        'reaction:0:hurt',
+        'reaction:0:death',
+        'reaction:1:hurt',
+        'reaction:1:death',
         ...Object.keys(RELOAD_URLS).map((kind) => `reload:${kind}`),
       ]) {
         const row = result.report.results.find((row) => row.name === name);
