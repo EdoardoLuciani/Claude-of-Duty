@@ -277,6 +277,7 @@ try {
     assert.equal(result.census.triangles.prepass ?? 0, population * 48);
     assert.equal(result.census.triangles.shadow ?? 0, population * 144);
     assert.equal(result.census.other, 0);
+    assert.equal(result.totalBuilders, 0, 'no post-readiness builders, including first use/warmup');
     assert.equal(
       result.samples.reduce((n, s) => n + s.builders, 0),
       0,

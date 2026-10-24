@@ -19,6 +19,7 @@ function harness() {
   const intel = { blocked: false, blocksUse: () => intel.blocked };
   const ctx = {
     scene,
+    camera: new THREE.PerspectiveCamera(),
     time: { elapsed: 0, scale: 1 },
     input,
     events: { emit: (name, payload) => events.push({ name, payload }) },
@@ -52,10 +53,12 @@ function harness() {
 function matricesMatch(pickups) {
   const actual = new THREE.Matrix4();
   for (const mesh of pickups._batches) {
-    assert.equal(mesh.count, pickups.items.length, 'no stale dense slots');
-    for (const [i, item] of pickups.items.entries()) {
+    const count = pickups.items.length ? Math.max(...pickups.items.map((p) => p.slot)) + 1 : 0;
+    assert.equal(mesh.count, count, 'bounded sparse draw range');
+    assert(count <= 32);
+    for (const item of pickups.items) {
       item.group.updateMatrix();
-      mesh.getMatrixAt(i, actual);
+      mesh.getMatrixAt(item.slot, actual);
       actual.elements.forEach((n, j) => assert(Math.abs(n - item.group.matrix.elements[j]) < 1e-6));
       const sphere = mesh.geometry.boundingSphere.clone().applyMatrix4(actual);
       assert(
@@ -63,6 +66,14 @@ function matricesMatch(pickups) {
           mesh.boundingSphere.radius + 1e-5,
         'updated population bounds enclose each transformed item'
       );
+    }
+    for (let slot = 0; slot < mesh.count; slot++) {
+      if (pickups._slots[slot]) continue;
+      mesh.getMatrixAt(slot, actual);
+      assert.equal(actual.determinant(), 0, 'holes have no rasterized geometry');
+      assert.equal(actual.elements[0], 0);
+      assert.equal(actual.elements[5], 0);
+      assert.equal(actual.elements[10], 0);
     }
   }
 }
@@ -111,6 +122,7 @@ function matricesMatch(pickups) {
 
 // Stable IDs, unchanged two-draw RNG order, cap evicts oldest; array order
 // remains creation order even when first, middle and last items are removed.
+// Surviving native slots never move; reuse changes identity, not capacity.
 {
   const { pickups, ctx } = harness();
   const expected = new Rng(123);
@@ -133,7 +145,13 @@ function matricesMatch(pickups) {
   for (const index of [0, 15, 29]) {
     const removed = pickups.items[index];
     const ids = pickups.items.filter((p) => p !== removed).map((p) => p.id);
+    const slots = pickups.items.filter((p) => p !== removed).map((p) => p.slot);
     pickups._remove(removed);
+    assert.deepEqual(
+      pickups.items.map((p) => p.slot),
+      slots
+    );
+    assert.equal(pickups._slots[removed.slot], null);
     assert.deepEqual(
       pickups.items.map((p) => p.id),
       ids
@@ -233,6 +251,54 @@ function matricesMatch(pickups) {
   pickups.dispose();
 }
 
+// History becomes valid only after the actual world prepass has rendered that
+// family. Removal cannot move survivors; reused/restarted identities start fresh.
+{
+  const { pickups, ctx } = harness();
+  const a = pickups.spawn({ x: 2, y: 0, z: 0 });
+  const b = pickups.spawn({ x: 3, y: 0, z: 0 });
+  const markRendered = () => {
+    ctx.camera.layers.set(1);
+    for (const mesh of pickups._batches.slice(0, 3))
+      mesh.onAfterRender(null, ctx.scene, ctx.camera);
+    pickups._syncVisuals();
+  };
+  const flags = (slot) =>
+    pickups._batches.slice(0, 3).map((m) => m.geometry.getAttribute('ammoHistoryValid').getX(slot));
+  assert.deepEqual(flags(a.slot), [0, 0, 0]);
+  const shadow = new THREE.PerspectiveCamera();
+  shadow.layers.set(1);
+  for (const mesh of pickups._batches.slice(0, 3)) mesh.onAfterRender(null, ctx.scene, shadow);
+  pickups._syncVisuals();
+  assert.deepEqual(flags(a.slot), [0, 0, 0], 'shadow callbacks cannot validate velocity history');
+  markRendered();
+  assert.deepEqual(flags(a.slot), [1, 1, 1]);
+  b.group.position.x += 0.2;
+  pickups._remove(a);
+  assert.equal(b.slot, 1);
+  assert.deepEqual(flags(b.slot), [1, 1, 1], 'moving survivor keeps its legitimate native history');
+  const replacement = pickups.spawn({ x: -2, y: 0, z: 0 });
+  assert.equal(replacement.slot, a.slot);
+  assert.deepEqual(flags(replacement.slot), [0, 0, 0]);
+  assert.deepEqual(flags(b.slot), [1, 1, 1]);
+  markRendered();
+  assert.deepEqual(flags(replacement.slot), [1, 1, 1]);
+  pickups.clear();
+  const versions = pickups._batches.map((m) => m.instanceMatrix.version);
+  pickups.update(0);
+  pickups.update(0);
+  assert.deepEqual(
+    pickups._batches.map((m) => m.instanceMatrix.version),
+    versions,
+    'empty frames do not dirty matrices'
+  );
+  const restarted = pickups.spawn({ x: 10, y: 0, z: 0 });
+  assert.equal(restarted.slot, 0);
+  assert.deepEqual(flags(restarted.slot), [0, 0, 0]);
+  matricesMatch(pickups);
+  pickups.dispose();
+}
+
 // Drop eligibility and RNG sequencing stay part of the economy, not batching.
 {
   const { pickups, owner } = harness();
@@ -255,5 +321,5 @@ function matricesMatch(pickups) {
   pickups.dispose();
 }
 console.log(
-  'Ammo pickup instancing: geometry/transforms, dense compaction/reuse, lifecycle, interaction, RNG and disposal passed'
+  'Ammo pickup instancing: geometry/transforms, stable sparse slots/history/reuse, lifecycle, interaction, RNG and disposal passed'
 );
