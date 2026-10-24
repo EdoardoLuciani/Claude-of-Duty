@@ -17,9 +17,14 @@ Preserve the authored approximation unless controlled evidence justifies a chang
 ## Copy, clone and ownership
 
 Use the pinned native `NodeMaterial.copy()`, not borrowed classic prototypes.
-Weapons force physical nodes; arms retain standard/physical source selection.
-Maps stay borrowed; colors/vectors, definitions, iridescence ranges and clipping
-planes must retain their value ownership. Disposal must not destroy input maps.
+Weapons force physical nodes and keep source maps borrowed. The arm source-copy
+utility retains standard/physical selection; runtime arms combine their authored
+Physical finishes into owned texture arrays per shared asset, with one draw per
+independently bound hand. Keep authored specular strength (approximately 0.16),
+UV0 AO / UV1 microdetail, grouped material selection and sleeve/stitch-only blood.
+Arm packing releases source textures/images; asset disposal frees its arrays.
+Colors/vectors, definitions, iridescence ranges and clipping planes must retain
+value ownership. Weapon material disposal must not destroy borrowed input maps.
 
 Soldier output subclasses native `setupOutput()` and calls super before fog/alpha.
 Declarative `rimNode` survives copy/clone and distinguishes shader cache keys;
