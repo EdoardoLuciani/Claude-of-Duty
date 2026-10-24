@@ -22,7 +22,7 @@
 import type { ReloadPhase } from '../core/events.ts';
 import { Rng } from '../core/rng.ts';
 import { AIRCRAFT_MIX } from './aircraft.ts';
-import { ambientOneShot, ONE_SHOTS } from './ambience.ts';
+import { ONE_SHOTS } from './ambience.ts';
 import { NoiseBank } from './dsp.ts';
 import { shellCasing, explosion, uiSound, heartbeat } from './foley.ts';
 import { IR_SPECS, generateIR, classifySpace } from './ir.ts';
@@ -390,8 +390,8 @@ async function runCases(loadedSamples: WeaponSampleBank, opts: { verbose?: boole
 
   /* ---- ambient one-shots ---------------------------------------- */
   for (const k of ONE_SHOTS) {
-    await push(`ambient:${k}`, 14, ({ bank, rng, mixer, t }) => {
-      route(mixer, ambientOneShot(mixer.actx, bank, rng, k, { when: t }), 'ambience');
+    await push(`ambient:${k}`, 14, ({ samples, rng, mixer, t }) => {
+      route(mixer, samples.environment(k, rng, { when: t }), 'ambience');
     });
   }
 
