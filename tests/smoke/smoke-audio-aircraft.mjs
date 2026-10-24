@@ -8,6 +8,7 @@ import { AircraftVoice, AIRCRAFT_MIX, AIRCRAFT_URLS } from '../../src/audio/airc
 import { ENVIRONMENT_URLS } from '../../src/audio/environment.ts';
 import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
+import { REACTION_URLS } from '../../src/audio/reactions.ts';
 import { RELOAD_URLS } from '../../src/audio/reloads.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import provenance from '../../src/audio/samples/aircraft/provenance.json' with { type: 'json' };
@@ -374,7 +375,10 @@ try {
   const required =
     50 +
     (AIRCRAFT_URLS.length +
-      Object.values(ENVIRONMENT_URLS).reduce((n, urls) => n + urls.length, 0)) +
+      Object.values({ ...REACTION_URLS, ...ENVIRONMENT_URLS }).reduce(
+        (n, urls) => n + urls.length,
+        0
+      )) +
     Object.values(FOLEY_URLS).reduce((sum, urls) => sum + urls.length, 0) +
     Object.values(RELOAD_URLS).reduce((sum, urls) => sum + urls.length, 0);
   assert.equal(decodes, required - 1, 'remaining required jobs settle before failure teardown');

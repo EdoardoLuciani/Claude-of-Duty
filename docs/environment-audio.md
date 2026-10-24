@@ -4,7 +4,7 @@ This independent slice replaces the environmental oscillators/noise generators
 with **14 required finite recordings**, two variants each for dog, birds, wooden
 creak, gravel settling, truck and helicopter passes, and air-alert siren. Bomber,
 weapons, explosions, hits and tactical speech are not reauthored here. Nonverbal
-reactions are a separate PR; spoken dialogue remains deferred in #497.
+reactions are merged in #507; spoken dialogue remains deferred in #497.
 
 ## Source audit / deliberate gaps
 
@@ -55,9 +55,10 @@ The −24 dB active-sample target and −9 dB pre-codec peak cap are source refe
 not automatic runtime matching; decoded peak must remain below 0.5.
 
 Added storage: **715,588 encoded bytes / 11,558,400 float bytes at 48 kHz** (~11 MiB).
-This independent branch has 252 required recordings (238 baseline + 14); other
-categories add recordings. Reuse the existing all-settled bank's contact containers,
-per-kind no-immediate-repeat state, disposal and per-render cache ownership. Each
+With merged nonverbal reactions (#507), this branch has 264 required recordings
+(238 earlier baseline + 12 reactions + 14 environment); other categories add recordings.
+Reuse the existing all-settled bank's contact containers, per-kind no-immediate-repeat
+state, disposal and per-render cache ownership. Each
 event creates one finite source/output in the existing pool. Missing assets fail
 startup, with no per-event I/O or synthetic substitute. No new runtime dependency.
 
