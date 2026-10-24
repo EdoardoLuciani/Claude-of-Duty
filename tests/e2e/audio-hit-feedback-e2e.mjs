@@ -17,7 +17,10 @@ import { waitForGame } from '../../tools/lib/native-render.mjs';
 const args = parseArgs();
 const root = resolve(args.root ?? fileURLToPath(new URL('../../', import.meta.url)));
 const out = args.out ? resolve(args.out) : null;
-assert(!out || !out.startsWith(root), 'Audio evidence stays outside the repository');
+assert(
+  !out || (out !== root && !out.startsWith(root + '/')),
+  'Audio evidence stays outside the repository'
+);
 if (out) mkdirSync(out, { recursive: true });
 const server = await ensureViteServer({ root, port: Number(args.port ?? 5533) });
 assert(server, 'Refusing an occupied server port');
@@ -251,6 +254,7 @@ try {
     for (const agent of ai.agents) agent.dispose();
     ai.agents.length = 0;
     const { positions } = combatLane(ai, ctx.get('world'), physics, [[9, 0]]);
+    window.physicalBase = positions[0].clone();
     const V3 = engine.camera.position.constructor;
     const eye = positions[0].clone().add(new V3(0, 1.6, 0));
     const target = ai.spawn('vanguard', positions[1], 0);
@@ -299,6 +303,140 @@ try {
     );
   }
   results.push({ id: 'real-enemy', ...enemy });
+  // Additional physical-foley paths: real world-layer contacts, actual actor
+  // death, and controller-produced landing/stride plants (not emitted fixtures).
+  const physical = await page.evaluate(async () => {
+    const engine = window.__ENGINE__,
+      ctx = engine.ctx;
+    const physics = ctx.get('physics'),
+      player = ctx.get('player'),
+      audio = ctx.get('audio');
+    const Matrix4 = engine.camera.matrixWorld.constructor,
+      Vector3 = engine.camera.position.constructor;
+    const origin = player.eyePosition.clone();
+    const target = ctx.get('ai').agents[0];
+    target.health = 1;
+    target.syncHitboxes();
+    window.hitTrace.length = 0;
+    physics.fireBullet({
+      origin,
+      dir: target.position
+        .clone()
+        .add(new Vector3(0, 1.35, 0))
+        .sub(origin)
+        .normalize(),
+      shooter: player,
+      damage: 100,
+      penetration: 0,
+      maxDist: 30,
+      weapon: 'rifle',
+    });
+    const death = { alive: target.alive, trace: window.hitTrace.slice() };
+    const toward = target.position.clone().sub(origin);
+    toward.y = 0;
+    toward.normalize();
+    const at = origin.clone().addScaledVector(toward, 2);
+    const materials = [];
+    for (const surface of [
+      'concrete',
+      'plaster',
+      'metal',
+      'wood',
+      'dirt',
+      'sand',
+      'glass',
+      'water',
+      'foliage',
+      'fabric',
+      'rubber',
+    ]) {
+      const collider = physics.addCollider({
+        shape: 'box',
+        hx: 0.3,
+        hy: 0.3,
+        hz: 0.3,
+        layer: physics.LAYER.WORLD,
+        surface,
+      });
+      collider.setMatrix(new Matrix4().makeTranslation(at.x, at.y, at.z));
+      try {
+        audio.update(0, ctx);
+        window.hitTrace.length = 0;
+        const result = physics.fireBullet({
+          origin,
+          dir: toward,
+          shooter: player,
+          damage: 30,
+          penetration: 0,
+          maxDist: 3,
+          weapon: 'rifle',
+        });
+        materials.push({
+          surface,
+          resolved: result.impacts.map((p) => p.surface),
+          trace: window.hitTrace.slice(),
+        });
+      } finally {
+        physics.removeCollider(collider);
+      }
+    }
+    player.health.reset(true);
+    engine.input.enabled = true;
+    engine.input.frozen = false;
+    engine.input.clear();
+    player.setControlEnabled(true);
+    const weapons = ctx.get('weapons');
+    weapons.debugMode = null;
+    weapons.viewmodel.debugFrozen = false;
+    const eye = window.physicalBase.clone();
+    eye.y += player.eyeHeight + 2;
+    player.teleport(eye, 0);
+    window.hitTrace.length = 0;
+    await window.__PUMP__(100);
+    const landing = window.hitTrace.filter((p) => p.kind === 'step' && p.options?.gait === 'land');
+    window.hitTrace.length = 0;
+    engine.input._pendingDown.add('KeyW');
+    await window.__PUMP__(55);
+    engine.input._pendingUp.add('KeyW');
+    await window.__PUMP__(1);
+    const walking = window.hitTrace.filter((p) => p.kind === 'step' && p.options?.gait !== 'land');
+    engine.input.enabled = false;
+    engine.input.frozen = true;
+    player.setControlEnabled(false);
+    return {
+      id: 'real-physical-foley',
+      death,
+      materials,
+      landing,
+      walking,
+      report: audio.report(),
+      engineError: engine.error ?? null,
+    };
+  });
+  assert.equal(physical.death.alive, false, 'actual bullet causes actor death');
+  assert.equal(physical.death.trace.filter((p) => p.kind === 'bodyfall').length, 1);
+  for (const material of physical.materials) {
+    assert(
+      material.resolved.includes(material.surface),
+      material.surface + ': physical collider surface'
+    );
+    assert.equal(
+      material.trace.filter((p) => p.kind === 'impact' && p.options.surface === material.surface)
+        .length,
+      1
+    );
+    if (!args.baseline)
+      assert.equal(
+        material.trace.filter((p) => p.kind === 'whizz').length,
+        0,
+        'own world contact is not a flight pass'
+      );
+  }
+  assert.equal(physical.landing.length, 1, 'one actual controller landing');
+  assert(physical.walking.length > 0, 'actual controller stride plants');
+  assert.equal(physical.report.errors, 0);
+  assert.equal(physical.engineError, null);
+  results.push(physical);
   const healthPaths = await page.evaluate(async () => {
     const { HEALTH } = await import('/src/player/tuning.ts');
     const ctx = window.__ENGINE__.ctx,
@@ -349,7 +487,7 @@ try {
   results.push(...healthPaths);
   assert.deepEqual(errors, []);
   console.log(
-    `PASS: actual gameplay HUD/audio, six contact cases, four real incoming trajectories, real health/explosion/death and enemy bullet contact${args.baseline ? ' (baseline recorded)' : ''}`
+    `PASS: actual game HUD/audio, incoming trajectories, health/explosion/death, enemy/material bullet contacts, controller steps/landing and body fall${args.baseline ? ' (baseline recorded)' : ''}`
   );
 } finally {
   await browser?.close();

@@ -35,18 +35,7 @@ import type { EngineEventMap, EngineEventName, ReloadPhase } from '../core/event
 import type { Rng } from '../core/rng.ts';
 import { Ambience, ambientOneShot, ONE_SHOTS, AMBIENT_EVENT_GAIN } from './ambience.ts';
 import { NoiseBank, SPEED_OF_SOUND, clamp, gain as mkGain } from './dsp.ts';
-import {
-  surfaceImpact,
-  footstep,
-  shellCasing,
-  reloadPhase,
-  explosion,
-  bodyFall,
-  uiSound,
-  heartbeat,
-  cloth,
-  intelSiren,
-} from './foley.ts';
+import { shellCasing, reloadPhase, explosion, uiSound, heartbeat, intelSiren } from './foley.ts';
 import { classifySpace, SPACE_KEYS } from './ir.ts';
 import { Mixer } from './mixer.ts';
 import { TentRadio } from './music.ts';
@@ -660,9 +649,9 @@ export class AudioSystem {
       case 'impact':
         if (o.surface === 'flesh')
           return this.samples!.hit('flesh', rng, { when, level: o.energy });
-        return surfaceImpact(actx, bank, rng, { when, surface: o.surface, energy: o.energy });
+        return this.samples!.impact(rng, { when, surface: o.surface, level: o.energy });
       case 'step':
-        return footstep(actx, bank, rng, {
+        return this.samples!.step(rng, {
           when,
           surface: o.surface,
           gait: o.gait,
@@ -705,9 +694,9 @@ export class AudioSystem {
         return { node: out, end: synthetic.end, send: synthetic.send };
       }
       case 'bodyfall':
-        return bodyFall(actx, bank, rng, { when, level: o.level });
+        return this.samples!.fall(rng, { when, surface: o.surface, level: o.level });
       case 'cloth':
-        return cloth(actx, bank, rng, { when, level: o.level });
+        return this.samples!.cloth(rng, { when, level: o.level });
       case 'heartbeat':
         return heartbeat(actx, { when, level: o.level, buffer: this.samples!.heartbeatBuffer! });
       case 'bark':
@@ -1143,10 +1132,8 @@ export class AudioSystem {
       'foley',
       0.55
     );
-    // The round cracking past you is a separate sound from the impact itself.
-    if (dist < 6 && p.surface !== 'flesh') {
-      this._playAt('whizz', pt.x, pt.y, pt.z, { miss: dist, noDelay: true }, 'foley', 0.7);
-    }
+    // Only reached bullet:segment flight owns the whizz, not a nearby wall
+    // contact (including the player's own rounds). Never duplicate the pass.
   }
 
   _onBulletSegment(p: EngineEventMap['bullet:segment']): void {
@@ -1269,12 +1256,13 @@ export class AudioSystem {
   _onLand(p: EngineEventMap['player:land']): void {
     if (!this.running) return;
     const lp = this.field!.listenerPos;
+    const pos = p?.position;
     const v = Math.abs(p?.velocity ?? 4);
     this._playAt(
       'step',
-      lp.x,
-      lp.y - 1.6,
-      lp.z,
+      pos?.x ?? lp.x,
+      pos?.y ?? lp.y - 1.6,
+      pos?.z ?? lp.z,
       {
         surface: p?.surface ?? 'concrete',
         gait: 'land',
@@ -1284,7 +1272,7 @@ export class AudioSystem {
       'foley',
       0.7
     );
-    if (v > 8.5) this._playDry('cloth', { level: 0.8 }, 'foley', 0.15);
+    // Landing gear is already part of this composite; do not add a second rustle.
   }
 
   _onPlayerState(p: EngineEventMap['player:state']): void {
@@ -1330,6 +1318,8 @@ export class AudioSystem {
     const pt = p?.point;
     if (!pt) return;
     this.bark('death', pt, { level: 1, force: true, voice: actorVoice(p?.actor) });
+    const phys = this.ctx.peek('physics');
+    const ground = phys?.raycast?.(pt.x, pt.y + 0.5, pt.z, 0, -1, 0, 4, phys.MASK?.WORLD);
     this._playAt(
       'bodyfall',
       pt.x,
@@ -1337,6 +1327,7 @@ export class AudioSystem {
       pt.z,
       {
         level: 1,
+        surface: ground?.hit ? ground.surface : 'concrete',
         extraDelay: 0.45 + this.rng.range(0, 0.4),
       },
       'foley',

@@ -20,7 +20,27 @@ export function mixCases() {
     add(`reload-${phase}`, 'routine', 'reload', { phase });
   for (const event of ['cloth', 'ads', 'shell']) add(event, 'routine', event);
   add('bodyfall', 'impact', 'bodyfall');
-  for (const velocity of [4, 9]) add(`land-${velocity}`, 'impact', 'land', { velocity });
+  for (const surface of [
+    'concrete',
+    'plaster',
+    'metal',
+    'wood',
+    'dirt',
+    'sand',
+    'glass',
+    'water',
+    'foliage',
+    'fabric',
+    'rubber',
+  ])
+    for (const distance of [2, 10])
+      add(`material-${surface}-${distance}`, 'impact', 'material', { surface, distance });
+  for (const surface of ['wood', 'dirt', 'foliage', 'fabric', 'water'])
+    add(`bodyfall-${surface}`, 'impact', 'fall-surface', { surface });
+  for (const surface of ['glass', 'water', 'fabric', 'rubber'])
+    for (const gait of ['walk', 'run'])
+      add(`own-step-${surface}-${gait}`, 'routine', 'own-step', { surface, gait });
+  for (const velocity of [4, 9, 14]) add(`land-${velocity}`, 'impact', 'land', { velocity });
   for (const kind of [
     'hitmarker',
     'headshot',
@@ -267,6 +287,24 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
         break;
       case 'heartbeat':
         at(t, () => emit('player:heartbeat', { strength: s.strength }));
+        break;
+      case 'material':
+        at(t, () =>
+          emit('bullet:impact', {
+            point: point(s.distance, 1.4),
+            surface: s.surface,
+            damage: 30,
+            actor: null,
+            shooter: 'player',
+            shot: 473,
+            exit: false,
+          })
+        );
+        break;
+      case 'fall-surface':
+        at(t, () =>
+          audio._playAt('bodyfall', 2, 0.1, 0, { surface: s.surface, level: 1 }, 'foley', 0.6)
+        );
         break;
       case 'damage':
         if (s.flight)
