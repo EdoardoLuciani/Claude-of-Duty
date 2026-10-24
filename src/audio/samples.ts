@@ -2,6 +2,12 @@ import type { ReloadPhase } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
 import { AIRCRAFT_URLS } from './aircraft.ts';
 import { biquad, clamp, gain, series } from './dsp.ts';
+import {
+  ENVIRONMENT_URLS,
+  ENVIRONMENT_GAIN,
+  environmentBank,
+  type EnvironmentKind,
+} from './environment.ts';
 import { FOLEY_URLS } from './foley-urls.ts';
 import { HIT_MIX, HIT_URLS, type DamageSoundOptions } from './hits.ts';
 import { FALL_BANK, FOLEY_MIX, IMPACT_BANK, STEP_BANK, type FoleyOptions } from './physical.ts';
@@ -94,7 +100,7 @@ const EXPLOSION_URL = new URL('./samples/explosion.opus', import.meta.url).href;
 const HEARTBEAT_URL = new URL('./samples/heartbeat.opus', import.meta.url).href;
 
 /** Required decoded recordings. Any fetch/decode failure rejects the bank. */
-const CONTACT_URLS = { ...HIT_URLS, ...FOLEY_URLS, ...REACTION_URLS };
+const CONTACT_URLS = { ...HIT_URLS, ...FOLEY_URLS, ...REACTION_URLS, ...ENVIRONMENT_URLS };
 type ContactKind = keyof typeof CONTACT_URLS;
 type SpecialBufferKey = 'actionBuffer' | 'explosionBuffer' | 'heartbeatBuffer';
 export class WeaponSampleBank {
@@ -247,6 +253,30 @@ export class WeaponSampleBank {
     const when = o.when ?? this.actx.currentTime;
     src.start(when);
     return { node: out, end: when + src.buffer.duration + 0.02, send: REACTION_MIX.send };
+  }
+
+  /** Required finite background event; use recorded takes, not pitch-shifted pseudo-variants. */
+  environment(
+    kind: EnvironmentKind,
+    rng: Rng,
+    o: { when?: number; level?: number } = {}
+  ): AudioVoice {
+    const key = environmentBank(kind),
+      choices = this.hitBuffers[key];
+    if (!choices?.length) throw new Error(`[audio] ${key} recordings are not loaded`);
+    const previous = this.hitIndices[key] ?? -1;
+    const index =
+      previous < 0
+        ? rng.u32() % choices.length
+        : (previous + 1 + (rng.u32() % (choices.length - 1))) % choices.length;
+    this.hitIndices[key] = index;
+    const src = this.actx.createBufferSource();
+    src.buffer = choices[index];
+    const out = gain(this.actx, ENVIRONMENT_GAIN[kind] * (o.level ?? 1));
+    src.connect(out);
+    const when = o.when ?? this.actx.currentTime;
+    src.start(when);
+    return { node: out, end: when + src.buffer.duration + 0.02, send: 0.65 };
   }
 
   /** No hot-path fetch/decode, and no immediate repeat within a contact family. */
