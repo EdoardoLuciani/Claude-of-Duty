@@ -163,6 +163,7 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
       heartbeatBuffer: load.heartbeatBuffer,
       hitBuffers: load.hitBuffers,
       aircraftBuffers: load.aircraftBuffers,
+      reloadBuffers: load.reloadBuffers,
     };
   }
   const seconds = 14,

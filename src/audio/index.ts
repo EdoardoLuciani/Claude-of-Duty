@@ -2,7 +2,7 @@
  * AUDIO — recorded weapon fire/physical hits, spatialisation and mix
  *
  * Recorded assets are required. Synthesis supplies authored reinforcement,
- * weapon mechanics, voices, ambience and UI—not failed-load recovery.
+ * casings/dry fire, voices, ambience and UI—not failed-load recovery.
  *
  * ───────────────────────────────────────────────────────────────────────────
  * PUBLIC API   const audio = ctx.get('audio')
@@ -37,7 +37,7 @@ import type { Rng } from '../core/rng.ts';
 import { AircraftVoice, AIRCRAFT_MIX, type AircraftPosition } from './aircraft.ts';
 import { Ambience, ambientOneShot, ONE_SHOTS, AMBIENT_EVENT_GAIN } from './ambience.ts';
 import { NoiseBank, SPEED_OF_SOUND, clamp, gain as mkGain } from './dsp.ts';
-import { shellCasing, reloadPhase, explosion, uiSound, heartbeat, intelSiren } from './foley.ts';
+import { shellCasing, explosion, uiSound, heartbeat, intelSiren } from './foley.ts';
 import { classifySpace, SPACE_KEYS } from './ir.ts';
 import { Mixer } from './mixer.ts';
 import { TentRadio } from './music.ts';
@@ -80,9 +80,7 @@ interface AudioOptions {
   gear?: number;
   flight?: number;
   phase?: ReloadPhase;
-  heavy?: number;
-  retained?: boolean;
-  settleOnly?: boolean;
+  reloadWeapon?: string;
   radius?: number;
   bark?: string;
   f0?: number;
@@ -721,12 +719,7 @@ export class AudioSystem {
           flight: o.flight,
         });
       case 'reload':
-        return reloadPhase(actx, bank, rng, o.phase, {
-          when,
-          heavy: o.heavy,
-          retained: o.retained,
-          settleOnly: o.settleOnly,
-        });
+        return this.samples!.reload(o.reloadWeapon ?? '', o.phase, rng, { when });
       case 'explosion': {
         if (dist > 50)
           return explosion(actx, bank, rng, {
@@ -1123,14 +1116,9 @@ export class AudioSystem {
   _onReload(p: EngineEventMap['weapon:reload']): void {
     if (!this.running) return;
     const w = p?.weapon;
-    const name = typeof w === 'string' ? w : (w?.audio ?? w?.id ?? w?.name);
-    const heavy = /lmg|shot|snip|m249|pkm/i.test(String(name ?? '')) ? 1.35 : 1;
-    const phase = p?.phase ?? 'end';
     const options = {
-      phase,
-      heavy,
-      retained: p?.retained === true,
-      settleOnly: typeof w === 'object' && w?.id === 'pistol',
+      phase: p?.phase ?? 'end',
+      reloadWeapon: typeof w === 'string' ? w : (w?.id ?? ''),
     };
     if (p?.position) {
       this._playAt('reload', p.position.x, p.position.y, p.position.z, options, 'foley', 0.6);

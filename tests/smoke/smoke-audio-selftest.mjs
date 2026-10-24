@@ -4,12 +4,13 @@ import { readFileSync } from 'node:fs';
 import { AIRCRAFT_URLS } from '../../src/audio/aircraft.ts';
 import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
 import * as foley from '../../src/audio/foley.ts';
+import { RELOAD_URLS } from '../../src/audio/reloads.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import { runAudioSelfTest } from '../../src/audio/selftest.ts';
 
 assert.deepEqual(
   Object.keys(foley).sort(),
-  ['explosion', 'heartbeat', 'intelSiren', 'reloadPhase', 'shellCasing', 'uiSound'],
+  ['explosion', 'heartbeat', 'intelSiren', 'shellCasing', 'uiSound'],
   'only remaining procedural voices are exported'
 );
 const source = readFileSync(new URL('../../src/audio/foley.ts', import.meta.url), 'utf8');
@@ -20,6 +21,7 @@ for (const obsolete of [
   'StepSpec',
   'ImpactOptions',
   'FootstepOptions',
+  'reloadPhase',
 ])
   assert(
     !new RegExp(`\\b${obsolete}\\b`).test(source),
@@ -64,7 +66,10 @@ try {
   assert.deepEqual(report.spaces, {});
   assert.equal(
     requests,
-    50 + Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0) + AIRCRAFT_URLS.length
+    50 +
+      Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0) +
+      Object.values(RELOAD_URLS).reduce((n, urls) => n + urls.length, 0) +
+      AIRCRAFT_URLS.length
   );
   assert.equal(renders, 0);
   assert.equal(disposals, 1, 'failed run disposes its single required bank');

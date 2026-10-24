@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import { AIRCRAFT_URLS } from '../../src/audio/aircraft.ts';
 import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
+import { RELOAD_URLS } from '../../src/audio/reloads.ts';
 import {
   ensureViteServer,
   launchChromium,
@@ -12,7 +13,10 @@ import {
 const server = await ensureViteServer({ root: REPO_ROOT, port: 5551 });
 assert(server, 'Refusing an occupied self-test server port');
 const required =
-  50 + Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0) + AIRCRAFT_URLS.length;
+  50 +
+  Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0) +
+  Object.values(RELOAD_URLS).reduce((n, urls) => n + urls.length, 0) +
+  AIRCRAFT_URLS.length;
 let browser,
   fault = null,
   requests = 0;
@@ -59,6 +63,7 @@ try {
         'cloth',
         'damage',
         'hit',
+        'reload',
         'nextAircraft',
       ]) {
         const original = WeaponSampleBank.prototype[method];
@@ -69,7 +74,7 @@ try {
           const value = original.apply(this, args);
           if (method === 'load') {
             loadedBank = this;
-            retained = Object.values(this.hitBuffers);
+            retained = [...Object.values(this.hitBuffers), ...Object.values(this.reloadBuffers)];
           }
           return value;
         };
@@ -83,6 +88,7 @@ try {
           cacheDisposed:
             Object.keys(loadedBank.hitBuffers).length === 0 &&
             loadedBank.aircraftBuffers.length === 0 &&
+            Object.keys(loadedBank.reloadBuffers).length === 0 &&
             retained.every((buffers) => buffers.length === 0),
         };
       } finally {
@@ -105,6 +111,7 @@ try {
       assert.equal(result.counts.fall, 1);
       assert.equal(result.counts.cloth, 1);
       assert.equal(result.counts.damage, 5);
+      assert.equal(result.counts.reload, Object.keys(RELOAD_URLS).length);
       for (const kind of [
         'flesh',
         'armour',
@@ -130,6 +137,7 @@ try {
         'damage:break-mixed',
         'damage:break-armour-only',
         'aircraft:source',
+        ...Object.keys(RELOAD_URLS).map((kind) => `reload:${kind}`),
       ]) {
         const row = result.report.results.find((row) => row.name === name);
         assert(

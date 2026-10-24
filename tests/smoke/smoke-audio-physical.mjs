@@ -6,6 +6,7 @@ import { AIRCRAFT_URLS } from '../../src/audio/aircraft.ts';
 import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
 import { FALL_BANK, FOLEY_MIX, IMPACT_BANK, STEP_BANK } from '../../src/audio/physical.ts';
+import { RELOAD_URLS } from '../../src/audio/reloads.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import provenance from '../../src/audio/samples/foley/provenance.json' with { type: 'json' };
 import { Rng } from '../../src/core/rng.ts';
@@ -221,7 +222,10 @@ try {
   await assert.rejects(missing.load(), /step-metal-run-2.*HTTP 404/);
   assert.equal(
     decodes,
-    172 + AIRCRAFT_URLS.length,
+    49 +
+      Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0) +
+      Object.values(RELOAD_URLS).reduce((n, urls) => n + urls.length, 0) +
+      AIRCRAFT_URLS.length,
     'all other required jobs settle before failure teardown'
   );
   missing.dispose();

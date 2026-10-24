@@ -5,7 +5,9 @@ import { readFileSync } from 'node:fs';
 import { Box3, Scene, Vector3 } from 'three';
 
 import { AircraftVoice, AIRCRAFT_MIX, AIRCRAFT_URLS } from '../../src/audio/aircraft.ts';
+import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
+import { RELOAD_URLS } from '../../src/audio/reloads.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import provenance from '../../src/audio/samples/aircraft/provenance.json' with { type: 'json' };
 import { EventBus } from '../../src/core/registry.ts';
@@ -368,7 +370,12 @@ try {
     },
   });
   await assert.rejects(missing.load(), /propeller-2.*HTTP 404/);
-  assert.equal(decodes, 174, 'remaining required jobs settle before failure teardown');
+  const required =
+    50 +
+    AIRCRAFT_URLS.length +
+    Object.values(FOLEY_URLS).reduce((sum, urls) => sum + urls.length, 0) +
+    Object.values(RELOAD_URLS).reduce((sum, urls) => sum + urls.length, 0);
+  assert.equal(decodes, required - 1, 'remaining required jobs settle before failure teardown');
   missing.dispose();
   assert.deepEqual(missing.aircraftBuffers, []);
 } finally {
