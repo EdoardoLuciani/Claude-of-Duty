@@ -135,6 +135,15 @@ node tools/capture-hit-combat.mjs --foley --out=/tmp/physical-combat
   full-motion gameplay. Direct palette clips isolate the material/gait difference;
   the combat clip demonstrates coexistence with the rest of the game.
 
+Additional sample-rate probes: all 38 targeted physical mix cases passed at
+44.1 kHz. At 96 kHz the existing strict spatial hierarchy gate fails on both the
+new bank and the pre-change `develop` runtime (for example, procedural concrete
+walk/run measure about −20.05/−17.15 dB per 20 ms versus recorded −20.19/−17.96,
+against the same −8.12 dB own-rifle anchor). This is a reproducible native offline
+spatial-mix limitation, not established as a new recording defect or an audition
+of actual 96 kHz gameplay. Investigation is separate; no thresholds or mixer
+paths were altered to hide it. The normal 48 kHz suite passes all 150 cases.
+
 Measurements, hashes, event counts and stereo metadata are **not perceptual
 approval**. Owner listening is still needed for contact character, gunshot bleed
 in source edits, cloth/gear prominence, repetition, landing weight, and masking
