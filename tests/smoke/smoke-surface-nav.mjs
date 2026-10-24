@@ -428,10 +428,17 @@ assert.ok(live.canStand(w5.from) && entry.probeGround(), 'W5 starts supported an
 map.physics.removeCharacter(entry);
 assert.equal(
   map.meta.navigation.sha256,
-  // Removing write-only physics state refreshes only source provenance. All
-  // 8,897,464 Detour/component/cover payload bytes match the preceding bake.
-  'bc6b58f488918920526ab27c4568a13724b1434bf08a482f5f6ee4cbb32d8751',
+  // Reviewed small-clutter castShadow policy refreshes only source provenance.
+  // The physical payload assertion below also guards the preceding bake.
+  'db5489826f51f1af4d7066f0c18ba8bf581690c8354736589aca4ad8e3e2a104',
   're-measure recorded fixture outcomes after changing baked assets'
+);
+const physicalPayload = map.surfaceRaw.subarray(64 + map.surfaceRaw.readUInt32LE(8));
+assert.equal(physicalPayload.length, 8897464, 'unchanged Detour/component/cover payload size');
+assert.equal(
+  await navHash(physicalPayload),
+  'bbf10f69d8dedfa3b048fa8f11b2b0e680df8f8f3775459fdd89eb90e08b0500',
+  'shadow policy must not change navigation topology, components or cover'
 );
 let arrivals = 0;
 for (const c of map.cases) {
