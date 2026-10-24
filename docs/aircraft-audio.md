@@ -16,19 +16,22 @@ pass are not claimed as independent variants.
 
 These are **designed propeller-engine textures**, not verified steady RPM or a
 scale-matched twin-engine bomber recording. Each edit uses a 0.9 s near-pass crop,
-explicit stereo averaging, 90 Hz high-pass/8.5 kHz low-pass, pitch-preserving 4×
-stretch and a 300 ms circular linear overlap. It does not play a complete stereo
-flyby or add a second runtime Doppler model over a baked-in pass. Runtime panning
-and distance create the approach/pass/retreat; small source pitch/envelope changes
-and looping character still require listening acceptance.
+explicit stereo averaging and 90 Hz high-pass/8.5 kHz low-pass. Before 4× stretch,
+offline fractional resampling removes the measured dominant-line pitch sweep
+(50 ms anchors, target 193/237 Hz). This is a designed recording correction, not
+verified engine RPM or a new physical Doppler model. A phase-aligned 300 ms
+circular overlap and circular 200 ms RMS-envelope correction (bounded 0.5–2×)
+retain fast propeller texture without repeating a broad flyby swell. Runtime
+panning/distance alone supply approach/pass/retreat; no runtime gain, playback
+rate, emitter, loading or lifecycle change is involved in this correction.
 
 `tools/prepare-aircraft-audio.mjs /path/to/Music` reproduces the two loops and
 `src/audio/samples/aircraft/provenance.json`: exact source/crop/filter/stretch,
-source/output SHA-256, downmix loss, gain, decoded duration/peak and boundary
-measurements. A −20 dB RMS reference is limited by a −9 dB pre-codec sample-peak
+source/output SHA-256, downmix loss, pitch anchors/target, phase trim, envelope
+window/bounds, gain, decoded duration/peak, boundary and steadiness measurements. A −20 dB RMS reference is limited by a −9 dB pre-codec sample-peak
 cap; no full-scale normalization or runtime automatic level matching. Circular
-editing joins adjacent original samples at the buffer wrap and crossfades the
-original crop's tail/head internally. Decoded boundary checks are engineering
+editing joins adjacent samples of the edited recording at the buffer wrap and
+crossfades its tail/head internally. Decoded boundary checks are engineering
 checks, **not a claim of an inaudible seam**.
 
 The owner explicitly confirmed public redistribution clearance for edited #474
@@ -38,6 +41,24 @@ licence records; these commercial-derived media retain their own terms rather
 than the code licence. No source masters are included or uploaded to AI services;
 unrelated legacy firearm restrictions remain separate. Mixed gameplay review
 recordings have separate owner publication clearance.
+
+### Owner-reported loop pumping: diagnosis and regression
+
+The initial PR's pitch-preserving stretch preserved the **recording's changing
+pitch**, not constant engine speed. That sweep reset every ~3.2 seconds. A small
+sample-boundary delta was therefore insufficient: the owner correctly heard a
+repeated spin-up/spin-down. The broad source-level envelope also repeated.
+
+On decoded 250 ms circular windows (125 ms hop, including the wrap), the prior
+loops span **304/485 cents** in the dominant engine line and **5.80/6.41 dB** in
+RMS. The corrected files span **11.22/10.95 cents** and **0.38/0.39 dB**. The
+35-cent/1.5 dB authoring/native regression bounds reject both previous files.
+Known chirp/pumping fixtures additionally check the detector and corrections.
+These measurements cover this partial and broad envelope, not every audible
+modulation or a claim that the loop is perceptually approved. Fixed-source
+consecutive-repeat previews isolate the defect; actual-game captures verify the
+unchanged moving source and full strike. Only clip-boundary fades are used in the
+isolated audition, never additional fades at repeated asset boundaries.
 
 ## Ownership and lifecycle
 
@@ -80,6 +101,7 @@ npm run typecheck
 npm run build
 npm run format:check
 node tests/e2e/audio-selftest-e2e.mjs
+node tests/e2e/audio-aircraft-loops-e2e.mjs # optional --before=/path/to/prior-PR-worktree
 AUDIO_MIX_CASES=aircraft node tests/e2e/audio-mix-e2e.mjs
 node tests/e2e/audio-aircraft-e2e.mjs --out=/tmp/aircraft-after
 node tests/e2e/audio-aircraft-e2e.mjs --root=/path/to/pre-change --port=5543 --baseline --out=/tmp/aircraft-before

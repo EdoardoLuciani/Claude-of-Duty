@@ -1,39 +1,75 @@
 {
   "format": "mono 48000 Hz Opus, 96 kbps VBR",
   "rights": "Owner explicitly cleared public redistribution of edited #474 aircraft derivatives. Original masters and unrelated legacy asset permissions remain separate. Keep source entitlement/licence records; these media do not inherit the code licence.",
-  "design": "Short near-pass propeller texture, pitch-preserving 4x stretch and circular overlap edit. PC-21 turboprop source, not a steady or scale-matched twin-engine bomber recording. Runtime distance/panning owns the flyby; no complete baked-in stereo pass is played.",
+  "design": "Recorded PC-21 texture with the measured dominant-line pitch sweep removed offline before 4x stretch, phase-aligned circular overlap and broad RMS-envelope correction. Not verified engine RPM or a scale-matched twin-engine bomber recording. Runtime distance/panning owns the flyby.",
   "files": {
     "propeller-1": {
       "source": "Boom ONE Update/update_23_05/AIRCRAFT/MILITARY/AEROMil_Military Jet PC-21 Fly By 01 MS MKH 416_B00M_ONE.wav",
       "sourceSha256": "c94f30acedb6c844364f2a2dd70612e0ad66e6bb19e6c39dca0b0de42ea167a2",
       "start": 58.05,
       "duration": 0.9,
-      "filter": "atrim=start=58.05:duration=0.9,asetpts=PTS-STARTPTS,pan=mono|c0=0.5*c0+0.5*c1,aresample=48000,highpass=f=90,lowpass=f=8500,atempo=0.5,atempo=0.5",
+      "filter": "atrim=start=58.05:duration=0.9,asetpts=PTS-STARTPTS,pan=mono|c0=0.5*c0+0.5*c1,aresample=48000,highpass=f=90,lowpass=f=8500",
+      "pitchCorrection": {
+        "anchorStepSeconds": 0.05,
+        "measuredHz": [
+          212.4, 210.21, 208.01, 205.44, 203.25, 201.23, 198.3, 195.56, 192.99, 190.98, 188.78,
+          185.3, 182.74, 181.64, 180.36, 178.16, 177.06, 174.68, 172.49
+        ],
+        "targetHz": 193
+      },
+      "stretch": "atempo=0.5,atempo=0.5",
       "crossfadeSeconds": 0.3,
+      "phaseTrimSamples": 370,
+      "rmsWindowSeconds": 0.2,
+      "rmsCorrectionBounds": [0.5, 2],
+      "steadiness": {
+        "pitchMinHz": 192.25,
+        "pitchMaxHz": 193.5,
+        "pitchSpanCents": 11.219961819100535,
+        "rmsSpanDb": 0.3766521809717851
+      },
       "targetRmsDb": -20,
-      "level": 0.5928161766304747,
-      "decodedDuration": 3.2618125,
-      "decodedPeak": 0.26231637597084045,
+      "level": 0.5820646197657513,
+      "decodedDuration": 3.188645833333333,
+      "decodedPeak": 0.2185005396604538,
       "downmixLossDb": -0.04734558402024073,
-      "seamDelta": 0.00014512985944747925,
-      "maxDelta": 0.017783381044864655,
-      "sha256": "320a6ef9120046c16a51c5f4f19419194aec9920ce1bb0cc07e4b5a981cd4fcb"
+      "seamDelta": 0.0028051137924194336,
+      "maxDelta": 0.02431119978427887,
+      "sha256": "d402dbd3892e57e157cd77d69d71c69581cc291058e8e9c7cccc5bcba5e67df7"
     },
     "propeller-2": {
       "source": "Boom ONE Update/update_23_05/AIRCRAFT/MILITARY/AEROMil_Military Jet PC-21 Fly By 02 MS MKH 416_B00M_ONE.wav",
       "sourceSha256": "405cda50acbfd57f03645c3d79ee134f8aff145318448e5b35a00f8826a30f7c",
       "start": 11.1,
       "duration": 0.9,
-      "filter": "atrim=start=11.1:duration=0.9,asetpts=PTS-STARTPTS,pan=mono|c0=0.5*c0+0.5*c1,aresample=48000,highpass=f=90,lowpass=f=8500,atempo=0.5,atempo=0.5",
+      "filter": "atrim=start=11.1:duration=0.9,asetpts=PTS-STARTPTS,pan=mono|c0=0.5*c0+0.5*c1,aresample=48000,highpass=f=90,lowpass=f=8500",
+      "pitchCorrection": {
+        "anchorStepSeconds": 0.05,
+        "measuredHz": [
+          275.39, 271.55, 267.15, 263.12, 259.83, 254.88, 248.29, 244.45, 240.6, 237.3, 232.54,
+          226.14, 222.84, 220.28, 217.53, 213.13, 207.28, 203.43, 200.5
+        ],
+        "targetHz": 237
+      },
+      "stretch": "atempo=0.5,atempo=0.5",
       "crossfadeSeconds": 0.3,
+      "phaseTrimSamples": 464,
+      "rmsWindowSeconds": 0.2,
+      "rmsCorrectionBounds": [0.5, 2],
+      "steadiness": {
+        "pitchMinHz": 236.5,
+        "pitchMaxHz": 238,
+        "pitchSpanCents": 10.94566796225811,
+        "rmsSpanDb": 0.3858087415717222
+      },
       "targetRmsDb": -20,
-      "level": 0.7882687403939066,
-      "decodedDuration": 3.2157916666666666,
-      "decodedPeak": 0.35640668869018555,
+      "level": 0.8055905213574215,
+      "decodedDuration": 3.2468541666666666,
+      "decodedPeak": 0.3216889798641205,
       "downmixLossDb": -0.04391345802372771,
-      "seamDelta": 0.0017272420227527618,
-      "maxDelta": 0.040353767573833466,
-      "sha256": "f5613db43434c8c7038a5b65f35180257c695f23dc80c8e543f51f1e8f8cb1d7"
+      "seamDelta": 0.010205723345279694,
+      "maxDelta": 0.035669565200805664,
+      "sha256": "658683feb8fc085e668a07e71c1febd76145413da126713b7744f0666ff582a7"
     }
   }
 }

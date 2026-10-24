@@ -11,6 +11,7 @@ import provenance from '../../src/audio/samples/aircraft/provenance.json' with {
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { RadioSystem, CARPET } from '../../src/radio/index.ts';
+import { removePitchSweep, steadyLoop, measureLoop } from '../../tools/lib/aircraft-loop.mjs';
 
 let bytes = 0,
   decoded = 0;
@@ -24,11 +25,35 @@ for (const [index, url] of AIRCRAFT_URLS.entries()) {
   assert(file.decodedDuration > 3 && file.decodedDuration < 4);
   assert(file.decodedPeak < 0.5 && file.downmixLossDb > -6);
   assert(file.seamDelta < Math.max(0.005, file.maxDelta * 1.5));
+  assert(file.steadiness.pitchSpanCents < 35, 'no large recorded pitch cycle');
+  assert(file.steadiness.rmsSpanDb < 1.5, 'no broad level pumping');
   bytes += data.length;
   decoded += file.decodedDuration * 48000 * 4;
 }
 assert(bytes < 100000 && decoded < 1500000);
 assert.notEqual(provenance.files['propeller-1'].source, provenance.files['propeller-2'].source);
+
+// Known signals ensure the offline detector rejects a chirp/pump, not merely metadata.
+const fixtureRate = 12000;
+const chirp = Buffer.alloc(Math.round(0.9 * fixtureRate) * 4);
+let phase = 0;
+for (let i = 0; i < chirp.length / 4; i++) {
+  chirp.writeFloatLE(Math.sin(phase) * 0.1, i * 4);
+  phase += (2 * Math.PI * (220 - (40 * i) / (chirp.length / 4))) / fixtureRate;
+}
+assert(measureLoop(chirp, 200).pitchSpanCents > 200, 'detector rejects repeated pitch sweep');
+const pitchCurve = Array.from({ length: 19 }, (_, i) => 220 - (40 * i) / 18);
+assert(measureLoop(removePitchSweep(chirp, pitchCurve, 200, fixtureRate), 200).pitchSpanCents < 20);
+const pumping = Buffer.alloc(Math.round(3.2 * fixtureRate) * 4);
+for (let i = 0; i < pumping.length / 4; i++) {
+  const t = i / fixtureRate;
+  pumping.writeFloatLE(
+    0.1 * (1 + 0.4 * Math.cos((2 * Math.PI * t) / 3.2)) * Math.sin(2 * Math.PI * 200 * t),
+    i * 4
+  );
+}
+assert(measureLoop(pumping, 200).rmsSpanDb > 6, 'detector rejects broad envelope pumping');
+assert(measureLoop(steadyLoop(pumping, fixtureRate).pcm, 200).rmsSpanDb < 1.5);
 
 const parameter = () => ({
   value: 0,
