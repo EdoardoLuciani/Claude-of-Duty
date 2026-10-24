@@ -252,10 +252,13 @@ parts or drop pools. Native metres, sockets, grips and provisional 89 mm travel
 remain asset-owned; damage, 6+1 accounting and per-shell interruption remain in
 the common weapon system.
 Preserve shared IK, ADS/sway/recoil and pooled casings. Source/regen/reference
-contracts live beside each asset. Weapons force physical materials; arms select
-standard/physical from their source. Preserve authored maps/specular factors and
-borrowed texture ownership. Native copy, clone/cache-safe soldier output and
-render-owned environment re-registration contracts are documented in
+contracts live beside each asset. Weapons force physical materials and borrow
+source maps. Arms consolidate authored Physical finishes into one opaque material
+per independent skeleton, accepting single and grouped indexed surfaces. Preserve
+UV0 AO, UV1 detail, weights, mirrored binding, specular factors and sleeve-only blood.
+The arm asset owns packed texture arrays and releases source images after packing.
+Native copy, clone/cache-safe soldier output and render-owned environment
+re-registration contracts are documented in
 [docs/material-calibration.md](docs/material-calibration.md).
 
 FX particle/decal PNGs are required runtime assets; generation
