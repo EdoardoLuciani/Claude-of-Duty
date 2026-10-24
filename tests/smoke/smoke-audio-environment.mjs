@@ -102,12 +102,17 @@ assert.throws(() => empty.environment('dog', rng), /recordings are not loaded/);
 assert.throws(() => bank.environment('shout', rng), /recordings are not loaded/);
 const oldFetch = globalThis.fetch;
 try {
-  let decodes = 0;
+  let decodes = 0,
+    fail = false;
   globalThis.fetch = async (url) => ({
-    ok: !url.includes('environment-heli-2'),
+    ok: !(fail && url.includes('environment-heli-2')),
     status: 404,
     arrayBuffer: async () => new ArrayBuffer(1),
   });
+  const complete = new WeaponSampleBank({ decodeAudioData: async () => ({ duration: 1 }) });
+  const completeCount = await complete.load();
+  complete.dispose();
+  fail = true;
   const required = new WeaponSampleBank({
     decodeAudioData: async () => {
       decodes++;
@@ -122,7 +127,8 @@ try {
       (sum, group) => sum + Object.values(group).reduce((n, urls) => n + urls.length, 0),
       0
     );
-  assert.equal(decodes, total - 1);
+  assert(completeCount >= total, 'full bank includes every category required by this slice');
+  assert.equal(decodes, completeCount - 1, 'one failed file, all other categories settle');
   required.dispose();
   assert.deepEqual(required.hitBuffers, {});
 } finally {
