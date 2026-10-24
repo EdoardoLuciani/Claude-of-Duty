@@ -33,7 +33,7 @@ try {
       rec = ctx.get('telemetry');
     const { meta } = await ctx.get('models').worldPrefetch;
     await rec._provenanceReady;
-    player.health.value = 40;
+    player.health.setDebugValue(40);
     player.controlEnabled = true;
     player.healCtrl.tryStart();
     rec._samplePlayer();

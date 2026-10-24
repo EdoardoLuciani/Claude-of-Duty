@@ -53,7 +53,7 @@ try {
     const V3 = ctx.camera.position.constructor;
     const eye = new V3(x, y, z),
       yaw = world.spawn(0)?.yaw ?? 0;
-    player.health.value = 1000000;
+    player.health.setDebugValue(1000000);
     player.health.armour = 150;
     player.teleport(eye, 0);
     player.setControlEnabled(false);

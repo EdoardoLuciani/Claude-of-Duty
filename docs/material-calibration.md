@@ -4,6 +4,8 @@
 
 Weapons preserve GLB base factors, maps, normal scales and physical extensions;
 pigment/finish edits belong in Blender, exposure/light budgets in render.
+Runtime weapon material helpers own reticles only. Frozen dry-surface recipes in
+`tools/lib/material-fixtures.ts` exercise shader calibration, not gameplay finishes.
 No blanket loader darkening/specular suppression. Arms have one source:
 `tools/blender/player_arms.py` and the committed arm GLB, not procedural recipes.
 

@@ -53,7 +53,7 @@ const setup = await page.evaluate(() => {
   ai.agents.length = 0;
   ai.squads.length = 0;
   ai.pathsPerFrame = 8;
-  player.health.value = 800;
+  player.health.setDebugValue(800);
 
   const gate = world.spawnPoints.find((s) => s.tag === 'gate') ?? world.spawnPoints[5];
   const gy = phys.groundHeight(gate.position.x, gate.position.z, gate.position.y + 6);

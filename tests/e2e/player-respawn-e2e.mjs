@@ -80,7 +80,7 @@ try {
         p.movement.leanOffsetZ = -0.15;
         p.rig.eye = 1;
         if (dead) p.applyDamage(10000, null);
-        else p.health.value = 25;
+        else p.health.setDebugValue(25);
         p._syncHitbox(); // Establish an old-location, disabled death capsule.
         cycle.before = snapshot();
         ctx.events.emit('game:restart', { source: 'test' });
