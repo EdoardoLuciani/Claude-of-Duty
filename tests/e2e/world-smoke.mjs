@@ -141,7 +141,9 @@ try {
   });
 
   const failures = [...errors];
-  if (result.stats.drawCalls !== 211 || result.stats.instances !== 7802)
+  // Match the already-shipped baseline batching/placement budget; visual-only
+  // tyre geometry changes must not alter either exact count.
+  if (result.stats.drawCalls !== 174 || result.stats.instances !== 7797)
     failures.push('world draw/instance budget changed');
   if (result.physicsTris < 300000 || result.physicsTris > 340000) {
     failures.push(`physics triangle budget changed: ${result.physicsTris}`);

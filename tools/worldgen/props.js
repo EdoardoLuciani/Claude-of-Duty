@@ -311,12 +311,15 @@ function concreteBlock(rng, w = 1.2, h = 0.9, d = 0.8) {
  * sidewall. The tread count is deliberately low (14 blocks) so it resolves as
  * blocks at 3 m instead of aliasing into a hum like a 34-cycle ripple does.
  */
-function tyre(rng, r = 0.33) {
+function tyre(stagger, r = 0.33, visualOnly = false) {
   const BLOCKS = 17;
   // 5 columns per block (block x3 / shoulder / groove). At 3 columns the groove
   // was a third of the pitch and the crown read as a ring of beads rather than
   // as tread; the extra segments also kill the faceting on the shoulder.
-  const radial = BLOCKS * 5;
+  // The visual derivative keeps the full bead/shoulder profile, but trades fine
+  // tread sampling and raised lettering for 60% fewer triangles. Canonical
+  // collision/support geometry still uses all five columns per block.
+  const radial = BLOCKS * (visualOnly ? 2 : 5);
   const HW = r * 0.3; // half the section width
   // A real tyre section: flat-ish sidewalls at the widest point, a distinct
   // shoulder, a flat crown, and a bead that leaves a proper hole in the middle.
@@ -341,7 +344,6 @@ function tyre(rng, r = 0.33) {
   ].map(([pr, py]) => new THREE.Vector2(pr * r, py * HW));
   const g = new THREE.LatheGeometry(prof, radial);
   const pa = g.getAttribute('position');
-  const stagger = rng.float() * 6.28;
   for (let i = 0; i < pa.count; i++) {
     const x = pa.getX(i);
     const y = pa.getY(i);
@@ -363,8 +365,9 @@ function tyre(rng, r = 0.33) {
     const f = 1 + grow / Math.max(1e-4, rr);
     // sidewall lettering / brand ring relief, pushed along the sidewall normal
     const band = Math.exp(-(((rr / r - 0.76) / 0.11) ** 2));
-    const letter =
-      band * ((Math.sin(a * 23 + stagger * 3) > 0.4 ? 0.006 : 0) + 0.0022) * (r / 0.33);
+    const letter = visualOnly
+      ? 0
+      : band * ((Math.sin(a * 23 + stagger * 3) > 0.4 ? 0.006 : 0) + 0.0022) * (r / 0.33);
     pa.setXYZ(i, x * f, y * 0.94 + Math.sign(y) * letter, z * f);
   }
   g.computeVertexNormals();
@@ -1194,8 +1197,14 @@ export function registerProps(A, rng) {
   P('jersey', 'concrete_prop', jerseyBarrier(), { skirt: 0.69, maxDist: 0 });
   P('block_big', 'concrete_prop', concreteBlock(rng, 1.25, 0.95, 0.85), { skirt: 0.63 });
   P('block_small', 'concrete_dark', concreteBlock(rng, 0.55, 0.42, 0.4), { skirt: 0.31 });
-  P('tyre', 'rubber', tyre(rng), { skirt: 0.33 });
-  P('tyre_small', 'rubber', tyre(rng, 0.26));
+  const T = (id, r, opts = {}) => {
+    // Consume exactly the original one sample per prototype; visuals must not
+    // advance the world RNG or move any later placement/support geometry.
+    const stagger = rng.float() * 6.28;
+    P(id, 'rubber', tyre(stagger, r), { visualGeo: tyre(stagger, r, true), ...opts });
+  };
+  T('tyre', 0.33, { skirt: 0.33 });
+  T('tyre_small', 0.26);
   P('pallet', 'wood_prop', pallet(rng), { skirt: 0.51 });
 
   // furniture
