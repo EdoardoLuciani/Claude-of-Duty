@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
+import { AIRCRAFT_URLS } from '../../src/audio/aircraft.ts';
 import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
 import { FALL_BANK, FOLEY_MIX, IMPACT_BANK, STEP_BANK } from '../../src/audio/physical.ts';
@@ -218,7 +219,11 @@ try {
     },
   });
   await assert.rejects(missing.load(), /step-metal-run-2.*HTTP 404/);
-  assert.equal(decodes, 172, 'all other required jobs settle before failure teardown');
+  assert.equal(
+    decodes,
+    172 + AIRCRAFT_URLS.length,
+    'all other required jobs settle before failure teardown'
+  );
   missing.dispose();
   assert.deepEqual(missing.hitBuffers, {});
 } finally {

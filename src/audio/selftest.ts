@@ -20,6 +20,7 @@
  */
 
 import { Rng } from '../core/rng.ts';
+import { AIRCRAFT_MIX } from './aircraft.ts';
 import { ambientOneShot, ONE_SHOTS } from './ambience.ts';
 import { NoiseBank } from './dsp.ts';
 import { shellCasing, reloadPhase, explosion, uiSound, heartbeat } from './foley.ts';
@@ -127,6 +128,7 @@ async function renderCase(
     Object.entries(loadedSamples.hitBuffers).map(([kind, buffers]) => [kind, buffers!.slice()])
   );
   samples.heartbeatBuffer = loadedSamples.heartbeatBuffer;
+  samples.aircraftBuffers = loadedSamples.aircraftBuffers.slice();
   try {
     if (opts.reverb !== false) mixer.buildReverbs();
     if (opts.space) mixer.setSpace(opts.space, 0.001);
@@ -431,6 +433,15 @@ async function runCases(loadedSamples: WeaponSampleBank, opts: { verbose?: boole
       { reverb: false }
     );
   }
+
+  // Finite source audition; tracked movement/loop shutdown is covered by the
+  // native bomber integration test rather than leaving an infinite test source.
+  await push('aircraft:source', 5, ({ ctx, samples, rng, mixer, t }) => {
+    const source = ctx.createBufferSource();
+    source.buffer = samples.nextAircraft(rng);
+    source.start(t);
+    route(mixer, { node: source, send: AIRCRAFT_MIX.send }, 'ambience');
+  });
 
   /* ---- space classifier (pure function, no audio) ---------------- */
   const spaces: Record<string, ReturnType<typeof classifySpace>> = {};

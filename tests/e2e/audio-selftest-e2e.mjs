@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 
+import { AIRCRAFT_URLS } from '../../src/audio/aircraft.ts';
 import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
 import {
   ensureViteServer,
@@ -10,7 +11,8 @@ import {
 
 const server = await ensureViteServer({ root: REPO_ROOT, port: 5551 });
 assert(server, 'Refusing an occupied self-test server port');
-const required = 50 + Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0);
+const required =
+  50 + Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0) + AIRCRAFT_URLS.length;
 let browser,
   fault = null,
   requests = 0;
@@ -49,7 +51,16 @@ try {
         originals = new Map();
       let retained = [],
         loadedBank;
-      for (const method of ['load', 'impact', 'step', 'fall', 'cloth', 'damage', 'hit']) {
+      for (const method of [
+        'load',
+        'impact',
+        'step',
+        'fall',
+        'cloth',
+        'damage',
+        'hit',
+        'nextAircraft',
+      ]) {
         const original = WeaponSampleBank.prototype[method];
         originals.set(method, original);
         WeaponSampleBank.prototype[method] = function (...args) {
@@ -71,6 +82,7 @@ try {
           kinds: [...kinds],
           cacheDisposed:
             Object.keys(loadedBank.hitBuffers).length === 0 &&
+            loadedBank.aircraftBuffers.length === 0 &&
             retained.every((buffers) => buffers.length === 0),
         };
       } finally {
@@ -82,7 +94,11 @@ try {
     assert(result.cacheDisposed, 'run-owned decoded cache disposed');
     if (!fault) {
       assert.equal(result.report.ok, true, JSON.stringify(result.report.failures));
-      assert(result.report.cases >= 96, 'all original cases and recorded armour states run');
+      assert(
+        result.report.cases >= 97,
+        'all original cases, recorded armour states and aircraft source run'
+      );
+      assert.equal(result.counts.nextAircraft, 1);
       assert.deepEqual(result.report.failures, []);
       assert.equal(result.counts.impact, 11);
       assert.equal(result.counts.step, 17);
@@ -113,6 +129,7 @@ try {
         'damage:mixed',
         'damage:break-mixed',
         'damage:break-armour-only',
+        'aircraft:source',
       ]) {
         const row = result.report.results.find((row) => row.name === name);
         assert(

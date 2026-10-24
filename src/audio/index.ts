@@ -11,6 +11,7 @@
  *   audio.start()                      force-start (returns Promise<boolean>)
  *   audio.deafness                     0..1 concussion; UI/post may read this
  *   audio.play(kind, position, opts)   one-shot; position null = head-locked
+ *   audio.startAircraft(position)     tracked recorded loop handle: move/stop
  *   audio.bark(kind, position, opts)   enemy voice: 'spot' | 'reload' |
  *                                      'grenade' | 'flank' | 'suppress' |
  *                                      'advance' | 'hurt' | 'death' | 'copy'
@@ -33,6 +34,7 @@ import { Vector3 } from 'three';
 import type { EngineContext } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName, ReloadPhase } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
+import { AircraftVoice, AIRCRAFT_MIX, type AircraftPosition } from './aircraft.ts';
 import { Ambience, ambientOneShot, ONE_SHOTS, AMBIENT_EVENT_GAIN } from './ambience.ts';
 import { NoiseBank, SPEED_OF_SOUND, clamp, gain as mkGain } from './dsp.ts';
 import { shellCasing, reloadPhase, explosion, uiSound, heartbeat, intelSiren } from './foley.ts';
@@ -259,6 +261,7 @@ export class AudioSystem {
   declare _offs: Array<() => void>;
   declare _gestureHandler: (() => void) | null;
   declare _ambienceApi: AmbienceApi | null;
+  declare _aircraft: Set<AircraftVoice>;
 
   static id = 'audio';
   static deps = [];
@@ -330,6 +333,7 @@ export class AudioSystem {
     this._offs = [];
     this._gestureHandler = null;
     this._ambienceApi = null;
+    this._aircraft = new Set();
   }
 
   /* ================================================================ */
@@ -425,6 +429,7 @@ export class AudioSystem {
 
   _teardown() {
     this._onIntelOperation({ active: false });
+    this._stopAircraft(true);
     try {
       this.tentRadio?.dispose();
       this.ambience?.dispose();
@@ -483,6 +488,7 @@ export class AudioSystem {
       /* ---- subsystems -------------------------------------------- */
       this.mixer!.update(dt);
       this.field!.update();
+      for (const voice of this._aircraft) if (voice.ended) this._aircraft.delete(voice);
       this.deafness = this.mixer!.deafness;
       if (!this._ambienceApi) {
         this._ambienceApi = {
@@ -541,6 +547,55 @@ export class AudioSystem {
       this.failed = true;
       this._teardown();
     }
+  }
+
+  /** Start one required recorded propeller loop in the existing tracked pool. */
+  startAircraft(position: AircraftPosition): AircraftVoice | null {
+    if (!this.running || this.actx?.state !== 'running' || !isVec(position)) return null;
+    const field = this.field!;
+    let emitter;
+    try {
+      const dist = field.distanceTo(position.x, position.y, position.z);
+      emitter = field.acquire({
+        x: position.x,
+        y: position.y,
+        z: position.z,
+        bus: 'ambience',
+        tracked: true,
+        priority: AIRCRAFT_MIX.priority,
+        gain: AIRCRAFT_MIX.gain,
+        send: AIRCRAFT_MIX.send,
+        endTime: Infinity,
+      });
+      if (!emitter) return null;
+      const buffer = this.samples!.nextAircraft(this.rng);
+      const voice = new AircraftVoice(
+        this.actx,
+        field,
+        emitter,
+        buffer,
+        this.actx.currentTime + dist / SPEED_OF_SOUND
+      );
+      this._aircraft.add(voice);
+      this.stats.events++;
+      return voice;
+    } catch (error) {
+      emitter?.detach();
+      this._error(error);
+      return null;
+    }
+  }
+
+  _stopAircraft(immediate = false): void {
+    for (const voice of this._aircraft) {
+      if (immediate) voice.dispose();
+      else voice.stop();
+    }
+    if (immediate) this._aircraft.clear();
+  }
+
+  _pauseAircraft(): void {
+    for (const voice of this._aircraft) voice.setPaused(true);
   }
 
   /* ================================================================ */
@@ -972,14 +1027,24 @@ export class AudioSystem {
     on('ai:bark', (p) => this.bark(p?.kind ?? 'spot', p?.position, { voice: p?.voice ?? 0 }));
     on('intel:operation', (e) => this._onIntelOperation(e));
     const stopIntel = () => this._onIntelOperation({ active: false });
-    on('game:restart', stopIntel);
+    on('game:restart', () => {
+      stopIntel();
+      this._stopAircraft();
+    });
     on('player:death', stopIntel);
-    on('engine:error', stopIntel);
+    on('engine:error', () => {
+      stopIntel();
+      this._stopAircraft(true);
+    });
     on('ui:pause', (e) => {
-      if (e.paused) stopIntel();
+      if (e.paused) {
+        stopIntel();
+        this._pauseAircraft();
+      }
     });
     on('market:open', () => {
       stopIntel();
+      this._pauseAircraft();
       if (!this.running) return;
       this.tentRadio?.start()?.catch?.(() => {});
       this.mixer?.setBusVolume('ambience', 0.28);

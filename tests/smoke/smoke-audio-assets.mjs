@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 
+import { AIRCRAFT_URLS } from '../../src/audio/aircraft.ts';
 import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
 const foleyCount = Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0);
@@ -27,10 +28,10 @@ try {
         bank.load(),
         failure === 'http' ? /smg-1.*HTTP 404/ : /invalid recording/
       );
-    else assert.equal(await bank.load(), 50 + foleyCount);
+    else assert.equal(await bank.load(), 50 + foleyCount + AIRCRAFT_URLS.length);
     assert.equal(
       decodes,
-      (failure === 'http' ? 49 : 50) + foleyCount,
+      (failure === 'http' ? 49 : 50) + foleyCount + AIRCRAFT_URLS.length,
       'all jobs settle before failure teardown'
     );
     bank.dispose();
@@ -38,6 +39,8 @@ try {
     assert.equal(bank.heartbeatBuffer, null);
     assert.deepEqual(bank.hitBuffers, {});
     assert.deepEqual(bank.hitIndices, {});
+    assert.deepEqual(bank.aircraftBuffers, []);
+    assert.equal(bank.aircraftIndex, -1);
   }
   const missing = new WeaponSampleBank({});
   missing.buffers.rifle = [{ duration: 0.2 }];

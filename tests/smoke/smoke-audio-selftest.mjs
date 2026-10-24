@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+import { AIRCRAFT_URLS } from '../../src/audio/aircraft.ts';
 import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
 import * as foley from '../../src/audio/foley.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
@@ -61,7 +62,10 @@ try {
   assert.match(report.failures[0].error, /HTTP 404/);
   assert.equal(report.results, undefined, 'public verbose option is retained');
   assert.deepEqual(report.spaces, {});
-  assert.equal(requests, 50 + Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0));
+  assert.equal(
+    requests,
+    50 + Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0) + AIRCRAFT_URLS.length
+  );
   assert.equal(renders, 0);
   assert.equal(disposals, 1, 'failed run disposes its single required bank');
 } finally {

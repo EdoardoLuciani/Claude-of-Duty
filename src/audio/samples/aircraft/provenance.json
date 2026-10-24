@@ -1,0 +1,39 @@
+{
+  "format": "mono 48000 Hz Opus, 96 kbps VBR",
+  "rights": "Owner explicitly cleared public redistribution of edited #474 aircraft derivatives. Original masters and unrelated legacy asset permissions remain separate. Keep source entitlement/licence records; these media do not inherit the code licence.",
+  "design": "Short near-pass propeller texture, pitch-preserving 4x stretch and circular overlap edit. PC-21 turboprop source, not a steady or scale-matched twin-engine bomber recording. Runtime distance/panning owns the flyby; no complete baked-in stereo pass is played.",
+  "files": {
+    "propeller-1": {
+      "source": "Boom ONE Update/update_23_05/AIRCRAFT/MILITARY/AEROMil_Military Jet PC-21 Fly By 01 MS MKH 416_B00M_ONE.wav",
+      "sourceSha256": "c94f30acedb6c844364f2a2dd70612e0ad66e6bb19e6c39dca0b0de42ea167a2",
+      "start": 58.05,
+      "duration": 0.9,
+      "filter": "atrim=start=58.05:duration=0.9,asetpts=PTS-STARTPTS,pan=mono|c0=0.5*c0+0.5*c1,aresample=48000,highpass=f=90,lowpass=f=8500,atempo=0.5,atempo=0.5",
+      "crossfadeSeconds": 0.3,
+      "targetRmsDb": -20,
+      "level": 0.5928161766304747,
+      "decodedDuration": 3.2618125,
+      "decodedPeak": 0.26231637597084045,
+      "downmixLossDb": -0.04734558402024073,
+      "seamDelta": 0.00014512985944747925,
+      "maxDelta": 0.017783381044864655,
+      "sha256": "320a6ef9120046c16a51c5f4f19419194aec9920ce1bb0cc07e4b5a981cd4fcb"
+    },
+    "propeller-2": {
+      "source": "Boom ONE Update/update_23_05/AIRCRAFT/MILITARY/AEROMil_Military Jet PC-21 Fly By 02 MS MKH 416_B00M_ONE.wav",
+      "sourceSha256": "405cda50acbfd57f03645c3d79ee134f8aff145318448e5b35a00f8826a30f7c",
+      "start": 11.1,
+      "duration": 0.9,
+      "filter": "atrim=start=11.1:duration=0.9,asetpts=PTS-STARTPTS,pan=mono|c0=0.5*c0+0.5*c1,aresample=48000,highpass=f=90,lowpass=f=8500,atempo=0.5,atempo=0.5",
+      "crossfadeSeconds": 0.3,
+      "targetRmsDb": -20,
+      "level": 0.7882687403939066,
+      "decodedDuration": 3.2157916666666666,
+      "decodedPeak": 0.35640668869018555,
+      "downmixLossDb": -0.04391345802372771,
+      "seamDelta": 0.0017272420227527618,
+      "maxDelta": 0.040353767573833466,
+      "sha256": "f5613db43434c8c7038a5b65f35180257c695f23dc80c8e543f51f1e8f8cb1d7"
+    }
+  }
+}

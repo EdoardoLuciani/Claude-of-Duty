@@ -1,4 +1,5 @@
 import type { Rng } from '../core/rng.ts';
+import { AIRCRAFT_URLS } from './aircraft.ts';
 import { biquad, clamp, gain, series } from './dsp.ts';
 import { FOLEY_URLS, type FoleyKind } from './foley-urls.ts';
 import { HIT_MIX, HIT_URLS, type DamageSoundOptions, type HitKind } from './hits.ts';
@@ -99,6 +100,8 @@ export class WeaponSampleBank {
   actionBuffer: AudioBuffer | null;
   explosionBuffer: AudioBuffer | null;
   heartbeatBuffer: AudioBuffer | null;
+  aircraftBuffers: AudioBuffer[];
+  aircraftIndex: number;
   hitBuffers: Partial<Record<ContactKind, AudioBuffer[]>>;
   hitIndices: Partial<Record<ContactKind, number>>;
   loaded: number;
@@ -109,6 +112,8 @@ export class WeaponSampleBank {
     this.actionBuffer = null;
     this.explosionBuffer = null;
     this.heartbeatBuffer = null;
+    this.aircraftBuffers = [];
+    this.aircraftIndex = -1;
     this.hitBuffers = {};
     this.hitIndices = {};
     this.loaded = 0;
@@ -125,6 +130,9 @@ export class WeaponSampleBank {
     jobs.push(this._loadSpecial('actionBuffer', ACTION_URL));
     jobs.push(this._loadSpecial('explosionBuffer', EXPLOSION_URL));
     jobs.push(this._loadSpecial('heartbeatBuffer', HEARTBEAT_URL));
+    this.aircraftBuffers = new Array<AudioBuffer>(AIRCRAFT_URLS.length);
+    this.aircraftIndex = -1;
+    AIRCRAFT_URLS.forEach((url, index) => jobs.push(this._loadAircraft(index, url)));
     for (const kind of Object.keys(CONTACT_URLS) as ContactKind[]) {
       this.hitBuffers[kind] = new Array<AudioBuffer>(CONTACT_URLS[kind].length);
       this.hitIndices[kind] = -1;
@@ -155,6 +163,20 @@ export class WeaponSampleBank {
   async _loadHit(kind: ContactKind, index: number, url: string): Promise<void> {
     this.hitBuffers[kind]![index] = await this._loadBuffer(url);
     this.loaded++;
+  }
+
+  async _loadAircraft(index: number, url: string): Promise<void> {
+    this.aircraftBuffers[index] = await this._loadBuffer(url);
+    this.loaded++;
+  }
+
+  nextAircraft(rng: Rng): AudioBuffer {
+    if (!this.aircraftBuffers.length) throw new Error('[audio] aircraft recordings are not loaded');
+    this.aircraftIndex =
+      this.aircraftIndex < 0
+        ? rng.u32() % this.aircraftBuffers.length
+        : (this.aircraftIndex + 1) % this.aircraftBuffers.length;
+    return this.aircraftBuffers[this.aircraftIndex];
   }
 
   /** No hot-path fetch/decode, and no immediate repeat within a contact family. */
@@ -495,6 +517,8 @@ export class WeaponSampleBank {
     this.actionBuffer = null;
     this.explosionBuffer = null;
     this.heartbeatBuffer = null;
+    this.aircraftBuffers.length = 0;
+    this.aircraftIndex = -1;
     this.loaded = 0;
   }
 }
