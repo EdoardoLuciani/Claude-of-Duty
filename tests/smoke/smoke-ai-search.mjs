@@ -17,7 +17,7 @@ import {
   SEARCH_CANDIDATES,
   SEARCH_DURATION,
 } from '../../src/ai/agent.ts';
-import { NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.ts';
+import { NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.js';
 import { AiSystem } from '../../src/ai/index.ts';
 import { Squad } from '../../src/ai/squad.ts';
 import { makeAgent, makeAi, makeRng } from '../../tools/lib/agent-fixture.mjs';

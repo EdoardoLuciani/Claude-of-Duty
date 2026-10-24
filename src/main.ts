@@ -37,7 +37,7 @@ const lockstep = capture && params.get('lockstep') === '1';
 
 const config = createConfig({
   // 'high' is the default (see src/core/config.ts); pass ?q=ultra for the
-  // larger shadow and FX budgets.
+  // full effect stack.
   quality: (params.get('q') as QualityName | null) ?? 'high',
   deterministic: capture || params.has('deterministic'),
 });
@@ -48,11 +48,9 @@ if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Missing game canvas
 const engine = new Engine({ canvas, config });
 // DOM input is blocked by the HTML shell; also gate native/gamepad consumers.
 engine.input.enabled = false;
-engine.setGameplaySuspended(!capture);
 engine.onFirstRender = () => {
-  engine.input.enabled = capture;
+  engine.input.enabled = true;
   window.__STARTUP__.complete();
-  engine.ctx.get('ui').startGate?.ready();
 };
 
 // Registration order is irrelevant — Registry topo-sorts on static deps.
@@ -142,7 +140,6 @@ if (engine.error) throw new Error(engine.error.message);
 console.info('[boot] prewarm', warmup);
 engine.ctx.peek('telemetry')?.start();
 
-if (!capture) engine.ctx.get('ui').installStartGate();
 engine.start();
 
 // Capture harness handshake: only flag ready once a frame has actually landed.

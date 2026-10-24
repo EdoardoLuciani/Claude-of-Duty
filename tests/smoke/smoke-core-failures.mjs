@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import { Engine } from '../../src/core/engine.ts';
 import { ModelSystem } from '../../src/core/models.ts';
+import { WeaponMaterialsNode } from '../../src/weapons/materials-tsl.ts';
 
 // A partial update is terminal: later gameplay hooks and later frames cannot
 // continue mutating the simulation, even if something tries to unpause it.
@@ -193,4 +194,7 @@ try {
 } finally {
   globalThis.fetch = fetch;
 }
-console.log('ok  terminal engine failure and mandatory navigation');
+const materials = new WeaponMaterialsNode({ get: () => ({}) });
+assert.throws(() => materials.get('misspelled-surface'), /unknown material/);
+materials.dispose();
+console.log('ok  terminal engine failure, mandatory navigation and explicit material names');

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import { Vector3 } from 'three';
 
-import { AttachmentQueries } from '../../src/ai/attachment-queries.ts';
+import { AttachmentQueries } from '../../src/ai/attachment-queries.js';
 import { createLadderDescriptors, ladderMoveBudget } from '../../src/ai/ladder.ts';
 import { unpackNav, packNav, NAV_LINK_RADIUS } from '../../src/ai/nav-format.ts';
 import { SurfaceNav, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/nav.ts';

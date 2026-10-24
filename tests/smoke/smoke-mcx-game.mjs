@@ -25,6 +25,24 @@ assert(def.muzzleVelocity < 343 && def.suppressed);
 assert.equal(resolveProfile('MCX VIRTUS'), WEAPON_PROFILES.mcx);
 assert.notEqual(resolveProfile('mcx'), resolveProfile('rifle'));
 assert(resolveProfile('mcx').suppressed && resolveProfile('mcx').sampleAction === false);
+for (const n of [1, 2]) {
+  const wav = readFileSync(new URL(`../../src/audio/samples/mcx-${n}.wav`, import.meta.url));
+  assert.equal(wav.toString('ascii', 0, 4), 'RIFF');
+  assert.equal(wav.readUInt16LE(22), 1);
+  assert.equal(wav.readUInt32LE(24), 48000);
+  assert.equal(wav.readUInt32LE(40) / 96000, 0.32);
+  let peak = 0,
+    energy = 0;
+  for (let i = 44; i < wav.length; i += 2) {
+    const x = wav.readInt16LE(i) / 32768;
+    peak = Math.max(peak, Math.abs(x));
+    energy += x * x;
+  }
+  assert(peak > 0.59 && peak < 0.6, '4.5 dB peak headroom');
+  assert(energy > 0.1);
+  assert.equal(wav.readInt16LE(wav.length - 2), 0, 'clean end fade');
+}
+
 // Exercise the REAL GLB hierarchy, animation samplers and runtime adapter.
 // Only PNG decoding is stubbed: WebGL/browser decoding is checked separately.
 const bytes = readFileSync(new URL(MCX_URL));

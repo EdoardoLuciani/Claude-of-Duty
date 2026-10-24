@@ -291,42 +291,17 @@ try {
         assert.equal(blocked.pitch, blocked.before.pitch);
         assert(blocked.yawRate === 0);
         assert.equal(resumed.visible, false);
-        if (args.normal) {
-          assert.equal(resumed.enabled, false, 'normal readiness still awaits explicit Start');
-          assert.equal(resumed.polls, 0);
-          assert.deepEqual(resumed.stick, blocked.stick);
-          assert.deepEqual(resumed.cmd, blocked.cmd);
-          assert.equal(resumed.yaw, resumed.before.yaw);
-          assert.equal(resumed.pitch, resumed.before.pitch);
-          assert.equal(await page.evaluate(() => window.__ENGINE__.time.elapsed), 0);
-          await page.getByRole('button', { name: 'START', exact: true }).click();
-          await page.waitForFunction(() => !window.__ENGINE__.gameplaySuspended);
-          await page.waitForFunction(() => {
-            const e = window.__ENGINE__;
-            const movement = e.ctx.get('player').movement;
-            return (
-              e.input.stick.moveX === 1 &&
-              e.input.stick.lookY === -1 &&
-              movement.cmd.moveX > 0 &&
-              movement.cmd.moveY > 0 &&
-              movement.cmd.sprintHeld &&
-              movement.yawRate < 0 &&
-              movement.pitch > 0
-            );
-          });
-        } else {
-          assert.equal(resumed.enabled, true);
-          assert.equal(resumed.polls, 1);
-          assert.deepEqual(resumed.stick, { moveX: 1, moveY: -1, lookX: 1, lookY: -1 });
-          assert.deepEqual(resumed.cmd, {
-            moveX: 1 / Math.sqrt(2),
-            moveY: 1 / Math.sqrt(2),
-            sprintHeld: true,
-          });
-          assert(resumed.yaw < resumed.before.yaw, 'held look resumes on the next gameplay frame');
-          assert(resumed.pitch > resumed.before.pitch);
-          assert(resumed.yawRate < 0);
-        }
+        assert.equal(resumed.enabled, true);
+        assert.equal(resumed.polls, 1);
+        assert.deepEqual(resumed.stick, { moveX: 1, moveY: -1, lookX: 1, lookY: -1 });
+        assert.deepEqual(resumed.cmd, {
+          moveX: 1 / Math.sqrt(2),
+          moveY: 1 / Math.sqrt(2),
+          sprintHeld: true,
+        });
+        assert(resumed.yaw < resumed.before.yaw, 'held look resumes on the next gameplay frame');
+        assert(resumed.pitch > resumed.before.pitch);
+        assert(resumed.yawRate < 0);
         assert.equal(await page.locator('#startup').isVisible(), false);
         const readyFrame = await page.evaluate(() => window.__ENGINE__.time.frame);
         if (!args.normal) assert.equal(readyFrame, 3, 'capture handshake is unchanged');

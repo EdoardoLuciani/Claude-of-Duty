@@ -23,7 +23,7 @@ export function createCombatProfile(engine, combatLane, { realtime = false, agen
   const base = lane.positions[0],
     yaw = Math.atan2(-lane.fx, -lane.fz);
   player.teleport({ x: base.x, y: base.y + player.eyeHeight, z: base.z }, yaw);
-  player.health.setDebugValue(10000);
+  player.health.value = 10000;
   player.health.armour = 0;
   let squad = ai.createSquad();
   for (let i = 2; i < lane.positions.length; i++) {

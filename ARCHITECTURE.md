@@ -128,16 +128,9 @@ stop as `unknown-thickness`, overlapping solids as `overlapping-solids`.
 No nominal fallback or layered-solid approximation.
 
 JS in `tools/worldgen/` is world-authoring authority; `placements/` owns
-free-standing prop transforms. `npm run world` builds meshes and cooks collision
-with meshoptimizer from the canonical instance buckets. Visual-only bucket
-coalescing may join non-distance-LOD clouds within the existing 64 m X/Z span;
-it must not change collision inputs or navigation. Both transient outputs use
-assembler-owned materials and canonical `geo`. A prototype may supply an owned
-`visualGeo` derivative for visual output only; support, collision and navigation
-must retain canonical geometry, topology and RNG/instance inputs. The assembler
-owns both geometries and handles aliased/unused inputs without double disposal.
-Manifest v2 and content-hashed GLBs live in
-`public/models/world/`. Preserve instancing/masks.
+free-standing prop transforms. `npm run world` builds visual meshes, cooks
+collision from those same meshes with meshoptimizer, and exports manifest v2
+plus content-hashed GLBs under `public/models/world/`. Preserve instancing/masks.
 Never author separate collision geometry or hand-edit generated files. Commit
 source + manifest + generated runtime assets together. Validate with
 `npm run world -- --check`, world/physics tests and screenshots.
@@ -172,8 +165,10 @@ Post passes normally consume textures through `asNode`; optional
 The graph owns RTTs it creates, not borrowed outputs. Pipeline disposal is not recursive.
 
 Graph order: opaque depth/normal/velocity → GTAO/world lighting → world TAA →
-fog/haze → separate transparent-black, non-MSAA first-person pass → low-health
-effects → exposure → bloom → AgX → optional LUT. Exposure works without a LUT.
+optional additive SSR → fog/haze → separate transparent-black, non-MSAA first-person
+pass → low-health effects → exposure → bloom → AgX → optional LUT.
+SSR composition/temporal quality is deferred to #370. Exposure works without a LUT.
+SSR uses evaluated roughness/metalness, not overridden scalar material defaults.
 First-person depth/history never merges with world depth/history or world haze.
 View-pass context identity prevents camera-specialized environment cache sharing.
 World beauty alone uses clustered point lighting; the unlit prepass and first-person
@@ -189,9 +184,6 @@ Prepass layer 1 contains opaque meshes/lights, not sky/transparent FX. Schedule 
 exactly once before world rendering at every quality, even without AO.
 `afterDepth` draws haze against current-frame depth; soft particles borrow it.
 Mesh opt-outs: `userData.owNoPrepass = true`, native `castShadow = false`.
-Pickup instances retain stable slots. Birth/reuse history is validated only by the
-live world camera's layer-1 prepass callback; preserve that camera/layer contract
-or update the pickup owner and rendered motion-transition tests together.
 Refresh CSM frustums when the unjittered projection changes. Bias depends on slope/
 cascade texels. Fog borrows native cascade depth/matrices, adding no shadow draw.
 Hoist noise outside the fog march; its uniform uses application frames, not native
@@ -206,7 +198,7 @@ sky initialization. No synthetic sun/background/environment or no-sky fill exist
 an owned zero-intensity sky remains dark.
 
 HDR exposure samples unexposed world beauty asynchronously, at most one readback
-pending. It excludes fog, TAA, viewmodel and post effects. Elapsed-time smoothing
+pending. It excludes fog, SSR/TAA, viewmodel and post effects. Elapsed-time smoothing
 freezes with paused time. Camera/FOV can still affect metering. Keep approved
 key/limits/bias; this policy is not a WebGL visual-parity claim.
 
@@ -231,10 +223,8 @@ regressions, not external disposal of its private textures. The Git dependency's
 ESM exports use source so committed stale bundles cannot hide the pinned fixes.
 Keep the source-export correction and upstream buffer-name verification
 exact-commit/hash guarded; see README upgrade checks. Builder-local WGSL buffer
-names enable native program/pipeline reuse. Upstream reference attributes bind each
-instanced mesh's own buffers while compatible meshes share shader-builder state;
-object-specific builds remain uncached. Preserve pixel-level buffer isolation and
-reuse regressions rather than restoring obsolete per-object cache-key IDs.
+names enable native program/pipeline reuse; never remove per-object instanced-buffer
+identity from shader-builder cache keys.
 
 Bakes use native top-left texture UVs and shared `QuadMesh` geometry: no extra Y
 flip or disposal of borrowed geometry. Preview PNGs redirect the output target
@@ -259,42 +249,23 @@ parts or drop pools. Native metres, sockets, grips and provisional 89 mm travel
 remain asset-owned; damage, 6+1 accounting and per-shell interruption remain in
 the common weapon system.
 Preserve shared IK, ADS/sway/recoil and pooled casings. Source/regen/reference
-contracts live beside each asset. Weapons force physical materials and borrow
-source maps. Arms consolidate authored Physical finishes into one opaque material
-per independent skeleton, accepting single and grouped indexed surfaces. Preserve
-UV0 AO, UV1 detail, weights, mirrored binding, specular factors and sleeve-only blood.
-The arm asset owns packed texture arrays and releases source images after packing.
-Native copy, clone/cache-safe soldier output and render-owned environment
-re-registration contracts are documented in
+contracts live beside each asset. Weapons force physical materials; arms select
+standard/physical from their source. Preserve authored maps/specular factors and
+borrowed texture ownership. Native copy, clone/cache-safe soldier output and
+render-owned environment re-registration contracts are documented in
 [docs/material-calibration.md](docs/material-calibration.md).
 
 FX particle/decal PNGs are required runtime assets; generation
 lives in `tools/lib/fx-atlas.ts` and the offline texture exporter. Missing/invalid
 atlases reject FX initialization. Recorded audio fetch/decode failures disable the
-audio graph rather than substituting synthesis. Physical hits and movement/body/
-equipment foley use required recordings; see [docs/physical-foley.md](docs/physical-foley.md).
-Bomber engines use required recorded loops in the existing tracked spatial pool.
-Radio owns each handle's moving pose/pass lifetime; audio owns its source/pool
-cleanup. See [docs/aircraft-audio.md](docs/aircraft-audio.md).
-Nonverbal hurt/death efforts use required identity-grouped recordings; see
-[docs/vocal-reactions.md](docs/vocal-reactions.md). Spoken tactical callouts remain
-separate in #497.
-Sparse environmental one-shots use required recordings; see
-[docs/environment-audio.md](docs/environment-audio.md). Unsupported ambient human
-shouts/random tactical chatter are retired rather than inventing phantom actors.
-Radio switch/receive textures use required recordings composed with unchanged
-functional electronic tones; see [docs/radio-audio.md](docs/radio-audio.md).
-Remaining synthesis includes authored distant/sniper reports, reinforcement,
-shell casings/dry fire, tactical speech and intentional UI cues.
+audio graph rather than substituting synthesis. Authored distant/sniper reports
+and reinforcement/foley remain synthesized by design.
 
 `models.getSoldier(name)` returns `{ name, geometry, slots, boneNames, weapon,
 stats, variant }`. Merge GLTF primitives into one skinned geometry with slot
 groups, slicing shared accessors correctly. Bone order must match
 `RIG.createSkeleton()`; models and AI validate names/order, groups, slots and skin
-attributes and fail boot on mismatches. AI annotates those disjoint surfaces once
-with `soldierSurface`; one native material per variant ignores the authoring groups
-when drawing. AI owns the shared texture arrays and immutable finish lookup textures;
-meshes retain ordinary Three.js skinning, history, culling and shadow ownership.
+attributes and fail boot on mismatches.
 
 ## Prewarm
 

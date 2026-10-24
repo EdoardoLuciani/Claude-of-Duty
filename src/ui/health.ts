@@ -6,9 +6,9 @@ import { el, setText, setStyle, setClass, clamp01, damp, ease } from './util.ts'
  * Blood edges and desaturation scale with injury; the player pulse animates
  * the vignette. Damage also adds a brief red flash.
  *
- * Blood detail uses ordinary alpha-composited gradients. Desaturation lives
- * in the prewarmed WebGPU low-health pass, not a second full-screen CSS
- * backdrop filter; SVG displacement is particularly costly in Firefox.
+ * The vignette is two stacked layers pushed through an feTurbulence
+ * displacement filter (see style.ts) so its edge is organic; a clean radial
+ * gradient is the single most "WebGL demo" thing a hurt overlay can do.
  *
  * The vitals widget lives in the bottom-LEFT of the safe area — the mirror of
  * the ammo block — because it holds the most important number on the screen and
@@ -34,6 +34,7 @@ interface HealthState {
 export class HealthFx {
   declare bloodWrap: HTMLElement;
   declare beat: HTMLElement;
+  declare desat: HTMLElement;
   declare flash: HTMLElement;
   declare vitals: HTMLElement;
   declare hpNum: HTMLElement;
@@ -55,6 +56,7 @@ export class HealthFx {
     el('div', 'ow-blood-a', this.bloodWrap);
     el('div', 'ow-blood-b', this.bloodWrap);
     this.beat = el('div', 'ow-lowbeat', parent);
+    this.desat = el('div', 'ow-desat', parent);
     this.flash = el('div', 'ow-hitflash', parent);
 
     // ---- vitals widget ----------------------------------------------------
@@ -86,6 +88,7 @@ export class HealthFx {
     this.armourFlash = 0; // plate strike flash, decays in update
 
     setStyle(this.bloodWrap, 'opacity', '0');
+    setStyle(this.desat, 'display', 'none');
     setStyle(this.flash, 'opacity', '0');
     setStyle(this.beat, 'opacity', '0');
   }
@@ -121,6 +124,11 @@ export class HealthFx {
     const beatA = clamp01(this.beatEnergy * 0.55);
     setStyle(this.beat, 'opacity', beatA.toFixed(3));
     setStyle(this.beat, 'display', beatA < 0.004 ? 'none' : '');
+
+    // backdrop-filter is expensive: only mount the element when it does work
+    const desatA = clamp01(hurt * 0.8);
+    setStyle(this.desat, 'display', desatA < 0.01 ? 'none' : '');
+    setStyle(this.desat, 'opacity', desatA.toFixed(3));
 
     if (this.flashT < 1) {
       this.flashT = Math.min(1, this.flashT + dt / 0.19);
@@ -174,6 +182,7 @@ export class HealthFx {
   dispose(): void {
     this.bloodWrap.remove();
     this.beat.remove();
+    this.desat.remove();
     this.flash.remove();
     this.vitals.remove();
   }

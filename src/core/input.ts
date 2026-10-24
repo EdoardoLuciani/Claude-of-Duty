@@ -243,18 +243,6 @@ export class Input {
     this._rawLook.y = 0;
   }
 
-  /** Discard all gameplay state at a control handoff, without changing focus or lock. */
-  clear(): void {
-    this.down.clear();
-    this._pressed.clear();
-    this._released.clear();
-    this._pendingDown.clear();
-    this._pendingUp.clear();
-    this.look.x = this.look.y = this._rawLook.x = this._rawLook.y = 0;
-    this.wheel = this._pendingWheel = 0;
-    this.stick.moveX = this.stick.moveY = this.stick.lookX = this.stick.lookY = 0;
-  }
-
   beginFrame(): void {
     this._pressed.clear();
     this._released.clear();

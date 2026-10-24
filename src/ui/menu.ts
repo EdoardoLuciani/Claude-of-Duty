@@ -20,7 +20,8 @@ type InvertButton = [HTMLButtonElement, boolean];
  * is announced on the event bus so render/player can react without importing
  * this module.
  *
- * Events emitted: `ui:pause` {paused}. Settings update the shared config directly.
+ * Events emitted: `ui:pause` {paused}, `ui:sensitivity` {value}, `ui:fov` {value},
+ * `ui:setting` {key, value}.
  */
 export class PauseMenu {
   ctx: MenuContext;
@@ -63,6 +64,7 @@ export class PauseMenu {
     // ---- sensitivity -----------------------------------------------------
     this.sens = this._slider('Mouse Sensitivity', 0.2, 3.0, 0.01, (v) => {
       this.ctx.config.sensitivity = 0.0022 * v;
+      this.ctx.events.emit('ui:sensitivity', { value: this.ctx.config.sensitivity, multiplier: v });
       return v.toFixed(2);
     });
 
@@ -74,12 +76,14 @@ export class PauseMenu {
         cam.fov = v;
         cam.updateProjectionMatrix();
       }
+      this.ctx.events.emit('ui:fov', { value: v });
       return String(v | 0);
     });
 
     // ---- firing camera shake ---------------------------------------------
     this.shake = this._slider('Firing Camera Shake', 0, 1, 0.05, (v) => {
       this.ctx.config.firingShake = v;
+      this.ctx.events.emit('ui:setting', { key: 'firingShake', value: v });
       return v <= 1e-6 ? 'OFF' : `${Math.round(v * 100)}%`;
     });
 
@@ -96,6 +100,7 @@ export class PauseMenu {
       b.type = 'button';
       b.addEventListener('click', () => {
         this.ctx.config.invertY = val;
+        this.ctx.events.emit('ui:setting', { key: 'invertY', value: val });
         this.syncFromConfig();
       });
       this.invBtns.push([b, val]);
@@ -115,13 +120,23 @@ export class PauseMenu {
       this.ctx.config.invertY = false;
       this.setQuality('high');
     });
-    el('div', 'hint', inner, `${bindingLabel('pause').toUpperCase()} RESUME`);
+    el(
+      'div',
+      'hint',
+      inner,
+      `${bindingLabel('pause').toUpperCase()} RESUME · SCROLL FOR ALL CONTROLS`
+    );
 
     const reference = el('section', 'ow-controls', layout);
     reference.setAttribute('aria-label', 'Gameplay controls');
     reference.tabIndex = 0; // Keyboard users can scroll the reference without leaving the game.
     el('h2', null, reference, 'CONTROLS');
-    el('p', 'ow-controls-note', reference, 'Keyboard & mouse · Quick reference.');
+    el(
+      'p',
+      'ow-controls-note',
+      reference,
+      'Keyboard & mouse · Scroll for the full reference. Hold and toggle actions are noted below.'
+    );
     const groups = el('div', 'ow-controls-groups', reference);
     for (const section of CONTROL_SECTIONS) {
       const group = el('section', 'ow-controls-group', groups);
@@ -133,6 +148,12 @@ export class PauseMenu {
         el('dd', null, row, control.description);
       }
     }
+    el(
+      'p',
+      'ow-controls-note',
+      reference,
+      'Gamepad sticks: left moves, right looks. No gamepad button actions are bound.'
+    );
 
     this.open = false;
     this.shown = 0;

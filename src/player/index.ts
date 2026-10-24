@@ -859,11 +859,20 @@ export class PlayerSystem {
   get healthFraction() {
     return this.health.fraction;
   }
+  get lowHealth() {
+    return this.health.low;
+  }
   get dead() {
     return this.health.dead;
   }
   get suppression() {
     return this.health.suppression;
+  }
+  get damageIndicators() {
+    return this.health.indicators;
+  }
+  get heartbeatPulse() {
+    return this.health.pulse;
   }
   get bobPhase() {
     return this.rig.bobPhase;
@@ -993,8 +1002,6 @@ export class PlayerSystem {
       this.movement.teleport(sp.position.x, feetY, sp.position.z);
       this.rig.reset(STANCE.stand.eye);
     }
-    // Restart observers and AI placement run before the next player update.
-    this._syncHitbox();
     this._endDeath();
   }
 
@@ -1034,12 +1041,12 @@ export class PlayerSystem {
         m.grounded = false;
         break;
       case 'hurt':
-        this.health.setDebugValue(this.health.max * 0.28);
+        this.health.value = this.health.max * 0.28;
         this.health.lastDamageTime = this.ctx.time.elapsed;
         this.health.effect = clamp01((HEALTH.lowThreshold - 0.28) / HEALTH.lowThreshold);
         break;
       case 'critical':
-        this.health.setDebugValue(this.health.max * 0.11);
+        this.health.value = this.health.max * 0.11;
         this.health.lastDamageTime = this.ctx.time.elapsed;
         this.health.effect = 1;
         this.health.hitFlash = 0.6;

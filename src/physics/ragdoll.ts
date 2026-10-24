@@ -243,6 +243,8 @@ export class Ragdoll {
   declare qz: Float64Array;
   declare invMass: Float64Array;
   declare bones3D: Array<THREE.Bone | null> | null;
+  declare boneBind: unknown;
+  declare rootObject: THREE.Object3D | null;
   declare skeleton: THREE.Skeleton | null;
   declare boneLocalOffset: Float64Array;
   declare boneRestDirection: Float64Array;
@@ -366,6 +368,8 @@ export class Ragdoll {
 
     // skeleton binding (filled by adoptSkeleton)
     this.bones3D = null;
+    this.boneBind = null;
+    this.rootObject = null;
     this._m4 = new THREE.Matrix4();
     this._m4b = new THREE.Matrix4();
     this._q = new THREE.Quaternion();

@@ -85,7 +85,7 @@ await page.evaluate(async () => {
     const phys = ctx.get('physics');
     // Keep the target alive across this safety fixture. Merely assigning HP
     // after death does not re-enable its collider or reset the death camera.
-    player.health.setDebugValue(10000);
+    player.health.value = 10000;
     const slots = [
       [8, 0],
       [12, 0],

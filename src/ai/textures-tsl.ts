@@ -1,6 +1,5 @@
 import {
   abs,
-  attribute,
   cameraPosition,
   clamp,
   dot,
@@ -12,30 +11,14 @@ import {
   positionWorld,
   smoothstep,
   texture,
-  textureLoad,
-  ivec2,
-  uint,
   uv,
-  varying,
   vec3,
   vec4,
 } from 'three/tsl';
-import {
-  Color,
-  FrontSide,
-  MeshStandardNodeMaterial,
-  Vector4,
-  DataTexture,
-  FloatType,
-  RGBAFormat,
-} from 'three/webgpu';
-import type { DataArrayTexture } from 'three/webgpu';
+import { Color, FrontSide, MeshStandardNodeMaterial } from 'three/webgpu';
 import type { Node, Texture } from 'three/webgpu';
 
 import { loadPngTexture } from '../core/pngtex.ts';
-import { soldierSurface } from './soldier.ts';
-import type { VariantName } from './soldier.ts';
-import { soldierTextureArray } from './texture-array.ts';
 import { isRecord, isNumber, isStringArray } from './validation.ts';
 
 // Authored silhouette darkening against bright sky: confine it to the grazing
@@ -49,15 +32,14 @@ class SoldierNodeMaterial extends MeshStandardNodeMaterial {
 
   constructor(
     parameters: ConstructorParameters<typeof MeshStandardNodeMaterial>[0] = {},
-    rimScale: number | Node<'float'> = 1
+    rimScale = 1
   ) {
     super(parameters);
     const view = normalize(cameraPosition.sub(positionWorld));
     const facing = abs(dot(view, normalize(normalWorldGeometry)));
     this.rimNode = smoothstep(RIM.edge, 1, float(1).sub(facing))
       .pow(RIM.power)
-      .mul(RIM.strength)
-      .mul(rimScale);
+      .mul(RIM.strength * rimScale);
   }
 
   setupOutput(
@@ -130,7 +112,7 @@ interface SoldierDetail {
   rough: number;
   texture?: Texture;
 }
-export interface SoldierMaterialOptions {
+interface SoldierMaterialOptions {
   tint?: readonly [number, number, number];
   side?: typeof FrontSide;
   rough?: number;
@@ -196,10 +178,6 @@ export class SoldierMaterialsNode {
   declare camoStats: Record<string, CamoStats>;
   declare bakeMs: number;
   declare materials: Map<string, SoldierNodeMaterial>;
-  declare combined: Map<VariantName, SoldierNodeMaterial>;
-  declare layers: Map<string, number>;
-  declare surfaceTables: DataTexture[];
-  declare arrays: Record<'albedo' | 'orm' | 'normal' | 'detail', DataArrayTexture> | null;
 
   static async fromCache({
     base = 'models/proc',
@@ -228,25 +206,7 @@ export class SoldierMaterialsNode {
         details[name] = await load(`ai-detail-${name}`, false);
       })
     );
-    const library = new SoldierMaterialsNode(sets, details, manifest.camoStats ?? {});
-    const names = Object.keys(sets);
-    library.layers = new Map([...names, 'glass'].map((name, i) => [name, i]));
-    const maps = (field: keyof SoldierTextureSet) => [
-      ...names.map((name) => sets[name][field]),
-      null,
-    ];
-    library.arrays = {
-      albedo: soldierTextureArray(maps('albedo'), [255, 255, 255, 255], true, anisotropy),
-      orm: soldierTextureArray(maps('orm'), [255, 255, 0, 255], false, anisotropy),
-      normal: soldierTextureArray(maps('normal'), [128, 128, 255, 255], false, anisotropy),
-      detail: soldierTextureArray(
-        [details.cloth, details.nylon],
-        [128, 128, 255, 128],
-        false,
-        anisotropy
-      ),
-    };
-    return library;
+    return new SoldierMaterialsNode(sets, details, manifest.camoStats ?? {});
   }
 
   constructor(
@@ -259,10 +219,6 @@ export class SoldierMaterialsNode {
     this.camoStats = camoStats;
     this.bakeMs = 0;
     this.materials = new Map();
-    this.combined = new Map();
-    this.layers = new Map();
-    this.surfaceTables = [];
-    this.arrays = null;
   }
 
   get(setName: string, opts: SoldierMaterialOptions = {}): SoldierNodeMaterial {
@@ -303,85 +259,14 @@ export class SoldierMaterialsNode {
     return mat;
   }
 
-  /** One opaque material per variant; every triangle selects its authored finish. */
-  soldier(name: VariantName, slots: readonly string[]): SoldierNodeMaterial {
-    const cached = this.combined.get(name);
-    if (cached) return cached;
-    if (!this.arrays) throw new Error('[ai] soldier texture arrays are not loaded');
-    const colors: Vector4[] = [],
-      base: Vector4[] = [],
-      detail: Vector4[] = [];
-    for (const slot of slots) {
-      const { set, options: o } = soldierSurface(name, slot);
-      const layer = this.layers.get(set);
-      if (layer === undefined) throw new Error(`[ai] missing soldier texture layer ${set}`);
-      colors.push(new Vector4(...(o.tint ?? [1, 1, 1]), layer));
-      base.push(new Vector4(o.rough ?? 1, o.metal ?? 1, o.ao ?? 0.85, o.normalScale ?? 1));
-      detail.push(
-        new Vector4(
-          o.detail?.scale ?? 0,
-          o.detail?.set === 'nylon' ? 1 : 0,
-          o.detail?.normal ?? 0,
-          o.detail?.rough ?? 0
-        )
-      );
-    }
-    const surface = varying(attribute('soldierSurface', 'float')).setInterpolation('flat').toUint();
-    // A tiny immutable lookup texture stays in the native material bindings.
-    // Another shared uniform group would exceed the game's four-group limit.
-    const pixels = new Float32Array(slots.length * 3 * 4);
-    [colors, base, detail].forEach((row, y) =>
-      row.forEach((value, x) => value.toArray(pixels, (y * slots.length + x) * 4))
-    );
-    const table = new DataTexture(pixels, slots.length, 3, RGBAFormat, FloatType);
-    table.needsUpdate = true;
-    this.surfaceTables.push(table);
-    // Resolve finishes at vertices, not with dependent lookups at every pixel.
-    const read = (row: number) =>
-      varying(textureLoad(table, ivec2(surface.toInt(), row))).setInterpolation('flat');
-    const c = read(0),
-      b = read(1),
-      d = read(2);
-    const rim = surface.equal(uint(slots.indexOf('glass'))).select(0.5, 1);
-    const mat = new SoldierNodeMaterial(
-      { vertexColors: true, side: FrontSide, dithering: true },
-      rim
-    );
-    const coords = uv();
-    const sample = (map: DataArrayTexture) => texture(map, coords).depth(c.w);
-    const orm = sample(this.arrays.orm);
-    const micro = texture(this.arrays.detail, coords.mul(d.x)).depth(d.y);
-    mat.colorNode = sample(this.arrays.albedo).rgb.mul(c.rgb);
-    mat.aoNode = float(1).add(orm.r.sub(1).mul(b.z));
-    mat.roughnessNode = clamp(orm.g.mul(b.x).add(micro.a.sub(0.5).mul(d.w)), 0.04, 1);
-    mat.metalnessNode = orm.b.mul(b.y);
-    const n = sample(this.arrays.normal).rgb.mul(2).sub(1);
-    const slope = micro.xy.mul(2).sub(1).mul(d.z);
-    const normal = normalize(vec3(n.xy.mul(b.w).add(slope), n.z));
-    mat.normalNode = normalMap(normal.mul(0.5).add(0.5));
-    mat.name = `ai_${name}`;
-    this.combined.set(name, mat);
-    return mat;
-  }
-
   dispose(): void {
-    for (const mat of this.combined.values()) mat.dispose();
-    for (const array of Object.values(this.arrays ?? {})) array.dispose();
-    this.arrays = null;
-    for (const table of this.surfaceTables) table.dispose();
-    this.surfaceTables.length = 0;
     for (const mat of this.materials.values()) mat.dispose();
     for (const set of Object.values(this.sets)) {
-      for (const texture of [set.albedo, set.orm, set.normal]) {
-        texture.dispose();
-        (texture.image as ImageBitmap | null)?.close?.();
-      }
+      set.albedo.dispose();
+      set.orm.dispose();
+      set.normal.dispose();
     }
-    for (const texture of Object.values(this.details)) {
-      texture.dispose();
-      (texture.image as ImageBitmap | null)?.close?.();
-    }
+    for (const texture of Object.values(this.details)) texture.dispose();
     this.materials.clear();
-    this.combined.clear();
   }
 }

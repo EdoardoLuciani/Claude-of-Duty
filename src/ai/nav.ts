@@ -19,9 +19,9 @@ import {
 } from './nav-format.ts';
 import { TACTICS } from './tuning.ts';
 export { unpackNav } from './nav-format.ts';
-import { NAV_PENDING, NAV_CANCELLED, AttachmentQueries } from './attachment-queries.ts';
+import { NAV_PENDING, NAV_CANCELLED, AttachmentQueries } from './attachment-queries.js';
 import { ladderMoveBudget, type LadderDescriptor, type LadderDirection } from './ladder.ts';
-export { NAV_PENDING, NAV_CANCELLED } from './attachment-queries.ts';
+export { NAV_PENDING, NAV_CANCELLED } from './attachment-queries.js';
 const EXTENTS = Object.freeze({ x: 1.2, y: INFANTRY.stepHeight, z: 1.2 });
 // Cross-map upper-floor routes exhaust 12k nodes; retain a finite cap and
 // the shared two-solves/frame scheduler rather than accepting partial paths.

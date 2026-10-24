@@ -34,6 +34,11 @@ try {
       'blendSrcAlpha: ZeroFactor, blendDstAlpha: OneFactor,',
       'blendSrcAlpha: OneFactor, blendDstAlpha: OneFactor,',
     ],
+    surface: [
+      'src/render/webgpu-pipeline.ts',
+      'channels.surface = vec4(roughness, metalness, 0, 1)',
+      'channels.surface = vec4(materialRoughness, materialMetalness, 0, 1)',
+    ],
     order: [
       'src/render/webgpu-pipeline.ts',
       "prePass.getTextureNode('linearDepth').sample(screenUV).toVar();",
@@ -51,17 +56,19 @@ try {
     ],
   };
   if (args.negative) {
-    assert(args.negative === 'surface' || Object.hasOwn(negatives, args.negative));
-    if (args.negative !== 'surface') {
-      const [file, before, after] = negatives[args.negative];
-      await routeSourceMutation(page, file, before, after);
-    }
+    assert(Object.hasOwn(negatives, args.negative));
+    const [file, before, after] = negatives[args.negative];
+    await routeSourceMutation(page, file, before, after, (body) =>
+      args.negative === 'surface'
+        ? body.replace('metalness, roughness,', 'materialMetalness, materialRoughness,')
+        : body
+    );
   }
   await page.route('**/correctness-fixture', (route) =>
     route.fulfill({ contentType: 'text/html', body: '<canvas></canvas>' })
   );
   await page.goto(`http://127.0.0.1:${port}/correctness-fixture`);
-  const result = await page.evaluate(async (negative) => {
+  const result = await page.evaluate(async () => {
     const {
       THREE: T,
       TSL: N,
@@ -70,9 +77,7 @@ try {
     const { createWorldViewPipeline } = await import('/src/render/webgpu-pipeline.ts');
     const { ParticleLayer, resetSpawn } = await import('/src/fx/particles.ts');
     const { HazeSystem } = await import('/src/fx/haze.ts');
-    const { ReticleMaterials } = await import('/src/weapons/materials-tsl.ts');
-    const { loadAX338 } = await import('/src/weapons/ax338.ts');
-    const { disposeWeaponMaterials } = await import('/src/weapons/asset-material.ts');
+    const { WeaponMaterialsNode } = await import('/src/weapons/materials-tsl.ts');
     const { parallaxUV } = await import('/src/materials/shader-tsl.ts');
     const { packedReadback } = await import('/tools/lib/native-readback.js');
     const check = (ok, message) => {
@@ -134,15 +139,8 @@ try {
         layer.dispose();
         underlay.removeFromParent();
       }
-    const optics = new ReticleMaterials();
-    const weapon = await loadAX338();
-    const lens = [...weapon.materials].find((material) => material.transparent);
-    check(lens, 'authored AX338 lens must exercise ordinary translucent coverage');
-    for (const [mat, alpha] of [
-      [optics.reticle(), 0],
-      [optics.reticleOutline(), 0.8],
-      [lens, lens.opacity],
-    ]) {
+    const optics = new WeaponMaterialsNode({});
+    for (const mat of [optics.reticle(), optics.lensRing(), optics.glass()]) {
       const mesh = new T.Mesh(geometry, mat);
       mesh.position.z = -2;
       view.add(mesh);
@@ -152,15 +150,15 @@ try {
       });
       renderer.setRenderTarget(target);
       graph.render();
-      close((await read(graph.viewPass.renderTarget))[3], alpha, `${mat.name}: optical coverage`);
+      close(
+        (await read(graph.viewPass.renderTarget))[3],
+        mat === optics.glass() ? 0.1 : 0,
+        `${mat.name}: optical coverage`
+      );
       graph.dispose();
       mesh.removeFromParent();
     }
     optics.dispose();
-    disposeWeaponMaterials(weapon);
-    weapon.scene.traverse((node) => {
-      if (node.isMesh) node.geometry.dispose();
-    });
     const surface = new T.MeshStandardNodeMaterial({ roughness: 1, metalness: 1 });
     surface.roughnessNode = N.float(0.15);
     surface.metalnessNode = N.float(0);
@@ -170,24 +168,9 @@ try {
     scene.add(wall);
     const graph = createWorldViewPipeline(renderer, scene, camera, view, camera, {
       gtao: false,
+      ssrEnabled: true,
       bloomStrength: 0,
     });
-    check(
-      Object.keys(graph.prePass.getMRT().outputNodes).sort().join(',') === 'linearDepth,output',
-      'production prepass must not allocate an unused material-surface MRT'
-    );
-    // Keep the evaluated-material oracle as a fixture-owned diagnostic output;
-    // production only needs normals/depth (and velocity when TAA is enabled).
-    graph.prePass.setMRT(
-      N.mrt({
-        ...graph.prePass.getMRT().outputNodes,
-        surface:
-          negative === 'surface'
-            ? N.vec4(N.materialRoughness, N.materialMetalness, 0, 1)
-            : N.vec4(N.roughness, N.metalness, 0, 1),
-      })
-    );
-    graph.prePass.getTextureNode('surface');
     const mapped = new T.DataTexture(new Uint8Array([255, 128, 64, 255]), 1, 1);
     mapped.needsUpdate = true;
     const surfaces = [];
@@ -322,7 +305,7 @@ try {
     target.dispose();
     await renderer.dispose();
     return { coverage, surfaces, depth, parallax, readbacks };
-  }, args.negative);
+  });
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`);
   await waitForGame(page, { timeout: 180000 });
   result.shadows = await page.evaluate(async () => {

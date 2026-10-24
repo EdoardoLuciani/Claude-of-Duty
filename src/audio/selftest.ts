@@ -4,7 +4,7 @@
  * Renders every voice through the real mixer graph in an OfflineAudioContext
  * and measures what came out. This is how the audio subsystem is verified:
  * screenshots prove nothing about sound, and OfflineAudioContext needs no user
- * gesture, so recordings and remaining synthesis can run headlessly.
+ * gesture, so the whole synthesis path can be exercised headlessly.
  *
  * For each case we report:
  *   peak     absolute sample peak — >= 1.0 means the limiter failed
@@ -14,22 +14,27 @@
  *   centroid rough spectral centre of mass in Hz (via zero-crossing rate),
  *            enough to prove a "distant" shot is darker than a near one
  *
- * Usage from a served page:
+ * Usage from a page (see probe.mjs):
  *   const { runAudioSelfTest } = await import('/src/audio/selftest.ts');
  *   const report = await runAudioSelfTest();
  */
 
-import type { ReloadPhase } from '../core/events.ts';
 import { Rng } from '../core/rng.ts';
-import { AIRCRAFT_MIX } from './aircraft.ts';
-import { ONE_SHOTS } from './ambience.ts';
+import { ambientOneShot, ONE_SHOTS } from './ambience.ts';
 import { NoiseBank } from './dsp.ts';
-import { shellCasing, explosion, uiSound, heartbeat } from './foley.ts';
+import {
+  surfaceImpact,
+  footstep,
+  shellCasing,
+  reloadPhase,
+  explosion,
+  bodyFall,
+  uiSound,
+  heartbeat,
+  cloth,
+} from './foley.ts';
 import { IR_SPECS, generateIR, classifySpace } from './ir.ts';
 import { Mixer } from './mixer.ts';
-import { radioCue } from './radio.ts';
-import { RELOAD_CUES, reloadKind, type ReloadKind } from './reloads.ts';
-import { WeaponSampleBank } from './samples.ts';
 import { bark, BARKS } from './vox.ts';
 import { WEAPON_PROFILES, weaponShot, weaponPunch, bulletWhizz, dryFire } from './weapons.ts';
 
@@ -56,7 +61,6 @@ interface AudioFixture {
   rng: Rng;
   bank: NoiseBank;
   mixer: Mixer;
-  samples: WeaponSampleBank;
   t: number;
 }
 interface AudioVoice {
@@ -101,11 +105,9 @@ function measure(buf: AudioBuffer): AudioMetrics {
   // Zero crossing rate -> a crude but stable spectral centre indicator.
   const centroid = (crossings / (n / SR)) * 0.5;
   return {
-    // Thresholds below must use measured values, not display rounding. In
-    // particular 0.000024 rounds to the 0.00002 silence floor and falsely fails.
-    peak,
-    rms,
-    dc: sum / total,
+    peak: +peak.toFixed(4),
+    rms: +rms.toFixed(5),
+    dc: +(sum / total).toFixed(5),
     nan,
     centroid: Math.round(centroid),
   };
@@ -116,35 +118,17 @@ async function renderCase(
   seconds: number,
   seed: number,
   fn: (fixture: AudioFixture) => void | Promise<void>,
-  loadedSamples: WeaponSampleBank,
   opts: RenderOptions = {}
 ): Promise<AudioMetrics> {
   const ctx = new OfflineAudioContext(2, Math.ceil(SR * seconds), SR);
   const rng = new Rng(seed);
   const bank = new NoiseBank(ctx, rng.fork(), 1.2);
-  await Mixer.prepare(ctx);
   const mixer = new Mixer(ctx, rng.fork(), {});
-  const samples = new WeaponSampleBank(ctx);
-  // AudioBuffers may be shared across same-rate contexts, but selection state
-  // and arrays belong to this render so disposing it cannot empty the cache.
-  samples.hitBuffers = Object.fromEntries(
-    Object.entries(loadedSamples.hitBuffers).map(([kind, buffers]) => [kind, buffers!.slice()])
-  );
-  samples.reloadBuffers = Object.fromEntries(
-    Object.entries(loadedSamples.reloadBuffers).map(([kind, buffers]) => [kind, buffers!.slice()])
-  );
-  samples.heartbeatBuffer = loadedSamples.heartbeatBuffer;
-  samples.aircraftBuffers = loadedSamples.aircraftBuffers.slice();
-  try {
-    if (opts.reverb !== false) mixer.buildReverbs();
-    if (opts.space) mixer.setSpace(opts.space, 0.001);
-    await fn({ ctx, rng, bank, mixer, samples, t: 0.02 });
-    return measure(await ctx.startRendering());
-  } finally {
-    samples.dispose();
-    mixer.dispose();
-    bank.dispose();
-  }
+  if (opts.reverb !== false) mixer.buildReverbs();
+  if (opts.space) mixer.setSpace(opts.space, 0.001);
+  await fn({ ctx, rng, bank, mixer, t: 0.02 });
+  const buf = await ctx.startRendering();
+  return measure(buf);
 }
 
 /** Connect a voice to a bus and its reverb send, the way the live system does. */
@@ -154,37 +138,12 @@ function route(mixer: Mixer, voice: AudioVoice, busName = 'weapons', sendScale =
     const g = mixer.actx.createGain();
     g.gain.value = voice.send! * sendScale;
     voice.node.connect(g);
-    g.connect(mixer.sendBus(busName));
+    g.connect(mixer.reverbSend);
   }
   return voice;
 }
 
 export async function runAudioSelfTest(opts: { verbose?: boolean } = {}) {
-  const samples = new WeaponSampleBank(new OfflineAudioContext(2, 1, SR));
-  try {
-    try {
-      // Required recordings decode once for the run, never once per case.
-      await samples.load();
-    } catch (err) {
-      const failure = {
-        name: 'samples:load',
-        error: err instanceof Error ? err.message : String(err),
-      };
-      return {
-        ok: false,
-        cases: 1,
-        failures: [failure],
-        results: opts.verbose === false ? undefined : [failure],
-        spaces: {},
-      };
-    }
-    return await runCases(samples, opts);
-  } finally {
-    samples.dispose();
-  }
-}
-
-async function runCases(loadedSamples: WeaponSampleBank, opts: { verbose?: boolean }) {
   const results: SelfTestResult[] = [];
   const push = async (
     name: string,
@@ -194,7 +153,7 @@ async function runCases(loadedSamples: WeaponSampleBank, opts: { verbose?: boole
   ): Promise<void> => {
     const t0 = performance.now();
     try {
-      const m = await renderCase(seconds, 0xa0d10 + results.length * 7919, fn, loadedSamples, o);
+      const m = await renderCase(seconds, 0xa0d10 + results.length * 7919, fn, o);
       results.push({ name, ms: Math.round(performance.now() - t0), ...m });
     } catch (err) {
       results.push({ name, error: err instanceof Error ? err.message : String(err) });
@@ -295,20 +254,24 @@ async function runCases(loadedSamples: WeaponSampleBank, opts: { verbose?: boole
     'plaster',
   ] as const;
   for (const s of surfaces) {
-    await push(`impact:${s}`, 2.2, ({ samples, rng, mixer, t }) => {
-      const voice =
-        s === 'flesh'
-          ? samples.hit('flesh', rng, { when: t, level: 1 })
-          : samples.impact(rng, { when: t, surface: s, level: 1 });
-      route(mixer, voice, 'foley');
+    await push(`impact:${s}`, 2.2, ({ bank, rng, mixer, t }) => {
+      route(
+        mixer,
+        surfaceImpact(mixer.actx, bank, rng, { when: t, surface: s, energy: 1 }),
+        'foley'
+      );
     });
-    await push(`step:${s}`, 2.2, ({ samples, rng, mixer, t }) => {
-      route(mixer, samples.step(rng, { when: t, surface: s, gait: 'run' }), 'foley');
+    await push(`step:${s}`, 2.2, ({ bank, rng, mixer, t }) => {
+      route(mixer, footstep(mixer.actx, bank, rng, { when: t, surface: s, gait: 'run' }), 'foley');
     });
   }
   for (const gait of ['walk', 'run', 'sprint', 'crouch', 'land'] as const) {
-    await push(`step:concrete:${gait}`, 2.2, ({ samples, rng, mixer, t }) => {
-      route(mixer, samples.step(rng, { when: t, surface: 'concrete', gait }), 'foley');
+    await push(`step:concrete:${gait}`, 2.2, ({ bank, rng, mixer, t }) => {
+      route(
+        mixer,
+        footstep(mixer.actx, bank, rng, { when: t, surface: 'concrete', gait }),
+        'foley'
+      );
     });
   }
   await push('shell:concrete', 3, ({ bank, rng, mixer, t }) => {
@@ -317,20 +280,10 @@ async function runCases(loadedSamples: WeaponSampleBank, opts: { verbose?: boole
   await push('shell:dirt', 3, ({ bank, rng, mixer, t }) => {
     route(mixer, shellCasing(mixer.actx, bank, rng, { when: t, surface: 'dirt' }), 'foley');
   });
-  const reloadCases: Record<string, Partial<Record<ReloadPhase, ReloadKind>>> = {
-    ...RELOAD_CUES,
-    movement: { start: 'gear' },
-  };
-  const testedReloads = new Set<ReloadKind>();
-  for (const [weapon, cues] of Object.entries(reloadCases)) {
-    for (const phase of Object.keys(cues) as ReloadPhase[]) {
-      const kind = reloadKind(weapon, phase)!;
-      if (testedReloads.has(kind)) continue;
-      testedReloads.add(kind);
-      await push(`reload:${kind}`, 2.5, ({ samples, rng, mixer, t }) => {
-        route(mixer, samples.reload(weapon, phase, rng, { when: t }), 'foley');
-      });
-    }
+  for (const phase of ['start', 'magout', 'magin', 'end'] as const) {
+    await push(`reload:${phase}`, 2.5, ({ bank, rng, mixer, t }) => {
+      route(mixer, reloadPhase(mixer.actx, bank, rng, phase, { when: t }), 'foley');
+    });
   }
   await push('explosion@5m', 6, ({ bank, rng, mixer, t }) => {
     route(mixer, explosion(mixer.actx, bank, rng, { when: t, distance: 5, radius: 8 }));
@@ -338,11 +291,11 @@ async function runCases(loadedSamples: WeaponSampleBank, opts: { verbose?: boole
   await push('explosion@180m', 7, ({ bank, rng, mixer, t }) => {
     route(mixer, explosion(mixer.actx, bank, rng, { when: t, distance: 180, radius: 12 }));
   });
-  await push('bodyfall', 2, ({ samples, rng, mixer, t }) => {
-    route(mixer, samples.fall(rng, { when: t }), 'foley');
+  await push('bodyfall', 2, ({ bank, rng, mixer, t }) => {
+    route(mixer, bodyFall(mixer.actx, bank, rng, { when: t }), 'foley');
   });
-  await push('cloth', 1.5, ({ samples, rng, mixer, t }) => {
-    route(mixer, samples.cloth(rng, { when: t }), 'foley');
+  await push('cloth', 1.5, ({ bank, rng, mixer, t }) => {
+    route(mixer, cloth(mixer.actx, bank, rng, { when: t }), 'foley');
   });
   await push('whizz', 1.2, ({ bank, rng, mixer, t }) => {
     route(mixer, bulletWhizz(mixer.actx, bank, rng, { when: t, miss: 1.2 }), 'foley');
@@ -350,36 +303,24 @@ async function runCases(loadedSamples: WeaponSampleBank, opts: { verbose?: boole
   await push('dryfire', 1, ({ bank, rng, mixer, t }) => {
     route(mixer, dryFire(mixer.actx, bank, rng, { when: t }), 'weapons');
   });
-  await push('heartbeat', 1.5, ({ samples, mixer, t }) => {
-    route(
-      mixer,
-      heartbeat(mixer.actx, { when: t, level: 0.74, buffer: samples.heartbeatBuffer! }),
-      'ui'
-    );
+  await push('heartbeat', 1.5, async ({ mixer, t }) => {
+    const file = await fetch(new URL('./samples/heartbeat.wav', import.meta.url));
+    if (!file.ok) throw new Error(`heartbeat sample: ${file.status}`);
+    const buffer = await mixer.actx.decodeAudioData(await file.arrayBuffer());
+    route(mixer, heartbeat(mixer.actx, { when: t, level: 0.74, buffer }), 'ui');
   });
   for (const k of ['hitmarker', 'headshot', 'kill', 'damage', 'lowhealth']) {
     await push(
       `ui:${k}`,
       1.5,
-      ({ bank, samples, rng, mixer, t }) => {
-        const voice =
-          k === 'damage'
-            ? samples.damage(rng, { when: t, amount: 25, armourAbsorbed: 0, plateBreak: false })
-            : uiSound(mixer.actx, bank, rng, k, { when: t });
-        route(mixer, voice, 'ui');
+      ({ bank, rng, mixer, t }) => {
+        route(mixer, uiSound(mixer.actx, bank, rng, k, { when: t }), 'ui');
       },
       { reverb: false }
     );
   }
 
   /* ---- voice ----------------------------------------------------- */
-  for (const voice of [0, 1]) {
-    for (const kind of ['hurt', 'death'] as const) {
-      await push(`reaction:${voice}:${kind}`, 2, ({ samples, rng, mixer, t }) => {
-        route(mixer, samples.reaction(kind, voice, rng, { when: t }), 'voice');
-      });
-    }
-  }
   for (const key of Object.keys(BARKS)) {
     await push(`bark:${key}`, 3, ({ bank, rng, mixer, t }) => {
       route(mixer, bark(mixer.actx, bank, rng, { when: t, bark: key }), 'voice');
@@ -391,8 +332,8 @@ async function runCases(loadedSamples: WeaponSampleBank, opts: { verbose?: boole
 
   /* ---- ambient one-shots ---------------------------------------- */
   for (const k of ONE_SHOTS) {
-    await push(`ambient:${k}`, 14, ({ samples, rng, mixer, t }) => {
-      route(mixer, samples.environment(k, rng, { when: t }), 'ambience');
+    await push(`ambient:${k}`, 14, ({ bank, rng, mixer, t }) => {
+      route(mixer, ambientOneShot(mixer.actx, bank, rng, k, { when: t }), 'ambience');
     });
   }
 
@@ -439,48 +380,6 @@ async function runCases(loadedSamples: WeaponSampleBank, opts: { verbose?: boole
       );
     }
   });
-
-  // Append new recorded states so existing isolated synthesis cases keep seeds.
-  for (const [name, amount, armourAbsorbed, plateBreak] of [
-    ['armour-only', 0, 25, false],
-    ['mixed', 15, 15, false],
-    ['break-mixed', 15, 15, true],
-    ['break-armour-only', 0, 25, true],
-  ] as const) {
-    await push(
-      `damage:${name}`,
-      1.5,
-      ({ samples, rng, mixer, t }) => {
-        route(mixer, samples.damage(rng, { when: t, amount, armourAbsorbed, plateBreak }), 'ui');
-      },
-      { reverb: false }
-    );
-  }
-
-  // Finite source audition; tracked movement/loop shutdown is covered by the
-  // native bomber integration test rather than leaving an infinite test source.
-  await push('aircraft:source', 5, ({ ctx, samples, rng, mixer, t }) => {
-    const source = ctx.createBufferSource();
-    source.buffer = samples.nextAircraft(rng);
-    source.start(t);
-    route(mixer, { node: source, send: AIRCRAFT_MIX.send }, 'ambience');
-  });
-
-  // Append new cues without changing existing isolated-case seeds.
-  for (const kind of ['radio_open', 'radio_strike', 'intel_call'] as const) {
-    await push(
-      `radio:${kind}`,
-      2,
-      ({ samples, bank, rng, mixer, t }) => {
-        route(
-          mixer,
-          radioCue(mixer.actx, bank, rng, kind, samples.radio(kind, rng, { when: t }), t),
-          'ui'
-        );
-      },
-      { reverb: false }
-    );
-  }
 
   /* ---- space classifier (pure function, no audio) ---------------- */
   const spaces: Record<string, ReturnType<typeof classifySpace>> = {};

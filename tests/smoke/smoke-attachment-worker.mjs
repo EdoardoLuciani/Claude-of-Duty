@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
 
-import { AttachmentQueries, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.ts';
+import { AttachmentQueries, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.js';
 import { canStand, checkAttachment } from '../../src/ai/attachment.js';
 import { CoverMap, SurfaceNav } from '../../src/ai/nav.ts';
 import { StaticWorld } from '../../src/physics/bvh.ts';
@@ -180,7 +180,7 @@ points[1].claimed = 2;
 assert.equal(pick(), null, 'current claims are reevaluated, not returned from a worker snapshot');
 service.clear();
 assert.equal(service.scopes.size, 0);
-worker.onmessage({ data: { type: 'result', id: 999, value: 'false', ms: 0, moves: 0 } });
+service.receive({ type: 'result', id: 999, value: 'false', ms: 0, moves: 0 });
 assert.throws(() => run(), /malformed/);
 service.dispose();
 assert(worker.terminated);

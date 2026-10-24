@@ -8,6 +8,7 @@ import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 for (const body of [null, undefined]) {
   const vm = Object.create(Viewmodel.prototype);
   vm.rig = new Object3D();
+  vm.mats = {};
   assert.throws(() => vm.addWeapon({ id: 'broken', body }, {}), /broken: missing authored weapon/);
   assert.equal(vm.rig.children.length, 0);
 }

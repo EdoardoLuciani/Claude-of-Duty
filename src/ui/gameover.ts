@@ -65,11 +65,6 @@ export class GameOverScreen {
   hide(): void {
     this.active = false;
     this.elapsed = 0;
-    // Start owns the next frame and suspends normal HUD updates. Do not leave
-    // the previous run's summary visible behind its modal while awaiting input.
-    this.shown = 0;
-    setStyle(this.root, 'display', 'none');
-    setStyle(this.root, 'pointer-events', 'none');
   }
 
   restart(): void {

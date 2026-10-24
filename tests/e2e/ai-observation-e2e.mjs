@@ -82,7 +82,7 @@ try {
         Math.atan2(feet.x - from.x, feet.z - from.z)
       );
       if (scenario === 'arch') p.movement.stanceWant = 'crouch';
-      p.health.setDebugValue(10000);
+      p.health.value = 10000;
       p.health.armour = 0;
       await window.__PUMP__(30);
       const yaw =

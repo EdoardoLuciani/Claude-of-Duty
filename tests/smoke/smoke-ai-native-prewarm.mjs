@@ -26,7 +26,7 @@ const render = {
     assert.equal(skins.length, Object.keys(VARIANTS).length);
     for (const mesh of skins) {
       assert.equal(mesh.geometry, geometry, 'borrow actual model geometry');
-      assert.equal(mesh.material, material, 'one material draws all surface groups');
+      assert.equal(mesh.material[0], material);
       assert(mesh.castShadow && mesh.receiveShadow, 'compile actual receiving/casting variants');
       assert.equal(mesh.frustumCulled, false);
     }
@@ -36,7 +36,7 @@ const render = {
 const ai = Object.assign(Object.create(AiSystem.prototype), {
   ctx: { scene, camera: new THREE.PerspectiveCamera(), peek: () => render },
   materials: { get: () => material, glass: () => material },
-  variant: () => ({ geometry, material }),
+  variant: () => ({ geometry, materials: [material] }),
   rng: { fork: () => assert.fail('warmup must not create an Agent or consume RNG') },
 });
 const early = await ai.prewarmMaterials();

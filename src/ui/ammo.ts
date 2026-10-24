@@ -105,7 +105,6 @@ export class AmmoPanel {
   declare _lastPips: number;
   declare _lastCount: number;
   declare _lastName: string | null;
-  declare _lastMode: string | null;
   constructor(parent: HTMLElement) {
     this.root = el('div', 'ow-ammo', parent);
 
@@ -143,7 +142,6 @@ export class AmmoPanel {
     this._lastPips = -1;
     this._lastCount = -1;
     this._lastName = null;
-    this._lastMode = null;
     setStyle(this.reload, 'display', 'none');
     setStyle(this.reloadBar, 'display', 'none');
   }
@@ -163,13 +161,7 @@ export class AmmoPanel {
     }
     setText(this.res, Math.max(0, s.reserve | 0));
     this._fitName(String(s.weaponName ?? s.name ?? 'M4A1'));
-    // The badge reads AUTO / BURST / SEMI; uppercase once per mode change
-    // rather than once per frame.
-    const mode = s.fireMode ?? 'AUTO';
-    if (mode !== this._lastMode) {
-      this._lastMode = mode;
-      setText(this.mode, mode.toUpperCase());
-    }
+    setText(this.mode, s.fireMode ?? 'AUTO');
 
     this.punch = Math.max(0, this.punch - dt * 6.5);
     const p = 1 - 0.075 * ease.outQuad(this.punch);

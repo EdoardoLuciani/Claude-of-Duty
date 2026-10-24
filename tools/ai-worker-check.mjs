@@ -177,7 +177,7 @@ try {
         builders = window.__NATIVE_BUILDS__ - before;
       const { StaticWorld } = await import('/src/physics/bvh.ts');
       const { CharacterController } = await import('/src/physics/character.ts');
-      const { AttachmentQueries, NAV_PENDING } = await import('/src/ai/attachment-queries.ts');
+      const { AttachmentQueries, NAV_PENDING } = await import('/src/ai/attachment-queries.js');
       const { canStand, checkAttachment } = await import('/src/ai/attachment.js');
       const vector = () => engine.ctx.get('ai').agents[0].position.clone();
       const world = new StaticWorld();

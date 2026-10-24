@@ -84,6 +84,7 @@ export class Movement {
   declare grounded: boolean;
   declare wasGrounded: boolean;
   declare airTime: number;
+  declare groundTime: number;
   declare speed: number;
   declare horizontalSpeed: number;
   declare blocked: boolean;
@@ -92,6 +93,7 @@ export class Movement {
   declare yawRate: number;
   declare adsAmount: number;
   declare controlEnabled: boolean;
+  declare leanInput: number;
   declare leanAmount: number;
   declare leanAllowed: number;
   declare leanOffsetX: number;
@@ -111,6 +113,7 @@ export class Movement {
   declare _climbCooldown: number;
   declare _ledgeProbeTimer: number;
   declare _stepDistance: number;
+  declare _bobDistance: number;
   declare _bobPhase: number;
   declare _footLeft: boolean;
   declare _footHold: number;
@@ -165,6 +168,7 @@ export class Movement {
     this.grounded = true;
     this.wasGrounded = true;
     this.airTime = 0;
+    this.groundTime = 0;
     this.speed = 0;
     this.horizontalSpeed = 0;
     this.blocked = false;
@@ -180,6 +184,7 @@ export class Movement {
     this.controlEnabled = true;
 
     // ---- lean ----------------------------------------------------------
+    this.leanInput = 0;
     this.leanAmount = 0;
     this.leanAllowed = 0;
     this.leanOffsetX = 0;
@@ -201,6 +206,7 @@ export class Movement {
     this._climbCooldown = 0;
     this._ledgeProbeTimer = 0;
     this._stepDistance = 0;
+    this._bobDistance = 0;
     this._bobPhase = 0;
     this._footLeft = false;
     this._footHold = 0;
@@ -511,10 +517,12 @@ export class Movement {
     this._leanProbeTimer = Math.max(0, this._leanProbeTimer - h);
     if (this.grounded) {
       this._coyote = MOVE.coyoteTime;
+      this.groundTime += h;
       this.airTime = 0;
     } else {
       this._coyote = Math.max(0, this._coyote - h);
       this.airTime += h;
+      this.groundTime = 0;
     }
   }
 
@@ -1085,6 +1093,7 @@ export class Movement {
   _updateLean(h: number, cmd: MovementInput): void {
     let want = (cmd.leanR ? 1 : 0) - (cmd.leanL ? 1 : 0);
     if (this.sprinting || this.sliding || !this.grounded || this.stance === 'prone') want = 0;
+    this.leanInput = want;
 
     // Validate against the world at ~30 Hz — the camera must never poke through
     // a wall, so we shorten the lean until the probe capsule is clear.
@@ -1145,6 +1154,7 @@ export class Movement {
     const moved = Math.hypot(dx, dz);
     if (this.grounded && !this.sliding) {
       this._stepDistance += moved;
+      this._bobDistance += moved;
       const stride = STANCE[this.stance].strideLength * (this.sprinting ? 1.28 : 1);
       // One footfall = pi of bob phase, so the camera's horizontal extreme and
       // the footstep event are the same event by construction.
@@ -1155,8 +1165,9 @@ export class Movement {
         this._footLeft = !this._footLeft;
         this._emitFootstep();
       }
-    } else if (!this.grounded) {
-      this._stepDistance = STANCE[this.stance].strideLength * 0.55;
+    } else {
+      this._bobDistance += moved * 0.25;
+      if (!this.grounded) this._stepDistance = STANCE[this.stance].strideLength * 0.55;
     }
   }
 
@@ -1263,12 +1274,17 @@ export class Movement {
     this.leanAmount = 0;
     this.leanOffsetX = this.leanOffsetZ = 0;
     this._stepDistance = 0;
+    this._bobDistance = 0;
     this._bobPhase = 0;
     this._footHold = 0;
     this._jumpBuffer = 0;
     this.landEvent.pending = false;
     this.stepEvent.pending = false;
     this._setState('stand');
+  }
+
+  get bobDistance() {
+    return this._bobDistance;
   }
 
   /** Radians of gait phase; pi per footfall. Drives the camera's figure-eight. */

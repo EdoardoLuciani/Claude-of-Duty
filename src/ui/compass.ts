@@ -42,6 +42,7 @@ export class Compass {
   declare objPool: Pool;
   declare pingPool: Pool;
   declare k: number;
+  declare _heading: number;
   constructor(parent: HTMLElement) {
     this.root = el('div', 'ow-compass', parent);
     this.strip = el('div', 'ow-compass-strip', this.root);
@@ -63,6 +64,7 @@ export class Compass {
     this.pingPool = new Pool(8, () => el('div', 'ow-compass-ping'), this.root);
 
     this.k = 1;
+    this._heading = 0;
   }
 
   /** Short-lived bearing tick for a heard sprint. */
@@ -81,6 +83,7 @@ export class Compass {
     this.k = this.k || 1;
     const k = this.k;
     const h = ((heading % 360) + 360) % 360;
+    this._heading = h;
     const x = STRIP_W * 0.5 * k - (h + 360) * PPD * k;
     setStyle(this.strip, 'transform', `translateX(${x.toFixed(2)}px)`);
 

@@ -1,35 +1,51 @@
 import assert from 'node:assert/strict';
 
-import { ReticleMaterials } from '../../src/weapons/materials-tsl.ts';
+import { MeshStandardNodeMaterial } from 'three/webgpu';
 
-const materials = new ReticleMaterials();
-const reticle = materials.reticle();
-const outline = materials.reticleOutline();
-assert.equal(materials.reticle(), reticle, 'retain additive reticle cache identity');
-assert.equal(materials.reticleOutline(), outline, 'retain keyline cache identity');
-const variants = [
-  reticle,
-  outline,
-  materials.reticle(0xff1206, 0.95),
-  materials.reticle(0xff1206, 0.475),
-  materials.reticleOutline(0.85),
-];
-assert.equal(
-  new Set(variants).size,
-  variants.length,
-  'appearance parameters distinguish materials'
-);
-const disposals = new Map(variants.map((material) => [material, 0]));
-for (const material of variants) {
-  assert.equal(material.isNodeMaterial, true);
-  material.addEventListener('dispose', () => disposals.set(material, disposals.get(material) + 1));
+import { WeaponMaterialsNode } from '../../src/weapons/materials-tsl.ts';
+import { WEAPON_MATERIALS } from '../../src/weapons/materials.ts';
+
+const borrowed = new MeshStandardNodeMaterial();
+let calls = 0,
+  borrowedDisposals = 0;
+borrowed.addEventListener('dispose', () => borrowedDisposals++);
+const materials = new WeaponMaterialsNode({
+  get(name, options) {
+    calls++;
+    assert.equal(name, WEAPON_MATERIALS.steel[0]);
+    assert.equal(options, WEAPON_MATERIALS.steel[1]);
+    return borrowed;
+  },
+});
+assert.equal(materials.get('steel'), borrowed);
+assert.equal(materials.get('steel'), borrowed);
+assert.equal(calls, 1, 'cache borrowed recipes without recreating their materials');
+const owned = [];
+for (const method of [
+  'cavity',
+  'opticTube',
+  'glass',
+  'lensRing',
+  'lensVignette',
+  'reticleOutline',
+  'reticle',
+]) {
+  const mat = materials[method]();
+  assert.equal(materials[method](), mat, `${method} must retain cache identity`);
+  assert.equal(mat.isNodeMaterial, true);
+  owned.push(mat);
 }
+assert.equal(materials.rimRamp(), materials.rimTexture);
+owned.push(materials.rimTexture);
+const disposals = new Map(owned.map((resource) => [resource, 0]));
+for (const resource of owned)
+  resource.addEventListener('dispose', () => disposals.set(resource, disposals.get(resource) + 1));
 materials.dispose();
-materials.dispose();
+assert.equal(borrowedDisposals, 0, 'weapon resolver must not dispose library-owned materials');
 assert(
   [...disposals.values()].every((count) => count === 1),
-  'dispose each owned reticle once'
+  'dispose all owned optics and the shared ramp once'
 );
-assert.notEqual(materials.reticle(), reticle, 'disposal clears the cache');
-materials.dispose();
-console.log('reticle variants, cache identity and idempotent ownership cleanup preserved');
+assert.equal(materials.cache.size, 0);
+borrowed.dispose();
+console.log('native weapon recipes, cache identity and material/texture ownership preserved');

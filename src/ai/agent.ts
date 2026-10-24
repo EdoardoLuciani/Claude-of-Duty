@@ -30,7 +30,7 @@ import { makeHitRecord } from '../physics/math.ts';
 import { MASK } from '../physics/surfaces.ts';
 import { GRENADE_FUSE, GRENADE_RADIUS } from '../weapons/index.ts';
 import { Animator } from './animator.ts';
-import { NAV_PENDING, NAV_CANCELLED } from './attachment-queries.ts';
+import { NAV_PENDING, NAV_CANCELLED } from './attachment-queries.js';
 import { LADDER_QUERY_MAX_ITERATIONS } from './attachment-types.ts';
 import { INFANTRY, vaultPoint } from './capabilities.ts';
 import type { AiSystem } from './index.ts';
@@ -196,6 +196,7 @@ export class Agent {
   declare skeleton: THREE.Skeleton;
   declare mesh: THREE.SkinnedMesh;
   declare group: THREE.Group;
+  declare skinnedMesh: THREE.SkinnedMesh;
   declare mass: number;
   declare position: THREE.Vector3;
   declare yaw: number;
@@ -259,6 +260,7 @@ export class Agent {
   declare spread: number;
   declare weaponDamage: number;
   declare aimTarget: THREE.Vector3;
+  declare aimActual: THREE.Vector3;
   declare aimWeight: number;
   declare wantFire: boolean;
   declare peeking: boolean;
@@ -387,7 +389,7 @@ export class Agent {
     const { bones, skeleton, root } = RIG.createSkeleton();
     this.bones = bones;
     this.skeleton = skeleton;
-    this.mesh = new THREE.SkinnedMesh(def.geometry, def.material);
+    this.mesh = new THREE.SkinnedMesh(def.geometry, def.materials);
     this.mesh.castShadow = true;
     this.mesh.receiveShadow = true;
     this.mesh.frustumCulled = true;
@@ -401,6 +403,7 @@ export class Agent {
     ai.root.add(this.group);
 
     /** Physics looks for these when it adopts the skeleton on death. */
+    this.skinnedMesh = this.mesh;
     this.mass = 82 * this.scale;
 
     this.position = new THREE.Vector3().copy(opts.position ?? new THREE.Vector3());
@@ -528,6 +531,7 @@ export class Agent {
     this.spread = COMBAT.spread;
     this.weaponDamage = COMBAT.damage;
     this.aimTarget = new THREE.Vector3();
+    this.aimActual = new THREE.Vector3();
     this.aimWeight = 0;
     this.wantFire = false;
     this.peeking = false;

@@ -6,8 +6,8 @@ import { FONT_STACK, FONT_DISPLAY, FONT_MONO } from './util.ts';
  * Design system
  * -------------
  *  scale     every dimension is `calc(N * var(--k))` where --k is set from the
- *            fitted 1920x1080 reference size. Both viewport axes constrain
- *            this uniform scale, preserving proportions in narrow windows.
+ *            viewport height (1080p == 1.0). The HUD therefore holds its
+ *            proportions from 720p to 4K without re-authoring.
  *  spacing   4px grid: --u. Screen margins are 6u (24px @1080p), the same
  *            margin CoD uses (~2.2% of height).
  *  type      one condensed system stack, uppercase, tabular figures, three
@@ -93,11 +93,6 @@ const CSS = `
   text-shadow: var(--sh);
 }
 .ow-layer { position:absolute; inset:0; }
-.ow-fps {
-  position:absolute; top:4px; right:var(--pad);
-  font:600 max(10px, calc(12px * var(--k))) var(--fm);
-  text-shadow:var(--sh);
-}
 
 /* ============================================================== crosshair */
 .ow-cross { position:absolute; left:50%; top:50%; width:0; height:0; }
@@ -147,18 +142,21 @@ const CSS = `
   position:absolute; inset:0;
   background:
     radial-gradient(ellipse 78% 74% at 50% 50%, rgba(0,0,0,0) 62%, rgba(122,14,10,.55) 86%, rgba(74,8,5,.85) 100%);
+  filter: url(#ow-warp);
 }
 .ow-blood-b {
-  position:absolute; inset:0; opacity:.5;
+  position:absolute; inset:0; opacity:.5; mix-blend-mode:multiply;
   background:
     radial-gradient(circle at 2% 22%,  rgba(96,10,8,.75) 0, rgba(96,10,8,0) 17%),
     radial-gradient(circle at 99% 58%, rgba(96,10,8,.7) 0, rgba(96,10,8,0) 15%),
     radial-gradient(circle at 26% 101%,rgba(88,10,8,.75) 0, rgba(88,10,8,0) 19%),
     radial-gradient(circle at 74% -2%, rgba(88,10,8,.7) 0, rgba(88,10,8,0) 18%);
+  filter: url(#ow-warp);
 }
+.ow-desat { position:absolute; inset:0; backdrop-filter: saturate(.6) contrast(1.04) brightness(.97); }
 .ow-hitflash { position:absolute; inset:0;
   background: radial-gradient(ellipse 90% 86% at 50% 50%, rgba(150,16,10,.22) 40%, rgba(160,18,12,.62) 100%);
-}
+  mix-blend-mode:screen; }
 .ow-lowbeat {
   position:absolute; inset:0;
   background: radial-gradient(ellipse 76% 70% at 50% 50%, rgba(0,0,0,0) 64%, rgba(150,14,10,.34) 100%);
@@ -336,7 +334,7 @@ const CSS = `
 
 /* ============================================================== killfeed */
 .ow-killfeed {
-  position:absolute; right:var(--pad); top:max(24px, calc(var(--pad) + var(--u) * 2));
+  position:absolute; right:var(--pad); top:calc(var(--pad) + var(--u) * 2);
   display:flex; flex-direction:column; align-items:flex-end;
   gap: calc(var(--u) * 1.1);
 }
@@ -621,7 +619,7 @@ const CSS = `
 .ow-menu-layout {
   display:grid; grid-template-columns: minmax(400px, calc(430px * var(--k))) minmax(0, 1fr);
   gap: max(28px, calc(40px * var(--k)));
-  width: min(max(1520px, calc(1520px * var(--k))), 100%);
+  width: min(calc(1520px * var(--k)), 100%);
   padding:24px; margin:auto; flex-shrink:0;
 }
 .ow-menu-inner {
@@ -709,19 +707,17 @@ const CSS = `
   text-transform:none; letter-spacing:.02em;
 }
 .ow-controls h2 { font-family:var(--fd); font-size:max(24px, calc(28px * var(--k))); letter-spacing:.16em; }
-.ow-controls-note { font-size:max(14px, calc(14px * var(--k))); line-height:1.5; color:#bdcbd3; margin-top:12px; }
-.ow-controls-groups { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:20px 28px; margin:16px 0; }
+.ow-controls-note { font-size:max(13px, calc(13px * var(--k))); line-height:1.5; color:#bdcbd3; margin-top:12px; }
+.ow-controls-groups { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:24px; margin:20px 0; }
 .ow-controls h3 { font-size:max(14px, calc(14px * var(--k))); color:var(--amber); margin-bottom:8px; }
 .ow-control {
-  display:grid; grid-template-columns:minmax(0, .65fr) minmax(0, 1fr); gap:12px;
-  padding:6px 0; border-top:1px solid var(--hair-2);
+  display:grid; grid-template-columns:minmax(0, .4fr) minmax(0, 1fr); gap:12px;
+  padding:8px 0; border-top:1px solid var(--hair);
   font-size:max(14px, calc(14px * var(--k))); line-height:1.4;
 }
 .ow-control dt { color:#f0f5f7; font-weight:800; }
 .ow-control dd { color:#bdcbd3; }
-.ow-control dt, .ow-control dd { overflow-wrap:anywhere; }
-
-@media (max-width:1200px) {
+@media (max-width:1400px) {
   .ow-controls-groups { grid-template-columns:minmax(0, 1fr); }
 }
 @media (max-width:1000px) {
@@ -1002,6 +998,18 @@ const CSS = `
 .ow-radio-row.empty .ow-radio-charge { color:rgba(255,110,110,.85); }
 `;
 
+const DEFS = `
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- organic edge for the blood vignette: banded turbulence displacing the
+         gradient so the hurt overlay never reads as a clean radial ramp -->
+    <filter id="ow-warp" x="-12%" y="-12%" width="124%" height="124%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.006 0.011" numOctaves="4" seed="17" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="34" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+</svg>`;
+
 let installed = false;
 
 export function installStyles() {
@@ -1010,10 +1018,15 @@ export function installStyles() {
   s.id = 'ow-ui-style';
   s.textContent = CSS;
   document.head.appendChild(s);
+  const d = document.createElement('div');
+  d.id = 'ow-ui-defs';
+  d.innerHTML = DEFS;
+  document.body.appendChild(d);
   installed = true;
 }
 
 export function removeStyles() {
   document.getElementById('ow-ui-style')?.remove();
+  document.getElementById('ow-ui-defs')?.remove();
   installed = false;
 }

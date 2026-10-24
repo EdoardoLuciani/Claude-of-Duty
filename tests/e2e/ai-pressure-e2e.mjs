@@ -121,7 +121,7 @@ try {
           ? { x: 0.23, y: Math.atan2(15.56, -16.95) }
           : Math.atan2(-lane.fx, -lane.fz);
       player.teleport({ x: base.x, y: base.y + player.eyeHeight, z: base.z }, facing);
-      player.health.setDebugValue(10000);
+      player.health.value = 10000;
       player.health.armour = 0;
       const sq = ai.createSquad();
       const s = (window.__PRESSURE__ = {
