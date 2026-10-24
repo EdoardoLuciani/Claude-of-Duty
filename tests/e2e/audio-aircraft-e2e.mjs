@@ -151,13 +151,20 @@ try {
           const elapsed = (performance.now() - started) / 1000;
           if (engineOnly && elapsed >= 3 && !pause) {
             pause = true;
+            report.pauseAt = audio.actx.currentTime;
             pauseTravel = strike.travel;
             pausePose = strike.plane.position.clone();
             if (!baseline) report.beforePauseGain = voice.node.gain.value;
             engine.time.scale = 0;
             ctx.events.emit('ui:pause', { paused: true });
           }
-          if (engineOnly && elapsed >= 3.5 && !resumed) {
+          if (
+            engineOnly &&
+            pause &&
+            !resumed &&
+            report.pausedFrames > 0 &&
+            audio.actx.currentTime - report.pauseAt >= 0.5
+          ) {
             resumed = true;
             if (!baseline)
               report.paused = {
@@ -170,12 +177,20 @@ try {
             ctx.events.emit('ui:pause', { paused: false });
           }
           engine.step(now);
+          if (engineOnly && resumed && report.resumeAt === undefined)
+            report.resumeAt = audio.actx.currentTime;
           if (engineOnly && pause && !resumed) {
             if (strike.travel !== pauseTravel || !strike.plane.position.equals(pausePose))
               throw Error('Aircraft moved while simulation was paused');
             report.pausedFrames = (report.pausedFrames ?? 0) + 1;
           }
-          if (engineOnly && !baseline && resumed && elapsed >= 3.75 && !report.resumed)
+          if (
+            engineOnly &&
+            !baseline &&
+            resumed &&
+            !report.resumed &&
+            audio.actx.currentTime - report.resumeAt >= 0.25
+          )
             report.resumed = {
               gain: voice.node.gain.value,
               travel: strike.travel,
