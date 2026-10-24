@@ -146,37 +146,74 @@ try {
     await pump(80);
     assert.equal(await page.evaluate(() => window.p320Review.w.viewmodel.clipName), null);
     const audio = await page.evaluate(async () => {
-      const { NoiseBank } = await import('/src/audio/dsp.ts');
-      const { reloadPhase } = await import('/src/audio/foley.ts');
+      const { AudioSystem } = await import('/src/audio/index.ts');
+      const { WeaponSampleBank } = await import('/src/audio/samples.ts');
       const { Rng } = await import('/src/core/rng.ts');
+      const bank = new WeaponSampleBank(new OfflineAudioContext(1, 48000, 48000));
       const results = {};
-      for (const [label, phase, options] of [
-        ['retained', 'magout', { retained: true }],
-        ['dropped', 'magout', {}],
-        ['slide', 'slide', {}],
-        ['settle', 'end', { settleOnly: true }],
-      ]) {
-        const ac = new OfflineAudioContext(1, 48000, 48000),
-          rng = new Rng(320);
-        const voice = reloadPhase(ac, new NoiseBank(ac, rng.fork(), 1), rng, phase, options);
-        voice.node.connect(ac.destination);
-        const samples = (await ac.startRendering()).getChannelData(0);
-        let energy = 0,
-          peak = 0;
-        for (const sample of samples) {
-          energy += sample * sample;
-          peak = Math.max(peak, Math.abs(sample));
+      let retainedSamples;
+      try {
+        await bank.load();
+        for (const [label, phase, kind, retained] of [
+          ['retained', 'magout', 'pistol-out', true],
+          ['dropped', 'magout', 'pistol-out', false],
+          ['seat', 'magin', 'pistol-in', false],
+          ['slide', 'slide', 'pistol-close', false],
+          ['settle', 'end', 'gear', false],
+        ]) {
+          const ac = new OfflineAudioContext(1, 48000, 48000),
+            audio = new AudioSystem(),
+            sources = [];
+          // Decode once; reset selection so retained/dropped compare the same take and gain.
+          bank.actx = ac;
+          bank.reloadIndices = {};
+          Object.assign(audio, { running: true, actx: ac, samples: bank, rng: new Rng(320) });
+          const createSource = ac.createBufferSource.bind(ac);
+          ac.createBufferSource = () => {
+            const source = createSource();
+            sources.push(source);
+            return source;
+          };
+          ac.createOscillator = () => {
+            throw Error(`${label}: reload must not synthesize`);
+          };
+          // Exercise the real event consumer/builder, isolating its voice from the mixer.
+          audio._playDry = (voiceKind, options, bus) => {
+            if (voiceKind !== 'reload' || bus !== 'foley')
+              throw Error(`${label}: unexpected handling layer ${voiceKind}/${bus}`);
+            audio._build(voiceKind, 0, 0, options).node.connect(ac.destination);
+          };
+          audio._onReload({ weapon: 'pistol', phase, retained });
+          if (sources.length !== 1 || !bank.reloadBuffers[kind].includes(sources[0].buffer))
+            throw Error(`${label}: expected exactly one ${kind} recording, without extra layers`);
+          const samples = (await ac.startRendering()).getChannelData(0);
+          let energy = 0,
+            peak = 0;
+          for (const sample of samples) {
+            energy += sample * sample;
+            peak = Math.max(peak, Math.abs(sample));
+          }
+          results[label] = { energy, peak, recordedSources: sources.length };
+          if (label === 'retained') retainedSamples = samples;
+          if (label === 'dropped')
+            results[label].matchesRetained = samples.every(
+              (sample, i) => sample === retainedSamples[i]
+            );
         }
-        results[label] = { energy, peak };
+        return results;
+      } finally {
+        bank.dispose();
       }
-      return results;
     });
     for (const [name, sound] of Object.entries(audio))
       assert(
         Number.isFinite(sound.energy) && sound.energy > 0 && sound.peak < 1,
         `${name}: finite unclipped audio`
       );
-    assert(audio.dropped.energy > audio.retained.energy, 'retained magazine omits ground impact');
+    assert(
+      audio.dropped.matchesRetained,
+      'same recorded removal for retained/dropped magazines, without an invented impact layer'
+    );
     const report = args['checks-only']
       ? { checksOnly: true }
       : await page.evaluate(async (frames) => {
