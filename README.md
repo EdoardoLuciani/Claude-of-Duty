@@ -45,31 +45,25 @@ A WebGPU-capable browser/device is required. Normal builds use committed world
 and Blender assets, with no Blender requirement. Change world source in
 `tools/worldgen/`, regenerate with `npm run world`, then run `npm run world:validate`.
 
-**Three.js pin:** GitHub commit `e27dfa95ae7f453b5d7a9a36ffdb563f7c9b529b`,
+**Three.js pin:** GitHub commit `313f1f582b61af64f76ffaa4f23b3abb3ff298a1`,
 not a moving `dev` dependency. Its package version still says `0.186.0`; runtime
 source reports `187dev`. `tools/compensate-three.mjs` selects the pinned ESM source
-exports because committed bundles still lag the latest source fixes. This pin
-includes native builder-local buffer names and declaration collision handling
-([#34872](https://github.com/mrdoob/three.js/pull/34872)), plus per-object reference
-attributes that let compatible instanced meshes safely share shader builds
-([#35007](https://github.com/mrdoob/three.js/pull/35007)). The local WGSL edit is retired; its
+exports because committed bundles still lag the latest source fixes (including
+[#34872](https://github.com/mrdoob/three.js/pull/34872), native builder-local buffer
+names and declaration collision handling). The local WGSL edit is retired; its
 reviewed upstream source remains hash-verified without modification. Commit, version
 and hash guards validate all targets before writing; review them on every upgrade.
 Upstream also owns Fresnel and TRAA cleanup—those local corrections remain removed.
 Preserve the material oracle (`node tools/arm-material-audit.mjs --strict=1`),
 buffer isolation/reuse probe (`node tests/e2e/buffer-names-e2e.mjs`), and native
-startup/first-use/lifetime/failure checks. Compatible native instancing now shares
-shader-builder state and GPU programs/pipelines, never object buffers. Upstream
-keeps builds that embed object-specific data out of the shared builder cache.
+startup/first-use/lifetime/failure checks. Stable names share GPU programs/pipelines,
+not shader-builder state or object buffers.
 Other renderer follow-ups: [#370](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/370).
 
 ## Play
 
-After loading, select **Start** to capture the mouse and begin. Pending or denied
-mouse capture keeps the run frozen; select **Retry Start** to retry (there is no
-unlocked-play fallback). Once playing, click the game canvas to reacquire the
-cursor (also a fire press). The pause menu contains the full keyboard/mouse
-reference, including contextual behaviors.
+Click the game canvas to lock/reacquire the cursor (also a fire press). The pause
+menu contains the full keyboard/mouse reference, including contextual behaviors.
 Static defaults come from `src/core/bindings.ts`; rebinding is a follow-up.
 
 | Keys                    | Action                                                 |
@@ -93,11 +87,9 @@ movement can interrupt actions; the pause reference lists exact conditions.
 
 Unlocked menus use native mouse, Tab/Shift+Tab and Enter/Space navigation; arrow,
 Home/End and PageUp/Down keys adjust sliders or scroll the focused reference.
-After death, New Game is available after 2.85 seconds. It resets the run and
-returns to the Start dialog; gameplay stays frozen until you select Start and
-mouse capture succeeds. Terminal errors require Reload. Quality changes restart
-the run; Defaults resets settings, not bindings. Gamepad sticks move/look; no
-buttons are bound. F7/F8 are telemetry-only.
+After death, restart is available after 2.85 seconds. Terminal errors require
+Reload. Quality changes restart the run; Defaults resets settings, not bindings.
+Gamepad sticks move/look; no buttons are bound. F7/F8 are telemetry-only.
 
 Survive escalating squads, earn credits and shop between waves. M4/P320 are the
 starting weapons; MCX, EVOLYS, MPX and AX338 are shop options. The day/night clock

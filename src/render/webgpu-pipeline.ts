@@ -3,11 +3,14 @@ import { ClusteredLighting } from 'three/addons/lighting/ClusteredLighting.js';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { ao } from 'three/addons/tsl/display/GTAONode.js';
 import { lut3D } from 'three/addons/tsl/display/Lut3DNode.js';
+import { ssr } from 'three/addons/tsl/display/SSRNode.js';
 import { traa } from 'three/addons/tsl/display/TRAANode.js';
 import {
   builtinAOContext,
   context,
   convertToTexture,
+  metalness,
+  roughness,
   mrt,
   normalView,
   pass,
@@ -33,6 +36,7 @@ import { createFogCompute } from './fog-compute-webgpu.ts';
 import type { createGradeLut } from './lut.ts';
 
 // Application art policy, not upstream defaults or a physical reflectance model.
+const SSR_ADDITIVE_GAIN = 0.16;
 const BLOOM_STRENGTH = 0.14,
   BLOOM_THRESHOLD = 1.6;
 const BLOOM_RADIUS = 0,
@@ -48,6 +52,7 @@ export type FogInputs = VolumetricBuildOptions;
 type FogBuilder = (inputs: FogInputs) => Node<'vec3'> | Node<'vec4'>;
 export interface PipelineOptions {
   gtao?: boolean;
+  ssrEnabled?: boolean;
   taa?: boolean;
   bloomStrength?: number;
   bloomThreshold?: number;
@@ -62,7 +67,7 @@ export interface PipelineOptions {
 /**
  * WebGPU frame graph shared by production gameplay and isolated GPU probes.
  * World and first-person
- * depth never mix; the latter has no MSAA and bypasses world TAA/fog.
+ * depth never mix; the latter has no MSAA and bypasses world TAA/SSR/fog.
  */
 export function createWorldViewPipeline(
   renderer: Renderer,
@@ -72,6 +77,7 @@ export function createWorldViewPipeline(
   viewCamera: Camera,
   {
     gtao = true,
+    ssrEnabled = false,
     taa = false,
     bloomStrength = BLOOM_STRENGTH,
     bloomThreshold = BLOOM_THRESHOLD,
@@ -85,6 +91,7 @@ export function createWorldViewPipeline(
 ) {
   let aoPass = null,
     aoBlur = null,
+    ssrPass = null,
     taaPass = null;
   const intermediates: Array<{ dispose(): void }> = [];
   const asTexture = (node: Node<'vec4'>): Node<'vec4'> => {
@@ -173,6 +180,7 @@ export function createWorldViewPipeline(
     return undefined;
   } as NonNullable<typeof prePass.updateBefore>;
   const channels: Record<string, Node> = { output: normalView as Node };
+  if (ssrEnabled) channels.surface = vec4(roughness, metalness, 0, 1);
   if (taa) channels.velocity = velocity;
   // The native depth attachment is nonlinear; publish positive view metres.
   channels.linearDepth = positionView.z.negate();
@@ -206,6 +214,17 @@ export function createWorldViewPipeline(
   // TSL transitions among texture, variable, and vector nodes here; upstream
   // generic node types are not covariant across those equivalent color values.
   let world: Node<'vec4'> = worldPass.getTextureNode();
+  if (ssrEnabled) {
+    const surface = prePass.getTextureNode('surface');
+    ssrPass = ssr(
+      world as never,
+      prePass.getTextureNode('depth') as never,
+      prePass.getTextureNode() as never,
+      { camera, roughnessNode: surface.r, metalnessNode: surface.g, reflectNonMetals: true }
+    );
+    ssrPass.intensity.value = SSR_ADDITIVE_GAIN;
+    world = vec4(world.rgb.add(ssrPass.rgb), world.a);
+  }
   // Resolve only the world. The weapon's ADS motion has no valid world velocity.
   if (taa) {
     taaPass = traa(
@@ -214,8 +233,11 @@ export function createWorldViewPipeline(
       prePass.getTextureNode('velocity'),
       camera
     );
-    // Borrow the published resolve texture instead of materializing an identity RTT.
-    world = (taaPass as typeof taaPass & { getTextureNode(): Node<'vec4'> }).getTextureNode();
+    // Use the published resolve texture instead of materializing an identity
+    // RTT. Ultra still needs the pointwise TAA + SSR input before fog.
+    world = ssrPass
+      ? vec4(taaPass.rgb.add(ssrPass.rgb), taaPass.a)
+      : (taaPass as typeof taaPass & { getTextureNode(): Node<'vec4'> }).getTextureNode();
   }
   // Apply aerial perspective to world pixels only; the viewmodel is held in
   // view space and must never inherit world fog or temporal reprojection.
@@ -279,6 +301,7 @@ export function createWorldViewPipeline(
     prePass,
     aoPass,
     aoBlur,
+    ssrPass,
     taaPass,
     exposure,
     linearDepth: prePass.getTextureNode('linearDepth'),
@@ -300,6 +323,7 @@ export function createWorldViewPipeline(
       fogPass?.dispose();
       aoBlur?.dispose();
       aoPass?.dispose();
+      ssrPass?.dispose();
       taaPass?.dispose();
       glow?.dispose();
     },

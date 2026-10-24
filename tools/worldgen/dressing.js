@@ -218,7 +218,7 @@ export function registerDressingProps(A, rng) {
       });
       return g;
     })(),
-    { maxDist: 55, castShadow: false }
+    { maxDist: 55 }
   );
 
   // Cheap plastic chair — one is on every roof and outside every shop.

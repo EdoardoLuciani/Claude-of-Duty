@@ -11,7 +11,7 @@
     "primitives": 13,
     "materials": 7,
     "images": 3,
-    "bytes": 9037164
+    "bytes": 9037044
   },
   "clips": {
     "Idle": {
@@ -34,10 +34,6 @@
         {
           "time": 0.14400000000000002,
           "event": "pump"
-        },
-        {
-          "time": 0.369,
-          "event": "boltrelease"
         },
         {
           "time": 0.44775,
@@ -80,15 +76,15 @@
           "event": "start"
         },
         {
-          "time": 0.209,
-          "event": "pump"
-        },
-        {
           "time": 0.646,
           "event": "shellin"
         },
         {
-          "time": 0.8929999999999999,
+          "time": 0.836,
+          "event": "pump"
+        },
+        {
+          "time": 0.8835,
           "event": "boltrelease"
         },
         {

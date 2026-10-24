@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { AttachmentQueries, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.ts';
+import { AttachmentQueries, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.js';
 import { makeAgent, makeAi, makeRng } from '../../tools/lib/agent-fixture.mjs';
 import { testNav } from '../../tools/lib/test-nav.mjs';
 

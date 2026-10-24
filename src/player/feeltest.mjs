@@ -731,24 +731,20 @@ function runBench() {
   place(0);
   {
     p.health.reset(true);
-    // 4 m to the player's right, so the published damage angle must be +pi/2.
+    // 4 m to the player's right, so the indicator angle must come out at +pi/2.
     const from = {
       x: base.x + Math.cos(base.yaw) * 4,
       y: base.y + 1.6,
       z: base.z - Math.sin(base.yaw) * 4,
     };
-    let dir;
-    const offDamage = eng.events.on('damage:taken', (e) => {
-      dir = e.direction;
-    });
     p.applyDamage(45, from);
-    offDamage();
+    const dir = p.health.indicators.find((i) => i.active)?.angle ?? 0;
     const passEnabled = (() => {
-      p.health.setDebugValue(20);
+      p.health.value = 20;
       p.health.effect = 0.9;
       p.lowHealthPass?.sync(p.health);
       const on = !!p.lowHealthPass?.enabled;
-      p.health.setDebugValue(55);
+      p.health.value = 55;
       p.health.effect = 0;
       return on;
     })();

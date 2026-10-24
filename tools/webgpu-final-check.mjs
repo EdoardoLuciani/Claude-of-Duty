@@ -408,7 +408,7 @@ try {
     cube.geometry.dispose();
     aoMaterial.dispose();
     env.dispose();
-    // Retain the frame fixture's camera velocity, LUT, TAA and injury rim gates.
+    // Retain the frame fixture's camera velocity, LUT, SSR/TAA and injury rim gates.
     const { createGradeLut } = await import('/src/render/lut.ts');
     const frameScene = new T.Scene(),
       frameView = new T.Scene(),
@@ -432,7 +432,7 @@ try {
       frames = [];
     let healthyEdge;
     r.setSize(128, 96);
-    for (const mode of ['grade', 'plain', 'taa-grade', 'low-grade']) {
+    for (const mode of ['grade', 'ssr', 'taa-ssr-grade', 'low-grade']) {
       frameCamera.position.set(0, 1, 4);
       frameCamera.lookAt(0, 0, 0);
       const low = mode.startsWith('low') ? new LowHealthPass() : null;
@@ -448,6 +448,7 @@ try {
         frameViewCamera,
         {
           gtao: true,
+          ssrEnabled: mode.includes('ssr'),
           taa: mode.includes('taa'),
           bloomStrength: 0.14,
           grade: mode.includes('grade') ? lut : null,
@@ -545,10 +546,12 @@ try {
       const rt = new T.RenderTarget(64, 64, { type: T.HalfFloatType, depthBuffer: false });
       const oldSize = r.renderer.getSize(new T.Vector2());
       const oldTaa = r.q.taa,
+        oldSsr = r.q.ssr,
         viewVisible = e.viewScene.visible;
       e.viewScene.visible = false; // Exclude frame-smoothed first-person lighting.
       r._releaseGraph();
       r.q.taa = false;
+      r.q.ssr = false;
       r._getGraph();
       r.settings.autoExposure = false;
       r._exposure = 1;
@@ -582,6 +585,7 @@ try {
       r.renderer.setSize(oldSize.x, oldSize.y, false);
       r._releaseGraph();
       r.q.taa = oldTaa;
+      r.q.ssr = oldSsr;
       r._getGraph();
       r.settings.autoExposure = true;
       e.viewScene.visible = viewVisible;

@@ -43,6 +43,7 @@ interface ViewKick {
 export class CameraRig {
   ctx: CameraContext;
   eye: number;
+  crouchBlend: number;
   bobPhase: number;
   bobWeight: number;
   bobRoll: number;
@@ -85,6 +86,7 @@ export class CameraRig {
 
     // ---- smoothed stance -------------------------------------------------
     this.eye = 1.66;
+    this.crouchBlend = 0;
 
     // ---- bob -------------------------------------------------------------
     this.bobPhase = 0;
@@ -255,6 +257,7 @@ export class CameraRig {
           ? MOVE.stanceTau.crouchStand
           : MOVE.stanceTau.standCrouch;
     this.eye = approach(this.eye, targetEye, tau, dt);
+    this.crouchBlend = clamp01(1 - (this.eye - 1.0) / 0.66);
 
     // ---- slide envelope --------------------------------------------------
     const slideTarget = m.sliding ? 1 - 0.45 * m.slideProgress : 0;

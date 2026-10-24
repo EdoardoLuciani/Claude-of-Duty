@@ -94,8 +94,7 @@ def author_actions(root,asset,rig,parts,forend,bolt,trigger,shell):
     pose('right',.010,p=p);pose('right',.030,p=p);pose('right',.060)
     # Handling tilt only; recoil remains reactive in the viewmodel.
     key(rig,.28*d,(.006,-.010,.016),(-4.58,2.29,3.44));key(rig,.62*d,(.004,-.006,.010),(-1.72,1.15,1.72))
-    # Contact cues at the authored rear/forward stops; pump still owns ejection.
-    events('Pump',d,[(.32,'pump'),(.82,'boltrelease'),(.995,'end')]);finish('Pump')
+    events('Pump',d,[(.32,'pump'),(.995,'end')]);finish('Pump')
     sh=ref['shell'];sq=Quaternion((sh['quaternion'][3],*sh['quaternion'][:3]));relative=Vector(sh['pos'])-Vector(sh['hullPosition'])
     insertion=ref['insertion'];iq=Quaternion((insertion['quaternion'][3],*insertion['quaternion'][:3]))
     insert_relative=Vector(insertion['pos'])-Vector(sh['hullPosition'])
@@ -153,8 +152,7 @@ def author_actions(root,asset,rig,parts,forend,bolt,trigger,shell):
         # Complete reset channels and original fractional gameplay times.
         key(shell,d,scale=0);pose('left',d)
         for k,loc,rot in [(.18,(.010,-.018,.020),(-5.73,12.61,16.04)),(.55,(.012,-.020,.018),(-4.58,14.90,18.33)),(1,(0,0,0),(0,0,0))]:key(rig,k*d,loc,rot)
-        # Empty reload opens BEFORE shell insertion, not at the return onset.
-        events(name,d,[(.02,'start')]+([(.22,'pump')] if empty_reload else [])+[(accept,'shellin')]+([(.94,'boltrelease')] if empty_reload else [])+[(.995,'end')])
+        events(name,d,[(.02,'start'),(accept,'shellin')]+([(.88,'pump'),(.93,'boltrelease')] if empty_reload else [])+[(.995,'end')])
         finish(name)
     begin('Inspect',3)
     for t,rot in [(.5,(-10,-42,12)),(1.1,(-10,-42,12)),(1.7,(6,43,-12)),(2.4,(6,43,-12)),(2.92,(0,0,0))]:

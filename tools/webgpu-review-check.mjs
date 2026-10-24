@@ -127,7 +127,7 @@ try {
       viewCamera = new T.PerspectiveCamera();
     scene.background = new T.Color(0x123456);
     const rows = [];
-    for (const mode of ['warp', 'post', 'fog', 'compute-fog', 'taa-build', 'taa'])
+    for (const mode of ['warp', 'post', 'ssr-fog', 'compute-fog', 'taa-build', 'taa'])
       for (let i = 0; i < 3; i++) {
         const owned = [],
           disposed = [];
@@ -144,6 +144,7 @@ try {
           gtao: false,
           taa: mode.startsWith('taa'),
           bloomStrength: 0,
+          ssrEnabled: mode === 'ssr-fog',
           fogCompute: mode === 'compute-fog',
           fog: ({ color, uv = N.screenUV }) => {
             if (mode === 'compute-fog') {

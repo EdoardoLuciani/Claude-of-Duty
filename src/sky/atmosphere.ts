@@ -145,3 +145,8 @@ export function transmittanceToSpace(mu: number, mieScale = 1, out: RGB = [0, 0,
   out[2] = Math.exp(-od2);
   return out;
 }
+
+/** Rec.709 luminance — used to split transmittance into colour + intensity. */
+export function luminance(rgb: readonly number[]): number {
+  return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+}

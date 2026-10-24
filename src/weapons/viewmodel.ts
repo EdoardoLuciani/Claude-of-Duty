@@ -24,7 +24,7 @@ import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from './grip-contacts.ts';
 import { Arm } from './hands.ts';
 import { M4Animation } from './m4.ts';
 import { M590Animation } from './m590.ts';
-import type { ReticleMaterials } from './materials-tsl.ts';
+import type { WeaponMaterialsNode } from './materials-tsl.ts';
 import {
   Spring,
   Spring3,
@@ -53,7 +53,6 @@ import type {
   WeaponAnimation,
   ViewmodelContext,
 } from './runtime-types.ts';
-import { SNIPER_RETICLE, sniperMradScale, sniperReticleCoverage } from './sniper-reticle.ts';
 
 /**
  * THE VIEWMODEL RIG.
@@ -246,14 +245,13 @@ export class Viewmodel {
   declare maskUniforms: {
     uAlpha: UniformNode<'float', number>;
     uAspect: UniformNode<'float', number>;
-    uSniper: UniformNode<'float', number>;
   };
   declare reticleUniforms: {
     uAlpha: UniformNode<'float', number>;
     uAspect: UniformNode<'float', number>;
     uChevron: UniformNode<'float', number>;
-    uMradScale: UniformNode<'float', number>;
   };
+  declare mats: WeaponMaterialsNode;
   declare rng: import('../core/rng.ts').Rng;
   declare anchor: THREE.Object3D;
   declare rig: THREE.Object3D;
@@ -333,12 +331,14 @@ export class Viewmodel {
   declare rigOverride: { position: THREE.Vector3; quaternion: THREE.Quaternion } | null;
   declare settle: Spring3;
   declare sprintT: number;
+  declare stepT: number;
   declare trackCamera: boolean;
   declare triggerT: number;
   declare triggerTarget: number;
 
-  constructor(ctx: ViewmodelContext, mats: ReticleMaterials) {
+  constructor(ctx: ViewmodelContext, mats: WeaponMaterialsNode) {
     this.ctx = ctx;
+    this.mats = mats;
     this.rng = ctx.rng.fork();
 
     this.anchor = new THREE.Object3D();
@@ -510,11 +510,7 @@ export class Viewmodel {
     // Fullscreen ADS overlays. The scene draws them at a fixed clip-space
     // position (vertexNode), so they do not depend on the world camera, and they
     // are authored in TSL like every other production material.
-    const maskU = (this.maskUniforms = {
-      uAlpha: TSL.uniform(1),
-      uAspect: TSL.uniform(16 / 9),
-      uSniper: TSL.uniform(0),
-    });
+    const maskU = (this.maskUniforms = { uAlpha: TSL.uniform(1), uAspect: TSL.uniform(16 / 9) });
     const mp = TSL.uv().mul(2).sub(1).toVar();
     const mr = TSL.length(TSL.vec2(mp.x.mul(maskU.uAspect), mp.y));
     const maskHole = TSL.float(0.72);
@@ -530,20 +526,7 @@ export class Viewmodel {
     });
     maskMat.vertexNode = TSL.vec4(TSL.positionLocal.xy, 0, 1);
     maskMat.colorNode = TSL.mix(TSL.vec3(0), TSL.vec3(0.02, 0.02, 0.018), maskRim.mul(0.35));
-    // Sniper only: a defined aperture with restrained inner lens shadow. Keep
-    // the existing MCX mask, color and transition completely unchanged.
-    const sniperRadius = SNIPER_RETICLE.apertureRadius;
-    const edgeAA = TSL.fwidth(mr).max(0.0001);
-    const sniperEdge = TSL.smoothstep(
-      TSL.float(sniperRadius).sub(edgeAA.mul(0.5)),
-      TSL.float(sniperRadius).add(edgeAA.mul(0.5)),
-      mr
-    );
-    const lensShadow = TSL.smoothstep(sniperRadius - 0.045, sniperRadius, mr).mul(0.18);
-    maskMat.opacityNode = maskU.uSniper
-      .greaterThan(0.5)
-      .select(TSL.max(sniperEdge, lensShadow), maskEdge)
-      .mul(maskU.uAlpha);
+    maskMat.opacityNode = maskEdge.mul(maskU.uAlpha);
     maskMat.userData.owUniforms = maskU;
     const mask = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), maskMat);
     mask.frustumCulled = false;
@@ -565,7 +548,6 @@ export class Viewmodel {
       uAlpha: TSL.uniform(1),
       uChevron: TSL.uniform(0),
       uAspect: TSL.uniform(16 / 9),
-      uMradScale: TSL.uniform(sniperMradScale(20)),
     });
     const rp = TSL.uv().mul(2).sub(1).toVar();
     const rc = TSL.vec2(rp.x.mul(retU.uAspect), rp.y);
@@ -576,22 +558,27 @@ export class Viewmodel {
       const w = 0.12 - i * 0.018;
       stadia = stadia.add(line(rc, -w, y, w, y, 0.006));
     }
-    const mil = sniperReticleCoverage(rc.div(retU.uMradScale));
-    // The sniper quad reaches the aperture, unlike the original small overlay.
-    const milRadius = TSL.length(rc);
-    const milAA = TSL.fwidth(milRadius).max(0.0001);
-    const milClip = TSL.smoothstep(
-      TSL.float(sniperRadius).sub(milAA.mul(0.5)),
-      TSL.float(sniperRadius).add(milAA.mul(0.5)),
-      milRadius
-    ).oneMinus();
+    let mil = line(rp, -0.72, 0, -0.045, 0, 0.009)
+      .add(line(rp, 0.045, 0, 0.72, 0, 0.009))
+      .add(line(rp, 0, -0.72, 0, -0.045, 0.009))
+      .add(line(rp, 0, 0.045, 0, 0.72, 0.009))
+      .add(line(rp, -0.018, 0, 0.018, 0, 0.006))
+      .add(line(rp, 0, -0.018, 0, 0.018, 0.006));
+    for (let i = 1; i <= 4; i++) {
+      const x = i * 0.14;
+      mil = mil
+        .add(line(rp, x, -0.018, x, 0.018, 0.0065))
+        .add(line(rp, -x, -0.018, -x, 0.018, 0.0065))
+        .add(line(rp, -0.018, x, 0.018, x, 0.0065))
+        .add(line(rp, -0.018, -x, 0.018, -x, 0.0065));
+    }
     const chevronCol = TSL.mix(
       TSL.vec3(0.015),
       TSL.vec3(0.85, 0.04, 0.012),
       TSL.clamp(chevron, 0, 1)
     );
     const chevronAlpha = TSL.clamp(chevron.add(stadia), 0, 1).mul(retU.uAlpha);
-    const milAlpha = mil.mul(milClip).mul(retU.uAlpha);
+    const milAlpha = TSL.clamp(mil, 0, 1).mul(retU.uAlpha);
     const useChevron = retU.uChevron.greaterThan(0.5);
     const reticleMat = new MeshBasicNodeMaterial({
       transparent: true,
@@ -599,7 +586,7 @@ export class Viewmodel {
       depthWrite: false,
       toneMapped: false,
     });
-    reticleMat.vertexNode = TSL.vec4(TSL.positionLocal.xy.mul(useChevron.select(0.55, 1)), 0, 1);
+    reticleMat.vertexNode = TSL.vec4(TSL.positionLocal.xy.mul(0.55), 0, 1);
     reticleMat.colorNode = useChevron.select(chevronCol, TSL.vec3(0));
     reticleMat.opacityNode = useChevron.select(chevronAlpha, milAlpha);
     reticleMat.userData.owUniforms = retU;
@@ -620,6 +607,7 @@ export class Viewmodel {
     this.sprintT = 0;
     this.lowReadyT = 0;
     this.bobPhase = 0;
+    this.stepT = 0;
     this.noiseT = 0;
     this.triggerT = 0;
     this.triggerTarget = 0;
@@ -777,7 +765,8 @@ export class Viewmodel {
     });
   }
 
-  // MCX retains fitted support-hand posing; weapon AO belongs to the authored asset.
+  // Fit the support wrap and bake its contacts into weapon AO. The glove itself
+  // uses Blender's self-occlusion map, not static weapon-space vertex AO.
   _fitSupportHand(w: WeaponEntry) {
     const nodes: WeaponNodes = w.model.nodes;
     const hg = nodes.supportContact ?? nodes.handguard;
@@ -787,12 +776,52 @@ export class Viewmodel {
     handBasis(this._handQuatL, gL.finger ?? [0.82, 0.5, -0.28], gL.back ?? [-0.5, 0.32, -0.8]);
     const poseName = `clamp:${w.id}`;
     this.armL.setPose('clamp');
-    this.armL.fitToCylinder(this._handPosL, this._handQuatL, vec3(hg.axis), vec3(hg.dir), hg.r, {
-      clearance: 0.001,
-      poseName,
-    });
+    const contacts = this.armL.fitToCylinder(
+      this._handPosL,
+      this._handQuatL,
+      vec3(hg.axis),
+      vec3(hg.dir),
+      hg.r,
+      { clearance: 0.001, poseName }
+    );
     w.lhandPose = poseName;
+    // Only keep contacts that actually landed on the handguard's own extent —
+    // a fingertip that overshot past the end cap must not paint AO on the barrel.
+    const z0 = Math.max(hg.z0, hg.z1);
+    const z1 = Math.min(hg.z0, hg.z1);
+    const kept = contacts.filter((p) => p.z <= z0 + 0.012 && p.z >= z1 - 0.012);
+    this._bakeContactAOOnWeapon(w, kept, 0.012, 0.9);
     this.armL.setPose(poseName);
+  }
+
+  /**
+   * The weapon side of the same contact gradient. The handguard geometry already
+   * carries wear/grime/AO masks from `bakeMasks`, so this only ever RAISES the
+   * AO channel — the edge-wear and grime layers are untouched.
+   */
+  _bakeContactAOOnWeapon(w: WeaponEntry, contacts: THREE.Vector3[], radius: number, peak: number) {
+    if (!contacts.length) return;
+    const r2 = radius * radius;
+    for (const mesh of w.meshes) {
+      const geo = mesh.geometry;
+      const pos = geo.getAttribute('position');
+      const col = geo.getAttribute('color');
+      if (!pos || !col) continue;
+      for (let i = 0; i < pos.count; i++) {
+        _v.fromBufferAttribute(pos, i);
+        let closest = Infinity;
+        for (const c of contacts) {
+          const d2 = _v.distanceToSquared(c);
+          if (d2 < closest) closest = d2;
+        }
+        if (closest > r2) continue;
+        const t = 1 - Math.sqrt(closest) / radius;
+        const s = t * t * t * (t * (t * 6 - 15) + 10);
+        const k = i * 3 + 2;
+        col.array[k] = Math.max(col.array[k], peak * s);
+      }
+      col.needsUpdate = true;
+    }
   }
 
   setActive(id: string) {
@@ -1731,14 +1760,12 @@ export class Viewmodel {
       const u = this.maskUniforms;
       u.uAlpha.value = smootherstep(0.82, 0.97, ads);
       u.uAspect.value = this.ctx.viewCamera.aspect;
-      u.uSniper.value = optic?.reticle === 'p4fl' ? 1 : 0;
     }
     if (this.scopeReticle) {
       const u = this.reticleUniforms;
       u.uAlpha.value = smootherstep(0.88, 0.99, ads);
       u.uChevron.value = optic?.reticle === 'chevron' ? 1 : 0;
       u.uAspect.value = this.ctx.viewCamera.aspect;
-      u.uMradScale.value = sniperMradScale(this.ctx.camera.fov, this.ctx.camera.zoom);
     }
   }
 

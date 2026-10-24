@@ -480,9 +480,7 @@ export class ParticleLayer {
 
     this.array = new Float32Array(this.capacity * STRIDE);
     this.ibuf = new THREE.InstancedInterleavedBuffer(this.array, STRIDE, 1);
-    // Native WebGPU's non-dynamic path uploads published versions only.
-    // emit()/flush() publish slot changes; shader time drives motion and fading.
-    this.ibuf.setUsage(THREE.StaticDrawUsage);
+    this.ibuf.setUsage(THREE.DynamicDrawUsage);
 
     const src = quadSource();
     const geo = new THREE.InstancedBufferGeometry();

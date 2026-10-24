@@ -3,7 +3,7 @@ import { writeFileSync } from 'node:fs';
 
 import { Vector3 } from 'three';
 
-import { AttachmentQueries, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.ts';
+import { AttachmentQueries, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.js';
 import {
   parseQueryKey,
   parseClientMessage,

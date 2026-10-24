@@ -51,13 +51,17 @@ export function makeP320Model(gltf: GLTF) {
     },
     shell: { caseLen: 0.0192, rimR: 0.00478 },
     magSize: { len: 0.09 },
+    materials: new Set<THREE.Material>(),
+    textures: new Set<THREE.Texture>(),
   };
   const converted = convertWeaponScene(scene, (_source, material) => {
     for (const value of Object.values(material as object)) {
       if (value instanceof THREE.Texture) value.anisotropy = 8;
     }
   });
-  return { ...model, ...converted };
+  model.materials = converted.materials;
+  model.textures = converted.textures;
+  return model;
 }
 
 export async function loadP320() {
@@ -81,9 +85,9 @@ export class P320Animation {
   spare!: THREE.Object3D;
   magazineRound!: THREE.Object3D;
   hands!: Record<HandSide, AuthoredHand>;
-  poseQ = new THREE.Quaternion();
-  idleTime = 0;
-  name: string | null = null;
+  poseQ!: THREE.Quaternion;
+  idleTime!: number;
+  name!: string | null;
   fireTime!: number;
   constructor(model: P320Model) {
     this.model = model;
@@ -99,6 +103,9 @@ export class P320Animation {
     this.spare = node('magazine_spare');
     this.magazineRound = node('magazine_round');
     this.hands = discoverAuthoredHands(node);
+    this.poseQ = new THREE.Quaternion();
+    this.idleTime = 0;
+    this.name = null;
     this.reset();
   }
 

@@ -65,6 +65,7 @@ export class RenderSystem {
   declare q: EngineContext['config']['q'];
   declare _warmAbort: AbortController;
   declare renderer: Renderer;
+  declare maxAnisotropy: number;
   declare screenSize: { width: number; height: number };
   declare displaySize: { width: number; height: number };
   declare passes: PostPass[];
@@ -140,6 +141,7 @@ export class RenderSystem {
     this.renderer.setClearColor(0, 0);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = PCFShadowMap;
+    this.maxAnisotropy = this.q.anisotropy;
     this.screenSize = { width: 1, height: 1 };
     this.displaySize = { width: 1, height: 1 };
     this.passes = [];
@@ -232,6 +234,7 @@ export class RenderSystem {
       );
     const options: PipelineOptions = {
       gtao: this.q.gtao,
+      ssrEnabled: this.q.ssr,
       taa: this.q.taa,
       bloomStrength: this.q.bloom ? this.settings.bloomStrength : 0,
       bloomThreshold: this.settings.bloomThreshold,

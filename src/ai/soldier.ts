@@ -1,6 +1,6 @@
 /**
  * AI — soldier assembly. Turns the part library into a finished, skinned,
- * surface-labelled character. One geometry per visual variant, shared by every
+ * material-grouped character. One geometry per visual variant, shared by every
  * instance of that variant; only the skeleton is per-instance.
  */
 
@@ -11,7 +11,6 @@ import type { Vec3 } from './geo.ts';
 import { CharacterBuilder, Noise } from './geo.ts';
 import * as P from './parts.ts';
 import { RIG, GRIP_R, BORE_DIR } from './rig.ts';
-import type { SoldierMaterialOptions } from './textures-tsl.ts';
 import { CLOTH_TILE } from './textures.ts';
 import { buildWeapon } from './weapon.ts';
 
@@ -26,8 +25,8 @@ const MATERIALS: Record<string, { tile: number }> = {
   gear: { tile: 0.26 },
   // Boots and gloves share the cordura bake with the pouches but NOT its
   // roughness: leather-and-rubber footwear is markedly smoother than webbing,
-  // and having the whole kit sit at one gloss makes the figure read as a blob.
-  // Runtime keeps this distinction as surface data, not another material draw.
+  // and having the whole kit sit at one gloss is half of why the figure reads as
+  // one extruded blob. Own material name -> own geometry group -> own roughness.
   boot: { tile: 0.26 },
   skin: { tile: 0.2 },
   polymer: { tile: 0.15 },
@@ -878,7 +877,7 @@ export function buildSoldier(
   ) {
     console.warn(
       `[ai] material slot order changed (${built.materialNames.join()}); ` +
-        'update MATERIAL_SLOTS to match the exported surface labels'
+        'update MATERIAL_SLOTS or prewarmMaterials will reorder opaque draws'
     );
   }
   const mats = resolveMaterials(name, built.materialNames, materials);
@@ -900,8 +899,14 @@ export function buildSoldier(
  * `CharacterBuilder.build()` emits them — which is the order the parts are added
  * above, deduplicated. All three variants use all nine.
  *
- * These remain authoring/GLB surface labels. Runtime uses one material and a
- * per-vertex surface ID, so this order no longer controls separate material draws.
+ * THE ORDER IS LOad-BEARING, and this is not a style preference. `THREE.Material`
+ * hands out globally incrementing ids and three sorts the opaque render list by
+ * `material.id` (`painterSortStable`), including the nine groups *within* one
+ * soldier. Create them in a different order and the goggle lens draws before its
+ * frame instead of after it; with a depth prepass in front, whichever coplanar
+ * surface is drawn last wins the equal-depth test. MEASURED: prewarming these in
+ * a hand-written order moved 2 pixels of the `combat` shot by 1/255 and failed
+ * the pixel gate. `buildSoldier` asserts the order below still matches.
  */
 export const MATERIAL_SLOTS = Object.freeze([
   'cloth',
@@ -918,8 +923,13 @@ export const MATERIAL_SLOTS = Object.freeze([
 /**
  * Resolve a variant's material slot names to real materials.
  *
- * Used by the offline builder. Runtime uses the same recipes in one material;
- * neither recipe lookup nor material creation consumes the gameplay RNG.
+ * Split out of `buildSoldier` on purpose: `AiSystem.prewarmMaterials()` needs
+ * every material a variant will ever ask for so their shader programs can be
+ * compiled while a loading screen is up, and it must be able to get them WITHOUT
+ * building a single triangle (geometry construction draws from the shared RNG
+ * stream, so doing it early would move every downstream random draw and change
+ * the picture). `SoldierMaterialsNode.get()` caches by material key and opts,
+ * so calling it early is free of side effects.
  *
  * `detail` is the second half of the two-scale system: the base tile carries the
  * macro camo and the garment seams, this tile carries the weave and the webbing
@@ -932,99 +942,61 @@ export function resolveMaterials(
   slots: readonly string[],
   materials: SoldierMaterialFactory
 ): THREE.Material[] {
-  return slots.map((slot) => {
-    const { set, options } = soldierSurface(name, slot);
-    return slot === 'glass' ? materials.glass() : materials.get(set, { ...options });
-  });
-}
-
-/** Keep authored finishes as data, not separate runtime draws. */
-export function soldierSurface(
-  name: VariantName,
-  slot: string
-): {
-  set: string;
-  options: SoldierMaterialOptions;
-} {
-  const V = VARIANTS[name];
+  const V = VARIANTS[name] ?? VARIANTS.vanguard;
   const detail = (set: string, matName: string, normal: number, rough: number) => ({
     set,
     scale: MATERIALS[matName].tile / DETAIL_TILE,
     normal,
     rough,
   });
-  const options = (set: string, value: SoldierMaterialOptions = {}) => ({ set, options: value });
-  switch (slot) {
-    case 'cloth':
-      return options(`camo_${V.camo}`, {
-        key: name,
-        tint: V.clothTint,
-        rough: ROUGH.cloth,
-        metal: 1,
-        // 1.15, not 1.0: the base tile now carries a 1-2 cm crease field and
-        // the folds have to actually catch the key light at 25 m.
-        normalScale: 1.15,
-        detail: detail('cloth', 'cloth', 0.45, 0.16),
-      });
-    case 'plate':
-      return options('plate', {
-        key: name,
-        tint: V.plateTint,
-        rough: ROUGH.plate,
-        normalScale: 1.0,
-        detail: detail('nylon', 'plate', 0.45, 0.1),
-      });
-    case 'gear':
-      return options('nylon', {
-        key: name,
-        tint: V.gearTint,
-        normalScale: 1.1,
-        detail: detail('nylon', 'gear', 0.5, 0.14),
-      });
-    case 'boot':
-      return options('nylon', {
-        key: `${name}_boot`,
-        tint: V.gearTint,
-        rough: ROUGH.boot,
-        normalScale: 1.1,
-        detail: detail('nylon', 'boot', 0.5, 0.1),
-      });
-    case 'skin':
-      return options('skin', { key: name, tint: V.skinTint, normalScale: 0.8, ao: 0.6 });
-    case 'polymer':
-      return options('polymer', { key: name, normalScale: 1.0 });
-    case 'steel':
-      return options('steel', { key: name, normalScale: 1.0 });
-    case 'rubber':
-      return options('rubber', { key: name, normalScale: 1.2 });
-    case 'glass':
-      return options('glass', {
-        tint: [0.06, 0.07, 0.08],
-        rough: 0.11,
-        metal: 0,
-        ao: 0,
-        normalScale: 0,
-        rim: 0.5,
-      });
-    default:
-      return options('polymer', { key: name });
-  }
-}
-
-/** GLB groups label disjoint surfaces. Keep them for metadata, not draw splitting. */
-export function prepareSoldierSurfaces(geometry: THREE.BufferGeometry): void {
-  if (geometry.hasAttribute('soldierSurface')) return;
-  const index = geometry.getIndex();
-  if (!index) throw new Error('[ai] soldier surface labels require indexed geometry');
-  const ids = new Float32Array(geometry.getAttribute('position').count).fill(-1);
-  for (let slot = 0; slot < geometry.groups.length; slot++) {
-    const { start, count } = geometry.groups[slot];
-    for (let i = start; i < start + count; i++) {
-      const vertex = index.getX(i);
-      if (ids[vertex] !== -1 && ids[vertex] !== slot)
-        throw new Error('[ai] soldier surfaces must not share vertices across slots');
-      ids[vertex] = slot;
+  return slots.map((n: string) => {
+    switch (n) {
+      case 'cloth':
+        return materials.get(`camo_${V.camo}`, {
+          key: name,
+          tint: V.clothTint,
+          rough: ROUGH.cloth,
+          metal: 1,
+          // 1.15, not 1.0: the base tile now carries a 1-2 cm crease field and
+          // the folds have to actually catch the key light at 25 m.
+          normalScale: 1.15,
+          detail: detail('cloth', 'cloth', 0.45, 0.16),
+        });
+      case 'plate':
+        return materials.get('plate', {
+          key: name,
+          tint: V.plateTint,
+          rough: ROUGH.plate,
+          normalScale: 1.0,
+          detail: detail('nylon', 'plate', 0.45, 0.1),
+        });
+      case 'gear':
+        return materials.get('nylon', {
+          key: name,
+          tint: V.gearTint,
+          normalScale: 1.1,
+          detail: detail('nylon', 'gear', 0.5, 0.14),
+        });
+      case 'boot':
+        return materials.get('nylon', {
+          key: `${name}_boot`,
+          tint: V.gearTint,
+          rough: ROUGH.boot,
+          normalScale: 1.1,
+          detail: detail('nylon', 'boot', 0.5, 0.1),
+        });
+      case 'skin':
+        return materials.get('skin', { key: name, tint: V.skinTint, normalScale: 0.8, ao: 0.6 });
+      case 'polymer':
+        return materials.get('polymer', { key: name, normalScale: 1.0 });
+      case 'steel':
+        return materials.get('steel', { key: name, normalScale: 1.0 });
+      case 'rubber':
+        return materials.get('rubber', { key: name, normalScale: 1.2 });
+      case 'glass':
+        return materials.glass();
+      default:
+        return materials.get('polymer', { key: name });
     }
-  }
-  geometry.setAttribute('soldierSurface', new THREE.BufferAttribute(ids, 1));
+  });
 }

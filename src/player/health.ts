@@ -2,8 +2,10 @@
  * Health, armour, suppression and the damage-direction model.
  *
  * There is no passive regeneration: health only returns through player-activated
- * bandages. Damage publishes the attacker position and view-space angle for
- * HUD feedback, alongside a matching camera impulse. UI owns indicator lifetime.
+ * bandages. Damage arriving from a direction produces an indicator (angle in
+ * *view* space, so the HUD can draw it without knowing anything about the
+ * player's transform) and a matching camera impulse, so a hit is felt before it
+ * is read.
  *
  * Suppression is a separate 0..1 pool fed by near misses, hits and blasts. It
  * widens the breathing sway and adds a little shake — the same trick CoD uses to
@@ -14,6 +16,16 @@ import * as THREE from 'three';
 
 import { clamp01, approach, lerp, DEG } from './springs.ts';
 import { HEALTH } from './tuning.ts';
+
+interface HealthIndicator {
+  active: boolean;
+  angle: number;
+  amount: number;
+  life: number;
+  worldX: number;
+  worldY: number;
+  worldZ: number;
+}
 
 interface DamageTakenPayload {
   amount: number;
@@ -70,12 +82,15 @@ export class Health {
   declare lastDamageTime: number;
   declare suppression: number;
   declare hitFlash: number;
+  declare indicators: HealthIndicator[];
   declare beatPhase: number;
   declare beatAge: number;
   declare pulse: number;
   declare effect: number;
   declare _payload: DamageTakenPayload;
   declare _statePayload: HealthStatePayload;
+  declare _emitTimer: number;
+  declare _lastEmitHealth: number;
   declare _beat: { strength: number; fraction: number };
 
   constructor(ctx: HealthContext, rig: DamageRig | null) {
@@ -90,6 +105,20 @@ export class Health {
     this.lastDamageTime = -100;
     this.suppression = 0;
     this.hitFlash = 0;
+
+    /** Direction indicators, oldest first. angle is radians, 0 = straight ahead. */
+    this.indicators = [];
+    for (let i = 0; i < HEALTH.indicatorMax; i++) {
+      this.indicators.push({
+        active: false,
+        angle: 0,
+        amount: 0,
+        life: 0,
+        worldX: 0,
+        worldY: 0,
+        worldZ: 0,
+      });
+    }
 
     // Beat phase controls cadence; age tracks the recording's two visual thumps.
     this.beatPhase = 0;
@@ -114,6 +143,8 @@ export class Health {
       dead: false,
       effect: 0,
     };
+    this._emitTimer = 0;
+    this._lastEmitHealth = HEALTH.max;
     this._beat = { strength: 0, fraction: 1 };
   }
 
@@ -136,14 +167,10 @@ export class Health {
     this.beatAge = 1;
     this.pulse = 0;
     this.lastDamageTime = -100;
+    this._lastEmitHealth = this.value;
+    for (let k = 0; k < this.indicators.length; k++) this.indicators[k].active = false;
     // Publish resets too: living-player respawns have no death-camera event.
-    this._emitState();
-  }
-
-  /** Diagnostic override without damage feedback; publish explicitly, never poll. */
-  setDebugValue(value: number): void {
-    this.value = value;
-    this._emitState();
+    this._emitState(true);
   }
 
   /* ==================================================================== */
@@ -174,6 +201,7 @@ export class Health {
       const f = -Math.sin(yaw) * dx - Math.cos(yaw) * dz;
       const r = Math.cos(yaw) * dx - Math.sin(yaw) * dz;
       angle = Math.atan2(r, f);
+      this._pushIndicator(angle, dealt, from);
     }
 
     // ---- felt response --------------------------------------------------
@@ -224,7 +252,7 @@ export class Health {
       });
       // (death allocations are fine — this happens once)
     }
-    this._emitState();
+    this._emitState(true);
     return dealt;
   }
 
@@ -233,7 +261,7 @@ export class Health {
     const before = this.value;
     this.value = Math.min(this.max, this.value + amount);
     const applied = this.value - before;
-    if (applied > 0) this._emitState();
+    if (applied > 0) this._emitState(true);
     return applied;
   }
 
@@ -246,6 +274,32 @@ export class Health {
     this.suppression = clamp01(this.suppression + a);
   }
 
+  _pushIndicator(angle: number, amount: number, from: THREE.Vector3): void {
+    // Reuse the slot pointing the most similar way, else the oldest.
+    let slot = null;
+    let oldest = null;
+    for (let k = 0; k < this.indicators.length; k++) {
+      const i = this.indicators[k];
+      if (!i.active) {
+        slot = i;
+        break;
+      }
+      if (Math.abs(angle - i.angle) < 0.5) {
+        slot = i;
+        break;
+      }
+      if (!oldest || i.life > oldest.life) oldest = i;
+    }
+    slot = slot ?? oldest ?? this.indicators[0];
+    slot.active = true;
+    slot.angle = angle;
+    slot.amount = Math.max(slot.active ? slot.amount * 0.5 : 0, amount);
+    slot.life = 0;
+    slot.worldX = from.x;
+    slot.worldY = from.y;
+    slot.worldZ = from.z;
+  }
+
   /* ==================================================================== */
 
   update(dt: number): void {
@@ -254,6 +308,13 @@ export class Health {
     // ---- pools ----------------------------------------------------------
     this.suppression = Math.max(0, this.suppression - H.suppression.decay * dt);
     this.hitFlash = approach(this.hitFlash, 0, H.effect.hitFlashTau, dt);
+
+    for (let k = 0; k < this.indicators.length; k++) {
+      const i = this.indicators[k];
+      if (!i.active) continue;
+      i.life += dt;
+      if (i.life > H.indicatorTime) i.active = false;
+    }
 
     // ---- low-health treatment weight ------------------------------------
     // Fresh wounds hit harder; settled injuries retain a reduced grade.
@@ -295,9 +356,15 @@ export class Health {
     if (this.rig && this.suppression > 0.02) {
       this.rig.addTrauma(this.suppression * H.suppression.shakeScale * dt);
     }
+
+    this._emitTimer -= dt;
+    if (this._emitTimer <= 0) {
+      this._emitTimer = 0.1;
+      if (Math.abs(this.value - this._lastEmitHealth) > 0.4) this._emitState(false);
+    }
   }
 
-  _emitState(): void {
+  _emitState(force: boolean): void {
     const s = this._statePayload;
     const wasLow = s.low;
     s.health = this.value;
@@ -306,8 +373,9 @@ export class Health {
     s.effect = this.effect;
     s.suppression = this.suppression;
     s.dead = this.dead;
+    this._lastEmitHealth = this.value;
     s.changedLowState = wasLow !== s.low;
-    s.forced = true;
+    s.forced = !!force;
     this.ctx.events.emit('player:health', s);
   }
 }

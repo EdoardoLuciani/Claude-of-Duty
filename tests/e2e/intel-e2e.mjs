@@ -438,7 +438,6 @@ try {
       const actx = new OfflineAudioContext(1, 48000, 48000);
       const rng = new Rng(132);
       const bank = new NoiseBank(actx, rng.fork(), 1.2);
-      await Mixer.prepare(actx);
       const mixer = new Mixer(actx, rng.fork());
       if (kind === 'intel_siren') {
         const siren = intelSiren(actx);
@@ -471,10 +470,7 @@ try {
   }
   const siren = audio.find((s) => s.kind === 'intel_siren');
   assert(
-    // Preserve detector/siren priority without the obsolete 0.15 absolute
-    // floor that forced a sustained warning up to gunfire-like energy. The
-    // whole-mix benchmark separately bounds it below the approved report.
-    siren.rms > audio[0].rms * 4,
+    siren.rms > 0.15 && siren.rms > audio[0].rms * 4,
     `siren must dominate the detector: ${JSON.stringify(audio)}`
   );
   assert(siren.tail < 0.0001, `siren must stop promptly: ${JSON.stringify(siren)}`);
@@ -484,7 +480,6 @@ try {
     const { Mixer } = await import('/src/audio/mixer.ts');
     const { Rng } = await import('/src/core/rng.ts');
     const actx = new OfflineAudioContext(1, 4.25 * 48000, 48000);
-    await Mixer.prepare(actx);
     const mixer = new Mixer(actx, new Rng(132));
     const voice = intelSiren(actx);
     voice.node.connect(mixer.bus('ui'));
@@ -543,11 +538,11 @@ try {
   }, !!process.env.AUDIO_PREVIEW);
   assert.equal(alert.nan, 0);
   assert(
-    alert.peak > 0.01 && alert.peak < 1 && alert.rms > audio[0].rms * 4,
+    alert.peak > 0.5 && alert.peak < 1 && alert.rms > 0.15,
     JSON.stringify({ ...alert, pcm: null })
   );
   assert(
-    alert.pulses.every((rms) => rms > audio[0].rms * 4),
+    alert.pulses.every((rms) => rms > 0.2),
     'all six alert pulses must sound during a claim'
   );
   assert(
