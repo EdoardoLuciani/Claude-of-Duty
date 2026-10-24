@@ -196,7 +196,6 @@ export class Agent {
   declare skeleton: THREE.Skeleton;
   declare mesh: THREE.SkinnedMesh;
   declare group: THREE.Group;
-  declare skinnedMesh: THREE.SkinnedMesh;
   declare mass: number;
   declare position: THREE.Vector3;
   declare yaw: number;
@@ -260,7 +259,6 @@ export class Agent {
   declare spread: number;
   declare weaponDamage: number;
   declare aimTarget: THREE.Vector3;
-  declare aimActual: THREE.Vector3;
   declare aimWeight: number;
   declare wantFire: boolean;
   declare peeking: boolean;
@@ -403,7 +401,6 @@ export class Agent {
     ai.root.add(this.group);
 
     /** Physics looks for these when it adopts the skeleton on death. */
-    this.skinnedMesh = this.mesh;
     this.mass = 82 * this.scale;
 
     this.position = new THREE.Vector3().copy(opts.position ?? new THREE.Vector3());
@@ -531,7 +528,6 @@ export class Agent {
     this.spread = COMBAT.spread;
     this.weaponDamage = COMBAT.damage;
     this.aimTarget = new THREE.Vector3();
-    this.aimActual = new THREE.Vector3();
     this.aimWeight = 0;
     this.wantFire = false;
     this.peeking = false;

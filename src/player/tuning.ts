@@ -295,10 +295,6 @@ export const HEALTH = {
   /** Fraction stripped while any plate remains. */
   armourReduction: 0.25,
   lowThreshold: 0.5,
-  /** Directional damage indicators live this long. */
-  indicatorTime: 1.8,
-  indicatorMax: 4,
-
   suppression: {
     /** Suppression added by a round cracking past / hitting nearby. */
     perNearMiss: 0.28,

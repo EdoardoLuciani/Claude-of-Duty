@@ -19,15 +19,9 @@ import { Rng } from '../core/rng.ts';
 import { rendererCounters } from '../dev/render-info.ts';
 import { MaterialSystem } from '../materials/index.ts';
 import { createWebGpuRenderer } from '../render/webgpu-device.ts';
-import { loadAX338 } from './ax338.ts';
 import { WEAPON_DEFS, WEAPON_IDS } from './defs.ts';
-import { loadEvolys } from './evolys.ts';
-import { loadM4 } from './m4.ts';
-import { loadM590 } from './m590.ts';
+import { loadWeapon } from './loaders.ts';
 import { WeaponMaterialsNode } from './materials-tsl.ts';
-import { loadMCX } from './mcx.ts';
-import { loadMPX } from './mpx.ts';
-import { loadP320 } from './p320.ts';
 import { Viewmodel } from './viewmodel.ts';
 
 const params = new URLSearchParams(location.search);
@@ -137,22 +131,7 @@ if (!FIRST_PERSON) {
 const stats: Record<string, number> = {};
 for (const id of WEAPON_IDS as Array<keyof typeof WEAPON_DEFS>) {
   const def = { ...WEAPON_DEFS[id], cycleTime: 60 / WEAPON_DEFS[id].rpm };
-  const entry = vm.addWeapon(
-    id === 'rifle'
-      ? await loadM4()
-      : id === 'mcx'
-        ? await loadMCX()
-        : id === 'pistol'
-          ? await loadP320()
-          : id === 'lmg'
-            ? await loadEvolys()
-            : id === 'smg'
-              ? await loadMPX()
-              : id === 'sniper'
-                ? await loadAX338()
-                : await loadM590(),
-    def
-  );
+  const entry = vm.addWeapon(await loadWeapon(id), def);
   stats[id] = entry.tris;
 }
 vm.setActive(WEAPON);

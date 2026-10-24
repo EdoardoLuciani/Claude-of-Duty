@@ -65,8 +65,6 @@ export function makeEvolysModel(gltf: GLTF) {
     },
     shell: { caseLen: 0.051, rimR: 0.005975 },
     magSize: { len: 0.125 },
-    materials: new Set<THREE.Material>(),
-    textures: new Set<THREE.Texture>(),
   };
   const converted = convertWeaponScene(scene, (source, material) => {
     if (source.name.startsWith('10 |')) {
@@ -79,9 +77,7 @@ export function makeEvolysModel(gltf: GLTF) {
       if (value instanceof THREE.Texture) value.anisotropy = 8;
     }
   });
-  model.materials = converted.materials;
-  model.textures = converted.textures;
-  return model;
+  return { ...model, ...converted };
 }
 
 export async function loadEvolys() {
@@ -106,10 +102,10 @@ export class EvolysAnimation {
   belt!: THREE.Object3D;
   bones!: THREE.Object3D[];
   hands!: Record<HandSide, AuthoredHand>;
-  poseQ!: THREE.Quaternion;
+  poseQ = new THREE.Quaternion();
   poseMatrix!: THREE.Matrix4;
-  idleTime!: number;
-  name!: string | null;
+  idleTime = 0;
+  name: string | null = null;
   remainingRounds!: number;
   fireTime!: number;
   constructor(model: EvolysModel) {
@@ -126,10 +122,7 @@ export class EvolysAnimation {
     this.belt = node('belt_mesh');
     this.bones = Array.from({ length: manifest.belt.rounds }, (_, i) => node(`belt_${i}`));
     this.hands = discoverAuthoredHands(node);
-    this.poseQ = new THREE.Quaternion();
     this.poseMatrix = this.root.matrix;
-    this.idleTime = 0;
-    this.name = null;
     this.remainingRounds = 100;
     this.reset();
   }

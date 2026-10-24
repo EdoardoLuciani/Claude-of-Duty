@@ -428,9 +428,9 @@ assert.ok(live.canStand(w5.from) && entry.probeGround(), 'W5 starts supported an
 map.physics.removeCharacter(entry);
 assert.equal(
   map.meta.navigation.sha256,
-  // Worker TypeScript/lifecycle changes refresh only source provenance. All
+  // Removing write-only physics state refreshes only source provenance. All
   // 8,897,464 Detour/component/cover payload bytes match the preceding bake.
-  'a5aad0d8fa1eecb423589ad286ae78329b16fe7f68fdd762372a6e78829ff04d',
+  'bc6b58f488918920526ab27c4568a13724b1434bf08a482f5f6ee4cbb32d8751',
   're-measure recorded fixture outcomes after changing baked assets'
 );
 let arrivals = 0;

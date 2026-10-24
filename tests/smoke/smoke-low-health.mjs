@@ -22,6 +22,29 @@ const ctx = {
   },
 };
 const hp = new Health(ctx, null);
+// Direction remains an event contract; the HUD alone owns indicator pools.
+const hits = [];
+const offDamage = ctx.events.on('damage:taken', (e) => hits.push({ ...e, from: e.from.clone() }));
+for (const [x, z, yaw, angle] of [
+  [0, -4, 0, 0],
+  [4, 0, 0, Math.PI / 2],
+  [-4, 0, 0, -Math.PI / 2],
+  [0, 4, 0, Math.PI],
+  [0, -4, Math.PI / 2, Math.PI / 2],
+]) {
+  ctx.camera.rotation.y = yaw;
+  const from = { x, y: 0, z };
+  hp.damage(5, from);
+  assert(Math.abs(hits.at(-1).direction - angle) < 1e-12);
+  assert.deepEqual(hits.at(-1).from.toArray(), [x, 0, z]);
+}
+hp.damage(5, null);
+assert.equal(hits.at(-1).direction, 0, 'source-free damage keeps its neutral angle');
+assert.deepEqual(hits.at(-1).from.toArray(), [0, 0, 0]);
+assert.deepEqual(hits[0].from.toArray(), [0, 0, -4], 'later hits do not mutate retained sources');
+offDamage();
+ctx.camera.rotation.y = 0;
+hp.reset();
 const audio = new AudioSystem();
 const sounds = [];
 audio.running = true;

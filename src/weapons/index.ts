@@ -5,7 +5,6 @@ import type { EngineContext, EngineSystems } from '../core/context.ts';
 import type { ReloadPhase } from '../core/events.ts';
 import { Rng } from '../core/rng.ts';
 import { AmmoPickups } from './ammo-pickups.ts';
-import { loadAX338 } from './ax338.ts';
 import { ProjectileSim, dropAt } from './ballistics.ts';
 import {
   WEAPON_DEFS,
@@ -15,15 +14,13 @@ import {
   buildRecoilPattern,
   SPREAD_MODS,
 } from './defs.ts';
-import { loadEvolys } from './evolys.ts';
 import { grenadeMesh } from './grenade-mesh.ts';
-import { loadM4 } from './m4.ts';
-import { loadM590 } from './m590.ts';
+import { loadWeapon } from './loaders.ts';
 import { WeaponMaterialsNode } from './materials-tsl.ts';
 import { lerp, DEG } from './mathx.ts';
-import { loadMCX, MCX_EJECT_DELAY } from './mcx.ts';
-import { loadMPX, MPX_EJECT_DELAY } from './mpx.ts';
-import { loadP320, P320_EJECT_DELAY } from './p320.ts';
+import { MCX_EJECT_DELAY } from './mcx.ts';
+import { MPX_EJECT_DELAY } from './mpx.ts';
+import { P320_EJECT_DELAY } from './p320.ts';
 import type { WeaponModelRecord, WeaponState } from './runtime-types.ts';
 import { Viewmodel } from './viewmodel.ts';
 import type { ViewModel } from './viewmodel.ts';
@@ -375,31 +372,15 @@ export class WeaponSystem {
     this.viewmodel.onClipEvent = (name, clip) => this._onClipEvent(name, clip);
 
     const t0 = performance.now();
-    const load = (id: string): Promise<WeaponModelRecord> =>
-      id === 'rifle'
-        ? loadM4()
-        : id === 'mcx'
-          ? loadMCX()
-          : id === 'pistol'
-            ? loadP320()
-            : id === 'lmg'
-              ? loadEvolys()
-              : id === 'smg'
-                ? loadMPX()
-                : id === 'sniper'
-                  ? loadAX338()
-                  : id === 'shotgun'
-                    ? loadM590()
-                    : Promise.reject(new Error(`[weapons] unknown weapon ${id}`));
     for (const id of WEAPON_IDS) this.states.set(id, this._makeState(id));
     const spawn = [...this.owned];
     const rest = WEAPON_IDS.filter((id) => !this.owned.has(id));
     let tris = 0;
-    const records = await Promise.all(spawn.map(load));
+    const records = await Promise.all(spawn.map(loadWeapon));
     for (let i = 0; i < spawn.length; i++) {
       tris += this.viewmodel.addWeapon(records[i], this._requireState(spawn[i]).def).tris;
     }
-    this._restTask = this._mountRest(rest, load);
+    this._restTask = this._mountRest(rest, loadWeapon);
     this.viewmodel.setActive(this.activeId);
     this.viewmodel.play('draw');
     this._pickups = new AmmoPickups(this);
@@ -1952,8 +1933,6 @@ export class WeaponSystem {
   }
 
   /* ====================================================================== */
-
-  resize() {}
 
   dispose() {
     for (const off of this._off ?? []) off();

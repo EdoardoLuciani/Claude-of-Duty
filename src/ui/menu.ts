@@ -20,8 +20,7 @@ type InvertButton = [HTMLButtonElement, boolean];
  * is announced on the event bus so render/player can react without importing
  * this module.
  *
- * Events emitted: `ui:pause` {paused}, `ui:sensitivity` {value}, `ui:fov` {value},
- * `ui:setting` {key, value}.
+ * Events emitted: `ui:pause` {paused}. Settings update the shared config directly.
  */
 export class PauseMenu {
   ctx: MenuContext;
@@ -64,7 +63,6 @@ export class PauseMenu {
     // ---- sensitivity -----------------------------------------------------
     this.sens = this._slider('Mouse Sensitivity', 0.2, 3.0, 0.01, (v) => {
       this.ctx.config.sensitivity = 0.0022 * v;
-      this.ctx.events.emit('ui:sensitivity', { value: this.ctx.config.sensitivity, multiplier: v });
       return v.toFixed(2);
     });
 
@@ -76,14 +74,12 @@ export class PauseMenu {
         cam.fov = v;
         cam.updateProjectionMatrix();
       }
-      this.ctx.events.emit('ui:fov', { value: v });
       return String(v | 0);
     });
 
     // ---- firing camera shake ---------------------------------------------
     this.shake = this._slider('Firing Camera Shake', 0, 1, 0.05, (v) => {
       this.ctx.config.firingShake = v;
-      this.ctx.events.emit('ui:setting', { key: 'firingShake', value: v });
       return v <= 1e-6 ? 'OFF' : `${Math.round(v * 100)}%`;
     });
 
@@ -100,7 +96,6 @@ export class PauseMenu {
       b.type = 'button';
       b.addEventListener('click', () => {
         this.ctx.config.invertY = val;
-        this.ctx.events.emit('ui:setting', { key: 'invertY', value: val });
         this.syncFromConfig();
       });
       this.invBtns.push([b, val]);
