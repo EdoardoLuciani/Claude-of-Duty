@@ -272,6 +272,8 @@ separate in #497.
 Sparse environmental one-shots use required recordings; see
 [docs/environment-audio.md](docs/environment-audio.md). Unsupported ambient human
 shouts/random tactical chatter are retired rather than inventing phantom actors.
+Radio switch/receive textures use required recordings composed with unchanged
+functional electronic tones; see [docs/radio-audio.md](docs/radio-audio.md).
 Remaining synthesis includes authored distant/sniper reports, reinforcement,
 shell casings/dry fire, tactical speech and intentional UI cues.
 

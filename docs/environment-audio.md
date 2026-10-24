@@ -55,12 +55,12 @@ The −24 dB active-sample target and −9 dB pre-codec peak cap are source refe
 not automatic runtime matching; decoded peak must remain below 0.5.
 
 Added storage: **715,588 encoded bytes / 11,558,400 float bytes at 48 kHz** (~11 MiB).
-With merged nonverbal reactions (#507), this branch has 264 required recordings
-(238 earlier baseline + 12 reactions + 14 environment); other categories add recordings.
-Reuse the existing all-settled bank's contact containers, per-kind no-immediate-repeat
-state, disposal and per-render cache ownership. Each
-event creates one finite source/output in the existing pool. Missing assets fail
-startup, with no per-event I/O or synthetic substitute. No new runtime dependency.
+Including merged nonverbal reactions (#507) and this branch's radio textures (#509),
+the required bank has 270 recordings: 238 earlier baseline, 12 reactions, 14 environment
+and 6 radio. Reuse the existing all-settled bank's contact containers, per-kind
+no-immediate-repeat state, disposal and per-render cache ownership. Each event
+creates one finite source/output in the existing pool. Missing assets fail startup,
+with no per-event I/O or synthetic substitute. No new runtime dependency.
 
 The scheduler retains the original volley/boom/one-shot timing ranges and silence
 when stopped. It no longer schedules nonexistent actors' tactical speech. All

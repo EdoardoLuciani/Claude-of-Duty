@@ -1571,7 +1571,7 @@ export class WeaponSystem {
         return;
       }
       this._stowRadio();
-      this.audio?.playUi?.('radio_strike', 1);
+      // The accepted radio:strike event owns the UI/audio acknowledgment once.
       return;
     }
     this.audio?.playUi?.('radio_denied', 0.9);

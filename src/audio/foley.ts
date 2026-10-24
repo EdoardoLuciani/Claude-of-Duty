@@ -560,14 +560,7 @@ export function uiSound(
       break;
     }
     case 'radio_open': {
-      const src = bank.source('white', rng, 0.9);
-      const bp = biquad(actx, 'bandpass', 1900, 0.9);
-      const g = gain(actx, 0);
-      src.connect(bp);
-      bp.connect(g);
-      g.connect(out);
-      ad(g.gain, t0, 0.5 * lvl, 0.006, 0.16);
-      src.start(t0, src._offset, 0.4);
+      // Physical switch/static are required recordings; retain the functional tone.
       const o = osc(actx, 'square', 880);
       const og = gain(actx, 0);
       o.connect(og);
@@ -597,14 +590,7 @@ export function uiSound(
       break;
     }
     case 'radio_strike': {
-      const src = bank.source('white', rng, 0.9);
-      const bp = biquad(actx, 'bandpass', 1500, 0.7);
-      const g = gain(actx, 0);
-      src.connect(bp);
-      bp.connect(g);
-      g.connect(out);
-      ad(g.gain, t0, 0.34 * lvl, 0.005, 0.2);
-      src.start(t0, src._offset, 0.4);
+      // Recorded transmission texture is composed with these acknowledgment tones.
       for (let i = 0; i < 2; i++) {
         const bt = t0 + 0.16 + i * 0.13;
         const o = osc(actx, 'square', 660 * Math.pow(1.35, i));
@@ -653,15 +639,7 @@ export function uiSound(
       break;
     }
     case 'intel_call': {
-      // Round callout: a radio hiss, then three rising beeps.
-      const src = bank.source('white', rng, 0.7);
-      const bp = biquad(actx, 'bandpass', 1800, 0.8);
-      const hg = gain(actx, 0);
-      src.connect(bp);
-      bp.connect(hg);
-      hg.connect(out);
-      ad(hg.gain, t0, 0.22 * lvl, 0.004, 0.18);
-      src.start(t0, src._offset, 0.35);
+      // Recorded receive texture is separate; keep all three useful rising beeps.
       for (let i = 0; i < 3; i++) {
         const bt = t0 + 0.08 + i * 0.16;
         const o = osc(actx, 'square', 720 * Math.pow(1.28, i));

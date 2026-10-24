@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { AIRCRAFT_URLS } from '../../src/audio/aircraft.ts';
 import { ENVIRONMENT_URLS } from '../../src/audio/environment.ts';
 import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
+import { RADIO_URLS } from '../../src/audio/radio.ts';
 import { REACTION_URLS } from '../../src/audio/reactions.ts';
 import { RELOAD_URLS } from '../../src/audio/reloads.ts';
 import {
@@ -19,7 +20,7 @@ const required =
   Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0) +
   Object.values(RELOAD_URLS).reduce((n, urls) => n + urls.length, 0) +
   (AIRCRAFT_URLS.length +
-    Object.values({ ...REACTION_URLS, ...ENVIRONMENT_URLS }).reduce(
+    Object.values({ ...REACTION_URLS, ...ENVIRONMENT_URLS, ...RADIO_URLS }).reduce(
       (n, urls) => n + urls.length,
       0
     ));
@@ -71,6 +72,7 @@ try {
         'hit',
         'reload',
         'nextAircraft',
+        'radio',
         'environment',
         'reaction',
       ]) {
@@ -113,6 +115,7 @@ try {
         'all original cases, recorded armour states and aircraft source run'
       );
       assert.equal(result.counts.nextAircraft, 1);
+      assert.equal(result.counts.radio, 3);
       assert.equal(result.counts.environment, 7);
       assert.equal(result.counts.reaction, 4);
       assert.deepEqual(result.report.failures, []);
@@ -147,6 +150,9 @@ try {
         'damage:break-mixed',
         'damage:break-armour-only',
         'aircraft:source',
+        'radio:radio_open',
+        'radio:radio_strike',
+        'radio:intel_call',
         ...['dog', 'siren', 'creak', 'settle', 'birds', 'vehicle', 'heli'].map(
           (kind) => `ambient:${kind}`
         ),
