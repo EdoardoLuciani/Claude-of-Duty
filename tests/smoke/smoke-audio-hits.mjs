@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 import { AIRCRAFT_URLS } from '../../src/audio/aircraft.ts';
+import { ENVIRONMENT_URLS } from '../../src/audio/environment.ts';
 import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
 import { HIT_URLS } from '../../src/audio/hits.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
@@ -249,7 +250,10 @@ try {
       reloads +
       Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0) +
       (AIRCRAFT_URLS.length +
-        Object.values({ ...REACTION_URLS, ...RADIO_URLS }).reduce((n, urls) => n + urls.length, 0)),
+        Object.values({ ...REACTION_URLS, ...ENVIRONMENT_URLS, ...RADIO_URLS }).reduce(
+          (n, urls) => n + urls.length,
+          0
+        )),
     'missing contact participates in required all-settled startup'
   );
   missing.dispose();

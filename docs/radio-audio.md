@@ -39,8 +39,8 @@ The shared offline helper applies explicit mono conversion/cancellation checks,
 5/25 ms fades, active references (click −26 dB, fuzz −30 dB), −9 dB pre-codec peak
 cap and decoded peak <0.5. No pitch/time modification or per-play normalization.
 **30,575 encoded / 322,560 decoded float bytes at 48 kHz.** With merged nonverbal
-reactions (#507), this branch has 256 required files (238 earlier baseline +12 reactions
-+6 radio); other categories add recordings.
+reactions (#507) and environment (#508), this branch has 270 required files
+(238 earlier baseline +12 reactions +14 environment +6 radio).
 
 The owner explicitly cleared public edited #474 radio derivatives and separately
 mixed review captures. Preserve source licence/entitlement records; this is owner

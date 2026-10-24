@@ -122,6 +122,13 @@ export function mixCases() {
       distance: 90,
       space,
     });
+  for (const which of ['dog', 'siren', 'creak', 'settle', 'birds', 'vehicle', 'heli'])
+    for (const variant of [0, 1])
+      add(`recorded-environment-${which}-${variant}`, 'background', 'ambient', {
+        which,
+        variant,
+        distance: which === 'heli' || which === 'siren' ? 90 : 14,
+      });
   add('distant-volley', 'distant', 'distant-volley');
   add('distant-boom', 'distant', 'distant-boom');
   add('shop-radio', 'music', 'music');
@@ -391,8 +398,10 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
         startAmbience(t);
         break;
       case 'ambient':
-        at(t, () =>
-          audio._playAt(
+        at(t, () => {
+          if (s.variant !== undefined)
+            samples.hitIndices[`environment-${s.which}`] = s.variant === 0 ? 1 : 0;
+          return audio._playAt(
             'ambient',
             s.distance,
             1.6,
@@ -405,8 +414,8 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
             },
             'ambience',
             0.15
-          )
-        );
+          );
+        });
         break;
       case 'music':
         at(t, () => radio.start());
