@@ -24,7 +24,7 @@ import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from './grip-contacts.ts';
 import { Arm } from './hands.ts';
 import { M4Animation } from './m4.ts';
 import { M590Animation } from './m590.ts';
-import type { WeaponMaterialsNode } from './materials-tsl.ts';
+import type { ReticleMaterials } from './materials-tsl.ts';
 import {
   Spring,
   Spring3,
@@ -254,7 +254,6 @@ export class Viewmodel {
     uChevron: UniformNode<'float', number>;
     uMradScale: UniformNode<'float', number>;
   };
-  declare mats: WeaponMaterialsNode;
   declare rng: import('../core/rng.ts').Rng;
   declare anchor: THREE.Object3D;
   declare rig: THREE.Object3D;
@@ -338,9 +337,8 @@ export class Viewmodel {
   declare triggerT: number;
   declare triggerTarget: number;
 
-  constructor(ctx: ViewmodelContext, mats: WeaponMaterialsNode) {
+  constructor(ctx: ViewmodelContext, mats: ReticleMaterials) {
     this.ctx = ctx;
-    this.mats = mats;
     this.rng = ctx.rng.fork();
 
     this.anchor = new THREE.Object3D();
@@ -779,8 +777,7 @@ export class Viewmodel {
     });
   }
 
-  // Fit the support wrap and bake its contacts into weapon AO. The glove itself
-  // uses Blender's self-occlusion map, not static weapon-space vertex AO.
+  // MCX retains fitted support-hand posing; weapon AO belongs to the authored asset.
   _fitSupportHand(w: WeaponEntry) {
     const nodes: WeaponNodes = w.model.nodes;
     const hg = nodes.supportContact ?? nodes.handguard;
@@ -790,52 +787,12 @@ export class Viewmodel {
     handBasis(this._handQuatL, gL.finger ?? [0.82, 0.5, -0.28], gL.back ?? [-0.5, 0.32, -0.8]);
     const poseName = `clamp:${w.id}`;
     this.armL.setPose('clamp');
-    const contacts = this.armL.fitToCylinder(
-      this._handPosL,
-      this._handQuatL,
-      vec3(hg.axis),
-      vec3(hg.dir),
-      hg.r,
-      { clearance: 0.001, poseName }
-    );
+    this.armL.fitToCylinder(this._handPosL, this._handQuatL, vec3(hg.axis), vec3(hg.dir), hg.r, {
+      clearance: 0.001,
+      poseName,
+    });
     w.lhandPose = poseName;
-    // Only keep contacts that actually landed on the handguard's own extent —
-    // a fingertip that overshot past the end cap must not paint AO on the barrel.
-    const z0 = Math.max(hg.z0, hg.z1);
-    const z1 = Math.min(hg.z0, hg.z1);
-    const kept = contacts.filter((p) => p.z <= z0 + 0.012 && p.z >= z1 - 0.012);
-    this._bakeContactAOOnWeapon(w, kept, 0.012, 0.9);
     this.armL.setPose(poseName);
-  }
-
-  /**
-   * The weapon side of the same contact gradient. The handguard geometry already
-   * carries wear/grime/AO masks from `bakeMasks`, so this only ever RAISES the
-   * AO channel — the edge-wear and grime layers are untouched.
-   */
-  _bakeContactAOOnWeapon(w: WeaponEntry, contacts: THREE.Vector3[], radius: number, peak: number) {
-    if (!contacts.length) return;
-    const r2 = radius * radius;
-    for (const mesh of w.meshes) {
-      const geo = mesh.geometry;
-      const pos = geo.getAttribute('position');
-      const col = geo.getAttribute('color');
-      if (!pos || !col) continue;
-      for (let i = 0; i < pos.count; i++) {
-        _v.fromBufferAttribute(pos, i);
-        let closest = Infinity;
-        for (const c of contacts) {
-          const d2 = _v.distanceToSquared(c);
-          if (d2 < closest) closest = d2;
-        }
-        if (closest > r2) continue;
-        const t = 1 - Math.sqrt(closest) / radius;
-        const s = t * t * t * (t * (t * 6 - 15) + 10);
-        const k = i * 3 + 2;
-        col.array[k] = Math.max(col.array[k], peak * s);
-      }
-      col.needsUpdate = true;
-    }
   }
 
   setActive(id: string) {

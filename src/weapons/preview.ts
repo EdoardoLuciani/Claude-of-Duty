@@ -21,7 +21,7 @@ import { MaterialSystem } from '../materials/index.ts';
 import { createWebGpuRenderer } from '../render/webgpu-device.ts';
 import { WEAPON_DEFS, WEAPON_IDS } from './defs.ts';
 import { loadWeapon } from './loaders.ts';
-import { WeaponMaterialsNode } from './materials-tsl.ts';
+import { ReticleMaterials } from './materials-tsl.ts';
 import { Viewmodel } from './viewmodel.ts';
 
 const params = new URLSearchParams(location.search);
@@ -119,7 +119,7 @@ const ctx = {
   has: (id: string) => id === 'materials',
 };
 
-const mats = new WeaponMaterialsNode(materials);
+const mats = new ReticleMaterials();
 const vm = new Viewmodel(ctx, mats);
 await vm.loadArms();
 const FIRST_PERSON = ['fp', 'ads', 'sprint', 'reload', 'inspect'].includes(VIEW);

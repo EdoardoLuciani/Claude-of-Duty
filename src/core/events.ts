@@ -223,4 +223,3 @@ export interface EngineEventMap {
   'ui:pause': { paused: boolean };
 }
 export type EngineEventName = keyof EngineEventMap;
-export type EventListener<K extends EngineEventName> = (payload: EngineEventMap[K]) => void;

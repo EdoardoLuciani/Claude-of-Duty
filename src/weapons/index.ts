@@ -16,7 +16,7 @@ import {
 } from './defs.ts';
 import { grenadeMesh } from './grenade-mesh.ts';
 import { loadWeapon } from './loaders.ts';
-import { WeaponMaterialsNode } from './materials-tsl.ts';
+import { ReticleMaterials } from './materials-tsl.ts';
 import { lerp, DEG } from './mathx.ts';
 import { MCX_EJECT_DELAY } from './mcx.ts';
 import { MPX_EJECT_DELAY } from './mpx.ts';
@@ -144,7 +144,7 @@ interface LiveGrenade {
 export class WeaponSystem {
   declare ctx: EngineContext;
   declare rng: Rng;
-  declare mats: WeaponMaterialsNode;
+  declare mats: ReticleMaterials;
   private _viewmodel: ViewModel | null = null;
   private _sim: ProjectileSim | null = null;
   private _pickups: AmmoPickups | null = null;
@@ -209,7 +209,6 @@ export class WeaponSystem {
     spin: number;
   };
   declare _pendingShots: number;
-  declare _pendingFirst: boolean;
   declare _shellQueue: Array<{ t: number; weapon: string | null }>;
   declare _droppedMags: DroppedMagazine[];
   declare _grenades: LiveGrenade[];
@@ -297,7 +296,6 @@ export class WeaponSystem {
       spin: 0,
     };
     this._pendingShots = 0;
-    this._pendingFirst = false;
 
     // Deferred shell ejections (a case leaves the port a few ms after the shot).
     this._shellQueue = [];
@@ -364,7 +362,7 @@ export class WeaponSystem {
   async init(ctx: EngineContext) {
     this.ctx = ctx;
     this.rng = ctx.rng.fork();
-    this.mats = new WeaponMaterialsNode(ctx.get('materials'));
+    this.mats = new ReticleMaterials();
     this._sim = new ProjectileSim(ctx);
     this._viewmodel = new Viewmodel(ctx, this.mats);
     await this.viewmodel.loadArms();
@@ -984,7 +982,6 @@ export class WeaponSystem {
     this._sinceShot = 0;
     this.stats.fired++;
     this._pendingShots++;
-    this._pendingFirst = this._pendingFirst || first;
     this._fireSeed = seed;
 
     if (boltAction) {
@@ -1758,7 +1755,6 @@ export class WeaponSystem {
         ctx.events.emit('weapon:fire', this._firePayload);
       }
       this._pendingShots = 0;
-      this._pendingFirst = false;
     }
 
     // ---- deferred shell ejection ---------------------------------------

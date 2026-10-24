@@ -76,8 +76,6 @@ export class Health {
   declare effect: number;
   declare _payload: DamageTakenPayload;
   declare _statePayload: HealthStatePayload;
-  declare _emitTimer: number;
-  declare _lastEmitHealth: number;
   declare _beat: { strength: number; fraction: number };
 
   constructor(ctx: HealthContext, rig: DamageRig | null) {
@@ -116,8 +114,6 @@ export class Health {
       dead: false,
       effect: 0,
     };
-    this._emitTimer = 0;
-    this._lastEmitHealth = HEALTH.max;
     this._beat = { strength: 0, fraction: 1 };
   }
 
@@ -140,9 +136,14 @@ export class Health {
     this.beatAge = 1;
     this.pulse = 0;
     this.lastDamageTime = -100;
-    this._lastEmitHealth = this.value;
     // Publish resets too: living-player respawns have no death-camera event.
-    this._emitState(true);
+    this._emitState();
+  }
+
+  /** Diagnostic override without damage feedback; publish explicitly, never poll. */
+  setDebugValue(value: number): void {
+    this.value = value;
+    this._emitState();
   }
 
   /* ==================================================================== */
@@ -223,7 +224,7 @@ export class Health {
       });
       // (death allocations are fine — this happens once)
     }
-    this._emitState(true);
+    this._emitState();
     return dealt;
   }
 
@@ -232,7 +233,7 @@ export class Health {
     const before = this.value;
     this.value = Math.min(this.max, this.value + amount);
     const applied = this.value - before;
-    if (applied > 0) this._emitState(true);
+    if (applied > 0) this._emitState();
     return applied;
   }
 
@@ -294,15 +295,9 @@ export class Health {
     if (this.rig && this.suppression > 0.02) {
       this.rig.addTrauma(this.suppression * H.suppression.shakeScale * dt);
     }
-
-    this._emitTimer -= dt;
-    if (this._emitTimer <= 0) {
-      this._emitTimer = 0.1;
-      if (Math.abs(this.value - this._lastEmitHealth) > 0.4) this._emitState(false);
-    }
   }
 
-  _emitState(force: boolean): void {
+  _emitState(): void {
     const s = this._statePayload;
     const wasLow = s.low;
     s.health = this.value;
@@ -311,9 +306,8 @@ export class Health {
     s.effect = this.effect;
     s.suppression = this.suppression;
     s.dead = this.dead;
-    this._lastEmitHealth = this.value;
     s.changedLowState = wasLow !== s.low;
-    s.forced = !!force;
+    s.forced = true;
     this.ctx.events.emit('player:health', s);
   }
 }

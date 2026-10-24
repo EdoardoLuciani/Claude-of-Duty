@@ -17,7 +17,6 @@ export const HIT_URLS = {
     new URL('./samples/hits/break-3.opus', import.meta.url).href,
   ],
 } as const;
-export type HitKind = keyof typeof HIT_URLS;
 export interface DamageSoundOptions {
   when?: number;
   amount: number;

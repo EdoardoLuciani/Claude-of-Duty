@@ -106,18 +106,10 @@ export type QualityPreset = (typeof QUALITY_PRESETS)[QualityName];
 export interface RuntimeConfig extends Omit<typeof DEFAULTS, 'quality'> {
   quality: QualityName;
   q: QualityPreset;
-  setQuality(name: QualityName): void;
 }
 
-export function createConfig(
-  overrides: Partial<Omit<RuntimeConfig, 'q' | 'setQuality'>> = {}
-): RuntimeConfig {
+export function createConfig(overrides: Partial<Omit<RuntimeConfig, 'q'>> = {}): RuntimeConfig {
   const cfg = { ...DEFAULTS, ...overrides } as RuntimeConfig;
   cfg.q = { ...QUALITY_PRESETS[cfg.quality] };
-  cfg.setQuality = (name: QualityName) => {
-    if (!QUALITY_PRESETS[name]) throw new Error(`unknown quality preset "${name}"`);
-    cfg.quality = name;
-    Object.assign(cfg.q, QUALITY_PRESETS[name]);
-  };
   return cfg;
 }

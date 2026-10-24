@@ -29,7 +29,7 @@ try {
   await page.evaluate(() => {
     window.__APPLY_SHOT__('weapon');
     const ctx = window.__ENGINE__.ctx;
-    ctx.get('player').health.value = 30;
+    ctx.get('player').health.setDebugValue(30);
     ctx.get('player').setControlEnabled(true);
     ctx.input.enabled = true;
     ctx.input.frozen = false;

@@ -139,7 +139,7 @@ try {
             weapon: 'rifle',
           });
         } else {
-          player.health.value = 100 - amount;
+          player.health.setDebugValue(100 - amount);
           player.health.armour = plateBreak ? 0 : 50;
           const from = engine.camera.position.clone();
           from.x += 5;
@@ -457,7 +457,7 @@ try {
       ['real-lethal-damage', 10, 0, 25, 'bullet'],
     ].map(([id, health, armour, damage, type]) => {
       player.health.reset(true);
-      player.health.value = health;
+      player.health.setDebugValue(health);
       player.health.armour = armour;
       window.hitTrace.length = 0;
       player.applyDamage(damage, from, { type });

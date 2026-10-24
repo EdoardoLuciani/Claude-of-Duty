@@ -52,7 +52,7 @@ const HEAL_KEY = bindingLabel('heal');
  *   ui.debugState('combat'|'menu'|'clean'|'market')
  *
  * ---------------------------------------------------------------------------
- * WHAT THIS SUBSYSTEM READS FROM OTHERS (all optional, all duck-typed)
+ * WHAT THIS SUBSYSTEM READS FROM OTHERS (optional providers, complete snapshots)
  * ---------------------------------------------------------------------------
  *   weapons.getHudState() -> { name, mode, ammo, reserve, magSize, reloading,
  *                              reloadProgress, ads, spread, lethalCount }
@@ -505,8 +505,7 @@ export class UiSystem {
   _weaponState() {
     const w = this.ctx.peek('weapons');
     if (!w || typeof w.getHudState !== 'function') return null;
-    const s = w.getHudState();
-    return s && typeof s === 'object' ? s : null;
+    return w.getHudState() ?? null;
   }
 
   /** True when a `damage:dealt` payload is aimed at the local player. */
@@ -522,8 +521,7 @@ export class UiSystem {
   _playerState() {
     const p = this.ctx.peek('player');
     if (!p || typeof p.getHudState !== 'function') return null;
-    const s = p.getHudState();
-    return s && typeof s === 'object' ? s : null;
+    return p.getHudState() ?? null;
   }
 
   _playerPos() {
@@ -725,51 +723,51 @@ export class UiSystem {
     if (ws) {
       if (ws.name) s.weaponName = ws.name;
       if (ws.mode) s.fireMode = ws.mode;
-      if (ws.ammo !== undefined) s.ammo = ws.ammo;
-      if (ws.reserve !== undefined) s.reserve = ws.reserve;
-      if (ws.magSize !== undefined) s.magSize = ws.magSize;
-      if (ws.reloading !== undefined) s.reloading = !!ws.reloading;
-      if (ws.reloadProgress !== undefined) s.reloadProgress = ws.reloadProgress;
-      if (ws.ads !== undefined) s.ads = !!ws.ads;
-      if (ws.spread !== undefined) s.baseSpread = 4 + ws.spread * 40;
-      if (ws.lethalCount !== undefined) s.lethalCount = ws.lethalCount;
-      if (ws.cooking !== undefined) s.cooking = !!ws.cooking;
-      if (ws.grenadeEquipped !== undefined) s.grenadeEquipped = !!ws.grenadeEquipped;
-      if (ws.radioEquipped !== undefined) s.radioEquipped = !!ws.radioEquipped;
-      if (ws.carpetCount !== undefined) s.carpetCount = ws.carpetCount;
+      s.ammo = ws.ammo;
+      s.reserve = ws.reserve;
+      s.magSize = ws.magSize;
+      s.reloading = ws.reloading;
+      s.reloadProgress = ws.reloadProgress;
+      s.ads = ws.ads;
+      s.baseSpread = 4 + ws.spread * 40;
+      s.lethalCount = ws.lethalCount;
+      s.cooking = ws.cooking;
+      s.grenadeEquipped = ws.grenadeEquipped;
+      s.radioEquipped = ws.radioEquipped;
+      s.carpetCount = ws.carpetCount;
     }
 
     const gameState = s.simulate ? null : ctx.peek('game')?.getHudState?.();
     if (gameState) {
-      s.score = gameState.score ?? s.score;
-      s.wave = gameState.wave ?? s.wave;
-      s.enemiesRemaining = gameState.enemiesRemaining ?? s.enemiesRemaining;
-      s.waveTotal = gameState.waveTotal ?? s.waveTotal;
-      s.waveIncoming = gameState.waveIncoming ?? s.waveIncoming;
-      s.nextWaveIn = gameState.nextWaveIn ?? s.nextWaveIn;
+      s.score = gameState.score;
+      s.wave = gameState.wave;
+      s.enemiesRemaining = gameState.enemiesRemaining;
+      s.waveTotal = gameState.waveTotal;
+      s.waveIncoming = gameState.waveIncoming;
+      s.nextWaveIn = gameState.nextWaveIn;
     }
 
     const marketState = s.simulate ? null : ctx.peek('market')?.getHudState?.();
     if (marketState) {
-      s.credits = marketState.credits ?? s.credits;
-      s.marketIn = marketState.marketIn ?? s.marketIn;
+      s.credits = marketState.credits;
+      s.marketIn = marketState.marketIn;
     }
 
     const ps = s.simulate ? null : this._playerState();
     if (ps) {
-      if (ps.health !== undefined) s.health = ps.health;
-      if (ps.maxHealth !== undefined) s.maxHealth = ps.maxHealth;
-      if (ps.armour !== undefined) s.armour = ps.armour;
-      if (ps.bandages !== undefined) s.bandages = ps.bandages;
-      if (ps.healing !== undefined) s.healing = !!ps.healing;
-      if (ps.healProgress !== undefined) s.healProgress = ps.healProgress;
-      if (ps.hurt !== undefined) s.hurt = ps.hurt;
-      if (ps.pulse !== undefined) s.pulse = ps.pulse;
-      if (ps.move !== undefined) s.move = ps.move;
-      if (ps.sprint !== undefined) s.sprint = !!ps.sprint;
-      if (ps.crouch !== undefined) s.crouch = !!ps.crouch;
-      if (ps.ads !== undefined) s.ads = !!ps.ads;
-      if (ps.airborne !== undefined) s.airborne = !!ps.airborne;
+      s.health = ps.health;
+      s.maxHealth = ps.maxHealth;
+      s.armour = ps.armour;
+      s.bandages = ps.bandages;
+      s.healing = ps.healing;
+      s.healProgress = ps.healProgress;
+      s.hurt = ps.hurt;
+      s.pulse = ps.pulse;
+      s.move = ps.move;
+      s.sprint = ps.sprint;
+      s.crouch = ps.crouch;
+      s.ads = ps.ads;
+      s.airborne = ps.airborne;
     }
 
     const pos = this._playerPos();

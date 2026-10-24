@@ -165,7 +165,7 @@ try {
       point,
       headshot: true,
     });
-    player.health.value = 62;
+    player.health.setDebugValue(62);
     player.health.armour = 78;
     ctx.events.emit('damage:taken', {
       amount: 11,

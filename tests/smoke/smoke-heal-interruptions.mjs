@@ -113,7 +113,21 @@ for (const ending of ['release', 'complete', 'grenade'])
     ui._blipView = [];
     ui._objectives = [];
     ui._weaponState = () => null;
-    ui._playerState = () => ({ healing: player.healCtrl.active });
+    ui._playerState = () => ({
+      health: player.health.value,
+      maxHealth: player.health.max,
+      armour: player.health.armour,
+      bandages: player.healCtrl.bandages,
+      healing: player.healCtrl.active,
+      healProgress: player.healCtrl.active ? 0.3 : 0,
+      hurt: 0,
+      pulse: 0,
+      move: 0,
+      sprint: false,
+      crouch: false,
+      ads: false,
+      airborne: false,
+    });
     ui._playerPos = () => ({ x: 0, z: 0 });
     ui._collectBlips = ui._buildCompassObjectives = noop;
     for (const name of [

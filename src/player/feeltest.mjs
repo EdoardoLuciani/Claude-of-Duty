@@ -744,11 +744,11 @@ function runBench() {
     p.applyDamage(45, from);
     offDamage();
     const passEnabled = (() => {
-      p.health.value = 20;
+      p.health.setDebugValue(20);
       p.health.effect = 0.9;
       p.lowHealthPass?.sync(p.health);
       const on = !!p.lowHealthPass?.enabled;
-      p.health.value = 55;
+      p.health.setDebugValue(55);
       p.health.effect = 0;
       return on;
     })();
