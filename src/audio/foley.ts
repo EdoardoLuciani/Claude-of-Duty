@@ -1,7 +1,7 @@
 /**
  * AUDIO / FOLEY
  *
- * Impacts, footsteps, shell casings, reload mechanics, explosions, body falls
+ * Impacts, footsteps, shell casings, explosions, body falls
  * and UI. Everything is keyed off the twelve surface names in ARCHITECTURE.md
  * so physics, FX, decals and audio always agree about what was hit.
  *
@@ -106,11 +106,6 @@ interface ShellOptions extends VoiceOptions {
   flight?: number;
   surface?: string;
 }
-interface ReloadOptions {
-  when?: number;
-  heavy?: number;
-  retained?: boolean;
-}
 interface ExplosionOptions extends VoiceOptions {
   distance?: number;
   radius?: number;
@@ -118,12 +113,6 @@ interface ExplosionOptions extends VoiceOptions {
 type UiOptions = VoiceOptions;
 interface HeartbeatOptions extends VoiceOptions {
   buffer: AudioBuffer;
-}
-interface ResonatorPart {
-  f: number;
-  q: number;
-  g: number;
-  decay: number;
 }
 
 /**
@@ -836,193 +825,6 @@ export function shellCasing(
     }
   }
   return { node: out, end: end + 0.05, send: 0.42 };
-}
-
-/* ------------------------------------------------------------------ */
-/* Reload foley                                                       */
-/* ------------------------------------------------------------------ */
-
-/**
- * Reload mechanics, one call per `weapon:reload` phase. Keeping the phases as
- * separate one-shots (instead of one long sound) is what lets the audio stay
- * locked to the animation whatever its length.
- */
-/** The four phases are wildly different in energy; level them per phase. */
-const RELOAD_TRIM = {
-  start: 3.2,
-  magout: 3.0,
-  magin: 0.7,
-  slide: 1.5,
-  end: 1.5,
-  pump: 2.2,
-  shellin: 1.4,
-  charge: 1.5,
-  boltopen: 1.5,
-  boltclose: 1.5,
-} as const;
-type ReloadPhase = keyof typeof RELOAD_TRIM;
-
-export function reloadPhase(
-  actx: BaseAudioContext,
-  bank: NoiseBank,
-  rng: Rng,
-  phase: ReloadPhase | undefined,
-  o: ReloadOptions = {}
-): AudioVoice {
-  const t0 = o.when ?? actx.currentTime;
-  const heavy = o.heavy ?? 1; // LMG/shotgun = heavier hardware
-  const out = gain(actx, 0.42 * (phase === undefined ? 1.5 : (RELOAD_TRIM[phase] ?? 1.5))); // VOICE TRIM
-  let end = t0 + 0.3;
-  const metal = (t: number, parts: ResonatorPart[], exc = 0.0025): void => {
-    struckResonator(actx, bank, rng, t, parts, exc).connect(out);
-    end = Math.max(end, t + 0.35);
-  };
-  const rustle = (t: number, dur: number, level: number, f: number): void => {
-    const src = bank.source('white', rng, rng.range(0.8, 1.2));
-    const bp = biquad(actx, 'bandpass', f, 0.6);
-    const g = gain(actx, 0);
-    series(src, bp, g).connect(out);
-    ad(g.gain, t, level, 0.02, dur);
-    src.start(t, src._offset, dur * 2 + 0.05);
-    end = Math.max(end, t + dur * 2);
-  };
-
-  switch (phase) {
-    case 'shellin':
-      // Hull seats in the tube: brass rim clicks the elevator, polymer scrapes in.
-      rustle(t0, 0.07, 0.16, rng.range(1800, 2800));
-      metal(t0 + 0.02, [
-        { f: 2100 * semis(rng.range(-2, 2)), q: 22, g: 0.28 * heavy, decay: 0.03 },
-        { f: 740, q: 8, g: 0.18 * heavy, decay: 0.04 },
-      ]);
-      break;
-
-    case 'start':
-      // Hand leaves the grip, palm slaps the magwell, mag catch is pressed.
-      rustle(t0, 0.18, 0.2, rng.range(1400, 2200));
-      metal(t0 + rng.range(0.04, 0.08), [
-        { f: 2450 * semis(rng.range(-2, 2)), q: 30, g: 0.55 * heavy, decay: 0.03 },
-        { f: 5100, q: 18, g: 0.25, decay: 0.016 },
-        { f: 780, q: 10, g: 0.3 * heavy, decay: 0.045 },
-      ]);
-      break;
-
-    case 'magout': {
-      // Spring release, mag scrapes out of the well, then plastic hits the deck.
-      metal(t0, [
-        { f: 1650 * semis(rng.range(-2, 2)), q: 24, g: 0.65 * heavy, decay: 0.05 },
-        { f: 3400, q: 16, g: 0.35, decay: 0.025 },
-      ]);
-      const st = t0 + 0.03;
-      const src = bank.source('white', rng, rng.range(0.9, 1.3));
-      const bp = biquad(actx, 'bandpass', 3200, 1.1);
-      const g = gain(actx, 0);
-      series(src, bp, g).connect(out);
-      sweep(bp.frequency, st, 4200, 1600, 0.12);
-      ad(g.gain, st, 0.2, 0.01, 0.12);
-      src.start(st, src._offset, 0.3);
-      // A retained tactical magazine must not make a ground-impact sound.
-      if (!o.retained) {
-        const dt = t0 + rng.range(0.16, 0.3);
-        metal(
-          dt,
-          [
-            { f: 480 * semis(rng.range(-3, 3)), q: 9, g: 0.2, decay: 0.05 },
-            { f: 1180, q: 7, g: 0.11, decay: 0.03 },
-            { f: 2600, q: 5, g: 0.05, decay: 0.015 },
-          ],
-          0.004
-        );
-        end = Math.max(end, dt + 0.3);
-      }
-      break;
-    }
-
-    case 'magin': {
-      // Fresh mag guided in, seated with a palm strike: a low thunk plus a sharp
-      // latch click. The thunk needs real low end or it feels weightless.
-      rustle(t0, 0.12, 0.16, rng.range(1200, 2000));
-      const it = t0 + rng.range(0.05, 0.1);
-      const b = osc(actx, 'sine', 190 * heavy);
-      const bg = gain(actx, 0);
-      const drv = shaper(actx, saturationCurve(3, 0.5), '2x');
-      b.connect(bg);
-      series(bg, drv).connect(out);
-      sweep(b.frequency, it, 230 * heavy, 110 * heavy, 0.06);
-      ad(bg.gain, it, 0.4 * heavy, 0.002, 0.055);
-      b.start(it);
-      b.stop(it + 0.16);
-      metal(
-        it,
-        [
-          { f: 1250 * semis(rng.range(-2, 2)), q: 20, g: 0.3 * heavy, decay: 0.06 },
-          { f: 2800, q: 26, g: 0.18, decay: 0.03 },
-          { f: 6200, q: 14, g: 0.07, decay: 0.012 },
-        ],
-        0.003
-      );
-      metal(
-        it + rng.range(0.02, 0.05),
-        [
-          { f: 3600, q: 34, g: 0.16, decay: 0.02 },
-          { f: 7400, q: 20, g: 0.07, decay: 0.01 },
-        ],
-        0.0015
-      );
-      break;
-    }
-
-    case 'pump': {
-      // Forend rack: wood/polymer scrape, the bars slam home, hull ejects.
-      rustle(t0, 0.08, 0.28 * heavy, rng.range(900, 1500));
-      metal(
-        t0 + 0.02,
-        [
-          { f: 620 * semis(rng.range(-2, 2)), q: 14, g: 0.55 * heavy, decay: 0.07 },
-          { f: 1480, q: 18, g: 0.32 * heavy, decay: 0.04 },
-          { f: 2800, q: 10, g: 0.14, decay: 0.02 },
-        ],
-        0.0035
-      );
-      rustle(t0 + 0.07, 0.09, 0.18, rng.range(1600, 2400));
-      metal(
-        t0 + 0.16,
-        [
-          { f: 980 * semis(rng.range(-2, 2)), q: 20, g: 0.48 * heavy, decay: 0.06 },
-          { f: 2100, q: 16, g: 0.22, decay: 0.03 },
-          { f: 4200, q: 12, g: 0.1, decay: 0.016 },
-        ],
-        0.003
-      );
-      break;
-    }
-
-    case 'charge':
-    case 'boltopen':
-      // Rearward movement only. Forward closure belongs to its own native beat.
-      rustle(t0, 0.06, 0.24 * heavy, 2600);
-      metal(t0, [
-        { f: 1450, q: 22, g: 0.3 * heavy, decay: 0.05 },
-        { f: 3100, q: 18, g: 0.16, decay: 0.022 },
-      ]);
-      break;
-    case 'boltclose':
-    case 'slide':
-      // Reuse the existing steel resonators at the authored slide-catch beat,
-      // without a fictitious rearward rack or a second clack at reload end.
-      metal(t0, [
-        { f: 1450 * semis(rng.range(-2, 2)), q: 22, g: 0.3 * heavy, decay: 0.05 },
-        { f: 3100, q: 18, g: 0.16, decay: 0.022 },
-      ]);
-      metal(t0 + 0.008, [{ f: 4900, q: 46, g: 0.09, decay: 0.16 }], 0.002);
-      break;
-    case 'end':
-    default:
-      // A gesture ending is not a charging action, including tube reload loops.
-      rustle(t0, 0.08, 0.08, 1400);
-      break;
-  }
-  return { node: out, end: end + 0.05, send: 0.3 };
 }
 
 /* ------------------------------------------------------------------ */

@@ -111,7 +111,7 @@ try {
   });
   console.log('Audio capture initialized');
   const cases = [
-    ...['rifle', 'mcx', 'pistol'].flatMap((id) => [
+    ...['rifle', 'mcx', 'pistol', 'smg', 'sniper', 'shotgun', 'lmg'].flatMap((id) => [
       [id, 'tactical'],
       [id, 'empty'],
     ]),
@@ -135,7 +135,7 @@ try {
         Object.assign(w.state, {
           mag: mode === 'empty' ? 0 : 2,
           chambered: mode !== 'empty',
-          reserve: 60,
+          reserve: id === 'shotgun' ? 1 : 200,
         });
         Object.assign(w._state, {
           empty: mode === 'empty',
@@ -198,8 +198,13 @@ try {
             });
           }
           ctx.time.elapsed += dt;
-          w._fireTimer = Math.max(0, w._fireTimer - dt);
+          // Advance normal pose/ammo state and transient FX as well as the clip;
+          // suspending unrelated gameplay must not freeze lockback or muzzle flash.
+          w.update(dt, ctx);
+          const fx = ctx.get('fx');
+          fx.update(dt, ctx);
           w.lateUpdate(dt, ctx);
+          fx.lateUpdate(dt, ctx);
           audio.update(dt, ctx);
           await window.__PUMP__(1);
           if (capture) await window.reloadFrame(`${id} / ${mode} — ${before ? 'BEFORE' : 'AFTER'}`);
@@ -232,6 +237,11 @@ try {
     assert.equal(row.error, null);
     assert.equal(row.report.errors, 0);
     if (!args.before) {
+      assert.equal(
+        row.recorded.length,
+        row.trace.filter((e) => e.phase !== 'casing').length,
+        `${id}/${mode}: every handling cue uses a recording, including hand settle`
+      );
       if (mode === 'fire')
         assert.deepEqual(
           row.trace.filter((e) => e.phase !== 'casing').map((e) => e.phase),

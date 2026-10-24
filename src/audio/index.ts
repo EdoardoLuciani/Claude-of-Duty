@@ -39,7 +39,6 @@ import {
   surfaceImpact,
   footstep,
   shellCasing,
-  reloadPhase,
   explosion,
   bodyFall,
   uiSound,
@@ -90,8 +89,6 @@ interface AudioOptions {
   flight?: number;
   phase?: ReloadPhase;
   reloadWeapon?: string;
-  heavy?: number;
-  retained?: boolean;
   radius?: number;
   bark?: string;
   f0?: number;
@@ -677,14 +674,7 @@ export class AudioSystem {
           flight: o.flight,
         });
       case 'reload':
-        return (
-          this.samples!.reload(o.reloadWeapon ?? '', o.phase, rng, { when }) ??
-          reloadPhase(actx, bank, rng, o.phase, {
-            when,
-            heavy: o.heavy,
-            retained: o.retained,
-          })
-        );
+        return this.samples!.reload(o.reloadWeapon ?? '', o.phase, rng, { when });
       case 'explosion': {
         if (dist > 50)
           return explosion(actx, bank, rng, {
@@ -1071,14 +1061,9 @@ export class AudioSystem {
   _onReload(p: EngineEventMap['weapon:reload']): void {
     if (!this.running) return;
     const w = p?.weapon;
-    const name = typeof w === 'string' ? w : (w?.audio ?? w?.id ?? w?.name);
-    const heavy = /lmg|shot|snip|m249|pkm/i.test(String(name ?? '')) ? 1.35 : 1;
-    const phase = p?.phase ?? 'end';
     const options = {
-      phase,
+      phase: p?.phase ?? 'end',
       reloadWeapon: typeof w === 'string' ? w : (w?.id ?? ''),
-      heavy,
-      retained: p?.retained === true,
     };
     if (p?.position) {
       this._playAt('reload', p.position.x, p.position.y, p.position.z, options, 'foley', 0.6);

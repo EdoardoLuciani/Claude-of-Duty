@@ -4,7 +4,7 @@
  * Renders every voice through the real mixer graph in an OfflineAudioContext
  * and measures what came out. This is how the audio subsystem is verified:
  * screenshots prove nothing about sound, and OfflineAudioContext needs no user
- * gesture, so the whole synthesis path can be exercised headlessly.
+ * gesture, so recordings and procedural voices can be exercised headlessly.
  *
  * For each case we report:
  *   peak     absolute sample peak — >= 1.0 means the limiter failed
@@ -19,6 +19,7 @@
  *   const report = await runAudioSelfTest();
  */
 
+import type { ReloadPhase } from '../core/events.ts';
 import { Rng } from '../core/rng.ts';
 import { ambientOneShot, ONE_SHOTS } from './ambience.ts';
 import { NoiseBank } from './dsp.ts';
@@ -26,7 +27,6 @@ import {
   surfaceImpact,
   footstep,
   shellCasing,
-  reloadPhase,
   explosion,
   bodyFall,
   uiSound,
@@ -35,6 +35,8 @@ import {
 } from './foley.ts';
 import { IR_SPECS, generateIR, classifySpace } from './ir.ts';
 import { Mixer } from './mixer.ts';
+import { RELOAD_CUES, RELOAD_URLS, reloadKind, type ReloadKind } from './reloads.ts';
+import { WeaponSampleBank } from './samples.ts';
 import { bark, BARKS } from './vox.ts';
 import { WEAPON_PROFILES, weaponShot, weaponPunch, bulletWhizz, dryFire } from './weapons.ts';
 
@@ -283,21 +285,24 @@ export async function runAudioSelfTest(opts: { verbose?: boolean } = {}) {
   await push('shell:dirt', 3, ({ bank, rng, mixer, t }) => {
     route(mixer, shellCasing(mixer.actx, bank, rng, { when: t, surface: 'dirt' }), 'foley');
   });
-  for (const phase of [
-    'start',
-    'magout',
-    'magin',
-    'slide',
-    'charge',
-    'boltopen',
-    'boltclose',
-    'pump',
-    'shellin',
-    'end',
-  ] as const) {
-    await push(`reload:${phase}`, 2.5, ({ bank, rng, mixer, t }) => {
-      route(mixer, reloadPhase(mixer.actx, bank, rng, phase, { when: t }), 'foley');
-    });
+  const reloadCases: Record<string, Partial<Record<ReloadPhase, ReloadKind>>> = {
+    ...RELOAD_CUES,
+    movement: { start: 'gear' },
+  };
+  const testedReloads = new Set<ReloadKind>();
+  for (const [weapon, cues] of Object.entries(reloadCases)) {
+    for (const phase of Object.keys(cues) as ReloadPhase[]) {
+      const kind = reloadKind(weapon, phase)!;
+      if (testedReloads.has(kind)) continue;
+      testedReloads.add(kind);
+      await push(`reload:${kind}`, 2.5, async ({ ctx, rng, mixer, t }) => {
+        const samples = new WeaponSampleBank(ctx);
+        samples.reloadBuffers[kind] = await Promise.all(
+          RELOAD_URLS[kind].map((url) => samples._loadBuffer(url))
+        );
+        route(mixer, samples.reload(weapon, phase, rng, { when: t }), 'foley');
+      });
+    }
   }
   await push('explosion@5m', 6, ({ bank, rng, mixer, t }) => {
     route(mixer, explosion(mixer.actx, bank, rng, { when: t, distance: 5, radius: 8 }));

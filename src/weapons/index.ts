@@ -1048,16 +1048,15 @@ export class WeaponSystem {
         }
         break;
       case 'pump':
-        this._emitReload('pump');
+        // The empty reload has a separate authored forward-return beat.
+        this._emitReload(isReload ? 'boltopen' : 'pump');
         if (!isReload) this._queueShell(0);
         break;
       case 'charge':
         if (isReload) this._emitReload('charge');
         break;
       case 'boltrelease':
-        // M590's pump cue already contains its forward return.
-        if (s?.def.action !== 'pump')
-          this._emitReload(s?.def.id === 'pistol' ? 'slide' : 'boltclose');
+        this._emitReload(s?.def.id === 'pistol' ? 'slide' : 'boltclose');
         break;
       case 'bolt:close':
         this._emitReload('boltclose');

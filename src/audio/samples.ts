@@ -170,15 +170,15 @@ export class WeaponSampleBank {
     this.loaded++;
   }
 
-  /** Null means intentionally unmapped, never a recovery for a missing recording. */
+  /** Recorded handling only: unsupported cues and missing assets never synthesize. */
   reload(
     weapon: string,
     phase: ReloadPhase | undefined,
     rng: Rng,
     o: Pick<SampleOptions, 'when'> = {}
-  ): AudioVoice | null {
+  ): AudioVoice {
     const kind = reloadKind(weapon, phase);
-    if (!kind) return null;
+    if (!kind) throw new Error(`[audio] no recorded reload cue for ${weapon}/${phase}`);
     const choices = this.reloadBuffers[kind];
     if (!choices?.length) throw new Error(`[audio] ${kind} reload recordings are not loaded`);
     const previous = this.reloadIndices[kind] ?? -1;

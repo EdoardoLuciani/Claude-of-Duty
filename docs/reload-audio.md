@@ -1,114 +1,144 @@
-# Recorded reloads — #337, first slice
+# Recorded weapon handling — #337
 
-## Coverage and event ownership
+## Coverage: recordings only
 
-M4 and MCX share edited M16 donor recordings for magazine removal/seating and
-forward closure. M4 also uses a separate rearward charging cue. P320 uses P99
-magazine and slide-snap donors: its already-open slide receives only a forward
-release, not a full rack. These are acoustic proxies, not recordings of the exact
-in-game weapon models. Listening approval of donor character remains human-owned.
+All seven player weapons now use recorded cues for their published reload/manual
+mechanical beats, including recorded start/end gear rustle. The old `reloadPhase()`
+oscillator/noise generator is removed; neither unsupported cues nor missing files
+fall back to synthesis. This is the reload/pump/bolt path, not a redesign of
+unrelated movement, voices, UI cues, dry fire or gunshots.
 
-`weapon:reload` also carries manual-action audio. Its new phases are `charge`,
-`boltopen` and `boltclose`; the existing `slide` remains the pistol release.
-`src/weapons/index.ts` publishes directly from native clip events:
+| Weapon    | Recorded donors                                                                            |
+| --------- | ------------------------------------------------------------------------------------------ |
+| M4 / MCX  | M16 magazine removal/seating and charging-handle contacts.                                 |
+| P320      | P99 normal magazine handling and isolated forward slide snap.                              |
+| MPX       | MP5 magazine detach/attach and cocking-handle release; no added HK slap.                   |
+| AX338     | Remington 700 bolt action; G36 detachable-magazine handling as a proxy.                    |
+| M590      | Pumpgun fore-end cocking takes; Remington 870 shell-loading contacts.                      |
+| EVOLYS    | Tactical-bag take/stow, recorded ammo-box latch and vest belt clip; M16 charging contacts. |
+| Start/end | Quiet tactical-vest handling crops, shared across weapons.                                 |
 
-- `charge` emits rearward action only, and `boltrelease` emits forward closure.
-- AX338 `bolt:open` / `bolt:close` emit separate cues during the post-shot cycle.
-  Opening still owns the existing casing queue; sound never owns ammunition.
-- M590 `pump` emits during reload **and** post-shot cycling. Only the post-shot
-  case queues a spent casing. Its reload `boltrelease` does not add another close:
-  the pump cue already includes forward return.
-- `shellin` only emits if `_insertShell()` actually committed a shell.
-- `end` is a quiet hand settle, never an invented charging-handle sequence. This
-  also removes phantom racking at the end of tactical and per-shell reloads.
+These are acoustic donors, not exact-model recordings. The owner explicitly
+approved recorded pouch/latch/charging donors for EVOLYS after a library search
+found no dedicated belt-fed reload recording. Its pouch-out/in sounds are offline
+composites of **recorded layers only**, not a rifle-magazine substitute or generated
+metallic texture. Dedicated EVOLYS feed-link/cover recordings remain a possible
+future improvement, not a hidden synthesized layer. Listening approval remains
+human-owned.
 
-The new recordings replace mapped mechanical phases; no synthesized duplicate is
-layered underneath them. Start/end hand rustle remains procedural. MPX, EVOLYS,
-AX338 and M590 retain procedural handling in this first slice, now with corrected
-mechanical event coverage. Their recorded banks remain follow-up work in #337.
-EVOLYS is **not** assigned a detachable-rifle-magazine recording.
+The first implementation's 20 M4/MCX/P320 delivery files are byte-for-byte
+unchanged. The additional 43 clips cover the remaining weapons and shared rustle.
 
-No clip durations, weapon definitions, ammo/chamber accounting, shot cadence or
-shell-ejection times are changed. Cancelled clips cannot schedule future cues:
-there is no full-reload audio track, timeout or deferred mechanical sequence.
-Short tails from already-triggered contacts can finish naturally.
+## Native event ownership and timing
+
+`weapon:reload` also carries post-shot manual-action audio. The common weapon
+system publishes directly from native clip events, with no full-reload audio
+track, timeouts or future mechanical-action scheduling:
+
+- M4/EVOLYS/AX338 empty reloads emit rearward `charge` then forward `boltclose`.
+  P320 uses `slide` for its already-open slide; no fictitious full rack is added.
+- AX338 post-shot `bolt:open` / `bolt:close` emit separate recorded movements.
+  Opening still owns its one existing casing queue. Sound never owns ammunition.
+- M590 post-shot `pump` uses a full recorded rearward/forward take and queues one
+  spent casing. Empty reloads instead emit `boltopen` at their native pump beat
+  (0.836 s) and `boltclose` at release (0.8835 s). Short isolated recorded contacts
+  fit this 47.5 ms gap; replaying the full pump would double the return or place it
+  after the gesture. Neither reload contact invents a spent casing.
+- `shellin` emits only when `_insertShell()` committed one shell.
+- `end` selects quiet recorded gear handling, never another charging action.
+  Retained P320/MPX magazines have no synthesized ground-impact add-on.
+
+No clip durations, balance definitions, ammo/chamber accounting, shot cadence or
+shell-ejection times are changed. Cancelling a clip prevents its future cues;
+short natural tails from already-triggered contacts may finish.
 
 ## Delivery, balance and lifecycle
 
-Twenty mono 48 kHz Opus files occupy **64,741 bytes**, with **3.41 seconds** of
-source duration / **654,720 bytes of decoded float PCM at 48 kHz**. Native decode
-rates can change the PCM total. The shortest crops are 45 ms: M4's authored charge
-and release beats are only 49.3 ms apart, so a full rearward/forward sample would
-sound twice or overlap the following closure. All files remain below 0.5 decoded
-sample peak, with approximately 8 dB or more source headroom before delivery-codec
-overshoot. There is no codec header gain.
+The full bank contains **63 mono 48 kHz Opus files**, **229,960 delivery bytes** and
+**12.86 seconds / 2,469,120 bytes of decoded float PCM at 48 kHz**. Native decode
+rates can change the PCM total. Files are single-action crops (maximum 0.52 s),
+not entire multi-take reels. Short rearward contacts fit the existing close beats
+without pitch-shifting, time-stretching or moving gameplay milestones.
 
-The bank preloads alongside other required recordings, taking the current total
-from 50 to 70. Every fetch/decode settles before startup failure teardown. A missing
-mapped recording rejects audio startup; it does not recover with synthesis.
-Intentionally unmapped weapon/phase pairs retain synthesis, not a missing-asset
-fallback. Disposal clears buffers and selection state. Playback does no asset I/O,
-avoids immediately repeated takes and uses only ±3% gain variation, with original
-pitch/rate retained for timing.
+The sample bank preloads/caches these alongside the 50 pre-existing recordings
+(113 total). Every fetch/decode settles before startup failure teardown. Missing
+recordings reject startup; an unsupported weapon/phase combination produces an
+explicit diagnostic, not a generic or synthetic substitute. Disposal clears the
+buffers and selection state. Playback has no asset I/O, avoids immediately
+repeated takes and uses only ±3% gain variation, retaining original playback rate.
 
-`src/audio/reloads.ts` owns the mapping and modest cue tuning. Existing foley bus
+`src/audio/reloads.ts` owns the explicit mapping and cue tuning. Existing foley
 balance, gunfire ducking, compression, peak control and spatial routing remain.
-The final `0.22` argument to `_playDry()` is **reverb send, not gain**; the initial
-issue analysis was corrected accordingly. No master-gain or gunshot-asset changes
-are included. Source peak measurements are not a listening verdict or a claim of
-calibrated loudness. Check quiet reloads, post-shot actions and nearby gunfire in
-the attached captures before final sound-quality acceptance.
+The `0.22` argument to `_playDry()` is reverb send, not gain. Master gain and
+gunshot assets are unchanged. All delivery assets have decoded sample peaks below
+0.5 and zero codec header gain. The offline mixer probe also verifies audible,
+finite, non-clipping output; these checks are not perceptual sound-design approval.
 
-## Source preparation and rights
-
-Rebuild using FFmpeg/libopus and the owner's local library:
+## Sources, preparation and rights
 
 ```sh
 node tools/prepare-reload-audio.mjs /path/to/Music
 ```
 
-The exact mono sources are under `BOOM Library - Gun Handling/`: M16 magazine
-in/out and charging handle `01`, plus Walther P99 normal magazine in/out and slide
-snap `01`. The script records source-relative paths/hashes, individual crop ranges,
-filter/fade settings, energy/peak-limited level adjustments and delivery hashes in
-`src/audio/samples/reloads/provenance.json`. It normalizes maximum 20 ms event
-energy with a peak-headroom cap, not whole-reel RMS or full-scale normalization.
-Two consecutive authoring runs produced identical provenance and delivery hashes.
-Original source reels are not committed or uploaded.
+Sources come from `BOOM Library - Gun Handling/`, BOOM ONE 24.02 gun mechanisms,
+24.03 tactical bags, and the 23.12 ammo-box latch. Embedded source descriptions
+confirm that `Pumpgun Reload` is fore-end cocking, while the Remington 870 loading
+source is separate. `samples/reloads/provenance.json` records each layer's exact
+source-relative path/hash, embedded description, channel count, crop, level and
+stereo-to-mono energy loss, plus processing and delivery hashes. Original reels
+are never committed or uploaded.
 
-The owner explicitly confirmed public redistribution clearance for the selected
-edited #337 samples **and** mixed gameplay recordings in this implementation
-session. This is owner attestation, not independent legal advice or transfer of
-source-library copyright. Retain applicable licence/purchase records. These media
-do not inherit the code licence; this permission does not alter separate legacy
-firearm-sample restrictions.
+Stereo donors are explicitly averaged, not equal-power boosted. The tool rejects
+crops with more than 6 dB cancellation loss; the selected stereo crops' maximum
+loss is **1.14 dB**. Short edge fades, modest filtering and maximum 20 ms event
+energy matching retain at least 8 dB master peak headroom before codec overshoot.
+Gear rustle has a quieter -29 dB target than mechanical contacts (-19 dB); no
+whole-reel RMS/full-scale normalization or synthesized sweeteners are used.
+Repeated authoring runs produce identical provenance and delivery hashes.
+
+The owner confirmed public redistribution clearance for selected edited #337
+samples and mixed gameplay recordings, and separately approved EVOLYS's recorded
+donors in the implementation conversation. This is owner attestation, not
+independent legal advice or transfer of source copyright. Retain applicable
+licence/purchase records. Media do not inherit the code licence; this permission
+does not alter separate restrictions on legacy firearm samples.
 
 ## Validation and review
 
-- `tests/smoke/smoke-audio-reloads.mjs` loads all seven real weapon GLBs and native
-  event clips, runs the common weapon callbacks and audio consumer, and checks
-  exact phase order/timing, retained magazines, ammo, cancellation and single
-  correctly timed post-shot casings. It also checks delivery hashes/headers,
-  bounded memory, variants, required playback and unchanged positioned routing.
-- Existing asset/hit startup tests include the enlarged bank, including a missing
-  reload file and all-settled failure/disposal. Their old fixed 50-file expectations
-  were updated because this slice intentionally adds 20 required recordings.
-- `tests/e2e/audio-reloads-e2e.mjs` exercises the actual live game audio graph and
-  viewmodels on hardware WebGPU, using wall-clock animation stepping while unrelated
-  gameplay is suspended. It covers six reloads, pump, bolt cycle, interruption and
-  a reload under injected nearby gunfire. It does not simulate a whole AI battle.
-- The e2e capture uses native final-output readback into a 2D recording canvas:
-  direct WebGPU swapchain capture is black under headless Vulkan. Evidence includes
-  rendered animation and post-mixer audio, not a standalone sound preview.
+- `tests/smoke/smoke-audio-reloads.mjs` loads all seven real GLBs/native clips and
+  runs clip → common callbacks → audio consumer, requiring a recording for every
+  actual beat. It checks phase order/timing, retained magazines, ammo, cancellation,
+  committed shell insertion, casing counts/times, delivery hashes/headers, stereo
+  loss, bounded memory, variants and positioned routing. Missing/unknown cues must
+  fail explicitly, never use synthesis.
+- Existing startup/contact tests account for all 113 required recordings and
+  retain all-settled failure/disposal coverage. The native mix fixture now caches
+  the loaded reload bank alongside its other recordings; omitting it caused a
+  legitimate required-recording error, not a reason to restore synthesis. No tests
+  are weakened to permit missing assets or synthetic recovery.
+- `src/audio/selftest.ts` exercises all 22 recorded handling families through the
+  real offline mixer, rather than continuing to test the deleted synthesizer.
+- `tests/e2e/audio-reloads-e2e.mjs` covers tactical/empty reloads for all seven
+  weapons, post-shot pump/bolt, interruption and reload under injected nearby
+  gunfire. Every handling event must reach the recorded bank. Normal weapon
+  pose/ammo and transient FX updates continue while unrelated gameplay is suspended;
+  this is a controlled live-game fixture, not a whole AI battle.
+- Capture uses native final-output readback into a 2D recording canvas, since
+  direct WebGPU swapchain capture is black under headless Vulkan. Video contains
+  rendered viewmodels and live post-mixer audio, not standalone library uploads.
 
 ```sh
-node tests/e2e/audio-reloads-e2e.mjs --out=/tmp/cod-337-after
+node tests/e2e/audio-reloads-e2e.mjs --out=/tmp/cod-337-full-after
 node tests/e2e/audio-reloads-e2e.mjs \
-  --root=/path/to/unchanged-baseline --before --port=5538 --out=/tmp/cod-337-before
+  --root=/path/to/8861329-baseline --before --port=5538 --out=/tmp/cod-337-full-before
+node src/audio/probe.mjs --port=5540 --live=0
+AUDIO_MIX_CASES=reload PORT=5542 node tests/e2e/audio-mix-e2e.mjs
 ```
 
-Baseline and new captures passed on native AMD RDNA 4 WebGPU, with zero audio or
-engine errors. Capture files stay outside the repository. Automated correctness,
-format and signal checks do not establish subjective timbre/synchronization
-approval: listen/watch the before/after evidence before accepting the sound design.
-This slice advances #337; it does not close the issue.
+The full before/after e2e passed on native AMD RDNA 4 WebGPU with zero engine/audio
+errors. The offline probe passed all 110 cases, including the 22 recorded handling
+families. The 10-case filtered native mix suite also passed hierarchy, silence,
+peak-ceiling and tail checks. The new comparison baseline is first-slice commit `8861329`, not the
+original pre-#337 game. Evidence stays outside the repository. Tests and signal
+checks do not replace human listening review of donor character, synchronization
+and combat readability; review the attached videos before final acceptance.
