@@ -7,6 +7,7 @@ import { ENVIRONMENT_URLS } from '../../src/audio/environment.ts';
 import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
 import { HIT_URLS } from '../../src/audio/hits.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
+import { RADIO_URLS } from '../../src/audio/radio.ts';
 import { REACTION_URLS } from '../../src/audio/reactions.ts';
 import { RELOAD_URLS } from '../../src/audio/reloads.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
@@ -249,7 +250,7 @@ try {
       reloads +
       Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0) +
       (AIRCRAFT_URLS.length +
-        Object.values({ ...REACTION_URLS, ...ENVIRONMENT_URLS }).reduce(
+        Object.values({ ...REACTION_URLS, ...ENVIRONMENT_URLS, ...RADIO_URLS }).reduce(
           (n, urls) => n + urls.length,
           0
         )),
