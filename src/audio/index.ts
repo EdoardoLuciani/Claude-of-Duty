@@ -35,8 +35,9 @@ import type { EngineContext } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName, ReloadPhase } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
 import { AircraftVoice, AIRCRAFT_MIX, type AircraftPosition } from './aircraft.ts';
-import { Ambience, ambientOneShot, ONE_SHOTS, AMBIENT_EVENT_GAIN } from './ambience.ts';
+import { Ambience, ONE_SHOTS, AMBIENT_EVENT_GAIN } from './ambience.ts';
 import { NoiseBank, SPEED_OF_SOUND, clamp, gain as mkGain } from './dsp.ts';
+import type { EnvironmentKind } from './environment.ts';
 import { shellCasing, explosion, uiSound, heartbeat, intelSiren } from './foley.ts';
 import { classifySpace, SPACE_KEYS } from './ir.ts';
 import { Mixer } from './mixer.ts';
@@ -138,7 +139,6 @@ interface AmbienceApi {
   distantVolley(): void;
   distantBoom(): void;
   oneShot(): void;
-  distantChatter(): void;
 }
 declare global {
   interface Window {
@@ -493,7 +493,6 @@ export class AudioSystem {
           distantVolley: () => this._distantVolley(),
           distantBoom: () => this._distantBoom(),
           oneShot: () => this._ambientOneShot(),
-          distantChatter: () => this._distantChatter(),
         };
       }
       this.ambience!.update(dt, this._ambienceApi);
@@ -757,7 +756,7 @@ export class AudioSystem {
           radio: o.radio,
         });
       case 'ambient':
-        return ambientOneShot(actx, bank, rng, o.which, { when, level: o.level });
+        return this.samples!.environment(o.which as EnvironmentKind, rng, { when, level: o.level });
       default:
         return uiSound(actx, bank, rng, kind, { when, level: o.level });
     }
@@ -1478,23 +1477,6 @@ export class AudioSystem {
     );
   }
 
-  _distantChatter(): void {
-    if (!this.running) return;
-    const rng = this.rng;
-    const lp = this.field!.listenerPos;
-    const a = rng.range(0, Math.PI * 2);
-    const d = rng.range(25, 75);
-    this.bark(
-      rng.pick(['advance', 'flank', 'copy', 'spot'])!,
-      {
-        x: lp.x + Math.cos(a) * d,
-        y: lp.y,
-        z: lp.z + Math.sin(a) * d,
-      },
-      { level: 0.85, voice: rng.int(0, 9) }
-    );
-  }
-
   /* ================================================================ */
   /* debug                                                            */
   /* ================================================================ */
@@ -1631,7 +1613,6 @@ export class AudioSystem {
     }
     this._distantVolley();
     this._distantBoom();
-    this._distantChatter();
     ev.emit('explosion', { position: at(6, 0, -7), radius: 8, damage: 120 });
     return { ok: true, voices: this.field!.stats.active, errors: this.stats.errors };
   }

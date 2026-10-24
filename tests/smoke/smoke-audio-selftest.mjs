@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { AIRCRAFT_URLS } from '../../src/audio/aircraft.ts';
+import { ENVIRONMENT_URLS } from '../../src/audio/environment.ts';
 import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
 import * as foley from '../../src/audio/foley.ts';
 import { RELOAD_URLS } from '../../src/audio/reloads.ts';
@@ -69,7 +70,8 @@ try {
     50 +
       Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0) +
       Object.values(RELOAD_URLS).reduce((n, urls) => n + urls.length, 0) +
-      AIRCRAFT_URLS.length
+      (AIRCRAFT_URLS.length +
+        Object.values(ENVIRONMENT_URLS).reduce((n, urls) => n + urls.length, 0))
   );
   assert.equal(renders, 0);
   assert.equal(disposals, 1, 'failed run disposes its single required bank');
