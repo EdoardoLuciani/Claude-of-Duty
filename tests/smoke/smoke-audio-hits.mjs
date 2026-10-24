@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
+import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
 import { HIT_URLS } from '../../src/audio/hits.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
 import { RELOAD_URLS } from '../../src/audio/reloads.ts';
@@ -151,7 +152,11 @@ audio.ctx.peek = () => null;
 audio._budget.impact = 0;
 calls.length = 0;
 audio._onImpact({ ...contact, actor: null, surface: 'concrete' });
-assert.equal(calls.length, 2, 'actorless nearby world impact is not mistaken for absent player');
+assert.equal(
+  calls.length,
+  1,
+  'actorless world contact plays once without inventing a flight whizz'
+);
 calls.length = 0;
 const segment = {
   from: { x: -9, y: 1.35, z: 0 },
@@ -237,7 +242,7 @@ try {
   const reloads = Object.values(RELOAD_URLS).reduce((sum, urls) => sum + urls.length, 0);
   assert.equal(
     decodes,
-    49 + reloads,
+    49 + reloads + Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0),
     'missing contact participates in required all-settled startup'
   );
   missing.dispose();

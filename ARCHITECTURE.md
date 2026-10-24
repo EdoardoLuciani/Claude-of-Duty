@@ -261,8 +261,10 @@ render-owned environment re-registration contracts are documented in
 FX particle/decal PNGs are required runtime assets; generation
 lives in `tools/lib/fx-atlas.ts` and the offline texture exporter. Missing/invalid
 atlases reject FX initialization. Recorded audio fetch/decode failures disable the
-audio graph rather than substituting synthesis. Authored distant/sniper reports
-and reinforcement/foley remain synthesized by design.
+audio graph rather than substituting synthesis. Physical hits and movement/body/
+equipment foley use required recordings; see [docs/physical-foley.md](docs/physical-foley.md).
+Remaining synthesis includes authored distant/sniper reports, reinforcement,
+shell casings/dry fire, voices, ambience and intentional UI cues.
 
 `models.getSoldier(name)` returns `{ name, geometry, slots, boneNames, weapon,
 stats, variant }`. Merge GLTF primitives into one skinned geometry with slot

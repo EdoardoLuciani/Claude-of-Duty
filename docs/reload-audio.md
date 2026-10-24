@@ -62,9 +62,9 @@ rates can change the PCM total. Files are single-action crops (maximum 0.52 s),
 not entire multi-take reels. Short rearward contacts fit the existing close beats
 without pitch-shifting, time-stretching or moving gameplay milestones.
 
-The sample bank preloads/caches these alongside the 50 pre-existing recordings
-(113 total). Every fetch/decode settles before startup failure teardown. Missing
-recordings reject startup; an unsupported weapon/phase combination produces an
+The sample bank preloads/caches these alongside the 173 firearm/hit/physical-foley
+recordings (236 total). Every fetch/decode settles before startup failure teardown.
+Missing recordings reject startup; an unsupported weapon/phase combination produces an
 explicit diagnostic, not a generic or synthetic substitute. Disposal clears the
 buffers and selection state. Playback has no asset I/O, avoids immediately
 repeated takes and uses only ±3% gain variation, retaining original playback rate.
@@ -119,7 +119,7 @@ does not alter separate restrictions on legacy firearm samples.
   committed shell insertion, casing counts/times, delivery hashes/headers, stereo
   loss, bounded memory, variants, pump transient offsets and positioned routing.
   Missing/unknown cues must fail explicitly, never use synthesis.
-- Existing startup/contact tests account for all 113 required recordings and
+- Existing startup/contact tests account for all 236 required recordings and
   retain all-settled failure/disposal coverage. The native mix fixture now caches
   the loaded reload bank alongside its other recordings; omitting it caused a
   legitimate required-recording error, not a reason to restore synthesis. No tests
@@ -146,7 +146,7 @@ AUDIO_MIX_CASES=reload PORT=5542 node tests/e2e/audio-mix-e2e.mjs
 The native AMD RDNA 4 WebGPU fixture includes 19 cases, with a four-case focused
 shotgun before/after capture against `65b2917` for the pump correction. The initial
 full-bank comparison against first-slice `8861329` remains historical evidence.
-The offline probe covers 110 cases, including all 22 recorded handling families;
+The offline probe covers 114 cases, including all 22 recorded handling families;
 the filtered native mix suite checks 10 cases for hierarchy, silence, peak ceiling
 and tails. Evidence stays outside the repository. Tests and signal checks do not
 replace human listening review of synchronization and combat readability. The LMG
