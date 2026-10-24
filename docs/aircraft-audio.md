@@ -63,7 +63,7 @@ isolated audition, never additional fades at repeated asset boundaries.
 ## Ownership and lifecycle
 
 - `WeaponSampleBank` decodes both new required recordings alongside existing
-  assets, once at audio startup. With recorded reloads, there are now 238 required files. Selection starts
+  assets, once at audio startup. At #504, recorded reloads brought the required cache to 238 files; later categories add their own recordings. Selection starts
   seeded and alternates the two takes without immediate repeats; loops are not
   pitch-randomized. Missing/invalid files fail audio startup with no synthesis.
 - `audio.startAircraft(position)` acquires one **tracked emitter from the existing
