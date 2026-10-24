@@ -79,21 +79,38 @@ export async function loadArmAsset(): Promise<ArmAsset> {
       mesh.skeleton.bones.length !== names.length
     )
       throw new Error('Player arms: inconsistent exported bone order');
-    if (Array.isArray(mesh.material))
-      throw new Error('Player arms: expected authored single surfaces');
-    const surface = sources.length;
-    sources.push(mesh.material as THREE.MeshPhysicalMaterial);
-    const geometry = mesh.geometry.clone();
-    if (!geometry.getAttribute('skinWeight') || !geometry.getAttribute('skinIndex'))
+    const index = mesh.geometry.index;
+    if (!index) throw new Error('Player arms: expected indexed Blender geometry');
+    if (!mesh.geometry.getAttribute('skinWeight') || !mesh.geometry.getAttribute('skinIndex'))
       throw new Error(`Player arms: missing skin data on ${mesh.name}`);
-    geometry.applyMatrix4(mesh.matrixWorld);
-    const count = geometry.getAttribute('position').count;
-    geometry.setAttribute(
-      'armSurface',
-      new THREE.Float32BufferAttribute(new Float32Array(count).fill(surface), 1)
-    );
-    pieces.push(geometry);
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    // Match native submissions: arrays select indexed groups; a single material
+    // ignores groups. Both are clipped by the geometry's authored draw range.
+    const groups = Array.isArray(mesh.material)
+      ? mesh.geometry.groups
+      : [{ start: 0, count: index.count, materialIndex: 0 }];
+    const range = mesh.geometry.drawRange;
+    for (const group of groups) {
+      const source = materials[group.materialIndex ?? 0];
+      const start = Math.max(0, range.start, group.start);
+      const end = Math.min(index.count, range.start + range.count, group.start + group.count);
+      if (!source?.visible || end <= start) continue;
+      const surface = sources.length;
+      sources.push(source as THREE.MeshPhysicalMaterial);
+      const geometry = mesh.geometry.clone();
+      geometry.setIndex(new THREE.BufferAttribute(index.array.slice(start, end), 1));
+      geometry.clearGroups();
+      geometry.setDrawRange(0, Infinity);
+      geometry.applyMatrix4(mesh.matrixWorld);
+      const count = geometry.getAttribute('position').count;
+      geometry.setAttribute(
+        'armSurface',
+        new THREE.Float32BufferAttribute(new Float32Array(count).fill(surface), 1)
+      );
+      pieces.push(geometry);
+    }
   }
+  if (!pieces.length) throw new Error('Player arms: no rendered deformation surfaces');
   const material = createArmSurfaceMaterial(sources, blood);
   const geometry = mergeGeometries(pieces, false);
   for (const piece of pieces) piece.dispose();
@@ -107,7 +124,10 @@ export async function loadArmAsset(): Promise<ArmAsset> {
   skeletons.delete(merged.skeleton);
   for (const skeleton of skeletons) skeleton.dispose();
   const textures = new Set<THREE.Texture>();
-  for (const source of new Set(sources)) {
+  const sourceMaterials = new Set(
+    meshes.flatMap((mesh) => (Array.isArray(mesh.material) ? mesh.material : [mesh.material]))
+  );
+  for (const source of sourceMaterials) {
     for (const value of Object.values(source))
       if (value instanceof THREE.Texture)
         textures.add(value as THREE.Texture<unknown, THREE.TextureEventMap>);
