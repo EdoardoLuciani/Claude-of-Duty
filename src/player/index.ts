@@ -859,20 +859,11 @@ export class PlayerSystem {
   get healthFraction() {
     return this.health.fraction;
   }
-  get lowHealth() {
-    return this.health.low;
-  }
   get dead() {
     return this.health.dead;
   }
   get suppression() {
     return this.health.suppression;
-  }
-  get damageIndicators() {
-    return this.health.indicators;
-  }
-  get heartbeatPulse() {
-    return this.health.pulse;
   }
   get bobPhase() {
     return this.rig.bobPhase;

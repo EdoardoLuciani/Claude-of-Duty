@@ -2,10 +2,8 @@
  * Health, armour, suppression and the damage-direction model.
  *
  * There is no passive regeneration: health only returns through player-activated
- * bandages. Damage arriving from a direction produces an indicator (angle in
- * *view* space, so the HUD can draw it without knowing anything about the
- * player's transform) and a matching camera impulse, so a hit is felt before it
- * is read.
+ * bandages. Damage publishes the attacker position and view-space angle for
+ * HUD feedback, alongside a matching camera impulse. UI owns indicator lifetime.
  *
  * Suppression is a separate 0..1 pool fed by near misses, hits and blasts. It
  * widens the breathing sway and adds a little shake — the same trick CoD uses to
@@ -16,16 +14,6 @@ import * as THREE from 'three';
 
 import { clamp01, approach, lerp, DEG } from './springs.ts';
 import { HEALTH } from './tuning.ts';
-
-interface HealthIndicator {
-  active: boolean;
-  angle: number;
-  amount: number;
-  life: number;
-  worldX: number;
-  worldY: number;
-  worldZ: number;
-}
 
 interface DamageTakenPayload {
   amount: number;
@@ -82,7 +70,6 @@ export class Health {
   declare lastDamageTime: number;
   declare suppression: number;
   declare hitFlash: number;
-  declare indicators: HealthIndicator[];
   declare beatPhase: number;
   declare beatAge: number;
   declare pulse: number;
@@ -105,20 +92,6 @@ export class Health {
     this.lastDamageTime = -100;
     this.suppression = 0;
     this.hitFlash = 0;
-
-    /** Direction indicators, oldest first. angle is radians, 0 = straight ahead. */
-    this.indicators = [];
-    for (let i = 0; i < HEALTH.indicatorMax; i++) {
-      this.indicators.push({
-        active: false,
-        angle: 0,
-        amount: 0,
-        life: 0,
-        worldX: 0,
-        worldY: 0,
-        worldZ: 0,
-      });
-    }
 
     // Beat phase controls cadence; age tracks the recording's two visual thumps.
     this.beatPhase = 0;
@@ -168,7 +141,6 @@ export class Health {
     this.pulse = 0;
     this.lastDamageTime = -100;
     this._lastEmitHealth = this.value;
-    for (let k = 0; k < this.indicators.length; k++) this.indicators[k].active = false;
     // Publish resets too: living-player respawns have no death-camera event.
     this._emitState(true);
   }
@@ -201,7 +173,6 @@ export class Health {
       const f = -Math.sin(yaw) * dx - Math.cos(yaw) * dz;
       const r = Math.cos(yaw) * dx - Math.sin(yaw) * dz;
       angle = Math.atan2(r, f);
-      this._pushIndicator(angle, dealt, from);
     }
 
     // ---- felt response --------------------------------------------------
@@ -274,32 +245,6 @@ export class Health {
     this.suppression = clamp01(this.suppression + a);
   }
 
-  _pushIndicator(angle: number, amount: number, from: THREE.Vector3): void {
-    // Reuse the slot pointing the most similar way, else the oldest.
-    let slot = null;
-    let oldest = null;
-    for (let k = 0; k < this.indicators.length; k++) {
-      const i = this.indicators[k];
-      if (!i.active) {
-        slot = i;
-        break;
-      }
-      if (Math.abs(angle - i.angle) < 0.5) {
-        slot = i;
-        break;
-      }
-      if (!oldest || i.life > oldest.life) oldest = i;
-    }
-    slot = slot ?? oldest ?? this.indicators[0];
-    slot.active = true;
-    slot.angle = angle;
-    slot.amount = Math.max(slot.active ? slot.amount * 0.5 : 0, amount);
-    slot.life = 0;
-    slot.worldX = from.x;
-    slot.worldY = from.y;
-    slot.worldZ = from.z;
-  }
-
   /* ==================================================================== */
 
   update(dt: number): void {
@@ -308,13 +253,6 @@ export class Health {
     // ---- pools ----------------------------------------------------------
     this.suppression = Math.max(0, this.suppression - H.suppression.decay * dt);
     this.hitFlash = approach(this.hitFlash, 0, H.effect.hitFlashTau, dt);
-
-    for (let k = 0; k < this.indicators.length; k++) {
-      const i = this.indicators[k];
-      if (!i.active) continue;
-      i.life += dt;
-      if (i.life > H.indicatorTime) i.active = false;
-    }
 
     // ---- low-health treatment weight ------------------------------------
     // Fresh wounds hit harder; settled injuries retain a reduced grade.
