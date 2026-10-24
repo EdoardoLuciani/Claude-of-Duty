@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
 import { HIT_URLS } from '../../src/audio/hits.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
+import { RELOAD_URLS } from '../../src/audio/reloads.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import provenance from '../../src/audio/samples/hits/provenance.json' with { type: 'json' };
 import { Rng } from '../../src/core/rng.ts';
@@ -238,9 +239,10 @@ try {
     },
   });
   await assert.rejects(missing.load(), /armour-2.*HTTP 404/);
+  const reloads = Object.values(RELOAD_URLS).reduce((sum, urls) => sum + urls.length, 0);
   assert.equal(
     decodes,
-    49 + Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0),
+    49 + reloads + Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0),
     'missing contact participates in required all-settled startup'
   );
   missing.dispose();

@@ -43,9 +43,9 @@ isolated tests retain synthesis that still has legitimate runtime callers.
   storage, seeded no-immediate-repeat selection, and complete disposal. There is
   no second engine, per-event fetch/decode, runtime dependency or network service.
 - 123 new mono 48 kHz Opus clips: **621,437 delivery bytes**, **8,488,320 decoded
-  float bytes** (about 8.10 MiB). Together with the existing bank there are 173
-  required decoded files; the historical `firearmSamples` report key counts the
-  whole bank, not just guns. This increase is explicit rather than hidden lazy
+  float bytes** (about 8.10 MiB). Together with the firearm/hit and recorded
+  reload banks there are 236 required decoded files; the historical `firearmSamples`
+  report key counts the whole bank, not just guns. This increase is explicit rather than hidden lazy
   runtime fetching. Missing new files reject audio startup normally.
 - Mono is the source format: positional playback and room returns remain stereo.
   Original stereo crops were explicitly averaged and checked for cancellation;

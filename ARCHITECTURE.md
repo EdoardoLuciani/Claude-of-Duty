@@ -264,7 +264,7 @@ atlases reject FX initialization. Recorded audio fetch/decode failures disable t
 audio graph rather than substituting synthesis. Physical hits and movement/body/
 equipment foley use required recordings; see [docs/physical-foley.md](docs/physical-foley.md).
 Remaining synthesis includes authored distant/sniper reports, reinforcement,
-weapon mechanics, voices, ambience and intentional UI cues.
+shell casings/dry fire, voices, ambience and intentional UI cues.
 
 `models.getSoldier(name)` returns `{ name, geometry, slots, boneNames, weapon,
 stats, variant }`. Merge GLTF primitives into one skinned geometry with slot

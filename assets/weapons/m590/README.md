@@ -103,6 +103,13 @@ shared event-only Clip bridge, never mixer listeners. Pump owns the trigger
 pulse; there is no separate Fire action or baked shot recoil. Retain common
 reactive recoil, pooled ejection, damage/spread and 6+1 accounting.
 
+The #337 pump-audio correction adds a post-shot `boltrelease` at the existing
+forward stop and places empty-reload `pump`/`boltrelease` at its real rear/forward
+stops. Only event metadata changes: the complete GLB BIN (mesh, maps and sampled
+motion) is byte-identical to the pre-correction export. Post-shot `pump` still owns
+one casing; reload markers never invent one. Recorded audio contacts are split
+so stopping an action cannot play a later return from inside a whole-cycle file.
+
 Use shared arm scales left `.97` / right `1`, authored wrist/finger/thumb controls
 and `hand-reference.json` contacts without adapter refits. Reload wraps, release,
 thumb/rim insertion, clearance and return are distinct phases. The asset owns

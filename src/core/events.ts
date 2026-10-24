@@ -12,7 +12,18 @@ export type EventWeapon =
       suppressed?: boolean;
     })
   | null;
-export type ReloadPhase = 'start' | 'magout' | 'magin' | 'slide' | 'end' | 'shellin' | 'pump';
+/** Mechanical beats also cover post-shot manual actions; end is hand settle only. */
+export type ReloadPhase =
+  | 'start'
+  | 'magout'
+  | 'magin'
+  | 'slide'
+  | 'end'
+  | 'shellin'
+  | 'pump'
+  | 'charge'
+  | 'boltopen'
+  | 'boltclose';
 
 export interface EngineError {
   system: string;
@@ -79,7 +90,6 @@ export interface EngineEventMap {
     retained?: boolean;
     actor?: unknown;
     position?: Vector3;
-    settleOnly?: boolean;
   };
   'weapon:shell': {
     position: Vector3;

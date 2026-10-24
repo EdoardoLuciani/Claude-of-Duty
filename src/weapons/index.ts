@@ -134,7 +134,7 @@ interface LiveGrenade {
  * EVENTS EMITTED  (all canonical, see ARCHITECTURE.md)
  *   weapon:fire    { actor, weapon, origin, dir, seed }
  *   weapon:shell   { position, velocity }
- *   weapon:reload  { weapon, phase: 'start'|'magout'|'magin'|'slide'|'end', retained?: boolean }
+ *   weapon:reload  { weapon, phase: ReloadPhase, retained?: boolean } (also manual actions)
  *   shot:resolved  { shooter, weapon, from, to, result, target, part, damage, pellet }
  *                    (only while the telemetry subsystem is present)
  * `bullet:segment` / `bullet:impact` come from physics, which owns resolved paths.
@@ -1044,19 +1044,25 @@ export class WeaponSystem {
         break;
       case 'shellin':
         if (isReload) {
-          this._insertShell();
-          this._emitReload('shellin');
+          if (this._insertShell()) this._emitReload('shellin');
         }
         break;
       case 'pump':
-        if (isReload) this._emitReload('pump');
-        else this._queueShell(0);
+        // Each native rear/forward stop owns a separate recorded contact.
+        this._emitReload(isReload ? 'boltopen' : 'pump');
+        if (!isReload) this._queueShell(0);
+        break;
+      case 'charge':
+        if (isReload) this._emitReload('charge');
         break;
       case 'boltrelease':
+        this._emitReload(s?.def.id === 'pistol' ? 'slide' : 'boltclose');
+        break;
       case 'bolt:close':
-        if (s?.def.id === 'pistol') this._emitReload('slide');
+        this._emitReload('boltclose');
         break;
       case 'bolt:open':
+        this._emitReload('boltopen');
         this._queueShell(0);
         break;
       case 'chamber':
