@@ -171,6 +171,9 @@ export class UiSystem {
   shop!: MarketOverlay;
   marketCountdown!: MarketCountdown;
   radio!: RadioPanel;
+  fps!: HTMLElement;
+  _fpsSince: number | null = null;
+  _fpsFrames = 0;
   state!: HudState;
   k!: number;
   vw!: number;
@@ -233,6 +236,7 @@ export class UiSystem {
     this.shop = new MarketOverlay(this.root, ctx);
     this.marketCountdown = new MarketCountdown(this.chromeLayer, ctx.get('market').delay);
     this.radio = new RadioPanel(this.chromeLayer, ctx);
+    this.fps = el('div', 'ow-fps', this.chromeLayer, '— FPS');
 
     /** Single source of truth for everything the HUD draws. */
     this.state = {
@@ -665,7 +669,22 @@ export class UiSystem {
 
   /* -------------------------------------------------------------- frame --- */
 
+  _updateFps(now = performance.now()): void {
+    if (this._fpsSince === null) {
+      this._fpsSince = now;
+      return;
+    }
+    this._fpsFrames++;
+    const elapsed = now - this._fpsSince;
+    if (elapsed < 500) return;
+    this.fps.textContent = `${Math.round((this._fpsFrames * 1000) / elapsed)} FPS`;
+    this._fpsSince = now;
+    this._fpsFrames = 0;
+  }
+
   lateUpdate(dt: number, ctx: UiContext): void {
+    // Wall time, not scaled/clamped gameplay time: accurate through pause and hitches.
+    this._updateFps();
     const t = ctx.time;
     const rawDt = clamp(t.raw - this._lastRaw, 0, 0.1);
     this._lastRaw = t.raw;

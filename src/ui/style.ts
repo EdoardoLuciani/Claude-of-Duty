@@ -93,6 +93,11 @@ const CSS = `
   text-shadow: var(--sh);
 }
 .ow-layer { position:absolute; inset:0; }
+.ow-fps {
+  position:absolute; top:4px; right:var(--pad);
+  font:600 max(10px, calc(12px * var(--k))) var(--fm);
+  text-shadow:var(--sh);
+}
 
 /* ============================================================== crosshair */
 .ow-cross { position:absolute; left:50%; top:50%; width:0; height:0; }
