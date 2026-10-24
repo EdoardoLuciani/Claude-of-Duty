@@ -40,7 +40,8 @@ try {
   await waitForGame(page, { timeout: 180000 });
   await page.evaluate(() => window.__APPLY_SHOT__('weapon'));
   await page.evaluate(() => window.__PUMP__(3));
-  const result = await page.evaluate(async (seconds) => {
+  const captureOptions = { seconds, foley: !!args.foley };
+  const result = await page.evaluate(async ({ seconds, foley }) => {
     const [{ createCombatProfile }, { combatLane }, { HEALTH }] = await Promise.all([
       import('/tools/lib/profile-combat.js'),
       import('/tools/lib/combat-fixture.js'),
@@ -56,6 +57,7 @@ try {
       combatLane(ai, world, physics, offsets.slice(0, 4));
     const fixture = createCombatProfile(engine, lane, { realtime: true });
     const weapons = ctx.get('weapons');
+    if (foley) ctx.get('ai').agents[0].health = 40;
     // The initial screenshot pose is not gameplay: release both weapon and
     // viewmodel debug gates before driving normal fire/reload/grenade input.
     weapons.debugMode = null;
@@ -72,6 +74,7 @@ try {
       seconds,
       fixture: 'living-combat-realtime',
       finiteHp: 10000,
+      woundedEnemyHp: foley ? 40 : null,
       masterVolume: audio.mixer.masterVolume,
       playerShots: 0,
       enemyShots: 0,
@@ -84,8 +87,14 @@ try {
       grenades: 0,
       footsteps: 0,
       backgroundVoices: 0,
+      bodyFalls: 0,
+      bodyFallVoices: 0,
+      landings: 0,
+      jumps: 0,
+      jumpLandings: 0,
       frames: 0,
     };
+    let jumpPending = false;
     const offs = [
       ctx.events.on('weapon:fire', (e) => {
         if (e.actor === 'player' || e.actor === player) report.playerShots++;
@@ -104,12 +113,25 @@ try {
       }),
       ctx.events.on('explosion', () => report.grenades++),
       ctx.events.on('player:footstep', () => report.footsteps++),
+      ctx.events.on('player:jump', () => {
+        report.jumps++;
+        jumpPending = true;
+      }),
+      ctx.events.on('player:land', (e) => {
+        report.landings++;
+        if (jumpPending && e.velocity > 2) report.jumpLandings++;
+        // The first landing consumes the jump even when it is too soft to
+        // qualify; a later terrain contact must not inherit that pending pair.
+        jumpPending = false;
+      }),
+      ctx.events.on('actor:death', () => report.bodyFalls++),
     ];
     const play = audio._playAt.bind(audio);
     audio._playAt = (...args) => {
       const accepted = play(...args);
       if (accepted && args[0] === 'whizz') report.whizzes++;
       if (accepted && args[5] === 'ambience') report.backgroundVoices++;
+      if (accepted && args[0] === 'bodyfall') report.bodyFallVoices++;
       return accepted;
     };
     const dest = audio.actx.createMediaStreamDestination();
@@ -138,6 +160,24 @@ try {
         // Mouse counter-recoil keeps the ordinary shots aimed at torso height,
         // rather than letting this unattended audition climb into the sky.
         input._rawLook.y += (player.pitch + 0.025) / engine.config.sensitivity;
+        if (foley) {
+          // Aim via ordinary mouse input so a real shot can kill the one actor
+          // starting wounded at 40 HP. Others keep the audition running.
+          const target = ctx.get('ai').agents.find((a) => a.alive);
+          if (target) {
+            const dx = target.position.x - player.eyePosition.x;
+            const dz = target.position.z - player.eyePosition.z;
+            const yaw = Math.atan2(-dx, -dz);
+            const delta = Math.atan2(Math.sin(yaw - player.yaw), Math.cos(yaw - player.yaw));
+            input._rawLook.x = -delta / engine.config.sensitivity;
+            const pitch = Math.atan2(
+              target.position.y + 1.25 - player.eyePosition.y,
+              Math.hypot(dx, dz)
+            );
+            input._rawLook.y = (player.pitch - pitch) / engine.config.sensitivity;
+          }
+          setKey('Space', (elapsed >= 2.5 && elapsed < 2.7) || (elapsed >= 11 && elapsed < 11.2));
+        }
         // Normal G/ADS input: equip, cook briefly, release a short throw. The
         // actual animation releases the live physics grenade and its fuse.
         const g = (elapsed >= 4.8 && elapsed < 4.95) || (elapsed >= 19.8 && elapsed < 19.95);
@@ -151,7 +191,10 @@ try {
           replenished = true;
         }
         engine.step(now);
-        fixture.after();
+        if (foley) {
+          if (engine.error) throw Error(JSON.stringify(engine.error));
+          if (player.dead) throw Error('Audition player died');
+        } else fixture.after();
         report.frames++;
       }
       report.simulationSeconds = engine.time.elapsed;
@@ -169,11 +212,12 @@ try {
       fixture.dispose();
       setKey('KeyG', false);
       setKey('Mouse2', false);
+      setKey('Space', false);
       audio._playAt = play;
       for (const off of offs) off();
       engine.setGameplaySuspended(true);
     }
-  }, seconds);
+  }, captureOptions);
   const media = resolve(out, 'combat.webm');
   writeFileSync(media, Buffer.from(result.pcm, 'base64'));
   delete result.pcm;
@@ -211,6 +255,18 @@ try {
   ])
     assert(result[name] > 0, `Combat capture did not exercise ${name}; inspect report.json`);
   assert(result.grenades >= 2, 'Both real input-driven grenades must explode');
+  if (args.foley) {
+    assert.equal(result.jumps, 2, 'Both scripted jump presses cause actual jumps');
+    assert.equal(
+      result.jumpLandings,
+      2,
+      'Both actual jumps must land, not merely terrain step-downs'
+    );
+    assert(
+      result.bodyFalls > 0 && result.bodyFallVoices > 0,
+      'Real actor death and accepted body fall'
+    );
+  }
   console.log(JSON.stringify(result, null, 2));
   console.log(
     'PASS: continuous real-game combat audio; no per-source/bus/master overrides or loudness normalization.'

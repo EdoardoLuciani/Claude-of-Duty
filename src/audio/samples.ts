@@ -1,6 +1,8 @@
 import type { Rng } from '../core/rng.ts';
 import { biquad, clamp, gain, series } from './dsp.ts';
+import { FOLEY_URLS, type FoleyKind } from './foley-urls.ts';
 import { HIT_MIX, HIT_URLS, type DamageSoundOptions, type HitKind } from './hits.ts';
+import { FALL_BANK, FOLEY_MIX, IMPACT_BANK, STEP_BANK, type FoleyOptions } from './physical.ts';
 import type { AudioVoice, SampleKind, SampleOptions, WeaponProfile } from './types.ts';
 import { REPORT_DISTANT_MATCH, reportDistantMix } from './weapons.ts';
 
@@ -87,6 +89,8 @@ const EXPLOSION_URL = new URL('./samples/explosion.opus', import.meta.url).href;
 const HEARTBEAT_URL = new URL('./samples/heartbeat.opus', import.meta.url).href;
 
 /** Required decoded recordings. Any fetch/decode failure rejects the bank. */
+const CONTACT_URLS = { ...HIT_URLS, ...FOLEY_URLS };
+type ContactKind = HitKind | FoleyKind;
 type SpecialBufferKey = 'actionBuffer' | 'explosionBuffer' | 'heartbeatBuffer';
 export class WeaponSampleBank {
   actx: BaseAudioContext;
@@ -95,8 +99,8 @@ export class WeaponSampleBank {
   actionBuffer: AudioBuffer | null;
   explosionBuffer: AudioBuffer | null;
   heartbeatBuffer: AudioBuffer | null;
-  hitBuffers: Partial<Record<HitKind, AudioBuffer[]>>;
-  hitIndices: Partial<Record<HitKind, number>>;
+  hitBuffers: Partial<Record<ContactKind, AudioBuffer[]>>;
+  hitIndices: Partial<Record<ContactKind, number>>;
   loaded: number;
   constructor(actx: BaseAudioContext) {
     this.actx = actx;
@@ -121,10 +125,10 @@ export class WeaponSampleBank {
     jobs.push(this._loadSpecial('actionBuffer', ACTION_URL));
     jobs.push(this._loadSpecial('explosionBuffer', EXPLOSION_URL));
     jobs.push(this._loadSpecial('heartbeatBuffer', HEARTBEAT_URL));
-    for (const kind of Object.keys(HIT_URLS) as HitKind[]) {
-      this.hitBuffers[kind] = new Array<AudioBuffer>(HIT_URLS[kind].length);
+    for (const kind of Object.keys(CONTACT_URLS) as ContactKind[]) {
+      this.hitBuffers[kind] = new Array<AudioBuffer>(CONTACT_URLS[kind].length);
       this.hitIndices[kind] = -1;
-      HIT_URLS[kind].forEach((url, index) => jobs.push(this._loadHit(kind, index, url)));
+      CONTACT_URLS[kind].forEach((url, index) => jobs.push(this._loadHit(kind, index, url)));
     }
     // Finish all decodes before start() tears down a failed bank.
     for (const result of await Promise.allSettled(jobs))
@@ -148,13 +152,13 @@ export class WeaponSampleBank {
     this.loaded++;
   }
 
-  async _loadHit(kind: HitKind, index: number, url: string): Promise<void> {
+  async _loadHit(kind: ContactKind, index: number, url: string): Promise<void> {
     this.hitBuffers[kind]![index] = await this._loadBuffer(url);
     this.loaded++;
   }
 
   /** No hot-path fetch/decode, and no immediate repeat within a contact family. */
-  hit(kind: HitKind, rng: Rng, o: { when?: number; level?: number } = {}): AudioVoice {
+  hit(kind: ContactKind, rng: Rng, o: { when?: number; level?: number } = {}): AudioVoice {
     const choices = this.hitBuffers[kind];
     if (!choices?.length) throw new Error(`[audio] ${kind} contact recordings are not loaded`);
     const previous = this.hitIndices[kind] ?? -1;
@@ -200,6 +204,57 @@ export class WeaponSampleBank {
       end = Math.max(end, flesh.end);
     }
     return { node: out, end, send: 0 };
+  }
+
+  impact(rng: Rng, o: FoleyOptions = {}): AudioVoice {
+    const kind = IMPACT_BANK[o.surface ?? 'concrete'] ?? IMPACT_BANK.concrete;
+    const voice = this.hit(kind, rng, {
+      when: o.when,
+      level: (o.level ?? 1) * FOLEY_MIX.impact * (o.surface === 'plaster' ? FOLEY_MIX.plaster : 1),
+    });
+    voice.send = FOLEY_MIX.impactSend;
+    return voice;
+  }
+
+  /** A single emitter owns boot + optional water/gear layers, on the same clock. */
+  step(rng: Rng, o: FoleyOptions = {}): AudioVoice {
+    const when = o.when ?? this.actx.currentTime;
+    const gait = o.gait ?? 'walk';
+    const pair = STEP_BANK[o.surface ?? 'concrete'] ?? STEP_BANK.concrete;
+    const fast = gait === 'run' || gait === 'sprint' || gait === 'land';
+    const level = (o.level ?? 1) * (FOLEY_MIX.gait[gait] ?? FOLEY_MIX.gait.walk) * FOLEY_MIX.step;
+    const out = gain(this.actx, level);
+    const kind = fast ? pair.run : pair.walk;
+    const boot = this.hit(kind, rng, { when, level: FOLEY_MIX.stepLevel[kind] ?? 1 });
+    boot.node.connect(out);
+    let end = boot.end;
+    if (o.surface === 'water') {
+      const splash = this.hit('splash', rng, { when, level: FOLEY_MIX.splashLevel });
+      splash.node.connect(out);
+      end = Math.max(end, splash.end);
+    }
+    const gearLevel = o.gear ?? FOLEY_MIX.gear[gait] ?? FOLEY_MIX.gear.walk;
+    if (gearLevel > 0) {
+      const gear = this.hit('gear', rng, { when, level: gearLevel * FOLEY_MIX.gearLevel });
+      gear.node.connect(out);
+      end = Math.max(end, gear.end);
+    }
+    return { node: out, end, send: FOLEY_MIX.stepSend };
+  }
+
+  fall(rng: Rng, o: FoleyOptions = {}): AudioVoice {
+    const voice = this.hit(FALL_BANK[o.surface ?? 'concrete'] ?? FALL_BANK.concrete, rng, {
+      when: o.when,
+      level: (o.level ?? 1) * FOLEY_MIX.fall,
+    });
+    voice.send = FOLEY_MIX.fallSend;
+    return voice;
+  }
+
+  cloth(rng: Rng, o: FoleyOptions = {}): AudioVoice {
+    const voice = this.hit('cloth', rng, { when: o.when, level: (o.level ?? 1) * FOLEY_MIX.cloth });
+    voice.send = FOLEY_MIX.clothSend;
+    return voice;
   }
 
   /**
@@ -433,7 +488,8 @@ export class WeaponSampleBank {
     for (const key of Object.keys(this.buffers) as SampleKind[]) this.buffers[key]!.length = 0;
     this.buffers = {};
     this.indices = {};
-    for (const key of Object.keys(this.hitBuffers) as HitKind[]) this.hitBuffers[key]!.length = 0;
+    for (const key of Object.keys(this.hitBuffers) as ContactKind[])
+      this.hitBuffers[key]!.length = 0;
     this.hitBuffers = {};
     this.hitIndices = {};
     this.actionBuffer = null;

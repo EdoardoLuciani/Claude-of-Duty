@@ -30,6 +30,8 @@ assert(
   !evidence || (evidence !== resolve(root) && !evidence.startsWith(root)),
   'Keep evidence outside the repository'
 );
+const capture = process.env.AUDIO_MIX_CAPTURE?.split(',') ?? [];
+if (evidence) mkdirSync(evidence, { recursive: true });
 const baselinePath = process.env.AUDIO_MIX_BASELINE;
 const baseline = baselinePath
   ? JSON.parse(readFileSync(resolve(baselinePath, 'results.json'), 'utf8'))
@@ -67,7 +69,11 @@ try {
     const pcm = Buffer.from(row.pcm, 'base64');
     delete row.pcm;
     row.pcmSha256 = createHash('sha256').update(pcm).digest('hex');
-    // Meter the actual full-length float output directly; no WAV writer/export tree.
+    // Preserve native float anchors for tolerant cross-context regression checks;
+    // explicitly requested listening cases can be encoded locally from the same PCM.
+    if (evidence && (scenario.role === 'anchor' || capture.some((id) => scenario.id.includes(id))))
+      writeFileSync(resolve(evidence, scenario.id + '.f32'), pcm);
+    // Meter the actual full-length float output directly, without a WAV round trip.
     const meter = spawnSync(
       'ffmpeg',
       [
@@ -117,7 +123,7 @@ try {
         baseline.rows.some((old) => old.scenario.id === scenario.id),
         'Missing approved gun anchor'
       );
-      const old = readFileSync(resolve(baselinePath, scenario.id + '.wav')).subarray(44);
+      const old = readFileSync(resolve(baselinePath, scenario.id + '.f32'));
       assert.equal(old.length, pcm.length, 'Gun duration changed');
       let difference = 0;
       for (let i = 0; i < old.length; i += 4)
