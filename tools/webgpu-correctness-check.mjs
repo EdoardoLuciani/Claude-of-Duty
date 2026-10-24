@@ -70,7 +70,9 @@ try {
     const { createWorldViewPipeline } = await import('/src/render/webgpu-pipeline.ts');
     const { ParticleLayer, resetSpawn } = await import('/src/fx/particles.ts');
     const { HazeSystem } = await import('/src/fx/haze.ts');
-    const { WeaponMaterialsNode } = await import('/src/weapons/materials-tsl.ts');
+    const { ReticleMaterials } = await import('/src/weapons/materials-tsl.ts');
+    const { loadAX338 } = await import('/src/weapons/ax338.ts');
+    const { disposeWeaponMaterials } = await import('/src/weapons/asset-material.ts');
     const { parallaxUV } = await import('/src/materials/shader-tsl.ts');
     const { packedReadback } = await import('/tools/lib/native-readback.js');
     const check = (ok, message) => {
@@ -132,8 +134,15 @@ try {
         layer.dispose();
         underlay.removeFromParent();
       }
-    const optics = new WeaponMaterialsNode({});
-    for (const mat of [optics.reticle(), optics.lensRing(), optics.glass()]) {
+    const optics = new ReticleMaterials();
+    const weapon = await loadAX338();
+    const lens = [...weapon.materials].find((material) => material.transparent);
+    check(lens, 'authored AX338 lens must exercise ordinary translucent coverage');
+    for (const [mat, alpha] of [
+      [optics.reticle(), 0],
+      [optics.reticleOutline(), 0.8],
+      [lens, lens.opacity],
+    ]) {
       const mesh = new T.Mesh(geometry, mat);
       mesh.position.z = -2;
       view.add(mesh);
@@ -143,15 +152,15 @@ try {
       });
       renderer.setRenderTarget(target);
       graph.render();
-      close(
-        (await read(graph.viewPass.renderTarget))[3],
-        mat === optics.glass() ? 0.1 : 0,
-        `${mat.name}: optical coverage`
-      );
+      close((await read(graph.viewPass.renderTarget))[3], alpha, `${mat.name}: optical coverage`);
       graph.dispose();
       mesh.removeFromParent();
     }
     optics.dispose();
+    disposeWeaponMaterials(weapon);
+    weapon.scene.traverse((node) => {
+      if (node.isMesh) node.geometry.dispose();
+    });
     const surface = new T.MeshStandardNodeMaterial({ roughness: 1, metalness: 1 });
     surface.roughnessNode = N.float(0.15);
     surface.metalnessNode = N.float(0);

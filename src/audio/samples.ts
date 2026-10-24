@@ -146,23 +146,29 @@ export class WeaponSampleBank {
       const urls = URLS[kind];
       this.buffers[kind] = new Array<AudioBuffer>(urls.length);
       this.indices[kind] = 0;
-      urls.forEach((url, index) => jobs.push(this._loadOne(kind, index, url)));
+      urls.forEach((url, index) => jobs.push(this._loadInto(this.buffers[kind]!, index, url)));
     }
     jobs.push(this._loadSpecial('actionBuffer', ACTION_URL));
     jobs.push(this._loadSpecial('explosionBuffer', EXPLOSION_URL));
     jobs.push(this._loadSpecial('heartbeatBuffer', HEARTBEAT_URL));
     this.aircraftBuffers = new Array<AudioBuffer>(AIRCRAFT_URLS.length);
     this.aircraftIndex = -1;
-    AIRCRAFT_URLS.forEach((url, index) => jobs.push(this._loadAircraft(index, url)));
+    AIRCRAFT_URLS.forEach((url, index) =>
+      jobs.push(this._loadInto(this.aircraftBuffers, index, url))
+    );
     for (const kind of Object.keys(CONTACT_URLS) as ContactKind[]) {
       this.hitBuffers[kind] = new Array<AudioBuffer>(CONTACT_URLS[kind].length);
       this.hitIndices[kind] = -1;
-      CONTACT_URLS[kind].forEach((url, index) => jobs.push(this._loadHit(kind, index, url)));
+      CONTACT_URLS[kind].forEach((url, index) =>
+        jobs.push(this._loadInto(this.hitBuffers[kind]!, index, url))
+      );
     }
     for (const kind of Object.keys(RELOAD_URLS) as ReloadKind[]) {
       this.reloadBuffers[kind] = new Array<AudioBuffer>(RELOAD_URLS[kind].length);
       this.reloadIndices[kind] = -1;
-      RELOAD_URLS[kind].forEach((url, index) => jobs.push(this._loadReload(kind, index, url)));
+      RELOAD_URLS[kind].forEach((url, index) =>
+        jobs.push(this._loadInto(this.reloadBuffers[kind]!, index, url))
+      );
     }
     // Finish all decodes before start() tears down a failed bank.
     for (const result of await Promise.allSettled(jobs))
@@ -173,27 +179,39 @@ export class WeaponSampleBank {
   async _loadBuffer(url: string): Promise<AudioBuffer> {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`[audio] failed to load ${url}: HTTP ${response.status}`);
-    return this.actx.decodeAudioData(await response.arrayBuffer());
+    const buffer = await this.actx.decodeAudioData(await response.arrayBuffer());
+    this.loaded++;
+    return buffer;
   }
 
-  async _loadOne(kind: SampleKind, index: number, url: string): Promise<void> {
-    this.buffers[kind]![index] = await this._loadBuffer(url);
-    this.loaded++;
+  private async _loadInto(buffers: AudioBuffer[], index: number, url: string): Promise<void> {
+    buffers[index] = await this._loadBuffer(url);
   }
 
   async _loadSpecial(field: SpecialBufferKey, url: string): Promise<void> {
     this[field] = await this._loadBuffer(url);
-    this.loaded++;
   }
 
-  async _loadHit(kind: ContactKind, index: number, url: string): Promise<void> {
-    this.hitBuffers[kind]![index] = await this._loadBuffer(url);
-    this.loaded++;
-  }
-
-  async _loadAircraft(index: number, url: string): Promise<void> {
-    this.aircraftBuffers[index] = await this._loadBuffer(url);
-    this.loaded++;
+  /** One RNG draw per cue; a one-take bank necessarily repeats its only take. */
+  private _nextTake<K extends string>(
+    kind: K,
+    buffers: Partial<Record<K, AudioBuffer[]>>,
+    indices: Partial<Record<K, number>>,
+    rng: Rng,
+    family = ''
+  ): AudioBuffer {
+    const choices = buffers[kind];
+    if (!choices?.length) {
+      const label = family ? `${kind} ${family}` : kind;
+      throw new Error(`[audio] ${label} recordings are not loaded`);
+    }
+    const previous = indices[kind] ?? -1;
+    const index =
+      previous < 0
+        ? rng.u32() % choices.length
+        : (previous + 1 + (rng.u32() % Math.max(1, choices.length - 1))) % choices.length;
+    indices[kind] = index;
+    return choices[index];
   }
 
   nextAircraft(rng: Rng): AudioBuffer {
@@ -205,11 +223,6 @@ export class WeaponSampleBank {
     return this.aircraftBuffers[this.aircraftIndex];
   }
 
-  async _loadReload(kind: ReloadKind, index: number, url: string): Promise<void> {
-    this.reloadBuffers[kind]![index] = await this._loadBuffer(url);
-    this.loaded++;
-  }
-
   /** Recorded handling only: unsupported cues and missing assets never synthesize. */
   reload(
     weapon: string,
@@ -219,16 +232,9 @@ export class WeaponSampleBank {
   ): AudioVoice {
     const kind = reloadKind(weapon, phase);
     if (!kind) throw new Error(`[audio] no recorded reload cue for ${weapon}/${phase}`);
-    const choices = this.reloadBuffers[kind];
-    if (!choices?.length) throw new Error(`[audio] ${kind} reload recordings are not loaded`);
-    const previous = this.reloadIndices[kind] ?? -1;
-    const index =
-      previous < 0
-        ? rng.u32() % choices.length
-        : (previous + 1 + (rng.u32() % (choices.length - 1))) % choices.length;
-    this.reloadIndices[kind] = index;
+    const buffer = this._nextTake(kind, this.reloadBuffers, this.reloadIndices, rng, 'reload');
     const src = this.actx.createBufferSource();
-    src.buffer = choices[index];
+    src.buffer = buffer;
     // Preserve authored attack timing and action duration; vary takes, not pitch.
     const out = gain(this.actx, RELOAD_MIX.gain * rng.range(0.97, 1.03));
     src.connect(out);
@@ -244,17 +250,9 @@ export class WeaponSampleBank {
     rng: Rng,
     o: { when?: number; level?: number } = {}
   ): AudioVoice {
-    const key = reactionBank(voice, kind),
-      choices = this.hitBuffers[key];
-    if (!choices?.length) throw new Error(`[audio] ${key} recordings are not loaded`);
-    const previous = this.hitIndices[key] ?? -1;
-    const index =
-      previous < 0
-        ? rng.u32() % choices.length
-        : (previous + 1 + (rng.u32() % (choices.length - 1))) % choices.length;
-    this.hitIndices[key] = index;
+    const buffer = this._nextTake(reactionBank(voice, kind), this.hitBuffers, this.hitIndices, rng);
     const src = this.actx.createBufferSource();
-    src.buffer = choices[index];
+    src.buffer = buffer;
     const out = gain(this.actx, REACTION_MIX.gain * (o.level ?? 1));
     src.connect(out);
     const when = o.when ?? this.actx.currentTime;
@@ -268,17 +266,9 @@ export class WeaponSampleBank {
     rng: Rng,
     o: { when?: number; level?: number } = {}
   ): AudioVoice {
-    const key = environmentBank(kind),
-      choices = this.hitBuffers[key];
-    if (!choices?.length) throw new Error(`[audio] ${key} recordings are not loaded`);
-    const previous = this.hitIndices[key] ?? -1;
-    const index =
-      previous < 0
-        ? rng.u32() % choices.length
-        : (previous + 1 + (rng.u32() % (choices.length - 1))) % choices.length;
-    this.hitIndices[key] = index;
+    const buffer = this._nextTake(environmentBank(kind), this.hitBuffers, this.hitIndices, rng);
     const src = this.actx.createBufferSource();
-    src.buffer = choices[index];
+    src.buffer = buffer;
     const out = gain(this.actx, ENVIRONMENT_GAIN[kind] * (o.level ?? 1));
     src.connect(out);
     const when = o.when ?? this.actx.currentTime;
@@ -292,18 +282,11 @@ export class WeaponSampleBank {
       out = gain(this.actx, 1);
     let end = when;
     for (const key of RADIO_PARTS[kind]) {
-      const choices = this.hitBuffers[key];
-      if (!choices?.length) throw new Error(`[audio] ${key} recordings are not loaded`);
-      const previous = this.hitIndices[key] ?? -1;
-      const index =
-        previous < 0
-          ? rng.u32() % choices.length
-          : (previous + 1 + (rng.u32() % (choices.length - 1))) % choices.length;
-      this.hitIndices[key] = index;
       const click = key === 'radio-click',
         start = when + (click ? 0 : RADIO_MIX.staticDelay);
+      const buffer = this._nextTake(key, this.hitBuffers, this.hitIndices, rng);
       const src = this.actx.createBufferSource();
-      src.buffer = choices[index];
+      src.buffer = buffer;
       const trim = gain(this.actx, (click ? RADIO_MIX.click : RADIO_MIX.static) * (o.level ?? 1));
       src.connect(trim);
       trim.connect(out);
@@ -315,16 +298,9 @@ export class WeaponSampleBank {
 
   /** No hot-path fetch/decode, and no immediate repeat within a contact family. */
   hit(kind: ContactKind, rng: Rng, o: { when?: number; level?: number } = {}): AudioVoice {
-    const choices = this.hitBuffers[kind];
-    if (!choices?.length) throw new Error(`[audio] ${kind} contact recordings are not loaded`);
-    const previous = this.hitIndices[kind] ?? -1;
-    const index =
-      previous < 0
-        ? rng.u32() % choices.length
-        : (previous + 1 + (rng.u32() % Math.max(1, choices.length - 1))) % choices.length;
-    this.hitIndices[kind] = index;
+    const buffer = this._nextTake(kind, this.hitBuffers, this.hitIndices, rng, 'contact');
     const src = this.actx.createBufferSource();
-    src.buffer = choices[index];
+    src.buffer = buffer;
     const rate = rng.range(HIT_MIX.rateMin, HIT_MIX.rateMax);
     src.playbackRate.value = rate;
     const out = gain(this.actx, (o.level ?? 1) * rng.range(HIT_MIX.gainMin, HIT_MIX.gainMax));
