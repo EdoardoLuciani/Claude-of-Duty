@@ -2,7 +2,11 @@
 
 Charcoal gloves/olive sleeves for seven weapons. Blender owns skin/maps and
 12 finger poses; gameplay owns trajectories, fitting, IK, healing and events.
-Five material submissions; 28 controls per arm, including hinge/thumb-web.
+Five editable authored surfaces, consolidated at load to one physical-material
+submission per independently controlled arm; 28 controls per arm, including
+hinge/thumb-web. UV0 retains baked AO and UV1 retains tiled microdetail; immutable
+surface IDs select texture-array layers and restrict injury blood to sleeve/stitch.
+Each hand owns its mirrored/bound geometry and skeleton.
 
 Maintained: `player-arms.blend` (packed source), `pose-reference.json`,
 `manifest.json`, `public/models/player/arms.glb`, generated `hand-poses.ts`.
