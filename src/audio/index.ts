@@ -41,6 +41,7 @@ import { shellCasing, explosion, uiSound, heartbeat, intelSiren } from './foley.
 import { classifySpace, SPACE_KEYS } from './ir.ts';
 import { Mixer } from './mixer.ts';
 import { TentRadio } from './music.ts';
+import { reactionKind } from './reactions.ts';
 import { WeaponSampleBank } from './samples.ts';
 import { SpatialField } from './spatial.ts';
 import type { WeaponProfile } from './types.ts';
@@ -252,6 +253,7 @@ export class AudioSystem {
   declare _intelAlarm: ReturnType<typeof intelSiren> | null;
   declare _budget: AudioBudget;
   declare _lastBarkTime: number;
+  declare _lastReactionEnd: number;
   declare _lastEnemyFire: number;
   declare _stance: string | null;
   declare _ads: boolean;
@@ -310,6 +312,7 @@ export class AudioSystem {
     /* per-frame rate limits */
     this._budget = { impact: 0, step: 0, aiStep: 0, shell: 0, whizz: 0 };
     this._lastBarkTime = -99;
+    this._lastReactionEnd = -99;
     this._lastEnemyFire = -99;
 
     this._stance = null;
@@ -427,6 +430,7 @@ export class AudioSystem {
 
   _teardown() {
     this._onIntelOperation({ active: false });
+    this._lastReactionEnd = -99;
     this._stopAircraft(true);
     try {
       this.tentRadio?.dispose();
@@ -747,7 +751,16 @@ export class AudioSystem {
         return this.samples!.cloth(rng, { when, level: o.level });
       case 'heartbeat':
         return heartbeat(actx, { when, level: o.level, buffer: this.samples!.heartbeatBuffer! });
-      case 'bark':
+      case 'bark': {
+        const reaction = reactionKind(o.bark);
+        if (reaction) {
+          const voice = this.samples!.reaction(reaction, o.voice ?? 0, rng, {
+            when,
+            level: o.level,
+          });
+          this._lastReactionEnd = Math.max(this._lastReactionEnd, voice.end);
+          return voice;
+        }
         return voxBark(actx, bank, rng, {
           when,
           bark: o.bark,
@@ -756,6 +769,7 @@ export class AudioSystem {
           level: o.level,
           radio: o.radio,
         });
+      }
       case 'ambient':
         return ambientOneShot(actx, bank, rng, o.which, { when, level: o.level });
       default:
@@ -943,11 +957,17 @@ export class AudioSystem {
   bark(kind: string, position: Vec3Like | null = null, opts: AudioOptions = {}): boolean {
     if (!this.running) return false;
     const now = this.actx!.currentTime;
-    if (now - this._lastBarkTime < 0.42 && !opts.force) return false; // no mush
+    const reaction = reactionKind(kind);
+    if (
+      !opts.force &&
+      (now - this._lastBarkTime < 0.42 || (reaction && now < this._lastReactionEnd))
+    )
+      return false; // no overlapping recorded efforts
     this._lastBarkTime = now;
     const seed = (opts.voice ?? 0) | 0;
     const o = {
-      bark: barkFor(kind, this.rng),
+      bark: reaction ?? barkFor(kind, this.rng),
+      voice: seed,
       f0: 96 + ((seed * 37) % 41),
       tract: 0.95 + ((seed * 13) % 11) / 100,
       level: opts.level ?? 1,
@@ -1022,6 +1042,7 @@ export class AudioSystem {
     const stopIntel = () => this._onIntelOperation({ active: false });
     on('game:restart', () => {
       stopIntel();
+      this._lastReactionEnd = -99;
       this._stopAircraft();
     });
     on('player:death', stopIntel);
@@ -1351,7 +1372,7 @@ export class AudioSystem {
     this.ui(p.headshot ? 'headshot' : armoured ? 'armour' : 'hitmarker', 1);
     if (p.killed) this.ui('kill', 1);
     else if (p.point && p.target && this.rng.float() < 0.3) {
-      this.bark('hurt', p.point, { level: 0.85 });
+      this.bark('hurt', p.point, { level: 0.85, voice: actorVoice(t) });
     }
   }
 
