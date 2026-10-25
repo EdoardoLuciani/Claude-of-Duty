@@ -261,7 +261,7 @@ export class Collider {
     this.matrix = new THREE.Matrix4();
     this.inverse = new THREE.Matrix4();
     this.layer = opts.layer ?? LAYER.ACTOR;
-    this.surfaceIndex = surfaceIndex(opts.surface ?? 'flesh');
+    this.surfaceIndex = surfaceIndex(opts.surface === undefined ? 'flesh' : opts.surface);
     this.ballisticSurfaceIndex =
       opts.ballisticSurface === undefined ? this.surfaceIndex : surfaceIndex(opts.ballisticSurface);
     this.sheetThickness = opts.sheetThickness ?? 0;
@@ -555,15 +555,27 @@ export class PhysicsSystem {
     const ids: number[] = [];
     if (!root) return ids;
     root.updateWorldMatrix(true, true);
-    root.traverse((o: THREE.Object3D): void => {
-      if (!isCollisionMesh(o)) return;
-      if (o.userData?.collision === false || o.userData?.noCollision) return;
-      const metadataSurface: unknown = o.userData?.surface;
-      const resolvedSurface =
-        surfaceType ?? (metadataSurface === undefined ? undefined : surfaceIndex(metadataSurface));
-      const id = this.addStatic(o, resolvedSurface, opts);
-      if (id >= 0) ids.push(id);
-    });
+    const registered = this._explicitStatics;
+    try {
+      root.traverse((o: THREE.Object3D): void => {
+        if (!isCollisionMesh(o)) return;
+        if (o.userData?.collision === false || o.userData?.noCollision) return;
+        const metadataSurface: unknown = o.userData?.surface;
+        const resolvedSurface =
+          surfaceType === undefined
+            ? metadataSurface === undefined
+              ? undefined
+              : surfaceIndex(metadataSurface)
+            : surfaceType;
+        const id = this.addStatic(o, resolvedSurface, opts);
+        if (id >= 0) ids.push(id);
+      });
+    } catch (error) {
+      // A failed group returns no handles: do not leave unreachable partial registrations.
+      for (let i = ids.length - 1; i >= 0; i--) this.removeStatic(ids[i]);
+      this._explicitStatics = registered;
+      throw error;
+    }
     return ids;
   }
 
@@ -1395,7 +1407,7 @@ export class PhysicsSystem {
 
   addRigidBody(opts: PhysicsRigidBodyOptions = {}): RigidBody {
     const b = new RigidBody(opts);
-    if (opts.surfaceType) b.surface = surfaceIndex(opts.surfaceType);
+    if (opts.surfaceType !== undefined) b.surface = surfaceIndex(opts.surfaceType);
     this.bodies.add(b);
     return b;
   }
@@ -1421,7 +1433,7 @@ export class PhysicsSystem {
     } = {}
   ): RigidBody {
     const s = opts.size ?? 0.08;
-    const si = surfaceIndex(opts.surface ?? 'concrete');
+    const si = surfaceIndex(opts.surface === undefined ? 'concrete' : opts.surface);
     const b = this.addRigidBody({
       shape: opts.shape ?? 'box',
       halfExtents: { x: s, y: s * 0.7, z: s * 0.85 },

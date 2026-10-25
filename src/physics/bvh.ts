@@ -201,7 +201,8 @@ export class StaticWorld {
     if (!baked || baked.count === 0) return -1;
     const rawMetadata: unknown = mesh.userData;
     const metadata: Record<string, unknown> = isRecord(rawMetadata) ? rawMetadata : {};
-    const ballisticSurface = opts.ballisticSurface ?? metadata.ballisticSurface;
+    const ballisticSurface =
+      opts.ballisticSurface === undefined ? metadata.ballisticSurface : opts.ballisticSurface;
     const sheetThickness = opts.sheetThickness ?? metadata.sheetThickness;
     const ballisticIndex = ballisticSurface === undefined ? null : surfaceIndex(ballisticSurface);
 
