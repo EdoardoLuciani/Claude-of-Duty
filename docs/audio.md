@@ -38,8 +38,9 @@ and crop start directly, with unity donor gain. `processing` owns default filter
 and fades; per-file filters override it. Overlays retain explicit `layers`.
 Frozen hashes remain independent of the candidate asset.
 
-Historical preparation/capture tools stay in Git history. Edits require licensed
-originals and fresh native decode/mix validation, not a normal build. Delivery is
+Historical preparation/capture tools and source-downmix measurement receipts stay
+in Git history. Edits require licensed originals and fresh native decode/mix
+validation, not a normal build. Delivery is
 48 kHz Opus; spatial banks are mono and legacy gun layouts remain source-owned.
 Foley/hit crops use 1 ms attack / 35 ms release fades and 20 ms energy matching
 with respectively 9/8 dB peak headroom; other edit settings remain in provenance.
@@ -55,7 +56,7 @@ permission to distribute legacy raw samples or source-library masters.
 `npm test` checks assets, routing, selection, native clip timing and lifecycle.
 Run `node tests/e2e/audio-e2e.mjs` for native codec/automation regressions and
 `node tests/e2e/audio-mix-e2e.mjs` for whole-mix hierarchy/headroom. The
-`audio-{hit-feedback,reloads,aircraft,reactions,environment,radio}-e2e.mjs` checks
-exercise actual game integration; `audio-aircraft-loops-e2e.mjs` measures decoded
-loop steadiness. Real-time AI captures are not sample-aligned A/Bs. Measurements
-are regression evidence, not perceptual or final human acceptance.
+`audio-game-e2e.mjs` and `audio-aircraft-e2e.mjs` checks exercise live game
+integration. Aircraft loop-authoring/steadiness probes remain in Git history;
+approved loop hashes stay frozen. Real-time AI captures are not sample-aligned A/Bs.
+Measurements are regression evidence, not perceptual or final human acceptance.

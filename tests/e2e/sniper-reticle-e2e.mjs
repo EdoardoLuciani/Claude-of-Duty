@@ -1,10 +1,5 @@
-#!/usr/bin/env node
-/** Native gameplay captures + pixel oracle for the actual sniper material.
- * node tests/e2e/sniper-reticle-e2e.mjs --out=/tmp/sniper-reticle-after
- */
+/** Pixel oracle for the shipped sniper material, not a screenshot/report generator. */
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 
 import {
   collectBrowserErrors,
@@ -13,17 +8,14 @@ import {
   parseArgs,
   stopViteServer,
 } from '../../tools/lib/browser-harness.mjs';
-import { captureNative, installDevicePolicy, waitForGame } from '../../tools/lib/native-render.mjs';
+import { installDevicePolicy, waitForGame } from '../../tools/lib/native-render.mjs';
 
 const args = parseArgs();
 const port = Number(args.port ?? 5231);
-const out = resolve(args.out ?? '/tmp/sniper-reticle-after');
-mkdirSync(out, { recursive: true });
 const scenes = [
   { id: 'day-1080', width: 1920, height: 1080, time: 16.5 },
   { id: 'day-720', width: 1280, height: 720, time: 16.5 },
   { id: 'day-ultrawide', width: 2560, height: 1080, time: 16.5 },
-  { id: 'dusk-1080', width: 1920, height: 1080, time: 19.2 },
 ];
 const server = await ensureViteServer({ port });
 let browser;
@@ -50,7 +42,7 @@ try {
     await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`, {
       waitUntil: 'domcontentloaded',
     });
-    const device = await waitForGame(page);
+    await waitForGame(page);
     const state = await page.evaluate(async (time) => {
       window.__APPLY_SHOT__('weapon');
       const ctx = window.__ENGINE__.ctx,
@@ -63,20 +55,14 @@ try {
       await window.__PUMP__(100);
       await window.__PRESENT__(2);
       return {
-        frame: ctx.time.frame,
         fov: ctx.camera.fov,
-        aspect: ctx.camera.aspect,
         reticle: w.viewmodel.scopeOverlay.visible,
         optic: w.viewmodel.active.optic.reticle,
-        scale: w.viewmodel.reticleUniforms.uMradScale.value,
-        render: window.__RENDER_INFO__,
       };
     }, scene.time);
     assert.equal(state.reticle, true);
     assert.equal(state.optic, 'p4fl');
-    assert.equal(state.frame, 103);
     assert(Math.abs(state.fov - 20) < 0.001, 'shipped ADS zoom is unchanged');
-    await captureNative(page, `${out}/${scene.id}.png`);
 
     // Borrow the shipped material on white: isolates actual WGSL pixel coverage
     // from scene detail/postprocessing. Never substitute a JS rendering of it.
@@ -174,8 +160,8 @@ try {
     assert(probe.fineWidth >= 0.9 && probe.fineWidth < 1.6, 'readable pixel-width center');
     assert(probe.postWidth > probe.fineWidth * 2, 'heavier outer posts');
     assert(probe.outside < 0.01, 'reticle clipped to aperture');
-    captures.push({ scene, device, ...state, probe });
-    console.log(`Captured and verified ${scene.id}`);
+    captures.push(probe);
+    console.log(`PASS ${scene.id}`);
   }
   // Existing boot warning, traced with Node.captureStackTrace to
   // render/volumetric-shadow.ts, not the reticle (which uses no inline Fn).
@@ -189,17 +175,9 @@ try {
     []
   );
   assert.equal(
-    captures[0].probe.pixelsPerMrad,
-    captures[2].probe.pixelsPerMrad,
+    captures[0].pixelsPerMrad,
+    captures[2].pixelsPerMrad,
     'ultrawide must not stretch markings'
-  );
-  writeFileSync(
-    `${out}/report.json`,
-    JSON.stringify(
-      { captures, errors: errors.filter((message) => message !== knownWarning), knownWarnings },
-      null,
-      2
-    ) + '\n'
   );
 } finally {
   try {

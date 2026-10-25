@@ -1,6 +1,4 @@
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
-import { resolve } from 'node:path';
 
 import {
   ensureViteServer,
@@ -9,15 +7,13 @@ import {
   portOpen,
   stopViteServer,
 } from '../../tools/lib/browser-harness.mjs';
-import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
+import { waitForGame } from '../../tools/lib/native-render.mjs';
 
 const args = parseArgs();
 const port = Number(args.port ?? 5488);
 assert.equal(await portOpen(port), false, 'use a dedicated server for this worktree');
 const server = await ensureViteServer({ port });
 const browser = await launchChromium({ headless: true });
-const out = args.out ? resolve(String(args.out)) : null;
-if (out) await mkdir(out, { recursive: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   const errors = [];
@@ -43,7 +39,8 @@ try {
       if (window.__RUN_RENDERS__.length < 1000) window.__RUN_RENDERS__.push({
         suspended: this.gameplaySuspended, visible: this.viewScene.visible,
         elapsed: this.time.elapsed, dt: this.time.dt,
-        pose: this.ctx.get('weapons').__TEST_POSES__ ?? 0,
+        poseFrame: this.ctx.get('weapons').__TEST_POSE_FRAME__, frame: this.time.frame,
+        posed: this.viewCamera.position.equals(this.ctx.get('weapons').viewmodel.anchor.position),
         input: [...this.input.down], wheel: this.input.wheel
       });
       ${marker}`
@@ -62,6 +59,7 @@ try {
     const pose = w.lateUpdate.bind(w);
     w.lateUpdate = (...args) => {
       w.__TEST_POSES__ = (w.__TEST_POSES__ ?? 0) + 1;
+      w.__TEST_POSE_FRAME__ = e.time.frame;
       return pose(...args);
     };
   });
@@ -131,7 +129,6 @@ try {
     0,
     'actual waiting view pass is transparent, not a stale weapon'
   );
-  if (out) await captureNative(page, resolve(out, 'after-awaiting-start.png'));
   // Resolving a request without actual acquisition is deliberately insufficient.
   await page.evaluate(() => {
     const canvas = window.__ENGINE__.canvas;
@@ -163,15 +160,18 @@ try {
   await page.waitForFunction(() => window.__RUN_RENDERS__.some((r) => !r.suspended));
   const firstActive = await page.evaluate(() => window.__RUN_RENDERS__.find((r) => !r.suspended));
   assert.equal(firstActive.visible, true);
-  assert(firstActive.pose > 0, 'normal pose hooks run before first active render');
+  assert.equal(
+    firstActive.poseFrame,
+    firstActive.frame,
+    'normal pose precedes first active render'
+  );
+  assert(firstActive.posed, 'view camera matches the current first-person pose');
   assert.deepEqual(firstActive.input, []);
   assert.equal(firstActive.wheel, 0);
   assert.equal(await page.evaluate(() => window.__RUN_EVENTS__.fire), 0);
-  // The existing draw clip starts below the screen. The separate frame-sequence
-  // regression compares earliest composed frames against the pre-integration base.
+  // The draw clip starts below screen; test eventual visibility, not an exact frame index.
   await page.waitForFunction(() => window.__ENGINE__.ctx.get('weapons').viewmodel.clipT >= 0.2);
   assert((await viewPixels()) > 0, 'normal draw animation brings first-person geometry into view');
-  if (out) await captureNative(page, resolve(out, 'after-active.png'));
   // Existing pointer-loss pause and shop cleanup remain authoritative once active.
   await page.evaluate(() => document.exitPointerLock());
   await page.waitForFunction(() => window.__ENGINE__.ctx.get('ui').menu.open);
@@ -224,7 +224,6 @@ try {
   const afterDeath = await snapshot();
   await page.waitForTimeout(300);
   assert.deepEqual(await snapshot(), afterDeath);
-  if (out) await page.screenshot({ path: resolve(out, 'after-death-new-game.png') });
   await page.getByRole('button', { name: 'START', exact: true }).click();
   await page.waitForFunction(() => !window.__ENGINE__.gameplaySuspended);
   // Neither Enter key may autorepeat from New Game into the newly focused Start button.

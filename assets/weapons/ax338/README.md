@@ -64,8 +64,8 @@ world-camera FOV/zoom and remain aspect-correct. No reference image ships.
 Runtime source: `src/weapons/sniper-reticle.ts` and the sniper branch of
 `src/weapons/viewmodel.ts`. No GLB/Blender rebuild is needed for overlay edits.
 Run `node tests/smoke/smoke-sniper-reticle.mjs` and
-`node tests/e2e/sniper-reticle-e2e.mjs --out=/tmp/sniper-reticle-review` for native
-720p/1080p/ultrawide/day/dusk captures and shader pixel checks.
+`node tests/e2e/sniper-reticle-e2e.mjs` for native
+720p/1080p/ultrawide shader pixel checks. Review captures are disposable.
 
 ## Rebuild/check (root, Blender 5.2.2)
 
