@@ -22,6 +22,7 @@
 
 import * as THREE from 'three';
 
+import { isRecord } from '../core/guards.ts';
 import {
   rayAabb,
   rayTriangle,
@@ -190,7 +191,7 @@ export class StaticWorld {
    */
   addMesh(
     mesh: THREE.Mesh | THREE.InstancedMesh,
-    surface: number | string,
+    surface: number | string | undefined,
     mask = LAYER.STATIC,
     opts: StaticMeshOptions = {}
   ): number {
@@ -198,10 +199,7 @@ export class StaticWorld {
     const baked = bakeMesh(mesh, surface);
     if (!baked || baked.count === 0) return -1;
     const rawMetadata: unknown = mesh.userData;
-    const metadata: Record<string, unknown> =
-      rawMetadata && typeof rawMetadata === 'object'
-        ? (rawMetadata as Record<string, unknown>)
-        : {};
+    const metadata: Record<string, unknown> = isRecord(rawMetadata) ? rawMetadata : {};
     const ballisticSurface = opts.ballisticSurface ?? metadata.ballisticSurface;
     const sheetThickness = opts.sheetThickness ?? metadata.sheetThickness;
 
@@ -1349,8 +1347,8 @@ export function bakeMesh(
   const triPerInstance = ((index ? index.count : posAttr.count) / 3) | 0;
   if (triPerInstance === 0) return null;
 
-  const instancedMesh = mesh as THREE.InstancedMesh;
-  const isInstanced = instancedMesh.isInstancedMesh === true && instancedMesh.count > 0;
+  const instancedMesh = mesh instanceof THREE.InstancedMesh ? mesh : null;
+  const isInstanced = instancedMesh !== null && instancedMesh.count > 0;
   const instances = isInstanced ? mesh.count : 1;
   const total = triPerInstance * instances;
 
@@ -1390,7 +1388,7 @@ export function bakeMesh(
 
   for (let inst = 0; inst < instances; inst++) {
     if (isInstanced) {
-      instancedMesh.getMatrixAt(inst, _m4);
+      instancedMesh!.getMatrixAt(inst, _m4);
       _m4.premultiply(mesh.matrixWorld);
     } else {
       _m4.copy(mesh.matrixWorld);

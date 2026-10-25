@@ -1,9 +1,9 @@
 import type { Vector2 } from 'three';
 import type { FnNode } from 'three/src/nodes/tsl/TSLCore.js';
+import { nodeArray } from 'three/tsl';
 import {
   Fn,
   If,
-  Loop,
   abs,
   clamp,
   cos,
@@ -24,15 +24,19 @@ import {
   vec3,
   vec4,
 } from 'three/tsl';
+import { LoopNode } from 'three/webgpu';
 import type { Node } from 'three/webgpu';
 import type { ConstNode, JoinNode, VarNode } from 'three/webgpu';
 
 type NamedLoopSpec = { start: Node<'int'>; end: Node<'int'>; name: 'x' | 'y'; condition: '<=' };
 type NamedLoopVariables = { x: Node<'int'>; y: Node<'int'> };
-const namedLoop = Loop as unknown as (
+// Same construction as native Loop; its declarations omit named counters.
+const namedLoop = (
   spec: NamedLoopSpec,
   callback: (variables: NamedLoopVariables) => void
-) => void;
+): void => {
+  new LoopNode(nodeArray([spec, callback])).toStack();
+};
 
 // Periodic, sin-free lattice hash from the authored GLSL noise stack. Wrapping
 // the lattice (not the fractional coordinate) is what makes tile edges meet.

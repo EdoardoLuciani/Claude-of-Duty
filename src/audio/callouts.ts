@@ -84,7 +84,7 @@ export function isCalloutKind(kind: string): kind is AiCalloutKind {
 /** Sequential, immutable enemy IDs distribute each four spawns evenly across the cast. */
 export function calloutBank(voice: number, kind: AiCalloutKind): CalloutBank {
   const identity = Number.isFinite(voice) ? Math.abs(Math.trunc(voice)) : 0;
-  return (CALLOUT_CAST[identity % CALLOUT_CAST.length] + '-' + kind) as CalloutBank;
+  return `${CALLOUT_CAST[identity % CALLOUT_CAST.length]}-${kind}`;
 }
 
 interface Position {

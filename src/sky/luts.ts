@@ -18,7 +18,8 @@ import {
   uv,
   vec3,
 } from 'three/tsl';
-import { RepeatWrapping } from 'three/webgpu';
+import { nodeArray } from 'three/tsl';
+import { RepeatWrapping, LoopNode } from 'three/webgpu';
 import type { Node, Renderer } from 'three/webgpu';
 import type { ConstNode, VarNode } from 'three/webgpu';
 
@@ -80,15 +81,20 @@ interface NamedLoopSpec {
   name: string;
   condition: string;
 }
-const namedLoop = Loop as unknown as (
+// Native Loop construction, preserving its integer counters and custom names.
+const namedLoop = (
   spec: NamedLoopSpec,
   callback: (variables: { s: Node<'int'> }) => void
-) => void;
-const nestedLoop = Loop as unknown as (
+): void => {
+  new LoopNode(nodeArray([spec, callback])).toStack();
+};
+const nestedLoop = (
   countI: number,
   countJ: number,
   callback: (variables: { i: Node<'int'>; j: Node<'int'> }) => void
-) => void;
+): void => {
+  new LoopNode(nodeArray([int(countI), int(countJ), callback])).toStack();
+};
 
 /** 256 x 64 transmittance bake. */
 const transmittanceNode = (

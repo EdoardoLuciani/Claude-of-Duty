@@ -84,7 +84,7 @@ export const QUALITY_PRESETS = {
 export const DEFAULTS = {
   // 'high' balances GPU cost; 'ultra' retains an extra shadow cascade and
   // larger particle/decal budgets, one click away.
-  quality: 'high',
+  quality: 'high' as const,
   fov: 80, // horizontal-ish vertical FOV, CoD default feel
   // ADS magnification: hip 80 deg -> 49.6 deg while aiming = 1.61x, in line
   // with what a modern CoD shows behind the sight (its ADS lands near 48 deg).
@@ -109,7 +109,6 @@ export interface RuntimeConfig extends Omit<typeof DEFAULTS, 'quality'> {
 }
 
 export function createConfig(overrides: Partial<Omit<RuntimeConfig, 'q'>> = {}): RuntimeConfig {
-  const cfg = { ...DEFAULTS, ...overrides } as RuntimeConfig;
-  cfg.q = { ...QUALITY_PRESETS[cfg.quality] };
-  return cfg;
+  const quality = overrides.quality ?? DEFAULTS.quality;
+  return { ...DEFAULTS, ...overrides, quality, q: { ...QUALITY_PRESETS[quality] } };
 }

@@ -92,7 +92,8 @@ for (const fixture of ['single', 'grouped', 'grouped-draw-range']) {
       ['aoMap', source.occlusionTexture],
     ]) {
       const pixels = imagePNG(json.images[json.textures[info.index].source]);
-      mesh.material[key].image = pixels;
+      // Match the decoded ImageBitmap interface used by the runtime loader.
+      mesh.material[key].image = { ...pixels, close() {} };
       mesh.material[key].flipY = false;
       mesh.material[key].channel = info.texCoord ?? 0;
       expectedPixels.set(mesh.material[key], pixels.data);

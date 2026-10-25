@@ -18,8 +18,7 @@ import { normalFromHeight } from './normal-tsl.ts';
 import { detailSurface, macroSurface } from './surfaces-tsl.ts';
 
 export interface SurfaceNode {
-  get(name: 'albedo'): Node<'vec3'>;
-  get(name: 'height' | 'ao' | 'rough' | 'metal'): Node<'float'>;
+  get(name: 'albedo' | 'height' | 'ao' | 'rough' | 'metal'): Node;
 }
 interface SurfaceBakeInput {
   size: number;
@@ -178,17 +177,21 @@ export function bakeSurface(
   const quad = new QuadMesh(material);
   const previous = renderer.getRenderTarget();
   try {
-    material.colorNode = vec3(surface.get('height'));
+    material.colorNode = vec3(surface.get('height').toFloat());
     renderer.setRenderTarget(height);
     quad.render(renderer);
 
-    material.colorNode = surface.get('albedo');
-    material.opacityNode = surface.get('height');
+    material.colorNode = surface.get('albedo').toVec3();
+    material.opacityNode = surface.get('height').toFloat();
     material.needsUpdate = true;
     renderer.setRenderTarget(albedo);
     quad.render(renderer);
 
-    material.colorNode = vec3(surface.get('ao'), surface.get('rough'), surface.get('metal'));
+    material.colorNode = vec3(
+      surface.get('ao').toFloat(),
+      surface.get('rough').toFloat(),
+      surface.get('metal').toFloat()
+    );
     material.opacityNode = float(1);
     material.needsUpdate = true;
     renderer.setRenderTarget(orm);

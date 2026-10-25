@@ -33,8 +33,8 @@ import type { PoolRecord as BasePoolRecord } from './pool-types.ts';
 type CachedElement = Element & {
   style: CSSStyleDeclaration;
   _owText?: string;
-  _ows?: Record<string, string>;
-  _owc?: Record<string, boolean>;
+  _ows?: Map<string, string>;
+  _owc?: Map<string, boolean>;
 };
 type PoolRecord<Node extends HTMLElement = HTMLElement> = BasePoolRecord<Node>;
 
@@ -95,17 +95,17 @@ export function setText(node: CachedElement, value: string | number): void {
 
 /** Write any style property only on change. */
 export function setStyle(node: CachedElement, prop: string, value: string): void {
-  const styles = node._ows ?? (node._ows = Object.create(null) as Record<string, string>);
-  if (styles[prop] !== value) {
-    styles[prop] = value;
+  const styles = node._ows ?? (node._ows = new Map());
+  if (styles.get(prop) !== value) {
+    styles.set(prop, value);
     node.style.setProperty(prop, value);
   }
 }
 
 export function setClass(node: CachedElement, cls: string, on: boolean): void {
-  const classes = node._owc ?? (node._owc = Object.create(null) as Record<string, boolean>);
-  if (classes[cls] !== on) {
-    classes[cls] = on;
+  const classes = node._owc ?? (node._owc = new Map());
+  if (classes.get(cls) !== on) {
+    classes.set(cls, on);
     node.classList.toggle(cls, on);
   }
 }

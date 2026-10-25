@@ -127,7 +127,7 @@ globalThis.OffscreenCanvas = class {
   }
 };
 try {
-  const map = new THREE.Texture({ width: 2, height: 2 });
+  const map = new THREE.Texture({ width: 2, height: 2, close() {} });
   const packed = soldierTextureArray([map, null], [128, 128, 255, 255], true, 8);
   assert.equal(packed.image.depth, 2);
   assert.equal(packed.image.data.length, 32);
@@ -139,7 +139,7 @@ try {
   assert.throws(
     () =>
       soldierTextureArray(
-        [map, new THREE.Texture({ width: 1, height: 1 })],
+        [map, new THREE.Texture({ width: 1, height: 1, close() {} })],
         [0, 0, 0, 255],
         false,
         8

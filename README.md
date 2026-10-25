@@ -20,9 +20,15 @@ imports and is checked by `npm run typecheck`. `npm run lint` requires explicit
 return types on every TypeScript function, method, getter and callback (including
 contextually typed functions and functions returning functions). Constructors and
 setters have no return annotation; JavaScript helpers are outside this rule.
-Lint also bans explicit `any` and unsafe assignment, argument, call, member access
-and return through its type-aware pass; regular rules cover `src/`, `tools/`, and
-`tests/`. Missing return annotations fail CI's lint step, not `tsc` itself.
+The compiler also checks implicit missing returns, missing `override` modifiers,
+and switch fallthrough. Lint rejects floating/misused promises and unsafe narrowing
+assertions (including `as unknown as T`), as well as explicit `any` and unsafe
+assignment, argument, call, member access and return. Runtime boundaries must
+validate unknown data; owned records should be constructed with their full type.
+Regular lint rules cover `src/`, `tools/`, and `tests/`. Missing return annotations
+fail CI's lint step, not `tsc` itself. The narrow declaration additions in
+`src/render/three-types.d.ts` describe APIs verified against the pinned Three.js
+source; review them alongside the Three/@types upgrade checks.
 `npm run build` runs typecheck and lint first via `prebuild`. Remaining JavaScript
 helpers run alongside TypeScript; broad `checkJs` adoption is deferred.
 

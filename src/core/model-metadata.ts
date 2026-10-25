@@ -1,6 +1,8 @@
 import type { BufferGeometry } from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+import { isRecord } from './guards.ts';
+
 export type ModelVec3 = [number, number, number];
 export interface SoldierWeapon {
   muzzle: ModelVec3;
@@ -113,9 +115,8 @@ export interface WorldPrefetch {
 
 /** JSON is unknown until each field consumed by runtime has been checked. */
 function object(value: unknown): Record<string, unknown> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value))
-    throw new Error('[models] expected metadata object');
-  return value as Record<string, unknown>;
+  if (!isRecord(value)) throw new Error('[models] expected metadata object');
+  return value;
 }
 function string(value: unknown): string {
   if (typeof value !== 'string') throw new Error('[models] expected metadata string');

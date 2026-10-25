@@ -11,6 +11,8 @@
  * is a dry kinetic coefficient, restitution is measured drop-bounce.
  */
 
+import { hasOwn } from '../core/guards.ts';
+
 export const SURFACE_NAMES = [
   'concrete',
   'metal',
@@ -37,7 +39,21 @@ interface SurfaceProps {
   shatters: boolean;
 }
 
-export const SURFACE: Record<SurfaceName, number> = {} as Record<SurfaceName, number>;
+// Seed every required key, then derive indices from the canonical order.
+export const SURFACE = {
+  concrete: 0,
+  metal: 0,
+  wood: 0,
+  dirt: 0,
+  sand: 0,
+  glass: 0,
+  water: 0,
+  foliage: 0,
+  fabric: 0,
+  flesh: 0,
+  rubber: 0,
+  plaster: 0,
+} satisfies Record<SurfaceName, number>;
 for (let i = 0; i < SURFACE_NAMES.length; i++) SURFACE[SURFACE_NAMES[i]] = i;
 
 /**
@@ -191,8 +207,7 @@ export const SURFACE_PROPS: SurfaceProps[] = [
 export function surfaceIndex(s: unknown, fallback = SURFACE.concrete): number {
   if (typeof s === 'number') return s >= 0 && s < SURFACE_NAMES.length ? s | 0 : fallback;
   if (typeof s === 'string') {
-    const i = SURFACE[s as SurfaceName];
-    if (i !== undefined) return i;
+    if (hasOwn(SURFACE, s)) return SURFACE[s];
     return guessSurface(s, fallback);
   }
   return fallback;

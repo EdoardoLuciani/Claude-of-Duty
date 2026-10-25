@@ -33,5 +33,5 @@ export function reactionKind(kind: string | undefined): ReactionKind | null {
 }
 export function reactionBank(voice: number, kind: ReactionKind): ReactionBank {
   const actor = Number.isFinite(voice) ? Math.abs(Math.trunc(voice)) % 2 : 0;
-  return ('reaction-' + actor + '-' + kind) as ReactionBank;
+  return `reaction-${actor === 0 ? 0 : 1}-${kind}`;
 }

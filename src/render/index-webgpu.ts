@@ -1,7 +1,7 @@
-import type { BufferGeometry, Camera, Material, Mesh, Object3D, Texture } from 'three';
+import { Mesh, InstancedMesh } from 'three';
+import type { BufferGeometry, Camera, Material, Object3D, Texture } from 'three';
 import type { MaterialEventMap, PerspectiveCamera, Scene } from 'three';
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
-import type MeshStandardNodeMaterial from 'three/src/materials/nodes/MeshStandardNodeMaterial.js';
 import { lightPosition, lightTargetPosition, sharedUniformGroup, uniform } from 'three/tsl';
 import {
   Color,
@@ -14,10 +14,12 @@ import {
   Vector3,
 } from 'three/webgpu';
 import { Light, SpotLight } from 'three/webgpu';
-import type { Renderer, Node, UniformNode } from 'three/webgpu';
+import { UniformNode } from 'three/webgpu';
+import type { Renderer, Node } from 'three/webgpu';
 import type { PassNode } from 'three/webgpu';
 
 import type { EngineContext } from '../core/context.ts';
+import { isMesh } from '../core/three-guards.ts';
 import { StableCSMShadowNode } from './csm-webgpu.ts';
 import { IndirectFill } from './indirect-webgpu.ts';
 import { createGradeLut } from './lut.ts';
@@ -47,10 +49,7 @@ interface RegisteredLight {
   priority?: number;
 }
 type RenderGraph = ReturnType<typeof createWorldViewPipeline>;
-type GroupedPositionNode = Omit<Node, 'groupNode' | 'setGroup'> & {
-  groupNode: Node | null;
-  setGroup(group: Node | null): void;
-};
+type GroupedPositionNode = UniformNode<unknown, unknown>;
 
 function copyDirectional(target: DirectionalLight, source: DirectionalLight): void {
   target.color.copy(source.color);
@@ -72,7 +71,7 @@ export class RenderSystem {
   declare passes: PostPass[];
   declare lights: RegisteredLight[];
   declare _lightPositionGroup: ReturnType<typeof sharedUniformGroup>;
-  declare _lightUniformGroups: Map<GroupedPositionNode, Node | null>;
+  declare _lightUniformGroups: Map<GroupedPositionNode, import('three/webgpu').UniformGroupNode>;
   declare grade: ReturnType<typeof createGradeLut>;
   declare settings: RenderSettings;
   declare _exposure: number;
@@ -87,9 +86,7 @@ export class RenderSystem {
   declare _skyKey: DirectionalLight;
   declare _skySecondary: DirectionalLight;
   declare indirect: IndirectFill;
-  declare activeSun: DirectionalLight & {
-    shadow: DirectionalLight['shadow'] & { shadowNode: StableCSMShadowNode };
-  };
+  declare activeSun: DirectionalLight;
   declare sunDir: Vector3;
   declare viewSun: DirectionalLight;
   declare viewFill: DirectionalLight;
@@ -176,7 +173,7 @@ export class RenderSystem {
     ctx.scene.add(this._skyKey, this._skyKey.target, this._skySecondary, this._skySecondary.target);
     this.indirect = new IndirectFill(ctx);
     this.indirect.sunDir.value = this.sunDir;
-    this.activeSun = this._skyKey as typeof this.activeSun;
+    this.activeSun = this._skyKey;
     this.viewSun = new DirectionalLight(0xffffff, 0);
     this.viewFill = new DirectionalLight(0xffffff, 0);
     this.viewSun.name = 'ow-view-world-key';
@@ -279,7 +276,9 @@ export class RenderSystem {
   }
 
   _shareLightPosition(node: Node): void {
-    const grouped = node as GroupedPositionNode;
+    if (!(node instanceof UniformNode))
+      throw new Error('[render] light position must be a uniform node');
+    const grouped = node;
     if (this._lightUniformGroups.has(grouped)) return;
     this._lightUniformGroups.set(grouped, grouped.groupNode);
     grouped.setGroup(this._lightPositionGroup);
@@ -298,11 +297,11 @@ export class RenderSystem {
       object.layers.enable(1);
       return;
     }
-    const mesh = object as Mesh;
-    if (!mesh.isMesh) return;
-    const instanced = object as import('three').InstancedMesh;
+    if (!isMesh(object)) return;
+    const mesh = object;
+    const instanced = object;
     if (
-      instanced.isInstancedMesh &&
+      instanced instanceof InstancedMesh &&
       mesh.userData.owStatic &&
       !(
         instanced.instanceMatrix as typeof instanced.instanceMatrix & {
@@ -322,8 +321,8 @@ export class RenderSystem {
     }
     const material = mesh.material;
     if (Array.isArray(material)) {
-      for (const entry of material) this.indirect.patch(entry as MeshStandardNodeMaterial);
-    } else this.indirect.patch(material as MeshStandardNodeMaterial | null);
+      for (const entry of material) this.indirect.patch(entry);
+    } else this.indirect.patch(material);
     let opaque = !!material && !Array.isArray(material) && !material.transparent;
     if (Array.isArray(material)) {
       opaque = true;
@@ -343,12 +342,12 @@ export class RenderSystem {
       this._tagLight(object);
       return;
     }
-    const mesh = object as Mesh;
-    if (!mesh.isMesh) return;
+    if (!isMesh(object)) return;
+    const mesh = object;
     const material = mesh.material;
     if (Array.isArray(material)) {
-      for (const entry of material) this.indirect.patch(entry as MeshStandardNodeMaterial);
-    } else this.indirect.patch(material as MeshStandardNodeMaterial | null);
+      for (const entry of material) this.indirect.patch(entry);
+    } else this.indirect.patch(material);
   };
 
   _syncSun(ctx: EngineContext): void {
@@ -560,8 +559,9 @@ export class RenderSystem {
     // native graph without any world/view geometry, simulation or RNG.
     for (const scene of [this.ctx.scene, this.ctx.viewScene])
       scene.traverse((object): void => {
-        const mesh = object as Mesh;
-        if (!mesh.isMesh || (mesh.material as Material | null)?.visible === false) return;
+        if (!isMesh(object)) return;
+        const mesh = object;
+        if (!Array.isArray(mesh.material) && mesh.material?.visible === false) return;
         saved.push([mesh, mesh.visible, mesh.frustumCulled, mesh.layers.mask]);
         mesh.visible = true;
         mesh.frustumCulled = false;
@@ -611,12 +611,7 @@ export class RenderSystem {
       for (const [geometry, [start, count]] of ranges) geometry.setDrawRange(start, count);
       // The pinned TRAA node attaches these runtime helpers, though its public
       // declaration omits them. Keep the rest of the graph type inferred.
-      const taaPass = graph.taaPass as
-        | (NonNullable<typeof graph.taaPass> & {
-            setSize(width: number, height: number): void;
-            clearViewOffset(): void;
-          })
-        | null;
+      const taaPass = graph.taaPass;
       // Force native history initialization from the first real beauty frame.
       taaPass?.setSize(1, 1);
       // TRAA's after-pipeline callback is not run if rendering throws.

@@ -59,17 +59,14 @@ export class Killfeed {
     this.pool = new Pool(
       6,
       (): KillfeedRow => {
-        const row = el('div', 'ow-kf-row') as KillfeedRow;
+        const row = el('div', 'ow-kf-row');
         const a = el('span', 'ow-kf-a', row, 'PLAYER');
         const w = el('span', 'ow-kf-w', row);
         const hs = el('span', 'ow-kf-hs', w);
         skullIcon(hs);
         rifleIcon(w);
         const v = el('span', 'ow-kf-v', row, 'ENEMY');
-        row._a = a;
-        row._v = v;
-        row._hs = hs;
-        return row;
+        return Object.assign(row, { _a: a, _v: v, _hs: hs });
       },
       this.root
     );

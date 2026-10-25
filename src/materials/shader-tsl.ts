@@ -251,11 +251,7 @@ export function createSurfaceNodeMaterial(
     const faceN = frontFacing.select(surfN, surfN.negate());
     const maskColor = p.vertexMasks
       ? Fn((builder: NodeBuilder): VarNode<'vec4', ConstNode<'vec4', Vector4>> | VertexColorNode =>
-          (
-            builder as NodeBuilder & { hasGeometryAttribute(name: string): boolean }
-          ).hasGeometryAttribute('color')
-            ? vertexColor()
-            : vec4(0)
+          builder.hasGeometryAttribute('color') ? vertexColor() : vec4(0)
         )()
       : null;
 

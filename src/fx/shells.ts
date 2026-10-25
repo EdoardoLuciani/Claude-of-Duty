@@ -4,6 +4,7 @@ import { attribute } from 'three/tsl';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 
 import type { EventWeapon } from '../core/events.ts';
+import { isMesh } from '../core/three-guards.ts';
 import { P, buildBrassTextures } from './atlas.ts';
 import { resetSpawn } from './particles.ts';
 
@@ -101,9 +102,9 @@ export interface ShellOptions {
 
 export async function loadSpentHullGeometry(): Promise<THREE.BufferGeometry> {
   const gltf = await new GLTFLoader().loadAsync('/models/fx/spent12g.glb');
-  const mesh = gltf.scene.getObjectByName('spent12g') as THREE.Mesh;
+  const mesh = gltf.scene.getObjectByName('spent12g');
   if (
-    !mesh?.isMesh ||
+    !isMesh(mesh) ||
     !mesh.geometry.hasAttribute('_shellpbr') ||
     !mesh.geometry.hasAttribute('color')
   ) {

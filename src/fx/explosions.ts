@@ -63,7 +63,7 @@ const TWO_PI = Math.PI * 2;
 export function explode(fx: ExplosionFx, o: ExplosionOptions): boolean {
   const rng = fx.rng;
   const q = fx.pScale;
-  const p: Point3 = o.position ?? (o as Point3);
+  const p = 'x' in o ? o : o.position;
   const R = Math.max(0.6, o.radius ?? 5);
   const up = o.up ?? { x: 0, y: 1, z: 0 };
   const px = p.x;
