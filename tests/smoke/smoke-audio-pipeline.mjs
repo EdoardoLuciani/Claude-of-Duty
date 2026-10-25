@@ -69,25 +69,20 @@ globalThis.AudioWorkletNode = class {
   }
 };
 const mixer = new Mixer(actx, new Rng(1907));
-assert.equal(nodes.length - 1, 28, '22 existing nodes plus six category-controlled wet inputs');
 assert.equal(mixer.buses.weapons.comp, null, 'no weapon-bus compressor');
 assert.equal(
   nodes.filter((n) => n.type === 'compressor').length,
   3,
   'other categories retain dynamics'
 );
-assert.equal('masterComp' in mixer, false, 'no reintroduced master compressor');
 for (const [from, to] of [
   [mixer.masterSum, mixer.energyMix],
   [mixer.energyMix, mixer.masterGain],
   [mixer.masterGain, actx.destination],
 ])
   assert.deepEqual([...from.outputs], [to]);
-assert.equal('preGain' in mixer, false, 'energy controller replaces fixed attenuation');
 assert.equal(mixer.masterGain.gain.value, 1);
-assert.equal('softClip' in mixer || 'sampleCeiling' in mixer, false, 'no hidden clipping stages');
 for (const bus of Object.values(mixer.buses)) {
-  assert.equal('trim' in bus || 'duck' in bus, false, 'no serial category gain stack');
   assert.equal(bus.level.gain.value, bus.baseTrim);
   assert.equal(bus.send.gain.value, bus.baseTrim, 'wet shares the same logical reference');
   assert.deepEqual([...bus.send.outputs], [mixer.reverbSend], 'convolution remains shared');

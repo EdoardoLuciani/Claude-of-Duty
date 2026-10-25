@@ -430,751 +430,628 @@
     "impact-concrete-1": {
       "start": 0.095,
       "level": 0.38805955977600387,
-      "downmixLossDb": -0.520638808294768,
       "sha256": "4ac07573fdcc12033bfd6c2ad164e6fbc7bcc60bd57c8b6f0085041366d54105"
     },
     "impact-concrete-2": {
       "start": 2.5900000000000003,
       "level": 0.391565815135702,
-      "downmixLossDb": -0.660693545860787,
       "sha256": "4dd290924993bbafde787291a9f1491969cfb38db0db3542a85767c84bd71c63"
     },
     "impact-concrete-3": {
       "start": 17.605,
       "level": 0.4829590921806564,
-      "downmixLossDb": -1.38337918960482,
       "sha256": "f485cf68f098cdc60dddfdfe14f4929d75654f93e3cec45afbef493e05cec398"
     },
     "impact-metal-1": {
       "source": "BulletImpactMetal_BW.54458.wav",
       "start": 0.009999999999999998,
       "level": 0.4019003823469625,
-      "downmixLossDb": 1.4754210238265043e-13,
       "sha256": "8fc9548886480e4706ebe45c99ea6cf7dce7a137931764d70340f2b984f9babf"
     },
     "impact-metal-2": {
       "source": "BulletImpactMetal_BW.54459.wav",
       "start": 0.009999999999999998,
       "level": 0.39577481178986756,
-      "downmixLossDb": 9.353976425566783e-14,
       "sha256": "8049ebc82946de9001c614b0f5c8b944a109f0110f1984d543b01da34f839bf6"
     },
     "impact-metal-3": {
       "source": "BulletImpactMetal_BW.54460.wav",
       "start": 0.009999999999999998,
       "level": 0.32388369567586944,
-      "downmixLossDb": -1.2391607945209916e-13,
       "sha256": "5d3424b48df41c653a96606aa7c639b588fdff47110b4f42909d478825bd51f2"
     },
     "impact-wood-1": {
       "source": "BulletImpactWood_BW.54495.wav",
       "start": 0,
       "level": 0.36544238271456947,
-      "downmixLossDb": 1.3114853545124507e-13,
       "sha256": "3844af7f1466bbab885ecd6470a9ad6b6f62ceaadd5d0a33a65a276007fb3f49"
     },
     "impact-wood-2": {
       "source": "BulletImpactWood_BW.54496.wav",
       "start": 0,
       "level": 0.3462629891712644,
-      "downmixLossDb": -4.821637332766462e-14,
       "sha256": "6f6e2a25c839bdfce1b518de927f2bb51da12d26a4c3a5fe6a397386218a74a3"
     },
     "impact-wood-3": {
       "source": "BulletImpactWood_BW.54497.wav",
       "start": 0,
       "level": 0.3055945874379609,
-      "downmixLossDb": -7.232455999149713e-14,
       "sha256": "bbf833fa693192aea849e8651165b7132d5263f0a15c3ae7be268ae2d513165e"
     },
     "impact-dirt-1": {
       "source": "BulletImpactDirt_BW.54405.wav",
       "start": 0,
       "level": 0.25321690870948826,
-      "downmixLossDb": 2.2759092538064493e-11,
       "sha256": "ed7ca5f9c86024856b584af7b5185ec079a9d9c3ddb5332b1236b07e63a835fa"
     },
     "impact-dirt-2": {
       "source": "BulletImpactDirt_BW.54406.wav",
       "start": 0,
       "level": 0.2612614988660071,
-      "downmixLossDb": -1.7518503137866945e-10,
       "sha256": "4bc4c1d6fd0ab01acbe26f015a115f2f4a95bffc60089623d0cb4821159428e9"
     },
     "impact-dirt-3": {
       "source": "BulletImpactDirt_BW.54407.wav",
       "start": 0,
       "level": 0.37142054657445495,
-      "downmixLossDb": -9.498625545549983e-14,
       "sha256": "322625c7360b466b8f83682c4e361f42ea84ede527c3c5edb7452e489b1cf305"
     },
     "impact-glass-1": {
       "source": "BulletImpactGlass_BW.54443.wav",
       "start": 0,
       "level": 0.40133330548328233,
-      "downmixLossDb": -0.48385144371061645,
       "sha256": "c5faefbf65eed5b0c36d510bf2dd44ccff8e87026ce948b485541d93c243c423"
     },
     "impact-glass-2": {
       "source": "BulletImpactGlass_BW.54444.wav",
       "start": 0,
       "level": 0.41760578490986455,
-      "downmixLossDb": -0.2876688575701448,
       "sha256": "2ec11c318de69e2d910b578b9d7cc6656f47e62be16d47416a107a230634289f"
     },
     "impact-glass-3": {
       "source": "BulletImpactGlass_BW.54445.wav",
       "start": 0,
       "level": 0.43724196382148783,
-      "downmixLossDb": -0.531842975853666,
       "sha256": "d7727721ff4579ce65cf98949bcd3af0cd7e796a2c0dd50e26da60f1956b32c6"
     },
     "impact-sand-1": {
       "start": 1.235,
       "level": 1.0635379438880042,
-      "downmixLossDb": 0,
       "sha256": "b2538b7212177b0d4ea74994a8f1a7014c50958dec6f42e656cb3d28401ea2ba"
     },
     "impact-sand-2": {
       "start": 4.6850000000000005,
       "level": 0.5409352454833943,
-      "downmixLossDb": 0,
       "sha256": "8b2a3083f0354732ac5cd31371a9e0503f0f9e54b99a117dcd7f301cd80c5243"
     },
     "impact-sand-3": {
       "start": 6.985,
       "level": 0.5097328364601412,
-      "downmixLossDb": 0,
       "sha256": "fe4d276e2e4e07dc70efaa314c0befac5d0674352a55568ee3f5f303012bec16"
     },
     "impact-water-1": {
       "start": 8.094999999999999,
       "level": 0.3988461558883076,
-      "downmixLossDb": -0.879304093767153,
       "sha256": "0e740227961268109675ffe29c2037491715332bff219c83ce8304c409956c76"
     },
     "impact-water-2": {
       "start": 12.094999999999999,
       "level": 0.406085023735924,
-      "downmixLossDb": -0.8073163132071861,
       "sha256": "2cf23e24b3cf5f3af30ad41f5c90d20b03e56c4faa16aa37e7bb3c6098f71361"
     },
     "impact-water-3": {
       "start": 28.1,
       "level": 0.39727332669321014,
-      "downmixLossDb": -0.7739335357892224,
       "sha256": "166b459ca567700be009d0f23d74ed021b092230004dc071973cef118af25306"
     },
     "impact-foliage-1": {
       "start": 3.095,
       "level": 0.9514450279561437,
-      "downmixLossDb": 0,
       "sha256": "1088dae46956f98a9a0e3e1e615d1a7ab8be6eef1af4680ca42b650a539dae87"
     },
     "impact-foliage-2": {
       "start": 4.595000000000001,
       "level": 0.7282373926225802,
-      "downmixLossDb": 0,
       "sha256": "1b4e7547afe39b1bca3ce6a195eac1cceae43b9ca1ea82f0690c6083e588129a"
     },
     "impact-foliage-3": {
       "start": 6.1000000000000005,
       "level": 0.4838846082421572,
-      "downmixLossDb": 0,
       "sha256": "5f19998bffca04e6a9fed4b57ef551abc8100bdb3d86dbf56bdf113659809a47"
     },
     "impact-fabric-1": {
       "start": 1.3,
       "level": 0.35574132934218533,
-      "downmixLossDb": 0,
       "sha256": "f62a722b6d3f81a47425fa59a2d8ab7483b31b8ac15dc73bfae3f557812fd8f3"
     },
     "impact-fabric-2": {
       "start": 6.095000000000001,
       "level": 0.3398240204938332,
-      "downmixLossDb": 0,
       "sha256": "86456bbcdfdcc48e78970ac41c1d4b5b334ada11475bd50d6d3cbe6a0a760eea"
     },
     "impact-fabric-3": {
       "start": 8.495,
       "level": 0.270391242627294,
-      "downmixLossDb": 0,
       "sha256": "6b5d7b2c1d3005353878df08076adf06767832e970d40ca099699161f3036957"
     },
     "impact-rubber-1": {
       "start": 0.245,
       "level": 0.3822425592212576,
-      "downmixLossDb": 0,
       "sha256": "c8a59d77fbba95c8f70215f277d7b2119f5877089d10f8b827e2df6021800f4c"
     },
     "impact-rubber-2": {
       "start": 3.185,
       "level": 0.303641324723968,
-      "downmixLossDb": 0,
       "sha256": "5884d3fef57f553871f86b5100cc363a46f6401b93aedebf092421abc9f21de7"
     },
     "impact-rubber-3": {
       "start": 7.765000000000001,
       "level": 0.3699177544851162,
-      "downmixLossDb": 0,
       "sha256": "84f41ce8e88bd578ec0becba204f09b58f2af93bd88d7b9020e8abffc6c214fc"
     },
     "step-concrete-walk-1": {
       "start": 0.19,
       "level": 0.736129057815188,
-      "downmixLossDb": 0,
       "sha256": "a85d35d2eb735960d8a86f9b56c724c3967e6c262a56dd5a88f77ac59e4c74f4"
     },
     "step-concrete-walk-2": {
       "start": 2.9650000000000003,
       "level": 0.6649648024696728,
-      "downmixLossDb": 0,
       "sha256": "9fde87ee4a0b88be493c8a2c55b5bc27af331acb6914d1386f917ae91c85e501"
     },
     "step-concrete-walk-3": {
       "start": 6.915,
       "level": 0.5714522978511499,
-      "downmixLossDb": 0,
       "sha256": "388d45af0f708f4b87935ea6cdce2fa5ba104769f822f31f18e96c1c69d9ff97"
     },
     "step-concrete-walk-4": {
       "start": 11.055,
       "level": 0.8155048440090957,
-      "downmixLossDb": 0,
       "sha256": "669eee4a2a3c88cfddb11493f5aadd52a0366fe15783bfaf582e010c56c4e9ef"
     },
     "step-concrete-run-1": {
       "start": 7.385000000000001,
       "level": 0.43633086772741825,
-      "downmixLossDb": 0,
       "sha256": "e4fcbda04c5021c32184dde821ed3b235f360772cfd6625978b7b74167c6cc00"
     },
     "step-concrete-run-2": {
       "start": 14.86,
       "level": 0.577159380374227,
-      "downmixLossDb": 0,
       "sha256": "e72e2af36198835e24cd9e8210697975cbabdcd6cfff74efe97134860e7a8d47"
     },
     "step-concrete-run-3": {
       "start": 21.595000000000002,
       "level": 0.4999732803757984,
-      "downmixLossDb": 0,
       "sha256": "2db41b73ed01fb80ce778caf61623544a9c1f464a064792f20d63a728f03d392"
     },
     "step-concrete-run-4": {
       "start": 25.770000000000003,
       "level": 0.4294247250450736,
-      "downmixLossDb": 0,
       "sha256": "e656af849f6d86cdfa774effa9f1b3d6f24534b82b27247ae3ebb68962199558"
     },
     "step-metal-walk-1": {
       "start": 0.105,
       "level": 0.6294268210051438,
-      "downmixLossDb": 0,
       "sha256": "3c2deb21a329455bc7a851b046c83100b4590b43672a1ceb6ee0f337cb7fd741"
     },
     "step-metal-walk-2": {
       "start": 1.36,
       "level": 0.70062851396598,
-      "downmixLossDb": 0,
       "sha256": "36c754c100d2bf8c651583b55803c64ed43c164ba5b3525f2f2c6c377d84379a"
     },
     "step-metal-walk-3": {
       "start": 3.915,
       "level": 0.6337338829583368,
-      "downmixLossDb": 0,
       "sha256": "f074845999775ca9376645d530e7cfec2bfaa9cd67e390dc433c1e41d8c40372"
     },
     "step-metal-walk-4": {
       "start": 5.175,
       "level": 0.6467215530214698,
-      "downmixLossDb": 0,
       "sha256": "ce812dc0f4f95c007c4d90ddcce07d6769bae6f2bfba52070f67c469dbc31f65"
     },
     "step-metal-run-1": {
       "start": 9.01,
       "level": 0.6629151914911843,
-      "downmixLossDb": 0,
       "sha256": "ca40542bc26cd984d87a3fe51b37f0994f5d5923205491a4540919b561876b81"
     },
     "step-metal-run-2": {
       "start": 10.28,
       "level": 0.690601223679054,
-      "downmixLossDb": 0,
       "sha256": "3c47cc0ef6d992c35dd2753617e369e5896c3b743d6ce22743d08141cde2d0a8"
     },
     "step-metal-run-3": {
       "start": 12.84,
       "level": 0.6341588750423218,
-      "downmixLossDb": 0,
       "sha256": "414e9f2c2db79bcd2ccff9032587c1cf5fcf522d7bdbbf4d1836e88d7e985e3d"
     },
     "step-metal-run-4": {
       "start": 15.365,
       "level": 0.6774716585935852,
-      "downmixLossDb": 0,
       "sha256": "1ca303cb48eea19b990cd8345428a0728eee5de770de40cd47c09d20d5470ecb"
     },
     "step-wood-walk-1": {
       "start": 1.4600000000000002,
       "level": 0.5851936785022197,
-      "downmixLossDb": 0,
       "sha256": "5970e1e2483d22f59d9f17caa180ae7076c5e1ecbc1b74c1d165b8b49faf9565"
     },
     "step-wood-walk-2": {
       "start": 2.855,
       "level": 0.6806821927147939,
-      "downmixLossDb": 0,
       "sha256": "ab60e78eac3d12e3c85e9941302869bb815d72210c50164fc6dd978a86036767"
     },
     "step-wood-walk-3": {
       "start": 9.635,
       "level": 0.6573076151513569,
-      "downmixLossDb": 0,
       "sha256": "0fe898669cd15025b85974b1eec08b7f6e5eaeb4be82bc2f0dd3a0b8ae5203ce"
     },
     "step-wood-walk-4": {
       "start": 13.76,
       "level": 0.6744974787124103,
-      "downmixLossDb": 0,
       "sha256": "e039a3258a25b3ce13a76ad3034418c967e8260bef981b91a2155ee25d24a5ea"
     },
     "step-wood-run-1": {
       "start": 5.575,
       "level": 0.6787718430632415,
-      "downmixLossDb": 0,
       "sha256": "9f4f774e3eef118e30694fc435747a9295ac26a18448b7ef8cd1855746cabc9b"
     },
     "step-wood-run-2": {
       "start": 15.08,
       "level": 0.5424665787883814,
-      "downmixLossDb": 0,
       "sha256": "4667837193fa9d18cee9c21e68b26a11712dc8466c18c3c84b428c8665c04bcd"
     },
     "step-wood-run-3": {
       "start": 16.435000000000002,
       "level": 0.725530114247931,
-      "downmixLossDb": 0,
       "sha256": "01a68721c9df599040877a7759280ad0683a5c5fa81c39f06ca58dfa1e2e09d9"
     },
     "step-wood-run-4": {
       "start": 21.795,
       "level": 0.6863752519075801,
-      "downmixLossDb": 0,
       "sha256": "e6b3676b1f621df67327a78964fd8de3ec3930b54752944b2810415c6dc0828a"
     },
     "step-dirt-walk-1": {
       "start": 1.6,
       "level": 0.8048388469388762,
-      "downmixLossDb": 0,
       "sha256": "c9ea814010173dbc1bb96de8019745e736d5a9f2b77883593bdad50519e84e34"
     },
     "step-dirt-walk-2": {
       "start": 5.955,
       "level": 1.0784492207747747,
-      "downmixLossDb": 0,
       "sha256": "ae32cc9eb966072e594a3b4cf189aa01066f4ae92e6e8619f07c24becfbc2b4d"
     },
     "step-dirt-walk-3": {
       "start": 8.965,
       "level": 0.7560880789129167,
-      "downmixLossDb": 0,
       "sha256": "11ddf938b7d13b3251f031540c817cdb2cf3bbf5eee07abd185b17bad9f99acf"
     },
     "step-dirt-walk-4": {
       "start": 12.02,
       "level": 1.3758479612658432,
-      "downmixLossDb": 0,
       "sha256": "b2909ee33b98fab029fa91842890b39bd8c6e930d2ee7f6ddc690241418e3300"
     },
     "step-dirt-run-1": {
       "start": 1.57,
       "level": 0.7848894414064358,
-      "downmixLossDb": 0,
       "sha256": "2a58c28f34048cf01a702f34385a45b9168199c635d3a8e0f767ecbbe7b6f37b"
     },
     "step-dirt-run-2": {
       "start": 9.465,
       "level": 0.8395522905846055,
-      "downmixLossDb": 0,
       "sha256": "16824a192e7b592971084d3701dc470166065bbe050256ec5b0b09ec5cf44097"
     },
     "step-dirt-run-3": {
       "start": 10.95,
       "level": 0.9110858683533886,
-      "downmixLossDb": 0,
       "sha256": "20cd8e1af0733a197bb42d7656f7f59fb1ab6bdeaf3ec8404196c3ff2f652491"
     },
     "step-dirt-run-4": {
       "start": 15.45,
       "level": 0.9740999607455453,
-      "downmixLossDb": 0,
       "sha256": "61d811c18c8a099c3f9765460ff3e79122b6721721977f07448afd561c144614"
     },
     "step-sand-walk-1": {
       "start": 0.13,
       "level": 1.9529297635791176,
-      "downmixLossDb": 0,
       "sha256": "40b8b86e36938f41674e18dd97e6e19413a20ae908fa0f83a225e18a2c63c32a"
     },
     "step-sand-walk-2": {
       "start": 1.8750000000000002,
       "level": 1.4522951177834498,
-      "downmixLossDb": 0,
       "sha256": "a0de2972c92e7920f647369c2db595aff65b4894fb9afc924fd4ea35bf2d6f2a"
     },
     "step-sand-walk-3": {
       "start": 5.335,
       "level": 1.9546234747375055,
-      "downmixLossDb": 0,
       "sha256": "6b2191528366f96b20a002da32f39db1fbbdfb7763fae3548f0f4a9980050256"
     },
     "step-sand-walk-4": {
       "start": 9.959999999999999,
       "level": 2.226150043796812,
-      "downmixLossDb": 0,
       "sha256": "cdd5b2832bc83740c079c220b56b682e149d5bc223caa81e4bf2b955f673321f"
     },
     "step-sand-run-1": {
       "start": 3.29,
       "level": 0.9480273593701047,
-      "downmixLossDb": 0,
       "sha256": "bb2820addedb81a7fd87a18c66980eac5740cf9910a786f9d82ca362b567e2a1"
     },
     "step-sand-run-2": {
       "start": 10.745,
       "level": 1.2266570594288633,
-      "downmixLossDb": 0,
       "sha256": "2bf06bc2ae764e090306120f35f0197b6ef814e78a622b43d053309dfbebafcd"
     },
     "step-sand-run-3": {
       "start": 13.67,
       "level": 0.8222810693947986,
-      "downmixLossDb": 0,
       "sha256": "748de0a0b13e3895ac4cae195e36553d017ef8c622e79ed5df485691bd990f7a"
     },
     "step-sand-run-4": {
       "start": 17.965,
       "level": 1.2036910921080555,
-      "downmixLossDb": 0,
       "sha256": "2de38f6f8fc9dd67d3da2680f8013cc1a8366433a58bf3828d60827d18bcbc25"
     },
     "step-grass-walk-1": {
       "start": 2.0100000000000002,
       "level": 0.883527071181578,
-      "downmixLossDb": 0,
       "sha256": "f802f3a0d4bea7b53f2007aeb307436c5a1b9a29d0109dfc84358c17768bcc70"
     },
     "step-grass-walk-2": {
       "start": 9.139999999999999,
       "level": 0.7161001517138942,
-      "downmixLossDb": 0,
       "sha256": "535e0d20edbe136db947bfb34a091f585cb24e084384fadeeabd830539b423a2"
     },
     "step-grass-walk-3": {
       "start": 14.32,
       "level": 0.7975951040708686,
-      "downmixLossDb": 0,
       "sha256": "fc9dc4f6af3271feb2609a99ffc4399bf88884634ee1bc5d7d380f4cead256ed"
     },
     "step-grass-walk-4": {
       "start": 18.020000000000003,
       "level": 0.8008766607048876,
-      "downmixLossDb": 0,
       "sha256": "d13c3850fbebf0441a8a633bad31a2bfd8ad91878aeca6beac8c6b7db882290a"
     },
     "step-grass-run-1": {
       "start": 1.8750000000000002,
       "level": 0.9631345773856915,
-      "downmixLossDb": 0,
       "sha256": "31b8d8963c29317e2c77d14ec6aaa98bd4268d25c570c0d5bb75fce9e4481779"
     },
     "step-grass-run-2": {
       "start": 3.43,
       "level": 0.7462304287020052,
-      "downmixLossDb": 0,
       "sha256": "2ff17c91af488720658971107828df5e6c47b54c65824739ef8f0bf79776eaf1"
     },
     "step-grass-run-3": {
       "start": 9.865,
       "level": 0.7708674255879353,
-      "downmixLossDb": 0,
       "sha256": "2861e52a600b2fbbba8d269191c1f93fe357167ecde97eb5958eccefda32f5b1"
     },
     "step-grass-run-4": {
       "start": 25.445,
       "level": 0.7559639753795033,
-      "downmixLossDb": 0,
       "sha256": "de18469cd4711ceaebce942a05166f0b3b2ef5d71f703b15b876c3315c3b8d42"
     },
     "step-fabric-walk-1": {
       "start": 1.3900000000000001,
       "level": 0.878855097527093,
-      "downmixLossDb": 0,
       "sha256": "6d7784095dc926acd7850678ffe03e07e0cf9309e35307d8811a2f8995f690c2"
     },
     "step-fabric-walk-2": {
       "start": 2.6750000000000003,
       "level": 0.812147886327277,
-      "downmixLossDb": 0,
       "sha256": "77008e2d597f8498e9f57cca6b87b4822e6b158e1fa1900a62c1b63f20acf628"
     },
     "step-fabric-walk-3": {
       "start": 3.97,
       "level": 0.8513469447831585,
-      "downmixLossDb": 0,
       "sha256": "32afe67380cc687938122ac36dbf7135a26760a0d267d3e51cc85088de3345f2"
     },
     "step-fabric-walk-4": {
       "start": 5.255,
       "level": 0.8849267289766077,
-      "downmixLossDb": 0,
       "sha256": "9a2ec5d4228414f3772b6bddbecff7dacd57bf51959c382b3feeb2d9e85d66d8"
     },
     "step-fabric-run-1": {
       "start": 3.7350000000000003,
       "level": 0.7310675183284834,
-      "downmixLossDb": 0,
       "sha256": "6e9433d6fe1381d5028871f2d38279bb84e71524c905a1f9093d234a26fa5f25"
     },
     "step-fabric-run-2": {
       "start": 4.965,
       "level": 0.7813832647958681,
-      "downmixLossDb": 0,
       "sha256": "1bbc53a7df0da487a0bbaeef868022a09ba5ba0512ae41a809ef1ba8df0a8e6a"
     },
     "step-fabric-run-3": {
       "start": 13.424999999999999,
       "level": 0.7517118390213887,
-      "downmixLossDb": 0,
       "sha256": "7b542e33ed2fd7f83b35dbea32c8145c9a91be78711dc33822abfb23a4f36db3"
     },
     "step-fabric-run-4": {
       "start": 14.61,
       "level": 0.8115385411991308,
-      "downmixLossDb": 0,
       "sha256": "6a409fe5e7153cf97345a845396f16543f54c4a4bf70ee35228165e027c5c797"
     },
     "step-glass-walk-1": {
       "start": 12.465,
       "level": 0.5045336702267366,
-      "downmixLossDb": -2.155712489965549,
       "sha256": "0c631e1261c46def63adadbc38951a3375e51089df21fe149ff6db49fdfc5393"
     },
     "step-glass-walk-2": {
       "start": 16.950000000000003,
       "level": 0.8448727649523388,
-      "downmixLossDb": -2.441839016576007,
       "sha256": "e7681c62deee3b6db78563c0d3261ed6faf28f478321079d08eeda75682a4197"
     },
     "step-glass-walk-3": {
       "start": 52.4,
       "level": 0.9791346619379455,
-      "downmixLossDb": -3.2387945462121164,
       "sha256": "4b0542dfc3dc0e56852476cfa5be11f80568065e78dcabd1c19303b8c70490f0"
     },
     "step-glass-walk-4": {
       "start": 58.775,
       "level": 0.4821483428052501,
-      "downmixLossDb": -1.2607205849142376,
       "sha256": "743919a2c1bf2e6e72c948613c75084190b40f266dab6ee6d32244e9d7345360"
     },
     "step-glass-run-1": {
       "start": 2.6350000000000002,
       "level": 0.5385106624932532,
-      "downmixLossDb": -2.7745746807557636,
       "sha256": "599a15b0d1338a3bbbb55903adb1bed0d076775526084288d5823571cacb698f"
     },
     "step-glass-run-2": {
       "start": 4.485,
       "level": 0.6201352795648132,
-      "downmixLossDb": -2.862469280207031,
       "sha256": "662230ea8ad33425775bbbc62c4a94d019ab83fa28c7fac11b307fcb18720a36"
     },
     "step-glass-run-3": {
       "start": 18.87,
       "level": 0.4789692240576897,
-      "downmixLossDb": -2.184400368039304,
       "sha256": "188118a7ca7d91703889302242551f07da3abd54ddc649733431e38bf3bf765a"
     },
     "step-glass-run-4": {
       "start": 26.310000000000002,
       "level": 0.5140899664532739,
-      "downmixLossDb": -2.886052487583969,
       "sha256": "388975332e98f5035c1aa244c64cfffaa01996bf75e42a147463600fcfd344ea"
     },
     "splash-1": {
       "start": 3.9050000000000002,
       "level": 0.2686424716909657,
-      "downmixLossDb": -0.4582510692898485,
       "sha256": "78585f53bcb7e4ddc2cc0daa140bea01b94f76f2dcf4059b9225010b3a1da590"
     },
     "splash-2": {
       "start": 6.62,
       "level": 0.31738337086926316,
-      "downmixLossDb": -0.12990015015215264,
       "sha256": "4936aee6ad7e1ab8131ceb4755434e858cff2f024e3b8b2bd85c8802721fa9f2"
     },
     "splash-3": {
       "start": 9.325,
       "level": 0.24721182600953842,
-      "downmixLossDb": -0.03803413655152393,
       "sha256": "8e62ef1b8c9eca03614b7ac103369c0e4a119293cb5c42cbb86ab77d2803c78c"
     },
     "fall-hard-1": {
       "start": 0.005,
       "level": 0.2701492256540103,
-      "downmixLossDb": -0.0425998372818491,
       "sha256": "00d29712be5a28deeb82cd1ec1ed04d674a2eda3948f331b52b0f05d228985b8"
     },
     "fall-hard-2": {
       "start": 1.2650000000000001,
       "level": 0.2466349383022775,
-      "downmixLossDb": -0.032773279603505026,
       "sha256": "b824c7ae9b1a1e9137876645251188155410463f23b9f97b2c607f54e15d2a61"
     },
     "fall-hard-3": {
       "start": 3.745,
       "level": 0.27318863352393313,
-      "downmixLossDb": -0.039866346404666485,
       "sha256": "cba057b10467583d7df0b1af8f1b0e1bc2681a1c3f05d04c85c8c9fedd008ce3"
     },
     "fall-wood-1": {
       "start": 3.1,
       "level": 0.22796232630169103,
-      "downmixLossDb": -0.07007121524403705,
       "sha256": "d365d2b4c25a8f90b439016d3aff25209f8e93aa97faec6cf713ba7322719485"
     },
     "fall-wood-2": {
       "start": 6.36,
       "level": 0.2375606054505648,
-      "downmixLossDb": -0.0948230291046362,
       "sha256": "c256981c3fd690ab4878e90d5cf4b2f982c297bfcf96ce73d1ef7fd1d8ed3cee"
     },
     "fall-wood-3": {
       "start": 7.930000000000001,
       "level": 0.22639341167353097,
-      "downmixLossDb": -0.08414371610555173,
       "sha256": "239e2383d74c63c658102f51f255aee9d68a8b07799f1ff0ca751c5ed1e45008"
     },
     "fall-earth-1": {
       "start": 0.39,
       "level": 0.24298881740315317,
-      "downmixLossDb": -0.000017489919370582456,
       "sha256": "0e1675e6c0a6df6bd6636980e4f2aa39e705bc6234c758f8cc6297bf46835502"
     },
     "fall-earth-2": {
       "start": 6.3950000000000005,
       "level": 0.26364322514116795,
-      "downmixLossDb": -0.000020583880685495016,
       "sha256": "d6381592c3c76783e51a2f467bf55e6cdfa9f5d2cc26790158d63b4ba2ec7730"
     },
     "fall-earth-3": {
       "start": 10.389999999999999,
       "level": 0.26745010480780806,
-      "downmixLossDb": -0.000017824342947864386,
       "sha256": "32a8d4bef2323c56c4283ea8cece68fc146094c8f976f1e61d10aca4ab26fe79"
     },
     "fall-grass-1": {
       "start": 1.62,
       "level": 0.2426902431784014,
-      "downmixLossDb": -0.06795949793535574,
       "sha256": "ea5c65bdb0196847e34d951d8fcd4872320b8e32910d11b85ab43bc554d99afa"
     },
     "fall-grass-2": {
       "start": 3.3200000000000003,
       "level": 0.2454585749302734,
-      "downmixLossDb": -0.028323354648981343,
       "sha256": "8c1965b7d27f8e6df6ecd479fffe3fd11dad238c55d43f5aadccc786b877be56"
     },
     "fall-grass-3": {
       "start": 5.08,
       "level": 0.22977413429536742,
-      "downmixLossDb": -0.02597260600932289,
       "sha256": "2c619cfb60645c47510301d46868caf2d2c47bd6a7537df0c8c85d66066da503"
     },
     "fall-soft-1": {
       "start": 0.205,
       "level": 0.20776319052741865,
-      "downmixLossDb": -0.045695210262896614,
       "sha256": "9954a3147762961178d65a5f0190a09ab00239ea0f060c9b018f223bdb39c79e"
     },
     "fall-soft-2": {
       "start": 6.23,
       "level": 0.18724645758116576,
-      "downmixLossDb": -0.03958130825216031,
       "sha256": "d214e58a46e581f9aa71eddce9d7fd71c2a0502a587cb902da32d63ba5138cff"
     },
     "fall-soft-3": {
       "start": 8.194999999999999,
       "level": 0.2149442210343455,
-      "downmixLossDb": -0.07323365344952472,
       "sha256": "0966d8d896ca0bb76f0a5592173872b30b5ebad4c81dcf079d8c13f139b971fe"
     },
     "fall-water-1": {
       "start": 0.02,
       "level": 0.35748135004434123,
-      "downmixLossDb": -0.5034305622892463,
       "sha256": "d8f2a8fdeb0dd685422972dbbe8bbe3e5b676c563c7a299929f0d6cfb644630c"
     },
     "fall-water-2": {
       "start": 4.91,
       "level": 0.3051110921453923,
-      "downmixLossDb": -0.5394684534491313,
       "sha256": "6ce3ee1b4173343bc86f2bc2a0b8c7fea1798731d6e63aeef9e881455aa4b0f5"
     },
     "fall-water-3": {
       "start": 7.48,
       "level": 0.35327371934089447,
-      "downmixLossDb": -0.17072383763422405,
       "sha256": "4535ffccb7999b0f40e8687d679ab75d2b5c28ed063c913aef20edc90a1c9f61"
     },
     "gear-1": {
       "start": 31.885,
       "level": 0.2892134326149312,
-      "downmixLossDb": -0.49543208841530123,
       "sha256": "554b387338030527f4afff39c345c99efb932e3c13b403dd40946459e263582d"
     },
     "gear-2": {
       "start": 34.83,
       "level": 0.34867868094700644,
-      "downmixLossDb": -0.6688386403200326,
       "sha256": "60025dc9fc290351ee29ce10da4d655df65e9d94dd2ce96ea30b22d6b860abb6"
     },
     "gear-3": {
       "start": 36.91,
       "level": 0.2700270408053277,
-      "downmixLossDb": -0.49428532093242084,
       "sha256": "ec6c95bed92eea406d2f1f103d88084f526483781d4ad642c790bddd1c61bf29"
     },
     "gear-4": {
       "start": 66.21000000000001,
       "level": 0.35851125744257617,
-      "downmixLossDb": -0.7026415656760723,
       "sha256": "d8abbaa58e5d8e57362a9e458c4802540419da698d5f036a33671bb9f3165e48"
     },
     "cloth-1": {
       "start": 7.775,
       "level": 1.2852131006658445,
-      "downmixLossDb": -0.15799639294099554,
       "sha256": "8a01ddda721ec4225c172c1bc7f354338ab7c46e78b4562beefa3b8d81f19fab"
     },
     "cloth-2": {
       "start": 8.389999999999999,
       "level": 1.3281663809798432,
-      "downmixLossDb": -0.16062567133403044,
       "sha256": "ba532903106d3ab63474d0ae9eecc70dd2048baaece13ac809a640d1401cea69"
     },
     "cloth-3": {
       "start": 11.215,
       "level": 0.8212317419655514,
-      "downmixLossDb": -0.12295347780279173,
       "sha256": "6b062cf3247d385fb69425a56d15f4b7907384cfa8eaf35de359445275d0d8f5"
     },
     "cloth-4": {
       "start": 14.62,
       "level": 0.600163719847798,
-      "downmixLossDb": -0.16154884570397138,
       "sha256": "92775b1111ee8cf83af5c032293cd90e1bf976010e929df48e6093f0bcb55d1d"
     }
   }

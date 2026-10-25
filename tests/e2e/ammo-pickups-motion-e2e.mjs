@@ -137,7 +137,35 @@ try {
         ), 'surviving identities/slots/poses unchanged');
     async function frame(label, expectedX = 0) {
       const before = window.__NATIVE_BUILDS__;
-      await window.__PUMP__(1);
+      const census = { beauty: 0, prepass: 0, shadow: 0 };
+      const draw = r.renderer.backend.draw;
+      r.renderer.backend.draw = function (object, info) {
+        const before = info.render.drawCalls;
+        const result = draw.apply(this, arguments);
+        if (p._batches.includes(object.object)) {
+          const pass = object.material.isShadowPassMaterial
+            ? 'shadow'
+            : object.context.renderTarget === rt
+              ? 'prepass'
+              : 'beauty';
+          census[pass] += info.render.drawCalls - before;
+        }
+        return result;
+      };
+      try {
+        await window.__PUMP__(1);
+      } finally {
+        r.renderer.backend.draw = draw;
+      }
+      if (label === 'first-population-render')
+        require(census.beauty === 4 &&
+          census.prepass === 3 &&
+          census.shadow ===
+            9, 'populated loot retains four beauty, three prepass and nine cascade draws');
+      if (label === 'empty-after-clear')
+        require(Object.values(census).every(
+          (count) => count === 0
+        ), 'cleared loot submits no draws');
       if (e.error) throw Error(JSON.stringify(e.error));
       const data = await r.renderer.readRenderTargetPixelsAsync(
         rt,

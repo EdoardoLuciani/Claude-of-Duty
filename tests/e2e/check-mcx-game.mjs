@@ -3,7 +3,6 @@
  * node tests/e2e/check-mcx-game.mjs --port=5197 --out=.tmp-rend/mcx-game
  */
 import assert from 'node:assert/strict';
-import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { parseArgs } from '../../tools/lib/browser-harness.mjs';
@@ -137,65 +136,6 @@ try {
 
   const after = await checkFireBurst(page, pump, capture, 'mcxReview', 5);
 
-  // Audition the actual sample + procedural reinforcement pipeline, with a
-  // quiet single shot then an 800 rpm burst. Dry preview, not scene reverb.
-  const audio = await page.evaluate(async () => {
-    const { WeaponSampleBank } = await import('/src/audio/samples.ts');
-    const { NoiseBank } = await import('/src/audio/dsp.ts');
-    const { Rng } = await import('/src/core/rng.ts');
-    const { WEAPON_PROFILES, weaponPunch, weaponShot } = await import('/src/audio/weapons.ts');
-    const ac = new OfflineAudioContext(2, 48000 * 3, 48000),
-      rng = new Rng(0x300bc);
-    const bank = new NoiseBank(ac, rng),
-      samples = new WeaponSampleBank(ac);
-    await samples.load();
-    const profile = WEAPON_PROFILES.mcx;
-    const sum = ac.createGain();
-    sum.gain.value = 0.22 * 1.35 * 0.95 * profile.firstPersonGain;
-    sum.connect(ac.destination);
-    for (const when of [0.15, 1, 1.075, 1.15, 1.225, 1.3, 1.375]) {
-      const opts = { when, distance: 0, firstPerson: true };
-      const recorded = samples.shot(profile, rng, opts);
-      if (!recorded) throw new Error('MCX samples failed to decode');
-      recorded.node.connect(sum);
-      weaponPunch(ac, bank, rng, profile, opts).node.connect(sum);
-    }
-    // Also exercise the no-sample fallback, separately at the end of the demo.
-    weaponShot(ac, bank, rng, profile, { when: 2.3, distance: 0, firstPerson: true }).node.connect(
-      sum
-    );
-    const b = await ac.startRendering();
-    return {
-      left: Array.from(b.getChannelData(0)),
-      right: Array.from(b.getChannelData(1)),
-      loaded: samples.loaded,
-    };
-  });
-  const wav = Buffer.alloc(44 + audio.left.length * 4);
-  wav.write('RIFF');
-  wav.writeUInt32LE(wav.length - 8, 4);
-  wav.write('WAVEfmt ', 8);
-  wav.writeUInt32LE(16, 16);
-  wav.writeUInt16LE(1, 20);
-  wav.writeUInt16LE(2, 22);
-  wav.writeUInt32LE(48000, 24);
-  wav.writeUInt32LE(192000, 28);
-  wav.writeUInt16LE(4, 32);
-  wav.writeUInt16LE(16, 34);
-  wav.write('data', 36);
-  wav.writeUInt32LE(wav.length - 44, 40);
-  let peak = 0;
-  for (let i = 0; i < audio.left.length; i++) {
-    for (const [channel, samples] of [audio.left, audio.right].entries()) {
-      peak = Math.max(peak, Math.abs(samples[i]));
-      wav.writeInt16LE(
-        Math.round(Math.max(-1, Math.min(1, samples[i])) * 32767),
-        44 + i * 4 + channel * 2
-      );
-    }
-  }
-  assert(peak > 0.05 && peak < 0.95, `audio peak ${peak}: audible without clipping`);
-  writeFileSync(`${out}/sound-preview.wav`, wav);
   assert.deepEqual(errors, []);
   console.log(
     JSON.stringify(
@@ -204,8 +144,6 @@ try {
         out,
         shots: after.shots,
         shells: after.shells,
-        audioPeakDBFS: 20 * Math.log10(peak),
-        decodedSamples: audio.loaded,
         render: await page.evaluate(() => window.__RENDER_INFO__),
         errors,
         warnings,

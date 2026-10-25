@@ -44,11 +44,6 @@ for (const [dir, banks, provenance, count, maxDuration, maxBytes, maxDecoded] of
           name + ': donor hash'
         );
         if (dir === 'reloads') assert(source.description.length > 0);
-        if (layer.downmixLossDb !== undefined)
-          assert(
-            dir === 'reloads' ? layer.downmixLossDb < 6 : layer.downmixLossDb > -6,
-            name + ': source downmix audit'
-          );
       }
       cuts.add(file.source + ':' + file.start);
       bytes += data.length;

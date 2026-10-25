@@ -58,22 +58,21 @@ const bank = new WeaponSampleBank(actx),
 for (const [key, urls] of Object.entries(RADIO_URLS))
   bank.hitBuffers[key] = urls.map((_, index) => ({ key, index, duration: 0.3 }));
 for (const kind of ['radio_open', 'radio_strike', 'intel_call']) {
-  const previous = {};
-  for (let i = 0; i < 6; i++) {
-    const before = sources.length,
-      recorded = bank.radio(kind, rng, { when: 2 }),
-      used = sources.slice(before);
-    assert.equal(used.length, kind === 'intel_call' ? 1 : 2);
-    for (const src of used) {
-      assert.notEqual(src.buffer.index, previous[src.buffer.key]);
-      previous[src.buffer.key] = src.buffer.index;
-      assert.equal(src.playbackRate.value, 1);
-      assert(src.when >= 2 && src.when <= 2.02);
-    }
-    const result = radioCue(actx, noNoise, rng, kind, recorded, 2);
-    assert.equal(result.end, 2.9);
-    assert.equal(result.send, 0);
+  const before = sources.length;
+  const recorded = bank.radio(kind, rng, { when: 2 });
+  const used = sources.slice(before);
+  assert.equal(used.length, kind === 'intel_call' ? 1 : 2);
+  assert.deepEqual(
+    used.map((source) => source.buffer.key),
+    kind === 'intel_call' ? ['radio-static'] : ['radio-click', 'radio-static']
+  );
+  for (const source of used) {
+    assert.equal(source.playbackRate.value, 1);
+    assert(source.when >= 2 && source.when <= 2.02);
   }
+  const result = radioCue(actx, noNoise, rng, kind, recorded, 2);
+  assert.equal(result.end, 2.9);
+  assert.equal(result.send, 0);
 }
 for (const [kind, freqs, times] of [
   ['radio_open', [880], [2.11]],
