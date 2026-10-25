@@ -9,7 +9,7 @@ playable-snapshot/
 perf-candidate/
 perf-cand2/
 
-# Capture output — 780 MB of PNGs. Regenerate with tools/baseline.mjs.
+# Capture output — 780 MB of PNGs (regenerate with tools/capture.mjs).
 shots/
 
 # Arm maps are packed in the authoring .blend and runtime GLB; reviews regenerate.
