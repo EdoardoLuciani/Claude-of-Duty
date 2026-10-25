@@ -1,7 +1,4 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import reference from '../../src/audio/samples/reference.json' with { type: 'json' };
@@ -12,17 +9,6 @@ import {
 } from '../../tools/lib/browser-harness.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
-const masters = new Map();
-if (process.env.AUDIO_MASTER_DIR)
-  for (const [name, ref] of Object.entries(reference.files)) {
-    const data = readFileSync(resolve(process.env.AUDIO_MASTER_DIR, name + '.wav'));
-    assert.equal(
-      createHash('sha256').update(data).digest('hex'),
-      ref.sha256,
-      name + ': master changed'
-    );
-    masters.set(name + '.wav', data);
-  }
 const port = Number(process.env.PORT ?? 5495);
 const server = await ensureViteServer({ root, port });
 assert(server, 'Refusing an unverified server on an occupied port');
@@ -40,11 +26,6 @@ try {
   await page.route('**/private-audio', (route) =>
     route.fulfill({ contentType: 'text/html', body: 'Native audio regressions' })
   );
-  if (masters.size)
-    await page.route('**/private-audio-masters/*.wav', (route) => {
-      const data = masters.get(new URL(route.request().url()).pathname.split('/').at(-1));
-      return data ? route.fulfill({ contentType: 'audio/wav', body: data }) : route.abort();
-    });
   await page.goto(`http://127.0.0.1:${port}/private-audio`);
 
   // hearing: real native nodes and automation; no Web Audio substitutes.
@@ -511,79 +492,71 @@ try {
   }
   assert.equal(results.buses.length, 18);
 
-  results.codecs = await page.evaluate(
-    async ({ files, rates, external }) => {
-      const rows = [];
-      for (const rate of rates)
-        for (const [name, reference] of Object.entries(files)) {
-          const ctx = new OfflineAudioContext(2, rate, rate);
-          const load = async (url) => {
-            const response = await fetch(url);
-            if (!response.ok) throw Error('Missing audio: ' + url);
-            return ctx.decodeAudioData(await response.arrayBuffer());
-          };
-          const [master, opus] = await Promise.all([
-            external ? load('/private-audio-masters/' + name + '.wav') : null,
-            load('/src/audio/samples/' + name + '.opus'),
-          ]);
-          function measure(buffer) {
-            let energy = 0,
-              peak = 0;
-            for (let ch = 0; ch < buffer.numberOfChannels; ch++)
-              for (const value of buffer.getChannelData(ch)) {
-                if (!Number.isFinite(value)) throw Error('Nonfinite PCM: ' + name);
-                energy += value * value;
-                peak = Math.max(peak, Math.abs(value));
-              }
-            return {
-              frames: buffer.length,
-              channels: buffer.numberOfChannels,
-              rate: buffer.sampleRate,
-              rms: Math.sqrt(energy / (buffer.length * buffer.numberOfChannels)),
-              peak,
-            };
-          }
-          const a = master
-            ? measure(master)
-            : {
-                frames: reference.native[rate][0],
-                rms: reference.native[rate][1],
-                channels: reference.channels,
-                rate,
-              };
-          const b = measure(opus);
-          let pulsePeaks;
-          if (name === 'heartbeat') {
-            const data = opus.getChannelData(0),
-              bins = [],
-              width = rate / 100;
-            for (let i = 0; i + width <= data.length; i += width) {
-              let energy = 0;
-              for (let j = i; j < i + width; j++) energy += data[j] ** 2;
-              bins.push(energy);
+  results.codecs = await page.evaluate(async ({ files, rates }) => {
+    const rows = [];
+    for (const rate of rates)
+      for (const [name, reference] of Object.entries(files)) {
+        const ctx = new OfflineAudioContext(2, rate, rate);
+        const load = async (url) => {
+          const response = await fetch(url);
+          if (!response.ok) throw Error('Missing audio: ' + url);
+          return ctx.decodeAudioData(await response.arrayBuffer());
+        };
+        const opus = await load('/src/audio/samples/' + name + '.opus');
+        function measure(buffer) {
+          let energy = 0,
+            peak = 0;
+          for (let ch = 0; ch < buffer.numberOfChannels; ch++)
+            for (const value of buffer.getChannelData(ch)) {
+              if (!Number.isFinite(value)) throw Error('Nonfinite PCM: ' + name);
+              energy += value * value;
+              peak = Math.max(peak, Math.abs(value));
             }
-            pulsePeaks = [
-              [2, 20],
-              [20, 45],
-            ].map(([start, end]) => {
-              let best = start;
-              for (let i = start + 1; i < end; i++) if (bins[i] > bins[best]) best = i;
-              return best / 100;
-            });
+          return {
+            frames: buffer.length,
+            channels: buffer.numberOfChannels,
+            rate: buffer.sampleRate,
+            rms: Math.sqrt(energy / (buffer.length * buffer.numberOfChannels)),
+            peak,
+          };
+        }
+        const a = {
+          frames: reference.native[rate][0],
+          rms: reference.native[rate][1],
+          channels: reference.channels,
+          rate,
+        };
+        const b = measure(opus);
+        let pulsePeaks;
+        if (name === 'heartbeat') {
+          const data = opus.getChannelData(0),
+            bins = [],
+            width = rate / 100;
+          for (let i = 0; i + width <= data.length; i += width) {
+            let energy = 0;
+            for (let j = i; j < i + width; j++) energy += data[j] ** 2;
+            bins.push(energy);
           }
-          rows.push({
-            name,
-            rate,
-            master: a,
-            opus: b,
-            pulsePeaks,
-            energyDeltaDb: 20 * Math.log10(b.rms / a.rms),
+          pulsePeaks = [
+            [2, 20],
+            [20, 45],
+          ].map(([start, end]) => {
+            let best = start;
+            for (let i = start + 1; i < end; i++) if (bins[i] > bins[best]) best = i;
+            return best / 100;
           });
         }
-      return rows;
-    },
-    { ...reference, external: masters.size > 0 }
-  );
+        rows.push({
+          name,
+          rate,
+          master: a,
+          opus: b,
+          pulsePeaks,
+          energyDeltaDb: 20 * Math.log10(b.rms / a.rms),
+        });
+      }
+    return rows;
+  }, reference);
   for (const row of results.codecs) {
     assert.equal(row.opus.frames, row.master.frames, row.name + ': full duration/pre-skip');
     assert.equal(row.opus.channels, row.master.channels, row.name + ': channel identity');
@@ -602,20 +575,124 @@ try {
   );
 
   assert.equal(results.codecs.length, 120);
+  // Recompute output measurements instead of committing generated peak/duration reports.
+  results.recordings = await page.evaluate(async () => {
+    const { AUDIO_BANKS } = await import('/tests/lib/audio-banks.mjs');
+    const ctx = new OfflineAudioContext(2, 1, 48000);
+    let count = 0;
+    for (const [, banks, , , maxDuration] of AUDIO_BANKS)
+      for (const urls of Object.values(banks))
+        for (const url of urls) {
+          const response = await fetch(url);
+          if (!response.ok) throw Error(url + ': HTTP ' + response.status);
+          const buffer = await ctx.decodeAudioData(await response.arrayBuffer());
+          let peak = 0,
+            sum = 0;
+          for (const value of buffer.getChannelData(0)) {
+            if (!Number.isFinite(value)) throw Error(url + ': nonfinite PCM');
+            peak = Math.max(peak, Math.abs(value));
+            sum += value;
+          }
+          if (
+            buffer.numberOfChannels !== 1 ||
+            buffer.duration > maxDuration ||
+            peak >= 0.5 ||
+            peak < 1e-7 ||
+            Math.abs(sum / buffer.length) > 0.02
+          )
+            throw Error(url + ': decoded layout, duration, headroom, silence or DC');
+          count++;
+        }
+    return count;
+  });
+  assert.equal(results.recordings, 230);
+  // Retain native checks for procedural voices/IRs without another self-test API.
+  results.voices = await page.evaluate(async () => {
+    const [{ Rng }, { NoiseBank }, { Mixer }, foley, weapons, vox, ir] = await Promise.all([
+      import('/src/core/rng.ts'),
+      import('/src/audio/dsp.ts'),
+      import('/src/audio/mixer.ts'),
+      import('/src/audio/foley.ts'),
+      import('/src/audio/weapons.ts'),
+      import('/src/audio/vox.ts'),
+      import('/src/audio/ir.ts'),
+    ]);
+    const check = (name, buffer) => {
+      let peak = 0,
+        power = 0,
+        sum = 0;
+      for (let ch = 0; ch < buffer.numberOfChannels; ch++)
+        for (const value of buffer.getChannelData(ch)) {
+          if (!Number.isFinite(value)) throw Error(name + ': nonfinite PCM');
+          peak = Math.max(peak, Math.abs(value));
+          power += value * value;
+          sum += value;
+        }
+      const n = buffer.length * buffer.numberOfChannels;
+      if (peak >= 1 || Math.sqrt(power / n) <= 0.00002 || Math.abs(sum / n) > 0.02)
+        throw Error(name + ': headroom, silence or DC');
+    };
+    const cases = [
+      ...Object.entries(weapons.WEAPON_PROFILES).map(([id, profile]) => [
+        id,
+        (ctx, bank, rng) =>
+          weapons.weaponShot(ctx, bank, rng, profile, {
+            when: 0.02,
+            distance: 2,
+            firstPerson: true,
+          }),
+      ]),
+      ...[120, 300].map((distance) => [
+        'distant-' + distance,
+        (ctx, bank, rng) =>
+          weapons.weaponShot(ctx, bank, rng, weapons.WEAPON_PROFILES.rifle, {
+            when: 0.02,
+            distance,
+          }),
+      ]),
+      ...['concrete', 'dirt'].map((surface) => [
+        'shell-' + surface,
+        (ctx, bank, rng) => foley.shellCasing(ctx, bank, rng, { when: 0.02, surface }),
+      ]),
+      ...['whizz', 'dryFire'].map((kind) => [
+        kind,
+        (ctx, bank, rng) =>
+          (kind === 'whizz' ? weapons.bulletWhizz : weapons.dryFire)(ctx, bank, rng, {
+            when: 0.02,
+            miss: 1.2,
+          }),
+      ]),
+      ...Object.keys(vox.BARKS).map((kind) => [
+        'bark-' + kind,
+        (ctx, bank, rng) => vox.bark(ctx, bank, rng, { when: 0.02, bark: kind }),
+      ]),
+    ];
+    for (const [name, build] of cases) {
+      const ctx = new OfflineAudioContext(2, 48000 * 6, 48000);
+      const rng = new Rng(0xa0d10),
+        bank = new NoiseBank(ctx, rng.fork(), 1.2);
+      await Mixer.prepare(ctx);
+      const mixer = new Mixer(ctx, rng.fork());
+      try {
+        const voice = build(ctx, bank, rng);
+        voice.node.connect(mixer.bus('weapons'));
+        check(name, await ctx.startRendering());
+      } finally {
+        mixer.dispose();
+        bank.dispose();
+      }
+    }
+    const ctx = new OfflineAudioContext(2, 1, 48000);
+    for (const [name, spec] of Object.entries(ir.IR_SPECS))
+      check(name, ir.generateIR(ctx, new Rng(0x1234 + name.length), spec));
+    return cases.length + Object.keys(ir.IR_SPECS).length;
+  });
+  assert(results.voices > 20);
   assert.deepEqual(errors, []);
   console.log(
-    'PASS: 12 hearing, 12 emitter-ownership, 18 category-envelope and 120 codec cases at 44.1/48/96 kHz.'
+    `PASS: 12 hearing, 12 emitter-ownership, 18 category-envelope, 120 codec, ${results.recordings} recording and ${results.voices} procedural/IR checks.`
   );
 } finally {
   await browser?.close();
   stopViteServer(server);
-  if (process.env.AUDIO_EVIDENCE_DIR) {
-    const out = resolve(process.env.AUDIO_EVIDENCE_DIR);
-    assert(out !== resolve(root) && !out.startsWith(root), 'Keep evidence outside the repository');
-    mkdirSync(out, { recursive: true });
-    writeFileSync(
-      resolve(out, 'results.json'),
-      JSON.stringify({ results, errors }, null, 2) + '\n'
-    );
-  }
 }

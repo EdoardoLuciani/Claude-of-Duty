@@ -44,9 +44,7 @@ export class EnergyPeakController {
     left: Float32Array | undefined,
     right: Float32Array | undefined,
     outL: Float32Array,
-    outR: Float32Array,
-    energyL?: Float32Array,
-    energyR?: Float32Array
+    outR: Float32Array
   ): void {
     const size = this.powersL.length;
     for (let i = 0; i < outL.length; i++) {
@@ -71,9 +69,6 @@ export class EnergyPeakController {
       const applied = Math.min(this.gain, peakGain);
       const delayedL = this.delayL[this.delayIndex];
       const delayedR = this.delayR[this.delayIndex];
-      // Auxiliary native output exposes the actual RMS-only signal for review.
-      if (energyL) energyL[i] = delayedL * this.gain;
-      if (energyR) energyR[i] = delayedR * this.gain;
       outL[i] = delayedL * applied;
       outR[i] = delayedR * applied;
       this.delayL[this.delayIndex] = l;

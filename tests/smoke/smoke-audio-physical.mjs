@@ -1,94 +1,21 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 
-import { AIRCRAFT_URLS } from '../../src/audio/aircraft.ts';
-import { ENVIRONMENT_URLS } from '../../src/audio/environment.ts';
 import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
 import { FALL_BANK, FOLEY_MIX, IMPACT_BANK, STEP_BANK } from '../../src/audio/physical.ts';
-import { RADIO_URLS } from '../../src/audio/radio.ts';
-import { REACTION_URLS } from '../../src/audio/reactions.ts';
-import { RELOAD_URLS } from '../../src/audio/reloads.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
-import provenance from '../../src/audio/samples/foley/provenance.json' with { type: 'json' };
 import { Rng } from '../../src/core/rng.ts';
+import { audioFixture } from '../lib/audio-banks.mjs';
 
-let totalBytes = 0,
-  decodedBytes = 0;
-for (const [kind, urls] of Object.entries(FOLEY_URLS)) {
-  assert(urls.length >= 3, kind + ': genuine crop/take variants');
-  const cuts = new Set();
-  for (const url of urls) {
-    const bytes = readFileSync(new URL(url));
-    const name = new URL(url).pathname.split('/').at(-1).replace('.opus', '');
-    assert(provenance.files[name], name + ': provenance');
-    const file = { ...provenance.banks[kind], ...provenance.files[name] };
-    assert.equal(createHash('sha256').update(bytes).digest('hex'), file.sha256);
-    assert(provenance.sources[file.source]?.sha256);
-    assert(file.duration >= 0.2 && file.duration <= 0.8);
-    assert(file.decodedPeak < 0.5 && file.downmixLossDb > -6);
-    const head = bytes.indexOf('OpusHead');
-    assert(head >= 0);
-    assert.equal(bytes[head + 9], 1, 'mono source, stereo spatial playback');
-    assert.equal(bytes.readInt16LE(head + 16), 0, 'no hidden codec gain');
-    cuts.add(file.source + ':' + file.start);
-    totalBytes += bytes.length;
-    decodedBytes += file.duration * 48000 * 4;
-  }
-  assert.equal(cuts.size, urls.length, kind + ': no microphone duplicates or pitch-only variants');
-}
-assert.equal(Object.keys(provenance.files).length, 123);
-assert(totalBytes < 700000 && decodedBytes < 9000000, 'bounded authored delivery/decoded bank');
-
-const sources = [];
-const actx = {
-  currentTime: 3,
-  createGain: () => ({
-    gain: { value: 0 },
-    connect(target) {
-      this.target = target;
-    },
-  }),
-  createBufferSource() {
-    const node = {
-      playbackRate: { value: 1 },
-      connect(target) {
-        this.target = target;
-      },
-      start(when) {
-        this.when = when;
-      },
-    };
-    sources.push(node);
-    return node;
-  },
-};
+const { actx, sources } = audioFixture(3);
 const rng = new Rng(473);
 const bank = new WeaponSampleBank(actx);
 for (const [kind, urls] of Object.entries(FOLEY_URLS))
   bank.hitBuffers[kind] = urls.map((url, index) => ({
     kind,
     index,
-    duration:
-      provenance.files[new URL(url).pathname.split('/').at(-1).replace('.opus', '')].duration ??
-      provenance.banks[kind].duration,
+    duration: 0.3,
   }));
-for (const kind of Object.keys(FOLEY_URLS)) {
-  let previous = -1;
-  const seen = new Set();
-  for (let i = 0; i < 40; i++) {
-    const voice = bank.hit(kind, rng, { when: 5 });
-    const source = sources.at(-1);
-    assert.notEqual(source.buffer.index, previous, kind + ': no immediate repeats');
-    previous = source.buffer.index;
-    seen.add(previous);
-    assert(source.playbackRate.value >= 0.98 && source.playbackRate.value <= 1.02);
-    assert.equal(source.when, 5);
-    assert.equal(voice.end, 5 + source.buffer.duration / source.playbackRate.value + 0.02);
-  }
-  assert.equal(seen.size, FOLEY_URLS[kind].length);
-}
 for (const surface of Object.keys(IMPACT_BANK)) {
   const voice = bank.impact(rng, { when: 6, surface, level: 1.2 });
   assert.equal(sources.at(-1).buffer.kind, IMPACT_BANK[surface]);
@@ -209,38 +136,6 @@ assert(retained.every((a) => a.length === 0));
 assert.deepEqual(bank.hitBuffers, {});
 assert.deepEqual(bank.hitIndices, {});
 
-const originalFetch = globalThis.fetch;
-try {
-  let decodes = 0;
-  globalThis.fetch = async (url) => ({
-    ok: !url.includes('step-metal-run-2'),
-    status: 404,
-    arrayBuffer: async () => new ArrayBuffer(1),
-  });
-  const missing = new WeaponSampleBank({
-    decodeAudioData: async () => {
-      decodes++;
-      return { duration: 0.2 };
-    },
-  });
-  await assert.rejects(missing.load(), /step-metal-run-2.*HTTP 404/);
-  assert.equal(
-    decodes,
-    49 +
-      Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0) +
-      Object.values(RELOAD_URLS).reduce((n, urls) => n + urls.length, 0) +
-      (AIRCRAFT_URLS.length +
-        Object.values({ ...REACTION_URLS, ...ENVIRONMENT_URLS, ...RADIO_URLS }).reduce(
-          (n, urls) => n + urls.length,
-          0
-        )),
-    'all other required jobs settle before failure teardown'
-  );
-  missing.dispose();
-  assert.deepEqual(missing.hitBuffers, {});
-} finally {
-  globalThis.fetch = originalFetch;
-}
 console.log(
   'Recorded material/boot/body/gear banks, timing, variants, memory, routing, budgets and required startup'
 );

@@ -15,8 +15,6 @@
       "activeRmsTargetDb": -22,
       "gain": 0.540718802870427,
       "downmixLossDb": 0,
-      "decodedDuration": 0.35,
-      "decodedPeak": 0.34709611535072327,
       "sha256": "0811cca69db37e7481c0f8da1804290443ee234751681e662b82f40bd7be2633"
     },
     "reaction-0-hurt-2": {
@@ -31,8 +29,6 @@
       "activeRmsTargetDb": -22,
       "gain": 0.37537848903052035,
       "downmixLossDb": 0,
-      "decodedDuration": 0.42,
-      "decodedPeak": 0.23521944880485535,
       "sha256": "40f139f542cc09668b5ad9b009cbbc1c7fb8bbee6b5948ad230d5060e244e3b7"
     },
     "reaction-0-hurt-3": {
@@ -47,8 +43,6 @@
       "activeRmsTargetDb": -22,
       "gain": 0.42166670326395056,
       "downmixLossDb": 0,
-      "decodedDuration": 0.43,
-      "decodedPeak": 0.2966722846031189,
       "sha256": "4c32f88445c6e7a6a18da2782ce66ef7e8fff68168d6bcfe1568f5b876f068d9"
     },
     "reaction-0-death-1": {
@@ -63,8 +57,6 @@
       "activeRmsTargetDb": -22,
       "gain": 0.3588349870237963,
       "downmixLossDb": 0,
-      "decodedDuration": 0.48,
-      "decodedPeak": 0.30868983268737793,
       "sha256": "548bbba5723244b115a8decfed9c65e8fe7dd2b05fc163645b94950ee1d8331c"
     },
     "reaction-0-death-2": {
@@ -79,8 +71,6 @@
       "activeRmsTargetDb": -22,
       "gain": 0.37646328332080975,
       "downmixLossDb": 0,
-      "decodedDuration": 0.46,
-      "decodedPeak": 0.34453266859054565,
       "sha256": "00019b40ffa269e4d3db79aaf2c9398123c447f9ec7b276e5693ce672610dfb5"
     },
     "reaction-0-death-3": {
@@ -95,8 +85,6 @@
       "activeRmsTargetDb": -22,
       "gain": 0.3907903991218544,
       "downmixLossDb": 0,
-      "decodedDuration": 0.48,
-      "decodedPeak": 0.3388829827308655,
       "sha256": "e229e1c7f202bd70b09f171cfdc5d884061c5f5bd12543135b7ea8647ab47d6a"
     },
     "reaction-1-hurt-1": {
@@ -111,8 +99,6 @@
       "activeRmsTargetDb": -22,
       "gain": 0.35903929750665536,
       "downmixLossDb": 0,
-      "decodedDuration": 0.48,
-      "decodedPeak": 0.3397068977355957,
       "sha256": "90c57ddfc4500fb82577a97c57cf9c3a4269c1294adbaae6a664d694eb2c4a37"
     },
     "reaction-1-hurt-2": {
@@ -127,8 +113,6 @@
       "activeRmsTargetDb": -22,
       "gain": 0.3624451417562294,
       "downmixLossDb": 0,
-      "decodedDuration": 0.48,
-      "decodedPeak": 0.3018478453159332,
       "sha256": "c9d54c00e626ea3910660bff6e494afd96a0c8776d1f8e4af8d485b42e4e24d8"
     },
     "reaction-1-hurt-3": {
@@ -143,8 +127,6 @@
       "activeRmsTargetDb": -22,
       "gain": 0.6258388206526684,
       "downmixLossDb": 0,
-      "decodedDuration": 0.46,
-      "decodedPeak": 0.2943043112754822,
       "sha256": "2906e67c65839f3410b2dbf3e8f0c5bce8ffa0ae5bd45bbd253363a72c5450ad"
     },
     "reaction-1-death-1": {
@@ -159,8 +141,6 @@
       "activeRmsTargetDb": -22,
       "gain": 0.31582981602313276,
       "downmixLossDb": 0,
-      "decodedDuration": 0.43,
-      "decodedPeak": 0.24495334923267365,
       "sha256": "2a5ea0254b78bec71bd9c030eab3b66e07982d482598e4854b628c2a1a9b58f8"
     },
     "reaction-1-death-2": {
@@ -175,8 +155,6 @@
       "activeRmsTargetDb": -22,
       "gain": 0.2982500787193594,
       "downmixLossDb": 0,
-      "decodedDuration": 0.58,
-      "decodedPeak": 0.26259610056877136,
       "sha256": "80d14f420f770cc295dd6bfc189acc2e1b19814200fed1a634d08ad69cb0a243"
     },
     "reaction-1-death-3": {
@@ -191,8 +169,6 @@
       "activeRmsTargetDb": -22,
       "gain": 0.45358547031898605,
       "downmixLossDb": 0,
-      "decodedDuration": 0.45,
-      "decodedPeak": 0.35906127095222473,
       "sha256": "b24facb26a3a62caf0eab60dc5c14d13aa41ae2b9943bb78b86d123d29b69175"
     }
   }

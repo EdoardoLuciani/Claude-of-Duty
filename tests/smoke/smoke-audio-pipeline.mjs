@@ -63,7 +63,8 @@ globalThis.AudioWorkletNode = class {
   constructor(context, name, options) {
     assert.equal(context, actx);
     assert.equal(name, 'cod-energy-mix');
-    assert.deepEqual(options.outputChannelCount, [2, 2]);
+    assert.equal(options.numberOfOutputs, 1);
+    assert.deepEqual(options.outputChannelCount, [2]);
     return Object.assign(node('energy'), { port: { postMessage() {}, close() {} } });
   }
 };

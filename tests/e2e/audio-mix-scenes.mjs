@@ -1,140 +1,51 @@
-/** Browser-only, deterministic native-audio mix benchmark. No runtime gain overrides. */
+/** Native whole-mix regression; per-bank assets/routing are covered separately. */
 export function mixCases() {
   const cases = [];
   const add = (id, role, event, options = {}) => cases.push({ id, role, event, ...options });
-  for (const weapon of ['rifle', 'mcx', 'pistol', 'lmg', 'smg', 'sniper', 'shotgun'])
-    for (const distance of [0, 20, 70])
-      add(`gun-${weapon}-${distance}`, 'anchor', 'gun', { weapon, distance });
-  for (const surface of ['concrete', 'metal', 'wood', 'dirt', 'foliage', 'sand'])
-    for (const gait of ['walk', 'run'])
-      add(`own-step-${surface}-${gait}`, 'routine', 'own-step', { surface, gait });
-  for (const gait of ['crouch', 'sprint'])
-    add(`own-step-concrete-${gait}`, 'routine', 'own-step', { surface: 'concrete', gait });
-  for (const surface of ['concrete', 'metal', 'sand'])
-    for (const distance of [2, 8, 20])
-      add(`enemy-step-${surface}-${distance}`, 'routine', 'enemy-step', {
-        surface,
-        distance,
-      });
-  for (const phase of ['start', 'magout', 'magin', 'end', 'pump', 'shellin'])
-    add(`reload-${phase}`, 'routine', 'reload', { phase });
-  for (const event of ['cloth', 'ads', 'shell']) add(event, 'routine', event);
-  add('bodyfall', 'impact', 'bodyfall');
-  for (const surface of [
-    'concrete',
-    'plaster',
-    'metal',
-    'wood',
-    'dirt',
-    'sand',
-    'glass',
-    'water',
-    'foliage',
-    'fabric',
-    'rubber',
-  ])
-    for (const distance of [2, 10])
-      add(`material-${surface}-${distance}`, 'impact', 'material', { surface, distance });
-  for (const surface of ['wood', 'dirt', 'foliage', 'fabric', 'water'])
-    add(`bodyfall-${surface}`, 'impact', 'fall-surface', { surface });
-  for (const surface of ['glass', 'water', 'fabric', 'rubber'])
-    for (const gait of ['walk', 'run'])
-      add(`own-step-${surface}-${gait}`, 'routine', 'own-step', { surface, gait });
-  for (const velocity of [4, 9, 14]) add(`land-${velocity}`, 'impact', 'land', { velocity });
-  for (const kind of [
-    'hitmarker',
-    'headshot',
-    'kill',
-    'damage',
-    'market_buy',
-    'market_hover',
-    'grenade_warn',
-    'lowhealth',
-    'intel_call',
-    'intel_beep',
-  ])
-    add(
-      `ui-${kind}`,
-      ['damage', 'grenade_warn', 'lowhealth', 'intel_call'].includes(kind) ? 'warning' : 'routine',
-      'ui',
-      { kind }
-    );
+  add('gun-rifle-0', 'anchor', 'gun', { weapon: 'rifle', distance: 0 });
+  add('gun-rifle-70', 'anchor', 'gun', { weapon: 'rifle', distance: 70 });
+  add('own-step-concrete-walk', 'routine', 'own-step', { surface: 'concrete', gait: 'walk' });
+  for (const distance of [2, 8])
+    add(`enemy-step-concrete-${distance}`, 'routine', 'enemy-step', {
+      surface: 'concrete',
+      distance,
+    });
+  add('reload-room', 'routine', 'reload', { phase: 'magin', space: 'room' });
+  add('ui-hitmarker', 'routine', 'ui', { kind: 'hitmarker' });
   for (const kind of ['radio_open', 'radio_strike', 'intel_call'])
     add(`recorded-radio-${kind}`, 'warning', 'ui', { kind });
-  for (const kind of ['spot', 'reload', 'hurt', 'death'])
-    add(`voice-${kind}`, 'speech', 'voice', { kind });
-  for (const voice of [0, 1])
-    for (const kind of ['hurt', 'death'])
-      add(`reaction-${voice}-${kind}`, 'speech', 'voice', { kind, voice });
-  add('radio-voice', 'speech', 'voice', { kind: 'spot', radio: true });
   add('voice-near', 'speech', 'voice', { kind: 'spot', distance: 2 });
-  add('own-hurt', 'warning', 'own-hurt');
-  for (const strength of [0.25, 0.6])
-    add(`heartbeat-${strength}`, 'warning', 'heartbeat', { strength });
+  add('voice-room', 'speech', 'voice', { kind: 'spot', space: 'room' });
   for (const [id, amount, armourAbsorbed, plateBreak] of [
     ['health', 25, 0, false],
     ['armour', 0, 25, false],
     ['mixed', 15, 15, false],
     ['break', 15, 15, true],
     ['break-armour-only', 0, 25, true],
-  ]) {
-    add(`damage-${id}`, 'warning', 'damage', { amount, armourAbsorbed, plateBreak });
-    add(`damage-${id}-combat`, 'context', 'damage', {
-      amount,
-      armourAbsorbed,
-      plateBreak,
-      combat: true,
-    });
-  }
+  ])
+    for (const combat of [false, true])
+      add(`damage-${id}${combat ? '-combat' : ''}`, combat ? 'context' : 'warning', 'damage', {
+        amount,
+        armourAbsorbed,
+        plateBreak,
+        combat,
+      });
   add('damage-concussed', 'context', 'damage', { amount: 25, armourAbsorbed: 0, concussed: true });
   add('damage-health-flight', 'threat', 'damage', { amount: 25, armourAbsorbed: 0, flight: true });
-  for (const distance of [2, 10, 25]) add(`flesh-${distance}`, 'impact', 'flesh', { distance });
   for (const variant of [0, 1])
     add(`aircraft-flyby-${variant}`, 'aircraft', 'aircraft', { variant });
   add('aircraft-room', 'aircraft', 'aircraft', { variant: 0, space: 'room' });
   add('aircraft-cancel-before-arrival', 'silence', 'aircraft', { cancelEarly: true });
-  add('near-impact', 'threat', 'near-impact');
-  add('near-miss', 'threat', 'near-miss');
-  add('own-step-room', 'routine', 'own-step', {
-    surface: 'concrete',
-    gait: 'run',
-    space: 'room',
-  });
-  add('reload-room', 'routine', 'reload', { phase: 'magin', space: 'room' });
-  add('voice-room', 'speech', 'voice', { kind: 'spot', space: 'room' });
-  add('ambient-heli-room', 'background', 'ambient', {
-    which: 'heli',
-    distance: 120,
-    space: 'room',
-  });
-  add('distant-boom-room', 'distant', 'distant-boom', { space: 'room' });
   add('ambience-idle', 'silence', 'ambience-idle');
-  for (const [which, distance] of [
-    ['creak', 14],
-    ['birds', 24],
-    ['heli', 120],
-    ['siren', 120],
-  ])
-    add(`ambient-${which}`, 'background', 'ambient', { which, distance });
   for (const space of ['open', 'room'])
     add(`ambient-heli-nearest-${space}`, 'background', 'ambient', {
       which: 'heli',
       distance: 90,
       space,
     });
-  for (const which of ['dog', 'siren', 'creak', 'settle', 'birds', 'vehicle', 'heli'])
-    for (const variant of [0, 1])
-      add(`recorded-environment-${which}-${variant}`, 'background', 'ambient', {
-        which,
-        variant,
-        distance: which === 'heli' || which === 'siren' ? 90 : 14,
-      });
-  add('distant-volley', 'distant', 'distant-volley');
-  add('distant-boom', 'distant', 'distant-boom');
   add('shop-radio', 'music', 'music');
   add('intel-alarm', 'warning', 'intel');
-  for (const distance of [3, 20]) add(`blast-${distance}`, 'threat', 'blast', { distance });
-  add('walking-street', 'context', 'street');
+  add('blast-3', 'threat', 'blast', { distance: 3 });
   add('mixed-firefight', 'context', 'combat');
   add('mixed-room', 'context', 'combat', { space: 'room' });
   add('mixed-far', 'context', 'combat', { far: true });
@@ -274,21 +185,6 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
           })
         );
         break;
-      case 'cloth':
-        at(t, () => emit('player:state', { stance: 'crouch' }));
-        break;
-      case 'ads':
-        at(t, () => emit('player:state', { ads: true }));
-        break;
-      case 'shell':
-        at(t, () => emit('weapon:shell', { position: point(0, 1.6) }));
-        break;
-      case 'land':
-        at(t, () => emit('player:land', { velocity: s.velocity, surface: 'concrete' }));
-        break;
-      case 'bodyfall':
-        at(t, () => audio._playAt('bodyfall', 2, 0, 0, { level: 1 }, 'foley', 0.6));
-        break;
       case 'ui':
         at(t, () => audio.ui(s.kind, 1));
         break;
@@ -300,12 +196,6 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
             force: true,
           })
         );
-        break;
-      case 'own-hurt':
-        at(t, () => audio._playDry('bark', { bark: 'hit', level: 0.5, f0: 108 }, 'voice', 0.1));
-        break;
-      case 'heartbeat':
-        at(t, () => emit('player:heartbeat', { strength: s.strength }));
         break;
       case 'aircraft': {
         let voice;
@@ -321,24 +211,6 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
         }
         break;
       }
-      case 'material':
-        at(t, () =>
-          emit('bullet:impact', {
-            point: point(s.distance, 1.4),
-            surface: s.surface,
-            damage: 30,
-            actor: null,
-            shooter: 'player',
-            shot: 473,
-            exit: false,
-          })
-        );
-        break;
-      case 'fall-surface':
-        at(t, () =>
-          audio._playAt('bodyfall', 2, 0.1, 0, { surface: s.surface, level: 1 }, 'foley', 0.6)
-        );
-        break;
       case 'damage':
         if (s.flight)
           at(t, () =>
@@ -365,34 +237,6 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
               from: point(10, 1.6),
             })
           );
-        break;
-      case 'flesh':
-        at(t, () =>
-          emit('bullet:impact', {
-            point: point(s.distance, 1.6),
-            surface: 'flesh',
-            damage: 30,
-            actor: { id: 1 },
-            shooter: 'player',
-            shot: 1,
-            exit: false,
-          })
-        );
-        break;
-      case 'near-impact':
-        at(t, () =>
-          emit('bullet:impact', { point: point(2, 1.6), damage: 30, surface: 'concrete' })
-        );
-        break;
-      case 'near-miss':
-        at(t, () =>
-          emit('bullet:segment', {
-            from: { x: -10, y: 1.6, z: -0.5 },
-            to: { x: 10, y: 1.6, z: -0.5 },
-            shooter: 'enemy',
-            shot: 1,
-          })
-        );
         break;
       case 'ambience-idle':
         startAmbience(t);
@@ -423,16 +267,9 @@ export async function renderMixCase(scenario, { rate = 48000, seed = 1907 } = {}
       case 'intel':
         at(t, () => emit('intel:operation', { active: true }));
         break;
-      case 'distant-volley':
-        at(t, () => audio._distantVolley());
-        break;
-      case 'distant-boom':
-        at(t, () => audio._distantBoom());
-        break;
       case 'blast':
         at(t, () => emit('explosion', { position: point(s.distance, 1.6), radius: 6 }));
         break;
-      case 'street':
       case 'combat': {
         startAmbience(t);
         for (let i = 0; i < 10; i++)

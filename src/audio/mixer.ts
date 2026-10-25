@@ -137,12 +137,11 @@ export class Mixer {
 
     /* ---- master chain (built first, everything hangs off it) ------ */
     this.masterSum = gain(actx, 1);
-    // Linked RMS and peak constraints share one lookahead and one applied
-    // gain. Output 1 exposes RMS-only audio for inspection, not another route.
+    // Linked RMS and peak constraints share one lookahead and one applied gain.
     this.energyMix = new AudioWorkletNode(actx, 'cod-energy-mix', {
       numberOfInputs: 1,
-      numberOfOutputs: 2,
-      outputChannelCount: [2, 2],
+      numberOfOutputs: 1,
+      outputChannelCount: [2],
       channelCount: 2,
       channelCountMode: 'explicit',
       channelInterpretation: 'speakers',
@@ -150,8 +149,6 @@ export class Mixer {
     this.masterGain = gain(actx, this.masterVolume);
 
     this.masterSum.connect(this.energyMix);
-    // Output 0: shared energy/peak-controlled mix. Output 1: RMS-only review
-    // tap, normally unconnected. Both use the SAME 5 ms audio delay.
     this.energyMix.connect(this.masterGain);
     this.masterGain.connect(actx.destination);
 

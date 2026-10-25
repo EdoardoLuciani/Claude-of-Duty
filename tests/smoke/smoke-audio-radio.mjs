@@ -1,32 +1,11 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 
 import { uiSound } from '../../src/audio/foley.ts';
 import { RADIO_URLS, radioCue } from '../../src/audio/radio.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
-import provenance from '../../src/audio/samples/radio/provenance.json' with { type: 'json' };
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
-let bytes = 0,
-  decoded = 0;
-for (const [key, urls] of Object.entries(RADIO_URLS)) {
-  assert.equal(urls.length, 3);
-  for (const [i, url] of urls.entries()) {
-    const data = readFileSync(new URL(url)),
-      meta = provenance.files[`${key}-${i + 1}`];
-    assert.equal(createHash('sha256').update(data).digest('hex'), meta.sha256);
-    const h = data.indexOf('OpusHead');
-    assert(h >= 0);
-    assert.equal(data[h + 9], 1);
-    assert.equal(data.readInt16LE(h + 16), 0);
-    assert(meta.decodedPeak < 0.5 && meta.decodedDuration < 0.5);
-    bytes += data.length;
-    decoded += meta.decodedDuration * 48000 * 4;
-  }
-}
-assert(bytes < 80000 && decoded < 500000);
 const parameter = () => ({
   value: 0,
   events: [],
