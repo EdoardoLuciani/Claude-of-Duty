@@ -1185,6 +1185,7 @@ export class AiSystem {
 
   emitReload(agent: Agent) {
     this.ctx.events.emit('weapon:reload', { weapon: 'ai_rifle', phase: 'start', actor: agent });
+    this.ctx.events.emit('ai:bark', { kind: 'reload', position: agent.position, voice: agent.id });
   }
 
   _grenadeLob(from: THREE.Vector3, target: THREE.Vector3) {
@@ -1245,9 +1246,9 @@ export class AiSystem {
 
   throwGrenade(agent: Agent, from: THREE.Vector3, target: THREE.Vector3) {
     const phys = this.phys;
-    if (!phys) return;
+    if (!phys) return false;
     const { dx, dz, dist, vy, vh, valid } = this._grenadeLob(from, target);
-    if (!valid) return;
+    if (!valid) return false;
     const mesh = grenadeMesh();
     this.root.add(mesh);
     const body = phys.addRigidBody({
@@ -1268,6 +1269,7 @@ export class AiSystem {
     });
     this._grenades.push({ body, mesh, fuse: GRENADE_FUSE, agent });
     agent.animator.fire(0.35);
+    return true;
   }
 
   _updateGrenades(dt: number) {

@@ -739,6 +739,12 @@ export class Agent {
       this._noteEvidence(player, EVIDENCE.VISUAL, 0);
       this.alertness = 1;
       if (this.awareness >= 1) {
+        if (!this.hasTarget)
+          this.ctx.events.emit('ai:bark', {
+            kind: 'spot',
+            position: this.position,
+            voice: this.id,
+          });
         this.hasTarget = true;
         this.target = player;
       }
@@ -3226,11 +3232,11 @@ export class Agent {
   }
 
   _throwGrenade(target: THREE.Vector3) {
+    const from = this._v.copy(this.animator.muzzleWorld);
+    if (!this.ai.throwGrenade(this, from, target)) return;
     this.grenadeCooldown = this.rng.range(16, 34);
     this.hasGrenade = false;
     this.ctx.events.emit('ai:bark', { kind: 'grenade', position: this.position, voice: this.id });
-    const from = this._v.copy(this.animator.muzzleWorld);
-    this.ai.throwGrenade(this, from, target);
   }
 
   /* ================================================================== */

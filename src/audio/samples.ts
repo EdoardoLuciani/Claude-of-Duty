@@ -1,6 +1,7 @@
-import type { ReloadPhase } from '../core/events.ts';
+import type { AiCalloutKind, ReloadPhase } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
 import { AIRCRAFT_URLS } from './aircraft.ts';
+import { CALLOUT_URLS, CALLOUT_MIX, calloutBank } from './callouts.ts';
 import { biquad, clamp, gain, series } from './dsp.ts';
 import {
   ENVIRONMENT_URLS,
@@ -105,6 +106,7 @@ const CONTACT_URLS = {
   ...HIT_URLS,
   ...FOLEY_URLS,
   ...REACTION_URLS,
+  ...CALLOUT_URLS,
   ...ENVIRONMENT_URLS,
   ...RADIO_URLS,
 };
@@ -258,6 +260,35 @@ export class WeaponSampleBank {
     const when = o.when ?? this.actx.currentTime;
     src.start(when);
     return { node: out, end: when + src.buffer.duration + 0.02, send: REACTION_MIX.send };
+  }
+
+  /** Local speech, natural rate and stable identity; caller owns interruption/cleanup. */
+  callout(
+    kind: AiCalloutKind,
+    voice: number,
+    rng: Rng,
+    o: { when?: number; level?: number } = {}
+  ): AudioVoice & { stop(): void } {
+    const buffer = this._nextTake(calloutBank(voice, kind), this.hitBuffers, this.hitIndices, rng);
+    const src = this.actx.createBufferSource();
+    src.buffer = buffer;
+    const out = gain(this.actx, CALLOUT_MIX.gain * (o.level ?? 1));
+    src.connect(out);
+    const when = o.when ?? this.actx.currentTime;
+    src.start(when);
+    let stopped = false;
+    return {
+      node: out,
+      end: when + buffer.duration + 0.02,
+      send: CALLOUT_MIX.send,
+      stop() {
+        if (stopped) return;
+        stopped = true;
+        src.stop();
+        src.disconnect();
+        out.disconnect();
+      },
+    };
   }
 
   /** Required finite background event; use recorded takes, not pitch-shifted pseudo-variants. */
