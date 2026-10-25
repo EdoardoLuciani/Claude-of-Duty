@@ -1277,6 +1277,7 @@ export class AiSystem {
       if (g.fuse > 0) continue;
       const p = g.body?.position ?? g.mesh.position;
       this.ctx.events.emit('explosion', {
+        kind: 'grenade',
         position: new THREE.Vector3(p.x, p.y, p.z),
         radius: GRENADE_RADIUS,
         damage: GRENADE_DAMAGE,
