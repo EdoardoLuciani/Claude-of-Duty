@@ -1,0 +1,315 @@
+{
+  "format": "mono 48000 Hz Opus, 128 kbps VBR; zero header gain",
+  "rights": "Owner explicitly confirmed publication clearance for the selected edited Urban Explosions clips and mixed before/after captures in the #112 implementation session. Original masters remain private. Retain applicable entitlement/licence records; media do not inherit the code licence.",
+  "design": "Four distinct bursts per bank from BOOM Urban Explosions Designed. Small neutral/crisp grenade versus large urban/crisp bomb, each with recorded close/mid/far perspectives. Source labels are design character, not verified M67 or aerial-bomb field recordings. Mono average, 25 Hz high-pass and 14 kHz low-pass; trim to 5 ms before the first 5 ms RMS block reaching 20% of the first-second maximum, retain decays, 1 ms entrance and 100 ms exit fades. Match the first 350 ms RMS across perspectives, subject to -2.5 dBFS sample-peak headroom. No pitch shifting, synthesis, compression or limiting. Runtime owns propagation, attenuation, occlusion and a restrained local reverb send.",
+  "sources": {
+    "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION NEUTRAL FAST CRISP Small 2.0.wav": {
+      "sha256": "f5eadd18caf565629c083109807bc08bff6333a72e61ca5cb1c0fb30ae5649ba"
+    },
+    "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION NEUTRAL FAST MED DISTANCE Small 2.0.wav": {
+      "sha256": "cd7537512d846562e4cbc77f153b6e42e3ff7572d7892e881a25903fc9d77915"
+    },
+    "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION NEUTRAL FAST FAR DISTANCE Small 2.0.wav": {
+      "sha256": "b7defe437f5a92fd3fdeaed4387a9ed57787df2950294f547c178e2c4a6e7930"
+    },
+    "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION URBAN FAST CRISP Large 2.0.wav": {
+      "sha256": "a78c8c56aedfbaa63e6c585f52eedbf5e504de9fa392abc1dff208244308effa"
+    },
+    "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION URBAN FAST MED DISTANCE Large 2.0.wav": {
+      "sha256": "f001548967a7d19f49e43016f67c3fc634f9c51a447bf54b00fb74d0131eb4e9"
+    },
+    "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION URBAN FAST FAR DISTANCE Large 2.0.wav": {
+      "sha256": "be1da57194346d82764a0061f4b38f554e3fc3ba7aab7c508b1eb10f7ef8cd70"
+    }
+  },
+  "files": {
+    "grenade-close-1": {
+      "source": "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION NEUTRAL FAST CRISP Small 2.0.wav",
+      "segmentStart": 0,
+      "trimFrames": 10320,
+      "start": 0.215,
+      "duration": 3.0544166666666666,
+      "level": 0.47151755258535105,
+      "targetAttackRmsDb": -12,
+      "attackRmsDb": -11.999999222748059,
+      "samplePeakDb": -6.53004252454247,
+      "sha256": "4436193cc651652f27600552ee907bccc6df99adb14b44e21641c607c0b36e2f"
+    },
+    "grenade-close-2": {
+      "source": "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION NEUTRAL FAST CRISP Small 2.0.wav",
+      "segmentStart": 6.145365,
+      "trimFrames": 720,
+      "start": 6.160365,
+      "duration": 3.1479583333333334,
+      "level": 0.5044971876451788,
+      "targetAttackRmsDb": -12,
+      "attackRmsDb": -12.000000253286988,
+      "samplePeakDb": -5.942825304582416,
+      "sha256": "726a26ac0a2bd9e9ba70cbc0a38f47b175b9eadab2a15681131eb63e8c88a83d"
+    },
+    "grenade-close-3": {
+      "source": "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION NEUTRAL FAST CRISP Small 2.0.wav",
+      "segmentStart": 12.186,
+      "trimFrames": 960,
+      "start": 12.206,
+      "duration": 3.3966875,
+      "level": 0.4962609641938766,
+      "targetAttackRmsDb": -12,
+      "attackRmsDb": -11.999998192209251,
+      "samplePeakDb": -6.085797583673244,
+      "sha256": "8a85229981d39085ca400eb96650804aa3c019a7c93c7d2f6f7273628a8ccdb3"
+    },
+    "grenade-close-4": {
+      "source": "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION NEUTRAL FAST CRISP Small 2.0.wav",
+      "segmentStart": 18.182624999999998,
+      "trimFrames": 720,
+      "start": 18.197625,
+      "duration": 4.249895833333333,
+      "level": 0.45975252520642307,
+      "targetAttackRmsDb": -12,
+      "attackRmsDb": -11.999999222748059,
+      "samplePeakDb": -6.749517446212422,
+      "sha256": "ce0c95d9eb183a26820e34e2bcdd5ad176c1ec73337a3f49d4c94e9f677fd467"
+    },
+    "grenade-mid-1": {
+      "source": "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION NEUTRAL FAST MED DISTANCE Small 2.0.wav",
+      "segmentStart": 0,
+      "trimFrames": 2880,
+      "start": 0.06,
+      "duration": 4.197979166666666,
+      "level": 0.8354250024565668,
+      "targetAttackRmsDb": -12,
+      "attackRmsDb": -16.49989923739834,
+      "samplePeakDb": -2.5000000877622415,
+      "sha256": "ee650a1e99504bb84126f49596db6e4856f3ea0fa20466baa1c4349eeb0e446f"
+    },
+    "grenade-mid-2": {
+      "source": "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION NEUTRAL FAST MED DISTANCE Small 2.0.wav",
+      "segmentStart": 5.759969,
+      "trimFrames": 1200,
+      "start": 5.784969,
+      "duration": 5.239875,
+      "level": 1.0041159547840546,
+      "targetAttackRmsDb": -12,
+      "attackRmsDb": -12.60307877320072,
+      "samplePeakDb": -2.5000000877622415,
+      "sha256": "3ea311e620f2637694d0aa10540029bb05c10bbed856070707621ce8e23754c0"
+    },
+    "grenade-mid-3": {
+      "source": "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION NEUTRAL FAST MED DISTANCE Small 2.0.wav",
+      "segmentStart": 11.667365,
+      "trimFrames": 4800,
+      "start": 11.767365,
+      "duration": 4.966479166666667,
+      "level": 0.769362870229744,
+      "targetAttackRmsDb": -12,
+      "attackRmsDb": -12.002371847244746,
+      "samplePeakDb": -2.5000000877622415,
+      "sha256": "83c0c6c9b023426b26413e35f84dfd55d46b6a930548f55e98867f619058a17a"
+    },
+    "grenade-mid-4": {
+      "source": "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION NEUTRAL FAST MED DISTANCE Small 2.0.wav",
+      "segmentStart": 18.196427,
+      "trimFrames": 480,
+      "start": 18.206427,
+      "duration": 5.191604166666667,
+      "level": 0.9038054404255913,
+      "targetAttackRmsDb": -12,
+      "attackRmsDb": -14.345262626556751,
+      "samplePeakDb": -2.5000000877622415,
+      "sha256": "54a973357f09af05fca5adba0a70edc84234ae96ce93f9d38ffbe780a25bcd18"
+    },
+    "grenade-far-1": {
+      "source": "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION NEUTRAL FAST FAR DISTANCE Small 2.0.wav",
+      "segmentStart": 0,
+      "trimFrames": 5760,
+      "start": 0.12,
+      "duration": 3.4478333333333335,
+      "level": 1.4720640974628763,
+      "targetAttackRmsDb": -12,
+      "attackRmsDb": -13.61827744451628,
+      "samplePeakDb": -2.5000000877622415,
+      "sha256": "4b3a8126add841016d034196bbefc5fd408afb8a138c6895982c018c0a3d7f0b"
+    },
+    "grenade-far-2": {
+      "source": "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION NEUTRAL FAST FAR DISTANCE Small 2.0.wav",
+      "segmentStart": 6.155,
+      "trimFrames": 720,
+      "start": 6.17,
+      "duration": 3.4775833333333335,
+      "level": 1.2408511160703242,
+      "targetAttackRmsDb": -12,
+      "attackRmsDb": -14.644976141232675,
+      "samplePeakDb": -2.499999397372391,
+      "sha256": "33722602ff4c908a2b694f57a9dd040344e72676c57f483e96a1d9c31a7b94c2"
+    },
+    "grenade-far-3": {
+      "source": "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION NEUTRAL FAST FAR DISTANCE Small 2.0.wav",
+      "segmentStart": 11.744,
+      "trimFrames": 720,
+      "start": 11.759,
+      "duration": 4.937729166666666,
+      "level": 1.0421030494679069,
+      "targetAttackRmsDb": -12,
+      "attackRmsDb": -12.387690836776981,
+      "samplePeakDb": -2.5000000877622415,
+      "sha256": "1a32f029757f6c96a9963c79243d14c597076535724f6ab8feab53e210c0ed00"
+    },
+    "grenade-far-4": {
+      "source": "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION NEUTRAL FAST FAR DISTANCE Small 2.0.wav",
+      "segmentStart": 18.429009999999998,
+      "trimFrames": 1440,
+      "start": 18.45901,
+      "duration": 3.5965208333333334,
+      "level": 1.1094489902960054,
+      "targetAttackRmsDb": -12,
+      "attackRmsDb": -13.176866832154664,
+      "samplePeakDb": -2.499999397372391,
+      "sha256": "b41e83cac7d879c5ce6efee7d84db715de9cf705d4df32e62717ba2c06f91086"
+    },
+    "bomb-close-1": {
+      "source": "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION URBAN FAST CRISP Large 2.0.wav",
+      "segmentStart": 0,
+      "trimFrames": 9840,
+      "start": 0.205,
+      "duration": 4.7865,
+      "level": 0.5261412451213772,
+      "targetAttackRmsDb": -10,
+      "attackRmsDb": -10.000000876970995,
+      "samplePeakDb": -5.577953346322499,
+      "sha256": "fbd66a78ab9581ed4dc8850d24ab3f92be2e2121a8e3bb95f1cd2c6e7cda5255"
+    },
+    "bomb-close-2": {
+      "source": "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION URBAN FAST CRISP Large 2.0.wav",
+      "segmentStart": 8.417416999999999,
+      "trimFrames": 1920,
+      "start": 8.457417,
+      "duration": 4.485458333333334,
+      "level": 0.5200538632679657,
+      "targetAttackRmsDb": -10,
+      "attackRmsDb": -10.00000005838476,
+      "samplePeakDb": -5.679033457289057,
+      "sha256": "ac3de53485ac872db6053275167877c8cfb89be4d765479a361517c11ef80cb5"
+    },
+    "bomb-close-3": {
+      "source": "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION URBAN FAST CRISP Large 2.0.wav",
+      "segmentStart": 15.246125,
+      "trimFrames": 2400,
+      "start": 15.296125,
+      "duration": 4.647520833333333,
+      "level": 0.5112822533393523,
+      "targetAttackRmsDb": -10,
+      "attackRmsDb": -10.00000005838476,
+      "samplePeakDb": -5.8267854271161745,
+      "sha256": "2200e01ff54110488fc9baf83522ce520e93d03d41898fa97d27fffe37b63d1a"
+    },
+    "bomb-close-4": {
+      "source": "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION URBAN FAST CRISP Large 2.0.wav",
+      "segmentStart": 22.927135,
+      "trimFrames": 720,
+      "start": 22.942135,
+      "duration": 4.94425,
+      "level": 0.5047387478756706,
+      "targetAttackRmsDb": -10,
+      "attackRmsDb": -10.00000005838476,
+      "samplePeakDb": -5.938667076374863,
+      "sha256": "54c4bbdd64393ab2842fc3431dd7d9ae7d683058c57dd3f57d431bb5c9305a6b"
+    },
+    "bomb-mid-1": {
+      "source": "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION URBAN FAST MED DISTANCE Large 2.0.wav",
+      "segmentStart": 0,
+      "trimFrames": 14160,
+      "start": 0.295,
+      "duration": 5.253333333333333,
+      "level": 0.7120992199088934,
+      "targetAttackRmsDb": -10,
+      "attackRmsDb": -10.000000876970995,
+      "samplePeakDb": -2.9491901094269224,
+      "sha256": "594e9e798ebaa86103b9ba70eceb8e622d89fa6a5a9342139a2accf9c59fca20"
+    },
+    "bomb-mid-2": {
+      "source": "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION URBAN FAST MED DISTANCE Large 2.0.wav",
+      "segmentStart": 8.983666999999999,
+      "trimFrames": 480,
+      "start": 8.993667,
+      "duration": 4.991041666666667,
+      "level": 0.7436825869605934,
+      "targetAttackRmsDb": -10,
+      "attackRmsDb": -10.000000876970995,
+      "samplePeakDb": -2.5722480208954557,
+      "sha256": "7393aa49d20ac56a0a0c70af3a6a6dc6ec77f836fe61451bab1b1a12bd5476d4"
+    },
+    "bomb-mid-3": {
+      "source": "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION URBAN FAST MED DISTANCE Large 2.0.wav",
+      "segmentStart": 17.309,
+      "trimFrames": 720,
+      "start": 17.324,
+      "duration": 4.973083333333333,
+      "level": 0.7498942093324559,
+      "targetAttackRmsDb": -10,
+      "attackRmsDb": -12.57761070377089,
+      "samplePeakDb": -2.5000000877622415,
+      "sha256": "684832cae2d227f692989a11974b2ab8d3d86059ed885f2adae7809e6982d98d"
+    },
+    "bomb-mid-4": {
+      "source": "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION URBAN FAST MED DISTANCE Large 2.0.wav",
+      "segmentStart": 25.074333,
+      "trimFrames": 480,
+      "start": 25.084333,
+      "duration": 6.084791666666667,
+      "level": 0.7498942093324559,
+      "targetAttackRmsDb": -10,
+      "attackRmsDb": -11.804017218943548,
+      "samplePeakDb": -2.5000000877622415,
+      "sha256": "a3fd4053df46e1b38e3bfc3d4eb27507e0f99cba0696ae5cf3cd26df82c81293"
+    },
+    "bomb-far-1": {
+      "source": "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION URBAN FAST FAR DISTANCE Large 2.0.wav",
+      "segmentStart": 0,
+      "trimFrames": 10560,
+      "start": 0.22,
+      "duration": 5.560125,
+      "level": 0.5592234964051216,
+      "targetAttackRmsDb": -10,
+      "attackRmsDb": -10.000000876970995,
+      "samplePeakDb": -5.048292152553858,
+      "sha256": "b007d3d7d1f9275a08dfd5bd4752c4fdf53991731eaacddffee6ee126166f8ba"
+    },
+    "bomb-far-2": {
+      "source": "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION URBAN FAST FAR DISTANCE Large 2.0.wav",
+      "segmentStart": 8.466698,
+      "trimFrames": 720,
+      "start": 8.481698,
+      "duration": 5.927854166666667,
+      "level": 0.6025312633414523,
+      "targetAttackRmsDb": -10,
+      "attackRmsDb": -10.00000005838476,
+      "samplePeakDb": -4.400408411931541,
+      "sha256": "952d2ded5c2a2ca11d86468941e673bc361e81630a380ab655b2ddffe98f89c6"
+    },
+    "bomb-far-3": {
+      "source": "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION URBAN FAST FAR DISTANCE Large 2.0.wav",
+      "segmentStart": 16.465812,
+      "trimFrames": 2640,
+      "start": 16.520812,
+      "duration": 6.035479166666667,
+      "level": 0.627052344210787,
+      "targetAttackRmsDb": -10,
+      "attackRmsDb": -10.00000005838476,
+      "samplePeakDb": -4.053923772420929,
+      "sha256": "06e317762c9d3432ebf683fefdd81554e4a8f295a236061d97646727212b54b3"
+    },
+    "bomb-far-4": {
+      "source": "Boom Library Urban Explosions Bundle/Urban Explosions - Designed/01 Urban Explosions DS Stereo/UEDS EXPLOSION URBAN FAST FAR DISTANCE Large 2.0.wav",
+      "segmentStart": 25.018833,
+      "trimFrames": 480,
+      "start": 25.028833,
+      "duration": 5.9850208333333335,
+      "level": 0.5948098733578245,
+      "targetAttackRmsDb": -10,
+      "attackRmsDb": -10.00000005838476,
+      "samplePeakDb": -4.5124363831297085,
+      "sha256": "c9cbc857b076ba948cd6c60816320b1c01159fa5d5d771b3093ac18cdbd50e47"
+    }
+  }
+}

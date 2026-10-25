@@ -1328,6 +1328,7 @@ export class WeaponSystem {
       this._viewmodel?.endGrenade();
       this.ui?.clearPrompt?.();
       this.ctx.events.emit('explosion', {
+        kind: 'grenade',
         position: this._boomPos.copy(this._throwOrigin()),
         radius: GRENADE_RADIUS,
         damage: GRENADE_DAMAGE,
@@ -1498,6 +1499,7 @@ export class WeaponSystem {
       if (g.fuse > 0) continue;
       const p = g.body?.position ?? g.mesh.position;
       this.ctx.events.emit('explosion', {
+        kind: 'grenade',
         position: this._boomPos.copy(p),
         radius: GRENADE_RADIUS,
         damage: GRENADE_DAMAGE,
