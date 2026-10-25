@@ -799,7 +799,7 @@ export class RigidBodyWorld {
     }
   }
 
-  get awakeCount() {
+  get awakeCount(): number {
     return this._awake;
   }
 }

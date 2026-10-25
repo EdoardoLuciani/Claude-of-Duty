@@ -29,7 +29,7 @@ const ALIASES: Record<string, string> = {
 };
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
 
-export function makeM4Model(gltf: GLTF) {
+export function makeM4Model(gltf: GLTF): M4Model {
   const scene = gltf.scene;
   const { root, animations, point } = authoredModel(gltf, 'M4_RIG', REQUIRED, scene);
   const model = {
@@ -54,7 +54,7 @@ export function makeM4Model(gltf: GLTF) {
     shell: { caseLen: 0.0447, rimR: 0.00478 },
     magSize: { len: 0.16 },
   };
-  const converted = convertWeaponScene(scene, (_source, material) => {
+  const converted = convertWeaponScene(scene, (_source, material): void => {
     for (const value of Object.values(material as object)) {
       if (value instanceof THREE.Texture) value.anisotropy = 8;
     }
@@ -62,13 +62,39 @@ export function makeM4Model(gltf: GLTF) {
   return { ...model, ...converted };
 }
 
-export async function loadM4() {
+export async function loadM4(): Promise<M4Model> {
   return makeM4Model(await new GLTFLoader().loadAsync(M4_URL));
 }
 
 /** Blender owns mechanisms and wrist/finger choreography; the existing recoil,
  * shared arm skin, upper/forearm IK and ammunition/event system remain in charge. */
-type M4Model = ReturnType<typeof makeM4Model>;
+type M4Model = {
+  materials: Set<THREE.Material>;
+  textures: Set<THREE.Texture>;
+  id: string;
+  label: string;
+  scene: THREE.Group;
+  root: THREE.Object3D;
+  animations: THREE.AnimationClip[];
+  reactiveFire: boolean;
+  handPoses: {
+    left: typeof handReference.sides.left.grip;
+    right: typeof handReference.sides.left.grip;
+  };
+  nodes: {
+    muzzle: [number, number, number];
+    eject: [number, number, number];
+    sight: [number, number, number];
+    ejectDir: number[];
+    gripR: { pos: number[]; finger: number[]; back: number[] };
+    gripL: { pos: number[]; finger: number[]; back: number[] };
+    magSeat: { pos: number[]; rot: number[] };
+    triggerPivot: { pos: [number, number, number]; rot: number[] };
+    handguard: { axis: number[]; dir: number[]; r: number; z0: number; z1: number };
+  };
+  shell: { caseLen: number; rimR: number };
+  magSize: { len: number };
+};
 type M4Arm = HandRig;
 export class M4Animation {
   model!: M4Model;
@@ -100,7 +126,7 @@ export class M4Animation {
     this.root = model.root;
     this.mixer = new THREE.AnimationMixer(this.root);
     this.actions = createAuthoredActions(this.mixer, model.animations);
-    const node = (name: string) => requiredNode(this.root, name);
+    const node = (name: string): THREE.Object3D => requiredNode(this.root, name);
     this.bolt = node('bolt');
     this.boltRest = this.bolt.position.clone();
     this.boltHead = node('bolt_head');

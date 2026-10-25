@@ -39,8 +39,8 @@ export class GameOverScreen {
     this.elapsed = 0;
     this.shown = 0;
     this.delay = 2.85;
-    this._click = () => this.restart();
-    this._key = (e) => {
+    this._click = (): void => this.restart();
+    this._key = (e): void => {
       if (!this.active || this.elapsed < this.delay) return;
       if (e.code !== 'Enter' && e.code !== 'Space') return;
       e.preventDefault();

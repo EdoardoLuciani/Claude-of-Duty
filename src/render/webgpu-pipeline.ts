@@ -2,8 +2,11 @@ import type { Camera, Object3D, Scene } from 'three';
 import { ClusteredLighting } from 'three/addons/lighting/ClusteredLighting.js';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { ao } from 'three/addons/tsl/display/GTAONode.js';
+import type GTAONode from 'three/addons/tsl/display/GTAONode.js';
 import { lut3D } from 'three/addons/tsl/display/Lut3DNode.js';
+import type Lut3DNode from 'three/addons/tsl/display/Lut3DNode.js';
 import { traa } from 'three/addons/tsl/display/TRAANode.js';
+import type TRAANode from 'three/addons/tsl/display/TRAANode.js';
 import {
   builtinAOContext,
   context,
@@ -26,6 +29,7 @@ import {
 import { Lighting, RenderPipeline, Vector2 } from 'three/webgpu';
 import { AgXToneMapping, Color, SRGBColorSpace } from 'three/webgpu';
 import type { Renderer, Node } from 'three/webgpu';
+import type { PassNode, RTTNode, TextureNode, UniformNode } from 'three/webgpu';
 
 import type { VolumetricBuildOptions } from '../sky/volumetrics.ts';
 import { createAoBilateralBlur } from './ao-blur-webgpu.ts';
@@ -82,7 +86,20 @@ export function createWorldViewPipeline(
     postPasses = [],
     afterDepth = null,
   }: PipelineOptions = {}
-) {
+): {
+  pipeline: RenderPipeline;
+  worldPass: PassNode;
+  viewPass: PassNode;
+  prePass: PassNode;
+  aoPass: GTAONode | null;
+  aoBlur: { textureNode: RTTNode; dispose(): void } | null;
+  taaPass: TRAANode | null;
+  exposure: UniformNode<'float', number>;
+  linearDepth: TextureNode;
+  detach: () => void;
+  render(): void;
+  dispose(): void;
+} {
   let aoPass = null,
     aoBlur = null,
     taaPass = null;
@@ -122,7 +139,7 @@ export function createWorldViewPipeline(
   ): void => {
     (hook as unknown as ViewRenderHook).call(viewScene, r, s, c, target);
   };
-  const beforeRender: ViewRenderHook = (r, s, c, target) => {
+  const beforeRender: ViewRenderHook = (r, s, c, target): void => {
     if (oldBefore) callViewHook(oldBefore, r, s, c, target);
     if (target !== viewPass.renderTarget) return;
     r.getClearColor(savedColor);
@@ -130,13 +147,13 @@ export function createWorldViewPipeline(
     r.setClearColor(0, 0);
   };
   const beforeView = beforeRender;
-  const afterView: ViewRenderHook = (r, s, c, target) => {
+  const afterView: ViewRenderHook = (r, s, c, target): void => {
     if (target === viewPass.renderTarget) r.setClearColor(savedColor, savedAlpha);
     if (oldAfter) callViewHook(oldAfter, r, s, c, target);
   };
   viewScene.onBeforeRender = beforeView as unknown as typeof viewScene.onBeforeRender;
   viewScene.onAfterRender = afterView as unknown as typeof viewScene.onAfterRender;
-  const detach = () => {
+  const detach = (): void => {
     if ((viewScene.onBeforeRender as unknown) === beforeView) viewScene.onBeforeRender = oldBefore;
     if ((viewScene.onAfterRender as unknown) === afterView) viewScene.onAfterRender = oldAfter;
   };
@@ -148,7 +165,7 @@ export function createWorldViewPipeline(
   // isolates the prepass render-list/light cache from the lit world pass.
   prePass.lighting = new Lighting();
   prePass.lighting.enabled = false;
-  scene.traverse((object: Object3D) => {
+  scene.traverse((object: Object3D): void => {
     if ((object as Object3D & { isLight?: boolean }).isLight) object.layers.enable(1);
   });
   prePass.setLayers({ mask: 2 } as import('three').Layers);
@@ -159,7 +176,10 @@ export function createWorldViewPipeline(
     renderer: Renderer | null;
   }) => void;
   const preClear = new Color();
-  prePass.updateBefore = function (this: typeof prePass, frame: { renderer: Renderer | null }) {
+  prePass.updateBefore = function (
+    this: typeof prePass,
+    frame: { renderer: Renderer | null }
+  ): undefined {
     const r = frame.renderer!,
       alpha = r.getClearAlpha();
     r.getClearColor(preClear);
@@ -194,7 +214,7 @@ export function createWorldViewPipeline(
     // inherited AO context. One pass-aware uniform keeps the same native UVs.
     const aoSize = uniform(new Vector2())
       .setGroup(renderGroup)
-      .onRenderUpdate(({ renderer }, self) => {
+      .onRenderUpdate(({ renderer }, self): undefined => {
         const target = renderer!.getRenderTarget();
         if (target) self.value.set(target.width, target.height);
         else renderer!.getDrawingBufferSize(self.value);
@@ -264,7 +284,7 @@ export function createWorldViewPipeline(
     : lit;
   // Publish current depth before any world soft particles or haze, even without
   // AO. PassNode deduplicates this dependency: exactly one prepass per frame.
-  const output = Fn(() => {
+  const output = Fn((): Node<'vec4'> | Lut3DNode => {
     prePass.getTextureNode('linearDepth').sample(screenUV).toVar();
     if (aoBlur) aoBlur.textureNode.sample(screenUV).toVar();
     if (fogPass) fogPass.computeNode.toStack();
@@ -283,13 +303,13 @@ export function createWorldViewPipeline(
     exposure,
     linearDepth: prePass.getTextureNode('linearDepth'),
     detach,
-    render() {
+    render(): void {
       // Resize before any draw/binding lookup, not from the lights' late update.
       renderer.getDrawingBufferSize(clusterSize);
       worldLights.setSize(clusterSize.x, clusterSize.y);
       pipeline.render();
     },
-    dispose() {
+    dispose(): void {
       detach();
       pipeline.dispose();
       for (const node of intermediates) node.dispose();

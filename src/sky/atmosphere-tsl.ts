@@ -1,4 +1,6 @@
 import type { Texture } from 'three';
+import type { Vector3 } from 'three';
+import type { FnNode } from 'three/src/nodes/tsl/TSLCore.js';
 import {
   Fn,
   If,
@@ -21,6 +23,7 @@ import {
   vec3,
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
+import type { ConstNode, JoinNode, VarNode } from 'three/webgpu';
 
 import { ATMO } from './atmosphere.ts';
 
@@ -35,11 +38,11 @@ const SK_RAYLEIGH = vec3(ATMO.rayleigh[0], ATMO.rayleigh[1], ATMO.rayleigh[2]);
 const SK_OZONE = vec3(ATMO.ozone[0], ATMO.ozone[1], ATMO.ozone[2]);
 const SK_GROUND_ALBEDO = float(ATMO.groundAlbedo);
 
-const safeAcos = (x: Node<'float'>) => acos(clamp(x, -1, 1));
+const safeAcos = (x: Node<'float'>): Node<'float'> => acos(clamp(x, -1, 1));
 
 /** Nearest positive hit of a ray against a sphere centred on the origin. */
 export const skRaySphere = Fn<[Node<'vec3'>, Node<'vec3'>, Node<'float'>], Node<'float'>>(
-  ([ro, rd, rad]) => {
+  ([ro, rd, rad]): Node<'float'> => {
     const b = dot(ro, rd);
     const c = dot(ro, ro).sub(rad.mul(rad));
     const d = b.mul(b).sub(c);
@@ -54,36 +57,40 @@ export const skRaySphere = Fn<[Node<'vec3'>, Node<'vec3'>, Node<'float'>], Node<
 );
 
 /** Rayleigh scattering coefficient at a point, in Mm^-1. */
-export const skRayleighS = Fn<[Node<'vec3'>], Node<'vec3'>>(([pos]) => {
+export const skRayleighS = Fn<[Node<'vec3'>], Node<'vec3'>>(([pos]): Node<'vec3'> => {
   const altKM = length(pos).sub(SK_GROUND_R).mul(1000);
   return SK_RAYLEIGH.mul(exp(altKM.negate().div(ATMO.rayleighScaleHeightKM)));
 });
 
 /** Mie scattering coefficient (aerosol multiplier included) at a point. */
-export const skMieS = Fn<[Node<'vec3'>, Node<'float'>], Node<'float'>>(([pos, mieScale]) => {
-  const altKM = length(pos).sub(SK_GROUND_R).mul(1000);
-  return float(ATMO.mieScattering)
-    .mul(mieScale)
-    .mul(exp(altKM.negate().div(ATMO.mieScaleHeightKM)));
-});
+export const skMieS = Fn<[Node<'vec3'>, Node<'float'>], Node<'float'>>(
+  ([pos, mieScale]): Node<'float'> => {
+    const altKM = length(pos).sub(SK_GROUND_R).mul(1000);
+    return float(ATMO.mieScattering)
+      .mul(mieScale)
+      .mul(exp(altKM.negate().div(ATMO.mieScaleHeightKM)));
+  }
+);
 
 /** Total extinction — Rayleigh + Mie (scatter+absorb) + ozone tent. */
-export const skExtinction = Fn<[Node<'vec3'>, Node<'float'>], Node<'vec3'>>(([pos, mieScale]) => {
-  const altKM = length(pos).sub(SK_GROUND_R).mul(1000);
-  const rDen = exp(altKM.negate().div(ATMO.rayleighScaleHeightKM));
-  const mDen = exp(altKM.negate().div(ATMO.mieScaleHeightKM));
-  const rayon = SK_RAYLEIGH.mul(rDen);
-  const mie = float(ATMO.mieScattering + ATMO.mieAbsorption)
-    .mul(mieScale)
-    .mul(mDen);
-  const oz = SK_OZONE.mul(
-    max(0, float(1).sub(abs(altKM.sub(ATMO.ozoneCentreKM)).div(ATMO.ozoneWidthKM)))
-  );
-  return rayon.add(vec3(mie)).add(oz);
-});
+export const skExtinction = Fn<[Node<'vec3'>, Node<'float'>], Node<'vec3'>>(
+  ([pos, mieScale]): Node<'vec3'> => {
+    const altKM = length(pos).sub(SK_GROUND_R).mul(1000);
+    const rDen = exp(altKM.negate().div(ATMO.rayleighScaleHeightKM));
+    const mDen = exp(altKM.negate().div(ATMO.mieScaleHeightKM));
+    const rayon = SK_RAYLEIGH.mul(rDen);
+    const mie = float(ATMO.mieScattering + ATMO.mieAbsorption)
+      .mul(mieScale)
+      .mul(mDen);
+    const oz = SK_OZONE.mul(
+      max(0, float(1).sub(abs(altKM.sub(ATMO.ozoneCentreKM)).div(ATMO.ozoneWidthKM)))
+    );
+    return rayon.add(vec3(mie)).add(oz);
+  }
+);
 
 /** Cornette-Shanks, the well-behaved cousin of Henyey-Greenstein. */
-export const skMiePhase = Fn<[Node<'float'>], Node<'float'>>(([cosTheta]) => {
+export const skMiePhase = Fn<[Node<'float'>], Node<'float'>>(([cosTheta]): Node<'float'> => {
   const g = 0.8;
   const k = ((3 / (8 * PI)) * (1 - g * g)) / (2 + g * g);
   return float(k)
@@ -91,22 +98,24 @@ export const skMiePhase = Fn<[Node<'float'>], Node<'float'>>(([cosTheta]) => {
     .div(pow(float(1 + g * g).sub(cosTheta.mul(2 * g)), 1.5));
 });
 
-export const skRayleighPhase = Fn<[Node<'float'>], Node<'float'>>(([cosTheta]) =>
+export const skRayleighPhase = Fn<[Node<'float'>], Node<'float'>>(([cosTheta]): Node<'float'> =>
   float(3 / (16 * PI)).mul(float(1).add(cosTheta.mul(cosTheta)))
 );
 
 /** Henyey-Greenstein — used by the ground fog, exposed here so both agree. */
-export const skHG = Fn<[Node<'float'>, Node<'float'>], Node<'float'>>(([cosTheta, g]) => {
-  const g2 = g.mul(g);
-  const d = max(1e-4, float(1).add(g2).sub(cosTheta.mul(g).mul(2)));
-  return float(1)
-    .sub(g2)
-    .div(
-      float(4 * PI)
-        .mul(d)
-        .mul(sqrt(d))
-    );
-});
+export const skHG = Fn<[Node<'float'>, Node<'float'>], Node<'float'>>(
+  ([cosTheta, g]): Node<'float'> => {
+    const g2 = g.mul(g);
+    const d = max(1e-4, float(1).add(g2).sub(cosTheta.mul(g).mul(2)));
+    return float(1)
+      .sub(g2)
+      .div(
+        float(4 * PI)
+          .mul(d)
+          .mul(sqrt(d))
+      );
+  }
+);
 
 /**
  * Build the TSL atmosphere lookups bound to the shared uniform/texture records.
@@ -127,25 +136,31 @@ interface AtmosphereLookup {
   skMultiScatter: (pos: Node<'vec3'>, dir: Node<'vec3'>) => Node<'vec3'>;
 }
 
-export function createAtmosphereNodes(shared: AtmosphereNodesContext) {
+export function createAtmosphereNodes(shared: AtmosphereNodesContext): {
+  skLutUv: FnNode<[Vector3 | Node<'vec3'>, Vector3 | Node<'vec3'>], Node<'vec2'>>;
+  skTransmittance: FnNode<[Vector3 | Node<'vec3'>, Vector3 | Node<'vec3'>], Node<'vec3'>>;
+  skMultiScatter: FnNode<[Vector3 | Node<'vec3'>, Vector3 | Node<'vec3'>], Node<'vec3'>>;
+} {
   const { transmittanceTex, multiScatterTex } = shared;
 
-  const skLutUv = Fn<[Node<'vec3'>, Node<'vec3'>], Node<'vec2'>>(([pos, dir]) => {
-    const h = length(pos);
-    const mu = dot(dir, pos.div(h));
-    return vec2(
-      clamp(mu.mul(0.5).add(0.5), 0, 1),
-      clamp(h.sub(SK_GROUND_R).div(SK_TOP_R.sub(SK_GROUND_R)), 0, 1)
-    );
-  });
+  const skLutUv = Fn<[Node<'vec3'>, Node<'vec3'>], Node<'vec2'>>(
+    ([pos, dir]): VarNode<'vec2', JoinNode<'vec2'>> => {
+      const h = length(pos);
+      const mu = dot(dir, pos.div(h));
+      return vec2(
+        clamp(mu.mul(0.5).add(0.5), 0, 1),
+        clamp(h.sub(SK_GROUND_R).div(SK_TOP_R.sub(SK_GROUND_R)), 0, 1)
+      );
+    }
+  );
 
   /** Transmittance from pos along dir out to the top of the atmosphere. */
   const skTransmittance = Fn<[Node<'vec3'>, Node<'vec3'>], Node<'vec3'>>(
-    ([pos, dir]) => texture(transmittanceTex, skLutUv(pos, dir)).rgb
+    ([pos, dir]): Node<'vec3'> => texture(transmittanceTex, skLutUv(pos, dir)).rgb
   );
 
   const skMultiScatter = Fn<[Node<'vec3'>, Node<'vec3'>], Node<'vec3'>>(
-    ([pos, dir]) => texture(multiScatterTex, skLutUv(pos, dir)).rgb
+    ([pos, dir]): Node<'vec3'> => texture(multiScatterTex, skLutUv(pos, dir)).rgb
   );
 
   return { skLutUv, skTransmittance, skMultiScatter };
@@ -160,67 +175,82 @@ export function createAtmosphereNodes(shared: AtmosphereNodesContext) {
 export function createRaymarchSky(
   { skTransmittance, skMultiScatter, uMieScale }: AtmosphereLookup & { uMieScale: Node<'float'> },
   steps: number
-) {
+): FnNode<
+  [
+    Vector3 | Node<'vec3'>,
+    Vector3 | Node<'vec3'>,
+    Vector3 | Node<'vec3'>,
+    Vector3 | Node<'vec3'>,
+    Vector3 | Node<'vec3'>,
+    Vector3 | Node<'vec3'>,
+  ],
+  Node<'vec3'>
+> {
   return Fn<
     [Node<'vec3'>, Node<'vec3'>, Node<'vec3'>, Node<'vec3'>, Node<'vec3'>, Node<'vec3'>],
     Node<'vec3'>
-  >(([pos, rayDir, sunDir, sunIrr, moonDir, moonIrr]) => {
-    const topT = skRaySphere(pos, rayDir, SK_TOP_R);
-    const groundT = skRaySphere(pos, rayDir, SK_GROUND_R);
-    const tMax = groundT.lessThan(0).select(topT, groundT);
-    const lum = vec3(0).toVar();
-    const trans = vec3(1).toVar();
-    const t = float(0).toVar();
+  >(
+    ([pos, rayDir, sunDir, sunIrr, moonDir, moonIrr]): VarNode<
+      'vec3',
+      VarNode<'vec3', ConstNode<'vec3', Vector3>>
+    > => {
+      const topT = skRaySphere(pos, rayDir, SK_TOP_R);
+      const groundT = skRaySphere(pos, rayDir, SK_GROUND_R);
+      const tMax = groundT.lessThan(0).select(topT, groundT);
+      const lum = vec3(0).toVar();
+      const trans = vec3(1).toVar();
+      const t = float(0).toVar();
 
-    If(tMax.greaterThan(0), () => {
-      const cS = dot(rayDir, sunDir);
-      const cM = dot(rayDir, moonDir);
-      const mieS = skMiePhase(cS);
-      const rayS = skRayleighPhase(cS);
-      const mieM = skMiePhase(cM);
-      const rayM = skRayleighPhase(cM);
+      If(tMax.greaterThan(0), (): void => {
+        const cS = dot(rayDir, sunDir);
+        const cM = dot(rayDir, moonDir);
+        const mieS = skMiePhase(cS);
+        const rayS = skRayleighPhase(cS);
+        const mieM = skMiePhase(cM);
+        const rayM = skRayleighPhase(cM);
 
-      Loop(steps, ({ i }) => {
-        // 0.3 rather than 0.5 biases samples toward the dense lower atmosphere,
-        // which is where all the interesting colour is.
-        const nt = i.toFloat().add(0.3).div(steps).mul(tMax).toVar();
-        const dt = nt.sub(t).toVar();
-        t.assign(nt);
-        const p = pos.add(rayDir.mul(t)).toVar();
+        Loop(steps, ({ i }): void => {
+          // 0.3 rather than 0.5 biases samples toward the dense lower atmosphere,
+          // which is where all the interesting colour is.
+          const nt = i.toFloat().add(0.3).div(steps).mul(tMax).toVar();
+          const dt = nt.sub(t).toVar();
+          t.assign(nt);
+          const p = pos.add(rayDir.mul(t)).toVar();
 
-        const rs = skRayleighS(p);
-        const ms = skMieS(p, uMieScale);
-        const ext = skExtinction(p, uMieScale);
-        const sampleT = exp(dt.negate().mul(ext)).toVar();
+          const rs = skRayleighS(p);
+          const ms = skMieS(p, uMieScale);
+          const ext = skExtinction(p, uMieScale);
+          const sampleT = exp(dt.negate().mul(ext)).toVar();
 
-        const tSun = skTransmittance(p, sunDir);
-        const psiSun = skMultiScatter(p, sunDir);
-        const inScatter = rs
-          .mul(rayS.mul(tSun).add(psiSun))
-          .add(vec3(ms).mul(mieS.mul(tSun).add(psiSun)))
-          .mul(sunIrr)
-          .toVar();
+          const tSun = skTransmittance(p, sunDir);
+          const psiSun = skMultiScatter(p, sunDir);
+          const inScatter = rs
+            .mul(rayS.mul(tSun).add(psiSun))
+            .add(vec3(ms).mul(mieS.mul(tSun).add(psiSun)))
+            .mul(sunIrr)
+            .toVar();
 
-        const tMoon = skTransmittance(p, moonDir);
-        const psiMoon = skMultiScatter(p, moonDir);
-        inScatter.addAssign(
-          rs
-            .mul(rayM.mul(tMoon).add(psiMoon))
-            .add(vec3(ms).mul(mieM.mul(tMoon).add(psiMoon)))
-            .mul(moonIrr)
-        );
+          const tMoon = skTransmittance(p, moonDir);
+          const psiMoon = skMultiScatter(p, moonDir);
+          inScatter.addAssign(
+            rs
+              .mul(rayM.mul(tMoon).add(psiMoon))
+              .add(vec3(ms).mul(mieM.mul(tMoon).add(psiMoon)))
+              .mul(moonIrr)
+          );
 
-        // Analytic integration of the segment (Hillaire eq. 8): exact for
-        // constant media over dt, and it never overshoots a large optical depth.
-        lum.addAssign(trans.mul(inScatter.sub(inScatter.mul(sampleT))).div(max(ext, vec3(1e-8))));
-        trans.mulAssign(sampleT);
+          // Analytic integration of the segment (Hillaire eq. 8): exact for
+          // constant media over dt, and it never overshoots a large optical depth.
+          lum.addAssign(trans.mul(inScatter.sub(inScatter.mul(sampleT))).div(max(ext, vec3(1e-8))));
+          trans.mulAssign(sampleT);
+        });
       });
-    });
 
-    // No pi here. The integral above is sigma_s * P(theta) * E with E in scene
-    // light units, which *is* a radiance in the buffer's own convention.
-    return lum;
-  });
+      // No pi here. The integral above is sigma_s * P(theta) * E with E in scene
+      // light units, which *is* a radiance in the buffer's own convention.
+      return lum;
+    }
+  );
 }
 
 /** Shared sky-view LUT lookup. Azimuth is relative to the sun. */
@@ -230,15 +260,15 @@ export function createSkyViewLookup({
 }: {
   uViewPos: Node<'vec3'>;
   skyViewTex: Texture;
-}) {
-  return Fn<[Node<'vec3'>, Node<'vec3'>], Node<'vec3'>>(([rayDir, sunDir]) => {
+}): FnNode<[Vector3 | Node<'vec3'>, Vector3 | Node<'vec3'>], Node<'vec3'>> {
+  return Fn<[Node<'vec3'>, Node<'vec3'>], Node<'vec3'>>(([rayDir, sunDir]): Node<'vec3'> => {
     const h = length(uViewPos);
     const up = uViewPos.div(h);
     const horizon = safeAcos(sqrt(h.mul(h).sub(SK_GROUND_R.mul(SK_GROUND_R))).div(h));
     const altitude = horizon.sub(safeAcos(dot(rayDir, up)));
     const azimuth = float(0).toVar();
 
-    If(abs(altitude).lessThan(0.5 * PI - 1e-4), () => {
+    If(abs(altitude).lessThan(0.5 * PI - 1e-4), (): void => {
       const right = cross(sunDir, up).toVar();
       const fwd = cross(up, right).toVar();
       const proj = normalize(rayDir.sub(up.mul(dot(rayDir, up)))).toVar();
@@ -256,8 +286,8 @@ export function createSkyViewLookup({
 
 // TSL exposes a one-argument atan; GLSL's two-argument form is composed from
 // the quadrant test so the LUT azimuth wraps exactly as the bake wrote it.
-function atan2Node(y: Node<'float'>, x: Node<'float'>) {
-  return Fn<[Node<'float'>, Node<'float'>], Node<'float'>>(([yy, xx]) => {
+function atan2Node(y: Node<'float'>, x: Node<'float'>): Node<'float'> {
+  return Fn<[Node<'float'>, Node<'float'>], Node<'float'>>(([yy, xx]): Node<'float'> => {
     const base = yy.div(xx).atan();
     return xx.lessThan(0).select(yy.greaterThanEqual(0).select(base.add(PI), base.sub(PI)), base);
   })(y, x);

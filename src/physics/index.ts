@@ -497,7 +497,7 @@ export class PhysicsSystem {
     this.rng = ctx.rng.fork();
     this.ballistics.rng = this.rng;
 
-    this._onExplosion = (e) => this.explode(e);
+    this._onExplosion = (e): void => this.explode(e);
     ctx.events.on('explosion', this._onExplosion);
 
     // Dev escape hatch: ?physdebug=1 turns the collision wireframe on from the
@@ -512,7 +512,7 @@ export class PhysicsSystem {
       if (demoRequested) {
         this._pendingDemo = true;
         // Shots re-pose the camera after boot; respawn in front of the new view.
-        ctx.events.on('shot:applied', () => {
+        ctx.events.on('shot:applied', (): void => {
           this.bodies.clear();
           for (const rd of this.ragdolls) rd.dispose();
           this.ragdolls.length = 0;
@@ -553,7 +553,7 @@ export class PhysicsSystem {
     const ids: number[] = [];
     if (!root) return ids;
     root.updateWorldMatrix(true, true);
-    root.traverse((o: THREE.Object3D) => {
+    root.traverse((o: THREE.Object3D): void => {
       if (!isCollisionMesh(o)) return;
       if (o.userData?.collision === false || o.userData?.noCollision) return;
       const metadataSurface: unknown = o.userData?.surface;
@@ -574,12 +574,12 @@ export class PhysicsSystem {
     return id >= 0 ? this.staticWorld.removeObject(id) : false;
   }
 
-  rebuildStatic() {
+  rebuildStatic(): void {
     this.staticWorld.build();
     this._syncStats();
   }
 
-  get triangleCount() {
+  get triangleCount(): number {
     return this.staticWorld.triCount;
   }
 
@@ -1233,7 +1233,7 @@ export class PhysicsSystem {
   /* Characters                                                         */
   /* ================================================================== */
 
-  createCharacter(opts = {}) {
+  createCharacter(opts = {}): CharacterController {
     const c = new CharacterController(this.staticWorld, {
       radius: UNITS.playerRadius,
       height: UNITS.playerHeight,
@@ -1267,7 +1267,7 @@ export class PhysicsSystem {
     this.ballistics.publish(shot);
   }
 
-  nextShotId() {
+  nextShotId(): number {
     return ++this._shotId;
   }
 
@@ -1485,7 +1485,7 @@ export class PhysicsSystem {
     const rd = this.createRagdoll({ ...opts, bones: spec, transform: undefined });
     rd.adoptSkeleton(
       skeleton,
-      boneMap.map((bone) => bone ?? null)
+      boneMap.map((bone): THREE.Bone<THREE.Object3DEventMap> | null => bone ?? null)
     );
     rd.actor = opts.actor ?? skinnedMesh;
     return rd;
@@ -1569,7 +1569,7 @@ export class PhysicsSystem {
     this.stats.colliders = this.colliders.length;
   }
 
-  _syncStats() {
+  _syncStats(): void {
     this.stats.triangles = this.staticWorld.triCount;
     this.stats.nodes = this.staticWorld.nodeCount;
     this.stats.buildMs = this.staticWorld.buildMs;
@@ -1594,11 +1594,13 @@ export class PhysicsSystem {
   async _ensureDebugView(): Promise<import('./debug.ts').PhysicsDebugView | null> {
     if (this.debug) return this.debug;
     if (!this._debugPromise) {
-      this._debugPromise = import('./debug.ts').then(({ PhysicsDebugView }) => {
-        if (this._disposed || !this.ctx.scene) return null;
-        this.debug = new PhysicsDebugView(this.ctx.scene);
-        return this.debug;
-      });
+      this._debugPromise = import('./debug.ts').then(
+        ({ PhysicsDebugView }): import('./debug.ts').PhysicsDebugView | null => {
+          if (this._disposed || !this.ctx.scene) return null;
+          this.debug = new PhysicsDebugView(this.ctx.scene);
+          return this.debug;
+        }
+      );
     }
     return this._debugPromise;
   }
@@ -1613,7 +1615,7 @@ export class PhysicsSystem {
     opts: { triangles?: boolean; nodes?: boolean; rays?: boolean; radius?: number } = {}
   ): boolean {
     if (on && !this.debug) {
-      void this._ensureDebugView().then((view) => {
+      void this._ensureDebugView().then((view): void => {
         if (view) this.setDebugDraw(true, opts);
       });
       return false;
@@ -1646,7 +1648,7 @@ export class PhysicsSystem {
    * wireframe on. Purely a verification aid for whoever is looking at the
    * collision system; nothing in the game calls it.
    */
-  _spawnDemo() {
+  _spawnDemo(): PhysicsStats {
     this.setDebugDraw(true, { triangles: true, radius: 30 });
     const cam = this.ctx.camera;
     if (!cam) return this.stats;

@@ -16,7 +16,9 @@ export function isNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 export function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item: unknown) => typeof item === 'string');
+  return (
+    Array.isArray(value) && value.every((item: unknown): item is string => typeof item === 'string')
+  );
 }
 export function isNumberArray(value: unknown): value is number[] {
   return Array.isArray(value) && value.every(isNumber);

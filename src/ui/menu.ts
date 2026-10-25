@@ -55,19 +55,19 @@ export class PauseMenu {
     for (const p of PRESETS) {
       const b = el('button', null, seg, p);
       b.type = 'button';
-      b.addEventListener('click', () => this.setQuality(p));
+      b.addEventListener('click', (): void => this.setQuality(p));
       this.qBtns.push(b);
     }
     el('div', 'hint', this.rows, 'PRESET CHANGE RESTARTS THE RUN');
 
     // ---- sensitivity -----------------------------------------------------
-    this.sens = this._slider('Mouse Sensitivity', 0.2, 3.0, 0.01, (v) => {
+    this.sens = this._slider('Mouse Sensitivity', 0.2, 3.0, 0.01, (v): string => {
       this.ctx.config.sensitivity = 0.0022 * v;
       return v.toFixed(2);
     });
 
     // ---- field of view ---------------------------------------------------
-    this.fov = this._slider('Field Of View', 65, 120, 1, (v) => {
+    this.fov = this._slider('Field Of View', 65, 120, 1, (v): string => {
       this.ctx.config.fov = v;
       const cam = this.ctx.camera;
       if (cam) {
@@ -78,7 +78,7 @@ export class PauseMenu {
     });
 
     // ---- firing camera shake ---------------------------------------------
-    this.shake = this._slider('Firing Camera Shake', 0, 1, 0.05, (v) => {
+    this.shake = this._slider('Firing Camera Shake', 0, 1, 0.05, (v): string => {
       this.ctx.config.firingShake = v;
       return v <= 1e-6 ? 'OFF' : `${Math.round(v * 100)}%`;
     });
@@ -94,7 +94,7 @@ export class PauseMenu {
     for (const [label, val] of invertOptions) {
       const b = el('button', null, invSeg, label);
       b.type = 'button';
-      b.addEventListener('click', () => {
+      b.addEventListener('click', (): void => {
         this.ctx.config.invertY = val;
         this.syncFromConfig();
       });
@@ -105,10 +105,10 @@ export class PauseMenu {
     const btns = el('div', 'ow-btns', inner);
     this.resumeBtn = el('button', 'ow-btn primary', btns, 'Resume');
     this.resumeBtn.type = 'button';
-    this.resumeBtn.addEventListener('click', () => this.close());
+    this.resumeBtn.addEventListener('click', (): void => this.close());
     const reset = el('button', 'ow-btn', btns, 'Defaults');
     reset.type = 'button';
-    reset.addEventListener('click', () => {
+    reset.addEventListener('click', (): void => {
       this.sens.set(1);
       this.fov.set(80);
       this.shake.set(1);
@@ -173,7 +173,7 @@ export class PauseMenu {
       setStyle(knob, 'left', (t * 100).toFixed(2) + '%');
       setText(val, apply(v) ?? String(v));
     };
-    input.addEventListener('input', () => paint(parseFloat(input.value)));
+    input.addEventListener('input', (): void => paint(parseFloat(input.value)));
     const api = {
       set: (v: number): void => {
         const c = clamp(v, min, max);

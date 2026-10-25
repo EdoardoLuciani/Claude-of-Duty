@@ -60,7 +60,11 @@ export function explosionDistanceGain(distance: number, kind: ExplosionKind): nu
   return reference / Math.max(reference, distance);
 }
 
-export function explosionBlend(distance: number) {
+export function explosionBlend(distance: number): {
+  readonly from: 'mid' | 'close';
+  readonly to: 'mid' | 'far';
+  readonly mix: number;
+} {
   const far = distance > EXPLOSION_MIX.midEnd;
   const start = far ? EXPLOSION_MIX.midEnd : EXPLOSION_MIX.closeEnd;
   const end = far ? EXPLOSION_MIX.farStart : EXPLOSION_MIX.midStart;

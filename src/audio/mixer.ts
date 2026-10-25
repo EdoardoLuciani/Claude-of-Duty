@@ -116,7 +116,7 @@ export class Mixer {
   static prepare(actx: BaseAudioContext): Promise<void> {
     let ready = preparedContexts.get(actx);
     if (!ready) {
-      ready = import('./energy-worklet.ts?worker&url').then(({ default: url }) =>
+      ready = import('./energy-worklet.ts?worker&url').then(({ default: url }): Promise<void> =>
         actx.audioWorklet.addModule(url)
       );
       preparedContexts.set(actx, ready);
@@ -428,7 +428,7 @@ export class Mixer {
     // Native time and source completion, not a future gameplay frame, own cleanup.
     tin.nodes[0].addEventListener(
       'ended',
-      () => {
+      (): void => {
         for (const node of tin.nodes) node.disconnect();
         tin.g.disconnect();
       },

@@ -179,10 +179,10 @@ const previewWindow = window as Window & {
   __PREVIEW_DRAW__?: () => void;
 };
 previewWindow.__PREVIEW_RENDERER__ = renderer;
-previewWindow.__PREVIEW_DRAW__ = () => renderer.render(scene, camera);
+previewWindow.__PREVIEW_DRAW__ = (): void => renderer.render(scene, camera);
 requestAnimationFrame(loop);
 
-addEventListener('resize', () => {
+addEventListener('resize', (): void => {
   renderer.setSize(innerWidth, innerHeight, false);
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();

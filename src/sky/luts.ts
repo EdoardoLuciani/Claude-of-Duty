@@ -1,4 +1,6 @@
 import type { Texture } from 'three';
+import type { Vector2, Vector3 } from 'three';
+import type { FnNode } from 'three/src/nodes/tsl/TSLCore.js';
 import {
   Fn,
   If,
@@ -18,6 +20,7 @@ import {
 } from 'three/tsl';
 import { RepeatWrapping } from 'three/webgpu';
 import type { Node, Renderer } from 'three/webgpu';
+import type { ConstNode, VarNode } from 'three/webgpu';
 
 import {
   skRaySphere,
@@ -88,29 +91,36 @@ const nestedLoop = Loop as unknown as (
 ) => void;
 
 /** 256 x 64 transmittance bake. */
-const transmittanceNode = (uMieScale: Node<'float'>) =>
-  Fn<[Node<'vec2'>], Node<'vec3'>>(([vUv]) => {
-    const mu = vUv.x.mul(2).sub(1);
-    const h = mix(SK_GROUND_R, SK_TOP_R, vUv.y);
-    const pos = vec3(0, h, 0);
-    const dir = vec3(sqrt(max(0, float(1).sub(mu.mul(mu)))), mu, 0);
-    const result = vec3(0).toVar();
-    const t = skRaySphere(pos, dir, SK_TOP_R).toVar();
-    If(t.greaterThan(0), () => {
-      const dt = t.div(TS_STEPS);
-      const od = vec3(0).toVar();
-      Loop(TS_STEPS, ({ i }) => {
-        const p = pos.add(dir.mul(i.toFloat().add(0.5).mul(dt)));
-        od.addAssign(skExtinction(p, uMieScale).mul(dt));
+const transmittanceNode = (
+  uMieScale: Node<'float'>
+): FnNode<[Vector2 | Node<'vec2'>], Node<'vec3'>> =>
+  Fn<[Node<'vec2'>], Node<'vec3'>>(
+    ([vUv]): VarNode<'vec3', VarNode<'vec3', ConstNode<'vec3', Vector3>>> => {
+      const mu = vUv.x.mul(2).sub(1);
+      const h = mix(SK_GROUND_R, SK_TOP_R, vUv.y);
+      const pos = vec3(0, h, 0);
+      const dir = vec3(sqrt(max(0, float(1).sub(mu.mul(mu)))), mu, 0);
+      const result = vec3(0).toVar();
+      const t = skRaySphere(pos, dir, SK_TOP_R).toVar();
+      If(t.greaterThan(0), (): void => {
+        const dt = t.div(TS_STEPS);
+        const od = vec3(0).toVar();
+        Loop(TS_STEPS, ({ i }): void => {
+          const p = pos.add(dir.mul(i.toFloat().add(0.5).mul(dt)));
+          od.addAssign(skExtinction(p, uMieScale).mul(dt));
+        });
+        result.assign(exp(od.negate()));
       });
-      result.assign(exp(od.negate()));
-    });
-    return result;
-  });
+      return result;
+    }
+  );
 
 /** 32 x 32 multiple-scattering bake. */
-const multiScatterNode = (uMieScale: Node<'float'>, skTransmittance: Vec3Fn) =>
-  Fn<[Node<'vec2'>], Node<'vec3'>>(([vUv]) => {
+const multiScatterNode = (
+  uMieScale: Node<'float'>,
+  skTransmittance: Vec3Fn
+): FnNode<[Vector2 | Node<'vec2'>], Node<'vec3'>> =>
+  Fn<[Node<'vec2'>], Node<'vec3'>>(([vUv]): Node<'vec3'> => {
     const mu = vUv.x.mul(2).sub(1);
     const h = mix(SK_GROUND_R.add(1e-5), SK_TOP_R, vUv.y);
     const pos = vec3(0, h, 0);
@@ -120,7 +130,7 @@ const multiScatterNode = (uMieScale: Node<'float'>, skTransmittance: Vec3Fn) =>
     const fmsTotal = vec3(0).toVar();
     const invSamples = 1 / (SQRT_SAMPLES * SQRT_SAMPLES);
 
-    nestedLoop(SQRT_SAMPLES, SQRT_SAMPLES, ({ i, j }) => {
+    nestedLoop(SQRT_SAMPLES, SQRT_SAMPLES, ({ i, j }): void => {
       // Uniform on the sphere: theta linear, cos(phi) linear.
       const theta = float(SK_PI).mul(i.toFloat().add(0.5)).div(SQRT_SAMPLES);
       const phi = acos(float(1).sub(j.toFloat().add(0.5).mul(2).div(SQRT_SAMPLES)));
@@ -132,33 +142,36 @@ const multiScatterNode = (uMieScale: Node<'float'>, skTransmittance: Vec3Fn) =>
       const grnT = skRaySphere(pos, rayDir, SK_GROUND_R);
       const tMax = grnT.lessThan(0).select(topT, grnT);
 
-      If(tMax.greaterThan(0), () => {
+      If(tMax.greaterThan(0), (): void => {
         const lum = vec3(0).toVar();
         const fms = vec3(0).toVar();
         const trans = vec3(1).toVar();
         const t = float(0).toVar();
-        namedLoop({ start: int(0), end: int(MS_STEPS), name: 's', condition: '<' }, ({ s }) => {
-          const nt = s.toFloat().add(0.5).div(MS_STEPS).mul(tMax).toVar();
-          const dt = nt.sub(t).toVar();
-          t.assign(nt);
-          const p = pos.add(rayDir.mul(t)).toVar();
-          // Scattering media only (no absorption): rs + vec3(ms).
-          const scatter = skRayleighS(p).add(vec3(skMieS(p, uMieScale)));
-          const ext = skExtinction(p, uMieScale);
-          const sampleT = exp(dt.negate().mul(ext)).toVar();
+        namedLoop(
+          { start: int(0), end: int(MS_STEPS), name: 's', condition: '<' },
+          ({ s }): void => {
+            const nt = s.toFloat().add(0.5).div(MS_STEPS).mul(tMax).toVar();
+            const dt = nt.sub(t).toVar();
+            t.assign(nt);
+            const p = pos.add(rayDir.mul(t)).toVar();
+            // Scattering media only (no absorption): rs + vec3(ms).
+            const scatter = skRayleighS(p).add(vec3(skMieS(p, uMieScale)));
+            const ext = skExtinction(p, uMieScale);
+            const sampleT = exp(dt.negate().mul(ext)).toVar();
 
-          // f_ms: the fraction of light that scatters at least once more.
-          fms.addAssign(trans.mul(scatter.sub(scatter.mul(sampleT))).div(max(ext, vec3(1e-8))));
+            // f_ms: the fraction of light that scatters at least once more.
+            fms.addAssign(trans.mul(scatter.sub(scatter.mul(sampleT))).div(max(ext, vec3(1e-8))));
 
-          const tSun = skTransmittance(p, sunDir);
-          const inS = scatter.mul(ISO_PHASE).mul(tSun);
-          lum.addAssign(trans.mul(inS.sub(inS.mul(sampleT))).div(max(ext, vec3(1e-8))));
-          trans.mulAssign(sampleT);
-        });
+            const tSun = skTransmittance(p, sunDir);
+            const inS = scatter.mul(ISO_PHASE).mul(tSun);
+            lum.addAssign(trans.mul(inS.sub(inS.mul(sampleT))).div(max(ext, vec3(1e-8))));
+            trans.mulAssign(sampleT);
+          }
+        );
 
-        If(grnT.greaterThan(0), () => {
+        If(grnT.greaterThan(0), (): void => {
           const hit = normalize(pos.add(rayDir.mul(grnT))).mul(SK_GROUND_R);
-          If(hit.dot(sunDir).greaterThan(0), () => {
+          If(hit.dot(sunDir).greaterThan(0), (): void => {
             lum.addAssign(trans.mul(SK_GROUND_ALBEDO).mul(skTransmittance(hit, sunDir)));
           });
         });
@@ -173,8 +186,11 @@ const multiScatterNode = (uMieScale: Node<'float'>, skTransmittance: Vec3Fn) =>
   });
 
 /** 384 x 192 sky-view bake. */
-const skyViewNode = (shared: SkyLutShared, skRaymarchSky: RaymarchFn) =>
-  Fn<[Node<'vec2'>], Node<'vec3'>>(([vUv]) => {
+const skyViewNode = (
+  shared: SkyLutShared,
+  skRaymarchSky: RaymarchFn
+): FnNode<[Vector2 | Node<'vec2'>], Node<'vec3'>> =>
+  Fn<[Node<'vec2'>], Node<'vec3'>>(([vUv]): Node<'vec3'> => {
     const { uViewPos, uSunIrradiance, uMoonIrradiance, uSunAltitude, uMoonAltitude, uMoonRelAz } =
       shared;
     const azimuth = vUv.x.sub(0.5).mul(2 * SK_PI);
@@ -207,15 +223,18 @@ const skyViewNode = (shared: SkyLutShared, skRaymarchSky: RaymarchFn) =>
  * Average sky radiance over the upper hemisphere (cosine weighted) and over the
  * lower hemisphere-facing band. texel 0 -> sky ambient, texel 1 -> horizon band.
  */
-const ambientNode = (shared: SkyLutShared, skSkyView: Vec3Fn) =>
-  Fn<[Node<'vec2'>], Node<'vec3'>>(([vUv]) => {
+const ambientNode = (
+  shared: SkyLutShared,
+  skSkyView: Vec3Fn
+): FnNode<[Vector2 | Node<'vec2'>], Node<'vec3'>> =>
+  Fn<[Node<'vec2'>], Node<'vec3'>>(([vUv]): Node<'vec3'> => {
     const { uSunAltitude } = shared;
     const sunDir = vec3(0, sin(uSunAltitude), cos(uSunAltitude).negate());
     const horizonBand = vUv.x.greaterThan(0.5);
     const sum = vec3(0).toVar();
     const wsum = float(0).toVar();
 
-    Loop(AMBIENT_TAPS, ({ i }) => {
+    Loop(AMBIENT_TAPS, ({ i }): void => {
       // Fibonacci hemisphere.
       const fi = i.toFloat().add(0.5).div(AMBIENT_TAPS);
       const phi = i.toFloat().mul(2.39996323);
@@ -294,7 +313,7 @@ export class SkyLuts {
     this.ambientPass.render(renderer, this.ambientRt);
   }
 
-  dispose() {
+  dispose(): void {
     this.transmittanceRt.dispose();
     this.multiScatterRt.dispose();
     this.skyViewRt.dispose();

@@ -27,7 +27,7 @@ const ok = (cond: boolean, label: string, detail = ''): void => {
     console.log(`  ok    ${label}${detail ? '  (' + detail + ')' : ''}`);
   }
 };
-const section = (t: string) => console.log(`\n\x1b[1m${t}\x1b[0m`);
+const section = (t: string): void => console.log(`\n\x1b[1m${t}\x1b[0m`);
 
 /* ------------------------------------------------------------------ */
 /* Test level                                                          */
@@ -447,7 +447,7 @@ section('Bullet penetration');
   const impacts: { surface: string; exit: boolean; damage: number; x: number }[] = [];
   const off = events.on(
     'bullet:impact',
-    (e: { surface: string; exit: boolean; damage: number; point: THREE.Vector3 }) =>
+    (e: { surface: string; exit: boolean; damage: number; point: THREE.Vector3 }): number =>
       impacts.push({ surface: e.surface, exit: e.exit, damage: e.damage, x: e.point.x })
   );
 
@@ -461,8 +461,8 @@ section('Bullet penetration');
     maxDist: 50,
     mask: MASK.BULLET,
   });
-  const woodEntry = impacts.filter((i) => !i.exit && i.surface === 'wood');
-  const woodExit = impacts.filter((i) => i.exit && i.surface === 'wood');
+  const woodEntry = impacts.filter((i): boolean => !i.exit && i.surface === 'wood');
+  const woodExit = impacts.filter((i): boolean => i.exit && i.surface === 'wood');
   ok(woodEntry.length === 1, 'entry impact on wood', `${woodEntry.length}`);
   ok(woodExit.length === 1, 'exit impact on wood', `${woodExit.length}`);
   ok(
@@ -498,7 +498,7 @@ section('Bullet penetration');
     mask: MASK.BULLET,
   });
   ok(
-    impacts.some((i) => i.exit),
+    impacts.some((i): boolean => i.exit),
     'AP round defeats the same wall',
     `${impacts.length} impacts`
   );
@@ -525,7 +525,7 @@ section('Bullet penetration');
       maxDist: 40,
       mask: MASK.BULLET,
     });
-    const entries = impacts.filter((i) => !i.exit).length;
+    const entries = impacts.filter((i): boolean => !i.exit).length;
     ok(
       entries === 3,
       'penetrates three stacked panels',
@@ -720,7 +720,7 @@ section('Hitbox colliders');
   // One round, one actor: overlapping head+torso must not stack damage, and a
   // ray that clips the head must credit the head even if the torso is wider.
   const dealt: { target: unknown; headshot?: boolean; amount: number }[] = [];
-  const offD = events.on('damage:dealt', (e) => {
+  const offD = events.on('damage:dealt', (e): void => {
     dealt.push({ target: e.target, headshot: e.headshot, amount: e.amount });
   });
   phys.fireBullet({

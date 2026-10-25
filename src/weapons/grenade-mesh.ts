@@ -67,7 +67,7 @@ const bandMat = new MeshStandardNodeMaterial({
 });
 
 /** Stamped L: plate on the fuze, neck, polar crescent over the crown. */
-function spoonOutline() {
+function spoonOutline(): number[][] {
   const pts = [];
   const n = 16;
   const a0 = 0.32;
@@ -102,7 +102,10 @@ function spoonOutline() {
 }
 
 // ---- body: slightly flattened sphere + equatorial weld --------------------
-const bodyGeo = (() => {
+const bodyGeo = ((): THREE.BufferGeometry<
+  THREE.NormalBufferAttributes,
+  THREE.BufferGeometryEventMap
+> => {
   const shell = latheZ(
     [
       [-0.04, 0.0001],
@@ -134,7 +137,10 @@ const bodyGeo = (() => {
 })();
 
 // ---- fuze -----------------------------------------------------------------
-const fuzeGeo = (() => {
+const fuzeGeo = ((): THREE.BufferGeometry<
+  THREE.NormalBufferAttributes,
+  THREE.BufferGeometryEventMap
+> => {
   const fuze = latheZ(
     [
       [0.0, 0.0001],
@@ -163,7 +169,10 @@ const spoonGeo = extrude(spoonOutline(), 0.026, {
 });
 
 // ---- yellow HE band around the well ---------------------------------------
-const bandGeo = (() => {
+const bandGeo = ((): THREE.BufferGeometry<
+  THREE.NormalBufferAttributes,
+  THREE.BufferGeometryEventMap
+> => {
   const g = latheZ(
     [
       [0.0326, 0.0148],
@@ -178,7 +187,10 @@ const bandGeo = (() => {
 })();
 
 // ---- bare metal: cotter pin + safety clip ---------------------------------
-const steelGeo = (() => {
+const steelGeo = ((): THREE.BufferGeometry<
+  THREE.NormalBufferAttributes,
+  THREE.BufferGeometryEventMap
+> => {
   const parts = [];
   const pin = rodZ(0.0018, 0.0018, 0.028, 8, 0.0003);
   pin.rotateY(Math.PI / 2);
@@ -190,7 +202,10 @@ const steelGeo = (() => {
 })();
 
 // ---- pull ring, standing off the pin --------------------------------------
-const ringGeo = (() => {
+const ringGeo = ((): THREE.BufferGeometry<
+  THREE.NormalBufferAttributes,
+  THREE.BufferGeometryEventMap
+> => {
   const g = ring(0.0134, 0.0019, 18, 8);
   g.rotateZ(Math.PI / 2);
   g.translate(-0.029, 0.097, 0);

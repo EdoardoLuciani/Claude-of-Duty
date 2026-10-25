@@ -18,6 +18,7 @@ import {
   vec3,
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
+import type { StructNode } from 'three/webgpu';
 
 import { authoredColor } from '../color-tsl.ts';
 import {
@@ -37,7 +38,7 @@ import { Surface } from './surface.ts';
 
 // WOOD: authored channel stack migrated from surfaces-organic.js.
 export const woodSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof Surface>>(
-  ([coords, seed]) => {
+  ([coords, seed]): StructNode => {
     const alb = vec3(0.5).toVar(),
       h = float(0.5).toVar();
     const rough = float(0.5).toVar(),
@@ -267,7 +268,7 @@ export const woodSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof S
 export const fabricSurface = Fn<
   [Node<'vec2'>, Node<'float'>, Node<'vec3'>, Node<'vec3'>],
   ReturnType<typeof Surface>
->(([coords, seed, tintA, tintB]) => {
+>(([coords, seed, tintA, tintB]): StructNode => {
   const alb = vec3(0.5).toVar(),
     h = float(0.5).toVar();
   const rough = float(0.5).toVar(),
@@ -384,7 +385,7 @@ export const fabricSurface = Fn<
 
 // BURLAP: authored channel stack migrated from surfaces-organic.js.
 export const burlapSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof Surface>>(
-  ([coords, seed]) => {
+  ([coords, seed]): StructNode => {
     const alb = vec3(0.5).toVar(),
       h = float(0.5).toVar();
     const rough = float(0.5).toVar(),

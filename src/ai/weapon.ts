@@ -84,7 +84,7 @@ function cyl(
   for (let i = 0; i < n; i++) pts.push([x, y, z0 + ((z1 - z0) * i) / (n - 1)]);
   const m = tube(
     pts,
-    (t) => {
+    (t): import('./geo.ts').Vec2[] => {
       const r = r0 + (r1 - r0) * t;
       return ellipseProfile(r, r, seg);
     },
@@ -103,7 +103,23 @@ function cyl(
  * Returns { steel, polymer, rubber, glass, muzzle:[x,y,z], stock:[x,y,z] }
  * with every mesh already transformed into the actor's bind space.
  */
-export function buildWeapon(nz: NoiseLike, style: 'carbine' | 'ak' = 'carbine', rng?: WeaponRng) {
+export function buildWeapon(
+  nz: NoiseLike,
+  style: 'carbine' | 'ak' = 'carbine',
+  rng?: WeaponRng
+): {
+  steel: MeshRecord;
+  polymer: MeshRecord;
+  rubber: MeshRecord;
+  glass: MeshRecord;
+  matrix: THREE.Matrix4;
+  muzzle: [number, number, number];
+  boreOrigin: [number, number, number];
+  ejection: [number, number, number];
+  stockTop: [number, number, number];
+  foregrip: [number, number, number];
+  magBottom: [number, number, number];
+} {
   const steel = emptyMesh();
   const poly = emptyMesh();
   const rubber = emptyMesh();
@@ -140,16 +156,20 @@ export function buildWeapon(nz: NoiseLike, style: 'carbine' | 'ak' = 'carbine', 
         -0.028 - Math.sin(rake) * -t * 0.105 * 0.55 - t * 0.03,
       ]);
     }
-    const g = tube(pts, (t) => superEllipse(0.0165 - t * 0.002, 0.02 - t * 0.004, 3.4, 14), {
-      capStart: true,
-      capEnd: true,
-      up: [0, 0, 1],
-    });
+    const g = tube(
+      pts,
+      (t): import('./geo.ts').Vec2[] => superEllipse(0.0165 - t * 0.002, 0.02 - t * 0.004, 3.4, 14),
+      {
+        capStart: true,
+        capEnd: true,
+        up: [0, 0, 1],
+      }
+    );
     computeNormals(g);
     // finger grooves
     displace(
       g,
-      (x, y, z) =>
+      (x, y, z): number =>
         Math.sin((y - BORE_Y) * 150) * 0.0012 + nz.fbm3(x * 90, y * 90, z * 90, 2) * 0.0012
     );
     appendMesh(poly, g);
@@ -175,7 +195,7 @@ export function buildWeapon(nz: NoiseLike, style: 'carbine' | 'ak' = 'carbine', 
     }
     const mag = loft(rings, { capStart: true, capEnd: true });
     computeNormals(mag);
-    displace(mag, (x, y, z, nx) => {
+    displace(mag, (x, y, z, nx): number => {
       // moulded ribs down the sides
       const rib = Math.sin((y - BORE_Y) * 210) * 0.5 + 0.5;
       return Math.abs(nx) > 0.6 ? rib * 0.0012 : nz.fbm3(x * 80, y * 80, z * 80, 2) * 0.0008;
@@ -229,7 +249,7 @@ export function buildWeapon(nz: NoiseLike, style: 'carbine' | 'ak' = 'carbine', 
   {
     const mz = cyl(0.0145, 0.0135, barrelEnd - 0.045, barrelEnd, 0, BORE_Y, 14, true);
     // port slots
-    displace(mz, (x, y, z) => {
+    displace(mz, (x, y, z): 0 | -0.0035 => {
       const a = Math.atan2(x, y - BORE_Y);
       const slot = Math.abs(Math.sin(a * 3)) > 0.92 && z > barrelEnd - 0.035 ? -0.0035 : 0;
       return slot;
@@ -254,7 +274,7 @@ export function buildWeapon(nz: NoiseLike, style: 'carbine' | 'ak' = 'carbine', 
     }
     const hg = loft(rings, { capStart: false, capEnd: true });
     computeNormals(hg);
-    displace(hg, (x, y, z, nx, ny) => {
+    displace(hg, (x, y, z, nx, ny): number => {
       if (long) {
         // ribbed polymer handguard
         const rib = Math.sin(z * 260) * 0.5 + 0.5;
@@ -288,12 +308,12 @@ export function buildWeapon(nz: NoiseLike, style: 'carbine' | 'ak' = 'carbine', 
     appendMesh(steel, cyl(0.0155, 0.0155, -0.075, -0.225, 0, BORE_Y + 0.002, 12, false));
     // collapsible stock body
     const body = box(0.0215, 0.03, 0.058, 0, BORE_Y - 0.004, -0.175, { n: 3.8, roundY: 0.28 });
-    warp(body, (v) => {
+    warp(body, (v): void => {
       // cheek weld slope
       if (v.y > BORE_Y + 0.008) v.y -= (v.z + 0.175) * -0.12;
     });
     computeNormals(body);
-    displace(body, (x, y, z) => nz.fbm3(x * 80, y * 80, z * 80, 2) * 0.0012);
+    displace(body, (x, y, z): number => nz.fbm3(x * 80, y * 80, z * 80, 2) * 0.0012);
     appendMesh(poly, body);
     appendMesh(poly, box(0.0075, 0.026, 0.048, 0, BORE_Y - 0.034, -0.165, { n: 4, roundY: 0.3 }));
     appendMesh(rubber, box(0.0215, 0.033, 0.007, 0, BORE_Y - 0.004, -0.23, { n: 4, roundY: 0.35 }));

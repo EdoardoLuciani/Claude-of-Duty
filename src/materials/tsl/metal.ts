@@ -17,6 +17,7 @@ import {
   vec3,
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
+import type { StructNode } from 'three/webgpu';
 
 import { authoredColor } from '../color-tsl.ts';
 import {
@@ -38,7 +39,7 @@ import { Surface } from './surface.ts';
 
 // METAL_RUST: authored channel stack migrated from surfaces-metal.js.
 export const metalRustSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof Surface>>(
-  ([coords, seed]) => {
+  ([coords, seed]): StructNode => {
     const alb = vec3(0.5).toVar(),
       h = float(0.5).toVar();
     const rough = float(0.5).toVar(),
@@ -170,7 +171,7 @@ export const metalRustSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typ
 export const metalPaintedSurface = Fn<
   [Node<'vec2'>, Node<'float'>, Node<'vec3'>, Node<'vec3'>, Node<'vec4'>],
   ReturnType<typeof Surface>
->(([coords, seed, tintA, , param]) => {
+>(([coords, seed, tintA, , param]): StructNode => {
   const alb = vec3(0.5).toVar(),
     h = float(0.5).toVar();
   const rough = float(0.5).toVar(),
@@ -346,7 +347,7 @@ export const metalPaintedSurface = Fn<
 
 // CORRUGATED: authored channel stack migrated from surfaces-metal.js.
 export const corrugatedSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof Surface>>(
-  ([coords, seed]) => {
+  ([coords, seed]): StructNode => {
     const alb = vec3(0.5).toVar(),
       h = float(0.5).toVar();
     const rough = float(0.5).toVar(),

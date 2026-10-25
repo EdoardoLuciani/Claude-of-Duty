@@ -30,7 +30,9 @@ function buildingTraversables(info: unknown): Traversable[] {
 }
 function isPointTuple(value: unknown): value is [number, number, number] {
   return (
-    Array.isArray(value) && value.length === 3 && value.every((n: unknown) => typeof n === 'number')
+    Array.isArray(value) &&
+    value.length === 3 &&
+    value.every((n: unknown): n is number => typeof n === 'number')
   );
 }
 type MinimapContext = Pick<EngineContext, 'peek'>;

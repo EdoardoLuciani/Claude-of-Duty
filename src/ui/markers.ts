@@ -142,7 +142,13 @@ export class WorldMarkers {
     this.objRoot = el('div', 'ow-layer', parent);
     this.objPool = new Pool(
       6,
-      () => {
+      (): HTMLDivElement & {
+        _dia: SVGSVGElement;
+        _chev: SVGSVGElement;
+        _letter: HTMLDivElement;
+        _dist: HTMLDivElement;
+        _name: HTMLDivElement;
+      } => {
         const node = el('div', 'ow-mk');
         const gl = el('div', 'ow-mk-glyph', node);
         const dia = diamond(gl);
@@ -164,7 +170,11 @@ export class WorldMarkers {
 
     this.nadePool = new Pool(
       4,
-      () => {
+      (): HTMLDivElement & {
+        _ring: HTMLDivElement;
+        _label: HTMLDivElement;
+        _pos: THREE.Vector3;
+      } => {
         const node = el('div', 'ow-nade');
         const ring = el('div', 'ow-nade-ring', node);
         const core = el('div', 'ow-nade-core', node);
@@ -226,7 +236,10 @@ export class WorldMarkers {
   }
 
   /** @param {number} fuse seconds until detonation */
-  spawnGrenade(position: THREE.Vector3, fuse = 2.4) {
+  spawnGrenade(
+    position: THREE.Vector3,
+    fuse = 2.4
+  ): import('./pool-types.ts').PoolRecord<GrenadeNode> {
     const it = this.nadePool.acquire();
     it.life = fuse;
     it.node._pos.copy(position);

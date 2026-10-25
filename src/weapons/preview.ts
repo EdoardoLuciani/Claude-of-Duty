@@ -92,7 +92,7 @@ const events: {
       this.handlers.set(t, handlers);
     }
     handlers.add(f);
-    return () => this.handlers.get(t)?.delete(f);
+    return (): boolean | undefined => this.handlers.get(t)?.delete(f);
   },
   emit(t: string, p: unknown): void {
     for (const f of this.handlers.get(t) ?? []) f(p);
@@ -115,8 +115,8 @@ const ctx = {
   time: { elapsed: 0, dt: 1 / 60, frame: 0 },
   rng: new Rng(0xbeef1234),
   get: previewGet,
-  peek: (id: string) => (id === 'materials' ? materials : null),
-  has: (id: string) => id === 'materials',
+  peek: (id: string): MaterialSystem | null => (id === 'materials' ? materials : null),
+  has: (id: string): id is 'materials' => id === 'materials',
 };
 
 const mats = new ReticleMaterials();
@@ -274,7 +274,7 @@ const previewWindow = window as Omit<
   __READY__?: boolean;
 };
 previewWindow.__PREVIEW_RENDERER__ = renderer;
-previewWindow.__PREVIEW_DRAW__ = () => renderer.render(scene, camera);
+previewWindow.__PREVIEW_DRAW__ = (): void => renderer.render(scene, camera);
 const STEP = 1 / 60;
 const GRAB = Math.max(0, Math.round(Number(params.get('grab')) || 0));
 let frames = 0;
@@ -301,11 +301,11 @@ function tick(): void {
       ...rendererCounters(renderer),
       calls: renderer.info.render.calls, // retained cumulative alias
       drawnTris: renderer.info.render.triangles,
-      bbox: [size.x, size.y, size.z].map((v) => +v.toFixed(3)),
-      bmin: bbox.min.toArray().map((v) => +v.toFixed(3)),
-      bmax: bbox.max.toArray().map((v) => +v.toFixed(3)),
-      rig: vm.rig.position.toArray().map((v) => +v.toFixed(3)),
-      base: vm._basePos.toArray().map((v: number) => +v.toFixed(3)),
+      bbox: [size.x, size.y, size.z].map((v): number => +v.toFixed(3)),
+      bmin: bbox.min.toArray().map((v): number => +v.toFixed(3)),
+      bmax: bbox.max.toArray().map((v): number => +v.toFixed(3)),
+      rig: vm.rig.position.toArray().map((v): number => +v.toFixed(3)),
+      base: vm._basePos.toArray().map((v: number): number => +v.toFixed(3)),
       hip: w.def.hipPos,
       adsT: +vm.adsT.toFixed(3),
       sprintT: +vm.sprintT.toFixed(3),
@@ -317,7 +317,7 @@ function tick(): void {
 }
 requestAnimationFrame(tick);
 
-addEventListener('resize', () => {
+addEventListener('resize', (): void => {
   renderer.setSize(innerWidth, innerHeight, false);
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();

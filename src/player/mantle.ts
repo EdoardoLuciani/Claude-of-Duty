@@ -336,7 +336,7 @@ export class MantleMotion {
     this.camRoll = 0;
   }
 
-  get progress() {
+  get progress(): number {
     return this.duration > 0 ? clamp01(this.t / this.duration) : 1;
   }
 

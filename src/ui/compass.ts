@@ -59,8 +59,8 @@ export class Compass {
     }
     setStyle(this.strip, 'width', `calc(${(720 * PPD).toFixed(0)}px * var(--k))`);
 
-    this.objPool = new Pool(5, () => el('div', 'ow-compass-obj'), this.root);
-    this.pingPool = new Pool(8, () => el('div', 'ow-compass-ping'), this.root);
+    this.objPool = new Pool(5, (): HTMLDivElement => el('div', 'ow-compass-obj'), this.root);
+    this.pingPool = new Pool(8, (): HTMLDivElement => el('div', 'ow-compass-ping'), this.root);
 
     this.k = 1;
   }
@@ -186,7 +186,7 @@ export class ScoreBar {
     }
   }
 
-  dispose() {
+  dispose(): void {
     this.root.remove();
   }
 }

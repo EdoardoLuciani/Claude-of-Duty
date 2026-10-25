@@ -104,7 +104,7 @@ function isBone(object: THREE.Object3D | null): object is THREE.Bone {
 export function humanoidSpec(height = 1.8, scaleMass = 82): BoneSpec[] {
   const h = height;
   const M = scaleMass;
-  const y = (f: number) => h * f;
+  const y = (f: number): number => h * f;
   const b = (
     name: string,
     hx: number,

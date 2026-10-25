@@ -21,7 +21,7 @@ const ONE = new THREE.Vector3(1, 1, 1);
 
 // Authored +X forward/+Y up/+Z right -> game -Z forward/+Y up/+X right.
 // Move the origin to the shooting-hand web, not the Blender chamber origin.
-export function makeMCXModel(gltf: GLTF) {
+export function makeMCXModel(gltf: GLTF): MCXModel {
   const scene = new THREE.Group();
   scene.name = 'mcx-coordinate-frame';
   scene.rotation.y = Math.PI / 2;
@@ -73,7 +73,7 @@ export function makeMCXModel(gltf: GLTF) {
   // transmission pass; the gameplay scope supplies the magnified sight picture.
   const converted = convertWeaponScene(
     scene,
-    (original, material) => {
+    (original, material): void => {
       // Intentional scope approximation, not exposure calibration: the gameplay
       // scope supplies the sight picture. Keep its established thin-alpha tint
       // instead of adding a second full-scene transmission pass.
@@ -93,7 +93,7 @@ export function makeMCXModel(gltf: GLTF) {
   return { ...model, ...converted };
 }
 
-export async function loadMCX() {
+export async function loadMCX(): Promise<MCXModel> {
   return makeMCXModel(await new GLTFLoader().loadAsync(MCX_URL));
 }
 
@@ -110,7 +110,46 @@ function handQuaternion(
 }
 
 /** Baked rigid-part animation under the shared movement/ADS/arm rig. */
-type MCXModel = ReturnType<typeof makeMCXModel>;
+type MCXModel = {
+  materials: Set<THREE.Material>;
+  textures: Set<THREE.Texture>;
+  id: string;
+  scene: THREE.Group;
+  root: THREE.Object3D;
+  animations: THREE.AnimationClip[];
+  nodes: {
+    muzzle: [number, number, number];
+    eject: [number, number, number];
+    sight: [number, number, number];
+    ejectDir: [number, number, number];
+    gripR: {
+      pos: [number, number, number];
+      finger: [number, number, number];
+      back: [number, number, number];
+    };
+    gripL: {
+      pos: [number, number, number];
+      finger: [number, number, number];
+      back: [number, number, number];
+    };
+    handguard: {
+      axis: [number, number, number];
+      dir: [number, number, number];
+      r: number;
+      z0: number;
+      z1: number;
+    };
+    magSeat: { pos: [number, number, number]; rot: number[] };
+    opticGlass: {
+      kind: string;
+      reticle: string;
+      center: [number, number, number];
+      apertureR: number;
+    };
+  };
+  shell: { caseLen: number; rimR: number };
+  magSize: { len: number };
+};
 type MCXDefinition = Parameters<typeof buildEquipClips>[1];
 export class MCXAnimation {
   model!: MCXModel;
@@ -156,7 +195,7 @@ export class MCXAnimation {
     for (const source of model.animations) {
       // The single showcase casing must not replay under the gun on every
       // shot. Live fire emits independent .300 cases via the existing FX pool.
-      const tracks = source.tracks.filter((t) => !t.name.startsWith('spent_case.'));
+      const tracks = source.tracks.filter((t): boolean => !t.name.startsWith('spent_case.'));
       const clip = new THREE.AnimationClip(source.name, source.duration, tracks);
       const action = this.mixer.clipAction(clip);
       action.setLoop(THREE.LoopOnce, 1);
@@ -180,13 +219,13 @@ export class MCXAnimation {
     this.reset();
   }
 
-  clips() {
+  clips(): { [x: string]: import('./clips.ts').Clip } {
     return {
       ...buildEquipClips(this.model.nodes, this.def),
       ...buildMagazineClips(
         ALIASES,
         manifest.clips,
-        (source) => this.actions[source].getClip().duration
+        (source): number => this.actions[source].getClip().duration
       ),
     };
   }
@@ -268,7 +307,7 @@ export class MCXAnimation {
     quat.slerp(this.targetQ, weight);
   }
 
-  get leftPose() {
+  get leftPose(): 'pinch' | null {
     if (
       this.gesture?.startsWith('reload') &&
       this.gestureTime > 0.2 &&

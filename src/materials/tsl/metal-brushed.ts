@@ -1,5 +1,6 @@
 import { Fn, clamp, float, mix, smoothstep, vec2 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
+import type { StructNode } from 'three/webgpu';
 
 import { authoredColor } from '../color-tsl.ts';
 import { fbm01, fbm3, fbm4, scratches, shear, shearPeriod, warp } from '../noise-tsl.ts';
@@ -7,7 +8,7 @@ import { Surface } from './surface.ts';
 
 // Directional brushed steel: fibres, score lines, handling and grease.
 export const brushedMetalSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof Surface>>(
-  ([coords, seed]) => {
+  ([coords, seed]): StructNode => {
     const period = vec2(8);
     const p = coords.mul(period).add(seed.mul(15.1));
     const bp = shear(p, 0, 64),

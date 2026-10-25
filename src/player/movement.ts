@@ -304,12 +304,12 @@ export class Movement {
     return this.character!;
   }
 
-  get stanceDef() {
+  get stanceDef(): (typeof STANCE)[PlayerStance] {
     return STANCE[this.stance];
   }
 
   /** Eye height for the *current* stance, before camera smoothing. */
-  get eyeHeight() {
+  get eyeHeight(): number {
     return STANCE[this.stance].eye;
   }
 
@@ -740,7 +740,7 @@ export class Movement {
     v.z = dz * sp;
   }
 
-  get slideProgress() {
+  get slideProgress(): number {
     return this.sliding ? clamp01(this._slideTime / MOVE.slide.duration) : 0;
   }
 
@@ -767,7 +767,7 @@ export class Movement {
     return true;
   }
 
-  _doJump() {
+  _doJump(): void {
     const v = this.velocity;
     v.y = JUMP_SPEED;
     this._jumpBuffer = 0;
@@ -783,7 +783,7 @@ export class Movement {
   /* acceleration                                                         */
   /* ==================================================================== */
 
-  targetSpeed() {
+  targetSpeed(): number {
     let base;
     if (this.sprinting) {
       base = this.tacticalSprint ? MOVE.tacSprintSpeed : MOVE.sprintSpeed;
@@ -952,7 +952,7 @@ export class Movement {
     this._resolveState();
   }
 
-  cancelClimb() {
+  cancelClimb(): void {
     if (!this.climbMotion.active) return;
     const m = this.climbMotion;
     this._leaveClimb(m.x, m.y, m.z, 0, 0, 0);
@@ -1160,7 +1160,7 @@ export class Movement {
     }
   }
 
-  _emitFootstep() {
+  _emitFootstep(): void {
     const c = this._character;
     const phys = this.physics;
     const e = this.stepEvent;
@@ -1220,7 +1220,7 @@ export class Movement {
     this.stateTime = 0;
   }
 
-  _publish() {
+  _publish(): void {
     const c = this._character;
     this.position.set(c.position.x, c.position.y, c.position.z);
     const v = this.velocity;
@@ -1272,7 +1272,7 @@ export class Movement {
   }
 
   /** Radians of gait phase; pi per footfall. Drives the camera's figure-eight. */
-  get stepPhase() {
+  get stepPhase(): number {
     return this._bobPhase;
   }
 }

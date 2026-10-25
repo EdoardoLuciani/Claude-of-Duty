@@ -1,4 +1,5 @@
 import type { BufferGeometry, Camera, Material, Mesh, Object3D, Texture } from 'three';
+import type { MaterialEventMap, PerspectiveCamera, Scene } from 'three';
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
 import type MeshStandardNodeMaterial from 'three/src/materials/nodes/MeshStandardNodeMaterial.js';
 import { lightPosition, lightTargetPosition, sharedUniformGroup, uniform } from 'three/tsl';
@@ -14,6 +15,7 @@ import {
 } from 'three/webgpu';
 import { Light, SpotLight } from 'three/webgpu';
 import type { Renderer, Node, UniformNode } from 'three/webgpu';
+import type { PassNode } from 'three/webgpu';
 
 import type { EngineContext } from '../core/context.ts';
 import { StableCSMShadowNode } from './csm-webgpu.ts';
@@ -131,7 +133,7 @@ export class RenderSystem {
     this.sunDir = ctx.get('sky').keyDirection;
     this._warmAbort = new AbortController();
     this._fogFrame = uniform(0);
-    this.renderer = await createWebGpuRenderer(ctx.canvas, (error) => {
+    this.renderer = await createWebGpuRenderer(ctx.canvas, (error): void => {
       if (this._disposing) return;
       this._warmAbort.abort(error);
       ctx.engine.fail('render', 'deviceLost', error);
@@ -188,18 +190,21 @@ export class RenderSystem {
     this._viewProbeWorld = null;
     this._viewProbeVersion = -1;
     this._viewSkyVisibility = 1;
-    this._viewSkyDirections = Array.from({ length: VIEW_LIGHTING.skySamples }, (_, i) => {
+    this._viewSkyDirections = Array.from({ length: VIEW_LIGHTING.skySamples }, (_, i): Vector3 => {
       const y = (i + 0.5) / VIEW_LIGHTING.skySamples;
       const radius = Math.sqrt(1 - y * y),
         angle = i * Math.PI * (3 - Math.sqrt(5));
       return new Vector3(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
     });
-    this.viewPracticals = Array.from({ length: VIEW_LIGHTING.practicalCount }, () => {
-      const light = new PointLight(0xffffff, 0);
-      light.name = 'ow-view-practical';
-      ctx.viewScene.add(light);
-      return { light, source: null, score: 0, irradiance: 0 };
-    });
+    this.viewPracticals = Array.from(
+      { length: VIEW_LIGHTING.practicalCount },
+      (): { light: PointLight; source: null; score: number; irradiance: number } => {
+        const light = new PointLight(0xffffff, 0);
+        light.name = 'ow-view-practical';
+        ctx.viewScene.add(light);
+        return { light, source: null, score: 0, irradiance: 0 };
+      }
+    );
     ctx.viewScene.add(this.viewSun, this.viewSun.target, this.viewFill, this.viewFill.target);
     this.resize(ctx.canvas.clientWidth || 1280, ctx.canvas.clientHeight || 720);
   }
@@ -239,7 +244,7 @@ export class RenderSystem {
       // Postprocessing draws with an orthographic fullscreen camera. Its
       // built-in camera accessors are NOT the gameplay camera used by fog.
       fog: sky.createFogNode
-        ? (inputs: FogInputs) =>
+        ? (inputs: FogInputs): Node<'vec3'> =>
             sky.createFogNode!({
               ...inputs,
               invProj: uniform(this.ctx.camera.projectionMatrixInverse),
@@ -250,8 +255,8 @@ export class RenderSystem {
             })
         : null,
       fogCompute: this.q.volumetrics,
-      warp: haze ? (node: Node<'vec4'>) => haze.warpNode(node) : null,
-      afterDepth: haze ? () => haze.render(this.renderer, this.ctx.camera) : null,
+      warp: haze ? (node: Node<'vec4'>): Node<'vec4'> => haze.warpNode(node) : null,
+      afterDepth: haze ? (): boolean => haze.render(this.renderer, this.ctx.camera) : null,
       postPasses: this.passes,
     };
     this._graph = createWorldViewPipeline(
@@ -387,7 +392,7 @@ export class RenderSystem {
     if (this._meterElapsed >= METER_INTERVAL && !this._metering) {
       this._meterElapsed %= METER_INTERVAL;
       this._meterTask = this._meter();
-      this._meterTask.catch((e) => console.warn('[render] exposure meter', e));
+      this._meterTask.catch((e): void => console.warn('[render] exposure meter', e));
     }
   }
 
@@ -431,11 +436,11 @@ export class RenderSystem {
     light: DirectionalLight | PointLight,
     opts: { range?: number; priority?: number } = {}
   ): DirectionalLight | PointLight {
-    if (!this.lights.some((l) => l.light === light)) this.lights.push({ light, ...opts });
+    if (!this.lights.some((l): boolean => l.light === light)) this.lights.push({ light, ...opts });
     return light;
   }
   removeLight(light: DirectionalLight | PointLight): void {
-    this.lights = this.lights.filter((l) => l.light !== light);
+    this.lights = this.lights.filter((l): boolean => l.light !== light);
   }
   async prewarmLightShadow(
     light: DirectionalLight | SpotLight
@@ -461,14 +466,14 @@ export class RenderSystem {
     const sky = this.ctx.get('sky');
     this.indirect.update(sky.keyLight, sky);
   }
-  _releaseGraph() {
+  _releaseGraph(): void {
     const meter = this._meterPass,
       graph = this._graph;
     // Readback may retain targets, but must not retain scene callback ownership.
     graph?.detach();
     this._meterPass = null;
     this._graph = null;
-    const dispose = () => {
+    const dispose = (): void => {
       meter?.dispose();
       graph?.dispose();
     };
@@ -480,10 +485,10 @@ export class RenderSystem {
     if (typeof pass.asNode !== 'function')
       throw new Error('[render] post pass must expose asNode() for the WebGPU graph');
     this.passes.push(pass);
-    this.passes.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    this.passes.sort((a, b): number => (a.order ?? 0) - (b.order ?? 0));
     pass.resize?.(this.screenSize.width, this.screenSize.height);
     this._releaseGraph();
-    return () => {
+    return (): void => {
       this.passes.splice(this.passes.indexOf(pass), 1);
       this._releaseGraph();
     };
@@ -522,12 +527,21 @@ export class RenderSystem {
       renderObject = this.renderer.getRenderObjectFunction();
     const xr = this.renderer.xr.enabled,
       shadows = this.renderer.shadowMap.enabled;
-    const cameraMasks: Array<[Camera, number]> = [camera, this.ctx.viewCamera].map((c) => [
-      c,
-      c.layers.mask,
-    ]);
+    const cameraMasks: Array<[Camera, number]> = [camera, this.ctx.viewCamera].map(
+      (c): [PerspectiveCamera, number] => [c, c.layers.mask]
+    );
     const sceneStates = [this.ctx.scene, this.ctx.viewScene].map(
-      (scene) =>
+      (
+        scene
+      ): readonly [
+        Scene,
+        {
+          readonly name: string;
+          readonly overrideMaterial: Material<MaterialEventMap> | null;
+          readonly background: Texture | Color | null;
+          readonly backgroundNode: Node | null | undefined;
+        },
+      ] =>
         [
           scene,
           {
@@ -539,12 +553,13 @@ export class RenderSystem {
         ] as const
     );
     const passFlags = [graph.prePass, graph.worldPass, graph.viewPass].map(
-      (pass) => [pass, pass.opaque, pass.transparent] as const
+      (pass): readonly [PassNode, boolean, boolean] =>
+        [pass, pass.opaque, pass.transparent] as const
     );
     // compileAsync() uses a different nested render-context key. Exercise the
     // native graph without any world/view geometry, simulation or RNG.
     for (const scene of [this.ctx.scene, this.ctx.viewScene])
-      scene.traverse((object) => {
+      scene.traverse((object): void => {
         const mesh = object as Mesh;
         if (!mesh.isMesh || (mesh.material as Material | null)?.visible === false) return;
         saved.push([mesh, mesh.visible, mesh.frustumCulled, mesh.layers.mask]);
@@ -574,7 +589,7 @@ export class RenderSystem {
             pass.transparent = transparent;
           }
         await warmFrame(
-          () => graph.render(),
+          (): void => graph.render(),
           this._warmAbort.signal,
           started + WARM_GRAPH_TIMEOUT_MS
         );
@@ -651,8 +666,8 @@ export class RenderSystem {
   async dispose(): Promise<void> {
     this._disposing = true;
     this._warmAbort.abort(new Error('Renderer disposed during warmup'));
-    await this._warmTask?.catch(() => {});
-    await this._meterTask?.catch(() => {});
+    await this._warmTask?.catch((): void => {});
+    await this._meterTask?.catch((): void => {});
     this._meterPass?.dispose();
     this._graph?.dispose();
     this._volumeShadow?.dispose();

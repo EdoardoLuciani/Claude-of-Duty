@@ -27,7 +27,7 @@ const ALIASES: Record<string, string> = {
 };
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
 
-export function makeAX338Model(gltf: GLTF) {
+export function makeAX338Model(gltf: GLTF): AX338Model {
   const scene = gltf.scene;
   const { root, animations, point } = authoredModel(gltf, 'AX338_RIG', REQUIRED, scene);
   const model = {
@@ -53,7 +53,7 @@ export function makeAX338Model(gltf: GLTF) {
     shell: { caseLen: 0.0697, rimR: 0.0074 },
     magSize: { len: manifest.dimensions.magazineHeight },
   };
-  const converted = convertWeaponScene(scene, (source, material) => {
+  const converted = convertWeaponScene(scene, (source, material): void => {
     if (source.name.startsWith('10 |')) {
       material.transparent = true;
       material.opacity = 0.13;
@@ -67,13 +67,46 @@ export function makeAX338Model(gltf: GLTF) {
   return { ...model, ...converted };
 }
 
-export async function loadAX338() {
+export async function loadAX338(): Promise<AX338Model> {
   return makeAX338Model(await new GLTFLoader().loadAsync(AX338_URL));
 }
 
 /** Blender owns mechanisms and wrist/finger choreography; the existing recoil,
  * shared arm skin, upper/forearm IK and ammunition/event system remain in charge. */
-type AX338Model = ReturnType<typeof makeAX338Model>;
+type AX338Model = {
+  materials: Set<THREE.Material>;
+  textures: Set<THREE.Texture>;
+  id: string;
+  label: string;
+  scene: THREE.Group;
+  root: THREE.Object3D;
+  animations: THREE.AnimationClip[];
+  reactiveFire: boolean;
+  handPoses: {
+    left: typeof handReference.sides.left.grip;
+    right: {
+      fingers: number[][];
+      thumb: number[];
+      thumbBase: number[];
+      fingerSpread: number[];
+      fingerRoll: number[];
+    };
+  };
+  nodes: {
+    muzzle: [number, number, number];
+    eject: [number, number, number];
+    sight: [number, number, number];
+    ejectDir: number[];
+    gripR: { pos: number[]; finger: number[]; back: number[] };
+    gripL: { pos: number[]; finger: number[]; back: number[] };
+    magSeat: { pos: [number, number, number]; rot: number[] };
+    triggerPivot: { pos: [number, number, number]; rot: number[] };
+    opticGlass: { kind: string; center: [number, number, number]; reticle: string };
+    handguard: { axis: number[]; dir: number[]; r: number; z0: number; z1: number };
+  };
+  shell: { caseLen: number; rimR: number };
+  magSize: { len: number };
+};
 type AX338Arm = HandRig;
 export class AX338Animation {
   model!: AX338Model;
@@ -97,7 +130,7 @@ export class AX338Animation {
     this.root = model.root;
     this.mixer = new THREE.AnimationMixer(this.root);
     this.actions = createAuthoredActions(this.mixer, model.animations);
-    const node = (name: string) => requiredNode(this.root, name);
+    const node = (name: string): THREE.Object3D => requiredNode(this.root, name);
     this.bolt = node('bolt');
     this.magazine = node('magazine');
     this.spare = node('magazine_spare');

@@ -210,7 +210,7 @@ export class MaterialSystemNode {
       '|' +
       Object.keys(opts)
         .sort()
-        .map((k) => `${k}=${JSON.stringify(opts[k])}`)
+        .map((k): string => `${k}=${JSON.stringify(opts[k])}`)
         .join(',');
     const cached = this._materials.get(matKey);
     if (cached) return cached;
@@ -278,7 +278,7 @@ export class MaterialSystemNode {
   ): ReturnType<typeof setMask> {
     return setMask(geometry, opts);
   }
-  get detailNormal() {
+  get detailNormal(): Texture | null {
     return this._shared?.detailNormal ?? null;
   }
 

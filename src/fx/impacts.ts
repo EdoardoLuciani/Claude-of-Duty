@@ -1400,16 +1400,16 @@ export const IMPACTS: Record<
   plaster,
   metal,
   wood,
-  dirt: (fx: ImpactFx, p: Vec3Like, n: Vec3Like, _i: Vec3Like, e: number) =>
+  dirt: (fx: ImpactFx, p: Vec3Like, n: Vec3Like, _i: Vec3Like, e: number): void =>
     ground(fx, p, n, e, false),
-  sand: (fx: ImpactFx, p: Vec3Like, n: Vec3Like, _i: Vec3Like, e: number) =>
+  sand: (fx: ImpactFx, p: Vec3Like, n: Vec3Like, _i: Vec3Like, e: number): void =>
     ground(fx, p, n, e, true),
   glass,
   water,
   flesh,
   foliage,
-  fabric: (fx: ImpactFx, p: Vec3Like, n: Vec3Like, i: Vec3Like) => soft(fx, p, n, i, false),
-  rubber: (fx: ImpactFx, p: Vec3Like, n: Vec3Like, i: Vec3Like) => soft(fx, p, n, i, true),
+  fabric: (fx: ImpactFx, p: Vec3Like, n: Vec3Like, i: Vec3Like): void => soft(fx, p, n, i, false),
+  rubber: (fx: ImpactFx, p: Vec3Like, n: Vec3Like, i: Vec3Like): void => soft(fx, p, n, i, true),
 };
 
 /** Dispatch on surface name; unknown surfaces fall back to concrete. */

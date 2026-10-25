@@ -22,16 +22,16 @@ export class AttachmentConnection {
   ) {
     this.worker = worker;
     this.onFailure = onFailure;
-    this.initialized = new Promise<void>((resolve, reject) => {
+    this.initialized = new Promise<void>((resolve, reject): void => {
       this.cancelInit = resolve;
       this.rejectInit = reject;
       this.timer = setTimeout(
-        () => this.fail(new Error('[ai worker] initialization deadline exceeded')),
+        (): Error => this.fail(new Error('[ai worker] initialization deadline exceeded')),
         ATTACHMENT_DEADLINE_MS
       );
-      worker.onerror = (event) => this.fail(new Error(`[ai worker] ${event.message}`));
-      worker.onmessageerror = () => this.fail(new Error('[ai worker] invalid message'));
-      worker.onmessage = ({ data }: MessageEvent<unknown>) => {
+      worker.onerror = (event): Error => this.fail(new Error(`[ai worker] ${event.message}`));
+      worker.onmessageerror = (): Error => this.fail(new Error('[ai worker] invalid message'));
+      worker.onmessage = ({ data }: MessageEvent<unknown>): void => {
         if (!this.worker) return;
         try {
           const message = parseWorkerMessage(data);
@@ -58,7 +58,7 @@ export class AttachmentConnection {
     });
   }
 
-  send(message: ClientMessage) {
+  send(message: ClientMessage): void {
     if (!this.worker) throw new Error('[ai worker] connection closed');
     try {
       this.worker.postMessage(message);
@@ -77,7 +77,7 @@ export class AttachmentConnection {
     return failure;
   }
 
-  close() {
+  close(): void {
     const worker = this.worker;
     this.worker = null;
     clearTimeout(this.timer);
