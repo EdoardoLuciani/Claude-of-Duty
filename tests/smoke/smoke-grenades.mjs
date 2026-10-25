@@ -316,7 +316,10 @@ resetLive();
 pressG();
 assert.equal(wp.grenadeEquipped, false, 'with zero grenades G does not equip');
 
-// ---- overcook detonates in the hand ----------------------------------------
+// ---- overcook detonates in the hand, without synthetic fuse warnings --------
+const cookAudio = [],
+  previousAudio = wp.audio;
+wp.audio = { playUi: (kind) => cookAudio.push(kind) };
 wp.grenades = 2; // a market pack — the harness skipped init()
 pressG();
 input.firePressed = true;
@@ -330,6 +333,12 @@ assert.equal(wp.cooking, false, 'overcook ends the cook');
 assert.equal(wp.grenadeEquipped, false, 'overcook drops the grenade in the hand');
 const booms = events.filter((e) => e.type === 'explosion');
 assert.equal(booms.length, 1, 'overcook emits exactly one explosion');
+assert.deepEqual(
+  cookAudio,
+  [],
+  'arming and holding the full fuse are silent: no rejected pin donor or warning beep'
+);
+wp.audio = previousAudio;
 assert.equal(booms[0].payload.kind, 'grenade', 'overcook selects grenade audio');
 assert.equal(booms[0].payload.damage, GRENADE_DAMAGE, 'blast carries the tuned damage');
 assert.equal(booms[0].payload.radius, GRENADE_RADIUS, 'blast carries the tuned radius');

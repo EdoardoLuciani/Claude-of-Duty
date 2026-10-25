@@ -289,8 +289,13 @@ Tactical contact/reload/outgoing-grenade speech uses required offline-generated,
 locally bundled Opus recordings with source hashes, prompts and processing in
 `src/audio/samples/callouts/provenance.json`; authoring/rights notes live in
 `assets/audio/tactical-callouts/README.md`. No runtime TTS or credential access.
+Reached-segment bullet near-misses, material-mapped casing drops, family-matched dry
+fire and grenade throw foley also use required recordings. Physical grenade
+handling uses the foley bus; the pin cue is silent pending a suitable recording,
+and cooking the fuse has no synthetic warning beep. Empty
+triggers play a click without emitting a shot, muzzle flash or AI-hearing evidence.
 Remaining synthesis includes legacy AK/generic-suppressed reports and reinforcement,
-shell casings/dry fire and intentional UI cues. Other spoken intents remain deferred.
+intentional UI cues. Other spoken intents remain deferred.
 
 `models.getSoldier(name)` returns `{ name, geometry, slots, boneNames, weapon,
 stats, variant }`. Merge GLTF primitives into one skinned geometry with slot

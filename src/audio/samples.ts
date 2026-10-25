@@ -2,6 +2,7 @@ import type { AiCalloutKind, ReloadPhase } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
 import { AIRCRAFT_URLS } from './aircraft.ts';
 import { CALLOUT_URLS, CALLOUT_MIX, calloutBank } from './callouts.ts';
+import { COMBAT_URLS, type CombatKind } from './combat.ts';
 import { biquad, clamp, gain, series } from './dsp.ts';
 import {
   ENVIRONMENT_URLS,
@@ -111,6 +112,7 @@ const HEARTBEAT_URL = new URL('./samples/heartbeat.opus', import.meta.url).href;
 const CONTACT_URLS = {
   ...HIT_URLS,
   ...FOLEY_URLS,
+  ...COMBAT_URLS,
   ...REACTION_URLS,
   ...CALLOUT_URLS,
   ...ENVIRONMENT_URLS,
@@ -552,6 +554,22 @@ export class WeaponSampleBank {
       // Legacy isolated takes retain their separately tuned environmental send.
       send: (profile.sampleSend ?? 0.2) * (1 + Math.min(dist, 100) * 0.004),
     };
+  }
+
+  /** One required recorded physical cue, with source timing/identity left intact. */
+  combat(
+    kind: CombatKind,
+    rng: Rng,
+    o: { when?: number; level?: number; delay?: number; send?: number } = {}
+  ): AudioVoice {
+    const buffer = this._nextTake(kind, this.hitBuffers, this.hitIndices, rng, 'combat');
+    const src = this.actx.createBufferSource();
+    src.buffer = buffer;
+    const out = gain(this.actx, o.level ?? 1);
+    src.connect(out);
+    const when = (o.when ?? this.actx.currentTime) + Math.max(0, o.delay ?? 0);
+    src.start(when);
+    return { node: out, end: when + buffer.duration + 0.02, send: o.send ?? 0 };
   }
 
   /** Required recorded blast at every distance, with no synthetic reinforcement. */
