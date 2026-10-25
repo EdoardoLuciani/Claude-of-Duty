@@ -37,9 +37,6 @@ blender -b --python-exit-code 1 --python tools/blender/player_bandage.py
 node tests/smoke/smoke-arm-asset.mjs
 node tests/smoke/smoke-bandage.mjs
 node tests/smoke/smoke-grips.mjs
-node tests/e2e/check-bandage-intersections.mjs --dense --out=/tmp/bandage.json
-node tests/e2e/check-bandage-game.mjs --out=/tmp/bandage --video
-node tests/e2e/check-arm-surfaces.mjs
 ```
 
 Rebuild bandage after arms: the arms generator replaces the scene.

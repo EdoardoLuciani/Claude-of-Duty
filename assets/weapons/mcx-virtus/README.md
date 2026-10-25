@@ -44,7 +44,6 @@ blender -b --python-exit-code 1 --python tools/blender/mcx_virtus.py
 blender -b assets/weapons/mcx-virtus/mcx-virtus.blend \
   --python-exit-code 1 --python tools/blender/mcx_check.py
 node tests/smoke/smoke-mcx.mjs
-node tests/e2e/weapons-e2e.mjs
 ```
 
 Follow the [shared authoring workflow](../../../tools/blender/README.md).
