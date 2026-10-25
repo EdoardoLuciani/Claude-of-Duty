@@ -6,6 +6,7 @@ import { float, vec3, vec4 } from 'three/tsl';
 import { hasOwn, isClosable, isImageBitmap, isRecord } from '../../src/core/guards.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import {
+  isGroup,
   isMesh,
   isSingleMaterialMesh,
   isSkinnedMesh,
@@ -37,6 +38,9 @@ assert.equal(isMesh(mesh), true);
 assert.equal(isSingleMaterialMesh(mesh), true);
 assert.equal(isSingleMaterialMesh(new Mesh(geometry, [material])), false);
 assert.equal(isMesh(new Group()), false);
+assert.equal(isGroup(new Group()), true);
+assert.equal(isGroup(mesh), false);
+assert.equal(isGroup({ isGroup: true }), false);
 assert.equal(isMesh({ isMesh: true }), false, 'flags alone do not establish a Three instance');
 assert.equal(isSkinnedMesh(new SkinnedMesh(geometry, material)), true);
 const texture = new Texture();
