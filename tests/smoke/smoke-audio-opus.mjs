@@ -9,8 +9,17 @@ const module = readFileSync(new URL('../../src/audio/samples.ts', import.meta.ur
 const names = [...module.matchAll(/new URL\(['"]\.\/samples\/([a-z0-9-]+)\.opus['"]/g)].map(
   (m) => m[1]
 );
-assert.equal(names.length, 39, 'Legacy root bank excludes the retired single explosion take');
+assert.equal(
+  names.length,
+  39,
+  'Recorded report bank plus heartbeat; obsolete action/generic-suppressed takes removed'
+);
 assert.equal(new Set(names).size, 39);
+assert.deepEqual(
+  [...names].sort(),
+  Object.keys(reference.files).sort(),
+  'exact frozen reference coverage'
+);
 assert(!/new URL\(['"]\.\/samples\/[^'"]+\.wav/.test(module), 'WAV masters are not shipped');
 assert(
   !readdirSync(new URL('../../src/audio/samples/', import.meta.url)).some((n) =>
@@ -58,5 +67,5 @@ for (const name of names) {
 }
 assert(totalBytes < 4_000_000, 'High-quality delivery bank stays within4MB');
 console.log(
-  'PASS:39 legacy Opus assets (explosions covered by bank integrity), intact master durations/layouts, zero header gain, compact bank'
+  'PASS:39 root Opus assets (AK replaced, obsolete report layers removed), intact master durations/layouts, zero header gain, compact bank'
 );

@@ -107,7 +107,6 @@ const DRY_BANK: Record<string, CombatKind> = {
   rifle: 'dry-ar',
   mcx: 'dry-ar',
   lmg: 'dry-ar',
-  suppressed: 'dry-ar',
   ak: 'dry-ak',
   pistol: 'dry-pistol',
   smg: 'dry-smg',
