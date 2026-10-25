@@ -6,7 +6,7 @@ import { MeshBasicNodeMaterial } from 'three/webgpu';
 
 import type { AudioSystem } from '../audio/index.ts';
 import { bindingLabel } from '../core/bindings.ts';
-import type { EngineContext } from '../core/context.ts';
+import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
 import type { MarketSystem } from '../market/index.ts';
@@ -89,8 +89,8 @@ export class IntelSystem {
   declare secured: number;
   declare budget: number;
 
-  static id = 'intel';
-  static deps = ['world', 'player', 'market', 'ui', 'ai'];
+  static readonly id = 'intel';
+  static readonly deps: SystemId[] = ['world', 'player', 'market', 'ui', 'ai'];
 
   async init(ctx: IntelContext): Promise<void> {
     this.ctx = ctx;

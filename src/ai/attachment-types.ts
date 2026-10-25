@@ -236,7 +236,7 @@ export type QuerySample =
       actor: number | null;
       kind: string | null;
       frame: number | null;
-      key?: QueryKey | null;
+      key?: QueryKey | null | undefined;
       ms: number;
       roundTripMs: number | null;
       queueMs: number | null;
@@ -301,9 +301,9 @@ export type WorkerMessage =
       value: boolean;
       ms: number;
       moves: number;
-      repeatedStates?: number;
-      savedMoves?: number;
-      queueMs?: number;
+      repeatedStates?: number | undefined;
+      savedMoves?: number | undefined;
+      queueMs?: number | undefined;
       costs?: QueryCosts | null;
     };
 function snapshot(value: unknown): value is AttachmentSnapshot {

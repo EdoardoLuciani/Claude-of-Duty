@@ -4,18 +4,17 @@ import type { CardId } from '../intel/cards.ts';
 import type { SurfaceName } from '../physics/surfaces.ts';
 import type { PlayerState } from '../player/index.ts';
 import type { PlayerStance } from '../player/tuning.ts';
-import type { WEAPON_DEFS } from '../weapons/defs.ts';
+import type { WeaponClass, WeaponId } from '../weapons/defs.ts';
 
-/** Both gameplay definitions and compact dev/audio descriptors are supported. */
-export type EventWeapon =
-  | string
-  | (Partial<Pick<(typeof WEAPON_DEFS)[keyof typeof WEAPON_DEFS], 'id' | 'class'>> & {
-      audio?: string;
-      name?: string;
-      kind?: string;
-      suppressed?: boolean;
-    })
-  | null;
+/** Gameplay and AI identities are closed; compact descriptors must identify a weapon. */
+export type EventWeaponId = WeaponId | 'ai_rifle';
+export interface EventWeaponDescriptor {
+  id: EventWeaponId;
+  class?: WeaponClass;
+  audio?: string;
+  suppressed?: boolean;
+}
+export type EventWeapon = EventWeaponId | EventWeaponDescriptor | null;
 /** Mechanical beats also cover post-shot manual actions; end is hand settle only. */
 export type ReloadPhase =
   | 'start'

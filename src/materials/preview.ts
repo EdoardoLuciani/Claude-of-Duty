@@ -14,6 +14,7 @@ import * as THREE from 'three/webgpu';
 import { rendererCounters } from '../dev/render-info.ts';
 import { createWebGpuRenderer } from '../render/webgpu-device.ts';
 import { MaterialSystem } from './index.ts';
+import type { MaterialOptions } from './index.ts';
 
 interface PreviewInfo {
   calls: number;
@@ -169,7 +170,7 @@ if (VIEW === 'board') {
   // vertexMasks: true consumes the curvature masks baked below, so corners are
   // worn back and creases are dirty.
   const dbg = params.get('dbg') ?? '';
-  const M: Record<string, unknown> = { vertexMasks: true };
+  const M: MaterialOptions = { vertexMasks: true };
   if (dbg.includes('nopom')) M.parallax = 0;
   if (dbg.includes('nodetile')) M.detile = 0;
   if (dbg.includes('noweather')) M.weather = [0, 0, 0, 0];
@@ -185,7 +186,6 @@ if (VIEW === 'board') {
     });
     brick.map!.repeat.set(1, 1);
   }
-  if (dbg.includes('nograd')) brick = materials.get('brick', { ...M, noGrad: true });
   if (dbg.includes('meshuv')) brick = materials.get('brick', { ...M, uvMode: 'mesh', scale: 4 });
   const concrete = materials.get('concrete', M);
   const plaster = materials.get('plaster', M);

@@ -26,7 +26,7 @@
  * Events emitted:  market:open {wave}, market:close.
  */
 
-import type { EngineContext } from '../core/context.ts';
+import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
 import type { Health } from '../player/health.ts';
 import type { PlayerSystem } from '../player/index.ts';
@@ -168,8 +168,8 @@ const CATALOG = [
 ] as const;
 
 export class MarketSystem {
-  static id = 'market';
-  static deps = ['weapons', 'player'];
+  static readonly id = 'market';
+  static readonly deps: SystemId[] = ['weapons', 'player'];
   declare ctx: EngineContext;
   declare weapons: WeaponSystem;
   declare player: PlayerSystem;

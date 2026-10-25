@@ -3,6 +3,7 @@ import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import { isRecord } from './guards.ts';
 
+// Parsed optional metadata may be present as undefined; it is not a state patch.
 export type ModelVec3 = [number, number, number];
 export interface SoldierWeapon {
   muzzle: ModelVec3;
@@ -18,14 +19,14 @@ export interface SoldierVariant {
   plateTint: ModelVec3;
   skinTint: ModelVec3;
   helmet: boolean;
-  helmetCover?: boolean;
-  helmetTint?: ModelVec3;
-  headWrap?: boolean;
+  helmetCover?: boolean | undefined;
+  helmetTint?: ModelVec3 | undefined;
+  headWrap?: boolean | undefined;
   goggles: boolean;
-  gogglesDown?: boolean;
-  shades?: boolean;
+  gogglesDown?: boolean | undefined;
+  shades?: boolean | undefined;
   faceWrap: boolean;
-  maskHard?: boolean;
+  maskHard?: boolean | undefined;
   beard: boolean;
   kneePads: boolean;
   fullCarrier: boolean;
@@ -51,13 +52,13 @@ export interface WorldBuilding {
     z: number;
     w: number;
     d: number;
-    enterable?: boolean;
-    collapse?: boolean;
-    ruin?: boolean;
-    setback?: { from?: number };
+    enterable?: boolean | undefined;
+    collapse?: boolean | undefined;
+    ruin?: boolean | undefined;
+    setback?: { from?: number | undefined } | undefined;
   };
-  floorY?: number[];
-  roofY?: number;
+  floorY?: number[] | undefined;
+  roofY?: number | undefined;
 }
 export interface WorldLadder {
   kind: 'ladder';
@@ -66,25 +67,46 @@ export interface WorldLadder {
   y0: number;
   y1: number;
   radius: number;
-  nx?: number;
-  nz?: number;
+  nx?: number | undefined;
+  nz?: number | undefined;
+}
+export interface WorldIntelMarker {
+  id: string;
+  tag?: string | undefined;
+  position: ModelVec3;
+}
+export interface WorldMarkerData {
+  MARKERS?: { INTEL?: WorldIntelMarker[] | undefined } | undefined;
+}
+export interface WorldStreet {
+  halfWidth: number;
+  kerb: number;
+  walkH: number;
+  zMin: number;
+  zMax: number;
+}
+export interface WorldQueryData {
+  street?: WorldStreet | undefined;
+  alleys?: Array<{ rect: [number, number, number, number]; surface: string }> | undefined;
 }
 export interface WorldManifest {
   version: 2;
   sourceHash: string;
   assets: { visual: string; collision: string; nav: string };
-  navigation?: {
-    version: number;
-    sha256: string;
-    polygons?: number;
-    components?: number;
-    coverPoints?: number;
-  };
+  navigation?:
+    | {
+        version: number;
+        sha256: string;
+        polygons?: number | undefined;
+        components?: number | undefined;
+        coverPoints?: number | undefined;
+      }
+    | undefined;
   transform: number[];
   bounds: { min: ModelVec3; max: ModelVec3 };
-  spawns: Array<{ position: ModelVec3; forward?: ModelVec3; yaw: number; tag: string }>;
-  buildings?: WorldBuilding[];
-  volumes?: WorldLadder[];
+  spawns: Array<{ position: ModelVec3; forward?: ModelVec3 | undefined; yaw: number; tag: string }>;
+  buildings?: WorldBuilding[] | undefined;
+  volumes?: WorldLadder[] | undefined;
   stats: {
     staticTris: number;
     instTris: number;
@@ -101,11 +123,8 @@ export interface WorldManifest {
     day: number;
     night: number;
   }>;
-  WORLD?: { MARKERS?: { INTEL?: Array<{ id: string; tag?: string; position: ModelVec3 }> } };
-  query?: {
-    street?: { halfWidth: number; kerb: number; walkH: number; zMin: number; zMax: number };
-    alleys?: Array<{ rect: [number, number, number, number]; surface: string }>;
-  };
+  WORLD?: WorldMarkerData | undefined;
+  query?: WorldQueryData | undefined;
 }
 export interface WorldPrefetch {
   meta: WorldManifest;

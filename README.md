@@ -21,7 +21,8 @@ return types on every TypeScript function, method, getter and callback (includin
 contextually typed functions and functions returning functions). Constructors and
 setters have no return annotation; JavaScript helpers are outside this rule.
 The compiler also checks implicit missing returns, missing `override` modifiers,
-and switch fallthrough. Lint rejects floating/misused promises and unsafe narrowing
+switch fallthrough, and exact optional properties: omit unset patch fields rather
+than writing `undefined` over required defaults. Lint rejects floating/misused promises and unsafe narrowing
 assertions (including `as unknown as T`), as well as explicit `any` and unsafe
 assignment, argument, call, member access and return. Runtime boundaries must
 validate unknown data; owned records should be constructed with their full type.

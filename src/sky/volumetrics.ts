@@ -72,7 +72,7 @@ export interface VolumetricBuildOptions {
   invProj?: Node<'mat4'>;
   camWorld?: Node<'mat4'>;
   camPos?: Node<'vec3'>;
-  visibility?: (worldPos: Node<'vec3'>, noise?: Node<'float'>) => Node<'float'>;
+  visibility?: ((worldPos: Node<'vec3'>, noise?: Node<'float'>) => Node<'float'>) | undefined;
   frame?: Node<'float'>;
   uv?: Node<'vec2'>;
   coordinate?: Node<'vec2'>;

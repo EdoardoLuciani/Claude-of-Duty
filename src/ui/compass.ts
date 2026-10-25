@@ -25,7 +25,7 @@ const CARD: Record<number, string> = {
 interface CompassObjective {
   bearing: number;
   label?: string;
-  color?: string;
+  color?: string | undefined;
 }
 interface ScoreState {
   score?: number;

@@ -208,7 +208,7 @@ const bp = (name: string): Vec3 => {
  * @returns { geometry, materials: THREE.Material[], weapon, stats }
  */
 export interface SoldierMaterialFactory {
-  get(name: string, options?: Record<string, unknown>): THREE.Material;
+  get(name: string, options?: SoldierMaterialOptions): THREE.Material;
   glass(): THREE.Material;
 }
 export interface BuildSoldierResult {
@@ -216,7 +216,7 @@ export interface BuildSoldierResult {
   materials: THREE.Material[];
   slots: string[];
   parts: {
-    name?: string;
+    name?: string | undefined;
     material: string;
     start: number | undefined;
     count: number | undefined;

@@ -28,7 +28,7 @@
  * player:state, player:heartbeat, explosion. Optional `ai:bark` is picked up too.
  */
 
-import type { EngineContext } from '../core/context.ts';
+import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName, ReloadPhase } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
 import type { SurfaceName } from '../physics/surfaces.ts';
@@ -64,37 +64,37 @@ const CALLOUT_BLOCK = { pause: 1, shop: 2, death: 4, error: 8 } as const;
 
 type Vec3Like = { x: number; y: number; z: number };
 interface AudioOptions {
-  profile?: WeaponProfile;
-  firstPerson?: boolean;
-  miss?: number;
-  gain?: number;
-  surface?: SurfaceName;
-  energy?: number;
-  amount?: number;
-  armourAbsorbed?: number;
-  plateBreak?: boolean;
-  gait?: string;
-  level?: number;
-  gear?: number;
-  flight?: number;
-  phase?: ReloadPhase;
-  reloadWeapon?: string;
-  dryWeapon?: string;
-  explosionKind?: ExplosionKind;
-  bark?: string;
-  radio?: boolean;
-  which?: string;
-  send?: number;
-  maxDist?: number;
-  noDelay?: boolean;
-  extraDelay?: number;
-  occlusion?: number;
-  tracked?: boolean;
-  dist?: number;
-  voice?: number;
-  priority?: number;
-  bus?: BusName;
-  force?: boolean;
+  profile?: WeaponProfile | undefined;
+  firstPerson?: boolean | undefined;
+  miss?: number | undefined;
+  gain?: number | undefined;
+  surface?: SurfaceName | undefined;
+  energy?: number | undefined;
+  amount?: number | undefined;
+  armourAbsorbed?: number | undefined;
+  plateBreak?: boolean | undefined;
+  gait?: string | undefined;
+  level?: number | undefined;
+  gear?: number | undefined;
+  flight?: number | undefined;
+  phase?: ReloadPhase | undefined;
+  reloadWeapon?: string | undefined;
+  dryWeapon?: string | undefined;
+  explosionKind?: ExplosionKind | undefined;
+  bark?: string | undefined;
+  radio?: boolean | undefined;
+  which?: string | undefined;
+  send?: number | undefined;
+  maxDist?: number | undefined;
+  noDelay?: boolean | undefined;
+  extraDelay?: number | undefined;
+  occlusion?: number | undefined;
+  tracked?: boolean | undefined;
+  dist?: number | undefined;
+  voice?: number | undefined;
+  priority?: number | undefined;
+  bus?: BusName | undefined;
+  force?: boolean | undefined;
 }
 type AudioRuntimeContext = Pick<EngineContext, 'rng' | 'camera' | 'events' | 'peek'>;
 interface SpaceMetrics {
@@ -257,8 +257,8 @@ export class AudioSystem {
   declare _ambienceApi: AmbienceApi | null;
   declare _aircraft: Set<AircraftVoice>;
 
-  static id = 'audio';
-  static deps = [];
+  static readonly id = 'audio';
+  static readonly deps: SystemId[] = [];
 
   constructor() {
     this.running = false;
@@ -1075,7 +1075,7 @@ export class AudioSystem {
     const field = this.field!,
       mixer = this.mixer!;
     const w = p.weapon;
-    const name = typeof w === 'string' ? w : (w?.audio ?? w?.id ?? w?.name ?? w?.kind);
+    const name = typeof w === 'string' ? w : (w?.audio ?? w?.id);
     const profile = resolveProfile(name);
     // Removing the unused generic fallback must not substitute an unsuppressed report.
     if (!profile || (w && typeof w === 'object' && w.suppressed && !profile.suppressed)) return;

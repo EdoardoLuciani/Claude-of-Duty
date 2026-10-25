@@ -198,6 +198,7 @@ hot.dispose((): Promise<void> => Promise.resolve());
       'TS7029',
       'export function select(value: number): void { switch (value) { case 1: console.log(value); case 2: break; } }',
     ],
+    ['TS2375', 'export const patch: { value?: number } = { value: undefined };'],
   ];
   for (const [code, source] of compilerProbes) {
     const result = compile(source);
@@ -284,6 +285,13 @@ const incorrect: string = ctx.get('player').health;
 events.emit('player:heartbeat', { strength: 'wrong', fraction: 1 });
 // @ts-expect-error event names are canonical
 events.on('not-an-event', () => {});
+declare const ambiguousEvent: 'player:heartbeat' | 'resize';
+// @ts-expect-error a key union cannot accept a payload for only one possible key
+events.emit(ambiguousEvent, { strength: 1, fraction: 1 });
+declare const correlatedEvent:
+  | ['player:heartbeat', { strength: number; fraction: number }]
+  | ['resize', { width: number; height: number }];
+events.emit(...correlatedEvent);
 
 // Closed domains must survive provider/event/presentation boundaries.
 import { STATE } from ${JSON.stringify(join(root, 'src/ai/agent.ts'))};
@@ -416,6 +424,161 @@ if (model.id === 'rifle') {
 declare const pistol: AuthoredModels['pistol'];
 // @ts-expect-error loader contracts cannot associate an ID with a different adapter
 const wrongAdapter: AuthoredModels['rifle'] = pistol;
+
+// Registration must establish exactly the provider contract lookup promises.
+import { Registry } from ${JSON.stringify(join(root, 'src/core/registry.ts'))};
+import type { Engine } from ${JSON.stringify(join(root, 'src/core/engine.ts'))};
+import { MaterialSystemNode } from ${JSON.stringify(join(root, 'src/materials/index.ts'))};
+declare const engine: Engine;
+const registry = new Registry<EngineSystems>();
+registry.add('player', ctx.get('player'));
+const player: EngineSystems['player'] = registry.get('player');
+engine.add(MaterialSystemNode, { renderer: ctx.get('render').renderer });
+// @ts-expect-error the provider cannot determine/widen the registration key
+registry.add('player', ctx.get('audio'));
+// @ts-expect-error registration IDs are as closed as lookup IDs
+registry.add('not-a-system', ctx.get('player'));
+declare const ambiguousId: 'player' | 'audio';
+// @ts-expect-error a union key does not establish which provider is being registered
+registry.add(ambiguousId, ctx.get('player'));
+declare const ambiguousConstructor: {
+  readonly id: 'player' | 'audio';
+  new (): EngineSystems['player'];
+};
+// @ts-expect-error constructor identity and instance must remain correlated too
+engine.add(ambiguousConstructor);
+declare const badDependencies: {
+  readonly id: 'player';
+  readonly deps: ['wepaons'];
+  new (): EngineSystems['player'];
+};
+// @ts-expect-error static dependency names must use the provider map too
+engine.add(badDependencies);
+class FakePlayer {
+  static readonly id = 'player';
+  update(): void {}
+}
+// @ts-expect-error a valid-looking static ID does not establish the instance contract
+engine.add(FakePlayer);
+// @ts-expect-error direct registration cannot bypass Engine.add
+engine.registry.add('player', new FakePlayer());
+const dynamicRegistry = new Registry();
+// @ts-expect-error a dynamic registry cannot promise a concrete player implementation
+dynamicRegistry.get('player').setFlashlightEnabled(true);
+// @ts-expect-error lifecycle hooks cannot return arbitrary values
+dynamicRegistry.add('bad', { init(): number { return 1; } });
+
+// Authored overrides are closed, correctly typed and cannot erase required state.
+import { createConfig } from ${JSON.stringify(join(root, 'src/core/config.ts'))};
+import { applyDefinedPatch } from ${JSON.stringify(join(root, 'src/core/patch.ts'))};
+import { LIBRARY } from ${JSON.stringify(join(root, 'src/materials/library.ts'))};
+declare const materials: MaterialSystemNode;
+materials.get('concrete', { scale: 2, three: { physical: true, clearcoat: 0.5 } });
+materials.get('concrete', { three: { physical: false, roughness: 0.5 } });
+// @ts-expect-error physical-only properties require choosing the physical constructor
+materials.get('concrete', { three: { clearcoat: 0.5 } });
+// @ts-expect-error selecting a standard material cannot admit physical-only properties
+materials.get('concrete', { three: { physical: false, clearcoat: 0.5 } });
+// @ts-expect-error color nodes belong to the surface shader, not authoring options
+materials.get('concrete', { three: { colorNode: null } });
+// @ts-expect-error this remains true for physical materials
+materials.get('concrete', { three: { physical: true, normalNode: null } });
+// @ts-expect-error cloth emission is also owned by the surface shader
+materials.get('concrete', { three: { emissiveNode: null } });
+// @ts-expect-error surface option typos must not be accepted by an index signature
+materials.get('concrete', { normalStrenght: 0.8 });
+// @ts-expect-error nested Three options are checked too
+materials.get('concrete', { three: { metalnes: 1 } });
+// @ts-expect-error Three values retain their real types
+materials.get('concrete', { three: { roughness: 'very rough' } });
+// @ts-expect-error constructor selection is boolean, not arbitrary metadata
+materials.get('concrete', { three: { physical: 'false' } });
+// @ts-expect-error bake shader parameters have exactly four components
+materials.get('concrete', { bake: { param: [1, 0] } });
+// @ts-expect-error library-owned live uniforms are not caller authoring options
+materials.get('concrete', { tileNode: 2 });
+// @ts-expect-error removed legacy switches must not silently do nothing
+materials.get('concrete', { noGrad: true });
+// @ts-expect-error explicit undefined cannot erase a required surface default
+materials.get('concrete', { scale: undefined });
+// @ts-expect-error explicit undefined cannot erase a required bake default
+materials.get('concrete', { bake: { size: undefined } });
+// @ts-expect-error config overrides must omit unset fields
+createConfig({ fov: undefined });
+// @ts-expect-error weather patches follow the same omission contract
+ctx.get('sky').setWeather({ cloudCoverage: undefined });
+const statePatch = { value: 1 };
+applyDefinedPatch(statePatch, { value: 2 });
+// @ts-expect-error a patch must preserve target value types
+applyDefinedPatch(statePatch, { value: 'wrong' });
+// @ts-expect-error a patch cannot introduce unrelated fields
+applyDefinedPatch(statePatch, { other: 1 });
+const { sand, ...withoutSand } = LIBRARY;
+// @ts-expect-error every generated surface requires a library definition
+const incompleteLibrary: typeof LIBRARY = withoutSand;
+
+// Public options describe consumed data, not entire implementation objects.
+import type { ShellSystem } from ${JSON.stringify(join(root, 'src/fx/shells.ts'))};
+import type { Ambience } from ${JSON.stringify(join(root, 'src/fx/ambience.ts'))};
+import type { RaycastIgnore } from ${JSON.stringify(join(root, 'src/physics/index.ts'))};
+import type { ArmRig } from ${JSON.stringify(join(root, 'src/weapons/arm-asset.ts'))};
+import type { SoldierMaterialFactory } from ${JSON.stringify(join(root, 'src/ai/soldier.ts'))};
+declare const shells: ShellSystem;
+declare const ambience: Ambience;
+declare const arm: ArmRig;
+declare const soldierMaterials: SoldierMaterialFactory;
+shells.spawn(ctx.camera.position, { x: 1 });
+ambience.addColumn(0, 0, 0, { rate: 8, life: 3 });
+const ignoredContact: RaycastIgnore = { staticObject: 1, solid: 2 };
+// @ts-expect-error velocity inputs do not include Vector3 methods
+shells.spawn(ctx.camera.position, { normalize() { throw new Error(); } });
+// @ts-expect-error emitter bookkeeping is not an authoring control
+ambience.addColumn(0, 0, 0, { age: 3 });
+// @ts-expect-error hit measurements are not exclusion selectors
+const irrelevantContact: RaycastIgnore = { distance: 20 };
+// @ts-expect-error the decal's world is owned by FX, not its callers
+ctx.get('fx').addDecal(ctx.camera.position, ctx.camera.position, { world: null });
+// @ts-expect-error pooled projection coordinates are not decal options
+ctx.get('fx').addDecal(ctx.camera.position, ctx.camera.position, { point: ctx.camera.position });
+// @ts-expect-error arm poses are named strings, not opaque values
+arm.setPose(42);
+// @ts-expect-error offline soldier material options use their real authoring schema
+soldierMaterials.get('cloth', { normalScael: 1 });
+
+// Compact event descriptors must identify a weapon; arbitrary strings stay at external boundaries.
+import type { EventWeapon } from ${JSON.stringify(join(root, 'src/core/events.ts'))};
+const compactWeapon: EventWeapon = { id: 'pistol' };
+const aiWeapon: EventWeapon = 'ai_rifle';
+// @ts-expect-error an empty descriptor has no identity
+const emptyWeapon: EventWeapon = {};
+// @ts-expect-error suppressed alone is not an identity
+const unidentifiedWeapon: EventWeapon = { suppressed: true };
+// @ts-expect-error gameplay events do not accept arbitrary external strings
+const inventedWeapon: EventWeapon = 'not-a-weapon';
+
+// Optional snapshots/defaulted inputs can use ordinary undefined-valued properties.
+import type { QuerySample, WorkerMessage } from ${JSON.stringify(join(root, 'src/ai/attachment-types.ts'))};
+import type { Arm } from ${JSON.stringify(join(root, 'src/weapons/hands.ts'))};
+import type { VolumetricBuildOptions } from ${JSON.stringify(join(root, 'src/sky/volumetrics.ts'))};
+const querySample: QuerySample = {
+  type: 'query', actor: null, kind: null, frame: null, key: undefined,
+  ms: 0, roundTripMs: null, queueMs: null, moves: 0,
+};
+const workerSample: WorkerMessage = {
+  type: 'result', id: 1, value: true, ms: 0, moves: 0,
+  repeatedStates: undefined, savedMoves: undefined, queueMs: undefined,
+};
+const gripOptions: Parameters<Arm['fitGrip']>[1] = { fingers: undefined, spread: undefined };
+declare const fogInputs: VolumetricBuildOptions;
+const fogWithoutVisibility: VolumetricBuildOptions = { ...fogInputs, visibility: undefined };
+
+// Sparse/random inputs retain absence; nonempty choices do not invent it.
+import { Rng } from ${JSON.stringify(join(root, 'src/core/rng.ts'))};
+const rng = new Rng(1);
+const guaranteedChoice: number = rng.pick([1, 2]);
+const absentChoice: number | undefined = rng.pick([] as number[]);
+// @ts-expect-error an empty/dynamic array does not guarantee a choice
+const inventedChoice: number = rng.pick([] as number[]);
 `
   );
   writeFileSync(

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import { UNITS } from '../core/config.ts';
-import type { EngineContext, EngineSystems } from '../core/context.ts';
+import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName, EventWeapon } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
 import type { SurfaceName } from '../physics/surfaces.ts';
@@ -60,7 +60,13 @@ export type FxContext = Pick<
   'scene' | 'viewScene' | 'camera' | 'viewCamera' | 'config' | 'time' | 'rng' | 'events' | 'peek'
 >;
 type DecalWorld = NonNullable<Parameters<DecalSystem['add']>[0]['world']>;
-type FxDecalOptions = Parameters<DecalSystem['add']>[0] & { noFallback?: boolean };
+type DecalOptions = Parameters<DecalSystem['add']>[0];
+/** Projection inputs and world/time bookkeeping belong to FX, not its callers. */
+export type FxDecalOptions = Partial<
+  Omit<DecalOptions, 'point' | 'normal' | 'world' | 'now' | 'mask'>
+> & {
+  noFallback?: boolean;
+};
 interface FxTargetFrame {
   point: THREE.Vector3;
   normal: THREE.Vector3;
@@ -117,7 +123,7 @@ export class FxSystem {
   declare _tmpA: THREE.Vector3;
   declare _tmpB: THREE.Vector3;
   declare _camPos: THREE.Vector3;
-  declare _decalOpts: FxDecalOptions;
+  declare _decalOpts: DecalOptions;
   declare _off: Array<() => void>;
   declare _script: Array<{ t: number; fn: () => void }>;
   declare _scriptTime: number;
@@ -130,8 +136,8 @@ export class FxSystem {
   declare _target: FxTargetFrame | undefined;
   declare _probes: Float32Array | undefined;
   declare _warmScene: THREE.Scene;
-  static id = 'fx';
-  static deps = ['render', 'materials'];
+  static readonly id = 'fx';
+  static readonly deps: SystemId[] = ['render', 'materials'];
 
   async init(ctx: FxContext): Promise<void> {
     this.ctx = ctx;
@@ -520,9 +526,9 @@ export class FxSystem {
     weapon?: EventWeapon;
     view?: boolean;
     viewSpace?: boolean;
-    intensity?: number;
-    light?: number;
-    scale?: number;
+    intensity?: number | undefined;
+    light?: number | undefined;
+    scale?: number | undefined;
   }): ReturnType<typeof muzzleFlash> {
     this.now = this.ctx.time.elapsed;
     let pos = o.position;
@@ -559,10 +565,10 @@ export class FxSystem {
     position: new THREE.Vector3(),
     direction: new THREE.Vector3(),
     lightPos: new THREE.Vector3(),
-    weapon: undefined as Parameters<typeof muzzleFlash>[1]['weapon'],
-    intensity: 1 as number | undefined,
-    light: 1 as number | undefined,
-    scale: undefined as number | undefined,
+    weapon: undefined,
+    intensity: 1,
+    light: 1,
+    scale: undefined,
     view: false,
   };
   _lightPos = new THREE.Vector3();
@@ -632,9 +638,9 @@ export class FxSystem {
    * @param {THREE.Vector3} normal
    */
   addDecal(
-    point: THREE.Vector3,
-    normal: THREE.Vector3,
-    opts: Partial<FxDecalOptions> = {}
+    point: THREE.Vector3Like,
+    normal: THREE.Vector3Like,
+    opts: FxDecalOptions = {}
   ): boolean {
     if (this._suppressDecals) return false;
     const o = this._decalOpts;

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import { bindingLabel } from '../core/bindings.ts';
-import type { EngineContext, EngineSystems } from '../core/context.ts';
+import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 import type { ReloadPhase } from '../core/events.ts';
 import { Rng } from '../core/rng.ts';
 import { AmmoPickups } from './ammo-pickups.ts';
@@ -253,8 +253,8 @@ export class WeaponSystem {
   declare _scriptFrames: number[] | null;
   declare radioSys: EngineSystems['radio'] | null;
 
-  static id = 'weapons';
-  static deps = ['materials', 'physics', 'models'];
+  static readonly id = 'weapons';
+  static readonly deps: SystemId[] = ['materials', 'physics', 'models'];
 
   constructor() {
     this.states = new Map();
