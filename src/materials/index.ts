@@ -271,7 +271,7 @@ export class MaterialSystemNode {
   names(): string[] {
     return Object.keys(SURFACES_TSL);
   }
-  surfaceOf(name: string): string {
+  surfaceOf(name: string): import('../physics/surfaces.ts').SurfaceName {
     return LIBRARY[resolveName(name)]?.surface ?? 'concrete';
   }
   bakeMasks(

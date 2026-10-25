@@ -14,8 +14,10 @@ export const CARDS = Object.freeze([
 export type CardId = (typeof CARDS)[number]['id'];
 export type IntelCard = (typeof CARDS)[number];
 
-export function cardById(id: string): IntelCard | null {
-  return CARDS.find((card): boolean => card.id === id) ?? null;
+export function cardById(id: CardId): IntelCard {
+  const card = CARDS.find((card): boolean => card.id === id);
+  if (!card) throw new Error(`[intel] unknown card: ${id}`);
+  return card;
 }
 
 export interface RandomSource {

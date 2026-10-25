@@ -10,7 +10,7 @@ import { Input } from '../../src/core/input.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { spawnIntelSparks } from '../../src/fx/impacts.ts';
-import { shuffleDeck, drawCard, CARDS } from '../../src/intel/cards.ts';
+import { shuffleDeck, drawCard, cardById, CARDS } from '../../src/intel/cards.ts';
 import { IntelSystem } from '../../src/intel/index.ts';
 import { randomMarker, rollBudget } from '../../src/intel/spawn.ts';
 import { INTEL, lureInterval } from '../../src/intel/tuning.ts';
@@ -652,14 +652,28 @@ assert.equal(intel._alive.length, 0);
 assert.equal(intel._lastWave, 0);
 assert.equal(intel._announceAt, 0);
 assert(intel._pool.every((p) => !p.group.visible && !p.group.parent));
+assert.equal(intel.getHudState().card, null, 'no card is explicit before the first draw');
 const cards = new Set();
 for (let i = 0; i < 6; i++) {
   const spawned = intel._spawn({ id: `card-${i}`, x: i * 2, y: 0, z: 0 });
   intel._secure(spawned);
-  cards.add(intel.getHudState().card);
+  const card = intel.getHudState().card;
+  cards.add(card);
+  const event = emitted.filter((e) => e.type === 'intel:secured').at(-1);
+  assert.equal(event.card, card);
+  assert.equal(event.cardLabel, cardById(card).label);
 }
 assert.equal(cards.size, 6, 'six names drawn without repetition');
 assert.equal(intel.getHudState().secured, 6);
+intel._secure(intel._spawn({ id: 'exhausted', x: 14, y: 0, z: 0 }));
+const exhausted = emitted.filter((e) => e.type === 'intel:secured').at(-1);
+assert.equal(exhausted.card, null, 'exhaustion never emits an empty or invented card ID');
+assert.equal(exhausted.cardLabel, 'Intel');
+assert.equal(
+  exhausted.credits,
+  INTEL.credits,
+  'card exhaustion does not suppress the credit reward'
+);
 intel.dispose();
 ctx.events.emit('wave:complete', { wave: 20 });
 assert.equal(intel._alive.length, 0, 'dispose unsubscribes');

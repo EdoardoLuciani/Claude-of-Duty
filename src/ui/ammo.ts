@@ -1,3 +1,4 @@
+import type { WeaponMode } from '../weapons/defs.ts';
 import { el, svg, setText, setStyle, setClass, clamp01, ease } from './util.ts';
 
 const MAX_PIPS = 30;
@@ -69,7 +70,7 @@ interface AmmoState {
   reserve: number;
   weaponName?: string;
   name?: string;
-  fireMode?: string;
+  fireMode?: WeaponMode;
   reloading?: boolean;
   reloadProgress?: number;
   time?: number;
@@ -105,7 +106,7 @@ export class AmmoPanel {
   declare _lastPips: number;
   declare _lastCount: number;
   declare _lastName: string | null;
-  declare _lastMode: string | null;
+  declare _lastMode: WeaponMode | null;
   constructor(parent: HTMLElement) {
     this.root = el('div', 'ow-ammo', parent);
 
@@ -165,7 +166,7 @@ export class AmmoPanel {
     this._fitName(String(s.weaponName ?? s.name ?? 'M4A1'));
     // The badge reads AUTO / BURST / SEMI; uppercase once per mode change
     // rather than once per frame.
-    const mode = s.fireMode ?? 'AUTO';
+    const mode = s.fireMode ?? 'auto';
     if (mode !== this._lastMode) {
       this._lastMode = mode;
       setText(this.mode, mode.toUpperCase());

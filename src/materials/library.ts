@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 
+import type { SurfaceName } from '../physics/surfaces.ts';
 import type { SurfaceParams } from './shader-tsl.ts';
 
 /**
@@ -21,7 +22,7 @@ interface BakeDefinition {
   tintB?: number;
 }
 interface MaterialDefinition {
-  surface: string;
+  surface: SurfaceName;
   bake: BakeDefinition;
   mat: Partial<SurfaceParams>;
   three?: Record<string, unknown>;

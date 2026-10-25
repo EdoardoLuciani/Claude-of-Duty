@@ -67,5 +67,5 @@ export interface EngineContext {
   rng: Rng;
   get<K extends SystemId>(id: K): EngineSystems[K];
   peek<K extends SystemId>(id: K): EngineSystems[K] | null;
-  has(id: string): boolean;
+  has(id: SystemId): boolean;
 }

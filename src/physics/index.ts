@@ -87,6 +87,7 @@ import {
 import { Ballistics, type ActorRegionImpact } from './penetration.ts';
 import { Ragdoll, humanoidSpec, specFromSkeleton } from './ragdoll.ts';
 import { RigidBody, RigidBodyWorld } from './rigidbody.ts';
+import type { SurfaceName } from './surfaces.ts';
 import {
   LAYER,
   MASK,
@@ -116,7 +117,7 @@ export type PhysicsRigidBodyOptions = {
   angularDamping?: number;
   gravityScale?: number;
   surface?: number;
-  surfaceType?: string;
+  surfaceType?: SurfaceName;
   mask?: number;
   layer?: number;
   ccd?: boolean;
@@ -136,7 +137,7 @@ export interface PhysicsHit {
   normal: THREE.Vector3;
   distance: number;
   fraction: number;
-  surface: string;
+  surface: SurfaceName;
   surfaceIndex: number;
   ballisticSurfaceIndex: number;
   staticObject: number;
@@ -155,7 +156,7 @@ export interface PhysicsHit {
 interface StaticOptions {
   mask?: number;
   layer?: number;
-  ballisticSurface?: string | number;
+  ballisticSurface?: SurfaceName | number;
   sheetThickness?: number;
   userData?: unknown;
 }
@@ -203,8 +204,8 @@ export interface ColliderOptions {
   hy?: number;
   hz?: number;
   layer?: number;
-  surface?: string;
-  ballisticSurface?: string;
+  surface?: SurfaceName;
+  ballisticSurface?: SurfaceName;
   sheetThickness?: number;
   owner?: unknown;
   part?: string;
@@ -260,8 +261,9 @@ export class Collider {
     this.matrix = new THREE.Matrix4();
     this.inverse = new THREE.Matrix4();
     this.layer = opts.layer ?? LAYER.ACTOR;
-    this.surfaceIndex = surfaceIndex(opts.surface ?? 'flesh');
-    this.ballisticSurfaceIndex = surfaceIndex(opts.ballisticSurface, this.surfaceIndex);
+    this.surfaceIndex = surfaceIndex(opts.surface === undefined ? 'flesh' : opts.surface);
+    this.ballisticSurfaceIndex =
+      opts.ballisticSurface === undefined ? this.surfaceIndex : surfaceIndex(opts.ballisticSurface);
     this.sheetThickness = opts.sheetThickness ?? 0;
     this.owner = opts.owner ?? null;
     this.part = opts.part ?? null;
@@ -358,7 +360,7 @@ interface ImpactRecord {
   point: THREE.Vector3;
   normal: THREE.Vector3;
   incident: THREE.Vector3;
-  surface: string;
+  surface: SurfaceName;
   surfaceIndex: number;
   damage: number;
   exit: boolean;
@@ -534,7 +536,7 @@ export class PhysicsSystem {
    */
   addStatic(
     mesh: THREE.Mesh | THREE.InstancedMesh,
-    surfaceType?: string | number,
+    surfaceType?: SurfaceName | number,
     opts: StaticOptions = {}
   ): number {
     if (!mesh) return -1;
@@ -547,24 +549,33 @@ export class PhysicsSystem {
   /** Register every Mesh under an Object3D. Returns the handle list. */
   addStaticGroup(
     root: THREE.Object3D,
-    surfaceType?: string | number,
+    surfaceType?: SurfaceName | number,
     opts: StaticOptions = {}
   ): number[] {
     const ids: number[] = [];
     if (!root) return ids;
     root.updateWorldMatrix(true, true);
-    root.traverse((o: THREE.Object3D): void => {
-      if (!isCollisionMesh(o)) return;
-      if (o.userData?.collision === false || o.userData?.noCollision) return;
-      const metadataSurface: unknown = o.userData?.surface;
-      const resolvedSurface =
-        surfaceType ??
-        (typeof metadataSurface === 'string' || typeof metadataSurface === 'number'
-          ? metadataSurface
-          : undefined);
-      const id = this.addStatic(o, resolvedSurface, opts);
-      if (id >= 0) ids.push(id);
-    });
+    const registered = this._explicitStatics;
+    try {
+      root.traverse((o: THREE.Object3D): void => {
+        if (!isCollisionMesh(o)) return;
+        if (o.userData?.collision === false || o.userData?.noCollision) return;
+        const metadataSurface: unknown = o.userData?.surface;
+        const resolvedSurface =
+          surfaceType === undefined
+            ? metadataSurface === undefined
+              ? undefined
+              : surfaceIndex(metadataSurface)
+            : surfaceType;
+        const id = this.addStatic(o, resolvedSurface, opts);
+        if (id >= 0) ids.push(id);
+      });
+    } catch (error) {
+      // A failed group returns no handles: do not leave unreachable partial registrations.
+      for (let i = ids.length - 1; i >= 0; i--) this.removeStatic(ids[i]);
+      this._explicitStatics = registered;
+      throw error;
+    }
     return ids;
   }
 
@@ -1396,7 +1407,7 @@ export class PhysicsSystem {
 
   addRigidBody(opts: PhysicsRigidBodyOptions = {}): RigidBody {
     const b = new RigidBody(opts);
-    if (opts.surfaceType) b.surface = surfaceIndex(opts.surfaceType);
+    if (opts.surfaceType !== undefined) b.surface = surfaceIndex(opts.surfaceType);
     this.bodies.add(b);
     return b;
   }
@@ -1411,7 +1422,7 @@ export class PhysicsSystem {
     velocity: Vector3Like,
     opts: {
       size?: number;
-      surface?: string;
+      surface?: SurfaceName;
       shape?: 'box' | 'sphere' | 'capsule';
       mass?: number;
       restitution?: number;
@@ -1422,7 +1433,7 @@ export class PhysicsSystem {
     } = {}
   ): RigidBody {
     const s = opts.size ?? 0.08;
-    const si = surfaceIndex(opts.surface ?? 'concrete');
+    const si = surfaceIndex(opts.surface === undefined ? 'concrete' : opts.surface);
     const b = this.addRigidBody({
       shape: opts.shape ?? 'box',
       halfExtents: { x: s, y: s * 0.7, z: s * 0.85 },

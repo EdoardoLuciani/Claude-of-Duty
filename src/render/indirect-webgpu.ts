@@ -23,8 +23,7 @@ import {
   uniformArray,
   vec3,
 } from 'three/tsl';
-import { EnvironmentNode, MeshStandardNodeMaterial, Vector3, Vector4 } from 'three/webgpu';
-import type { Node } from 'three/webgpu';
+import { EnvironmentNode, MeshStandardNodeMaterial, Node, Vector3, Vector4 } from 'three/webgpu';
 
 import type { EngineContext, EngineSystems } from '../core/context.ts';
 import { isRecord } from '../core/guards.ts';
@@ -94,14 +93,14 @@ interface LightingNodeContext {
   irradiance: Node<'vec3'>;
   lightingModel: { clearcoatRadiance?: Node<'vec3'> | null };
 }
-function isLightingContext(value: unknown): value is LightingNodeContext {
+export function isLightingContext(value: unknown): value is LightingNodeContext {
   if (!isRecord(value) || !isRecord(value.lightingModel)) return false;
   for (const name of ['ambientOcclusion', 'iblIrradiance', 'radiance', 'irradiance']) {
     const node = value[name];
-    if (!isRecord(node) || node.isNode !== true) return false;
+    if (!(node instanceof Node)) return false;
   }
   const clearcoat = value.lightingModel.clearcoatRadiance;
-  return clearcoat == null || (isRecord(clearcoat) && clearcoat.isNode === true);
+  return clearcoat == null || clearcoat instanceof Node;
 }
 export class IndirectFill {
   declare ctx: IndirectContext;

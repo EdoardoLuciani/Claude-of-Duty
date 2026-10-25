@@ -15,6 +15,7 @@ import { HealController } from './heal.ts';
 import { Health } from './health.ts';
 import { LowHealthPass } from './lowhealth.ts';
 import { Movement } from './movement.ts';
+import type { PlayerMoveState } from './movement.ts';
 import { clamp, clamp01, lerp, approach, DEG } from './springs.ts';
 import {
   STANCE,
@@ -26,6 +27,9 @@ import {
   JUMP_SPEED,
   FLASHLIGHT,
 } from './tuning.ts';
+
+/** Presentation adds leaning without inventing a locomotion transition. */
+export type PlayerState = PlayerMoveState | 'lean';
 
 type PlayerMovement = Movement;
 type PlayerHitbox = ReturnType<PhysicsSystem['addCollider']>;
@@ -90,17 +94,10 @@ export class PlayerSystem {
   declare _jumpPayload: PlayerEventsMap['player:jump'];
   declare _hudState: PlayerHudState;
   declare _tmp: THREE.Vector3;
-  declare _prev: Required<
+  declare _prev: { state: PlayerState | null; stance: Movement['stance'] | null } & Required<
     Pick<
       PlayerEventsMap['player:state'],
-      | 'state'
-      | 'stance'
-      | 'sprinting'
-      | 'tacticalSprint'
-      | 'sliding'
-      | 'grounded'
-      | 'ads'
-      | 'mantling'
+      'sprinting' | 'tacticalSprint' | 'sliding' | 'grounded' | 'ads' | 'mantling'
     >
   >;
   declare _offEvents: Array<() => void>;
@@ -205,8 +202,8 @@ export class PlayerSystem {
     this._tmp = new THREE.Vector3();
     /** Last emitted discrete state, compared field-wise so no string is built. */
     this._prev = {
-      state: '',
-      stance: '',
+      state: null,
+      stance: null,
       sprinting: false,
       tacticalSprint: false,
       sliding: false,
@@ -663,7 +660,7 @@ export class PlayerSystem {
       q.ads !== s.ads ||
       q.mantling !== s.mantling
     ) {
-      q.state = s.state;
+      q.state = state;
       q.stance = s.stance;
       q.sprinting = s.sprinting;
       q.tacticalSprint = s.tacticalSprint;
@@ -808,7 +805,7 @@ export class PlayerSystem {
   get character(): import('../physics/character.ts').CharacterController | null {
     return this.movement.character;
   }
-  get state(): string | undefined {
+  get state(): PlayerState | undefined {
     return this._statePayload.state;
   }
   get stance(): 'stand' | 'crouch' | 'prone' {
@@ -975,7 +972,7 @@ export class PlayerSystem {
     this.rig.eyePosition.set(eyeOrPos.x, eyeOrPos.y, eyeOrPos.z);
     this.rig.fov = this.ctx.config.fov;
     this._lookFrame = this.ctx.time.frame;
-    this._prev.state = '';
+    this._prev.state = null;
   }
 
   respawn(index = 0): void {
@@ -1000,7 +997,7 @@ export class PlayerSystem {
 
   /** Named states for dev overlays and future shots. */
   debugState(name: string): {
-    state: string | undefined;
+    state: PlayerState | undefined;
     stance: 'stand' | 'crouch' | 'prone';
     speed: number;
     health: number;
@@ -1069,7 +1066,7 @@ export class PlayerSystem {
 
   /** Snapshot for the dev HUD / debugging. */
   get stats(): {
-    state: string | undefined;
+    state: PlayerState | undefined;
     stance: 'stand' | 'crouch' | 'prone';
     speed: number;
     vertical: number;

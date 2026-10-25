@@ -37,7 +37,7 @@ interface IntelPrompt {
 interface IntelHud {
   holding: boolean;
   progress: number;
-  card: string;
+  card: CardId | null;
   secured: number;
   pulses: Array<{ x: number; y: number; z: number; radius: number }>;
   pulseTime: number;
@@ -137,7 +137,7 @@ export class IntelSystem {
     this._sparkPayload = { position: new THREE.Vector3() };
     this._operationPayload = { active: false, position: new THREE.Vector3() };
     this._prompt = { key: bindingLabel('use'), text: 'Secure intel', sub: '', progress: 0 };
-    this._hud = { holding: false, progress: 0, card: '', secured: 0, pulses: [], pulseTime: 0 };
+    this._hud = { holding: false, progress: 0, card: null, secured: 0, pulses: [], pulseTime: 0 };
     this._pulseSlots = Array.from(
       { length: INTEL.aliveMax },
       (): { x: number; y: number; z: number; radius: 12 } => ({
@@ -152,7 +152,7 @@ export class IntelSystem {
     this._securePayload = {
       id: '',
       position: new THREE.Vector3(),
-      card: '',
+      card: null,
       cardLabel: '',
       credits: INTEL.credits,
     };
@@ -203,7 +203,7 @@ export class IntelSystem {
     const h = this._hud;
     h.holding = this._holding !== null;
     h.progress = this._holding ? this._hold / INTEL.hold : 0;
-    h.card = this._drawn[this._drawn.length - 1] ?? '';
+    h.card = this._drawn[this._drawn.length - 1] ?? null;
     h.secured = this.secured;
     h.pulseTime = this.ctx.time.elapsed;
     h.pulses.length = this._alive.length;
@@ -419,8 +419,8 @@ export class IntelSystem {
     const e = this._securePayload;
     e.id = cache.id;
     e.position.set(cache.x, cache.y + INTEL.targetHeight, cache.z);
-    e.card = card ?? '';
-    e.cardLabel = cardById(card ?? '')?.label ?? 'Intel';
+    e.card = card;
+    e.cardLabel = card ? cardById(card).label : 'Intel';
     this._despawn(cache);
     this._interrupt();
     this._clearPrompt();
