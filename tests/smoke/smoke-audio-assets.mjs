@@ -12,7 +12,11 @@ try {
   for (const failure of [null, ...failedUrls, 'decode']) {
     let decodes = 0;
     globalThis.fetch = async (url) => ({
-      ok: !failure || failure === 'decode' || !url.includes(failure),
+      // Match one asset, not e.g. both smg-1.opus and dry-smg-1.opus.
+      ok:
+        !failure ||
+        failure === 'decode' ||
+        !(url === failure || url.endsWith('/' + failure + '.opus')),
       status: 404,
       arrayBuffer: async () => new ArrayBuffer(1),
     });

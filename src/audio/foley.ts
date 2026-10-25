@@ -1,115 +1,22 @@
 /**
  * AUDIO / PROCEDURAL FOLEY
  *
- * Shell casings, recorded heartbeat playback and intentional UI cues.
+ * Recorded heartbeat playback and intentional UI cues.
  * Reload handling, physical contacts, boots, body falls and cloth use required
  * recordings through WeaponSampleBank; do not synthesize missing assets.
  */
 
 import type { Rng } from '../core/rng.ts';
-import { ad, biquad, gain, hit, osc, semis, series, struckResonator, sweep } from './dsp.ts';
+import { ad, biquad, gain, hit, osc, series, struckResonator, sweep } from './dsp.ts';
 import type { NoiseBank } from './dsp.ts';
 import type { AudioVoice } from './types.ts';
 interface VoiceOptions {
   when?: number;
   level?: number;
 }
-interface ShellOptions extends VoiceOptions {
-  flight?: number;
-  surface?: string;
-}
 type UiOptions = VoiceOptions;
 interface HeartbeatOptions extends VoiceOptions {
   buffer: AudioBuffer;
-}
-
-/* ------------------------------------------------------------------ */
-/* Shell casings                                                      */
-/* ------------------------------------------------------------------ */
-
-/**
- * A casing bounces 2–4 times with shortening intervals and then rolls. Brass on
- * concrete is one of the most recognisable sounds in a shooter; the trick is
- * that each bounce is a *different* set of partials because the shell lands on a
- * different part of itself.
- */
-export function shellCasing(
-  actx: BaseAudioContext,
-  bank: NoiseBank,
-  rng: Rng,
-  o: ShellOptions = {}
-): AudioVoice {
-  const t0 = (o.when ?? actx.currentTime) + (o.flight ?? rng.range(0.28, 0.52));
-  const surface = o.surface ?? 'concrete';
-  const hard =
-    surface === 'metal' || surface === 'concrete' || surface === 'glass' || surface === 'plaster';
-  const soft =
-    surface === 'dirt' || surface === 'sand' || surface === 'foliage' || surface === 'fabric';
-  const out = gain(actx, 1);
-  const base = rng.range(2650, 4200);
-  let t = t0;
-  let amp = (o.level ?? 1) * (soft ? 0.35 : 1) * rng.range(0.8, 1.1);
-  const bounces = soft ? 1 : 2 + ((rng.u32() % 3) | 0);
-  let end = t0;
-  for (let i = 0; i < bounces; i++) {
-    const detune = semis(rng.range(-4, 4));
-    struckResonator(
-      actx,
-      bank,
-      rng,
-      t,
-      [
-        {
-          f: base * detune,
-          q: rng.range(30, 60),
-          g: 0.95 * amp,
-          decay: rng.range(0.05, 0.13) * (hard ? 1 : 0.5),
-        },
-        {
-          f: base * detune * 1.87,
-          q: rng.range(24, 44),
-          g: 0.58 * amp,
-          decay: rng.range(0.03, 0.08),
-        },
-        {
-          f: base * detune * 3.1,
-          q: rng.range(16, 30),
-          g: 0.3 * amp,
-          decay: rng.range(0.015, 0.04),
-        },
-        { f: base * detune * 0.42, q: 12, g: 0.2 * amp, decay: 0.03 },
-      ],
-      0.0015
-    ).connect(out);
-    end = t + 0.2;
-    t += rng.range(0.045, 0.13) * (i === 0 ? 1 : 0.6);
-    amp *= rng.range(0.38, 0.62);
-    if (amp < 0.03) break;
-  }
-  // Roll: a stream of very quiet, very short pings.
-  if (hard && rng.float() < 0.55) {
-    const rolls = 3 + ((rng.u32() % 5) | 0);
-    for (let i = 0; i < rolls; i++) {
-      const rt = t + i * rng.range(0.018, 0.05);
-      struckResonator(
-        actx,
-        bank,
-        rng,
-        rt,
-        [
-          {
-            f: base * semis(rng.range(-5, 5)),
-            q: rng.range(20, 44),
-            g: rng.range(0.03, 0.09) * (o.level ?? 1),
-            decay: rng.range(0.01, 0.03),
-          },
-        ],
-        0.0012
-      ).connect(out);
-      end = Math.max(end, rt + 0.06);
-    }
-  }
-  return { node: out, end: end + 0.05, send: 0.42 };
 }
 
 /* ------------------------------------------------------------------ */
@@ -294,46 +201,6 @@ export function uiSound(
         o1.start(bt);
         o1.stop(bt + 0.16);
       }
-      break;
-    }
-    case 'grenade_pin': {
-      // Pin pull: a tight metallic double-click — pin, then the spoon spring.
-      const click = (t: number, f: number, g0: number, decay: number): void => {
-        const o = osc(actx, 'square', f);
-        const gg = gain(actx, 0);
-        o.connect(gg);
-        gg.connect(out);
-        ad(gg.gain, t, g0 * lvl, 0.002, decay);
-        o.start(t);
-        o.stop(t + decay + 0.05);
-      };
-      click(t0, 3400, 0.5, 0.03);
-      click(t0 + 0.07, 2200, 0.3, 0.035);
-      break;
-    }
-    case 'grenade_tick': {
-      // Cook warning: one short beep, reads as "almost done".
-      const o1 = osc(actx, 'square', 2200);
-      const lp = biquad(actx, 'lowpass', 5200, 0.7);
-      const g = gain(actx, 0);
-      o1.connect(lp);
-      lp.connect(g);
-      g.connect(out);
-      ad(g.gain, t0, 0.4 * lvl, 0.003, 0.05);
-      o1.start(t0);
-      o1.stop(t0 + 0.09);
-      break;
-    }
-    case 'grenade_throw': {
-      // Arm whip: a short bandpassed noise swell.
-      const src = bank.source('white', rng, 1.0);
-      const bp = biquad(actx, 'bandpass', 900, 0.8);
-      const g = gain(actx, 0);
-      src.connect(bp);
-      bp.connect(g);
-      g.connect(out);
-      ad(g.gain, t0, 0.5 * lvl, 0.01, 0.14);
-      src.start(t0, src._offset, 0.3);
       break;
     }
     case 'radio_open': {

@@ -44,7 +44,6 @@ const GRENADE_SPEED = 15; // m/s — SHORT throw keeps roughly today's reach
 const GRENADE_LONG_SPEED = 30; // m/s — LONG throw, over double the reach
 const GRENADE_SHORT_UP = 1.2; // vertical bias (m/s) of the short toss
 const GRENADE_LONG_UP = 2.6; // vertical bias (m/s) — a lofted arc, not a laser
-const GRENADE_TICK_AT = 0.5; // s left on the fuse when the warning tick plays
 
 interface WeaponPoseState {
   ads: boolean;
@@ -221,7 +220,6 @@ export class WeaponSystem {
   declare _cookAction: 'fire' | 'ads' | null;
   declare _throwType: string;
   declare _cookTime: number;
-  declare _cookTicked: boolean;
   declare _throwing: boolean;
   declare _throwReleased: boolean;
   declare _throwFuse: number;
@@ -317,7 +315,6 @@ export class WeaponSystem {
     this._cookAction = null;
     this._throwType = 'long'; // decided by the action at cook start
     this._cookTime = 0;
-    this._cookTicked = false;
     this._throwing = false; // release accepted; arm anim in flight
     this._throwReleased = false; // release beat fired: the grenade is out
     this._throwFuse = 0; // fuse decided at release, spent at the release beat
@@ -922,7 +919,8 @@ export class WeaponSystem {
     this._interruptHeal('fire');
     if (this.grenadeEquipped || this.radioEquipped || this.healing) return false;
     if (!s.chambered) {
-      // Dry-fire cooldown.
+      // Physical empty-trigger feedback; do not emit a shot/muzzle flash or alert AI.
+      this.audio?.play?.('dryfire', null, { dryWeapon: s.def.id });
       this._fireTimer = 0.25;
       return false;
     }
@@ -1131,7 +1129,6 @@ export class WeaponSystem {
         this.cooking = false;
         this._cookAction = null;
         this._cookTime = 0;
-        this._cookTicked = false;
         this.ui?.clearPrompt?.();
         break;
       case 'end':
@@ -1390,10 +1387,6 @@ export class WeaponSystem {
       this._viewmodel?.throwGrenade(this._throwType);
       return;
     }
-    if (!this._cookTicked && GRENADE_FUSE - this._cookTime <= GRENADE_TICK_AT) {
-      this._cookTicked = true;
-      this.audio?.playUi?.('grenade_tick', 0.9);
-    }
   }
 
   /** Pull the pin and start the fuse — the moment the grenade is spent. */
@@ -1404,10 +1397,8 @@ export class WeaponSystem {
     this._throwType = type;
     this._cookAction = action;
     this._cookTime = 0;
-    this._cookTicked = false;
     this.grenades--;
     this._viewmodel?.cookGrenade(type);
-    this.audio?.playUi?.('grenade_pin', 0.9);
   }
 
   /** Shared grenade/radio hand-state clear. Does not drop a committed throw. */
