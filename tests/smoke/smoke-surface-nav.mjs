@@ -428,9 +428,9 @@ assert.ok(live.canStand(w5.from) && entry.probeGround(), 'W5 starts supported an
 map.physics.removeCharacter(entry);
 assert.equal(
   map.meta.navigation.sha256,
-  // Type-safety migration refreshes source-byte provenance only.
+  // Canonical surface contracts refresh source-byte provenance only.
   // The unchanged physical payload hash below also guards the preceding bake.
-  'f93170e65a9081728c4a055e25f24499ea80911823ca7b12c036ddf8552cdacd',
+  '9d34b999f8a2f19f0d9b58056597990811bd42e19e73b8d0b77867b928f6d7e2',
   're-measure recorded fixture outcomes after changing baked assets'
 );
 const physicalPayload = map.surfaceRaw.subarray(64 + map.surfaceRaw.readUInt32LE(8));

@@ -180,14 +180,9 @@ export class RadioSystem {
 
   /** Warm real MRT/forward variants without starting a strike or drawing geometry. */
   async prewarmMaterials(): Promise<
-    | { ok: boolean; reason: string; graphWarm?: undefined; error?: undefined }
-    | {
-        ok: boolean;
-        graphWarm: { ms: number; geometries: number; frameUnchanged: boolean };
-        reason?: undefined;
-        error?: undefined;
-      }
-    | { ok: boolean; error: string; reason?: undefined; graphWarm?: undefined }
+    | { ok: false; reason: string }
+    | { ok: true; graphWarm: Awaited<ReturnType<EngineSystems['render']['_warmGraph']>> }
+    | { ok: false; error: string }
     | undefined
   > {
     if (this._warmed) return;

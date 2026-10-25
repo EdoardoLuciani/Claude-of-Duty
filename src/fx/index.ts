@@ -4,6 +4,7 @@ import { UNITS } from '../core/config.ts';
 import type { EngineContext, EngineSystems } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName, EventWeapon } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
+import type { SurfaceName } from '../physics/surfaces.ts';
 import { Ambience } from './ambience.ts';
 import { loadFxAtlases, P, D } from './atlas.ts';
 import { DecalSystem } from './decals.ts';
@@ -48,7 +49,7 @@ interface FxImpactEvent {
   point: THREE.Vector3;
   normal: THREE.Vector3;
   incident?: THREE.Vector3;
-  surface: string;
+  surface: SurfaceName;
   damage: number;
   exit?: boolean;
   actor?: unknown;
@@ -65,7 +66,7 @@ interface FxTargetFrame {
   normal: THREE.Vector3;
   tangent: THREE.Vector3;
   bitangent: THREE.Vector3;
-  surface: string;
+  surface: SurfaceName;
   world: DecalWorld | null;
   distance: number;
   spanU: number;
@@ -1136,7 +1137,12 @@ export class FxSystem {
   }
 
   /** Fake a bullet:impact at an offset on the staged surface. */
-  _impactAt(target: FxTargetFrame, u: number, v: number, surfaceOverride?: string | null): void {
+  _impactAt(
+    target: FxTargetFrame,
+    u: number,
+    v: number,
+    surfaceOverride?: SurfaceName | null
+  ): void {
     this._p
       .copy(target.point)
       .addScaledVector(target.tangent, u)
@@ -1245,7 +1251,7 @@ export class FxSystem {
   }
 
   /** Surface name per probe hit; sized once, reused (see `_findTarget`). */
-  _probeSurf = new Array<string>(63).fill('concrete');
+  _probeSurf = new Array<SurfaceName>(63).fill('concrete');
   _probeCount = 0;
 
   _findTarget(): FxTargetFrame {
@@ -1263,7 +1269,7 @@ export class FxSystem {
     });
     this._camPos.setFromMatrixPosition(cam.matrixWorld);
     const ph = this.physics;
-    let best = null;
+    let best: Pick<FxTargetFrame, 'point' | 'normal' | 'surface' | 'distance'> | null = null;
     let bestDist = Infinity;
     if (ph?.raycast && (ph.staticWorld?.triCount ?? 0) > 0) {
       // Fan of probes: prefer something in the 1.5-9 m band, which is where a
@@ -1332,7 +1338,7 @@ export class FxSystem {
           best = best ?? {
             point: new THREE.Vector3(),
             normal: new THREE.Vector3(),
-            surface: '',
+            surface: 'concrete',
             distance: 0,
           };
           best.point.set(probes[a], probes[a + 1], probes[a + 2]);

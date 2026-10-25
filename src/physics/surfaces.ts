@@ -27,7 +27,17 @@ export const SURFACE_NAMES = [
   'rubber',
   'plaster',
 ] as const;
-type SurfaceName = (typeof SURFACE_NAMES)[number];
+export type SurfaceName = (typeof SURFACE_NAMES)[number];
+
+export function isSurfaceName(value: unknown): value is SurfaceName {
+  return typeof value === 'string' && hasOwn(SURFACE, value);
+}
+
+/** Explicit authored metadata must use the canonical vocabulary, never fuzzy inference. */
+export function parseSurfaceName(value: unknown): SurfaceName {
+  if (!isSurfaceName(value)) throw new Error(`[physics] invalid surface: ${String(value)}`);
+  return value;
+}
 interface SurfaceProps {
   penDepth: number;
   energyLoss: number;
@@ -203,14 +213,17 @@ export const SURFACE_PROPS: SurfaceProps[] = [
   },
 ];
 
-/** Resolve a surface name (or index, or undefined) to a valid index. */
-export function surfaceIndex(s: unknown, fallback = SURFACE.concrete): number {
-  if (typeof s === 'number') return s >= 0 && s < SURFACE_NAMES.length ? s | 0 : fallback;
-  if (typeof s === 'string') {
-    if (hasOwn(SURFACE, s)) return SURFACE[s];
-    return guessSurface(s, fallback);
-  }
-  return fallback;
+/** Parse an explicit surface name/index. Omitted values and label inference belong to callers. */
+export function surfaceIndex(value: unknown): number {
+  if (isSurfaceName(value)) return SURFACE[value];
+  if (
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= 0 &&
+    value < SURFACE_NAMES.length
+  )
+    return value;
+  throw new Error(`[physics] invalid surface: ${String(value)}`);
 }
 
 const GUESS: [RegExp, number][] = [
@@ -238,7 +251,7 @@ export function guessSurface(name: string | null | undefined, fallback = SURFACE
   return fallback;
 }
 
-export function surfaceName(i: number): string {
+export function surfaceName(i: number): SurfaceName {
   return SURFACE_NAMES[i] ?? 'concrete';
 }
 

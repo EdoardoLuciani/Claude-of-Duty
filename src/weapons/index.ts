@@ -68,7 +68,7 @@ interface WeaponPoseState {
 }
 interface WeaponHudState {
   name: string;
-  mode: string;
+  mode: WeaponMode;
   ammo: number;
   reserve: number;
   magSize: number;
@@ -654,7 +654,7 @@ export class WeaponSystem {
     };
   }
 
-  get fireMode(): string {
+  get fireMode(): WeaponMode {
     return this.state?.mode ?? 'semi';
   }
 

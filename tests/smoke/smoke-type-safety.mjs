@@ -285,6 +285,83 @@ events.emit('player:heartbeat', { strength: 'wrong', fraction: 1 });
 // @ts-expect-error event names are canonical
 events.on('not-an-event', () => {});
 
+// Closed domains must survive provider/event/presentation boundaries.
+import { STATE } from ${JSON.stringify(join(root, 'src/ai/agent.ts'))};
+import type { Agent, AiState } from ${JSON.stringify(join(root, 'src/ai/agent.ts'))};
+import type { PlayerMoveState } from ${JSON.stringify(join(root, 'src/player/movement.ts'))};
+import type { PlayerState } from ${JSON.stringify(join(root, 'src/player/index.ts'))};
+import type { SurfaceName } from ${JSON.stringify(join(root, 'src/physics/surfaces.ts'))};
+import type { FoleyOptions } from ${JSON.stringify(join(root, 'src/audio/physical.ts'))};
+import type { CardId } from ${JSON.stringify(join(root, 'src/intel/cards.ts'))};
+import type { Mixer } from ${JSON.stringify(join(root, 'src/audio/mixer.ts'))};
+declare const agent: Agent;
+declare const mixer: Mixer;
+declare const mesh: import('three').Mesh;
+ctx.has('telemetry');
+// @ts-expect-error optional provider checks must use the same IDs as get/peek
+ctx.has('telemetery');
+agent._setState(STATE.COMBAT);
+const aiState: AiState = agent.state;
+// @ts-expect-error invalid AI transitions must not silently idle the actor
+agent._setState('comabt');
+// @ts-expect-error direct state writes retain the same finite vocabulary
+agent.state = 'typo';
+const move = ctx.get('player').movement;
+move._setState('climb');
+const previousMove: PlayerMoveState = move.prevState;
+// @ts-expect-error locomotion state is closed
+move._setState('tac-sprint');
+// @ts-expect-error lean is a presentation modifier, not a locomotion state
+move._setState('lean');
+events.on('player:state', e => {
+  const state: PlayerState | undefined = e.state;
+  return state;
+});
+const surface: SurfaceName = ctx.get('physics').raycast({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 }, 1).surface;
+const materialSurface: SurfaceName = ctx.get('materials').surfaceOf('asphalt');
+ctx.get('physics').addStatic(mesh, 'metal');
+ctx.get('physics').addCollider({ surface: 'flesh', ballisticSurface: 'fabric' });
+// @ts-expect-error explicit collision surfaces cannot be fuzzy material labels
+ctx.get('physics').addStatic(mesh, 'metal_panel');
+// @ts-expect-error ballistic surfaces use the same vocabulary as finishes
+ctx.get('physics').addCollider({ ballisticSurface: 'metla' });
+// @ts-expect-error canonical names survive the event bus
+events.emit('player:land', { velocity: 1, surface: 'concret' });
+const foley: FoleyOptions = { surface: 'metal' };
+// @ts-expect-error audio consumes canonical surfaces, not arbitrary strings
+const badFoley: FoleyOptions = { surface: 'metla' };
+mixer.bus('weapons');
+mixer.sendBus('foley');
+// @ts-expect-error incorrect routing must not silently select foley
+mixer.bus('wepaons');
+// @ts-expect-error reverb sends retain the same routing domain
+mixer.sendBus('foely');
+// @ts-expect-error spatial emitter options retain the bus vocabulary
+ctx.get('audio').play('step', null, { bus: 'foely' });
+// @ts-expect-error dry playback must not widen the route
+ctx.get('audio')._playDry('step', {}, 'foely');
+// @ts-expect-error volume controls retain the same route vocabulary
+ctx.get('audio').setBusVolume('foely', 1);
+const hudMode: WeaponMode = ctx.get('weapons').getHudState().mode;
+const fireMode: WeaponMode = ctx.get('weapons').fireMode;
+const uiMode: WeaponMode = ctx.get('ui').state.fireMode;
+const intelCard: CardId | null = ctx.get('intel').getHudState().card;
+// @ts-expect-error card IDs must survive the event boundary
+events.emit('intel:secured', { id: 'case', position: ctx.camera.position, card: 'typo', cardLabel: 'Typo', credits: 500 });
+events.emit('intel:secured', { id: 'case', position: ctx.camera.position, card: null, cardLabel: 'Intel', credits: 500 });
+// @ts-expect-error UI state is semantic; casing belongs only in rendered text
+ctx.get('ui').state.fireMode = 'AUTO';
+
+type RadioWarm = Awaited<ReturnType<EngineSystems['radio']['prewarmMaterials']>>;
+declare const radioWarm: RadioWarm;
+if (radioWarm?.ok) {
+  const milliseconds: number = radioWarm.graphWarm.ms;
+  // @ts-expect-error success cannot expose an error branch
+  radioWarm.error;
+}
+// @ts-expect-error a successful warmup must carry the provider's actual graph result
+const wrongWarm: RadioWarm = { ok: true, reason: 'no renderer' };
+
 // Weapon data, runtime state, loaders and market share the same domain.
 import { WEAPON_DEFS, isWeaponId } from ${JSON.stringify(join(root, 'src/weapons/defs.ts'))};
 import type { WeaponId, WeaponDef, WeaponMode } from ${JSON.stringify(join(root, 'src/weapons/defs.ts'))};

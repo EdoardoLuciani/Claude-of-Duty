@@ -1,8 +1,11 @@
+import type { SurfaceName } from '../physics/surfaces.ts';
 import type { FoleyKind } from './foley-urls.ts';
 
 /** Explicit related-material mappings; source/design limits are intentional related-material approximations. */
-export const IMPACT_BANK: Record<string, FoleyKind> = {
+export const IMPACT_BANK = {
   concrete: 'impact-concrete',
+  // Flesh impacts use the recorded body-hit path; direct generic requests keep the hard fallback.
+  flesh: null,
   plaster: 'impact-concrete',
   metal: 'impact-metal',
   wood: 'impact-wood',
@@ -13,10 +16,10 @@ export const IMPACT_BANK: Record<string, FoleyKind> = {
   foliage: 'impact-foliage',
   fabric: 'impact-fabric',
   rubber: 'impact-rubber',
-};
+} satisfies Record<SurfaceName, FoleyKind | null>;
 const concrete = { walk: 'step-concrete-walk', run: 'step-concrete-run' } as const;
 const fabric = { walk: 'step-fabric-walk', run: 'step-fabric-run' } as const;
-export const STEP_BANK: Record<string, { walk: FoleyKind; run: FoleyKind }> = {
+export const STEP_BANK: Record<SurfaceName, { walk: FoleyKind; run: FoleyKind }> = {
   concrete,
   plaster: concrete,
   metal: { walk: 'step-metal-walk', run: 'step-metal-run' },
@@ -30,7 +33,7 @@ export const STEP_BANK: Record<string, { walk: FoleyKind; run: FoleyKind }> = {
   flesh: fabric,
   water: fabric,
 };
-export const FALL_BANK: Record<string, FoleyKind> = {
+export const FALL_BANK: Record<SurfaceName, FoleyKind> = {
   concrete: 'fall-hard',
   plaster: 'fall-hard',
   metal: 'fall-hard',
@@ -75,7 +78,7 @@ export const FOLEY_MIX = {
 } as const;
 export interface FoleyOptions {
   when?: number;
-  surface?: string;
+  surface?: SurfaceName;
   gait?: string;
   level?: number;
   gear?: number;

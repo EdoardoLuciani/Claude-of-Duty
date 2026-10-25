@@ -4,6 +4,7 @@ import type { EngineContext, EngineSystems } from '../core/context.ts';
 import { hasOwn } from '../core/guards.ts';
 import type { WorldManifest } from '../core/model-metadata.ts';
 import type { Rng } from '../core/rng.ts';
+import { parseSurfaceName } from '../physics/surfaces.ts';
 import { tickStreetlightOutage } from './lighting.ts';
 import { PALETTE } from './palette.ts';
 import { WorldQueries } from './queries.ts';
@@ -169,9 +170,7 @@ export class WorldSystem {
     const physics = ctx.peek('physics');
     this.collisionRoot.traverse((object): void => {
       if (!isWorldMesh(object)) return;
-      const surface: unknown = object.userData?.surface;
-      if (typeof surface !== 'string' || !surface)
-        throw new Error(`[world] missing collision surface on ${object.name}`);
+      const surface = parseSurfaceName(object.userData?.surface);
       if (Array.isArray(object.material))
         object.material.forEach((m): Set<THREE.Material<THREE.MaterialEventMap>> =>
           collisionPlaceholders.add(m)
