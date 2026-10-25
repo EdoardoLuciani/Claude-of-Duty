@@ -77,7 +77,7 @@ export function value(): string {
     'export const missing: () => number = () => 1;',
     'export const missing = [1].map(value => value + 1);',
     'export function missing() { return (): number => 1; }',
-    'export const missing = () => ({ value: 1 } as const);',
+    'export const missing = () => 1 as const;',
     'export const missing = (() => 1)();',
   ];
   for (const source of missingReturns) {
@@ -103,7 +103,7 @@ export const arrow = (): number => 1;
 export const typed: () => number = (): number => 1;
 export const mapped = [1].map((value): number => value + 1);
 export function higherOrder(): () => number { return (): number => 1; }
-export const constant = (): { readonly value: 1 } => ({ value: 1 } as const);
+export const constant = (): 1 => 1 as const;
 export const immediate = ((): number => 1)();
 `);
   assert.equal(explicitReturns.status, 0, explicitReturns.stdout + explicitReturns.stderr);
