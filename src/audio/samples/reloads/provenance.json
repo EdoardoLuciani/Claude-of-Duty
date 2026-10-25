@@ -518,8 +518,7 @@
       "level": 0.5893306486053467,
       "sha256": "ef81719f4569f227105676aa57ebebf14d3a78d45055460349848ce5d2f4dae4",
       "source": "BOOM ONE Update/Update 24-02/GUNS/MECHANISM/GUNMech_Remington 870 Shotgun Load_B00M_ONE.wav",
-      "start": 0.76,
-      "downmixLossDb": 0.8211954044816948
+      "start": 0.76
     },
     "shell-in-2": {
       "duration": 0.23,
@@ -527,8 +526,7 @@
       "level": 0.6589226584012594,
       "sha256": "141beeeab3a85ed49526428805166cb050ad67a633a88355350649e140249e86",
       "source": "BOOM ONE Update/Update 24-02/GUNS/MECHANISM/GUNMech_Remington 870 Shotgun Load_B00M_ONE.wav",
-      "start": 3.1,
-      "downmixLossDb": 0.8007088407537808
+      "start": 3.1
     },
     "shell-in-3": {
       "duration": 0.18,
@@ -536,8 +534,7 @@
       "level": 0.6752682914907198,
       "sha256": "d8713470deaa78013b03b5354ecbcde440cc00be369153b31bc93d06c23ad065",
       "source": "BOOM ONE Update/Update 24-02/GUNS/MECHANISM/GUNMech_Remington 870 Shotgun Load_B00M_ONE.wav",
-      "start": 5.56,
-      "downmixLossDb": 1.1395133887142763
+      "start": 5.56
     },
     "gear-1": {
       "duration": 0.22,
@@ -545,8 +542,7 @@
       "level": 1.45866621622562,
       "sha256": "68c171a7bc30067e81cdf73213edacc4cd70e3af95a01d693acc87fc5318c212",
       "source": "BOOM ONE Update/Update 24-03/OBJECTS/BAG/OBJBag_Tactical Gear Vest Handle_B00M_ONE.wav",
-      "start": 0.17,
-      "downmixLossDb": 0.34439966827118335
+      "start": 0.17
     },
     "gear-2": {
       "duration": 0.19,
@@ -554,8 +550,7 @@
       "level": 1.0245563109855291,
       "sha256": "1cf5f41a4553680adbacfd7af3446c5c912321886383f06fe4bfb3f1a9b50025",
       "source": "BOOM ONE Update/Update 24-03/OBJECTS/BAG/OBJBag_Tactical Gear Vest Handle_B00M_ONE.wav",
-      "start": 0.78,
-      "downmixLossDb": 1.0119966592283727
+      "start": 0.78
     },
     "gear-3": {
       "duration": 0.25,
@@ -563,8 +558,7 @@
       "level": 3.922809307503265,
       "sha256": "b6c97fb916799d4ae9429918308e4a805cc49017614e017b3d0edbf36b19aa95",
       "source": "BOOM ONE Update/Update 24-03/OBJECTS/BAG/OBJBag_Tactical Gear Vest Handle_B00M_ONE.wav",
-      "start": 6.06,
-      "downmixLossDb": 0.5595508892708901
+      "start": 6.06
     },
     "pouch-out-1": {
       "layers": [
@@ -572,14 +566,12 @@
           "source": "BOOM ONE Update/Update 24-03/OBJECTS/BAG/OBJBag_Tactical Gear Backpack Small Take Out 01_B00M_ONE.wav",
           "start": 0.51,
           "duration": 0.3,
-          "downmixLossDb": 0.28820126433889875,
           "level": 1
         },
         {
           "source": "Boom One Update/Update 23-12/EQUIPMENT/TACTICAL/EQUIPTact_Ammo Box Latch Opening Short_B00M_ONE.wav",
           "start": 0.2,
           "duration": 0.14,
-          "downmixLossDb": 0.0005239166720724994,
           "level": 0.2
         }
       ],
@@ -594,14 +586,12 @@
           "source": "BOOM ONE Update/Update 24-03/OBJECTS/BAG/OBJBag_Tactical Gear Backpack Small Take Out 01_B00M_ONE.wav",
           "start": 2.32,
           "duration": 0.3,
-          "downmixLossDb": 0.2441228760941228,
           "level": 1
         },
         {
           "source": "Boom One Update/Update 23-12/EQUIPMENT/TACTICAL/EQUIPTact_Ammo Box Latch Opening Short_B00M_ONE.wav",
           "start": 2.12,
           "duration": 0.16,
-          "downmixLossDb": 0.0005522080999104633,
           "level": 0.2
         }
       ],
@@ -616,14 +606,12 @@
           "source": "BOOM ONE Update/Update 24-03/OBJECTS/BAG/OBJBag_Tactical Gear Backpack Small Take Out 01_B00M_ONE.wav",
           "start": 3.98,
           "duration": 0.3,
-          "downmixLossDb": 0.3565480482874733,
           "level": 1
         },
         {
           "source": "Boom One Update/Update 23-12/EQUIPMENT/TACTICAL/EQUIPTact_Ammo Box Latch Opening Short_B00M_ONE.wav",
           "start": 3.91,
           "duration": 0.18,
-          "downmixLossDb": 0.00045757075114741654,
           "level": 0.2
         }
       ],
@@ -638,14 +626,12 @@
           "source": "BOOM ONE Update/Update 24-03/OBJECTS/BAG/OBJBag_Tactical Gear Backpack Small Stow Heavy_B00M_ONE.wav",
           "start": 0.53,
           "duration": 0.25,
-          "downmixLossDb": 0.0859189122506346,
           "level": 1
         },
         {
           "source": "BOOM ONE Update/Update 24-03/OBJECTS/BAG/OBJBag_Tactical Gear Vest Belt Clip_B00M_ONE.wav",
           "start": 0.24,
           "duration": 0.12,
-          "downmixLossDb": 0.35525673146828973,
           "level": 0.25
         }
       ],
@@ -660,14 +646,12 @@
           "source": "BOOM ONE Update/Update 24-03/OBJECTS/BAG/OBJBag_Tactical Gear Backpack Small Stow Heavy_B00M_ONE.wav",
           "start": 2.23,
           "duration": 0.25,
-          "downmixLossDb": 0.13871066051876504,
           "level": 1
         },
         {
           "source": "BOOM ONE Update/Update 24-03/OBJECTS/BAG/OBJBag_Tactical Gear Vest Belt Clip_B00M_ONE.wav",
           "start": 1.72,
           "duration": 0.12,
-          "downmixLossDb": 0.39787600704302784,
           "level": 0.25
         }
       ],
@@ -682,14 +666,12 @@
           "source": "BOOM ONE Update/Update 24-03/OBJECTS/BAG/OBJBag_Tactical Gear Backpack Small Stow Heavy_B00M_ONE.wav",
           "start": 5.91,
           "duration": 0.25,
-          "downmixLossDb": 0.10179970717042117,
           "level": 1
         },
         {
           "source": "BOOM ONE Update/Update 24-03/OBJECTS/BAG/OBJBag_Tactical Gear Vest Belt Clip_B00M_ONE.wav",
           "start": 3.18,
           "duration": 0.12,
-          "downmixLossDb": 0.27066882465783515,
           "level": 0.25
         }
       ],

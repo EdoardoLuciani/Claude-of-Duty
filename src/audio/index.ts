@@ -650,7 +650,7 @@ export class AudioSystem {
         // Complete authored reports carry their own decay. The sample bank selects
         // distant enemy perspectives; MCX/MPX retain suppressed sources at range.
         // Unmodified legacy profiles keep their procedural distant model.
-        if (profile.sample && (o.firstPerson || dist <= 45 || profile.samplePunch === false)) {
+        if (o.firstPerson || dist <= 45 || profile.samplePunch === false) {
           const recorded = this.samples!.shot(profile, rng, {
             when,
             distance: dist,

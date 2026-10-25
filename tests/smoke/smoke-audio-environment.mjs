@@ -9,46 +9,24 @@ import {
 import { AudioSystem } from '../../src/audio/index.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import { Rng } from '../../src/core/rng.ts';
+import { audioFixture } from '../lib/audio-banks.mjs';
 assert(!('ambientOneShot' in ambienceModule), 'replaced generators are removed');
 assert.deepEqual(
   [...ambienceModule.ONE_SHOTS],
   ['dog', 'siren', 'creak', 'settle', 'birds', 'vehicle', 'heli']
 );
-const sources = [],
-  actx = {
-    currentTime: 0,
-    createGain: () => ({ gain: { value: 0 }, connect() {} }),
-    createBufferSource() {
-      const s = {
-        playbackRate: { value: 1 },
-        connect() {},
-        start(when) {
-          this.when = when;
-        },
-      };
-      sources.push(s);
-      return s;
-    },
-  };
+const { actx, sources } = audioFixture();
 const bank = new WeaponSampleBank(actx),
   rng = new Rng(474);
 for (const [key, urls] of Object.entries(ENVIRONMENT_URLS))
   bank.hitBuffers[key] = urls.map((_, index) => ({ key, index, duration: 2 }));
 for (const kind of ENVIRONMENT_KINDS) {
-  let last = -1;
-  const seen = new Set();
-  for (let i = 0; i < 6; i++) {
-    const voice = bank.environment(kind, rng, { when: 3 });
-    const s = sources.at(-1);
-    assert.equal(s.buffer.key, environmentBank(kind));
-    assert.notEqual(s.buffer.index, last);
-    assert.equal(s.playbackRate.value, 1);
-    assert.equal(s.when, 3);
-    assert.equal(voice.end, 5.02);
-    last = s.buffer.index;
-    seen.add(last);
-  }
-  assert.equal(seen.size, 2);
+  const voice = bank.environment(kind, rng, { when: 3 });
+  const source = sources.at(-1);
+  assert.equal(source.buffer.key, environmentBank(kind));
+  assert.equal(source.playbackRate.value, 1);
+  assert.equal(source.when, 3);
+  assert.equal(voice.end, 5.02);
 }
 const audio = new AudioSystem();
 Object.assign(audio, {

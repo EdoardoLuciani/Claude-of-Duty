@@ -28,19 +28,24 @@ export type SampleKind =
   | 'sniper-distant'
   | 'shotgun-distant';
 
-export interface WeaponProfile {
-  sample?: SampleKind | null;
+interface RecordingProfile {
+  sample: SampleKind;
   /** Authored distant report; absent for the suppressed MCX close-source fallback. */
   distantSample?: SampleKind;
-  sampleGain?: number;
   sampleSend?: number;
-  sampleLowpass?: number;
-  sampleAction?: boolean;
-  samplePunch?: boolean;
-  firstPersonGain?: number;
-  punchTail?: number;
   suppressed?: boolean;
-  pellets?: number;
+}
+
+export type WeaponProfile = RecordingProfile &
+  ({ samplePunch: false; sampleAction: false } | LegacyWeaponProfile);
+
+/** Only AK/generic-suppressed takes still need synthesized repair/reinforcement. */
+export interface LegacyWeaponProfile extends RecordingProfile {
+  samplePunch?: true;
+  sampleAction?: boolean;
+  sampleGain?: number;
+  sampleLowpass?: number;
+  firstPersonGain?: number;
   level: number;
   bodyF: number;
   bodyF2: number;

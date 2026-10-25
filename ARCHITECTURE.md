@@ -276,7 +276,7 @@ equipment foley, bomber loops, nonverbal reactions and sparse environmental even
 use required recordings. Radio owns aircraft pose/pass lifetime; audio owns source
 cleanup. Radio textures supplement intentional electronic tones. Do not invent
 ambient human/tactical actors. Asset/routing/rights contracts: [docs/audio.md](docs/audio.md).
-Remaining synthesis includes authored distant/sniper reports, reinforcement,
+Remaining synthesis includes legacy AK/generic-suppressed reports and reinforcement,
 shell casings/dry fire, tactical speech and intentional UI cues.
 
 `models.getSoldier(name)` returns `{ name, geometry, slots, boneNames, weapon,

@@ -12,7 +12,6 @@
       "filter": "pan=mono|c0=0.5*c0+0.5*c1,highpass=f=70,lowpass=f=10000,afade=t=in:d=0.005,afade=t=out:st=1.0250000000000001:d=0.025",
       "activeRmsTargetDb": -24,
       "gain": 0.619498173528083,
-      "downmixLossDb": -1.9141900211086968e-12,
       "sha256": "74dc588c86384b460a804fe4f3d0f86800631386c38bcbb1b8139b46f677a4cf"
     },
     "environment-dog-2": {
@@ -24,7 +23,6 @@
       "filter": "pan=mono|c0=0.5*c0+0.5*c1,highpass=f=70,lowpass=f=10000,afade=t=in:d=0.005,afade=t=out:st=1.0250000000000001:d=0.025",
       "activeRmsTargetDb": -24,
       "gain": 0.6775692830549733,
-      "downmixLossDb": -1.8129356371205582e-12,
       "sha256": "417b14261243e79bf281dc8323dd13da585917e40dca0dd2679f8805c13a500b"
     },
     "environment-birds-1": {
@@ -36,7 +34,6 @@
       "filter": "pan=mono|c0=0.5*c0+0.5*c1,highpass=f=70,lowpass=f=10000,afade=t=in:d=0.005,afade=t=out:st=1.675:d=0.025",
       "activeRmsTargetDb": -24,
       "gain": 0.8576571512680617,
-      "downmixLossDb": -2.557105063054011,
       "sha256": "9d930e3e7ed695bd54692cf1ffcb69f2893d7d7fbdf3b828187dff9b467f51d1"
     },
     "environment-birds-2": {
@@ -48,7 +45,6 @@
       "filter": "pan=mono|c0=0.5*c0+0.5*c1,highpass=f=70,lowpass=f=10000,afade=t=in:d=0.005,afade=t=out:st=1.5750000000000002:d=0.025",
       "activeRmsTargetDb": -24,
       "gain": 0.9430924798341835,
-      "downmixLossDb": -3.2228119325713003,
       "sha256": "477b7d64f2bdb23460251fa224475373d01ade18a5d24ce50a7246c51466c032"
     },
     "environment-creak-1": {
@@ -60,7 +56,6 @@
       "filter": "pan=mono|c0=0.5*c0+0.5*c1,highpass=f=70,lowpass=f=10000,afade=t=in:d=0.005,afade=t=out:st=1.925:d=0.025",
       "activeRmsTargetDb": -24,
       "gain": 4.932690080292799,
-      "downmixLossDb": -0.34360297126241635,
       "sha256": "22c86787654fde7ea80a95aad16bd6e107046452364df83b7420480232c3db98"
     },
     "environment-creak-2": {
@@ -72,7 +67,6 @@
       "filter": "pan=mono|c0=0.5*c0+0.5*c1,highpass=f=70,lowpass=f=10000,afade=t=in:d=0.005,afade=t=out:st=2.1750000000000003:d=0.025",
       "activeRmsTargetDb": -24,
       "gain": 2.1396617861545417,
-      "downmixLossDb": -0.5403252615206922,
       "sha256": "6fc5d19185c343ba9cc4e06a1919a1e2b391175977a72f70ee66f3dca011793f"
     },
     "environment-settle-1": {
@@ -84,7 +78,6 @@
       "filter": "pan=mono|c0=0.5*c0+0.5*c1,highpass=f=70,lowpass=f=10000,afade=t=in:d=0.005,afade=t=out:st=2.475:d=0.025",
       "activeRmsTargetDb": -24,
       "gain": 2.2757890583060116,
-      "downmixLossDb": -0.3930317206753172,
       "sha256": "883c062f079980534047fc45193b0e4589cf33d47968187c1febdf16ee76cada"
     },
     "environment-settle-2": {
@@ -96,7 +89,6 @@
       "filter": "pan=mono|c0=0.5*c0+0.5*c1,highpass=f=70,lowpass=f=10000,afade=t=in:d=0.005,afade=t=out:st=2.775:d=0.025",
       "activeRmsTargetDb": -24,
       "gain": 2.3006380982432475,
-      "downmixLossDb": -0.5968364766317223,
       "sha256": "ee36dcc385d3ff5e2b636cffc59fa2665fa3fefda01bacee6224d9ab05459d59"
     },
     "environment-vehicle-1": {
@@ -108,7 +100,6 @@
       "filter": "pan=mono|c0=0.5*c0+0.5*c1,highpass=f=70,lowpass=f=10000,afade=t=in:d=0.3,afade=t=out:st=4.7:d=0.5",
       "activeRmsTargetDb": -24,
       "gain": 0.5422883782096236,
-      "downmixLossDb": -0.33477740377686604,
       "sha256": "7a1ceeffdd3cbf3ddf091c50aeead5e578c42f1cc865d78cc9eeaa90bbaa4eec"
     },
     "environment-vehicle-2": {
@@ -120,7 +111,6 @@
       "filter": "pan=mono|c0=0.5*c0+0.5*c1,highpass=f=70,lowpass=f=10000,afade=t=in:d=0.3,afade=t=out:st=5.7:d=0.5",
       "activeRmsTargetDb": -24,
       "gain": 0.42474327849976906,
-      "downmixLossDb": -0.012649102406933567,
       "sha256": "473b8055d48dafbeb4a3b5941ce4672c9f554b8db0b8f7d8146aad6a61d37262"
     },
     "environment-heli-1": {
@@ -132,7 +122,6 @@
       "filter": "pan=mono|c0=0.5*c0+0.5*c1,highpass=f=70,lowpass=f=10000,afade=t=in:d=0.3,afade=t=out:st=9.25:d=0.5",
       "activeRmsTargetDb": -24,
       "gain": 1.532833928367251,
-      "downmixLossDb": -0.007937090926683883,
       "sha256": "2d53489a8051b1b3897815d5a03bec9705fdf892f44b7b9e76f163f9e8bea977"
     },
     "environment-heli-2": {
@@ -144,7 +133,6 @@
       "filter": "pan=mono|c0=0.5*c0+0.5*c1,highpass=f=70,lowpass=f=10000,afade=t=in:d=0.3,afade=t=out:st=8.7:d=0.5",
       "activeRmsTargetDb": -24,
       "gain": 0.8120303416783019,
-      "downmixLossDb": -0.015419488220306794,
       "sha256": "48e85df8bd3dbe17c04ea30d0e23955096397f6d756b1463acd66167f88c5930"
     },
     "environment-siren-1": {
@@ -156,7 +144,6 @@
       "filter": "pan=mono|c0=0.5*c0+0.5*c1,highpass=f=180,lowpass=f=3000,afade=t=in:d=0.3,afade=t=out:st=7:d=0.5",
       "activeRmsTargetDb": -24,
       "gain": 0.7800596251754505,
-      "downmixLossDb": -1.0739057046241316,
       "sha256": "8fadc615a68b36e2675e81c3de1b388225473ff7f2faa10340c20ccc4f824d18"
     },
     "environment-siren-2": {
@@ -168,7 +155,6 @@
       "filter": "pan=mono|c0=0.5*c0+0.5*c1,highpass=f=180,lowpass=f=3000,afade=t=in:d=0.3,afade=t=out:st=7:d=0.5",
       "activeRmsTargetDb": -24,
       "gain": 0.6727026222467867,
-      "downmixLossDb": -0.8465181357249558,
       "sha256": "3e5383016d08e7e84faaf8bcaf84974a172b98b1cb0277c76400fff2fa4936f9"
     }
   }

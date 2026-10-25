@@ -633,10 +633,10 @@ try {
         throw Error(name + ': headroom, silence or DC');
     };
     const cases = [
-      ...Object.entries(weapons.WEAPON_PROFILES).map(([id, profile]) => [
+      ...['ak', 'suppressed'].map((id) => [
         id,
         (ctx, bank, rng) =>
-          weapons.weaponShot(ctx, bank, rng, profile, {
+          weapons.weaponShot(ctx, bank, rng, weapons.WEAPON_PROFILES[id], {
             when: 0.02,
             distance: 2,
             firstPerson: true,
@@ -645,7 +645,7 @@ try {
       ...[120, 300].map((distance) => [
         'distant-' + distance,
         (ctx, bank, rng) =>
-          weapons.weaponShot(ctx, bank, rng, weapons.WEAPON_PROFILES.rifle, {
+          weapons.weaponShot(ctx, bank, rng, weapons.WEAPON_PROFILES.ak, {
             when: 0.02,
             distance,
           }),

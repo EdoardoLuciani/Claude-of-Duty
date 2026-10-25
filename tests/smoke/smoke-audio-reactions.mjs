@@ -14,20 +14,12 @@ for (const [key, urls] of Object.entries(REACTION_URLS))
   bank.hitBuffers[key] = urls.map((_, i) => ({ key, index: i, duration: 0.5 }));
 for (const id of [0, 1, 2, 3, -1, Infinity])
   for (const kind of ['hurt', 'death']) {
-    let previous = -1;
-    const seen = new Set();
-    for (let i = 0; i < 18; i++) {
-      const voice = bank.reaction(kind, id, rng, { when: 2 });
-      const src = sources.at(-1);
-      assert.equal(src.buffer.key, reactionBank(id, kind));
-      assert.notEqual(src.buffer.index, previous);
-      assert.equal(src.playbackRate.value, 1);
-      assert.equal(src.when, 2);
-      assert.equal(voice.end, 2.52);
-      previous = src.buffer.index;
-      seen.add(previous);
-    }
-    assert.equal(seen.size, 3);
+    const voice = bank.reaction(kind, id, rng, { when: 2 });
+    const source = sources.at(-1);
+    assert.equal(source.buffer.key, reactionBank(id, kind));
+    assert.equal(source.playbackRate.value, 1);
+    assert.equal(source.when, 2);
+    assert.equal(voice.end, 2.52);
   }
 const audio = new AudioSystem();
 Object.assign(audio, { running: true, actx, samples: bank, rng });

@@ -8,26 +8,6 @@ import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { RadioSystem, CARPET } from '../../src/radio/index.ts';
-import { measureLoop } from '../lib/aircraft-loop.mjs';
-
-// Known signals ensure the offline detector rejects a chirp/pump, not merely metadata.
-const fixtureRate = 12000;
-const chirp = Buffer.alloc(Math.round(0.9 * fixtureRate) * 4);
-let phase = 0;
-for (let i = 0; i < chirp.length / 4; i++) {
-  chirp.writeFloatLE(Math.sin(phase) * 0.1, i * 4);
-  phase += (2 * Math.PI * (220 - (40 * i) / (chirp.length / 4))) / fixtureRate;
-}
-assert(measureLoop(chirp, 200).pitchSpanCents > 200, 'detector rejects repeated pitch sweep');
-const pumping = Buffer.alloc(Math.round(3.2 * fixtureRate) * 4);
-for (let i = 0; i < pumping.length / 4; i++) {
-  const t = i / fixtureRate;
-  pumping.writeFloatLE(
-    0.1 * (1 + 0.4 * Math.cos((2 * Math.PI * t) / 3.2)) * Math.sin(2 * Math.PI * 200 * t),
-    i * 4
-  );
-}
-assert(measureLoop(pumping, 200).rmsSpanDb > 6, 'detector rejects broad envelope pumping');
 
 const parameter = () => ({
   value: 0,

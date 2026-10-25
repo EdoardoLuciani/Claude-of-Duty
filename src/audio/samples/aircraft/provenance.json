@@ -24,7 +24,6 @@
       "rmsCorrectionBounds": [0.5, 2],
       "targetRmsDb": -20,
       "level": 0.5820646197657513,
-      "downmixLossDb": -0.04734558402024073,
       "sha256": "d402dbd3892e57e157cd77d69d71c69581cc291058e8e9c7cccc5bcba5e67df7"
     },
     "propeller-2": {
@@ -48,7 +47,6 @@
       "rmsCorrectionBounds": [0.5, 2],
       "targetRmsDb": -20,
       "level": 0.8055905213574215,
-      "downmixLossDb": -0.04391345802372771,
       "sha256": "658683feb8fc085e668a07e71c1febd76145413da126713b7744f0666ff582a7"
     }
   }
