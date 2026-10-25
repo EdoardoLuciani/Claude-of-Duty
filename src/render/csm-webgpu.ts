@@ -41,9 +41,8 @@ import {
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-import { Matrix4, PCFShadowMap } from 'three/webgpu';
-import type { DepthTexture, DirectionalLight, DirectionalLightShadow, Node } from 'three/webgpu';
-import type { TextureNode } from 'three/webgpu';
+import { Matrix4, PCFShadowMap, DirectionalLight } from 'three/webgpu';
+import type { DepthTexture, DirectionalLightShadow, Node } from 'three/webgpu';
 
 // PCF spans neighboring depth texels on a sloping receiver. Express the
 // conservative receiver bias in cascade texels, not a resolution-independent
@@ -52,12 +51,16 @@ export const CSM_BIAS = Object.freeze({ texels: 0.5, slopeTexels: 1.5, maxSlope:
 type GroupedReference<T extends string> = Node<T> & {
   setGroup(group: typeof renderGroup): GroupedReference<T>;
 };
+function hasReferenceGroup<T extends string>(node: Node<T>): node is GroupedReference<T> {
+  return 'setGroup' in node && typeof node.setGroup === 'function';
+}
 export function groupedReference<T extends 'float' | 'vec2'>(
   name: string,
   type: T,
   object: object
 ): GroupedReference<T> {
-  const ref = reference(name, type, object) as unknown as GroupedReference<T>;
+  const ref = reference(name, type, object);
+  if (!hasReferenceGroup(ref)) throw new Error('[render] reference node lacks uniform grouping');
   return ref.setGroup(renderGroup);
 }
 type CascadeShadow = DirectionalLightShadow & { bias: number };
@@ -88,22 +91,19 @@ function cascadeBias(shadow: CascadeShadow, key: DirectionalLight): Node<'float'
 // parameter-node lifetime differs: one pair per shadow, not per shader build.
 // Otherwise fresh reference IDs fragment the render bind group by material,
 // making every draw compare/upload the same camera and light coefficients.
-interface PCFArguments {
+type PCFArguments = {
   depthTexture: DepthTexture;
   shadowCoord: Node<'vec3'>;
   shadow: CascadeShadow;
   depthLayer: Node;
-}
+};
 
 interface PCFNodes {
   mapSize: GroupedReference<'vec2'>;
   radius: GroupedReference<'float'>;
 }
 const shadowFields = new WeakMap<CascadeShadow, PCFNodes>();
-const pcfFunction = Fn as unknown as (
-  callback: (args: PCFArguments) => Node<'float'>
-) => Node<'float'>;
-export const stablePCFShadowFilter = pcfFunction(
+export const stablePCFShadowFilter = Fn<PCFArguments, Node<'float'>>(
   ({ depthTexture, shadowCoord, shadow, depthLayer }): Node<'float'> => {
     let fields = shadowFields.get(shadow);
     if (!fields) {
@@ -115,15 +115,13 @@ export const stablePCFShadowFilter = pcfFunction(
     }
     const radiusScaled = fields.radius.mul(vec2(1).div(fields.mapSize).x);
     const phi = interleavedGradientNoise(screenCoordinate.xy).mul(6.28318530718);
-    const compare = (i: number): TextureNode<'vec4'> => {
+    const compare = (i: number): Node<'float'> => {
       const uv = shadowCoord.xy.add(vogelDiskSample(float(i), float(5), phi).mul(radiusScaled));
       let depth = texture(depthTexture, uv);
       if (depthTexture.isArrayTexture) depth = depth.depth(depthLayer);
-      return depth.compare(shadowCoord.z);
+      return depth.compare(shadowCoord.z).toFloat();
     };
-    return add(compare(0), compare(1), compare(2), compare(3), compare(4)).mul(
-      1 / 5
-    ) as unknown as Node<'float'>;
+    return add(compare(0), compare(1), compare(2), compare(3), compare(4)).mul(1 / 5);
   }
 );
 
@@ -134,7 +132,7 @@ export class StableCSMShadowNode extends CSMShadowNode {
   declare _stableCascades: number;
   _cameraProjection = new Matrix4();
 
-  updateFrustums(): void {
+  override updateFrustums(): void {
     super.updateFrustums();
     if (this.camera) this._cameraProjection.copy(this.camera.projectionMatrix);
   }
@@ -146,7 +144,7 @@ export class StableCSMShadowNode extends CSMShadowNode {
       this.updateFrustums();
   }
 
-  setup(builder: NodeBuilder): ReturnType<CSMShadowNode['setup']> {
+  override setup(builder: NodeBuilder): ReturnType<CSMShadowNode['setup']> {
     // The inherited Fn still runs setupShadowPosition for each builder/context.
     // Its camera, split and far-distance references remain live native nodes.
     if (
@@ -160,14 +158,15 @@ export class StableCSMShadowNode extends CSMShadowNode {
       this._stableCascades = this.cascades;
     }
     for (const light of this.lights) {
-      const shadow = light.shadow as
-        | (CascadeShadow & { biasNode?: Node; filterNode?: Node | null })
-        | undefined;
+      const shadow = light.shadow;
       if (!shadow) continue;
-      shadow.biasNode ??= cascadeBias(shadow, this.light as DirectionalLight);
+      if (!(this.light instanceof DirectionalLight))
+        throw new Error('[render] CSM requires a directional light');
+      shadow.biasNode ??= cascadeBias(shadow, this.light);
       if (builder.renderer.shadowMap.type === PCFShadowMap) {
-        shadow.filterNode ??= stablePCFShadowFilter;
-      } else if (shadow.filterNode === stablePCFShadowFilter) {
+        if (!('filterNode' in shadow) || !shadow.filterNode)
+          Object.assign(shadow, { filterNode: stablePCFShadowFilter });
+      } else if ('filterNode' in shadow && shadow.filterNode === stablePCFShadowFilter) {
         shadow.filterNode = null;
       }
     }

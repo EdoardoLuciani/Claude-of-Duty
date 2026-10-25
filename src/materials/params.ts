@@ -1,5 +1,7 @@
 /** Shared authored material defaults for both the legacy and TSL paths. */
-export const DEFAULT_PARAMS = {
+import type { SurfaceParams } from './shader-tsl.ts';
+
+export const DEFAULT_PARAMS: SurfaceParams & { noGrad: boolean } = {
   uvMode: 'planar', // dominant world axis | triplanar | mesh UV
   localSpace: false,
   scale: 2, // metres per tile in projected modes; repeat in mesh mode

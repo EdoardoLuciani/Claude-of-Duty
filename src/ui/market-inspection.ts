@@ -2,6 +2,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import * as THREE from 'three/webgpu';
 
+import { isMesh } from '../core/three-guards.ts';
 import type { WeaponSystem } from '../weapons/index.ts';
 import { el, setText } from './util.ts';
 
@@ -171,8 +172,8 @@ export class MarketInspection {
       const box = new THREE.Box3();
       model.scene.updateMatrixWorld(true);
       model.scene.traverseVisible((node): void => {
-        if (!(node instanceof THREE.Mesh)) return;
-        const mesh = node as THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
+        if (!isMesh(node)) return;
+        const mesh = node;
         mesh.geometry.computeBoundingBox();
         if (mesh.geometry.boundingBox)
           bounds.union(box.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld));

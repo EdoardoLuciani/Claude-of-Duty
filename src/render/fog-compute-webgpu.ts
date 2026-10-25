@@ -34,11 +34,10 @@ export function createFogCompute(
       textureStore(output, globalId.xy, vec4(color, 1));
     });
   })();
-  const schedule = computeKernel.compute as unknown as (
-    dispatch: number[],
-    workgroupSize: number[]
-  ) => ComputeNode;
-  const computeNode = schedule.call(computeKernel, dispatch, [8, 8, 1]).setName('Volumetric fog');
+  const computeNode = computeKernel.computeKernel([8, 8, 1]).setName('Volumetric fog');
+  // Native compute(node, dispatch, workgroups) selects dispatchSize for arrays.
+  // @types exposes setCount(), but that method is absent from the pinned runtime.
+  computeNode.dispatchSize = dispatch;
   return {
     computeNode,
     textureNode: texture(output),

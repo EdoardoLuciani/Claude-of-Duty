@@ -830,8 +830,9 @@ section('Determinism');
 console.log(
   `\n${failures === 0 ? '\x1b[32mPASS' : '\x1b[31mFAIL'}\x1b[0m  ${checks - failures}/${checks} checks`
 );
-(globalThis as typeof globalThis & { process: { exitCode: number } }).process.exitCode =
-  failures === 0 ? 0 : 1;
+const runtime: object = globalThis;
+if ('process' in runtime && typeof runtime.process === 'object' && runtime.process !== null)
+  Object.assign(runtime.process, { exitCode: failures === 0 ? 0 : 1 });
 
 /** Reference implementation for cross-checking the BVH. */
 interface TriangleSource {

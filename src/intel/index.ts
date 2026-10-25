@@ -2,7 +2,7 @@
  * Limits live in tuning.ts; event contracts live in ARCHITECTURE.md.
  */
 import * as THREE from 'three';
-import type { MeshBasicNodeMaterial } from 'three/webgpu';
+import { MeshBasicNodeMaterial } from 'three/webgpu';
 
 import type { AudioSystem } from '../audio/index.ts';
 import { bindingLabel } from '../core/bindings.ts';
@@ -233,7 +233,10 @@ export class IntelSystem {
     // HDR lens feeds the existing bloom; no extra point-light shader variants.
     const pulse = 0.5 - 0.5 * Math.cos((ctx.time.elapsed * 2 * Math.PI) / INTEL.beaconPeriod);
     const glow = INTEL.beaconDim + (INTEL.beaconBright - INTEL.beaconDim) * pulse * pulse;
-    (this._kit.mats.beacon as MeshBasicNodeMaterial).color.setRGB(glow, glow * 0.008, glow * 0.002);
+    const beacon = this._kit.mats.beacon;
+    if (!(beacon instanceof MeshBasicNodeMaterial))
+      throw new Error('[intel] beacon must be a basic node material');
+    beacon.color.setRGB(glow, glow * 0.008, glow * 0.002);
     this._tickLure();
     if (this._announceAt && ctx.time.elapsed >= this._announceAt) {
       this._announceAt = 0;

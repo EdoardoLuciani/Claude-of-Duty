@@ -36,7 +36,7 @@ import { Ambience, ONE_SHOTS, AMBIENT_EVENT_GAIN } from './ambience.ts';
 import { CalloutPlayer, isCalloutKind } from './callouts.ts';
 import { CASING_BANK, COMBAT_MIX, dryBank, nearMissGain } from './combat.ts';
 import { NoiseBank, SPEED_OF_SOUND, clamp, gain as mkGain } from './dsp.ts';
-import type { EnvironmentKind } from './environment.ts';
+import { isEnvironmentKind } from './environment.ts';
 import { EXPLOSION_MIX, explosionDistanceGain, type ExplosionKind } from './explosions.ts';
 import { uiSound, heartbeat, intelSiren } from './foley.ts';
 import { classifySpace, SPACE_KEYS } from './ir.ts';
@@ -742,7 +742,8 @@ export class AudioSystem {
         throw new Error('[audio] unknown recorded reaction: ' + o.bark);
       }
       case 'ambient':
-        return this.samples!.environment(o.which as EnvironmentKind, rng, { when, level: o.level });
+        if (!isEnvironmentKind(o.which)) throw new Error('[audio] unknown environment: ' + o.which);
+        return this.samples!.environment(o.which, rng, { when, level: o.level });
       default:
         return uiSound(actx, bank, rng, kind, { when, level: o.level });
     }

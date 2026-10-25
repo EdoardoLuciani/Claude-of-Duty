@@ -986,6 +986,7 @@ export class Agent {
         d = this._searchGeometry[i * 2 + 1];
       push(origin.x + Math.cos(ang) * d, origin.y, origin.z + Math.sin(ang) * d);
     }
+    return undefined;
   }
 
   _goSearchCandidate(): void {

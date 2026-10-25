@@ -147,13 +147,12 @@ export function makeKit(materials?: IntelMaterials): IntelKit {
 }
 
 export function makeCrate(kit: IntelKit): IntelCrate {
-  const root = new THREE.Group() as IntelCrate;
-  root.name = 'intel-cache';
   const lid = new THREE.Group();
+  const root = Object.assign(new THREE.Group(), { lid });
+  root.name = 'intel-cache';
   lid.name = 'intel-lid';
   lid.position.set(0, 0.38, -0.23);
   root.add(lid);
-  root.lid = lid;
   for (const kind of Object.keys(kit.geos)) {
     const mesh = new THREE.Mesh(kit.geos[kind], kit.mats[kind]);
     mesh.receiveShadow = true;

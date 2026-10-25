@@ -390,7 +390,7 @@ export class Minimap {
     }
     tg.putImageData(tImg, 0, 0);
     g.globalAlpha = 0.03;
-    g.fillStyle = g.createPattern(tile, 'repeat') as CanvasPattern;
+    g.fillStyle = g.createPattern(tile, 'repeat') ?? '#000';
     g.fillRect(0, 0, N, N);
 
     this.baked = cv;

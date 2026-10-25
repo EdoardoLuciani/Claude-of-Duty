@@ -183,7 +183,9 @@ export class MCXAnimation {
   constructor(model: MCXModel, def: MCXDefinition) {
     this.model = model;
     this.def = def;
-    this.fireSpeed = (def as MCXDefinition & { fireAnimationSpeed: number }).fireAnimationSpeed;
+    if (!('fireAnimationSpeed' in def) || typeof def.fireAnimationSpeed !== 'number')
+      throw new Error('MCX: missing authored fire animation speed');
+    this.fireSpeed = def.fireAnimationSpeed;
     this.root = model.root;
     this.frame = model.scene;
     this.frame.updateMatrix();

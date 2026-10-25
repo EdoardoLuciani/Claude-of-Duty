@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 import type { EngineContext, EngineSystems } from '../core/context.ts';
+import { hasOwn } from '../core/guards.ts';
 import type { WorldManifest } from '../core/model-metadata.ts';
 import type { Rng } from '../core/rng.ts';
 import { tickStreetlightOutage } from './lighting.ts';
@@ -18,8 +19,7 @@ type WorldMesh = THREE.Mesh & {
   };
 };
 function isWorldMesh(object: THREE.Object3D): object is WorldMesh {
-  const candidate = object as THREE.Mesh & { isInstancedMesh?: boolean };
-  return candidate.isMesh === true || candidate.isInstancedMesh === true;
+  return object instanceof THREE.Mesh;
 }
 // The WebGL renderer applied this to room bulbs and street lamps after the
 // world's day/night mix. Preserve that authored practical-to-sun ratio here;
@@ -132,8 +132,9 @@ export class WorldSystem {
     const placeholders = new Set<THREE.Material>();
     this.root.traverse((object): void => {
       if (!isWorldMesh(object)) return;
-      const palette = object.userData?.palette as keyof typeof PALETTE;
-      if (!PALETTE[palette]) throw new Error(`[world] unknown palette on ${object.name}`);
+      const palette: unknown = object.userData?.palette;
+      if (typeof palette !== 'string' || !hasOwn(PALETTE, palette))
+        throw new Error(`[world] unknown palette on ${object.name}`);
       if (Array.isArray(object.material))
         object.material.forEach((m): Set<THREE.Material<THREE.MaterialEventMap>> =>
           placeholders.add(m)
@@ -168,8 +169,9 @@ export class WorldSystem {
     const physics = ctx.peek('physics');
     this.collisionRoot.traverse((object): void => {
       if (!isWorldMesh(object)) return;
-      const surface = object.userData?.surface as string | undefined;
-      if (!surface) throw new Error(`[world] missing collision surface on ${object.name}`);
+      const surface: unknown = object.userData?.surface;
+      if (typeof surface !== 'string' || !surface)
+        throw new Error(`[world] missing collision surface on ${object.name}`);
       if (Array.isArray(object.material))
         object.material.forEach((m): Set<THREE.Material<THREE.MaterialEventMap>> =>
           collisionPlaceholders.add(m)
@@ -234,7 +236,10 @@ export class WorldSystem {
       add(light, { range: entry.range, priority: entry.priority });
       (interior ? this.bulbs : this.lamps).push(light);
     }
-    this.lampLens = this._material('lamp_lens') as THREE.Material & { emissiveIntensity: number };
+    const lens = this._material('lamp_lens');
+    if (!('emissiveIntensity' in lens) || typeof lens.emissiveIntensity !== 'number')
+      throw new Error('[world] lamp lens requires emissive intensity');
+    this.lampLens = Object.assign(lens, { emissiveIntensity: lens.emissiveIntensity });
     this._lampMix = -1;
     this._lampPower = -1;
     // Keep these same PointLight instances visible on WebGPU. TSL hashes light

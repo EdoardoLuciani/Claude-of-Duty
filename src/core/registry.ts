@@ -114,7 +114,10 @@ export class Registry {
 
 /** Synchronous event bus. Each bucket contains only listeners for its key. */
 export class EventBus<Events extends object = EngineEventMap> {
-  #map = new Map<keyof Events, Set<unknown>>();
+  #map: { [K in keyof Events]?: Set<(payload: Events[K]) => void> } = {};
+  // Separate numeric keys before object indexing coerces them to strings.
+  // This preserves Map's 1/'1' distinction and SameValueZero number semantics.
+  #numbers: { [K in keyof Events]?: Set<(payload: Events[K]) => void> } = {};
   #onError: ((type: keyof Events, error: unknown) => void) | undefined;
 
   constructor(onError?: (type: keyof Events, error: unknown) => void) {
@@ -122,10 +125,11 @@ export class EventBus<Events extends object = EngineEventMap> {
   }
 
   on<K extends keyof Events>(type: K, fn: (payload: Events[K]) => void): () => void {
-    let listeners = this.#map.get(type);
+    const buckets = typeof type === 'number' ? this.#numbers : this.#map;
+    let listeners = Object.hasOwn(buckets, type) ? buckets[type] : undefined;
     if (!listeners) {
-      listeners = new Set();
-      this.#map.set(type, listeners);
+      listeners = new Set<(payload: Events[K]) => void>();
+      Object.defineProperty(buckets, type, { value: listeners, configurable: true });
     }
     listeners.add(fn);
     return (): void => this.off(type, fn);
@@ -140,15 +144,15 @@ export class EventBus<Events extends object = EngineEventMap> {
   }
 
   off<K extends keyof Events>(type: K, fn: (payload: Events[K]) => void): void {
-    this.#map.get(type)?.delete(fn);
+    const buckets = typeof type === 'number' ? this.#numbers : this.#map;
+    if (Object.hasOwn(buckets, type)) buckets[type]?.delete(fn);
   }
 
   emit<K extends keyof Events>(type: K, payload: Events[K]): void {
-    const listeners = this.#map.get(type);
+    const buckets = typeof type === 'number' ? this.#numbers : this.#map;
+    const listeners = Object.hasOwn(buckets, type) ? buckets[type] : undefined;
     if (!listeners) return;
-    // Erasure is local to storage: on/off preserve the key/payload relationship.
-    for (const listener of Array.from(listeners)) {
-      const fn = listener as (payload: Events[K]) => void;
+    for (const fn of Array.from(listeners)) {
       try {
         fn(payload);
       } catch (err) {
@@ -163,6 +167,7 @@ export class EventBus<Events extends object = EngineEventMap> {
   }
 
   clear(): void {
-    this.#map.clear();
+    this.#map = {};
+    this.#numbers = {};
   }
 }

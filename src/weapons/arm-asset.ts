@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
+import { isTexture } from '../core/three-guards.ts';
 import { createArmBlood, addArmBloodCoordinates } from './arm-blood.ts';
 import { createArmSurfaceMaterial } from './arm-surfaces.ts';
 
@@ -74,7 +75,9 @@ export async function loadArmAsset(): Promise<ArmAsset> {
       const end = Math.min(index.count, range.start + range.count, group.start + group.count);
       if (!source?.visible || end <= start) continue;
       const surface = sources.length;
-      sources.push(source as THREE.MeshPhysicalMaterial);
+      if (!(source instanceof THREE.MeshPhysicalMaterial))
+        throw new Error('Player arms: expected physical material');
+      sources.push(source);
       const geometry = mesh.geometry.clone();
       geometry.setIndex(new THREE.BufferAttribute(index.array.slice(start, end), 1));
       geometry.clearGroups();
@@ -108,9 +111,7 @@ export async function loadArmAsset(): Promise<ArmAsset> {
     )
   );
   for (const source of sourceMaterials) {
-    for (const value of Object.values(source))
-      if (value instanceof THREE.Texture)
-        textures.add(value as THREE.Texture<unknown, THREE.TextureEventMap>);
+    for (const value of Object.values(source)) if (isTexture(value)) textures.add(value);
     source.dispose();
   }
   const images = new Set<ImageBitmap>();
@@ -135,8 +136,7 @@ export async function loadArmAsset(): Promise<ArmAsset> {
         for (const mat of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
           materials.add(mat);
           for (const value of Object.values(mat as object)) {
-            if (value instanceof THREE.Texture)
-              textures.add(value as THREE.Texture<unknown, THREE.TextureEventMap>);
+            if (isTexture(value)) textures.add(value);
           }
         }
       }

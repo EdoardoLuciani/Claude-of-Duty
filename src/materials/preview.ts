@@ -26,7 +26,15 @@ declare global {
     __PREVIEW_RENDERER__?: THREE.Renderer;
     __PREVIEW_DRAW__?: () => void;
     __READY__?: boolean;
-    __INFO__?: PreviewInfo;
+    __INFO__?:
+      | PreviewInfo
+      | {
+          weapon: string;
+          view: string;
+          tris: Record<string, number>;
+          calls: number;
+          [key: string]: unknown;
+        };
     __RENDERER__?: THREE.Renderer;
     __MATERIALS__?: MaterialSystem;
   }

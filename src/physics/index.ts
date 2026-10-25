@@ -167,7 +167,7 @@ interface ExplosionEvent {
 }
 
 function isCollisionMesh(object: THREE.Object3D): object is THREE.Mesh | THREE.InstancedMesh {
-  return (object as THREE.Mesh).isMesh === true;
+  return object instanceof THREE.Mesh;
 }
 
 function makePublicHit(): PhysicsHit {
@@ -539,7 +539,7 @@ export class PhysicsSystem {
   ): number {
     if (!mesh) return -1;
     const mask = opts.mask ?? opts.layer ?? LAYER.STATIC;
-    const id = this.staticWorld.addMesh(mesh, surfaceType as string | number, mask, opts);
+    const id = this.staticWorld.addMesh(mesh, surfaceType, mask, opts);
     if (id >= 0) this._explicitStatics++;
     return id;
   }
@@ -645,8 +645,8 @@ export class PhysicsSystem {
     c?: number,
     d?: number,
     e?: unknown,
-    f?: unknown,
-    g?: unknown,
+    f?: number | unknown[] | null,
+    g?: number | Partial<PhysicsHit> | null,
     h?: number,
     ignoreOwner: unknown = null,
     ignoreActors: unknown[] | null = null,
@@ -655,17 +655,20 @@ export class PhysicsSystem {
     let ox: number, oy: number, oz: number, dx: number, dy: number, dz: number;
     let maxDist: number, mask: number;
     if (typeof a === 'number') {
-      oy = b as number;
+      if (typeof b !== 'number') throw new Error('[physics] numeric ray requires numeric y');
+      oy = b;
       oz = c ?? 0;
       dx = d ?? 0;
-      dy = (e as number) ?? 0;
-      dz = (f as number) ?? 0;
+      dy = typeof e === 'number' ? e : 0;
+      dz = typeof f === 'number' ? f : 0;
       ox = a;
       maxDist = typeof g === 'number' ? g : 1000;
       mask = h ?? MASK.ALL;
     } else {
+      if (typeof b === 'number')
+        throw new Error('[physics] vector ray requires a vector direction');
       const origin = a,
-        direction = b as Vector3Like;
+        direction = b;
       ox = origin.x;
       oy = origin.y;
       oz = origin.z;
@@ -675,8 +678,8 @@ export class PhysicsSystem {
       maxDist = c ?? 1000;
       mask = d ?? MASK.ALL;
       ignoreOwner = e ?? null;
-      ignoreActors = (f as unknown[] | null) ?? null;
-      ignoreHit = (g as Partial<PhysicsHit> | null) ?? null;
+      ignoreActors = Array.isArray(f) ? f : null;
+      ignoreHit = typeof g === 'object' ? g : null;
     }
     const out = this._nextHit();
     const l = Math.hypot(dx, dy, dz);
@@ -1042,17 +1045,20 @@ export class PhysicsSystem {
     let ox: number, oy: number, oz: number, dx: number, dy: number, dz: number;
     let maxDist: number, mask: number;
     if (typeof a === 'number') {
+      if (typeof b !== 'number') throw new Error('[physics] numeric ray requires numeric y');
       ox = a;
-      oy = b as number;
+      oy = b;
       oz = c ?? 0;
       dx = d ?? 0;
-      dy = (e as number) ?? 0;
-      dz = (f as number) ?? 0;
+      dy = e ?? 0;
+      dz = f ?? 0;
       maxDist = g ?? 1000;
       mask = h ?? MASK.SIGHT;
     } else {
+      if (typeof b === 'number')
+        throw new Error('[physics] vector ray requires a vector direction');
       const origin = a,
-        direction = b as Vector3Like;
+        direction = b;
       ox = origin.x;
       oy = origin.y;
       oz = origin.z;
@@ -1354,8 +1360,8 @@ export class PhysicsSystem {
    */
   explode(e: ExplosionEvent | THREE.Vector3): void {
     if (!e) return;
-    const event = 'position' in e ? (e as ExplosionEvent) : null;
-    const pos = event ? event.position : (e as THREE.Vector3);
+    const event = 'position' in e ? e : null;
+    const pos = 'position' in e ? e.position : e;
     const radius = event?.radius ?? 5;
     const strength = event ? (event.impulse ?? (event.damage ?? 100) * 0.9) : 90;
     this.bodies.applyRadialImpulse(pos.x, pos.y, pos.z, radius, strength * 0.06);
@@ -1389,7 +1395,7 @@ export class PhysicsSystem {
   /* ================================================================== */
 
   addRigidBody(opts: PhysicsRigidBodyOptions = {}): RigidBody {
-    const b = new RigidBody(opts as ConstructorParameters<typeof RigidBody>[0]);
+    const b = new RigidBody(opts);
     if (opts.surfaceType) b.surface = surfaceIndex(opts.surfaceType);
     this.bodies.add(b);
     return b;

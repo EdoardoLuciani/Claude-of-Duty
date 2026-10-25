@@ -3,6 +3,7 @@ import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
 import handReference from '../../assets/weapons/sig-mpx/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: 'json' };
+import { isMesh } from '../core/three-guards.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
 import {
@@ -40,8 +41,8 @@ export function makeMPXModel(gltf: GLTF): MPXModel {
     const x = o.scale.x;
     o.scale.x = o.scale.z;
     o.scale.z = x;
-    if (o instanceof THREE.Mesh) {
-      const mesh = o as THREE.Mesh<THREE.BufferGeometry, THREE.Material | THREE.Material[]>;
+    if (isMesh(o)) {
+      const mesh = o;
       if (!geometries.has(mesh.geometry)) {
         mesh.geometry.applyQuaternion(basis);
         geometries.add(mesh.geometry);
