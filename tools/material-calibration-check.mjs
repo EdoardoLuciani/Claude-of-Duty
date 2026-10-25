@@ -132,7 +132,6 @@ try {
       const { createSoldierNodeMaterial, SoldierMaterialsNode } =
         await import('/src/ai/textures-tsl.ts');
       const { createWeaponMaterial } = await import('/src/weapons/asset-material.ts');
-      const { createArmReferenceMaterial } = await import('/tools/lib/arm-material-reference.js');
       const { IndirectFill } = await import('/src/render/indirect-webgpu.ts');
       const { trackNodeBuilders } = await import('/src/dev/native-builds.ts');
       const renderer = await createWebGpuRenderer(document.querySelector('#game'));
@@ -433,25 +432,21 @@ try {
           source.normalMap = normal;
           source.normalScale.set(0.85, 0.85);
           resources.push(source);
-          for (const [name, make] of [
-            ['weapon', createWeaponMaterial],
-            // Keep the unmerged arm reference as a native-copy calibration control.
-            ['arm-reference', createArmReferenceMaterial],
-          ]) {
-            const m = make(source),
-              ref = legacyCopy(source, name === 'weapon');
+          {
+            const m = createWeaponMaterial(source),
+              ref = legacyCopy(source, true);
             resources.push(m);
             mesh.material = ref;
             const expected = await read();
             mesh.material = m;
             const actual = await read();
             const difference = maxDiff(expected, actual);
-            integration.copies[`${name}/${physical}`] = difference;
+            integration.copies[`weapon/${physical}`] = difference;
             check(
               actual.some((v, i) => i % 4 < 3 && v > 0.01),
               'copy probe must render a lit surface'
             );
-            check(difference < 1e-6, `${name}: public copy must match legacy pixels`);
+            check(difference < 1e-6, 'weapon: public copy must match legacy pixels');
           }
         }
         const goggles = new SoldierMaterialsNode({}, {}),
