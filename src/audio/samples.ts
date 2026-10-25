@@ -8,6 +8,13 @@ import {
   environmentBank,
   type EnvironmentKind,
 } from './environment.ts';
+import {
+  EXPLOSION_URLS,
+  EXPLOSION_MIX,
+  explosionBlend,
+  type ExplosionKind,
+  type ExplosionBank,
+} from './explosions.ts';
 import { FOLEY_URLS } from './foley-urls.ts';
 import { HIT_MIX, HIT_URLS, type DamageSoundOptions } from './hits.ts';
 import { FALL_BANK, FOLEY_MIX, IMPACT_BANK, STEP_BANK, type FoleyOptions } from './physical.ts';
@@ -97,7 +104,6 @@ const URLS = {
 } satisfies Record<SampleKind, string[]>;
 
 const ACTION_URL = new URL('./samples/action.opus', import.meta.url).href;
-const EXPLOSION_URL = new URL('./samples/explosion.opus', import.meta.url).href;
 const HEARTBEAT_URL = new URL('./samples/heartbeat.opus', import.meta.url).href;
 
 /** Required decoded recordings. Any fetch/decode failure rejects the bank. */
@@ -107,15 +113,15 @@ const CONTACT_URLS = {
   ...REACTION_URLS,
   ...ENVIRONMENT_URLS,
   ...RADIO_URLS,
+  ...EXPLOSION_URLS,
 };
 type ContactKind = keyof typeof CONTACT_URLS;
-type SpecialBufferKey = 'actionBuffer' | 'explosionBuffer' | 'heartbeatBuffer';
+type SpecialBufferKey = 'actionBuffer' | 'heartbeatBuffer';
 export class WeaponSampleBank {
   actx: BaseAudioContext;
   buffers: Partial<Record<SampleKind, AudioBuffer[]>>;
   indices: Partial<Record<SampleKind, number>>;
   actionBuffer: AudioBuffer | null;
-  explosionBuffer: AudioBuffer | null;
   heartbeatBuffer: AudioBuffer | null;
   aircraftBuffers: AudioBuffer[];
   aircraftIndex: number;
@@ -129,7 +135,6 @@ export class WeaponSampleBank {
     this.buffers = {};
     this.indices = {};
     this.actionBuffer = null;
-    this.explosionBuffer = null;
     this.heartbeatBuffer = null;
     this.aircraftBuffers = [];
     this.aircraftIndex = -1;
@@ -149,7 +154,6 @@ export class WeaponSampleBank {
       urls.forEach((url, index) => jobs.push(this._loadInto(this.buffers[kind]!, index, url)));
     }
     jobs.push(this._loadSpecial('actionBuffer', ACTION_URL));
-    jobs.push(this._loadSpecial('explosionBuffer', EXPLOSION_URL));
     jobs.push(this._loadSpecial('heartbeatBuffer', HEARTBEAT_URL));
     this.aircraftBuffers = new Array<AudioBuffer>(AIRCRAFT_URLS.length);
     this.aircraftIndex = -1;
@@ -517,32 +521,39 @@ export class WeaponSampleBank {
     };
   }
 
-  /** Recorded close-range explosion, lightly shaped before procedural reinforcement. */
-  explosion(rng: Rng, o: Pick<SampleOptions, 'when'> = {}): AudioVoice {
-    if (!this.explosionBuffer) throw new Error('[audio] explosion recording is not loaded');
+  /** Required recorded blast at every distance, with no synthetic reinforcement. */
+  explosion(
+    kind: ExplosionKind,
+    rng: Rng,
+    o: { when?: number; distance?: number; level?: number } = {}
+  ): AudioVoice {
+    const { from, to, mix } = explosionBlend(o.distance ?? 0);
+    const fromKey: ExplosionBank = `${kind}-${from}`;
+    const toKey: ExplosionBank = `${kind}-${to}`;
+    // Validate/select all required layers before creating or scheduling any nodes.
+    const fromBuffer =
+      mix < 1 ? this._nextTake(fromKey, this.hitBuffers, this.hitIndices, rng, 'explosion') : null;
+    const toBuffer =
+      mix > 0 ? this._nextTake(toKey, this.hitBuffers, this.hitIndices, rng, 'explosion') : null;
     const actx = this.actx;
-    const t0 = o.when ?? actx.currentTime;
-    const src = actx.createBufferSource();
-    src.buffer = this.explosionBuffer;
-    src.playbackRate.value = rng.range(0.97, 1.03);
-    const hp = biquad(actx, 'highpass', 30, 0.7);
-    const crack = biquad(actx, 'peaking', 4000, 1.0, 1.2);
-    crack.gain.setTargetAtTime(0, t0 + 0.035, 0.008);
-    const air = biquad(actx, 'highshelf', 4000, 0.7, 1.5);
-    // Restore the take's thin power band after the initial crack has passed.
-    const mid = biquad(actx, 'peaking', 350, 1.1, 2.8);
-    mid.gain.setValueAtTime(0, t0);
-    mid.gain.linearRampToValueAtTime(2.8, t0 + 0.006);
-    mid.gain.setTargetAtTime(0, t0 + 0.21, 0.117);
-    const low = biquad(actx, 'lowshelf', 130, 0.8, 1.5);
-    const out = gain(actx, 2.45 * rng.range(0.96, 1.04));
-    series(src, hp, crack, air, mid, low, out);
-    src.start(t0);
-    return {
-      node: out,
-      end: t0 + this.explosionBuffer.duration / src.playbackRate.value + 0.05,
-      send: 0.7,
-    };
+    const when = o.when ?? actx.currentTime;
+    const out = gain(actx, o.level ?? 1);
+    let end = when;
+    for (const [buffer, weight] of [
+      [fromBuffer, 1 - mix],
+      [toBuffer, mix],
+    ] as const) {
+      if (!buffer) continue;
+      const src = actx.createBufferSource();
+      src.buffer = buffer;
+      // Linear complementary weights avoid a level boost during a perspective blend.
+      const layer = gain(actx, weight);
+      src.connect(layer);
+      layer.connect(out);
+      src.start(when);
+      end = Math.max(end, when + buffer.duration);
+    }
+    return { node: out, end: end + 0.02, send: EXPLOSION_MIX.send };
   }
 
   dispose(): void {
@@ -558,7 +569,6 @@ export class WeaponSampleBank {
     this.reloadBuffers = {};
     this.reloadIndices = {};
     this.actionBuffer = null;
-    this.explosionBuffer = null;
     this.heartbeatBuffer = null;
     this.aircraftBuffers.length = 0;
     this.aircraftIndex = -1;

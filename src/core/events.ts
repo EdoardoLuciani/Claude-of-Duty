@@ -211,6 +211,8 @@ export interface EngineEventMap {
   'game:restart': { source?: string };
   'radio:strike': { position: Vector3 };
   explosion: {
+    /** Recorded ordnance identity; omitted legacy events retain the grenade default. */
+    kind?: 'grenade' | 'bomb';
     position: Vector3;
     radius: number;
     damage: number;

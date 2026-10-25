@@ -36,7 +36,8 @@ import { AircraftVoice, AIRCRAFT_MIX, type AircraftPosition } from './aircraft.t
 import { Ambience, ONE_SHOTS, AMBIENT_EVENT_GAIN } from './ambience.ts';
 import { NoiseBank, SPEED_OF_SOUND, clamp, gain as mkGain } from './dsp.ts';
 import type { EnvironmentKind } from './environment.ts';
-import { shellCasing, explosion, uiSound, heartbeat, intelSiren } from './foley.ts';
+import { EXPLOSION_MIX, explosionDistanceGain, type ExplosionKind } from './explosions.ts';
+import { shellCasing, uiSound, heartbeat, intelSiren } from './foley.ts';
 import { classifySpace, SPACE_KEYS } from './ir.ts';
 import { Mixer } from './mixer.ts';
 import { TentRadio } from './music.ts';
@@ -83,7 +84,7 @@ interface AudioOptions {
   flight?: number;
   phase?: ReloadPhase;
   reloadWeapon?: string;
-  radius?: number;
+  explosionKind?: ExplosionKind;
   bark?: string;
   f0?: number;
   tract?: number;
@@ -723,27 +724,12 @@ export class AudioSystem {
         });
       case 'reload':
         return this.samples!.reload(o.reloadWeapon ?? '', o.phase, rng, { when });
-      case 'explosion': {
-        if (dist > 50)
-          return explosion(actx, bank, rng, {
-            when,
-            distance: dist,
-            radius: o.radius,
-            level: o.level,
-          });
-        const recorded = this.samples!.explosion(rng, { when });
-        const synthetic = explosion(actx, bank, rng, {
+      case 'explosion':
+        return this.samples!.explosion(o.explosionKind ?? 'grenade', rng, {
           when,
           distance: dist,
-          radius: o.radius,
-          // The required recording carries the blast; synthesis reinforces it.
-          level: (o.level ?? 1) * 0.48,
+          level: o.level,
         });
-        const out = mkGain(actx, 1);
-        recorded.node.connect(out);
-        synthetic.node.connect(out);
-        return { node: out, end: synthetic.end, send: synthetic.send };
-      }
       case 'radio_open':
       case 'radio_strike':
       case 'intel_call': {
@@ -818,7 +804,9 @@ export class AudioSystem {
         atten:
           kind === 'shot' && (o.profile ?? WEAPON_PROFILES.rifle).samplePunch === false
             ? reportDistanceGain(dist, o.profile ?? WEAPON_PROFILES.rifle, o.firstPerson)
-            : undefined,
+            : kind === 'explosion'
+              ? explosionDistanceGain(dist, o.explosionKind ?? 'grenade')
+              : undefined,
         send: o.send ?? voice.send ?? 0.3,
         gain: o.gain ?? 1,
         endTime: voice.end,
@@ -1256,14 +1244,9 @@ export class AudioSystem {
       pos.y,
       pos.z,
       {
-        // 0.62 reverb send, not 1.0: a full send through the 1.6 s open-space IR
-        // rang the tail past 3 s and read as a warehouse echo. The direct boom
-        // carries the hit; the room only colours it.
-        radius: p.radius ?? 6,
+        explosionKind: p.kind ?? 'grenade',
         level: 1,
-        send: 0.62,
-        // Calibrated below unity so ordinary blasts do not lean on the limiter.
-        gain: 0.8,
+        gain: EXPLOSION_MIX.gain,
       },
       'weapons',
       1
@@ -1469,7 +1452,7 @@ export class AudioSystem {
       lp.y + rng.range(0, 8),
       lp.z + Math.sin(a) * d,
       {
-        radius: rng.range(6, 16),
+        explosionKind: 'bomb',
         level: 1,
         maxDist: 400,
         occlusion: 0,

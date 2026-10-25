@@ -271,8 +271,10 @@ FX particle/decal PNGs are required runtime assets; generation
 lives in `tools/lib/fx-atlas.ts` and the offline texture exporter. Missing/invalid
 atlases reject FX initialization. Recorded audio fetch/decode failures disable the
 audio graph rather than substituting synthesis. Physical hits and movement/body/
-equipment foley, bomber loops, nonverbal reactions and sparse environmental events
-use required recordings. Radio owns aircraft pose/pass lifetime; audio owns source
+equipment foley, bomber loops, nonverbal reactions, explosions and sparse environmental
+events use required recordings. Explosions carry optional `kind: 'grenade' | 'bomb'`
+(legacy default: grenade); audio blends recorded close/mid/far perspectives with no
+synthetic blast layers. Radio owns aircraft pose/pass lifetime; audio owns source
 cleanup. Radio textures supplement intentional electronic tones. Do not invent
 ambient human/tactical actors.
 Remaining synthesis includes legacy AK/generic-suppressed reports and reinforcement,
