@@ -30,20 +30,10 @@ import type { EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
 import type { Health } from '../player/health.ts';
 import type { PlayerSystem } from '../player/index.ts';
+import type { WeaponId } from '../weapons/defs.ts';
 import type { WeaponSystem } from '../weapons/index.ts';
-type MarketItemId =
-  | 'ammo'
-  | 'grenade'
-  | 'armour'
-  | 'bandage'
-  | 'pistol'
-  | 'smg'
-  | 'shotgun'
-  | 'rifle'
-  | 'mcx'
-  | 'lmg'
-  | 'sniper'
-  | 'carpet';
+
+type MarketItemId = WeaponId | 'ammo' | 'grenade' | 'armour' | 'bandage' | 'carpet';
 type MarketSlot = 'kit' | 'secondary' | 'primary' | 'strike';
 type MarketAction = 'buy' | 'swap' | 'equipped' | 'max';
 interface HudItem {

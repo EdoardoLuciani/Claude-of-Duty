@@ -19,7 +19,7 @@ import { buildManifestClips, type Clip } from './clips.ts';
 type M590Model = {
   materials: Set<THREE.Material>;
   textures: Set<THREE.Texture>;
-  id: string;
+  id: 'shotgun';
   label: string;
   fxClass: string;
   scene: THREE.Group;

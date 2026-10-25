@@ -19,11 +19,97 @@
  *                aiming, crouched or still. This is the part you cannot learn.
  */
 
-export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx'];
-export const PRIMARY_IDS = ['rifle', 'lmg', 'sniper', 'mcx'];
-export const SECONDARY_IDS = ['pistol', 'smg', 'shotgun'];
+export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx'] as const;
+export type WeaponId = (typeof WEAPON_IDS)[number];
+export const PRIMARY_IDS = ['rifle', 'lmg', 'sniper', 'mcx'] as const satisfies readonly WeaponId[];
+export const SECONDARY_IDS = ['pistol', 'smg', 'shotgun'] as const satisfies readonly WeaponId[];
+export type PrimaryWeaponId = (typeof PRIMARY_IDS)[number];
+export type SecondaryWeaponId = (typeof SECONDARY_IDS)[number];
+export type WeaponMode = 'auto' | 'burst' | 'semi';
+export type WeaponClass = 'carbine' | 'smg' | 'pistol' | 'lmg' | 'shotgun' | 'sniper';
+type TuningVector = [number, number, number];
 
-export const WEAPON_DEFS = {
+/** Authored tuning is checked against this contract, not inferred into one. */
+export interface WeaponDef {
+  id: WeaponId;
+  label: string;
+  class: WeaponClass;
+  caliber: string;
+  audio?: string;
+  suppressed?: boolean;
+  rpm: number;
+  modes: [WeaponMode, ...WeaponMode[]];
+  burstCount?: number;
+  burstRpm?: number;
+  burstDelay?: number;
+  boltAction?: boolean;
+  boltTime?: number;
+  action?: 'pump';
+  reloadStyle?: 'tube';
+  magSize: number;
+  reserve: number;
+  pellets?: number;
+  fireAnimationSpeed?: number;
+  muzzleVelocity: number;
+  damage: number;
+  penetration: number;
+  dropoff: number;
+  maxRange: number;
+  dragK: number;
+  zeroRange: number;
+  spreadHip: number;
+  spreadAds: number;
+  spreadPerShot: number;
+  spreadMax: number;
+  spreadDecay: number;
+  recoil: {
+    pitch: number;
+    yaw: number;
+    kickBack: number;
+    kickUp: number;
+    roll: number;
+    punch: number;
+    freq: number;
+    damping: number;
+    adsScale: number;
+    crouchScale: number;
+    patternLength: number;
+    patternSeed: number;
+    climbShape: [number, ...number[]];
+    drift: number;
+  };
+  fireVibe: { amp: number; duration: number; adsScale: number };
+  adsTime: number;
+  adsFovScale?: number;
+  adsSensScale?: number;
+  viewFov: number;
+  reloadTac: number;
+  reloadEmpty: number;
+  inspectTime: number;
+  drawTime: number;
+  holsterTime: number;
+  hipPos: TuningVector;
+  hipRot: TuningVector;
+  adsCant: TuningVector;
+  eyeRelief: number;
+  sprintPos: TuningVector;
+  sprintRot: TuningVector;
+  lowReadyPos: TuningVector;
+  lowReadyRot: TuningVector;
+  swayScale: number;
+  bobScale: number;
+  magLen?: number;
+  firingShoulderZ?: number;
+  adsFiringShoulderZ?: number;
+  supportShoulderZ?: number;
+}
+
+/** Untrusted DOM/URL/debug input is narrowed once before entering weapon state. */
+export function isWeaponId(value: unknown): value is WeaponId {
+  return typeof value === 'string' && Object.hasOwn(WEAPON_DEFS, value);
+}
+
+export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
   mcx: {
     id: 'mcx',
     label: 'MCX VIRTUS',

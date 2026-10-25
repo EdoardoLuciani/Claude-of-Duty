@@ -34,7 +34,7 @@ export function makeP320Model(gltf: GLTF): P320Model {
   const scene = gltf.scene;
   const { root, animations, point } = authoredModel(gltf, 'P320_RIG', REQUIRED, scene);
   const model = {
-    id: 'pistol',
+    id: 'pistol' as const,
     label: 'P320 Compact',
     scene,
     root,
@@ -69,7 +69,7 @@ export async function loadP320(): Promise<P320Model> {
 type P320Model = {
   materials: Set<THREE.Material>;
   textures: Set<THREE.Texture>;
-  id: string;
+  id: 'pistol';
   label: string;
   scene: THREE.Group;
   root: THREE.Object3D;
