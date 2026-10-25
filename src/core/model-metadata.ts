@@ -132,7 +132,7 @@ function boolean(value: unknown): boolean {
 }
 function array<T>(value: unknown, parse: (item: unknown) => T): T[] {
   if (!Array.isArray(value)) throw new Error('[models] expected metadata array');
-  return value.map((item: unknown) => parse(item));
+  return value.map((item: unknown): T => parse(item));
 }
 function vec3(value: unknown): ModelVec3 {
   const values = array(value, number);
@@ -203,36 +203,57 @@ export function parseWorldManifest(value: unknown): WorldManifest {
     assets = parseWorldAssets(source);
   const bounds = object(source.bounds),
     stats = object(source.stats);
-  const world = optional(source.WORLD, (value) => {
-    const world = object(value);
-    return {
-      ...world,
-      MARKERS: optional(world.MARKERS, (value) => {
-        const markers = object(value);
-        return {
-          ...markers,
-          INTEL: optional(markers.INTEL, (value) =>
-            array(value, (value) => {
-              const marker = object(value);
-              return {
-                ...marker,
-                id: string(marker.id),
-                tag: optional(marker.tag, string),
-                position: vec3(marker.position),
-              };
-            })
-          ),
-        };
-      }),
-    };
-  });
+  const world = optional(
+    source.WORLD,
+    (
+      value
+    ): {
+      MARKERS:
+        | { INTEL: { id: string; tag: string | undefined; position: ModelVec3 }[] | undefined }
+        | undefined;
+    } => {
+      const world = object(value);
+      return {
+        ...world,
+        MARKERS: optional(
+          world.MARKERS,
+          (
+            value
+          ): {
+            INTEL: { id: string; tag: string | undefined; position: ModelVec3 }[] | undefined;
+          } => {
+            const markers = object(value);
+            return {
+              ...markers,
+              INTEL: optional(
+                markers.INTEL,
+                (value): { id: string; tag: string | undefined; position: ModelVec3 }[] =>
+                  array(
+                    value,
+                    (value): { id: string; tag: string | undefined; position: ModelVec3 } => {
+                      const marker = object(value);
+                      return {
+                        ...marker,
+                        id: string(marker.id),
+                        tag: optional(marker.tag, string),
+                        position: vec3(marker.position),
+                      };
+                    }
+                  )
+              ),
+            };
+          }
+        ),
+      };
+    }
+  );
   const transform = array(source.transform, number);
   if (transform.length !== 16) throw new Error('[models] expected world transform matrix');
   return {
     ...source,
     version: 2,
     sourceHash: string(source.sourceHash),
-    navigation: optional(source.navigation, (value) => {
+    navigation: optional(source.navigation, (value): NonNullable<WorldManifest['navigation']> => {
       const navigation = object(value);
       return {
         ...navigation,
@@ -254,7 +275,7 @@ export function parseWorldManifest(value: unknown): WorldManifest {
       drawCalls: number(stats.drawCalls),
       collideTris: number(stats.collideTris),
     },
-    spawns: array(source.spawns, (value) => {
+    spawns: array(source.spawns, (value): WorldManifest['spawns'][number] => {
       const spawn = object(value);
       return {
         ...spawn,
@@ -264,7 +285,7 @@ export function parseWorldManifest(value: unknown): WorldManifest {
         tag: string(spawn.tag),
       };
     }),
-    lights: array(source.lights, (value) => {
+    lights: array(source.lights, (value): WorldManifest['lights'][number] => {
       const light = object(value);
       return {
         ...light,
@@ -277,8 +298,8 @@ export function parseWorldManifest(value: unknown): WorldManifest {
         night: number(light.night),
       };
     }),
-    buildings: optional(source.buildings, (value) =>
-      array(value, (value) => {
+    buildings: optional(source.buildings, (value): WorldBuilding[] =>
+      array(value, (value): WorldBuilding => {
         const building = object(value),
           spec = object(building.spec);
         return {
@@ -292,17 +313,17 @@ export function parseWorldManifest(value: unknown): WorldManifest {
             enterable: optional(spec.enterable, boolean),
             collapse: optional(spec.collapse, boolean),
             ruin: optional(spec.ruin, boolean),
-            setback: optional(spec.setback, (value) => {
+            setback: optional(spec.setback, (value): { from: number | undefined } => {
               const setback = object(value);
               return { ...setback, from: optional(setback.from, number) };
             }),
           },
-          floorY: optional(building.floorY, (value) => array(value, number)),
+          floorY: optional(building.floorY, (value): number[] => array(value, number)),
           roofY: optional(building.roofY, number),
         };
       })
     ),
-    volumes: optional(source.volumes, (value) =>
+    volumes: optional(source.volumes, (value): WorldLadder[] =>
       array(value, (value): WorldLadder => {
         const volume = object(value);
         if (volume.kind !== 'ladder') throw new Error('[models] unsupported world volume');
@@ -320,32 +341,37 @@ export function parseWorldManifest(value: unknown): WorldManifest {
       })
     ),
     WORLD: world,
-    query: optional(source.query, (value) => {
+    query: optional(source.query, (value): NonNullable<WorldManifest['query']> => {
       const query = object(value);
       return {
         ...query,
-        street: optional(query.street, (value) => {
-          const street = object(value);
-          return {
-            ...street,
-            halfWidth: number(street.halfWidth),
-            kerb: number(street.kerb),
-            walkH: number(street.walkH),
-            zMin: number(street.zMin),
-            zMax: number(street.zMax),
-          };
-        }),
-        alleys: optional(query.alleys, (value) =>
-          array(value, (value) => {
-            const alley = object(value),
-              rect = array(alley.rect, number);
-            if (rect.length !== 4) throw new Error('[models] expected alley rectangle');
+        street: optional(
+          query.street,
+          (value): NonNullable<NonNullable<WorldManifest['query']>['street']> => {
+            const street = object(value);
             return {
-              ...alley,
-              rect: [rect[0], rect[1], rect[2], rect[3]] as [number, number, number, number],
-              surface: string(alley.surface),
+              ...street,
+              halfWidth: number(street.halfWidth),
+              kerb: number(street.kerb),
+              walkH: number(street.walkH),
+              zMin: number(street.zMin),
+              zMax: number(street.zMax),
             };
-          })
+          }
+        ),
+        alleys: optional(
+          query.alleys,
+          (value): { rect: [number, number, number, number]; surface: string }[] =>
+            array(value, (value): { rect: [number, number, number, number]; surface: string } => {
+              const alley = object(value),
+                rect = array(alley.rect, number);
+              if (rect.length !== 4) throw new Error('[models] expected alley rectangle');
+              return {
+                ...alley,
+                rect: [rect[0], rect[1], rect[2], rect[3]] as [number, number, number, number],
+                surface: string(alley.surface),
+              };
+            })
         ),
       };
     }),

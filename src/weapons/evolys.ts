@@ -29,7 +29,7 @@ const ALIASES: Record<string, string> = {
 };
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
 
-export function makeEvolysModel(gltf: GLTF) {
+export function makeEvolysModel(gltf: GLTF): EvolysModel {
   const scene = gltf.scene;
   const { root, animations, point } = authoredModel(gltf, 'EVOLYS_RIG', REQUIRED, scene);
   const sight = point('SOCKET_sight');
@@ -66,7 +66,7 @@ export function makeEvolysModel(gltf: GLTF) {
     shell: { caseLen: 0.051, rimR: 0.005975 },
     magSize: { len: 0.125 },
   };
-  const converted = convertWeaponScene(scene, (source, material) => {
+  const converted = convertWeaponScene(scene, (source, material): void => {
     if (source.name.startsWith('10 |')) {
       material.transparent = true;
       material.opacity = 0.13;
@@ -80,14 +80,50 @@ export function makeEvolysModel(gltf: GLTF) {
   return { ...model, ...converted };
 }
 
-export async function loadEvolys() {
+export async function loadEvolys(): Promise<EvolysModel> {
   return makeEvolysModel(await new GLTFLoader().loadAsync(EVOLYS_URL));
 }
 
 /** Native Blender mechanism/belt/hand tracks, under shared ADS/sway/recoil.
  * Only ammunition-tail visibility is runtime-driven. No per-shot belt objects,
  * new textures, duplicate cases, frame allocations or second animation rig. */
-type EvolysModel = ReturnType<typeof makeEvolysModel>;
+type EvolysModel = {
+  materials: Set<THREE.Material>;
+  textures: Set<THREE.Texture>;
+  id: string;
+  label: string;
+  scene: THREE.Group;
+  root: THREE.Object3D;
+  animations: THREE.AnimationClip[];
+  reactiveFire: boolean;
+  handPoses: {
+    left: typeof handReference.sides.left.grip;
+    right: typeof handReference.sides.left.grip;
+  };
+  nodes: {
+    muzzle: [number, number, number];
+    eject: [number, number, number];
+    sight: [number, number, number];
+    ejectDir: number[];
+    gripR: { pos: number[]; finger: number[]; back: number[] };
+    gripL: { pos: number[]; finger: number[]; back: number[] };
+    magSeat: { pos: [number, number, number]; rot: number[] };
+    triggerPivot: { pos: [number, number, number]; rot: number[] };
+    handguard: { axis: number[]; dir: number[]; r: number; z0: number; z1: number };
+    opticGlass: {
+      center: [number, number, number];
+      apertureR: number;
+      windowW: number;
+      windowH: number;
+      reticle: string;
+      dotMoa: number;
+      minDotPixels: number;
+      dotOpacity: number;
+    };
+  };
+  shell: { caseLen: number; rimR: number };
+  magSize: { len: number };
+};
 type EvolysArm = HandRig;
 export class EvolysAnimation {
   model!: EvolysModel;
@@ -113,14 +149,16 @@ export class EvolysAnimation {
     this.root = model.root;
     this.mixer = new THREE.AnimationMixer(this.root);
     this.actions = createAuthoredActions(this.mixer, model.animations);
-    const node = (name: string) => requiredNode(this.root, name);
+    const node = (name: string): THREE.Object3D => requiredNode(this.root, name);
     this.pouch = node('pouch');
     this.spare = node('pouch_spare');
     this.cover = node('feed_cover');
     this.bolt = node('bolt');
     this.charging = node('charging_handle');
     this.belt = node('belt_mesh');
-    this.bones = Array.from({ length: manifest.belt.rounds }, (_, i) => node(`belt_${i}`));
+    this.bones = Array.from({ length: manifest.belt.rounds }, (_, i): THREE.Object3D =>
+      node(`belt_${i}`)
+    );
     this.hands = discoverAuthoredHands(node);
     this.poseMatrix = this.root.matrix;
     this.remainingRounds = 100;

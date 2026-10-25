@@ -7,7 +7,7 @@ import type { NodeBuilder } from 'three/webgpu';
 export function trackNodeBuilders(
   renderer: Renderer | null | undefined,
   { onBuild }: { onBuild?: (builder: NodeBuilder, object: unknown) => unknown } = {}
-) {
+): { readonly count: number | null; dispose(): void } {
   const supported =
     !!renderer?.backend &&
     'isWebGPUBackend' in renderer.backend &&
@@ -24,10 +24,10 @@ export function trackNodeBuilders(
   }
   if (supported) renderer.debug.onNodeBuilderCreated = observe;
   return {
-    get count() {
+    get count(): number | null {
       return count;
     },
-    dispose() {
+    dispose(): void {
       active = false;
       if (supported && renderer.debug.onNodeBuilderCreated === observe)
         renderer.debug.onNodeBuilderCreated = previous;

@@ -1004,7 +1004,7 @@ const CSS = `
 
 let installed = false;
 
-export function installStyles() {
+export function installStyles(): void {
   if (installed && document.getElementById('ow-ui-style')) return;
   const s = document.createElement('style');
   s.id = 'ow-ui-style';
@@ -1013,7 +1013,7 @@ export function installStyles() {
   installed = true;
 }
 
-export function removeStyles() {
+export function removeStyles(): void {
   document.getElementById('ow-ui-style')?.remove();
   installed = false;
 }

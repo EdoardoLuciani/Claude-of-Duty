@@ -163,7 +163,10 @@ function applyGrade(
   return [scurve(r), scurve(gg), scurve(b)];
 }
 
-export function createGradeLut(preset: string = 'default') {
+export function createGradeLut(preset: string = 'default'): {
+  texture: THREE.Data3DTexture;
+  size: number;
+} {
   const g = GRADE_PRESETS[preset] ?? GRADE_PRESETS.default;
   const sh = shoulderParams(g);
   const n = SIZE;

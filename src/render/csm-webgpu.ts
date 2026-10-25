@@ -43,6 +43,7 @@ import {
  */
 import { Matrix4, PCFShadowMap } from 'three/webgpu';
 import type { DepthTexture, DirectionalLight, DirectionalLightShadow, Node } from 'three/webgpu';
+import type { TextureNode } from 'three/webgpu';
 
 // PCF spans neighboring depth texels on a sloping receiver. Express the
 // conservative receiver bias in cascade texels, not a resolution-independent
@@ -61,14 +62,15 @@ export function groupedReference<T extends 'float' | 'vec2'>(
 }
 type CascadeShadow = DirectionalLightShadow & { bias: number };
 function cascadeBias(shadow: CascadeShadow, key: DirectionalLight): Node<'float'> {
-  const field = (name: string, object: object) => groupedReference(name, 'float', object);
+  const field = (name: string, object: object): GroupedReference<'float'> =>
+    groupedReference(name, 'float', object);
   const camera = shadow.camera;
   const width = field('right', camera).sub(field('left', camera));
   const range = field('far', camera).sub(field('near', camera));
   const mapSize = groupedReference('mapSize', 'vec2', shadow);
   const base = field('bias', shadow);
   const direction = lightPosition(key).sub(lightTargetPosition(key)).normalize();
-  return Fn(() => {
+  return Fn((): Node<'float'> => {
     const cosine = abs(dot(normalWorldGeometry, direction)).clamp(0.12, 1).toVar();
     const slope = sqrt(max(0, cosine.mul(cosine).oneMinus()))
       .div(cosine)
@@ -102,7 +104,7 @@ const pcfFunction = Fn as unknown as (
   callback: (args: PCFArguments) => Node<'float'>
 ) => Node<'float'>;
 export const stablePCFShadowFilter = pcfFunction(
-  ({ depthTexture, shadowCoord, shadow, depthLayer }) => {
+  ({ depthTexture, shadowCoord, shadow, depthLayer }): Node<'float'> => {
     let fields = shadowFields.get(shadow);
     if (!fields) {
       fields = {
@@ -113,7 +115,7 @@ export const stablePCFShadowFilter = pcfFunction(
     }
     const radiusScaled = fields.radius.mul(vec2(1).div(fields.mapSize).x);
     const phi = interleavedGradientNoise(screenCoordinate.xy).mul(6.28318530718);
-    const compare = (i: number) => {
+    const compare = (i: number): TextureNode<'vec4'> => {
       const uv = shadowCoord.xy.add(vogelDiskSample(float(i), float(5), phi).mul(radiusScaled));
       let depth = texture(depthTexture, uv);
       if (depthTexture.isArrayTexture) depth = depth.depth(depthLayer);

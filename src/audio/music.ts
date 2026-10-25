@@ -182,11 +182,11 @@ export class TentRadio {
   warm(): Promise<AudioBuffer | null> {
     if (this._warm) return this._warm;
     this._warm = renderBed(this.actx.sampleRate, this.rng)
-      .then((buf) => {
+      .then((buf): AudioBuffer | null => {
         this._buf = buf;
         return buf;
       })
-      .catch(() => {
+      .catch((): null => {
         this._buf = null;
         return null;
       });
@@ -246,7 +246,7 @@ export class TentRadio {
     } catch {
       /* already stopped */
     }
-    setTimeout(() => {
+    setTimeout((): void => {
       try {
         src?.disconnect();
       } catch {

@@ -7,6 +7,7 @@ import {
   StandardNodeLibrary,
   WebGPUBackend,
 } from 'three/webgpu';
+import type { Node } from 'three/webgpu';
 
 import { createConfig } from '../core/config.ts';
 import { EventBus } from '../core/registry.ts';
@@ -30,8 +31,8 @@ import { Noise } from './noise.ts';
 
 const canvas = document.getElementById('fx');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('FX preview canvas is missing');
-const W = () => canvas.clientWidth || 1920;
-const H = () => canvas.clientHeight || 1080;
+const W = (): number => canvas.clientWidth || 1920;
+const H = (): number => canvas.clientHeight || 1080;
 
 // Strict WebGPU only: construct the backend directly so the dev harness cannot
 // silently fall back to WebGL when the GPU is unavailable.
@@ -139,7 +140,7 @@ function surfaceMaps(seed: number, opts: SurfaceOptions): SurfaceMaps {
   }
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {
-      const at = (dx: number, dy: number) =>
+      const at = (dx: number, dy: number): number =>
         h[((((y + dy) % S) + S) % S) * S + ((((x + dx) % S) + S) % S)];
       const gx = (at(1, 0) - at(-1, 0)) * opts.relief;
       const gy = (at(0, 1) - at(0, -1)) * opts.relief;
@@ -319,7 +320,7 @@ const physicsStub = {
     }
     return _hitOut;
   },
-  groundHeight() {
+  groundHeight(): number {
     return 0;
   },
   addRigidBody: null,
@@ -334,7 +335,7 @@ const renderStub = {
   screenSize: { width: W(), height: H() },
   sunDir: new THREE.Vector3(),
   activeSun: sun,
-  addLight() {},
+  addLight(): void {},
 };
 
 let pipeline: WorldViewPipeline | null = null;
@@ -344,8 +345,8 @@ function buildPipeline(): void {
     gtao: false,
     bloomStrength: 0.16,
     bloomThreshold: 1.5,
-    warp: (node) => fx.hazeSys.warpNode(node),
-    afterDepth: () => fx.hazeSys.render(renderer, camera),
+    warp: (node): Node<'vec4'> => fx.hazeSys.warpNode(node),
+    afterDepth: (): boolean => fx.hazeSys.render(renderer, camera),
   });
   renderStub.depthTexture = pipeline.linearDepth.value;
 }
@@ -372,12 +373,12 @@ const ctx = {
   input: { frozen: true },
   time,
   rng: new Rng(0xfeed),
-  get: (id: string) => systems[id] ?? null,
+  get: (id: string): {} | null => systems[id] ?? null,
   peek,
-  has: (id: string) => !!systems[id],
+  has: (id: string): boolean => !!systems[id],
 };
 
-function resize() {
+function resize(): void {
   const w = Math.max(1, W());
   const h = Math.max(1, H());
   renderer.setSize(w, h, false);
@@ -411,7 +412,8 @@ if (KIND === 'closeup') {
 }
 fx.debugBurst(KIND);
 window.__FX__ = fx;
-window.__BURST__ = (k: string) => fx.debugBurst(k);
+window.__BURST__ = (k: string): { staged: string; at?: number[]; surface?: string } =>
+  fx.debugBurst(k);
 
 // Atlas inspector: ?kind=atlas | patlas | natlas | ormatlas draws a baked atlas
 // full-screen so every tile can be judged on its own.
@@ -424,15 +426,15 @@ const atlasScene = new THREE.Scene();
 atlasScene.add(atlasQuad);
 const atlasCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 10);
 const ATLAS_VIEWS: Record<string, () => THREE.Texture> = {
-  atlas: () => fx._decalAtlas.albedo,
-  atlasa: () => fx._decalAtlas.albedo,
-  natlas: () => fx._decalAtlas.normal,
-  ormatlas: () => fx._decalAtlas.orm,
-  patlas: () => fx._atlas.texture,
-  patlasa: () => fx._atlas.texture,
+  atlas: (): THREE.Texture => fx._decalAtlas.albedo,
+  atlasa: (): THREE.Texture => fx._decalAtlas.albedo,
+  natlas: (): THREE.Texture => fx._decalAtlas.normal,
+  ormatlas: (): THREE.Texture => fx._decalAtlas.orm,
+  patlas: (): THREE.Texture => fx._atlas.texture,
+  patlasa: (): THREE.Texture => fx._atlas.texture,
 };
 
-function advance() {
+function advance(): void {
   time.frame++;
   time.elapsed += time.dt;
   time.raw += time.dt;
@@ -468,10 +470,10 @@ function draw(): void {
 window.__PREVIEW_RENDERER__ = renderer;
 window.__PREVIEW_DRAW__ = draw;
 window.__PREVIEW_STEP__ = advance;
-window.__PREVIEW_GRAPH__ = () => pipeline;
+window.__PREVIEW_GRAPH__ = (): ReturnType<typeof createWorldViewPipeline> | null => pipeline;
 window.__PREVIEW_CTX__ = ctx;
 let raf = 0;
-function frame() {
+function frame(): void {
   advance();
   draw();
   raf = requestAnimationFrame(frame);
@@ -480,7 +482,7 @@ draw(); // Do not publish readiness before the real composition succeeds.
 window.__READY__ = true;
 if (!params.has('lockstep')) raf = requestAnimationFrame(frame);
 
-async function dispose() {
+async function dispose(): Promise<void> {
   window.__READY__ = false;
   cancelAnimationFrame(raf);
   removeEventListener('resize', resize);

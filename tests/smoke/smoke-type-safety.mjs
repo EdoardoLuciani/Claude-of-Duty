@@ -65,6 +65,49 @@ export function value(): string {
 `);
   assert.equal(safe.status, 0, safe.stdout + safe.stderr);
 
+  // Every TypeScript function needs a return contract, including the rule's
+  // normally exempt contextually typed callbacks and higher-order functions.
+  const missingReturns = [
+    'export function missing() { return 1; }',
+    'export async function missing() { return 1; }',
+    'export class Missing { method() { return 1; } }',
+    'export class Missing { get value() { return 1; } }',
+    'export const missing = function () { return 1; };',
+    'export const missing = () => 1;',
+    'export const missing: () => number = () => 1;',
+    'export const missing = [1].map(value => value + 1);',
+    'export function missing() { return (): number => 1; }',
+    'export const missing = () => 1 as const;',
+    'export const missing = (() => 1)();',
+  ];
+  for (const source of missingReturns) {
+    const result = lint(source);
+    assert.equal(result.status, 1, source + '\n' + result.stdout + result.stderr);
+    assert.ok(
+      JSON.parse(result.stdout).diagnostics.some(
+        (d) => d.code === 'typescript(explicit-function-return-type)'
+      ),
+      `missing return annotation must be rejected: ${source}`
+    );
+  }
+  const explicitReturns = lint(`export function value(): number { return 1; }
+export async function asyncValue(): Promise<number> { return 1; }
+export class Explicit {
+  constructor() {}
+  method(): number { return 1; }
+  get value(): number { return 1; }
+  set value(value: number) { void value; }
+}
+export const expression = function (): number { return 1; };
+export const arrow = (): number => 1;
+export const typed: () => number = (): number => 1;
+export const mapped = [1].map((value): number => value + 1);
+export function higherOrder(): () => number { return (): number => 1; }
+export const constant = (): 1 => 1 as const;
+export const immediate = ((): number => 1)();
+`);
+  assert.equal(explicitReturns.status, 0, explicitReturns.stdout + explicitReturns.stderr);
+
   // Provider and event payload contracts must reject invalid consumers too.
   writeFileSync(
     file,
@@ -150,5 +193,5 @@ events.on('not-an-event', () => {});
   rmSync(dir, { recursive: true, force: true });
 }
 console.log(
-  'type-safety: six unsafe patterns rejected; concrete FX/render/haze/world boundary return and argument types enforced'
+  'type-safety: six unsafe patterns and missing return annotations rejected; concrete FX/render/haze/world boundary return and argument types enforced'
 );

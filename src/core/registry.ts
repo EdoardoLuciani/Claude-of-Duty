@@ -35,7 +35,7 @@ export function describeSystem(system: object): SystemDescriptor {
   const deps: unknown = 'deps' in ctor ? ctor.deps : undefined;
   if (
     deps !== undefined &&
-    (!Array.isArray(deps) || !deps.every((dep: unknown) => typeof dep === 'string'))
+    (!Array.isArray(deps) || !deps.every((dep: unknown): dep is string => typeof dep === 'string'))
   ) {
     throw new Error(`${name} has invalid static deps`);
   }
@@ -47,7 +47,7 @@ export class Registry {
   #order: Subsystem[] = [];
   #cache = new Map<LifecycleHook, Subsystem[]>();
 
-  add<S extends object>(system: S & Pick<Subsystem, keyof S & keyof Subsystem>) {
+  add<S extends object>(system: S & Pick<Subsystem, keyof S & keyof Subsystem>): this {
     const { id } = describeSystem(system);
     if (this.#systems.has(id)) throw new Error(`duplicate subsystem id "${id}"`);
     // Registration checks every lifecycle member present on the actual provider,
@@ -75,7 +75,7 @@ export class Registry {
     return this.#systems.has(id);
   }
 
-  resolve() {
+  resolve(): Subsystem[] {
     const seen = new Map<string, 0 | 1>();
     const out: Subsystem[] = [];
     const visit = (id: string, from: string): void => {
@@ -94,20 +94,20 @@ export class Registry {
     return out;
   }
 
-  get ordered() {
+  get ordered(): Subsystem[] {
     return this.#order.length ? this.#order : this.resolve();
   }
 
   with(method: LifecycleHook): Subsystem[] {
     let list = this.#cache.get(method);
     if (!list) {
-      list = this.ordered.filter((system) => typeof system[method] === 'function');
+      list = this.ordered.filter((system): boolean => typeof system[method] === 'function');
       this.#cache.set(method, list);
     }
     return list;
   }
 
-  invalidate() {
+  invalidate(): void {
     this.#cache.clear();
   }
 }
@@ -128,11 +128,11 @@ export class EventBus<Events extends object = EngineEventMap> {
       this.#map.set(type, listeners);
     }
     listeners.add(fn);
-    return () => this.off(type, fn);
+    return (): void => this.off(type, fn);
   }
 
   once<K extends keyof Events>(type: K, fn: (payload: Events[K]) => void): () => void {
-    const off = this.on(type, (event) => {
+    const off = this.on(type, (event): void => {
       off();
       fn(event);
     });
@@ -162,7 +162,7 @@ export class EventBus<Events extends object = EngineEventMap> {
     }
   }
 
-  clear() {
+  clear(): void {
     this.#map.clear();
   }
 }

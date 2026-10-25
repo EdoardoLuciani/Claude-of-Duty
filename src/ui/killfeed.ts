@@ -58,7 +58,7 @@ export class Killfeed {
     this.root = el('div', 'ow-killfeed', parent);
     this.pool = new Pool(
       6,
-      () => {
+      (): KillfeedRow => {
         const row = el('div', 'ow-kf-row') as KillfeedRow;
         const a = el('span', 'ow-kf-a', row, 'PLAYER');
         const w = el('span', 'ow-kf-w', row);

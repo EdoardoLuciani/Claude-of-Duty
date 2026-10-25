@@ -3,6 +3,7 @@ import type TextureNode from 'three/src/nodes/accessors/TextureNode.js';
 import { Fn, float, max, rtt, screenUV, textureSize, uint, vec2 } from 'three/tsl';
 import { RedFormat, UnsignedByteType } from 'three/webgpu';
 import type { Camera, Node } from 'three/webgpu';
+import type { RTTNode } from 'three/webgpu';
 
 /** Reuse Three's five-tap Gaussian, retaining depth-relative rejection, neutral
  * sky, full-resolution R8 intermediates and GTAO's unmodified strength.
@@ -12,9 +13,9 @@ export function createAoBilateralBlur(
   linearDepth: TextureNode,
   rawDepth: TextureNode,
   camera: Camera
-) {
-  const blur = (input: Node, direction: Node<'vec2'>) =>
-    Fn(() => {
+): { textureNode: RTTNode; dispose(): void } {
+  const blur = (input: Node, direction: Node<'vec2'>): Node<'float'> =>
+    Fn((): Node<'float'> => {
       const center = linearDepth.sample(screenUV).r;
       const step = direction
         .mul(1.65)
@@ -30,7 +31,7 @@ export function createAoBilateralBlur(
   vertical.name = 'AO bilateral vertical';
   return {
     textureNode: vertical,
-    dispose() {
+    dispose(): void {
       vertical.dispose();
       horizontal.dispose();
     },

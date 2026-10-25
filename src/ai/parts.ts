@@ -57,7 +57,7 @@ import {
 
 /** Cylindrical wrap about the Y axis — bends flat slabs around the torso. */
 export function bendY(mesh: MeshRecord, radius: number, centreZ = 0): MeshRecord {
-  return warp(mesh, (v) => {
+  return warp(mesh, (v): void => {
     const r = radius + (v.z - centreZ);
     const a = v.x / radius;
     v.x = Math.sin(a) * r;
@@ -115,7 +115,7 @@ export function jacketTorso(nz: Noise, p: { flare?: number; bulk?: number } = {}
     [1.505, 0.07, 0.066, -0.01, 2.3],
   ];
   const seg = 26;
-  const rings = S.map(([y, hx, hz, zo, n]) => ({
+  const rings = S.map(([y, hx, hz, zo, n]): { pts: import('./geo.ts').Vec2[]; o: number[] } => ({
     pts: superEllipse(hx, hz, n, seg),
     o: [0, y, zo],
   }));
@@ -123,7 +123,7 @@ export function jacketTorso(nz: Noise, p: { flare?: number; bulk?: number } = {}
   computeNormals(m);
 
   // chest deeper at the front than the back, shoulders squared off
-  warp(m, (v) => {
+  warp(m, (v): void => {
     const t = Math.max(0, Math.min(1, (v.y - 1.1) / 0.3));
     if (v.z > 0) v.z += 0.016 * t;
     else v.z -= 0.006 * t;
@@ -133,7 +133,7 @@ export function jacketTorso(nz: Noise, p: { flare?: number; bulk?: number } = {}
   computeNormals(m);
 
   // cloth folds: horizontal creases at the waist, vertical pull from the plate
-  displace(m, (x, y, z) => {
+  displace(m, (x, y, z): number => {
     const fold = nz.fbm3(x * 22, y * 15, z * 22, 3);
     const crease = Math.sin(y * 38 + fold * 3.4) * 0.5 + 0.5;
     const waist = Math.exp(-((y - 1.06) ** 2) / 0.006);
@@ -156,10 +156,13 @@ export function pelvis(nz: Noise): MeshRecord {
     [0.935, 0.152, 0.108],
     [0.985, 0.15, 0.104],
     [1.03, 0.144, 0.098],
-  ].map(([y, hx, hz]) => ({ pts: superEllipse(hx, hz, 3.0, seg), o: [0, y, -0.006] }));
+  ].map(([y, hx, hz]): { pts: import('./geo.ts').Vec2[]; o: number[] } => ({
+    pts: superEllipse(hx, hz, 3.0, seg),
+    o: [0, y, -0.006],
+  }));
   const m = loft(rings, { capStart: true, capEnd: true });
   computeNormals(m);
-  displace(m, (x, y, z) => nz.fbm3(x * 26, y * 20, z * 26, 3) * 0.004);
+  displace(m, (x, y, z): number => nz.fbm3(x * 26, y * 20, z * 26, 3) * 0.004);
   return m;
 }
 
@@ -171,10 +174,13 @@ export function collar(nz: Noise): MeshRecord {
     [1.47, 0.09, 0.082],
     [1.5, 0.082, 0.076],
     [1.516, 0.086, 0.08],
-  ].map(([y, hx, hz]) => ({ pts: superEllipse(hx, hz, 2.6, seg), o: [0, y, -0.006] }));
+  ].map(([y, hx, hz]): { pts: import('./geo.ts').Vec2[]; o: number[] } => ({
+    pts: superEllipse(hx, hz, 2.6, seg),
+    o: [0, y, -0.006],
+  }));
   const m = loft(rings, { capStart: false, capEnd: true });
   computeNormals(m);
-  displace(m, (x, y, z) => nz.fbm3(x * 40, y * 30, z * 40, 2) * 0.003);
+  displace(m, (x, y, z): number => nz.fbm3(x * 40, y * 30, z * 40, 2) * 0.003);
   return m;
 }
 
@@ -231,7 +237,7 @@ export function limbTube(
   const flat = opts.flat ?? 0.88;
   const m = tube(
     pts,
-    (t) => {
+    (t): import('./geo.ts').Vec2[] => {
       const r = radiusAt(radii, t);
       return ellipseProfile(r, r * flat, segs);
     },
@@ -251,7 +257,7 @@ export function limbTube(
     const total = lAB + lBC;
     const bend = new THREE.Vector3(...(opts.bend ?? [0, 0, -1])).normalize();
     const q = new THREE.Vector3();
-    displace(m, (x, y, z, nx, ny, nzc) => {
+    displace(m, (x, y, z, nx, ny, nzc): number => {
       // distance along the chain, and how far out along the bend axis we are
       const tAB = Math.max(0, Math.min(lAB, q.set(x, y, z).sub(A).dot(uAB)));
       const tBC = Math.max(0, Math.min(lBC, q.set(x, y, z).sub(B).dot(uBC)));
@@ -273,7 +279,7 @@ export function limbTube(
     });
     computeNormals(m);
   }
-  displace(m, (x, y, z) => {
+  displace(m, (x, y, z): number => {
     const f = nz.fbm3(x * 11, y * 9, z * 11, 3);
     const fine = nz.fbm3(x * 34, y * 30, z * 34, 2);
     return f * amp + fine * amp * 0.3;
@@ -293,12 +299,12 @@ function radiusAt(radii: number[], t: number): number {
 export function shoulderCap(nz: Noise, shoulder: Vec3, side: number): MeshRecord {
   const m = ellipsoid(0.052, 0.064, 0.056, { seg: 18, rows: 12 });
   computeNormals(m);
-  warp(m, (v) => {
+  warp(m, (v): void => {
     v.y *= 1.0;
     if (v.y < 0) v.x *= 0.9;
   });
   place(m, shoulder[0] + side * 0.012, shoulder[1] - 0.008, shoulder[2], 0, 0, -side * 0.12);
-  displace(m, (x, y, z) => nz.fbm3(x * 30, y * 30, z * 30, 3) * 0.004);
+  displace(m, (x, y, z): number => nz.fbm3(x * 30, y * 30, z * 30, 3) * 0.004);
   return m;
 }
 
@@ -323,7 +329,7 @@ export function headMesh(nz: Noise, base: Vec3, p: HeadOptions = {}): MeshRecord
     [0.244, 0.012 * w, 0.013, -0.014, 2.4],
   ];
   const seg = 24;
-  const rings = S.map(([y, hx, hz, zo, n]) => ({
+  const rings = S.map(([y, hx, hz, zo, n]): { pts: import('./geo.ts').Vec2[]; o: number[] } => ({
     pts: superEllipse(hx, hz, n, seg),
     o: [base[0], base[1] + y, base[2] + zo],
   }));
@@ -334,7 +340,7 @@ export function headMesh(nz: Noise, base: Vec3, p: HeadOptions = {}): MeshRecord
     by = base[1],
     bz = base[2];
   // features, all in head-local coordinates
-  warp(m, (v) => {
+  warp(m, (v): void => {
     const x = v.x - bx,
       y = v.y - by,
       z = v.z - bz;
@@ -364,7 +370,7 @@ export function headMesh(nz: Noise, base: Vec3, p: HeadOptions = {}): MeshRecord
     v.z = bz + z * scale + 0.006 * brow + 0.004 * chin + 0.008 * occ * -1;
   });
   computeNormals(m);
-  displace(m, (x, y, z) => nz.fbm3(x * 70, y * 70, z * 70, 3) * 0.0012);
+  displace(m, (x, y, z): number => nz.fbm3(x * 70, y * 70, z * 70, 3) * 0.0012);
   return m;
 }
 
@@ -381,7 +387,7 @@ export function nose(nz: Noise, base: Vec3): MeshRecord {
     [0.064, 0.1, 0.02, 0.018],
     [0.058, 0.092, 0.019, 0.012],
   ];
-  const rings = S.map(([y, z, hx, hz]) => ({
+  const rings = S.map(([y, z, hx, hz]): { pts: import('./geo.ts').Vec2[]; o: number[] } => ({
     pts: superEllipse(hx, hz, 2.2, 12),
     o: [bx, by + y, bz + z],
   }));
@@ -394,7 +400,7 @@ export function nose(nz: Noise, base: Vec3): MeshRecord {
 export function ear(nz: Noise, base: Vec3, side: number): MeshRecord {
   const m = ellipsoid(0.01, 0.03, 0.02, { seg: 12, rows: 9 });
   computeNormals(m);
-  warp(m, (v) => {
+  warp(m, (v): void => {
     v.z += v.y * 0.25;
     v.x += Math.abs(v.y) * 0.1;
   });
@@ -435,7 +441,7 @@ export function faceWrap(nz: Noise, base: Vec3, p: HeadOptions = {}): MeshRecord
     [0.086, 0.09, 0.093, -0.006, 2.4],
   ];
   const seg = 22;
-  const rings = S.map(([y, hx, hz, zo, n]) => ({
+  const rings = S.map(([y, hx, hz, zo, n]): { pts: import('./geo.ts').Vec2[]; o: number[] } => ({
     pts: superEllipse(hx, hz, n, seg),
     o: [bx, by + y, bz + zo],
   }));
@@ -445,7 +451,7 @@ export function faceWrap(nz: Noise, base: Vec3, p: HeadOptions = {}): MeshRecord
   // A hard mask is moulded polymer, so the fold field is quieter than cloth.
   const foldAmp = p.maskHard ? 0.0016 : 0.005;
   const wrapAmp = p.maskHard ? 0.0012 : 0.0035;
-  displace(m, (x, y, z) => {
+  displace(m, (x, y, z): number => {
     const fold = nz.fbm3(x * 30, y * 24, z * 30, 3);
     const wrap = Math.sin(y * 90 + fold * 4) * 0.5 + 0.5;
     return fold * foldAmp + wrap * wrapAmp;
@@ -570,7 +576,7 @@ export function helmet(nz: Noise, base: Vec3, p: HelmetOptions = {}): MeshRecord
   const shell = loft(rings, { capStart: false, capEnd: false });
   computeNormals(shell);
   // scallop: raise the rim over the ears, drop it at the front and back
-  warp(shell, (v) => {
+  warp(shell, (v): void => {
     const dy = v.y - cy;
     if (dy > 0.012) return;
     const ang = Math.atan2(v.x - bx, v.z - bz);
@@ -580,7 +586,7 @@ export function helmet(nz: Noise, base: Vec3, p: HelmetOptions = {}): MeshRecord
     v.y += lift * k;
   });
   computeNormals(shell);
-  displace(shell, (x, y, z) => nz.fbm3(x * 40, y * 40, z * 40, 3) * 0.0016);
+  displace(shell, (x, y, z): number => nz.fbm3(x * 40, y * 40, z * 40, 3) * 0.0016);
   appendMesh(out, shell);
 
   // --- brim lip: a thin band following the rim
@@ -638,7 +644,7 @@ export function helmetHardware(nz: Noise, base: Vec3): MeshRecord {
   const cw = boxRound(0.058, 0.034, 0.026, { n: 4, seg: 14, rows: 6, roundY: 0.5 });
   place(cw, bx, cy + 0.075, bz - 0.128, 0.28, 0, 0);
   computeNormals(cw);
-  displace(cw, (x, y, z) => nz.fbm3(x * 40, y * 40, z * 40, 2) * 0.002);
+  displace(cw, (x, y, z): number => nz.fbm3(x * 40, y * 40, z * 40, 2) * 0.002);
   appendMesh(out, cw);
   return out;
 }
@@ -765,7 +771,7 @@ export function headScarf(nz: Noise, base: Vec3): MeshRecord {
   const dome = ellipsoid(0.102, 0.146, 0.112, { seg: 22, rows: 12, v0: 0.34, v1: 1 });
   computeNormals(dome);
   place(dome, bx, by + 0.104, bz - 0.008);
-  displace(dome, (x, y, z) => {
+  displace(dome, (x, y, z): number => {
     const f = nz.fbm3(x * 26, y * 22, z * 26, 3);
     return f * 0.006 + Math.sin(y * 70 + f * 4) * 0.0022;
   });
@@ -789,12 +795,16 @@ export function headScarf(nz: Noise, base: Vec3): MeshRecord {
     const t = i / 5;
     tail.push([bx + 0.028 * t, by + 0.115 - t * 0.2, bz - 0.085 - Math.sin(t * 2.2) * 0.03]);
   }
-  const tl = tube(tail, (t) => superEllipse(0.052 - t * 0.012, 0.02 + t * 0.006, 3, 12), {
-    capStart: false,
-    capEnd: true,
-  });
+  const tl = tube(
+    tail,
+    (t): import('./geo.ts').Vec2[] => superEllipse(0.052 - t * 0.012, 0.02 + t * 0.006, 3, 12),
+    {
+      capStart: false,
+      capEnd: true,
+    }
+  );
   computeNormals(tl);
-  displace(tl, (x, y, z) => nz.fbm3(x * 30, y * 26, z * 30, 3) * 0.006);
+  displace(tl, (x, y, z): number => nz.fbm3(x * 30, y * 26, z * 30, 3) * 0.006);
   appendMesh(out, tl);
   return out;
 }
@@ -815,7 +825,7 @@ function plate(
 ): MeshRecord {
   const m = boxRound(hx, hy, hz, { n: 3.6, seg: 22, rows: 11, roundY: 0.24 });
   // taper: a real plate narrows toward the waist and wraps in at the bottom
-  warp(m, (v) => {
+  warp(m, (v): void => {
     const t = Math.max(0, -v.y / hy);
     v.x *= 1 - 0.2 * t * t;
     v.z *= 1 - 0.35 * t * t;
@@ -835,7 +845,7 @@ export function pouch(nz: Noise, o: PouchOptions): MeshRecord {
     hz = o.hz ?? 0.03;
   const body = boxRound(hx, hy, hz, { n: 5.5, seg: 18, rows: 8, roundY: 0.18 });
   computeNormals(body);
-  displace(body, (x, y, z) => nz.fbm3(x * 40, y * 40, z * 40, 3) * 0.0022);
+  displace(body, (x, y, z): number => nz.fbm3(x * 40, y * 40, z * 40, 3) * 0.0022);
   appendMesh(out, body);
   // lid
   const lid = boxRound(hx * 1.03, 0.01, hz * 0.98, { n: 5.5, seg: 18, rows: 4, roundY: 0.5 });
@@ -867,10 +877,10 @@ export function plateCarrier(nz: Noise, p: CarrierOptions = {}): MeshRecord {
   const bulk = p.bulk ?? 1;
   const thick = p.fullCarrier === false ? 0.88 : 1;
   const front = plate(0.152 * bulk, 0.14 * bulk, 0.03 * thick, 1.298, 0.126, -0.05, 0.2);
-  displace(front, (x, y, z) => nz.fbm3(x * 34, y * 34, z * 34, 3) * 0.0026);
+  displace(front, (x, y, z): number => nz.fbm3(x * 34, y * 34, z * 34, 3) * 0.0026);
   appendMesh(out, front);
   const back = plate(0.154 * bulk, 0.148 * bulk, 0.026 * thick, 1.3, -0.116, 0.05, 0.21);
-  displace(back, (x, y, z) => nz.fbm3(x * 34, y * 34, z * 34, 3) * 0.0026);
+  displace(back, (x, y, z): number => nz.fbm3(x * 34, y * 34, z * 34, 3) * 0.0026);
   appendMesh(out, back);
 
   // cummerbund wrapping the waist
@@ -886,7 +896,7 @@ export function plateCarrier(nz: Noise, p: CarrierOptions = {}): MeshRecord {
   }
   const band = ribbon(cb, 0.1, 0.022, { seg: 8, up: [0, 1, 0], upright: true });
   computeNormals(band);
-  displace(band, (x, y, z) => nz.fbm3(x * 34, y * 34, z * 34, 3) * 0.002);
+  displace(band, (x, y, z): number => nz.fbm3(x * 34, y * 34, z * 34, 3) * 0.002);
   appendMesh(out, band);
 
   // shoulder straps
@@ -899,7 +909,7 @@ export function plateCarrier(nz: Noise, p: CarrierOptions = {}): MeshRecord {
     ];
     const s = ribbon(pts, 0.076, 0.03, { seg: 8, up: [0, 1, 0] });
     computeNormals(s);
-    displace(s, (x, y, z) => nz.fbm3(x * 34, y * 34, z * 34, 3) * 0.002);
+    displace(s, (x, y, z): number => nz.fbm3(x * 34, y * 34, z * 34, 3) * 0.002);
     appendMesh(out, s);
   }
   return out;
@@ -966,7 +976,7 @@ export function belt(nz: Noise): MeshRecord {
   }
   const b = ribbon(pts, 0.056, 0.018, { seg: 7, up: [0, 1, 0], upright: true });
   computeNormals(b);
-  displace(b, (x, y, z) => nz.fbm3(x * 40, y * 40, z * 40, 2) * 0.0018);
+  displace(b, (x, y, z): number => nz.fbm3(x * 40, y * 40, z * 40, 2) * 0.0018);
   appendMesh(out, b);
   return out;
 }
@@ -993,7 +1003,7 @@ export function kneePad(nz: Noise, knee: Vec3, side = 0): MeshRecord {
   place(cap, 0, 0, 0.052, 0, 0, 0);
   bendY(cap, 0.075, 0.052);
   computeNormals(cap);
-  displace(cap, (x, y, z) => nz.fbm3(x * 60 + side * 13, y * 60, z * 60, 3) * 0.0018);
+  displace(cap, (x, y, z): number => nz.fbm3(x * 60 + side * 13, y * 60, z * 60, 3) * 0.0018);
   appendMesh(out, cap);
   for (const dy of [-0.056, 0.052]) {
     const pts = [];
@@ -1018,7 +1028,7 @@ export function kneePad(nz: Noise, knee: Vec3, side = 0): MeshRecord {
 function cantLast(mesh: MeshRecord, ankle: Vec3, side: number): MeshRecord {
   if (!side) return mesh;
   const az = ankle[2];
-  warp(mesh, (v) => {
+  warp(mesh, (v): void => {
     const z = v.z - az;
     if (z > 0) v.x += -side * z * 0.1;
   });
@@ -1043,15 +1053,17 @@ export function boot(nz: Noise, ankle: Vec3, side = 0): MeshRecord {
     [0.134, 0.028, 0.022, 0.024],
   ];
   const seg = 18;
-  const rings = S.map(([z, hx, hy, cy]) => ({
-    pts: superEllipse(hx, hy, 2.8, seg),
-    o: [ax, ay - 0.088 + cy, az + z],
-    q: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2),
-  }));
+  const rings = S.map(
+    ([z, hx, hy, cy]): { pts: import('./geo.ts').Vec2[]; o: number[]; q: THREE.Quaternion } => ({
+      pts: superEllipse(hx, hy, 2.8, seg),
+      o: [ax, ay - 0.088 + cy, az + z],
+      q: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2),
+    })
+  );
   const upper = loft(rings, { capStart: true, capEnd: true });
   computeNormals(upper);
   cantLast(upper, ankle, side);
-  displace(upper, (x, y, z) => nz.fbm3(x * 44 + side * 17, y * 44, z * 44, 3) * 0.0022);
+  displace(upper, (x, y, z): number => nz.fbm3(x * 44 + side * 17, y * 44, z * 44, 3) * 0.0022);
   appendMesh(out, upper);
 
   // ankle cuff up the shin
@@ -1061,11 +1073,11 @@ export function boot(nz: Noise, ankle: Vec3, side = 0): MeshRecord {
       [ax, ay + 0.07, az - 0.002],
       [ax, ay + 0.125, az + 0.002],
     ],
-    (t) => ellipseProfile(0.056 - 0.004 * t, 0.05 - 0.002 * t, 16),
+    (t): import('./geo.ts').Vec2[] => ellipseProfile(0.056 - 0.004 * t, 0.05 - 0.002 * t, 16),
     { capStart: false, capEnd: false }
   );
   computeNormals(cuff);
-  displace(cuff, (x, y, z) => nz.fbm3(x * 44 + side * 17, y * 44, z * 44, 3) * 0.0025);
+  displace(cuff, (x, y, z): number => nz.fbm3(x * 44 + side * 17, y * 44, z * 44, 3) * 0.0025);
   appendMesh(out, cuff);
   return out;
 }
@@ -1084,11 +1096,13 @@ export function bootSole(ankle: Vec3, side = 0): MeshRecord {
   const ax = ankle[0],
     ay = ankle[1],
     az = ankle[2];
-  const rings = S.map(([z, hx, hy]) => ({
-    pts: superEllipse(hx, hy, 3.6, 16),
-    o: [ax, ay - 0.088 + hy + 0.001, az + z],
-    q: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2),
-  }));
+  const rings = S.map(
+    ([z, hx, hy]): { pts: import('./geo.ts').Vec2[]; o: number[]; q: THREE.Quaternion } => ({
+      pts: superEllipse(hx, hy, 3.6, 16),
+      o: [ax, ay - 0.088 + hy + 0.001, az + z],
+      q: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2),
+    })
+  );
   const m = loft(rings, { capStart: true, capEnd: true });
   computeNormals(m);
   // heel block
@@ -1169,10 +1183,14 @@ export function glove(
         .addScaledVector(S, side * (0.02 - t * 0.019));
       pts.push([p.x, p.y, p.z]);
     }
-    const fin = tube(pts, (u) => ellipseProfile(0.0115 - u * 0.002, 0.0105 - u * 0.002, 10), {
-      capStart: true,
-      capEnd: true,
-    });
+    const fin = tube(
+      pts,
+      (u): import('./geo.ts').Vec2[] => ellipseProfile(0.0115 - u * 0.002, 0.0105 - u * 0.002, 10),
+      {
+        capStart: true,
+        capEnd: true,
+      }
+    );
     computeNormals(fin);
     appendMesh(out, fin);
   }
@@ -1186,15 +1204,19 @@ export function glove(
       .addScaledVector(S, side * (-0.026 - u * 0.004));
     tp.push([p.x, p.y, p.z]);
   }
-  const thumb = tube(tp, (u) => ellipseProfile(0.014 - u * 0.003, 0.013 - u * 0.003, 10), {
-    capStart: true,
-    capEnd: true,
-  });
+  const thumb = tube(
+    tp,
+    (u): import('./geo.ts').Vec2[] => ellipseProfile(0.014 - u * 0.003, 0.013 - u * 0.003, 10),
+    {
+      capStart: true,
+      capEnd: true,
+    }
+  );
   computeNormals(thumb);
   appendMesh(out, thumb);
 
   computeNormals(out);
-  displace(out, (x, y, z) => nz.fbm3(x * 90, y * 90, z * 90, 3) * 0.0012);
+  displace(out, (x, y, z): number => nz.fbm3(x * 90, y * 90, z * 90, 3) * 0.0012);
   return out;
 }
 

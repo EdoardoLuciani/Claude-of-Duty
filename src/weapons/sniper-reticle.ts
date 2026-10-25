@@ -40,7 +40,7 @@ export function sniperReticleCoverage(p: Node<'vec2'>): Node<'float'> {
   const horizontal = y.sub(x.greaterThanEqual(s.postStartMrad).select(post, fine));
   // P4FL-style heavy posts left/right/up; the lower fine stadia stay open.
   const vertical = x.sub(p.y.greaterThanEqual(s.postStartMrad).select(post, fine));
-  const ticks = (along: Node<'float'>, across: Node<'float'>, lower: boolean) => {
+  const ticks = (along: Node<'float'>, across: Node<'float'>, lower: boolean): Node<'float'> => {
     const nearest = TSL.round(along.div(s.minorMrad)).mul(s.minorMrad);
     const major = TSL.abs(TSL.mod(nearest, s.majorMrad)).lessThan(0.01);
     const halfLength = major.select(s.majorLengthMrad / 2, s.minorLengthMrad / 2);

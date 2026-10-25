@@ -52,10 +52,10 @@ interface HandNode {
 type Blend = (a: ClipKey, b: ClipKey, weight: number, out: ClipSample) => void;
 
 const EASE: Record<Ease, (t: number) => number> = {
-  linear: (t: number) => t,
-  smooth: (t: number) => smootherstep(0, 1, t),
-  out: (t: number) => easeOutCubic(t),
-  back: (t: number) => easeOutBack(t, 1.4),
+  linear: (t: number): number => t,
+  smooth: (t: number): number => smootherstep(0, 1, t),
+  out: (t: number): number => easeOutCubic(t),
+  back: (t: number): number => easeOutBack(t, 1.4),
 };
 
 function sampleTrack(keys: Track | null, t: number, out: ClipSample, blend: Blend): boolean {
@@ -94,7 +94,7 @@ export class Clip {
     out.active = true;
     // ---- weapon additive pose ----
     if (this.weapon) {
-      sampleTrack(this.weapon, t, out, (a, b, w, o) => {
+      sampleTrack(this.weapon, t, out, (a, b, w, o): void => {
         for (let k = 0; k < 3; k++) {
           o.pos[k] = lerp(a.p?.[k] ?? 0, b.p?.[k] ?? 0, w);
           o.rot[k] = lerp(a.r?.[k] ?? 0, b.r?.[k] ?? 0, w);
@@ -107,7 +107,7 @@ export class Clip {
 
     // ---- support hand ----
     if (this.lhand) {
-      sampleTrack(this.lhand, t, out, (a, b, w, o) => {
+      sampleTrack(this.lhand, t, out, (a, b, w, o): void => {
         for (let k = 0; k < 3; k++) {
           o.lhand.pos[k] = lerp(a.p![k], b.p![k], w);
           o.lhand.finger[k] = lerp(a.finger?.[k] ?? 0, b.finger?.[k] ?? 0, w);
@@ -133,7 +133,10 @@ export function buildManifestClips(
   for (const [name, source] of Object.entries(aliases)) {
     const info = manifest[source];
     clips[name] = new Clip(name, info.duration, {
-      events: info.events.map((ev) => ({ t: ev.time, name: ev.event })),
+      events: info.events.map((ev): { t: number; name: string } => ({
+        t: ev.time,
+        name: ev.event,
+      })),
     });
   }
   return clips;
@@ -143,7 +146,7 @@ export function buildManifestClips(
 export function buildMagazineClips(
   aliases: Record<string, string>,
   manifest: Record<string, { duration: number; events: { time: number; event: string }[] }>,
-  durationOf = (source: string) => manifest[source].duration
+  durationOf = (source: string): number => manifest[source].duration
 ): Record<string, Clip> {
   const mapping: Record<string, string> = {
     magazine_out: 'magout',

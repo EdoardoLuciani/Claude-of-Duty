@@ -1003,10 +1003,10 @@ export class StaticWorld {
     return n;
   }
 
-  get candidates() {
+  get candidates(): Int32Array<ArrayBufferLike> {
     return this._cand;
   }
-  get candidateCount() {
+  get candidateCount(): number {
     return this._candCount;
   }
 
@@ -1375,7 +1375,7 @@ export function bakeMesh(
           guessSurface(mesh.name)
         );
   const groupSurface = groups
-    ? groups.map((g, gi) => {
+    ? groups.map((g, gi): number => {
         if (surfaceOverride !== undefined && surfaceOverride !== null) return baseSurface;
         const mat = Array.isArray(mesh.material)
           ? mesh.material[g.materialIndex ?? gi]

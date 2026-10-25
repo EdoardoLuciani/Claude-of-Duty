@@ -44,16 +44,16 @@ export async function loadArmAsset(): Promise<ArmAsset> {
   gltf.scene.updateMatrixWorld(true);
   const meshes: ArmSkinnedMesh[] = [];
   const blood = createArmBlood();
-  gltf.scene.traverse((object) => {
+  gltf.scene.traverse((object): void => {
     if (object instanceof THREE.SkinnedMesh) meshes.push(object as ArmSkinnedMesh);
   });
   if (!meshes.length) throw new Error('Player arms: no deformation meshes in arms.glb');
-  const names = meshes[0].skeleton.bones.map((bone) => bone.name);
+  const names = meshes[0].skeleton.bones.map((bone): string => bone.name);
   const sources: THREE.MeshPhysicalMaterial[] = [];
   const pieces: THREE.BufferGeometry[] = [];
   for (const mesh of meshes) {
     if (
-      mesh.skeleton.bones.some((bone, i) => bone.name !== names[i]) ||
+      mesh.skeleton.bones.some((bone, i): boolean => bone.name !== names[i]) ||
       mesh.skeleton.bones.length !== names.length
     )
       throw new Error('Player arms: inconsistent exported bone order');
@@ -96,14 +96,16 @@ export async function loadArmAsset(): Promise<ArmAsset> {
   const merged = new THREE.SkinnedMesh(geometry, material);
   merged.name = 'Player_arm';
   merged.skeleton = meshes[0].skeleton;
-  const skeletons = new Set(meshes.map((mesh) => mesh.skeleton));
+  const skeletons = new Set(meshes.map((mesh): THREE.Skeleton => mesh.skeleton));
   // The merged source retains just one skeleton for bone-name validation. Each
   // gameplay hand still creates its own skeleton and transformed geometry below.
   skeletons.delete(merged.skeleton);
   for (const skeleton of skeletons) skeleton.dispose();
   const textures = new Set<THREE.Texture>();
   const sourceMaterials = new Set(
-    meshes.flatMap((mesh) => (Array.isArray(mesh.material) ? mesh.material : [mesh.material]))
+    meshes.flatMap((mesh): THREE.Material<THREE.MaterialEventMap>[] =>
+      Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+    )
   );
   for (const source of sourceMaterials) {
     for (const value of Object.values(source))
@@ -122,7 +124,7 @@ export async function loadArmAsset(): Promise<ArmAsset> {
   return {
     meshes,
     blood,
-    dispose() {
+    dispose(): void {
       const geometries = new Set<THREE.BufferGeometry>();
       const materials = new Set<THREE.Material>();
       const textures = new Set<THREE.Texture>();
@@ -178,21 +180,21 @@ export function bindArmAsset(arm: ArmRig, asset: ArmAsset): void {
     arm.scale,
     arm.scale
   );
-  const names = asset.meshes[0].skeleton.bones.map((b) => b.name);
-  const bones = names.map((name: string) => {
+  const names = asset.meshes[0].skeleton.bones.map((b): string => b.name);
+  const bones = names.map((name: string): THREE.Bone<THREE.Object3DEventMap> => {
     const control = controls[name];
     if (!control) throw new Error(`Player arms: unknown Blender bone ${name}`);
     return control;
   });
   const skeleton = new THREE.Skeleton(
     bones,
-    bones.map((b) => b.matrixWorld.clone().invert())
+    bones.map((b): THREE.Matrix4 => b.matrixWorld.clone().invert())
   );
   arm.skeleton = skeleton;
   for (const source of asset.meshes) {
     if (
       source.skeleton.bones.length !== names.length ||
-      source.skeleton.bones.some((b, i) => b.name !== names[i])
+      source.skeleton.bones.some((b, i): boolean => b.name !== names[i])
     ) {
       throw new Error('Player arms: inconsistent exported bone order');
     }

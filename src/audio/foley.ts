@@ -497,12 +497,12 @@ export function intelSiren(actx: BaseAudioContext): { node: GainNode; stop(when?
   cadence.start(now);
   const nodes = [low, high, cadence, bed, filter, gate, out];
   let stopped = false;
-  cadence.onended = () => {
+  cadence.onended = (): void => {
     for (const node of nodes) node.disconnect();
   };
   return {
     node: out,
-    stop(when = actx.currentTime) {
+    stop(when = actx.currentTime): void {
       if (stopped) return;
       stopped = true;
       out.gain.cancelScheduledValues(when);

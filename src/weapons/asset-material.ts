@@ -26,7 +26,7 @@ export function convertWeaponScene(
 ): WeaponSceneMaterials {
   const result: WeaponSceneMaterials = { materials: new Set(), textures: new Set() };
   const replacements = new Map<Material, MeshPhysicalNodeMaterial>();
-  scene.traverse((object) => {
+  scene.traverse((object): void => {
     if (!(object instanceof THREE.Mesh)) return;
     if (requireSingleMaterial && Array.isArray(object.material)) {
       throw new Error('Weapon GLB: expected single-material mesh primitives');

@@ -58,7 +58,7 @@ function solveElbow(S: Vec3, W: Vec3, l1: number, l2: number, pole: Vec3): THREE
 
 /** Bore line of the carried weapon in bind pose: origin + direction. */
 export const BORE_ORIGIN: Vec3 = [-0.148, 1.398, -0.078];
-export const BORE_DIR: Vec3 = (() => {
+export const BORE_DIR: Vec3 = ((): [number, number, number] => {
   const v = new THREE.Vector3(0.115, -0.1, 1).normalize();
   return [v.x, v.y, v.z];
 })();
@@ -189,7 +189,7 @@ export class Rig {
         tail.copy(this.bindPos[kids[0]]);
         if (kids.length > 1) {
           // a branch point (Hips, Spine2): aim at the average of the chain kids
-          const primary = kids.find((k) => !/Clavicle|UpLeg/.test(this.names[k]));
+          const primary = kids.find((k): boolean => !/Clavicle|UpLeg/.test(this.names[k]));
           if (primary !== undefined) tail.copy(this.bindPos[primary]);
           else {
             tail.set(0, 0, 0);

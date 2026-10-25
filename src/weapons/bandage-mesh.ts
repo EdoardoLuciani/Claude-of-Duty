@@ -7,12 +7,21 @@ import type { MeshPhysicalNodeMaterial } from 'three/webgpu';
 import { createWeaponMaterial } from './asset-material.ts';
 import { BANDAGE_SEGMENTS } from './bandage-path.ts';
 
+type BandageMesh = THREE.Mesh<THREE.BufferGeometry, Material>;
+
 /** Authored with the player arms in assets/player/arms/player-arms.blend. */
-export async function loadBandage() {
+export async function loadBandage(): Promise<{
+  wrap: BandageMesh;
+  roll: THREE.Group;
+  body: BandageMesh;
+  cap: BandageMesh;
+  tail: BandageMesh;
+  dispose(): void;
+}> {
   const gltf = await new GLTFLoader().loadAsync(
     `${import.meta.env.BASE_URL}models/player/bandage.glb`
   );
-  type BandageMesh = THREE.Mesh<THREE.BufferGeometry, Material>;
+
   const wrap = gltf.scene.getObjectByName('Bandage_wrap') as BandageMesh | undefined;
   const body = gltf.scene.getObjectByName('Bandage_roll') as BandageMesh | undefined;
   const cap = gltf.scene.getObjectByName('Bandage_cap') as BandageMesh | undefined;
@@ -76,7 +85,7 @@ export async function loadBandage() {
     body,
     cap,
     tail,
-    dispose() {
+    dispose(): void {
       const textures = new Set<THREE.Texture>();
       for (const mat of new Set([wrap.material, body.material, cap.material])) {
         for (const value of Object.values(mat as object))

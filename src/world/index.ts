@@ -106,31 +106,38 @@ export class WorldSystem {
     this._inv = this._xform.clone().invert();
     this.buildings = meta.buildings;
     this.volumes = meta.volumes ?? [];
-    this.spawnPoints = meta.spawns.map((spawn) => ({
-      position: new THREE.Vector3().fromArray(spawn.position),
-      yaw: spawn.forward ? Math.atan2(-spawn.forward[0], -spawn.forward[2]) : spawn.yaw,
-      tag: spawn.tag,
-    }));
+    this.spawnPoints = meta.spawns.map(
+      (spawn): { position: THREE.Vector3; yaw: number; tag: string } => ({
+        position: new THREE.Vector3().fromArray(spawn.position),
+        yaw: spawn.forward ? Math.atan2(-spawn.forward[0], -spawn.forward[2]) : spawn.yaw,
+        tag: spawn.tag,
+      })
+    );
     this.bounds = new THREE.Box3(
       new THREE.Vector3().fromArray(meta.bounds.min),
       new THREE.Vector3().fromArray(meta.bounds.max)
     );
     this.stats = meta.stats;
     this.queries = new WorldQueries(meta);
-    this.intelMarkers = (meta.WORLD?.MARKERS?.INTEL ?? []).map((marker) => ({
-      id: marker.id,
-      tag: marker.tag ?? marker.id,
-      x: marker.position[0],
-      y: marker.position[1],
-      z: marker.position[2],
-    }));
+    this.intelMarkers = (meta.WORLD?.MARKERS?.INTEL ?? []).map(
+      (marker): { id: string; tag: string; x: number; y: number; z: number } => ({
+        id: marker.id,
+        tag: marker.tag ?? marker.id,
+        x: marker.position[0],
+        y: marker.position[1],
+        z: marker.position[2],
+      })
+    );
 
     const placeholders = new Set<THREE.Material>();
-    this.root.traverse((object) => {
+    this.root.traverse((object): void => {
       if (!isWorldMesh(object)) return;
       const palette = object.userData?.palette as keyof typeof PALETTE;
       if (!PALETTE[palette]) throw new Error(`[world] unknown palette on ${object.name}`);
-      if (Array.isArray(object.material)) object.material.forEach((m) => placeholders.add(m));
+      if (Array.isArray(object.material))
+        object.material.forEach((m): Set<THREE.Material<THREE.MaterialEventMap>> =>
+          placeholders.add(m)
+        );
       else if (object.material) placeholders.add(object.material);
       object.material = this._material(palette);
       object.castShadow = object.userData.castShadow !== false;
@@ -159,12 +166,14 @@ export class WorldSystem {
     this._collisionMaterial = new THREE.MeshBasicMaterial({ visible: false });
     const collisionPlaceholders = new Set<THREE.Material>();
     const physics = ctx.peek('physics');
-    this.collisionRoot.traverse((object) => {
+    this.collisionRoot.traverse((object): void => {
       if (!isWorldMesh(object)) return;
       const surface = object.userData?.surface as string | undefined;
       if (!surface) throw new Error(`[world] missing collision surface on ${object.name}`);
       if (Array.isArray(object.material))
-        object.material.forEach((m) => collisionPlaceholders.add(m));
+        object.material.forEach((m): Set<THREE.Material<THREE.MaterialEventMap>> =>
+          collisionPlaceholders.add(m)
+        );
       else if (object.material) collisionPlaceholders.add(object.material);
       object.material = this._collisionMaterial;
       object.visible = false;
@@ -178,7 +187,7 @@ export class WorldSystem {
     this._addLights(meta.lights);
     this._outage = { elapsed: -1 };
     this._streetlightPower = 1;
-    this._offRestart = ctx.events.on('game:restart', () => {
+    this._offRestart = ctx.events.on('game:restart', (): void => {
       this._outage.elapsed = -1;
       this.setStreetlightPower(1);
     });

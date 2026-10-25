@@ -25,7 +25,7 @@ let scheduled = false,
   profiling = false,
   failed = false;
 let ladderController: CharacterController | undefined;
-function failure(error: unknown) {
+function failure(error: unknown): void {
   failed = true;
   queues.clear();
   actors.length = 0;
@@ -34,7 +34,7 @@ function failure(error: unknown) {
     message: error instanceof Error ? (error.stack ?? error.message) : String(error),
   });
 }
-function checkLadder(query: LadderQuery) {
+function checkLadder(query: LadderQuery): boolean {
   const c = ladderController;
   if (!c) throw new Error('[ai worker] missing ladder scratch');
   c.radius = query.radius;
@@ -63,16 +63,16 @@ const queues = new Map<number, QueuedQuery[]>();
 const actors: number[] = [];
 const channel = new MessageChannel();
 const costs: QueryCosts = {};
-function timedCost(key: string) {
+function timedCost(key: string): { calls: number; ms: number } {
   return (costs[key] = { calls: 0, ms: 0 });
 }
-function schedule() {
+function schedule(): void {
   if (!failed && !scheduled && actors.length) {
     scheduled = true;
     channel.port2.postMessage(0);
   }
 }
-channel.port1.onmessage = () => {
+channel.port1.onmessage = (): void => {
   scheduled = false;
   if (failed) return;
   const actor = actors.shift();
@@ -118,7 +118,7 @@ channel.port1.onmessage = () => {
   }
   schedule();
 };
-worker.onmessage = ({ data: value }) => {
+worker.onmessage = ({ data: value }): void => {
   if (failed) return;
   try {
     const data = parseClientMessage(value);
@@ -134,7 +134,7 @@ worker.onmessage = ({ data: value }) => {
         staticWorld: world,
         gravity: data.gravity,
         MASK: data.mask,
-        checkCapsule: (a: Vector3Like, b: Vector3Like, r: number, mask: number) =>
+        checkCapsule: (a: Vector3Like, b: Vector3Like, r: number, mask: number): boolean =>
           world.overlapCapsule(a.x, a.y, a.z, b.x, b.y, b.z, r, mask, 0) === 0,
       };
       nav = {
@@ -149,12 +149,12 @@ worker.onmessage = ({ data: value }) => {
       profiling = data.profile;
       const move = controller.move.bind(controller);
       costs.move = { calls: 0, ms: null };
-      controller.move = function (x, y, z) {
+      controller.move = function (x, y, z): number {
         costs.move.calls++;
         return move.call(this, x, y, z);
       };
       const ladderMove = ladderController.move.bind(ladderController);
-      ladderController.move = function (x, y, z) {
+      ladderController.move = function (x, y, z): number {
         costs.move.calls++;
         return ladderMove(x, y, z);
       };
@@ -185,7 +185,10 @@ worker.onmessage = ({ data: value }) => {
       }
       worker.postMessage({ type: 'ready' });
     } else if (data.type === 'queries') {
-      if (!nav || data.jobs.length + [...queues.values()].reduce((n, q) => n + q.length, 0) > 256)
+      if (
+        !nav ||
+        data.jobs.length + [...queues.values()].reduce((n, q): number => n + q.length, 0) > 256
+      )
         throw new Error('[ai worker] query queue limit');
       for (const job of data.jobs) {
         if (!queues.has(job.actor)) {
@@ -198,7 +201,7 @@ worker.onmessage = ({ data: value }) => {
     } else if (data.type === 'cancel') {
       const ids = new Set(data.ids);
       for (const [actor, jobs] of queues) {
-        const remaining = jobs.filter((j) => !ids.has(j.id));
+        const remaining = jobs.filter((j): boolean => !ids.has(j.id));
         if (remaining.length) queues.set(actor, remaining);
         else {
           queues.delete(actor);

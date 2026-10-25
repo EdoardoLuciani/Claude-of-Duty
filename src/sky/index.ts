@@ -384,7 +384,7 @@ export class SkySystem {
     this._applyWeather();
     this._applyFog();
     this.setTimeOfDay(this.hour);
-    this._offRestart = ctx.events.on('game:restart', () => {
+    this._offRestart = ctx.events.on('game:restart', (): void => {
       this.timeRate = ctx.config.deterministic ? 0 : CLOCK.hoursPerSecond;
       this.setTimeOfDay(CLOCK.startHour);
     });
@@ -400,19 +400,19 @@ export class SkySystem {
   //  public API
   // =========================================================================
 
-  get timeOfDay() {
+  get timeOfDay(): number {
     return this.hour;
   }
-  get sunDirection() {
+  get sunDirection(): THREE.Vector3 {
     return this.celestial.sun;
   }
-  get moonDirection() {
+  get moonDirection(): THREE.Vector3 {
     return this.celestial.moon;
   }
-  get sunAltitude() {
+  get sunAltitude(): number {
     return this.celestial.sunAlt;
   }
-  get fog() {
+  get fog(): SkyFog {
     return this._fog;
   }
 
@@ -421,7 +421,9 @@ export class SkySystem {
    * the world pass colour/depth and attaches the result where the world colour
    * is composed (before the view pass).
    */
-  createFogNode(options: Parameters<ReturnType<typeof createVolumetricNodes>['createNode']>[0]) {
+  createFogNode(
+    options: Parameters<ReturnType<typeof createVolumetricNodes>['createNode']>[0]
+  ): Node<'vec3'> {
     return this.volumetrics.createNode(options);
   }
 

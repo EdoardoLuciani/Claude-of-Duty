@@ -15,7 +15,7 @@ export function soldierTextureArray(
   srgb: boolean,
   anisotropy: number
 ): DataArrayTexture {
-  const first = maps.find((map) => map !== null)?.image as ImageBitmap;
+  const first = maps.find((map): map is Texture => map !== null)?.image as ImageBitmap;
   if (!first?.width || !first.height) throw new Error('[ai] missing soldier texture array images');
   const { width, height } = first;
   const canvas = new OffscreenCanvas(width, height);
