@@ -5,7 +5,7 @@ import type { Node, UniformNode } from 'three/webgpu';
 
 import { loadArmAsset } from './arm-asset.ts';
 import { createWeaponMaterial } from './asset-material.ts';
-import { AX338Animation } from './ax338.ts';
+import { createWeaponAnimation } from './authored-animation.ts';
 import { loadBandage } from './bandage-mesh.ts';
 import {
   BANDAGE_PATH,
@@ -17,13 +17,10 @@ import {
 } from './bandage-path.ts';
 import { makeSampleResult } from './clips.ts';
 import type { Clip } from './clips.ts';
-import { EvolysAnimation } from './evolys.ts';
 import { triCount, mergeAll } from './geometry.ts';
 import { grenadeMesh } from './grenade-mesh.ts';
 import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from './grip-contacts.ts';
 import { Arm } from './hands.ts';
-import { M4Animation } from './m4.ts';
-import { M590Animation } from './m590.ts';
 import type { ReticleMaterials } from './materials-tsl.ts';
 import {
   Spring,
@@ -37,11 +34,7 @@ import {
   wrapPi,
   TAU,
 } from './mathx.ts';
-import { MCXAnimation } from './mcx.ts';
-import { MPXAnimation } from './mpx.ts';
-import { P320Animation } from './p320.ts';
 import { radioMesh, radioScreenTexture } from './radio-mesh.ts';
-import { isWeaponAdapter } from './runtime-types.ts';
 import type {
   ClipResult,
   ViewPoseKey,
@@ -50,7 +43,6 @@ import type {
   WeaponEntry,
   WeaponModelRecord,
   WeaponNodes,
-  WeaponAnimation,
   ViewmodelContext,
 } from './runtime-types.ts';
 import { SNIPER_RETICLE, sniperMradScale, sniperReticleCoverage } from './sniper-reticle.ts';
@@ -688,22 +680,7 @@ export class Viewmodel {
       throw new Error(`[weapons] ${model?.id}: missing authored weapon scene/rig/clips`);
     let tris = 0;
     const meshes: THREE.Mesh[] = [];
-    const animation: WeaponAnimation | null = isWeaponAdapter(model, 'rifle')
-      ? new M4Animation(model)
-      : isWeaponAdapter(model, 'pistol')
-        ? new P320Animation(model)
-        : isWeaponAdapter(model, 'lmg')
-          ? new EvolysAnimation(model)
-          : isWeaponAdapter(model, 'smg')
-            ? new MPXAnimation(model)
-            : isWeaponAdapter(model, 'sniper')
-              ? new AX338Animation(model)
-              : isWeaponAdapter(model, 'shotgun')
-                ? new M590Animation(model)
-                : isWeaponAdapter(model, 'mcx')
-                  ? new MCXAnimation(model, def)
-                  : null;
-    if (!animation) throw new Error(`[weapons] unsupported authored weapon ${model.id}`);
+    const animation = createWeaponAnimation(model, def);
     const group = new THREE.Object3D();
     group.name = `weapon-${model.id}`;
     group.visible = false;
