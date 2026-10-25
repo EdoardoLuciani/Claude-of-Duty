@@ -302,8 +302,11 @@ fire and grenade throw foley also use required recordings. Physical grenade
 handling uses the foley bus; the pin cue is silent pending a suitable recording,
 and cooking the fuse has no synthetic warning beep. Empty
 triggers play a click without emitting a shot, muzzle flash or AI-hearing evidence.
-Remaining synthesis includes legacy AK/generic-suppressed reports and reinforcement,
-intentional UI cues. Other spoken intents remain deferred.
+All firearm reports, including close/distant AK and background gunfire, use required
+recordings without synthetic reinforcement. MCX/MPX select explicit suppressed
+recordings; unsupported generic-suppressed requests stay silent rather than using
+another gun's report. Remaining synthesis is intentional UI/electronic feedback,
+healing-completion cues, tinnitus and shop music/reverb. Other spoken intents remain deferred.
 
 `models.getSoldier(name)` returns `{ name, geometry, slots, boneNames, weapon,
 stats, variant }`. Merge GLTF primitives into one skinned geometry with slot

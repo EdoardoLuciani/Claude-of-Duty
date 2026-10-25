@@ -1,0 +1,70 @@
+{
+  "format": "stereo 48000 Hz Opus, 192 kbps VBR, zero header gain",
+  "rights": "Owner requested replacing legacy AK synthesis with professional-library reports in a public PR. Selected edited BOOM Tactical Guns derivatives only; original library reels stay private. Retain source entitlement/licence records; media do not inherit the code licence. Review audio stays local, not attached to the PR.",
+  "design": "Three distinct close and two distant AK47 single-shot crops from the corresponding BOOM Tactical Guns Designed reels. Preserve stereo and full edited decays, no pitch shifts, synthesized body/action layers, compression or limiting. Trim 5 ms before authored shot onset; 1 ms entrance and 80 ms exit fades. One common -3 dB offline delivery-headroom gain on both perspectives; runtime report gain is unity, with the existing shared output controller and close/distant energy-reference logic unchanged.",
+  "sources": {
+    "Tactical Guns (Designed) [Boom Library]/GUNAuto_AR-AK47 Close Single_B00M_TGDS.wav": {
+      "sha256": "8d0463f6574c12cd3131058a402c8ef8dbe484a570fb1715ca2dd8f1f6572b47"
+    },
+    "Tactical Guns (Designed) [Boom Library]/GUNAuto_AR-AK47 Distant Single_B00M_TGDS.wav": {
+      "sha256": "70255ca9ba2de6616009db121e0ef39d178b579f537b9e67c0aa477cdf42d9b5"
+    }
+  },
+  "files": {
+    "ak-1": {
+      "source": "Tactical Guns (Designed) [Boom Library]/GUNAuto_AR-AK47 Close Single_B00M_TGDS.wav",
+      "start": 0.095,
+      "duration": 4.5,
+      "gainDb": -3,
+      "fadeInSeconds": 0.001,
+      "fadeOutSeconds": 0.08,
+      "sourceChannels": 2,
+      "masterSha256": "2a8a2ffaed53f5a1800e7dcefd2bce99f8e03088985b91998ee271faf54a74a9",
+      "sha256": "c2e87ed7c0152f3941aa434e6dd3b20f439501c2be7ec064a9bcd6e39fd76a8f"
+    },
+    "ak-2": {
+      "source": "Tactical Guns (Designed) [Boom Library]/GUNAuto_AR-AK47 Close Single_B00M_TGDS.wav",
+      "start": 5.115,
+      "duration": 4.5,
+      "gainDb": -3,
+      "fadeInSeconds": 0.001,
+      "fadeOutSeconds": 0.08,
+      "sourceChannels": 2,
+      "masterSha256": "b440450f5d81059d64502a1e5037a6c7edb0b4c528d0235f107b8bd758f6ee9f",
+      "sha256": "c2d82562456f25f80445b90c8f7b2cadbc39455e213bcc277b24e4c1061e803a"
+    },
+    "ak-3": {
+      "source": "Tactical Guns (Designed) [Boom Library]/GUNAuto_AR-AK47 Close Single_B00M_TGDS.wav",
+      "start": 10.15,
+      "duration": 4.5,
+      "gainDb": -3,
+      "fadeInSeconds": 0.001,
+      "fadeOutSeconds": 0.08,
+      "sourceChannels": 2,
+      "masterSha256": "eeb5af73207d9999d038cc15fb177461a676b5fad7d59ceefaefa575353e158e",
+      "sha256": "27d36cd7c749750999fe6e5a6e9ed5941283efd3fd7ebc31e1c59b57e48775f7"
+    },
+    "ak-distant-1": {
+      "source": "Tactical Guns (Designed) [Boom Library]/GUNAuto_AR-AK47 Distant Single_B00M_TGDS.wav",
+      "start": 0.095,
+      "duration": 4.7,
+      "gainDb": -3,
+      "fadeInSeconds": 0.001,
+      "fadeOutSeconds": 0.08,
+      "sourceChannels": 2,
+      "masterSha256": "1232ed513b72efb7081179a6a1a0143a77123b374c19643a4ea63b459fc14ec3",
+      "sha256": "c6ebf824bbad32724067a4d5c8c12fb0a3570462decd7dedef789cd8da81e81f"
+    },
+    "ak-distant-2": {
+      "source": "Tactical Guns (Designed) [Boom Library]/GUNAuto_AR-AK47 Distant Single_B00M_TGDS.wav",
+      "start": 5.325,
+      "duration": 4.7,
+      "gainDb": -3,
+      "fadeInSeconds": 0.001,
+      "fadeOutSeconds": 0.08,
+      "sourceChannels": 2,
+      "masterSha256": "b5a69a2c06c7a0a3de9365aa2acfafdfdb89f22af2a90e55915c8742d5c68c59",
+      "sha256": "2684fda29d02ff625ff9bf863b954df33cb3d33e4e3dda3267ea4aaa20f86a39"
+    }
+  }
+}
