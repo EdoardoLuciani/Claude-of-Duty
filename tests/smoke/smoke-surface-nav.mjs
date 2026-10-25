@@ -430,7 +430,7 @@ assert.equal(
   map.meta.navigation.sha256,
   // Type-contract hardening refreshes source-byte provenance only.
   // The unchanged physical payload hash below also guards the preceding bake.
-  '0735e714e678d8bab06e6beb22390f65dbbb5f977496072ce344be80b92170cf',
+  '07d02b8fa5d379a8c835cd640bfea4fae033458c793d38c1793a7c9e3b64ef6c',
   're-measure recorded fixture outcomes after changing baked assets'
 );
 const physicalPayload = map.surfaceRaw.subarray(64 + map.surfaceRaw.readUInt32LE(8));
