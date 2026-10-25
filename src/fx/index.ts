@@ -354,7 +354,7 @@ export class FxSystem {
   _viewmodelPresent(): boolean {
     let found = false;
     this.ctx.viewScene?.traverse((o): void => {
-      if (found || !(o as THREE.Mesh).isMesh) return;
+      if (found || !(o instanceof THREE.Mesh)) return;
       if (o === this.viewAdd?.mesh || o === this.viewLit?.mesh) return;
       found = true;
     });
@@ -551,13 +551,13 @@ export class FxSystem {
     this._flashArg.light = o.light;
     this._flashArg.scale = o.scale;
     this._flashArg.view = o.view === true || o.viewSpace === true;
-    return muzzleFlash(this, this._flashArg as Parameters<typeof muzzleFlash>[1]);
+    return muzzleFlash(this, this._flashArg);
   }
 
-  _flashArg = {
-    position: null as THREE.Vector3 | null,
-    direction: null as THREE.Vector3 | null,
-    lightPos: null as THREE.Vector3 | null,
+  _flashArg: Parameters<typeof muzzleFlash>[1] = {
+    position: new THREE.Vector3(),
+    direction: new THREE.Vector3(),
+    lightPos: new THREE.Vector3(),
     weapon: undefined as Parameters<typeof muzzleFlash>[1]['weapon'],
     intensity: 1 as number | undefined,
     light: 1 as number | undefined,

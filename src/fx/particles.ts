@@ -359,10 +359,7 @@ function buildParticleMaterial(o: ParticleOptions): {
     const headNdc = headClip.xy.div(max(headClip.w, 1e-4));
     const tailNdc = tailClip.xy.div(max(tailClip.w, 1e-4));
     // P[0][0], P[1][1] — column-major element access, same as GLSL.
-    const projection = cameraProjectionMatrix as unknown as {
-      element(index: number): { element(index: number): Node<'float'> };
-    };
-    const pdiag = vec2(projection.element(0).element(0), projection.element(1).element(1));
+    const pdiag = vec2(cameraProjectionMatrix.element(0).x, cameraProjectionMatrix.element(1).y);
     const segment = headNdc.sub(tailNdc).mul(headClip.w).div(pdiag);
     const segmentLen = length(segment);
     const alongA = select(segmentLen.greaterThan(1e-5), segment.div(segmentLen), along0);

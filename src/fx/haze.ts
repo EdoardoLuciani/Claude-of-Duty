@@ -23,6 +23,14 @@ interface ColorTextureNode extends Node<'vec4'> {
   sample(uv: Node<'vec2'>): Node<'vec4'>;
 }
 
+function isColorTextureNode(node: Node<'vec4'>): node is ColorTextureNode {
+  return (
+    'isTextureNode' in node &&
+    node.isTextureNode === true &&
+    'sample' in node &&
+    typeof node.sample === 'function'
+  );
+}
 export class HazeSystem {
   declare enabled: boolean;
   declare scene: THREE.Scene;
@@ -215,9 +223,9 @@ export class HazeSystem {
    * @returns {import('three/tsl').Node<vec4>}
    */
   warpNode(colorSource: Node<'vec4'> | THREE.Texture): Node<'vec4'> {
-    const colorNode: ColorTextureNode = (colorSource as ColorTextureNode).isTextureNode
-      ? (colorSource as ColorTextureNode)
-      : (uniformTexture(colorSource as THREE.Texture) as ColorTextureNode);
+    const colorNode =
+      colorSource instanceof THREE.Texture ? uniformTexture(colorSource) : colorSource;
+    if (!isColorTextureNode(colorNode)) throw new Error('[fx] haze warp requires a texture node');
     if (this._warp && this._warpColor === colorNode) return this._warp;
     const distort = this.distortTexNode;
     const strength = this.uStrength;

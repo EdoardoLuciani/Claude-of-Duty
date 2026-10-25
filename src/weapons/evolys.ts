@@ -3,6 +3,7 @@ import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
 import handReference from '../../assets/weapons/fn-evolys-762/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/fn-evolys-762/manifest.json' with { type: 'json' };
+import { hasOwn } from '../core/guards.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
 import {
@@ -213,16 +214,17 @@ export class EvolysAnimation {
     if (gesture) this._sample(gesture, clipTime);
     else if (firing) this._sample(empty ? 'Last_Shot' : 'Fire', this.fireTime);
     else this._sample('Idle', this.idleTime % manifest.clips.Idle.duration);
-    const info = gesture
-      ? (manifest.clips[gesture as keyof typeof manifest.clips] as {
-          beltClearTime?: number;
-          beltInsertTime?: number;
-        })
-      : undefined;
+    const info = gesture && hasOwn(manifest.clips, gesture) ? manifest.clips[gesture] : undefined;
+    const clearTime =
+      info && 'beltClearTime' in info && typeof info.beltClearTime === 'number'
+        ? info.beltClearTime
+        : undefined;
+    const insertTime =
+      info && 'beltInsertTime' in info && typeof info.beltInsertTime === 'number'
+        ? info.beltInsertTime
+        : undefined;
     const loaded =
-      !info?.beltClearTime ||
-      clipTime < info.beltClearTime ||
-      (info.beltInsertTime !== undefined && clipTime >= info.beltInsertTime);
+      !clearTime || clipTime < clearTime || (insertTime !== undefined && clipTime >= insertTime);
     this._beltVisibility(remainingRounds, firing, loaded);
     this.root.updateMatrixWorld(true);
   }

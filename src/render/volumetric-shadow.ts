@@ -1,5 +1,6 @@
 import type { DepthTextureImageData, Vector3 } from 'three';
-import type NodeBuilder from 'three/src/nodes/core/NodeBuilder.js';
+import type { DirectionalLight } from 'three';
+import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
 import type { FnNode } from 'three/src/nodes/tsl/TSLCore.js';
 import {
   Fn,
@@ -39,7 +40,7 @@ interface CascadeShadow {
 }
 interface CascadeRender {
   activeSun: {
-    shadow: { shadowNode?: { lights?: Array<{ shadow?: CascadeShadow }>; breaks?: number[] } };
+    shadow: DirectionalLight['shadow'];
   };
   q: { cascades: number; shadowDistance: number };
   ctx: { camera: { far: number; matrixWorldInverse: Matrix4 } };
@@ -50,10 +51,6 @@ interface ShadowLayer {
   params: Node<'vec2'>;
   split: Node<'float'>;
 }
-type StageFn = (
-  callback: (inputs: Node, builder: NodeBuilder & { shaderStage: string }) => Node<'float'>
-) => () => Node<'float'>;
-const stageFn = Fn as unknown as StageFn;
 
 export function createVolumetricShadow(render: CascadeRender): {
   visibility: FnNode<
@@ -64,8 +61,10 @@ export function createVolumetricShadow(render: CascadeRender): {
 } {
   const placeholders: DepthTexture[] = [];
   const identity = new Matrix4();
-  const csm = (): { lights?: Array<{ shadow?: CascadeShadow }>; breaks?: number[] } | undefined =>
-    render.activeSun.shadow.shadowNode;
+  const csm = (): CSMShadowNode | undefined => {
+    const node = render.activeSun.shadow.shadowNode;
+    return node instanceof CSMShadowNode ? node : undefined;
+  };
   const layers = Array.from(
     { length: render.q.cascades },
     (
@@ -137,15 +136,15 @@ export function createVolumetricShadow(render: CascadeRender): {
           for (let i = 0; i < 4; i++) {
             const tapUV = uv.add(vogelDiskSample(float(i), float(4), phi).mul(layer.params.y));
             taps.push(
-              stageFn((_, builder): Node<'float'> =>
+              Fn<[], Node<'float'>>((_, builder): Node<'float'> =>
                 builder.shaderStage === 'compute'
-                  ? (compareLevel({
+                  ? compareLevel({
                       depth: layer.depth,
                       comparison: layer.depth,
                       uv: tapUV,
                       receiver,
-                    }) as Node<'float'>)
-                  : (layer.depth.sample(tapUV).compare(receiver) as unknown as Node<'float'>)
+                    }).toFloat()
+                  : layer.depth.sample(tapUV).compare(receiver).toFloat()
               )()
             );
           }

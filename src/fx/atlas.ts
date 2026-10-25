@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 
+import { isClosable } from '../core/guards.ts';
 import { loadPngTexture } from '../core/pngtex.ts';
 import type { Rng } from '../core/rng.ts';
 import { Noise, clamp01 } from './noise.ts';
@@ -97,7 +98,8 @@ export async function loadFxAtlases(size: number): Promise<{
   if (failed) {
     for (const texture of textures) {
       texture.dispose();
-      (texture.source.data as ImageBitmap).close();
+      const image: unknown = texture.source.data;
+      if (isClosable(image)) image.close();
     }
     throw failed.reason;
   }

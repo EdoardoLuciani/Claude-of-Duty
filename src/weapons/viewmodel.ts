@@ -3,6 +3,7 @@ import * as TSL from 'three/tsl';
 import { MeshBasicNodeMaterial, MeshPhysicalNodeMaterial } from 'three/webgpu';
 import type { Node, UniformNode } from 'three/webgpu';
 
+import { hasOwn } from '../core/guards.ts';
 import { loadArmAsset } from './arm-asset.ts';
 import { createWeaponMaterial } from './asset-material.ts';
 import { createWeaponAnimation } from './authored-animation.ts';
@@ -734,7 +735,8 @@ export class Viewmodel {
 
   // Refine the baseline poses against weapon-specific thumb/trigger targets.
   _fitGripContacts(w: WeaponEntry): void {
-    const contact = GRIP_CONTACTS[w.id as keyof typeof GRIP_CONTACTS];
+    if (!hasOwn(GRIP_CONTACTS, w.id)) return;
+    const contact = GRIP_CONTACTS[w.id];
     if (!contact) return;
     this.armR.hand.position.fromArray(w.gripR.pos);
     handBasis(

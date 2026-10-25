@@ -3,6 +3,7 @@ import { float, uniform, uv, vec3, vec4 } from 'three/tsl';
 import { Color, MeshStandardNodeMaterial, Vector3, Vector4 } from 'three/webgpu';
 import type { Renderer, Texture, Node } from 'three/webgpu';
 
+import { hasOwn } from '../core/guards.ts';
 import { bakeDetail, bakeMacro, bakeSurface } from './forge-tsl.ts';
 import type { SurfaceNode } from './forge-tsl.ts';
 import { LIBRARY, resolveName } from './library.ts';
@@ -10,7 +11,7 @@ import { bakeMasks, setMask } from './masks.ts';
 import { DEFAULT_PARAMS } from './params.ts';
 import type { SurfaceParams } from './shader-tsl.ts';
 import { createSurfaceNodeMaterial } from './shader-tsl.ts';
-import { GENERATED_SURFACES, SURFACES_TSL } from './surfaces-index-tsl.ts';
+import { isGeneratedSurface, SURFACES_TSL } from './surfaces-index-tsl.ts';
 
 /**
  * Production material library for the strict-WebGPU renderer.
@@ -84,6 +85,10 @@ export class MaterialSystemNode {
   declare ctx: MaterialContext;
   declare _sets: Map<string, MaterialTextureSet>;
   declare _materials: Map<string, MeshStandardNodeMaterial>;
+  private readonly _controls = new WeakMap<
+    MeshStandardNodeMaterial,
+    { params: SurfaceParams; controls: MaterialControls }
+  >();
   declare _targets: Array<{ dispose(): void }>;
   declare _shared: MaterialSharedData | null;
   declare _groundY: number;
@@ -149,7 +154,7 @@ export class MaterialSystemNode {
 
   _resolve(name: string): keyof typeof SURFACES_TSL {
     const key = resolveName(name);
-    if (Object.hasOwn(SURFACES_TSL, key)) return key as keyof typeof SURFACES_TSL;
+    if (hasOwn(SURFACES_TSL, key)) return key;
     if (!this._missing) this._missing = new Set();
     if (!this._missing.has(name)) {
       this._missing.add(name);
@@ -170,22 +175,24 @@ export class MaterialSystemNode {
     if (set) return set;
     const tintA = new Color(bake.tintA ?? 0xffffff);
     const tintB = new Color(bake.tintB ?? 0xffffff);
-    const args: Node[] = [uv(), float(bake.seed ?? 1)];
-    if (GENERATED_SURFACES.has(key)) {
+    const coords = uv(),
+      seed = float(bake.seed ?? 1);
+    let surface: SurfaceNode;
+    if (isGeneratedSurface(key)) {
       const p = bake.param ?? [0, 0, 0, 0];
-      args.push(
+      surface = SURFACES_TSL[key](
+        coords,
+        seed,
         vec3(tintA.r, tintA.g, tintA.b),
         vec3(tintB.r, tintB.g, tintB.b),
         vec4(p[0], p[1], p[2], p[3])
       );
-    }
+    } else surface = SURFACES_TSL[key](coords, seed);
     const targets = bakeSurface(this.renderer, {
       size: bake.size,
       worldSize: bake.worldSize,
       relief: bake.relief,
-      surface: (SURFACES_TSL[key] as unknown as (...nodes: Node[]) => Node)(
-        ...args
-      ) as unknown as SurfaceNode,
+      surface,
     });
     for (const target of Object.values(targets)) {
       target.texture.anisotropy = this._anisotropy;
@@ -216,10 +223,10 @@ export class MaterialSystemNode {
     if (cached) return cached;
     const def = LIBRARY[key];
     const set = this.getTextureSet(key, opts);
-    const p = { ...DEFAULT_PARAMS, ...def.mat, ...opts } as unknown as SurfaceParams & {
+    const p: SurfaceParams & {
       bake?: MaterialOptions['bake'];
       three?: MaterialOptions['three'];
-    };
+    } = { ...DEFAULT_PARAMS, ...def.mat, ...opts };
     delete p.bake;
     delete p.three;
     p.groundY = opts.groundY ?? this._groundY;
@@ -242,7 +249,7 @@ export class MaterialSystemNode {
       weather: uniform(new Vector4(...p.weather)),
     };
     p.tileNode = controls.tile;
-    p.tintNode = controls.tint as unknown as Node<'vec3'>;
+    p.tintNode = controls.tint.toVec3();
     p.parallaxNode = controls.parallax;
     p.normalAmpNode = controls.normal;
     p.groundNode = controls.ground;
@@ -253,6 +260,7 @@ export class MaterialSystemNode {
     mat.name = matKey;
     mat.userData.owParams = p;
     mat.userData.owControls = controls;
+    this._controls.set(mat, { params: p, controls });
     this._materials.set(matKey, mat);
     return mat;
   }
@@ -286,9 +294,9 @@ export class MaterialSystemNode {
     material: MeshStandardNodeMaterial,
     changes: MaterialChanges = {}
   ): MeshStandardNodeMaterial {
-    const c = material.userData.owControls as MaterialControls | undefined;
-    if (!c) return material;
-    const p = material.userData.owParams as SurfaceParams;
+    const owned = this._controls.get(material);
+    if (!owned) return material;
+    const { controls: c, params: p } = owned;
     if (changes.scale !== undefined) {
       c.tile.value = p.uvMode === 'mesh' ? changes.scale : 1 / changes.scale;
       p.scale = changes.scale;

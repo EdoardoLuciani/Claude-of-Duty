@@ -22,6 +22,7 @@
  * the user's volume setting.
  */
 
+import { hasOwn } from '../core/guards.ts';
 import type { Rng } from '../core/rng.ts';
 import { biquad, gain, clamp, osc } from './dsp.ts';
 import { IR_SPECS, generateIR, type SpaceName } from './ir.ts';
@@ -83,7 +84,7 @@ const BUS_DEFS = {
   ui: { trim: 0.45, comp: null },
   music: { trim: 0.6, comp: null },
 };
-const BUS_NAMES = Object.keys(BUS_DEFS) as BusName[];
+const BUS_NAMES = Object.keys(BUS_DEFS).filter((name): name is BusName => hasOwn(BUS_DEFS, name));
 const preparedContexts = new WeakMap<BaseAudioContext, Promise<void>>();
 
 export class Mixer {
@@ -172,8 +173,7 @@ export class Mixer {
     this.muffleGain.connect(this.masterSum);
 
     /* ---- buses ---------------------------------------------------- */
-    this.buses = {} as Record<BusName, MixerBus>;
-    for (const name of BUS_NAMES) {
+    const createBus = (name: BusName): MixerBus => {
       const def = BUS_DEFS[name];
       const level = gain(actx, def.trim);
       let comp: DynamicsCompressorNode | null = null;
@@ -190,7 +190,7 @@ export class Mixer {
       // Keep category volume/balance out of the compressor detector. Ducking
       // now controls the audible post-compressor level too, not its drive.
       level.connect(name === 'ui' || name === 'music' ? this.masterSum : this.worldSum);
-      this.buses[name] = {
+      return {
         input: comp ?? level,
         level,
         send: gain(actx, def.trim),
@@ -199,7 +199,15 @@ export class Mixer {
         volume: 1,
         duckAmount: 0,
       };
-    }
+    };
+    this.buses = {
+      weapons: createBus('weapons'),
+      foley: createBus('foley'),
+      ambience: createBus('ambience'),
+      voice: createBus('voice'),
+      ui: createBus('ui'),
+      music: createBus('music'),
+    };
 
     /* ---- reverb ---------------------------------------------------- */
     // One send bus fanning into five convolvers; the space probe crossfades
@@ -217,7 +225,9 @@ export class Mixer {
     this.sendHP.connect(this.sendLP);
 
     this.spaces = {};
-    this.spaceNames = Object.keys(IR_SPECS) as SpaceName[];
+    this.spaceNames = Object.keys(IR_SPECS).filter((name): name is SpaceName =>
+      hasOwn(IR_SPECS, name)
+    );
     // Wet return. The send chain already scales with distance and the IRs are
     // peak-normalised to 0.42. The real firearm recordings already contain
     // their outdoor decay, so this return only establishes the local space;
@@ -296,12 +306,12 @@ export class Mixer {
 
   /** Bus input node a voice should connect to. */
   bus(name: string): AudioNode {
-    return (this.buses[name as BusName] ?? this.buses.foley).input;
+    return (hasOwn(this.buses, name) ? this.buses[name] : this.buses.foley).input;
   }
 
   /** Category-controlled input to the shared room field. */
   sendBus(name: string): AudioNode {
-    return (this.buses[name as BusName] ?? this.buses.foley).send;
+    return (hasOwn(this.buses, name) ? this.buses[name] : this.buses.foley).send;
   }
 
   /**
@@ -504,7 +514,8 @@ export class Mixer {
   }
 
   setBusVolume(name: string, v: number): void {
-    const b = this.buses[name as BusName];
+    if (!hasOwn(this.buses, name)) return;
+    const b = this.buses[name];
     if (!b) return;
     b.volume = clamp(v, 0, 2);
     this._setBusLevel(b, 0.05);
@@ -532,16 +543,14 @@ export class Mixer {
       this._tin.g.disconnect();
       this._tin = null;
     }
-    for (const name of Object.keys(this.spaces) as SpaceName[]) {
-      const space = this.spaces[name];
+    for (const space of Object.values(this.spaces)) {
       if (!space) continue;
       space.conv.disconnect();
       space.conv.buffer = null;
       space.gain.disconnect();
     }
     this.spaces = {};
-    for (const name of Object.keys(this.buses) as BusName[]) {
-      const b = this.buses[name];
+    for (const b of Object.values(this.buses)) {
       b.level.disconnect();
       b.send.disconnect();
       b.comp?.disconnect();

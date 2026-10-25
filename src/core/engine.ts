@@ -267,7 +267,7 @@ export class Engine {
         } catch (error) {
           errors.push(error);
           console.error(
-            `[engine] ${String((sys.constructor as { id?: string }).id)} dispose failed`,
+            `[engine] ${String('id' in sys.constructor ? sys.constructor.id : undefined)} dispose failed`,
             error
           );
         }

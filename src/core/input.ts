@@ -145,7 +145,7 @@ export class Input {
     // swallow it: failing to lock is not a game error.
     try {
       const p = this.canvas.requestPointerLock?.();
-      if (p && typeof p.catch === 'function') p.catch((): void => {});
+      void Promise.resolve(p).catch((): void => {});
     } catch {
       /* not eligible — keep running unlocked */
     }

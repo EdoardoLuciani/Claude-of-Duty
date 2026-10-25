@@ -1083,7 +1083,8 @@ export class TelemetrySystem {
     const now = performance.now();
     this._probeFrame(now);
     this._snapInfo();
-    const raw = this._rawTime() as number;
+    const raw = this._rawTime();
+    if (raw === null) return;
     if (raw >= this._nextPlayerRaw) {
       this._samplePlayer();
       this._nextPlayerRaw = raw + 1 / PLAYER_HZ;
@@ -1914,7 +1915,7 @@ export class TelemetrySystem {
   }
 
   _updateBadge(force = false): void {
-    const raw = this._rawTime() as number;
+    const raw = this._rawTime() ?? 0;
     if (!force && raw - this._lastBadgeAt < 1) return;
     this._lastBadgeAt = raw;
     if (!this.recording) {

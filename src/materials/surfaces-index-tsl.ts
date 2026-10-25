@@ -31,7 +31,7 @@ export const SURFACES_TSL = {
   glass: glassSurface,
 };
 
-export const GENERATED_SURFACES = new Set([
+const GENERATED_NAMES = [
   'concrete',
   'concrete_floor',
   'brick',
@@ -46,4 +46,10 @@ export const GENERATED_SURFACES = new Set([
   'wood',
   'fabric',
   'burlap',
-]);
+] as const;
+export const GENERATED_SURFACES = new Set<string>(GENERATED_NAMES);
+export function isGeneratedSurface(
+  name: keyof typeof SURFACES_TSL
+): name is (typeof GENERATED_NAMES)[number] {
+  return GENERATED_SURFACES.has(name);
+}

@@ -34,7 +34,7 @@ export async function prewarm(
       if (typeof system.prewarmMaterials !== 'function') continue;
       // Real registry entries validate metadata at registration. Isolated warmup
       // fixtures can omit it; preserve the original property-key coercion.
-      const id = String((system.constructor as { id?: string }).id);
+      const id = String('id' in system.constructor ? system.constructor.id : undefined);
       try {
         hooks[id] = (await system.prewarmMaterials(engine.ctx)) ?? { ok: true };
       } catch (error) {

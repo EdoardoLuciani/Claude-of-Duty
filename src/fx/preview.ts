@@ -316,7 +316,10 @@ const physicsStub = {
       _hitOut.point.copy(first.point);
       _hitOut.normal.copy(first.face.normal).transformDirection(first.object.matrixWorld);
       _hitOut.distance = first.distance;
-      _hitOut.surface = (first.object as THREE.Mesh).material === steelMat ? 'metal' : 'concrete';
+      _hitOut.surface =
+        first.object instanceof THREE.Mesh && first.object.material === steelMat
+          ? 'metal'
+          : 'concrete';
     }
     return _hitOut;
   },
@@ -502,4 +505,7 @@ async function dispose(): Promise<void> {
   await renderer.dispose();
 }
 window.__PREVIEW_DISPOSE__ = dispose;
-if (import.meta.hot) import.meta.hot.dispose(dispose);
+if (import.meta.hot)
+  import.meta.hot.dispose((): Promise<void> =>
+    dispose().catch((error: unknown): void => console.error('[fx] HMR disposal failed', error))
+  );

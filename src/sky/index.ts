@@ -277,10 +277,12 @@ export class SkySystem {
     // is always 40 steps, as it was.
     const steps = q.volumetrics ? (ctx.config.quality === 'ultra' ? 48 : 20) : 0;
     this.luts = new SkyLuts(this.shared);
-    const lutShared = this.shared as SkyShared &
-      Required<
-        Pick<SkyShared, 'transmittanceTex' | 'multiScatterTex' | 'skyViewTex' | 'ambientTex'>
-      >;
+    const lutShared = Object.assign(this.shared, {
+      transmittanceTex: this.luts.transmittanceRt.texture,
+      multiScatterTex: this.luts.multiScatterRt.texture,
+      skyViewTex: this.luts.skyViewRt.texture,
+      ambientTex: this.luts.ambientRt.texture,
+    });
     const atmo = createAtmosphereNodes(lutShared);
     const skyView = createSkyViewLookup(lutShared);
     this.raymarchSky = createRaymarchSky({ ...atmo, uMieScale: this.shared.uMieScale }, 40);
@@ -349,17 +351,13 @@ export class SkySystem {
     // ---- volumetrics ------------------------------------------------------
     // A node factory, not a registered pass: the WebGPU frame graph has no pass
     // chain to register into. `skCloudShadow` rides along in `shared`.
-    this.shared.skCloudShadow = cloudsScreen.skCloudShadow as (
-      worldXZ: Node<'vec2'>,
-      sunDir: Node<'vec3'>
-    ) => Node<'float'>;
-    this.volumetrics = createVolumetricNodes(
-      lutShared as typeof lutShared & Required<Pick<SkyShared, 'skCloudShadow'>>,
-      {
-        steps: Math.max(8, steps),
-        march: q.volumetrics,
-      }
-    );
+    const volumetricShared = Object.assign(lutShared, {
+      skCloudShadow: cloudsScreen.skCloudShadow,
+    });
+    this.volumetrics = createVolumetricNodes(volumetricShared, {
+      steps: Math.max(8, steps),
+      march: q.volumetrics,
+    });
 
     // ---- bookkeeping ------------------------------------------------------
     this.ambientColor = new THREE.Color(0, 0, 0);
@@ -758,7 +756,9 @@ export class SkySystem {
     this._offRestart?.();
     this.luts.dispose();
     this.ctx.scene.remove(this.dome);
-    (this.dome.material as THREE.Material).dispose();
+    if (Array.isArray(this.dome.material))
+      for (const material of this.dome.material) material.dispose();
+    else this.dome.material.dispose();
     this.envPass.dispose();
     this.envEquirect.dispose();
     // The sky owns this environment; leave another owner's replacement alone.
