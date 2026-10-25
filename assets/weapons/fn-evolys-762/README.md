@@ -34,6 +34,8 @@ none waive final human approval or establish all-state/device equivalence.
 Eight native clips in `src/weapons/evolys.ts`; shared skins/IK/ADS/recoil remain.
 Reloads open cover, replace pouch/belt and close; empty reload racks.
 Keep all event/balance/chamber/+1 values and one live pooled case per shot.
+Runtime ADS framing enlarges the weapon-only sight picture and uses a world-sized 3.25 MOA dot with a five-pixel readability floor;
+no segmented ring/halo. Physical window, lens material and authored grips are unchanged.
 
 Eight cartridges/links, one skin/three primitives, 12.7 mm pitch: finish the last
 stroke, then stop. Only insertion restores spent belt; switch/reset/interruption
@@ -54,12 +56,11 @@ blender -b assets/weapons/fn-evolys-762/fn-evolys-762.blend \
   --python-exit-code 1 --python tools/blender/evolys_check.py
 node tests/smoke/smoke-evolys.mjs
 node tests/smoke/smoke-evolys-clearance.mjs
-node tests/e2e/check-evolys-game.mjs --out=.tmp-rend/evolys/game
+node tests/e2e/weapons-e2e.mjs
 ```
 
 Follow the [shared authoring workflow](../../../tools/blender/README.md).
 `--render` writes five studio views; the local guide owns 120 Hz/STEP export details.
-`evolys_review.py` reviews saved source/photos/reels using Eevee, ray tracing off.
 Match cameras/uniform registration/ROI/exclusions; no independent axis fitting.
 Preserve stock joins, 120 mm head-envelope and sleeve/pouch clearance, pitch,
 contacts/events, replacement-pouch and reset gates. Sampled envelopes aren't

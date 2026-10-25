@@ -5,7 +5,6 @@ import type { EngineContext, EngineSystems } from '../core/context.ts';
 import type { ReloadPhase } from '../core/events.ts';
 import { Rng } from '../core/rng.ts';
 import { AmmoPickups } from './ammo-pickups.ts';
-import { loadAX338 } from './ax338.ts';
 import { ProjectileSim, dropAt } from './ballistics.ts';
 import {
   WEAPON_DEFS,
@@ -15,15 +14,13 @@ import {
   buildRecoilPattern,
   SPREAD_MODS,
 } from './defs.ts';
-import { loadEvolys } from './evolys.ts';
 import { grenadeMesh } from './grenade-mesh.ts';
-import { loadM4 } from './m4.ts';
-import { loadM590 } from './m590.ts';
-import { WeaponMaterialsNode } from './materials-tsl.ts';
+import { loadWeapon } from './loaders.ts';
+import { ReticleMaterials } from './materials-tsl.ts';
 import { lerp, DEG } from './mathx.ts';
-import { loadMCX, MCX_EJECT_DELAY } from './mcx.ts';
-import { loadMPX, MPX_EJECT_DELAY } from './mpx.ts';
-import { loadP320, P320_EJECT_DELAY } from './p320.ts';
+import { MCX_EJECT_DELAY } from './mcx.ts';
+import { MPX_EJECT_DELAY } from './mpx.ts';
+import { P320_EJECT_DELAY } from './p320.ts';
 import type { WeaponModelRecord, WeaponState } from './runtime-types.ts';
 import { Viewmodel } from './viewmodel.ts';
 import type { ViewModel } from './viewmodel.ts';
@@ -124,7 +121,8 @@ interface LiveGrenade {
  *   wp.weaponIds          equipped primary + secondary (spawn: rifle/pistol)
  *   wp.setWeapon(id)      draw/holster animated swap
  *   wp.nextWeapon()
- *   wp.cycleFireMode()
+ *   wp.cycleFireMode()    next mode needs a fresh press; release/press clears the latch
+ *                        even if the release was missed while paused/frozen
  *   wp.reload()           no-op if full or empty of reserve
  *   wp.inspect()
  *   wp.tryFire()          honours fire mode + rpm; returns true if a shot left
@@ -136,7 +134,7 @@ interface LiveGrenade {
  * EVENTS EMITTED  (all canonical, see ARCHITECTURE.md)
  *   weapon:fire    { actor, weapon, origin, dir, seed }
  *   weapon:shell   { position, velocity }
- *   weapon:reload  { weapon, phase: 'start'|'magout'|'magin'|'slide'|'end', retained?: boolean }
+ *   weapon:reload  { weapon, phase: ReloadPhase, retained?: boolean } (also manual actions)
  *   shot:resolved  { shooter, weapon, from, to, result, target, part, damage, pellet }
  *                    (only while the telemetry subsystem is present)
  * `bullet:segment` / `bullet:impact` come from physics, which owns resolved paths.
@@ -146,7 +144,7 @@ interface LiveGrenade {
 export class WeaponSystem {
   declare ctx: EngineContext;
   declare rng: Rng;
-  declare mats: WeaponMaterialsNode;
+  declare mats: ReticleMaterials;
   private _viewmodel: ViewModel | null = null;
   private _sim: ProjectileSim | null = null;
   private _pickups: AmmoPickups | null = null;
@@ -180,6 +178,8 @@ export class WeaponSystem {
   declare _fireTimer: number;
   declare _burstLeft: number;
   declare _burstCooldown: number;
+  /** Mode-change latch: the new mode needs a fresh trigger press. */
+  declare _triggerLatched: boolean;
   declare _spread: number;
   declare _shotIndex: number;
   declare _sinceShot: number;
@@ -209,7 +209,6 @@ export class WeaponSystem {
     spin: number;
   };
   declare _pendingShots: number;
-  declare _pendingFirst: boolean;
   declare _shellQueue: Array<{ t: number; weapon: string | null }>;
   declare _droppedMags: DroppedMagazine[];
   declare _grenades: LiveGrenade[];
@@ -262,6 +261,7 @@ export class WeaponSystem {
     this._fireTimer = 0;
     this._burstLeft = 0;
     this._burstCooldown = 0;
+    this._triggerLatched = false;
     this._spread = 0;
     this._shotIndex = 0;
     this._sinceShot = 10;
@@ -296,7 +296,6 @@ export class WeaponSystem {
       spin: 0,
     };
     this._pendingShots = 0;
-    this._pendingFirst = false;
 
     // Deferred shell ejections (a case leaves the port a few ms after the shot).
     this._shellQueue = [];
@@ -363,7 +362,7 @@ export class WeaponSystem {
   async init(ctx: EngineContext) {
     this.ctx = ctx;
     this.rng = ctx.rng.fork();
-    this.mats = new WeaponMaterialsNode(ctx.get('materials'));
+    this.mats = new ReticleMaterials();
     this._sim = new ProjectileSim(ctx);
     this._viewmodel = new Viewmodel(ctx, this.mats);
     await this.viewmodel.loadArms();
@@ -371,31 +370,15 @@ export class WeaponSystem {
     this.viewmodel.onClipEvent = (name, clip) => this._onClipEvent(name, clip);
 
     const t0 = performance.now();
-    const load = (id: string): Promise<WeaponModelRecord> =>
-      id === 'rifle'
-        ? loadM4()
-        : id === 'mcx'
-          ? loadMCX()
-          : id === 'pistol'
-            ? loadP320()
-            : id === 'lmg'
-              ? loadEvolys()
-              : id === 'smg'
-                ? loadMPX()
-                : id === 'sniper'
-                  ? loadAX338()
-                  : id === 'shotgun'
-                    ? loadM590()
-                    : Promise.reject(new Error(`[weapons] unknown weapon ${id}`));
     for (const id of WEAPON_IDS) this.states.set(id, this._makeState(id));
     const spawn = [...this.owned];
     const rest = WEAPON_IDS.filter((id) => !this.owned.has(id));
     let tris = 0;
-    const records = await Promise.all(spawn.map(load));
+    const records = await Promise.all(spawn.map(loadWeapon));
     for (let i = 0; i < spawn.length; i++) {
       tris += this.viewmodel.addWeapon(records[i], this._requireState(spawn[i]).def).tris;
     }
-    this._restTask = this._mountRest(rest, load);
+    this._restTask = this._mountRest(rest, loadWeapon);
     this.viewmodel.setActive(this.activeId);
     this.viewmodel.play('draw');
     this._pickups = new AmmoPickups(this);
@@ -732,6 +715,7 @@ export class WeaponSystem {
     this._fireTimer = 0;
     this._burstLeft = 0;
     this._burstCooldown = 0;
+    this._triggerLatched = false;
     this._spread = 0;
     this._shotIndex = 0;
     this._sinceShot = 10;
@@ -775,6 +759,8 @@ export class WeaponSystem {
     if (this.radioEquipped) this._stowRadio();
     this._switchTo = id;
     this._tubeLoop = false;
+    // A burst queued on the outgoing gun must not resume when it comes back.
+    this._burstLeft = 0;
     this.player?.clearFireVibe?.();
     this.viewmodel.play('holster');
     return true;
@@ -791,7 +777,11 @@ export class WeaponSystem {
     if (this.disabled || !s || s.def.modes.length < 2) return s?.mode;
     s.modeIndex = (s.modeIndex + 1) % s.def.modes.length;
     s.mode = s.def.modes[s.modeIndex];
+    // A burst in flight dies with the old mode; the new mode needs a fresh
+    // press, not an inherited held pull. Release or press clears the latch,
+    // even if the release happened while paused/frozen.
     this._burstLeft = 0;
+    this._triggerLatched = true;
     return s.mode;
   }
 
@@ -992,7 +982,6 @@ export class WeaponSystem {
     this._sinceShot = 0;
     this.stats.fired++;
     this._pendingShots++;
-    this._pendingFirst = this._pendingFirst || first;
     this._fireSeed = seed;
 
     if (boltAction) {
@@ -1052,19 +1041,25 @@ export class WeaponSystem {
         break;
       case 'shellin':
         if (isReload) {
-          this._insertShell();
-          this._emitReload('shellin');
+          if (this._insertShell()) this._emitReload('shellin');
         }
         break;
       case 'pump':
-        if (isReload) this._emitReload('pump');
-        else this._queueShell(0);
+        // Each native rear/forward stop owns a separate recorded contact.
+        this._emitReload(isReload ? 'boltopen' : 'pump');
+        if (!isReload) this._queueShell(0);
+        break;
+      case 'charge':
+        if (isReload) this._emitReload('charge');
         break;
       case 'boltrelease':
+        this._emitReload(s?.def.id === 'pistol' ? 'slide' : 'boltclose');
+        break;
       case 'bolt:close':
-        if (s?.def.id === 'pistol') this._emitReload('slide');
+        this._emitReload('boltclose');
         break;
       case 'bolt:open':
+        this._emitReload('boltopen');
         this._queueShell(0);
         break;
       case 'chamber':
@@ -1264,6 +1259,7 @@ export class WeaponSystem {
     this._viewmodel.anchor.visible = !this.disabled;
     if (this.disabled) {
       this._burstLeft = 0;
+      this._triggerLatched = false;
       this._pendingShots = 0;
       this._state.ads = false;
       this._state.trigger = false;
@@ -1572,7 +1568,7 @@ export class WeaponSystem {
         return;
       }
       this._stowRadio();
-      this.audio?.playUi?.('radio_strike', 1);
+      // The accepted radio:strike event owns the UI/audio acknowledgment once.
       return;
     }
     this.audio?.playUi?.('radio_denied', 0.9);
@@ -1617,6 +1613,11 @@ export class WeaponSystem {
       !input.frozen &&
       input.enabled !== false &&
       this.debugMode === null;
+    // The selector latch lives only while the pull is continuously live: a
+    // frozen/disabled input gate drops the physical release, so a non-live
+    // frame must break the pull instead of leaving the next press dead
+    // behind a latch that no edge can clear.
+    if (!live) this._triggerLatched = false;
     if (
       this.healing &&
       live &&
@@ -1690,6 +1691,11 @@ export class WeaponSystem {
     def: WeaponState['def'],
     s: WeaponState
   ) {
+    // A new mode needs a fresh press. Either release or press clears the latch,
+    // so a release missed while paused/frozen cannot strand the next press,
+    // even when another gate refuses that press's shot.
+    if (!held || pressed) this._triggerLatched = false;
+    if (this._triggerLatched) return;
     switch (s.mode) {
       case 'auto':
         if (held) this.tryFire();
@@ -1749,7 +1755,6 @@ export class WeaponSystem {
         ctx.events.emit('weapon:fire', this._firePayload);
       }
       this._pendingShots = 0;
-      this._pendingFirst = false;
     }
 
     // ---- deferred shell ejection ---------------------------------------
@@ -1911,6 +1916,7 @@ export class WeaponSystem {
     this._shotIndex = 0;
     this._spread = 0;
     this._fireTimer = 0;
+    this._burstLeft = 0;
     this._tubeLoop = false;
     return true;
   }
@@ -1929,8 +1935,6 @@ export class WeaponSystem {
   }
 
   /* ====================================================================== */
-
-  resize() {}
 
   dispose() {
     for (const off of this._off ?? []) off();

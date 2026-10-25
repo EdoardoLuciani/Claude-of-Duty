@@ -48,6 +48,25 @@ Last-round ejection without manual cycle and empty-insertion chambering are
 gameplay simplifications. Switching/death/reset must not restore spent ammo.
 Caps: <150k triangles, ≤48 primitives, ≤18 materials, three 1024² maps, ≤15 MiB.
 
+## Gameplay reticle
+
+The fullscreen ADS overlay is a **P4FL-inspired game adaptation**, not a certified
+replica of the manufacturer's reticle. The [P4FL FFP 5–25×56 PM II datasheet,
+revision 00](https://www.guncity.com/function/file/06f5980f-11f3-4afc-a473-067104e0cea1)
+was inspected for the fine center, alternating hashes and three heavy outer posts.
+The game retains its wider, fixed ~20° ADS vertical FOV: major ticks indicate
+**5 mrad**, minor ticks **2.5 mrad**, and heavy posts begin at **25 mrad**. These
+are angular offsets, not bullet-drop distances or automatic ballistic compensation.
+The reference's auxiliary rangefinder and illumination are omitted. Fine stroke
+width has a 1.1-render-pixel readability floor; graduation positions use the live
+world-camera FOV/zoom and remain aspect-correct. No reference image ships.
+
+Runtime source: `src/weapons/sniper-reticle.ts` and the sniper branch of
+`src/weapons/viewmodel.ts`. No GLB/Blender rebuild is needed for overlay edits.
+Run `node tests/smoke/smoke-sniper-reticle.mjs` and
+`node tests/e2e/sniper-reticle-e2e.mjs` for native
+720p/1080p/ultrawide shader pixel checks. Review captures are disposable.
+
 ## Rebuild/check (root, Blender 5.2.2)
 
 ```sh
@@ -70,7 +89,7 @@ blender -b -t 4 assets/weapons/ax338/ax338.blend --python-exit-code 1 \
 node tests/smoke/smoke-ax338.mjs
 node tests/smoke/smoke-ax338-contact.mjs
 # GPU/browser lane required:
-node tests/e2e/check-ax338-game.mjs --out=.tmp-rend/ax338/game
+node tests/e2e/weapons-e2e.mjs
 ```
 
 The old `--hands-only` saved-weapon mesh/UV substitution is retired. Every build
@@ -101,7 +120,6 @@ For reproducibility, build twice into empty external directories in fresh Blende
 processes with the same Blender/exporter/NumPy/OCIO settings. Compare GLB, embedded
 maps and manifest hashes; blend metadata can contain different output paths.
 No cross-platform byte-identity promise follows from a same-host check.
-`ax338_review.py` supplies saved-preview photos/reels with Eevee, ray tracing off.
 Match registration/cameras/lights/pose/exposure/ROI/exclusions; don't hide hands
 in acceptance reels or compare old Cycles frames. A compatible OCIO configuration
 is required (supply process-local `OCIO` if needed, never compensate lighting or

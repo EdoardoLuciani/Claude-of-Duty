@@ -42,7 +42,7 @@ try {
     const { meta } = await e.ctx.get('models').worldPrefetch;
     const nav = ai.grid,
       player = e.ctx.get('player');
-    player.health.value = 100000;
+    player.health.setDebugValue(100000);
     player.setControlEnabled(false);
     const made = ai.populate({ squads: 3, perSquad: 4 });
     const state = (window.__NAV_SMOKE__ = {

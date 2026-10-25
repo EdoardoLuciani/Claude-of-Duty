@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { BoxGeometry, Group, Vector3 } from 'three';
 
 import { Agent, STATE, EVIDENCE } from '../../src/ai/agent.ts';
-import { AttachmentQueries } from '../../src/ai/attachment-queries.js';
+import { AttachmentQueries } from '../../src/ai/attachment-queries.ts';
 import { ladderMoveBudget } from '../../src/ai/ladder.ts';
 import { SurfaceNav } from '../../src/ai/nav.ts';
 import { VARIANTS } from '../../src/ai/soldier.ts';
@@ -35,7 +35,7 @@ Object.assign(ai, {
     events: { emit() {} },
   },
 });
-ai.variant = (name) => ({ geometry, materials: [], variant: VARIANTS[name], weapon: null });
+ai.variant = (name) => ({ geometry, material: undefined, variant: VARIANTS[name], weapon: null });
 const calls = [],
   checkLadder = service.checkLadder.bind(service);
 service.checkLadder = (descriptor, direction, foot, cursor, options) => {

@@ -21,7 +21,7 @@ const ai = {
   agents: [],
 };
 for (const [name, variant] of Object.entries(VARIANTS)) {
-  ai.variant = () => ({ geometry, materials: [material], variant, weapon: null });
+  ai.variant = () => ({ geometry, material, variant, weapon: null });
   const a = new Agent(ai, { variant: name, position: new THREE.Vector3(-6, 0, -2) });
   const c = a.controller;
   assert.equal(c.radius, INFANTRY.radius * variant.scale);

@@ -1,27 +1,15 @@
 /**
  * AUDIO / WEAPON FIRE
  *
- * A gunshot is not one sound. Every layer below exists in real recordings and
- * removing any one of them is immediately audible:
+ * Complete authored reports already contain their transient, body, action and
+ * natural tail. SampleBank rotates unmodified reports without pitch/level jitter;
+ * positional close/distant perspectives overlap only in the distance transition.
+ * Enemy direction, distance, air and obstruction belong to SpatialField.
  *
- *   1. TRANSIENT  sub-millisecond click — the pressure step. Gives the shot its
- *                 "instant" feel; without it the gun sounds like a firework.
- *   2. BODY       a fast downward-swept sine/triangle pair, saturated. This is
- *                 the chest thump, the layer people describe as "punch".
- *   3. CRACK      resonant band-passed noise around 1.5–3.5 kHz driven into
- *                 saturation. Calibre character lives here.
- *   4. MID        a short 500–900 Hz noise body that glues 2 and 3 together.
- *   5. TAIL       a broadband burst under a falling lowpass, fed hard into the
- *                 reverb send — this is what the *room* hears.
- *   6. MECH       the bolt/action: a separate, drier, later metallic layer. It
- *                 is what makes a weapon feel mechanical rather than sampled.
- *   7. BOOM       (distance only) a slow, dark, rolling low-frequency swell
- *                 plus a ground-bounce repeat.
- *
- * Variation: each profile owns a round-robin table of 6 timbre variants, and on
- * top of that every shot gets fresh pitch/level/decay jitter from ctx.rng. Two
- * consecutive rounds are never the same waveform, which is the single biggest
- * difference between "synthesized game audio" and "a looping sample".
+ * The synthesis below remains for legacy AK/suppressed reports and ambient gunfire:
+ * transient, body, crack, mid, tail, mechanism and distant boom. Those paths
+ * still use their existing timbre variation and room/bounce treatment. They
+ * are not additional processors on the complete authored reports.
  */
 
 import type { Rng } from '../core/rng.ts';
@@ -41,69 +29,95 @@ import {
   sweep,
 } from './dsp.ts';
 import type { NoiseBank } from './dsp.ts';
-import type { AudioVoice, WeaponProfile, WeaponSoundOptions } from './types.ts';
+import type {
+  AudioVoice,
+  SampleKind,
+  WeaponProfile,
+  LegacyWeaponProfile,
+  WeaponSoundOptions,
+} from './types.ts';
+
+/** Approved +12 dB positional presentation vs the previous 0.5 reference.
+ * Own reports bypass this gain. Not a measured microphone distance or SPL. */
+export const REPORT_DISTANCE = {
+  reference: 0.5 * 10 ** (12 / 20),
+  blendStart: 20,
+  blendEnd: 140,
+} as const;
+
+/** sqrt(mean close mono report energy / mean distant mono report energy).
+ * Fixed bank-level reference matches, NOT per-take normalization or volume knobs.
+ * Frozen full-tail bank energies live in samples/reference.json. */
+export const REPORT_DISTANT_MATCH: Readonly<Partial<Record<SampleKind, number>>> = {
+  'rifle-distant': 2.5059448946436964,
+  'pistol-distant': 1.749320949339822,
+  'lmg-distant': 2.5570276651449104,
+  'sniper-distant': 1.5367612937080013,
+  'shotgun-distant': 1.0058342240905216,
+};
+
+/** Equal-power perspective transition; own and same-source suppressed shots bypass it. */
+export function reportDistantMix(
+  distance: number,
+  profile?: WeaponProfile,
+  firstPerson = false
+): number {
+  if (firstPerson || !profile?.distantSample) return 0;
+  return clamp(
+    (distance - REPORT_DISTANCE.blendStart) /
+      (REPORT_DISTANCE.blendEnd - REPORT_DISTANCE.blendStart),
+    0,
+    1
+  );
+}
+
+export function reportDistanceGain(
+  distance: number,
+  profile?: WeaponProfile,
+  firstPerson = false
+): number {
+  const mix = reportDistantMix(distance, profile, firstPerson);
+  const match = profile?.distantSample ? (REPORT_DISTANT_MATCH[profile.distantSample] ?? 1) : 1;
+  // Factor the crossfade's level into the existing distance node so the source
+  // mix is convex, its output stays unity, and pure-bank routes stay unchanged.
+  const reference =
+    mix === 0
+      ? 1
+      : mix === 1
+        ? match
+        : Math.cos((mix * Math.PI) / 2) + match * Math.sin((mix * Math.PI) / 2);
+  return (REPORT_DISTANCE.reference / Math.max(REPORT_DISTANCE.reference, distance)) * reference;
+}
+
+const SMG_PROFILE = {
+  sample: 'smg',
+  sampleSend: 0,
+  sampleAction: false,
+  samplePunch: false,
+} as const;
 
 /**
  * Per-weapon character. Frequencies in Hz, times in seconds.
- * `level` is a linear trim; the mix expects ~1.0 for a 5.56 rifle.
+ * `level` and body/tail parameters tune legacy synthesis, not authored playback.
+ * Authored reports retain source level with unity voice output: no per-profile
+ * playback trim. The mixer's single shared weapon level defaults to 1.
  */
 export const WEAPON_PROFILES = {
   mcx: {
-    // Designed suppressed subsonic .300 BLK, not a claimed MCX field recording.
-    // Short piston-action pair, no AR buffer-spring twang or revolver cock layer.
+    // Private curated report: no duplicate synthesized body or generic action.
     sample: 'mcx',
-    sampleGain: 1.15,
-    sampleSend: 0.2,
-    firstPersonGain: 1.55,
-    sampleLowpass: 5200,
+    sampleSend: 0,
     sampleAction: false,
+    samplePunch: false,
     suppressed: true,
-    level: 0.58,
-    bodyF: 142,
-    bodyF2: 68,
-    bodyDecay: 0.047,
-    subF: 76,
-    subDecay: 0.058,
-    crackF: 1450,
-    crackQ: 0.7,
-    crackDecay: 0.018,
-    drive: 2.8,
-    asym: 0.18,
-    midF: 510,
-    midDecay: 0.032,
-    tailDecay: 0.13,
-    tailF: 2900,
-    tailEndF: 550,
-    mechDelay: 0.026,
-    mechLevel: 0.68,
-    mechPartials: [1750, 3150, 5200],
-    send: 0.16,
   },
   rifle: {
+    // Private curated report: no duplicate synthesized body or generic action.
     sample: 'rifle',
-    sampleGain: 1.9,
-    sampleSend: 0.5,
-    firstPersonGain: 1.18,
-    level: 1.0,
-    bodyF: 148,
-    bodyF2: 56,
-    bodyDecay: 0.085,
-    subF: 62,
-    subDecay: 0.12,
-    crackF: 2450,
-    crackQ: 0.95,
-    crackDecay: 0.055,
-    drive: 6,
-    asym: 0.35,
-    midF: 780,
-    midDecay: 0.05,
-    tailDecay: 0.3,
-    tailF: 5200,
-    tailEndF: 700,
-    mechDelay: 0.028,
-    mechLevel: 0.42,
-    mechPartials: [1880, 3260, 5400],
-    send: 0.3,
+    distantSample: 'rifle-distant',
+    sampleSend: 0,
+    sampleAction: false,
+    samplePunch: false,
   },
   ak: {
     sample: 'ak',
@@ -130,142 +144,43 @@ export const WEAPON_PROFILES = {
     mechPartials: [1420, 2650, 4300],
     send: 0.34,
   },
-  smg: {
-    sample: 'smg',
-    sampleGain: 1.6,
-    sampleSend: 0.38,
-    firstPersonGain: 2.96,
-    level: 0.84,
-    bodyF: 172,
-    bodyF2: 72,
-    bodyDecay: 0.06,
-    subF: 78,
-    subDecay: 0.08,
-    crackF: 3050,
-    crackQ: 1.05,
-    crackDecay: 0.04,
-    drive: 5,
-    asym: 0.3,
-    midF: 900,
-    midDecay: 0.035,
-    tailDecay: 0.19,
-    tailF: 6200,
-    tailEndF: 900,
-    mechDelay: 0.021,
-    mechLevel: 0.5,
-    mechPartials: [2200, 3900, 6300],
-    send: 0.26,
+  smg: SMG_PROFILE,
+  mpx: {
+    ...SMG_PROFILE,
+    sample: 'mpx',
+    suppressed: true,
   },
   pistol: {
+    // Private curated report: no duplicate synthesized body or generic action.
     sample: 'pistol',
-    sampleGain: 1.45,
-    sampleSend: 0.2,
-    firstPersonGain: 2.64,
-    // Let the recorded report carry the shot. The shared revolver-cock sample
-    // and synthesized snap/body/action obscure this semi-auto's actual take.
+    distantSample: 'pistol-distant',
+    sampleSend: 0,
     sampleAction: false,
     samplePunch: false,
-    level: 0.74,
-    bodyF: 186,
-    bodyF2: 84,
-    bodyDecay: 0.05,
-    subF: 92,
-    subDecay: 0.07,
-    crackF: 2750,
-    crackQ: 1.15,
-    crackDecay: 0.035,
-    drive: 4.5,
-    asym: 0.28,
-    midF: 950,
-    midDecay: 0.03,
-    tailDecay: 0.16,
-    tailF: 6800,
-    tailEndF: 1000,
-    mechDelay: 0.038,
-    mechLevel: 0.46,
-    mechPartials: [2450, 4200, 6900],
-    send: 0.24,
   },
   shotgun: {
+    // Private curated report: no duplicate synthesized body or generic action.
     sample: 'shotgun',
-    sampleGain: 2.7,
-    sampleSend: 0.55,
-    firstPersonGain: 2.55,
-    punchTail: 0.22,
-    level: 1.32,
-    bodyF: 112,
-    bodyF2: 42,
-    bodyDecay: 0.11,
-    subF: 48,
-    subDecay: 0.16,
-    crackF: 2100,
-    crackQ: 0.85,
-    crackDecay: 0.07,
-    drive: 8.5,
-    asym: 0.5,
-    midF: 640,
-    midDecay: 0.06,
-    tailDecay: 0.42,
-    tailF: 4800,
-    tailEndF: 620,
-    mechDelay: 0.16,
-    mechLevel: 0.55,
-    mechPartials: [980, 1760, 3050],
-    send: 0.38,
-    pellets: 8,
+    distantSample: 'shotgun-distant',
+    sampleSend: 0,
+    sampleAction: false,
+    samplePunch: false,
   },
   sniper: {
-    sample: null,
-    firstPersonGain: 2.85,
-    sampleSend: 0.62,
-    level: 2.15,
-    bodyF: 62,
-    bodyF2: 24,
-    bodyDecay: 0.28,
-    subF: 26,
-    subDecay: 0.42,
-    crackF: 980,
-    crackQ: 0.55,
-    crackDecay: 0.2,
-    drive: 13,
-    asym: 0.72,
-    midF: 310,
-    midDecay: 0.18,
-    tailDecay: 1.55,
-    tailF: 2100,
-    tailEndF: 240,
-    mechDelay: 0.28,
-    mechLevel: 0.38,
-    mechPartials: [620, 1180, 2100],
-    send: 0.58,
+    // Private curated report: no duplicate synthesized body or generic action.
+    sample: 'sniper',
+    distantSample: 'sniper-distant',
+    sampleSend: 0,
+    sampleAction: false,
+    samplePunch: false,
   },
   lmg: {
-    // Tuned to the sample's ~75 Hz body and ~1.9 kHz crack.
+    // Private curated report: no duplicate synthesized body or generic action.
     sample: 'lmg',
-    sampleGain: 2.4,
-    sampleSend: 0.5,
-    firstPersonGain: 2.3,
-    punchTail: 0.34,
-    level: 1.22,
-    bodyF: 88,
-    bodyF2: 38,
-    bodyDecay: 0.12,
-    subF: 42,
-    subDecay: 0.18,
-    crackF: 1900,
-    crackQ: 0.9,
-    crackDecay: 0.085,
-    drive: 9,
-    asym: 0.55,
-    midF: 560,
-    midDecay: 0.075,
-    tailDecay: 0.55,
-    tailF: 3800,
-    tailEndF: 480,
-    mechDelay: 0.042,
-    mechLevel: 0.65,
-    mechPartials: [1250, 2200, 3700],
-    send: 0.36,
+    distantSample: 'lmg-distant',
+    sampleSend: 0,
+    sampleAction: false,
+    samplePunch: false,
   },
   suppressed: {
     sample: 'suppressed',
@@ -319,7 +234,10 @@ export function resolveProfile(name?: string | null): WeaponProfile {
 const RR_SLOTS = 6;
 
 /** Build (once, lazily) the round-robin timbre table for a profile. */
-function roundRobin(profile: WeaponProfile, rng: Rng): NonNullable<WeaponProfile['_rr']> {
+function roundRobin(
+  profile: LegacyWeaponProfile,
+  rng: Rng
+): NonNullable<LegacyWeaponProfile['_rr']> {
   if (profile._rr) return profile._rr;
   const rr = [];
   for (let i = 0; i < RR_SLOTS; i++) {
@@ -355,10 +273,9 @@ export function weaponShot(
   actx: BaseAudioContext,
   bank: NoiseBank,
   rng: Rng,
-  profile: WeaponProfile,
+  profile: LegacyWeaponProfile,
   o: WeaponSoundOptions = {}
 ): AudioVoice {
-  if (profile === WEAPON_PROFILES.sniper) return magnumShot(actx, bank, rng, profile, o);
   const t0 = o.when ?? actx.currentTime;
   const dist = Math.max(0, o.distance ?? 0);
   const fp = !!o.firstPerson;
@@ -574,168 +491,8 @@ export function weaponShot(
     b2.start(bounceT, b2._offset, 0.4);
   }
 
-  /* ---- shotgun pellet spatter ----------------------------------- */
-  if (profile.pellets && nearP > 0.2) {
-    for (let i = 0; i < profile.pellets; i++) {
-      const pt = t0 + rng.range(0.0004, 0.006);
-      const src = bank.source('white', rng, rng.range(0.9, 1.4));
-      const bp = biquad(actx, 'bandpass', rng.range(2600, 6200), 1.8);
-      const g = gain(actx, 0);
-      series(src, bp, g).connect(out);
-      hit(g.gain, pt, 0.1 * nearP, rng.range(0.004, 0.014));
-      src.start(pt, src._offset, 0.05);
-    }
-  }
-
   const send = profile.send * (1 + far * 1.4) * (o.echoBoost ?? 1);
   return { node: out, end: end + 0.05, send };
-}
-
-function magnumShot(
-  actx: BaseAudioContext,
-  bank: NoiseBank,
-  rng: Rng,
-  profile: WeaponProfile,
-  o: WeaponSoundOptions = {}
-): AudioVoice {
-  const t0 = o.when ?? actx.currentTime;
-  const dist = Math.max(0, o.distance ?? 0);
-  const fp = !!o.firstPerson;
-  const near = clamp(1 - dist / 70, 0, 1);
-  const far = 1 - near;
-  const jL = rng.range(0.94, 1.06);
-  const jB = semis(rng.range(-0.35, 0.35));
-  const out = gain(actx, fp ? 1.55 : 1.15);
-  let end = t0 + 0.4;
-
-  if (near > 0.05) {
-    const src = bank.source('white', rng, rng.range(0.9, 1.2));
-    const hp = biquad(actx, 'highpass', 1800, 0.65);
-    const pk = biquad(actx, 'peaking', 3400, 1.0, 5);
-    const tg = gain(actx, 0);
-    series(src, hp, pk, tg).connect(out);
-    hit(tg.gain, t0, 1.35 * near * jL, 0.006);
-    src.start(t0, src._offset, 0.04);
-    const clk = osc(actx, 'triangle', 980);
-    const cg = gain(actx, 0);
-    clk.connect(cg);
-    cg.connect(out);
-    hit(cg.gain, t0, 0.55 * near * jL, 0.004);
-    clk.start(t0);
-    clk.stop(t0 + 0.018);
-  }
-
-  {
-    const b1 = osc(actx, 'sine', profile.bodyF * jB);
-    const b2 = osc(actx, 'sine', profile.bodyF * jB * 0.48);
-    const bg = gain(actx, 0);
-    const drv = shaper(actx, saturationCurve(profile.drive * 0.55, profile.asym), '4x');
-    const lp = biquad(actx, 'lowpass', lerp(900, 280, far), 0.8);
-    b1.connect(bg);
-    b2.connect(bg);
-    series(bg, drv, lp).connect(out);
-    sweep(b1.frequency, t0, profile.bodyF * jB * 1.35, profile.bodyF2 * jB, profile.bodyDecay);
-    sweep(
-      b2.frequency,
-      t0,
-      profile.bodyF * jB * 0.62,
-      profile.bodyF2 * jB * 0.55,
-      profile.bodyDecay * 1.25
-    );
-    ad(bg.gain, t0, 1.15 * profile.level * jL, 0.0025, profile.bodyDecay);
-    const bEnd = t0 + profile.bodyDecay * 2.2;
-    b1.start(t0);
-    b2.start(t0);
-    b1.stop(bEnd);
-    b2.stop(bEnd);
-    end = Math.max(end, bEnd);
-  }
-
-  {
-    const s = osc(actx, 'sine', profile.subF * jB);
-    const sg = gain(actx, 0);
-    s.connect(sg);
-    sg.connect(out);
-    sweep(s.frequency, t0, profile.subF * jB * 1.8, profile.subF * jB * 0.7, profile.subDecay);
-    ad(sg.gain, t0, (0.85 + far * 0.35) * profile.level * jL, 0.006, profile.subDecay);
-    s.start(t0);
-    s.stop(t0 + profile.subDecay * 2.1);
-    end = Math.max(end, t0 + profile.subDecay * 2.1);
-  }
-
-  if (near > 0.08) {
-    const src = bank.source('pink', rng, rng.range(0.7, 1.05));
-    const bp = biquad(
-      actx,
-      'bandpass',
-      profile.crackF * semis(rng.range(-0.4, 0.4)),
-      profile.crackQ
-    );
-    const drv = shaper(actx, saturationCurve(8, 0.45), '2x');
-    const cg = gain(actx, 0);
-    series(src, bp, drv, cg).connect(out);
-    sweep(bp.frequency, t0, profile.crackF * 1.15, profile.crackF * 0.55, profile.crackDecay * 2.2);
-    ad(cg.gain, t0, 0.7 * near * profile.level * jL, 0.002, profile.crackDecay);
-    src.start(t0, src._offset, profile.crackDecay * 3);
-    end = Math.max(end, t0 + profile.crackDecay * 3);
-  }
-
-  {
-    const src = bank.source('brown', rng, rng.range(0.7, 1.1));
-    const bp = biquad(actx, 'bandpass', profile.midF, 0.9);
-    const mg = gain(actx, 0);
-    series(src, bp, mg).connect(out);
-    ad(mg.gain, t0, 0.7 * profile.level * jL, 0.004, profile.midDecay * 1.6);
-    src.start(t0, src._offset, profile.midDecay * 4);
-  }
-
-  {
-    const tailDur = profile.tailDecay * (1 + far * 1.1);
-    const src = bank.source('brown', rng, rng.range(0.55, 0.9));
-    const lp = biquad(actx, 'lowpass', profile.tailF, 0.55);
-    const hp = biquad(actx, 'highpass', 50, 0.7);
-    const tg = gain(actx, 0);
-    series(src, hp, lp, tg).connect(out);
-    sweep(lp.frequency, t0, profile.tailF, profile.tailEndF, tailDur);
-    ad(tg.gain, t0, (0.55 + far * 0.45) * profile.level * jL, 0.012, tailDur);
-    src.start(t0, src._offset, tailDur * 1.25);
-    end = Math.max(end, t0 + tailDur * 1.25);
-  }
-
-  {
-    const boomDur = 0.45 + dist * 0.006;
-    const src = bank.source('brown', rng, rng.range(0.5, 0.85));
-    const lp = biquad(actx, 'lowpass', 280, 0.75);
-    const bg = gain(actx, 0);
-    series(src, lp, bg).connect(out);
-    sweep(lp.frequency, t0, 380, 110, boomDur);
-    ad(bg.gain, t0, (0.22 + far * 0.5) * profile.level, 0.02, boomDur);
-    src.start(t0, src._offset, boomDur * 1.3);
-    end = Math.max(end, t0 + boomDur * 1.3);
-  }
-
-  if (dist < 16 && profile.mechLevel > 0) {
-    const md = profile.mechDelay * rng.range(0.9, 1.1);
-    const lvl = profile.mechLevel * (fp ? 1 : 0.5) * clamp(1 - dist / 16, 0.2, 1);
-    struckResonator(
-      actx,
-      bank,
-      rng,
-      t0 + md,
-      [
-        { f: 620 * rng.range(0.95, 1.05), q: 14, g: 0.55 * lvl, decay: 0.08 },
-        { f: 1180, q: 10, g: 0.22 * lvl, decay: 0.04 },
-      ],
-      0.004
-    ).connect(out);
-    end = Math.max(end, t0 + md + 0.16);
-  }
-
-  return {
-    node: out,
-    end: end + 0.06,
-    send: profile.send * (1 + far * 1.2) * (o.echoBoost ?? 1),
-  };
 }
 
 /**
@@ -750,7 +507,7 @@ export function weaponPunch(
   actx: BaseAudioContext,
   bank: NoiseBank,
   rng: Rng,
-  profile: WeaponProfile,
+  profile: LegacyWeaponProfile,
   o: WeaponSoundOptions = {}
 ): AudioVoice {
   const t0 = o.when ?? actx.currentTime;
@@ -760,25 +517,17 @@ export function weaponPunch(
   const level = profile.level * (profile.suppressed ? 0.62 : 1) * near;
   const pitch = semis(rng.range(-0.45, 0.45));
   const out = gain(actx, 0.95);
-  const isSmg = profile === WEAPON_PROFILES.smg;
-  const isPistol = profile === WEAPON_PROFILES.pistol;
 
   // Clean shock-front snap above the rounded transient in the field take. It is
   // intentionally noise, not another saturated oscillator, so the limiter sees
   // a narrow micro-transient rather than a dense clipped block.
   if (!profile.suppressed) {
     const snap = bank.source('white', rng, rng.range(0.96, 1.05));
-    const snapHP = biquad(actx, 'highpass', isSmg || isPistol ? 2600 : 3000, 0.65);
-    const snapPeak = biquad(
-      actx,
-      'peaking',
-      isSmg || isPistol ? 5200 : 7500,
-      1.1,
-      isSmg || isPistol ? 2.5 : 4
-    );
+    const snapHP = biquad(actx, 'highpass', 3000, 0.65);
+    const snapPeak = biquad(actx, 'peaking', 7500, 1.1, 4);
     const snapGain = gain(actx, 0);
     series(snap, snapHP, snapPeak, snapGain).connect(out);
-    hit(snapGain.gain, t0, (isSmg || isPistol ? 0.9 : 1.2) * level, 0.0028);
+    hit(snapGain.gain, t0, 1.2 * level, 0.0028);
     snap.start(t0, snap._offset, 0.025);
   }
 
@@ -806,7 +555,7 @@ export function weaponPunch(
     profile.bodyF2 * pitch * 0.48,
     profile.bodyDecay * 1.15
   );
-  ad(bg.gain, t0, (isSmg || isPistol ? 0.3 : 0.52) * level, 0.001, profile.bodyDecay * 0.82);
+  ad(bg.gain, t0, 0.52 * level, 0.001, profile.bodyDecay * 0.82);
   const bodyEnd = t0 + profile.bodyDecay * 1.5 + 0.025;
   body.start(t0);
   body2.start(t0);
@@ -816,39 +565,18 @@ export function weaponPunch(
   // A separate sub pulse gives headphones/speakers weight without sustaining
   // enough 80–250 Hz energy to mask footsteps or the next automatic round.
   const subStart = clamp(profile.subF * 1.2, 68, 105) * pitch;
-  const subAmount = profile.suppressed
-    ? 0.18
-    : isPistol
-      ? 0.14
-      : isSmg
-        ? 0.2
-        : profile === WEAPON_PROFILES.rifle
-          ? 0.42
-          : 0.62;
-  const subEndHz = isPistol || isSmg ? 58 : profile === WEAPON_PROFILES.rifle ? 46 : 40;
+  const subAmount = profile.suppressed ? 0.18 : 0.62;
   const sub = osc(actx, 'sine', subStart);
   const sg = gain(actx, 0);
   sub.connect(sg);
   sg.connect(out);
-  sweep(sub.frequency, t0, subStart, subEndHz * pitch, 0.06);
+  sweep(sub.frequency, t0, subStart, 40 * pitch, 0.06);
   ad(sg.gain, t0, subAmount * level, 0.002, 0.062);
   const subEnd = t0 + 0.115;
   sub.start(t0);
   sub.stop(subEnd);
 
   let end = Math.max(bodyEnd, subEnd);
-  // Short recordings can opt into the same rolling decay as distant shots.
-  if (profile.punchTail) {
-    const tDecay = profile.tailDecay;
-    const tail = bank.source('white', rng, tDecay + 0.05);
-    const tl = biquad(actx, 'lowpass', profile.tailF, 0.6);
-    const tg = gain(actx, 0);
-    series(tail, tl, tg).connect(out);
-    sweep(tl.frequency, t0, profile.tailF, profile.tailEndF, tDecay);
-    ad(tg.gain, t0, profile.punchTail * level, 0.004, tDecay);
-    tail.start(t0, tail._offset, tDecay + 0.05);
-    end = Math.max(end, t0 + tDecay + 0.05);
-  }
   if (dist < 10 && profile.mechLevel > 0) {
     const mt = t0 + clamp(profile.mechDelay * 0.55, 0.012, 0.028) * rng.range(0.92, 1.08);
     const m = profile.mechPartials;
@@ -883,21 +611,6 @@ export function weaponPunch(
       ],
       0.002
     ).connect(pan);
-    if (profile === WEAPON_PROFILES.rifle) {
-      // AR buffer tube spring: a quiet, high-Q metallic twang following carrier
-      // unlock. This near-ear signature differentiates it from both 9 mm guns.
-      struckResonator(
-        actx,
-        bank,
-        rng,
-        mt + 0.032,
-        [
-          { f: rng.range(1180, 1380), q: 52, g: 0.11, decay: 0.14 },
-          { f: rng.range(2350, 2700), q: 38, g: 0.055, decay: 0.09 },
-        ],
-        0.0018
-      ).connect(pan);
-    }
     end = Math.max(end, mt + 0.18);
   }
 

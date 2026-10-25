@@ -433,12 +433,6 @@ export class SkySystem {
     this._updateCelestial();
     this._bakeSky();
     this._bakeEnv();
-    this.ctx.events.emit('sky:changed', {
-      hour: this.hour,
-      sunDir: this.celestial.sun,
-      sunIntensity: this.sunLight.intensity,
-      moonIntensity: this.moonLight.intensity,
-    });
     if (this.ctx.config.deterministic === true) {
       const c = this.celestial;
       const sc = this.sunLight.color;
@@ -756,7 +750,6 @@ export class SkySystem {
     this._envMoonDir.copy(this.celestial.moon);
     this._envDirty = false;
     this._envAge = 0;
-    this.ctx.events.emit('sky:env', { envMap: this.envMap, sunDir: this.celestial.sun });
   }
 
   dispose(): void {

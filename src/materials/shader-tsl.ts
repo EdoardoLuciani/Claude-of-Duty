@@ -32,7 +32,6 @@ import {
   step,
   texture,
   transformNormalToView,
-  struct,
   uv,
   vec2,
   vec3,
@@ -43,15 +42,6 @@ import { Color, MeshPhysicalNodeMaterial, MeshStandardNodeMaterial } from 'three
 import type { Node, Texture } from 'three/webgpu';
 
 import { hash11 } from './noise-tsl.ts';
-
-const MaterialChannels = struct({
-  color: 'vec3',
-  opacity: 'float',
-  normal: 'vec3',
-  rough: 'float',
-  metal: 'float',
-  ao: 'float',
-});
 
 export interface SurfaceParams {
   uvMode: 'planar' | 'triplanar' | 'mesh';
@@ -103,10 +93,6 @@ interface SharedSurfaceMaps {
   keyDir?: Node<'vec3'>;
   keyColor?: Node<'vec3'>;
 }
-interface MaterialChannelOutput {
-  get(name: 'color' | 'normal'): Node<'vec3'>;
-  get(name: 'opacity' | 'rough' | 'metal' | 'ao'): Node<'float'>;
-}
 const tint = (hex: number | string) => {
   const c = new Color(hex);
   return vec3(c.r, c.g, c.b);
@@ -151,8 +137,11 @@ export function parallaxUV(
 ) {
   const depthNode = typeof depth === 'number' ? float(depth) : depth;
   const coords = uv0.toVar();
-  const dx = dFdx(uv0).toVar(),
-    dy = dFdy(uv0).toVar();
+  // Explicit assignments keep derivatives outside the non-uniform march branch.
+  const dx = vec2(0).toVar(),
+    dy = vec2(0).toVar();
+  dx.assign(dFdx(uv0));
+  dy.assign(dFdy(uv0));
   If(depthNode.greaterThan(0).and(fade.greaterThan(0.001)), () => {
     const nl = max(mix(float(maxLayers), 8, clamp(abs(vt.z), 0, 1)).mul(fade), 4).toVar();
     const layer = float(1).div(nl).toVar();
@@ -214,6 +203,8 @@ function runoff(sAxis: Node<'float'>, y: Node<'float'>, wobble: Node<'float'>) {
  * `p` is the merged library/variant parameter record; `shared` holds the
  * detail albedo/normal and macro maps. Owns neither the input textures nor the
  * baked geometry. Keeps vertex RGBA as wear/grime/AO/tint masks, not albedo.
+ * Authoring options define the graph at construction; live tuning changes the
+ * supplied uniform values, not this parameter record or its node references.
  */
 export function createSurfaceNodeMaterial(
   set: SurfaceTextureSet,
@@ -224,7 +215,9 @@ export function createSurfaceNodeMaterial(
   const { physical, ...props } = threeProps;
   const Ctor = physical ? MeshPhysicalNodeMaterial : MeshStandardNodeMaterial;
   const mat = new Ctor({ color: 0xffffff, roughness: 1, metalness: 1, dithering: true, ...props });
-  const channels = Fn(() => {
+  // A JS record of shared expressions, not a TSL function returning a struct:
+  // consuming color/opacity must not also build the unrelated normal channels.
+  const channels = (() => {
     const projected = p.uvMode !== 'mesh';
     const scale = p.tileNode ?? (projected ? 1 / p.scale : p.scale);
     const normalAmp = p.normalAmpNode ?? p.normalStrength;
@@ -287,17 +280,14 @@ export function createSurfaceNodeMaterial(
         : normalize(cameraPosition.sub(worldP));
       const vt = normalize(vec3(dot(view, tangent!), dot(view, bitangent!), dot(view, faceN)));
       const fade = smoothstep(p.parallaxFade[0], p.parallaxFade[1], dist).oneMinus();
-      coords = parallaxUV(
-        set.albedo,
-        baseUV,
-        vt,
-        (typeof p.parallaxNode === 'number'
+      const depth = (
+        typeof p.parallaxNode === 'number'
           ? float(p.parallaxNode)
           : (p.parallaxNode ?? float(p.parallax))
-        ).mul(scale),
-        fade,
-        p.parallaxLayers ?? 22
-      );
+      ).mul(scale);
+      const map = set.albedo;
+      const layers = p.parallaxLayers ?? 22;
+      coords = Fn(() => parallaxUV(map, baseUV, vt, depth, fade, layers))().toVar();
     }
 
     let alb: Node<'vec4'>, orm: Node<'vec3'>, nT: Node<'vec3'> | undefined, nP: Node<'vec3'> | null;
@@ -349,19 +339,23 @@ export function createSurfaceNodeMaterial(
           0,
           1
         ).mul(p.detile);
-        const weightA = float(1).sub(blend).add(alb.a.mul(0.6)).toVar();
-        const weightB = blend.add(alb2.a.mul(0.6)).toVar();
+        let weightA = float(1).sub(blend).add(alb.a.mul(0.6)).toVar();
+        let weightB = blend.add(alb2.a.mul(0.6)).toVar();
         const threshold = max(weightA, weightB).sub(0.18);
-        weightA.assign(max(weightA.sub(threshold), 0));
-        weightB.assign(max(weightB.sub(threshold), 0));
+        weightA = max(weightA.sub(threshold), 0).toVar();
+        weightB = max(weightB.sub(threshold), 0).toVar();
         const inv = float(1).div(max(weightA.add(weightB), 0.0001));
-        alb.assign(alb.mul(weightA).add(alb2.mul(weightB)).mul(inv));
-        orm.assign(orm.mul(weightA).add(orm2.mul(weightB)).mul(inv));
-        nT.assign(normalize(nT.mul(weightA).add(n2.mul(weightB))));
+        alb = alb.mul(weightA).add(alb2.mul(weightB)).mul(inv).toVar();
+        orm = orm.mul(weightA).add(orm2.mul(weightB)).mul(inv).toVar();
+        nT = normalize(nT.mul(weightA).add(n2.mul(weightB))).toVar();
       }
       nP = p.uvMode === 'planar' ? anchoredNormal(nT).toVar() : null;
     }
 
+    let color = alb.rgb;
+    let occlusion = orm.r;
+    let roughness = orm.g;
+    let metalness = orm.b;
     const detailTiles =
       p.uvMode === 'mesh' || !(p.detailWorld > 0) || p.scale < 0.3
         ? p.detail[0]
@@ -371,17 +365,21 @@ export function createSurfaceNodeMaterial(
     const micro = sample(shared.detailAlbedo, detUV);
     const tooth = micro.a.sub(0.5).mul(2);
     const dn = sample(shared.detailNormal, detUV).rgb.mul(2).sub(1);
-    alb.rgb.mulAssign(
-      float(1).add(tooth.mul(0.95).add(micro.r.sub(0.5).mul(1.25)).mul(p.detail[2]).mul(detFade))
-    );
-    orm.r.mulAssign(
-      float(1).sub(
-        max(tooth.negate(), 0)
-          .mul(0.3 * p.detail[2])
-          .mul(detFade)
+    color = color
+      .mul(
+        float(1).add(tooth.mul(0.95).add(micro.r.sub(0.5).mul(1.25)).mul(p.detail[2]).mul(detFade))
       )
-    );
-    const height = clamp(alb.a.add(tooth.mul(0.16).mul(detFade)), 0, 1).toVar();
+      .toVar();
+    occlusion = occlusion
+      .mul(
+        float(1).sub(
+          max(tooth.negate(), 0)
+            .mul(0.3 * p.detail[2])
+            .mul(detFade)
+        )
+      )
+      .toVar();
+    let height = clamp(alb.a.add(tooth.mul(0.16).mul(detFade)), 0, 1).toVar();
     if (p.uvMode === 'mesh') {
       nT = normalize(vec3(nT!.xy.add(dn.xy.mul(p.detail[1]).mul(detFade)), nT!.z));
     } else {
@@ -395,7 +393,7 @@ export function createSurfaceNodeMaterial(
                 dominant.equal(1).select(axisNormal(dn, 1, fy.sign), axisNormal(dn, 2, fz.sign))
               );
       const component = dP.sub(faceN.mul(dot(dP, faceN)));
-      nP!.assign(normalize(nP!.add(component.mul(p.detail[1]).mul(detFade))));
+      nP = normalize(nP!.add(component.mul(p.detail[1]).mul(detFade))).toVar();
     }
 
     // Broad finish variation follows the selected projection space, including wear/grime.
@@ -410,7 +408,7 @@ export function createSurfaceNodeMaterial(
       0,
       1
     );
-    alb.rgb.mulAssign(mix(1, macro.mul(0.92).add(0.55), p.macro[1]));
+    color = color.mul(mix(1, macro.mul(0.92).add(0.55), p.macro[1])).toVar();
     if (p.macroBig[1] > 0) {
       const bigUV = macroUV.mul(p.macroBig[2]);
       const big = clamp(
@@ -422,28 +420,26 @@ export function createSurfaceNodeMaterial(
         -1,
         1
       );
-      alb.rgb.mulAssign(big.mul(p.macroBig[1]).add(1));
-      orm.g.assign(clamp(orm.g.sub(big.mul(p.macroBig[1] * 0.55)), 0, 1));
+      color = color.mul(big.mul(p.macroBig[1]).add(1)).toVar();
+      roughness = clamp(roughness.sub(big.mul(p.macroBig[1] * 0.55)), 0, 1).toVar();
     }
-    alb.rgb.mulAssign(mix(vec3(1), vec3(1.05, 1, 0.93), mac2.r.sub(0.5).mul(p.macro[3])));
-    orm.g.assign(
-      clamp(
-        orm.g
-          .add(mac1.g.sub(0.5).mul(p.macro[2]))
-          .add(mac1.a.sub(0.5).mul(0.16))
-          .sub(tooth.mul(0.07).mul(detFade)),
-        0,
-        1
-      )
-    );
+    color = color.mul(mix(vec3(1), vec3(1.05, 1, 0.93), mac2.r.sub(0.5).mul(p.macro[3]))).toVar();
+    roughness = clamp(
+      roughness
+        .add(mac1.g.sub(0.5).mul(p.macro[2]))
+        .add(mac1.a.sub(0.5).mul(0.16))
+        .sub(tooth.mul(0.07).mul(detFade)),
+      0,
+      1
+    ).toVar();
     if (p.macroRelief > 0 && projected && !p.localSpace) {
       const mUV = macroUV.mul(p.macro[0]);
       const dx = sample(shared.macro, mUV.add(vec2(0.035, 0))).b.sub(mac1.b);
       const dy = sample(shared.macro, mUV.add(vec2(0, 0.035))).b.sub(mac1.b);
       const up = step(0.62, abs(worldN.y));
       const tilt = vec3(dx.negate(), 0, dy.negate()).mul(p.macroRelief).mul(up);
-      nP!.assign(normalize(nP!.add(tilt.sub(worldN.mul(dot(worldN, tilt))))));
-      alb.rgb.mulAssign(float(1).sub(mac1.b.sub(0.5).mul(0.16).mul(up)));
+      nP = normalize(nP!.add(tilt.sub(worldN.mul(dot(worldN, tilt))))).toVar();
+      color = color.mul(float(1).sub(mac1.b.sub(0.5).mul(0.16).mul(up))).toVar();
     }
 
     const vertical = smoothstep(0.34, 0.72, abs(worldN.y)).oneMinus();
@@ -471,27 +467,27 @@ export function createSurfaceNodeMaterial(
         .mul(vertical);
       const warm = r3.greaterThan(0.48);
       const sign = warm.select(float(1), float(-1));
-      alb.rgb.mulAssign(float(1).add(sign.mul(p.patch[2]).mul(mask)));
-      alb.rgb.mulAssign(
-        mix(vec3(1), warm.select(vec3(0.975, 0.988, 1.02), vec3(1.03, 1.008, 0.968)), mask)
-      );
-      orm.g.assign(clamp(orm.g.add(mask.mul(p.patch[3])), 0, 1));
+      color = color.mul(float(1).add(sign.mul(p.patch[2]).mul(mask))).toVar();
+      color = color
+        .mul(mix(vec3(1), warm.select(vec3(0.975, 0.988, 1.02), vec3(1.03, 1.008, 0.968)), mask))
+        .toVar();
+      roughness = clamp(roughness.add(mask.mul(p.patch[3])), 0, 1).toVar();
       const lip = mask.mul(float(1).sub(mask)).mul(4);
-      alb.rgb.mulAssign(lip.mul(0.13).add(1));
-      height.assign(clamp(height.add(mask.mul(0.07)).add(lip.mul(0.05)), 0, 1));
+      color = color.mul(lip.mul(0.13).add(1)).toVar();
+      height = clamp(height.add(mask.mul(0.07)).add(lip.mul(0.05)), 0, 1).toVar();
     }
     if (p.weather.some((x) => x > 0)) {
       const dust = clamp(worldN.y, 0, 1)
         .pow(2)
         .mul(weather.x)
         .mul(smoothstep(0.3, 0.8, mac1.b.mul(0.7).add(mac2.g.mul(0.5))));
-      alb.rgb.assign(mix(alb.rgb, tint(p.dustColor), dust.mul(0.75)));
-      orm.g.assign(clamp(orm.g.add(dust.mul(0.3)), 0, 1));
-      orm.b.mulAssign(float(1).sub(dust.mul(0.85)));
+      color = mix(color, tint(p.dustColor), dust.mul(0.75)).toVar();
+      roughness = clamp(roughness.add(dust.mul(0.3)), 0, 1).toVar();
+      metalness = metalness.mul(float(1).sub(dust.mul(0.85))).toVar();
       const sN = sample(shared.macro, vec2(sAxis.mul(0.46), worldP.y.mul(0.155))).a;
       const sFine = sample(shared.macro, vec2(sAxis.mul(1.35).add(0.4), worldP.y.mul(0.42))).g;
       const run = runoff(sAxis, worldP.y, sN.sub(0.5));
-      const streak = clamp(
+      let streak = clamp(
         vertical
           .mul(run.amount)
           .mul(clamp(weather.y.mul(2.2), 0, 1.15))
@@ -501,42 +497,42 @@ export function createSurfaceNodeMaterial(
       ).toVar();
       if (p.vertexMasks) {
         const v = maskColor!;
-        streak.assign(
-          clamp(
-            streak
-              .mul(
-                clamp(v.g.mul(1.5).add(v.b.mul(0.6)), 0, 1)
-                  .mul(0.75)
-                  .add(0.45)
-              )
-              .add(
-                smoothstep(0.58, 0.98, v.g)
-                  .mul(vertical)
-                  .mul(
-                    smoothstep(0.2, 0.7, sN.mul(0.6).add(sFine.mul(0.55)))
-                      .mul(0.45)
-                      .add(0.55)
-                  )
-              ),
-            0,
-            1
-          )
-        );
+        streak = clamp(
+          streak
+            .mul(
+              clamp(v.g.mul(1.5).add(v.b.mul(0.6)), 0, 1)
+                .mul(0.75)
+                .add(0.45)
+            )
+            .add(
+              smoothstep(0.58, 0.98, v.g)
+                .mul(vertical)
+                .mul(
+                  smoothstep(0.2, 0.7, sN.mul(0.6).add(sFine.mul(0.55)))
+                    .mul(0.45)
+                    .add(0.55)
+                )
+            ),
+          0,
+          1
+        ).toVar();
       }
       // Vertex grime may seed runoff, but cannot enable rain on a dry material.
-      streak.mulAssign(step(0.0001, weather.y));
-      const rust = clamp(step(0.86, run.random).mul(0.9).add(orm.b.mul(0.5)), 0, 1).mul(
+      streak = streak.mul(step(0.0001, weather.y)).toVar();
+      const rust = clamp(step(0.86, run.random).mul(0.9).add(metalness.mul(0.5)), 0, 1).mul(
         float(1)
           .sub(smoothstep(0.1, 0.9, run.below))
           .mul(0.7)
           .add(0.3)
       );
-      const runoffColor = mix(alb.rgb.mul(0.72), tint(p.grimeColor), 0.26);
-      alb.rgb.assign(
-        mix(alb.rgb, mix(runoffColor, mix(alb.rgb.mul(0.94), tint(p.rustColor), 0.5), rust), streak)
-      );
-      orm.g.assign(clamp(orm.g.add(streak.mul(0.09)), 0, 1));
-      orm.b.mulAssign(float(1).sub(streak.mul(0.35)));
+      const runoffColor = mix(color.mul(0.72), tint(p.grimeColor), 0.26);
+      color = mix(
+        color,
+        mix(runoffColor, mix(color.mul(0.94), tint(p.rustColor), 0.5), rust),
+        streak
+      ).toVar();
+      roughness = clamp(roughness.add(streak.mul(0.09)), 0, 1).toVar();
+      metalness = metalness.mul(float(1).sub(streak.mul(0.35))).toVar();
       const above = worldP.y.sub(p.groundNode ?? p.groundY);
       const band = smoothstep(0.02, 0.22, above).oneMinus();
       const spray = smoothstep(0.1, max(weather.z, 0.101), above).oneMinus();
@@ -548,23 +544,21 @@ export function createSurfaceNodeMaterial(
             .mul(0.45)
             .add(0.55)
         );
-      alb.rgb.assign(
-        mix(
-          alb.rgb.mul(float(1).sub(splash.mul(0.35))),
-          mix(tint(p.grimeColor), tint(p.dustColor).mul(0.9), 0.35),
-          splash.mul(0.42)
-        )
-      );
+      color = mix(
+        color.mul(float(1).sub(splash.mul(0.35))),
+        mix(tint(p.grimeColor), tint(p.dustColor).mul(0.9), 0.35),
+        splash.mul(0.42)
+      ).toVar();
       // The damp ground band shares splash enablement, not cavity grime's weight.
-      orm.g.assign(
-        clamp(
-          orm.g.add(splash.mul(0.16)).sub(band.mul(vertical).mul(0.1).mul(step(0.0001, weather.z))),
-          0,
-          1
-        )
-      );
-      orm.r.mulAssign(float(1).sub(splash.mul(0.18)));
-      orm.b.mulAssign(float(1).sub(splash.mul(0.7)));
+      roughness = clamp(
+        roughness
+          .add(splash.mul(0.16))
+          .sub(band.mul(vertical).mul(0.1).mul(step(0.0001, weather.z))),
+        0,
+        1
+      ).toVar();
+      occlusion = occlusion.mul(float(1).sub(splash.mul(0.18))).toVar();
+      metalness = metalness.mul(float(1).sub(splash.mul(0.7))).toVar();
       const wedgeH = mac1.r.mul(0.6).add(mac2.b.mul(0.7)).mul(0.18).add(0.26);
       const wedge = vertical.mul(smoothstep(wedgeH.mul(0.25), wedgeH, above).oneMinus());
       const dustWedge = clamp(
@@ -572,13 +566,13 @@ export function createSurfaceNodeMaterial(
         0,
         1
       ).mul(step(0.0001, weather.z));
-      alb.rgb.assign(mix(alb.rgb, tint(p.dustColor), dustWedge.mul(0.46)));
-      orm.g.assign(clamp(orm.g.add(dustWedge.mul(0.07)), 0, 1));
-      orm.b.mulAssign(float(1).sub(dustWedge.mul(0.9)));
+      color = mix(color, tint(p.dustColor), dustWedge.mul(0.46)).toVar();
+      roughness = clamp(roughness.add(dustWedge.mul(0.07)), 0, 1).toVar();
+      metalness = metalness.mul(float(1).sub(dustWedge.mul(0.9))).toVar();
     }
     const cav = float(1).sub(height);
-    alb.rgb.assign(mix(alb.rgb, tint(p.grimeColor), cav.pow(2).mul(weather.w)));
-    orm.r.mulAssign(float(1).sub(cav.mul(weather.w).mul(0.5)));
+    color = mix(color, tint(p.grimeColor), cav.pow(2).mul(weather.w)).toVar();
+    occlusion = occlusion.mul(float(1).sub(cav.mul(weather.w).mul(0.5))).toVar();
     if (p.vertexMasks) {
       const v = maskColor!;
       const wearN = smoothstep(0.25, 0.85, mac1.b.mul(0.65).add(mac2.a.mul(0.55)));
@@ -590,19 +584,19 @@ export function createSurfaceNodeMaterial(
         0,
         1
       );
-      alb.rgb.assign(mix(alb.rgb, tint(p.wearColor), wear.mul(p.wearMaterial[3])));
-      orm.g.assign(mix(orm.g, p.wearMaterial[0], wear));
-      orm.b.assign(mix(orm.b, p.wearMaterial[1], wear));
+      color = mix(color, tint(p.wearColor), wear.mul(p.wearMaterial[3])).toVar();
+      roughness = mix(roughness, p.wearMaterial[0], wear).toVar();
+      metalness = mix(metalness, p.wearMaterial[1], wear).toVar();
       const grime = v.g.mul(p.wear[1]).mul(cav.mul(0.65).add(0.35)).mul(mac2.g.mul(0.9).add(0.45));
-      alb.rgb.assign(mix(alb.rgb, tint(p.grimeColor), grime.mul(0.8)));
-      orm.g.assign(clamp(orm.g.add(grime.mul(0.22)), 0, 1));
-      orm.b.mulAssign(float(1).sub(grime.mul(0.8)));
-      orm.r.mulAssign(float(1).sub(v.b.mul(p.wear[2])));
+      color = mix(color, tint(p.grimeColor), grime.mul(0.8)).toVar();
+      roughness = clamp(roughness.add(grime.mul(0.22)), 0, 1).toVar();
+      metalness = metalness.mul(float(1).sub(grime.mul(0.8))).toVar();
+      occlusion = occlusion.mul(float(1).sub(v.b.mul(p.wear[2]))).toVar();
     }
     if (p.cloth?.[1] < 1) {
       const underside = smoothstep(-0.7, 0.1, worldN.y).oneMinus();
-      alb.rgb.mulAssign(mix(1, p.cloth[1], underside));
-      orm.g.assign(clamp(orm.g.add(underside.mul(0.05)), 0, 1));
+      color = color.mul(mix(1, p.cloth[1], underside)).toVar();
+      roughness = clamp(roughness.add(underside.mul(0.05)), 0, 1).toVar();
       if (p.cloth[2] > 0 && projected && !p.localSpace) {
         const foldUV = vec2(
           worldP.x.add(worldP.z.mul(0.63)),
@@ -611,31 +605,31 @@ export function createSurfaceNodeMaterial(
         const f0 = sample(shared.macro, foldUV).b;
         const dx = sample(shared.macro, foldUV.add(vec2(0.05, 0))).b.sub(f0);
         const dy = sample(shared.macro, foldUV.add(vec2(0, 0.05))).b.sub(f0);
-        nP!.assign(normalize(nP!.add(vec3(dx.negate(), dy.negate(), 0).mul(p.cloth[2] * 9))));
-        alb.rgb.mulAssign(float(1).sub(f0.sub(0.5).mul(p.cloth[2] * 0.9)));
+        nP = normalize(nP!.add(vec3(dx.negate(), dy.negate(), 0).mul(p.cloth[2] * 9))).toVar();
+        color = color.mul(float(1).sub(f0.sub(0.5).mul(p.cloth[2] * 0.9))).toVar();
       }
     }
-    alb.rgb.mulAssign(p.tintNode ?? tint(p.tint));
+    color = color.mul(p.tintNode ?? tint(p.tint)).toVar();
     const rough = clamp(
-      orm.g.mul(p.roughness[0]).add(p.roughness[1]),
+      roughness.mul(p.roughness[0]).add(p.roughness[1]),
       Math.max(p.roughness[2] ?? 0.06, 0.015),
       1
     );
-    const ao = float(1).add(orm.r.sub(1).mul(p.aoStrength));
+    const ao = float(1).add(occlusion.sub(1).mul(p.aoStrength));
     const normal =
       p.uvMode === 'mesh'
         ? normalMap(nT!.mul(0.5).add(0.5))
         : p.localSpace
           ? normalize(transformNormalToView(nP!))
           : normalize(cameraViewMatrix.mul(vec4(nP!, 0)).xyz);
-    return MaterialChannels(alb.rgb, alb.a, normal, rough, clamp(orm.b, 0, 1), ao);
-  })() as unknown as MaterialChannelOutput;
-  mat.colorNode = channels.get('color');
-  if (p.alphaMask) mat.opacityNode = channels.get('opacity');
-  mat.normalNode = channels.get('normal');
-  mat.roughnessNode = channels.get('rough').mul(materialRoughness);
-  mat.metalnessNode = channels.get('metal').mul(materialMetalness);
-  mat.aoNode = channels.get('ao');
+    return { color, opacity: alb.a, normal, rough, metal: clamp(metalness, 0, 1), ao };
+  })();
+  mat.colorNode = channels.color;
+  if (p.alphaMask) mat.opacityNode = channels.opacity;
+  mat.normalNode = channels.normal;
+  mat.roughnessNode = channels.rough.mul(materialRoughness);
+  mat.metalnessNode = channels.metal.mul(materialMetalness);
+  mat.aoNode = channels.ao;
   if (p.cloth?.[0] > 0 && shared.keyDir && shared.keyColor) {
     // Authored backlight approximation, not physical transmission: this emissive
     // term uses orientation/cavity AO, but does not sample direct-light shadows.
@@ -643,12 +637,11 @@ export function createSurfaceNodeMaterial(
     const back = max(float(0), dot(normalWorldGeometry, shared.keyDir).negate());
     const view = normalize(cameraPosition.sub(positionWorld));
     const forward = max(float(0), dot(view, shared.keyDir).negate());
-    mat.emissiveNode = channels
-      .get('color')
+    mat.emissiveNode = channels.color
       .mul(shared.keyColor)
       .mul(back.mul(float(0.3).add(forward.pow(2).mul(0.9))))
       .mul(p.cloth[0])
-      .mul(channels.get('ao'));
+      .mul(channels.ao);
   }
   mat.name = `ow_${set.name ?? 'surface'}`;
   return mat;

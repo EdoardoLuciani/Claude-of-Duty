@@ -3,13 +3,16 @@ import assert from 'node:assert/strict';
 import { AudioSystem } from '../../src/audio/index.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import { WEAPON_PROFILES } from '../../src/audio/weapons.ts';
+import { AUDIO_BANKS } from '../lib/audio-banks.mjs';
 
+const total = 40 + AUDIO_BANKS.reduce((n, bank) => n + bank[3], 0);
+const failedUrls = ['smg-1', ...AUDIO_BANKS.map(([, banks]) => Object.values(banks)[0][0])];
 const fetch = globalThis.fetch;
 try {
-  for (const failure of [null, 'http', 'decode']) {
+  for (const failure of [null, ...failedUrls, 'decode']) {
     let decodes = 0;
     globalThis.fetch = async (url) => ({
-      ok: !(failure === 'http' && url.includes('smg-1')),
+      ok: !failure || failure === 'decode' || !url.includes(failure),
       status: 404,
       arrayBuffer: async () => new ArrayBuffer(1),
     });
@@ -21,15 +24,22 @@ try {
       },
     });
     if (failure)
-      await assert.rejects(
-        bank.load(),
-        failure === 'http' ? /smg-1.*HTTP 404/ : /invalid recording/
-      );
-    else assert.equal(await bank.load(), 18);
-    assert.equal(decodes, failure === 'http' ? 17 : 18, 'all jobs settle before failure teardown');
+      await assert.rejects(bank.load(), failure === 'decode' ? /invalid recording/ : /HTTP 404/);
+    else assert.equal(await bank.load(), total);
+    assert.equal(
+      decodes,
+      failedUrls.includes(failure) ? total - 1 : total,
+      'all jobs settle before failure teardown'
+    );
     bank.dispose();
     assert(Object.values(bank.buffers).every((buffers) => buffers.length === 0));
     assert.equal(bank.heartbeatBuffer, null);
+    assert.deepEqual(bank.hitBuffers, {});
+    assert.deepEqual(bank.hitIndices, {});
+    assert.deepEqual(bank.aircraftBuffers, []);
+    assert.equal(bank.aircraftIndex, -1);
+    assert.deepEqual(bank.reloadBuffers, {});
+    assert.deepEqual(bank.reloadIndices, {});
   }
   const missing = new WeaponSampleBank({});
   missing.buffers.rifle = [{ duration: 0.2 }];

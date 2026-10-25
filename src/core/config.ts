@@ -4,7 +4,8 @@
  * quality scaler and the capture harness can drive everything from one place.
  *
  * `dprCap` caps the device-pixel-ratio multiplier on the internal render
- * target — the single biggest resolution lever on Retina-class displays.
+ * target. Every preset is 1, so a high-DPR display never renders above CSS
+ * resolution; `renderScale` is the remaining resolution lever.
  */
 
 export const PHYSICS_HZ = 120;
@@ -30,7 +31,6 @@ export const QUALITY_PRESETS = {
     shadowDistance: 60,
     taa: false,
     gtao: false,
-    ssr: false,
     volumetrics: false,
     bloom: true,
     anisotropy: 4,
@@ -45,7 +45,6 @@ export const QUALITY_PRESETS = {
     shadowDistance: 80,
     taa: true,
     gtao: true,
-    ssr: false,
     volumetrics: true,
     bloom: true,
     anisotropy: 8,
@@ -60,7 +59,6 @@ export const QUALITY_PRESETS = {
     shadowDistance: 130,
     taa: true,
     gtao: true,
-    ssr: false,
     volumetrics: true,
     bloom: true,
     anisotropy: 16,
@@ -69,13 +67,12 @@ export const QUALITY_PRESETS = {
   },
   ultra: {
     renderScale: 1.0,
-    dprCap: 1.5,
+    dprCap: 1.0,
     shadowMapSize: 2048,
     cascades: 4,
     shadowDistance: 160,
     taa: true,
     gtao: true,
-    ssr: true,
     volumetrics: true,
     bloom: true,
     anisotropy: 16,
@@ -85,9 +82,8 @@ export const QUALITY_PRESETS = {
 };
 
 export const DEFAULTS = {
-  // 'ultra' was the default; it is a lot of GPU for a web shooter (4k shadows,
-  // SSR, 24k particles). 'high' keeps the full effect stack but runs at sane
-  // resolutions; ultra stays one click away.
+  // 'high' balances GPU cost; 'ultra' retains an extra shadow cascade and
+  // larger particle/decal budgets, one click away.
   quality: 'high',
   fov: 80, // horizontal-ish vertical FOV, CoD default feel
   // ADS magnification: hip 80 deg -> 49.6 deg while aiming = 1.61x, in line
@@ -110,18 +106,10 @@ export type QualityPreset = (typeof QUALITY_PRESETS)[QualityName];
 export interface RuntimeConfig extends Omit<typeof DEFAULTS, 'quality'> {
   quality: QualityName;
   q: QualityPreset;
-  setQuality(name: QualityName): void;
 }
 
-export function createConfig(
-  overrides: Partial<Omit<RuntimeConfig, 'q' | 'setQuality'>> = {}
-): RuntimeConfig {
+export function createConfig(overrides: Partial<Omit<RuntimeConfig, 'q'>> = {}): RuntimeConfig {
   const cfg = { ...DEFAULTS, ...overrides } as RuntimeConfig;
   cfg.q = { ...QUALITY_PRESETS[cfg.quality] };
-  cfg.setQuality = (name: QualityName) => {
-    if (!QUALITY_PRESETS[name]) throw new Error(`unknown quality preset "${name}"`);
-    cfg.quality = name;
-    Object.assign(cfg.q, QUALITY_PRESETS[name]);
-  };
   return cfg;
 }

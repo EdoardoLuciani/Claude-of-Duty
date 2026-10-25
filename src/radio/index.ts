@@ -149,7 +149,7 @@ interface Strike {
   drops: number[];
   dropIdx: number;
   bombs: Bomb[];
-  engineRepeat: boolean;
+  engine: ReturnType<EngineSystems['audio']['startAircraft']>;
 }
 type RadioContext = Pick<EngineContext, 'scene' | 'get' | 'peek' | 'events'>;
 
@@ -251,12 +251,13 @@ export class RadioSystem {
       drops,
       dropIdx: 0,
       bombs: [],
-      engineRepeat: false,
+      engine: null,
     });
 
     this.ctx.events.emit('radio:strike', { position: start });
     this._audio = this._audio ?? this.ctx.peek('audio');
-    this._audio?.play?.('ambient', start, { which: 'heli', level: 1.2 });
+    this.active[this.active.length - 1].engine =
+      this._audio?.startAircraft?.(plane.position) ?? null;
     return true;
   }
 
@@ -285,10 +286,18 @@ export class RadioSystem {
         s.dropIdx++;
         for (const off of CARPET.lateral) this._dropBomb(s, off);
       }
-      const mid = s.drops[Math.floor(s.drops.length / 2)];
-      if (!s.engineRepeat && mid != null && s.travel >= mid) {
-        s.engineRepeat = true;
-        audio?.play?.('ambient', s.plane.position, { which: 'heli', level: 1.2 });
+      // Audio may still be loading on the gesture that launched the strike.
+      // Attach at the current plane position once ready; never restart mid-flight.
+      const airborne = s.travel < s.drops[s.drops.length - 1] + LEAD + 30;
+      if (airborne) {
+        if (!s.engine || s.engine.ended)
+          s.engine = audio?.startAircraft?.(s.plane.position) ?? null;
+        s.engine?.move(s.plane.position, dt <= 0);
+      } else {
+        // Bombs over missing ground may survive longer than the visible pass.
+        // Their retirement must not keep/restart an aircraft loop off-map.
+        s.engine?.stop();
+        s.engine = null;
       }
 
       // Horizontal follow is derived from the bomber; only vy is integrated.
@@ -315,7 +324,7 @@ export class RadioSystem {
         }
       }
 
-      if (s.travel >= s.drops[s.drops.length - 1] + LEAD + 30 && s.bombs.length === 0) {
+      if (!airborne && s.bombs.length === 0) {
         s.plane.removeFromParent();
         this.active.splice(i, 1);
       }
@@ -344,6 +353,7 @@ export class RadioSystem {
 
   clearStrike(): void {
     for (const s of this.active) {
+      s.engine?.stop();
       s.plane.removeFromParent();
       for (const b of s.bombs) b.mesh.removeFromParent();
     }

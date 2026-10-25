@@ -37,7 +37,8 @@ export class Engine {
   declare _accum: number;
   declare _last: number;
   declare _running: boolean;
-  /** One-shot gameplay submission boundary; graph warmup never calls step(). */
+  private _gameplaySuspended = false;
+  /** One-shot rendered-frame boundary; graph warmup never calls step(). */
   onFirstRender: (() => void) | null = null;
   declare error: EngineError | null;
   declare _onResize: () => void;
@@ -158,6 +159,24 @@ export class Engine {
     this._running = false;
   }
 
+  get gameplaySuspended(): boolean {
+    return this._gameplaySuspended;
+  }
+
+  /**
+   * Gate gameplay without stopping rendered frames or raw-time UI/input.
+   * Opt-in: existing callers and capture pumps continue running by default.
+   * The caller owns Start/control readiness; this does not cancel async work
+   * or block synchronous events such as game:restart.
+   */
+  setGameplaySuspended(suspended: boolean): void {
+    if (this.error || suspended === this._gameplaySuspended) return;
+    this._gameplaySuspended = suspended;
+    this.time.dt = this.time.alpha = this._accum = 0;
+    // A Start click/key and input collected while waiting must not reach play.
+    if (!suspended) this.input.clear();
+  }
+
   /** Advance one frame. Exposed so the capture harness can pump frames by hand. */
   step(now = performance.now()) {
     const t = this.time;
@@ -165,7 +184,7 @@ export class Engine {
     const rawDt = Math.min(0.1, Math.max(0, (now - this._last) / 1000));
     this._last = now;
     t.raw += rawDt;
-    t.dt = this.error ? 0 : rawDt * t.scale;
+    t.dt = this.error || this._gameplaySuspended ? 0 : rawDt * t.scale;
     t.elapsed += t.dt;
     t.frame++;
 
@@ -174,9 +193,14 @@ export class Engine {
     this._accum += t.dt;
     let steps = 0;
     const fixedSystems = this.registry.with('fixedUpdate');
-    while (!this.error && this._accum >= FIXED_DT && steps < MAX_SUBSTEPS) {
+    while (
+      !this.error &&
+      !this._gameplaySuspended &&
+      this._accum >= FIXED_DT &&
+      steps < MAX_SUBSTEPS
+    ) {
       for (const sys of fixedSystems) this._invoke(sys, 'fixedUpdate', FIXED_DT);
-      if (this.error) break;
+      if (this.error || this._gameplaySuspended) break;
       this._accum -= FIXED_DT;
       steps++;
     }
@@ -208,6 +232,10 @@ export class Engine {
 
   _invoke(sys: Subsystem, method: FrameHook, arg: number) {
     if (this.error) return;
+    // UI owns raw-time menu/HUD animation in lateUpdate. Do not run even a
+    // zero-dt gameplay hook: several hooks publish damage/spawns without dt.
+    if (this._gameplaySuspended && !(method === 'lateUpdate' && describeSystem(sys).id === 'ui'))
+      return;
     try {
       sys[method]?.(arg, this.ctx);
     } catch (err) {

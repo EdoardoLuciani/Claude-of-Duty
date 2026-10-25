@@ -77,7 +77,6 @@ export class CharacterController {
   declare _hit: ReturnType<typeof makeHitRecord>;
   declare _hit2: ReturnType<typeof makeHitRecord>;
   declare _planes: Float32Array;
-  declare _planeCount: number;
   declare _startPos: CharacterVector;
 
   constructor(world: StaticWorld, opts: CharacterOptions = {}) {
@@ -118,7 +117,6 @@ export class CharacterController {
     this._hit = makeHitRecord();
     this._hit2 = makeHitRecord();
     this._planes = new Float32Array(MAX_PLANES * 3);
-    this._planeCount = 0;
     this._startPos = { x: 0, y: 0, z: 0 };
 
     if (opts.position) this.setPosition(opts.position.x, opts.position.y, opts.position.z);
@@ -396,7 +394,6 @@ export class CharacterController {
 
       if (dx * dx + dy * dy + dz * dz < 1e-12) break;
     }
-    this._planeCount = planeCount;
     this.lastMoveBlocked = blocked;
     return blocked;
   }
