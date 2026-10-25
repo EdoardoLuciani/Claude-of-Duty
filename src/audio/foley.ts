@@ -203,19 +203,6 @@ export function uiSound(
       }
       break;
     }
-    case 'grenade_tick': {
-      // Cook warning: one short beep, reads as "almost done".
-      const o1 = osc(actx, 'square', 2200);
-      const lp = biquad(actx, 'lowpass', 5200, 0.7);
-      const g = gain(actx, 0);
-      o1.connect(lp);
-      lp.connect(g);
-      g.connect(out);
-      ad(g.gain, t0, 0.4 * lvl, 0.003, 0.05);
-      o1.start(t0);
-      o1.stop(t0 + 0.09);
-      break;
-    }
     case 'radio_open': {
       // Physical switch/static are required recordings; retain the functional tone.
       const o = osc(actx, 'square', 880);

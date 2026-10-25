@@ -1,39 +1,9 @@
 {
   "format": "mono 48000 Hz Opus, 96 kbps VBR, zero header gain",
   "rights": "Owner requested the selected professional-library replacements in a public PR in this implementation session. Original masters remain private; retain applicable library entitlement/licence records. Edited media do not inherit the code licence. Review mixes stay local and are not uploaded to the PR.",
-  "design": "Recorded bullet pass-bys, material-dependent generic casing drops, family-matched dry-fire donors, composed metal-click grenade pin/spoon approximation and isolated cloth throw movements. No synthesized layers or pitch variants. Sand donors stand in for dry earth; carpet for fabric/rubber; concrete for glass/plaster. Casings are not calibre-specific or verified 12-gauge hull recordings. Dry donors are M16, AK47, Glock45, MP5, Remington700 and Pumpgun, not claimed exact recordings of the in-game models. Pin donors are metal clicks, not a verified grenade mechanism. Only these combat-foley paths change; voices, reports, UI warning tones, explosions and master safety remain separate.",
+  "design": "Owner-selected Blastwave pass-bys 54507 through 54511 only (54504-54506 rejected at audition), material-dependent generic casing drops, family-matched dry-fire donors, composed metal-click grenade pin/spoon approximation and isolated cloth throw movements. No synthesized layers or pitch variants. Sand donors stand in for dry earth; carpet for fabric/rubber; concrete for glass/plaster. Casings are not calibre-specific or verified 12-gauge hull recordings. Dry donors are M16, AK47, Glock45, MP5, Remington700 and Pumpgun, not claimed exact recordings of the in-game models. Pin donors are metal clicks, not a verified grenade mechanism. Only these combat-foley paths change; voices, reports, other UI tones, explosions and master safety remain separate. The synthetic grenade cook-warning cue is removed at owner request.",
   "processing": "Decode to mono arithmetic mean, resample 48 kHz, high-pass/low-pass per crop; trim to 5 ms before first 5 ms RMS block exceeding max(-70 dBFS, 4% of peak block RMS), retain the authored crop/tail. 1 ms linear entrance and 10 ms linear exit fades. Scale maximum sliding-window RMS to the listed target subject to -3 dBFS sample-peak headroom. No compression or limiting. Output hashes bind actual Opus files.",
   "sources": {
-    "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54504.wav": {
-      "sha256": "ae273f74561a30a01f41f98140046a75426de69ba7ddb4feb6bfac256689f3b6",
-      "channels": 2,
-      "description": "Bullet Pass By, Whiz"
-    },
-    "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54505.wav": {
-      "sha256": "5281e80dccca11b8170a8d906acfa0dfc5e0179a4fc7923273a523766669f301",
-      "channels": 2,
-      "description": "Bullet Pass By, Whiz"
-    },
-    "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54506.wav": {
-      "sha256": "f81c0967c03004df35deb41f512279c88801960afd56bb10b164dbbb5ff9e737",
-      "channels": 2,
-      "description": "Bullet Pass By, Whiz"
-    },
-    "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54507.wav": {
-      "sha256": "e2b9b4577c673657fed995c193a3d4177a9fba8ab86af45dc77e6b123f19166c",
-      "channels": 2,
-      "description": "Bullet Pass By, Whiz"
-    },
-    "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54508.wav": {
-      "sha256": "416896a230a3fbf666a04ade93e45872c796664ce527acb5897a7b221c33f5e4",
-      "channels": 2,
-      "description": "Bullet Pass By, Whiz"
-    },
-    "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54509.wav": {
-      "sha256": "739851b26bab9dc52da92434dbe5fb35b7763d3c3913913720152926ec11d544",
-      "channels": 2,
-      "description": "Bullet Pass By, Whiz"
-    },
     "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropCement_BW_99.wav": {
       "sha256": "29769c54502dde7e49e127ac30c538c5f8ce304fd2e341aaf14edf89a630dbfc",
       "channels": 2,
@@ -173,55 +143,35 @@
       "sha256": "486cf357260d92b677c5be173014d26dbb98732c1c5b3c1226e93aa0451b5bfb",
       "channels": 2,
       "description": "WHOOSH MOVEMENT CLOTH Fast, rustling cloth movement."
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54507.wav": {
+      "sha256": "e2b9b4577c673657fed995c193a3d4177a9fba8ab86af45dc77e6b123f19166c",
+      "channels": 2,
+      "description": "Bullet Pass By, Whiz"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54508.wav": {
+      "sha256": "416896a230a3fbf666a04ade93e45872c796664ce527acb5897a7b221c33f5e4",
+      "channels": 2,
+      "description": "Bullet Pass By, Whiz"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54509.wav": {
+      "sha256": "739851b26bab9dc52da92434dbe5fb35b7763d3c3913913720152926ec11d544",
+      "channels": 2,
+      "description": "Bullet Pass By, Whiz"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54510.wav": {
+      "sha256": "b6ba4afaa1e8d8a75217271e0f42ff0e253be6cf71bb13ab941e41d4bd76a0d5",
+      "channels": 2,
+      "description": "Bullet Pass By, Whiz"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54511.wav": {
+      "sha256": "0030fcdcad8177956194f2514d399294b07280255274bcd93fe92a5a3b97b302",
+      "channels": 2,
+      "description": "Bullet Pass By, Whiz"
     }
   },
   "files": {
     "whizz-1": {
-      "layers": [
-        {
-          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54504.wav",
-          "start": 0.02,
-          "duration": 0.3373333333333333,
-          "filter": "highpass=130,lowpass=16000"
-        }
-      ],
-      "duration": 0.3373333333333333,
-      "level": 0.7085517048835754,
-      "rmsWindowSeconds": 0.1,
-      "targetWindowRmsDb": -10,
-      "sha256": "8e5c40bdf2f413651c15441d1433af34c98a199813d6dbfd82c953e532da714f"
-    },
-    "whizz-2": {
-      "layers": [
-        {
-          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54505.wav",
-          "start": 0.0,
-          "duration": 0.304,
-          "filter": "highpass=130,lowpass=16000"
-        }
-      ],
-      "duration": 0.304,
-      "level": 0.7239067554473877,
-      "rmsWindowSeconds": 0.1,
-      "targetWindowRmsDb": -10,
-      "sha256": "01ab2a66615f22388417472028bb5c7330d30ea1969c6ba7cab6cc2b0727d149"
-    },
-    "whizz-3": {
-      "layers": [
-        {
-          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54506.wav",
-          "start": 0.02,
-          "duration": 0.32133333333333336,
-          "filter": "highpass=130,lowpass=16000"
-        }
-      ],
-      "duration": 0.32133333333333336,
-      "level": 3.0206432342529297,
-      "rmsWindowSeconds": 0.1,
-      "targetWindowRmsDb": -10,
-      "sha256": "f86e22986f952fa4e558554a65beb94a0680ba5cb216546c298c5f362a0ff730"
-    },
-    "whizz-4": {
       "layers": [
         {
           "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54507.wav",
@@ -234,9 +184,9 @@
       "level": 2.3201849460601807,
       "rmsWindowSeconds": 0.1,
       "targetWindowRmsDb": -10,
-      "sha256": "bbe6f2e2e573a998b67a8f2be149198a6102f64a1e36444691aeef11c0efec3b"
+      "sha256": "a856fa2fce9044a49ec72ea08bb72c6ab48ec4f1e23119bcb0c467b56929acb1"
     },
-    "whizz-5": {
+    "whizz-2": {
       "layers": [
         {
           "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54508.wav",
@@ -249,9 +199,9 @@
       "level": 1.5748906135559082,
       "rmsWindowSeconds": 0.1,
       "targetWindowRmsDb": -10,
-      "sha256": "5d19e5a0c019485832368e6c294d00becbfb35b3d72f201a2a0a92717977d9fd"
+      "sha256": "be328ed12eeac63ea614ceb1e2cf70e4ffb42e07dac88ab7baf03714b88718e8"
     },
-    "whizz-6": {
+    "whizz-3": {
       "layers": [
         {
           "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54509.wav",
@@ -264,7 +214,37 @@
       "level": 3.4584882259368896,
       "rmsWindowSeconds": 0.1,
       "targetWindowRmsDb": -10,
-      "sha256": "c2cceb1c930853f9fac8aa216078a0eef1967182b70d719f950b504fd624f48f"
+      "sha256": "219d151e96b952e39684b240bd242d71d7c359e2bdf91fb4bd233532a2b8ab57"
+    },
+    "whizz-4": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54510.wav",
+          "start": 0.005,
+          "duration": 0.18166666666666667,
+          "filter": "highpass=130,lowpass=16000"
+        }
+      ],
+      "duration": 0.18166666666666667,
+      "level": 5.287038803100586,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -10,
+      "sha256": "cfe42a0a14e581fd8a76d1c3c52a61832db4f86219034774bcf1afbe1a80bce3"
+    },
+    "whizz-5": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54511.wav",
+          "start": 0.005,
+          "duration": 0.139,
+          "filter": "highpass=130,lowpass=16000"
+        }
+      ],
+      "duration": 0.139,
+      "level": 4.934896945953369,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -10,
+      "sha256": "934bf933f1326e0dd67ce50ac403d973c7f883ce9fd621a09d8ba483e6107bb4"
     },
     "casing-concrete-1": {
       "layers": [

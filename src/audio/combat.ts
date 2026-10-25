@@ -8,7 +8,6 @@ export const COMBAT_URLS = {
     new URL('./samples/combat/whizz-3.opus', import.meta.url).href,
     new URL('./samples/combat/whizz-4.opus', import.meta.url).href,
     new URL('./samples/combat/whizz-5.opus', import.meta.url).href,
-    new URL('./samples/combat/whizz-6.opus', import.meta.url).href,
   ],
   'casing-concrete': [
     new URL('./samples/combat/casing-concrete-1.opus', import.meta.url).href,

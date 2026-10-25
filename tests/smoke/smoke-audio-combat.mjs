@@ -16,7 +16,15 @@ import { audioFixture } from '../lib/audio-banks.mjs';
 
 assert.equal(
   Object.values(COMBAT_URLS).reduce((n, urls) => n + urls.length, 0),
-  50
+  49
+);
+assert.deepEqual(
+  COMBAT_URLS.whizz.map((url) => {
+    const name = new URL(url).pathname.split('/').at(-1).replace('.opus', '');
+    return provenance.files[name].layers[0].source.split('/').at(-1);
+  }),
+  [507, 508, 509, 510, 511].map((n) => `BulletPassBy_BW.54${n}.wav`),
+  'owner-selected pass-bys only; exclude the rejected variants'
 );
 const { actx, sources } = audioFixture(2);
 const gains = [];
@@ -106,13 +114,13 @@ for (const [kind, key] of [
   assert.equal(sources.at(-1).when, 4);
   assert.equal(gains.at(-1).gain.value, 0.8);
 }
-// Public grenade callbacks keep physical handling on foley, warning cues on UI.
+// Public grenade callbacks keep physical handling on foley, hit feedback on UI.
 const calls = [];
 audio._playDry = (...args) => {
   calls.push(args);
   return true;
 };
-for (const cue of ['grenade_pin', 'grenade_throw', 'grenade_tick']) audio.playUi(cue, 0.9);
+for (const cue of ['grenade_pin', 'grenade_throw', 'hitmarker']) audio.playUi(cue, 0.9);
 assert.deepEqual(
   calls.map((c) => c[2]),
   ['foley', 'foley', 'ui']
