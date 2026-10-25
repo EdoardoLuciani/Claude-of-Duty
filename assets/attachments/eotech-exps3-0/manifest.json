@@ -1,0 +1,32 @@
+{
+  "asset": "EOTECH EXPS3-0 | reference-backed original Blender art",
+  "source": "tools/blender/exps3.py",
+  "sourceSha256": "1b71b769e2378fe3e8e57d5982d1047ce4d35e4eea4bec560f3eda61069da427",
+  "blender": "5.2.2 LTS",
+  "units": "metres",
+  "axes": {
+    "right": "+X",
+    "up": "+Y",
+    "forward": "-Z"
+  },
+  "nominalEnvelopeMm": [
+    58.4,
+    73.7,
+    96.5
+  ],
+  "mountOrigin": "rail top centre; SOCKET_mount at [0,0,0]",
+  "opticalDatum": "provisional photo-derived 46mm above rail; not a certified manufacturer datum",
+  "reticle": {
+    "ringMoa": 68,
+    "dotMoa": 1,
+    "geometryBaked": false
+  },
+  "stats": {
+    "triangles": 36371,
+    "primitives": 11,
+    "materials": 10,
+    "bytes": 4013976,
+    "images": 2
+  },
+  "sha256": "377eeac71e9dc461a3c23a8ff16b9deef3e51c42e60d0a3f95f00b9317819dd6"
+}
