@@ -193,6 +193,22 @@ assert nearest(grip,ref['sides']['right']['thumbPad'])<.003,'conventional neck/t
 assert nearest(tree(pick('Rubber buttpad')),dim['buttCenter'])<.001,'LOP butt datum is on physical rubber face'
 assert nearest(trigger,dim['triggerFace'])<.001,'LOP trigger datum is on physical trigger face'
 assert nearest(tree(pick('Bolt face')),dim['closedBreech'])<1e-6,'barrel datum is on closed bolt face'
+# Firing-hand regression (#447): selected distal pad contacts used to pass
+# while the proximal glove/thumb crossed the stock. Test all evaluated shared
+# glove, reinforcement, knuckle, cuff and sleeve triangles, not bone capsules.
+# The moving trigger is intentionally a contact surface (index flexes on Pump);
+# the stock, receiver/tang and guard must have NO surface crossings.
+right_skin=[o for o in review.objects if o.type=='MESH' and o.name.startswith('M590_right_')]
+assert len(right_skin)==5
+firing_fixed=tree(pick('Conventional synthetic stock')+pick('590A1 receiver forging')+pick('Rear tang')+pick('Metal trigger guard'))
+right_poses=0
+for name,clip in manifest['clips'].items():
+    for frame in range(math.ceil(clip['duration']*120)+1):
+        pose(name,min(frame/120,clip['duration']))
+        assert not tree(right_skin).overlap(firing_fixed),(name,frame,'actual right glove/cuff crosses stock/receiver/guard',[o.name for o in right_skin if tree([o]).overlap(firing_fixed)])
+        right_poses+=1
+pose('Idle')
+print('M590_RIGHT_SKIN_CLEARANCE_OK:',right_poses,'120Hz poses across all seven clips; all five full deformed surfaces, zero stock/receiver/guard crossings')
 # Rigid mechanism sweep in rig-space against the fixed receiver and barrel.
 fixed=tree(pick('590A1 receiver forging')+pick('Heavy barrel')+pick('Barrel crown'))
 minimum=math.inf;poses=0;seen=set();skin_poses=0

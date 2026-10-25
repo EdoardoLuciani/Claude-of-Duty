@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 
 import { AudioSystem } from '../../src/audio/index.ts';
+import reference from '../../src/audio/samples/reference.json' with { type: 'json' };
 import { Health } from '../../src/player/health.ts';
 import { damp } from '../../src/ui/util.ts';
 
@@ -22,6 +22,29 @@ const ctx = {
   },
 };
 const hp = new Health(ctx, null);
+// Direction remains an event contract; the HUD alone owns indicator pools.
+const hits = [];
+const offDamage = ctx.events.on('damage:taken', (e) => hits.push({ ...e, from: e.from.clone() }));
+for (const [x, z, yaw, angle] of [
+  [0, -4, 0, 0],
+  [4, 0, 0, Math.PI / 2],
+  [-4, 0, 0, -Math.PI / 2],
+  [0, 4, 0, Math.PI],
+  [0, -4, Math.PI / 2, Math.PI / 2],
+]) {
+  ctx.camera.rotation.y = yaw;
+  const from = { x, y: 0, z };
+  hp.damage(5, from);
+  assert(Math.abs(hits.at(-1).direction - angle) < 1e-12);
+  assert.deepEqual(hits.at(-1).from.toArray(), [x, 0, z]);
+}
+hp.damage(5, null);
+assert.equal(hits.at(-1).direction, 0, 'source-free damage keeps its neutral angle');
+assert.deepEqual(hits.at(-1).from.toArray(), [0, 0, 0]);
+assert.deepEqual(hits[0].from.toArray(), [0, 0, -4], 'later hits do not mutate retained sources');
+offDamage();
+ctx.camera.rotation.y = 0;
+hp.reset();
 const audio = new AudioSystem();
 const sounds = [];
 audio.running = true;
@@ -64,9 +87,6 @@ assert.equal(sounds.length, before, 'bandaging back to full health stops the bea
 assert.ok(hp.effect < 0.004 && hp.pulse === 0, 'the visual pulse also stops');
 
 // The visual lobes must stay aligned with the two recorded thumps at any BPM.
-const wav = readFileSync(new URL('../../src/audio/samples/heartbeat.wav', import.meta.url));
-const rate = wav.readUInt32LE(24);
-assert.equal(rate, 48000);
 function peakIn(samples, start, end, hz) {
   let best = -1,
     time = 0;
@@ -78,17 +98,7 @@ function peakIn(samples, start, end, hz) {
   }
   return time;
 }
-const window = rate / 100;
-const energy = [];
-for (let i = 44; i + window * 2 <= wav.length; i += window * 2) {
-  let sum = 0;
-  for (let j = i; j < i + window * 2; j += 2) {
-    const s = wav.readInt16LE(j) / 32768;
-    sum += s * s;
-  }
-  energy.push(sum);
-}
-const audioPeaks = [peakIn(energy, 0.02, 0.2, 100), peakIn(energy, 0.2, 0.45, 100)];
+const audioPeaks = reference.files.heartbeat.pulsePeaksSec;
 
 function visualPeaks(health) {
   hp.reset(true);

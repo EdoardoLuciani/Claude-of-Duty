@@ -3,8 +3,14 @@
 ## Ownership and proof contract
 
 - AI owns one preinitialized module worker, bounded queues, controller scratch,
-  revisions and lifetime. Physics owns collision snapshot construction
-  (`query-snapshot.js`); transfer chunked copies, never live buffers.
+  revisions and lifetime. `attachment-queries.ts` owns planning/proof policy;
+  `attachment-connection.ts` owns typed sending, wire validation, initialization
+  deadlines and idempotent transport shutdown; `attachment-worker.ts` owns the
+  native oracle and actor-fair queue. Transport has no AI planning state.
+  Physics owns collision snapshot construction (`query-snapshot.js`): transfer
+  chunked copies of used triangle/BVH ranges, never live buffers or spare capacity.
+  Copying checks revision, counts and cancellation each chunk and yields at a
+  cooperative 2 ms target (allocation/GC/a single chunk can exceed that target).
 - Authoring and runtime share `attachment.js`, `StaticWorld` and the native
   character controller. No approximate collision or synchronous failure fallback.
 - Proof keys contain ordered exact endpoints, radius, height and the original
@@ -12,6 +18,12 @@
   The 512-entry completed-proof cache belongs to one collision generation.
   World replacement/revision, controller/options, gravity or mask changes
   invalidate proofs, including cached failures.
+- Restart/failure/disposal detach handlers and close transport before clearing
+  policy state; shutdown settles pending initialization and cannot send further
+  cancellations through a broken transport. Factory/send exceptions are terminal.
+  Late events cannot restore readiness. Duplicate initialization/readiness and
+  results before readiness are protocol errors. Source disposal and same-version
+  world/controller replacement invalidate proofs, including during snapshot copy.
 - Workers prove static geometry only. Live actors, Detour paths, sensing,
   firing safety, cover claims and tactical scoring remain main-thread authority.
 - `NAV_PENDING` waits; `NAV_CANCELLED` means superseded, not unreachable.
@@ -117,6 +129,12 @@ Historical investigations and evidence:
 [cycle/batching trial](https://github.com/EdoardoLuciani/Claude-of-Duty/commit/ed8e3e2),
 [rejected continuation reuse](https://gist.github.com/EdoardoLuciani/87f6b0a9ad8653ad6a083f74b5eafb5e).
 Closed experiments belong there, not in the runtime or another diagnostic subsystem.
+
+Snapshot preparation transfers only used geometry/BVH ranges with cooperative
+2 ms copy slices. Measurements and rejected backend experiments belong to
+[#496](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/496), not this contract.
+This is a browser Worker design, not a SharedArrayBuffer/native-thread backend;
+no steady-state FPS or deterministic replay improvement is implied.
 
 ## Validation
 

@@ -1,5 +1,6 @@
 // Actual committed export/source contract; no shotgun adapter or game-state substitute.
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 import * as THREE from 'three';
@@ -12,13 +13,24 @@ const dir = new URL('../../assets/weapons/m590/', import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', dir)));
 const reference = JSON.parse(readFileSync(new URL('hand-reference.json', dir)));
 const file = readFileSync(new URL('m590.glb', dir));
-const { json: gltf, accessor: floats, imagePNG } = inspectGLB(file);
+const { json: gltf, bin, accessor: floats, imagePNG } = inspectGLB(file);
+assert.equal(
+  createHash('sha256').update(bin).digest('hex'),
+  'bb02658011152cae2c299db6e22c235e36cbe8b33dc865464d3a8fe649277431',
+  'pump cue correction must not change geometry, maps or sampled animation bytes'
+);
+assert.deepEqual(
+  JSON.parse(gltf.scenes[0].extras.clips),
+  manifest.clips,
+  'native exported event metadata matches the generated manifest'
+);
 const expected = {
   Idle: [2, []],
   Pump: [
     0.45,
     [
       [0.32, 'pump'],
+      [0.82, 'boltrelease'],
       [0.995, 'end'],
     ],
   ],
@@ -34,9 +46,9 @@ const expected = {
     0.95,
     [
       [0.02, 'start'],
+      [0.22, 'pump'],
       [0.68, 'shellin'],
-      [0.88, 'pump'],
-      [0.93, 'boltrelease'],
+      [0.94, 'boltrelease'],
       [0.995, 'end'],
     ],
   ],
@@ -251,6 +263,20 @@ assert.ok(
       13.875 * 0.0254
   ) < 1e-6,
   'physical trigger/butt LOP datums'
+);
+// The frozen firing calibration must reach the runtime controls too: testing
+// reference points alone would still pass if export lost the finger channels.
+const rightPads = pads('right');
+for (const [i, pad] of rightPads.entries()) {
+  // pads() uses the ordinary distal patch; the index owns a trigger patch.
+  if (i === 0) pad.set(0, -0.006, -0.013).applyMatrix4(arms.right.fingers[0].joints[2].matrixWorld);
+  assert.ok(pad.distanceTo(new THREE.Vector3(...reference.sides.right.pads[i])) < 1e-7);
+}
+assert.ok(
+  new THREE.Vector3(0, -0.0078, -0.026)
+    .applyMatrix4(arms.right.thumb.joints[1].matrixWorld)
+    .distanceTo(new THREE.Vector3(...reference.sides.right.thumbPad)) < 1e-7,
+  'native thumb calibration, not just a reference-only contact claim'
 );
 const restPads = pads('left'),
   shell = node('shell_insert'),

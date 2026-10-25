@@ -6,7 +6,7 @@ import { Scene, PerspectiveCamera, RenderTarget } from 'three/webgpu';
 import { RenderSystem } from '../../src/render/index-webgpu.ts';
 import { createWorldViewPipeline } from '../../src/render/webgpu-pipeline.ts';
 
-for (const ssrEnabled of [false, true]) {
+for (const taa of [false, true]) {
   const scene = new Scene(),
     view = new Scene(),
     camera = new PerspectiveCamera();
@@ -29,7 +29,7 @@ for (const ssrEnabled of [false, true]) {
   const graph = createWorldViewPipeline({}, scene, camera, view, camera, {
     gtao: false,
     bloomStrength: 0,
-    ssrEnabled,
+    taa,
     fog: ({ color }) => {
       watch(color);
       return texture(borrowed.texture);
@@ -37,12 +37,17 @@ for (const ssrEnabled of [false, true]) {
     warp: watch,
     postPasses: [{ asNode: watch }],
   });
+  assert.deepEqual(
+    Object.keys(graph.prePass.getMRT().outputNodes).sort(),
+    taa ? ['linearDepth', 'output', 'velocity'] : ['linearDepth', 'output'],
+    'prepass publishes only normals, depth and optional temporal velocity'
+  );
   let worldDisposals = 0;
   graph.worldPass.renderTarget.addEventListener('dispose', () => worldDisposals++);
   graph.dispose();
-  // World-only warp now borrows the fog texture rather than materializing
-  // the world/view composite. Only the post input (+ SSR input) is owned.
-  assert.equal(owned.length, ssrEnabled ? 2 : 1);
+  // World-only warp borrows the fog texture rather than materializing the
+  // world/view composite. Only the post input is owned, with or without TAA.
+  assert.equal(owned.length, 1);
   assert(
     counts.every((n) => n === 1),
     'dispose every created RTT exactly once'

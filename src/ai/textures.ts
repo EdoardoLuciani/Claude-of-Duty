@@ -154,42 +154,9 @@ function dataTexture(
   return t;
 }
 
-/**
- * Run a per-texel shader function over a tile and pack the three maps.
- * fn(u, v, out) fills out.rgb (linear albedo), out.h (height, metres-ish),
- * out.rough, out.metal, out.ao.
- */
-function bake(
-  size: number,
-  fn: (u: number, v: number, out: Texel, x: number, y: number) => void,
-  aniso: number,
-  normalScale = 1
-): TextureSet {
-  const alb = new Uint8Array(size * size * 4);
-  const orm = new Uint8Array(size * size * 4);
+/** Wrapped Sobel normal map; callers may replace opaque alpha with detail roughness. */
+function bakeNormals(height: Float32Array, size: number, normalScale: number): Uint8Array {
   const nrm = new Uint8Array(size * size * 4);
-  const height = new Float32Array(size * size);
-  const out = { r: 0.5, g: 0.5, b: 0.5, h: 0, rough: 0.7, metal: 0, ao: 1 };
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const i = y * size + x;
-      out.r = out.g = out.b = 0.5;
-      out.h = 0;
-      out.rough = 0.7;
-      out.metal = 0;
-      out.ao = 1;
-      fn(x / size, y / size, out, x, y);
-      alb[i * 4] = srgb(out.r);
-      alb[i * 4 + 1] = srgb(out.g);
-      alb[i * 4 + 2] = srgb(out.b);
-      alb[i * 4 + 3] = 255;
-      orm[i * 4] = out.ao * 255;
-      orm[i * 4 + 1] = out.rough * 255;
-      orm[i * 4 + 2] = out.metal * 255;
-      orm[i * 4 + 3] = 255;
-      height[i] = out.h;
-    }
-  }
   // Sobel -> tangent normal, wrapping so the tile stays seamless
   const at = (x: number, y: number): number =>
     height[(((y % size) + size) % size) * size + (((x % size) + size) % size)];
@@ -226,6 +193,45 @@ function bake(
       nrm[i * 4 + 3] = 255;
     }
   }
+  return nrm;
+}
+
+/**
+ * Run a per-texel shader function over a tile and pack the three maps.
+ * fn(u, v, out) fills out.rgb (linear albedo), out.h (height, metres-ish),
+ * out.rough, out.metal, out.ao.
+ */
+function bake(
+  size: number,
+  fn: (u: number, v: number, out: Texel, x: number, y: number) => void,
+  aniso: number,
+  normalScale = 1
+): TextureSet {
+  const alb = new Uint8Array(size * size * 4);
+  const orm = new Uint8Array(size * size * 4);
+  const height = new Float32Array(size * size);
+  const out = { r: 0.5, g: 0.5, b: 0.5, h: 0, rough: 0.7, metal: 0, ao: 1 };
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = y * size + x;
+      out.r = out.g = out.b = 0.5;
+      out.h = 0;
+      out.rough = 0.7;
+      out.metal = 0;
+      out.ao = 1;
+      fn(x / size, y / size, out, x, y);
+      alb[i * 4] = srgb(out.r);
+      alb[i * 4 + 1] = srgb(out.g);
+      alb[i * 4 + 2] = srgb(out.b);
+      alb[i * 4 + 3] = 255;
+      orm[i * 4] = out.ao * 255;
+      orm[i * 4 + 1] = out.rough * 255;
+      orm[i * 4 + 2] = out.metal * 255;
+      orm[i * 4 + 3] = 255;
+      height[i] = out.h;
+    }
+  }
+  const nrm = bakeNormals(height, size, normalScale);
   return {
     albedo: dataTexture(alb, size, true, aniso),
     orm: dataTexture(orm, size, false, aniso),
@@ -258,36 +264,9 @@ function bakeDetail(
       rough[i] = out.rough;
     }
   }
-  const buf = new Uint8Array(size * size * 4);
-  const at = (x: number, y: number): number =>
-    height[(((y % size) + size) % size) * size + (((x % size) + size) % size)];
-  const k = normalScale * 0.17;
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const dx =
-        at(x + 1, y - 1) +
-        2 * at(x + 1, y) +
-        at(x + 1, y + 1) -
-        at(x - 1, y - 1) -
-        2 * at(x - 1, y) -
-        at(x - 1, y + 1);
-      const dy =
-        at(x - 1, y + 1) +
-        2 * at(x, y + 1) +
-        at(x + 1, y + 1) -
-        at(x - 1, y - 1) -
-        2 * at(x, y - 1) -
-        at(x + 1, y - 1);
-      let nx = -dx * k,
-        ny = -dy * k,
-        nz = 1;
-      const l = Math.hypot(nx, ny, nz);
-      const i = y * size + x;
-      buf[i * 4] = ((nx / l) * 0.5 + 0.5) * 255;
-      buf[i * 4 + 1] = ((ny / l) * 0.5 + 0.5) * 255;
-      buf[i * 4 + 2] = ((nz / l) * 0.5 + 0.5) * 255;
-      buf[i * 4 + 3] = Math.max(0, Math.min(255, (rough[i] * 0.5 + 0.5) * 255));
-    }
+  const buf = bakeNormals(height, size, normalScale);
+  for (let i = 0; i < rough.length; i++) {
+    buf[i * 4 + 3] = Math.max(0, Math.min(255, (rough[i] * 0.5 + 0.5) * 255));
   }
   return dataTexture(buf, size, false, aniso);
 }

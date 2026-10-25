@@ -1,13 +1,9 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { MeshPhysicalNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 import { createArmBlood, addArmBloodCoordinates } from './arm-blood.ts';
-
-type SourceArmMaterial = THREE.Material;
-type ArmNodeMaterial = (MeshStandardNodeMaterial | MeshPhysicalNodeMaterial) & {
-  iridescenceThicknessRange?: [number, number];
-};
+import { createArmSurfaceMaterial } from './arm-surfaces.ts';
 
 function isCloseableImage(value: unknown): value is ImageBitmap {
   return (
@@ -40,22 +36,6 @@ export interface ArmRig {
   setPose(pose: unknown): void;
 }
 
-/** Preserve glTF physical extensions (notably the authored low specular strength). */
-export function createArmMaterial(source: SourceArmMaterial): ArmNodeMaterial {
-  const physical = source instanceof THREE.MeshPhysicalMaterial;
-  const mat = physical ? new MeshPhysicalNodeMaterial() : new MeshStandardNodeMaterial();
-  mat.copy(source);
-  mat.defines = { ...mat.defines };
-  if (physical) {
-    const physicalMat = mat as ArmNodeMaterial;
-    const sourcePhysical = source as THREE.MeshPhysicalMaterial;
-    if (physicalMat.iridescenceThicknessRange && sourcePhysical.iridescenceThicknessRange) {
-      physicalMat.iridescenceThicknessRange = [...sourcePhysical.iridescenceThicknessRange];
-    }
-  }
-  return mat;
-}
-
 /** Owned by a Viewmodel, never a global cache: disposal/restart stays local. */
 export async function loadArmAsset(): Promise<ArmAsset> {
   const gltf = await new GLTFLoader().loadAsync(
@@ -63,42 +43,82 @@ export async function loadArmAsset(): Promise<ArmAsset> {
   );
   gltf.scene.updateMatrixWorld(true);
   const meshes: ArmSkinnedMesh[] = [];
-  const decorated = new Set<ArmNodeMaterial>();
-  const replacements = new Map<SourceArmMaterial, ArmNodeMaterial>();
   const blood = createArmBlood();
   gltf.scene.traverse((object) => {
-    if (!(object instanceof THREE.SkinnedMesh)) return;
-    const o = object as ArmSkinnedMesh;
-    if (!o.geometry.getAttribute('skinWeight') || !o.geometry.getAttribute('skinIndex')) {
-      throw new Error(`Player arms: missing skin data on ${o.name}`);
-    }
-    const convert = (source: SourceArmMaterial): ArmNodeMaterial => {
-      let mat = replacements.get(source);
-      if (!mat) {
-        mat = createArmMaterial(source);
-        replacements.set(source, mat);
-      }
-      return mat;
-    };
-    const convertedMaterials = Array.isArray(o.material)
-      ? o.material.map(convert)
-      : [convert(o.material)];
-    o.material = Array.isArray(o.material) ? convertedMaterials : convertedMaterials[0];
-    for (const mat of convertedMaterials) {
-      if (decorated.has(mat)) continue;
-      decorated.add(mat);
-      // Preserve authored reflectance; illumination belongs to the renderer.
-      // Glove seams share stitch material, but their bind-space mask stays clean.
-      if (mat.name === 'Olive_ripstop' || mat.name === 'Olive_stitch') blood.decorate(mat);
-      for (const property of ['map', 'normalMap', 'roughnessMap']) {
-        const texture: unknown = Object.getOwnPropertyDescriptor(mat, property)?.value;
-        if (texture instanceof THREE.Texture) texture.anisotropy = 8;
-      }
-    }
-    meshes.push(o);
+    if (object instanceof THREE.SkinnedMesh) meshes.push(object as ArmSkinnedMesh);
   });
-  for (const source of replacements.keys()) source.dispose();
   if (!meshes.length) throw new Error('Player arms: no deformation meshes in arms.glb');
+  const names = meshes[0].skeleton.bones.map((bone) => bone.name);
+  const sources: THREE.MeshPhysicalMaterial[] = [];
+  const pieces: THREE.BufferGeometry[] = [];
+  for (const mesh of meshes) {
+    if (
+      mesh.skeleton.bones.some((bone, i) => bone.name !== names[i]) ||
+      mesh.skeleton.bones.length !== names.length
+    )
+      throw new Error('Player arms: inconsistent exported bone order');
+    const index = mesh.geometry.index;
+    if (!index) throw new Error('Player arms: expected indexed Blender geometry');
+    if (!mesh.geometry.getAttribute('skinWeight') || !mesh.geometry.getAttribute('skinIndex'))
+      throw new Error(`Player arms: missing skin data on ${mesh.name}`);
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    // Match native submissions: arrays select indexed groups; a single material
+    // ignores groups. Both are clipped by the geometry's authored draw range.
+    const groups = Array.isArray(mesh.material)
+      ? mesh.geometry.groups
+      : [{ start: 0, count: index.count, materialIndex: 0 }];
+    const range = mesh.geometry.drawRange;
+    for (const group of groups) {
+      const source = materials[group.materialIndex ?? 0];
+      const start = Math.max(0, range.start, group.start);
+      const end = Math.min(index.count, range.start + range.count, group.start + group.count);
+      if (!source?.visible || end <= start) continue;
+      const surface = sources.length;
+      sources.push(source as THREE.MeshPhysicalMaterial);
+      const geometry = mesh.geometry.clone();
+      geometry.setIndex(new THREE.BufferAttribute(index.array.slice(start, end), 1));
+      geometry.clearGroups();
+      geometry.setDrawRange(0, Infinity);
+      geometry.applyMatrix4(mesh.matrixWorld);
+      const count = geometry.getAttribute('position').count;
+      geometry.setAttribute(
+        'armSurface',
+        new THREE.Float32BufferAttribute(new Float32Array(count).fill(surface), 1)
+      );
+      pieces.push(geometry);
+    }
+  }
+  if (!pieces.length) throw new Error('Player arms: no rendered deformation surfaces');
+  const material = createArmSurfaceMaterial(sources, blood);
+  const geometry = mergeGeometries(pieces, false);
+  for (const piece of pieces) piece.dispose();
+  if (!geometry) throw new Error('Player arms: incompatible deformation geometry');
+  const merged = new THREE.SkinnedMesh(geometry, material);
+  merged.name = 'Player_arm';
+  merged.skeleton = meshes[0].skeleton;
+  const skeletons = new Set(meshes.map((mesh) => mesh.skeleton));
+  // The merged source retains just one skeleton for bone-name validation. Each
+  // gameplay hand still creates its own skeleton and transformed geometry below.
+  skeletons.delete(merged.skeleton);
+  for (const skeleton of skeletons) skeleton.dispose();
+  const textures = new Set<THREE.Texture>();
+  const sourceMaterials = new Set(
+    meshes.flatMap((mesh) => (Array.isArray(mesh.material) ? mesh.material : [mesh.material]))
+  );
+  for (const source of sourceMaterials) {
+    for (const value of Object.values(source))
+      if (value instanceof THREE.Texture)
+        textures.add(value as THREE.Texture<unknown, THREE.TextureEventMap>);
+    source.dispose();
+  }
+  const images = new Set<ImageBitmap>();
+  for (const texture of textures) {
+    if (isCloseableImage(texture.source?.data)) images.add(texture.source.data);
+    texture.dispose();
+  }
+  for (const image of images) image.close();
+  for (const mesh of meshes) mesh.geometry.dispose();
+  meshes.splice(0, meshes.length, merged);
   return {
     meshes,
     blood,
@@ -177,13 +197,7 @@ export function bindArmAsset(arm: ArmRig, asset: ArmAsset): void {
       throw new Error('Player arms: inconsistent exported bone order');
     }
     const geometry = source.geometry.clone();
-    if (
-      (Array.isArray(source.material) ? source.material : [source.material]).some(
-        (mat) => mat.name === 'Olive_ripstop' || mat.name === 'Olive_stitch'
-      )
-    ) {
-      addArmBloodCoordinates(geometry, source, arm.side);
-    }
+    addArmBloodCoordinates(geometry, source, arm.side);
     transform.multiplyMatrices(scale, source.matrixWorld);
     geometry.applyMatrix4(transform);
     if (arm.side > 0) {

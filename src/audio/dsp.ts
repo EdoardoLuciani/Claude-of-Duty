@@ -3,7 +3,7 @@
  *
  * Low-level Web Audio helpers shared by every synthesis voice in this
  * directory. Everything here is written against `BaseAudioContext` so the exact
- * same code path renders in an `OfflineAudioContext` (see selftest.js) as in
+ * same code path renders in an `OfflineAudioContext` (see tests/e2e/audio-e2e.mjs) as in
  * the live `AudioContext` — that is how this subsystem is verified without a
  * user gesture or a speaker.
  *
@@ -300,28 +300,6 @@ export function saturationCurve(drive = 4, asym = 0): Curve {
     c[i] = Math.tanh(k * xa) / norm;
   }
   CURVE_CACHE.set(key, c);
-  return c;
-}
-
-/** Hard-knee-free soft clip for the very last stage of the master bus. */
-export function limiterCurve(): Curve {
-  let c = CURVE_CACHE.get('__limit');
-  if (c) return c;
-  const n = 4096;
-  c = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    const x = (i / (n - 1)) * 2 - 1;
-    // Preserve firearm micro-transients up to -2.2 dBFS; above that, bend
-    // smoothly into the ceiling. The previous -3.6 dB knee audibly rounded the
-    // first 2–5 ms even when the compressor itself was doing no work.
-    const knee = 0.78;
-    const a = Math.abs(x);
-    let y;
-    if (a < knee) y = x;
-    else y = Math.sign(x) * (knee + (1 - knee) * Math.tanh((a - knee) / (1 - knee)));
-    c[i] = y * 0.985;
-  }
-  CURVE_CACHE.set('__limit', c);
   return c;
 }
 

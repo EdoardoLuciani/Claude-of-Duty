@@ -131,7 +131,6 @@ export class Animator {
   turnT!: number;
   turnDir!: number;
   footIk!: boolean;
-  iHips!: number;
   iSpine!: number;
   iSpine1!: number;
   iSpine2!: number;
@@ -224,7 +223,6 @@ export class Animator {
     this.footIk = true;
 
     /* ---- indices we touch often ---- */
-    this.iHips = rig.index('Hips');
     this.iSpine = rig.index('Spine');
     this.iSpine1 = rig.index('Spine1');
     this.iSpine2 = rig.index('Spine2');

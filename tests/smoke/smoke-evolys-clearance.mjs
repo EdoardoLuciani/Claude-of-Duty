@@ -22,7 +22,15 @@ skin.scene.traverse((o) => {
 });
 const camera = new THREE.PerspectiveCamera(80, 16 / 9, 0.004, 60);
 const vm = new Viewmodel(
-  { camera, viewCamera: camera, viewScene: new THREE.Scene(), rng: new Rng(704) },
+  {
+    camera,
+    viewCamera: camera,
+    viewScene: new THREE.Scene(),
+    rng: new Rng(704),
+    // The world-sized RMR dot needs the same framebuffer contract as other optics.
+    get: () => null,
+    canvas: { height: 720 },
+  },
   {
     get: () => new THREE.MeshStandardMaterial(),
     reticle: () => new THREE.MeshBasicMaterial(),

@@ -128,11 +128,10 @@ try {
       const { DEFAULT_PARAMS } = await import('/src/materials/params.ts');
       const { MaterialSystemNode } = await import('/src/materials/index.ts');
       const { glassSurface } = await import('/src/materials/tsl/glass.ts');
-      const { WEAPON_MATERIALS } = await import('/src/weapons/materials.ts');
+      const { SURFACE_FIXTURES } = await import('/tools/lib/material-fixtures.ts');
       const { createSoldierNodeMaterial, SoldierMaterialsNode } =
         await import('/src/ai/textures-tsl.ts');
       const { createWeaponMaterial } = await import('/src/weapons/asset-material.ts');
-      const { createArmMaterial } = await import('/src/weapons/arm-asset.ts');
       const { IndirectFill } = await import('/src/render/indirect-webgpu.ts');
       const { trackNodeBuilders } = await import('/src/dev/native-builds.ts');
       const renderer = await createWebGpuRenderer(document.querySelector('#game'));
@@ -328,7 +327,7 @@ try {
         await library.init({ config: { quality: 'low', q: { anisotropy: 2 } } });
         const recipeDryRoughness = {};
         for (const name of ['alu', 'polymer', 'steel']) {
-          const [surface, opts] = WEAPON_MATERIALS[name],
+          const [surface, opts] = SURFACE_FIXTURES[name],
             m = library.get(surface, opts);
           m.setupOutput = function () {
             return N.vec4(N.vec3(this.roughnessNode), 1);
@@ -345,7 +344,7 @@ try {
           );
         }
         move(0);
-        const [sootSurface, sootOpts] = WEAPON_MATERIALS.steel_soot;
+        const [sootSurface, sootOpts] = SURFACE_FIXTURES.steel_soot;
         const soot = library.get(sootSurface, sootOpts);
         soot.setupOutput = function () {
           return N.vec4(this.metalnessNode, 0, 0, 1);
@@ -433,24 +432,21 @@ try {
           source.normalMap = normal;
           source.normalScale.set(0.85, 0.85);
           resources.push(source);
-          for (const [name, make] of [
-            ['weapon', createWeaponMaterial],
-            ['arm', createArmMaterial],
-          ]) {
-            const m = make(source),
-              ref = legacyCopy(source, name === 'weapon');
+          {
+            const m = createWeaponMaterial(source),
+              ref = legacyCopy(source, true);
             resources.push(m);
             mesh.material = ref;
             const expected = await read();
             mesh.material = m;
             const actual = await read();
             const difference = maxDiff(expected, actual);
-            integration.copies[`${name}/${physical}`] = difference;
+            integration.copies[`weapon/${physical}`] = difference;
             check(
               actual.some((v, i) => i % 4 < 3 && v > 0.01),
               'copy probe must render a lit surface'
             );
-            check(difference < 1e-6, `${name}: public copy must match legacy pixels`);
+            check(difference < 1e-6, 'weapon: public copy must match legacy pixels');
           }
         }
         const goggles = new SoldierMaterialsNode({}, {}),

@@ -27,7 +27,7 @@
   "dependencies": {
     "@recast-navigation/core": "0.43.1",
     "@recast-navigation/wasm": "0.43.1",
-    "three": "github:mrdoob/three.js#313f1f582b61af64f76ffaa4f23b3abb3ff298a1"
+    "three": "github:mrdoob/three.js#e27dfa95ae7f453b5d7a9a36ffdb563f7c9b529b"
   },
   "devDependencies": {
     "@recast-navigation/generators": "0.43.1",

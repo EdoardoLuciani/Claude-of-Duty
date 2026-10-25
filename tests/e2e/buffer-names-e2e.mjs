@@ -86,18 +86,10 @@ try {
       renderer.setClearColor(0, 0);
       const first = await read(scene);
       const samples = colors.map((rgb, i) => pixel(first, 16 + i * 32, [...rgb, 1]));
-      check(
-        builders.length === 2,
-        `expected two distinct instanced builders, got ${builders.length}`
-      );
-      check(
-        builders[0].vertexShader === builders[1].vertexShader,
-        'equivalent instanced vertex WGSL must match'
-      );
-      check(
-        builders[0].fragmentShader === builders[1].fragmentShader,
-        'equivalent instanced fragment WGSL must match'
-      );
+      // Upstream #35007 binds reference attributes per object, so compatible
+      // instanced meshes share a build without sharing matrix/color buffers.
+      check(builders.length === 1, `expected one shared instanced builder, got ${builders.length}`);
+      check(builders[0].objectSpecific === false, 'reference attributes must allow build reuse');
       check(
         renderer._pipelines.caches.size === 1,
         'equivalent instanced meshes must reuse one pipeline'
@@ -114,7 +106,7 @@ try {
       pixel(updated, 80, [...colors[2], 1]);
       pixel(updated, 112, [...colors[3], 1]);
       check(
-        builders.length === 2 && renderer._pipelines.caches.size === 1,
+        builders.length === 1 && renderer._pipelines.caches.size === 1,
         'data updates must not rebuild shaders/pipelines'
       );
 
@@ -136,11 +128,11 @@ try {
       const buffersScene = new T.Scene();
       buffersScene.add(new T.Mesh(geometry, buffersMaterial));
       const bufferPixel = pixel(await read(buffersScene), 74, [0.15, 0.29, 0.43, 1]);
-      check(builders.length === 3, 'multi-buffer material must build');
+      check(builders.length === 2, 'multi-buffer material must build');
       const names = {};
       for (const stage of ['vertexShader', 'fragmentShader']) {
         names[stage] = Array.from(
-          builders[2][stage].matchAll(
+          builders[1][stage].matchAll(
             /var<(?:uniform|storage, read)>\s+(nodeUniform\d+|explicitColor)\s*:/g
           ),
           (m) => m[1]
@@ -161,7 +153,7 @@ try {
           architecture: info.architecture,
           fallback: info.isFallbackAdapter,
         },
-        instanced: { builders: 2, pipelines: 1, samples },
+        instanced: { builders: 1, pipelines: 1, samples },
         bufferPixel,
         names,
       };

@@ -1,7 +1,8 @@
 """Author the first-person deformation meshes and hand-pose actions in Blender.
 Run: blender -b --python tools/blender/player_arms.py [-- --render]
 Metres. Helpers accept game coordinates (+Y dorsal, -Z fingers).
-Original geometry/textures, deterministic; no external assets or add-ons.
+Original geometry/textures; no external assets or add-ons.
+Geometry and poses are deterministic; Cycles AO baking can vary at low image bits.
 """
 import bpy
 import json
@@ -256,9 +257,29 @@ smooth = glove.modifiers.new('Relax glove surface', 'SMOOTH')
 smooth.factor = .65
 smooth.iterations = 5
 bpy.ops.object.modifier_apply(modifier=smooth.name)
-dec = glove.modifiers.new('Viewmodel topology budget', 'DECIMATE')
+# Keep the original welded shape as a geometric reference. The smaller glove
+# budget may lose sub-mm grain geometry, never the finger/thumb contact shape.
+reference_glove = glove.copy()
+reference_glove.data = glove.data.copy()
+scene.collection.objects.link(reference_glove)
+active(reference_glove)
+dec = reference_glove.modifiers.new('Previous glove budget reference', 'DECIMATE')
 dec.ratio = .48
 bpy.ops.object.modifier_apply(modifier=dec.name)
+active(glove)
+dec = glove.modifiers.new('Viewmodel topology budget', 'DECIMATE')
+dec.ratio = .40
+bpy.ops.object.modifier_apply(modifier=dec.name)
+from mathutils.bvhtree import BVHTree
+surface = BVHTree.FromPolygons([v.co for v in glove.data.vertices],
+                              [p.vertices[:] for p in glove.data.polygons])
+glove_deviation = max(surface.find_nearest(v.co)[3] for v in reference_glove.data.vertices)
+if glove_deviation > .0005:
+    raise RuntimeError(f'Glove contact silhouette deviation exceeds 0.5 mm: {glove_deviation}')
+print(f'Glove budget deviation from previous authored surface: {glove_deviation*1000:.4f} mm')
+reference_data = reference_glove.data
+bpy.data.objects.remove(reference_glove, do_unlink=True)
+bpy.data.meshes.remove(reference_data)
 # Match the abducted thumb rest mesh in Blender. Runtime inverses use the same
 # rest transform, leaving the saddle free to oppose the fingers in every pose.
 active(rig)
@@ -271,7 +292,6 @@ bpy.ops.object.mode_set(mode='OBJECT')
 
 # Sewn polygonal panels, flex channels and real lockstitch silhouettes.
 meshes = [glove]
-from mathutils.bvhtree import BVHTree
 glove_surface = BVHTree.FromObject(glove, bpy.context.evaluated_depsgraph_get())
 def conform(obj, y, offset):
     for v in obj.data.vertices:
@@ -290,12 +310,14 @@ def panel(name, outline, y, mat, thickness=.0012, stitch=False):
     active(obj)
     bevel = obj.modifiers.new('Soft sewn edge', 'BEVEL')
     bevel.width = .0007
-    bevel.segments = 3
+    bevel.segments = 2
     bpy.ops.object.modifier_apply(modifier=bevel.name)
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.mesh.quads_convert_to_tris(quad_method='BEAUTY', ngon_method='BEAUTY')
-    bpy.ops.mesh.subdivide(number_cuts=2)
+    # One conforming subdivision retains panel flex; the old two-cut grid
+    # mostly tessellated sub-mm bevels rather than finger/contact silhouettes.
+    bpy.ops.mesh.subdivide(number_cuts=1)
     bpy.ops.object.mode_set(mode='OBJECT')
     conform(obj, y, .0004)
     meshes.append(obj)
@@ -566,6 +588,8 @@ scene.frame_end=52
 bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'player-arms.blend'))
 manifest = {'generator':'tools/blender/player_arms.py', 'runtime':'public/models/player/arms.glb',
     'vertices':sum(len(o.data.vertices) for o in meshes), 'bones':list(bones), 'poses':list(poses),
+    'gloveMaxDeviationMetres':glove_deviation,
+    'triangles':sum(len(p.vertices)-2 for o in meshes for p in o.data.polygons),
     'thumbRestY':thumb_angle, 'units':'metres', 'scope':'deformation meshes and finger-pose actions; game-owned weapon trajectories',
     'sha256': {str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in [Path(__file__), OUT/'pose-reference.json', PUBLIC/'arms.glb', ROOT/'src/weapons/hand-poses.ts']}}
 (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
