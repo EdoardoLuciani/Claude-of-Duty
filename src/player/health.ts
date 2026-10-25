@@ -33,7 +33,6 @@ interface HealthStatePayload {
   dead: boolean;
   effect: number;
   changedLowState?: boolean;
-  forced?: boolean;
 }
 
 interface HealthContext {
@@ -307,7 +306,6 @@ export class Health {
     s.suppression = this.suppression;
     s.dead = this.dead;
     s.changedLowState = wasLow !== s.low;
-    s.forced = true;
     this.ctx.events.emit('player:health', s);
   }
 }

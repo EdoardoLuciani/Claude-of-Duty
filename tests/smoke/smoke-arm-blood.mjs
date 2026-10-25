@@ -6,8 +6,8 @@ import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 
 import { Health } from '../../src/player/health.ts';
-import { createArmMaterial } from '../../src/weapons/arm-asset.ts';
 import { createArmBlood, addArmBloodCoordinates } from '../../src/weapons/arm-blood.ts';
+import { createArmReferenceMaterial } from '../../tools/lib/arm-material-reference.js';
 
 const blood = createArmBlood();
 const again = createArmBlood();
@@ -92,13 +92,14 @@ assert.equal(blood.amount.value, 0);
 blood.setHealthFraction(NaN);
 assert.equal(blood.amount.value, 0, 'invalid snapshots do not poison the uniform');
 
-// Exercise blood on the exported sleeve's specular contract, not a guessed factor.
+// The unmerged reference isolates blood decoration on the exported specular
+// contract; smoke-arm-asset covers the consolidated gameplay material.
 const glb = readFileSync(new URL('../../public/models/player/arms.glb', import.meta.url));
 const json = JSON.parse(glb.subarray(20, 20 + glb.readUInt32LE(12)).toString());
 const specular = json.materials.find((m) => m.name === 'Olive_ripstop').extensions
   .KHR_materials_specular.specularFactor;
 const sleeve = new THREE.MeshPhysicalMaterial({ specularIntensity: specular });
-const authored = createArmMaterial(sleeve);
+const authored = createArmReferenceMaterial(sleeve);
 blood.decorate(authored);
 blood.setHealthFraction(0.2);
 assert.equal(authored.specularIntensity, specular, 'blood preserves exported specular');

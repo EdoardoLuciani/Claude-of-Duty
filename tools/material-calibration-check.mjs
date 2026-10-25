@@ -132,7 +132,7 @@ try {
       const { createSoldierNodeMaterial, SoldierMaterialsNode } =
         await import('/src/ai/textures-tsl.ts');
       const { createWeaponMaterial } = await import('/src/weapons/asset-material.ts');
-      const { createArmMaterial } = await import('/src/weapons/arm-asset.ts');
+      const { createArmReferenceMaterial } = await import('/tools/lib/arm-material-reference.js');
       const { IndirectFill } = await import('/src/render/indirect-webgpu.ts');
       const { trackNodeBuilders } = await import('/src/dev/native-builds.ts');
       const renderer = await createWebGpuRenderer(document.querySelector('#game'));
@@ -435,7 +435,8 @@ try {
           resources.push(source);
           for (const [name, make] of [
             ['weapon', createWeaponMaterial],
-            ['arm', createArmMaterial],
+            // Keep the unmerged arm reference as a native-copy calibration control.
+            ['arm-reference', createArmReferenceMaterial],
           ]) {
             const m = make(source),
               ref = legacyCopy(source, name === 'weapon');

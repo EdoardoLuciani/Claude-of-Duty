@@ -37,6 +37,12 @@ assert.equal(snapshots.length, 4, 'there is no deferred dirty-value polling path
 health.setDebugValue(10000);
 assert.equal(snapshots.at(-1).health, 10000, 'diagnostic invulnerability retains uncapped health');
 assert.equal(snapshots.at(-1).fraction, 1);
+for (const snapshot of snapshots)
+  assert.deepEqual(
+    Object.keys(snapshot).sort(),
+    ['changedLowState', 'dead', 'effect', 'fraction', 'health', 'low', 'suppression'],
+    'health notifications retain their state data without redundant forced metadata'
+  );
 console.log(
   'health events: damage/heal/reset/debug notifications are synchronous, with no change polling'
 );

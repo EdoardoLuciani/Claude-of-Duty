@@ -1,5 +1,6 @@
 /** Independent arm material checks: glTF contract, linear color, neutral BRDF.
- * Standalone fixtures, not a second gameplay backend or a legacy-look target.
+ * The unmerged reference isolates native material copy/BRDF behavior; gameplay
+ * uses consolidated arm surfaces. This is not a second gameplay backend.
  */
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -122,7 +123,7 @@ try {
       T.MeshPhysicalMaterial.prototype.copy.call(m, source);
       return m;
     };
-    const current = native ? fixture.createArmMaterial(source) : source.clone();
+    const current = native ? fixture.createArmReferenceMaterial(source) : source.clone();
     // Current gameplay preserves authored base color. Keep the old .30 only
     // as the explicitly named unlit calibration control below.
     const preserved = physical();
@@ -300,7 +301,7 @@ try {
   assert.deepEqual(
     report.currentTextured,
     report.preservedTextured,
-    'application adapter preserves the physical material response'
+    'unmerged reference preserves the physical material response'
   );
   for (const row of report.matrix) assert(row.rgb.every(Number.isFinite), 'finite BRDF samples');
   if (args.strict === '1')
