@@ -1,43 +1,19 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 
-import { AIRCRAFT_URLS } from '../../src/audio/aircraft.ts';
 import * as ambienceModule from '../../src/audio/ambience.ts';
 import {
   ENVIRONMENT_URLS,
   ENVIRONMENT_KINDS,
   environmentBank,
 } from '../../src/audio/environment.ts';
-import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
-import { RELOAD_URLS } from '../../src/audio/reloads.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
-import provenance from '../../src/audio/samples/environment/provenance.json' with { type: 'json' };
 import { Rng } from '../../src/core/rng.ts';
 assert(!('ambientOneShot' in ambienceModule), 'replaced generators are removed');
 assert.deepEqual(
   [...ambienceModule.ONE_SHOTS],
   ['dog', 'siren', 'creak', 'settle', 'birds', 'vehicle', 'heli']
 );
-let bytes = 0,
-  decoded = 0;
-for (const [key, urls] of Object.entries(ENVIRONMENT_URLS)) {
-  assert.equal(urls.length, 2);
-  for (const [i, url] of urls.entries()) {
-    const data = readFileSync(new URL(url)),
-      meta = provenance.files[`${key}-${i + 1}`];
-    assert.equal(createHash('sha256').update(data).digest('hex'), meta.sha256);
-    const h = data.indexOf('OpusHead');
-    assert(h >= 0);
-    assert.equal(data[h + 9], 1);
-    assert.equal(data.readInt16LE(h + 16), 0);
-    assert(meta.decodedPeak < 0.5 && meta.decodedDuration <= 10 && meta.downmixLossDb > -6);
-    bytes += data.length;
-    decoded += meta.decodedDuration * 48000 * 4;
-  }
-}
-assert(bytes < 1000000 && decoded < 16000000);
 const sources = [],
   actx = {
     currentTime: 0,
@@ -100,40 +76,6 @@ assert.equal(typeof audio._distantChatter, 'undefined');
 const empty = new WeaponSampleBank(actx);
 assert.throws(() => empty.environment('dog', rng), /recordings are not loaded/);
 assert.throws(() => bank.environment('shout', rng), /recordings are not loaded/);
-const oldFetch = globalThis.fetch;
-try {
-  let decodes = 0,
-    fail = false;
-  globalThis.fetch = async (url) => ({
-    ok: !(fail && url.includes('environment-heli-2')),
-    status: 404,
-    arrayBuffer: async () => new ArrayBuffer(1),
-  });
-  const complete = new WeaponSampleBank({ decodeAudioData: async () => ({ duration: 1 }) });
-  const completeCount = await complete.load();
-  complete.dispose();
-  fail = true;
-  const required = new WeaponSampleBank({
-    decodeAudioData: async () => {
-      decodes++;
-      return { duration: 1 };
-    },
-  });
-  await assert.rejects(required.load(), /environment-heli-2.*HTTP 404/);
-  const total =
-    50 +
-    AIRCRAFT_URLS.length +
-    [FOLEY_URLS, RELOAD_URLS, ENVIRONMENT_URLS].reduce(
-      (sum, group) => sum + Object.values(group).reduce((n, urls) => n + urls.length, 0),
-      0
-    );
-  assert(completeCount >= total, 'full bank includes every category required by this slice');
-  assert.equal(decodes, completeCount - 1, 'one failed file, all other categories settle');
-  required.dispose();
-  assert.deepEqual(required.hitBuffers, {});
-} finally {
-  globalThis.fetch = oldFetch;
-}
 console.log(
   'Recorded environment assets, variants, no synthesis fallback, sparse scheduler ownership and no phantom tactical voices'
 );

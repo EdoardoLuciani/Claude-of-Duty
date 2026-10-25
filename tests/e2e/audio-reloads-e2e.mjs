@@ -1,33 +1,11 @@
 #!/usr/bin/env node
 /** Real weapon clips and live game audio: routing, timing, interruption and casings. */
 import assert from 'node:assert/strict';
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-import {
-  ensureViteServer,
-  launchChromium,
-  parseArgs,
-  stopViteServer,
-} from '../../tools/lib/browser-harness.mjs';
-import { waitForGame } from '../../tools/lib/native-render.mjs';
+import { openAudioGame } from '../lib/audio-game.mjs';
 
-const args = parseArgs();
-const root = resolve(args.root ?? fileURLToPath(new URL('../../', import.meta.url)));
-const port = Number(args.port ?? 5537);
-const server = await ensureViteServer({ root, port });
-assert(server, 'Refusing an occupied server port');
-const errors = [];
-let browser;
+const { page, errors, close } = await openAudioGame(5537, 'weapon');
 try {
-  browser = await launchChromium({
-    headless: true,
-    args: ['--mute-audio', '--autoplay-policy=no-user-gesture-required'],
-  });
-  const page = await browser.newPage({ viewport: { width: 960, height: 640 } });
-  page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1&shot=weapon`);
-  await waitForGame(page, { timeout: 180000 });
   await page.evaluate(async () => {
     window.__APPLY_SHOT__('weapon');
     const engine = window.__ENGINE__,
@@ -94,7 +72,7 @@ try {
     ['sniper', 'fire'],
     ['rifle', 'cancel'],
     ['rifle', 'combat'],
-  ].filter(([id]) => !args.weapon || args.weapon === id);
+  ];
   for (const [id, mode] of cases) {
     const row = await page.evaluate(
       async ({ id, mode }) => {
@@ -232,6 +210,5 @@ try {
   }
   assert.deepEqual(errors, []);
 } finally {
-  await browser?.close();
-  stopViteServer(server);
+  await close();
 }

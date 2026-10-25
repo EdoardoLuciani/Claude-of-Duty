@@ -1,31 +1,11 @@
 #!/usr/bin/env node
 /** Actual game/master graph: real bullet-caused hurt/death and actor identity. */
 import assert from 'node:assert/strict';
-import { resolve } from 'node:path';
 
-import {
-  ensureViteServer,
-  launchChromium,
-  parseArgs,
-  REPO_ROOT,
-  stopViteServer,
-} from '../../tools/lib/browser-harness.mjs';
-import { waitForGame } from '../../tools/lib/native-render.mjs';
-const args = parseArgs(),
-  root = resolve(args.root ?? REPO_ROOT);
-const server = await ensureViteServer({ root, port: Number(args.port ?? 5545) });
-assert(server);
-let browser;
-const errors = [];
+import { openAudioGame } from '../lib/audio-game.mjs';
+
+const { page, errors, close } = await openAudioGame(5545, 'hero');
 try {
-  browser = await launchChromium({
-    headless: true,
-    args: ['--mute-audio', '--autoplay-policy=no-user-gesture-required'],
-  });
-  const page = await browser.newPage({ viewport: { width: 960, height: 640 } });
-  page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto(`http://127.0.0.1:${Number(args.port ?? 5545)}/?capture=1&lockstep=1&shot=hero`);
-  await waitForGame(page, { timeout: 180000 });
   const report = await page.evaluate(async () => {
     const engine = window.__ENGINE__,
       ctx = engine.ctx,
@@ -125,6 +105,5 @@ try {
     JSON.stringify({ actual: report.actual, actor: report.actor, active: report.active })
   );
 } finally {
-  await browser?.close();
-  stopViteServer(server);
+  await close();
 }

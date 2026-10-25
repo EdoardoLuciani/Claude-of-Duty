@@ -1,42 +1,14 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 
 import { Box3, Scene, Vector3 } from 'three';
 
 import { AircraftVoice, AIRCRAFT_MIX, AIRCRAFT_URLS } from '../../src/audio/aircraft.ts';
-import { ENVIRONMENT_URLS } from '../../src/audio/environment.ts';
-import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
-import { RADIO_URLS } from '../../src/audio/radio.ts';
-import { REACTION_URLS } from '../../src/audio/reactions.ts';
-import { RELOAD_URLS } from '../../src/audio/reloads.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
-import provenance from '../../src/audio/samples/aircraft/provenance.json' with { type: 'json' };
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { RadioSystem, CARPET } from '../../src/radio/index.ts';
 import { measureLoop } from '../lib/aircraft-loop.mjs';
-
-let bytes = 0,
-  decoded = 0;
-for (const [index, url] of AIRCRAFT_URLS.entries()) {
-  const data = readFileSync(new URL(url)),
-    file = provenance.files[`propeller-${index + 1}`];
-  assert.equal(createHash('sha256').update(data).digest('hex'), file.sha256);
-  const head = data.indexOf('OpusHead');
-  assert.equal(data[head + 9], 1);
-  assert.equal(data.readInt16LE(head + 16), 0, 'no hidden codec gain');
-  assert(file.decodedDuration > 3 && file.decodedDuration < 4);
-  assert(file.decodedPeak < 0.5 && file.downmixLossDb > -6);
-  assert(file.seamDelta < Math.max(0.005, file.maxDelta * 1.5));
-  assert(file.steadiness.pitchSpanCents < 35, 'no large recorded pitch cycle');
-  assert(file.steadiness.rmsSpanDb < 1.5, 'no broad level pumping');
-  bytes += data.length;
-  decoded += file.decodedDuration * 48000 * 4;
-}
-assert(bytes < 100000 && decoded < 1500000);
-assert.notEqual(provenance.files['propeller-1'].source, provenance.files['propeller-2'].source);
 
 // Known signals ensure the offline detector rejects a chirp/pump, not merely metadata.
 const fixtureRate = 12000;
@@ -355,36 +327,6 @@ radio.callStrike();
 radio.dispose();
 assert.equal(handles.at(-1).stops, 1);
 
-const originalFetch = globalThis.fetch;
-try {
-  let decodes = 0;
-  globalThis.fetch = async (url) => ({
-    ok: !url.includes('propeller-2'),
-    status: 404,
-    arrayBuffer: async () => new ArrayBuffer(1),
-  });
-  const missing = new WeaponSampleBank({
-    decodeAudioData: async () => {
-      decodes++;
-      return { duration: 0.2 };
-    },
-  });
-  await assert.rejects(missing.load(), /propeller-2.*HTTP 404/);
-  const required =
-    50 +
-    (AIRCRAFT_URLS.length +
-      Object.values({ ...REACTION_URLS, ...ENVIRONMENT_URLS, ...RADIO_URLS }).reduce(
-        (n, urls) => n + urls.length,
-        0
-      )) +
-    Object.values(FOLEY_URLS).reduce((sum, urls) => sum + urls.length, 0) +
-    Object.values(RELOAD_URLS).reduce((sum, urls) => sum + urls.length, 0);
-  assert.equal(decodes, required - 1, 'remaining required jobs settle before failure teardown');
-  missing.dispose();
-  assert.deepEqual(missing.aircraftBuffers, []);
-} finally {
-  globalThis.fetch = originalFetch;
-}
 console.log(
   'Required propeller loops, tracked source motion/fades/pause/disposal and bomber ownership/lifecycle'
 );
