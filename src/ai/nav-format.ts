@@ -53,8 +53,8 @@ export interface NavMetadata {
   profile?: typeof NAV_PROFILE;
   config?: typeof NAV_CONFIG;
   bounds: { min: number[]; max: number[] };
-  sourceHash?: string;
-  collisionAsset?: string;
+  sourceHash?: string | undefined;
+  collisionAsset?: string | undefined;
   ladderMotorVersion?: number;
   ladders?: readonly LadderDescriptor[];
 }

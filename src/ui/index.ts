@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import { bindingLabel } from '../core/bindings.ts';
-import type { EngineContext, EngineSystems } from '../core/context.ts';
+import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName } from '../core/events.ts';
 import type { WeaponMode } from '../weapons/defs.ts';
 import { AmmoPanel } from './ammo.ts';
@@ -123,13 +123,18 @@ interface BlipInput {
   heading?: number;
   fade?: number;
 }
+interface CompassMarker {
+  bearing: number;
+  label: string;
+  color: string | undefined;
+}
 interface HudObjective {
   position: THREE.Vector3;
   label: string;
   name?: string;
   color?: string;
   _mm?: { x: number; z: number; label: string };
-  _cmp?: { bearing: number; label: string; color?: string };
+  _cmp?: CompassMarker;
 }
 interface MinimapFrame {
   x: number;
@@ -145,8 +150,8 @@ interface MinimapFrame {
 type UiContext = EngineContext;
 
 export class UiSystem {
-  static id = 'ui';
-  static deps = ['render', 'game', 'market'];
+  static readonly id = 'ui';
+  static readonly deps: SystemId[] = ['render', 'game', 'market'];
   ctx!: UiContext;
   rng!: import('../core/rng.ts').Rng;
   root!: HTMLElement;
@@ -189,7 +194,7 @@ export class UiSystem {
   _pos!: THREE.Vector3;
   _tmp!: THREE.Vector3;
   _objectives!: HudObjective[];
-  _compassObjs!: { bearing: number; label: string; color?: string }[];
+  _compassObjs!: CompassMarker[];
   _blips!: Blip[];
   _blipCount!: number;
   _blipView!: Blip[];
@@ -892,9 +897,7 @@ export class UiSystem {
     this._blipCount = n;
   }
 
-  _buildCompassObjectives(
-    pos: THREE.Vector3
-  ): { bearing: number; label: string; color?: string }[] {
+  _buildCompassObjectives(pos: THREE.Vector3): CompassMarker[] {
     const out = this._compassObjs;
     out.length = 0;
     for (const o of this._objectives) {

@@ -619,7 +619,7 @@ export interface CharacterBuild {
   vertices: number;
   triangles: number;
   parts: {
-    name?: string;
+    name?: string | undefined;
     material: string;
     start: number | undefined;
     count: number | undefined;

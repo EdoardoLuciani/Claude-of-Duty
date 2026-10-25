@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import type { EngineContext, EngineSystems } from '../core/context.ts';
+import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 import { hasOwn } from '../core/guards.ts';
 import type { WorldManifest } from '../core/model-metadata.ts';
 import type { Rng } from '../core/rng.ts';
@@ -8,6 +8,8 @@ import { parseSurfaceName } from '../physics/surfaces.ts';
 import { tickStreetlightOutage } from './lighting.ts';
 import { PALETTE } from './palette.ts';
 import { WorldQueries } from './queries.ts';
+
+type WorldMaterial = ReturnType<EngineSystems['materials']['get']>;
 
 type WorldMesh = THREE.Mesh & {
   isInstancedMesh?: boolean;
@@ -56,7 +58,7 @@ export class WorldSystem {
   declare rng: Rng;
   declare materials: EngineSystems['materials'];
   declare renderSystem: EngineSystems['render'] | null;
-  declare _mats: Map<keyof typeof PALETTE, THREE.Material>;
+  declare _mats: Map<keyof typeof PALETTE, WorldMaterial>;
   declare meshes: WorldMesh[] | null;
   declare collisionMeshes: WorldMesh[] | null;
   declare lodGroups: WorldMesh[] | null;
@@ -78,13 +80,13 @@ export class WorldSystem {
   declare _offRestart: (() => void) | null;
   declare bulbs: THREE.PointLight[] | null;
   declare lamps: THREE.PointLight[] | null;
-  declare lampLens: (THREE.Material & { emissiveIntensity: number }) | null;
+  declare lampLens: WorldMaterial | null;
   declare _lampMix: number;
   declare _lampPower: number;
   declare _sky: EngineSystems['sky'] | null;
 
-  static id = 'world';
-  static deps = ['materials', 'physics', 'models'];
+  static readonly id = 'world';
+  static readonly deps: SystemId[] = ['materials', 'physics', 'models'];
 
   async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
@@ -200,7 +202,7 @@ export class WorldSystem {
     );
   }
 
-  _material(key: keyof typeof PALETTE): THREE.Material {
+  _material(key: keyof typeof PALETTE): WorldMaterial {
     let material = this._mats.get(key);
     if (!material) {
       const def = PALETTE[key];
@@ -235,10 +237,7 @@ export class WorldSystem {
       add(light, { range: entry.range, priority: entry.priority });
       (interior ? this.bulbs : this.lamps).push(light);
     }
-    const lens = this._material('lamp_lens');
-    if (!('emissiveIntensity' in lens) || typeof lens.emissiveIntensity !== 'number')
-      throw new Error('[world] lamp lens requires emissive intensity');
-    this.lampLens = Object.assign(lens, { emissiveIntensity: lens.emissiveIntensity });
+    this.lampLens = this._material('lamp_lens');
     this._lampMix = -1;
     this._lampPower = -1;
     // Keep these same PointLight instances visible on WebGPU. TSL hashes light

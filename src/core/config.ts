@@ -8,6 +8,8 @@
  * resolution; `renderScale` is the remaining resolution lever.
  */
 
+import { applyDefinedPatch } from './patch.ts';
+
 export const PHYSICS_HZ = 120;
 export const FIXED_DT = 1 / PHYSICS_HZ;
 /** Never simulate more than this many physics steps in one frame (spiral-of-death guard). */
@@ -110,5 +112,8 @@ export interface RuntimeConfig extends Omit<typeof DEFAULTS, 'quality'> {
 
 export function createConfig(overrides: Partial<Omit<RuntimeConfig, 'q'>> = {}): RuntimeConfig {
   const quality = overrides.quality ?? DEFAULTS.quality;
-  return { ...DEFAULTS, ...overrides, quality, q: { ...QUALITY_PRESETS[quality] } };
+  const config: Omit<RuntimeConfig, 'q'> = { ...DEFAULTS, quality };
+  applyDefinedPatch(config, overrides);
+  // q is derived, never caller-owned (including untyped debug callers).
+  return { ...config, q: { ...QUALITY_PRESETS[quality] } };
 }

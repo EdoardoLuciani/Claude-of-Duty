@@ -85,6 +85,8 @@ export class Rng {
     return r * Math.cos(th);
   }
 
+  pick<T>(arr: readonly [T, ...T[]]): T;
+  pick<T>(arr: readonly T[]): T | undefined;
   pick<T>(arr: readonly T[]): T | undefined {
     return arr[this.u32() % arr.length];
   }

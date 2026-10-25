@@ -24,9 +24,9 @@ export interface WeaponProfile {
 }
 
 export interface SampleOptions {
-  when?: number;
-  distance?: number;
-  firstPerson?: boolean;
+  when?: number | undefined;
+  distance?: number | undefined;
+  firstPerson?: boolean | undefined;
 }
 
 export interface AudioVoice {
