@@ -343,6 +343,7 @@ export class RadioSystem {
   _detonate(bomb: Bomb, groundY: number): void {
     bomb.mesh.position.y = groundY + CARPET.blastHeight;
     this.ctx.events.emit('explosion', {
+      kind: 'bomb',
       position: bomb.mesh.position,
       radius: CARPET.radius,
       damage: CARPET.damage,

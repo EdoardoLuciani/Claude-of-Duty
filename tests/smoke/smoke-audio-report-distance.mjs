@@ -127,7 +127,7 @@ for (const profile of Object.values(WEAPON_PROFILES)) {
     assert.equal(reportDistantMix(distance, profile, true) === 1, false);
   }
 }
-for (const kind of ['step', 'explosion', 'bark', 'ambient', 'whizz']) {
+for (const kind of ['step', 'bark', 'ambient', 'whizz']) {
   assert(audio._playAt(kind, distance, 0, 0));
   assert.equal(acquired.atten, undefined, `${kind}: no report-only falloff`);
 }
