@@ -87,6 +87,51 @@ assert.throws(() => new Collider({ surface: 'metla' }), /invalid surface/);
 assert.throws(() => new Collider({ ballisticSurface: 'metla' }), /invalid surface/);
 assert.equal(new Collider({ surface: 'wood' }).ballisticSurfaceIndex, SURFACE.wood);
 assert.equal(new Collider({}).surfaceIndex, SURFACE.flesh, 'omission keeps the actor default');
+for (const metadata of [undefined, 'metal']) {
+  if (metadata === undefined) delete mesh.userData.ballisticSurface;
+  else mesh.userData.ballisticSurface = metadata;
+  assert.throws(
+    () => physics.addStatic(mesh, 'wood', { ballisticSurface: null }),
+    /invalid surface/,
+    'explicit null must not select metadata or an omitted-surface default'
+  );
+}
+delete mesh.userData.ballisticSurface;
+assert.throws(() => physics.addStaticGroup(group, null), /invalid surface/);
+assert.throws(() => new Collider({ surface: null }), /invalid surface/);
+assert.throws(() => new Collider({ ballisticSurface: null }), /invalid surface/);
+for (const invalid of [null, '']) {
+  assert.throws(() => physics.addRigidBody({ surfaceType: invalid }), /invalid surface/);
+  assert.throws(
+    () => physics.spawnDebris({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }, { surface: invalid }),
+    /invalid surface/
+  );
+}
+
+// A later invalid child cannot leave the earlier registration alive or alter prior colliders.
+const groupedPhysics = new PhysicsSystem();
+const existing = groupedPhysics.addStatic(mesh, 'concrete');
+const first = new Mesh(geometry, material);
+const second = new Mesh(geometry, material);
+first.userData.surface = 'wood';
+second.userData.surface = 'metla';
+const pair = new Group();
+pair.add(first, second);
+assert.throws(() => groupedPhysics.addStaticGroup(pair), /invalid surface/);
+assert.equal(groupedPhysics.staticWorld.objects.filter((o) => o?.alive).length, 1);
+assert.equal(groupedPhysics.staticWorld.objects[existing].mesh, mesh);
+assert.equal(groupedPhysics._explicitStatics, 1, 'rollback restores registration bookkeeping');
+second.userData.surface = 'metal';
+second.userData.ballisticSurface = 'metla';
+assert.throws(() => groupedPhysics.addStaticGroup(pair), /invalid surface/);
+assert.equal(groupedPhysics.staticWorld.objects.filter((o) => o?.alive).length, 1);
+assert.equal(groupedPhysics._explicitStatics, 1, 'rollback also covers rejection inside addStatic');
+delete second.userData.ballisticSurface;
+const handles = groupedPhysics.addStaticGroup(pair);
+assert.equal(handles.length, 2);
+assert.equal(groupedPhysics.staticWorld.objects.filter((o) => o?.alive).length, 3);
+assert.equal(groupedPhysics._explicitStatics, 3, 'retry registers each group mesh exactly once');
+assert.deepEqual(handles, [1, 2], 'rolled-back handles remain reusable');
 
 const raw = new StaticWorld();
 const triangles = new Float32Array(9);
