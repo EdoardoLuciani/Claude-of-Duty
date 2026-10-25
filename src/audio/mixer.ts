@@ -406,6 +406,37 @@ export class Mixer {
     this._tin = { g, nodes: [o1, o2, o3, lfo, g1, g2, g3, lfoG], until: t + 4 + 7 * level };
   }
 
+  /** New runs must settle hearing even while Start suspends gameplay updates. */
+  resetHearing(): void {
+    this._pendingConcussion = null;
+    this._concussionAttackUntil = 0;
+    this.deafness = 0;
+    const t = this.actx.currentTime;
+    const end = t + HEARING_SETTLE_SECONDS;
+    this._fadeHearing(0, end);
+    holdHearingParam(this.muffleGain.gain, t);
+    this.muffleGain.gain.linearRampToValueAtTime(1, end);
+    holdHearingParam(this.muffleLP.frequency, t);
+    holdHearingParam(this.muffleHS.gain, t);
+    this.muffleLP.frequency.setTargetAtTime(20000, t, 0.25);
+    this.muffleHS.gain.setTargetAtTime(0, t, 0.25);
+    const tin = this._tin;
+    if (!tin) return;
+    this._tin = null;
+    holdHearingParam(tin.g.gain, t);
+    tin.g.gain.linearRampToValueAtTime(0, end);
+    // Native time and source completion, not a future gameplay frame, own cleanup.
+    tin.nodes[0].addEventListener(
+      'ended',
+      () => {
+        for (const node of tin.nodes) node.disconnect();
+        tin.g.disconnect();
+      },
+      { once: true }
+    );
+    for (const node of tin.nodes) node.stop?.(end);
+  }
+
   /** Per-frame housekeeping: duck recovery, deafening recovery, tinnitus teardown. */
   update(dt: number): void {
     const t = this.actx.currentTime;

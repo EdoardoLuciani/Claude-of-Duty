@@ -2,7 +2,6 @@
 // imports creates two TSL stacks and invalidates the material fixture.
 export * as THREE from 'three/webgpu';
 export * as TSL from 'three/tsl';
-export { createArmMaterial } from '../src/weapons/arm-asset.ts';
 import { createWebGpuRenderer } from '../src/render/webgpu-device.ts';
 
 /** Analytic fixtures share device validation, not their independent pixel oracles. */

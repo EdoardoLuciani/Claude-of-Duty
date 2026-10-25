@@ -56,8 +56,7 @@ attributes that let compatible instanced meshes safely share shader builds
 reviewed upstream source remains hash-verified without modification. Commit, version
 and hash guards validate all targets before writing; review them on every upgrade.
 Upstream also owns Fresnel and TRAA cleanup—those local corrections remain removed.
-Preserve the material oracle (`node tools/arm-material-audit.mjs --strict=1`),
-buffer isolation/reuse probe (`node tests/e2e/buffer-names-e2e.mjs`), and native
+Preserve the buffer isolation/reuse probe (`node tests/e2e/buffer-names-e2e.mjs`), and native
 startup/first-use/lifetime/failure checks. Compatible native instancing now shares
 shader-builder state and GPU programs/pipelines, never object buffers. Upstream
 keeps builds that embed object-specific data out of the shared builder cache.

@@ -1,15 +1,9 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { MeshPhysicalNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu';
 
 import { createArmBlood, addArmBloodCoordinates } from './arm-blood.ts';
 import { createArmSurfaceMaterial } from './arm-surfaces.ts';
-
-type SourceArmMaterial = THREE.Material;
-type ArmNodeMaterial = (MeshStandardNodeMaterial | MeshPhysicalNodeMaterial) & {
-  iridescenceThicknessRange?: [number, number];
-};
 
 function isCloseableImage(value: unknown): value is ImageBitmap {
   return (
@@ -40,22 +34,6 @@ export interface ArmRig {
   skeleton: THREE.Skeleton | null;
   skins: THREE.SkinnedMesh[];
   setPose(pose: unknown): void;
-}
-
-/** Preserve glTF physical extensions (notably the authored low specular strength). */
-export function createArmMaterial(source: SourceArmMaterial): ArmNodeMaterial {
-  const physical = source instanceof THREE.MeshPhysicalMaterial;
-  const mat = physical ? new MeshPhysicalNodeMaterial() : new MeshStandardNodeMaterial();
-  mat.copy(source);
-  mat.defines = { ...mat.defines };
-  if (physical) {
-    const physicalMat = mat as ArmNodeMaterial;
-    const sourcePhysical = source as THREE.MeshPhysicalMaterial;
-    if (physicalMat.iridescenceThicknessRange && sourcePhysical.iridescenceThicknessRange) {
-      physicalMat.iridescenceThicknessRange = [...sourcePhysical.iridescenceThicknessRange];
-    }
-  }
-  return mat;
 }
 
 /** Owned by a Viewmodel, never a global cache: disposal/restart stays local. */
