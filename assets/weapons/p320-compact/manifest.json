@@ -118,13 +118,22 @@
     }
   },
   "stats": {
-    "triangles": 50062,
-    "vertices": 77718,
-    "meshes": 7,
-    "primitives": 13,
-    "textureImages": 3
+    "triangles": 18036,
+    "vertices": 39689,
+    "meshes": 1,
+    "primitives": 1,
+    "materials": 1,
+    "textureImages": 4,
+    "joints": 9,
+    "bytes": 9290700
   },
-  "textureResolution": 1024,
+  "textureResolutions": {
+    "base": 2048,
+    "orm": 1024,
+    "normal": 2048,
+    "emission": 1024
+  },
+  "geometry": "One rigidly weighted mechanical skin; lettering/traction baked from retained high source",
   "handAnimation": "Blender wrist and finger controls; shared runtime skins and shoulder IK",
   "source": "tools/blender/p320_compact.py + tools/blender/p320/ + tools/blender/p320_actions.py + tools/p320-hand-reference.mjs",
   "notes": [

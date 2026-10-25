@@ -4,14 +4,31 @@ blender -b assets/weapons/p320-compact/p320-compact.blend --python-exit-code 1 -
 import json
 import math
 import bpy
-from mathutils import Vector
+from mathutils import Matrix, Vector
 s=bpy.context.scene;clips=json.loads(s['clips'])
 assert s.unit_settings.system=='METRIC'
 assert len(clips)==8
-for suffix in ('base','orm','normal'):
+for suffix in ('base','orm','normal','emission'):
     images=[im for im in bpy.data.images if im.name.startswith('P320_'+suffix) or im.name=='p320-'+suffix+'.png']
     assert images and images[0].packed_file, 'packed '+suffix
+    expected=2048 if suffix in ('base','normal') else 1024
+    assert list(images[0].size)==[expected,expected]
+marks=[o for o in s.objects if o.name.startswith('Mark |')]
+assert len(marks)==13
+for mark in marks:
+    assert mark['bake_projected_vertices']==len(mark.data.vertices), mark.name
+    assert all(p.normal.z>0 for p in mark.data.polygons), 'no reversed coincident glyph caps'
 maximum=0
+skin_error=0
+arm=bpy.data.objects['P320_SKIN']
+basis=Matrix.Rotation(math.pi/2,4,'X')
+surface=bpy.data.objects['P320_surface']
+assert len(surface.data.materials)==1
+surface.data.calc_loop_triangles()
+assert len(surface.data.loop_triangles)<30000
+assert len(arm.data.bones)==9
+for vertex in surface.data.vertices:
+    assert len(vertex.groups)==1 and vertex.groups[0].weight==1
 for name,info in clips.items():
     for o in s.objects:
         if not o.animation_data:continue
@@ -19,6 +36,13 @@ for name,info in clips.items():
         for track in o.animation_data.nla_tracks:track.mute=track.name!=name
     for frame in range(0,info['frames'][1]+1,2):
         s.frame_set(frame);bpy.context.view_layer.update()
+        mechanical=bpy.data.objects['P320_SKIN']
+        for bone in mechanical.pose.bones:
+            actual=mechanical.matrix_world@bone.matrix@basis.inverted()
+            expected=bpy.data.objects[bone.name].matrix_world
+            gap=max(abs(actual[r][c]-expected[r][c]) for r in range(4) for c in range(4))
+            skin_error=max(skin_error,gap)
+            assert gap<2e-6, f'{name}/{frame}/{bone.name}: skin/source transform differs by {gap}'
         for side,prefix in [('left','L'),('right','R')]:
             arm=bpy.data.objects['P320_arm_'+side]
             wrist=bpy.data.objects['hand_'+prefix]
@@ -41,4 +65,4 @@ for o in bpy.data.collections['P320 | editable weapon'].objects:
     if o.type!='MESH':continue
     assert len(o.data.polygons)>0,o.name
     assert max((Vector(o.bound_box[6])-Vector(o.bound_box[0])).length,0)>.00001,o.name
-print(f'P320_BLENDER_OK: 8 synchronized actions, native skin wrists agree within {maximum*1000:.4f} mm, packed atlases, finite bone transforms and discrete magazines')
+print(f'P320_BLENDER_OK: 8 synchronized actions, wrists {maximum*1000:.4f} mm, mechanical skin/source matrix error {skin_error:.9f}, packed atlases, rigid weights and discrete magazines')
