@@ -44,7 +44,7 @@ export class MarketInspection {
     this.canvas.tabIndex = 0;
     this.canvas.setAttribute(
       'aria-label',
-      '3D weapon view. Arrow keys rotate, Shift and arrows pan, plus and minus zoom, Home resets.'
+      '3D weapon view. Arrow keys rotate, plus and minus zoom, Home resets.'
     );
     this.status = el(
       'div',
@@ -60,27 +60,15 @@ export class MarketInspection {
       btn.addEventListener('click', action, { signal: this.abort.signal });
       return btn;
     };
-    const rotate = button('ROTATE', () => mode(false));
-    const pan = button('PAN', () => mode(true));
-    const mode = (panning: boolean): void => {
-      this.controls.mouseButtons.LEFT = panning ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE;
-      rotate.setAttribute('aria-pressed', String(!panning));
-      pan.setAttribute('aria-pressed', String(panning));
-    };
     button('ZOOM IN', () => this.zoom(0.8));
     button('ZOOM OUT', () => this.zoom(1.25));
     button('RESET', () => this.reset());
+    el('p', 'ow-market-inspect-help', this.root, 'Drag to rotate · Scroll to zoom');
     el(
       'p',
       'ow-market-inspect-help',
       this.root,
-      'Drag to rotate · Right-drag to pan · Scroll to zoom'
-    );
-    el(
-      'p',
-      'ow-market-inspect-help',
-      this.root,
-      'Keyboard: arrows · Shift + arrows pan · + / − zoom · Home reset'
+      'Keyboard: arrows rotate · + / − zoom · Home reset'
     );
     el(
       'p',
@@ -90,12 +78,12 @@ export class MarketInspection {
     );
 
     this.controls = new OrbitControls(this.camera, this.canvas);
+    this.controls.enablePan = false;
     this.controls.enableDamping = false;
     this.controls.zoomToCursor = false;
     this.controls.addEventListener('change', () => {
       this.dirty = true;
     });
-    mode(false);
     this.canvas.addEventListener('keydown', (event) => this.key(event), {
       signal: this.abort.signal,
     });
@@ -193,7 +181,6 @@ export class MarketInspection {
       const radius = Math.max(bounds.getSize(new THREE.Vector3()).length() / 2, 0.05);
       this.framing.copy(bounds).translate(center.negate());
       this.controls.minDistance = radius * 0.65;
-      this.controls.maxTargetRadius = radius;
       this.camera.near = radius * 0.01;
       this.reset();
       setText(this.status, 'Preview only · current weapon configuration');
@@ -204,7 +191,6 @@ export class MarketInspection {
 
   reset(): void {
     this.controls.target.set(0, 0, 0);
-    this.controls.cursor.set(0, 0, 0);
     // Authored weapons point down -Z; start nearly broadside, slightly above.
     this.camera.position.set(1, 0.3, 0.35).normalize();
     this.camera.lookAt(0, 0, 0);
@@ -245,19 +231,11 @@ export class MarketInspection {
     const y = Number(event.key === 'ArrowUp') - Number(event.key === 'ArrowDown');
     if (x || y) {
       const offset = this.camera.position.clone().sub(this.controls.target);
-      if (event.shiftKey) {
-        const movement = new THREE.Vector3(x, y, 0)
-          .applyQuaternion(this.camera.quaternion)
-          .multiplyScalar(this.distance * 0.04);
-        this.controls.target.add(movement);
-        this.camera.position.add(movement);
-      } else {
-        const spherical = new THREE.Spherical().setFromVector3(offset);
-        spherical.theta += x * 0.12;
-        spherical.phi -= y * 0.12;
-        spherical.makeSafe();
-        this.camera.position.copy(this.controls.target).add(offset.setFromSpherical(spherical));
-      }
+      const spherical = new THREE.Spherical().setFromVector3(offset);
+      spherical.theta += x * 0.12;
+      spherical.phi -= y * 0.12;
+      spherical.makeSafe();
+      this.camera.position.copy(this.controls.target).add(offset.setFromSpherical(spherical));
       this.controls.update();
     } else if (event.key === '+' || event.key === '=') this.zoom(0.8);
     else if (event.key === '-' || event.key === '_') this.zoom(1.25);

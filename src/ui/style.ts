@@ -803,7 +803,6 @@ const CSS = `
 .ow-market-inspect-status { min-height:3.2em; padding-top:calc(var(--u) * 2); }
 .ow-market-inspect-tools { display:flex; flex-wrap:wrap; gap:calc(var(--u) * 1); }
 .ow-market-inspect-tools button { border:1px solid var(--hair-2); padding:calc(var(--u) * 1.5); color:var(--ink); background:rgba(255,255,255,.04); cursor:pointer; font:inherit; font-size:calc(9px * var(--k)); }
-.ow-market-inspect-tools button[aria-pressed=true] { border-color:var(--amber); color:var(--amber); }
 .ow-market-card.inspecting { box-shadow:inset 0 0 0 1px var(--amber); }
 .ow-market-card:focus-visible, .ow-market-inspect-canvas:focus-visible, .ow-market-inspect-tools button:focus-visible { outline:2px solid var(--amber); outline-offset:3px; }
 @media (max-width:700px) {

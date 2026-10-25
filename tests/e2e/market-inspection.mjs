@@ -90,7 +90,7 @@ try {
   await page.keyboard.press('ArrowRight');
   assert.notDeepEqual((await state()).camera, before.camera);
   await page.keyboard.press('Shift+ArrowUp');
-  assert.notDeepEqual((await state()).target, before.target);
+  assert.deepEqual((await state()).target, before.target, 'modified arrows never pan');
   await page.keyboard.press('Home');
   const reset = await state();
   assert.deepEqual(reset.target, [0, 0, 0]);
@@ -105,12 +105,28 @@ try {
   await page.mouse.move(box.x + box.width * 0.7, box.y + box.height * 0.6, { steps: 8 });
   await page.mouse.up();
   assert.notDeepEqual((await state()).camera, reset.camera, 'pointer rotation');
-  await page.getByRole('button', { name: 'PAN', exact: true }).click();
+  assert.equal(await page.getByRole('button', { name: 'PAN', exact: true }).count(), 0);
+  assert.equal(
+    await page.evaluate(() => window.__ENGINE__.ctx.get('ui').shop.inspection.controls.enablePan),
+    false,
+    'native mouse and touch panning disabled'
+  );
+  const rotated = await state();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down();
+  await page.mouse.down({ button: 'right' });
   await page.mouse.move(box.x + box.width * 0.6, box.y + box.height / 2, { steps: 5 });
-  await page.mouse.up();
-  assert.notDeepEqual((await state()).target, [0, 0, 0], 'pointer panning');
+  await page.mouse.up({ button: 'right' });
+  assert.deepEqual((await state()).target, [0, 0, 0], 'right-drag cannot pan');
+  assert.deepEqual((await state()).camera, rotated.camera, 'right-drag leaves the orbit unchanged');
+  for (const modifier of ['Shift', 'Control', 'Meta']) {
+    await page.keyboard.down(modifier);
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.6, box.y + box.height / 2, { steps: 5 });
+    await page.mouse.up();
+    await page.keyboard.up(modifier);
+    assert.deepEqual((await state()).target, [0, 0, 0], modifier + '-drag cannot pan');
+  }
   const preZoom = (await state()).distance;
   await page.mouse.wheel(0, -100);
   assert((await state()).distance < preZoom, 'wheel zoom');

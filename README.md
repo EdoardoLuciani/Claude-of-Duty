@@ -104,9 +104,9 @@ buttons are bound. F7/F8 are telemetry-only.
 
 Survive escalating squads, earn credits and shop between waves. Hover or focus a
 market weapon to preview it; click its card (Enter/Space on the focused card) to
-keep it selected. Drag to rotate, right-drag or choose Pan to pan, and scroll to
-zoom. In the focused 3D view, arrows rotate, Shift+arrows pan, +/- zoom and Home
-resets; toolbar buttons offer the same controls. Inspection never spends credits:
+keep it selected. Drag to orbit around the weapon and scroll to zoom; panning is
+disabled. In the focused 3D view, arrows rotate, +/- zoom and Home resets.
+Toolbar buttons also provide zoom and reset. Inspection never spends credits:
 use the explicit Buy/Swap button to purchase. Resupply cards still buy on click.
 This first customization increment previews the current authored configurations;
 separate attachment purchases and iron-sight-only defaults are not implemented yet.
