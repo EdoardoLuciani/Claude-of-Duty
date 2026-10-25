@@ -114,8 +114,8 @@ function parseManifest(value: unknown): SoldierManifest {
     }
   }
   return {
-    sets: isStringArray(value.sets) ? value.sets : undefined,
-    details: isStringArray(value.details) ? value.details : undefined,
+    ...(isStringArray(value.sets) ? { sets: value.sets } : {}),
+    ...(isStringArray(value.details) ? { details: value.details } : {}),
     camoStats,
   };
 }

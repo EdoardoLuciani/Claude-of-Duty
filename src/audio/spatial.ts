@@ -34,16 +34,16 @@ interface EmitterOptions {
   x: number;
   y: number;
   z: number;
-  when?: number;
-  dist?: number;
-  occlusion?: number;
-  atten?: number;
-  priority?: number;
-  endTime?: number;
-  bus?: BusName;
-  tracked?: boolean;
-  gain?: number;
-  send?: number;
+  when?: number | undefined;
+  dist?: number | undefined;
+  occlusion?: number | undefined;
+  atten?: number | undefined;
+  priority?: number | undefined;
+  endTime?: number | undefined;
+  bus?: BusName | undefined;
+  tracked?: boolean | undefined;
+  gain?: number | undefined;
+  send?: number | undefined;
 }
 
 const MAX_EMITTERS = 40;

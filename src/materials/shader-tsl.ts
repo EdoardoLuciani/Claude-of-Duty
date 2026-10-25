@@ -40,10 +40,21 @@ import {
   vertexColor,
 } from 'three/tsl';
 import { Color, MeshPhysicalNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu';
-import type { Node, Texture } from 'three/webgpu';
+import type { Node, Texture, MeshPhysicalNodeMaterialParameters } from 'three/webgpu';
 import type { ConstNode, JoinNode, NormalMapNode, VarNode, VertexColorNode } from 'three/webgpu';
 
 import { hash11 } from './noise-tsl.ts';
+
+/** Checked at every material-authoring entry point, including physical-only properties. */
+export interface SurfaceMaterialOptions extends MeshPhysicalNodeMaterialParameters {
+  physical?: boolean;
+}
+
+/** Authored values exclude live uniforms installed and owned by MaterialSystem. */
+export type SurfaceAuthoringParams = Omit<
+  SurfaceParams,
+  'tileNode' | 'normalAmpNode' | 'weatherNode' | 'parallaxNode' | 'groundNode' | 'tintNode'
+>;
 
 export interface SurfaceParams {
   uvMode: 'planar' | 'triplanar' | 'mesh';
@@ -221,7 +232,7 @@ export function createSurfaceNodeMaterial(
   set: SurfaceTextureSet,
   p: SurfaceParams,
   shared: SharedSurfaceMaps,
-  threeProps: { physical?: boolean; [key: string]: unknown } = {}
+  threeProps: SurfaceMaterialOptions = {}
 ): MeshStandardNodeMaterial {
   const { physical, ...props } = threeProps;
   const Ctor = physical ? MeshPhysicalNodeMaterial : MeshStandardNodeMaterial;

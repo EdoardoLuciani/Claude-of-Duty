@@ -71,7 +71,7 @@
 import * as THREE from 'three';
 
 import { UNITS } from '../core/config.ts';
-import type { EngineContext } from '../core/context.ts';
+import type { SystemId, EngineContext } from '../core/context.ts';
 import type { BulletSegmentEvent } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
 import { StaticWorld } from './bvh.ts';
@@ -105,31 +105,8 @@ interface Vector3Like {
   y: number;
   z: number;
 }
-export type PhysicsRigidBodyOptions = {
-  shape?: 'box' | 'sphere' | 'capsule';
-  halfExtents?: Vector3Like;
-  radius?: number;
-  halfHeight?: number;
-  mass?: number;
-  restitution?: number;
-  friction?: number;
-  linearDamping?: number;
-  angularDamping?: number;
-  gravityScale?: number;
-  surface?: number;
+export type PhysicsRigidBodyOptions = NonNullable<ConstructorParameters<typeof RigidBody>[0]> & {
   surfaceType?: SurfaceName;
-  mask?: number;
-  layer?: number;
-  ccd?: boolean;
-  lifetime?: number;
-  position?: Vector3Like;
-  quaternion?: THREE.Quaternion;
-  velocity?: Vector3Like;
-  angularVelocity?: Vector3Like;
-  object3D?: THREE.Object3D | null;
-  userData?: unknown;
-  onSleep?: ((body: RigidBody) => void) | null;
-  onImpact?: RigidBody['onImpact'];
 };
 export interface PhysicsHit {
   hit: boolean;
@@ -153,6 +130,11 @@ export interface PhysicsHit {
   triangle: number;
   frontFace: boolean;
 }
+/** Only identity fields participate in excluding a prior ray contact. */
+export type RaycastIgnore = Partial<
+  Pick<PhysicsHit, 'staticObject' | 'solid' | 'collider' | 'body' | 'ragdoll' | 'ragdollBone'>
+>;
+
 interface StaticOptions {
   mask?: number;
   layer?: number;
@@ -414,8 +396,8 @@ export class PhysicsSystem {
   declare stats: PhysicsStats;
   declare _rayCount: number;
 
-  static id = 'physics';
-  static deps = [];
+  static readonly id = 'physics';
+  static readonly deps: SystemId[] = [];
 
   constructor() {
     this.staticWorld = new StaticWorld();
@@ -635,7 +617,7 @@ export class PhysicsSystem {
     mask?: number,
     ignoreOwner?: unknown,
     ignoreActors?: unknown[] | null,
-    ignoreHit?: Partial<PhysicsHit> | null
+    ignoreHit?: RaycastIgnore | null
   ): PhysicsHit;
   raycast(
     ox: number,
@@ -648,7 +630,7 @@ export class PhysicsSystem {
     mask?: number,
     ignoreOwner?: unknown,
     ignoreActors?: unknown[] | null,
-    ignoreHit?: Partial<PhysicsHit> | null
+    ignoreHit?: RaycastIgnore | null
   ): PhysicsHit;
   raycast(
     a: number | Vector3Like,
@@ -657,11 +639,11 @@ export class PhysicsSystem {
     d?: number,
     e?: unknown,
     f?: number | unknown[] | null,
-    g?: number | Partial<PhysicsHit> | null,
+    g?: number | RaycastIgnore | null,
     h?: number,
     ignoreOwner: unknown = null,
     ignoreActors: unknown[] | null = null,
-    ignoreHit: Partial<PhysicsHit> | null = null
+    ignoreHit: RaycastIgnore | null = null
   ): PhysicsHit {
     let ox: number, oy: number, oz: number, dx: number, dy: number, dz: number;
     let maxDist: number, mask: number;
@@ -959,7 +941,7 @@ export class PhysicsSystem {
     out: PhysicsHit,
     ignoreOwner: unknown,
     ignoreActors: unknown[] | null,
-    ignoreHit: Partial<PhysicsHit> | null | undefined
+    ignoreHit: RaycastIgnore | null | undefined
   ): number {
     if ((mask & LAYER.RAGDOLL) === 0) return best;
     for (let r = 0; r < this.ragdolls.length; r++) {
@@ -1499,7 +1481,9 @@ export class PhysicsSystem {
     if (!skeleton?.bones?.length) return null;
     const { spec, boneMap } = specFromSkeleton(skeleton, opts);
     if (!spec.length) return null;
-    const rd = this.createRagdoll({ ...opts, bones: spec, transform: undefined });
+    const { transform, ...options } = opts;
+    void transform;
+    const rd = this.createRagdoll({ ...options, bones: spec });
     rd.adoptSkeleton(
       skeleton,
       boneMap.map((bone): THREE.Bone<THREE.Object3DEventMap> | null => bone ?? null)

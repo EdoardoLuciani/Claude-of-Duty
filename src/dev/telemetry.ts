@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import type { EngineContext, EngineSystems } from '../core/context.ts';
+import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName } from '../core/events.ts';
 import { STANCE } from '../player/tuning.ts';
 import {
@@ -642,8 +642,8 @@ export class TelemetrySystem {
   declare _nextEnemyRaw: number;
   declare _provenanceReady: Promise<void> | null;
 
-  static id = 'telemetry';
-  static deps = ['ui', 'audio'];
+  static readonly id = 'telemetry';
+  static readonly deps: SystemId[] = ['ui', 'audio'];
 
   async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;

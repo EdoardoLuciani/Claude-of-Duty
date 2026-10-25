@@ -18,7 +18,7 @@ import { UniformNode } from 'three/webgpu';
 import type { Renderer, Node } from 'three/webgpu';
 import type { PassNode } from 'three/webgpu';
 
-import type { EngineContext } from '../core/context.ts';
+import type { SystemId, EngineContext } from '../core/context.ts';
 import { isMesh } from '../core/three-guards.ts';
 import { StableCSMShadowNode } from './csm-webgpu.ts';
 import { IndirectFill } from './indirect-webgpu.ts';
@@ -120,8 +120,8 @@ export class RenderSystem {
   declare _warmTask: Promise<{ ms: number; geometries: number; frameUnchanged: boolean }> | null;
   declare _meterTask: Promise<void> | null;
 
-  static id = 'render';
-  static deps = [];
+  static readonly id = 'render';
+  static readonly deps: SystemId[] = [];
 
   async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
@@ -248,7 +248,7 @@ export class RenderSystem {
               camWorld: uniform(this.ctx.camera.matrixWorld),
               camPos: uniform(this.ctx.camera.position),
               frame: this._fogFrame,
-              visibility: this._volumeShadow?.visibility,
+              ...(this._volumeShadow ? { visibility: this._volumeShadow.visibility } : {}),
             })
         : null,
       fogCompute: this.q.volumetrics,

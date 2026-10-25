@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import { bindingLabel } from '../core/bindings.ts';
-import type { EngineContext, EngineSystems } from '../core/context.ts';
+import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName } from '../core/events.ts';
 import type { WeaponMode } from '../weapons/defs.ts';
 import { AmmoPanel } from './ammo.ts';
@@ -145,8 +145,8 @@ interface MinimapFrame {
 type UiContext = EngineContext;
 
 export class UiSystem {
-  static id = 'ui';
-  static deps = ['render', 'game', 'market'];
+  static readonly id = 'ui';
+  static readonly deps: SystemId[] = ['render', 'game', 'market'];
   ctx!: UiContext;
   rng!: import('../core/rng.ts').Rng;
   root!: HTMLElement;
@@ -902,11 +902,12 @@ export class UiSystem {
       const dx = o.position.x - pos.x;
       const dz = o.position.z - pos.z;
       const bearing = (Math.atan2(dx, -dz) * 180) / Math.PI;
-      out.push(o._cmp ?? (o._cmp = { bearing: 0, label: o.label, color: o.color }));
+      out.push(o._cmp ?? (o._cmp = { bearing: 0, label: o.label }));
       const last = out[out.length - 1];
       last.bearing = bearing;
       last.label = o.label;
-      last.color = o.color;
+      if (o.color === undefined) delete last.color;
+      else last.color = o.color;
     }
     return out;
   }

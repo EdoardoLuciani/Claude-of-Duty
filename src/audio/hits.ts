@@ -18,11 +18,11 @@ export const HIT_URLS = {
   ],
 } as const;
 export interface DamageSoundOptions {
-  when?: number;
+  when?: number | undefined;
   amount: number;
   armourAbsorbed: number;
   plateBreak: boolean;
-  level?: number;
+  level?: number | undefined;
 }
 
 // Incoming contacts are subjective, headlocked feedback on the existing UI bus.

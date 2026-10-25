@@ -1158,10 +1158,7 @@ export function specFromSkeleton(
     if (len < 1e-4) continue;
     const si = spec.length;
     specIndexOfBone.set(bone, si);
-    const parentSpec =
-      isBone(bone.parent) && specIndexOfBone.has(bone.parent)
-        ? specIndexOfBone.get(bone.parent)
-        : -1;
+    const parentSpec = isBone(bone.parent) ? (specIndexOfBone.get(bone.parent) ?? -1) : -1;
     spec.push({
       name: bone.name || `bone${i}`,
       head: [v.x, v.y, v.z] as const,

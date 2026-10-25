@@ -260,7 +260,7 @@ export class ProjectileSim {
             damage: p.damage,
             penetration: p.penetration,
             dropoff: p.dropoff,
-            mask: p.mask,
+            mask: p.mask ?? phys.MASK.BULLET,
             shooter: p.shooter,
             weapon: p.weapon,
             shot: p.shot,

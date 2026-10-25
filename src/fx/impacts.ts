@@ -30,6 +30,9 @@ import {
  * actually throws: chips at 4-10 m/s, sparks at 6-16 m/s, aerosols under 3 m/s.
  */
 
+import type { EngineSystems } from '../core/context.ts';
+import type { FxDecalOptions } from './index.ts';
+
 interface Vec3Like {
   x: number;
   y: number;
@@ -45,16 +48,8 @@ interface ImpactFx {
   pScale: number;
   emitAdd(spawn: object): void;
   emitLit(spawn: object): void;
-  physics?: {
-    MASK?: { WORLD?: number };
-    raycast(
-      origin: Vec3Like,
-      direction: Vec3Like,
-      distance: number,
-      mask: number
-    ): { hit: boolean; distance: number; point: Vec3Like; normal: Vec3Like } | null;
-  };
-  addDecal(point: Vec3Like, normal: Vec3Like, options: Record<string, unknown>): void;
+  physics?: Pick<EngineSystems['physics'], 'MASK' | 'raycast'> | undefined;
+  addDecal(point: Vec3Like, normal: Vec3Like, options: FxDecalOptions): void;
   haze(...args: number[]): void;
   sunWorld(): Vec3Like;
   bloodSpatterBehind(point: Vec3Like, incident: Vec3Like): void;

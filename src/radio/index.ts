@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 
-import type { EngineContext, EngineSystems } from '../core/context.ts';
+import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 
 /**
  * RADIO — carpet-bomb strike: bomber, falling bombs, blast chain.
@@ -154,8 +154,8 @@ interface Strike {
 type RadioContext = Pick<EngineContext, 'scene' | 'get' | 'peek' | 'events'>;
 
 export class RadioSystem {
-  static id = 'radio';
-  static deps = ['world'];
+  static readonly id = 'radio';
+  static readonly deps: SystemId[] = ['world'];
   ctx!: RadioContext;
   _world!: EngineSystems['world'];
   _physics!: EngineSystems['physics'] | null;

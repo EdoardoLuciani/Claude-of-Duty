@@ -45,7 +45,7 @@
 
 import * as THREE from 'three';
 
-import type { EngineContext, EngineSystems } from '../core/context.ts';
+import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
 import type { SoldierRecord } from '../core/model-metadata.ts';
 import type { Rng } from '../core/rng.ts';
@@ -225,8 +225,8 @@ export class AiSystem {
   declare _stagedAgents: AiActor[];
   declare _phys: PhysicsSystem | null;
 
-  static id = 'ai';
-  static deps = ['physics', 'world', 'models'];
+  static readonly id = 'ai';
+  static readonly deps: SystemId[] = ['physics', 'world', 'models'];
 
   async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;

@@ -3,7 +3,7 @@ import type { WorldManifest, WorldLadder } from '../core/model-metadata.ts';
 
 type BuildingFootprint = NonNullable<WorldManifest['buildings']>[number]['spec'];
 type WorldQueryMetadata = Pick<WorldManifest, 'query' | 'volumes'> & {
-  buildings?: readonly (BuildingFootprint | { spec: BuildingFootprint })[];
+  buildings?: readonly (BuildingFootprint | { spec: BuildingFootprint })[] | undefined;
 };
 type ClimbLadder = WorldLadder & { nx: number; nz: number };
 
@@ -28,19 +28,8 @@ export class WorldQueries {
   declare ladders: WorldLadder[];
 
   constructor(meta: WorldQueryMetadata) {
-    this.buildings = (meta.buildings ?? []).map(
-      (
-        building
-      ): {
-        x: number;
-        z: number;
-        w: number;
-        d: number;
-        enterable?: boolean;
-        collapse?: boolean;
-        ruin?: boolean;
-        setback?: { from?: number };
-      } => ('spec' in building ? building.spec : building)
+    this.buildings = (meta.buildings ?? []).map((building): BuildingFootprint =>
+      'spec' in building ? building.spec : building
     );
     const street = meta.query?.street;
     if (!street) throw new Error('[world] manifest is missing query.street metadata');

@@ -38,6 +38,11 @@ Teardown is reverse-order and failure-isolated.
 `canvas`, `config`, `events`, `input`, `time`, `rng`, `get/peek/has(id)`.
 `src/core/context.ts` owns the provider-keyed `EngineContext`; subsystem types
 come from their implementations, not independently handwritten consumer APIs.
+`Engine.add()` checks a constructor's literal static ID against that provider map.
+Direct registration is `registry.add(id, instance)`; the engine's registry checks
+the same ID/instance relationship. A standalone `Registry` promises only lifecycle
+hooks unless given an explicit provider map. Registration also invalidates ordering
+and hook caches.
 `src/core/bindings.ts` owns static physical defaults, action IDs, binding labels and
 action-backed contextual control reference. Input snapshots actions; gameplay
 consumers own state machines. UI adapts this metadata into the existing pause
@@ -54,7 +59,12 @@ state; dispose owned resources, not borrowed textures/geometry.
 
 Use `ctx.events`; [src/core/events.ts](src/core/events.ts) owns event names and
 typed plain-object payloads. Add/change the type and its producers/consumers
-together. Architectural semantics not captured by those types:
+together. Weapon identities use `WeaponId | 'ai_rifle'`; compact weapon descriptors
+require an ID. Free-form external names belong at the input/audio adapter boundary,
+not on gameplay events. Actor handles may remain opaque where only identity matters.
+Event names and payloads stay correlated even when dispatching unions (pass a
+correlated tuple rather than an independent union key and payload).
+Architectural semantics not captured by those types:
 
 - `bullet:segment` is reached free flight, clipped to collisions/range, excluding
   material interiors. Audio/suppression/tracers consume it rather than rebuilding
@@ -359,6 +369,18 @@ that build unused contexts or repeat it in a world hook.
 
 Diagnostic counter/readback contracts live in `src/dev/render-info.ts`; they do not
 change warmup staging or renderer-info reset scheduling.
+
+## Type contracts
+
+Optional override/patch fields mean omission, not an explicit `undefined` write
+(`exactOptionalPropertyTypes`). Config, material/bake and weather patches also
+skip undefined values from untyped JS/debug callers via `applyDefinedPatch`.
+Parsed optional metadata and defaulted audio inputs explicitly permit undefined
+where that is their actual representation/semantics; do not widen required-state
+patches to silence compiler diagnostics.
+Material authoring options are closed and use native Three material parameter
+types. Live uniforms, pooled bookkeeping and internally supplied world/time inputs
+are not authoring options. Keep finite catalogs exhaustive and sparse maps sparse.
 
 ## Quality
 
