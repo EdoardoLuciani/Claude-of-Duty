@@ -335,8 +335,8 @@ const booms = events.filter((e) => e.type === 'explosion');
 assert.equal(booms.length, 1, 'overcook emits exactly one explosion');
 assert.deepEqual(
   cookAudio,
-  ['grenade_pin'],
-  'full fuse has only the physical pin cue, no warning beep'
+  [],
+  'arming and holding the full fuse are silent: no rejected pin donor or warning beep'
 );
 wp.audio = previousAudio;
 assert.equal(booms[0].payload.kind, 'grenade', 'overcook selects grenade audio');

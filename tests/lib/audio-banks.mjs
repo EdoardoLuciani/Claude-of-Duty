@@ -30,7 +30,7 @@ export const AUDIO_BANKS = [
   ['radio', RADIO_URLS, radio, 6, 0.5, 80000, 500000],
   ['reactions', REACTION_URLS, reactions, 12, 0.65, 150000, 1500000],
   ['reloads', RELOAD_URLS, reloads, 63, 0.53, 250000, 3000000],
-  ['combat', COMBAT_URLS, combat, 49, 1.25, 500000, 6000000],
+  ['combat', COMBAT_URLS, combat, 46, 1.25, 500000, 6000000],
 ];
 
 export function audioFixture(currentTime = 0) {

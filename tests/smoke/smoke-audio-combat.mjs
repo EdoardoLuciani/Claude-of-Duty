@@ -16,7 +16,7 @@ import { audioFixture } from '../lib/audio-banks.mjs';
 
 assert.equal(
   Object.values(COMBAT_URLS).reduce((n, urls) => n + urls.length, 0),
-  49
+  46
 );
 assert.deepEqual(
   COMBAT_URLS.whizz.map((url) => {
@@ -105,10 +105,7 @@ for (const [weapon, expected] of [
   audio._build('dryfire', 4, 0, { dryWeapon: weapon });
   assert.equal(sources.at(-1).buffer.key, expected);
 }
-for (const [kind, key] of [
-  ['grenade_pin', 'grenade-pin'],
-  ['grenade_throw', 'grenade-throw'],
-]) {
+for (const [kind, key] of [['grenade_throw', 'grenade-throw']]) {
   audio._build(kind, 4, 0, { level: 0.8 });
   assert.equal(sources.at(-1).buffer.key, key);
   assert.equal(sources.at(-1).when, 4);
@@ -120,10 +117,15 @@ audio._playDry = (...args) => {
   calls.push(args);
   return true;
 };
-for (const cue of ['grenade_pin', 'grenade_throw', 'hitmarker']) audio.playUi(cue, 0.9);
+assert.equal(audio.play('grenade_pin'), false);
+assert.equal(audio.play('grenade_pin', { x: 0, y: 0, z: 0 }), false);
+assert.equal(audio.ui('grenade_pin'), false);
+assert.equal(audio.playUi('grenade_pin'), false);
+assert.equal(calls.length, 0, 'rejected pin cue stays silent, never a fallback beep');
+for (const cue of ['grenade_throw', 'hitmarker']) audio.playUi(cue, 0.9);
 assert.deepEqual(
   calls.map((c) => c[2]),
-  ['foley', 'foley', 'ui']
+  ['foley', 'ui']
 );
 assert(calls.every((c) => c[1].level === 0.9));
 Object.assign(audio, { running: true, field: {}, mixer: {} });
