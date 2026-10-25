@@ -180,7 +180,6 @@ const BUS_FOR: Record<string, string> = {
   market_deny: 'ui',
   grenade_warn: 'ui',
   grenade_pin: 'foley',
-  grenade_tick: 'ui',
   grenade_throw: 'foley',
   radio_open: 'ui',
   radio_denied: 'ui',

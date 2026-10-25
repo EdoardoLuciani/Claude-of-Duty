@@ -291,7 +291,7 @@ locally bundled Opus recordings with source hashes, prompts and processing in
 `assets/audio/tactical-callouts/README.md`. No runtime TTS or credential access.
 Reached-segment bullet near-misses, material-mapped casing drops, family-matched dry
 fire and grenade pin/throw foley also use required recordings. Physical grenade
-handling uses the foley bus; cook-warning beeps remain intentional UI cues. Empty
+handling uses the foley bus; cooking the fuse has no synthetic warning beep. Empty
 triggers play a click without emitting a shot, muzzle flash or AI-hearing evidence.
 Remaining synthesis includes legacy AK/generic-suppressed reports and reinforcement,
 intentional UI cues. Other spoken intents remain deferred.
