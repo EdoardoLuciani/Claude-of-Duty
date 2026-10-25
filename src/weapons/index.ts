@@ -15,6 +15,7 @@ import {
   SPREAD_MODS,
 } from './defs.ts';
 import { grenadeMesh } from './grenade-mesh.ts';
+import { createWeaponInspection } from './inspection.ts';
 import { loadWeapon } from './loaders.ts';
 import { ReticleMaterials } from './materials-tsl.ts';
 import { lerp, DEG } from './mathx.ts';
@@ -444,6 +445,14 @@ export class WeaponSystem {
       mode: def.modes[0],
       modeIndex: 0,
     };
+  }
+
+  /** Read-only market inspection; never mounts or animates the equipped model. */
+  async createInspectionModel(id: string): Promise<ReturnType<typeof createWeaponInspection>> {
+    await this._restTask;
+    const entry = this.viewmodel.weapons.get(id);
+    if (!entry) throw new Error(`[weapons] inspection unavailable: ${id}`);
+    return createWeaponInspection(entry);
   }
 
   _hasMesh(id: string): boolean {
