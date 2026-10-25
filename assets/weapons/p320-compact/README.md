@@ -33,7 +33,6 @@ blender -b -t 8 --python-exit-code 1 --python tools/blender/p320_compact.py -- \
 blender -b -t 8 /tmp/p320-review/p320-compact.blend \
   --python-exit-code 1 --python tools/blender/p320_check.py
 node tests/smoke/smoke-p320.mjs
-node tests/e2e/weapons-e2e.mjs # GPU lane required
 ```
 
 Each factory-empty build bakes three maps with Cycles CPU, authors actions, saves
