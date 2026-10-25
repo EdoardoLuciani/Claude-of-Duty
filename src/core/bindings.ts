@@ -65,7 +65,7 @@ const BINDING_LABELS: Readonly<Record<PhysicalBinding, string>> = {
 };
 
 export function bindingLabels(action: ActionId): readonly string[] {
-  return DEFAULT_BINDINGS[action].map((binding) => BINDING_LABELS[binding]);
+  return DEFAULT_BINDINGS[action].map((binding): string => BINDING_LABELS[binding]);
 }
 
 /** Includes every alias; single-binding actions also serve as prompt keycaps. */

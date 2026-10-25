@@ -1,5 +1,6 @@
 import { Fn, abs, clamp, float, fract, max, mix, smoothstep, step, vec2, vec3 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
+import type { StructNode } from 'three/webgpu';
 
 import { authoredColor } from '../color-tsl.ts';
 import {
@@ -18,7 +19,7 @@ import { Surface } from './surface.ts';
 
 // ASPHALT: authored channel stack migrated from surfaces-ground.js.
 export const asphaltSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof Surface>>(
-  ([coords, seed]) => {
+  ([coords, seed]): StructNode => {
     const alb = vec3(0.5).toVar(),
       h = float(0.5).toVar();
     const rough = float(0.5).toVar(),
@@ -201,7 +202,7 @@ export const asphaltSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeo
 
 // DIRT: authored channel stack migrated from surfaces-ground.js.
 export const dirtSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof Surface>>(
-  ([coords, seed]) => {
+  ([coords, seed]): StructNode => {
     const alb = vec3(0.5).toVar(),
       h = float(0.5).toVar();
     const rough = float(0.5).toVar(),
@@ -312,7 +313,7 @@ export const dirtSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof S
 
 // GRAVEL: authored channel stack migrated from surfaces-ground.js.
 export const gravelSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof Surface>>(
-  ([coords, seed]) => {
+  ([coords, seed]): StructNode => {
     const alb = vec3(0.5).toVar(),
       h = float(0.5).toVar();
     const rough = float(0.5).toVar(),

@@ -150,7 +150,7 @@ export class Squad {
     return this.members.length;
   }
 
-  get alive() {
+  get alive(): number {
     let n = 0;
     for (const m of this.members) if (m.alive) n++;
     return n;
@@ -409,7 +409,7 @@ export class Squad {
 
     if (this.intent === INTENT.WRAP) {
       const threat = this.hasContact ? this.contact : alive[0].lastKnown;
-      const far = threat && alive.some((m) => m.position.distanceTo(threat) > LONG_RANGE);
+      const far = threat && alive.some((m): boolean => m.position.distanceTo(threat) > LONG_RANGE);
       const offX = this.why === 'unseen-deaths' || far;
       if (offX) {
         this.pickWrapDest(alive[0].position, threat);
@@ -424,7 +424,7 @@ export class Squad {
         return;
       }
       const candidates = alive.filter(
-        (m) => !m._wrapDone && m !== this.elevated && m !== this.holder
+        (m): boolean => !m._wrapDone && m !== this.elevated && m !== this.holder
       );
       const pool = candidates.length ? candidates : alive;
       this.wrapper = this._pickWrapper(pool);
@@ -617,7 +617,7 @@ export class Squad {
     this.flanker = agent;
   }
 
-  requestGrenade() {
+  requestGrenade(): boolean {
     if (this.wantFlush && !this.flushUsed) {
       this.flushUsed = true;
       this.flushFails = 0;

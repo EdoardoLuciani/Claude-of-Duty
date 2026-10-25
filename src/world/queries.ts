@@ -28,14 +28,25 @@ export class WorldQueries {
   declare ladders: WorldLadder[];
 
   constructor(meta: WorldQueryMetadata) {
-    this.buildings = (meta.buildings ?? []).map((building) =>
-      'spec' in building ? building.spec : building
+    this.buildings = (meta.buildings ?? []).map(
+      (
+        building
+      ): {
+        x: number;
+        z: number;
+        w: number;
+        d: number;
+        enterable?: boolean;
+        collapse?: boolean;
+        ruin?: boolean;
+        setback?: { from?: number };
+      } => ('spec' in building ? building.spec : building)
     );
     const street = meta.query?.street;
     if (!street) throw new Error('[world] manifest is missing query.street metadata');
     this.street = street;
     this.alleys = meta.query?.alleys ?? [];
-    this.ladders = (meta.volumes ?? []).filter((volume) => volume.kind === 'ladder');
+    this.ladders = (meta.volumes ?? []).filter((volume): boolean => volume.kind === 'ladder');
   }
 
   /** Ladder whose catch cylinder contains the world-space point, or null. */

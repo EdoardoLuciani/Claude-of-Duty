@@ -134,7 +134,7 @@ export function navigationComponents(
       refs.push(base + j);
     }
   }
-  const parent = Int32Array.from({ length: refs.length }, (_, i) => i);
+  const parent = Int32Array.from({ length: refs.length }, (_, i): number => i);
   const root = (i: number): number => {
     while (parent[i] !== i) {
       parent[i] = parent[parent[i]];
@@ -153,7 +153,7 @@ export function navigationComponents(
       if (a !== b) parent[Math.max(a, b)] = Math.min(a, b);
     }
   }
-  return new Map(refs.map((ref, i) => [ref, root(i) + 1]));
+  return new Map(refs.map((ref, i): [number, number] => [ref, root(i) + 1]));
 }
 
 /** One offline-baked surface authority. No grid, online bake or fallback solver. */
@@ -331,7 +331,13 @@ export class SurfaceNav {
   }
 
   // Read-only diagnostics: nearest baked surface, not a physical attachment.
-  inspect(p: THREE.Vector3) {
+  inspect(p: THREE.Vector3): {
+    success: boolean;
+    status: number;
+    nearestRef: number;
+    nearestPoint: { x: number; y: number; z: number };
+    isOverPoly: boolean;
+  } {
     return this.query.findNearestPoly(p, { halfExtents: EXTENTS });
   }
 
@@ -365,7 +371,7 @@ export class SurfaceNav {
       // send its full budget to the worker. Never prefix static/long candidates.
       const immediate =
         from === this.worker.current?.origin && distance < 0.12
-          ? () => checkAttachment.call(this, from, to, radius, height, maxSteps, 1)
+          ? (): boolean | null => checkAttachment.call(this, from, to, radius, height, maxSteps, 1)
           : null;
       return this.worker.request(from, to, radius, height, maxSteps, immediate);
     }
@@ -810,7 +816,7 @@ export class CoverMap {
       ? this.grid.worker.run(
           opts.id ?? -1,
           opts.elevated ? 'elevation' : 'cover',
-          () => this._pick(pos, threat, opts),
+          (): BakedCoverPoint | null => this._pick(pos, threat, opts),
           pos
         )
       : this._pick(pos, threat, opts);
@@ -971,7 +977,12 @@ export class CoverMap {
   ): number | null | typeof NAV_PENDING | typeof NAV_CANCELLED {
     const grid = this.grid;
     if (actor !== undefined && grid?.worker)
-      return grid.worker.run(actor, 'peek', () => this.peekOffset(cover, threat, eyeH, out));
+      return grid.worker.run(
+        actor,
+        'peek',
+        (): number | typeof NAV_PENDING | typeof NAV_CANCELLED | null =>
+          this.peekOffset(cover, threat, eyeH, out)
+      );
     if (!grid) return null;
     // Low cover may expose by standing; high cover must be physically rounded.
     // Zero is a valid standing peek, null means there is no executable shot.

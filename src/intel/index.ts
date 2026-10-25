@@ -111,7 +111,7 @@ export class IntelSystem {
           for (const id of ids) {
             if (
               typeof id === 'string' &&
-              this.markers.some((m) => m.id === id) &&
+              this.markers.some((m): boolean => m.id === id) &&
               !this._recent.includes(id)
             )
               this._recent.push(id);
@@ -138,12 +138,15 @@ export class IntelSystem {
     this._operationPayload = { active: false, position: new THREE.Vector3() };
     this._prompt = { key: bindingLabel('use'), text: 'Secure intel', sub: '', progress: 0 };
     this._hud = { holding: false, progress: 0, card: '', secured: 0, pulses: [], pulseTime: 0 };
-    this._pulseSlots = Array.from({ length: INTEL.aliveMax }, () => ({
-      x: 0,
-      y: 0,
-      z: 0,
-      radius: INTEL.pulseRadius,
-    }));
+    this._pulseSlots = Array.from(
+      { length: INTEL.aliveMax },
+      (): { x: number; y: number; z: number; radius: 12 } => ({
+        x: 0,
+        y: 0,
+        z: 0,
+        radius: INTEL.pulseRadius,
+      })
+    );
     this._spawnPayload = { id: '', position: new THREE.Vector3() };
     this._noisePayload = { position: new THREE.Vector3(), loudness: INTEL.pryLoudness };
     this._securePayload = {
@@ -162,14 +165,24 @@ export class IntelSystem {
       priority: 0.5,
     };
     this._kit = makeKit(ctx.get('materials'));
-    this._pool = Array.from({ length: INTEL.aliveMax }, () => ({
-      id: '',
-      x: 0,
-      y: 0,
-      z: 0,
-      group: makeCrate(this._kit),
-      open: 0,
-    }));
+    this._pool = Array.from(
+      { length: INTEL.aliveMax },
+      (): {
+        id: string;
+        x: number;
+        y: number;
+        z: number;
+        group: THREE.Group & { lid: THREE.Group };
+        open: number;
+      } => ({
+        id: '',
+        x: 0,
+        y: 0,
+        z: 0,
+        group: makeCrate(this._kit),
+        open: 0,
+      })
+    );
     this._off = [];
     const on = <K extends keyof IntelEventMap>(
       type: K,
@@ -177,12 +190,12 @@ export class IntelSystem {
     ): void => {
       this._off.push(ctx.events.on(type, fn));
     };
-    on('wave:complete', (e) => this._onWaveComplete(e));
-    on('damage:taken', () => {
+    on('wave:complete', (e): void => this._onWaveComplete(e));
+    on('damage:taken', (): void => {
       this._hitFrame = ctx.time.frame;
       this._interrupt();
     });
-    on('game:restart', () => this.reset());
+    on('game:restart', (): void => this.reset());
     this.reset();
   }
 
@@ -363,7 +376,7 @@ export class IntelSystem {
   }
 
   _spawn(marker: IntelMarker): IntelCache | null {
-    const cache = this._pool.find((slot) => !this._alive.includes(slot));
+    const cache = this._pool.find((slot): boolean => !this._alive.includes(slot));
     if (!cache || this._used.has(marker.id)) return null;
     cache.id = marker.id;
     cache.x = marker.x;

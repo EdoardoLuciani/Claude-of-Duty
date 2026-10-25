@@ -50,7 +50,7 @@ export class AircraftVoice {
     this.source.loopEnd = buffer.duration;
     this.source.connect(this.node);
     field.hold(emitter, this.node, Infinity);
-    this.source.onended = () => this._finish();
+    this.source.onended = (): void => this._finish();
     this.node.gain.setValueAtTime(0, when);
     this.node.gain.linearRampToValueAtTime(1, when + AIRCRAFT_MIX.fadeIn);
     try {

@@ -42,7 +42,7 @@ export class Hitmarkers {
   constructor(parent: HTMLElement) {
     this.pool = new Pool(
       10,
-      () => {
+      (): HitmarkerNode => {
         const node = el('div', 'ow-hit') as HitmarkerNode;
         const s = svg('svg', { viewBox: '-28 -28 56 56' }, node);
 

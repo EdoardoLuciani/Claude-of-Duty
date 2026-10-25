@@ -176,11 +176,11 @@ export class PhysicsDebugView {
     this.rayCount = 0;
   }
 
-  attach() {
+  attach(): void {
     if (!this.object.parent) this.scene.add(this.object);
   }
 
-  setEnabled(on: boolean) {
+  setEnabled(on: boolean): void {
     this.enabled = !!on;
     this.object.visible = this.enabled;
     if (this.enabled) this.attach();
@@ -202,7 +202,7 @@ export class PhysicsDebugView {
     if (this.rayCount < 256) this.rayCount++;
   }
 
-  begin() {
+  begin(): void {
     this._v = 0;
   }
 
@@ -536,7 +536,7 @@ export class PhysicsDebugView {
     this.colAttr.needsUpdate = true;
   }
 
-  dispose() {
+  dispose(): void {
     this.object.parent?.remove(this.object);
     this.geometry.dispose();
     this.material.dispose();

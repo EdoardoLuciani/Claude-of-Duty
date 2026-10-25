@@ -124,7 +124,7 @@ export function setCaseScale<T extends CaseScale>(
   return out;
 }
 
-function caseProfile() {
+function caseProfile(): THREE.Vector2[] {
   // metres; a 5.56x45 case is 45 mm long, 9.6 mm at the base
   const pts: THREE.Vector2[] = [];
   const add = (r: number, y: number): number => pts.push(new THREE.Vector2(r, y));

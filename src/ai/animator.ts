@@ -48,7 +48,7 @@ class Poser {
     for (let i = 0; i < rig.count; i++) this._idx.set(rig.names[i], i);
   }
 
-  reset() {
+  reset(): void {
     this.d3.fill(0);
     this.hipOff.set(0, 0, 0);
     this.w = 1;
@@ -308,13 +308,13 @@ export class Animator {
 
   /* ---------------- one-shot triggers ---------------- */
 
-  fire(strength = 1) {
+  fire(strength = 1): void {
     if (this.climbing) return;
     this.recoilT = 0;
     this.recoilK = strength;
   }
 
-  hit(region = 'torso', side = 1, strength = 1) {
+  hit(region = 'torso', side = 1, strength = 1): void {
     if (this.climbing) return;
     this.hitT = 0;
     this.hitRegion = region;
@@ -322,23 +322,23 @@ export class Animator {
     this.hitK = strength;
   }
 
-  reload(duration = 2.4) {
+  reload(duration = 2.4): void {
     if (this.climbing) return;
     this.reloadT = 0;
     this.reloadDur = duration;
   }
 
-  get reloading() {
+  get reloading(): boolean {
     return this.reloadT >= 0;
   }
 
-  vault(duration = 0.85) {
+  vault(duration = 0.85): void {
     if (this.climbing) return;
     this.vaultT = 0;
     this.vaultDur = duration;
   }
 
-  get vaulting() {
+  get vaulting(): boolean {
     return this.vaultT >= 0;
   }
 
@@ -457,7 +457,7 @@ export class Animator {
     this._updateMuzzle();
   }
 
-  _writePose() {
+  _writePose(): void {
     const rig = this.rig;
     const bones = this.bones;
     const d3 = this.P.d3;
@@ -583,7 +583,7 @@ export class Animator {
 
   /* ---------------- C: support hand ---------------- */
 
-  _supportHandIk() {
+  _supportHandIk(): void {
     const bodyRoot = this.bones[0].parent;
     if (!bodyRoot) return;
     const hand = this.bones[this.iHandR];
@@ -611,7 +611,7 @@ export class Animator {
 
   /* ---------------- D: feet ---------------- */
 
-  _footIk() {
+  _footIk(): void {
     if (!this.probe) return;
     const bodyRoot = this.bones[0].parent;
     if (!bodyRoot) return;
@@ -710,7 +710,7 @@ export class Animator {
 
   /* ---------------- outputs for FX / ballistics ---------------- */
 
-  _updateMuzzle() {
+  _updateMuzzle(): void {
     const hand = this.bones[this.iHandR];
     this.muzzleWorld.copy(this.muzzleLocal).applyMatrix4(hand.matrixWorld);
     this.ejectWorld.copy(this.ejectLocal).applyMatrix4(hand.matrixWorld);

@@ -22,7 +22,7 @@ const BASE = 'models';
 
 /** Observe a prefetch so a rejection is not unhandled before the consumer awaits it. */
 function watch<T>(promise: Promise<T>): Promise<T> {
-  promise.catch(() => {});
+  promise.catch((): void => {});
   return promise;
 }
 
@@ -36,7 +36,7 @@ export class ModelSystem {
   static id = 'models';
   static deps = [];
 
-  async init(ctx: EngineContext) {
+  async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
     this.loader = new GLTFLoader();
     this._soldiers = new Map();
@@ -85,8 +85,8 @@ export class ModelSystem {
   }
 
   async _loadGLB(url: string): Promise<GLTF> {
-    return new Promise<GLTF>((resolve, reject) => {
-      this.loader.load(url, resolve, undefined, (err: unknown) => {
+    return new Promise<GLTF>((resolve, reject): void => {
+      this.loader.load(url, resolve, undefined, (err: unknown): void => {
         const message =
           typeof err === 'object' && err !== null && 'message' in err ? err.message : err;
         reject(new Error(`[models] failed to load ${url}: ${String(message ?? err)}`));
@@ -125,13 +125,13 @@ export class ModelSystem {
 
     const meta = parseSoldierMetadata(metadata);
     const meshes: THREE.SkinnedMesh[] = [];
-    gltf.scene.traverse((node: THREE.Object3D) => {
+    gltf.scene.traverse((node: THREE.Object3D): void => {
       if (node instanceof THREE.SkinnedMesh) meshes.push(node as THREE.SkinnedMesh);
     });
     if (!meshes.length) throw new Error(`[models] ${name}.glb: no skinned mesh`);
 
     const geometry = meshes.length === 1 ? meshes[0].geometry : mergePrimitives(meshes);
-    const boneNames = (meshes[0].skeleton?.bones ?? []).map((bone) => bone.name);
+    const boneNames = (meshes[0].skeleton?.bones ?? []).map((bone): string => bone.name);
 
     const record = {
       // `name` is what the JSON METADATA claims the variant is (validated by
@@ -162,21 +162,30 @@ export class ModelSystem {
  * reproduces the original authored vertex array exactly.
  */
 export function mergePrimitives(meshes: THREE.SkinnedMesh[]): THREE.BufferGeometry {
-  const parts = meshes.map((m) => {
-    const g = m.geometry;
-    const index = g.getIndex()!;
-    const src = index.array;
-    let lo = Infinity;
-    let hi = -1;
-    for (let i = 0; i < index.count; i++) {
-      const v = src[i];
-      if (v < lo) lo = v;
-      if (v > hi) hi = v;
+  const parts = meshes.map(
+    (
+      m
+    ): {
+      g: THREE.BufferGeometry<THREE.NormalBufferAttributes, THREE.BufferGeometryEventMap>;
+      index: THREE.BufferAttribute<THREE.BufferAttributeEventMap>;
+      lo: number;
+      count: number;
+    } => {
+      const g = m.geometry;
+      const index = g.getIndex()!;
+      const src = index.array;
+      let lo = Infinity;
+      let hi = -1;
+      for (let i = 0; i < index.count; i++) {
+        const v = src[i];
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      }
+      return { g, index, lo, count: hi - lo + 1 };
     }
-    return { g, index, lo, count: hi - lo + 1 };
-  });
-  const totalVerts = parts.reduce((s, p) => s + p.count, 0);
-  const totalIdx = parts.reduce((s, p) => s + p.index.count, 0);
+  );
+  const totalVerts = parts.reduce((s, p): number => s + p.count, 0);
+  const totalIdx = parts.reduce((s, p): number => s + p.index.count, 0);
 
   const first = meshes[0]!;
   const attrNames = Object.keys(first.geometry.attributes);

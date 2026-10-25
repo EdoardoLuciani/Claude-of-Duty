@@ -113,28 +113,29 @@ export function setClass(node: CachedElement, cls: string, on: boolean): void {
 /* --------------------------------------------------------------- easing --- */
 
 export const ease: Record<string, (t: number) => number> = {
-  linear: (t) => t,
-  inQuad: (t) => t * t,
-  outQuad: (t) => t * (2 - t),
-  outCubic: (t) => 1 - (1 - t) ** 3,
-  inOutCubic: (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2),
-  outQuint: (t) => 1 - (1 - t) ** 5,
-  outExpo: (t) => (t >= 1 ? 1 : 1 - 2 ** (-10 * t)),
-  inOutSine: (t) => -(Math.cos(Math.PI * t) - 1) / 2,
+  linear: (t): number => t,
+  inQuad: (t): number => t * t,
+  outQuad: (t): number => t * (2 - t),
+  outCubic: (t): number => 1 - (1 - t) ** 3,
+  inOutCubic: (t): number => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2),
+  outQuint: (t): number => 1 - (1 - t) ** 5,
+  outExpo: (t): number => (t >= 1 ? 1 : 1 - 2 ** (-10 * t)),
+  inOutSine: (t): number => -(Math.cos(Math.PI * t) - 1) / 2,
   /** Overshoot then settle — hitmarker / banner punch. */
-  outBack: (t) => {
+  outBack: (t): number => {
     const c = 1.9;
     const u = t - 1;
     return 1 + (c + 1) * u * u * u + c * u * u;
   },
   /** Damped oscillation, k = number of bounces. */
-  outElastic: (t) => {
+  outElastic: (t): number => {
     if (t <= 0) return 0;
     if (t >= 1) return 1;
     return 1 - 2 ** (-9 * t) * Math.cos(t * 22);
   },
   /** Fast attack, slow release — good for anything that must feel "snappy". */
-  punch: (t) => (t < 0.18 ? ease.outQuint(t / 0.18) : 1 - ease.inOutSine((t - 0.18) / 0.82)),
+  punch: (t): number =>
+    t < 0.18 ? ease.outQuint(t / 0.18) : 1 - ease.inOutSine((t - 0.18) / 0.82),
 };
 
 /* ----------------------------------------------------------------- math --- */

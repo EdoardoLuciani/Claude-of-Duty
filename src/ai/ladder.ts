@@ -49,7 +49,7 @@ export function createLadderDescriptors(
 ): readonly LadderDescriptor[] {
   if (volumes.length > 1024) throw new Error('Too many ladders');
   return Object.freeze(
-    volumes.map((v, volumeIndex) => {
+    volumes.map((v, volumeIndex): LadderDescriptor => {
       const { x, z, y0, y1, radius, nx, nz } = v;
       if (
         v.kind !== 'ladder' ||
@@ -77,7 +77,7 @@ export function createLadderDescriptors(
       ]) as LadderDescriptor['points'];
       if (
         !points.every(finitePoint) ||
-        points.slice(1).some((p, i) => !positiveSpan(length(points[i], p)))
+        points.slice(1).some((p, i): boolean => !positiveSpan(length(points[i], p)))
       ) {
         throw new Error('Invalid ladder geometry');
       }
@@ -107,7 +107,7 @@ export function ladderMoveBudget(d: LadderDescriptor): number {
     d.points
       .slice(1)
       .reduce(
-        (n, p, i) => n + Math.ceil(length(d.points[i], p) / (LADDER.speed * LADDER.step)),
+        (n, p, i): number => n + Math.ceil(length(d.points[i], p) / (LADDER.speed * LADDER.step)),
         0
       ) + 3
   );

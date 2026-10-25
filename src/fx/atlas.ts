@@ -68,7 +68,16 @@ export function makeTexture(
   return t;
 }
 
-export async function loadFxAtlases(size: number) {
+export async function loadFxAtlases(size: number): Promise<{
+  particles: { texture: THREE.Texture; cols: number; size: number };
+  decals: {
+    albedo: THREE.Texture;
+    normal: THREE.Texture;
+    orm: THREE.Texture;
+    cols: number;
+    size: number;
+  };
+}> {
   const wrap = THREE.ClampToEdgeWrapping;
   const aniso = 4;
   const results = await Promise.allSettled([
@@ -78,9 +87,13 @@ export async function loadFxAtlases(size: number) {
     loadPngTexture(`/models/proc/fx-decals-${size}-orm.png`, { srgb: false, aniso, wrap }),
   ]);
   const textures = results
-    .filter((result) => result.status === 'fulfilled')
-    .map((result) => result.value);
-  const failed = results.find((result) => result.status === 'rejected');
+    .filter(
+      (result): result is PromiseFulfilledResult<THREE.Texture> => result.status === 'fulfilled'
+    )
+    .map((result): THREE.Texture => result.value);
+  const failed = results.find(
+    (result): result is PromiseRejectedResult => result.status === 'rejected'
+  );
   if (failed) {
     for (const texture of textures) {
       texture.dispose();
@@ -99,7 +112,10 @@ export async function loadFxAtlases(size: number) {
  * Brass casing maps: drawn seams, extractor scuffing and a machined-rim
  * roughness break so casings never read as plastic.
  */
-export function buildBrassTextures(rng: Rng, size = 256) {
+export function buildBrassTextures(
+  rng: Rng,
+  size = 256
+): { normal: THREE.DataTexture; orm: THREE.DataTexture } {
   const n = new Noise(rng);
   const normal = new Uint8Array(size * size * 4);
   const orm = new Uint8Array(size * size * 4);

@@ -350,9 +350,9 @@ export class AudioSystem {
     // Web Audio needs a user gesture. Arm every plausible one; the first to
     // land builds the graph. Capture mode never gestures, so shots render in
     // silence and stay byte-identical.
-    const kick = () => {
+    const kick = (): void => {
       this._disarmGesture();
-      this.start().catch(() => {});
+      this.start().catch((): void => {});
     };
     this._gestureHandler = kick;
     if (typeof addEventListener === 'function') {
@@ -361,7 +361,7 @@ export class AudioSystem {
     if (typeof window !== 'undefined') window.__AUDIO__ = this;
   }
 
-  _disarmGesture() {
+  _disarmGesture(): void {
     if (!this._gestureHandler) return;
     for (const ev of GESTURES) removeEventListener(ev, this._gestureHandler);
     this._gestureHandler = null;
@@ -371,7 +371,7 @@ export class AudioSystem {
    * Build the graph. Safe to call repeatedly; resolves false when audio is
    * unavailable (no AudioContext, blocked autoplay, headless renderer, ...).
    */
-  async start() {
+  async start(): Promise<boolean> {
     if (this.running) return true;
     if (this.failed) return false;
     // A pointer gesture and a menu/API call can land in the same task. Without
@@ -387,7 +387,7 @@ export class AudioSystem {
     }
   }
 
-  async _startGraph() {
+  async _startGraph(): Promise<boolean> {
     try {
       const AC = globalThis.AudioContext;
       if (!AC) throw new Error('no AudioContext');
@@ -401,7 +401,7 @@ export class AudioSystem {
       const samples = (this.samples = new WeaponSampleBank(actx));
       await samples.load();
       const mixer = (this.mixer = new Mixer(actx, this.rng.fork(), {}));
-      mixer.energyMix.onprocessorerror = () => {
+      mixer.energyMix.onprocessorerror = (): void => {
         console.error('[audio] energy processor failed; disabling audio');
         this.stats.errors++;
         this.failed = true;
@@ -430,7 +430,7 @@ export class AudioSystem {
     }
   }
 
-  _teardown() {
+  _teardown(): void {
     this._onIntelOperation({ active: false });
     this._lastReactionEnd = -99;
     this._callouts?.reset();
@@ -452,7 +452,7 @@ export class AudioSystem {
     this.running = false;
   }
 
-  dispose() {
+  dispose(): void {
     this._disarmGesture();
     for (const off of this._offs) off();
     this._offs.length = 0;
@@ -499,9 +499,9 @@ export class AudioSystem {
       this.deafness = this.mixer!.deafness;
       if (!this._ambienceApi) {
         this._ambienceApi = {
-          distantVolley: () => this._distantVolley(),
-          distantBoom: () => this._distantBoom(),
-          oneShot: () => this._ambientOneShot(),
+          distantVolley: (): void => this._distantVolley(),
+          distantBoom: (): void => this._distantBoom(),
+          oneShot: (): void => this._ambientOneShot(),
         };
       }
       this.ambience!.update(dt, this._ambienceApi);
@@ -646,7 +646,12 @@ export class AudioSystem {
    * Build a voice by name. `when` is absolute context time, `dist` is metres
    * from the listener — voices use it to rebalance their own layers.
    */
-  _build(kind: string, when: number, dist: number, o: AudioOptions) {
+  _build(
+    kind: string,
+    when: number,
+    dist: number,
+    o: AudioOptions
+  ): import('./types.ts').AudioVoice {
     const actx = this.actx!,
       bank = this.bank!;
     const rng = this.rng;
@@ -1018,27 +1023,27 @@ export class AudioSystem {
       this._offs.push(ev.on(name, fn));
     };
 
-    on('weapon:fire', (p) => this._onFire(p));
-    on('weapon:reload', (p) => this._onReload(p));
-    on('weapon:shell', (p) => this._onShell(p));
-    on('bullet:impact', (p) => this._onImpact(p));
-    on('bullet:segment', (p) => this._onBulletSegment(p));
-    on('explosion', (p) => this._onExplosion(p));
-    on('player:footstep', (p) => this._onFootstep(p));
-    on('ai:footstep', (p) => this._onAiFootstep(p));
-    on('player:land', (p) => this._onLand(p));
-    on('player:state', (p) => this._onPlayerState(p));
-    on('damage:dealt', (p) => this._onDamageDealt(p));
-    on('damage:taken', (p) => this._onDamageTaken(p));
+    on('weapon:fire', (p): void => this._onFire(p));
+    on('weapon:reload', (p): void => this._onReload(p));
+    on('weapon:shell', (p): void => this._onShell(p));
+    on('bullet:impact', (p): void => this._onImpact(p));
+    on('bullet:segment', (p): void => this._onBulletSegment(p));
+    on('explosion', (p): void => this._onExplosion(p));
+    on('player:footstep', (p): void => this._onFootstep(p));
+    on('ai:footstep', (p): void => this._onAiFootstep(p));
+    on('player:land', (p): void => this._onLand(p));
+    on('player:state', (p): void => this._onPlayerState(p));
+    on('damage:dealt', (p): void => this._onDamageDealt(p));
+    on('damage:taken', (p): void => this._onDamageTaken(p));
     // Head-locked warning: keep it above the gunfire ducking on the foley bus.
-    on('player:heartbeat', (p) =>
+    on('player:heartbeat', (p): boolean =>
       this._playDry('heartbeat', { level: Math.min(1, 0.25 + p.strength * 1.3) }, 'ui', 0)
     );
-    on('actor:death', (p) => this._onDeath(p));
-    on('ai:bark', (p) => this.bark(p.kind, p.position, { voice: p.voice }));
-    on('intel:operation', (e) => this._onIntelOperation(e));
-    const stopIntel = () => this._onIntelOperation({ active: false });
-    on('game:restart', () => {
+    on('actor:death', (p): void => this._onDeath(p));
+    on('ai:bark', (p): boolean => this.bark(p.kind, p.position, { voice: p.voice }));
+    on('intel:operation', (e): void => this._onIntelOperation(e));
+    const stopIntel = (): void => this._onIntelOperation({ active: false });
+    on('game:restart', (): void => {
       stopIntel();
       this._lastReactionEnd = -99;
       this._lastBarkTime = -99;
@@ -1048,32 +1053,32 @@ export class AudioSystem {
       this.mixer?.resetHearing();
       this.deafness = this.stats.deafness = 0;
     });
-    on('player:death', () => {
+    on('player:death', (): void => {
       stopIntel();
       this._blockCallouts(CALLOUT_BLOCK.death, true);
     });
-    on('engine:error', () => {
+    on('engine:error', (): void => {
       stopIntel();
       this._blockCallouts(CALLOUT_BLOCK.error, true);
       this._stopAircraft(true);
     });
-    on('ui:pause', (e) => {
+    on('ui:pause', (e): void => {
       this._blockCallouts(CALLOUT_BLOCK.pause, e.paused);
       if (e.paused) {
         stopIntel();
         this._pauseAircraft();
       }
     });
-    on('market:open', () => {
+    on('market:open', (): void => {
       this._blockCallouts(CALLOUT_BLOCK.shop, true);
       stopIntel();
       this._pauseAircraft();
       if (!this.running) return;
-      this.tentRadio?.start()?.catch?.(() => {});
+      this.tentRadio?.start()?.catch?.((): void => {});
       this.mixer?.setBusVolume('ambience', 0.28);
       this.mixer?.setBusVolume('foley', 0.5);
     });
-    on('market:close', () => {
+    on('market:close', (): void => {
       this._blockCallouts(CALLOUT_BLOCK.shop, false);
       this.tentRadio?.stop();
       this.mixer?.setBusVolume('ambience', 1);
@@ -1498,7 +1503,31 @@ export class AudioSystem {
   }
 
   /** Snapshot for the dev overlay. */
-  report() {
+  report(): {
+    running: boolean;
+    failed: boolean;
+    state: string;
+    sampleRate: number;
+    firearmSamples: number;
+    voices: number;
+    dropped: number;
+    stolen: number;
+    occlusionRays: number;
+    space: string;
+    spaceWeights: {
+      tight: number;
+      room: number;
+      street: number;
+      tunnel: number;
+      open: number;
+    } | null;
+    enclosure: number;
+    meanFree: number;
+    deafness: number;
+    outputSafety: string;
+    events: number;
+    errors: number;
+  } {
     return {
       running: this.running,
       failed: this.failed,

@@ -16,10 +16,38 @@ import {
 import { authoredModel, requiredNode } from './authored-model.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 
+type M590Model = {
+  materials: Set<THREE.Material>;
+  textures: Set<THREE.Texture>;
+  id: string;
+  label: string;
+  fxClass: string;
+  scene: THREE.Group;
+  root: THREE.Object3D;
+  animations: THREE.AnimationClip[];
+  reactiveFire: boolean;
+  handPoses: {
+    left: typeof handReference.sides.left.grip;
+    right: { fingers: number[][]; fingerSpread: number[]; thumbBase: number[]; thumb: number[] };
+  };
+  nodes: {
+    muzzle: [number, number, number];
+    eject: [number, number, number];
+    sight: [number, number, number];
+    ejectDir: number[];
+    gripR: { pos: number[]; finger: number[]; back: number[] };
+    gripL: { pos: number[]; finger: number[]; back: number[] };
+    magSeat: { pos: number[]; rot: number[] };
+    opticGlass: null;
+  };
+  shell: { caseLen: number; rimR: number };
+  magSize: { len: number };
+};
+
 export const M590_URL = new URL('../../assets/weapons/m590/m590.glb', import.meta.url).href;
 const ALIASES: Record<string, string> = manifest.aliases;
 
-export function makeM590Model(gltf: GLTF) {
+export function makeM590Model(gltf: GLTF): M590Model {
   const scene = gltf.scene;
   const { root, animations, point } = authoredModel(
     gltf,
@@ -27,7 +55,7 @@ export function makeM590Model(gltf: GLTF) {
     ['Idle', ...Object.values(ALIASES)],
     scene
   );
-  const converted = convertWeaponScene(scene, (_source, material) => {
+  const converted = convertWeaponScene(scene, (_source, material): void => {
     for (const value of Object.values(material as object)) {
       if (value instanceof THREE.Texture) value.anisotropy = 8;
     }
@@ -58,7 +86,7 @@ export function makeM590Model(gltf: GLTF) {
   };
 }
 
-export async function loadM590() {
+export async function loadM590(): Promise<M590Model> {
   return makeM590Model(await new GLTFLoader().loadAsync(M590_URL));
 }
 
@@ -82,7 +110,7 @@ export class M590Animation {
     this.poseMatrix = this.root.matrix;
     this.mixer = new THREE.AnimationMixer(this.root);
     this.actions = createAuthoredActions(this.mixer, model.animations);
-    const node = (name: string) => requiredNode(this.root, name);
+    const node = (name: string): THREE.Object3D => requiredNode(this.root, name);
     this.shellInsert = node('shell_insert');
     this.hands = discoverAuthoredHands(node);
     this.reset();

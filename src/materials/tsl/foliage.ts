@@ -14,6 +14,7 @@ import {
   vec2,
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
+import type { StructNode } from 'three/webgpu';
 
 import { authoredColor } from '../color-tsl.ts';
 import { fbm01, fbm3 } from '../noise-tsl.ts';
@@ -22,7 +23,7 @@ import { Surface } from './surface.ts';
 // One leaf per tile. Height is a cutout mask, not a parallax field.
 
 export const foliageSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof Surface>>(
-  ([coords, seed]) => {
+  ([coords, seed]): StructNode => {
     const period = vec2(8);
     const p = coords.mul(period).add(seed.mul(5.9));
     const e = coords.sub(0.5).div(vec2(0.42, 0.17));

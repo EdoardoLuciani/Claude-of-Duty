@@ -30,7 +30,7 @@ export const ACTIONS = {
 const GAME_KEYS: ReadonlySet<string> = new Set(
   Object.values(DEFAULT_BINDINGS)
     .flat()
-    .filter((binding) => !binding.startsWith('Mouse'))
+    .filter((binding): boolean => !binding.startsWith('Mouse'))
 );
 
 type InputConfig = { sensitivity: number; invertY: boolean };
@@ -106,11 +106,11 @@ export class Input {
       wheel: this._onWheel.bind(this),
       lockchange: this._onLockChange.bind(this),
       blur: this._onBlur.bind(this),
-      contextmenu: (e) => e.preventDefault(),
+      contextmenu: (e): void => e.preventDefault(),
     };
   }
 
-  attach() {
+  attach(): void {
     // Capture keyboard events before UI/browser-facing handlers. This matters
     // for modifier shortcuts: the browser must see preventDefault() before it
     // decides what Ctrl/Meta/Alt + a game key means.
@@ -126,7 +126,7 @@ export class Input {
     this.canvas.addEventListener('contextmenu', this._bound.contextmenu);
   }
 
-  detach() {
+  detach(): void {
     removeEventListener('keydown', this._bound.keydown, this._keyboardCapture);
     removeEventListener('keyup', this._bound.keyup, this._keyboardCapture);
     removeEventListener('mousedown', this._bound.mousedown);
@@ -138,14 +138,14 @@ export class Input {
     this.canvas.removeEventListener('contextmenu', this._bound.contextmenu);
   }
 
-  requestPointerLock() {
+  requestPointerLock(): void {
     // Chrome returns a promise that rejects if the document is not eligible
     // (headless capture, an iframe, a lock request too soon after an exit).
     // An unhandled rejection there shows up as a page error in the harness, so
     // swallow it: failing to lock is not a game error.
     try {
       const p = this.canvas.requestPointerLock?.();
-      if (p && typeof p.catch === 'function') p.catch(() => {});
+      if (p && typeof p.catch === 'function') p.catch((): void => {});
     } catch {
       /* not eligible — keep running unlocked */
     }
@@ -223,13 +223,13 @@ export class Input {
     this._pendingWheel += Math.sign(e.deltaY);
   }
 
-  _onLockChange() {
+  _onLockChange(): void {
     this.pointerLocked = document.pointerLockElement === this.canvas;
     if (!this.pointerLocked) this._onBlur();
   }
 
   /** Losing focus must release every held key, or the player runs forever. */
-  _onBlur() {
+  _onBlur(): void {
     this._gameplayFocus = false;
     // Discard not-yet-snapshotted gameplay presses, but keep the modal Escape
     // intent if the browser delivers pointerlockchange before beginFrame().
@@ -341,15 +341,15 @@ export class Input {
     return this._released.has(code);
   }
 
-  get fire() {
+  get fire(): boolean {
     return this.action('fire');
   }
 
-  get firePressed() {
+  get firePressed(): boolean {
     return this.actionPressed('fire');
   }
 
-  get ads() {
+  get ads(): boolean {
     return this.action('ads');
   }
 

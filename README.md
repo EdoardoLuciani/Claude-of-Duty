@@ -16,9 +16,13 @@ npm run build
 
 Node.js 24.x is required; Node-run tools and smoke tests load migrated `.ts`
 modules using native type stripping. Runtime TypeScript uses explicit `.ts`
-imports and is checked by `npm run typecheck`. `npm run lint` bans explicit `any`
-and unsafe assignment, argument, call, member access and return through its
-type-aware pass; regular rules also cover `src/`, `tools/`, and `tests/`.
+imports and is checked by `npm run typecheck`. `npm run lint` requires explicit
+return types on every TypeScript function, method, getter and callback (including
+contextually typed functions and functions returning functions). Constructors and
+setters have no return annotation; JavaScript helpers are outside this rule.
+Lint also bans explicit `any` and unsafe assignment, argument, call, member access
+and return through its type-aware pass; regular rules cover `src/`, `tools/`, and
+`tests/`. Missing return annotations fail CI's lint step, not `tsc` itself.
 `npm run build` runs typecheck and lint first via `prebuild`. Remaining JavaScript
 helpers run alongside TypeScript; broad `checkJs` adoption is deferred.
 

@@ -12,7 +12,7 @@ class EnergyMixProcessor extends AudioWorkletProcessor {
 
   constructor() {
     super();
-    this.port.onmessage = ({ data }) => {
+    this.port.onmessage = ({ data }): void => {
       if (data === 'stop') this.running = false;
     };
   }

@@ -15,7 +15,7 @@ export type CardId = (typeof CARDS)[number]['id'];
 export type IntelCard = (typeof CARDS)[number];
 
 export function cardById(id: string): IntelCard | null {
-  return CARDS.find((card) => card.id === id) ?? null;
+  return CARDS.find((card): boolean => card.id === id) ?? null;
 }
 
 export interface RandomSource {

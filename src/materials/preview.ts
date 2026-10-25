@@ -125,7 +125,7 @@ function groundPlane(name = 'asphalt', size = 60): THREE.Mesh {
 if (VIEW === 'board') {
   const cols = 5;
   const rows = Math.ceil(materials.names().length / cols);
-  materials.names().forEach((name, index) => {
+  materials.names().forEach((name, index): void => {
     const col = index % cols,
       row = Math.floor(index / cols);
     mesh(new THREE.SphereGeometry(0.49, 32, 20), materials.get(name), [
@@ -141,9 +141,9 @@ if (VIEW === 'board') {
   // Unlit channel inspection: albedo | normal | ORM for every surface.
   const which = (params.get('m') ?? 'concrete,brick,plaster,asphalt').split(',');
   const quad = new THREE.PlaneGeometry(1, 1);
-  which.forEach((name, row) => {
+  which.forEach((name, row): void => {
     const set = materials.getTextureSet(name);
-    [set.albedo, set.normal, set.orm].forEach((tex, col) => {
+    [set.albedo, set.normal, set.orm].forEach((tex, col): void => {
       const m = new THREE.MeshBasicNodeMaterial({ map: tex, toneMapped: false });
       const q = new THREE.Mesh(quad, m);
       q.position.set(col * 1.06 - 1.06, -row * 1.06, 0);
@@ -268,7 +268,7 @@ sun.target.position.set(0, 1, 0);
 sun.target.updateMatrixWorld();
 
 // --------------------------------------------------------------- loop ------
-addEventListener('resize', () => {
+addEventListener('resize', (): void => {
   renderer.setSize(innerWidth, innerHeight, false);
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
@@ -276,14 +276,14 @@ addEventListener('resize', () => {
 
 if ((params.get('dbg') ?? '').includes('noshadow')) renderer.shadowMap.enabled = false;
 if ((params.get('dbg') ?? '').includes('nonormal')) {
-  scene.traverse((o) => {
+  scene.traverse((o): void => {
     if (!(o instanceof THREE.Mesh)) return;
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     for (const mat of mats) if (mat instanceof THREE.MeshStandardMaterial) mat.normalMap = null;
   });
 }
 window.__PREVIEW_RENDERER__ = renderer;
-window.__PREVIEW_DRAW__ = () => renderer.render(scene, camera);
+window.__PREVIEW_DRAW__ = (): void => renderer.render(scene, camera);
 let frames = 0;
 function tick(): void {
   renderer.render(scene, camera);

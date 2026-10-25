@@ -116,11 +116,11 @@ export class Health {
     this._beat = { strength: 0, fraction: 1 };
   }
 
-  get fraction() {
+  get fraction(): number {
     return clamp01(this.value / this.max);
   }
 
-  get low() {
+  get low(): boolean {
     return this.fraction < HEALTH.lowThreshold;
   }
 

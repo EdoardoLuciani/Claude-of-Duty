@@ -153,26 +153,28 @@ export class WeaponSampleBank {
       const urls = URLS[kind];
       this.buffers[kind] = new Array<AudioBuffer>(urls.length);
       this.indices[kind] = 0;
-      urls.forEach((url, index) => jobs.push(this._loadInto(this.buffers[kind]!, index, url)));
+      urls.forEach((url, index): number =>
+        jobs.push(this._loadInto(this.buffers[kind]!, index, url))
+      );
     }
     jobs.push(this._loadSpecial('actionBuffer', ACTION_URL));
     jobs.push(this._loadSpecial('heartbeatBuffer', HEARTBEAT_URL));
     this.aircraftBuffers = new Array<AudioBuffer>(AIRCRAFT_URLS.length);
     this.aircraftIndex = -1;
-    AIRCRAFT_URLS.forEach((url, index) =>
+    AIRCRAFT_URLS.forEach((url, index): number =>
       jobs.push(this._loadInto(this.aircraftBuffers, index, url))
     );
     for (const kind of Object.keys(CONTACT_URLS) as ContactKind[]) {
       this.hitBuffers[kind] = new Array<AudioBuffer>(CONTACT_URLS[kind].length);
       this.hitIndices[kind] = -1;
-      CONTACT_URLS[kind].forEach((url, index) =>
+      CONTACT_URLS[kind].forEach((url, index): number =>
         jobs.push(this._loadInto(this.hitBuffers[kind]!, index, url))
       );
     }
     for (const kind of Object.keys(RELOAD_URLS) as ReloadKind[]) {
       this.reloadBuffers[kind] = new Array<AudioBuffer>(RELOAD_URLS[kind].length);
       this.reloadIndices[kind] = -1;
-      RELOAD_URLS[kind].forEach((url, index) =>
+      RELOAD_URLS[kind].forEach((url, index): number =>
         jobs.push(this._loadInto(this.reloadBuffers[kind]!, index, url))
       );
     }
@@ -285,7 +287,7 @@ export class WeaponSampleBank {
       node: out,
       end: when + buffer.duration + 0.02,
       send: CALLOUT_MIX.send,
-      stop() {
+      stop(): void {
         if (stopped) return;
         stopped = true;
         src.stop();

@@ -303,7 +303,7 @@ export class Arm {
     const base = this.poses[this.pose] ?? POSES[this.pose];
     const pose = {
       ...base,
-      fingers: (fingers ?? base.fingers).map((a) => a.slice()),
+      fingers: (fingers ?? base.fingers).map((a): number[] => a.slice()),
       fingerSpread: (spread ?? base.fingerSpread ?? this.fingerSpread).slice(),
     };
     this.poses[name] = pose;

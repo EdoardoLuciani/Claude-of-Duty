@@ -115,7 +115,7 @@ class Projectile {
   speed: number;
   tracer: boolean;
   hitActors: unknown[] = [];
-  pending = Array.from({ length: MAX_BULLET_LAYERS }, () => new PendingActorHit());
+  pending = Array.from({ length: MAX_BULLET_LAYERS }, (): PendingActorHit => new PendingActorHit());
   path: NonNullable<Parameters<PhysicsSystem['selectBulletRegion']>[3]>;
   layers = 0;
   materialTime = 0;
