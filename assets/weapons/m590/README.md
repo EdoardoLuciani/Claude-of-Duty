@@ -151,8 +151,6 @@ For play review, run `npm run dev`, buy M-590 as the secondary and equip with 2/
 For deterministic diagnostics in `/?capture=1`, await readiness then call
 `__ENGINE__.ctx.get('weapons').setWeaponImmediate('shotgun')`; this bypass is not
 shop/balance acceptance. Use normal fire/ADS/reload/switch/pause controls and
-`__ENGINE__.ctx.get('sky').setTimeOfDay(23)` for night. Use
-`node tests/e2e/weapons-e2e.mjs` for live native handling checks. Weapon/action
-capture matrices are temporary review scripts; read native final output rather
-than trusting a possibly black headless swapchain.
+`__ENGINE__.ctx.get('sky').setTimeOfDay(23)` for night. Read native final output rather than trusting a possibly black headless
+swapchain; weapon/action capture matrices are temporary review scripts.
 Before/after #447 hip/ADS/inspect images belong on the PR for human review.

@@ -56,7 +56,6 @@ blender -b --threads 8 --python-exit-code 1 --python tools/blender/m4a1.py -- \
 blender -b assets/weapons/m4a1-block-ii/m4a1-block-ii.blend \
   --python-exit-code 1 --python tools/blender/m4_check.py
 node tests/smoke/smoke-m4.mjs
-node tests/e2e/weapons-e2e.mjs
 ```
 
 Use frozen uniform registration for visual review: no after-only reframing or
