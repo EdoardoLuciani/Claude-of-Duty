@@ -25,6 +25,9 @@ export type ReloadPhase =
   | 'boltopen'
   | 'boltclose';
 
+/** Spoken tactical intents currently backed by local recordings; grenade means our throw. */
+export type AiCalloutKind = 'spot' | 'reload' | 'grenade';
+
 export interface EngineError {
   system: string;
   method: string;
@@ -153,7 +156,8 @@ export interface EngineEventMap {
     left?: boolean;
     speed?: number;
   };
-  'ai:bark': { kind: string; position: Vector3; voice: number };
+  /** position is the actor's retained position; voice is its immutable, sequential ID. */
+  'ai:bark': { kind: AiCalloutKind; position: Vector3; voice: number };
   'player:state': {
     stance: string;
     sprinting: boolean;
