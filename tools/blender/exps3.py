@@ -20,6 +20,12 @@ from mathutils import Matrix, Vector
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'assets/attachments/eotech-exps3-0'
 MM = 0.001
+# Photo-backed art datums, not certified optical/installation specifications.
+OPTICAL_Z = 48.2
+PANE_MM = (30, 23)
+CLEAR_MM = (30, 22)
+CORNER_MM = 5.4
+BATTERY_ROOF_Z = 36.7
 
 
 def material(name, color, metal=0, rough=0.5):
@@ -319,8 +325,8 @@ def screw(name, pos, mats, parent, axis='X', sign=1, radius=2.6):
 def build_geometry(mats):
     root = bpy.data.objects.new('ATTACHMENT_exps3', None)
     bpy.context.collection.objects.link(root)
-    for name, pos in [('SOCKET_mount', (0,0,0)), ('SOCKET_sight', (0,-23.1,46)),
-                      ('SOCKET_lens_rear', (0,-23.1,46)), ('SOCKET_lens_front', (0,18.1,46))]:
+    for name, pos in [('SOCKET_mount', (0,0,0)), ('SOCKET_sight', (0,-23.1,OPTICAL_Z)),
+                      ('SOCKET_lens_rear', (0,-23.1,OPTICAL_Z)), ('SOCKET_lens_front', (0,18.1,OPTICAL_Z))]:
         obj = bpy.data.objects.new(name, None)
         bpy.context.collection.objects.link(obj)
         obj.parent = root
@@ -339,21 +345,26 @@ def build_geometry(mats):
                (9,7),(-9,7),(-12,3),(-16,3)]
     prism('Rear electronics cover', contour, -35, -33.6, mats['body'], root, 'Y', .55)
     # Clear central bore; carrier, elastomer seals and separately removable optical windows.
-    outer = rounded_rect(42, 32, 7, 46)
-    inner = rounded_rect(30, 23, 5.4, 46)
+    # Slim carrier cheeks; its bottom stays seated on the existing 33mm housing roof.
+    outer = rounded_rect(39, 30.4, 7, OPTICAL_Z)
+    inner = rounded_rect(*CLEAR_MM, CORNER_MM, OPTICAL_Z)
     frame('Optical carrier | genuinely open aperture', outer, inner, 18, -23, mats['body'], root)
     for name,y in [('rear',-23.1),('front',18.1)]:
-        frame('Lens '+name+' recessed gasket', rounded_rect(33,26,6,46),
-              rounded_rect(30,23,5.4,46), y+.18, y-.18, mats['rubber'], root)
-        path = rounded_rect(30,23,5.4,46)
+        frame('Lens '+name+' recessed gasket', rounded_rect(33,25,6,OPTICAL_Z),
+              rounded_rect(*CLEAR_MM,CORNER_MM,OPTICAL_Z), y+.18, y-.18, mats['rubber'], root)
+        # Nominal physical pane and the visible/clear bezel opening are distinct.
+        path = rounded_rect(*PANE_MM,CORNER_MM,OPTICAL_Z)
         # Manufacturer manual: front 3.17mm glass, rear 4.76mm laminate.
         low,high = (y-3.17,y) if name == 'front' else (y,y+4.76)
         prism('OPTIC_glass_'+name,path,low,high,mats['glass'],root,'Y',.04)
     # Transverse CR123 battery body, seam, cap and scalloped grip.
-    battery = [(26,37.5),(46.2,37.5)]
+    battery = [(26,BATTERY_ROOF_Z),(46.2,BATTERY_ROOF_Z)]
     for i in range(1,49):
         a = math.pi/2-i*math.pi/48
-        battery.append((46.2+14.5*math.cos(a),23+14.5*math.sin(a)))
+        # Relieve the whole upper shoulder, not only the flat roof. Lower profile,
+        # cap axis and forward reach remain unchanged; clear-bore margin is 0.5mm.
+        radius_z = BATTERY_ROOF_Z-23 if a > 0 else 14.5
+        battery.append((46.2+14.5*math.cos(a),23+radius_z*math.sin(a)))
     battery += [(32.5,8.5),(26,12)]
     prism('Transverse CR123 battery housing', battery, -25,25, mats['body'], root, bevel=.6)
     prism('Battery compartment left end', battery, -25.6,-25, mats['hood'], root, bevel=.35)
@@ -543,7 +554,12 @@ def export(output, root):
         'blender':bpy.app.version_string,'units':'metres',
         'axes':{'right':'+X','up':'+Y','forward':'-Z'},'nominalEnvelopeMm':[58.4,73.7,96.5],
         'mountOrigin':'rail top centre; SOCKET_mount at [0,0,0]',
-        'opticalDatum':'provisional photo-derived 46mm above rail; not a certified manufacturer datum',
+        'opticalDatum':f'provisional photo-derived {OPTICAL_Z}mm above the current rail datum; not manufacturer-certified',
+        'opticalWindow':{'nominalPaneMm':list(PANE_MM),'clearOpeningMm':list(CLEAR_MM),
+            'clearCornerRadiusMm':CORNER_MM,'centreAboveArtDatumMm':OPTICAL_Z,
+            'carrierOuterMm':[39,30.4],'gasketOuterMm':[33,25],
+            'batteryRoofMm':BATTERY_ROOF_Z,'axialLowerClearanceMm':.5,
+            'status':'clear opening and centre inferred from registered photos; not an approved ADS/eye-box specification'},
         'reticle':{'ringMoa':68,'dotMoa':1,'geometryBaked':False},'stats':stats,
         'sha256':hashlib.sha256(data).hexdigest()}
     (output/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
