@@ -3,6 +3,7 @@ import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
 import handReference from '../../assets/weapons/p320-compact/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/p320-compact/manifest.json' with { type: 'json' };
+import { isSkinnedMesh } from '../core/three-guards.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
 import {
@@ -103,6 +104,7 @@ export class P320Animation {
   magazine!: THREE.Object3D;
   spare!: THREE.Object3D;
   magazineRound!: THREE.Object3D;
+  skin!: THREE.SkinnedMesh;
   hands!: Record<HandSide, AuthoredHand>;
   poseQ = new THREE.Quaternion();
   idleTime = 0;
@@ -121,6 +123,9 @@ export class P320Animation {
     this.magazine = node('magazine');
     this.spare = node('magazine_spare');
     this.magazineRound = node('magazine_round');
+    const skin = node('P320_surface');
+    if (!isSkinnedMesh(skin)) throw new Error('P320: missing mechanical skin');
+    this.skin = skin;
     this.hands = discoverAuthoredHands(node);
     this.reset();
   }
@@ -169,6 +174,9 @@ export class P320Animation {
       this.barrel.rotation.x = THREE.MathUtils.degToRad(3.5);
     }
     this.magazineRound.visible = magazineLoaded;
+    // Bone visibility does not hide its weighted vertices. Collapse only the
+    // cartridge bone; the next native sample restores its authored scale.
+    if (!magazineLoaded) this.magazineRound.scale.setScalar(0);
     this.root.updateMatrixWorld(true);
   }
 
@@ -184,6 +192,7 @@ export class P320Animation {
   dispose(): void {
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.root);
+    this.skin.skeleton.dispose();
     disposeWeaponMaterials(this.model);
   }
 }

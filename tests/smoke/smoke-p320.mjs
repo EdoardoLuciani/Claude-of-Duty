@@ -10,7 +10,7 @@ import { WeaponSystem } from '../../src/weapons/index.ts';
 import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
 import { makeP320Model, P320_URL } from '../../src/weapons/p320.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
-import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
+import { inspectGLB, parseGLB } from '../../tools/lib/glb-fixture.mjs';
 
 const dir = new URL('../../assets/weapons/p320-compact/', import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', dir)));
@@ -23,13 +23,48 @@ assert(
 const bytes = readFileSync(new URL(P320_URL));
 const json = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)));
 assert.equal(json.animations.length, 8);
-assert.equal(json.images.length, 3, 'one shared unique UV PBR atlas, no duplicated arm textures');
+assert.equal(json.images.length, 4, 'shared base/ORM/normal/emission atlas, no arm textures');
+assert.equal(json.materials.length, 1, 'all finishes, lettering and sights share one material');
+assert.equal(json.meshes.length, 1);
+assert.equal(json.meshes[0].primitives.length, 1, 'one complete animated weapon submission');
+assert.equal(json.skins.length, 1);
+assert.equal(json.skins[0].joints.length, 9, 'rigid mechanical parts, not duplicate hands');
+assert(
+  !json.nodes.some((node) => node.name?.startsWith('Mark |')),
+  'lettering is baked, not drawn'
+);
+const { imagePNG } = inspectGLB(bytes);
+for (const image of json.images) {
+  const png = imagePNG(image);
+  const kind = image.name.replace('p320-', '');
+  const resolution = kind === 'base' || kind === 'normal' ? 2048 : 1024;
+  assert.equal(manifest.textureResolutions[kind], resolution);
+  assert.equal(png.width, resolution);
+  assert.equal(png.height, resolution);
+  if (image.name.includes('emission')) {
+    let lit = 0;
+    for (let i = 0; i < png.data.length; i += 4)
+      if (png.data[i] || png.data[i + 1] || png.data[i + 2]) lit++;
+    assert(lit > 0 && lit < resolution * resolution * 0.01, 'sight-only emission mask');
+  }
+}
+assert(json.materials[0].emissiveTexture, 'emission survives material consolidation');
 assert(
   json.buffers.every((b) => !b.uri) && json.images.every((i) => i.bufferView !== undefined),
   'self-contained offline GLB'
 );
-assert(manifest.stats.triangles < 93606, 'less geometry than MCX');
-assert(manifest.stats.primitives < 37, 'fewer submissions than MCX');
+assert(manifest.stats.triangles < 30000, 'low surfaces replace the 56862-triangle instance asset');
+assert.equal(manifest.stats.primitives, 1);
+assert.equal(manifest.stats.bytes, bytes.length);
+assert.equal(
+  manifest.stats.vertices,
+  json.accessors[json.meshes[0].primitives[0].attributes.POSITION].count
+);
+assert.equal(
+  manifest.stats.triangles,
+  json.accessors[json.meshes[0].primitives[0].indices].count / 3,
+  'manifest counts actual rendered geometry'
+);
 for (const mesh of json.meshes)
   for (const p of mesh.primitives) {
     const pos = json.accessors[p.attributes.POSITION];
@@ -90,6 +125,44 @@ const rifle = makeM4Model(await parseGLB(rifleBytes));
 vm.addWeapon(rifle, { ...WEAPON_DEFS.rifle, cycleTime: 60 / WEAPON_DEFS.rifle.rpm });
 const entry = vm.addWeapon(model, { ...WEAPON_DEFS.pistol, cycleTime: 60 / 460 });
 const anim = entry.animation;
+assert(anim.skin.isSkinnedMesh);
+const weights = anim.skin.geometry.getAttribute('skinWeight');
+const joints = anim.skin.geometry.getAttribute('skinIndex');
+for (let i = 0; i < weights.count; i++) {
+  assert.equal(weights.getX(i), 1, 'one rigid influence per vertex');
+  assert.equal(weights.getY(i) + weights.getZ(i) + weights.getW(i), 0);
+}
+const slideJoint = anim.skin.skeleton.bones.indexOf(anim.slide);
+const roundJoint = anim.skin.skeleton.bones.indexOf(anim.magazineRound);
+const slideVertex = Array.from({ length: joints.count }, (_, i) => i).find(
+  (i) => joints.getX(i) === slideJoint
+);
+assert.notEqual(slideVertex, undefined);
+function skinPoint(index) {
+  anim.root.updateMatrixWorld(true);
+  anim.skin.skeleton.update();
+  return anim.root.worldToLocal(
+    anim.skin.localToWorld(anim.skin.getVertexPosition(index, new THREE.Vector3()))
+  );
+}
+anim._sample('Idle', 0);
+const slidePoint = skinPoint(slideVertex);
+anim._sample('Last_Shot', manifest.clips.Last_Shot.duration);
+assert(
+  skinPoint(slideVertex)
+    .sub(slidePoint)
+    .distanceTo(new THREE.Vector3(0, 0, 0.027)) < 1e-6,
+  'actual slide vertices follow the last-shot bone, not just an animated empty'
+);
+anim.update(0, 'reloadEmpty', 0.8, true, false);
+const collapsedRounds = [];
+for (let i = 0; i < joints.count; i++)
+  if (joints.getX(i) === roundJoint) collapsedRounds.push(skinPoint(i));
+assert(collapsedRounds.length > 0);
+assert(
+  collapsedRounds.every((point) => point.distanceTo(collapsedRounds[0]) < 1e-6),
+  'empty-magazine override collapses cartridge vertices, not only Bone.visible'
+);
 anim._sample('Last_Shot', manifest.clips.Last_Shot.duration);
 assert(
   anim.slide.position.z > 0.025,

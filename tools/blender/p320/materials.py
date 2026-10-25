@@ -1,5 +1,8 @@
 """P320 procedural finishes and unique-UV atlas baking; no cached asset inputs."""
 import bpy
+from .surfaces import active, build_surfaces, stash_sources
+
+ATLAS_RESOLUTIONS = {'base': 2048, 'orm': 1024, 'normal': 2048, 'emission': 1024}
 
 def build_source_materials(coords):
     materials = []
@@ -52,56 +55,97 @@ def build_source_materials(coords):
 
     return materials, (nitron, polymer, stipple, steel, barrel_mat, mag_mat, cavity, mark, brass, copper, white)
 
-def bake_atlas(output, weapon_meshes, materials, tritium):
+def bake_atlas(output, asset, weapon_meshes):
     scene = bpy.context.scene
-    bake_meshes=[o for o in weapon_meshes if not o.name.startswith('Mark |') and o.data.materials[0]!=tritium]
-    atlas={}
-    for name,color in [('base',True),('orm',False),('normal',False)]:
-        im=bpy.data.images.new('P320_'+name,width=1024,height=1024,alpha=False)
-        im.generated_color=(.5,.5,1,1) if name=='normal' else (1,1,1,1)
-        im.colorspace_settings.name='sRGB' if color else 'Non-Color';atlas[name]=im
-    scene.render.bake.use_clear=False;scene.render.bake.margin=3
-    # Emission bake preserves the authored base and packed metallic/roughness,
-    # without baking studio illumination. Normal bake includes micro-bump.
-    all_mats=materials+[tritium]
-    for name in ('base','orm','normal'):
+    surfaces = build_surfaces(asset, weapon_meshes)
+    atlas = {}
+    for name, resolution in ATLAS_RESOLUTIONS.items():
+        im = bpy.data.images.new('P320_' + name, width=resolution, height=resolution, alpha=False)
+        im.generated_color = (.5,.5,1,1) if name == 'normal' else (0,0,0,1)
+        im.colorspace_settings.name = 'sRGB' if name in ('base', 'emission') else 'Non-Color'
+        atlas[name] = im
+    bake = scene.render.bake
+    bake.use_clear = False
+    bake.margin = 4
+    bake.use_selected_to_active = True
+    bake.cage_extrusion = .0012
+    bake.max_ray_distance = .0024
+    all_mats = {slot.material for obj in weapon_meshes for slot in obj.material_slots if slot.material}
+    # High-to-low projection includes the former lettering/traction geometry.
+    # The emission map keeps the small sight dots in the SAME material section.
+    for name in atlas:
+        bake.margin = atlas[name].size[0] // 256
         for mat in all_mats:
-            n,l=mat.node_tree.nodes,mat.node_tree.links;p=n.get('Principled BSDF');out=n.get('Material Output')
-            target=n.get('ATLAS_TARGET') or n.new('ShaderNodeTexImage');target.name='ATLAS_TARGET';target.image=atlas[name];n.active=target
-            if name=='normal':l.new(p.outputs[0],out.inputs['Surface']);continue
-            emit=n.get('BAKE_EMIT') or n.new('ShaderNodeEmission');emit.name='BAKE_EMIT'
-            if name=='base':
-                socket=p.inputs['Base Color']
-                if socket.is_linked:l.new(socket.links[0].from_socket,emit.inputs[0])
-                else:emit.inputs[0].default_value=socket.default_value
+            n, l = mat.node_tree.nodes, mat.node_tree.links
+            p, out = n.get('Principled BSDF'), n.get('Material Output')
+            target = n.get('ATLAS_TARGET') or n.new('ShaderNodeTexImage')
+            target.name = 'ATLAS_TARGET'
+            target.image = atlas[name]
+            n.active = target
+            if name == 'normal':
+                l.new(p.outputs[0], out.inputs['Surface'])
+                continue
+            emit = n.get('BAKE_EMIT') or n.new('ShaderNodeEmission')
+            emit.name = 'BAKE_EMIT'
+            for link in list(emit.inputs[0].links):
+                l.remove(link)
+            if name == 'orm':
+                pack = n.new('ShaderNodeCombineColor')
+                pack.inputs[0].default_value = 1
+                r, m = p.inputs['Roughness'], p.inputs['Metallic']
+                if r.is_linked:
+                    l.new(r.links[0].from_socket, pack.inputs[1])
+                else:
+                    pack.inputs[1].default_value = r.default_value
+                pack.inputs[2].default_value = m.default_value
+                l.new(pack.outputs[0], emit.inputs[0])
             else:
-                pack=n.new('ShaderNodeCombineColor');pack.inputs[0].default_value=1
-                r=p.inputs['Roughness'];m=p.inputs['Metallic']
-                if r.is_linked:l.new(r.links[0].from_socket,pack.inputs[1])
-                else:pack.inputs[1].default_value=r.default_value
-                pack.inputs[2].default_value=m.default_value
-                l.new(pack.outputs[0],emit.inputs[0])
-            l.new(emit.outputs[0],out.inputs['Surface'])
-        bpy.ops.object.select_all(action='DESELECT')
-        bake_meshes[0].select_set(True)
-        bpy.context.view_layer.objects.active=bake_meshes[0]
-        for o in bake_meshes:o.select_set(True)
-        bpy.ops.object.bake(type='NORMAL' if name=='normal' else 'EMIT')
-        im=atlas[name];im.filepath_raw=str(output/'textures'/f'p320-{name}.png');im.file_format='PNG';im.save()
-    for mat in all_mats:mat.node_tree.links.new(mat.node_tree.nodes.get('Principled BSDF').outputs[0],mat.node_tree.nodes.get('Material Output').inputs[0])
-    for name,im in atlas.items():
-        im.pack();im.filepath='//textures/p320-'+name+'.png'
-    # Standard glTF-compatible PBR shader, shared by every non-emissive component.
-    baked=bpy.data.materials.new('P320 | baked unique PBR');baked.use_nodes=True
-    n,l=baked.node_tree.nodes,baked.node_tree.links;p=n.get('Principled BSDF')
-    for name in ('base','orm','normal'):
-        t=n.new('ShaderNodeTexImage');t.image=atlas[name]
-        if name=='base':l.new(t.outputs[0],p.inputs['Base Color'])
-        elif name=='normal':
-            norm=n.new('ShaderNodeNormalMap');l.new(t.outputs[0],norm.inputs['Color']);l.new(norm.outputs[0],p.inputs['Normal'])
+                socket = p.inputs['Base Color' if name == 'base' else 'Emission Color']
+                if socket.is_linked:
+                    l.new(socket.links[0].from_socket, emit.inputs[0])
+                else:
+                    strength = p.inputs['Emission Strength'].default_value if name == 'emission' else 1
+                    emit.inputs[0].default_value = tuple(v * strength for v in socket.default_value[:3]) + (1,)
+            l.new(emit.outputs[0], out.inputs['Surface'])
+        for surface, sources in surfaces:
+            active(surface)
+            for source in sources:
+                source.select_set(True)
+            bpy.ops.object.bake(type='NORMAL' if name == 'normal' else 'EMIT')
+        im = atlas[name]
+        im.filepath_raw = str(output / 'textures' / f'p320-{name}.png')
+        im.file_format = 'PNG'
+        im.save()
+        im.pack()
+        im.filepath = '//textures/p320-' + name + '.png'
+    bake.use_selected_to_active = False
+    for mat in all_mats:
+        n = mat.node_tree.nodes
+        mat.node_tree.links.new(n.get('Principled BSDF').outputs[0], n.get('Material Output').inputs[0])
+    baked = bpy.data.materials.new('P320 | baked unique PBR')
+    baked.use_nodes = True
+    n, l = baked.node_tree.nodes, baked.node_tree.links
+    p = n.get('Principled BSDF')
+    for name, im in atlas.items():
+        t = n.new('ShaderNodeTexImage')
+        t.image = im
+        if name == 'base':
+            l.new(t.outputs[0], p.inputs['Base Color'])
+        elif name == 'emission':
+            l.new(t.outputs[0], p.inputs['Emission Color'])
+            p.inputs['Emission Strength'].default_value = 1
+        elif name == 'normal':
+            norm = n.new('ShaderNodeNormalMap')
+            l.new(t.outputs[0], norm.inputs['Color'])
+            l.new(norm.outputs[0], p.inputs['Normal'])
         else:
-            sep=n.new('ShaderNodeSeparateColor');l.new(t.outputs[0],sep.inputs[0]);l.new(sep.outputs[1],p.inputs['Roughness']);l.new(sep.outputs[2],p.inputs['Metallic'])
-    for o in weapon_meshes:
-        if o.data.materials[0]==tritium or o.name.startswith('Mark |'):continue
-        o.data.materials.clear();o.data.materials.append(baked)
-        for poly in o.data.polygons:poly.material_index=0
+            sep = n.new('ShaderNodeSeparateColor')
+            l.new(t.outputs[0], sep.inputs[0])
+            l.new(sep.outputs[1], p.inputs['Roughness'])
+            l.new(sep.outputs[2], p.inputs['Metallic'])
+    for surface, _ in surfaces:
+        surface.data.materials.clear()
+        surface.data.materials.append(baked)
+        for poly in surface.data.polygons:
+            poly.material_index = 0
+    stash_sources(weapon_meshes)
