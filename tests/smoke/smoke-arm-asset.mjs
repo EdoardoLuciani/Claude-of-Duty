@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { registerHooks, stripTypeScriptTypes } from 'node:module';
 
@@ -41,6 +42,23 @@ const { Arm, HAND_POSES } = await import('../../src/weapons/hands.ts');
 hooks.deregister();
 const bytes = readFileSync(new URL('../../public/models/player/arms.glb', import.meta.url));
 const { json, imagePNG } = inspectGLB(bytes);
+const manifest = JSON.parse(
+  readFileSync(new URL('../../assets/player/arms/manifest.json', import.meta.url))
+);
+for (const [path, hash] of Object.entries(manifest.sha256))
+  assert.equal(
+    createHash('sha256')
+      .update(readFileSync(new URL('../../' + path, import.meta.url)))
+      .digest('hex'),
+    hash,
+    `stale arms: ${path}`
+  );
+assert.equal(json.animations.length, Object.keys(HAND_POSES).length);
+assert(
+  json.materials.every((material) => material.normalTexture.texCoord === 1),
+  'physical-density detail UVs'
+);
+assert(manifest.gloveMaxDeviationMetres <= 0.0005, 'retained contact silhouette');
 for (const fixture of ['single', 'grouped', 'grouped-draw-range']) {
   globalThis.OffscreenCanvas = FixtureCanvas;
   const gltf = await parseGLB(bytes);
@@ -50,6 +68,20 @@ for (const fixture of ['single', 'grouped', 'grouped-draw-range']) {
     if (o.isSkinnedMesh) sources.push(o);
   });
   assert.equal(sources.length, 5, 'five editable authored surfaces');
+  if (fixture === 'single') {
+    const triangles = sources.reduce((sum, mesh) => sum + mesh.geometry.index.count / 3, 0);
+    assert.equal(triangles, manifest.triangles);
+    assert(triangles <= 45000, 'authored triangle budget');
+    for (const mesh of sources) {
+      const weights = mesh.geometry.attributes.skinWeight;
+      for (let i = 0; i < weights.count; i++)
+        assert(
+          Math.abs(weights.getX(i) + weights.getY(i) + weights.getZ(i) + weights.getW(i) - 1) <
+            1e-5,
+          'normalized skin weights'
+        );
+    }
+  }
   const expectedPixels = new Map();
   for (const mesh of sources) {
     const source = json.materials.find((m) => m.name === mesh.material.name);

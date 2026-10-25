@@ -117,6 +117,51 @@ function makeHarness() {
   return { wp, input, frame, tap, clips, prompts, cancellations, bodies, player, shots };
 }
 
+// Retain the real loadout boundary without separate per-weapon fake rigs.
+for (const [equip, first, second] of [
+  ['equipPrimary', 'lmg', 'sniper'],
+  ['equipSecondary', 'smg', 'shotgun'],
+]) {
+  const { wp } = makeHarness();
+  assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
+  assert(wp[equip](first) && !wp[equip](first), 'cannot rebuy the equipped weapon');
+  assert.deepEqual(wp.weaponIds, equip === 'equipPrimary' ? [first, 'pistol'] : ['rifle', first]);
+  wp.state.mag = 1;
+  assert(wp.reload());
+  assert(wp[equip](second) && !wp.owns(first));
+  assert.deepEqual(wp.weaponIds, equip === 'equipPrimary' ? [second, 'pistol'] : ['rifle', second]);
+  assert(!wp.reloading && wp.tryFire(), 'mid-reload purchase is immediately usable');
+  wp.states.get(first).reserve = 0;
+  wp.state.reserve = 1;
+  wp.refillAmmo();
+  assert.equal(wp.state.reserve, wp.current.reserve);
+  assert.equal(wp.states.get(first).reserve, 0, 'refill ignores unowned weapons');
+  assert.equal(wp.ammoFraction(), 1);
+  wp.resetForNewGame();
+  assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
+  assert.equal(wp.activeId, 'rifle');
+}
+{
+  const { wp, shots } = makeHarness();
+  assert(wp.equipSecondary('shotgun') && wp.tryFire());
+  assert.equal(shots.fired, 8, 'one shotgun shell spawns eight pellets');
+  assert.equal(wp._pendingShots, 1, 'pellets still produce one accepted-shot event');
+}
+{
+  const { wp } = makeHarness();
+  assert(wp.equipPrimary('sniper') && wp.tryFire());
+  assert(
+    !wp.state.chambered && !wp.tryFire() && !wp.setWeapon('pistol'),
+    'bolt cycle blocks fire/switch'
+  );
+  wp.viewmodel.stopClip();
+  wp._fireTimer = 0;
+  assert(wp.reload(), 'interrupted bolt cycle can reload a full box with empty chamber');
+  assert.equal(wp.viewmodel.clipName, 'reloadEmpty');
+  wp._completeReload(true);
+  assert(wp.state.chambered && wp.state.mag === wp.current.magSize - 1);
+}
+
 // Same-frame operations retain their order, independent of physical event order.
 {
   const { wp, frame } = makeHarness();

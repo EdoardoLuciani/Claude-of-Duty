@@ -34,7 +34,7 @@ no idle sway or stretching. Gameplay retains cancellation, not an added wound.
 ```sh
 blender -b --python-exit-code 1 --python tools/blender/player_arms.py
 blender -b --python-exit-code 1 --python tools/blender/player_bandage.py
-node tests/smoke/smoke-arms.mjs
+node tests/smoke/smoke-arm-asset.mjs
 node tests/smoke/smoke-bandage.mjs
 node tests/smoke/smoke-grips.mjs
 node tests/e2e/check-bandage-intersections.mjs --dense --out=/tmp/bandage.json

@@ -1,6 +1,21 @@
 import assert from 'node:assert/strict';
 
+import { CONTROL_REFERENCE, DEFAULT_BINDINGS } from '../../src/core/bindings.ts';
 import { Input } from '../../src/core/input.ts';
+
+// Keep canonical coverage/conflict checks without a second literal binding table.
+const owners = new Map();
+for (const [action, codes] of Object.entries(DEFAULT_BINDINGS)) {
+  assert(codes.length > 0);
+  for (const code of codes) {
+    assert(!owners.has(code), `${code}: ${owners.get(code)} conflicts with ${action}`);
+    owners.set(code, action);
+  }
+}
+assert.deepEqual(
+  new Set(CONTROL_REFERENCE.map((row) => row.action)),
+  new Set(Object.keys(DEFAULT_BINDINGS))
+);
 
 const input = new Input({}, { sensitivity: 0.001, invertY: false });
 input.pointerLocked = true;
@@ -69,6 +84,37 @@ assert.equal(input.actionPressed('jump'), true);
 assert.equal(input.firePressed, true);
 assert.deepEqual(input.look, { x: 0.005, y: -0.002 });
 assert.equal(input.wheel, -1);
+
+// Alias edges retain physical-key semantics; a same-frame tap retains both edges.
+input.clear();
+input._onKeyDown({ code: 'ControlLeft', preventDefault() {} });
+input.beginFrame();
+assert(input.action('crouch') && input.actionPressed('crouch'));
+input._onKeyDown({ code: 'KeyC', preventDefault() {} });
+input.beginFrame();
+assert(input.action('crouch') && input.actionPressed('crouch'));
+input._onKeyUp({ code: 'ControlLeft', preventDefault() {} });
+input.beginFrame();
+assert(input.action('crouch') && input.actionReleased('crouch'));
+input._onKeyUp({ code: 'KeyC', preventDefault() {} });
+input._onKeyDown({ code: 'KeyZ', preventDefault() {} });
+input._onKeyUp({ code: 'KeyZ', preventDefault() {} });
+input.beginFrame();
+assert(!input.action('crouch') && !input.action('prone'));
+assert(input.actionPressed('prone') && input.actionReleased('prone'));
+input._onKeyDown({ code: 'KeyF', preventDefault() {} });
+assert(!input.action('flashlight'), 'DOM events wait for the next snapshot');
+input.beginFrame();
+for (let fixedRead = 0; fixedRead < 4; fixedRead++) assert(input.actionPressed('flashlight'));
+input._onKeyDown({ code: 'KeyF', repeat: true, preventDefault() {} });
+input._onKeyDown({ code: 'Tab', preventDefault() {} });
+input._onWheel({ target: input.canvas, deltaY: -1 });
+input.beginFrame();
+assert(
+  input.action('flashlight') && !input.actionPressed('flashlight'),
+  'repeat is not a new edge'
+);
+assert(input.actionPressed('cycleWeapon') && input.wheel === -1, 'Tab and wheel stay independent');
 input.enabled = false;
 input.frozen = true;
 input.clear();
