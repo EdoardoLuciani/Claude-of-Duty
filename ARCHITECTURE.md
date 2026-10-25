@@ -252,6 +252,14 @@ composition with its ACES transform; first-person refraction uses world coordina
 
 ## Models
 
+`weapons.createInspectionModel(id)` returns an independent rest-pose scene and
+`dispose()` for the market's single demand-rendered WebGPU studio. Cloned transforms,
+skeletons and mixers are inspection-owned; geometry, materials and maps are borrowed
+from gameplay and must not be disposed by the caller. UI drops the clone on selection,
+close/restart/error and releases its renderer/environment at teardown. Controls use
+DOM input, not the paused simulation clock. Only explicit weapon Buy/Swap buttons
+purchase; selecting or inspecting a weapon never changes loadout or credits.
+
 `tools/export-models.mjs` runs the same procedural builders offline with a fixed
 seed; runtime never builds meshes. Regenerate ALL procedural models, since
 transitive builder inputs invalidate naive per-file caches. Export uses atomic
