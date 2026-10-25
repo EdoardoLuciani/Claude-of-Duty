@@ -13,6 +13,14 @@ import {
   SECONDARY_IDS,
   buildRecoilPattern,
   SPREAD_MODS,
+  isWeaponId,
+} from './defs.ts';
+import type {
+  WeaponId,
+  WeaponDef,
+  WeaponMode,
+  PrimaryWeaponId,
+  SecondaryWeaponId,
 } from './defs.ts';
 import { grenadeMesh } from './grenade-mesh.ts';
 import { createWeaponInspection } from './inspection.ts';
@@ -169,9 +177,9 @@ export class WeaponSystem {
   set pickups(value: AmmoPickups | null) {
     this._pickups = value;
   }
-  declare states: Map<string, WeaponState>;
-  declare owned: Set<string>;
-  declare activeId: string;
+  declare states: Map<WeaponId, WeaponState>;
+  declare owned: Set<WeaponId>;
+  declare activeId: WeaponId;
   declare debugMode: string | null;
   declare disabled: boolean;
   declare _warmed: boolean;
@@ -183,7 +191,7 @@ export class WeaponSystem {
   declare _spread: number;
   declare _shotIndex: number;
   declare _sinceShot: number;
-  declare _switchTo: string | null;
+  declare _switchTo: WeaponId | null;
   declare _muzzle: THREE.Vector3;
   declare _dir: THREE.Vector3;
   declare _right: THREE.Vector3;
@@ -209,7 +217,7 @@ export class WeaponSystem {
     spin: number;
   };
   declare _pendingShots: number;
-  declare _shellQueue: Array<{ t: number; weapon: string | null }>;
+  declare _shellQueue: Array<{ t: number; weapon: WeaponId | null }>;
   declare _droppedMags: DroppedMagazine[];
   declare _grenades: LiveGrenade[];
   declare grenades: number;
@@ -237,7 +245,7 @@ export class WeaponSystem {
   declare _off: Array<() => void>;
   declare stats: WeaponStats;
   declare _warming: boolean;
-  declare _magPools: Map<string, DroppedMagazine[]>;
+  declare _magPools: Map<WeaponId, DroppedMagazine[]>;
   declare _tubeLoop: boolean;
   declare _disc: { x: number; y: number };
   declare _fireSeed: number;
@@ -422,17 +430,8 @@ export class WeaponSystem {
     );
   }
 
-  _makeState(id: string): {
-    def: import('./runtime-types.ts').WeaponDef;
-    pattern: Float32Array<ArrayBufferLike>;
-    mag: number;
-    chambered: boolean;
-    reserve: number;
-    mode: string;
-    modeIndex: number;
-  } {
-    if (!isWeaponId(id)) throw new Error(`[weapons] unknown weapon ${id}`);
-    const def: WeaponState['def'] = { ...WEAPON_DEFS[id], cycleTime: 60 / WEAPON_DEFS[id].rpm };
+  _makeState(id: WeaponId): WeaponState {
+    const def = { ...WEAPON_DEFS[id] };
     return {
       def,
       pattern: buildRecoilPattern(def, Rng),
@@ -445,21 +444,24 @@ export class WeaponSystem {
   }
 
   /** Read-only market inspection; never mounts or animates the equipped model. */
-  async createInspectionModel(id: string): Promise<ReturnType<typeof createWeaponInspection>> {
+  async createInspectionModel(id: WeaponId): Promise<ReturnType<typeof createWeaponInspection>> {
     await this._restTask;
     const entry = this.viewmodel.weapons.get(id);
     if (!entry) throw new Error(`[weapons] inspection unavailable: ${id}`);
     return createWeaponInspection(entry);
   }
 
-  _hasMesh(id: string): boolean {
+  _hasMesh(id: WeaponId): boolean {
     const map = this._viewmodel?.weapons;
     return !map || map.has(id);
   }
 
-  async _mountRest(ids: string[], load: (id: string) => Promise<WeaponModelRecord>): Promise<void> {
+  async _mountRest(
+    ids: WeaponId[],
+    load: (id: WeaponId) => Promise<WeaponModelRecord>
+  ): Promise<void> {
     const records = await Promise.all(
-      ids.map(async (id: string): Promise<WeaponModelRecord | null> => {
+      ids.map(async (id: WeaponId): Promise<WeaponModelRecord | null> => {
         try {
           return await load(id);
         } catch (err: unknown) {
@@ -546,7 +548,7 @@ export class WeaponSystem {
   /*  public getters                                                        */
   /* ====================================================================== */
 
-  _requireState(id: string): WeaponState {
+  _requireState(id: WeaponId): WeaponState {
     const state = this.states.get(id);
     if (!state) throw new Error(`[weapons] unknown weapon ${id}`);
     return state;
@@ -556,11 +558,11 @@ export class WeaponSystem {
     return this.states.get(this.activeId);
   }
 
-  get current(): import('./runtime-types.ts').WeaponDef | null {
+  get current(): WeaponDef | null {
     return this.state?.def ?? null;
   }
 
-  get weaponIds(): string[] {
+  get weaponIds(): WeaponId[] {
     return SLOT_IDS.filter((id): boolean => this.owned.has(id));
   }
 
@@ -570,17 +572,17 @@ export class WeaponSystem {
   }
 
   /** True when the player owns `id` — non-owned weapons can't be drawn. */
-  owns(id: string): boolean {
+  owns(id: WeaponId): boolean {
     return this.owned.has(id);
   }
 
   /** Market: buy a primary weapon, replacing the others in the primary slot. */
-  equipPrimary(id: string): boolean {
+  equipPrimary(id: PrimaryWeaponId): boolean {
     return this._equipSlot(id, PRIMARY_IDS);
   }
 
   /** Market: buy into a weapon slot, replacing the old gun and refreshing ammo. */
-  _equipSlot(id: string, slot: readonly string[]): boolean {
+  _equipSlot(id: WeaponId, slot: readonly WeaponId[]): boolean {
     if (!slot.includes(id) || this.owned.has(id)) return false;
     if (!this._hasMesh(id)) return false;
     for (const weapon of slot) if (weapon !== id) this.owned.delete(weapon);
@@ -595,7 +597,7 @@ export class WeaponSystem {
     return true;
   }
 
-  equipSecondary(id: string): boolean {
+  equipSecondary(id: SecondaryWeaponId): boolean {
     return this._equipSlot(id, SECONDARY_IDS);
   }
 
@@ -797,7 +799,13 @@ export class WeaponSystem {
   }
 
   setWeapon(id: string): boolean {
-    if (this.disabled || !this.owned.has(id) || id === this.activeId || this._switchTo)
+    if (
+      !isWeaponId(id) ||
+      this.disabled ||
+      !this.owned.has(id) ||
+      id === this.activeId ||
+      this._switchTo
+    )
       return false;
     if (!this._hasMesh(id)) return false;
     if (this.cycling) return false;
@@ -820,7 +828,7 @@ export class WeaponSystem {
     return this.setWeapon(ids[(i + 1) % ids.length]);
   }
 
-  cycleFireMode(): string | undefined {
+  cycleFireMode(): WeaponMode | undefined {
     const s = this.state;
     if (this.disabled || !s || s.def.modes.length < 2) return s?.mode;
     s.modeIndex = (s.modeIndex + 1) % s.def.modes.length;
@@ -1925,7 +1933,7 @@ export class WeaponSystem {
 
   /** Swap without the draw animation (harness + debug only). */
   setWeaponImmediate(id: string): boolean {
-    if (!this.states.has(id)) return false;
+    if (!isWeaponId(id) || !this.states.has(id)) return false;
     if (!this._hasMesh(id)) return false;
     this._switchTo = null;
     this.activeId = id;
@@ -1994,10 +2002,6 @@ export class WeaponSystem {
     this._viewmodel?.dispose();
     this.mats?.dispose();
   }
-}
-
-function isWeaponId(id: string): id is keyof typeof WEAPON_DEFS {
-  return Object.hasOwn(WEAPON_DEFS, id);
 }
 
 function requiredTuning(value: number | undefined, name: string): number {

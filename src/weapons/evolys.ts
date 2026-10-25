@@ -35,7 +35,7 @@ export function makeEvolysModel(gltf: GLTF): EvolysModel {
   const { root, animations, point } = authoredModel(gltf, 'EVOLYS_RIG', REQUIRED, scene);
   const sight = point('SOCKET_sight');
   const model = {
-    id: 'lmg',
+    id: 'lmg' as const,
     label: 'EVOLYS-7.62',
     scene,
     root,
@@ -91,7 +91,7 @@ export async function loadEvolys(): Promise<EvolysModel> {
 type EvolysModel = {
   materials: Set<THREE.Material>;
   textures: Set<THREE.Texture>;
-  id: string;
+  id: 'lmg';
   label: string;
   scene: THREE.Group;
   root: THREE.Object3D;

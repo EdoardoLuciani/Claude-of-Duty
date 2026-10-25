@@ -1,6 +1,5 @@
 import { dot, mix, normalize, positionLocal, pow, smoothstep, vec3 } from 'three/tsl';
 
-import { hasOwn } from '../core/guards.ts';
 /**
  * Standalone visual harness for the weapons subsystem.
  *
@@ -21,13 +20,14 @@ import { Rng } from '../core/rng.ts';
 import { rendererCounters } from '../dev/render-info.ts';
 import { MaterialSystem } from '../materials/index.ts';
 import { createWebGpuRenderer } from '../render/webgpu-device.ts';
-import { WEAPON_DEFS, WEAPON_IDS } from './defs.ts';
+import { WEAPON_DEFS, WEAPON_IDS, isWeaponId } from './defs.ts';
 import { loadWeapon } from './loaders.ts';
 import { ReticleMaterials } from './materials-tsl.ts';
 import { Viewmodel } from './viewmodel.ts';
 
 const params = new URLSearchParams(location.search);
 const WEAPON = params.get('w') ?? 'rifle';
+if (!isWeaponId(WEAPON)) throw new Error(`[preview] unknown weapon ${WEAPON}`);
 const VIEW = params.get('view') ?? 'hero';
 const TIME = Number(params.get('t') ?? 0);
 const ARMS = params.get('arms') !== '0';
@@ -132,8 +132,7 @@ if (!FIRST_PERSON) {
 
 const stats: Record<string, number> = {};
 for (const id of WEAPON_IDS) {
-  if (!hasOwn(WEAPON_DEFS, id)) throw new Error('[preview] invalid weapon ID');
-  const def = { ...WEAPON_DEFS[id], cycleTime: 60 / WEAPON_DEFS[id].rpm };
+  const def = WEAPON_DEFS[id];
   const entry = vm.addWeapon(await loadWeapon(id), def);
   stats[id] = entry.tris;
 }

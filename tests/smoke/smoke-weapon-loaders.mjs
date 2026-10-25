@@ -3,9 +3,35 @@ import { readFileSync } from 'node:fs';
 
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-import { WEAPON_IDS } from '../../src/weapons/defs.ts';
+import {
+  WEAPON_IDS,
+  WEAPON_DEFS,
+  PRIMARY_IDS,
+  SECONDARY_IDS,
+  isWeaponId,
+} from '../../src/weapons/defs.ts';
 import { loadWeapon } from '../../src/weapons/loaders.ts';
 import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
+
+assert.deepEqual([...PRIMARY_IDS, ...SECONDARY_IDS].sort(), [...WEAPON_IDS].sort());
+assert.deepEqual(Object.keys(WEAPON_DEFS).sort(), [...WEAPON_IDS].sort());
+for (const id of WEAPON_IDS) {
+  assert.equal(isWeaponId(id), true);
+  assert.equal(WEAPON_DEFS[id].id, id);
+}
+for (const input of [
+  undefined,
+  null,
+  1,
+  {},
+  [],
+  'unknown',
+  '__proto__',
+  'constructor',
+  'toString',
+]) {
+  assert.equal(isWeaponId(input), false, 'only own catalog IDs enter weapon state');
+}
 
 // Exercise the real adapters and assets without browser-only URL fetching.
 const original = GLTFLoader.prototype.loadAsync;

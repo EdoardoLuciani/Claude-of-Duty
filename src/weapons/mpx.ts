@@ -68,7 +68,7 @@ export function makeMPXModel(gltf: GLTF): MPXModel {
     }
   const { root, animations, point } = authoredModel(gltf, 'MPX_RIG', REQUIRED, scene);
   const model = {
-    id: 'smg',
+    id: 'smg' as const,
     label: 'SIG MPX',
     scene,
     root,
@@ -133,7 +133,7 @@ export async function loadMPX(): Promise<MPXModel> {
 type MPXModel = {
   materials: Set<THREE.Material>;
   textures: Set<THREE.Texture>;
-  id: string;
+  id: 'smg';
   label: string;
   scene: THREE.Group;
   root: THREE.Object3D;
