@@ -1,8 +1,8 @@
 /**
  * AUDIO — recorded weapon fire/physical hits, spatialisation and mix
  *
- * Recorded assets are required. Synthesis supplies authored reinforcement,
- * casings/dry fire and intentional electronic/UI cues—not failed-load recovery.
+ * Physical sounds and firearm reports require recordings. Synthesis supplies
+ * intentional electronic/UI cues, never missing-asset recovery.
  *
  * ───────────────────────────────────────────────────────────────────────────
  * PUBLIC API   const audio = ctx.get('audio')
@@ -47,13 +47,7 @@ import { reactionKind } from './reactions.ts';
 import { WeaponSampleBank } from './samples.ts';
 import { SpatialField } from './spatial.ts';
 import type { WeaponProfile } from './types.ts';
-import {
-  WEAPON_PROFILES,
-  reportDistanceGain,
-  resolveProfile,
-  weaponShot,
-  weaponPunch,
-} from './weapons.ts';
+import { WEAPON_PROFILES, reportDistanceGain, resolveProfile } from './weapons.ts';
 
 const PROBE_RAYS = 9;
 const PROBE_DIST = 40;
@@ -654,44 +648,12 @@ export class AudioSystem {
       bank = this.bank!;
     const rng = this.rng;
     switch (kind) {
-      case 'shot': {
-        const profile: WeaponProfile = o.profile ?? WEAPON_PROFILES.rifle;
-        // Complete authored reports carry their own decay. The sample bank selects
-        // distant enemy perspectives; MCX/MPX retain suppressed sources at range.
-        // Unmodified legacy profiles keep their procedural distant model.
-        if (o.firstPerson || dist <= 45 || profile.samplePunch === false) {
-          const recorded = this.samples!.shot(profile, rng, {
-            when,
-            distance: dist,
-            firstPerson: o.firstPerson,
-          });
-          if (profile.samplePunch === false) return recorded;
-          const punch = weaponPunch(actx, bank, rng, profile, {
-            when,
-            distance: dist,
-            firstPerson: o.firstPerson,
-          });
-          const out = mkGain(actx, 1);
-          recorded.node.connect(out);
-          punch.node.connect(out);
-          return {
-            node: out,
-            end: Math.max(recorded.end, punch.end),
-            send: Math.max(recorded.send ?? 0, punch.send ?? 0),
-          };
-        }
-        return weaponShot(actx, bank, rng, profile, {
+      case 'shot':
+        return this.samples!.shot(o.profile ?? WEAPON_PROFILES.rifle, rng, {
           when,
           distance: dist,
           firstPerson: o.firstPerson,
-          echoBoost:
-            0.75 +
-            this._space.street * 0.7 +
-            this._space.tight * 0.35 +
-            this._space.tunnel * 0.8 +
-            this._space.open * 0.2,
         });
-      }
       case 'whizz':
         return this.samples!.combat('whizz', rng, {
           when,
@@ -820,7 +782,7 @@ export class AudioSystem {
         // Selected presentation reference + fixed digital-bank energy matching.
         // The sample selector and correction share the same perspective rule.
         atten:
-          kind === 'shot' && (o.profile ?? WEAPON_PROFILES.rifle).samplePunch === false
+          kind === 'shot'
             ? reportDistanceGain(dist, o.profile ?? WEAPON_PROFILES.rifle, o.firstPerson)
             : kind === 'explosion'
               ? explosionDistanceGain(dist, o.explosionKind ?? 'grenade')
@@ -1111,12 +1073,9 @@ export class AudioSystem {
       mixer = this.mixer!;
     const w = p.weapon;
     const name = typeof w === 'string' ? w : (w?.audio ?? w?.id ?? w?.name ?? w?.kind);
-    let profile = resolveProfile(name);
-    // The real MPX definition deliberately retains its generic suppressed tag.
-    // Select its dedicated 9mm report without changing unrelated suppressed guns.
-    if (w && typeof w === 'object' && w.id === 'smg' && w.suppressed) profile = WEAPON_PROFILES.mpx;
-    if (w && typeof w === 'object' && w.suppressed && !profile.suppressed)
-      profile = WEAPON_PROFILES.suppressed;
+    const profile = resolveProfile(name);
+    // Removing the unused generic fallback must not substitute an unsuppressed report.
+    if (!profile || (w && typeof w === 'object' && w.suppressed && !profile.suppressed)) return;
 
     if (p.empty) {
       this._playDry(
@@ -1137,27 +1096,8 @@ export class AudioSystem {
     const firstPerson = p.firstPerson ?? dist < 2.6;
 
     if (firstPerson) {
-      // Complete reports already contain their decay: no extra room branch.
-      // Legacy isolated takes retain their separately tuned environment send.
-      const send =
-        profile.samplePunch === false
-          ? 0
-          : (0.35 +
-              this._space.tight * 0.5 +
-              this._space.street * 0.9 +
-              this._space.tunnel * 1.0 +
-              this._space.room * 0.75) *
-            0.6;
-      this._playDry(
-        'shot',
-        {
-          profile,
-          firstPerson: true,
-          gain: profile.samplePunch === false ? 1 : (profile.firstPersonGain ?? 1.18),
-        },
-        'weapons',
-        send
-      );
+      // The complete recording owns its action and decay; no additional body or reverb.
+      this._playDry('shot', { profile, firstPerson: true, gain: 1 }, 'weapons', 0);
       mixer.duck(0.55, 0.1);
     } else {
       this._playAt('shot', x, y, z, { profile, firstPerson: false, gain: 1 }, 'weapons', 0.95);
