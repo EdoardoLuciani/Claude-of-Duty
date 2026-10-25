@@ -56,7 +56,6 @@ blender -b assets/weapons/fn-evolys-762/fn-evolys-762.blend \
   --python-exit-code 1 --python tools/blender/evolys_check.py
 node tests/smoke/smoke-evolys.mjs
 node tests/smoke/smoke-evolys-clearance.mjs
-node tests/e2e/weapons-e2e.mjs
 ```
 
 Follow the [shared authoring workflow](../../../tools/blender/README.md).

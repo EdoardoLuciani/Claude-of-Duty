@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Sustained living-combat baseline. See docs/profiling.md for methodology. */
+/** Sustained living-combat baseline; fixture/measurement limits live below. */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, writeFileSync } from 'node:fs';

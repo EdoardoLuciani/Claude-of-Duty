@@ -54,7 +54,6 @@ blender -b assets/weapons/sig-mpx/mpx.blend --python-exit-code 1 \
   --python tools/blender/mpx_check.py
 node tests/smoke/smoke-mpx-asset.mjs
 node tests/smoke/smoke-mpx.mjs
-node tests/e2e/weapons-e2e.mjs
 ```
 
 Previews use Eevee without ray tracing; common flags follow the shared workflow.

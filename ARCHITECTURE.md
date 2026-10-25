@@ -150,11 +150,11 @@ snapshot construction in `src/physics/query-snapshot.ts`. AI owns one module
 worker, its scratch/controller, revisions, bounded queues and lifetime. Initialize
 before AI readiness; transfer copies, never live collision buffers.
 
-[docs/ai-worker.md](docs/ai-worker.md) owns the caller map, exact proof/pending/
-cancellation semantics, bounded native budgets, tactical revalidation and timing
-limitations. Unknown is never provisional success or unreachable; failures are
-terminal, not unbounded main-thread fallback. Async admission is not same-tick
-seeded replay determinism.
+`src/ai/attachment-*.ts` owns the caller map, exact proof/pending/cancellation
+semantics, bounded native budgets, tactical revalidation and timing limitations.
+Unknown is never provisional success or unreachable; failures are terminal, not
+unbounded main-thread fallback. Async admission is not same-tick seeded replay
+determinism.
 
 ## Render integration
 
@@ -265,8 +265,7 @@ per independent skeleton, accepting single and grouped indexed surfaces. Preserv
 UV0 AO, UV1 detail, weights, mirrored binding, specular factors and sleeve-only blood.
 The arm asset owns packed texture arrays and releases source images after packing.
 Native copy, clone/cache-safe soldier output and render-owned environment
-re-registration contracts are documented in
-[docs/material-calibration.md](docs/material-calibration.md).
+re-registration follow the same ownership rules.
 
 FX particle/decal PNGs are required runtime assets; generation
 lives in `tools/lib/fx-atlas.ts` and the offline texture exporter. Missing/invalid
@@ -275,7 +274,7 @@ audio graph rather than substituting synthesis. Physical hits and movement/body/
 equipment foley, bomber loops, nonverbal reactions and sparse environmental events
 use required recordings. Radio owns aircraft pose/pass lifetime; audio owns source
 cleanup. Radio textures supplement intentional electronic tones. Do not invent
-ambient human/tactical actors. Asset/routing/rights contracts: [docs/audio.md](docs/audio.md).
+ambient human/tactical actors.
 Remaining synthesis includes legacy AK/generic-suppressed reports and reinforcement,
 shell casings/dry fire, tactical speech and intentional UI cues.
 
@@ -314,15 +313,14 @@ that build unused contexts or repeat it in a world hook.
 - Haze warms its private RG context, restoring target/clear/ranges/counts/
   visibility/activity even after failure.
 
-Diagnostic counter/readback contracts and canonical prewarm reporting are in
-[docs/profiling.md](docs/profiling.md). They do not change warmup
-staging or renderer-info reset scheduling.
+Diagnostic counter/readback contracts live in `src/dev/render-info.ts`; they do not
+change warmup staging or renderer-info reset scheduling.
 
 ## Quality
 
 Aim for rich, physically plausible materials/lighting and convincing motion, not
 flat colours or uniform light. Respect albedo/metalness conventions, detail maps,
 contact shadows, irregularity and weapon feedback. Finish units, authored asset
-ownership and explicit readability/optics exceptions are documented in
-[docs/material-calibration.md](docs/material-calibration.md). Smoke tests are
-correctness gates, not visual or combat-performance acceptance.
+ownership and explicit readability/optics exceptions follow the material policy
+above. Smoke tests are correctness gates, not visual or combat-performance
+acceptance.
