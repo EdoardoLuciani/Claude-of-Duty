@@ -20,15 +20,7 @@ class EnergyMixProcessor extends AudioWorkletProcessor {
   process(inputs: Float32Array[][], outputs: Float32Array[][]): boolean {
     if (!this.running) return false;
     const output = outputs[0];
-    const energy = outputs[1];
-    this.normalizer.process(
-      inputs[0]?.[0],
-      inputs[0]?.[1],
-      output[0],
-      output[1],
-      energy?.[0],
-      energy?.[1]
-    );
+    this.normalizer.process(inputs[0]?.[0], inputs[0]?.[1], output[0], output[1]);
     return true;
   }
 }

@@ -1,32 +1,11 @@
 #!/usr/bin/env node
 /** Actual game environmental scheduler, recorded routing and finite cleanup. */
 import assert from 'node:assert/strict';
-import { resolve } from 'node:path';
 
-import {
-  ensureViteServer,
-  launchChromium,
-  parseArgs,
-  REPO_ROOT,
-  stopViteServer,
-} from '../../tools/lib/browser-harness.mjs';
-import { waitForGame } from '../../tools/lib/native-render.mjs';
-const args = parseArgs(),
-  root = resolve(args.root ?? REPO_ROOT),
-  port = Number(args.port ?? 5547);
-const server = await ensureViteServer({ root, port });
-assert(server);
-let browser;
-const errors = [];
+import { openAudioGame } from '../lib/audio-game.mjs';
+
+const { page, errors, close } = await openAudioGame(5547, 'hero');
 try {
-  browser = await launchChromium({
-    headless: true,
-    args: ['--mute-audio', '--autoplay-policy=no-user-gesture-required'],
-  });
-  const page = await browser.newPage({ viewport: { width: 960, height: 640 } });
-  page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1&shot=hero`);
-  await waitForGame(page, { timeout: 180000 });
   const report = await page.evaluate(async () => {
     const engine = window.__ENGINE__,
       ctx = engine.ctx,
@@ -97,6 +76,5 @@ try {
     JSON.stringify({ events: report.records.length, active: report.active })
   );
 } finally {
-  await browser?.close();
-  stopViteServer(server);
+  await close();
 }

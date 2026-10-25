@@ -22,19 +22,9 @@
       "phaseTrimSamples": 370,
       "rmsWindowSeconds": 0.2,
       "rmsCorrectionBounds": [0.5, 2],
-      "steadiness": {
-        "pitchMinHz": 192.25,
-        "pitchMaxHz": 193.5,
-        "pitchSpanCents": 11.219961819100535,
-        "rmsSpanDb": 0.3766521809717851
-      },
       "targetRmsDb": -20,
       "level": 0.5820646197657513,
-      "decodedDuration": 3.188645833333333,
-      "decodedPeak": 0.2185005396604538,
       "downmixLossDb": -0.04734558402024073,
-      "seamDelta": 0.0028051137924194336,
-      "maxDelta": 0.02431119978427887,
       "sha256": "d402dbd3892e57e157cd77d69d71c69581cc291058e8e9c7cccc5bcba5e67df7"
     },
     "propeller-2": {
@@ -56,19 +46,9 @@
       "phaseTrimSamples": 464,
       "rmsWindowSeconds": 0.2,
       "rmsCorrectionBounds": [0.5, 2],
-      "steadiness": {
-        "pitchMinHz": 236.5,
-        "pitchMaxHz": 238,
-        "pitchSpanCents": 10.94566796225811,
-        "rmsSpanDb": 0.3858087415717222
-      },
       "targetRmsDb": -20,
       "level": 0.8055905213574215,
-      "decodedDuration": 3.2468541666666666,
-      "decodedPeak": 0.3216889798641205,
       "downmixLossDb": -0.04391345802372771,
-      "seamDelta": 0.010205723345279694,
-      "maxDelta": 0.035669565200805664,
       "sha256": "658683feb8fc085e668a07e71c1febd76145413da126713b7744f0666ff582a7"
     }
   }

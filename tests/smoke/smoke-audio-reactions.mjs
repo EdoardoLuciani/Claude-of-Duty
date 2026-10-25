@@ -1,48 +1,13 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 
 import { AudioSystem } from '../../src/audio/index.ts';
 import { REACTION_URLS, reactionBank } from '../../src/audio/reactions.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
-import provenance from '../../src/audio/samples/reactions/provenance.json' with { type: 'json' };
 import { BARKS, bark } from '../../src/audio/vox.ts';
 import { Rng } from '../../src/core/rng.ts';
+import { audioFixture } from '../lib/audio-banks.mjs';
 
-let encoded = 0,
-  decoded = 0;
-for (const [key, urls] of Object.entries(REACTION_URLS)) {
-  assert.equal(urls.length, 3);
-  for (const [i, url] of urls.entries()) {
-    const data = readFileSync(new URL(url)),
-      meta = provenance.files[`${key}-${i + 1}`];
-    assert.equal(createHash('sha256').update(data).digest('hex'), meta.sha256);
-    const header = data.indexOf('OpusHead');
-    assert(header >= 0);
-    assert.equal(data[header + 9], 1);
-    assert.equal(data.readInt16LE(header + 16), 0);
-    assert(meta.decodedDuration < 0.65 && meta.decodedPeak < 0.5);
-    encoded += data.length;
-    decoded += meta.decodedDuration * 48000 * 4;
-  }
-}
-assert(encoded < 150000 && decoded < 1500000);
-const sources = [];
-const actx = {
-  currentTime: 0,
-  createGain: () => ({ gain: { value: 0 }, connect() {}, disconnect() {} }),
-  createBufferSource() {
-    const src = {
-      playbackRate: { value: 1 },
-      connect() {},
-      start(when) {
-        this.when = when;
-      },
-    };
-    sources.push(src);
-    return src;
-  },
-};
+const { actx, sources } = audioFixture(0);
 const bank = new WeaponSampleBank(actx),
   rng = new Rng(474);
 for (const [key, urls] of Object.entries(REACTION_URLS))

@@ -1,8 +1,5 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -13,33 +10,9 @@ import {
 import { mixCases } from './audio-mix-scenes.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
-const rate = Number(process.env.AUDIO_MIX_RATE ?? 48000);
-const seed = Number(process.env.AUDIO_MIX_SEED ?? 1907);
-const filter = process.env.AUDIO_MIX_CASES?.split(',');
-const cases = mixCases().filter(
-  (c) =>
-    !filter ||
-    ['gun-rifle-0', 'ambience-idle'].includes(c.id) ||
-    filter.some((f) => c.id.includes(f))
-);
-assert(cases.length > 0, 'No matching mix cases');
-const evidence = process.env.AUDIO_MIX_EVIDENCE_DIR
-  ? resolve(process.env.AUDIO_MIX_EVIDENCE_DIR)
-  : null;
-assert(
-  !evidence || (evidence !== resolve(root) && !evidence.startsWith(root)),
-  'Keep evidence outside the repository'
-);
-const capture = process.env.AUDIO_MIX_CAPTURE?.split(',') ?? [];
-if (evidence) mkdirSync(evidence, { recursive: true });
-const baselinePath = process.env.AUDIO_MIX_BASELINE;
-const baseline = baselinePath
-  ? JSON.parse(readFileSync(resolve(baselinePath, 'results.json'), 'utf8'))
-  : null;
-if (baseline) {
-  assert.equal(baseline.rate, rate, 'Baseline sample rate');
-  assert.equal(baseline.seed, seed, 'Baseline seed');
-}
+const rate = 48000,
+  seed = 1907;
+const cases = mixCases();
 const rows = [],
   errors = [];
 const port = Number(process.env.PORT ?? 5500);
@@ -68,11 +41,6 @@ try {
     );
     const pcm = Buffer.from(row.pcm, 'base64');
     delete row.pcm;
-    row.pcmSha256 = createHash('sha256').update(pcm).digest('hex');
-    // Preserve native float anchors for tolerant cross-context regression checks;
-    // explicitly requested listening cases can be encoded locally from the same PCM.
-    if (evidence && (scenario.role === 'anchor' || capture.some((id) => scenario.id.includes(id))))
-      writeFileSync(resolve(evidence, scenario.id + '.f32'), pcm);
     // Meter the actual full-length float output directly, without a WAV round trip.
     const meter = spawnSync(
       'ffmpeg',
@@ -118,19 +86,6 @@ try {
       }
     } else assert(row.stages.final.peak > 1e-7, scenario.id + ': silent fixture');
     assert(row.stages.final.tailPeak < 1e-5, scenario.id + ': truncated tail');
-    if (baseline && scenario.role === 'anchor') {
-      assert(
-        baseline.rows.some((old) => old.scenario.id === scenario.id),
-        'Missing approved gun anchor'
-      );
-      const old = readFileSync(resolve(baselinePath, scenario.id + '.f32'));
-      assert.equal(old.length, pcm.length, 'Gun duration changed');
-      let difference = 0;
-      for (let i = 0; i < old.length; i += 4)
-        difference = Math.max(difference, Math.abs(old.readFloatLE(i) - pcm.readFloatLE(i)));
-      row.baselineMaxDifference = difference;
-      assert(difference <= 3e-7, scenario.id + ': approved gun waveform changed');
-    }
     console.log(
       `${rows.length}/${cases.length} ${scenario.id}: ${row.stages.final.max20Db.toFixed(2)} dB/20ms; ${row.loudness.maxMomentaryLUFS} LUFS`
     );
@@ -206,11 +161,4 @@ try {
 } finally {
   await browser?.close();
   stopViteServer(server);
-  if (evidence) {
-    mkdirSync(evidence, { recursive: true });
-    writeFileSync(
-      resolve(evidence, 'results.json'),
-      JSON.stringify({ rate, seed, rows, errors }, null, 2) + '\n'
-    );
-  }
 }

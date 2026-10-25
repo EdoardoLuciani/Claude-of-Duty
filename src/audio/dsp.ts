@@ -3,7 +3,7 @@
  *
  * Low-level Web Audio helpers shared by every synthesis voice in this
  * directory. Everything here is written against `BaseAudioContext` so the exact
- * same code path renders in an `OfflineAudioContext` (see selftest.js) as in
+ * same code path renders in an `OfflineAudioContext` (see tests/e2e/audio-e2e.mjs) as in
  * the live `AudioContext` — that is how this subsystem is verified without a
  * user gesture or a speaker.
  *

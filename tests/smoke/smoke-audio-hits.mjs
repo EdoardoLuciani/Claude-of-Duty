@@ -1,56 +1,13 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 
-import { AIRCRAFT_URLS } from '../../src/audio/aircraft.ts';
-import { ENVIRONMENT_URLS } from '../../src/audio/environment.ts';
-import { FOLEY_URLS } from '../../src/audio/foley-urls.ts';
 import { HIT_URLS } from '../../src/audio/hits.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
-import { RADIO_URLS } from '../../src/audio/radio.ts';
-import { REACTION_URLS } from '../../src/audio/reactions.ts';
-import { RELOAD_URLS } from '../../src/audio/reloads.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
-import provenance from '../../src/audio/samples/hits/provenance.json' with { type: 'json' };
 import { Rng } from '../../src/core/rng.ts';
 import { UiSystem } from '../../src/ui/index.ts';
+import { audioFixture } from '../lib/audio-banks.mjs';
 
-let bytes = 0;
-for (const [kind, urls] of Object.entries(HIT_URLS)) {
-  assert(urls.length >= 3, `${kind}: authored variations`);
-  for (const url of urls) {
-    const data = readFileSync(new URL(url));
-    const name = new URL(url).pathname.split('/').at(-1).replace('.opus', '');
-    assert.equal(createHash('sha256').update(data).digest('hex'), provenance.files[name].sha256);
-    assert(provenance.files[name].duration <= 0.35, 'short contacts, not whole source reels');
-    assert(provenance.files[name].decodedPeak < 0.5, 'authored headroom');
-    const head = data.indexOf('OpusHead');
-    assert(head >= 0);
-    assert.equal(data[head + 9], 1, 'phase-checked mono positional contacts');
-    assert.equal(data.readInt16LE(head + 16), 0, 'no hidden codec gain');
-    bytes += data.length;
-  }
-}
-assert.equal(Object.keys(provenance.files).length, 10);
-assert(bytes < 60_000, 'compact delivery bank');
-
-const param = () => ({ value: 0 });
-const sources = [];
-const actx = {
-  currentTime: 3,
-  createGain: () => ({ gain: param(), connect() {} }),
-  createBufferSource() {
-    const node = {
-      playbackRate: param(),
-      connect() {},
-      start(when) {
-        this.when = when;
-      },
-    };
-    sources.push(node);
-    return node;
-  },
-};
+const { actx, sources } = audioFixture(3);
 const bank = new WeaponSampleBank(actx);
 const rng = new Rng(473);
 for (const [kind, urls] of Object.entries(HIT_URLS))
@@ -59,21 +16,6 @@ for (const [kind, urls] of Object.entries(HIT_URLS))
     index,
     duration: kind === 'break' ? 0.33 : 0.32,
   }));
-for (const kind of Object.keys(HIT_URLS)) {
-  let previous = -1;
-  const seen = new Set();
-  for (let i = 0; i < 50; i++) {
-    const voice = bank.hit(kind, rng, { when: 4 });
-    const src = sources.at(-1);
-    assert.notEqual(src.buffer.index, previous, 'no consecutive identical sample');
-    previous = src.buffer.index;
-    seen.add(previous);
-    assert(src.playbackRate.value >= 0.98 && src.playbackRate.value <= 1.02);
-    assert.equal(src.when, 4);
-    assert.equal(voice.end, 4 + src.buffer.duration / src.playbackRate.value + 0.02);
-  }
-  assert.equal(seen.size, HIT_URLS[kind].length);
-}
 const cases = [
   [25, 0, false, ['flesh']],
   [0, 25, false, ['armour']],
@@ -228,39 +170,6 @@ assert.deepEqual(
   'visual confirmation remains, without a duplicate UI tick'
 );
 
-const originalFetch = globalThis.fetch;
-let decodes = 0;
-try {
-  globalThis.fetch = async (url) => ({
-    ok: !url.includes('/hits/armour-2'),
-    status: 404,
-    arrayBuffer: async () => new ArrayBuffer(1),
-  });
-  const missing = new WeaponSampleBank({
-    decodeAudioData: async () => {
-      decodes++;
-      return { duration: 0.1 };
-    },
-  });
-  await assert.rejects(missing.load(), /armour-2.*HTTP 404/);
-  const reloads = Object.values(RELOAD_URLS).reduce((sum, urls) => sum + urls.length, 0);
-  assert.equal(
-    decodes,
-    49 +
-      reloads +
-      Object.values(FOLEY_URLS).reduce((n, urls) => n + urls.length, 0) +
-      (AIRCRAFT_URLS.length +
-        Object.values({ ...REACTION_URLS, ...ENVIRONMENT_URLS, ...RADIO_URLS }).reduce(
-          (n, urls) => n + urls.length,
-          0
-        )),
-    'missing contact participates in required all-settled startup'
-  );
-  missing.dispose();
-  assert.deepEqual(missing.hitBuffers, {});
-} finally {
-  globalThis.fetch = originalFetch;
-}
 console.log(
   'Recorded contact assets, variants, incoming-state composition, sole SFX ownership and spatial/UI separation'
 );

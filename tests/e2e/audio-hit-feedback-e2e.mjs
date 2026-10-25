@@ -1,34 +1,11 @@
 #!/usr/bin/env node
 /** Actual game graph/HUD integration: contact/flight, health and physical foley. */
 import assert from 'node:assert/strict';
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-import {
-  ensureViteServer,
-  launchChromium,
-  parseArgs,
-  stopViteServer,
-} from '../../tools/lib/browser-harness.mjs';
-import { waitForGame } from '../../tools/lib/native-render.mjs';
+import { openAudioGame } from '../lib/audio-game.mjs';
 
-const args = parseArgs();
-const root = resolve(args.root ?? fileURLToPath(new URL('../../', import.meta.url)));
-const server = await ensureViteServer({ root, port: Number(args.port ?? 5533) });
-assert(server, 'Refusing an occupied server port');
-let browser;
-const errors = [];
+const { page, errors, close } = await openAudioGame(5533, 'weapon');
 try {
-  browser = await launchChromium({
-    headless: true,
-    args: ['--ignore-gpu-blocklist', '--mute-audio', '--autoplay-policy=no-user-gesture-required'],
-  });
-  const page = await browser.newPage({ viewport: { width: 960, height: 640 } });
-  page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto(
-    `http://127.0.0.1:${Number(args.port ?? 5533)}/?capture=1&lockstep=1&shot=weapon`
-  );
-  await waitForGame(page, { timeout: 180000 });
   await page.evaluate(() => window.__APPLY_SHOT__('weapon'));
   await page.evaluate(() => window.__PUMP__(3));
   await page.evaluate(async () => {
@@ -415,6 +392,5 @@ try {
     'PASS: actual game HUD/audio, incoming trajectories, health/explosion/death, enemy/material bullet contacts, controller steps/landing and body fall'
   );
 } finally {
-  await browser?.close();
-  stopViteServer(server);
+  await close();
 }

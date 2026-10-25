@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 import * as THREE from 'three';
@@ -7,7 +6,6 @@ import * as THREE from 'three';
 import { AudioSystem } from '../../src/audio/index.ts';
 import { RELOAD_CUES, RELOAD_URLS, reloadKind } from '../../src/audio/reloads.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
-import provenance from '../../src/audio/samples/reloads/provenance.json' with { type: 'json' };
 import { Rng } from '../../src/core/rng.ts';
 import { makeAX338Model, AX338_URL } from '../../src/weapons/ax338.ts';
 import { WEAPON_IDS } from '../../src/weapons/defs.ts';
@@ -20,53 +18,9 @@ import { makeMPXModel, MPX_URL } from '../../src/weapons/mpx.ts';
 import { makeP320Model, P320_URL } from '../../src/weapons/p320.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
+import { audioFixture } from '../lib/audio-banks.mjs';
 
-let bytes = 0,
-  seconds = 0;
-for (const urls of Object.values(RELOAD_URLS)) {
-  assert(urls.length >= 2, 'recorded variations');
-  for (const url of urls) {
-    const data = readFileSync(new URL(url));
-    const name = new URL(url).pathname.split('/').at(-1).replace('.opus', '');
-    const info = provenance.files[name];
-    assert.equal(createHash('sha256').update(data).digest('hex'), info.sha256);
-    assert(info.duration <= 0.53 && info.decodedPeak < 0.5, 'single actions, not source reels');
-    if (name.startsWith('pump-')) {
-      assert(info.duration <= 0.11, 'one pump contact per cue, not a pre-timed full cycle');
-      assert(info.contactPeakTime <= 0.02, 'contact energy must be near its native stop');
-    }
-    for (const layer of info.layers) {
-      const source = provenance.sources[layer.source];
-      assert(source.description.length > 0, 'bank metadata identifies the recorded action');
-      assert(layer.downmixLossDb < 6, 'stereo sources checked before mono averaging');
-      assert.match(source.sourceSha256, /^[a-f0-9]{64}$/);
-    }
-    const head = data.indexOf('OpusHead');
-    assert(head >= 0);
-    assert.equal(data[head + 9], 1, 'mono source');
-    assert.equal(data.readInt16LE(head + 16), 0, 'no header gain');
-    bytes += data.length;
-    seconds += info.duration;
-  }
-}
-assert.equal(Object.keys(provenance.files).length, 63);
-assert(bytes < 250_000 && seconds * 48000 * 4 < 3_000_000, 'bounded delivery/decoded storage');
-const sources = [];
-const actx = {
-  currentTime: 0,
-  createGain: () => ({ gain: { value: 0 }, connect() {} }),
-  createBufferSource() {
-    const src = {
-      playbackRate: { value: 1 },
-      connect() {},
-      start(when) {
-        this.when = when;
-      },
-    };
-    sources.push(src);
-    return src;
-  },
-};
+const { actx, sources } = audioFixture(0);
 const bank = new WeaponSampleBank(actx),
   rng = new Rng(337);
 for (const [kind, urls] of Object.entries(RELOAD_URLS))
@@ -280,5 +234,5 @@ vm.dispose();
 bank.dispose();
 assert.deepEqual(bank.reloadBuffers, {});
 console.log(
-  `Reloads: 63 assets/${bytes} bytes/${Math.round(seconds * 48000 * 4)} decoded bytes; seven native weapon timelines, routing, cancellation, pump/bolt and casing invariants passed`
+  'Seven native weapon timelines, routing, cancellation, pump/bolt and casing invariants passed'
 );

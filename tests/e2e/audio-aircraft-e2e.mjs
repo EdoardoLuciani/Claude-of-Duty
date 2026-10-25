@@ -1,33 +1,11 @@
 #!/usr/bin/env node
 /** Actual bomber/master graph: motion, pause/source ownership and cleanup. */
 import assert from 'node:assert/strict';
-import { resolve } from 'node:path';
 
-import {
-  ensureViteServer,
-  launchChromium,
-  parseArgs,
-  REPO_ROOT,
-  stopViteServer,
-} from '../../tools/lib/browser-harness.mjs';
-import { waitForGame } from '../../tools/lib/native-render.mjs';
+import { openAudioGame } from '../lib/audio-game.mjs';
 
-const args = parseArgs(),
-  root = resolve(args.root ?? REPO_ROOT),
-  port = Number(args.port ?? 5542);
-const server = await ensureViteServer({ root, port });
-assert(server, 'Refusing an occupied port');
-let browser;
-const errors = [];
+const { page, errors, close } = await openAudioGame(5542, 'hero');
 try {
-  browser = await launchChromium({
-    headless: true,
-    args: ['--ignore-gpu-blocklist', '--mute-audio', '--autoplay-policy=no-user-gesture-required'],
-  });
-  const page = await browser.newPage({ viewport: { width: 960, height: 640 } });
-  page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1&shot=hero`);
-  await waitForGame(page, { timeout: 180000 });
   await page.evaluate(() => window.__PUMP__(3));
   await page.evaluate(async () => {
     const engine = window.__ENGINE__,
@@ -257,6 +235,5 @@ try {
     'PASS: actual bomber engine/full-strike, pause, source ownership, natural stop and restart/disposal.'
   );
 } finally {
-  await browser?.close();
-  stopViteServer(server);
+  await close();
 }

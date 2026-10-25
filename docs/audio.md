@@ -27,23 +27,22 @@ seeded selection and disposal. Mixer tuning lives in `src/audio/`, not authoring
 ## Authoring and rights
 
 Committed Opus files are the runtime authority. Each sample directory's
-`provenance.json` retains source identities/hashes, edits, levels, output hashes,
-measurements and its rights attestation. `samples/reference.json` freezes the
-legacy masters and codec baselines; never regenerate expected hashes merely to
-accept a changed asset. Masters remain outside the game repository.
+`provenance.json` retains donor identities/hashes, edits, levels, approved output
+hashes and rights attestations. Validation recomputes output measurements.
+`samples/reference.json` freezes legacy master/codec baselines: never regenerate
+expected hashes to accept a changed asset. Masters stay outside the repository.
 
 Foley `banks` factor settings shared by takes (filename without its numeric
-suffix); reload `sources` factor layer source metadata. File/layer fields override
-these shared records. Frozen hashes remain independent of the candidate asset.
+suffix). Reload `sources` factor donor metadata; single-layer takes store donor
+and crop start directly, with unity donor gain. `processing` owns default filter
+and fades; per-file filters override it. Overlays retain explicit `layers`.
+Frozen hashes remain independent of the candidate asset.
 
-The bespoke preparation CLIs and historical review reports are retired; their
-implementations remain in Git history. Audio edits require the licensed originals
-and fresh native decode/mix validation, not a normal build. Delivery is 48 kHz Opus;
-spatial point-source banks are mono, while legacy gun layouts remain source-owned.
-Foley/hit crops used 1 ms attack / 35 ms release fades and 20 ms energy matching
-with respectively 9/8 dB peak headroom. Reload provenance includes its fades;
-other one-shot provenance includes its filters/fades. Aircraft provenance retains
-pitch anchors, stretch, overlap and envelope-correction settings.
+Historical preparation/capture tools stay in Git history. Edits require licensed
+originals and fresh native decode/mix validation, not a normal build. Delivery is
+48 kHz Opus; spatial banks are mono and legacy gun layouts remain source-owned.
+Foley/hit crops use 1 ms attack / 35 ms release fades and 20 ms energy matching
+with respectively 9/8 dB peak headroom; other edit settings remain in provenance.
 
 New-bank public-derivative clearance is an owner attestation, not independent legal
 verification. Preserve original licence/entitlement records; media do not inherit

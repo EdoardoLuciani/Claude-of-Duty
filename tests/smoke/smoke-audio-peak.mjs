@@ -49,10 +49,16 @@ for (const rate of [44100, 48000, 96000]) {
 
   const a = new Float32Array(length),
     b = new Float32Array(length);
-  const energyL = new Float32Array(length),
-    energyR = new Float32Array(length);
   const controller = new EnergyPeakController(rate);
-  controller.process(l, r, a, b, energyL, energyR);
+  controller.process(l, r, a, b);
+  const reference = new EnergyPeakController(rate);
+  const sampleL = new Float32Array(1),
+    sampleR = new Float32Array(1);
+  const rmsGains = new Float64Array(length);
+  for (let i = 0; i < length; i++) {
+    reference.process(l.subarray(i, i + 1), r.subarray(i, i + 1), sampleL, sampleR);
+    rmsGains[i] = reference.gain;
+  }
   const c = new Float32Array(length),
     d = new Float32Array(length);
   const chunked = new EnergyPeakController(rate);
@@ -76,9 +82,12 @@ for (const rate of [44100, 48000, 96000]) {
       Math.abs(a[i] * other - b[i] * input) < 1e-4,
       'common gain preserves stereo including antiphase'
     );
-    assert(Math.abs(a[i]) <= Math.abs(energyL[i]) + 1e-7, 'peak envelope never boosts RMS output');
+    assert(
+      Math.abs(a[i]) <= Math.abs(input * rmsGains[i]) + 1e-7,
+      'peak envelope never boosts RMS output'
+    );
     if (Math.abs(input) > 1e-6) {
-      const rmsGain = energyL[i] / input;
+      const rmsGain = rmsGains[i];
       assert(
         Math.abs(a[i] - input * Math.min(rmsGain, gains[i])) < 1e-7,
         'tighter envelope wins, not two multiplied reductions'
