@@ -68,7 +68,7 @@ assert.deepEqual(
   'reticle/framing work must not change recoil'
 );
 assert.equal(def.suppressed, true);
-assert.equal(def.audio, 'suppressed');
+assert.equal(def.audio, 'mpx');
 // Shared glTF accessors must be converted once per track, not mutated again
 // through another clip. Check known game-space idle wrists and finger curls.
 for (const side of ['left', 'right']) {

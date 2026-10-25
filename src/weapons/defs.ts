@@ -168,7 +168,7 @@ export const WEAPON_DEFS = {
     id: 'smg',
     label: 'SIG MPX',
     class: 'smg',
-    audio: 'suppressed',
+    audio: 'mpx',
     suppressed: true,
     caliber: '9x19',
     rpm: 950,
