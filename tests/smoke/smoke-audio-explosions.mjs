@@ -11,6 +11,10 @@ import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { audioFixture } from '../lib/audio-banks.mjs';
 
+assert(
+  Math.abs(20 * Math.log10(EXPLOSION_MIX.gain / 0.8) - 3) < 1e-12,
+  'owner-requested +3 dB explosion gain'
+);
 assert.equal(Object.keys(EXPLOSION_URLS).length, 6);
 for (const urls of Object.values(EXPLOSION_URLS)) assert.equal(urls.length, 4);
 for (const [distance, expected] of [
@@ -142,11 +146,13 @@ Object.assign(audio, {
     played = args;
   },
 });
-audio._onExplosion({ kind: 'bomb', position: { x: 0, y: 0, z: -30 }, radius: 20 });
-assert.equal(played[4].explosionKind, 'bomb');
-assert.equal(played[4].send, undefined, 'recorded voice owns its restrained reverb send');
-assert.equal(played[4].gain, EXPLOSION_MIX.gain);
-assert.equal(played[5], 'weapons');
+for (const kind of ['grenade', 'bomb']) {
+  audio._onExplosion({ kind, position: { x: 0, y: 0, z: -30 }, radius: kind === 'bomb' ? 20 : 10 });
+  assert.equal(played[4].explosionKind, kind);
+  assert.equal(played[4].send, undefined, 'recorded voice owns its restrained reverb send');
+  assert.equal(played[4].gain, EXPLOSION_MIX.gain, 'both ordnance identities receive the boost');
+  assert.equal(played[5], 'weapons');
+}
 
 bank.dispose();
 for (const kind of ['grenade', 'bomb'])
