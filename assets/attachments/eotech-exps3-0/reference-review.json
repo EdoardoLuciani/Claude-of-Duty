@@ -1,0 +1,290 @@
+{
+  "asset": "EOTECH EXPS3-0, black, CR123 / side controls / raised QD base",
+  "accessed": "2026-10-25",
+  "sources": [
+    {
+      "publisher": "EOTECH",
+      "url": "https://www.eotechinc.com/products/eotech-hws-exps3",
+      "establishes": [
+        "L x W x H 96.5 x 58.4 x 73.7 mm",
+        "CR123 battery",
+        "side controls and quick-detach mounting",
+        "EXPS3-0: 68 MOA ring and 1 MOA dot"
+      ]
+    },
+    {
+      "publisher": "EOTECH operator manual, served by OpticsPlanet",
+      "url": "https://www.opticsplanet.com/i/pdf/opplanet-eotech-exps3-manual.pdf",
+      "sha256": "65a295921c46be53853b872d7a3047902e59c195103ebd2ad5eb7b0e7350d533",
+      "establishes": [
+        "Equipment description, printed page 5: nominal envelope",
+        "Display window, printed page 6: 30 x 23 mm, front glass 3.17 mm and rear laminate 4.76 mm",
+        "Components/controls and adjustment locations",
+        "Optical reticle is a projected virtual image, not a physical mesh on the glass"
+      ],
+      "unitConflict": "The same window line prints 1.20 x 0.85 inches and 30 x 23 mm; these are not exact conversions. Model follows the stated 30 x 23 mm metric aperture, not an inferred exact optical specification."
+    },
+    {
+      "publisher": "EOTECH photo gallery",
+      "url": "https://www.eotechinc.com/products/eotech-hws-exps3",
+      "photoBase": "https://www.eotechinc.com/cdn/shop/files/exps3_",
+      "views": [
+        "ls",
+        "rs",
+        "f",
+        "br",
+        "to",
+        "flo",
+        "fro",
+        "rlo",
+        "rro"
+      ]
+    },
+    {
+      "publisher": "Militia Armory, higher-resolution copies of EOTECH product photography",
+      "url": "https://www.militia-armory.com/product/eotech-exps3-0-holographic-weapon-sight/",
+      "photoBase": "https://www.militia-armory.com/wp-content/uploads/2022/05/exps3_",
+      "views": [
+        "ls",
+        "rs",
+        "br",
+        "flo",
+        "fro",
+        "rlo",
+        "rro"
+      ]
+    }
+  ],
+  "photoRights": "Photographs remain their owners’ reference material. They are not committed, embedded in the Blender file, used as textures, or shipped in the GLB. Original geometry, finishes, warning text and vector mark reconstruction only; EOTECH identifies the reference subject, not endorsement.",
+  "method": {
+    "projection": "Estimated orthographic profile cameras, uniform scale from nominal overall dimensions and fixed rail/body landmarks. No independent X/Y image scaling; no per-part registration. Photo perspective/lens distortion is unknown.",
+    "cameraPolicy": "Frozen camera/scale settings in tools/blender/exps3.py for all profile comparisons. Initial-blockout screenshots rerendered using the same final studio exposure and cameras.",
+    "mask": "Alpha > 250, then flood-fill exterior background and fill enclosed holes to isolate external profile. Faint reference drop shadows excluded; transparent optical apertures are NOT assessed by this statistic.",
+    "metric": "Intersection-over-union of the filled masks at original image resolution, without cropping/reframing either image. Descriptive comparison only, not an automatic visual-acceptance threshold or proof of 1:1 accuracy.",
+    "lighting": "One shared original studio, AgX Medium High Contrast, exposure -1.5; no attempt to claim identical illumination to the photographer."
+  },
+  "profiles": [
+    {
+      "view": "left",
+      "sourceImage": "https://www.militia-armory.com/wp-content/uploads/2022/05/exps3_ls.png",
+      "sha256": "e8e2cab87eba41e1d9348674c1949cc7ff255891ef89e63bff3ceb727e9c193d",
+      "imageSize": [
+        1600,
+        1200
+      ],
+      "referenceSolidBoundsPx": [
+        198,
+        139,
+        1383,
+        1049
+      ],
+      "modelSolidBoundsPx": [
+        184,
+        139,
+        1375,
+        1048
+      ],
+      "filledSilhouetteIoU": 0.93545,
+      "cameraBlender": {
+        "positionM": [
+          -0.4,
+          0.01085,
+          0.03086
+        ],
+        "targetM": [
+          0,
+          0.01085,
+          0.03086
+        ],
+        "orthoWidthM": 0.1293
+      }
+    },
+    {
+      "view": "right",
+      "sourceImage": "https://www.militia-armory.com/wp-content/uploads/2022/05/exps3_rs.png",
+      "sha256": "9b505d2d88c6b20e66e12c2b9d937082fe55dffded2ff6cd79c0ed7c141856cb",
+      "imageSize": [
+        1600,
+        1200
+      ],
+      "referenceSolidBoundsPx": [
+        163,
+        105,
+        1466,
+        1090
+      ],
+      "modelSolidBoundsPx": [
+        165,
+        103,
+        1443,
+        1079
+      ],
+      "filledSilhouetteIoU": 0.91971,
+      "cameraBlender": {
+        "positionM": [
+          0.4,
+          0.0121,
+          0.0307
+        ],
+        "targetM": [
+          0,
+          0.0121,
+          0.0307
+        ],
+        "orthoWidthM": 0.1205
+      }
+    },
+    {
+      "view": "rear",
+      "sourceImage": "https://www.militia-armory.com/wp-content/uploads/2022/05/exps3_br.png",
+      "sha256": "4d113ac8d38247278be63956b8e1287c416a0caac73667adcc9a0c217a1880e7",
+      "imageSize": [
+        1600,
+        1200
+      ],
+      "referenceSolidBoundsPx": [
+        433,
+        132,
+        1158,
+        1057
+      ],
+      "modelSolidBoundsPx": [
+        430,
+        129,
+        1170,
+        1062
+      ],
+      "filledSilhouetteIoU": 0.90348,
+      "cameraBlender": {
+        "positionM": [
+          0,
+          -0.4,
+          0.031
+        ],
+        "targetM": [
+          0,
+          0,
+          0.031
+        ],
+        "orthoWidthM": 0.126
+      }
+    },
+    {
+      "view": "front",
+      "sourceImage": "https://www.eotechinc.com/cdn/shop/files/exps3_f.png",
+      "sha256": "28a67f8d5e80aee0fdb797f9257fb262882124bdf2bb0a7b0cc4800d234c1c2f",
+      "imageSize": [
+        700,
+        700
+      ],
+      "referenceSolidBoundsPx": [
+        185,
+        136,
+        518,
+        567
+      ],
+      "modelSolidBoundsPx": [
+        179,
+        135,
+        519,
+        564
+      ],
+      "filledSilhouetteIoU": 0.9159,
+      "cameraBlender": {
+        "positionM": [
+          0,
+          0.4,
+          0.0314
+        ],
+        "targetM": [
+          0,
+          0,
+          0.0314
+        ],
+        "orthoWidthM": 0.11945
+      }
+    },
+    {
+      "view": "top",
+      "sourceImage": "https://www.eotechinc.com/cdn/shop/files/exps3_to.png",
+      "sha256": "48bb645b068bbfd54dcf4cd63952e64639a4a5c6a4824f25e69182f6539cb7e0",
+      "imageSize": [
+        700,
+        700
+      ],
+      "referenceSolidBoundsPx": [
+        83,
+        196,
+        609,
+        510
+      ],
+      "modelSolidBoundsPx": [
+        84,
+        192,
+        607,
+        508
+      ],
+      "filledSilhouetteIoU": 0.93731,
+      "cameraBlender": {
+        "positionM": [
+          0,
+          0.0132,
+          0.4
+        ],
+        "targetM": [
+          0,
+          0.0132,
+          0
+        ],
+        "orthoWidthM": 0.1284,
+        "screenRight": "+Y",
+        "screenUp": "-X"
+      }
+    }
+  ],
+  "measuredEnvelopeMm": {
+    "width": 58.5400015,
+    "height": 73.7000001,
+    "length": 96.4699984,
+    "differenceFromNominalMm": [
+      0.1400015,
+      1e-7,
+      -0.0300016
+    ],
+    "note": "Width includes the raised polarity marking; manufacturer envelope is rounded. Not engineering or installation tolerances."
+  },
+  "repeatBuild": {
+    "blender": "5.2.2 LTS",
+    "host": "Linux x86_64, same host, independent factory-empty processes and empty output directories",
+    "glbSha256": "377eeac71e9dc461a3c23a8ff16b9deef3e51c42e60d0a3f95f00b9317819dd6",
+    "result": "Byte-identical GLBs and finish PNGs for independent builds, one with all seven renders and one without rendering. Therefore geometry, indices, UVs/normals, materials/maps and socket transforms are identical. Not a universal cross-host determinism claim.",
+    "authoringUVs": "Native Blender UV projection uses a 1/65536 binary UV lattice, including Boolean-interpolated UVs, before save/render/export. No GLB rewriting or exporter hooks.",
+    "ocioCompatibility": {
+      "reason": "This host ships Blender OCIO 2.5 configuration with OCIO library 2.4.2. Default config fails; color management was NOT disabled.",
+      "profile": "https://raw.githubusercontent.com/blender/blender/v4.4.3/release/datafiles/colormanagement/config.ocio",
+      "sha256": "6a072a5e34fb520a35ee858b3b46271504ddd325fc112d2a78a8be75ea333f56",
+      "processLocal": "OCIO=/tmp/exps3-ocio/config.ocio, with luts/ and filmic/ pointing at installed Blender data; AgX preserved."
+    }
+  },
+  "limitations": [
+    "Original reference-backed game art, not manufacturer CAD, a scan, or claimed final human visual acceptance.",
+    "46 mm rail-top-to-optical-centre datum is provisionally inferred from photos. Manufacturer specs do not certify that datum. Confirm it during M4 ADS/co-witness integration.",
+    "Window curvature, internal holographic laminate/laser, hidden battery internals, exact fastener threads and detailed mount tolerances are not reconstructed.",
+    "Public photos are not calibrated views; silhouettes and apparent small features do not certify all dimensions or surface finish.",
+    "Glass uses a single neutral AR-tinted PBR approximation for front glass and rear laminate; a spectral AR coating and real hologram are not simulated.",
+    "No price, purchase rules, mounted gameplay model, ADS/reticle implementation, stat effects or default-M4 change in this asset-first PR."
+  ],
+  "nativeValidation": {
+    "backend": "native WebGPU, AMD RDNA 4, non-fallback",
+    "viewport": [
+      1400,
+      1100
+    ],
+    "assetMeshes": 11,
+    "opticalWindows": 2,
+    "transmission": 1,
+    "ior": 1.5,
+    "result": "Actual exported GLB loaded with GLTFLoader and rendered using the project's strict WebGPU renderer; two thick glass meshes, local embedded textures, no browser errors. Output-target readback preserves AgX/display transform. Isolated asset fixture, not M4 gameplay/ADS acceptance.",
+    "fixture": "Temporary authoring fixture, intentionally not a maintained screenshot-matrix tool."
+  }
+}
