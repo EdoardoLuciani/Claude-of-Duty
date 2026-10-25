@@ -84,7 +84,7 @@
         1375,
         1048
       ],
-      "filledSilhouetteIoU": 0.93685,
+      "filledSilhouetteIoU": 0.93695,
       "cameraBlender": {
         "positionM": [
           -0.4,
@@ -119,7 +119,7 @@
         1443,
         1079
       ],
-      "filledSilhouetteIoU": 0.92205,
+      "filledSilhouetteIoU": 0.92221,
       "cameraBlender": {
         "positionM": [
           0.4,
@@ -154,7 +154,7 @@
         1169,
         1062
       ],
-      "filledSilhouetteIoU": 0.89858,
+      "filledSilhouetteIoU": 0.89862,
       "cameraBlender": {
         "positionM": [
           0,
@@ -189,7 +189,7 @@
         519,
         564
       ],
-      "filledSilhouetteIoU": 0.90584,
+      "filledSilhouetteIoU": 0.90614,
       "cameraBlender": {
         "positionM": [
           0,
@@ -224,7 +224,7 @@
         607,
         507
       ],
-      "filledSilhouetteIoU": 0.93378,
+      "filledSilhouetteIoU": 0.9361,
       "cameraBlender": {
         "positionM": [
           0,
@@ -243,21 +243,29 @@
     }
   ],
   "measuredEnvelopeMm": {
-    "width": 58.5400015,
-    "height": 73.7000001,
-    "length": 96.4699984,
+    "width": 58.4000014,
+    "height": 73.6999996,
+    "length": 96.4700021,
     "differenceFromNominalMm": [
-      0.1400015,
-      1e-7,
-      -0.0300016
+      0.0000014,
+      -4e-7,
+      -0.0299979
     ],
-    "note": "Width includes the raised polarity marking; manufacturer envelope is rounded. Not engineering or installation tolerances."
+    "note": "Former0.14mm raised cap polarity mark is now baked; body not uniformly rescaled. Not engineering tolerances."
   },
   "repeatBuild": {
     "blender": "5.2.2 LTS",
     "host": "Linux x86_64, same host, independent factory-empty processes and empty output directories",
-    "glbSha256": "719ccf14fae5f00b94a616399e7082290bdb83690bdb6c0f7a3f28c945da4ac3",
-    "result": "Byte-identical GLBs and finish PNGs for independent builds, one with all seven renders and one without rendering. Therefore geometry, indices, UVs/normals, materials/maps and socket transforms are identical. Not a universal cross-host determinism claim.",
+    "glbSha256": "777a6c5735b6b4afe0dfae2b447e9687a04fea490f4a331e5bc8b43c4f3316a7",
+    "result": "Atlas PNGs, positions, normals, indices, UVs, materials and nodes are exact across render/no-render builds. One native Mikk tangent component differs by0.0001000166 (one four-decimal bin, <=0.006degrees); optimized GLBs are NOT claimed byte-identical. Narrow measured exporter difference, not a general tolerance or cross-host promise.",
+    "nativeTangentDifference": {
+      "components": 1,
+      "maxAbsolute": 0.00010001659393310547,
+      "otherAccessors": "exact",
+      "json": "exact",
+      "atlasPngBytes": "exact",
+      "angularUpperBoundDegrees": 0.006
+    },
     "authoringUVs": "Native Blender UV projection uses a 1/65536 binary UV lattice, including Boolean-interpolated UVs, before save/render/export. No GLB rewriting or exporter hooks.",
     "ocioCompatibility": {
       "reason": "This host ships Blender OCIO 2.5 configuration with OCIO library 2.4.2. Default config fails; color management was NOT disabled.",
@@ -670,6 +678,7 @@
     "limits": "No complete eye-box certification. Centreline ±5° and -7° pitch probes clear after correction; -10° still meets the battery, a normal physical off-axis limit rather than a promised unlimited aperture. Photo-derived48.2mm centre and22mm clear height remain provisional art datums."
   },
   "rearRightRefinement": {
+    "stage": "Historical approved high-source review, before the later atlas optimization.",
     "baselineCommit": "4dcb6bf8a67c9d9f43ac75f73d8e5b31385d18c7",
     "baselineGlbSha256": "e626bc3e5b7cb5b62bf772d123a85d26b977a66c7315d7f90cc2f6f04847b79f",
     "reason": "Owner requested an independent GPT-6.1 Sol reference-difference review, especially the rear-right view, followed by parent-owned iterative fixes.",
@@ -748,13 +757,92 @@
     },
     "acceptance": "No remaining P1 blocker established in round3; acceptable with notes for the named asset-only review. Final bounded arrowhead correction is parent-verified, not separately Sol-reviewed. Owner visual acceptance still required; not certified CAD."
   },
+  "atlasOptimization": {
+    "baselineCommit": "7675c96f5bce7d6f999982c20012fb9f6b3e1e61",
+    "baselineGlbSha256": "719ccf14fae5f00b94a616399e7082290bdb83690bdb6c0f7a3f28c945da4ac3",
+    "sourceSha256": "b9292fb428ee74585fafd6aee61cafbc7463e20920f9f95156dbcef92fa1b602",
+    "bakeSourceSha256": "a8dc53c029ca7141778bf8ba1ba5f931131b89f136911af73292e1c8aeeba462",
+    "glbSha256": "777a6c5735b6b4afe0dfae2b447e9687a04fea490f4a331e5bc8b43c4f3316a7",
+    "approvedTarget": "Owner selected8–12ktriangles, one opaque body atlas plus one glass material.",
+    "before": {
+      "triangles": 44617,
+      "primitives": 11,
+      "materials": 10,
+      "bytes": 4522712,
+      "images": 2
+    },
+    "after": {
+      "triangles": 11972,
+      "primitives": 2,
+      "materials": 2,
+      "bytes": 2952288,
+      "images": 3
+    },
+    "triangleReductionPercent": 73.2,
+    "geometry": "Retain silhouette, real optical corridor/recesses, bosses, cap/mouth, cable and a small rear emblem. Bake small lettering, warning/print, moulded legends, Torx and small bevel detail. Both panes retain original geometry/split normals, joined into one glass primitive.",
+    "bake": "Native Cycles normal/emission passes from freshly authored high source; unique UV atlas, paired exploded projection, stored exact native positions restored. No studio-light/shadow bake or GLB repair. Native Mikk tangents exported for opaque normal mapping.",
+    "highSource": {
+      "meshParts": 178,
+      "triangles": 44617,
+      "retained": "Hidden SOURCE_HIGH collection in editable blend; never exported."
+    },
+    "atlas": {
+      "baseColor": [
+        2048,
+        2048
+      ],
+      "normal": [
+        2048,
+        2048
+      ],
+      "orm": [
+        1024,
+        1024
+      ]
+    },
+    "textureMemory": "36MiB before mips (~48MiB with full mips), versus8MiB/10.67MiB for the former two1K source maps; no GPU compression or FPS claim.",
+    "visualComparison": [
+      {
+        "view": "rear-quarter",
+        "opaqueAlphaIoU": 0.9974752504987843
+      },
+      {
+        "view": "hero",
+        "opaqueAlphaIoU": 0.9982672518276039
+      },
+      {
+        "view": "left",
+        "opaqueAlphaIoU": 0.9997892165269954
+      },
+      {
+        "view": "right",
+        "opaqueAlphaIoU": 0.999711494119705
+      },
+      {
+        "view": "rear",
+        "opaqueAlphaIoU": 0.9991522670608657
+      },
+      {
+        "view": "front",
+        "opaqueAlphaIoU": 0.9983382604065294
+      },
+      {
+        "view": "top",
+        "opaqueAlphaIoU": 0.9992409497859089
+      }
+    ],
+    "boundsChange": "Only the formerly physical cap polarity marking's0.14mm width becomes texture. Body58.4x73.7x96.47mm, same sockets, physical panes/thicknesses, clear opening and0.5mm roof margin.",
+    "regression": "2primitives/2materials,<=12ktriangles; base/normal/ORM dimensions, warning/white-print pixels and metal/rubber roughness ranges, native tangents, UV bounds, both source hashes, blend hash, no high-source nodes, physical pane bounds and all prior optical/recess/boss/cap/normal tests retained. Removed geometry-only arrow/old per-material-factor assertions because those details are explicitly baked now.",
+    "acceptance": "Parent visual/native checks against approved high source; finite texture/edge differences disclosed. No new Sol review or owner approval implied; no FPS or overall VRAM-reduction claim."
+  },
   "nativeValidation": {
     "backend": "native WebGPU, AMD RDNA 4, non-fallback",
     "viewport": [
       1400,
       1100
     ],
-    "assetMeshes": 11,
+    "assetMeshes": 2,
+    "glassPrimitives": 1,
     "opticalWindows": 2,
     "transmission": 1,
     "ior": 1.5,

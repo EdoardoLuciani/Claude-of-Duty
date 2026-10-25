@@ -11,18 +11,56 @@ captive scalloped cap, raised quick-detach mount and separate optical windows.
 - [`../../../tools/blender/exps3.py`](../../../tools/blender/exps3.py) is the
   source of truth. It constructs native Blender geometry/materials from a
   factory-empty scene; no prior blend, purchased model, scan or CAD is an input.
-- `exps3-0.blend` contains separately editable components, actual machined Torx
-  recesses, packed original finish maps, seven review cameras and the studio.
-  It is saved **before** consolidating runtime copies. Blender 5.2 uses Zstandard
-  compression; open it normally in Blender 5.2.2.
-- `exps3-0.glb` is the stock native glTF export: **44,617 triangles, 11 primitives,
-  10 PBR materials, two embedded 1024² maps, 4,522,712 bytes**. No studio, external
-  asset URL, animation, arms or baked reticle is exported.
-- `finish-normal.png` and `finish-roughness.png` are seeded original micro-finish
-  maps, also packed/embedded in the blend/GLB. Reference photos are not textures.
+- `exps3-0.blend` retains the **178 separately editable high-source components**
+  in hidden `SOURCE_HIGH | editable bake authority`, plus the two optimized runtime
+  meshes, five packed maps, seven review cameras and the unchanged studio.
+  Blender 5.2 uses Zstandard compression; open normally in Blender 5.2.2.
+- `exps3-0.glb` is the stock native glTF export: **11,972 triangles, two primitives,
+  two PBR materials, three embedded atlases, 2,952,288 bytes**. No high-source
+  geometry, studio, external asset URL, animation, arms or reticle is exported.
+- `exps3-base-color.png` and `exps3-normal.png` are 2048² unique-UV atlases;
+  `exps3-orm.png` is 1024² (R=1, G=roughness, B=metallic). Normal/data maps are
+  Non-Color; base color is sRGB. These three maps are embedded in the GLB.
+- `finish-normal.png` and `finish-roughness.png` are the original seeded 1024²
+  high-source finish maps, retained in the blend but **not** the runtime GLB.
+  Reference photos are not textures.
 - `manifest.json` records source/product hashes, budgets, axes and datums.
   `reference-review.json` records source URLs, photo hashes, frozen cameras,
   profile measurements, repeat-build evidence and limitations.
+
+## Atlas optimization
+
+At the owner's request, the approved detailed model became the bake source for an
+**8–12k target with one opaque atlas material plus separate optical glass**.
+The result reduces triangles **44,617 → 11,972 (73.2%)**, primitives **11 → 2**,
+materials **10 → 2**, and GLB size **4.31 → 2.82 MiB**. This is an asset-resource
+comparison, not an FPS benchmark or a promise of two total renderer passes.
+
+`tools/blender/exps3_bake.py` regenerates from freshly authored high/low geometry.
+Small lettering, warning labels, printing, moulded legends and Torx detail transfer
+to base-color/normal/ORM images using native Cycles selected-to-active baking.
+No studio illumination or ambient shadow is baked. Corresponding parts are
+exploded only for projection to prevent neighbouring rings/cases contaminating
+one another; exact stored native positions are restored before saving/export.
+UVs are uniquely unwrapped/packed, with extra density for printed panels. The
+body exports native Mikk tangents with its tangent-space normal map.
+
+The silhouette, open sight corridor, recesses, major screw bosses, cap/mouth and
+wire remain geometric. A small rear emblem stays geometric where flattening it
+lost too much of the shallow-relief presentation. **Both optical panes retain the
+original geometry and split normals**, joined into one glass primitive. The body
+is opaque; it is not forced through transmission to achieve a single material.
+
+**Texture-memory trade-off:** the three uncompressed RGBA8 atlases total about
+**36 MiB before mipmaps / 48 MiB with full mips**, versus 8 / 10.7 MiB for the old
+two shared 1K maps. The extra atlas resolution preserves inspection lettering;
+this pass reduces geometry/material submissions and file size, not every memory
+category. No GPU texture compression or performance claim is implied. Tiny baked
+features have finite-resolution/edge differences rather than identical geometry.
+
+The high-source Sol review below is historical. This new optimization was
+parent-checked against the approved source under the frozen cameras and native
+WebGPU; it is **not a new Sol approval**. Owner visual acceptance remains separate.
 
 ## Reference/profile review
 
@@ -43,8 +81,8 @@ removal need not leave floating panes behind.
 Side, front, rear and top comparisons use estimated orthographic cameras with
 one uniform scale per photo, not independent X/Y stretching or per-part alignment.
 The camera poses are frozen in the source and review JSON. Filled-silhouette IoU
-is descriptive only: **left .93685, right .92205, rear .89858, front .90584,
-top .93378**. Alpha >250 excludes faint photo shadows; enclosed holes are filled
+is descriptive only: **left 0.93695, right 0.92221, rear 0.89862, front 0.90614,
+top 0.93610**. Alpha >250 excludes faint photo shadows; enclosed holes are filled
 for this external-profile statistic. It does **not** assess the optical aperture,
 small details, material fidelity or certify 1:1 accuracy. The smoke test separately
 casts two-way rays across the rounded clear opening, with extra lower-edge coverage.
@@ -141,10 +179,13 @@ All mesh parts and the following datums descend from `ATTACHMENT_exps3`:
 | `SOCKET_lens_rear` | `[0, .0482, .0231]` | Rear laminate external surface centre |
 | `SOCKET_lens_front` | `[0, .0482, -.0181]` | Front glass external surface centre |
 
-The measured visual envelope is **58.540 × 73.700 × 96.470 mm** W/H/L. The raised
-cap marking contributes 0.14 mm over the rounded nominal width; length is 0.03 mm
-under nominal. These are measured art dimensions, **not** installation tolerances.
+The optimized visual envelope is **58.400 × 73.700 × 96.470 mm** W/H/L. The cap's
+former 0.14 mm raised polarity marking is now a texture, so the body width is the
+manufacturer's rounded nominal width; this is not a uniform rescale. Length stays
+0.03 mm under nominal. These are art dimensions, **not** installation tolerances.
 The jaw/channel geometry is a visual Picatinny approximation, not manufacturing data.
+Runtime meshes are `EXPS3_body` and `EXPS3_glass`; the latter contains both panes.
+Use the retained lens sockets, not the retired individual-pane mesh names.
 
 **The 48.2 mm optical centre above the current art datum is photo-derived and provisional.** The
 published envelope does not certify it. Confirm mount height, rail seating,
@@ -181,11 +222,14 @@ unchanged. Cameras are `left`, `right`, `front`, `rear`, `top`, `hero` and
 `rear-quarter`. Normal game builds use committed products and require no Blender.
 The asset is intentionally not mounted or imported by production runtime code yet.
 
-Two fresh independent processes in empty output directories produced byte-identical
-GLBs and finish PNGs, including a build that rendered all seven views and one that
-did not render. The native authored UV lattice is fixed before saving/exporting;
-there are no exporter hooks or post-export GLB repairs. This is same-host evidence,
-not a promise of universal cross-platform floating-point identity.
+Fresh separate-process builds (one rendering all seven views, one without renders)
+produce identical atlas PNGs, geometry/indices, normals, UVs, materials and sockets.
+Native Mikk export differs in **one tangent component by 0.0001000166**, one native
+four-decimal rounding bin (at most about 0.006°); therefore the optimized GLBs are
+not claimed byte-identical. This narrowly measured render-cache difference does
+not permit broader geometry/texture tolerances. The native UV lattice is fixed
+before baking/export; no exporter hooks or post-export GLB/texture repairs exist.
+Same-host evidence is not universal cross-platform determinism.
 
 On the authoring host, the installed Blender OCIO 2.5 configuration was incompatible
 with its OCIO 2.4.2 library. A process-local official Blender 4.4.3 configuration
