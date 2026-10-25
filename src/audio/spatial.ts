@@ -23,7 +23,7 @@
 
 import type { EngineContext } from '../core/context.ts';
 import { airCutoff, clamp, gain, biquad } from './dsp.ts';
-import type { Mixer } from './mixer.ts';
+import type { BusName, Mixer } from './mixer.ts';
 interface Point3 {
   x: number;
   y: number;
@@ -40,7 +40,7 @@ interface EmitterOptions {
   atten?: number;
   priority?: number;
   endTime?: number;
-  bus?: string;
+  bus?: BusName;
   tracked?: boolean;
   gain?: number;
   send?: number;
@@ -71,7 +71,7 @@ class Emitter {
   free!: boolean;
   endTime!: number;
   priority!: number;
-  busName!: string;
+  busName!: BusName;
   attached!: AudioNode | null;
   tracked!: boolean;
   pos!: Point3;

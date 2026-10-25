@@ -101,7 +101,10 @@ together. Architectural semantics not captured by those types:
 ## Physics and world contracts
 
 Surface names: `concrete, metal, wood, dirt, sand, glass, water, foliage, fabric,
-flesh, rubber, plaster`.
+flesh, rubber, plaster`. `src/physics/surfaces.ts` owns `SurfaceName`; carry it through
+physics results, events, FX and audio. Explicit collision/ballistic metadata is
+validated, never guessed or silently replaced. Only unlabelled mesh/material names
+use `guessSurface`; world query/visual authoring labels are a separate vocabulary.
 
 `physics.fireBullet({ origin, dir, shooter, damage, penetration, maxDist,
 maxRange?, travelled?, from?, dropoff?, weapon?, shot?, mask?, emit? })` returns
@@ -127,6 +130,10 @@ clear flush remaining reached contacts before telemetry/retirement. Extreme
 sideways/backwards scatter may require that terminal flush rather than normal
 forward completion. Instantaneous/AI damage publication remains immediate.
 Targets own health; range/region scaling is already applied and must not repeat.
+AI transitions use `AiState` from `agent.ts`; player locomotion uses `PlayerMoveState`,
+with presentation-only `lean` added by `PlayerState`. Keep `WeaponMode` semantic
+through HUD polling (uppercase only for display), `CardId | null` for intel card
+identity/absence, and mixer-owned `BusName` through dry/spatial/send routing.
 
 Collision `surface` is the impact finish; optional `ballisticSurface` determines
 penetration. Preserve cooked `_solid` IDs; unlabelled geometry uses connected

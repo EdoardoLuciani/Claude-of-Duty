@@ -1,3 +1,4 @@
+import type { SurfaceName } from '../physics/surfaces.ts';
 import { P, D } from './atlas.ts';
 import { screenAngle } from './muzzle.ts';
 import { resetSpawn } from './particles.ts';
@@ -1419,7 +1420,7 @@ export function spawnExit(
   point: Vec3Like,
   normal: Vec3Like,
   incident: Vec3Like,
-  surface: string,
+  surface: SurfaceName,
   energy: number
 ): void {
   if (surface === 'flesh') {
@@ -1463,7 +1464,7 @@ export function spawnImpact(
   point: Vec3Like,
   normal: Vec3Like,
   incident: Vec3Like,
-  surface: string,
+  surface: SurfaceName,
   energy: number
 ): void {
   (IMPACTS[surface] ?? IMPACTS.concrete)(fx, point, normal, incident, energy);

@@ -31,6 +31,7 @@
 import type { EngineContext } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName, ReloadPhase } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
+import type { SurfaceName } from '../physics/surfaces.ts';
 import { AircraftVoice, AIRCRAFT_MIX, type AircraftPosition } from './aircraft.ts';
 import { Ambience, ONE_SHOTS, AMBIENT_EVENT_GAIN } from './ambience.ts';
 import { CalloutPlayer, isCalloutKind } from './callouts.ts';
@@ -41,6 +42,7 @@ import { EXPLOSION_MIX, explosionDistanceGain, type ExplosionKind } from './expl
 import { uiSound, heartbeat, intelSiren } from './foley.ts';
 import { classifySpace, SPACE_KEYS } from './ir.ts';
 import { Mixer } from './mixer.ts';
+import type { BusName } from './mixer.ts';
 import { TentRadio } from './music.ts';
 import { radioCue } from './radio.ts';
 import { reactionKind } from './reactions.ts';
@@ -66,7 +68,7 @@ interface AudioOptions {
   firstPerson?: boolean;
   miss?: number;
   gain?: number;
-  surface?: string;
+  surface?: SurfaceName;
   energy?: number;
   amount?: number;
   armourAbsorbed?: number;
@@ -91,7 +93,7 @@ interface AudioOptions {
   dist?: number;
   voice?: number;
   priority?: number;
-  bus?: string;
+  bus?: BusName;
   force?: boolean;
 }
 type AudioRuntimeContext = Pick<EngineContext, 'rng' | 'camera' | 'events' | 'peek'>;
@@ -156,7 +158,7 @@ const UI_ALIAS: Record<string, string> = {
 };
 
 /** Default bus per voice kind, so callers do not have to know the mix layout. */
-const BUS_FOR: Record<string, string> = {
+const BUS_FOR: Partial<Record<string, BusName>> = {
   shot: 'weapons',
   explosion: 'weapons',
   dryfire: 'weapons',
@@ -759,7 +761,7 @@ export class AudioSystem {
     y: number,
     z: number,
     o: AudioOptions = {},
-    bus = 'foley',
+    bus: BusName = 'foley',
     priority = 0.5
   ): boolean {
     if (!this.running || this.actx!.state === 'suspended') return false;
@@ -812,7 +814,7 @@ export class AudioSystem {
   }
 
   /** Head-locked one-shot: own weapon, UI, player grunts, heartbeat. */
-  _playDry(kind: string, o: AudioOptions = {}, bus = 'foley', send = 0.15): boolean {
+  _playDry(kind: string, o: AudioOptions = {}, bus: BusName = 'foley', send = 0.15): boolean {
     if (!this.running || this.actx!.state === 'suspended') return false;
     const actx = this.actx!,
       mixer = this.mixer!;
@@ -967,7 +969,7 @@ export class AudioSystem {
   setMasterVolume(v: number): void {
     this.mixer?.setMasterVolume(v);
   }
-  setBusVolume(bus: string, v: number): void {
+  setBusVolume(bus: BusName, v: number): void {
     this.mixer?.setBusVolume(bus, v);
   }
   setAmbienceIntensity(v: number): void {
@@ -1132,7 +1134,7 @@ export class AudioSystem {
     const dist = field.distanceTo(x, y, z);
     if (dist > 22) return;
     // Find what it will land on, so brass on sand does not ring like concrete.
-    let surface = 'concrete';
+    let surface: SurfaceName = 'concrete';
     const phys = this.ctx.peek('physics');
     if (phys?.raycast) {
       const h = phys.raycast(x, y + 0.2, z, 0, -1, 0, 6, phys.MASK?.WORLD);

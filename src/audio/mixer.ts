@@ -26,7 +26,7 @@ import { hasOwn } from '../core/guards.ts';
 import type { Rng } from '../core/rng.ts';
 import { biquad, gain, clamp, osc } from './dsp.ts';
 import { IR_SPECS, generateIR, type SpaceName } from './ir.ts';
-type BusName = keyof typeof BUS_DEFS;
+export type BusName = keyof typeof BUS_DEFS;
 interface MixerBus {
   input: AudioNode;
   level: GainNode;
@@ -305,13 +305,13 @@ export class Mixer {
   }
 
   /** Bus input node a voice should connect to. */
-  bus(name: string): AudioNode {
-    return (hasOwn(this.buses, name) ? this.buses[name] : this.buses.foley).input;
+  bus(name: BusName): AudioNode {
+    return this.buses[name].input;
   }
 
   /** Category-controlled input to the shared room field. */
-  sendBus(name: string): AudioNode {
-    return (hasOwn(this.buses, name) ? this.buses[name] : this.buses.foley).send;
+  sendBus(name: BusName): AudioNode {
+    return this.buses[name].send;
   }
 
   /**
@@ -513,7 +513,7 @@ export class Mixer {
     this.masterGain.gain.setTargetAtTime(this.masterVolume, this.actx.currentTime, 0.03);
   }
 
-  setBusVolume(name: string, v: number): void {
+  setBusVolume(name: BusName, v: number): void {
     if (!hasOwn(this.buses, name)) return;
     const b = this.buses[name];
     if (!b) return;

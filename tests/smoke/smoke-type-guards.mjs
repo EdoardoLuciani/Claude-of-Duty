@@ -14,6 +14,7 @@ import {
 } from '../../src/core/three-guards.ts';
 import { SURFACE, SURFACE_NAMES } from '../../src/physics/surfaces.ts';
 import { createFogCompute } from '../../src/render/fog-compute-webgpu.ts';
+import { isLightingContext } from '../../src/render/indirect-webgpu.ts';
 import { setClass, setStyle } from '../../src/ui/util.ts';
 import { FixtureImageBitmap, installImageBitmapFixture } from '../lib/image-bitmap.mjs';
 
@@ -67,6 +68,27 @@ assert.equal(isTexture({ isTexture: true }), false);
 texture.dispose();
 geometry.dispose();
 material.dispose();
+
+// Native TSL proxies pass; forgeable isNode markers never establish operator methods.
+const lighting = {
+  ambientOcclusion: float(1),
+  iblIrradiance: vec3(0).toVar(),
+  radiance: vec3(0).toVar(),
+  irradiance: vec3(0).toVar(),
+  lightingModel: { clearcoatRadiance: vec3(0).toVar() },
+};
+assert.equal(isLightingContext(lighting), true);
+for (const name of ['ambientOcclusion', 'iblIrradiance', 'radiance', 'irradiance']) {
+  assert.equal(isLightingContext({ ...lighting, [name]: { isNode: true } }), false);
+  assert.equal(isLightingContext({ ...lighting, [name]: null }), false);
+}
+assert.equal(
+  isLightingContext({ ...lighting, lightingModel: { clearcoatRadiance: { isNode: true } } }),
+  false
+);
+assert.equal(isLightingContext({ ...lighting, lightingModel: {} }), true);
+assert.equal(isLightingContext({ ...lighting, lightingModel: { clearcoatRadiance: null } }), true);
+assert.equal(isLightingContext({ ...lighting, lightingModel: null }), false);
 
 // Exercise the pinned compute API, not a newer @types-only method such as setCount.
 const fog = createFogCompute(() => vec3(0), { color: vec4(0), depth: float(1) });
