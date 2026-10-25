@@ -102,8 +102,17 @@ mouse capture succeeds. Terminal errors require Reload. Quality changes restart
 the run; Defaults resets settings, not bindings. Gamepad sticks move/look; no
 buttons are bound. F7/F8 are telemetry-only.
 
-Survive escalating squads, earn credits and shop between waves. M4/P320 are the
-starting weapons; MCX, EVOLYS, MPX and AX338 are shop options. The day/night clock
+Survive escalating squads, earn credits and shop between waves. Hover or focus a
+market weapon to preview it; click its card (Enter/Space on the focused card) to
+keep it selected. Drag to rotate, right-drag or choose Pan to pan, and scroll to
+zoom. In the focused 3D view, arrows rotate, Shift+arrows pan, +/- zoom and Home
+resets; toolbar buttons offer the same controls. Inspection never spends credits:
+use the explicit Buy/Swap button to purchase. Resupply cards still buy on click.
+This first customization increment previews the current authored configurations;
+separate attachment purchases and iron-sight-only defaults are not implemented yet.
+
+M4/P320 are the starting weapons; MCX, EVOLYS, MPX and AX338 are shop options.
+The day/night clock
 starts at 16:30 and advances nine hours per ten active minutes. Pause/shop freeze
 it; the first 21:00 triggers a three-minute streetlight outage, not an interior outage.
 

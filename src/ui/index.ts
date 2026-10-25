@@ -397,6 +397,7 @@ export class UiSystem {
       this.sfx('objective', 0.7);
     });
 
+    on('engine:error', (): void => this.shop.hide());
     on('market:open', (e): void => {
       this.shop.show(e?.wave ?? 0);
       this.sfx('market_open', 0.85);
