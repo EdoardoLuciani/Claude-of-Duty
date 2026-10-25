@@ -15,8 +15,8 @@ captive scalloped cap, raised quick-detach mount and separate optical windows.
   recesses, packed original finish maps, seven review cameras and the studio.
   It is saved **before** consolidating runtime copies. Blender 5.2 uses Zstandard
   compression; open it normally in Blender 5.2.2.
-- `exps3-0.glb` is the stock native glTF export: **36,371 triangles, 11 primitives,
-  10 PBR materials, two embedded 1024² maps, 4,013,976 bytes**. No studio, external
+- `exps3-0.glb` is the stock native glTF export: **44,617 triangles, 11 primitives,
+  10 PBR materials, two embedded 1024² maps, 4,522,712 bytes**. No studio, external
   asset URL, animation, arms or baked reticle is exported.
 - `finish-normal.png` and `finish-roughness.png` are seeded original micro-finish
   maps, also packed/embedded in the blend/GLB. Reference photos are not textures.
@@ -43,8 +43,8 @@ removal need not leave floating panes behind.
 Side, front, rear and top comparisons use estimated orthographic cameras with
 one uniform scale per photo, not independent X/Y stretching or per-part alignment.
 The camera poses are frozen in the source and review JSON. Filled-silhouette IoU
-is descriptive only: **left .93658, right .92014, rear .90329, front .91572,
-top .93730**. Alpha >250 excludes faint photo shadows; enclosed holes are filled
+is descriptive only: **left .93685, right .92205, rear .89858, front .90584,
+top .93378**. Alpha >250 excludes faint photo shadows; enclosed holes are filled
 for this external-profile statistic. It does **not** assess the optical aperture,
 small details, material fidelity or certify 1:1 accuracy. The smoke test separately
 casts two-way rays across the rounded clear opening, with extra lower-edge coverage.
@@ -75,6 +75,52 @@ mean these are visual estimates, not certified optical dimensions. See the revie
 JSON for masks, bounds, angular probes and original defect evidence. No complete
 eye box is claimed; for example, a −10° downward centreline ray still meets the
 battery housing. Runtime reticle and ADS remain outside this asset-only PR.
+
+### Rear/right correction after independent Sol review
+
+The owner-requested GPT-6.1 Sol comparison identified concrete rear anatomy and
+hardware differences that silhouette overlap did not measure. The revised cover
+has a 26 mm screw-row spacing, a lower row at Z2 mm, rounded 9 mm lower bosses,
+upper ears/shallow saddle and actual counterbores. The rear icon intersects the
+cover with 0.12 mm exposed relief; the old 0.72 mm floating gap is gone. Lettering
+also has shallow physical relief, rather than relying on a detached black badge.
+
+Right-side adjustments now occupy actual hood/housing openings, with recessed
+walls, convex moulded annuli, physical tool grooves and moulded legends/arrows.
+The lower mount has an open shaped channel, contoured lever, oval tension-pad
+inset and genuinely recessed slotted nut. A redundant zero-area skirt spike was
+removed; planar sheet/casting/slot faces receive explicit native split normals
+instead of the false rounded/triangular highlights from averaged corner normals.
+
+The cap has a **23.5 mm nominal grip diameter** within its unchanged **28.2 mm
+retaining mouth**, approximately the photograph's **1.2 ratio**, not an OEM
+measurement. Seal and groove floor fit the smaller cap. Tether eyes, folded loops
+and crimp sleeves provide visible attachment at both ends; its exact flexible bend
+is not reconstructed. The complete outside envelope and optical contracts remain
+unchanged—this is local anatomy work, not a uniform rescale.
+
+Casting uses an 80 mm finish tile and .65 normal strength versus the hood/mount's
+40 mm/.22, using the same two original PNGs. Native roughness factors are
+hood .86 / casting 1 / mount .94 rather than replacing every scalar with the shared
+map's mean. Base colors, metalness, glass settings, studio/exposure and all cameras
+are preserved. This separates coarse casting from fine hood response without
+trying to match an uncalibrated photograph's absolute brightness.
+
+Regression probes cover the shipped recess/dome/groove depths, lower boss and
+counterbore surfaces, seated rear relief, cap/mouth proportion, valid planar hood
+normals and exported finish factors, alongside the unchanged optical checks.
+Before/after candidates use the same cameras; the quarter reference photograph's
+pose differs and is labelled. Exterior IoU is not a detail-acceptance target: its
+rear/front/top values declined despite corrected local anatomy, and the current
+measurements are reported rather than hidden. Three independent Sol review rounds
+ended **acceptable with notes**, with no remaining P1 blocker established. After
+that review, the parent fixed the small reported arrowhead/dial intersection by
+subdividing and conforming only those heads: 11,856 dense samples per head found
+zero buried points, with 0.062–0.108 mm clearance. This bounded final correction
+was parent-verified, not separately Sol-reviewed. Fine moulded lettering remains
+less readable than the photos, and the shallow rear mark is lighting-sensitive.
+Human visual acceptance remains separate; exact typeface and spectral glazing
+are still acknowledged approximations.
 
 EOTECH's photos retain their original ownership and are not committed or embedded.
 The original geometry, procedural finish and reconstructed vector markings are

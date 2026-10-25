@@ -1,7 +1,7 @@
 {
   "asset": "EOTECH EXPS3-0 | reference-backed original Blender art",
   "source": "tools/blender/exps3.py",
-  "sourceSha256": "aadf31d9d35ed24c102dd288232d64b359d6324c9df9531dcb11146a47a7c647",
+  "sourceSha256": "502d483864e23667c1bb4e0ba0cfa80c51d3c874793db8e316c23d9685d5472b",
   "blender": "5.2.2 LTS",
   "units": "metres",
   "axes": {
@@ -45,11 +45,11 @@
     "geometryBaked": false
   },
   "stats": {
-    "triangles": 36371,
+    "triangles": 44617,
     "primitives": 11,
     "materials": 10,
-    "bytes": 4013976,
+    "bytes": 4522712,
     "images": 2
   },
-  "sha256": "e626bc3e5b7cb5b62bf772d123a85d26b977a66c7315d7f90cc2f6f04847b79f"
+  "sha256": "719ccf14fae5f00b94a616399e7082290bdb83690bdb6c0f7a3f28c945da4ac3"
 }

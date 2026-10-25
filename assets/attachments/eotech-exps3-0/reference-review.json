@@ -84,7 +84,7 @@
         1375,
         1048
       ],
-      "filledSilhouetteIoU": 0.93658,
+      "filledSilhouetteIoU": 0.93685,
       "cameraBlender": {
         "positionM": [
           -0.4,
@@ -119,7 +119,7 @@
         1443,
         1079
       ],
-      "filledSilhouetteIoU": 0.92014,
+      "filledSilhouetteIoU": 0.92205,
       "cameraBlender": {
         "positionM": [
           0.4,
@@ -151,10 +151,10 @@
       "modelSolidBoundsPx": [
         430,
         129,
-        1170,
+        1169,
         1062
       ],
-      "filledSilhouetteIoU": 0.90329,
+      "filledSilhouetteIoU": 0.89858,
       "cameraBlender": {
         "positionM": [
           0,
@@ -184,12 +184,12 @@
         567
       ],
       "modelSolidBoundsPx": [
-        179,
+        180,
         135,
         519,
         564
       ],
-      "filledSilhouetteIoU": 0.91572,
+      "filledSilhouetteIoU": 0.90584,
       "cameraBlender": {
         "positionM": [
           0,
@@ -222,9 +222,9 @@
         84,
         192,
         607,
-        508
+        507
       ],
-      "filledSilhouetteIoU": 0.9373,
+      "filledSilhouetteIoU": 0.93378,
       "cameraBlender": {
         "positionM": [
           0,
@@ -256,7 +256,7 @@
   "repeatBuild": {
     "blender": "5.2.2 LTS",
     "host": "Linux x86_64, same host, independent factory-empty processes and empty output directories",
-    "glbSha256": "e626bc3e5b7cb5b62bf772d123a85d26b977a66c7315d7f90cc2f6f04847b79f",
+    "glbSha256": "719ccf14fae5f00b94a616399e7082290bdb83690bdb6c0f7a3f28c945da4ac3",
     "result": "Byte-identical GLBs and finish PNGs for independent builds, one with all seven renders and one without rendering. Therefore geometry, indices, UVs/normals, materials/maps and socket transforms are identical. Not a universal cross-host determinism claim.",
     "authoringUVs": "Native Blender UV projection uses a 1/65536 binary UV lattice, including Boolean-interpolated UVs, before save/render/export. No GLB rewriting or exporter hooks.",
     "ocioCompatibility": {
@@ -668,6 +668,85 @@
     },
     "smokeRegression": "Full rounded-opening1mm grid plus0.25mm lower-edge samples in both directions; physical30x23panes and glass thicknesses asserted independently. Old37.5mm roof blocks37.25mm; corrected geometry clears that formerly obstructed height.",
     "limits": "No complete eye-box certification. Centreline ±5° and -7° pitch probes clear after correction; -10° still meets the battery, a normal physical off-axis limit rather than a promised unlimited aperture. Photo-derived48.2mm centre and22mm clear height remain provisional art datums."
+  },
+  "rearRightRefinement": {
+    "baselineCommit": "4dcb6bf8a67c9d9f43ac75f73d8e5b31385d18c7",
+    "baselineGlbSha256": "e626bc3e5b7cb5b62bf772d123a85d26b977a66c7315d7f90cc2f6f04847b79f",
+    "reason": "Owner requested an independent GPT-6.1 Sol reference-difference review, especially the rear-right view, followed by parent-owned iterative fixes.",
+    "sourceSha256": "502d483864e23667c1bb4e0ba0cfa80c51d3c874793db8e316c23d9685d5472b",
+    "glbSha256": "719ccf14fae5f00b94a616399e7082290bdb83690bdb6c0f7a3f28c945da4ac3",
+    "stats": {
+      "triangles": 44617,
+      "primitives": 11,
+      "materials": 10,
+      "bytes": 4522712,
+      "images": 2
+    },
+    "authoringMeshParts": 178,
+    "reviewRounds": [
+      {
+        "round": 1,
+        "verdict": "NEEDS CORRECTION",
+        "findings": "Rear cover too short, missing rounded lower bosses, applied adjustment discs, floating rear badge; lower transition, cap/tether and finish discrepancies."
+      },
+      {
+        "round": 2,
+        "verdict": "NEEDS CORRECTION",
+        "verified": "Main rear-cover anatomy, recessed domed controls, badge seating, nut recess and tether attachments corrected.",
+        "blocker": "Degenerate skirt spike and off-plane split normals created a false rounded highlight; cap/mouth ratio and finish/legend polish also noted."
+      },
+      {
+        "round": 3,
+        "verdict": "ACCEPTABLE WITH NOTES",
+        "reviewedGlbSha256": "e247238d702786fc2681af56cae166e89176b7cf8b27bba1bf3079af6b98984c",
+        "blockers": [],
+        "notes": "Skirt/nut normals, cap ratio, rear anatomy and finish separation verified. Moulded detail readability and lighting-sensitive rear mark remain non-blocking; small arrowhead conformance defect reported as P2."
+      }
+    ],
+    "geometry": {
+      "rearCover": "26mm fastener-row spacing, lower row Z2mm, 9mm cast lower bosses, rounded upper ears/shallow saddle; actual counterbores rather than proud fasteners.",
+      "rearMark": "0.12mm exposed icon relief intersecting the Y-35mm cover; physical shallow lettering, no old 0.72mm air gap. Bundled font is not exact OEM typography.",
+      "controls": "11mm-radius openings cut through hood and overlapping housing/battery; recessed walls/floors, convex moulded annuli, physical tool grooves, seated white print and shallow moulded legends/arrows.",
+      "mount": "Open shaped rail channel, contoured lever, oval tension-pad inset and actual slotted nut recess. Still a visual rail approximation, not engineering data.",
+      "cap": "23.5mm nominal grip diameter inside 28.2mm retaining mouth, approximately1.2 ratio; measured peak radius11.74818mm after0.08mm edge rounding; fitted seal/groove floor, tether eyes/loops and aligned crimp sleeves.",
+      "normals": "Removed redundant (31.5,8) skirt spike. Native sharp/weighted normals plus explicit planar split normals on axis-aligned sheet/casting/slot caps; no GLB rewriting.",
+      "unchanged": "58.54x73.7x96.47mm envelope, mount origin, optical sockets/datums, pane sizes/thicknesses, clear opening and battery-roof clearance. Frozen studio/cameras/exposure. No reticle/ADS/M4/runtime/economy changes."
+    },
+    "finish": {
+      "maps": "Same two seeded1024px procedural PNGs; no photographic textures, new material or new runtime dependency.",
+      "casting": {
+        "tileMm": 80,
+        "normalStrength": 0.65,
+        "roughnessFactor": 1
+      },
+      "hood": {
+        "tileMm": 40,
+        "normalStrength": 0.22,
+        "roughnessFactor": 0.86
+      },
+      "mount": {
+        "tileMm": 40,
+        "normalStrength": 0.22,
+        "roughnessFactor": 0.94
+      },
+      "note": "Native glTF carries the authored scalar roughness multipliers. Finish separation is inferred from photos, not calibrated to their absolute brightness; base colors, metalness and glass settings unchanged."
+    },
+    "regression": "Actual opaque-geometry probes verify control recesses/domes/slots, lower bosses and counterbores, shallow rear relief, cap/nut groove depth and cap/mouth proportion. Exported hood normals are unit length and stepped face normals planar. Existing full rounded opening/lower-edge, exact-envelope, physical-pane/thickness and source/product provenance checks remain.",
+    "comparison": "Original seven cameras and lights are unchanged. Reference/before/after rear, right and rear-quarter sheets; quarter reference photo pose differs and is labelled. Filled external-profile IoU is not a detailing acceptance gate: rear/front/top values can decline despite corrected local anatomy; all current measured values are retained above.",
+    "postReviewArrowheadCorrection": {
+      "reviewedCandidateSha256": "e247238d702786fc2681af56cae166e89176b7cf8b27bba1bf3079af6b98984c",
+      "publishedCandidateSha256": "719ccf14fae5f00b94a616399e7082290bdb83690bdb6c0f7a3f28c945da4ac3",
+      "change": "After round3, parent subdivided only the small arrowhead meshes before conforming them to the domed dial, then refreshed native surface normals. No fourth review/remodeling loop.",
+      "denseVerification": {
+        "samplesPerHead": 11856,
+        "buriedSamplesPerHead": 0,
+        "minClearanceMm": 0.06217,
+        "maxClearanceMm": 0.10832
+      },
+      "regression": "Committed interior barycentric ray probes require the visible arrowheads to remain above the underlying dome.",
+      "reviewBoundary": "Sol's final verdict applies to the stated reviewed hash. This subsequent bounded P2 correction was parent-verified with dense geometry probes, smoke/full tests, repeat builds and native WebGPU; it was not separately Sol-reviewed."
+    },
+    "acceptance": "No remaining P1 blocker established in round3; acceptable with notes for the named asset-only review. Final bounded arrowhead correction is parent-verified, not separately Sol-reviewed. Owner visual acceptance still required; not certified CAD."
   },
   "nativeValidation": {
     "backend": "native WebGPU, AMD RDNA 4, non-fallback",
