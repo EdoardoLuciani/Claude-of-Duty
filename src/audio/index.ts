@@ -34,10 +34,11 @@ import type { Rng } from '../core/rng.ts';
 import { AircraftVoice, AIRCRAFT_MIX, type AircraftPosition } from './aircraft.ts';
 import { Ambience, ONE_SHOTS, AMBIENT_EVENT_GAIN } from './ambience.ts';
 import { CalloutPlayer, isCalloutKind } from './callouts.ts';
+import { CASING_BANK, COMBAT_MIX, dryBank, nearMissGain } from './combat.ts';
 import { NoiseBank, SPEED_OF_SOUND, clamp, gain as mkGain } from './dsp.ts';
 import type { EnvironmentKind } from './environment.ts';
 import { EXPLOSION_MIX, explosionDistanceGain, type ExplosionKind } from './explosions.ts';
-import { shellCasing, uiSound, heartbeat, intelSiren } from './foley.ts';
+import { uiSound, heartbeat, intelSiren } from './foley.ts';
 import { classifySpace, SPACE_KEYS } from './ir.ts';
 import { Mixer } from './mixer.ts';
 import { TentRadio } from './music.ts';
@@ -52,8 +53,6 @@ import {
   resolveProfile,
   weaponShot,
   weaponPunch,
-  bulletWhizz,
-  dryFire,
 } from './weapons.ts';
 
 const PROBE_RAYS = 9;
@@ -84,6 +83,7 @@ interface AudioOptions {
   flight?: number;
   phase?: ReloadPhase;
   reloadWeapon?: string;
+  dryWeapon?: string;
   explosionKind?: ExplosionKind;
   bark?: string;
   radio?: boolean;
@@ -179,9 +179,9 @@ const BUS_FOR: Record<string, string> = {
   market_hover: 'ui',
   market_deny: 'ui',
   grenade_warn: 'ui',
-  grenade_pin: 'ui',
+  grenade_pin: 'foley',
   grenade_tick: 'ui',
-  grenade_throw: 'ui',
+  grenade_throw: 'foley',
   radio_open: 'ui',
   radio_denied: 'ui',
   radio_strike: 'ui',
@@ -690,9 +690,24 @@ export class AudioSystem {
         });
       }
       case 'whizz':
-        return bulletWhizz(actx, bank, rng, { when, miss: o.miss, gain: o.gain });
+        return this.samples!.combat('whizz', rng, {
+          when,
+          level: nearMissGain(o.miss) * (o.level ?? 1),
+          send: COMBAT_MIX.whizzSend,
+        });
       case 'dryfire':
-        return dryFire(actx, bank, rng, { when });
+        return this.samples!.combat(dryBank(o.dryWeapon ?? o.profile?.sample), rng, {
+          when,
+          level: o.level,
+          send: COMBAT_MIX.drySend,
+        });
+      case 'grenade_pin':
+      case 'grenade_throw':
+        return this.samples!.combat(kind === 'grenade_pin' ? 'grenade-pin' : 'grenade-throw', rng, {
+          when,
+          level: o.level,
+          send: COMBAT_MIX.handlingSend,
+        });
       case 'damage':
         return this.samples!.damage(rng, {
           when,
@@ -720,12 +735,16 @@ export class AudioSystem {
           gear: o.gear,
         });
       case 'shell':
-        return shellCasing(actx, bank, rng, {
-          when,
-          surface: o.surface,
-          level: o.level,
-          flight: o.flight,
-        });
+        return this.samples!.combat(
+          CASING_BANK[o.surface ?? 'concrete'] ?? 'casing-concrete',
+          rng,
+          {
+            when,
+            level: o.level,
+            delay: o.flight ?? COMBAT_MIX.casingFlight,
+            send: COMBAT_MIX.casingSend,
+          }
+        );
       case 'reload':
         return this.samples!.reload(o.reloadWeapon ?? '', o.phase, rng, { when });
       case 'explosion':
@@ -1095,7 +1114,12 @@ export class AudioSystem {
       profile = WEAPON_PROFILES.suppressed;
 
     if (p.empty) {
-      this._playDry('dryfire', {}, 'weapons', 0.15);
+      this._playDry(
+        'dryfire',
+        { dryWeapon: typeof w === 'string' ? w : (w?.id ?? name) },
+        'weapons',
+        0.15
+      );
       return;
     }
 

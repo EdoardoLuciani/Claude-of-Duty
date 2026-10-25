@@ -30,6 +30,7 @@ const cases = [
     (bank, rng) => bank.radio('radio_open', rng),
   ],
   ['hit', 'hitBuffers', ['flesh'], (bank, rng) => bank.hit('flesh', rng)],
+  ['combat', 'hitBuffers', ['whizz'], (bank, rng) => bank.combat('whizz', rng)],
 ];
 for (const count of [1, 2, 3, 4]) {
   for (const [name, field, keys, play] of cases) {
