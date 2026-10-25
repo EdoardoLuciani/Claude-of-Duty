@@ -72,6 +72,14 @@ together. Architectural semantics not captured by those types:
 - A wave clear allows 10 s ammo-looting grace, then one player-dismissed shop
   session. The shop freezes scaled time and the longer AI wave countdown.
 - `ai:footstep` is one boot per animated stride plant; cull by distance.
+  `ai:bark` requests recorded contact on visual acquisition, reload on actual
+  reload start, or an outgoing-grenade announcement after a successful launch.
+  Its `voice` is the actor's immutable sequential ID: audio distributes four
+  fixed identities evenly by ID, varying takes rather than pitch/speaker.
+  `position` is that actor's retained position, not pooled scratch. Speech uses
+  one tracked spatial slot, duration/actor cooldowns and no queue; grenade
+  announcements can preempt ordinary lines. Pause/shop/death/error stop it,
+  and restart clears speech history. Unsupported intents remain silent.
   `hud:search` is a coarse 45° last-enemy sector; pause/shop freeze its timer.
 - Intel chooses unused sites, initially 18 m from player / 24 m from live cases,
   preferring sites absent from the last five drops. History survives reloads/runs
@@ -277,8 +285,12 @@ events use required recordings. Explosions carry optional `kind: 'grenade' | 'bo
 synthetic blast layers. Radio owns aircraft pose/pass lifetime; audio owns source
 cleanup. Radio textures supplement intentional electronic tones. Do not invent
 ambient human/tactical actors.
+Tactical contact/reload/outgoing-grenade speech uses required offline-generated,
+locally bundled Opus recordings with source hashes, prompts and processing in
+`src/audio/samples/callouts/provenance.json`; authoring/rights notes live in
+`assets/audio/tactical-callouts/README.md`. No runtime TTS or credential access.
 Remaining synthesis includes legacy AK/generic-suppressed reports and reinforcement,
-shell casings/dry fire, tactical speech and intentional UI cues.
+shell casings/dry fire and intentional UI cues. Other spoken intents remain deferred.
 
 `models.getSoldier(name)` returns `{ name, geometry, slots, boneNames, weapon,
 stats, variant }`. Merge GLTF primitives into one skinned geometry with slot
