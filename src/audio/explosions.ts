@@ -49,7 +49,8 @@ export const EXPLOSION_MIX = {
   farStart: 180,
   // The recordings already contain outdoor decay. Do not add a second long tail.
   send: 0.08,
-  gain: 0.8,
+  // Owner audition: +3 dB over the initial 0.8 level, without changing source character.
+  gain: 0.8 * 10 ** (3 / 20),
   // Presentation references, not measured SPL. Blasts carry farther than small arms.
   reference: { grenade: 8, bomb: 16 },
 } as const;
