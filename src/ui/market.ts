@@ -141,7 +141,9 @@ export class MarketOverlay {
     this._onClick = (e: MouseEvent): void => {
       const card = targetCard(e.target);
       if (!this.active || !card) return;
-      const item = this.market.getHudState().items.find((it) => it.id === card.dataset.item);
+      const item = this.market
+        .getHudState()
+        .items.find((it): boolean => it.id === card.dataset.item);
       if (!item) return;
       const gun = item.slot === 'primary' || item.slot === 'secondary';
       if (gun) {
@@ -245,7 +247,7 @@ export class MarketOverlay {
   }
 
   _preview(id: string): void {
-    const item = this.market.getHudState().items.find((it) => it.id === id);
+    const item = this.market.getHudState().items.find((it): boolean => it.id === id);
     if (!item || (item.slot !== 'primary' && item.slot !== 'secondary')) return;
     for (const row of this.cards) setClass(row.card, 'inspecting', row.card.dataset.item === id);
     void this.inspection.select(id, item.label);
