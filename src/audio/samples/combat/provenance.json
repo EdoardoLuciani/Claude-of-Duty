@@ -1,7 +1,7 @@
 {
   "format": "mono 48000 Hz Opus, 96 kbps VBR, zero header gain",
   "rights": "Owner requested the selected professional-library replacements in a public PR in this implementation session. Original masters remain private; retain applicable library entitlement/licence records. Edited media do not inherit the code licence. Review mixes stay local and are not uploaded to the PR.",
-  "design": "Owner-selected Blastwave pass-bys 54507 through 54511 only (54504-54506 rejected at audition), material-dependent generic casing drops, family-matched dry-fire donors, composed metal-click grenade pin/spoon approximation and isolated cloth throw movements. No synthesized layers or pitch variants. Sand donors stand in for dry earth; carpet for fabric/rubber; concrete for glass/plaster. Casings are not calibre-specific or verified 12-gauge hull recordings. Dry donors are M16, AK47, Glock45, MP5, Remington700 and Pumpgun, not claimed exact recordings of the in-game models. Pin donors are metal clicks, not a verified grenade mechanism. Only these combat-foley paths change; voices, reports, other UI tones, explosions and master safety remain separate. The synthetic grenade cook-warning cue is removed at owner request.",
+  "design": "Owner-selected Blastwave pass-bys 54507 through 54511 only (54504-54506 rejected at audition), material-dependent generic casing drops, family-matched dry-fire donors, isolated cloth throw movements. No synthesized layers or pitch variants. Sand donors stand in for dry earth; carpet for fabric/rubber; concrete for glass/plaster. Casings are not calibre-specific or verified 12-gauge hull recordings. Dry donors are M16, AK47, Glock45, MP5, Remington700 and Pumpgun, not claimed exact recordings of the in-game models. The rejected generic-metal pin donor is removed; pin audio is intentionally silent pending an approved suitable recording. Only these combat-foley paths change; voices, reports, other UI tones, explosions and master safety remain separate. The synthetic grenade cook-warning cue is removed at owner request.",
   "processing": "Decode to mono arithmetic mean, resample 48 kHz, high-pass/low-pass per crop; trim to 5 ms before first 5 ms RMS block exceeding max(-70 dBFS, 4% of peak block RMS), retain the authored crop/tail. 1 ms linear entrance and 10 ms linear exit fades. Scale maximum sliding-window RMS to the listed target subject to -3 dBFS sample-peak headroom. No compression or limiting. Output hashes bind actual Opus files.",
   "sources": {
     "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropCement_BW_99.wav": {
@@ -133,11 +133,6 @@
       "sha256": "11aa7a89644443d6255c3303f842aa370776a550f63acdecfaddfdb380edffeb",
       "channels": 1,
       "description": "PUMP GUN RIFLE DRY FIRE Pulling the trigger without ammunition. Rifle, Gun, Shotgun, foley. Close, mono."
-    },
-    "BOOM ONE Update/Update 24-03/METAL/IMPACT/METLImpt_Metal Little Click Double_B00M_ONE.wav": {
-      "sha256": "14745c41fb641df9dac28f35195b70a3822b5bc24d62ec60d0d98ad65be1e857",
-      "channels": 2,
-      "description": "Two small metallic clicking sounds in succession. Metal, Little, Click, Double, Metallic, Small Impact."
     },
     "BOOM.Library.Close.Combat.WAV.DVDR/Close.Combat.Construction.Kit/CloseCombat_ConstructionKit_48kHz/CC-CK Whoosh Cloth Medium 02.wav": {
       "sha256": "486cf357260d92b677c5be173014d26dbb98732c1c5b3c1226e93aa0451b5bfb",
@@ -815,75 +810,6 @@
       "rmsWindowSeconds": 0.02,
       "targetWindowRmsDb": -20,
       "sha256": "ed19bd5bb3b8795e31530bd1cf0a240cd918d593d2a79b0b30c934d05f989bff"
-    },
-    "grenade-pin-1": {
-      "layers": [
-        {
-          "source": "BOOM ONE Update/Update 24-03/METAL/IMPACT/METLImpt_Metal Little Click Double_B00M_ONE.wav",
-          "start": 0.22,
-          "duration": 0.15,
-          "filter": "highpass=300,lowpass=11500",
-          "delay": 0
-        },
-        {
-          "source": "BOOM ONE Update/Update 24-03/METAL/IMPACT/METLImpt_Metal Little Click Double_B00M_ONE.wav",
-          "start": 0.665,
-          "duration": 0.145,
-          "filter": "highpass=300,lowpass=11500",
-          "delay": 0.07
-        }
-      ],
-      "duration": 0.215,
-      "level": 0.668786083772351,
-      "rmsWindowSeconds": 0.05,
-      "targetWindowRmsDb": -23,
-      "sha256": "a3eda67005b4db72a1243a7c1a54350e4b1f6ef86deb5427ad158217ddecb269"
-    },
-    "grenade-pin-2": {
-      "layers": [
-        {
-          "source": "BOOM ONE Update/Update 24-03/METAL/IMPACT/METLImpt_Metal Little Click Double_B00M_ONE.wav",
-          "start": 2.235,
-          "duration": 0.15,
-          "filter": "highpass=300,lowpass=11500",
-          "delay": 0
-        },
-        {
-          "source": "BOOM ONE Update/Update 24-03/METAL/IMPACT/METLImpt_Metal Little Click Double_B00M_ONE.wav",
-          "start": 2.6999999999999997,
-          "duration": 0.145,
-          "filter": "highpass=300,lowpass=11500",
-          "delay": 0.07
-        }
-      ],
-      "duration": 0.215,
-      "level": 0.6667269893931802,
-      "rmsWindowSeconds": 0.05,
-      "targetWindowRmsDb": -23,
-      "sha256": "42a159f9ac4f9fd775bd13cd6de9905c2e4b1cf31749a840494cdeb91d61eef0"
-    },
-    "grenade-pin-3": {
-      "layers": [
-        {
-          "source": "BOOM ONE Update/Update 24-03/METAL/IMPACT/METLImpt_Metal Little Click Double_B00M_ONE.wav",
-          "start": 4.345,
-          "duration": 0.15,
-          "filter": "highpass=300,lowpass=11500",
-          "delay": 0
-        },
-        {
-          "source": "BOOM ONE Update/Update 24-03/METAL/IMPACT/METLImpt_Metal Little Click Double_B00M_ONE.wav",
-          "start": 4.7749999999999995,
-          "duration": 0.145,
-          "filter": "highpass=300,lowpass=11500",
-          "delay": 0.07
-        }
-      ],
-      "duration": 0.215,
-      "level": 0.6359189989034866,
-      "rmsWindowSeconds": 0.05,
-      "targetWindowRmsDb": -23,
-      "sha256": "b8d25bf39a0b40eb0b7cbf89120004e476217a1e471ea809d411cd9b9b868695"
     },
     "grenade-throw-1": {
       "layers": [

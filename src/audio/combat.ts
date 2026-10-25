@@ -73,11 +73,6 @@ export const COMBAT_URLS = {
     new URL('./samples/combat/dry-shotgun-2.opus', import.meta.url).href,
     new URL('./samples/combat/dry-shotgun-3.opus', import.meta.url).href,
   ],
-  'grenade-pin': [
-    new URL('./samples/combat/grenade-pin-1.opus', import.meta.url).href,
-    new URL('./samples/combat/grenade-pin-2.opus', import.meta.url).href,
-    new URL('./samples/combat/grenade-pin-3.opus', import.meta.url).href,
-  ],
   'grenade-throw': [
     new URL('./samples/combat/grenade-throw-1.opus', import.meta.url).href,
     new URL('./samples/combat/grenade-throw-2.opus', import.meta.url).href,

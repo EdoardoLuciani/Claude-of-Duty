@@ -1357,7 +1357,6 @@ export class WeaponSystem {
     this._cookTime = 0;
     this.grenades--;
     this._viewmodel?.cookGrenade(type);
-    this.audio?.playUi?.('grenade_pin', 0.9);
   }
 
   /** Shared grenade/radio hand-state clear. Does not drop a committed throw. */

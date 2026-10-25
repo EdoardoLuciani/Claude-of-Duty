@@ -179,7 +179,6 @@ const BUS_FOR: Record<string, string> = {
   market_hover: 'ui',
   market_deny: 'ui',
   grenade_warn: 'ui',
-  grenade_pin: 'foley',
   grenade_throw: 'foley',
   radio_open: 'ui',
   radio_denied: 'ui',
@@ -700,9 +699,8 @@ export class AudioSystem {
           level: o.level,
           send: COMBAT_MIX.drySend,
         });
-      case 'grenade_pin':
       case 'grenade_throw':
-        return this.samples!.combat(kind === 'grenade_pin' ? 'grenade-pin' : 'grenade-throw', rng, {
+        return this.samples!.combat('grenade-throw', rng, {
           when,
           level: o.level,
           send: COMBAT_MIX.handlingSend,
@@ -911,6 +909,8 @@ export class AudioSystem {
     position: Vec3Like | AudioOptions | number | null = null,
     opts?: AudioOptions | number
   ): boolean {
+    // Rejected pin donor: silence until a convincing replacement is approved.
+    if (kind === 'grenade_pin') return false;
     if (typeof opts === 'number') opts = { gain: opts };
     if (typeof position === 'number') {
       opts = { gain: position };
@@ -938,6 +938,7 @@ export class AudioSystem {
   }
 
   ui(kind: string, level = 1): boolean {
+    if (kind === 'grenade_pin') return false;
     const k = UI_ALIAS[kind] ?? kind;
     return this._playDry(k, { level }, BUS_FOR[k] ?? 'ui', k === 'heartbeat' ? 0.1 : 0);
   }
