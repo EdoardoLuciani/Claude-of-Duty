@@ -36,9 +36,10 @@ for (const urls of Object.values(RELOAD_URLS)) {
       assert(info.contactPeakTime <= 0.02, 'contact energy must be near its native stop');
     }
     for (const layer of info.layers) {
-      assert(layer.description.length > 0, 'bank metadata identifies the recorded action');
+      const source = provenance.sources[layer.source];
+      assert(source.description.length > 0, 'bank metadata identifies the recorded action');
       assert(layer.downmixLossDb < 6, 'stereo sources checked before mono averaging');
-      assert.match(layer.sourceSha256, /^[a-f0-9]{64}$/);
+      assert.match(source.sourceSha256, /^[a-f0-9]{64}$/);
     }
     const head = data.indexOf('OpusHead');
     assert(head >= 0);
