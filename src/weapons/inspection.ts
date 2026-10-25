@@ -30,6 +30,8 @@ export function createWeaponInspection(entry: WeaponEntry): {
       scene.removeFromParent();
       animation.dispose();
       scene.traverse((node): void => {
+        // Release renderer-side records, not the borrowed geometry/materials/maps.
+        node.dispose();
         if (node instanceof THREE.SkinnedMesh) node.skeleton.dispose();
       });
     },

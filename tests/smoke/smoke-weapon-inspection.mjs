@@ -50,8 +50,14 @@ try {
       if (liveMeshes[i].isSkinnedMesh)
         assert.notEqual(previewMeshes[i].skeleton, liveMeshes[i].skeleton);
     }
+    let objectDisposals = 0;
+    let liveObjectDisposals = 0;
+    for (const mesh of previewMeshes) mesh.addEventListener('dispose', () => objectDisposals++);
+    for (const mesh of liveMeshes) mesh.addEventListener('dispose', () => liveObjectDisposals++);
     inspection.scene.position.set(9, 8, 7);
     inspection.dispose();
+    assert.equal(objectDisposals, previewMeshes.length, id + ' releases every cloned mesh');
+    assert.equal(liveObjectDisposals, 0, id + ' never disposes gameplay objects');
     for (const [node, position, quaternion, scale, visible] of snapshot) {
       assert.deepEqual(node.position.toArray(), position, id + ' live position');
       assert.deepEqual(node.quaternion.toArray(), quaternion, id + ' live orientation');

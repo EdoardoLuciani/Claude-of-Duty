@@ -164,6 +164,168 @@ try {
     await page.evaluate(() => document.getElementById('inspection-test-capture').remove());
   }
 
+  // Rendered clones must release object records/bindings, not just share geometry caches.
+  const lifetime = await page.evaluate(async () => {
+    const ctx = window.__ENGINE__.ctx;
+    const market = ctx.get('market');
+    const p = ctx.get('ui').shop.inspection;
+    const records = p.renderer._objects._renderObjects;
+    const nodes = (scene) => {
+      const result = new Set();
+      scene.traverse((node) => result.add(node));
+      return result;
+    };
+    const retained = (owned) => [...records].filter((record) => owned.has(record.object)).length;
+    const resources = new Set();
+    for (const entry of ctx.get('weapons').viewmodel.weapons.values()) {
+      for (const resource of [...entry.model.materials, ...entry.model.textures])
+        resources.add(resource);
+      for (const mesh of entry.meshes) resources.add(mesh.geometry);
+    }
+    let borrowedDisposals = 0;
+    const onDispose = () => borrowedDisposals++;
+    for (const resource of resources) resource.addEventListener('dispose', onDispose);
+    try {
+      const switches = [];
+      let previous = nodes(p.model.scene);
+      for (const id of ['rifle', 'pistol', 'rifle', 'pistol', 'rifle', 'pistol']) {
+        await p.select(id, id);
+        p.update();
+        const current = nodes(p.model.scene);
+        switches.push({ previous: retained(previous), current: retained(current) });
+        previous = current;
+      }
+      market.closeShop();
+      const closed = retained(previous);
+      const closedCount = records.size;
+      const reopened = [];
+      for (let i = 0; i < 4; i++) {
+        market.openShop(3);
+        await p.select('pistol', 'pistol');
+        p.update();
+        const current = nodes(p.model.scene);
+        const rendered = retained(current);
+        market.closeShop();
+        reopened.push({ rendered, retained: retained(current), total: records.size });
+      }
+      market.openShop(3);
+      await p.select('mcx', 'MCX VIRTUS');
+      p.update();
+      return { switches, closed, closedCount, reopened, borrowedDisposals };
+    } finally {
+      for (const resource of resources) resource.removeEventListener('dispose', onDispose);
+    }
+  });
+  for (const selection of lifetime.switches) {
+    assert(selection.current > 0, 'lifetime regression must render the current clone');
+    assert.equal(selection.previous, 0, 'selection releases the preceding clone render records');
+  }
+  assert.equal(lifetime.closed, 0, 'closing releases the current clone render records');
+  for (const reopen of lifetime.reopened) {
+    assert(reopen.rendered > 0, 'reopened preview is actually rendered');
+    assert.equal(reopen.retained, 0, 'repeated close releases all clone records');
+    assert.equal(
+      reopen.total,
+      lifetime.closedCount,
+      'reopening does not accumulate render records'
+    );
+  }
+  assert.equal(lifetime.borrowedDisposals, 0, 'rendered cleanup leaves borrowed assets alive');
+
+  // Failure must invalidate a model result that is already being awaited.
+  const lateFailure = await page.evaluate(async () => {
+    const ctx = window.__ENGINE__.ctx;
+    const w = ctx.get('weapons');
+    const p = ctx.get('ui').shop.inspection;
+    const probe = new p.constructor(document.createElement('div'), w);
+    probe.active = true;
+    probe.ready = Promise.resolve();
+    const model = await w.createInspectionModel('rifle');
+    let disposals = 0;
+    const dispose = model.dispose;
+    model.dispose = () => {
+      disposals++;
+      dispose();
+    };
+    let deliver, started;
+    const pending = new Promise((resolve) => {
+      deliver = resolve;
+    });
+    const requested = new Promise((resolve) => {
+      started = resolve;
+    });
+    const original = w.createInspectionModel;
+    w.createInspectionModel = () => {
+      started();
+      return pending;
+    };
+    try {
+      const task = probe.select('rifle', 'rifle');
+      await requested;
+      probe.fail();
+      const status = probe.status.textContent;
+      deliver(model);
+      await task;
+      return {
+        failed: probe.failed,
+        model: probe.model,
+        parent: model.scene.parent,
+        disposals,
+        status,
+        finalStatus: probe.status.textContent,
+      };
+    } finally {
+      w.createInspectionModel = original;
+      probe.dispose();
+    }
+  });
+  assert.equal(lateFailure.failed, true);
+  assert.equal(lateFailure.model, null, 'failed preview never publishes a late model');
+  assert.equal(lateFailure.parent, null, 'late model is not attached');
+  assert.equal(lateFailure.disposals, 1, 'late model is disposed exactly once');
+  assert.match(lateFailure.status, /3D preview unavailable/);
+  assert.equal(lateFailure.finalStatus, lateFailure.status, 'late result preserves failure status');
+
+  // Exercise actual backend init rejection, including Three's rejecting disposal path.
+  const initFailure = await page.evaluate(async () => {
+    const ctx = window.__ENGINE__.ctx;
+    const p = ctx.get('ui').shop.inspection;
+    const probe = new p.constructor(document.createElement('div'), ctx.get('weapons'));
+    probe.active = true;
+    const Backend = p.renderer.backend.constructor;
+    const original = Backend.prototype.init;
+    const failure = new Error('fixture adapter unavailable');
+    Backend.prototype.init = () => Promise.reject(failure);
+    try {
+      const init = probe.initRenderer();
+      probe.ready = init;
+      await probe.select('rifle', 'rifle');
+      const originalError = await init.then(
+        () => false,
+        (error) => error === failure
+      );
+      // Let any detached cleanup rejection reach the normal pageerror collector.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return {
+        originalError,
+        failed: probe.failed,
+        model: probe.model,
+        renderer: probe.renderer,
+        enabled: probe.controls.enabled,
+        status: probe.status.textContent,
+      };
+    } finally {
+      Backend.prototype.init = original;
+      probe.dispose();
+    }
+  });
+  assert.equal(initFailure.originalError, true, 'cleanup preserves the original init failure');
+  assert.equal(initFailure.failed, true);
+  assert.equal(initFailure.model, null);
+  assert.equal(initFailure.renderer, null);
+  assert.equal(initFailure.enabled, false);
+  assert.match(initFailure.status, /3D preview unavailable/);
+
   // Explicit purchase remains authoritative; resupply retains card-click behavior.
   await page.evaluate(() => {
     window.__ENGINE__.ctx.get('market').credits = 2000;

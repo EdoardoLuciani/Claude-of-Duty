@@ -107,7 +107,7 @@ export class MarketInspection {
     try {
       await renderer.init();
       if (this.disposed) {
-        void renderer.dispose();
+        await renderer.dispose();
         return;
       }
       renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -130,13 +130,15 @@ export class MarketInspection {
       this.scene.environment = this.environment.texture;
       this.dirty = true;
     } catch (error) {
-      void renderer.dispose();
+      // Three's cleanup awaits init too, so it can reject with the same failure.
+      await renderer.dispose().catch((): void => {});
       this.renderer = null;
       throw error;
     }
   }
 
   private fail(): void {
+    ++this.revision;
     this.clearModel();
     this.failed = true;
     this.controls.enabled = false;
