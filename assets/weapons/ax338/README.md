@@ -63,8 +63,7 @@ world-camera FOV/zoom and remain aspect-correct. No reference image ships.
 
 Runtime source: `src/weapons/sniper-reticle.ts` and the sniper branch of
 `src/weapons/viewmodel.ts`. No GLB/Blender rebuild is needed for overlay edits.
-Run `node tests/smoke/smoke-sniper-reticle.mjs` and
-`node tests/e2e/sniper-reticle-e2e.mjs` for native
+Run `node tests/smoke/smoke-sniper-reticle.mjs` for the native
 720p/1080p/ultrawide shader pixel checks. Review captures are disposable.
 
 ## Rebuild/check (root, Blender 5.2.2)
@@ -88,8 +87,6 @@ blender -b -t 4 assets/weapons/ax338/ax338.blend --python-exit-code 1 \
   --python tools/blender/ax338_contact.py -- --side right --out /tmp/ax338-right.json
 node tests/smoke/smoke-ax338.mjs
 node tests/smoke/smoke-ax338-contact.mjs
-# GPU/browser lane required:
-node tests/e2e/weapons-e2e.mjs
 ```
 
 The old `--hands-only` saved-weapon mesh/UV substitution is retired. Every build

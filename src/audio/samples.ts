@@ -24,7 +24,7 @@ import { REPORT_DISTANT_MATCH, reportDistantMix } from './weapons.ts';
  * for public Git distribution or upload.
  * See the private recovery recipe/provenance. Newly cleared contact/reload
  * recordings have separate provenance under samples/hits/ and samples/reloads/;
- * see docs/audio.md.
+ * see the audio asset contract in ARCHITECTURE.md.
  */
 const URLS = {
   mpx: [

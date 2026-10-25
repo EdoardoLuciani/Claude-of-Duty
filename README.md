@@ -56,7 +56,7 @@ attributes that let compatible instanced meshes safely share shader builds
 reviewed upstream source remains hash-verified without modification. Commit, version
 and hash guards validate all targets before writing; review them on every upgrade.
 Upstream also owns Fresnel and TRAA cleanup—those local corrections remain removed.
-Preserve the buffer isolation/reuse probe (`node tests/e2e/buffer-names-e2e.mjs`), and native
+Preserve the native buffer isolation/reuse guards plus native
 startup/first-use/lifetime/failure checks. Compatible native instancing now shares
 shader-builder state and GPU programs/pipelines, never object buffers. Upstream
 keeps builds that embed object-specific data out of the shared builder cache.
@@ -111,22 +111,18 @@ Tests are not final human visual acceptance; see each asset's remaining limits.
 
 ## Diagnostics
 
-- `node tools/capture.mjs`: named gameplay screenshot; `shotset.mjs`: multi-shot review.
-- `node tools/baseline.mjs`: isolated native-readback captures. Verify repeatability
-  before using `imagediff.mjs` as a strict pixel gate; shared-shot state can leak.
+- `node tools/capture.mjs`: named gameplay screenshot. Use final-output captures,
+  not old intermediate-target PNGs, for appearance review.
 - `node tools/profile.mjs`: sustained living-combat frame/CPU percentiles and hitches.
-  See [methodology and limitations](docs/profiling.md). GPU timestamps are unavailable;
-  node-builder activity is not GPU compilation time. Historical WebGL results are
-  not current WebGPU performance evidence.
-- `node tools/webgpu-preview-check.mjs`: native preview composition, resize and lifetime.
-  Use final-output captures, not old intermediate-target PNGs, for appearance review.
-- `node tests/e2e/weapons-e2e.mjs`: all seven authored weapons in the native game;
-  ADS/draw, reload accounting/cancellation, pause and casing ownership.
-- [AI behaviour and controlled validation](docs/ai-combat-pressure.md).
+  GPU timestamps are unavailable; node-builder activity is not GPU compilation time.
+  Historical WebGL results are not current WebGPU performance evidence. No universal
+  cross-hardware frame-time threshold applies; compare matched runs only.
 
 Keep capture/profile primitives and focused correctness checks. Task-specific
-screenshot matrices, reels, map reports and GPU investigations are temporary;
-retired scripts remain in Git history, not a second maintained tool catalogue.
+screenshot matrices, reels, map reports, GPU investigations and their methodology
+notes are temporary: retired scripts stay in Git history, not a second maintained
+tool catalogue. `npm test` is the correctness gate; it is not visual or combat-
+performance acceptance.
 
 For local telemetry open `/?telemetry=1`: **F7** marks a moment (optional note),
 **F8** stops/downloads `cod-telemetry-<timestamp>.tgz`. It contains JSON and marked
