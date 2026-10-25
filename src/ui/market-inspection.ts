@@ -60,9 +60,9 @@ export class MarketInspection {
       btn.addEventListener('click', action, { signal: this.abort.signal });
       return btn;
     };
-    button('ZOOM IN', () => this.zoom(0.8));
-    button('ZOOM OUT', () => this.zoom(1.25));
-    button('RESET', () => this.reset());
+    button('ZOOM IN', (): void => this.zoom(0.8));
+    button('ZOOM OUT', (): void => this.zoom(1.25));
+    button('RESET', (): void => this.reset());
     el('p', 'ow-market-inspect-help', this.root, 'Drag to rotate · Scroll to zoom');
     el(
       'p',
@@ -81,13 +81,13 @@ export class MarketInspection {
     this.controls.enablePan = false;
     this.controls.enableDamping = false;
     this.controls.zoomToCursor = false;
-    this.controls.addEventListener('change', () => {
+    this.controls.addEventListener('change', (): void => {
       this.dirty = true;
     });
-    this.canvas.addEventListener('keydown', (event) => this.key(event), {
+    this.canvas.addEventListener('keydown', (event): void => this.key(event), {
       signal: this.abort.signal,
     });
-    this.canvas.addEventListener('pointerdown', () => this.canvas.focus(), {
+    this.canvas.addEventListener('pointerdown', (): void => this.canvas.focus(), {
       signal: this.abort.signal,
     });
     this.scene.background = new THREE.Color(0x10151b);
@@ -113,7 +113,7 @@ export class MarketInspection {
       renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
       renderer.toneMapping = THREE.AgXToneMapping;
       const onDeviceLost = renderer.onDeviceLost;
-      renderer.onDeviceLost = (info) => {
+      renderer.onDeviceLost = (info): void => {
         if (info.reason === 'destroyed') return;
         onDeviceLost.call(renderer, info);
         this.fail();
@@ -168,7 +168,7 @@ export class MarketInspection {
       const bounds = new THREE.Box3();
       const box = new THREE.Box3();
       model.scene.updateMatrixWorld(true);
-      model.scene.traverseVisible((node) => {
+      model.scene.traverseVisible((node): void => {
         if (!(node instanceof THREE.Mesh)) return;
         const mesh = node as THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
         mesh.geometry.computeBoundingBox();

@@ -5,9 +5,13 @@ import { createWeaponAnimation } from './authored-animation.ts';
 import type { WeaponEntry } from './runtime-types.ts';
 
 /** Independent transforms, skeletons and mixers; geometry/maps remain weapon-owned. */
-export function createWeaponInspection(entry: WeaponEntry) {
-  const scene = clone(entry.model.scene);
-  if (!(scene instanceof THREE.Group)) throw new Error('[weapons] inspection scene missing');
+export function createWeaponInspection(entry: WeaponEntry): {
+  scene: THREE.Group;
+  dispose(): void;
+} {
+  const cloned = clone(entry.model.scene);
+  if (!(cloned instanceof THREE.Group)) throw new Error('[weapons] inspection scene missing');
+  const scene = cloned as THREE.Group;
   const root = scene.getObjectByName(entry.model.root.name);
   if (!root) throw new Error('[weapons] inspection rig missing');
   const model = {
@@ -22,10 +26,10 @@ export function createWeaponInspection(entry: WeaponEntry) {
   scene.updateMatrixWorld(true);
   return {
     scene,
-    dispose() {
+    dispose(): void {
       scene.removeFromParent();
       animation.dispose();
-      scene.traverse((node) => {
+      scene.traverse((node): void => {
         if (node instanceof THREE.SkinnedMesh) node.skeleton.dispose();
       });
     },
