@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { AudioSystem } from '../../src/audio/index.ts';
 import { REACTION_URLS, reactionBank } from '../../src/audio/reactions.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
-import { BARKS, bark } from '../../src/audio/vox.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { audioFixture } from '../lib/audio-banks.mjs';
 
@@ -27,16 +26,18 @@ assert(audio._build('bark', 1, 8, { bark: 'hurt', voice: 1 }).end > 1);
 assert.equal(sources.at(-1).buffer.key, 'reaction-1-hurt');
 const empty = new WeaponSampleBank(actx);
 assert.throws(() => empty.reaction('hurt', 0, rng), /recordings are not loaded/);
-for (const k of ['hit', 'pain', 'death']) {
-  assert(!Object.hasOwn(BARKS, k));
-  assert.throws(() => bark(actx, null, rng, { bark: k }), /unknown synthesized speech/);
-}
+assert.throws(
+  () => audio._build('bark', 0, 0, { bark: 'unknown' }),
+  /unknown recorded reaction/,
+  'unknown cues cannot synthesize or substitute tactical speech'
+);
 const calls = [];
 audio._playAt = (kind, x, y, z, opts) => {
   calls.push({ kind, opts });
   return true;
 };
 audio._lastReactionEnd = 10;
+audio._callouts = { play: () => true, stop() {}, forget() {} };
 actx.currentTime = 9;
 assert.equal(audio.bark('hurt', { x: 1, y: 1, z: 1 }), false, 'duration-aware reaction gate');
 assert.equal(
