@@ -22,8 +22,8 @@ for (const [kind, urls] of Object.entries(FOLEY_URLS)) {
   for (const url of urls) {
     const bytes = readFileSync(new URL(url));
     const name = new URL(url).pathname.split('/').at(-1).replace('.opus', '');
-    const file = provenance.files[name];
-    assert(file, name + ': provenance');
+    assert(provenance.files[name], name + ': provenance');
+    const file = { ...provenance.banks[kind], ...provenance.files[name] };
     assert.equal(createHash('sha256').update(bytes).digest('hex'), file.sha256);
     assert(provenance.sources[file.source]?.sha256);
     assert(file.duration >= 0.2 && file.duration <= 0.8);
@@ -71,7 +71,8 @@ for (const [kind, urls] of Object.entries(FOLEY_URLS))
     kind,
     index,
     duration:
-      provenance.files[new URL(url).pathname.split('/').at(-1).replace('.opus', '')].duration,
+      provenance.files[new URL(url).pathname.split('/').at(-1).replace('.opus', '')].duration ??
+      provenance.banks[kind].duration,
   }));
 for (const kind of Object.keys(FOLEY_URLS)) {
   let previous = -1;

@@ -272,18 +272,10 @@ FX particle/decal PNGs are required runtime assets; generation
 lives in `tools/lib/fx-atlas.ts` and the offline texture exporter. Missing/invalid
 atlases reject FX initialization. Recorded audio fetch/decode failures disable the
 audio graph rather than substituting synthesis. Physical hits and movement/body/
-equipment foley use required recordings; see [docs/physical-foley.md](docs/physical-foley.md).
-Bomber engines use required recorded loops in the existing tracked spatial pool.
-Radio owns each handle's moving pose/pass lifetime; audio owns its source/pool
-cleanup. See [docs/aircraft-audio.md](docs/aircraft-audio.md).
-Nonverbal hurt/death efforts use required identity-grouped recordings; see
-[docs/vocal-reactions.md](docs/vocal-reactions.md). Spoken tactical callouts remain
-separate in #497.
-Sparse environmental one-shots use required recordings; see
-[docs/environment-audio.md](docs/environment-audio.md). Unsupported ambient human
-shouts/random tactical chatter are retired rather than inventing phantom actors.
-Radio switch/receive textures use required recordings composed with unchanged
-functional electronic tones; see [docs/radio-audio.md](docs/radio-audio.md).
+equipment foley, bomber loops, nonverbal reactions and sparse environmental events
+use required recordings. Radio owns aircraft pose/pass lifetime; audio owns source
+cleanup. Radio textures supplement intentional electronic tones. Do not invent
+ambient human/tactical actors. Asset/routing/rights contracts: [docs/audio.md](docs/audio.md).
 Remaining synthesis includes authored distant/sniper reports, reinforcement,
 shell casings/dry fire, tactical speech and intentional UI cues.
 

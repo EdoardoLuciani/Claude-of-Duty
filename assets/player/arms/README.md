@@ -41,13 +41,10 @@ node tests/e2e/check-bandage-intersections.mjs --dense --out=/tmp/bandage.json
 node tests/e2e/check-bandage-game.mjs --out=/tmp/bandage --video
 node tools/review-grips.mjs --out=/tmp/grips
 node tests/e2e/check-arm-surfaces.mjs --port=5403 --out=/tmp/arm-surfaces
-node tests/e2e/check-arm-topology.mjs --control=/path/to/previous/arms.glb --out=/tmp/arm-topology.json
 ```
 
 Rebuild bandage after arms: the arms generator replaces the scene.
 Intersection checks deform actual triangles, not wrist proxies; keep full orbits,
 cloth travel, fixed joints/alignment and cancellation gates. Sampled checks
-don't certify exhaustive collision/art quality. The topology comparator checks
-sampled bidirectional distances on actual old/new skinned surfaces in both hands
-and all weapon/utility/bandage poses (1 mm glove / 2 mm panel bound); it is not a
-replacement for in-engine hip/ADS/reload/bandage review.
+don't certify exhaustive collision/art quality or replace in-engine
+hip/ADS/reload/bandage review.

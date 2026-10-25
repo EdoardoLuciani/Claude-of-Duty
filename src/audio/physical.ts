@@ -1,6 +1,6 @@
 import type { FoleyKind } from './foley-urls.ts';
 
-/** Explicit related-material mappings; source/design gaps are documented in docs/physical-foley.md. */
+/** Explicit related-material mappings; source/design limits are documented in docs/audio.md. */
 export const IMPACT_BANK: Record<string, FoleyKind> = {
   concrete: 'impact-concrete',
   plaster: 'impact-concrete',

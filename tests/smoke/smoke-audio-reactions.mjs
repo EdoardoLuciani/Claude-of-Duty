@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 import { AudioSystem } from '../../src/audio/index.ts';
@@ -7,7 +8,6 @@ import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import provenance from '../../src/audio/samples/reactions/provenance.json' with { type: 'json' };
 import { BARKS, bark } from '../../src/audio/vox.ts';
 import { Rng } from '../../src/core/rng.ts';
-import { sha256 } from '../../tools/lib/recorded-one-shot.mjs';
 
 let encoded = 0,
   decoded = 0;
@@ -16,7 +16,7 @@ for (const [key, urls] of Object.entries(REACTION_URLS)) {
   for (const [i, url] of urls.entries()) {
     const data = readFileSync(new URL(url)),
       meta = provenance.files[`${key}-${i + 1}`];
-    assert.equal(sha256(data), meta.sha256);
+    assert.equal(createHash('sha256').update(data).digest('hex'), meta.sha256);
     const header = data.indexOf('OpusHead');
     assert(header >= 0);
     assert.equal(data[header + 9], 1);

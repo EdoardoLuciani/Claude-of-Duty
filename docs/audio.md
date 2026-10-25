@@ -1,0 +1,62 @@
+# Audio assets and contracts
+
+Runtime audio is local. Required recording fetch/decode failures disable the audio
+graph; they never substitute synthesis. The sample bank owns decoded buffers,
+seeded selection and disposal. Mixer tuning lives in `src/audio/`, not authoring tools.
+
+## Ownership
+
+- `damage:taken` produces one headlocked contact on the UI bus, bypassing ducking,
+  concussion and room sends. Plate break replaces the ordinary armour contact;
+  mixed damage can include flesh. Player actor impacts must not add another contact.
+  Canonical bullet segments own flight whizzes, including incoming hits.
+- Enemy flesh/material contacts and movement/body/equipment foley use spatial
+  recordings. Surface aliases are intentional related-material approximations,
+  not recordings of every named finish. Exits are silent.
+- Reload/manual-action recordings follow native weapon clip events. Pump contacts
+  are separate beats, not a prerecorded full cycle; interruption cancels later beats.
+- Radio owns aircraft pose/pass lifetime; audio owns the tracked loop and cleanup.
+  Pause silences the retained source without restarting it. The PC-21 donor is a
+  designed bomber texture, not a verified twin-engine/RPM reproduction.
+- Nonverbal reactions retain identity groups; library labels do not verify real
+  performer identity. Tactical speech is separate. Sparse environmental events
+  must not invent human shouts or tactical actors.
+- Radio textures supplement intentional electronic tones. Successful strike
+  acknowledgment has one producer, not duplicate weapon/UI playback.
+
+## Authoring and rights
+
+Committed Opus files are the runtime authority. Each sample directory's
+`provenance.json` retains source identities/hashes, edits, levels, output hashes,
+measurements and its rights attestation. `samples/reference.json` freezes the
+legacy masters and codec baselines; never regenerate expected hashes merely to
+accept a changed asset. Masters remain outside the game repository.
+
+Foley `banks` factor settings shared by takes (filename without its numeric
+suffix); reload `sources` factor layer source metadata. File/layer fields override
+these shared records. Frozen hashes remain independent of the candidate asset.
+
+The bespoke preparation CLIs and historical review reports are retired; their
+implementations remain in Git history. Audio edits require the licensed originals
+and fresh native decode/mix validation, not a normal build. Delivery is 48 kHz Opus;
+spatial point-source banks are mono, while legacy gun layouts remain source-owned.
+Foley/hit crops used 1 ms attack / 35 ms release fades and 20 ms energy matching
+with respectively 9/8 dB peak headroom. Reload provenance includes its fades;
+other one-shot provenance includes its filters/fades. Aircraft provenance retains
+pitch anchors, stretch, overlap and envelope-correction settings.
+
+New-bank public-derivative clearance is an owner attestation, not independent legal
+verification. Preserve original licence/entitlement records; media do not inherit
+the code licence. Legacy firearm derivatives remain explicitly marked private in
+`samples.ts`; clearance for newer banks or mixed gameplay captures does not grant
+permission to distribute legacy raw samples or source-library masters.
+
+## Validation
+
+`npm test` checks assets, routing, selection, native clip timing and lifecycle.
+Run `node tests/e2e/audio-e2e.mjs` for native codec/automation regressions and
+`node tests/e2e/audio-mix-e2e.mjs` for whole-mix hierarchy/headroom. The
+`audio-{hit-feedback,reloads,aircraft,reactions,environment,radio}-e2e.mjs` checks
+exercise actual game integration; `audio-aircraft-loops-e2e.mjs` measures decoded
+loop steadiness. Real-time AI captures are not sample-aligned A/Bs. Measurements
+are regression evidence, not perceptual or final human acceptance.
