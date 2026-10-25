@@ -85,10 +85,17 @@ def finishes(output):
             texture.image = image
             bsdf = mat.node_tree.nodes.get('Principled BSDF')
             if values is not None:
-                mat.node_tree.links.new(texture.outputs['Color'], bsdf.inputs['Roughness'])
+                # Preserve the finish-specific response instead of replacing it
+                # with the shared map's 0.5 mean. Native glTF exports these factors.
+                factor = {'hood':.86,'body':1.0,'mount':.94}[key]
+                multiply = mat.node_tree.nodes.new('ShaderNodeMath')
+                multiply.operation = 'MULTIPLY'
+                multiply.inputs[1].default_value = factor
+                mat.node_tree.links.new(texture.outputs['Color'],multiply.inputs[0])
+                mat.node_tree.links.new(multiply.outputs[0],bsdf.inputs['Roughness'])
             else:
                 normal = mat.node_tree.nodes.new('ShaderNodeNormalMap')
-                normal.inputs['Strength'].default_value = .22
+                normal.inputs['Strength'].default_value = .65 if key == 'body' else .22
                 mat.node_tree.links.new(texture.outputs['Color'], normal.inputs['Color'])
                 mat.node_tree.links.new(normal.outputs['Normal'], bsdf.inputs['Normal'])
     return mats
@@ -130,14 +137,15 @@ def finish(obj, width=.25, smooth=True):
         weighted.keep_sharp = True
         bpy.ops.object.modifier_apply(modifier=weighted.name)
     uv = obj.data.uv_layers.new(name='UVMap')
-    # 40 mm original finish tile; triplanar projection baked to ordinary UV0.
+    # Coarser cast-housing grain, finer hood/mount; original maps and ordinary UV0.
+    tile = .08 if obj.data.materials[0].name.startswith('02 |') else .04
     for polygon in obj.data.polygons:
         axis = max(range(3), key=lambda i: abs(polygon.normal[i]))
         a, b = [(1, 2), (0, 2), (0, 1)][axis]
         for loop in polygon.loop_indices:
             p = obj.data.vertices[obj.data.loops[loop].vertex_index].co
             # Binary authoring lattice keeps native export's V flip exact, including after renders.
-            uv.data[loop].uv = tuple(round(p[i] / .04 * 65536) / 65536 for i in (a,b))
+            uv.data[loop].uv = tuple(round(p[i] / tile * 65536) / 65536 for i in (a,b))
     return obj
 
 
@@ -175,13 +183,17 @@ def prism(name, contour, low, high, mat, parent, axis='X', bevel=.2):
     return finish(mesh(name, verts, faces, mat, parent), bevel)
 
 
-def text(name, value, pos, size, mat, parent, side='left', angle=0):
+def text(name, value, pos, size, mat, parent, side='left', angle=0, relief=0):
     data = bpy.data.curves.new(name, 'FONT')
     data.body = value
     data.size = size * MM
     data.align_x = 'CENTER'
     data.align_y = 'CENTER'
     data.resolution_u = 3
+    if relief:
+        data.extrude = relief * MM
+        data.bevel_depth = (.015 if relief >= .1 else .008 if relief >= .05 else 0) * MM
+        data.bevel_resolution = 1 if relief >= .1 else 0
     obj = bpy.data.objects.new(name, data)
     bpy.context.collection.objects.link(obj)
     obj.location = tuple(v * MM for v in pos)
@@ -212,7 +224,7 @@ def rounded_rect(width, height, radius, center_z=0, steps=10):
     return pts
 
 
-def brand_icon(name, pos, mat, parent, side):
+def brand_icon(name, pos, mat, parent, side, depth=.035):
     # Rounded pad-print/casting outline with the four negative-space slots of the mark.
     axis = 'Y' if side == 'rear' else 'X'
     sign = 1 if side == 'right' else -1
@@ -221,13 +233,13 @@ def brand_icon(name, pos, mat, parent, side):
     def profile(w,h,r,u=0,v=0):
         return [(pos[0 if axis=='Y' else 1]+horizontal*(a+u),pos[2]+b+v)
                 for a,b in rounded_rect(w,h,r,steps=6)]
-    low,high = sorted((pos[index],pos[index]+sign*.035))
+    low,high = sorted((pos[index],pos[index]+sign*depth))
     obj = prism(name,profile(11.5,8.4,1.1),low,high,mat,parent,axis,0)
     for i,(w,h,r,u,v) in enumerate([(.95,5.8,.22,-3.75,0),
                                    (6.9,1.0,.20,1.2,2.3),(6.9,1.0,.20,1.2,0),
                                    (6.9,1.0,.20,1.2,-2.3)]):
         cutter = prism(name+' negative slot '+str(i),profile(w,h,r,u,v),
-                       pos[index]-.1,pos[index]+.1,mat,parent,axis,0)
+                       pos[index]-depth-.1,pos[index]+depth+.1,mat,parent,axis,0)
         active(obj)
         cut = obj.modifiers.new('Negative-space print slot','BOOLEAN')
         cut.operation,cut.object = 'DIFFERENCE',cutter
@@ -235,7 +247,7 @@ def brand_icon(name, pos, mat, parent, side):
         data = cutter.data
         bpy.data.objects.remove(cutter,do_unlink=True)
         bpy.data.meshes.remove(data)
-    return obj
+    return surface_normals(obj)
 
 
 def frame(name, outer, inner, front, rear, mat, parent):
@@ -249,9 +261,91 @@ def frame(name, outer, inner, front, rear, mat, parent):
     return finish(mesh(name, verts, faces, mat, parent), .12)
 
 
+def surface_normals(obj):
+    # Boolean interpolation must not leave old corner normals across new holes.
+    # Native sharp-edge splitting keeps planar casting/hood faces planar.
+    active(obj)
+    obj.data.set_sharp_from_angle(angle=math.radians(40))
+    modifier = obj.modifiers.new('Normals after machining', 'WEIGHTED_NORMAL')
+    modifier.keep_sharp = True
+    bpy.ops.object.modifier_apply(modifier=modifier.name)
+    # A weighted average is not a planar cap normal. Keep the bevel/curved-wall
+    # normals, but explicitly author the axis-aligned sheet/casting/slot faces.
+    normals = [tuple(n.vector) for n in obj.data.corner_normals]
+    for polygon in obj.data.polygons:
+        if max(abs(v) for v in polygon.normal) > .999999:
+            for loop in polygon.loop_indices:
+                normals[loop] = tuple(polygon.normal)
+    obj.data.normals_split_custom_set(normals)
+    return obj
+
+
+def subtract(cutter, *objects):
+    for obj in objects:
+        active(obj)
+        cutter.data.materials[0] = obj.data.materials[0]
+        modifier = obj.modifiers.new('Actual machined recess', 'BOOLEAN')
+        modifier.operation, modifier.object = 'DIFFERENCE', cutter
+        bpy.ops.object.modifier_apply(modifier=modifier.name)
+        surface_normals(obj)
+    data = cutter.data
+    bpy.data.objects.remove(cutter, do_unlink=True)
+    bpy.data.meshes.remove(data)
+
+
+def hood_x(z):
+    return float(np.interp(z, [8,31,42,58.7], [26,26,23.8,23.8]))
+
+
+def ring_x(name, y, z, outer, inner, low, high, mat, parent, follow_hood=False):
+    # Four circular loops; the adjustment well's mouth follows the bent hood.
+    n = 48 if outer > 5 else 24
+    vertices = []
+    for front in (False, True):
+        for radius in (outer, inner):
+            for i in range(n):
+                a = math.tau*i/n
+                py, pz = y+radius*math.cos(a), z+radius*math.sin(a)
+                px = hood_x(pz)-.12 if front and follow_hood else high if front else low
+                vertices.append((px,py,pz))
+    faces = []
+    for i in range(n):
+        j = (i+1)%n
+        faces += [(i,j,n+j,n+i),(2*n+i,3*n+i,3*n+j,2*n+j),
+                  (i,2*n+i,2*n+j,j),(n+i,n+j,3*n+j,3*n+i)]
+    return surface_normals(finish(mesh(name,vertices,faces,mat,parent),0))
+
+
+def hood_print(obj, plane):
+    # Seat pad print on the actual sloped hood, never in a floating parallel plane.
+    transform = obj.matrix_basis
+    inverse = transform.inverted()
+    for vertex in obj.data.vertices:
+        p = transform @ vertex.co
+        p.x = (hood_x(p.z/MM)+.025+p.x/MM-plane)*MM
+        vertex.co = inverse @ p
+    obj.data.update()
+    return obj
+
+
+def adjuster_x(radius):
+    return float(np.interp(radius,[5.75,7.5,9.5,10.2],[23.8,23.6,22.6,21.9]))
+
+
+def wire_loop(name, pos, radius, mat, parent):
+    bpy.ops.mesh.primitive_torus_add(major_segments=24,minor_segments=8,
+        major_radius=radius*MM,minor_radius=.16*MM,
+        location=tuple(v*MM for v in pos),rotation=(math.pi/2,0,0))
+    obj = bpy.context.object
+    obj.name, obj.parent = name, parent
+    obj.data.materials.append(mat)
+    bpy.ops.object.transform_apply(location=False,rotation=True,scale=True)
+    return finish(obj,0)
+
+
 def shroud(mat, parent):
     # The real bent hood is an open U, not a solid cube with glass pasted on it.
-    side = [(float(np.interp(z, [8,31,42,58.7], [26,26,23.8,23.8])), z)
+    side = [(hood_x(z), z)
             for z in [8,20,26,30,34,36,38,40,42,44,46,48,50,52,54,56,58.7]]
     path = [(-x,z) for x,z in side]
     for i in range(1, 13):
@@ -335,15 +429,27 @@ def build_geometry(mats):
     root['assetId'] = 'eotech-exps3-0'
     root['forward'] = '-Z after glTF export'
     root['reticle'] = 'EXPS3-0: 68 MOA ring / 1 MOA dot; runtime projection deferred, no baked reticle'
-    shroud(mats['hood'], root)
-    skirt = [(31.5,8),(1.5,8),(-6.5,3.7),(-31.9,3.7),(-34,5.7),(-34,8)]
+    hood = shroud(mats['hood'], root)
+    skirt = [(1.5,8),(-6.5,3.7),(-31.9,3.7),(-34,5.7),(-34,8)]
     for lo,hi in [(-26,-24.2),(24.2,26)]:
-        prism('Hood lower stepped skirt',skirt,lo,hi,mats['hood'],root,bevel=0)
-    box('Electronics lower housing', (0,-1,20), (46,66,26), mats['body'], root, 2)
-    # Rear cover with the characteristic rail-clearance arch.
-    contour = [(-20,7),(-20,31),(-17,33),(17,33),(20,31),(20,7),(16,3),(12,3),
-               (9,7),(-9,7),(-12,3),(-16,3)]
-    prism('Rear electronics cover', contour, -35, -33.6, mats['body'], root, 'Y', .55)
+        surface_normals(prism('Hood lower stepped skirt',skirt,lo,hi,mats['hood'],root,bevel=0))
+    housing = box('Electronics lower housing', (0,-1,20), (46,66,26), mats['body'], root, 2)
+    # Photo-derived cast-cover anatomy: raised upper ears, shallow saddle and
+    # lower circular lobes. Lower screw row is 26mm below the retained upper row.
+    contour = [(-20,5.5),(-20,29),(-19.8,31.2),(-18.4,32.4),(-16.5,33.3),
+               (-15.3,33.3),(-13,32.2),(-8,31.5),(0,31.5),(8,31.5),(13,32.2),
+               (15.3,33.3),(16.5,33.3),(18.4,32.4),(19.8,31.2),(20,29),(20,5.5)]
+    contour += [(15.3+4.5*math.cos(a),2+4.5*math.sin(a))
+                for a in np.linspace(0,-math.pi,17)]
+    contour += [(9.7,3.5),(9.3,4.5),(8,5),(-8,5),(-9.3,4.5),(-9.7,3.5)]
+    contour += [(-15.3+4.5*math.cos(a),2+4.5*math.sin(a))
+                for a in np.linspace(0,-math.pi,17)]
+    cover = prism('Rear electronics cover', contour, -35, -33.6, mats['body'], root, 'Y', .4)
+    bosses = {}
+    for x in (-15.3,15.3):
+        # Boss face retains the old assembly's aft envelope, not proud screw heads.
+        bosses[x] = cylinder('Rear cast lower boss '+str(x),(x,-34.77,2),4.5,2,
+                             mats['body'],root,'Y',32,.25)
     # Clear central bore; carrier, elastomer seals and separately removable optical windows.
     # Slim carrier cheeks; its bottom stays seated on the existing 33mm housing roof.
     outer = rounded_rect(39, 30.4, 7, OPTICAL_Z)
@@ -366,20 +472,30 @@ def build_geometry(mats):
         radius_z = BATTERY_ROOF_Z-23 if a > 0 else 14.5
         battery.append((46.2+14.5*math.cos(a),23+radius_z*math.sin(a)))
     battery += [(32.5,8.5),(26,12)]
-    prism('Transverse CR123 battery housing', battery, -25,25, mats['body'], root, bevel=.6)
+    battery_housing = prism('Transverse CR123 battery housing', battery, -25,25, mats['body'], root, bevel=.6)
     prism('Battery compartment left end', battery, -25.6,-25, mats['hood'], root, bevel=.35)
-    cylinder('Battery cap seal', (25.4,46.2,23), 14, 1.0, mats['rubber'], root)
+    cylinder('Battery cap seal', (25.4,46.2,23), 11.95, 1.0, mats['rubber'], root)
     verts, faces = [], []
     for x in (26,29.2):
         for i in range(120):
             a = i*math.tau/120
-            r = 13.2 if i%3 else 12.85
+            r = 11.75 if i%3 else 11.4
             verts.append((x,46.2+r*math.cos(a),23+r*math.sin(a)))
     faces = [tuple(reversed(range(120))), tuple(range(120,240))]
     faces += [(i,(i+1)%120,(i+1)%120+120,i+120) for i in range(120)]
-    finish(mesh('Scalloped battery cap', verts, faces, mats['hood'], root), .08)
-    box('Battery cap coin slot', (29.25,46.2,23), (.15,.85,24), mats['ink'], root, .05)
+    cap = finish(mesh('Scalloped battery cap', verts, faces, mats['hood'], root), .08)
+    subtract(box('Battery cap groove cutter',(29,46.2,23),(1.8,2.1,28),mats['hood'],root,0),cap)
+    box('Battery cap recessed groove floor',(28.115,46.2,23),(.02,2.08,22.8),mats['ink'],root,0)
+    collar = ring_x('Battery cap retaining collar',46.2,23,14.1,13.3,25.8,27.1,mats['body'],root)
     text('Battery polarity marking', '+', (29.34,51.2,23), 5, mats['rubber'], root, 'right')
+    # Both tether ends have visible threaded eyes and crimp sleeves. Wire pose
+    # remains an exterior approximation; no hidden captive mechanism is modelled.
+    ring_x('Hood tether eye',23,39,1.65,1.2,hood_x(39)-.1,hood_x(39)+.7,mats['body'],root)
+    subtract(cylinder('Hood tether eye bore',(25,23,39),1.2,5,mats['hood'],root,bevel=0),hood)
+    ring_x('Cap tether eye',44,36.5,1.2,.65,26.1,27.1,mats['body'],root)
+    subtract(cylinder('Cap tether eye bore',(26.5,44,36.5),.65,3,mats['body'],root,bevel=0),collar)
+    wire_loop('Hood tether folded loop',(25,23,40.3),1.4,mats['steel'],root)
+    wire_loop('Cap tether folded loop',(27.3,44,37.2),1,mats['steel'],root)
     # Steel tether routed clear of the upper sight window.
     curve = bpy.data.curves.new('Cap tether wire', 'CURVE')
     curve.dimensions = '3D'
@@ -387,30 +503,52 @@ def build_geometry(mats):
     curve.bevel_resolution = 2
     spline = curve.splines.new('BEZIER')
     spline.bezier_points.add(3)
-    for p,co in zip(spline.bezier_points, [(25.9,23,39),(28,30,45),(28,40,43),(28,44,35.5)]):
+    for p,co in zip(spline.bezier_points, [(26.4,23,40.3),(28,30,45),(28,40,43),(28.3,44,37.2)]):
         p.co = tuple(v*MM for v in co)
         p.handle_left_type = p.handle_right_type = 'AUTO'
     tether = bpy.data.objects.new('Battery cap captive tether', curve)
     bpy.context.collection.objects.link(tether)
     tether.parent = root
     curve.materials.append(mats['steel'])
+    bpy.context.view_layer.update()
+    sleeves = []
+    for index,start,end in [(0,.1,.35),(2,.5,.95)]:
+        a,b = spline.bezier_points[index:index+2]
+        def point(t):
+            return ((1-t)**3*a.co+3*(1-t)**2*t*a.handle_right+
+                    3*(1-t)*t*t*b.handle_left+t**3*b.co).copy()
+        sleeves.append((point(start),point(end)))
     active(tether)
     bpy.ops.object.convert(target='MESH')
     finish(bpy.context.object, 0)
-    cylinder('Cap tether protective boot',(28,44,36),1.0,4,mats['rubber'],root,'Z',32,.1)
+    for i,(a,b) in enumerate(sleeves):
+        sleeve = cylinder('Tether crimp sleeve '+str(i),(a+b)/(2*MM),.7,(b-a).length/MM,
+                          mats['steel'],root,'Z',16,.08)
+        sleeve.rotation_euler = (b-a).to_track_quat('Z','Y').to_euler()
+        active(sleeve)
+        bpy.ops.object.transform_apply(location=False,rotation=True,scale=True)
     # Raised quick-detach mount with real open rail channel and clamp shoulders.
-    box('7mm raised mount deck', (0,-.5,4.2), (45,67,5), mats['mount'], root, .6)
+    deck = [(-22.5,1.7),(-22.5,6.7),(22.5,6.7),(22.5,1.7),(10.6,1.7),
+            (9,4.2),(8,4.8),(-8,4.8),(-9,4.2),(-10.6,1.7)]
+    prism('7mm raised mount deck with open channel',deck,-34,33,mats['mount'],root,'Y',.3)
     for sign in (-1,1):
         jaw = [(sign*x,z) for x,z in [(10.6,1.7),(10.6,-1.8),(12.4,-4.5),(15,-5.5),
                                      (22,-5.5),(22,3.5)]]
         prism('Picatinny clamp jaw '+str(sign), jaw, -34, 33, mats['mount'], root, 'Y', .25)
-    box('QD closed lever', (-27.1,-3,1), (4.2,62,7), mats['mount'], root, .8)
+    lever = [(-34,-1.5),(-34,2.5),(-31,4.5),(17,4.5),(25,3),(28,1.5),
+             (28,-1.5),(23,-2.5),(-30,-2.5)]
+    prism('QD closed contoured lever',lever,-29.2,-25,mats['mount'],root,bevel=.65)
     cylinder('QD lever pivot', (-27.2,25,1), 4.2, 3.2, mats['mount'], root)
     box('QD locking catch', (-27.7,20,4.5), (2.5,9,4), mats['body'], root, .5)
+    oval = [(13+y,z) for y,z in rounded_rect(31,9,4.2)]
+    pad = prism('QD oval tension pad',oval,22.25,23.05,mats['mount'],root,bevel=.12)
+    inset = [(13+y,z) for y,z in rounded_rect(28.6,7.3,3.4)]
+    subtract(prism('QD oval inset cutter',inset,22.4,23.5,mats['mount'],root,bevel=0),pad)
     cylinder('Crossbolt adjustment washer', (23,13,0), 5, 1.3, mats['steel'], root)
-    cylinder('QD slotted tension nut', (24,13,0), 4.3, 2, mats['edge'], root)
-    box('Tension nut tool slot', (25.05,13,0), (.15,8.2,.8), mats['ink'], root, .05)
-    cylinder('Crossbolt recess', (25.1,13,0), 2, .1, mats['ink'], root)
+    nut = cylinder('QD slotted tension nut', (24,13,0), 4.3, 2, mats['edge'], root)
+    subtract(box('Tension nut tool slot cutter',(25,13,0),(1,8.2,.8),mats['edge'],root,0),nut)
+    subtract(cylinder('Crossbolt bore cutter',(24.7,13,0),1.8,1.6,mats['edge'],root,bevel=0),nut)
+    surface_normals(cylinder('Crossbolt recessed floor',(23.915,13,0),1.78,.02,mats['ink'],root,bevel=0))
     # Left side brightness buttons, NV button, and recessed rubber surround.
     box('Brightness button surround', (-26.3,-21,16), (1.2,25,13), mats['body'], root, 1.8)
     for name,y,sign in [('Brightness down',-14.5,-1),('Brightness up',-27,1)]:
@@ -426,29 +564,76 @@ def build_geometry(mats):
         screw('Left shroud Torx '+str(y), (-26.1,y,12.4), mats, root, sign=-1)
     # Right-side inset windage and elevation adjusters, markings and index dots.
     for name,y,z in [('DOWN',-9,30),('RIGHT',20,21)]:
-        cylinder(name+' well', (26.1,y,z), 11.7, .3, mats['body'], root)
-        cylinder(name+' dial', (26.4,y,z), 10.4, .7, mats['rubber'], root)
-        cylinder(name+' centre', (26.9,y,z), 5.6, .4, mats['steel'], root)
-        box(name+' coin slot', (27.15,y,z), (.15,9.9,1.1), mats['ink'], root, .1)
+        subtract(cylinder(name+' hood opening cutter',(24.5,y,z),11,8,mats['hood'],root,bevel=0),
+                 hood,housing,battery_housing)
+        ring_x(name+' recessed well wall',y,z,10.95,10.5,20.7,26,mats['body'],root,True)
+        cylinder(name+' well floor',(20.8,y,z),10.5,.2,mats['body'],root,bevel=0)
+        # Convex moulded annulus, not a stack of flat applied discs.
+        profile = [(10.2,21.2),(10.2,21.9),(9.5,22.6),(7.5,23.6),(5.75,23.8),(5.75,21.2)]
+        vertices = [(px,y+r*math.cos(i*math.tau/48),z+r*math.sin(i*math.tau/48))
+                    for r,px in profile for i in range(48)]
+        faces = [(k*48+i,k*48+(i+1)%48,((k+1)%len(profile))*48+(i+1)%48,
+                  ((k+1)%len(profile))*48+i) for k in range(len(profile)) for i in range(48)]
+        surface_normals(finish(mesh(name+' domed recessed dial',vertices,faces,mats['rubber'],root),0))
+        centre = cylinder(name+' centre',(23.25,y,z),5.6,.7,mats['steel'],root)
+        subtract(box(name+' tool groove cutter',(23.65,y,z),(1.1,9.9,1.1),mats['steel'],root,0),centre)
+        box(name+' recessed slot floor',(23.115,y,z),(.02,9.8,1),mats['ink'],root,0)
+        for i in range(8):
+            a = i*math.tau/8
+            cylinder(name+' moulded index '+str(i),(adjuster_x(6.5)+.02,y+6.5*math.cos(a),z+6.5*math.sin(a)),
+                     .3,.08,mats['rubber'],root,sides=8,bevel=0)
         for i in range(20):
             a = i*math.tau/20
-            cylinder(name+' index '+str(i), (26.35,y+12.2*math.cos(a),z+12.2*math.sin(a)),
-                     .19, .12, mats['paint'], root, sides=8, bevel=0)
-        text(name+' rotation direction', name, (26.6,y-7.8,z+10), 2.3, mats['paint'], root, 'right', .8)
+            dot = cylinder(name+' index '+str(i),(26.35,y+12.2*math.cos(a),z+12.2*math.sin(a)),
+                           .19,.04,mats['paint'],root,sides=8,bevel=0)
+            hood_print(dot,26.35)
+        hood_print(text(name+' rotation direction',name,(26.6,y-7.8,z+10),2.3,
+                        mats['paint'],root,'right',.8),26.6)
         for i,char in enumerate(name):
             a = math.radians(145-i*15)
-            text(name+' moulded '+str(i),char,(27.0,y+7.9*math.cos(a),z+7.9*math.sin(a)),
-                 2.0,mats['body'],root,'right',a-math.pi/2)
+            letter = text(name+' moulded '+str(i),char,(0,y+7.9*math.cos(a),z+7.9*math.sin(a)),
+                          2.0,mats['rubber'],root,'right',a-math.pi/2,relief=.08)
+            transform = letter.matrix_basis
+            inverse = transform.inverted()
+            for vertex in letter.data.vertices:
+                p = transform @ vertex.co
+                p.x += (adjuster_x(math.hypot(p.y/MM-y,p.z/MM-z))+.02)*MM
+                vertex.co = inverse @ p
+            letter.data.update()
+        # Prominent curved moulded arrow, separate from the white hood print.
+        arc = []
+        for radius,angles in [(7.55,np.linspace(170,232,9)),(7.05,np.linspace(232,170,9))]:
+            arc += [(y+radius*math.cos(math.radians(a)),z+radius*math.sin(math.radians(a)))
+                    for a in angles]
+        arrow_obj = prism(name+' moulded curved arrow',arc,0,.12,mats['rubber'],root,bevel=0)
+        tip = [(y-8.1,z+1.1),(y-7,z+2.7),(y-6.3,z+1.2)]
+        arrow_tip = prism(name+' moulded curved arrow tip',tip,0,.12,mats['rubber'],root,bevel=0)
+        # Conform the head interior too: a corner-only triangle cuts into the dome.
+        bm = bmesh.new()
+        bm.from_mesh(arrow_tip.data)
+        bmesh.ops.subdivide_edges(bm,edges=list(bm.edges),cuts=3,use_grid_fill=True)
+        bm.to_mesh(arrow_tip.data)
+        bm.free()
+        for obj in (arrow_obj,arrow_tip):
+            for vertex in obj.data.vertices:
+                vertex.co.x += (adjuster_x(math.hypot(vertex.co.y/MM-y,vertex.co.z/MM-z))-.02)*MM
+            obj.data.update()
+            surface_normals(obj)
         arrow = [(y+a,z+b) for a,b in [(-13.6,-1),(-13.9,3),(-15,2.2),
                  (-13.8,5.5),(-12,2.7),(-13,3.0),(-12.7,-1)]]
-        prism(name+' white rotation arrow', arrow,26.4,26.5,mats['paint'],root,bevel=0)
+        hood_print(prism(name+' white rotation arrow',arrow,26.4,26.44,mats['paint'],root,bevel=0),26.4)
     screw('Right rear shroud Torx', (26.1,-28,12), mats, root)
     for x in (-15.3,15.3):
-        for z in (7.0,28):
-            screw('Rear cover Torx '+str(x)+' '+str(z), (x,-35.3,z), mats, root, 'Y', -1)
-    # Raised rear-cover manufacturer's mark, part of the casting rather than a white label.
-    text('Rear cast brand','EOTECH',(0,-35.72,17.7),2.4,mats['body'],root,'rear')
-    brand_icon('Rear cast mark',(0,-35.72,23),mats['body'],root,'rear')
+        for z in (2,28):
+            cutter = cylinder('Rear fastener counterbore',(x,-34.5,z),2.9,3,
+                              mats['body'],root,'Y',32,0)
+            subtract(cutter,cover,bosses[x] if z == 2 else housing)
+            screw('Rear cover Torx '+str(x)+' '+str(z),(x,-34.8 if z == 2 else -33.9,z),
+                  mats,root,'Y',-1)
+    # Shallow cast relief intersects its backing; no floating badge/shadow gap.
+    wordmark = text('Rear cast brand','EOTECH',(0,-34.995,17.7),2.4,mats['body'],root,'rear',relief=.1)
+    wordmark.scale.x = 1.25
+    brand_icon('Rear cast mark',(0,-34.97,23),mats['body'],root,'rear',depth=.15)
     # Reconstructed vector marks, never sampled from third-party photographs.
     for side,sign in [('left',-1),('right',1)]:
         text('Hood brand '+side, 'EOTECH', (sign*23.89,-2.5,47.6), 2.8, mats['paint'], root, side)
