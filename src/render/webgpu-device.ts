@@ -24,7 +24,7 @@ export async function createWebGpuRenderer(
   renderer.library = new StandardNodeLibrary();
   let lost = null;
   const defaultDeviceLost = renderer.onDeviceLost;
-  renderer.onDeviceLost = (info) => {
+  renderer.onDeviceLost = (info): void => {
     if (info.reason === 'destroyed') return; // Explicit disposal is not a failure.
     defaultDeviceLost.call(renderer, info); // Preserve Three's lost-device state.
     lost = new Error(`WebGPU device lost (${info.reason}): ${info.message ?? 'unknown GPU error'}`);

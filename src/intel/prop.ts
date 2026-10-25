@@ -57,7 +57,7 @@ export function makeKit(materials?: IntelMaterials): IntelKit {
     y: number,
     z: number
   ): void => {
-    const segments = (size: number) => Math.max(2, Math.min(12, Math.ceil(size / 0.06)));
+    const segments = (size: number): number => Math.max(2, Math.min(12, Math.ceil(size / 0.06)));
     add(
       kind,
       new THREE.BoxGeometry(w, h, d, segments(w), segments(h), segments(d)).translate(x, y, z)
@@ -138,7 +138,7 @@ export function makeKit(materials?: IntelMaterials): IntelKit {
     geos,
     mats,
     lidKinds,
-    dispose() {
+    dispose(): void {
       for (const geo of Object.values(geos)) geo.dispose();
       for (const mat of owned) mat.dispose();
       for (const texture of textures) texture.dispose();

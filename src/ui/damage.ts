@@ -37,7 +37,7 @@ export class DamageArcs {
   constructor(parent: HTMLElement) {
     this.pool = new Pool(
       6,
-      () => {
+      (): HTMLDivElement => {
         const node = el('div', 'ow-dmg');
         const s = svg('svg', { viewBox: '-170 -170 340 340' }, node);
         const back = svg('g', { fill: 'none', stroke: 'rgba(0,0,0,.5)', 'stroke-width': 9.5 }, s);

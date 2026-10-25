@@ -1,12 +1,13 @@
 import { Fn, clamp, float, mix, smoothstep, vec2 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
+import type { StructNode } from 'three/webgpu';
 
 import { authoredColor } from '../color-tsl.ts';
 import { fbm01, fbm3, fbm4, fbm5, scratches, shear, shearPeriod, worley } from '../noise-tsl.ts';
 import { Surface } from './surface.ts';
 
 export const glassSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof Surface>>(
-  ([coords, seed]) => {
+  ([coords, seed]): StructNode => {
     const period = vec2(8);
     const p = coords.mul(period).add(seed.mul(2.2));
     const smear = fbm01(fbm4(shear(p.mul(3), 1, 6), shearPeriod(period.mul(3), 6), 0.5));

@@ -5,8 +5,11 @@ import type { Engine } from './engine.ts';
 /** Strict-WebGPU material warmup; never creates or requests a WebGL context. */
 export async function prewarm(
   engine: Engine,
-  { onProgress = () => {} }: { onProgress?: (progress: number) => void } = {}
-) {
+  { onProgress = (): void => {} }: { onProgress?: (progress: number) => void } = {}
+): Promise<
+  | { ok: boolean; reason: string; hooks?: undefined; ms?: undefined }
+  | { ok: boolean; hooks: Record<string, unknown>; ms: number; reason?: undefined }
+> {
   const render = engine.ctx.peek('render');
   const renderer = render?.renderer;
   if (!renderer) return { ok: false, reason: 'no renderer' };
@@ -52,7 +55,8 @@ export async function prewarm(
   }
   return {
     ok: Object.values(hooks).every(
-      (hook) => !(typeof hook === 'object' && hook !== null && 'ok' in hook && hook.ok === false)
+      (hook): boolean =>
+        !(typeof hook === 'object' && hook !== null && 'ok' in hook && hook.ok === false)
     ),
     hooks,
     ms: Math.round(performance.now() - start),

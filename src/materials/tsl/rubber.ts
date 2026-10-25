@@ -1,5 +1,6 @@
 import { Fn, abs, clamp, float, fract, mix, smoothstep, vec2 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
+import type { StructNode } from 'three/webgpu';
 
 import { authoredColor } from '../color-tsl.ts';
 import { cracks, fbm01, fbm3, fbm4, warp, worley } from '../noise-tsl.ts';
@@ -7,7 +8,7 @@ import { Surface } from './surface.ts';
 
 // Moulded rubber: tileable pebble relief, seam, chalky wear and ozone cracks.
 export const rubberSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof Surface>>(
-  ([coords, seed]) => {
+  ([coords, seed]): StructNode => {
     const period = vec2(8);
     const p = coords.mul(period).add(seed.mul(9.6));
     const pb = worley(p.mul(12), period.mul(12), 1).toVar();

@@ -27,14 +27,14 @@ const ALIASES: Record<string, string> = {
 };
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
 
-export function makeMPXModel(gltf: GLTF) {
+export function makeMPXModel(gltf: GLTF): MPXModel {
   const scene = gltf.scene;
   // Source remains +X-forward for reproducible photo/DCC review. Normalize
   // the full native hierarchy and curves once; no extra runtime orientation rig.
   const basis = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
   const inverse = basis.clone().invert(),
     geometries = new Set<THREE.BufferGeometry>();
-  scene.traverse((o) => {
+  scene.traverse((o): void => {
     o.position.applyQuaternion(basis);
     o.quaternion.premultiply(basis).multiply(inverse);
     const x = o.scale.x;
@@ -97,7 +97,7 @@ export function makeMPXModel(gltf: GLTF) {
     shell: { caseLen: 0.0192, rimR: 0.00478 },
     magSize: { len: 0.192 },
   };
-  const converted = convertWeaponScene(scene, (source, material) => {
+  const converted = convertWeaponScene(scene, (source, material): void => {
     // Keep authored reflectance; only optical sheets/interior have view-pass policies.
     if (source.name.startsWith('11 |') || source.name.startsWith('12 |')) {
       // World colour is already behind the separate weapon pass. Use one
@@ -123,13 +123,47 @@ export function makeMPXModel(gltf: GLTF) {
   return { ...model, ...converted };
 }
 
-export async function loadMPX() {
+export async function loadMPX(): Promise<MPXModel> {
   return makeMPXModel(await new GLTFLoader().loadAsync(MPX_URL));
 }
 
 /** Samples the actual Blender curves, including fingers. Upper/forearm IK is
  * the only runtime solve; wrists and finger contact are not reconstructed. */
-type MPXModel = ReturnType<typeof makeMPXModel>;
+type MPXModel = {
+  materials: Set<THREE.Material>;
+  textures: Set<THREE.Texture>;
+  id: string;
+  label: string;
+  scene: THREE.Group;
+  root: THREE.Object3D;
+  animations: THREE.AnimationClip[];
+  reactiveFire: boolean;
+  handPoses: {
+    left: typeof handReference.sides.left.grip;
+    right: { fingers: number[][]; fingerSpread: number[]; thumb: number[]; thumbBase: number[] };
+  };
+  nodes: {
+    muzzle: [number, number, number];
+    eject: [number, number, number];
+    sight: [number, number, number];
+    ejectDir: number[];
+    gripR: { pos: number[]; finger: number[]; back: number[] };
+    gripL: { pos: number[]; finger: number[]; back: number[] };
+    magSeat: { pos: [number, number, number]; rot: number[] };
+    opticGlass: {
+      center: [number, number, number];
+      apertureR: number;
+      windowW: number;
+      windowH: number;
+      reticle: string;
+      dotMoa: number;
+      minDotPixels: number;
+      dotOpacity: number;
+    };
+  };
+  shell: { caseLen: number; rimR: number };
+  magSize: { len: number };
+};
 type MPXArm = HandRig;
 export class MPXAnimation {
   model!: MPXModel;
@@ -153,7 +187,7 @@ export class MPXAnimation {
     this.root = model.root;
     this.mixer = new THREE.AnimationMixer(this.root);
     this.actions = createAuthoredActions(this.mixer, model.animations);
-    const node = (name: string) => requiredNode(this.root, name);
+    const node = (name: string): THREE.Object3D => requiredNode(this.root, name);
     this.bolt = node('bolt');
     this.boltRest = this.bolt.position.clone();
     this.poseMatrix = this.root.matrix;

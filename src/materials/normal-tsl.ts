@@ -9,7 +9,8 @@ export function normalFromHeight(
   strength: Node<'float'>
 ): Node<'vec3'> {
   const coords = uv();
-  const h = (x: number, y: number) => texture(height, coords.add(vec2(x, y).mul(texel))).r;
+  const h = (x: number, y: number): Node<'float'> =>
+    texture(height, coords.add(vec2(x, y).mul(texel))).r;
   const tl = h(-1, 1),
     t = h(0, 1),
     tr = h(1, 1);

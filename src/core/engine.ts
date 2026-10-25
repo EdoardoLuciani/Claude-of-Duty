@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 import { FIXED_DT, MAX_SUBSTEPS } from './config.ts';
 import type { RuntimeConfig } from './config.ts';
-import type { EngineContext, EngineTime } from './context.ts';
+import type { EngineContext, EngineSystems, SystemId, EngineTime } from './context.ts';
 import type { EngineError } from './events.ts';
 import { Input } from './input.ts';
 import { Registry, EventBus, describeSystem } from './registry.ts';
@@ -52,7 +52,7 @@ export class Engine {
     this.canvas = canvas;
     this.config = config;
     this.registry = new Registry();
-    this.events = new EventBus((type, err) => this.fail('events', type, err));
+    this.events = new EventBus((type, err): void => this.fail('events', type, err));
     this.input = new Input(canvas, config);
     this.rng = new Rng(config.deterministic ? 0x5eed1234 : (Math.random() * 2 ** 32) >>> 0);
 
@@ -87,27 +87,27 @@ export class Engine {
       input: this.input,
       time: this.time,
       rng: this.rng,
-      get: (id) => this.registry.get(id),
-      peek: (id) => this.registry.peek(id),
-      has: (id: string) => this.registry.has(id),
+      get: <K extends SystemId>(id: K): EngineSystems[K] => this.registry.get(id),
+      peek: <K extends SystemId>(id: K): EngineSystems[K] | null => this.registry.peek(id),
+      has: (id: string): boolean => this.registry.has(id),
     };
 
     this._accum = 0;
     this._last = 0;
     this._running = false;
     this.error = null; // Fatal simulation failure; only reloading may clear it.
-    this._onResize = () => this.resize();
+    this._onResize = (): void => this.resize();
   }
 
   add<Args extends unknown[]>(
     SystemClass: { new (...args: Args): Subsystem; id: string; deps?: string[] },
     ...args: Args
-  ) {
+  ): this {
     this.registry.add(new SystemClass(...args));
     return this;
   }
 
-  async init() {
+  async init(): Promise<this> {
     const order = this.registry.resolve();
     for (const sys of order) {
       const t0 = performance.now();
@@ -126,7 +126,7 @@ export class Engine {
     return this.error !== null;
   }
 
-  resize() {
+  resize(): void {
     if (this.hasError()) return;
     const w = Math.max(1, this.canvas.clientWidth || innerWidth);
     const h = Math.max(1, this.canvas.clientHeight || innerHeight);
@@ -148,14 +148,14 @@ export class Engine {
     }
   }
 
-  start() {
+  start(): void {
     if (this._running || this.error) return;
     this._running = true;
     this._last = performance.now();
     requestAnimationFrame(this._loop);
   }
 
-  stop() {
+  stop(): void {
     this._running = false;
   }
 
@@ -178,7 +178,7 @@ export class Engine {
   }
 
   /** Advance one frame. Exposed so the capture harness can pump frames by hand. */
-  step(now = performance.now()) {
+  step(now = performance.now()): void {
     const t = this.time;
     // Clamp so a tab-switch or a breakpoint doesn't teleport the simulation.
     const rawDt = Math.min(0.1, Math.max(0, (now - this._last) / 1000));
@@ -230,7 +230,7 @@ export class Engine {
     this.input.endFrame();
   }
 
-  _invoke(sys: Subsystem, method: FrameHook, arg: number) {
+  _invoke(sys: Subsystem, method: FrameHook, arg: number): void {
     if (this.error) return;
     // UI owns raw-time menu/HUD animation in lateUpdate. Do not run even a
     // zero-dt gameplay hook: several hooks publish damage/spawns without dt.
@@ -244,7 +244,7 @@ export class Engine {
   }
 
   /** Terminal errors may also arrive asynchronously (for example device loss). */
-  fail(system: string, method: string, err: unknown) {
+  fail(system: string, method: string, err: unknown): void {
     if (this.error) return;
     const message = typeof err === 'object' && err !== null && 'message' in err ? err.message : err;
     this.error = { system, method, message: String(message ?? err).slice(0, 200) };
@@ -255,7 +255,7 @@ export class Engine {
     this.events.emit('engine:error', this.error);
   }
 
-  async dispose() {
+  async dispose(): Promise<void> {
     this.stop();
     removeEventListener('resize', this._onResize);
     this.input.detach();

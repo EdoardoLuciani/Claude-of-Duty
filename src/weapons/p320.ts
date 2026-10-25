@@ -30,7 +30,7 @@ const ALIASES: Record<string, string> = {
 };
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
 
-export function makeP320Model(gltf: GLTF) {
+export function makeP320Model(gltf: GLTF): P320Model {
   const scene = gltf.scene;
   const { root, animations, point } = authoredModel(gltf, 'P320_RIG', REQUIRED, scene);
   const model = {
@@ -52,7 +52,7 @@ export function makeP320Model(gltf: GLTF) {
     shell: { caseLen: 0.0192, rimR: 0.00478 },
     magSize: { len: 0.09 },
   };
-  const converted = convertWeaponScene(scene, (_source, material) => {
+  const converted = convertWeaponScene(scene, (_source, material): void => {
     for (const value of Object.values(material as object)) {
       if (value instanceof THREE.Texture) value.anisotropy = 8;
     }
@@ -60,13 +60,36 @@ export function makeP320Model(gltf: GLTF) {
   return { ...model, ...converted };
 }
 
-export async function loadP320() {
+export async function loadP320(): Promise<P320Model> {
   return makeP320Model(await new GLTFLoader().loadAsync(P320_URL));
 }
 
 /** Samples the actual Blender curves, including fingers. Upper/forearm IK is
  * the only runtime solve; wrists and finger contact are not reconstructed. */
-type P320Model = ReturnType<typeof makeP320Model>;
+type P320Model = {
+  materials: Set<THREE.Material>;
+  textures: Set<THREE.Texture>;
+  id: string;
+  label: string;
+  scene: THREE.Group;
+  root: THREE.Object3D;
+  animations: THREE.AnimationClip[];
+  handPoses: {
+    left: typeof handReference.sides.left.grip;
+    right: typeof handReference.sides.left.grip;
+  };
+  nodes: {
+    muzzle: [number, number, number];
+    eject: [number, number, number];
+    sight: [number, number, number];
+    ejectDir: number[];
+    gripR: { pos: number[]; finger: number[]; back: number[] };
+    gripL: { pos: number[]; finger: number[]; back: number[] };
+    magSeat: { pos: number[]; rot: number[] };
+  };
+  shell: { caseLen: number; rimR: number };
+  magSize: { len: number };
+};
 type P320Arm = HandRig;
 export class P320Animation {
   model!: P320Model;
@@ -90,7 +113,7 @@ export class P320Animation {
     this.root = model.root;
     this.mixer = new THREE.AnimationMixer(this.root);
     this.actions = createAuthoredActions(this.mixer, model.animations);
-    const node = (name: string) => requiredNode(this.root, name);
+    const node = (name: string): THREE.Object3D => requiredNode(this.root, name);
     this.slide = node('slide');
     this.barrel = node('barrel');
     this.slideRest = this.slide.position.clone();

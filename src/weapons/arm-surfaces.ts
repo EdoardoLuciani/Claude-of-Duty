@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { attribute, float, normalMap, texture, uv, varying, vec2, vec3 } from 'three/tsl';
 import { MeshPhysicalNodeMaterial } from 'three/webgpu';
 import type { Node } from 'three/webgpu';
+import type { ConstNode, TextureNode, VarNode } from 'three/webgpu';
 
 import type { createArmBlood } from './arm-blood.ts';
 
@@ -63,15 +64,15 @@ export function createArmSurfaceMaterial(
   material.copy(first);
   material.name = 'Player_arm_surfaces';
   material.map = armTextureArray(
-    sources.map((m) => m.map!),
+    sources.map((m): THREE.Texture => m.map!),
     true
   );
   material.normalMap = armTextureArray(
-    sources.map((m) => m.normalMap!),
+    sources.map((m): THREE.Texture => m.normalMap!),
     false
   );
   material.roughnessMap = armTextureArray(
-    sources.map((m) => m.roughnessMap!),
+    sources.map((m): THREE.Texture => m.roughnessMap!),
     false
   );
   material.aoMap = material.roughnessMap;
@@ -82,29 +83,44 @@ export function createArmSurfaceMaterial(
     for (let i = 1; i < values.length; i++) result = surface.equal(i).select(values[i], result);
     return result;
   };
-  const sample = (map: THREE.Texture, channel: number) => texture(map, uv(channel)).depth(surface);
+  const sample = (map: THREE.Texture, channel: number): TextureNode<'vec4'> =>
+    texture(map, uv(channel)).depth(surface);
   const base = sample(material.map, 1).rgb.mul(
-    choose(sources.map((m) => vec3(m.color.r, m.color.g, m.color.b)))
+    choose(
+      sources.map((m): VarNode<'vec3', ConstNode<'vec3', THREE.Vector3>> =>
+        vec3(m.color.r, m.color.g, m.color.b)
+      )
+    )
   );
   const roughness = sample(material.roughnessMap, 1).g.mul(
-    choose(sources.map((m) => float(m.roughness)))
+    choose(sources.map((m): VarNode<'float', ConstNode<'float', number>> => float(m.roughness)))
   );
-  material.metalnessNode = choose(sources.map((m) => float(m.metalness)));
+  material.metalnessNode = choose(
+    sources.map((m): VarNode<'float', ConstNode<'float', number>> => float(m.metalness))
+  );
   material.aoNode = sample(material.aoMap, 0)
     .r.sub(1)
-    .mul(choose(sources.map((m) => float(m.aoMapIntensity))))
+    .mul(
+      choose(
+        sources.map((m): VarNode<'float', ConstNode<'float', number>> => float(m.aoMapIntensity))
+      )
+    )
     .add(1);
   // Retain the native derivative tangent frame (including mirrored/back-face handling).
   material.normalNode = normalMap(
     sample(material.normalMap, 1).rgb,
-    choose(sources.map((m) => vec2(m.normalScale)))
+    choose(
+      sources.map((m): VarNode<'vec2', ConstNode<'vec2', THREE.Vector2>> => vec2(m.normalScale))
+    )
   );
   blood.decorate(
     material,
     base,
     roughness,
     choose(
-      sources.map((m) => float(m.name === 'Olive_ripstop' || m.name === 'Olive_stitch' ? 1 : 0))
+      sources.map((m): VarNode<'float', ConstNode<'float', number>> =>
+        float(m.name === 'Olive_ripstop' || m.name === 'Olive_stitch' ? 1 : 0)
+      )
     )
   );
   return material;

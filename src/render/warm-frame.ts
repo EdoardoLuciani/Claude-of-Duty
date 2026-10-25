@@ -2,7 +2,7 @@
  * Hidden tabs resume on visibility; a stalled/hidden boot fails after the graph
  * deadline rather than hanging forever. Cancel the callback before rejecting. */
 export function warmFrame(draw: () => void, signal: AbortSignal, deadline: number): Promise<void> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve, reject): void => {
     let raf: number | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const finish = (error?: unknown): void => {
@@ -26,7 +26,7 @@ export function warmFrame(draw: () => void, signal: AbortSignal, deadline: numbe
       return;
     }
     timer = setTimeout(timeout, remaining);
-    raf = requestAnimationFrame(() => {
+    raf = requestAnimationFrame((): void => {
       if (performance.now() >= deadline) {
         timeout();
         return;

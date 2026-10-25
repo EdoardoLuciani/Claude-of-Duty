@@ -28,7 +28,7 @@ export function createHdrMeter(
   const pipeline = new RenderPipeline(renderer, vec4(log2(luminance).mul(weight), weight, 0, 1));
   pipeline.outputColorTransform = false;
 
-  const draw = () => {
+  const draw = (): void => {
     const previous = renderer.getRenderTarget();
     try {
       renderer.setRenderTarget(target);
@@ -40,7 +40,7 @@ export function createHdrMeter(
   let layoutWarned = false;
   return {
     warm: draw,
-    async sample() {
+    async sample(): Promise<number | null> {
       draw();
       const pixels = await renderer.readRenderTargetPixelsAsync(target, 0, 0, size, size);
       // RGBA16F at 64 pixels is 512 bytes/row: already WebGPU's 256-byte
@@ -61,7 +61,7 @@ export function createHdrMeter(
         }
       return totalWeight > 0 ? 2 ** (weightedLog / totalWeight) : null;
     },
-    dispose() {
+    dispose(): void {
       pipeline.dispose();
       target.dispose();
     },

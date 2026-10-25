@@ -85,12 +85,13 @@ export function parseQueryKey(value: unknown): QueryKey {
     throw new Error('[ai worker] invalid ladder descriptor');
   const normal = point(d.normal),
     points = d.points.map(point) as unknown as LadderDescriptor['points'];
-  const span = (a: Vector3Like, b: Vector3Like) => Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
-  const spans = points.slice(1).map((p, i) => span(points[i], p));
+  const span = (a: Vector3Like, b: Vector3Like): number =>
+    Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+  const spans = points.slice(1).map((p, i): number => span(points[i], p));
   if (
     normal.y !== 0 ||
     Math.abs(Math.hypot(normal.x, normal.z) - 1) > 1e-6 ||
-    !spans.every((n) => Number.isFinite(n) && n > 0) ||
+    !spans.every((n): boolean => Number.isFinite(n) && n > 0) ||
     points[0].y !== points[1].y ||
     points[2].y !== points[3].y ||
     points[1].x !== points[2].x ||
@@ -181,7 +182,7 @@ export function parseQueryKey(value: unknown): QueryKey {
 export function queryIdentity(key: QueryKey): string {
   return Array.isArray(key)
     ? key.join(',')
-    : JSON.stringify(key, (_name, value: unknown) =>
+    : JSON.stringify(key, (_name, value: unknown): unknown =>
         typeof value === 'number' && Object.is(value, -0) ? '-0' : value
       );
 }
@@ -412,7 +413,9 @@ export function parseSnapshotCopy(
     !isRecord(value) ||
     !snapshot(value.snapshot) ||
     !Array.isArray(value.transfer) ||
-    !value.transfer.every((buffer: unknown) => buffer instanceof ArrayBuffer) ||
+    !value.transfer.every(
+      (buffer: unknown): buffer is ArrayBuffer => buffer instanceof ArrayBuffer
+    ) ||
     !isNumber(value.bytes)
   )
     throw new Error('[ai worker] invalid collision snapshot');

@@ -117,7 +117,7 @@ export class MarketOverlay {
     const foot = el('div', 'ow-market-foot', panel);
     const skip = el('button', 'ow-market-skip', foot, 'SKIP ▸');
     skip.type = 'button';
-    skip.addEventListener('click', () => this.skip());
+    skip.addEventListener('click', (): void => this.skip());
     el('div', 'ow-market-hint', foot, 'ESC SKIP · CLICK / ENTER TO BUY');
 
     this.active = false;
@@ -199,7 +199,7 @@ export class MarketOverlay {
   }
 
   _buy(itemId: string | undefined): void {
-    const id = this.market.getHudState().items.find((item) => item.id === itemId)?.id;
+    const id = this.market.getHudState().items.find((item): boolean => item.id === itemId)?.id;
     if (id === undefined || !this.market.buy(id)) {
       this.ctx.peek('ui')?.sfx?.('market_deny', 0.75);
       return;

@@ -1,4 +1,5 @@
 import type { Texture } from 'three';
+import type { FnNode } from 'three/src/nodes/tsl/TSLCore.js';
 import {
   Fn,
   If,
@@ -37,6 +38,7 @@ import {
   Vector3,
 } from 'three/webgpu';
 import type { Node } from 'three/webgpu';
+import type { ConstNode, JoinNode, VarNode } from 'three/webgpu';
 
 import { SK_PI, SK_GROUND_R, skMiePhase } from './atmosphere-tsl.ts';
 import { ATMO } from './atmosphere.ts';
@@ -60,7 +62,9 @@ import { fbm3 } from './noise.ts';
  * sky the camera actually sees without a four-decade disc in the input.
  */
 
-const owSkLum = Fn<[Node<'vec3'>], Node<'float'>>(([c]) => dot(c, vec3(0.2126, 0.7152, 0.0722)));
+const owSkLum = Fn<[Node<'vec3'>], Node<'float'>>(([c]): Node<'float'> =>
+  dot(c, vec3(0.2126, 0.7152, 0.0722))
+);
 
 interface SkySampleUniforms {
   uViewPos: Node<'vec3'>;
@@ -102,7 +106,7 @@ export function createSkySample(
   shared: SkySampleUniforms,
   deps: SkySampleDeps,
   { points, moonOct }: { points: boolean; moonOct: number }
-) {
+): FnNode<[Vector3 | Node<'vec3'>], Node<'vec3'>> {
   const {
     uViewPos,
     uMieScale,
@@ -120,45 +124,50 @@ export function createSkySample(
   } = shared;
   const { skTransmittance, skSkyView, skClouds, skNightSky } = deps;
 
-  const skAmbientSky = Fn(() => texture(ambientTex, vec2(0.25, 0.5)).rgb);
-  const skAmbientHorizon = Fn(() => texture(ambientTex, vec2(0.75, 0.5)).rgb);
+  const skAmbientSky = Fn((): Node<'vec3'> => texture(ambientTex, vec2(0.25, 0.5)).rgb);
+  const skAmbientHorizon = Fn((): Node<'vec3'> => texture(ambientTex, vec2(0.75, 0.5)).rgb);
 
   /**
    * Radiance of the solar disc, limb darkened. The exponents are the per-channel
    * Hosek-Wilkie limb coefficients: blue falls off fastest, which is why the rim
    * of a low sun is orange while the centre stays white.
    */
-  const skSunDisc = Fn<[Node<'float'>], Node<'vec3'>>(([theta]) => {
-    const result = vec3(0).toVar();
-    const R = uDisc.x.mul(uDisc.z);
-    const aa = max(1e-6, fwidth(theta));
-    const cover = smoothstep(R.add(aa), R.sub(aa), theta);
-    If(cover.greaterThan(0), () => {
-      const r = clamp(theta.div(R), 0, 1);
-      const mu = sqrt(max(0, float(1).sub(r.mul(r))));
-      const limb = vec3(mu).pow(vec3(0.32, 0.44, 0.58));
-      // Enlarging the disc for readability must not add energy, so divide by the
-      // area factor; bloom then behaves the same as it would at true angular size.
-      result.assign(
-        uSunDiscRadiance
-          .mul(limb)
-          .mul(cover)
-          .mul(skTransmittance(uViewPos, uSunDir))
-          .div(uDisc.z.mul(uDisc.z))
-      );
-    });
-    return result;
-  });
+  const skSunDisc = Fn<[Node<'float'>], Node<'vec3'>>(
+    ([theta]): VarNode<'vec3', VarNode<'vec3', ConstNode<'vec3', Vector3>>> => {
+      const result = vec3(0).toVar();
+      const R = uDisc.x.mul(uDisc.z);
+      const aa = max(1e-6, fwidth(theta));
+      const cover = smoothstep(R.add(aa), R.sub(aa), theta);
+      If(cover.greaterThan(0), (): void => {
+        const r = clamp(theta.div(R), 0, 1);
+        const mu = sqrt(max(0, float(1).sub(r.mul(r))));
+        const limb = vec3(mu).pow(vec3(0.32, 0.44, 0.58));
+        // Enlarging the disc for readability must not add energy, so divide by the
+        // area factor; bloom then behaves the same as it would at true angular size.
+        result.assign(
+          uSunDiscRadiance
+            .mul(limb)
+            .mul(cover)
+            .mul(skTransmittance(uViewPos, uSunDir))
+            .div(uDisc.z.mul(uDisc.z))
+        );
+      });
+      return result;
+    }
+  );
 
   /**
    * Circumsolar aureole — the bright white halo that surrounds a real sun out to
    * ten or fifteen degrees, restoring the Mie forward peak the LUT destroys.
    */
   const skAureole = Fn<[Node<'vec3'>, Node<'vec3'>, Node<'float'>], Node<'vec3'>>(
-    ([rayDir, irradiance, cosTheta]) => {
+    ([rayDir, irradiance, cosTheta]): VarNode<
+      'vec3',
+      VarNode<'vec3', ConstNode<'vec3', Vector3>>
+    > => {
       const result = vec3(0).toVar();
       const CUT = 0.9135; // cos(24 degrees)
-      If(cosTheta.greaterThan(CUT), () => {
+      If(cosTheta.greaterThan(CUT), (): void => {
         const mieOd = float(ATMO.mieScattering)
           .mul(uMieScale)
           .mul(0.0012)
@@ -177,57 +186,59 @@ export function createSkySample(
    * luminance with the chromaticity carried through unchanged, so a sunset
    * horizon keeps its peach-to-crimson ramp instead of clipping to a plateau.
    */
-  const skRolloff = Fn<[Node<'vec3'>], Node<'vec3'>>(([col]) => {
+  const skRolloff = Fn<[Node<'vec3'>], Node<'vec3'>>(([col]): VarNode<'vec3', Node<'vec3'>> => {
     const out = col.toVar();
-    If(uSkyRolloff.x.greaterThan(0), () => {
+    If(uSkyRolloff.x.greaterThan(0), (): void => {
       const l = max(owSkLum(col), 1e-6);
-      If(l.greaterThan(uSkyRolloff.x), () => {
+      If(l.greaterThan(uSkyRolloff.x), (): void => {
         out.assign(col.mul(pow(l.div(uSkyRolloff.x), uSkyRolloff.y).mul(uSkyRolloff.x).div(l)));
       });
     });
     return out;
   });
 
-  const skMoonDisc = Fn<[Node<'vec3'>, Node<'float'>], Node<'vec3'>>(([rayDir, theta]) => {
-    const result = vec3(0).toVar();
-    const R = uDisc.y.mul(uDisc.w);
-    If(theta.lessThanEqual(R.mul(1.6)), () => {
-      const ref = abs(uMoonDir.y)
-        .greaterThan(0.97)
-        .select(vec3(0, 0, 1), vec3(0, 1, 0));
-      const mr = normalize(ref.cross(uMoonDir));
-      const mu3 = uMoonDir.cross(mr);
-      // Gnomonic projection is exact enough over a quarter of a degree.
-      const p = vec2(dot(rayDir, mr), dot(rayDir, mu3)).div(R);
-      const r2 = dot(p, p);
-      const aa = max(1e-4, fwidth(r2).mul(1.9));
-      const cover = smoothstep(float(1).add(aa), float(1).sub(aa), r2);
-      If(cover.greaterThan(0), () => {
-        const n = normalize(
-          mr
-            .mul(p.x)
-            .add(mu3.mul(p.y))
-            .sub(uMoonDir.mul(sqrt(max(0, float(1).sub(min(r2, 1))))))
-        );
+  const skMoonDisc = Fn<[Node<'vec3'>, Node<'float'>], Node<'vec3'>>(
+    ([rayDir, theta]): VarNode<'vec3', VarNode<'vec3', ConstNode<'vec3', Vector3>>> => {
+      const result = vec3(0).toVar();
+      const R = uDisc.y.mul(uDisc.w);
+      If(theta.lessThanEqual(R.mul(1.6)), (): void => {
+        const ref = abs(uMoonDir.y)
+          .greaterThan(0.97)
+          .select(vec3(0, 0, 1), vec3(0, 1, 0));
+        const mr = normalize(ref.cross(uMoonDir));
+        const mu3 = uMoonDir.cross(mr);
+        // Gnomonic projection is exact enough over a quarter of a degree.
+        const p = vec2(dot(rayDir, mr), dot(rayDir, mu3)).div(R);
+        const r2 = dot(p, p);
+        const aa = max(1e-4, fwidth(r2).mul(1.9));
+        const cover = smoothstep(float(1).add(aa), float(1).sub(aa), r2);
+        If(cover.greaterThan(0), (): void => {
+          const n = normalize(
+            mr
+              .mul(p.x)
+              .add(mu3.mul(p.y))
+              .sub(uMoonDir.mul(sqrt(max(0, float(1).sub(min(r2, 1))))))
+          );
 
-        // Maria are basalt floods over anorthositic highlands: 0.06 vs 0.14.
-        const highlands = fbm3(moonOct)(n.mul(6.5));
-        const maria = smoothstep(0.44, 0.63, fbm3(Math.max(2, moonOct - 1))(n.mul(2.1).add(5.0)));
-        const albedo = mix(0.105, 0.155, highlands).mul(mix(1.0, 0.52, maria));
+          // Maria are basalt floods over anorthositic highlands: 0.06 vs 0.14.
+          const highlands = fbm3(moonOct)(n.mul(6.5));
+          const maria = smoothstep(0.44, 0.63, fbm3(Math.max(2, moonOct - 1))(n.mul(2.1).add(5.0)));
+          const albedo = mix(0.105, 0.155, highlands).mul(mix(1.0, 0.52, maria));
 
-        const NdL = max(0, dot(n, uSunDir));
-        // Lunar regolith backscatters hard: nearly flat up to the terminator.
-        const shade = pow(NdL, 0.42);
-        const earthshine = 0.014;
-        result.assign(
-          uMoonDiscRadiance.mul(albedo.div(0.13)).mul(shade.add(earthshine)).mul(cover)
-        );
+          const NdL = max(0, dot(n, uSunDir));
+          // Lunar regolith backscatters hard: nearly flat up to the terminator.
+          const shade = pow(NdL, 0.42);
+          const earthshine = 0.014;
+          result.assign(
+            uMoonDiscRadiance.mul(albedo.div(0.13)).mul(shade.add(earthshine)).mul(cover)
+          );
+        });
       });
-    });
-    return result;
-  });
+      return result;
+    }
+  );
 
-  return Fn<[Node<'vec3'>], Node<'vec3'>>(([rayDirIn]) => {
+  return Fn<[Node<'vec3'>], Node<'vec3'>>(([rayDirIn]): Node<'vec3'> => {
     const rayDir = normalize(rayDirIn);
     const ambSky = skAmbientSky();
     const ambHor = skAmbientHorizon();
@@ -257,14 +268,14 @@ export function createSkySample(
     const night = skNightSky(rayDir);
     col.addAssign(night.mul(float(1).sub(clamp(cl.a.mul(1.9), 0, 1))));
 
-    If(cl.a.greaterThan(1e-4), () => {
+    If(cl.a.greaterThan(1e-4), (): void => {
       // Aerial perspective on the decks themselves, keyed off view elevation.
       const bleed = float(1).sub(smoothstep(0, 0.22, rayDir.y));
       col.assign(mix(col, mix(cl.rgb, col, bleed.mul(0.82)), cl.a));
     });
 
     // ---- ground / below the horizon ----------------------------------------
-    If(rayDir.y.lessThan(0), () => {
+    If(rayDir.y.lessThan(0), (): void => {
       // First bounce off the street: what fills the lower hemisphere of the IBL.
       const ground = uGroundAlbedo.mul(
         ambHor
@@ -289,12 +300,14 @@ export function createSkySample(
 }
 
 /** Equirectangular direction, matching three's `equirectUv` exactly. */
-export const dirFromEquirectUv = Fn<[Node<'vec2'>], Node<'vec3'>>(([uv]) => {
-  const az = uv.x.sub(0.5).mul(2 * SK_PI);
-  const lat = uv.y.sub(0.5).mul(SK_PI);
-  const cl = cos(lat);
-  return vec3(cl.mul(cos(az)), sin(lat), cl.mul(sin(az)));
-});
+export const dirFromEquirectUv = Fn<[Node<'vec2'>], Node<'vec3'>>(
+  ([uv]): VarNode<'vec3', JoinNode<'vec3'>> => {
+    const az = uv.x.sub(0.5).mul(2 * SK_PI);
+    const lat = uv.y.sub(0.5).mul(SK_PI);
+    const cl = cos(lat);
+    return vec3(cl.mul(cos(az)), sin(lat), cl.mul(sin(az)));
+  }
+);
 
 const _domeGeometry = new BufferGeometry();
 _domeGeometry.setAttribute(
@@ -344,7 +357,7 @@ export function createSkyDome(skyScreen: SkyNodeFn): Mesh {
 }
 
 /** World ray through a screen UV, using the live camera matrices. */
-export const dirFromCamera = Fn<[Node<'vec2'>], Node<'vec3'>>(([uv]) => {
+export const dirFromCamera = Fn<[Node<'vec2'>], Node<'vec3'>>(([uv]): Node<'vec3'> => {
   const ndc = uv.mul(2).sub(1);
   const h = cameraProjectionMatrixInverse.mul(vec4(ndc, 1, 1));
   const vd = h.xyz.div(h.w);

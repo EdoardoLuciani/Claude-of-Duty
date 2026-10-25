@@ -210,7 +210,7 @@ export class MarketSystem {
     this._hud = {
       credits: 0,
       marketIn: 0,
-      items: CATALOG.map((c) => ({
+      items: CATALOG.map((c): HudItem => ({
         id: c.id,
         label: c.label,
         cost: c.cost,
@@ -235,18 +235,18 @@ export class MarketSystem {
 
     // Credits mirror the score's rewards 1:1 (kills, headshots, wave bonuses
     // — see score:change in ARCHITECTURE.md); spending is the only divergence.
-    on('score:change', (e) => {
+    on('score:change', (e): void => {
       this.credits += Math.max(0, e?.delta ?? 0);
     });
 
-    on('wave:complete', (e) => {
+    on('wave:complete', (e): void => {
       const wave = Math.max(1, (e?.wave ?? 0) | 0);
       // Arm the grace period; the shop opens from update() once it elapses.
       this._pendingWave = wave;
       this._marketAt = this.ctx.time.elapsed + MARKET_DELAY;
     });
 
-    on('game:restart', () => this.reset());
+    on('game:restart', (): void => this.reset());
   }
 
   _level(itemId: MarketItemId): number {
@@ -293,7 +293,7 @@ export class MarketSystem {
   /** Buy one unit when the shop is open and the player can afford it. */
   buy(itemId: MarketItemId): boolean {
     if (!this.open) return false;
-    const item = CATALOG.find((c) => c.id === itemId);
+    const item = CATALOG.find((c): boolean => c.id === itemId);
     if (!item || this._level(itemId) >= item.max || this.credits < item.cost) return false;
     if (itemId === 'grenade') this.weapons.addGrenades(item.step);
     else if (itemId === 'armour') this.health.addArmour(item.step);

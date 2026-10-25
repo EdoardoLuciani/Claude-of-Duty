@@ -13,11 +13,15 @@ export function authoredModel(
   rigName: string,
   required: readonly string[],
   scene: THREE.Object3D = gltf.scene
-) {
+): {
+  root: THREE.Object3D;
+  animations: THREE.AnimationClip[];
+  point: (name: string) => [number, number, number];
+} {
   scene.updateMatrixWorld(true);
   const root = requiredNode(scene, rigName);
-  const animations = required.map((name) => {
-    const clip = gltf.animations.find((clip) => clip.name === name);
+  const animations = required.map((name): THREE.AnimationClip => {
+    const clip = gltf.animations.find((clip): boolean => clip.name === name);
     if (!clip) throw new Error(`[${rigName}] missing ${name} clip`);
     return clip;
   });

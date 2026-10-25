@@ -110,7 +110,7 @@ export class Spring3 {
     this.a.f = this.b.f = this.c.f = v;
   }
 
-  get f() {
+  get f(): number {
     return this.a.f;
   }
 
@@ -118,7 +118,7 @@ export class Spring3 {
     this.a.z = this.b.z = this.c.z = v;
   }
 
-  get damping() {
+  get damping(): number {
     return this.a.z;
   }
 
@@ -143,15 +143,15 @@ export class Spring3 {
     return this;
   }
 
-  get x() {
+  get x(): number {
     return this.a.x;
   }
 
-  get y() {
+  get y(): number {
     return this.b.x;
   }
 
-  get z() {
+  get z(): number {
     return this.c.x;
   }
 }

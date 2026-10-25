@@ -74,7 +74,7 @@ export class AttachmentQueries {
   constructor(
     nav: SurfaceNav,
     {
-      workerFactory = () =>
+      workerFactory = (): Worker =>
         new Worker(new URL('./attachment-worker.ts', import.meta.url), { type: 'module' }),
       profile = false,
       collectSamples = profile,
@@ -85,16 +85,16 @@ export class AttachmentQueries {
     this.profile = profile;
     this.collectSamples = collectSamples;
   }
-  get worker() {
+  get worker(): Worker | null {
     return this.connection?.worker ?? null;
   }
-  get active() {
+  get active(): boolean {
     return this.current !== null;
   }
-  get pending() {
+  get pending(): boolean {
     return this.current?.pending === true;
   }
-  get valid() {
+  get valid(): boolean {
     const p = this.nav.physics,
       c = this.nav._probe;
     return (
@@ -106,7 +106,7 @@ export class AttachmentQueries {
       this.config === this.signature()
     );
   }
-  signature() {
+  signature(): string {
     const p = this.nav.physics,
       c = this.nav._probe;
     if (!c) throw new Error('[ai worker] missing controller');
@@ -124,7 +124,7 @@ export class AttachmentQueries {
       c.enabled,
     ].join(',');
   }
-  async start() {
+  async start(): Promise<void> {
     if (this.error) throw this.error;
     if (this.disposed) return;
     const generation = ++this.generation;
@@ -139,7 +139,7 @@ export class AttachmentQueries {
       this.sourceTriCount = world.triCount;
       this.probe = c;
       this.config = this.signature();
-      const current = () =>
+      const current = (): boolean =>
         !this.disposed &&
         !this.error &&
         generation === this.generation &&
@@ -172,8 +172,8 @@ export class AttachmentQueries {
           repeatState: this.nav.repeatState !== false,
         },
         data.transfer,
-        (message) => this.receive(message),
-        (error) => this.failure(error)
+        (message): void => this.receive(message),
+        (error): Error => this.failure(error)
       ));
       await connection.initialized;
       if (current() && this.connection === connection) this.ready = true;
@@ -181,17 +181,17 @@ export class AttachmentQueries {
       if (!this.disposed && generation === this.generation) throw this.failure(error);
     }
   }
-  private closeConnection() {
+  private closeConnection(): void {
     this.ready = false;
     this.connection?.close();
     this.connection = null;
   }
-  private send(message: ClientMessage) {
+  private send(message: ClientMessage): void {
     if (!this.connection?.worker)
       throw this.failure(new Error('[ai worker] missing initialized worker'));
     this.connection.send(message);
   }
-  update(frame: number, alive: Set<number>) {
+  update(frame: number, alive: Set<number>): void {
     this.frame = frame;
     if (this.error) throw this.error;
     const p = this.nav.physics;
@@ -201,10 +201,10 @@ export class AttachmentQueries {
       if (!this.rebuilding) {
         this.rebuilding = true;
         void this.start()
-          .catch((error) => {
+          .catch((error): void => {
             this.failure(error);
           })
-          .finally(() => {
+          .finally((): void => {
             this.rebuilding = false;
           });
       }
@@ -391,7 +391,7 @@ export class AttachmentQueries {
     });
     return this.submit(key, foot === this.current.origin);
   }
-  private invalidateCurrent() {
+  private invalidateCurrent(): void {
     if (this.current) this.current.cancelled = true;
     this.generation++;
     this.closeConnection();
@@ -452,7 +452,7 @@ export class AttachmentQueries {
     this.stats.maxPending = Math.max(this.stats.maxPending, this.jobs.size);
     return false;
   }
-  receive(message: WorkerMessage) {
+  receive(message: WorkerMessage): void {
     if (this.disposed || this.error || message.type !== 'result') return;
     const job = this.jobs.get(message.id);
     this.stats.workerMs += message.ms;
@@ -482,21 +482,21 @@ export class AttachmentQueries {
     this.stats.completed++;
     this.stats.pending = this.jobs.size;
   }
-  remember(key: string, value: boolean) {
+  remember(key: string, value: boolean): void {
     if (this.proofs.size === MAX_PROOFS && !this.proofs.has(key)) {
       const first = this.proofs.keys().next().value;
       if (first !== undefined) this.proofs.delete(first);
     }
     this.proofs.set(key, value);
   }
-  record(sample: QuerySample) {
+  record(sample: QuerySample): void {
     if (this.samples.length === 2048) {
       this.samples.shift();
       this.stats.droppedSamples++;
     }
     this.samples.push(sample);
   }
-  cancel(key: string) {
+  cancel(key: string): void {
     const scope = this.scopes.get(key);
     if (!scope) return;
     const ids = [];
@@ -510,17 +510,17 @@ export class AttachmentQueries {
     this.stats.pending = this.jobs.size;
     this.scopes.delete(key);
   }
-  failure(error: unknown) {
+  failure(error: unknown): Error {
     this.error ??= error instanceof Error ? error : new Error(String(error));
     this.closeConnection();
     this.clear();
     return this.error;
   }
-  clear() {
+  clear(): void {
     for (const key of this.scopes.keys()) this.cancel(key);
     this.proofs.clear();
   }
-  dispose() {
+  dispose(): void {
     this.disposed = true;
     this.generation++;
     this.closeConnection();

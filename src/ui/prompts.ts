@@ -51,7 +51,7 @@ export class Prompt {
     setStyle(this.bar, 'display', p.progress !== undefined ? '' : 'none');
   }
 
-  clear() {
+  clear(): void {
     this.active = false;
   }
 
@@ -66,7 +66,7 @@ export class Prompt {
     setStyle(this.fill, 'transform', `scaleX(${clamp01(this.progress).toFixed(3)})`);
   }
 
-  dispose() {
+  dispose(): void {
     this.root.remove();
   }
 }
@@ -96,7 +96,7 @@ export class Banner {
     this.t = 0;
   }
 
-  clear() {
+  clear(): void {
     this.t = 1;
     setStyle(this.root, 'display', 'none');
   }
@@ -116,7 +116,7 @@ export class Banner {
     setStyle(this.root, 'transform', `translate(-50%,-50%) scale(${s.toFixed(4)})`);
   }
 
-  dispose() {
+  dispose(): void {
     this.root.remove();
   }
 }

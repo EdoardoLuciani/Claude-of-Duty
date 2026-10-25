@@ -32,7 +32,7 @@ function poly(parent: SVGElement, points: string): void {
 }
 
 function grenade(parent: HTMLElement): void {
-  icon(parent, '0 0 20 24', (s) => {
+  icon(parent, '0 0 20 24', (s): void => {
     p(s, 'M8 0h4v2.4h1.8l1.3 2.2H5.9L7.2 2.4H8z');
     p(s, 'M10 5.4c3.6 0 6.5 3.3 6.5 8.1S13.6 24 10 24 3.5 18.3 3.5 13.5 6.4 5.4 10 5.4z');
     const g = svg('g', { fill: 'none', stroke: 'rgba(0,0,0,.45)', 'stroke-width': 0.9 }, s);
@@ -44,7 +44,7 @@ function grenade(parent: HTMLElement): void {
 }
 
 function bandage(parent: HTMLElement): void {
-  icon(parent, '0 0 22 24', (s) => {
+  icon(parent, '0 0 22 24', (s): void => {
     // Rolled dressing with a hanging tail.
     p(
       s,
@@ -59,7 +59,7 @@ function bandage(parent: HTMLElement): void {
 }
 
 function armour(parent: HTMLElement): void {
-  icon(parent, '0 0 22 24', (s) => {
+  icon(parent, '0 0 22 24', (s): void => {
     // HUD plate row, stood on end: three ceramic slabs with a dark well.
     r(s, 3.2, 1.4, 15.6, 6.2, 0.6);
     r(s, 3.2, 8.9, 15.6, 6.2, 0.6);
@@ -72,7 +72,7 @@ function armour(parent: HTMLElement): void {
 }
 
 function ammo(parent: HTMLElement): void {
-  icon(parent, '0 0 16 24', (s) => {
+  icon(parent, '0 0 16 24', (s): void => {
     r(s, 4.2, 0.4, 7.6, 4.2, 0.6);
     r(s, 2.4, 4.4, 11.2, 19.2, 1.4);
     svg('rect', { x: 4.6, y: 7.2, width: 6.8, height: 4.2, rx: 0.5, fill: 'rgba(0,0,0,.5)' }, s);
@@ -82,7 +82,7 @@ function ammo(parent: HTMLElement): void {
 }
 
 function pistol(parent: HTMLElement): void {
-  icon(parent, '0 0 32 24', (s) => {
+  icon(parent, '0 0 32 24', (s): void => {
     r(s, 4, 3, 25, 6, 0.8); // slide
     r(s, 5, 1.5, 2, 1.5); // rear sight
     r(s, 26, 1.5, 1.5, 1.5); // front sight
@@ -93,7 +93,7 @@ function pistol(parent: HTMLElement): void {
 }
 
 function smg(parent: HTMLElement): void {
-  icon(parent, '0 0 64 20', (s) => {
+  icon(parent, '0 0 64 20', (s): void => {
     // Short PDW, left-of-centre so the missing barrel is the read.
     poly(s, '10,8.2 18,8.2 18,12.2 13,12.2');
     r(s, 17.6, 7.2, 12, 5.2);
@@ -106,7 +106,7 @@ function smg(parent: HTMLElement): void {
 }
 
 function rifle(parent: HTMLElement): void {
-  icon(parent, '0 0 64 20', (s) => {
+  icon(parent, '0 0 64 20', (s): void => {
     poly(s, '2,7.6 12.4,7.6 12.4,12.4 5.2,12.4');
     r(s, 12, 6.6, 14.4, 5.6);
     r(s, 26.2, 7.6, 11, 3.6);
@@ -119,7 +119,7 @@ function rifle(parent: HTMLElement): void {
 }
 
 function mcx(parent: HTMLElement): void {
-  icon(parent, '0 0 64 20', (s) => {
+  icon(parent, '0 0 64 20', (s): void => {
     poly(s, '2,7 14,7 14,10 5,10 5,14 2,14'); // folding stock
     r(s, 14, 6.6, 14, 5.6);
     r(s, 28, 7, 14, 4);
@@ -131,7 +131,7 @@ function mcx(parent: HTMLElement): void {
 }
 
 function shotgun(parent: HTMLElement): void {
-  icon(parent, '0 0 64 20', (s) => {
+  icon(parent, '0 0 64 20', (s): void => {
     // Pump: no box mag. Tube under the barrel is the tell.
     poly(s, '1,6.8 13,6.8 13,13.2 4,13.2');
     r(s, 12.6, 6.6, 12.4, 6, 0.5);
@@ -144,7 +144,7 @@ function shotgun(parent: HTMLElement): void {
 }
 
 function lmg(parent: HTMLElement): void {
-  icon(parent, '0 0 64 20', (s) => {
+  icon(parent, '0 0 64 20', (s): void => {
     poly(s, '1.2,6.4 12.2,6.4 12.2,13.4 3.4,13.4');
     r(s, 11.8, 5.2, 16.8, 7.6); // fat receiver
     r(s, 28.4, 7.2, 9.2, 4);
@@ -182,7 +182,7 @@ function lmg(parent: HTMLElement): void {
 }
 
 function sniper(parent: HTMLElement): void {
-  icon(parent, '0 0 64 20', (s) => {
+  icon(parent, '0 0 64 20', (s): void => {
     poly(s, '0.4,5.8 13.2,5.8 13.2,9.4 10.4,9.4 10.4,13 3.2,13'); // cheek rest
     r(s, 12.8, 6.6, 12.4, 5.2);
     r(s, 25, 7.8, 8.4, 3);
@@ -195,7 +195,7 @@ function sniper(parent: HTMLElement): void {
 }
 
 function carpet(parent: HTMLElement): void {
-  icon(parent, '0 0 28 20', (s) => {
+  icon(parent, '0 0 28 20', (s): void => {
     // Inverted chevrons over a fuselage — a strike, not another gun.
     p(s, 'M14 1.2 26.4 8.2l-2.2 1.8L14 4.6 3.8 10 1.6 8.2z');
     p(s, 'M14 6.4 24.6 12.4l-2.1 1.7L14 9.6 5.5 14.1 3.4 12.4z');

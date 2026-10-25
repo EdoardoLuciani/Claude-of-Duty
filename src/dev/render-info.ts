@@ -3,7 +3,16 @@ import { field, numberField } from './diagnostic-values.ts';
 // Diagnostic snapshots only; never reset renderer.info to obtain convenient counts.
 // Accept native renderers and historical fixture snapshots, validating their
 // optional counters rather than asserting that every renderer has a WebGL API.
-export function rendererCounters(renderer?: unknown) {
+export function rendererCounters(renderer?: unknown): {
+  rendererFrame: number | null;
+  renderCallsTotal: number | null;
+  renderCallsFrame: number | null;
+  drawCallsFrame: number | null;
+  computeCallsTotal: number | null;
+  computeCallsFrame: number | null;
+  shaderStagesLive: number | null;
+  webglProgramsLive: number | null;
+} {
   const info = field(renderer, 'info');
   const native = field(field(renderer, 'backend'), 'isWebGPUBackend') === true;
   const render = field(info, 'render'),

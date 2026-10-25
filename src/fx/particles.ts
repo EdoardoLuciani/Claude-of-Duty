@@ -36,6 +36,7 @@ import {
 } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import type { Node } from 'three/webgpu';
+import type { JoinNode, TextureNode, UniformNode, VarNode } from 'three/webgpu';
 
 /**
  * GPU particle system — strict WebGPU / TSL.
@@ -117,7 +118,40 @@ export const SP = {
   flags: 0,
 };
 
-export function resetSpawn() {
+export function resetSpawn(): {
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  size0: number;
+  size1: number;
+  sizeCurve: number;
+  life: number;
+  delay: number;
+  drag: number;
+  gravity: number;
+  rot: number;
+  spin: number;
+  stretch: number;
+  r0: number;
+  g0: number;
+  b0: number;
+  i0: number;
+  r1: number;
+  g1: number;
+  b1: number;
+  i1: number;
+  tile: number;
+  soft: number;
+  alpha: number;
+  alphaCurve: number;
+  turb: number;
+  turbFreq: number;
+  seed: number;
+  flags: number;
+} {
   const s = SP;
   s.x = s.y = s.z = 0;
   s.vx = s.vy = s.vz = 0;
@@ -203,7 +237,22 @@ function quadSource(): THREE.PlaneGeometry {
  * @param {number} [o.renderOrder]
  * @returns {{material: MeshBasicNodeMaterial, uniforms: object}}
  */
-function buildParticleMaterial(o: ParticleOptions) {
+function buildParticleMaterial(o: ParticleOptions): {
+  material: MeshBasicNodeMaterial;
+  uniforms: {
+    uTime: UniformNode<'float', number>;
+    uAtlas: UniformNode<'vec2', THREE.Vector2>;
+    uSprite: TextureNode<'vec4'>;
+    uDepth: TextureNode<'vec4'>;
+    uSoftEnable: UniformNode<'vec2', THREE.Vector2>;
+    uSunDir: UniformNode<'vec3', THREE.Vector3>;
+    uSunCol: UniformNode<'vec3', THREE.Vector3>;
+    uAmbTop: UniformNode<'vec3', THREE.Vector3>;
+    uAmbBot: UniformNode<'vec3', THREE.Vector3>;
+    uUpView: UniformNode<'vec3', THREE.Vector3>;
+    uFog: UniformNode<'vec4', THREE.Vector4>;
+  };
+} {
   const additive = o.mode === 'additive';
   const distort = o.mode === 'distort';
 
@@ -238,7 +287,7 @@ function buildParticleMaterial(o: ParticleOptions) {
   const vSoft = varying(float(1), 'vSoft');
   const vQ = varying(vec2(0), 'vQ');
 
-  const vertex = Fn(() => {
+  const vertex = Fn((): Node<'vec4'> => {
     const t = uniforms.uTime.sub(aLife.x);
     const n = t.mul(aLife.y);
     const alive = t.greaterThanEqual(0).and(n.lessThan(1));
@@ -356,7 +405,7 @@ function buildParticleMaterial(o: ParticleOptions) {
     return select(alive, clip, vec4(0.0, 0.0, 2.0, 1.0));
   })();
 
-  const fragment = Fn(() => {
+  const fragment = Fn((): VarNode<'vec4', JoinNode<'vec4'>> => {
     Discard(vCol.a.lessThanEqual(0.0));
     const tex = uniforms.uSprite.sample(vUv);
     let a = tex.a.mul(vCol.a);
@@ -527,7 +576,7 @@ export class ParticleLayer {
   }
 
   /** True while anything might still be alive. */
-  get active() {
+  get active(): boolean {
     return this.mesh.visible;
   }
 

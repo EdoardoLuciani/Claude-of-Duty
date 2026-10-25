@@ -1,5 +1,6 @@
 import { Fn, clamp, float, mix, pow, sin, smoothstep, step, vec2 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
+import type { StructNode } from 'three/webgpu';
 
 import { authoredColor } from '../color-tsl.ts';
 import { fbm01, fbm3, fbm4, fbm5, shear, shearPeriod, worley } from '../noise-tsl.ts';
@@ -7,7 +8,7 @@ import { Surface } from './surface.ts';
 
 // Wind ripples, damp hollows, loose grains and sparse buried shell fragments.
 export const sandSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof Surface>>(
-  ([coords, seed]) => {
+  ([coords, seed]): StructNode => {
     const period = vec2(8);
     const p = coords.mul(period).add(seed.mul(8.2));
     const warp = fbm3(p.mul(0.9), period.mul(0.9), 0.55);

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Fn, attribute, mix, positionLocal, positionPrevious } from 'three/tsl';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
+import type { AttributeNode } from 'three/webgpu';
 
 import { bindingLabel } from '../core/bindings.ts';
 import type { EngineContext } from '../core/context.ts';
@@ -84,7 +85,7 @@ export class AmmoPickups {
     this._makeAssets();
   }
 
-  _makeAssets() {
+  _makeAssets(): void {
     const lid = new THREE.BoxGeometry(0.4, 0.045, 0.29).translate(0, 0.235, 0);
     const band = new THREE.BoxGeometry(0.045, 0.205, 0.282).translate(0.1, 0.13, 0);
     this.geometries = {
@@ -117,7 +118,7 @@ export class AmmoPickups {
     };
     for (const name of ['case', 'edge', 'latch'] as const) {
       const material = this.materials[name] as MeshStandardNodeMaterial;
-      material.positionNode = Fn(() => {
+      material.positionNode = Fn((): AttributeNode<'vec3'> => {
         // Native history remains slot-indexed. Only a newly assigned identity
         // lacks a previous pose; preserve real motion for every surviving slot.
         positionPrevious.assign(
@@ -150,7 +151,7 @@ export class AmmoPickups {
       const renderedIds = new Float64Array(MAX_PICKUPS);
       this._renderedIds.push(renderedIds);
       if (!ring)
-        mesh.onAfterRender = (_renderer, _scene, camera) => {
+        mesh.onAfterRender = (_renderer, _scene, camera): void => {
           // Layer 1 on the world camera is the actual opaque/velocity prepass,
           // not a shadow. An unrendered batch cannot validate fresh slots.
           if (camera !== this.ctx.camera || camera.layers.mask !== 2) return;

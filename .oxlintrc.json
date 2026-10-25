@@ -1,6 +1,14 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "rules": {
+    "typescript/explicit-function-return-type": [
+      "error",
+      {
+        "allowTypedFunctionExpressions": false,
+        "allowHigherOrderFunctions": false,
+        "allowDirectConstAssertionInArrowFunctions": false
+      }
+    ],
     "typescript/no-explicit-any": "error",
     "typescript/no-unsafe-assignment": "error",
     "typescript/no-unsafe-argument": "error",

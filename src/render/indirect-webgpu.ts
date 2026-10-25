@@ -131,8 +131,8 @@ export class IndirectFill {
     this.viewVisibility = uniform(1).setGroup(renderGroup);
     this.roomXf = uniform(new Vector4(1, 0, 0, 0));
     this.roomCount = uniform(0, 'int');
-    this.rooms = Array.from({ length: MAX_ROOMS }, () => new Vector4());
-    this.roomsY = Array.from({ length: MAX_ROOMS }, () => new Vector4());
+    this.rooms = Array.from({ length: MAX_ROOMS }, (): Vector4 => new Vector4());
+    this.roomsY = Array.from({ length: MAX_ROOMS }, (): Vector4 => new Vector4());
     this.roomBoxes = uniformArray(this.rooms, 'vec4') as unknown as UniformVec4Array;
     this.roomHeights = uniformArray(this.roomsY, 'vec4') as unknown as UniformVec4Array;
     // Node updateType stops CPU packing; a shared immutable binding group also
@@ -147,30 +147,32 @@ export class IndirectFill {
     this._tmp = new Vector3();
     this._tmp2 = new Vector3();
     this._patched = new WeakSet();
-    this.roomGate = Fn<[Node<'vec3'>, Node<'float'>], Node<'float'>>(([worldPos, ao]) => {
-      const lx = worldPos.x
-        .mul(this.roomXf.x)
-        .add(worldPos.z.mul(this.roomXf.y))
-        .add(this.roomXf.z);
-      const lz = worldPos.z
-        .mul(this.roomXf.x)
-        .sub(worldPos.x.mul(this.roomXf.y))
-        .add(this.roomXf.w);
-      const indoor = float(0).toVar();
-      Loop(MAX_ROOMS, ({ i }) => {
-        If(i.greaterThanEqual(this.roomCount), () => {
-          Break();
+    this.roomGate = Fn<[Node<'vec3'>, Node<'float'>], Node<'float'>>(
+      ([worldPos, ao]): Node<'float'> => {
+        const lx = worldPos.x
+          .mul(this.roomXf.x)
+          .add(worldPos.z.mul(this.roomXf.y))
+          .add(this.roomXf.z);
+        const lz = worldPos.z
+          .mul(this.roomXf.x)
+          .sub(worldPos.x.mul(this.roomXf.y))
+          .add(this.roomXf.w);
+        const indoor = float(0).toVar();
+        Loop(MAX_ROOMS, ({ i }): void => {
+          If(i.greaterThanEqual(this.roomCount), (): void => {
+            Break();
+          });
+          const r = this.roomBoxes.element(i) as unknown as Node<'vec4'>,
+            ry = this.roomHeights.element(i) as unknown as Node<'vec4'>;
+          const dx = r.z.sub(abs(lx.sub(r.x))),
+            dz = r.w.sub(abs(lz.sub(r.y)));
+          const dy = min(worldPos.y.sub(ry.x), ry.y.sub(worldPos.y));
+          indoor.assign(max(indoor, smoothstep(0.06, 0.3, min(min(dx, dz), dy))));
         });
-        const r = this.roomBoxes.element(i) as unknown as Node<'vec4'>,
-          ry = this.roomHeights.element(i) as unknown as Node<'vec4'>;
-        const dx = r.z.sub(abs(lx.sub(r.x))),
-          dz = r.w.sub(abs(lz.sub(r.y)));
-        const dy = min(worldPos.y.sub(ry.x), ry.y.sub(worldPos.y));
-        indoor.assign(max(indoor, smoothstep(0.06, 0.3, min(min(dx, dz), dy))));
-      });
-      const aoGate = mix(1, smoothstep(0.45, 0.98, ao), 0.6);
-      return mix(INTERIOR_FLOOR, 1, clamp(min(float(1).sub(indoor), aoGate), 0, 1));
-    }) as unknown as typeof this.roomGate;
+        const aoGate = mix(1, smoothstep(0.45, 0.98, ao), 0.6);
+        return mix(INTERIOR_FLOOR, 1, clamp(min(float(1).sub(indoor), aoGate), 0, 1));
+      }
+    ) as unknown as typeof this.roomGate;
   }
 
   patch(material: MeshStandardNodeMaterial | null | undefined): void {
@@ -179,11 +181,11 @@ export class IndirectFill {
     this._patched.add(material);
     const original = material.setupEnvironment.bind(material);
     const viewCamera = this.ctx.viewCamera;
-    const wrapEnvironment = (node: Node, view: boolean) =>
+    const wrapEnvironment = (node: Node, view: boolean): IndirectEnvironmentNode =>
       new IndirectEnvironmentNode(node, this, view);
     // NodeMaterial's public lighting hook: preserve the actual environment
     // sampling and add diffuse-only fill in the same PBR lighting context.
-    material.setupEnvironment = function (builder: NodeBuilder) {
+    material.setupEnvironment = function (builder: NodeBuilder): IndirectEnvironmentNode | null {
       const env = original(builder);
       // Shared library materials can appear in BOTH passes. Viewmodel prewarm
       // compiles them in a temporary scene, but always with the view camera.

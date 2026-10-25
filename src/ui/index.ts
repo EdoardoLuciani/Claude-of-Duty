@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import { bindingLabel } from '../core/bindings.ts';
-import type { EngineContext } from '../core/context.ts';
+import type { EngineContext, EngineSystems } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName } from '../core/events.ts';
 import { AmmoPanel } from './ammo.ts';
 import { Compass, ScoreBar } from './compass.ts';
@@ -226,7 +226,7 @@ export class UiSystem {
     this.prompt = new Prompt(this.chromeLayer);
     this.banner = new Banner(this.chromeLayer);
     this.menu = new PauseMenu(this.root, ctx);
-    this.gameOver = new GameOverScreen(this.root, ctx, () => {
+    this.gameOver = new GameOverScreen(this.root, ctx, (): void => {
       if (this.startGate) this.startGate.restart();
       else {
         ctx.events.emit('game:restart', { source: 'game-over' });
@@ -301,15 +301,17 @@ export class UiSystem {
     this.demo = null;
 
     this._unsubs = [];
-    const on = <K extends EngineEventName>(type: K, fn: (event: EngineEventMap[K]) => void) =>
-      this._unsubs.push(ctx.events.on(type, fn));
+    const on = <K extends EngineEventName>(
+      type: K,
+      fn: (event: EngineEventMap[K]) => void
+    ): number => this._unsubs.push(ctx.events.on(type, fn));
 
-    on('weapon:fire', (e) => {
+    on('weapon:fire', (e): void => {
       const recoil = 'recoil' in e && typeof e.recoil === 'number' ? e.recoil : 1;
       this.crosshair.onFire(recoil);
     });
 
-    on('weapon:reload', (e) => {
+    on('weapon:reload', (e): void => {
       const s = this.state;
       if (e?.phase === 'start') {
         s.reloading = true;
@@ -319,7 +321,7 @@ export class UiSystem {
       }
     });
 
-    on('damage:dealt', (e) => {
+    on('damage:dealt', (e): void => {
       if (!e) return;
       // The payload means "damage dealt TO e.target". `ai` uses it for enemy
       // rounds that connect with the player, which must not draw a hitmarker or
@@ -348,7 +350,7 @@ export class UiSystem {
       }
     });
 
-    on('damage:taken', (e) => {
+    on('damage:taken', (e): void => {
       const amount = e?.amount ?? 10;
       if (e?.health !== undefined) this.state.health = e.health;
       else this.state.health = Math.max(0, this.state.health - amount);
@@ -367,11 +369,11 @@ export class UiSystem {
       if (amount > 0) this.hurt(amount, dx, dz);
     });
 
-    on('score:change', (e) => {
+    on('score:change', (e): void => {
       if (e?.score !== undefined) this.state.score = e.score;
     });
 
-    on('wave:start', (e) => {
+    on('wave:start', (e): void => {
       if (!e) return;
       this.state.wave = e.wave ?? this.state.wave;
       this.state.enemiesRemaining = e.enemies ?? this.state.enemiesRemaining;
@@ -383,7 +385,7 @@ export class UiSystem {
       }
     });
 
-    on('wave:complete', (e) => {
+    on('wave:complete', (e): void => {
       if (!e) return;
       this.state.enemiesRemaining = 0;
       this.state.waveIncoming = true;
@@ -395,11 +397,11 @@ export class UiSystem {
       this.sfx('objective', 0.7);
     });
 
-    on('market:open', (e) => {
+    on('market:open', (e): void => {
       this.shop.show(e?.wave ?? 0);
       this.sfx('market_open', 0.85);
     });
-    on('market:close', () => {
+    on('market:close', (): void => {
       this.shop.hide();
       this.sfx('market_close', 0.7);
       // The shop released the pointer and possibly consumed the Escape that
@@ -409,24 +411,24 @@ export class UiSystem {
       this.ctx.input?.requestPointerLock?.();
     });
 
-    on('explosion', (e) => {
+    on('explosion', (e): void => {
       if (!e?.position) return;
       this._tmp.copy(e.position).sub(this._playerPos());
       const d = this._tmp.length();
       if (d < (e.radius ?? 6) * 2.5) this.crosshair.onFlinch(0.6);
     });
 
-    on('radio:strike', () => {
+    on('radio:strike', (): void => {
       this.banner.show('CARPET BOMB INBOUND', 'TAKE COVER', 4);
       this.sfx('radio_strike', 0.7);
     });
 
-    on('hud:heard', (e) => {
+    on('hud:heard', (e): void => {
       if (!e) return;
       this.compass.ping(e.bearing);
       this.sfx('compass_ping', 0.4);
     });
-    on('hud:search', (e) => {
+    on('hud:search', (e): void => {
       if (!e) return;
       this.compass.ping(e.bearing);
       this.banner.show(
@@ -437,7 +439,7 @@ export class UiSystem {
       this.sfx('compass_ping', 0.45);
     });
 
-    on('player:state', (e) => {
+    on('player:state', (e): void => {
       if (!e) return;
       const s = this.state;
       if (e.ads !== undefined) s.ads = !!e.ads;
@@ -447,27 +449,27 @@ export class UiSystem {
 
     // Clear the combat chrome while the world camera cranes into the death
     // shot; leaving ammo, crosshair and minimap over it defeats the cinematic.
-    on('player:death', () => {
+    on('player:death', (): void => {
       this.hudTarget = 0;
       this._hadPointerLock = false;
       const run = ctx.peek('game')?.getHudState?.() ?? this.state;
       this.gameOver.show(run, ctx.peek('market')?.credits ?? 0);
     });
-    on('player:respawn', () => {
+    on('player:respawn', (): void => {
       this.hudTarget = 1;
       this.gameOver.hide();
     });
-    on('player:heal', (e) => {
+    on('player:heal', (e): void => {
       if (e?.phase === 'complete') {
         const amt = Math.round(e.amount ?? 0);
         this.banner.show('Bandage Applied', amt > 0 ? `+${amt} HP` : 'STABILISED', 1.6);
       }
     });
-    on('ammo:pickup', (e) => {
+    on('ammo:pickup', (e): void => {
       this.banner.show('Ammunition Recovered', `+${e?.amount ?? 0} ROUNDS`, 1.5);
       this.sfx('objective', 0.45);
     });
-    on('intel:available', (e) => {
+    on('intel:available', (e): void => {
       const n = Math.max(1, e?.count ?? 1);
       this.banner.show(
         'Intel Cache Active',
@@ -476,14 +478,14 @@ export class UiSystem {
       );
       this.sfx('intel_call', 0.55);
     });
-    on('intel:secured', (e) => {
+    on('intel:secured', (e): void => {
       const label = e?.cardLabel || 'Cache secured';
       const credits = e?.credits ?? 0;
       this.banner.show('Intel Secured', `+${credits} CREDITS · ${label} ARCHIVED`, 3);
       this.sfx('market_buy', 0.75);
     });
 
-    on('game:restart', () => {
+    on('game:restart', (): void => {
       this.state.score = 0;
       this.state.wave = 1;
       this.state.enemiesRemaining = 0;
@@ -502,7 +504,7 @@ export class UiSystem {
 
   /* ------------------------------------------------------------- helpers -- */
 
-  _weaponState() {
+  _weaponState(): ReturnType<EngineSystems['weapons']['getHudState']> | null {
     const w = this.ctx.peek('weapons');
     if (!w || typeof w.getHudState !== 'function') return null;
     return w.getHudState() ?? null;
@@ -518,13 +520,13 @@ export class UiSystem {
     );
   }
 
-  _playerState() {
+  _playerState(): ReturnType<EngineSystems['player']['getHudState']> | null {
     const p = this.ctx.peek('player');
     if (!p || typeof p.getHudState !== 'function') return null;
     return p.getHudState() ?? null;
   }
 
-  _playerPos() {
+  _playerPos(): THREE.Vector3 {
     const p = this.ctx.peek('player');
     const pos = p?.position;
     if (pos && pos.isVector3) return this._pos.copy(pos);
@@ -551,7 +553,7 @@ export class UiSystem {
   }
 
   /** Incoming damage: arc toward the source, screen flash, reticle flinch. */
-  hurt(amount = 10, dirX = 0, dirZ = 1) {
+  hurt(amount = 10, dirX = 0, dirZ = 1): void {
     const i = clamp01(amount / 40);
     this.arcs.spawn(dirX, dirZ, 0.45 + i * 0.55);
     this.health.onDamage(i);
@@ -568,7 +570,7 @@ export class UiSystem {
     this.prompt.set(p);
   }
 
-  clearPrompt(owner: unknown = null) {
+  clearPrompt(owner: unknown = null): void {
     if (owner !== null && this._promptOwner !== owner) return;
     this._promptOwner = null;
     this._healPrompt = false;
@@ -607,12 +609,12 @@ export class UiSystem {
     this.startGate = new StartGate(this.ctx.engine);
   }
 
-  pause() {
+  pause(): void {
     if (this.ctx.engine.gameplaySuspended) return;
     this.menu.show();
   }
 
-  resume() {
+  resume(): void {
     if (this.ctx.engine.gameplaySuspended) return;
     this.menu.close();
   }
@@ -623,7 +625,9 @@ export class UiSystem {
    * Populate a representative state for screenshots / critics.
    * 'combat' runs the scripted firefight timeline in demo.ts.
    */
-  debugState(name = 'combat') {
+  debugState(
+    name = 'combat'
+  ): { state: string; frames?: undefined } | { state: string; frames: string } {
     if (name === 'clean') {
       this.demo?.stop(this);
       this.demo = null;
@@ -866,7 +870,7 @@ export class UiSystem {
     this.minimap.draw(this._mmState);
   }
 
-  _collectBlips() {
+  _collectBlips(): void {
     if (this.demo?.active) return; // demo drives its own contacts
     const ai = this.ctx.peek('ai');
     const list = typeof ai?.getHudActors === 'function' ? ai.getHudActors() : null;
