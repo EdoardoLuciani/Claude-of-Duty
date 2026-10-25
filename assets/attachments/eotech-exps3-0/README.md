@@ -34,18 +34,47 @@ and [higher-resolution product photos](https://www.militia-armory.com/product/eo
 The manual/product page establish the nominal **96.5 × 58.4 × 73.7 mm** L/W/H
 and the 68 MOA ring / 1 MOA dot variant. The manual's display-window section gives
 **30 × 23 mm**, **3.17 mm front glass** and **4.76 mm rear laminate**. Its parallel
-1.20 × 0.85 inch window listing is not an exact conversion; this model uses the
-stated metric aperture. The glass pieces have actual thickness and share the
-attachment root, so later removal need not leave floating panes behind.
+1.20 × 0.85 inch window listing is not an exact conversion. This art retains nominal
+**30 × 23 mm physical panes**, while modelling a separately photo-estimated
+**30 × 22 mm clear bezel opening**. The manual does not certify a full 30 × 23 mm
+unobstructed bore. Glass thicknesses and attachment-root ownership are unchanged;
+removal need not leave floating panes behind.
 
 Side, front, rear and top comparisons use estimated orthographic cameras with
 one uniform scale per photo, not independent X/Y stretching or per-part alignment.
 The camera poses are frozen in the source and review JSON. Filled-silhouette IoU
-is descriptive only: **left .93545, right .91971, rear .90348, front .91590,
-top .93731**. Alpha >250 excludes faint photo shadows; enclosed holes are filled
+is descriptive only: **left .93658, right .92014, rear .90329, front .91572,
+top .93730**. Alpha >250 excludes faint photo shadows; enclosed holes are filled
 for this external-profile statistic. It does **not** assess the optical aperture,
 small details, material fidelity or certify 1:1 accuracy. The smoke test separately
-casts rays through a genuinely open carrier/window bore.
+casts two-way rays across the rounded clear opening, with extra lower-edge coverage.
+
+### Optical-window correction after owner/oracle review
+
+The original 46 mm optical centre and 42 mm-wide carrier were not well matched to
+the registered window cutouts. Worse, the 37.5 mm battery roof clipped the bottom
+3 mm of the former 30 × 23 mm bore claim. The old test's lowest ray was 38 mm,
+so it missed that defect. The correction keeps the outside hood/envelope and all
+cameras/materials fixed: optical group at **48.2 mm**, carrier **39 × 30.4 mm**,
+clear opening **30 × 22 mm**, gasket **33 × 25 mm**, battery roof **36.7 mm**.
+The carrier's bottom remains seated on the existing 33 mm electronics-housing roof.
+Physical pane sizes, fore/aft positions and 3.17/4.76 mm thicknesses are unchanged.
+
+Usable axial centreline height increases from about **20 to 22 mm**; it is not a
+smaller window used to conceal the clipping. The lower clear opening has 0.5 mm
+battery-roof clearance. An independent 0.25 mm two-way opaque-mesh ray grid found
+**2,500/21,264** blocked rays in the old claimed pane, versus **0/20,304** in the
+corrected declared clear opening. The committed regression samples the complete
+rounded opening at 1 mm plus the lower edge at 0.25 mm, with both face directions.
+
+Separate, unfilled window overlays now accompany external silhouettes. Reference
+cutout overlap improves **front .91808 → .94504**, **rear .89916 → .97580**.
+Glass-hidden renders isolate opaque geometry only; the shipped glass shader is not
+made artificially transparent. Edited reference transparency and anti-aliasing
+mean these are visual estimates, not certified optical dimensions. See the review
+JSON for masks, bounds, angular probes and original defect evidence. No complete
+eye box is claimed; for example, a −10° downward centreline ray still meets the
+battery housing. Runtime reticle and ADS remain outside this asset-only PR.
 
 EOTECH's photos retain their original ownership and are not committed or embedded.
 The original geometry, procedural finish and reconstructed vector markings are
@@ -62,16 +91,16 @@ All mesh parts and the following datums descend from `ATTACHMENT_exps3`:
 | Node | Exported local position (metres) | Meaning |
 | --- | --- | --- |
 | `SOCKET_mount` | `[0, 0, 0]` | Rail-top datum, central receiver mounting region |
-| `SOCKET_sight` | `[0, .046, .0231]` | Provisional optical centre at rear external surface |
-| `SOCKET_lens_rear` | `[0, .046, .0231]` | Rear laminate external surface centre |
-| `SOCKET_lens_front` | `[0, .046, -.0181]` | Front glass external surface centre |
+| `SOCKET_sight` | `[0, .0482, .0231]` | Provisional optical centre at rear external surface |
+| `SOCKET_lens_rear` | `[0, .0482, .0231]` | Rear laminate external surface centre |
+| `SOCKET_lens_front` | `[0, .0482, -.0181]` | Front glass external surface centre |
 
 The measured visual envelope is **58.540 × 73.700 × 96.470 mm** W/H/L. The raised
 cap marking contributes 0.14 mm over the rounded nominal width; length is 0.03 mm
 under nominal. These are measured art dimensions, **not** installation tolerances.
 The jaw/channel geometry is a visual Picatinny approximation, not manufacturing data.
 
-**The 46 mm rail-to-optical-centre datum is photo-derived and provisional.** The
+**The 48.2 mm optical centre above the current art datum is photo-derived and provisional.** The
 published envelope does not certify it. Confirm mount height, rail seating,
 rear-sight clearance, co-witness and sight picture against the M4 when implementing
 ADS; do not silently turn this candidate datum into an approved gameplay alignment.

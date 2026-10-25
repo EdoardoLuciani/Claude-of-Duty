@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { zstdDecompressSync } from 'node:zlib';
 
-import { Box3, Mesh, Raycaster, Vector3 } from 'three';
+import { Box3, DoubleSide, Mesh, Raycaster, Vector3 } from 'three';
 
 import { inspectGLB, parseGLB } from '../../tools/lib/glb-fixture.mjs';
 
@@ -55,9 +55,9 @@ for (const [value, expected] of size.toArray().map((v, i) => [v, [58.54, 73.7, 9
   assert(Math.abs(value - expected) < 0.00002, 'native-metre exported envelope');
 for (const [name, expected] of [
   ['SOCKET_mount', [0, 0, 0]],
-  ['SOCKET_sight', [0, 0.046, 0.0231]],
-  ['SOCKET_lens_rear', [0, 0.046, 0.0231]],
-  ['SOCKET_lens_front', [0, 0.046, -0.0181]],
+  ['SOCKET_sight', [0, 0.0482, 0.0231]],
+  ['SOCKET_lens_rear', [0, 0.0482, 0.0231]],
+  ['SOCKET_lens_front', [0, 0.0482, -0.0181]],
 ]) {
   const node = root.getObjectByName(name);
   assert(node && node.parent === root, name + ' belongs to the removable assembly');
@@ -72,23 +72,67 @@ for (const [i, pane] of glass.entries()) {
   assert(pane instanceof Mesh);
   assert.equal(pane.material.transmission, 1);
   assert.equal(pane.material.ior, 1.5);
-  const thickness = new Box3().setFromObject(pane).getSize(new Vector3()).z * 1000;
+  const dimensions = new Box3().setFromObject(pane).getSize(new Vector3()).multiplyScalar(1000);
+  assert(
+    Math.abs(dimensions.x - 30) < 0.00002 && Math.abs(dimensions.y - 23) < 0.00002,
+    'physical 30×23mm pane is not shrunk to conceal an obstruction'
+  );
+  const thickness = dimensions.z;
   assert(
     Math.abs(thickness - [4.76, 3.17][i]) < 0.00002,
     'manual-backed physical window thickness'
   );
 }
+assert.deepEqual(manifest.opticalWindow.nominalPaneMm, [30, 23]);
+assert.deepEqual(manifest.opticalWindow.clearOpeningMm, [30, 22]);
+assert.equal(manifest.opticalWindow.centreAboveArtDatumMm, 48.2);
+assert.equal(manifest.opticalWindow.axialLowerClearanceMm, 0.5);
 const opaque = meshes.filter((mesh) => !glass.includes(mesh));
-for (const x of [-0.012, 0, 0.012]) {
-  for (const y of [0.038, 0.046, 0.054]) {
-    const ray = new Raycaster(new Vector3(x, y, 0.1), new Vector3(0, 0, -1), 0, 0.2);
-    assert.equal(
-      ray.intersectObjects(opaque, false).length,
-      0,
-      'optical aperture is real, not painted'
-    );
-  }
+for (const mesh of opaque) {
+  // Count both face directions: back-face culling must not conceal an obstruction.
+  mesh.material.side = DoubleSide;
+  mesh.geometry.computeBoundingBox();
 }
+const ray = new Raycaster(new Vector3(), new Vector3(), 0, 0.2);
+const hits = [];
+let checked = 0;
+const inside = (x, y) => {
+  const dx = Math.max(Math.abs(x) - (15 - 5.4), 0);
+  const dy = Math.max(Math.abs(y - 48.2) - (11 - 5.4), 0);
+  return (
+    Math.abs(x) <= 14.95 && Math.abs(y - 48.2) <= 10.95 && dx * dx + dy * dy < (5.4 - 0.05) ** 2
+  );
+};
+const check = (x, y) => {
+  if (!inside(x, y)) return;
+  for (const direction of [-1, 1]) {
+    ray.ray.origin.set(x / 1000, y / 1000, -direction * 0.1);
+    ray.ray.direction.set(0, 0, direction);
+    hits.length = 0;
+    ray.intersectObjects(opaque, false, hits);
+    assert.equal(hits.length, 0, `unobstructed clear opening from ${direction}: x=${x}mm y=${y}mm`);
+    checked++;
+  }
+};
+// Cover the rounded opening, not just a sparse rectangle above the battery roof.
+for (let x = -14.95; x <= 14.95; x += 1) {
+  for (let y = 37.25; y <= 59.15; y += 1) check(x, y);
+}
+// Extra resolution at the former clipping edge: the old roof blocked 37.25/37.5 mm.
+for (let x = -14.95; x <= 14.95; x += 0.25) {
+  for (const y of [37.25, 37.5, 37.75]) check(x, y);
+}
+assert(checked > 1500, 'regression samples the complete clear opening and lower edge');
+ray.ray.origin.set(0, 0.1, -0.04);
+ray.ray.direction.set(0, -1, 0);
+hits.length = 0;
+ray.intersectObjects(opaque, false, hits);
+assert(hits.length > 0, 'probe reaches the actual battery roof');
+assert(Math.abs(hits[0].point.y - 0.0367) < 2e-8, 'actual roof is relieved, not just metadata');
+assert(
+  Math.abs(0.0482 - 0.022 / 2 - hits[0].point.y - 0.0005) < 2e-8,
+  'clear opening has a physical 0.5mm axial lower margin'
+);
 assert.deepEqual(manifest.reticle, { ringMoa: 68, dotMoa: 1, geometryBaked: false });
 root.removeFromParent();
 assert(!gltf.scene.getObjectByName('OPTIC_glass_front'), 'removal cannot leave floating glass');

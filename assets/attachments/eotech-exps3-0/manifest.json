@@ -1,7 +1,7 @@
 {
   "asset": "EOTECH EXPS3-0 | reference-backed original Blender art",
   "source": "tools/blender/exps3.py",
-  "sourceSha256": "1b71b769e2378fe3e8e57d5982d1047ce4d35e4eea4bec560f3eda61069da427",
+  "sourceSha256": "aadf31d9d35ed24c102dd288232d64b359d6324c9df9531dcb11146a47a7c647",
   "blender": "5.2.2 LTS",
   "units": "metres",
   "axes": {
@@ -15,7 +15,30 @@
     96.5
   ],
   "mountOrigin": "rail top centre; SOCKET_mount at [0,0,0]",
-  "opticalDatum": "provisional photo-derived 46mm above rail; not a certified manufacturer datum",
+  "opticalDatum": "provisional photo-derived 48.2mm above the current rail datum; not manufacturer-certified",
+  "opticalWindow": {
+    "nominalPaneMm": [
+      30,
+      23
+    ],
+    "clearOpeningMm": [
+      30,
+      22
+    ],
+    "clearCornerRadiusMm": 5.4,
+    "centreAboveArtDatumMm": 48.2,
+    "carrierOuterMm": [
+      39,
+      30.4
+    ],
+    "gasketOuterMm": [
+      33,
+      25
+    ],
+    "batteryRoofMm": 36.7,
+    "axialLowerClearanceMm": 0.5,
+    "status": "clear opening and centre inferred from registered photos; not an approved ADS/eye-box specification"
+  },
   "reticle": {
     "ringMoa": 68,
     "dotMoa": 1,
@@ -28,5 +51,5 @@
     "bytes": 4013976,
     "images": 2
   },
-  "sha256": "377eeac71e9dc461a3c23a8ff16b9deef3e51c42e60d0a3f95f00b9317819dd6"
+  "sha256": "e626bc3e5b7cb5b62bf772d123a85d26b977a66c7315d7f90cc2f6f04847b79f"
 }
