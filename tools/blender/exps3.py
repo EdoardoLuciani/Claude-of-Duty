@@ -2,7 +2,7 @@
 
 blender -b -t 8 --python-exit-code 1 --python tools/blender/exps3.py -- --output /tmp/exps3 --render
 Coordinates: Blender X right, Y forward, Z up. Dimensions below are millimetres;
-export is native metres, glTF +Y up / -Z forward. See asset README/references.json.
+export is native metres, glTF +Y up / -Z forward. See asset README/reference-review.json.
 """
 import argparse
 import hashlib
@@ -26,6 +26,7 @@ PANE_MM = (30, 23)
 CLEAR_MM = (30, 22)
 CORNER_MM = 5.4
 BATTERY_ROOF_Z = 36.7
+LOW_POLY = False
 
 
 def material(name, color, metal=0, rough=0.5):
@@ -125,10 +126,10 @@ def finish(obj, width=.25, smooth=True):
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bm.to_mesh(obj.data)
     bm.free()
-    if width:
+    if width and (not LOW_POLY or width >= .4 or obj.name.startswith('Protective bent-metal hood')):
         bevel = obj.modifiers.new('Manufactured edge radius', 'BEVEL')
         bevel.width = width * MM
-        bevel.segments = 2
+        bevel.segments = 1 if LOW_POLY and width < .5 else 2
         bpy.ops.object.modifier_apply(modifier=bevel.name)
     if smooth:
         for p in obj.data.polygons:
@@ -161,6 +162,8 @@ def box(name, pos, size, mat, parent, bevel=.3):
 
 
 def cylinder(name, pos, radius, depth, mat, parent, axis='X', sides=48, bevel=.15):
+    if LOW_POLY:
+        sides = min(sides,32 if radius > 8 else 24 if radius > 4 else 16 if radius > 1 else 12)
     bpy.ops.mesh.primitive_cylinder_add(vertices=sides, radius=radius * MM, depth=depth * MM,
                                       location=tuple(v * MM for v in pos))
     obj = bpy.context.object
@@ -189,10 +192,10 @@ def text(name, value, pos, size, mat, parent, side='left', angle=0, relief=0):
     data.size = size * MM
     data.align_x = 'CENTER'
     data.align_y = 'CENTER'
-    data.resolution_u = 3
+    data.resolution_u = 1 if LOW_POLY else 3
     if relief:
         data.extrude = relief * MM
-        data.bevel_depth = (.015 if relief >= .1 else .008 if relief >= .05 else 0) * MM
+        data.bevel_depth = (0 if LOW_POLY else .015 if relief >= .1 else .008 if relief >= .05 else 0) * MM
         data.bevel_resolution = 1 if relief >= .1 else 0
     obj = bpy.data.objects.new(name, data)
     bpy.context.collection.objects.link(obj)
@@ -213,6 +216,8 @@ def text(name, value, pos, size, mat, parent, side='left', angle=0, relief=0):
 
 
 def rounded_rect(width, height, radius, center_z=0, steps=10):
+    if LOW_POLY:
+        steps = min(steps,1 if radius < .4 else 3 if radius < 1.5 else 8)
     pts = []
     for x, z, start in [(width/2-radius, height/2-radius, 0),
                          (-width/2+radius, height/2-radius, 90),
@@ -299,7 +304,7 @@ def hood_x(z):
 
 def ring_x(name, y, z, outer, inner, low, high, mat, parent, follow_hood=False):
     # Four circular loops; the adjustment well's mouth follows the bent hood.
-    n = 48 if outer > 5 else 24
+    n = (32 if outer > 5 else 16) if LOW_POLY else (48 if outer > 5 else 24)
     vertices = []
     for front in (False, True):
         for radius in (outer, inner):
@@ -333,7 +338,7 @@ def adjuster_x(radius):
 
 
 def wire_loop(name, pos, radius, mat, parent):
-    bpy.ops.mesh.primitive_torus_add(major_segments=24,minor_segments=8,
+    bpy.ops.mesh.primitive_torus_add(major_segments=16 if LOW_POLY else 24,minor_segments=6 if LOW_POLY else 8,
         major_radius=radius*MM,minor_radius=.16*MM,
         location=tuple(v*MM for v in pos),rotation=(math.pi/2,0,0))
     obj = bpy.context.object
@@ -388,6 +393,8 @@ def screw(name, pos, mats, parent, axis='X', sign=1, radius=2.6):
     index = 0 if axis == 'X' else 1
     p[index] += sign * .22
     head = cylinder(name+' head', p, radius, .5, mats['steel'], parent, axis)
+    if LOW_POLY:
+        return  # Torx walls/floors transfer from the retained high source to the atlas.
     # Actual recessed six-lobe socket: the dark floor sits below the machined head.
     contour = []
     for i in range(48):
@@ -570,10 +577,11 @@ def build_geometry(mats):
         cylinder(name+' well floor',(20.8,y,z),10.5,.2,mats['body'],root,bevel=0)
         # Convex moulded annulus, not a stack of flat applied discs.
         profile = [(10.2,21.2),(10.2,21.9),(9.5,22.6),(7.5,23.6),(5.75,23.8),(5.75,21.2)]
-        vertices = [(px,y+r*math.cos(i*math.tau/48),z+r*math.sin(i*math.tau/48))
-                    for r,px in profile for i in range(48)]
-        faces = [(k*48+i,k*48+(i+1)%48,((k+1)%len(profile))*48+(i+1)%48,
-                  ((k+1)%len(profile))*48+i) for k in range(len(profile)) for i in range(48)]
+        sides = 24 if LOW_POLY else 48
+        vertices = [(px,y+r*math.cos(i*math.tau/sides),z+r*math.sin(i*math.tau/sides))
+                    for r,px in profile for i in range(sides)]
+        faces = [(k*sides+i,k*sides+(i+1)%sides,((k+1)%len(profile))*sides+(i+1)%sides,
+                  ((k+1)%len(profile))*sides+i) for k in range(len(profile)) for i in range(sides)]
         surface_normals(finish(mesh(name+' domed recessed dial',vertices,faces,mats['rubber'],root),0))
         centre = cylinder(name+' centre',(23.25,y,z),5.6,.7,mats['steel'],root)
         subtract(box(name+' tool groove cutter',(23.65,y,z),(1.1,9.9,1.1),mats['steel'],root,0),centre)
@@ -704,27 +712,15 @@ def studio(quick):
     return views
 
 
-def export(output, root):
-    # Save the editable separate parts first; only export copies are consolidated.
-    objects = [o for o in root.children_recursive if o.type == 'MESH']
-    groups = {}
-    for obj in objects:
-        groups.setdefault(obj.data.materials[0].name, []).append(obj)
-    for name,group in groups.items():
-        if name.startswith('10 |'):
-            continue  # front/rear glass must remain individually identifiable
-        active(group[0])
-        for obj in group:
-            obj.select_set(True)
-        bpy.ops.object.join()
-        bpy.context.object.name = 'exps3_'+name.split(' | ')[1].replace(' ','_')
+def export(output, root, optimization):
+    # Only the optimized root is selected; editable high source never enters glTF.
     bpy.ops.object.select_all(action='DESELECT')
     root.select_set(True)
     for obj in root.children_recursive:
         obj.select_set(True)
     bpy.ops.export_scene.gltf(filepath=str(output/'exps3-0.glb'), export_format='GLB',
         use_selection=True, export_yup=True, export_extras=True, export_animations=False,
-        export_cameras=False, export_lights=False)
+        export_cameras=False, export_lights=False, export_tangents=True)
     data = (output/'exps3-0.glb').read_bytes()
     n = struct.unpack_from('<I',data,12)[0]
     doc = json.loads(data[20:20+n])
@@ -732,10 +728,14 @@ def export(output, root):
     stats = {'triangles':sum(doc['accessors'][p['indices']]['count']//3 for p in prims),
              'primitives':len(prims),'materials':len(doc['materials']),
              'bytes':len(data),'images':len(doc.get('images',[]))}
-    assert stats['triangles'] < 45000 and stats['primitives'] <= 14 and stats['materials'] <= 10, stats
-    assert stats['images'] == 2 and stats['bytes'] < 5*1024*1024, stats
+    assert stats['triangles'] <= 12000 and stats['primitives'] == 2 and stats['materials'] == 2, stats
+    assert stats['images'] == 3 and stats['bytes'] < 5*1024*1024, stats
     manifest = {'asset':'EOTECH EXPS3-0 | reference-backed original Blender art',
         'source':'tools/blender/exps3.py','sourceSha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        'bakeSource':'tools/blender/exps3_bake.py',
+        'bakeSourceSha256':hashlib.sha256(Path(__file__).with_name('exps3_bake.py').read_bytes()).hexdigest(),
+        'optimization':optimization,
+        'blendSha256':hashlib.sha256((output/'exps3-0.blend').read_bytes()).hexdigest(),
         'blender':bpy.app.version_string,'units':'metres',
         'axes':{'right':'+X','up':'+Y','forward':'-Z'},'nominalEnvelopeMm':[58.4,73.7,96.5],
         'mountOrigin':'rail top centre; SOCKET_mount at [0,0,0]',
@@ -751,24 +751,41 @@ def export(output, root):
     print('EXPS3_EXPORT_COMPLETE',json.dumps(stats))
 
 
-def build(output, render=False, quick=False):
-    output.mkdir(parents=True,exist_ok=True)
-    bpy.ops.wm.read_factory_settings(use_empty=True)
-    bpy.context.scene.unit_settings.system = 'METRIC'
-    mats = finishes(output)
-    root = build_geometry(mats)
-    # Boolean lettering/socket cuts interpolate UVs; finish the authored UV lattice
-    # before saving or rendering, not by rewriting any exported glTF buffers.
+def snap_uvs(root):
     for obj in root.children_recursive:
         if obj.type == 'MESH':
             for layer in obj.data.uv_layers:
                 for loop in layer.data:
                     loop.uv = tuple(round(v*65536)/65536 for v in loop.uv)
+
+
+def build(output, render=False, quick=False):
+    global LOW_POLY
+    sys.path.insert(0,str(Path(__file__).parent))
+    from exps3_bake import prepare_source, bake_asset
+    output.mkdir(parents=True,exist_ok=True)
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    bpy.context.scene.unit_settings.system = 'METRIC'
+    mats = finishes(output)
+    high = build_geometry(mats)
+    snap_uvs(high)
+    prepare_source(high)
+    LOW_POLY = True
+    root = build_geometry(mats)
+    LOW_POLY = False
+    for obj in root.children_recursive:
+        if obj.type == 'MESH':
+            surface_normals(obj)
+    optimization = bake_asset(output,root,high)
+    # Boolean lettering/socket cuts interpolate UVs; finish the authored UV lattice
+    # before saving or rendering, not by rewriting any exported glTF buffers.
+    snap_uvs(root)
     views = studio(quick)
     notes = bpy.data.texts.new('START HERE')
     notes.write('EXPS3-0 original visual reconstruction, not CAD or manufacturing data.\n'
                 'Source: tools/blender/exps3.py. Native metres; rail-top mount origin.\n'
-                'Editable parts and review cameras are saved before runtime consolidation.\n'
+                'SOURCE_HIGH retains the editable detailed model; EXPS3_body/glass are the optimized target.\n'
+                'Unique UV base-color/normal/ORM atlases are baked with native Cycles, not studio light.\n'
                 'Photo/reference uncertainty and the provisional sight datum are in README.md.\n'
                 'No runtime reticle, ADS integration or paid attachment system in this asset PR.\n')
     active(root)
@@ -781,7 +798,7 @@ def build(output, render=False, quick=False):
             scene.render.resolution_x,scene.render.resolution_y = w,h
             scene.render.filepath = str(output/'renders'/f'{name}.png')
             bpy.ops.render.render(write_still=True)
-    export(output,root)
+    export(output,root,optimization)
 
 
 if __name__ == '__main__':
