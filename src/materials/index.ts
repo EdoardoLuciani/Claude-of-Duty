@@ -219,6 +219,8 @@ export class MaterialSystemNode {
     const cached = this._materials.get(matKey);
     if (cached) return cached;
     const def = LIBRARY[key];
+    if (def.three?.physical && opts.three?.physical === false)
+      throw new Error(`[materials] "${key}" requires its authored physical material`);
     const set = this.getTextureSet(key, opts);
     const { bake, three, ...surface } = opts;
     void bake;

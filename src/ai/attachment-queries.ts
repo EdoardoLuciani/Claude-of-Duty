@@ -466,7 +466,7 @@ export class AttachmentQueries {
         actor: job?.scope.actor ?? null,
         kind: job?.scope.kind ?? null,
         frame: job?.frame ?? null,
-        ...(this.profile ? { key: job?.key ?? null } : {}),
+        key: this.profile ? (job?.key ?? null) : undefined,
         ms: message.ms,
         roundTripMs: job ? performance.now() - job.sent : null,
         queueMs: message.queueMs ?? null,

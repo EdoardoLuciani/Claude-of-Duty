@@ -81,8 +81,8 @@ export interface CamoStats {
   sd: number;
 }
 interface SoldierManifest {
-  sets?: string[];
-  details?: string[];
+  sets?: string[] | undefined;
+  details?: string[] | undefined;
   camoStats?: Record<string, CamoStats>;
 }
 function parseManifest(value: unknown): SoldierManifest {
@@ -114,8 +114,8 @@ function parseManifest(value: unknown): SoldierManifest {
     }
   }
   return {
-    ...(isStringArray(value.sets) ? { sets: value.sets } : {}),
-    ...(isStringArray(value.details) ? { details: value.details } : {}),
+    sets: isStringArray(value.sets) ? value.sets : undefined,
+    details: isStringArray(value.details) ? value.details : undefined,
     camoStats,
   };
 }

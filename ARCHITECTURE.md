@@ -375,11 +375,14 @@ change warmup staging or renderer-info reset scheduling.
 Optional override/patch fields mean omission, not an explicit `undefined` write
 (`exactOptionalPropertyTypes`). Config, material/bake and weather patches also
 skip undefined values from untyped JS/debug callers via `applyDefinedPatch`.
-Parsed optional metadata and defaulted audio inputs explicitly permit undefined
-where that is their actual representation/semantics; do not widen required-state
-patches to silence compiler diagnostics.
+Snapshots, telemetry and defaulted inputs may explicitly permit undefined where
+that means unavailable or use the default. Use straightforward assignments there;
+do not manufacture property omission when consumers do not distinguish it.
+Required-state patches remain strict.
 Material authoring options are closed and use native Three material parameter
-types. Live uniforms, pooled bookkeeping and internally supplied world/time inputs
+types, not node-graph inputs. Physical-only values require `physical: true`;
+callers cannot downgrade a library-authored physical finish to a standard material.
+Live uniforms, pooled bookkeeping and internally supplied world/time inputs
 are not authoring options. Keep finite catalogs exhaustive and sparse maps sparse.
 
 ## Quality

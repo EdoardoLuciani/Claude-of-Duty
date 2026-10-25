@@ -32,7 +32,7 @@ interface HalfExtents {
   1?: number;
   2?: number;
 }
-interface RigidBodyOptions {
+export interface RigidBodyOptions {
   shape?: BodyShape;
   halfExtents?: HalfExtents;
   radius?: number;

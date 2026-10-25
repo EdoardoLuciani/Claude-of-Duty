@@ -216,7 +216,7 @@ export interface BuildSoldierResult {
   materials: THREE.Material[];
   slots: string[];
   parts: {
-    name?: string;
+    name?: string | undefined;
     material: string;
     start: number | undefined;
     count: number | undefined;

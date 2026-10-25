@@ -1,4 +1,10 @@
-import type { Vector3, Vector4 } from 'three';
+import type {
+  Vector3,
+  Vector4,
+  MeshStandardMaterialParameters,
+  MeshPhysicalMaterialParameters,
+} from 'three';
+import type { MeshPhysicalNodeMaterialNodeProperties } from 'three/src/materials/nodes/MeshPhysicalNodeMaterial.js';
 import type TextureNode from 'three/src/nodes/accessors/TextureNode.js';
 import type NodeBuilder from 'three/src/nodes/core/NodeBuilder.js';
 import {
@@ -40,15 +46,18 @@ import {
   vertexColor,
 } from 'three/tsl';
 import { Color, MeshPhysicalNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu';
-import type { Node, Texture, MeshPhysicalNodeMaterialParameters } from 'three/webgpu';
+import type { Node, Texture } from 'three/webgpu';
 import type { ConstNode, JoinNode, NormalMapNode, VarNode, VertexColorNode } from 'three/webgpu';
 
 import { hash11 } from './noise-tsl.ts';
 
-/** Checked at every material-authoring entry point, including physical-only properties. */
-export interface SurfaceMaterialOptions extends MeshPhysicalNodeMaterialParameters {
-  physical?: boolean;
-}
+// Three adds shader-node fields to its base parameters; the surface system owns those inputs.
+type MaterialGraphInputs = keyof MeshPhysicalNodeMaterialNodeProperties;
+
+/** Physical-only values require the physical constructor; shader graphs are not authoring options. */
+export type SurfaceMaterialOptions =
+  | (Omit<MeshStandardMaterialParameters, MaterialGraphInputs> & { physical?: false })
+  | (Omit<MeshPhysicalMaterialParameters, MaterialGraphInputs> & { physical: true });
 
 /** Authored values exclude live uniforms installed and owned by MaterialSystem. */
 export type SurfaceAuthoringParams = Omit<

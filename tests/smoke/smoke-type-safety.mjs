@@ -474,6 +474,17 @@ import { applyDefinedPatch } from ${JSON.stringify(join(root, 'src/core/patch.ts
 import { LIBRARY } from ${JSON.stringify(join(root, 'src/materials/library.ts'))};
 declare const materials: MaterialSystemNode;
 materials.get('concrete', { scale: 2, three: { physical: true, clearcoat: 0.5 } });
+materials.get('concrete', { three: { physical: false, roughness: 0.5 } });
+// @ts-expect-error physical-only properties require choosing the physical constructor
+materials.get('concrete', { three: { clearcoat: 0.5 } });
+// @ts-expect-error selecting a standard material cannot admit physical-only properties
+materials.get('concrete', { three: { physical: false, clearcoat: 0.5 } });
+// @ts-expect-error color nodes belong to the surface shader, not authoring options
+materials.get('concrete', { three: { colorNode: null } });
+// @ts-expect-error this remains true for physical materials
+materials.get('concrete', { three: { physical: true, normalNode: null } });
+// @ts-expect-error cloth emission is also owned by the surface shader
+materials.get('concrete', { three: { emissiveNode: null } });
 // @ts-expect-error surface option typos must not be accepted by an index signature
 materials.get('concrete', { normalStrenght: 0.8 });
 // @ts-expect-error nested Three options are checked too
@@ -544,6 +555,22 @@ const emptyWeapon: EventWeapon = {};
 const unidentifiedWeapon: EventWeapon = { suppressed: true };
 // @ts-expect-error gameplay events do not accept arbitrary external strings
 const inventedWeapon: EventWeapon = 'not-a-weapon';
+
+// Optional snapshots/defaulted inputs can use ordinary undefined-valued properties.
+import type { QuerySample, WorkerMessage } from ${JSON.stringify(join(root, 'src/ai/attachment-types.ts'))};
+import type { Arm } from ${JSON.stringify(join(root, 'src/weapons/hands.ts'))};
+import type { VolumetricBuildOptions } from ${JSON.stringify(join(root, 'src/sky/volumetrics.ts'))};
+const querySample: QuerySample = {
+  type: 'query', actor: null, kind: null, frame: null, key: undefined,
+  ms: 0, roundTripMs: null, queueMs: null, moves: 0,
+};
+const workerSample: WorkerMessage = {
+  type: 'result', id: 1, value: true, ms: 0, moves: 0,
+  repeatedStates: undefined, savedMoves: undefined, queueMs: undefined,
+};
+const gripOptions: Parameters<Arm['fitGrip']>[1] = { fingers: undefined, spread: undefined };
+declare const fogInputs: VolumetricBuildOptions;
+const fogWithoutVisibility: VolumetricBuildOptions = { ...fogInputs, visibility: undefined };
 
 // Sparse/random inputs retain absence; nonempty choices do not invent it.
 import { Rng } from ${JSON.stringify(join(root, 'src/core/rng.ts'))};

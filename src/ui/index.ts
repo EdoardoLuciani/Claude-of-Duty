@@ -123,13 +123,18 @@ interface BlipInput {
   heading?: number;
   fade?: number;
 }
+interface CompassMarker {
+  bearing: number;
+  label: string;
+  color: string | undefined;
+}
 interface HudObjective {
   position: THREE.Vector3;
   label: string;
   name?: string;
   color?: string;
   _mm?: { x: number; z: number; label: string };
-  _cmp?: { bearing: number; label: string; color?: string };
+  _cmp?: CompassMarker;
 }
 interface MinimapFrame {
   x: number;
@@ -189,7 +194,7 @@ export class UiSystem {
   _pos!: THREE.Vector3;
   _tmp!: THREE.Vector3;
   _objectives!: HudObjective[];
-  _compassObjs!: { bearing: number; label: string; color?: string }[];
+  _compassObjs!: CompassMarker[];
   _blips!: Blip[];
   _blipCount!: number;
   _blipView!: Blip[];
@@ -892,9 +897,7 @@ export class UiSystem {
     this._blipCount = n;
   }
 
-  _buildCompassObjectives(
-    pos: THREE.Vector3
-  ): { bearing: number; label: string; color?: string }[] {
+  _buildCompassObjectives(pos: THREE.Vector3): CompassMarker[] {
     const out = this._compassObjs;
     out.length = 0;
     for (const o of this._objectives) {
@@ -902,12 +905,11 @@ export class UiSystem {
       const dx = o.position.x - pos.x;
       const dz = o.position.z - pos.z;
       const bearing = (Math.atan2(dx, -dz) * 180) / Math.PI;
-      out.push(o._cmp ?? (o._cmp = { bearing: 0, label: o.label }));
+      out.push(o._cmp ?? (o._cmp = { bearing: 0, label: o.label, color: o.color }));
       const last = out[out.length - 1];
       last.bearing = bearing;
       last.label = o.label;
-      if (o.color === undefined) delete last.color;
-      else last.color = o.color;
+      last.color = o.color;
     }
     return out;
   }
