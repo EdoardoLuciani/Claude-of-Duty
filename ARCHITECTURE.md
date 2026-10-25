@@ -274,6 +274,13 @@ STEP-scale visibility owned/reset by the adapter, never detachable-magazine
 parts or drop pools. Native metres, sockets, grips and provisional 89 mm travel
 remain asset-owned; damage, 6+1 accounting and per-shell interruption remain in
 the common weapon system.
+`src/weapons/defs.ts` owns the weapon tuning schema, IDs, slot IDs and fire modes;
+check authored data against that schema rather than inferring its contract from
+current values. Keep internal state keyed by `WeaponId`; narrow DOM/URL/debug
+strings with `isWeaponId` at entry. Authored models carry literal adapter IDs,
+and the loader table checks complete ID coverage and per-ID adapter returns.
+The market UI derives its item contract from `MarketSystem.getHudState()`.
+
 Preserve shared IK, ADS/sway/recoil and pooled casings. Source/regen/reference
 contracts live beside each asset. Weapons force physical materials and borrow
 source maps. Arms consolidate authored Physical finishes into one opaque material

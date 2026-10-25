@@ -35,7 +35,7 @@ export function makeMCXModel(gltf: GLTF): MCXModel {
   );
   const sight = point('SOCKET_sight');
   const model = {
-    id: 'mcx',
+    id: 'mcx' as const,
     scene,
     root,
     animations,
@@ -113,7 +113,7 @@ function handQuaternion(
 type MCXModel = {
   materials: Set<THREE.Material>;
   textures: Set<THREE.Texture>;
-  id: string;
+  id: 'mcx';
   scene: THREE.Group;
   root: THREE.Object3D;
   animations: THREE.AnimationClip[];

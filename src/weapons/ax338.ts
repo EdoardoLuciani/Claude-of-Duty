@@ -31,7 +31,7 @@ export function makeAX338Model(gltf: GLTF): AX338Model {
   const scene = gltf.scene;
   const { root, animations, point } = authoredModel(gltf, 'AX338_RIG', REQUIRED, scene);
   const model = {
-    id: 'sniper',
+    id: 'sniper' as const,
     label: 'AX-338',
     scene,
     root,
@@ -76,7 +76,7 @@ export async function loadAX338(): Promise<AX338Model> {
 type AX338Model = {
   materials: Set<THREE.Material>;
   textures: Set<THREE.Texture>;
-  id: string;
+  id: 'sniper';
   label: string;
   scene: THREE.Group;
   root: THREE.Object3D;
