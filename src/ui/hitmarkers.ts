@@ -43,7 +43,7 @@ export class Hitmarkers {
     this.pool = new Pool(
       10,
       (): HitmarkerNode => {
-        const node = el('div', 'ow-hit') as HitmarkerNode;
+        const node = el('div', 'ow-hit');
         const s = svg('svg', { viewBox: '-28 -28 56 56' }, node);
 
         const ring = svg(
@@ -78,9 +78,7 @@ export class Hitmarkers {
             );
           }
         }
-        node._ring = ring;
-        node._main = main;
-        return node;
+        return Object.assign(node, { _ring: ring, _main: main });
       },
       parent
     );

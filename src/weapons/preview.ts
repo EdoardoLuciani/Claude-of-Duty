@@ -1,4 +1,6 @@
 import { dot, mix, normalize, positionLocal, pow, smoothstep, vec3 } from 'three/tsl';
+
+import { hasOwn } from '../core/guards.ts';
 /**
  * Standalone visual harness for the weapons subsystem.
  *
@@ -129,7 +131,8 @@ if (!FIRST_PERSON) {
 }
 
 const stats: Record<string, number> = {};
-for (const id of WEAPON_IDS as Array<keyof typeof WEAPON_DEFS>) {
+for (const id of WEAPON_IDS) {
+  if (!hasOwn(WEAPON_DEFS, id)) throw new Error('[preview] invalid weapon ID');
   const def = { ...WEAPON_DEFS[id], cycleTime: 60 / WEAPON_DEFS[id].rpm };
   const entry = vm.addWeapon(await loadWeapon(id), def);
   stats[id] = entry.tris;
@@ -264,15 +267,7 @@ if (!FIRST_PERSON) {
  * inside the RPC. `grab=0` (the default when a human opens the page) keeps the
  * animation running forever.
  */
-const previewWindow = window as Omit<
-  Window,
-  '__PREVIEW_RENDERER__' | '__PREVIEW_DRAW__' | '__INFO__' | '__READY__'
-> & {
-  __PREVIEW_RENDERER__?: typeof renderer;
-  __PREVIEW_DRAW__?: () => void;
-  __INFO__?: Record<string, unknown>;
-  __READY__?: boolean;
-};
+const previewWindow = window;
 previewWindow.__PREVIEW_RENDERER__ = renderer;
 previewWindow.__PREVIEW_DRAW__ = (): void => renderer.render(scene, camera);
 const STEP = 1 / 60;

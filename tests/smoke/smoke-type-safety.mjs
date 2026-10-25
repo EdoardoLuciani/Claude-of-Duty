@@ -108,6 +108,90 @@ export const immediate = ((): number => 1)();
 `);
   assert.equal(explicitReturns.status, 0, explicitReturns.stdout + explicitReturns.stderr);
 
+  // Exercise each newly enabled type-aware rule, including both single and
+  // double assertions. Keep all fixture functions explicitly annotated.
+  const safetyProbes = [
+    ['no-floating-promises', 'export function ignored(): void { Promise.resolve(1); }'],
+    [
+      'no-misused-promises',
+      'export function conditional(): void { if (Promise.resolve(false)) console.log("bad"); }',
+    ],
+    ['no-misused-promises', 'export const callbacks = [1].forEach(async (): Promise<void> => {});'],
+    [
+      'no-unsafe-type-assertion',
+      'declare const input: unknown; export const narrowed = input as { health: number };',
+    ],
+    [
+      'no-unsafe-type-assertion',
+      'declare const input: number; export const narrowed = input as unknown as string;',
+    ],
+  ];
+  for (const [rule, source] of safetyProbes) {
+    const result = lint(source);
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.ok(
+      JSON.parse(result.stdout).diagnostics.some((d) => d.code === `typescript(${rule})`),
+      `${rule}: ${source}`
+    );
+  }
+  const safeAsync =
+    lint(`export async function awaited(): Promise<number> { return await Promise.resolve(1); }
+export function handled(): void { void Promise.resolve(1).catch((error: unknown): void => console.error(error)); }
+export function checked(input: unknown): string {
+  if (typeof input !== 'string') throw new Error('expected string');
+  return input;
+}
+export const widened = { health: 1 } as object;
+`);
+  assert.equal(safeAsync.status, 0, safeAsync.stdout + safeAsync.stderr);
+
+  // Use the real compiler settings, not a duplicated flag list. These probes
+  // must fail if the implementation is wrong and fail this test if a flag is removed.
+  writeFileSync(
+    config,
+    JSON.stringify({
+      extends: join(root, 'tsconfig.json'),
+      compilerOptions: {
+        typeRoots: [join(root, 'node_modules/@types'), join(root, 'node_modules')],
+      },
+      include: [file],
+      exclude: [],
+    })
+  );
+  const compile = (source) => {
+    writeFileSync(file, source);
+    return spawnSync(join(root, 'node_modules/.bin/tsc'), ['--project', config], {
+      cwd: root,
+      encoding: 'utf8',
+    });
+  };
+  const compilerProbes = [
+    [
+      'TS7030',
+      'export function incomplete(value: boolean): number | undefined { if (value) return 1; }',
+    ],
+    [
+      'TS4114',
+      'class Base { run(): void {} } export class Derived extends Base { run(): void {} }',
+    ],
+    [
+      'TS7029',
+      'export function select(value: number): void { switch (value) { case 1: console.log(value); case 2: break; } }',
+    ],
+  ];
+  for (const [code, source] of compilerProbes) {
+    const result = compile(source);
+    assert.notEqual(result.status, 0, `${code} must be enforced`);
+    assert.ok((result.stdout + result.stderr).includes(code), result.stdout + result.stderr);
+  }
+  const safeCompiler =
+    compile(`export function complete(value: boolean): number | undefined { if (value) return 1; return undefined; }
+class Base { run(): void {} }
+export class Derived extends Base { override run(): void {} }
+export function select(value: number): void { switch (value) { case 1: console.log(value); break; case 2: break; } }
+`);
+  assert.equal(safeCompiler.status, 0, safeCompiler.stdout + safeCompiler.stderr);
+
   // Provider and event payload contracts must reject invalid consumers too.
   writeFileSync(
     file,
@@ -193,5 +277,5 @@ events.on('not-an-event', () => {});
   rmSync(dir, { recursive: true, force: true });
 }
 console.log(
-  'type-safety: six unsafe patterns and missing return annotations rejected; concrete FX/render/haze/world boundary return and argument types enforced'
+  'type-safety: unsafe usage, assertions, promise misuse, missing return/override and fallthrough rejected; provider/event contracts enforced'
 );

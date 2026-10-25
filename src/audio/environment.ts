@@ -49,6 +49,9 @@ export const ENVIRONMENT_GAIN = {
   vehicle: 0.6,
   heli: 4,
 } as const;
+export function isEnvironmentKind(kind: unknown): kind is EnvironmentKind {
+  return ENVIRONMENT_KINDS.some((candidate): boolean => candidate === kind);
+}
 export function environmentBank(kind: EnvironmentKind): EnvironmentBank {
-  return ('environment-' + kind) as EnvironmentBank;
+  return `environment-${kind}`;
 }

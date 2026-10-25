@@ -115,10 +115,10 @@ export function fillNoise(out: Float32Array, kind: NoiseKind, rng: AudioRandom):
  */
 export class NoiseBank {
   actx: BaseAudioContext;
-  buffers: Record<NoiseKind, AudioBuffer>;
+  buffers: Partial<Record<NoiseKind, AudioBuffer>>;
   constructor(actx: BaseAudioContext, rng: AudioRandom, seconds = 2.2) {
     this.actx = actx;
-    this.buffers = {} as Record<NoiseKind, AudioBuffer>;
+    this.buffers = {};
     const kinds: NoiseKind[] = ['white', 'pink', 'brown', 'crackle'];
     for (const kind of kinds) {
       const len = Math.max(1, Math.floor(actx.sampleRate * seconds));
@@ -134,6 +134,7 @@ export class NoiseBank {
   source(kind: NoiseKind, rng: AudioRandom | null, rate = 1, loop = false): OffsetBufferSource {
     const src = this.actx.createBufferSource();
     const buf = this.buffers[kind] ?? this.buffers.white;
+    if (!buf) throw new Error('[audio] noise bank is disposed');
     src.buffer = buf;
     src.playbackRate.value = rate;
     src.loop = loop;
@@ -141,13 +142,11 @@ export class NoiseBank {
       src.loopStart = 0;
       src.loopEnd = buf.duration;
     }
-    const offsetSrc = src as OffsetBufferSource;
-    offsetSrc._offset = rng ? rng.range(0, buf.duration * 0.7) : 0;
-    return offsetSrc;
+    return Object.assign(src, { _offset: rng ? rng.range(0, buf.duration * 0.7) : 0 });
   }
 
   dispose(): void {
-    this.buffers = {} as Record<NoiseKind, AudioBuffer>;
+    this.buffers = {};
   }
 }
 

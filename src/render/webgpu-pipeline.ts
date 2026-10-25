@@ -1,4 +1,5 @@
 import type { Camera, Object3D, Scene } from 'three';
+import { Layers } from 'three';
 import { ClusteredLighting } from 'three/addons/lighting/ClusteredLighting.js';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { ao } from 'three/addons/tsl/display/GTAONode.js';
@@ -7,6 +8,7 @@ import { lut3D } from 'three/addons/tsl/display/Lut3DNode.js';
 import type Lut3DNode from 'three/addons/tsl/display/Lut3DNode.js';
 import { traa } from 'three/addons/tsl/display/TRAANode.js';
 import type TRAANode from 'three/addons/tsl/display/TRAANode.js';
+import { float } from 'three/tsl';
 import {
   builtinAOContext,
   context,
@@ -26,6 +28,7 @@ import {
   vec4,
   velocity,
 } from 'three/tsl';
+import type { NodeFrame } from 'three/webgpu';
 import { Lighting, RenderPipeline, Vector2 } from 'three/webgpu';
 import { AgXToneMapping, Color, SRGBColorSpace } from 'three/webgpu';
 import type { Renderer, Node } from 'three/webgpu';
@@ -41,6 +44,10 @@ const BLOOM_STRENGTH = 0.14,
   BLOOM_THRESHOLD = 1.6;
 const BLOOM_RADIUS = 0,
   BLOOM_INPUT_CEILING = 16;
+
+function hasClusterSize(node: object): node is { setSize(width: number, height: number): void } {
+  return 'setSize' in node && typeof node.setSize === 'function';
+}
 
 export interface PostPass {
   order?: number;
@@ -104,19 +111,16 @@ export function createWorldViewPipeline(
     aoBlur = null,
     taaPass = null;
   const intermediates: Array<{ dispose(): void }> = [];
-  const asTexture = (node: Node<'vec4'>): Node<'vec4'> => {
-    const result = convertToTexture(node as never) as Node<'vec4'> & {
-      isRTTNode?: boolean;
-      dispose(): void;
-    };
+  const asTexture = (node: Node<'vec3'> | Node<'vec4'>): Node<'vec4'> => {
+    const result = convertToTexture(node);
     if (result !== node && result.isRTTNode) intermediates.push(result);
     return result; // Existing texture/pass outputs remain borrowed.
   };
   const worldPass = pass(scene, camera, { samples: 0 });
   worldPass.lighting = new ClusteredLighting();
-  const worldLights = worldPass.lighting.getNode(scene) as ReturnType<
-    typeof worldPass.lighting.getNode
-  > & { setSize(width: number, height: number): void };
+  const worldLights = worldPass.lighting.getNode(scene);
+  if (!hasClusterSize(worldLights))
+    throw new Error('[render] clustered lighting node lacks setSize');
   const clusterSize = new Vector2();
   const viewPass = pass(viewScene, viewCamera, { samples: 0 });
   // Environment hooks specialize by camera. Give the view pass an explicit
@@ -125,19 +129,13 @@ export function createWorldViewPipeline(
   // PassNode resets Three's clear alpha to one for each pass (including after
   // native CSM renders). Clear the view scene to transparent black, otherwise
   // an empty pixel covers the entire world during alpha composition.
-  const oldBefore = Reflect.get(viewScene, 'onBeforeRender') as typeof viewScene.onBeforeRender;
-  const oldAfter = Reflect.get(viewScene, 'onAfterRender') as typeof viewScene.onAfterRender;
+  const oldBefore: unknown = Reflect.get(viewScene, 'onBeforeRender');
+  const oldAfter: unknown = Reflect.get(viewScene, 'onAfterRender');
   const savedColor = new Color();
   let savedAlpha = 0;
   type ViewRenderHook = (renderer: Renderer, scene: Scene, camera: Camera, target: unknown) => void;
-  const callViewHook = (
-    hook: typeof oldBefore,
-    r: Renderer,
-    s: Scene,
-    c: Camera,
-    target: unknown
-  ): void => {
-    (hook as unknown as ViewRenderHook).call(viewScene, r, s, c, target);
+  const callViewHook = (hook: unknown, r: Renderer, s: Scene, c: Camera, target: unknown): void => {
+    if (typeof hook === 'function') Reflect.apply(hook, viewScene, [r, s, c, target]);
   };
   const beforeRender: ViewRenderHook = (r, s, c, target): void => {
     if (oldBefore) callViewHook(oldBefore, r, s, c, target);
@@ -151,11 +149,14 @@ export function createWorldViewPipeline(
     if (target === viewPass.renderTarget) r.setClearColor(savedColor, savedAlpha);
     if (oldAfter) callViewHook(oldAfter, r, s, c, target);
   };
-  viewScene.onBeforeRender = beforeView as unknown as typeof viewScene.onBeforeRender;
-  viewScene.onAfterRender = afterView as unknown as typeof viewScene.onAfterRender;
+  // The pinned WebGPU Scene hooks differ from Object3D's WebGL signatures.
+  Reflect.set(viewScene, 'onBeforeRender', beforeView);
+  Reflect.set(viewScene, 'onAfterRender', afterView);
   const detach = (): void => {
-    if ((viewScene.onBeforeRender as unknown) === beforeView) viewScene.onBeforeRender = oldBefore;
-    if ((viewScene.onAfterRender as unknown) === afterView) viewScene.onAfterRender = oldAfter;
+    const before: unknown = Reflect.get(viewScene, 'onBeforeRender');
+    const after: unknown = Reflect.get(viewScene, 'onAfterRender');
+    if (before === beforeView) Reflect.set(viewScene, 'onBeforeRender', oldBefore);
+    if (after === afterView) Reflect.set(viewScene, 'onAfterRender', oldAfter);
   };
   // Opaque geometry only: custom translucent particle fragment shaders cannot
   // produce MRT attachments. Layer 1 excludes the sky dome and soft FX.
@@ -168,30 +169,27 @@ export function createWorldViewPipeline(
   scene.traverse((object: Object3D): void => {
     if ((object as Object3D & { isLight?: boolean }).isLight) object.layers.enable(1);
   });
-  prePass.setLayers({ mask: 2 } as import('three').Layers);
+  const prepassLayers = new Layers();
+  prepassLayers.set(1);
+  prePass.setLayers(prepassLayers);
   prePass.transparent = false;
   // GTAO sets a white clear before updating its depth dependency. With AO
   // scheduled outside world lighting, don't inherit that clear in normals.
-  const updatePrepass = Reflect.get(prePass, 'updateBefore') as (frame: {
-    renderer: Renderer | null;
-  }) => void;
+  const updatePrepass = prePass.updateBefore.bind(prePass);
   const preClear = new Color();
-  prePass.updateBefore = function (
-    this: typeof prePass,
-    frame: { renderer: Renderer | null }
-  ): undefined {
+  prePass.updateBefore = function (this: typeof prePass, frame: NodeFrame): undefined {
     const r = frame.renderer!,
       alpha = r.getClearAlpha();
     r.getClearColor(preClear);
     r.setClearColor(0, 1);
     try {
-      updatePrepass.call(this, frame);
+      updatePrepass(frame);
       afterDepth?.(); // Consumers now see this frame's opaque depth.
     } finally {
       r.setClearColor(preClear, alpha);
     }
     return undefined;
-  } as NonNullable<typeof prePass.updateBefore>;
+  };
   const channels: Record<string, Node> = { output: normalView as Node };
   if (taa) channels.velocity = velocity;
   // The native depth attachment is nonlinear; publish positive view metres.
@@ -225,26 +223,26 @@ export function createWorldViewPipeline(
   }
   // TSL transitions among texture, variable, and vector nodes here; upstream
   // generic node types are not covariant across those equivalent color values.
-  let world: Node<'vec4'> = worldPass.getTextureNode();
+  let world: Node<'vec3'> | Node<'vec4'> = worldPass.getTextureNode();
   // Resolve only the world. The weapon's ADS motion has no valid world velocity.
   if (taa) {
     taaPass = traa(
-      worldPass.getTextureNode() as never,
+      worldPass.getTextureNode(),
       prePass.getTextureNode('depth'),
       prePass.getTextureNode('velocity'),
       camera
     );
     // Borrow the published resolve texture instead of materializing an identity RTT.
-    world = (taaPass as typeof taaPass & { getTextureNode(): Node<'vec4'> }).getTextureNode();
+    world = taaPass.getTextureNode();
   }
   // Apply aerial perspective to world pixels only; the viewmodel is held in
   // view space and must never inherit world fog or temporal reprojection.
   let fogPass = null;
   if (fog) {
     const inputs = { color: asTexture(world), depth: prePass.getTextureNode('linearDepth') };
-    const fogInputs = inputs as unknown as FogInputs;
+    const fogInputs: FogInputs = inputs;
     if (fogCompute) fogPass = createFogCompute(fog, fogInputs);
-    world = (fogPass ? fogPass.textureNode : fog(fogInputs)) as Node<'vec4'>;
+    world = fogPass ? fogPass.textureNode : fog(fogInputs);
   }
   // World-depth haze must not distort an occluding first-person weapon.
   if (warp) world = warp(asTexture(world));
@@ -278,8 +276,8 @@ export function createWorldViewPipeline(
     ? lut3D(
         renderOutput(lit, AgXToneMapping, SRGBColorSpace),
         texture3D(grade.texture),
-        grade.size as never,
-        1 as never
+        grade.size,
+        float(1)
       )
     : lit;
   // Publish current depth before any world soft particles or haze, even without

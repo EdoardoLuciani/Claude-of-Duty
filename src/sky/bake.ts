@@ -13,7 +13,10 @@ import {
 
 // QuadMesh supplies native texture UVs and owns the shared fullscreen geometry.
 // Only the per-pass material and returned targets belong to this subsystem.
-const quad = new QuadMesh(null as unknown as MeshBasicNodeMaterial);
+// A disposed, never-rendered sentinel avoids retaining a pass's shader graph.
+const idleMaterial = new MeshBasicNodeMaterial();
+idleMaterial.dispose();
+const quad = new QuadMesh(idleMaterial);
 
 const RT_OPTIONS = {
   depthBuffer: false,
@@ -42,7 +45,7 @@ export class BakePass {
       quad.render(renderer);
     } finally {
       renderer.setRenderTarget(previous);
-      quad.material = null as unknown as typeof quad.material;
+      quad.material = idleMaterial;
     }
   }
 
