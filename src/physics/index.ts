@@ -87,6 +87,7 @@ import {
 import { Ballistics, type ActorRegionImpact } from './penetration.ts';
 import { Ragdoll, humanoidSpec, specFromSkeleton } from './ragdoll.ts';
 import { RigidBody, RigidBodyWorld } from './rigidbody.ts';
+import type { RigidBodyOptions } from './rigidbody.ts';
 import type { SurfaceName } from './surfaces.ts';
 import {
   LAYER,
@@ -105,9 +106,9 @@ interface Vector3Like {
   y: number;
   z: number;
 }
-export type PhysicsRigidBodyOptions = NonNullable<ConstructorParameters<typeof RigidBody>[0]> & {
+export interface PhysicsRigidBodyOptions extends RigidBodyOptions {
   surfaceType?: SurfaceName;
-};
+}
 export interface PhysicsHit {
   hit: boolean;
   point: THREE.Vector3;

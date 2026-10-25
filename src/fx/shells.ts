@@ -6,6 +6,7 @@ import { MeshStandardNodeMaterial } from 'three/webgpu';
 import type { EngineSystems } from '../core/context.ts';
 import type { EventWeapon } from '../core/events.ts';
 import { isMesh } from '../core/three-guards.ts';
+import type { RigidBody } from '../physics/rigidbody.ts';
 import { P, buildBrassTextures } from './atlas.ts';
 import { resetSpawn } from './particles.ts';
 
@@ -43,7 +44,7 @@ interface ShellSlot extends CaseScale {
   shotgun: boolean;
   alive: boolean;
   age: number;
-  body: ShellRigidBody | null;
+  body: RigidBody | null;
   proxy: THREE.Object3D;
   pos: THREE.Vector3;
   vel: THREE.Vector3;
@@ -51,7 +52,6 @@ interface ShellSlot extends CaseScale {
   spin: THREE.Vector3;
   fade: number;
 }
-type ShellRigidBody = EngineSystems['physics']['bodies']['bodies'][number];
 type ShellPhysics = Pick<EngineSystems['physics'], 'addRigidBody' | 'removeRigidBody'>;
 interface ShellFx {
   rng: import('../core/rng.ts').Rng;
@@ -283,7 +283,7 @@ export class ShellSystem {
   }
 
   _onImpact = (
-    _body: ShellRigidBody,
+    _body: RigidBody,
     px: number,
     py: number,
     pz: number,

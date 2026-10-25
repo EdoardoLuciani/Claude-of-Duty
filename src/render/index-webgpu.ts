@@ -248,7 +248,7 @@ export class RenderSystem {
               camWorld: uniform(this.ctx.camera.matrixWorld),
               camPos: uniform(this.ctx.camera.position),
               frame: this._fogFrame,
-              ...(this._volumeShadow ? { visibility: this._volumeShadow.visibility } : {}),
+              visibility: this._volumeShadow?.visibility,
             })
         : null,
       fogCompute: this.q.volumetrics,

@@ -9,6 +9,8 @@ import { tickStreetlightOutage } from './lighting.ts';
 import { PALETTE } from './palette.ts';
 import { WorldQueries } from './queries.ts';
 
+type WorldMaterial = ReturnType<EngineSystems['materials']['get']>;
+
 type WorldMesh = THREE.Mesh & {
   isInstancedMesh?: boolean;
   computeBoundingSphere?: () => void;
@@ -56,7 +58,7 @@ export class WorldSystem {
   declare rng: Rng;
   declare materials: EngineSystems['materials'];
   declare renderSystem: EngineSystems['render'] | null;
-  declare _mats: Map<keyof typeof PALETTE, ReturnType<EngineSystems['materials']['get']>>;
+  declare _mats: Map<keyof typeof PALETTE, WorldMaterial>;
   declare meshes: WorldMesh[] | null;
   declare collisionMeshes: WorldMesh[] | null;
   declare lodGroups: WorldMesh[] | null;
@@ -78,7 +80,7 @@ export class WorldSystem {
   declare _offRestart: (() => void) | null;
   declare bulbs: THREE.PointLight[] | null;
   declare lamps: THREE.PointLight[] | null;
-  declare lampLens: ReturnType<EngineSystems['materials']['get']> | null;
+  declare lampLens: WorldMaterial | null;
   declare _lampMix: number;
   declare _lampPower: number;
   declare _sky: EngineSystems['sky'] | null;
@@ -200,7 +202,7 @@ export class WorldSystem {
     );
   }
 
-  _material(key: keyof typeof PALETTE): ReturnType<EngineSystems['materials']['get']> {
+  _material(key: keyof typeof PALETTE): WorldMaterial {
     let material = this._mats.get(key);
     if (!material) {
       const def = PALETTE[key];

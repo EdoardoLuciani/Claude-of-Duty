@@ -70,6 +70,25 @@ export interface WorldLadder {
   nx?: number | undefined;
   nz?: number | undefined;
 }
+export interface WorldIntelMarker {
+  id: string;
+  tag?: string | undefined;
+  position: ModelVec3;
+}
+export interface WorldMarkerData {
+  MARKERS?: { INTEL?: WorldIntelMarker[] | undefined } | undefined;
+}
+export interface WorldStreet {
+  halfWidth: number;
+  kerb: number;
+  walkH: number;
+  zMin: number;
+  zMax: number;
+}
+export interface WorldQueryData {
+  street?: WorldStreet | undefined;
+  alleys?: Array<{ rect: [number, number, number, number]; surface: string }> | undefined;
+}
 export interface WorldManifest {
   version: 2;
   sourceHash: string;
@@ -104,25 +123,8 @@ export interface WorldManifest {
     day: number;
     night: number;
   }>;
-  WORLD?:
-    | {
-        MARKERS?:
-          | {
-              INTEL?:
-                | Array<{ id: string; tag?: string | undefined; position: ModelVec3 }>
-                | undefined;
-            }
-          | undefined;
-      }
-    | undefined;
-  query?:
-    | {
-        street?:
-          | { halfWidth: number; kerb: number; walkH: number; zMin: number; zMax: number }
-          | undefined;
-        alleys?: Array<{ rect: [number, number, number, number]; surface: string }> | undefined;
-      }
-    | undefined;
+  WORLD?: WorldMarkerData | undefined;
+  query?: WorldQueryData | undefined;
 }
 export interface WorldPrefetch {
   meta: WorldManifest;

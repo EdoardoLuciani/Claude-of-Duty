@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 
-import { Texture } from 'three';
+import { Texture, Vector3 } from 'three';
+import { MeshPhysicalNodeMaterial } from 'three/webgpu';
 
+import { parseWorkerMessage } from '../../src/ai/attachment-types.ts';
 import { createConfig, DEFAULTS, QUALITY_PRESETS } from '../../src/core/config.ts';
 import { applyDefinedPatch } from '../../src/core/patch.ts';
 import { Registry } from '../../src/core/registry.ts';
@@ -9,6 +11,7 @@ import { Rng } from '../../src/core/rng.ts';
 import { MaterialSystemNode } from '../../src/materials/index.ts';
 import { LIBRARY, resolveName } from '../../src/materials/library.ts';
 import { SkySystem } from '../../src/sky/index.ts';
+import { UiSystem } from '../../src/ui/index.ts';
 
 // JS/debug callers cannot erase required defaults with explicit undefined.
 const overrides = { fov: undefined, sensitivity: undefined, quality: 'medium', invertY: true };
@@ -73,6 +76,9 @@ materials.getTextureSet = () => ({
   normal: texture,
   orm: texture,
 });
+const materialWarnings = [];
+const warn = console.warn;
+console.warn = (...args) => materialWarnings.push(args);
 try {
   const material = materials.get('concrete', { scale: undefined, normalStrength: 0, three: {} });
   assert.equal(material.userData.owParams.scale, LIBRARY.concrete.mat.scale);
@@ -82,10 +88,55 @@ try {
   assert.equal(materials.surfaceOf('constructor'), 'concrete');
   assert.equal(resolveName('metal'), 'metal_painted');
   assert.equal(resolveName('constructor'), 'constructor', 'prototype keys are not aliases');
+  assert(!(material instanceof MeshPhysicalNodeMaterial));
+  const coated = materials.get('concrete', { three: { physical: true, clearcoat: 0.5 } });
+  assert(coated instanceof MeshPhysicalNodeMaterial);
+  assert.equal(coated.clearcoat, 0.5);
+  const glass = materials.get('glass', { three: { roughness: 0.25 } });
+  assert(glass instanceof MeshPhysicalNodeMaterial);
+  assert.equal(glass.ior, 1.52, 'standard-value overrides preserve the authored physical finish');
+  assert.equal(glass.roughness, 0.25);
+  assert.throws(
+    () => materials.get('glass', { three: { physical: false } }),
+    /requires its authored physical material/
+  );
+  assert.deepEqual(materialWarnings, [], 'supported options must not be silently ignored by Three');
 } finally {
+  console.warn = warn;
   materials.dispose();
   texture.dispose();
 }
+
+// Unavailable telemetry values are still undefined; zero-valued measurements survive parsing.
+const absentStats = parseWorkerMessage({ type: 'result', id: 1, value: true, ms: 0, moves: 0 });
+assert.equal(absentStats.repeatedStates, undefined);
+assert.equal(absentStats.savedMoves, undefined);
+assert.equal(absentStats.queueMs, undefined);
+const zeroStats = parseWorkerMessage({
+  type: 'result',
+  id: 1,
+  value: true,
+  ms: 0,
+  moves: 0,
+  repeatedStates: 0,
+  savedMoves: 0,
+  queueMs: 0,
+});
+assert.equal(zeroStats.repeatedStates, 0);
+assert.equal(zeroStats.savedMoves, 0);
+assert.equal(zeroStats.queueMs, 0);
+assert.equal(JSON.stringify(absentStats).includes('repeatedStates'), false);
+
+// Compass markers stay reusable as an optional color becomes unavailable.
+const objective = { position: new Vector3(1, 0, 0), label: 'A', color: '#fff' };
+const ui = { _compassObjs: [], _objectives: [objective] };
+const markers = UiSystem.prototype._buildCompassObjectives.call(ui, new Vector3());
+const marker = markers[0];
+assert.equal(marker.color, '#fff');
+objective.color = undefined;
+const nextMarkers = UiSystem.prototype._buildCompassObjectives.call(ui, new Vector3());
+assert.equal(nextMarkers[0], marker);
+assert.equal(marker.color, undefined);
 
 // Keyed registration validates metadata and invalidates both ordering and hook caches.
 const registry = new Registry();

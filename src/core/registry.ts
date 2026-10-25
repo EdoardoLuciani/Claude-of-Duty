@@ -51,6 +51,7 @@ export type SystemConstructor<Systems, Args extends unknown[]> = {
   };
 }[keyof Systems & string];
 
+// For example: ['player', PlayerSystem] | ['audio', AudioSystem], not independent unions.
 type Registration<Systems> = {
   [K in keyof Systems & string]: [id: K, system: Systems[K]];
 }[keyof Systems & string];
@@ -140,6 +141,7 @@ export class Registry<
   }
 }
 
+// For example: ['resize', ResizePayload] | ['player:heartbeat', HeartbeatPayload].
 type Emission<Events> = {
   [K in keyof Events]: [type: K, payload: Events[K]];
 }[keyof Events];

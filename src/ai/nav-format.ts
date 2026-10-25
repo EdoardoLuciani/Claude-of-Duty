@@ -53,8 +53,8 @@ export interface NavMetadata {
   profile?: typeof NAV_PROFILE;
   config?: typeof NAV_CONFIG;
   bounds: { min: number[]; max: number[] };
-  sourceHash?: string;
-  collisionAsset?: string;
+  sourceHash?: string | undefined;
+  collisionAsset?: string | undefined;
   ladderMotorVersion?: number;
   ladders?: readonly LadderDescriptor[];
 }
@@ -457,8 +457,8 @@ export async function unpackNav(
     profile: NAV_PROFILE,
     config: NAV_CONFIG,
     bounds: { min: value.bounds.min, max: value.bounds.max },
-    ...(typeof value.sourceHash === 'string' ? { sourceHash: value.sourceHash } : {}),
-    ...(typeof value.collisionAsset === 'string' ? { collisionAsset: value.collisionAsset } : {}),
+    sourceHash: typeof value.sourceHash === 'string' ? value.sourceHash : undefined,
+    collisionAsset: typeof value.collisionAsset === 'string' ? value.collisionAsset : undefined,
   };
   check(
     meta.version === NAV_VERSION && meta.engine === NAV_ENGINE,

@@ -749,7 +749,7 @@ export class Viewmodel {
     this.armR.fitGrip(w.rhandPose, {
       thumb: vec3(contact.rightThumb),
       index: vec3(contact.trigger),
-      ...('rightFingers' in contact ? { fingers: contact.rightFingers } : {}),
+      fingers: 'rightFingers' in contact ? contact.rightFingers : undefined,
       spread: FIRING_FINGER_SPREAD,
     });
     this.armL.hand.position.fromArray(w.gripL.pos);
@@ -762,8 +762,8 @@ export class Viewmodel {
     this.armL.fitGrip(w.lhandPose, {
       thumb: vec3(contact.leftThumb),
       thumbPole: 'leftThumbPole' in contact ? vec3(contact.leftThumbPole) : [-1, 0, 0],
-      ...('leftFingers' in contact ? { fingers: contact.leftFingers } : {}),
-      ...('leftSpread' in contact ? { spread: contact.leftSpread } : {}),
+      fingers: 'leftFingers' in contact ? contact.leftFingers : undefined,
+      spread: 'leftSpread' in contact ? contact.leftSpread : undefined,
     });
   }
 

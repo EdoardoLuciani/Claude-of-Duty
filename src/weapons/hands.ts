@@ -63,8 +63,8 @@ interface FitGripOptions {
   thumb?: Vec3;
   thumbPole?: Vec3;
   index?: Vec3;
-  fingers?: number[][];
-  spread?: number[];
+  fingers?: number[][] | undefined;
+  spread?: number[] | undefined;
 }
 
 /** Aim local -Z along `dir`, with +Y toward `up`, all in rig space.

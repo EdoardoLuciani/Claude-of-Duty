@@ -619,7 +619,7 @@ export interface CharacterBuild {
   vertices: number;
   triangles: number;
   parts: {
-    name?: string;
+    name?: string | undefined;
     material: string;
     start: number | undefined;
     count: number | undefined;
@@ -748,12 +748,14 @@ export class CharacterBuilder {
       triangles: iTotal / 3,
       // vertex range per part, so the albedo audit in selftest.mjs can report
       // the effective value of every single piece of kit
-      parts: order.map((p): { name?: string; material: string; start: number; count: number } => ({
-        ...(p.name === undefined ? {} : { name: p.name }),
-        material: p.material,
-        start: p._vo!,
-        count: p._vn!,
-      })),
+      parts: order.map(
+        (p): { name: string | undefined; material: string; start: number; count: number } => ({
+          name: p.name,
+          material: p.material,
+          start: p._vo!,
+          count: p._vn!,
+        })
+      ),
     };
   }
 

@@ -236,7 +236,7 @@ export type QuerySample =
       actor: number | null;
       kind: string | null;
       frame: number | null;
-      key?: QueryKey | null;
+      key?: QueryKey | null | undefined;
       ms: number;
       roundTripMs: number | null;
       queueMs: number | null;
@@ -301,9 +301,9 @@ export type WorkerMessage =
       value: boolean;
       ms: number;
       moves: number;
-      repeatedStates?: number;
-      savedMoves?: number;
-      queueMs?: number;
+      repeatedStates?: number | undefined;
+      savedMoves?: number | undefined;
+      queueMs?: number | undefined;
       costs?: QueryCosts | null;
     };
 function snapshot(value: unknown): value is AttachmentSnapshot {
@@ -405,9 +405,9 @@ export function parseWorkerMessage(value: unknown): WorkerMessage {
     ms: value.ms,
     moves: value.moves,
     costs: value.costs == null ? null : costs,
-    ...(isNumber(value.repeatedStates) ? { repeatedStates: value.repeatedStates } : {}),
-    ...(isNumber(value.savedMoves) ? { savedMoves: value.savedMoves } : {}),
-    ...(isNumber(value.queueMs) ? { queueMs: value.queueMs } : {}),
+    repeatedStates: isNumber(value.repeatedStates) ? value.repeatedStates : undefined,
+    savedMoves: isNumber(value.savedMoves) ? value.savedMoves : undefined,
+    queueMs: isNumber(value.queueMs) ? value.queueMs : undefined,
   };
 }
 export function parseSnapshotCopy(
