@@ -284,6 +284,61 @@ const incorrect: string = ctx.get('player').health;
 events.emit('player:heartbeat', { strength: 'wrong', fraction: 1 });
 // @ts-expect-error event names are canonical
 events.on('not-an-event', () => {});
+
+// Weapon data, runtime state, loaders and market share the same domain.
+import { WEAPON_DEFS, isWeaponId } from ${JSON.stringify(join(root, 'src/weapons/defs.ts'))};
+import type { WeaponId, WeaponDef, WeaponMode } from ${JSON.stringify(join(root, 'src/weapons/defs.ts'))};
+import type { AuthoredModels, WeaponModelRecord, WeaponState } from ${JSON.stringify(join(root, 'src/weapons/runtime-types.ts'))};
+declare const input: unknown;
+if (isWeaponId(input)) {
+  const id: WeaponId = input;
+  ctx.get('weapons').owns(id);
+  const def: WeaponDef = WEAPON_DEFS[id];
+}
+ctx.get('weapons').equipPrimary('mcx');
+ctx.get('weapons').equipSecondary('smg');
+// @ts-expect-error internal weapon state must not widen IDs to string
+ctx.get('weapons').activeId = 'typo';
+// @ts-expect-error owned collections reject unknown IDs
+ctx.get('weapons').owned.add('typo');
+// @ts-expect-error primary and secondary are different slots
+ctx.get('weapons').equipPrimary('pistol');
+// @ts-expect-error primary and secondary are different slots
+ctx.get('weapons').equipSecondary('rifle');
+// @ts-expect-error inspection only receives validated weapon IDs, not kit IDs
+ctx.get('weapons').createInspectionModel('bandage');
+// @ts-expect-error market item IDs cannot silently widen to string
+ctx.get('market').buy('typo');
+type MarketItem = ReturnType<EngineSystems['market']['getHudState']>['items'][number];
+declare const item: MarketItem;
+const uiItem: Parameters<EngineSystems['ui']['shop']['_card']>[0] = item;
+declare const state: WeaponState;
+const mode: WeaponMode = state.mode;
+// @ts-expect-error fire modes are a closed domain
+state.mode = 'automatic';
+// @ts-expect-error schema rejects misspelled nested fire modes
+const badMode: WeaponDef = { ...WEAPON_DEFS.rifle, modes: ['automatic'] };
+// @ts-expect-error every definition needs an initial fire mode
+const noModes: WeaponDef = { ...WEAPON_DEFS.rifle, modes: [] };
+// @ts-expect-error vectors have exactly three components
+const shortVector: WeaponDef = { ...WEAPON_DEFS.rifle, hipPos: [0, 0] };
+// @ts-expect-error recoil pattern construction requires a nonempty climb shape
+const noClimb: WeaponDef['recoil'] = { ...WEAPON_DEFS.rifle.recoil, climbShape: [] };
+// @ts-expect-error schema rejects misspelled tuning rather than inferring it as valid
+const typoTuning: WeaponDef = { ...WEAPON_DEFS.rifle, spreadHpi: 2 };
+const { damage, ...withoutDamage } = WEAPON_DEFS.rifle;
+// @ts-expect-error authored definitions must retain mandatory tuning
+const missingDamage: WeaponDef = withoutDamage;
+// @ts-expect-error catalog keys and embedded IDs cannot disagree
+const wrongCatalogId: typeof WEAPON_DEFS.rifle = { ...WEAPON_DEFS.rifle, id: 'pistol' };
+declare const model: WeaponModelRecord;
+if (model.id === 'rifle') {
+  // Native discriminant narrowing, without a user-authored type predicate.
+  const rifle: AuthoredModels['rifle'] = model;
+}
+declare const pistol: AuthoredModels['pistol'];
+// @ts-expect-error loader contracts cannot associate an ID with a different adapter
+const wrongAdapter: AuthoredModels['rifle'] = pistol;
 `
   );
   writeFileSync(
