@@ -152,7 +152,7 @@ For deterministic diagnostics in `/?capture=1`, await readiness then call
 `__ENGINE__.ctx.get('weapons').setWeaponImmediate('shotgun')`; this bypass is not
 shop/balance acceptance. Use normal fire/ADS/reload/switch/pause controls and
 `__ENGINE__.ctx.get('sky').setTimeOfDay(23)` for night. Use
-`node tools/capture-arms.mjs --weapon=shotgun --out=/tmp/m590-review` for the
-in-engine action matrix (including pump, reload and draw/holster). It reads the
-native final output rather than trusting a possibly black headless swapchain.
+`node tests/e2e/weapons-e2e.mjs` for live native handling checks. Weapon/action
+capture matrices are temporary review scripts; read native final output rather
+than trusting a possibly black headless swapchain.
 Before/after #447 hip/ADS/inspect images belong on the PR for human review.
