@@ -58,9 +58,10 @@ import {
 
 const PROBE_RAYS = 9;
 const PROBE_DIST = 40;
-// Private full-tail trial: full-tail player reports and compatibility SMG aliases can overlap.
+// Preserve overlapping full-length player report tails, including compatibility SMG aliases.
 const DRY_SLOTS = 80;
-const GESTURES = ['pointerdown', 'mousedown', 'keydown', 'touchstart', 'wheel'];
+// Native button clicks also cover keyboard activation inside input-isolating dialogs.
+const GESTURES = ['pointerdown', 'mousedown', 'keydown', 'touchstart', 'wheel', 'click'];
 /** An enemy boot is at the edge of the mix here, and gone by the fade below it. */
 const AI_STEP_RANGE = 32;
 const AI_STEP_FADE = 12;
@@ -1048,6 +1049,8 @@ export class AudioSystem {
       stopIntel();
       this._lastReactionEnd = -99;
       this._stopAircraft();
+      this.mixer?.resetHearing();
+      this.deafness = this.stats.deafness = 0;
     });
     on('player:death', stopIntel);
     on('engine:error', () => {

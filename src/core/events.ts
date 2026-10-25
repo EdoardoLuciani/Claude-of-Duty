@@ -191,7 +191,6 @@ export interface EngineEventMap {
     dead: boolean;
     effect: number;
     changedLowState?: boolean;
-    forced?: boolean;
   };
   'player:heartbeat': { strength: number; fraction: number };
   'ammo:pickup': { amount: number; weapon: EventWeapon; position: Vector3 };
