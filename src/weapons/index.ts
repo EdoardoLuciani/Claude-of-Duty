@@ -880,7 +880,8 @@ export class WeaponSystem {
     this._interruptHeal('fire');
     if (this.grenadeEquipped || this.radioEquipped || this.healing) return false;
     if (!s.chambered) {
-      // Dry-fire cooldown.
+      // Physical empty-trigger feedback; do not emit a shot/muzzle flash or alert AI.
+      this.audio?.play?.('dryfire', null, { dryWeapon: s.def.id });
       this._fireTimer = 0.25;
       return false;
     }
