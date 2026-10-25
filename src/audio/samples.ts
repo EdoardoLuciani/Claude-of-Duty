@@ -263,7 +263,7 @@ export class WeaponSampleBank {
     kind: ReactionKind,
     voice: number,
     rng: Rng,
-    o: { when?: number; level?: number } = {}
+    o: { when?: number | undefined; level?: number | undefined } = {}
   ): AudioVoice {
     const buffer = this._nextTake(reactionBank(voice, kind), this.hitBuffers, this.hitIndices, rng);
     const src = this.actx.createBufferSource();
@@ -280,7 +280,7 @@ export class WeaponSampleBank {
     kind: AiCalloutKind,
     voice: number,
     rng: Rng,
-    o: { when?: number; level?: number } = {}
+    o: { when?: number | undefined; level?: number | undefined } = {}
   ): AudioVoice & { stop(): void } {
     const buffer = this._nextTake(calloutBank(voice, kind), this.hitBuffers, this.hitIndices, rng);
     const src = this.actx.createBufferSource();
@@ -308,7 +308,7 @@ export class WeaponSampleBank {
   environment(
     kind: EnvironmentKind,
     rng: Rng,
-    o: { when?: number; level?: number } = {}
+    o: { when?: number | undefined; level?: number | undefined } = {}
   ): AudioVoice {
     const buffer = this._nextTake(environmentBank(kind), this.hitBuffers, this.hitIndices, rng);
     const src = this.actx.createBufferSource();
@@ -321,7 +321,11 @@ export class WeaponSampleBank {
   }
 
   /** One finite click/static composite; receive-only intel never invents a button press. */
-  radio(kind: RadioKind, rng: Rng, o: { when?: number; level?: number } = {}): AudioVoice {
+  radio(
+    kind: RadioKind,
+    rng: Rng,
+    o: { when?: number | undefined; level?: number | undefined } = {}
+  ): AudioVoice {
     const when = o.when ?? this.actx.currentTime,
       out = gain(this.actx, 1);
     let end = when;
@@ -341,7 +345,11 @@ export class WeaponSampleBank {
   }
 
   /** No hot-path fetch/decode, and no immediate repeat within a contact family. */
-  hit(kind: ContactKind, rng: Rng, o: { when?: number; level?: number } = {}): AudioVoice {
+  hit(
+    kind: ContactKind,
+    rng: Rng,
+    o: { when?: number | undefined; level?: number | undefined } = {}
+  ): AudioVoice {
     const buffer = this._nextTake(kind, this.hitBuffers, this.hitIndices, rng, 'contact');
     const src = this.actx.createBufferSource();
     src.buffer = buffer;
@@ -482,7 +490,12 @@ export class WeaponSampleBank {
   combat(
     kind: CombatKind,
     rng: Rng,
-    o: { when?: number; level?: number; delay?: number; send?: number } = {}
+    o: {
+      when?: number | undefined;
+      level?: number | undefined;
+      delay?: number | undefined;
+      send?: number | undefined;
+    } = {}
   ): AudioVoice {
     const buffer = this._nextTake(kind, this.hitBuffers, this.hitIndices, rng, 'combat');
     const src = this.actx.createBufferSource();
@@ -498,7 +511,7 @@ export class WeaponSampleBank {
   explosion(
     kind: ExplosionKind,
     rng: Rng,
-    o: { when?: number; distance?: number; level?: number } = {}
+    o: { when?: number | undefined; distance?: number | undefined; level?: number | undefined } = {}
   ): AudioVoice {
     const { from, to, mix } = explosionBlend(o.distance ?? 0);
     const fromKey: ExplosionBank = `${kind}-${from}`;

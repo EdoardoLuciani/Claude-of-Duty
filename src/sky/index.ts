@@ -4,7 +4,8 @@ import { uniform, uv } from 'three/tsl';
 import { PMREMGenerator } from 'three/webgpu';
 import type { Renderer, Node } from 'three/webgpu';
 
-import type { EngineContext } from '../core/context.ts';
+import type { SystemId, EngineContext } from '../core/context.ts';
+import { applyDefinedPatch } from '../core/patch.ts';
 import type { RenderSystem } from '../render/index-webgpu.ts';
 import { createAtmosphereNodes, createRaymarchSky, createSkyViewLookup } from './atmosphere-tsl.ts';
 import {
@@ -174,8 +175,8 @@ export class SkySystem {
   declare _occParams: SkyOccParams;
   declare _offRestart: (() => void) | null;
 
-  static id = 'sky';
-  static deps = ['render', 'materials'];
+  static readonly id = 'sky';
+  static readonly deps: SystemId[] = ['render', 'materials'];
 
   // Stable, read-only-to-consumers direction toward the active placed key.
   // Available before init so material/render uniforms can borrow its identity.
@@ -455,14 +456,15 @@ export class SkySystem {
   }
 
   setWeather(patch: SkyWeatherPatch = {}): this {
-    Object.assign(this.weather, patch);
-    if (patch.fogDensity !== undefined) {
-      const k = patch.fogDensity;
+    const { fogDensity, fogHeight, shaftGain, ...weather } = patch;
+    applyDefinedPatch(this.weather, weather);
+    if (fogDensity !== undefined) {
+      const k = fogDensity;
       this._fog.scatter = 3.6e-3 * k;
       this._fog.extinction = 1.45e-3 * k;
     }
-    if (patch.fogHeight !== undefined) this._fog.heightScale = patch.fogHeight;
-    if (patch.shaftGain !== undefined) this._fog.shaftGain = patch.shaftGain;
+    if (fogHeight !== undefined) this._fog.heightScale = fogHeight;
+    if (shaftGain !== undefined) this._fog.shaftGain = shaftGain;
     this._applyWeather();
     this._applyFog();
     // Turbidity is baked into all three LUTs, so it needs the static bake too.

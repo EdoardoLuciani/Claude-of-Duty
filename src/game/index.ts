@@ -21,7 +21,7 @@
  */
 
 import type { AiSystem } from '../ai/index.ts';
-import type { EngineContext } from '../core/context.ts';
+import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
 import type { SearchState } from './search-assist.ts';
 import { resetSearchState, tickSearchAssist } from './search-assist.ts';
@@ -53,8 +53,8 @@ export class GameSystem {
   declare _search: SearchState;
   declare _off: Array<() => void>;
 
-  static id = 'game';
-  static deps = ['ai'];
+  static readonly id = 'game';
+  static readonly deps: SystemId[] = ['ai'];
 
   async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;

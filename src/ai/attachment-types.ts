@@ -405,9 +405,9 @@ export function parseWorkerMessage(value: unknown): WorkerMessage {
     ms: value.ms,
     moves: value.moves,
     costs: value.costs == null ? null : costs,
-    repeatedStates: isNumber(value.repeatedStates) ? value.repeatedStates : undefined,
-    savedMoves: isNumber(value.savedMoves) ? value.savedMoves : undefined,
-    queueMs: isNumber(value.queueMs) ? value.queueMs : undefined,
+    ...(isNumber(value.repeatedStates) ? { repeatedStates: value.repeatedStates } : {}),
+    ...(isNumber(value.savedMoves) ? { savedMoves: value.savedMoves } : {}),
+    ...(isNumber(value.queueMs) ? { queueMs: value.queueMs } : {}),
   };
 }
 export function parseSnapshotCopy(

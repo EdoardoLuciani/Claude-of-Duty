@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-import type { EngineContext } from './context.ts';
+import type { SystemId, EngineContext } from './context.ts';
 import { parseSoldierMetadata, parseWorldManifest, parseWorldAssets } from './model-metadata.ts';
 import type { SoldierRecord, WorldPrefetch } from './model-metadata.ts';
 /** Loads cached soldier GLBs/metadata and the cooked world; player weapons own their adapters. */
@@ -34,8 +34,8 @@ export class ModelSystem {
   declare worldPrefetch: Promise<WorldPrefetch>;
   declare worldNav: ArrayBuffer;
 
-  static id = 'models';
-  static deps = [];
+  static readonly id = 'models';
+  static readonly deps: SystemId[] = [];
 
   async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;

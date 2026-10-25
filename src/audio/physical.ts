@@ -77,9 +77,9 @@ export const FOLEY_MIX = {
   fallSend: 0.4,
 } as const;
 export interface FoleyOptions {
-  when?: number;
-  surface?: SurfaceName;
-  gait?: string;
-  level?: number;
-  gear?: number;
+  when?: number | undefined;
+  surface?: SurfaceName | undefined;
+  gait?: string | undefined;
+  level?: number | undefined;
+  gear?: number | undefined;
 }

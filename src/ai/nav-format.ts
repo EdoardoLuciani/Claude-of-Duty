@@ -457,8 +457,8 @@ export async function unpackNav(
     profile: NAV_PROFILE,
     config: NAV_CONFIG,
     bounds: { min: value.bounds.min, max: value.bounds.max },
-    sourceHash: typeof value.sourceHash === 'string' ? value.sourceHash : undefined,
-    collisionAsset: typeof value.collisionAsset === 'string' ? value.collisionAsset : undefined,
+    ...(typeof value.sourceHash === 'string' ? { sourceHash: value.sourceHash } : {}),
+    ...(typeof value.collisionAsset === 'string' ? { collisionAsset: value.collisionAsset } : {}),
   };
   check(
     meta.version === NAV_VERSION && meta.engine === NAV_ENGINE,

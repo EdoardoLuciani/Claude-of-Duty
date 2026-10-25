@@ -11,8 +11,8 @@ import { ad, biquad, gain, hit, osc, series, struckResonator, sweep } from './ds
 import type { NoiseBank } from './dsp.ts';
 import type { AudioVoice } from './types.ts';
 interface VoiceOptions {
-  when?: number;
-  level?: number;
+  when?: number | undefined;
+  level?: number | undefined;
 }
 type UiOptions = VoiceOptions;
 interface HeartbeatOptions extends VoiceOptions {

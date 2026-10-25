@@ -1481,7 +1481,7 @@ export class Agent {
       const maxTravel = this.cover ? TACTICS.coverReplaceTravel : TACTICS.coverTravel;
       const pick = this.ai.cover?.pick(this.position, target, {
         id: this.id,
-        squad: sq?.members,
+        squad: sq?.members ?? [],
         minRange: 7,
         maxRange: 30,
         maxTravel,
