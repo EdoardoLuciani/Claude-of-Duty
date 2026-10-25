@@ -121,7 +121,13 @@ Tests are not final human visual acceptance; see each asset's remaining limits.
   not current WebGPU performance evidence.
 - `node tools/webgpu-preview-check.mjs`: native preview composition, resize and lifetime.
   Use final-output captures, not old intermediate-target PNGs, for appearance review.
+- `node tests/e2e/weapons-e2e.mjs`: all seven authored weapons in the native game;
+  ADS/draw, reload accounting/cancellation, pause and casing ownership.
 - [AI behaviour and controlled validation](docs/ai-combat-pressure.md).
+
+Keep capture/profile primitives and focused correctness checks. Task-specific
+screenshot matrices, reels, map reports and GPU investigations are temporary;
+retired scripts remain in Git history, not a second maintained tool catalogue.
 
 For local telemetry open `/?telemetry=1`: **F7** marks a moment (optional note),
 **F8** stops/downloads `cod-telemetry-<timestamp>.tgz`. It contains JSON and marked

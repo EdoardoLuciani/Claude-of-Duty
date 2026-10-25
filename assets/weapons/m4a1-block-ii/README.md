@@ -56,11 +56,10 @@ blender -b --threads 8 --python-exit-code 1 --python tools/blender/m4a1.py -- \
 blender -b assets/weapons/m4a1-block-ii/m4a1-block-ii.blend \
   --python-exit-code 1 --python tools/blender/m4_check.py
 node tests/smoke/smoke-m4.mjs
-node tests/e2e/check-m4-game.mjs --out=.tmp-rend/m4-game
-node tools/capture-m4-sights.mjs --out=.tmp-rend/m4-sights
+node tests/e2e/weapons-e2e.mjs
 ```
 
-`m4_review.py` / `m4_photo_review.py` use Eevee and frozen uniform registration.
-No after-only reframing or independent X/Y warp; final native frames are authority.
+Use frozen uniform registration for visual review: no after-only reframing or
+independent X/Y warp; final native frames are authority.
 History: [#339](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/339),
 [sight approval #343](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/343).

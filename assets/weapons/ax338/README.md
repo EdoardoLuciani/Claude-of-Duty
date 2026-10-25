@@ -89,7 +89,7 @@ blender -b -t 4 assets/weapons/ax338/ax338.blend --python-exit-code 1 \
 node tests/smoke/smoke-ax338.mjs
 node tests/smoke/smoke-ax338-contact.mjs
 # GPU/browser lane required:
-node tests/e2e/check-ax338-game.mjs --out=.tmp-rend/ax338/game
+node tests/e2e/weapons-e2e.mjs
 ```
 
 The old `--hands-only` saved-weapon mesh/UV substitution is retired. Every build
@@ -120,7 +120,6 @@ For reproducibility, build twice into empty external directories in fresh Blende
 processes with the same Blender/exporter/NumPy/OCIO settings. Compare GLB, embedded
 maps and manifest hashes; blend metadata can contain different output paths.
 No cross-platform byte-identity promise follows from a same-host check.
-`ax338_review.py` supplies saved-preview photos/reels with Eevee, ray tracing off.
 Match registration/cameras/lights/pose/exposure/ROI/exclusions; don't hide hands
 in acceptance reels or compare old Cycles frames. A compatible OCIO configuration
 is required (supply process-local `OCIO` if needed, never compensate lighting or

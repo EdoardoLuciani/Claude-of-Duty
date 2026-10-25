@@ -39,7 +39,6 @@ node tests/smoke/smoke-bandage.mjs
 node tests/smoke/smoke-grips.mjs
 node tests/e2e/check-bandage-intersections.mjs --dense --out=/tmp/bandage.json
 node tests/e2e/check-bandage-game.mjs --out=/tmp/bandage --video
-node tools/review-grips.mjs --out=/tmp/grips
 node tests/e2e/check-arm-surfaces.mjs
 ```
 

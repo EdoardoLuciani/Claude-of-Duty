@@ -54,12 +54,10 @@ blender -b assets/weapons/sig-mpx/mpx.blend --python-exit-code 1 \
   --python tools/blender/mpx_check.py
 node tests/smoke/smoke-mpx-asset.mjs
 node tests/smoke/smoke-mpx.mjs
-node tests/e2e/check-mpx-game.mjs --optic-review
+node tests/e2e/weapons-e2e.mjs
 ```
 
 Previews use Eevee without ray tracing; common flags follow the shared workflow.
-`--reel` records gameplay; `tools/mpx-photo-review.py` needs the 2019 PDF p.25
-rasterized with `pdftoppm -scale-to 1800 -singlefile -png` under `.tmp-rend/mpx/`.
 The [approved UV-repeatability limitation](../../../tools/blender/mpx/README.md#approved-repeatability-limit)
 retains the atlas and explicitly leaves GLB byte-repeatability unmet for evaluated
 UV bytes. Maps/manifest and non-UV payloads still require exact comparison.

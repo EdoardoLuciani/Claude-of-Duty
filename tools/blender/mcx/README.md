@@ -29,4 +29,4 @@ Sample sparse motion natively at **60 Hz** into LINEAR keys; visibility stays
 CONSTANT/STEP with explicit resets. Mute tracks, restore rest transforms, evaluate
 modifiers and join in name order under ten rigid parents. Stock Actions export
 merges matching track names with forced sampling off. No GLB repair or alternate
-saved-source/material-only path. Review generated scenes with `mcx_review.py`.
+saved-source/material-only path.
