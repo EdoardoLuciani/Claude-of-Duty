@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { bindingLabel } from '../core/bindings.ts';
 import type { EngineContext, EngineSystems } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName } from '../core/events.ts';
+import type { WeaponMode } from '../weapons/defs.ts';
 import { AmmoPanel } from './ammo.ts';
 import { Compass, ScoreBar } from './compass.ts';
 import { Crosshair } from './crosshair.ts';
@@ -85,7 +86,7 @@ interface HudState {
   reloading: boolean;
   reloadProgress: number;
   weaponName: string;
-  fireMode: string;
+  fireMode: WeaponMode;
   lethalCount: number;
   radioEquipped: boolean;
   carpetCount: number;
@@ -257,7 +258,7 @@ export class UiSystem {
       reloading: false,
       reloadProgress: 0,
       weaponName: 'M4A1',
-      fireMode: 'AUTO',
+      fireMode: 'auto',
       lethalCount: 2,
       radioEquipped: false,
       carpetCount: 1,

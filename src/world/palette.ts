@@ -412,8 +412,8 @@ export const PALETTE = {
   string,
   {
     name: string;
-    surface: string;
-    ballisticSurface?: string;
+    surface: import('../physics/surfaces.ts').SurfaceName;
+    ballisticSurface?: import('../physics/surfaces.ts').SurfaceName;
     sheetThickness?: number;
     opts: Parameters<MaterialSystemNode['get']>[1];
   }

@@ -18,10 +18,23 @@ import * as THREE from 'three';
 
 import type { EngineContext, EngineSystems } from '../core/context.ts';
 import type { CharacterController } from '../physics/character.ts';
+import type { SurfaceName } from '../physics/surfaces.ts';
 import { LedgeProbe, MantleMotion, LEDGE_NONE, LEDGE_VAULT } from './mantle.ts';
 import { clamp, clamp01, approach, lerp } from './springs.ts';
 import { STANCE, MOVE, GRAVITY, JUMP_SPEED, FOOTSTEP } from './tuning.ts';
 import type { PlayerStance } from './tuning.ts';
+
+/** Locomotion state is distinct from physical stance. */
+export type PlayerMoveState =
+  | PlayerStance
+  | 'sprint'
+  | 'tacsprint'
+  | 'slide'
+  | 'jump'
+  | 'fall'
+  | 'mantle'
+  | 'vault'
+  | 'climb';
 
 interface MovementInput {
   x: number;
@@ -73,8 +86,8 @@ export class Movement {
   declare probe: LedgeProbe | null;
   declare mantleMotion: MantleMotion;
   declare climbMotion: ClimbMotion;
-  declare state: string;
-  declare prevState: string;
+  declare state: PlayerMoveState;
+  declare prevState: PlayerMoveState;
   declare stateTime: number;
   declare stance: PlayerStance;
   declare stanceWant: PlayerStance;
@@ -126,11 +139,11 @@ export class Movement {
   declare position: THREE.Vector3;
   declare velocity: THREE.Vector3;
   declare renderPosition: THREE.Vector3;
-  declare landEvent: { pending: boolean; speed: number; surface: string };
+  declare landEvent: { pending: boolean; speed: number; surface: SurfaceName };
   declare stepEvent: {
     pending: boolean;
     running: boolean;
-    surface: string;
+    surface: SurfaceName;
     x: number;
     y: number;
     z: number;
@@ -1203,7 +1216,7 @@ export class Movement {
 
   _resolveState(): void {
     if (this.mantleMotion.active || this.climbMotion.active) return;
-    let next;
+    let next: PlayerMoveState;
     if (this.sliding) next = 'slide';
     else if (!this.grounded) next = this.velocity.y > 0.35 ? 'jump' : 'fall';
     else if (this.stance === 'prone') next = 'prone';
@@ -1213,7 +1226,7 @@ export class Movement {
     this._setState(next);
   }
 
-  _setState(next: string): void {
+  _setState(next: PlayerMoveState): void {
     if (next === this.state) return;
     this.prevState = this.state;
     this.state = next;

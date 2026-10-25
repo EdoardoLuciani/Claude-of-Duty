@@ -33,6 +33,7 @@ import {
 } from './math.ts';
 import { solidIds } from './solids.ts';
 import { surfaceIndex, guessSurface, LAYER } from './surfaces.ts';
+import type { SurfaceName } from './surfaces.ts';
 
 const BINS = 12;
 const LEAF_SIZE = 6;
@@ -66,7 +67,7 @@ interface BakedMesh {
   uniformSurface: number;
 }
 interface StaticMeshOptions {
-  ballisticSurface?: number | string;
+  ballisticSurface?: number | SurfaceName;
   sheetThickness?: number;
   userData?: unknown;
 }
@@ -191,7 +192,7 @@ export class StaticWorld {
    */
   addMesh(
     mesh: THREE.Mesh | THREE.InstancedMesh,
-    surface: number | string | undefined,
+    surface: number | SurfaceName | undefined,
     mask = LAYER.STATIC,
     opts: StaticMeshOptions = {}
   ): number {
@@ -202,6 +203,7 @@ export class StaticWorld {
     const metadata: Record<string, unknown> = isRecord(rawMetadata) ? rawMetadata : {};
     const ballisticSurface = opts.ballisticSurface ?? metadata.ballisticSurface;
     const sheetThickness = opts.sheetThickness ?? metadata.sheetThickness;
+    const ballisticIndex = ballisticSurface === undefined ? null : surfaceIndex(ballisticSurface);
 
     const id = this._freeIds.length ? this._freeIds.pop()! : this.objects.length;
     const obj = {
@@ -214,10 +216,7 @@ export class StaticWorld {
       tris: baked.pos,
       triCount: baked.count,
       solids: baked.solids,
-      ballisticSurface:
-        typeof ballisticSurface === 'string' || typeof ballisticSurface === 'number'
-          ? surfaceIndex(ballisticSurface, baked.uniformSurface)
-          : null,
+      ballisticSurface: ballisticIndex,
       sheetThickness: typeof sheetThickness === 'number' ? sheetThickness : 0,
       alive: true,
       userData: opts.userData ?? null,
@@ -231,12 +230,12 @@ export class StaticWorld {
   addTriangles(
     positions: Float32Array,
     count: number,
-    surface: number | string,
+    surface: number | SurfaceName,
     mask = LAYER.STATIC,
     name = 'raw'
   ): number {
-    const id = this._freeIds.length ? this._freeIds.pop()! : this.objects.length;
     const s = surfaceIndex(surface);
+    const id = this._freeIds.length ? this._freeIds.pop()! : this.objects.length;
     const surfaces = new Uint8Array(count);
     surfaces.fill(s);
     this.objects[id] = {
@@ -1338,7 +1337,7 @@ function surfaceArea(
  */
 export function bakeMesh(
   mesh: THREE.Mesh | THREE.InstancedMesh,
-  surfaceOverride?: number | string
+  surfaceOverride?: number | SurfaceName
 ): BakedMesh | null {
   const geo = mesh.geometry;
   if (!geo || !geo.attributes || !geo.attributes.position) return null;
@@ -1366,19 +1365,18 @@ export function bakeMesh(
   // Per-group surface resolution.
   const groups = geo.groups && geo.groups.length ? geo.groups : null;
   const baseSurface =
-    surfaceOverride !== undefined && surfaceOverride !== null
+    surfaceOverride !== undefined
       ? surfaceIndex(surfaceOverride)
-      : surfaceIndex(
-          mesh.userData?.surface ?? materialName(mesh.material) ?? mesh.name,
-          guessSurface(mesh.name)
-        );
+      : mesh.userData?.surface !== undefined
+        ? surfaceIndex(mesh.userData.surface)
+        : materialSurface(mesh.material, guessSurface(mesh.name));
   const groupSurface = groups
     ? groups.map((g, gi): number => {
-        if (surfaceOverride !== undefined && surfaceOverride !== null) return baseSurface;
+        if (surfaceOverride !== undefined) return baseSurface;
         const mat = Array.isArray(mesh.material)
           ? mesh.material[g.materialIndex ?? gi]
           : mesh.material;
-        return surfaceIndex(mat?.userData?.surface ?? mat?.name ?? mesh.name, baseSurface);
+        return materialSurface(mat, baseSurface);
       })
     : null;
 
@@ -1447,9 +1445,12 @@ export function bakeMesh(
   return { pos: out, count: w, surfaces, solids, uniformSurface: baseSurface };
 }
 
-function materialName(m: THREE.Material | THREE.Material[] | null | undefined): string | null {
-  if (!m) return null;
-  if (Array.isArray(m)) return m[0]?.name ?? null;
-  const surface: unknown = m.userData?.surface;
-  return typeof surface === 'string' ? surface : (m.name ?? null);
+/** Metadata is explicit even without geometry groups; only native names are inferred. */
+function materialSurface(
+  materials: THREE.Material | THREE.Material[] | null | undefined,
+  fallback: number
+): number {
+  const material = Array.isArray(materials) ? materials[0] : materials;
+  const explicit: unknown = material?.userData?.surface;
+  return explicit === undefined ? guessSurface(material?.name, fallback) : surfaceIndex(explicit);
 }

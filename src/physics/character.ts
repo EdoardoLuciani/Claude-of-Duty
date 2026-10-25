@@ -650,7 +650,7 @@ export class CharacterController {
     return SURFACE_PROPS[this.groundSurface]?.friction ?? 0.9;
   }
 
-  get groundSurfaceName(): string {
+  get groundSurfaceName(): import('./surfaces.ts').SurfaceName {
     return surfaceName(this.groundSurface);
   }
 
