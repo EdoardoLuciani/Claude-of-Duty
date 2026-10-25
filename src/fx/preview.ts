@@ -506,8 +506,6 @@ async function dispose(): Promise<void> {
 }
 window.__PREVIEW_DISPOSE__ = dispose;
 if (import.meta.hot)
-  import.meta.hot.dispose((): void => {
-    void dispose().catch((error: unknown): void =>
-      console.error('[fx] HMR disposal failed', error)
-    );
-  });
+  import.meta.hot.dispose((): Promise<void> =>
+    dispose().catch((error: unknown): void => console.error('[fx] HMR disposal failed', error))
+  );

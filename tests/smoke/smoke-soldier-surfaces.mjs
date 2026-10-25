@@ -11,6 +11,7 @@ import {
 import { soldierTextureArray } from '../../src/ai/texture-array.ts';
 import { SoldierMaterialsNode } from '../../src/ai/textures-tsl.ts';
 import { Rng } from '../../src/core/rng.ts';
+import { FixtureImageBitmap, installImageBitmapFixture } from '../lib/image-bitmap.mjs';
 
 const placeholder = new THREE.MeshStandardMaterial();
 const library = new SoldierMaterialsNode({}, {});
@@ -112,6 +113,7 @@ bad.dispose();
 
 // Exercise packing/filtering without a browser; no rendered pixel-diff gate.
 const original = globalThis.OffscreenCanvas;
+const restoreImageBitmap = installImageBitmapFixture();
 globalThis.OffscreenCanvas = class {
   getContext() {
     let image;
@@ -127,7 +129,7 @@ globalThis.OffscreenCanvas = class {
   }
 };
 try {
-  const map = new THREE.Texture({ width: 2, height: 2, close() {} });
+  const map = new THREE.Texture(new FixtureImageBitmap({ width: 2, height: 2 }));
   const packed = soldierTextureArray([map, null], [128, 128, 255, 255], true, 8);
   assert.equal(packed.image.depth, 2);
   assert.equal(packed.image.data.length, 32);
@@ -139,7 +141,7 @@ try {
   assert.throws(
     () =>
       soldierTextureArray(
-        [map, new THREE.Texture({ width: 1, height: 1, close() {} })],
+        [map, new THREE.Texture(new FixtureImageBitmap({ width: 1, height: 1 }))],
         [0, 0, 0, 255],
         false,
         8
@@ -150,6 +152,7 @@ try {
   map.dispose();
 } finally {
   globalThis.OffscreenCanvas = original;
+  restoreImageBitmap();
 }
 console.log(
   'Soldier single-material surfaces, preserved skin/UV/index data, finishes, filtering and owned disposal passed'
