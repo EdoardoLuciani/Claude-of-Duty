@@ -15,6 +15,7 @@ import {
 import { SURFACE, SURFACE_NAMES } from '../../src/physics/surfaces.ts';
 import { createFogCompute } from '../../src/render/fog-compute-webgpu.ts';
 import { setClass, setStyle } from '../../src/ui/util.ts';
+import { FixtureImageBitmap, installImageBitmapFixture } from '../lib/image-bitmap.mjs';
 
 for (const value of [null, undefined, 1, 'value', [], () => {}]) {
   assert.equal(isRecord(value), false);
@@ -25,10 +26,27 @@ assert.equal(isRecord({ value: 1 }), true);
 assert.equal(hasOwn({ value: 1 }, 'value'), true);
 assert.equal(hasOwn({ value: 1 }, 'constructor'), false);
 assert.equal(hasOwn({ value: 1 }, '__proto__'), false);
-const image = { width: 2, height: 2, close() {} };
-assert.equal(isImageBitmap(image), true);
-assert.equal(isImageBitmap({ ...image, width: '2' }), false);
-assert.equal(isImageBitmap({ ...image, close: true }), false);
+const previousBitmap = Object.getOwnPropertyDescriptor(globalThis, 'ImageBitmap');
+try {
+  delete globalThis.ImageBitmap;
+  assert.equal(isImageBitmap({ width: 2, height: 2, close() {} }), false);
+} finally {
+  if (previousBitmap) Object.defineProperty(globalThis, 'ImageBitmap', previousBitmap);
+}
+const restoreImageBitmap = installImageBitmapFixture();
+try {
+  const image = new FixtureImageBitmap({ width: 2, height: 2 });
+  assert.equal(isImageBitmap(image), true);
+  assert.equal(
+    isImageBitmap({ width: 2, height: 2, close() {} }),
+    false,
+    'a native canvas rejects plain lookalikes'
+  );
+  assert.equal(isImageBitmap({ ...image, width: '2' }), false);
+  assert.equal(isImageBitmap({ ...image, close: true }), false);
+} finally {
+  restoreImageBitmap();
+}
 assert.equal(isClosable({ close() {} }), true);
 
 const geometry = new BufferGeometry();
@@ -78,6 +96,56 @@ assert.equal(once, 1);
 bus.on('cleared', () => assert.fail('cleared listener ran'));
 bus.clear();
 bus.emit('cleared', {});
+
+// Number/string pairs remain separate channels, including Map's numeric edge cases.
+for (const [numeric, text] of [
+  [1, '1'],
+  [0, '0'],
+  [NaN, 'NaN'],
+  [Infinity, 'Infinity'],
+]) {
+  const keyed = new EventBus();
+  const calls = [];
+  const listener = (payload) => calls.push(payload);
+  const offNumeric = keyed.on(numeric, listener);
+  keyed.on(text, listener);
+  keyed.emit(numeric, 'number');
+  assert.deepEqual(calls, ['number']);
+  keyed.emit(text, 'string');
+  assert.deepEqual(calls, ['number', 'string']);
+  offNumeric();
+  keyed.emit(numeric, 'removed');
+  assert.equal(calls.length, 2);
+  keyed.emit(text, 'string remains');
+  assert.equal(calls.at(-1), 'string remains');
+  let numericOnce = 0;
+  keyed.once(numeric, () => numericOnce++);
+  keyed.emit(text, 'does not consume numeric once');
+  keyed.emit(numeric, 'once');
+  keyed.emit(numeric, 'not twice');
+  assert.equal(numericOnce, 1);
+  keyed.on(numeric, () => assert.fail('numeric listener survived clear'));
+  keyed.clear();
+  keyed.emit(numeric, 'cleared');
+  keyed.emit(text, 'cleared');
+}
+const zeroBus = new EventBus();
+let zeroCalls = 0;
+zeroBus.on(-0, () => zeroCalls++);
+zeroBus.emit(0, {});
+assert.equal(zeroCalls, 1, 'numeric -0 and 0 share a channel, like Map');
+const failure = new Error('numeric event failure');
+const reported = [];
+const errors = new EventBus((key, error) => reported.push([key, error]));
+errors.on(1, () => {
+  throw failure;
+});
+errors.on('1', () => assert.fail('numeric error crossed to string key'));
+assert.throws(
+  () => errors.emit(1, {}),
+  (error) => error === failure
+);
+assert.deepEqual(reported, [[1, failure]]);
 
 // UI caches are allocated once; duplicate writes still stay out of the DOM.
 let styles = 0,

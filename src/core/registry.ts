@@ -115,6 +115,9 @@ export class Registry {
 /** Synchronous event bus. Each bucket contains only listeners for its key. */
 export class EventBus<Events extends object = EngineEventMap> {
   #map: { [K in keyof Events]?: Set<(payload: Events[K]) => void> } = {};
+  // Separate numeric keys before object indexing coerces them to strings.
+  // This preserves Map's 1/'1' distinction and SameValueZero number semantics.
+  #numbers: { [K in keyof Events]?: Set<(payload: Events[K]) => void> } = {};
   #onError: ((type: keyof Events, error: unknown) => void) | undefined;
 
   constructor(onError?: (type: keyof Events, error: unknown) => void) {
@@ -122,10 +125,11 @@ export class EventBus<Events extends object = EngineEventMap> {
   }
 
   on<K extends keyof Events>(type: K, fn: (payload: Events[K]) => void): () => void {
-    let listeners = Object.hasOwn(this.#map, type) ? this.#map[type] : undefined;
+    const buckets = typeof type === 'number' ? this.#numbers : this.#map;
+    let listeners = Object.hasOwn(buckets, type) ? buckets[type] : undefined;
     if (!listeners) {
       listeners = new Set<(payload: Events[K]) => void>();
-      Object.defineProperty(this.#map, type, { value: listeners, configurable: true });
+      Object.defineProperty(buckets, type, { value: listeners, configurable: true });
     }
     listeners.add(fn);
     return (): void => this.off(type, fn);
@@ -140,11 +144,13 @@ export class EventBus<Events extends object = EngineEventMap> {
   }
 
   off<K extends keyof Events>(type: K, fn: (payload: Events[K]) => void): void {
-    if (Object.hasOwn(this.#map, type)) this.#map[type]?.delete(fn);
+    const buckets = typeof type === 'number' ? this.#numbers : this.#map;
+    if (Object.hasOwn(buckets, type)) buckets[type]?.delete(fn);
   }
 
   emit<K extends keyof Events>(type: K, payload: Events[K]): void {
-    const listeners = Object.hasOwn(this.#map, type) ? this.#map[type] : undefined;
+    const buckets = typeof type === 'number' ? this.#numbers : this.#map;
+    const listeners = Object.hasOwn(buckets, type) ? buckets[type] : undefined;
     if (!listeners) return;
     for (const fn of Array.from(listeners)) {
       try {
@@ -162,5 +168,6 @@ export class EventBus<Events extends object = EngineEventMap> {
 
   clear(): void {
     this.#map = {};
+    this.#numbers = {};
   }
 }

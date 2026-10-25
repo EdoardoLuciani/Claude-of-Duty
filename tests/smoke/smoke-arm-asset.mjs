@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 import { inspectGLB, parseGLB } from '../../tools/lib/glb-fixture.mjs';
+import { FixtureImageBitmap, installImageBitmapFixture } from '../lib/image-bitmap.mjs';
 
 // Decode real embedded pixels; only the browser canvas transport is replaced.
 const previousCanvas = globalThis.OffscreenCanvas;
@@ -61,6 +62,7 @@ assert(
 assert(manifest.gloveMaxDeviationMetres <= 0.0005, 'retained contact silhouette');
 for (const fixture of ['single', 'grouped', 'grouped-draw-range']) {
   globalThis.OffscreenCanvas = FixtureCanvas;
+  const restoreImageBitmap = installImageBitmapFixture();
   const gltf = await parseGLB(bytes);
   gltf.scene.updateMatrixWorld(true);
   const sources = [];
@@ -92,8 +94,8 @@ for (const fixture of ['single', 'grouped', 'grouped-draw-range']) {
       ['aoMap', source.occlusionTexture],
     ]) {
       const pixels = imagePNG(json.images[json.textures[info.index].source]);
-      // Match the decoded ImageBitmap interface used by the runtime loader.
-      mesh.material[key].image = { ...pixels, close() {} };
+      // Keep the decoded-image double at the offline canvas boundary.
+      mesh.material[key].image = new FixtureImageBitmap(pixels);
       mesh.material[key].flipY = false;
       mesh.material[key].channel = info.texCoord ?? 0;
       expectedPixels.set(mesh.material[key], pixels.data);
@@ -148,6 +150,7 @@ for (const fixture of ['single', 'grouped', 'grouped-draw-range']) {
   } finally {
     GLTFLoader.prototype.loadAsync = originalLoad;
     globalThis.OffscreenCanvas = previousCanvas;
+    restoreImageBitmap();
   }
   try {
     assert.equal(asset.meshes.length, 1);

@@ -145,6 +145,26 @@ export const widened = { health: 1 } as object;
 `);
   assert.equal(safeAsync.status, 0, safeAsync.stdout + safeAsync.stderr);
 
+  // Only Vite's awaited disposal callback accepts promises; ordinary DOM
+  // callbacks must remain covered by no-misused-promises in the same program.
+  const hmrTypes = `import type {} from ${JSON.stringify(join(root, 'src/core/vite-types.d.ts'))};\n`;
+  const safeHmr = lint(
+    hmrTypes +
+      `declare const hot: import(${JSON.stringify(join(root, 'node_modules/vite/types/hot.js'))}).ViteHotContext;
+hot.dispose((): Promise<void> => Promise.resolve());
+`
+  );
+  assert.equal(safeHmr.status, 0, safeHmr.stdout + safeHmr.stderr);
+  const unsafeDom = lint(
+    hmrTypes + `document.addEventListener('click', async (): Promise<void> => {});`
+  );
+  assert.equal(unsafeDom.status, 1, unsafeDom.stdout + unsafeDom.stderr);
+  assert.ok(
+    JSON.parse(unsafeDom.stdout).diagnostics.some(
+      (d) => d.code === 'typescript(no-misused-promises)'
+    )
+  );
+
   // Use the real compiler settings, not a duplicated flag list. These probes
   // must fail if the implementation is wrong and fail this test if a flag is removed.
   writeFileSync(
@@ -204,6 +224,16 @@ import type { HazeSystem } from ${JSON.stringify(join(root, 'src/fx/haze.ts'))};
 import type { EventBus } from ${JSON.stringify(join(root, 'src/core/registry.ts'))};
 declare const ctx: EngineContext;
 declare const events: EventBus;
+declare const keyedEvents: EventBus<Record<string | number, string>>;
+keyedEvents.on(1, payload => { const text: string = payload; return text; });
+keyedEvents.on('1', payload => { const text: string = payload; return text; });
+keyedEvents.emit(1, 'numeric');
+keyedEvents.emit('1', 'string');
+// @ts-expect-error numeric event keys must retain their payload contract
+keyedEvents.emit(1, 123);
+import type { ViteHotContext } from 'vite/types/hot.js';
+type DisposalResult = ReturnType<Parameters<ViteHotContext['dispose']>[0]>;
+const pendingDisposal: DisposalResult = Promise.resolve();
 ctx.get('player').setFlashlightEnabled(true);
 ctx.get('render')._warmGraph().then(report => { const ms: number = report.ms; return ms; });
 const fxCtx: FxContext = ctx;

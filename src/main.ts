@@ -172,9 +172,9 @@ if (lockstep) {
 window.__ENGINE__ = engine;
 
 if (import.meta.hot) {
-  import.meta.hot.dispose((): void => {
-    void engine
+  import.meta.hot.dispose((): Promise<void> =>
+    engine
       .dispose()
-      .catch((error: unknown): void => console.error('[engine] HMR disposal failed', error));
-  });
+      .catch((error: unknown): void => console.error('[engine] HMR disposal failed', error))
+  );
 }

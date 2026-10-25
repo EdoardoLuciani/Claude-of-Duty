@@ -13,12 +13,7 @@ export function isClosable(value: unknown): value is { close(): void } {
   return isRecord(value) && typeof value.close === 'function';
 }
 
-/** ImageBitmap's public surface also works with offline image-loader fixtures. */
+/** Canvas requires a native image instance, not a structurally similar object. */
 export function isImageBitmap(value: unknown): value is ImageBitmap {
-  return (
-    isRecord(value) &&
-    typeof value.width === 'number' &&
-    typeof value.height === 'number' &&
-    typeof value.close === 'function'
-  );
+  return typeof ImageBitmap !== 'undefined' && value instanceof ImageBitmap;
 }
