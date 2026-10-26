@@ -114,20 +114,21 @@ for (const name of ['basis_transcoder.js', 'basis_transcoder.wasm'])
 const originalLoad = GLTFLoader.prototype.loadAsync;
 const originalDispose = KTX2Loader.prototype.dispose;
 const sentinel = new Error('fixture load failure');
+const initFailure = new Error('fixture decoder initialization failure');
 let mode = 'compressed',
   disposals = 0,
-  finishInit;
-const configs = [];
+  finishInit,
+  config;
 GLTFLoader.prototype.loadAsync = async function (url) {
   assert.equal(url, mode === 'png' ? new URL('p320-compact.glb', dir).href : P320_URL);
   const decoder = this.ktx2Loader;
-  configs.push(decoder.workerConfig);
+  config = decoder.workerConfig;
   assert.match(decoder.transcoderPath, /vendor\/basis-e27dfa95\/$/);
   if (mode !== 'png')
     decoder.transcoderPending =
-      mode === 'error'
-        ? new Promise((resolve) => {
-            finishInit = resolve;
+      mode === 'error' || mode === 'init-error'
+        ? new Promise((_resolve, reject) => {
+            finishInit = () => reject(initFailure);
           })
         : Promise.resolve();
   if (mode === 'error') throw sentinel;
@@ -143,7 +144,6 @@ try {
     new Set(),
   ]) {
     const model = await loadP320({ hasFeature: (feature) => supported.has(feature) });
-    const config = configs.at(-1);
     assert.equal(config.bptcSupported, supported.has('texture-compression-bc'));
     assert.equal(config.astcSupported, supported.has('texture-compression-astc'));
     assert(
@@ -170,7 +170,21 @@ try {
   assert.equal(disposals, 3, 'initialization must settle before disposal');
   finishInit();
   await rejected;
-  assert.equal(disposals, 4, 'failed loads also close an initialized decoder');
+  assert.equal(
+    disposals,
+    4,
+    'model failure stays authoritative when decoder initialization also fails'
+  );
+  // GLTFLoader can resolve after dropping failed textures instead of rejecting.
+  mode = 'init-error';
+  const rejectedInit = assert.rejects(
+    loadP320({ hasFeature: () => false }),
+    (error) => error === initFailure
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+  finishInit();
+  await rejectedInit;
+  assert.equal(disposals, 5, 'decoder initialization failure rejects the model and still disposes');
 } finally {
   GLTFLoader.prototype.loadAsync = originalLoad;
   KTX2Loader.prototype.dispose = originalDispose;

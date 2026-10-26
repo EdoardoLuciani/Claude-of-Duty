@@ -84,12 +84,14 @@ export async function loadP320(
   // UASTC data maps fall back to RGBA when ASTC/BC7 are unavailable, avoiding
   // lower-quality transcoding of normal/ORM channels into color-only formats.
   try {
-    return makeP320Model(await new GLTFLoader().setKTX2Loader(decoder).loadAsync(url));
+    const gltf = await new GLTFLoader().setKTX2Loader(decoder).loadAsync(url);
+    // GLTFLoader can drop failed textures and still resolve.
+    await decoder.transcoderPending;
+    return makeP320Model(gltf);
   } finally {
     // PNG diagnostic loads never initialize the decoder or increment its count.
     if (decoder.transcoderPending) {
-      // A failed model load can race decoder initialization. Wait so it cannot
-      // create a worker URL after disposal; loadAsync already reports failures.
+      // Prevent late worker-URL creation; preserve any load/initialization error.
       await decoder.transcoderPending.catch((): void => {});
       decoder.dispose();
     }
