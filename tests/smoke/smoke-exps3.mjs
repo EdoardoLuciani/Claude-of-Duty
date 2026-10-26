@@ -42,7 +42,7 @@ assert.equal(
 );
 for (const image of json.images) {
   const png = imagePNG(image);
-  const size = image.name === 'exps3-orm' ? 1024 : 2048;
+  const size = 1024;
   assert.equal(png.width, size);
   assert.equal(png.height, size);
 }
@@ -81,6 +81,20 @@ assert.equal(primitives.length, 2);
 assert.equal(json.materials.length, 2);
 assert.equal(manifest.optimization.highSourceTriangles, 44617);
 assert.equal(manifest.optimization.targetTriangles, triangles);
+assert.equal(manifest.optimization.decodedTextureBytesRGBA8, 12 * 1024 * 1024);
+assert.deepEqual(manifest.optimization.atlas, {
+  baseColor: [1024, 1024],
+  normal: [1024, 1024],
+  orm: [1024, 1024],
+});
+assert(
+  manifest.optimization.uvAllocation.print.texelsPerMm >
+    manifest.optimization.uvAllocation.plain.texelsPerMm * 4
+);
+assert(
+  manifest.optimization.uvAllocation.relief.texelsPerMm >
+    manifest.optimization.uvAllocation.plain.texelsPerMm * 2
+);
 assert(bytes.length < 5 * 1024 * 1024);
 for (const primitive of primitives) {
   assert(primitive.attributes.NORMAL !== undefined);
@@ -127,6 +141,8 @@ assert.equal(
 );
 assert.equal(glass.material.transmission, 1);
 assert.equal(glass.material.ior, 1.5);
+for (const key of ['map', 'normalMap', 'roughnessMap', 'metalnessMap'])
+  assert.equal(glass.material[key], null, 'constant optical glass needs no texture allocation');
 assert(
   body.material.map &&
     body.material.normalMap &&
@@ -217,6 +233,33 @@ const firstOpaque = (origin, direction) => {
   assert(hits.length > 0, 'exterior detail probe reaches the assembly');
   return hits[0].point.clone().multiplyScalar(1000);
 };
+const surfaceDensity = (origin, direction) => {
+  firstOpaque(origin, direction);
+  const hit = hits[0],
+    geometry = hit.object.geometry,
+    uv = geometry.attributes.uv;
+  const ids = [hit.face.a, hit.face.b, hit.face.c];
+  const [a, b, c] = ids.map((i) =>
+    new Vector3()
+      .fromBufferAttribute(geometry.attributes.position, i)
+      .applyMatrix4(hit.object.matrixWorld)
+  );
+  const worldAreaMm2 = b.sub(a).cross(c.sub(a)).length() * 0.5 * 1e6;
+  const [u, v, w] = ids.map((i) => [uv.getX(i), uv.getY(i)]);
+  const uvArea = Math.abs((v[0] - u[0]) * (w[1] - u[1]) - (v[1] - u[1]) * (w[0] - u[0])) * 0.5;
+  return Math.sqrt((uvArea * 1024 ** 2) / worldAreaMm2);
+};
+const printDensity = surfaceDensity([0.1, 0.054, 0.0025], [-1, 0, 0]);
+const plainDensity = surfaceDensity([0.018, -0.05, -0.01], [0, 1, 0]);
+const reliefDensity = surfaceDensity([0.0172, 0.002, 0.1], [0, 0, -1]);
+assert(
+  printDensity > plainDensity * 4,
+  'actual label UVs have much higher density than plain clamp faces'
+);
+assert(
+  reliefDensity > plainDensity * 2,
+  'actual fine hardware UVs retain priority, not just manifest weights'
+);
 const fromRight = (forward, height) =>
   firstOpaque([0.1, height / 1000, -forward / 1000], [-1, 0, 0]).x;
 const fromRear = (x, height) => firstOpaque([x / 1000, height / 1000, 0.1], [0, 0, -1]).z;

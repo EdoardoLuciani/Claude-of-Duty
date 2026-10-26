@@ -16,11 +16,12 @@ captive scalloped cap, raised quick-detach mount and separate optical windows.
   meshes, five packed maps, seven review cameras and the unchanged studio.
   Blender 5.2 uses Zstandard compression; open normally in Blender 5.2.2.
 - `exps3-0.glb` is the stock native glTF export: **11,972 triangles, two primitives,
-  two PBR materials, three embedded atlases, 2,952,288 bytes**. No high-source
+  two PBR materials, three embedded atlases, 1,676,584 bytes**. No high-source
   geometry, studio, external asset URL, animation, arms or reticle is exported.
-- `exps3-base-color.png` and `exps3-normal.png` are 2048² unique-UV atlases;
-  `exps3-orm.png` is 1024² (R=1, G=roughness, B=metallic). Normal/data maps are
-  Non-Color; base color is sRGB. These three maps are embedded in the GLB.
+- `exps3-base-color.png`, `exps3-normal.png` and `exps3-orm.png` are all **1024²**
+  unique-UV atlases (ORM: R=1, G=roughness, B=metallic). Normal/data maps are
+  Non-Color; base color is sRGB. The glass material is texture-free, not given a
+  redundant 1K map. Only these three body maps are embedded in the GLB.
 - `finish-normal.png` and `finish-roughness.png` are the original seeded 1024²
   high-source finish maps, retained in the blend but **not** the runtime GLB.
   Reference photos are not textures.
@@ -33,7 +34,7 @@ captive scalloped cap, raised quick-detach mount and separate optical windows.
 At the owner's request, the approved detailed model became the bake source for an
 **8–12k target with one opaque atlas material plus separate optical glass**.
 The result reduces triangles **44,617 → 11,972 (73.2%)**, primitives **11 → 2**,
-materials **10 → 2**, and GLB size **4.31 → 2.82 MiB**. This is an asset-resource
+materials **10 → 2**, and GLB size **4.31 → 1.60 MiB**. This is an asset-resource
 comparison, not an FPS benchmark or a promise of two total renderer passes.
 
 `tools/blender/exps3_bake.py` regenerates from freshly authored high/low geometry.
@@ -51,12 +52,40 @@ lost too much of the shallow-relief presentation. **Both optical panes retain th
 original geometry and split normals**, joined into one glass primitive. The body
 is opaque; it is not forced through transmission to achieve a single material.
 
-**Texture-memory trade-off:** the three uncompressed RGBA8 atlases total about
-**36 MiB before mipmaps / 48 MiB with full mips**, versus 8 / 10.7 MiB for the old
-two shared 1K maps. The extra atlas resolution preserves inspection lettering;
-this pass reduces geometry/material submissions and file size, not every memory
-category. No GPU texture compression or performance claim is implied. Tiny baked
-features have finite-resolution/edge differences rather than identical geometry.
+### Detail-weighted 1K evaluation
+
+The owner requested lower texture cost and more useful UV allocation. Three
+freshly baked variants were compared under identical cameras/lights: the previous
+2K/2K/1K atlas, a uniform 1K control with its old UVs, and the selected **all-1K**
+layout. `density_group()` prioritizes printed hood bands, warning text, dial
+legends, shallow relief and hardware; plain/back-facing surfaces get less space.
+Curved roof/rims retain a minimum density because their baked normals are not
+merely a constant base color. No geometry or material-count changes were made.
+
+Measured mean base-color/normal texel densities on matching physical triangles:
+
+| Surface group | Previous 2K | Uniform 1K | Weighted 1K |
+| --- | ---: | ---: | ---: |
+| Printed detail | 7.64 px/mm | 3.82 px/mm | **8.17 px/mm** |
+| Fine relief | 5.67 | 2.84 | **5.11** |
+| Curved edges | 6.15 | 3.07 | 2.94 |
+| Plain surfaces | 4.09 | 2.04 | **1.46** |
+| Hidden/back-facing | 6.05 | 3.02 | **0.51** |
+
+The warning/marking crops support comparable readability to the previous 2K
+layout and a clear improvement over simply shrinking it. Tiny relief is slightly
+softer; unmarked micrograin and small bevel highlights are lower resolution,
+especially at extreme zoom. Group densities are averages, not a guarantee for
+every glyph. The 1K raster check found zero overlapping interior pixel centres;
+UVs remain in bounds. The density attribute is retained in the editable blend
+for inspection and is not exported as runtime vertex data.
+
+**Texture memory:** three uncompressed RGBA8 1K maps total **12 MiB before mips /
+about 16 MiB with full mips**, versus 36 / 48 MiB for the preceding atlas—a
+**66.7% reduction**. GLB size drops from 2.82 to **1.60 MiB**. The original
+44k model's two shared 1K maps used 8 / 10.7 MiB, so this is still a geometry/state
+versus texture trade-off, not an FPS or universal-memory reduction claim. No GPU
+texture compression or studio-light baking is introduced.
 
 The high-source Sol review below is historical. This new optimization was
 parent-checked against the approved source under the frozen cameras and native
@@ -80,8 +109,8 @@ removal need not leave floating panes behind.
 
 Side, front, rear and top comparisons use estimated orthographic cameras with
 one uniform scale per photo, not independent X/Y stretching or per-part alignment.
-The camera poses are frozen in the source and review JSON. Filled-silhouette IoU
-is descriptive only: **left 0.93695, right 0.92221, rear 0.89862, front 0.90614,
+The camera poses are frozen in the source and review JSON. Historical 2K-atlas
+filled-silhouette reference IoU is descriptive only: **left 0.93695, right 0.92221, rear 0.89862, front 0.90614,
 top 0.93610**. Alpha >250 excludes faint photo shadows; enclosed holes are filled
 for this external-profile statistic. It does **not** assess the optical aperture,
 small details, material fidelity or certify 1:1 accuracy. The smoke test separately
@@ -222,14 +251,13 @@ unchanged. Cameras are `left`, `right`, `front`, `rear`, `top`, `hero` and
 `rear-quarter`. Normal game builds use committed products and require no Blender.
 The asset is intentionally not mounted or imported by production runtime code yet.
 
-Fresh separate-process builds (one rendering all seven views, one without renders)
-produce identical atlas PNGs, geometry/indices, normals, UVs, materials and sockets.
-Native Mikk export differs in **one tangent component by 0.0001000166**, one native
-four-decimal rounding bin (at most about 0.006°); therefore the optimized GLBs are
-not claimed byte-identical. This narrowly measured render-cache difference does
-not permit broader geometry/texture tolerances. The native UV lattice is fixed
-before baking/export; no exporter hooks or post-export GLB/texture repairs exist.
-Same-host evidence is not universal cross-platform determinism.
+Fresh separate-process **1K** builds (one rendering all seven views, one without
+renders) produced byte-identical GLBs and atlas PNGs on this host. Positions,
+normals, indices, UVs, native tangents, materials and nodes were compared exactly.
+The previous 2K stage had a measured one-component native tangent rounding
+variation; that historical observation is not a blanket tolerance. The native UV
+lattice is fixed before baking/export; no exporter hooks or post-export GLB/texture
+repairs exist. Same-host evidence is not universal cross-platform determinism.
 
 On the authoring host, the installed Blender OCIO 2.5 configuration was incompatible
 with its OCIO 2.4.2 library. A process-local official Blender 4.4.3 configuration
