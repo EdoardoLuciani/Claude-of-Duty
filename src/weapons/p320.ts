@@ -3,6 +3,7 @@ import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
 import handReference from '../../assets/weapons/p320-compact/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/p320-compact/manifest.json' with { type: 'json' };
+import { isSkinnedMesh } from '../core/three-guards.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
 import {
@@ -103,8 +104,11 @@ export class P320Animation {
   magazine!: THREE.Object3D;
   spare!: THREE.Object3D;
   magazineRound!: THREE.Object3D;
+  skin!: THREE.SkinnedMesh;
   hands!: Record<HandSide, AuthoredHand>;
   poseQ = new THREE.Quaternion();
+  private magazineRoundAuthoredScale = new THREE.Vector3();
+  private magazineRoundScaleOverridden = false;
   idleTime = 0;
   name: string | null = null;
   fireTime!: number;
@@ -121,6 +125,9 @@ export class P320Animation {
     this.magazine = node('magazine');
     this.spare = node('magazine_spare');
     this.magazineRound = node('magazine_round');
+    const skin = node('P320_surface');
+    if (!isSkinnedMesh(skin)) throw new Error('P320: missing mechanical skin');
+    this.skin = skin;
     this.hands = discoverAuthoredHands(node);
     this.reset();
   }
@@ -130,6 +137,12 @@ export class P320Animation {
   }
 
   _sample(name: string, time: number): void {
+    // PropertyMixer skips unchanged constant channels. Undo our visibility
+    // override before sampling so authored hidden/visible scales stay authoritative.
+    if (this.magazineRoundScaleOverridden) {
+      this.magazineRound.scale.copy(this.magazineRoundAuthoredScale);
+      this.magazineRoundScaleOverridden = false;
+    }
     sampleAuthoredAction(this, name, time);
     this.root.updateMatrix();
     this.poseQ.copy(this.root.quaternion);
@@ -169,6 +182,13 @@ export class P320Animation {
       this.barrel.rotation.x = THREE.MathUtils.degToRad(3.5);
     }
     this.magazineRound.visible = magazineLoaded;
+    // Bone visibility does not hide its weighted vertices. Preserve the native
+    // scale before collapsing the cartridge, then restore it in _sample().
+    if (!magazineLoaded) {
+      this.magazineRoundAuthoredScale.copy(this.magazineRound.scale);
+      this.magazineRound.scale.setScalar(0);
+      this.magazineRoundScaleOverridden = true;
+    }
     this.root.updateMatrixWorld(true);
   }
 
@@ -184,6 +204,7 @@ export class P320Animation {
   dispose(): void {
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.root);
+    this.skin.skeleton.dispose();
     disposeWeaponMaterials(this.model);
   }
 }
