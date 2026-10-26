@@ -27,6 +27,9 @@ assert.equal(json.images.length, 4, 'shared base/ORM/normal/emission atlas, no a
 assert.equal(json.materials.length, 1, 'all finishes, lettering and sights share one material');
 assert.equal(json.meshes.length, 1);
 assert.equal(json.meshes[0].primitives.length, 1, 'one complete animated weapon submission');
+assert(json.meshes[0].primitives[0].attributes.TEXCOORD_1 !== undefined);
+assert.equal(json.materials[0].pbrMetallicRoughness.baseColorTexture.texCoord, 1);
+assert.equal(json.materials[0].normalTexture.texCoord ?? 0, 0, 'normal detail keeps UV0');
 assert.equal(json.skins.length, 1);
 assert.equal(json.skins[0].joints.length, 9, 'rigid mechanical parts, not duplicate hands');
 assert(
@@ -37,7 +40,7 @@ const { imagePNG } = inspectGLB(bytes);
 for (const image of json.images) {
   const png = imagePNG(image);
   const kind = image.name.replace('p320-', '');
-  const resolution = kind === 'base' || kind === 'normal' ? 2048 : 1024;
+  const resolution = 1024;
   assert.equal(manifest.textureResolutions[kind], resolution);
   assert.equal(png.width, resolution);
   assert.equal(png.height, resolution);
@@ -92,6 +95,8 @@ const model = makeP320Model(gltf);
 for (const m of model.materials) {
   const source = json.materials.find((a) => a.name === m.name).pbrMetallicRoughness;
   assert(m.isMeshPhysicalNodeMaterial, 'authored weapon enters native indirect hook');
+  assert.equal(m.map.channel, 1, 'lettering-focused color UV survives material conversion');
+  assert.equal(m.normalMap.channel, 0, 'normal mapping is independent of color UV allocation');
   assert.deepEqual(m.color.toArray(), (source.baseColorFactor ?? [1, 1, 1]).slice(0, 3));
   assert.equal(m.metalness, source.metallicFactor ?? 1);
   assert.equal(m.roughness, source.roughnessFactor ?? 1);

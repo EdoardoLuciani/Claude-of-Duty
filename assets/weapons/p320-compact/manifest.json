@@ -118,19 +118,19 @@
     }
   },
   "stats": {
-    "triangles": 18036,
-    "vertices": 39689,
+    "triangles": 20212,
+    "vertices": 43320,
     "meshes": 1,
     "primitives": 1,
     "materials": 1,
     "textureImages": 4,
     "joints": 9,
-    "bytes": 9290700
+    "bytes": 5532644
   },
   "textureResolutions": {
-    "base": 2048,
+    "base": 1024,
     "orm": 1024,
-    "normal": 2048,
+    "normal": 1024,
     "emission": 1024
   },
   "geometry": "One rigidly weighted mechanical skin; lettering/traction baked from retained high source",

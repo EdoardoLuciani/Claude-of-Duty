@@ -59,7 +59,7 @@ def build(output, render=False, quick=False):
     select_clip(parts, hands, clips, 'Idle')
     cameras = build_studio(studio, hands, quick)
     notes=bpy.data.texts.new('START HERE')
-    notes.write('P320 COMPACT / GENERATED PREVIEW\nEdit tools/blender/p320/ and p320_actions.py, not this file.\nReference-specific early-production exterior.\nEight weapon + wrist/finger NLA actions.\nHands use existing glove/sleeve meshes; authored deformation lives in this file.\nSelect the same clip on weapon controls and the two armatures.\nRuntime exports hand controls and reuses shared skins (no duplicated texture cost).\nRun tools/blender/p320_review.py for stills or an animation reel.\nPacked 2048 base/normal and 1024 ORM/emission atlas; high bake sources and studio are excluded from GLB.\nNot manufacturing geometry; not endorsed by SIG SAUER.\n')
+    notes.write('P320 COMPACT / GENERATED PREVIEW\nEdit tools/blender/p320/ and p320_actions.py, not this file.\nReference-specific early-production exterior.\nEight weapon + wrist/finger NLA actions.\nHands use existing glove/sleeve meshes; authored deformation lives in this file.\nSelect the same clip on weapon controls and the two armatures.\nRuntime exports hand controls and reuses shared skins (no duplicated texture cost).\nRun tools/blender/p320_review.py for stills or an animation reel.\nPacked base/ORM/normal/emission atlas (sizes in manifest textureResolutions); high bake sources and studio are excluded from GLB.\nNot manufacturing geometry; not endorsed by SIG SAUER.\n')
     scene['clips']=json.dumps(clips)
     scene['hand_collection']='P320 | authored hands (shared appearance)'
     for s in bpy.data.screens:
