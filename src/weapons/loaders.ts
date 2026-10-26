@@ -1,3 +1,5 @@
+import type { Renderer } from 'three/webgpu';
+
 import { loadAX338 } from './ax338.ts';
 import { isWeaponId } from './defs.ts';
 import type { WeaponId } from './defs.ts';
@@ -9,7 +11,9 @@ import { loadMPX } from './mpx.ts';
 import { loadP320 } from './p320.ts';
 import type { AuthoredModels, WeaponModelRecord } from './runtime-types.ts';
 
-const LOADERS: { [K in WeaponId]: () => Promise<AuthoredModels[K]> } = {
+const LOADERS: {
+  [K in WeaponId]: (renderer: Pick<Renderer, 'hasFeature'>) => Promise<AuthoredModels[K]>;
+} = {
   rifle: loadM4,
   mcx: loadMCX,
   pistol: loadP320,
@@ -20,8 +24,11 @@ const LOADERS: { [K in WeaponId]: () => Promise<AuthoredModels[K]> } = {
 };
 
 /** Gameplay and preview mount the same required authored assets. */
-export function loadWeapon(id: string): Promise<WeaponModelRecord> {
+export function loadWeapon(
+  id: string,
+  renderer: Pick<Renderer, 'hasFeature'>
+): Promise<WeaponModelRecord> {
   return isWeaponId(id)
-    ? LOADERS[id]()
+    ? LOADERS[id](renderer)
     : Promise.reject(new Error(`[weapons] unknown weapon ${id}`));
 }

@@ -380,11 +380,13 @@ export class WeaponSystem {
     const spawn = [...this.owned];
     const rest = WEAPON_IDS.filter((id): boolean => !this.owned.has(id));
     let tris = 0;
-    const records = await Promise.all(spawn.map(loadWeapon));
+    const load = (id: WeaponId): Promise<WeaponModelRecord> =>
+      loadWeapon(id, ctx.get('render').renderer);
+    const records = await Promise.all(spawn.map(load));
     for (let i = 0; i < spawn.length; i++) {
       tris += this.viewmodel.addWeapon(records[i], this._requireState(spawn[i]).def).tris;
     }
-    this._restTask = this._mountRest(rest, loadWeapon);
+    this._restTask = this._mountRest(rest, load);
     this.viewmodel.setActive(this.activeId);
     this.viewmodel.play('draw');
     this._pickups = new AmmoPickups(this);
