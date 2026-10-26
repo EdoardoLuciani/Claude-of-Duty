@@ -41,9 +41,16 @@ for uv in surface.data.uv_layers:
     assert all(0<=coord<=1 for loop in uv.data for coord in loop.uv)
 surface.data.calc_loop_triangles()
 assert len(surface.data.loop_triangles)<30000
-assert len(arm.data.bones)==9
+expected_parts={'frame','slide','barrel','trigger','slide_catch','magazine',
+                'magazine_spare','magazine_round','magazine_spare_round'}
+assert {bone.name for bone in arm.data.bones}==expected_parts
+membership={name:0 for name in expected_parts}
 for vertex in surface.data.vertices:
     assert len(vertex.groups)==1 and vertex.groups[0].weight==1
+    part=surface.vertex_groups[vertex.groups[0].group].name
+    assert part in membership, 'expected mechanical group: '+part
+    membership[part]+=1
+assert all(membership.values()), 'every mechanical joint must own geometry: '+str(membership)
 for name,info in clips.items():
     for o in s.objects:
         if not o.animation_data:continue

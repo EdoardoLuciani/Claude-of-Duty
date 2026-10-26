@@ -107,6 +107,8 @@ export class P320Animation {
   skin!: THREE.SkinnedMesh;
   hands!: Record<HandSide, AuthoredHand>;
   poseQ = new THREE.Quaternion();
+  private magazineRoundAuthoredScale = new THREE.Vector3();
+  private magazineRoundScaleOverridden = false;
   idleTime = 0;
   name: string | null = null;
   fireTime!: number;
@@ -135,6 +137,12 @@ export class P320Animation {
   }
 
   _sample(name: string, time: number): void {
+    // PropertyMixer skips unchanged constant channels. Undo our visibility
+    // override before sampling so authored hidden/visible scales stay authoritative.
+    if (this.magazineRoundScaleOverridden) {
+      this.magazineRound.scale.copy(this.magazineRoundAuthoredScale);
+      this.magazineRoundScaleOverridden = false;
+    }
     sampleAuthoredAction(this, name, time);
     this.root.updateMatrix();
     this.poseQ.copy(this.root.quaternion);
@@ -174,9 +182,13 @@ export class P320Animation {
       this.barrel.rotation.x = THREE.MathUtils.degToRad(3.5);
     }
     this.magazineRound.visible = magazineLoaded;
-    // Bone visibility does not hide its weighted vertices. Collapse only the
-    // cartridge bone; the next native sample restores its authored scale.
-    if (!magazineLoaded) this.magazineRound.scale.setScalar(0);
+    // Bone visibility does not hide its weighted vertices. Preserve the native
+    // scale before collapsing the cartridge, then restore it in _sample().
+    if (!magazineLoaded) {
+      this.magazineRoundAuthoredScale.copy(this.magazineRound.scale);
+      this.magazineRound.scale.setScalar(0);
+      this.magazineRoundScaleOverridden = true;
+    }
     this.root.updateMatrixWorld(true);
   }
 
