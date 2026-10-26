@@ -2,6 +2,7 @@
 import math
 from pathlib import Path
 import bpy
+import bmesh
 from mathutils import Vector, Matrix
 from .materials import build_source_materials
 
@@ -34,7 +35,7 @@ def build_geometry(asset):
     bpy.context.view_layer.update()
     coords = empty('Surface_coordinates')
 
-    materials, (nitron, polymer, stipple, steel, barrel_mat, mag_mat, cavity, mark, brass, copper, white) = build_source_materials(coords)
+    nitron, polymer, stipple, steel, barrel_mat, mag_mat, cavity, mark, brass, copper, white = build_source_materials(coords)
     def finish(o, name, mat=polymer, parent=body, bevel=.0005, smooth=False):
         o.name = name; move(o)
         if mat: o.data.materials.append(mat)
@@ -290,18 +291,42 @@ def build_geometry(asset):
     for o in list(asset.objects):
         if o.type not in {'MESH','FONT'}:continue
         active(o);bpy.ops.object.convert(target='MESH');weapon_meshes.append(o)
-    # Conform molded grip lettering to the actual curved side, no hovering glyphs.
+        # Boolean cutter interiors inherit the assembly finish, not an empty
+        # material slot that would have no active atlas bake target.
+        for index, material in enumerate(o.data.materials):
+            if material is None:o.data.materials[index]=o.data.materials[0]
+    # Conform every bake-source glyph to its actual assembly, not just the grip.
+    # The old floating barrel label sat 3.3 mm outside the chamber side: it could
+    # render as geometry but would miss a sensible high-to-low bake cage entirely.
     from mathutils.bvhtree import BVHTree
-    grip_surface=BVHTree.FromObject(grip,bpy.context.evaluated_depsgraph_get())
+    assembly_surfaces={}
+    for parent in {o.parent for o in weapon_meshes}:
+        vertices=[];polygons=[]
+        for o in weapon_meshes:
+            if o.parent!=parent or o.name.startswith('Mark |'):continue
+            start=len(vertices)
+            vertices.extend(o.matrix_world@v.co for v in o.data.vertices)
+            polygons.extend(tuple(start+i for i in p.vertices) for p in o.data.polygons)
+        assembly_surfaces[parent]=BVHTree.FromPolygons(vertices,polygons)
     for o in weapon_meshes:
-        if not o.name.startswith('Mark | SIGSAUER') or o.parent!=body:continue
-        inv=o.matrix_world.inverted();side=-1 if o.location.x<0 else 1
+        if not o.name.startswith('Mark |'):continue
+        # Project only the outward glyph cap. Flattening an extruded font's
+        # front AND back would create coincident reversed bake surfaces.
+        bm=bmesh.new();bm.from_mesh(o.data)
+        bmesh.ops.delete(bm,geom=[face for face in bm.faces if face.normal.z<.5],context='FACES')
+        bm.to_mesh(o.data);bm.free();o.data.update()
+        inv=o.matrix_world.inverted()
+        direction=(o.matrix_world.to_3x3()@Vector((0,0,1))).normalized()
+        projected=0
         for v in o.data.vertices:
             p=o.matrix_world@v.co
-            hit,normal,_,_=grip_surface.ray_cast(Vector((side*.1,p.y,p.z)),Vector((-side,0,0)))
-            if hit:v.co=inv@(hit+normal*.00009)
-    # Small letters retain a constant physical material instead of consuming tiny
-    # subpixel UV islands. This also prevents bake-padding bleeding into markings.
+            hit,normal,_,_=assembly_surfaces[o.parent].ray_cast(p+direction*.01,-direction,.022)
+            if hit:
+                v.co=inv@(hit+normal*.00009)
+                projected+=1
+        o['bake_projected_vertices']=projected
+    # Constant physical source finishes bake readable markings into the shared
+    # low atlas; glyphs never get independent rendered UV islands or materials.
     letter_materials={}
     for o in weapon_meshes:
         if not o.name.startswith('Mark |'):continue
@@ -312,12 +337,5 @@ def build_geometry(asset):
             p.inputs['Roughness'].default_value=.65;p.inputs['Metallic'].default_value=.1
             letter_materials[source.name]=m
         o.data.materials.clear();o.data.materials.append(letter_materials[source.name])
-    bake_meshes=[o for o in weapon_meshes if not o.name.startswith('Mark |') and o.data.materials[0]!=tritium]
-    # Unique atlas across all weapon surfaces; density allocation follows area.
-    active(bake_meshes[0])
-    for o in bake_meshes:o.select_set(True)
-    bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT')
-    bpy.ops.uv.smart_project(angle_limit=math.radians(75),island_margin=.012)
-    bpy.ops.object.mode_set(mode='OBJECT')
-
-    return asset, coords, [rig,body,slide,barrel,trigger,catch,mag,spare,round_live,round_spare], weapon_meshes, materials, tritium
+    # The source is procedural; only the reduced surfaces need atlas UVs.
+    return asset, coords, [rig,body,slide,barrel,trigger,catch,mag,spare,round_live,round_spare], weapon_meshes
