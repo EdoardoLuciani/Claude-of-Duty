@@ -258,7 +258,7 @@
     "blender": "5.2.2 LTS",
     "host": "Linux x86_64, same host, independent factory-empty processes and empty output directories",
     "glbSha256": "72523d1517ce1a60fe588811464c08c71bb8ab282359162cd226db22c372d1c8",
-    "result": "Current weighted1K render/no-render builds produce byte-identical GLBs and atlas PNGs on this host. JSON, positions, normals, UVs, native tangents and indices match exactly; no general cross-host determinism or relaxed tolerance claim.",
+    "result": "Historical initial weighted1K render/no-render builds produced byte-identical GLBs and atlas PNGs on this host. JSON, positions, normals, UVs, native tangents and indices matched exactly; no general cross-host determinism or relaxed tolerance claim. Current product evidence: texture1kHoodReturnCorrection.repeatBuild.",
     "nativeTangentDifference": {
       "components": 0,
       "maxAbsolute": 0,
