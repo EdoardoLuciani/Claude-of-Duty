@@ -81,12 +81,25 @@ export async function loadP320(
     dxtSupported: false,
     pvrtcSupported: false,
   };
+  // GLTFLoader converts image failures to null textures; retain their original cause.
+  let textureFailed = false;
+  let textureFailure: unknown;
+  const loadTexture = decoder.load.bind(decoder);
+  decoder.load = (source, onLoad, onProgress, onError): void => {
+    loadTexture(source, onLoad, onProgress, (error): void => {
+      if (!textureFailed) {
+        textureFailed = true;
+        textureFailure = error;
+      }
+      onError?.(error);
+    });
+  };
   // UASTC data maps fall back to RGBA when ASTC/BC7 are unavailable, avoiding
   // lower-quality transcoding of normal/ORM channels into color-only formats.
   try {
     const gltf = await new GLTFLoader().setKTX2Loader(decoder).loadAsync(url);
-    // GLTFLoader can drop failed textures and still resolve.
     await decoder.transcoderPending;
+    if (textureFailed) throw textureFailure;
     return makeP320Model(gltf);
   } finally {
     // PNG diagnostic loads never initialize the decoder or increment its count.
