@@ -30,6 +30,12 @@ assert.equal(json.meshes[0].primitives.length, 1, 'one complete animated weapon 
 assert(json.meshes[0].primitives[0].attributes.TEXCOORD_1 !== undefined);
 assert.equal(json.materials[0].pbrMetallicRoughness.baseColorTexture.texCoord, 1);
 assert.equal(json.materials[0].normalTexture.texCoord ?? 0, 0, 'normal detail keeps UV0');
+assert.equal(
+  json.materials[0].pbrMetallicRoughness.metallicRoughnessTexture.texCoord ?? 0,
+  0,
+  'roughness/metalness keep UV0'
+);
+assert.equal(json.materials[0].emissiveTexture.texCoord ?? 0, 0, 'sight emission keeps UV0');
 assert.equal(json.skins.length, 1);
 assert.equal(json.skins[0].joints.length, 9, 'rigid mechanical parts, not duplicate hands');
 assert(
@@ -97,6 +103,9 @@ for (const m of model.materials) {
   assert(m.isMeshPhysicalNodeMaterial, 'authored weapon enters native indirect hook');
   assert.equal(m.map.channel, 1, 'lettering-focused color UV survives material conversion');
   assert.equal(m.normalMap.channel, 0, 'normal mapping is independent of color UV allocation');
+  assert.equal(m.roughnessMap.channel, 0, 'roughness keeps surface UV0');
+  assert.equal(m.metalnessMap.channel, 0, 'metalness keeps surface UV0');
+  assert.equal(m.emissiveMap.channel, 0, 'sight emission keeps surface UV0');
   assert.deepEqual(m.color.toArray(), (source.baseColorFactor ?? [1, 1, 1]).slice(0, 3));
   assert.equal(m.metalness, source.metallicFactor ?? 1);
   assert.equal(m.roughness, source.roughnessFactor ?? 1);
@@ -133,22 +142,59 @@ const anim = entry.animation;
 assert(anim.skin.isSkinnedMesh);
 const weights = anim.skin.geometry.getAttribute('skinWeight');
 const joints = anim.skin.geometry.getAttribute('skinIndex');
+const verticesByPart = new Map(
+  [
+    'frame',
+    'slide',
+    'barrel',
+    'trigger',
+    'slide_catch',
+    'magazine',
+    'magazine_spare',
+    'magazine_round',
+    'magazine_spare_round',
+  ].map((name) => [name, []])
+);
+assert.deepEqual(
+  new Set(anim.skin.skeleton.bones.map((bone) => bone.name)),
+  new Set(verticesByPart.keys())
+);
 for (let i = 0; i < weights.count; i++) {
   assert.equal(weights.getX(i), 1, 'one rigid influence per vertex');
   assert.equal(weights.getY(i) + weights.getZ(i) + weights.getW(i), 0);
+  const part = anim.skin.skeleton.bones[joints.getX(i)]?.name;
+  assert(verticesByPart.has(part), `vertex ${i}: expected mechanical joint`);
+  verticesByPart.get(part).push(i);
 }
-const slideJoint = anim.skin.skeleton.bones.indexOf(anim.slide);
+for (const [part, vertices] of verticesByPart)
+  assert(vertices.length > 0, `${part}: joint must own rendered geometry`);
 const roundJoint = anim.skin.skeleton.bones.indexOf(anim.magazineRound);
-const slideVertex = Array.from({ length: joints.count }, (_, i) => i).find(
-  (i) => joints.getX(i) === slideJoint
-);
-assert.notEqual(slideVertex, undefined);
+const slideVertex = verticesByPart.get('slide')[0];
 function skinPoint(index) {
   anim.root.updateMatrixWorld(true);
   anim.skin.skeleton.update();
   return anim.root.worldToLocal(
     anim.skin.localToWorld(anim.skin.getVertexPosition(index, new THREE.Vector3()))
   );
+}
+function assertPartGeometry(part, visible, context) {
+  anim.root.updateMatrixWorld(true);
+  anim.skin.skeleton.update();
+  const bounds = new THREE.Box3();
+  const point = new THREE.Vector3();
+  for (const index of verticesByPart.get(part))
+    bounds.expandByPoint(anim.skin.getVertexPosition(index, point));
+  const extent = bounds.getSize(point).length();
+  assert(
+    visible ? extent > 0.001 : extent < 1e-6,
+    `${context}: ${part} skinned extent ${extent} must be ${visible ? 'visible' : 'collapsed'}`
+  );
+}
+function assertMagazineGeometry(oldVisible, spareVisible, oldRoundVisible, context) {
+  assertPartGeometry('magazine', oldVisible, context);
+  assertPartGeometry('magazine_round', oldVisible && oldRoundVisible, context);
+  assertPartGeometry('magazine_spare', spareVisible, context);
+  assertPartGeometry('magazine_spare_round', spareVisible, context);
 }
 anim._sample('Idle', 0);
 const slidePoint = skinPoint(slideVertex);
@@ -168,6 +214,59 @@ assert(
   collapsedRounds.every((point) => point.distanceTo(collapsedRounds[0]) < 1e-6),
   'empty-magazine override collapses cartridge vertices, not only Bone.visible'
 );
+// Constant Idle scale channels need explicit restoration before re-sampling;
+// Three's PropertyMixer otherwise leaves an external zero-scale override intact.
+for (const resetBetween of [false, true]) {
+  anim.reset();
+  anim.update(1 / 60, null, 0, true, false);
+  assertPartGeometry('magazine_round', false, 'empty Idle');
+  if (resetBetween) {
+    anim.reset();
+    assertPartGeometry('magazine_round', true, 'empty Idle -> reset');
+  }
+  anim.update(1 / 60, null, 0, false, true);
+  assert(anim.magazineRound.visible);
+  assertPartGeometry('magazine_round', true, `loaded Idle after reset=${resetBetween}`);
+}
+// Restoring the adapter override must not replace native hidden-round keys.
+anim.reset();
+anim.fire();
+anim.update(2 / 60, null, 0, true, false);
+anim._sample('Last_Shot', 2 / 60);
+assertPartGeometry('magazine_round', false, 'authored Last_Shot after empty override');
+anim.update(0, 'reloadEmpty', 0.8, true, false);
+anim.update(0, 'reloadEmpty', 0.8, true, true);
+assertPartGeometry('magazine_round', false, 'authored Reload_Empty after loaded update');
+for (const name of ['Reload_Tactical', 'Reload_Empty']) {
+  anim.reset();
+  assertMagazineGeometry(true, false, true, `${name}: Idle`);
+  const seatedPoint = skinPoint(verticesByPart.get('magazine')[0]);
+  anim._sample(name, 0.8);
+  assert(
+    skinPoint(verticesByPart.get('magazine')[0]).distanceTo(seatedPoint) > 0.01,
+    `${name}: old magazine vertices follow the departing bone`
+  );
+  anim._sample(name, 1 - 1e-6);
+  assertMagazineGeometry(true, false, name !== 'Reload_Empty', `${name}: before handoff`);
+  anim._sample(name, 1);
+  assertMagazineGeometry(false, true, false, `${name}: at handoff`);
+  const arrivingPoint = skinPoint(verticesByPart.get('magazine_spare')[0]);
+  anim._sample(name, 1.8);
+  assertMagazineGeometry(false, true, false, `${name}: fresh magazine seated`);
+  assert(
+    skinPoint(verticesByPart.get('magazine_spare')[0]).distanceTo(arrivingPoint) > 0.05,
+    `${name}: fresh magazine vertices follow the arriving bone`
+  );
+  // STEP endpoints use the actual float32 clip time, not the rounded manifest duration.
+  const nativeDuration = anim.actions[name].getClip().duration;
+  anim._sample(name, nativeDuration - 1e-6);
+  assertMagazineGeometry(false, true, false, `${name}: before final exchange`);
+  anim._sample(name, nativeDuration);
+  assertMagazineGeometry(true, false, true, `${name}: final exchange`);
+  anim._sample(name, 1.8);
+  anim.reset();
+  assertMagazineGeometry(true, false, true, `${name}: reset during reload`);
+}
 anim._sample('Last_Shot', manifest.clips.Last_Shot.duration);
 assert(
   anim.slide.position.z > 0.025,
