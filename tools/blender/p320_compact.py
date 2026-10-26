@@ -72,7 +72,7 @@ def build(output, render=False, quick=False):
     if render:
         for name,cam in cameras.items():
             scene.camera=cam;scene.render.filepath=str(output/'renders'/f'{name}.png');bpy.ops.render.render(write_still=True)
-    stats = export_asset(asset, coords, parts, output)
+    stats = export_asset(asset, coords, output)
     manifest={'asset':'SIG P320 Nitron Compact | early-production visual reconstruction','units':'metres','blender_forward':'+Y','gltf_forward':'-Z','clips':clips,'stats':stats,
      'textureResolutions':ATLAS_RESOLUTIONS,'geometry':'One rigidly weighted mechanical skin; lettering/traction baked from retained high source','handAnimation':'Blender wrist and finger controls; shared runtime skins and shoulder IK',
      'source':'tools/blender/p320_compact.py + tools/blender/p320/ + tools/blender/p320_actions.py + tools/p320-hand-reference.mjs',

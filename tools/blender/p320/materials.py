@@ -6,7 +6,6 @@ from .color_uv import COLOR_UV, layout_color
 ATLAS_RESOLUTIONS = {'base': 1024, 'orm': 1024, 'normal': 1024, 'emission': 1024}
 
 def build_source_materials(coords):
-    materials = []
     def material(name, color, rough=.6, metal=0, grain=0, stipple=False):
         m = bpy.data.materials.new(name); m.use_nodes = True
         m.diffuse_color = (*color,1)
@@ -39,7 +38,6 @@ def build_source_materials(coords):
         mix = n.new('ShaderNodeMixRGB'); mix.blend_type = 'MULTIPLY'; mix.inputs[0].default_value = .32
         l.new(ramp.outputs[0],mix.inputs[1]); l.new(ao.outputs['Color'],mix.inputs[2])
         l.new(mix.outputs[0],p.inputs['Base Color'])
-        materials.append(m)
         return m
 
     nitron = material('Nitron | satin coated steel',(.033,.036,.039),.53,0,.24)
@@ -54,7 +52,7 @@ def build_source_materials(coords):
     copper = material('Visible dummy round | copper',(.30,.105,.045),.32,1,.1)
     white = material('SIGLITE | white surround',(.68,.69,.63),.58,0,.05)
 
-    return materials, (nitron, polymer, stipple, steel, barrel_mat, mag_mat, cavity, mark, brass, copper, white)
+    return nitron, polymer, stipple, steel, barrel_mat, mag_mat, cavity, mark, brass, copper, white
 
 def bake_atlas(output, asset, weapon_meshes):
     scene = bpy.context.scene

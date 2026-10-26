@@ -21,7 +21,7 @@ assert(
   'editable Blender source'
 );
 const bytes = readFileSync(new URL(P320_URL));
-const json = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)));
+const { json, imagePNG } = inspectGLB(bytes);
 assert.equal(json.animations.length, 8);
 assert.equal(json.images.length, 4, 'shared base/ORM/normal/emission atlas, no arm textures');
 assert.equal(json.materials.length, 1, 'all finishes, lettering and sights share one material');
@@ -42,7 +42,6 @@ assert(
   !json.nodes.some((node) => node.name?.startsWith('Mark |')),
   'lettering is baked, not drawn'
 );
-const { imagePNG } = inspectGLB(bytes);
 for (const image of json.images) {
   const png = imagePNG(image);
   const kind = image.name.replace('p320-', '');
@@ -168,7 +167,6 @@ for (let i = 0; i < weights.count; i++) {
 }
 for (const [part, vertices] of verticesByPart)
   assert(vertices.length > 0, `${part}: joint must own rendered geometry`);
-const roundJoint = anim.skin.skeleton.bones.indexOf(anim.magazineRound);
 const slideVertex = verticesByPart.get('slide')[0];
 function skinPoint(index) {
   anim.root.updateMatrixWorld(true);
@@ -206,14 +204,7 @@ assert(
   'actual slide vertices follow the last-shot bone, not just an animated empty'
 );
 anim.update(0, 'reloadEmpty', 0.8, true, false);
-const collapsedRounds = [];
-for (let i = 0; i < joints.count; i++)
-  if (joints.getX(i) === roundJoint) collapsedRounds.push(skinPoint(i));
-assert(collapsedRounds.length > 0);
-assert(
-  collapsedRounds.every((point) => point.distanceTo(collapsedRounds[0]) < 1e-6),
-  'empty-magazine override collapses cartridge vertices, not only Bone.visible'
-);
+assertPartGeometry('magazine_round', false, 'empty-magazine override');
 // Constant Idle scale channels need explicit restoration before re-sampling;
 // Three's PropertyMixer otherwise leaves an external zero-scale override intact.
 for (const resetBetween of [false, true]) {
