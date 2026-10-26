@@ -5,6 +5,11 @@ import bpy
 from mathutils import Vector
 
 
+ATLAS_SIZE = 1024
+# Relative UV area, not material changes. Plain/hidden faces should not consume
+# the same texel density as lettering and projected shallow relief.
+UV_DENSITY = {'print':32, 'relief':12, 'edge':4, 'casting':.5, 'plain':1, 'hidden':.125}
+
 BAKED_DETAILS = ('Rear cast brand', 'Hood brand ', 'Printed mark ', 'Battery polarity ',
     'Warning label ', 'Laser warning ', 'NV moulded legend', 'DOWN index ',
     'RIGHT index ', 'DOWN rotation ', 'RIGHT rotation ', 'DOWN moulded ', 'RIGHT moulded ')
@@ -69,6 +74,60 @@ def detail_anchor(name):
     raise ValueError('No bake receiver for '+name)
 
 
+def density_group(obj, polygon):
+    name = obj.name
+    points = [obj.matrix_world @ obj.data.vertices[i].co for i in polygon.vertices]
+    centre = sum(points,Vector()) / len(points)
+    normal = (obj.matrix_world.to_3x3() @ polygon.normal).normalized()
+    low_y,high_y = min(p.y for p in points)*1000,max(p.y for p in points)*1000
+    low_z,high_z = min(p.z for p in points)*1000,max(p.z for p in points)*1000
+    if name.startswith('Protective bent-metal hood'):
+        # Curved roof/rim shading still needs a texel floor even without printing.
+        if normal.z > .25 or abs(normal.y) > .8:
+            return 'edge'
+        if abs(normal.x) < .8 or normal.x*centre.x <= 0:
+            return 'hidden' if normal.x*centre.x < 0 else 'plain'
+        logo = low_z < 59.5 and high_z > 45.5 and low_y < 5 and high_y > -10
+        warning = centre.x < 0 and low_z < 39 and high_z > 27 and low_y < 10 and high_y > -15
+        controls = centre.x > 0 and low_z < 46 and high_z > 8 and low_y < 34 and high_y > -25
+        return 'print' if logo or warning or controls else 'plain'
+    if name == 'Electronics lower housing':
+        return 'hidden' if normal.y < -.8 or normal.z < -.8 else 'plain'
+    if name.endswith(' domed recessed dial'):
+        return 'relief' if normal.x > .5 else 'hidden'
+    if name.endswith(' head') or name in ('NV rubber key','Brightness down rubber key','Brightness up rubber key','DOWN centre','RIGHT centre'):
+        return 'relief' if normal.dot(centre) > 0 else 'plain'
+    if name == 'Scalloped battery cap':
+        return 'print' if normal.x > .8 and low_y < 54 and high_y > 48 and low_z < 27 and high_z > 19 else 'plain'
+    if name.startswith(('QD slotted tension nut','Crossbolt adjustment washer','QD oval tension pad','Battery cap retaining collar','Tether crimp sleeve')):
+        return 'edge'
+    if name.startswith(('Optical carrier','Lens rear recessed gasket','Lens front recessed gasket')):
+        return 'edge' if abs(normal.y) > .8 else 'plain'
+    if name == 'Rear electronics cover':
+        return 'relief' if normal.y < -.8 else 'casting'
+    if name.startswith('Rear cast '):
+        return 'casting'
+    return 'plain'
+
+
+def density_report(body):
+    report = {key:{'surfaceMm2':0,'uvArea':0,'triangles':0} for key in UV_DENSITY}
+    uv = body.data.uv_layers.active.data
+    rest = body.data.attributes['_atlas_rest'].data
+    weights = body.data.attributes['_atlas_weight'].data
+    for polygon,weight in zip(body.data.polygons,weights):
+        group = next(key for key,value in UV_DENSITY.items() if value == weight.value)
+        a,b,c = [rest[i].vector for i in polygon.vertices]
+        u,v,w = [uv[i].uv for i in polygon.loop_indices]
+        report[group]['surfaceMm2'] += (b-a).cross(c-a).length*.5*1e6
+        report[group]['uvArea'] += abs((v.x-u.x)*(w.y-u.y)-(v.y-u.y)*(w.x-u.x))*.5
+        report[group]['triangles'] += 1
+    for key,data in report.items():
+        data['relativeAreaWeight'] = UV_DENSITY[key]
+        data['texelsPerMm'] = math.sqrt(data['uvArea']*ATLAS_SIZE**2/data['surfaceMm2']) if data['surfaceMm2'] else 0
+    return report
+
+
 def bake_asset(output, root, high):
     high_objects = [o for o in high.children_recursive if o.type == 'MESH']
     high_triangles = triangles(high_objects)
@@ -104,9 +163,8 @@ def bake_asset(output, root, high):
         for vertex,value in zip(obj.data.vertices,rest.data):
             value.vector = obj.matrix_world @ vertex.co
         weight = obj.data.attributes.new('_atlas_weight','FLOAT','FACE')
-        density = 4 if obj.name.startswith('Protective bent-metal hood') else 3 if obj.name == 'Rear electronics cover' else .4 if obj.name == 'Electronics lower housing' else 1
-        for value in weight.data:
-            value.value = density
+        for polygon,value in zip(obj.data.polygons,weight.data):
+            value.value = UV_DENSITY[density_group(obj,polygon)]
         obj.location += offset
     body = join(body_objects,'EXPS3_body')
     bpy.ops.object.transform_apply(location=True,rotation=True,scale=True)
@@ -137,6 +195,8 @@ def bake_asset(output, root, high):
     for loop in body.data.uv_layers.active.data:
         loop.uv = tuple(round(v*65536)/65536 for v in loop.uv)
 
+    allocation = density_report(body)
+
     # A temporary joined donor leaves every original high component editable.
     copies = []
     for obj in high_objects:
@@ -164,7 +224,8 @@ def bake_asset(output, root, high):
     target = nodes.new('ShaderNodeTexImage')
     nodes.active = target
     images = {}
-    for name,size in [('base-color',2048),('normal',2048),('orm',1024)]:
+    for name in ('base-color','normal','orm'):
+        size = ATLAS_SIZE
         image = bpy.data.images.new('exps3-'+name,width=size,height=size,alpha=False)
         image.colorspace_settings.name = 'sRGB' if name == 'base-color' else 'Non-Color'
         # Neutral gutters, not white garbage around black silhouette/UV borders.
@@ -182,7 +243,7 @@ def bake_asset(output, root, high):
     scene.render.bake.normal_space = 'TANGENT'
     for name,image in images.items():
         target.image = image
-        scene.render.bake.margin = 6 if name != 'orm' else 3
+        scene.render.bake.margin = 3
         for mat in materials:
             n,l = mat.node_tree.nodes,mat.node_tree.links
             p,out = n.get('Principled BSDF'),n.get('Material Output')
@@ -227,8 +288,9 @@ def bake_asset(output, root, high):
     # Restore exact stored float positions, not subtraction of metre-sized offsets.
     for vertex,rest in zip(body.data.vertices,body.data.attributes['_atlas_rest'].data):
         vertex.co = rest.vector
-    for name in ('_atlas_rest','_atlas_weight'):
-        body.data.attributes.remove(body.data.attributes[name])
+    body.data.attributes.remove(body.data.attributes['_atlas_rest'])
+    # Useful authoring inspection data; generic attributes are not exported to glTF.
+    body.data.attributes['_atlas_weight'].name = 'atlas_density_weight'
     body.data.update()
     nodes.remove(target)
     p = nodes.get('Principled BSDF')
@@ -249,9 +311,10 @@ def bake_asset(output, root, high):
     scene.render.bake.use_selected_to_active = False
     return {'highSourceTriangles':high_triangles,'targetTriangles':low_triangles,
         'bodyPrimitive':'EXPS3_body','glassPrimitive':'EXPS3_glass',
-        'atlas':{'baseColor':[2048,2048],'normal':[2048,2048],'orm':[1024,1024]},
+        'atlas':{key:[ATLAS_SIZE,ATLAS_SIZE] for key in ('baseColor','normal','orm')},
+        'uvAllocation':allocation,
         'decodedTextureBytesRGBA8':sum(i.size[0]*i.size[1]*4 for i in images.values()),
-        'textureMemoryNote':'36MiB before mips (~48MiB with full mips), versus8MiB/10.67MiB for the former two1K source maps; no GPU compression or FPS claim.',
+        'textureMemoryNote':'12MiB before mips (~16MiB with full mips), versus36MiB/48MiB for the previous2K/2K/1K atlas. Glass uses no textures. No GPU compression or FPS claim.',
         'packing':'ORM: R=1 (unoccluded), G=roughness, B=metallic; no baked studio illumination',
         'projectionMm':{'cage':1.5,'maxRay':3},
         'projection':'Corresponding parts exploded for bake only; exact stored native positions restored before save/export.',
