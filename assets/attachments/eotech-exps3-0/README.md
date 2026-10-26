@@ -16,7 +16,7 @@ captive scalloped cap, raised quick-detach mount and separate optical windows.
   meshes, five packed maps, seven review cameras and the unchanged studio.
   Blender 5.2 uses Zstandard compression; open normally in Blender 5.2.2.
 - `exps3-0.glb` is the stock native glTF export: **11,972 triangles, two primitives,
-  two PBR materials, three embedded atlases, 1,676,584 bytes**. No high-source
+  two PBR materials, three embedded atlases, 1,685,588 bytes**. No high-source
   geometry, studio, external asset URL, animation, arms or reticle is exported.
 - `exps3-base-color.png`, `exps3-normal.png` and `exps3-orm.png` are all **1024²**
   unique-UV atlases (ORM: R=1, G=roughness, B=metallic). Normal/data maps are
@@ -34,7 +34,7 @@ captive scalloped cap, raised quick-detach mount and separate optical windows.
 At the owner's request, the approved detailed model became the bake source for an
 **8–12k target with one opaque atlas material plus separate optical glass**.
 The result reduces triangles **44,617 → 11,972 (73.2%)**, primitives **11 → 2**,
-materials **10 → 2**, and GLB size **4.31 → 1.60 MiB**. This is an asset-resource
+materials **10 → 2**, and GLB size **4.31 → 1.61 MiB**. This is an asset-resource
 comparison, not an FPS benchmark or a promise of two total renderer passes.
 
 `tools/blender/exps3_bake.py` regenerates from freshly authored high/low geometry.
@@ -62,9 +62,10 @@ legends, shallow relief and hardware; plain/back-facing surfaces get less space.
 Curved roof/rims retain a minimum density because their baked normals are not
 merely a constant base color. No geometry or material-count changes were made.
 
-Measured mean base-color/normal texel densities on matching physical triangles:
+Initial evaluation's mean base-color/normal texel densities on matching physical
+triangles (before the bounded roof-return correction below):
 
-| Surface group | Previous 2K | Uniform 1K | Weighted 1K |
+| Surface group | Previous 2K | Uniform 1K | Initial weighted 1K |
 | --- | ---: | ---: | ---: |
 | Printed detail | 7.64 px/mm | 3.82 px/mm | **8.17 px/mm** |
 | Fine relief | 5.67 | 2.84 | **5.11** |
@@ -80,9 +81,21 @@ every glyph. The 1K raster check found zero overlapping interior pixel centres;
 UVs remain in bounds. The density attribute is retained in the editable blend
 for inspection and is not exported as runtime vertex data.
 
+A subsequent review found a visible downward-facing **rear hood-return bevel**
+missed by the roof/rim guard. Its UV strip was only **0.594 texel** wide and baked
+as a detached bright bar in the unchanged rear view. The recipe now gives just
+that upper rear return relief priority: **30 triangles / 22.22 mm²**, not all hidden
+or downward faces. Exported triangle-altitude probes across the straight span
+measure **2.000 texels** (minimum 1.99982), and the matched rear render no longer
+has the isolated bright bar. A focused regression requires more than 1.9 texels
+across that actual exported strip. Geometry, corner normals, glass and studio
+remain exact. Current group means are **print 8.13, relief 5.08, edge 2.92,
+plain 1.45 and hidden 0.51 px/mm**; the original table is retained as historical
+evaluation evidence, not silently substituted with the revised grouping.
+
 **Texture memory:** three uncompressed RGBA8 1K maps total **12 MiB before mips /
 about 16 MiB with full mips**, versus 36 / 48 MiB for the preceding atlas—a
-**66.7% reduction**. GLB size drops from 2.82 to **1.60 MiB**. The original
+**66.7% reduction**. GLB size drops from 2.82 to **1.61 MiB**. The original
 44k model's two shared 1K maps used 8 / 10.7 MiB, so this is still a geometry/state
 versus texture trade-off, not an FPS or universal-memory reduction claim. No GPU
 texture compression or studio-light baking is introduced.

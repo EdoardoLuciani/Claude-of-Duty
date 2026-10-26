@@ -3,7 +3,7 @@
   "source": "tools/blender/exps3.py",
   "sourceSha256": "b9292fb428ee74585fafd6aee61cafbc7463e20920f9f95156dbcef92fa1b602",
   "bakeSource": "tools/blender/exps3_bake.py",
-  "bakeSourceSha256": "0f1bc6b328443fefdfbdb0b1d5c210570920ca687c34a8a9da8dede3d8d137c5",
+  "bakeSourceSha256": "b389812eb582bd539c92758d53c5caaaedfb66b7080058aa842ce903eff4ddc9",
   "optimization": {
     "highSourceTriangles": 44617,
     "targetTriangles": 11972,
@@ -26,45 +26,45 @@
     "uvAllocation": {
       "print": {
         "surfaceMm2": 3913.5842851633242,
-        "uvArea": 0.24899686186108738,
+        "uvArea": 0.2467404210474342,
         "triangles": 230,
         "relativeAreaWeight": 32,
-        "texelsPerMm": 8.167883745143225
+        "texelsPerMm": 8.13079032375602
       },
       "relief": {
-        "surfaceMm2": 2135.9451317590633,
-        "uvArea": 0.053217576583847404,
-        "triangles": 917,
+        "surfaceMm2": 2158.162795882699,
+        "uvArea": 0.05315625772345811,
+        "triangles": 947,
         "relativeAreaWeight": 12,
-        "texelsPerMm": 5.111312774581054
+        "texelsPerMm": 5.0820046145266105
       },
       "edge": {
         "surfaceMm2": 5827.244101955484,
-        "uvArea": 0.04790268396027386,
+        "uvArea": 0.0474599456647411,
         "triangles": 1990,
         "relativeAreaWeight": 4,
-        "texelsPerMm": 2.93594742894719
+        "texelsPerMm": 2.9223482558068805
       },
       "casting": {
         "surfaceMm2": 1890.7069736280807,
-        "uvArea": 0.001963650225661695,
+        "uvArea": 0.001945539261214435,
         "triangles": 1155,
         "relativeAreaWeight": 0.5,
-        "texelsPerMm": 1.0435659722319535
+        "texelsPerMm": 1.0387423617751501
       },
       "plain": {
-        "surfaceMm2": 50637.74094532895,
-        "uvArea": 0.1028045826824382,
-        "triangles": 5786,
+        "surfaceMm2": 50622.92383790178,
+        "uvArea": 0.10184366186149418,
+        "triangles": 5784,
         "relativeAreaWeight": 1,
-        "texelsPerMm": 1.459046162065706
+        "texelsPerMm": 1.4524237678133696
       },
       "hidden": {
-        "surfaceMm2": 11011.665386345992,
-        "uvArea": 0.0027846881421282887,
-        "triangles": 846,
+        "surfaceMm2": 11004.264829649534,
+        "uvArea": 0.0027588781667873263,
+        "triangles": 818,
         "relativeAreaWeight": 0.125,
-        "texelsPerMm": 0.5149460562521133
+        "texelsPerMm": 0.5127264252307762
       }
     },
     "decodedTextureBytesRGBA8": 12582912,
@@ -78,7 +78,7 @@
     "sourceRetained": "Hidden SOURCE_HIGH collection; factory-empty recipe, not an old blend input",
     "boundsNote": "Baked cap polarity mark no longer adds0.14mm of physical width; nominal body width58.4mm."
   },
-  "blendSha256": "f612ba5ae4b4e50fc32baefa64fb5d5f9846f1286fdd07bf852c821da5bf0ad1",
+  "blendSha256": "31fef2505a5ca6bfff86b96d4f2fc12f1b06ac52d19d82d2d57b77fbe628e2a4",
   "blender": "5.2.2 LTS",
   "units": "metres",
   "axes": {
@@ -125,8 +125,8 @@
     "triangles": 11972,
     "primitives": 2,
     "materials": 2,
-    "bytes": 1676584,
+    "bytes": 1685588,
     "images": 3
   },
-  "sha256": "72523d1517ce1a60fe588811464c08c71bb8ab282359162cd226db22c372d1c8"
+  "sha256": "c95d0d737488506cc4386554089f9258976a22473ba74621517b85d6c5fe59eb"
 }
