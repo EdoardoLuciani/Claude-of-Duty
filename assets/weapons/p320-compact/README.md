@@ -3,7 +3,9 @@
 Early Nitron Compact, curved trigger, SIGLITE irons, flush 15-round magazine.
 Original game art, not downloaded CAD/mesh/maps or an endorsed/licensed replica.
 Follow the [shared source-first workflow](../../../tools/blender/README.md):
-Python owns the weapon; blend, GLB, atlas PNGs and manifest are generated products.
+Python owns the weapon; blend, native GLB, atlas PNGs and manifest are generated
+products. A separate texture-only cook derives the KTX2 runtime GLB; the native
+PNG export remains the editable/rebuild reference.
 
 ## Edit map
 
@@ -38,12 +40,14 @@ blender -b -t 8 --python-exit-code 1 --python tools/blender/p320_compact.py -- \
   --output /tmp/p320-review --render --quick
 blender -b -t 8 /tmp/p320-review/p320-compact.blend \
   --python-exit-code 1 --python tools/blender/p320_check.py
+TOKTX=/absolute/path/KTX-Software-4.4.2/bin/toktx node tools/cook-p320-textures.mjs
 node tests/smoke/smoke-p320.mjs
+node tests/smoke/smoke-p320-ktx2.mjs
 ```
 
 Each factory-empty build bakes four maps with Cycles CPU, authors the original
 object/hand actions, samples the mechanical bones, saves packed preview/studio,
-then exports native Actions grouped by NLA name at **60 Hz**. The runtime export
+then exports native Actions grouped by NLA name at **60 Hz**. The native export
 copy samples the same 60 Hz control lattice without exporter force-sampling:
 force-sampling bones would change discrete visibility to LINEAR. CONSTANT scale
 curves must export STEP; all vertices have one unit bone weight. Bone axes preserve
@@ -57,7 +61,7 @@ including both magazines and their cartridges. Outward-only glyph caps conform
 to their actual assembly before
 baking (the former barrel label floated 3.3 mm outside the chamber). All four maps
 use 1024². The extra emission image preserves sight lighting without another
-material section. Uncompressed RGBA8+mips image storage is approximately 21.3 MiB
+material section. The native PNG export's RGBA8+mips image storage is approximately 21.3 MiB
 versus 16 MiB before optimization (and 53.3 MiB for the initial 2K color/normal
 candidate). These are asset counts, not GPU timing claims; skinning and the extra
 emission map are deliberate trade-offs.
@@ -74,7 +78,7 @@ Lighting, cameras, material factors and animation remain fixed across all rows:
 | 2K / 2K (initial optimization) | 8.86 | 53.3 |
 | 2K / 1K | 5.34 | 37.3 |
 | 1K / 1K, shared surface UVs | 4.77 | 21.3 |
-| **1K / 1K, lettering-focused color UV1 (current)** | **5.28** | **21.3** |
+| **1K / 1K, lettering-focused color UV1 (native PNG reference)** | **5.28** | **21.3** |
 
 Color has its own `BaseColorUV` layer (glTF TEXCOORD_1), with about 80% of occupied
 color UV area reserved for 13 tight lettering panels; unmarked finishes share
@@ -90,6 +94,40 @@ is sharper, without a larger image. Plain-color grain/cavity shading receives
 less resolution; geometric and normal-map detail remain separate. The 1K normal
 still loses fine traction definition and changes highlights relative to 2K.
 This is not a lossless replacement or an FPS claim. Human review still applies.
+
+### KTX2 runtime cook
+
+`tools/cook-p320-textures.mjs` reads the untouched native `p320-compact.glb` and
+writes `p320-compact.ktx2.glb` plus a provenance/settings JSON. It replaces only
+embedded images and their texture references with required `KHR_texture_basisu`;
+all non-image buffer bytes, accessors, meshes, skin, clips, nodes, material factors
+and UV selections are preserved and checked by smoke tests. This is not geometry
+optimization or exporter repair. Rebuild the native asset first, then recook;
+stale derived products fail the source-hash check. Normal builds need neither
+Blender nor the encoder because both GLBs are committed.
+
+The external encoder is [**KTX-Software 4.4.2**](https://github.com/KhronosGroup/KTX-Software/releases/tag/v4.4.2)
+(`toktx v4.4.2`, no new npm dependency).
+The Linux x86-64 release archive SHA-256 is
+`a8781bad05f9624edbf910b7f258cd0a4ba7d3e63b49ecc0a0ab440bf6a0a245`.
+Settings are UASTC quality 4, RDO lambda 0.25, Zstandard level 18, one encoder
+thread, RGB, and a complete 11-level box-filtered mip chain. Color/emission use
+sRGB; normal/ORM use linear data. Normal XYZ is retained, not repacked into XY;
+there is no shader reconstruction or material retuning. Encoding is lossy: inspect
+lettering and shallow highlights against the native PNG reference before approval.
+
+The runtime GLB is **4.86 MiB** versus **5.28 MiB** native. On BC7 or ASTC 4×4,
+four 1K maps plus mips occupy approximately **5.33 MiB** instead of **21.33 MiB**
+(format footprint, excluding driver padding). Unsupported hardware gets decoded
+RGBA8, not this memory saving. This is a memory optimization, not an FPS claim.
+
+`src/weapons/p320.ts` configures the pinned Three loader from initialized native
+WebGPU features, selecting BC7/ASTC or RGBA8; it intentionally avoids lower-quality
+color block formats for normal/ORM. A two-worker decoder is disposed after the
+asset load. Its matching JS/WASM and upstream notice are served locally from
+`public/vendor/basis-e27dfa95/` (about 0.56 MiB uncompressed, a one-time cold-load
+cost). Other weapon assets are unchanged. The decoder and cold transcode cost
+must be included when evaluating download/load savings for this P320-only trial.
 
 Some distributions ship a Blender OCIO config newer than their linked OpenColorIO
 library. Use a compatible process-local `OCIO=/absolute/path/config.ocio` retaining

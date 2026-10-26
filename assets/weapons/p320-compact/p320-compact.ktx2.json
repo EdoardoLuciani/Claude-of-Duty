@@ -1,0 +1,67 @@
+{
+  "encoder": "toktx v4.4.2",
+  "flags": [
+    "--t2",
+    "--encode",
+    "uastc",
+    "--uastc_quality",
+    "4",
+    "--uastc_rdo_l",
+    "0.25",
+    "--zcmp",
+    "18",
+    "--genmipmap",
+    "--filter",
+    "box",
+    "--target_type",
+    "RGB",
+    "--threads",
+    "1"
+  ],
+  "sourceSha256": "e616a3dc78cf8680911b549b9d25f8af7d5ddb5392fd3496a8ece221a48a3164",
+  "sha256": "7c33479b05225723d53abfa46ef386307c6e2bb533d08bda404c3fa474bd276f",
+  "sourceBytes": 5532644,
+  "bytes": 5092948,
+  "images": [
+    {
+      "name": "p320-emission",
+      "sourceSha256": "64818f2bbb5c13b1caa533c7d2acdf3cd7c55eeb6d5d3e8c483a42c84c2aed03",
+      "bytes": 2071,
+      "sha256": "d4b3aa7e3a0f3d8be0f46af83e884d57c9f4f9706fa48084d2995b682c0b15fa",
+      "width": 1024,
+      "height": 1024,
+      "mipLevels": 11,
+      "colorSpace": "sRGB"
+    },
+    {
+      "name": "p320-normal",
+      "sourceSha256": "e62a669ef75232320f7c680cdc6b4e8c473fb0f2caccdcdffa587b41d7d77faf",
+      "bytes": 727040,
+      "sha256": "83a41428181d1ad0d7109455cb43c67832570a0cad031d7efe05c848888b85dc",
+      "width": 1024,
+      "height": 1024,
+      "mipLevels": 11,
+      "colorSpace": "linear"
+    },
+    {
+      "name": "p320-base",
+      "sourceSha256": "6c6274afeaa6de921d91633ce2f75f99526d4d9b067e5077e8c19a20e0351384",
+      "bytes": 314803,
+      "sha256": "c504ff56cece454e4e176d5d1e1a75d00e7ea37be4d6573688b0edff761ae5ce",
+      "width": 1024,
+      "height": 1024,
+      "mipLevels": 11,
+      "colorSpace": "sRGB"
+    },
+    {
+      "name": "p320-orm",
+      "sourceSha256": "e7360598fee3108b86745a7c936a68025c9c920c6071ed640d1c6da474c2f157",
+      "bytes": 431638,
+      "sha256": "7e89e7cee97fa7917b6b8e86022f57a6197add91c0d98fef8ee9ee219ee300e9",
+      "width": 1024,
+      "height": 1024,
+      "mipLevels": 11,
+      "colorSpace": "linear"
+    }
+  ]
+}

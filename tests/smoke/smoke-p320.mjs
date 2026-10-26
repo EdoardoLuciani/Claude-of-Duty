@@ -21,7 +21,9 @@ assert(
   'editable Blender source'
 );
 const bytes = readFileSync(new URL(P320_URL));
-const { json, imagePNG } = inspectGLB(bytes);
+const { json } = inspectGLB(bytes);
+const nativeBytes = readFileSync(new URL('p320-compact.glb', dir));
+const native = inspectGLB(nativeBytes);
 assert.equal(json.animations.length, 8);
 assert.equal(json.images.length, 4, 'shared base/ORM/normal/emission atlas, no arm textures');
 assert.equal(json.materials.length, 1, 'all finishes, lettering and sights share one material');
@@ -42,8 +44,9 @@ assert(
   !json.nodes.some((node) => node.name?.startsWith('Mark |')),
   'lettering is baked, not drawn'
 );
-for (const image of json.images) {
-  const png = imagePNG(image);
+// Blender's editable source retains its lossless PNGs; the cooked runtime uses KTX2.
+for (const image of native.json.images) {
+  const png = native.imagePNG(image);
   const kind = image.name.replace('p320-', '');
   const resolution = 1024;
   assert.equal(manifest.textureResolutions[kind], resolution);
@@ -63,7 +66,7 @@ assert(
 );
 assert(manifest.stats.triangles < 30000, 'low surfaces replace the 56862-triangle instance asset');
 assert.equal(manifest.stats.primitives, 1);
-assert.equal(manifest.stats.bytes, bytes.length);
+assert.equal(manifest.stats.bytes, nativeBytes.length);
 assert.equal(
   manifest.stats.vertices,
   json.accessors[json.meshes[0].primitives[0].attributes.POSITION].count

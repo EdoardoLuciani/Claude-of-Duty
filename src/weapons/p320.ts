@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
+import type { Renderer } from 'three/webgpu';
 
 import handReference from '../../assets/weapons/p320-compact/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/p320-compact/manifest.json' with { type: 'json' };
@@ -18,7 +20,7 @@ import { authoredModel, requiredNode } from './authored-model.ts';
 import { buildMagazineClips, type Clip } from './clips.ts';
 
 export const P320_URL = new URL(
-  '../../assets/weapons/p320-compact/p320-compact.glb',
+  '../../assets/weapons/p320-compact/p320-compact.ktx2.glb',
   import.meta.url
 ).href;
 export const P320_EJECT_DELAY = 2 / 60;
@@ -61,8 +63,37 @@ export function makeP320Model(gltf: GLTF): P320Model {
   return { ...model, ...converted };
 }
 
-export async function loadP320(): Promise<P320Model> {
-  return makeP320Model(await new GLTFLoader().loadAsync(P320_URL));
+export async function loadP320(
+  renderer: Pick<Renderer, 'hasFeature'>,
+  url = P320_URL
+): Promise<P320Model> {
+  const decoder = new KTX2Loader()
+    .setTranscoderPath(`${import.meta.env?.BASE_URL ?? '/'}vendor/basis-e27dfa95/`)
+    .setWorkerLimit(2);
+  // Our strict native Renderer has no isWebGPURenderer flag. Use the public
+  // worker config rather than detectSupport()'s WebGL renderer branch.
+  decoder.workerConfig = {
+    astcSupported: renderer.hasFeature('texture-compression-astc'),
+    bptcSupported: renderer.hasFeature('texture-compression-bc'),
+    astcHDRSupported: false,
+    etc1Supported: false,
+    etc2Supported: false,
+    dxtSupported: false,
+    pvrtcSupported: false,
+  };
+  // UASTC data maps fall back to RGBA when ASTC/BC7 are unavailable, avoiding
+  // lower-quality transcoding of normal/ORM channels into color-only formats.
+  try {
+    return makeP320Model(await new GLTFLoader().setKTX2Loader(decoder).loadAsync(url));
+  } finally {
+    // PNG diagnostic loads never initialize the decoder or increment its count.
+    if (decoder.transcoderPending) {
+      // A failed model load can race decoder initialization. Wait so it cannot
+      // create a worker URL after disposal; loadAsync already reports failures.
+      await decoder.transcoderPending.catch((): void => {});
+      decoder.dispose();
+    }
+  }
 }
 
 /** Samples the actual Blender curves, including fingers. Upper/forearm IK is

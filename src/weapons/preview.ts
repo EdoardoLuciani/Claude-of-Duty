@@ -133,7 +133,7 @@ if (!FIRST_PERSON) {
 const stats: Record<string, number> = {};
 for (const id of WEAPON_IDS) {
   const def = WEAPON_DEFS[id];
-  const entry = vm.addWeapon(await loadWeapon(id), def);
+  const entry = vm.addWeapon(await loadWeapon(id, renderer), def);
   stats[id] = entry.tris;
 }
 vm.setActive(WEAPON);
