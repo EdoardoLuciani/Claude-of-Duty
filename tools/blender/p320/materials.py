@@ -1,8 +1,9 @@
 """P320 procedural finishes and unique-UV atlas baking; no cached asset inputs."""
 import bpy
 from .surfaces import active, build_surfaces, stash_sources
+from .color_uv import COLOR_UV, layout_color
 
-ATLAS_RESOLUTIONS = {'base': 2048, 'orm': 1024, 'normal': 2048, 'emission': 1024}
+ATLAS_RESOLUTIONS = {'base': 1024, 'orm': 1024, 'normal': 1024, 'emission': 1024}
 
 def build_source_materials(coords):
     materials = []
@@ -58,6 +59,7 @@ def build_source_materials(coords):
 def bake_atlas(output, asset, weapon_meshes):
     scene = bpy.context.scene
     surfaces = build_surfaces(asset, weapon_meshes)
+    layout_color(surfaces)
     atlas = {}
     for name, resolution in ATLAS_RESOLUTIONS.items():
         im = bpy.data.images.new('P320_' + name, width=resolution, height=resolution, alpha=False)
@@ -108,6 +110,9 @@ def bake_atlas(output, asset, weapon_meshes):
                     emit.inputs[0].default_value = tuple(v * strength for v in socket.default_value[:3]) + (1,)
             l.new(emit.outputs[0], out.inputs['Surface'])
         for surface, sources in surfaces:
+            mesh = surface.data
+            mesh.uv_layers.active_index = mesh.uv_layers.find(COLOR_UV) if name == 'base' else 0
+            mesh.uv_layers.active.active_render = True
             active(surface)
             for source in sources:
                 source.select_set(True)
@@ -130,6 +135,9 @@ def bake_atlas(output, asset, weapon_meshes):
         t = n.new('ShaderNodeTexImage')
         t.image = im
         if name == 'base':
+            coordinates = n.new('ShaderNodeUVMap')
+            coordinates.uv_map = COLOR_UV
+            l.new(coordinates.outputs['UV'], t.inputs['Vector'])
             l.new(t.outputs[0], p.inputs['Base Color'])
         elif name == 'emission':
             l.new(t.outputs[0], p.inputs['Emission Color'])
@@ -144,6 +152,8 @@ def bake_atlas(output, asset, weapon_meshes):
             l.new(sep.outputs[1], p.inputs['Roughness'])
             l.new(sep.outputs[2], p.inputs['Metallic'])
     for surface, _ in surfaces:
+        surface.data.uv_layers.active_index = 0
+        surface.data.uv_layers[0].active_render = True
         surface.data.materials.clear()
         surface.data.materials.append(baked)
         for poly in surface.data.polygons:

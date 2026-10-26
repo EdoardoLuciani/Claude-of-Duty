@@ -11,7 +11,7 @@ assert len(clips)==8
 for suffix in ('base','orm','normal','emission'):
     images=[im for im in bpy.data.images if im.name.startswith('P320_'+suffix) or im.name=='p320-'+suffix+'.png']
     assert images and images[0].packed_file, 'packed '+suffix
-    expected=2048 if suffix in ('base','normal') else 1024
+    expected=1024
     assert list(images[0].size)==[expected,expected]
 marks=[o for o in s.objects if o.name.startswith('Mark |')]
 assert len(marks)==13
@@ -24,6 +24,21 @@ arm=bpy.data.objects['P320_SKIN']
 basis=Matrix.Rotation(math.pi/2,4,'X')
 surface=bpy.data.objects['P320_surface']
 assert len(surface.data.materials)==1
+assert len(surface.data.uv_layers)==2
+assert surface.data.uv_layers[1].name=='BaseColorUV'
+assert s['p320_color_panels']==13
+color_uv=surface.data.uv_layers['BaseColorUV'].data
+panels=surface.data.attributes['color_panel'].data
+marked_area=total_area=0
+for face in surface.data.polygons:
+    a,b,c=[color_uv[i].uv for i in face.loop_indices]
+    u,v=b-a,c-a
+    area=abs(u.x*v.y-u.y*v.x)/2
+    total_area+=area
+    if panels[face.index].value:marked_area+=area
+assert .75<marked_area/total_area<.90, 'most occupied color UV area belongs to lettering panels'
+for uv in surface.data.uv_layers:
+    assert all(0<=coord<=1 for loop in uv.data for coord in loop.uv)
 surface.data.calc_loop_triangles()
 assert len(surface.data.loop_triangles)<30000
 assert len(arm.data.bones)==9
@@ -65,4 +80,4 @@ for o in bpy.data.collections['P320 | editable weapon'].objects:
     if o.type!='MESH':continue
     assert len(o.data.polygons)>0,o.name
     assert max((Vector(o.bound_box[6])-Vector(o.bound_box[0])).length,0)>.00001,o.name
-print(f'P320_BLENDER_OK: 8 synchronized actions, wrists {maximum*1000:.4f} mm, mechanical skin/source matrix error {skin_error:.9f}, packed atlases, rigid weights and discrete magazines')
+print(f'P320_BLENDER_OK: 8 synchronized actions, wrists {maximum*1000:.4f} mm, mechanical skin/source matrix error {skin_error:.9f}, packed atlases, {marked_area/total_area:.1%} lettering UV1, rigid weights and discrete magazines')
