@@ -65,8 +65,9 @@ emission map are deliberate trade-offs.
 ### Texture-budget comparison
 
 Matched 1920×1440 Blender profiles and fixed-pose native-WebGPU first-person
-captures compare these fresh source bakes without changing geometry, UVs,
-lighting, cameras, material factors or animation:
+captures compare these fresh source bakes. The first three rows use identical
+geometry and UVs; the final row uses the local lettering panels described below.
+Lighting, cameras, material factors and animation remain fixed across all rows:
 
 | Base / normal resolution (ORM/emission stay 1K) | GLB MiB | Approx. RGBA8+mips MiB |
 | --- | ---: | ---: |

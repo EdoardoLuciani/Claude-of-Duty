@@ -35,7 +35,7 @@ def build_geometry(asset):
     bpy.context.view_layer.update()
     coords = empty('Surface_coordinates')
 
-    materials, (nitron, polymer, stipple, steel, barrel_mat, mag_mat, cavity, mark, brass, copper, white) = build_source_materials(coords)
+    nitron, polymer, stipple, steel, barrel_mat, mag_mat, cavity, mark, brass, copper, white = build_source_materials(coords)
     def finish(o, name, mat=polymer, parent=body, bevel=.0005, smooth=False):
         o.name = name; move(o)
         if mat: o.data.materials.append(mat)

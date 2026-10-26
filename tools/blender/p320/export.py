@@ -65,7 +65,7 @@ def sample_controls(asset):
     bpy.context.view_layer.update()
 
 
-def export_asset(asset, coords, parts, output):
+def export_asset(asset, coords, output):
     sample_controls(asset)
     bpy.ops.object.select_all(action='DESELECT')
     for obj in asset.objects:
