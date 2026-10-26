@@ -34,7 +34,6 @@ assert.equal(raw.readUInt32LE(4), 2);
 assert.equal(raw.readUInt32LE(8), raw.length);
 const jsonLength = raw.readUInt32LE(12);
 const doc = JSON.parse(raw.subarray(20, 20 + jsonLength));
-const original = structuredClone(doc);
 const binary = raw.subarray(28 + jsonLength);
 assert.equal(doc.buffers.length, 1);
 assert.equal(doc.images.length, 4);
@@ -111,12 +110,11 @@ try {
   const chunks = [];
   let offset = 0;
   for (let i = 0; i < doc.bufferViews.length; i++) {
-    const view = doc.bufferViews[i],
-      old = original.bufferViews[i];
+    const view = doc.bufferViews[i];
     assert.equal(view.buffer, 0);
     const bytes =
       replacements.get(i) ??
-      binary.subarray(old.byteOffset ?? 0, (old.byteOffset ?? 0) + old.byteLength);
+      binary.subarray(view.byteOffset ?? 0, (view.byteOffset ?? 0) + view.byteLength);
     view.byteOffset = offset;
     view.byteLength = bytes.length;
     const padded = Buffer.alloc((bytes.length + 3) & ~3);
