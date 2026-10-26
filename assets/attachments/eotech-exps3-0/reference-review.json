@@ -845,6 +845,7 @@
     "acceptance": "Parent visual/native checks against approved high source; finite texture/edge differences disclosed. No new Sol review or owner approval implied; no FPS or overall VRAM-reduction claim."
   },
   "texture1kEvaluation": {
+    "stage": "Initial weighted1K evaluation; product hashes/densities below are historical, superseded by texture1kHoodReturnCorrection.",
     "baselineCommit": "aa5d5fd435514be13bab34d3870d5256c111aa47",
     "baselinePublishedGlbSha256": "777a6c5735b6b4afe0dfae2b447e9687a04fea490f4a331e5bc8b43c4f3316a7",
     "sourceSha256": "b9292fb428ee74585fafd6aee61cafbc7463e20920f9f95156dbcef92fa1b602",
@@ -988,6 +989,134 @@
     "memory": "Three1KRGBA8maps12MiB before mips/about16MiB with full mips; 66.7% lower than36/48MiB. No glass textures, GPU compression or FPS claim.",
     "nativeCheck": "All three variants rendered on non-fallback AMD RDNA4 with the same fixed native preview camera/room;2meshes,1glass primitive, no browser errors; candidate/control maps all1024.",
     "acceptance": "Parent evaluation supports the weighted1K candidate. Finite-detail losses disclosed; no new Sol review or final owner visual approval implied. Asset-only, no M4/ADS/economy changes."
+  },
+  "texture1kHoodReturnCorrection": {
+    "stage": "Bounded parent-approved P2 correction after initial weighted1K review; same asset-only scope.",
+    "baselineCommit": "93bc86ff2e746d291365dd99cf2d76a300f0ab1b",
+    "baselineGlbSha256": "72523d1517ce1a60fe588811464c08c71bb8ab282359162cd226db22c372d1c8",
+    "sourceSha256": "b9292fb428ee74585fafd6aee61cafbc7463e20920f9f95156dbcef92fa1b602",
+    "bakeSourceSha256": "b389812eb582bd539c92758d53c5caaaedfb66b7080058aa842ce903eff4ddc9",
+    "glbSha256": "c95d0d737488506cc4386554089f9258976a22473ba74621517b85d6c5fe59eb",
+    "blendSha256": "31fef2505a5ca6bfff86b96d4f2fc12f1b06ac52d19d82d2d57b77fbe628e2a4",
+    "stats": {
+      "triangles": 11972,
+      "primitives": 2,
+      "materials": 2,
+      "bytes": 1685588,
+      "images": 3
+    },
+    "correction": "Visible rear roof-return faces on the protective hood (highY<-20mm,lowZ>60mm,normalY<-.5,normalZ<-.5) receive existing relief weight12 instead of plain/hidden weights. Other downward/hidden faces retain their allocation.",
+    "changedWeightTriangles": 30,
+    "changedWeightSurfaceMm2": 22.217664138679538,
+    "uvSampling": {
+      "method": "Actual exported glTF triangles reached by rear-facing rays at x=-10,0,+10mm, y=66.55576mm; minimum UV-triangle altitude in1024px atlas, not only bounding-box height or manifest weight.",
+      "beforeMinimumPx": 0.5936946183612044,
+      "afterMinimumPx": 1.9998219493344958,
+      "afterMaximumPx": 2,
+      "regressionFloorPx": 1.9,
+      "negativeControl": "Same exported-UV assertion fails the preceding committed GLB at all three span probes."
+    },
+    "uvAllocation": {
+      "print": {
+        "surfaceMm2": 3913.5842851633242,
+        "uvArea": 0.2467404210474342,
+        "triangles": 230,
+        "relativeAreaWeight": 32,
+        "texelsPerMm": 8.13079032375602
+      },
+      "relief": {
+        "surfaceMm2": 2158.162795882699,
+        "uvArea": 0.05315625772345811,
+        "triangles": 947,
+        "relativeAreaWeight": 12,
+        "texelsPerMm": 5.0820046145266105
+      },
+      "edge": {
+        "surfaceMm2": 5827.244101955484,
+        "uvArea": 0.0474599456647411,
+        "triangles": 1990,
+        "relativeAreaWeight": 4,
+        "texelsPerMm": 2.9223482558068805
+      },
+      "casting": {
+        "surfaceMm2": 1890.7069736280807,
+        "uvArea": 0.001945539261214435,
+        "triangles": 1155,
+        "relativeAreaWeight": 0.5,
+        "texelsPerMm": 1.0387423617751501
+      },
+      "plain": {
+        "surfaceMm2": 50622.92383790178,
+        "uvArea": 0.10184366186149418,
+        "triangles": 5784,
+        "relativeAreaWeight": 1,
+        "texelsPerMm": 1.4524237678133696
+      },
+      "hidden": {
+        "surfaceMm2": 11004.264829649534,
+        "uvArea": 0.0027588781667873263,
+        "triangles": 818,
+        "relativeAreaWeight": 0.125,
+        "texelsPerMm": 0.5127264252307762
+      }
+    },
+    "uvRasterCheck": {
+      "resolution": [
+        1024,
+        1024
+      ],
+      "coveredInteriorPixelCentres": 475557,
+      "overlappingInteriorPixelCentres": 0,
+      "barycentricEdgeExclusion": 0.0001,
+      "note": "Pixel-centre diagnostic, not an exact continuous-overlap proof."
+    },
+    "geometryAndStudio": "Native Blender body/glass positions, polygon indices and corner normals match the preceding1K blend exactly. Seven camera transforms/scales, light transforms/energy/colors/sizes, AgX Medium High Contrast exposure-1.5 and96samples exact.178high meshes/44617high triangles,2runtime meshes and5packed1K maps retained.",
+    "rearComparison": {
+      "method": "Frozen1600x1200 rear render, identical native-resolution box[618,146,982,153], no sharpening/reframing/tone changes. Means diagnose the formerly isolated bright bar; not a pixel-equivalence or automatic visual-acceptance target.",
+      "rgbMeans": {
+        "previous2k": [
+          29.7276295133438,
+          33.287284144427005,
+          37.18445839874411
+        ],
+        "uniform1k": [
+          16.259419152276294,
+          18.79591836734694,
+          21.69270015698587
+        ],
+        "before": [
+          87.04160125588697,
+          94.21860282574568,
+          101.44897959183673
+        ],
+        "after": [
+          35.80769230769231,
+          39.217032967032964,
+          42.869309262166404
+        ]
+      },
+      "result": "The detached bright bar is absent in the revised render. A thinner ordinary edge response and finite1K differences versus2K remain."
+    },
+    "repeatBuild": {
+      "method": "Fresh separate Blender5.2.2 processes, one with all seven renders and one without; factory-empty source recipe, official OCIO profile unchanged.",
+      "glbAndFivePNGsByteIdentical": true,
+      "allGLBJSONAndAccessorsExact": true,
+      "productSha256": {
+        "exps3-0.glb": "c95d0d737488506cc4386554089f9258976a22473ba74621517b85d6c5fe59eb",
+        "exps3-base-color.png": "2a11e853d0de477225a246aa79399273c0cc49e7f594c9efe322b7f049a467a6",
+        "exps3-normal.png": "510c4e09165127a2f3597cf9b6da8fee8e94eb3632a6d19bd684984933c7d2db",
+        "exps3-orm.png": "e37aab1994d7f68daa2d4780e9bb1209ec4fce66f4cc00ccad7b01abf8e02265",
+        "finish-normal.png": "5f31bfaf615de6861a664f856d3ec71ff943b9c8363f9193c14d129448b4dd3b",
+        "finish-roughness.png": "86224821b5681887fa3edf942b5dcf4afc2fb8f3fcaad9cbdb1776605b32a480"
+      },
+      "blendSha256": {
+        "candidate": "31fef2505a5ca6bfff86b96d4f2fc12f1b06ac52d19d82d2d57b77fbe628e2a4",
+        "repeat": "194486eb2c56b5f63cbc09b4c52ad45dc8e47410e5b77fc006165faf72800994"
+      },
+      "note": "Blend paths/metadata differ; not a cross-platform determinism claim. No tangent tolerance or exporter/GLB repair."
+    },
+    "nativeCheck": "Revised committed GLB rendered using the project's strict native WebGPU renderer on non-fallback AMD RDNA4; two meshes, one texture-free glass primitive, body maps1024², no browser errors. Separate temporary RoomEnvironment sanity fixture, not the earlier frozen three-way native comparison or gameplay/ADS acceptance.",
+    "acceptance": "Worker evidence for the bounded parent-approved P2 fix; independent targeted follow-up and final owner visual acceptance remain separate. Other disclosed1K grain/tiny-relief trade-offs are unchanged in scope."
   },
   "nativeValidation": {
     "backend": "native WebGPU, AMD RDNA 4, non-fallback",

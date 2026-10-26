@@ -82,6 +82,10 @@ def density_group(obj, polygon):
     low_y,high_y = min(p.y for p in points)*1000,max(p.y for p in points)*1000
     low_z,high_z = min(p.z for p in points)*1000,max(p.z for p in points)*1000
     if name.startswith('Protective bent-metal hood'):
+        # The visible rear roof-return bevel faces down, unlike the outer rim.
+        # Its thin normal-map strip needs relief density, not a subpixel plain UV.
+        if high_y < -20 and low_z > 60 and normal.y < -.5 and normal.z < -.5:
+            return 'relief'
         # Curved roof/rim shading still needs a texel floor even without printing.
         if normal.z > .25 or abs(normal.y) > .8:
             return 'edge'

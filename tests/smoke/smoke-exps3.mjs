@@ -260,6 +260,25 @@ assert(
   reliefDensity > plainDensity * 2,
   'actual fine hardware UVs retain priority, not just manifest weights'
 );
+// This rear-facing roof-return bevel is visible despite its downward normal.
+// A subpixel UV strip produced a detached bright bar in the frozen rear view.
+for (const x of [-0.01, 0, 0.01]) {
+  firstOpaque([x, 0.06655576, 0.1], [0, 0, -1]);
+  const hit = hits[0],
+    uv = hit.object.geometry.attributes.uv;
+  assert(hit.face.normal.y < -0.7 && hit.face.normal.z > 0.6, 'probe reaches the return bevel');
+  const [a, b, c] = [hit.face.a, hit.face.b, hit.face.c].map((i) => [uv.getX(i), uv.getY(i)]);
+  const twiceArea = Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
+  const longestEdge = Math.max(
+    Math.hypot(a[0] - b[0], a[1] - b[1]),
+    Math.hypot(b[0] - c[0], b[1] - c[1]),
+    Math.hypot(c[0] - a[0], c[1] - a[1])
+  );
+  assert(
+    (twiceArea * 1024) / longestEdge > 1.9,
+    'actual return-bevel UVs retain nearly two texels across their narrow dimension'
+  );
+}
 const fromRight = (forward, height) =>
   firstOpaque([0.1, height / 1000, -forward / 1000], [-1, 0, 0]).x;
 const fromRear = (x, height) => firstOpaque([x / 1000, height / 1000, 0.1], [0, 0, -1]).z;
