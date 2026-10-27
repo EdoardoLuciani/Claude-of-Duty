@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import type { EngineContext, EngineSystems } from '../core/context.ts';
+import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName } from '../core/events.ts';
 import { STANCE } from '../player/tuning.ts';
 import {
@@ -642,8 +642,8 @@ export class TelemetrySystem {
   declare _nextEnemyRaw: number;
   declare _provenanceReady: Promise<void> | null;
 
-  static id = 'telemetry';
-  static deps = ['ui', 'audio'];
+  static readonly id = 'telemetry';
+  static readonly deps: SystemId[] = ['ui', 'audio'];
 
   async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
@@ -1083,7 +1083,8 @@ export class TelemetrySystem {
     const now = performance.now();
     this._probeFrame(now);
     this._snapInfo();
-    const raw = this._rawTime() as number;
+    const raw = this._rawTime();
+    if (raw === null) return;
     if (raw >= this._nextPlayerRaw) {
       this._samplePlayer();
       this._nextPlayerRaw = raw + 1 / PLAYER_HZ;
@@ -1914,7 +1915,7 @@ export class TelemetrySystem {
   }
 
   _updateBadge(force = false): void {
-    const raw = this._rawTime() as number;
+    const raw = this._rawTime() ?? 0;
     if (!force && raw - this._lastBadgeAt < 1) return;
     this._lastBadgeAt = raw;
     if (!this.recording) {

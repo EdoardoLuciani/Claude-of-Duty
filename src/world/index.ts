@@ -1,11 +1,15 @@
 import * as THREE from 'three';
 
-import type { EngineContext, EngineSystems } from '../core/context.ts';
+import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
+import { hasOwn } from '../core/guards.ts';
 import type { WorldManifest } from '../core/model-metadata.ts';
 import type { Rng } from '../core/rng.ts';
+import { parseSurfaceName } from '../physics/surfaces.ts';
 import { tickStreetlightOutage } from './lighting.ts';
 import { PALETTE } from './palette.ts';
 import { WorldQueries } from './queries.ts';
+
+type WorldMaterial = ReturnType<EngineSystems['materials']['get']>;
 
 type WorldMesh = THREE.Mesh & {
   isInstancedMesh?: boolean;
@@ -18,8 +22,7 @@ type WorldMesh = THREE.Mesh & {
   };
 };
 function isWorldMesh(object: THREE.Object3D): object is WorldMesh {
-  const candidate = object as THREE.Mesh & { isInstancedMesh?: boolean };
-  return candidate.isMesh === true || candidate.isInstancedMesh === true;
+  return object instanceof THREE.Mesh;
 }
 // The WebGL renderer applied this to room bulbs and street lamps after the
 // world's day/night mix. Preserve that authored practical-to-sun ratio here;
@@ -55,7 +58,7 @@ export class WorldSystem {
   declare rng: Rng;
   declare materials: EngineSystems['materials'];
   declare renderSystem: EngineSystems['render'] | null;
-  declare _mats: Map<keyof typeof PALETTE, THREE.Material>;
+  declare _mats: Map<keyof typeof PALETTE, WorldMaterial>;
   declare meshes: WorldMesh[] | null;
   declare collisionMeshes: WorldMesh[] | null;
   declare lodGroups: WorldMesh[] | null;
@@ -77,13 +80,13 @@ export class WorldSystem {
   declare _offRestart: (() => void) | null;
   declare bulbs: THREE.PointLight[] | null;
   declare lamps: THREE.PointLight[] | null;
-  declare lampLens: (THREE.Material & { emissiveIntensity: number }) | null;
+  declare lampLens: WorldMaterial | null;
   declare _lampMix: number;
   declare _lampPower: number;
   declare _sky: EngineSystems['sky'] | null;
 
-  static id = 'world';
-  static deps = ['materials', 'physics', 'models'];
+  static readonly id = 'world';
+  static readonly deps: SystemId[] = ['materials', 'physics', 'models'];
 
   async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
@@ -132,8 +135,9 @@ export class WorldSystem {
     const placeholders = new Set<THREE.Material>();
     this.root.traverse((object): void => {
       if (!isWorldMesh(object)) return;
-      const palette = object.userData?.palette as keyof typeof PALETTE;
-      if (!PALETTE[palette]) throw new Error(`[world] unknown palette on ${object.name}`);
+      const palette: unknown = object.userData?.palette;
+      if (typeof palette !== 'string' || !hasOwn(PALETTE, palette))
+        throw new Error(`[world] unknown palette on ${object.name}`);
       if (Array.isArray(object.material))
         object.material.forEach((m): Set<THREE.Material<THREE.MaterialEventMap>> =>
           placeholders.add(m)
@@ -168,8 +172,7 @@ export class WorldSystem {
     const physics = ctx.peek('physics');
     this.collisionRoot.traverse((object): void => {
       if (!isWorldMesh(object)) return;
-      const surface = object.userData?.surface as string | undefined;
-      if (!surface) throw new Error(`[world] missing collision surface on ${object.name}`);
+      const surface = parseSurfaceName(object.userData?.surface);
       if (Array.isArray(object.material))
         object.material.forEach((m): Set<THREE.Material<THREE.MaterialEventMap>> =>
           collisionPlaceholders.add(m)
@@ -199,7 +202,7 @@ export class WorldSystem {
     );
   }
 
-  _material(key: keyof typeof PALETTE): THREE.Material {
+  _material(key: keyof typeof PALETTE): WorldMaterial {
     let material = this._mats.get(key);
     if (!material) {
       const def = PALETTE[key];
@@ -234,7 +237,7 @@ export class WorldSystem {
       add(light, { range: entry.range, priority: entry.priority });
       (interior ? this.bulbs : this.lamps).push(light);
     }
-    this.lampLens = this._material('lamp_lens') as THREE.Material & { emissiveIntensity: number };
+    this.lampLens = this._material('lamp_lens');
     this._lampMix = -1;
     this._lampPower = -1;
     // Keep these same PointLight instances visible on WebGPU. TSL hashes light

@@ -1,4 +1,5 @@
 import type { AiCalloutKind, ReloadPhase } from '../core/events.ts';
+import { hasOwn } from '../core/guards.ts';
 import type { Rng } from '../core/rng.ts';
 import { AIRCRAFT_URLS } from './aircraft.ts';
 import { CALLOUT_URLS, CALLOUT_MIX, calloutBank } from './callouts.ts';
@@ -150,7 +151,9 @@ export class WeaponSampleBank {
 
   async load(): Promise<number> {
     const jobs = [];
-    for (const kind of Object.keys(URLS) as SampleKind[]) {
+    for (const kind of Object.keys(URLS).filter((key): key is keyof typeof URLS =>
+      hasOwn(URLS, key)
+    )) {
       const urls = URLS[kind];
       this.buffers[kind] = new Array<AudioBuffer>(urls.length);
       this.indices[kind] = 0;
@@ -164,14 +167,18 @@ export class WeaponSampleBank {
     AIRCRAFT_URLS.forEach((url, index): number =>
       jobs.push(this._loadInto(this.aircraftBuffers, index, url))
     );
-    for (const kind of Object.keys(CONTACT_URLS) as ContactKind[]) {
+    for (const kind of Object.keys(CONTACT_URLS).filter((key): key is keyof typeof CONTACT_URLS =>
+      hasOwn(CONTACT_URLS, key)
+    )) {
       this.hitBuffers[kind] = new Array<AudioBuffer>(CONTACT_URLS[kind].length);
       this.hitIndices[kind] = -1;
       CONTACT_URLS[kind].forEach((url, index): number =>
         jobs.push(this._loadInto(this.hitBuffers[kind]!, index, url))
       );
     }
-    for (const kind of Object.keys(RELOAD_URLS) as ReloadKind[]) {
+    for (const kind of Object.keys(RELOAD_URLS).filter((key): key is keyof typeof RELOAD_URLS =>
+      hasOwn(RELOAD_URLS, key)
+    )) {
       this.reloadBuffers[kind] = new Array<AudioBuffer>(RELOAD_URLS[kind].length);
       this.reloadIndices[kind] = -1;
       RELOAD_URLS[kind].forEach((url, index): number =>
@@ -256,7 +263,7 @@ export class WeaponSampleBank {
     kind: ReactionKind,
     voice: number,
     rng: Rng,
-    o: { when?: number; level?: number } = {}
+    o: { when?: number | undefined; level?: number | undefined } = {}
   ): AudioVoice {
     const buffer = this._nextTake(reactionBank(voice, kind), this.hitBuffers, this.hitIndices, rng);
     const src = this.actx.createBufferSource();
@@ -273,7 +280,7 @@ export class WeaponSampleBank {
     kind: AiCalloutKind,
     voice: number,
     rng: Rng,
-    o: { when?: number; level?: number } = {}
+    o: { when?: number | undefined; level?: number | undefined } = {}
   ): AudioVoice & { stop(): void } {
     const buffer = this._nextTake(calloutBank(voice, kind), this.hitBuffers, this.hitIndices, rng);
     const src = this.actx.createBufferSource();
@@ -301,7 +308,7 @@ export class WeaponSampleBank {
   environment(
     kind: EnvironmentKind,
     rng: Rng,
-    o: { when?: number; level?: number } = {}
+    o: { when?: number | undefined; level?: number | undefined } = {}
   ): AudioVoice {
     const buffer = this._nextTake(environmentBank(kind), this.hitBuffers, this.hitIndices, rng);
     const src = this.actx.createBufferSource();
@@ -314,7 +321,11 @@ export class WeaponSampleBank {
   }
 
   /** One finite click/static composite; receive-only intel never invents a button press. */
-  radio(kind: RadioKind, rng: Rng, o: { when?: number; level?: number } = {}): AudioVoice {
+  radio(
+    kind: RadioKind,
+    rng: Rng,
+    o: { when?: number | undefined; level?: number | undefined } = {}
+  ): AudioVoice {
     const when = o.when ?? this.actx.currentTime,
       out = gain(this.actx, 1);
     let end = when;
@@ -334,7 +345,11 @@ export class WeaponSampleBank {
   }
 
   /** No hot-path fetch/decode, and no immediate repeat within a contact family. */
-  hit(kind: ContactKind, rng: Rng, o: { when?: number; level?: number } = {}): AudioVoice {
+  hit(
+    kind: ContactKind,
+    rng: Rng,
+    o: { when?: number | undefined; level?: number | undefined } = {}
+  ): AudioVoice {
     const buffer = this._nextTake(kind, this.hitBuffers, this.hitIndices, rng, 'contact');
     const src = this.actx.createBufferSource();
     src.buffer = buffer;
@@ -475,7 +490,12 @@ export class WeaponSampleBank {
   combat(
     kind: CombatKind,
     rng: Rng,
-    o: { when?: number; level?: number; delay?: number; send?: number } = {}
+    o: {
+      when?: number | undefined;
+      level?: number | undefined;
+      delay?: number | undefined;
+      send?: number | undefined;
+    } = {}
   ): AudioVoice {
     const buffer = this._nextTake(kind, this.hitBuffers, this.hitIndices, rng, 'combat');
     const src = this.actx.createBufferSource();
@@ -491,7 +511,7 @@ export class WeaponSampleBank {
   explosion(
     kind: ExplosionKind,
     rng: Rng,
-    o: { when?: number; distance?: number; level?: number } = {}
+    o: { when?: number | undefined; distance?: number | undefined; level?: number | undefined } = {}
   ): AudioVoice {
     const { from, to, mix } = explosionBlend(o.distance ?? 0);
     const fromKey: ExplosionBank = `${kind}-${from}`;
@@ -523,15 +543,13 @@ export class WeaponSampleBank {
   }
 
   dispose(): void {
-    for (const key of Object.keys(this.buffers) as SampleKind[]) this.buffers[key]!.length = 0;
+    for (const buffers of Object.values(this.buffers)) buffers.length = 0;
     this.buffers = {};
     this.indices = {};
-    for (const key of Object.keys(this.hitBuffers) as ContactKind[])
-      this.hitBuffers[key]!.length = 0;
+    for (const buffers of Object.values(this.hitBuffers)) buffers.length = 0;
     this.hitBuffers = {};
     this.hitIndices = {};
-    for (const key of Object.keys(this.reloadBuffers) as ReloadKind[])
-      this.reloadBuffers[key]!.length = 0;
+    for (const buffers of Object.values(this.reloadBuffers)) buffers.length = 0;
     this.reloadBuffers = {};
     this.reloadIndices = {};
     this.heartbeatBuffer = null;

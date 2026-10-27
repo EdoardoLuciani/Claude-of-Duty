@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 
 import { UNITS } from '../core/config.ts';
-import type { EngineContext, EngineSystems } from '../core/context.ts';
+import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName, EventWeapon } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
+import type { SurfaceName } from '../physics/surfaces.ts';
 import { Ambience } from './ambience.ts';
 import { loadFxAtlases, P, D } from './atlas.ts';
 import { DecalSystem } from './decals.ts';
@@ -48,7 +49,7 @@ interface FxImpactEvent {
   point: THREE.Vector3;
   normal: THREE.Vector3;
   incident?: THREE.Vector3;
-  surface: string;
+  surface: SurfaceName;
   damage: number;
   exit?: boolean;
   actor?: unknown;
@@ -59,13 +60,19 @@ export type FxContext = Pick<
   'scene' | 'viewScene' | 'camera' | 'viewCamera' | 'config' | 'time' | 'rng' | 'events' | 'peek'
 >;
 type DecalWorld = NonNullable<Parameters<DecalSystem['add']>[0]['world']>;
-type FxDecalOptions = Parameters<DecalSystem['add']>[0] & { noFallback?: boolean };
+type DecalOptions = Parameters<DecalSystem['add']>[0];
+/** Projection inputs and world/time bookkeeping belong to FX, not its callers. */
+export type FxDecalOptions = Partial<
+  Omit<DecalOptions, 'point' | 'normal' | 'world' | 'now' | 'mask'>
+> & {
+  noFallback?: boolean;
+};
 interface FxTargetFrame {
   point: THREE.Vector3;
   normal: THREE.Vector3;
   tangent: THREE.Vector3;
   bitangent: THREE.Vector3;
-  surface: string;
+  surface: SurfaceName;
   world: DecalWorld | null;
   distance: number;
   spanU: number;
@@ -116,7 +123,7 @@ export class FxSystem {
   declare _tmpA: THREE.Vector3;
   declare _tmpB: THREE.Vector3;
   declare _camPos: THREE.Vector3;
-  declare _decalOpts: FxDecalOptions;
+  declare _decalOpts: DecalOptions;
   declare _off: Array<() => void>;
   declare _script: Array<{ t: number; fn: () => void }>;
   declare _scriptTime: number;
@@ -129,8 +136,8 @@ export class FxSystem {
   declare _target: FxTargetFrame | undefined;
   declare _probes: Float32Array | undefined;
   declare _warmScene: THREE.Scene;
-  static id = 'fx';
-  static deps = ['render', 'materials'];
+  static readonly id = 'fx';
+  static readonly deps: SystemId[] = ['render', 'materials'];
 
   async init(ctx: FxContext): Promise<void> {
     this.ctx = ctx;
@@ -354,7 +361,7 @@ export class FxSystem {
   _viewmodelPresent(): boolean {
     let found = false;
     this.ctx.viewScene?.traverse((o): void => {
-      if (found || !(o as THREE.Mesh).isMesh) return;
+      if (found || !(o instanceof THREE.Mesh)) return;
       if (o === this.viewAdd?.mesh || o === this.viewLit?.mesh) return;
       found = true;
     });
@@ -519,9 +526,9 @@ export class FxSystem {
     weapon?: EventWeapon;
     view?: boolean;
     viewSpace?: boolean;
-    intensity?: number;
-    light?: number;
-    scale?: number;
+    intensity?: number | undefined;
+    light?: number | undefined;
+    scale?: number | undefined;
   }): ReturnType<typeof muzzleFlash> {
     this.now = this.ctx.time.elapsed;
     let pos = o.position;
@@ -551,17 +558,17 @@ export class FxSystem {
     this._flashArg.light = o.light;
     this._flashArg.scale = o.scale;
     this._flashArg.view = o.view === true || o.viewSpace === true;
-    return muzzleFlash(this, this._flashArg as Parameters<typeof muzzleFlash>[1]);
+    return muzzleFlash(this, this._flashArg);
   }
 
-  _flashArg = {
-    position: null as THREE.Vector3 | null,
-    direction: null as THREE.Vector3 | null,
-    lightPos: null as THREE.Vector3 | null,
-    weapon: undefined as Parameters<typeof muzzleFlash>[1]['weapon'],
-    intensity: 1 as number | undefined,
-    light: 1 as number | undefined,
-    scale: undefined as number | undefined,
+  _flashArg: Parameters<typeof muzzleFlash>[1] = {
+    position: new THREE.Vector3(),
+    direction: new THREE.Vector3(),
+    lightPos: new THREE.Vector3(),
+    weapon: undefined,
+    intensity: 1,
+    light: 1,
+    scale: undefined,
     view: false,
   };
   _lightPos = new THREE.Vector3();
@@ -631,9 +638,9 @@ export class FxSystem {
    * @param {THREE.Vector3} normal
    */
   addDecal(
-    point: THREE.Vector3,
-    normal: THREE.Vector3,
-    opts: Partial<FxDecalOptions> = {}
+    point: THREE.Vector3Like,
+    normal: THREE.Vector3Like,
+    opts: FxDecalOptions = {}
   ): boolean {
     if (this._suppressDecals) return false;
     const o = this._decalOpts;
@@ -1136,7 +1143,12 @@ export class FxSystem {
   }
 
   /** Fake a bullet:impact at an offset on the staged surface. */
-  _impactAt(target: FxTargetFrame, u: number, v: number, surfaceOverride?: string | null): void {
+  _impactAt(
+    target: FxTargetFrame,
+    u: number,
+    v: number,
+    surfaceOverride?: SurfaceName | null
+  ): void {
     this._p
       .copy(target.point)
       .addScaledVector(target.tangent, u)
@@ -1245,7 +1257,7 @@ export class FxSystem {
   }
 
   /** Surface name per probe hit; sized once, reused (see `_findTarget`). */
-  _probeSurf = new Array<string>(63).fill('concrete');
+  _probeSurf = new Array<SurfaceName>(63).fill('concrete');
   _probeCount = 0;
 
   _findTarget(): FxTargetFrame {
@@ -1263,7 +1275,7 @@ export class FxSystem {
     });
     this._camPos.setFromMatrixPosition(cam.matrixWorld);
     const ph = this.physics;
-    let best = null;
+    let best: Pick<FxTargetFrame, 'point' | 'normal' | 'surface' | 'distance'> | null = null;
     let bestDist = Infinity;
     if (ph?.raycast && (ph.staticWorld?.triCount ?? 0) > 0) {
       // Fan of probes: prefer something in the 1.5-9 m band, which is where a
@@ -1332,7 +1344,7 @@ export class FxSystem {
           best = best ?? {
             point: new THREE.Vector3(),
             normal: new THREE.Vector3(),
-            surface: '',
+            surface: 'concrete',
             distance: 0,
           };
           best.point.set(probes[a], probes[a + 1], probes[a + 2]);

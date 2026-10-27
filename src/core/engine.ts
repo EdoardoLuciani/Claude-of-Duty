@@ -6,7 +6,7 @@ import type { EngineContext, EngineSystems, SystemId, EngineTime } from './conte
 import type { EngineError } from './events.ts';
 import { Input } from './input.ts';
 import { Registry, EventBus, describeSystem } from './registry.ts';
-import type { Subsystem, FrameHook } from './registry.ts';
+import type { Subsystem, FrameHook, SystemConstructor } from './registry.ts';
 import { Rng } from './rng.ts';
 
 /**
@@ -22,26 +22,26 @@ import { Rng } from './rng.ts';
  *   6. input.endFrame()
  */
 export class Engine {
-  declare canvas: HTMLCanvasElement;
-  declare config: RuntimeConfig;
-  declare registry: Registry;
-  declare events: EventBus;
-  declare input: Input;
-  declare rng: Rng;
-  declare scene: THREE.Scene;
-  declare camera: THREE.PerspectiveCamera;
-  declare viewScene: THREE.Scene;
-  declare viewCamera: THREE.PerspectiveCamera;
-  declare time: EngineTime;
-  declare ctx: EngineContext;
-  declare _accum: number;
-  declare _last: number;
-  declare _running: boolean;
+  canvas: HTMLCanvasElement;
+  config: RuntimeConfig;
+  registry: Registry<EngineSystems>;
+  events: EventBus;
+  input: Input;
+  rng: Rng;
+  scene: THREE.Scene;
+  camera: THREE.PerspectiveCamera;
+  viewScene: THREE.Scene;
+  viewCamera: THREE.PerspectiveCamera;
+  time: EngineTime;
+  ctx: EngineContext;
+  _accum: number;
+  _last: number;
+  _running: boolean;
   private _gameplaySuspended = false;
   /** One-shot rendered-frame boundary; graph warmup never calls step(). */
   onFirstRender: (() => void) | null = null;
-  declare error: EngineError | null;
-  declare _onResize: () => void;
+  error: EngineError | null;
+  _onResize: () => void;
   _loop = (now: number): void => {
     if (!this._running) return;
     requestAnimationFrame(this._loop);
@@ -51,7 +51,7 @@ export class Engine {
   constructor({ canvas, config }: { canvas: HTMLCanvasElement; config: RuntimeConfig }) {
     this.canvas = canvas;
     this.config = config;
-    this.registry = new Registry();
+    this.registry = new Registry<EngineSystems>();
     this.events = new EventBus((type, err): void => this.fail('events', type, err));
     this.input = new Input(canvas, config);
     this.rng = new Rng(config.deterministic ? 0x5eed1234 : (Math.random() * 2 ** 32) >>> 0);
@@ -89,7 +89,7 @@ export class Engine {
       rng: this.rng,
       get: <K extends SystemId>(id: K): EngineSystems[K] => this.registry.get(id),
       peek: <K extends SystemId>(id: K): EngineSystems[K] | null => this.registry.peek(id),
-      has: (id: string): boolean => this.registry.has(id),
+      has: (id: SystemId): boolean => this.registry.has(id),
     };
 
     this._accum = 0;
@@ -100,10 +100,10 @@ export class Engine {
   }
 
   add<Args extends unknown[]>(
-    SystemClass: { new (...args: Args): Subsystem; id: string; deps?: string[] },
+    SystemClass: SystemConstructor<EngineSystems, Args>,
     ...args: Args
   ): this {
-    this.registry.add(new SystemClass(...args));
+    this.registry.addConstructor(SystemClass, ...args);
     return this;
   }
 
@@ -267,7 +267,7 @@ export class Engine {
         } catch (error) {
           errors.push(error);
           console.error(
-            `[engine] ${String((sys.constructor as { id?: string }).id)} dispose failed`,
+            `[engine] ${String('id' in sys.constructor ? sys.constructor.id : undefined)} dispose failed`,
             error
           );
         }

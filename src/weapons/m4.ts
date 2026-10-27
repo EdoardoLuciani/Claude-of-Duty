@@ -33,7 +33,7 @@ export function makeM4Model(gltf: GLTF): M4Model {
   const scene = gltf.scene;
   const { root, animations, point } = authoredModel(gltf, 'M4_RIG', REQUIRED, scene);
   const model = {
-    id: 'rifle',
+    id: 'rifle' as const,
     label: 'M4A1',
     scene,
     root,
@@ -71,7 +71,7 @@ export async function loadM4(): Promise<M4Model> {
 type M4Model = {
   materials: Set<THREE.Material>;
   textures: Set<THREE.Texture>;
-  id: string;
+  id: 'rifle';
   label: string;
   scene: THREE.Group;
   root: THREE.Object3D;

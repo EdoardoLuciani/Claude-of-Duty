@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
+import { isGroup } from '../core/three-guards.ts';
 import { createWeaponAnimation } from './authored-animation.ts';
 import type { WeaponEntry } from './runtime-types.ts';
 
@@ -9,9 +10,9 @@ export function createWeaponInspection(entry: WeaponEntry): {
   scene: THREE.Group;
   dispose(): void;
 } {
-  const cloned = clone(entry.model.scene);
-  if (!(cloned instanceof THREE.Group)) throw new Error('[weapons] inspection scene missing');
-  const scene = cloned as THREE.Group;
+  const cloned: unknown = clone(entry.model.scene);
+  if (!isGroup(cloned)) throw new Error('[weapons] inspection scene missing');
+  const scene = cloned;
   const root = scene.getObjectByName(entry.model.root.name);
   if (!root) throw new Error('[weapons] inspection rig missing');
   const model = {

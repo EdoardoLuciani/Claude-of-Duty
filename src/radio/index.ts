@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 
-import type { EngineContext, EngineSystems } from '../core/context.ts';
+import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 
 /**
  * RADIO — carpet-bomb strike: bomber, falling bombs, blast chain.
@@ -154,8 +154,8 @@ interface Strike {
 type RadioContext = Pick<EngineContext, 'scene' | 'get' | 'peek' | 'events'>;
 
 export class RadioSystem {
-  static id = 'radio';
-  static deps = ['world'];
+  static readonly id = 'radio';
+  static readonly deps: SystemId[] = ['world'];
   ctx!: RadioContext;
   _world!: EngineSystems['world'];
   _physics!: EngineSystems['physics'] | null;
@@ -180,14 +180,9 @@ export class RadioSystem {
 
   /** Warm real MRT/forward variants without starting a strike or drawing geometry. */
   async prewarmMaterials(): Promise<
-    | { ok: boolean; reason: string; graphWarm?: undefined; error?: undefined }
-    | {
-        ok: boolean;
-        graphWarm: { ms: number; geometries: number; frameUnchanged: boolean };
-        reason?: undefined;
-        error?: undefined;
-      }
-    | { ok: boolean; error: string; reason?: undefined; graphWarm?: undefined }
+    | { ok: false; reason: string }
+    | { ok: true; graphWarm: Awaited<ReturnType<EngineSystems['render']['_warmGraph']>> }
+    | { ok: false; error: string }
     | undefined
   > {
     if (this._warmed) return;

@@ -28,19 +28,21 @@
  * player:state, player:heartbeat, explosion. Optional `ai:bark` is picked up too.
  */
 
-import type { EngineContext } from '../core/context.ts';
+import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName, ReloadPhase } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
+import type { SurfaceName } from '../physics/surfaces.ts';
 import { AircraftVoice, AIRCRAFT_MIX, type AircraftPosition } from './aircraft.ts';
 import { Ambience, ONE_SHOTS, AMBIENT_EVENT_GAIN } from './ambience.ts';
 import { CalloutPlayer, isCalloutKind } from './callouts.ts';
 import { CASING_BANK, COMBAT_MIX, dryBank, nearMissGain } from './combat.ts';
 import { NoiseBank, SPEED_OF_SOUND, clamp, gain as mkGain } from './dsp.ts';
-import type { EnvironmentKind } from './environment.ts';
+import { isEnvironmentKind } from './environment.ts';
 import { EXPLOSION_MIX, explosionDistanceGain, type ExplosionKind } from './explosions.ts';
 import { uiSound, heartbeat, intelSiren } from './foley.ts';
 import { classifySpace, SPACE_KEYS } from './ir.ts';
 import { Mixer } from './mixer.ts';
+import type { BusName } from './mixer.ts';
 import { TentRadio } from './music.ts';
 import { radioCue } from './radio.ts';
 import { reactionKind } from './reactions.ts';
@@ -62,37 +64,37 @@ const CALLOUT_BLOCK = { pause: 1, shop: 2, death: 4, error: 8 } as const;
 
 type Vec3Like = { x: number; y: number; z: number };
 interface AudioOptions {
-  profile?: WeaponProfile;
-  firstPerson?: boolean;
-  miss?: number;
-  gain?: number;
-  surface?: string;
-  energy?: number;
-  amount?: number;
-  armourAbsorbed?: number;
-  plateBreak?: boolean;
-  gait?: string;
-  level?: number;
-  gear?: number;
-  flight?: number;
-  phase?: ReloadPhase;
-  reloadWeapon?: string;
-  dryWeapon?: string;
-  explosionKind?: ExplosionKind;
-  bark?: string;
-  radio?: boolean;
-  which?: string;
-  send?: number;
-  maxDist?: number;
-  noDelay?: boolean;
-  extraDelay?: number;
-  occlusion?: number;
-  tracked?: boolean;
-  dist?: number;
-  voice?: number;
-  priority?: number;
-  bus?: string;
-  force?: boolean;
+  profile?: WeaponProfile | undefined;
+  firstPerson?: boolean | undefined;
+  miss?: number | undefined;
+  gain?: number | undefined;
+  surface?: SurfaceName | undefined;
+  energy?: number | undefined;
+  amount?: number | undefined;
+  armourAbsorbed?: number | undefined;
+  plateBreak?: boolean | undefined;
+  gait?: string | undefined;
+  level?: number | undefined;
+  gear?: number | undefined;
+  flight?: number | undefined;
+  phase?: ReloadPhase | undefined;
+  reloadWeapon?: string | undefined;
+  dryWeapon?: string | undefined;
+  explosionKind?: ExplosionKind | undefined;
+  bark?: string | undefined;
+  radio?: boolean | undefined;
+  which?: string | undefined;
+  send?: number | undefined;
+  maxDist?: number | undefined;
+  noDelay?: boolean | undefined;
+  extraDelay?: number | undefined;
+  occlusion?: number | undefined;
+  tracked?: boolean | undefined;
+  dist?: number | undefined;
+  voice?: number | undefined;
+  priority?: number | undefined;
+  bus?: BusName | undefined;
+  force?: boolean | undefined;
 }
 type AudioRuntimeContext = Pick<EngineContext, 'rng' | 'camera' | 'events' | 'peek'>;
 interface SpaceMetrics {
@@ -156,7 +158,7 @@ const UI_ALIAS: Record<string, string> = {
 };
 
 /** Default bus per voice kind, so callers do not have to know the mix layout. */
-const BUS_FOR: Record<string, string> = {
+const BUS_FOR: Partial<Record<string, BusName>> = {
   shot: 'weapons',
   explosion: 'weapons',
   dryfire: 'weapons',
@@ -255,8 +257,8 @@ export class AudioSystem {
   declare _ambienceApi: AmbienceApi | null;
   declare _aircraft: Set<AircraftVoice>;
 
-  static id = 'audio';
-  static deps = [];
+  static readonly id = 'audio';
+  static readonly deps: SystemId[] = [];
 
   constructor() {
     this.running = false;
@@ -742,7 +744,8 @@ export class AudioSystem {
         throw new Error('[audio] unknown recorded reaction: ' + o.bark);
       }
       case 'ambient':
-        return this.samples!.environment(o.which as EnvironmentKind, rng, { when, level: o.level });
+        if (!isEnvironmentKind(o.which)) throw new Error('[audio] unknown environment: ' + o.which);
+        return this.samples!.environment(o.which, rng, { when, level: o.level });
       default:
         return uiSound(actx, bank, rng, kind, { when, level: o.level });
     }
@@ -758,7 +761,7 @@ export class AudioSystem {
     y: number,
     z: number,
     o: AudioOptions = {},
-    bus = 'foley',
+    bus: BusName = 'foley',
     priority = 0.5
   ): boolean {
     if (!this.running || this.actx!.state === 'suspended') return false;
@@ -811,7 +814,7 @@ export class AudioSystem {
   }
 
   /** Head-locked one-shot: own weapon, UI, player grunts, heartbeat. */
-  _playDry(kind: string, o: AudioOptions = {}, bus = 'foley', send = 0.15): boolean {
+  _playDry(kind: string, o: AudioOptions = {}, bus: BusName = 'foley', send = 0.15): boolean {
     if (!this.running || this.actx!.state === 'suspended') return false;
     const actx = this.actx!,
       mixer = this.mixer!;
@@ -966,7 +969,7 @@ export class AudioSystem {
   setMasterVolume(v: number): void {
     this.mixer?.setMasterVolume(v);
   }
-  setBusVolume(bus: string, v: number): void {
+  setBusVolume(bus: BusName, v: number): void {
     this.mixer?.setBusVolume(bus, v);
   }
   setAmbienceIntensity(v: number): void {
@@ -1072,7 +1075,7 @@ export class AudioSystem {
     const field = this.field!,
       mixer = this.mixer!;
     const w = p.weapon;
-    const name = typeof w === 'string' ? w : (w?.audio ?? w?.id ?? w?.name ?? w?.kind);
+    const name = typeof w === 'string' ? w : (w?.audio ?? w?.id);
     const profile = resolveProfile(name);
     // Removing the unused generic fallback must not substitute an unsuppressed report.
     if (!profile || (w && typeof w === 'object' && w.suppressed && !profile.suppressed)) return;
@@ -1131,7 +1134,7 @@ export class AudioSystem {
     const dist = field.distanceTo(x, y, z);
     if (dist > 22) return;
     // Find what it will land on, so brass on sand does not ring like concrete.
-    let surface = 'concrete';
+    let surface: SurfaceName = 'concrete';
     const phys = this.ctx.peek('physics');
     if (phys?.raycast) {
       const h = phys.raycast(x, y + 0.2, z, 0, -1, 0, 6, phys.MASK?.WORLD);

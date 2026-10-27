@@ -16,8 +16,7 @@
 
 import * as THREE from 'three';
 
-import { makeHitRecord, closestPtPointTriangle } from './math.ts';
-import type { makeClosest } from './math.ts';
+import { makeHitRecord, closestPtPointTriangle, makeClosest } from './math.ts';
 import { MASK, SURFACE_PROPS } from './surfaces.ts';
 
 const _m3 = new THREE.Matrix3();
@@ -33,7 +32,7 @@ interface HalfExtents {
   1?: number;
   2?: number;
 }
-interface RigidBodyOptions {
+export interface RigidBodyOptions {
   shape?: BodyShape;
   halfExtents?: HalfExtents;
   radius?: number;
@@ -65,10 +64,10 @@ interface RigidBodyOptions {
         surface: number
       ) => void)
     | null;
-  position?: THREE.Vector3;
+  position?: THREE.Vector3Like;
   quaternion?: THREE.Quaternion;
-  velocity?: THREE.Vector3;
-  angularVelocity?: THREE.Vector3;
+  velocity?: THREE.Vector3Like;
+  angularVelocity?: THREE.Vector3Like;
 }
 type StaticCollisionWorld = Pick<
   import('./bvh.ts').StaticWorld,
@@ -870,6 +869,6 @@ function rotZ(q: THREE.Quaternion, x: number, y: number, z: number): number {
 }
 
 /** Shared closest-point record; `closestPtPointTriangle` writes b* into it. */
-const _cpt = { bx: 0, by: 0, bz: 0 } as unknown as ReturnType<typeof makeClosest>;
+const _cpt = makeClosest();
 
 export { rotX, rotY, rotZ, integrateQuaternion };

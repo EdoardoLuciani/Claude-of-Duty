@@ -46,6 +46,7 @@ interface MuzzleProfile {
   sparks: number;
 }
 interface MuzzleWeapon {
+  id?: string;
   suppressed?: boolean;
   class?: string;
   kind?: string;
@@ -72,10 +73,10 @@ interface MuzzleFx {
 interface MuzzleOptions {
   position: Vec3Like;
   direction: Vec3Like;
-  weapon?: string | MuzzleWeapon;
-  intensity?: number;
-  scale?: number;
-  light?: number;
+  weapon?: string | MuzzleWeapon | undefined;
+  intensity?: number | undefined;
+  scale?: number | undefined;
+  light?: number | undefined;
   view?: boolean;
   lightPos?: Vec3Like;
 }
@@ -136,7 +137,8 @@ const REF_LIGHT = MUZZLE_PROFILES.rifle.light;
 function profileFor(weapon?: string | MuzzleWeapon): MuzzleProfile {
   if (!weapon) return MUZZLE_PROFILES.rifle;
   if (typeof weapon !== 'string' && weapon.suppressed) return MUZZLE_PROFILES.suppressed;
-  const key = typeof weapon === 'string' ? weapon : (weapon.class ?? weapon.kind ?? weapon.name);
+  const key =
+    typeof weapon === 'string' ? weapon : (weapon.class ?? weapon.id ?? weapon.kind ?? weapon.name);
   if (!key) return MUZZLE_PROFILES.rifle;
   const k = String(key).toLowerCase();
   for (const name in MUZZLE_PROFILES) if (k.includes(name)) return MUZZLE_PROFILES[name];

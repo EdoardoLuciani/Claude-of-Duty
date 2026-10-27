@@ -1,8 +1,12 @@
 import * as THREE from 'three';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
+import type { Renderer } from 'three/webgpu';
 
 import handReference from '../../assets/weapons/p320-compact/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/p320-compact/manifest.json' with { type: 'json' };
+import { isSkinnedMesh } from '../core/three-guards.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
 import {
@@ -17,7 +21,7 @@ import { authoredModel, requiredNode } from './authored-model.ts';
 import { buildMagazineClips, type Clip } from './clips.ts';
 
 export const P320_URL = new URL(
-  '../../assets/weapons/p320-compact/p320-compact.glb',
+  '../../assets/weapons/p320-compact/p320-compact.runtime.glb',
   import.meta.url
 ).href;
 export const P320_EJECT_DELAY = 2 / 60;
@@ -34,7 +38,7 @@ export function makeP320Model(gltf: GLTF): P320Model {
   const scene = gltf.scene;
   const { root, animations, point } = authoredModel(gltf, 'P320_RIG', REQUIRED, scene);
   const model = {
-    id: 'pistol',
+    id: 'pistol' as const,
     label: 'P320 Compact',
     scene,
     root,
@@ -60,8 +64,85 @@ export function makeP320Model(gltf: GLTF): P320Model {
   return { ...model, ...converted };
 }
 
-export async function loadP320(): Promise<P320Model> {
-  return makeP320Model(await new GLTFLoader().loadAsync(P320_URL));
+export async function loadP320(
+  renderer: Pick<Renderer, 'hasFeature'>,
+  url = P320_URL
+): Promise<P320Model> {
+  const decoder = new KTX2Loader().setWorkerLimit(2);
+  // Our strict native Renderer has no isWebGPURenderer flag. Use the public
+  // worker config rather than detectSupport()'s WebGL renderer branch.
+  decoder.workerConfig = {
+    astcSupported: renderer.hasFeature('texture-compression-astc'),
+    bptcSupported: renderer.hasFeature('texture-compression-bc'),
+    astcHDRSupported: false,
+    etc1Supported: false,
+    etc2Supported: false,
+    dxtSupported: false,
+    pvrtcSupported: false,
+  };
+  // Image fetches can finish after geometry has already rejected the GLTF load.
+  let closed = false;
+  const closedError = new Error('P320: texture decoder closed');
+  const init = decoder.init.bind(decoder);
+  decoder.init = (): Promise<void> => (closed ? Promise.reject(closedError) : init());
+  const transcodes: Promise<MessageEvent<unknown>>[] = [];
+  const postMessage = decoder.workerPool.postMessage.bind(decoder.workerPool);
+  decoder.workerPool.postMessage = (
+    message: unknown,
+    transfer?: Transferable[]
+  ): Promise<MessageEvent<unknown>> => {
+    if (closed) return Promise.reject(closedError);
+    const task = postMessage(message, transfer).then(
+      (event: MessageEvent<unknown>): MessageEvent<unknown> => {
+        const reply = event.data;
+        // The pinned loader reads success data before checking worker errors.
+        if (
+          typeof reply === 'object' &&
+          reply !== null &&
+          'type' in reply &&
+          reply.type === 'error' &&
+          'error' in reply
+        )
+          throw reply.error;
+        return event;
+      }
+    );
+    transcodes.push(task);
+    return task;
+  };
+  // GLTFLoader converts image failures to null textures; retain their original cause.
+  let textureFailed = false;
+  let textureFailure: unknown;
+  const loadTexture = decoder.load.bind(decoder);
+  decoder.load = (source, onLoad, onProgress, onError): void => {
+    loadTexture(source, onLoad, onProgress, (error): void => {
+      if (!textureFailed) {
+        textureFailed = true;
+        textureFailure = error;
+      }
+      onError?.(error);
+    });
+  };
+  // UASTC data maps fall back to RGBA when ASTC/BC7 are unavailable, avoiding
+  // lower-quality transcoding of normal/ORM channels into color-only formats.
+  try {
+    const gltf = await new GLTFLoader()
+      .setMeshoptDecoder(MeshoptDecoder)
+      .setKTX2Loader(decoder)
+      .loadAsync(url);
+    await decoder.transcoderPending;
+    if (textureFailed) throw textureFailure;
+    return makeP320Model(gltf);
+  } finally {
+    closed = true;
+    // PNG diagnostic loads never initialize the decoder or increment its count.
+    if (decoder.transcoderPending) {
+      // Prevent late worker-URL creation; preserve any load/initialization error.
+      await decoder.transcoderPending.catch((): void => {});
+      await Promise.allSettled(transcodes);
+      decoder.dispose();
+    }
+  }
 }
 
 /** Samples the actual Blender curves, including fingers. Upper/forearm IK is
@@ -69,7 +150,7 @@ export async function loadP320(): Promise<P320Model> {
 type P320Model = {
   materials: Set<THREE.Material>;
   textures: Set<THREE.Texture>;
-  id: string;
+  id: 'pistol';
   label: string;
   scene: THREE.Group;
   root: THREE.Object3D;
@@ -103,8 +184,11 @@ export class P320Animation {
   magazine!: THREE.Object3D;
   spare!: THREE.Object3D;
   magazineRound!: THREE.Object3D;
+  skin!: THREE.SkinnedMesh;
   hands!: Record<HandSide, AuthoredHand>;
   poseQ = new THREE.Quaternion();
+  private magazineRoundAuthoredScale = new THREE.Vector3();
+  private magazineRoundScaleOverridden = false;
   idleTime = 0;
   name: string | null = null;
   fireTime!: number;
@@ -121,6 +205,9 @@ export class P320Animation {
     this.magazine = node('magazine');
     this.spare = node('magazine_spare');
     this.magazineRound = node('magazine_round');
+    const skin = node('P320_surface');
+    if (!isSkinnedMesh(skin)) throw new Error('P320: missing mechanical skin');
+    this.skin = skin;
     this.hands = discoverAuthoredHands(node);
     this.reset();
   }
@@ -130,6 +217,12 @@ export class P320Animation {
   }
 
   _sample(name: string, time: number): void {
+    // PropertyMixer skips unchanged constant channels. Undo our visibility
+    // override before sampling so authored hidden/visible scales stay authoritative.
+    if (this.magazineRoundScaleOverridden) {
+      this.magazineRound.scale.copy(this.magazineRoundAuthoredScale);
+      this.magazineRoundScaleOverridden = false;
+    }
     sampleAuthoredAction(this, name, time);
     this.root.updateMatrix();
     this.poseQ.copy(this.root.quaternion);
@@ -169,6 +262,13 @@ export class P320Animation {
       this.barrel.rotation.x = THREE.MathUtils.degToRad(3.5);
     }
     this.magazineRound.visible = magazineLoaded;
+    // Bone visibility does not hide its weighted vertices. Preserve the native
+    // scale before collapsing the cartridge, then restore it in _sample().
+    if (!magazineLoaded) {
+      this.magazineRoundAuthoredScale.copy(this.magazineRound.scale);
+      this.magazineRound.scale.setScalar(0);
+      this.magazineRoundScaleOverridden = true;
+    }
     this.root.updateMatrixWorld(true);
   }
 
@@ -184,6 +284,7 @@ export class P320Animation {
   dispose(): void {
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.root);
+    this.skin.skeleton.dispose();
     disposeWeaponMaterials(this.model);
   }
 }

@@ -1,4 +1,5 @@
 import { dot, mix, normalize, positionLocal, pow, smoothstep, vec3 } from 'three/tsl';
+
 /**
  * Standalone visual harness for the weapons subsystem.
  *
@@ -19,13 +20,14 @@ import { Rng } from '../core/rng.ts';
 import { rendererCounters } from '../dev/render-info.ts';
 import { MaterialSystem } from '../materials/index.ts';
 import { createWebGpuRenderer } from '../render/webgpu-device.ts';
-import { WEAPON_DEFS, WEAPON_IDS } from './defs.ts';
+import { WEAPON_DEFS, WEAPON_IDS, isWeaponId } from './defs.ts';
 import { loadWeapon } from './loaders.ts';
 import { ReticleMaterials } from './materials-tsl.ts';
 import { Viewmodel } from './viewmodel.ts';
 
 const params = new URLSearchParams(location.search);
 const WEAPON = params.get('w') ?? 'rifle';
+if (!isWeaponId(WEAPON)) throw new Error(`[preview] unknown weapon ${WEAPON}`);
 const VIEW = params.get('view') ?? 'hero';
 const TIME = Number(params.get('t') ?? 0);
 const ARMS = params.get('arms') !== '0';
@@ -129,9 +131,9 @@ if (!FIRST_PERSON) {
 }
 
 const stats: Record<string, number> = {};
-for (const id of WEAPON_IDS as Array<keyof typeof WEAPON_DEFS>) {
-  const def = { ...WEAPON_DEFS[id], cycleTime: 60 / WEAPON_DEFS[id].rpm };
-  const entry = vm.addWeapon(await loadWeapon(id), def);
+for (const id of WEAPON_IDS) {
+  const def = WEAPON_DEFS[id];
+  const entry = vm.addWeapon(await loadWeapon(id, renderer), def);
   stats[id] = entry.tris;
 }
 vm.setActive(WEAPON);
@@ -264,15 +266,7 @@ if (!FIRST_PERSON) {
  * inside the RPC. `grab=0` (the default when a human opens the page) keeps the
  * animation running forever.
  */
-const previewWindow = window as Omit<
-  Window,
-  '__PREVIEW_RENDERER__' | '__PREVIEW_DRAW__' | '__INFO__' | '__READY__'
-> & {
-  __PREVIEW_RENDERER__?: typeof renderer;
-  __PREVIEW_DRAW__?: () => void;
-  __INFO__?: Record<string, unknown>;
-  __READY__?: boolean;
-};
+const previewWindow = window;
 previewWindow.__PREVIEW_RENDERER__ = renderer;
 previewWindow.__PREVIEW_DRAW__ = (): void => renderer.render(scene, camera);
 const STEP = 1 / 60;

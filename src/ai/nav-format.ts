@@ -2,7 +2,7 @@
 // Kept separate from the WASM module so invalid assets fail before native import.
 import { INFANTRY } from './capabilities.ts';
 import { LADDER, LADDER_MOTOR_VERSION, type LadderDescriptor } from './ladder.ts';
-import { isRecord, isNumberArray } from './validation.ts';
+import { isRecord, isNumberArray, isNumber } from './validation.ts';
 export const NAV_VERSION = 2;
 export const NAV_LADDER_FLAG = 2,
   NAV_LINK_RADIUS = 0.7;
@@ -53,8 +53,8 @@ export interface NavMetadata {
   profile?: typeof NAV_PROFILE;
   config?: typeof NAV_CONFIG;
   bounds: { min: number[]; max: number[] };
-  sourceHash?: string;
-  collisionAsset?: string;
+  sourceHash?: string | undefined;
+  collisionAsset?: string | undefined;
   ladderMotorVersion?: number;
   ladders?: readonly LadderDescriptor[];
 }
@@ -68,7 +68,7 @@ const bytes = (b: ByteInput): Uint8Array =>
   b instanceof ArrayBuffer
     ? new Uint8Array(b)
     : new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
-const check = (ok: unknown, why: string): void => {
+const check: (ok: unknown, why: string) => asserts ok = (ok, why): asserts ok => {
   if (!ok) throw new Error(`[nav] ${why}`);
 };
 export async function navHash(buffer: ByteInput): Promise<string> {
@@ -88,9 +88,9 @@ function checkedLadders(
 ): readonly LadderDescriptor[] {
   check(Array.isArray(value) && value.length <= 1024, 'invalid ladder descriptors');
   return Object.freeze(
-    (value as unknown[]).map(
+    value.map(
       (
-        v,
+        v: unknown,
         i
       ): Readonly<{
         id: number;
@@ -113,15 +113,17 @@ function checkedLadders(
         )
           throw new Error('[nav] invalid ladder descriptor');
         const point = (p: unknown): { x: number; y: number; z: number } => {
-          if (
-            !isRecord(p) ||
-            ![p.x, p.y, p.z].every((n): boolean => typeof n === 'number' && Number.isFinite(n))
-          )
+          if (!isRecord(p) || !isNumber(p.x) || !isNumber(p.y) || !isNumber(p.z))
             throw new Error('[nav] invalid ladder point');
-          return { x: p.x as number, y: p.y as number, z: p.z as number };
+          return { x: p.x, y: p.y, z: p.z };
         };
         const normal = point(v.normal),
-          points = v.points.map(point) as unknown as LadderDescriptor['points'];
+          points: LadderDescriptor['points'] = [
+            point(v.points[0]),
+            point(v.points[1]),
+            point(v.points[2]),
+            point(v.points[3]),
+          ];
         const [lower, bottom, top, upper] = points;
         check(
           normal.y === 0 &&
@@ -155,7 +157,12 @@ function checkedLadders(
           volumeIndex: i,
           normal: Object.freeze(normal),
           radius: v.radius,
-          points: Object.freeze(points.map(Object.freeze)) as LadderDescriptor['points'],
+          points: Object.freeze([
+            Object.freeze(points[0]),
+            Object.freeze(points[1]),
+            Object.freeze(points[2]),
+            Object.freeze(points[3]),
+          ] as const),
         });
       }
     )

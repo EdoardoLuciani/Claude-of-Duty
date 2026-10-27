@@ -3,6 +3,7 @@ import * as TSL from 'three/tsl';
 import { MeshBasicNodeMaterial, MeshPhysicalNodeMaterial } from 'three/webgpu';
 import type { Node, UniformNode } from 'three/webgpu';
 
+import { hasOwn } from '../core/guards.ts';
 import { loadArmAsset } from './arm-asset.ts';
 import { createWeaponMaterial } from './asset-material.ts';
 import { createWeaponAnimation } from './authored-animation.ts';
@@ -17,6 +18,7 @@ import {
 } from './bandage-path.ts';
 import { makeSampleResult } from './clips.ts';
 import type { Clip } from './clips.ts';
+import type { WeaponDef } from './defs.ts';
 import { triCount, mergeAll } from './geometry.ts';
 import { grenadeMesh } from './grenade-mesh.ts';
 import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from './grip-contacts.ts';
@@ -39,7 +41,6 @@ import type {
   ClipResult,
   ViewPoseKey,
   ViewState,
-  WeaponDef,
   WeaponEntry,
   WeaponModelRecord,
   WeaponNodes,
@@ -294,7 +295,7 @@ export class Viewmodel {
   declare _adsPos: THREE.Vector3;
   declare _adsQuat: THREE.Quaternion;
   declare _sightLocal: THREE.Vector3;
-  declare weapons: Map<string, WeaponEntry>;
+  declare weapons: Map<WeaponEntry['id'], WeaponEntry>;
   declare _basePos: THREE.Vector3;
   declare _baseQuat: THREE.Quaternion;
   declare _handPos: THREE.Vector3;
@@ -734,7 +735,8 @@ export class Viewmodel {
 
   // Refine the baseline poses against weapon-specific thumb/trigger targets.
   _fitGripContacts(w: WeaponEntry): void {
-    const contact = GRIP_CONTACTS[w.id as keyof typeof GRIP_CONTACTS];
+    if (!hasOwn(GRIP_CONTACTS, w.id)) return;
+    const contact = GRIP_CONTACTS[w.id];
     if (!contact) return;
     this.armR.hand.position.fromArray(w.gripR.pos);
     handBasis(
@@ -783,7 +785,7 @@ export class Viewmodel {
     this.armL.setPose(poseName);
   }
 
-  setActive(id: string): WeaponEntry | null {
+  setActive(id: WeaponEntry['id']): WeaponEntry | null {
     const w = this.weapons.get(id);
     if (!w || w === this.active) return this.active;
     if (this.active) {
@@ -1254,7 +1256,7 @@ export class Viewmodel {
   /**
    * @param {number} dt
    * @param {object} s  { ads, sprint, lowReady, speed, crouch, airborne,
-   *                      trigger, empty, cycleTime }
+   *                      trigger, empty }
    */
   update(dt: number, s: ViewState): void {
     const w = this.active;

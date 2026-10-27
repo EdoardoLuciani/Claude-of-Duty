@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 import { bindingLabel } from '../core/bindings.ts';
+import type { WeaponMode } from '../weapons/defs.ts';
 
 /**
  * Scripted mid-combat HUD state for `debugState('combat')`.
@@ -28,7 +29,7 @@ interface CombatUiState {
   reloading: boolean;
   reloadProgress: number;
   weaponName: string;
-  fireMode: string;
+  fireMode: WeaponMode;
   lethalCount: number;
   bandages: number;
   move: number;
@@ -110,7 +111,7 @@ export class CombatDemo {
     s.reloading = false;
     s.reloadProgress = 0;
     s.weaponName = 'M4A1';
-    s.fireMode = 'AUTO';
+    s.fireMode = 'auto';
     s.lethalCount = 2;
     s.bandages = 2;
     s.move = 0.34;
