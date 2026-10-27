@@ -47,12 +47,10 @@ for (const extension of ['js', 'wasm']) {
   assert(code.includes(base + asset.fileName), 'loader URLs honor the deployment base path');
 }
 assert(!code.includes('vendor/basis-'), 'no legacy vendored decoder URLs');
-assert(
-  readFileSync(
-    new URL('../../public/licenses/basis-universal-LICENSE.txt', import.meta.url),
-    'utf8'
-  ).includes('Apache License')
-);
+const license = output.find((file) => file.type === 'asset' && file.fileName === 'LICENSE.txt');
+assert(license, 'distribute third-party notices in the existing LICENSE.txt');
+assert.equal(license.source, readFileSync(new URL('../../LICENSE', import.meta.url), 'utf8'));
+assert.match(license.source, /Basis Universal transcoder[\s\S]*Apache License/);
 console.log(
   'P320 transcoder: Vite emits npm-provided JS/WASM with local base-aware URLs and an Apache notice'
 );

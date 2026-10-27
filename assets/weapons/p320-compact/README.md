@@ -144,7 +144,7 @@ from initialized native WebGPU features (BC7/ASTC or RGBA8). Its two-worker Basi
 decoder closes after loading. `KTX2Loader` uses the JS/WASM already supplied by
 the pinned Three npm dependency; Vite serves/emits these assets locally using the
 loader's default package-relative URLs. No duplicate decoder binaries are checked
-in. The Apache notice is distributed at `public/licenses/basis-universal-LICENSE.txt`.
+in. The Apache notice is included in the root `LICENSE`, emitted as `LICENSE.txt`.
 Decoder transfer remains ~0.56 MiB before HTTP compression. Other weapons are
 unchanged. Include decoder transfer/startup when evaluating cold-load savings.
 
