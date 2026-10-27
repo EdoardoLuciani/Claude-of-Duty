@@ -22,7 +22,7 @@ GLB; the native PNG export remains the lossless authoring/rebuild reference.
 | Native 60 Hz control sampling and stock Actions glTF export | `p320/export.py` |
 | Fixed review cameras, lights and color management | `p320/studio.py` |
 
-Paths above are under `tools/blender/`. `tools/cook-p320.mjs` owns the runtime
+Paths above are under `tools/blender/`. `build/models.mjs` owns the runtime
 gltfpack settings. Helpers remain weapon-local. Keep the
 unique atlas, not MCX repeating projection. Lettering and shallow traction ribs
 are high-to-low baked rather than rendered geometry; tritium emission has its
@@ -40,10 +40,10 @@ blender -b -t 8 --python-exit-code 1 --python tools/blender/p320_compact.py -- \
   --output /tmp/p320-review --render --quick
 blender -b -t 8 /tmp/p320-review/p320-compact.blend \
   --python-exit-code 1 --python tools/blender/p320_check.py
-GLTFPACK=/absolute/path/gltfpack node tools/cook-p320.mjs /tmp/p320-review
+GLTFPACK=/absolute/path/gltfpack npm run models:cook -- p320 /tmp/p320-review
 # After scratch inspection, regenerate the committed products:
 blender -b -t 8 --python-exit-code 1 --python tools/blender/p320_compact.py
-GLTFPACK=/absolute/path/gltfpack node tools/cook-p320.mjs
+GLTFPACK=/absolute/path/gltfpack npm run models:cook -- p320
 node tests/smoke/smoke-p320.mjs
 node tests/smoke/smoke-p320-ktx2.mjs
 ```
@@ -100,13 +100,16 @@ This is not a lossless replacement or an FPS claim. Human review still applies.
 
 ### gltfpack runtime cook
 
-`tools/cook-p320.mjs [asset-directory]` reads Blender's untouched native
-`p320-compact.glb` and invokes the native **gltfpack 1.3** build with BasisU support.
-It writes `p320-compact.ktx2.glb` and provenance/settings JSON. The wrapper does not
-repack or repair the GLB. Rebuild native source first, then recook; native-input,
-cook-script and runtime-product hashes catch stale products. Normal builds use
-committed assets and need neither Blender nor gltfpack. No new npm dependency.
-Download the native tool from the [official releases](https://github.com/zeux/meshoptimizer/releases/tag/v1.3).
+`npm run models:cook -- p320 [asset-directory]` uses the shared
+[`build/models.mjs`](../../../build/models.mjs) pipeline with a P320-specific
+simplification profile. It reads Blender's untouched native `p320-compact.glb` and
+invokes native **gltfpack 1.3** with BasisU support, writing
+`p320-compact.runtime.glb`. This is a GLB containing KTX2 textures and compressed
+geometry, not a KTX2 model format. There is no per-model provenance sidecar and no
+custom GLB repacking/repair. Rebuild native source first, then explicitly recook
+and validate. Normal builds use committed assets and need neither Blender nor
+gltfpack. No new npm dependency. Download the native tool from the
+[official releases](https://github.com/zeux/meshoptimizer/releases/tag/v1.3).
 
 The pinned settings retain named nodes/extras and constant tracks, disable time
 resampling, use floating-point position/UV quantization (14/16 bits), 8-bit normals,
@@ -138,9 +141,12 @@ that memory saving. These are storage/buffer optimizations, not an FPS claim.
 
 `src/weapons/p320.ts` attaches Three's local meshopt decoder and configures KTX2
 from initialized native WebGPU features (BC7/ASTC or RGBA8). Its two-worker Basis
-decoder closes after loading; matching JS/WASM/notices are served locally from
-`public/vendor/basis-e27dfa95/` (~0.56 MiB before HTTP compression). Other weapons
-are unchanged. Include decoder transfer/startup when evaluating cold-load savings.
+decoder closes after loading. `KTX2Loader` uses the JS/WASM already supplied by
+the pinned Three npm dependency; Vite serves/emits these assets locally using the
+loader's default package-relative URLs. No duplicate decoder binaries are checked
+in. The Apache notice is distributed at `public/licenses/basis-universal-LICENSE.txt`.
+Decoder transfer remains ~0.56 MiB before HTTP compression. Other weapons are
+unchanged. Include decoder transfer/startup when evaluating cold-load savings.
 
 Some distributions ship a Blender OCIO config newer than their linked OpenColorIO
 library. Use a compatible process-local `OCIO=/absolute/path/config.ocio` retaining

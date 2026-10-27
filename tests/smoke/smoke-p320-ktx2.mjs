@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 import * as THREE from 'three';
@@ -12,6 +11,7 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 
+import { GLTFPACK_FLAGS, GLTFPACK_VERSION, MODEL_COOKS } from '../../build/models.mjs';
 import { loadP320, P320_URL, P320Animation, makeP320Model } from '../../src/weapons/p320.ts';
 import { inspectGLB, parseGLB } from '../../tools/lib/glb-fixture.mjs';
 
@@ -20,18 +20,8 @@ const sourceBytes = readFileSync(new URL('p320-compact.glb', dir));
 const bytes = readFileSync(new URL(P320_URL));
 const source = inspectGLB(sourceBytes),
   cooked = inspectGLB(bytes);
-const report = JSON.parse(readFileSync(new URL('p320-compact.ktx2.json', dir)));
-const hash = (buffer) => createHash('sha256').update(buffer).digest('hex');
-assert.equal(report.encoder, 'gltfpack 1.3');
-assert.equal(
-  report.cookSha256,
-  hash(readFileSync(new URL('../../tools/cook-p320.mjs', import.meta.url)))
-);
-assert.equal(report.sourceSha256, hash(sourceBytes), 'recook after native source changes');
-assert.equal(report.sha256, hash(bytes));
-assert.equal(report.bytes, bytes.length);
-assert.equal(report.sourceBytes, sourceBytes.length);
-assert.deepEqual(report.flags, [
+assert.equal(GLTFPACK_VERSION, 'gltfpack 1.3');
+assert.deepEqual(GLTFPACK_FLAGS, [
   '-kn',
   '-ke',
   '-ac',
@@ -52,17 +42,13 @@ assert.deepEqual(report.flags, [
   '-as',
   '24',
   '-cc',
-  '-si',
-  '0.50',
-  '-se',
-  '0.001',
-  '-sp',
   '-tu',
   '-tq',
   '10',
   '-tj',
   '1',
 ]);
+assert.deepEqual(MODEL_COOKS.p320.flags, ['-si', '0.50', '-se', '0.001', '-sp']);
 for (const extension of ['KHR_texture_basisu', 'EXT_meshopt_compression', 'KHR_mesh_quantization'])
   assert(cooked.json.extensionsRequired.includes(extension));
 assert(
@@ -83,15 +69,10 @@ assert.deepEqual(
   new Set(source.json.skins[0].joints.map((i) => source.json.nodes[i].name))
 );
 const primitive = cooked.json.meshes[0].primitives[0];
-assert.equal(report.stats.triangles, cooked.json.accessors[primitive.indices].count / 3);
-assert.equal(report.stats.vertices, cooked.json.accessors[primitive.attributes.POSITION].count);
-assert(
-  report.stats.triangles >= 17000 && report.stats.triangles < 18000,
-  'approved tight-error triangle budget'
-);
-assert.equal(report.stats.primitives, 1);
-assert.equal(report.stats.materials, 1);
-assert.equal(report.stats.joints, 9);
+const triangles = cooked.json.accessors[primitive.indices].count / 3;
+assert(triangles >= 17000 && triangles < 18000, 'approved tight-error triangle budget');
+assert.equal(cooked.json.accessors[primitive.attributes.POSITION].count, 32626);
+assert.equal(cooked.json.skins[0].joints.length, 9);
 
 function imageData(container, image) {
   const view = container.json.bufferViews[image.bufferView];
@@ -120,19 +101,13 @@ for (let i = 0; i < cooked.json.images.length; i++) {
   assert.equal(dfd.flags, 0);
   assert.equal(dfd.samples.length, 1);
   assert.equal(dfd.samples[0].channelType, 0, 'RGB, not packed XY normal data');
-  assert.equal(report.images[i].name, image.name);
-  assert.equal(report.images[i].sha256, hash(raw));
-  assert.equal(report.images[i].sourceSha256, hash(imageData(source, native)));
-}
-for (const name of ['basis_transcoder.js', 'basis_transcoder.wasm'])
+  assert.equal(native.mimeType, 'image/png');
   assert.deepEqual(
-    readFileSync(new URL(`../../public/vendor/basis-e27dfa95/${name}`, import.meta.url)),
-    readFileSync(
-      new URL(`../../node_modules/three/examples/jsm/libs/basis/${name}`, import.meta.url)
-    ),
-    'serve transcoder bytes matching the pinned Three version'
+    imageData(source, native),
+    readFileSync(new URL(`textures/${native.name}.png`, dir)),
+    'native export matches the editable PNG bake'
   );
-
+}
 // Geometry/animation optimization is now intentional; bound the approved motion loss.
 const nativeModel = makeP320Model(await parseGLB(sourceBytes));
 const packedModel = makeP320Model(await parseGLB(bytes));
@@ -223,7 +198,7 @@ GLTFLoader.prototype.loadAsync = async function (url) {
   assert.equal(this.meshoptDecoder, MeshoptDecoder, 'runtime uses the local meshopt decoder');
   const decoder = this.ktx2Loader;
   config = decoder.workerConfig;
-  assert.match(decoder.transcoderPath, /vendor\/basis-e27dfa95\/$/);
+  assert.equal(decoder.transcoderPath, '', 'use Three’s npm-provided default transcoder URLs');
   if (mode !== 'png')
     decoder.transcoderPending =
       mode === 'error' || mode === 'init-error'
@@ -290,5 +265,5 @@ try {
   KTX2Loader.prototype.dispose = originalDispose;
 }
 console.log(
-  'P320 gltfpack: source/product hashes, quantization budget, UASTC/mips/UVs, bounded motion and decoder lifecycle passed'
+  'P320 gltfpack: cook settings, geometry budget, UASTC/mips/UVs, bounded motion and decoder lifecycle passed'
 );

@@ -26,7 +26,7 @@ than writing `undefined` over required defaults. Lint rejects floating/misused p
 assertions (including `as unknown as T`), as well as explicit `any` and unsafe
 assignment, argument, call, member access and return. Runtime boundaries must
 validate unknown data; owned records should be constructed with their full type.
-Regular lint rules cover `src/`, `tools/`, and `tests/`. Missing return annotations
+Regular lint rules cover `src/`, `build/`, `tools/`, and `tests/`. Missing return annotations
 fail CI's lint step, not `tsc` itself. The narrow declaration additions in
 `src/render/three-types.d.ts` describe APIs verified against the pinned Three.js
 source; review them alongside the Three/@types upgrade checks.
@@ -55,6 +55,10 @@ just to format source.
 A WebGPU-capable browser/device is required. Normal builds use committed world
 and Blender assets, with no Blender requirement. Change world source in
 `tools/worldgen/`, regenerate with `npm run world`, then run `npm run world:validate`.
+Runtime-model optimization is explicit: `npm run models:cook -- p320` uses the
+[shared gltfpack build recipe](build/README.md). Normal dev/build/CI consumes the
+committed `.runtime.glb`; it does not require gltfpack. P320 is the first opt-in
+profile; other models retain their current loading paths until validated.
 
 **Three.js pin:** GitHub commit `e27dfa95ae7f453b5d7a9a36ffdb563f7c9b529b`,
 not a moving `dev` dependency. Its package version still says `0.186.0`; runtime
