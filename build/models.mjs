@@ -41,6 +41,13 @@ export const GLTFPACK_FLAGS = [
 // Opt assets in here after validating their adapters and visual/animation fidelity.
 // Simplification is model-specific, never a blanket default for all models.
 export const MODEL_COOKS = {
+  exps3: {
+    directory: 'assets/attachments/eotech-exps3-0',
+    source: 'exps3-0.glb',
+    output: 'exps3-0.runtime.glb',
+    // The P320 error limit clips the rounded optical opening on this smaller asset.
+    flags: ['-si', '0.50', '-se', '0.0002', '-sp'],
+  },
   p320: {
     directory: 'assets/weapons/p320-compact',
     source: 'p320-compact.glb',
