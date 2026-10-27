@@ -13,7 +13,7 @@ const original = GLTFLoader.prototype.loadAsync;
 GLTFLoader.prototype.loadAsync = (url) => parseGLB(readFileSync(new URL(url)));
 try {
   for (const id of WEAPON_IDS) {
-    const model = await loadWeapon(id);
+    const model = await loadWeapon(id, { hasFeature: () => false });
     const def = { ...WEAPON_DEFS[id], cycleTime: 60 / WEAPON_DEFS[id].rpm };
     const animation = createWeaponAnimation(model, def);
     // Inspect while the live gun is midway through an empty reload.
