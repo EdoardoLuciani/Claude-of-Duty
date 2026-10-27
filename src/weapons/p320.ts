@@ -21,7 +21,7 @@ import { authoredModel, requiredNode } from './authored-model.ts';
 import { buildMagazineClips, type Clip } from './clips.ts';
 
 export const P320_URL = new URL(
-  '../../assets/weapons/p320-compact/p320-compact.ktx2.glb',
+  '../../assets/weapons/p320-compact/p320-compact.runtime.glb',
   import.meta.url
 ).href;
 export const P320_EJECT_DELAY = 2 / 60;
@@ -68,9 +68,7 @@ export async function loadP320(
   renderer: Pick<Renderer, 'hasFeature'>,
   url = P320_URL
 ): Promise<P320Model> {
-  const decoder = new KTX2Loader()
-    .setTranscoderPath(`${import.meta.env?.BASE_URL ?? '/'}vendor/basis-e27dfa95/`)
-    .setWorkerLimit(2);
+  const decoder = new KTX2Loader().setWorkerLimit(2);
   // Our strict native Renderer has no isWebGPURenderer flag. Use the public
   // worker config rather than detectSupport()'s WebGL renderer branch.
   decoder.workerConfig = {
