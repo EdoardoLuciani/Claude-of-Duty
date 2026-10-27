@@ -23,6 +23,8 @@
  */
 
 import * as THREE from 'three';
+
+import { hasOwn } from '../core/guards.ts';
 interface NoiseRandom {
   float(): number;
   int(min: number, max: number): number;
@@ -495,12 +497,11 @@ export function makeCamoSampler(
   B: CamoBudget = budgetFor(cfg)
 ): CamoSampler {
   const pre = measureCamo(nz, cfg);
-  const fn = ((u: number, v: number, out: Texel): void => {
+  const fn = (u: number, v: number, out: Texel): void => {
     camoTexel(nz, cfg, u, v, out);
     applyBudget(out, pre.mean, B);
-  }) as CamoSampler;
-  fn.srcMean = pre.mean;
-  return fn;
+  };
+  return Object.assign(fn, { srcMean: pre.mean });
 }
 
 function applyBudget(out: Texel, srcMean: number, B: CamoBudget): void {
@@ -588,7 +589,7 @@ export class SoldierMaterials {
     // noise is touched, and the figure goes chalky without anybody noticing.
     this.camoStats = {};
     for (const name of opts.camo ?? ['arid', 'woodland']) {
-      const cfg = CAMO[name as keyof typeof CAMO] ?? CAMO.arid;
+      const cfg = hasOwn(CAMO, name) ? CAMO[name] : CAMO.arid;
       const sample = makeCamoSampler(nz, cfg);
       let s = 0;
       let s2 = 0;

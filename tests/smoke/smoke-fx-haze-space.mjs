@@ -4,7 +4,7 @@ import { PerspectiveCamera, Vector3 } from 'three';
 
 import { Rng } from '../../src/core/rng.ts';
 import { FxSystem } from '../../src/fx/index.ts';
-import { muzzleFlash } from '../../src/fx/muzzle.ts';
+import { muzzleFlash, MUZZLE_PROFILES } from '../../src/fx/muzzle.ts';
 
 const camera = new PerspectiveCamera(),
   viewCamera = new PerspectiveCamera();
@@ -37,5 +37,11 @@ for (const view of [false, true]) {
   };
   muzzleFlash(fx, { position, direction, view, weapon: 'rifle' });
   assert(actual.distanceTo(expected) < 1e-10, `muzzle haze must be in world space (view=${view})`);
+  const profile = muzzleFlash(fx, { position, direction, view, weapon: { id: 'pistol' } });
+  assert.equal(
+    profile,
+    MUZZLE_PROFILES.pistol,
+    'compact descriptors resolve their weapon identity'
+  );
 }
 console.log('world and translated/rotated first-person muzzle haze coordinates passed');

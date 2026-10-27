@@ -4,7 +4,8 @@ import { uniform, uv } from 'three/tsl';
 import { PMREMGenerator } from 'three/webgpu';
 import type { Renderer, Node } from 'three/webgpu';
 
-import type { EngineContext } from '../core/context.ts';
+import type { SystemId, EngineContext } from '../core/context.ts';
+import { applyDefinedPatch } from '../core/patch.ts';
 import type { RenderSystem } from '../render/index-webgpu.ts';
 import { createAtmosphereNodes, createRaymarchSky, createSkyViewLookup } from './atmosphere-tsl.ts';
 import {
@@ -174,8 +175,8 @@ export class SkySystem {
   declare _occParams: SkyOccParams;
   declare _offRestart: (() => void) | null;
 
-  static id = 'sky';
-  static deps = ['render', 'materials'];
+  static readonly id = 'sky';
+  static readonly deps: SystemId[] = ['render', 'materials'];
 
   // Stable, read-only-to-consumers direction toward the active placed key.
   // Available before init so material/render uniforms can borrow its identity.
@@ -277,10 +278,12 @@ export class SkySystem {
     // is always 40 steps, as it was.
     const steps = q.volumetrics ? (ctx.config.quality === 'ultra' ? 48 : 20) : 0;
     this.luts = new SkyLuts(this.shared);
-    const lutShared = this.shared as SkyShared &
-      Required<
-        Pick<SkyShared, 'transmittanceTex' | 'multiScatterTex' | 'skyViewTex' | 'ambientTex'>
-      >;
+    const lutShared = Object.assign(this.shared, {
+      transmittanceTex: this.luts.transmittanceRt.texture,
+      multiScatterTex: this.luts.multiScatterRt.texture,
+      skyViewTex: this.luts.skyViewRt.texture,
+      ambientTex: this.luts.ambientRt.texture,
+    });
     const atmo = createAtmosphereNodes(lutShared);
     const skyView = createSkyViewLookup(lutShared);
     this.raymarchSky = createRaymarchSky({ ...atmo, uMieScale: this.shared.uMieScale }, 40);
@@ -349,17 +352,13 @@ export class SkySystem {
     // ---- volumetrics ------------------------------------------------------
     // A node factory, not a registered pass: the WebGPU frame graph has no pass
     // chain to register into. `skCloudShadow` rides along in `shared`.
-    this.shared.skCloudShadow = cloudsScreen.skCloudShadow as (
-      worldXZ: Node<'vec2'>,
-      sunDir: Node<'vec3'>
-    ) => Node<'float'>;
-    this.volumetrics = createVolumetricNodes(
-      lutShared as typeof lutShared & Required<Pick<SkyShared, 'skCloudShadow'>>,
-      {
-        steps: Math.max(8, steps),
-        march: q.volumetrics,
-      }
-    );
+    const volumetricShared = Object.assign(lutShared, {
+      skCloudShadow: cloudsScreen.skCloudShadow,
+    });
+    this.volumetrics = createVolumetricNodes(volumetricShared, {
+      steps: Math.max(8, steps),
+      march: q.volumetrics,
+    });
 
     // ---- bookkeeping ------------------------------------------------------
     this.ambientColor = new THREE.Color(0, 0, 0);
@@ -457,14 +456,15 @@ export class SkySystem {
   }
 
   setWeather(patch: SkyWeatherPatch = {}): this {
-    Object.assign(this.weather, patch);
-    if (patch.fogDensity !== undefined) {
-      const k = patch.fogDensity;
+    const { fogDensity, fogHeight, shaftGain, ...weather } = patch;
+    applyDefinedPatch(this.weather, weather);
+    if (fogDensity !== undefined) {
+      const k = fogDensity;
       this._fog.scatter = 3.6e-3 * k;
       this._fog.extinction = 1.45e-3 * k;
     }
-    if (patch.fogHeight !== undefined) this._fog.heightScale = patch.fogHeight;
-    if (patch.shaftGain !== undefined) this._fog.shaftGain = patch.shaftGain;
+    if (fogHeight !== undefined) this._fog.heightScale = fogHeight;
+    if (shaftGain !== undefined) this._fog.shaftGain = shaftGain;
     this._applyWeather();
     this._applyFog();
     // Turbidity is baked into all three LUTs, so it needs the static bake too.
@@ -758,7 +758,9 @@ export class SkySystem {
     this._offRestart?.();
     this.luts.dispose();
     this.ctx.scene.remove(this.dome);
-    (this.dome.material as THREE.Material).dispose();
+    if (Array.isArray(this.dome.material))
+      for (const material of this.dome.material) material.dispose();
+    else this.dome.material.dispose();
     this.envPass.dispose();
     this.envEquirect.dispose();
     // The sky owns this environment; leave another owner's replacement alone.

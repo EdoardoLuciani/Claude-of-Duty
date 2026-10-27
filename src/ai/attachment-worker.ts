@@ -13,10 +13,7 @@ import type {
 } from './attachment-types.ts';
 
 // Keep worker globals local: the application tsconfig also includes DOM types.
-const worker = self as unknown as {
-  postMessage(message: WorkerMessage): void;
-  onmessage: ((event: MessageEvent<unknown>) => void) | null;
-};
+const post = (message: WorkerMessage): void => self.postMessage(message);
 import { canStand, checkAttachment } from './attachment.js';
 import { LADDER, LadderMotor } from './ladder.ts';
 
@@ -29,7 +26,7 @@ function failure(error: unknown): void {
   failed = true;
   queues.clear();
   actors.length = 0;
-  worker.postMessage({
+  post({
     type: 'error',
     message: error instanceof Error ? (error.stack ?? error.message) : String(error),
   });
@@ -112,13 +109,13 @@ channel.port1.onmessage = (): void => {
       queueMs: start - job.queuedAt,
       costs: profiling ? costs : null,
     };
-    worker.postMessage(result);
+    post(result);
   } catch (error) {
     failure(error);
   }
   schedule();
 };
-worker.onmessage = ({ data: value }): void => {
+self.onmessage = ({ data: value }: MessageEvent<unknown>): void => {
   if (failed) return;
   try {
     const data = parseClientMessage(value);
@@ -183,7 +180,7 @@ worker.onmessage = ({ data: value }): void => {
           timedCost('_sweepDown')
         );
       }
-      worker.postMessage({ type: 'ready' });
+      post({ type: 'ready' });
     } else if (data.type === 'queries') {
       if (
         !nav ||

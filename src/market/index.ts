@@ -26,24 +26,14 @@
  * Events emitted:  market:open {wave}, market:close.
  */
 
-import type { EngineContext } from '../core/context.ts';
+import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
 import type { Health } from '../player/health.ts';
 import type { PlayerSystem } from '../player/index.ts';
+import type { WeaponId } from '../weapons/defs.ts';
 import type { WeaponSystem } from '../weapons/index.ts';
-type MarketItemId =
-  | 'ammo'
-  | 'grenade'
-  | 'armour'
-  | 'bandage'
-  | 'pistol'
-  | 'smg'
-  | 'shotgun'
-  | 'rifle'
-  | 'mcx'
-  | 'lmg'
-  | 'sniper'
-  | 'carpet';
+
+type MarketItemId = WeaponId | 'ammo' | 'grenade' | 'armour' | 'bandage' | 'carpet';
 type MarketSlot = 'kit' | 'secondary' | 'primary' | 'strike';
 type MarketAction = 'buy' | 'swap' | 'equipped' | 'max';
 interface HudItem {
@@ -178,8 +168,8 @@ const CATALOG = [
 ] as const;
 
 export class MarketSystem {
-  static id = 'market';
-  static deps = ['weapons', 'player'];
+  static readonly id = 'market';
+  static readonly deps: SystemId[] = ['weapons', 'player'];
   declare ctx: EngineContext;
   declare weapons: WeaponSystem;
   declare player: PlayerSystem;

@@ -71,7 +71,9 @@ export class AmmoPickups {
   _slots: (AmmoPickup | null)[] = Array<AmmoPickup | null>(MAX_PICKUPS).fill(null);
   _renderedIds: Float64Array[] = [];
   _hiddenMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
-  materials!: Record<'case' | 'edge' | 'latch' | 'glow', THREE.Material>;
+  materials!: Record<'case' | 'edge' | 'latch', MeshStandardNodeMaterial> & {
+    glow: THREE.MeshBasicMaterial;
+  };
   constructor(owner: AmmoOwner) {
     this.owner = owner;
     this.ctx = owner.ctx;
@@ -117,7 +119,7 @@ export class AmmoPickups {
       }),
     };
     for (const name of ['case', 'edge', 'latch'] as const) {
-      const material = this.materials[name] as MeshStandardNodeMaterial;
+      const material = this.materials[name];
       material.positionNode = Fn((): AttributeNode<'vec3'> => {
         // Native history remains slot-indexed. Only a newly assigned identity
         // lacks a previous pose; preserve real motion for every surviving slot.

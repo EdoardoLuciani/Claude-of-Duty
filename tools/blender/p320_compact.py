@@ -13,8 +13,9 @@ from p320.animations import select_clip
 from p320_actions import author_actions
 from p320.export import export_asset
 from p320.geometry import build_geometry
-from p320.materials import bake_atlas
+from p320.materials import ATLAS_RESOLUTIONS, bake_atlas
 from p320.studio import build_studio
+from p320.skin import build_skin
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -37,9 +38,9 @@ def build(output, render=False, quick=False):
     studio = bpy.data.collections.new('STUDIO | excluded from export')
     scene.collection.children.link(studio)
 
-    asset, coords, pivots, weapon_meshes, materials, tritium = build_geometry(asset)
+    asset, coords, pivots, weapon_meshes = build_geometry(asset)
     rig, body, slide, barrel, trigger, catch, mag, spare, round_live, round_spare = pivots
-    bake_atlas(output, weapon_meshes, materials, tritium)
+    bake_atlas(output, asset, weapon_meshes)
     # Spare shares the same evaluated geometry and atlas UVs.
     for obj in list(asset.objects):
         if obj.type == 'MESH' and obj.parent in (mag, round_live):
@@ -53,10 +54,12 @@ def build(output, render=False, quick=False):
     clips, controls, hands = author_actions(ROOT, asset, rig, parts, mag, spare,
         slide, barrel, trigger, catch, round_live)
     parts += controls
+    armature = build_skin(asset, parts, clips)
+    parts.append(armature)
     select_clip(parts, hands, clips, 'Idle')
     cameras = build_studio(studio, hands, quick)
     notes=bpy.data.texts.new('START HERE')
-    notes.write('P320 COMPACT / GENERATED PREVIEW\nEdit tools/blender/p320/ and p320_actions.py, not this file.\nReference-specific early-production exterior.\nEight weapon + wrist/finger NLA actions.\nHands use existing glove/sleeve meshes; authored deformation lives in this file.\nSelect the same clip on weapon controls and the two armatures.\nRuntime exports hand controls and reuses shared skins (no duplicated texture cost).\nRun tools/blender/p320_review.py for stills or an animation reel.\nUnique packed 1024 PBR atlas; studio is excluded from GLB.\nNot manufacturing geometry; not endorsed by SIG SAUER.\n')
+    notes.write('P320 COMPACT / GENERATED PREVIEW\nEdit tools/blender/p320/ and p320_actions.py, not this file.\nReference-specific early-production exterior.\nEight weapon + wrist/finger NLA actions.\nHands use existing glove/sleeve meshes; authored deformation lives in this file.\nSelect the same clip on weapon controls and the two armatures.\nRuntime exports hand controls and reuses shared skins (no duplicated texture cost).\nRun tools/blender/p320_review.py for stills or an animation reel.\nPacked base/ORM/normal/emission atlas (sizes in manifest textureResolutions); high bake sources and studio are excluded from GLB.\nNot manufacturing geometry; not endorsed by SIG SAUER.\n')
     scene['clips']=json.dumps(clips)
     scene['hand_collection']='P320 | authored hands (shared appearance)'
     for s in bpy.data.screens:
@@ -69,9 +72,9 @@ def build(output, render=False, quick=False):
     if render:
         for name,cam in cameras.items():
             scene.camera=cam;scene.render.filepath=str(output/'renders'/f'{name}.png');bpy.ops.render.render(write_still=True)
-    stats = export_asset(asset, coords, parts, output)
+    stats = export_asset(asset, coords, output)
     manifest={'asset':'SIG P320 Nitron Compact | early-production visual reconstruction','units':'metres','blender_forward':'+Y','gltf_forward':'-Z','clips':clips,'stats':stats,
-     'textureResolution':1024,'handAnimation':'Blender wrist and finger controls; shared runtime skins and shoulder IK',
+     'textureResolutions':ATLAS_RESOLUTIONS,'geometry':'One rigidly weighted mechanical skin; lettering/traction baked from retained high source','handAnimation':'Blender wrist and finger controls; shared runtime skins and shoulder IK',
      'source':'tools/blender/p320_compact.py + tools/blender/p320/ + tools/blender/p320_actions.py + tools/p320-hand-reference.mjs',
      'notes':['Original non-functional game art, not a dimensionally exact replica.','No downloaded models or textures.','No endorsement by SIG SAUER.']}
     (output/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')

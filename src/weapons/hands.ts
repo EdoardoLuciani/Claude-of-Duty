@@ -63,8 +63,8 @@ interface FitGripOptions {
   thumb?: Vec3;
   thumbPole?: Vec3;
   index?: Vec3;
-  fingers?: number[][];
-  spread?: number[];
+  fingers?: number[][] | undefined;
+  spread?: number[] | undefined;
 }
 
 /** Aim local -Z along `dir`, with +Y toward `up`, all in rig space.
@@ -235,8 +235,8 @@ export class Arm {
 
     // Fit thumb abduction and roll before flexion. This cylinder contact still
     // contributes weapon AO, even though fitGrip later refines the thumb pose.
-    const thumbBase = (base.thumbBase ?? [0, 0, 0]).slice() as Vec3;
-    this.thumb.root.rotation.fromArray(thumbBase);
+    const thumbBase = (base.thumbBase ?? [0, 0, 0]).slice();
+    this.thumb.root.rotation.set(thumbBase[0], thumbBase[1], thumbBase[2]);
     const tr = THUMB.r2 * this.scale;
     const tlen = THUMB.l1 * this.scale;
     const tLocal: Vec3 = [0, -tr * 1.05, -tlen * 0.55];
@@ -402,8 +402,8 @@ export class Arm {
       this._poseTo[n++] = -p.thumb[j];
     }
     this._thumbFrom.copy(this.thumb.root.quaternion);
-    const thumbBase = (p.thumbBase ?? [0, 0, 0]) as Vec3;
-    this.thumb.root.rotation.fromArray(thumbBase);
+    const thumbBase = p.thumbBase ?? [0, 0, 0];
+    this.thumb.root.rotation.set(thumbBase[0], thumbBase[1], thumbBase[2]);
     this._thumbTo.copy(this.thumb.root.quaternion);
     this.thumb.root.quaternion.copy(this._thumbFrom);
     this._poseTime = 0;

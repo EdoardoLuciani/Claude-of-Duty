@@ -3,16 +3,42 @@ import { readFileSync } from 'node:fs';
 
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-import { WEAPON_IDS } from '../../src/weapons/defs.ts';
+import {
+  WEAPON_IDS,
+  WEAPON_DEFS,
+  PRIMARY_IDS,
+  SECONDARY_IDS,
+  isWeaponId,
+} from '../../src/weapons/defs.ts';
 import { loadWeapon } from '../../src/weapons/loaders.ts';
 import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
+
+assert.deepEqual([...PRIMARY_IDS, ...SECONDARY_IDS].sort(), [...WEAPON_IDS].sort());
+assert.deepEqual(Object.keys(WEAPON_DEFS).sort(), [...WEAPON_IDS].sort());
+for (const id of WEAPON_IDS) {
+  assert.equal(isWeaponId(id), true);
+  assert.equal(WEAPON_DEFS[id].id, id);
+}
+for (const input of [
+  undefined,
+  null,
+  1,
+  {},
+  [],
+  'unknown',
+  '__proto__',
+  'constructor',
+  'toString',
+]) {
+  assert.equal(isWeaponId(input), false, 'only own catalog IDs enter weapon state');
+}
 
 // Exercise the real adapters and assets without browser-only URL fetching.
 const original = GLTFLoader.prototype.loadAsync;
 GLTFLoader.prototype.loadAsync = (url) => parseGLB(readFileSync(new URL(url)));
 try {
   for (const id of WEAPON_IDS) {
-    const model = await loadWeapon(id);
+    const model = await loadWeapon(id, { hasFeature: () => false });
     assert.equal(model.id, id, 'each catalog key loads its own authored adapter');
     assert(model.root && model.animations.length > 0);
     assert(model.materials.size > 0, 'the returned ownership sets contain converted materials');
@@ -20,7 +46,7 @@ try {
     for (const texture of model.textures) texture.dispose();
   }
   for (const id of ['unknown', '__proto__', 'constructor', 'toString']) {
-    await assert.rejects(loadWeapon(id), /\[weapons\] unknown weapon/);
+    await assert.rejects(loadWeapon(id, { hasFeature: () => false }), /\[weapons\] unknown weapon/);
   }
 } finally {
   GLTFLoader.prototype.loadAsync = original;

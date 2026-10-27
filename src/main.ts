@@ -1,8 +1,8 @@
 import { AiSystem } from './ai/index.ts';
 import { AudioSystem } from './audio/index.ts';
-import { createConfig } from './core/config.ts';
-import type { QualityName } from './core/config.ts';
+import { createConfig, QUALITY_PRESETS } from './core/config.ts';
 import { Engine } from './core/engine.ts';
+import { hasOwn } from './core/guards.ts';
 import { ModelSystem } from './core/models.ts';
 import { prewarm } from './core/prewarm.ts';
 import { FxSystem } from './fx/index.ts';
@@ -35,10 +35,11 @@ const capture = params.get('capture') === '1';
 // free-run. See the long comment in src/dev/shots.ts.
 const lockstep = capture && params.get('lockstep') === '1';
 
+const quality = params.get('q');
 const config = createConfig({
   // 'high' is the default (see src/core/config.ts); pass ?q=ultra for the
   // larger shadow and FX budgets.
-  quality: (params.get('q') as QualityName | null) ?? 'high',
+  quality: quality !== null && hasOwn(QUALITY_PRESETS, quality) ? quality : 'high',
   deterministic: capture || params.has('deterministic'),
 });
 
@@ -171,5 +172,9 @@ if (lockstep) {
 window.__ENGINE__ = engine;
 
 if (import.meta.hot) {
-  import.meta.hot.dispose((): Promise<void> => engine.dispose());
+  import.meta.hot.dispose((): Promise<void> =>
+    engine
+      .dispose()
+      .catch((error: unknown): void => console.error('[engine] HMR disposal failed', error))
+  );
 }

@@ -24,6 +24,7 @@
 import * as THREE from 'three';
 
 import type { EngineContext } from '../core/context.ts';
+import type { EngineEventMap } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
 import type { PhysicsSystem } from '../physics/index.ts';
 import { makeHitRecord } from '../physics/math.ts';
@@ -53,7 +54,9 @@ const STATE = {
   FLANK: 'flank',
   RETREAT: 'retreat',
   DEAD: 'dead',
-};
+} as const;
+
+export type AiState = (typeof STATE)[keyof typeof STATE];
 
 export { STATE };
 
@@ -105,7 +108,7 @@ const MUZZLE_AIM_DOT = 0.72;
 const PATH_FAIL_WAIT = 0.35;
 const PATH_FAIL_WAIT_MAX = 2.5;
 const PATROL_ALT_MAX = 2;
-const PATH_OBJECTIVE = {
+const PATH_OBJECTIVE: Partial<Record<AiState, string>> = {
   [STATE.ALERT]: 'search',
   [STATE.PATROL]: 'patrol',
   [STATE.FLANK]: 'flank',
@@ -211,7 +214,7 @@ export class Agent {
   declare health: number;
   declare maxHealth: number;
   declare alive: boolean;
-  declare state: string;
+  declare state: AiState;
   declare stateTime: number;
   declare squad: Squad | null;
   declare team: number;
@@ -351,7 +354,7 @@ export class Agent {
   declare _boneA: THREE.Vector3;
   declare _boneB: THREE.Vector3;
   declare _muzzleDir: THREE.Vector3;
-  declare _stepPayload: { position: THREE.Vector3; surface: string; gait: string };
+  declare _stepPayload: EngineEventMap['ai:footstep'];
   declare clip: string;
   declare _searchPending: boolean;
   declare _searchGeometry: Float64Array;
@@ -359,7 +362,7 @@ export class Agent {
   declare _waitingNav: boolean;
   declare _repositionAdmitted: boolean;
   declare _positionPlan:
-    | { investigate: boolean; state: string; center: THREE.Vector3; retryAt?: number }
+    | { investigate: boolean; state: AiState; center: THREE.Vector3; retryAt?: number }
     | null
     | undefined;
   declare navStart: NavCache;
@@ -850,7 +853,7 @@ export class Agent {
   /* behaviour                                                          */
   /* ================================================================== */
 
-  _setState(s: string): void {
+  _setState(s: AiState): void {
     if (this.ladder) return;
     if (this.state === s) return;
     const prev = this.state;
@@ -986,6 +989,7 @@ export class Agent {
         d = this._searchGeometry[i * 2 + 1];
       push(origin.x + Math.cos(ang) * d, origin.y, origin.z + Math.sin(ang) * d);
     }
+    return undefined;
   }
 
   _goSearchCandidate(): void {
@@ -1477,7 +1481,7 @@ export class Agent {
       const maxTravel = this.cover ? TACTICS.coverReplaceTravel : TACTICS.coverTravel;
       const pick = this.ai.cover?.pick(this.position, target, {
         id: this.id,
-        squad: sq?.members,
+        squad: sq?.members ?? [],
         minRange: 7,
         maxRange: 30,
         maxTravel,

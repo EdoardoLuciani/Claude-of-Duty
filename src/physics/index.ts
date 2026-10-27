@@ -71,7 +71,7 @@
 import * as THREE from 'three';
 
 import { UNITS } from '../core/config.ts';
-import type { EngineContext } from '../core/context.ts';
+import type { SystemId, EngineContext } from '../core/context.ts';
 import type { BulletSegmentEvent } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
 import { StaticWorld } from './bvh.ts';
@@ -87,6 +87,8 @@ import {
 import { Ballistics, type ActorRegionImpact } from './penetration.ts';
 import { Ragdoll, humanoidSpec, specFromSkeleton } from './ragdoll.ts';
 import { RigidBody, RigidBodyWorld } from './rigidbody.ts';
+import type { RigidBodyOptions } from './rigidbody.ts';
+import type { SurfaceName } from './surfaces.ts';
 import {
   LAYER,
   MASK,
@@ -104,39 +106,16 @@ interface Vector3Like {
   y: number;
   z: number;
 }
-export type PhysicsRigidBodyOptions = {
-  shape?: 'box' | 'sphere' | 'capsule';
-  halfExtents?: Vector3Like;
-  radius?: number;
-  halfHeight?: number;
-  mass?: number;
-  restitution?: number;
-  friction?: number;
-  linearDamping?: number;
-  angularDamping?: number;
-  gravityScale?: number;
-  surface?: number;
-  surfaceType?: string;
-  mask?: number;
-  layer?: number;
-  ccd?: boolean;
-  lifetime?: number;
-  position?: Vector3Like;
-  quaternion?: THREE.Quaternion;
-  velocity?: Vector3Like;
-  angularVelocity?: Vector3Like;
-  object3D?: THREE.Object3D | null;
-  userData?: unknown;
-  onSleep?: ((body: RigidBody) => void) | null;
-  onImpact?: RigidBody['onImpact'];
-};
+export interface PhysicsRigidBodyOptions extends RigidBodyOptions {
+  surfaceType?: SurfaceName;
+}
 export interface PhysicsHit {
   hit: boolean;
   point: THREE.Vector3;
   normal: THREE.Vector3;
   distance: number;
   fraction: number;
-  surface: string;
+  surface: SurfaceName;
   surfaceIndex: number;
   ballisticSurfaceIndex: number;
   staticObject: number;
@@ -152,10 +131,15 @@ export interface PhysicsHit {
   triangle: number;
   frontFace: boolean;
 }
+/** Only identity fields participate in excluding a prior ray contact. */
+export type RaycastIgnore = Partial<
+  Pick<PhysicsHit, 'staticObject' | 'solid' | 'collider' | 'body' | 'ragdoll' | 'ragdollBone'>
+>;
+
 interface StaticOptions {
   mask?: number;
   layer?: number;
-  ballisticSurface?: string | number;
+  ballisticSurface?: SurfaceName | number;
   sheetThickness?: number;
   userData?: unknown;
 }
@@ -167,7 +151,7 @@ interface ExplosionEvent {
 }
 
 function isCollisionMesh(object: THREE.Object3D): object is THREE.Mesh | THREE.InstancedMesh {
-  return (object as THREE.Mesh).isMesh === true;
+  return object instanceof THREE.Mesh;
 }
 
 function makePublicHit(): PhysicsHit {
@@ -203,8 +187,8 @@ export interface ColliderOptions {
   hy?: number;
   hz?: number;
   layer?: number;
-  surface?: string;
-  ballisticSurface?: string;
+  surface?: SurfaceName;
+  ballisticSurface?: SurfaceName;
   sheetThickness?: number;
   owner?: unknown;
   part?: string;
@@ -260,8 +244,9 @@ export class Collider {
     this.matrix = new THREE.Matrix4();
     this.inverse = new THREE.Matrix4();
     this.layer = opts.layer ?? LAYER.ACTOR;
-    this.surfaceIndex = surfaceIndex(opts.surface ?? 'flesh');
-    this.ballisticSurfaceIndex = surfaceIndex(opts.ballisticSurface, this.surfaceIndex);
+    this.surfaceIndex = surfaceIndex(opts.surface === undefined ? 'flesh' : opts.surface);
+    this.ballisticSurfaceIndex =
+      opts.ballisticSurface === undefined ? this.surfaceIndex : surfaceIndex(opts.ballisticSurface);
     this.sheetThickness = opts.sheetThickness ?? 0;
     this.owner = opts.owner ?? null;
     this.part = opts.part ?? null;
@@ -358,7 +343,7 @@ interface ImpactRecord {
   point: THREE.Vector3;
   normal: THREE.Vector3;
   incident: THREE.Vector3;
-  surface: string;
+  surface: SurfaceName;
   surfaceIndex: number;
   damage: number;
   exit: boolean;
@@ -412,8 +397,8 @@ export class PhysicsSystem {
   declare stats: PhysicsStats;
   declare _rayCount: number;
 
-  static id = 'physics';
-  static deps = [];
+  static readonly id = 'physics';
+  static readonly deps: SystemId[] = [];
 
   constructor() {
     this.staticWorld = new StaticWorld();
@@ -534,12 +519,12 @@ export class PhysicsSystem {
    */
   addStatic(
     mesh: THREE.Mesh | THREE.InstancedMesh,
-    surfaceType?: string | number,
+    surfaceType?: SurfaceName | number,
     opts: StaticOptions = {}
   ): number {
     if (!mesh) return -1;
     const mask = opts.mask ?? opts.layer ?? LAYER.STATIC;
-    const id = this.staticWorld.addMesh(mesh, surfaceType as string | number, mask, opts);
+    const id = this.staticWorld.addMesh(mesh, surfaceType, mask, opts);
     if (id >= 0) this._explicitStatics++;
     return id;
   }
@@ -547,24 +532,33 @@ export class PhysicsSystem {
   /** Register every Mesh under an Object3D. Returns the handle list. */
   addStaticGroup(
     root: THREE.Object3D,
-    surfaceType?: string | number,
+    surfaceType?: SurfaceName | number,
     opts: StaticOptions = {}
   ): number[] {
     const ids: number[] = [];
     if (!root) return ids;
     root.updateWorldMatrix(true, true);
-    root.traverse((o: THREE.Object3D): void => {
-      if (!isCollisionMesh(o)) return;
-      if (o.userData?.collision === false || o.userData?.noCollision) return;
-      const metadataSurface: unknown = o.userData?.surface;
-      const resolvedSurface =
-        surfaceType ??
-        (typeof metadataSurface === 'string' || typeof metadataSurface === 'number'
-          ? metadataSurface
-          : undefined);
-      const id = this.addStatic(o, resolvedSurface, opts);
-      if (id >= 0) ids.push(id);
-    });
+    const registered = this._explicitStatics;
+    try {
+      root.traverse((o: THREE.Object3D): void => {
+        if (!isCollisionMesh(o)) return;
+        if (o.userData?.collision === false || o.userData?.noCollision) return;
+        const metadataSurface: unknown = o.userData?.surface;
+        const resolvedSurface =
+          surfaceType === undefined
+            ? metadataSurface === undefined
+              ? undefined
+              : surfaceIndex(metadataSurface)
+            : surfaceType;
+        const id = this.addStatic(o, resolvedSurface, opts);
+        if (id >= 0) ids.push(id);
+      });
+    } catch (error) {
+      // A failed group returns no handles: do not leave unreachable partial registrations.
+      for (let i = ids.length - 1; i >= 0; i--) this.removeStatic(ids[i]);
+      this._explicitStatics = registered;
+      throw error;
+    }
     return ids;
   }
 
@@ -624,7 +618,7 @@ export class PhysicsSystem {
     mask?: number,
     ignoreOwner?: unknown,
     ignoreActors?: unknown[] | null,
-    ignoreHit?: Partial<PhysicsHit> | null
+    ignoreHit?: RaycastIgnore | null
   ): PhysicsHit;
   raycast(
     ox: number,
@@ -637,7 +631,7 @@ export class PhysicsSystem {
     mask?: number,
     ignoreOwner?: unknown,
     ignoreActors?: unknown[] | null,
-    ignoreHit?: Partial<PhysicsHit> | null
+    ignoreHit?: RaycastIgnore | null
   ): PhysicsHit;
   raycast(
     a: number | Vector3Like,
@@ -645,27 +639,30 @@ export class PhysicsSystem {
     c?: number,
     d?: number,
     e?: unknown,
-    f?: unknown,
-    g?: unknown,
+    f?: number | unknown[] | null,
+    g?: number | RaycastIgnore | null,
     h?: number,
     ignoreOwner: unknown = null,
     ignoreActors: unknown[] | null = null,
-    ignoreHit: Partial<PhysicsHit> | null = null
+    ignoreHit: RaycastIgnore | null = null
   ): PhysicsHit {
     let ox: number, oy: number, oz: number, dx: number, dy: number, dz: number;
     let maxDist: number, mask: number;
     if (typeof a === 'number') {
-      oy = b as number;
+      if (typeof b !== 'number') throw new Error('[physics] numeric ray requires numeric y');
+      oy = b;
       oz = c ?? 0;
       dx = d ?? 0;
-      dy = (e as number) ?? 0;
-      dz = (f as number) ?? 0;
+      dy = typeof e === 'number' ? e : 0;
+      dz = typeof f === 'number' ? f : 0;
       ox = a;
       maxDist = typeof g === 'number' ? g : 1000;
       mask = h ?? MASK.ALL;
     } else {
+      if (typeof b === 'number')
+        throw new Error('[physics] vector ray requires a vector direction');
       const origin = a,
-        direction = b as Vector3Like;
+        direction = b;
       ox = origin.x;
       oy = origin.y;
       oz = origin.z;
@@ -675,8 +672,8 @@ export class PhysicsSystem {
       maxDist = c ?? 1000;
       mask = d ?? MASK.ALL;
       ignoreOwner = e ?? null;
-      ignoreActors = (f as unknown[] | null) ?? null;
-      ignoreHit = (g as Partial<PhysicsHit> | null) ?? null;
+      ignoreActors = Array.isArray(f) ? f : null;
+      ignoreHit = typeof g === 'object' ? g : null;
     }
     const out = this._nextHit();
     const l = Math.hypot(dx, dy, dz);
@@ -945,7 +942,7 @@ export class PhysicsSystem {
     out: PhysicsHit,
     ignoreOwner: unknown,
     ignoreActors: unknown[] | null,
-    ignoreHit: Partial<PhysicsHit> | null | undefined
+    ignoreHit: RaycastIgnore | null | undefined
   ): number {
     if ((mask & LAYER.RAGDOLL) === 0) return best;
     for (let r = 0; r < this.ragdolls.length; r++) {
@@ -1042,17 +1039,20 @@ export class PhysicsSystem {
     let ox: number, oy: number, oz: number, dx: number, dy: number, dz: number;
     let maxDist: number, mask: number;
     if (typeof a === 'number') {
+      if (typeof b !== 'number') throw new Error('[physics] numeric ray requires numeric y');
       ox = a;
-      oy = b as number;
+      oy = b;
       oz = c ?? 0;
       dx = d ?? 0;
-      dy = (e as number) ?? 0;
-      dz = (f as number) ?? 0;
+      dy = e ?? 0;
+      dz = f ?? 0;
       maxDist = g ?? 1000;
       mask = h ?? MASK.SIGHT;
     } else {
+      if (typeof b === 'number')
+        throw new Error('[physics] vector ray requires a vector direction');
       const origin = a,
-        direction = b as Vector3Like;
+        direction = b;
       ox = origin.x;
       oy = origin.y;
       oz = origin.z;
@@ -1354,8 +1354,8 @@ export class PhysicsSystem {
    */
   explode(e: ExplosionEvent | THREE.Vector3): void {
     if (!e) return;
-    const event = 'position' in e ? (e as ExplosionEvent) : null;
-    const pos = event ? event.position : (e as THREE.Vector3);
+    const event = 'position' in e ? e : null;
+    const pos = 'position' in e ? e.position : e;
     const radius = event?.radius ?? 5;
     const strength = event ? (event.impulse ?? (event.damage ?? 100) * 0.9) : 90;
     this.bodies.applyRadialImpulse(pos.x, pos.y, pos.z, radius, strength * 0.06);
@@ -1389,8 +1389,8 @@ export class PhysicsSystem {
   /* ================================================================== */
 
   addRigidBody(opts: PhysicsRigidBodyOptions = {}): RigidBody {
-    const b = new RigidBody(opts as ConstructorParameters<typeof RigidBody>[0]);
-    if (opts.surfaceType) b.surface = surfaceIndex(opts.surfaceType);
+    const b = new RigidBody(opts);
+    if (opts.surfaceType !== undefined) b.surface = surfaceIndex(opts.surfaceType);
     this.bodies.add(b);
     return b;
   }
@@ -1405,7 +1405,7 @@ export class PhysicsSystem {
     velocity: Vector3Like,
     opts: {
       size?: number;
-      surface?: string;
+      surface?: SurfaceName;
       shape?: 'box' | 'sphere' | 'capsule';
       mass?: number;
       restitution?: number;
@@ -1416,7 +1416,7 @@ export class PhysicsSystem {
     } = {}
   ): RigidBody {
     const s = opts.size ?? 0.08;
-    const si = surfaceIndex(opts.surface ?? 'concrete');
+    const si = surfaceIndex(opts.surface === undefined ? 'concrete' : opts.surface);
     const b = this.addRigidBody({
       shape: opts.shape ?? 'box',
       halfExtents: { x: s, y: s * 0.7, z: s * 0.85 },
@@ -1482,7 +1482,9 @@ export class PhysicsSystem {
     if (!skeleton?.bones?.length) return null;
     const { spec, boneMap } = specFromSkeleton(skeleton, opts);
     if (!spec.length) return null;
-    const rd = this.createRagdoll({ ...opts, bones: spec, transform: undefined });
+    const { transform, ...options } = opts;
+    void transform;
+    const rd = this.createRagdoll({ ...options, bones: spec });
     rd.adoptSkeleton(
       skeleton,
       boneMap.map((bone): THREE.Bone<THREE.Object3DEventMap> | null => bone ?? null)

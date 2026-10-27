@@ -2,6 +2,8 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import * as THREE from 'three/webgpu';
 
+import { isMesh } from '../core/three-guards.ts';
+import type { WeaponId } from '../weapons/defs.ts';
 import type { WeaponSystem } from '../weapons/index.ts';
 import { el, setText } from './util.ts';
 
@@ -20,7 +22,7 @@ export class MarketInspection {
   environment: THREE.RenderTarget | null = null;
   model: InspectionModel | null = null;
   ready: Promise<void> | null = null;
-  activeId: string | null = null;
+  activeId: WeaponId | null = null;
   active = false;
   disposed = false;
   failed = false;
@@ -145,7 +147,7 @@ export class MarketInspection {
     setText(this.status, '3D preview unavailable. Purchases and resupply still work.');
   }
 
-  async select(id: string, label: string): Promise<void> {
+  async select(id: WeaponId, label: string): Promise<void> {
     if (!this.active || this.disposed || id === this.activeId) return;
     this.activeId = id;
     const revision = ++this.revision;
@@ -171,8 +173,8 @@ export class MarketInspection {
       const box = new THREE.Box3();
       model.scene.updateMatrixWorld(true);
       model.scene.traverseVisible((node): void => {
-        if (!(node instanceof THREE.Mesh)) return;
-        const mesh = node as THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
+        if (!isMesh(node)) return;
+        const mesh = node;
         mesh.geometry.computeBoundingBox();
         if (mesh.geometry.boundingBox)
           bounds.union(box.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld));

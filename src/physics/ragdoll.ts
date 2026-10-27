@@ -1052,8 +1052,9 @@ export class Ragdoll {
   ): this {
     const bones = new Array<THREE.Bone | null>(this.boneCount).fill(null);
     for (let i = 0; i < this.boneCount; i++) {
-      const entries = boneMap as Record<string, THREE.Bone | string | null | undefined>;
-      const entry = entries?.[i] ?? entries?.[this.spec[i].name] ?? null;
+      const entry = Array.isArray(boneMap)
+        ? (boneMap[i] ?? null)
+        : (boneMap[i] ?? boneMap[this.spec[i].name] ?? null);
       if (!entry) continue;
       bones[i] = typeof entry === 'string' ? (skeleton.getBoneByName(entry) ?? null) : entry;
     }
@@ -1157,10 +1158,7 @@ export function specFromSkeleton(
     if (len < 1e-4) continue;
     const si = spec.length;
     specIndexOfBone.set(bone, si);
-    const parentSpec =
-      isBone(bone.parent) && specIndexOfBone.has(bone.parent)
-        ? specIndexOfBone.get(bone.parent)
-        : -1;
+    const parentSpec = isBone(bone.parent) ? (specIndexOfBone.get(bone.parent) ?? -1) : -1;
     spec.push({
       name: bone.name || `bone${i}`,
       head: [v.x, v.y, v.z] as const,

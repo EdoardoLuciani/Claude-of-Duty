@@ -84,7 +84,12 @@ export function parseQueryKey(value: unknown): QueryKey {
   )
     throw new Error('[ai worker] invalid ladder descriptor');
   const normal = point(d.normal),
-    points = d.points.map(point) as unknown as LadderDescriptor['points'];
+    points: LadderDescriptor['points'] = [
+      point(d.points[0]),
+      point(d.points[1]),
+      point(d.points[2]),
+      point(d.points[3]),
+    ];
   const span = (a: Vector3Like, b: Vector3Like): number =>
     Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
   const spans = points.slice(1).map((p, i): number => span(points[i], p));
@@ -231,7 +236,7 @@ export type QuerySample =
       actor: number | null;
       kind: string | null;
       frame: number | null;
-      key?: QueryKey | null;
+      key?: QueryKey | null | undefined;
       ms: number;
       roundTripMs: number | null;
       queueMs: number | null;
@@ -296,9 +301,9 @@ export type WorkerMessage =
       value: boolean;
       ms: number;
       moves: number;
-      repeatedStates?: number;
-      savedMoves?: number;
-      queueMs?: number;
+      repeatedStates?: number | undefined;
+      savedMoves?: number | undefined;
+      queueMs?: number | undefined;
       costs?: QueryCosts | null;
     };
 function snapshot(value: unknown): value is AttachmentSnapshot {

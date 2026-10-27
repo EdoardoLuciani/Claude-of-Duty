@@ -1,37 +1,13 @@
 import type { EngineContext } from '../core/context.ts';
 import type { MarketSystem } from '../market/index.ts';
+import { isWeaponId } from '../weapons/defs.ts';
 import { marketIcon } from './market-icons.ts';
 import { MarketInspection } from './market-inspection.ts';
 import { el, setText, setStyle, setClass, damp } from './util.ts';
 
-type MarketId =
-  | 'ammo'
-  | 'grenade'
-  | 'armour'
-  | 'bandage'
-  | 'pistol'
-  | 'smg'
-  | 'rifle'
-  | 'mcx'
-  | 'shotgun'
-  | 'lmg'
-  | 'sniper'
-  | 'carpet';
-type MarketAction = 'buy' | 'swap' | 'equipped' | 'max';
-type MarketSlot = 'kit' | 'secondary' | 'primary' | 'strike';
-interface MarketItem {
-  id: MarketId;
-  label: string;
-  blurb: string;
-  cost: number;
-  max: number;
-  step: number;
-  unit: string;
-  slot: MarketSlot;
-  level: number;
-  affordable: boolean;
-  action: MarketAction;
-}
+type MarketItem = ReturnType<MarketSystem['getHudState']>['items'][number];
+type MarketAction = MarketItem['action'];
+type MarketSlot = MarketItem['slot'];
 type MarketApi = MarketSystem;
 type MarketContext = Pick<EngineContext, 'get' | 'peek'>;
 interface MarketCard {
@@ -248,9 +224,9 @@ export class MarketOverlay {
 
   _preview(id: string): void {
     const item = this.market.getHudState().items.find((it): boolean => it.id === id);
-    if (!item || (item.slot !== 'primary' && item.slot !== 'secondary')) return;
+    if (!item || !isWeaponId(item.id)) return;
     for (const row of this.cards) setClass(row.card, 'inspecting', row.card.dataset.item === id);
-    void this.inspection.select(id, item.label);
+    void this.inspection.select(item.id, item.label);
   }
 
   skip(): void {

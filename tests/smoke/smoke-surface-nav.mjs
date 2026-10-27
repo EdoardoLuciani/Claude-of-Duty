@@ -428,9 +428,9 @@ assert.ok(live.canStand(w5.from) && entry.probeGround(), 'W5 starts supported an
 map.physics.removeCharacter(entry);
 assert.equal(
   map.meta.navigation.sha256,
-  // Explicit return annotations refresh source-byte provenance only.
+  // Type-contract hardening refreshes source-byte provenance only.
   // The unchanged physical payload hash below also guards the preceding bake.
-  '006268c83b489da8d9c556af4d8219aea4572fc9fe9bc9c4561f6fd683c20371',
+  '07d02b8fa5d379a8c835cd640bfea4fae033458c793d38c1793a7c9e3b64ef6c',
   're-measure recorded fixture outcomes after changing baked assets'
 );
 const physicalPayload = map.surfaceRaw.subarray(64 + map.surfaceRaw.readUInt32LE(8));
@@ -438,7 +438,7 @@ assert.equal(physicalPayload.length, 8897464, 'unchanged Detour/component/cover 
 assert.equal(
   await navHash(physicalPayload),
   'bbf10f69d8dedfa3b048fa8f11b2b0e680df8f8f3775459fdd89eb90e08b0500',
-  'return annotations must not change navigation topology, components or cover'
+  'type-safety migration must not change navigation topology, components or cover'
 );
 let arrivals = 0;
 for (const c of map.cases) {

@@ -38,6 +38,11 @@ Teardown is reverse-order and failure-isolated.
 `canvas`, `config`, `events`, `input`, `time`, `rng`, `get/peek/has(id)`.
 `src/core/context.ts` owns the provider-keyed `EngineContext`; subsystem types
 come from their implementations, not independently handwritten consumer APIs.
+`Engine.add()` checks a constructor's literal static ID against that provider map.
+Direct registration is `registry.add(id, instance)`; the engine's registry checks
+the same ID/instance relationship. A standalone `Registry` promises only lifecycle
+hooks unless given an explicit provider map. Registration also invalidates ordering
+and hook caches.
 `src/core/bindings.ts` owns static physical defaults, action IDs, binding labels and
 action-backed contextual control reference. Input snapshots actions; gameplay
 consumers own state machines. UI adapts this metadata into the existing pause
@@ -54,7 +59,12 @@ state; dispose owned resources, not borrowed textures/geometry.
 
 Use `ctx.events`; [src/core/events.ts](src/core/events.ts) owns event names and
 typed plain-object payloads. Add/change the type and its producers/consumers
-together. Architectural semantics not captured by those types:
+together. Weapon identities use `WeaponId | 'ai_rifle'`; compact weapon descriptors
+require an ID. Free-form external names belong at the input/audio adapter boundary,
+not on gameplay events. Actor handles may remain opaque where only identity matters.
+Event names and payloads stay correlated even when dispatching unions (pass a
+correlated tuple rather than an independent union key and payload).
+Architectural semantics not captured by those types:
 
 - `bullet:segment` is reached free flight, clipped to collisions/range, excluding
   material interiors. Audio/suppression/tracers consume it rather than rebuilding
@@ -101,7 +111,10 @@ together. Architectural semantics not captured by those types:
 ## Physics and world contracts
 
 Surface names: `concrete, metal, wood, dirt, sand, glass, water, foliage, fabric,
-flesh, rubber, plaster`.
+flesh, rubber, plaster`. `src/physics/surfaces.ts` owns `SurfaceName`; carry it through
+physics results, events, FX and audio. Explicit collision/ballistic metadata is
+validated, never guessed or silently replaced. Only unlabelled mesh/material names
+use `guessSurface`; world query/visual authoring labels are a separate vocabulary.
 
 `physics.fireBullet({ origin, dir, shooter, damage, penetration, maxDist,
 maxRange?, travelled?, from?, dropoff?, weapon?, shot?, mask?, emit? })` returns
@@ -127,6 +140,10 @@ clear flush remaining reached contacts before telemetry/retirement. Extreme
 sideways/backwards scatter may require that terminal flush rather than normal
 forward completion. Instantaneous/AI damage publication remains immediate.
 Targets own health; range/region scaling is already applied and must not repeat.
+AI transitions use `AiState` from `agent.ts`; player locomotion uses `PlayerMoveState`,
+with presentation-only `lean` added by `PlayerState`. Keep `WeaponMode` semantic
+through HUD polling (uppercase only for display), `CardId | null` for intel card
+identity/absence, and mixer-owned `BusName` through dry/spatial/send routing.
 
 Collision `surface` is the impact finish; optional `ballisticSurface` determines
 penetration. Preserve cooked `_solid` IDs; unlabelled geometry uses connected
@@ -260,6 +277,12 @@ close/restart/error and releases its renderer/environment at teardown. Controls 
 DOM input, not the paused simulation clock. Only explicit weapon Buy/Swap buttons
 purchase; selecting or inspecting a weapon never changes loadout or credits.
 
+`build/models.mjs` owns explicit gltfpack runtime-model cooking and per-model
+profiles (`npm run models:cook`). Normal builds consume committed `.runtime.glb`
+products; they do not run the encoder. P320 is the first opt-in profile; adding
+models requires adapter, animation and visual validation rather than blanket
+simplification. Native authoring exports remain unchanged.
+
 `tools/export-models.mjs` runs the same procedural builders offline with a fixed
 seed; runtime never builds meshes. Regenerate ALL procedural models, since
 transitive builder inputs invalidate naive per-file caches. Export uses atomic
@@ -274,6 +297,13 @@ STEP-scale visibility owned/reset by the adapter, never detachable-magazine
 parts or drop pools. Native metres, sockets, grips and provisional 89 mm travel
 remain asset-owned; damage, 6+1 accounting and per-shell interruption remain in
 the common weapon system.
+`src/weapons/defs.ts` owns the weapon tuning schema, IDs, slot IDs and fire modes;
+check authored data against that schema rather than inferring its contract from
+current values. Keep internal state keyed by `WeaponId`; narrow DOM/URL/debug
+strings with `isWeaponId` at entry. Authored models carry literal adapter IDs,
+and the loader table checks complete ID coverage and per-ID adapter returns.
+The market UI derives its item contract from `MarketSystem.getHudState()`.
+
 Preserve shared IK, ADS/sway/recoil and pooled casings. Source/regen/reference
 contracts live beside each asset. Weapons force physical materials and borrow
 source maps. Arms consolidate authored Physical finishes into one opaque material
@@ -345,6 +375,21 @@ that build unused contexts or repeat it in a world hook.
 
 Diagnostic counter/readback contracts live in `src/dev/render-info.ts`; they do not
 change warmup staging or renderer-info reset scheduling.
+
+## Type contracts
+
+Optional override/patch fields mean omission, not an explicit `undefined` write
+(`exactOptionalPropertyTypes`). Config, material/bake and weather patches also
+skip undefined values from untyped JS/debug callers via `applyDefinedPatch`.
+Snapshots, telemetry and defaulted inputs may explicitly permit undefined where
+that means unavailable or use the default. Use straightforward assignments there;
+do not manufacture property omission when consumers do not distinguish it.
+Required-state patches remain strict.
+Material authoring options are closed and use native Three material parameter
+types, not node-graph inputs. Physical-only values require `physical: true`;
+callers cannot downgrade a library-authored physical finish to a standard material.
+Live uniforms, pooled bookkeeping and internally supplied world/time inputs
+are not authoring options. Keep finite catalogs exhaustive and sparse maps sparse.
 
 ## Quality
 

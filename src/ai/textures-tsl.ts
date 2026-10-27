@@ -33,6 +33,7 @@ import type { DataArrayTexture } from 'three/webgpu';
 import type { Node, Texture } from 'three/webgpu';
 import type { TextureNode, VaryingNode } from 'three/webgpu';
 
+import { isClosable } from '../core/guards.ts';
 import { loadPngTexture } from '../core/pngtex.ts';
 import { soldierSurface } from './soldier.ts';
 import type { VariantName } from './soldier.ts';
@@ -61,7 +62,7 @@ class SoldierNodeMaterial extends MeshStandardNodeMaterial {
       .mul(rimScale);
   }
 
-  setupOutput(
+  override setupOutput(
     builder: Parameters<MeshStandardNodeMaterial['setupOutput']>[0],
     output: Parameters<MeshStandardNodeMaterial['setupOutput']>[1] & {
       rgb: ReturnType<typeof vec3>;
@@ -80,8 +81,8 @@ export interface CamoStats {
   sd: number;
 }
 interface SoldierManifest {
-  sets?: string[];
-  details?: string[];
+  sets?: string[] | undefined;
+  details?: string[] | undefined;
   camoStats?: Record<string, CamoStats>;
 }
 function parseManifest(value: unknown): SoldierManifest {
@@ -377,12 +378,14 @@ export class SoldierMaterialsNode {
     for (const set of Object.values(this.sets)) {
       for (const texture of [set.albedo, set.orm, set.normal]) {
         texture.dispose();
-        (texture.image as ImageBitmap | null)?.close?.();
+        const image = texture.image;
+        if (isClosable(image)) image.close();
       }
     }
     for (const texture of Object.values(this.details)) {
       texture.dispose();
-      (texture.image as ImageBitmap | null)?.close?.();
+      const image = texture.image;
+      if (isClosable(image)) image.close();
     }
     this.materials.clear();
     this.combined.clear();

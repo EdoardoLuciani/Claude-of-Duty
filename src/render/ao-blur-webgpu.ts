@@ -17,9 +17,7 @@ export function createAoBilateralBlur(
   const blur = (input: Node, direction: Node<'vec2'>): Node<'float'> =>
     Fn((): Node<'float'> => {
       const center = linearDepth.sample(screenUV).r;
-      const step = direction
-        .mul(1.65)
-        .div(textureSize(rawDepth, uint(0)) as unknown as Node<'vec2'>);
+      const step = direction.mul(1.65).div(textureSize(rawDepth, uint(0)).toVec2());
       const radius = max(float(0.1), center).mul(2 / 22);
       const value = depthAwareBlur(input, rawDepth, step, camera, 2, radius);
       return center.lessThanEqual(0).select(1, value);

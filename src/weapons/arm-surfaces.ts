@@ -4,12 +4,14 @@ import { MeshPhysicalNodeMaterial } from 'three/webgpu';
 import type { Node } from 'three/webgpu';
 import type { ConstNode, TextureNode, VarNode } from 'three/webgpu';
 
+import { isImageBitmap } from '../core/guards.ts';
 import type { createArmBlood } from './arm-blood.ts';
 
 /** Equal-sized authored tiles stay separate layers: no atlas seams or UV remapping. */
 function armTextureArray(maps: THREE.Texture[], srgb: boolean): THREE.DataArrayTexture {
-  const first = maps[0].image as ImageBitmap;
-  if (!first?.width || !first.height) throw new Error('Player arms: missing texture image');
+  const first = maps[0].image;
+  if (!isImageBitmap(first) || !first.width || !first.height)
+    throw new Error('Player arms: missing texture image');
   const { width, height } = first;
   const canvas = new OffscreenCanvas(width, height);
   const context = canvas.getContext('2d', { willReadFrequently: true });
@@ -17,8 +19,8 @@ function armTextureArray(maps: THREE.Texture[], srgb: boolean): THREE.DataArrayT
   const stride = width * height * 4;
   const pixels = new Uint8Array(stride * maps.length);
   for (const [layer, map] of maps.entries()) {
-    const image = map.image as ImageBitmap;
-    if (image.width !== width || image.height !== height || map.flipY)
+    const image = map.image;
+    if (!isImageBitmap(image) || image.width !== width || image.height !== height || map.flipY)
       throw new Error('Player arms: incompatible texture layer');
     context.clearRect(0, 0, width, height);
     context.drawImage(image, 0, 0);
