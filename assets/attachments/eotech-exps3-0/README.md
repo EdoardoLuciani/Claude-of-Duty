@@ -18,6 +18,9 @@ captive scalloped cap, raised quick-detach mount and separate optical windows.
 - `exps3-0.glb` is the stock native glTF export: **11,972 triangles, two primitives,
   two PBR materials, three embedded atlases, 1,685,588 bytes**. No high-source
   geometry, studio, external asset URL, animation, arms or reticle is exported.
+- `exps3-0.runtime.glb` is the separately cooked gltfpack product: **11,552 triangles,
+  two primitives/materials, three embedded UASTC KTX2 maps, 1,351,676 bytes**.
+  The native GLB, blend and PNGs remain unchanged authoring references.
 - `exps3-base-color.png`, `exps3-normal.png` and `exps3-orm.png` are all **1024²**
   unique-UV atlases (ORM: R=1, G=roughness, B=metallic). Normal/data maps are
   Non-Color; base color is sRGB. The glass material is texture-free, not given a
@@ -25,7 +28,8 @@ captive scalloped cap, raised quick-detach mount and separate optical windows.
 - `finish-normal.png` and `finish-roughness.png` are the original seeded 1024²
   high-source finish maps, retained in the blend but **not** the runtime GLB.
   Reference photos are not textures.
-- `manifest.json` records source/product hashes, budgets, axes and datums.
+- `manifest.json` records native source/product hashes, budgets, axes and datums.
+  Runtime cooking settings live in `build/models.mjs`; no cook sidecar is emitted.
   `reference-review.json` records source URLs, photo hashes, frozen cameras,
   profile measurements, repeat-build evidence and limitations.
 
@@ -103,6 +107,73 @@ texture compression or studio-light baking is introduced.
 The high-source Sol review below is historical. This new optimization was
 parent-checked against the approved source under the frozen cameras and native
 WebGPU; it is **not a new Sol approval**. Owner visual acceptance remains separate.
+
+## gltfpack runtime cook
+
+The shared [model build stage](../../../build/README.md) derives the runtime GLB
+from the untouched native export, following the P320 pipeline merged in #548:
+
+```sh
+# Rebuild the native Blender export first when changing its Python source.
+GLTFPACK=/absolute/path/gltfpack npm run models:cook -- exps3
+# Or cook a scratch native export without replacing committed products:
+npm run models:cook -- exps3 /tmp/exps3-review
+```
+
+Native **gltfpack 1.3 with BasisU support** uses the shared quality-10 UASTC,
+one encoder thread, meshopt compression, float position/UV quantization (14/16
+bits) and 8-bit normals. Named nodes/extras survive. Each 1K body map has eleven
+mip levels; base color is sRGB, normal/ORM are linear, with full normal XYZ.
+The glass remains a separate texture-free transmission material. No runtime
+shader compensation, custom GLB repair, new dependency or duplicate decoder is
+introduced. Cooking is explicit; normal builds do not invoke the encoder.
+
+Simplification uses the tighter EXPS3 profile `-si 0.50 -se 0.0002 -sp`.
+The P320 `0.001` error limit blocked **20 of 20,018** double-sided axial
+probes in the rounded aperture. The selected profile blocks **zero**, including
+the former lower clipping edge. It stops at **10,506 opaque + 1,046 glass
+triangles**, retaining the agreed 8–12k budget. Sampled bidirectional surface
+errors (every vertex and triangle centroid, not a continuous Hausdorff proof)
+peak at **0.0405 mm** on the body and **0.0117 mm** on glass. Physical pane bounds
+stay within **0.0012 mm** of nominal dimensions; the measured roof margin is
+**0.5026 mm** after quantization. Mount/sight/lens sockets retain their datums.
+Native geometry/normals are therefore not claimed byte-identical to the cook.
+
+| Resource | Native PNG GLB | Cooked GLB |
+| --- | ---: | ---: |
+| Raw GLB | 1,685,588 B | 1,351,676 B (−19.8%) |
+| gzip level 9 | 1,246,752 B | 1,314,419 B (+5.4%) |
+| Brotli quality 11 | 1,184,140 B | 1,307,479 B (+10.4%) |
+| Triangles | 11,972 | 11,552 |
+| Vertex records | 13,017 | 12,315 |
+| Observed vertex/index GPU buffers | 678,984 B | 407,808 B |
+| Logical texture storage, including mips | ~16 MiB RGBA8 | ~4 MiB BC7/ASTC 4×4 |
+
+GPU buffer sizes were measured after actual native WebGPU uploads on AMD RDNA-4;
+texture storage comes from uploaded formats/dimensions/mip counts, not the
+renderer’s compressed-texture estimate. Driver padding/residency, environment
+maps and other renderer resources are excluded. Forced RGBA8 fallback renders
+correctly but keeps the ~16 MiB texture cost. Cold loading also needs the existing
+local meshopt/Basis decoders; compressed HTTP transfer is **not smaller** here.
+No FPS gain is established.
+
+Matched native-WebGPU captures use all seven original camera poses/projections,
+one fixed RoomEnvironment/light rig, AgX exposure 1.15 and 24 settled frames for
+both products. They are not Blender reference renders. Warning/dial print and
+major form remain comparable; UASTC and simplification still change fine grain,
+small highlights and pane-edge response. Crops use identical pixel boxes and 2×
+nearest display, without sharpening or tone changes. Final owner acceptance is
+separate. Independent scratch/committed-directory cooks are byte-identical on
+this host; this is not a cross-host determinism promise.
+
+`tests/smoke/smoke-exps3-cook.mjs` checks the actual decoded runtime geometry,
+materials, UV sampling floor, physical panes, sockets and optical bore, plus KTX2
+format/color-space/mip contracts. The native smoke test retains its stricter
+source/blend/PNG checks. Browser checks exercise real BC7 and forced RGBA8 loads
+and verify that transcoding workers close. This attachment is still asset-only:
+no production loader, M4 mounting, ADS, reticle or economy is added. Future loading
+must use the existing local meshopt/KTX2 pattern with native-renderer BC/ASTC
+feature selection and decoder cleanup, not a plain GLTFLoader.
 
 ## Reference/profile review
 
