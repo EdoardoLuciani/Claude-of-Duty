@@ -80,6 +80,36 @@ export async function loadP320(
     dxtSupported: false,
     pvrtcSupported: false,
   };
+  // Image fetches can finish after geometry has already rejected the GLTF load.
+  let closed = false;
+  const closedError = new Error('P320: texture decoder closed');
+  const init = decoder.init.bind(decoder);
+  decoder.init = (): Promise<void> => (closed ? Promise.reject(closedError) : init());
+  const transcodes: Promise<MessageEvent<unknown>>[] = [];
+  const postMessage = decoder.workerPool.postMessage.bind(decoder.workerPool);
+  decoder.workerPool.postMessage = (
+    message: unknown,
+    transfer?: Transferable[]
+  ): Promise<MessageEvent<unknown>> => {
+    if (closed) return Promise.reject(closedError);
+    const task = postMessage(message, transfer).then(
+      (event: MessageEvent<unknown>): MessageEvent<unknown> => {
+        const reply = event.data;
+        // The pinned loader reads success data before checking worker errors.
+        if (
+          typeof reply === 'object' &&
+          reply !== null &&
+          'type' in reply &&
+          reply.type === 'error' &&
+          'error' in reply
+        )
+          throw reply.error;
+        return event;
+      }
+    );
+    transcodes.push(task);
+    return task;
+  };
   // GLTFLoader converts image failures to null textures; retain their original cause.
   let textureFailed = false;
   let textureFailure: unknown;
@@ -104,10 +134,12 @@ export async function loadP320(
     if (textureFailed) throw textureFailure;
     return makeP320Model(gltf);
   } finally {
+    closed = true;
     // PNG diagnostic loads never initialize the decoder or increment its count.
     if (decoder.transcoderPending) {
       // Prevent late worker-URL creation; preserve any load/initialization error.
       await decoder.transcoderPending.catch((): void => {});
+      await Promise.allSettled(transcodes);
       decoder.dispose();
     }
   }
