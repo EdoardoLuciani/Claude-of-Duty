@@ -4,8 +4,8 @@ Early Nitron Compact, curved trigger, SIGLITE irons, flush 15-round magazine.
 Original game art, not downloaded CAD/mesh/maps or an endorsed/licensed replica.
 Follow the [shared source-first workflow](../../../tools/blender/README.md):
 Python owns the weapon; blend, native GLB, atlas PNGs and manifest are generated
-products. A separate texture-only cook derives the KTX2 runtime GLB; the native
-PNG export remains the editable/rebuild reference.
+products. A gltfpack cook derives the quantized, simplified KTX2/meshopt runtime
+GLB; the native PNG export remains the lossless authoring/rebuild reference.
 
 ## Edit map
 
@@ -22,7 +22,8 @@ PNG export remains the editable/rebuild reference.
 | Native 60 Hz control sampling and stock Actions glTF export | `p320/export.py` |
 | Fixed review cameras, lights and color management | `p320/studio.py` |
 
-Paths above are under `tools/blender/`. Helpers remain weapon-local. Keep the
+Paths above are under `tools/blender/`. `tools/cook-p320.mjs` owns the runtime
+gltfpack settings. Helpers remain weapon-local. Keep the
 unique atlas, not MCX repeating projection. Lettering and shallow traction ribs
 are high-to-low baked rather than rendered geometry; tritium emission has its
 own mask in the same physical material. Spare magazines reuse topology/UVs,
@@ -35,12 +36,14 @@ contacts, reload thumb grip and STEP magazines without renderer compensation.
 ## Build/check (root, Blender 5.2.2)
 
 ```sh
-blender -b -t 8 --python-exit-code 1 --python tools/blender/p320_compact.py
 blender -b -t 8 --python-exit-code 1 --python tools/blender/p320_compact.py -- \
   --output /tmp/p320-review --render --quick
 blender -b -t 8 /tmp/p320-review/p320-compact.blend \
   --python-exit-code 1 --python tools/blender/p320_check.py
-TOKTX=/absolute/path/KTX-Software-4.4.2/bin/toktx node tools/cook-p320-textures.mjs
+GLTFPACK=/absolute/path/gltfpack node tools/cook-p320.mjs /tmp/p320-review
+# After scratch inspection, regenerate the committed products:
+blender -b -t 8 --python-exit-code 1 --python tools/blender/p320_compact.py
+GLTFPACK=/absolute/path/gltfpack node tools/cook-p320.mjs
 node tests/smoke/smoke-p320.mjs
 node tests/smoke/smoke-p320-ktx2.mjs
 ```
@@ -56,7 +59,7 @@ slide/barrel overrides. Empty cartridge visibility uses bone scale, not only
 `Bone.visible`. Post-export inspection is read-only. Review with `p320_review.py`.
 
 Optimization baseline: 56,862 triangle instances / 16 primitive instances / four
-materials. The optimized skin has 20,212 triangles / one primitive / one material,
+materials. The native optimized skin has 20,212 triangles / one primitive / one material,
 including both magazines and their cartridges. Outward-only glyph caps conform
 to their actual assembly before
 baking (the former barrel label floated 3.3 mm outside the chamber). All four maps
@@ -95,39 +98,49 @@ less resolution; geometric and normal-map detail remain separate. The 1K normal
 still loses fine traction definition and changes highlights relative to 2K.
 This is not a lossless replacement or an FPS claim. Human review still applies.
 
-### KTX2 runtime cook
+### gltfpack runtime cook
 
-`tools/cook-p320-textures.mjs` reads the untouched native `p320-compact.glb` and
-writes `p320-compact.ktx2.glb` plus a provenance/settings JSON. It replaces only
-embedded images and their texture references with required `KHR_texture_basisu`;
-all non-image buffer bytes, accessors, meshes, skin, clips, nodes, material factors
-and UV selections are preserved and checked by smoke tests. This is not geometry
-optimization or exporter repair. Rebuild the native asset first, then recook;
-stale derived products fail the source-hash check. Normal builds need neither
-Blender nor the encoder because both GLBs are committed.
+`tools/cook-p320.mjs [asset-directory]` reads Blender's untouched native
+`p320-compact.glb` and invokes the native **gltfpack 1.3** build with BasisU support.
+It writes `p320-compact.ktx2.glb` and provenance/settings JSON. The wrapper does not
+repack or repair the GLB. Rebuild native source first, then recook; native-input,
+cook-script and runtime-product hashes catch stale products. Normal builds use
+committed assets and need neither Blender nor gltfpack. No new npm dependency.
+Download the native tool from the [official releases](https://github.com/zeux/meshoptimizer/releases/tag/v1.3).
 
-The external encoder is [**KTX-Software 4.4.2**](https://github.com/KhronosGroup/KTX-Software/releases/tag/v4.4.2)
-(`toktx v4.4.2`, no new npm dependency).
-The Linux x86-64 release archive SHA-256 is
-`a8781bad05f9624edbf910b7f258cd0a4ba7d3e63b49ecc0a0ab440bf6a0a245`.
-Settings are UASTC quality 4, RDO lambda 0.25, Zstandard level 18, one encoder
-thread, RGB, and a complete 11-level box-filtered mip chain. Color/emission use
-sRGB; normal/ORM use linear data. Normal XYZ is retained, not repacked into XY;
-there is no shader reconstruction or material retuning. Encoding is lossy: inspect
-lettering and shallow highlights against the native PNG reference before approval.
+The pinned settings retain named nodes/extras and constant tracks, disable time
+resampling, use floating-point position/UV quantization (14/16 bits), 8-bit normals,
+high animation precision (rotation 16, translation/scale 24), and meshopt compression.
+Permissive simplification targets 50% with a tighter relative error limit of 0.001;
+this asset stops at **17,368 triangles / one primitive / one material / nine joints**.
+Float positions keep the named mechanical skin directly addressable. Float UVs
+avoid `KHR_texture_transform` clones of the shared ORM map in the pinned renderer.
 
-The runtime GLB is **4.86 MiB** versus **5.28 MiB** native. On BC7 or ASTC 4×4,
-four 1K maps plus mips occupy approximately **5.33 MiB** instead of **21.33 MiB**
-(format footprint, excluding driver padding). Unsupported hardware gets decoded
-RGBA8, not this memory saving. This is a memory optimization, not an FPS claim.
+All four maps remain 1024² UASTC KTX2 with eleven mip levels. Color/emission use
+sRGB; normal/ORM are linear data, with full normal XYZ and no shader reconstruction.
+Texture quality 10 disables UASTC RDO; gltfpack uses Zstandard level 9. One encoder
+thread makes repeated cooks reproducible. This replaces the former custom toktx
+texture-only pass (quality effort 4, RDO lambda 0.25, Zstandard 18); its smaller
+images were a different quality/size trade-off, not a better GLB container.
 
-`src/weapons/p320.ts` configures the pinned Three loader from initialized native
-WebGPU features, selecting BC7/ASTC or RGBA8; it intentionally avoids lower-quality
-color block formats for normal/ORM. A two-worker decoder is disposed after the
-asset load. Its matching JS/WASM and upstream notice are served locally from
-`public/vendor/basis-e27dfa95/` (about 0.56 MiB uncompressed, a one-time cold-load
-cost). Other weapon assets are unchanged. The decoder and cold transcode cost
-must be included when evaluating download/load savings for this P320-only trial.
+Geometry and animation bytes are intentionally no longer identical to native.
+The approved constant-track folding removes the tiny ±0.1° idle tilt while retaining
+vertical bob. Clip durations, hand contacts, STEP magazine visibility, sockets,
+UV selections, material factors and gameplay events remain covered by tests.
+Full-clip sampled socket/helper deviations are bounded at **0.3 mm / 0.12°** against
+native (observed 0.238 mm / 0.103°). Inspect lettering, highlights, reloads and idle
+motion before accepting further simplification or tuning changes.
+
+The runtime GLB is **2.27 MiB** versus **5.28 MiB** native. Four BC7/ASTC 4×4 maps
+with mips occupy approximately **5.33 MiB** instead of **21.33 MiB** (logical format
+footprint, excluding driver padding). Unsupported hardware decodes to RGBA8 without
+that memory saving. These are storage/buffer optimizations, not an FPS claim.
+
+`src/weapons/p320.ts` attaches Three's local meshopt decoder and configures KTX2
+from initialized native WebGPU features (BC7/ASTC or RGBA8). Its two-worker Basis
+decoder closes after loading; matching JS/WASM/notices are served locally from
+`public/vendor/basis-e27dfa95/` (~0.56 MiB before HTTP compression). Other weapons
+are unchanged. Include decoder transfer/startup when evaluating cold-load savings.
 
 Some distributions ship a Blender OCIO config newer than their linked OpenColorIO
 library. Use a compatible process-local `OCIO=/absolute/path/config.ocio` retaining

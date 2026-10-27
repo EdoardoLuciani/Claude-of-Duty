@@ -2,12 +2,14 @@ import assert from 'node:assert/strict';
 
 import { PNG } from 'pngjs';
 import { Texture } from 'three';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 /** Actual GLTFLoader/geometry/animation; only image decoding is stubbed in Node. */
 export function parseGLB(bytes) {
   const textureStub = () => Promise.resolve(new Texture());
   const loader = new GLTFLoader()
+    .setMeshoptDecoder(MeshoptDecoder)
     .register(() => ({ name: 'NODE_TEXTURE_STUB', loadTexture: textureStub }))
     .register(() => ({ name: 'KHR_texture_basisu', loadTexture: textureStub }));
   return loader.parseAsync(

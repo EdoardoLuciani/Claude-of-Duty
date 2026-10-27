@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import type { Renderer } from 'three/webgpu';
@@ -97,7 +98,10 @@ export async function loadP320(
   // UASTC data maps fall back to RGBA when ASTC/BC7 are unavailable, avoiding
   // lower-quality transcoding of normal/ORM channels into color-only formats.
   try {
-    const gltf = await new GLTFLoader().setKTX2Loader(decoder).loadAsync(url);
+    const gltf = await new GLTFLoader()
+      .setMeshoptDecoder(MeshoptDecoder)
+      .setKTX2Loader(decoder)
+      .loadAsync(url);
     await decoder.transcoderPending;
     if (textureFailed) throw textureFailure;
     return makeP320Model(gltf);
