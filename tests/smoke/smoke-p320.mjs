@@ -69,12 +69,12 @@ assert.equal(manifest.stats.primitives, 1);
 assert.equal(manifest.stats.bytes, nativeBytes.length);
 assert.equal(
   manifest.stats.vertices,
-  json.accessors[json.meshes[0].primitives[0].attributes.POSITION].count
+  native.json.accessors[native.json.meshes[0].primitives[0].attributes.POSITION].count
 );
 assert.equal(
   manifest.stats.triangles,
-  json.accessors[json.meshes[0].primitives[0].indices].count / 3,
-  'manifest counts actual rendered geometry'
+  native.json.accessors[native.json.meshes[0].primitives[0].indices].count / 3,
+  'Blender manifest counts native geometry; runtime cook has separate statistics'
 );
 for (const mesh of json.meshes)
   for (const p of mesh.primitives) {
@@ -327,9 +327,11 @@ wp.setWeaponImmediate('pistol');
 step(0.3);
 assert(!vm.reticle.visible && !vm.scopeOverlay.visible);
 const thumb = vm.armR.thumb.root.quaternion;
-assert(
-  thumb.angleTo(anim.hands.right.thumb[0].quaternion) < 1e-6,
-  'finger curves consumed, not runtime pose substitution'
+// Quantized quaternions can be slightly non-unit; angleTo(q, q) need not be zero.
+assert.deepEqual(
+  thumb.toArray(),
+  anim.hands.right.thumb[0].quaternion.toArray(),
+  'finger curves copied component-for-component, not runtime pose substitution'
 );
 messages.length = 0;
 for (let i = 0; i < 6; i++) {
@@ -456,5 +458,5 @@ vm.dispose();
 assert.equal(model.materials.size, 0);
 assert.equal(model.textures.size, 0);
 console.log(
-  `P320: ${manifest.stats.triangles} triangles, ${manifest.stats.primitives} primitives; eight Blender clips, wrists/fingers, magazine visibility, ammo/events, cadence, interruption and cleanup passed`
+  `P320: ${json.accessors[json.meshes[0].primitives[0].indices].count / 3} triangles, ${json.meshes[0].primitives.length} primitives; eight Blender clips, wrists/fingers, magazine visibility, ammo/events, cadence, interruption and cleanup passed`
 );
