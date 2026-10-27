@@ -38,7 +38,7 @@ const original = GLTFLoader.prototype.loadAsync;
 GLTFLoader.prototype.loadAsync = (url) => parseGLB(readFileSync(new URL(url)));
 try {
   for (const id of WEAPON_IDS) {
-    const model = await loadWeapon(id);
+    const model = await loadWeapon(id, { hasFeature: () => false });
     assert.equal(model.id, id, 'each catalog key loads its own authored adapter');
     assert(model.root && model.animations.length > 0);
     assert(model.materials.size > 0, 'the returned ownership sets contain converted materials');
@@ -46,7 +46,7 @@ try {
     for (const texture of model.textures) texture.dispose();
   }
   for (const id of ['unknown', '__proto__', 'constructor', 'toString']) {
-    await assert.rejects(loadWeapon(id), /\[weapons\] unknown weapon/);
+    await assert.rejects(loadWeapon(id, { hasFeature: () => false }), /\[weapons\] unknown weapon/);
   }
 } finally {
   GLTFLoader.prototype.loadAsync = original;

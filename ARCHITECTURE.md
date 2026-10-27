@@ -277,6 +277,12 @@ close/restart/error and releases its renderer/environment at teardown. Controls 
 DOM input, not the paused simulation clock. Only explicit weapon Buy/Swap buttons
 purchase; selecting or inspecting a weapon never changes loadout or credits.
 
+`build/models.mjs` owns explicit gltfpack runtime-model cooking and per-model
+profiles (`npm run models:cook`). Normal builds consume committed `.runtime.glb`
+products; they do not run the encoder. P320 is the first opt-in profile; adding
+models requires adapter, animation and visual validation rather than blanket
+simplification. Native authoring exports remain unchanged.
+
 `tools/export-models.mjs` runs the same procedural builders offline with a fixed
 seed; runtime never builds meshes. Regenerate ALL procedural models, since
 transitive builder inputs invalidate naive per-file caches. Export uses atomic
