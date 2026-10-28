@@ -1,0 +1,1137 @@
+{
+  "asset": "EOTECH EXPS3-0, black, CR123 / side controls / raised QD base",
+  "accessed": "2026-10-25",
+  "sources": [
+    {
+      "publisher": "EOTECH",
+      "url": "https://www.eotechinc.com/products/eotech-hws-exps3",
+      "establishes": [
+        "L x W x H 96.5 x 58.4 x 73.7 mm",
+        "CR123 battery",
+        "side controls and quick-detach mounting",
+        "EXPS3-0: 68 MOA ring and 1 MOA dot"
+      ]
+    },
+    {
+      "publisher": "EOTECH operator manual, served by OpticsPlanet",
+      "url": "https://www.opticsplanet.com/i/pdf/opplanet-eotech-exps3-manual.pdf",
+      "sha256": "65a295921c46be53853b872d7a3047902e59c195103ebd2ad5eb7b0e7350d533",
+      "establishes": [
+        "Equipment description, printed page 5: nominal envelope",
+        "Display window, printed page 6: 30 x 23 mm, front glass 3.17 mm and rear laminate 4.76 mm",
+        "Components/controls and adjustment locations",
+        "Optical reticle is a projected virtual image, not a physical mesh on the glass"
+      ],
+      "unitConflict": "The same window line prints 1.20 x 0.85 inches and 30 x 23 mm; these are not exact conversions. Art retains nominal30x23mm physical panes; clear bezel opening is separately photo-inferred at30x22mm. The inconsistent manual line does not certify either as an exact clear-bore specification."
+    },
+    {
+      "publisher": "EOTECH photo gallery",
+      "url": "https://www.eotechinc.com/products/eotech-hws-exps3",
+      "photoBase": "https://www.eotechinc.com/cdn/shop/files/exps3_",
+      "views": [
+        "ls",
+        "rs",
+        "f",
+        "br",
+        "to",
+        "flo",
+        "fro",
+        "rlo",
+        "rro"
+      ]
+    },
+    {
+      "publisher": "Militia Armory, higher-resolution copies of EOTECH product photography",
+      "url": "https://www.militia-armory.com/product/eotech-exps3-0-holographic-weapon-sight/",
+      "photoBase": "https://www.militia-armory.com/wp-content/uploads/2022/05/exps3_",
+      "views": [
+        "ls",
+        "rs",
+        "br",
+        "flo",
+        "fro",
+        "rlo",
+        "rro"
+      ]
+    }
+  ],
+  "photoRights": "Photographs remain their owners’ reference material. They are not committed, embedded in the Blender file, used as textures, or shipped in the GLB. Original geometry, finishes, warning text and vector mark reconstruction only; EOTECH identifies the reference subject, not endorsement.",
+  "method": {
+    "projection": "Estimated orthographic profile cameras, uniform scale from nominal overall dimensions and fixed rail/body landmarks. No independent X/Y image scaling; no per-part registration. Photo perspective/lens distortion is unknown.",
+    "cameraPolicy": "Frozen camera/scale settings in tools/blender/exps3.py for all profile comparisons. Initial-blockout screenshots rerendered using the same final studio exposure and cameras.",
+    "mask": "Alpha > 250, then flood-fill exterior background and fill enclosed holes to isolate external profile. Faint reference drop shadows excluded; transparent optical apertures are NOT assessed by this statistic.",
+    "metric": "Intersection-over-union of the filled masks at original image resolution, without cropping/reframing either image. Descriptive comparison only, not an automatic visual-acceptance threshold or proof of 1:1 accuracy.",
+    "lighting": "One shared original studio, AgX Medium High Contrast, exposure -1.5; no attempt to claim identical illumination to the photographer."
+  },
+  "profilesStage": "Historical 2K atlas reference-photo registration (published777a6c57); 1K evaluation compares unchanged geometry and fixed-camera variants separately.",
+  "profiles": [
+    {
+      "view": "left",
+      "sourceImage": "https://www.militia-armory.com/wp-content/uploads/2022/05/exps3_ls.png",
+      "sha256": "e8e2cab87eba41e1d9348674c1949cc7ff255891ef89e63bff3ceb727e9c193d",
+      "imageSize": [
+        1600,
+        1200
+      ],
+      "referenceSolidBoundsPx": [
+        198,
+        139,
+        1383,
+        1049
+      ],
+      "modelSolidBoundsPx": [
+        184,
+        139,
+        1375,
+        1048
+      ],
+      "filledSilhouetteIoU": 0.93695,
+      "cameraBlender": {
+        "positionM": [
+          -0.4,
+          0.01085,
+          0.03086
+        ],
+        "targetM": [
+          0,
+          0.01085,
+          0.03086
+        ],
+        "orthoWidthM": 0.1293
+      }
+    },
+    {
+      "view": "right",
+      "sourceImage": "https://www.militia-armory.com/wp-content/uploads/2022/05/exps3_rs.png",
+      "sha256": "9b505d2d88c6b20e66e12c2b9d937082fe55dffded2ff6cd79c0ed7c141856cb",
+      "imageSize": [
+        1600,
+        1200
+      ],
+      "referenceSolidBoundsPx": [
+        163,
+        105,
+        1466,
+        1090
+      ],
+      "modelSolidBoundsPx": [
+        165,
+        103,
+        1443,
+        1079
+      ],
+      "filledSilhouetteIoU": 0.92221,
+      "cameraBlender": {
+        "positionM": [
+          0.4,
+          0.0121,
+          0.0307
+        ],
+        "targetM": [
+          0,
+          0.0121,
+          0.0307
+        ],
+        "orthoWidthM": 0.1205
+      }
+    },
+    {
+      "view": "rear",
+      "sourceImage": "https://www.militia-armory.com/wp-content/uploads/2022/05/exps3_br.png",
+      "sha256": "4d113ac8d38247278be63956b8e1287c416a0caac73667adcc9a0c217a1880e7",
+      "imageSize": [
+        1600,
+        1200
+      ],
+      "referenceSolidBoundsPx": [
+        433,
+        132,
+        1158,
+        1057
+      ],
+      "modelSolidBoundsPx": [
+        430,
+        129,
+        1169,
+        1062
+      ],
+      "filledSilhouetteIoU": 0.89862,
+      "cameraBlender": {
+        "positionM": [
+          0,
+          -0.4,
+          0.031
+        ],
+        "targetM": [
+          0,
+          0,
+          0.031
+        ],
+        "orthoWidthM": 0.126
+      }
+    },
+    {
+      "view": "front",
+      "sourceImage": "https://www.eotechinc.com/cdn/shop/files/exps3_f.png",
+      "sha256": "28a67f8d5e80aee0fdb797f9257fb262882124bdf2bb0a7b0cc4800d234c1c2f",
+      "imageSize": [
+        700,
+        700
+      ],
+      "referenceSolidBoundsPx": [
+        185,
+        136,
+        518,
+        567
+      ],
+      "modelSolidBoundsPx": [
+        180,
+        135,
+        519,
+        564
+      ],
+      "filledSilhouetteIoU": 0.90614,
+      "cameraBlender": {
+        "positionM": [
+          0,
+          0.4,
+          0.0314
+        ],
+        "targetM": [
+          0,
+          0,
+          0.0314
+        ],
+        "orthoWidthM": 0.11945
+      }
+    },
+    {
+      "view": "top",
+      "sourceImage": "https://www.eotechinc.com/cdn/shop/files/exps3_to.png",
+      "sha256": "48bb645b068bbfd54dcf4cd63952e64639a4a5c6a4824f25e69182f6539cb7e0",
+      "imageSize": [
+        700,
+        700
+      ],
+      "referenceSolidBoundsPx": [
+        83,
+        196,
+        609,
+        510
+      ],
+      "modelSolidBoundsPx": [
+        84,
+        192,
+        607,
+        507
+      ],
+      "filledSilhouetteIoU": 0.9361,
+      "cameraBlender": {
+        "positionM": [
+          0,
+          0.0132,
+          0.4
+        ],
+        "targetM": [
+          0,
+          0.0132,
+          0
+        ],
+        "orthoWidthM": 0.1284,
+        "screenRight": "+Y",
+        "screenUp": "-X"
+      }
+    }
+  ],
+  "measuredEnvelopeMm": {
+    "width": 58.4000014,
+    "height": 73.6999996,
+    "length": 96.4700021,
+    "differenceFromNominalMm": [
+      0.0000014,
+      -4e-7,
+      -0.0299979
+    ],
+    "note": "Former0.14mm raised cap polarity mark is now baked; body not uniformly rescaled. Not engineering tolerances."
+  },
+  "repeatBuild": {
+    "blender": "5.2.2 LTS",
+    "host": "Linux x86_64, same host, independent factory-empty processes and empty output directories",
+    "glbSha256": "72523d1517ce1a60fe588811464c08c71bb8ab282359162cd226db22c372d1c8",
+    "result": "Historical initial weighted1K render/no-render builds produced byte-identical GLBs and atlas PNGs on this host. JSON, positions, normals, UVs, native tangents and indices matched exactly; no general cross-host determinism or relaxed tolerance claim. Current product evidence: texture1kHoodReturnCorrection.repeatBuild.",
+    "nativeTangentDifference": {
+      "components": 0,
+      "maxAbsolute": 0,
+      "otherAccessors": "exact",
+      "json": "exact",
+      "atlasPngBytes": "exact",
+      "historical2kObservation": {
+        "components": 1,
+        "maxAbsolute": 0.00010001659393310547,
+        "otherAccessors": "exact",
+        "json": "exact",
+        "atlasPngBytes": "exact",
+        "angularUpperBoundDegrees": 0.006
+      }
+    },
+    "authoringUVs": "Native Blender UV projection uses a 1/65536 binary UV lattice, including Boolean-interpolated UVs, before save/render/export. No GLB rewriting or exporter hooks.",
+    "ocioCompatibility": {
+      "reason": "This host ships Blender OCIO 2.5 configuration with OCIO library 2.4.2. Default config fails; color management was NOT disabled.",
+      "profile": "https://raw.githubusercontent.com/blender/blender/v4.4.3/release/datafiles/colormanagement/config.ocio",
+      "sha256": "6a072a5e34fb520a35ee858b3b46271504ddd325fc112d2a78a8be75ea333f56",
+      "processLocal": "OCIO=/tmp/exps3-ocio/config.ocio, with luts/ and filmic/ pointing at installed Blender data; AgX preserved."
+    }
+  },
+  "limitations": [
+    "Original reference-backed game art, not manufacturer CAD, a scan, or claimed final human visual acceptance.",
+    "48.2mm optical centre above the existing art datum and30x22mm clear opening are provisionally inferred from registered photos. Manufacturer specs do not certify these datums. Confirm actual mounting/rail seating and M4 ADS/co-witness separately.",
+    "Window curvature, internal holographic laminate/laser, hidden battery internals, exact fastener threads and detailed mount tolerances are not reconstructed.",
+    "Public photos are not calibrated views; silhouettes and apparent small features do not certify all dimensions or surface finish.",
+    "Glass uses a single neutral AR-tinted PBR approximation for front glass and rear laminate; a spectral AR coating and real hologram are not simulated.",
+    "No price, purchase rules, mounted gameplay model, ADS/reticle implementation, stat effects or default-M4 change in this asset-first PR."
+  ],
+  "windowRefinement": {
+    "baselineCommit": "2ef4f292a74aa10a0078d2c0efe4718f7dacc335",
+    "baselineGlbSha256": "377eeac71e9dc461a3c23a8ff16b9deef3e51c42e60d0a3f95f00b9317819dd6",
+    "reason": "Owner reported bulky front frame/sight-window obstruction; independent oracle confirmed geometry rather than a camera/shader-only issue.",
+    "previous": {
+      "opticalCentreAboveArtDatumMm": 46,
+      "physicalPaneMm": [
+        30,
+        23
+      ],
+      "carrierOuterMm": [
+        42,
+        32
+      ],
+      "clearBoreClaimMm": [
+        30,
+        23
+      ],
+      "batteryRoofMm": 37.5,
+      "actualCentrelineClearHeightMm": 20
+    },
+    "revised": {
+      "nominalPaneMm": [
+        30,
+        23
+      ],
+      "clearOpeningMm": [
+        30,
+        22
+      ],
+      "clearCornerRadiusMm": 5.4,
+      "centreAboveArtDatumMm": 48.2,
+      "carrierOuterMm": [
+        39,
+        30.4
+      ],
+      "gasketOuterMm": [
+        33,
+        25
+      ],
+      "batteryRoofMm": 36.7,
+      "axialLowerClearanceMm": 0.5,
+      "status": "clear opening and centre inferred from registered photos; not an approved ADS/eye-box specification",
+      "actualCentrelineClearHeightMm": 22,
+      "carrierHeightReason": "30.4mm, rather than the oracle's initial30.2mm candidate, seats its lower edge on the unchanged33mm electronics housing roof."
+    },
+    "fixedConditions": "Outer hood/envelope, mounting origin, fore/aft pane locations, pane sizes/thicknesses, registered cameras, studio/exposure, material settings and embedded maps unchanged. No runtime reticle or ADS change.",
+    "windowMeasurementMethod": "Connected transparent window component (alpha<250, 4-connected flood from front[350,250], rear[800,380]); compared with glass-hidden opaque-geometry renders, not a material-alpha change. Masks must not connect to exterior. Same full-resolution registration; no independent X/Y scaling. Bounds include antialiased pixels and edited photographic transparency, so are estimates, not certified dimensions.",
+    "registeredWindowComparisons": [
+      {
+        "view": "front",
+        "reference": {
+          "boundsPx": [
+            262,
+            190,
+            439,
+            314
+          ],
+          "apparentWidthMm": 30.3744,
+          "apparentHeightMm": 21.3304,
+          "centreAboveArtDatumMm": 48.0377,
+          "areaPx": 21198
+        },
+        "before": {
+          "boundsPx": [
+            261,
+            196,
+            438,
+            314
+          ],
+          "apparentWidthMm": 30.3744,
+          "apparentHeightMm": 20.3065,
+          "centreAboveArtDatumMm": 47.5258,
+          "areaPx": 20666
+        },
+        "after": {
+          "boundsPx": [
+            261,
+            186,
+            438,
+            316
+          ],
+          "apparentWidthMm": 30.3744,
+          "apparentHeightMm": 22.3542,
+          "centreAboveArtDatumMm": 48.2083,
+          "areaPx": 22369
+        },
+        "beforeReferenceIoU": 0.91808,
+        "afterReferenceIoU": 0.94504
+      },
+      {
+        "view": "rear",
+        "reference": {
+          "boundsPx": [
+            613,
+            243,
+            992,
+            522
+          ],
+          "apparentWidthMm": 29.925,
+          "apparentHeightMm": 22.05,
+          "centreAboveArtDatumMm": 48.0888,
+          "areaPx": 101994
+        },
+        "before": {
+          "boundsPx": [
+            609,
+            263,
+            990,
+            517
+          ],
+          "apparentWidthMm": 30.0825,
+          "apparentHeightMm": 20.0813,
+          "centreAboveArtDatumMm": 47.4981,
+          "areaPx": 95277
+        },
+        "after": {
+          "boundsPx": [
+            609,
+            241,
+            990,
+            521
+          ],
+          "apparentWidthMm": 30.0825,
+          "apparentHeightMm": 22.1288,
+          "centreAboveArtDatumMm": 48.2069,
+          "areaPx": 103266
+        },
+        "beforeReferenceIoU": 0.89916,
+        "afterReferenceIoU": 0.9758
+      }
+    ],
+    "denseAxialProbe": {
+      "method": "Actual old/new GLBs, all opaque meshes double-sided, both axial directions, 0.25mm cell-centre grid with0.025mm rounded-edge guard. Before samples the formerly claimed physical30x23pane; after samples the explicitly declared30x22clear opening.",
+      "before": {
+        "name": "before",
+        "gridMm": 0.25,
+        "edgeGuardMm": 0.025,
+        "samplesBothDirections": 21264,
+        "blockedRays": 2500,
+        "blockedPercent": 11.756960120391271,
+        "heights": [
+          {
+            "heightMm": 34.6,
+            "blocked": true,
+            "nearest": {
+              "object": "exps3_phosphate-black_housing",
+              "point": [
+                0,
+                0.0346,
+                -0.025999998673796654
+              ]
+            }
+          },
+          {
+            "heightMm": 35,
+            "blocked": true,
+            "nearest": {
+              "object": "exps3_phosphate-black_housing",
+              "point": [
+                0,
+                0.035,
+                -0.025999998673796654
+              ]
+            }
+          },
+          {
+            "heightMm": 36,
+            "blocked": true,
+            "nearest": {
+              "object": "exps3_phosphate-black_housing",
+              "point": [
+                0,
+                0.036,
+                -0.025999998673796654
+              ]
+            }
+          },
+          {
+            "heightMm": 37,
+            "blocked": true,
+            "nearest": {
+              "object": "exps3_phosphate-black_housing",
+              "point": [
+                0,
+                0.037,
+                -0.026041420272584492
+              ]
+            }
+          },
+          {
+            "heightMm": 37.25,
+            "blocked": true,
+            "nearest": {
+              "object": "exps3_phosphate-black_housing",
+              "point": [
+                0,
+                0.03725,
+                -0.02614497686815731
+              ]
+            }
+          },
+          {
+            "heightMm": 37.49,
+            "blocked": true,
+            "nearest": {
+              "object": "exps3_phosphate-black_housing",
+              "point": [
+                0,
+                0.03749,
+                -0.026575855882224803
+              ]
+            }
+          },
+          {
+            "heightMm": 37.51,
+            "blocked": false,
+            "nearest": null
+          },
+          {
+            "heightMm": 38,
+            "blocked": false,
+            "nearest": null
+          },
+          {
+            "heightMm": 48.2,
+            "blocked": false,
+            "nearest": null
+          },
+          {
+            "heightMm": 59.1,
+            "blocked": true,
+            "nearest": {
+              "object": "exps3_phosphate-black_housing",
+              "point": [
+                0,
+                0.0591,
+                0.023000000044703497
+              ]
+            }
+          }
+        ],
+        "pitch": [
+          {
+            "degrees": -10,
+            "blocked": true
+          },
+          {
+            "degrees": -7,
+            "blocked": true
+          },
+          {
+            "degrees": -5,
+            "blocked": false
+          },
+          {
+            "degrees": 0,
+            "blocked": false
+          },
+          {
+            "degrees": 5,
+            "blocked": false
+          },
+          {
+            "degrees": 7,
+            "blocked": false
+          },
+          {
+            "degrees": 10,
+            "blocked": false
+          }
+        ]
+      },
+      "after": {
+        "name": "after",
+        "gridMm": 0.25,
+        "edgeGuardMm": 0.025,
+        "samplesBothDirections": 20304,
+        "blockedRays": 0,
+        "blockedPercent": 0,
+        "heights": [
+          {
+            "heightMm": 34.6,
+            "blocked": true,
+            "nearest": {
+              "object": "exps3_phosphate-black_housing",
+              "point": [
+                0,
+                0.0346,
+                0.023000000044703484
+              ]
+            }
+          },
+          {
+            "heightMm": 35,
+            "blocked": true,
+            "nearest": {
+              "object": "exps3_phosphate-black_housing",
+              "point": [
+                0,
+                0.035,
+                0.023000000044703484
+              ]
+            }
+          },
+          {
+            "heightMm": 36,
+            "blocked": true,
+            "nearest": {
+              "object": "exps3_moulded_rubber_controls",
+              "point": [
+                0,
+                0.036,
+                0.023280002176761627
+              ]
+            }
+          },
+          {
+            "heightMm": 37,
+            "blocked": true,
+            "nearest": {
+              "object": "exps3_moulded_rubber_controls",
+              "point": [
+                0,
+                0.037,
+                0.023280002176761627
+              ]
+            }
+          },
+          {
+            "heightMm": 37.25,
+            "blocked": false,
+            "nearest": null
+          },
+          {
+            "heightMm": 37.49,
+            "blocked": false,
+            "nearest": null
+          },
+          {
+            "heightMm": 37.51,
+            "blocked": false,
+            "nearest": null
+          },
+          {
+            "heightMm": 38,
+            "blocked": false,
+            "nearest": null
+          },
+          {
+            "heightMm": 48.2,
+            "blocked": false,
+            "nearest": null
+          },
+          {
+            "heightMm": 59.1,
+            "blocked": false,
+            "nearest": null
+          }
+        ],
+        "pitch": [
+          {
+            "degrees": -10,
+            "blocked": true
+          },
+          {
+            "degrees": -7,
+            "blocked": false
+          },
+          {
+            "degrees": -5,
+            "blocked": false
+          },
+          {
+            "degrees": 0,
+            "blocked": false
+          },
+          {
+            "degrees": 5,
+            "blocked": false
+          },
+          {
+            "degrees": 7,
+            "blocked": false
+          },
+          {
+            "degrees": 10,
+            "blocked": false
+          }
+        ]
+      }
+    },
+    "smokeRegression": "Full rounded-opening1mm grid plus0.25mm lower-edge samples in both directions; physical30x23panes and glass thicknesses asserted independently. Old37.5mm roof blocks37.25mm; corrected geometry clears that formerly obstructed height.",
+    "limits": "No complete eye-box certification. Centreline ±5° and -7° pitch probes clear after correction; -10° still meets the battery, a normal physical off-axis limit rather than a promised unlimited aperture. Photo-derived48.2mm centre and22mm clear height remain provisional art datums."
+  },
+  "rearRightRefinement": {
+    "stage": "Historical approved high-source review, before the later atlas optimization.",
+    "baselineCommit": "4dcb6bf8a67c9d9f43ac75f73d8e5b31385d18c7",
+    "baselineGlbSha256": "e626bc3e5b7cb5b62bf772d123a85d26b977a66c7315d7f90cc2f6f04847b79f",
+    "reason": "Owner requested an independent GPT-6.1 Sol reference-difference review, especially the rear-right view, followed by parent-owned iterative fixes.",
+    "sourceSha256": "502d483864e23667c1bb4e0ba0cfa80c51d3c874793db8e316c23d9685d5472b",
+    "glbSha256": "719ccf14fae5f00b94a616399e7082290bdb83690bdb6c0f7a3f28c945da4ac3",
+    "stats": {
+      "triangles": 44617,
+      "primitives": 11,
+      "materials": 10,
+      "bytes": 4522712,
+      "images": 2
+    },
+    "authoringMeshParts": 178,
+    "reviewRounds": [
+      {
+        "round": 1,
+        "verdict": "NEEDS CORRECTION",
+        "findings": "Rear cover too short, missing rounded lower bosses, applied adjustment discs, floating rear badge; lower transition, cap/tether and finish discrepancies."
+      },
+      {
+        "round": 2,
+        "verdict": "NEEDS CORRECTION",
+        "verified": "Main rear-cover anatomy, recessed domed controls, badge seating, nut recess and tether attachments corrected.",
+        "blocker": "Degenerate skirt spike and off-plane split normals created a false rounded highlight; cap/mouth ratio and finish/legend polish also noted."
+      },
+      {
+        "round": 3,
+        "verdict": "ACCEPTABLE WITH NOTES",
+        "reviewedGlbSha256": "e247238d702786fc2681af56cae166e89176b7cf8b27bba1bf3079af6b98984c",
+        "blockers": [],
+        "notes": "Skirt/nut normals, cap ratio, rear anatomy and finish separation verified. Moulded detail readability and lighting-sensitive rear mark remain non-blocking; small arrowhead conformance defect reported as P2."
+      }
+    ],
+    "geometry": {
+      "rearCover": "26mm fastener-row spacing, lower row Z2mm, 9mm cast lower bosses, rounded upper ears/shallow saddle; actual counterbores rather than proud fasteners.",
+      "rearMark": "0.12mm exposed icon relief intersecting the Y-35mm cover; physical shallow lettering, no old 0.72mm air gap. Bundled font is not exact OEM typography.",
+      "controls": "11mm-radius openings cut through hood and overlapping housing/battery; recessed walls/floors, convex moulded annuli, physical tool grooves, seated white print and shallow moulded legends/arrows.",
+      "mount": "Open shaped rail channel, contoured lever, oval tension-pad inset and actual slotted nut recess. Still a visual rail approximation, not engineering data.",
+      "cap": "23.5mm nominal grip diameter inside 28.2mm retaining mouth, approximately1.2 ratio; measured peak radius11.74818mm after0.08mm edge rounding; fitted seal/groove floor, tether eyes/loops and aligned crimp sleeves.",
+      "normals": "Removed redundant (31.5,8) skirt spike. Native sharp/weighted normals plus explicit planar split normals on axis-aligned sheet/casting/slot caps; no GLB rewriting.",
+      "unchanged": "58.54x73.7x96.47mm envelope, mount origin, optical sockets/datums, pane sizes/thicknesses, clear opening and battery-roof clearance. Frozen studio/cameras/exposure. No reticle/ADS/M4/runtime/economy changes."
+    },
+    "finish": {
+      "maps": "Same two seeded1024px procedural PNGs; no photographic textures, new material or new runtime dependency.",
+      "casting": {
+        "tileMm": 80,
+        "normalStrength": 0.65,
+        "roughnessFactor": 1
+      },
+      "hood": {
+        "tileMm": 40,
+        "normalStrength": 0.22,
+        "roughnessFactor": 0.86
+      },
+      "mount": {
+        "tileMm": 40,
+        "normalStrength": 0.22,
+        "roughnessFactor": 0.94
+      },
+      "note": "Native glTF carries the authored scalar roughness multipliers. Finish separation is inferred from photos, not calibrated to their absolute brightness; base colors, metalness and glass settings unchanged."
+    },
+    "regression": "Actual opaque-geometry probes verify control recesses/domes/slots, lower bosses and counterbores, shallow rear relief, cap/nut groove depth and cap/mouth proportion. Exported hood normals are unit length and stepped face normals planar. Existing full rounded opening/lower-edge, exact-envelope, physical-pane/thickness and source/product provenance checks remain.",
+    "comparison": "Original seven cameras and lights are unchanged. Reference/before/after rear, right and rear-quarter sheets; quarter reference photo pose differs and is labelled. Filled external-profile IoU is not a detailing acceptance gate: rear/front/top values can decline despite corrected local anatomy; all current measured values are retained above.",
+    "postReviewArrowheadCorrection": {
+      "reviewedCandidateSha256": "e247238d702786fc2681af56cae166e89176b7cf8b27bba1bf3079af6b98984c",
+      "publishedCandidateSha256": "719ccf14fae5f00b94a616399e7082290bdb83690bdb6c0f7a3f28c945da4ac3",
+      "change": "After round3, parent subdivided only the small arrowhead meshes before conforming them to the domed dial, then refreshed native surface normals. No fourth review/remodeling loop.",
+      "denseVerification": {
+        "samplesPerHead": 11856,
+        "buriedSamplesPerHead": 0,
+        "minClearanceMm": 0.06217,
+        "maxClearanceMm": 0.10832
+      },
+      "regression": "Committed interior barycentric ray probes require the visible arrowheads to remain above the underlying dome.",
+      "reviewBoundary": "Sol's final verdict applies to the stated reviewed hash. This subsequent bounded P2 correction was parent-verified with dense geometry probes, smoke/full tests, repeat builds and native WebGPU; it was not separately Sol-reviewed."
+    },
+    "acceptance": "No remaining P1 blocker established in round3; acceptable with notes for the named asset-only review. Final bounded arrowhead correction is parent-verified, not separately Sol-reviewed. Owner visual acceptance still required; not certified CAD."
+  },
+  "atlasOptimization": {
+    "stage": "Historical 2K/2K/1K atlas optimization, superseded by texture1kEvaluation.",
+    "baselineCommit": "7675c96f5bce7d6f999982c20012fb9f6b3e1e61",
+    "baselineGlbSha256": "719ccf14fae5f00b94a616399e7082290bdb83690bdb6c0f7a3f28c945da4ac3",
+    "sourceSha256": "b9292fb428ee74585fafd6aee61cafbc7463e20920f9f95156dbcef92fa1b602",
+    "bakeSourceSha256": "a8dc53c029ca7141778bf8ba1ba5f931131b89f136911af73292e1c8aeeba462",
+    "glbSha256": "777a6c5735b6b4afe0dfae2b447e9687a04fea490f4a331e5bc8b43c4f3316a7",
+    "approvedTarget": "Owner selected8–12ktriangles, one opaque body atlas plus one glass material.",
+    "before": {
+      "triangles": 44617,
+      "primitives": 11,
+      "materials": 10,
+      "bytes": 4522712,
+      "images": 2
+    },
+    "after": {
+      "triangles": 11972,
+      "primitives": 2,
+      "materials": 2,
+      "bytes": 2952288,
+      "images": 3
+    },
+    "triangleReductionPercent": 73.2,
+    "geometry": "Retain silhouette, real optical corridor/recesses, bosses, cap/mouth, cable and a small rear emblem. Bake small lettering, warning/print, moulded legends, Torx and small bevel detail. Both panes retain original geometry/split normals, joined into one glass primitive.",
+    "bake": "Native Cycles normal/emission passes from freshly authored high source; unique UV atlas, paired exploded projection, stored exact native positions restored. No studio-light/shadow bake or GLB repair. Native Mikk tangents exported for opaque normal mapping.",
+    "highSource": {
+      "meshParts": 178,
+      "triangles": 44617,
+      "retained": "Hidden SOURCE_HIGH collection in editable blend; never exported."
+    },
+    "atlas": {
+      "baseColor": [
+        2048,
+        2048
+      ],
+      "normal": [
+        2048,
+        2048
+      ],
+      "orm": [
+        1024,
+        1024
+      ]
+    },
+    "textureMemory": "36MiB before mips (~48MiB with full mips), versus8MiB/10.67MiB for the former two1K source maps; no GPU compression or FPS claim.",
+    "visualComparison": [
+      {
+        "view": "rear-quarter",
+        "opaqueAlphaIoU": 0.9974752504987843
+      },
+      {
+        "view": "hero",
+        "opaqueAlphaIoU": 0.9982672518276039
+      },
+      {
+        "view": "left",
+        "opaqueAlphaIoU": 0.9997892165269954
+      },
+      {
+        "view": "right",
+        "opaqueAlphaIoU": 0.999711494119705
+      },
+      {
+        "view": "rear",
+        "opaqueAlphaIoU": 0.9991522670608657
+      },
+      {
+        "view": "front",
+        "opaqueAlphaIoU": 0.9983382604065294
+      },
+      {
+        "view": "top",
+        "opaqueAlphaIoU": 0.9992409497859089
+      }
+    ],
+    "boundsChange": "Only the formerly physical cap polarity marking's0.14mm width becomes texture. Body58.4x73.7x96.47mm, same sockets, physical panes/thicknesses, clear opening and0.5mm roof margin.",
+    "regression": "2primitives/2materials,<=12ktriangles; base/normal/ORM dimensions, warning/white-print pixels and metal/rubber roughness ranges, native tangents, UV bounds, both source hashes, blend hash, no high-source nodes, physical pane bounds and all prior optical/recess/boss/cap/normal tests retained. Removed geometry-only arrow/old per-material-factor assertions because those details are explicitly baked now.",
+    "acceptance": "Parent visual/native checks against approved high source; finite texture/edge differences disclosed. No new Sol review or owner approval implied; no FPS or overall VRAM-reduction claim."
+  },
+  "texture1kEvaluation": {
+    "stage": "Initial weighted1K evaluation; product hashes/densities below are historical, superseded by texture1kHoodReturnCorrection.",
+    "baselineCommit": "aa5d5fd435514be13bab34d3870d5256c111aa47",
+    "baselinePublishedGlbSha256": "777a6c5735b6b4afe0dfae2b447e9687a04fea490f4a331e5bc8b43c4f3316a7",
+    "sourceSha256": "b9292fb428ee74585fafd6aee61cafbc7463e20920f9f95156dbcef92fa1b602",
+    "bakeSourceSha256": "0f1bc6b328443fefdfbdb0b1d5c210570920ca687c34a8a9da8dede3d8d137c5",
+    "glbSha256": "72523d1517ce1a60fe588811464c08c71bb8ab282359162cd226db22c372d1c8",
+    "request": "Evaluate all1K runtime maps, prioritize fine details rather than plain base-color surfaces. Glass remains texture-free.",
+    "variants": {
+      "previous2k": {
+        "rebuiltGlbSha256": "75368b81cf3d61941bc37be84b4342ce6b24bced6744410d3b7cefeee8ed8cd6",
+        "stats": {
+          "triangles": 11972,
+          "primitives": 2,
+          "materials": 2,
+          "bytes": 2952352,
+          "images": 3
+        },
+        "textureMiBWithMips": 48
+      },
+      "uniform1kControl": {
+        "glbSha256": "b078dd9bd029ba6c7ed934412856dd55bee3d468d110a4b8a7e27d81ab0a61db",
+        "stats": {
+          "triangles": 11972,
+          "primitives": 2,
+          "materials": 2,
+          "bytes": 1642104,
+          "images": 3
+        },
+        "textureMiBWithMips": 16
+      },
+      "weighted1k": {
+        "stats": {
+          "triangles": 11972,
+          "primitives": 2,
+          "materials": 2,
+          "bytes": 1676584,
+          "images": 3
+        },
+        "textureMiBWithMips": 16
+      }
+    },
+    "method": "Three fresh factory-empty builds using identical official OCIO profile, frozen cameras/lights/exposure/samples, unchanged11972triangles/2primitives/2materials. No texture downsampling/GLB repair as build input. Per-face UV priority within the existing physical topology.",
+    "allocationPolicy": "Printed hood bands, warning label and dial markings highest; shallow relief/hardware next. Unmarked/back-facing surfaces lower. Curved roof/rims retain a minimum for normal-map shading. atlas_density_weight is authoring data, not a runtime vertex attribute.",
+    "densityComparison": {
+      "plain": {
+        "surfaceMm2": 50637.74094532895,
+        "oldUV": 0.20165087026543915,
+        "controlUV": 0.20165087026543915,
+        "newUV": 0.1028045826824382,
+        "previous2kTexelsPerMm": 4.0868889893229845,
+        "uniform1kTexelsPerMm": 2.0434444946614923,
+        "weighted1kTexelsPerMm": 1.459046162065706
+      },
+      "hidden": {
+        "surfaceMm2": 11011.665386345992,
+        "oldUV": 0.09607636486180127,
+        "controlUV": 0.09607636486180127,
+        "newUV": 0.0027846881421282887,
+        "previous2kTexelsPerMm": 6.049392042715431,
+        "uniform1kTexelsPerMm": 3.0246960213577156,
+        "weighted1kTexelsPerMm": 0.5149460562521133
+      },
+      "edge": {
+        "surfaceMm2": 5827.244101955484,
+        "oldUV": 0.05254349217284471,
+        "controlUV": 0.05254349217284471,
+        "newUV": 0.04790268396027386,
+        "previous2kTexelsPerMm": 6.149754991609595,
+        "uniform1kTexelsPerMm": 3.0748774958047975,
+        "weighted1kTexelsPerMm": 2.93594742894719
+      },
+      "print": {
+        "surfaceMm2": 3913.5842851633242,
+        "oldUV": 0.05442560149822384,
+        "controlUV": 0.05442560149822384,
+        "newUV": 0.24899686186108738,
+        "previous2kTexelsPerMm": 7.637376935022615,
+        "uniform1kTexelsPerMm": 3.8186884675113073,
+        "weighted1kTexelsPerMm": 8.167883745143225
+      },
+      "casting": {
+        "surfaceMm2": 1890.7069736280807,
+        "oldUV": 0.017790952930226922,
+        "controlUV": 0.017790952930226922,
+        "newUV": 0.001963650225661695,
+        "previous2kTexelsPerMm": 6.282282252249039,
+        "uniform1kTexelsPerMm": 3.1411411261245195,
+        "weighted1kTexelsPerMm": 1.0435659722319535
+      },
+      "relief": {
+        "surfaceMm2": 2135.9451317590633,
+        "oldUV": 0.01639259362127632,
+        "controlUV": 0.01639259362127632,
+        "newUV": 0.053217576583847404,
+        "previous2kTexelsPerMm": 5.67360037313933,
+        "uniform1kTexelsPerMm": 2.836800186569665,
+        "weighted1kTexelsPerMm": 5.111312774581054
+      }
+    },
+    "uvRasterCheck": {
+      "resolution": [
+        1024,
+        1024
+      ],
+      "coveredInteriorPixelCentres": 478728,
+      "overlappingInteriorPixelCentres": 0,
+      "barycentricEdgeExclusion": 0.0001,
+      "note": "Pixel-centre diagnostic, not a claim of exact continuous triangle-overlap proof."
+    },
+    "geometryCheck": "All10924 opaque body triangles match baseline/control/weighted by their native world-space corners (rounded to1e-8m); glass and physical/socket tests unchanged. UV seam/vertex packing may differ, but no physical remodelling or camera changes.",
+    "cropPixelBounds": {
+      "warning": {
+        "view": "left",
+        "box": [
+          777,
+          478,
+          1153,
+          669
+        ]
+      },
+      "dials": {
+        "view": "right",
+        "box": [
+          299,
+          402,
+          1113,
+          910
+        ]
+      },
+      "rear-mark": {
+        "view": "rear",
+        "box": [
+          690,
+          617,
+          910,
+          812
+        ]
+      }
+    },
+    "cropDisplay": "Identical pixel boxes across variants; nearest-neighbour2x crops disclose actual render detail without sharpening/contrast/axis warp.",
+    "result": "Weighted1K printed regions average8.17texels/mm versus7.64previous2K and3.82uniform1K; relief5.11versus5.67. Warning/dial crops support comparable marking readability, while unmarked micrograin/small bevels are softer at extreme zoom.",
+    "memory": "Three1KRGBA8maps12MiB before mips/about16MiB with full mips; 66.7% lower than36/48MiB. No glass textures, GPU compression or FPS claim.",
+    "nativeCheck": "All three variants rendered on non-fallback AMD RDNA4 with the same fixed native preview camera/room;2meshes,1glass primitive, no browser errors; candidate/control maps all1024.",
+    "acceptance": "Parent evaluation supports the weighted1K candidate. Finite-detail losses disclosed; no new Sol review or final owner visual approval implied. Asset-only, no M4/ADS/economy changes."
+  },
+  "texture1kHoodReturnCorrection": {
+    "stage": "Bounded parent-approved P2 correction after initial weighted1K review; same asset-only scope.",
+    "baselineCommit": "93bc86ff2e746d291365dd99cf2d76a300f0ab1b",
+    "baselineGlbSha256": "72523d1517ce1a60fe588811464c08c71bb8ab282359162cd226db22c372d1c8",
+    "sourceSha256": "b9292fb428ee74585fafd6aee61cafbc7463e20920f9f95156dbcef92fa1b602",
+    "bakeSourceSha256": "b389812eb582bd539c92758d53c5caaaedfb66b7080058aa842ce903eff4ddc9",
+    "glbSha256": "c95d0d737488506cc4386554089f9258976a22473ba74621517b85d6c5fe59eb",
+    "blendSha256": "31fef2505a5ca6bfff86b96d4f2fc12f1b06ac52d19d82d2d57b77fbe628e2a4",
+    "stats": {
+      "triangles": 11972,
+      "primitives": 2,
+      "materials": 2,
+      "bytes": 1685588,
+      "images": 3
+    },
+    "correction": "Visible rear roof-return faces on the protective hood (highY<-20mm,lowZ>60mm,normalY<-.5,normalZ<-.5) receive existing relief weight12 instead of plain/hidden weights. Other downward/hidden faces retain their allocation.",
+    "changedWeightTriangles": 30,
+    "changedWeightSurfaceMm2": 22.217664138679538,
+    "uvSampling": {
+      "method": "Actual exported glTF triangles reached by rear-facing rays at x=-10,0,+10mm, y=66.55576mm; minimum UV-triangle altitude in1024px atlas, not only bounding-box height or manifest weight.",
+      "beforeMinimumPx": 0.5936946183612044,
+      "afterMinimumPx": 1.9998219493344958,
+      "afterMaximumPx": 2,
+      "regressionFloorPx": 1.9,
+      "negativeControl": "Same exported-UV assertion fails the preceding committed GLB at all three span probes."
+    },
+    "uvAllocation": {
+      "print": {
+        "surfaceMm2": 3913.5842851633242,
+        "uvArea": 0.2467404210474342,
+        "triangles": 230,
+        "relativeAreaWeight": 32,
+        "texelsPerMm": 8.13079032375602
+      },
+      "relief": {
+        "surfaceMm2": 2158.162795882699,
+        "uvArea": 0.05315625772345811,
+        "triangles": 947,
+        "relativeAreaWeight": 12,
+        "texelsPerMm": 5.0820046145266105
+      },
+      "edge": {
+        "surfaceMm2": 5827.244101955484,
+        "uvArea": 0.0474599456647411,
+        "triangles": 1990,
+        "relativeAreaWeight": 4,
+        "texelsPerMm": 2.9223482558068805
+      },
+      "casting": {
+        "surfaceMm2": 1890.7069736280807,
+        "uvArea": 0.001945539261214435,
+        "triangles": 1155,
+        "relativeAreaWeight": 0.5,
+        "texelsPerMm": 1.0387423617751501
+      },
+      "plain": {
+        "surfaceMm2": 50622.92383790178,
+        "uvArea": 0.10184366186149418,
+        "triangles": 5784,
+        "relativeAreaWeight": 1,
+        "texelsPerMm": 1.4524237678133696
+      },
+      "hidden": {
+        "surfaceMm2": 11004.264829649534,
+        "uvArea": 0.0027588781667873263,
+        "triangles": 818,
+        "relativeAreaWeight": 0.125,
+        "texelsPerMm": 0.5127264252307762
+      }
+    },
+    "uvRasterCheck": {
+      "resolution": [
+        1024,
+        1024
+      ],
+      "coveredInteriorPixelCentres": 475557,
+      "overlappingInteriorPixelCentres": 0,
+      "barycentricEdgeExclusion": 0.0001,
+      "note": "Pixel-centre diagnostic, not an exact continuous-overlap proof."
+    },
+    "geometryAndStudio": "Native Blender body/glass positions, polygon indices and corner normals match the preceding1K blend exactly. Seven camera transforms/scales, light transforms/energy/colors/sizes, AgX Medium High Contrast exposure-1.5 and96samples exact.178high meshes/44617high triangles,2runtime meshes and5packed1K maps retained.",
+    "rearComparison": {
+      "method": "Frozen1600x1200 rear render, identical native-resolution box[618,146,982,153], no sharpening/reframing/tone changes. Means diagnose the formerly isolated bright bar; not a pixel-equivalence or automatic visual-acceptance target.",
+      "rgbMeans": {
+        "previous2k": [
+          29.7276295133438,
+          33.287284144427005,
+          37.18445839874411
+        ],
+        "uniform1k": [
+          16.259419152276294,
+          18.79591836734694,
+          21.69270015698587
+        ],
+        "before": [
+          87.04160125588697,
+          94.21860282574568,
+          101.44897959183673
+        ],
+        "after": [
+          35.80769230769231,
+          39.217032967032964,
+          42.869309262166404
+        ]
+      },
+      "result": "The detached bright bar is absent in the revised render. A thinner ordinary edge response and finite1K differences versus2K remain."
+    },
+    "repeatBuild": {
+      "method": "Fresh separate Blender5.2.2 processes, one with all seven renders and one without; factory-empty source recipe, official OCIO profile unchanged.",
+      "glbAndFivePNGsByteIdentical": true,
+      "allGLBJSONAndAccessorsExact": true,
+      "productSha256": {
+        "exps3-0.glb": "c95d0d737488506cc4386554089f9258976a22473ba74621517b85d6c5fe59eb",
+        "exps3-base-color.png": "2a11e853d0de477225a246aa79399273c0cc49e7f594c9efe322b7f049a467a6",
+        "exps3-normal.png": "510c4e09165127a2f3597cf9b6da8fee8e94eb3632a6d19bd684984933c7d2db",
+        "exps3-orm.png": "e37aab1994d7f68daa2d4780e9bb1209ec4fce66f4cc00ccad7b01abf8e02265",
+        "finish-normal.png": "5f31bfaf615de6861a664f856d3ec71ff943b9c8363f9193c14d129448b4dd3b",
+        "finish-roughness.png": "86224821b5681887fa3edf942b5dcf4afc2fb8f3fcaad9cbdb1776605b32a480"
+      },
+      "blendSha256": {
+        "candidate": "31fef2505a5ca6bfff86b96d4f2fc12f1b06ac52d19d82d2d57b77fbe628e2a4",
+        "repeat": "194486eb2c56b5f63cbc09b4c52ad45dc8e47410e5b77fc006165faf72800994"
+      },
+      "note": "Blend paths/metadata differ; not a cross-platform determinism claim. No tangent tolerance or exporter/GLB repair."
+    },
+    "nativeCheck": "Revised committed GLB rendered using the project's strict native WebGPU renderer on non-fallback AMD RDNA4; two meshes, one texture-free glass primitive, body maps1024², no browser errors. Separate temporary RoomEnvironment sanity fixture, not the earlier frozen three-way native comparison or gameplay/ADS acceptance.",
+    "acceptance": "Worker evidence for the bounded parent-approved P2 fix; independent targeted follow-up and final owner visual acceptance remain separate. Other disclosed1K grain/tiny-relief trade-offs are unchanged in scope."
+  },
+  "nativeValidation": {
+    "backend": "native WebGPU, AMD RDNA 4, non-fallback",
+    "viewport": [
+      1400,
+      1100
+    ],
+    "assetMeshes": 2,
+    "glassPrimitives": 1,
+    "runtimeMapSizes": [1024, 1024],
+    "glassTextures": 0,
+    "opticalWindows": 2,
+    "transmission": 1,
+    "ior": 1.5,
+    "result": "Actual exported GLB loaded with GLTFLoader and rendered using the project's strict WebGPU renderer; two thick glass meshes, local embedded textures, no browser errors. Output-target readback preserves AgX/display transform. Isolated asset fixture, not M4 gameplay/ADS acceptance.",
+    "fixture": "Temporary authoring fixture, intentionally not a maintained screenshot-matrix tool."
+  }
+}
