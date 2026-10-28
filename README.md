@@ -163,9 +163,7 @@ continues unless it failed; the reload-required error is exposed through
 
 ## Automation
 
-Owner-authorized issues run through an issue → `develop` pipeline: DeepSeek V4 Flash
-via OpenCode Go implements; Grok 4.6 via OpenRouter reviews with read-only GitHub
-access. CI, fix limits and squash merge are deterministic; only the owner promotes
-to `main`. Actions secrets: `CODEX_API_KEY`, `OPENROUTER_API_KEY`,
-`AI_CI_TRIGGER_TOKEN` (fine-grained PAT: Contents/Issues/PR read-write). Enable
-**Allow GitHub Actions to create and approve pull requests**.
+The `Validate` GitHub Actions workflow runs on pull requests and pushes to `main`
+and `develop`. It checks formatting, types, lint, tests and the production build.
+Changes go through pull requests into `develop`; only the owner promotes to `main`.
+AI implementation, review, fix and automatic merge workflows have been retired.
