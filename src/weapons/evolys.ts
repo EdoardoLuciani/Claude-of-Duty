@@ -1,9 +1,11 @@
 import * as THREE from 'three';
-import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { Renderer } from 'three/webgpu';
 
 import handReference from '../../assets/weapons/fn-evolys-762/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/fn-evolys-762/manifest.json' with { type: 'json' };
 import { hasOwn } from '../core/guards.ts';
+import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
 import {
@@ -18,7 +20,7 @@ import { authoredModel, requiredNode } from './authored-model.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 
 export const EVOLYS_URL = new URL(
-  '../../assets/weapons/fn-evolys-762/fn-evolys-762.glb',
+  '../../assets/weapons/fn-evolys-762/fn-evolys-762.runtime.glb',
   import.meta.url
 ).href;
 const ALIASES: Record<string, string> = {
@@ -92,8 +94,8 @@ export function makeEvolysModel(gltf: GLTF): EvolysModel {
   return { ...model, ...converted };
 }
 
-export async function loadEvolys(): Promise<EvolysModel> {
-  return makeEvolysModel(await new GLTFLoader().loadAsync(EVOLYS_URL));
+export async function loadEvolys(renderer: Pick<Renderer, 'hasFeature'>): Promise<EvolysModel> {
+  return makeEvolysModel(await loadWeaponGLTF(renderer, EVOLYS_URL));
 }
 
 /** Native Blender mechanism/belt/hand tracks, under shared ADS/sway/recoil.
