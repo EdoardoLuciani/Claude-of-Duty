@@ -745,39 +745,6 @@ section('Hitbox colliders');
   phys.removeCollider(torso);
 }
 
-/* ---------------- debug view ---------------- */
-section('Debug view');
-{
-  const { PhysicsDebugView } = await import('./debug.ts');
-  const view = new PhysicsDebugView(new THREE.Scene());
-  view.setEnabled(true);
-  view.begin();
-  const m = new THREE.Matrix4().compose(
-    new THREE.Vector3(1, 2, 3),
-    new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.6),
-    new THREE.Vector3(1, 1, 1)
-  );
-  view.obb(m, 0.5, 0.25, 0.75);
-  ok(view._v === 24, 'obb emits 12 edges', `${view._v / 2} lines`);
-  // every edge length must match one of the three box dimensions
-  let good = 0;
-  for (let i = 0; i < view._v; i += 2) {
-    const a = i * 3,
-      b = (i + 1) * 3;
-    const p = view.positions;
-    const len = Math.hypot(p[b] - p[a], p[b + 1] - p[a + 1], p[b + 2] - p[a + 2]);
-    if (Math.abs(len - 1.0) < 1e-4 || Math.abs(len - 0.5) < 1e-4 || Math.abs(len - 1.5) < 1e-4)
-      good++;
-  }
-  ok(good === 12, 'obb edge lengths match the half-extents', `${good}/12`);
-  view.begin();
-  view.capsule(0, 1, 0, 0, 2, 0, 0.3, [1, 1, 1]);
-  ok(view._v > 40 && view._v < 400, 'capsule wireframe is bounded', `${view._v} verts`);
-  view.rebuild(phys, new THREE.PerspectiveCamera(), 1 / 60);
-  ok(view._v > 0 && view.geometry.drawRange.count === view._v, 'rebuild sets the draw range');
-  view.dispose();
-}
-
 /* ---------------- determinism ---------------- */
 section('Determinism');
 {

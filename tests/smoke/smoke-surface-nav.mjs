@@ -428,9 +428,9 @@ assert.ok(live.canStand(w5.from) && entry.probeGround(), 'W5 starts supported an
 map.physics.removeCharacter(entry);
 assert.equal(
   map.meta.navigation.sha256,
-  // Type-contract hardening refreshes source-byte provenance only.
-  // The unchanged physical payload hash below also guards the preceding bake.
-  '07d02b8fa5d379a8c835cd640bfea4fae033458c793d38c1793a7c9e3b64ef6c',
+  // Removing the physics visualizer refreshes source-byte provenance only.
+  // The physical payload hash below verifies unchanged topology and cover.
+  'b6fd9fc8cdf9326a1111187027101436b994eaa7988902d6fffa30f8943165cf',
   're-measure recorded fixture outcomes after changing baked assets'
 );
 const physicalPayload = map.surfaceRaw.subarray(64 + map.surfaceRaw.readUInt32LE(8));
@@ -438,7 +438,7 @@ assert.equal(physicalPayload.length, 8897464, 'unchanged Detour/component/cover 
 assert.equal(
   await navHash(physicalPayload),
   'bbf10f69d8dedfa3b048fa8f11b2b0e680df8f8f3775459fdd89eb90e08b0500',
-  'type-safety migration must not change navigation topology, components or cover'
+  'visualizer removal must not change navigation topology, components or cover'
 );
 let arrivals = 0;
 for (const c of map.cases) {

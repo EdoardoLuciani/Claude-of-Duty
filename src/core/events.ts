@@ -1,6 +1,5 @@
 import type { Vector3 } from 'three';
 
-import type { CardId } from '../intel/cards.ts';
 import type { SurfaceName } from '../physics/surfaces.ts';
 import type { PlayerState } from '../player/index.ts';
 import type { PlayerStance } from '../player/tuning.ts';
@@ -109,7 +108,6 @@ export interface EngineEventMap {
   };
   'bullet:impact': BulletImpactEvent;
   'bullet:segment': BulletSegmentEvent;
-  'bullet:tracer': { from: Vector3; to: Vector3; speed: number };
   'shot:resolved': {
     shooter: unknown;
     weapon: EventWeapon;
@@ -209,8 +207,6 @@ export interface EngineEventMap {
   'intel:secured': {
     id: string;
     position: Vector3;
-    card: CardId | null;
-    cardLabel: string;
     credits: number;
   };
   'hud:heard': { bearing: number };
