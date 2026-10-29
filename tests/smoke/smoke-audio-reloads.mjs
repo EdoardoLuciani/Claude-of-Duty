@@ -116,12 +116,13 @@ for (const [id, url, make] of [
 ])
   vm.addWeapon(make(await parseGLB(readFileSync(new URL(url)))), wp.states.get(id).def);
 vm.onClipEvent = (event, clip) => wp._onClipEvent(event, clip);
-function step(seconds) {
-  for (let i = 0; i < Math.ceil(seconds * 240); i++) {
-    ctx.time.elapsed += 1 / 240;
+function step(seconds, hz = 240) {
+  const dt = 1 / hz;
+  for (let i = 0; i < Math.ceil(seconds * hz); i++) {
+    ctx.time.elapsed += dt;
     wp._state.empty = !wp.ammo.total;
     wp._state.magazineLoaded = wp.state.mag > 0;
-    wp.lateUpdate(1 / 240, ctx);
+    wp.lateUpdate(dt, ctx);
   }
 }
 function setup(id, empty) {
@@ -187,7 +188,9 @@ for (const id of WEAPON_IDS) {
     step(0.25);
     vm.stopClip();
     trace.length = 0;
-    step(5);
+    // Cancellation is checked over five seconds; unlike event timing, it does
+    // not require 240 Hz sampling.
+    step(5, 60);
     assert.equal(trace.length, 0, 'cancelled clip has no later mechanical beats');
   }
 }
