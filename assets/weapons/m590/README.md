@@ -48,6 +48,9 @@ Follow the [shared authoring workflow](../../../tools/blender/README.md).
 | `tools/blender/m590.py` | Geometry, seeded maps, UVs, studio, export and manifest |
 | `tools/blender/m590_actions.py` | Seven actions, shared hand controls and excluded review skins |
 | `tools/blender/m590/export_actions.py` | Runtime action sampling and native export assertions |
+| `tools/blender/m590/skin.py` | Export-only four-joint rigid mechanical skin |
+| `tools/blender/m590/finishes.py` | Export-only UV1 scalar finish atlas and exact linear vertex colours |
+| `tools/blender/m590/clearance.py` | Narrow measured shared-glove/stock clearance exception |
 | `manifest.json` | Basis, sockets, aliases, exact event beats, contact windows and export stats |
 | `hand-reference.json` | Versioned shared-Arm calibration; quaternions x,y,z,w, angles in radians |
 
@@ -63,15 +66,20 @@ proximal fingers and thumb web crossed the stock.
 From the repository root after `npm ci`, using Blender **5.2.2**:
 
 ```sh
-blender -b -t 4 --python-exit-code 1 --python tools/blender/m590.py
+blender -b -t 2 --python-exit-code 1 --python tools/blender/m590.py
 # Isolated products; add --render --quick for optional GPU preview stills:
-blender -b -t 4 --python-exit-code 1 --python tools/blender/m590.py -- \
+blender -b -t 2 --python-exit-code 1 --python tools/blender/m590.py -- \
   --output /tmp/m590-authoring-review
-blender -b -t 4 /tmp/m590-authoring-review/m590.blend \
+blender -b -t 2 /tmp/m590-authoring-review/m590.blend \
   --python-exit-code 1 --python tools/blender/m590_check.py
 node tests/smoke/smoke-shotgun-asset.mjs
 node tests/smoke/smoke-m590.mjs
 node tests/smoke/smoke-m590-ads.mjs
+node tests/smoke/smoke-m590-runtime.mjs
+M590_TEST_RUNTIME=1 node tests/smoke/smoke-m590.mjs
+M590_TEST_RUNTIME=1 node tests/smoke/smoke-m590-ads.mjs
+blender -b -t 2 /tmp/m590-authoring-review/m590.blend \
+  --python-exit-code 1 --python tools/blender/m590_clearance_check.py
 ```
 
 The native Actions exporter retains the 120 Hz lattice, fractional endpoints,
@@ -130,12 +138,87 @@ weapon framing, support/shell poses and all handling timings are unchanged.
 
 `m590_check.py` now sweeps all five full evaluated right-arm skin surfaces at
 120 Hz through all seven actions against the actual stock, receiver/tang and
-trigger guard, with zero triangle crossings allowed. The moving trigger is an
+trigger guard, with the one narrowly approved sub-30-micrometre tessellation
+exception below; all other triangle crossings are forbidden. The moving trigger is an
 intentional index contact and remains covered by the existing trigger-pad checks;
 the existing left-hand pump/loading skin sweeps are retained. The original #447
 pose fails the new full-surface gate at Idle frame 0. These gates do not certify
 finger-to-finger clearance, anatomy or final lighting; human visual acceptance
 of hip, ADS, inspect and transitions is still required.
+
+## Export/runtime optimization
+
+The editable `.blend` keeps all 110 original high component meshes, modifiers,
+seven source finishes, UVs and sparse poses. Only evaluated export copies change:
+rubber-buttpad bevels use two rather than four segments, forend-rib bevels two
+rather than three, and receiver/forend/bolt/trigger share one four-joint rigid
+skin. Original mechanical controls, sockets and hands remain named nodes.
+`shell_insert` stays an independent, unskinned STEP-scale owner, never a magazine.
+
+One opaque finish material serves both mechanical skin and insertion shell (two
+submissions). Exact original linear base-colour factors live in `COLOR_0`;
+UV0 albedo pixels, normal XYZ pixels and normal strength `.25` are unchanged.
+UV1 selects seven padded binary-metal/scalar-roughness tiles in generated
+`m590-finish-orm.png`. Only subtle roughness micro-grain is area-filtered over each
+finish's UV domain; colours, exposure and normal detail are not compensated.
+The generated PNG is authoritative Python output, not a metadata sidecar.
+
+Native export: **72,206 triangles / 2 primitives / 1 material / 11,820,048 B**
+versus 93,106 / 13 / 7 / 9,037,164 B before optimization. Native size grows due to
+rigid weights, vertex colours, UV1 and 32-bit indices; the old unskinned 10MiB
+native budget is replaced by a 12MiB authoring cap plus explicit <4MiB runtime
+and <3.5MiB decoded-typed-array gates. The latter measure storage, not GPU allocation.
+No gameplay/contact tolerance was relaxed for the new representation.
+
+`m590.runtime.glb` is cooked using pinned gltfpack 1.3 through `cookModel` in
+`build/models.mjs`, common flags plus:
+
+```js
+['-si', '0.50', '-se', '0.0002', '-sp', '-vc', '16']
+```
+
+Keep `-kn` and `-af 0`; use 16-bit vertex colours to retain dark finish factors.
+The registry and shared meshopt/KTX2 loader integration remain parent-owned;
+`loadM590()` deliberately retains its operational native URL/signature. Node
+fixtures decode the runtime candidate without duplicating runtime loader machinery.
+Matched render/evaluation evidence is external; final hardware-WebGPU and human
+visual acceptance are separate from counts and smoke tests.
+
+## Narrow approved shared-glove clearance exception
+
+The committed older review blend embedded a denser glove. A fresh rebuild using
+current shared arms has 12,562 charcoal-glove vertices / 25,120 triangles instead
+of 15,074 / 30,144. The coarser surface creates the same tiny neck contact at all
+**979** sampled 120Hz poses: Idle 0–240, Pump 0–54, Reload_Tactical 0–66,
+Reload_Empty 0–114, Inspect 0–360, Draw 0–84 and Holster 0–54. Only right charcoal
+glove faces **774 [1816,1813,1873]** and **7834 [1813,1872,1873]** cross stock-local
+faces **1154/1157** (four overlap pairs per pose). Stock global face numbers in
+historical combined audit buffers were 6426/6429; they are not local indices.
+
+The operator explicitly approved this tessellation contact, not a general
+clearance tolerance. `m590/clearance.py` requires the exact shared-arm file SHA256
+`0fde215d10b6b7725f1117881b79c8888a2630d601a0a0e3eb34629ba74ef7ad`
+and glove triangle topology SHA256 (little-endian uint32 triples)
+`90eef66426a22d171eb78e2668c15c7a4b7809ecf73b4f7b9eb2f483bbc05bcc`.
+The only admissible contact vertices lie in game-space bounds
+`[-.0021,-.0347,.0861]` to `[.0021,-.0337,.0885]` metres. Different meshes,
+triangles, winding, stock regions, receiver/tang/guard contacts or deeper contacts
+still fail; no shared appearance, calibration or stock geometry was changed.
+
+This is not a triangle skip list: every intersecting triangle receives an
+adaptive signed-Euclidean-distance certificate over its entire area, using the
+closed stock's 1-Lipschitz distance bound plus 0.1µm float-arithmetic allowance.
+A cached certificate is reused only with its measured maximum vertex-displacement
+error added. **30µm (0.030mm) is the absolute ceiling**, not a millimetre-scale
+allowance. Initial 200-grid sampling measured ~26.43µm;
+a full uncached 979-pose adaptive diagnostic found **27.6231µm** at Holster frame 50
+(face 774), with a certified global upper bound **28.5000µm**. The cached
+production checker conservatively bounds its complete sweep below 29.10µm.
+The diagnostic records every affected pose/triangle externally. Native
+source wrist/shell drift and all other original skin/contact checks are retained.
+`m590_clearance_check.py` proves that +20µm deeper geometry, new contact triangles,
+other right-skin surfaces, receiver contact, changed winding and out-of-region
+contacts are rejected.
 
 ## Review evidence
 
