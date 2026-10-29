@@ -28,3 +28,11 @@ integer-frame lattice; motion exports LINEAR, visibility CONSTANT/STEP. Keep
 explicit TRS resets on every control in every clip. Draw retains the held frame-75
 value at its exact **74.4-frame / .620 s** endpoint. Stock Actions export merges
 matching NLA names without forced sampling; no output rewriting.
+
+Runtime preparation joins the three fixed assemblies by finish while retaining
+`handguard`/`stock` helper seats; named irons and all independently animated
+mechanisms remain separate. The saved blend is deliberately pre-join and remains
+component-editable. Cylinder micro-bevels use a single chamfer (not the exact
+front aiming post); Picatinny corner curves retain three samples. The asset
+README records the deliberately nonquantized gltfpack candidate/profile and its
+precision trade-off. Do not substitute more permissive simplification globally.

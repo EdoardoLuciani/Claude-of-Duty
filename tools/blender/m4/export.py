@@ -8,6 +8,15 @@ def active(o):
 
 def export_asset(output, asset, parents, separate, clips):
     OUT=output
+    # These three seats are rigid in every clip. Join their runtime geometry by
+    # finish, not by authoring assembly; retain the named seats as empty helpers.
+    # The editable blend was saved before this runtime-only preparation.
+    body=bpy.data.objects['receiver']
+    for name in ('handguard','stock'):
+        for obj in list(bpy.data.objects[name].children):
+            if obj.type!='MESH' or obj in separate:continue
+            world=obj.matrix_world.copy()
+            obj.parent=body;obj.matrix_world=world
     for parent in parents:
         objects=[o for o in asset.objects if o.type=='MESH' and o.parent==parent and o not in separate]
         if not objects:continue
@@ -32,7 +41,7 @@ def export_asset(output, asset, parents, separate, clips):
     # Count both magazines/cartridge instances even when glTF deduplicates buffers.
     primitives=[p for node in doc['nodes'] if 'mesh' in node for p in doc['meshes'][node['mesh']]['primitives']]
     stats={'triangles':sum(doc['accessors'][p['indices']]['count']//3 for p in primitives),'primitives':len(primitives),'materials':len(doc['materials']),'meshes':len(doc['meshes']),'bytes':path.stat().st_size,'images':len(doc['images'])}
-    assert stats['triangles']<110000 and stats['primitives']<=40 and stats['materials']<=16 and stats['bytes']<=10*1024*1024 and stats['images']==4,stats
+    assert stats['triangles']<=91000 and stats['primitives']<=29 and stats['materials']==12 and stats['bytes']<=7600000 and stats['images']==4,stats
     assert {animation['name'] for animation in doc['animations']} == set(clips)
     for animation in doc['animations']:
         duration=clips[animation['name']]['duration']
