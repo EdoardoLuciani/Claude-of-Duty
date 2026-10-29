@@ -30,6 +30,10 @@ const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
 export function makeAX338Model(gltf: GLTF): AX338Model {
   const scene = gltf.scene;
   const { root, animations, point } = authoredModel(gltf, 'AX338_RIG', REQUIRED, scene);
+  // glTF infers duration from keys; gltfpack folds the wholly constant Idle to
+  // t=0. Restore only that authored hold, never normalize moving clip timing.
+  const idle = animations.find((clip): boolean => clip.name === 'Idle');
+  if (idle?.duration === 0) idle.duration = manifest.clips.Idle.duration;
   const model = {
     id: 'sniper' as const,
     label: 'AX-338',
@@ -120,6 +124,7 @@ export class AX338Animation {
   magazineRound!: THREE.Object3D;
   spareRound!: THREE.Object3D;
   hands!: Record<HandSide, AuthoredHand>;
+  rotationControls: THREE.Object3D[];
   poseQ = new THREE.Quaternion();
   poseMatrix!: THREE.Matrix4;
   idleTime = 0;
@@ -138,6 +143,11 @@ export class AX338Animation {
     this.magazineRound = node('magazine_round');
     this.spareRound = node('magazine_spare_round');
     this.hands = discoverAuthoredHands(node);
+    this.rotationControls = [this.root, this.bolt, node('trigger'), this.magazine, this.spare];
+    for (const hand of Object.values(this.hands)) {
+      this.rotationControls.push(hand.wrist, ...hand.thumb);
+      for (const finger of hand.fingers) this.rotationControls.push(finger.root, ...finger.joints);
+    }
     this.poseMatrix = this.root.matrix;
     this.reset();
   }
@@ -148,6 +158,9 @@ export class AX338Animation {
 
   _sample(name: string, time: number): void {
     sampleAuthoredAction(this, name, time);
+    // Integer-encoded animation components are normalized individually by glTF,
+    // not as a quaternion. Restore unit rotations before matrices/hand contacts.
+    for (const control of this.rotationControls) control.quaternion.normalize();
     this.root.updateMatrix();
     this.poseQ.copy(this.root.quaternion);
     this.magazine.visible = this.magazine.scale.x > 0.5;
