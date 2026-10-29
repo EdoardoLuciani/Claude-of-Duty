@@ -1,15 +1,18 @@
 import * as THREE from 'three';
-import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { Renderer } from 'three/webgpu';
 
 import manifest from '../../assets/weapons/mcx-virtus/manifest.json' with { type: 'json' };
+import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { authoredModel } from './authored-model.ts';
 import { buildEquipClips, buildMagazineClips } from './clips.ts';
 import { smootherstep } from './mathx.ts';
 
-// Vite bundles the committed Blender export; never rebuild Blender at game boot.
-export const MCX_URL = new URL('../../assets/weapons/mcx-virtus/mcx-virtus.glb', import.meta.url)
-  .href;
+export const MCX_URL = new URL(
+  '../../assets/weapons/mcx-virtus/mcx-virtus.runtime.glb',
+  import.meta.url
+).href;
 const ALIASES: Record<string, string> = {
   reloadTac: 'Reload_Tactical',
   reloadEmpty: 'Reload_Empty',
@@ -93,8 +96,8 @@ export function makeMCXModel(gltf: GLTF): MCXModel {
   return { ...model, ...converted };
 }
 
-export async function loadMCX(): Promise<MCXModel> {
-  return makeMCXModel(await new GLTFLoader().loadAsync(MCX_URL));
+export async function loadMCX(renderer: Pick<Renderer, 'hasFeature'>): Promise<MCXModel> {
+  return makeMCXModel(await loadWeaponGLTF(renderer, MCX_URL));
 }
 
 function handQuaternion(
