@@ -44,8 +44,6 @@ const HEAL_KEY = bindingLabel('heal');
  *   ui.killfeed.push({attacker,victim,headshot,mine,attackerFriendly})
  *   ui.banner.show(title, sub, life)    kill / objective confirmation
  *   ui.setPrompt({key,text,sub,progress}, owner?) / ui.clearPrompt(owner?)
- *   ui.setObjectives([{position,label,name}])
- *   ui.setBlips([{x,z,kind:'enemy'|'friend',heading}])
  *   ui.spawnGrenade(worldPos, fuse)
  *   ui.setHudVisible(bool)              hide everything (cinematics)
  *   ui.pause() / ui.resume() / ui.menu.toggle()
@@ -110,15 +108,6 @@ interface Blip {
   z: number;
   kind: 'enemy' | 'friend';
   heading: number;
-  fade?: number;
-}
-interface BlipInput {
-  x?: number;
-  z?: number;
-  position?: THREE.Vector3;
-  kind?: 'enemy' | 'friend';
-  friendly?: boolean;
-  heading?: number;
   fade?: number;
 }
 interface CompassMarker {
@@ -576,25 +565,6 @@ export class UiSystem {
     this.prompt.clear();
   }
 
-  setObjectives(list: { position: THREE.Vector3; label: string; name: string }[]): void {
-    this._objectives = list ?? [];
-  }
-
-  /** Copies into a preallocated array — the caller's array is not retained. */
-  setBlips(list: BlipInput[]): void {
-    const n = Math.min(list?.length ?? 0, MAX_BLIPS);
-    for (let i = 0; i < n; i++) {
-      const src = list[i];
-      const dst = this._blips[i];
-      dst.x = src.x ?? src.position?.x ?? 0;
-      dst.z = src.z ?? src.position?.z ?? 0;
-      dst.kind = src.kind ?? (src.friendly ? 'friend' : 'enemy');
-      dst.heading = src.heading ?? 0;
-      dst.fade = src.fade ?? 1;
-    }
-    this._blipCount = n;
-  }
-
   spawnGrenade(worldPos: THREE.Vector3, fuse = 2.4): void {
     this.markers.spawnGrenade(worldPos, fuse);
     this.sfx('grenade_warn', 0.6);
@@ -622,24 +592,22 @@ export class UiSystem {
 
   /** Prepare the market state for integration checks. */
   debugState(name: 'market'): { state: string } {
-    if (name === 'market') {
-      this.menu.close();
-      this.killfeed.clear();
-      this.clearPrompt();
-      const rifle = this.ctx.peek('weapons')?.states?.get('rifle');
-      if (rifle) rifle.reserve = Math.round((rifle.def?.reserve ?? 90) * 0.4);
-      const hp = this.ctx.peek('player')?.health;
-      if (hp) hp.armour = 50;
-      const m = this.ctx.peek('market');
-      if (m) {
-        m.credits = 1850;
-        if (!m.open) m.openShop(3);
-      }
-      this.shop.show(3);
-      this.shop.shown = 1;
-      return { state: 'market' };
+    if (name !== 'market') throw new Error('Unknown UI debug state');
+    this.menu.close();
+    this.killfeed.clear();
+    this.clearPrompt();
+    const rifle = this.ctx.peek('weapons')?.states?.get('rifle');
+    if (rifle) rifle.reserve = Math.round((rifle.def?.reserve ?? 90) * 0.4);
+    const hp = this.ctx.peek('player')?.health;
+    if (hp) hp.armour = 50;
+    const m = this.ctx.peek('market');
+    if (m) {
+      m.credits = 1850;
+      if (!m.open) m.openShop(3);
     }
-    return { state: name };
+    this.shop.show(3);
+    this.shop.shown = 1;
+    return { state: 'market' };
   }
 
   /* -------------------------------------------------------------- frame --- */
@@ -694,8 +662,6 @@ export class UiSystem {
     this.shop.update(rawDt);
 
     // ---- external state --------------------------------------------------
-    // `simulate` means a scripted debug timeline owns the HUD numbers; letting
-    // the live weapon/player state through would fight it every frame.
     const ws = this._weaponState();
     if (ws) {
       if (ws.name) s.weaponName = ws.name;

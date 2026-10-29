@@ -7,8 +7,8 @@ Read this before changing a subsystem. Workflow and validation: [AGENTS.md](AGEN
 
 Own only your assigned subsystem. Shared/lead-owned: `src/core/`, `src/main.ts`,
 `src/dev/`, `tools/`, `vite.config.js`. Coordinate changes across owners.
-Use `ctx.get(id)` rather than importing other subsystems. Existing constant
-couplings (`ai` → `weapons`, `weapons/preview` → `materials`) are exceptions.
+Use `ctx.get(id)` rather than importing other subsystems. The existing constant
+coupling `ai` → `weapons` is an exception.
 
 | id / directory                                      | responsibility                                              |
 | --------------------------------------------------- | ----------------------------------------------------------- |
@@ -24,7 +24,7 @@ couplings (`ai` → `weapons`, `weapons/preview` → `materials`) are exceptions
 | `ai`                                                | Soldiers, squads, navigation, perception, waves             |
 | `game`                                              | Survival state, score/rewards, HUD threat cues              |
 | `market`                                            | Between-wave shop/economy                                   |
-| `intel`                                             | Cache spawning, interaction, credits and archive            |
+| `intel`                                             | Cache spawning, interaction and credits                     |
 | `radio`                                             | Strike, bomber, bombs, blast chain                          |
 | `ui`                                                | HUD, menus, overlays                                        |
 | `audio`                                             | Synthesis/recordings, spatialization, occlusion             |
@@ -262,10 +262,8 @@ object-specific builds remain uncached. Preserve pixel-level buffer isolation an
 reuse regressions rather than restoring obsolete per-object cache-key IDs.
 
 Bakes use native top-left texture UVs and shared `QuadMesh` geometry: no extra Y
-flip or disposal of borrowed geometry. Preview PNGs redirect the output target
-with an untagged attachment, avoiding double sRGB. Gameplay readback uses its
-explicit display-transform path. Standalone FX reuses depth/world/view/haze
-composition with its ACES transform; first-person refraction uses world coordinates.
+flip or disposal of borrowed geometry. Gameplay readback uses its explicit
+display-transform path. First-person refraction uses world coordinates.
 
 ## Models
 
