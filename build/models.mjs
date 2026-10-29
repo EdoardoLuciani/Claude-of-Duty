@@ -41,6 +41,12 @@ export const GLTFPACK_FLAGS = [
 // Opt assets in here after validating their adapters and visual/animation fidelity.
 // Simplification is model-specific, never a blanket default for all models.
 export const MODEL_COOKS = {
+  m4: {
+    directory: 'assets/weapons/m4a1-block-ii',
+    source: 'm4a1-block-ii.glb',
+    output: 'm4a1-block-ii.runtime.glb',
+    flags: ['-noq', '-vc', '16'],
+  },
   mcx: {
     directory: 'assets/weapons/mcx-virtus',
     source: 'mcx-virtus.glb',

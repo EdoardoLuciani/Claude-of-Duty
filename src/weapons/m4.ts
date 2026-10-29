@@ -1,8 +1,10 @@
 import * as THREE from 'three';
-import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { Renderer } from 'three/webgpu';
 
 import handReference from '../../assets/weapons/m4a1-block-ii/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/m4a1-block-ii/manifest.json' with { type: 'json' };
+import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
 import {
@@ -17,7 +19,7 @@ import { authoredModel, requiredNode } from './authored-model.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 
 export const M4_URL = new URL(
-  '../../assets/weapons/m4a1-block-ii/m4a1-block-ii.glb',
+  '../../assets/weapons/m4a1-block-ii/m4a1-block-ii.runtime.glb',
   import.meta.url
 ).href;
 const ALIASES: Record<string, string> = {
@@ -78,8 +80,8 @@ export function makeM4Model(gltf: GLTF): M4Model {
   return { ...model, ...converted };
 }
 
-export async function loadM4(): Promise<M4Model> {
-  return makeM4Model(await new GLTFLoader().loadAsync(M4_URL));
+export async function loadM4(renderer: Pick<Renderer, 'hasFeature'>): Promise<M4Model> {
+  return makeM4Model(await loadWeaponGLTF(renderer, M4_URL));
 }
 
 /** Blender owns mechanisms and wrist/finger choreography; the existing recoil,

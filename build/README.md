@@ -10,7 +10,7 @@ Install native **gltfpack 1.3 with BasisU support** from the
 
 ```sh
 GLTFPACK=/absolute/path/gltfpack npm run models:cook -- p320
-# All registered models (P320 and standalone EXPS3):
+# All registered profiles (six weapons and standalone EXPS3):
 npm run models:cook
 # Use the same profile on a scratch native export:
 npm run models:cook -- p320 /tmp/p320-review
@@ -26,6 +26,9 @@ output and any model-specific flags in `MODEL_COOKS`. Wire its loader to the
 runtime output with KTX2/meshopt support, then validate its named mechanics,
 materials/UVs, animation/contacts, resource ownership and visual fidelity.
 Simplification is opt-in **per model**; P320's tight-error profile is not a global
-triangle-reduction policy. EXPS3 uses a tighter error limit to preserve its optical
+triangle-reduction policy. M4 disables geometry quantization to preserve its iron
+apertures, and AX338 keeps full geometry where simplification damaged panel detail.
+M590 is not registered: its fresh-source glove clearance gate remains blocked.
+EXPS3 uses a tighter error limit to preserve its optical
 opening; its cooked attachment is not yet wired into gameplay. Other models are
 not converted by these profiles.
