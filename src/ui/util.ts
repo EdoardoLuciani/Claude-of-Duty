@@ -11,7 +11,6 @@
 /**
  * Condensed system stacks — no webfonts, crisp at any size.
  *
- * Verified against the capture browser with `node src/ui/preview.mjs --fonts`:
  * "Avenir Next Condensed" (four weights) carries the body text, "DIN Condensed"
  * (very narrow, bold only) carries display numerals, and both degrade through
  * Arial Narrow / Helvetica Neue on machines without them.

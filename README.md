@@ -150,8 +150,7 @@ performance acceptance.
 
 For local telemetry open `/?telemetry=1`: **F7** marks a moment (optional note),
 **F8** stops/downloads `cod-telemetry-<timestamp>.tgz`. It contains JSON and marked
-view JPEGs; nothing uploads. Analyze with
-`node tools/analyze-telemetry.mjs <run.tgz> [--out summary.json]`.
+view JPEGs; nothing uploads.
 Console: `__TELEMETRY__.mark('note')`, `.summary()`, `.stop()`, `.download()`.
 Unclamped wall-time hitches (>50 ms and >3× recent frame time) include resource/
 node-builder deltas and available long-task attribution; these are activity clues,

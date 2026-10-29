@@ -300,7 +300,6 @@ import type { PlayerMoveState } from ${JSON.stringify(join(root, 'src/player/mov
 import type { PlayerState } from ${JSON.stringify(join(root, 'src/player/index.ts'))};
 import type { SurfaceName } from ${JSON.stringify(join(root, 'src/physics/surfaces.ts'))};
 import type { FoleyOptions } from ${JSON.stringify(join(root, 'src/audio/physical.ts'))};
-import type { CardId } from ${JSON.stringify(join(root, 'src/intel/cards.ts'))};
 import type { Mixer } from ${JSON.stringify(join(root, 'src/audio/mixer.ts'))};
 declare const agent: Agent;
 declare const mixer: Mixer;
@@ -353,10 +352,9 @@ ctx.get('audio').setBusVolume('foely', 1);
 const hudMode: WeaponMode = ctx.get('weapons').getHudState().mode;
 const fireMode: WeaponMode = ctx.get('weapons').fireMode;
 const uiMode: WeaponMode = ctx.get('ui').state.fireMode;
-const intelCard: CardId | null = ctx.get('intel').getHudState().card;
-// @ts-expect-error card IDs must survive the event boundary
-events.emit('intel:secured', { id: 'case', position: ctx.camera.position, card: 'typo', cardLabel: 'Typo', credits: 500 });
-events.emit('intel:secured', { id: 'case', position: ctx.camera.position, card: null, cardLabel: 'Intel', credits: 500 });
+events.emit('intel:secured', { id: 'case', position: ctx.camera.position, credits: 500 });
+// @ts-expect-error credits remain numeric
+events.emit('intel:secured', { id: 'case', position: ctx.camera.position, credits: '500' });
 // @ts-expect-error UI state is semantic; casing belongs only in rendered text
 ctx.get('ui').state.fireMode = 'AUTO';
 

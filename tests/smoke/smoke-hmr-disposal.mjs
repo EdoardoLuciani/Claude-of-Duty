@@ -28,7 +28,7 @@ function registration(file, dispose, errors) {
   return callback;
 }
 
-for (const file of ['src/main.ts', 'src/fx/preview.ts']) {
+for (const file of ['src/main.ts']) {
   let finish,
     disposed = false,
     imported = false;
@@ -76,4 +76,6 @@ for (const file of ['src/main.ts', 'src/fx/preview.ts']) {
   assert.equal(errors[0][1], failure);
   assert.match(errors[0][0], /HMR disposal failed/);
 }
-console.log('HMR disposal: both module callbacks remain awaited and handle asynchronous rejection');
+console.log(
+  'HMR disposal: main module callback remains awaited and handles asynchronous rejection'
+);
