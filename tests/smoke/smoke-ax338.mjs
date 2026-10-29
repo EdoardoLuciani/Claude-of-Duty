@@ -6,11 +6,11 @@ import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 
 import manifest from '../../assets/weapons/ax338/manifest.json' with { type: 'json' };
-import { makeAX338Model, AX338Animation, AX338_URL } from '../../src/weapons/ax338.ts';
+import { makeAX338Model, AX338Animation } from '../../src/weapons/ax338.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import { Arm } from '../../src/weapons/hands.ts';
 import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
-const bytes = readFileSync(new URL(AX338_URL));
+const bytes = readFileSync(new URL('../../assets/weapons/ax338/ax338.glb', import.meta.url));
 const json = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)).toString());
 const primitives = json.nodes
   .filter((n) => n.mesh !== undefined)

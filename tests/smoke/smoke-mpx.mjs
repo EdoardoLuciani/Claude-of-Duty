@@ -12,10 +12,8 @@ import { Arm } from '../../src/weapons/hands.ts';
 import { makeMPXModel, MPXAnimation, MPX_URL, MPX_EJECT_DELAY } from '../../src/weapons/mpx.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
-for (const asset of [
-  MPX_URL,
-  new URL('../../assets/weapons/sig-mpx/mpx.runtime.glb', import.meta.url).href,
-]) {
+const MPX_NATIVE_URL = new URL('../../assets/weapons/sig-mpx/mpx.glb', import.meta.url).href;
+for (const asset of [MPX_NATIVE_URL, MPX_URL]) {
   const bytes = readFileSync(new URL(asset));
   const gltf = await parseGLB(bytes);
   const model = makeMPXModel(gltf),
@@ -518,7 +516,7 @@ for (const asset of [
 
 // The Idle hold fix is not a general animation-duration normalization.
 for (const duration of [0, 0.5]) {
-  const fixture = await parseGLB(readFileSync(new URL(MPX_URL)));
+  const fixture = await parseGLB(readFileSync(new URL(MPX_NATIVE_URL)));
   fixture.animations.find((clip) => clip.name === 'Idle').duration = duration;
   fixture.animations.find((clip) => clip.name === 'Fire').duration = 0.01;
   const model = makeMPXModel(fixture);
@@ -539,11 +537,9 @@ for (const duration of [0, 0.5]) {
 // This also bounds any signed-16 rotation quantization at the actual hands,
 // rather than accepting equivalent quaternion signs as component equality.
 const pair = await Promise.all(
-  [MPX_URL, new URL('../../assets/weapons/sig-mpx/mpx.runtime.glb', import.meta.url).href].map(
-    async (url) => {
-      return new MPXAnimation(makeMPXModel(await parseGLB(readFileSync(new URL(url)))));
-    }
-  )
+  [MPX_NATIVE_URL, MPX_URL].map(async (url) => {
+    return new MPXAnimation(makeMPXModel(await parseGLB(readFileSync(new URL(url)))));
+  })
 );
 const names = [
   'MPX_RIG',

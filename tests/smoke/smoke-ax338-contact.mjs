@@ -36,8 +36,8 @@ vm.addWeapon(
   makeAX338Model(
     await load(
       process.env.AX338_RUNTIME
-        ? new URL('../../assets/weapons/ax338/ax338.runtime.glb', import.meta.url)
-        : new URL(AX338_URL)
+        ? new URL(AX338_URL)
+        : new URL('../../assets/weapons/ax338/ax338.glb', import.meta.url)
     )
   ),
   {

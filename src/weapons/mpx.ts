@@ -1,9 +1,11 @@
 import * as THREE from 'three';
-import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { Renderer } from 'three/webgpu';
 
 import handReference from '../../assets/weapons/sig-mpx/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: 'json' };
 import { isMesh } from '../core/three-guards.ts';
+import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
 import {
@@ -17,7 +19,8 @@ import {
 import { authoredModel, requiredNode } from './authored-model.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 
-export const MPX_URL = new URL('../../assets/weapons/sig-mpx/mpx.glb', import.meta.url).href;
+export const MPX_URL = new URL('../../assets/weapons/sig-mpx/mpx.runtime.glb', import.meta.url)
+  .href;
 export const MPX_EJECT_DELAY = 0.025;
 const ALIASES: Record<string, string> = {
   reloadTac: 'Reload_Tactical',
@@ -133,8 +136,8 @@ export function makeMPXModel(gltf: GLTF): MPXModel {
   return { ...model, ...converted };
 }
 
-export async function loadMPX(): Promise<MPXModel> {
-  return makeMPXModel(await new GLTFLoader().loadAsync(MPX_URL));
+export async function loadMPX(renderer: Pick<Renderer, 'hasFeature'>): Promise<MPXModel> {
+  return makeMPXModel(await loadWeaponGLTF(renderer, MPX_URL));
 }
 
 /** Samples the actual Blender curves, including fingers. Upper/forearm IK is
