@@ -33,6 +33,11 @@ const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
 export function makeEvolysModel(gltf: GLTF): EvolysModel {
   const scene = gltf.scene;
   const { root, animations, point } = authoredModel(gltf, 'EVOLYS_RIG', REQUIRED, scene);
+  // gltfpack retains constant channels but reduces their keys to t=0. Idle is
+  // entirely constant, so recover its authored duration from the weapon source.
+  for (const clip of animations) {
+    if (clip.name === 'Idle') clip.duration = Math.fround(manifest.clips.Idle.duration);
+  }
   const sight = point('SOCKET_sight');
   const model = {
     id: 'lmg' as const,

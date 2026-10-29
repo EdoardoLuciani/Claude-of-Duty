@@ -155,11 +155,11 @@
     }
   },
   "stats": {
-    "triangles": 74888,
-    "primitives": 35,
+    "triangles": 53059,
+    "primitives": 26,
     "materials": 10,
     "images": 3,
-    "bytes": 9320692
+    "bytes": 8140248
   },
   "textureResolution": 1024,
   "belt": {
