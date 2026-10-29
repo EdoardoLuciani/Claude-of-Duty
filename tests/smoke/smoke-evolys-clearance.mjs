@@ -166,7 +166,5 @@ async function checkAsset(url) {
     `EVOLYS ${url.pathname.split('/').at(-1)} clearance: ${samples} sampled poses; no left sleeve/cuff triangle intersects either pouch envelope; minimum vertex gap ${(minimum * 1000).toFixed(2)} mm`
   );
 }
+await checkAsset(new URL('../../assets/weapons/fn-evolys-762/fn-evolys-762.glb', import.meta.url));
 await checkAsset(new URL(EVOLYS_URL));
-await checkAsset(
-  new URL('../../assets/weapons/fn-evolys-762/fn-evolys-762.runtime.glb', import.meta.url)
-);
