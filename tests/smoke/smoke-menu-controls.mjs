@@ -7,7 +7,6 @@ import {
   bindingLabel,
 } from '../../src/core/bindings.ts';
 import { CONTROL_SECTIONS } from '../../src/ui/controls.ts';
-import { CombatDemo } from '../../src/ui/demo.ts';
 import { PauseMenu } from '../../src/ui/menu.ts';
 import { Prompt } from '../../src/ui/prompts.ts';
 import { RadioPanel } from '../../src/ui/radio.ts';
@@ -177,27 +176,6 @@ for (const action of ['slot1', 'slot2', 'slot3']) {
 radio.update(1);
 assert.equal(radio.rows[0].charge.textContent, 'x2');
 radio.dispose();
-let demoPrompt;
-const demo = new CombatDemo();
-demo.start({
-  state: {},
-  health: {},
-  killfeed: {
-    clear() {},
-    push() {
-      return {};
-    },
-  },
-  arcs: { clear() {} },
-  hit: { clear() {} },
-  markers: { clear() {} },
-  setObjectives() {},
-  setBlips() {},
-  setPrompt(value) {
-    demoPrompt = value;
-  },
-});
-assert.equal(demoPrompt.key, bindingLabel('use'), 'capture demo cannot show stale F interaction');
 console.log(
-  'smoke-menu-controls: ok (concise reference, canonical labels, native rows, contextual prompts and radio/demo labels)'
+  'smoke-menu-controls: ok (concise reference, canonical labels, native rows, contextual prompts and radio labels)'
 );

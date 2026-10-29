@@ -276,7 +276,6 @@ export class FxSystem {
     on('bullet:segment', (e): void => {
       if (e.tracer) this.tracer(e.from, e.to, e.speed);
     });
-    on('bullet:tracer', (e): void => this.tracer(e.from, e.to, e.speed)); // explicit dev staging
     on('weapon:fire', (e): void => this.onWeaponFire(e));
     on('weapon:shell', (e): void => this.spawnShell(e.position, e.velocity, e));
     on('explosion', (e): void => this.explosion(e));
@@ -307,7 +306,7 @@ export class FxSystem {
     //
     // Gated on a viewmodel already existing: `render` decides whether to run the
     // viewmodel pass at all by counting viewScene's children, and in an FX-only
-    // scene (src/fx/preview.ts) adding ours would turn that pass on. In that case
+    // scene adding ours would turn that pass on. In that case
     // the lazy attach on first use still applies.
     if (this._viewmodelPresent()) this._attachView();
 

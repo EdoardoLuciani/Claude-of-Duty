@@ -7,8 +7,8 @@ Read this before changing a subsystem. Workflow and validation: [AGENTS.md](AGEN
 
 Own only your assigned subsystem. Shared/lead-owned: `src/core/`, `src/main.ts`,
 `src/dev/`, `tools/`, `vite.config.js`. Coordinate changes across owners.
-Use `ctx.get(id)` rather than importing other subsystems. Existing constant
-couplings (`ai` → `weapons`, `weapons/preview` → `materials`) are exceptions.
+Use `ctx.get(id)` rather than importing other subsystems. The existing constant
+coupling `ai` → `weapons` is an exception.
 
 | id / directory                                      | responsibility                                              |
 | --------------------------------------------------- | ----------------------------------------------------------- |
@@ -24,7 +24,7 @@ couplings (`ai` → `weapons`, `weapons/preview` → `materials`) are exceptions
 | `ai`                                                | Soldiers, squads, navigation, perception, waves             |
 | `game`                                              | Survival state, score/rewards, HUD threat cues              |
 | `market`                                            | Between-wave shop/economy                                   |
-| `intel`                                             | Cache spawning, interaction, credits and archive            |
+| `intel`                                             | Cache spawning, interaction and credits                     |
 | `radio`                                             | Strike, bomber, bombs, blast chain                          |
 | `ui`                                                | HUD, menus, overlays                                        |
 | `audio`                                             | Synthesis/recordings, spatialization, occlusion             |
@@ -69,7 +69,7 @@ Architectural semantics not captured by those types:
 - `bullet:segment` is reached free flight, clipped to collisions/range, excluding
   material interiors. Audio/suppression/tracers consume it rather than rebuilding
   rays from `weapon:fire`. Deduplicate near misses by shot; copy pooled vectors.
-  `shot:resolved` is telemetry, not another damage path; `bullet:tracer` is dev staging.
+  `shot:resolved` is telemetry, not another damage path.
 - `damage:dealt` means damage **to** target; exclude player targets from hitmarkers.
   Targets alone apply health damage. Physics emits once per actor/round using the
   highest reached region, with range/penetration/region scaling already applied.
@@ -99,7 +99,7 @@ Architectural semantics not captured by those types:
   evidence within 75 m; detector pings never alert AI. Spark cadence is 0.16 s,
   using pooled FX without lights/decals. Also stop audio on shop/pause/death/
   restart/terminal error. Securing pays 500 shop credits independently of score;
-  cards are archived names, not implemented perks. Intel yields to busy hands
+  Intel yields to busy hands
   and has aimed-visible interaction priority over ammo. Prompts use owner-scoped
   `ui.setPrompt(p, owner)` / `ui.clearPrompt(owner)`.
 - The first `engine:error` is terminal: abort the failed synchronous dispatch,
@@ -142,8 +142,8 @@ forward completion. Instantaneous/AI damage publication remains immediate.
 Targets own health; range/region scaling is already applied and must not repeat.
 AI transitions use `AiState` from `agent.ts`; player locomotion uses `PlayerMoveState`,
 with presentation-only `lean` added by `PlayerState`. Keep `WeaponMode` semantic
-through HUD polling (uppercase only for display), `CardId | null` for intel card
-identity/absence, and mixer-owned `BusName` through dry/spatial/send routing.
+through HUD polling (uppercase only for display), and mixer-owned `BusName`
+through dry/spatial/send routing.
 
 Collision `surface` is the impact finish; optional `ballisticSurface` determines
 penetration. Preserve cooked `_solid` IDs; unlabelled geometry uses connected
@@ -262,10 +262,8 @@ object-specific builds remain uncached. Preserve pixel-level buffer isolation an
 reuse regressions rather than restoring obsolete per-object cache-key IDs.
 
 Bakes use native top-left texture UVs and shared `QuadMesh` geometry: no extra Y
-flip or disposal of borrowed geometry. Preview PNGs redirect the output target
-with an untagged attachment, avoiding double sRGB. Gameplay readback uses its
-explicit display-transform path. Standalone FX reuses depth/world/view/haze
-composition with its ACES transform; first-person refraction uses world coordinates.
+flip or disposal of borrowed geometry. Gameplay readback uses its explicit
+display-transform path. First-person refraction uses world coordinates.
 
 ## Models
 

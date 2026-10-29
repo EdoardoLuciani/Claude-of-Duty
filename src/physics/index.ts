@@ -61,7 +61,6 @@
  *   collider.setFromObject(object3D, hx,hy,hz)   removeCollider(c)
  *
  * DEBUG
- *   setDebugDraw(bool, {triangles, nodes, rays, radius})   toggleDebugDraw()
  *   stats -> { triangles, nodes, buildMs, bodies, awake, ragdolls, ... }
  *
  * CONSTANTS
@@ -383,10 +382,6 @@ export class PhysicsSystem {
   declare _blastTarget: THREE.Vector3;
   declare _blastWaypoint: THREE.Vector3;
   declare _explicitStatics: number;
-  declare _pendingDemo: boolean;
-  declare debug: import('./debug.ts').PhysicsDebugView | null;
-  declare _debugPromise: Promise<import('./debug.ts').PhysicsDebugView | null> | null;
-  declare _disposed: boolean;
   declare _loggedTris: number;
   declare _onExplosion: (event: {
     position: THREE.Vector3;
@@ -455,11 +450,6 @@ export class PhysicsSystem {
     this._blastTarget = new THREE.Vector3();
     this._blastWaypoint = new THREE.Vector3();
     this._explicitStatics = 0;
-    this._pendingDemo = false;
-
-    this.debug = null;
-    this._debugPromise = null;
-    this._disposed = false;
     this._loggedTris = -1;
     this.stats = {
       triangles: 0,
@@ -484,27 +474,6 @@ export class PhysicsSystem {
 
     this._onExplosion = (e): void => this.explode(e);
     ctx.events.on('explosion', this._onExplosion);
-
-    // Dev escape hatch: ?physdebug=1 turns the collision wireframe on from the
-    // URL, and ?physdemo=1 also drops a ragdoll and some debris. Neither is
-    // reachable in normal play.
-    if (typeof location !== 'undefined') {
-      const q = new URLSearchParams(location.search);
-      const debugRequested = q.get('physdebug') === '1';
-      const demoRequested = q.get('physdemo') === '1';
-      if (debugRequested || demoRequested) await this._ensureDebugView();
-      if (debugRequested) this.setDebugDraw(true, { triangles: true, radius: 30 });
-      if (demoRequested) {
-        this._pendingDemo = true;
-        // Shots re-pose the camera after boot; respawn in front of the new view.
-        ctx.events.on('shot:applied', (): void => {
-          this.bodies.clear();
-          for (const rd of this.ragdolls) rd.dispose();
-          this.ragdolls.length = 0;
-          this._pendingDemo = true;
-        });
-      }
-    }
   }
 
   /* ================================================================== */
@@ -760,9 +729,6 @@ export class PhysicsSystem {
       out.normal.set(-dx, -dy, -dz);
       out.distance = maxDist;
       out.surface = 'concrete';
-    }
-    if (this.debug?.enabled) {
-      this.debug.logRay(ox, oy, oz, out.point.x, out.point.y, out.point.z);
     }
     return out;
   }
@@ -1526,11 +1492,6 @@ export class PhysicsSystem {
       this._syncStats();
     }
 
-    if (this._pendingDemo && this.staticWorld.triCount > 0) {
-      this._pendingDemo = false;
-      this._spawnDemo();
-    }
-
     this.bodies.step(h);
     for (let i = 0; i < this.ragdolls.length; i++) this.ragdolls[i].step(h);
 
@@ -1559,12 +1520,11 @@ export class PhysicsSystem {
     }
   }
 
-  lateUpdate(dt: number, ctx: PhysicsContext): void {
+  lateUpdate(): void {
     for (let i = 0; i < this.ragdolls.length; i++) {
       const rd = this.ragdolls[i];
       if (rd.bones3D) rd.writeToSkeleton();
     }
-    if (this.debug?.enabled) this.debug.rebuild(this, ctx.camera, dt);
     this.stats.bodies = this.bodies.bodies.length;
     this.stats.ragdolls = this.ragdolls.length;
     this.stats.characters = this.characters.length;
@@ -1589,100 +1549,8 @@ export class PhysicsSystem {
     }
   }
 
-  /* ================================================================== */
-  /* Debug                                                              */
-  /* ================================================================== */
-
-  async _ensureDebugView(): Promise<import('./debug.ts').PhysicsDebugView | null> {
-    if (this.debug) return this.debug;
-    if (!this._debugPromise) {
-      this._debugPromise = import('./debug.ts').then(
-        ({ PhysicsDebugView }): import('./debug.ts').PhysicsDebugView | null => {
-          if (this._disposed || !this.ctx.scene) return null;
-          this.debug = new PhysicsDebugView(this.ctx.scene);
-          return this.debug;
-        }
-      );
-    }
-    return this._debugPromise;
-  }
-
-  /**
-   * Toggle the collision wireframe. Its multi-megabyte buffers are loaded and
-   * allocated only on first use.
-   *   phys.setDebugDraw(true, { nodes: true, radius: 25 })
-   */
-  setDebugDraw(
-    on: boolean,
-    opts: { triangles?: boolean; nodes?: boolean; rays?: boolean; radius?: number } = {}
-  ): boolean {
-    if (on && !this.debug) {
-      void this._ensureDebugView().then((view): void => {
-        if (view) this.setDebugDraw(true, opts);
-      });
-      return false;
-    }
-    if (!this.debug) return false;
-    if (opts.triangles !== undefined) this.debug.showTriangles = opts.triangles;
-    if (opts.nodes !== undefined) this.debug.showNodes = opts.nodes;
-    if (opts.rays !== undefined) this.debug.showRays = opts.rays;
-    if (opts.radius !== undefined) this.debug.radius = opts.radius;
-    this.debug.setEnabled(on);
-    return this.debug.enabled;
-  }
-
-  toggleDebugDraw(): boolean {
-    this.setDebugDraw(!this.debug?.enabled);
-    return this.debug?.enabled ?? false;
-  }
-
-  /** Named states for dev overlays / the capture harness. */
-  debugState(name: string): PhysicsStats {
-    if (name === 'collision') this.setDebugDraw(true, { triangles: true, nodes: false });
-    else if (name === 'bvh') this.setDebugDraw(true, { triangles: false, nodes: true });
-    else if (name === 'demo') this._spawnDemo();
-    else if (name === 'off') this.setDebugDraw(false);
-    return this.stats;
-  }
-
-  /**
-   * Drop a ragdoll and a pile of debris in front of the camera and turn the
-   * wireframe on. Purely a verification aid for whoever is looking at the
-   * collision system; nothing in the game calls it.
-   */
-  _spawnDemo(): PhysicsStats {
-    this.setDebugDraw(true, { triangles: true, radius: 30 });
-    const cam = this.ctx.camera;
-    if (!cam) return this.stats;
-    const fwd = _v.set(0, 0, -1).applyQuaternion(cam.quaternion);
-    const cx = cam.position.x + fwd.x * 6;
-    const cz = cam.position.z + fwd.z * 6;
-    const floor = this.groundHeight(cx, cz, cam.position.y + 20);
-    const base = Number.isFinite(floor) ? floor : 0;
-    const r = this.rng;
-    for (let i = 0; i < 14; i++) {
-      this.spawnDebris(
-        { x: cx + r.signed() * 1.6, y: base + 1.2 + i * 0.22, z: cz + r.signed() * 1.6 },
-        { x: r.signed() * 2, y: 0, z: r.signed() * 2 },
-        {
-          size: 0.09 + r.float() * 0.06,
-          surface: r.pick(['concrete', 'wood', 'metal']),
-          lifetime: 1e9,
-        }
-      );
-    }
-    const m = _m4.makeTranslation(cx + 1.5, base + 1.15, cz);
-    const rd = this.createRagdoll({ transform: m, height: 1.82, mass: 84 });
-    rd.setVelocity(-1.2, 0.2, 0.4);
-    return this.stats;
-  }
-
   dispose(): void {
-    this._disposed = true;
     this.ctx?.events.off('explosion', this._onExplosion);
-    this.debug?.dispose();
-    this.debug = null;
-    this._debugPromise = null;
     this.bodies.clear();
     for (const rd of this.ragdolls) rd.dispose();
     this.ragdolls.length = 0;
