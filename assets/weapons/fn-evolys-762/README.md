@@ -42,7 +42,7 @@ Keep all event/balance/chamber/+1 values and one live pooled case per shot.
 Runtime ADS framing enlarges the weapon-only sight picture and uses a world-sized 3.25 MOA dot with a five-pixel readability floor;
 no segmented ring/halo. Physical window, lens material and authored grips are unchanged.
 
-Eight cartridges/links, one skin/three primitives, 12.7 mm pitch: finish the last
+Eight cartridges/links, one skin/one atlas primitive, 12.7 mm pitch: finish the last
 stroke, then stop. Only insertion restores spent belt; switch/reset/interruption
 cannot resurrect it. Mirror native scale keys around mixer-cached constants.
 Keep physical pouch/feed passages, curve/tail enclosure and synchronized DCC skins.

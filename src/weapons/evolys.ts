@@ -36,7 +36,13 @@ export function makeEvolysModel(gltf: GLTF): EvolysModel {
   // gltfpack retains constant channels but reduces their keys to t=0. Idle is
   // entirely constant, so recover its authored duration from the weapon source.
   for (const clip of animations) {
-    if (clip.name === 'Idle') clip.duration = Math.fround(manifest.clips.Idle.duration);
+    if (
+      clip.name === 'Idle' &&
+      clip.duration === 0 &&
+      clip.tracks.length > 0 &&
+      clip.tracks.every((track): boolean => track.times.length === 1 && track.times[0] === 0)
+    )
+      clip.duration = Math.fround(manifest.clips.Idle.duration);
   }
   const sight = point('SOCKET_sight');
   const model = {
