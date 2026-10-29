@@ -296,9 +296,7 @@ export function installShotApi(
     player?.teleport?.(cam.position, cam.rotation);
 
     // Shots are applied back to back in one browser session, so clear the
-    // previous shot's *looping* debug state first. Without this the `muzzle`
-    // shot's scripted burst is still emptying the magazine during `combat`, and
-    // `impacts` keeps walking rounds across a wall behind the HUD shot.
+    // previous shot's looping debug state before staging the next one.
     engine.ctx.peek('weapons')?.debugPose?.('idle');
     engine.ctx.peek('radio')?.clearStrike?.();
     engine.ctx.peek('fx')?.debugBurst?.('none');
