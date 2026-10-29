@@ -25,14 +25,17 @@ floorplate/feed lips, not world-Z height. No copied serial or real 5.56 BDC.
 Python under [`tools/blender/mcx/`](../../../tools/blender/mcx/README.md) is the
 sole authoring source. `mcx-virtus.blend/.glb` are generated editable-preview/native
 products; `mcx-virtus.runtime.glb` is the derived gltfpack candidate.
-`manifest.json` records native counts/events; `textures/` holds generated
-1024² maps. Do not author changes in the generated files.
+`manifest.json` records native counts/events; `textures/` holds the three
+1024² editable-source maps and the generated 64² scalar finish lookup. The native
+and runtime GLBs embed two 1024² detail maps plus that lookup. Do not author
+changes in the generated files.
 `src/weapons/mcx.ts` converts +X-forward/+Y-up and samples six native clips.
 Draw/holster remain procedural, stock fold showcase-only. Shared arms/IK,
 scope/reticle, sound and live pooled cases are runtime-owned; hide baked cases.
 Normal builds need no Blender.
 
-Caps: <110k triangles, ≤40 primitives, ≤16 materials, three 1024² maps, ≤10 MiB.
+Caps: <110k triangles, ≤13 primitive instances, five materials, two 1024² detail
+maps plus one 64² scalar lookup, ≤10 MiB native GLB.
 Preserve complete-magazine bounds, vents/trigger, charging stem, cap/spine seating,
 hinge/handle clearance throughout reload/fold and the seated TA51 foot/rail.
 Keep matching clip names and STEP magazine visibility without reload blending.
@@ -45,8 +48,9 @@ blender -b --python-exit-code 1 --python tools/blender/mcx_virtus.py
 blender -b assets/weapons/mcx-virtus/mcx-virtus.blend \
   --python-exit-code 1 --python tools/blender/mcx_check.py
 node tests/smoke/smoke-mcx.mjs
-node --input-type=module -e "import {cookModel} from './build/models.mjs'; cookModel({input:'assets/weapons/mcx-virtus/mcx-virtus.glb', output:'assets/weapons/mcx-virtus/mcx-virtus.runtime.glb', flags:['-si','0.65','-se','0.0002','-sp']});"
+node --input-type=module -e "import {cookModel} from './build/models.mjs'; cookModel({input:'assets/weapons/mcx-virtus/mcx-virtus.glb', output:'assets/weapons/mcx-virtus/mcx-virtus.runtime.glb', flags:['-si','0.65','-se','0.0002','-sp','-vc','16']});"
 node tests/smoke/smoke-mcx-runtime.mjs
+node tests/smoke/smoke-mcx-finishes.mjs
 ```
 
 Follow the [shared authoring workflow](../../../tools/blender/README.md).
@@ -58,7 +62,8 @@ polymer and a darker charcoal suppressor. This is an artistic alternative to the
 previous cool satin proposal, not a measured factory finish. In `FINISHES`, the
 coating is linear RGB (.135, .130, .123), roughness .44, normal strength .025;
 polymer retains its pigment with roughness .84 / normal .50; the suppressor is
-RGB (.045, .046, .049), roughness .76 / normal .15. Other finishes are unchanged.
+RGB (.045, .046, .049), roughness .76 / normal .15. These remain the editable
+source settings; the export-only consolidation policy below reduces fine grain.
 
 The authoring pilot intentionally rebuilt UVs/triangle order. The subsequent
 finish revision changed only material factors. The current optimization reduces
@@ -67,16 +72,28 @@ forging/grip transitions, and exports one rigid-influence mechanical skin instea
 of seven independent mechanical meshes. Independent magazines/casing, all named
 helpers/sockets, six clips and their original events remain intact.
 
-Native triangles: 90,146 → 59,860; primitive instances: 37 → 22 (Idle-visible:
-30 → 15); native bytes: 8,866,176 → 8,147,296. The selected runtime candidate is
-3,077,652 bytes / 52,677 instanced triangles. All thirteen distinct finishes and
-three 1024² maps remain unchanged, including full normal XYZ and the established
-10 cm repeating finish UVs. No material, exposure or color-management compensation
-is included. These are asset counts, not GPU allocation or performance timings.
+The material follow-up packs original linear pigments into per-corner `COLOR_0`
+and metalness/mean roughness into padded 64² scalar tiles on UV1. Original UV0
+albedo and full-XYZ normal pixels/repeat remain unchanged. Five materials keep
+fine surfaces, polymer, absorptive rubber, optical glass and emissive fiber
+independent. Polymer/rubber normal strengths remain .50/.90; fine-surface strength
+is reduced to .02. Procedural roughness grain is intentionally replaced by its
+original mean; glass/fiber roughness factors stay outside the lookup so the
+adapter's existing optical override retains its meaning. No pigment, lighting,
+exposure or color-management compensation is included.
+
+Compared with the skin-only optimization: materials 13 → 5, primitive instances
+22 → 13 (Idle-visible 15 → 8), runtime bytes 3,077,652 → 2,267,368. The trade-off
+is larger native export (8,147,296 → 9,163,208 bytes) and decoded geometry storage
+(2,515,012 → 3,679,532 bytes) from corner pigment and UV1. Native triangles remain
+59,860, with identical position/normal/UV0/finish-identity triangle records. The
+selected runtime has 53,209 instanced triangles. These are asset/storage counts,
+not GPU allocation or performance timings. `c7bdd359` preserves the prior
+13-material skin-only result as a fallback.
 
 The derived candidate uses gltfpack 1.3 with the shared cook flags plus
-`-si 0.65 -se 0.0002 -sp`; a more aggressive `0.50 / 0.0005` trial saved only
-132,244 additional bytes and was not selected. The adapter continues loading the
+`-si 0.65 -se 0.0002 -sp -vc 16`. Sixteen-bit corner colors avoid dark-pigment
+shifts from default eight-bit linear quantization. The adapter continues loading the
 native GLB pending shared KTX2/meshopt loader integration. Compare matched cameras,
 pose and lighting; the decoded-geometry smoke uses texture stubs and does not
 replace hardware-WebGPU optical/texture/hand review.

@@ -2,6 +2,8 @@
 import bpy
 from mathutils import Vector
 
+from mcx.finishes import consolidate_finishes
+
 # One repeat per 10 cm, independent of component bounds or packing order.
 SURFACE_TILE_METRES = 0.10
 
@@ -136,6 +138,8 @@ def export_asset(asset, parts, output):
         triangulate.ngon_method = 'CLIP'
         bpy.ops.object.modifier_apply(modifier=triangulate.name)
         surface_uvs(obj)
+
+    consolidate_finishes(asset, output)
 
     # One mesh per rigid parent. Explicit ordering fixes the active join object.
     for parent in [bpy.data.objects['receiver'], *parts[1:]]:

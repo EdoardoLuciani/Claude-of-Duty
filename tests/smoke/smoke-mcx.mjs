@@ -12,10 +12,10 @@ const manifest = JSON.parse(readFileSync(new URL('manifest.json', dir), 'utf8'))
 const file = readFileSync(new URL('mcx-virtus.glb', dir));
 const { json: gltf, accessor, imagePNG } = inspectGLB(file);
 assert.ok(file.length <= 10 * 1024 * 1024, 'approved MCX GLB size budget');
-assert.ok(gltf.materials.length <= 16, 'approved material budget');
+assert.equal(gltf.materials.length, 5, 'fine/polymer/rubber finishes plus independent lens/fiber');
 assert.ok(
-  gltf.meshes.reduce((sum, mesh) => sum + mesh.primitives.length, 0) <= 22,
-  'consolidated mechanical skin primitive budget'
+  gltf.meshes.reduce((sum, mesh) => sum + mesh.primitives.length, 0) <= 13,
+  'consolidated mechanics and finishes primitive budget'
 );
 const blend = readFileSync(new URL('mcx-virtus.blend', dir));
 assert.ok(
@@ -27,22 +27,29 @@ for (const image of gltf.images) {
   assert.ok(Number.isInteger(image.bufferView), 'textures must be embedded');
   assert.equal(image.uri, undefined);
   const png = imagePNG(image);
-  assert.equal(png.width, manifest.textures.resolution);
-  assert.equal(png.height, manifest.textures.resolution);
-  assert.equal(png.width, 1024, 'retain the approved map resolution');
-  if (image.name === 'roughness_variation') {
-    for (let i = 0; i < png.data.length; i += 64) {
-      assert.equal(png.data[i + 2], 255, 'untextured metalness must pack as white, not roughness');
-    }
-  }
+  const resolution =
+    image.name === 'mcx_finish_scalars'
+      ? manifest.textures.finish_lookup_resolution
+      : manifest.textures.resolution;
+  assert.equal(png.width, resolution);
+  assert.equal(png.height, resolution);
+  assert.equal(
+    resolution,
+    image.name === 'mcx_finish_scalars' ? 64 : 1024,
+    'retain full albedo/normal detail; scalar lookup has a separate resolution contract'
+  );
 }
 assert.ok(gltf.extensionsUsed.includes('KHR_materials_transmission'), 'coated lenses');
 for (const buffer of gltf.buffers) assert.equal(buffer.uri, undefined);
 for (const material of gltf.materials) {
   const pbr = material.pbrMetallicRoughness;
-  assert.ok(pbr.baseColorFactor, `${material.name}: preserve authored tint, not white`);
   assert.ok(pbr.baseColorTexture && pbr.metallicRoughnessTexture && material.normalTexture);
-  assert.ok(pbr.baseColorFactor.slice(0, 3).every((v) => v > 0 && v < 0.6));
+  assert.equal(pbr.baseColorTexture.texCoord ?? 0, 0, 'repeating albedo UV0');
+  assert.equal(material.normalTexture.texCoord ?? 0, 0, 'repeating normal UV0');
+  assert.equal(pbr.metallicRoughnessTexture.texCoord, 1, 'independent scalar finish lookup UV1');
+  if (/^(11|12) /.test(material.name)) {
+    assert.ok(pbr.baseColorFactor.slice(0, 3).every((v) => v > 0 && v < 0.6));
+  }
 }
 
 let triangles = 0;
@@ -289,7 +296,8 @@ function magazineLength(meshName) {
   const vertex = new THREE.Vector3();
   const points = [];
   for (const p of gltf.meshes[node.mesh].primitives) {
-    if (/^(07|08) /.test(gltf.materials[p.material].name)) continue;
+    // Consolidated fine finish on magazines contains only brass/projectiles.
+    if (gltf.materials[p.material].name === 'MCX | fine finishes') continue;
     const positions = accessor(p.attributes.POSITION);
     for (const index of accessor(p.indices)) {
       vertex
