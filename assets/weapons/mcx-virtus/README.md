@@ -23,8 +23,9 @@ floorplate/feed lips, not world-Z height. No copied serial or real 5.56 BDC.
 ## Source/runtime contract
 
 Python under [`tools/blender/mcx/`](../../../tools/blender/mcx/README.md) is the
-sole authoring source. `mcx-virtus.blend/.glb` are generated preview/runtime
-products; `manifest.json` records counts/events; `textures/` holds generated
+sole authoring source. `mcx-virtus.blend/.glb` are generated editable-preview/native
+products; `mcx-virtus.runtime.glb` is the derived gltfpack candidate.
+`manifest.json` records native counts/events; `textures/` holds generated
 1024² maps. Do not author changes in the generated files.
 `src/weapons/mcx.ts` converts +X-forward/+Y-up and samples six native clips.
 Draw/holster remain procedural, stock fold showcase-only. Shared arms/IK,
@@ -44,6 +45,8 @@ blender -b --python-exit-code 1 --python tools/blender/mcx_virtus.py
 blender -b assets/weapons/mcx-virtus/mcx-virtus.blend \
   --python-exit-code 1 --python tools/blender/mcx_check.py
 node tests/smoke/smoke-mcx.mjs
+node --input-type=module -e "import {cookModel} from './build/models.mjs'; cookModel({input:'assets/weapons/mcx-virtus/mcx-virtus.glb', output:'assets/weapons/mcx-virtus/mcx-virtus.runtime.glb', flags:['-si','0.65','-se','0.0002','-sp']});"
+node tests/smoke/smoke-mcx-runtime.mjs
 ```
 
 Follow the [shared authoring workflow](../../../tools/blender/README.md).
@@ -57,10 +60,23 @@ coating is linear RGB (.135, .130, .123), roughness .44, normal strength .025;
 polymer retains its pigment with roughness .84 / normal .50; the suppressor is
 RGB (.045, .046, .049), roughness .76 / normal .15. Other finishes are unchanged.
 
-The authoring pilot intentionally rebuilt UVs/triangle order. This subsequent
-finish-only revision preserves that pilot's complete nonmaterial GLB JSON and
-binary chunk, including maps, geometry, UVs, sockets and animations. Compare
-frozen registration and matched lighting, not independently rescaled screenshots.
-The appearance change is clearer in studio lighting; bright outdoor gameplay
-still compresses the coating's tonal differences, and the indoor view stays dark.
-No renderer or exposure compensation is included.
+The authoring pilot intentionally rebuilt UVs/triangle order. The subsequent
+finish revision changed only material factors. The current optimization reduces
+small machined bevels to one segment while retaining the four-segment rounded
+forging/grip transitions, and exports one rigid-influence mechanical skin instead
+of seven independent mechanical meshes. Independent magazines/casing, all named
+helpers/sockets, six clips and their original events remain intact.
+
+Native triangles: 90,146 → 59,860; primitive instances: 37 → 22 (Idle-visible:
+30 → 15); native bytes: 8,866,176 → 8,147,296. The selected runtime candidate is
+3,077,652 bytes / 52,677 instanced triangles. All thirteen distinct finishes and
+three 1024² maps remain unchanged, including full normal XYZ and the established
+10 cm repeating finish UVs. No material, exposure or color-management compensation
+is included. These are asset counts, not GPU allocation or performance timings.
+
+The derived candidate uses gltfpack 1.3 with the shared cook flags plus
+`-si 0.65 -se 0.0002 -sp`; a more aggressive `0.50 / 0.0005` trial saved only
+132,244 additional bytes and was not selected. The adapter continues loading the
+native GLB pending shared KTX2/meshopt loader integration. Compare matched cameras,
+pose and lighting; the decoded-geometry smoke uses texture stubs and does not
+replace hardware-WebGPU optical/texture/hand review.

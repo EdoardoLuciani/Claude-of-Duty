@@ -27,6 +27,27 @@ were not retuned by that migration.
 Save the editable packed preview with modifiers and Idle before export prep.
 Sample sparse motion natively at **60 Hz** into LINEAR keys; visibility stays
 CONSTANT/STEP with explicit resets. Mute tracks, restore rest transforms, evaluate
-modifiers and join in name order under ten rigid parents. Stock Actions export
-merges matching track names with forced sampling off. No GLB repair or alternate
+modifiers and join in name order under the ten rigid parents. Export preparation
+then consolidates receiver, bolt, charging handle, trigger, cover, stock and bolt
+release into one single-influence mechanical skin. The original animated empties
+remain runtime contacts/helpers; six moving bones copy their native Action curves
+with only rest translation subtracted. The static receiver bone has no motion.
+Magazines and the showcase case stay independently owned rigid meshes, preserving
+STEP visibility and dropped-magazine cloning. Stock Actions export merges matching
+track names with forced sampling off. No GLB repair, exporter hooks or alternate
 saved-source/material-only path.
+
+Small machined chamfers use one bevel segment; the broad rounded receiver/grip
+transitions retain four. All thirteen finishes and their repeating UVs/maps remain
+separate: their pigment, metalness, roughness and normal strengths are not compatible
+for a lossless merge. Consolidation shares each finish across mechanical parts
+instead of atlas-baking away the established physical-scale repeat strategy.
+
+The committed `mcx-virtus.runtime.glb` is cooked by gltfpack 1.3 using the shared
+`GLTFPACK_FLAGS` in `build/models.mjs` plus `-si 0.65 -se 0.0002 -sp`. Keep `-kn`:
+sockets, helper names, independent magazine ownership and mechanical bones are
+runtime contracts. `loadMCX()` intentionally still loads the native export until
+the shared runtime-loader integration. `smoke-mcx-runtime.mjs` exercises both
+through the actual GLTFLoader/Meshopt decoder, including all rigid-influence
+vertices, fractional poses, wrist contacts, reload visibility, interruption reset
+and the adapter's empty-state bolt override.
