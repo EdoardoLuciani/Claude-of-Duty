@@ -185,7 +185,24 @@ for (const { model, animation } of sources) {
     false,
     'live casing remains FX-owned'
   );
+  const skeletons = new Set();
+  model.root.traverse((mesh) => {
+    if (mesh.isSkinnedMesh) skeletons.add(mesh.skeleton);
+  });
+  let boneTextureDisposals = 0;
+  for (const skeleton of skeletons) {
+    skeleton.computeBoneTexture();
+    skeleton.boneTexture.addEventListener('dispose', () => {
+      boneTextureDisposals++;
+    });
+  }
   animation.dispose();
+  assert.equal(
+    boneTextureDisposals,
+    skeletons.size,
+    'mechanical skin bone textures are owned and released'
+  );
+  assert([...skeletons].every((skeleton) => skeleton.boneTexture === null));
 }
 console.log(
   `MCX decoded: skin error ${maximumSkinDeviation * 1000} mm; contact error ${maximumContactDeviation * 1000} mm / ${maximumContactAngle} rad; native/runtime reload STEP, interruptions and empty bolt verified`

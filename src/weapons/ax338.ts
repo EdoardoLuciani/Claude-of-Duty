@@ -36,7 +36,12 @@ export function makeAX338Model(gltf: GLTF): AX338Model {
   // glTF infers duration from keys; gltfpack folds the wholly constant Idle to
   // t=0. Restore only that authored hold, never normalize moving clip timing.
   const idle = animations.find((clip): boolean => clip.name === 'Idle');
-  if (idle?.duration === 0) idle.duration = manifest.clips.Idle.duration;
+  if (
+    idle?.duration === 0 &&
+    idle.tracks.length > 0 &&
+    idle.tracks.every((track): boolean => track.times.length === 1 && track.times[0] === 0)
+  )
+    idle.duration = manifest.clips.Idle.duration;
   const model = {
     id: 'sniper' as const,
     label: 'AX-338',
