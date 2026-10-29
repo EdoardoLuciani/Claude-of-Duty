@@ -2,12 +2,14 @@
 import json
 import struct
 import bpy
+from m4.finishes import consolidate_finishes
 
 def active(o):
     bpy.ops.object.select_all(action='DESELECT');o.select_set(True);bpy.context.view_layer.objects.active=o
 
 def export_asset(output, asset, parents, separate, clips):
     OUT=output
+    consolidate_finishes(asset, output)
     # These three seats are rigid in every clip. Join their runtime geometry by
     # finish, not by authoring assembly; retain the named seats as empty helpers.
     # The editable blend was saved before this runtime-only preparation.
@@ -41,7 +43,7 @@ def export_asset(output, asset, parents, separate, clips):
     # Count both magazines/cartridge instances even when glTF deduplicates buffers.
     primitives=[p for node in doc['nodes'] if 'mesh' in node for p in doc['meshes'][node['mesh']]['primitives']]
     stats={'triangles':sum(doc['accessors'][p['indices']]['count']//3 for p in primitives),'primitives':len(primitives),'materials':len(doc['materials']),'meshes':len(doc['meshes']),'bytes':path.stat().st_size,'images':len(doc['images'])}
-    assert stats['triangles']<=91000 and stats['primitives']<=29 and stats['materials']==12 and stats['bytes']<=7600000 and stats['images']==4,stats
+    assert stats['triangles']<=91000 and stats['primitives']<=19 and stats['materials']==4 and stats['bytes']<=9800000 and stats['images']==6,stats
     assert {animation['name'] for animation in doc['animations']} == set(clips)
     for animation in doc['animations']:
         duration=clips[animation['name']]['duration']

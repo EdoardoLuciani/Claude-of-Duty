@@ -16,21 +16,22 @@ const runtimeBytes = readFileSync(new URL('m4a1-block-ii.runtime.glb', dir));
 const native = inspectGLB(nativeBytes),
   runtime = inspectGLB(runtimeBytes);
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', dir)));
-assert(runtimeBytes.length < 5000000);
+assert(runtimeBytes.length < 5500000);
 assert.deepEqual(
   runtime.json.nodes.map((node) => node.name).sort(),
   native.json.nodes.map((node) => node.name).sort(),
   'keep named controls, seats and sockets, including static empty helpers'
 );
-assert.equal(runtime.json.materials.length, 12, 'retain distinct physical finishes');
-assert.equal(runtime.json.images.length, 4);
+assert.equal(runtime.json.materials.length, 4, 'receiver, polymer, packed opaque and sight paint');
+assert.equal(runtime.json.images.length, 6);
 for (const image of runtime.json.images) {
   assert.equal(image.mimeType, 'image/ktx2');
   const view = runtime.json.bufferViews[image.bufferView];
   const ktx = readKTX(runtime.bin.subarray(view.byteOffset, view.byteOffset + view.byteLength));
-  assert.equal(ktx.pixelWidth, 1024);
-  assert.equal(ktx.pixelHeight, 1024);
-  assert.equal(ktx.levels.length, 11);
+  const size = image.name.startsWith('m4_finish_') ? 512 : 1024;
+  assert.equal(ktx.pixelWidth, size);
+  assert.equal(ktx.pixelHeight, size);
+  assert.equal(ktx.levels.length, Math.log2(size) + 1);
   assert.equal(ktx.supercompressionScheme, KHR_SUPERCOMPRESSION_ZSTD);
   const dfd = ktx.dataFormatDescriptor[0];
   assert.equal(dfd.colorModel, KHR_DF_MODEL_UASTC);
@@ -70,7 +71,9 @@ for (const clip of runtime.json.animations) {
   else assert(Math.abs(duration - manifest.clips[clip.name].duration) < 1e-6);
   assert.equal(
     cooked.animations.find((animation) => animation.name === clip.name).duration,
-    manifest.clips[clip.name].duration,
+    clip.name === 'Idle'
+      ? manifest.clips.Idle.duration
+      : source.animations.find((animation) => animation.name === clip.name).duration,
     `${clip.name}: adapter preserves the authored duration, including constant Idle`
   );
 }
@@ -132,12 +135,13 @@ function surfaces(model) {
       for (let corner = 0; corner < 3; corner++) {
         const vertex = geometry.index.getX(index + corner);
         const values = [];
-        for (const name of ['position', 'uv']) {
+        for (const name of ['position', 'uv', 'uv1']) {
           const attribute = geometry.attributes[name];
           // Texture-free sight paint deliberately has no UV in the runtime cook.
-          if (name === 'uv' && mesh.material.name.startsWith('12 |')) continue;
+          if (name !== 'position' && mesh.material.name.startsWith('12 |')) continue;
+          if (name === 'uv1' && mesh.material.name !== 'M4 | packed opaque finishes') continue;
           assert(attribute, `${mesh.name}: ${name}`);
-          for (let axis = 0; axis < (name === 'uv' ? 2 : 3); axis++)
+          for (let axis = 0; axis < (name === 'position' ? 3 : 2); axis++)
             values.push(attribute.getComponent(vertex, axis));
         }
         const key = `${mesh.material.name}:${values.join(',')}`;
