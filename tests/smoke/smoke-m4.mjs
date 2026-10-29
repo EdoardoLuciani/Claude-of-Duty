@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { Rng } from '../../src/core/rng.ts';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
-import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
+import { makeM4Model } from '../../src/weapons/m4.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
 import { checkM4Sights } from '../../tools/lib/m4-sight-checks.js';
@@ -20,7 +20,7 @@ assert(
   blend.subarray(0, 7).equals(Buffer.from('BLENDER')) || blend.readUInt32LE(0) === 0xfd2fb528,
   'editable packed Blender source'
 );
-const bytes = readFileSync(new URL(M4_URL));
+const bytes = readFileSync(new URL('m4a1-block-ii.glb', dir));
 const json = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)));
 const primitives = json.nodes
   .filter((n) => n.mesh !== undefined)
