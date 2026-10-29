@@ -2,7 +2,8 @@
 
 Factory **SKU50774 (2016)**: 18.5-inch barrel, 6+1, ghost rings, fixed black
 synthetic stock and tri-rail forend. Runtime uses `src/weapons/m590.ts` and the
-committed GLB. **Strict 1:1 fidelity and final visual/gameplay acceptance remain
+committed `m590.runtime.glb`; native `m590.glb` remains the authoring reference.
+**Strict 1:1 fidelity and final visual/gameplay acceptance remain
 unapproved.** Passing contact tests is not visual approval.
 
 ## References and unresolved limits
@@ -76,8 +77,8 @@ node tests/smoke/smoke-shotgun-asset.mjs
 node tests/smoke/smoke-m590.mjs
 node tests/smoke/smoke-m590-ads.mjs
 node tests/smoke/smoke-m590-runtime.mjs
-M590_TEST_RUNTIME=1 node tests/smoke/smoke-m590.mjs
-M590_TEST_RUNTIME=1 node tests/smoke/smoke-m590-ads.mjs
+M590_TEST_NATIVE=1 node tests/smoke/smoke-m590.mjs
+M590_TEST_NATIVE=1 node tests/smoke/smoke-m590-ads.mjs
 blender -b -t 2 /tmp/m590-authoring-review/m590.blend \
   --python-exit-code 1 --python tools/blender/m590_clearance_check.py
 ```
@@ -171,7 +172,7 @@ and <3.5MiB decoded-typed-array gates. The latter measure storage, not GPU alloc
 No gameplay/contact tolerance was relaxed for the new representation.
 
 `m590.runtime.glb` is cooked using pinned gltfpack 1.3 through `cookModel` in
-`build/models.mjs`, common flags plus:
+`build/models.mjs` (`npm run models:cook -- m590`), common flags plus:
 
 ```js
 ['-si', '0.50', '-se', '0.0002', '-sp', '-vc', '16']

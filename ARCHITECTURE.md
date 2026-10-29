@@ -277,8 +277,8 @@ purchase; selecting or inspecting a weapon never changes loadout or credits.
 
 `build/models.mjs` owns explicit gltfpack runtime-model cooking and per-model
 profiles (`npm run models:cook`). Normal builds consume committed `.runtime.glb`
-products; they do not run the encoder. M4/MCX/P320/EVOLYS/MPX/AX338 opt in; M590
-keeps its native loading path. Adding profiles requires adapter, animation and
+products; they do not run the encoder. All seven authored weapons opt in.
+Adding profiles requires adapter, animation and
 visual validation rather than blanket simplification. Native authoring exports
 remain editable references.
 

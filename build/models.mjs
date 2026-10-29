@@ -41,6 +41,12 @@ export const GLTFPACK_FLAGS = [
 // Opt assets in here after validating their adapters and visual/animation fidelity.
 // Simplification is model-specific, never a blanket default for all models.
 export const MODEL_COOKS = {
+  m590: {
+    directory: 'assets/weapons/m590',
+    source: 'm590.glb',
+    output: 'm590.runtime.glb',
+    flags: ['-si', '0.50', '-se', '0.0002', '-sp', '-vc', '16'],
+  },
   m4: {
     directory: 'assets/weapons/m4a1-block-ii',
     source: 'm4a1-block-ii.glb',

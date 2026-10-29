@@ -12,7 +12,7 @@ import { makeM590Model, M590Animation, M590_URL } from '../../src/weapons/m590.t
 import { inspectGLB, parseGLB } from '../../tools/lib/glb-fixture.mjs';
 import { mechanicalPartViews, finishIndex } from './m590-geometry.mjs';
 
-const runtimeURL = new URL('../../assets/weapons/m590/m590.runtime.glb', import.meta.url);
+const runtimeURL = new URL(M590_URL);
 const bytes = readFileSync(runtimeURL),
   { json } = inspectGLB(bytes);
 assert(json.extensionsRequired.includes('EXT_meshopt_compression'));
@@ -29,7 +29,9 @@ assert.equal(
   2
 );
 
-const native = makeM590Model(await parseGLB(readFileSync(new URL(M590_URL)))),
+const native = makeM590Model(
+    await parseGLB(readFileSync(new URL('../../assets/weapons/m590/m590.glb', import.meta.url)))
+  ),
   runtime = makeM590Model(await parseGLB(bytes)),
   nativeAnimation = new M590Animation(native),
   animation = new M590Animation(runtime);
@@ -248,7 +250,17 @@ for (const alias of ['reloadTac', 'reloadEmpty']) {
   animation.reset();
   assert(!animation.shellInsert.visible && animation.shellInsert.scale.x === 0);
 }
+const skeletons = new Set(skins.map((mesh) => mesh.skeleton));
+let boneTextureDisposals = 0;
+for (const skeleton of skeletons) {
+  skeleton.computeBoneTexture();
+  skeleton.boneTexture.addEventListener('dispose', () => {
+    boneTextureDisposals++;
+  });
+}
 animation.dispose();
+assert.equal(boneTextureDisposals, skeletons.size, 'mechanical bone textures are released');
+assert([...skeletons].every((skeleton) => skeleton.boneTexture === null));
 nativeAnimation.dispose();
 console.log(
   `M590 decoded runtime: ${poses} poses; control position ${maxPosition}m / rotation ${maxRotation}rad; rigid vertex error ${maxSkinError}m; pump/shell ${maxPadError * 1000}mm; rim thumb ${maxThumbError * 1000}mm; exact STEP visibility/reset and actual contact surfaces passed`

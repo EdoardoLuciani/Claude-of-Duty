@@ -17,14 +17,14 @@ import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
 
 async function parse(url) {
-  if (url === M590_URL && process.env.M590_TEST_RUNTIME)
-    url = new URL('../../assets/weapons/m590/m590.runtime.glb', import.meta.url).href;
+  if (url === M590_URL && process.env.M590_TEST_NATIVE)
+    url = new URL('../../assets/weapons/m590/m590.glb', import.meta.url).href;
   const bytes = readFileSync(new URL(url));
   return parseGLB(bytes);
 }
 assert.equal(
   createHash('sha256')
-    .update(readFileSync(new URL(M590_URL)))
+    .update(readFileSync(new URL('../../assets/weapons/m590/m590.glb', import.meta.url)))
     .digest('hex'),
   'b6d55b4e90c1d99b4e2708fa57fad4e01be5b2187da1706931257ab9c3933892'
 );

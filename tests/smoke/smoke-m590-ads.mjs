@@ -72,8 +72,8 @@ for (const [url, makeModel] of [
   [M4_URL, makeM4Model],
 ]) {
   const source =
-    url === M590_URL && process.env.M590_TEST_RUNTIME
-      ? new URL('../../assets/weapons/m590/m590.runtime.glb', import.meta.url)
+    url === M590_URL && process.env.M590_TEST_NATIVE
+      ? new URL('../../assets/weapons/m590/m590.glb', import.meta.url)
       : new URL(url);
   const bytes = readFileSync(source);
   const model = makeModel(await parseGLB(bytes));
