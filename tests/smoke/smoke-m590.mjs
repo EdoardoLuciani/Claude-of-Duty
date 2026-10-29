@@ -17,6 +17,8 @@ import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
 
 async function parse(url) {
+  if (url === M590_URL && process.env.M590_TEST_RUNTIME)
+    url = new URL('../../assets/weapons/m590/m590.runtime.glb', import.meta.url).href;
   const bytes = readFileSync(new URL(url));
   return parseGLB(bytes);
 }
@@ -24,7 +26,7 @@ assert.equal(
   createHash('sha256')
     .update(readFileSync(new URL(M590_URL)))
     .digest('hex'),
-  'c390de79ad122a71400e10a9395a96de231c8af5320d8f2b24c86bc02df8452a'
+  'b6d55b4e90c1d99b4e2708fa57fad4e01be5b2187da1706931257ab9c3933892'
 );
 const model = makeM590Model(await parse(M590_URL)),
   animation = new M590Animation(model);

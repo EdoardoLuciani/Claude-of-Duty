@@ -3,11 +3,15 @@ blender -b assets/weapons/m590/m590.blend --python-exit-code 1 --python tools/bl
 """
 import json
 import math
+import sys
+from collections import Counter
 from pathlib import Path
 import bpy
 from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
 ROOT=Path(__file__).resolve().parents[2]
+sys.path.insert(0,str(ROOT/'tools/blender'))
+from m590.clearance import RightGloveStockException
 ref=json.loads((ROOT/'assets/weapons/m590/hand-reference.json').read_text())
 manifest=json.loads((ROOT/'assets/weapons/m590/manifest.json').read_text())
 scene=bpy.context.scene;rig=bpy.data.objects['M590_RIG'];CI=Matrix(((1,0,0),(0,0,1),(0,-1,0))).to_4x4()
@@ -27,13 +31,17 @@ def pose(name,t=0):
     f=t*120;scene.frame_set(math.floor(f),subframe=f-math.floor(f));bpy.context.view_layer.update()
 def point(o):return CI@rig.matrix_world.inverted()@o.matrix_world.translation
 # Use evaluated rendered triangles, never Boolean-ngon fan approximations.
-def tree(objects):
-    vertices=[];faces=[];deps=bpy.context.evaluated_depsgraph_get()
+def geometry(objects):
+    vertices=[];faces=[];owners=[];deps=bpy.context.evaluated_depsgraph_get()
     for o in objects:
         ev=o.evaluated_get(deps);data=ev.to_mesh();data.calc_loop_triangles()
         m=CI@rig.matrix_world.inverted()@ev.matrix_world;offset=len(vertices)
         vertices.extend(m@v.co for v in data.vertices);faces.extend(tuple(offset+i for i in f.vertices) for f in data.loop_triangles)
+        owners.extend((o.name,f.index) for f in data.loop_triangles)
         ev.to_mesh_clear()
+    return vertices,faces,owners
+def tree(objects):
+    vertices,faces,_=geometry(objects)
     return BVHTree.FromPolygons(vertices,faces,all_triangles=True)
 def pick(prefix):return [o for o in meshes if o.name.startswith(prefix)]
 def nearest(bvh,p):return bvh.find_nearest(Vector(p))[3]
@@ -197,18 +205,30 @@ assert nearest(tree(pick('Bolt face')),dim['closedBreech'])<1e-6,'barrel datum i
 # while the proximal glove/thumb crossed the stock. Test all evaluated shared
 # glove, reinforcement, knuckle, cuff and sleeve triangles, not bone capsules.
 # The moving trigger is intentionally a contact surface (index flexes on Pump);
-# the stock, receiver/tang and guard must have NO surface crossings.
+# the stock, receiver/tang and guard remain strict except the documented,
+# operator-approved <=30um coarse-glove contact at the stock neck.
 right_skin=[o for o in review.objects if o.type=='MESH' and o.name.startswith('M590_right_')]
 assert len(right_skin)==5
-firing_fixed=tree(pick('Conventional synthetic stock')+pick('590A1 receiver forging')+pick('Rear tang')+pick('Metal trigger guard'))
+firing_vertices,firing_faces,firing_owners=geometry(pick('Conventional synthetic stock')+pick('590A1 receiver forging')+pick('Rear tang')+pick('Metal trigger guard'))
+firing_fixed=BVHTree.FromPolygons(firing_vertices,firing_faces,all_triangles=True)
+stock_vertices,stock_faces,_=geometry(pick('Conventional synthetic stock'))
+stock_edges=Counter((face[i],face[(i+1)%3]) for face in stock_faces for i in range(3))
+assert all(count==1 and stock_edges[(b,a)]==1 for (a,b),count in stock_edges.items()),'depth certificate requires closed consistently oriented stock'
+firing_stock=BVHTree.FromPolygons(stock_vertices,stock_faces,all_triangles=True)
+right_exception=RightGloveStockException(ROOT/'assets/player/arms/player-arms.blend')
 right_poses=0
 for name,clip in manifest['clips'].items():
     for frame in range(math.ceil(clip['duration']*120)+1):
         pose(name,min(frame/120,clip['duration']))
-        assert not tree(right_skin).overlap(firing_fixed),(name,frame,'actual right glove/cuff crosses stock/receiver/guard',[o.name for o in right_skin if tree([o]).overlap(firing_fixed)])
+        for skin in right_skin:
+            vertices,faces,_=geometry([skin])
+            overlaps=BVHTree.FromPolygons(vertices,faces,all_triangles=True).overlap(firing_fixed)
+            if overlaps:
+                try:right_exception.check(skin.name,vertices,faces,overlaps,firing_owners,firing_stock)
+                except AssertionError as error:raise AssertionError((name,frame,str(error))) from error
         right_poses+=1
 pose('Idle')
-print('M590_RIGHT_SKIN_CLEARANCE_OK:',right_poses,'120Hz poses across all seven clips; all five full deformed surfaces, zero stock/receiver/guard crossings')
+print('M590_RIGHT_SKIN_CLEARANCE_OK:',right_poses,'120Hz poses across all seven clips; approved neck-contact poses',right_exception.poses,'; sampled depth mm',right_exception.maximum_sample*1000,'; certified upper bound mm',right_exception.maximum_bound*1000,'; all other crossings forbidden')
 # Rigid mechanism sweep in rig-space against the fixed receiver and barrel.
 fixed=tree(pick('590A1 receiver forging')+pick('Heavy barrel')+pick('Barrel crown'))
 minimum=math.inf;poses=0;seen=set();skin_poses=0

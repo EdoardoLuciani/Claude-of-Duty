@@ -71,7 +71,11 @@ for (const [url, makeModel] of [
   [M590_URL, makeM590Model],
   [M4_URL, makeM4Model],
 ]) {
-  const bytes = readFileSync(new URL(url));
+  const source =
+    url === M590_URL && process.env.M590_TEST_RUNTIME
+      ? new URL('../../assets/weapons/m590/m590.runtime.glb', import.meta.url)
+      : new URL(url);
+  const bytes = readFileSync(source);
   const model = makeModel(await parseGLB(bytes));
   vm.addWeapon(model, wp.states.get(model.id).def);
 }
