@@ -165,6 +165,7 @@ export class MCXAnimation {
   magazine!: THREE.Object3D;
   spare!: THREE.Object3D;
   bolt!: THREE.Object3D;
+  boltBone!: THREE.Object3D;
   charging!: THREE.Object3D;
   poseMatrix!: THREE.Matrix4;
   poseQ = new THREE.Quaternion();
@@ -207,6 +208,7 @@ export class MCXAnimation {
     this.magazine = this.root.getObjectByName('magazine')!;
     this.spare = this.root.getObjectByName('magazine_spare')!;
     this.bolt = this.root.getObjectByName('bolt')!;
+    this.boltBone = this.root.getObjectByName('MECH_bolt')!;
     this.charging = this.root.getObjectByName('charging_handle')!;
     this.root.getObjectByName('spent_case')!.visible = false;
     this.poseMatrix = new THREE.Matrix4();
@@ -258,6 +260,10 @@ export class MCXAnimation {
     this.gesture = null;
     this.gestureTime = 0;
     this._sample('Idle', 0);
+    // Mixer property caching may skip an unchanged Idle value after our
+    // out-of-band empty-state override; reset both contact and visible skin.
+    this.bolt.position.x = 0;
+    this.boltBone.position.x = 0;
   }
 
   update(dt: number, clipName: string, clipTime: number, empty: boolean): void {
@@ -269,7 +275,10 @@ export class MCXAnimation {
     else if (this.fireTime < this.actions.Fire.getClip().duration)
       this._sample('Fire', this.fireTime);
     else this._sample('Idle', this.idleTime % this.actions.Idle.getClip().duration);
-    if (empty && !this.gesture && this.fireTime >= 7 / 60) this.bolt.position.x = -0.068;
+    if (empty && !this.gesture && this.fireTime >= 7 / 60) {
+      this.bolt.position.x = -0.068;
+      this.boltBone.position.x = this.bolt.position.x;
+    }
     this.frame.updateMatrixWorld(true);
   }
 

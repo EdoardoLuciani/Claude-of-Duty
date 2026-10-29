@@ -1,5 +1,6 @@
 """Deterministic surface coordinates and one unmodified Blender glTF export."""
 import bpy
+from mathutils import Vector
 
 # One repeat per 10 cm, independent of component bounds or packing order.
 SURFACE_TILE_METRES = 0.10
@@ -44,6 +45,81 @@ def activate(obj):
     bpy.context.view_layer.objects.active = obj
 
 
+def consolidate_mechanics(asset, parts):
+    """One rigid-influence skin; detachable magazines/casing stay independent.
+
+    Keep the original animated empties as runtime contacts/sockets. Bones copy
+    their native sparse/60 Hz Actions, not constraints or exporter sampling.
+    """
+    rig = parts[0]
+    parents = [bpy.data.objects[name] for name in (
+        'receiver', 'bolt', 'charging_handle', 'trigger', 'dust_cover',
+        'stock_hinge', 'bolt_release',
+    )]
+    data = bpy.data.armatures.new('MCX mechanics')
+    armature = bpy.data.objects.new('MCX_mechanics', data)
+    asset.objects.link(armature)
+    armature.parent = rig
+    activate(armature)
+    bpy.ops.object.mode_set(mode='EDIT')
+    for parent in parents:
+        bone = data.edit_bones.new('MECH_' + parent.name)
+        bone.head = parent.location
+        bone.tail = parent.location + Vector((0, .01, 0))
+    bpy.ops.object.mode_set(mode='OBJECT')
+    for bone in armature.pose.bones:
+        bone.rotation_mode = 'XYZ'
+
+    # The rest bone basis is identity, so subtract only its rest translation.
+    clip_names = [track.name for track in rig.animation_data.nla_tracks]
+    armature.animation_data_create()
+    for name in clip_names:
+        action = bpy.data.actions.new(name + ' | mechanics')
+        armature.animation_data.action = action
+        slot = action.slots.new(id_type='OBJECT', name=armature.name)
+        armature.animation_data.action_slot = slot
+        layer = action.layers.new('Mechanics')
+        bag = layer.strips.new(type='KEYFRAME').channelbag(slot, ensure=True)
+        for parent in parents:
+            if not parent.animation_data:
+                continue
+            source = next(track for track in parent.animation_data.nla_tracks if track.name == name).strips[0].action
+            for source_layer in source.layers:
+                for strip in source_layer.strips:
+                    for source_bag in strip.channelbags:
+                        for curve in source_bag.fcurves:
+                            path = 'pose.bones["MECH_' + parent.name + '"].' + curve.data_path
+                            target = bag.fcurves.new(data_path=path, index=curve.array_index)
+                            for key in curve.keyframe_points:
+                                offset = parent.location[curve.array_index] if curve.data_path == 'location' else 0
+                                point = target.keyframe_points.insert(key.co.x, key.co.y - offset, options={'FAST'})
+                                point.interpolation = key.interpolation
+                            target.update()
+        track = armature.animation_data.nla_tracks.new()
+        track.name = name
+        track.strips.new(name, 0, action).extrapolation = 'NOTHING'
+        track.mute = True
+        armature.animation_data.action = None
+
+    meshes = []
+    for parent in parents:
+        mesh = bpy.data.objects[parent.name + '_mesh']
+        group = mesh.vertex_groups.new(name='MECH_' + parent.name)
+        group.add(list(range(len(mesh.data.vertices))), 1, 'REPLACE')
+        world = mesh.matrix_world.copy()
+        mesh.parent = armature
+        mesh.matrix_world = world
+        meshes.append(mesh)
+    activate(meshes[0])
+    for mesh in meshes:
+        mesh.select_set(True)
+    bpy.ops.object.join()
+    mesh = bpy.context.object
+    mesh.name = 'receiver_mesh'
+    modifier = mesh.modifiers.new('Rigid mechanical skin', 'ARMATURE')
+    modifier.object = armature
+
+
 def export_asset(asset, parts, output):
     """Consume the in-memory export copy; the source must already be saved.
 
@@ -74,6 +150,8 @@ def export_asset(asset, parts, output):
             obj.select_set(True)
         bpy.ops.object.join()
         bpy.context.object.name = parent.name + '_mesh'
+
+    consolidate_mechanics(asset, parts)
 
     bpy.ops.object.select_all(action='DESELECT')
     for obj in asset.objects:
