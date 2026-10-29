@@ -41,6 +41,12 @@ export const GLTFPACK_FLAGS = [
 // Opt assets in here after validating their adapters and visual/animation fidelity.
 // Simplification is model-specific, never a blanket default for all models.
 export const MODEL_COOKS = {
+  mcx: {
+    directory: 'assets/weapons/mcx-virtus',
+    source: 'mcx-virtus.glb',
+    output: 'mcx-virtus.runtime.glb',
+    flags: ['-si', '0.65', '-se', '0.0002', '-sp', '-vc', '16'],
+  },
   evolys: {
     directory: 'assets/weapons/fn-evolys-762',
     source: 'fn-evolys-762.glb',
