@@ -134,6 +134,25 @@ for (const model of [native, runtime]) {
 }
 a.dispose();
 b.dispose();
+for (const duration of [0, 0.5]) {
+  const gltf = await parseGLB(
+    readFileSync(new URL('../../assets/weapons/ax338/ax338.glb', import.meta.url))
+  );
+  gltf.animations.find((clip) => clip.name === 'Idle').duration = duration;
+  gltf.animations.find((clip) => clip.name === 'Fire').duration = 0.01;
+  const model = makeAX338Model(gltf);
+  assert.equal(
+    model.animations.find((clip) => clip.name === 'Idle').duration,
+    duration,
+    'do not repair multi-key or nonzero Idle'
+  );
+  assert.equal(
+    model.animations.find((clip) => clip.name === 'Fire').duration,
+    0.01,
+    'do not normalize moving clips'
+  );
+  new AX338Animation(model).dispose();
+}
 console.log(
   `AX338 runtime: ${samples} half-frame poses; max translation ${positionError} m / rotation ${rotationError} rad / scale ${scaleError}; ${probes} geometry probes, max surface loss ${geometryError * 1000} mm; named sockets and STEP visibility retained`
 );

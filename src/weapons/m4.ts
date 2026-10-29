@@ -44,7 +44,7 @@ export function makeM4Model(gltf: GLTF): M4Model {
       clip.name === 'Idle' &&
       clip.duration === 0 &&
       clip.tracks.length > 0 &&
-      clip.tracks.every((track): boolean => track.times.length === 1)
+      clip.tracks.every((track): boolean => track.times.length === 1 && track.times[0] === 0)
     )
       clip.duration = duration;
     else if (Math.abs(clip.duration - duration) > 1e-6)
