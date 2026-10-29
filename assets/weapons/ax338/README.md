@@ -200,8 +200,9 @@ AX338_RUNTIME=1 node tests/smoke/smoke-ax338.mjs
 AX338_RUNTIME=1 node tests/smoke/smoke-ax338-contact.mjs
 ```
 
-`loadAX338()` deliberately retains its existing signature and native URL until
-shared decoder/registry integration. `makeAX338Model()` and its animation work
+`loadAX338(renderer)` uses the registered runtime profile and shared decoder.
+Native-WebGPU captures and forced RGBA fallback checks passed.
+`makeAX338Model()` and its animation work
 with either product via the decoded GLTF fixture. glTF infers duration from keys:
 gltfpack folds wholly constant Idle to t=0, so the adapter restores **only** its
 unchanged two-second hold from the manifest. Moving clip durations remain strict.

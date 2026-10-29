@@ -136,16 +136,15 @@ zero-area triangles. It also collapses constant Idle keys to t=0; `makeM4Model`
 restores **only** the observed zero-duration, wholly constant single-key Idle to
 2 s. Moving/nonconstant clip endpoint mismatches throw rather than being repaired.
 
-The native loader URL/signature intentionally remain operational. Parent
-integration must register this profile and enable shared KTX2/meshopt loading
-before selecting `.runtime.glb`. No EXPS3 attachment data or shared optic mounting,
+`loadM4(renderer)` selects the registered `.runtime.glb` profile through the shared
+KTX2/meshopt loader. No EXPS3 attachment data or shared optic mounting,
 ADS, arm appearance or hand calibration was changed. Both products run the full
 M4 behavioral/actual arm-skin/contact suite. The cook test additionally checks
 materials, map color spaces/channels/mips, names, indexed surfaces, STEP tracks
 and 2,796 fractional/event-adjacent poses. Native motion is unchanged; cooked
 maximum local translation error is 0.000051 mm and normalized quaternion error
-is 0.004635 degrees. Final native-WebGPU visual/performance review remains an
-integration gate. Matched CPU previews also use RGBA32-transcoded candidate
+is 0.004635 degrees. Matched native-WebGPU captures and forced RGBA fallback checks
+passed; no paired FPS improvement is established. CPU previews also use RGBA32-transcoded candidate
 textures; the normal map has 1.334/255 RGB RMSE (maximum 13/255), while
 receiver albedo is unchanged and the other two maps have <0.166/255 RMSE.
 This accepts very slight micro-normal grain loss, not material/color compensation

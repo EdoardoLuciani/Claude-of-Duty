@@ -88,12 +88,12 @@ is larger native export (8,147,296 → 9,163,208 bytes) and decoded geometry sto
 (2,515,012 → 3,679,532 bytes) from corner pigment and UV1. Native triangles remain
 59,860, with identical position/normal/UV0/finish-identity triangle records. The
 selected runtime has 53,209 instanced triangles. These are asset/storage counts,
-not GPU allocation or performance timings. `c7bdd359` preserves the prior
-13-material skin-only result as a fallback.
+not GPU allocation or performance timings. The earlier mechanical-skin commit
+preserves the prior 13-material result as a fallback.
 
 The derived candidate uses gltfpack 1.3 with the shared cook flags plus
 `-si 0.65 -se 0.0002 -sp -vc 16`. Sixteen-bit corner colors avoid dark-pigment
-shifts from default eight-bit linear quantization. The adapter continues loading the
-native GLB pending shared KTX2/meshopt loader integration. Compare matched cameras,
-pose and lighting; the decoded-geometry smoke uses texture stubs and does not
-replace hardware-WebGPU optical/texture/hand review.
+shifts from default eight-bit linear quantization. The adapter loads the runtime
+GLB through the shared KTX2/meshopt loader. Matched hardware-WebGPU optical/texture/
+hand captures and forced RGBA fallback checks passed; the decoded-geometry smoke
+alone is not visual evidence or an FPS measurement.

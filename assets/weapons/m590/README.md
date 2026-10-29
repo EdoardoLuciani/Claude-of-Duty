@@ -179,11 +179,11 @@ No gameplay/contact tolerance was relaxed for the new representation.
 ```
 
 Keep `-kn` and `-af 0`; use 16-bit vertex colours to retain dark finish factors.
-The registry and shared meshopt/KTX2 loader integration remain parent-owned;
-`loadM590()` deliberately retains its operational native URL/signature. Node
-fixtures decode the runtime candidate without duplicating runtime loader machinery.
-Matched render/evaluation evidence is external; final hardware-WebGPU and human
-visual acceptance are separate from counts and smoke tests.
+`loadM590(renderer)` uses the shared meshopt/KTX2 loader and registered runtime
+profile. Node fixtures compare both products without duplicating loader machinery.
+Matched hardware-WebGPU captures and RGBA fallback checks passed; evidence remains
+external. These optimization checks do not establish factory-reference fidelity
+or an FPS improvement.
 
 ## Narrow approved shared-glove clearance exception
 
