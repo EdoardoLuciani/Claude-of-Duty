@@ -34,18 +34,15 @@ assert.equal(
 assert.equal(primitives.length, manifest.stats.primitives);
 assert(
   triangles <= 91000 &&
-    primitives.length <= 29 &&
-    json.materials.length === 12 &&
-    bytes.length <= 7600000
+    primitives.length <= 19 &&
+    json.materials.length === 4 &&
+    bytes.length <= 9800000
 );
-assert.equal(json.images.length, 4, 'three shared maps plus the selected receiver albedo');
+assert.equal(json.images.length, 6, 'four unchanged maps plus two compact finish atlases');
 // Selected balanced finish: preserve metal/dielectric separation and authored maps.
 for (const [prefix, roughness, normal, metal] of [
   ['01', 0.44, 0.08, 1],
-  ['02', 0.56, 0.16, 1],
   ['03', 0.8, 0.55, 0],
-  ['05', 0.56, 0.16, 1],
-  ['07', 0.67, 0.18, 1],
 ]) {
   const material = json.materials.find((m) => m.name.startsWith(`${prefix} |`));
   assert(material, `${prefix}: missing finish`);
@@ -74,8 +71,9 @@ const binaryStart = 28 + bytes.readUInt32LE(12);
 for (const image of json.images) {
   const view = json.bufferViews[image.bufferView];
   const offset = binaryStart + (view.byteOffset ?? 0);
-  assert.equal(bytes.readUInt32BE(offset + 16), 1024);
-  assert.equal(bytes.readUInt32BE(offset + 20), 1024);
+  const size = image.name.startsWith('m4_finish_') ? 512 : 1024;
+  assert.equal(bytes.readUInt32BE(offset + 16), size);
+  assert.equal(bytes.readUInt32BE(offset + 20), size);
 }
 assert.equal(json.animations.length, 8);
 const albedoStats = (material) => {
@@ -203,7 +201,9 @@ async function checkModel(bytes, format) {
       const positions = mesh.geometry.attributes.position;
       for (let i = 0; i < positions.count; i++) {
         vertex.fromBufferAttribute(positions, i).applyMatrix4(transform);
-        if (include(vertex, mesh.material.name)) bounds.expandByPoint(vertex);
+        const colors = mesh.geometry.attributes.color;
+        const color = colors ? [colors.getX(i), colors.getY(i), colors.getZ(i)] : null;
+        if (include(vertex, mesh.material.name, color)) bounds.expandByPoint(vertex);
       }
     });
     assert(!bounds.isEmpty(), 'fixed assembly has real indexed geometry');
@@ -211,7 +211,10 @@ async function checkModel(bytes, format) {
   }
   for (const helper of ['handguard', 'stock'])
     assert(model.root.getObjectByName(helper), `${helper}: retain named authoring seat`);
-  const guard = fixedBounds((_vertex, material) => material.startsWith('02 |'));
+  const guard = fixedBounds(
+    (_vertex, _material, color) =>
+      color && color.every((value, axis) => Math.abs(value - [0.235, 0.15, 0.084][axis]) < 0.00002)
+  );
   close(guard.max.z - guard.min.z, 0.31115, 0.001);
   close(guard.max.x - guard.min.x, 0.056642, 0.001);
   close(guard.max.y - guard.min.y, 0.05715, 0.001);
@@ -373,7 +376,7 @@ async function checkModel(bytes, format) {
             `${name}/${t.toFixed(4)}: ${o.name} permanently collapsed under visible spare`
           );
         });
-        assert.equal(meshes, 4, 'rendered spare body/follower and brass/projectiles');
+        assert.equal(meshes, 2, 'independent indexed spare body/follower and loaded cartridges');
         const bounds = new THREE.Box3().setFromObject(anim.spare);
         assert(
           bounds.max.y - bounds.min.y > 0.14,
@@ -402,7 +405,9 @@ async function checkModel(bytes, format) {
   // Verify the exported motion on the real runtime skins and IK too. A whole-stock
   // envelope is conservative: no deformed triangle may enter even its empty space.
   const stockEnvelope = fixedBounds(
-    (vertex, material) => vertex.z >= 0.09 && /^(03|04|05) \|/.test(material)
+    (vertex, material) =>
+      vertex.z >= 0.09 &&
+      (material.startsWith('03 |') || material === 'M4 | packed opaque finishes')
   );
   const armBytes = readFileSync(new URL('../../public/models/player/arms.glb', import.meta.url));
   const armGltf = await parseGLB(armBytes);
@@ -558,7 +563,11 @@ async function checkModel(bytes, format) {
     proxy.group.traverse((o) => {
       if (o.isMesh) parts++;
     });
-    assert.equal(parts, 2, 'discarded shell/follower, not dummy loaded cartridges');
+    assert.equal(
+      parts,
+      1,
+      'one consolidated discarded shell/follower, independent of loaded cartridges'
+    );
   }
   wp.state.mag = 0;
   wp.state.chambered = false;
@@ -597,9 +606,9 @@ async function checkModel(bytes, format) {
 await checkModel(bytes, 'native');
 const runtime = readFileSync(new URL('m4a1-block-ii.runtime.glb', dir));
 const runtimeJSON = JSON.parse(runtime.subarray(20, 20 + runtime.readUInt32LE(12)));
-assert(runtime.length < 5000000, 'bounded runtime product');
+assert(runtime.length < 5500000, 'bounded runtime product');
 assert(runtimeJSON.extensionsRequired.includes('EXT_meshopt_compression'));
 assert(runtimeJSON.extensionsRequired.includes('KHR_texture_basisu'));
-assert.equal(runtimeJSON.images.length, 4);
+assert.equal(runtimeJSON.images.length, 6);
 for (const image of runtimeJSON.images) assert.equal(image.mimeType, 'image/ktx2');
 await checkModel(runtime, 'decoded runtime');

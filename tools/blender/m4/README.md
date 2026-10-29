@@ -10,6 +10,7 @@
 | Named assemblies, controls, sockets, applied radii and atlas      | `geometry.py`      |
 | Eight sparse weapon/wrist/finger actions, events and review skins | `../m4_actions.py` |
 | Clip selection, runtime sampling and explicit resets              | `animations.py`    |
+| Export-only linear colors and padded opaque finish atlases        | `finishes.py`      |
 | Rigid joining, native Actions export and read-only assertions     | `export.py`        |
 | Fixed review cameras, lights and color management                 | `studio.py`        |
 
@@ -36,3 +37,12 @@ component-editable. Cylinder micro-bevels use a single chamfer (not the exact
 front aiming post); Picatinny corner curves retain three samples. The asset
 README records the deliberately nonquantized gltfpack candidate/profile and its
 precision trade-off. Do not substitute more permissive simplification globally.
+
+`finishes.py` runs only after saving the editable preview. Receiver, polymer/A2
+checkering and emissive sight paint remain independent; the nine other opaque
+finishes share a material with per-corner linear base factors, unchanged UV0
+albedo and compact UV1 scalar/normal atlases. Four-pixel padding and a positive
+affine UV transform preserve finish boundaries and tangent orientation. Strength
+baking uses XY scale / unchanged Z / normalization, never an averaged strength.
+The asset README records the deliberate draw-count versus file/memory trade-off;
+keep the geometry-only `390390e9` fallback available during GPU review.

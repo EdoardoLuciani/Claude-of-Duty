@@ -156,11 +156,11 @@
   },
   "stats": {
     "triangles": 90605,
-    "primitives": 29,
-    "materials": 12,
+    "primitives": 19,
+    "materials": 4,
     "meshes": 14,
-    "bytes": 7574992,
-    "images": 4
+    "bytes": 9724336,
+    "images": 6
   },
   "textureResolution": 1024,
   "source": "tools/blender/m4a1.py + m4/ + m4_actions.py + tools/m4-hand-reference.mjs",
