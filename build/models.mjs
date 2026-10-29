@@ -41,6 +41,18 @@ export const GLTFPACK_FLAGS = [
 // Opt assets in here after validating their adapters and visual/animation fidelity.
 // Simplification is model-specific, never a blanket default for all models.
 export const MODEL_COOKS = {
+  ax338: {
+    directory: 'assets/weapons/ax338',
+    source: 'ax338.glb',
+    output: 'ax338.runtime.glb',
+    flags: ['-vc', '16', '-vp', '16'],
+  },
+  mpx: {
+    directory: 'assets/weapons/sig-mpx',
+    source: 'mpx.glb',
+    output: 'mpx.runtime.glb',
+    flags: ['-km', '-vc', '16', '-si', '0.7', '-se', '0.0002', '-sp'],
+  },
   exps3: {
     directory: 'assets/attachments/eotech-exps3-0',
     source: 'exps3-0.glb',

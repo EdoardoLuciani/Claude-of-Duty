@@ -1,8 +1,10 @@
 import * as THREE from 'three';
-import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { Renderer } from 'three/webgpu';
 
 import handReference from '../../assets/weapons/ax338/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/ax338/manifest.json' with { type: 'json' };
+import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
 import {
@@ -16,7 +18,8 @@ import {
 import { authoredModel, requiredNode } from './authored-model.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 
-export const AX338_URL = new URL('../../assets/weapons/ax338/ax338.glb', import.meta.url).href;
+export const AX338_URL = new URL('../../assets/weapons/ax338/ax338.runtime.glb', import.meta.url)
+  .href;
 const ALIASES: Record<string, string> = {
   reloadTac: 'Reload_Tactical',
   reloadEmpty: 'Reload_Empty',
@@ -71,8 +74,8 @@ export function makeAX338Model(gltf: GLTF): AX338Model {
   return { ...model, ...converted };
 }
 
-export async function loadAX338(): Promise<AX338Model> {
-  return makeAX338Model(await new GLTFLoader().loadAsync(AX338_URL));
+export async function loadAX338(renderer: Pick<Renderer, 'hasFeature'>): Promise<AX338Model> {
+  return makeAX338Model(await loadWeaponGLTF(renderer, AX338_URL));
 }
 
 /** Blender owns mechanisms and wrist/finger choreography; the existing recoil,
