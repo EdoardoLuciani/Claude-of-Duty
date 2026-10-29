@@ -16,6 +16,7 @@ ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(Path(__file__).parent))
 from evolys_actions import author_actions
 from evolys.export import consolidate_static_surfaces, prepare_export_actions, validate_export
+from evolys.finish_atlas import bake_finish_atlas
 
 
 def build(output, render=False, quick=False):
@@ -399,6 +400,7 @@ def build(output, render=False, quick=False):
             scene.camera=bpy.data.objects[name];scene.render.filepath=str(OUT/'renders'/(name+'.png'));bpy.ops.render.render(write_still=True)
     # Save the editable original actions first; prepare only the in-memory runtime copy.
     prepare_export_actions(asset, clips)
+    bake_finish_atlas(asset, OUT)
     consolidate_static_surfaces(asset)
     bpy.ops.object.select_all(action='DESELECT')
     for o in asset.objects:o.select_set(True)
@@ -407,12 +409,13 @@ def build(output, render=False, quick=False):
     raw,doc=validate_export(OUT/'fn-evolys-762.glb',clips)
     primitives=[p for n in doc['nodes'] if 'mesh' in n for p in doc['meshes'][n['mesh']]['primitives']]
     stats={'triangles':sum(doc['accessors'][p['indices']]['count']//3 for p in primitives),'primitives':len(primitives),'materials':len(doc['materials']),'images':len(doc['images']),'bytes':len(raw)}
-    manifest={'asset':'FN EVOLYS 7.62 / revised stock / RMR RM06 RM33 / 100-round pouch / no irons / no bipod','units':'metres','clips':clips,'stats':stats,'textureResolution':1024,'belt':{'rounds':8,'pitch':.0127,'fireDuration':60/700,'rig':'belt_rig'},'dimensions':{'barrel':.406,'retractedOverall':.948,'barrelFace':breech,'barrelCrown':barrel_end,'muzzle':crown},'source':'tools/blender/evolys_762.py + tools/blender/evolys/export.py + evolys_actions.py + tools/evolys-hand-reference.mjs'}
+    manifest={'asset':'FN EVOLYS 7.62 / revised stock / RMR RM06 RM33 / 100-round pouch / no irons / no bipod','units':'metres','clips':clips,'stats':stats,'textureResolution':1024,'belt':{'rounds':8,'pitch':.0127,'fireDuration':60/700,'rig':'belt_rig'},'dimensions':{'barrel':.406,'retractedOverall':.948,'barrelFace':breech,'barrelCrown':barrel_end,'muzzle':crown},'source':'tools/blender/evolys_762.py + tools/blender/evolys/export.py + tools/blender/evolys/finish_atlas.py + evolys_actions.py + tools/evolys-hand-reference.mjs'}
     (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     assert stats['triangles']<150000 and stats['primitives']<=48 and stats['materials']<=18 and stats['images']==3 and len(raw)<=15*1024*1024,stats
     print('EVOLYS export:',json.dumps(stats))
-    # Texture originals are packed in .blend and embedded in .glb; not duplicate assets.
-    for name in ('evolys_surface.png','evolys_roughness.png','evolys_normal.png'):(OUT/name).unlink(missing_ok=True)
+    # The blend packs original maps; GLB embeds the normal and baked finishes.
+    # Do not retain duplicate loose PNG assets.
+    for name in ('evolys_surface.png','evolys_roughness.png','evolys_normal.png','evolys_finish_base.png','evolys_finish_orm.png'):(OUT/name).unlink(missing_ok=True)
 
 
 def main():

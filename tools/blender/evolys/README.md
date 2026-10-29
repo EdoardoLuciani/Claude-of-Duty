@@ -11,6 +11,7 @@
 | Eight sparse actions, hands and events                                 | `../evolys_actions.py`: `author_actions`                |
 | Runtime lattice, endpoint/STEP preparation and read-only assertions    | `export.py`: `prepare_export_actions`                   |
 | Native static-surface consolidation after saving editable assemblies   | `export.py`: `consolidate_static_surfaces`              |
+| Opaque/base/ORM finish bake on UV1, with unchanged normal UV0          | `finish_atlas.py`: `bake_finish_atlas`                  |
 
 Read-only inputs are `assets/weapons/fn-evolys-762/hand-reference.json` and shared
 `assets/player/arms/player-arms.blend`; photo-review data freezes registration,
@@ -18,8 +19,10 @@ not geometry. Refit only with `node tools/evolys-hand-reference.mjs` as an
 intentional calibration change. `evolys_actions.author_review_hands` also serves
 MPX and is not a weapon-local API.
 
-Preserve assembly order and rubber/canvas/metal atlas partitions, not MCX planar
-projection or P320 baking. Three seeded maps are packed/embedded; temporary PNGs
+Preserve assembly order and rubber/canvas/metal **normal UV0** partitions.
+The export-only finish bake writes base color/ORM on UV1 without reprojecting
+normal detail. Three seeded source maps stay packed in the editable blend; the
+export embeds the unchanged normal and two baked finish maps. Temporary PNGs
 are removed. Save the editable preview with sparse Bezier actions/review skins
 before runtime preparation. Preserve the **120 Hz** integer-frame lattice and
 held `ceil(end)` sample at the exact endpoint: Fire/Last_Shot are **60/700 s**
@@ -27,42 +30,64 @@ before float32 encoding. Constant channels keep two endpoint samples and STEP;
 other motion is LINEAR. Keep TRS resets on controls/belt bones. Stock Actions
 export merges matching NLA names, without broadcasting unused armature actions.
 
-Keep one eight-joint/three-primitive belt at 12.7 mm pitch. Runtime owns persistent
+Keep one eight-joint/one-primitive belt at 12.7 mm pitch. Brass, projectile and
+link finishes occupy separate atlas tiles, not separate draws. Runtime owns persistent
 remaining-round masks, the departing last round and insertion/reset behavior;
 native constant channels must never resurrect spent ammunition.
 
 ## Native/export optimization
 
-The recipe uses two bevel segments instead of three at the same radii. This
-reduces the native mesh from 74,888 to 53,059 triangles without removing markings,
-rails, vents or mechanical parts. Close-up bevel profiles are slightly coarser.
-After saving the editable assemblies and sparse Actions, the native export joins
-receiver, handguard and optic surfaces with identical rigid motion. Their 16
-material submissions become seven (six opaque finishes and a separate alpha
-lens), reducing the complete export from 35 to 26 primitive instances. Distinct
-finishes are not merged or recolored. Stock, cover, trigger, charging slider,
-bolt, both independent pouches and the three-primitive belt remain separate.
-Named controls/sockets remain; the three static mesh names exist in the editable
-blend, while their exported geometry is `static_surfaces`.
+The recipe uses two bevel segments instead of three at the same radii. Native
+triangles fall from 74,888 to 53,059 without removing markings, rails, vents or
+mechanical parts. Close-up bevel profiles are slightly coarser. After saving the
+editable assemblies and sparse Actions, the export joins receiver, handguard and
+optic surfaces with identical rigid motion. Stock remains separately measurable;
+cover, trigger, charging slider, bolt, both independent pouches and belt retain
+all original controls and skinning. Named controls/sockets remain. The three
+static mesh names exist in the editable blend; exported geometry is `static_surfaces`.
 
-`fn-evolys-762.runtime.glb` is generated from the native export with gltfpack 1.3
-and `build/models.mjs`'s `GLTFPACK_FLAGS`, with **no additional flags**. Tested
-`-si 0.75 -se 0.0002 -sp` and `-si 0.5 -se 0.0005 -sp` variants saved only 29,356
-and 83,416 bytes and both increased gzip size. No extra simplification was chosen.
-The selected cook removes degenerate triangles/shares geometry (51,793 unique /
-52,977 instantiated triangles) and keeps 26 primitive instances, ten materials,
-three 1024² UASTC maps and eight clips. Native maps and material factors are not
-rebaked or compensated. Native/runtime bytes are 8,140,248 / 3,854,832.
+The export then bakes all ten source finishes into shared 1024² base/ORM maps,
+with one opaque material and a separate alpha lens. UV1 addresses ten 256² tiles,
+each with an eight-pixel gutter and 240² interior. Base samples are multiplied
+by their source factors in linear light; roughness/metallic factors enter the
+ORM channels. Four-by-four area sampling slightly subdues fine base/rough noise.
+There is **no normal-map resampling, UV0 change, strength adjustment or lighting/
+exposure compensation**. Geometry lettering remains geometry, not baked text.
+Original materials and images stay editable in the saved blend.
+
+| Profile                                 | Native triangles | Primitive instances | Materials | Native bytes | Runtime bytes |
+| --------------------------------------- | ---------------: | ------------------: | --------: | -----------: | ------------: |
+| Original                                |           74,888 |                  35 |        10 |    9,320,692 |             — |
+| Bevel/static-only fallback (`c7e5c93b`) |           53,059 |                  26 |        10 |    8,140,248 |     3,854,832 |
+| Finish atlas                            |           53,059 |                  10 |         2 |    7,735,012 |     3,166,568 |
+
+The atlas keeps three 1024² maps: texture texel memory does not increase. UV1
+raises measured decoded CPU vertex/index arrays from 1,845,070 to 2,321,350 bytes
+in the cooked asset (+476,280 B); this is not a GPU-allocation measurement.
+The trade buys 16 fewer total submissions, eight fewer materials and a smaller
+runtime file. A 2048² base/ORM trial had the same submission count but 11,523,492
+native bytes and **three times** the total texture texels (normal stays 1024²),
+so it was rejected. No extra rigid mechanical skin is required for this gain;
+independent pouch visibility, cover and belt mechanics remain straightforward.
+
+`fn-evolys-762.runtime.glb` uses gltfpack 1.3 and `build/models.mjs`'s
+`GLTFPACK_FLAGS`, with **no additional flags**. The cook retains 51,793 unique /
+52,977 instantiated triangles and ten primitive instances. Earlier fallback
+trials `-si 0.75 -se 0.0002 -sp` and `-si 0.5 -se 0.0005 -sp` saved only 29,356 /
+83,416 bytes and increased gzip size; no extra simplification was selected.
 
 The adapter retains its native load path pending shared-loader integration.
-`makeEvolysModel` also accepts the decoded runtime candidate: it restores manifest
-float32 clip durations because gltfpack collapses the entirely constant Idle to
-a single t=0 key. Both smoke scripts exercise both exports. Constant-key holds
-are checked against native controls, contacts, sockets, fractional endpoints and
-STEP visibility; actual deformed belt vertices must collapse when ammunition is
-masked. Sleeve/pouch and stock/head clearance checks remain geometry-based.
-CPU AgX comparisons cover studio sides, feed/optic close-ups and reload poses;
-final native-WebGPU/KTX2 visual review and human sign-off remain required.
+`makeEvolysModel` accepts the decoded runtime candidate and recovers Idle's
+manifest duration **only** for an entirely constant, single-t=0-key,
+zero-duration fold. Nonzero/moving/malformed clips are not repaired silently.
+Both smoke scripts exercise both exports. Exact pre-atlas oriented geometry,
+normal XYZ, UV0 and skin hashes, baked finish channels, every round's three
+finish regions, actual collapsed ammunition vertices, fractional endpoints,
+STEP visibility and 240 Hz control/contact parity are checked. Pouch clearance
+selects the original black/fabric surfaces by atlas tile instead of material name;
+it does not enlarge the enclosure across empty space below the mounting tongue.
+CPU AgX comparisons cover studio sides, feed/optic/markings close-ups and reload
+poses. Final native-WebGPU/KTX2 visual review and human sign-off remain required.
 
 ## Approved UV precision exception
 

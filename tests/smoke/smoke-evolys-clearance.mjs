@@ -107,10 +107,17 @@ async function checkAsset(url) {
       inv.copy(parent.matrixWorld).invert();
       box.makeEmpty();
       parent.traverse((m) => {
-        if (!m.isMesh || (!m.material.name.startsWith('06') && !m.material.name.startsWith('02')))
-          return;
+        if (!m.isMesh) return;
+        // Atlas tiles 1/5 are the original black lid/fabric finishes. Keep the
+        // same physical enclosure as the source-material test, not an enlarged
+        // box spanning the empty space below the separate steel mounting tongue.
+        const finish = m.geometry.attributes.uv1;
+        assert(finish, 'baked finish coordinates must exist');
         transform.multiplyMatrices(inv, m.matrixWorld);
         for (const index of m.geometry.index.array) {
+          const tile =
+            Math.floor(finish.getX(index) * 4) + 4 * Math.floor((1 - finish.getY(index)) * 4);
+          if (tile !== 1 && tile !== 5) continue;
           point.fromBufferAttribute(m.geometry.attributes.position, index).applyMatrix4(transform);
           box.expandByPoint(point);
         }
