@@ -29,6 +29,7 @@ export function convertWeaponScene(
 ): WeaponSceneMaterials {
   const result: WeaponSceneMaterials = { materials: new Set(), textures: new Set() };
   const replacements = new Map<Material, MeshPhysicalNodeMaterial>();
+  const sharedTextures = new Map<string, Texture>();
   scene.traverse((object): void => {
     if (!isMesh(object)) return;
     if (requireSingleMaterial && Array.isArray(object.material)) {
@@ -42,6 +43,42 @@ export function convertWeaponScene(
     if (!replacement) {
       replacement = createWeaponMaterial(source);
       configure?.(source, replacement);
+      // GLTFLoader clones UV1 maps per assignment, including roughness/metalness.
+      // Reuse only identical static maps; WebGPU otherwise uploads every clone.
+      for (const slot of [
+        'map',
+        'normalMap',
+        'roughnessMap',
+        'metalnessMap',
+        'emissiveMap',
+        'aoMap',
+      ] as const) {
+        const texture = replacement[slot];
+        if (!texture) continue;
+        if (texture.matrixAutoUpdate) texture.updateMatrix();
+        const key = JSON.stringify([
+          texture.source.uuid,
+          texture.channel,
+          texture.mapping,
+          texture.format,
+          texture.type,
+          texture.colorSpace,
+          texture.wrapS,
+          texture.wrapT,
+          texture.magFilter,
+          texture.minFilter,
+          texture.anisotropy,
+          texture.flipY,
+          texture.premultiplyAlpha,
+          texture.unpackAlignment,
+          texture.generateMipmaps,
+          texture.matrixAutoUpdate,
+          ...texture.matrix.elements,
+        ]);
+        const shared = sharedTextures.get(key);
+        if (shared) replacement[slot] = shared;
+        else sharedTextures.set(key, texture);
+      }
       for (const value of Object.values(replacement as object)) {
         if (isTexture(value)) result.textures.add(value);
       }
