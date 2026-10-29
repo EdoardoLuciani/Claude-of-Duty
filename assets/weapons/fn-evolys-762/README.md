@@ -20,7 +20,12 @@ Accessory loadout, unpublished depths/cloth and mechanism internals aren't certi
 ## Source/runtime contract
 
 Python is the weapon-authoring authority; `fn-evolys-762.blend/.glb` are generated
-packed preview/runtime products, never build inputs. `manifest.json` records
+packed preview/native-export products, never build inputs. The derived
+`fn-evolys-762.runtime.glb` uses gltfpack 1.3 with the shared cook flags and no
+additional simplification flags; the native adapter load path remains operational
+until shared runtime-loader integration. See the local guide's
+[native/export optimization](../../../tools/blender/evolys/README.md#nativeexport-optimization)
+for source changes, retained mechanisms and validation limits. `manifest.json` records
 events/belt, `hand-reference.json` is read-only versioned hand calibration, and
 `photo-review.json` freezes review registration. Shared review-arm appearance is
 also read-only and excluded from export. See the [edit map and build stages](../../../tools/blender/evolys/README.md).
@@ -48,9 +53,9 @@ Caps: <150k triangles, ≤48 primitives, ≤18 materials, three 1024² maps, ≤
 ```sh
 # Only when intentionally changing shared calibration/contact inputs:
 # node tools/evolys-hand-reference.mjs
-blender -b -t 4 --python-exit-code 1 --python tools/blender/evolys_762.py
+blender -b -t 2 --python-exit-code 1 --python tools/blender/evolys_762.py
 # Full scratch build, without touching committed products/calibration:
-blender -b -t 4 --python-exit-code 1 --python tools/blender/evolys_762.py -- \
+blender -b -t 2 --python-exit-code 1 --python tools/blender/evolys_762.py -- \
   --output /tmp/evolys-review --quick
 blender -b assets/weapons/fn-evolys-762/fn-evolys-762.blend \
   --python-exit-code 1 --python tools/blender/evolys_check.py

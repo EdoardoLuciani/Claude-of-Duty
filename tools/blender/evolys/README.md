@@ -10,6 +10,7 @@
 | Final source UV precision                                              | Binary-grid loop after atlas assignment                 |
 | Eight sparse actions, hands and events                                 | `../evolys_actions.py`: `author_actions`                |
 | Runtime lattice, endpoint/STEP preparation and read-only assertions    | `export.py`: `prepare_export_actions`                   |
+| Native static-surface consolidation after saving editable assemblies   | `export.py`: `consolidate_static_surfaces`              |
 
 Read-only inputs are `assets/weapons/fn-evolys-762/hand-reference.json` and shared
 `assets/player/arms/player-arms.blend`; photo-review data freezes registration,
@@ -30,7 +31,44 @@ Keep one eight-joint/three-primitive belt at 12.7 mm pitch. Runtime owns persist
 remaining-round masks, the departing last round and insertion/reset behavior;
 native constant channels must never resurrect spent ammunition.
 
+## Native/export optimization
+
+The recipe uses two bevel segments instead of three at the same radii. This
+reduces the native mesh from 74,888 to 53,059 triangles without removing markings,
+rails, vents or mechanical parts. Close-up bevel profiles are slightly coarser.
+After saving the editable assemblies and sparse Actions, the native export joins
+receiver, handguard and optic surfaces with identical rigid motion. Their 16
+material submissions become seven (six opaque finishes and a separate alpha
+lens), reducing the complete export from 35 to 26 primitive instances. Distinct
+finishes are not merged or recolored. Stock, cover, trigger, charging slider,
+bolt, both independent pouches and the three-primitive belt remain separate.
+Named controls/sockets remain; the three static mesh names exist in the editable
+blend, while their exported geometry is `static_surfaces`.
+
+`fn-evolys-762.runtime.glb` is generated from the native export with gltfpack 1.3
+and `build/models.mjs`'s `GLTFPACK_FLAGS`, with **no additional flags**. Tested
+`-si 0.75 -se 0.0002 -sp` and `-si 0.5 -se 0.0005 -sp` variants saved only 29,356
+and 83,416 bytes and both increased gzip size. No extra simplification was chosen.
+The selected cook removes degenerate triangles/shares geometry (51,793 unique /
+52,977 instantiated triangles) and keeps 26 primitive instances, ten materials,
+three 1024² UASTC maps and eight clips. Native maps and material factors are not
+rebaked or compensated. Native/runtime bytes are 8,140,248 / 3,854,832.
+
+The adapter retains its native load path pending shared-loader integration.
+`makeEvolysModel` also accepts the decoded runtime candidate: it restores manifest
+float32 clip durations because gltfpack collapses the entirely constant Idle to
+a single t=0 key. Both smoke scripts exercise both exports. Constant-key holds
+are checked against native controls, contacts, sockets, fractional endpoints and
+STEP visibility; actual deformed belt vertices must collapse when ammunition is
+masked. Sleeve/pouch and stock/head clearance checks remain geometry-based.
+CPU AgX comparisons cover studio sides, feed/optic close-ups and reload poses;
+final native-WebGPU/KTX2 visual review and human sign-off remain required.
+
 ## Approved UV precision exception
+
+The measurements and bounded WebGPU review below refer to the historical
+74,888-triangle / 35-primitive source, not the optimized bevel/export profile.
+The same UV rounding rule is retained, without repacking or reprojecting maps.
 
 Unmodified Blender-host builds varied by up to `1.1920928955078125e-7` in
 modifier-interpolated UVs. Explicitly approved rounding to nearest **1/16384**,
