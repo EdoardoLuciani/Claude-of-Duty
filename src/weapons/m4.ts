@@ -32,6 +32,12 @@ const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
 export function makeM4Model(gltf: GLTF): M4Model {
   const scene = gltf.scene;
   const { root, animations, point } = authoredModel(gltf, 'M4_RIG', REQUIRED, scene);
+  // gltfpack reduces a wholly constant Idle to one key at t=0. Keep the
+  // authored timeline authoritative for native and decoded runtime products.
+  for (const [name, { duration }] of Object.entries(manifest.clips)) {
+    const clip = animations.find((clip): boolean => clip.name === name);
+    if (clip) clip.duration = duration;
+  }
   const model = {
     id: 'rifle' as const,
     label: 'M4A1',

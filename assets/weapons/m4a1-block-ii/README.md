@@ -28,7 +28,8 @@ record reference limitations.
 Eight native clips preserve events/durations, shared IK/ADS/sway/reactive recoil.
 Keep invertible rest seats, matching NLA tracks, visible spare descendants and
 empty-reload latch/stock/deformed-arm clearance. No duplicate arms/live cases.
-Caps: <110k triangles, ≤40 primitives, ≤16 materials, four 1024² maps, ≤10 MiB.
+Native export caps: ≤91k instanced triangles, ≤29 primitive instances, 12 materials,
+four 1024² maps, ≤7.6 MB (decimal).
 The selected balanced finish adds a receiver-only albedo map with 25% of the
 original variation around the same mean. The other three maps remain shared.
 Receiver linear RGB is .041/.043/.046, roughness .44, normal strength .08;
@@ -49,16 +50,78 @@ world zoom, sight dimensions and ballistics are independent.
 ```sh
 # Only when intentionally changing shared hand calibration:
 # node tools/m4-hand-reference.mjs
-blender -b --threads 8 --python-exit-code 1 --python tools/blender/m4a1.py -- --quick
+blender -b --threads 2 --python-exit-code 1 --python tools/blender/m4a1.py -- --quick
 # Non-destructive scratch build:
-blender -b --threads 8 --python-exit-code 1 --python tools/blender/m4a1.py -- \
+blender -b --threads 2 --python-exit-code 1 --python tools/blender/m4a1.py -- \
   --output /tmp/m4-authoring-review --quick
 blender -b assets/weapons/m4a1-block-ii/m4a1-block-ii.blend \
   --python-exit-code 1 --python tools/blender/m4_check.py
 node tests/smoke/smoke-m4.mjs
+node tests/smoke/smoke-m4-cook.mjs
 ```
 
 Use frozen uniform registration for visual review: no after-only reframing or
 independent X/Y warp; final native frames are authority.
 History: [#339](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/339),
 [sight approval #343](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/343).
+
+## Optimized native export and runtime candidate
+
+Python still saves individually editable components, maps and sparse actions in
+`m4a1-block-ii.blend` before export preparation. Cylinder edge radii use one
+chamfer instead of two strips (the exact aiming post is excluded); the 0.2 mm
+Picatinny cross-section corners use three samples instead of four. No vent,
+letter, bore, mechanical contact, socket or aiming dimension is removed.
+At export, fixed receiver/handguard/stock geometry is joined across assembly
+boundaries into one indexed mesh with a primitive per compatible finish. Named
+`handguard`/`stock` seats remain as empty helpers. Moving mechanisms, independent
+magazine drops, top-round visibility and named iron meshes stay separate.
+The 12 distinct physical finishes and four original maps are unchanged; sharing
+incompatible finishes would require rebaking or changing their appearance.
+
+| Measure | Previous native | Optimized native | Runtime candidate |
+| --- | ---: | ---: | ---: |
+| File bytes | 8,270,588 | 7,574,992 | 4,960,516 |
+| gzip -9 bytes | 4,610,834 | 4,415,505 | 3,959,768 |
+| Unique triangles | 98,405 | 83,363 | 83,355 |
+| Instanced triangles | 105,647 | 90,605 | 90,597 |
+| Primitive instances | 32 | 29 | 29 |
+| Idle opaque primitive submissions (scene-derived) | 27 | 24 | 24 |
+| Materials / images | 12 / 4 | 12 / 4 | 12 / 4 |
+| Decoded vertex/index array bytes | 4,317,342 | 3,624,274 | 3,151,490 |
+
+Array bytes are measured from GLTFLoader's unique typed arrays, not measured GPU
+allocation or an FPS claim. Maps remain 1024². Runtime UASTC KTX2 images add all
+11 mip levels, preserve sRGB albedos / linear roughness and full RGB normal XYZ.
+
+Reproduce the candidate with gltfpack **1.3** through the shared cook function
+without overwriting the native export:
+
+```sh
+node --input-type=module -e "import {cookModel} from './build/models.mjs'; cookModel({input:'assets/weapons/m4a1-block-ii/m4a1-block-ii.glb',output:'assets/weapons/m4a1-block-ii/m4a1-block-ii.runtime.glb',flags:['-noq']})"
+```
+
+Use shared `GLTFPACK_FLAGS` plus `['-noq']`. Tested simplification ratios
+0.75/0.60/0.50 with error limits 0.0002/0.0005/0.001 changed the precision-critical
+iron meshes. Even unsimplified float-position quantization at 16 bits moves the
+aperture outside its existing 2 µm diameter check. Do not relax the iron checks:
+`-noq` keeps indexed positions/UVs/winding, retaining all nondegenerate surfaces.
+Additional nonquantized simplification with 0.000002/0.00001 error limits saved
+only 6–31 kB and made gzip larger, so it is not selected. The cook removes eight
+zero-area triangles. It also collapses constant Idle keys to t=0; `makeM4Model`
+restores all manifest-owned durations, keeping the 2 s Idle timeline.
+
+The native loader URL/signature intentionally remain operational. Parent
+integration must register this profile and enable shared KTX2/meshopt loading
+before selecting `.runtime.glb`. No EXPS3 attachment data or shared optic mounting,
+ADS, arm appearance or hand calibration was changed. Both products run the full
+M4 behavioral/actual arm-skin/contact suite. The cook test additionally checks
+materials, map color spaces/channels/mips, names, indexed surfaces, STEP tracks
+and 2,791 fractional/event-adjacent poses. Native motion is unchanged; cooked
+maximum local translation error is 0.000051 mm and normalized quaternion error
+is 0.004635 degrees. Final native-WebGPU visual/performance review remains an
+integration gate. Matched CPU previews also use RGBA32-transcoded candidate
+textures; the normal map has 1.334/255 RGB RMSE (maximum 13/255), while
+receiver albedo is unchanged and the other two maps have <0.166/255 RMSE.
+This accepts very slight micro-normal grain loss, not material/color compensation
+or a claim about native GPU texture-format fidelity.
