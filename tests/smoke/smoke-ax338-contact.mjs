@@ -32,10 +32,19 @@ const vm = new Viewmodel(
 );
 vm.armL.attachAsset({ meshes });
 vm.armR.attachAsset({ meshes });
-vm.addWeapon(makeAX338Model(await load(new URL(AX338_URL))), {
-  ...WEAPON_DEFS.sniper,
-  cycleTime: 60 / WEAPON_DEFS.sniper.rpm,
-});
+vm.addWeapon(
+  makeAX338Model(
+    await load(
+      process.env.AX338_RUNTIME
+        ? new URL('../../assets/weapons/ax338/ax338.runtime.glb', import.meta.url)
+        : new URL(AX338_URL)
+    )
+  ),
+  {
+    ...WEAPON_DEFS.sniper,
+    cycleTime: 60 / WEAPON_DEFS.sniper.rpm,
+  }
+);
 vm.setActive('sniper');
 vm.stopClip();
 const state = {

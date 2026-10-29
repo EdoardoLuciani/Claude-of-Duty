@@ -21,8 +21,8 @@ assert.equal(primitives.length, manifest.stats.primitives);
 assert.equal(bytes.length, manifest.stats.bytes);
 assert(
   triangles < 150000 &&
-    primitives.length <= 48 &&
-    json.materials.length <= 18 &&
+    primitives.length <= 11 &&
+    json.materials.length === 2 &&
     bytes.length <= 15 * 1024 * 1024
 );
 assert.equal(json.images.length, 3);
@@ -52,21 +52,46 @@ const gltf = await parseGLB(bytes);
 // Freeze the approved rifle and hand channels. Only the three holding fingers
 // and an empty-reload wrist hold (preventing early drift) may change.
 gltf.scene.updateMatrixWorld(true);
-const rifleHash = createHash('sha256'),
-  protectedTracks = createHash('sha256');
-gltf.scene.traverse((o) => {
-  if (!o.isMesh) return;
-  rifleHash.update(o.name);
-  rifleHash.update(o.material.name);
-  rifleHash.update(JSON.stringify(o.matrixWorld.toArray()));
-  for (const key of ['position', 'uv'])
-    rifleHash.update(Buffer.from(o.geometry.attributes[key].array.buffer));
-});
+// Material packing changes primitive partition and adds UV1/COLOR_0, not the
+// approved triangle surfaces, winding or UV0. Canonicalize only index ordering.
+function surfaceHash(root, normals = false) {
+  root.updateMatrixWorld(true);
+  const triangles = [],
+    point = new THREE.Vector3(),
+    normal = new THREE.Vector3();
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const attributes = o.geometry.attributes,
+      index = o.geometry.index;
+    const normalMatrix = new THREE.Matrix3().getNormalMatrix(o.matrixWorld);
+    for (let i = 0; i < index.count; i += 3) {
+      const vertices = [];
+      for (let j = 0; j < 3; j++) {
+        const id = index.getX(i + j);
+        point.fromBufferAttribute(attributes.position, id).applyMatrix4(o.matrixWorld);
+        normal.fromBufferAttribute(attributes.normal, id).applyMatrix3(normalMatrix);
+        const values = [
+          ...point.toArray(),
+          ...(normals ? normal.toArray() : []),
+          attributes.uv.getX(id),
+          attributes.uv.getY(id),
+        ];
+        // Offset avoids decimal half-grid ties in authored metre coordinates.
+        vertices.push(values.map((v) => Math.round(v * 1e5 + 0.12345)).join(','));
+      }
+      triangles.push(
+        [0, 1, 2].map((j) => [...vertices.slice(j), ...vertices.slice(0, j)].join(';')).sort()[0]
+      );
+    }
+  });
+  return createHash('sha256').update(triangles.sort().join('\n')).digest('hex');
+}
 assert.equal(
-  rifleHash.digest('hex'),
-  'f5b16ba0fc55dc91e4c44c367c341454fa47b3b8117d9846ce6ccf715da16ba9',
-  'approved rifle mesh positions/UVs/transforms unchanged'
+  surfaceHash(gltf.scene),
+  '78675d7fe241add878c0cfb08d14ad3225183895f5b4c5d35f284f4bdd65dd69',
+  'approved rifle triangle positions, winding, UV0 and transforms unchanged to 10 micrometre lattice'
 );
+const protectedTracks = createHash('sha256');
 for (const clip of gltf.animations) {
   protectedTracks.update(clip.name);
   protectedTracks.update(String(clip.duration));
@@ -88,20 +113,18 @@ assert.equal(
   'approved index/thumb, left hand and weapon clips unchanged'
 );
 // User-approved optic must not be incidentally rebuilt by furniture fixes.
-const opticHash = createHash('sha256');
-gltf.scene.getObjectByName('optic').traverse((o) => {
-  if (!o.isMesh) return;
-  opticHash.update(o.material.name);
-  for (const key of ['position', 'normal', 'uv'])
-    opticHash.update(Buffer.from(o.geometry.attributes[key].array.buffer));
-  opticHash.update(Buffer.from(o.geometry.index.array.buffer));
-});
 assert.equal(
-  opticHash.digest('hex'),
-  'c7d56f9a55b53d63f38eb4e73fe3a892dea13022ef2c78ae97bd7dc4741213c3',
-  'approved PM II geometry/normals/UVs/indices unchanged'
+  surfaceHash(gltf.scene.getObjectByName('optic'), true),
+  '2f0154718dcc1f99d5cd49f4825002356d593bf9de655fc32c95da130ff0fe61',
+  'approved PM II geometry, winding, normals and UV0 unchanged'
 );
-const model = makeAX338Model(gltf),
+const model = makeAX338Model(
+    process.env.AX338_RUNTIME
+      ? await parseGLB(
+          readFileSync(new URL('../../assets/weapons/ax338/ax338.runtime.glb', import.meta.url))
+        )
+      : gltf
+  ),
   anim = new AX338Animation(model),
   def = WEAPON_DEFS.sniper;
 assert(
@@ -163,7 +186,16 @@ for (const action of Object.values(anim.actions)) {
   const clip = action.getClip();
   for (const track of clip.tracks) {
     assert(track.values.every(Number.isFinite));
-    assert(Math.abs(track.times.at(-1) - clip.duration) < 1e-6, `${clip.name}: complete channel`);
+    if (!process.env.AX338_RUNTIME)
+      assert(
+        Math.abs(track.times.at(-1) - clip.duration) < 1e-6,
+        `${clip.name}: complete native channel`
+      );
+    else
+      assert(
+        track.times[0] === 0 && track.times.at(-1) <= clip.duration + 1e-6,
+        `${clip.name}: bounded cooked channel`
+      );
     for (let i = 1; i < track.times.length; i++) assert(track.times[i] >= track.times[i - 1]);
   }
 }
@@ -183,7 +215,8 @@ assert(
 anim.update(0, 'cycle', 0.22 * def.boltTime, false);
 assert(Math.abs(anim.bolt.position.z - rest.z - 0.1) < 0.00001, '100 mm authored rear stroke');
 assert(
-  Math.abs(anim.bolt.quaternion.angleTo(restQ) - Math.PI / 3) < 0.00001,
+  Math.abs(anim.bolt.quaternion.angleTo(restQ) - Math.PI / 3) <
+    (process.env.AX338_RUNTIME ? 0.0001 : 0.00001),
   '60-degree bolt lift'
 );
 const p = new THREE.Vector3(),

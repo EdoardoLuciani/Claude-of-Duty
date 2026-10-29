@@ -18,6 +18,7 @@ INPUT=ROOT/'assets/weapons/ax338'
 sys.path.insert(0,str(Path(__file__).parent))
 from ax338_actions import author_actions
 from ax338.export import prepare_export_actions, validate_export
+from ax338.finishes import consolidate_finishes
 
 
 def build(output,render=False,quick=False):
@@ -401,6 +402,7 @@ def build(output,render=False,quick=False):
         points=[C.inverted()@(inverse@(o.matrix_world@v.co)) for v in o.data.vertices]
         contact_boxes.append({'part':o.name,'min':[round(min(p[i] for p in points),8) for i in range(3)],'max':[round(max(p[i] for p in points),8) for i in range(3)]})
     # Consolidation operates after source save and only on runtime geometry.
+    consolidate_finishes(asset,rough,albedo,normal,OUT)
     for parent in (body,hg,stock,optic,bolt,trigger,mag,spare,mag_rounds,spare_rounds):
         objects=[o for o in list(asset.objects) if o.type=='MESH' and o.parent==parent]
         if not objects:continue
@@ -419,7 +421,7 @@ def build(output,render=False,quick=False):
     (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     assert stats['triangles']<150000 and stats['primitives']<=48 and stats['materials']<=18 and stats['images']==3 and stats['bytes']<=15*1024*1024,stats
     print('AX338 export:',json.dumps(stats))
-    for name in ('ax338_surface.png','ax338_roughness.png','ax338_normal.png'):(OUT/name).unlink(missing_ok=True)
+    for name in ('ax338_surface.png','ax338_roughness.png','ax338_normal.png','ax338_finishes.png'):(OUT/name).unlink(missing_ok=True)
 
 
 def main():
