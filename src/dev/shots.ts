@@ -210,17 +210,6 @@ export const SHOTS: Record<string, ShotDefinition> = {
       e.ctx.peek('fx')?.debugBurst?.('wall'),
     doc: 'Bullet impacts on a wall — decals, debris, dust puffs, sparks.',
   },
-  hud: {
-    pos: [12, 1.75, 18],
-    look: [-4, 2.2, -6],
-    fov: 80,
-    time: 16.5,
-    apply: (
-      e
-    ): { state: string; frames?: undefined } | { state: string; frames: string } | undefined =>
-      e.ctx.peek('ui')?.debugState?.('combat'),
-    doc: 'Full HUD in combat — layout, typography, readability, hit feedback.',
-  },
 };
 
 function shotRenderInfo(engine: Engine): {
@@ -307,13 +296,10 @@ export function installShotApi(
     player?.teleport?.(cam.position, cam.rotation);
 
     // Shots are applied back to back in one browser session, so clear the
-    // previous shot's *looping* debug state first. Without this the `muzzle`
-    // shot's scripted burst is still emptying the magazine during `combat`, and
-    // `impacts` keeps walking rounds across a wall behind the HUD shot.
+    // previous shot's looping debug state before staging the next one.
     engine.ctx.peek('weapons')?.debugPose?.('idle');
     engine.ctx.peek('radio')?.clearStrike?.();
     engine.ctx.peek('fx')?.debugBurst?.('none');
-    engine.ctx.peek('ui')?.debugState?.('clean');
 
     if (shot.time !== undefined) engine.ctx.peek('sky')?.setTimeOfDay?.(shot.time);
     shot.apply?.(engine, readShotOptions(options));

@@ -327,10 +327,8 @@ export class Viewmodel {
   declare onClipEvent: ((name: string, clipName: string) => void) | null;
   declare recPos: Spring3;
   declare recRot: Spring3;
-  declare rigOverride: { position: THREE.Vector3; quaternion: THREE.Quaternion } | null;
   declare settle: Spring3;
   declare sprintT: number;
-  declare trackCamera: boolean;
   declare triggerT: number;
   declare triggerTarget: number;
 
@@ -666,9 +664,6 @@ export class Viewmodel {
     this._sightLocal = new THREE.Vector3();
 
     this.debugFrozen = false;
-    /** Set false by the preview harness to leave the cameras alone. */
-    this.trackCamera = true;
-    this.rigOverride = null;
   }
 
   /* ====================================================================== */
@@ -1480,12 +1475,6 @@ export class Viewmodel {
       this.rig.position.set(0, -0.35 * (1 - present + stow), 0);
       this.rig.quaternion.identity();
     }
-    // The standalone preview harness pins the rig so the weapon can be framed
-    // in its own space; everything downstream reads the composed transform.
-    if (this.rigOverride) {
-      this.rig.position.copy(this.rigOverride.position);
-      this.rig.quaternion.copy(this.rigOverride.quaternion);
-    }
     this.rig.updateMatrix();
     this.rig.updateMatrixWorld(true);
 
@@ -1738,7 +1727,6 @@ export class Viewmodel {
 
   /** Copy the gameplay camera onto the viewmodel anchor and view camera. */
   syncToCamera(): void {
-    if (!this.trackCamera) return;
     const cam = this.ctx.camera;
     const vcam = this.ctx.viewCamera;
     cam.updateMatrixWorld();

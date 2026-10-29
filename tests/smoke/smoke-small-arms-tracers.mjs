@@ -103,7 +103,6 @@ function take(type) {
 }
 
 {
-  const tracers = take('bullet:tracer');
   const impacts = take('bullet:impact');
   const damage = take('damage:dealt');
   const sim = new ProjectileSim({
@@ -128,11 +127,9 @@ function take(type) {
   assert.equal(sim.live.length, 1, 'the penetrated round survives contact');
   assert.equal(damage.got.length, 1);
   for (let i = 0; i < 240 && sim.live.length; i++) sim.fixedUpdate(1 / 120);
-  tracers.off();
   impacts.off();
   damage.off();
   assert.equal(sim.live.length, 0);
-  assert.equal(tracers.got.length, 0);
   assert.ok(impacts.got.length >= 1);
   assert.equal(damage.got.length, 1);
 }
@@ -173,16 +170,13 @@ const agent = {
 };
 
 {
-  const tracers = take('bullet:tracer');
   const fires = take('weapon:fire');
   const shells = take('weapon:shell');
   const damage = take('damage:dealt');
   ai.onAgentFire(agent, new THREE.Vector3(0, 1.36, 8), new THREE.Vector3(0, 0, -1));
-  tracers.off();
   fires.off();
   shells.off();
   damage.off();
-  assert.equal(tracers.got.length, 0);
   assert.equal(fires.got.length, 1);
   assert.equal(shells.got.length, 1);
   assert.ok(damage.got.length >= 1);

@@ -8,7 +8,6 @@ import { AmmoPanel } from './ammo.ts';
 import { Compass, ScoreBar } from './compass.ts';
 import { Crosshair } from './crosshair.ts';
 import { DamageArcs } from './damage.ts';
-import { CombatDemo } from './demo.ts';
 import { GameOverScreen } from './gameover.ts';
 import { HealthFx } from './health.ts';
 import { Hitmarkers } from './hitmarkers.ts';
@@ -45,12 +44,10 @@ const HEAL_KEY = bindingLabel('heal');
  *   ui.killfeed.push({attacker,victim,headshot,mine,attackerFriendly})
  *   ui.banner.show(title, sub, life)    kill / objective confirmation
  *   ui.setPrompt({key,text,sub,progress}, owner?) / ui.clearPrompt(owner?)
- *   ui.setObjectives([{position,label,name}])
- *   ui.setBlips([{x,z,kind:'enemy'|'friend',heading}])
  *   ui.spawnGrenade(worldPos, fuse)
  *   ui.setHudVisible(bool)              hide everything (cinematics)
  *   ui.pause() / ui.resume() / ui.menu.toggle()
- *   ui.debugState('combat'|'menu'|'clean'|'market')
+ *   ui.debugState('market')
  *
  * ---------------------------------------------------------------------------
  * WHAT THIS SUBSYSTEM READS FROM OTHERS (optional providers, complete snapshots)
@@ -104,7 +101,6 @@ interface HudState {
   waveTotal: number;
   waveIncoming: boolean;
   nextWaveIn: number;
-  simulate: boolean;
   time: number;
 }
 interface Blip {
@@ -112,15 +108,6 @@ interface Blip {
   z: number;
   kind: 'enemy' | 'friend';
   heading: number;
-  fade?: number;
-}
-interface BlipInput {
-  x?: number;
-  z?: number;
-  position?: THREE.Vector3;
-  kind?: 'enemy' | 'friend';
-  friendly?: boolean;
-  heading?: number;
   fade?: number;
 }
 interface CompassMarker {
@@ -201,7 +188,6 @@ export class UiSystem {
   _mmState?: MinimapFrame;
   _mmObjs?: { x: number; z: number; label: string }[];
   _promptOwner?: unknown;
-  demo!: CombatDemo | null;
   _unsubs!: (() => void)[];
 
   async init(ctx: UiContext): Promise<void> {
@@ -279,8 +265,6 @@ export class UiSystem {
       waveTotal: 0,
       waveIncoming: false,
       nextWaveIn: 0,
-      /** true when no player/weapons subsystem is driving us (stub-safe demo) */
-      simulate: false,
       time: 0,
     };
 
@@ -303,8 +287,6 @@ export class UiSystem {
     for (let i = 0; i < MAX_BLIPS; i++) this._blips[i] = { x: 0, z: 0, kind: 'enemy', heading: 0 };
     this._blipCount = 0;
     this._blipView = [];
-
-    this.demo = null;
 
     this._unsubs = [];
     const on = <K extends EngineEventName>(
@@ -486,9 +468,8 @@ export class UiSystem {
       this.sfx('intel_call', 0.55);
     });
     on('intel:secured', (e): void => {
-      const label = e?.cardLabel || 'Cache secured';
       const credits = e?.credits ?? 0;
-      this.banner.show('Intel Secured', `+${credits} CREDITS · ${label} ARCHIVED`, 3);
+      this.banner.show('Intel Secured', `+${credits} CREDITS`, 3);
       this.sfx('market_buy', 0.75);
     });
 
@@ -584,25 +565,6 @@ export class UiSystem {
     this.prompt.clear();
   }
 
-  setObjectives(list: { position: THREE.Vector3; label: string; name: string }[]): void {
-    this._objectives = list ?? [];
-  }
-
-  /** Copies into a preallocated array — the caller's array is not retained. */
-  setBlips(list: BlipInput[]): void {
-    const n = Math.min(list?.length ?? 0, MAX_BLIPS);
-    for (let i = 0; i < n; i++) {
-      const src = list[i];
-      const dst = this._blips[i];
-      dst.x = src.x ?? src.position?.x ?? 0;
-      dst.z = src.z ?? src.position?.z ?? 0;
-      dst.kind = src.kind ?? (src.friendly ? 'friend' : 'enemy');
-      dst.heading = src.heading ?? 0;
-      dst.fade = src.fade ?? 1;
-    }
-    this._blipCount = n;
-  }
-
   spawnGrenade(worldPos: THREE.Vector3, fuse = 2.4): void {
     this.markers.spawnGrenade(worldPos, fuse);
     this.sfx('grenade_warn', 0.6);
@@ -628,52 +590,24 @@ export class UiSystem {
 
   /* --------------------------------------------------------------- debug -- */
 
-  /**
-   * Populate a representative state for screenshots / critics.
-   * 'combat' runs the scripted firefight timeline in demo.ts.
-   */
-  debugState(
-    name = 'combat'
-  ): { state: string; frames?: undefined } | { state: string; frames: string } {
-    if (name === 'clean') {
-      this.demo?.stop(this);
-      this.demo = null;
-      this.state.simulate = false;
-      this.killfeed.clear();
-      this.arcs.clear();
-      this.hit.clear();
-      this.markers.clear();
-      this.clearPrompt();
-      return { state: 'clean' };
+  /** Prepare the market state for integration checks. */
+  debugState(name: 'market'): { state: string } {
+    if (name !== 'market') throw new Error('Unknown UI debug state');
+    this.menu.close();
+    this.killfeed.clear();
+    this.clearPrompt();
+    const rifle = this.ctx.peek('weapons')?.states?.get('rifle');
+    if (rifle) rifle.reserve = Math.round((rifle.def?.reserve ?? 90) * 0.4);
+    const hp = this.ctx.peek('player')?.health;
+    if (hp) hp.armour = 50;
+    const m = this.ctx.peek('market');
+    if (m) {
+      m.credits = 1850;
+      if (!m.open) m.openShop(3);
     }
-    if (name === 'menu') {
-      this.debugState('combat');
-      this.menu.show();
-      return { state: 'menu' };
-    }
-    if (name === 'market') {
-      this.demo?.stop(this);
-      this.demo = null;
-      this.state.simulate = false;
-      this.menu.close();
-      this.killfeed.clear();
-      this.clearPrompt();
-      const rifle = this.ctx.peek('weapons')?.states?.get('rifle');
-      if (rifle) rifle.reserve = Math.round((rifle.def?.reserve ?? 90) * 0.4);
-      const hp = this.ctx.peek('player')?.health;
-      if (hp) hp.armour = 50;
-      const m = this.ctx.peek('market');
-      if (m) {
-        m.credits = 1850;
-        if (!m.open) m.openShop(3);
-      }
-      this.shop.show(3);
-      this.shop.shown = 1;
-      return { state: 'market' };
-    }
-    if (!this.demo) this.demo = new CombatDemo();
-    this.demo.start(this);
-    return { state: 'combat', frames: 'timeline keyed to frame 90' };
+    this.shop.show(3);
+    this.shop.shown = 1;
+    return { state: 'market' };
   }
 
   /* -------------------------------------------------------------- frame --- */
@@ -728,9 +662,7 @@ export class UiSystem {
     this.shop.update(rawDt);
 
     // ---- external state --------------------------------------------------
-    // `simulate` means a scripted debug timeline owns the HUD numbers; letting
-    // the live weapon/player state through would fight it every frame.
-    const ws = s.simulate ? null : this._weaponState();
+    const ws = this._weaponState();
     if (ws) {
       if (ws.name) s.weaponName = ws.name;
       if (ws.mode) s.fireMode = ws.mode;
@@ -748,7 +680,7 @@ export class UiSystem {
       s.carpetCount = ws.carpetCount;
     }
 
-    const gameState = s.simulate ? null : ctx.peek('game')?.getHudState?.();
+    const gameState = ctx.peek('game')?.getHudState?.();
     if (gameState) {
       s.score = gameState.score;
       s.wave = gameState.wave;
@@ -758,13 +690,13 @@ export class UiSystem {
       s.nextWaveIn = gameState.nextWaveIn;
     }
 
-    const marketState = s.simulate ? null : ctx.peek('market')?.getHudState?.();
+    const marketState = ctx.peek('market')?.getHudState?.();
     if (marketState) {
       s.credits = marketState.credits;
       s.marketIn = marketState.marketIn;
     }
 
-    const ps = s.simulate ? null : this._playerState();
+    const ps = this._playerState();
     if (ps) {
       s.health = ps.health;
       s.maxHealth = ps.maxHealth;
@@ -782,9 +714,6 @@ export class UiSystem {
     }
 
     const pos = this._playerPos();
-
-    // ---- demo timeline ---------------------------------------------------
-    if (this.demo?.active) this.demo.update(this, dt);
 
     // ---- ai blips --------------------------------------------------------
     this._collectBlips();
@@ -878,7 +807,6 @@ export class UiSystem {
   }
 
   _collectBlips(): void {
-    if (this.demo?.active) return; // demo drives its own contacts
     const ai = this.ctx.peek('ai');
     const list = typeof ai?.getHudActors === 'function' ? ai.getHudActors() : null;
     if (!Array.isArray(list)) return;
