@@ -64,8 +64,8 @@ node tests/smoke/smoke-mpx.mjs
 
 ### Runtime candidate cook
 
-`mpx.runtime.glb` is a committed opt-in candidate; `loadMPX()` deliberately keeps
-loading the native path until shared meshopt/KTX2 integration. Both exports run
+`loadMPX(renderer)` loads committed `mpx.runtime.glb` through the shared
+meshopt/KTX2 loader; native `mpx.glb` remains the authoring reference. Both exports run
 through the same adapter and smoke checks via `tools/lib/glb-fixture.mjs`.
 With gltfpack **1.3**, use `cookModel` from `build/models.mjs` and its unchanged
 shared flags plus `['-km', '-vc', '16', '-si', '0.7', '-se', '0.0002', '-sp']`.
@@ -74,7 +74,8 @@ runtime pass policies. `-vc 16` preserves dark linear reflectance; retain `-kn`
 for every socket/helper. No decoder or registry changes are weapon-owned.
 The more aggressive 0.5 / 0.0005 setting was rejected for visible optic-rim
 artifacts. The selected conservative setting preserves lettering and silhouettes
-in matched CPU previews; final native-WebGPU/Basis-texture review is still required.
+in matched previews. Native-WebGPU/Basis-texture captures and forced RGBA fallback
+checks also passed; this is not factory-reference approval or an FPS claim.
 
 All eight authored clip durations/events are unchanged. glTF infers durations
 from keys: gltfpack deduplicates wholly constant Idle to one t=0 key. The adapter
