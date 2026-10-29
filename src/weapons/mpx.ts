@@ -67,6 +67,15 @@ export function makeMPXModel(gltf: GLTF): MPXModel {
       }
     }
   const { root, animations, point } = authoredModel(gltf, 'MPX_RIG', REQUIRED, scene);
+  const idle = animations.find((clip): boolean => clip.name === 'Idle');
+  // gltfpack deduplicates the wholly constant Idle to t=0. glTF has no
+  // explicit clip duration; retain only this observed authored two-second hold.
+  if (
+    idle?.duration === 0 &&
+    idle.tracks.length > 0 &&
+    idle.tracks.every((track): boolean => track.times.length === 1 && track.times[0] === 0)
+  )
+    idle.duration = manifest.clips.Idle.duration;
   const model = {
     id: 'smg' as const,
     label: 'SIG MPX',
