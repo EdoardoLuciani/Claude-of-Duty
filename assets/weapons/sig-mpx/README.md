@@ -33,8 +33,14 @@ No duplicate arms, root recoil or review casing; all DCC controls need NLA track
 Keep exact balance/events, partial-mag retention, empty-mag discard, chamber/+1,
 lockback/cancellation/reset and one live case per shot. Handle is non-reciprocating;
 empty reload uses bolt release. Sound isn't a verified MPX recording.
-Caps: <110k triangles, ≤40 primitives, ≤16 materials including glTF fallback,
-three 1024² maps, ≤10 MiB. Normal builds need no Blender/network.
+Optimized native caps: <80k triangles, ≤18 primitives, four materials including
+glTF fallback, three embedded 1024² maps, ≤10 MiB. Normal builds need no Blender/network.
+Editable components retain all 15 original finishes and three source maps. Runtime
+copies retain full-resolution colour grain on UV0, exact per-corner linear finish
+colours (16-bit normalized export), and padded 248²-per-finish roughness/normal
+XYZ tiles on UV1. Only that subtle procedural grain is reduced; geometry markings,
+rail/optic datums, source normals, sockets and authored contacts are not repacked.
+Tiny magazine witness-dot cap bevels and handguard rim bevels use fewer segments.
 
 Optics use absorptive inward faces and double-sided single-pass sheets, 2% lens/
 1% cover opacity. Dot is nominal 2 MOA in world-camera space with a six-pixel
@@ -45,16 +51,38 @@ mount axis, open caps, fixed battery rim, wrist/contact and eight-action reach g
 ## Rebuild/check (root, Blender 5.2.2)
 
 ```sh
-blender -b -t 4 --python-exit-code 1 --python tools/blender/mpx.py -- \
+OPENBLAS_NUM_THREADS=2 OMP_NUM_THREADS=2 blender -b -t 2 --python-exit-code 1 --python tools/blender/mpx.py -- \
   --output /tmp/mpx-review
 # Omit --output to regenerate committed products after review.
 # Refit calibration only as a separately approved change:
 # node tools/mpx-hand-reference.mjs
-blender -b assets/weapons/sig-mpx/mpx.blend --python-exit-code 1 \
+blender -b -t 2 assets/weapons/sig-mpx/mpx.blend --python-exit-code 1 \
   --python tools/blender/mpx_check.py
 node tests/smoke/smoke-mpx-asset.mjs
 node tests/smoke/smoke-mpx.mjs
 ```
+
+### Runtime candidate cook
+
+`mpx.runtime.glb` is a committed opt-in candidate; `loadMPX()` deliberately keeps
+loading the native path until shared meshopt/KTX2 integration. Both exports run
+through the same adapter and smoke checks via `tools/lib/glb-fixture.mjs`.
+With gltfpack **1.3**, use `cookModel` from `build/models.mjs` and its unchanged
+shared flags plus `['-km', '-vc', '16', '-si', '0.7', '-se', '0.0002', '-sp']`.
+`-km` is required: opaque and absorptive interior use the same atlas but different
+runtime pass policies. `-vc 16` preserves dark linear reflectance; retain `-kn`
+for every socket/helper. No decoder or registry changes are weapon-owned.
+The more aggressive 0.5 / 0.0005 setting was rejected for visible optic-rim
+artifacts. The selected conservative setting preserves lettering and silhouettes
+in matched CPU previews; final native-WebGPU/Basis-texture review is still required.
+
+All eight authored clip durations/events are unchanged. glTF infers durations
+from keys: gltfpack deduplicates wholly constant Idle to one t=0 key. The adapter
+restores its authored two-second hold **only** for that zero-duration/single-key
+case; moving clips and arbitrary Idle durations are not rewritten. Tests retain
+all contact gates and check native/decoded STEP edges and Idle start/interior/end,
+reset and loop poses. Equivalent quaternion signs are compared as orientations,
+with explicit 16-bit quantization bounds and dense world-space motion parity.
 
 Previews use Eevee without ray tracing; common flags follow the shared workflow.
 The [approved UV-repeatability limitation](../../../tools/blender/mpx/README.md#approved-repeatability-limit)
