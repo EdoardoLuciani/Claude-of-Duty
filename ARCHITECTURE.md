@@ -278,9 +278,10 @@ purchase; selecting or inspecting a weapon never changes loadout or credits.
 `build/models.mjs` owns explicit gltfpack runtime-model cooking and per-model
 profiles (`npm run models:cook`). Normal builds consume committed `.runtime.glb`
 products; they do not run the encoder. All seven authored weapons opt in.
-Adding profiles requires adapter, animation and
-visual validation rather than blanket simplification. Native authoring exports
-remain editable references.
+Adding profiles requires adapter, animation and visual validation rather than
+blanket simplification. Editable Blender sources remain authoring references.
+M4/MCX adapters decode packed finish metadata in small weapon-local physical-node
+graphs; their consolidated GLBs require those adapters for material fidelity.
 
 `src/weapons/asset-loader.ts` serializes compressed model loads to bound Basis
 worker/memory use and owns per-load decoder/error cleanup. Material conversion

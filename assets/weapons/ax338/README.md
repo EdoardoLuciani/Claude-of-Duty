@@ -301,9 +301,14 @@ native 60°/100 mm and runtime 1e-4 rad rotation gates are not relaxed. The bolt
 contact sweep additionally checks actual deformed knob triangles, not just target
 helpers, against the original <3 mm glove-pad contact allowance.
 
-No new GPU capture/benchmark was run in this worker lane: serialized native GPU
-allocation, timing, matched appearance and final human sign-off remain parent
-integration gates. Counts alone do not establish performance acceptance.
+Parent native-WebGPU hero/side/ADS/reload/optic captures, RGBA fallback and
+independent review passed on Three r187 / AMD RDNA-4. Uploaded geometry increases
+**5,383,896 → 8,272,448 B**; the geometry-plus-logical-texture subtotal increases
+**9,578,280 → 12,466,832 B** (9.135 → 11.889 MiB), excluding other renderer resources
+and driver padding. This saves draws, not memory; no paired FPS gain is established.
+Independent review confirmed the eight retessellated coplanar guard triangles
+retain the same patch boundary/area and UV vertices. These regression checks do
+not clear the existing human/full-right-hand acceptance limitations below.
 
 ## Known issues and gates
 
