@@ -59,9 +59,8 @@ const binaryStart = 28 + bytes.readUInt32LE(12);
 for (const image of json.images) {
   const view = json.bufferViews[image.bufferView];
   const offset = binaryStart + (view.byteOffset ?? 0);
-  const size = image.name.startsWith('m4_finish_') ? 512 : 1024;
-  assert.equal(bytes.readUInt32BE(offset + 16), size);
-  assert.equal(bytes.readUInt32BE(offset + 20), size);
+  assert.equal(bytes.readUInt32BE(offset + 16), 1024);
+  assert.equal(bytes.readUInt32BE(offset + 20), 1024);
 }
 assert.equal(json.animations.length, 8);
 const albedoStats = (name) => {

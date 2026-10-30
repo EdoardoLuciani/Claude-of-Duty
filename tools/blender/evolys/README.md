@@ -87,7 +87,8 @@ STEP visibility and 240 Hz control/contact parity are checked. Pouch clearance
 selects the original black/fabric surfaces by atlas tile instead of material name;
 it does not enlarge the enclosure across empty space below the mounting tongue.
 CPU AgX comparisons cover studio sides, feed/optic/markings close-ups and reload
-poses. Final native-WebGPU/KTX2 visual review and human sign-off remain required.
+poses. The second-pass section below records completed native-WebGPU/KTX2 checks;
+factory-reference and all-state human acceptance remain separate.
 
 ## Second-pass mechanical consolidation
 
