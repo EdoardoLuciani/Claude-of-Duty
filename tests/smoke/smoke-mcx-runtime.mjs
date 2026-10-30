@@ -6,6 +6,7 @@ import * as THREE from 'three';
 
 import manifest from '../../assets/weapons/mcx-virtus/manifest.json' with { type: 'json' };
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
+import { createWeaponInspection } from '../../src/weapons/inspection.ts';
 import { makeMCXModel, MCXAnimation } from '../../src/weapons/mcx.ts';
 import { inspectGLB, parseGLB } from '../../tools/lib/glb-fixture.mjs';
 
@@ -185,6 +186,64 @@ for (const { model, animation } of sources) {
     false,
     'live casing remains FX-owned'
   );
+  // Loaded Idle has only one opaque skin + lens + seated magazine submission.
+  const visible = [];
+  model.scene.traverseVisible((mesh) => {
+    if (mesh.isMesh) visible.push(mesh);
+  });
+  assert.equal(visible.length, 3, 'real Idle primitive count, not mesh/group renaming');
+  animation.update(0, 'reloadEmpty', 1.4, true);
+  const liveBones = new Set();
+  const liveSnapshot = [];
+  const borrowed = new Set([...model.materials, ...model.textures]);
+  model.scene.traverse((node) => {
+    liveSnapshot.push([
+      node,
+      node.position.toArray(),
+      node.quaternion.toArray(),
+      node.scale.toArray(),
+      node.visible,
+    ]);
+    if (node.isMesh) borrowed.add(node.geometry);
+    if (node.isSkinnedMesh) liveBones.add(node.skeleton);
+  });
+  let borrowedDisposals = 0;
+  for (const resource of borrowed) resource.addEventListener('dispose', () => borrowedDisposals++);
+  const inspection = createWeaponInspection({
+    model,
+    def: { ...WEAPON_DEFS.mcx, cycleTime: 60 / WEAPON_DEFS.mcx.rpm },
+  });
+  const previewSkeletons = new Set();
+  inspection.scene.traverse((mesh) => {
+    if (!mesh.isMesh) return;
+    assert.ok(
+      borrowed.has(mesh.geometry) && borrowed.has(mesh.material),
+      'inspection borrows merged resources'
+    );
+    if (mesh.isSkinnedMesh) {
+      assert.ok(!liveBones.has(mesh.skeleton));
+      previewSkeletons.add(mesh.skeleton);
+    }
+  });
+  let previewBoneDisposals = 0;
+  for (const skeleton of previewSkeletons) {
+    skeleton.computeBoneTexture();
+    skeleton.boneTexture.addEventListener('dispose', () => previewBoneDisposals++);
+  }
+  inspection.dispose();
+  assert.equal(
+    previewBoneDisposals,
+    previewSkeletons.size,
+    'inspection releases only its bone textures'
+  );
+  assert.equal(borrowedDisposals, 0);
+  for (const [node, position, quaternion, scale, visible] of liveSnapshot) {
+    assert.deepEqual(
+      [node.position.toArray(), node.quaternion.toArray(), node.scale.toArray(), node.visible],
+      [position, quaternion, scale, visible]
+    );
+  }
+  animation.reset();
   const skeletons = new Set();
   model.root.traverse((mesh) => {
     if (mesh.isSkinnedMesh) skeletons.add(mesh.skeleton);
