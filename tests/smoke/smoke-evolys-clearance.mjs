@@ -72,10 +72,29 @@ async function checkAsset(url) {
     point = new THREE.Vector3(),
     triangle = new THREE.Triangle();
   const stock = [];
-  vm.active.model.root.getObjectByName('stock_mesh').traverse((o) => {
-    if (o.isMesh) stock.push(o);
+  vm.active.model.root.traverse((mesh) => {
+    if (!mesh.isSkinnedMesh) return;
+    const joint = mesh.skeleton.bones.findIndex((bone) => bone.name === 'MECH_stock');
+    if (joint < 0) return;
+    const indices = mesh.geometry.index.array;
+    const skinIndex = mesh.geometry.attributes.skinIndex;
+    const triangles = [];
+    for (let i = 0; i < indices.length; i += 3) {
+      const members = [indices[i], indices[i + 1], indices[i + 2]];
+      if (!members.some((index) => skinIndex.getX(index) === joint)) continue;
+      assert(
+        members.every((index) => skinIndex.getX(index) === joint),
+        'rigid stock triangles'
+      );
+      triangles.push(...members);
+    }
+    if (triangles.length) stock.push({ mesh, indices: triangles });
   });
-  assert(stock.length > 0, 'actual stock geometry must be loaded');
+  assert.equal(
+    stock.reduce((count, surface) => count + surface.indices.length / 3, 0),
+    4922,
+    'all actual stock triangles remain in the shared mechanical draw'
+  );
   const head = new THREE.Vector3();
   let headGap = Infinity,
     minimum = Infinity,
@@ -85,13 +104,12 @@ async function checkAsset(url) {
     vm.armL.skeleton.update();
     samples++;
     if (label.startsWith('reload')) {
-      for (const mesh of stock) {
-        const pos = mesh.geometry.attributes.position,
-          indices = mesh.geometry.index.array;
+      for (const { mesh, indices } of stock) {
+        mesh.skeleton.update();
         for (let i = 0; i < indices.length; i += 3) {
-          triangle.a.fromBufferAttribute(pos, indices[i]).applyMatrix4(mesh.matrixWorld);
-          triangle.b.fromBufferAttribute(pos, indices[i + 1]).applyMatrix4(mesh.matrixWorld);
-          triangle.c.fromBufferAttribute(pos, indices[i + 2]).applyMatrix4(mesh.matrixWorld);
+          mesh.getVertexPosition(indices[i], triangle.a).applyMatrix4(mesh.matrixWorld);
+          mesh.getVertexPosition(indices[i + 1], triangle.b).applyMatrix4(mesh.matrixWorld);
+          mesh.getVertexPosition(indices[i + 2], triangle.c).applyMatrix4(mesh.matrixWorld);
           triangle.closestPointToPoint(head, point);
           const gap = point.length();
           assert(
