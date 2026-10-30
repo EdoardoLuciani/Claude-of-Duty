@@ -18,6 +18,11 @@ export function configureM4Finishes(material: MeshPhysicalNodeMaterial): void {
     texture(material.roughnessMap, uv(0)).g.mul(factors.x)
   );
   material.metalnessNode = factors.y;
-  material.normalNode = normalMap(texture(material.normalMap, uv(0)).rgb, vec2(detail.x));
+  // GLTFLoader flips normal Y for derivative tangents; retain its orientation
+  // while replacing only the per-finish strength, just as the original maps did.
+  material.normalNode = normalMap(
+    texture(material.normalMap, uv(0)).rgb,
+    vec2(Math.sign(material.normalScale.x), Math.sign(material.normalScale.y)).mul(detail.x)
+  );
   material.emissiveNode = paint.select(attribute('color', 'vec3').mul(2), vec3(0));
 }

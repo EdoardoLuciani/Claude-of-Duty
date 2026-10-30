@@ -51,7 +51,7 @@ export const MODEL_COOKS = {
     directory: 'assets/weapons/m4a1-block-ii',
     source: 'm4a1-block-ii.glb',
     output: 'm4a1-block-ii.runtime.glb',
-    flags: ['-noq', '-vc', '16'],
+    flags: ['-noq', '-vc', '16', '-kv'],
   },
   mcx: {
     directory: 'assets/weapons/mcx-virtus',
