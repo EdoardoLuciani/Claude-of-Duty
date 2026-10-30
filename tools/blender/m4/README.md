@@ -10,7 +10,8 @@
 | Named assemblies, controls, sockets, applied radii and atlas      | `geometry.py`      |
 | Eight sparse weapon/wrist/finger actions, events and review skins | `../m4_actions.py` |
 | Clip selection, runtime sampling and explicit resets              | `animations.py`    |
-| Export-only linear colors and padded opaque finish atlases        | `finishes.py`      |
+| Export-only original tint and exact per-corner finish factors     | `finishes.py`      |
+| Rigid mechanical skin and sampled native bone actions             | `skin.py`          |
 | Rigid joining, native Actions export and read-only assertions     | `export.py`        |
 | Fixed review cameras, lights and color management                 | `studio.py`        |
 
@@ -30,19 +31,28 @@ explicit TRS resets on every control in every clip. Draw retains the held frame-
 value at its exact **74.4-frame / .620 s** endpoint. Stock Actions export merges
 matching NLA names without forced sampling; no output rewriting.
 
-Runtime preparation joins the three fixed assemblies by finish while retaining
-`handguard`/`stock` helper seats; named irons and all independently animated
-mechanisms remain separate. The saved blend is deliberately pre-join and remains
-component-editable. Cylinder micro-bevels use a single chamfer (not the exact
-front aiming post); Picatinny corner curves retain three samples. The asset
-README records the deliberately nonquantized gltfpack candidate/profile and its
-precision trade-off. Do not substitute more permissive simplification globally.
+Runtime preparation merges fixed assemblies, the four exact irons and moving
+mechanisms into one one-influence mechanical skin, regardless of authoring
+parent. Named static/moving controls become bones with equivalent public local
+TRS; no dimensions/tolerances or source geometry are edited. The two magazine
+bodies/followers, independently visible loaded rounds and review case remain
+separate rigid meshes under their original parents. Save invertible rest seats
+before export: selecting Idle and joining/exporting with its hidden spare scale
+would permanently collapse that geometry.
 
-`finishes.py` runs only after saving the editable preview. Receiver, polymer/A2
-checkering and emissive sight paint remain independent; the nine other opaque
-finishes share a material with per-corner linear base factors, unchanged UV0
-albedo and compact UV1 scalar/normal atlases. Four-pixel padding and a positive
-affine UV transform preserve finish boundaries and tangent orientation. Strength
-baking uses XY scale / unchanged Z / normalization, never an averaged strength.
-The asset README records the deliberate draw-count versus file/memory trade-off;
-keep the geometry-only `390390e9` fallback available during GPU review.
+`finishes.py` runs only after saving the editable preview, which retains all 12
+source materials and original maps. Export uses a single opaque material with
+original tint in COLOR_0, roughness/metalness in UV1 and normal strength/role in
+UV2, constant per triangle. The small M4-owned physical graph in
+`src/weapons/m4-finishes.ts` interprets those factors and samples all four original
+1024² maps at UV0, preserving receiver albedo, full-resolution A2 checkering and
+normal XYZ/strength. Role 2 retains green paint emission strength 2 and roughness
+.8 without grain; role 1 selects the receiver-only albedo. No atlas baking or
+averaged material values are used. The receiver image is carried in the standard
+emissive slot, so the adapter is required to display the consolidated GLB.
+
+Use `['-noq', '-vc', '16', '-kv']` with the pinned shared cook API. `-kv` preserves
+finish UVs that the standard glTF slots do not sample. The asset README records
+measured geometry-byte/index and four-sample shader costs, improved file sizes,
+unchanged triangles and the remaining native-GPU review gate. Do not substitute
+more permissive simplification or relax the existing precision-critical irons.

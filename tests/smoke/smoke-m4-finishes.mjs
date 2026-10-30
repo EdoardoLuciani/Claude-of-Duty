@@ -8,8 +8,6 @@ import { inspectGLB, parseGLB } from '../../tools/lib/glb-fixture.mjs';
 const dir = new URL('../../assets/weapons/m4a1-block-ii/', import.meta.url);
 const bytes = readFileSync(new URL('m4a1-block-ii.glb', dir));
 const native = inspectGLB(bytes);
-const images = new Map(native.json.images.map((image) => [image.name, native.imagePNG(image)]));
-// Original source images are deliberately independent from the compact atlas.
 for (const [name, hash] of Object.entries({
   m4_normal: '68bd012cdafd6836ac158e863ec78a170888225119defa97901b59fed73840a7',
   m4_surface: '2e841cf31a0b81a00320a59f6c3fbdabd2c26e99f07597d0b4a6d8f41fff41db',
@@ -23,129 +21,126 @@ for (const [name, hash] of Object.entries({
       .update(native.bin.subarray(view.byteOffset, view.byteOffset + view.byteLength))
       .digest('hex'),
     hash,
-    `${name}: unchanged full-resolution source map`
+    `${name}: unchanged full-resolution source map, including A2 checkering`
   );
+  assert.equal(native.imagePNG(image).width, 1024);
 }
-// Source-named factors in sorted atlas order: color, metalness, roughness, normalScale.
+// Source-named color, roughness, metalness, normal strength, albedo/emission role.
+const green = [57, 255, 20].map((v) =>
+  v / 255 > 0.04045 ? ((v / 255 + 0.055) / 1.055) ** 2.4 : v / 255 / 12.92
+);
 const finishes = [
-  ['FDE', [0.235, 0.15, 0.084], 1, 0.56, 0.16],
-  ['rubber', [0.022, 0.024, 0.026], 0, 0.92, 0.9],
-  ['steel', [0.071, 0.078, 0.086], 1, 0.56, 0.16],
-  ['burnished', [0.115, 0.125, 0.137], 1, 0.48, 0.1],
-  ['magazine', [0.145, 0.155, 0.164], 1, 0.67, 0.18],
-  ['brass', [0.49, 0.285, 0.084], 1, 0.35, 0.1],
-  ['copper', [0.43, 0.16, 0.066], 1, 0.39, 0.1],
-  ['markings', [0.115, 0.122, 0.129], 0, 0.72, 0.05],
-  ['follower', [0.085, 0.103, 0.056], 0, 0.78, 0.3],
+  ['receiver', [0.041, 0.043, 0.046], 0.44, 1, 0.08, 1],
+  ['FDE', [0.235, 0.15, 0.084], 0.56, 1, 0.16, 0],
+  ['furniture/checkering', [0.026, 0.029, 0.032], 0.8, 0, 0.55, 0],
+  ['rubber', [0.022, 0.024, 0.026], 0.92, 0, 0.9, 0],
+  ['steel', [0.071, 0.078, 0.086], 0.56, 1, 0.16, 0],
+  ['burnished', [0.115, 0.125, 0.137], 0.48, 1, 0.1, 0],
+  ['magazine', [0.145, 0.155, 0.164], 0.67, 1, 0.18, 0],
+  ['brass', [0.49, 0.285, 0.084], 0.35, 1, 0.1, 0],
+  ['copper', [0.43, 0.16, 0.066], 0.39, 1, 0.1, 0],
+  ['markings', [0.115, 0.122, 0.129], 0.72, 0, 0.05, 0],
+  ['follower', [0.085, 0.103, 0.056], 0.78, 0, 0.3, 0],
+  ['paint', green, 0.8, 0, 0, 2],
 ];
-function sample(image, x, y, channel) {
-  const x0 = Math.floor(x),
-    y0 = Math.floor(y),
-    x1 = Math.min(x0 + 1, image.width - 1),
-    y1 = Math.min(y0 + 1, image.height - 1);
-  const get = (px, py) => image.data[(py * image.width + px) * 4 + channel] / 255;
-  const tx = x - x0,
-    ty = y - y0;
-  return (
-    (get(x0, y0) * (1 - tx) + get(x1, y0) * tx) * (1 - ty) +
-    (get(x0, y1) * (1 - tx) + get(x1, y1) * tx) * ty
-  );
-}
-for (const [index, [name, , metal, roughness, strength]] of finishes.entries()) {
-  const orm = images.get('m4_finish_orm'),
-    normal = images.get('m4_finish_normal');
-  assert.equal(orm.width, 512);
-  assert.equal(normal.height, 512);
-  for (const x of [0, 17, 59, 93, 119])
-    for (const y of [0, 23, 61, 98, 119]) {
-      const sx = (x * 1023) / 119,
-        sy = 1023 - (y * 1023) / 119;
-      const tx = (index % 4) * 128 + 4 + x,
-        ty = 511 - (Math.floor(index / 4) * 128 + 4 + y);
-      const expectedRoughness = sample(images.get('m4_roughness'), sx, sy, 1) * roughness;
-      assert(Math.abs(sample(orm, tx, ty, 1) - expectedRoughness) < 2 / 255, `${name}: roughness`);
-      assert.equal(sample(orm, tx, ty, 2), metal, `${name}: metallic boundary`);
-      const direction = [0, 1, 2].map(
-        (channel) =>
-          (sample(images.get('m4_normal'), sx, sy, channel) * 2 - 1) *
-          (channel === 2 ? 1 : strength)
-      );
-      const length = Math.hypot(...direction);
-      for (let channel = 0; channel < 3; channel++)
-        assert(
-          Math.abs(sample(normal, tx, ty, channel) - ((direction[channel] / length) * 0.5 + 0.5)) <
-            3 / 255,
-          `${name}: runtime-equivalent normal XYZ channel ${channel}`
-        );
-      // Four-pixel guards repeat the endpoint rather than sampling another finish.
-      if (x === 0) assert.equal(sample(orm, tx - 4, ty, 2), metal);
-      if (x === 119) assert.equal(sample(orm, tx + 4, ty, 2), metal);
-    }
-}
 for (const [format, data] of [
   ['native', bytes],
   ['runtime', readFileSync(new URL('m4a1-block-ii.runtime.glb', dir))],
 ]) {
   const model = makeM4Model(await parseGLB(data));
+  assert.equal(model.materials.size, 1);
   const seen = new Set();
+  let meshes = 0;
   model.root.traverse((mesh) => {
     if (!mesh.isMesh) return;
-    if (/^(01|03) \|/.test(mesh.material.name)) {
-      assert.equal(mesh.material.map.channel, 0);
-      assert.equal(mesh.material.normalMap.channel, 0);
-      const color = mesh.geometry.attributes.color;
-      if (color)
-        for (let i = 0; i < color.count; i++)
-          assert(color.getX(i) === 1 && color.getY(i) === 1 && color.getZ(i) === 1);
-      return;
-    }
-    if (mesh.material.name !== 'M4 | packed opaque finishes') return;
-    const { color, uv, uv1 } = mesh.geometry.attributes;
-    assert(color && uv && uv1);
-    assert(mesh.material.vertexColors);
-    assert.equal(mesh.material.normalMap.channel, 1);
-    assert.equal(mesh.material.roughnessMap.channel, 1);
-    assert.equal(mesh.material.metalnessMap.channel, 1);
-    assert.equal(mesh.material.map.channel, 0);
-    assert.equal(mesh.material.normalScale.x, 1);
+    meshes++;
+    const { material, geometry } = mesh;
+    assert.equal(material.name, 'M4 | unified opaque finishes');
+    assert(!material.transparent && material.opacity === 1 && material.alphaTest === 0);
+    assert(material.vertexColors);
+    for (const slot of ['map', 'normalMap', 'roughnessMap', 'emissiveMap'])
+      assert.equal(material[slot].channel, 0, `${slot}: full-resolution original UV0`);
+    for (const slot of [
+      'colorNode',
+      'normalNode',
+      'roughnessNode',
+      'metalnessNode',
+      'emissiveNode',
+    ])
+      assert(material[slot], `physical graph owns ${slot}`);
+    const emission = material.emissiveNode;
+    assert.equal(emission.condNode.op, '==');
+    assert.equal(emission.condNode.bNode.value, 2, 'emission is restricted to role 2');
+    assert.equal(emission.ifNode.op, '*');
+    assert.equal(emission.ifNode.aNode.getAttributeName(), 'color');
+    assert.equal(emission.ifNode.bNode.value, 2, 'original emission strength, not compensation');
+    assert.equal(emission.elseNode.value.length(), 0, 'other finishes remain nonemissive');
+    assert.equal(material.colorNode.condNode, emission.condNode);
+    const receiverSelect = material.colorNode.elseNode;
+    assert.equal(receiverSelect.condNode.bNode.value, 1, 'only receiver uses balanced albedo');
+    assert.equal(receiverSelect.ifNode.node.value, material.emissiveMap);
+    assert.equal(receiverSelect.elseNode.node.value, material.map);
+    assert.equal(material.normalNode.node.node.value, material.normalMap);
+    assert.equal(material.normalNode.scaleNode.node.components, 'x');
+    const detail = material.normalNode.scaleNode.node.node;
+    assert.equal(detail.interpolationType, 'flat');
+    assert.equal(detail.node.node.getAttributeName(), 'uv2');
+    assert.equal(material.normalNode.node.node.uvNode.getAttributeName(), 'uv');
+    const { color, uv, uv1, uv2 } = geometry.attributes;
+    assert(color && uv && uv1 && uv2, `${format}: -kv retains finish transport`);
     const partFinishes = new Set();
+    const finishIndices = [];
     for (let i = 0; i < color.count; i++) {
-      const actual = [color.getX(i), color.getY(i), color.getZ(i)];
       const index = finishes.findIndex(([, expected]) =>
-        actual.every((value, axis) => Math.abs(value - expected[axis]) < 1 / 65535)
+        expected.every((value, axis) => Math.abs(color.getComponent(i, axis) - value) < 1 / 65535)
       );
-      assert(index >= 0, `${format}: original linear COLOR_0, not an averaged tint`);
+      assert(index >= 0, `${format}: original linear tint, not averaged`);
+      const [name, , roughness, metalness, strength, role] = finishes[index];
+      for (const [actual, expected] of [
+        [uv1.getX(i), roughness],
+        [uv1.getY(i), metalness],
+        [uv2.getX(i), strength],
+        [uv2.getY(i), role],
+      ])
+        assert(
+          Math.abs(actual - expected) < 1e-7,
+          `${format}/${mesh.name}/${name}: exact finish factors`
+        );
+      finishIndices.push(index);
       seen.add(index);
       partFinishes.add(index);
-      const expectedU = ((index % 4) * 128 + 4.5 + uv.getX(i) * 119) / 512;
-      const expectedV = 1 - (Math.floor(index / 4) * 128 + 4.5 + (1 - uv.getY(i)) * 119) / 512;
-      assert(Math.abs(uv1.getX(i) - expectedU) < 1e-7);
+    }
+    for (let triangle = 0; triangle < geometry.index.count; triangle += 3) {
+      const indices = [0, 1, 2].map(
+        (corner) => finishIndices[geometry.index.getX(triangle + corner)]
+      );
       assert(
-        Math.abs(uv1.getY(i) - expectedV) < 1e-7,
-        'positive affine UV1 preserves tangent orientation'
+        indices.every((index) => index === indices[0]),
+        `${mesh.name}: no interpolation across finish boundaries`
       );
     }
     if (['magazine_mesh', 'magazine_spare_mesh'].includes(mesh.name))
       assert.deepEqual(
-        [...partFinishes].sort(),
-        [4, 8],
+        [...partFinishes].sort((a, b) => a - b),
+        [6, 10],
         'drop body retains aluminum/follower only'
       );
     if (['magazine_round_mesh', 'magazine_spare_round_mesh'].includes(mesh.name))
       assert.deepEqual(
-        [...partFinishes].sort(),
-        [5, 6],
-        'loaded brass/copper stay independently hidden'
+        [...partFinishes].sort((a, b) => a - b),
+        [7, 8],
+        'brass/copper remain independently hidden'
       );
+    if (mesh.name === 'spent_case_mesh') assert.deepEqual([...partFinishes], [7]);
   });
-  assert.equal(seen.size, 9, `${format}: all nine packed finishes remain represented`);
+  assert.equal(meshes, 6);
+  assert.equal(seen.size, 12, `${format}: every original finish survives`);
 }
-// Moving endpoints and nonconstant Idle must fail, not be silently repaired.
 for (const name of ['Fire', 'Idle']) {
   const damaged = await parseGLB(bytes);
   damaged.animations.find((clip) => clip.name === name).duration = 0;
   assert.throws(() => makeM4Model(damaged), new RegExp(`invalid ${name} duration`));
 }
 console.log(
-  'M4 finishes: unchanged full-resolution receiver/checkering maps, nine linear colors, padded ORM, strength-baked XYZ normals, UV roles/tangents and strict duration gates passed'
+  'M4 finishes: four unchanged 1024² maps; all 12 original tints/factors/roles on native and cooked triangles; full UV0 normals/checkering, receiver selection and paint emission graph passed'
 );
