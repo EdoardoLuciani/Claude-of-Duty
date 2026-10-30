@@ -165,3 +165,35 @@ The `Validate` GitHub Actions workflow runs on pull requests and pushes to `main
 and `develop`. It checks formatting, types, lint, tests and the production build.
 Changes go through pull requests into `develop`; only the owner promotes to `main`.
 AI implementation, review, fix and automatic merge workflows have been retired.
+
+### Milestone releases
+
+Before promoting `develop` to `main`, prepare the target milestone's version
+on a small branch from up-to-date `develop`, for example:
+
+```sh
+git switch -c chore/release-1.1.0
+npm version 1.1.0 --no-git-tag-version
+git add package.json package-lock.json
+git commit -m "chore(release): bump version to 1.1.0"
+git push -u origin HEAD
+```
+
+Merge that bump through a PR into `develop`, including both package files in review.
+Then open the `develop → main` release PR, wait for its `Validate` checks, and merge.
+
+The `Release` workflow then creates `v1.1.0` on that PR's exact merged commit and
+publishes a GitHub release with generated notes. It accepts stable
+`MAJOR.MINOR.PATCH` versions and checks that both lockfile version fields match
+`package.json`. It does not bump versions, close milestones, publish to npm, or
+upload build artifacts. Milestone titles are planning labels, not workflow inputs.
+Feature PRs into `develop`, other source branches into `main`, unmerged PRs and
+direct pushes do not publish releases.
+
+Use a new version for each release: an existing tag on another commit is an error,
+never overwritten. To recover from a transient publication failure, rerun the same
+`Release` job in GitHub Actions; it reuses a matching tag and leaves an already
+published release unchanged. Permission/API failures are not treated as missing
+tags or releases. The workflow uses only the built-in `GITHUB_TOKEN` with
+`contents: write`; no extra token, dependency or release service is needed.
+The workflow must be present in the merged release commit to run.

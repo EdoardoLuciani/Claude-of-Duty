@@ -1,0 +1,37 @@
+name: Release
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    if: >-
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.ref == 'develop' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    concurrency:
+      group: release-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          persist-credentials: false
+      - name: Publish version tag and release
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { publishRelease } = await import(
+              `${process.env.GITHUB_WORKSPACE}/tools/release.mjs`
+            );
+            const release = await publishRelease(github, context);
+            core.info(`Release: ${release.html_url}`);
