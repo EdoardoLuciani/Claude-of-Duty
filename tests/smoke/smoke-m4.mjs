@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 import { PNG } from 'pngjs';
 import * as THREE from 'three';
+import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 import { Rng } from '../../src/core/rng.ts';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
@@ -10,7 +11,7 @@ import { WeaponSystem } from '../../src/weapons/index.ts';
 import { makeM4Model } from '../../src/weapons/m4.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
-import { checkM4Sights } from '../../tools/lib/m4-sight-checks.js';
+import { checkM4Sights, createM4SurfaceProbe } from '../../tools/lib/m4-sight-checks.js';
 
 const dir = new URL('../../assets/weapons/m4a1-block-ii/', import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', dir)));
@@ -34,39 +35,26 @@ assert.equal(
 assert.equal(primitives.length, manifest.stats.primitives);
 assert(
   triangles <= 91000 &&
-    primitives.length <= 19 &&
-    json.materials.length === 4 &&
-    bytes.length <= 9800000
+    primitives.length === 6 &&
+    json.materials.length === 1 &&
+    bytes.length <= 13000000
 );
-assert.equal(json.images.length, 6, 'four unchanged maps plus two compact finish atlases');
-// Selected balanced finish: preserve metal/dielectric separation and authored maps.
-for (const [prefix, roughness, normal, metal] of [
-  ['01', 0.44, 0.08, 1],
-  ['03', 0.8, 0.55, 0],
-]) {
-  const material = json.materials.find((m) => m.name.startsWith(`${prefix} |`));
-  assert(material, `${prefix}: missing finish`);
-  const pbr = material.pbrMetallicRoughness;
-  assert(Math.abs(pbr.roughnessFactor - roughness) < 1e-6);
-  assert(Math.abs(material.normalTexture.scale - normal) < 1e-6);
-  assert.equal(pbr.metallicFactor ?? 1, metal);
-  assert.equal(material.extensions?.KHR_materials_clearcoat?.clearcoatFactor ?? 0, 0);
-}
-const receiverMaterial = json.materials.find((m) => m.name.startsWith('01 |'));
-const polymerMaterial = json.materials.find((m) => m.name.startsWith('03 |'));
+assert.equal(json.images.length, 4, 'unchanged full-resolution source maps, no finish atlas');
 const imageFor = (texture) => json.textures[texture.index].source;
+const unified = json.materials[0];
+assert.equal(unified.name, 'M4 | unified opaque finishes');
+assert.equal(unified.alphaMode ?? 'OPAQUE', 'OPAQUE');
 assert.notEqual(
-  imageFor(receiverMaterial.pbrMetallicRoughness.baseColorTexture),
-  imageFor(polymerMaterial.pbrMetallicRoughness.baseColorTexture),
-  'receiver-only albedo, not a global texture replacement'
+  imageFor(unified.pbrMetallicRoughness.baseColorTexture),
+  imageFor(unified.emissiveTexture),
+  'receiver-only source albedo is carried independently, selected by the local graph'
 );
-for (const [i, value] of [0.041, 0.043, 0.046].entries())
-  assert(Math.abs(receiverMaterial.pbrMetallicRoughness.baseColorFactor[i] - value) < 1e-6);
 assert(
   json.buffers.every((b) => !b.uri) && json.images.every((i) => i.bufferView !== undefined),
   'local self-contained GLB'
 );
-assert(!json.skins, 'reuse existing runtime arm skins, do not export duplicate arms');
+assert.equal(json.skins.length, 1, 'weapon mechanical skin only, no duplicate arms');
+assert.equal(json.skins[0].joints.length, 13);
 const binaryStart = 28 + bytes.readUInt32LE(12);
 for (const image of json.images) {
   const view = json.bufferViews[image.bufferView];
@@ -76,8 +64,8 @@ for (const image of json.images) {
   assert.equal(bytes.readUInt32BE(offset + 20), size);
 }
 assert.equal(json.animations.length, 8);
-const albedoStats = (material) => {
-  const image = json.images[imageFor(material.pbrMetallicRoughness.baseColorTexture)];
+const albedoStats = (name) => {
+  const image = json.images.find((image) => image.name === name);
   const view = json.bufferViews[image.bufferView];
   const start = binaryStart + (view.byteOffset ?? 0);
   const pixels = PNG.sync.read(bytes.subarray(start, start + view.byteLength)).data;
@@ -90,8 +78,8 @@ const albedoStats = (material) => {
   const mean = sum / (pixels.length / 4);
   return { mean, sd: Math.sqrt(squares / (pixels.length / 4) - mean ** 2) };
 };
-const receiverAlbedo = albedoStats(receiverMaterial);
-const sharedAlbedo = albedoStats(polymerMaterial);
+const receiverAlbedo = albedoStats('m4_receiver_surface');
+const sharedAlbedo = albedoStats('m4_surface');
 assert(
   Math.abs(receiverAlbedo.mean - sharedAlbedo.mean) < 1,
   'preserve mean albedo within PNG quantization'
@@ -169,7 +157,7 @@ async function checkModel(bytes, format) {
       /paint cap must clear/,
     ],
   ]) {
-    const faulty = model.root.clone(true);
+    const faulty = clone(model.root);
     move(faulty.getObjectByName(name));
     assert.throws(() => checkM4Sights(faulty), error);
   }
@@ -180,9 +168,15 @@ async function checkModel(bytes, format) {
       0,
       1
     );
-    const hits = ray.intersectObject(model.root.getObjectByName(name), true);
-    assert(hits.length, `${name}: expected rendered indexed surface`);
-    return hits[0].point;
+    const node = model.root.getObjectByName(name);
+    const probe = node.isBone ? createM4SurfaceProbe(model.root, name) : null;
+    try {
+      const hits = ray.intersectObject(probe ?? node, true);
+      assert(hits.length, `${name}: expected rendered indexed surface`);
+      return hits[0].point;
+    } finally {
+      probe?.geometry.dispose();
+    }
   }
   close(firstHit('bolt_head', [0.002, 0.075, -0.108], [0, 0, 1]).z, -0.105, 0.00001);
   close(firstHit('receiver_mesh', [0.004, 0.075, -0.4738], [0, 0, 1]).z, -0.4733, 0.00001);
@@ -200,7 +194,7 @@ async function checkModel(bytes, format) {
       const transform = new THREE.Matrix4().multiplyMatrices(inverse, mesh.matrixWorld);
       const positions = mesh.geometry.attributes.position;
       for (let i = 0; i < positions.count; i++) {
-        vertex.fromBufferAttribute(positions, i).applyMatrix4(transform);
+        mesh.getVertexPosition(i, vertex).applyMatrix4(transform);
         const colors = mesh.geometry.attributes.color;
         const color = colors ? [colors.getX(i), colors.getY(i), colors.getZ(i)] : null;
         if (include(vertex, mesh.material.name, color)) bounds.expandByPoint(vertex);
@@ -405,9 +399,7 @@ async function checkModel(bytes, format) {
   // Verify the exported motion on the real runtime skins and IK too. A whole-stock
   // envelope is conservative: no deformed triangle may enter even its empty space.
   const stockEnvelope = fixedBounds(
-    (vertex, material) =>
-      vertex.z >= 0.09 &&
-      (material.startsWith('03 |') || material === 'M4 | packed opaque finishes')
+    (vertex, material) => vertex.z >= 0.09 && material === 'M4 | unified opaque finishes'
   );
   const armBytes = readFileSync(new URL('../../public/models/player/arms.glb', import.meta.url));
   const armGltf = await parseGLB(armBytes);
@@ -609,6 +601,6 @@ const runtimeJSON = JSON.parse(runtime.subarray(20, 20 + runtime.readUInt32LE(12
 assert(runtime.length < 5500000, 'bounded runtime product');
 assert(runtimeJSON.extensionsRequired.includes('EXT_meshopt_compression'));
 assert(runtimeJSON.extensionsRequired.includes('KHR_texture_basisu'));
-assert.equal(runtimeJSON.images.length, 6);
+assert.equal(runtimeJSON.images.length, 4);
 for (const image of runtimeJSON.images) assert.equal(image.mimeType, 'image/ktx2');
 await checkModel(runtime, 'decoded runtime');

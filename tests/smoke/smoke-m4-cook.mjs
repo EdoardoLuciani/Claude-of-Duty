@@ -22,8 +22,8 @@ assert.deepEqual(
   native.json.nodes.map((node) => node.name).sort(),
   'keep named controls, seats and sockets, including static empty helpers'
 );
-assert.equal(runtime.json.materials.length, 4, 'receiver, polymer, packed opaque and sight paint');
-assert.equal(runtime.json.images.length, 6);
+assert.equal(runtime.json.materials.length, 1, 'one opaque finish graph');
+assert.equal(runtime.json.images.length, 4);
 for (const image of runtime.json.images) {
   assert.equal(image.mimeType, 'image/ktx2');
   const view = runtime.json.bufferViews[image.bufferView];
@@ -41,6 +41,19 @@ for (const image of runtime.json.images) {
 }
 const source = makeM4Model(await parseGLB(nativeBytes));
 const cooked = makeM4Model(await parseGLB(runtimeBytes));
+// Measured decoded CPU geometry budget, not actual uploaded GPU allocation.
+// One rigid skin crosses the 65k-index boundary and adds exact finish factors.
+const arrayBytes = (model) => {
+  const arrays = new Set();
+  model.root.traverse((mesh) => {
+    if (!mesh.isMesh) return;
+    for (const attribute of Object.values(mesh.geometry.attributes)) arrays.add(attribute.array);
+    arrays.add(mesh.geometry.index.array);
+  });
+  return [...arrays].reduce((sum, array) => sum + array.byteLength, 0);
+};
+assert(arrayBytes(source) <= 8_223_524, 'bounded native mechanical skin/finish arrays');
+assert(arrayBytes(cooked) <= 6_216_528, 'bounded decoded runtime mechanical skin/finish arrays');
 const materials = (model) => {
   const result = new Map();
   model.root.traverse((mesh) => {
@@ -135,11 +148,8 @@ function surfaces(model) {
       for (let corner = 0; corner < 3; corner++) {
         const vertex = geometry.index.getX(index + corner);
         const values = [];
-        for (const name of ['position', 'uv', 'uv1']) {
+        for (const name of ['position', 'uv', 'uv1', 'uv2']) {
           const attribute = geometry.attributes[name];
-          // Texture-free sight paint deliberately has no UV in the runtime cook.
-          if (name !== 'position' && mesh.material.name.startsWith('12 |')) continue;
-          if (name === 'uv1' && mesh.material.name !== 'M4 | packed opaque finishes') continue;
           assert(attribute, `${mesh.name}: ${name}`);
           for (let axis = 0; axis < (name === 'position' ? 3 : 2); axis++)
             values.push(attribute.getComponent(vertex, axis));
