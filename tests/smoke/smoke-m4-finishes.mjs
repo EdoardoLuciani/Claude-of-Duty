@@ -81,8 +81,17 @@ for (const [format, data] of [
     assert.equal(receiverSelect.ifNode.node.value, material.emissiveMap);
     assert.equal(receiverSelect.elseNode.node.value, material.map);
     assert.equal(material.normalNode.node.node.value, material.normalMap);
-    assert.equal(material.normalNode.scaleNode.node.components, 'x');
-    const detail = material.normalNode.scaleNode.node.node;
+    assert.equal(geometry.attributes.tangent, undefined, 'use the derivative tangent frame');
+    assert.deepEqual(material.normalScale.toArray(), [1, -1], 'GLTFLoader normal-map signs');
+    const normalScale = material.normalNode.scaleNode;
+    assert.equal(normalScale.op, '*');
+    assert.deepEqual(
+      normalScale.aNode.value.toArray(),
+      material.normalScale.toArray().map(Math.sign),
+      'finish strength must preserve the loader normal-Y correction'
+    );
+    assert.equal(normalScale.bNode.components, 'x');
+    const detail = normalScale.bNode.node;
     assert.equal(detail.interpolationType, 'flat');
     assert.equal(detail.node.node.getAttributeName(), 'uv2');
     assert.equal(material.normalNode.node.node.uvNode.getAttributeName(), 'uv');
