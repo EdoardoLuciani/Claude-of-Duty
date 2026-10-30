@@ -1,13 +1,13 @@
 import { Fn, clamp, float, smoothstep, step, vec2, vec3, vec4 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
-import type { JoinNode, VarNode } from 'three/webgpu';
+import type { JoinNode } from 'three/webgpu';
 
 import { fbm01, fbm3, fbm4, scratches, worley } from './noise-tsl.ts';
 
 // Shared macro map: R = low-frequency swell, G = warped blotches,
 // B = mid-frequency variation, A = fine variation (same packing as generator.js).
 export const macroSurface = Fn<[Node<'vec2'>, Node<'float'>], Node<'vec4'>>(
-  ([coords, seed]): VarNode<'vec4', JoinNode<'vec4'>> => {
+  ([coords, seed]): JoinNode<'vec4'> => {
     const period = vec2(6, 6);
     const p = coords.mul(period).add(seed.mul(3));
     const a = fbm01(fbm4(p.mul(0.5), period.mul(0.5), 0.62));
@@ -25,7 +25,7 @@ export const macroSurface = Fn<[Node<'vec2'>, Node<'float'>], Node<'vec4'>>(
 // Shared 0.25 m micro surface: linear RGB is albedo variation, A is height.
 // The old detail ORM was never sampled; a second pass derives the normal from A.
 export const detailSurface = Fn<[Node<'vec2'>, Node<'float'>], Node<'vec4'>>(
-  ([coords, seed]): VarNode<'vec4', JoinNode<'vec4'>> => {
+  ([coords, seed]): JoinNode<'vec4'> => {
     const period = vec2(8);
     const p = coords.mul(period).add(seed);
     const a = fbm01(fbm4(p.mul(3), period.mul(3), 0.55));

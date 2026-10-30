@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Fn, clamp, screenUV, uniform, uniformTexture, vec2, vec4 } from 'three/tsl';
 import type { Node, Renderer } from 'three/webgpu';
-import type { JoinNode, VarNode } from 'three/webgpu';
+import type { JoinNode } from 'three/webgpu';
 
 import type { RenderSystem } from '../render/index-webgpu.ts';
 import { P } from './atlas.ts';
@@ -230,7 +230,7 @@ export class HazeSystem {
     const distort = this.distortTexNode;
     const strength = this.uStrength;
     const active = this.uActive;
-    this._warp = Fn((): VarNode<'vec4', JoinNode<'vec4'>> => {
+    this._warp = Fn((): JoinNode<'vec4'> => {
       // Particle offsets are camera-space (Y up); native texture UVs point down.
       const raw = distort.sample(screenUV).xy.mul(vec2(1, -1)).mul(strength.x).mul(active);
       const d = clamp(raw, vec2(-0.03), vec2(0.03));

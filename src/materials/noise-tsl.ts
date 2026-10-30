@@ -67,12 +67,10 @@ const hash22 = Fn<[Node<'vec2'>], Node<'vec2'>>(([p]): Node<'vec2'> => {
   return fract(p3.xx.add(p3.yz).mul(p3.zy));
 }).setLayout({ name: 'ow_hash22', type: 'vec2', inputs: [{ name: 'p', type: 'vec2' }] });
 
-const grad2 = Fn<[Node<'vec2'>, Node<'vec2'>], Node<'vec2'>>(
-  ([i, period]): VarNode<'vec2', JoinNode<'vec2'>> => {
-    const angle = hash12(mod(i, period).add(0.317)).mul(6.28318530718);
-    return vec2(cos(angle), sin(angle));
-  }
-).setLayout({
+const grad2 = Fn<[Node<'vec2'>, Node<'vec2'>], Node<'vec2'>>(([i, period]): JoinNode<'vec2'> => {
+  const angle = hash12(mod(i, period).add(0.317)).mul(6.28318530718);
+  return vec2(cos(angle), sin(angle));
+}).setLayout({
   name: 'ow_grad2',
   type: 'vec2',
   inputs: [
@@ -167,7 +165,7 @@ export const ridged4 = shapedFbm(4, false);
 
 // Returns F1, F2 and the two id hashes of the closest periodic cell.
 export const worley = Fn<[Node<'vec2'>, Node<'vec2'>, Node<'float'>], Node<'vec4'>>(
-  ([p, period, jitter]): VarNode<'vec4', JoinNode<'vec4'>> => {
+  ([p, period, jitter]): JoinNode<'vec4'> => {
     const ip = floor(p),
       fp = fract(p);
     const f1 = float(8).toVar(),
@@ -205,7 +203,7 @@ export const warp = (
 
 // Two-pass periodic Voronoi edge distance (Quilez), used for physical cracks.
 export const voronoiEdge = Fn<[Node<'vec2'>, Node<'vec2'>, Node<'float'>], Node<'float'>>(
-  ([p, period, jitter]): VarNode<'float', VarNode<'float', ConstNode<'float', number>>> => {
+  ([p, period, jitter]): VarNode<'float', ConstNode<'float', number>> => {
     const ip = floor(p),
       fp = fract(p);
     const nearest = vec2(0).toVar(),
@@ -262,11 +260,11 @@ export const shear = (
   p: Node<'vec2'>,
   slope: Node<'float'> | number,
   stretch: Node<'float'> | number
-): VarNode<'vec2', JoinNode<'vec2'>> => vec2(p.x.add(p.y.mul(slope)), p.y.mul(stretch));
+): JoinNode<'vec2'> => vec2(p.x.add(p.y.mul(slope)), p.y.mul(stretch));
 export const shearPeriod = (
   period: Node<'vec2'>,
   stretch: Node<'float'> | number
-): VarNode<'vec2', JoinNode<'vec2'>> => vec2(period.x, period.y.mul(stretch));
+): JoinNode<'vec2'> => vec2(period.x, period.y.mul(stretch));
 
 export const scratches = (
   p: Node<'vec2'>,

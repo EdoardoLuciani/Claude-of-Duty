@@ -2,7 +2,7 @@ import type { Vector2, Vector3 } from 'three';
 import type { FnNode } from 'three/src/nodes/tsl/TSLCore.js';
 import { Fn, dot, float, fract, max, mix, vec2, vec3 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
-import type { JoinNode, VarNode } from 'three/webgpu';
+import type { JoinNode } from 'three/webgpu';
 
 /**
  * Procedural noise shared by the stars, the clouds and the fog — the TSL port
@@ -17,7 +17,7 @@ import type { JoinNode, VarNode } from 'three/webgpu';
  * replaces.
  */
 
-const rot2 = (p: Node<'vec2'>): VarNode<'vec2', JoinNode<'vec2'>> =>
+const rot2 = (p: Node<'vec2'>): JoinNode<'vec2'> =>
   vec2(p.x.mul(0.8).sub(p.y.mul(0.6)), p.x.mul(0.6).add(p.y.mul(0.8)));
 
 // Share pure shader functions across octaves and consumers. Keep the authored

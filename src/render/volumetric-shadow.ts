@@ -116,8 +116,8 @@ export function createVolumetricShadow(render: CascadeRender): {
     layer: ShadowLayer,
     point: Node<'vec3'>,
     phi: Node<'float'>
-  ): VarNode<'float', VarNode<'float', ConstNode<'float', number>>> =>
-    Fn((): VarNode<'float', VarNode<'float', ConstNode<'float', number>>> => {
+  ): VarNode<'float', ConstNode<'float', number>> =>
+    Fn((): VarNode<'float', ConstNode<'float', number>> => {
       const h = layer.matrix.mul(vec4(point, 1)).toVar();
       const uvz = h.xyz.div(h.w).toVar();
       const result = float(1).toVar();
@@ -156,7 +156,7 @@ export function createVolumetricShadow(render: CascadeRender): {
   const visibility = Fn<[Node<'vec3'>, Node<'float'> | undefined], Node<'float'>>(
     ([point, noise = interleavedGradientNoise(screenCoordinate.xy)]): VarNode<
       'float',
-      VarNode<'float', ConstNode<'float', number>>
+      ConstNode<'float', number>
     > => {
       const distance = view.mul(vec4(point, 1)).z.negate().toVar();
       const phi = noise.mul(6.28318530718).toVar();
@@ -164,7 +164,7 @@ export function createVolumetricShadow(render: CascadeRender): {
       let branch;
       for (const layer of layers) {
         const condition = distance.lessThan(layer.split);
-        const body = (): VarNode<'float', VarNode<'float', ConstNode<'float', number>>> =>
+        const body = (): VarNode<'float', ConstNode<'float', number>> =>
           result.assign(sample(layer, point, phi));
         branch = branch ? branch.ElseIf(condition, body) : If(condition, body);
       }

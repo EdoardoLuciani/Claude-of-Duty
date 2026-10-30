@@ -1,6 +1,6 @@
 # Claude of Duty
 
-A browser FPS built with pinned Three.js `187dev`, Vite and **WebGPU only**. Procedural and
+A browser FPS built with Three.js r187 (`0.187.0`), Vite and **WebGPU only**. Procedural and
 Blender-authored assets load locally; no runtime CDN or WebGL fallback.
 [Updates](https://shumer.dev/newsletter) · [Engine contract](ARCHITECTURE.md) ·
 [Contributor instructions](AGENTS.md)
@@ -60,17 +60,16 @@ Runtime-model optimization is explicit: `npm run models:cook -- p320` uses the
 committed `.runtime.glb`; it does not require gltfpack. P320 is the first opt-in
 profile; other models retain their current loading paths until validated.
 
-**Three.js pin:** GitHub commit `e27dfa95ae7f453b5d7a9a36ffdb563f7c9b529b`,
-not a moving `dev` dependency. Its package version still says `0.186.0`; runtime
-source reports `187dev`. `tools/compensate-three.mjs` selects the pinned ESM source
-exports because committed bundles still lag the latest source fixes. This pin
-includes native builder-local buffer names and declaration collision handling
+**Three.js pin:** published npm release `three@0.187.0`, with matching
+`@types/three@0.187.0` and lockfile integrity hashes. The release bundles include the
+upstream fixes, so no postinstall source-export correction or local Three edits
+are needed. Native builder-local buffer names and declaration collision handling
 ([#34872](https://github.com/mrdoob/three.js/pull/34872)), plus per-object reference
 attributes that let compatible instanced meshes safely share shader builds
-([#35007](https://github.com/mrdoob/three.js/pull/35007)). The local WGSL edit is retired; its
-reviewed upstream source remains hash-verified without modification. Commit, version
-and hash guards validate all targets before writing; review them on every upgrade.
+([#35007](https://github.com/mrdoob/three.js/pull/35007)), remain upstream-owned.
 Upstream also owns Fresnel and TRAA cleanup—those local corrections remain removed.
+Review the release/export/shared-core and upstream source/bundle smoke guards, plus
+`src/render/three-types.d.ts`, on every Three/@types upgrade.
 Preserve the native buffer isolation/reuse guards plus native
 startup/first-use/lifetime/failure checks. Compatible native instancing now shares
 shader-builder state and GPU programs/pipelines, never object buffers. Upstream

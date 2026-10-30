@@ -37,7 +37,7 @@ let fixtureBytes = bytes,
   onTranscode = () => {},
   onTextureError = () => {};
 
-// Keep GLTFLoader, blob fetching, KTX parsing and texture-error handling real.
+// Keep GLTFLoader, direct bufferView KTX parsing and texture-error handling real.
 globalThis.self = globalThis;
 globalThis.ProgressEvent = class extends Event {
   constructor(type, properties) {
@@ -48,7 +48,6 @@ globalThis.ProgressEvent = class extends Event {
 globalThis.fetch = async (input, options) => {
   const url = input instanceof Request ? input.url : String(input);
   if (url === P320_URL) return new Response(fixtureBytes);
-  if (url.startsWith('blob:')) await imageGate?.promise;
   return originalGlobals.fetch(input, options);
 };
 KTX2Loader.prototype.init = function () {
@@ -60,10 +59,16 @@ KTX2Loader.prototype.init = function () {
   return this.transcoderPending;
 };
 KTX2Loader.prototype.parse = function (buffer, onLoad, onError) {
-  return originalParse.call(this, buffer, onLoad, (error) => {
+  const fail = (error) => {
     onTextureError(error);
     onError?.(error);
-  });
+  };
+  // r187 no longer fetches blob URLs for embedded KTX2; delay parse instead.
+  if (imageGate) {
+    imageGate.promise.then(() => originalParse.call(this, buffer, onLoad, fail)).catch(fail);
+    return;
+  }
+  return originalParse.call(this, buffer, onLoad, fail);
 };
 WorkerPool.prototype.postMessage = async function () {
   transcodes++;
@@ -103,7 +108,7 @@ try {
   assert.equal(initializations, 0, 'malformed KTX fails before decoder setup');
   assert.equal(disposals, 0, 'no initialized decoder to dispose');
 
-  // Geometry can reject before image bytes arrive. Late images must not start workers.
+  // Geometry can reject before image parsing starts. Late images must not start workers.
   fixtureBytes = Buffer.from(bytes);
   fixtureBytes[binaryOffset + compressed.byteOffset] = 0;
   imageGate = Promise.withResolvers();
