@@ -25,7 +25,13 @@ packed preview/native-export products, never build inputs. The derived
 additional simplification flags; the native adapter load path remains operational
 until shared runtime-loader integration. See the local guide's
 [native/export optimization](../../../tools/blender/evolys/README.md#nativeexport-optimization)
-for source changes, retained mechanisms and validation limits. `manifest.json` records
+for source changes, retained mechanisms and validation limits. The second pass
+uses one eight-joint rigid mechanical skin plus the independent deforming belt:
+five primitive instances total, four in loaded Idle, with two unchanged materials.
+The stock/head oracle selects actual stock triangles by joint membership, not a
+separate draw. The guide documents the approved, EVOLYS-only split-normal
+encoding bound (0.0026 normalized-vector distance); normal-map bytes, UV0/UV1,
+strength, geometry and contact thresholds are unchanged. `manifest.json` records
 events/belt, `hand-reference.json` is read-only versioned hand calibration, and
 `photo-review.json` freezes review registration. Shared review-arm appearance is
 also read-only and excluded from export. See the [edit map and build stages](../../../tools/blender/evolys/README.md).
@@ -60,7 +66,10 @@ blender -b -t 2 --python-exit-code 1 --python tools/blender/evolys_762.py -- \
 blender -b assets/weapons/fn-evolys-762/fn-evolys-762.blend \
   --python-exit-code 1 --python tools/blender/evolys_check.py
 node tests/smoke/smoke-evolys.mjs
+node tests/smoke/smoke-evolys-skin.mjs
 node tests/smoke/smoke-evolys-clearance.mjs
+# Extract the independent pass-1 native GLB from base 875587a3, then:
+node tools/evolys-pass2-parity.mjs /absolute/path/to/base-native.glb
 ```
 
 Follow the [shared authoring workflow](../../../tools/blender/README.md).

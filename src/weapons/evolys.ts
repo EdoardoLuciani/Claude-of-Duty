@@ -254,6 +254,11 @@ export class EvolysAnimation {
   dispose(): void {
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.root);
+    const skeletons = new Set<THREE.Skeleton>();
+    this.root.traverse((node): void => {
+      if (node instanceof THREE.SkinnedMesh) skeletons.add(node.skeleton);
+    });
+    for (const skeleton of skeletons) skeleton.dispose();
     disposeWeaponMaterials(this.model);
   }
 }

@@ -5,29 +5,6 @@ import struct
 import bpy
 
 
-def consolidate_static_surfaces(asset):
-    """Join only nonmoving assemblies, after saving the editable source.
-
-    Receiver, handguard and optic share the rig's transform in every clip.
-    Blender's native exporter batches their identical material slots; the lens
-    remains its own transparent primitive. Stock stays separate for the runtime
-    triangle/head-clearance oracle. Mechanisms, pouches and belt are untouched.
-    """
-    objects=[bpy.data.objects[name] for name in ('receiver_mesh','handguard_mesh','optic_mesh')]
-    rig=bpy.data.objects['EVOLYS_RIG']
-    for obj in objects:
-        assert obj.name in asset.objects and not obj.animation_data
-        assert obj.parent.parent==rig and not obj.parent.animation_data
-    bpy.ops.object.select_all(action='DESELECT')
-    for obj in objects:obj.select_set(True)
-    bpy.context.view_layer.objects.active=objects[0]
-    bpy.ops.object.join()
-    merged=bpy.context.object
-    world=merged.matrix_world.copy();merged.parent=rig
-    merged.matrix_parent_inverse=rig.matrix_world.inverted();merged.matrix_world=world
-    merged.name='static_surfaces'
-
-
 def prepare_export_actions(asset, clips):
     """Preserve the historical 120 Hz NLA lattice in native Actions curves.
 
