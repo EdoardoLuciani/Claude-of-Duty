@@ -133,7 +133,7 @@ export function createSkySample(
    * of a low sun is orange while the centre stays white.
    */
   const skSunDisc = Fn<[Node<'float'>], Node<'vec3'>>(
-    ([theta]): VarNode<'vec3', VarNode<'vec3', ConstNode<'vec3', Vector3>>> => {
+    ([theta]): VarNode<'vec3', ConstNode<'vec3', Vector3>> => {
       const result = vec3(0).toVar();
       const R = uDisc.x.mul(uDisc.z);
       const aa = max(1e-6, fwidth(theta));
@@ -161,10 +161,7 @@ export function createSkySample(
    * ten or fifteen degrees, restoring the Mie forward peak the LUT destroys.
    */
   const skAureole = Fn<[Node<'vec3'>, Node<'vec3'>, Node<'float'>], Node<'vec3'>>(
-    ([rayDir, irradiance, cosTheta]): VarNode<
-      'vec3',
-      VarNode<'vec3', ConstNode<'vec3', Vector3>>
-    > => {
+    ([rayDir, irradiance, cosTheta]): VarNode<'vec3', ConstNode<'vec3', Vector3>> => {
       const result = vec3(0).toVar();
       const CUT = 0.9135; // cos(24 degrees)
       If(cosTheta.greaterThan(CUT), (): void => {
@@ -198,7 +195,7 @@ export function createSkySample(
   });
 
   const skMoonDisc = Fn<[Node<'vec3'>, Node<'float'>], Node<'vec3'>>(
-    ([rayDir, theta]): VarNode<'vec3', VarNode<'vec3', ConstNode<'vec3', Vector3>>> => {
+    ([rayDir, theta]): VarNode<'vec3', ConstNode<'vec3', Vector3>> => {
       const result = vec3(0).toVar();
       const R = uDisc.y.mul(uDisc.w);
       If(theta.lessThanEqual(R.mul(1.6)), (): void => {
@@ -300,14 +297,12 @@ export function createSkySample(
 }
 
 /** Equirectangular direction, matching three's `equirectUv` exactly. */
-export const dirFromEquirectUv = Fn<[Node<'vec2'>], Node<'vec3'>>(
-  ([uv]): VarNode<'vec3', JoinNode<'vec3'>> => {
-    const az = uv.x.sub(0.5).mul(2 * SK_PI);
-    const lat = uv.y.sub(0.5).mul(SK_PI);
-    const cl = cos(lat);
-    return vec3(cl.mul(cos(az)), sin(lat), cl.mul(sin(az)));
-  }
-);
+export const dirFromEquirectUv = Fn<[Node<'vec2'>], Node<'vec3'>>(([uv]): JoinNode<'vec3'> => {
+  const az = uv.x.sub(0.5).mul(2 * SK_PI);
+  const lat = uv.y.sub(0.5).mul(SK_PI);
+  const cl = cos(lat);
+  return vec3(cl.mul(cos(az)), sin(lat), cl.mul(sin(az)));
+});
 
 const _domeGeometry = new BufferGeometry();
 _domeGeometry.setAttribute(

@@ -159,7 +159,7 @@ export function createVolumetricNodes(
    * transmittance applied to geometry is smooth at full resolution.
    */
   const skHeightIntegral = Fn<[Node<'float'>, Node<'float'>, Node<'float'>], Node<'float'>>(
-    ([y0, dy, t]): VarNode<'float', VarNode<'float', ConstNode<'float', number>>> => {
+    ([y0, dy, t]): VarNode<'float', ConstNode<'float', number>> => {
       const d0 = exp(y0.sub(uFog.z).negate().mul(uFog.y));
       const x = dy.mul(uFog.y).mul(t);
       const result = float(0).toVar();
@@ -174,7 +174,7 @@ export function createVolumetricNodes(
 
   /** World ray through the current screen UV, normalised on the z = -1 plane. */
   const skRayFor = Fn<[Node<'vec2'>, Node<'mat4'>, Node<'mat4'>], Node<'vec4'>>(
-    ([uv, invProj, camWorld]): VarNode<'vec4', JoinNode<'vec4'>> => {
+    ([uv, invProj, camWorld]): JoinNode<'vec4'> => {
       // Native screen/texture UV has its origin at the top left; camera NDC
       // points up. Flip only the reconstruction coordinate, not the depth/color
       // sample. Otherwise ground pixels march skyward and mirror the sun's lobe.

@@ -115,17 +115,13 @@ interface SharedSurfaceMaps {
   keyDir?: Node<'vec3'>;
   keyColor?: Node<'vec3'>;
 }
-const tint = (hex: number | string): VarNode<'vec3', ConstNode<'vec3', Vector3>> => {
+const tint = (hex: number | string): ConstNode<'vec3', Vector3> => {
   const c = new Color(hex);
   return vec3(c.r, c.g, c.b);
 };
 const sample = (map: Texture | TextureNode, coords: Node<'vec2'>): TextureNode<'vec4'> =>
   texture(map, coords);
-const axisNormal = (
-  n: Node<'vec3'>,
-  axis: 0 | 1 | 2,
-  sign: Node<'float'>
-): VarNode<'vec3', JoinNode<'vec3'>> =>
+const axisNormal = (n: Node<'vec3'>, axis: 0 | 1 | 2, sign: Node<'float'>): JoinNode<'vec3'> =>
   axis === 0
     ? vec3(sign.mul(n.z), n.y, sign.negate().mul(n.x))
     : axis === 1
@@ -270,7 +266,7 @@ export function createSurfaceNodeMaterial(
     const surfN = p.localSpace ? localN : geometricN;
     const faceN = frontFacing.select(surfN, surfN.negate());
     const maskColor = p.vertexMasks
-      ? Fn((builder: NodeBuilder): VarNode<'vec4', ConstNode<'vec4', Vector4>> | VertexColorNode =>
+      ? Fn((builder: NodeBuilder): ConstNode<'vec4', Vector4> | VertexColorNode =>
           builder.hasGeometryAttribute('color') ? vertexColor() : vec4(0)
         )()
       : null;

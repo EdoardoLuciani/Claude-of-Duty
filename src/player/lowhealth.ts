@@ -15,7 +15,7 @@ import {
 } from 'three/tsl';
 import { Vector2, Vector3 } from 'three/webgpu';
 import type { Node as TslNode, TextureNode, UniformNode } from 'three/webgpu';
-import type { JoinNode, VarNode } from 'three/webgpu';
+import type { JoinNode } from 'three/webgpu';
 
 interface HealthEffect {
   effect: number;
@@ -42,7 +42,7 @@ export class LowHealthPass {
 
   /** Pointwise input preserves any upstream sample's coordinates. */
   asColorNode(colorNode: TslNode<'vec4'>, exposure: TslNode<'float'>): TslNode<'vec4'> {
-    return Fn((): VarNode<'vec4', JoinNode<'vec4'>> => {
+    return Fn((): JoinNode<'vec4'> => {
       const color = colorNode.toVar();
       const c = color.rgb.toVar();
       const state = this.state;

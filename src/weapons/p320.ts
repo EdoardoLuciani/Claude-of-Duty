@@ -113,13 +113,29 @@ export async function loadP320(
   // GLTFLoader converts image failures to null textures; retain their original cause.
   let textureFailed = false;
   let textureFailure: unknown;
+  const recordTextureFailure = (error: unknown): void => {
+    if (!textureFailed) {
+      textureFailed = true;
+      textureFailure = error;
+    }
+  };
+  // r187 parses embedded KTX2 bufferViews directly, bypassing load().
+  const parseTexture = decoder.parse.bind(decoder);
+  decoder.parse = (buffer, onLoad, onError): void => {
+    try {
+      parseTexture(buffer, onLoad, (error): void => {
+        recordTextureFailure(error);
+        onError?.(error);
+      });
+    } catch (error) {
+      recordTextureFailure(error);
+      throw error;
+    }
+  };
   const loadTexture = decoder.load.bind(decoder);
   decoder.load = (source, onLoad, onProgress, onError): void => {
     loadTexture(source, onLoad, onProgress, (error): void => {
-      if (!textureFailed) {
-        textureFailed = true;
-        textureFailure = error;
-      }
+      recordTextureFailure(error);
       onError?.(error);
     });
   };
