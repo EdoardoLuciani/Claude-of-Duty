@@ -79,13 +79,12 @@ const cell = (p) => p.toArray().map((v) => Math.floor(v / cellSize));
 const key = (x, y, z) => `${x},${y},${z}`;
 runtime.root.traverse((mesh) => {
   if (!mesh.isMesh || mesh.name.startsWith('magazine_spare')) return;
-  const { position } = mesh.geometry.attributes,
-    index = mesh.geometry.index;
+  const index = mesh.geometry.index;
   for (let i = 0; i < index.count; i += 3) {
     const tri = new THREE.Triangle(
       ...[0, 1, 2].map((j) =>
-        new THREE.Vector3()
-          .fromBufferAttribute(position, index.getX(i + j))
+        mesh
+          .getVertexPosition(index.getX(i + j), new THREE.Vector3())
           .applyMatrix4(mesh.matrixWorld)
       )
     );
@@ -109,7 +108,7 @@ native.root.traverse((mesh) => {
   if (!mesh.isMesh || mesh.name.startsWith('magazine_spare')) return;
   const position = mesh.geometry.attributes.position;
   for (let i = 0; i < position.count; i += 12) {
-    p.fromBufferAttribute(position, i).applyMatrix4(mesh.matrixWorld);
+    mesh.getVertexPosition(i, p).applyMatrix4(mesh.matrixWorld);
     const c = cell(p);
     let distance = Infinity;
     for (let x = c[0] - 1; x <= c[0] + 1; x++)

@@ -172,10 +172,10 @@
   },
   "stats": {
     "triangles": 100697,
-    "primitives": 11,
+    "primitives": 6,
     "materials": 2,
     "images": 3,
-    "bytes": 12615752
+    "bytes": 15626140
   },
   "textureResolution": 1024,
   "contactGeometry": {

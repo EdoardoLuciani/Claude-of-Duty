@@ -28,7 +28,7 @@ animation datums, not mechanism certification. References aren't shipped texture
 
 Follow the [shared authoring workflow](../../../tools/blender/README.md).
 Sources: `tools/blender/ax338.py`, `ax338_actions.py`, `ax338/export.py`,
-`ax338/finishes.py`.
+`ax338/finishes.py`, `ax338/skin.py`.
 
 Declared read-only build inputs:
 
@@ -140,14 +140,14 @@ disable color management). History:
 Imports do not build or mutate Blender. Missing declared inputs fail; there is
 no previous blend/GLB/map fallback. Generated preview edits are not source edits.
 
-## Opaque finish consolidation and runtime candidate
+## First-pass opaque finish consolidation
 
 The saved `.blend` retains the original separately editable components, finishes,
 UVs and packed maps. After saving, `ax338/finishes.py` consolidates the **actual
 export geometry/material slots**, not just scene groups: seven opaque finishes
 share one material and one primitive per independently controlled assembly. The
 coated scope lenses retain their separate transparent material/primitive, alpha
-and normal scale. There is no new skin, hand calibration or hierarchy migration.
+and normal scale. That first pass added no skin, hand calibration or hierarchy migration; the second-pass skin below is the current runtime product.
 
 Original linear albedo factors move into `COLOR_0`. Albedo and normal XYZ images
 and UV0 remain unchanged. Only scalar roughness/metalness move into a guarded
@@ -225,6 +225,85 @@ Matched CPU studio views, optical/rail/lettering details and reload poses were
 reviewed using a geometry-equivalent PNG cook; final native-WebGPU KTX2 captures
 and timing remain integration-owned. The existing full right-hand DCC failure
 below is unchanged, not waived by these passing runtime checks.
+
+## Second-pass draw consolidation (current product)
+
+`ax338/skin.py` runs only after saving the editable source and preparing its
+unchanged 120 Hz Actions. Receiver, handguard, stock, optic, bolt and trigger
+surfaces now share one rigid one-influence skin with six `MECH_` ownership bones.
+The first four helpers have no independent Actions; static authoring parents no
+longer cost draws. Bolt/trigger bone curves copy the original controls with only
+rest translation subtracted. Original named empties, sockets, hand tracks and
+magazine ownership remain. The existing opaque finish atlas is **not rebuilt by
+a new scheme**; its factors/maps/UV roles and transparent lens material remain.
+
+There are **six primitive instances**, down from eleven; loaded Idle is **four**,
+down from nine (weapon only; shared arms are excluded). Boundaries are:
+
+| Draw | Native triangles | Runtime triangles | Loaded Idle | Reason retained |
+| --- | ---: | ---: | --- | --- |
+| Opaque mechanical skin | 94,833 | 94,769 | yes | All static surfaces plus independently moving bolt/trigger in one draw |
+| Transparent coated lenses | 504 | 504 | yes | Authored alpha 0.13 / no depth writes; same static optic bone, separate transparent primitive |
+| Seated magazine body | 1,632 | 1,632 | yes | Independent transfer/drop ownership, real geometry |
+| Seated magazine rounds | 1,048 | 1,048 | yes when loaded | Independent empty-round visibility |
+| Spare magazine body | 1,632 | 1,632 | no | Independent carried-magazine STEP control |
+| Spare magazine rounds | 1,048 | 1,048 | no | Real carried cartridges / independent visibility |
+
+Keeping the lens on the static optic bone avoids material separation's custom
+normal re-encoding; it still has its own transparent draw. Magazines/rounds are
+not skinned and remain usable by the existing real drop pool. No geometry
+simplification, hand refit, timing change or material-policy exception was used.
+
+| Product | Raw bytes | gzip-9 bytes | Unique / instanced triangles | Primitive instances | Materials | Decoded vertex / index bytes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| First-pass native | 12,615,752 | 5,986,154 | 100,697 / 100,697 | 11 | 2 | 6,687,720 / 588,102 |
+| Second-pass native | 15,626,140 | 5,970,466 | 100,697 / 100,697 | 6 | 2 | 9,101,560 / 1,157,100 |
+| First-pass runtime | 4,673,060 | 3,521,587 | 97,953 / 100,633 | 11 | 2 | 4,796,176 / 587,718 |
+| Second-pass runtime | 4,673,444 | 3,513,406 | 97,953 / 100,633 | 6 | 2 | 5,724,152 / 1,156,332 |
+
+The trade is 1,496,590 more decoded geometry bytes (5,383,894 → 6,880,484,
++27.8%): rigid skin indices/weights and 32-bit indices for the >65k-vertex opaque
+surface, versus five fewer submissions. Runtime raw grows only 384 B and gzip
+shrinks 8,181 B. These are **CPU typed-array storage**, not measured uploaded GPU
+allocation or an FPS claim. The two glTF material primitives load as two skeleton
+instances sharing six authored bones; each palette is disposed by the adapter.
+Their renderer-created bone textures and ordinary skinning shader work are new
+costs; no custom shader/material, new texture, dependency or runtime framework is
+added. All three runtime UASTC KTX2 maps remain 1024² with eleven mip levels.
+Native still fits the unchanged 15 MiB cap (102,500 B headroom).
+
+Native count and all surface vertices/UV0 are preserved. Export-frame rebasing
+changes float/bind-matrix rounding: matching triangle positions differ by at most
+3.368e-8 m. Eight coplanar receiver/trigger-guard triangles are re-tessellated by
+Blender after the join; no polygon boundary or vertex UV changes. PM II triangles
+all match, maximum position 1.844e-8 m and normal-vector difference 1.366e-7.
+Other transformed normals can re-round at Blender's existing normal precision
+(maximum matching normal-vector difference 0.000800). Geometry hashes now sample
+actual bound vertices and select optic surfaces by rigid ownership, retaining
+the original 10-micrometre lattice, normal/UV checks and cyclic winding check.
+Empty helper subtrees are never accepted as geometry proof.
+
+Two new empty-directory, separate-process exports/cooks are byte-identical to the
+committed native/runtime GLBs and manifest. Use the same commands above and the
+registered `['-vc', '16', '-vp', '16']` cook flags; no shared cook profile changes.
+The source check and 474-pose left DCC sweep pass (0.903077 mm / unchanged 1 mm).
+Native/runtime adapter/contact checks pass, as do the actual shared-hand 761-pose
+sweeps. Sampled runtime surface error remains below the original 0.05 mm gate
+(measured 0.007691 mm).
+
+`smoke-ax338-skin.mjs` checks 7,118 native/runtime half-frame poses and 5,487,799
+actual vertex probes, all endpoint vertices, rigid weights, six/four draw counts,
+real drop/cartridge geometry, gesture interruption and independent inspection
+skeleton/bone-texture disposal. Maximum actual skin/helper deviation is 0.007561
+mm. Native uses 1 um; runtime propagates the unchanged per-channel 1 um / 1e-4 rad
+codec bounds through both rest bases to vertex distance. The original strict
+native 60°/100 mm and runtime 1e-4 rad rotation gates are not relaxed. The bolt
+contact sweep additionally checks actual deformed knob triangles, not just target
+helpers, against the original <3 mm glove-pad contact allowance.
+
+No new GPU capture/benchmark was run in this worker lane: serialized native GPU
+allocation, timing, matched appearance and final human sign-off remain parent
+integration gates. Counts alone do not establish performance acceptance.
 
 ## Known issues and gates
 
