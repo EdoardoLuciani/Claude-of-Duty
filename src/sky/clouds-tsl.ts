@@ -112,7 +112,7 @@ const skCirrusBand = ({
   >(
     ([p, cov, seed, base, rotKmInv, lenKM, aniso]): VarNode<
       'float',
-      VarNode<'float', ConstNode<'float', number>>
+      ConstNode<'float', number>
     > => {
       const d = float(0).toVar();
       const w = vec2(skVal2(p.mul(0.3).add(seed)), skVal2(p.mul(0.3).add(seed).add(11.7))).sub(0.5);
@@ -243,7 +243,7 @@ export function createCloudNodes(
   >(
     ([rayDir, sunDir, sunLow, sunHigh, moonDir, moonLow, moonHigh, ambient]): VarNode<
       'vec4',
-      VarNode<'vec4', ConstNode<'vec4', Vector4>>
+      ConstNode<'vec4', Vector4>
     > => {
       const out = vec4(0).toVar();
       If(rayDir.y.greaterThanEqual(-0.008), (): void => {

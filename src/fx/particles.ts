@@ -36,7 +36,7 @@ import {
 } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import type { Node } from 'three/webgpu';
-import type { JoinNode, TextureNode, UniformNode, VarNode } from 'three/webgpu';
+import type { JoinNode, TextureNode, UniformNode } from 'three/webgpu';
 
 /**
  * GPU particle system — strict WebGPU / TSL.
@@ -402,7 +402,7 @@ function buildParticleMaterial(o: ParticleOptions): {
     return select(alive, clip, vec4(0.0, 0.0, 2.0, 1.0));
   })();
 
-  const fragment = Fn((): VarNode<'vec4', JoinNode<'vec4'>> => {
+  const fragment = Fn((): JoinNode<'vec4'> => {
     Discard(vCol.a.lessThanEqual(0.0));
     const tex = uniforms.uSprite.sample(vUv);
     let a = tex.a.mul(vCol.a);

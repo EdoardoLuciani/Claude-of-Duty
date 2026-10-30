@@ -143,16 +143,14 @@ export function createAtmosphereNodes(shared: AtmosphereNodesContext): {
 } {
   const { transmittanceTex, multiScatterTex } = shared;
 
-  const skLutUv = Fn<[Node<'vec3'>, Node<'vec3'>], Node<'vec2'>>(
-    ([pos, dir]): VarNode<'vec2', JoinNode<'vec2'>> => {
-      const h = length(pos);
-      const mu = dot(dir, pos.div(h));
-      return vec2(
-        clamp(mu.mul(0.5).add(0.5), 0, 1),
-        clamp(h.sub(SK_GROUND_R).div(SK_TOP_R.sub(SK_GROUND_R)), 0, 1)
-      );
-    }
-  );
+  const skLutUv = Fn<[Node<'vec3'>, Node<'vec3'>], Node<'vec2'>>(([pos, dir]): JoinNode<'vec2'> => {
+    const h = length(pos);
+    const mu = dot(dir, pos.div(h));
+    return vec2(
+      clamp(mu.mul(0.5).add(0.5), 0, 1),
+      clamp(h.sub(SK_GROUND_R).div(SK_TOP_R.sub(SK_GROUND_R)), 0, 1)
+    );
+  });
 
   /** Transmittance from pos along dir out to the top of the atmosphere. */
   const skTransmittance = Fn<[Node<'vec3'>, Node<'vec3'>], Node<'vec3'>>(
@@ -192,7 +190,7 @@ export function createRaymarchSky(
   >(
     ([pos, rayDir, sunDir, sunIrr, moonDir, moonIrr]): VarNode<
       'vec3',
-      VarNode<'vec3', ConstNode<'vec3', Vector3>>
+      ConstNode<'vec3', Vector3>
     > => {
       const topT = skRaySphere(pos, rayDir, SK_TOP_R);
       const groundT = skRaySphere(pos, rayDir, SK_GROUND_R);

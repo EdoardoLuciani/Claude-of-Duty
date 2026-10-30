@@ -1,6 +1,6 @@
 # Engine contract
 
-Browser FPS: pinned Three.js 187dev + WebGPU only. Assets and WASM are local; no WebGL fallback.
+Browser FPS: Three.js r187 (`0.187.0`) + WebGPU only. Assets and WASM are local; no WebGL fallback.
 Read this before changing a subsystem. Workflow and validation: [AGENTS.md](AGENTS.md).
 
 ## Ownership and subsystem API
@@ -252,10 +252,10 @@ Unexpected GPU loss is terminal and stops the loop; intentional destruction is
 not a gameplay failure. Init/prewarm must not publish readiness after loss.
 Detach owned callbacks/lights and finish failure-isolated teardown. Upstream now
 owns TRAA depth/history disposal; keep first-build and active-history lifetime
-regressions, not external disposal of its private textures. The Git dependency's
-ESM exports use source so committed stale bundles cannot hide the pinned fixes.
-Keep the source-export correction and upstream buffer-name verification
-exact-commit/hash guarded; see README upgrade checks. Builder-local WGSL buffer
+regressions, not external disposal of its private textures. The published npm
+release uses unmodified ESM bundles; no postinstall source-export correction is
+needed. Keep release/export/shared-core and upstream source/bundle regressions;
+see README upgrade checks. Builder-local WGSL buffer
 names enable native program/pipeline reuse. Upstream reference attributes bind each
 instanced mesh's own buffers while compatible meshes share shader-builder state;
 object-specific builds remain uncached. Preserve pixel-level buffer isolation and

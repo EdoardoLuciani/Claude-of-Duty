@@ -100,26 +100,24 @@ const nestedLoop = (
 const transmittanceNode = (
   uMieScale: Node<'float'>
 ): FnNode<[Vector2 | Node<'vec2'>], Node<'vec3'>> =>
-  Fn<[Node<'vec2'>], Node<'vec3'>>(
-    ([vUv]): VarNode<'vec3', VarNode<'vec3', ConstNode<'vec3', Vector3>>> => {
-      const mu = vUv.x.mul(2).sub(1);
-      const h = mix(SK_GROUND_R, SK_TOP_R, vUv.y);
-      const pos = vec3(0, h, 0);
-      const dir = vec3(sqrt(max(0, float(1).sub(mu.mul(mu)))), mu, 0);
-      const result = vec3(0).toVar();
-      const t = skRaySphere(pos, dir, SK_TOP_R).toVar();
-      If(t.greaterThan(0), (): void => {
-        const dt = t.div(TS_STEPS);
-        const od = vec3(0).toVar();
-        Loop(TS_STEPS, ({ i }): void => {
-          const p = pos.add(dir.mul(i.toFloat().add(0.5).mul(dt)));
-          od.addAssign(skExtinction(p, uMieScale).mul(dt));
-        });
-        result.assign(exp(od.negate()));
+  Fn<[Node<'vec2'>], Node<'vec3'>>(([vUv]): VarNode<'vec3', ConstNode<'vec3', Vector3>> => {
+    const mu = vUv.x.mul(2).sub(1);
+    const h = mix(SK_GROUND_R, SK_TOP_R, vUv.y);
+    const pos = vec3(0, h, 0);
+    const dir = vec3(sqrt(max(0, float(1).sub(mu.mul(mu)))), mu, 0);
+    const result = vec3(0).toVar();
+    const t = skRaySphere(pos, dir, SK_TOP_R).toVar();
+    If(t.greaterThan(0), (): void => {
+      const dt = t.div(TS_STEPS);
+      const od = vec3(0).toVar();
+      Loop(TS_STEPS, ({ i }): void => {
+        const p = pos.add(dir.mul(i.toFloat().add(0.5).mul(dt)));
+        od.addAssign(skExtinction(p, uMieScale).mul(dt));
       });
-      return result;
-    }
-  );
+      result.assign(exp(od.negate()));
+    });
+    return result;
+  });
 
 /** 32 x 32 multiple-scattering bake. */
 const multiScatterNode = (

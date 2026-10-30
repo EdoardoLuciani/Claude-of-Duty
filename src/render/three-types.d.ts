@@ -1,14 +1,13 @@
-// Declaration gaps verified against the pinned Three.js source (e27dfa95).
+// Declaration gaps verified against Three.js r187 (0.187.0).
 // Keep these signatures narrow and review them when upgrading Three/@types.
-import type { Camera, Node, TextureNode } from 'three/webgpu';
+import type { Node, TextureNode } from 'three/webgpu';
 import 'three/src/nodes/core/NodeBuilder.js';
 import 'three/src/nodes/core/Node.js';
 import 'three/examples/jsm/tsl/display/TRAANode.js';
 
-// src/nodes/core/NodeBuilder.js: camera, shaderStage, hasGeometryAttribute.
+// src/nodes/core/NodeBuilder.js: shaderStage, hasGeometryAttribute.
 declare module 'three/src/nodes/core/NodeBuilder.js' {
   export default interface NodeBuilder {
-    camera: Camera | null;
     shaderStage: 'vertex' | 'fragment' | 'compute' | null;
     hasGeometryAttribute(name: string): boolean;
   }

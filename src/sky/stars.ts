@@ -121,7 +121,7 @@ const starLayer = (
   Node<'vec3'>
 > =>
   Fn<[Node<'vec3'>, Node<'float'>, Node<'float'>], Node<'vec3'>>(
-    ([dir, twinkle, band]): VarNode<'vec3', VarNode<'vec3', ConstNode<'vec3', Vector3>>> => {
+    ([dir, twinkle, band]): VarNode<'vec3', ConstNode<'vec3', Vector3>> => {
       const result = vec3(0).toVar();
       const cell = floor(dir.mul(N)).add(seed);
       const h = skHash33(cell);
@@ -168,7 +168,7 @@ const skMilkyWay = (
   octaves: number
 ): FnNode<[Vector3 | Node<'vec3'>, number | Node<'float'> | Node<'uint'>], Node<'vec3'>> =>
   Fn<[Node<'vec3'>, Node<'float'>], Node<'vec3'>>(
-    ([eq, gain]): VarNode<'vec3', VarNode<'vec3', ConstNode<'vec3', Vector3>>> => {
+    ([eq, gain]): VarNode<'vec3', ConstNode<'vec3', Vector3>> => {
       const lat = dot(eq, SK_GAL_POLE);
       // Two nested bands: a tight bright spine inside a broad halo.
       const spineBand = exp(pow(abs(lat).div(0.048), 1.55).negate());
