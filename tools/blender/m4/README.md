@@ -54,5 +54,6 @@ emissive slot, so the adapter is required to display the consolidated GLB.
 Use `['-noq', '-vc', '16', '-kv']` with the pinned shared cook API. `-kv` preserves
 finish UVs that the standard glTF slots do not sample. The asset README records
 measured geometry-byte/index and four-sample shader costs, improved file sizes,
-unchanged triangles and the remaining native-GPU review gate. Do not substitute
-more permissive simplification or relax the existing precision-critical irons.
+unchanged triangles and completed bounded native-GPU checks. Factory-fidelity
+and all-state human acceptance remain separate. Do not substitute more permissive
+simplification or relax the existing precision-critical irons.

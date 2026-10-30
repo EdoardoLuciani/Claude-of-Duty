@@ -28,10 +28,9 @@ for (const image of runtime.json.images) {
   assert.equal(image.mimeType, 'image/ktx2');
   const view = runtime.json.bufferViews[image.bufferView];
   const ktx = readKTX(runtime.bin.subarray(view.byteOffset, view.byteOffset + view.byteLength));
-  const size = image.name.startsWith('m4_finish_') ? 512 : 1024;
-  assert.equal(ktx.pixelWidth, size);
-  assert.equal(ktx.pixelHeight, size);
-  assert.equal(ktx.levels.length, Math.log2(size) + 1);
+  assert.equal(ktx.pixelWidth, 1024);
+  assert.equal(ktx.pixelHeight, 1024);
+  assert.equal(ktx.levels.length, 11);
   assert.equal(ktx.supercompressionScheme, KHR_SUPERCOMPRESSION_ZSTD);
   const dfd = ktx.dataFormatDescriptor[0];
   assert.equal(dfd.colorModel, KHR_DF_MODEL_UASTC);
