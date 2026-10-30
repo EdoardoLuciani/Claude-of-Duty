@@ -97,7 +97,7 @@
     "triangles": 59860,
     "vertices": 32448,
     "meshes": 4,
-    "material_slots": 20
+    "material_slots": 8
   },
   "textures": {
     "resolution": 1024,
@@ -110,6 +110,7 @@
     "Reference-backed visual exterior, not manufacturing geometry or licensed SIG art.",
     "Named sockets and rigid-part clips; hands, audio and live casing physics are runtime-owned.",
     "Visibility is authored CONSTANT; motion LINEAR at 60 Hz. Stock Actions export, no GLB rewriting.",
-    "Export-only corner pigment and scalar finish lookup; UV0 albedo/normal detail retained. Roughness grain reduced to its mean."
+    "Export-only corner pigment and scalar finish lookup; UV0 albedo/normal detail retained. Roughness grain reduced to its mean.",
+    "One opaque material; MCX adapter selects exact fine/polymer/rubber/fiber normal strengths and fiber emission from UV1 finish identity. Lens remains separate."
   ]
 }

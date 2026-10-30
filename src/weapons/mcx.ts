@@ -9,6 +9,7 @@ import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts'
 import { authoredModel } from './authored-model.ts';
 import { buildEquipClips, buildMagazineClips } from './clips.ts';
 import { smootherstep } from './mathx.ts';
+import { configureMCXFinishes } from './mcx-finishes.ts';
 
 export const MCX_URL = new URL(
   '../../assets/weapons/mcx-virtus/mcx-virtus.runtime.glb',
@@ -90,6 +91,8 @@ export function makeMCXModel(gltf: GLTF): MCXModel {
         material.metalness = 0;
         material.roughness = 0.12;
         material.specularIntensity = 0.25;
+      } else if (original.name === 'MCX | opaque finishes') {
+        configureMCXFinishes(material);
       }
     },
     true

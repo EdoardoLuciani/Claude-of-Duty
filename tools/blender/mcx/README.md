@@ -34,7 +34,9 @@ release into one single-influence mechanical skin. The original animated empties
 remain runtime contacts/helpers; six moving bones copy their native Action curves
 with only rest translation subtracted. The static receiver bone has no motion.
 Magazines and the showcase case stay independently owned rigid meshes, preserving
-STEP visibility and dropped-magazine cloning. Stock Actions export merges matching
+STEP visibility and independent geometry ownership. MCX's adapter currently does
+not expose `magazineBody`, so the shared viewmodel does not create world dropped-
+magazine props; that pre-existing API gap is unchanged by this material pass. Stock Actions export merges matching
 track names with forced sampling off. No GLB repair, exporter hooks or alternate
 saved-source/material-only path.
 
@@ -44,11 +46,15 @@ linear pigments in per-corner `FinishColor` and scalar metalness/mean roughness 
 sixteen-texel padded tiles of a 64² `FinishUV` lookup. UV0 albedo/full normal XYZ
 pixels retain their original resolution and 10 cm repeat; UV1 is constant at each
 finish tile centre, with zero derivatives and seven guard texels on either side.
-Five materials separate fine surfaces, polymer, absorptive rubber, glass and
-emissive fiber. Polymer/rubber strengths remain .50/.90; only already-weak fine
-normal grain is reduced to .02. Roughness grain is replaced by its source mean,
-not a retuned factor. Glass/fiber retain their roughness factors outside the lookup
-and white vertex colors, preserving runtime optical overrides and emission.
+Two materials separate all opaque surfaces from glass. Existing UV1 identity
+also drives `src/weapons/mcx-finishes.ts`: exact .02/.50/.90/.03 fine/polymer/rubber/
+fiber normal strengths, plus fiber-only linear emission (.336, .0175, .0056).
+Full normal XYZ sampling and derivative/back-face tangent handling remain native;
+there is no extra atlas, texture sample or vertex stream. Roughness grain remains
+replaced by its source mean, not a retuned factor. Glass retains its roughness
+factor outside the lookup and white vertex colors, preserving runtime optical
+overrides; fiber uses the same linear corner pigment path as other opaque finishes.
+Editable original materials are saved before this export-only consolidation.
 The editable blend and original three source maps are saved before consolidation.
 
 This is a deliberate grain/storage trade-off rather than a lossless merge:
@@ -58,12 +64,21 @@ increases 2,515,012 → 3,679,532 bytes. Source-contact checks stay unchanged;
 `smoke-mcx-finishes.mjs` checks every decoded pigment/lookup coordinate, original
 albedo/normal pixels, padded ORM values and independent optical policies.
 
+The second pass reduces the five-material result to two materials / five actual
+primitive instances (three in loaded Idle). Source triangles, normal/UV0/UV1 and
+mechanical bindings retain an exact pre-pass2 corner-record digest checked by
+`smoke-mcx-pass2.mjs`. Magazines and spent case each have one opaque primitive;
+no rubber boundary remains. The MCX-local shader adds two floors, three finish-ID
+comparisons and normal/emission selections, with no new texture sampling. The
+native GLB requires the adapter for masked normal/emission behavior; the editable
+Blender preview remains complete. Hardware visual/performance acceptance belongs
+to the serialized integration lane, not these CPU counts.
+
 The committed `mcx-virtus.runtime.glb` is cooked by gltfpack 1.3 using the shared
 `GLTFPACK_FLAGS` in `build/models.mjs` plus `-si 0.65 -se 0.0002 -sp -vc 16`.
 Sixteen-bit linear colors bound pigment quantization error to 1/65535. Keep `-kn`:
 sockets, helper names, independent magazine ownership and mechanical bones are
-runtime contracts. `loadMCX()` intentionally still loads the native export until
-the shared runtime-loader integration. `smoke-mcx-runtime.mjs` exercises both
+runtime contracts. `loadMCX()` loads the cooked runtime through the shared decoder. `smoke-mcx-runtime.mjs` exercises both
 through the actual GLTFLoader/Meshopt decoder, including all rigid-influence
 vertices, fractional poses, wrist contacts, reload visibility, interruption reset
 and the adapter's empty-state bolt override.

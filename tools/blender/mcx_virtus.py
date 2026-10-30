@@ -86,6 +86,7 @@ def build(output, render=False, quick=False):
             'Named sockets and rigid-part clips; hands, audio and live casing physics are runtime-owned.',
             'Visibility is authored CONSTANT; motion LINEAR at 60 Hz. Stock Actions export, no GLB rewriting.',
             'Export-only corner pigment and scalar finish lookup; UV0 albedo/normal detail retained. Roughness grain reduced to its mean.',
+            'One opaque material; MCX adapter selects exact fine/polymer/rubber/fiber normal strengths and fiber emission from UV1 finish identity. Lens remains separate.',
         ],
     }
     (output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')

@@ -12,9 +12,9 @@ const manifest = JSON.parse(readFileSync(new URL('manifest.json', dir), 'utf8'))
 const file = readFileSync(new URL('mcx-virtus.glb', dir));
 const { json: gltf, accessor, imagePNG } = inspectGLB(file);
 assert.ok(file.length <= 10 * 1024 * 1024, 'approved MCX GLB size budget');
-assert.equal(gltf.materials.length, 5, 'fine/polymer/rubber finishes plus independent lens/fiber');
+assert.equal(gltf.materials.length, 2, 'one masked opaque finish plus independent lens');
 assert.ok(
-  gltf.meshes.reduce((sum, mesh) => sum + mesh.primitives.length, 0) <= 13,
+  gltf.meshes.reduce((sum, mesh) => sum + mesh.primitives.length, 0) === 5,
   'consolidated mechanics and finishes primitive budget'
 );
 const blend = readFileSync(new URL('mcx-virtus.blend', dir));
@@ -296,10 +296,14 @@ function magazineLength(meshName) {
   const vertex = new THREE.Vector3();
   const points = [];
   for (const p of gltf.meshes[node.mesh].primitives) {
-    // Consolidated fine finish on magazines contains only brass/projectiles.
-    if (gltf.materials[p.material].name === 'MCX | fine finishes') continue;
     const positions = accessor(p.attributes.POSITION);
+    const finishes = accessor(p.attributes.TEXCOORD_1);
     for (const index of accessor(p.indices)) {
+      const finish =
+        Math.floor(finishes[index * 2] * 4) + Math.floor((1 - finishes[index * 2 + 1]) * 4) * 4;
+      // Check the same complete polymer/rubber exterior, excluding cartridges,
+      // even though all three finishes now share a single actual primitive.
+      if (finish !== 2 && finish !== 3) continue;
       vertex
         .fromArray(positions, index * 3)
         .applyMatrix4(named[meshName].matrixWorld)
