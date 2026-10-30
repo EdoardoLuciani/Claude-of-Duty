@@ -128,14 +128,16 @@ indices; both magazine instances share buffers. Its decoded attributes use
 actual uploaded GPU allocation. The merged skin exceeds 65k vertices, requiring
 32-bit indices. Exact finish factors and rigid joints/weights increase runtime
 CPU geometry by **2,052,702 bytes (+49.3%)**. The regression budget is 6,216,528
-bytes; the trade-off is explicitly approved only for candidate review.
+bytes; this is an explicit draw-versus-storage trade-off, not a memory win.
 
 Each runtime map is UASTC RGB KTX2 with all 11 mips; albedos stay sRGB, scalar and
 normal images linear. Estimated full-mip BC7/ASTC 4×4 texture storage falls from
 6,291,616 to 5,592,512 bytes; RGBA8 fallback estimate falls from 25,165,816 to
-22,369,616 bytes. A 13-joint bone texture and skinning/attribute/index upload costs
-must be measured on native WebGPU by the parent review. Counts/storage estimates
-are not an FPS or total GPU-memory improvement claim.
+22,369,616 bytes. Native AMD RDNA-4 / Three r187 measurements found uploaded
+geometry **4,163,828 → 7,148,208 B** and geometry-plus-logical-texture subtotal
+**10,455,444 → 12,740,720 B** (9.971 → 12.150 MiB). This excludes other renderer
+resources and driver padding; queue tracing also observed 832 B of bone buffers.
+The second pass saves draws, not GPU memory, and establishes no FPS improvement.
 
 Reproduce using gltfpack **1.3** through the checked-out `cookModel` API:
 
@@ -144,8 +146,7 @@ node --input-type=module -e "import {cookModel} from './build/models.mjs'; cookM
 node tests/smoke/smoke-m4-skin.mjs
 ```
 
-`-kv` is essential for otherwise-unused finish UV1/UV2; the parent owns its shared
-registry integration. `-noq` preserves the existing 2 µm iron geometry checks;
+The registered profile includes `-kv` for otherwise-unused finish UV1/UV2. `-noq` preserves the existing 2 µm iron geometry checks;
 16-bit tint avoids dark-finish eight-bit linear errors. No additional reduction
 or material-policy change is selected. The cook still removes only eight
 zero-area triangles. `makeM4Model` restores only a wholly constant, single-key
@@ -159,5 +160,8 @@ quaternion reduction; the static iron dimension, bore/ray and support checks
 remain unchanged. Tests retain the actual hand-skin/stock sweeps, latch contacts,
 magazine drops/ammunition, interruption/death/reset behavior, direct cover and
 lockback deformation, independent rounds, inspection clone skeleton/bone-texture
-ownership and disposal. Matched native GPU appearance/allocation acceptance for
-this second-pass candidate remains a parent review gate, not a CPU-test claim.
+ownership and disposal. Matched native-WebGPU hero/side/ADS/reload/iron captures,
+RGBA fallback and independent code review passed. The normal graph retains the
+loader's normal-Y sign for derivative tangents; native/runtime tests cover this
+separately from geometry-normal parity. These checks do not establish factory
+fidelity, continuous contact correctness or an FPS improvement.

@@ -22,8 +22,7 @@ Accessory loadout, unpublished depths/cloth and mechanism internals aren't certi
 Python is the weapon-authoring authority; `fn-evolys-762.blend/.glb` are generated
 packed preview/native-export products, never build inputs. The derived
 `fn-evolys-762.runtime.glb` uses gltfpack 1.3 with the shared cook flags and no
-additional simplification flags; the native adapter load path remains operational
-until shared runtime-loader integration. See the local guide's
+additional simplification flags, loaded through the shared KTX2/meshopt adapter. See the local guide's
 [native/export optimization](../../../tools/blender/evolys/README.md#nativeexport-optimization)
 for source changes, retained mechanisms and validation limits. The second pass
 uses one eight-joint rigid mechanical skin plus the independent deforming belt:
@@ -31,7 +30,11 @@ five primitive instances total, four in loaded Idle, with two unchanged material
 The stock/head oracle selects actual stock triangles by joint membership, not a
 separate draw. The guide documents the approved, EVOLYS-only split-normal
 encoding bound (0.0026 normalized-vector distance); normal-map bytes, UV0/UV1,
-strength, geometry and contact thresholds are unchanged. `manifest.json` records
+strength, geometry and contact thresholds are unchanged. Matched native-WebGPU
+captures, RGBA fallback and independent review passed on Three r187 / AMD RDNA-4.
+Uploaded geometry rises 2,479,560 → 3,360,060 B; its geometry-plus-logical-texture
+subtotal rises 6.365 → 7.204 MiB, excluding other renderer resources and driver
+padding. This is a draw-consolidation trade-off, not a measured FPS gain. `manifest.json` records
 events/belt, `hand-reference.json` is read-only versioned hand calibration, and
 `photo-review.json` freezes review registration. Shared review-arm appearance is
 also read-only and excluded from export. See the [edit map and build stages](../../../tools/blender/evolys/README.md).

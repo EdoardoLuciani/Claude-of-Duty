@@ -76,8 +76,8 @@ skin; the second pass trades additional rigid skin attributes for fewer draws.
 trials `-si 0.75 -se 0.0002 -sp` and `-si 0.5 -se 0.0005 -sp` saved only 29,356 /
 83,416 bytes and increased gzip size; no extra simplification was selected.
 
-The adapter retains its native load path pending shared-loader integration.
-`makeEvolysModel` accepts the decoded runtime candidate and recovers Idle's
+The adapter loads the registered runtime product through the shared KTX2/meshopt
+loader. `makeEvolysModel` accepts either decoded export and recovers Idle's
 manifest duration **only** for an entirely constant, single-t=0-key,
 zero-duration fold. Nonzero/moving/malformed clips are not repaired silently.
 Both smoke scripts exercise both exports. Exact pre-atlas oriented geometry,
@@ -164,7 +164,12 @@ Belt (13,184 vertices) and both pouches (2,342 each) have exactly zero change.
 cooked actual vertices against source controls, plus independent inspection and
 bone-texture disposal. Existing 9,042-pose native/cooked control/contact checks
 retain their original tolerances. Two independent fresh exports and cooks are
-byte-identical; final hardware-WebGPU appearance/allocation review is parent-owned.
+byte-identical. Parent matched Three r187 native-WebGPU captures, RGBA fallback
+and independent review passed, including the narrowly approved normal-encoding
+loss. Uploaded geometry increases 2,479,560 → 3,360,060 B; with unchanged logical
+textures the subtotal rises 6.365 → 7.204 MiB. These omit other renderer allocations
+and driver padding and are not an FPS improvement claim. Final factory-reference
+and all-state human acceptance remain separate.
 
 ## Approved UV precision exception
 

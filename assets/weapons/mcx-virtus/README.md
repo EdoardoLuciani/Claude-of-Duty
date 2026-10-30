@@ -107,7 +107,11 @@ The new shader adds finish-ID arithmetic (two floors, three comparisons and
 normal/emission selects) to existing sampling; it adds no texture samples.
 External GLB viewers need the MCX adapter to reproduce per-finish normal strengths
 and fiber emission; the editable Blender preview retains all original materials.
-Native hardware GPU visual/performance acceptance is a separate integration gate.
+Matched native-WebGPU captures and RGBA fallback checks passed. Measured uploaded
+geometry is 4,454,976 → 4,457,100 B; logical textures remain 2,801,744 B. This is a
+draw reduction, not an established FPS improvement. The pre-existing absence of
+`magazineBody` means functional world-magazine drops remain unavailable in both
+pass-1 and pass-2 MCX; independent main/spare transfer geometry is preserved.
 
 The derived candidate uses gltfpack 1.3 with the shared cook flags plus
 `-si 0.65 -se 0.0002 -sp -vc 16`. Sixteen-bit corner colors avoid dark-pigment
