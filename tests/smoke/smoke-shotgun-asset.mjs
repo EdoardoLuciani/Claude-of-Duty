@@ -9,6 +9,7 @@ import { createAuthoredActions, sampleAuthoredAction } from '../../src/weapons/a
 import { discoverAuthoredHands, applyAuthoredHand } from '../../src/weapons/authored-hands.ts';
 import { Arm } from '../../src/weapons/hands.ts';
 import { parseGLB, inspectGLB } from '../../tools/lib/glb-fixture.mjs';
+import { mechanicalPartViews, M590_FINISHES } from './m590-geometry.mjs';
 const dir = new URL('../../assets/weapons/m590/', import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', dir)));
 const reference = JSON.parse(readFileSync(new URL('hand-reference.json', dir)));
@@ -16,8 +17,8 @@ const file = readFileSync(new URL('m590.glb', dir));
 const { json: gltf, bin, accessor: floats, imagePNG } = inspectGLB(file);
 assert.equal(
   createHash('sha256').update(bin).digest('hex'),
-  'bb02658011152cae2c299db6e22c235e36cbe8b33dc865464d3a8fe649277431',
-  'pump cue correction must not change geometry, maps or sampled animation bytes'
+  'ce33d718719a08c06b83554eb3827917a2440eaa73aced6dc9c61e98a488657d',
+  'reviewed source-generated geometry, maps and sampled animation bytes'
 );
 assert.deepEqual(
   JSON.parse(gltf.scenes[0].extras.clips),
@@ -102,7 +103,9 @@ assert.ok(
   !gltf.nodes.some((n) => /arm_|spent_case|camera|light/i.test(n.name)),
   'no duplicate arms/cases/studio'
 );
-assert.ok(!gltf.cameras && !gltf.skins);
+assert.ok(!gltf.cameras);
+assert.equal(gltf.skins.length, 1, 'one rigid mechanical skin; insertion shell stays independent');
+assert.equal(gltf.skins[0].joints.length, 4);
 assert.ok(!gltf.extensionsUsed?.includes('KHR_lights_punctual'));
 assert.equal(gltf.buffers.length, 1);
 assert.equal(gltf.buffers[0].uri, undefined);
@@ -122,6 +125,74 @@ for (const m of gltf.materials) {
   assert.ok(pbr.baseColorTexture && pbr.metallicRoughnessTexture && m.normalTexture, m.name);
   assert.ok([0, 1].includes(pbr.metallicFactor ?? 1), 'binary metalness');
 }
+assert.equal(gltf.materials.length, 1);
+const finishMaterial = gltf.materials[0],
+  orm = imagePNG(
+    gltf.images[
+      gltf.textures[finishMaterial.pbrMetallicRoughness.metallicRoughnessTexture.index].source
+    ]
+  );
+assert.equal(finishMaterial.normalTexture.texCoord ?? 0, 0, 'normal XYZ stays on original UV0');
+assert.equal(finishMaterial.normalTexture.scale, 0.25);
+assert.equal(finishMaterial.pbrMetallicRoughness.baseColorTexture.texCoord ?? 0, 0);
+assert.equal(finishMaterial.pbrMetallicRoughness.metallicRoughnessTexture.texCoord, 1);
+for (const [name, hash] of [
+  ['m590-normal', 'f109ac79c9db85cc2e19141f5918e9c0d67a75b4080f36f4fe7769b2f2eb28f6'],
+  ['m590-surface', 'a7cf59b36e8fae59eda10420f507ab7ab5cc190bf7cbb8184345a1fc1a7a6006'],
+])
+  assert.equal(
+    createHash('sha256')
+      .update(imagePNG(gltf.images.find((image) => image.name === name)).data)
+      .digest('hex'),
+    hash,
+    'original albedo/normal pixels must not be resampled or colour compensated'
+  );
+const usedFinishes = new Set();
+for (const mesh of gltf.meshes)
+  for (const primitive of mesh.primitives) {
+    const colors = floats(primitive.attributes.COLOR_0),
+      uv = floats(primitive.attributes.TEXCOORD_1),
+      indices = floats(primitive.indices),
+      count = gltf.accessors[primitive.attributes.COLOR_0].count;
+    const finishes = [];
+    for (let vertex = 0; vertex < count; vertex++) {
+      const finish = M590_FINISHES.findIndex(([, expected]) =>
+        expected.every((value, axis) => Math.abs(colors[vertex * 3 + axis] - value) < 0.0000001)
+      );
+      assert(finish >= 0, 'exact original linear colour factors, not an averaged finish');
+      finishes.push(finish);
+      usedFinishes.add(finish);
+      const x = Math.floor(uv[vertex * 2] * 1024),
+        y = Math.floor(uv[vertex * 2 + 1] * 1024),
+        pixel = (y * 1024 + x) * 4,
+        [, , metal, roughness] = M590_FINISHES[finish];
+      assert.equal(Math.floor(x / 256), finish % 4);
+      assert.equal(
+        Math.floor(y / 512),
+        1 - Math.floor(finish / 4),
+        'native exporter flips UV/image Y together'
+      );
+      assert.equal(
+        orm.data[pixel + 2],
+        metal * 255,
+        'binary metallic finish survives consolidation'
+      );
+      assert(
+        orm.data[pixel + 1] / 255 >= roughness * 0.85 - 1 / 255 &&
+          orm.data[pixel + 1] / 255 <= roughness * 0.97 + 1 / 255,
+        'roughness stays within original finish grain envelope'
+      );
+    }
+    for (let i = 0; i < indices.length; i += 3) {
+      assert.equal(finishes[indices[i]], finishes[indices[i + 1]]);
+      assert.equal(
+        finishes[indices[i]],
+        finishes[indices[i + 2]],
+        'no colour/metal interpolation across finishes'
+      );
+    }
+  }
+assert.equal(usedFinishes.size, 7);
 const primitives = gltf.meshes.reduce((n, m) => n + m.primitives.length, 0);
 const triangles = gltf.nodes.reduce(
   (n, node) =>
@@ -141,13 +212,13 @@ assert.deepEqual(manifest.stats, {
   images: 3,
   bytes: file.length,
 });
-assert.ok(triangles < 110000 && triangles > 10000 && primitives <= 40);
+assert.ok(triangles < 73000 && triangles > 10000 && primitives === 2);
 assert.ok(
   gltf.materials.length +
     Number(gltf.meshes.some((m) => m.primitives.some((p) => p.material === undefined))) <=
     16
 );
-assert.ok(file.length <= 10 * 1024 * 1024);
+assert.ok(file.length <= 12 * 1024 * 1024);
 for (const animation of gltf.animations) {
   const [d, events] = expected[animation.name];
   assert.equal(manifest.clips[animation.name].duration, d);
@@ -242,11 +313,12 @@ function pads(side) {
   );
 }
 sample('Idle', 0);
+const traversePart = mechanicalPartViews(model.scene);
 const exteriorBounds = new THREE.Box3();
-node('receiver').traverse((o) => {
+traversePart(node('receiver'), (o) => {
   if (o.isMesh) exteriorBounds.expandByObject(o);
 });
-exteriorBounds.expandByObject(node('forend'));
+traversePart(node('forend'), (o) => exteriorBounds.expandByObject(o));
 assert.ok(
   Math.abs(exteriorBounds.getSize(new THREE.Vector3()).z - 39.5 * 0.0254) < 0.0002,
   'actual exported manufacturer nominal OAL'
@@ -303,7 +375,7 @@ function surface(part) {
   part.updateWorldMatrix(true, true);
   const inverse = part.matrixWorld.clone().invert(),
     triangles = [];
-  part.traverse((o) => {
+  traversePart(part, (o) => {
     if (!o.isMesh) return;
     const matrix = inverse.clone().multiply(o.matrixWorld),
       p = o.geometry.attributes.position,
@@ -368,7 +440,7 @@ assert.ok(
   'actual thumb/beavertail contact'
 );
 const receiverMeshes = [];
-node('receiver').traverse((o) => {
+traversePart(node('receiver'), (o) => {
   if (o.isMesh) {
     receiverMeshes.push(o);
     for (const m of Array.isArray(o.material) ? o.material : [o.material])
@@ -437,7 +509,7 @@ assert.ok(
   'exported rear toe head/recess'
 );
 const railMeshes = [];
-forend.traverse((o) => {
+traversePart(forend, (o) => {
   if (o.isMesh) {
     railMeshes.push(o);
     o.material.side = THREE.DoubleSide;
@@ -518,7 +590,7 @@ for (const [z, y] of [
 }
 assert.ok(clearRay([0.05, 0.063, -0.132], [-1, 0, 0], 0.05), 'real exported ejection opening');
 const boltMeshes = [];
-node('bolt').traverse((o) => {
+traversePart(node('bolt'), (o) => {
   if (o.isMesh) {
     boltMeshes.push(o);
     o.material.side = THREE.DoubleSide;
