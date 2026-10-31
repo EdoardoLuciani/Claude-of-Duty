@@ -99,6 +99,13 @@ const CSS = `
   text-shadow:var(--sh);
 }
 
+/* Four-widget opt-in; equipment and all other presenters remain native. */
+.ow-hud-slice .ow-cross, .ow-hud-slice .ow-vitals,
+.ow-hud-slice .ow-minimap,
+.ow-hud-slice .ow-ammo > :not(.ow-equip) { display:none !important; }
+.ow-hud-slice .ow-ammo { --ammo-w:calc(248px * var(--k)); }
+.ow-hud-slice .ow-equip { margin-bottom:calc(154px * var(--k)); }
+
 /* ============================================================== crosshair */
 .ow-cross { position:absolute; left:50%; top:50%; width:0; height:0; }
 .ow-blade {
@@ -249,6 +256,10 @@ const CSS = `
   width: var(--ammo-w);
   text-align:right; line-height:1;
 }
+.ow-ammo-pixi { --ammo-w:calc(248px * var(--k)); }
+.ow-ammo-pixi .ow-ammo-head, .ow-ammo-pixi .ow-ammo-row,
+.ow-ammo-pixi .ow-mag, .ow-ammo-pixi .ow-reload,
+.ow-ammo-pixi .ow-reload-bar { display:none; }
 .ow-ammo-head {
   display:grid; grid-auto-flow:column; grid-auto-columns:max-content;
   justify-content:end; align-items:center;
