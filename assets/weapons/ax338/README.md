@@ -28,7 +28,7 @@ animation datums, not mechanism certification. References aren't shipped texture
 
 Follow the [shared authoring workflow](../../../tools/blender/README.md).
 Sources: `tools/blender/ax338.py`, `ax338_actions.py`, `ax338/export.py`,
-`ax338/finishes.py`, `ax338/skin.py`.
+`ax338/finishes.py`.
 
 Declared read-only build inputs:
 
@@ -147,7 +147,7 @@ UVs and packed maps. After saving, `ax338/finishes.py` consolidates the **actual
 export geometry/material slots**, not just scene groups: seven opaque finishes
 share one material and one primitive per independently controlled assembly. The
 coated scope lenses retain their separate transparent material/primitive, alpha
-and normal scale. That first pass added no skin, hand calibration or hierarchy migration; the second-pass skin below is the current runtime product.
+and normal scale. That first pass added no skin, hand calibration or hierarchy migration; the second-pass skin below records the historical baseline.
 
 Original linear albedo factors move into `COLOR_0`. Albedo and normal XYZ images
 and UV0 remain unchanged. Only scalar roughness/metalness move into a guarded
@@ -226,7 +226,7 @@ reviewed using a geometry-equivalent PNG cook; final native-WebGPU KTX2 captures
 and timing remain integration-owned. The existing full right-hand DCC failure
 below is unchanged, not waived by these passing runtime checks.
 
-## Second-pass draw consolidation (current product)
+## Second-pass draw consolidation (historical d29573f8 baseline)
 
 `ax338/skin.py` runs only after saving the editable source and preparing its
 unchanged 120 Hz Actions. Receiver, handguard, stock, optic, bolt and trigger
@@ -265,8 +265,8 @@ The trade is 1,496,590 more decoded geometry bytes (5,383,894 → 6,880,484,
 +27.8%): rigid skin indices/weights and 32-bit indices for the >65k-vertex opaque
 surface, versus five fewer submissions. Runtime raw grows only 384 B and gzip
 shrinks 8,181 B. These are **CPU typed-array storage**, not measured uploaded GPU
-allocation or an FPS claim. The two glTF material primitives load as two skeleton
-instances sharing six authored bones; each palette is disposed by the adapter.
+allocation or an FPS claim. The two glTF material primitives share the gameplay skeleton and its six
+authored bones; the adapter disposes that owned palette.
 Their renderer-created bone textures and ordinary skinning shader work are new
 costs; no custom shader/material, new texture, dependency or runtime framework is
 added. All three runtime UASTC KTX2 maps remain 1024² with eleven mip levels.
@@ -309,6 +309,83 @@ and driver padding. This saves draws, not memory; no paired FPS gain is establis
 Independent review confirmed the eight retessellated coplanar guard triangles
 retain the same patch boundary/area and UV vertices. These regression checks do
 not clear the existing human/full-right-hand acceptance limitations below.
+
+## Ordinary-mesh representation (current product)
+
+The full-body export skin is retired. The source still saves the same editable
+components before runtime consolidation; the `.blend` and calibration inputs are
+unchanged. Existing per-parent joins now export ordinary receiver, handguard,
+stock, optic, bolt and trigger geometry. Only bolt/trigger have independent
+mechanical motion. Lens material/geometry, magazine bodies and cartridge controls
+remain independent. No new joins, detail reduction, runtime mechanism, material
+policy, texture, dependency or cooker flags were added.
+
+Removing `ax338/skin.py` eliminates six export bones and duplicated mechanical
+bone Actions. The adapter no longer discovers/disposes weapon skeletons, but still
+normalizes root, bolt, trigger, magazines and every authored hand control after
+sampling. Bolt-cycle mechanics, native 60°/100 mm gates, STEP visibility, canonical
+Idle, event timing, hand inputs and magazine/drop ownership remain unchanged.
+
+| Product | Raw bytes | gzip-9 bytes | Unique / instanced triangles | All / Idle primitives | Attribute / index bytes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| d295 native | 15,626,140 | 5,970,466 | 100,697 / 100,697 | 6 / 4 | 9,101,560 / 1,157,100 |
+| Ordinary native | 12,615,752 | 5,986,154 | 100,697 / 100,697 | 11 / 9 | 6,687,720 / 588,102 |
+| d295 runtime | 4,673,444 | 3,513,406 | 97,953 / 100,633 | 6 / 4 | 5,724,152 / 1,156,332 |
+| Ordinary runtime | 4,673,060 | 3,521,587 | 97,953 / 100,633 | 11 / 9 | 4,796,176 / 587,718 |
+
+Counts include hidden spare geometry, exclude shared arms, and use unique decoded
+attribute/index typed arrays. Native has 128,610 ordinary vertices; cooked has
+120,010, including 4,013 vertices shared by the identical magazine assemblies.
+There are **zero skinned weapon vertices/joints**, versus 115,997 cooked skinned
+vertices/six joints in d295. Every candidate index stream is Uint16 (11 native,
+9 unique cooked geometries); no large Uint32 body join remains. Decoded runtime
+geometry falls 1,496,590 bytes (21.75%). Encoded raw storage is nearly unchanged
+and gzip grows 8,181 bytes; this is not a file-size optimization.
+
+The current r187 backend expanded the baseline non-normalized joint IDs on upload;
+removing them and the large index stream is expected to recover about 2.89 MB
+(~35%) of uploaded geometry, but **candidate GPU allocation is parent-measured**,
+not inferred from encoded skin bytes. Five extra submissions are an explicit
+trade-off. No FPS or whole-renderer residency improvement is claimed. Two materials
+and all three embedded image payloads are unchanged: native PNGs, runtime UASTC
+KTX2, each 1024² with eleven runtime mip levels; logical runtime texture payload
+remains 4,194,384 bytes.
+
+Frozen-d295 native comparison:
+`node tools/ax338-representation-parity.mjs /path/to/d295-ax338.glb`.
+This independent tool accepts the immutable old product, not a regenerated expected
+candidate. All 1,215 non-retired animation tracks (including all right-hand channels)
+retain byte-identical times/values and interpolation; all nine durations match.
+All six per-part triangle counts and position/UV0 vertices match;
+maximum position difference is 3.819e-8 m. The eight accepted coplanar guard
+triangles reverse their former retessellation, preserving directed patch boundary,
+position/UV0 vertex sets and area (4.28936042845e-6 → 4.28936072209e-6 m²).
+No other topology differs. UV1 differs by at most 6.664e-8; finish colours and all
+three native image payloads match exactly; cooked image payloads are also
+byte-identical to d295. Optic normal differences peak at
+1.366e-7 vector units. Removing bind-frame rounding changes 2,455 receiver,
+5,776 stock and 311 bolt vertex normals by >1e-5, with respective maxima
+0.000800, 0.00036015 and 0.00013913. Triangles touching those changed
+normals cover 0.019758, 0.0139355 and 0.00378926 m² respectively (not removed
+geometry or flipped faces). These are minor representation rounding
+changes, not flipped surfaces or permission to increase normal tolerances.
+Parent approved updating only the representation-dependent rifle/optic hashes;
+the original 10-micrometre lattice, winding/normal/UV logic and protected clip hash
+are unchanged. No geometry/contact/motion tolerance was relaxed.
+
+The retained `smoke-ax338-skin.mjs` regression now verifies real ordinary vertices
+against their authored controls (7,118 half-frame poses / 5,505,279 probes,
+maximum 3.141e-16 m), exact per-part triangles, absence of unnecessary skin
+attributes/skeletons, real drop/cartridge geometry, unit sampled quaternions and
+interruptions. Inspection owns cloned transforms while borrowing geometry,
+materials and textures; disposing it leaves live pose/resources intact, and adapter
+disposal releases owned materials/maps exactly once. Native/runtime parity retains
+the original 0.05 mm sampled-surface gate (measured 0.007631 mm). Native/cooked
+actual shared-arm sweeps pass 761 poses; left DCC passes 474 poses at the unchanged
+0.903077 mm depth. Full right-hand DCC acceptance remains the inherited failure
+below; none of these checks clears it. Two fresh separate-process source
+exports and cooks match byte-for-byte (native, runtime and manifest). Parent GPU, matched-view and independent
+review gates remain required before integration.
 
 ## Known issues and gates
 

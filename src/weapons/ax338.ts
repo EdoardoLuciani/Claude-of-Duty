@@ -4,7 +4,6 @@ import type { Renderer } from 'three/webgpu';
 
 import handReference from '../../assets/weapons/ax338/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/ax338/manifest.json' with { type: 'json' };
-import { isSkinnedMesh } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
@@ -134,7 +133,6 @@ export class AX338Animation {
   spareRound!: THREE.Object3D;
   hands!: Record<HandSide, AuthoredHand>;
   rotationControls: THREE.Object3D[];
-  private skeletons = new Set<THREE.Skeleton>();
   poseQ = new THREE.Quaternion();
   poseMatrix!: THREE.Matrix4;
   idleTime = 0;
@@ -154,12 +152,6 @@ export class AX338Animation {
     this.spareRound = node('magazine_spare_round');
     this.hands = discoverAuthoredHands(node);
     this.rotationControls = [this.root, this.bolt, node('trigger'), this.magazine, this.spare];
-    this.root.traverse((object): void => {
-      if (isSkinnedMesh(object)) {
-        this.skeletons.add(object.skeleton);
-        this.rotationControls.push(...object.skeleton.bones);
-      }
-    });
     for (const hand of Object.values(this.hands)) {
       this.rotationControls.push(hand.wrist, ...hand.thumb);
       for (const finger of hand.fingers) this.rotationControls.push(finger.root, ...finger.joints);
@@ -224,8 +216,6 @@ export class AX338Animation {
   dispose(): void {
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.root);
-    for (const skeleton of this.skeletons) skeleton.dispose();
-    this.skeletons.clear();
     disposeWeaponMaterials(this.model);
   }
 }

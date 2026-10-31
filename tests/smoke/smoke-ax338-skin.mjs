@@ -1,4 +1,4 @@
-// Rigid skin geometry follows retained authored controls, not just empty helpers.
+// Ordinary geometry follows retained authored controls without unnecessary skins.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
@@ -8,6 +8,7 @@ import { AX338Animation, makeAX338Model } from '../../src/weapons/ax338.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import { createWeaponInspection } from '../../src/weapons/inspection.ts';
 import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
+import { ax338GeometryControl } from './ax338-geometry.mjs';
 
 let maximumError = 0,
   poses = 0,
@@ -21,7 +22,7 @@ for (const product of ['ax338.glb', 'ax338.runtime.glb']) {
   const vertices = [],
     dense = [],
     parts = new Set(),
-    skeletons = new Set();
+    partTriangles = new Map();
   const point = new THREE.Vector3(),
     expected = new THREE.Vector3();
   let draws = 0,
@@ -32,17 +33,17 @@ for (const product of ['ax338.glb', 'ax338.runtime.glb']) {
     let visible = true;
     for (let node = mesh; node; node = node.parent) visible &&= node.visible;
     if (visible) visibleDraws++;
-    if (!mesh.isSkinnedMesh) return;
-    skeletons.add(mesh.skeleton);
-    const { position, skinIndex, skinWeight } = mesh.geometry.attributes;
+    assert(!mesh.isSkinnedMesh, 'no unnecessary weapon skeleton or skin attributes');
+    assert(!mesh.geometry.attributes.skinIndex && !mesh.geometry.attributes.skinWeight);
+    const helper = ax338GeometryControl(mesh);
+    if (!helper) return;
+    parts.add(helper.name);
+    partTriangles.set(
+      helper.name,
+      (partTriangles.get(helper.name) ?? 0) + mesh.geometry.index.count / 3
+    );
+    const { position } = mesh.geometry.attributes;
     for (let i = 0; i < position.count; i++) {
-      assert.equal(skinWeight.getX(i), 1, 'one complete rigid influence');
-      assert.equal(skinWeight.getY(i) + skinWeight.getZ(i) + skinWeight.getW(i), 0);
-      const bone = mesh.skeleton.bones[skinIndex.getX(i)];
-      const part = bone.name.replace(/^MECH_/, '');
-      parts.add(part);
-      const helper = model.root.getObjectByName(part);
-      assert(helper && !helper.isMesh, `${part}: retained original authored control`);
       const local = mesh
         .getVertexPosition(i, new THREE.Vector3())
         .applyMatrix4(mesh.matrixWorld)
@@ -52,8 +53,8 @@ for (const product of ['ax338.glb', 'ax338.runtime.glb']) {
       if (i % 251 === 0) dense.push(vertex);
     }
   });
-  assert.equal(draws, 6, 'opaque skin + transparent lens + two magazine bodies + two rounds');
-  assert.equal(visibleDraws, 4, 'loaded Idle excludes the spare body and rounds');
+  assert.equal(draws, 11, 'six natural parts + lens + two magazine bodies + two rounds');
+  assert.equal(visibleDraws, 9, 'loaded Idle excludes the spare body and rounds');
   assert.deepEqual([...parts].sort(), [
     'bolt',
     'handguard',
@@ -62,9 +63,17 @@ for (const product of ['ax338.glb', 'ax338.runtime.glb']) {
     'stock',
     'trigger',
   ]);
-  assert(
-    vertices.length > 115000,
-    'actual mechanical surfaces retained after codec vertex deduplication'
+  assert.deepEqual(
+    Object.fromEntries([...partTriangles].sort()),
+    {
+      bolt: 3024,
+      handguard: 30958,
+      optic: 26319,
+      receiver: 16828,
+      stock: product === 'ax338.glb' ? 17828 : 17764,
+      trigger: 380,
+    },
+    'actual per-control geometry, not a vertex-count target'
   );
   for (const clip of model.animations) {
     for (let frame = 0; frame <= Math.ceil(clip.duration * 240); frame++) {
@@ -78,21 +87,13 @@ for (const product of ['ax338.glb', 'ax338.runtime.glb']) {
         expected.copy(local).applyMatrix4(helper.matrixWorld);
         const error = point.distanceTo(expected);
         maximumError = Math.max(maximumError, error);
-        // Bone and helper encode the same rotation in different rest bases.
-        // Propagate the existing per-channel 1 um / 1e-4 rad codec bounds for
-        // both paths, rather than weakening either channel or contact gate.
-        const bound = product === 'ax338.glb' ? 0.000001 : 2 * (0.000001 + local.length() * 0.0001);
-        assert(error < bound, `${product}/${clip.name}/${time}: real skin/control gap ${error}`);
+        assert(error < 0.000001, `${product}/${clip.name}/${time}: real mesh/control gap ${error}`);
         probes++;
       }
-      for (const skeleton of skeletons)
-        for (const bone of skeleton.bones)
-          assert(
-            Math.abs(bone.quaternion.length() - 1) < 1e-12,
-            'unit sampled mechanical rotation'
-          );
+      for (const control of animation.rotationControls)
+        assert(Math.abs(control.quaternion.length() - 1) < 1e-12, 'unit sampled rotation');
     }
-    // Every gesture can be interrupted/reset without a stale skinned bolt/trigger.
+    // Every gesture can be interrupted/reset without a stale bolt/trigger.
     animation.update(0, 'cycle', 0.4, true, false);
     animation.update(0, null, 0, true, false);
     assert(!animation.magazineRound.visible && !animation.spare.visible);
@@ -114,42 +115,53 @@ for (const product of ['ax338.glb', 'ax338.runtime.glb']) {
     'real drop body, not a helper'
   );
 
-  // Market cloning owns its new bones/textures, while geometry/materials stay borrowed.
+  // Market clones borrow resources, own transforms and never mutate live pose.
   animation.update(0, 'cycle', 0.4, false);
   const snapshot = animation.bolt.position.clone();
   const inspection = createWeaponInspection({ model, def: WEAPON_DEFS.sniper });
-  const previewSkeletons = new Set();
+  const previewBolt = inspection.scene.getObjectByName('bolt');
+  assert.notEqual(previewBolt, animation.bolt);
+  assert(previewBolt.position.distanceTo(new THREE.Vector3(0, 0.075, 0.05)) < 0.000001);
+  assert(
+    previewBolt.quaternion.angleTo(new THREE.Quaternion()) < 0.000001,
+    'inspection is canonical Idle even while gameplay cycles'
+  );
+  let previewMeshes = 0,
+    geometryDisposals = 0,
+    materialDisposals = 0,
+    textureDisposals = 0;
+  const geometries = new Set();
   inspection.scene.traverse((mesh) => {
-    if (!mesh.isSkinnedMesh) return;
-    assert(!skeletons.has(mesh.skeleton));
-    assert(mesh.skeleton.bones.every((bone) => !model.root.getObjectById(bone.id)));
-    previewSkeletons.add(mesh.skeleton);
+    assert(!mesh.isSkinnedMesh, 'inspection also needs no weapon skeleton');
+    if (!mesh.isMesh) return;
+    previewMeshes++;
     const live = model.scene.getObjectByName(mesh.name);
+    assert.notEqual(mesh, live);
     assert.equal(mesh.geometry, live.geometry);
     assert.equal(mesh.material, live.material);
+    geometries.add(mesh.geometry);
   });
-  assert(previewSkeletons.size > 0);
-  let liveDisposals = 0,
-    previewDisposals = 0;
-  for (const skeleton of skeletons) {
-    skeleton.computeBoneTexture();
-    skeleton.boneTexture.addEventListener('dispose', () => liveDisposals++);
-  }
-  for (const skeleton of previewSkeletons) {
-    skeleton.computeBoneTexture();
-    skeleton.boneTexture.addEventListener('dispose', () => previewDisposals++);
-  }
+  assert.equal(previewMeshes, draws);
+  for (const geometry of geometries)
+    geometry.addEventListener('dispose', () => geometryDisposals++);
+  const materialCount = model.materials.size,
+    textureCount = model.textures.size;
+  for (const material of model.materials)
+    material.addEventListener('dispose', () => materialDisposals++);
+  for (const texture of model.textures)
+    texture.addEventListener('dispose', () => textureDisposals++);
   inspection.dispose();
-  assert.equal(previewDisposals, previewSkeletons.size);
-  assert.equal(liveDisposals, 0);
+  assert.equal(geometryDisposals, 0, 'inspection borrows geometry');
+  assert.equal(materialDisposals, 0, 'inspection borrows materials');
+  assert.equal(textureDisposals, 0, 'inspection borrows textures');
   assert(animation.bolt.position.equals(snapshot), 'inspection never changes gameplay controls');
   animation.dispose();
-  assert.equal(
-    liveDisposals,
-    skeletons.size,
-    'adapter releases all owned mechanical bone textures'
-  );
+  assert.equal(geometryDisposals, 0, 'adapter does not own cached geometry');
+  assert.equal(materialDisposals, materialCount, 'adapter releases owned materials');
+  assert.equal(textureDisposals, textureCount, 'adapter releases owned map clones');
+  assert.equal(model.materials.size, 0);
+  assert.equal(model.textures.size, 0);
 }
 console.log(
-  `AX338 rigid skin: ${poses} half-frame poses / ${probes} actual vertex probes, maximum control gap ${maximumError} m; six draws/four Idle, real drop geometry, interruptions and independent inspection/disposal passed`
+  `AX338 ordinary meshes: ${poses} half-frame poses / ${probes} actual vertex probes, maximum control gap ${maximumError} m; eleven draws/nine Idle, real drop geometry, interruptions and borrowed inspection resources/owned material disposal passed`
 );
