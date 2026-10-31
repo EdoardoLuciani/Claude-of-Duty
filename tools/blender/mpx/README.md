@@ -27,7 +27,7 @@ opaque finishes using linear corner colours and a padded 4×4 finish atlas for
 roughness/metalness and strength-adjusted normal XYZ. Original UV0/colour grain
 remain unchanged; UV1 is a deterministic affine transform of that same atlas,
 not a reproject/repack. Each finish tile reduces procedural grain from 1024² to
-248² plus four-pixel edge padding. In the solid-cover visual prototype, body lenses
+248² plus four-pixel edge padding. With the approved solid covers, body lenses
 alone use the optical material with constant original alpha/coating; opaque polymer
 lids join their existing mechanical cap frames. No optical role selector remains.
 The unused clear-cap calibration tile stays reserved so all original maps/other
@@ -74,8 +74,8 @@ independent `tools/mpx-pass2-parity.mjs` requires a retained pass-1 native GLB: 
 matches every oriented triangle/position/UV/finish/owner and compares every corner
 normal at rest, every surface vertex over ≥21 moving poses per clip, plus dense
 120 Hz samples. That historical full-surface comparison applies to the accepted
-clear-cover consolidation, not to the explicitly redesigned solid lids. Prototype
-acceptance separately enumerates exactly 80 removed clear-sheet triangles and 312
+clear-cover consolidation, not to the explicitly redesigned solid lids. Approved
+solid-cover acceptance separately enumerates exactly 80 removed clear-sheet triangles and 312
 replacement lid triangles, confines all new surfaces to the two 1.5 mm polymer lid
 volumes, and compares every unaffected surface against the accepted base; it does
 not waive numerical or normal gates. No new expected hash substitutes for that
