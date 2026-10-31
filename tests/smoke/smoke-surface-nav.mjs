@@ -428,9 +428,9 @@ assert.ok(live.canStand(w5.from) && entry.probeGround(), 'W5 starts supported an
 map.physics.removeCharacter(entry);
 assert.equal(
   map.meta.navigation.sha256,
-  // Removing the physics visualizer refreshes source-byte provenance only.
+  // Authoring relocation and the release exporter label refresh provenance only.
   // The physical payload hash below verifies unchanged topology and cover.
-  'b6fd9fc8cdf9326a1111187027101436b994eaa7988902d6fffa30f8943165cf',
+  'd1cb9801425a5e4c1cbbbd7e9335f53538cff657eed995e8e7cb0645a47b8bd8',
   're-measure recorded fixture outcomes after changing baked assets'
 );
 const physicalPayload = map.surfaceRaw.subarray(64 + map.surfaceRaw.readUInt32LE(8));
@@ -438,7 +438,7 @@ assert.equal(physicalPayload.length, 8897464, 'unchanged Detour/component/cover 
 assert.equal(
   await navHash(physicalPayload),
   'bbf10f69d8dedfa3b048fa8f11b2b0e680df8f8f3775459fdd89eb90e08b0500',
-  'visualizer removal must not change navigation topology, components or cover'
+  'authoring relocation must not change navigation topology, components or cover'
 );
 let arrivals = 0;
 for (const c of map.cases) {

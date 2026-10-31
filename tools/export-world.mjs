@@ -22,7 +22,7 @@ import { NAV_VERSION } from '../src/ai/nav-format.ts';
 import { Rng } from '../src/core/rng.ts';
 import { buildWorld } from './worldgen/build.js';
 import { Assembler } from './worldgen/builder.js';
-import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from './worldgen/config.js';
+import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from './worldgen/level/config.js';
 import { worldMetadata } from './worldgen/metadata.js';
 import { bakeNav } from './worldgen/nav-bake.js';
 import { buildCollision } from './worldgen/pack.js';

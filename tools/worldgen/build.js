@@ -7,8 +7,8 @@ import {
   buildPerimeter,
 } from './dressing.js';
 import { buildGround } from './ground.js';
-import { BUILDINGS } from './layout.js';
-import { clearDoorwayClutter, clearVolumeClutter, placeBaked } from './placements/index.js';
+import { BUILDINGS } from './level/layout.js';
+import { clearDoorwayClutter, clearVolumeClutter, placeBaked } from './placement.js';
 import { registerProps } from './props.js';
 
 /** Populate an Assembler with the complete authored level. */

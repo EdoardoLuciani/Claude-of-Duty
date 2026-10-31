@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { Rng } from '../../src/core/rng.ts';
 import { buildWorld } from '../../tools/worldgen/build.js';
 import { Assembler } from '../../tools/worldgen/builder.js';
-import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from '../../tools/worldgen/config.js';
+import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from '../../tools/worldgen/level/config.js';
 import { buildCollision } from '../../tools/worldgen/pack.js';
 
 function worldRng() {
