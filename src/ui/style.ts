@@ -99,12 +99,15 @@ const CSS = `
   text-shadow:var(--sh);
 }
 
-/* Four-widget opt-in; equipment and all other presenters remain native. */
+/* Opt-in presenters; native owners keep advancing their animation state. */
 .ow-hud-slice .ow-cross, .ow-hud-slice .ow-vitals,
 .ow-hud-slice .ow-minimap,
 .ow-hud-slice .ow-ammo > :not(.ow-equip) { display:none !important; }
 .ow-hud-slice .ow-ammo { --ammo-w:calc(248px * var(--k)); }
 .ow-hud-slice .ow-equip { margin-bottom:calc(154px * var(--k)); }
+.ow-hud-combat .ow-hit, .ow-hud-combat .ow-dmg,
+.ow-hud-combat .ow-equip, .ow-hud-combat .ow-fps,
+.ow-hud-compass .ow-compass { display:none !important; }
 
 /* ============================================================== crosshair */
 .ow-cross { position:absolute; left:50%; top:50%; width:0; height:0; }
@@ -337,13 +340,8 @@ const CSS = `
 .ow-slot.empty { opacity:.34; }
 .ow-slot.cooking {
   color: var(--amber);
-  animation: ow-cook 0.28s ease-in-out infinite alternate;
 }
 .ow-slot.cooking svg { filter: drop-shadow(0 0 calc(3px * var(--k)) rgba(255,176,42,.55)); }
-@keyframes ow-cook {
-  from { opacity:.35; }
-  to { opacity:1; }
-}
 
 /* ============================================================== killfeed */
 .ow-killfeed {

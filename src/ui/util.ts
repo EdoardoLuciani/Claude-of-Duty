@@ -178,7 +178,7 @@ export class Pool<Node extends HTMLElement = HTMLElement> {
   }
 
   /** Oldest-first reuse so a burst never starves. */
-  acquire(): PoolRecord<Node> {
+  acquire(present = true): PoolRecord<Node> {
     let best: PoolRecord<Node> | null = null;
     let bestT = -Infinity;
     for (let i = 0; i < this.count; i++) {
@@ -187,7 +187,7 @@ export class Pool<Node extends HTMLElement = HTMLElement> {
         this._next = (it.i + 1) % this.count;
         it.alive = true;
         it.t = 0;
-        it.node.style.display = '';
+        if (present) it.node.style.display = '';
         return it;
       }
       const age = it.t / (it.life || 1);
@@ -198,17 +198,17 @@ export class Pool<Node extends HTMLElement = HTMLElement> {
     }
     best!.alive = true;
     best!.t = 0;
-    best!.node.style.display = '';
+    if (present) best!.node.style.display = '';
     return best!;
   }
 
-  release(it: PoolRecord<Node>): void {
+  release(it: PoolRecord<Node>, present = true): void {
     if (!it.alive) return;
     it.alive = false;
-    it.node.style.display = 'none';
+    if (present) it.node.style.display = 'none';
   }
 
-  releaseAll(): void {
-    for (let i = 0; i < this.count; i++) this.release(this.items[i]);
+  releaseAll(present = true): void {
+    for (let i = 0; i < this.count; i++) this.release(this.items[i], present);
   }
 }

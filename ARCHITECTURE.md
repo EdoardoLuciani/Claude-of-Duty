@@ -282,14 +282,20 @@ See [panel limitations](docs/experiments/pixi-ui.md) and
 UI migration or a general-purpose UI abstraction.
 
 `?pixi=hud` is the playable gameplay slice: ammo/reload, health/armour, reticle,
-minimap and fullscreen injury. One passive Pixi canvas stays below native
+minimap, fullscreen injury, compass/heard pings, hitmarkers/damage arcs,
+equipment and FPS. One passive Pixi canvas stays below native
 centre/chrome layers. Its order is injury → readouts; HUD fade affects readouts,
-**not injury**. `HealthFx` owns shared injury/vitals animation values; Pixi only
-presents them. Native hurt/replaced widget DOM writes are disabled.
+**not injury**. `HealthFx`, `Compass`, `Hitmarkers`, `DamageArcs` and `AmmoPanel`
+own shared animation/pooling/equipment state; Pixi only presents it. The optional
+pool presentation flag suppresses acquire/release/clear DOM writes as well as
+normal update writes. Equipment's280ms alternating pulse uses shared unscaled
+UI time; FPS keeps wall-clock500ms samples and can invalidate paused rendering.
+`?pixi=hud&combat=html` keeps the new group native; `&compass=html` keeps only
+the compass native. Neither is a production backend default. Native hurt/replaced widget DOM writes are disabled.
 `?pixi=hud&underlays=html` keeps native injury presentation for comparison.
 Unwired projected objective/grenade-warning UI is removed in both backends,
 including its UI spawning API and objective-list plumbing. Actual grenades,
-minimap contacts/search areas, hitmarkers and damage arcs are unchanged.
+minimap contacts/search areas and combat state/events are unchanged.
 `PixiAmmoView` shares ammo graphics without renderer ownership. Minimap uploads
 the existing one-time Canvas2D bake once and retains GPU objects.
 All other native HUD/menu presenters remain. Engine-driven active rendering,
@@ -298,6 +304,7 @@ shared-device ownership and failure-isolated teardown remain required. The injur
 mesh owns its geometry/WGSL program, never borrowed device/textures. This is not
 the no-UI benchmark state. See [initial slice](docs/experiments/pixi-hud.md) and
 [injury migration and historical comparison](docs/experiments/pixi-underlays.md).
+Current extension ownership/limits/measurements: [combat UI](docs/experiments/pixi-combat.md).
 
 ## Models
 

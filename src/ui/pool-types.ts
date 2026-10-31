@@ -13,7 +13,7 @@ export interface PoolRecord<Node extends HTMLElement = HTMLElement> {
 
 export interface ElementPool<Node extends HTMLElement = HTMLElement> {
   items: PoolRecord<Node>[];
-  acquire(): PoolRecord<Node>;
-  release(item: PoolRecord<Node>): void;
-  releaseAll(): void;
+  acquire(present?: boolean): PoolRecord<Node>;
+  release(item: PoolRecord<Node>, present?: boolean): void;
+  releaseAll(present?: boolean): void;
 }

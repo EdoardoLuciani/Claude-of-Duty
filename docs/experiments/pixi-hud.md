@@ -4,8 +4,10 @@ Use `?pixi=hud` for ammo/reload, health/armour, crosshair and a live minimap.
 Omit the parameter for the unchanged native HUD. The later
 [injury extension](pixi-underlays.md) also moves fullscreen injury to Pixi.
 The never-wired projected objective/grenade-warning UI has been removed from
-both HTML and Pixi, including its spawning API and unused objective-list plumbing. Menus, shop/inspection, startup/error handling, equipment, compass,
-hitmarkers/damage arcs, prompts, radio and killfeed remain native. The measurements
+both HTML and Pixi, including its spawning API and unused objective-list plumbing.
+The [combat UI extension](pixi-combat.md) also migrates compass/heard pings,
+hitmarkers/damage arcs, equipment and FPS. Menus, shop/inspection, startup/error
+handling, status bar, prompts, radio and killfeed remain native. The measurements
 below describe the initial four-widget slice, not that extension or the no-UI state.
 
 Supersedes draft PRs #564, #565 and #566 (closed at the operator's request).
@@ -22,7 +24,8 @@ crosshair experiment is not included.
   or render ticker. Absent content and unchanged paused content do not redraw
   after fades settle. The readout group fades independently of fullscreen injury.
 - Canvas placement is after native injury and before native centre/chrome
-  feedback. Native hitmarkers/damage arcs, equipment and menus stay above it.
+  feedback. The combat extension orders arcs below the reticle and hitmarkers
+  above it; remaining native feedback/menus stay above the canvas.
   The injury extension renders injury below readouts in Pixi instead.
 - The shared `PixiAmmoView` is the previous ammo presenter without renderer ownership.
   The old ammo-only wrapper and the new HUD reuse the same code/pip calculation.
@@ -37,7 +40,8 @@ crosshair experiment is not included.
   objectives, pulsing search areas and above/below arrows are retained Pixi objects.
   It never draws/uploads an entire Canvas2D minimap each frame.
 - The replaced native ammo readout, vitals/crosshair presentation and minimap draw
-  are not updated behind the experiment. Equipment and all remaining UI still update.
+  are not updated behind the experiment. The combat extension suppresses its
+  replaced presenters too; remaining native UI still updates.
 - No changes to Three's frame graph, world resolution, post-effects or viewmodel.
   A separate Pixi canvas still requires browser composition; this is not a final
   single-canvas presentation integration.

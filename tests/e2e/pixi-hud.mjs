@@ -33,13 +33,17 @@ try {
   const modes = [];
   for (let i = 0; i < rounds; i++)
     modes.push(
-      ...(args.underlays
+      ...(args.combat || args.compass
         ? i % 2
-          ? ['hud', 'html']
-          : ['html', 'hud']
-        : i % 2
-          ? ['hud', 'dom']
-          : ['dom', 'hud'])
+          ? ['hud', args.compass ? 'bearing' : 'legacy']
+          : [args.compass ? 'bearing' : 'legacy', 'hud']
+        : args.underlays
+          ? i % 2
+            ? ['hud', 'html']
+            : ['html', 'hud']
+          : i % 2
+            ? ['hud', 'dom']
+            : ['dom', 'hud'])
     );
   modes.push('retina', 'unavailable');
   for (const [run, mode] of modes.entries()) {
@@ -82,7 +86,7 @@ try {
       };
     }, mode === 'unavailable');
     await page.goto(
-      `http://localhost:${port}/?capture=1&lockstep=1&q=${args.quality ?? 'high'}${mode === 'dom' ? '' : '&pixi=hud'}${mode === 'html' ? '&underlays=html' : ''}`
+      `http://localhost:${port}/?capture=1&lockstep=1&q=${args.quality ?? 'high'}${mode === 'dom' ? '' : '&pixi=hud'}${mode === 'html' ? '&underlays=html' : ''}${mode === 'legacy' ? '&combat=html' : mode === 'bearing' ? '&compass=html' : ''}`
     );
     const device = await waitForGame(page);
     // Known upstream prewarm warning; all other errors/validation failures fail.
@@ -121,6 +125,10 @@ try {
           (!!p && 'worldMarkers' in p),
         markerElements: document.querySelectorAll('.ow-mk, .ow-nade').length,
         gpuUnderlays: p?.gpuUnderlays ?? false,
+        gpuCombat: p?.gpuCombat ?? false,
+        gpuCompass: p?.gpuCompass ?? false,
+        nativeCompass: getComputedStyle(ui.compass.root).display !== 'none',
+        nativeFps: getComputedStyle(ui.fps).display !== 'none',
         nativeMap: getComputedStyle(ui.minimap.root).display !== 'none',
         nativeVitals: getComputedStyle(ui.health.vitals).display !== 'none',
         nativeCrosshair: getComputedStyle(ui.crosshair.root).display !== 'none',
@@ -134,7 +142,12 @@ try {
     assert.equal(setup.pixi, mode !== 'dom' && mode !== 'unavailable');
     assert.equal(setup.devices, 1);
     assert.equal(setup.webgl, 0);
-    assert(setup.passive && setup.nativeEquipment);
+    assert(setup.passive);
+    assert.equal(setup.gpuCombat, setup.pixi && mode !== 'legacy');
+    assert.equal(setup.gpuCompass, setup.gpuCombat && mode !== 'bearing');
+    assert.equal(setup.nativeEquipment, !setup.gpuCombat);
+    assert.equal(setup.nativeFps, !setup.gpuCombat);
+    assert.equal(setup.nativeCompass, !setup.gpuCompass);
     assert.equal(setup.nativeMap, !setup.pixi);
     assert.equal(setup.nativeVitals, !setup.pixi);
     assert.equal(setup.nativeCrosshair, !setup.pixi);
@@ -147,7 +160,7 @@ try {
     let combat = null,
       metrics = null,
       checks = null;
-    if (mode === 'dom' || mode === 'hud' || mode === 'html') {
+    if (!['retina', 'unavailable'].includes(mode)) {
       await page.addScriptTag({
         content: `window.__PROFILE__={lane:${combatLane.toString()},create:${createCombatProfile.toString()}};`,
       });
@@ -170,9 +183,30 @@ try {
           p = ui.pixiHud;
         const steps = [],
           intervals = [],
-          updates = [];
+          updates = [],
+          compassModel = [],
+          compassView = [];
         let previous;
         const late = ui.lateUpdate;
+        const modelUpdate = ui.compass.update,
+          viewUpdate = p?.compass.update;
+        ui.compass.update = function (...a) {
+          const t = performance.now();
+          try {
+            return modelUpdate.apply(this, a);
+          } finally {
+            compassModel.push(performance.now() - t);
+          }
+        };
+        if (p?.gpuCompass)
+          p.compass.update = function (...a) {
+            const t = performance.now();
+            try {
+              return viewUpdate.apply(this, a);
+            } finally {
+              compassView.push(performance.now() - t);
+            }
+          };
         ui.lateUpdate = function (...a) {
           const at = performance.now();
           try {
@@ -193,6 +227,8 @@ try {
             steps.push(performance.now() - start);
             f.after();
             const s = ui.state;
+            if (p?.gpuCombat && p.combat.fps.text !== ui.fpsText)
+              throw Error('FPS presentation mismatch');
             const ammo = p ? p.ammo.current.text : ui.ammo.cur.textContent;
             const hp = p ? p.hp.text : ui.health.hpVal.textContent;
             if (
@@ -209,6 +245,8 @@ try {
           }
         } finally {
           ui.lateUpdate = late;
+          ui.compass.update = modelUpdate;
+          if (p) p.compass.update = viewUpdate;
           f.dispose();
         }
         const summary = (a) => {
@@ -223,6 +261,8 @@ try {
           stepMs: summary(steps),
           intervalMs: summary(intervals),
           uiMs: summary(updates),
+          compassModelMs: summary(compassModel),
+          compassViewMs: compassView.length ? summary(compassView) : null,
           report: f.report,
           native: window.__NATIVE_COUNTS__,
           mapUploads: p?.minimap.uploads ?? 0,
@@ -268,6 +308,114 @@ try {
       );
     } else await captureNative(page, resolve(out, `${run}-${mode}.png`));
     if (setup.pixi) {
+      const feedback = await page.evaluate(async () => {
+        const e = window.__ENGINE__,
+          ui = e.ctx.get('ui'),
+          p = ui.pixiHud;
+        const oldWeapon = ui._weaponState,
+          oldPlayer = ui._playerState,
+          oldFps = ui._updateFps;
+        const fixture = { oldWeapon, oldPlayer, oldFps, mutations: 0 };
+        window.__COMBAT_FIXTURE__ = fixture;
+        ui._updateFps = () => {};
+        ui.fpsText = '123 FPS';
+        if (!p.gpuCombat) ui.fps.textContent = ui.fpsText;
+        let empty = true;
+        ui._weaponState = function () {
+          return {
+            ...oldWeapon.call(this),
+            lethalCount: empty ? 0 : 3,
+            carpetCount: empty ? 0 : 2,
+            cooking: !empty,
+            grenadeEquipped: false,
+            radioEquipped: !empty,
+          };
+        };
+        ui._playerState = function () {
+          return { ...oldPlayer.call(this), bandages: empty ? 0 : 12, healing: !empty };
+        };
+        const observer = new MutationObserver((records) => {
+          fixture.mutations += records.length;
+        });
+        const roots = [];
+        if (p.gpuCombat)
+          roots.push(
+            ui.ammo.equip,
+            ui.fps,
+            ...ui.hit.pool.items.map((it) => it.node),
+            ...ui.arcs.pool.items.map((it) => it.node)
+          );
+        if (p.gpuCompass) roots.push(ui.compass.root);
+        for (const root of roots)
+          observer.observe(root, {
+            subtree: true,
+            attributes: true,
+            childList: true,
+            characterData: true,
+          });
+        fixture.observer = observer;
+        await window.__PUMP__(1);
+        if (p.gpuCombat && !p.combat.slots.every((slot) => slot.node.alpha === 0.34))
+          throw Error('empty equipment opacity');
+        empty = false;
+        ui.compass.ping(ui.compass.heading - 35);
+        ui.compass.ping(ui.compass.heading + 35);
+        ui.arcs.spawn(1, 0, 1);
+        ui.arcs.spawn(-1, -1, 0.6);
+        await window.__PUMP__(3);
+        return { empty: true };
+      });
+      for (const kind of ['hit', 'armour', 'head', 'kill']) {
+        await page.evaluate(async (kind) => {
+          const ui = window.__ENGINE__.ctx.get('ui'),
+            p = ui.pixiHud;
+          ui.hit.clear();
+          const item = ui.hit.spawn(kind);
+          await window.__PUMP__(3);
+          if (p.gpuCombat) {
+            const view = p.combat.hitSlots[item.i],
+              state = ui.hit.visuals[item.i];
+            if (
+              !view.node.visible ||
+              !view.variants[kind].visible ||
+              view.node.scale.x !== state.scale ||
+              view.ring.alpha !== state.ringAlpha
+            )
+              throw Error('hit style/animation parity');
+            for (let i = 0; i < 6; i++)
+              if (
+                ui.arcs.pool.items[i].alive &&
+                p.combat.arcSlots[i].rotation !== ui.arcs.visuals[i].rotation
+              )
+                throw Error('damage arc direction');
+            if (p.combat.slots.map((s) => s.count.text).join() !== '12,3,2')
+              throw Error('equipment count parity');
+          }
+          if (p.gpuCompass && p.compass.pings.filter((n) => n.visible).length < 2)
+            throw Error('heard bearing pings missing');
+        }, kind);
+        await capturePixi(page, resolve(out, `${run}-${mode}-feedback-${kind}.png`), 'hud');
+      }
+      feedback.mutations = await page.evaluate(async () => {
+        const ui = window.__ENGINE__.ctx.get('ui'),
+          f = window.__COMBAT_FIXTURE__;
+        ui.hit.clear();
+        ui.arcs.clear();
+        ui.compass.pingPool.releaseAll(ui.compass.present);
+        const n = f.mutations + f.observer.takeRecords().length;
+        f.observer.disconnect();
+        ui._weaponState = f.oldWeapon;
+        ui._playerState = f.oldPlayer;
+        ui._updateFps = f.oldFps;
+        await window.__PUMP__(60);
+        delete window.__COMBAT_FIXTURE__;
+        return n;
+      });
+      assert.equal(
+        feedback.mutations,
+        0,
+        'replaced combat DOM must never update, including spawn/clear/FPS/pulses'
+      );
       await page.evaluate(async () => {
         const e = window.__ENGINE__,
           ui = e.ctx.get('ui');
@@ -354,9 +502,23 @@ try {
         ui.menu.show();
         // HUD opacity is now a GPU group fade, separate from injury opacity.
         await window.__PUMP__(60);
-        const draws = p.draws;
-        await window.__PUMP__(30);
-        if (p.draws !== draws) throw Error('paused static HUD redraws');
+        const sampleFps = ui._updateFps;
+        ui._updateFps = () => {}; // unchanged-content test; live FPS changes tested separately below
+        try {
+          const draws = p.draws;
+          await window.__PUMP__(30);
+          if (p.draws !== draws) throw Error('paused static HUD redraws');
+          if (p.gpuCombat) {
+            ui.fpsText = '123 FPS';
+            await window.__PUMP__(1);
+            if (p.combat.fps.text !== '123 FPS' || p.draws !== draws + 1)
+              throw Error('paused FPS must invalidate once');
+            await window.__PUMP__(5);
+            if (p.draws !== draws + 1) throw Error('unchanged FPS redraws');
+          }
+        } finally {
+          ui._updateFps = sampleFps;
+        }
         ui.menu.close();
         await window.__PUMP__(30);
         ui.setHudVisible(false);
@@ -374,16 +536,19 @@ try {
         if (!w.setWeapon('pistol')) throw Error('switch failed');
         await window.__PUMP__(100);
         if (!p.ammo.name.text.includes('P320')) throw Error('weapon name missing');
-        const counts = [];
+        const counts = [],
+          originalYaw = player.yaw;
         for (let cycle = 0; cycle < 3; cycle++) {
           for (let i = 0; i < 60; i++) {
             w.state.mag = i % 12;
             player.health.value = 20 + i;
+            player.movement.yaw = (i * Math.PI) / 30; // warm every cardinal and cross north repeatedly
             await window.__PUMP__(1);
           }
           await p.renderer.gpu.device.queue.onSubmittedWorkDone();
           counts.push(p.renderer.texture.managedTextures.length);
         }
+        player.movement.yaw = originalYaw;
         player.health.reset(true);
         w.resetForNewGame();
         await window.__PUMP__(60);
@@ -458,6 +623,8 @@ try {
       browser: browser.version(),
       quality: args.quality ?? 'high',
       underlayComparison: !!args.underlays,
+      combatComparison: !!args.combat,
+      compassComparison: !!args.compass,
       uncapped: !!args.uncapped,
       device,
       setup,

@@ -1,9 +1,9 @@
 import { el, setText, setStyle, clamp, Pool } from './util.ts';
 
-const SPAN_DEG = 120; // degrees visible across the strip
-const STRIP_W = 470; // css px at k=1, must match .ow-compass width
-const PPD = STRIP_W / SPAN_DEG;
-const CARD: Record<number, string> = {
+export const SPAN_DEG = 120; // degrees visible across the strip
+export const STRIP_W = 470; // css px at k=1, must match .ow-compass width
+export const PPD = STRIP_W / SPAN_DEG;
+export const CARD: Record<number, string> = {
   0: 'N',
   45: 'NE',
   90: 'E',
@@ -37,6 +37,12 @@ interface ScoreState {
   enemiesRemaining?: number;
 }
 export class Compass {
+  present = true;
+  heading = 0;
+  readonly pings = Array.from({ length: 8 }, (): { x: number; alpha: number } => ({
+    x: 0,
+    alpha: 0,
+  }));
   declare root: HTMLElement;
   declare strip: HTMLElement;
   declare objPool: Pool;
@@ -67,7 +73,7 @@ export class Compass {
 
   /** Short-lived bearing tick for a heard sprint. */
   ping(bearing: number): void {
-    const it = this.pingPool.acquire();
+    const it = this.pingPool.acquire(this.present);
     it.a = bearing;
     it.life = 1.25;
   }
@@ -82,12 +88,13 @@ export class Compass {
     const k = this.k;
     const h = ((heading % 360) + 360) % 360;
     const x = STRIP_W * 0.5 * k - (h + 360) * PPD * k;
-    setStyle(this.strip, 'transform', `translateX(${x.toFixed(2)}px)`);
+    this.heading = h;
+    if (this.present) setStyle(this.strip, 'transform', `translateX(${x.toFixed(2)}px)`);
 
     const half = STRIP_W * 0.5 * k;
     const items = this.objPool.items;
     let n = 0;
-    if (objectives) {
+    if (objectives && this.present) {
       for (let i = 0; i < objectives.length && n < items.length; i++) {
         const o = objectives[i];
         let rel = o.bearing - h;
@@ -107,7 +114,7 @@ export class Compass {
       }
     }
     for (let i = n; i < items.length; i++) {
-      if (items[i].alive) {
+      if (items[i].alive && this.present) {
         items[i].alive = false;
         setStyle(items[i].node, 'display', 'none');
       }
@@ -119,7 +126,7 @@ export class Compass {
       if (!it.alive) continue;
       it.t += dt;
       if (it.t >= it.life) {
-        this.pingPool.release(it);
+        this.pingPool.release(it, this.present);
         continue;
       }
       let rel = it.a - h;
@@ -127,6 +134,9 @@ export class Compass {
       while (rel < -180) rel += 360;
       const px = clamp(rel * PPD * k, -half + 8 * k, half - 8 * k);
       const fade = 1 - it.t / it.life;
+      this.pings[i].x = px / k;
+      this.pings[i].alpha = fade;
+      if (!this.present) continue;
       setStyle(it.node, 'left', '50%');
       setStyle(it.node, 'transform', `translateX(calc(-50% + ${px.toFixed(1)}px))`);
       setStyle(it.node, 'opacity', fade.toFixed(3));

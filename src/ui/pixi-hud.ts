@@ -6,6 +6,9 @@ import type { Crosshair } from './crosshair.ts';
 import type { HealthFx, HealthState } from './health.ts';
 import type { Minimap, MinimapState } from './minimap.ts';
 import { PixiAmmoView, AMMO_WIDTH, AMMO_HEIGHT } from './pixi-ammo-view.ts';
+import { PixiCombat } from './pixi-combat.ts';
+import type { CombatModels } from './pixi-combat.ts';
+import { PixiCompass } from './pixi-compass.ts';
 import { initPixiRenderer, restrictPixiCanvases } from './pixi-device.ts';
 import { PixiInjury } from './pixi-injury.ts';
 import { PixiMinimap } from './pixi-minimap.ts';
@@ -48,6 +51,10 @@ export class PixiHudSlice {
   readonly chrome = new Container();
   readonly injury = new PixiInjury();
   readonly gpuUnderlays: boolean;
+  readonly gpuCombat: boolean;
+  readonly gpuCompass: boolean;
+  readonly combat = new PixiCombat();
+  readonly compass = new PixiCompass();
   readonly ammo = new PixiAmmoView();
   readonly minimap = new PixiMinimap();
   readonly vitals = new Container();
@@ -74,14 +81,14 @@ export class PixiHudSlice {
     parent: HTMLElement,
     before: HTMLElement,
     game: Renderer,
-    gpuUnderlays = true
+    options: { injury?: boolean; combat?: boolean; compass?: boolean } = {}
   ): Promise<PixiHudSlice> {
     const restore = restrictPixiCanvases();
     let hud: PixiHudSlice | null = null;
     try {
       // Construct only after recording the restoration boundary: even field
       // initializer / text / graphics failures must restore the global adapter.
-      hud = new PixiHudSlice(gpuUnderlays);
+      hud = new PixiHudSlice(options);
       hud.restoreAdapter = restore;
       await initPixiRenderer(
         hud.renderer,
@@ -102,20 +109,38 @@ export class PixiHudSlice {
     }
   }
 
-  private constructor(gpuUnderlays: boolean) {
-    this.gpuUnderlays = gpuUnderlays;
+  private constructor(options: { injury?: boolean; combat?: boolean; compass?: boolean }) {
+    this.gpuUnderlays = options.injury !== false;
+    this.gpuCombat = options.combat !== false;
+    this.gpuCompass = this.gpuCombat && options.compass !== false;
     this.canvas.className = 'ow-pixi-hud-slice';
     this.canvas.setAttribute('role', 'img');
     this.canvas.setAttribute(
       'aria-label',
-      'Experimental gameplay HUD: ammo, health, crosshair, minimap and injury'
+      'Experimental gameplay HUD: ammo, health, crosshair, minimap, injury, compass, combat feedback, equipment and FPS'
     );
     this.canvas.style.cssText = 'position:absolute;inset:0;pointer-events:none;visibility:hidden';
     this.stage.eventMode = 'none';
     this.stage.interactiveChildren = false;
     this.injury.mesh.visible = false;
     this.stage.addChild(this.injury.mesh, this.chrome);
-    this.chrome.addChild(this.ammo.stage, this.vitals, this.minimap.stage, this.reticle);
+    this.chrome.addChild(
+      this.ammo.stage,
+      this.vitals,
+      this.minimap.stage,
+      this.combat.arcs,
+      this.reticle,
+      this.combat.hits,
+      this.compass.stage,
+      this.combat.equipment,
+      this.combat.fps
+    );
+    this.combat.arcs.visible =
+      this.combat.hits.visible =
+      this.combat.equipment.visible =
+      this.combat.fps.visible =
+        this.gpuCombat;
+    this.compass.stage.visible = this.gpuCompass;
     this.vitals.addChild(text('HEALTH', 14, 10, 10, 0xa9bac5), this.hp, this.maxHp);
     this.vitals.addChild(
       new Graphics().rect(14, 72, 168, 7).fill(0x35434c).stroke({ color: 0x080c10, width: 2 })
@@ -156,6 +181,12 @@ export class PixiHudSlice {
     this.vitals.position.set(26, h / k - 26 - 112);
     this.minimap.stage.position.set(26, 26 * 0.8);
     this.reticle.position.set(w / k / 2, h / k / 2);
+    this.combat.hits.position.copyFrom(this.reticle.position);
+    this.combat.arcs.position.copyFrom(this.reticle.position);
+    this.compass.stage.position.set(w / k / 2 - 235, 26 * 0.7);
+    this.combat.equipment.position.set(w / k - 40, h / k - 202);
+    this.combat.fps.position.set(w / k - 26, 4 / k);
+    this.combat.fps.style.fontSize = Math.max(10 / k, 12);
     this.dirty = true;
   }
 
@@ -173,7 +204,8 @@ export class PixiHudSlice {
     crosshair: Crosshair,
     map: Minimap,
     mapState: MinimapState,
-    opacity: number
+    opacity: number,
+    models: CombatModels
   ): void {
     if (this.disposed) return;
     if (!this.enabled) return;
@@ -194,6 +226,8 @@ export class PixiHudSlice {
         this.dirty = true;
       }
     }
+    if (this.gpuCombat) this.dirty = this.combat.update(models) || this.dirty;
+    if (this.gpuCompass) this.dirty = this.compass.update(models.compass) || this.dirty;
     this.ammo.update(dt, s);
     const max = s.maxHealth || 100,
       hp = Math.round(Math.max(0, Math.min(max, s.health ?? max)));
@@ -252,7 +286,11 @@ export class PixiHudSlice {
       try {
         this.injury.dispose();
       } finally {
-        this.stage.destroy({ children: true, texture: true, textureSource: true });
+        try {
+          this.stage.destroy({ children: true, texture: true, textureSource: true });
+        } finally {
+          this.compass.dispose();
+        }
       }
     } finally {
       try {

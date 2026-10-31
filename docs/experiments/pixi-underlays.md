@@ -2,7 +2,9 @@
 
 `?pixi=hud` renders blood edges, heartbeat vignette and hit flash through the same
 Pixi canvas. `?pixi=hud&underlays=html` retains native injury for comparison.
-Omitting Pixi still uses the native UI throughout.
+Omitting Pixi still uses the native UI throughout. The later
+[combat extension](pixi-combat.md) also migrates compass, hitmarkers/damage arcs,
+equipment and FPS, retaining their gameplay state/events.
 
 ## Removed unused marker UI
 

@@ -1,0 +1,1039 @@
+{
+  "method": "AMD RDNA4 native WebGPU, Chromium156, High 1920x1080/DPR1; seeded combat, 180 warmup/900 measured frames, readbacks/fixtures outside timing; comparisons are active presentation, all paths initialize Pixi. CPU scopes overlap; short-scope timers quantized. Historical four-widget GPU timing is not expanded-HUD attribution.",
+  "compass": [
+    {
+      "run": 0,
+      "mode": "bearing",
+      "browser": "156.0.8078.73",
+      "quality": "high",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "uncapped": true,
+      "combat": {
+        "stepMs": {
+          "median": 4.200000002980232,
+          "p95": 5.600000001490116,
+          "mean": 4.403111111149192
+        },
+        "intervalMs": {
+          "median": 4.9000000059604645,
+          "p95": 6.600000001490116,
+          "mean": 5.148275862065651
+        },
+        "uiMs": {
+          "median": 0.19999999552965164,
+          "p95": 0.3999999985098839,
+          "mean": 0.20233333326876163
+        },
+        "compassModelMs": {
+          "median": 0,
+          "p95": 0.10000000149011612,
+          "mean": 0.009111111122700903
+        },
+        "compassViewMs": null,
+        "report": {
+          "fixture": "living-combat-v1",
+          "hp": 10000,
+          "aiCount": 5,
+          "simulationHz": 60,
+          "cycleFrames": 900,
+          "blockFrames": 300,
+          "spawn": [13.707976341247559, 0.15893791615962982, 19.843128204345703],
+          "enemies": [
+            [20.926616668701172, 0.08900192379951477, 27.04668426513672],
+            [18.71187973022461, 0.1547260880470276, 30.931903839111328],
+            [22.59709930419922, 0.11564325541257858, 33.14664077758789],
+            [26.48232078552246, 0.16939502954483032, 35.36138153076172],
+            [24.267581939697266, 0.17204715311527252, 39.24660110473633]
+          ],
+          "blocks": [
+            {
+              "start": 0,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 75,
+              "playerShots": 18,
+              "distance": 18.934479863373234
+            },
+            {
+              "start": 300,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 71,
+              "playerShots": 7,
+              "distance": 18.727611687461962
+            },
+            {
+              "start": 600,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 81,
+              "playerShots": 0,
+              "distance": 18.816279381367345
+            }
+          ],
+          "reloadStarts": 2,
+          "reloadEnds": 2,
+          "switches": 2,
+          "playerShots": 25,
+          "aiShots": 227,
+          "impacts": 408,
+          "damageTaken": 1629.9480293622055,
+          "distance": 56.478370932202616,
+          "yawTravel": 1.3715151094475768,
+          "frames": 900
+        },
+        "native": {
+          "map": 0,
+          "ammo": 0
+        },
+        "mapUploads": 1,
+        "textures": 35
+      },
+      "metrics": {
+        "TaskDuration": 4.849672222222222,
+        "LayoutDuration": 0,
+        "RecalcStyleDuration": 0.06283777777777778
+      }
+    },
+    {
+      "run": 1,
+      "mode": "hud",
+      "browser": "156.0.8078.73",
+      "quality": "high",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "uncapped": true,
+      "combat": {
+        "stepMs": {
+          "median": 4.100000001490116,
+          "p95": 5.200000002980232,
+          "mean": 4.218888888913725
+        },
+        "intervalMs": {
+          "median": 4.300000004470348,
+          "p95": 5.5,
+          "mean": 4.461624026696329
+        },
+        "uiMs": {
+          "median": 0.19999999552965164,
+          "p95": 0.3999999985098839,
+          "mean": 0.2023333332935969
+        },
+        "compassModelMs": {
+          "median": 0,
+          "p95": 0,
+          "mean": 0.00044444444278875987
+        },
+        "compassViewMs": {
+          "median": 0,
+          "p95": 0.09999999403953552,
+          "mean": 0.00611111107799742
+        },
+        "report": {
+          "fixture": "living-combat-v1",
+          "hp": 10000,
+          "aiCount": 5,
+          "simulationHz": 60,
+          "cycleFrames": 900,
+          "blockFrames": 300,
+          "spawn": [13.707976341247559, 0.15893791615962982, 19.843128204345703],
+          "enemies": [
+            [20.926616668701172, 0.08900192379951477, 27.04668426513672],
+            [18.71187973022461, 0.1547260880470276, 30.931903839111328],
+            [22.59709930419922, 0.11564325541257858, 33.14664077758789],
+            [26.48232078552246, 0.16939502954483032, 35.36138153076172],
+            [24.267581939697266, 0.17204715311527252, 39.24660110473633]
+          ],
+          "blocks": [
+            {
+              "start": 0,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 75,
+              "playerShots": 18,
+              "distance": 18.934479863373234
+            },
+            {
+              "start": 300,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 71,
+              "playerShots": 7,
+              "distance": 18.727611687461962
+            },
+            {
+              "start": 600,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 81,
+              "playerShots": 0,
+              "distance": 18.816279381367345
+            }
+          ],
+          "reloadStarts": 2,
+          "reloadEnds": 2,
+          "switches": 2,
+          "playerShots": 25,
+          "aiShots": 227,
+          "impacts": 408,
+          "damageTaken": 1629.9480293622055,
+          "distance": 56.478370932202616,
+          "yawTravel": 1.3715151094475768,
+          "frames": 900
+        },
+        "native": {
+          "map": 0,
+          "ammo": 0
+        },
+        "mapUploads": 1,
+        "textures": 39
+      },
+      "metrics": {
+        "TaskDuration": 4.427648888888889,
+        "LayoutDuration": 0,
+        "RecalcStyleDuration": 0
+      }
+    },
+    {
+      "run": 2,
+      "mode": "hud",
+      "browser": "156.0.8078.73",
+      "quality": "high",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "uncapped": true,
+      "combat": {
+        "stepMs": {
+          "median": 4.200000002980232,
+          "p95": 6.800000004470348,
+          "mean": 4.606888889057768
+        },
+        "intervalMs": {
+          "median": 4.5,
+          "p95": 7.200000002980232,
+          "mean": 4.898109010017754
+        },
+        "uiMs": {
+          "median": 0.20000000298023224,
+          "p95": 0.4000000059604645,
+          "mean": 0.22511111112104523
+        },
+        "compassModelMs": {
+          "median": 0,
+          "p95": 0,
+          "mean": 0.00044444444278875987
+        },
+        "compassViewMs": {
+          "median": 0,
+          "p95": 0.10000000149011612,
+          "mean": 0.007444444431198968
+        },
+        "report": {
+          "fixture": "living-combat-v1",
+          "hp": 10000,
+          "aiCount": 5,
+          "simulationHz": 60,
+          "cycleFrames": 900,
+          "blockFrames": 300,
+          "spawn": [13.707976341247559, 0.15893791615962982, 19.843128204345703],
+          "enemies": [
+            [20.926616668701172, 0.08900192379951477, 27.04668426513672],
+            [18.71187973022461, 0.1547260880470276, 30.931903839111328],
+            [22.59709930419922, 0.11564325541257858, 33.14664077758789],
+            [26.48232078552246, 0.16939502954483032, 35.36138153076172],
+            [24.267581939697266, 0.17204715311527252, 39.24660110473633]
+          ],
+          "blocks": [
+            {
+              "start": 0,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 75,
+              "playerShots": 18,
+              "distance": 18.934479863373234
+            },
+            {
+              "start": 300,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 71,
+              "playerShots": 7,
+              "distance": 18.727611687461962
+            },
+            {
+              "start": 600,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 81,
+              "playerShots": 0,
+              "distance": 18.816279381367345
+            }
+          ],
+          "reloadStarts": 2,
+          "reloadEnds": 2,
+          "switches": 2,
+          "playerShots": 25,
+          "aiShots": 227,
+          "impacts": 408,
+          "damageTaken": 1629.9480293622055,
+          "distance": 56.478370932202616,
+          "yawTravel": 1.3715151094475768,
+          "frames": 900
+        },
+        "native": {
+          "map": 0,
+          "ammo": 0
+        },
+        "mapUploads": 1,
+        "textures": 39
+      },
+      "metrics": {
+        "TaskDuration": 4.8593,
+        "LayoutDuration": 0,
+        "RecalcStyleDuration": 0
+      }
+    },
+    {
+      "run": 3,
+      "mode": "bearing",
+      "browser": "156.0.8078.73",
+      "quality": "high",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "uncapped": true,
+      "combat": {
+        "stepMs": {
+          "median": 4.399999998509884,
+          "p95": 5.899999998509884,
+          "mean": 4.546666666683223
+        },
+        "intervalMs": {
+          "median": 5.100000001490116,
+          "p95": 6.9000000059604645,
+          "mean": 5.340155728584004
+        },
+        "uiMs": {
+          "median": 0.20000000298023224,
+          "p95": 0.3999999985098839,
+          "mean": 0.21111111109455427
+        },
+        "compassModelMs": {
+          "median": 0,
+          "p95": 0.10000000149011612,
+          "mean": 0.01211111109289858
+        },
+        "compassViewMs": null,
+        "report": {
+          "fixture": "living-combat-v1",
+          "hp": 10000,
+          "aiCount": 5,
+          "simulationHz": 60,
+          "cycleFrames": 900,
+          "blockFrames": 300,
+          "spawn": [13.707976341247559, 0.15893791615962982, 19.843128204345703],
+          "enemies": [
+            [20.926616668701172, 0.08900192379951477, 27.04668426513672],
+            [18.71187973022461, 0.1547260880470276, 30.931903839111328],
+            [22.59709930419922, 0.11564325541257858, 33.14664077758789],
+            [26.48232078552246, 0.16939502954483032, 35.36138153076172],
+            [24.267581939697266, 0.17204715311527252, 39.24660110473633]
+          ],
+          "blocks": [
+            {
+              "start": 0,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 75,
+              "playerShots": 18,
+              "distance": 18.934479863373234
+            },
+            {
+              "start": 300,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 71,
+              "playerShots": 7,
+              "distance": 18.727611687461962
+            },
+            {
+              "start": 600,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 81,
+              "playerShots": 0,
+              "distance": 18.816279381367345
+            }
+          ],
+          "reloadStarts": 2,
+          "reloadEnds": 2,
+          "switches": 2,
+          "playerShots": 25,
+          "aiShots": 227,
+          "impacts": 408,
+          "damageTaken": 1629.9480293622055,
+          "distance": 56.478370932202616,
+          "yawTravel": 1.3715151094475768,
+          "frames": 900
+        },
+        "native": {
+          "map": 0,
+          "ammo": 0
+        },
+        "mapUploads": 1,
+        "textures": 35
+      },
+      "metrics": {
+        "TaskDuration": 5.021234444444445,
+        "LayoutDuration": 0,
+        "RecalcStyleDuration": 0.07691111111111111
+      }
+    }
+  ],
+  "combat": [
+    {
+      "run": 0,
+      "mode": "legacy",
+      "browser": "156.0.8078.73",
+      "quality": "high",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "uncapped": true,
+      "combat": {
+        "stepMs": {
+          "median": 4.700000002980232,
+          "p95": 6.300000004470348,
+          "mean": 4.927444444563654
+        },
+        "intervalMs": {
+          "median": 5.699999995529652,
+          "p95": 7.5,
+          "mean": 5.8979977753025805
+        },
+        "uiMs": {
+          "median": 0.20000000298023224,
+          "p95": 0.3999999985098839,
+          "mean": 0.23322222198877068
+        },
+        "compassModelMs": {
+          "median": 0,
+          "p95": 0,
+          "mean": 0.0036666666716337203
+        },
+        "compassViewMs": null,
+        "report": {
+          "fixture": "living-combat-v1",
+          "hp": 10000,
+          "aiCount": 5,
+          "simulationHz": 60,
+          "cycleFrames": 900,
+          "blockFrames": 300,
+          "spawn": [13.707976341247559, 0.15893791615962982, 19.843128204345703],
+          "enemies": [
+            [20.926616668701172, 0.08900192379951477, 27.04668426513672],
+            [18.71187973022461, 0.1547260880470276, 30.931903839111328],
+            [22.59709930419922, 0.11564325541257858, 33.14664077758789],
+            [26.48232078552246, 0.16939502954483032, 35.36138153076172],
+            [24.267581939697266, 0.17204715311527252, 39.24660110473633]
+          ],
+          "blocks": [
+            {
+              "start": 0,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 75,
+              "playerShots": 18,
+              "distance": 18.934479863373234
+            },
+            {
+              "start": 300,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 71,
+              "playerShots": 7,
+              "distance": 18.727611687461962
+            },
+            {
+              "start": 600,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 81,
+              "playerShots": 0,
+              "distance": 18.816279381367345
+            }
+          ],
+          "reloadStarts": 2,
+          "reloadEnds": 2,
+          "switches": 2,
+          "playerShots": 25,
+          "aiShots": 227,
+          "impacts": 408,
+          "damageTaken": 1629.9480293622055,
+          "distance": 56.478370932202616,
+          "yawTravel": 1.3715151094475768,
+          "frames": 900
+        },
+        "native": {
+          "map": 0,
+          "ammo": 0
+        },
+        "mapUploads": 1,
+        "textures": 31
+      },
+      "metrics": {
+        "TaskDuration": 5.549257777777778,
+        "LayoutDuration": 0.00376,
+        "RecalcStyleDuration": 0.11151777777777777
+      }
+    },
+    {
+      "run": 1,
+      "mode": "hud",
+      "browser": "156.0.8078.73",
+      "quality": "high",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "uncapped": true,
+      "combat": {
+        "stepMs": {
+          "median": 4.4000000059604645,
+          "p95": 6.199999995529652,
+          "mean": 4.656555555702911
+        },
+        "intervalMs": {
+          "median": 4.699999995529652,
+          "p95": 6.5,
+          "mean": 4.926473859842614
+        },
+        "uiMs": {
+          "median": 0.20000000298023224,
+          "p95": 0.5,
+          "mean": 0.24433333330684237
+        },
+        "compassModelMs": {
+          "median": 0,
+          "p95": 0,
+          "mean": 0.002111111134290695
+        },
+        "compassViewMs": {
+          "median": 0,
+          "p95": 0.10000000149011612,
+          "mean": 0.007555555593636301
+        },
+        "report": {
+          "fixture": "living-combat-v1",
+          "hp": 10000,
+          "aiCount": 5,
+          "simulationHz": 60,
+          "cycleFrames": 900,
+          "blockFrames": 300,
+          "spawn": [13.707976341247559, 0.15893791615962982, 19.843128204345703],
+          "enemies": [
+            [20.926616668701172, 0.08900192379951477, 27.04668426513672],
+            [18.71187973022461, 0.1547260880470276, 30.931903839111328],
+            [22.59709930419922, 0.11564325541257858, 33.14664077758789],
+            [26.48232078552246, 0.16939502954483032, 35.36138153076172],
+            [24.267581939697266, 0.17204715311527252, 39.24660110473633]
+          ],
+          "blocks": [
+            {
+              "start": 0,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 75,
+              "playerShots": 18,
+              "distance": 18.934479863373234
+            },
+            {
+              "start": 300,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 71,
+              "playerShots": 7,
+              "distance": 18.727611687461962
+            },
+            {
+              "start": 600,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 81,
+              "playerShots": 0,
+              "distance": 18.816279381367345
+            }
+          ],
+          "reloadStarts": 2,
+          "reloadEnds": 2,
+          "switches": 2,
+          "playerShots": 25,
+          "aiShots": 227,
+          "impacts": 408,
+          "damageTaken": 1629.9480293622055,
+          "distance": 56.478370932202616,
+          "yawTravel": 1.3715151094475768,
+          "frames": 900
+        },
+        "native": {
+          "map": 0,
+          "ammo": 0
+        },
+        "mapUploads": 1,
+        "textures": 39
+      },
+      "metrics": {
+        "TaskDuration": 4.889402222222222,
+        "LayoutDuration": 0,
+        "RecalcStyleDuration": 0
+      }
+    },
+    {
+      "run": 2,
+      "mode": "hud",
+      "browser": "156.0.8078.73",
+      "quality": "high",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "uncapped": true,
+      "combat": {
+        "stepMs": {
+          "median": 4.299999997019768,
+          "p95": 5.699999995529652,
+          "mean": 4.447333333061801
+        },
+        "intervalMs": {
+          "median": 4.5,
+          "p95": 6,
+          "mean": 4.71212458287317
+        },
+        "uiMs": {
+          "median": 0.20000000298023224,
+          "p95": 0.3999999985098839,
+          "mean": 0.21455555553237596
+        },
+        "compassModelMs": {
+          "median": 0,
+          "p95": 0,
+          "mean": 0.0006666666600439284
+        },
+        "compassViewMs": {
+          "median": 0,
+          "p95": 0.10000000149011612,
+          "mean": 0.006888888883921835
+        },
+        "report": {
+          "fixture": "living-combat-v1",
+          "hp": 10000,
+          "aiCount": 5,
+          "simulationHz": 60,
+          "cycleFrames": 900,
+          "blockFrames": 300,
+          "spawn": [13.707976341247559, 0.15893791615962982, 19.843128204345703],
+          "enemies": [
+            [20.926616668701172, 0.08900192379951477, 27.04668426513672],
+            [18.71187973022461, 0.1547260880470276, 30.931903839111328],
+            [22.59709930419922, 0.11564325541257858, 33.14664077758789],
+            [26.48232078552246, 0.16939502954483032, 35.36138153076172],
+            [24.267581939697266, 0.17204715311527252, 39.24660110473633]
+          ],
+          "blocks": [
+            {
+              "start": 0,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 75,
+              "playerShots": 18,
+              "distance": 18.934479863373234
+            },
+            {
+              "start": 300,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 71,
+              "playerShots": 7,
+              "distance": 18.727611687461962
+            },
+            {
+              "start": 600,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 81,
+              "playerShots": 0,
+              "distance": 18.816279381367345
+            }
+          ],
+          "reloadStarts": 2,
+          "reloadEnds": 2,
+          "switches": 2,
+          "playerShots": 25,
+          "aiShots": 227,
+          "impacts": 408,
+          "damageTaken": 1629.9480293622055,
+          "distance": 56.478370932202616,
+          "yawTravel": 1.3715151094475768,
+          "frames": 900
+        },
+        "native": {
+          "map": 0,
+          "ammo": 0
+        },
+        "mapUploads": 1,
+        "textures": 39
+      },
+      "metrics": {
+        "TaskDuration": 4.67682,
+        "LayoutDuration": 0,
+        "RecalcStyleDuration": 0
+      }
+    },
+    {
+      "run": 3,
+      "mode": "legacy",
+      "browser": "156.0.8078.73",
+      "quality": "high",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "uncapped": true,
+      "combat": {
+        "stepMs": {
+          "median": 4.600000001490116,
+          "p95": 6.200000002980232,
+          "mean": 4.764444444518951
+        },
+        "intervalMs": {
+          "median": 5.5,
+          "p95": 7.4000000059604645,
+          "mean": 5.716573971082291
+        },
+        "uiMs": {
+          "median": 0.20000000298023224,
+          "p95": 0.3999999985098839,
+          "mean": 0.22444444444444445
+        },
+        "compassModelMs": {
+          "median": 0,
+          "p95": 0,
+          "mean": 0.0034444444709353975
+        },
+        "compassViewMs": null,
+        "report": {
+          "fixture": "living-combat-v1",
+          "hp": 10000,
+          "aiCount": 5,
+          "simulationHz": 60,
+          "cycleFrames": 900,
+          "blockFrames": 300,
+          "spawn": [13.707976341247559, 0.15893791615962982, 19.843128204345703],
+          "enemies": [
+            [20.926616668701172, 0.08900192379951477, 27.04668426513672],
+            [18.71187973022461, 0.1547260880470276, 30.931903839111328],
+            [22.59709930419922, 0.11564325541257858, 33.14664077758789],
+            [26.48232078552246, 0.16939502954483032, 35.36138153076172],
+            [24.267581939697266, 0.17204715311527252, 39.24660110473633]
+          ],
+          "blocks": [
+            {
+              "start": 0,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 75,
+              "playerShots": 18,
+              "distance": 18.934479863373234
+            },
+            {
+              "start": 300,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 71,
+              "playerShots": 7,
+              "distance": 18.727611687461962
+            },
+            {
+              "start": 600,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 81,
+              "playerShots": 0,
+              "distance": 18.816279381367345
+            }
+          ],
+          "reloadStarts": 2,
+          "reloadEnds": 2,
+          "switches": 2,
+          "playerShots": 25,
+          "aiShots": 227,
+          "impacts": 408,
+          "damageTaken": 1629.9480293622055,
+          "distance": 56.478370932202616,
+          "yawTravel": 1.3715151094475768,
+          "frames": 900
+        },
+        "native": {
+          "map": 0,
+          "ammo": 0
+        },
+        "mapUploads": 1,
+        "textures": 31
+      },
+      "metrics": {
+        "TaskDuration": 5.375889999999999,
+        "LayoutDuration": 0.0035399999999999997,
+        "RecalcStyleDuration": 0.10597333333333334
+      }
+    }
+  ],
+  "paced": [
+    {
+      "run": 0,
+      "mode": "legacy",
+      "browser": "156.0.8078.73",
+      "quality": "high",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "uncapped": false,
+      "combat": {
+        "stepMs": {
+          "median": 5.199999995529652,
+          "p95": 7,
+          "mean": 5.38677777769665
+        },
+        "intervalMs": {
+          "median": 16.69999999552965,
+          "p95": 16.799999997019768,
+          "mean": 16.665962180203536
+        },
+        "uiMs": {
+          "median": 0.20000000298023224,
+          "p95": 0.4000000059604645,
+          "mean": 0.25788888906439145
+        },
+        "compassModelMs": {
+          "median": 0,
+          "p95": 0,
+          "mean": 0.003333333358168602
+        },
+        "compassViewMs": null,
+        "report": {
+          "fixture": "living-combat-v1",
+          "hp": 10000,
+          "aiCount": 5,
+          "simulationHz": 60,
+          "cycleFrames": 900,
+          "blockFrames": 300,
+          "spawn": [13.707976341247559, 0.15893791615962982, 19.843128204345703],
+          "enemies": [
+            [20.926616668701172, 0.08900192379951477, 27.04668426513672],
+            [18.71187973022461, 0.1547260880470276, 30.931903839111328],
+            [22.59709930419922, 0.11564325541257858, 33.14664077758789],
+            [26.48232078552246, 0.16939502954483032, 35.36138153076172],
+            [24.267581939697266, 0.17204715311527252, 39.24660110473633]
+          ],
+          "blocks": [
+            {
+              "start": 0,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 75,
+              "playerShots": 18,
+              "distance": 18.934479863373234
+            },
+            {
+              "start": 300,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 72,
+              "playerShots": 7,
+              "distance": 18.727611687461962
+            },
+            {
+              "start": 600,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 91,
+              "playerShots": 0,
+              "distance": 18.816279381367345
+            }
+          ],
+          "reloadStarts": 2,
+          "reloadEnds": 2,
+          "switches": 2,
+          "playerShots": 25,
+          "aiShots": 238,
+          "impacts": 435,
+          "damageTaken": 1630.0446108876167,
+          "distance": 56.478370932202616,
+          "yawTravel": 1.3715151094475768,
+          "frames": 900
+        },
+        "native": {
+          "map": 0,
+          "ammo": 0
+        },
+        "mapUploads": 1,
+        "textures": 31
+      },
+      "metrics": {
+        "TaskDuration": 6.076042222222222,
+        "LayoutDuration": 0.006633333333333333,
+        "RecalcStyleDuration": 0.12582555555555555
+      }
+    },
+    {
+      "run": 1,
+      "mode": "hud",
+      "browser": "156.0.8078.73",
+      "quality": "high",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "uncapped": false,
+      "combat": {
+        "stepMs": {
+          "median": 5.4000000059604645,
+          "p95": 7.5,
+          "mean": 5.579333333298564
+        },
+        "intervalMs": {
+          "median": 16.69999999552965,
+          "p95": 16.80000000447035,
+          "mean": 16.666073414902137
+        },
+        "uiMs": {
+          "median": 0.29999999701976776,
+          "p95": 0.5,
+          "mean": 0.3037777776353889
+        },
+        "compassModelMs": {
+          "median": 0,
+          "p95": 0,
+          "mean": 0.0008888889021343655
+        },
+        "compassViewMs": {
+          "median": 0,
+          "p95": 0.10000000149011612,
+          "mean": 0.009444444485836558
+        },
+        "report": {
+          "fixture": "living-combat-v1",
+          "hp": 10000,
+          "aiCount": 5,
+          "simulationHz": 60,
+          "cycleFrames": 900,
+          "blockFrames": 300,
+          "spawn": [13.707976341247559, 0.15893791615962982, 19.843128204345703],
+          "enemies": [
+            [20.926616668701172, 0.08900192379951477, 27.04668426513672],
+            [18.71187973022461, 0.1547260880470276, 30.931903839111328],
+            [22.59709930419922, 0.11564325541257858, 33.14664077758789],
+            [26.48232078552246, 0.16939502954483032, 35.36138153076172],
+            [24.267581939697266, 0.17204715311527252, 39.24660110473633]
+          ],
+          "blocks": [
+            {
+              "start": 0,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 75,
+              "playerShots": 18,
+              "distance": 18.934479863373234
+            },
+            {
+              "start": 300,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 72,
+              "playerShots": 7,
+              "distance": 18.727611687461962
+            },
+            {
+              "start": 600,
+              "frames": 300,
+              "livingFrames": 300,
+              "activeAiFrames": 300,
+              "aiShots": 91,
+              "playerShots": 0,
+              "distance": 18.816279381367345
+            }
+          ],
+          "reloadStarts": 2,
+          "reloadEnds": 2,
+          "switches": 2,
+          "playerShots": 25,
+          "aiShots": 238,
+          "impacts": 435,
+          "damageTaken": 1630.0446108876167,
+          "distance": 56.478370932202616,
+          "yawTravel": 1.3715151094475768,
+          "frames": 900
+        },
+        "native": {
+          "map": 0,
+          "ammo": 0
+        },
+        "mapUploads": 1,
+        "textures": 39
+      },
+      "metrics": {
+        "TaskDuration": 5.899903333333333,
+        "LayoutDuration": 0,
+        "RecalcStyleDuration": 0
+      }
+    }
+  ]
+}

@@ -153,6 +153,7 @@ export class UiSystem {
   fps!: HTMLElement;
   _fpsSince: number | null = null;
   _fpsFrames = 0;
+  fpsText = '— FPS';
   state!: HudState;
   k!: number;
   vw!: number;
@@ -479,11 +480,19 @@ export class UiSystem {
           this.root,
           this.centreLayer,
           ctx.get('render').renderer,
-          new URLSearchParams(location.search).get('underlays') !== 'html'
+          {
+            injury: new URLSearchParams(location.search).get('underlays') !== 'html',
+            combat: new URLSearchParams(location.search).get('combat') !== 'html',
+            compass: new URLSearchParams(location.search).get('compass') !== 'html',
+          }
         );
         this.pixiHud.resize(this.vw, this.vh, this.k);
         this.root.classList.add('ow-hud-slice');
         this.ammo.presentReadout = false;
+        this.hit.present = this.arcs.present = this.ammo.presentEquipment = !this.pixiHud.gpuCombat;
+        this.compass.present = !this.pixiHud.gpuCompass;
+        this.root.classList.toggle('ow-hud-combat', this.pixiHud.gpuCombat);
+        this.root.classList.toggle('ow-hud-compass', this.pixiHud.gpuCompass);
         this.hurtLayer.hidden = this.pixiHud.gpuUnderlays;
       } catch (error) {
         try {
@@ -494,6 +503,12 @@ export class UiSystem {
           this.pixiHud = null;
           this.root.classList.remove('ow-hud-slice');
           this.ammo.presentReadout = true;
+          this.hit.present =
+            this.arcs.present =
+            this.ammo.presentEquipment =
+            this.compass.present =
+              true;
+          this.root.classList.remove('ow-hud-combat', 'ow-hud-compass');
           this.hurtLayer.hidden = false;
         }
         console.warn('[ui] Pixi HUD unavailable; using native HUD', error);
@@ -653,7 +668,8 @@ export class UiSystem {
     this._fpsFrames++;
     const elapsed = now - this._fpsSince;
     if (elapsed < 500) return;
-    this.fps.textContent = `${Math.round((this._fpsFrames * 1000) / elapsed)} FPS`;
+    this.fpsText = `${Math.round((this._fpsFrames * 1000) / elapsed)} FPS`;
+    if (!this.pixiHud?.gpuCombat) this.fps.textContent = this.fpsText;
     this._fpsSince = now;
     this._fpsFrames = 0;
   }
@@ -662,7 +678,8 @@ export class UiSystem {
     // Wall time, not scaled/clamped gameplay time: accurate through pause and hitches.
     this._updateFps();
     const t = ctx.time;
-    const rawDt = clamp(t.raw - this._lastRaw, 0, 0.1);
+    const rawElapsed = Math.max(0, t.raw - this._lastRaw);
+    const rawDt = clamp(rawElapsed, 0, 0.1);
     this._lastRaw = t.raw;
     // The native Start dialog exclusively owns waiting input/presentation.
     // Resume happens between frames; reveal only after normal active pose hooks.
@@ -781,7 +798,7 @@ export class UiSystem {
     this.arcs.update(dt, rx, rz, fx, fz);
     this.health.update(dt, s, !this.pixiHud, !this.pixiHud?.gpuUnderlays);
     this.ammo.pixi?.setVisible(this.hudVisible >= 0.004 && !ctx.engine.error);
-    this.ammo.update(dt, s);
+    this.ammo.update(dt, s, rawElapsed);
     this.killfeed.update(dt);
     this.scoreBar.update(s);
     if (s.healing) {
@@ -834,7 +851,8 @@ export class UiSystem {
         this.crosshair,
         this.minimap,
         this._mmState,
-        this.hudVisible
+        this.hudVisible,
+        this
       );
     } else this.minimap.draw(this._mmState);
   }

@@ -1,12 +1,12 @@
 import type { ElementPool, PoolRecord } from './pool-types.ts';
 import { el, svg, setStyle, Pool, ease, clamp01 } from './util.ts';
 
-const SEG = 7;
-const SEG_STEP = 8.2; // degrees between segment centres
-const SEG_ARC = 8.9; // degrees each segment covers (slight overlap = solid arc)
-const BELL = [0.1, 0.28, 0.62, 1, 0.62, 0.28, 0.1];
-const R_MAIN = 112;
-const R_THIN = 124;
+export const SEG = 7;
+export const SEG_STEP = 8.2; // degrees between segment centres
+export const SEG_ARC = 8.9; // degrees each segment covers (slight overlap = solid arc)
+export const BELL = [0.1, 0.28, 0.62, 1, 0.62, 0.28, 0.1];
+export const R_MAIN = 112;
+export const R_THIN = 124;
 
 function pt(deg: number, r: number): string {
   const a = (deg * Math.PI) / 180;
@@ -31,6 +31,11 @@ function arcPath(cDeg: number, r: number): string {
  * frame, so turning toward the shooter sweeps the arc to the centre.
  */
 export class DamageArcs {
+  present = true;
+  readonly visuals = Array.from(
+    { length: 6 },
+    (): { rotation: number; scale: number; alpha: number } => ({ rotation: 0, scale: 1, alpha: 0 })
+  );
   declare pool: ElementPool;
   declare life: number;
 
@@ -63,7 +68,7 @@ export class DamageArcs {
    */
   spawn(dx: number, dz: number, intensity = 1): PoolRecord {
     const len = Math.hypot(dx, dz) || 1;
-    const it = this.pool.acquire();
+    const it = this.pool.acquire(this.present);
     it.life = this.life;
     it.a = dx / len;
     it.b = dz / len;
@@ -80,7 +85,7 @@ export class DamageArcs {
       it.t += dt;
       const u = it.t / it.life;
       if (u >= 1) {
-        this.pool.release(it);
+        this.pool.release(it, this.present);
         continue;
       }
       const deg = (Math.atan2(it.a * rx + it.b * rz, it.a * fx + it.b * fz) * 180) / Math.PI;
@@ -89,13 +94,18 @@ export class DamageArcs {
       const scale = 0.92 + 0.08 * ease.outQuint(inT);
       const hold = clamp01((u - 0.18) / 0.82);
       const alpha = (0.35 + 0.65 * it.c) * (1 - ease.inQuad(hold)) * ease.outQuad(inT);
+      const visual = this.visuals[i];
+      visual.rotation = (deg * Math.PI) / 180;
+      visual.scale = scale;
+      visual.alpha = alpha;
+      if (!this.present) continue;
       setStyle(it.node, 'transform', `rotate(${deg.toFixed(2)}deg) scale(${scale.toFixed(3)})`);
       setStyle(it.node, 'opacity', alpha.toFixed(3));
     }
   }
 
   clear(): void {
-    this.pool.releaseAll();
+    this.pool.releaseAll(this.present);
   }
 
   dispose(): void {
