@@ -94,7 +94,7 @@ export function wallBacking(r, side, t0, t1, y0, y1) {
  * WORLD — procedural interior micro-detail.
  *
  * Gameplay-significant furniture and floor props are explicitly authored in
- * placements/interiors.js. This module only builds attached dressing and small
+ * level/placements/interiors.js. This module only builds attached dressing and small
  * debris whose exact transform does not affect traversal.
  */
 

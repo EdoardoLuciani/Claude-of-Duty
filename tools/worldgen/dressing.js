@@ -15,7 +15,7 @@ import {
   stripedCloth,
   spallPatch,
 } from './kit.js';
-import { STREET, BUILDINGS, SET_PIECES, GATE } from './layout.js';
+import { STREET, BUILDINGS, SET_PIECES, GATE } from './level/layout.js';
 import { burntCar } from './props.js';
 import { isOpen, groundY } from './queries.js';
 import {
@@ -35,7 +35,7 @@ import {
  *
  * Geometry makes a level; dressing makes it a *place*. This pass builds merged
  * ground wear, cloth, cables and other procedural micro-detail around the
- * explicitly authored props in placements/. Everything is authored in LEVEL
+ * explicitly authored props in level/placements/. Everything is authored in LEVEL
  * space and batched through the Assembler.
  */
 
@@ -441,7 +441,7 @@ function streetFloor(A, rng) {
   }
 
   // Ground the largest authored set pieces with merged dust patches. The prop
-  // transforms themselves live in placements/ and are added by placeBaked().
+  // transforms themselves live in level/placements/ and are added by placeBaked().
   for (const [x, z, radius] of [
     [-3.35, -6.2, 1.1],
     [-5.1, -2.0, 0.8],
