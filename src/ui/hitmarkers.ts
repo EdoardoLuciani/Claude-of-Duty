@@ -1,12 +1,12 @@
 import type { ElementPool, PoolRecord } from './pool-types.ts';
 import { el, svg, setStyle, Pool, ease, clamp01 } from './util.ts';
 
-const R_IN = 13; // well outside the reticle blades, so the two never merge
-const R_OUT = 28.5;
+export const R_IN = 13; // well outside the reticle blades, so the two never merge
+export const R_OUT = 28.5;
 const D = Math.SQRT1_2;
 
 /** kind -> { colour, weight, scale, life, ring } */
-type HitmarkerKind = 'hit' | 'armour' | 'head' | 'kill';
+export type HitmarkerKind = 'hit' | 'armour' | 'head' | 'kill';
 
 type HitmarkerNode = HTMLDivElement & {
   _ring: SVGCircleElement;
@@ -22,7 +22,7 @@ interface HitmarkerStyle {
   spin: number;
 }
 
-const KINDS: Record<HitmarkerKind, HitmarkerStyle> = {
+export const KINDS: Record<HitmarkerKind, HitmarkerStyle> = {
   hit: { c: '#f6fafc', w: 1.8, s: 1.0, life: 0.26, ring: 0, spin: 0 },
   armour: { c: '#8fdcff', w: 2.0, s: 1.03, life: 0.28, ring: 0.5, spin: 0 },
   head: { c: '#ffc247', w: 2.2, s: 1.08, life: 0.32, ring: 0.3, spin: 0 },
@@ -37,6 +37,25 @@ const KINDS: Record<HitmarkerKind, HitmarkerStyle> = {
  * slower than this feels like a notification instead of a hit.
  */
 export class Hitmarkers {
+  present = true;
+  readonly visuals = Array.from(
+    { length: 10 },
+    (): {
+      kind: HitmarkerKind;
+      scale: number;
+      alpha: number;
+      rotation: number;
+      ringScale: number;
+      ringAlpha: number;
+    } => ({
+      kind: 'hit' as HitmarkerKind,
+      scale: 1,
+      alpha: 0,
+      rotation: 0,
+      ringScale: 1,
+      ringAlpha: 0,
+    })
+  );
   declare pool: ElementPool<HitmarkerNode>;
 
   constructor(parent: HTMLElement) {
@@ -87,11 +106,13 @@ export class Hitmarkers {
   /** @param {'hit'|'armour'|'head'|'kill'} kind */
   spawn(kind: HitmarkerKind = 'hit'): PoolRecord<HitmarkerNode> {
     const k = KINDS[kind] ?? KINDS.hit;
-    const it = this.pool.acquire();
+    const it = this.pool.acquire(this.present);
     it.life = k.life;
     it.a = k.s;
     it.b = k.ring;
     it.c = k.spin;
+    this.visuals[it.i].kind = kind in KINDS ? kind : 'hit';
+    if (!this.present) return it;
     it.node._main.setAttribute('stroke', k.c);
     it.node._main.setAttribute('stroke-width', String(k.w));
     it.node._ring.setAttribute('stroke', k.c);
@@ -107,7 +128,7 @@ export class Hitmarkers {
       it.t += dt;
       const u = it.t / it.life;
       if (u >= 1) {
-        this.pool.release(it);
+        this.pool.release(it, this.present);
         continue;
       }
       // snap in over the first 34% of life, then hold, then fall off
@@ -115,6 +136,14 @@ export class Hitmarkers {
       const scale = it.a * (0.62 + 0.38 * ease.outBack(inT));
       const alpha = u < 0.55 ? 1 : 1 - ease.inOutSine((u - 0.55) / 0.45);
       const rot = it.c * ease.outCubic(inT);
+      const visual = this.visuals[i];
+      visual.scale = scale;
+      visual.alpha = alpha;
+      visual.rotation = (rot * Math.PI) / 180;
+      const rt = clamp01(u / 0.6);
+      visual.ringScale = 0.55 + 1.15 * ease.outQuint(rt);
+      visual.ringAlpha = it.b * (1 - ease.outQuad(rt));
+      if (!this.present) continue;
       setStyle(
         it.node,
         'transform',
@@ -123,17 +152,14 @@ export class Hitmarkers {
       setStyle(it.node, 'opacity', alpha.toFixed(3));
 
       if (it.b > 0) {
-        const rt = clamp01(u / 0.6);
-        const rs = 0.55 + 1.15 * ease.outQuint(rt);
-        const ro = it.b * (1 - ease.outQuad(rt));
-        it.node._ring.setAttribute('transform', `scale(${rs.toFixed(3)})`);
-        setStyle(it.node._ring, 'opacity', ro.toFixed(3));
+        it.node._ring.setAttribute('transform', `scale(${visual.ringScale.toFixed(3)})`);
+        setStyle(it.node._ring, 'opacity', visual.ringAlpha.toFixed(3));
       }
     }
   }
 
   clear(): void {
-    this.pool.releaseAll();
+    this.pool.releaseAll(this.present);
   }
 
   dispose(): void {

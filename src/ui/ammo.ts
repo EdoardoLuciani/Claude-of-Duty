@@ -100,8 +100,42 @@ export function filledMagazinePips(
     : Math.max(1, Math.round((count / magSize) * Math.min(MAX_PIPS, magSize)));
 }
 
+export interface EquipmentSlot {
+  count: number;
+  active: boolean;
+  elapsed: number;
+  alpha: number;
+}
+
+function updateSlot(slot: EquipmentSlot, count: number, active: boolean, dt: number): void {
+  slot.elapsed = active ? (slot.active ? slot.elapsed + dt : 0) : 0;
+  slot.count = count;
+  slot.active = active;
+  if (!active) {
+    slot.alpha = count <= 0 ? 0.34 : 0.9;
+    return;
+  }
+  // The original CSS ease-in-out, 280ms each way, now shared by both presenters.
+  const cycle = slot.elapsed % 0.56;
+  const x = cycle < 0.28 ? cycle / 0.28 : (0.56 - cycle) / 0.28;
+  let t = x;
+  for (let i = 0; i < 6; i++) {
+    const bx = 1.26 * t - 0.78 * t * t + 0.52 * t * t * t;
+    const dx = 1.26 - 1.56 * t + 1.56 * t * t;
+    t = clamp01(t - (bx - x) / dx);
+  }
+  slot.alpha = 0.35 + 0.65 * (3 * t * t - 2 * t * t * t);
+}
+
 export class AmmoPanel {
   presentReadout = true;
+  presentEquipment = true;
+  readonly equipment: EquipmentSlot[] = Array.from({ length: 3 }, (): EquipmentSlot => ({
+    count: 0,
+    active: false,
+    elapsed: 0,
+    alpha: 0.34,
+  }));
   pixi: PixiAmmoHud | null = null;
   declare root: HTMLElement;
   declare equip: HTMLElement;
@@ -173,11 +207,14 @@ export class AmmoPanel {
    * @param {object} s { name, mode, ammo, reserve, magSize, reloading,
    *                     reloadProgress, lethal, lethalCount }
    */
-  update(dt: number, s: AmmoState): void {
+  update(dt: number, s: AmmoState, rawDt = dt): void {
     if (this.pixi) this.pixi.update(dt, s);
     else if (this.presentReadout) this._updateReadout(dt, s);
 
-    // Equipment remains native in both A/B modes, in its original HUD layer.
+    updateSlot(this.equipment[0], s.bandages ?? 0, !!s.healing, rawDt);
+    updateSlot(this.equipment[1], s.lethalCount ?? 0, !!s.cooking || !!s.grenadeEquipped, rawDt);
+    updateSlot(this.equipment[2], s.carpetCount ?? 0, !!s.radioEquipped, rawDt);
+    if (!this.presentEquipment) return;
     const bc = s.bandages ?? 0;
     setText(this.slotBn, bc);
     setClass(this.slotB, 'empty', bc <= 0);
@@ -190,6 +227,9 @@ export class AmmoPanel {
     setText(this.slotRn, cc);
     setClass(this.slotR, 'empty', cc <= 0);
     setClass(this.slotR, 'cooking', !!s.radioEquipped);
+    setStyle(this.slotB, 'opacity', this.equipment[0].alpha.toFixed(3));
+    setStyle(this.slotL, 'opacity', this.equipment[1].alpha.toFixed(3));
+    setStyle(this.slotR, 'opacity', this.equipment[2].alpha.toFixed(3));
   }
 
   private _updateReadout(dt: number, s: AmmoState): void {
