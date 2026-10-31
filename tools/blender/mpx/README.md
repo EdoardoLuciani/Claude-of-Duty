@@ -53,8 +53,10 @@ carry unchanged prepared helper curves; ten identity-rest child frame bones carr
 original static mesh-local TRS. Pose transforms, rather than vertex rebasing,
 assemble the skin. The two-level hierarchy preserves the exact subframe rotation
 of a translated mesh origin. Stock `export_rest_position_armature=False` exports
-these pose frames, while stock inverse binds use identity rest frames. The mesh
-still uses ordinary one-influence skinning; no GLB rewrite or exporter hook exists.
+these pose frames, while stock inverse binds use identity rest frames (with the
+exporter's fixed Blender/glTF axis conversion, not part-specific bind offsets).
+The mesh still uses ordinary one-influence skinning; no GLB rewrite or exporter
+hook exists.
 
 Preserve Blender's packed `custom_normal` attribute through separate/join under a
 temporary export-copy corner attribute and restore its exact encoding, not decoded
@@ -71,7 +73,11 @@ normal at rest, every surface vertex over ≥21 moving poses per clip, plus dens
 120 Hz samples. No new expected hash substitutes for that external reference.
 `smoke-mpx-skin.mjs` separately checks native/cooked actual vertices and normal
 transforms against the named controls, dense subframes, lockback/reset, moving caps,
-magazine ownership and gameplay/inspection bone-texture disposal.
+magazine ownership and gameplay/inspection bone-texture disposal. Independent
+Blender/source and runtime reviewers confirmed the fix; parent native-GPU captures
+and RGBA fallback passed without a normal waiver. Inspection regressions also cover
+actual helper/bone and weighted carrier rest positions when cloning lockback and
+mid-reload gameplay scenes.
 
 ## Approved repeatability limit
 
