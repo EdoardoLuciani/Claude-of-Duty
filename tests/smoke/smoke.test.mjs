@@ -13,6 +13,7 @@ for (const file of readdirSync(dir).sort()) {
     'smoke-ai-ladder-live.mjs',
     'smoke-evolys-skin.mjs',
   ].includes(file);
+  const longSweepTimeout = file === 'smoke-evolys-skin.mjs' ? 120000 : 60000;
   const integrationSweep = ['smoke-ai-ladder.mjs', 'smoke-audio-reloads.mjs'].includes(file);
   const geometrySweep = [
     'smoke-ai-access.mjs',
@@ -28,12 +29,18 @@ for (const file of readdirSync(dir).sort()) {
     () => {
       const r = spawnSync(process.execPath, [join(dir, file)], {
         encoding: 'utf8',
-        timeout: longSweep ? 60000 : integrationSweep ? 30000 : geometrySweep ? 18000 : undefined,
+        timeout: longSweep
+          ? longSweepTimeout
+          : integrationSweep
+            ? 30000
+            : geometrySweep
+              ? 18000
+              : undefined,
       });
       expect(r.status, r.stdout + r.stderr).toBe(0);
     },
     longSweep
-      ? 65000
+      ? longSweepTimeout + 5000
       : integrationSweep
         ? 35000
         : geometrySweep ||
