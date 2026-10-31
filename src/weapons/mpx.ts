@@ -229,9 +229,7 @@ export class MPXAnimation {
     this.actions = createAuthoredActions(this.mixer, model.animations);
     const node = (name: string): THREE.Object3D => requiredNode(this.root, name);
     this.bolt = node('bolt');
-    this.boltRest = this.bolt.position.clone();
     this.boltBone = node('MECH_bolt');
-    this.boltBoneRest = this.boltBone.position.clone();
     this.root.traverse((object): void => {
       if (isSkinnedMesh(object)) this.skeletons.add(object.skeleton);
     });
@@ -241,6 +239,10 @@ export class MPXAnimation {
     this.magazineBody = node('magazine_mesh');
     this.rounds = node('magazine_rounds');
     this.hands = discoverAuthoredHands(node);
+    // Inspection may clone a live reload/lockback pose, not the authored rest pose.
+    this._sample('Idle', 0);
+    this.boltRest = this.bolt.position.clone();
+    this.boltBoneRest = this.boltBone.position.clone();
     this.reset();
   }
 
