@@ -1,6 +1,6 @@
 """Build M4 source preview and runtime products from an empty scene.
 
-blender -b -t 8 --python-exit-code 1 --python tools/blender/m4a1.py -- --quick
+blender -b -t 2 --python-exit-code 1 --python tools/blender/m4a1.py -- --quick
 See tools/blender/m4/README.md. No previous weapon blend or GLB is an input.
 """
 import argparse

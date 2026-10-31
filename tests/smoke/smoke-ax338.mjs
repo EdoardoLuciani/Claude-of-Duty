@@ -6,11 +6,11 @@ import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 
 import manifest from '../../assets/weapons/ax338/manifest.json' with { type: 'json' };
-import { makeAX338Model, AX338Animation, AX338_URL } from '../../src/weapons/ax338.ts';
+import { makeAX338Model, AX338Animation } from '../../src/weapons/ax338.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import { Arm } from '../../src/weapons/hands.ts';
 import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
-const bytes = readFileSync(new URL(AX338_URL));
+const bytes = readFileSync(new URL('../../assets/weapons/ax338/ax338.glb', import.meta.url));
 const json = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)).toString());
 const primitives = json.nodes
   .filter((n) => n.mesh !== undefined)
@@ -64,7 +64,7 @@ gltf.scene.traverse((o) => {
 });
 assert.equal(
   rifleHash.digest('hex'),
-  'f5b16ba0fc55dc91e4c44c367c341454fa47b3b8117d9846ce6ccf715da16ba9',
+  '24426d0db4a7ac52c1544dda7250703affff09cf77010c2322e4c2de308e6227',
   'approved rifle mesh positions/UVs/transforms unchanged'
 );
 for (const clip of gltf.animations) {
@@ -98,7 +98,7 @@ gltf.scene.getObjectByName('optic').traverse((o) => {
 });
 assert.equal(
   opticHash.digest('hex'),
-  'c7d56f9a55b53d63f38eb4e73fe3a892dea13022ef2c78ae97bd7dc4741213c3',
+  'c54777affffaa6b9ef1655cc8536985ee5c56f2abfd2fc58fd3349b379cddd37',
   'approved PM II geometry/normals/UVs/indices unchanged'
 );
 const model = makeAX338Model(gltf),

@@ -277,9 +277,19 @@ purchase; selecting or inspecting a weapon never changes loadout or credits.
 
 `build/models.mjs` owns explicit gltfpack runtime-model cooking and per-model
 profiles (`npm run models:cook`). Normal builds consume committed `.runtime.glb`
-products; they do not run the encoder. P320 is the first opt-in profile; adding
-models requires adapter, animation and visual validation rather than blanket
-simplification. Native authoring exports remain unchanged.
+products; they do not run the encoder. All seven authored weapons opt in.
+Adding profiles requires adapter, animation and visual validation rather than
+blanket simplification. Editable Blender sources remain authoring references.
+M4/MCX adapters decode packed finish metadata in small weapon-local physical-node
+graphs; their consolidated GLBs require those adapters for material fidelity.
+M4, MPX and AX338 rigid assemblies use ordinary meshes; EVOLYS skins only its
+deforming belt. Keep static bodies out of mechanical skins merely to reduce
+primitive counts; preserve independent moving controls and magazine ownership.
+
+`src/weapons/asset-loader.ts` serializes compressed model loads to bound Basis
+worker/memory use and owns per-load decoder/error cleanup. Material conversion
+shares equivalent static map clones only when source, UV channel/transform,
+color space and sampler state match, avoiding duplicate WebGPU uploads for UV1.
 
 `tools/export-models.mjs` runs the same procedural builders offline with a fixed
 seed; runtime never builds meshes. Regenerate ALL procedural models, since

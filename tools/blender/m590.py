@@ -15,6 +15,8 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 from m590_actions import author_actions
 ROOT=Path(__file__).resolve().parents[2]
 from m590.export_actions import prepare_export_actions, validate_export
+from m590.skin import build_mechanical_skin
+from m590.finishes import consolidate_finishes
 
 def build(output, render=False, quick=False):
     OUT=output
@@ -381,8 +383,14 @@ def build(output, render=False, quick=False):
     for clone in list(export.objects):
         if clone.type!='MESH':continue
         active(clone)
-        for mod in list(clone.modifiers):bpy.ops.object.modifier_apply(modifier=mod.name)
+        for mod in list(clone.modifiers):
+            # Retain full editable radii above; two segments suffice for these
+            # sub-millimetre rubber/rib edges in the evaluated runtime copy.
+            if mod.type=='BEVEL' and clone.name.startswith(('Rubber buttpad','Forend grip rib')):
+                mod.segments=2
+            bpy.ops.object.modifier_apply(modifier=mod.name)
         surface_uv(clone)
+    consolidate_finishes(list(export.objects), rough, OUT)
     for parent in sorted({o.parent for o in export.objects if o.type=='MESH'},key=lambda o:o.name):
         group=[o for o in export.objects if o.type=='MESH' and o.parent==parent]
         active(group[0])
@@ -399,6 +407,7 @@ def build(output, render=False, quick=False):
     for source,clone in copies.items():
         if source.type=='EMPTY':source.name='SOURCE_'+source.name;clone.name=source.name.removeprefix('SOURCE_')
     prepare_export_actions(copies, clips)
+    build_mechanical_skin(export, [copies[o] for o in (body,forend,bolt,trigger)], clips)
     bpy.ops.object.select_all(action='DESELECT')
     for o in export.objects:o.select_set(True)
     bpy.context.view_layer.objects.active=copies[rig]
@@ -412,7 +421,7 @@ def build(output, render=False, quick=False):
     triangles=sum(j['accessors'][p['indices']]['count']//3 for n in j['nodes'] if 'mesh' in n for p in j['meshes'][n['mesh']]['primitives'])
     stats={'triangleInstances':triangles,'primitives':sum(len(m['primitives']) for m in j['meshes']),
            'materials':len(j['materials']),'images':len(j['images']),'bytes':len(raw)}
-    assert triangles<110000 and stats['primitives']<=40 and stats['materials']<=16 and stats['images']==3 and len(raw)<=10*1024*1024,stats
+    assert triangles<73000 and stats['primitives']==2 and stats['materials']==1 and stats['images']==3 and len(raw)<=12*1024*1024,stats
     pose('Idle')
     vertices=[C.inverted().to_4x4()@rig.matrix_world.inverted()@o.matrix_world@v.co for o in asset.objects if o.type=='MESH' and o.parent!=shell for v in o.data.vertices]
     bounds=[[min(v[i] for v in vertices) for i in range(3)],[max(v[i] for v in vertices) for i in range(3)]]
@@ -422,7 +431,7 @@ def build(output, render=False, quick=False):
         'units':'metres','blenderForward':'+Y','blenderUp':'+Z','runtimeBasis':'-Z forward / +Y up / +X right; no adapter basis transform',
         'source':'tools/blender/m590.py + tools/blender/m590/ + tools/blender/m590_actions.py + tools/m590-hand-reference.mjs','stats':stats,'clips':clips,
         'aliases':{'pump':'Pump','reloadTac':'Reload_Tactical','reloadEmpty':'Reload_Empty','inspect':'Inspect','draw':'Draw','holster':'Holster'},
-        'textures':{'resolution':1024,'packed':True,'embedded':True,'method':'original deterministic surface maps; no photographic inputs'},
+        'textures':{'resolution':1024,'packed':True,'embedded':True,'method':'UV0 original albedo/normal; UV1 padded scalar finish atlas; exact linear vertex colours; no photographic inputs'},
         'dimensions':{'sourceBounds':bounds,'caseLength':.07,'rimRadius':.01105,'barrelLength':BARREL,'exposedBarrelLength':-.194-muzzle_z,'overallLength':OAL,'lengthOfPull':LOP,'nominalBarrelInches':18.5,
                       'triggerFace':list(trigger_patch),'buttCenter':[0,butt_y,butt_z],'closedBreech':[0,.068,breech_z]},
         'reference':{'manufacturer':'O.F. Mossberg & Sons','model':'590A1 Tactical','sku':'50774','year':2016,'stock':'fixed black synthetic, no positions',

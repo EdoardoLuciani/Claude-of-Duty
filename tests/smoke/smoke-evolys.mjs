@@ -6,9 +6,11 @@ import * as THREE from 'three';
 
 import manifest from '../../assets/weapons/fn-evolys-762/manifest.json' with { type: 'json' };
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
-import { makeEvolysModel, EvolysAnimation, EVOLYS_URL } from '../../src/weapons/evolys.ts';
-import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
-const bytes = readFileSync(new URL(EVOLYS_URL));
+import { makeEvolysModel, EvolysAnimation } from '../../src/weapons/evolys.ts';
+import { parseGLB, inspectGLB } from '../../tools/lib/glb-fixture.mjs';
+const bytes = readFileSync(
+  new URL('../../assets/weapons/fn-evolys-762/fn-evolys-762.glb', import.meta.url)
+);
 const json = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)).toString());
 const primitives = json.nodes
   .filter((n) => n.mesh !== undefined)
@@ -33,23 +35,26 @@ for (const image of json.images) {
   assert.equal(bytes.readUInt32BE(offset + 16), 1024);
   assert.equal(bytes.readUInt32BE(offset + 20), 1024);
 }
+const { imagePNG } = inspectGLB(bytes);
 for (const mat of json.materials) {
   const p = mat.pbrMetallicRoughness;
   assert(
-    p.baseColorFactor && p.baseColorFactor.slice(0, 3).some((c) => c < 0.8),
-    `${mat.name}: authored colour, not uncoloured white`
-  );
-  assert(
     p.baseColorTexture && p.metallicRoughnessTexture && mat.normalTexture,
     `${mat.name}: original PBR detail`
+  );
+  const albedo = imagePNG(json.images[json.textures[p.baseColorTexture.index].source]);
+  assert(
+    p.baseColorFactor?.slice(0, 3).some((c) => c < 0.8) ||
+      albedo.data.some((value, i) => i % 4 !== 3 && value < 0.8 * 255),
+    `${mat.name}: authored colour, not uncoloured white`
   );
 }
 const beltNode = json.nodes.find((n) => n.name === 'belt_mesh');
 assert(beltNode.skin !== undefined, 'belt uses one exported native skin');
 assert.equal(
   json.meshes[beltNode.mesh].primitives.length,
-  3,
-  'brass/projectile/link batches, not per-round submissions'
+  1,
+  'atlas batches brass/projectile/link, not per-round submissions'
 );
 assert.equal(json.skins[beltNode.skin].joints.length, 8);
 assert(

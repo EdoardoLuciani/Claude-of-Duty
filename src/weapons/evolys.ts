@@ -1,9 +1,11 @@
 import * as THREE from 'three';
-import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { Renderer } from 'three/webgpu';
 
 import handReference from '../../assets/weapons/fn-evolys-762/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/fn-evolys-762/manifest.json' with { type: 'json' };
 import { hasOwn } from '../core/guards.ts';
+import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
 import {
@@ -18,7 +20,7 @@ import { authoredModel, requiredNode } from './authored-model.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 
 export const EVOLYS_URL = new URL(
-  '../../assets/weapons/fn-evolys-762/fn-evolys-762.glb',
+  '../../assets/weapons/fn-evolys-762/fn-evolys-762.runtime.glb',
   import.meta.url
 ).href;
 const ALIASES: Record<string, string> = {
@@ -33,6 +35,17 @@ const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
 export function makeEvolysModel(gltf: GLTF): EvolysModel {
   const scene = gltf.scene;
   const { root, animations, point } = authoredModel(gltf, 'EVOLYS_RIG', REQUIRED, scene);
+  // gltfpack retains constant channels but reduces their keys to t=0. Idle is
+  // entirely constant, so recover its authored duration from the weapon source.
+  for (const clip of animations) {
+    if (
+      clip.name === 'Idle' &&
+      clip.duration === 0 &&
+      clip.tracks.length > 0 &&
+      clip.tracks.every((track): boolean => track.times.length === 1 && track.times[0] === 0)
+    )
+      clip.duration = Math.fround(manifest.clips.Idle.duration);
+  }
   const sight = point('SOCKET_sight');
   const model = {
     id: 'lmg' as const,
@@ -81,8 +94,8 @@ export function makeEvolysModel(gltf: GLTF): EvolysModel {
   return { ...model, ...converted };
 }
 
-export async function loadEvolys(): Promise<EvolysModel> {
-  return makeEvolysModel(await new GLTFLoader().loadAsync(EVOLYS_URL));
+export async function loadEvolys(renderer: Pick<Renderer, 'hasFeature'>): Promise<EvolysModel> {
+  return makeEvolysModel(await loadWeaponGLTF(renderer, EVOLYS_URL));
 }
 
 /** Native Blender mechanism/belt/hand tracks, under shared ADS/sway/recoil.
@@ -241,6 +254,11 @@ export class EvolysAnimation {
   dispose(): void {
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.root);
+    const skeletons = new Set<THREE.Skeleton>();
+    this.root.traverse((node): void => {
+      if (node instanceof THREE.SkinnedMesh) skeletons.add(node.skeleton);
+    });
+    for (const skeleton of skeletons) skeleton.dispose();
     disposeWeaponMaterials(this.model);
   }
 }

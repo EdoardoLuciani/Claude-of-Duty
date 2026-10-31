@@ -18,6 +18,7 @@ INPUT=ROOT/'assets/weapons/ax338'
 sys.path.insert(0,str(Path(__file__).parent))
 from ax338_actions import author_actions
 from ax338.export import prepare_export_actions, validate_export
+from ax338.finishes import consolidate_finishes
 
 
 def build(output,render=False,quick=False):
@@ -401,6 +402,7 @@ def build(output,render=False,quick=False):
         points=[C.inverted()@(inverse@(o.matrix_world@v.co)) for v in o.data.vertices]
         contact_boxes.append({'part':o.name,'min':[round(min(p[i] for p in points),8) for i in range(3)],'max':[round(max(p[i] for p in points),8) for i in range(3)]})
     # Consolidation operates after source save and only on runtime geometry.
+    consolidate_finishes(asset,rough,albedo,normal,OUT)
     for parent in (body,hg,stock,optic,bolt,trigger,mag,spare,mag_rounds,spare_rounds):
         objects=[o for o in list(asset.objects) if o.type=='MESH' and o.parent==parent]
         if not objects:continue
@@ -410,6 +412,8 @@ def build(output,render=False,quick=False):
         for o in objects:o.select_set(True)
         bpy.ops.object.join();o=bpy.context.object;o.name=parent.name+'_mesh'
     prepare_export_actions([rig,bolt,trigger,mag,spare]+controls,clips)
+    # Retain ordinary per-parent meshes: only bolt/trigger move independently.
+    # The optic keeps its true transparent lens material; magazines stay independent.
     bpy.ops.object.select_all(action='DESELECT')
     for o in asset.objects:o.select_set(True)
     bpy.context.view_layer.objects.active=rig
@@ -417,9 +421,9 @@ def build(output,render=False,quick=False):
     stats=validate_export(OUT/'ax338.glb',clips)
     manifest={'asset':'Early AX338 / Dark Earth / factory brake / PM II LP 5-25x56 / no bipod','units':'metres','clips':clips,'stats':stats,'textureResolution':1024,'contactGeometry':{'magazine':contact_boxes,'pistolGripSections':grip_sections},'dimensions':{'barrel':.6858,'overall':1.250,'barrelFace':breech,'barrelCrown':crown,'muzzle':muzzle,'butt':butt,'scopeLength':.417,'scopeTubeDiameter':.034,'magazineBodyHeight':.105,'magazineDepth':.104,'magazineThickness':.034,'magazineHeight':.1125},'source':'tools/blender/ax338.py + tools/blender/ax338_actions.py + tools/blender/ax338/export.py; calibration stage: tools/ax338-hand-reference.mjs'}
     (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
-    assert stats['triangles']<150000 and stats['primitives']<=48 and stats['materials']<=18 and stats['images']==3 and stats['bytes']<=15*1024*1024,stats
+    assert stats['triangles']<150000 and stats['primitives']==11 and stats['materials']==2 and stats['images']==3 and stats['bytes']<=15*1024*1024,stats
     print('AX338 export:',json.dumps(stats))
-    for name in ('ax338_surface.png','ax338_roughness.png','ax338_normal.png'):(OUT/name).unlink(missing_ok=True)
+    for name in ('ax338_surface.png','ax338_roughness.png','ax338_normal.png','ax338_finishes.png'):(OUT/name).unlink(missing_ok=True)
 
 
 def main():

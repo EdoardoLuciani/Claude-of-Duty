@@ -106,10 +106,13 @@ function check(label) {
     inv.copy(parent.matrixWorld).invert();
     box.makeEmpty();
     parent.traverse((m) => {
-      if (!m.isMesh || (!m.material.name.startsWith('06') && !m.material.name.startsWith('02')))
-        return;
+      if (!m.isMesh) return;
+      const finish = m.geometry.attributes.uv1;
       transform.multiplyMatrices(inv, m.matrixWorld);
       for (const index of m.geometry.index.array) {
+        const tile =
+          Math.floor(finish.getX(index) * 4) + 4 * Math.floor((1 - finish.getY(index)) * 4);
+        if (tile !== 1 && tile !== 5) continue;
         point.fromBufferAttribute(m.geometry.attributes.position, index).applyMatrix4(transform);
         box.expandByPoint(point);
       }

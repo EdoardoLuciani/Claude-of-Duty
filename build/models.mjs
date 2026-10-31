@@ -41,6 +41,42 @@ export const GLTFPACK_FLAGS = [
 // Opt assets in here after validating their adapters and visual/animation fidelity.
 // Simplification is model-specific, never a blanket default for all models.
 export const MODEL_COOKS = {
+  m590: {
+    directory: 'assets/weapons/m590',
+    source: 'm590.glb',
+    output: 'm590.runtime.glb',
+    flags: ['-si', '0.50', '-se', '0.0002', '-sp', '-vc', '16'],
+  },
+  m4: {
+    directory: 'assets/weapons/m4a1-block-ii',
+    source: 'm4a1-block-ii.glb',
+    output: 'm4a1-block-ii.runtime.glb',
+    flags: ['-noq', '-vc', '16', '-kv'],
+  },
+  mcx: {
+    directory: 'assets/weapons/mcx-virtus',
+    source: 'mcx-virtus.glb',
+    output: 'mcx-virtus.runtime.glb',
+    flags: ['-si', '0.65', '-se', '0.0002', '-sp', '-vc', '16'],
+  },
+  evolys: {
+    directory: 'assets/weapons/fn-evolys-762',
+    source: 'fn-evolys-762.glb',
+    output: 'fn-evolys-762.runtime.glb',
+    flags: [],
+  },
+  ax338: {
+    directory: 'assets/weapons/ax338',
+    source: 'ax338.glb',
+    output: 'ax338.runtime.glb',
+    flags: ['-vc', '16', '-vp', '16'],
+  },
+  mpx: {
+    directory: 'assets/weapons/sig-mpx',
+    source: 'mpx.glb',
+    output: 'mpx.runtime.glb',
+    flags: ['-km', '-vc', '16', '-si', '0.7', '-se', '0.0002', '-sp'],
+  },
   exps3: {
     directory: 'assets/attachments/eotech-exps3-0',
     source: 'exps3-0.glb',
