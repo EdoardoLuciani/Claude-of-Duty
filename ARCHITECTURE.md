@@ -265,6 +265,17 @@ Bakes use native top-left texture UVs and shared `QuadMesh` geometry: no extra Y
 flip or disposal of borrowed geometry. Gameplay readback uses its explicit
 display-transform path. First-person refraction uses world coordinates.
 
+## Experimental UI
+
+`?pixi=1` dynamically loads `src/ui/pixi-experiment.ts` into the existing pause
+layout; the default UI does not load Pixi. It uses a separate demand-rendered,
+display-resolution WebGPU canvas with the game's borrowed GPUDevice, not Three's
+renderer or world textures. UI owns Pixi resources and restores its restricted
+DOM adapter at teardown; it must never destroy the borrowed device. Native menus
+and controls remain available, including if the optional trial fails to initialize.
+See [measurements and limitations](docs/experiments/pixi-ui.md). This is not a
+production UI migration or a general-purpose UI abstraction.
+
 ## Models
 
 `weapons.createInspectionModel(id)` returns an independent rest-pose scene and

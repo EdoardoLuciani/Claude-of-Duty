@@ -16,6 +16,7 @@ import { WorldMarkers } from './markers.ts';
 import { MarketOverlay, MarketCountdown } from './market.ts';
 import { PauseMenu } from './menu.ts';
 import { Minimap } from './minimap.ts';
+import type { PixiUiExperiment } from './pixi-experiment.ts';
 import { Prompt, Banner } from './prompts.ts';
 import { RadioPanel } from './radio.ts';
 import { StartGate } from './start.ts';
@@ -160,6 +161,7 @@ export class UiSystem {
   banner!: Banner;
   menu!: PauseMenu;
   startGate: StartGate | null = null;
+  pixiExperiment: PixiUiExperiment | null = null;
   gameOver!: GameOverScreen;
   shop!: MarketOverlay;
   marketCountdown!: MarketCountdown;
@@ -385,7 +387,10 @@ export class UiSystem {
       this.sfx('objective', 0.7);
     });
 
-    on('engine:error', (): void => this.shop.hide());
+    on('engine:error', (): void => {
+      this.shop.hide();
+      this.pixiExperiment?.root.setAttribute('inert', '');
+    });
     on('market:open', (e): void => {
       this.shop.show(e?.wave ?? 0);
       this.sfx('market_open', 0.85);
@@ -488,6 +493,27 @@ export class UiSystem {
     });
 
     this.resize(ctx.canvas.clientWidth || innerWidth, ctx.canvas.clientHeight || innerHeight, ctx);
+    if (new URLSearchParams(location.search).get('pixi') === '1') {
+      const layout = this.menu.root.querySelector<HTMLElement>('.ow-menu-layout');
+      const controls = this.menu.root.querySelector<HTMLElement>('.ow-controls');
+      if (layout && controls) {
+        try {
+          const { PixiUiExperiment } = await import('./pixi-experiment.ts');
+          this.pixiExperiment = await PixiUiExperiment.create(layout, ctx.get('render').renderer);
+          controls.before(this.pixiExperiment.root);
+          controls.style.gridColumn = '1 / -1';
+        } catch (error) {
+          const status = el(
+            'p',
+            null,
+            layout,
+            'Pixi experiment unavailable; native settings still work.'
+          );
+          status.setAttribute('role', 'status');
+          console.warn('[ui] Pixi experiment unavailable', error);
+        }
+      }
+    }
   }
 
   /* ------------------------------------------------------------- helpers -- */
@@ -634,6 +660,7 @@ export class UiSystem {
     // The native Start dialog exclusively owns waiting input/presentation.
     // Resume happens between frames; reveal only after normal active pose hooks.
     if (this.startGate && !this.startGate.afterPose()) {
+      this.pixiExperiment?.update(false, 0);
       this._hadPointerLock = false;
       return;
     }
@@ -658,6 +685,7 @@ export class UiSystem {
       }
     }
     this.menu.update(rawDt);
+    this.pixiExperiment?.update(this.menu.open && !ctx.engine.error, rawDt);
     this.gameOver.update(rawDt);
     this.shop.update(rawDt);
 
@@ -853,10 +881,13 @@ export class UiSystem {
     this.crosshair.setScale(this.k);
     this.compass.setScale(this.k);
     this.minimap.resize(this.k);
+    this.pixiExperiment?.resize();
   }
 
   dispose(): void {
     this.startGate?.dispose();
+    this.pixiExperiment?.dispose();
+    this.pixiExperiment = null;
     for (const off of this._unsubs) off();
     this._unsubs.length = 0;
     this.crosshair.dispose();
