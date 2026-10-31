@@ -70,8 +70,8 @@ def consolidate_finishes(objects, output, orm, normal):
     orm_atlas = image('mpx-finish-orm', packed_orm)
     normal_atlas = image('mpx-finish-normal', packed_normal)
     materials = {}
-    for category, source in [('opaque', sources[0]), ('lens', sources[10]),
-                             ('cover', sources[11]), ('interior', sources[14])]:
+    for category, source in [('opaque', sources[0]), ('optical', sources[10]),
+                             ('interior', sources[14])]:
         result = source.copy()
         result.name = 'MPX | consolidated opaque finishes' if category == 'opaque' else source.name
         nodes, links = result.node_tree.nodes, result.node_tree.links
@@ -89,8 +89,8 @@ def consolidate_finishes(objects, output, orm, normal):
                 node.inputs[1].default_value = 1
             elif node.type == 'NORMAL_MAP':
                 node.inputs['Strength'].default_value = 1
-        # A dedicated ORM UV is shared by roughness and metalness. Optical and
-        # absorptive materials remain separate for their runtime pass policies.
+        # UV1 also identifies lens/cap coating for the runtime physical nodes.
+        # Absorptive interiors retain their exact independent environment policy.
         sep = next(n for n in nodes if n.type == 'SEPARATE_COLOR')
         links.new(sep.outputs['Blue'], p.inputs['Metallic'])
         materials[category] = result
@@ -110,7 +110,7 @@ def consolidate_finishes(objects, output, orm, normal):
             source = finishes[face.index]
             assert source is not None, (obj.name, face.index, 'unassigned finish')
             index = sources.index(source)
-            category = 'lens' if index == 10 else 'cover' if index == 11 else 'interior' if index == 14 else 'opaque'
+            category = 'optical' if index in (10, 11) else 'interior' if index == 14 else 'opaque'
             face.material_index = list(materials).index(category)
             for loop in face.loop_indices:
                 uv = uv0.data[loop].uv

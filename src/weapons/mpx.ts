@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { uv } from 'three/tsl';
 import type { Renderer } from 'three/webgpu';
 
 import handReference from '../../assets/weapons/sig-mpx/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: 'json' };
-import { isMesh } from '../core/three-guards.ts';
+import { isMesh, isSkinnedMesh } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
@@ -37,7 +38,10 @@ export function makeMPXModel(gltf: GLTF): MPXModel {
   // the full native hierarchy and curves once; no extra runtime orientation rig.
   const basis = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
   const inverse = basis.clone().invert(),
-    geometries = new Set<THREE.BufferGeometry>();
+    geometries = new Set<THREE.BufferGeometry>(),
+    skeletons = new Set<THREE.Skeleton>(),
+    basisMatrix = new THREE.Matrix4().makeRotationFromQuaternion(basis),
+    inverseBasisMatrix = basisMatrix.clone().invert();
   scene.traverse((o): void => {
     o.position.applyQuaternion(basis);
     o.quaternion.premultiply(basis).multiply(inverse);
@@ -49,6 +53,16 @@ export function makeMPXModel(gltf: GLTF): MPXModel {
       if (!geometries.has(mesh.geometry)) {
         mesh.geometry.applyQuaternion(basis);
         geometries.add(mesh.geometry);
+      }
+    }
+    if (isSkinnedMesh(o)) {
+      // Geometry, joint transforms and inverse binds must change basis together.
+      o.bindMatrix.premultiply(basisMatrix).multiply(inverseBasisMatrix);
+      o.bindMatrixInverse.copy(o.bindMatrix).invert();
+      if (!skeletons.has(o.skeleton)) {
+        for (const matrix of o.skeleton.boneInverses)
+          matrix.premultiply(basisMatrix).multiply(inverseBasisMatrix);
+        skeletons.add(o.skeleton);
       }
     }
     o.updateMatrix();
@@ -69,6 +83,11 @@ export function makeMPXModel(gltf: GLTF): MPXModel {
         }
       }
     }
+  scene.updateMatrixWorld(true);
+  // Static open-cap joints have no clip tracks. Keep the named pivot as their
+  // runtime owner so independently moving a cap moves its frame and sheet.
+  for (const tag of ['front', 'rear'])
+    requiredNode(scene, `lens_cap_${tag}`).attach(requiredNode(scene, `MECH_lens_cap_${tag}`));
   const { root, animations, point } = authoredModel(gltf, 'MPX_RIG', REQUIRED, scene);
   const idle = animations.find((clip): boolean => clip.name === 'Idle');
   // gltfpack deduplicates the wholly constant Idle to t=0. glTF has no
@@ -117,7 +136,12 @@ export function makeMPXModel(gltf: GLTF): MPXModel {
       // faint coating per optical sheet, not a foggy stack of solid discs or
       // transmission sampling a viewmodel-only render target.
       material.transparent = true;
-      material.opacity = source.name.startsWith('11 |') ? 0.02 : 0.01;
+      // The padded UV1 tile is constant in role across each sheet. Keep exact
+      // alpha/coating factors without another map or interpolated vertex alpha.
+      const cover = uv(1).x.greaterThanEqual(0.75);
+      material.opacity = 1;
+      material.opacityNode = cover.select(0.01, 0.02);
+      material.clearcoatNode = cover.select(0, 0.25);
       material.depthWrite = false;
       material.side = THREE.DoubleSide;
       material.forceSinglePass = true;
@@ -185,6 +209,9 @@ export class MPXAnimation {
   actions!: Record<string, THREE.AnimationAction>;
   bolt!: THREE.Object3D;
   boltRest!: THREE.Vector3;
+  boltBone!: THREE.Object3D;
+  boltBoneRest!: THREE.Vector3;
+  skeletons = new Set<THREE.Skeleton>();
   poseMatrix!: THREE.Matrix4;
   magazine!: THREE.Object3D;
   spare!: THREE.Object3D;
@@ -203,6 +230,11 @@ export class MPXAnimation {
     const node = (name: string): THREE.Object3D => requiredNode(this.root, name);
     this.bolt = node('bolt');
     this.boltRest = this.bolt.position.clone();
+    this.boltBone = node('MECH_bolt');
+    this.boltBoneRest = this.boltBone.position.clone();
+    this.root.traverse((object): void => {
+      if (isSkinnedMesh(object)) this.skeletons.add(object.skeleton);
+    });
     this.poseMatrix = this.root.matrix;
     this.magazine = node('magazine');
     this.spare = node('magazine_spare');
@@ -230,6 +262,10 @@ export class MPXAnimation {
   reset(): void {
     this.fireTime = Infinity;
     this._sample('Idle', 0);
+    // Mixer caches cannot observe our out-of-band lockback override.
+    this.bolt.position.copy(this.boltRest);
+    this.boltBone.position.copy(this.boltBoneRest);
+    this.root.updateMatrixWorld(true);
   }
 
   update(
@@ -250,6 +286,8 @@ export class MPXAnimation {
     if (empty && gesture !== 'Reload_Empty' && this.fireTime >= MPX_EJECT_DELAY) {
       this.bolt.position.copy(this.boltRest);
       this.bolt.position.z += 0.038;
+      this.boltBone.position.copy(this.boltBoneRest);
+      this.boltBone.position.z += 0.038;
     }
     this.rounds.visible = magazineLoaded && this.rounds.scale.x > 0.5;
     this.root.updateMatrixWorld(true);
@@ -267,6 +305,8 @@ export class MPXAnimation {
   dispose(): void {
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.root);
+    for (const skeleton of this.skeletons) skeleton.dispose();
+    this.skeletons.clear();
     disposeWeaponMaterials(this.model);
   }
 }

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 
 import * as THREE from 'three';
 
-import { inspectGLB } from '../../tools/lib/glb-fixture.mjs';
+import { inspectGLB, parseGLB } from '../../tools/lib/glb-fixture.mjs';
 
 const dir = new URL('../../assets/weapons/sig-mpx/', import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', dir), 'utf8'));
@@ -28,17 +28,22 @@ assert.ok(
 );
 assert.equal(manifest.textures.resolution, 1024);
 assert.ok(manifest.textures.packed && manifest.textures.embedded);
+// Rigid skin attributes and preserved split-normal fans add native-only storage.
 assert.ok(file.length <= 10 * 1024 * 1024);
 const usesDefaultMaterial = gltf.meshes.some((m) =>
   m.primitives.some((p) => p.material === undefined)
 );
 assert.equal(
   gltf.materials.length + Number(usesDefaultMaterial),
-  4,
+  3,
   'include the implicit glTF fallback in the runtime material budget'
 );
 const primitives = gltf.meshes.reduce((n, mesh) => n + mesh.primitives.length, 0);
-assert.ok(primitives <= 18, 'consolidated opaque sections remain independent only by rigid parent');
+assert.equal(
+  primitives,
+  9,
+  'one mechanical skin, four magazine/round draws, three sorted optical sheets and interior'
+);
 assert.equal(primitives, manifest.stats.primitives);
 assert.equal(gltf.materials.length, manifest.stats.materials);
 assert.equal(file.length, manifest.stats.bytes);
@@ -163,8 +168,7 @@ for (const mesh of gltf.meshes) {
             (Math.floor(finish / 4) * 256 + 4 + (1 - uv0[vertex * 2 + 1]) * 248) / 1024
         ) < 1e-6
       );
-      const expected =
-        finish === 10 ? '11 |' : finish === 11 ? '12 |' : finish === 14 ? '15 |' : 'MPX |';
+      const expected = finish === 10 || finish === 11 ? '11 |' : finish === 14 ? '15 |' : 'MPX |';
       assert.ok(
         name.startsWith(expected),
         'optical and absorptive finishes keep independent pass policies'
@@ -228,25 +232,13 @@ assert.ok(
   'source-level rim/dot reduction, not only encoder simplification'
 );
 
-const nodes = gltf.nodes.map((n) => {
-  const object = new THREE.Object3D();
-  object.name = n.name;
-  if (n.matrix) {
-    object.matrix.fromArray(n.matrix);
-    object.matrix.decompose(object.position, object.quaternion, object.scale);
-  } else {
-    if (n.translation) object.position.fromArray(n.translation);
-    if (n.rotation) object.quaternion.fromArray(n.rotation);
-    if (n.scale) object.scale.fromArray(n.scale);
-  }
-  return object;
-});
-for (let i = 0; i < nodes.length; i++) {
-  for (const child of gltf.nodes[i].children ?? []) nodes[i].add(nodes[child]);
-}
-const root = new THREE.Group();
-for (const i of gltf.scenes[gltf.scene ?? 0].nodes) root.add(nodes[i]);
+const root = (await parseGLB(file)).scene;
 root.updateMatrixWorld(true);
+const nodes = gltf.nodes.map((node) => root.getObjectByName(node.name));
+const surface = root.getObjectByName('MPX_surface');
+assert.ok(surface.isSkinnedMesh);
+assert.equal(surface.geometry.groups.length, 0, 'one real primitive, not disguised groups');
+assert.equal(surface.skeleton.bones.length, 20);
 for (const name of [
   'MPX_RIG',
   'receiver',
@@ -287,19 +279,34 @@ for (const [tag, side] of [
     `${tag} cover pivot must mount to the optic, not float below it`
   );
 }
-function meshBounds(name) {
-  const nodeIndex = gltf.nodes.findIndex((n) => n.name === name);
-  assert.ok(nodeIndex >= 0, name);
-  const object = nodes[nodeIndex];
-  const result = new THREE.Box3();
-  const p = new THREE.Vector3();
-  for (const primitive of gltf.meshes[gltf.nodes[nodeIndex].mesh].primitives) {
-    const positions = accessor(primitive.attributes.POSITION);
-    for (let i = 0; i < positions.length; i += 3) {
-      p.fromArray(positions, i).applyMatrix4(object.matrixWorld);
-      result.expandByPoint(p);
+// Read the actual weighted surface for former rigid parts, never empty helpers.
+function partVertices(name, visit) {
+  const helper = root.getObjectByName(name.replace(/_mesh$/, ''));
+  const direct = root.getObjectByName(name);
+  if (direct?.isMesh) {
+    const p = new THREE.Vector3();
+    for (let i = 0; i < direct.geometry.attributes.position.count; i++) {
+      direct.getVertexPosition(i, p);
+      visit(p.applyMatrix4(direct.matrixWorld));
     }
+    return;
   }
+  assert.ok(helper, name);
+  const joint = surface.skeleton.bones.findIndex((bone) => bone.name === 'FRAME_' + helper.name);
+  assert.ok(joint >= 0, name);
+  const p = new THREE.Vector3();
+  let count = 0;
+  for (let i = 0; i < surface.geometry.attributes.position.count; i++) {
+    if (surface.geometry.attributes.skinIndex.getX(i) !== joint) continue;
+    surface.getVertexPosition(i, p);
+    visit(p.applyMatrix4(surface.matrixWorld));
+    count++;
+  }
+  assert.ok(count > 0, `${name}: actual weighted geometry exists`);
+}
+function meshBounds(name) {
+  const result = new THREE.Box3();
+  partVertices(name, (p) => result.expandByPoint(p));
   return result;
 }
 const closedBounds = new THREE.Box3(),
@@ -307,24 +314,21 @@ const closedBounds = new THREE.Box3(),
   vertex = new THREE.Vector3();
 for (const tag of ['rear', 'front']) {
   const pivot = root.getObjectByName(`lens_cap_${tag}`);
-  const object = root.getObjectByName(`lens_cap_${tag}_mesh`);
   const closed = pivot.parent.matrixWorld
     .clone()
     .multiply(new THREE.Matrix4().compose(pivot.position, new THREE.Quaternion(), pivot.scale))
-    .multiply(object.matrix);
-  const index = gltf.nodes.findIndex((n) => n.name === object.name);
-  for (const primitive of gltf.meshes[gltf.nodes[index].mesh].primitives) {
-    const positions = accessor(primitive.attributes.POSITION);
-    for (let i = 0; i < positions.length; i += 3)
-      closedBounds.expandByPoint(vertex.fromArray(positions, i).applyMatrix4(closed));
-  }
+    .multiply(pivot.matrixWorld.clone().invert());
+  partVertices(`lens_cap_${tag}_mesh`, (p) => closedBounds.expandByPoint(p.applyMatrix4(closed)));
+  partVertices(`lens_cap_${tag}_optical`, (p) =>
+    closedBounds.expandByPoint(p.applyMatrix4(closed))
+  );
 }
 assert.ok(
   Math.abs(closedBounds.max.x - closedBounds.min.x - 0.0855) < 1e-6,
   `85.5mm includes closed covers, not only the tube: ${closedBounds.max.x - closedBounds.min.x}`
 );
 for (let n = 0; n < gltf.nodes.length; n++) {
-  if (gltf.nodes[n].mesh === undefined) continue;
+  if (gltf.nodes[n].name !== 'receiver_optical') continue;
   for (const primitive of gltf.meshes[gltf.nodes[n].mesh].primitives) {
     if (!gltf.materials[primitive.material]?.name.startsWith('11 |')) continue;
     const positions = accessor(primitive.attributes.POSITION);
@@ -343,7 +347,7 @@ assert.ok(
 // The cap is merged into receiver_mesh. Select its alloy perimeter by the
 // unchanged centre/radius; exclude the smaller neck and steel face knurls.
 const capBounds = new THREE.Box3();
-const receiverIndex = gltf.nodes.findIndex((n) => n.name === 'receiver_mesh');
+const receiverIndex = gltf.nodes.findIndex((n) => n.name === 'MPX_surface');
 for (const primitive of gltf.meshes[gltf.nodes[receiverIndex].mesh].primitives) {
   if (gltf.materials[primitive.material]?.name !== 'MPX | consolidated opaque finishes') continue;
   const positions = accessor(primitive.attributes.POSITION);
@@ -392,13 +396,33 @@ assert.equal(manifest.dimensions.suppressorEnvelope[1], 0.035);
 const runtimeFile = readFileSync(new URL('mpx.runtime.glb', dir));
 const { json: runtime } = inspectGLB(runtimeFile);
 assert.ok(
+  runtimeFile.length < 2.7 * 1024 * 1024,
+  'bounded cooked delivery size, independent of native skin storage'
+);
+const vertexViews = new Set(
+  runtime.meshes.flatMap((mesh) =>
+    mesh.primitives.flatMap((primitive) =>
+      Object.values(primitive.attributes).map((index) => runtime.accessors[index].bufferView)
+    )
+  )
+);
+assert.ok(
+  [...vertexViews].reduce((bytes, index) => bytes + runtime.bufferViews[index].byteLength, 0) <
+    4.1 * 1024 * 1024,
+  'decoded vertex buffer-view budget includes rigid skin attributes'
+);
+assert.ok(
   runtimeFile.length < file.length / 3,
   'cooked delivery savings, independent of native source compression'
 );
-assert.equal(runtime.materials.length, 4, '-km retains the absorptive interior runtime policy');
+assert.equal(
+  runtime.materials.length,
+  3,
+  '-km retains the exact absorptive interior runtime policy'
+);
 assert.equal(
   runtime.meshes.reduce((sum, mesh) => sum + mesh.primitives.length, 0),
-  18
+  9
 );
 assert.equal(runtime.images.length, 3);
 assert.ok(
