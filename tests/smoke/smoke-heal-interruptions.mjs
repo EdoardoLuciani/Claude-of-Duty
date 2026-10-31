@@ -111,7 +111,6 @@ for (const ending of ['release', 'complete', 'grenade'])
     ui.hudTarget = ui.hudVisible = 1;
     ui._blipCount = 0;
     ui._blipView = [];
-    ui._objectives = [];
     ui._weaponState = () => null;
     ui._playerState = () => ({
       health: player.health.value,
@@ -129,7 +128,7 @@ for (const ending of ['release', 'complete', 'grenade'])
       airborne: false,
     });
     ui._playerPos = () => ({ x: 0, z: 0 });
-    ui._collectBlips = ui._buildCompassObjectives = noop;
+    ui._collectBlips = noop;
     for (const name of [
       'menu',
       'gameOver',
@@ -147,9 +146,7 @@ for (const ending of ['release', 'complete', 'grenade'])
       'compass',
     ])
       ui[name] = { update: noop };
-    for (const name of ['chromeLayer', 'worldLayer', 'centreLayer'])
-      ui[name] = { style: { setProperty: noop } };
-    ui.markers = { updateObjectives: noop, updateGrenades: noop };
+    for (const name of ['chromeLayer', 'centreLayer']) ui[name] = { style: { setProperty: noop } };
     ui.minimap = { bakeDone: true, draw: noop };
     ui.prompt = {
       value: null,

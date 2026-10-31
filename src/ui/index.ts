@@ -12,7 +12,6 @@ import { GameOverScreen } from './gameover.ts';
 import { HealthFx } from './health.ts';
 import { Hitmarkers } from './hitmarkers.ts';
 import { Killfeed } from './killfeed.ts';
-import { WorldMarkers } from './markers.ts';
 import { MarketOverlay, MarketCountdown } from './market.ts';
 import { PauseMenu } from './menu.ts';
 import { Minimap } from './minimap.ts';
@@ -46,7 +45,6 @@ const HEAL_KEY = bindingLabel('heal');
  *   ui.killfeed.push({attacker,victim,headshot,mine,attackerFriendly})
  *   ui.banner.show(title, sub, life)    kill / objective confirmation
  *   ui.setPrompt({key,text,sub,progress}, owner?) / ui.clearPrompt(owner?)
- *   ui.spawnGrenade(worldPos, fuse)
  *   ui.setHudVisible(bool)              hide everything (cinematics)
  *   ui.pause() / ui.resume() / ui.menu.toggle()
  *   ui.debugState('market')
@@ -112,26 +110,12 @@ interface Blip {
   heading: number;
   fade?: number;
 }
-interface CompassMarker {
-  bearing: number;
-  label: string;
-  color: string | undefined;
-}
-interface HudObjective {
-  position: THREE.Vector3;
-  label: string;
-  name?: string;
-  color?: string;
-  _mm?: { x: number; z: number; label: string };
-  _cmp?: CompassMarker;
-}
 interface MinimapFrame {
   x: number;
   z: number;
   heading: number;
   fov: number;
   blips: Blip[] | null;
-  objectives: { x: number; z: number; label: string }[] | null;
   pulses?: { x: number; z: number; y?: number; radius?: number }[] | null;
   pulseTime?: number;
   playerY?: number;
@@ -145,11 +129,9 @@ export class UiSystem {
   rng!: import('../core/rng.ts').Rng;
   root!: HTMLElement;
   hurtLayer!: HTMLElement;
-  worldLayer!: HTMLElement;
   centreLayer!: HTMLElement;
   chromeLayer!: HTMLElement;
   health!: HealthFx;
-  markers!: WorldMarkers;
   arcs!: DamageArcs;
   crosshair!: Crosshair;
   hit!: Hitmarkers;
@@ -184,13 +166,10 @@ export class UiSystem {
   _bakeFrame!: number;
   _pos!: THREE.Vector3;
   _tmp!: THREE.Vector3;
-  _objectives!: HudObjective[];
-  _compassObjs!: CompassMarker[];
   _blips!: Blip[];
   _blipCount!: number;
   _blipView!: Blip[];
   _mmState?: MinimapFrame;
-  _mmObjs?: { x: number; z: number; label: string }[];
   _promptOwner?: unknown;
   _unsubs!: (() => void)[];
 
@@ -204,12 +183,10 @@ export class UiSystem {
 
     // Stacking order: hurt overlays sit under the HUD, the menu over everything.
     this.hurtLayer = el('div', 'ow-layer', this.root);
-    this.worldLayer = el('div', 'ow-layer', this.root);
     this.centreLayer = el('div', 'ow-layer', this.root);
     this.chromeLayer = el('div', 'ow-layer', this.root);
 
     this.health = new HealthFx(this.hurtLayer, this.chromeLayer);
-    this.markers = new WorldMarkers(this.worldLayer);
     this.rng.fork(); // Keep the minimap's noise stream unchanged after removing damage popups.
     this.arcs = new DamageArcs(this.centreLayer);
     this.crosshair = new Crosshair(this.centreLayer);
@@ -285,8 +262,6 @@ export class UiSystem {
 
     this._pos = new THREE.Vector3();
     this._tmp = new THREE.Vector3();
-    this._objectives = [];
-    this._compassObjs = [];
     this._blips = new Array<Blip>(MAX_BLIPS);
     for (let i = 0; i < MAX_BLIPS; i++) this._blips[i] = { x: 0, z: 0, kind: 'enemy', heading: 0 };
     this._blipCount = 0;
@@ -492,7 +467,6 @@ export class UiSystem {
       this.killfeed.clear();
       this.arcs.clear();
       this.hit.clear();
-      this.markers.clear(!this.pixiHud?.gpuUnderlays);
       this.clearPrompt();
     });
 
@@ -510,7 +484,7 @@ export class UiSystem {
         this.pixiHud.resize(this.vw, this.vh, this.k);
         this.root.classList.add('ow-hud-slice');
         this.ammo.presentReadout = false;
-        this.hurtLayer.hidden = this.worldLayer.hidden = this.pixiHud.gpuUnderlays;
+        this.hurtLayer.hidden = this.pixiHud.gpuUnderlays;
       } catch (error) {
         try {
           this.pixiHud?.dispose();
@@ -520,7 +494,7 @@ export class UiSystem {
           this.pixiHud = null;
           this.root.classList.remove('ow-hud-slice');
           this.ammo.presentReadout = true;
-          this.hurtLayer.hidden = this.worldLayer.hidden = false;
+          this.hurtLayer.hidden = false;
         }
         console.warn('[ui] Pixi HUD unavailable; using native HUD', error);
       }
@@ -627,11 +601,6 @@ export class UiSystem {
     this._promptOwner = null;
     this._healPrompt = false;
     this.prompt.clear();
-  }
-
-  spawnGrenade(worldPos: THREE.Vector3, fuse = 2.4): void {
-    this.markers.spawnGrenade(worldPos, fuse);
-    this.sfx('grenade_warn', 0.6);
   }
 
   setHudVisible(v: boolean): void {
@@ -805,7 +774,6 @@ export class UiSystem {
     this.hudVisible = damp(this.hudVisible, hudGoal, 10, rawDt);
     const hudOp = this.hudVisible.toFixed(3);
     setStyle(this.chromeLayer, 'opacity', hudOp);
-    if (!this.pixiHud?.gpuUnderlays) setStyle(this.worldLayer, 'opacity', hudOp);
     setStyle(this.centreLayer, 'opacity', hudOp);
 
     this.crosshair.update(dt, s, !this.pixiHud);
@@ -832,25 +800,7 @@ export class UiSystem {
     this.marketCountdown.update(rawDt, s.marketIn);
     this.radio.update(rawDt);
 
-    this._buildCompassObjectives(pos);
-    this.compass.update(heading, this._compassObjs, dt);
-
-    this.markers.updateObjectives(
-      this._objectives,
-      ctx.camera,
-      this.vw,
-      this.vh,
-      this.k,
-      !this.pixiHud?.gpuUnderlays
-    );
-    this.markers.updateGrenades(
-      dt,
-      ctx.camera,
-      this.vw,
-      this.vh,
-      this.k,
-      !this.pixiHud?.gpuUnderlays
-    );
+    this.compass.update(heading, null, dt);
 
     // ---- minimap ---------------------------------------------------------
     if (!this.minimap.bakeDone && ++this._bakeFrame > 6 && this._bakeFrame % 20 === 0) {
@@ -864,7 +814,6 @@ export class UiSystem {
       heading: 0,
       fov: 80,
       blips: null,
-      objectives: null,
     };
     this._mmState.x = pos.x;
     this._mmState.z = pos.z;
@@ -876,16 +825,6 @@ export class UiSystem {
     this._mmState.pulses = intelHud?.pulses ?? null;
     this._mmState.pulseTime = intelHud?.pulseTime ?? 0;
     this._mmState.playerY = ctx.peek('player')?.feetPosition?.y ?? 0;
-    this._mmState.objectives = this._mmObjs ?? (this._mmObjs = []);
-    this._mmObjs.length = 0;
-    for (const o of this._objectives) {
-      if (!o.position) continue;
-      this._mmObjs.push(o._mm ?? (o._mm = { x: 0, z: 0, label: o.label }));
-      const last = this._mmObjs[this._mmObjs.length - 1];
-      last.x = o.position.x;
-      last.z = o.position.z;
-      last.label = o.label;
-    }
     if (this.pixiHud) {
       this.pixiHud.setVisible(!ctx.engine.error);
       this.pixiHud.update(
@@ -895,8 +834,7 @@ export class UiSystem {
         this.crosshair,
         this.minimap,
         this._mmState,
-        this.hudVisible,
-        this.markers
+        this.hudVisible
       );
     } else this.minimap.draw(this._mmState);
   }
@@ -918,23 +856,6 @@ export class UiSystem {
       b.fade = a.hudFade ?? 1;
     }
     this._blipCount = n;
-  }
-
-  _buildCompassObjectives(pos: THREE.Vector3): CompassMarker[] {
-    const out = this._compassObjs;
-    out.length = 0;
-    for (const o of this._objectives) {
-      if (!o.position) continue;
-      const dx = o.position.x - pos.x;
-      const dz = o.position.z - pos.z;
-      const bearing = (Math.atan2(dx, -dz) * 180) / Math.PI;
-      out.push(o._cmp ?? (o._cmp = { bearing: 0, label: o.label, color: o.color }));
-      const last = out[out.length - 1];
-      last.bearing = bearing;
-      last.label = o.label;
-      last.color = o.color;
-    }
-    return out;
   }
 
   resize(w: number, h: number, _ctx: UiContext = this.ctx): void {
@@ -975,7 +896,6 @@ export class UiSystem {
       this.compass.dispose();
       this.scoreBar.dispose();
       this.minimap.dispose();
-      this.markers.dispose();
       this.prompt.dispose();
       this.banner.dispose();
       this.menu.dispose();

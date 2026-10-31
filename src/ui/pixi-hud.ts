@@ -4,12 +4,10 @@ import type { Renderer } from 'three/webgpu';
 import type { AmmoState } from './ammo.ts';
 import type { Crosshair } from './crosshair.ts';
 import type { HealthFx, HealthState } from './health.ts';
-import type { WorldMarkers } from './markers.ts';
 import type { Minimap, MinimapState } from './minimap.ts';
 import { PixiAmmoView, AMMO_WIDTH, AMMO_HEIGHT } from './pixi-ammo-view.ts';
 import { initPixiRenderer, restrictPixiCanvases } from './pixi-device.ts';
 import { PixiInjury } from './pixi-injury.ts';
-import { PixiWorldMarkers } from './pixi-markers.ts';
 import { PixiMinimap } from './pixi-minimap.ts';
 import { clamp01, setStyle } from './util.ts';
 
@@ -49,7 +47,6 @@ export class PixiHudSlice {
   readonly stage = new Container();
   readonly chrome = new Container();
   readonly injury = new PixiInjury();
-  readonly worldMarkers = new PixiWorldMarkers();
   readonly gpuUnderlays: boolean;
   readonly ammo = new PixiAmmoView();
   readonly minimap = new PixiMinimap();
@@ -111,14 +108,13 @@ export class PixiHudSlice {
     this.canvas.setAttribute('role', 'img');
     this.canvas.setAttribute(
       'aria-label',
-      'Experimental gameplay HUD: ammo, health, crosshair, minimap, injury and world markers'
+      'Experimental gameplay HUD: ammo, health, crosshair, minimap and injury'
     );
     this.canvas.style.cssText = 'position:absolute;inset:0;pointer-events:none;visibility:hidden';
     this.stage.eventMode = 'none';
     this.stage.interactiveChildren = false;
     this.injury.mesh.visible = false;
-    this.worldMarkers.stage.visible = false;
-    this.stage.addChild(this.injury.mesh, this.worldMarkers.stage, this.chrome);
+    this.stage.addChild(this.injury.mesh, this.chrome);
     this.chrome.addChild(this.ammo.stage, this.vitals, this.minimap.stage, this.reticle);
     this.vitals.addChild(text('HEALTH', 14, 10, 10, 0xa9bac5), this.hp, this.maxHp);
     this.vitals.addChild(
@@ -177,20 +173,17 @@ export class PixiHudSlice {
     crosshair: Crosshair,
     map: Minimap,
     mapState: MinimapState,
-    opacity: number,
-    markers: WorldMarkers
+    opacity: number
   ): void {
     if (this.disposed) return;
     if (!this.enabled) return;
     // Injury opacity is independent of HUD/menu/death fading, as in HTML.
     const alpha = Number(opacity.toFixed(3));
     if (this.chrome.alpha !== alpha) this.dirty = true;
-    this.chrome.alpha = this.worldMarkers.stage.alpha = alpha;
+    this.chrome.alpha = alpha;
     this.chrome.visible = alpha >= 0.004;
-    this.worldMarkers.stage.visible = this.gpuUnderlays && this.chrome.visible;
     if (this.gpuUnderlays) {
       this.dirty = this.injury.update(health) || this.dirty;
-      this.dirty = this.worldMarkers.update(markers, this.stage.scale.x) || this.dirty;
     }
     const visible = this.chrome.visible || this.injury.mesh.visible;
     setStyle(this.canvas, 'visibility', visible ? '' : 'hidden');

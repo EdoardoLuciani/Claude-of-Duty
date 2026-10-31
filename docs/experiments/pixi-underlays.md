@@ -1,9 +1,35 @@
-# Pixi injury overlays and projected world markers
+# Pixi injury overlays
 
-`?pixi=hud` now also renders blood edges, heartbeat vignette, hit flash,
-projected objective markers and grenade warnings through the same Pixi canvas.
-`?pixi=hud&underlays=html` retains the previous HTML/CSS/SVG underlay presenters
-for a like-for-like comparison. Omitting Pixi still uses the native UI throughout.
+`?pixi=hud` renders blood edges, heartbeat vignette and hit flash through the same
+Pixi canvas. `?pixi=hud&underlays=html` retains native injury for comparison.
+Omitting Pixi still uses the native UI throughout.
+
+## Removed unused marker UI
+
+The pre-Pixi code had no gameplay caller of `ui.spawnGrenade()`, and nothing
+populated `ui._objectives`. Thus these overlays were dormant, not missing because
+of a diagnosed rendering bug. Earlier screenshots injected objective/grenade
+markers explicitly to test their presenters; they were not normal gameplay cues.
+At the operator's request both HTML and Pixi projected marker/grenade-warning
+renderers, their styles/pools, spawning API, objective-list plumbing and injected
+fixtures have now been removed. Actual grenades, explosions, minimap contacts/
+search areas, hitmarkers and directional damage arcs are unchanged.
+
+The measurements below are historical, from before this removal; they are not a
+new performance claim for the cleanup. They exercised injury during combat and
+had no live objective/grenade HUD markers in their timed phases.
+
+Cleanup validation:150 smoke tests, formatting/typecheck/lint/build, source and
+production hardware checks passed. Both backends and fallback have no projected
+marker owner/API/layer nodes. Injury pixels, zero hidden injury DOM mutations,
+independent HUD fade, pause/shop/death/restart/Start/error, resize/DPR2 and shared
+device ownership remain checked. Ammo/health texture stress plateaus at38/38/38
+sources (DPR2:35/35/35); the map still uploads once. This is not a new benchmark.
+
+```sh
+node tests/e2e/pixi-hud.mjs --uncapped --rounds=1 --port=5211 --out=/tmp/pixi-no-markers-source
+node tests/e2e/pixi-hud.mjs --preview --underlays --uncapped --rounds=1 --port=5211 --out=/tmp/pixi-no-markers-built
+```
 
 ## Ownership and presentation
 
@@ -17,24 +43,16 @@ for a like-for-like comparison. Omitting Pixi still uses the native UI throughou
   No per-frame Canvas2D bakes/uploads, fullscreen filter chain, GLSL or WebGL path.
 - The mesh is skipped when healthy/no flash. Its geometry/program are owned by
   the UI and explicitly released; the game's borrowed device is never destroyed.
-- `WorldMarkers` owns shared projection, distance fade and grenade fuse/pulse
-  state, with six objectives/four grenades and the same oldest-first reuse.
-  Pixi retains glyphs/text/rings rather than duplicating projection/lifetime rules.
-  Existing behind-camera mirroring, safe margins, edge arrows, distance formatting,
-  proximity text, expiry and caller-position copying are preserved. No raycast/
-  occlusion policy or new gameplay marker producer has been added.
-- Layering is **injury → world/grenade markers → minimap/readouts/crosshair** in
-  Pixi, below the remaining native centre/chrome/menu layers. Markers/readouts
-  fade with HUD visibility; injury stays independent during pause/death/HUD hiding,
-  as before. The canvas hides only when its content is absent or Start/error owns
-  presentation. Static paused content does not redraw after the group fade settles.
-- Native hurt/world-marker layer containers remain available for fallback but are
-  hidden and do not mutate behind Pixi. Other HUD/menu presenters remain native.
-- Objective labels use the native 40-reference-pixel wrapping width. Small font/
-  outline/shadow differences are not a pixel-identical SVG renderer replacement.
-  Map/readout backgrounds remain as requested: map retained, readouts panel-free.
+- Layering is **injury → minimap/readouts/crosshair** in Pixi, below remaining
+  native centre/chrome/menu layers. Readouts fade with HUD visibility; injury
+  stays independent during pause/death/HUD hiding. The canvas hides only when
+  its content is absent or Start/error owns presentation. Static paused content
+  does not redraw after the group fade settles.
+- The native hurt container remains for fallback, hidden with no mutations behind
+  Pixi. Other HUD/menu presenters remain native. Map backgrounds stay retained
+  and readouts panel-free.
 
-## Comparison
+## Historical comparison (before marker cleanup)
 
 AMD RDNA 4, Chromium156, High,1920×1080CSS/DPR1; fixed exposure and seeded60Hz
 simulation.180warmup/900measured frames per run, uncapped headless. Same branch,
@@ -89,13 +107,13 @@ node tests/e2e/pixi-hud.mjs --underlays --uncapped --rounds=2 --port=5207 --out=
 node tests/e2e/pixi-hud.mjs --preview --underlays --rounds=1 --port=5207 --out=/tmp/pixi-underlays-built
 ```
 
-Smoke tests compare native/presentation-disabled health state, projected marker
-and grenade state, clipping/mirroring/fades/proximity/expiry/pooling/clear/pause,
-and prove the model-only updates do not write DOM styles. Hardware fixtures check
+Current smoke tests compare native/presentation-disabled health state and prove
+model-only updates do not write DOM styles. Removed marker APIs/layers are checked
+as absent, rather than hidden. Synthetic marker checks were removed with the feature. Hardware fixtures check
 actual GPU injury pixels, no hidden native mutations, transparent uninjured
 readouts, independent injury/HUD visibility, resize/DPR2, paused redraw suppression,
 texture plateau, native init fallback, shared device, zero WebGL requests and
 shop/death/restart/Start/terminal teardown behavior. Default native HUD remains.
 
-The benchmark's `--underlays` flag compares just these presenters; without it the
-existing HTML/Pixi whole-HUD comparison remains available.
+The benchmark's `--underlays` flag now compares just injury presentation; without
+it the existing HTML/Pixi whole-HUD comparison remains available.
