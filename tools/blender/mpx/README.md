@@ -27,10 +27,13 @@ opaque finishes using linear corner colours and a padded 4×4 finish atlas for
 roughness/metalness and strength-adjusted normal XYZ. Original UV0/colour grain
 remain unchanged; UV1 is a deterministic affine transform of that same atlas,
 not a reproject/repack. Each finish tile reduces procedural grain from 1024² to
-248² plus four-pixel edge padding. Lens/cap sheets share one optical material with
-exact UV1-selected alpha/coating; absorptive interior retains its separate
-specular/environment policy. Three transparent sorting objects and four rigid
-magazine/round draws remain independent. The two finish PNGs are
+248² plus four-pixel edge padding. In the solid-cover visual prototype, body lenses
+alone use the optical material with constant original alpha/coating; opaque polymer
+lids join their existing mechanical cap frames. No optical role selector remains.
+The unused clear-cap calibration tile stays reserved so all original maps/other
+finish UVs remain identical. Absorptive interior retains its separate
+specular/environment policy. One transparent sorting object and four rigid
+magazine/round primitives remain independent. The two finish PNGs are
 export products; the editable blend still packs the three full-resolution maps.
 Runtime motion retains the historical
 **120 Hz** lattice. The held `ceil(duration * 120)` value receives the exact
@@ -70,7 +73,13 @@ setter and assert the packed-encoding fix through an actual identity join. The
 independent `tools/mpx-pass2-parity.mjs` requires a retained pass-1 native GLB: it
 matches every oriented triangle/position/UV/finish/owner and compares every corner
 normal at rest, every surface vertex over ≥21 moving poses per clip, plus dense
-120 Hz samples. No new expected hash substitutes for that external reference.
+120 Hz samples. That historical full-surface comparison applies to the accepted
+clear-cover consolidation, not to the explicitly redesigned solid lids. Prototype
+acceptance separately enumerates exactly 80 removed clear-sheet triangles and 312
+replacement lid triangles, confines all new surfaces to the two 1.5 mm polymer lid
+volumes, and compares every unaffected surface against the accepted base; it does
+not waive numerical or normal gates. No new expected hash substitutes for that
+external reference.
 `smoke-mpx-skin.mjs` separately checks native/cooked actual vertices and normal
 transforms against the named controls, dense subframes, lockback/reset, moving caps,
 magazine ownership and gameplay/inspection bone-texture disposal. Independent

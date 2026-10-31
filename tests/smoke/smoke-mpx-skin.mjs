@@ -133,34 +133,64 @@ for (const suffix of ['glb', 'runtime.glb']) {
   assert.equal(optical.side, THREE.DoubleSide);
   assert.equal(optical.depthWrite, false);
   assert.equal(optical.forceSinglePass, true);
-  // Evaluate the actual small TSL conditionals at every optical vertex, not a
-  // separate test-only spelling of the alpha/clearcoat selection formula.
-  function evaluate(node, uv1) {
-    if (node.isConstNode) return node.value;
-    if (node.isAttributeNode || node.getAttributeName?.() === 'uv1') return uv1;
-    if (node.isSplitNode) return evaluate(node.node, uv1)[{ x: 0, y: 1 }[node.components]];
-    if (node.isOperatorNode && node.op === '>=')
-      return evaluate(node.aNode, uv1) >= evaluate(node.bNode, uv1);
-    if (node.condNode)
-      return evaluate(evaluate(node.condNode, uv1) ? node.ifNode : node.elseNode, uv1);
-    throw new Error(`Unexpected MPX optical node ${node.constructor.name}`);
-  }
-  let sheets = 0;
+  assert.equal(optical.opacity, 0.02);
+  assert.equal(optical.clearcoat, 0.25);
+  assert.equal(optical.opacityNode, null, 'body lenses need no cap/lens role selector');
+  assert.equal(optical.clearcoatNode, null);
+  let opticalObjects = 0;
   model.root.traverse((mesh) => {
     if (!mesh.isMesh || mesh.material !== optical) return;
-    sheets++;
-    assert.ok(
-      !mesh.isSkinnedMesh,
-      'independent optical sorting stays rigid, outside the opaque skin'
-    );
-    const cap = mesh.name.startsWith('lens_cap_');
-    for (let i = 0; i < mesh.geometry.attributes.position.count; i++) {
-      const uv1 = [mesh.geometry.attributes.uv1.getX(i), mesh.geometry.attributes.uv1.getY(i)];
-      assert.equal(evaluate(optical.opacityNode, uv1), cap ? 0.01 : 0.02);
-      assert.equal(evaluate(optical.clearcoatNode, uv1), cap ? 0 : 0.25);
-    }
+    opticalObjects++;
+    assert.ok(!mesh.isSkinnedMesh);
+    assert.equal(mesh.name, 'receiver_optical', 'only body lenses remain transparent');
   });
-  assert.equal(sheets, 3, 'body lenses and two independently sorted moving covers');
+  assert.equal(opticalObjects, 1);
+  assert.equal(surface.material.transparent, false);
+  assert.equal(
+    surface.material.side,
+    THREE.DoubleSide,
+    'retain the existing opaque material policy'
+  );
+  // Both sides of each closed lid must really cover its aperture, not just a
+  // double-sided material flag. Cast against actual weighted cap triangles.
+  for (const tag of ['front', 'rear']) {
+    const pivot = model.root.getObjectByName(`lens_cap_${tag}`);
+    const q = pivot.quaternion.clone();
+    pivot.quaternion.identity();
+    model.root.updateMatrixWorld(true);
+    const joint = surface.skeleton.bones.findIndex((bone) => bone.name === `FRAME_lens_cap_${tag}`);
+    const indices = surface.geometry.index;
+    const triangles = [];
+    for (let i = 0; i < indices.count; i += 3) {
+      const ids = [indices.getX(i), indices.getX(i + 1), indices.getX(i + 2)];
+      if (!ids.every((id) => skinIndex.getX(id) === joint)) continue;
+      triangles.push(
+        ids.map((id) =>
+          surface.getVertexPosition(id, new THREE.Vector3()).applyMatrix4(surface.matrixWorld)
+        )
+      );
+    }
+    assert.ok(triangles.length > 0, `${tag}: cap remains owned by its original opaque frame`);
+    for (const side of [-1, 1])
+      for (const [x, y] of [
+        [0, 0],
+        [0.008, 0],
+        [-0.008, 0],
+        [0, 0.008],
+        [0, -0.008],
+      ]) {
+        const ray = new THREE.Ray(
+          new THREE.Vector3(x, 0.0129 + y, side * 0.02).applyMatrix4(pivot.matrixWorld),
+          new THREE.Vector3(0, 0, -side).transformDirection(pivot.matrixWorld)
+        );
+        assert.ok(
+          triangles.some(([a, b, c]) => ray.intersectTriangle(a, b, c, true, new THREE.Vector3())),
+          `${suffix}/${tag}: closed opaque lid obstructs aperture from side ${side}`
+        );
+      }
+    pivot.quaternion.copy(q);
+  }
+  model.root.updateMatrixWorld(true);
 
   // The transferred/dropped body and rounds have not moved into the skin.
   assert.ok(animation.magazineBody.isMesh && !animation.magazineBody.isSkinnedMesh);

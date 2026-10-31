@@ -41,8 +41,8 @@ assert.equal(
 const primitives = gltf.meshes.reduce((n, mesh) => n + mesh.primitives.length, 0);
 assert.equal(
   primitives,
-  9,
-  'one mechanical skin, four magazine/round draws, three sorted optical sheets and interior'
+  7,
+  'opaque mechanics including solid lids, four magazine/round primitives, body glass and interior'
 );
 assert.equal(primitives, manifest.stats.primitives);
 assert.equal(gltf.materials.length, manifest.stats.materials);
@@ -130,7 +130,7 @@ for (const mesh of gltf.meshes) {
   for (const primitive of mesh.primitives) {
     if (primitive.material === interiorMaterial) interiorUsed = true;
     const name = gltf.materials[primitive.material]?.name ?? '';
-    if (name.startsWith('11 |') || name.startsWith('12 |')) {
+    if (name.startsWith('11 |')) {
       const normals = accessor(primitive.attributes.NORMAL),
         first = new THREE.Vector3().fromArray(normals);
       for (let i = 0; i < normals.length; i += 3) {
@@ -168,7 +168,7 @@ for (const mesh of gltf.meshes) {
             (Math.floor(finish / 4) * 256 + 4 + (1 - uv0[vertex * 2 + 1]) * 248) / 1024
         ) < 1e-6
       );
-      const expected = finish === 10 || finish === 11 ? '11 |' : finish === 14 ? '15 |' : 'MPX |';
+      const expected = finish === 10 ? '11 |' : finish === 14 ? '15 |' : 'MPX |';
       assert.ok(
         name.startsWith(expected),
         'optical and absorptive finishes keep independent pass policies'
@@ -184,7 +184,11 @@ for (const mesh of gltf.meshes) {
   }
 }
 assert.ok(interiorUsed, 'optic finish must actually be assigned to exported faces');
-assert.equal(usedFinishes.size, 15, 'all original finishes survive consolidation');
+assert.deepEqual(
+  [...usedFinishes].sort((a, b) => a - b),
+  Array.from({ length: 15 }, (_, i) => i).filter((i) => i !== 11),
+  'only the explicitly replaced clear-cover finish is unused; all other finishes survive'
+);
 for (const animation of gltf.animations) {
   const info = manifest.clips[animation.name];
   for (const sampler of animation.samplers) {
@@ -319,8 +323,10 @@ for (const tag of ['rear', 'front']) {
     .multiply(new THREE.Matrix4().compose(pivot.position, new THREE.Quaternion(), pivot.scale))
     .multiply(pivot.matrixWorld.clone().invert());
   partVertices(`lens_cap_${tag}_mesh`, (p) => closedBounds.expandByPoint(p.applyMatrix4(closed)));
-  partVertices(`lens_cap_${tag}_optical`, (p) =>
-    closedBounds.expandByPoint(p.applyMatrix4(closed))
+  assert.equal(
+    root.getObjectByName(`lens_cap_${tag}_optical`),
+    undefined,
+    'solid cover surfaces belong to the existing opaque cap frame, not a separate glass mesh'
   );
 }
 assert.ok(
@@ -422,7 +428,7 @@ assert.equal(
 );
 assert.equal(
   runtime.meshes.reduce((sum, mesh) => sum + mesh.primitives.length, 0),
-  9
+  7
 );
 assert.equal(runtime.images.length, 3);
 assert.ok(

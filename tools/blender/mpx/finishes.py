@@ -10,8 +10,11 @@ def consolidate_finishes(objects, output, orm, normal):
     Only the subtle procedural roughness/normal grain is reduced to 248px per
     finish. Geometry lettering, normals and optical policies are independent.
     """
+    # Reserve the original clear-cap calibration tile even though solid lids use
+    # the existing polymer finish; every unaffected finish keeps its exact UVs/maps.
     sources = sorted({m for obj in objects if obj.type == 'MESH'
-                      for m in obj.data.materials if m}, key=lambda m: m.name)
+                      for m in obj.data.materials if m}
+                     | {bpy.data.materials['12 | clear protective caps']}, key=lambda m: m.name)
     assert len(sources) == 15
     size, tile, pad = 1024, 256, 4
 
@@ -89,7 +92,7 @@ def consolidate_finishes(objects, output, orm, normal):
                 node.inputs[1].default_value = 1
             elif node.type == 'NORMAL_MAP':
                 node.inputs['Strength'].default_value = 1
-        # UV1 also identifies lens/cap coating for the runtime physical nodes.
+        # Only body lenses use the optical pass; solid lids use ordinary polymer.
         # Absorptive interiors retain their exact independent environment policy.
         sep = next(n for n in nodes if n.type == 'SEPARATE_COLOR')
         links.new(sep.outputs['Blue'], p.inputs['Metallic'])
@@ -110,7 +113,7 @@ def consolidate_finishes(objects, output, orm, normal):
             source = finishes[face.index]
             assert source is not None, (obj.name, face.index, 'unassigned finish')
             index = sources.index(source)
-            category = 'optical' if index in (10, 11) else 'interior' if index == 14 else 'opaque'
+            category = 'optical' if index == 10 else 'interior' if index == 14 else 'opaque'
             face.material_index = list(materials).index(category)
             for loop in face.loop_indices:
                 uv = uv0.data[loop].uv

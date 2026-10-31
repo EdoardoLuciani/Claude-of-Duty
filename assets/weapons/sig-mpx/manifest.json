@@ -5,11 +5,11 @@
   "blenderForward": "+X",
   "blenderUp": "+Z",
   "stats": {
-    "triangleInstances": 78040,
-    "primitives": 9,
+    "triangleInstances": 78272,
+    "primitives": 7,
     "materials": 3,
     "images": 3,
-    "bytes": 10178760
+    "bytes": 10198740
   },
   "clips": {
     "Idle": {
