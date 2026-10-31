@@ -128,14 +128,14 @@ disable color management). History:
 
 | Concern | Location |
 | --- | --- |
-| Seeded three 1024² maps, atlas quarters, finish factors | `ax338.py`: map generation and `material` |
-| Geometry, pivots, sockets, photo-registered grip | `ax338.py`: named assembly sections and geometry helpers |
-| Applied bevel/weighted normals, knob face ordering | `ax338.py`: `finish` |
-| Original rubber/stipple/metal atlas partition | `ax338.py`: smart-project loop before action authoring |
+| Seeded three 1024² maps, atlas quarters, finish factors | `tools/blender/ax338/build.py`: map generation and `material` |
+| Geometry, pivots, sockets, photo-registered grip | `tools/blender/ax338/build.py`: named assembly sections and geometry helpers |
+| Applied bevel/weighted normals, knob face ordering | `tools/blender/ax338/build.py`: `finish` |
+| Original rubber/stipple/metal atlas partition | `tools/blender/ax338/build.py`: smart-project loop before action authoring |
 | Weapon, wrist/finger poses, fitted spans and events | `tools/blender/ax338/actions.py`: `author_actions` (unchanged by workflow migration) |
 | Runtime 120 Hz curves, endpoint/constant semantics, read-only output checks | `ax338/export.py` |
 | Export-only vertex albedo and guarded scalar-finish atlas | `ax338/finishes.py` |
-| Guarded entry, stage order/output paths, saved preview/studio, joins/native export | `ax338.py`: `build` / `main` |
+| Guarded entry, stage order/output paths, saved preview/studio, joins/native export | `tools/blender/ax338/build.py`: `build` / `main` |
 
 Imports do not build or mutate Blender. Missing declared inputs fail; there is
 no previous blend/GLB/map fallback. Generated preview edits are not source edits.
