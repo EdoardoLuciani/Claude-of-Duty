@@ -21,7 +21,7 @@ import { el, setText, setStyle, setClass, clamp01, damp, ease } from './util.ts'
  * @param {HTMLElement} parent      full-screen layer for the hurt overlays
  * @param {HTMLElement} [chrome]    layer for the widget (fades with the HUD)
  */
-interface HealthState {
+export interface HealthState {
   health?: number;
   maxHealth?: number;
   armour?: number;
@@ -101,7 +101,7 @@ export class HealthFx {
   }
 
   /** @param {object} s { health, maxHealth, armour, maxArmour, hurt, pulse } */
-  update(dt: number, s: HealthState): void {
+  update(dt: number, s: HealthState, presentVitals = true): void {
     const h = clamp01((s.health ?? 100) / (s.maxHealth || 100));
     const targetHurt = s.hurt !== undefined ? clamp01(s.hurt) : clamp01((0.78 - h) / 0.78) ** 1.3;
     this.hurt = damp(this.hurt, targetHurt, 7, dt);
@@ -137,6 +137,11 @@ export class HealthFx {
     // the bar chases the value so a burst reads as a slide, not a jump; the
     // numeral is the truth and updates immediately
     this.hpShown = damp(this.hpShown, h, 16, dt);
+    const maxA = s.maxArmour || 150;
+    const armour = Math.max(0, s.armour ?? 0);
+    this.armourShown = damp(this.armourShown, armour > 0 ? 1 : 0, 10, dt);
+    if (this.armourShown > 0.01) this.armourFlash = Math.max(0, this.armourFlash - dt * 3.2);
+    if (!presentVitals) return;
     setStyle(this.hpFill, 'transform', `scaleX(${clamp01(this.hpShown).toFixed(4)})`);
     const shownHp = Math.round(hp);
     if (shownHp !== this._lastHp) {
@@ -150,13 +155,9 @@ export class HealthFx {
     setStyle(this.hpNum, 'transform', `scale(${(1 + this.beatEnergy * 0.05).toFixed(3)})`);
 
     // --- armour plates ----------------------------------------------------
-    const maxA = s.maxArmour || 150;
-    const armour = Math.max(0, s.armour ?? 0);
-    this.armourShown = damp(this.armourShown, armour > 0 ? 1 : 0, 10, dt);
     setStyle(this.armour, 'opacity', this.armourShown.toFixed(3));
     setStyle(this.armour, 'display', this.armourShown < 0.01 ? 'none' : '');
     if (this.armourShown > 0.01) {
-      this.armourFlash = Math.max(0, this.armourFlash - dt * 3.2);
       setStyle(
         this.armour,
         'filter',

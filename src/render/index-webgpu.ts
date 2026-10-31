@@ -67,6 +67,7 @@ export class RenderSystem {
   declare _warmAbort: AbortController;
   declare renderer: Renderer;
   declare screenSize: { width: number; height: number };
+  private displayOverlay: (() => void) | null = null;
   declare displaySize: { width: number; height: number };
   declare passes: PostPass[];
   declare lights: RegisteredLight[];
@@ -378,6 +379,7 @@ export class RenderSystem {
     graph.exposure.value = this._exposure * 2 ** -this.settings.exposureBias;
     this.renderer.setRenderTarget(null);
     graph.render();
+    this.displayOverlay?.();
     this._updateExposure(ctx.time.dt);
   }
 
@@ -480,6 +482,15 @@ export class RenderSystem {
     if (this._metering && this._meterTask) this._meterTask.then(dispose, dispose);
     else dispose();
   }
+  /** Opt-in final-display overlay. Does not invalidate or enter the HDR graph. */
+  registerDisplayOverlay(draw: () => void): () => void {
+    if (this.displayOverlay) throw new Error('[render] display overlay already registered');
+    this.displayOverlay = draw;
+    return (): void => {
+      if (this.displayOverlay === draw) this.displayOverlay = null;
+    };
+  }
+
   registerPass(pass: PostPass): () => void {
     if (typeof pass.asNode !== 'function')
       throw new Error('[render] post pass must expose asNode() for the WebGPU graph');
@@ -659,6 +670,7 @@ export class RenderSystem {
     return { ok: true, graphWarm: await this._warmGraph() };
   }
   async dispose(): Promise<void> {
+    this.displayOverlay = null;
     this._disposing = true;
     this._warmAbort.abort(new Error('Renderer disposed during warmup'));
     await this._warmTask?.catch((): void => {});

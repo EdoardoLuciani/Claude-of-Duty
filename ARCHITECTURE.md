@@ -265,6 +265,45 @@ Bakes use native top-left texture UVs and shared `QuadMesh` geometry: no extra Y
 flip or disposal of borrowed geometry. Gameplay readback uses its explicit
 display-transform path. First-person refraction uses world coordinates.
 
+## Experimental UI
+
+`?pixi=1` loads the pause-panel trial; `?pixi=ammo` loads only the actual ammo/reload
+readout. They are mutually exclusive and the default UI does not load Pixi.
+Both borrow the game's GPUDevice through `ui/pixi-device.ts`, using one separate,
+demand-rendered, display-resolution canvas, not Three's renderer/world textures.
+UI owns Pixi resources and restores its restricted DOM adapter on construction or
+teardown failure; it must never destroy the borrowed device or skip native cleanup.
+`AmmoPanel` retains native equipment and shares `AmmoState` / magazine-pip math with
+`ui/pixi-ammo.ts`. Its passive canvas stays in the original chrome layer so injury,
+menu and HUD opacity ordering are unchanged. No application/render ticker is used;
+Pixi still has an interaction ticker. Native startup/error/menu controls remain.
+See [panel limitations](docs/experiments/pixi-ui.md) and
+[ammo combat measurements](docs/experiments/pixi-ammo.md). This is not a production
+UI migration or a general-purpose UI abstraction.
+
+`?pixi=hud` is the playable four-widget slice: ammo/reload, health/armour,
+reticle and minimap, one passive Pixi canvas between the world-marker and native
+centre/chrome layers. `PixiAmmoView` shares the ammo presenter without owning a
+renderer. Native crosshair/health owners advance their existing visual state while
+skipping replaced DOM widgets; injury overlays and every other native presenter
+remain active. Minimap borrows its existing one-time Canvas2D world bake, uploads
+it once, and retains GPU map/text/marker objects; native per-frame minimap drawing
+is skipped. Engine-driven active rendering, no hidden/static-paused redraws,
+independent capped DPR, shared-device ownership and failure-isolated teardown
+remain required. This does not reproduce the no-UI benchmark state or promise its
+savings. See [implementation and measurements](docs/experiments/pixi-hud.md).
+
+`?pixi=hud&presentation=canvas` is a separate measurement experiment. UI renders
+its same MSAA HUD into a Pixi-owned GPU texture; a render-owned final-display
+callback alpha-blends it into Three's canvas after the ordinary graph, without
+reconfiguring that canvas or entering the HDR/post-effect graph. The callback
+has one owner and explicit unsubscribe. UI disposes the target/uniform, never
+the shared device/context. Only equal physical HUD/world dimensions activate it;
+quality scaling/DPR mismatches fall back to the separate canvas. This changes
+ordering relative to still-native hurt/world-marker underlays, so controlled
+comparisons suppress those in **both** paths. Not a production integration or
+full-resolution presentation refactor. See [same-canvas results](docs/experiments/pixi-same-canvas.md).
+
 ## Models
 
 `weapons.createInspectionModel(id)` returns an independent rest-pose scene and
