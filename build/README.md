@@ -30,8 +30,10 @@ triangle-reduction policy. M4 disables geometry quantization to preserve its iro
 apertures and retains finish-bearing UV1/UV2 with `-kv`. Its weapon-local shader
 uses those values alongside the original detail maps. MCX similarly decodes finish
 identity from UV1; ordinary external GLB viewers are not material-fidelity references.
-MPX solid covers join its opaque skin; remaining body lenses use constant optical
-factors without the former lens/cap selectors.
+M4, MPX and AX338 use ordinary rigid meshes; EVOLYS retains only its deforming
+belt skin. Their moving controls remain ordinary transforms rather than full-body
+mechanical skins. MPX body lenses use constant optical factors; solid covers
+retain their ordinary pivots without lens/cap selectors.
 AX338 keeps full geometry where simplification damaged panel detail.
 M590 keeps its shell separate from the mechanical skin, with exact STEP visibility;
 its source checker narrowly bounds one approved shared-glove contact below 30 µm.

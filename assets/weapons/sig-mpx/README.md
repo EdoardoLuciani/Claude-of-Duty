@@ -103,8 +103,13 @@ slightly grows compressed; this is not a delivery-size win. All three PNG/KTX2 i
 payloads are byte-identical: 1024² with 11 cooked mips, 358,652 normal + 226,365 surface
 + 601,978 ORM encoded bytes. CPU array reductions are not GPU measurements. Removing
 62,369 weighted vertices avoids r187's non-normalized Uint8 joint-ID expansion
-(four Uint32 IDs plus four normalized weight bytes, 20 B/vertex); parent must measure
-actual uploaded geometry and increased object/submission costs. No FPS claim is made.
+(four Uint32 IDs plus four normalized weight bytes, 20 B/vertex). Parent native
+AMD RDNA-4 / r187 measurement confirms uploaded geometry **5,304,684 → 3,974,664 B**
+(−25.1%), with unchanged 4,194,384 B logical textures; the subtotal is
+**9,499,068 → 8,169,048 B**. Observed palette storage falls 1,280 → 0 B, separately
+from that subtotal. Other renderer resources and driver padding are excluded.
+Isolated loaded-Idle beauty draws rise 5 → 14; paired A/B/B/A CPU/GPU microbench
+results are not whole-game FPS evidence. No FPS claim is made.
 
 Independent native comparison matches **all 78,272 oriented triangles**, 63 retained
 named controls and all 1,224 original helper channels. Maximum position difference
@@ -114,8 +119,10 @@ limit), rest normal vector error 1.18e-7 and animated normal error 1.86e-7 over
 new normal exceptions or appearance waivers. Actual ordinary carrier vertices from
 live lockback/mid-reload inspections match fresh Idle exactly. Native/cooked gameplay,
 contacts, actual closed solid-lid rays, magazine/round ownership and borrowed-resource
-inspection disposal remain checked. GPU storage/submission/timing, matched views and
-independent review remain parent gates; this candidate is not final visual acceptance.
+inspection disposal remain checked. Parent matched hero/side/optic/ADS/reload/inspect
+and closed-cover views, RGBA fallback, market and production integration passed.
+Fresh independent review found no issues; the combined 160-test suite passed.
+This bounded representation acceptance does not clear general factory/human Gate 3.
 
 ### Approved solid covers and costs (historical skinned representation)
 

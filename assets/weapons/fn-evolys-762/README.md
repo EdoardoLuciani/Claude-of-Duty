@@ -32,9 +32,14 @@ Both pouches retain their separate animation/visibility ownership. There are ten
 primitive instances total, nine in loaded Idle, and two unchanged materials.
 The stock/head oracle checks all 4,922 actual ordinary stock triangles against
 the unchanged 120 mm envelope. Native/runtime geometry and gameplay tests pass;
-parent GPU/visual acceptance of this representation remains pending. The expected
-recovery of about 880,500 uploaded skin-attribute bytes is a backend estimate,
-not a new GPU measurement or an FPS claim. `manifest.json` records
+parent native AMD RDNA-4 / r187 measurements confirm uploaded geometry
+**3,360,060 → 2,479,560 B** (−26.2%) and geometry-plus-logical-texture subtotal
+**7,554,444 → 6,673,944 B**, with unchanged textures. Only the belt skin remains.
+Isolated loaded-Idle beauty draws rise 5 → 10; CPU/GPU microbench timings do not
+establish whole-game FPS. Matched views, RGBA fallback, market/production and
+combined 160 tests passed; fresh independent review found no issues. These
+subtotals exclude other renderer resources/palette buffers/driver padding and
+do not clear general factory/human sign-off. `manifest.json` records
 events/belt, `hand-reference.json` is read-only versioned hand calibration, and
 `photo-review.json` freezes review registration. Shared review-arm appearance is
 also read-only and excluded from export. See the [edit map and build stages](../../../tools/blender/evolys/README.md).

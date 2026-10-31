@@ -282,6 +282,9 @@ Adding profiles requires adapter, animation and visual validation rather than
 blanket simplification. Editable Blender sources remain authoring references.
 M4/MCX adapters decode packed finish metadata in small weapon-local physical-node
 graphs; their consolidated GLBs require those adapters for material fidelity.
+M4, MPX and AX338 rigid assemblies use ordinary meshes; EVOLYS skins only its
+deforming belt. Keep static bodies out of mechanical skins merely to reduce
+primitive counts; preserve independent moving controls and magazine ownership.
 
 `src/weapons/asset-loader.ts` serializes compressed model loads to bound Basis
 worker/memory use and owns per-load decoder/error cleanup. Material conversion

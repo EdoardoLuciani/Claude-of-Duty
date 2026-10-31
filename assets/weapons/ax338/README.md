@@ -343,10 +343,13 @@ geometry falls 1,496,590 bytes (21.75%). Encoded raw storage is nearly unchanged
 and gzip grows 8,181 bytes; this is not a file-size optimization.
 
 The current r187 backend expanded the baseline non-normalized joint IDs on upload;
-removing them and the large index stream is expected to recover about 2.89 MB
-(~35%) of uploaded geometry, but **candidate GPU allocation is parent-measured**,
-not inferred from encoded skin bytes. Five extra submissions are an explicit
-trade-off. No FPS or whole-renderer residency improvement is claimed. Two materials
+parent native AMD RDNA-4 / r187 measurements confirm uploaded geometry
+**8,272,448 → 5,383,896 B** (−34.9%) and geometry-plus-logical-texture subtotal
+**12,466,832 → 9,578,280 B**. Isolated loaded-Idle beauty draws rise 5 → 10
+(the double-sided transparent lens adds a submission beyond primitive counts).
+The separately observed 1,152 B palette storage is removed. Other renderer
+resources/driver padding are excluded. Paired A/B/B/A isolated CPU/GPU timings
+are not whole-game FPS evidence; no FPS improvement is claimed. Two materials
 and all three embedded image payloads are unchanged: native PNGs, runtime UASTC
 KTX2, each 1024² with eleven runtime mip levels; logical runtime texture payload
 remains 4,194,384 bytes.
@@ -384,8 +387,10 @@ the original 0.05 mm sampled-surface gate (measured 0.007631 mm). Native/cooked
 actual shared-arm sweeps pass 761 poses; left DCC passes 474 poses at the unchanged
 0.903077 mm depth. Full right-hand DCC acceptance remains the inherited failure
 below; none of these checks clears it. Two fresh separate-process source
-exports and cooks match byte-for-byte (native, runtime and manifest). Parent GPU, matched-view and independent
-review gates remain required before integration.
+exports and cooks match byte-for-byte (native, runtime and manifest). Matched
+native-GPU hero/side/optic/ADS/reload/inspect, RGBA fallback, market and production
+gates passed. Fresh independent review found no issues; combined 160 tests passed.
+This representation acceptance does not clear the inherited right-hand/factory gates.
 
 ## Known issues and gates
 
