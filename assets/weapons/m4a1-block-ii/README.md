@@ -171,7 +171,6 @@ Reproduce with gltfpack **1.3** through the unchanged registered cook profile:
 
 ```sh
 GLTFPACK=/home/edoardo/.local/bin/gltfpack node build/models.mjs m4
-node tests/smoke/smoke-m4-skin.mjs
-# Optional immutable d29573f8 native baseline:
-M4_BASELINE=/path/to/d29573f8-native.glb node tests/smoke/smoke-m4-skin.mjs
+node tests/smoke/smoke-m4.mjs
+node tests/smoke/smoke-m4-cook.mjs
 ```

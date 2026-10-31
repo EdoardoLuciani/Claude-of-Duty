@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+import { Matrix3, Vector3 } from 'three';
 import {
   KHR_DF_MODEL_UASTC,
   KHR_SUPERCOMPRESSION_ZSTD,
@@ -91,6 +92,24 @@ for (const clip of runtime.json.animations) {
 }
 const originalAnimation = new M4Animation(source),
   cookedAnimation = new M4Animation(cooked);
+// Eight local box corners conservatively bound the affine error for every rigid vertex.
+const surfaceBounds = [];
+source.root.traverse((mesh) => {
+  if (!mesh.isMesh) return;
+  mesh.geometry.computeBoundingBox();
+  const { min, max } = mesh.geometry.boundingBox;
+  for (const x of [min.x, max.x])
+    for (const y of [min.y, max.y])
+      for (const z of [min.z, max.z])
+        surfaceBounds.push({
+          point: new Vector3(x, y, z),
+          mesh,
+          cooked: cooked.root.getObjectByName(mesh.name),
+        });
+});
+const sourcePoint = new Vector3(),
+  cookedPoint = new Vector3();
+let maxSurfaceDeviation = 0;
 let maxMatrixDeviation = 0,
   samples = 0;
 let maxPositionDeviation = 0,
@@ -121,15 +140,32 @@ for (const clip of source.animations) {
         );
       assert.equal(a.visible, b.visible, `${clip.name}/${time}: ${node.name} visibility`);
     }
+    for (const { point, mesh, cooked } of surfaceBounds) {
+      sourcePoint.copy(point).applyMatrix4(mesh.matrixWorld);
+      cookedPoint.copy(point).applyMatrix4(cooked.matrixWorld);
+      maxSurfaceDeviation = Math.max(maxSurfaceDeviation, sourcePoint.distanceTo(cookedPoint));
+    }
     samples++;
   }
 }
+assert(maxSurfaceDeviation < 0.0001, `posed rigid surface deviation ${maxSurfaceDeviation} m`);
 // gltfpack also reduces redundant quaternion keys with -af 0. Bound the
 // measured local rotation error independently from native-metre translation.
 assert(maxPositionDeviation < 0.000002, `translation deviation: ${maxPositionDeviation}`);
 assert(maxRotationDeviation < 0.00015, `rotation deviation: ${maxRotationDeviation}`);
 originalAnimation.reset();
 cookedAnimation.reset();
+for (const model of [source, cooked]) {
+  for (const name of [
+    'magazine',
+    'magazine_spare',
+    'magazine_round',
+    'magazine_spare_round',
+    'spent_case',
+  ])
+    model.root.getObjectByName(name).scale.setScalar(1);
+  model.root.updateMatrixWorld(true);
+}
 
 // The selected -noq cook must preserve every nondegenerate indexed triangle's
 // positions and UV0. Vertex/index reordering is not geometry loss. Check that
@@ -141,7 +177,9 @@ function surfaces(model) {
     if (!mesh.isMesh) return;
     const geometry = mesh.geometry,
       positions = geometry.attributes.position;
-    const triangles = surfaces.get(mesh.material.name) ?? [];
+    const owner = `${mesh.name}:${mesh.material.name}`;
+    const normalMatrix = new Matrix3().getNormalMatrix(mesh.matrixWorld);
+    const triangles = surfaces.get(owner) ?? [];
     for (let index = 0; index < geometry.index.count; index += 3) {
       const vertices = [];
       for (let corner = 0; corner < 3; corner++) {
@@ -153,11 +191,15 @@ function surfaces(model) {
           for (let axis = 0; axis < (name === 'position' ? 3 : 2); axis++)
             values.push(attribute.getComponent(vertex, axis));
         }
-        const key = `${mesh.material.name}:${values.join(',')}`;
+        const key = `${owner}:${values.join(',')}`;
         const normal = geometry.attributes.normal;
         assert(normal, `${mesh.name}: full XYZ normals`);
         const directions = normals.get(key) ?? [];
-        directions.push([normal.getX(vertex), normal.getY(vertex), normal.getZ(vertex)]);
+        const direction = new Vector3().fromBufferAttribute(normal, vertex);
+        directions.push({
+          local: direction.toArray(),
+          world: direction.applyNormalMatrix(normalMatrix),
+        });
         normals.set(key, directions);
         vertices.push(values);
       }
@@ -176,7 +218,7 @@ function surfaces(model) {
       const starts = keys.map((_, i) => [...keys.slice(i), ...keys.slice(0, i)].join(';'));
       triangles.push(starts.sort()[0]);
     }
-    surfaces.set(mesh.material.name, triangles);
+    surfaces.set(owner, triangles);
   });
   for (const triangles of surfaces.values()) triangles.sort();
   return { surfaces, normals };
@@ -184,20 +226,29 @@ function surfaces(model) {
 const a = surfaces(source),
   b = surfaces(cooked);
 assert.deepEqual(b.surfaces, a.surfaces, 'exact unsimplified indexed positions/UVs/winding');
-let maxNormalDeviation = 0;
+let maxNormalDeviation = 0,
+  maxRestNormalDeviation = 0;
 for (const [key, normals] of b.normals) {
   const original = a.normals.get(key);
   assert(original, 'no invented surface vertices');
   for (const normal of normals) {
     const closest = Math.min(
-      ...original.map((n) => Math.hypot(...n.map((v, axis) => v - normal[axis])))
+      ...original.map(({ local }) => Math.hypot(...local.map((v, axis) => v - normal.local[axis])))
     );
     maxNormalDeviation = Math.max(maxNormalDeviation, closest);
+    const matching = original.filter(({ local }) =>
+      local.every((v, axis) => v === normal.local[axis])
+    );
+    maxRestNormalDeviation = Math.max(
+      maxRestNormalDeviation,
+      Math.min(...matching.map(({ world }) => world.distanceTo(normal.world)))
+    );
   }
 }
 assert.equal(maxNormalDeviation, 0, 'normal direction retained at each position/UV');
+assert(maxRestNormalDeviation < 0.000002, `rest world-normal deviation ${maxRestNormalDeviation}`);
 originalAnimation.dispose();
 cookedAnimation.dispose();
 console.log(
-  `M4 cook: UASTC RGB/mips/color spaces, exact indexed surfaces, ${samples} fractional poses, max matrix deviation ${maxMatrixDeviation}, translation ${maxPositionDeviation} m, rotation ${maxRotationDeviation} rad, normal-vector deviation ${maxNormalDeviation}`
+  `M4 cook: UASTC RGB/mips/color spaces, exact indexed surfaces, ${samples} fractional poses, max matrix deviation ${maxMatrixDeviation}, translation ${maxPositionDeviation} m, rotation ${maxRotationDeviation} rad, surface bound ${maxSurfaceDeviation} m, normal-vector deviation ${maxNormalDeviation}`
 );

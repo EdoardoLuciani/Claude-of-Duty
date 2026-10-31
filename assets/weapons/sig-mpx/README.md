@@ -67,7 +67,6 @@ blender -b -t 2 assets/weapons/sig-mpx/mpx.blend --python-exit-code 1 \
   --python tools/blender/mpx_check.py
 node tests/smoke/smoke-mpx-asset.mjs
 node tests/smoke/smoke-mpx.mjs
-node tests/smoke/smoke-mpx-skin.mjs
 blender -b -t 2 assets/weapons/sig-mpx/mpx.blend --python-exit-code 1 \
   --python tools/blender/mpx_normal_check.py
 ```

@@ -284,10 +284,9 @@ and all three embedded image payloads are unchanged: native PNGs, runtime UASTC
 KTX2, each 1024² with eleven runtime mip levels; logical runtime texture payload
 remains 4,194,384 bytes.
 
-Frozen-d295 native comparison:
-`node tools/ax338-representation-parity.mjs /path/to/d295-ax338.glb`.
-This independent tool accepts the immutable old product, not a regenerated expected
-candidate. All 1,215 non-retired animation tracks (including all right-hand channels)
+The frozen-d295 native migration comparison is preserved in
+[Git history](https://github.com/EdoardoLuciani/Claude-of-Duty/blob/ec1d361fdfd4b1424bd101ebaa79bb9f370a9734/tools/ax338-representation-parity.mjs).
+It used the immutable old product, not a regenerated expected candidate. All 1,215 non-retired animation tracks (including all right-hand channels)
 retain byte-identical times/values and interpolation; all nine durations match.
 All six per-part triangle counts and position/UV0 vertices match;
 maximum position difference is 3.819e-8 m. The eight accepted coplanar guard
@@ -306,14 +305,11 @@ Parent approved updating only the representation-dependent rifle/optic hashes;
 the original 10-micrometre lattice, winding/normal/UV logic and protected clip hash
 are unchanged. No geometry/contact/motion tolerance was relaxed.
 
-The retained `smoke-ax338-skin.mjs` regression now verifies real ordinary vertices
-against their authored controls (7,118 half-frame poses / 5,505,279 probes,
-maximum 3.141e-16 m), exact per-part triangles, absence of unnecessary skin
-attributes/skeletons, real drop/cartridge geometry, unit sampled quaternions and
-interruptions. Inspection owns cloned transforms while borrowing geometry,
-materials and textures; disposing it leaves live pose/resources intact, and adapter
-disposal releases owned materials/maps exactly once. Native/runtime parity retains
-the original 0.05 mm sampled-surface gate (measured 0.007631 mm). Native/cooked
+`smoke-ax338.mjs` and `smoke-ax338-runtime.mjs` retain geometry fingerprints,
+ordinary ownership, real drop/cartridge geometry, unit sampled quaternions,
+interruptions and the original 0.05 mm native/runtime sampled-surface gate
+(measured 0.007631 mm). Shared inspection tests cover independent transforms,
+borrowed resources and owned material/map disposal. Native/cooked
 actual shared-arm sweeps pass 761 poses; left DCC passes 474 poses at the unchanged
 0.903077 mm depth. Full right-hand DCC acceptance remains the inherited failure
 below; none of these checks clears it. Two fresh separate-process source

@@ -125,6 +125,19 @@ native.root.traverse((mesh) => {
   }
 });
 for (const model of [native, runtime]) {
+  model.root.traverse((mesh) => {
+    if (mesh.isMesh)
+      assert(
+        !mesh.isSkinnedMesh &&
+          !mesh.geometry.attributes.skinIndex &&
+          !mesh.geometry.attributes.skinWeight
+      );
+  });
+  for (const name of ['receiver', 'handguard', 'stock', 'optic', 'bolt', 'trigger'])
+    assert.equal(
+      model.root.getObjectByName(`${name}_mesh`).parent,
+      model.root.getObjectByName(name)
+    );
   const glass = [...model.materials].find((m) => m.name.startsWith('10 |'));
   assert(
     glass.transparent && !glass.depthWrite && Math.abs(glass.opacity - 0.13) < 1e-6,

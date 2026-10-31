@@ -61,21 +61,16 @@ lossy decoded-vector setter. Every restored corner is checked against its origin
 local normal, including zero-area and tiny triangles, then temporary attributes are
 removed. Editable components are saved before export preparation.
 
-`mpx_normal_check.py` retains the source-named selector regression for the lossy
-setter and exact packed-normal preservation. `tools/mpx-pass2-parity.mjs` accepts an
-independent native reference (including the d29573f8 solid-cover skin): it compares
-all oriented triangle/position/UV/finish/owner records, original helper curves and
-rest/moving normals, with dense 120 Hz samples and >=21 full-surface poses per clip.
-Only the retired mechanical armature/control/frame nodes and duplicate bone curves
-are omitted from the helper equality check; their actual geometry is still compared.
-No new expected hash replaces the independent reference.
+`mpx_normal_check.py` guards the lossy setter and exact packed-normal preservation.
+The one-off frozen-reference migration comparator is preserved in
+[Git history](https://github.com/EdoardoLuciani/Claude-of-Duty/blob/ec1d361fdfd4b1424bd101ebaa79bb9f370a9734/tools/mpx-pass2-parity.mjs), not the rebuild path.
 
-The historically named `smoke-mpx-skin.mjs` now checks ordinary native/cooked surface
-vertices and normals against all ten original owners, dense subframes, actual 38mm
-carrier lockback/reset, cap movement and back-face-culled closed-lid rays, independent
-magazine/round ownership and inspection/material disposal. Inspection clones from
-lockback and mid-reload compare every actual carrier vertex against fresh Idle.
-No geometry, normal, mechanical, contact or ownership tolerance was broadened.
+`smoke-mpx-asset.mjs` and `smoke-mpx.mjs` cover native/cooked geometry, original rigid
+owners, 38mm lockback/reset, back-face-culled closed-lid rays and independent ammunition.
+Inspection from lockback and mid-reload must give the real carrier the same geometry
+and world matrix as fresh Idle; ordinary geometry makes this exact for every vertex.
+Shared inspection tests cover borrowed resources and disposal. Existing contact,
+geometry, normal and animation limits are unchanged.
 
 ## Approved repeatability limit
 
