@@ -81,6 +81,17 @@ const localFrameNormalMeshes = new Set([
 ]);
 model.root.traverse((mesh) => {
   if (!mesh.isMesh) return;
+  assert(!mesh.isSkinnedMesh, `${mesh.name}: ordinary geometry, no full-body skin`);
+  assert.equal(mesh.geometry.attributes.skinIndex, undefined);
+  assert.equal(mesh.geometry.attributes.skinWeight, undefined);
+  const owner = [
+    'Front_sight_post',
+    'Front_sight_tip',
+    'MaTech_aperture_stalk',
+    'MaTech_open_aperture',
+  ].includes(mesh.name)
+    ? mesh.name
+    : mesh.parent.name;
   mesh.skeleton?.update();
   const uv = mesh.geometry.attributes.uv;
   for (let index = 0; index < mesh.geometry.attributes.position.count; index++) {
@@ -124,17 +135,6 @@ model.root.traverse((mesh) => {
     );
     if (normalDistance > 0.000002)
       normalDeviations.push({ mesh: mesh.name, index, normalDistance });
-    assert(!mesh.isSkinnedMesh, `${mesh.name}: ordinary geometry, no full-body skin`);
-    assert.equal(mesh.geometry.attributes.skinIndex, undefined);
-    assert.equal(mesh.geometry.attributes.skinWeight, undefined);
-    const owner = [
-      'Front_sight_post',
-      'Front_sight_tip',
-      'MaTech_aperture_stalk',
-      'MaTech_open_aperture',
-    ].includes(mesh.name)
-      ? mesh.name
-      : mesh.parent.name;
     const record = { mesh, index, reference: best, owner };
     matched.push(record);
     const owned = coverage.get(owner) ?? [];

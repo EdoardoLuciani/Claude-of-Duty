@@ -62,14 +62,14 @@ Compared with immutable published base **d29573f8**:
 | Native unique CPU attribute/index bytes    |                4,271,158 |                3,081,338 |
 | Runtime unique CPU attribute/index bytes   |                2,673,550 |                2,321,350 |
 
-Runtime CPU arrays fall by 352,200 B, but that is **not uploaded GPU memory**.
-On r187 WebGPU, the removed 44,025 four-influence rigid streams are expected to
-recover about **880,500 B** because non-normalized Uint8 joint IDs expand to
-Uint32. Expected geometry is around 2,479,560 B versus the measured baseline
-3,360,060 B (~26.2% less); parent must measure actual candidate uploads. No FPS
-improvement is claimed; five more submissions and ordinary-object costs are an
-explicit tradeoff. CPU index bytes stay 310,758 B in the runtime; no index-width
-saving is claimed. Gzip-9 uses the same Node zlib level 9 for both products.
+Runtime CPU arrays fall by 352,200 B. Separate native AMD RDNA-4 / r187 measurements
+confirm uploaded geometry falls **3,360,060 → 2,479,560 B** (26.2%). The **880,500 B**
+saving matches removing 44,025 rigid-skin attribute streams after the backend widens
+non-normalized Uint8 joint IDs to Uint32. See the
+[asset acceptance record](../../../assets/weapons/fn-evolys-762/README.md) for measured
+storage and integration checks. No FPS improvement is claimed; five more submissions
+and ordinary-object costs are an explicit tradeoff. CPU index bytes stay 310,758 B;
+no index-width saving is claimed. Gzip-9 uses the same Node zlib level 9 for both products.
 
 All three encoded native PNG and cooked KTX2 image payloads are unchanged.
 Each is 1024²; runtime retains 11 mip levels. KTX2 payloads remain 1,068,530 B
@@ -85,7 +85,8 @@ all 53,059 oriented triangles, image bytes, exact UV0/UV1 and 491 poses /
 vector difference remains 0.0024999942, solely the already approved historical
 mechanical-skin encoding loss documented below. There is no new normal exception,
 retessellation or deliberate detail/silhouette change. Slight local shading can
-differ when removing that historical encoding step; matched GPU review is pending.
+differ when removing that historical encoding step; matched native-GPU review passed.
+General factory/human sign-off remains separate.
 
 The dense ownership test keeps the **same 3,415 native / 3,409 cooked pose/time
 sets**, all actual ordinary rigid vertices, endpoint/STEP checks and unchanged
