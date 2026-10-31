@@ -13,7 +13,13 @@ import { clamp01 } from './util.ts';
 function text(value: string, x: number, y: number, size: number, fill = 0xe7f2ef): Text {
   const node = new Text({
     text: value,
-    style: { fontFamily: 'Arial', fontSize: size, fontWeight: '600', fill },
+    style: {
+      fontFamily: 'Arial',
+      fontSize: size,
+      fontWeight: '600',
+      fill,
+      stroke: { color: 0x080c10, width: size >= 20 ? 2 : 1, join: 'round' },
+    },
   });
   node.position.set(x, y);
   return node;
@@ -102,14 +108,10 @@ export class PixiHudSlice {
     this.stage.eventMode = 'none';
     this.stage.interactiveChildren = false;
     this.stage.addChild(this.ammo.stage, this.vitals, this.minimap.stage, this.reticle);
-    this.vitals.addChild(
-      new Graphics()
-        .roundRect(0, 0, 196, 112, 6)
-        .fill({ color: 0x0a141c, alpha: 0.88 })
-        .stroke({ color: 0x526e70, alpha: 0.7, width: 1 })
-    );
     this.vitals.addChild(text('HEALTH', 14, 10, 10, 0xa9bac5), this.hp, this.maxHp);
-    this.vitals.addChild(new Graphics().rect(14, 72, 168, 7).fill(0x35434c));
+    this.vitals.addChild(
+      new Graphics().rect(14, 72, 168, 7).fill(0x35434c).stroke({ color: 0x080c10, width: 2 })
+    );
     this.hpFill.position.set(14, 72);
     this.vitals.addChild(this.hpFill);
     const dividers = new Graphics();
@@ -118,7 +120,9 @@ export class PixiHudSlice {
     this.armour.addChild(text('ARMOUR', 14, 91, 9, 0x79d2ff));
     for (let i = 0; i < 3; i++) {
       const x = 78 + i * 36;
-      this.armour.addChild(new Graphics().rect(x, 94, 31, 5).fill(0x35434c));
+      this.armour.addChild(
+        new Graphics().rect(x, 94, 31, 5).fill(0x35434c).stroke({ color: 0x080c10, width: 1 })
+      );
       const plate = new Graphics().rect(0, 0, 31, 5).fill(0x79d2ff);
       plate.position.set(x, 94);
       this.plates.push(plate);
