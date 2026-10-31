@@ -1,12 +1,12 @@
 """Independent saved-source geometry/animation/export checks, no regeneration.
-blender -b assets/weapons/fn-evolys-762/fn-evolys-762.blend --python-exit-code 1 --python tools/blender/evolys_check.py
+blender -b assets/weapons/fn-evolys-762/fn-evolys-762.blend --python-exit-code 1 --python tools/blender/evolys/check.py
 """
 import json
 import math
 from pathlib import Path
 import bpy
 from mathutils import Matrix, Vector
-ROOT=Path(__file__).resolve().parents[2];OUT=ROOT/'assets/weapons/fn-evolys-762'
+ROOT=Path(__file__).resolve().parents[3];OUT=ROOT/'assets/weapons/fn-evolys-762'
 manifest=json.loads((OUT/'manifest.json').read_text());scene=bpy.context.scene
 C=Matrix(((1,0,0),(0,0,-1),(0,1,0)));CI=C.inverted()
 asset=bpy.data.collections['EVOLYS | authored components']

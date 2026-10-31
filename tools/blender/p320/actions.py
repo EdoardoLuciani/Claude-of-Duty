@@ -1,4 +1,4 @@
-"""Blender P320 action authoring. Called by p320_compact.py, not at runtime.
+"""Blender P320 action authoring. Called by build.py, not at runtime.
 Wrist trajectories and every finger/ thumb channel are Blender actions. Shared
 arm skins are appended for DCC review; runtime reuses the game's same skins.
 """

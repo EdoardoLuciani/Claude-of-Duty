@@ -46,8 +46,8 @@ Follow the [shared authoring workflow](../../../tools/blender/README.md).
 
 | File | Purpose |
 | --- | --- |
-| `tools/blender/m590.py` | Geometry, seeded maps, UVs, studio, export and manifest |
-| `tools/blender/m590_actions.py` | Seven actions, shared hand controls and excluded review skins |
+| `tools/blender/m590/build.py` | Geometry, seeded maps, UVs, studio, export and manifest |
+| `tools/blender/m590/actions.py` | Seven actions, shared hand controls and excluded review skins |
 | `tools/blender/m590/export_actions.py` | Runtime action sampling and native export assertions |
 | `tools/blender/m590/skin.py` | Export-only four-joint rigid mechanical skin |
 | `tools/blender/m590/finishes.py` | Export-only UV1 scalar finish atlas and exact linear vertex colours |
@@ -57,9 +57,9 @@ Follow the [shared authoring workflow](../../../tools/blender/README.md).
 
 Declared read-only inputs are `hand-reference.json` and shared
 `assets/player/arms/player-arms.blend` (excluded review skins only). Missing inputs
-fail; ordinary builds never refit hands. `tools/m590-hand-reference.mjs` owns the
+fail; ordinary builds never refit hands. `tools/blender/m590/hand-reference.mjs` owns the
 frozen, surface-reviewed firing wrist/pose and the existing support/shell fits.
-Intentional calibration uses **edit calibration → `node tools/m590-hand-reference.mjs`
+Intentional calibration uses **edit calibration → `node tools/blender/m590/hand-reference.mjs`
 → export → source clearance checks → in-engine review**. Do not restore the old
 independent distal-pad stock fitting: it could satisfy pad distances while the
 proximal fingers and thumb web crossed the stock.
@@ -67,12 +67,12 @@ proximal fingers and thumb web crossed the stock.
 From the repository root after `npm ci`, using Blender **5.2.2**:
 
 ```sh
-blender -b -t 2 --python-exit-code 1 --python tools/blender/m590.py
+blender -b -t 2 --python-exit-code 1 --python tools/blender/m590/build.py
 # Isolated products; add --render --quick for optional GPU preview stills:
-blender -b -t 2 --python-exit-code 1 --python tools/blender/m590.py -- \
+blender -b -t 2 --python-exit-code 1 --python tools/blender/m590/build.py -- \
   --output /tmp/m590-authoring-review
 blender -b -t 2 /tmp/m590-authoring-review/m590.blend \
-  --python-exit-code 1 --python tools/blender/m590_check.py
+  --python-exit-code 1 --python tools/blender/m590/check.py
 node tests/smoke/smoke-shotgun-asset.mjs
 node tests/smoke/smoke-m590.mjs
 node tests/smoke/smoke-m590-ads.mjs
@@ -132,7 +132,7 @@ neck, keeps finger-root spreads within 11.5°, and distributes thumb flex across
 both hinges (29.3°/17.5°, instead of a 74.3° distal hook). Hand scale, shoulders,
 weapon framing, support/shell poses and all handling timings are unchanged.
 
-`m590_check.py` now sweeps all five full evaluated right-arm skin surfaces at
+`tools/blender/m590/check.py` now sweeps all five full evaluated right-arm skin surfaces at
 120 Hz through all seven actions against the actual stock, receiver/tang and
 trigger guard, with the one narrowly approved sub-30-micrometre tessellation
 exception below; all other triangle crossings are forbidden. The moving trigger is an

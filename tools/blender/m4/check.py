@@ -1,5 +1,5 @@
 """Evaluated M4 source geometry/assembly and complete-clip mechanical checks.
-blender -b assets/weapons/m4a1-block-ii/m4a1-block-ii.blend --python-exit-code 1 --python tools/blender/m4_check.py
+blender -b assets/weapons/m4a1-block-ii/m4a1-block-ii.blend --python-exit-code 1 --python tools/blender/m4/check.py
 Do not confuse surface contact/support or explicit clearance with factory CAD.
 """
 import json

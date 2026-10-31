@@ -3,20 +3,20 @@
 [Shared authoring workflow](../README.md) ·
 [Asset, references and build/check commands](../../../assets/weapons/sig-mpx/README.md)
 
-| Concern                                                               | Source                                           |
-| --------------------------------------------------------------------- | ------------------------------------------------ |
-| Build/reset/paths, seeded maps, finishes, named assemblies and studio | `../mpx.py`: `build` / `main` and named sections |
-| Original component smart-project atlas and projected markings         | End of component construction in `../mpx.py`     |
-| Eight sparse actions, hands, visibility and events                    | `../mpx_actions.py`: `author_actions`            |
-| Runtime-only sampling/reset preparation                               | `animations.py`: `prepare_export_actions`        |
-| Evaluated rigid copies, stock export and read-only assertions         | End of `../mpx.py`                               |
-| Export-only per-corner finish colour and padded ORM/normal tiles      | `finishes.py`: `consolidate_finishes`            |
-| Original rigid frames and packed-normal finish separation             | `geometry.py`: `separate_receiver_finishes`      |
+| Concern                                                               | Source                                          |
+| --------------------------------------------------------------------- | ----------------------------------------------- |
+| Build/reset/paths, seeded maps, finishes, named assemblies and studio | `build.py`: `build` / `main` and named sections |
+| Original component smart-project atlas and projected markings         | End of component construction in `build.py`     |
+| Eight sparse actions, hands, visibility and events                    | `actions.py`: `author_actions`                  |
+| Runtime-only sampling/reset preparation                               | `animations.py`: `prepare_export_actions`       |
+| Evaluated rigid copies, stock export and read-only assertions         | End of `build.py`                               |
+| Export-only per-corner finish colour and padded ORM/normal tiles      | `finishes.py`: `consolidate_finishes`           |
+| Original rigid frames and packed-normal finish separation             | `geometry.py`: `separate_receiver_finishes`     |
 
 Read-only inputs are `assets/weapons/sig-mpx/hand-reference.json` and shared
 `assets/player/arms/player-arms.blend`. Refit only with the separately approved
-`node tools/mpx-hand-reference.mjs` stage. The shared
-`evolys_actions.author_review_hands` API also serves EVOLYS; don't change it as a
+`node tools/blender/mpx/hand-reference.mjs` stage. The shared
+`evolys.actions.author_review_hands` API also serves EVOLYS; don't change it as a
 weapon-local cleanup. Review skins are excluded from the runtime GLB.
 
 Preserve assembly order, per-component smart-project atlas and optical finishes.

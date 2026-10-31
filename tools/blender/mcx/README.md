@@ -5,7 +5,7 @@
 
 | Concern                                                   | Source                                        |
 | --------------------------------------------------------- | --------------------------------------------- |
-| Stage order and paths                                     | `../mcx_virtus.py`                            |
+| Stage order and paths                                     | `build.py`                                    |
 | Finishes and three seeded 1024² maps                      | `materials.py`: `FINISHES`, `build_materials` |
 | Named assemblies, rigid pivots and sockets                | `geometry.py`: `build_*`, `build_geometry`    |
 | Six clips, poses, visibility and events                   | `animations.py`: `build_animations`           |

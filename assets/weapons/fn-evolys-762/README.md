@@ -66,13 +66,13 @@ Caps: <150k triangles, ≤48 primitives, ≤18 materials, three 1024² maps, ≤
 
 ```sh
 # Only when intentionally changing shared calibration/contact inputs:
-# node tools/evolys-hand-reference.mjs
-blender -b -t 2 --python-exit-code 1 --python tools/blender/evolys_762.py
+# node tools/blender/evolys/hand-reference.mjs
+blender -b -t 2 --python-exit-code 1 --python tools/blender/evolys/build.py
 # Full scratch build, without touching committed products/calibration:
-blender -b -t 2 --python-exit-code 1 --python tools/blender/evolys_762.py -- \
+blender -b -t 2 --python-exit-code 1 --python tools/blender/evolys/build.py -- \
   --output /tmp/evolys-review --quick
 blender -b assets/weapons/fn-evolys-762/fn-evolys-762.blend \
-  --python-exit-code 1 --python tools/blender/evolys_check.py
+  --python-exit-code 1 --python tools/blender/evolys/check.py
 node tests/smoke/smoke-evolys.mjs
 node tests/smoke/smoke-evolys-clearance.mjs
 ```

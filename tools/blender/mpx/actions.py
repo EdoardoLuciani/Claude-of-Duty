@@ -7,7 +7,7 @@ import json
 import math
 import bpy
 from mathutils import Vector, Quaternion, Matrix
-from evolys_actions import author_review_hands
+from evolys.actions import author_review_hands
 
 C = Matrix(((0, 0, -1), (-1, 0, 0), (0, 1, 0)))
 CI = C.inverted()

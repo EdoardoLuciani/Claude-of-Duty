@@ -1,5 +1,5 @@
 """Check the saved editable source, including its real skinned hands.
-blender -b assets/weapons/p320-compact/p320-compact.blend --python-exit-code 1 --python tools/blender/p320_check.py
+blender -b assets/weapons/p320-compact/p320-compact.blend --python-exit-code 1 --python tools/blender/p320/check.py
 """
 import json
 import math
