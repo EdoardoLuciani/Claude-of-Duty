@@ -92,7 +92,6 @@ model.root.traverse((mesh) => {
   ].includes(mesh.name)
     ? mesh.name
     : mesh.parent.name;
-  mesh.skeleton?.update();
   const uv = mesh.geometry.attributes.uv;
   for (let index = 0; index < mesh.geometry.attributes.position.count; index++) {
     worldPosition(mesh, index, vertex);
