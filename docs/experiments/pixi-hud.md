@@ -73,6 +73,11 @@ Built/preview confirmation with ordinary vsync pacing: HTML engine median/p95
 Frame-interval p95 remained **16.8 ms** in both: no demonstrated FPS increase at
 the 60 Hz cap. The earlier ammo-only comparison also passes after presenter reuse.
 
+These whole-frame comparisons do not isolate Pixi self-time. A later
+[CPU/GPU attribution experiment](pixi-cost.md) measured ~0.175 ms inclusive
+CPU-side Pixi update/submission and ~0.053 ms GPU render-pass time for this slice;
+those overlapping component timings must not be read as an additive FPS forecast.
+
 Raw source results/captures: `/tmp/pixi-hud-abba/`; built results:
 `/tmp/pixi-hud-built/`; additional lifecycle checks: `/tmp/pixi-hud-lifecycle/`.
 Screenshots normalize player/weapon/armour state and settle
