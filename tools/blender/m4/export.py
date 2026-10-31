@@ -3,7 +3,6 @@ import json
 import struct
 import bpy
 from m4.finishes import consolidate_finishes
-from m4.skin import build_skin
 
 def active(o):
     bpy.ops.object.select_all(action='DESELECT');o.select_set(True);bpy.context.view_layer.objects.active=o
@@ -11,17 +10,14 @@ def active(o):
 def export_asset(output, asset, parents, separate, clips):
     OUT=output
     consolidate_finishes(asset, output)
-    parts = [obj for obj in asset.objects if obj.animation_data and obj.animation_data.nla_tracks]
-    # Only ownership-sensitive magazines, rounds and review case remain rigid.
+    # Keep static assemblies unskinned and genuine mechanisms on their authored
+    # controls. Exact iron surfaces remain ordinary meshes, independently probed.
     for parent in parents:
-        if parent.name not in ('magazine', 'magazine_spare', 'magazine_round',
-                                'magazine_spare_round', 'spent_case'):
-            continue
-        objects=[o for o in asset.objects if o.type=='MESH' and o.parent==parent]
+        objects=[o for o in asset.objects if o.type=='MESH' and o.parent==parent and o not in separate]
+        if not objects:continue
         active(objects[0])
         for obj in objects:obj.select_set(True)
         bpy.ops.object.join();bpy.context.object.name=parent.name+'_mesh'
-    build_skin(asset, parts, separate, clips)
     # Actions read the baked curves directly. Keep rest seats invertible while
     # gathering static children; hidden-parent scale must not bake into them.
     bpy.ops.object.select_all(action='DESELECT')
@@ -43,7 +39,7 @@ def export_asset(output, asset, parents, separate, clips):
     # Count both magazines/cartridge instances even when glTF deduplicates buffers.
     primitives=[p for node in doc['nodes'] if 'mesh' in node for p in doc['meshes'][node['mesh']]['primitives']]
     stats={'triangles':sum(doc['accessors'][p['indices']]['count']//3 for p in primitives),'primitives':len(primitives),'materials':len(doc['materials']),'meshes':len(doc['meshes']),'bytes':path.stat().st_size,'images':len(doc['images'])}
-    assert stats['triangles']<=91000 and stats['primitives']==6 and stats['materials']==1 and stats['bytes']<=13000000 and stats['images']==4,stats
+    assert stats['triangles']<=91000 and stats['primitives']==18 and stats['materials']==1 and stats['bytes']<=13000000 and stats['images']==4,stats
     assert {animation['name'] for animation in doc['animations']} == set(clips)
     for animation in doc['animations']:
         duration=clips[animation['name']]['duration']

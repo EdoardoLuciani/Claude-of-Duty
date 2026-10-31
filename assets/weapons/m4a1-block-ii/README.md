@@ -28,10 +28,10 @@ record reference limitations.
 Eight native clips preserve events/durations, shared IK/ADS/sway/reactive recoil.
 Keep invertible rest seats, matching NLA tracks, visible spare descendants and
 empty-reload latch/stock/deformed-arm clearance. No duplicate arms/live cases.
-Native export caps: ≤91k instanced triangles, six primitive instances, one material,
-four unchanged 1024² source maps, ≤13 MB (decimal). The native authoring byte
-allowance includes the measured rigid-skin/finish attributes and 32-bit indices;
-geometry, normal, motion, contact and exact iron tolerances are unchanged.
+Native export: ≤91k instanced triangles, 18 ordinary primitive instances, one
+material, four unchanged 1024² source maps, ≤13 MB (decimal). Geometry, motion,
+contact and exact iron tolerances are unchanged; the narrow baseline-only normal
+comparison allowance is documented below.
 The selected balanced finish adds a receiver-only albedo map with 25% of the
 original variation around the same mean. The other three maps remain shared.
 Receiver linear RGB is .041/.043/.046, roughness .44, normal strength .08;
@@ -68,100 +68,103 @@ independent X/Y warp; final native frames are authority.
 History: [#339](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/339),
 [sight approval #343](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/343).
 
-## Second-pass opaque/mechanical consolidation
+## Ordinary-mesh representation (simplification candidate)
 
-Python still saves individually editable components, all 12 source materials,
-original maps and sparse actions in `m4a1-block-ii.blend` before export preparation.
-The approved first-pass geometry is unchanged: no new simplification, iron edits,
-letter removal, socket/contact movement or hand calibration. Source and native
-products are generated from an empty scene, not from an earlier GLB/blend.
+Python saves individually editable components, all 12 source materials, original
+maps and sparse actions before export preparation. No geometry reduction, iron
+reshaping, lettering removal, socket/contact movement or calibration change is
+selected. Source and native products are generated from an empty scene.
 
-All finishes now use one opaque physical-node material. Original linear tint is
-COLOR_0 (16-bit normalized); UV1 stores roughness/metalness and UV2 stores normal
-strength/role. These are constant per triangle, not texture coordinates for an
-atlas. `m4-finishes.ts` samples the original full-resolution UV0 maps, chooses the
-original receiver-only albedo on role 1, and emits the approved green paint tint
-at strength 2 only on role 2. It preserves the native derivative tangent frame,
-scales normal XY by the authored strength and retains Z before normalization.
-Paint keeps roughness .8, zero metalness and no normal perturbation. All other
-roughness values still multiply the original roughness image; no tint, roughness,
-normal-strength, exposure or specular averaging/compensation is applied.
+The existing single opaque physical-node material is unchanged. Original linear
+tint is COLOR_0 (16-bit normalized); UV1 stores roughness/metalness and UV2 normal
+strength/role, constant per triangle. `m4-finishes.ts` samples the original UV0
+maps, selects receiver-only albedo on role 1 and emits the approved paint tint at
+strength 2 on role 2. The GLTFLoader normal-Y correction is preserved. All four
+1024² PNGs remain byte-identical. Replacing this graph with an atlas or 12 source
+materials is deliberately outside this bounded representation change.
 
-The four original 1024² embedded PNGs remain byte-identical; both 512² finish
-atlases are removed. The direct graph samples four textures per fragment (shared
-albedo, receiver albedo, roughness and full XYZ normal), versus three in each old
-finish. Both albedo samples are selected by immutable surface data; no new
-runtime texture allocation/packing or giant atlas is needed. The native GLB's
-standard slots carry these four maps; the M4 adapter is required to interpret
-UV1/UV2 and the receiver image carried in the emissive slot. The editable blend
-continues to show the original source materials without that adapter.
+The full-body 13-joint mechanical skin and its bone-action bake are removed.
+Receiver, handguard and stock are three ordinary static chunks. Bolt, nested bolt
+head, charging handle, trigger, dust cover and magazine release retain ordinary
+geometry on their original animated controls. The four exact iron surfaces stay
+ordinary meshes: merging them would require new geometric-subset machinery in
+the precision probes for little additional storage return. More submissions are
+an explicit trade-off, not free work. No new runtime machinery replaces the skin.
 
-One 13-joint, one-influence mechanical skin contains receiver, handguard, stock,
-bolt, bolt head, charging handle, trigger, dust cover, mag release and the four
-exact iron surfaces. Static assembly/sight names remain bones, not extra draws;
-the M4 sight checker extracts actual weighted triangles rather than accepting
-empty helpers as geometry. Original object curves are sampled onto equivalent
-bone-local TRS at the historical 120 Hz/STEP lattice, including Draw's exact
-fractional endpoint. Direct gameplay cover and lockback overrides operate on
-those same bones. Independent magazine bodies/followers, independently hidden
-loaded rounds and the review case remain real rigid meshes under their original
-parents. Each retains one material/draw; neither magazine/drop ownership nor
-cartridge visibility is approximated by collapsed skin geometry.
+Historical 120 Hz motion, LINEAR/STEP interpolation, reset channels and exact
+fractional Draw endpoint are unchanged. Direct cover persistence and empty
+bolt/head overrides now move the actual ordinary descendants. Magazine
+bodies/followers, independently hidden rounds and review case remain independent;
+no hidden-parent scale is baked into their geometry. Inspection owns transforms
+and mixers, borrows surfaces/materials and no longer allocates a weapon skeleton.
 
-| Measure | Pass-1 native | Pass-2 native | Pass-1 runtime | Pass-2 runtime |
+Immutable comparison baseline: `d29573f8b9426d70671ac5fb3fa4289a2de7546b`.
+
+| Measure | Baseline native | Ordinary native | Baseline runtime | Ordinary runtime |
 | --- | ---: | ---: | ---: | ---: |
-| File bytes | 9,724,336 | 12,884,956 | 5,466,544 | 5,020,616 |
-| gzip -9 bytes | 4,825,034 | 4,405,531 | 4,325,920 | 3,962,487 |
+| Raw file bytes | 12,884,956 | 9,914,424 | 5,020,616 | 4,994,800 |
+| gzip -9 bytes | 4,405,531 | 4,416,379 | 3,962,487 | 3,963,226 |
 | Unique triangles | 83,363 | 83,363 | 83,355 | 83,355 |
 | Instanced triangles | 90,605 | 90,605 | 90,597 | 90,597 |
-| Primitive instances | 19 | 6 | 19 | 6 |
-| Visible loaded-Idle submissions | 16 | 3 | 16 | 3 |
-| Materials / images | 4 / 6 | 1 / 4 | 4 / 6 | 1 / 4 |
-| Decoded vertex/index bytes | 5,575,394 | 8,223,524 | 4,163,826 | 6,216,528 |
+| Primitive instances / loaded Idle | 6 / 3 | 18 / 15 | 6 / 3 | 18 / 15 |
+| Materials / images | 1 / 4 | 1 / 4 | 1 / 4 | 1 / 4 |
+| Unique vertices | 97,573 | 97,628 | 82,878 | 82,879 |
+| Skinned vertices / joints | 90,255 / 13 | 0 / 0 | 77,640 / 13 | 0 / 0 |
+| CPU attribute bytes | 7,269,188 | 5,467,168 | 5,262,288 | 4,641,224 |
+| CPU index bytes | 954,336 | 500,178 | 954,240 | 500,130 |
+| CPU geometry bytes | 8,223,524 | 5,967,346 | 6,216,528 | 5,141,354 |
+| Embedded image payload bytes | 3,147,456 | 3,147,456 | 2,883,599 | 2,883,599 |
 
-Runtime surfaces are the 75,685-triangle mechanical skin, two 5,014-triangle
-magazine bodies, two 2,228-triangle rounds and a 428-triangle case. Loaded Idle
-shows skin + primary body + primary round (82,927 triangles); spare and case are
-hidden exactly as before. The runtime has 82,878 unique vertices / 250,065 unique
-indices; both magazine instances share buffers. Its decoded attributes use
-5,262,288 bytes and indices 954,240 bytes. These are CPU typed-array storage, not
-actual uploaded GPU allocation. The merged skin exceeds 65k vertices, requiring
-32-bit indices. Exact finish factors and rigid joints/weights increase runtime
-CPU geometry by **2,052,702 bytes (+49.3%)**. The regression budget is 6,216,528
-bytes; this is an explicit draw-versus-storage trade-off, not a memory win.
+All ordinary streams use 16-bit indices; the previous body stream used 32-bit.
+CPU geometry falls 1,075,174 B (17.3%) in the decoded runtime. This is **not** a
+measured GPU saving. On r187 WebGPU, the baseline's non-normalized Uint8 joint IDs
+expand to Uint32: removal avoids 931,680 B of expansion beyond this CPU delta.
+The corresponding geometry-only estimate is ~2,006,854 B (28.1%) below the
+baseline's measured 7,148,208 B, pending actual backend measurement. No FPS or
+whole-renderer residency claim is made. Runtime raw bytes fall 25,816 B (0.51%);
+gzip grows 739 B (0.019%), so compressed transfer savings are not claimed.
 
-Each runtime map is UASTC RGB KTX2 with all 11 mips; albedos stay sRGB, scalar and
-normal images linear. Estimated full-mip BC7/ASTC 4×4 texture storage falls from
-6,291,616 to 5,592,512 bytes; RGBA8 fallback estimate falls from 25,165,816 to
-22,369,616 bytes. Native AMD RDNA-4 / Three r187 measurements found uploaded
-geometry **4,163,828 → 7,148,208 B** and geometry-plus-logical-texture subtotal
-**10,455,444 → 12,740,720 B** (9.971 → 12.150 MiB). This excludes other renderer
-resources and driver padding; queue tracing also observed 832 B of bone buffers.
-The second pass saves draws, not GPU memory, and establishes no FPS improvement.
+Texture formats, dimensions, mip count and payloads are unchanged: four 1024²
+UASTC RGB KTX2 images, 11 mips each, original sRGB/linear assignments. Logical
+texture storage remains 5,592,512 B for BC7/ASTC, not measured total residency.
+The cook retains `-noq -vc 16 -kv`; it removes only the same eight zero-area
+triangles. Exact native-to-cooked positions/UVs/winding/normals remain required.
 
-Reproduce using gltfpack **1.3** through the checked-out `cookModel` API:
+### Independent parity and intentional minor difference
+
+The immutable full-skin native baseline comparison covers 104,548 rest vertex
+instances, 18 real surface/control owners, 2,796 fractional/event-adjacent poses
+and 16,093,734 actual moving-vertex checks. Maximum position deviation is
+0.000000018342 m, within the unchanged 2 µm motion/iron gates.
+
+Local-frame native exporter normal rounding differs on 1,610 vertex instances,
+2,814 affected triangles, total triangle area 0.0002997259001771814 m² (~3.0 cm²).
+These are tiny bevel/local-frame normal differences, not flipped surfaces. The
+largest unit-normal vector deviation is 0.0002999812 (~0.0172 degrees). Parent
+approved a baseline-only 0.0003001 bound for exactly the six meshes below; every
+other mesh retains the tighter 0.000002 comparison, and native-to-cooked normals
+remain exactly equal. Positions and iron/contact tolerances are not relaxed.
+
+| Mesh | Affected vertices | Affected triangles | Triangle area m² | Max vector delta |
+| --- | ---: | ---: | ---: | ---: |
+| bolt_head_mesh | 750 | 1,692 | 0.0000737883528616 | 0.0001731903762 |
+| bolt_mesh | 191 | 304 | 0.0000190146735299 | 0.0001415291169 |
+| charging_handle_mesh | 238 | 352 | 0.0001856987372193 | 0.0001726653943 |
+| dust_cover_mesh | 70 | 96 | 0.0000043462578556 | 0.0000999999966 |
+| mag_release_mesh | 206 | 250 | 0.0000135492768335 | 0.0001633750805 |
+| Front_sight_post | 155 | 120 | 0.0000033286018773 | 0.0002999811689 |
+
+Tests retain actual iron rays/support/dimensions, deformed hand/stock sweeps,
+latch contact, magazine drops/ammunition, interruption/death/reset behavior,
+cover and lockback motion, independent rounds, inspection rest/ownership and
+material disposal. Candidate visual/GPU/submission/timing acceptance remains a
+parent gate; the increased submission count is not presumed beneficial.
+
+Reproduce with gltfpack **1.3** through the unchanged registered cook profile:
 
 ```sh
-node --input-type=module -e "import {cookModel} from './build/models.mjs'; cookModel({input:'assets/weapons/m4a1-block-ii/m4a1-block-ii.glb',output:'assets/weapons/m4a1-block-ii/m4a1-block-ii.runtime.glb',flags:['-noq','-vc','16','-kv']})"
+GLTFPACK=/home/edoardo/.local/bin/gltfpack node build/models.mjs m4
 node tests/smoke/smoke-m4-skin.mjs
+# Optional immutable d29573f8 native baseline:
+M4_BASELINE=/path/to/d29573f8-native.glb node tests/smoke/smoke-m4-skin.mjs
 ```
-
-The registered profile includes `-kv` for otherwise-unused finish UV1/UV2. `-noq` preserves the existing 2 µm iron geometry checks;
-16-bit tint avoids dark-finish eight-bit linear errors. No additional reduction
-or material-policy change is selected. The cook still removes only eight
-zero-area triangles. `makeM4Model` restores only a wholly constant, single-key
-zero-duration Idle to 2 s; moving/nonconstant endpoint damage still throws.
-
-Native-before-skin versus native-after-skin comparison covers 104,493 rest
-vertices, all 18 surface/control owners, 2,796 fractional/event-adjacent poses and
-16,135,083 deformed vertex comparisons (maximum 0.00001834 mm). Native-to-cooked
-actual surface maximum is 0.03524 mm, consistent with the existing bounded cook
-quaternion reduction; the static iron dimension, bore/ray and support checks
-remain unchanged. Tests retain the actual hand-skin/stock sweeps, latch contacts,
-magazine drops/ammunition, interruption/death/reset behavior, direct cover and
-lockback deformation, independent rounds, inspection clone skeleton/bone-texture
-ownership and disposal. Matched native-WebGPU hero/side/ADS/reload/iron captures,
-RGBA fallback and independent code review passed. The normal graph retains the
-loader's normal-Y sign for derivative tangents; native/runtime tests cover this
-separately from geometry-normal parity. These checks do not establish factory
-fidelity, continuous contact correctness or an FPS improvement.

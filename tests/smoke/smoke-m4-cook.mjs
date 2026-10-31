@@ -41,7 +41,7 @@ for (const image of runtime.json.images) {
 const source = makeM4Model(await parseGLB(nativeBytes));
 const cooked = makeM4Model(await parseGLB(runtimeBytes));
 // Measured decoded CPU geometry budget, not actual uploaded GPU allocation.
-// One rigid skin crosses the 65k-index boundary and adds exact finish factors.
+// Ordinary assembly streams retain exact finish factors without skin attributes.
 const arrayBytes = (model) => {
   const arrays = new Set();
   model.root.traverse((mesh) => {
@@ -51,8 +51,8 @@ const arrayBytes = (model) => {
   });
   return [...arrays].reduce((sum, array) => sum + array.byteLength, 0);
 };
-assert(arrayBytes(source) <= 8_223_524, 'bounded native mechanical skin/finish arrays');
-assert(arrayBytes(cooked) <= 6_216_528, 'bounded decoded runtime mechanical skin/finish arrays');
+assert(arrayBytes(source) <= 5_967_346, 'bounded native ordinary assembly/finish arrays');
+assert(arrayBytes(cooked) <= 5_141_354, 'bounded decoded runtime ordinary assembly/finish arrays');
 const materials = (model) => {
   const result = new Map();
   model.root.traverse((mesh) => {

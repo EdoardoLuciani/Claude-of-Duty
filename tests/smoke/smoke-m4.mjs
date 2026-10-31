@@ -11,7 +11,7 @@ import { WeaponSystem } from '../../src/weapons/index.ts';
 import { makeM4Model } from '../../src/weapons/m4.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
-import { checkM4Sights, createM4SurfaceProbe } from '../../tools/lib/m4-sight-checks.js';
+import { checkM4Sights } from '../../tools/lib/m4-sight-checks.js';
 
 const dir = new URL('../../assets/weapons/m4a1-block-ii/', import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', dir)));
@@ -35,7 +35,7 @@ assert.equal(
 assert.equal(primitives.length, manifest.stats.primitives);
 assert(
   triangles <= 91000 &&
-    primitives.length === 6 &&
+    primitives.length === 18 &&
     json.materials.length === 1 &&
     bytes.length <= 13000000
 );
@@ -53,8 +53,11 @@ assert(
   json.buffers.every((b) => !b.uri) && json.images.every((i) => i.bufferView !== undefined),
   'local self-contained GLB'
 );
-assert.equal(json.skins.length, 1, 'weapon mechanical skin only, no duplicate arms');
-assert.equal(json.skins[0].joints.length, 13);
+assert.equal(
+  json.skins?.length ?? 0,
+  0,
+  'ordinary weapon geometry, no full-body or duplicate arm skins'
+);
 const binaryStart = 28 + bytes.readUInt32LE(12);
 for (const image of json.images) {
   const view = json.bufferViews[image.bufferView];
@@ -168,27 +171,21 @@ async function checkModel(bytes, format) {
       1
     );
     const node = model.root.getObjectByName(name);
-    const probe = node.isBone ? createM4SurfaceProbe(model.root, name) : null;
-    try {
-      const hits = ray.intersectObject(probe ?? node, true);
-      assert(hits.length, `${name}: expected rendered indexed surface`);
-      return hits[0].point;
-    } finally {
-      probe?.geometry.dispose();
-    }
+    const hits = ray.intersectObject(node, true);
+    assert(hits.length, `${name}: expected rendered indexed surface`);
+    return hits[0].point;
   }
   close(firstHit('bolt_head', [0.002, 0.075, -0.108], [0, 0, 1]).z, -0.105, 0.00001);
   close(firstHit('receiver_mesh', [0.004, 0.075, -0.4738], [0, 0, 1]).z, -0.4733, 0.00001);
   // Open rear cup: first rendered surface is the front post/paint, not its
   // axis/socket. Allow 30 µm for the polygon chord and 10 µm paint clearance.
   close(firstHit('M4_RIG', [0, 0.1394, 0.06], [0, 0, -1]).z, -0.3027, 0.00003);
-  // Fixed assemblies now share one indexed receiver mesh, with one primitive per
-  // compatible finish. Inspect actual rendered vertices, not empty helper bounds.
+  // Inspect actual ordinary assembly vertices, not the retained empty seats.
   function fixedBounds(include) {
     const bounds = new THREE.Box3();
     const vertex = new THREE.Vector3();
     const inverse = model.root.matrixWorld.clone().invert();
-    model.root.getObjectByName('receiver_mesh').traverse((mesh) => {
+    model.root.traverse((mesh) => {
       if (!mesh.isMesh) return;
       const transform = new THREE.Matrix4().multiplyMatrices(inverse, mesh.matrixWorld);
       const positions = mesh.geometry.attributes.position;
@@ -258,7 +255,7 @@ async function checkModel(bytes, format) {
   );
   // Probe halfway between the 4.5 mm traction ribs, not their raised crowns.
   const padZ = [-0.02325, 0.00375, 0.03075, 0.05775, 0.07575].map(
-    (y) => firstHit('receiver_mesh', [0, y, 0.35], [0, 0, -1]).z
+    (y) => firstHit('stock_mesh', [0, y, 0.35], [0, 0, -1]).z
   );
   assert(
     Math.max(...padZ) - Math.min(...padZ) < 0.0001,

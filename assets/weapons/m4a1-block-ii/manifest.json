@@ -156,10 +156,10 @@
   },
   "stats": {
     "triangles": 90605,
-    "primitives": 6,
+    "primitives": 18,
     "materials": 1,
-    "meshes": 4,
-    "bytes": 12884956,
+    "meshes": 16,
+    "bytes": 9914424,
     "images": 4
   },
   "textureResolution": 1024,
