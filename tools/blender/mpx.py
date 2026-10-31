@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from mpx_actions import author_actions
 from mpx.animations import prepare_export_actions
 from mpx.finishes import consolidate_finishes
+from mpx.skin import consolidate_mechanics
 
 
 def build(output, render=False, quick=False):
@@ -773,17 +774,19 @@ def build(output, render=False, quick=False):
         if source.type=='EMPTY':
             source.name='SOURCE_'+source.name
             clone.name=source.name.removeprefix('SOURCE_')
+    prepare_export_actions(list(export.objects), clips)
+    consolidate_mechanics(export, clips)
     bpy.ops.object.select_all(action='DESELECT')
     for o in export.objects: o.select_set(True)
     bpy.context.view_layer.objects.active=copy_by_source[rig]
-    prepare_export_actions(list(export.objects), clips)
     bpy.ops.export_scene.gltf(filepath=str(OUT/'mpx.glb'),export_format='GLB',use_selection=True,
                               export_animations=True,export_animation_mode='ACTIONS',export_merge_animation='NLA_TRACK',
                               export_frame_range=False,export_force_sampling=False,
                               export_optimize_animation_keep_anim_object=True,
                               export_sampling_interpolation_fallback='LINEAR',
                               export_extras=True,export_yup=True,export_cameras=False,export_lights=False,
-                              export_vertex_color='ACTIVE',export_all_vertex_colors=False)
+                              export_vertex_color='ACTIVE',export_all_vertex_colors=False,
+                              export_rest_position_armature=False)
     raw=(OUT/'mpx.glb').read_bytes()
     length,kind=struct.unpack_from('<II',raw,12)
     assert kind==0x4e4f534a
@@ -811,7 +814,7 @@ def build(output, render=False, quick=False):
     stats={'triangleInstances':triangles,'primitives':sum(len(m['primitives']) for m in j['meshes']),
            'materials':len(j.get('materials',[])),'images':len(j.get('images',[])),'bytes':len(raw)}
     assert triangles<80000,stats
-    assert stats['primitives']<=18 and stats['materials']==4 and stats['images']==3 and len(raw)<=10*1024*1024,stats
+    assert stats['primitives']==9 and stats['materials']==3 and stats['images']==3 and len(raw)<=10*1024*1024,stats
     # Stage 7: separate manifest metadata (the GLB remains read-only).
     manifest={'status':'Geometry/materials approved; Gate 3 native animation/gameplay candidate — human review pending',
         'asset':'SIG MPX 8 inch / ROMEO4T 1.41 inch mount / MIL-SRD9-MPX / 30-round magazine / folded irons',

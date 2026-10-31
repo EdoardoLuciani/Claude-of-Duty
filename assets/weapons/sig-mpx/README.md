@@ -33,7 +33,7 @@ No duplicate arms, root recoil or review casing; all DCC controls need NLA track
 Keep exact balance/events, partial-mag retention, empty-mag discard, chamber/+1,
 lockback/cancellation/reset and one live case per shot. Handle is non-reciprocating;
 empty reload uses bolt release. Sound isn't a verified MPX recording.
-Optimized native caps: <80k triangles, ≤18 primitives, four materials including
+Optimized native caps: <80k triangles, nine real primitives, three materials including
 glTF fallback, three embedded 1024² maps, ≤10 MiB. Normal builds need no Blender/network.
 Editable components retain all 15 original finishes and three source maps. Runtime
 copies retain full-resolution colour grain on UV0, exact per-corner linear finish
@@ -60,7 +60,49 @@ blender -b -t 2 assets/weapons/sig-mpx/mpx.blend --python-exit-code 1 \
   --python tools/blender/mpx_check.py
 node tests/smoke/smoke-mpx-asset.mjs
 node tests/smoke/smoke-mpx.mjs
+node tests/smoke/smoke-mpx-skin.mjs
+blender -b -t 2 assets/weapons/sig-mpx/mpx.blend --python-exit-code 1 \
+  --python tools/blender/mpx_normal_check.py
+# Independent oriented surfaces, UV/finish/owner and moving-normal parity:
+node tools/mpx-pass2-parity.mjs /path/to/pass-1-mpx.glb /tmp/mpx-parity.json
 ```
+
+### Mechanical consolidation and costs
+
+Export copies combine the ten mechanical owners into one rigid-influence skin;
+magazine shells and rounds remain four independent draws for reload/drop ownership.
+Body lenses and both cap sheets remain three independently sorted rigid transparent
+objects, with unchanged 0.02/0.01 alpha, 0.25/0 clearcoat and 0.03/0.05
+specular/environment factors. The absorptive interior stays separate at 0.02/0.03.
+UV1 selects the optical scalar factors without another texture or vertex attribute.
+Original editable parts/materials, sockets, controls, calibration and Actions remain.
+
+| Metric | Pass 1 | Consolidated |
+|---|---:|---:|
+| All / loaded Idle primitives | 18 / 16 | 9 / 7 |
+| Materials | 4 | 3 |
+| Native triangles, all / Idle | 78,040 / 67,556 | 78,040 / 67,556 |
+| Cooked triangles, all / Idle | 71,104 / 60,818 | 73,139 / 62,875 |
+| Native raw / gzip bytes | 8,315,948 / 2,728,711 | 10,178,760 / 2,699,677 |
+| Runtime raw / gzip bytes | 2,649,308 / 1,786,348 | 2,688,196 / 1,773,429 |
+| Native vertices / vertex-view bytes / index-view bytes | 117,556 / 5,642,688 / 715,278 | 117,556 / 7,382,908 / 794,298 |
+| Runtime vertices / vertex-view bytes / index-view bytes | 88,490 / 3,539,600 / 426,624 | 90,168 / 4,102,984 / 438,834 |
+
+Opaque draws fall 14→5 (Idle 12→3); optical/interior draw counts stay 3/1.
+Native vertex-array growth is exactly 87,011 skinned vertices × 20 JOINTS/WEIGHTS bytes;
+runtime growth is 62,033 × eight bytes plus 1,678 extra vertices × 40 base bytes.
+Twenty joints (ten control parents, ten static mesh-local frames) add 1,280 inverse-bind
+bytes, copied control animation channels, CPU bone matrices and an owned bone texture.
+Loaded CPU geometry-array byte counts equal the vertex/index-view counts above;
+unique native/runtime animation-value arrays grow 366,072→384,916 / 351,736→368,768
+bytes. Animation-time arrays remain 4,008 / 4,020 bytes. Initial bone matrices cost
+1,280 CPU bytes, or 2,304 bytes after the 12×12 RGBA bone-texture backing allocation.
+Skinning adds vertex-shader work; mixed rigid/skinned opaque draws can require distinct
+shader variants. The two optical TSL selectors add scalar shader work. No GPU allocation,
+pipeline-count or FPS reduction is claimed from these CPU/delivery measurements.
+All three PNG/KTX2 payloads remain byte-identical to pass 1: 1024², cooked 11 mips,
+358,652 normal + 226,365 surface + 601,978 ORM encoded bytes. Parent native GPU
+appearance/sorting/allocation acceptance remains required.
 
 ### Runtime candidate cook
 

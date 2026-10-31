@@ -27,14 +27,17 @@ for (const asset of [MPX_NATIVE_URL, MPX_URL]) {
   assert.equal(model.reactiveFire, true);
   assert.equal(
     model.materials.size,
-    4,
-    'one opaque finish plus independent lens/cap/interior policies'
+    3,
+    'one opaque finish, one shared optical finish, exact absorptive interior'
   );
-  for (const prefix of ['11 |', '12 |']) {
+  for (const prefix of ['11 |']) {
     const material = [...model.materials].find((m) => m.name.startsWith(prefix));
     assert(material && material.transparent && material.forceSinglePass && !material.depthWrite);
     assert(
-      material.opacity <= 0.02 && material.transmission === 0 && material.envMapIntensity <= 0.05,
+      material.opacityNode &&
+        material.clearcoatNode &&
+        material.transmission === 0 &&
+        material.envMapIntensity === 0.05,
       'optical sheets must not wash out the world'
     );
   }
