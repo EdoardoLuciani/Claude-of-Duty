@@ -36,7 +36,7 @@ No duplicate arms, root recoil or review casing; all DCC controls need NLA track
 Keep exact balance/events, partial-mag retention, empty-mag discard, chamber/+1,
 lockback/cancellation/reset and one live case per shot. Handle is non-reciprocating;
 empty reload uses bolt release. Sound isn't a verified MPX recording.
-Native asset: <80k triangles, seven real primitives, three materials including
+Native asset: <80k triangles, sixteen ordinary primitives, three materials including
 glTF fallback, three embedded 1024² maps, ≤10 MiB. Normal builds need no Blender/network.
 The recipe retains all 15 original finish calibrations and three source maps;
 editable solid lids reuse the existing polymer finish. The unused clear-cover
@@ -72,7 +72,52 @@ blender -b -t 2 assets/weapons/sig-mpx/mpx.blend --python-exit-code 1 \
   --python tools/blender/mpx_normal_check.py
 ```
 
-### Approved solid covers and costs
+### Ordinary-mesh simplification candidate
+
+The d29573f8 solid-cover baseline is retained as the independent comparison, not the
+older clear-cap asset. The ten-control/twenty-joint full-body skin is removed in favour
+of the original local-frame ordinary meshes. The four genuinely animated mechanisms
+remain under their original controls; stationary parts need no skin. Caps keep their
+actual adjustable pivots, 1.5mm solid lids and original open/closed behaviour. Body
+lenses, absorptive interior and independent magazines/ammunition are unchanged.
+No intentional surface change or retessellation was authored. The unchanged pinned
+cook simplifies these separate rigid surfaces differently, which requires matched
+native-WebGPU visual review before accepting the increased submission count.
+
+| Metric | d29573f8 solid covers | Ordinary candidate |
+|---|---:|---:|
+| Materials | 3 | 3 |
+| All / loaded Idle primitives | 7 / 5 | 16 / 14 |
+| Native triangles all / Idle | 78,272 / 67,788 | 78,272 / 67,788 |
+| Cooked triangles all / Idle | 73,377 / 63,113 | 71,270 / 60,984 |
+| Native static / skinned vertices | 30,463 / 87,347 | 117,810 / 0 |
+| Cooked static / skinned vertices | 28,057 / 62,369 | 88,676 / 0 |
+| Joints / animation tracks (all 8 clips) | 20 / 1,368 | 0 / 1,224 |
+| Native raw / gzip-9 bytes | 10,198,740 / 2,615,880 | 8,327,412 / 2,649,173 |
+| Runtime raw / gzip-9 bytes | 2,689,748 / 1,768,263 | 2,650,272 / 1,774,679 |
+| Native CPU vertex / index bytes | 7,401,820 / 797,802 | 5,654,880 / 716,910 |
+| Runtime CPU vertex / index bytes | 4,115,992 / 440,262 | 3,547,040 / 427,620 |
+
+Gzip uses Node level 9 consistently for both sides. Runtime delivery shrinks raw but
+slightly grows compressed; this is not a delivery-size win. All three PNG/KTX2 image
+payloads are byte-identical: 1024² with 11 cooked mips, 358,652 normal + 226,365 surface
++ 601,978 ORM encoded bytes. CPU array reductions are not GPU measurements. Removing
+62,369 weighted vertices avoids r187's non-normalized Uint8 joint-ID expansion
+(four Uint32 IDs plus four normalized weight bytes, 20 B/vertex); parent must measure
+actual uploaded geometry and increased object/submission costs. No FPS claim is made.
+
+Independent native comparison matches **all 78,272 oriented triangles**, 63 retained
+named controls and all 1,224 original helper channels. Maximum position difference
+is 7.45e-9 m, UV difference 1.1920928955078125e-7 (the existing UV-only repeatability
+limit), rest normal vector error 1.18e-7 and animated normal error 1.86e-7 over
+15,349,162 samples. No affected normals exceed the existing 0.001 gate; there are no
+new normal exceptions or appearance waivers. Actual ordinary carrier vertices from
+live lockback/mid-reload inspections match fresh Idle exactly. Native/cooked gameplay,
+contacts, actual closed solid-lid rays, magazine/round ownership and borrowed-resource
+inspection disposal remain checked. GPU storage/submission/timing, matched views and
+independent review remain parent gates; this candidate is not final visual acceptance.
+
+### Approved solid covers and costs (historical skinned representation)
 
 Only the two clear cover sheets are replaced: closed polymer discs join their
 existing cap frames in the opaque mechanical skin. There are still twenty joints;
@@ -104,9 +149,10 @@ storage are unchanged. This excludes other renderer resources and driver padding
 Matched hero/side/optic/ADS/reload/inspect and closed-cover optic/ADS readbacks,
 forced RGBA, market and production integration checks passed. User visual approval
 and independent technical acceptance cover this redesign, not general Gate 3.
-The historical `tools/mpx-pass2-parity.mjs` full-surface checker applies only to the
-clear-cover consolidation checkout; solid-cover acceptance enumerates the intended
-lid replacements separately instead of weakening its original comparisons.
+When comparing the older clear-cover asset against the solid-cover asset,
+`tools/mpx-pass2-parity.mjs` cannot match the deliberately replaced lid triangles;
+that historical acceptance enumerated replacements separately. The current ordinary
+candidate instead matches every triangle against the accepted solid-cover baseline.
 
 ### Accepted clear-cover consolidation baseline (historical)
 

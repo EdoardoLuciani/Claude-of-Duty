@@ -28,7 +28,7 @@ assert.ok(
 );
 assert.equal(manifest.textures.resolution, 1024);
 assert.ok(manifest.textures.packed && manifest.textures.embedded);
-// Rigid skin attributes and preserved split-normal fans add native-only storage.
+// Local rigid surfaces retain all authored geometry without skin attributes.
 assert.ok(file.length <= 10 * 1024 * 1024);
 const usesDefaultMaterial = gltf.meshes.some((m) =>
   m.primitives.some((p) => p.material === undefined)
@@ -41,8 +41,8 @@ assert.equal(
 const primitives = gltf.meshes.reduce((n, mesh) => n + mesh.primitives.length, 0);
 assert.equal(
   primitives,
-  7,
-  'opaque mechanics including solid lids, four magazine/round primitives, body glass and interior'
+  16,
+  'ten rigid owners, four magazine/round primitives, body glass and interior'
 );
 assert.equal(primitives, manifest.stats.primitives);
 assert.equal(gltf.materials.length, manifest.stats.materials);
@@ -239,10 +239,13 @@ assert.ok(
 const root = (await parseGLB(file)).scene;
 root.updateMatrixWorld(true);
 const nodes = gltf.nodes.map((node) => root.getObjectByName(node.name));
-const surface = root.getObjectByName('MPX_surface');
-assert.ok(surface.isSkinnedMesh);
-assert.equal(surface.geometry.groups.length, 0, 'one real primitive, not disguised groups');
-assert.equal(surface.skeleton.bones.length, 20);
+root.traverse((mesh) => {
+  if (!mesh.isMesh) return;
+  assert.ok(!mesh.isSkinnedMesh, 'ordinary rigid geometry, no stationary-body skin');
+  assert.equal(mesh.geometry.groups.length, 0, 'one real primitive per surface');
+  assert.equal(mesh.geometry.attributes.skinIndex, undefined);
+  assert.equal(mesh.geometry.attributes.skinWeight, undefined);
+});
 for (const name of [
   'MPX_RIG',
   'receiver',
@@ -283,30 +286,15 @@ for (const [tag, side] of [
     `${tag} cover pivot must mount to the optic, not float below it`
   );
 }
-// Read the actual weighted surface for former rigid parts, never empty helpers.
+// Read actual ordinary part geometry, never empty control helpers.
 function partVertices(name, visit) {
-  const helper = root.getObjectByName(name.replace(/_mesh$/, ''));
-  const direct = root.getObjectByName(name);
-  if (direct?.isMesh) {
-    const p = new THREE.Vector3();
-    for (let i = 0; i < direct.geometry.attributes.position.count; i++) {
-      direct.getVertexPosition(i, p);
-      visit(p.applyMatrix4(direct.matrixWorld));
-    }
-    return;
-  }
-  assert.ok(helper, name);
-  const joint = surface.skeleton.bones.findIndex((bone) => bone.name === 'FRAME_' + helper.name);
-  assert.ok(joint >= 0, name);
+  const mesh = root.getObjectByName(name);
+  assert.ok(mesh?.isMesh && !mesh.isSkinnedMesh, name);
   const p = new THREE.Vector3();
-  let count = 0;
-  for (let i = 0; i < surface.geometry.attributes.position.count; i++) {
-    if (surface.geometry.attributes.skinIndex.getX(i) !== joint) continue;
-    surface.getVertexPosition(i, p);
-    visit(p.applyMatrix4(surface.matrixWorld));
-    count++;
+  for (let i = 0; i < mesh.geometry.attributes.position.count; i++) {
+    mesh.getVertexPosition(i, p);
+    visit(p.applyMatrix4(mesh.matrixWorld));
   }
-  assert.ok(count > 0, `${name}: actual weighted geometry exists`);
 }
 function meshBounds(name) {
   const result = new THREE.Box3();
@@ -353,7 +341,7 @@ assert.ok(
 // The cap is merged into receiver_mesh. Select its alloy perimeter by the
 // unchanged centre/radius; exclude the smaller neck and steel face knurls.
 const capBounds = new THREE.Box3();
-const receiverIndex = gltf.nodes.findIndex((n) => n.name === 'MPX_surface');
+const receiverIndex = gltf.nodes.findIndex((n) => n.name === 'receiver_mesh');
 for (const primitive of gltf.meshes[gltf.nodes[receiverIndex].mesh].primitives) {
   if (gltf.materials[primitive.material]?.name !== 'MPX | consolidated opaque finishes') continue;
   const positions = accessor(primitive.attributes.POSITION);
@@ -415,7 +403,7 @@ const vertexViews = new Set(
 assert.ok(
   [...vertexViews].reduce((bytes, index) => bytes + runtime.bufferViews[index].byteLength, 0) <
     4.1 * 1024 * 1024,
-  'decoded vertex buffer-view budget includes rigid skin attributes'
+  'decoded vertex buffer-view budget for ordinary rigid surfaces'
 );
 assert.ok(
   runtimeFile.length < file.length / 3,
@@ -428,7 +416,7 @@ assert.equal(
 );
 assert.equal(
   runtime.meshes.reduce((sum, mesh) => sum + mesh.primitives.length, 0),
-  7
+  16
 );
 assert.equal(runtime.images.length, 3);
 assert.ok(

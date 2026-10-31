@@ -1,5 +1,5 @@
-// Independent pass-1 native oriented-surface and normal audit.
-// node tools/mpx-pass2-parity.mjs <pass-1-mpx.glb> [report.json] [candidate.glb]
+// Independent native oriented-surface and normal audit across MPX representations.
+// node tools/mpx-pass2-parity.mjs <reference-mpx.glb> [report.json] [candidate.glb]
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -7,7 +7,7 @@ import * as THREE from 'three';
 
 import { inspectGLB, parseGLB } from './lib/glb-fixture.mjs';
 
-assert.ok(process.argv[2], 'provide an independent pass-1 MPX native GLB');
+assert.ok(process.argv[2], 'provide an independent MPX native GLB');
 const bytes = [
   process.argv[2],
   process.argv[4] ?? new URL('../assets/weapons/sig-mpx/mpx.glb', import.meta.url),
@@ -17,7 +17,7 @@ const [baseline, candidate] = bytes.map(inspectGLB);
 let exactNamedControls = 0,
   exactOriginalChannels = 0;
 for (const node of baseline.json.nodes) {
-  if (node.mesh !== undefined) continue;
+  if (node.mesh !== undefined || /^(MECH_|FRAME_|MPX_mechanics$)/.test(node.name)) continue;
   const replacement = candidate.json.nodes.find((other) => other.name === node.name);
   assert.ok(replacement, node.name);
   for (const key of ['translation', 'rotation', 'scale', 'matrix', 'extras'])
@@ -29,6 +29,7 @@ for (const clip of baseline.json.animations) {
   assert.ok(replacement, clip.name);
   for (const channel of clip.channels) {
     const name = baseline.json.nodes[channel.target.node].name;
+    if (/^(MECH_|FRAME_)/.test(name)) continue;
     const other = replacement.channels.find(
       (entry) =>
         candidate.json.nodes[entry.target.node].name === name &&
@@ -234,5 +235,5 @@ assert.ok(
   report.maxRestNormalVectorError < 0.001 &&
     report.maxAnimatedNormalVectorError < 0.001 &&
     report.maxAnimatedPosition < 1e-6,
-  'independent pass-1 positions and normal directions must survive consolidation'
+  'independent reference positions and normal directions must survive representation changes'
 );
