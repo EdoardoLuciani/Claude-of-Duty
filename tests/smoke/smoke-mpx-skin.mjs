@@ -179,26 +179,72 @@ for (const suffix of ['glb', 'runtime.glb']) {
 
   surface.skeleton.computeBoneTexture();
   const liveTexture = surface.skeleton.boneTexture;
-  let liveDisposed = 0,
-    previewDisposed = 0;
+  let liveDisposed = 0;
   liveTexture.addEventListener('dispose', () => liveDisposed++);
   const def = { ...WEAPON_DEFS.smg, cycleTime: 60 / WEAPON_DEFS.smg.rpm };
-  animation.update(0, 'reloadEmpty', 0.8, true, false);
-  const livePosition = animation.bolt.position.clone();
-  const inspection = createWeaponInspection({ model, def });
-  const previewSurface = inspection.scene.getObjectByName('MPX_surface');
-  assert.notEqual(previewSurface.skeleton, surface.skeleton);
-  assert.ok(previewSurface.skeleton.bones.every((bone) => !surface.skeleton.bones.includes(bone)));
-  previewSurface.skeleton.computeBoneTexture();
-  assert.notEqual(previewSurface.skeleton.boneTexture, liveTexture);
-  previewSurface.skeleton.boneTexture.addEventListener('dispose', () => previewDisposed++);
-  inspection.dispose();
-  assert.equal(previewDisposed, 1, 'inspection bone texture disposed exactly once');
-  assert.equal(liveDisposed, 0);
-  assert.ok(animation.bolt.position.equals(livePosition));
+  const idleModel = makeMPXModel(
+    await parseGLB(
+      readFileSync(new URL(`../../assets/weapons/sig-mpx/mpx.${suffix}`, import.meta.url))
+    )
+  );
+  const idleAnimation = new MPXAnimation(idleModel);
+  const idleInspection = createWeaponInspection({ model: idleModel, def });
+  const idleSurface = idleInspection.scene.getObjectByName('MPX_surface');
+  const boltJoint = surface.skeleton.bones.findIndex((bone) => bone.name === 'FRAME_bolt');
+  const carrierVertices = byJoint[boltJoint];
+  assert.ok(carrierVertices.length > 0, 'real carrier vertices belong to the bolt frame');
+  let maximumInspection = 0;
+  for (const pose of ['lockback', 'reloadEmpty']) {
+    animation.reset();
+    if (pose === 'lockback') {
+      animation.fire();
+      animation.update(0.1, null, 0, true, false);
+    } else animation.update(0, 'reloadEmpty', 0.8, true, false);
+    const livePosition = animation.bolt.position.clone();
+    const liveBonePosition = animation.boltBone.position.clone();
+    const inspection = createWeaponInspection({ model, def });
+    const previewSurface = inspection.scene.getObjectByName('MPX_surface');
+    assert.notEqual(previewSurface.skeleton, surface.skeleton);
+    assert.ok(
+      previewSurface.skeleton.bones.every((bone) => !surface.skeleton.bones.includes(bone))
+    );
+    assert.equal(previewSurface.geometry, surface.geometry, 'inspection borrows live geometry');
+    assert.equal(previewSurface.material, surface.material, 'inspection borrows live material');
+    for (const i of carrierVertices) {
+      previewSurface.getVertexPosition(i, actual).applyMatrix4(previewSurface.matrixWorld);
+      idleSurface.getVertexPosition(i, expected).applyMatrix4(idleSurface.matrixWorld);
+      const error = actual.distanceTo(expected);
+      maximumInspection = Math.max(maximumInspection, error);
+      assert.ok(
+        error < 1e-9,
+        `${suffix}/${pose}: inspection carrier drift ${error}m from fresh Idle`
+      );
+    }
+    for (const name of ['bolt', 'MECH_bolt']) {
+      const preview = inspection.scene.getObjectByName(name);
+      const idle = idleInspection.scene.getObjectByName(name);
+      assert.ok(
+        preview.matrixWorld.elements.every(
+          (value, i) => Math.abs(value - idle.matrixWorld.elements[i]) < 1e-9
+        ),
+        `${suffix}/${pose}/${name}: inspection transform must match fresh Idle`
+      );
+    }
+    let previewDisposed = 0;
+    previewSurface.skeleton.computeBoneTexture();
+    assert.notEqual(previewSurface.skeleton.boneTexture, liveTexture);
+    previewSurface.skeleton.boneTexture.addEventListener('dispose', () => previewDisposed++);
+    inspection.dispose();
+    assert.equal(previewDisposed, 1, 'inspection bone texture disposed exactly once');
+    assert.equal(liveDisposed, 0);
+    assert.ok(animation.bolt.position.equals(livePosition));
+    assert.ok(animation.boltBone.position.equals(liveBonePosition));
+  }
+  idleInspection.dispose();
+  idleAnimation.dispose();
   animation.dispose();
   assert.equal(liveDisposed, 1, 'gameplay bone texture released with animation');
   console.log(
-    `MPX ${suffix}: ${samples} actual skinned-vertex/control samples, max ${(maximum * 1000).toFixed(6)}mm; ${normalSamples} moving normal samples, max vector error ${maximumNormal}; exact optical alpha/coating, independent moving caps, magazine ownership and inspection/skeleton disposal passed`
+    `MPX ${suffix}: ${samples} actual skinned-vertex/control samples, max ${(maximum * 1000).toFixed(6)}mm; ${normalSamples} moving normal samples, max vector error ${maximumNormal}; lockback/reload inspection carrier drift ${maximumInspection}m; exact optical alpha/coating, independent moving caps, magazine ownership and inspection/skeleton disposal passed`
   );
 }

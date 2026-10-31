@@ -23,6 +23,7 @@ for (const file of readdirSync(dir).sort()) {
     'smoke-evolys-clearance.mjs',
     'smoke-m4.mjs',
     'smoke-m4-skin.mjs',
+    'smoke-mpx-skin.mjs',
   ].includes(file);
   test(
     file,
