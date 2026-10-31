@@ -1,5 +1,5 @@
 """Render the saved P320 source, never reconstruct it.
-blender -b assets/weapons/p320-compact/p320-compact.blend --python tools/blender/p320_review.py -- --reel
+blender -b assets/weapons/p320-compact/p320-compact.blend --python tools/blender/p320/review.py -- --reel
 """
 import argparse
 import json
@@ -8,7 +8,7 @@ import subprocess
 import sys
 import bpy
 
-root=Path(__file__).resolve().parents[2]
+root=Path(__file__).resolve().parents[3]
 p=argparse.ArgumentParser()
 p.add_argument('--clip',default='Idle')
 p.add_argument('--frame',type=int,default=0)

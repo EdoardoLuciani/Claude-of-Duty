@@ -58,13 +58,13 @@ mount axis, open caps, fixed battery rim, wrist/contact and eight-action reach g
 ## Rebuild/check (root, Blender 5.2.2)
 
 ```sh
-OPENBLAS_NUM_THREADS=2 OMP_NUM_THREADS=2 blender -b -t 2 --python-exit-code 1 --python tools/blender/mpx.py -- \
+OPENBLAS_NUM_THREADS=2 OMP_NUM_THREADS=2 blender -b -t 2 --python-exit-code 1 --python tools/blender/mpx/build.py -- \
   --output /tmp/mpx-review
 # Omit --output to regenerate committed products after review.
 # Refit calibration only as a separately approved change:
-# node tools/mpx-hand-reference.mjs
+# node tools/blender/mpx/hand-reference.mjs
 blender -b -t 2 assets/weapons/sig-mpx/mpx.blend --python-exit-code 1 \
-  --python tools/blender/mpx_check.py
+  --python tools/blender/mpx/check.py
 node tests/smoke/smoke-mpx-asset.mjs
 node tests/smoke/smoke-mpx.mjs
 ```

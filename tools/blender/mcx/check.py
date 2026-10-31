@@ -1,6 +1,6 @@
 """Geometry regression checks on the editable asset (requires Blender).
 blender -b assets/weapons/mcx-virtus/mcx-virtus.blend \
-  --python tools/blender/mcx_check.py
+  --python tools/blender/mcx/check.py
 Checks are independent of the authoring script; no source rebuild or save.
 """
 import bpy

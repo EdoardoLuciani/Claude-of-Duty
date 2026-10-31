@@ -1,5 +1,5 @@
 """Reference-approved MPX exterior with eight native gameplay clips.
-blender -b --threads 2 --python-exit-code 1 --python tools/blender/mpx.py -- --render
+blender -b --threads 2 --python-exit-code 1 --python tools/blender/mpx/build.py -- --render
 Original reference-informed game art; never manufacturing geometry.
 """
 import argparse
@@ -14,9 +14,9 @@ from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(Path(__file__).parent))
-from mpx_actions import author_actions
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from mpx.actions import author_actions
 from mpx.animations import prepare_export_actions
 from mpx.finishes import consolidate_finishes
 from mpx.geometry import separate_receiver_finishes
@@ -709,7 +709,7 @@ def build(output, render=False, quick=False):
             for track in o.animation_data.nla_tracks: track.mute = track.name != 'Idle'
     scene.frame_set(0)
     bpy.context.view_layer.update()
-    notes.write('GENERATED PREVIEW: edit tools/blender/mpx.py, mpx_actions.py and mpx/; rebuild from Python.\n'
+    notes.write('GENERATED PREVIEW: edit tools/blender/mpx/; rebuild from Python.\n'
                 'Geometry/materials approved. Gate 3 animation/gameplay review pending.\n'
                 'Eight native weapon/wrist/finger clips; select matching NLA tracks on controls and review arms.\n'
                 'Shared review skins are not exported; runtime uses shared IK and live casing pools.\n'
@@ -822,7 +822,7 @@ def build(output, render=False, quick=False):
     manifest={'status':'Geometry/materials approved; Gate 3 native animation/gameplay candidate — human review pending',
         'asset':'SIG MPX 8 inch / ROMEO4T 1.41 inch mount / MIL-SRD9-MPX / 30-round magazine / folded irons',
         'units':'metres','blenderForward':'+X','blenderUp':'+Z','stats':stats,'clips':clips,
-        'source':'tools/blender/mpx.py + tools/blender/mpx/animations.py + tools/blender/mpx_actions.py',
+        'source':'tools/blender/mpx/build.py + tools/blender/mpx/animations.py + tools/blender/mpx/actions.py',
         'runtimeBasis':'GLB +X forward / +Y up / +Z right; adapter rotates basis +90 degrees around Y once',
         'textures':{'resolution':1024,'packed':True,'embedded':True,'method':'original deterministic surface maps; no photographic inputs'},
         'dimensions':{'nominalBarrel':.2032,'barrelBreech':breech,'barrelCrown':barrel_end,
