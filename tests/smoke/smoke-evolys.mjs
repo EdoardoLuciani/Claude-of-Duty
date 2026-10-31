@@ -38,15 +38,15 @@ for (const image of json.images) {
 const { imagePNG } = inspectGLB(bytes);
 for (const mat of json.materials) {
   const p = mat.pbrMetallicRoughness;
+  assert(
+    p.baseColorTexture && p.metallicRoughnessTexture && mat.normalTexture,
+    `${mat.name}: original PBR detail`
+  );
   const albedo = imagePNG(json.images[json.textures[p.baseColorTexture.index].source]);
   assert(
     p.baseColorFactor?.slice(0, 3).some((c) => c < 0.8) ||
       albedo.data.some((value, i) => i % 4 !== 3 && value < 0.8 * 255),
     `${mat.name}: authored colour, not uncoloured white`
-  );
-  assert(
-    p.baseColorTexture && p.metallicRoughnessTexture && mat.normalTexture,
-    `${mat.name}: original PBR detail`
   );
 }
 const beltNode = json.nodes.find((n) => n.name === 'belt_mesh');
