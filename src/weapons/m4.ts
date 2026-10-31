@@ -4,7 +4,6 @@ import type { Renderer } from 'three/webgpu';
 
 import handReference from '../../assets/weapons/m4a1-block-ii/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/m4a1-block-ii/manifest.json' with { type: 'json' };
-import { isSkinnedMesh } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
@@ -131,7 +130,6 @@ export class M4Animation {
   magazine!: THREE.Object3D;
   spare!: THREE.Object3D;
   magazineBody!: THREE.Object3D;
-  skin!: THREE.SkinnedMesh;
   magazineRound!: THREE.Object3D;
   spareRound!: THREE.Object3D;
   reviewCase!: THREE.Object3D;
@@ -172,9 +170,6 @@ export class M4Animation {
     // The editable scene previews ejection. Runtime keeps the existing single
     // physical casing at its original scheduled event, never a duplicate mesh.
     this.reviewCase = node('spent_case');
-    const skin = node('receiver_mesh');
-    if (!isSkinnedMesh(skin)) throw new Error('M4: missing mechanical skin');
-    this.skin = skin;
     this.hands = discoverAuthoredHands(node);
     this.poseMatrix = this.root.matrix;
     this.coverOpen = false;
@@ -244,7 +239,6 @@ export class M4Animation {
   dispose(): void {
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.root);
-    this.skin.skeleton.dispose();
     disposeWeaponMaterials(this.model);
   }
 }

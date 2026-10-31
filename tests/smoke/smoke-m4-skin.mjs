@@ -10,8 +10,8 @@ import { M4Animation, makeM4Model } from '../../src/weapons/m4.ts';
 import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
 
 const dir = new URL('../../assets/weapons/m4a1-block-ii/', import.meta.url);
-// Optional independently exported pre-skin reference for acceptance review.
-// Ordinary CI compares the native and cooked actual skinned surfaces instead.
+// Optional immutable full-body-skin reference for acceptance review.
+// Ordinary CI compares the native and cooked actual ordinary surfaces instead.
 const referencePath = process.env.M4_BASELINE ?? new URL('m4a1-block-ii.glb', dir);
 const reference = await parseGLB(readFileSync(referencePath));
 const refRoot = reference.scene.getObjectByName('M4_RIG');
@@ -38,6 +38,11 @@ for (const root of [refRoot, model.root]) {
   root.updateMatrixWorld(true);
 }
 const vertex = new THREE.Vector3();
+const normalMatrix = new THREE.Matrix3();
+const worldNormal = (mesh, index) =>
+  new THREE.Vector3()
+    .fromBufferAttribute(mesh.geometry.attributes.normal, index)
+    .applyNormalMatrix(normalMatrix.getNormalMatrix(mesh.matrixWorld));
 const worldPosition = (mesh, index, target) =>
   mesh.getVertexPosition(index, target).applyMatrix4(mesh.matrixWorld);
 const buckets = new Map();
@@ -49,7 +54,13 @@ refRoot.traverse((mesh) => {
   for (let index = 0; index < mesh.geometry.attributes.position.count; index++) {
     const position = worldPosition(mesh, index, new THREE.Vector3());
     const key = cell(position).join(',');
-    const record = { mesh, index, position, uv: [uv.getX(index), uv.getY(index)] };
+    const record = {
+      mesh,
+      index,
+      position,
+      normal: worldNormal(mesh, index),
+      uv: [uv.getX(index), uv.getY(index)],
+    };
     const bucket = buckets.get(key) ?? [];
     bucket.push(record);
     buckets.set(key, bucket);
@@ -57,6 +68,17 @@ refRoot.traverse((mesh) => {
 });
 const matched = [];
 const coverage = new Map();
+const normalDeviations = [];
+// d29573f8 full-skin export rounded these local-frame normals differently.
+// Approved baseline-only bound: <=0.0172 degrees, no cooked-normal exception.
+const localFrameNormalMeshes = new Set([
+  'bolt_head_mesh',
+  'bolt_mesh',
+  'charging_handle_mesh',
+  'dust_cover_mesh',
+  'mag_release_mesh',
+  'Front_sight_post',
+]);
 model.root.traverse((mesh) => {
   if (!mesh.isMesh) return;
   mesh.skeleton?.update();
@@ -64,35 +86,55 @@ model.root.traverse((mesh) => {
   for (let index = 0; index < mesh.geometry.attributes.position.count; index++) {
     worldPosition(mesh, index, vertex);
     const [x, y, z] = cell(vertex);
+    const normal = worldNormal(mesh, index);
     let best,
-      distance = Infinity;
+      distance = Infinity,
+      normalDistance = Infinity;
     for (let dx = -1; dx <= 1; dx++)
       for (let dy = -1; dy <= 1; dy++)
         for (let dz = -1; dz <= 1; dz++)
           for (const candidate of buckets.get([x + dx, y + dy, z + dz].join(',')) ?? []) {
-            if (!mesh.isSkinnedMesh && candidate.mesh.name !== mesh.name) continue;
+            if (!candidate.mesh.isSkinnedMesh && candidate.mesh.name !== mesh.name) continue;
             if (
               Math.abs(uv.getX(index) - candidate.uv[0]) > 1e-7 ||
               Math.abs(uv.getY(index) - candidate.uv[1]) > 1e-7
             )
               continue;
             const delta = vertex.distanceTo(candidate.position);
-            if (delta < distance) {
+            const directionDelta = normal.distanceTo(candidate.normal);
+            if (
+              delta < 1e-7 &&
+              (directionDelta < normalDistance ||
+                (directionDelta === normalDistance && delta < distance))
+            ) {
               best = candidate;
               distance = delta;
+              normalDistance = directionDelta;
             }
           }
     assert(
       best && distance < 1e-7,
       `${mesh.name}/${index}: actual source surface preserved (${distance} m)`
     );
-    const joint = mesh.isSkinnedMesh ? mesh.geometry.attributes.skinIndex.getX(index) : -1;
-    if (mesh.isSkinnedMesh) {
-      const weights = mesh.geometry.attributes.skinWeight;
-      assert.equal(weights.getX(index), 1);
-      assert.equal(weights.getY(index) + weights.getZ(index) + weights.getW(index), 0);
-    }
-    const owner = joint < 0 ? mesh.name : mesh.skeleton.bones[joint].name;
+    const normalTolerance =
+      process.env.M4_BASELINE && localFrameNormalMeshes.has(mesh.name) ? 0.0003001 : 0.000002;
+    assert(
+      normalDistance < normalTolerance,
+      `${mesh.name}/${index}: source normal deviation ${normalDistance}`
+    );
+    if (normalDistance > 0.000002)
+      normalDeviations.push({ mesh: mesh.name, index, normalDistance });
+    assert(!mesh.isSkinnedMesh, `${mesh.name}: ordinary geometry, no full-body skin`);
+    assert.equal(mesh.geometry.attributes.skinIndex, undefined);
+    assert.equal(mesh.geometry.attributes.skinWeight, undefined);
+    const owner = [
+      'Front_sight_post',
+      'Front_sight_tip',
+      'MaTech_aperture_stalk',
+      'MaTech_open_aperture',
+    ].includes(mesh.name)
+      ? mesh.name
+      : mesh.parent.name;
     const record = { mesh, index, reference: best, owner };
     matched.push(record);
     const owned = coverage.get(owner) ?? [];
@@ -100,14 +142,42 @@ model.root.traverse((mesh) => {
     coverage.set(owner, owned);
   }
 });
-assert.equal(coverage.size, 18, '13 weighted controls plus 5 rigid ownership-sensitive surfaces');
+const normalSummary = [];
+for (const name of new Set(normalDeviations.map((entry) => entry.mesh))) {
+  const mesh = model.root.getObjectByName(name);
+  const affected = normalDeviations.filter((entry) => entry.mesh === name);
+  const indices = new Set(affected.map((entry) => entry.index));
+  let triangles = 0,
+    area = 0;
+  const triangle = new THREE.Triangle();
+  for (let i = 0; i < mesh.geometry.index.count; i += 3) {
+    const vertices = [0, 1, 2].map((offset) => mesh.geometry.index.getX(i + offset));
+    if (!vertices.some((index) => indices.has(index))) continue;
+    triangles++;
+    triangle.set(...vertices.map((index) => worldPosition(mesh, index, new THREE.Vector3())));
+    area += triangle.getArea();
+  }
+  normalSummary.push({
+    name,
+    vertices: affected.length,
+    triangles,
+    area,
+    maximum: Math.max(...affected.map((entry) => entry.normalDistance)),
+  });
+}
+console.log('M4_NORMAL_DIAGNOSTIC', JSON.stringify(normalSummary));
+assert.equal(
+  coverage.size,
+  18,
+  '13 ordinary assembly/control surfaces plus 5 ownership-sensitive surfaces'
+);
 const dense = [...coverage.values()].flatMap((records) =>
   records.filter((_, i) => i % Math.max(1, Math.floor(records.length / 64)) === 0)
 );
 const actual = new THREE.Vector3(),
   expected = new THREE.Vector3();
 // The cook's existing .00015-radian local quaternion bound can move a muzzle
-// tens of micrometres; source-to-skin parity retains the original 2 µm gate.
+// tens of micrometres; full-skin-to-ordinary parity retains the original 2 µm gate.
 let poses = 0,
   vertexChecks = 0,
   maximum = 0;
@@ -124,7 +194,6 @@ for (const clip of model.animations) {
     animation._sample(clip.name, time);
     refRoot.updateMatrixWorld(true);
     model.root.updateMatrixWorld(true);
-    animation.skin.skeleton.update();
     refRoot.traverse((node) => {
       if (node.isSkinnedMesh) node.skeleton.update();
     });
@@ -144,19 +213,34 @@ for (const clip of model.animations) {
     poses++;
   }
 }
-// Gameplay lockback must deform actual bolt/head vertices and survive gestures.
+// Gameplay lockback must move actual bolt/head vertices and survive gestures.
 animation.reset();
 animation.update(0.1, '', 0, false, true);
 const boltVertices = coverage.get('bolt');
 const seated = boltVertices.map(({ mesh, index }) =>
   worldPosition(mesh, index, new THREE.Vector3())
 );
+const headVertices = coverage.get('bolt_head');
+const seatedHead = headVertices.map(({ mesh, index }) =>
+  worldPosition(mesh, index, new THREE.Vector3())
+);
+const headPivot = animation.boltHead.getWorldPosition(new THREE.Vector3());
 animation.update(0.1, '', 0, true, false);
 for (let i = 0; i < boltVertices.length; i++) {
   const { mesh, index } = boltVertices[i];
   assert(Math.abs(worldPosition(mesh, index, vertex).z - seated[i].z - 0.062) < 0.000002);
 }
-// Gameplay cover override must deform its weighted vertices, not only a helper.
+const unlock = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 8);
+for (let i = 0; i < headVertices.length; i++) {
+  const { mesh, index } = headVertices[i];
+  expected.copy(seatedHead[i]).sub(headPivot).applyQuaternion(unlock).add(headPivot);
+  expected.z += 0.062;
+  assert(
+    worldPosition(mesh, index, vertex).distanceTo(expected) < 0.000002,
+    'empty override rotates actual nested head vertices and translates with carrier'
+  );
+}
+// Gameplay cover override must move actual vertices, not only a helper.
 const coverVertices = coverage.get('dust_cover');
 animation.reset();
 animation.update(0, '', 0, false, true);
@@ -165,7 +249,6 @@ const closed = coverVertices.map(({ mesh, index }) =>
 );
 animation.fire();
 animation.update(0.02, '', 0, false, true);
-animation.skin.skeleton.update();
 assert(
   coverVertices.some(
     ({ mesh, index }, i) => worldPosition(mesh, index, vertex).distanceTo(closed[i]) > 0.001
@@ -177,30 +260,40 @@ for (const clip of ['inspect', 'draw', 'holster', '']) {
   assert(animation.cover.quaternion.angleTo(open) < 1e-7, 'direct cover override persists');
   assert(!animation.magazineRound.visible && animation.magazineRound.isObject3D);
 }
-// SkeletonUtils clones must own bones/bone textures but borrow immutable surfaces.
+// Inspection owns ordinary transforms and borrows immutable surfaces/materials.
 const inspection = createWeaponInspection({ model, def: WEAPON_DEFS.rifle });
-const inspectionScene = inspection.scene;
-const skin = inspectionScene.getObjectByName('receiver_mesh');
-assert.notEqual(skin.skeleton, animation.skin.skeleton);
-assert.notEqual(skin.skeleton.bones[0], animation.skin.skeleton.bones[0]);
-assert.equal(skin.geometry, animation.skin.geometry);
-assert.equal(skin.material, animation.skin.material);
-skin.skeleton.computeBoneTexture();
-animation.skin.skeleton.computeBoneTexture();
-assert.notEqual(skin.skeleton.boneTexture, animation.skin.skeleton.boneTexture);
-let cloneDisposed = false,
-  gameplayDisposed = false;
-skin.skeleton.boneTexture.addEventListener('dispose', () => {
-  cloneDisposed = true;
+const receiver = inspection.scene.getObjectByName('receiver_mesh');
+const gameplayReceiver = model.root.getObjectByName('receiver_mesh');
+assert.notEqual(receiver, gameplayReceiver);
+assert.equal(receiver.geometry, gameplayReceiver.geometry);
+assert.equal(receiver.material, gameplayReceiver.material);
+assert.equal(receiver.skeleton, undefined);
+assert.equal(inspection.scene.getObjectByName('bolt').skeleton, undefined);
+assert(inspection.scene.getObjectByName('bolt').position.distanceTo(animation.boltRest) < 0.000002);
+assert(
+  inspection.scene.getObjectByName('dust_cover').quaternion.angleTo(new THREE.Quaternion()) < 1e-7
+);
+assert(animation.cover.quaternion.angleTo(open) < 1e-7, 'inspection preserves live cover override');
+assert(
+  animation.bolt.position.z > animation.boltRest.z + 0.061,
+  'inspection preserves live lockback'
+);
+const gameplayPosition = gameplayReceiver.position.clone();
+receiver.position.x += 1;
+assert(gameplayReceiver.position.equals(gameplayPosition), 'independent inspection transforms');
+let geometryDisposed = false,
+  materialDisposed = false;
+receiver.geometry.addEventListener('dispose', () => {
+  geometryDisposed = true;
 });
-animation.skin.skeleton.boneTexture.addEventListener('dispose', () => {
-  gameplayDisposed = true;
+receiver.material.addEventListener('dispose', () => {
+  materialDisposed = true;
 });
 inspection.dispose();
-assert(cloneDisposed && !gameplayDisposed);
+assert(!geometryDisposed && !materialDisposed, 'inspection never disposes borrowed surfaces');
 animation.dispose();
-assert(gameplayDisposed);
+assert(!geometryDisposed && materialDisposed, 'adapter disposes owned material only');
 assert.equal(model.materials.size, 0);
 console.log(
-  `M4 mechanical skin: ${matched.length} rest vertices, ${coverage.size} surface/control owners, ${poses} fractional poses, ${vertexChecks} actual deformed vertex checks; maximum ${maximum} m; direct cover deformation, independent rounds, clone ownership and skeleton disposal passed (${process.env.M4_BASELINE ? 'pre-skin reference' : 'native reference'})`
+  `M4 ordinary representation: ${matched.length} rest vertices, ${coverage.size} surface/control owners, ${poses} fractional poses, ${vertexChecks} actual moving vertex checks; maximum ${maximum} m; direct cover motion, independent rounds, clone ownership and material disposal passed (${process.env.M4_BASELINE ? 'immutable full-skin reference' : 'native reference'})`
 );

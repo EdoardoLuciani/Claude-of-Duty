@@ -1,52 +1,11 @@
 import * as THREE from 'three';
 
-/** A disposable probe of actual rendered triangles, including rigid bone skinning.
- * Empty/bone names alone are never accepted as geometry evidence. */
+/** A disposable probe of the actual ordinary rendered iron surface. */
 export function createM4SurfaceProbe(root, name) {
   const node = root.getObjectByName(name);
-  if (node?.isMesh) {
-    const probe = new THREE.Mesh(node.geometry.clone(), node.material);
-    probe.matrixWorld.copy(node.matrixWorld);
-    return probe;
-  }
-  const skin = root.getObjectByName('receiver_mesh');
-  if (!node?.isBone || !skin?.isSkinnedMesh) throw new Error(`[m4 sights] missing ${name}`);
-  const joint = skin.skeleton.bones.indexOf(node);
-  skin.skeleton.update();
-  const source = skin.geometry;
-  const indices = [];
-  for (let i = 0; i < source.index.count; i += 3) {
-    const triangle = [0, 1, 2].map((offset) => source.index.getX(i + offset));
-    if (
-      triangle.every(
-        (index) =>
-          source.attributes.skinIndex.getX(index) === joint &&
-          source.attributes.skinWeight.getX(index) === 1
-      )
-    )
-      indices.push(...triangle);
-  }
-  if (!indices.length) throw new Error(`[m4 sights] no weighted surface for ${name}`);
-  const selected = [...new Set(indices)];
-  const remap = new Map(selected.map((index, i) => [index, i]));
-  const geometry = new THREE.BufferGeometry();
-  for (const [name, attribute] of Object.entries(source.attributes)) {
-    const values = new Float32Array(selected.length * attribute.itemSize);
-    for (let i = 0; i < selected.length; i++)
-      for (let axis = 0; axis < attribute.itemSize; axis++)
-        values[i * attribute.itemSize + axis] = attribute.getComponent(selected[i], axis);
-    geometry.setAttribute(name, new THREE.BufferAttribute(values, attribute.itemSize));
-  }
-  const positions = new Float32Array(selected.length * 3);
-  const vertex = new THREE.Vector3();
-  for (let i = 0; i < selected.length; i++)
-    skin.getVertexPosition(selected[i], vertex).toArray(positions, i * 3);
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geometry.setIndex(indices.map((index) => remap.get(index)));
-  geometry.computeBoundingBox();
-  const probe = new THREE.Mesh(geometry, skin.material);
-  probe.name = name;
-  probe.matrixWorld.copy(skin.matrixWorld);
+  if (!node?.isMesh) throw new Error(`[m4 sights] missing ordinary surface ${name}`);
+  const probe = new THREE.Mesh(node.geometry.clone(), node.material);
+  probe.matrixWorld.copy(node.matrixWorld);
   return probe;
 }
 

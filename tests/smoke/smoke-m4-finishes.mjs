@@ -142,7 +142,7 @@ for (const [format, data] of [
       );
     if (mesh.name === 'spent_case_mesh') assert.deepEqual([...partFinishes], [7]);
   });
-  assert.equal(meshes, 6);
+  assert.equal(meshes, 18);
   assert.equal(seen.size, 12, `${format}: every original finish survives`);
 }
 for (const name of ['Fire', 'Idle']) {
