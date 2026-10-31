@@ -37,6 +37,15 @@ export async function capturePixi(page, path, kind = 'panel') {
         rgba.set(raw.subarray(y * bytesPerRow, y * bytesPerRow + width * 4), y * width * 4);
       if (source.format.startsWith('bgra'))
         for (let i = 0; i < rgba.length; i += 4) [rgba[i], rgba[i + 2]] = [rgba[i + 2], rgba[i]];
+      // GPU targets are premultiplied; ImageData expects straight-alpha RGB.
+      for (let i = 0; i < rgba.length; i += 4) {
+        const alpha = rgba[i + 3];
+        if (alpha > 0 && alpha < 255) {
+          rgba[i] = Math.min(255, Math.round((rgba[i] * 255) / alpha));
+          rgba[i + 1] = Math.min(255, Math.round((rgba[i + 1] * 255) / alpha));
+          rgba[i + 2] = Math.min(255, Math.round((rgba[i + 2] * 255) / alpha));
+        }
+      }
       const overlay = document.createElement('canvas'),
         parent = p.canvas.parentElement;
       const position = parent.style.position;
@@ -66,6 +75,12 @@ export async function capturePixi(page, path, kind = 'panel') {
           return pixels;
         };
         return {
+          cornerAlpha: [
+            rgba[3],
+            rgba[(width - 1) * 4 + 3],
+            rgba[(height - 1) * width * 4 + 3],
+            rgba[(width * height - 1) * 4 + 3],
+          ],
           panelAlpha: [alpha(p.vitals, 4, 4), alpha(p.ammo.stage, 4, 4)],
           readoutPixels: [ink(p.vitals, 12, 24, 90, 46), ink(p.ammo.stage, 12, 34, 206, 62)],
         };

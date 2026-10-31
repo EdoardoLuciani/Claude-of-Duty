@@ -1,9 +1,11 @@
 # Playable Pixi HUD slice
 
 Use `?pixi=hud` for ammo/reload, health/armour, crosshair and a live minimap.
-Omit the parameter for the unchanged native HUD. Menus, shop/inspection,
-startup/error handling, equipment, compass, markers, injury overlays, prompts,
-radio and killfeed remain native. This is **not** the no-UI benchmark state.
+Omit the parameter for the unchanged native HUD. The later
+[injury/world-marker extension](pixi-underlays.md) also moves those two presenters
+to Pixi. Menus, shop/inspection, startup/error handling, equipment, compass,
+hitmarkers/damage arcs, prompts, radio and killfeed remain native. The measurements
+below describe the initial four-widget slice, not that extension or the no-UI state.
 
 Supersedes draft PRs #564, #565 and #566 (closed at the operator's request).
 The shared-device and ammo groundwork is reused; `?pixi=ammo` and `?pixi=1`
@@ -19,14 +21,14 @@ crosshair experiment is not included.
   or render ticker. A hidden HUD does not render; unchanged paused HUD graphics
   do not render. CSS handles HUD/menu opacity without rerasterizing its content.
 - Canvas placement is after the world-marker layer and before native centre/chrome
-  feedback. Native hitmarkers/damage arcs, equipment and menus stay above it;
-  native blood/flash overlays stay below the HUD, as before.
+  feedback. Native hitmarkers/damage arcs, equipment and menus stay above it.
+  The later extension renders injury and world markers below readouts in Pixi.
 - The shared `PixiAmmoView` is the previous ammo presenter without renderer ownership.
   The old ammo-only wrapper and the new HUD reuse the same code/pip calculation.
 - Crosshair spring/stance/ADS/hit/flinch and health/bar/armour animation state stay
   in their existing native owners. Those owners can skip DOM widget presentation;
-  event wiring/gameplay behavior is not duplicated. Health's screen-space injury
-  overlays intentionally remain native and active.
+  event wiring/gameplay behavior is not duplicated. The later injury presenter
+  consumes the same state without mutating the hidden native overlay DOM.
 - Minimap uses the same north-up world bake, footprint geometry, traversables,
   labels, 60 m span, LOS/recent-shot contacts and intel/objective snapshots.
   Canvas2D is used **once** for the existing authored bake, then uploaded once.
@@ -59,7 +61,7 @@ Average main-thread task time **6.86 → 6.17 ms**. These overlap with engine/UI
 measurements: never add the columns. This is a small single-machine sample of
 uncapped headless throughput, **not guaranteed real-play FPS** or GPU/compositor
 execution attribution. No claim to recover the entire ~3 ms no-UI suppression
-budget; most other HUD/DOM injury presentation is still present. No second
+budget; this initial measurement still included native injury presentation. No second
 hardware or long-session validation yet.
 
 All four runs matched: 25 player shots, 227 AI shots, 2 completed reloads,

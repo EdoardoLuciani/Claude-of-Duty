@@ -50,6 +50,10 @@ export class HealthFx {
   declare beatEnergy: number;
   declare armourShown: number;
   declare armourFlash: number;
+  bloodAlpha = 0;
+  bloodScale = 1;
+  beatAlpha = 0;
+  flashAlpha = 0;
   constructor(parent: HTMLElement, chrome: HTMLElement = parent) {
     this.bloodWrap = el('div', 'ow-blood', parent);
     el('div', 'ow-blood-a', this.bloodWrap);
@@ -101,7 +105,7 @@ export class HealthFx {
   }
 
   /** @param {object} s { health, maxHealth, armour, maxArmour, hurt, pulse } */
-  update(dt: number, s: HealthState, presentVitals = true): void {
+  update(dt: number, s: HealthState, presentVitals = true, presentInjury = true): void {
     const h = clamp01((s.health ?? 100) / (s.maxHealth || 100));
     const targetHurt = s.hurt !== undefined ? clamp01(s.hurt) : clamp01((0.78 - h) / 0.78) ** 1.3;
     this.hurt = damp(this.hurt, targetHurt, 7, dt);
@@ -112,23 +116,20 @@ export class HealthFx {
 
     const healPulse = s.healing ? 0.08 * (s.healProgress ?? 0) : 0;
 
-    const bloodA = clamp01(hurt * 1.4 + this.beatEnergy * 0.16);
-    setStyle(this.bloodWrap, 'opacity', bloodA.toFixed(3));
-    setStyle(this.bloodWrap, 'display', bloodA < 0.004 ? 'none' : '');
-    const bs = 1 + this.beatEnergy * 0.022 + healPulse * 0.12;
-    setStyle(this.bloodWrap, 'transform', `scale(${bs.toFixed(4)})`);
-
-    const beatA = clamp01(this.beatEnergy * 0.55);
-    setStyle(this.beat, 'opacity', beatA.toFixed(3));
-    setStyle(this.beat, 'display', beatA < 0.004 ? 'none' : '');
-
-    if (this.flashT < 1) {
-      this.flashT = Math.min(1, this.flashT + dt / 0.19);
-      const a = (this.flashPeak ?? 1) * (1 - ease.outQuad(this.flashT)) * 0.8;
-      setStyle(this.flash, 'opacity', a.toFixed(3));
-      setStyle(this.flash, 'display', '');
-    } else {
-      setStyle(this.flash, 'display', 'none');
+    this.bloodAlpha = clamp01(hurt * 1.4 + this.beatEnergy * 0.16);
+    this.bloodScale = 1 + this.beatEnergy * 0.022 + healPulse * 0.12;
+    this.beatAlpha = clamp01(this.beatEnergy * 0.55);
+    const flashing = this.flashT < 1;
+    if (flashing) this.flashT = Math.min(1, this.flashT + dt / 0.19);
+    this.flashAlpha = flashing ? (this.flashPeak ?? 1) * (1 - ease.outQuad(this.flashT)) * 0.8 : 0;
+    if (presentInjury) {
+      setStyle(this.bloodWrap, 'opacity', this.bloodAlpha.toFixed(3));
+      setStyle(this.bloodWrap, 'display', this.bloodAlpha < 0.004 ? 'none' : '');
+      setStyle(this.bloodWrap, 'transform', `scale(${this.bloodScale.toFixed(4)})`);
+      setStyle(this.beat, 'opacity', this.beatAlpha.toFixed(3));
+      setStyle(this.beat, 'display', this.beatAlpha < 0.004 ? 'none' : '');
+      if (flashing) setStyle(this.flash, 'opacity', this.flashAlpha.toFixed(3));
+      setStyle(this.flash, 'display', flashing ? '' : 'none');
     }
 
     // --- vitals readout ---------------------------------------------------

@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { el, svg, setText, setStyle, Pool, ease, clamp01, metres } from './util.ts';
 
 const _v = new THREE.Vector3();
-interface Projection {
+export interface Projection {
   x: number;
   y: number;
   dist: number;
@@ -21,9 +21,8 @@ interface ObjectiveNode extends HTMLElement {
 interface GrenadeNode extends HTMLElement {
   _ring: HTMLElement;
   _label: HTMLElement;
-  _pos: THREE.Vector3;
 }
-interface Objective {
+export interface Objective {
   position?: THREE.Vector3;
   label?: string;
   name?: string;
@@ -35,7 +34,7 @@ interface Objective {
  * Returns the shared scratch object — never held past the call site.
  */
 const _proj: Projection = { x: 0, y: 0, dist: 0, behind: false, offscreen: false, angle: 0 };
-function project(
+export function projectMarker(
   pos: THREE.Vector3,
   camera: THREE.Camera,
   w: number,
@@ -134,8 +133,60 @@ function nadeGlyph(parent: HTMLElement): SVGSVGElement {
  * their glyph swaps to a chevron pointing at the target — the same behaviour as
  * a CoD objective you have turned away from.
  */
+export interface ObjectiveMarkerState {
+  visible: boolean;
+  x: number;
+  y: number;
+  edge: boolean;
+  angle: number;
+  alpha: number;
+  label: string;
+  distance: string;
+  name: string;
+}
+export interface GrenadeMarkerState {
+  visible: boolean;
+  position: THREE.Vector3;
+  t: number;
+  life: number;
+  x: number;
+  y: number;
+  label: string;
+  ringScale: number;
+  ringAlpha: number;
+  alpha: number;
+}
+
 export class WorldMarkers {
+  readonly objectives: ObjectiveMarkerState[] = Array.from(
+    { length: 6 },
+    (): ObjectiveMarkerState => ({
+      visible: false,
+      x: 0,
+      y: 0,
+      edge: false,
+      angle: 0,
+      alpha: 0,
+      label: '',
+      distance: '',
+      name: '',
+    })
+  );
+  readonly grenades: GrenadeMarkerState[] = Array.from({ length: 4 }, (): GrenadeMarkerState => ({
+    visible: false,
+    position: new THREE.Vector3(),
+    t: 0,
+    life: 1,
+    x: 0,
+    y: 0,
+    label: '',
+    ringScale: 1,
+    ringAlpha: 0,
+    alpha: 0,
+  }));
+  private nextGrenade = 0;
   objRoot: HTMLElement;
+  // Element pools are native presentation only; snapshots above own all state.
   objPool: Pool<ObjectiveNode>;
   nadePool: Pool<GrenadeNode>;
   constructor(parent: HTMLElement) {
@@ -173,108 +224,132 @@ export class WorldMarkers {
       (): HTMLDivElement & {
         _ring: HTMLDivElement;
         _label: HTMLDivElement;
-        _pos: THREE.Vector3;
       } => {
         const node = el('div', 'ow-nade');
         const ring = el('div', 'ow-nade-ring', node);
         const core = el('div', 'ow-nade-core', node);
         nadeGlyph(core);
         const label = el('div', 'ow-nade-label', node, 'GRENADE');
-        return Object.assign(node, { _ring: ring, _label: label, _pos: new THREE.Vector3() });
+        return Object.assign(node, { _ring: ring, _label: label });
       },
       this.objRoot
     );
   }
 
-  /** @param {Array} list [{ position:Vector3, label:'A', name:'CAPTURE', color }] */
   updateObjectives(
     list: Objective[] | null,
     camera: THREE.Camera,
     w: number,
     h: number,
-    k: number
+    k: number,
+    present = true
   ): void {
-    const items = this.objPool.items;
     let n = 0;
-    const margin = 74 * k;
-    if (list) {
-      for (let i = 0; i < list.length && n < items.length; i++) {
-        const o = list[i];
+    if (list)
+      for (const o of list) {
         if (!o?.position) continue;
-        const p = project(o.position, camera, w, h, margin);
-        const it = items[n++];
-        if (!it.alive) {
-          it.alive = true;
-          setStyle(it.node, 'display', '');
+        if (n >= this.objectives.length) break;
+        const p = projectMarker(o.position, camera, w, h, 74 * k),
+          state = this.objectives[n++];
+        state.visible = true;
+        state.x = p.x;
+        state.y = p.y;
+        state.edge = p.offscreen;
+        state.angle = p.angle;
+        state.alpha = clamp01(1.15 - p.dist / 260) * (p.offscreen ? 0.72 : 1);
+        state.label = o.label ?? '';
+        state.distance = metres(p.dist);
+        state.name = o.name ?? '';
+      }
+    for (let i = n; i < this.objectives.length; i++) this.objectives[i].visible = false;
+    if (!present) return;
+    for (let i = 0; i < this.objectives.length; i++) {
+      const s = this.objectives[i],
+        node = this.objPool.items[i].node;
+      setStyle(node, 'display', s.visible ? '' : 'none');
+      if (!s.visible) continue;
+      setStyle(
+        node,
+        'transform',
+        `translate(${(s.x - 20 * k).toFixed(1)}px,${(s.y - 12 * k).toFixed(1)}px)`
+      );
+      setStyle(node, 'width', `${(40 * k).toFixed(1)}px`);
+      setText(node._letter, s.label);
+      setText(node._dist, s.distance);
+      setText(node._name, s.name);
+      setStyle(node._dia, 'display', s.edge ? 'none' : '');
+      setStyle(node._chev, 'display', s.edge ? '' : 'none');
+      setStyle(node._letter, 'opacity', s.edge ? '0' : '1');
+      if (s.edge) setStyle(node._chev, 'transform', `rotate(${s.angle.toFixed(1)}deg)`);
+      setStyle(node, 'opacity', s.alpha.toFixed(3));
+    }
+  }
+
+  /** Copy caller position; same bounded oldest-first reuse as the native pool. */
+  spawnGrenade(position: THREE.Vector3, fuse = 2.4): GrenadeMarkerState {
+    let slot = this.grenades[0],
+      oldest = -Infinity;
+    for (let i = 0; i < this.grenades.length; i++) {
+      const index = (this.nextGrenade + i) % this.grenades.length,
+        candidate = this.grenades[index];
+      if (!candidate.visible) {
+        slot = candidate;
+        this.nextGrenade = (index + 1) % this.grenades.length;
+        break;
+      }
+      const age = candidate.t / (candidate.life || 1);
+      if (age > oldest) {
+        oldest = age;
+        slot = candidate;
+      }
+    }
+    slot.visible = true;
+    slot.t = 0;
+    slot.life = fuse;
+    slot.position.copy(position);
+    return slot;
+  }
+
+  updateGrenades(
+    dt: number,
+    camera: THREE.Camera,
+    w: number,
+    h: number,
+    k: number,
+    present = true
+  ): void {
+    for (let i = 0; i < this.grenades.length; i++) {
+      const s = this.grenades[i];
+      if (s.visible) {
+        s.t += dt;
+        if (s.t >= s.life) s.visible = false;
+        else {
+          const p = projectMarker(s.position, camera, w, h, 56 * k);
+          s.x = p.x;
+          s.y = p.y;
+          s.label = p.dist < 9 ? 'DANGER CLOSE' : 'GRENADE';
+          const remain = 1 - s.t / s.life,
+            phase = (s.t * (2.2 + (1 - remain) * 5)) % 1;
+          s.ringScale = 0.7 + 0.9 * ease.outCubic(phase);
+          s.ringAlpha = 0.9 * (1 - phase);
+          s.alpha = clamp01(remain * 4);
         }
-        const node = it.node;
-        setStyle(
-          node,
-          'transform',
-          `translate(${(p.x - 20 * k).toFixed(1)}px,${(p.y - 12 * k).toFixed(1)}px)`
-        );
-        setStyle(node, 'width', `${(40 * k).toFixed(1)}px`);
-        setText(node._letter, o.label ?? '');
-        setText(node._dist, metres(p.dist));
-        setText(node._name, o.name ?? '');
-        const edge = p.offscreen;
-        setStyle(node._dia, 'display', edge ? 'none' : '');
-        setStyle(node._chev, 'display', edge ? '' : 'none');
-        setStyle(node._letter, 'opacity', edge ? '0' : '1');
-        if (edge) setStyle(node._chev, 'transform', `rotate(${p.angle.toFixed(1)}deg)`);
-        // distant markers dim so a busy map doesn't turn into a wall of icons
-        const fade = clamp01(1.15 - p.dist / 260) * (edge ? 0.72 : 1);
-        setStyle(node, 'opacity', fade.toFixed(3));
       }
-    }
-    for (let i = n; i < items.length; i++) {
-      if (items[i].alive) {
-        items[i].alive = false;
-        setStyle(items[i].node, 'display', 'none');
-      }
+      if (!present) continue;
+      const node = this.nadePool.items[i].node;
+      setStyle(node, 'display', s.visible ? '' : 'none');
+      if (!s.visible) continue;
+      setStyle(node, 'transform', `translate(${s.x.toFixed(1)}px,${s.y.toFixed(1)}px)`);
+      setText(node._label, s.label);
+      setStyle(node._ring, 'transform', `scale(${s.ringScale.toFixed(3)})`);
+      setStyle(node._ring, 'opacity', s.ringAlpha.toFixed(3));
+      setStyle(node, 'opacity', s.alpha.toFixed(3));
     }
   }
 
-  /** @param {number} fuse seconds until detonation */
-  spawnGrenade(
-    position: THREE.Vector3,
-    fuse = 2.4
-  ): import('./pool-types.ts').PoolRecord<GrenadeNode> {
-    const it = this.nadePool.acquire();
-    it.life = fuse;
-    it.node._pos.copy(position);
-    return it;
-  }
-
-  updateGrenades(dt: number, camera: THREE.Camera, w: number, h: number, k: number): void {
-    const items = this.nadePool.items;
-    const margin = 56 * k;
-    for (let i = 0; i < items.length; i++) {
-      const it = items[i];
-      if (!it.alive) continue;
-      it.t += dt;
-      if (it.t >= it.life) {
-        this.nadePool.release(it);
-        continue;
-      }
-      const node = it.node;
-      const p = project(node._pos, camera, w, h, margin);
-      setStyle(node, 'transform', `translate(${p.x.toFixed(1)}px,${p.y.toFixed(1)}px)`);
-      const close = p.dist < 9;
-      setText(node._label, close ? 'DANGER CLOSE' : 'GRENADE');
-      // pulse rate ramps as the fuse burns down
-      const remain = 1 - it.t / it.life;
-      const rate = 2.2 + (1 - remain) * 5;
-      const ph = (it.t * rate) % 1;
-      const rs = 0.7 + 0.9 * ease.outCubic(ph);
-      setStyle(node._ring, 'transform', `scale(${rs.toFixed(3)})`);
-      setStyle(node._ring, 'opacity', (0.9 * (1 - ph)).toFixed(3));
-      setStyle(node, 'opacity', clamp01(remain * 4).toFixed(3));
-    }
-  }
-
-  clear(): void {
-    this.nadePool.releaseAll();
+  clear(present = true): void {
+    for (const state of this.grenades) state.visible = false;
+    if (present) for (const item of this.nadePool.items) setStyle(item.node, 'display', 'none');
   }
 
   dispose(): void {
