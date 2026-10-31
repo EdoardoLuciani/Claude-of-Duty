@@ -504,9 +504,16 @@ export class UiSystem {
         this.pixiHud = await PixiHudSlice.create(
           this.root,
           this.centreLayer,
-          ctx.get('render').renderer
+          ctx.get('render').renderer,
+          new URLSearchParams(location.search).get('presentation') === 'canvas'
         );
         this.pixiHud.resize(this.vw, this.vh, this.k);
+        if (this.pixiHud.sameCanvas) {
+          const hud = this.pixiHud;
+          this._unsubs.push(
+            ctx.get('render').registerDisplayOverlay((): void => hud.sameCanvas?.present())
+          );
+        }
         this.root.classList.add('ow-hud-slice');
         this.ammo.presentReadout = false;
       } catch (error) {

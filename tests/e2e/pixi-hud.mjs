@@ -1,4 +1,5 @@
-// node tests/e2e/pixi-hud.mjs --uncapped --rounds=2 --out=/tmp/pixi-hud
+// Native/Pixi: --uncapped --rounds=2
+// Same-canvas A/B: --canvas --controlled --uncapped --rounds=2
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -13,6 +14,7 @@ import {
 import { combatLane } from '../../tools/lib/combat-fixture.js';
 import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
 import { createCombatProfile, validateCombatProfile } from '../../tools/lib/profile-combat.js';
+import { captureCompositedCanvas } from '../lib/canvas-composite-capture.mjs';
 import { capturePixi } from '../lib/pixi-capture.mjs';
 
 const args = parseArgs(),
@@ -31,7 +33,16 @@ const browser = await launchChromium({
 const results = [];
 try {
   const modes = [];
-  for (let i = 0; i < rounds; i++) modes.push(...(i % 2 ? ['hud', 'dom'] : ['dom', 'hud']));
+  for (let i = 0; i < rounds; i++)
+    modes.push(
+      ...(args.canvas
+        ? i % 2
+          ? ['canvas', 'hud']
+          : ['hud', 'canvas']
+        : i % 2
+          ? ['hud', 'dom']
+          : ['dom', 'hud'])
+    );
   modes.push('retina', 'unavailable');
   for (const [run, mode] of modes.entries()) {
     const page = await browser.newPage({
@@ -73,9 +84,14 @@ try {
       };
     }, mode === 'unavailable');
     await page.goto(
-      `http://localhost:${port}/?capture=1&lockstep=1&q=${args.quality ?? 'high'}${mode === 'dom' ? '' : '&pixi=hud'}`
+      `http://localhost:${port}/?capture=1&lockstep=1&q=${args.quality ?? 'high'}${mode === 'dom' ? '' : '&pixi=hud'}${mode === 'canvas' || (args.canvas && mode === 'retina') ? '&presentation=canvas' : ''}`
     );
     const device = await waitForGame(page);
+    if (args.controlled)
+      await page.evaluate(() => {
+        const ui = window.__ENGINE__.ctx.get('ui');
+        ui.hurtLayer.style.display = ui.worldLayer.style.display = 'none';
+      });
     // Known upstream prewarm warning; all other errors/validation failures fail.
     errors.splice(
       0,
@@ -100,10 +116,15 @@ try {
       return {
         ...window.__GPU_PROBE__,
         pixi: !!p,
+        sameCanvas: !!p?.sameCanvas?.active,
+        canvasAttached: p?.canvas.isConnected ?? false,
+        worldPhysical: [e.canvas.width, e.canvas.height],
+        hudPhysical: p ? [p.canvas.width, p.canvas.height] : null,
         shared: p?.renderer.gpu.device === e.ctx.get('render').renderer.backend.device,
         passive:
           !p ||
-          (p.stage.eventMode === 'none' && getComputedStyle(p.canvas).pointerEvents === 'none'),
+          (p.stage.eventMode === 'none' &&
+            (!p.canvas.isConnected || getComputedStyle(p.canvas).pointerEvents === 'none')),
         nativeMap: getComputedStyle(ui.minimap.root).display !== 'none',
         nativeVitals: getComputedStyle(ui.health.vitals).display !== 'none',
         nativeCrosshair: getComputedStyle(ui.crosshair.root).display !== 'none',
@@ -122,11 +143,13 @@ try {
     assert.equal(setup.nativeVitals, !setup.pixi);
     assert.equal(setup.nativeCrosshair, !setup.pixi);
     if (setup.pixi) assert(setup.shared);
+    assert.equal(setup.sameCanvas, mode === 'canvas');
+    if (setup.sameCanvas) assert.equal(setup.canvasAttached, false);
     if (mode === 'dom') assert.deepEqual(setup.loads, [], 'default path does not fetch Pixi');
     let combat = null,
       metrics = null,
       checks = null;
-    if (mode === 'dom' || mode === 'hud') {
+    if (mode === 'dom' || mode === 'hud' || mode === 'canvas') {
       await page.addScriptTag({
         content: `window.__PROFILE__={lane:${combatLane.toString()},create:${createCombatProfile.toString()}};`,
       });
@@ -147,6 +170,7 @@ try {
           ui = e.ctx.get('ui'),
           f = window.__HUD_FIXTURE__,
           p = ui.pixiHud;
+        const compositesBefore = p?.sameCanvas?.draws ?? 0;
         const steps = [],
           intervals = [],
           updates = [];
@@ -206,6 +230,10 @@ try {
           native: window.__NATIVE_COUNTS__,
           mapUploads: p?.minimap.uploads ?? 0,
           textures: p?.renderer.texture.managedTextures.length ?? 0,
+          compositeDraws: (p?.sameCanvas?.draws ?? 0) - compositesBefore,
+          presentationCanvases: [e.canvas, p?.canvas].filter(
+            (c) => c?.isConnected && c.checkVisibility()
+          ).length,
         };
       });
       validateCombatProfile(combat.report);
@@ -219,6 +247,9 @@ try {
       if (setup.pixi) {
         assert.deepEqual(combat.native, { map: 0, ammo: 0 });
         assert.equal(combat.mapUploads, 1);
+        assert.equal(combat.presentationCanvases, setup.sameCanvas ? 1 : 2);
+        assert.equal(combat.compositeDraws, setup.sameCanvas ? 900 : 0);
+        if (setup.sameCanvas) assert.deepEqual(setup.worldPhysical, setup.hudPhysical);
       }
     }
     // Identical settled capture state for both backends; readback outside timing.
@@ -238,7 +269,8 @@ try {
       ui.hit.clear();
       await window.__PUMP__(180);
     });
-    if (setup.pixi) await capturePixi(page, resolve(out, `${run}-${mode}.png`), 'hud');
+    if (setup.sameCanvas) await captureCompositedCanvas(page, resolve(out, `${run}-${mode}.png`));
+    else if (setup.pixi) await capturePixi(page, resolve(out, `${run}-${mode}.png`), 'hud');
     else await captureNative(page, resolve(out, `${run}-${mode}.png`));
     if (setup.pixi) {
       checks = await page.evaluate(async () => {
@@ -373,6 +405,8 @@ try {
       mode,
       browser: browser.version(),
       quality: args.quality ?? 'high',
+      controlled: !!args.controlled,
+      canvasComparison: !!args.canvas,
       uncapped: !!args.uncapped,
       device,
       setup,

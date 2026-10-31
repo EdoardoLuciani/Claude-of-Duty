@@ -6,6 +6,7 @@ import type { Crosshair } from './crosshair.ts';
 import type { HealthFx, HealthState } from './health.ts';
 import type { Minimap, MinimapState } from './minimap.ts';
 import { PixiAmmoView, AMMO_WIDTH, AMMO_HEIGHT } from './pixi-ammo-view.ts';
+import { PixiCanvasComposite } from './pixi-canvas-composite.ts';
 import { initPixiRenderer, restrictPixiCanvases } from './pixi-device.ts';
 import { PixiMinimap } from './pixi-minimap.ts';
 import { clamp01 } from './util.ts';
@@ -59,11 +60,16 @@ export class PixiHudSlice {
   private enabled = false;
   private lastState = new Map<string, unknown>();
   draws = 0;
+  sameCanvas: PixiCanvasComposite | null = null;
+  private parent!: HTMLElement;
+  private before!: HTMLElement;
+  private presentationFallback = false;
 
   static async create(
     parent: HTMLElement,
     before: HTMLElement,
-    game: Renderer
+    game: Renderer,
+    sameCanvas = false
   ): Promise<PixiHudSlice> {
     const restore = restrictPixiCanvases();
     let hud: PixiHudSlice | null = null;
@@ -79,6 +85,9 @@ export class PixiHudSlice {
         parent.clientWidth || innerWidth,
         parent.clientHeight || innerHeight
       );
+      hud.parent = parent;
+      hud.before = before;
+      if (sameCanvas) hud.sameCanvas = new PixiCanvasComposite(game, hud.renderer);
       parent.insertBefore(hud.canvas, before);
       return hud;
     } catch (error) {
@@ -138,6 +147,14 @@ export class PixiHudSlice {
   resize(w: number, h: number, k: number): void {
     if (this.disposed) return;
     this.renderer.resize(Math.max(1, w), Math.max(1, h), Math.min(devicePixelRatio || 1, 2));
+    this.sameCanvas?.resize(w, h, this.renderer.resolution);
+    if (this.sameCanvas && !this.sameCanvas.active && !this.presentationFallback)
+      console.warn(
+        '[ui] Same-canvas experiment needs matching physical resolutions; using separate Pixi canvas'
+      );
+    this.presentationFallback = !!this.sameCanvas && !this.sameCanvas.active;
+    if (this.sameCanvas?.active) this.canvas.remove();
+    else if (!this.canvas.isConnected) this.parent.insertBefore(this.canvas, this.before);
     this.stage.scale.set(k);
     this.ammo.stage.position.set(w / k - 26 - AMMO_WIDTH, h / k - 26 - AMMO_HEIGHT);
     this.vitals.position.set(26, h / k - 26 - 112);
@@ -150,6 +167,7 @@ export class PixiHudSlice {
     if (this.enabled === visible) return;
     this.enabled = visible;
     this.canvas.style.visibility = visible ? '' : 'hidden';
+    if (!visible && this.sameCanvas) this.sameCanvas.opacity = 0;
     this.dirty = true;
   }
 
@@ -164,6 +182,7 @@ export class PixiHudSlice {
   ): void {
     if (this.disposed) return;
     this.canvas.style.opacity = opacity.toFixed(3);
+    if (this.sameCanvas) this.sameCanvas.opacity = this.enabled ? Number(opacity.toFixed(3)) : 0;
     if (!this.enabled) return;
     for (const key of WATCH) {
       if (this.lastState.get(key) !== s[key]) {
@@ -216,7 +235,9 @@ export class PixiHudSlice {
     // One render driven by the engine, never an Application/ticker. During a
     // paused static frame only resize/reveal/value changes require a redraw.
     if (dt <= 0 && !this.dirty) return;
-    this.renderer.render(this.stage);
+    if (this.sameCanvas?.active)
+      this.renderer.render({ container: this.stage, target: this.sameCanvas.target, clear: true });
+    else this.renderer.render(this.stage);
     this.draws++;
     this.dirty = false;
     this.ammo.dirty = false;
@@ -226,7 +247,11 @@ export class PixiHudSlice {
     if (this.disposed) return;
     this.disposed = true;
     try {
-      this.stage.destroy({ children: true, texture: true, textureSource: true });
+      try {
+        this.sameCanvas?.dispose();
+      } finally {
+        this.stage.destroy({ children: true, texture: true, textureSource: true });
+      }
     } finally {
       try {
         this.renderer.destroy();

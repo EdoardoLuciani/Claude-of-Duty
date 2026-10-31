@@ -293,6 +293,17 @@ independent capped DPR, shared-device ownership and failure-isolated teardown
 remain required. This does not reproduce the no-UI benchmark state or promise its
 savings. See [implementation and measurements](docs/experiments/pixi-hud.md).
 
+`?pixi=hud&presentation=canvas` is a separate measurement experiment. UI renders
+its same MSAA HUD into a Pixi-owned GPU texture; a render-owned final-display
+callback alpha-blends it into Three's canvas after the ordinary graph, without
+reconfiguring that canvas or entering the HDR/post-effect graph. The callback
+has one owner and explicit unsubscribe. UI disposes the target/uniform, never
+the shared device/context. Only equal physical HUD/world dimensions activate it;
+quality scaling/DPR mismatches fall back to the separate canvas. This changes
+ordering relative to still-native hurt/world-marker underlays, so controlled
+comparisons suppress those in **both** paths. Not a production integration or
+full-resolution presentation refactor. See [same-canvas results](docs/experiments/pixi-same-canvas.md).
+
 ## Models
 
 `weapons.createInspectionModel(id)` returns an independent rest-pose scene and
