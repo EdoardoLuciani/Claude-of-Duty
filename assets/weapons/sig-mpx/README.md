@@ -126,90 +126,38 @@ This bounded representation acceptance does not clear general factory/human Gate
 
 ### Approved solid covers and costs (historical skinned representation)
 
-Only the two clear cover sheets are replaced: closed polymer discs join their
-existing cap frames in the opaque mechanical skin. There are still twenty joints;
-no new animation mechanism, runtime selector, material or texture is introduced.
-Existing opaque material sidedness is unchanged; source manifold checks and
-back-face-culled rays from both directions verify real front/back lid geometry.
+The user approved replacing 80 clear-sheet triangles with 312 triangles forming
+closed 1.5 mm polymer lids. This preserved the existing cap frames/pivots and
+material sidedness; back-face-culled rays verify real front/back occlusion. Materials
+stayed at three, primitives fell 9 / 7 → 7 / 5 (all / Idle), and native/cooked
+triangles rose 78,040 / 73,139 → 78,272 / 73,377.
 
-| Metric | Earlier clear-cover base | Approved solid covers |
-|---|---:|---:|
-| Materials | 3 | 3 |
-| All / loaded Idle primitive instances | 9 / 7 | 7 / 5 |
-| Native triangles | 78,040 | 78,272 |
-| Cooked triangles | 73,139 | 73,377 |
-| Native raw bytes | 10,178,760 | 10,198,740 |
-| Runtime raw / gzip-9 bytes | 2,688,196 / 1,762,442 | 2,689,748 / 1,768,263 |
-| Runtime CPU vertex / index arrays, bytes | 4,102,984 / 438,834 | 4,115,992 / 440,262 |
+Costs versus clear covers were +1,552 runtime raw B, +5,821 gzip-9 B and +18,464
+uploaded geometry B; image payloads, texture footprint and palette storage were
+unchanged. All 77,960 unaffected oriented triangles were independently preserved.
+Matched views and user approval covered this redesign, not general Gate 3.
+The current ordinary meshes retain the approved lids and compare every triangle
+against that solid-cover baseline; comparing older clear covers requires accounting
+for the intentional replacements rather than relaxing parity.
 
-Gzip-9 values here use the same Node compression level for both assets. All embedded
-PNG/KTX2 payloads are byte-identical. Independent comparison matches all **77,960
-unaffected oriented triangles**, including the original cap rims, with zero position
-and rest/moving normal error across 15.3M samples. The deliberately removed 80 clear
-sheet triangles are replaced by 312 triangles confined to the two solid lids; all
-84 named controls and 1,368 existing channels match exactly. The existing UV-only
-repeatability bound is unchanged. Geometry/storage grow slightly; no FPS or GPU-memory
-improvement is claimed. Native AMD RDNA-4 / Three r187 measured uploaded geometry
-**5,286,220 → 5,304,684 B** and geometry-plus-logical-texture subtotal
-**9,480,604 → 9,499,068 B**; texture footprint and separately observed 1,280 B palette
-storage are unchanged. This excludes other renderer resources and driver padding.
-Matched hero/side/optic/ADS/reload/inspect and closed-cover optic/ADS readbacks,
-forced RGBA, market and production integration checks passed. User visual approval
-and independent technical acceptance cover this redesign, not general Gate 3.
-When comparing the older clear-cover asset against the solid-cover asset,
-`tools/mpx-pass2-parity.mjs` cannot match the deliberately replaced lid triangles;
-that historical acceptance enumerated replacements separately. The current ordinary
-candidate instead matches every triangle against the accepted solid-cover baseline.
+[Detailed solid-cover acceptance](https://github.com/EdoardoLuciani/Claude-of-Duty/blob/d29573f8b9426d70671ac5fb3fa4289a2de7546b/assets/weapons/sig-mpx/README.md#approved-solid-covers-and-costs).
 
 ### Accepted clear-cover consolidation baseline (historical)
 
-Export copies combine the ten mechanical owners into one rigid-influence skin;
-magazine shells and rounds remain four independent primitives for reload/drop ownership.
-Body lenses and both cap sheets remain three independently sorted rigid transparent
-objects, with unchanged 0.02/0.01 alpha, 0.25/0 clearcoat and 0.03/0.05
-specular/environment factors. The absorptive interior stays separate at 0.02/0.03.
-UV1 selects the optical scalar factors without another texture or vertex attribute.
-Original editable parts/materials, sockets, controls, calibration and Actions remain.
+Before the solid-cover redesign, ten control/frame pairs combined the mechanics
+without rebasing tiny bevels or re-encoding decoded normals. Materials fell 4 → 3,
+primitives 18 / 16 → 9 / 7 (all / Idle), while all 78,040 native triangles remained.
+Changed simplification boundaries produced 73,139 cooked triangles versus 71,104;
+runtime raw size grew 2,649,308 → 2,688,196 B.
 
-| Metric | Pass 1 | Consolidated |
-|---|---:|---:|
-| All / loaded Idle primitives | 18 / 16 | 9 / 7 |
-| Materials | 4 | 3 |
-| Native triangles, all / Idle | 78,040 / 67,556 | 78,040 / 67,556 |
-| Cooked triangles, all / Idle | 71,104 / 60,818 | 73,139 / 62,875 |
-| Native raw / gzip-default bytes | 8,315,948 / 2,728,711 | 10,178,760 / 2,699,677 |
-| Runtime raw / gzip-default bytes | 2,649,308 / 1,786,348 | 2,688,196 / 1,773,429 |
-| Native vertices / vertex-view bytes / index-view bytes | 117,556 / 5,642,688 / 715,278 | 117,556 / 7,382,908 / 794,298 |
-| Runtime vertices / vertex-view bytes / index-view bytes | 88,490 / 3,539,600 / 426,624 | 90,168 / 4,102,984 / 438,834 |
+The body lenses and two clear cap windows retained independent transparent sorting,
+with UV1 selecting their original alpha/coating factors; the absorptive interior
+kept its separate lighting policy. Uploaded geometry grew 3,966,232 → 5,286,220 B
+with unchanged images and logical textures. This was a draw/storage trade-off,
+not an FPS or memory win. The current representation removes the mechanical skin,
+and solid covers have already removed the optical selectors.
 
-Opaque primitives fall 14→5 (Idle 12→3); optical/interior counts stay 3/1.
-Native vertex-array growth is exactly 87,011 skinned vertices × 20 JOINTS/WEIGHTS bytes;
-runtime growth is 62,033 × eight bytes plus 1,678 extra vertices × 40 base bytes.
-Twenty joints (ten control parents, ten static mesh-local frames) add 1,280 inverse-bind
-bytes, copied control animation channels, CPU bone matrices and an owned bone texture.
-Loaded CPU geometry-array byte counts equal the vertex/index-view counts above;
-unique native/runtime animation-value arrays grow 366,072→384,916 / 351,736→368,768
-bytes. Animation-time arrays remain 4,008 / 4,020 bytes. Initial bone matrices cost
-1,280 CPU bytes, or 2,304 bytes after the 12×12 RGBA bone-texture backing allocation.
-Skinning adds vertex-shader work; mixed rigid/skinned opaque draws can require distinct
-shader variants. The two optical TSL selectors add scalar shader work. No GPU allocation,
-pipeline-count or FPS reduction is claimed from these CPU/delivery measurements.
-Gzip values above use Node's default level; PR aggregate figures use Python gzip-9.
-All three PNG/KTX2 payloads remain byte-identical to pass 1: 1024², cooked 11 mips,
-358,652 normal + 226,365 surface + 601,978 ORM encoded bytes. Native AMD RDNA-4 /
-Three r187 measurements found uploaded geometry **3,966,232 → 5,286,220 B** and
-geometry-plus-logical-texture subtotal **8,160,616 → 9,480,604 B** (7.783 → 9.041 MiB).
-This excludes other renderer resources, bone buffers and driver padding; queue
-tracing separately observed 1,280 B of palette storage. This is a draw/storage
-trade-off, not a GPU-memory or FPS improvement.
-
-Independent source/normal and runtime reviews passed, including every original
-triangle and tiny/zero-area normal. Matched native-GPU hero/side/ADS/reload/optic
-captures, RGBA fallback, market and production integration checks passed. Inspection
-samples authored Idle before caching helper/bone rest positions; native/cooked
-regressions compare actual carrier vertices from lockback and mid-reload against
-independent fresh Idle inspections. These checks do not clear human Gate 3 or
-all-state/factory-reference acceptance.
+[Detailed clear-cover consolidation](https://github.com/EdoardoLuciani/Claude-of-Duty/blob/d29573f8b9426d70671ac5fb3fa4289a2de7546b/assets/weapons/sig-mpx/README.md#accepted-clear-cover-consolidation-baseline-historical).
 
 ### Runtime candidate cook
 

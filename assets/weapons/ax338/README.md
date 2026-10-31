@@ -228,87 +228,17 @@ below is unchanged, not waived by these passing runtime checks.
 
 ## Second-pass draw consolidation (historical d29573f8 baseline)
 
-`ax338/skin.py` runs only after saving the editable source and preparing its
-unchanged 120 Hz Actions. Receiver, handguard, stock, optic, bolt and trigger
-surfaces now share one rigid one-influence skin with six `MECH_` ownership bones.
-The first four helpers have no independent Actions; static authoring parents no
-longer cost draws. Bolt/trigger bone curves copy the original controls with only
-rest translation subtracted. Original named empties, sockets, hand tracks and
-magazine ownership remain. The existing opaque finish atlas is **not rebuilt by
-a new scheme**; its factors/maps/UV roles and transparent lens material remain.
+The d29573f8 baseline joined receiver, handguard, stock, optic, bolt and trigger
+into a six-joint skin: two materials, six asset-wide primitives and four in loaded
+Idle. Native/runtime triangle counts stayed 100,697 / 100,633 and textures,
+mechanics, contacts and magazine ownership were preserved.
 
-There are **six primitive instances**, down from eleven; loaded Idle is **four**,
-down from nine (weapon only; shared arms are excluded). Boundaries are:
+Skin attributes and 32-bit indices increased uploaded geometry from 5,383,896 to
+8,272,448 B, without an established FPS gain. The current ordinary representation
+below retires that skin. Its comparison retains the bounded normal rounding and
+eight-triangle coplanar guard retessellation checks.
 
-| Draw | Native triangles | Runtime triangles | Loaded Idle | Reason retained |
-| --- | ---: | ---: | --- | --- |
-| Opaque mechanical skin | 94,833 | 94,769 | yes | All static surfaces plus independently moving bolt/trigger in one draw |
-| Transparent coated lenses | 504 | 504 | yes | Authored alpha 0.13 / no depth writes; same static optic bone, separate transparent primitive |
-| Seated magazine body | 1,632 | 1,632 | yes | Independent transfer/drop ownership, real geometry |
-| Seated magazine rounds | 1,048 | 1,048 | yes when loaded | Independent empty-round visibility |
-| Spare magazine body | 1,632 | 1,632 | no | Independent carried-magazine STEP control |
-| Spare magazine rounds | 1,048 | 1,048 | no | Real carried cartridges / independent visibility |
-
-Keeping the lens on the static optic bone avoids material separation's custom
-normal re-encoding; it still has its own transparent draw. Magazines/rounds are
-not skinned and remain usable by the existing real drop pool. No geometry
-simplification, hand refit, timing change or material-policy exception was used.
-
-| Product | Raw bytes | gzip-9 bytes | Unique / instanced triangles | Primitive instances | Materials | Decoded vertex / index bytes |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| First-pass native | 12,615,752 | 5,986,154 | 100,697 / 100,697 | 11 | 2 | 6,687,720 / 588,102 |
-| Second-pass native | 15,626,140 | 5,970,466 | 100,697 / 100,697 | 6 | 2 | 9,101,560 / 1,157,100 |
-| First-pass runtime | 4,673,060 | 3,521,587 | 97,953 / 100,633 | 11 | 2 | 4,796,176 / 587,718 |
-| Second-pass runtime | 4,673,444 | 3,513,406 | 97,953 / 100,633 | 6 | 2 | 5,724,152 / 1,156,332 |
-
-The trade is 1,496,590 more decoded geometry bytes (5,383,894 → 6,880,484,
-+27.8%): rigid skin indices/weights and 32-bit indices for the >65k-vertex opaque
-surface, versus five fewer submissions. Runtime raw grows only 384 B and gzip
-shrinks 8,181 B. These are **CPU typed-array storage**, not measured uploaded GPU
-allocation or an FPS claim. The two glTF material primitives share the gameplay skeleton and its six
-authored bones; the adapter disposes that owned palette.
-Their renderer-created bone textures and ordinary skinning shader work are new
-costs; no custom shader/material, new texture, dependency or runtime framework is
-added. All three runtime UASTC KTX2 maps remain 1024² with eleven mip levels.
-Native still fits the unchanged 15 MiB cap (102,500 B headroom).
-
-Native count and all surface vertices/UV0 are preserved. Export-frame rebasing
-changes float/bind-matrix rounding: matching triangle positions differ by at most
-3.368e-8 m. Eight coplanar receiver/trigger-guard triangles are re-tessellated by
-Blender after the join; no polygon boundary or vertex UV changes. PM II triangles
-all match, maximum position 1.844e-8 m and normal-vector difference 1.366e-7.
-Other transformed normals can re-round at Blender's existing normal precision
-(maximum matching normal-vector difference 0.000800). Geometry hashes now sample
-actual bound vertices and select optic surfaces by rigid ownership, retaining
-the original 10-micrometre lattice, normal/UV checks and cyclic winding check.
-Empty helper subtrees are never accepted as geometry proof.
-
-Two new empty-directory, separate-process exports/cooks are byte-identical to the
-committed native/runtime GLBs and manifest. Use the same commands above and the
-registered `['-vc', '16', '-vp', '16']` cook flags; no shared cook profile changes.
-The source check and 474-pose left DCC sweep pass (0.903077 mm / unchanged 1 mm).
-Native/runtime adapter/contact checks pass, as do the actual shared-hand 761-pose
-sweeps. Sampled runtime surface error remains below the original 0.05 mm gate
-(measured 0.007691 mm).
-
-`smoke-ax338-skin.mjs` checks 7,118 native/runtime half-frame poses and 5,487,799
-actual vertex probes, all endpoint vertices, rigid weights, six/four draw counts,
-real drop/cartridge geometry, gesture interruption and independent inspection
-skeleton/bone-texture disposal. Maximum actual skin/helper deviation is 0.007561
-mm. Native uses 1 um; runtime propagates the unchanged per-channel 1 um / 1e-4 rad
-codec bounds through both rest bases to vertex distance. The original strict
-native 60°/100 mm and runtime 1e-4 rad rotation gates are not relaxed. The bolt
-contact sweep additionally checks actual deformed knob triangles, not just target
-helpers, against the original <3 mm glove-pad contact allowance.
-
-Parent native-WebGPU hero/side/ADS/reload/optic captures, RGBA fallback and
-independent review passed on Three r187 / AMD RDNA-4. Uploaded geometry increases
-**5,383,896 → 8,272,448 B**; the geometry-plus-logical-texture subtotal increases
-**9,578,280 → 12,466,832 B** (9.135 → 11.889 MiB), excluding other renderer resources
-and driver padding. This saves draws, not memory; no paired FPS gain is established.
-Independent review confirmed the eight retessellated coplanar guard triangles
-retain the same patch boundary/area and UV vertices. These regression checks do
-not clear the existing human/full-right-hand acceptance limitations below.
+[Historical implementation, measurements and validation](https://github.com/EdoardoLuciani/Claude-of-Duty/blob/d29573f8b9426d70671ac5fb3fa4289a2de7546b/assets/weapons/ax338/README.md#second-pass-draw-consolidation-current-product).
 
 ## Ordinary-mesh representation (current product)
 

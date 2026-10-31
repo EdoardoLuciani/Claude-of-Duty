@@ -162,85 +162,29 @@ factory-reference and all-state human acceptance remain separate.
 
 ## Historical second-pass mechanical consolidation
 
-`skin.py` joins receiver, handguard, optic, stock, bolt, charging handle, feed
-cover and trigger into `mechanical_surfaces`, using eight one-influence rigid
-joints. Static authoring parents no longer create draws. Every original empty
-control remains and moving joints copy the already-prepared 120 Hz Actions,
-including exact fractional endpoints and STEP channels. No material/shader,
-lighting, exposure, normal-map strength or atlas change is introduced.
+The d29573f8 baseline added an eight-joint rigid mechanical skin beside the original
+eight-joint belt. It preserved the 120 Hz controls, STEP ownership, materials and
+textures while reducing all / Idle primitives from 10 / 9 to 5 / 4.
+Uploaded geometry increased 2,479,560 → 3,360,060 B; the current ordinary rigid export
+above removes that added skin and retains the belt and independent pouches.
 
-Retained runtime boundaries (all parts / loaded Idle: **5 / 4 primitives**):
-
-- Mechanical opaque: 34,775 triangles; all rigid mechanisms and stock.
-- Mechanical lens: 90 triangles; true transparent optical pass, same skin.
-- Deforming belt: 15,744 triangles; original independent eight-joint skin and
-  persistent per-round ammunition masks. Combining it would couple belt-wide
-  visibility/reset ownership to the mechanical mesh for no needed target gain.
-- Installed pouch: 1,184 triangles; original independent STEP parent/motion.
-- Spare pouch: 1,184 triangles; distinct replacement ownership and STEP parent,
-  hidden in loaded Idle. Neither pouch is folded into the rigid skin.
-
-Both opaque and alpha materials and all three 1024² textures are unchanged.
-Runtime KTX2 maps retain 11 mip levels. Runtime raw bytes rise 21,784 B
-(3,166,568 → 3,188,352); gzip-9 decreases 1,678 B (2,487,080 → 2,485,402).
-Decoded unique CPU vertex/index typed arrays rise 352,200 B
-(2,321,350 → 2,673,550). This is **not uploaded GPU allocation**. There is one
-additional eight-joint skeleton/bone texture, and skinning now covers rigid
-surfaces including the lens. The adapter disposes each unique skeleton once;
-inspection clones own their skeletons and borrow geometry/materials/maps.
-
-The stock/head oracle now selects all **4,922 actual stock triangles** by
-`MECH_stock` influence and evaluates their skinned positions. It retains the
-120 mm envelope, measuring 146.14 mm native / 146.15 mm runtime over the original
-reload sweep. Sleeve/pouch geometry and thresholds are unchanged.
+[Historical implementation, measurements and validation](https://github.com/EdoardoLuciani/Claude-of-Duty/blob/d29573f8b9426d70671ac5fb3fa4289a2de7546b/tools/blender/evolys/README.md#second-pass-mechanical-consolidation).
 
 ### Approved EVOLYS export-corner-normal encoding exception
 
-Freeze each source mesh's native local-space tessellation before joining;
-otherwise the rotated stock can choose different diagonals. Carry original
-corner normals through the bind transform as a temporary float attribute, then
-set final split normals after joining. Blender stores custom split normals as
-`INT16_2D`, so this step has a bounded encoding loss: independently compared with
-base `875587a3`, maximum normalized-vector distance **0.0024999942** (about
-0.143°), permitted only up to **0.0026** for these EVOLYS export normals. This
-exception was approved for the candidate subject to final matched native-GPU
-acceptance; it does not alter geometry, hand/contact, quaternion or other-weapon
-limits. No flattening, normal-map resampling or exporter/GLB repair is used.
+The retired join froze native local-space tessellation and carried corner normals
+through the bind transform before final split-normal encoding. Blender's
+`INT16_2D` storage introduced a measured normalized-vector difference of
+**0.0024999942** (~0.143°), approved only up to **0.0026** for EVOLYS export normals.
+Comparisons against that historical skinned reference retain this bound; removing
+its encoding step does not introduce a new exception.
 
-`node tools/evolys-pass2-parity.mjs /absolute/path/to/base-native.glb` compares
-all 53,059 oriented triangles, exact UV0/UV1 and encoded image bytes. Across 491
-poses / 30,768,515 actual evaluated vertices, maximum position difference is
-3.744e-8 m and deformed normal difference stays 0.0024999942. All stored normals
-are finite unit directions; the test evaluates normal skin matrices through
-moving poses, skipping only collapsed non-rendered surfaces. Exact UV0 plus
-preserved deformed positions retains derivative tangent-space inputs (including
-the existing degenerate-UV exception); direction changes are bounded above.
-The new mechanical hash freezes this layout; unchanged belt/pouch hashes remain.
-
-Affected original mesh normal distributions (unique original attribute vertices;
-columns partition `<1e-7`, `[1e-7,1e-4)`, `[1e-4,0.0026]` vector distance):
-
-| Original surface                       | Vertices |  <1e-7 | <1e-4 | Remainder |    Maximum |
-| -------------------------------------- | -------: | -----: | ----: | --------: | ---------: |
-| Bolt                                   |      216 |    182 |    34 |         0 | 0.00009457 |
-| Charging handle                        |      476 |    321 |   140 |        15 | 0.00014142 |
-| Feed cover                             |    1,042 |    838 |   200 |         4 | 0.00040775 |
-| Static opaque receiver/handguard/optic |   37,629 | 28,543 | 7,161 |     1,925 | 0.00249999 |
-| Lens                                   |      198 |    136 |    40 |        22 | 0.00031541 |
-| Stock                                  |    4,942 |    515 | 3,932 |       495 | 0.00044709 |
-| Trigger                                |      294 |    253 |    40 |         1 | 0.00013048 |
-
-Belt (13,184 vertices) and both pouches (2,342 each) have exactly zero change.
-`smoke-evolys-skin.mjs` additionally checks 169,708,425 native and 150,081,225
-cooked actual vertices against source controls, plus independent inspection and
-bone-texture disposal. Existing 9,042-pose native/cooked control/contact checks
-retain their original tolerances. Two independent fresh exports and cooks are
-byte-identical. Parent matched Three r187 native-WebGPU captures, RGBA fallback
-and independent review passed, including the narrowly approved normal-encoding
-loss. Uploaded geometry increases 2,479,560 → 3,360,060 B; with unchanged logical
-textures the subtotal rises 6.365 → 7.204 MiB. These omit other renderer allocations
-and driver padding and are not an FPS improvement claim. Final factory-reference
-and all-state human acceptance remain separate.
+This does not relax geometry, contact, quaternion or other-weapon limits. Normals
+remain finite unit directions, belt/pouch normals are unchanged, and exact UVs and
+preserved positions retain derivative tangent inputs, including the existing
+degenerate-UV exception. No flattening, normal-map resampling or exporter/GLB repair.
+Use `node tools/evolys-pass2-parity.mjs /absolute/path/to/base-native.glb` for the
+independent oriented-surface and moving-normal checks described above.
 
 ## Approved UV precision exception
 

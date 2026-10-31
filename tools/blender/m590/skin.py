@@ -84,4 +84,3 @@ def build_mechanical_skin(collection, parts, clips):
         arm.animation_data.action = None
     bpy.context.scene.frame_set(0)
     bpy.context.view_layer.update()
-    return arm

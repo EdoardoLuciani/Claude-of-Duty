@@ -74,4 +74,3 @@ def consolidate_finishes(asset, rough, albedo, normal, output):
         obj.data.materials.clear(); obj.data.materials.append(opaque)
     glass = next(m for m in materials if m.name.startswith('10 |'))
     finish_texture(glass)
-    return packed
