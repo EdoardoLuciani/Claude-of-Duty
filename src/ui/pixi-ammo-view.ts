@@ -1,0 +1,153 @@
+import { Container, Graphics, Text } from 'pixi.js';
+
+import { filledMagazinePips, MAX_PIPS } from './ammo.ts';
+import type { AmmoState } from './ammo.ts';
+import { clamp01, ease } from './util.ts';
+
+export const AMMO_WIDTH = 248;
+export const AMMO_HEIGHT = 146;
+const WIDTH = AMMO_WIDTH,
+  HEIGHT = AMMO_HEIGHT;
+const INK = 0xe7f2ef,
+  MUTED = 0xa9bac5,
+  AMBER = 0xffb02a,
+  RED = 0xff5145;
+
+/** Retained read-only ammo graphics; the owner decides when/where to render. */
+export class PixiAmmoView {
+  readonly stage = new Container();
+  private current: Text;
+  private reserve: Text;
+  private name: Text;
+  private mode: Text;
+  private prompt: Text;
+  private pips: Graphics[] = [];
+  private bar = new Graphics().rect(0, 0, 216, 3).fill(0x263943);
+  private fill = new Graphics().rect(0, 0, 216, 3).fill(0x85cbbb);
+  dirty = true;
+  protected disposed = false;
+  punch = 0;
+  private lastAmmo = -1;
+  private lastReserve = -1;
+  private lastMode: AmmoState['fireMode'] | null = null;
+
+  constructor() {
+    this.stage.eventMode = 'none';
+    this.stage.interactiveChildren = false;
+    this.stage.addChild(
+      new Graphics()
+        .roundRect(0, 0, WIDTH, HEIGHT, 6)
+        .fill({ color: 0x0a141c, alpha: 0.88 })
+        .stroke({ color: 0x526e70, alpha: 0.7, width: 1 })
+    );
+    this.stage.addChild(new Graphics().roundRect(0, 8, 2, HEIGHT - 16, 1).fill(0x85cbbb));
+    this.mode = this.text('AUTO', 14, 12, 10, MUTED);
+    this.name = this.text('M4A1', WIDTH - 14, 11, 12);
+    this.name.anchor.x = 1;
+    this.current = this.text('30', 119, 34, 54);
+    this.current.anchor.set(1, 0);
+    this.current.style.fill = 0xffffff;
+    this.reserve = this.text('/ 210', 131, 62, 21, MUTED);
+    this.prompt = this.text('', WIDTH / 2, 119, 11, AMBER);
+    this.prompt.anchor.x = 0.5;
+    for (let i = 0; i < MAX_PIPS; i++) {
+      const pip = new Graphics().rect(0, 0, 5, 7).fill(0xffffff);
+      pip.y = 101;
+      this.pips.push(pip);
+      this.stage.addChild(pip);
+    }
+    this.bar.position.set(16, 138);
+    this.fill.position.copyFrom(this.bar.position);
+    this.stage.addChild(this.bar, this.fill);
+  }
+
+  private text(value: string, x: number, y: number, fontSize: number, fill = INK): Text {
+    const text = new Text({
+      text: value,
+      style: { fontFamily: 'Arial', fontSize, fontWeight: '600', fill },
+    });
+    text.position.set(x, y);
+    this.stage.addChild(text);
+    return text;
+  }
+
+  private label(text: Text, value: string): void {
+    if (text.text === value) return;
+    text.text = value;
+    this.dirty = true;
+  }
+
+  update(dt: number, s: AmmoState): void {
+    if (this.disposed) return;
+    const ammo = Math.max(0, s.ammo | 0),
+      mag = Math.max(1, s.magSize | 0 || 30);
+    if (ammo !== this.lastAmmo) {
+      if (this.lastAmmo >= 0 && ammo < this.lastAmmo) this.punch = 1;
+      this.lastAmmo = ammo;
+      this.current.text = String(ammo);
+      this.dirty = true;
+    }
+    const reserve = Math.max(0, s.reserve | 0);
+    if (reserve !== this.lastReserve) {
+      this.lastReserve = reserve;
+      this.reserve.text = `/ ${reserve}`;
+      this.dirty = true;
+    }
+    const name = s.weaponName ?? s.name ?? 'M4A1';
+    if (this.name.text !== name) {
+      this.name.text = name;
+      // Measure only on a swap; keep long authored names inside the column.
+      this.name.scale.set(1);
+      this.name.scale.set(Math.min(1, 166 / Math.max(1, this.name.width)));
+      this.dirty = true;
+    }
+    const mode = s.fireMode ?? 'auto';
+    if (mode !== this.lastMode) {
+      this.lastMode = mode;
+      this.label(this.mode, mode.toUpperCase());
+    }
+    this.punch = Math.max(0, this.punch - dt * 6.5);
+    const scale = Math.round((1 - 0.075 * ease.outQuad(this.punch)) * 1000) / 1000;
+    if (this.current.scale.x !== scale) {
+      this.current.scale.set(scale);
+      this.dirty = true;
+    }
+    const color = ammo === 0 ? RED : ammo / mag <= 0.34 ? AMBER : INK;
+    if (this.current.tint !== color) {
+      this.current.tint = color;
+      this.dirty = true;
+    }
+    const reloading = !!s.reloading,
+      progress = clamp01(s.reloadProgress ?? 0);
+    const count = Math.min(MAX_PIPS, mag);
+    const filled = filledMagazinePips(ammo, mag, reserve, reloading, progress);
+    for (let i = 0; i < MAX_PIPS; i++) {
+      const pip = this.pips[i],
+        visible = i < count;
+      const tint = i < filled ? (!reloading && filled / count <= 0.34 ? AMBER : INK) : 0x35434c;
+      const x = WIDTH - 16 - count * 7 + i * 7;
+      if (pip.visible !== visible || pip.tint !== tint || pip.x !== x) {
+        pip.visible = visible;
+        pip.tint = tint;
+        pip.x = x;
+        this.dirty = true;
+      }
+    }
+    this.label(this.prompt, reloading ? 'RELOADING' : ammo === 0 ? 'PRESS R TO RELOAD' : '');
+    const alpha =
+      !reloading && ammo === 0
+        ? Math.round((0.55 + 0.45 * Math.abs(Math.sin((s.time ?? 0) * 3.8))) * 1000) / 1000
+        : 1;
+    const fill = Math.round(progress * 1000) / 1000;
+    if (
+      this.prompt.alpha !== alpha ||
+      this.bar.visible !== reloading ||
+      this.fill.scale.x !== fill
+    ) {
+      this.prompt.alpha = alpha;
+      this.bar.visible = this.fill.visible = reloading;
+      this.fill.scale.x = fill;
+      this.dirty = true;
+    }
+  }
+}

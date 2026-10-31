@@ -265,6 +265,34 @@ Bakes use native top-left texture UVs and shared `QuadMesh` geometry: no extra Y
 flip or disposal of borrowed geometry. Gameplay readback uses its explicit
 display-transform path. First-person refraction uses world coordinates.
 
+## Experimental UI
+
+`?pixi=1` loads the pause-panel trial; `?pixi=ammo` loads only the actual ammo/reload
+readout. They are mutually exclusive and the default UI does not load Pixi.
+Both borrow the game's GPUDevice through `ui/pixi-device.ts`, using one separate,
+demand-rendered, display-resolution canvas, not Three's renderer/world textures.
+UI owns Pixi resources and restores its restricted DOM adapter on construction or
+teardown failure; it must never destroy the borrowed device or skip native cleanup.
+`AmmoPanel` retains native equipment and shares `AmmoState` / magazine-pip math with
+`ui/pixi-ammo.ts`. Its passive canvas stays in the original chrome layer so injury,
+menu and HUD opacity ordering are unchanged. No application/render ticker is used;
+Pixi still has an interaction ticker. Native startup/error/menu controls remain.
+See [panel limitations](docs/experiments/pixi-ui.md) and
+[ammo combat measurements](docs/experiments/pixi-ammo.md). This is not a production
+UI migration or a general-purpose UI abstraction.
+
+`?pixi=hud` is the playable four-widget slice: ammo/reload, health/armour,
+reticle and minimap, one passive Pixi canvas between the world-marker and native
+centre/chrome layers. `PixiAmmoView` shares the ammo presenter without owning a
+renderer. Native crosshair/health owners advance their existing visual state while
+skipping replaced DOM widgets; injury overlays and every other native presenter
+remain active. Minimap borrows its existing one-time Canvas2D world bake, uploads
+it once, and retains GPU map/text/marker objects; native per-frame minimap drawing
+is skipped. Engine-driven active rendering, no hidden/static-paused redraws,
+independent capped DPR, shared-device ownership and failure-isolated teardown
+remain required. This does not reproduce the no-UI benchmark state or promise its
+savings. See [implementation and measurements](docs/experiments/pixi-hud.md).
+
 ## Models
 
 `weapons.createInspectionModel(id)` returns an independent rest-pose scene and

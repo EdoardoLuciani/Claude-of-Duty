@@ -16,6 +16,8 @@ import { WorldMarkers } from './markers.ts';
 import { MarketOverlay, MarketCountdown } from './market.ts';
 import { PauseMenu } from './menu.ts';
 import { Minimap } from './minimap.ts';
+import type { PixiUiExperiment } from './pixi-experiment.ts';
+import type { PixiHudSlice } from './pixi-hud.ts';
 import { Prompt, Banner } from './prompts.ts';
 import { RadioPanel } from './radio.ts';
 import { StartGate } from './start.ts';
@@ -160,6 +162,8 @@ export class UiSystem {
   banner!: Banner;
   menu!: PauseMenu;
   startGate: StartGate | null = null;
+  pixiExperiment: PixiUiExperiment | null = null;
+  pixiHud: PixiHudSlice | null = null;
   gameOver!: GameOverScreen;
   shop!: MarketOverlay;
   marketCountdown!: MarketCountdown;
@@ -385,7 +389,12 @@ export class UiSystem {
       this.sfx('objective', 0.7);
     });
 
-    on('engine:error', (): void => this.shop.hide());
+    on('engine:error', (): void => {
+      this.shop.hide();
+      this.pixiExperiment?.root.setAttribute('inert', '');
+      this.ammo.pixi?.setVisible(false);
+      this.pixiHud?.setVisible(false);
+    });
     on('market:open', (e): void => {
       this.shop.show(e?.wave ?? 0);
       this.sfx('market_open', 0.85);
@@ -488,6 +497,58 @@ export class UiSystem {
     });
 
     this.resize(ctx.canvas.clientWidth || innerWidth, ctx.canvas.clientHeight || innerHeight, ctx);
+    const pixiMode = new URLSearchParams(location.search).get('pixi');
+    if (pixiMode === 'hud') {
+      try {
+        const { PixiHudSlice } = await import('./pixi-hud.ts');
+        this.pixiHud = await PixiHudSlice.create(
+          this.root,
+          this.centreLayer,
+          ctx.get('render').renderer
+        );
+        this.pixiHud.resize(this.vw, this.vh, this.k);
+        this.root.classList.add('ow-hud-slice');
+        this.ammo.presentReadout = false;
+      } catch (error) {
+        try {
+          this.pixiHud?.dispose();
+        } catch (cleanupError) {
+          console.warn('[ui] Pixi HUD cleanup failed', cleanupError);
+        } finally {
+          this.pixiHud = null;
+          this.root.classList.remove('ow-hud-slice');
+          this.ammo.presentReadout = true;
+        }
+        console.warn('[ui] Pixi HUD unavailable; using native HUD', error);
+      }
+    } else if (pixiMode === 'ammo') {
+      try {
+        const { PixiAmmoHud } = await import('./pixi-ammo.ts');
+        this.ammo.pixi = await PixiAmmoHud.create(this.ammo.root, ctx.get('render').renderer);
+      } catch (error) {
+        console.warn('[ui] Pixi ammo unavailable; using native HUD', error);
+      }
+    } else if (pixiMode === '1') {
+      const layout = this.menu.root.querySelector<HTMLElement>('.ow-menu-layout');
+      const controls = this.menu.root.querySelector<HTMLElement>('.ow-controls');
+      if (layout && controls) {
+        try {
+          const { PixiUiExperiment } = await import('./pixi-experiment.ts');
+          this.pixiExperiment = await PixiUiExperiment.create(layout, ctx.get('render').renderer);
+          controls.before(this.pixiExperiment.root);
+          controls.style.gridColumn = '1 / -1';
+        } catch (error) {
+          const status = el(
+            'p',
+            null,
+            layout,
+            'Pixi experiment unavailable; native settings still work.'
+          );
+          status.setAttribute('role', 'status');
+          console.warn('[ui] Pixi experiment unavailable', error);
+        }
+      }
+    }
   }
 
   /* ------------------------------------------------------------- helpers -- */
@@ -634,6 +695,9 @@ export class UiSystem {
     // The native Start dialog exclusively owns waiting input/presentation.
     // Resume happens between frames; reveal only after normal active pose hooks.
     if (this.startGate && !this.startGate.afterPose()) {
+      this.pixiExperiment?.update(false, 0);
+      this.ammo.pixi?.setVisible(false);
+      this.pixiHud?.setVisible(false);
       this._hadPointerLock = false;
       return;
     }
@@ -658,6 +722,7 @@ export class UiSystem {
       }
     }
     this.menu.update(rawDt);
+    this.pixiExperiment?.update(this.menu.open && !ctx.engine.error, rawDt);
     this.gameOver.update(rawDt);
     this.shop.update(rawDt);
 
@@ -740,10 +805,11 @@ export class UiSystem {
     setStyle(this.worldLayer, 'opacity', hudOp);
     setStyle(this.centreLayer, 'opacity', hudOp);
 
-    this.crosshair.update(dt, s);
+    this.crosshair.update(dt, s, !this.pixiHud);
     this.hit.update(dt);
     this.arcs.update(dt, rx, rz, fx, fz);
-    this.health.update(dt, s);
+    this.health.update(dt, s, !this.pixiHud);
+    this.ammo.pixi?.setVisible(this.hudVisible >= 0.004 && !ctx.engine.error);
     this.ammo.update(dt, s);
     this.killfeed.update(dt);
     this.scoreBar.update(s);
@@ -803,7 +869,18 @@ export class UiSystem {
       last.z = o.position.z;
       last.label = o.label;
     }
-    this.minimap.draw(this._mmState);
+    if (this.pixiHud) {
+      this.pixiHud.setVisible(this.hudVisible >= 0.004 && !ctx.engine.error);
+      this.pixiHud.update(
+        dt,
+        s,
+        this.health,
+        this.crosshair,
+        this.minimap,
+        this._mmState,
+        this.hudVisible
+      );
+    } else this.minimap.draw(this._mmState);
   }
 
   _collectBlips(): void {
@@ -853,30 +930,43 @@ export class UiSystem {
     this.crosshair.setScale(this.k);
     this.compass.setScale(this.k);
     this.minimap.resize(this.k);
+    this.pixiExperiment?.resize();
+    this.ammo.pixi?.resize();
+    this.pixiHud?.resize(w, h, this.k);
   }
 
   dispose(): void {
-    this.startGate?.dispose();
-    for (const off of this._unsubs) off();
-    this._unsubs.length = 0;
-    this.crosshair.dispose();
-    this.hit.dispose();
-    this.arcs.dispose();
-    this.health.dispose();
-    this.ammo.dispose();
-    this.killfeed.dispose();
-    this.compass.dispose();
-    this.scoreBar.dispose();
-    this.minimap.dispose();
-    this.markers.dispose();
-    this.prompt.dispose();
-    this.banner.dispose();
-    this.menu.dispose();
-    this.gameOver.dispose();
-    this.shop.dispose();
-    this.marketCountdown.dispose();
-    this.radio.dispose();
-    this.root.remove();
-    removeStyles();
+    // These trials are mutually exclusive. Clear ownership before cleanup so a
+    // Pixi exception cannot skip the remaining native UI teardown or retry it.
+    const pixi = this.pixiHud ?? this.pixiExperiment ?? this.ammo.pixi;
+    this.pixiHud = null;
+    this.pixiExperiment = null;
+    this.ammo.pixi = null;
+    try {
+      pixi?.dispose();
+    } finally {
+      this.startGate?.dispose();
+      for (const off of this._unsubs) off();
+      this._unsubs.length = 0;
+      this.crosshair.dispose();
+      this.hit.dispose();
+      this.arcs.dispose();
+      this.health.dispose();
+      this.ammo.dispose();
+      this.killfeed.dispose();
+      this.compass.dispose();
+      this.scoreBar.dispose();
+      this.minimap.dispose();
+      this.markers.dispose();
+      this.prompt.dispose();
+      this.banner.dispose();
+      this.menu.dispose();
+      this.gameOver.dispose();
+      this.shop.dispose();
+      this.marketCountdown.dispose();
+      this.radio.dispose();
+      this.root.remove();
+      removeStyles();
+    }
   }
 }

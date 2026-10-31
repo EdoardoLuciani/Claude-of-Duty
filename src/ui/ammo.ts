@@ -1,7 +1,8 @@
 import type { WeaponMode } from '../weapons/defs.ts';
+import type { PixiAmmoHud } from './pixi-ammo.ts';
 import { el, svg, setText, setStyle, setClass, clamp01, ease } from './util.ts';
 
-const MAX_PIPS = 30;
+export const MAX_PIPS = 30;
 
 /** Tracking / size steps the weapon name falls back through when it overflows. */
 const NAME_FIT = [
@@ -64,7 +65,7 @@ function radioIcon(parent: HTMLElement): SVGSVGElement {
  * Deliberately understated: three ink levels, no boxes, no icons bigger than
  * the type. The only colour is the low-ammo amber and the empty-mag red.
  */
-interface AmmoState {
+export interface AmmoState {
   ammo: number;
   magSize: number;
   reserve: number;
@@ -82,7 +83,26 @@ interface AmmoState {
   carpetCount?: number;
   radioEquipped?: boolean;
 }
+export function filledMagazinePips(
+  ammo: number,
+  magSize: number,
+  reserve: number,
+  reloading: boolean,
+  progress: number
+): number {
+  let count = ammo;
+  if (reloading) {
+    const after = Math.min(magSize, ammo + Math.max(0, reserve | 0));
+    count = progress < 0.45 ? ammo * (1 - progress / 0.45) : after * ((progress - 0.45) / 0.55);
+  }
+  return count <= 0.001
+    ? 0
+    : Math.max(1, Math.round((count / magSize) * Math.min(MAX_PIPS, magSize)));
+}
+
 export class AmmoPanel {
+  presentReadout = true;
+  pixi: PixiAmmoHud | null = null;
   declare root: HTMLElement;
   declare equip: HTMLElement;
   declare slotB: HTMLElement;
@@ -154,6 +174,25 @@ export class AmmoPanel {
    *                     reloadProgress, lethal, lethalCount }
    */
   update(dt: number, s: AmmoState): void {
+    if (this.pixi) this.pixi.update(dt, s);
+    else if (this.presentReadout) this._updateReadout(dt, s);
+
+    // Equipment remains native in both A/B modes, in its original HUD layer.
+    const bc = s.bandages ?? 0;
+    setText(this.slotBn, bc);
+    setClass(this.slotB, 'empty', bc <= 0);
+    setClass(this.slotB, 'cooking', !!s.healing);
+    const lc = s.lethalCount ?? 0;
+    setText(this.slotLn, lc);
+    setClass(this.slotL, 'empty', lc <= 0);
+    setClass(this.slotL, 'cooking', !!s.cooking || !!s.grenadeEquipped);
+    const cc = s.carpetCount ?? 0;
+    setText(this.slotRn, cc);
+    setClass(this.slotR, 'empty', cc <= 0);
+    setClass(this.slotR, 'cooking', !!s.radioEquipped);
+  }
+
+  private _updateReadout(dt: number, s: AmmoState): void {
     const ammo = Math.max(0, s.ammo | 0);
     const magSize = Math.max(1, s.magSize | 0 || 30);
 
@@ -195,15 +234,7 @@ export class AmmoPanel {
       for (let i = 0; i < MAX_PIPS; i++)
         setStyle(this.pips[i], 'display', i < pipCount ? '' : 'none');
     }
-    let pipAmmo = ammo;
-    if (reloading) {
-      const after = Math.min(magSize, ammo + Math.max(0, s.reserve | 0));
-      pipAmmo =
-        reloadP < 0.45
-          ? ammo * (1 - reloadP / 0.45) // mag out
-          : after * ((reloadP - 0.45) / 0.55); // mag in
-    }
-    const filled = pipAmmo <= 0.001 ? 0 : Math.max(1, Math.round((pipAmmo / magSize) * pipCount));
+    const filled = filledMagazinePips(ammo, magSize, s.reserve, reloading, reloadP);
     if (filled !== this._lastCount) {
       this._lastCount = filled;
       for (let i = 0; i < pipCount; i++) {
@@ -225,22 +256,6 @@ export class AmmoPanel {
     }
     setStyle(this.reloadBar, 'display', reloading ? '' : 'none');
     if (reloading) setStyle(this.reloadFill, 'transform', `scaleX(${reloadP.toFixed(3)})`);
-
-    // --- equipment --------------------------------------------------------
-    const bc = s.bandages ?? 0;
-    setText(this.slotBn, bc);
-    setClass(this.slotB, 'empty', bc <= 0);
-    setClass(this.slotB, 'cooking', !!s.healing);
-
-    const lc = s.lethalCount ?? 0;
-    setText(this.slotLn, lc);
-    setClass(this.slotL, 'empty', lc <= 0);
-    setClass(this.slotL, 'cooking', !!s.cooking || !!s.grenadeEquipped);
-
-    const cc = s.carpetCount ?? 0;
-    setText(this.slotRn, cc);
-    setClass(this.slotR, 'empty', cc <= 0);
-    setClass(this.slotR, 'cooking', !!s.radioEquipped);
   }
 
   /**
@@ -261,6 +276,11 @@ export class AmmoPanel {
   }
 
   dispose(): void {
-    this.root.remove();
+    try {
+      this.pixi?.dispose();
+    } finally {
+      this.pixi = null;
+      this.root.remove();
+    }
   }
 }
