@@ -34,8 +34,10 @@ for (const asset of [MPX_NATIVE_URL, MPX_URL]) {
     const material = [...model.materials].find((m) => m.name.startsWith(prefix));
     assert(material && material.transparent && material.forceSinglePass && !material.depthWrite);
     assert(
-      material.opacityNode &&
-        material.clearcoatNode &&
+      material.opacity === 0.02 &&
+        material.clearcoat === 0.25 &&
+        material.opacityNode === null &&
+        material.clearcoatNode === null &&
         material.transmission === 0 &&
         material.envMapIntensity === 0.05,
       'optical sheets must not wash out the world'

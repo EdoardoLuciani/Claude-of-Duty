@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { uv } from 'three/tsl';
 import type { Renderer } from 'three/webgpu';
 
 import handReference from '../../assets/weapons/sig-mpx/hand-reference.json' with { type: 'json' };
@@ -131,17 +130,14 @@ export function makeMPXModel(gltf: GLTF): MPXModel {
   };
   const converted = convertWeaponScene(scene, (source, material): void => {
     // Keep authored reflectance; only optical sheets/interior have view-pass policies.
-    if (source.name.startsWith('11 |') || source.name.startsWith('12 |')) {
+    if (source.name.startsWith('11 |')) {
       // World colour is already behind the separate weapon pass. Use one
       // faint coating per optical sheet, not a foggy stack of solid discs or
       // transmission sampling a viewmodel-only render target.
       material.transparent = true;
-      // The padded UV1 tile is constant in role across each sheet. Keep exact
-      // alpha/coating factors without another map or interpolated vertex alpha.
-      const cover = uv(1).x.greaterThanEqual(0.75);
-      material.opacity = 1;
-      material.opacityNode = cover.select(0.01, 0.02);
-      material.clearcoatNode = cover.select(0, 0.25);
+      // Only the body lenses remain transparent; solid caps need no selector.
+      material.opacity = 0.02;
+      material.clearcoat = 0.25;
       material.depthWrite = false;
       material.side = THREE.DoubleSide;
       material.forceSinglePass = true;
