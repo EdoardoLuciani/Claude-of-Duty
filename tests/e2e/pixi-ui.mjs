@@ -12,6 +12,7 @@ import {
   parseArgs,
 } from '../../tools/lib/browser-harness.mjs';
 import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
+import { capturePixi } from '../lib/pixi-capture.mjs';
 
 const args = parseArgs();
 const port = Number(args.port ?? 5195);
@@ -132,6 +133,44 @@ try {
       x: rect.x + (x * rect.width) / 480,
       y: rect.y + (y * rect.height) / 360,
     });
+    const state = () =>
+      page.evaluate(() => {
+        const p = window.__ENGINE__.ctx.get('ui').pixiExperiment;
+        return {
+          state: p.stage.children.find((c) => c.onPress && c.x === 248).state,
+          draws: p.draws,
+        };
+      });
+    const reset = point(320, 295),
+      outside = { x: rect.x - 10, y: rect.y + 10 };
+    const beforeHover = await state();
+    await page.mouse.move(reset.x, reset.y);
+    await page.evaluate(() => window.__PUMP__(1));
+    const hover = await state();
+    assert.equal(hover.state, 'hover');
+    assert(hover.draws > beforeHover.draws, 'hover must actually redraw');
+    await page.mouse.down();
+    await page.evaluate(() => window.__PUMP__(1));
+    const pressed = await state();
+    assert.equal(pressed.state, 'pressed');
+    assert(pressed.draws > hover.draws, 'pressed skin must actually redraw');
+    await page.mouse.move(outside.x, outside.y);
+    await page.mouse.up();
+    await page.evaluate(() => window.__PUMP__(1));
+    const released = await state();
+    assert.equal(released.state, 'default');
+    assert(released.draws > pressed.draws, 'release outside must redraw');
+    await page.mouse.move(reset.x, reset.y);
+    await page.mouse.down();
+    await page.evaluate(() => window.__PUMP__(1));
+    const beforeCancel = await state();
+    await page.locator('.ow-pixi-experiment canvas').dispatchEvent('pointercancel');
+    await page.evaluate(() => window.__PUMP__(1));
+    const cancelled = await state();
+    assert.notEqual(cancelled.state, 'pressed');
+    assert(cancelled.draws > beforeCancel.draws, 'cancellation must redraw');
+    await page.mouse.move(outside.x, outside.y);
+    await page.mouse.up();
     const press = point(110, 295);
     await page.mouse.click(press.x, press.y);
     await page.evaluate(() => window.__PUMP__(30));
@@ -262,60 +301,7 @@ try {
       measurements.texturesAfter,
       'settled text resource count'
     );
-    // Native texture readback avoids blank headless Vulkan swapchain captures.
-    const screenshot = async (name) => {
-      await page.evaluate(async () => {
-        const p = window.__ENGINE__.ctx.get('ui').pixiExperiment,
-          r = p.renderer;
-        const texture = r.textureGenerator.generateTexture({
-          target: p.stage,
-          resolution: r.resolution,
-        });
-        const source = r.texture.getGpuSource(texture.source),
-          device = r.gpu.device;
-        const width = source.width,
-          height = source.height,
-          bytesPerRow = Math.ceil((width * 4) / 256) * 256;
-        const buffer = device.createBuffer({
-          size: bytesPerRow * height,
-          usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-        });
-        try {
-          const encoder = device.createCommandEncoder();
-          encoder.copyTextureToBuffer(
-            { texture: source },
-            { buffer, bytesPerRow },
-            { width, height }
-          );
-          device.queue.submit([encoder.finish()]);
-          await buffer.mapAsync(GPUMapMode.READ);
-          const raw = new Uint8Array(buffer.getMappedRange()),
-            rgba = new Uint8ClampedArray(width * height * 4);
-          for (let y = 0; y < height; y++)
-            rgba.set(raw.subarray(y * bytesPerRow, y * bytesPerRow + width * 4), y * width * 4);
-          if (source.format.startsWith('bgra'))
-            for (let i = 0; i < rgba.length; i += 4)
-              [rgba[i], rgba[i + 2]] = [rgba[i + 2], rgba[i]];
-          const overlay = document.createElement('canvas');
-          overlay.id = 'pixi-readback';
-          overlay.width = width;
-          overlay.height = height;
-          overlay.style.cssText =
-            'position:absolute;inset:0;width:100%;height:100%;pointer-events:none';
-          overlay.getContext('2d').putImageData(new ImageData(rgba, width, height), 0, 0);
-          p.root.style.position = 'relative';
-          p.root.append(overlay);
-        } finally {
-          buffer.destroy();
-          texture.destroy(true);
-        }
-      });
-      try {
-        await captureNative(page, resolve(out, name));
-      } finally {
-        await page.evaluate(() => document.getElementById('pixi-readback')?.remove());
-      }
-    };
+    const screenshot = (name) => capturePixi(page, resolve(out, name));
     await page.locator('.ow-pixi-experiment').scrollIntoViewIfNeeded();
     const retina = await page.evaluate(() => {
       const p = window.__ENGINE__.ctx.get('ui').pixiExperiment;

@@ -1,24 +1,27 @@
 import { FancyButton, Slider } from '@pixi/ui';
-import { Container, DOMAdapter, Graphics, Text, WebGPURenderer } from 'pixi.js';
+import { Container, FederatedPointerEvent, Graphics, Text, WebGPURenderer } from 'pixi.js';
 import type { Renderer } from 'three/webgpu';
+
+import { initPixiRenderer, restrictPixiCanvases } from './pixi-device.ts';
 
 const WIDTH = 480;
 const HEIGHT = 360;
 
 /** Opt-in library evaluation: DOM hosts one canvas, Pixi renders the contents.
- * No Application/ticker, WebGL fallback, world textures, or gameplay settings.
+ * No Application/render ticker, WebGL fallback, world textures, or gameplay settings.
+ * Pixi still owns its separate interaction ticker.
  * Pixi owns its renderer/resources, but borrows Three's GPUDevice. */
 export class PixiUiExperiment {
   readonly root = document.createElement('section');
   readonly canvas = document.createElement('canvas');
   readonly renderer = new WebGPURenderer();
   readonly stage = new Container();
-  readonly slider: Slider;
-  private strength: Text;
-  private status: Text;
+  slider!: Slider;
+  private strength!: Text;
+  private status!: Text;
   private reticle = new Graphics();
   private abort = new AbortController();
-  private adapter = DOMAdapter.get();
+  private restoreAdapter: () => void = (): void => {};
   private dirty = true;
   private visible = false;
   private disposed = false;
@@ -27,52 +30,28 @@ export class PixiUiExperiment {
   draws = 0;
 
   static async create(parent: HTMLElement, game: Renderer): Promise<PixiUiExperiment> {
-    const backend = game.backend;
-    if (!('device' in backend) || !(backend.device instanceof GPUDevice))
-      throw new Error('The Pixi experiment requires the initialized WebGPU device');
-    // Three does not retain its adapter. Pixi only uses adapter metadata when a
-    // device is supplied; this query does NOT request another logical device.
-    const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
-    if (!adapter || adapter.info.vendor !== backend.device.adapterInfo.vendor)
-      throw new Error('Could not query matching adapter metadata for Pixi');
-    const panel = new PixiUiExperiment();
+    const restore = restrictPixiCanvases();
+    let panel: PixiUiExperiment | null = null;
     try {
-      await panel.renderer.init({
-        canvas: panel.canvas,
-        gpu: { adapter, device: backend.device },
-        width: WIDTH,
-        height: HEIGHT,
-        resolution: Math.min(devicePixelRatio || 1, 2),
-        autoDensity: true,
-        antialias: true,
-        backgroundAlpha: 0,
-      });
+      panel = new PixiUiExperiment();
+      panel.restoreAdapter = restore;
+      panel.build();
+      await initPixiRenderer(panel.renderer, game, panel.canvas, WIDTH, HEIGHT);
       parent.append(panel.root);
       return panel;
     } catch (error) {
-      panel.dispose();
+      try {
+        panel?.dispose();
+      } finally {
+        restore();
+      }
       throw error;
     }
   }
 
-  private constructor() {
-    // Pixi's backend-independent shaders also construct GLSL programs and probe
-    // precision. Restrict only Pixi-created canvases through its supported adapter;
-    // do not create diagnostic WebGL contexts or patch browser/shader internals.
-    const adapter = this.adapter;
-    DOMAdapter.set({
-      ...adapter,
-      createCanvas: (...size): ReturnType<typeof adapter.createCanvas> => {
-        const canvas = adapter.createCanvas(...size);
-        canvas.getContext = new Proxy(canvas.getContext.bind(canvas), {
-          apply(target, context, args): unknown {
-            if (typeof args[0] === 'string' && /^(experimental-)?webgl/.test(args[0])) return null;
-            return Reflect.apply(target, context, args);
-          },
-        });
-        return canvas;
-      },
-    });
+  private constructor() {}
+
+  private build(): void {
     this.root.className = 'ow-pixi-experiment';
     this.root.setAttribute('aria-label', 'Experimental PixiJS panel');
     this.root.style.cssText =
@@ -122,10 +101,6 @@ export class PixiUiExperiment {
     this.button('TEST FEEDBACK', 24, (): void => this.hit());
     this.button('RESET', 248, (): void => this.reset());
     this.label('← → Strength · Enter Test · R Reset · Esc Resume', 24, 332, 12, 0x9aabb5);
-    for (const event of ['pointerover', 'pointerout', 'pointerdown', 'pointerup'] as const)
-      this.stage.on(event, (): void => {
-        this.dirty = true;
-      });
     this.canvas.addEventListener('pointerdown', (): void => this.canvas.focus(), {
       signal: this.abort.signal,
     });
@@ -167,6 +142,22 @@ export class PixiUiExperiment {
     });
     button.position.set(x, 275);
     button.onPress.connect(action);
+    // The passive stage does not receive these events. Invalidate from actual
+    // widget signals, including release outside, after FancyButton changes state.
+    for (const signal of [button.onHover, button.onOut, button.onDown, button.onUp, button.onUpOut])
+      signal.connect((): void => {
+        this.dirty = true;
+      });
+    const cancel = (): void => {
+      const boundary = this.renderer.events?.rootBoundary;
+      if (!boundary) return; // Window focus can change before renderer.init completes.
+      const event = new FederatedPointerEvent(boundary);
+      button.emit('mouseupoutside', event);
+      button.emit('pointerupoutside', event);
+      this.dirty = true;
+    };
+    this.canvas.addEventListener('pointercancel', cancel, { signal: this.abort.signal });
+    window.addEventListener('blur', cancel, { signal: this.abort.signal });
     this.stage.addChild(button);
   }
 
@@ -218,7 +209,7 @@ export class PixiUiExperiment {
       try {
         this.renderer.destroy(); // Pixi preserves explicitly supplied devices.
       } finally {
-        DOMAdapter.set(this.adapter);
+        this.restoreAdapter();
         this.root.remove();
       }
     }

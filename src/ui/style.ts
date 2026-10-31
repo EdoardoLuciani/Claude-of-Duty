@@ -249,6 +249,10 @@ const CSS = `
   width: var(--ammo-w);
   text-align:right; line-height:1;
 }
+.ow-ammo-pixi { --ammo-w:calc(248px * var(--k)); }
+.ow-ammo-pixi .ow-ammo-head, .ow-ammo-pixi .ow-ammo-row,
+.ow-ammo-pixi .ow-mag, .ow-ammo-pixi .ow-reload,
+.ow-ammo-pixi .ow-reload-bar { display:none; }
 .ow-ammo-head {
   display:grid; grid-auto-flow:column; grid-auto-columns:max-content;
   justify-content:end; align-items:center;
