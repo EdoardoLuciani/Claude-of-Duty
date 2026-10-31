@@ -1,9 +1,9 @@
 # SIG MPX
 
-**Solid-cover visual prototype: not yet accepted or promoted.**
-Gates 1–2 approval refers to the accepted clear-cover base (`1d4b0b93`);
-this branch's explicitly requested opaque-cover redesign awaits matched native-GPU
-images and user approval. Animation/gameplay/optic Gate 3 remains pending.
+**Solid-cover redesign approved after matched native-WebGPU comparisons.**
+The user approved replacing the two clear cap windows with solid polymer lids,
+including their closed-cover occlusion. Fresh independent technical review passed.
+This specific approval does not clear animation/gameplay/optic Gate 3.
 Original game art, not CAD/scan or an endorsed/licensed replica.
 Black select-fire 8-inch MPX, deployed factory stock, bare M-LOK guard,
 30-round magazine, folded irons, ROMEO4T (not PRO), 1.41-inch mount/no spacer,
@@ -36,7 +36,7 @@ No duplicate arms, root recoil or review casing; all DCC controls need NLA track
 Keep exact balance/events, partial-mag retention, empty-mag discard, chamber/+1,
 lockback/cancellation/reset and one live case per shot. Handle is non-reciprocating;
 empty reload uses bolt release. Sound isn't a verified MPX recording.
-Prototype native caps: <80k triangles, seven real primitives, three materials including
+Native asset: <80k triangles, seven real primitives, three materials including
 glTF fallback, three embedded 1024² maps, ≤10 MiB. Normal builds need no Blender/network.
 The recipe retains all 15 original finish calibrations and three source maps;
 editable solid lids reuse the existing polymer finish. The unused clear-cover
@@ -48,7 +48,7 @@ rail/optic datums, source normals, sockets and authored contacts are not repacke
 Tiny magazine witness-dot cap bevels and handguard rim bevels use fewer segments.
 
 Optics use absorptive inward faces and double-sided single-pass body lenses at
-2% opacity. Prototype covers are solid 1.5 mm polymer lids using the existing cap
+2% opacity. Covers are solid 1.5 mm polymer lids using the existing cap
 finish; they obstruct the aperture when closed. The existing lens/cap shader
 selectors are removed, with unchanged constant body-lens alpha and clearcoat. Dot is nominal 2 MOA in world-camera space with a six-pixel
 minimum diameter, no ring/halo; size after projection update. Weapon-only ADS FOV/shoulder
@@ -70,11 +70,9 @@ node tests/smoke/smoke-mpx.mjs
 node tests/smoke/smoke-mpx-skin.mjs
 blender -b -t 2 assets/weapons/sig-mpx/mpx.blend --python-exit-code 1 \
   --python tools/blender/mpx_normal_check.py
-# Independent oriented surfaces, UV/finish/owner and moving-normal parity:
-node tools/mpx-pass2-parity.mjs /path/to/pass-1-mpx.glb /tmp/mpx-parity.json
 ```
 
-### Solid-cover prototype and costs
+### Approved solid covers and costs
 
 Only the two clear cover sheets are replaced: closed polymer discs join their
 existing cap frames in the opaque mechanical skin. There are still twenty joints;
@@ -82,7 +80,7 @@ no new animation mechanism, runtime selector, material or texture is introduced.
 Existing opaque material sidedness is unchanged; source manifold checks and
 back-face-culled rays from both directions verify real front/back lid geometry.
 
-| Metric | Accepted clear-cover base | Solid-cover prototype |
+| Metric | Earlier clear-cover base | Approved solid covers |
 |---|---:|---:|
 | Materials | 3 | 3 |
 | All / loaded Idle primitive instances | 9 / 7 | 7 / 5 |
@@ -99,12 +97,21 @@ and rest/moving normal error across 15.3M samples. The deliberately removed 80 c
 sheet triangles are replaced by 312 triangles confined to the two solid lids; all
 84 named controls and 1,368 existing channels match exactly. The existing UV-only
 repeatability bound is unchanged. Geometry/storage grow slightly; no FPS or GPU-memory
-improvement is claimed. Parent GPU/storage and visual acceptance remain pending.
+improvement is claimed. Native AMD RDNA-4 / Three r187 measured uploaded geometry
+**5,286,220 → 5,304,684 B** and geometry-plus-logical-texture subtotal
+**9,480,604 → 9,499,068 B**; texture footprint and separately observed 1,280 B palette
+storage are unchanged. This excludes other renderer resources and driver padding.
+Matched hero/side/optic/ADS/reload/inspect and closed-cover optic/ADS readbacks,
+forced RGBA, market and production integration checks passed. User visual approval
+and independent technical acceptance cover this redesign, not general Gate 3.
+The historical `tools/mpx-pass2-parity.mjs` full-surface checker applies only to the
+clear-cover consolidation checkout; solid-cover acceptance enumerates the intended
+lid replacements separately instead of weakening its original comparisons.
 
 ### Accepted clear-cover consolidation baseline (historical)
 
 Export copies combine the ten mechanical owners into one rigid-influence skin;
-magazine shells and rounds remain four independent draws for reload/drop ownership.
+magazine shells and rounds remain four independent primitives for reload/drop ownership.
 Body lenses and both cap sheets remain three independently sorted rigid transparent
 objects, with unchanged 0.02/0.01 alpha, 0.25/0 clearcoat and 0.03/0.05
 specular/environment factors. The absorptive interior stays separate at 0.02/0.03.
@@ -122,7 +129,7 @@ Original editable parts/materials, sockets, controls, calibration and Actions re
 | Native vertices / vertex-view bytes / index-view bytes | 117,556 / 5,642,688 / 715,278 | 117,556 / 7,382,908 / 794,298 |
 | Runtime vertices / vertex-view bytes / index-view bytes | 88,490 / 3,539,600 / 426,624 | 90,168 / 4,102,984 / 438,834 |
 
-Opaque draws fall 14→5 (Idle 12→3); optical/interior draw counts stay 3/1.
+Opaque primitives fall 14→5 (Idle 12→3); optical/interior counts stay 3/1.
 Native vertex-array growth is exactly 87,011 skinned vertices × 20 JOINTS/WEIGHTS bytes;
 runtime growth is 62,033 × eight bytes plus 1,678 extra vertices × 40 base bytes.
 Twenty joints (ten control parents, ten static mesh-local frames) add 1,280 inverse-bind
