@@ -194,8 +194,6 @@ Reproduce the candidate without editing the shared registry:
 
 ```sh
 node --input-type=module -e "import { cookModel } from './build/models.mjs'; cookModel({ input: 'assets/weapons/ax338/ax338.glb', output: 'assets/weapons/ax338/ax338.runtime.glb', flags: ['-vc', '16', '-vp', '16'] });"
-node tests/smoke/smoke-ax338-finishes.mjs
-node tests/smoke/smoke-ax338-runtime.mjs
 AX338_RUNTIME=1 node tests/smoke/smoke-ax338.mjs
 AX338_RUNTIME=1 node tests/smoke/smoke-ax338-contact.mjs
 ```
@@ -305,12 +303,8 @@ Parent approved updating only the representation-dependent rifle/optic hashes;
 the original 10-micrometre lattice, winding/normal/UV logic and protected clip hash
 are unchanged. No geometry/contact/motion tolerance was relaxed.
 
-`smoke-ax338.mjs` and `smoke-ax338-runtime.mjs` retain geometry fingerprints,
-ordinary ownership, real drop/cartridge geometry, unit sampled quaternions,
-interruptions and the original 0.05 mm native/runtime sampled-surface gate
-(measured 0.007631 mm). Shared inspection tests cover independent transforms,
-borrowed resources and owned material/map disposal. Native/cooked
-actual shared-arm sweeps pass 761 poses; left DCC passes 474 poses at the unchanged
+Migration acceptance measured 0.007631 mm native/runtime surface deviation and
+passed 761 native/cooked shared-arm poses; left DCC passes 474 poses at the unchanged
 0.903077 mm depth. Full right-hand DCC acceptance remains the inherited failure
 below; none of these checks clears it. Two fresh separate-process source
 exports and cooks match byte-for-byte (native, runtime and manifest). Matched

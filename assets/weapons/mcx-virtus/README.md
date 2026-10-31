@@ -49,9 +49,6 @@ blender -b assets/weapons/mcx-virtus/mcx-virtus.blend \
   --python-exit-code 1 --python tools/blender/mcx_check.py
 node tests/smoke/smoke-mcx.mjs
 node --input-type=module -e "import {cookModel} from './build/models.mjs'; cookModel({input:'assets/weapons/mcx-virtus/mcx-virtus.glb', output:'assets/weapons/mcx-virtus/mcx-virtus.runtime.glb', flags:['-si','0.65','-se','0.0002','-sp','-vc','16']});"
-node tests/smoke/smoke-mcx-runtime.mjs
-node tests/smoke/smoke-mcx-finishes.mjs
-node tests/smoke/smoke-mcx-pass2.mjs
 ```
 
 Follow the [shared authoring workflow](../../../tools/blender/README.md).

@@ -11,7 +11,6 @@ import { makeAX338Model, AX338_URL } from '../../src/weapons/ax338.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
-import { ax338PartTriangles } from './ax338-geometry.mjs';
 async function load(url) {
   const b = readFileSync(url);
   return parseGLB(b);
@@ -33,19 +32,10 @@ const vm = new Viewmodel(
 );
 vm.armL.attachAsset({ meshes });
 vm.armR.attachAsset({ meshes });
-vm.addWeapon(
-  makeAX338Model(
-    await load(
-      process.env.AX338_RUNTIME
-        ? new URL(AX338_URL)
-        : new URL('../../assets/weapons/ax338/ax338.glb', import.meta.url)
-    )
-  ),
-  {
-    ...WEAPON_DEFS.sniper,
-    cycleTime: 60 / WEAPON_DEFS.sniper.rpm,
-  }
-);
+vm.addWeapon(makeAX338Model(await load(new URL(AX338_URL))), {
+  ...WEAPON_DEFS.sniper,
+  cycleTime: 60 / WEAPON_DEFS.sniper.rpm,
+});
 vm.setActive('sniper');
 vm.stopClip();
 const state = {
@@ -197,10 +187,22 @@ const gripTriangles = [],
     new THREE.Vector3(0.032, -0.019, 0.14)
   );
 vm.anchor.updateMatrixWorld(true);
-for (const tri of ax338PartTriangles(vm.active.animation.root, 'receiver')) {
-  if ([tri.a, tri.b, tri.c].every((v) => gripBounds.containsPoint(v)))
-    gripTriangles.push({ tri, box: new THREE.Box3().setFromPoints([tri.a, tri.b, tri.c]) });
-}
+inv.copy(vm.active.animation.root.matrixWorld).invert();
+vm.active.animation.root.getObjectByName('receiver').traverse((mesh) => {
+  if (!mesh.isMesh) return;
+  transform.multiplyMatrices(inv, mesh.matrixWorld);
+  const p = mesh.geometry.attributes.position,
+    index = mesh.geometry.index;
+  for (let i = 0; i < index.count; i += 3) {
+    const tri = new THREE.Triangle(
+      ...[0, 1, 2].map((k) =>
+        new THREE.Vector3().fromBufferAttribute(p, index.getX(i + k)).applyMatrix4(transform)
+      )
+    );
+    if ([tri.a, tri.b, tri.c].every((v) => gripBounds.containsPoint(v)))
+      gripTriangles.push({ tri, box: new THREE.Box3().setFromPoints([tri.a, tri.b, tri.c]) });
+  }
+});
 assert(gripTriangles.length > 100, 'actual lower curved-grip triangles present');
 let maximumRightGripGap = 0;
 function checkRightGrip(label) {

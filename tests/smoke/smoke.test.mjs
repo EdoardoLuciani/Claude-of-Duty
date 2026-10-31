@@ -16,7 +16,6 @@ for (const file of readdirSync(dir).sort()) {
     'smoke-floating-props.mjs',
     'smoke-export-cache.mjs',
     'smoke-evolys-clearance.mjs',
-    'smoke-m4.mjs',
   ].includes(file);
   test(
     file,

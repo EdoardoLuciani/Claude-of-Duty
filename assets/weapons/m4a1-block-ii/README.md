@@ -59,8 +59,6 @@ blender -b --threads 2 --python-exit-code 1 --python tools/blender/m4a1.py -- \
 blender -b assets/weapons/m4a1-block-ii/m4a1-block-ii.blend \
   --python-exit-code 1 --python tools/blender/m4_check.py
 node tests/smoke/smoke-m4.mjs
-node tests/smoke/smoke-m4-cook.mjs
-node tests/smoke/smoke-m4-finishes.mjs
 ```
 
 Use frozen uniform registration for visual review: no after-only reframing or
@@ -172,5 +170,4 @@ Reproduce with gltfpack **1.3** through the unchanged registered cook profile:
 ```sh
 GLTFPACK=/home/edoardo/.local/bin/gltfpack node build/models.mjs m4
 node tests/smoke/smoke-m4.mjs
-node tests/smoke/smoke-m4-cook.mjs
 ```
