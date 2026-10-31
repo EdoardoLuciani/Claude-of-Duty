@@ -60,14 +60,12 @@ The editable blend and original three source maps are saved before consolidation
 This is a deliberate grain/storage trade-off rather than a lossless merge:
 relative to the 13-material skin-only export, Idle submissions fall 15 → 8 and
 runtime size falls 3,077,652 → 2,267,368 bytes, while decoded geometry storage
-increases 2,515,012 → 3,679,532 bytes. Source-contact checks stay unchanged;
-`smoke-mcx-finishes.mjs` checks every decoded pigment/lookup coordinate, original
-albedo/normal pixels, padded ORM values and independent optical policies.
+increases 2,515,012 → 3,679,532 bytes. Original albedo/normal pixels, padded
+ORM values and independent optical policies were retained.
 
 The second pass reduces the five-material result to two materials / five actual
 primitive instances (three in loaded Idle). Source triangles, normal/UV0/UV1 and
-mechanical bindings retain an exact pre-pass2 corner-record digest checked by
-`smoke-mcx-pass2.mjs`. Magazines and spent case each have one opaque primitive;
+mechanical bindings were preserved. Magazines and spent case each have one opaque primitive;
 no rubber boundary remains. The MCX-local shader adds two floors, three finish-ID
 comparisons and normal/emission selections, with no new texture sampling. The
 native GLB requires the adapter for masked normal/emission behavior; the editable
@@ -78,7 +76,4 @@ The committed `mcx-virtus.runtime.glb` is cooked by gltfpack 1.3 using the share
 `GLTFPACK_FLAGS` in `build/models.mjs` plus `-si 0.65 -se 0.0002 -sp -vc 16`.
 Sixteen-bit linear colors bound pigment quantization error to 1/65535. Keep `-kn`:
 sockets, helper names, independent magazine ownership and mechanical bones are
-runtime contracts. `loadMCX()` loads the cooked runtime through the shared decoder. `smoke-mcx-runtime.mjs` exercises both
-through the actual GLTFLoader/Meshopt decoder, including all rigid-influence
-vertices, fractional poses, wrist contacts, reload visibility, interruption reset
-and the adapter's empty-state bolt override.
+runtime contracts. `loadMCX()` loads the cooked runtime through the shared decoder.

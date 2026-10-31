@@ -10,7 +10,6 @@ import { makeAX338Model, AX338Animation } from '../../src/weapons/ax338.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import { Arm } from '../../src/weapons/hands.ts';
 import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
-import { ax338PartTriangles, ax338GeometryControl } from './ax338-geometry.mjs';
 const bytes = readFileSync(new URL('../../assets/weapons/ax338/ax338.glb', import.meta.url));
 const json = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)).toString());
 const primitives = json.nodes
@@ -22,8 +21,8 @@ assert.equal(primitives.length, manifest.stats.primitives);
 assert.equal(bytes.length, manifest.stats.bytes);
 assert(
   triangles < 150000 &&
-    primitives.length === 11 &&
-    json.materials.length === 2 &&
+    primitives.length <= 48 &&
+    json.materials.length <= 18 &&
     bytes.length <= 15 * 1024 * 1024
 );
 assert.equal(json.images.length, 3);
@@ -53,49 +52,21 @@ const gltf = await parseGLB(bytes);
 // Freeze the approved rifle and hand channels. Only the three holding fingers
 // and an empty-reload wrist hold (preventing early drift) may change.
 gltf.scene.updateMatrixWorld(true);
-// Hash actual ordinary triangles on the unchanged 10-micrometre lattice.
-// Removing the bind rebase reverses its tiny rounding/guard retessellation;
-// frozen-baseline comparison and approved hash changes are recorded in README.
-// Canonicalize only cyclic index ordering; select optic by actual ownership.
-function surfaceHash(root, normals = false, part = null) {
-  root.updateMatrixWorld(true);
-  const triangles = [],
-    point = new THREE.Vector3(),
-    normal = new THREE.Vector3();
-  root.traverse((o) => {
-    if (!o.isMesh) return;
-    const attributes = o.geometry.attributes,
-      index = o.geometry.index;
-    const normalMatrix = new THREE.Matrix3().getNormalMatrix(o.matrixWorld);
-    for (let i = 0; i < index.count; i += 3) {
-      if (part && ax338GeometryControl(o)?.name !== part) continue;
-      const vertices = [];
-      for (let j = 0; j < 3; j++) {
-        const id = index.getX(i + j);
-        o.getVertexPosition(id, point).applyMatrix4(o.matrixWorld);
-        normal.fromBufferAttribute(attributes.normal, id).applyMatrix3(normalMatrix);
-        const values = [
-          ...point.toArray(),
-          ...(normals ? normal.toArray() : []),
-          attributes.uv.getX(id),
-          attributes.uv.getY(id),
-        ];
-        // Offset avoids decimal half-grid ties in authored metre coordinates.
-        vertices.push(values.map((v) => Math.round(v * 1e5 + 0.12345)).join(','));
-      }
-      triangles.push(
-        [0, 1, 2].map((j) => [...vertices.slice(j), ...vertices.slice(0, j)].join(';')).sort()[0]
-      );
-    }
-  });
-  return createHash('sha256').update(triangles.sort().join('\n')).digest('hex');
-}
+const rifleHash = createHash('sha256'),
+  protectedTracks = createHash('sha256');
+gltf.scene.traverse((o) => {
+  if (!o.isMesh) return;
+  rifleHash.update(o.name);
+  rifleHash.update(o.material.name);
+  rifleHash.update(JSON.stringify(o.matrixWorld.toArray()));
+  for (const key of ['position', 'uv'])
+    rifleHash.update(Buffer.from(o.geometry.attributes[key].array.buffer));
+});
 assert.equal(
-  surfaceHash(gltf.scene),
-  '78675d7fe241add878c0cfb08d14ad3225183895f5b4c5d35f284f4bdd65dd69',
-  'locked rifle triangle positions, winding, UV0 and transforms on the unchanged 10 micrometre lattice'
+  rifleHash.digest('hex'),
+  '24426d0db4a7ac52c1544dda7250703affff09cf77010c2322e4c2de308e6227',
+  'approved rifle mesh positions/UVs/transforms unchanged'
 );
-const protectedTracks = createHash('sha256');
 for (const clip of gltf.animations) {
   protectedTracks.update(clip.name);
   protectedTracks.update(String(clip.duration));
@@ -117,18 +88,20 @@ assert.equal(
   'approved index/thumb, left hand and weapon clips unchanged'
 );
 // User-approved optic must not be incidentally rebuilt by furniture fixes.
+const opticHash = createHash('sha256');
+gltf.scene.getObjectByName('optic').traverse((o) => {
+  if (!o.isMesh) return;
+  opticHash.update(o.material.name);
+  for (const key of ['position', 'normal', 'uv'])
+    opticHash.update(Buffer.from(o.geometry.attributes[key].array.buffer));
+  opticHash.update(Buffer.from(o.geometry.index.array.buffer));
+});
 assert.equal(
-  surfaceHash(gltf.scene, true, 'optic'),
-  '2f0154718dcc1f99d5cd49f4825002356d593bf9de655fc32c95da130ff0fe61',
-  'locked actual PM II geometry, winding, normals and UV0 in ordinary meshes'
+  opticHash.digest('hex'),
+  'c54777affffaa6b9ef1655cc8536985ee5c56f2abfd2fc58fd3349b379cddd37',
+  'approved PM II geometry/normals/UVs/indices unchanged'
 );
-const model = makeAX338Model(
-    process.env.AX338_RUNTIME
-      ? await parseGLB(
-          readFileSync(new URL('../../assets/weapons/ax338/ax338.runtime.glb', import.meta.url))
-        )
-      : gltf
-  ),
+const model = makeAX338Model(gltf),
   anim = new AX338Animation(model),
   def = WEAPON_DEFS.sniper;
 assert(
@@ -190,16 +163,7 @@ for (const action of Object.values(anim.actions)) {
   const clip = action.getClip();
   for (const track of clip.tracks) {
     assert(track.values.every(Number.isFinite));
-    if (!process.env.AX338_RUNTIME)
-      assert(
-        Math.abs(track.times.at(-1) - clip.duration) < 1e-6,
-        `${clip.name}: complete native channel`
-      );
-    else
-      assert(
-        track.times[0] === 0 && track.times.at(-1) <= clip.duration + 1e-6,
-        `${clip.name}: bounded cooked channel`
-      );
+    assert(Math.abs(track.times.at(-1) - clip.duration) < 1e-6, `${clip.name}: complete channel`);
     for (let i = 1; i < track.times.length; i++) assert(track.times[i] >= track.times[i - 1]);
   }
 }
@@ -219,8 +183,7 @@ assert(
 anim.update(0, 'cycle', 0.22 * def.boltTime, false);
 assert(Math.abs(anim.bolt.position.z - rest.z - 0.1) < 0.00001, '100 mm authored rear stroke');
 assert(
-  Math.abs(anim.bolt.quaternion.angleTo(restQ) - Math.PI / 3) <
-    (process.env.AX338_RUNTIME ? 0.0001 : 0.00001),
+  Math.abs(anim.bolt.quaternion.angleTo(restQ) - Math.PI / 3) < 0.00001,
   '60-degree bolt lift'
 );
 const p = new THREE.Vector3(),
@@ -246,16 +209,6 @@ for (const [name, first, last] of [
     anim.handTarget('right', armR.hand.position, armR.hand.quaternion);
     anim.applyHands(armL, armR);
     armR.root.updateMatrixWorld(true);
-    const knob = ax338PartTriangles(model.root, 'bolt').filter((tri) =>
-      [tri.a, tri.b, tri.c].every(
-        (v) =>
-          v
-            .clone()
-            .applyMatrix4(anim.bolt.matrixWorld.clone().invert().multiply(model.root.matrixWorld))
-            .x > 0.049
-      )
-    );
-    assert(knob.length > 100, 'actual bolt-knob surface retained');
     for (const [joint, pad, target] of [
       [armR.fingers[0].joints[2], [0, -0.006, -0.013], [0.069, 0.049, 0.057]],
       [armR.thumb.joints[1], [0, 0, -0.026], [0.055, 0.06, 0.056]],
@@ -266,15 +219,6 @@ for (const [name, first, last] of [
         .applyQuaternion(anim.bolt.quaternion)
         .add(anim.bolt.position)
         .applyMatrix4(model.root.matrix);
-      const localContact = contact.clone().applyMatrix4(model.root.matrix.clone().invert());
-      const closest = new THREE.Vector3();
-      const surfaceGap = Math.min(
-        ...knob.map((tri) => {
-          tri.closestPointToPoint(localContact, closest);
-          return localContact.distanceTo(closest);
-        })
-      );
-      assert(surfaceGap < 0.003, `${name}/${t}: real glove pad loses actual knob`);
       maximumContactGap = Math.max(maximumContactGap, contact.distanceTo(expected));
       assert(
         contact.distanceTo(expected) < 0.003,

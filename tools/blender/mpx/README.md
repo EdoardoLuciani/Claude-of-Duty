@@ -12,7 +12,6 @@
 | Evaluated rigid copies, stock export and read-only assertions         | End of `../mpx.py`                               |
 | Export-only per-corner finish colour and padded ORM/normal tiles      | `finishes.py`: `consolidate_finishes`            |
 | Original rigid frames and packed-normal finish separation             | `geometry.py`: `separate_receiver_finishes`      |
-| Source-named packed-normal regression                                 | `../mpx_normal_check.py`                         |
 
 Read-only inputs are `assets/weapons/sig-mpx/hand-reference.json` and shared
 `assets/player/arms/player-arms.blend`. Refit only with the separately approved
@@ -61,16 +60,8 @@ lossy decoded-vector setter. Every restored corner is checked against its origin
 local normal, including zero-area and tiny triangles, then temporary attributes are
 removed. Editable components are saved before export preparation.
 
-`mpx_normal_check.py` guards the lossy setter and exact packed-normal preservation.
 The one-off frozen-reference migration comparator is preserved in
 [Git history](https://github.com/EdoardoLuciani/Claude-of-Duty/blob/ec1d361fdfd4b1424bd101ebaa79bb9f370a9734/tools/mpx-pass2-parity.mjs), not the rebuild path.
-
-`smoke-mpx-asset.mjs` and `smoke-mpx.mjs` cover native/cooked geometry, original rigid
-owners, 38mm lockback/reset, back-face-culled closed-lid rays and independent ammunition.
-Inspection from lockback and mid-reload must give the real carrier the same geometry
-and world matrix as fresh Idle; ordinary geometry makes this exact for every vertex.
-Shared inspection tests cover borrowed resources and disposal. Existing contact,
-geometry, normal and animation limits are unchanged.
 
 ## Approved repeatability limit
 

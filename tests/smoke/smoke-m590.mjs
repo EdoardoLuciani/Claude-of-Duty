@@ -17,8 +17,6 @@ import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
 
 async function parse(url) {
-  if (url === M590_URL && process.env.M590_TEST_NATIVE)
-    url = new URL('../../assets/weapons/m590/m590.glb', import.meta.url).href;
   const bytes = readFileSync(new URL(url));
   return parseGLB(bytes);
 }

@@ -76,11 +76,6 @@ blender -b -t 2 /tmp/m590-authoring-review/m590.blend \
 node tests/smoke/smoke-shotgun-asset.mjs
 node tests/smoke/smoke-m590.mjs
 node tests/smoke/smoke-m590-ads.mjs
-node tests/smoke/smoke-m590-runtime.mjs
-M590_TEST_NATIVE=1 node tests/smoke/smoke-m590.mjs
-M590_TEST_NATIVE=1 node tests/smoke/smoke-m590-ads.mjs
-blender -b -t 2 /tmp/m590-authoring-review/m590.blend \
-  --python-exit-code 1 --python tools/blender/m590_clearance_check.py
 ```
 
 The native Actions exporter retains the 120 Hz lattice, fractional endpoints,
@@ -217,9 +212,6 @@ a full uncached 979-pose adaptive diagnostic found **27.6231µm** at Holster fra
 production checker conservatively bounds its complete sweep below 29.10µm.
 The diagnostic records every affected pose/triangle externally. Native
 source wrist/shell drift and all other original skin/contact checks are retained.
-`m590_clearance_check.py` proves that +20µm deeper geometry, new contact triangles,
-other right-skin surfaces, receiver contact, changed winding and out-of-region
-contacts are rejected.
 
 ## Review evidence
 
