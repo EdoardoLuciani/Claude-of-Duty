@@ -208,7 +208,17 @@ export class UiSystem {
     this.markers = new WorldMarkers(this.worldLayer);
     this.rng.fork(); // Keep the minimap's noise stream unchanged after removing damage popups.
     this.arcs = new DamageArcs(this.centreLayer);
-    this.crosshair = new Crosshair(this.centreLayer);
+    this.crosshair = new Crosshair(
+      this.centreLayer,
+      new URLSearchParams(location.search).get('crosshair') === 'gpu'
+    );
+    const gpu = this.crosshair.gpu;
+    if (gpu) {
+      const render = ctx.get('render');
+      render.hudDraw = (renderer): void => {
+        if (!ctx.engine.error) gpu.draw(renderer, this.vw, this.vh, this.hudVisible);
+      };
+    }
     this.hit = new Hitmarkers(this.centreLayer);
     this.minimap = new Minimap(this.chromeLayer, this.rng.fork());
     this.compass = new Compass(this.chromeLayer);
@@ -385,7 +395,10 @@ export class UiSystem {
       this.sfx('objective', 0.7);
     });
 
-    on('engine:error', (): void => this.shop.hide());
+    on('engine:error', (): void => {
+      this.shop.hide();
+      if (this.crosshair.gpu) this.crosshair.gpu.enabled = false;
+    });
     on('market:open', (e): void => {
       this.shop.show(e?.wave ?? 0);
       this.sfx('market_open', 0.85);
@@ -626,6 +639,8 @@ export class UiSystem {
   }
 
   lateUpdate(dt: number, ctx: UiContext): void {
+    // A stale GPU reticle must not survive a Start/restart/error handoff.
+    if (this.crosshair.gpu) this.crosshair.gpu.enabled = false;
     // Wall time, not scaled/clamped gameplay time: accurate through pause and hitches.
     this._updateFps();
     const t = ctx.time;
@@ -741,6 +756,7 @@ export class UiSystem {
     setStyle(this.centreLayer, 'opacity', hudOp);
 
     this.crosshair.update(dt, s);
+    if (this.crosshair.gpu) this.crosshair.gpu.enabled = true;
     this.hit.update(dt);
     this.arcs.update(dt, rx, rz, fx, fz);
     this.health.update(dt, s);
@@ -859,6 +875,7 @@ export class UiSystem {
     this.startGate?.dispose();
     for (const off of this._unsubs) off();
     this._unsubs.length = 0;
+    if (this.crosshair.gpu) this.ctx.get('render').hudDraw = null;
     this.crosshair.dispose();
     this.hit.dispose();
     this.arcs.dispose();

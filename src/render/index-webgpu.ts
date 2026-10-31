@@ -68,6 +68,8 @@ export class RenderSystem {
   declare renderer: Renderer;
   declare screenSize: { width: number; height: number };
   declare displaySize: { width: number; height: number };
+  /** Experimental single HUD slot, after display transforms. UI owns resources. */
+  hudDraw: ((renderer: Renderer) => void) | null = null;
   declare passes: PostPass[];
   declare lights: RegisteredLight[];
   declare _lightPositionGroup: ReturnType<typeof sharedUniformGroup>;
@@ -378,6 +380,7 @@ export class RenderSystem {
     graph.exposure.value = this._exposure * 2 ** -this.settings.exposureBias;
     this.renderer.setRenderTarget(null);
     graph.render();
+    this.hudDraw?.(this.renderer);
     this._updateExposure(ctx.time.dt);
   }
 
@@ -659,6 +662,7 @@ export class RenderSystem {
     return { ok: true, graphWarm: await this._warmGraph() };
   }
   async dispose(): Promise<void> {
+    this.hudDraw = null;
     this._disposing = true;
     this._warmAbort.abort(new Error('Renderer disposed during warmup'));
     await this._warmTask?.catch((): void => {});

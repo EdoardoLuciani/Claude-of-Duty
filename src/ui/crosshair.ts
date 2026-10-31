@@ -1,3 +1,4 @@
+import { GpuCrosshair } from './crosshair-gpu.ts';
 import { el, setStyle, clamp, clamp01, damp, ease } from './util.ts';
 
 /**
@@ -22,9 +23,10 @@ interface CrosshairState {
 }
 
 export class Crosshair {
-  declare root: HTMLElement;
+  declare root: HTMLElement | null;
+  readonly gpu: GpuCrosshair | null;
   declare blades: HTMLElement[];
-  declare dot: HTMLElement;
+  declare dot: HTMLElement | null;
   declare k: number;
   declare gap: number;
   declare kick: number;
@@ -34,11 +36,12 @@ export class Crosshair {
   declare hitPulse: number;
   declare visible: number;
   declare _rot: number[];
-  constructor(parent: HTMLElement) {
-    this.root = el('div', 'ow-cross', parent);
-    this.blades = new Array<HTMLElement>(4);
-    for (let i = 0; i < 4; i++) this.blades[i] = el('div', 'ow-blade', this.root);
-    this.dot = el('div', 'ow-dot', this.root);
+  constructor(parent: HTMLElement, gpu = false) {
+    this.gpu = gpu ? new GpuCrosshair() : null;
+    this.root = gpu ? null : el('div', 'ow-cross', parent);
+    this.blades = [];
+    if (this.root) for (let i = 0; i < 4; i++) this.blades.push(el('div', 'ow-blade', this.root));
+    this.dot = this.root ? el('div', 'ow-dot', this.root) : null;
 
     this.k = 1;
     this.gap = 6;
@@ -101,6 +104,11 @@ export class Crosshair {
     const vis = this.visible;
 
     const bright = 1 - 0.25 * this.adsBlend + 0.5 * ease.outQuad(this.hitPulse);
+    if (this.gpu) {
+      this.gpu.update(gap, len, vis, bright, this.hitPulse, this.k);
+      return;
+    }
+    if (!this.root || !this.dot) return;
     for (let i = 0; i < 4; i++) {
       const b = this.blades[i];
       setStyle(
@@ -121,6 +129,7 @@ export class Crosshair {
   }
 
   dispose(): void {
-    this.root.remove();
+    this.gpu?.dispose();
+    this.root?.remove();
   }
 }

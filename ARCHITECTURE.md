@@ -186,6 +186,11 @@ determinism.
 Public render surface:
 
 - `renderer`: initialized strict-WebGPU renderer.
+- `hudDraw`: optional experimental single callback after final world output. UI owns
+  and detaches it before disposing HUD resources; borrowed render state must be
+  restored. `?crosshair=gpu` uses it for a bounded shader quad; HTML stays default.
+  It shares canvas resolution and sits below HTML injury overlays. See
+  [the experiment measurements](docs/experiments/gpu-crosshair.md).
 - `registerPass({ order, asNode(color, exposure), resize, dispose })`.
 - `addLight(light)`, `prewarmLightShadow(light)`.
 - `viewLightLevel`; borrowed `sunDir` (never mutate).
