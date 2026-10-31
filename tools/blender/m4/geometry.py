@@ -68,7 +68,9 @@ def build_geometry(materials):
         o.rotation_mode='QUATERNION';o.rotation_quaternion=Vector((0,0,1)).rotation_difference(xyz({'X':(1,0,0),'Y':(0,1,0),'Z':(0,0,1)}[axis]))
         bpy.ops.object.transform_apply(location=False,rotation=True,scale=False)
         o=finish(o,name,mat,parent,bevel,True)
-        if bevel:o.modifiers['Selective edge radius'].segments=2
+        # A 0.15 mm cylinder edge needs one chamfer, not two curved strips.
+        # Keep the separately validated aiming post's exact original surface.
+        if bevel:o.modifiers['Selective edge radius'].segments=2 if name=='Front sight post' else 1
         return o
     def cut(o,cutter,bake_cutter=False):
         if bake_cutter:
@@ -253,8 +255,8 @@ def build_geometry(materials):
             rounded=[]
             for j,point in enumerate(section):
                 q=Vector(point);a=q+(Vector(section[j-1])-q).normalized()*.0002;b=q+(Vector(section[(j+1)%len(section)])-q).normalized()*.0002
-                for step in range(4):
-                    t=step/3;rounded.append(a*(1-t)**2+q*2*t*(1-t)+b*t*t)
+                for step in range(3):
+                    t=step/2;rounded.append(a*(1-t)**2+q*2*t*(1-t)+b*t*t)
             rings=[]
             for dz in (-.0023876,.0023876):
                 ring=[]

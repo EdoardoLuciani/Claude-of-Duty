@@ -57,8 +57,9 @@ and Blender assets, with no Blender requirement. Change world source in
 `tools/worldgen/`, regenerate with `npm run world`, then run `npm run world:validate`.
 Runtime-model optimization is explicit: `npm run models:cook -- p320` uses the
 [shared gltfpack build recipe](build/README.md). Normal dev/build/CI consumes the
-committed `.runtime.glb`; it does not require gltfpack. P320 is the first opt-in
-profile; other models retain their current loading paths until validated.
+committed `.runtime.glb`; it does not require gltfpack. All seven authored weapons
+use cooked runtime assets. Native exports remain authoring references; each model
+has its own geometry, material and animation acceptance gates.
 
 **Three.js pin:** published npm release `three@0.187.0`, with matching
 `@types/three@0.187.0` and lockfile integrity hashes. The release bundles include the

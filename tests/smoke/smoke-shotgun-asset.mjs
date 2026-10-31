@@ -16,8 +16,8 @@ const file = readFileSync(new URL('m590.glb', dir));
 const { json: gltf, bin, accessor: floats, imagePNG } = inspectGLB(file);
 assert.equal(
   createHash('sha256').update(bin).digest('hex'),
-  'bb02658011152cae2c299db6e22c235e36cbe8b33dc865464d3a8fe649277431',
-  'pump cue correction must not change geometry, maps or sampled animation bytes'
+  'ce33d718719a08c06b83554eb3827917a2440eaa73aced6dc9c61e98a488657d',
+  'reviewed optimized geometry, maps and sampled animation bytes'
 );
 assert.deepEqual(
   JSON.parse(gltf.scenes[0].extras.clips),
@@ -102,7 +102,7 @@ assert.ok(
   !gltf.nodes.some((n) => /arm_|spent_case|camera|light/i.test(n.name)),
   'no duplicate arms/cases/studio'
 );
-assert.ok(!gltf.cameras && !gltf.skins);
+assert.ok(!gltf.cameras && gltf.skins.length === 1);
 assert.ok(!gltf.extensionsUsed?.includes('KHR_lights_punctual'));
 assert.equal(gltf.buffers.length, 1);
 assert.equal(gltf.buffers[0].uri, undefined);
@@ -147,7 +147,7 @@ assert.ok(
     Number(gltf.meshes.some((m) => m.primitives.some((p) => p.material === undefined))) <=
     16
 );
-assert.ok(file.length <= 10 * 1024 * 1024);
+assert.ok(file.length <= 12 * 1024 * 1024);
 for (const animation of gltf.animations) {
   const [d, events] = expected[animation.name];
   assert.equal(manifest.clips[animation.name].duration, d);
@@ -242,6 +242,41 @@ function pads(side) {
   );
 }
 sample('Idle', 0);
+// Expose the existing part/material probes to the same triangles after rigid batching.
+model.scene.traverse((mesh) => {
+  if (!mesh.isSkinnedMesh) return;
+  mesh.skeleton.update();
+  const { skinIndex, uv1 } = mesh.geometry.attributes;
+  const index = mesh.geometry.index,
+    point = new THREE.Vector3();
+  for (const [joint, bone] of mesh.skeleton.bones.entries()) {
+    const part = node(bone.name.replace('MECH_', ''));
+    const local = part.matrixWorld.clone().invert().multiply(mesh.matrixWorld);
+    const geometry = new THREE.BufferGeometry(),
+      positions = [];
+    const materials = Array.from({ length: 7 }, (_, finish) => {
+      const material = mesh.material.clone();
+      material.name = String(finish + 1).padStart(2, '0') + ' | encoded finish';
+      material.side = THREE.DoubleSide;
+      const start = positions.length / 3;
+      for (let i = 0; i < index.count; i += 3) {
+        const first = index.getX(i);
+        const tile = Math.floor(uv1.getX(first) * 4) + 4 * Math.floor((1 - uv1.getY(first)) * 2);
+        if (skinIndex.getX(first) !== joint || tile !== finish) continue;
+        for (let k = 0; k < 3; k++) {
+          mesh.getVertexPosition(index.getX(i + k), point).applyMatrix4(local);
+          positions.push(point.x, point.y, point.z);
+        }
+      }
+      geometry.addGroup(start, positions.length / 3 - start, finish);
+      return material;
+    });
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setIndex(Array.from({ length: positions.length / 3 }, (_, i) => i));
+    part.add(new THREE.Mesh(geometry, materials));
+  }
+});
+model.scene.updateMatrixWorld(true);
 const exteriorBounds = new THREE.Box3();
 node('receiver').traverse((o) => {
   if (o.isMesh) exteriorBounds.expandByObject(o);

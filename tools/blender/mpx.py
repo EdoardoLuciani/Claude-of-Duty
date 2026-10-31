@@ -1,5 +1,5 @@
 """Reference-approved MPX exterior with eight native gameplay clips.
-blender -b --threads 4 --python-exit-code 1 --python tools/blender/mpx.py -- --render
+blender -b --threads 2 --python-exit-code 1 --python tools/blender/mpx.py -- --render
 Original reference-informed game art; never manufacturing geometry.
 """
 import argparse
@@ -18,6 +18,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).parent))
 from mpx_actions import author_actions
 from mpx.animations import prepare_export_actions
+from mpx.finishes import consolidate_finishes
+from mpx.geometry import separate_receiver_finishes
 
 
 def build(output, render=False, quick=False):
@@ -188,7 +190,10 @@ def build(output, render=False, quick=False):
                 f.use_smooth = smooth and len(f.vertices) == 4
         if bevel:
             mod = o.modifiers.new('Exterior edge radius', 'BEVEL')
-            mod.width = bevel; mod.segments = 2; mod.harden_normals = True
+            mod.width = bevel; mod.segments = 1 if name == 'Magazine moulded witness dot' else 2; mod.harden_normals = True
+            if name == 'Magazine moulded witness dot':
+                # Sub-millimetre dots need rounded caps, not bevelled radial seams.
+                mod.angle_limit = math.radians(60)
             # Sparse brighter micro-chamfers, not continuous white wear outlines.
             mod = o.modifiers.new('Weighted machined normals', 'WEIGHTED_NORMAL')
             mod.keep_sharp = True
@@ -411,7 +416,7 @@ def build(output, render=False, quick=False):
     for x in np.linspace(.123,.282,8):
         cut(hg, profile('CUT', [(x-.006,.027),(x-.002,.034),(x+.006,.034),(x+.002,.027)], .08, None, None, bevel=.0005))
         cut(hg, profile('CUT', [(x-.007,-.020),(x-.001,-.012),(x+.007,-.012),(x+.001,-.020)], .08, None, None, bevel=.0005))
-    mod = hg.modifiers.new('Slot rim radii', 'BEVEL'); mod.width=.00055; mod.segments=3; mod.harden_normals=True
+    mod = hg.modifiers.new('Slot rim radii', 'BEVEL'); mod.width=.00055; mod.segments=2; mod.harden_normals=True
     mod = hg.modifiers.new('Weighted shell normals', 'WEIGHTED_NORMAL'); mod.keep_sharp=True
     for side in (-1,1):
         screw((.105,side*.025,-.006), .003)
@@ -490,7 +495,7 @@ def build(output, render=False, quick=False):
             for offset in (-.0055,.0055):
                 p=centre+normal*offset
                 cyl('Magazine moulded witness dot',(p.x,side*.0138,p.z),.00085,.0004,
-                    polymer,'Y',mag,12,.0001)
+                    polymer,'Y',mag,8,.0001)
     base=box('Magazine floor plate',tuple(centres[-1]+Vector((0,0,-.0028))),
              (.0455,.029,.0055),polymer,mag,.001)
     base.rotation_euler.y=-math.atan2(normals[-1].z,normals[-1].x)
@@ -594,7 +599,10 @@ def build(output, render=False, quick=False):
         bpy.context.view_layer.update()
         cap_x=x+side*.0015
         tube('Open '+tag+' lens cap rim',(cap_x,0,optic_axis),.0137,.011,.0035,polymer,pivot,interior=polymer)
-        optical_sheet('Open '+tag+' clear lens cap',(cap_x,0,optic_axis),.011,clear,parent=pivot,sides=40)
+        # Solid polymer prototype: real front/back lid faces join the existing
+        # cap skin without relying on a material-sidedness change.
+        cyl('Open '+tag+' solid lens cap',(cap_x,0,optic_axis),.011,.0015,polymer,
+            parent=pivot,sides=40,bevel=0)
         box(tag+' lens cap hinge bridge',(cap_x,0,optic_axis-.012),(.0035,.015,.006),polymer,pivot,.0006)
         cyl(tag+' lens cap hinge barrel',tuple(hinge),.0025,.010,polymer,'Y',pivot)
         pivot.rotation_euler.y=side*math.radians(120)
@@ -745,6 +753,7 @@ def build(output, render=False, quick=False):
         active(clone)
         for mod in list(clone.modifiers):
             bpy.ops.object.modifier_apply(modifier=mod.name)
+    consolidate_finishes(list(export.objects), OUT, orm_map, normal_map)
     # Join mesh copies under the same rigid parent (not all components indiscriminately).
     parents={o.parent for o in export.objects if o.type=='MESH'}
     for parent in parents:
@@ -768,16 +777,19 @@ def build(output, render=False, quick=False):
         if source.type=='EMPTY':
             source.name='SOURCE_'+source.name
             clone.name=source.name.removeprefix('SOURCE_')
+    prepare_export_actions(list(export.objects), clips)
+    separate_receiver_finishes(export)
     bpy.ops.object.select_all(action='DESELECT')
     for o in export.objects: o.select_set(True)
     bpy.context.view_layer.objects.active=copy_by_source[rig]
-    prepare_export_actions(list(export.objects), clips)
     bpy.ops.export_scene.gltf(filepath=str(OUT/'mpx.glb'),export_format='GLB',use_selection=True,
                               export_animations=True,export_animation_mode='ACTIONS',export_merge_animation='NLA_TRACK',
                               export_frame_range=False,export_force_sampling=False,
                               export_optimize_animation_keep_anim_object=True,
                               export_sampling_interpolation_fallback='LINEAR',
-                              export_extras=True,export_yup=True,export_cameras=False,export_lights=False)
+                              export_extras=True,export_yup=True,export_cameras=False,export_lights=False,
+                              export_vertex_color='ACTIVE',export_all_vertex_colors=False,
+                              export_rest_position_armature=False)
     raw=(OUT/'mpx.glb').read_bytes()
     length,kind=struct.unpack_from('<II',raw,12)
     assert kind==0x4e4f534a
@@ -804,8 +816,8 @@ def build(output, render=False, quick=False):
                 triangles+=j['accessors'][p['indices']]['count']//3
     stats={'triangleInstances':triangles,'primitives':sum(len(m['primitives']) for m in j['meshes']),
            'materials':len(j.get('materials',[])),'images':len(j.get('images',[])),'bytes':len(raw)}
-    assert triangles<110000,stats
-    assert stats['primitives']<=40 and stats['materials']<=16 and stats['images']==3 and len(raw)<=10*1024*1024,stats
+    assert triangles<80000,stats
+    assert stats['primitives']==16 and stats['materials']==3 and stats['images']==3 and len(raw)<=10*1024*1024,stats
     # Stage 7: separate manifest metadata (the GLB remains read-only).
     manifest={'status':'Geometry/materials approved; Gate 3 native animation/gameplay candidate — human review pending',
         'asset':'SIG MPX 8 inch / ROMEO4T 1.41 inch mount / MIL-SRD9-MPX / 30-round magazine / folded irons',

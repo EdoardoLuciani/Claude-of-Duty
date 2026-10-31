@@ -2,17 +2,21 @@
 import json
 import struct
 import bpy
+from m4.finishes import consolidate_finishes
 
 def active(o):
     bpy.ops.object.select_all(action='DESELECT');o.select_set(True);bpy.context.view_layer.objects.active=o
 
 def export_asset(output, asset, parents, separate, clips):
     OUT=output
+    consolidate_finishes(asset, output)
+    # Keep static assemblies unskinned and genuine mechanisms on their authored
+    # controls. Exact iron surfaces remain ordinary meshes, independently probed.
     for parent in parents:
         objects=[o for o in asset.objects if o.type=='MESH' and o.parent==parent and o not in separate]
         if not objects:continue
         active(objects[0])
-        for o in objects:o.select_set(True)
+        for obj in objects:obj.select_set(True)
         bpy.ops.object.join();bpy.context.object.name=parent.name+'_mesh'
     # Actions read the baked curves directly. Keep rest seats invertible while
     # gathering static children; hidden-parent scale must not bake into them.
@@ -22,6 +26,9 @@ def export_asset(output, asset, parents, separate, clips):
         filepath=str(OUT/'m4a1-block-ii.glb'), export_format='GLB',
         use_selection=True, export_animations=True,
         export_animation_mode='ACTIONS', export_merge_animation='NLA_TRACK',
+        export_anim_single_armature=False, export_texcoords=True,
+        export_vertex_color='NAME', export_vertex_color_name='FinishColor',
+        export_all_vertex_colors=False,
         export_frame_range=False, export_force_sampling=False,
         export_optimize_animation_keep_anim_object=True,
         export_sampling_interpolation_fallback='LINEAR', export_extras=True,
@@ -32,7 +39,7 @@ def export_asset(output, asset, parents, separate, clips):
     # Count both magazines/cartridge instances even when glTF deduplicates buffers.
     primitives=[p for node in doc['nodes'] if 'mesh' in node for p in doc['meshes'][node['mesh']]['primitives']]
     stats={'triangles':sum(doc['accessors'][p['indices']]['count']//3 for p in primitives),'primitives':len(primitives),'materials':len(doc['materials']),'meshes':len(doc['meshes']),'bytes':path.stat().st_size,'images':len(doc['images'])}
-    assert stats['triangles']<110000 and stats['primitives']<=40 and stats['materials']<=16 and stats['bytes']<=10*1024*1024 and stats['images']==4,stats
+    assert stats['triangles']<=91000 and stats['primitives']==18 and stats['materials']==1 and stats['bytes']<=13000000 and stats['images']==4,stats
     assert {animation['name'] for animation in doc['animations']} == set(clips)
     for animation in doc['animations']:
         duration=clips[animation['name']]['duration']

@@ -159,10 +159,22 @@ assert tree('ROMEO4T battery cap neck').overlap(tree('ROMEO4T main housing')), '
 assert tree('ROMEO4T battery cap neck').overlap(tree('ROMEO4T battery cap')), 'battery cap must attach to neck'
 # Optical sheets must not become closed alpha-blended discs again. Boolean
 # cutters can leave an empty material slot: check faces, not just material names.
-for name in ['Coated optical lens','Coated optical lens.001','Open front clear lens cap','Open rear clear lens cap']:
+for name in ['Coated optical lens','Coated optical lens.001']:
     o = bpy.data.objects[name]
     xs = [v.co.x for v in o.data.vertices]
     assert max(xs)-min(xs) < EPS, (name,'stacked front/back optical surfaces')
+for tag in ['front', 'rear']:
+    lid = bpy.data.objects['Open '+tag+' solid lens cap']
+    assert lid.parent == bpy.data.objects['lens_cap_'+tag], (tag, 'solid lid lost hinge ownership')
+    assert len(lid.data.materials) == 1 and lid.data.materials[0].name == '03 | black moulded polymer'
+    xs = [v.co.x for v in lid.data.vertices]
+    assert abs(max(xs)-min(xs)-.0015) < EPS, (tag, 'solid lid must retain 1.5mm thickness')
+    assert any(p.normal.x > .99 for p in lid.data.polygons) and any(p.normal.x < -.99 for p in lid.data.polygons), (tag, 'solid lid needs real front and back faces')
+    edges = {}
+    for face in lid.data.polygons:
+        for edge in face.edge_keys:
+            edges[edge] = edges.get(edge, 0) + 1
+    assert edges and all(count == 2 for count in edges.values()), (tag, 'lid must be a closed solid')
 for name in ['ROMEO4T main housing','Objective and ocular rim','Objective and ocular rim.001','Open front lens cap rim','Open rear lens cap rim','Threaded cover mounting collar','Threaded cover mounting collar.001']:
     o = bpy.data.objects[name]
     expected = '03 | black moulded polymer' if name.startswith(('Open ','Threaded ')) else '15 | light-absorbing optic interior'
@@ -176,4 +188,4 @@ for o in scene.objects:
     assert o.data.uv_layers, o.name
     for vertex in o.data.vertices:
         assert all(math.isfinite(v) for v in vertex.co), o.name
-print('MPX saved source: maps/datums/slots/seams/port, mounted trigger, reference-mag silhouette, decals, attached clear optic covers, eight native control/shared-review-arm clips and retained/empty reload events verified; human animation/gameplay approval pending')
+print('MPX saved source: maps/datums/slots/seams/port, mounted trigger, reference-mag silhouette, decals, attached solid polymer optic covers, eight native control/shared-review-arm clips and retained/empty reload events verified; human animation/gameplay approval pending')

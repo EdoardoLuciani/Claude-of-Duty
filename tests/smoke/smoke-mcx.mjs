@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 import * as THREE from 'three';
 
-import { inspectGLB } from '../../tools/lib/glb-fixture.mjs';
+import { inspectGLB, parseGLB } from '../../tools/lib/glb-fixture.mjs';
 
 const dir = new URL('../../assets/weapons/mcx-virtus/', import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', dir), 'utf8'));
@@ -27,22 +27,27 @@ for (const image of gltf.images) {
   assert.ok(Number.isInteger(image.bufferView), 'textures must be embedded');
   assert.equal(image.uri, undefined);
   const png = imagePNG(image);
-  assert.equal(png.width, manifest.textures.resolution);
-  assert.equal(png.height, manifest.textures.resolution);
-  assert.equal(png.width, 1024, 'retain the approved map resolution');
-  if (image.name === 'roughness_variation') {
-    for (let i = 0; i < png.data.length; i += 64) {
-      assert.equal(png.data[i + 2], 255, 'untextured metalness must pack as white, not roughness');
-    }
-  }
+  const resolution =
+    image.name === 'mcx_finish_scalars'
+      ? manifest.textures.finish_lookup_resolution
+      : manifest.textures.resolution;
+  assert.equal(png.width, resolution);
+  assert.equal(png.height, resolution);
+  assert.equal(
+    resolution,
+    image.name === 'mcx_finish_scalars' ? 64 : 1024,
+    'retain full albedo/normal detail; scalar lookup has a separate resolution contract'
+  );
 }
 assert.ok(gltf.extensionsUsed.includes('KHR_materials_transmission'), 'coated lenses');
 for (const buffer of gltf.buffers) assert.equal(buffer.uri, undefined);
 for (const material of gltf.materials) {
   const pbr = material.pbrMetallicRoughness;
-  assert.ok(pbr.baseColorFactor, `${material.name}: preserve authored tint, not white`);
   assert.ok(pbr.baseColorTexture && pbr.metallicRoughnessTexture && material.normalTexture);
-  assert.ok(pbr.baseColorFactor.slice(0, 3).every((v) => v > 0 && v < 0.6));
+
+  if (/^(11|12) /.test(material.name)) {
+    assert.ok(pbr.baseColorFactor.slice(0, 3).every((v) => v > 0 && v < 0.6));
+  }
 }
 
 let triangles = 0;
@@ -52,6 +57,16 @@ for (const mesh of gltf.meshes) {
       assert.ok(Number.isInteger(p.attributes[name]), `${mesh.name}: ${name}`);
       accessor(p.attributes[name]);
     }
+    const colors = accessor(p.attributes.COLOR_0);
+    const width = colors.length / gltf.accessors[p.attributes.COLOR_0].count;
+    const denominator = gltf.accessors[p.attributes.COLOR_0].componentType === 5123 ? 65535 : 1;
+    const factor = gltf.materials[p.material].pbrMetallicRoughness.baseColorFactor ?? [1, 1, 1, 1];
+    assert.ok(
+      [...colors].every((v, i) => {
+        const tint = (v / denominator) * factor[i % width];
+        return i % width === 3 || (tint > 0 && tint < 0.6);
+      })
+    );
     const indices = accessor(p.indices);
     assert.ok(indices.every((i) => i < gltf.accessors[p.attributes.POSITION].count));
     triangles += indices.length / 3;
@@ -59,7 +74,24 @@ for (const mesh of gltf.meshes) {
 }
 assert.equal(triangles, manifest.stats.triangles);
 assert.ok(triangles > 30000 && triangles < 110000, 'strictly below approved 110k triangle cap');
-assert.equal(gltf.meshes.length, 10, 'merge static components under ten rigid pivots');
+assert.equal(gltf.meshes.length, 4, 'one mechanical skin plus independent magazines/casing');
+const decoded = await parseGLB(file);
+decoded.scene.updateMatrixWorld(true);
+// Read the actual bound skin at rest, partitioned by its single rigid influence.
+// Geometry checks below retain their physical thresholds after consolidation.
+function mechanicalVertices(part) {
+  const vertices = [];
+  decoded.scene.traverse((mesh) => {
+    if (!mesh.isSkinnedMesh) return;
+    mesh.skeleton.update();
+    const { position, skinIndex } = mesh.geometry.attributes;
+    for (let i = 0; i < position.count; i++) {
+      if (mesh.skeleton.bones[skinIndex.getX(i)].name !== `MECH_${part}`) continue;
+      vertices.push(mesh.getVertexPosition(i, new THREE.Vector3()).applyMatrix4(mesh.matrixWorld));
+    }
+  });
+  return vertices;
+}
 
 // Replay the exported sampler data in Three.js, including clip transitions.
 const nodes = gltf.nodes.map((n) => {
@@ -104,7 +136,7 @@ assert.deepEqual(gltf.animations.map((a) => a.name).sort(), [...expected].sort()
 const mixer = new THREE.AnimationMixer(root);
 const clips = {};
 for (const a of gltf.animations) {
-  assert.equal(a.channels.length, 30, `${a.name}: every rig TRS channel must reset`);
+  assert.equal(a.channels.length, 48, `${a.name}: helper and mechanical-bone TRS resets`);
   const tracks = a.channels.map((c) => {
     const s = a.samplers[c.sampler];
     assert.ok(['LINEAR', 'STEP'].includes(s.interpolation));
@@ -195,19 +227,11 @@ let hingeTop = -Infinity,
   chargeBottom = Infinity;
 const vertex = new THREE.Vector3();
 const inverseRig = named.MCX_RIG.matrixWorld.clone().invert();
-for (const meshName of ['stock_hinge_mesh', 'charging_handle_mesh']) {
-  const node = gltf.nodes.find((n) => n.name === meshName);
-  for (const p of gltf.meshes[node.mesh].primitives) {
-    const positions = accessor(p.attributes.POSITION);
-    for (const index of accessor(p.indices)) {
-      vertex
-        .fromArray(positions, index * 3)
-        .applyMatrix4(named[meshName].matrixWorld)
-        .applyMatrix4(inverseRig);
-      if (meshName === 'stock_hinge_mesh' && vertex.x > -0.204)
-        hingeTop = Math.max(hingeTop, vertex.y);
-      if (meshName === 'charging_handle_mesh') chargeBottom = Math.min(chargeBottom, vertex.y);
-    }
+for (const part of ['stock_hinge', 'charging_handle']) {
+  for (const position of mechanicalVertices(part)) {
+    vertex.copy(position).applyMatrix4(inverseRig);
+    if (part === 'stock_hinge' && vertex.x > -0.204) hingeTop = Math.max(hingeTop, vertex.y);
+    if (part === 'charging_handle') chargeBottom = Math.min(chargeBottom, vertex.y);
   }
 }
 assert.ok(
@@ -255,9 +279,14 @@ function magazineLength(meshName) {
   const vertex = new THREE.Vector3();
   const points = [];
   for (const p of gltf.meshes[node.mesh].primitives) {
-    if (/^(07|08) /.test(gltf.materials[p.material].name)) continue;
     const positions = accessor(p.attributes.POSITION);
+    const finishes = accessor(p.attributes.TEXCOORD_1);
     for (const index of accessor(p.indices)) {
+      const finish =
+        Math.floor(finishes[index * 2] * 4) + Math.floor((1 - finishes[index * 2 + 1]) * 4) * 4;
+      // Check the same complete polymer/rubber exterior, excluding cartridges,
+      // even though all three finishes now share a single actual primitive.
+      if (finish !== 2 && finish !== 3) continue;
       vertex
         .fromArray(positions, index * 3)
         .applyMatrix4(named[meshName].matrixWorld)
@@ -311,18 +340,12 @@ assert.ok(
   'MAG800 full exported envelope, floorplate included'
 );
 // Check the actual exported blade silhouette, not just its name or rotation.
-const triggerNode = gltf.nodes.find((n) => n.name === 'trigger_mesh');
 const bands = { head: [], belly: [], tip: [] };
-const point = new THREE.Vector3();
-for (const p of gltf.meshes[triggerNode.mesh].primitives) {
-  const positions = accessor(p.attributes.POSITION);
-  for (let i = 0; i < positions.length; i += 3) {
-    point.fromArray(positions, i).applyMatrix4(named.trigger_mesh.matrixWorld);
-    // Shape bands follow the corrected assembly; pull direction/timing stay.
-    if (point.y > -0.04) bands.head.push(point.x);
-    if (point.y < -0.049 && point.y > -0.06) bands.belly.push(point.x);
-    if (point.y < -0.066) bands.tip.push(point.x);
-  }
+for (const point of mechanicalVertices('trigger')) {
+  // Shape bands follow the corrected assembly; pull direction/timing stay.
+  if (point.y > -0.04) bands.head.push(point.x);
+  if (point.y < -0.049 && point.y > -0.06) bands.belly.push(point.x);
+  if (point.y < -0.066) bands.tip.push(point.x);
 }
 const mean = (values) => values.reduce((sum, v) => sum + v, 0) / values.length;
 assert.ok(
