@@ -17,6 +17,7 @@ import { MarketOverlay, MarketCountdown } from './market.ts';
 import { PauseMenu } from './menu.ts';
 import { Minimap } from './minimap.ts';
 import type { PixiUiExperiment } from './pixi-experiment.ts';
+import type { PixiHudSlice } from './pixi-hud.ts';
 import { Prompt, Banner } from './prompts.ts';
 import { RadioPanel } from './radio.ts';
 import { StartGate } from './start.ts';
@@ -162,6 +163,7 @@ export class UiSystem {
   menu!: PauseMenu;
   startGate: StartGate | null = null;
   pixiExperiment: PixiUiExperiment | null = null;
+  pixiHud: PixiHudSlice | null = null;
   gameOver!: GameOverScreen;
   shop!: MarketOverlay;
   marketCountdown!: MarketCountdown;
@@ -391,6 +393,7 @@ export class UiSystem {
       this.shop.hide();
       this.pixiExperiment?.root.setAttribute('inert', '');
       this.ammo.pixi?.setVisible(false);
+      this.pixiHud?.setVisible(false);
     });
     on('market:open', (e): void => {
       this.shop.show(e?.wave ?? 0);
@@ -495,7 +498,30 @@ export class UiSystem {
 
     this.resize(ctx.canvas.clientWidth || innerWidth, ctx.canvas.clientHeight || innerHeight, ctx);
     const pixiMode = new URLSearchParams(location.search).get('pixi');
-    if (pixiMode === 'ammo') {
+    if (pixiMode === 'hud') {
+      try {
+        const { PixiHudSlice } = await import('./pixi-hud.ts');
+        this.pixiHud = await PixiHudSlice.create(
+          this.root,
+          this.centreLayer,
+          ctx.get('render').renderer
+        );
+        this.pixiHud.resize(this.vw, this.vh, this.k);
+        this.root.classList.add('ow-hud-slice');
+        this.ammo.presentReadout = false;
+      } catch (error) {
+        try {
+          this.pixiHud?.dispose();
+        } catch (cleanupError) {
+          console.warn('[ui] Pixi HUD cleanup failed', cleanupError);
+        } finally {
+          this.pixiHud = null;
+          this.root.classList.remove('ow-hud-slice');
+          this.ammo.presentReadout = true;
+        }
+        console.warn('[ui] Pixi HUD unavailable; using native HUD', error);
+      }
+    } else if (pixiMode === 'ammo') {
       try {
         const { PixiAmmoHud } = await import('./pixi-ammo.ts');
         this.ammo.pixi = await PixiAmmoHud.create(this.ammo.root, ctx.get('render').renderer);
@@ -671,6 +697,7 @@ export class UiSystem {
     if (this.startGate && !this.startGate.afterPose()) {
       this.pixiExperiment?.update(false, 0);
       this.ammo.pixi?.setVisible(false);
+      this.pixiHud?.setVisible(false);
       this._hadPointerLock = false;
       return;
     }
@@ -778,10 +805,10 @@ export class UiSystem {
     setStyle(this.worldLayer, 'opacity', hudOp);
     setStyle(this.centreLayer, 'opacity', hudOp);
 
-    this.crosshair.update(dt, s);
+    this.crosshair.update(dt, s, !this.pixiHud);
     this.hit.update(dt);
     this.arcs.update(dt, rx, rz, fx, fz);
-    this.health.update(dt, s);
+    this.health.update(dt, s, !this.pixiHud);
     this.ammo.pixi?.setVisible(this.hudVisible >= 0.004 && !ctx.engine.error);
     this.ammo.update(dt, s);
     this.killfeed.update(dt);
@@ -842,7 +869,18 @@ export class UiSystem {
       last.z = o.position.z;
       last.label = o.label;
     }
-    this.minimap.draw(this._mmState);
+    if (this.pixiHud) {
+      this.pixiHud.setVisible(this.hudVisible >= 0.004 && !ctx.engine.error);
+      this.pixiHud.update(
+        dt,
+        s,
+        this.health,
+        this.crosshair,
+        this.minimap,
+        this._mmState,
+        this.hudVisible
+      );
+    } else this.minimap.draw(this._mmState);
   }
 
   _collectBlips(): void {
@@ -894,12 +932,14 @@ export class UiSystem {
     this.minimap.resize(this.k);
     this.pixiExperiment?.resize();
     this.ammo.pixi?.resize();
+    this.pixiHud?.resize(w, h, this.k);
   }
 
   dispose(): void {
     // These trials are mutually exclusive. Clear ownership before cleanup so a
     // Pixi exception cannot skip the remaining native UI teardown or retry it.
-    const pixi = this.pixiExperiment ?? this.ammo.pixi;
+    const pixi = this.pixiHud ?? this.pixiExperiment ?? this.ammo.pixi;
+    this.pixiHud = null;
     this.pixiExperiment = null;
     this.ammo.pixi = null;
     try {

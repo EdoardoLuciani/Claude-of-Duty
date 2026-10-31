@@ -61,7 +61,7 @@ interface MapPulse {
   y?: number;
   radius?: number;
 }
-interface MinimapState {
+export interface MinimapState {
   x?: number;
   z?: number;
   heading?: number;
