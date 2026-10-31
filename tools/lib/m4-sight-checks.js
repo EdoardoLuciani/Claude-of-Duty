@@ -67,8 +67,8 @@ export function checkM4Sights(root) {
       near(tip.geometry.attributes.uv2.getX(index), 0);
       near(tip.geometry.attributes.uv2.getY(index), 2);
       const emission = tip.material.emissiveNode;
-      require(emission?.condNode.op === '==' &&
-        emission.condNode.bNode.value === 2, 'paint-only emission mask changed');
+      if (!emission || emission.condNode.op !== '==' || emission.condNode.bNode.value !== 2)
+        throw new Error('[m4 sights] paint-only emission mask changed');
       require(emission.ifNode.op === '*' &&
         emission.ifNode.aNode.getAttributeName() === 'color', 'paint emission tint changed');
       near(emission.ifNode.bNode.value, 2);

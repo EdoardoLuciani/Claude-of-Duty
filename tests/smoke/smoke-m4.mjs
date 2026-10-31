@@ -163,6 +163,20 @@ async function checkModel(bytes, format) {
     move(faulty.getObjectByName(name));
     assert.throws(() => checkM4Sights(faulty), error);
   }
+  const missingEmissionRoot = clone(model.root);
+  const paintTip = missingEmissionRoot.getObjectByName('Front_sight_tip');
+  paintTip.material = paintTip.material.clone();
+  try {
+    for (const emission of [null, undefined]) {
+      paintTip.material.emissiveNode = emission;
+      assert.throws(
+        () => checkM4Sights(missingEmissionRoot),
+        new Error('[m4 sights] paint-only emission mask changed')
+      );
+    }
+  } finally {
+    paintTip.material.dispose();
+  }
   function firstHit(name, origin, direction) {
     const ray = new THREE.Raycaster(
       new THREE.Vector3(...origin),
