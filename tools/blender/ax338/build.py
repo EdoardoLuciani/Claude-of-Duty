@@ -1,5 +1,5 @@
 """Build original early AX338 game art from Python; Blender 5.2.2, metres.
-blender -b -t 4 --python-exit-code 1 --python tools/blender/ax338.py
+blender -b -t 4 --python-exit-code 1 --python tools/blender/ax338/build.py
 Optional: -- --output /absolute/directory --render --quick
 Declared read-only calibration/review inputs and edit map: asset README.md.
 """
@@ -13,10 +13,10 @@ import bmesh
 import numpy as np
 from mathutils import Matrix, Vector
 
-ROOT=Path(__file__).resolve().parents[2]
+ROOT=Path(__file__).resolve().parents[3]
 INPUT=ROOT/'assets/weapons/ax338'
-sys.path.insert(0,str(Path(__file__).parent))
-from ax338_actions import author_actions
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from ax338.actions import author_actions
 from ax338.export import prepare_export_actions, validate_export
 from ax338.finishes import consolidate_finishes
 
@@ -384,7 +384,7 @@ def build(output,render=False,quick=False):
     scene.render.engine='BLENDER_EEVEE';scene.eevee.taa_render_samples=12 if quick else 48;scene.eevee.use_raytracing=False
     scene.render.resolution_x=800 if quick else 1600;scene.render.resolution_y=450 if quick else 900;scene.render.resolution_percentage=100;scene.render.film_transparent=True;scene.view_settings.view_transform='AgX'
     scene['clips']=json.dumps(clips)
-    bpy.data.texts.new('START HERE').write('EARLY AX338 / PM II LP / GENERATED REVIEW PREVIEW\nEdit tools/blender/ax338.py, ax338_actions.py and ax338/export.py, not this product.\nNot a scan or manufacturer CAD. Read-only inputs, edit map and fidelity limits: asset README.md.\nNine weapon/wrist/finger NLA clips; shared review skins are not exported.\nSelect matching NLA tracks on all controls and review arms. 120 fps.\nGeometry remains separate editable components; runtime export joins copies.\nRegeneration overwrites manual edits; no saved-weapon input or automatic hand refit.\n')
+    bpy.data.texts.new('START HERE').write('EARLY AX338 / PM II LP / GENERATED REVIEW PREVIEW\nEdit tools/blender/ax338/, not this product.\nNot a scan or manufacturer CAD. Read-only inputs, edit map and fidelity limits: asset README.md.\nNine weapon/wrist/finger NLA clips; shared review skins are not exported.\nSelect matching NLA tracks on all controls and review arms. 120 fps.\nGeometry remains separate editable components; runtime export joins copies.\nRegeneration overwrites manual edits; no saved-weapon input or automatic hand refit.\n')
     bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'ax338.blend'),compress=True)
     if render:
         (OUT/'renders').mkdir(exist_ok=True)
@@ -419,7 +419,7 @@ def build(output,render=False,quick=False):
     bpy.context.view_layer.objects.active=rig
     bpy.ops.export_scene.gltf(filepath=str(OUT/'ax338.glb'),export_format='GLB',use_selection=True,export_animations=True,export_animation_mode='ACTIONS',export_merge_animation='NLA_TRACK',export_frame_range=False,export_force_sampling=False,export_optimize_animation_keep_anim_object=True,export_sampling_interpolation_fallback='LINEAR',export_extras=True,export_yup=True,export_cameras=False,export_lights=False)
     stats=validate_export(OUT/'ax338.glb',clips)
-    manifest={'asset':'Early AX338 / Dark Earth / factory brake / PM II LP 5-25x56 / no bipod','units':'metres','clips':clips,'stats':stats,'textureResolution':1024,'contactGeometry':{'magazine':contact_boxes,'pistolGripSections':grip_sections},'dimensions':{'barrel':.6858,'overall':1.250,'barrelFace':breech,'barrelCrown':crown,'muzzle':muzzle,'butt':butt,'scopeLength':.417,'scopeTubeDiameter':.034,'magazineBodyHeight':.105,'magazineDepth':.104,'magazineThickness':.034,'magazineHeight':.1125},'source':'tools/blender/ax338.py + tools/blender/ax338_actions.py + tools/blender/ax338/export.py; calibration stage: tools/ax338-hand-reference.mjs'}
+    manifest={'asset':'Early AX338 / Dark Earth / factory brake / PM II LP 5-25x56 / no bipod','units':'metres','clips':clips,'stats':stats,'textureResolution':1024,'contactGeometry':{'magazine':contact_boxes,'pistolGripSections':grip_sections},'dimensions':{'barrel':.6858,'overall':1.250,'barrelFace':breech,'barrelCrown':crown,'muzzle':muzzle,'butt':butt,'scopeLength':.417,'scopeTubeDiameter':.034,'magazineBodyHeight':.105,'magazineDepth':.104,'magazineThickness':.034,'magazineHeight':.1125},'source':'tools/blender/ax338/build.py + tools/blender/ax338/actions.py + tools/blender/ax338/export.py; calibration stage: tools/blender/ax338/hand-reference.mjs'}
     (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     assert stats['triangles']<150000 and stats['primitives']==11 and stats['materials']==2 and stats['images']==3 and stats['bytes']<=15*1024*1024,stats
     print('AX338 export:',json.dumps(stats))

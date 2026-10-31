@@ -1,5 +1,5 @@
 """Generate the P320 from an empty scene. Python is the authoring authority.
-blender -b -t 8 --python-exit-code 1 --python tools/blender/p320_compact.py
+blender -b -t 8 --python-exit-code 1 --python tools/blender/p320/build.py
 Optional: -- --output /absolute/directory --render --quick
 """
 import argparse
@@ -8,16 +8,16 @@ from pathlib import Path
 import sys
 import bpy
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from p320.animations import select_clip
-from p320_actions import author_actions
+from p320.actions import author_actions
 from p320.export import export_asset
 from p320.geometry import build_geometry
 from p320.materials import ATLAS_RESOLUTIONS, bake_atlas
 from p320.studio import build_studio
 from p320.skin import build_skin
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 
 
 def build(output, render=False, quick=False):
@@ -59,7 +59,7 @@ def build(output, render=False, quick=False):
     select_clip(parts, hands, clips, 'Idle')
     cameras = build_studio(studio, hands, quick)
     notes=bpy.data.texts.new('START HERE')
-    notes.write('P320 COMPACT / GENERATED PREVIEW\nEdit tools/blender/p320/ and p320_actions.py, not this file.\nReference-specific early-production exterior.\nEight weapon + wrist/finger NLA actions.\nHands use existing glove/sleeve meshes; authored deformation lives in this file.\nSelect the same clip on weapon controls and the two armatures.\nRuntime exports hand controls and reuses shared skins (no duplicated texture cost).\nRun tools/blender/p320_review.py for stills or an animation reel.\nPacked base/ORM/normal/emission atlas (sizes in manifest textureResolutions); high bake sources and studio are excluded from GLB.\nNot manufacturing geometry; not endorsed by SIG SAUER.\n')
+    notes.write('P320 COMPACT / GENERATED PREVIEW\nEdit tools/blender/p320/, not this file.\nReference-specific early-production exterior.\nEight weapon + wrist/finger NLA actions.\nHands use existing glove/sleeve meshes; authored deformation lives in this file.\nSelect the same clip on weapon controls and the two armatures.\nRuntime exports hand controls and reuses shared skins (no duplicated texture cost).\nRun tools/blender/p320/review.py for stills or an animation reel.\nPacked base/ORM/normal/emission atlas (sizes in manifest textureResolutions); high bake sources and studio are excluded from GLB.\nNot manufacturing geometry; not endorsed by SIG SAUER.\n')
     scene['clips']=json.dumps(clips)
     scene['hand_collection']='P320 | authored hands (shared appearance)'
     for s in bpy.data.screens:
@@ -75,7 +75,7 @@ def build(output, render=False, quick=False):
     stats = export_asset(asset, coords, output)
     manifest={'asset':'SIG P320 Nitron Compact | early-production visual reconstruction','units':'metres','blender_forward':'+Y','gltf_forward':'-Z','clips':clips,'stats':stats,
      'textureResolutions':ATLAS_RESOLUTIONS,'geometry':'One rigidly weighted mechanical skin; lettering/traction baked from retained high source','handAnimation':'Blender wrist and finger controls; shared runtime skins and shoulder IK',
-     'source':'tools/blender/p320_compact.py + tools/blender/p320/ + tools/blender/p320_actions.py + tools/p320-hand-reference.mjs',
+     'source':'tools/blender/p320/build.py + tools/blender/p320/ + tools/blender/p320/actions.py + tools/blender/p320/hand-reference.mjs',
      'notes':['Original non-functional game art, not a dimensionally exact replica.','No downloaded models or textures.','No endorsement by SIG SAUER.']}
     (output/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     print('P320_EXPORT_COMPLETE',json.dumps(stats))

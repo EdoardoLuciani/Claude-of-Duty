@@ -5,7 +5,7 @@ import { writeFileSync } from 'node:fs';
 
 import * as THREE from 'three';
 
-import { Arm } from '../src/weapons/hands.ts';
+import { Arm } from '../../../src/weapons/hands.ts';
 const basis = (finger, back) => {
   const z = new THREE.Vector3(...finger).negate().normalize();
   const y = new THREE.Vector3(...back)
@@ -107,7 +107,7 @@ for (const [side, g] of Object.entries(grips)) {
   // Frozen full-skin-reviewed calibration. Do not independently refit distal
   // patches: the old point-only fit buried the proximal glove and hooked the
   // thumb. Keep roots nearly parallel and distribute thumb flex across hinges.
-  // m590_check.py sweeps the deformed shared surfaces, including the web/cuff.
+  // check.py sweeps the deformed shared surfaces, including the web/cuff.
   if (side === 'right') {
     arm.poses.m590 = {
       fingers: [
@@ -265,7 +265,7 @@ result.pump = {
   strokePads: result.sides.left.pads.map((p) => [p[0], p[1], p[2] + 0.089]),
 };
 writeFileSync(
-  new URL('../assets/weapons/m590/hand-reference.json', import.meta.url),
+  new URL('../../../assets/weapons/m590/hand-reference.json', import.meta.url),
   JSON.stringify(result, null, 2) + '\n'
 );
 console.log(

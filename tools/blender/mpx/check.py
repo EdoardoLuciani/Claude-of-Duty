@@ -1,5 +1,5 @@
 """Independent saved-source geometry/native animation checks, not visual sign-off.
-blender -b assets/weapons/sig-mpx/mpx.blend --python-exit-code 1 --python tools/blender/mpx_check.py
+blender -b assets/weapons/sig-mpx/mpx.blend --python-exit-code 1 --python tools/blender/mpx/check.py
 """
 import json
 import math

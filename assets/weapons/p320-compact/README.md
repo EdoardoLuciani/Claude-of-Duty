@@ -11,13 +11,13 @@ GLB; the native PNG export remains the lossless authoring/rebuild reference.
 
 | Concern | Source |
 | --- | --- |
-| Stage order, paths and manifest | `p320_compact.py` |
+| Stage order, paths and manifest | `p320/build.py` |
 | Pigment/roughness/metalness/grain/stipple and unique 1024² base/ORM/normal/emission bake | `p320/materials.py`: `build_source_materials`, `bake_atlas` |
 | Low surfaces, surface UV density, baked-only lettering/traction, bevel reduction | `p320/surfaces.py` |
 | Color-only UV1, local lettering panels and coarse unmarked finishes | `p320/color_uv.py` |
 | Nine rigid mechanical bones sampled from the original part controls | `p320/skin.py` |
 | Named assemblies, sockets, cartridge-tip latitude rings, lettering/atlas | `p320/geometry.py`: `build_geometry` |
-| Eight weapon/wrist/finger clips, STEP visibility, events and review hands | `p320_actions.py`: `author_actions` |
+| Eight weapon/wrist/finger clips, STEP visibility, events and review hands | `p320/actions.py`: `author_actions` |
 | Preview clip selection | `p320/animations.py` |
 | Native 60 Hz control sampling and stock Actions glTF export | `p320/export.py` |
 | Fixed review cameras, lights and color management | `p320/studio.py` |
@@ -36,13 +36,13 @@ contacts, reload thumb grip and STEP magazines without renderer compensation.
 ## Build/check (root, Blender 5.2.2)
 
 ```sh
-blender -b -t 8 --python-exit-code 1 --python tools/blender/p320_compact.py -- \
+blender -b -t 8 --python-exit-code 1 --python tools/blender/p320/build.py -- \
   --output /tmp/p320-review --render --quick
 blender -b -t 8 /tmp/p320-review/p320-compact.blend \
-  --python-exit-code 1 --python tools/blender/p320_check.py
+  --python-exit-code 1 --python tools/blender/p320/check.py
 GLTFPACK=/absolute/path/gltfpack npm run models:cook -- p320 /tmp/p320-review
 # After scratch inspection, regenerate the committed products:
-blender -b -t 8 --python-exit-code 1 --python tools/blender/p320_compact.py
+blender -b -t 8 --python-exit-code 1 --python tools/blender/p320/build.py
 GLTFPACK=/absolute/path/gltfpack npm run models:cook -- p320
 node tests/smoke/smoke-p320.mjs
 node tests/smoke/smoke-p320-ktx2.mjs
@@ -56,7 +56,7 @@ force-sampling bones would change discrete visibility to LINEAR. CONSTANT scale
 curves must export STEP; all vertices have one unit bone weight. Bone axes preserve
 the former part-local coordinates, including magazine hand contacts and runtime
 slide/barrel overrides. Empty cartridge visibility uses bone scale, not only
-`Bone.visible`. Post-export inspection is read-only. Review with `p320_review.py`.
+`Bone.visible`. Post-export inspection is read-only. Review with `p320/review.py`.
 
 Optimization baseline: 56,862 triangle instances / 16 primitive instances / four
 materials. The native optimized skin has 20,212 triangles / one primitive / one material,
@@ -152,7 +152,7 @@ Some distributions ship a Blender OCIO config newer than their linked OpenColorI
 library. Use a compatible process-local `OCIO=/absolute/path/config.ocio` retaining
 AgX; never bake with color management disabled or compensate with exposure.
 Shared arm appearance and committed `hand-reference.json` are explicit read-only
-inputs. Refit separately with `node tools/p320-hand-reference.mjs` only when
+inputs. Refit separately with `node tools/blender/p320/hand-reference.mjs` only when
 intentionally changing contacts; normal rebuilds never refit.
 
 ## Historical migration exceptions (before the optimization)

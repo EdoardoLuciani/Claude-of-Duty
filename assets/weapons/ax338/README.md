@@ -27,7 +27,7 @@ animation datums, not mechanism certification. References aren't shipped texture
 ## Source/runtime contract
 
 Follow the [shared authoring workflow](../../../tools/blender/README.md).
-Sources: `tools/blender/ax338.py`, `ax338_actions.py`, `ax338/export.py`,
+Sources: `tools/blender/ax338/build.py`, `tools/blender/ax338/actions.py`, `ax338/export.py`,
 `ax338/finishes.py`.
 
 Declared read-only build inputs:
@@ -71,21 +71,21 @@ Run `node tests/smoke/smoke-sniper-reticle.mjs` for the native
 
 ```sh
 # Full source build, factory-empty scene, without reading an old weapon product:
-blender -b -t 2 --python-exit-code 1 --python tools/blender/ax338.py
+blender -b -t 2 --python-exit-code 1 --python tools/blender/ax338/build.py
 # Isolated full scratch products (does not change versioned calibration inputs):
-blender -b -t 2 --python-exit-code 1 --python tools/blender/ax338.py -- \
+blender -b -t 2 --python-exit-code 1 --python tools/blender/ax338/build.py -- \
   --output /tmp/ax338-authoring-review
 # Optional matched studio previews only; --quick changes resolution/samples only:
-blender -b -t 2 --python-exit-code 1 --python tools/blender/ax338.py -- \
+blender -b -t 2 --python-exit-code 1 --python tools/blender/ax338/build.py -- \
   --output /tmp/ax338-authoring-review --render --quick
 
 blender -b -t 2 assets/weapons/ax338/ax338.blend --python-exit-code 1 \
-  --python tools/blender/ax338_check.py
+  --python tools/blender/ax338/check.py
 blender -b -t 2 assets/weapons/ax338/ax338.blend --python-exit-code 1 \
-  --python tools/blender/ax338_contact.py -- --side left --out /tmp/ax338-left.json
+  --python tools/blender/ax338/contact.py -- --side left --out /tmp/ax338-left.json
 # Separate full right sweep: expected known failure, not cleared by source check.
 blender -b -t 2 assets/weapons/ax338/ax338.blend --python-exit-code 1 \
-  --python tools/blender/ax338_contact.py -- --side right --out /tmp/ax338-right.json
+  --python tools/blender/ax338/contact.py -- --side right --out /tmp/ax338-right.json
 node tests/smoke/smoke-ax338.mjs
 node tests/smoke/smoke-ax338-contact.mjs
 ```
@@ -108,7 +108,7 @@ monkeypatches or post-export timestamp/interpolation repair are used.
 **Intentional geometry/calibration changes only:** preserve the existing declared
 export → fit → export stage. First export geometry/contact sections with the
 versioned calibration; then run `npm run models` (shared actual arm skin) and
-`node tools/ax338-hand-reference.mjs` to intentionally update the versioned hand
+`node tools/blender/ax338/hand-reference.mjs` to intentionally update the versioned hand
 JSON; finally rebuild and run all checks. The fitter uses the committed asset
 manifest path, not `--output`; scratch builds do not refit or modify inputs. Do
 not run this stage automatically on material/workflow rebuilds, or treat it as a
@@ -132,7 +132,7 @@ disable color management). History:
 | Geometry, pivots, sockets, photo-registered grip | `ax338.py`: named assembly sections and geometry helpers |
 | Applied bevel/weighted normals, knob face ordering | `ax338.py`: `finish` |
 | Original rubber/stipple/metal atlas partition | `ax338.py`: smart-project loop before action authoring |
-| Weapon, wrist/finger poses, fitted spans and events | `ax338_actions.py`: `author_actions` (unchanged by workflow migration) |
+| Weapon, wrist/finger poses, fitted spans and events | `tools/blender/ax338/actions.py`: `author_actions` (unchanged by workflow migration) |
 | Runtime 120 Hz curves, endpoint/constant semantics, read-only output checks | `ax338/export.py` |
 | Export-only vertex albedo and guarded scalar-finish atlas | `ax338/finishes.py` |
 | Guarded entry, stage order/output paths, saved preview/studio, joins/native export | `ax338.py`: `build` / `main` |

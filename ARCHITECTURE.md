@@ -267,6 +267,11 @@ display-transform path. First-person refraction uses world coordinates.
 
 ## Models
 
+The [asset/world editing map](docs/assets.md) connects authoring tools, products
+and runtime consumers. Weapon authoring entry points and checks live together in
+`tools/blender/<weapon>/build.py` and `check.py`; asset products and runtime
+adapters retain their separate ownership.
+
 `weapons.createInspectionModel(id)` returns an independent rest-pose scene and
 `dispose()` for the market's single demand-rendered WebGPU studio. Cloned transforms,
 skeletons and mixers are inspection-owned; geometry, materials and maps are borrowed
