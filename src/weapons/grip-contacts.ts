@@ -17,7 +17,7 @@ export const GRIP_CONTACTS = {
     trigger: [0, 0.034, -0.001],
   },
   pistol: {
-    // P320 authored grip contacts (tools/p320-hand-reference.mjs).
+    // P320 authored grip contacts (tools/blender/p320/hand-reference.mjs).
     rightThumb: [-0.023, 0.012, 0.024],
     leftThumb: [-0.024, 0.01, -0.014],
     trigger: [0, -0.008, -0.035],

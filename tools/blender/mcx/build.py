@@ -1,6 +1,6 @@
 """Build the MCX visual asset from Python, never from a previous .blend/GLB.
 
-blender -b --python-exit-code 1 --python tools/blender/mcx_virtus.py
+blender -b --python-exit-code 1 --python tools/blender/mcx/build.py
 Optional: -- --output /absolute/directory --render --quick
 
 See tools/blender/mcx/README.md for the editing/build process.
@@ -13,7 +13,7 @@ import sys
 import bpy
 
 # Blender does not add the --python script's directory to Python's import path.
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from mcx.animations import FPS, build_animations, restore_rest, select_clip
 from mcx.export import export_asset, prepare_surfaces
 from mcx.geometry import build_geometry
@@ -21,7 +21,7 @@ from mcx.finishes import FINISH_LOOKUP_SIZE
 from mcx.materials import TEXTURE_SIZE, build_materials
 from mcx.studio import build_studio
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 
 
 def build(output, render=False, quick=False):

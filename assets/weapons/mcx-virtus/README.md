@@ -44,9 +44,9 @@ Materials borrow textures; counts aren't GPU timings.
 ## Rebuild/check (root, Blender 5.2.2)
 
 ```sh
-blender -b --python-exit-code 1 --python tools/blender/mcx_virtus.py
+blender -b --python-exit-code 1 --python tools/blender/mcx/build.py
 blender -b assets/weapons/mcx-virtus/mcx-virtus.blend \
-  --python-exit-code 1 --python tools/blender/mcx_check.py
+  --python-exit-code 1 --python tools/blender/mcx/check.py
 node tests/smoke/smoke-mcx.mjs
 node --input-type=module -e "import {cookModel} from './build/models.mjs'; cookModel({input:'assets/weapons/mcx-virtus/mcx-virtus.glb', output:'assets/weapons/mcx-virtus/mcx-virtus.runtime.glb', flags:['-si','0.65','-se','0.0002','-sp','-vc','16']});"
 ```

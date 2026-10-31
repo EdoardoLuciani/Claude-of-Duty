@@ -5,12 +5,12 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-import { Arm } from '../src/weapons/hands.ts';
+import { Arm } from '../../../src/weapons/hands.ts';
 const loader = new GLTFLoader().register(() => ({
   name: 'OFFLINE_TEXTURE',
   loadTexture: () => Promise.resolve(new THREE.Texture()),
 }));
-const bytes = readFileSync(new URL('../public/models/player/arms.glb', import.meta.url));
+const bytes = readFileSync(new URL('../../../public/models/player/arms.glb', import.meta.url));
 const skin = await loader.parseAsync(
   bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
   ''
@@ -214,7 +214,7 @@ const basis = (finger, back) => {
 // Generated from the actual curved mesh samples. Export geometry before this
 // offline solve after changing grip-profile.json; runtime never evaluates it.
 const pistolSections = JSON.parse(
-  readFileSync(new URL('../assets/weapons/ax338/manifest.json', import.meta.url))
+  readFileSync(new URL('../../../assets/weapons/ax338/manifest.json', import.meta.url))
 ).contactGeometry.pistolGripSections;
 function pistolGap(p) {
   let i = 0;
@@ -370,7 +370,7 @@ function fitHoldingHand(result) {
   }
   result.rightOpen = structuredClone(result.rightUnwrap.at(-1).pose);
 }
-const out = new URL('../assets/weapons/ax338/', import.meta.url);
+const out = new URL('../../../assets/weapons/ax338/', import.meta.url);
 function writeReference(result) {
   // release_right() keys only the index. Other controls are unused payload;
   // rightIndexed/rightOpen retain the complete poses needed by full pose keys.

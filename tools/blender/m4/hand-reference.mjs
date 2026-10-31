@@ -4,7 +4,7 @@ import { writeFileSync } from 'node:fs';
 
 import * as THREE from 'three';
 
-import { Arm } from '../src/weapons/hands.ts';
+import { Arm } from '../../../src/weapons/hands.ts';
 const basis = (finger, back) => {
   const z = new THREE.Vector3(...finger).negate().normalize();
   const y = new THREE.Vector3(...back)
@@ -91,7 +91,7 @@ result.charging = {
   pose: arm.poses.charging,
 };
 writeFileSync(
-  new URL('../assets/weapons/m4a1-block-ii/hand-reference.json', import.meta.url),
+  new URL('../../../assets/weapons/m4a1-block-ii/hand-reference.json', import.meta.url),
   JSON.stringify(result, null, 2) + '\n'
 );
 console.log('M4 hand control seed written; rebuild Blender actions after editing.');

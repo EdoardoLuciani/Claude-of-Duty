@@ -3,20 +3,20 @@
 [Shared authoring workflow](../README.md) ·
 [Asset, references and build/check commands](../../../assets/weapons/fn-evolys-762/README.md)
 
-| Concern                                                                | Source                                                  |
-| ---------------------------------------------------------------------- | ------------------------------------------------------- |
-| Seeded maps, finishes, named assemblies, atlas, studio and build/paths | `../evolys_762.py`: `build` / `main` and named sections |
-| Eight-bone skinned belt, pitch, links and weights                      | `belt_pos` and belt construction in `build`             |
-| Final source UV precision                                              | Binary-grid loop after atlas assignment                 |
-| Eight sparse actions, hands and events                                 | `../evolys_actions.py`: `author_actions`                |
-| Runtime lattice, endpoint/STEP preparation and read-only assertions    | `export.py`: `prepare_export_actions`                   |
-| Ordinary static join after saving editable assemblies                  | `export.py`: `consolidate_static_surfaces`              |
-| Opaque/base/ORM finish bake on UV1, with unchanged normal UV0          | `finish_atlas.py`: `bake_finish_atlas`                  |
+| Concern                                                                | Source                                          |
+| ---------------------------------------------------------------------- | ----------------------------------------------- |
+| Seeded maps, finishes, named assemblies, atlas, studio and build/paths | `build.py`: `build` / `main` and named sections |
+| Eight-bone skinned belt, pitch, links and weights                      | `belt_pos` and belt construction in `build`     |
+| Final source UV precision                                              | Binary-grid loop after atlas assignment         |
+| Eight sparse actions, hands and events                                 | `actions.py`: `author_actions`                  |
+| Runtime lattice, endpoint/STEP preparation and read-only assertions    | `export.py`: `prepare_export_actions`           |
+| Ordinary static join after saving editable assemblies                  | `export.py`: `consolidate_static_surfaces`      |
+| Opaque/base/ORM finish bake on UV1, with unchanged normal UV0          | `finish_atlas.py`: `bake_finish_atlas`          |
 
 Read-only inputs are `assets/weapons/fn-evolys-762/hand-reference.json` and shared
 `assets/player/arms/player-arms.blend`; photo-review data freezes registration,
-not geometry. Refit only with `node tools/evolys-hand-reference.mjs` as an
-intentional calibration change. `evolys_actions.author_review_hands` also serves
+not geometry. Refit only with `node tools/blender/evolys/hand-reference.mjs` as an
+intentional calibration change. `evolys.actions.author_review_hands` also serves
 MPX and is not a weapon-local API.
 
 Preserve assembly order and rubber/canvas/metal **normal UV0** partitions.

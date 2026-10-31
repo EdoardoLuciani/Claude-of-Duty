@@ -4,7 +4,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 
 import * as THREE from 'three';
 
-import { Arm } from '../src/weapons/hands.ts';
+import { Arm } from '../../../src/weapons/hands.ts';
 const basis = (finger, back) => {
   const z = new THREE.Vector3(...finger).negate().normalize();
   const y = new THREE.Vector3(...back)
@@ -77,9 +77,9 @@ for (const [name, g, pose, contacts] of [
   arm.fitGrip(name, contacts);
   result[name] = { pos: g.pos, quaternion: arm.hand.quaternion.toArray(), pose: arm.poses[name] };
 }
-mkdirSync(new URL('../assets/weapons/fn-evolys-762/', import.meta.url), { recursive: true });
+mkdirSync(new URL('../../../assets/weapons/fn-evolys-762/', import.meta.url), { recursive: true });
 writeFileSync(
-  new URL('../assets/weapons/fn-evolys-762/hand-reference.json', import.meta.url),
+  new URL('../../../assets/weapons/fn-evolys-762/hand-reference.json', import.meta.url),
   JSON.stringify(result, null, 2) + '\n'
 );
 console.log('EVOLYS hand reference written; rebuild Blender actions after edits.');

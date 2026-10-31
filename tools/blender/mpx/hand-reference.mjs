@@ -5,7 +5,7 @@ import { writeFileSync } from 'node:fs';
 
 import * as THREE from 'three';
 
-import { Arm } from '../src/weapons/hands.ts';
+import { Arm } from '../../../src/weapons/hands.ts';
 const basis = (finger, back) => {
   const z = new THREE.Vector3(...finger).negate().normalize();
   const y = new THREE.Vector3(...back)
@@ -182,7 +182,7 @@ result.restLeft = {
   pose: rest,
 };
 writeFileSync(
-  new URL('../assets/weapons/sig-mpx/hand-reference.json', import.meta.url),
+  new URL('../../../assets/weapons/sig-mpx/hand-reference.json', import.meta.url),
   JSON.stringify(result, null, 2) + '\n'
 );
 console.log('MPX shared-hand pads/thumbs fitted; regenerate Blender actions after edits.');

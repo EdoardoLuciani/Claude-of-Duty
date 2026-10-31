@@ -1,5 +1,5 @@
 """Manufacturer-reference 590A1 SKU50774 exterior. Game metres, -Z forward.
-blender -b --threads 4 --python-exit-code 1 --python tools/blender/m590.py
+blender -b --threads 4 --python-exit-code 1 --python tools/blender/m590/build.py
 Optional -- --output /absolute/scratch/directory --render --quick. No runtime dependency.
 """
 import argparse
@@ -11,9 +11,9 @@ import sys
 import bpy
 import numpy as np
 from mathutils import Vector, Matrix
-sys.path.insert(0,str(Path(__file__).resolve().parent))
-from m590_actions import author_actions
-ROOT=Path(__file__).resolve().parents[2]
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from m590.actions import author_actions
+ROOT=Path(__file__).resolve().parents[3]
 from m590.export_actions import prepare_export_actions, validate_export
 from m590.skin import build_mechanical_skin
 from m590.finishes import consolidate_finishes
@@ -349,7 +349,7 @@ def build(output, render=False, quick=False):
     if quick:
         scene.render.resolution_percentage=50;scene.eevee.taa_render_samples=8
     scene.camera=cams['hero'];pose('Idle')
-    notes=bpy.data.texts.new('M590_README');notes.write('GENERATED PREVIEW: edit tools/blender/m590.py, m590_actions.py and m590/export_actions.py; rebuild from Python, not this blend.\nFactory590A1 SKU50774 exterior reconstruction, metres. Manufacturer nominal OAL1003.3mm / barrel469.9mm / LOP352.425mm; local profiles remain photo estimates. Native seven NLA actions.\nSelect matching NLA tracks on all objects; review skins excluded from GLB.89mm stroke is provisional, not certified factory travel.\nRuntime owns reactive recoil and live casing pools; this asset has no Fire action or spent case.\n')
+    notes=bpy.data.texts.new('M590_README');notes.write('GENERATED PREVIEW: edit tools/blender/m590/; rebuild from Python, not this blend.\nFactory590A1 SKU50774 exterior reconstruction, metres. Manufacturer nominal OAL1003.3mm / barrel469.9mm / LOP352.425mm; local profiles remain photo estimates. Native seven NLA actions.\nSelect matching NLA tracks on all objects; review skins excluded from GLB.89mm stroke is provisional, not certified factory travel.\nRuntime owns reactive recoil and live casing pools; this asset has no Fire action or spent case.\n')
     bpy.context.preferences.filepaths.save_version=0
     bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'m590.blend'),compress=True)
     if render:
@@ -429,7 +429,7 @@ def build(output, render=False, quick=False):
     manifest={'asset':'Mossberg 590A1 Tactical SKU50774 (2016) / 18.5-inch / 6+1 / ghost ring / fixed synthetic stock / tri-rail',
         'status':'Provisional runtime review prototype; strict 1:1 and final human visual/gameplay approval pending',
         'units':'metres','blenderForward':'+Y','blenderUp':'+Z','runtimeBasis':'-Z forward / +Y up / +X right; no adapter basis transform',
-        'source':'tools/blender/m590.py + tools/blender/m590/ + tools/blender/m590_actions.py + tools/m590-hand-reference.mjs','stats':stats,'clips':clips,
+        'source':'tools/blender/m590/build.py + tools/blender/m590/ + tools/blender/m590/actions.py + tools/blender/m590/hand-reference.mjs','stats':stats,'clips':clips,
         'aliases':{'pump':'Pump','reloadTac':'Reload_Tactical','reloadEmpty':'Reload_Empty','inspect':'Inspect','draw':'Draw','holster':'Holster'},
         'textures':{'resolution':1024,'packed':True,'embedded':True,'method':'UV0 original albedo/normal; UV1 padded scalar finish atlas; exact linear vertex colours; no photographic inputs'},
         'dimensions':{'sourceBounds':bounds,'caseLength':.07,'rimRadius':.01105,'barrelLength':BARREL,'exposedBarrelLength':-.194-muzzle_z,'overallLength':OAL,'lengthOfPull':LOP,'nominalBarrelInches':18.5,

@@ -1,5 +1,5 @@
 """Saved editable M590 source checks. Not a runtime/gameplay acceptance claim.
-blender -b assets/weapons/m590/m590.blend --python-exit-code 1 --python tools/blender/m590_check.py
+blender -b assets/weapons/m590/m590.blend --python-exit-code 1 --python tools/blender/m590/check.py
 """
 import json
 import math
@@ -9,7 +9,7 @@ from pathlib import Path
 import bpy
 from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
-ROOT=Path(__file__).resolve().parents[2]
+ROOT=Path(__file__).resolve().parents[3]
 sys.path.insert(0,str(ROOT/'tools/blender'))
 from m590.clearance import RightGloveStockException
 ref=json.loads((ROOT/'assets/weapons/m590/hand-reference.json').read_text())

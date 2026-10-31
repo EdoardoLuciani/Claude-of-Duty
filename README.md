@@ -127,6 +127,9 @@ The day/night clock
 starts at 16:30 and advances nine hours per ten active minutes. Pause/shop freeze
 it; the first 21:00 triggers a three-minute streetlight outage, not an interior outage.
 
+For edit locations, source/generated ownership and regeneration commands, see the
+[asset and world editing map](docs/assets.md).
+
 Asset regeneration/reference notes: [arms](assets/player/arms/README.md),
 [M4](assets/weapons/m4a1-block-ii/README.md), [MCX](assets/weapons/mcx-virtus/README.md),
 [P320](assets/weapons/p320-compact/README.md), [EVOLYS](assets/weapons/fn-evolys-762/README.md),
