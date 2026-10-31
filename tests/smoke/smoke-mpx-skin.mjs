@@ -1,4 +1,4 @@
-// Actual rigid-influence vertices, independent control oracle and clone ownership.
+// Actual ordinary vertices, independent control oracle and clone ownership.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
@@ -17,102 +17,104 @@ for (const suffix of ['glb', 'runtime.glb']) {
     )
   );
   const animation = new MPXAnimation(model);
-  const surface = model.root.getObjectByName('MPX_surface');
-  assert.ok(surface.isSkinnedMesh);
-  assert.ok(!Array.isArray(surface.material) && surface.geometry.groups.length === 0);
-  const { position, normal, skinIndex, skinWeight } = surface.geometry.attributes;
-  const controls = surface.skeleton.bones.map((bone) =>
-    model.root.getObjectByName(bone.name.replace(/^(MECH|FRAME)_/, ''))
-  );
-  const rest = controls.map((control, joint) =>
-    control.matrixWorld
-      .clone()
-      .invert()
-      .multiply(surface.skeleton.bones[joint].matrixWorld)
-      .multiply(surface.skeleton.boneInverses[joint])
-      .multiply(surface.bindMatrix)
-  );
-  const byJoint = controls.map(() => []);
-  for (let i = 0; i < position.count; i++) {
-    assert.deepEqual(
-      [skinWeight.getX(i), skinWeight.getY(i), skinWeight.getZ(i), skinWeight.getW(i)],
-      [1, 0, 0, 0]
-    );
-    byJoint[skinIndex.getX(i)].push(i);
-  }
-  assert.ok(
-    byJoint.filter((vertices) => vertices.length > 0).length === 10,
-    'ten mesh frames own real surface vertices; control parents preserve local interpolation'
-  );
-  const denseVertices = byJoint
-    .filter((vertices) => vertices.length > 0)
-    .flatMap((vertices) =>
-      Array.from({ length: 12 }, (_, i) => vertices[Math.floor(((vertices.length - 1) * i) / 11)])
-    );
-  const matrices = controls.map(() => new THREE.Matrix4());
-  const expectedNormals = controls.map(() => new THREE.Matrix3());
-  const actualNormals = controls.map(() => new THREE.Matrix3());
-  const skinMatrix = new THREE.Matrix4();
+  const parts = [
+    'receiver',
+    'bolt',
+    'charging_handle',
+    'selector',
+    'trigger',
+    'stock_hinge',
+    'bolt_release',
+    'magazine_catch',
+    'lens_cap_front',
+    'lens_cap_rear',
+  ];
+  const surfaces = parts.map((name) => {
+    const control = model.root.getObjectByName(name);
+    const mesh = model.root.getObjectByName(`${name}_mesh`);
+    assert.ok(mesh?.isMesh && !mesh.isSkinnedMesh, `${name}: real ordinary surface`);
+    assert.equal(mesh.parent, control, `${name}: original rigid owner`);
+    assert.ok(!Array.isArray(mesh.material) && mesh.geometry.groups.length === 0);
+    assert.equal(mesh.geometry.attributes.skinIndex, undefined);
+    assert.equal(mesh.geometry.attributes.skinWeight, undefined);
+    return { mesh, control, rest: mesh.matrix.clone() };
+  });
+  const surface = surfaces[0].mesh;
   const actual = new THREE.Vector3(),
     expected = new THREE.Vector3();
   let maximum = 0,
     samples = 0,
     maximumNormal = 0,
     normalSamples = 0;
-  function check(vertices, checkNormals = true) {
+  function check(allVertices = false, checkNormals = true) {
     model.root.updateMatrixWorld(true);
-    for (let j = 0; j < controls.length; j++) {
-      matrices[j].multiplyMatrices(controls[j].matrixWorld, rest[j]);
-      if (checkNormals) {
-        expectedNormals[j].getNormalMatrix(matrices[j]);
-        skinMatrix
-          .copy(surface.matrixWorld)
-          .multiply(surface.bindMatrixInverse)
-          .multiply(surface.skeleton.bones[j].matrixWorld)
-          .multiply(surface.skeleton.boneInverses[j])
-          .multiply(surface.bindMatrix);
-        actualNormals[j].getNormalMatrix(skinMatrix);
-      }
-    }
-    for (const i of vertices) {
-      surface.getVertexPosition(i, actual).applyMatrix4(surface.matrixWorld);
-      expected.fromBufferAttribute(position, i).applyMatrix4(matrices[skinIndex.getX(i)]);
-      const error = actual.distanceTo(expected);
-      maximum = Math.max(maximum, error);
-      assert.ok(
-        error < (suffix === 'glb' ? 0.000001 : 0.000025),
-        `${animation.name}/${i}: skinned vertex drift ${error}m from actual control`
-      );
-      samples++;
-      if (checkNormals) {
-        const joint = skinIndex.getX(i);
-        actual.fromBufferAttribute(normal, i).applyNormalMatrix(actualNormals[joint]);
-        expected.fromBufferAttribute(normal, i).applyNormalMatrix(expectedNormals[joint]);
-        const normalError = actual.distanceTo(expected);
-        maximumNormal = Math.max(maximumNormal, normalError);
-        assert.ok(normalError < 0.001, 'actual skinned normal follows independent rigid control');
-        normalSamples++;
+    for (const { mesh, control, rest } of surfaces) {
+      const { position, normal } = mesh.geometry.attributes;
+      const matrix = new THREE.Matrix4().multiplyMatrices(control.matrixWorld, rest);
+      const expectedNormal = new THREE.Matrix3().getNormalMatrix(matrix);
+      const actualNormal = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld);
+      const vertices = allVertices
+        ? Array.from({ length: position.count }, (_, i) => i)
+        : Array.from({ length: 12 }, (_, i) => Math.floor(((position.count - 1) * i) / 11));
+      for (const i of vertices) {
+        mesh.getVertexPosition(i, actual).applyMatrix4(mesh.matrixWorld);
+        expected.fromBufferAttribute(position, i).applyMatrix4(matrix);
+        const error = actual.distanceTo(expected);
+        maximum = Math.max(maximum, error);
+        assert.ok(
+          error < (suffix === 'glb' ? 0.000001 : 0.000025),
+          `${mesh.name}/${i}: vertex drift ${error}m from rigid control`
+        );
+        samples++;
+        if (checkNormals) {
+          actual.fromBufferAttribute(normal, i).applyNormalMatrix(actualNormal);
+          expected.fromBufferAttribute(normal, i).applyNormalMatrix(expectedNormal);
+          const error = actual.distanceTo(expected);
+          maximumNormal = Math.max(maximumNormal, error);
+          assert.ok(error < 0.001, 'actual normal follows independent rigid control');
+          normalSamples++;
+        }
       }
     }
   }
-  const allVertices = Array.from({ length: position.count }, (_, i) => i);
   for (const [name, info] of Object.entries(manifest.clips)) {
     for (let i = 0; i <= 20; i++) {
       animation._sample(name, (info.duration * i) / 20);
-      check(allVertices, i % 10 === 0);
+      check(true, i % 10 === 0);
     }
     for (let i = 0; i <= Math.ceil(info.duration * 240); i++) {
       animation._sample(name, Math.min(info.duration, i / 240));
-      check(denseVertices);
+      check();
     }
+  }
+  // Check actual carrier travel, not only helper transforms. No MECH_bolt is needed.
+  animation.reset();
+  const carrier = model.root.getObjectByName('bolt_mesh');
+  const carrierRest = Array.from({ length: carrier.geometry.attributes.position.count }, (_, i) =>
+    carrier.getVertexPosition(i, new THREE.Vector3()).applyMatrix4(carrier.matrixWorld)
+  );
+  animation.fire();
+  animation.update(0.1, null, 0, true);
+  for (let i = 0; i < carrierRest.length; i++) {
+    carrier.getVertexPosition(i, actual).applyMatrix4(carrier.matrixWorld);
+    expected.copy(carrierRest[i]).add(new THREE.Vector3(0, 0, 0.038));
+    assert.ok(actual.distanceTo(expected) < 1e-9, 'actual carrier locks back exactly 38mm');
+  }
+  animation.reset();
+  for (let i = 0; i < carrierRest.length; i++) {
+    carrier.getVertexPosition(i, actual).applyMatrix4(carrier.matrixWorld);
+    assert.ok(
+      actual.distanceTo(carrierRest[i]) < 1e-9,
+      'actual carrier reset ignores mixer caches'
+    );
   }
   // Out-of-band empty lockback/reset must affect visible carrier vertices too.
   for (const clip of ['inspect', 'draw', 'holster', null]) {
     animation.fire();
     animation.update(0.1, clip, 0.1, true);
-    check(denseVertices);
+    check();
     animation.reset();
-    check(denseVertices);
+    check();
   }
   for (const tag of ['front', 'rear']) {
     const pivot = model.root.getObjectByName(`lens_cap_${tag}`);
@@ -121,7 +123,7 @@ for (const suffix of ['glb', 'runtime.glb']) {
       pivot.quaternion
         .copy(q)
         .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), angle));
-      check(allVertices);
+      check(true);
     }
     pivot.quaternion.copy(q);
   }
@@ -152,21 +154,21 @@ for (const suffix of ['glb', 'runtime.glb']) {
     'retain the existing opaque material policy'
   );
   // Both sides of each closed lid must really cover its aperture, not just a
-  // double-sided material flag. Cast against actual weighted cap triangles.
+  // double-sided material flag. Cast against actual ordinary cap triangles.
   for (const tag of ['front', 'rear']) {
     const pivot = model.root.getObjectByName(`lens_cap_${tag}`);
     const q = pivot.quaternion.clone();
     pivot.quaternion.identity();
     model.root.updateMatrixWorld(true);
-    const joint = surface.skeleton.bones.findIndex((bone) => bone.name === `FRAME_lens_cap_${tag}`);
-    const indices = surface.geometry.index;
+    const cap = model.root.getObjectByName(`lens_cap_${tag}_mesh`);
+    const indices = cap.geometry.index;
     const triangles = [];
     for (let i = 0; i < indices.count; i += 3) {
-      const ids = [indices.getX(i), indices.getX(i + 1), indices.getX(i + 2)];
-      if (!ids.every((id) => skinIndex.getX(id) === joint)) continue;
       triangles.push(
-        ids.map((id) =>
-          surface.getVertexPosition(id, new THREE.Vector3()).applyMatrix4(surface.matrixWorld)
+        [0, 1, 2].map((offset) =>
+          cap
+            .getVertexPosition(indices.getX(i + offset), new THREE.Vector3())
+            .applyMatrix4(cap.matrixWorld)
         )
       );
     }
@@ -207,10 +209,18 @@ for (const suffix of ['glb', 'runtime.glb']) {
   assert.equal(dropped.geometry, magazineGeometry);
   assert.equal(dropped.children.length, 0, 'loaded rounds never transfer with the dropped shell');
 
-  surface.skeleton.computeBoneTexture();
-  const liveTexture = surface.skeleton.boneTexture;
-  let liveDisposed = 0;
-  liveTexture.addEventListener('dispose', () => liveDisposed++);
+  let geometryDisposed = 0,
+    materialDisposed = 0;
+  const geometries = new Set(),
+    materials = new Set();
+  model.root.traverse((mesh) => {
+    if (!mesh.isMesh) return;
+    assert.ok(!mesh.isSkinnedMesh, 'no gameplay skeleton allocation');
+    geometries.add(mesh.geometry);
+    materials.add(mesh.material);
+  });
+  for (const geometry of geometries) geometry.addEventListener('dispose', () => geometryDisposed++);
+  for (const material of materials) material.addEventListener('dispose', () => materialDisposed++);
   const def = { ...WEAPON_DEFS.smg, cycleTime: 60 / WEAPON_DEFS.smg.rpm };
   const idleModel = makeMPXModel(
     await parseGLB(
@@ -219,10 +229,13 @@ for (const suffix of ['glb', 'runtime.glb']) {
   );
   const idleAnimation = new MPXAnimation(idleModel);
   const idleInspection = createWeaponInspection({ model: idleModel, def });
-  const idleSurface = idleInspection.scene.getObjectByName('MPX_surface');
-  const boltJoint = surface.skeleton.bones.findIndex((bone) => bone.name === 'FRAME_bolt');
-  const carrierVertices = byJoint[boltJoint];
-  assert.ok(carrierVertices.length > 0, 'real carrier vertices belong to the bolt frame');
+  const idleSurface = idleInspection.scene.getObjectByName('bolt_mesh');
+  const boltMesh = model.root.getObjectByName('bolt_mesh');
+  const carrierVertices = Array.from(
+    { length: boltMesh.geometry.attributes.position.count },
+    (_, i) => i
+  );
+  assert.ok(carrierVertices.length > 0, 'real carrier vertices belong to the bolt control');
   let maximumInspection = 0;
   for (const pose of ['lockback', 'reloadEmpty']) {
     animation.reset();
@@ -231,15 +244,11 @@ for (const suffix of ['glb', 'runtime.glb']) {
       animation.update(0.1, null, 0, true, false);
     } else animation.update(0, 'reloadEmpty', 0.8, true, false);
     const livePosition = animation.bolt.position.clone();
-    const liveBonePosition = animation.boltBone.position.clone();
     const inspection = createWeaponInspection({ model, def });
-    const previewSurface = inspection.scene.getObjectByName('MPX_surface');
-    assert.notEqual(previewSurface.skeleton, surface.skeleton);
-    assert.ok(
-      previewSurface.skeleton.bones.every((bone) => !surface.skeleton.bones.includes(bone))
-    );
-    assert.equal(previewSurface.geometry, surface.geometry, 'inspection borrows live geometry');
-    assert.equal(previewSurface.material, surface.material, 'inspection borrows live material');
+    const previewSurface = inspection.scene.getObjectByName('bolt_mesh');
+    assert.notEqual(previewSurface, boltMesh);
+    assert.equal(previewSurface.geometry, boltMesh.geometry, 'inspection borrows live geometry');
+    assert.equal(previewSurface.material, boltMesh.material, 'inspection borrows live material');
     for (const i of carrierVertices) {
       previewSurface.getVertexPosition(i, actual).applyMatrix4(previewSurface.matrixWorld);
       idleSurface.getVertexPosition(i, expected).applyMatrix4(idleSurface.matrixWorld);
@@ -250,7 +259,7 @@ for (const suffix of ['glb', 'runtime.glb']) {
         `${suffix}/${pose}: inspection carrier drift ${error}m from fresh Idle`
       );
     }
-    for (const name of ['bolt', 'MECH_bolt']) {
+    for (const name of ['bolt']) {
       const preview = inspection.scene.getObjectByName(name);
       const idle = idleInspection.scene.getObjectByName(name);
       assert.ok(
@@ -260,21 +269,17 @@ for (const suffix of ['glb', 'runtime.glb']) {
         `${suffix}/${pose}/${name}: inspection transform must match fresh Idle`
       );
     }
-    let previewDisposed = 0;
-    previewSurface.skeleton.computeBoneTexture();
-    assert.notEqual(previewSurface.skeleton.boneTexture, liveTexture);
-    previewSurface.skeleton.boneTexture.addEventListener('dispose', () => previewDisposed++);
     inspection.dispose();
-    assert.equal(previewDisposed, 1, 'inspection bone texture disposed exactly once');
-    assert.equal(liveDisposed, 0);
+    assert.equal(geometryDisposed, 0, 'inspection never disposes borrowed geometry');
+    assert.equal(materialDisposed, 0, 'inspection never disposes borrowed materials');
     assert.ok(animation.bolt.position.equals(livePosition));
-    assert.ok(animation.boltBone.position.equals(liveBonePosition));
   }
   idleInspection.dispose();
   idleAnimation.dispose();
   animation.dispose();
-  assert.equal(liveDisposed, 1, 'gameplay bone texture released with animation');
+  assert.equal(geometryDisposed, 0, 'animation teardown preserves loader-owned geometry');
+  assert.equal(materialDisposed, materials.size, 'gameplay materials disposed exactly once');
   console.log(
-    `MPX ${suffix}: ${samples} actual skinned-vertex/control samples, max ${(maximum * 1000).toFixed(6)}mm; ${normalSamples} moving normal samples, max vector error ${maximumNormal}; lockback/reload inspection carrier drift ${maximumInspection}m; exact optical alpha/coating, independent moving caps, magazine ownership and inspection/skeleton disposal passed`
+    `MPX ${suffix}: ${samples} actual ordinary-vertex/control samples, max ${(maximum * 1000).toFixed(6)}mm; ${normalSamples} moving normal samples, max vector error ${maximumNormal}; lockback/reload inspection carrier drift ${maximumInspection}m; exact optical alpha/coating, independent moving caps, magazine ownership and inspection/material disposal passed`
   );
 }

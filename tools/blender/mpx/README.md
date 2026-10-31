@@ -11,7 +11,7 @@
 | Runtime-only sampling/reset preparation                               | `animations.py`: `prepare_export_actions`        |
 | Evaluated rigid copies, stock export and read-only assertions         | End of `../mpx.py`                               |
 | Export-only per-corner finish colour and padded ORM/normal tiles      | `finishes.py`: `consolidate_finishes`            |
-| Lossless local mesh frames, packed normal fans and mechanical skin    | `skin.py`: `consolidate_mechanics`               |
+| Original rigid frames and packed-normal finish separation             | `geometry.py`: `separate_receiver_finishes`      |
 | Source-named packed-normal regression                                 | `../mpx_normal_check.py`                         |
 
 Read-only inputs are `assets/weapons/sig-mpx/hand-reference.json` and shared
@@ -29,7 +29,7 @@ remain unchanged; UV1 is a deterministic affine transform of that same atlas,
 not a reproject/repack. Each finish tile reduces procedural grain from 1024² to
 248² plus four-pixel edge padding. With the approved solid covers, body lenses
 alone use the optical material with constant original alpha/coating; opaque polymer
-lids join their existing mechanical cap frames. No optical role selector remains.
+lids remain under their original ordinary cap pivots. No optical role selector remains.
 The unused clear-cap calibration tile stays reserved so all original maps/other
 finish UVs remain identical. Absorptive interior retains its separate
 specular/environment policy. One transparent sorting object and four rigid
@@ -41,52 +41,41 @@ endpoint, including **60/950 s** Fire/Last_Shot. Motion is LINEAR, scales are
 CONSTANT/STEP; retain explicit child TRS resets even under hidden parents. Stock
 Actions export has forced sampling off; output inspection is read-only.
 
-## Normal-preserving mechanical skin
+## Ordinary local-frame runtime surfaces
 
-Do not rebase the evaluated rigid mesh vertices into a common physical bind frame:
-float32 translation changes tiny but nonzero bevel faces. Also do not restore decoded
-`corner_normals` using `normals_split_custom_set`: Blender's identity join/separate path
-already decodes/re-encodes the native `custom_normal` short2 values and that round trip
-is lossy on degenerate fan spaces. The selector regression demonstrates 16 changed
-corners even without coordinate/topology changes. The earlier rigid-GLB oracle was
-not a solution and is not part of this pipeline.
+Runtime export uses the existing per-parent joined rigid meshes directly. Receiver,
+stock, charging handle and selector remain ordinary static surfaces; bolt, trigger,
+release and catch follow their original animated parents. Both solid cap assemblies
+remain ordinary meshes under their independently adjustable original pivots.
+There is no mechanical skeleton, inverse-bind conversion, duplicate control Action,
+cap-to-bone attachment, bone lockback override or bone-texture allocation/disposal.
+Canonical Idle is still sampled before caching bolt rest and reset still explicitly
+restores the bolt after an out-of-band lockback override.
 
-Keep each rigid mesh's original local coordinates. Ten identity-rest control bones
-carry unchanged prepared helper curves; ten identity-rest child frame bones carry
-original static mesh-local TRS. Pose transforms, rather than vertex rebasing,
-assemble the skin. The two-level hierarchy preserves the exact subframe rotation
-of a translated mesh origin. Stock `export_rest_position_armature=False` exports
-these pose frames, while stock inverse binds use identity rest frames (with the
-exporter's fixed Blender/glTF axis conversion, not part-specific bind offsets).
-The mesh still uses ordinary one-influence skinning; no GLB rewrite or exporter
-hook exists.
+Do not rebase these meshes into a common physical frame just to reduce draws:
+float32 translation changes tiny but nonzero bevel faces. No cross-parent join is
+needed. Only the receiver is separated by material into opaque, optical and absorptive
+interior sorting objects. `geometry.py` preserves Blender's packed `custom_normal`
+short2 encoding around that separation; it never reconstructs normals through the
+lossy decoded-vector setter. Every restored corner is checked against its original
+local normal, including zero-area and tiny triangles, then temporary attributes are
+removed. Editable components are saved before export preparation.
 
-Preserve Blender's packed `custom_normal` attribute through separate/join under a
-temporary export-copy corner attribute and restore its exact encoding, not decoded
-vectors. Local geometry, sharpness and fan connectivity remain unchanged. The
-builder asserts every restored local corner normal against its pre-operation value,
-including zero-area and nonzero tiny triangles, then removes temporary attributes.
-The editable .blend is saved before these export-only operations.
+`mpx_normal_check.py` retains the source-named selector regression for the lossy
+setter and exact packed-normal preservation. `tools/mpx-pass2-parity.mjs` accepts an
+independent native reference (including the d29573f8 solid-cover skin): it compares
+all oriented triangle/position/UV/finish/owner records, original helper curves and
+rest/moving normals, with dense 120 Hz samples and >=21 full-surface poses per clip.
+Only the retired mechanical armature/control/frame nodes and duplicate bone curves
+are omitted from the helper equality check; their actual geometry is still compared.
+No new expected hash replaces the independent reference.
 
-`mpx_normal_check.py` uses the saved editable selector parts to reproduce the lossy
-setter and assert the packed-encoding fix through an actual identity join. The
-independent `tools/mpx-pass2-parity.mjs` requires a retained pass-1 native GLB: it
-matches every oriented triangle/position/UV/finish/owner and compares every corner
-normal at rest, every surface vertex over ≥21 moving poses per clip, plus dense
-120 Hz samples. That historical full-surface comparison applies to the accepted
-clear-cover consolidation, not to the explicitly redesigned solid lids. Approved
-solid-cover acceptance separately enumerates exactly 80 removed clear-sheet triangles and 312
-replacement lid triangles, confines all new surfaces to the two 1.5 mm polymer lid
-volumes, and compares every unaffected surface against the accepted base; it does
-not waive numerical or normal gates. No new expected hash substitutes for that
-external reference.
-`smoke-mpx-skin.mjs` separately checks native/cooked actual vertices and normal
-transforms against the named controls, dense subframes, lockback/reset, moving caps,
-magazine ownership and gameplay/inspection bone-texture disposal. Independent
-Blender/source and runtime reviewers confirmed the fix; parent native-GPU captures
-and RGBA fallback passed without a normal waiver. Inspection regressions also cover
-actual helper/bone and weighted carrier rest positions when cloning lockback and
-mid-reload gameplay scenes.
+The historically named `smoke-mpx-skin.mjs` now checks ordinary native/cooked surface
+vertices and normals against all ten original owners, dense subframes, actual 38mm
+carrier lockback/reset, cap movement and back-face-culled closed-lid rays, independent
+magazine/round ownership and inspection/material disposal. Inspection clones from
+lockback and mid-reload compare every actual carrier vertex against fresh Idle.
+No geometry, normal, mechanical, contact or ownership tolerance was broadened.
 
 ## Approved repeatability limit
 
