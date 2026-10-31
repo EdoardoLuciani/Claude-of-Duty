@@ -20,41 +20,41 @@ for (const suffix of ['.glb', '.runtime.glb']) {
   const animation = new EvolysAnimation(model);
   const surfaces = [];
   const skeletons = new Set();
-  model.root.traverse((mesh) => {
-    if (!mesh.isSkinnedMesh) return;
-    skeletons.add(mesh.skeleton);
-    if (mesh.skeleton.bones.some((bone) => bone.name === 'MECH_stock')) surfaces.push(mesh);
-  });
-  assert.equal(skeletons.size, 2, 'independent deforming belt and rigid mechanical skin');
-  assert.equal(surfaces.length, 2, 'one opaque draw and one real transparent optical boundary');
   const ownership = new Map();
-  const point = new THREE.Vector3();
-  const expected = new THREE.Vector3();
-  for (const mesh of surfaces) {
-    const { position, skinIndex, skinWeight } = mesh.geometry.attributes;
-    const members = new Map();
-    for (let i = 0; i < position.count; i++) {
-      assert.equal(skinWeight.getX(i), 1);
-      assert.equal(skinWeight.getY(i) + skinWeight.getZ(i) + skinWeight.getW(i), 0);
-      const joint = skinIndex.getX(i);
-      const indices = members.get(joint) ?? [];
-      indices.push(i);
-      members.set(joint, indices);
-    }
-    for (const [joint, indices] of members) {
-      const bone = mesh.skeleton.bones[joint];
-      const control = model.root.getObjectByName(bone.name.slice('MECH_'.length));
-      assert(control, `${bone.name}: original source control retained`);
+  const controls = {
+    static_surfaces: 'EVOLYS_RIG',
+    stock_mesh: 'stock',
+    bolt_mesh: 'bolt',
+    charging_handle_mesh: 'charging_handle',
+    feed_cover_mesh: 'feed_cover',
+    trigger_mesh: 'trigger',
+  };
+  for (const [name, controlName] of Object.entries(controls)) {
+    const group = model.root.getObjectByName(name);
+    const control = model.root.getObjectByName(controlName);
+    assert(group && control, `${name}: real geometry and source control retained`);
+    assert.equal(group.parent, control, `${name}: ordinary geometry belongs to its control`);
+    group.traverse((mesh) => {
+      if (!mesh.isMesh) return;
+      assert(!mesh.isSkinnedMesh, `${name}: rigid geometry must not pay for skinning`);
+      assert(!mesh.geometry.attributes.skinIndex && !mesh.geometry.attributes.skinWeight);
+      surfaces.push(mesh);
       const rest = new THREE.Matrix4()
         .copy(control.matrixWorld)
         .invert()
-        .multiply(bone.matrixWorld)
-        .multiply(mesh.skeleton.boneInverses[joint])
-        .multiply(mesh.bindMatrix);
-      members.set(joint, { indices, control, rest });
-    }
-    ownership.set(mesh, members);
+        .multiply(mesh.matrixWorld);
+      ownership.set(mesh, { control, rest });
+    });
   }
+  model.root.traverse((mesh) => {
+    if (!mesh.isSkinnedMesh) return;
+    skeletons.add(mesh.skeleton);
+    assert(mesh.skeleton.bones.every((bone) => /^belt_[0-7]$/.test(bone.name)));
+  });
+  assert.equal(skeletons.size, 1, 'only the independent deforming belt needs a skeleton');
+  assert.equal(surfaces.length, 7, 'static opaque/lens, stock and four real moving controls');
+  const point = new THREE.Vector3();
+  const expected = new THREE.Vector3();
   let poses = 0;
   let vertices = 0;
   let maximum = 0;
@@ -77,22 +77,19 @@ for (const suffix of ['.glb', '.runtime.glb']) {
       model.root.updateMatrixWorld(true);
       poses++;
       for (const mesh of surfaces) {
-        mesh.skeleton.update();
-        for (const { indices, control, rest } of ownership.get(mesh).values()) {
-          const transform = new THREE.Matrix4().multiplyMatrices(control.matrixWorld, rest);
-          for (const index of indices) {
-            expected
-              .fromBufferAttribute(mesh.geometry.attributes.position, index)
-              .applyMatrix4(transform);
-            mesh.getVertexPosition(index, point).applyMatrix4(mesh.matrixWorld);
-            const error = point.distanceTo(expected);
-            maximum = Math.max(maximum, error);
-            assert(
-              error < (suffix === '.glb' ? 0.000002 : 0.00004),
-              `${name}/${time}/${control.name}: actual skin drift ${error} m`
-            );
-            vertices++;
-          }
+        const { control, rest } = ownership.get(mesh);
+        const transform = new THREE.Matrix4().multiplyMatrices(control.matrixWorld, rest);
+        const position = mesh.geometry.attributes.position;
+        for (let index = 0; index < position.count; index++) {
+          expected.fromBufferAttribute(position, index).applyMatrix4(transform);
+          mesh.getVertexPosition(index, point).applyMatrix4(mesh.matrixWorld);
+          const error = point.distanceTo(expected);
+          maximum = Math.max(maximum, error);
+          assert(
+            error < (suffix === '.glb' ? 0.000002 : 0.00004),
+            `${name}/${time}/${control.name}: actual rigid surface drift ${error} m`
+          );
+          vertices++;
         }
       }
     }
@@ -103,16 +100,19 @@ for (const suffix of ['.glb', '.runtime.glb']) {
   const inspection = createWeaponInspection({ model, def: WEAPON_DEFS.lmg });
   const inspectionSkeletons = new Set();
   inspection.scene.traverse((mesh) => {
+    if (!mesh.isMesh) return;
+    const source = model.scene.getObjectByName(mesh.name);
+    assert.notEqual(mesh, source, 'inspection owns independent ordinary/skinned objects');
+    assert.notEqual(mesh.position, source.position, 'inspection owns independent transforms');
+    assert.equal(mesh.geometry, source.geometry, 'inspection borrows geometry');
+    assert.equal(mesh.material, source.material, 'inspection borrows finish');
     if (!mesh.isSkinnedMesh) return;
     assert(!skeletons.has(mesh.skeleton), 'inspection owns independent skeletons');
-    const source = model.scene.getObjectByName(mesh.name);
     assert.notEqual(
       mesh.skeleton.bones[0],
       source.skeleton.bones[0],
       'inspection owns independent bones'
     );
-    assert.equal(mesh.geometry, source.geometry, 'inspection borrows geometry');
-    assert.equal(mesh.material, source.material, 'inspection borrows finish');
     mesh.skeleton.computeBoneTexture();
     inspectionSkeletons.add(mesh.skeleton);
   });
@@ -130,7 +130,7 @@ for (const suffix of ['.glb', '.runtime.glb']) {
     skeleton.boneTexture.addEventListener('dispose', () => released++);
   }
   animation.dispose();
-  assert.equal(released, 2, 'release each unique belt/mechanical bone texture once');
+  assert.equal(released, 1, 'release the independent belt bone texture once');
   for (const skeleton of skeletons) assert.equal(skeleton.boneTexture, null);
   assert.equal(model.materials.size, 0);
   console.log(

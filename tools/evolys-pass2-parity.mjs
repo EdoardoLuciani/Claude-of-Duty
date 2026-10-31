@@ -1,5 +1,5 @@
-// Independent pass-2 geometry oracle. Supply a native GLB extracted from base
-// 875587a3, not a candidate-generated fixture. Never rewrites either product.
+// Independent representation geometry oracle. Supply a native GLB extracted from base
+// d29573f8, not a candidate-generated fixture. Never rewrites either product.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 

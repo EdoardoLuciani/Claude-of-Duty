@@ -22,7 +22,7 @@ assert.equal(triangles, manifest.stats.triangles);
 assert.equal(primitives.length, manifest.stats.primitives);
 assert(
   triangles < 54000 &&
-    primitives.length === 5 &&
+    primitives.length === 10 &&
     json.materials.length === 2 &&
     bytes.length <= 15 * 1024 * 1024
 );
@@ -133,18 +133,20 @@ assert(
   !json.nodes.some((n) => /bipod|spent_case|EVOLYS_arm/.test(n.name)),
   'no bipod, duplicate cases or duplicate exported arms'
 );
-// Frozen oriented triangles, normal XYZ, UV0 and rigid membership. Mechanical
-// positions now use a common skin bind space; pass-2 dense baseline comparison
-// validates the source-to-bind transform before freezing this new layout.
-// Belt and independent pouches retain the exact pre-skin hashes. Only EVOLYS
-// export-corner normals have an approved <=0.0026 vector-distance encoding
-// exception, checked against the independent baseline by evolys-pass2-parity.
+// Independent pre-skin hashes from 875587a3 freeze ordinary local geometry,
+// normal XYZ, UV0, joints and weights. The d29573f8 native baseline comparison
+// additionally checks every oriented/deformed triangle, finish UV and image.
 const nativeGLTF = await parseGLB(bytes);
 const sourceGeometryHashes = {
   belt_mesh: '6501d5035d91449c0446f2aa82cc1e633f4ceee4179f3c8869297db737071eab',
-  mechanical_surfaces: '9e739928d124ef989f088c2f72e781739cd8a32ed64bce0826ea2d33a01ca788',
+  bolt_mesh: '82facfcb7c6a21de6d77c392796372a94984178830adf42971a5b68ab8a6a836',
+  charging_handle_mesh: 'cedde73abda25e1a508224907bb5d33b80863d3b78e17c564a42d608d8237861',
+  feed_cover_mesh: '7066a1b0ebd3f37adfc109b70182bce87f9a810efa86697d064792a9a63b3aae',
   pouch_mesh: '9b120ad864586bc2ee5bd22477f2f5fd880d3dcbbbe95ccfc7a58d2cf9781470',
   pouch_spare_mesh: '9b120ad864586bc2ee5bd22477f2f5fd880d3dcbbbe95ccfc7a58d2cf9781470',
+  static_surfaces: '5764cd6b3a91d809df532d87c5868aaa6a2b454309f748842cadaa70df45c291',
+  stock_mesh: 'ac286f214e7278dd5cf354a14b3769d11c6c86b271c4e18fd0ee6eec115f9b4d',
+  trigger_mesh: '68e95b8e0a26d4e9832a6f652e077b4605a7013596ac482f78365b42f00f15f8',
 };
 for (const [name, expected] of Object.entries(sourceGeometryHashes)) {
   const node = nativeGLTF.scene.getObjectByName(name);
@@ -196,11 +198,12 @@ for (const [label, candidate] of [
     document.nodes
       .filter((n) => n.mesh !== undefined)
       .flatMap((n) => document.meshes[n.mesh].primitives).length,
-    5
+    10
   );
   assert(
-    document.nodes.some((n) => n.name === 'mechanical_surfaces' && n.skin !== undefined),
-    'native source/export consolidation, not a runtime merge'
+    document.nodes.some((n) => n.name === 'static_surfaces' && n.skin === undefined) &&
+      document.skins.length === 1,
+    'ordinary static body and only the independently deforming belt skin'
   );
   const gltf = label === 'native' ? nativeGLTF : await parseGLB(candidate);
   const model = makeEvolysModel(gltf),

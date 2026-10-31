@@ -23,18 +23,18 @@ Python is the weapon-authoring authority; `fn-evolys-762.blend/.glb` are generat
 packed preview/native-export products, never build inputs. The derived
 `fn-evolys-762.runtime.glb` uses gltfpack 1.3 with the shared cook flags and no
 additional simplification flags, loaded through the shared KTX2/meshopt adapter. See the local guide's
-[native/export optimization](../../../tools/blender/evolys/README.md#nativeexport-optimization)
-for source changes, retained mechanisms and validation limits. The second pass
-uses one eight-joint rigid mechanical skin plus the independent deforming belt:
-five primitive instances total, four in loaded Idle, with two unchanged materials.
-The stock/head oracle selects actual stock triangles by joint membership, not a
-separate draw. The guide documents the approved, EVOLYS-only split-normal
-encoding bound (0.0026 normalized-vector distance); normal-map bytes, UV0/UV1,
-strength, geometry and contact thresholds are unchanged. Matched native-WebGPU
-captures, RGBA fallback and independent review passed on Three r187 / AMD RDNA-4.
-Uploaded geometry rises 2,479,560 → 3,360,060 B; its geometry-plus-logical-texture
-subtotal rises 6.365 → 7.204 MiB, excluding other renderer resources and driver
-padding. This is a draw-consolidation trade-off, not a measured FPS gain. `manifest.json` records
+[ordinary rigid export](../../../tools/blender/evolys/README.md#ordinary-rigid-export-current)
+for the current representation and validation limits. Receiver, handguard and
+optic share ordinary static geometry; the rotated stock retains its native local
+mesh. Bolt, charging handle, feed cover and trigger remain ordinary meshes under
+their authored controls. Only the independent eight-joint deforming belt is skinned.
+Both pouches retain their separate animation/visibility ownership. There are ten
+primitive instances total, nine in loaded Idle, and two unchanged materials.
+The stock/head oracle checks all 4,922 actual ordinary stock triangles against
+the unchanged 120 mm envelope. Native/runtime geometry and gameplay tests pass;
+parent GPU/visual acceptance of this representation remains pending. The expected
+recovery of about 880,500 uploaded skin-attribute bytes is a backend estimate,
+not a new GPU measurement or an FPS claim. `manifest.json` records
 events/belt, `hand-reference.json` is read-only versioned hand calibration, and
 `photo-review.json` freezes review registration. Shared review-arm appearance is
 also read-only and excluded from export. See the [edit map and build stages](../../../tools/blender/evolys/README.md).
@@ -71,7 +71,7 @@ blender -b assets/weapons/fn-evolys-762/fn-evolys-762.blend \
 node tests/smoke/smoke-evolys.mjs
 node tests/smoke/smoke-evolys-skin.mjs
 node tests/smoke/smoke-evolys-clearance.mjs
-# Extract the independent pass-1 native GLB from base 875587a3, then:
+# Extract the independent published native GLB from base d29573f8, then:
 node tools/evolys-pass2-parity.mjs /absolute/path/to/base-native.glb
 ```
 
