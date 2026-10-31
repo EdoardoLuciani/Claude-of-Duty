@@ -5,6 +5,8 @@
 Run the game with `?pixi=1`, then press Escape to open the pause menu. A Pixi panel
 appears beside the existing settings; the control reference moves below both.
 Without the query parameter, the native UI is unchanged and Pixi is not loaded.
+The follow-up `?pixi=ammo` selects the real ammo/reload HUD instead; see
+[its combat measurements](pixi-ammo.md). Only one Pixi trial runs at a time.
 
 The panel contains text, a vector feedback preview, a Pixi UI slider and two Fancy
 Buttons. Drag the slider, click Test Feedback / Reset, or focus the canvas and use
@@ -31,6 +33,8 @@ experiment from the hand-written GPU crosshair; neither depends on the other.
   manual slider drag calculations are needed in application code.
 - There is no Pixi Application or render ticker. Existing UI raw-time updates drive
   the small feedback animation; unchanged or hidden content is not redrawn.
+  Pixi still registers its separate interaction ticker: zero draws do not mean
+  zero background CPU work.
 - Teardown destroys Pixi-owned resources, not the supplied device. A subsequent
   world render succeeds; only final Three teardown destroys the device.
 
@@ -50,7 +54,10 @@ infrastructure for arbitrary concurrent Pixi applications.
 
 The hardware harness observes zero native WebGL context requests in the final path.
 It also tests that failure to obtain adapter metadata leaves the native menu usable
-with an explicit status message, rather than failing the game.
+with an explicit status message, rather than failing the game. Follow-up repairs
+cover constructor/build failures and owning-UI cleanup even if Pixi disposal throws.
+Hover/pressed/release-outside/cancel invalidation now uses actual widget signals;
+listening on the passive stage was insufficient and is covered by redraw tests.
 
 ## Cost observations
 
@@ -85,7 +92,7 @@ These observations demonstrate bounded cost, not that Pixi is faster than HTML.
 ## Simplicity / recommendation
 
 This is a more meaningful library test than a crosshair. Roughly 225 lines of
-prototype code plus about 30 lines of integration produce text, two skinned buttons,
+initial prototype code plus about 30 lines of integration produced text, two skinned buttons,
 a slider, feedback, keyboard shortcuts and resource lifetime without hand-writing
 the rendering/interaction machinery. Much of the remaining code is styling, fixed
 positioning and the explicit integration policy.

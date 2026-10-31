@@ -267,14 +267,19 @@ display-transform path. First-person refraction uses world coordinates.
 
 ## Experimental UI
 
-`?pixi=1` dynamically loads `src/ui/pixi-experiment.ts` into the existing pause
-layout; the default UI does not load Pixi. It uses a separate demand-rendered,
-display-resolution WebGPU canvas with the game's borrowed GPUDevice, not Three's
-renderer or world textures. UI owns Pixi resources and restores its restricted
-DOM adapter at teardown; it must never destroy the borrowed device. Native menus
-and controls remain available, including if the optional trial fails to initialize.
-See [measurements and limitations](docs/experiments/pixi-ui.md). This is not a
-production UI migration or a general-purpose UI abstraction.
+`?pixi=1` loads the pause-panel trial; `?pixi=ammo` loads only the actual ammo/reload
+readout. They are mutually exclusive and the default UI does not load Pixi.
+Both borrow the game's GPUDevice through `ui/pixi-device.ts`, using one separate,
+demand-rendered, display-resolution canvas, not Three's renderer/world textures.
+UI owns Pixi resources and restores its restricted DOM adapter on construction or
+teardown failure; it must never destroy the borrowed device or skip native cleanup.
+`AmmoPanel` retains native equipment and shares `AmmoState` / magazine-pip math with
+`ui/pixi-ammo.ts`. Its passive canvas stays in the original chrome layer so injury,
+menu and HUD opacity ordering are unchanged. No application/render ticker is used;
+Pixi still has an interaction ticker. Native startup/error/menu controls remain.
+See [panel limitations](docs/experiments/pixi-ui.md) and
+[ammo combat measurements](docs/experiments/pixi-ammo.md). This is not a production
+UI migration or a general-purpose UI abstraction.
 
 ## Models
 
