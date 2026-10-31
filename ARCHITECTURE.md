@@ -281,6 +281,18 @@ See [panel limitations](docs/experiments/pixi-ui.md) and
 [ammo combat measurements](docs/experiments/pixi-ammo.md). This is not a production
 UI migration or a general-purpose UI abstraction.
 
+`?pixi=hud` is the playable four-widget slice: ammo/reload, health/armour,
+reticle and minimap, one passive Pixi canvas between the world-marker and native
+centre/chrome layers. `PixiAmmoView` shares the ammo presenter without owning a
+renderer. Native crosshair/health owners advance their existing visual state while
+skipping replaced DOM widgets; injury overlays and every other native presenter
+remain active. Minimap borrows its existing one-time Canvas2D world bake, uploads
+it once, and retains GPU map/text/marker objects; native per-frame minimap drawing
+is skipped. Engine-driven active rendering, no hidden/static-paused redraws,
+independent capped DPR, shared-device ownership and failure-isolated teardown
+remain required. This does not reproduce the no-UI benchmark state or promise its
+savings. See [implementation and measurements](docs/experiments/pixi-hud.md).
+
 ## Models
 
 `weapons.createInspectionModel(id)` returns an independent rest-pose scene and

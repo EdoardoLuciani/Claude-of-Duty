@@ -101,6 +101,7 @@ export function filledMagazinePips(
 }
 
 export class AmmoPanel {
+  presentReadout = true;
   pixi: PixiAmmoHud | null = null;
   declare root: HTMLElement;
   declare equip: HTMLElement;
@@ -174,7 +175,7 @@ export class AmmoPanel {
    */
   update(dt: number, s: AmmoState): void {
     if (this.pixi) this.pixi.update(dt, s);
-    else this._updateReadout(dt, s);
+    else if (this.presentReadout) this._updateReadout(dt, s);
 
     // Equipment remains native in both A/B modes, in its original HUD layer.
     const bc = s.bandages ?? 0;

@@ -5,10 +5,11 @@ import { captureNative } from '../../tools/lib/native-render.mjs';
 export async function capturePixi(page, path, kind = 'panel') {
   await page.evaluate(async (kind) => {
     const ui = window.__ENGINE__.ctx.get('ui');
-    const p = kind === 'ammo' ? ui.ammo.pixi : ui.pixiExperiment;
+    const p = kind === 'hud' ? ui.pixiHud : kind === 'ammo' ? ui.ammo.pixi : ui.pixiExperiment;
     const r = p.renderer;
     const texture = r.textureGenerator.generateTexture({
       target: p.stage,
+      ...(kind === 'hud' ? { frame: r.screen.clone() } : {}),
       resolution: r.resolution,
     });
     const source = r.texture.getGpuSource(texture.source),
@@ -39,7 +40,9 @@ export async function capturePixi(page, path, kind = 'panel') {
       overlay.height = height;
       overlay.style.cssText = `position:absolute;left:${p.canvas.offsetLeft}px;top:${p.canvas.offsetTop}px;width:${p.canvas.clientWidth}px;height:${p.canvas.clientHeight}px;pointer-events:none`;
       overlay.getContext('2d').putImageData(new ImageData(rgba, width, height), 0, 0);
-      parent.append(overlay);
+      overlay.style.opacity = p.canvas.style.opacity;
+      overlay.style.visibility = p.canvas.style.visibility;
+      parent.insertBefore(overlay, p.canvas.nextSibling);
       window.__PIXI_CAPTURE__ = { overlay, parent, position };
     } finally {
       buffer.destroy();
