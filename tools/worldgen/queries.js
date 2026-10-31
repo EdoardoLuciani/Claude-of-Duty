@@ -1,4 +1,4 @@
-import { BUILDINGS, STREET, ALLEYS } from './layout.js';
+import { BUILDINGS, STREET, ALLEYS } from './level/layout.js';
 import { fbm3 } from './util.js';
 
 export const ALLEY_MOUTHS = [];

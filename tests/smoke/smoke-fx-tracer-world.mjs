@@ -12,7 +12,7 @@ import { FxSystem } from '../../src/fx/index.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { buildWorld } from '../../tools/worldgen/build.js';
 import { Assembler } from '../../tools/worldgen/builder.js';
-import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from '../../tools/worldgen/config.js';
+import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from '../../tools/worldgen/level/config.js';
 import { buildCollision } from '../../tools/worldgen/pack.js';
 
 // --- world + collision BVH (same recipe as smoke-collision-fidelity) --------

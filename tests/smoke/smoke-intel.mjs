@@ -17,7 +17,7 @@ import { MarketSystem } from '../../src/market/index.ts';
 import { UiSystem } from '../../src/ui/index.ts';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
-import { INTEL_POINTS } from '../../tools/worldgen/intel.js';
+import { INTEL_POINTS } from '../../tools/worldgen/level/intel.js';
 
 assert.deepEqual(DEFAULT_BINDINGS.use, ['KeyT'], 'approved interact default is T');
 assert.deepEqual(DEFAULT_BINDINGS.flashlight, ['KeyF'], 'approved flashlight default is F');

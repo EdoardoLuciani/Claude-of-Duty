@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 import { Rng } from '../../src/core/rng.ts';
 import { BOX, BOX_SOFT, IDENT, LL } from './kit.js';
-import { STREET, ALLEYS } from './layout.js';
+import { STREET, ALLEYS } from './level/layout.js';
 import { ALLEY_MOUTHS, groundY } from './queries.js';
 import { fbm3, patchGeometry, paintMasks } from './util.js';
 
