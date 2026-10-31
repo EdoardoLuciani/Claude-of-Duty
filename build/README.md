@@ -29,7 +29,8 @@ Simplification is opt-in **per model**; P320's tight-error profile is not a glob
 triangle-reduction policy. M4 disables geometry quantization to preserve its iron
 apertures and retains finish-bearing UV1/UV2 with `-kv`. Its weapon-local shader
 uses those values alongside the original detail maps. MCX similarly decodes finish
-identity from UV1; ordinary external GLB viewers are not material-fidelity references.
+identity from UV1, and MPX selects lens/cap alpha and coating from its existing
+finish UVs. Ordinary external GLB viewers are not material-fidelity references.
 AX338 keeps full geometry where simplification damaged panel detail.
 M590 keeps its shell separate from the mechanical skin, with exact STEP visibility;
 its source checker narrowly bounds one approved shared-glove contact below 30 µm.

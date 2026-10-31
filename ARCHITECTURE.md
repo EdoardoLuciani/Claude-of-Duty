@@ -280,7 +280,7 @@ profiles (`npm run models:cook`). Normal builds consume committed `.runtime.glb`
 products; they do not run the encoder. All seven authored weapons opt in.
 Adding profiles requires adapter, animation and visual validation rather than
 blanket simplification. Editable Blender sources remain authoring references.
-M4/MCX adapters decode packed finish metadata in small weapon-local physical-node
+M4/MCX/MPX adapters decode packed finish metadata in small weapon-local physical-node
 graphs; their consolidated GLBs require those adapters for material fidelity.
 
 `src/weapons/asset-loader.ts` serializes compressed model loads to bound Basis

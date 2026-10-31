@@ -83,8 +83,8 @@ Original editable parts/materials, sockets, controls, calibration and Actions re
 | Materials | 4 | 3 |
 | Native triangles, all / Idle | 78,040 / 67,556 | 78,040 / 67,556 |
 | Cooked triangles, all / Idle | 71,104 / 60,818 | 73,139 / 62,875 |
-| Native raw / gzip bytes | 8,315,948 / 2,728,711 | 10,178,760 / 2,699,677 |
-| Runtime raw / gzip bytes | 2,649,308 / 1,786,348 | 2,688,196 / 1,773,429 |
+| Native raw / gzip-default bytes | 8,315,948 / 2,728,711 | 10,178,760 / 2,699,677 |
+| Runtime raw / gzip-default bytes | 2,649,308 / 1,786,348 | 2,688,196 / 1,773,429 |
 | Native vertices / vertex-view bytes / index-view bytes | 117,556 / 5,642,688 / 715,278 | 117,556 / 7,382,908 / 794,298 |
 | Runtime vertices / vertex-view bytes / index-view bytes | 88,490 / 3,539,600 / 426,624 | 90,168 / 4,102,984 / 438,834 |
 
@@ -100,9 +100,22 @@ bytes. Animation-time arrays remain 4,008 / 4,020 bytes. Initial bone matrices c
 Skinning adds vertex-shader work; mixed rigid/skinned opaque draws can require distinct
 shader variants. The two optical TSL selectors add scalar shader work. No GPU allocation,
 pipeline-count or FPS reduction is claimed from these CPU/delivery measurements.
+Gzip values above use Node's default level; PR aggregate figures use Python gzip-9.
 All three PNG/KTX2 payloads remain byte-identical to pass 1: 1024², cooked 11 mips,
-358,652 normal + 226,365 surface + 601,978 ORM encoded bytes. Parent native GPU
-appearance/sorting/allocation acceptance remains required.
+358,652 normal + 226,365 surface + 601,978 ORM encoded bytes. Native AMD RDNA-4 /
+Three r187 measurements found uploaded geometry **3,966,232 → 5,286,220 B** and
+geometry-plus-logical-texture subtotal **8,160,616 → 9,480,604 B** (7.783 → 9.041 MiB).
+This excludes other renderer resources, bone buffers and driver padding; queue
+tracing separately observed 1,280 B of palette storage. This is a draw/storage
+trade-off, not a GPU-memory or FPS improvement.
+
+Independent source/normal and runtime reviews passed, including every original
+triangle and tiny/zero-area normal. Matched native-GPU hero/side/ADS/reload/optic
+captures, RGBA fallback, market and production integration checks passed. Inspection
+samples authored Idle before caching helper/bone rest positions; native/cooked
+regressions compare actual carrier vertices from lockback and mid-reload against
+independent fresh Idle inspections. These checks do not clear human Gate 3 or
+all-state/factory-reference acceptance.
 
 ### Runtime candidate cook
 
