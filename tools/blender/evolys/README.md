@@ -10,7 +10,7 @@
 | Final source UV precision                                              | Binary-grid loop after atlas assignment                 |
 | Eight sparse actions, hands and events                                 | `../evolys_actions.py`: `author_actions`                |
 | Runtime lattice, endpoint/STEP preparation and read-only assertions    | `export.py`: `prepare_export_actions`                   |
-| Export-only rigid mechanical skin after saving editable assemblies     | `skin.py`: `consolidate_mechanics`                      |
+| Ordinary static join after saving editable assemblies                  | `export.py`: `consolidate_static_surfaces`              |
 | Opaque/base/ORM finish bake on UV1, with unchanged normal UV0          | `finish_atlas.py`: `bake_finish_atlas`                  |
 
 Read-only inputs are `assets/weapons/fn-evolys-762/hand-reference.json` and shared
@@ -34,6 +34,75 @@ Keep one eight-joint/one-primitive belt at 12.7 mm pitch. Brass, projectile and
 link finishes occupy separate atlas tiles, not separate draws. Runtime owns persistent
 remaining-round masks, the departing last round and insertion/reset behavior;
 native constant channels must never resurrect spent ammunition.
+
+## Ordinary rigid export (current)
+
+The current recipe removes the export-only eight-joint mechanical skin. Only
+receiver, handguard and optic are joined as `static_surfaces`, with ordinary
+opaque/lens primitives. The stock stays in its native rotated local frame: no
+bind-space triangulation, corner-normal carrier or custom-normal re-encoding is
+needed. Bolt, charging handle, feed cover and trigger are ordinary meshes under
+the original animated controls. No adapter, shader or other runtime code changes.
+The existing deforming eight-joint belt and both independent STEP-owned pouches
+are untouched. Source maps, atlas, UV rounding, hand calibration, sockets, event
+and timing data are unchanged. The editable source is still saved before export.
+
+Compared with immutable published base **d29573f8**:
+
+| Metric                                     | Mechanical skin baseline | Ordinary rigid candidate |
+| ------------------------------------------ | -----------------------: | -----------------------: |
+| Materials / total / loaded-Idle primitives |                2 / 5 / 4 |               2 / 10 / 9 |
+| Native / cooked instantiated triangles     |          53,059 / 52,977 |          53,059 / 52,977 |
+| Native rigid attribute vertices            |                   49,695 |                   44,797 |
+| Cooked rigid attribute vertices            |           44,025 skinned |          44,025 ordinary |
+| Native / cooked belt vertices              |          13,184 / 13,184 |          13,184 / 13,184 |
+| Skeletons / joints                         |                   2 / 16 |        1 / 8 (belt only) |
+| Native raw / gzip-9 bytes                  |    8,975,480 / 4,422,826 |    7,735,012 / 4,384,205 |
+| Runtime raw / gzip-9 bytes                 |    3,188,352 / 2,485,402 |    3,166,568 / 2,487,080 |
+| Native unique CPU attribute/index bytes    |                4,271,158 |                3,081,338 |
+| Runtime unique CPU attribute/index bytes   |                2,673,550 |                2,321,350 |
+
+Runtime CPU arrays fall by 352,200 B, but that is **not uploaded GPU memory**.
+On r187 WebGPU, the removed 44,025 four-influence rigid streams are expected to
+recover about **880,500 B** because non-normalized Uint8 joint IDs expand to
+Uint32. Expected geometry is around 2,479,560 B versus the measured baseline
+3,360,060 B (~26.2% less); parent must measure actual candidate uploads. No FPS
+improvement is claimed; five more submissions and ordinary-object costs are an
+explicit tradeoff. CPU index bytes stay 310,758 B in the runtime; no index-width
+saving is claimed. Gzip-9 uses the same Node zlib level 9 for both products.
+
+All three encoded native PNG and cooked KTX2 image payloads are unchanged.
+Each is 1024²; runtime retains 11 mip levels. KTX2 payloads remain 1,068,530 B
+normal, 575,258 B base, 508,056 B ORM. Logical compressed texture storage remains
+4,194,384 B; there is no texture-memory saving or exposure/material retuning.
+
+Two separate fresh exports and unchanged-profile cooks are byte-identical.
+The pre-skin **875587a3** hashes independently protect every ordinary local
+surface, belt and pouch; no candidate-generated geometry hashes were adopted.
+The representation parity tool additionally compares immutable **d29573f8**:
+all 53,059 oriented triangles, image bytes, exact UV0/UV1 and 491 poses /
+33,173,433 mapped vertices. Maximum position drift is 3.744e-8 m; maximum normal
+vector difference remains 0.0024999942, solely the already approved historical
+mechanical-skin encoding loss documented below. There is no new normal exception,
+retessellation or deliberate detail/silhouette change. Slight local shading can
+differ when removing that historical encoding step; matched GPU review is pending.
+
+The dense ownership test keeps the **same 3,415 native / 3,409 cooked pose/time
+sets**, all actual ordinary rigid vertices, endpoint/STEP checks and unchanged
+2 µm / 40 µm gates. Actual evaluations are 152,981,755 native + 150,081,225 cooked:
+the reduction from 319,789,650 reflects 4,898 fewer duplicate native attribute
+vertices, not removed samples or geometry coverage. Inspection checks both
+ordinary and skinned object/transform independence with borrowed geometry and
+finishes; belt skeleton disposal remains explicit. The stock oracle still checks
+all 4,922 actual triangles at 830 poses per asset against 120 mm (minimum measured
+146.14 mm). Sleeve/pouch checks retain the same atlas-selected physical enclosure
+and thresholds, with minimum vertex gaps 0.34 mm native / 0.33 mm cooked. Runtime
+belt masks, persistent visibility, insertion/interruption and installed/spare
+pouch ownership retain the existing smoke gates. Native/cooked 240 Hz contact
+parity remains 9,042 poses with its original tolerances.
+
+The following sections record **historical** optimization and accepted exceptions;
+the mechanical skin below is no longer the current representation.
 
 ## Native/export optimization
 
@@ -90,7 +159,7 @@ CPU AgX comparisons cover studio sides, feed/optic/markings close-ups and reload
 poses. The second-pass section below records completed native-WebGPU/KTX2 checks;
 factory-reference and all-state human acceptance remain separate.
 
-## Second-pass mechanical consolidation
+## Historical second-pass mechanical consolidation
 
 `skin.py` joins receiver, handguard, optic, stock, bolt, charging handle, feed
 cover and trigger into `mechanical_surfaces`, using eight one-influence rigid

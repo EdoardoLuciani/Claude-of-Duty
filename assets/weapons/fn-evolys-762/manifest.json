@@ -156,10 +156,10 @@
   },
   "stats": {
     "triangles": 53059,
-    "primitives": 5,
+    "primitives": 10,
     "materials": 2,
     "images": 3,
-    "bytes": 8975480
+    "bytes": 7735012
   },
   "textureResolution": 1024,
   "belt": {
@@ -175,5 +175,5 @@
     "barrelCrown": -0.5126887835703001,
     "muzzle": -0.5745908372827804
   },
-  "source": "tools/blender/evolys_762.py + tools/blender/evolys/export.py + tools/blender/evolys/finish_atlas.py + tools/blender/evolys/skin.py + evolys_actions.py + tools/evolys-hand-reference.mjs"
+  "source": "tools/blender/evolys_762.py + tools/blender/evolys/export.py + tools/blender/evolys/finish_atlas.py + evolys_actions.py + tools/evolys-hand-reference.mjs"
 }
