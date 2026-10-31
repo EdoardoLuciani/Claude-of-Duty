@@ -3,15 +3,20 @@ import { captureNative } from '../../tools/lib/native-render.mjs';
 /** Read back the real Pixi target before DOM composition (headless Vulkan can
  * present blank swapchains). Capture-only copies never enter runtime code. */
 export async function capturePixi(page, path, kind = 'panel') {
-  await page.evaluate(async (kind) => {
+  const readback = await page.evaluate(async (kind) => {
     const ui = window.__ENGINE__.ctx.get('ui');
     const p = kind === 'hud' ? ui.pixiHud : kind === 'ammo' ? ui.ammo.pixi : ui.pixiExperiment;
     const r = p.renderer;
+    const fullView = kind === 'hud' || kind === 'ammo';
     const texture = r.textureGenerator.generateTexture({
       target: p.stage,
-      ...(kind === 'hud' ? { frame: r.screen.clone() } : {}),
+      ...(fullView ? { frame: r.screen.clone() } : {}),
       resolution: r.resolution,
     });
+    // generateTexture crops local bounds and overrides the root transform.
+    // Replay into the full viewport with the normal root scale, so removing
+    // panels cannot crop/stretch ammo captures or break resized/DPR-2 HUD shots.
+    if (fullView) r.render({ container: p.stage, target: texture, clear: true });
     const source = r.texture.getGpuSource(texture.source),
       device = r.gpu.device;
     const width = source.width,
@@ -44,6 +49,28 @@ export async function capturePixi(page, path, kind = 'panel') {
       overlay.style.visibility = p.canvas.style.visibility;
       parent.insertBefore(overlay, p.canvas.nextSibling);
       window.__PIXI_CAPTURE__ = { overlay, parent, position };
+      if (kind === 'hud') {
+        const scale = p.stage.scale.x * r.resolution;
+        const alpha = (node, x, y) =>
+          rgba[
+            (Math.floor((node.y + y) * scale) * width + Math.floor((node.x + x) * scale)) * 4 + 3
+          ];
+        const ink = (node, x, y, w, h) => {
+          let pixels = 0;
+          for (let py = Math.floor(y * scale); py < Math.floor((y + h) * scale); py++)
+            for (let px = Math.floor(x * scale); px < Math.floor((x + w) * scale); px++) {
+              const ox = Math.floor(node.x * scale) + px,
+                oy = Math.floor(node.y * scale) + py;
+              if (rgba[(oy * width + ox) * 4 + 3] > 32) pixels++;
+            }
+          return pixels;
+        };
+        return {
+          panelAlpha: [alpha(p.vitals, 4, 4), alpha(p.ammo.stage, 4, 4)],
+          readoutPixels: [ink(p.vitals, 12, 24, 90, 46), ink(p.ammo.stage, 12, 34, 206, 62)],
+        };
+      }
+      return null;
     } finally {
       buffer.destroy();
       texture.destroy(true);
@@ -59,4 +86,5 @@ export async function capturePixi(page, path, kind = 'panel') {
       delete window.__PIXI_CAPTURE__;
     });
   }
+  return readback;
 }

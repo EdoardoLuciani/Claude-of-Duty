@@ -6,8 +6,7 @@ import { clamp01, ease } from './util.ts';
 
 export const AMMO_WIDTH = 248;
 export const AMMO_HEIGHT = 146;
-const WIDTH = AMMO_WIDTH,
-  HEIGHT = AMMO_HEIGHT;
+const WIDTH = AMMO_WIDTH;
 const INK = 0xe7f2ef,
   MUTED = 0xa9bac5,
   AMBER = 0xffb02a,
@@ -22,8 +21,11 @@ export class PixiAmmoView {
   private mode: Text;
   private prompt: Text;
   private pips: Graphics[] = [];
-  private bar = new Graphics().rect(0, 0, 216, 3).fill(0x263943);
-  private fill = new Graphics().rect(0, 0, 216, 3).fill(0x85cbbb);
+  private bar = new Graphics()
+    .rect(0, 0, 216, 3)
+    .fill(0x263943)
+    .stroke({ color: 0x080c10, width: 1 });
+  private fill = new Graphics().rect(0, 0, 216, 3).fill(INK);
   dirty = true;
   protected disposed = false;
   punch = 0;
@@ -34,13 +36,6 @@ export class PixiAmmoView {
   constructor() {
     this.stage.eventMode = 'none';
     this.stage.interactiveChildren = false;
-    this.stage.addChild(
-      new Graphics()
-        .roundRect(0, 0, WIDTH, HEIGHT, 6)
-        .fill({ color: 0x0a141c, alpha: 0.88 })
-        .stroke({ color: 0x526e70, alpha: 0.7, width: 1 })
-    );
-    this.stage.addChild(new Graphics().roundRect(0, 8, 2, HEIGHT - 16, 1).fill(0x85cbbb));
     this.mode = this.text('AUTO', 14, 12, 10, MUTED);
     this.name = this.text('M4A1', WIDTH - 14, 11, 12);
     this.name.anchor.x = 1;
@@ -51,7 +46,10 @@ export class PixiAmmoView {
     this.prompt = this.text('', WIDTH / 2, 119, 11, AMBER);
     this.prompt.anchor.x = 0.5;
     for (let i = 0; i < MAX_PIPS; i++) {
-      const pip = new Graphics().rect(0, 0, 5, 7).fill(0xffffff);
+      const pip = new Graphics()
+        .rect(0, 0, 5, 7)
+        .fill(0xffffff)
+        .stroke({ color: 0x080c10, width: 1 });
       pip.y = 101;
       this.pips.push(pip);
       this.stage.addChild(pip);
@@ -64,7 +62,13 @@ export class PixiAmmoView {
   private text(value: string, x: number, y: number, fontSize: number, fill = INK): Text {
     const text = new Text({
       text: value,
-      style: { fontFamily: 'Arial', fontSize, fontWeight: '600', fill },
+      style: {
+        fontFamily: 'Arial',
+        fontSize,
+        fontWeight: '600',
+        fill,
+        stroke: { color: 0x080c10, width: fontSize >= 20 ? 2 : 1, join: 'round' },
+      },
     });
     text.position.set(x, y);
     this.stage.addChild(text);

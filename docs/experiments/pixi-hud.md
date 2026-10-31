@@ -99,8 +99,16 @@ texture plateau, portrait resizing, DPR 2, shared-device lifetime,
 zero WebGL context requests, no Pixi download by default and native fallback when
 Pixi cannot obtain adapter metadata.
 
-Prototype visual differences are intentional: ammo/health use dark framed panels;
-minimap contact/player glow, edge vignette and view-cone gradient are simplified.
+Ammo/health now use panel-free readouts: decorative background fills, borders
+and green ammo stripe are removed. Thin dark glyph outlines and functional
+bar/pip outlines preserve contrast over scenery; reload fill is neutral white.
+The minimap background is unchanged. The measurements above used the earlier
+framed styling and are not a new performance claim for this cosmetic update.
+Capture checks assert transparent former panel areas and visible readout pixels
+at both DPR 1 and DPR 2.
+
+Prototype visual differences are intentional: minimap contact/player glow,
+edge vignette and view-cone gradient are simplified.
 Labels/fades and tactical data remain, but this is not a pixel-identical renderer
 swap. Pixi Text uses cached Canvas2D-rasterized text textures: changing text still
 has CPU/upload cost. Fonts and all runtime assets remain local. Gameplay canvas

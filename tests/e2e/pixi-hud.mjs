@@ -238,8 +238,14 @@ try {
       ui.hit.clear();
       await window.__PUMP__(180);
     });
-    if (setup.pixi) await capturePixi(page, resolve(out, `${run}-${mode}.png`), 'hud');
-    else await captureNative(page, resolve(out, `${run}-${mode}.png`));
+    if (setup.pixi) {
+      const pixels = await capturePixi(page, resolve(out, `${run}-${mode}.png`), 'hud');
+      assert.deepEqual(pixels.panelAlpha, [0, 0], 'health/ammo panel areas stay transparent');
+      assert(
+        pixels.readoutPixels.every((count) => count > 10),
+        'floating readouts actually render, including resized/DPR-2 captures'
+      );
+    } else await captureNative(page, resolve(out, `${run}-${mode}.png`));
     if (setup.pixi) {
       checks = await page.evaluate(async () => {
         const e = window.__ENGINE__,
