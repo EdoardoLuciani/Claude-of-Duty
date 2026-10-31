@@ -117,11 +117,15 @@ Immutable comparison baseline: `d29573f8b9426d70671ac5fb3fa4289a2de7546b`.
 
 All ordinary streams use 16-bit indices; the previous body stream used 32-bit.
 CPU geometry falls 1,075,174 B (17.3%) in the decoded runtime. This is **not** a
-measured GPU saving. On r187 WebGPU, the baseline's non-normalized Uint8 joint IDs
-expand to Uint32: removal avoids 931,680 B of expansion beyond this CPU delta.
-The corresponding geometry-only estimate is ~2,006,854 B (28.1%) below the
-baseline's measured 7,148,208 B, pending actual backend measurement. No FPS or
-whole-renderer residency claim is made. Runtime raw bytes fall 25,816 B (0.51%);
+GPU measurement. On r187 WebGPU, the baseline's non-normalized Uint8 joint IDs
+expand to Uint32. Parent native AMD RDNA-4 measurements confirm uploaded geometry
+**7,148,208 → 5,141,356 B** (−28.1%) and geometry-plus-logical-texture subtotal
+**12,740,720 → 10,733,868 B**, with unchanged texture storage. Observed palette
+storage falls 832 → 0 B, separately from that subtotal. This excludes other renderer
+resources and driver padding. Isolated loaded-Idle beauty draws rise 3 → 15;
+paired A/B/B/A CPU time averages roughly **0.120 → 0.150 ms**, while GPU pass time
+is roughly 0.062 ms on both. That is a disclosed submission-cost trade-off, not
+whole-game FPS evidence or a claim that CPU rendering became faster. Runtime raw bytes fall 25,816 B (0.51%);
 gzip grows 739 B (0.019%), so compressed transfer savings are not claimed.
 
 Texture formats, dimensions, mip count and payloads are unchanged: four 1024²
@@ -157,8 +161,11 @@ remain exactly equal. Positions and iron/contact tolerances are not relaxed.
 Tests retain actual iron rays/support/dimensions, deformed hand/stock sweeps,
 latch contact, magazine drops/ammunition, interruption/death/reset behavior,
 cover and lockback motion, independent rounds, inspection rest/ownership and
-material disposal. Candidate visual/GPU/submission/timing acceptance remains a
-parent gate; the increased submission count is not presumed beneficial.
+material disposal. Matched native-GPU hero/side/optic/ADS/reload/inspect captures,
+RGBA fallback, market and production integration passed. Fresh independent review
+found no issues and the combined 160-test suite passed. Acceptance prioritizes
+simpler representation and measured storage savings, not minimum submission count;
+it does not certify general factory/human fidelity or an FPS improvement.
 
 Reproduce with gltfpack **1.3** through the unchanged registered cook profile:
 
