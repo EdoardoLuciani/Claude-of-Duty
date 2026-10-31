@@ -9,6 +9,7 @@ import manifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: '
 import { Rng } from '../../src/core/rng.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import { Arm } from '../../src/weapons/hands.ts';
+import { createWeaponInspection } from '../../src/weapons/inspection.ts';
 import { makeMPXModel, MPXAnimation, MPX_URL, MPX_EJECT_DELAY } from '../../src/weapons/mpx.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
@@ -39,7 +40,9 @@ for (const asset of [MPX_NATIVE_URL, MPX_URL]) {
         material.opacityNode === null &&
         material.clearcoatNode === null &&
         material.transmission === 0 &&
-        material.envMapIntensity === 0.05,
+        material.envMapIntensity === 0.05 &&
+        material.specularIntensity === 0.03 &&
+        material.side === THREE.DoubleSide,
       'optical sheets must not wash out the world'
     );
   }
@@ -54,6 +57,95 @@ for (const asset of [MPX_NATIVE_URL, MPX_URL]) {
   // Actual zero-metal/0.96 roughness interior texels are independently checked in smoke-mpx-asset.
   assert(interior.envMapIntensity <= 0.03 && interior.specularIntensity <= 0.02);
   assert.equal(Object.keys(anim.actions).length, 8);
+  model.root.traverse((mesh) => {
+    if (!mesh.isMesh) return;
+    assert(
+      !mesh.isSkinnedMesh &&
+        !mesh.geometry.attributes.skinIndex &&
+        !mesh.geometry.attributes.skinWeight
+    );
+    if (mesh.material.transparent) assert.equal(mesh.name, 'receiver_optical');
+  });
+  for (const name of [
+    'receiver',
+    'bolt',
+    'charging_handle',
+    'selector',
+    'trigger',
+    'stock_hinge',
+    'bolt_release',
+    'magazine_catch',
+    'lens_cap_front',
+    'lens_cap_rear',
+  ])
+    assert.equal(
+      model.root.getObjectByName(`${name}_mesh`).parent,
+      model.root.getObjectByName(name)
+    );
+  assert.equal(anim.magazineBody.parent, anim.magazine);
+  assert.equal(anim.magazineBody.children.length, 0, 'dropped shell never includes live rounds');
+
+  // Real back-face-culled lid triangles must block both directions, not just look opaque.
+  for (const tag of ['front', 'rear']) {
+    const pivot = model.root.getObjectByName(`lens_cap_${tag}`);
+    const rest = pivot.quaternion.clone();
+    pivot.quaternion.identity();
+    model.root.updateMatrixWorld(true);
+    const cap = model.root.getObjectByName(`lens_cap_${tag}_mesh`);
+    const indices = cap.geometry.index;
+    const triangles = Array.from({ length: indices.count / 3 }, (_, i) =>
+      [0, 1, 2].map((offset) =>
+        cap
+          .getVertexPosition(indices.getX(i * 3 + offset), new THREE.Vector3())
+          .applyMatrix4(cap.matrixWorld)
+      )
+    );
+    for (const side of [-1, 1])
+      for (const [x, y] of [
+        [0, 0],
+        [0.008, 0],
+        [-0.008, 0],
+        [0, 0.008],
+        [0, -0.008],
+      ]) {
+        const ray = new THREE.Ray(
+          new THREE.Vector3(x, 0.0129 + y, side * 0.02).applyMatrix4(pivot.matrixWorld),
+          new THREE.Vector3(0, 0, -side).transformDirection(pivot.matrixWorld)
+        );
+        assert(
+          triangles.some(([a, b, c]) => ray.intersectTriangle(a, b, c, true, new THREE.Vector3())),
+          `${tag}: closed lid blocks side ${side}`
+        );
+      }
+    pivot.quaternion.copy(rest);
+  }
+  model.root.updateMatrixWorld(true);
+
+  // Same borrowed geometry + same rigid world matrix proves every carrier vertex is at fresh Idle.
+  const idleInspection = createWeaponInspection({ model, def });
+  const idleCarrier = idleInspection.scene.getObjectByName('bolt_mesh').matrixWorld.clone();
+  idleInspection.dispose();
+  for (const gesture of ['', 'reloadEmpty']) {
+    anim.reset();
+    assert(
+      anim.bolt.position.distanceTo(anim.boltRest) < 1e-9,
+      'reset repairs out-of-band lockback'
+    );
+    anim.update(0.1, gesture, 0.8, true, false);
+    const live = anim.bolt.position.clone();
+    const inspection = createWeaponInspection({ model, def });
+    const carrier = inspection.scene.getObjectByName('bolt_mesh');
+    assert.equal(carrier.geometry, model.root.getObjectByName('bolt_mesh').geometry);
+    assert(
+      carrier.matrixWorld.elements.every(
+        (value, i) => Math.abs(value - idleCarrier.elements[i]) < 1e-9
+      ),
+      `${gesture || 'lockback'}: inspection carrier matches fresh Idle`
+    );
+    inspection.dispose();
+    assert(anim.bolt.position.equals(live), 'inspection does not reset live lockback/reload');
+  }
+  anim.reset();
   for (const clip of model.animations) {
     assert.ok(
       Math.abs(clip.duration - manifest.clips[clip.name].duration) < 1e-6,
@@ -164,9 +256,12 @@ for (const asset of [MPX_NATIVE_URL, MPX_URL]) {
   anim.update(0.05, null, 0, true);
   assert.equal(anim.name, 'Last_Shot');
   anim.update(0.1, null, 0, true);
-  assert(Math.abs(anim.bolt.position.z - 0.038) < 1e-6);
+  assert(Math.abs(anim.bolt.position.z - anim.boltRest.z - 0.038) < 1e-9);
   anim.update(0, 'inspect', 1, true);
-  assert(Math.abs(anim.bolt.position.z - 0.038) < 1e-6, 'inspect preserves lockback');
+  assert(
+    Math.abs(anim.bolt.position.z - anim.boltRest.z - 0.038) < 1e-9,
+    'inspect preserves lockback'
+  );
   const arms = [new Arm(-1, { scale: 0.97 }), new Arm(1)];
   const hipInverse = new THREE.Matrix4()
     .compose(

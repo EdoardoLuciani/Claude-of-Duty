@@ -208,6 +208,25 @@ for (const [label, candidate] of [
   const gltf = label === 'native' ? nativeGLTF : await parseGLB(candidate);
   const model = makeEvolysModel(gltf),
     anim = new EvolysAnimation(model);
+  for (const [name, owner] of Object.entries({
+    static_surfaces: 'EVOLYS_RIG',
+    stock_mesh: 'stock',
+    bolt_mesh: 'bolt',
+    charging_handle_mesh: 'charging_handle',
+    feed_cover_mesh: 'feed_cover',
+    trigger_mesh: 'trigger',
+  })) {
+    const part = model.root.getObjectByName(name);
+    assert.equal(part.parent, model.root.getObjectByName(owner));
+    part.traverse((mesh) => {
+      if (mesh.isMesh)
+        assert(
+          !mesh.isSkinnedMesh &&
+            !mesh.geometry.attributes.skinIndex &&
+            !mesh.geometry.attributes.skinWeight
+        );
+    });
+  }
   for (const material of model.materials) {
     const source = document.materials.find((m) => m.name === material.name).pbrMetallicRoughness;
     const native = json.materials.find((m) => m.name === material.name).pbrMetallicRoughness;
@@ -333,10 +352,16 @@ for (const [label, candidate] of [
   );
   // Verify rendered skin positions, not only the ammunition-control bone scales.
   anim.update(0, null, 0, false, true, 1);
-  let skinCount = 0;
+  let skinCount = 0,
+    boneTextureDisposals = 0;
+  let beltSkeleton;
   anim.belt.traverse((mesh) => {
     if (!mesh.isSkinnedMesh) return;
     skinCount++;
+    beltSkeleton = mesh.skeleton;
+    assert.equal(beltSkeleton.bones.length, 8, 'no rigid body joints added to the belt');
+    beltSkeleton.computeBoneTexture();
+    beltSkeleton.boneTexture.addEventListener('dispose', () => boneTextureDisposals++);
     mesh.skeleton.update();
     const { position, skinIndex, skinWeight, uv1 } = mesh.geometry.attributes;
     const finishTiles = new Map();
@@ -389,6 +414,8 @@ for (const [label, candidate] of [
   assert.equal(WEAPON_DEFS.lmg.magSize, 100);
   assert.equal(WEAPON_DEFS.lmg.damage, 48);
   anim.dispose();
+  assert.equal(boneTextureDisposals, 1, 'release the independent belt palette exactly once');
+  assert.equal(beltSkeleton.boneTexture, null);
   assert.equal(model.materials.size, 0);
   assert.equal(model.textures.size, 0);
   console.log(

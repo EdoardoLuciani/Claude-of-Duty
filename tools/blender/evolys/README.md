@@ -183,8 +183,9 @@ This does not relax geometry, contact, quaternion or other-weapon limits. Normal
 remain finite unit directions, belt/pouch normals are unchanged, and exact UVs and
 preserved positions retain derivative tangent inputs, including the existing
 degenerate-UV exception. No flattening, normal-map resampling or exporter/GLB repair.
-Use `node tools/evolys-pass2-parity.mjs /absolute/path/to/base-native.glb` for the
-independent oriented-surface and moving-normal checks described above.
+The one-off oriented-surface/moving-normal migration comparator is preserved in
+[Git history](https://github.com/EdoardoLuciani/Claude-of-Duty/blob/ec1d361fdfd4b1424bd101ebaa79bb9f370a9734/tools/evolys-pass2-parity.mjs).
+Current rebuild gates are the EVOLYS asset/runtime and clearance smokes.
 
 ## Approved UV precision exception
 

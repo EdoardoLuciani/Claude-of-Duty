@@ -74,10 +74,7 @@ blender -b -t 2 --python-exit-code 1 --python tools/blender/evolys_762.py -- \
 blender -b assets/weapons/fn-evolys-762/fn-evolys-762.blend \
   --python-exit-code 1 --python tools/blender/evolys_check.py
 node tests/smoke/smoke-evolys.mjs
-node tests/smoke/smoke-evolys-skin.mjs
 node tests/smoke/smoke-evolys-clearance.mjs
-# Extract the independent published native GLB from base d29573f8, then:
-node tools/evolys-pass2-parity.mjs /absolute/path/to/base-native.glb
 ```
 
 Follow the [shared authoring workflow](../../../tools/blender/README.md).

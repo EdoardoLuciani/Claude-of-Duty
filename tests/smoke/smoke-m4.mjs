@@ -8,6 +8,7 @@ import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { Rng } from '../../src/core/rng.ts';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
+import { createWeaponInspection } from '../../src/weapons/inspection.ts';
 import { makeM4Model } from '../../src/weapons/m4.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
@@ -303,6 +304,23 @@ async function checkModel(bytes, format) {
   });
   const entry = vm.addWeapon(model, { ...WEAPON_DEFS.rifle, cycleTime: 60 / 800 });
   const anim = entry.animation;
+  for (const name of [
+    'bolt',
+    'bolt_head',
+    'charging_handle',
+    'dust_cover',
+    'mag_release',
+    'trigger',
+  ]) {
+    const mesh = model.root.getObjectByName(`${name}_mesh`);
+    assert(mesh.isMesh && !mesh.isSkinnedMesh);
+    assert.equal(mesh.parent, model.root.getObjectByName(name));
+  }
+  assert.equal(anim.boltHead.parent, anim.bolt, 'carrier travel carries the unlocked head');
+  const closedCover = anim.cover.quaternion.clone();
+  const unlockedHead = anim.boltHead.quaternion
+    .clone()
+    .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 8));
   assert.equal(
     entry.parts.magazine,
     anim.magazineBody,
@@ -587,9 +605,23 @@ async function checkModel(bytes, format) {
   assert(wp.tryFire());
   step(0.2);
   assert(anim.bolt.position.z > 0.06 && !anim.magazineRound.visible);
+  assert(
+    anim.boltHead.quaternion.angleTo(unlockedHead) < 1e-7,
+    'empty carrier unlocks the head about Z'
+  );
+  const openCover = anim.cover.quaternion.clone();
+  assert(openCover.angleTo(closedCover) > 0.1, 'firing opens the real attached dust cover');
   assert(wp.inspect());
   step(0.4);
   assert(anim.bolt.position.z > 0.06, 'inspect retains empty lockback');
+  assert(anim.cover.quaternion.angleTo(openCover) < 1e-7, 'inspect retains the open cover');
+  const inspection = createWeaponInspection({ model, def: WEAPON_DEFS.rifle });
+  assert(inspection.scene.getObjectByName('bolt').position.distanceTo(anim.boltRest) < 0.000002);
+  assert(
+    inspection.scene.getObjectByName('dust_cover').quaternion.angleTo(new THREE.Quaternion()) < 1e-7
+  );
+  inspection.dispose();
+  assert(anim.cover.quaternion.angleTo(openCover) < 1e-7, 'inspection leaves live cover open');
   vm.stopClip();
   assert(wp.reload());
   step(0.5);
