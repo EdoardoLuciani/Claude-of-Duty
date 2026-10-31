@@ -147,7 +147,6 @@ const widgets = [
   'compass',
   'scoreBar',
   'minimap',
-  'markers',
   'prompt',
   'banner',
   'menu',

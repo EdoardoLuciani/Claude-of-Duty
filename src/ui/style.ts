@@ -523,46 +523,6 @@ const CSS = `
   font-size: calc(9.5px * var(--k)); letter-spacing:.2em; color:var(--ink-3); text-shadow:var(--sh);
 }
 
-/* ========================================================= world markers */
-.ow-mk {
-  position:absolute; left:0; top:0;
-  display:flex; flex-direction:column; align-items:center;
-  will-change: transform, opacity;
-}
-.ow-mk-glyph { position:relative; width:calc(16px * var(--k)); height:calc(16px * var(--k)); }
-.ow-mk-glyph svg { position:absolute; inset:0; width:100%; height:100%; display:block; overflow:visible;
-  filter: drop-shadow(0 1px 2px rgba(0,0,0,.85)); }
-.ow-mk-letter {
-  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-  font-size: calc(9.5px * var(--k)); color:#08161c; font-weight:700;
-}
-.ow-mk-dist {
-  margin-top: calc(var(--u) * .6);
-  font-size: calc(10px * var(--k)); letter-spacing:.12em; color: var(--ink);
-  text-shadow: var(--sh);
-}
-.ow-mk-name { font-size: calc(9px * var(--k)); letter-spacing:.18em; color: var(--ink-2); text-shadow:var(--sh); }
-.ow-mk.threat .ow-mk-dist { color: var(--red); }
-
-/* grenade danger */
-.ow-nade { position:absolute; left:0; top:0; will-change: transform, opacity; }
-.ow-nade-ring {
-  position:absolute; left:50%; top:50%; width:calc(30px * var(--k)); height:calc(30px * var(--k));
-  margin:calc(-15px * var(--k)) 0 0 calc(-15px * var(--k));
-  border: calc(1.5px * var(--k)) solid var(--red); border-radius:50%;
-  will-change: transform, opacity;
-}
-.ow-nade-core {
-  position:absolute; left:50%; top:50%; width:calc(15px * var(--k)); height:calc(15px * var(--k));
-  margin:calc(-7.5px * var(--k)) 0 0 calc(-7.5px * var(--k));
-}
-.ow-nade-core svg { width:100%; height:100%; display:block; filter:drop-shadow(0 1px 2px rgba(0,0,0,.9)); }
-.ow-nade-label {
-  position:absolute; left:50%; top:calc(13px * var(--k)); transform:translateX(-50%);
-  font-size: calc(9px * var(--k)); letter-spacing:.24em; color:var(--red); white-space:nowrap;
-  text-shadow: var(--sh);
-}
-
 /* ================================================================ prompt */
 .ow-prompt {
   position:absolute; left:50%; top:58%;

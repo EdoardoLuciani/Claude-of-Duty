@@ -114,7 +114,12 @@ try {
           !p ||
           (p.stage.eventMode === 'none' && getComputedStyle(p.canvas).pointerEvents === 'none'),
         nativeInjury: getComputedStyle(ui.hurtLayer).display !== 'none',
-        nativeMarkers: getComputedStyle(ui.worldLayer).display !== 'none',
+        markerUiPresent:
+          'markers' in ui ||
+          'spawnGrenade' in ui ||
+          'worldLayer' in ui ||
+          (!!p && 'worldMarkers' in p),
+        markerElements: document.querySelectorAll('.ow-mk, .ow-nade').length,
         gpuUnderlays: p?.gpuUnderlays ?? false,
         nativeMap: getComputedStyle(ui.minimap.root).display !== 'none',
         nativeVitals: getComputedStyle(ui.health.vitals).display !== 'none',
@@ -136,7 +141,8 @@ try {
     if (setup.pixi) assert(setup.shared);
     assert.equal(setup.gpuUnderlays, setup.pixi && mode !== 'html');
     assert.equal(setup.nativeInjury, !setup.gpuUnderlays);
-    assert.equal(setup.nativeMarkers, !setup.gpuUnderlays);
+    assert.equal(setup.markerUiPresent, false);
+    assert.equal(setup.markerElements, 0);
     if (mode === 'dom') assert.deepEqual(setup.loads, [], 'default path does not fetch Pixi');
     let combat = null,
       metrics = null,
@@ -264,26 +270,18 @@ try {
     if (setup.pixi) {
       await page.evaluate(async () => {
         const e = window.__ENGINE__,
-          ui = e.ctx.get('ui'),
-          camera = e.ctx.camera;
+          ui = e.ctx.get('ui');
         window.__UNDERLAY_MUTATIONS__ = 0;
         window.__UNDERLAY_OBSERVER__ = new MutationObserver((records) => {
           window.__UNDERLAY_MUTATIONS__ += records.length;
         });
-        for (const root of [ui.hurtLayer, ui.worldLayer])
+        for (const root of [ui.hurtLayer])
           window.__UNDERLAY_OBSERVER__.observe(root, {
             attributes: true,
             childList: true,
             characterData: true,
             subtree: true,
           });
-        const point = (x, y, z) => camera.localToWorld(camera.position.clone().set(x, y, z));
-        ui._objectives.push(
-          { position: point(-2.5, 1, -16), label: 'A', name: 'INTEL CACHE' },
-          { position: point(100, 0, -16), label: 'B', name: 'SUPPLIES' },
-          { position: point(-5, 1, 12), label: 'C', name: 'BEHIND' }
-        );
-        ui.spawnGrenade(point(3, 0, -6), 2.4);
         e.ctx.get('player').health.armour = 0;
         e.ctx.get('player').applyDamage(65, null);
         await window.__PUMP__(6);
@@ -296,11 +294,7 @@ try {
       if (setup.gpuUnderlays)
         assert.equal(underlayMutations, 0, 'migrated native layers are not updated behind Pixi');
       else assert(underlayMutations > 0);
-      const injured = await capturePixi(
-        page,
-        resolve(out, `${run}-${mode}-injured-markers.png`),
-        'hud'
-      );
+      const injured = await capturePixi(page, resolve(out, `${run}-${mode}-injured.png`), 'hud');
       if (setup.gpuUnderlays)
         assert(
           injured.cornerAlpha.some((alpha) => alpha > 0),
@@ -313,7 +307,6 @@ try {
         await window.__PUMP__(60);
         const ok =
           !p.chrome.visible &&
-          !p.worldMarkers.stage.visible &&
           (!p.gpuUnderlays ||
             (p.injury.mesh.visible &&
               p.injury.mesh.parent === p.stage &&
@@ -326,8 +319,6 @@ try {
       await page.evaluate(async () => {
         const e = window.__ENGINE__,
           ui = e.ctx.get('ui');
-        ui._objectives.length = 0;
-        ui.markers.clear(!ui.pixiHud.gpuUnderlays);
         e.ctx.get('player').health.reset(true);
         ui.arcs.clear();
         ui.hit.clear();
@@ -349,7 +340,7 @@ try {
         player.health.reset(true);
         player.health.armour = 150;
         await window.__PUMP__(60);
-        // Native DOM injury feedback stays; this slice only replaces vitals.
+        // Injury and vitals share the existing health state in both renderers.
         player.applyDamage(10);
         await window.__PUMP__(3);
         const armour = p.plates.map((n) => n.scale.x);
@@ -384,22 +375,15 @@ try {
         await window.__PUMP__(100);
         if (!p.ammo.name.text.includes('P320')) throw Error('weapon name missing');
         const counts = [];
-        const moving = { position: e.ctx.camera.position.clone(), label: 'T', name: 'TRACK' };
-        const direction = e.ctx.camera.getWorldDirection(e.ctx.camera.position.clone());
-        ui._objectives.push(moving);
         for (let cycle = 0; cycle < 3; cycle++) {
           for (let i = 0; i < 60; i++) {
             w.state.mag = i % 12;
             player.health.value = 20 + i;
-            moving.position.copy(e.ctx.camera.position).addScaledVector(direction, 5 + (i % 45));
-            if (i % 30 === 0) ui.markers.spawnGrenade(moving.position, 0.3);
             await window.__PUMP__(1);
           }
           await p.renderer.gpu.device.queue.onSubmittedWorkDone();
           counts.push(p.renderer.texture.managedTextures.length);
         }
-        ui._objectives.pop();
-        ui.markers.clear(!p.gpuUnderlays);
         player.health.reset(true);
         w.resetForNewGame();
         await window.__PUMP__(60);
@@ -436,7 +420,7 @@ try {
         await window.__PUMP__(30);
         e.ctx.get('player').applyDamage(20000, null);
         await window.__PUMP__(90);
-        const death = ui.hudVisible < 0.004 && !p.chrome.visible && !p.worldMarkers.stage.visible;
+        const death = ui.hudVisible < 0.004 && !p.chrome.visible;
         e.events.emit('game:restart', { source: 'pixi-hud-test' });
         await window.__PUMP__(90);
         const restart = ui.hudVisible > 0.99 && p.enabled;

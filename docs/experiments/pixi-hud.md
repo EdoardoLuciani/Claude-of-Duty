@@ -2,8 +2,9 @@
 
 Use `?pixi=hud` for ammo/reload, health/armour, crosshair and a live minimap.
 Omit the parameter for the unchanged native HUD. The later
-[injury/world-marker extension](pixi-underlays.md) also moves those two presenters
-to Pixi. Menus, shop/inspection, startup/error handling, equipment, compass,
+[injury extension](pixi-underlays.md) also moves fullscreen injury to Pixi.
+The never-wired projected objective/grenade-warning UI has been removed from
+both HTML and Pixi, including its spawning API and unused objective-list plumbing. Menus, shop/inspection, startup/error handling, equipment, compass,
 hitmarkers/damage arcs, prompts, radio and killfeed remain native. The measurements
 below describe the initial four-widget slice, not that extension or the no-UI state.
 
@@ -18,11 +19,11 @@ crosshair experiment is not included.
   Three's existing GPUDevice. There is no WebGL fallback or second device.
   Pixi's supported DOM adapter restriction is restored even on init/cleanup failure.
 - The engine drives one HUD render per active frame. No independent Application
-  or render ticker. A hidden HUD does not render; unchanged paused HUD graphics
-  do not render. CSS handles HUD/menu opacity without rerasterizing its content.
-- Canvas placement is after the world-marker layer and before native centre/chrome
+  or render ticker. Absent content and unchanged paused content do not redraw
+  after fades settle. The readout group fades independently of fullscreen injury.
+- Canvas placement is after native injury and before native centre/chrome
   feedback. Native hitmarkers/damage arcs, equipment and menus stay above it.
-  The later extension renders injury and world markers below readouts in Pixi.
+  The injury extension renders injury below readouts in Pixi instead.
 - The shared `PixiAmmoView` is the previous ammo presenter without renderer ownership.
   The old ammo-only wrapper and the new HUD reuse the same code/pip calculation.
 - Crosshair spring/stance/ADS/hit/flinch and health/bar/armour animation state stay
@@ -30,7 +31,7 @@ crosshair experiment is not included.
   event wiring/gameplay behavior is not duplicated. The later injury presenter
   consumes the same state without mutating the hidden native overlay DOM.
 - Minimap uses the same north-up world bake, footprint geometry, traversables,
-  labels, 60 m span, LOS/recent-shot contacts and intel/objective snapshots.
+  labels, 60 m span, LOS/recent-shot contacts and intel search snapshots.
   Canvas2D is used **once** for the existing authored bake, then uploaded once.
   Map scrolling, grid, labels, cone, player arrow, pooled contacts, edge-clamped
   objectives, pulsing search areas and above/below arrows are retained Pixi objects.
