@@ -492,7 +492,7 @@ export class UiSystem {
       this.killfeed.clear();
       this.arcs.clear();
       this.hit.clear();
-      this.markers.clear();
+      this.markers.clear(!this.pixiHud?.gpuUnderlays);
       this.clearPrompt();
     });
 
@@ -504,11 +504,13 @@ export class UiSystem {
         this.pixiHud = await PixiHudSlice.create(
           this.root,
           this.centreLayer,
-          ctx.get('render').renderer
+          ctx.get('render').renderer,
+          new URLSearchParams(location.search).get('underlays') !== 'html'
         );
         this.pixiHud.resize(this.vw, this.vh, this.k);
         this.root.classList.add('ow-hud-slice');
         this.ammo.presentReadout = false;
+        this.hurtLayer.hidden = this.worldLayer.hidden = this.pixiHud.gpuUnderlays;
       } catch (error) {
         try {
           this.pixiHud?.dispose();
@@ -518,6 +520,7 @@ export class UiSystem {
           this.pixiHud = null;
           this.root.classList.remove('ow-hud-slice');
           this.ammo.presentReadout = true;
+          this.hurtLayer.hidden = this.worldLayer.hidden = false;
         }
         console.warn('[ui] Pixi HUD unavailable; using native HUD', error);
       }
@@ -802,13 +805,13 @@ export class UiSystem {
     this.hudVisible = damp(this.hudVisible, hudGoal, 10, rawDt);
     const hudOp = this.hudVisible.toFixed(3);
     setStyle(this.chromeLayer, 'opacity', hudOp);
-    setStyle(this.worldLayer, 'opacity', hudOp);
+    if (!this.pixiHud?.gpuUnderlays) setStyle(this.worldLayer, 'opacity', hudOp);
     setStyle(this.centreLayer, 'opacity', hudOp);
 
     this.crosshair.update(dt, s, !this.pixiHud);
     this.hit.update(dt);
     this.arcs.update(dt, rx, rz, fx, fz);
-    this.health.update(dt, s, !this.pixiHud);
+    this.health.update(dt, s, !this.pixiHud, !this.pixiHud?.gpuUnderlays);
     this.ammo.pixi?.setVisible(this.hudVisible >= 0.004 && !ctx.engine.error);
     this.ammo.update(dt, s);
     this.killfeed.update(dt);
@@ -832,8 +835,22 @@ export class UiSystem {
     this._buildCompassObjectives(pos);
     this.compass.update(heading, this._compassObjs, dt);
 
-    this.markers.updateObjectives(this._objectives, ctx.camera, this.vw, this.vh, this.k);
-    this.markers.updateGrenades(dt, ctx.camera, this.vw, this.vh, this.k);
+    this.markers.updateObjectives(
+      this._objectives,
+      ctx.camera,
+      this.vw,
+      this.vh,
+      this.k,
+      !this.pixiHud?.gpuUnderlays
+    );
+    this.markers.updateGrenades(
+      dt,
+      ctx.camera,
+      this.vw,
+      this.vh,
+      this.k,
+      !this.pixiHud?.gpuUnderlays
+    );
 
     // ---- minimap ---------------------------------------------------------
     if (!this.minimap.bakeDone && ++this._bakeFrame > 6 && this._bakeFrame % 20 === 0) {
@@ -870,7 +887,7 @@ export class UiSystem {
       last.label = o.label;
     }
     if (this.pixiHud) {
-      this.pixiHud.setVisible(this.hudVisible >= 0.004 && !ctx.engine.error);
+      this.pixiHud.setVisible(!ctx.engine.error);
       this.pixiHud.update(
         dt,
         s,
@@ -878,7 +895,8 @@ export class UiSystem {
         this.crosshair,
         this.minimap,
         this._mmState,
-        this.hudVisible
+        this.hudVisible,
+        this.markers
       );
     } else this.minimap.draw(this._mmState);
   }

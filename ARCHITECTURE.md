@@ -281,17 +281,22 @@ See [panel limitations](docs/experiments/pixi-ui.md) and
 [ammo combat measurements](docs/experiments/pixi-ammo.md). This is not a production
 UI migration or a general-purpose UI abstraction.
 
-`?pixi=hud` is the playable four-widget slice: ammo/reload, health/armour,
-reticle and minimap, one passive Pixi canvas between the world-marker and native
-centre/chrome layers. `PixiAmmoView` shares the ammo presenter without owning a
-renderer. Native crosshair/health owners advance their existing visual state while
-skipping replaced DOM widgets; injury overlays and every other native presenter
-remain active. Minimap borrows its existing one-time Canvas2D world bake, uploads
-it once, and retains GPU map/text/marker objects; native per-frame minimap drawing
-is skipped. Engine-driven active rendering, no hidden/static-paused redraws,
-independent capped DPR, shared-device ownership and failure-isolated teardown
-remain required. This does not reproduce the no-UI benchmark state or promise its
-savings. See [implementation and measurements](docs/experiments/pixi-hud.md).
+`?pixi=hud` is the playable gameplay slice: ammo/reload, health/armour, reticle,
+minimap, fullscreen injury and projected world/grenade markers. One passive Pixi
+canvas stays below native centre/chrome layers. Its order is injury → markers →
+readouts; HUD fade affects markers/readouts, **not injury**. `HealthFx` owns shared
+injury/vitals animation values, `WorldMarkers` owns bounded projection/fuse state;
+Pixi only presents those values. Native hurt/world-marker layers and replaced
+widget DOM writes are disabled. `?pixi=hud&underlays=html` keeps native injury/
+marker presentation for comparison. Existing marker inputs are not new gameplay
+producer wiring. `PixiAmmoView` shares ammo graphics without renderer ownership.
+Minimap uploads the existing one-time Canvas2D bake once and retains GPU objects.
+All other native HUD/menu presenters remain. Engine-driven active rendering,
+no absent-content/static-paused redraws after fades settle, independent capped DPR,
+shared-device ownership and failure-isolated teardown remain required. The injury
+mesh owns its geometry/WGSL program, never borrowed device/textures. This is not
+the no-UI benchmark state. See [initial slice](docs/experiments/pixi-hud.md) and
+[injury/marker migration and comparison](docs/experiments/pixi-underlays.md).
 
 ## Models
 

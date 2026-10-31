@@ -31,7 +31,16 @@ const browser = await launchChromium({
 const results = [];
 try {
   const modes = [];
-  for (let i = 0; i < rounds; i++) modes.push(...(i % 2 ? ['hud', 'dom'] : ['dom', 'hud']));
+  for (let i = 0; i < rounds; i++)
+    modes.push(
+      ...(args.underlays
+        ? i % 2
+          ? ['hud', 'html']
+          : ['html', 'hud']
+        : i % 2
+          ? ['hud', 'dom']
+          : ['dom', 'hud'])
+    );
   modes.push('retina', 'unavailable');
   for (const [run, mode] of modes.entries()) {
     const page = await browser.newPage({
@@ -73,7 +82,7 @@ try {
       };
     }, mode === 'unavailable');
     await page.goto(
-      `http://localhost:${port}/?capture=1&lockstep=1&q=${args.quality ?? 'high'}${mode === 'dom' ? '' : '&pixi=hud'}`
+      `http://localhost:${port}/?capture=1&lockstep=1&q=${args.quality ?? 'high'}${mode === 'dom' ? '' : '&pixi=hud'}${mode === 'html' ? '&underlays=html' : ''}`
     );
     const device = await waitForGame(page);
     // Known upstream prewarm warning; all other errors/validation failures fail.
@@ -104,6 +113,9 @@ try {
         passive:
           !p ||
           (p.stage.eventMode === 'none' && getComputedStyle(p.canvas).pointerEvents === 'none'),
+        nativeInjury: getComputedStyle(ui.hurtLayer).display !== 'none',
+        nativeMarkers: getComputedStyle(ui.worldLayer).display !== 'none',
+        gpuUnderlays: p?.gpuUnderlays ?? false,
         nativeMap: getComputedStyle(ui.minimap.root).display !== 'none',
         nativeVitals: getComputedStyle(ui.health.vitals).display !== 'none',
         nativeCrosshair: getComputedStyle(ui.crosshair.root).display !== 'none',
@@ -122,11 +134,14 @@ try {
     assert.equal(setup.nativeVitals, !setup.pixi);
     assert.equal(setup.nativeCrosshair, !setup.pixi);
     if (setup.pixi) assert(setup.shared);
+    assert.equal(setup.gpuUnderlays, setup.pixi && mode !== 'html');
+    assert.equal(setup.nativeInjury, !setup.gpuUnderlays);
+    assert.equal(setup.nativeMarkers, !setup.gpuUnderlays);
     if (mode === 'dom') assert.deepEqual(setup.loads, [], 'default path does not fetch Pixi');
     let combat = null,
       metrics = null,
       checks = null;
-    if (mode === 'dom' || mode === 'hud') {
+    if (mode === 'dom' || mode === 'hud' || mode === 'html') {
       await page.addScriptTag({
         content: `window.__PROFILE__={lane:${combatLane.toString()},create:${createCombatProfile.toString()}};`,
       });
@@ -247,6 +262,77 @@ try {
       );
     } else await captureNative(page, resolve(out, `${run}-${mode}.png`));
     if (setup.pixi) {
+      await page.evaluate(async () => {
+        const e = window.__ENGINE__,
+          ui = e.ctx.get('ui'),
+          camera = e.ctx.camera;
+        window.__UNDERLAY_MUTATIONS__ = 0;
+        window.__UNDERLAY_OBSERVER__ = new MutationObserver((records) => {
+          window.__UNDERLAY_MUTATIONS__ += records.length;
+        });
+        for (const root of [ui.hurtLayer, ui.worldLayer])
+          window.__UNDERLAY_OBSERVER__.observe(root, {
+            attributes: true,
+            childList: true,
+            characterData: true,
+            subtree: true,
+          });
+        const point = (x, y, z) => camera.localToWorld(camera.position.clone().set(x, y, z));
+        ui._objectives.push(
+          { position: point(-2.5, 1, -16), label: 'A', name: 'INTEL CACHE' },
+          { position: point(100, 0, -16), label: 'B', name: 'SUPPLIES' },
+          { position: point(-5, 1, 12), label: 'C', name: 'BEHIND' }
+        );
+        ui.spawnGrenade(point(3, 0, -6), 2.4);
+        e.ctx.get('player').health.armour = 0;
+        e.ctx.get('player').applyDamage(65, null);
+        await window.__PUMP__(6);
+      });
+      const underlayMutations = await page.evaluate(() => {
+        const n = window.__UNDERLAY_MUTATIONS__ + window.__UNDERLAY_OBSERVER__.takeRecords().length;
+        window.__UNDERLAY_OBSERVER__.disconnect();
+        return n;
+      });
+      if (setup.gpuUnderlays)
+        assert.equal(underlayMutations, 0, 'migrated native layers are not updated behind Pixi');
+      else assert(underlayMutations > 0);
+      const injured = await capturePixi(
+        page,
+        resolve(out, `${run}-${mode}-injured-markers.png`),
+        'hud'
+      );
+      if (setup.gpuUnderlays)
+        assert(
+          injured.cornerAlpha.some((alpha) => alpha > 0),
+          'injury really renders into GPU target'
+        );
+      const independentInjury = await page.evaluate(async () => {
+        const ui = window.__ENGINE__.ctx.get('ui'),
+          p = ui.pixiHud;
+        ui.setHudVisible(false);
+        await window.__PUMP__(60);
+        const ok =
+          !p.chrome.visible &&
+          !p.worldMarkers.stage.visible &&
+          (!p.gpuUnderlays ||
+            (p.injury.mesh.visible &&
+              p.injury.mesh.parent === p.stage &&
+              p.stage.alpha === 1 &&
+              Number(p.canvas.style.opacity || 1) === 1));
+        ui.setHudVisible(true);
+        return ok;
+      });
+      assert(independentInjury, 'HUD fading must not fade injury feedback');
+      await page.evaluate(async () => {
+        const e = window.__ENGINE__,
+          ui = e.ctx.get('ui');
+        ui._objectives.length = 0;
+        ui.markers.clear(!ui.pixiHud.gpuUnderlays);
+        e.ctx.get('player').health.reset(true);
+        ui.arcs.clear();
+        ui.hit.clear();
+        await window.__PUMP__(180);
+      });
       checks = await page.evaluate(async () => {
         const e = window.__ENGINE__,
           ui = e.ctx.get('ui'),
@@ -275,7 +361,8 @@ try {
         player.health.value = 100;
         await window.__PUMP__(30);
         ui.menu.show();
-        await window.__PUMP__(30);
+        // HUD opacity is now a GPU group fade, separate from injury opacity.
+        await window.__PUMP__(60);
         const draws = p.draws;
         await window.__PUMP__(30);
         if (p.draws !== draws) throw Error('paused static HUD redraws');
@@ -297,15 +384,22 @@ try {
         await window.__PUMP__(100);
         if (!p.ammo.name.text.includes('P320')) throw Error('weapon name missing');
         const counts = [];
+        const moving = { position: e.ctx.camera.position.clone(), label: 'T', name: 'TRACK' };
+        const direction = e.ctx.camera.getWorldDirection(e.ctx.camera.position.clone());
+        ui._objectives.push(moving);
         for (let cycle = 0; cycle < 3; cycle++) {
           for (let i = 0; i < 60; i++) {
             w.state.mag = i % 12;
             player.health.value = 20 + i;
+            moving.position.copy(e.ctx.camera.position).addScaledVector(direction, 5 + (i % 45));
+            if (i % 30 === 0) ui.markers.spawnGrenade(moving.position, 0.3);
             await window.__PUMP__(1);
           }
           await p.renderer.gpu.device.queue.onSubmittedWorkDone();
           counts.push(p.renderer.texture.managedTextures.length);
         }
+        ui._objectives.pop();
+        ui.markers.clear(!p.gpuUnderlays);
         player.health.reset(true);
         w.resetForNewGame();
         await window.__PUMP__(60);
@@ -342,7 +436,7 @@ try {
         await window.__PUMP__(30);
         e.ctx.get('player').applyDamage(20000, null);
         await window.__PUMP__(90);
-        const death = ui.hudVisible < 0.004 && !p.enabled;
+        const death = ui.hudVisible < 0.004 && !p.chrome.visible && !p.worldMarkers.stage.visible;
         e.events.emit('game:restart', { source: 'pixi-hud-test' });
         await window.__PUMP__(90);
         const restart = ui.hudVisible > 0.99 && p.enabled;
@@ -379,6 +473,7 @@ try {
       mode,
       browser: browser.version(),
       quality: args.quality ?? 'high',
+      underlayComparison: !!args.underlays,
       uncapped: !!args.uncapped,
       device,
       setup,

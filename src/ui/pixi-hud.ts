@@ -4,11 +4,14 @@ import type { Renderer } from 'three/webgpu';
 import type { AmmoState } from './ammo.ts';
 import type { Crosshair } from './crosshair.ts';
 import type { HealthFx, HealthState } from './health.ts';
+import type { WorldMarkers } from './markers.ts';
 import type { Minimap, MinimapState } from './minimap.ts';
 import { PixiAmmoView, AMMO_WIDTH, AMMO_HEIGHT } from './pixi-ammo-view.ts';
 import { initPixiRenderer, restrictPixiCanvases } from './pixi-device.ts';
+import { PixiInjury } from './pixi-injury.ts';
+import { PixiWorldMarkers } from './pixi-markers.ts';
 import { PixiMinimap } from './pixi-minimap.ts';
-import { clamp01 } from './util.ts';
+import { clamp01, setStyle } from './util.ts';
 
 function text(value: string, x: number, y: number, size: number, fill = 0xe7f2ef): Text {
   const node = new Text({
@@ -39,11 +42,15 @@ const WATCH = [
   'time',
 ] as const;
 
-/** Bounded four-widget experiment, not a replacement UI framework. */
+/** Bounded gameplay HUD experiment, not a replacement UI framework. */
 export class PixiHudSlice {
   readonly canvas = document.createElement('canvas');
   readonly renderer = new WebGPURenderer();
   readonly stage = new Container();
+  readonly chrome = new Container();
+  readonly injury = new PixiInjury();
+  readonly worldMarkers = new PixiWorldMarkers();
+  readonly gpuUnderlays: boolean;
   readonly ammo = new PixiAmmoView();
   readonly minimap = new PixiMinimap();
   readonly vitals = new Container();
@@ -69,14 +76,15 @@ export class PixiHudSlice {
   static async create(
     parent: HTMLElement,
     before: HTMLElement,
-    game: Renderer
+    game: Renderer,
+    gpuUnderlays = true
   ): Promise<PixiHudSlice> {
     const restore = restrictPixiCanvases();
     let hud: PixiHudSlice | null = null;
     try {
       // Construct only after recording the restoration boundary: even field
       // initializer / text / graphics failures must restore the global adapter.
-      hud = new PixiHudSlice();
+      hud = new PixiHudSlice(gpuUnderlays);
       hud.restoreAdapter = restore;
       await initPixiRenderer(
         hud.renderer,
@@ -97,17 +105,21 @@ export class PixiHudSlice {
     }
   }
 
-  private constructor() {
+  private constructor(gpuUnderlays: boolean) {
+    this.gpuUnderlays = gpuUnderlays;
     this.canvas.className = 'ow-pixi-hud-slice';
     this.canvas.setAttribute('role', 'img');
     this.canvas.setAttribute(
       'aria-label',
-      'Experimental gameplay HUD: ammo, health, crosshair and minimap'
+      'Experimental gameplay HUD: ammo, health, crosshair, minimap, injury and world markers'
     );
     this.canvas.style.cssText = 'position:absolute;inset:0;pointer-events:none;visibility:hidden';
     this.stage.eventMode = 'none';
     this.stage.interactiveChildren = false;
-    this.stage.addChild(this.ammo.stage, this.vitals, this.minimap.stage, this.reticle);
+    this.injury.mesh.visible = false;
+    this.worldMarkers.stage.visible = false;
+    this.stage.addChild(this.injury.mesh, this.worldMarkers.stage, this.chrome);
+    this.chrome.addChild(this.ammo.stage, this.vitals, this.minimap.stage, this.reticle);
     this.vitals.addChild(text('HEALTH', 14, 10, 10, 0xa9bac5), this.hp, this.maxHp);
     this.vitals.addChild(
       new Graphics().rect(14, 72, 168, 7).fill(0x35434c).stroke({ color: 0x080c10, width: 2 })
@@ -143,6 +155,7 @@ export class PixiHudSlice {
     if (this.disposed) return;
     this.renderer.resize(Math.max(1, w), Math.max(1, h), Math.min(devicePixelRatio || 1, 2));
     this.stage.scale.set(k);
+    this.injury.resize(w, h, k);
     this.ammo.stage.position.set(w / k - 26 - AMMO_WIDTH, h / k - 26 - AMMO_HEIGHT);
     this.vitals.position.set(26, h / k - 26 - 112);
     this.minimap.stage.position.set(26, 26 * 0.8);
@@ -153,7 +166,7 @@ export class PixiHudSlice {
   setVisible(visible: boolean): void {
     if (this.enabled === visible) return;
     this.enabled = visible;
-    this.canvas.style.visibility = visible ? '' : 'hidden';
+    setStyle(this.canvas, 'visibility', visible ? '' : 'hidden');
     this.dirty = true;
   }
 
@@ -164,11 +177,24 @@ export class PixiHudSlice {
     crosshair: Crosshair,
     map: Minimap,
     mapState: MinimapState,
-    opacity: number
+    opacity: number,
+    markers: WorldMarkers
   ): void {
     if (this.disposed) return;
-    this.canvas.style.opacity = opacity.toFixed(3);
     if (!this.enabled) return;
+    // Injury opacity is independent of HUD/menu/death fading, as in HTML.
+    const alpha = Number(opacity.toFixed(3));
+    if (this.chrome.alpha !== alpha) this.dirty = true;
+    this.chrome.alpha = this.worldMarkers.stage.alpha = alpha;
+    this.chrome.visible = alpha >= 0.004;
+    this.worldMarkers.stage.visible = this.gpuUnderlays && this.chrome.visible;
+    if (this.gpuUnderlays) {
+      this.dirty = this.injury.update(health) || this.dirty;
+      this.dirty = this.worldMarkers.update(markers, this.stage.scale.x) || this.dirty;
+    }
+    const visible = this.chrome.visible || this.injury.mesh.visible;
+    setStyle(this.canvas, 'visibility', visible ? '' : 'hidden');
+    if (!visible) return;
     for (const key of WATCH) {
       if (this.lastState.get(key) !== s[key]) {
         this.lastState.set(key, s[key]);
@@ -230,7 +256,11 @@ export class PixiHudSlice {
     if (this.disposed) return;
     this.disposed = true;
     try {
-      this.stage.destroy({ children: true, texture: true, textureSource: true });
+      try {
+        this.injury.dispose();
+      } finally {
+        this.stage.destroy({ children: true, texture: true, textureSource: true });
+      }
     } finally {
       try {
         this.renderer.destroy();
