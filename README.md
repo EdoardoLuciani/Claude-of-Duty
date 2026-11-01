@@ -24,7 +24,8 @@ The compiler also checks implicit missing returns, missing `override` modifiers,
 switch fallthrough, and exact optional properties: omit unset patch fields rather
 than writing `undefined` over required defaults. Lint rejects floating/misused promises and unsafe narrowing
 assertions (including `as unknown as T`), as well as explicit `any` and unsafe
-assignment, argument, call, member access and return. Runtime boundaries must
+assignment, argument, call, member access and return. Numeric enum assignments
+must use enum members rather than unchecked numbers. Runtime boundaries must
 validate unknown data; owned records should be constructed with their full type.
 Regular lint rules cover `src/`, `build/`, `tools/`, and `tests/`. Missing return annotations
 fail CI's lint step, not `tsc` itself. The narrow declaration additions in
