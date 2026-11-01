@@ -225,7 +225,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     fireVibe: { amp: 1, duration: 0.062, adsScale: 0.42 },
     /* --- handling (seconds) --- */
     adsTime: 0.22,
-    viewFov: 0.7, // Selected framing F: 42° weapon FOV, independent of world zoom.
+    viewFov: 0.7, // 42° weapon FOV; keep the front post readable without extra world zoom.
     reloadTac: 2.1,
     reloadEmpty: 2.9,
     inspectTime: 3.2,
@@ -237,8 +237,8 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     hipPos: [0.118, -0.185, -0.3],
     hipRot: [-0.05, 0.081, -0.135],
     adsCant: [0, 0, 0.004],
-    // Selected framing F: close rear aperture without magnifying the front post excessively.
-    eyeRelief: 0.06,
+    // Bring the eye closer to open the rear aperture; its bore and aim datum stay authored.
+    eyeRelief: 0.04,
     /* Sprint: gun dropped and angled across the body, muzzle down-left.
      * Carried over by the same delta as the hip pose so the blend does not
      * translate the weapon 90 mm sideways on the way into a sprint. */
