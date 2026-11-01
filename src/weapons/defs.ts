@@ -238,7 +238,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     hipRot: [-0.05, 0.081, -0.135],
     adsCant: [0, 0, 0.004],
     // Bring the eye closer to open the rear aperture; its bore and aim datum stay authored.
-    eyeRelief: 0.035,
+    eyeRelief: 0.03,
     /* Sprint: gun dropped and angled across the body, muzzle down-left.
      * Carried over by the same delta as the hip pose so the blend does not
      * translate the weapon 90 mm sideways on the way into a sprint. */
