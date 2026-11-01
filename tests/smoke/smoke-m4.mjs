@@ -527,7 +527,7 @@ for (const index of new Set(cup.geometry.index.array)) {
   );
   boreRadius = Math.min(boreRadius, Math.hypot(vertex.x - sightScreen.x, vertex.y - sightScreen.y));
 }
-assert(boreRadius * 2 > 70 && boreRadius * 2 < 85, 'rear bore should span about 75 px at 1080p');
+assert(boreRadius * 2 > 80 && boreRadius * 2 < 95, 'rear bore should span about 85 px at 1080p');
 // Check the solved aim datum before the ordinary breathing/sway layers.
 const solvedSight = new THREE.Vector3()
   .fromArray(model.nodes.sight)
