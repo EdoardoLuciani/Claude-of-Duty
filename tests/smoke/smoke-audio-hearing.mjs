@@ -23,13 +23,15 @@ function parameter(value, nativeHold) {
     },
   };
   if (nativeHold) {
-    param.cancelAndHoldAtTime = (time) => events.push(['hold', time]);
+    param.cancelAndHoldAtTime = () => {
+      throw new Error('Current-time hearing automation must not depend on native hold');
+    };
   }
   return param;
 }
 
-// Firefox has AudioParam.cancelScheduledValues but no cancelAndHoldAtTime.
-// Exercise the real restart/concussion paths with both API surfaces.
+// Firefox lacks cancelAndHoldAtTime. Use the same cancel-and-anchor path even
+// when native hold exists, preserving the sampled value before cancellation.
 for (const nativeHold of [false, true]) {
   const params = [0.25, 0.75, 0.8, 2000, -6].map((v) => parameter(v, nativeHold));
   const [dry, wet, level, cutoff, shelf] = params;
@@ -53,7 +55,7 @@ for (const nativeHold of [false, true]) {
   assert.equal(mixer.deafness, 0);
   for (const [index, value] of [0.25, 0.75, 0.8, 2000, -6].entries()) {
     assert.deepEqual(params[index].events.slice(0, 2), [
-      [nativeHold ? 'hold' : 'cancel', 10],
+      ['cancel', 10],
       ['set', value, 10],
     ]);
   }
