@@ -54,7 +54,7 @@ Native error/start/menu controls remain usable without the HUD renderer.
 
 ## Qualification
 
-Fresh `npm ci`, **156 smoke tests**, format/typecheck/lint and production build.
+Fresh `npm ci`, **157 smoke tests**, format/typecheck/lint and production build.
 Reference trajectories captured from `3cb261b5` preserve recoil, vitals,
 injury, compass, hit/arc lifetimes/pooling and inventory pulse values after DOM
 removal (10-decimal rounding ignores platform floating-point ulps). Ammo edge-case/reload/low/empty/numeric/bar tests use canonical state,
@@ -80,8 +80,15 @@ Production native AMD RDNA4/Chromium156 qualification covers:
   Activating its real Reload button after unblocking initialization reaches normal
   HUD readiness; normal engine teardown destroys the device once.
 
-Logs/captures: `/tmp/pixi-mainline-tests-final.log`,
-`/tmp/pixi-mainline-qualified/`, `/tmp/pixi-mainline-qualified.log`.
+Latest integrated qualification includes develop`fdd9f2a3` (market-art update),
+157 smoke tests, production HUD qualification and the independent market-inspection
+suite (five supply illustrations, seven weapons, selection/fallback/race/purchase
+and lifetime checks). No upstream market/world assets are part of this HUD delta.
+
+Logs/captures: `/tmp/pixi-mainline-integrated-tests.log`,
+`/tmp/pixi-mainline-integrated-qa/`, `/tmp/pixi-mainline-integrated-qa.log`,
+`/tmp/pixi-mainline-market.log`. Source-mode checks also passed at
+`/tmp/pixi-mainline-source-final/`.
 Before/after promotion captures normalize health/ammo and inject123FPS outside
 measurement; screenshots are not benchmark evidence. Qualification is not a new
 performance comparison or second-hardware/long-session certification.
