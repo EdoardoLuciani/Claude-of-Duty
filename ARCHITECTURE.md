@@ -309,18 +309,23 @@ the no-UI benchmark state. See [initial slice](docs/experiments/pixi-hud.md) and
 [injury migration and historical comparison](docs/experiments/pixi-underlays.md).
 Current extension ownership/limits/measurements: [combat UI](docs/experiments/pixi-combat.md).
 Presentation is intentionally not CSS-pixel-parity:24 compass ticks/simple backing,
-one tinted hit X, one outlined damage arc, cosine equipment pulse, text accessory
-counts, one magazine-fill bar and plain health/armour bars. Shared state/events,
+one tinted hit X, one outlined damage arc, cosine equipment pulse, chosen simple accessory
+icons/counts, one magazine-fill bar and plain health/armour bars. Shared state/events,
 low-health/empty/reload cues, unscaled pulse period and FPS sampling remain.
 See [Pixi-to-Pixi simplification measurements](docs/experiments/pixi-simplify.md).
-Bandage/grenade inventory visuals are selectable for comparison:
-`&icons=simple` (default), `&icons=original`, or `&icons=text`.
+The operator chose the simple bandage/grenade silhouettes; original/text comparison
+modes are retired. `pixi-type.ts` owns the bottom-HUD32/16/12px value/count/label
+hierarchy. Primary health/ammo rows align; maximum/reserve/accessory counts share a size.
 The radio inventory count/icon and its unused UI snapshot fields are removed
 from HTML and Pixi. Radio mechanics and the separate field-radio panel remain
 unchanged pending a broader rework.
-Both icon styles retain geometry, updating counts/layout only on stock changes.
-The magazine stays a bar. [Icon measurements](docs/experiments/pixi-accessory-icons.md)
-record the negligible measured cost difference; operator visual choice is pending.
+Icons retain geometry, updating counts/layout only on stock changes.
+The magazine stays a bar. [Historical icon measurements](docs/experiments/pixi-accessory-icons.md)
+found no meaningful original/simple cost difference. The retained minimap now combines
+name/code labels, omits the decorative grid and transforms unit FOV/search geometry
+instead of rebuilding it. Terrain, names/codes, contact capacity, clipping/fades,
+search radii and height arrows remain. [Isolated minimap CPU comparison](docs/experiments/pixi-minimap.md)
+is not whole-HUD marginal cost, GPU time or an FPS claim.
 
 ## Models
 

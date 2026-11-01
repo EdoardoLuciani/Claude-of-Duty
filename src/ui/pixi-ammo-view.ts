@@ -2,6 +2,7 @@ import { Container, Graphics, Text } from 'pixi.js';
 
 import { filledMagazinePips, MAX_PIPS } from './ammo.ts';
 import type { AmmoState } from './ammo.ts';
+import { HUD_TYPE } from './pixi-type.ts';
 import { clamp01 } from './util.ts';
 
 export const AMMO_WIDTH = 248;
@@ -35,14 +36,15 @@ export class PixiAmmoView {
   constructor() {
     this.stage.eventMode = 'none';
     this.stage.interactiveChildren = false;
-    this.mode = this.text('AUTO', 14, 12, 10, MUTED);
-    this.name = this.text('M4A1', WIDTH - 14, 11, 12);
+    this.mode = this.text('AUTO', 14, 40, HUD_TYPE.label, MUTED);
+    this.name = this.text('M4A1', WIDTH - 14, 40, HUD_TYPE.label);
     this.name.anchor.x = 1;
-    this.current = this.text('30', 119, 34, 54);
-    this.current.anchor.set(1, 0);
+    this.current = this.text('30', 119, 96, HUD_TYPE.value);
+    this.current.anchor.set(1, 1);
     this.current.style.fill = 0xffffff;
-    this.reserve = this.text('/ 210', 131, 62, 21, MUTED);
-    this.prompt = this.text('', WIDTH / 2, 119, 11, AMBER);
+    this.reserve = this.text('/ 210', 131, 96, HUD_TYPE.secondary, MUTED);
+    this.reserve.anchor.y = 1;
+    this.prompt = this.text('', WIDTH / 2, 119, HUD_TYPE.label, AMBER);
     this.prompt.anchor.x = 0.5;
     this.stage.addChild(new Graphics().rect(16, 102, 216, 4).fill(0x35434c));
     this.magFill.position.set(16, 102);

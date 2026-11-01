@@ -207,6 +207,10 @@ const args = parseArgs(),
   port = Number(args.port ?? 5221),
   beforeRoot = resolve(String(args.before ?? '../Claude-of-Duty-pixi-simplify-before')),
   out = resolve(String(args.out ?? '/tmp/pixi-simplify'));
+if (args.icons)
+  throw new Error(
+    'Icon comparison is retired after the operator chose simple icons; use commit 3cb261b5 to reproduce its historical measurements.'
+  );
 await mkdir(out, { recursive: true });
 const servers = [],
   results = [];

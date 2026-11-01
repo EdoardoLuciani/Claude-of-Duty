@@ -28,8 +28,9 @@ export class PixiMinimap {
   readonly viewport = new Container();
   private terrain = new Container();
   private pan = new Container();
-  private grid = new Graphics();
-  private cone = new Graphics();
+  // Unit triangle keeps the camera's FOV ray angles without arc tessellation on zoom.
+  private cone = new Graphics().poly([0, 0, -1, -1, 1, -1]).fill({ color: 0xdef2ff, alpha: 0.12 });
+  private contactCount = 0;
   private player = new Graphics()
     .poly([0, -7.44, 5.52, 6.24, 0, 2.88, -5.52, 6.24])
     .fill(0xf6fcff)
@@ -42,6 +43,7 @@ export class PixiMinimap {
     halfW: number;
     halfH: number;
     fits: boolean;
+    opacity: number;
   }[] = [];
   private contacts: Graphics[] = [];
   private objectives: { node: Container; text: Text }[] = [];
@@ -55,13 +57,7 @@ export class PixiMinimap {
     const mask = new Graphics().rect(0, 0, SIZE, SIZE).fill(0xffffff);
     this.stage.addChild(this.viewport, mask);
     this.viewport.mask = mask;
-    this.viewport.addChild(this.terrain, this.grid, this.cone, this.pan);
-    for (let i = 0; i < 9; i++) {
-      const n = (i * SIZE) / 6;
-      this.grid.moveTo(n, 0).lineTo(n, SIZE + SIZE / 6);
-      this.grid.moveTo(0, n).lineTo(SIZE + SIZE / 6, n);
-    }
-    this.grid.stroke({ color: 0x0a1117, alpha: 0.2, width: 0.5 });
+    this.viewport.addChild(this.terrain, this.cone, this.pan);
     this.cone.position.set(HALF, HALF);
     // Pools grow only to the bounded gameplay snapshot sizes, never each frame.
     for (let i = 0; i < 48; i++) {
@@ -95,33 +91,25 @@ export class PixiMinimap {
     sprite.position.set((map.centre.x - map.span / 2) * ppm, (map.centre.y - map.span / 2) * ppm);
     this.terrain.addChild(sprite);
     for (const l of map.labels) {
-      const node = new Container();
-      let size = 9;
       const room = l.w * ppm + 2;
-      const name = l.text ? label(l.text, size, 0x0c1319) : null;
-      if (name && name.width > room) {
-        size *= 0.8;
-        name.style.fontSize = size;
-      }
-      const codeSize = Math.min(7.5, size * 0.85);
-      const code = label(l.code, codeSize, l.text ? 0x0c1319 : 0xc4d6e2);
-      code.alpha = l.text ? 0.6 : 0.28;
-      if (name) {
-        name.y = -size * 0.62;
-        node.addChild(name);
-      }
-      code.y = name ? size * 0.78 : 0.5;
-      node.addChild(code);
+      const node = label(
+        l.text ? `${l.text}\n${l.code}` : l.code,
+        8.5,
+        l.text ? 0x0c1319 : 0xc4d6e2
+      );
+      node.style.lineHeight = 10;
+      if (node.width > room) node.style.fontSize = 6.8;
       node.position.set(l.x * ppm, l.z * ppm);
       this.pan.addChild(node);
-      const width = Math.max(name?.width ?? 0, code.width);
+      const width = node.width;
       this.labels.push({
         node,
         x: l.x,
         z: l.z,
         halfW: width / 2,
-        halfH: name ? size * 1.2 : codeSize / 2,
+        halfH: node.height / 2,
         fits: width <= room,
+        opacity: l.text ? 1 : 0.28,
       });
     }
     this.uploads++;
@@ -136,40 +124,34 @@ export class PixiMinimap {
       z = s.z ?? 0;
     const ox = HALF - x * ppm,
       oy = HALF - z * ppm;
-    changed = move(this.terrain, ox, oy) || changed;
-    changed = move(this.pan, ox, oy) || changed;
-    const step = ppm * 10;
-    changed =
-      move(this.grid, (((ox % step) + step) % step) - step, (((oy % step) + step) % step) - step) ||
-      changed;
+    const panned = move(this.terrain, ox, oy);
+    changed = panned || changed;
+    move(this.pan, ox, oy);
     const fov = Math.round((s.fov ?? 80) * 10) / 10;
     if (fov !== this.fov) {
       changed = true;
       this.fov = fov;
       const angle = (fov * Math.PI) / 360;
-      this.cone
-        .clear()
-        .moveTo(0, 0)
-        .arc(0, 0, SIZE * 0.42, -Math.PI / 2 - angle, -Math.PI / 2 + angle)
-        .closePath()
-        .fill({ color: 0xdef2ff, alpha: 0.12 })
-        .stroke({ color: 0xe2f4ff, alpha: 0.17, width: 0.5 });
+      this.cone.scale.set(Math.sin(angle) * SIZE * 0.42, Math.cos(angle) * SIZE * 0.42);
     }
     const heading = ((s.heading ?? 0) * Math.PI) / 180;
     if (this.player.rotation !== heading) changed = true;
     this.cone.rotation = this.player.rotation = heading;
-    for (const l of this.labels) {
-      const dx = l.x * ppm + ox,
-        dy = l.z * ppm + oy;
-      const edge = Math.min(dx - l.halfW, SIZE - dx - l.halfW, dy - l.halfH, SIZE - dy - l.halfH);
-      const alpha = clamp01((edge - 1) / 10);
-      if (l.node.alpha !== alpha) changed = true;
-      l.node.alpha = alpha;
-      l.node.visible = l.fits && l.node.alpha > 0.02;
-    }
-    for (let i = 0; i < this.contacts.length; i++) {
+    // Turning in place cannot change a north-up label's distance from the viewport edge.
+    if (panned || uploads !== this.uploads)
+      for (const l of this.labels) {
+        const dx = l.x * ppm + ox,
+          dy = l.z * ppm + oy;
+        const edge = Math.min(dx - l.halfW, SIZE - dx - l.halfW, dy - l.halfH, SIZE - dy - l.halfH);
+        const alpha = l.opacity * clamp01((edge - 1) / 10);
+        if (l.node.alpha !== alpha) changed = true;
+        l.node.alpha = alpha;
+        l.node.visible = l.fits && l.node.alpha > 0.02;
+      }
+    const count = Math.min(s.blips?.length ?? 0, this.contacts.length);
+    for (let i = 0; i < Math.max(count, this.contactCount); i++) {
       const node = this.contacts[i],
-        b = s.blips?.[i];
+        b = i < count ? s.blips?.[i] : undefined;
       const dx = b ? (b.x - x) * ppm + HALF : 0,
         dy = b ? (b.z - z) * ppm + HALF : 0;
       const visible =
@@ -186,6 +168,7 @@ export class PixiMinimap {
       node.tint = tint;
       node.alpha = alpha;
     }
+    this.contactCount = count;
     const objectives = s.objectives;
     for (let i = 0; i < Math.max(objectives?.length ?? 0, this.objectives.length); i++) {
       let entry = this.objectives[i];
@@ -222,7 +205,10 @@ export class PixiMinimap {
       const pulse = pulses?.[i];
       if (!entry && pulse) {
         const node = new Container(),
-          ring = new Graphics(),
+          ring = new Graphics()
+            .circle(0, 0, 1)
+            .fill({ color: 0xffa820, alpha: 0.13 })
+            .stroke({ color: 0xffd660, alpha: 0.92, width: 0.04 }),
           text = label('', 13, 0xffd660);
         node.addChild(ring, text);
         entry = { node, ring, text, radius: -1 };
@@ -241,11 +227,7 @@ export class PixiMinimap {
       if (entry.radius !== radius) {
         changed = true;
         entry.radius = radius;
-        entry.ring
-          .clear()
-          .circle(0, 0, radius)
-          .fill({ color: 0xffa820, alpha: 0.13 })
-          .stroke({ color: 0xffd660, alpha: 0.92, width: 1.5 });
+        entry.ring.scale.set(radius);
         entry.text.y = -radius - 8;
       }
       const height = (pulse.y ?? 0) - (s.playerY ?? 0),

@@ -86,7 +86,7 @@ try {
       };
     }, mode === 'unavailable');
     await page.goto(
-      `http://localhost:${port}/?capture=1&lockstep=1&q=${args.quality ?? 'high'}${mode === 'dom' ? '' : '&pixi=hud'}${mode === 'html' ? '&underlays=html' : ''}${mode === 'legacy' ? '&combat=html' : mode === 'bearing' ? '&compass=html' : ''}${args.icons ? '&icons=' + encodeURIComponent(String(args.icons)) : ''}`
+      `http://localhost:${port}/?capture=1&lockstep=1&q=${args.quality ?? 'high'}${mode === 'dom' ? '' : '&pixi=hud'}${mode === 'html' ? '&underlays=html' : ''}${mode === 'legacy' ? '&combat=html' : mode === 'bearing' ? '&compass=html' : ''}`
     );
     const device = await waitForGame(page);
     // Known upstream prewarm warning; all other errors/validation failures fail.
@@ -126,7 +126,6 @@ try {
         markerElements: document.querySelectorAll('.ow-mk, .ow-nade').length,
         gpuUnderlays: p?.gpuUnderlays ?? false,
         gpuCombat: p?.gpuCombat ?? false,
-        iconStyle: p?.combat.iconStyle ?? null,
         gpuCompass: p?.gpuCompass ?? false,
         nativeCompass: getComputedStyle(ui.compass.root).display !== 'none',
         nativeFps: getComputedStyle(ui.fps).display !== 'none',
@@ -160,8 +159,19 @@ try {
     if (setup.pixi) {
       assert(setup.shared);
       assert.equal(
-        setup.iconStyle,
-        ['text', 'original'].includes(args.icons) ? args.icons : 'simple'
+        await page.evaluate(() => {
+          const p = window.__ENGINE__.ctx.get('ui').pixiHud;
+          return (
+            p.hp.style.fontSize === 32 &&
+            p.ammo.current.style.fontSize === 32 &&
+            p.maxHp.style.fontSize === 16 &&
+            p.ammo.reserve.style.fontSize === 16 &&
+            p.combat.slots.every((s) => s.label.style.fontSize === 16) &&
+            Math.abs(p.vitals.y + p.hp.y - p.ammo.stage.y - p.ammo.current.y) < 1e-6
+          );
+        }),
+        true,
+        'shared bottom-HUD typography and aligned numeric baselines'
       );
     }
     assert.equal(setup.gpuUnderlays, setup.pixi && mode !== 'html');
@@ -407,10 +417,7 @@ try {
                 p.combat.arcSlots[i].rotation !== ui.arcs.visuals[i].rotation
               )
                 throw Error('damage arc direction');
-            if (
-              p.combat.slots.map((s) => s.label.text).join() !==
-              (p.combat.iconStyle === 'text' ? 'BANDAGES 12,FRAGS 3' : '12,3')
-            )
+            if (p.combat.slots.map((s) => s.label.text).join() !== '12,3')
               throw Error('equipment count parity');
           }
           if (p.gpuCompass && p.compass.pings.filter((n) => n.visible).length < 2)

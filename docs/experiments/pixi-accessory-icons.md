@@ -1,5 +1,11 @@
 # Grenade/bandage icon cost and appearance choice
 
+**Decision:** the operator chose the simple silhouettes. They are now the only
+Pixi inventory icons; original/text implementations and URL options are retired.
+The typography/minimap follow-up is documented in [pixi-minimap.md](pixi-minimap.md).
+Everything below is the historical comparison, reproducible at `3cb261b5` (or
+`b26e3827` before radio-indicator removal), not the current set of runtime modes.
+
 The magazine remains the simplified full bar. Only **bandage and grenade
 inventory icons** are compared. After these measurements, the operator requested
 removal of the radio inventory indicator: its count/icon and unused UI snapshot
@@ -9,7 +15,7 @@ unchanged. The historical table/captures below included radio text in every
 variant; they are not new performance claims for this removal. This does not
 restore the removed projected grenade danger warnings or objective UI.
 
-Use:
+Historical controls at those commits:
 
 - `?pixi=hud&icons=simple` (also the provisional default): diagonal bandage/pad,
   plain grenade body/cap/lever, retained vectors.

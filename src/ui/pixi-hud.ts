@@ -5,7 +5,6 @@ import type { AmmoState } from './ammo.ts';
 import type { Crosshair } from './crosshair.ts';
 import type { HealthFx, HealthState } from './health.ts';
 import type { Minimap, MinimapState } from './minimap.ts';
-import type { AccessoryIconStyle } from './pixi-accessory-icons.ts';
 import { PixiAmmoView, AMMO_WIDTH, AMMO_HEIGHT } from './pixi-ammo-view.ts';
 import { PixiCombat } from './pixi-combat.ts';
 import type { CombatModels } from './pixi-combat.ts';
@@ -13,6 +12,7 @@ import { PixiCompass } from './pixi-compass.ts';
 import { initPixiRenderer, restrictPixiCanvases } from './pixi-device.ts';
 import { PixiInjury } from './pixi-injury.ts';
 import { PixiMinimap } from './pixi-minimap.ts';
+import { HUD_TYPE } from './pixi-type.ts';
 import { clamp01, setStyle } from './util.ts';
 
 function text(value: string, x: number, y: number, size: number, fill = 0xe7f2ef): Text {
@@ -44,6 +44,12 @@ const WATCH = [
   'time',
 ] as const;
 
+interface HudOptions {
+  injury?: boolean;
+  combat?: boolean;
+  compass?: boolean;
+}
+
 /** Bounded gameplay HUD experiment, not a replacement UI framework. */
 export class PixiHudSlice {
   readonly canvas = document.createElement('canvas');
@@ -54,18 +60,18 @@ export class PixiHudSlice {
   readonly gpuUnderlays: boolean;
   readonly gpuCombat: boolean;
   readonly gpuCompass: boolean;
-  readonly combat: PixiCombat;
+  readonly combat = new PixiCombat();
   readonly compass = new PixiCompass();
   readonly ammo = new PixiAmmoView();
   readonly minimap = new PixiMinimap();
   readonly vitals = new Container();
   readonly reticle = new Container();
-  private hp = text('100', 14, 28, 28);
-  private maxHp = text('/100', 102, 40, 14, 0xa9bac5);
-  private hpFill = new Graphics().rect(0, 0, 168, 7).fill(0xffffff);
+  private hp = text('100', 14, 62, HUD_TYPE.value);
+  private maxHp = text('/100', 102, 62, HUD_TYPE.secondary, 0xa9bac5);
+  private hpFill = new Graphics().rect(0, 0, 168, 4).fill(0xffffff);
   private armour = new Container();
   private armourFill = new Graphics().rect(0, 0, 168, 4).fill(0x79d2ff);
-  private armourText = text('ARMOUR', 14, 88, 10, 0x79d2ff);
+  private armourText = text('ARMOUR', 14, 88, HUD_TYPE.label, 0x79d2ff);
   private blades: Graphics[] = [];
   private dot = new Graphics()
     .circle(0, 0, 1.1)
@@ -82,12 +88,7 @@ export class PixiHudSlice {
     parent: HTMLElement,
     before: HTMLElement,
     game: Renderer,
-    options: {
-      injury?: boolean;
-      combat?: boolean;
-      compass?: boolean;
-      icons?: AccessoryIconStyle;
-    } = {}
+    options: HudOptions = {}
   ): Promise<PixiHudSlice> {
     const restore = restrictPixiCanvases();
     let hud: PixiHudSlice | null = null;
@@ -115,13 +116,7 @@ export class PixiHudSlice {
     }
   }
 
-  private constructor(options: {
-    injury?: boolean;
-    combat?: boolean;
-    compass?: boolean;
-    icons?: AccessoryIconStyle;
-  }) {
-    this.combat = new PixiCombat(options.icons);
+  private constructor(options: HudOptions) {
     this.gpuUnderlays = options.injury !== false;
     this.gpuCombat = options.combat !== false;
     this.gpuCompass = this.gpuCombat && options.compass !== false;
@@ -153,11 +148,12 @@ export class PixiHudSlice {
       this.combat.fps.visible =
         this.gpuCombat;
     this.compass.stage.visible = this.gpuCompass;
-    this.vitals.addChild(text('HEALTH', 14, 10, 10, 0xa9bac5), this.hp, this.maxHp);
+    this.hp.anchor.y = this.maxHp.anchor.y = 1;
+    this.vitals.addChild(text('HEALTH', 14, 6, HUD_TYPE.label, 0xa9bac5), this.hp, this.maxHp);
     this.vitals.addChild(
-      new Graphics().rect(14, 72, 168, 7).fill(0x35434c).stroke({ color: 0x080c10, width: 2 })
+      new Graphics().rect(14, 68, 168, 4).fill(0x35434c).stroke({ color: 0x080c10, width: 2 })
     );
-    this.hpFill.position.set(14, 72);
+    this.hpFill.position.set(14, 68);
     this.vitals.addChild(this.hpFill);
     this.vitals.addChild(this.armour);
     this.armour.addChild(
@@ -189,7 +185,7 @@ export class PixiHudSlice {
     this.combat.hits.position.copyFrom(this.reticle.position);
     this.combat.arcs.position.copyFrom(this.reticle.position);
     this.compass.stage.position.set(w / k / 2 - 235, 26 * 0.7);
-    this.combat.equipment.position.set(w / k - 40, h / k - 202);
+    this.combat.equipment.position.set(w / k - 40, h / k - 170);
     this.combat.fps.position.set(w / k - 26, 4 / k);
     this.combat.fps.style.fontSize = Math.max(10 / k, 12);
     this.dirty = true;
