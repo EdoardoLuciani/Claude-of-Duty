@@ -1,0 +1,156 @@
+{
+  "style": "B: painted tactical inventory illustration; approved by the project owner",
+  "postProcessing": "Pillow: RGB, Lanczos resize from 1536x1024 to 960x640, WebP quality 85, method 6; no crop or retouching",
+  "images": {
+    "ammo": {
+      "file": "/images/market/ammo.webp",
+      "model": "gpt-image-2.5-sunburst",
+      "processing": "OpenAI Batch API /v1/images/generations",
+      "generatedAt": "2026-11-01T11:24:11+00:00",
+      "prompt": "Create one landscape item illustration for a grounded military survival game's supply market, 3:2 composition. This is a deliberate art-direction study, not a screenshot, not a UI layout, not a contact sheet. One centered subject, whole silhouette visible, occupying about 65 percent of the canvas width and height, with generous empty space. Three-quarter view from slightly above, consistent natural perspective. No lettering, labels, numerals, logos, watermarks, medical emblems, borders, people, hands, scenery or decorative interface. No blood, smoke, sparks or neon. All visible marks must belong to the stated illustration technique, not simulated photography. Subject: one compact open olive-green metal ammunition tin, lid raised behind it, containing orderly groups of brass rifle and pistol cartridges and two muted burgundy shotgun shells. A tightly composed small group of three cartridges rests immediately beside the tin. The tin is the dominant unified silhouette. No firearm and no gun magazine. General ammunition resupply. Art direction: HAND-PAINTED TACTICAL INVENTORY ILLUSTRATION, visibly not photorealistic. Paint broad deliberate brush strokes and angular planes of value, with selective crisp silhouette edges and lost edges in shadows. Simplify texture into a few purposeful painted marks; do not render every fabric thread or metallic reflection. Slightly exaggerated readable forms and restrained warm-ivory, dusty-olive, ochre, graphite palette. Soft top-left light interpreted through painted value blocks. A plain deep charcoal background with a faint hand-painted tonal variation and a small painted grounding shadow. Premium editorial concept-art finish: painterly, calm, tactile and grounded, never cute or cartoonish. The image MUST unmistakably read as a painted illustration rather than a photograph, ray-traced render or digitally filtered photograph.",
+      "generation": {
+        "size": "1536x1024",
+        "quality": "medium",
+        "background": "opaque",
+        "output_format": "webp",
+        "output_compression": 90
+      },
+      "usage": {
+        "input_tokens": 366,
+        "input_tokens_details": {
+          "image_tokens": 0,
+          "text_tokens": 366
+        },
+        "output_tokens": 343,
+        "output_tokens_details": {
+          "image_tokens": 343,
+          "text_tokens": 0
+        },
+        "total_tokens": 709
+      },
+      "sourceSha256": "0ea6844576e3bc5e77e92f7e5ead8eefbcbdd71fe529d44880bae2132fb50b3a",
+      "sha256": "a6b1f9fc61c883faa55a55b685e06bc55c631432e5d4e457c9e37cb129b8808c",
+      "bytes": 38828
+    },
+    "bandage": {
+      "file": "/images/market/bandage.webp",
+      "model": "gpt-image-2.5-sunburst",
+      "processing": "OpenAI Batch API /v1/images/generations",
+      "generatedAt": "2026-11-01T11:24:11+00:00",
+      "prompt": "Create one landscape item illustration for a grounded military survival game's supply market, 3:2 composition. This is a deliberate art-direction study, not a screenshot, not a UI layout, not a contact sheet. One centered subject, whole silhouette visible, occupying about 65 percent of the canvas width and height, with generous empty space. Three-quarter view from slightly above, consistent natural perspective. No lettering, labels, numerals, logos, watermarks, medical emblems, borders, people, hands, scenery or decorative interface. No blood, smoke, sparks or neon. All visible marks must belong to the stated illustration technique, not simulated photography. Subject: exactly one off-white rolled field dressing lying on its side, circular layered roll facing the viewer at a three-quarter angle, with one short broad loose gauze tail resting in front. Recognizable rolled woven fabric, not an adhesive sticking plaster and not a first-aid kit. Art direction: HAND-PAINTED TACTICAL INVENTORY ILLUSTRATION, visibly not photorealistic. Paint broad deliberate brush strokes and angular planes of value, with selective crisp silhouette edges and lost edges in shadows. Simplify texture into a few purposeful painted marks; do not render every fabric thread or metallic reflection. Slightly exaggerated readable forms and restrained warm-ivory, dusty-olive, ochre, graphite palette. Soft top-left light interpreted through painted value blocks. A plain deep charcoal background with a faint hand-painted tonal variation and a small painted grounding shadow. Premium editorial concept-art finish: painterly, calm, tactile and grounded, never cute or cartoonish. The image MUST unmistakably read as a painted illustration rather than a photograph, ray-traced render or digitally filtered photograph.",
+      "generation": {
+        "size": "1536x1024",
+        "quality": "medium",
+        "background": "opaque",
+        "output_format": "webp",
+        "output_compression": 90
+      },
+      "usage": {
+        "input_tokens": 356,
+        "input_tokens_details": {
+          "image_tokens": 0,
+          "text_tokens": 356
+        },
+        "output_tokens": 343,
+        "output_tokens_details": {
+          "image_tokens": 343,
+          "text_tokens": 0
+        },
+        "total_tokens": 699
+      },
+      "sourceSha256": "553dfdcde32e9b804b1cfb104236622a46abd14f38ea54c9341e8f5e001b03b9",
+      "sha256": "210a310e20437182b978bdbee549cb87add84cff2a998fbd9c5c582275fba814",
+      "bytes": 44082
+    },
+    "armour": {
+      "file": "/images/market/armour.webp",
+      "model": "gpt-image-2.5-sunburst",
+      "processing": "OpenAI Batch API /v1/images/generations",
+      "generatedAt": "2026-11-01T11:59:23+00:00",
+      "prompt": "Create one landscape item illustration for a grounded military survival game's supply market, 3:2 composition. This is a deliberate art-direction study, not a screenshot, not a UI layout, not a contact sheet. One centered subject, whole silhouette visible, occupying about 65 percent of the canvas width and height, with generous empty space. Three-quarter view from slightly above, consistent natural perspective. No lettering, labels, numerals, logos, watermarks, medical emblems, borders, people, hands, scenery or decorative interface. No blood, smoke, sparks or neon. All visible marks must belong to the stated illustration technique, not simulated photography. Subject: exactly one standalone ceramic ballistic armour insert plate standing upright, its broad chest-facing surface angled slightly toward the viewer. Tall shield-like rectangle with clipped upper shoulder corners, a subtle chest curvature and visible thickness. Graphite-black protective fabric cover with simple stitched edge binding; simplify woven texture to a few painted marks. No plate carrier, vest, straps, helmet or extra plates. Enough warm neutral edge light to separate the dark silhouette from the background. Art direction: HAND-PAINTED TACTICAL INVENTORY ILLUSTRATION, visibly not photorealistic. Paint broad deliberate brush strokes and angular planes of value, with selective crisp silhouette edges and lost edges in shadows. Simplify texture into a few purposeful painted marks; do not render every fabric thread or metallic reflection. Slightly exaggerated readable forms and restrained warm-ivory, dusty-olive, ochre, graphite palette. Soft top-left light interpreted through painted value blocks. A plain deep charcoal background with a faint hand-painted tonal variation and a small painted grounding shadow. Premium editorial concept-art finish: painterly, calm, tactile and grounded, never cute or cartoonish. The image MUST unmistakably read as a painted illustration rather than a photograph, ray-traced render or digitally filtered photograph.",
+      "generation": {
+        "size": "1536x1024",
+        "quality": "medium",
+        "background": "opaque",
+        "output_format": "webp",
+        "output_compression": 90
+      },
+      "usage": {
+        "input_tokens": 389,
+        "input_tokens_details": {
+          "image_tokens": 0,
+          "text_tokens": 389
+        },
+        "output_tokens": 343,
+        "output_tokens_details": {
+          "image_tokens": 343,
+          "text_tokens": 0
+        },
+        "total_tokens": 732
+      },
+      "sourceSha256": "3e956a2eea1353cc6d078677d9c9dad737d1d8b98cfe8331ee4be654860ec173",
+      "sha256": "f2ec7beed4d867512b4470102c1b4f9b4ba9879d491a6518942f1544d33fcc7c",
+      "bytes": 29474
+    },
+    "grenade": {
+      "file": "/images/market/grenade.webp",
+      "model": "gpt-image-2.5-sunburst",
+      "processing": "OpenAI Batch API /v1/images/generations",
+      "generatedAt": "2026-11-01T11:59:23+00:00",
+      "prompt": "Create one landscape item illustration for a grounded military survival game's supply market, 3:2 composition. This is a deliberate art-direction study, not a screenshot, not a UI layout, not a contact sheet. One centered subject, whole silhouette visible, occupying about 65 percent of the canvas width and height, with generous empty space. Three-quarter view from slightly above, consistent natural perspective. No lettering, labels, numerals, logos, watermarks, medical emblems, borders, people, hands, scenery or decorative interface. No blood, smoke, sparks or neon. All visible marks must belong to the stated illustration technique, not simulated photography. Subject: exactly one intact M67-style fragmentation grenade resting upright. Smooth round olive-drab steel body, narrow dark fuse assembly, dull steel safety lever running down one side, and one clearly visible intact pull ring. Recognizable spherical modern grenade, NOT a segmented pineapple grenade, not a cylindrical smoke grenade and not a bundle of grenades. Pin and safety lever remain in place. No explosion or cutaway. Art direction: HAND-PAINTED TACTICAL INVENTORY ILLUSTRATION, visibly not photorealistic. Paint broad deliberate brush strokes and angular planes of value, with selective crisp silhouette edges and lost edges in shadows. Simplify texture into a few purposeful painted marks; do not render every fabric thread or metallic reflection. Slightly exaggerated readable forms and restrained warm-ivory, dusty-olive, ochre, graphite palette. Soft top-left light interpreted through painted value blocks. A plain deep charcoal background with a faint hand-painted tonal variation and a small painted grounding shadow. Premium editorial concept-art finish: painterly, calm, tactile and grounded, never cute or cartoonish. The image MUST unmistakably read as a painted illustration rather than a photograph, ray-traced render or digitally filtered photograph.",
+      "generation": {
+        "size": "1536x1024",
+        "quality": "medium",
+        "background": "opaque",
+        "output_format": "webp",
+        "output_compression": 90
+      },
+      "usage": {
+        "input_tokens": 381,
+        "input_tokens_details": {
+          "image_tokens": 0,
+          "text_tokens": 381
+        },
+        "output_tokens": 343,
+        "output_tokens_details": {
+          "image_tokens": 343,
+          "text_tokens": 0
+        },
+        "total_tokens": 724
+      },
+      "sourceSha256": "3fb88885f5463dbdcddadda833baad3a175e52266ad6332b69d7c036d122aebb",
+      "sha256": "00010d48adb127f370c14252696b67482455d5890d868ae2fe32edd6a736cc76",
+      "bytes": 24802
+    },
+    "carpet": {
+      "file": "/images/market/carpet.webp",
+      "model": "gpt-image-2.5-sunburst",
+      "processing": "OpenAI Batch API /v1/images/generations",
+      "generatedAt": "2026-11-01T11:59:23+00:00",
+      "prompt": "Create one landscape item illustration for a grounded military survival game's supply market, 3:2 composition. This is a deliberate art-direction study, not a screenshot, not a UI layout, not a contact sheet. One centered subject, whole silhouette visible, occupying about 65 percent of the canvas width and height, with generous empty space. Three-quarter view from slightly above, consistent natural perspective. No lettering, labels, numerals, logos, watermarks, medical emblems, borders, people, hands, scenery or decorative interface. No blood, smoke, sparks or neon. All visible marks must belong to the stated illustration technique, not simulated photography. Subject: a small matte olive twin-propeller conventional bomber aircraft shown whole in three-quarter view from above, nose toward lower left. Straight broad main wing, cylindrical central fuselage, one vertical tail fin and conventional horizontal tailplane, exactly two engines with propellers, one on each main wing. This represents a radio-called carpet-bomb support charge, not a purchasable player weapon. Depict the aircraft alone as an isolated painted catalog illustration, not on a stand or runway and not in a landscape or sky. No bombs falling, no explosion and no weapon cutaway. Ground its silhouette only with a very faint painted shadow on the plain background; retain complete wings and propellers within the frame. Art direction: HAND-PAINTED TACTICAL INVENTORY ILLUSTRATION, visibly not photorealistic. Paint broad deliberate brush strokes and angular planes of value, with selective crisp silhouette edges and lost edges in shadows. Simplify texture into a few purposeful painted marks; do not render every fabric thread or metallic reflection. Slightly exaggerated readable forms and restrained warm-ivory, dusty-olive, ochre, graphite palette. Soft top-left light interpreted through painted value blocks. A plain deep charcoal background with a faint hand-painted tonal variation and a small painted grounding shadow. Premium editorial concept-art finish: painterly, calm, tactile and grounded, never cute or cartoonish. The image MUST unmistakably read as a painted illustration rather than a photograph, ray-traced render or digitally filtered photograph.",
+      "generation": {
+        "size": "1536x1024",
+        "quality": "medium",
+        "background": "opaque",
+        "output_format": "webp",
+        "output_compression": 90
+      },
+      "usage": {
+        "input_tokens": 441,
+        "input_tokens_details": {
+          "image_tokens": 0,
+          "text_tokens": 441
+        },
+        "output_tokens": 343,
+        "output_tokens_details": {
+          "image_tokens": 343,
+          "text_tokens": 0
+        },
+        "total_tokens": 784
+      },
+      "sourceSha256": "dc7aa29ea0c1a036c74a8124c8e6568db9e9646ca49e679f96131ca15657eb9e",
+      "sha256": "96e23aaac8897d7b8fb8308b26c6121e63ed63a8c80548e61c33f7ffd6f42a70",
+      "bytes": 29754
+    }
+  }
+}
