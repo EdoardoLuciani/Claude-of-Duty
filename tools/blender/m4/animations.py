@@ -1,7 +1,7 @@
 """Existing poses plus native 120 Hz Actions export curves, with STEP visibility."""
 import math
 import bpy
-from m4_actions import author_actions
+from m4.actions import author_actions
 
 FPS = 120
 

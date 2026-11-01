@@ -44,7 +44,12 @@ Comparison switches (diagnostics only):
 - `?pixi=hud&compass=html`: only compass is native, all other migrated UI Pixi.
 - `?pixi=hud&underlays=html`: only fullscreen injury is native.
 
-## Measurements
+## Measurements (historical pre-v1.1 integration)
+
+The data below was collected on `471759e2`, before merging develop `57a87737`
+and its v1.1.0 weapon/world asset updates after the interrupted session.
+It is not a fresh performance claim for the integrated build. The post-merge
+checks below revalidate functionality; the earlier ABBA data remains unchanged.
 
 Native AMD RDNA4, Chromium156, High1920×1080/DPR1, fixed exposure, seeded60Hz
 combat,180 warmup/900 measured frames per run. Separate HTML→Pixi→Pixi→HTML
@@ -93,7 +98,20 @@ node tests/e2e/pixi-hud.mjs --preview --combat --rounds=1 --port=5217 --out=/tmp
 node tests/e2e/pixi-hud.mjs --preview --uncapped --rounds=1 --port=5217 --out=/tmp/pixi-combat-default
 ```
 
-151 smoke tests pass. New coverage compares model state across backends, pause,
+After merging develop v1.1.0, a fresh `npm ci`, **153 smoke tests**, formatting,
+typecheck, lint and production build pass (151 tests before integration).
+Production hardware was rerun with:
+
+```sh
+node tests/e2e/pixi-hud.mjs --preview --combat --uncapped --rounds=1 --port=5217 --out=/tmp/pixi-resume-built
+```
+
+This passed native/Pixi comparison, all hit/equipment fixtures, paused FPS,
+full-circle texture plateau (64/64/64; DPR2:62/62/62), fallback, lifecycle and DPR2
+on the native AMD adapter with zero WebGL requests. This single post-merge pair
+is a correctness check, not a replacement for the historical performance suite.
+
+New coverage compares model state across backends, pause,
 expiry/oldest-first reuse/clear, wrap, count/highlight/empty state and FPS, including
 zero suppressed DOM writes on spawn/release/clear. Existing FPS/hitch tests remain.
 

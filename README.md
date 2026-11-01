@@ -53,12 +53,15 @@ navigation topology. Never hand-edit generated assets or rebuild Blender assets
 just to format source.
 
 A WebGPU-capable browser/device is required. Normal builds use committed world
-and Blender assets, with no Blender requirement. Change world source in
-`tools/worldgen/`, regenerate with `npm run world`, then run `npm run world:validate`.
+and Blender assets, with no Blender requirement. Change map content in
+`tools/worldgen/level/`; the [world editing map](tools/worldgen/README.md) identifies
+shape, placement and build locations. Regenerate with `npm run world`, then run
+`npm run world:validate`.
 Runtime-model optimization is explicit: `npm run models:cook -- p320` uses the
 [shared gltfpack build recipe](build/README.md). Normal dev/build/CI consumes the
-committed `.runtime.glb`; it does not require gltfpack. P320 is the first opt-in
-profile; other models retain their current loading paths until validated.
+committed `.runtime.glb`; it does not require gltfpack. All seven authored weapons
+use cooked runtime assets. Native exports remain authoring references; each model
+has its own geometry, material and animation acceptance gates.
 
 **Three.js pin:** published npm release `three@0.187.0`, with matching
 `@types/three@0.187.0` and lockfile integrity hashes. The release bundles include the
@@ -125,6 +128,9 @@ M4/P320 are the starting weapons; MCX, EVOLYS, MPX and AX338 are shop options.
 The day/night clock
 starts at 16:30 and advances nine hours per ten active minutes. Pause/shop freeze
 it; the first 21:00 triggers a three-minute streetlight outage, not an interior outage.
+
+For edit locations, source/generated ownership and regeneration commands, see the
+[asset and world editing map](docs/assets.md).
 
 Asset regeneration/reference notes: [arms](assets/player/arms/README.md),
 [M4](assets/weapons/m4a1-block-ii/README.md), [MCX](assets/weapons/mcx-virtus/README.md),

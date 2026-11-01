@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import { STREET } from './layout.js';
+import { STREET } from './level/layout.js';
 import {
   chamferBox,
   plainBox,
