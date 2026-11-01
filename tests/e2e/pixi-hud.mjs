@@ -144,12 +144,13 @@ try {
       const e = window.__ENGINE__,
         ui = e.ctx.get('ui'),
         p = ui.pixiHud;
+      if (!p) throw Error('Required default HUD did not initialize');
       return {
         ...window.__GPU_PROBE__,
-        pixi: !!p,
-        shared: p?.renderer.gpu.device === e.ctx.get('render').renderer.backend.device,
+        pixi: true,
+        shared: p.renderer.gpu.device === e.ctx.get('render').renderer.backend.device,
         passive:
-          p?.stage.eventMode === 'none' && getComputedStyle(p.canvas).pointerEvents === 'none',
+          p.stage.eventMode === 'none' && getComputedStyle(p.canvas).pointerEvents === 'none',
         legacyElements: document.querySelectorAll(
           '.ow-ammo,.ow-cross,.ow-vitals,.ow-blood,.ow-lowbeat,.ow-hitflash,.ow-compass,.ow-fps,.ow-minimap,.ow-hit,.ow-dmg'
         ).length,
@@ -165,7 +166,7 @@ try {
           ...ui.arcs.pool.items,
           ...ui.compass.pingPool.items,
         ].every((x) => x.node === null),
-        equipmentItems: p?.combat.slots.length,
+        equipmentItems: p.combat.slots.length,
         radioInventoryPresent: 'slotR' in ui.ammo || 'slotRn' in ui.ammo,
         markerUiPresent: 'markers' in ui || 'spawnGrenade' in ui || 'worldLayer' in ui,
         markerElements: document.querySelectorAll('.ow-mk,.ow-nade').length,
@@ -242,7 +243,7 @@ try {
         let previous;
         const late = ui.lateUpdate;
         const modelUpdate = ui.compass.update,
-          viewUpdate = p?.compass.update;
+          viewUpdate = p.compass.update;
         ui.compass.update = function (...a) {
           const t = performance.now();
           try {
@@ -318,8 +319,8 @@ try {
           report: f.report,
           nativeElements: document.querySelectorAll('.ow-ammo,.ow-vitals,.ow-cross,.ow-minimap')
             .length,
-          mapUploads: p?.minimap.uploads ?? 0,
-          textures: p?.renderer.texture.managedTextures.length ?? 0,
+          mapUploads: p.minimap.uploads,
+          textures: p.renderer.texture.managedTextures.length,
         };
       });
       validateCombatProfile(combat.report);
@@ -625,7 +626,7 @@ try {
       const e = window.__ENGINE__,
         p = e.ctx.get('ui').pixiHud;
       await e.dispose();
-      p?.dispose();
+      p.dispose();
       return {
         ...window.__GPU_PROBE__,
         canvases: document.querySelectorAll('.ow-pixi-hud').length,
