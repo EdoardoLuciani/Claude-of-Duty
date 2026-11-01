@@ -22,28 +22,18 @@ export interface CrosshairState {
 }
 
 export class Crosshair {
-  declare k: number;
-  declare gap: number;
-  declare kick: number;
-  declare kickVel: number;
-  declare moveSpread: number;
-  declare adsBlend: number;
-  declare hitPulse: number;
-  declare visible: number;
+  k = 1;
+  gap = 6;
+  kick = 0;
+  kickVel = 0;
+  moveSpread = 0;
+  adsBlend = 0;
+  hitPulse = 0;
+  visible = 1;
   bladeLength = 1;
   bladeAlpha = 1;
   dotScale = 1;
   dotAlpha = 1;
-  constructor() {
-    this.k = 1;
-    this.gap = 6;
-    this.kick = 0;
-    this.kickVel = 0;
-    this.moveSpread = 0;
-    this.adsBlend = 0;
-    this.hitPulse = 0;
-    this.visible = 1;
-  }
 
   /** Called on every shot. `amount` scales with weapon recoil. */
   onFire(amount = 1): void {

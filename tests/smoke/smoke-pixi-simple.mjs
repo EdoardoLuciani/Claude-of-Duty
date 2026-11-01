@@ -50,40 +50,26 @@ combat.equipment.destroy({ children: true });
 combat.fps.destroy();
 compass.stage.destroy({ children: true });
 
-const old = globalThis.document;
-try {
-  const make = () => ({
-    style: { setProperty() {} },
-    classList: { toggle() {} },
-    appendChild() {},
-    setAttribute() {},
-    textContent: '',
-  });
-  globalThis.document = { createElement: make, createElementNS: make };
-  const ammo = new AmmoPanel(make());
-  const s = { ammo: 10, reserve: 20, magSize: 30, bandages: 2, healing: true };
-  ammo.update(0, s, 0);
-  assert.equal(ammo.equipment[0].alpha, 0.35);
-  ammo.update(0, s, 0.14);
-  assert(Math.abs(ammo.equipment[0].alpha - 0.675) < 1e-12);
-  ammo.update(0, s, 0.14);
-  assert.equal(ammo.equipment[0].alpha, 1);
-  ammo.update(0, s, 0.28);
-  assert.equal(ammo.equipment[0].alpha, 0.35);
-  s.healing = false;
-  s.bandages = 0;
-  ammo.update(0, s, 1);
-  assert.equal(ammo.equipment[0].alpha, 0.34);
-  s.bandages = 2;
-  ammo.update(0, s, 1);
-  assert.equal(ammo.equipment[0].alpha, 0.9);
-  s.healing = true;
-  ammo.update(0, s, 1);
-  assert.equal(ammo.equipment[0].elapsed, 0, 'activation resets phase');
-} finally {
-  if (old === undefined) delete globalThis.document;
-  else globalThis.document = old;
-}
+const ammo = new AmmoPanel();
+const s = { ammo: 10, reserve: 20, magSize: 30, bandages: 2, healing: true };
+ammo.update(0, s, 0);
+assert.equal(ammo.equipment[0].alpha, 0.35);
+ammo.update(0, s, 0.14);
+assert(Math.abs(ammo.equipment[0].alpha - 0.675) < 1e-12);
+ammo.update(0, s, 0.14);
+assert.equal(ammo.equipment[0].alpha, 1);
+ammo.update(0, s, 0.28);
+assert.equal(ammo.equipment[0].alpha, 0.35);
+s.healing = false;
+s.bandages = 0;
+ammo.update(0, s, 1);
+assert.equal(ammo.equipment[0].alpha, 0.34);
+s.bandages = 2;
+ammo.update(0, s, 1);
+assert.equal(ammo.equipment[0].alpha, 0.9);
+s.healing = true;
+ammo.update(0, s, 1);
+assert.equal(ammo.equipment[0].elapsed, 0, 'activation resets phase');
 console.log(
   'ok simplified Pixi: sparse north-wrap compass, common X, outlined arcs, pulse period/range/reset/unscaled pause'
 );
