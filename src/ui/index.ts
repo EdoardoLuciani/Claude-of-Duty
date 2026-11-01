@@ -30,7 +30,7 @@ const HEAL_KEY = bindingLabel('heal');
  * HUD / UI subsystem
  * ===========================================================================
  *
- * A shared-device Pixi gameplay HUD plus native menus/prompts, driven entirely from
+ * A shared-device Pixi gameplay HUD plus native menus/radio, driven entirely from
  * `lateUpdate`, after the camera has reached its final transform for the frame.
  * Nothing animates on a CSS keyframe or transition: every value is integrated
  * from `dt` here, which is what makes the capture harness deterministic and
@@ -187,11 +187,11 @@ export class UiSystem {
     this.hit = new Hitmarkers();
     this.minimap = new Minimap(this.rng.fork());
     this.compass = new Compass();
-    this.scoreBar = new ScoreBar(this.chromeLayer);
-    this.killfeed = new Killfeed(this.chromeLayer);
+    this.scoreBar = new ScoreBar();
+    this.killfeed = new Killfeed();
     this.ammo = new AmmoPanel();
-    this.prompt = new Prompt(this.chromeLayer);
-    this.banner = new Banner(this.chromeLayer);
+    this.prompt = new Prompt();
+    this.banner = new Banner();
     this.menu = new PauseMenu(this.root, ctx);
     this.gameOver = new GameOverScreen(this.root, ctx, (): void => {
       if (this.startGate) this.startGate.restart();
@@ -201,7 +201,7 @@ export class UiSystem {
       }
     });
     this.shop = new MarketOverlay(this.root, ctx);
-    this.marketCountdown = new MarketCountdown(this.chromeLayer, ctx.get('market').delay);
+    this.marketCountdown = new MarketCountdown(ctx.get('market').delay);
     this.radio = new RadioPanel(this.chromeLayer, ctx);
 
     /** Single source of truth for everything the HUD draws. */
@@ -815,15 +815,10 @@ export class UiSystem {
       this.startGate?.dispose();
       for (const off of this._unsubs) off();
       this._unsubs.length = 0;
-      this.killfeed.dispose();
-      this.scoreBar.dispose();
       this.minimap.dispose();
-      this.prompt.dispose();
-      this.banner.dispose();
       this.menu.dispose();
       this.gameOver.dispose();
       this.shop.dispose();
-      this.marketCountdown.dispose();
       this.radio.dispose();
       this.root.remove();
       removeStyles();

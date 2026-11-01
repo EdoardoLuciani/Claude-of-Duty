@@ -84,7 +84,7 @@ Other renderer follow-ups: [#370](https://github.com/EdoardoLuciani/Claude-of-Du
 
 The gameplay HUD uses **PixiJS/WebGPU by default**—no query parameter is needed.
 The migrated HUD has no legacy HTML backend or fallback. Native menus, startup/error
-controls and remaining prompts/panels stay accessible; HUD initialization failure
+controls and the field-radio panel stay accessible; HUD initialization failure
 shows the native Reload error dialog instead of starting without readouts.
 [HUD ownership, boundaries and checks](docs/hud.md).
 
