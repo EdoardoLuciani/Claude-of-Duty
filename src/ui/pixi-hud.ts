@@ -10,6 +10,8 @@ import { PixiCombat } from './pixi-combat.ts';
 import type { CombatModels } from './pixi-combat.ts';
 import { PixiCompass } from './pixi-compass.ts';
 import { initPixiRenderer, restrictPixiCanvases } from './pixi-device.ts';
+import { PixiFeedback } from './pixi-feedback.ts';
+import type { FeedbackModels } from './pixi-feedback.ts';
 import { PixiInjury } from './pixi-injury.ts';
 import { PixiMinimap } from './pixi-minimap.ts';
 import { HUD_TYPE } from './pixi-type.ts';
@@ -52,6 +54,7 @@ export class PixiHud {
   readonly chrome = new Container();
   readonly injury = new PixiInjury();
   readonly combat = new PixiCombat();
+  readonly feedback = new PixiFeedback();
   readonly compass = new PixiCompass();
   readonly ammo = new PixiAmmoView();
   readonly minimap = new PixiMinimap();
@@ -109,7 +112,7 @@ export class PixiHud {
     this.canvas.setAttribute('role', 'img');
     this.canvas.setAttribute(
       'aria-label',
-      'Gameplay HUD: ammo, health, crosshair, minimap, injury, compass, combat feedback, equipment and FPS'
+      'Gameplay HUD: ammo, health, crosshair, minimap, injury, compass, combat feedback, equipment, FPS and messages'
     );
     this.canvas.style.cssText = 'position:absolute;inset:0;pointer-events:none;visibility:hidden';
     this.stage.eventMode = 'none';
@@ -125,7 +128,8 @@ export class PixiHud {
       this.combat.hits,
       this.compass.stage,
       this.combat.equipment,
-      this.combat.fps
+      this.combat.fps,
+      this.feedback.stage
     );
     this.hp.anchor.y = this.maxHp.anchor.y = 1;
     this.vitals.addChild(text('HEALTH', 14, 6, HUD_TYPE.label, 0xa9bac5), this.hp, this.maxHp);
@@ -157,6 +161,7 @@ export class PixiHud {
     this.renderer.resize(Math.max(1, w), Math.max(1, h), Math.min(devicePixelRatio || 1, 2));
     this.stage.scale.set(k);
     this.injury.resize(w, h, k);
+    this.feedback.resize(w, h, k);
     this.ammo.stage.position.set(w / k - 26 - AMMO_WIDTH, h / k - 26 - AMMO_HEIGHT);
     this.vitals.position.set(26, h / k - 26 - 112);
     this.minimap.stage.position.set(26, 26 * 0.8);
@@ -185,7 +190,7 @@ export class PixiHud {
     map: Minimap,
     mapState: MinimapState,
     opacity: number,
-    models: CombatModels
+    models: CombatModels & FeedbackModels
   ): void {
     if (this.disposed) return;
     if (!this.enabled) return;
@@ -205,6 +210,7 @@ export class PixiHud {
       }
     }
     this.dirty = this.combat.update(models) || this.dirty;
+    this.dirty = this.feedback.update(models) || this.dirty;
     this.dirty = this.compass.update(models.compass) || this.dirty;
     this.ammo.update(dt, s);
     const max = s.maxHealth || 100,

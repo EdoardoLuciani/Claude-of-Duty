@@ -278,14 +278,16 @@ the borrowed device; Pixi owns its stage, geometry, shaders, textures and canvas
 The restricted DOM adapter must restore on construction/init/disposal failure.
 
 Pixi presents ammo/reload, health/armour, crosshair, retained minimap, fullscreen
-injury, compass/heard pings, hitmarkers/damage arcs, bandage/grenade inventory and
-FPS. Its canvas sits below native centre/chrome/menu layers. Injury is independent
+injury, compass/heard pings, hitmarkers/damage arcs, bandage/grenade inventory,
+FPS, score/status, killfeed, prompts/progress and banners/countdown. Its canvas sits below native centre/chrome/menu layers. Injury is independent
 of readout fading. HUD fade, independent capped DPR, static-paused/absent-content
 redraw suppression, paused-FPS invalidation and failure-isolated teardown remain.
 `HealthFx`, `Crosshair`, `Hitmarkers`, `DamageArcs`, `Compass` and `AmmoPanel`
 retain animation/derived state, not legacy elements. Hit/arc/heard-ping pools use
-null nodes with the same bounded lifetime/reuse policy; native killfeed pools still
-own elements. Inventory pulses use unscaled UI time (280ms each direction); FPS
+null nodes with the same bounded lifetime/reuse policy. Killfeed's six-row pool
+also uses null nodes; `pixi-feedback.ts` presents its retained rows and other passive
+messages. Prompt ownership, progress, banner timing and score/status priority stay
+in the controllers; the independently anchored supply countdown uses raw time. Inventory pulses use unscaled UI time (280ms each direction); FPS
 samples wall time every500ms. Existing gameplay snapshots/events remain authority.
 
 Minimap's detached Canvas2D terrain bake remains one-time; `minimap.ts` no longer
@@ -302,8 +304,7 @@ A required HUD initialization failure propagates to the native boot/reload dialo
 readiness/gameplay must not start with no HUD. Preserve the original error even
 if partial cleanup fails.
 
-Start/error controls, menus/shop, score/status, killfeed, prompts/progress,
-banners/countdown and the field-radio panel remain native. The independent market
+Start/error controls, menus/shop/game-over and the field-radio panel remain native. The independent market
 inspection renderer is unchanged. This is not a wholesale UI framework/migration.
 See the [HUD contract and smoke checks](docs/hud.md). Earlier experiment reports
 and capture harnesses are available in Git history at `d5858ebc`.
