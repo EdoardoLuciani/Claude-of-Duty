@@ -152,8 +152,11 @@ Only explicit `sheetThickness` authorizes single-sided penetration; missing exit
 stop as `unknown-thickness`, overlapping solids as `overlapping-solids`.
 No nominal fallback or layered-solid approximation.
 
-JS in `tools/worldgen/` is world-authoring authority; `placements/` owns
-free-standing prop transforms. `npm run world` builds meshes and cooks collision
+JS in `tools/worldgen/` is world-authoring authority. Map-specific layout,
+configuration, intel sites and free-standing prop transforms live in `level/`;
+`level/placements/` is data-only, while `placement.js` owns validation, placement
+execution and clutter clearance. The [world editing map](tools/worldgen/README.md)
+connects content, geometry and baking. `npm run world` builds meshes and cooks collision
 with meshoptimizer from the canonical instance buckets. Visual-only bucket
 coalescing may join non-distance-LOD clouds within the existing 64 m X/Z span;
 it must not change collision inputs or navigation. Both transient outputs use
@@ -308,6 +311,11 @@ Current extension ownership/limits/measurements: [combat UI](docs/experiments/pi
 
 ## Models
 
+The [asset/world editing map](docs/assets.md) connects authoring tools, products
+and runtime consumers. Weapon authoring entry points and checks live together in
+`tools/blender/<weapon>/build.py` and `check.py`; asset products and runtime
+adapters retain their separate ownership.
+
 `weapons.createInspectionModel(id)` returns an independent rest-pose scene and
 `dispose()` for the market's single demand-rendered WebGPU studio. Cloned transforms,
 skeletons and mixers are inspection-owned; geometry, materials and maps are borrowed
@@ -318,9 +326,19 @@ purchase; selecting or inspecting a weapon never changes loadout or credits.
 
 `build/models.mjs` owns explicit gltfpack runtime-model cooking and per-model
 profiles (`npm run models:cook`). Normal builds consume committed `.runtime.glb`
-products; they do not run the encoder. P320 is the first opt-in profile; adding
-models requires adapter, animation and visual validation rather than blanket
-simplification. Native authoring exports remain unchanged.
+products; they do not run the encoder. All seven authored weapons opt in.
+Adding profiles requires adapter, animation and visual validation rather than
+blanket simplification. Editable Blender sources remain authoring references.
+M4/MCX adapters decode packed finish metadata in small weapon-local physical-node
+graphs; their consolidated GLBs require those adapters for material fidelity.
+M4, MPX and AX338 rigid assemblies use ordinary meshes; EVOLYS skins only its
+deforming belt. Keep static bodies out of mechanical skins merely to reduce
+primitive counts; preserve independent moving controls and magazine ownership.
+
+`src/weapons/asset-loader.ts` serializes compressed model loads to bound Basis
+worker/memory use and owns per-load decoder/error cleanup. Material conversion
+shares equivalent static map clones only when source, UV channel/transform,
+color space and sampler state match, avoiding duplicate WebGPU uploads for UV1.
 
 `tools/export-models.mjs` runs the same procedural builders offline with a fixed
 seed; runtime never builds meshes. Regenerate ALL procedural models, since

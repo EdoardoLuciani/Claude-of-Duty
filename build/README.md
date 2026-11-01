@@ -10,7 +10,7 @@ Install native **gltfpack 1.3 with BasisU support** from the
 
 ```sh
 GLTFPACK=/absolute/path/gltfpack npm run models:cook -- p320
-# All registered models (P320 and standalone EXPS3):
+# All registered profiles (seven weapons and standalone EXPS3):
 npm run models:cook
 # Use the same profile on a scratch native export:
 npm run models:cook -- p320 /tmp/p320-review
@@ -26,6 +26,17 @@ output and any model-specific flags in `MODEL_COOKS`. Wire its loader to the
 runtime output with KTX2/meshopt support, then validate its named mechanics,
 materials/UVs, animation/contacts, resource ownership and visual fidelity.
 Simplification is opt-in **per model**; P320's tight-error profile is not a global
-triangle-reduction policy. EXPS3 uses a tighter error limit to preserve its optical
+triangle-reduction policy. M4 disables geometry quantization to preserve its iron
+apertures and retains finish-bearing UV1/UV2 with `-kv`. Its weapon-local shader
+uses those values alongside the original detail maps. MCX similarly decodes finish
+identity from UV1; ordinary external GLB viewers are not material-fidelity references.
+M4, MPX and AX338 use ordinary rigid meshes; EVOLYS retains only its deforming
+belt skin. Their moving controls remain ordinary transforms rather than full-body
+mechanical skins. MPX body lenses use constant optical factors; solid covers
+retain their ordinary pivots without lens/cap selectors.
+AX338 keeps full geometry where simplification damaged panel detail.
+M590 keeps its shell separate from the mechanical skin, with exact STEP visibility;
+its source checker narrowly bounds one approved shared-glove contact below 30 µm.
+EXPS3 uses a tighter error limit to preserve its optical
 opening; its cooked attachment is not yet wired into gameplay. Other models are
 not converted by these profiles.

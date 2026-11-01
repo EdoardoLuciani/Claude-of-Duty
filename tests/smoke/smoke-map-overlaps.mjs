@@ -4,9 +4,9 @@ import * as THREE from 'three';
 import { Rng } from '../../src/core/rng.ts';
 import { buildWorld } from '../../tools/worldgen/build.js';
 import { Assembler } from '../../tools/worldgen/builder.js';
-import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from '../../tools/worldgen/config.js';
-import { BUILDINGS, GATE, STREET } from '../../tools/worldgen/layout.js';
-import { PLACEMENTS } from '../../tools/worldgen/placements/index.js';
+import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from '../../tools/worldgen/level/config.js';
+import { BUILDINGS, GATE, STREET } from '../../tools/worldgen/level/layout.js';
+import { PLACEMENTS } from '../../tools/worldgen/level/placements/index.js';
 
 function worldRng() {
   const root = new Rng(0x5eed1234);

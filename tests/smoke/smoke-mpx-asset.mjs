@@ -68,7 +68,6 @@ for (const material of gltf.materials) {
     pbr.baseColorTexture && pbr.metallicRoughnessTexture && material.normalTexture,
     `${material.name}: preserve all three original PBR maps`
   );
-  assert.ok(pbr.baseColorFactor.slice(0, 3).every((n) => n > 0 && n < 0.6));
   assert.ok([0, 1].includes(pbr.metallicFactor ?? 1), 'metals are binary');
 }
 
@@ -79,16 +78,29 @@ for (const mesh of gltf.meshes) {
   for (const primitive of mesh.primitives) {
     if (primitive.material === interiorMaterial) interiorUsed = true;
     const name = gltf.materials[primitive.material]?.name ?? '';
-    if (name.startsWith('11 |') || name.startsWith('12 |')) {
+    if (name.startsWith('11 |')) {
       const normals = accessor(primitive.attributes.NORMAL),
         first = new THREE.Vector3().fromArray(normals);
       for (let i = 0; i < normals.length; i += 3) {
         assert.ok(
-          first.dot(new THREE.Vector3().fromArray(normals, i)) > 0.999,
+          Math.abs(first.dot(new THREE.Vector3().fromArray(normals, i))) > 0.999,
           'optical surface is one sheet, not a closed cylinder'
         );
       }
     }
+    const colors = accessor(primitive.attributes.COLOR_0);
+    const count = gltf.accessors[primitive.attributes.COLOR_0].count;
+    const width = colors.length / count;
+    const denominator =
+      gltf.accessors[primitive.attributes.COLOR_0].componentType === 5123 ? 65535 : 1;
+    for (let i = 0; i < count; i++)
+      assert.ok(
+        [0, 1, 2].every(
+          (axis) =>
+            colors[i * width + axis] / denominator > 0 &&
+            colors[i * width + axis] / denominator < 0.6
+        )
+      );
     assert.equal(primitive.mode ?? 4, 4, 'triangle export');
     for (const name of ['POSITION', 'NORMAL', 'TEXCOORD_0']) accessor(primitive.attributes[name]);
     const indices = accessor(primitive.indices);
@@ -262,9 +274,13 @@ assert.ok(
 const capBounds = new THREE.Box3();
 const receiverIndex = gltf.nodes.findIndex((n) => n.name === 'receiver_mesh');
 for (const primitive of gltf.meshes[gltf.nodes[receiverIndex].mesh].primitives) {
-  if (!gltf.materials[primitive.material]?.name.startsWith('01 |')) continue;
+  if (gltf.materials[primitive.material]?.name !== 'MPX | consolidated opaque finishes') continue;
   const positions = accessor(primitive.attributes.POSITION);
+  const colors = accessor(primitive.attributes.COLOR_0);
+  const denominator =
+    gltf.accessors[primitive.attributes.COLOR_0].componentType === 5123 ? 65535 : 1;
   for (let i = 0; i < positions.length; i += 3) {
+    if (Math.abs(colors[(i / 3) * 4] / denominator - 0.06) > 1 / 65535) continue;
     vertex.fromArray(positions, i).applyMatrix4(nodes[receiverIndex].matrixWorld);
     const radius = Math.hypot(vertex.x - 0.088, vertex.y - axis);
     if (vertex.z > 0.014 && radius > 0.0125 && radius < 0.013001) capBounds.expandByPoint(vertex);

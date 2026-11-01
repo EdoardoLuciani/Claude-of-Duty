@@ -1,8 +1,11 @@
 import * as THREE from 'three';
-import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { Renderer } from 'three/webgpu';
 
 import handReference from '../../assets/weapons/m590/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/m590/manifest.json' with { type: 'json' };
+import { isSkinnedMesh } from '../core/three-guards.ts';
+import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
 import {
@@ -44,7 +47,7 @@ type M590Model = {
   magSize: { len: number };
 };
 
-export const M590_URL = new URL('../../assets/weapons/m590/m590.glb', import.meta.url).href;
+export const M590_URL = new URL('../../assets/weapons/m590/m590.runtime.glb', import.meta.url).href;
 const ALIASES: Record<string, string> = manifest.aliases;
 
 export function makeM590Model(gltf: GLTF): M590Model {
@@ -86,8 +89,8 @@ export function makeM590Model(gltf: GLTF): M590Model {
   };
 }
 
-export async function loadM590(): Promise<M590Model> {
-  return makeM590Model(await new GLTFLoader().loadAsync(M590_URL));
+export async function loadM590(renderer: Pick<Renderer, 'hasFeature'>): Promise<M590Model> {
+  return makeM590Model(await loadWeaponGLTF(renderer, M590_URL));
 }
 
 /** Provisional native 89 mm pump travel belongs to the asset, not the adapter.
@@ -98,6 +101,7 @@ export class M590Animation {
   mixer: THREE.AnimationMixer;
   actions: Record<string, THREE.AnimationAction>;
   shellInsert: THREE.Object3D;
+  private skeletons = new Set<THREE.Skeleton>();
   poseMatrix: THREE.Matrix4;
   hands: Record<HandSide, AuthoredHand>;
   poseQ = new THREE.Quaternion();
@@ -112,6 +116,9 @@ export class M590Animation {
     this.actions = createAuthoredActions(this.mixer, model.animations);
     const node = (name: string): THREE.Object3D => requiredNode(this.root, name);
     this.shellInsert = node('shell_insert');
+    this.root.traverse((object): void => {
+      if (isSkinnedMesh(object)) this.skeletons.add(object.skeleton);
+    });
     this.hands = discoverAuthoredHands(node);
     this.reset();
   }
@@ -157,6 +164,8 @@ export class M590Animation {
     this.reset();
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.root);
+    for (const skeleton of this.skeletons) skeleton.dispose();
+    this.skeletons.clear();
     disposeWeaponMaterials(this.model);
   }
 }

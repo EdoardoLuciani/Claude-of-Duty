@@ -1,15 +1,20 @@
 import * as THREE from 'three';
-import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { Renderer } from 'three/webgpu';
 
 import manifest from '../../assets/weapons/mcx-virtus/manifest.json' with { type: 'json' };
+import { isSkinnedMesh } from '../core/three-guards.ts';
+import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { authoredModel } from './authored-model.ts';
 import { buildEquipClips, buildMagazineClips } from './clips.ts';
 import { smootherstep } from './mathx.ts';
+import { configureMCXFinishes } from './mcx-finishes.ts';
 
-// Vite bundles the committed Blender export; never rebuild Blender at game boot.
-export const MCX_URL = new URL('../../assets/weapons/mcx-virtus/mcx-virtus.glb', import.meta.url)
-  .href;
+export const MCX_URL = new URL(
+  '../../assets/weapons/mcx-virtus/mcx-virtus.runtime.glb',
+  import.meta.url
+).href;
 const ALIASES: Record<string, string> = {
   reloadTac: 'Reload_Tactical',
   reloadEmpty: 'Reload_Empty',
@@ -86,6 +91,8 @@ export function makeMCXModel(gltf: GLTF): MCXModel {
         material.metalness = 0;
         material.roughness = 0.12;
         material.specularIntensity = 0.25;
+      } else if (original.name === 'MCX | opaque finishes') {
+        configureMCXFinishes(material);
       }
     },
     true
@@ -93,8 +100,8 @@ export function makeMCXModel(gltf: GLTF): MCXModel {
   return { ...model, ...converted };
 }
 
-export async function loadMCX(): Promise<MCXModel> {
-  return makeMCXModel(await new GLTFLoader().loadAsync(MCX_URL));
+export async function loadMCX(renderer: Pick<Renderer, 'hasFeature'>): Promise<MCXModel> {
+  return makeMCXModel(await loadWeaponGLTF(renderer, MCX_URL));
 }
 
 function handQuaternion(
@@ -165,6 +172,8 @@ export class MCXAnimation {
   magazine!: THREE.Object3D;
   spare!: THREE.Object3D;
   bolt!: THREE.Object3D;
+  boltBone!: THREE.Object3D;
+  private skeletons = new Set<THREE.Skeleton>();
   charging!: THREE.Object3D;
   poseMatrix!: THREE.Matrix4;
   poseQ = new THREE.Quaternion();
@@ -207,6 +216,10 @@ export class MCXAnimation {
     this.magazine = this.root.getObjectByName('magazine')!;
     this.spare = this.root.getObjectByName('magazine_spare')!;
     this.bolt = this.root.getObjectByName('bolt')!;
+    this.boltBone = this.root.getObjectByName('MECH_bolt')!;
+    this.root.traverse((object): void => {
+      if (isSkinnedMesh(object)) this.skeletons.add(object.skeleton);
+    });
     this.charging = this.root.getObjectByName('charging_handle')!;
     this.root.getObjectByName('spent_case')!.visible = false;
     this.poseMatrix = new THREE.Matrix4();
@@ -258,6 +271,10 @@ export class MCXAnimation {
     this.gesture = null;
     this.gestureTime = 0;
     this._sample('Idle', 0);
+    // Mixer property caching may skip an unchanged Idle value after our
+    // out-of-band empty-state override; reset both contact and visible skin.
+    this.bolt.position.x = 0;
+    this.boltBone.position.x = 0;
   }
 
   update(dt: number, clipName: string, clipTime: number, empty: boolean): void {
@@ -269,7 +286,10 @@ export class MCXAnimation {
     else if (this.fireTime < this.actions.Fire.getClip().duration)
       this._sample('Fire', this.fireTime);
     else this._sample('Idle', this.idleTime % this.actions.Idle.getClip().duration);
-    if (empty && !this.gesture && this.fireTime >= 7 / 60) this.bolt.position.x = -0.068;
+    if (empty && !this.gesture && this.fireTime >= 7 / 60) {
+      this.bolt.position.x = -0.068;
+      this.boltBone.position.x = this.bolt.position.x;
+    }
     this.frame.updateMatrixWorld(true);
   }
 
@@ -322,6 +342,8 @@ export class MCXAnimation {
   dispose(): void {
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.root);
+    for (const skeleton of this.skeletons) skeleton.dispose();
+    this.skeletons.clear();
     disposeWeaponMaterials(this.model);
   }
 }
