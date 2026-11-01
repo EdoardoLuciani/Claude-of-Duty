@@ -314,7 +314,10 @@ counts, one magazine-fill bar and plain health/armour bars. Shared state/events,
 low-health/empty/reload cues, unscaled pulse period and FPS sampling remain.
 See [Pixi-to-Pixi simplification measurements](docs/experiments/pixi-simplify.md).
 Bandage/grenade inventory visuals are selectable for comparison:
-`&icons=simple` (default), `&icons=original`, or `&icons=text`; radio remains text.
+`&icons=simple` (default), `&icons=original`, or `&icons=text`.
+The radio inventory count/icon and its unused UI snapshot fields are removed
+from HTML and Pixi. Radio mechanics and the separate field-radio panel remain
+unchanged pending a broader rework.
 Both icon styles retain geometry, updating counts/layout only on stock changes.
 The magazine stays a bar. [Icon measurements](docs/experiments/pixi-accessory-icons.md)
 record the negligible measured cost difference; operator visual choice is pending.

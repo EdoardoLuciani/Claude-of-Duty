@@ -50,7 +50,7 @@ function arc(): Graphics {
   return g;
 }
 
-const EQUIPMENT_LABELS = ['BANDAGES', 'FRAGS', 'RADIO'];
+const EQUIPMENT_LABELS = ['BANDAGES', 'FRAGS'];
 
 /** Retained presentation only; native owners advance all combat lifetimes. */
 interface HitSlot {
@@ -101,7 +101,7 @@ export class PixiCombat {
   constructor(iconStyle: AccessoryIconStyle = 'simple') {
     this.iconStyle = iconStyle;
     this.fps.anchor.set(1, 0);
-    this.slots = Array.from({ length: 3 }, (_, i): EquipmentView => {
+    this.slots = Array.from({ length: 2 }, (_, i): EquipmentView => {
       const label = new Text({
         text: '',
         style: {
@@ -112,7 +112,7 @@ export class PixiCombat {
           stroke: { color: 0x080c10, width: 1.5 },
         },
       });
-      const symbol = i < 2 && iconStyle !== 'text' ? accessoryIcon(i, iconStyle) : null;
+      const symbol = iconStyle !== 'text' ? accessoryIcon(i, iconStyle) : null;
       const node = symbol ? new Container() : label;
       if (symbol) {
         label.position.set(21, 1);

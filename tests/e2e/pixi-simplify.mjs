@@ -35,9 +35,7 @@ function createReplay(engine, lane) {
       return {
         ...weapon.call(this),
         cooking: true,
-        radioEquipped: true,
         lethalCount: 3,
-        carpetCount: 2,
       };
     };
     ui._playerState = function () {
@@ -97,8 +95,6 @@ async function measureUiOnly(e) {
     magSize: 30,
     cooking: true,
     lethalCount: 3,
-    carpetCount: 2,
-    radioEquipped: true,
   };
   const player = {
     ...ui._playerState(),

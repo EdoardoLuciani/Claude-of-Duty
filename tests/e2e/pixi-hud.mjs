@@ -134,6 +134,9 @@ try {
         nativeVitals: getComputedStyle(ui.health.vitals).display !== 'none',
         nativeCrosshair: getComputedStyle(ui.crosshair.root).display !== 'none',
         nativeEquipment: getComputedStyle(ui.ammo.equip).display !== 'none',
+        equipmentItems: ui.ammo.equip.childElementCount,
+        radioInventoryPresent:
+          'slotR' in ui.ammo || 'slotRn' in ui.ammo || (p?.combat.slots.length ?? 2) !== 2,
         loads: performance
           .getEntriesByType('resource')
           .filter((e) => /pixi/i.test(e.name))
@@ -147,6 +150,8 @@ try {
     assert.equal(setup.gpuCombat, setup.pixi && mode !== 'legacy');
     assert.equal(setup.gpuCompass, setup.gpuCombat && mode !== 'bearing');
     assert.equal(setup.nativeEquipment, !setup.gpuCombat);
+    assert.equal(setup.equipmentItems, 2, 'HTML inventory contains only bandage and grenade');
+    assert.equal(setup.radioInventoryPresent, false);
     assert.equal(setup.nativeFps, !setup.gpuCombat);
     assert.equal(setup.nativeCompass, !setup.gpuCompass);
     assert.equal(setup.nativeMap, !setup.pixi);
@@ -334,10 +339,8 @@ try {
           return {
             ...oldWeapon.call(this),
             lethalCount: empty ? 0 : 3,
-            carpetCount: empty ? 0 : 2,
             cooking: !empty,
             grenadeEquipped: false,
-            radioEquipped: !empty,
           };
         };
         ui._playerState = function () {
@@ -406,7 +409,7 @@ try {
                 throw Error('damage arc direction');
             if (
               p.combat.slots.map((s) => s.label.text).join() !==
-              (p.combat.iconStyle === 'text' ? 'BANDAGES 12,FRAGS 3,RADIO 2' : '12,3,RADIO 2')
+              (p.combat.iconStyle === 'text' ? 'BANDAGES 12,FRAGS 3' : '12,3')
             )
               throw Error('equipment count parity');
           }
