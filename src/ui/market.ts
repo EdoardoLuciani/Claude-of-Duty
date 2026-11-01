@@ -1,6 +1,5 @@
 import type { EngineContext } from '../core/context.ts';
 import type { MarketSystem } from '../market/index.ts';
-import { isWeaponId } from '../weapons/defs.ts';
 import { marketIcon } from './market-icons.ts';
 import { MarketInspection } from './market-inspection.ts';
 import { el, setText, setStyle, setClass, damp } from './util.ts';
@@ -40,8 +39,8 @@ function targetCard(target: EventTarget | null): HTMLElement | null {
  * the shop is open (see market/index.js), so this overlay — like the
  * game-over screen — animates on raw wall-clock time, never on dt.
  *
- * Weapon cards select an inspection; only their explicit purchase buttons buy.
- * Resupply cards still apply one unit immediately. The panel stays open
+ * All cards select an inspection; only explicit purchase buttons buy.
+ * The panel stays open
  * until the player explicitly leaves (SKIP or Esc). Number keys do not buy.
  */
 export class MarketOverlay {
@@ -105,7 +104,7 @@ export class MarketOverlay {
       'div',
       'ow-market-hint',
       foot,
-      'ESC SKIP · SELECT A WEAPON TO INSPECT · BUY / SWAP TO PURCHASE'
+      'ESC SKIP · SELECT AN ITEM TO INSPECT · BUY / SWAP TO PURCHASE'
     );
 
     this.active = false;
@@ -121,13 +120,9 @@ export class MarketOverlay {
         .getHudState()
         .items.find((it): boolean => it.id === card.dataset.item);
       if (!item) return;
-      const gun = item.slot === 'primary' || item.slot === 'secondary';
-      if (gun) {
-        this._selectedId = item.id;
-        this._preview(item.id);
-        if (!(e.target instanceof Element && e.target.closest('.ow-market-buy'))) return;
-      }
-      this._buy(item.id);
+      this._selectedId = item.id;
+      this._preview(item.id);
+      if (e.target instanceof Element && e.target.closest('.ow-market-buy')) this._buy(item.id);
     };
     this._onOver = (e: MouseEvent): void => {
       if (!this.active) return;
@@ -149,7 +144,7 @@ export class MarketOverlay {
       if (
         (e.code === 'Enter' || e.code === 'Space') &&
         e.target instanceof HTMLElement &&
-        e.target.matches('.ow-market-card[data-weapon]')
+        e.target.matches('.ow-market-card[data-item]')
       ) {
         e.preventDefault();
         e.target.click();
@@ -178,12 +173,10 @@ export class MarketOverlay {
     const meta = el('div', 'ow-market-meta', card);
     const stock = el('div', 'ow-market-stock', meta);
     const gun = item.action === 'equipped' || item.action === 'swap';
-    if (gun) {
-      card.dataset.weapon = '';
-      card.tabIndex = 0;
-      card.setAttribute('role', 'group');
-      card.setAttribute('aria-label', `${item.label}, select to inspect`);
-    }
+    if (gun) card.dataset.weapon = '';
+    card.tabIndex = 0;
+    card.setAttribute('role', 'group');
+    card.setAttribute('aria-label', `${item.label}, select to inspect`);
     const pipMax = item.unit === 'pct' || gun ? 0 : Math.floor(item.max / item.step);
     const pips: HTMLElement[] = [];
     if (pipMax > 0) {
@@ -211,7 +204,7 @@ export class MarketOverlay {
     this._selectedId = null;
     for (const row of this.cards) setClass(row.card, 'inspecting', false);
     this.inspection.active = true;
-    this.inspection.controls.enabled = !this.inspection.failed;
+    this.inspection.controls.enabled = false;
     document.exitPointerLock?.();
   }
 
@@ -224,7 +217,7 @@ export class MarketOverlay {
 
   _preview(id: string): void {
     const item = this.market.getHudState().items.find((it): boolean => it.id === id);
-    if (!item || !isWeaponId(item.id)) return;
+    if (!item) return;
     for (const row of this.cards) setClass(row.card, 'inspecting', row.card.dataset.item === id);
     void this.inspection.select(item.id, item.label);
   }

@@ -797,8 +797,11 @@ const CSS = `
 .ow-market-catalog { min-width:0; }
 .ow-market-inspection { position:sticky; top:0; padding:calc(var(--u) * 3); border:1px solid var(--hair-2); background:rgba(255,255,255,.025); }
 .ow-market-inspect-title { font:700 calc(18px * var(--k)) var(--fd); color:var(--ink); margin:calc(var(--u) * 2) 0; letter-spacing:.08em; }
-.ow-market-inspect-canvas { display:block; width:100%; height:calc(320px * var(--k)); touch-action:none; cursor:grab; }
+.ow-market-inspect-view { height:calc(320px * var(--k)); background:#10151b; }
+.ow-market-inspect-canvas { display:block; width:100%; height:100%; touch-action:none; cursor:grab; }
 .ow-market-inspect-canvas:active { cursor:grabbing; }
+.ow-market-inspect-art { display:block; width:100%; height:100%; object-fit:contain; background:#171a19; }
+.ow-market-inspect-canvas[hidden], .ow-market-inspect-art[hidden], .ow-market-inspect-3d[hidden] { display:none; }
 .ow-market-inspect-status, .ow-market-inspect-help { font-size:calc(10px * var(--k)); color:var(--ink-2); line-height:1.6; }
 .ow-market-inspect-status { min-height:3.2em; padding-top:calc(var(--u) * 2); }
 .ow-market-inspect-tools { display:flex; flex-wrap:wrap; gap:calc(var(--u) * 1); }
