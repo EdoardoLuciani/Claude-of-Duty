@@ -6,6 +6,7 @@ import { ScoreBar } from '../../src/ui/compass.ts';
 import { UiSystem } from '../../src/ui/index.ts';
 import { Killfeed } from '../../src/ui/killfeed.ts';
 import { MarketCountdown } from '../../src/ui/market.ts';
+import { PixiAmmoView, AMMO_HEIGHT } from '../../src/ui/pixi-ammo-view.ts';
 import { initPixiRenderer } from '../../src/ui/pixi-device.ts';
 import { PixiHud } from '../../src/ui/pixi-hud.ts';
 import { Prompt, Banner } from '../../src/ui/prompts.ts';
@@ -159,6 +160,14 @@ try {
   if (oldDocument === undefined) delete globalThis.document;
   else globalThis.document = oldDocument;
 }
+const ammoView = new PixiAmmoView();
+assert.equal(AMMO_HEIGHT - ammoView.magFill.y, 8, 'magazine shares armour-bar bottom inset');
+assert(ammoView.prompt.y >= 0 && ammoView.prompt.y + 16 <= ammoView.bar.y);
+assert(ammoView.bar.y + 3 < ammoView.mode.y, 'reload feedback stays above the readout');
+ammoView.update(0, { ammo: 0, magSize: 30, reserve: 210, reloading: true, reloadProgress: 0.5 });
+assert(ammoView.bar.visible && ammoView.fill.scale.x === 0.5);
+assert.equal(ammoView.prompt.text, 'RELOADING');
+ammoView.stage.destroy({ children: true });
 const prompt = new Prompt(),
   banner = new Banner(),
   feed = new Killfeed(),

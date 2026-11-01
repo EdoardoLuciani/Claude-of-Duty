@@ -21,7 +21,8 @@ interface FeedView {
   edge: Graphics;
   attacker: Text;
   victim: Text;
-  marker: Graphics;
+  rifle: Graphics;
+  skull: Graphics;
   sequence: number;
   width: number;
 }
@@ -44,6 +45,27 @@ function label(value = '', size: number = HUD_TYPE.label, color = INK, x = 0, y 
 }
 function rect(color: number, alpha = 1): Graphics {
   return new Graphics().rect(0, 0, 1, 1).fill({ color, alpha });
+}
+function rifle(): Graphics {
+  return new Graphics()
+    .poly([
+      0, 4, 6, 4, 6, 3, 14, 3, 14, 4, 28, 4, 28, 6, 16, 6, 14.5, 10, 12.5, 10, 13, 7, 12, 7, 11, 11,
+      9, 11, 8, 7, 6, 7, 6, 8, 2, 8,
+    ])
+    .rect(23, 2, 1, 2)
+    .fill(INK);
+}
+function skull(): Graphics {
+  return new Graphics()
+    .roundRect(1, 0, 10, 9, 4)
+    .rect(3, 7, 6, 5)
+    .fill(AMBER)
+    .circle(3.8, 4.5, 1.2)
+    .circle(8.2, 4.5, 1.2)
+    .rect(5.5, 6, 1, 1.5)
+    .rect(4.5, 10, 1, 2)
+    .rect(6.5, 10, 1, 2)
+    .fill(0x080c10);
 }
 function fit(node: Text, width: number): void {
   node.scale.set(1);
@@ -104,17 +126,12 @@ export class PixiFeedback {
       edge = rect(0xffffff),
       attacker = label('', HUD_TYPE.label, 0xffffff, 6, 3),
       victim = label('', HUD_TYPE.label, 0xffffff, 0, 3),
-      marker = new Graphics()
-        .moveTo(0, 7)
-        .lineTo(14, 7)
-        .moveTo(10, 3)
-        .lineTo(14, 7)
-        .lineTo(10, 11)
-        .stroke({ color: 0xffffff, width: 1.5 });
-    marker.y = 3;
-    node.addChild(back, edge, attacker, marker, victim);
+      gun = rifle(),
+      head = skull();
+    gun.scale.x = 31 / 28;
+    node.addChild(back, edge, attacker, head, gun, victim);
     node.visible = false;
-    return { node, back, edge, attacker, victim, marker, sequence: -1, width: 0 };
+    return { node, back, edge, attacker, victim, rifle: gun, skull: head, sequence: -1, width: 0 };
   });
   private width = 1920;
   private height = 1080;
@@ -244,12 +261,13 @@ export class PixiFeedback {
         alive = feed.pool.items[i].alive;
       if (alive && (slot.sequence !== entry.sequence || this.layoutDirty)) {
         write(slot.attacker, entry.attacker, 140);
-        write(slot.victim, entry.headshot ? `${entry.victim} · HS` : entry.victim, 160);
+        write(slot.victim, entry.victim, 140);
         slot.attacker.tint = entry.attackerFriendly ? (entry.mine ? 0xffffff : 0x8fc8ff) : 0xff7a63;
         slot.victim.tint = entry.attackerFriendly ? 0xff7a63 : 0x8fc8ff;
-        slot.marker.tint = entry.headshot ? AMBER : INK;
-        slot.marker.x = slot.attacker.x + slot.attacker.width + 6;
-        slot.victim.x = slot.marker.x + 24;
+        slot.skull.visible = entry.headshot;
+        slot.skull.position.set(slot.attacker.x + slot.attacker.width + 6, 5);
+        slot.rifle.position.set(slot.skull.x + (entry.headshot ? 18 : 0), 5);
+        slot.victim.x = slot.rifle.x + 37;
         slot.width = slot.victim.x + slot.victim.width + 6;
         slot.back.scale.set(slot.width, 22);
         slot.back.tint = entry.mine ? 0x1a1103 : 0x05090c;
