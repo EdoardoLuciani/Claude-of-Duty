@@ -35,7 +35,7 @@ type CachedElement = Element & {
   _ows?: Map<string, string>;
   _owc?: Map<string, boolean>;
 };
-type PoolRecord<Node extends HTMLElement = HTMLElement> = BasePoolRecord<Node>;
+type PoolRecord<Node extends HTMLElement | null = HTMLElement> = BasePoolRecord<Node>;
 
 export function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -158,10 +158,10 @@ export function metres(d: number): string {
 /* ------------------------------------------------------------------ pool --- */
 
 /**
- * Fixed-size element pool. `make()` builds one element; records carry their own
+ * Fixed-size lifetime pool. `make()` builds an element or returns null for Pixi-owned visuals; records carry their own
  * animation state. Nothing is allocated after construction.
  */
-export class Pool<Node extends HTMLElement = HTMLElement> {
+export class Pool<Node extends HTMLElement | null = HTMLElement> {
   items: PoolRecord<Node>[];
   count: number;
   _next: number;
@@ -169,8 +169,8 @@ export class Pool<Node extends HTMLElement = HTMLElement> {
     this.items = new Array<PoolRecord<Node>>(count);
     for (let i = 0; i < count; i++) {
       const node = make(i);
-      if (parent) parent.appendChild(node);
-      node.style.display = 'none';
+      if (node && parent) parent.appendChild(node);
+      if (node) node.style.display = 'none';
       this.items[i] = { node, alive: false, t: 0, life: 1, i, a: 0, b: 0, c: 0, d: 0, s: '' };
     }
     this.count = count;
@@ -187,7 +187,7 @@ export class Pool<Node extends HTMLElement = HTMLElement> {
         this._next = (it.i + 1) % this.count;
         it.alive = true;
         it.t = 0;
-        it.node.style.display = '';
+        if (it.node) it.node.style.display = '';
         return it;
       }
       const age = it.t / (it.life || 1);
@@ -198,14 +198,14 @@ export class Pool<Node extends HTMLElement = HTMLElement> {
     }
     best!.alive = true;
     best!.t = 0;
-    best!.node.style.display = '';
+    if (best!.node) best!.node!.style.display = '';
     return best!;
   }
 
   release(it: PoolRecord<Node>): void {
     if (!it.alive) return;
     it.alive = false;
-    it.node.style.display = 'none';
+    if (it.node) it.node.style.display = 'none';
   }
 
   releaseAll(): void {

@@ -268,6 +268,46 @@ Bakes use native top-left texture UVs and shared `QuadMesh` geometry: no extra Y
 flip or disposal of borrowed geometry. Gameplay readback uses its explicit
 display-transform path. First-person refraction uses world coordinates.
 
+## Gameplay HUD and native controls
+
+The gameplay HUD always uses `ui/pixi-hud.ts` (`PixiHud`), including without URL
+flags. One passive, display-resolution WebGPU canvas borrows Three's initialized
+GPUDevice through `ui/pixi-device.ts`. No WebGL, additional HUD device,
+Application/render ticker or shared renderer-cache ownership. Only Three destroys
+the borrowed device; Pixi owns its stage, geometry, shaders, textures and canvas.
+The restricted DOM adapter must restore on construction/init/disposal failure.
+
+Pixi presents ammo/reload, health/armour, crosshair, retained minimap, fullscreen
+injury, compass/heard pings, hitmarkers/damage arcs, bandage/grenade inventory and
+FPS. Its canvas sits below native centre/chrome/menu layers. Injury is independent
+of readout fading. HUD fade, independent capped DPR, static-paused/absent-content
+redraw suppression, paused-FPS invalidation and failure-isolated teardown remain.
+`HealthFx`, `Crosshair`, `Hitmarkers`, `DamageArcs`, `Compass` and `AmmoPanel`
+retain animation/derived state, not legacy elements. Hit/arc/heard-ping pools use
+null nodes with the same bounded lifetime/reuse policy; native killfeed pools still
+own elements. Inventory pulses use unscaled UI time (280ms each direction); FPS
+samples wall time every500ms. Existing gameplay snapshots/events remain authority.
+
+Minimap's detached Canvas2D terrain bake remains one-time; `minimap.ts` no longer
+owns a live canvas/widget/draw loop. Pixi retains terrain, fitted name/code labels,
+48-contact capacity, search radii/height cues, clipping/fades and player ordering.
+FOV/search changes transform retained geometry. Chosen simple accessory icons and
+magazine bar stay. `pixi-type.ts` owns32/16/12px bottom-HUD value/count/label tiers.
+Radio inventory indication and dormant projected markers remain absent.
+
+The old HTML presenters/CSS, HTML fallback and comparison switches are removed.
+Legacy `pixi`, `combat`, `compass`, `underlays`, `icons` query flags do not select
+another backend. Standalone pause/ammo prototypes and unused `@pixi/ui` are retired.
+A required HUD initialization failure propagates to the native boot/reload dialog;
+readiness/gameplay must not start with no HUD. Preserve the original error even
+if partial cleanup fails.
+
+Start/error controls, menus/shop, score/status, killfeed, prompts/progress,
+banners/countdown and the field-radio panel remain native. The independent market
+inspection renderer is unchanged. This is not a wholesale UI framework/migration.
+See the [HUD contract and smoke checks](docs/hud.md). Earlier experiment reports
+and capture harnesses are available in Git history at `d5858ebc`.
+
 ## Models
 
 The [asset/world editing map](docs/assets.md) connects authoring tools, products

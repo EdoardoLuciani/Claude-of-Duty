@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { Texture, Vector3 } from 'three';
+import { Texture } from 'three';
 import { MeshPhysicalNodeMaterial } from 'three/webgpu';
 
 import { parseWorkerMessage } from '../../src/ai/attachment-types.ts';
@@ -127,16 +127,13 @@ assert.equal(zeroStats.savedMoves, 0);
 assert.equal(zeroStats.queueMs, 0);
 assert.equal(JSON.stringify(absentStats).includes('repeatedStates'), false);
 
-// Compass markers stay reusable as an optional color becomes unavailable.
-const objective = { position: new Vector3(1, 0, 0), label: 'A', color: '#fff' };
-const ui = { _compassObjs: [], _objectives: [objective] };
-const markers = UiSystem.prototype._buildCompassObjectives.call(ui, new Vector3());
-const marker = markers[0];
-assert.equal(marker.color, '#fff');
-objective.color = undefined;
-const nextMarkers = UiSystem.prototype._buildCompassObjectives.call(ui, new Vector3());
-assert.equal(nextMarkers[0], marker);
-assert.equal(marker.color, undefined);
+// Unwired projected marker/grenade UI has been removed, not merely hidden.
+const ui = new UiSystem();
+assert.equal('markers' in ui, false);
+assert.equal('worldLayer' in ui, false);
+assert.equal('spawnGrenade' in ui, false);
+assert.equal('_objectives' in ui, false);
+assert.equal('_buildCompassObjectives' in ui, false);
 
 // Keyed registration validates metadata and invalidates both ordering and hook caches.
 const registry = new Registry();

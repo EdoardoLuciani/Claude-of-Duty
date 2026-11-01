@@ -1,9 +1,9 @@
-import { el, setText, setStyle, clamp, Pool } from './util.ts';
+import { el, setText, clamp, Pool } from './util.ts';
 
-const SPAN_DEG = 120; // degrees visible across the strip
-const STRIP_W = 470; // css px at k=1, must match .ow-compass width
-const PPD = STRIP_W / SPAN_DEG;
-const CARD: Record<number, string> = {
+export const SPAN_DEG = 120;
+export const STRIP_W = 470;
+export const PPD = STRIP_W / SPAN_DEG;
+export const CARD: Record<number, string> = {
   0: 'N',
   45: 'NE',
   90: 'E',
@@ -14,18 +14,36 @@ const CARD: Record<number, string> = {
   315: 'NW',
 };
 
-/**
- * Heading strip, top centre.
- *
- * Ticks are laid out once across two full revolutions (0-720deg) with left
- * positions written as `calc(Npx * var(--k))`, so a resolution change re-scales
- * the whole strip with zero JS work. Only the strip's translateX is touched
- * per frame — one style write for 144 ticks.
- */
-interface CompassObjective {
-  bearing: number;
-  label?: string;
-  color?: string | undefined;
+/** Heading/heard-ping state; Pixi owns strip layout and rendering. */
+export class Compass {
+  heading = 0;
+  readonly pings = Array.from({ length: 8 }, (): { x: number; alpha: number } => ({
+    x: 0,
+    alpha: 0,
+  }));
+  readonly pingPool = new Pool(8, (): null => null);
+  ping(bearing: number): void {
+    const it = this.pingPool.acquire();
+    it.a = bearing;
+    it.life = 1.25;
+  }
+  update(heading: number, dt: number): void {
+    this.heading = ((heading % 360) + 360) % 360;
+    for (let i = 0; i < this.pingPool.items.length; i++) {
+      const it = this.pingPool.items[i];
+      if (!it.alive) continue;
+      it.t += dt;
+      if (it.t >= it.life) {
+        this.pingPool.release(it);
+        continue;
+      }
+      let rel = it.a - this.heading;
+      while (rel > 180) rel -= 360;
+      while (rel < -180) rel += 360;
+      this.pings[i].x = clamp(rel * PPD, -STRIP_W * 0.5 + 8, STRIP_W * 0.5 - 8);
+      this.pings[i].alpha = 1 - it.t / it.life;
+    }
+  }
 }
 interface ScoreState {
   score?: number;
@@ -36,112 +54,6 @@ interface ScoreState {
   nextWaveIn?: number;
   enemiesRemaining?: number;
 }
-export class Compass {
-  declare root: HTMLElement;
-  declare strip: HTMLElement;
-  declare objPool: Pool;
-  declare pingPool: Pool;
-  declare k: number;
-  constructor(parent: HTMLElement) {
-    this.root = el('div', 'ow-compass', parent);
-    this.strip = el('div', 'ow-compass-strip', this.root);
-    el('div', 'ow-compass-base', this.root);
-    el('div', 'ow-compass-caret', this.root);
-
-    for (let a = 0; a < 720; a += 5) {
-      const t = el('div', 'ow-tick' + (a % 15 === 0 ? ' maj' : ''), this.strip);
-      t.style.left = `calc(${(a * PPD).toFixed(2)}px * var(--k))`;
-      const c = CARD[a % 360];
-      if (c) {
-        const l = el('div', 'ow-tick-l' + (c.length > 1 ? ' sub' : ''), this.strip, c);
-        l.style.left = `calc(${(a * PPD).toFixed(2)}px * var(--k))`;
-      }
-    }
-    setStyle(this.strip, 'width', `calc(${(720 * PPD).toFixed(0)}px * var(--k))`);
-
-    this.objPool = new Pool(5, (): HTMLDivElement => el('div', 'ow-compass-obj'), this.root);
-    this.pingPool = new Pool(8, (): HTMLDivElement => el('div', 'ow-compass-ping'), this.root);
-
-    this.k = 1;
-  }
-
-  /** Short-lived bearing tick for a heard sprint. */
-  ping(bearing: number): void {
-    const it = this.pingPool.acquire();
-    it.a = bearing;
-    it.life = 1.25;
-  }
-
-  /**
-   * @param {number} heading degrees, 0 = north, clockwise
-   * @param {Array} objectives [{ bearing:deg, label:'A', color }]
-   * @param {number} dt
-   */
-  update(heading: number, objectives: CompassObjective[] | null, dt: number): void {
-    this.k = this.k || 1;
-    const k = this.k;
-    const h = ((heading % 360) + 360) % 360;
-    const x = STRIP_W * 0.5 * k - (h + 360) * PPD * k;
-    setStyle(this.strip, 'transform', `translateX(${x.toFixed(2)}px)`);
-
-    const half = STRIP_W * 0.5 * k;
-    const items = this.objPool.items;
-    let n = 0;
-    if (objectives) {
-      for (let i = 0; i < objectives.length && n < items.length; i++) {
-        const o = objectives[i];
-        let rel = o.bearing - h;
-        while (rel > 180) rel -= 360;
-        while (rel < -180) rel += 360;
-        const it = items[n++];
-        if (!it.alive) {
-          it.alive = true;
-          setStyle(it.node, 'display', '');
-        }
-        const px = clamp(rel * PPD * k, -half + 8 * k, half - 8 * k);
-        setText(it.node, o.label ?? '');
-        setStyle(it.node, 'left', '50%');
-        setStyle(it.node, 'transform', `translateX(calc(-50% + ${px.toFixed(1)}px))`);
-        setStyle(it.node, 'background', o.color ?? 'var(--cyan)');
-        setStyle(it.node, 'opacity', Math.abs(rel) > SPAN_DEG * 0.5 ? '0.45' : '1');
-      }
-    }
-    for (let i = n; i < items.length; i++) {
-      if (items[i].alive) {
-        items[i].alive = false;
-        setStyle(items[i].node, 'display', 'none');
-      }
-    }
-
-    const pings = this.pingPool.items;
-    for (let i = 0; i < pings.length; i++) {
-      const it = pings[i];
-      if (!it.alive) continue;
-      it.t += dt;
-      if (it.t >= it.life) {
-        this.pingPool.release(it);
-        continue;
-      }
-      let rel = it.a - h;
-      while (rel > 180) rel -= 360;
-      while (rel < -180) rel += 360;
-      const px = clamp(rel * PPD * k, -half + 8 * k, half - 8 * k);
-      const fade = 1 - it.t / it.life;
-      setStyle(it.node, 'left', '50%');
-      setStyle(it.node, 'transform', `translateX(calc(-50% + ${px.toFixed(1)}px))`);
-      setStyle(it.node, 'opacity', fade.toFixed(3));
-    }
-  }
-
-  setScale(k: number): void {
-    this.k = k;
-  }
-
-  dispose(): void {
-    this.root.remove();
-  }
-}
-
 /** Survival run status: one player score, current wave and enemy count. */
 export class ScoreBar {
   declare root: HTMLElement;

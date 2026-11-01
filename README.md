@@ -82,6 +82,12 @@ Other renderer follow-ups: [#370](https://github.com/EdoardoLuciani/Claude-of-Du
 
 ## Play
 
+The gameplay HUD uses **PixiJS/WebGPU by default**—no query parameter is needed.
+The migrated HUD has no legacy HTML backend or fallback. Native menus, startup/error
+controls and remaining prompts/panels stay accessible; HUD initialization failure
+shows the native Reload error dialog instead of starting without readouts.
+[HUD ownership, boundaries and checks](docs/hud.md).
+
 After loading, select **Start** to capture the mouse and begin. Pending or denied
 mouse capture keeps the run frozen; select **Retry Start** to retry (there is no
 unlocked-play fallback). Once playing, click the game canvas to reacquire the
