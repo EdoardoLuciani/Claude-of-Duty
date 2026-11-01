@@ -4,12 +4,10 @@ import { Pool, ease, clamp01 } from './util.ts';
 export const R_IN = 13; // well outside the reticle blades, so the two never merge
 export const R_OUT = 28.5;
 
-/** kind -> { colour, weight, scale, life, ring } */
 export type HitmarkerKind = 'hit' | 'armour' | 'head' | 'kill';
 
 interface HitmarkerStyle {
   c: string;
-  w: number;
   s: number;
   life: number;
   ring: number;
@@ -17,10 +15,10 @@ interface HitmarkerStyle {
 }
 
 export const KINDS: Record<HitmarkerKind, HitmarkerStyle> = {
-  hit: { c: '#f6fafc', w: 1.8, s: 1.0, life: 0.26, ring: 0, spin: 0 },
-  armour: { c: '#8fdcff', w: 2.0, s: 1.03, life: 0.28, ring: 0.5, spin: 0 },
-  head: { c: '#ffc247', w: 2.2, s: 1.08, life: 0.32, ring: 0.3, spin: 0 },
-  kill: { c: '#ff4433', w: 2.7, s: 1.18, life: 0.42, ring: 1, spin: 9 },
+  hit: { c: '#f6fafc', s: 1.0, life: 0.26, ring: 0, spin: 0 },
+  armour: { c: '#8fdcff', s: 1.03, life: 0.28, ring: 0.5, spin: 0 },
+  head: { c: '#ffc247', s: 1.08, life: 0.32, ring: 0.3, spin: 0 },
+  kill: { c: '#ff4433', s: 1.18, life: 0.42, ring: 1, spin: 9 },
 };
 
 /**

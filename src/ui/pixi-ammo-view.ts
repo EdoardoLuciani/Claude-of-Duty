@@ -28,7 +28,6 @@ export class PixiAmmoView {
     .stroke({ color: 0x080c10, width: 1 });
   private fill = new Graphics().rect(0, 0, 216, 3).fill(INK);
   dirty = true;
-  protected disposed = false;
   private lastAmmo = -1;
   private lastReserve = -1;
   private lastMode: AmmoState['fireMode'] | null = null;
@@ -77,7 +76,6 @@ export class PixiAmmoView {
   }
 
   update(_dt: number, s: AmmoState): void {
-    if (this.disposed) return;
     const ammo = Math.max(0, s.ammo | 0),
       mag = Math.max(1, s.magSize | 0 || 30);
     if (ammo !== this.lastAmmo) {

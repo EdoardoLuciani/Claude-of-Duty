@@ -147,7 +147,6 @@ try {
       if (!p) throw Error('Required default HUD did not initialize');
       return {
         ...window.__GPU_PROBE__,
-        pixi: true,
         shared: p.renderer.gpu.device === e.ctx.get('render').renderer.backend.device,
         passive:
           p.stage.eventMode === 'none' && getComputedStyle(p.canvas).pointerEvents === 'none',
@@ -176,11 +175,6 @@ try {
           .map((e) => e.name),
       };
     });
-    assert.equal(
-      setup.pixi,
-      true,
-      'default and retired URLs always initialize the complete Pixi HUD'
-    );
     assert.equal(setup.devices, 1);
     assert.equal(setup.webgl, 0);
     assert(setup.passive);
@@ -190,24 +184,21 @@ try {
     assert(setup.stateOnlyPools);
     assert.equal(setup.equipmentItems, 2);
     assert.equal(setup.radioInventoryPresent, false);
-    if (setup.pixi) {
-      assert(setup.shared);
-      assert.equal(
-        await page.evaluate(() => {
-          const p = window.__ENGINE__.ctx.get('ui').pixiHud;
-          return (
-            p.hp.style.fontSize === 32 &&
-            p.ammo.current.style.fontSize === 32 &&
-            p.maxHp.style.fontSize === 16 &&
-            p.ammo.reserve.style.fontSize === 16 &&
-            p.combat.slots.every((s) => s.label.style.fontSize === 16) &&
-            Math.abs(p.vitals.y + p.hp.y - p.ammo.stage.y - p.ammo.current.y) < 1e-6
-          );
-        }),
-        true,
-        'shared bottom-HUD typography and aligned numeric baselines'
-      );
-    }
+    assert.equal(
+      await page.evaluate(() => {
+        const p = window.__ENGINE__.ctx.get('ui').pixiHud;
+        return (
+          p.hp.style.fontSize === 32 &&
+          p.ammo.current.style.fontSize === 32 &&
+          p.maxHp.style.fontSize === 16 &&
+          p.ammo.reserve.style.fontSize === 16 &&
+          p.combat.slots.every((s) => s.label.style.fontSize === 16) &&
+          Math.abs(p.vitals.y + p.hp.y - p.ammo.stage.y - p.ammo.current.y) < 1e-6
+        );
+      }),
+      true,
+      'shared bottom-HUD typography and aligned numeric baselines'
+    );
     assert.equal(setup.markerUiPresent, false);
     assert.equal(setup.markerElements, 0);
     assert(setup.loads.length > 0, 'default path loads Pixi');
@@ -331,10 +322,8 @@ try {
           (1000 *
             (after.find((m) => m.name === key).value - before.find((m) => m.name === key).value)) /
           900;
-      if (setup.pixi) {
-        assert.equal(combat.nativeElements, 0);
-        assert.equal(combat.mapUploads, 1);
-      }
+      assert.equal(combat.nativeElements, 0);
+      assert.equal(combat.mapUploads, 1);
     }
     // Settled validation pose; GPU readback is outside timing.
     await page.evaluate(async () => {
@@ -353,275 +342,271 @@ try {
       ui.hit.clear();
       await window.__PUMP__(180);
     });
-    if (setup.pixi) {
-      const pixels = await capturePixi(page, resolve(out, `${run}-${mode}.png`));
-      assert.deepEqual(pixels.panelAlpha, [0, 0], 'health/ammo panel areas stay transparent');
-      assert(
-        pixels.readoutPixels.every((count) => count > 10),
-        'floating readouts actually render, including resized/DPR-2 captures'
-      );
-    }
-    if (setup.pixi) {
-      const feedback = await page.evaluate(async () => {
-        const e = window.__ENGINE__,
-          ui = e.ctx.get('ui'),
-          p = ui.pixiHud;
-        const oldWeapon = ui._weaponState,
-          oldPlayer = ui._playerState,
-          oldFps = ui._updateFps;
-        const fixture = { oldWeapon, oldPlayer, oldFps };
-        window.__COMBAT_FIXTURE__ = fixture;
-        ui._updateFps = () => {};
-        ui.fpsText = '123 FPS';
-        let empty = true;
-        ui._weaponState = function () {
-          return {
-            ...oldWeapon.call(this),
-            lethalCount: empty ? 0 : 3,
-            cooking: !empty,
-            grenadeEquipped: false,
-          };
-        };
-        ui._playerState = function () {
-          return { ...oldPlayer.call(this), bandages: empty ? 0 : 12, healing: !empty };
-        };
-        await window.__PUMP__(1);
-        if (!p.combat.slots.every((slot) => slot.node.alpha === 0.34))
-          throw Error('empty equipment opacity');
-        empty = false;
-        ui.compass.ping(ui.compass.heading - 35);
-        ui.compass.ping(ui.compass.heading + 35);
-        ui.arcs.spawn(1, 0, 1);
-        ui.arcs.spawn(-1, -1, 0.6);
-        await window.__PUMP__(3);
-        return { empty: true };
-      });
-      for (const kind of ['hit', 'armour', 'head', 'kill']) {
-        await page.evaluate(async (kind) => {
-          const ui = window.__ENGINE__.ctx.get('ui'),
-            p = ui.pixiHud;
-          ui.hit.clear();
-          const item = ui.hit.spawn(kind);
-          await window.__PUMP__(3);
-          {
-            const view = p.combat.hitSlots[item.i],
-              state = ui.hit.visuals[item.i];
-            if (
-              !view.node.visible ||
-              view.kind !== kind ||
-              view.mark.tint !==
-                Number.parseInt(
-                  { hit: '#f6fafc', armour: '#8fdcff', head: '#ffc247', kill: '#ff4433' }[
-                    kind
-                  ].slice(1),
-                  16
-                ) ||
-              view.node.scale.x !== state.scale ||
-              view.ring.alpha !== state.ringAlpha
-            )
-              throw Error('hit style/animation parity');
-            for (let i = 0; i < 6; i++)
-              if (
-                ui.arcs.pool.items[i].alive &&
-                p.combat.arcSlots[i].rotation !== ui.arcs.visuals[i].rotation
-              )
-                throw Error('damage arc direction');
-            if (p.combat.slots.map((s) => s.label.text).join() !== '12,3')
-              throw Error('equipment count parity');
-          }
-          if (p.compass.pings.filter((n) => n.visible).length < 2)
-            throw Error('heard bearing pings missing');
-        }, kind);
-        await capturePixi(page, resolve(out, `${run}-${mode}-feedback-${kind}.png`));
-      }
-      feedback.nativeElements = await page.evaluate(async () => {
-        const ui = window.__ENGINE__.ctx.get('ui'),
-          f = window.__COMBAT_FIXTURE__;
-        ui.hit.clear();
-        ui.arcs.clear();
-        ui.compass.pingPool.releaseAll();
-        const n = document.querySelectorAll('.ow-hit,.ow-dmg,.ow-compass,.ow-equip,.ow-fps').length;
-        ui._weaponState = f.oldWeapon;
-        ui._playerState = f.oldPlayer;
-        ui._updateFps = f.oldFps;
-        await window.__PUMP__(60);
-        delete window.__COMBAT_FIXTURE__;
-        return n;
-      });
-      assert.equal(feedback.nativeElements, 0, 'retired combat DOM must not exist or be recreated');
-      await page.evaluate(async () => {
-        const e = window.__ENGINE__;
-        e.ctx.get('player').health.armour = 0;
-        e.ctx.get('player').applyDamage(65, null);
-        await window.__PUMP__(6);
-      });
-      assert.equal(
-        await page.evaluate(
-          () => document.querySelectorAll('.ow-blood,.ow-lowbeat,.ow-hitflash').length
-        ),
-        0,
-        'native injury presenter is absent'
-      );
-      const injured = await capturePixi(page, resolve(out, `${run}-${mode}-injured.png`));
-      assert(
-        injured.cornerAlpha.some((alpha) => alpha > 0),
-        'injury really renders into GPU target'
-      );
-      const independentInjury = await page.evaluate(async () => {
-        const ui = window.__ENGINE__.ctx.get('ui'),
-          p = ui.pixiHud;
-        ui.setHudVisible(false);
-        await window.__PUMP__(60);
-        const ok =
-          !p.chrome.visible &&
-          p.injury.mesh.visible &&
-          p.injury.mesh.parent === p.stage &&
-          p.stage.alpha === 1 &&
-          Number(p.canvas.style.opacity || 1) === 1;
-        ui.setHudVisible(true);
-        return ok;
-      });
-      assert(independentInjury, 'HUD fading must not fade injury feedback');
-      await page.evaluate(async () => {
-        const e = window.__ENGINE__,
-          ui = e.ctx.get('ui');
-        e.ctx.get('player').health.reset(true);
-        ui.arcs.clear();
-        ui.hit.clear();
-        await window.__PUMP__(180);
-      });
-      checks = await page.evaluate(async () => {
-        const e = window.__ENGINE__,
-          ui = e.ctx.get('ui'),
-          p = ui.pixiHud,
-          player = e.ctx.get('player'),
-          w = e.ctx.get('weapons'),
-          ai = e.ctx.get('ai');
-        for (const actor of ai.agents) actor.dispose();
-        ai.agents.length = 0;
-        ai.squads.length = 0;
-        e.input.enabled = false;
-        e.input.frozen = true;
-        w.resetForNewGame();
-        player.health.reset(true);
-        player.health.armour = 150;
-        await window.__PUMP__(60);
-        // Injury and vitals consume the same existing health state.
-        player.applyDamage(10);
-        await window.__PUMP__(3);
-        const armour = p.armourFill.scale.x;
-        if (armour >= 1 || Math.abs(armour - ui.state.armour / (ui.state.maxArmour || 150)) > 1e-8)
-          throw Error('armour damage/count not presented');
-        player.health.armour = 0;
-        player.health.value = 20;
-        await window.__PUMP__(30);
-        if (p.hp.text !== '20' || p.hp.tint !== 0xff5145) throw Error('critical HP not presented');
-        player.health.value = 100;
-        await window.__PUMP__(30);
-        ui.menu.show();
-        // HUD opacity is now a GPU group fade, separate from injury opacity.
-        await window.__PUMP__(60);
-        const sampleFps = ui._updateFps;
-        ui._updateFps = () => {}; // unchanged-content test; live FPS changes tested separately below
-        try {
-          const draws = p.draws;
-          await window.__PUMP__(30);
-          if (p.draws !== draws) throw Error('paused static HUD redraws');
-          {
-            ui.fpsText = '123 FPS';
-            await window.__PUMP__(1);
-            if (p.combat.fps.text !== '123 FPS' || p.draws !== draws + 1)
-              throw Error('paused FPS must invalidate once');
-            await window.__PUMP__(5);
-            if (p.draws !== draws + 1) throw Error('unchanged FPS redraws');
-          }
-        } finally {
-          ui._updateFps = sampleFps;
-        }
-        ui.menu.close();
-        await window.__PUMP__(30);
-        ui.setHudVisible(false);
-        await window.__PUMP__(60);
-        const hidden = p.draws;
-        await window.__PUMP__(20);
-        if (p.draws !== hidden) throw Error('hidden HUD redraws');
-        ui.setHudVisible(true);
-        await window.__PUMP__(60);
-        w.state.mag = 7;
-        w.state.chambered = true;
-        if (!w.reload()) throw Error('reload failed');
-        await window.__PUMP__(45);
-        if (p.ammo.prompt.text !== 'RELOADING') throw Error('reload progress missing');
-        if (!w.setWeapon('pistol')) throw Error('switch failed');
-        await window.__PUMP__(100);
-        if (!p.ammo.name.text.includes('P320')) throw Error('weapon name missing');
-        const counts = [],
-          originalYaw = player.yaw;
-        for (let cycle = 0; cycle < 3; cycle++) {
-          for (let i = 0; i < 60; i++) {
-            w.state.mag = i % 12;
-            player.health.value = 20 + i;
-            player.movement.yaw = (i * Math.PI) / 30; // warm every cardinal and cross north repeatedly
-            await window.__PUMP__(1);
-          }
-          await p.renderer.gpu.device.queue.onSubmittedWorkDone();
-          counts.push(p.renderer.texture.managedTextures.length);
-        }
-        player.movement.yaw = originalYaw;
-        player.health.reset(true);
-        w.resetForNewGame();
-        await window.__PUMP__(60);
+    const pixels = await capturePixi(page, resolve(out, `${run}-${mode}.png`));
+    assert.deepEqual(pixels.panelAlpha, [0, 0], 'health/ammo panel areas stay transparent');
+    assert(
+      pixels.readoutPixels.every((count) => count > 10),
+      'floating readouts actually render, including resized/DPR-2 captures'
+    );
+    const feedback = await page.evaluate(async () => {
+      const e = window.__ENGINE__,
+        ui = e.ctx.get('ui'),
+        p = ui.pixiHud;
+      const oldWeapon = ui._weaponState,
+        oldPlayer = ui._playerState,
+        oldFps = ui._updateFps;
+      const fixture = { oldWeapon, oldPlayer, oldFps };
+      window.__COMBAT_FIXTURE__ = fixture;
+      ui._updateFps = () => {};
+      ui.fpsText = '123 FPS';
+      let empty = true;
+      ui._weaponState = function () {
         return {
-          armour,
-          counts,
-          uploads: p.minimap.uploads,
-          width: p.canvas.width,
-          height: p.canvas.height,
-          resolution: p.renderer.resolution,
-          deviceLost: e.error?.message ?? null,
+          ...oldWeapon.call(this),
+          lethalCount: empty ? 0 : 3,
+          cooking: !empty,
+          grenadeEquipped: false,
         };
-      });
-      assert.equal(checks.uploads, 1);
-      assert.equal(checks.counts.at(-1), checks.counts.at(-2), 'text textures plateau');
-      assert.equal(checks.deviceLost, null);
-      await page.setViewportSize({ width: 800, height: 1000 });
-      await page.evaluate(() => window.__PUMP__(3));
-      const resize = await page.evaluate(() => {
-        const p = window.__ENGINE__.ctx.get('ui').pixiHud;
-        return [p.renderer.screen.width, p.renderer.screen.height, p.canvas.width, p.canvas.height];
-      });
-      assert.deepEqual(resize, [800, 1000, 800 * checks.resolution, 1000 * checks.resolution]);
-      checks.lifecycle = await page.evaluate(async () => {
-        const e = window.__ENGINE__,
-          ui = e.ctx.get('ui'),
+      };
+      ui._playerState = function () {
+        return { ...oldPlayer.call(this), bandages: empty ? 0 : 12, healing: !empty };
+      };
+      await window.__PUMP__(1);
+      if (!p.combat.slots.every((slot) => slot.node.alpha === 0.34))
+        throw Error('empty equipment opacity');
+      empty = false;
+      ui.compass.ping(ui.compass.heading - 35);
+      ui.compass.ping(ui.compass.heading + 35);
+      ui.arcs.spawn(1, 0, 1);
+      ui.arcs.spawn(-1, -1, 0.6);
+      await window.__PUMP__(3);
+      return { empty: true };
+    });
+    for (const kind of ['hit', 'armour', 'head', 'kill']) {
+      await page.evaluate(async (kind) => {
+        const ui = window.__ENGINE__.ctx.get('ui'),
           p = ui.pixiHud;
-        const pointerTransparent =
-          document.elementFromPoint(innerWidth / 2, innerHeight / 2) === e.canvas;
-        ui.debugState('market');
-        await window.__PUMP__(30);
-        const shop = e.time.scale === 0 && ui.shop.active;
-        e.ctx.get('market').closeShop();
-        await window.__PUMP__(30);
-        e.ctx.get('player').applyDamage(20000, null);
-        await window.__PUMP__(90);
-        const death = ui.hudVisible < 0.004 && !p.chrome.visible;
-        e.events.emit('game:restart', { source: 'pixi-hud-test' });
-        await window.__PUMP__(90);
-        const restart = ui.hudVisible > 0.99 && p.enabled;
-        ui.installStartGate();
-        await window.__PUMP__(2);
-        const waiting = !p.enabled && e.gameplaySuspended;
-        e.fail('ui', 'pixiHudFixture', new Error('intentional HUD terminal check'));
-        const terminal = !p.enabled && !!document.getElementById('engine-failure');
-        return { pointerTransparent, shop, death, restart, waiting, terminal };
-      });
-      assert(Object.values(checks.lifecycle).every(Boolean), JSON.stringify(checks.lifecycle));
-      errors.splice(
-        0,
-        errors.length,
-        ...errors.filter((s) => !s.includes('[engine] ui pixiHudFixture failed; reload required'))
-      );
+        ui.hit.clear();
+        const item = ui.hit.spawn(kind);
+        await window.__PUMP__(3);
+        {
+          const view = p.combat.hitSlots[item.i],
+            state = ui.hit.visuals[item.i];
+          if (
+            !view.node.visible ||
+            view.kind !== kind ||
+            view.mark.tint !==
+              Number.parseInt(
+                { hit: '#f6fafc', armour: '#8fdcff', head: '#ffc247', kill: '#ff4433' }[kind].slice(
+                  1
+                ),
+                16
+              ) ||
+            view.node.scale.x !== state.scale ||
+            view.ring.alpha !== state.ringAlpha
+          )
+            throw Error('hit style/animation parity');
+          for (let i = 0; i < 6; i++)
+            if (
+              ui.arcs.pool.items[i].alive &&
+              p.combat.arcSlots[i].rotation !== ui.arcs.visuals[i].rotation
+            )
+              throw Error('damage arc direction');
+          if (p.combat.slots.map((s) => s.label.text).join() !== '12,3')
+            throw Error('equipment count parity');
+        }
+        if (p.compass.pings.filter((n) => n.visible).length < 2)
+          throw Error('heard bearing pings missing');
+      }, kind);
+      await capturePixi(page, resolve(out, `${run}-${mode}-feedback-${kind}.png`));
     }
+    feedback.nativeElements = await page.evaluate(async () => {
+      const ui = window.__ENGINE__.ctx.get('ui'),
+        f = window.__COMBAT_FIXTURE__;
+      ui.hit.clear();
+      ui.arcs.clear();
+      ui.compass.pingPool.releaseAll();
+      const n = document.querySelectorAll('.ow-hit,.ow-dmg,.ow-compass,.ow-equip,.ow-fps').length;
+      ui._weaponState = f.oldWeapon;
+      ui._playerState = f.oldPlayer;
+      ui._updateFps = f.oldFps;
+      await window.__PUMP__(60);
+      delete window.__COMBAT_FIXTURE__;
+      return n;
+    });
+    assert.equal(feedback.nativeElements, 0, 'retired combat DOM must not exist or be recreated');
+    await page.evaluate(async () => {
+      const e = window.__ENGINE__;
+      e.ctx.get('player').health.armour = 0;
+      e.ctx.get('player').applyDamage(65, null);
+      await window.__PUMP__(6);
+    });
+    assert.equal(
+      await page.evaluate(
+        () => document.querySelectorAll('.ow-blood,.ow-lowbeat,.ow-hitflash').length
+      ),
+      0,
+      'native injury presenter is absent'
+    );
+    const injured = await capturePixi(page, resolve(out, `${run}-${mode}-injured.png`));
+    assert(
+      injured.cornerAlpha.some((alpha) => alpha > 0),
+      'injury really renders into GPU target'
+    );
+    const independentInjury = await page.evaluate(async () => {
+      const ui = window.__ENGINE__.ctx.get('ui'),
+        p = ui.pixiHud;
+      ui.setHudVisible(false);
+      await window.__PUMP__(60);
+      const ok =
+        !p.chrome.visible &&
+        p.injury.mesh.visible &&
+        p.injury.mesh.parent === p.stage &&
+        p.stage.alpha === 1 &&
+        Number(p.canvas.style.opacity || 1) === 1;
+      ui.setHudVisible(true);
+      return ok;
+    });
+    assert(independentInjury, 'HUD fading must not fade injury feedback');
+    await page.evaluate(async () => {
+      const e = window.__ENGINE__,
+        ui = e.ctx.get('ui');
+      e.ctx.get('player').health.reset(true);
+      ui.arcs.clear();
+      ui.hit.clear();
+      await window.__PUMP__(180);
+    });
+    checks = await page.evaluate(async () => {
+      const e = window.__ENGINE__,
+        ui = e.ctx.get('ui'),
+        p = ui.pixiHud,
+        player = e.ctx.get('player'),
+        w = e.ctx.get('weapons'),
+        ai = e.ctx.get('ai');
+      for (const actor of ai.agents) actor.dispose();
+      ai.agents.length = 0;
+      ai.squads.length = 0;
+      e.input.enabled = false;
+      e.input.frozen = true;
+      w.resetForNewGame();
+      player.health.reset(true);
+      player.health.armour = 150;
+      await window.__PUMP__(60);
+      // Injury and vitals consume the same existing health state.
+      player.applyDamage(10);
+      await window.__PUMP__(3);
+      const armour = p.armourFill.scale.x;
+      if (armour >= 1 || Math.abs(armour - ui.state.armour / (ui.state.maxArmour || 150)) > 1e-8)
+        throw Error('armour damage/count not presented');
+      player.health.armour = 0;
+      player.health.value = 20;
+      await window.__PUMP__(30);
+      if (p.hp.text !== '20' || p.hp.tint !== 0xff5145) throw Error('critical HP not presented');
+      player.health.value = 100;
+      await window.__PUMP__(30);
+      ui.menu.show();
+      // HUD opacity is now a GPU group fade, separate from injury opacity.
+      await window.__PUMP__(60);
+      const sampleFps = ui._updateFps;
+      ui._updateFps = () => {}; // unchanged-content test; live FPS changes tested separately below
+      try {
+        const draws = p.draws;
+        await window.__PUMP__(30);
+        if (p.draws !== draws) throw Error('paused static HUD redraws');
+        {
+          ui.fpsText = '123 FPS';
+          await window.__PUMP__(1);
+          if (p.combat.fps.text !== '123 FPS' || p.draws !== draws + 1)
+            throw Error('paused FPS must invalidate once');
+          await window.__PUMP__(5);
+          if (p.draws !== draws + 1) throw Error('unchanged FPS redraws');
+        }
+      } finally {
+        ui._updateFps = sampleFps;
+      }
+      ui.menu.close();
+      await window.__PUMP__(30);
+      ui.setHudVisible(false);
+      await window.__PUMP__(60);
+      const hidden = p.draws;
+      await window.__PUMP__(20);
+      if (p.draws !== hidden) throw Error('hidden HUD redraws');
+      ui.setHudVisible(true);
+      await window.__PUMP__(60);
+      w.state.mag = 7;
+      w.state.chambered = true;
+      if (!w.reload()) throw Error('reload failed');
+      await window.__PUMP__(45);
+      if (p.ammo.prompt.text !== 'RELOADING') throw Error('reload progress missing');
+      if (!w.setWeapon('pistol')) throw Error('switch failed');
+      await window.__PUMP__(100);
+      if (!p.ammo.name.text.includes('P320')) throw Error('weapon name missing');
+      const counts = [],
+        originalYaw = player.yaw;
+      for (let cycle = 0; cycle < 3; cycle++) {
+        for (let i = 0; i < 60; i++) {
+          w.state.mag = i % 12;
+          player.health.value = 20 + i;
+          player.movement.yaw = (i * Math.PI) / 30; // warm every cardinal and cross north repeatedly
+          await window.__PUMP__(1);
+        }
+        await p.renderer.gpu.device.queue.onSubmittedWorkDone();
+        counts.push(p.renderer.texture.managedTextures.length);
+      }
+      player.movement.yaw = originalYaw;
+      player.health.reset(true);
+      w.resetForNewGame();
+      await window.__PUMP__(60);
+      return {
+        armour,
+        counts,
+        uploads: p.minimap.uploads,
+        width: p.canvas.width,
+        height: p.canvas.height,
+        resolution: p.renderer.resolution,
+        deviceLost: e.error?.message ?? null,
+      };
+    });
+    assert.equal(checks.uploads, 1);
+    assert.equal(checks.counts.at(-1), checks.counts.at(-2), 'text textures plateau');
+    assert.equal(checks.deviceLost, null);
+    await page.setViewportSize({ width: 800, height: 1000 });
+    await page.evaluate(() => window.__PUMP__(3));
+    const resize = await page.evaluate(() => {
+      const p = window.__ENGINE__.ctx.get('ui').pixiHud;
+      return [p.renderer.screen.width, p.renderer.screen.height, p.canvas.width, p.canvas.height];
+    });
+    assert.deepEqual(resize, [800, 1000, 800 * checks.resolution, 1000 * checks.resolution]);
+    checks.lifecycle = await page.evaluate(async () => {
+      const e = window.__ENGINE__,
+        ui = e.ctx.get('ui'),
+        p = ui.pixiHud;
+      const pointerTransparent =
+        document.elementFromPoint(innerWidth / 2, innerHeight / 2) === e.canvas;
+      ui.debugState('market');
+      await window.__PUMP__(30);
+      const shop = e.time.scale === 0 && ui.shop.active;
+      e.ctx.get('market').closeShop();
+      await window.__PUMP__(30);
+      e.ctx.get('player').applyDamage(20000, null);
+      await window.__PUMP__(90);
+      const death = ui.hudVisible < 0.004 && !p.chrome.visible;
+      e.events.emit('game:restart', { source: 'pixi-hud-test' });
+      await window.__PUMP__(90);
+      const restart = ui.hudVisible > 0.99 && p.enabled;
+      ui.installStartGate();
+      await window.__PUMP__(2);
+      const waiting = !p.enabled && e.gameplaySuspended;
+      e.fail('ui', 'pixiHudFixture', new Error('intentional HUD terminal check'));
+      const terminal = !p.enabled && !!document.getElementById('engine-failure');
+      return { pointerTransparent, shop, death, restart, waiting, terminal };
+    });
+    assert(Object.values(checks.lifecycle).every(Boolean), JSON.stringify(checks.lifecycle));
+    errors.splice(
+      0,
+      errors.length,
+      ...errors.filter((s) => !s.includes('[engine] ui pixiHudFixture failed; reload required'))
+    );
     const teardown = await page.evaluate(async () => {
       const e = window.__ENGINE__,
         p = e.ctx.get('ui').pixiHud;

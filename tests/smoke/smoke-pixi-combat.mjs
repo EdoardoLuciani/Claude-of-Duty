@@ -10,15 +10,15 @@ import { UiSystem } from '../../src/ui/index.ts';
 const stable = (value) =>
   JSON.stringify(value, (_, v) => (typeof v === 'number' ? Number(v.toFixed(10)) : v));
 
-const native = {
+const models = {
   hit: new Hitmarkers(),
   arcs: new DamageArcs(),
   compass: new Compass(),
   ammo: new AmmoPanel(),
 };
 const golden = createHash('sha256'); // 240-frame golden captured at 3cb261b5.
-assert.equal(native.ammo.equipment.length, 2);
-for (const model of Object.values(native)) assert(!('root' in model));
+assert.equal(models.ammo.equipment.length, 2);
+for (const model of Object.values(models)) assert(!('root' in model));
 const kinds = ['hit', 'armour', 'head', 'kill'];
 for (let i = 0; i < 240; i++) {
   const dt = i > 90 && i < 120 ? 0 : 1 / 60;
@@ -34,47 +34,43 @@ for (let i = 0; i < 240; i++) {
     grenadeEquipped: i > 150 && i < 170,
     radioEquipped: i > 190,
   };
-  const update = (models) => {
-    if (i % 3 === 0) models.hit.spawn(kinds[i % 4]);
-    if (i % 8 === 0) models.arcs.spawn(Math.sin(i), Math.cos(i), i / 240);
-    if (i % 4 === 0) models.compass.ping(i * 13);
-    if (i === 180) {
-      models.hit.clear();
-      models.arcs.clear();
-    }
-    models.hit.update(dt);
-    models.arcs.update(dt, 1, 0, 0, -1);
-    models.compass.update(i * 9 - 720, dt);
-    models.ammo.update(dt, s, 1 / 60);
-  };
-  update(native);
+  if (i % 3 === 0) models.hit.spawn(kinds[i % 4]);
+  if (i % 8 === 0) models.arcs.spawn(Math.sin(i), Math.cos(i), i / 240);
+  if (i % 4 === 0) models.compass.ping(i * 13);
+  if (i === 180) {
+    models.hit.clear();
+    models.arcs.clear();
+  }
+  models.hit.update(dt);
+  models.arcs.update(dt, 1, 0, 0, -1);
+  models.compass.update(i * 9 - 720, dt);
+  models.ammo.update(dt, s, 1 / 60);
   golden.update(
     stable({
-      hit: native.hit.visuals,
-      arcs: native.arcs.visuals,
-      pings: native.compass.pings,
-      heading: native.compass.heading,
-      equipment: native.ammo.equipment,
-      pools: ['hit', 'arcs'].map((k) => native[k].pool.items.map((x) => [x.alive, x.t])),
+      hit: models.hit.visuals,
+      arcs: models.arcs.visuals,
+      pings: models.compass.pings,
+      heading: models.compass.heading,
+      equipment: models.ammo.equipment,
+      pools: ['hit', 'arcs'].map((k) => models[k].pool.items.map((x) => [x.alive, x.t])),
     })
   );
-  for (const key of ['hit', 'arcs']) assert(native[key].pool.items.every((x) => x.node === null));
+  for (const key of ['hit', 'arcs']) assert(models[key].pool.items.every((x) => x.node === null));
 }
 assert.equal(
   golden.digest('hex'),
   '8d7bca36ce2db659dfcb60df6802114517e3c550a28524cba56b924d7e96e5b3',
   'accepted combat/pooling/compass/equipment trajectory'
 );
-const gpu = native;
 for (let i = 0; i < 121; i++) {
-  gpu.hit.update(1 / 60);
-  gpu.arcs.update(1 / 60, 1, 0, 0, -1);
-  gpu.compass.update(-1, 1 / 60);
+  models.hit.update(1 / 60);
+  models.arcs.update(1 / 60, 1, 0, 0, -1);
+  models.compass.update(-1, 1 / 60);
 }
-assert(gpu.hit.pool.items.every((x) => !x.alive));
-assert(gpu.arcs.pool.items.every((x) => !x.alive));
-assert(gpu.compass.pingPool.items.every((x) => !x.alive));
-assert.equal(gpu.compass.heading, 359);
+assert(models.hit.pool.items.every((x) => !x.alive));
+assert(models.arcs.pool.items.every((x) => !x.alive));
+assert(models.compass.pingPool.items.every((x) => !x.alive));
+assert.equal(models.compass.heading, 359);
 
 const ui = new UiSystem();
 ui._updateFps(0);
