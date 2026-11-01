@@ -416,23 +416,40 @@ try {
       await probe.select('ammo', 'Ammo Refill');
       const status = probe.status.textContent;
       lateImageLoad();
-      const staleIgnored = probe.status.textContent === status && oldImage.parentNode === null;
+      const afterLateLoad = probe.status.textContent;
       probe.fail();
-      const failurePreservesArt =
-        probe.activeId === 'ammo' && probe.image !== null && probe.status.textContent === status;
+      const afterFailure = {
+        id: probe.activeId,
+        hasImage: probe.image !== null,
+        status: probe.status.textContent,
+      };
       probe.hide();
-      return { cancelled, staleIgnored, failurePreservesArt, imageAfterClose: probe.image };
+      return {
+        cancelled,
+        status,
+        afterLateLoad,
+        oldImageDetached: oldImage.parentNode === null,
+        afterFailure,
+        imageAfterClose: probe.image,
+      };
     } finally {
       w.createInspectionModel = original;
       probe.dispose();
     }
   });
-  assert.deepEqual(artworkRace, {
-    cancelled: true,
-    staleIgnored: true,
-    failurePreservesArt: true,
-    imageAfterClose: null,
-  });
+  assert.equal(artworkRace.cancelled, true, 'artwork disposes a late weapon clone');
+  assert.equal(artworkRace.oldImageDetached, true);
+  assert.equal(artworkRace.afterLateLoad, artworkRace.status, 'obsolete image loads are ignored');
+  assert.deepEqual(
+    artworkRace.afterFailure,
+    {
+      id: 'ammo',
+      hasImage: true,
+      status: artworkRace.status,
+    },
+    'a 3D failure preserves the supply illustration'
+  );
+  assert.equal(artworkRace.imageAfterClose, null);
 
   assert.equal(initFailure.originalError, true, 'cleanup preserves the original init failure');
   assert.equal(initFailure.failed, true);
