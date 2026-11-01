@@ -61,7 +61,10 @@ const HEARING_SETTLE_SECONDS = 0.03;
 // a new ramp without a value event at its start.
 function holdHearingParam(param: AudioParam, time: number): void {
   const value = param.value;
-  param.cancelAndHoldAtTime(time);
+  // Firefox lacks cancelAndHoldAtTime. All callers replace automation at the
+  // current audio time, so cancelling and anchoring the sampled value suffices.
+  if (typeof param.cancelAndHoldAtTime === 'function') param.cancelAndHoldAtTime(time);
+  else param.cancelScheduledValues(time);
   param.setValueAtTime(value, time);
 }
 const CONCUSSION_CUTOFF_RATIO = 0.075; // full concussion bottoms out at 1.5 kHz
