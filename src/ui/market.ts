@@ -173,7 +173,6 @@ export class MarketOverlay {
     const meta = el('div', 'ow-market-meta', card);
     const stock = el('div', 'ow-market-stock', meta);
     const gun = item.action === 'equipped' || item.action === 'swap';
-    if (gun) card.dataset.weapon = '';
     card.tabIndex = 0;
     card.setAttribute('role', 'group');
     card.setAttribute('aria-label', `${item.label}, select to inspect`);

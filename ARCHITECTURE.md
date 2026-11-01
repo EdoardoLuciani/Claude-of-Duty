@@ -284,8 +284,7 @@ DOM input, not the paused simulation clock. Only explicit Buy/Swap buttons
 purchase; selecting or inspecting an item never changes loadout or credits.
 Non-weapon market items use the exhaustive local artwork map in
 `src/ui/market-art.ts`. Image selection invalidates pending weapon clones and hides
-3D-only controls; image errors leave purchases usable. Supply cards now select only,
-just like weapon cards; every purchase requires its explicit Buy/Swap button.
+3D-only controls; image errors leave purchases usable.
 Artwork generation is offline-only; model, prompts and processing live in
 `assets/ui/market/`, with optimized runtime WebPs in `public/images/market/`.
 

@@ -169,7 +169,7 @@ export class MarketInspection {
     this.canvas.hidden = true;
     this.threeControls.hidden = !weapon;
     this.controls.enabled = weapon && !this.failed;
-    if (!isWeaponId(id)) {
+    if (!weapon) {
       const art = MARKET_ART[id];
       const image = el('img', 'ow-market-inspect-art');
       this.image = image;
