@@ -15,8 +15,7 @@ import { Killfeed } from './killfeed.ts';
 import { MarketOverlay, MarketCountdown } from './market.ts';
 import { PauseMenu } from './menu.ts';
 import { Minimap } from './minimap.ts';
-import type { PixiUiExperiment } from './pixi-experiment.ts';
-import type { PixiHudSlice } from './pixi-hud.ts';
+import type { PixiHud } from './pixi-hud.ts';
 import { Prompt, Banner } from './prompts.ts';
 import { RadioPanel } from './radio.ts';
 import { StartGate } from './start.ts';
@@ -31,7 +30,7 @@ const HEAL_KEY = bindingLabel('heal');
  * HUD / UI subsystem
  * ===========================================================================
  *
- * A DOM+CSS overlay (see style.ts for the design system) driven entirely from
+ * A shared-device Pixi gameplay HUD plus native menus/prompts, driven entirely from
  * `lateUpdate`, after the camera has reached its final transform for the frame.
  * Nothing animates on a CSS keyframe or transition: every value is integrated
  * from `dt` here, which is what makes the capture harness deterministic and
@@ -126,7 +125,6 @@ export class UiSystem {
   ctx!: UiContext;
   rng!: import('../core/rng.ts').Rng;
   root!: HTMLElement;
-  hurtLayer!: HTMLElement;
   centreLayer!: HTMLElement;
   chromeLayer!: HTMLElement;
   health!: HealthFx;
@@ -142,13 +140,11 @@ export class UiSystem {
   banner!: Banner;
   menu!: PauseMenu;
   startGate: StartGate | null = null;
-  pixiExperiment: PixiUiExperiment | null = null;
-  pixiHud: PixiHudSlice | null = null;
+  pixiHud: PixiHud | null = null;
   gameOver!: GameOverScreen;
   shop!: MarketOverlay;
   marketCountdown!: MarketCountdown;
   radio!: RadioPanel;
-  fps!: HTMLElement;
   _fpsSince: number | null = null;
   _fpsFrames = 0;
   fpsText = '— FPS';
@@ -181,20 +177,19 @@ export class UiSystem {
     this.root = el('div', 'ow-hud', host);
 
     // Stacking order: hurt overlays sit under the HUD, the menu over everything.
-    this.hurtLayer = el('div', 'ow-layer', this.root);
     this.centreLayer = el('div', 'ow-layer', this.root);
     this.chromeLayer = el('div', 'ow-layer', this.root);
 
-    this.health = new HealthFx(this.hurtLayer, this.chromeLayer);
+    this.health = new HealthFx();
     this.rng.fork(); // Keep the minimap's noise stream unchanged after removing damage popups.
-    this.arcs = new DamageArcs(this.centreLayer);
-    this.crosshair = new Crosshair(this.centreLayer);
-    this.hit = new Hitmarkers(this.centreLayer);
-    this.minimap = new Minimap(this.chromeLayer, this.rng.fork());
-    this.compass = new Compass(this.chromeLayer);
+    this.arcs = new DamageArcs();
+    this.crosshair = new Crosshair();
+    this.hit = new Hitmarkers();
+    this.minimap = new Minimap(this.rng.fork());
+    this.compass = new Compass();
     this.scoreBar = new ScoreBar(this.chromeLayer);
     this.killfeed = new Killfeed(this.chromeLayer);
-    this.ammo = new AmmoPanel(this.chromeLayer);
+    this.ammo = new AmmoPanel();
     this.prompt = new Prompt(this.chromeLayer);
     this.banner = new Banner(this.chromeLayer);
     this.menu = new PauseMenu(this.root, ctx);
@@ -208,7 +203,6 @@ export class UiSystem {
     this.shop = new MarketOverlay(this.root, ctx);
     this.marketCountdown = new MarketCountdown(this.chromeLayer, ctx.get('market').delay);
     this.radio = new RadioPanel(this.chromeLayer, ctx);
-    this.fps = el('div', 'ow-fps', this.chromeLayer, '— FPS');
 
     /** Single source of truth for everything the HUD draws. */
     this.state = {
@@ -363,8 +357,6 @@ export class UiSystem {
 
     on('engine:error', (): void => {
       this.shop.hide();
-      this.pixiExperiment?.root.setAttribute('inert', '');
-      this.ammo.pixi?.setVisible(false);
       this.pixiHud?.setVisible(false);
     });
     on('market:open', (e): void => {
@@ -468,75 +460,11 @@ export class UiSystem {
     });
 
     this.resize(ctx.canvas.clientWidth || innerWidth, ctx.canvas.clientHeight || innerHeight, ctx);
-    const pixiMode = new URLSearchParams(location.search).get('pixi');
-    if (pixiMode === 'hud') {
-      try {
-        const { PixiHudSlice } = await import('./pixi-hud.ts');
-        this.pixiHud = await PixiHudSlice.create(
-          this.root,
-          this.centreLayer,
-          ctx.get('render').renderer,
-          {
-            injury: new URLSearchParams(location.search).get('underlays') !== 'html',
-            combat: new URLSearchParams(location.search).get('combat') !== 'html',
-            compass: new URLSearchParams(location.search).get('compass') !== 'html',
-          }
-        );
-        this.pixiHud.resize(this.vw, this.vh, this.k);
-        this.root.classList.add('ow-hud-slice');
-        this.ammo.presentReadout = false;
-        this.hit.present = this.arcs.present = this.ammo.presentEquipment = !this.pixiHud.gpuCombat;
-        this.compass.present = !this.pixiHud.gpuCompass;
-        this.root.classList.toggle('ow-hud-combat', this.pixiHud.gpuCombat);
-        this.root.classList.toggle('ow-hud-compass', this.pixiHud.gpuCompass);
-        this.hurtLayer.hidden = this.pixiHud.gpuUnderlays;
-      } catch (error) {
-        try {
-          this.pixiHud?.dispose();
-        } catch (cleanupError) {
-          console.warn('[ui] Pixi HUD cleanup failed', cleanupError);
-        } finally {
-          this.pixiHud = null;
-          this.root.classList.remove('ow-hud-slice');
-          this.ammo.presentReadout = true;
-          this.hit.present =
-            this.arcs.present =
-            this.ammo.presentEquipment =
-            this.compass.present =
-              true;
-          this.root.classList.remove('ow-hud-combat', 'ow-hud-compass');
-          this.hurtLayer.hidden = false;
-        }
-        console.warn('[ui] Pixi HUD unavailable; using native HUD', error);
-      }
-    } else if (pixiMode === 'ammo') {
-      try {
-        const { PixiAmmoHud } = await import('./pixi-ammo.ts');
-        this.ammo.pixi = await PixiAmmoHud.create(this.ammo.root, ctx.get('render').renderer);
-      } catch (error) {
-        console.warn('[ui] Pixi ammo unavailable; using native HUD', error);
-      }
-    } else if (pixiMode === '1') {
-      const layout = this.menu.root.querySelector<HTMLElement>('.ow-menu-layout');
-      const controls = this.menu.root.querySelector<HTMLElement>('.ow-controls');
-      if (layout && controls) {
-        try {
-          const { PixiUiExperiment } = await import('./pixi-experiment.ts');
-          this.pixiExperiment = await PixiUiExperiment.create(layout, ctx.get('render').renderer);
-          controls.before(this.pixiExperiment.root);
-          controls.style.gridColumn = '1 / -1';
-        } catch (error) {
-          const status = el(
-            'p',
-            null,
-            layout,
-            'Pixi experiment unavailable; native settings still work.'
-          );
-          status.setAttribute('role', 'status');
-          console.warn('[ui] Pixi experiment unavailable', error);
-        }
-      }
-    }
+    // A HUD failure is a boot failure: main.ts keeps its native reload/error dialog.
+    // Never start gameplay with an invisible HUD or a retired HTML fallback.
+    const { PixiHud } = await import('./pixi-hud.ts');
+    this.pixiHud = await PixiHud.create(this.root, this.centreLayer, ctx.get('render').renderer);
+    this.pixiHud.resize(this.vw, this.vh, this.k);
   }
 
   /* ------------------------------------------------------------- helpers -- */
@@ -665,7 +593,6 @@ export class UiSystem {
     const elapsed = now - this._fpsSince;
     if (elapsed < 500) return;
     this.fpsText = `${Math.round((this._fpsFrames * 1000) / elapsed)} FPS`;
-    if (!this.pixiHud?.gpuCombat) this.fps.textContent = this.fpsText;
     this._fpsSince = now;
     this._fpsFrames = 0;
   }
@@ -680,8 +607,6 @@ export class UiSystem {
     // The native Start dialog exclusively owns waiting input/presentation.
     // Resume happens between frames; reveal only after normal active pose hooks.
     if (this.startGate && !this.startGate.afterPose()) {
-      this.pixiExperiment?.update(false, 0);
-      this.ammo.pixi?.setVisible(false);
       this.pixiHud?.setVisible(false);
       this._hadPointerLock = false;
       return;
@@ -707,7 +632,6 @@ export class UiSystem {
       }
     }
     this.menu.update(rawDt);
-    this.pixiExperiment?.update(this.menu.open && !ctx.engine.error, rawDt);
     this.gameOver.update(rawDt);
     this.shop.update(rawDt);
 
@@ -787,11 +711,10 @@ export class UiSystem {
     setStyle(this.chromeLayer, 'opacity', hudOp);
     setStyle(this.centreLayer, 'opacity', hudOp);
 
-    this.crosshair.update(dt, s, !this.pixiHud);
+    this.crosshair.update(dt, s);
     this.hit.update(dt);
     this.arcs.update(dt, rx, rz, fx, fz);
-    this.health.update(dt, s, !this.pixiHud, !this.pixiHud?.gpuUnderlays);
-    this.ammo.pixi?.setVisible(this.hudVisible >= 0.004 && !ctx.engine.error);
+    this.health.update(dt, s);
     this.ammo.update(dt, s, rawElapsed);
     this.killfeed.update(dt);
     this.scoreBar.update(s);
@@ -811,7 +734,7 @@ export class UiSystem {
     this.marketCountdown.update(rawDt, s.marketIn);
     this.radio.update(rawDt);
 
-    this.compass.update(heading, null, dt);
+    this.compass.update(heading, dt);
 
     // ---- minimap ---------------------------------------------------------
     if (!this.minimap.bakeDone && ++this._bakeFrame > 6 && this._bakeFrame % 20 === 0) {
@@ -848,7 +771,7 @@ export class UiSystem {
         this.hudVisible,
         this
       );
-    } else this.minimap.draw(this._mmState);
+    }
   }
 
   _collectBlips(): void {
@@ -879,33 +802,20 @@ export class UiSystem {
     this.k = clamp(Math.min(w / 1920, h / 1080), 0.25, 2.4);
     this.root.style.setProperty('--k', this.k.toFixed(4));
     this.crosshair.setScale(this.k);
-    this.compass.setScale(this.k);
-    this.minimap.resize(this.k);
-    this.pixiExperiment?.resize();
-    this.ammo.pixi?.resize();
     this.pixiHud?.resize(w, h, this.k);
   }
 
   dispose(): void {
-    // These trials are mutually exclusive. Clear ownership before cleanup so a
-    // Pixi exception cannot skip the remaining native UI teardown or retry it.
-    const pixi = this.pixiHud ?? this.pixiExperiment ?? this.ammo.pixi;
+    // Clear ownership first; a GPU cleanup failure must not skip native controls.
+    const pixi = this.pixiHud;
     this.pixiHud = null;
-    this.pixiExperiment = null;
-    this.ammo.pixi = null;
     try {
       pixi?.dispose();
     } finally {
       this.startGate?.dispose();
       for (const off of this._unsubs) off();
       this._unsubs.length = 0;
-      this.crosshair.dispose();
-      this.hit.dispose();
-      this.arcs.dispose();
-      this.health.dispose();
-      this.ammo.dispose();
       this.killfeed.dispose();
-      this.compass.dispose();
       this.scoreBar.dispose();
       this.minimap.dispose();
       this.prompt.dispose();

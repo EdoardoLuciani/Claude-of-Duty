@@ -2,21 +2,20 @@ import { captureNative } from '../../tools/lib/native-render.mjs';
 
 /** Read back the real Pixi target before DOM composition (headless Vulkan can
  * present blank swapchains). Capture-only copies never enter runtime code. */
-export async function capturePixi(page, path, kind = 'panel') {
-  const readback = await page.evaluate(async (kind) => {
+export async function capturePixi(page, path) {
+  const readback = await page.evaluate(async () => {
     const ui = window.__ENGINE__.ctx.get('ui');
-    const p = kind === 'hud' ? ui.pixiHud : kind === 'ammo' ? ui.ammo.pixi : ui.pixiExperiment;
+    const p = ui.pixiHud;
     const r = p.renderer;
-    const fullView = kind === 'hud' || kind === 'ammo';
     const texture = r.textureGenerator.generateTexture({
       target: p.stage,
-      ...(fullView ? { frame: r.screen.clone() } : {}),
+      frame: r.screen.clone(),
       resolution: r.resolution,
     });
     // generateTexture crops local bounds and overrides the root transform.
     // Replay into the full viewport with the normal root scale, so removing
     // panels cannot crop/stretch ammo captures or break resized/DPR-2 HUD shots.
-    if (fullView) r.render({ container: p.stage, target: texture, clear: true });
+    r.render({ container: p.stage, target: texture, clear: true });
     const source = r.texture.getGpuSource(texture.source),
       device = r.gpu.device;
     const width = source.width,
@@ -58,7 +57,7 @@ export async function capturePixi(page, path, kind = 'panel') {
       overlay.style.visibility = p.canvas.style.visibility;
       parent.insertBefore(overlay, p.canvas.nextSibling);
       window.__PIXI_CAPTURE__ = { overlay, parent, position };
-      if (kind === 'hud') {
+      {
         const scale = p.stage.scale.x * r.resolution;
         const alpha = (node, x, y) =>
           rgba[
@@ -85,12 +84,11 @@ export async function capturePixi(page, path, kind = 'panel') {
           readoutPixels: [ink(p.vitals, 12, 24, 90, 46), ink(p.ammo.stage, 12, 34, 206, 62)],
         };
       }
-      return null;
     } finally {
       buffer.destroy();
       texture.destroy(true);
     }
-  }, kind);
+  });
   try {
     await captureNative(page, path);
   } finally {

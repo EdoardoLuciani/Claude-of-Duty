@@ -61,7 +61,6 @@ try {
   });
   globalThis.document = { createElement: make, createElementNS: make };
   const ammo = new AmmoPanel(make());
-  ammo.presentEquipment = ammo.presentReadout = false;
   const s = { ammo: 10, reserve: 20, magSize: 30, bandages: 2, healing: true };
   ammo.update(0, s, 0);
   assert.equal(ammo.equipment[0].alpha, 0.35);

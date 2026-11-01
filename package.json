@@ -25,7 +25,6 @@
     "shot": "node tools/capture.mjs"
   },
   "dependencies": {
-    "@pixi/ui": "2.4.1",
     "@recast-navigation/core": "0.43.1",
     "@recast-navigation/wasm": "0.43.1",
     "pixi.js": "8.22.0",

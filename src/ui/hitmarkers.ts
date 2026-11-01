@@ -1,17 +1,11 @@
 import type { ElementPool, PoolRecord } from './pool-types.ts';
-import { el, svg, setStyle, Pool, ease, clamp01 } from './util.ts';
+import { Pool, ease, clamp01 } from './util.ts';
 
 export const R_IN = 13; // well outside the reticle blades, so the two never merge
 export const R_OUT = 28.5;
-const D = Math.SQRT1_2;
 
 /** kind -> { colour, weight, scale, life, ring } */
 export type HitmarkerKind = 'hit' | 'armour' | 'head' | 'kill';
-
-type HitmarkerNode = HTMLDivElement & {
-  _ring: SVGCircleElement;
-  _main: SVGGElement;
-};
 
 interface HitmarkerStyle {
   c: string;
@@ -37,7 +31,6 @@ export const KINDS: Record<HitmarkerKind, HitmarkerStyle> = {
  * slower than this feels like a notification instead of a hit.
  */
 export class Hitmarkers {
-  present = true;
   readonly visuals = Array.from(
     { length: 10 },
     (): {
@@ -56,67 +49,17 @@ export class Hitmarkers {
       ringAlpha: 0,
     })
   );
-  declare pool: ElementPool<HitmarkerNode>;
-
-  constructor(parent: HTMLElement) {
-    this.pool = new Pool(
-      10,
-      (): HitmarkerNode => {
-        const node = el('div', 'ow-hit');
-        const s = svg('svg', { viewBox: '-28 -28 56 56' }, node);
-
-        const ring = svg(
-          'circle',
-          {
-            r: 30,
-            fill: 'none',
-            stroke: '#fff',
-            'stroke-width': 1.4,
-            opacity: 0,
-          },
-          s
-        );
-
-        // dark backing strokes first so the marker keeps contrast on snow/sky
-        const back = svg('g', { stroke: 'rgba(0,0,0,.7)', 'stroke-width': 4.0, fill: 'none' }, s);
-        const main = svg('g', { stroke: '#fff', 'stroke-width': 2.2, fill: 'none' }, s);
-        for (const g of [back, main]) {
-          for (let q = 0; q < 4; q++) {
-            const sx = q === 0 || q === 3 ? 1 : -1;
-            const sy = q < 2 ? -1 : 1;
-            svg(
-              'line',
-              {
-                x1: (R_IN * D * sx).toFixed(2),
-                y1: (R_IN * D * sy).toFixed(2),
-                x2: (R_OUT * D * sx).toFixed(2),
-                y2: (R_OUT * D * sy).toFixed(2),
-                'stroke-linecap': 'square',
-              },
-              g
-            );
-          }
-        }
-        return Object.assign(node, { _ring: ring, _main: main });
-      },
-      parent
-    );
-  }
+  readonly pool: ElementPool<null> = new Pool(10, (): null => null);
 
   /** @param {'hit'|'armour'|'head'|'kill'} kind */
-  spawn(kind: HitmarkerKind = 'hit'): PoolRecord<HitmarkerNode> {
+  spawn(kind: HitmarkerKind = 'hit'): PoolRecord<null> {
     const k = KINDS[kind] ?? KINDS.hit;
-    const it = this.pool.acquire(this.present);
+    const it = this.pool.acquire();
     it.life = k.life;
     it.a = k.s;
     it.b = k.ring;
     it.c = k.spin;
     this.visuals[it.i].kind = kind in KINDS ? kind : 'hit';
-    if (!this.present) return it;
-    it.node._main.setAttribute('stroke', k.c);
-    it.node._main.setAttribute('stroke-width', String(k.w));
-    it.node._ring.setAttribute('stroke', k.c);
-    if (k.ring <= 0) setStyle(it.node._ring, 'opacity', '0');
     return it;
   }
 
@@ -128,7 +71,7 @@ export class Hitmarkers {
       it.t += dt;
       const u = it.t / it.life;
       if (u >= 1) {
-        this.pool.release(it, this.present);
+        this.pool.release(it);
         continue;
       }
       // snap in over the first 34% of life, then hold, then fall off
@@ -143,26 +86,10 @@ export class Hitmarkers {
       const rt = clamp01(u / 0.6);
       visual.ringScale = 0.55 + 1.15 * ease.outQuint(rt);
       visual.ringAlpha = it.b * (1 - ease.outQuad(rt));
-      if (!this.present) continue;
-      setStyle(
-        it.node,
-        'transform',
-        `scale(${scale.toFixed(3)})` + (it.c ? ` rotate(${rot.toFixed(2)}deg)` : '')
-      );
-      setStyle(it.node, 'opacity', alpha.toFixed(3));
-
-      if (it.b > 0) {
-        it.node._ring.setAttribute('transform', `scale(${visual.ringScale.toFixed(3)})`);
-        setStyle(it.node._ring, 'opacity', visual.ringAlpha.toFixed(3));
-      }
     }
   }
 
   clear(): void {
-    this.pool.releaseAll(this.present);
-  }
-
-  dispose(): void {
-    for (const it of this.pool.items) it.node.remove();
+    this.pool.releaseAll();
   }
 }

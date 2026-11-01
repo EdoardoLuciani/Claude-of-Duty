@@ -1,5 +1,11 @@
 # Pixi injury overlays
 
+> **Historical experiment.** The [current gameplay HUD](../hud.md) now uses Pixi
+> by default. Its old HTML presenters/fallback, URL comparison switches and
+> standalone experiment harnesses are retired. Commands and measurements below
+> refer to their named historical revisions, not current runtime options; use
+> Git history to reproduce them. No new performance claim accompanies promotion.
+
 `?pixi=hud` renders blood edges, heartbeat vignette and hit flash through the same
 Pixi canvas. `?pixi=hud&underlays=html` retains native injury for comparison.
 Omitting Pixi still uses the native UI throughout. The later

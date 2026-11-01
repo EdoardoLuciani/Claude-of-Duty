@@ -50,7 +50,7 @@ function arc(): Graphics {
   return g;
 }
 
-/** Retained presentation only; native owners advance all combat lifetimes. */
+/** Retained presentation only; HUD models advance all combat lifetimes. */
 interface HitSlot {
   node: Container;
   mark: Graphics;

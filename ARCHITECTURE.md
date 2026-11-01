@@ -268,64 +268,46 @@ Bakes use native top-left texture UVs and shared `QuadMesh` geometry: no extra Y
 flip or disposal of borrowed geometry. Gameplay readback uses its explicit
 display-transform path. First-person refraction uses world coordinates.
 
-## Experimental UI
+## Gameplay HUD and native controls
 
-`?pixi=1` loads the pause-panel trial; `?pixi=ammo` loads only the actual ammo/reload
-readout. They are mutually exclusive and the default UI does not load Pixi.
-Both borrow the game's GPUDevice through `ui/pixi-device.ts`, using one separate,
-demand-rendered, display-resolution canvas, not Three's renderer/world textures.
-UI owns Pixi resources and restores its restricted DOM adapter on construction or
-teardown failure; it must never destroy the borrowed device or skip native cleanup.
-`AmmoPanel` retains native equipment and shares `AmmoState` / magazine-pip math with
-`ui/pixi-ammo.ts`. Its passive canvas stays in the original chrome layer so injury,
-menu and HUD opacity ordering are unchanged. No application/render ticker is used;
-Pixi still has an interaction ticker. Native startup/error/menu controls remain.
-See [panel limitations](docs/experiments/pixi-ui.md) and
-[ammo combat measurements](docs/experiments/pixi-ammo.md). This is not a production
-UI migration or a general-purpose UI abstraction.
+The gameplay HUD always uses `ui/pixi-hud.ts` (`PixiHud`), including without URL
+flags. One passive, display-resolution WebGPU canvas borrows Three's initialized
+GPUDevice through `ui/pixi-device.ts`. No WebGL, additional HUD device,
+Application/render ticker or shared renderer-cache ownership. Only Three destroys
+the borrowed device; Pixi owns its stage, geometry, shaders, textures and canvas.
+The restricted DOM adapter must restore on construction/init/disposal failure.
 
-`?pixi=hud` is the playable gameplay slice: ammo/reload, health/armour, reticle,
-minimap, fullscreen injury, compass/heard pings, hitmarkers/damage arcs,
-equipment and FPS. One passive Pixi canvas stays below native
-centre/chrome layers. Its order is injury → readouts; HUD fade affects readouts,
-**not injury**. `HealthFx`, `Compass`, `Hitmarkers`, `DamageArcs` and `AmmoPanel`
-own shared animation/pooling/equipment state; Pixi only presents it. The optional
-pool presentation flag suppresses acquire/release/clear DOM writes as well as
-normal update writes. Equipment's280ms alternating pulse uses shared unscaled
-UI time; FPS keeps wall-clock500ms samples and can invalidate paused rendering.
-`?pixi=hud&combat=html` keeps the new group native; `&compass=html` keeps only
-the compass native. Neither is a production backend default. Native hurt/replaced widget DOM writes are disabled.
-`?pixi=hud&underlays=html` keeps native injury presentation for comparison.
-Unwired projected objective/grenade-warning UI is removed in both backends,
-including its UI spawning API and objective-list plumbing. Actual grenades,
-minimap contacts/search areas and combat state/events are unchanged.
-`PixiAmmoView` shares ammo graphics without renderer ownership. Minimap uploads
-the existing one-time Canvas2D bake once and retains GPU objects.
-All other native HUD/menu presenters remain. Engine-driven active rendering,
-no absent-content/static-paused redraws after fades settle, independent capped DPR,
-shared-device ownership and failure-isolated teardown remain required. The injury
-mesh owns its geometry/WGSL program, never borrowed device/textures. This is not
-the no-UI benchmark state. See [initial slice](docs/experiments/pixi-hud.md) and
-[injury migration and historical comparison](docs/experiments/pixi-underlays.md).
-Current extension ownership/limits/measurements: [combat UI](docs/experiments/pixi-combat.md).
-Presentation is intentionally not CSS-pixel-parity:24 compass ticks/simple backing,
-one tinted hit X, one outlined damage arc, cosine equipment pulse, chosen simple accessory
-icons/counts, one magazine-fill bar and plain health/armour bars. Shared state/events,
-low-health/empty/reload cues, unscaled pulse period and FPS sampling remain.
-See [Pixi-to-Pixi simplification measurements](docs/experiments/pixi-simplify.md).
-The operator chose the simple bandage/grenade silhouettes; original/text comparison
-modes are retired. `pixi-type.ts` owns the bottom-HUD32/16/12px value/count/label
-hierarchy. Primary health/ammo rows align; maximum/reserve/accessory counts share a size.
-The radio inventory count/icon and its unused UI snapshot fields are removed
-from HTML and Pixi. Radio mechanics and the separate field-radio panel remain
-unchanged pending a broader rework.
-Icons retain geometry, updating counts/layout only on stock changes.
-The magazine stays a bar. [Historical icon measurements](docs/experiments/pixi-accessory-icons.md)
-found no meaningful original/simple cost difference. The retained minimap now combines
-name/code labels, omits the decorative grid and transforms unit FOV/search geometry
-instead of rebuilding it. Terrain, names/codes, contact capacity, clipping/fades,
-search radii and height arrows remain. [Isolated minimap CPU comparison](docs/experiments/pixi-minimap.md)
-is not whole-HUD marginal cost, GPU time or an FPS claim.
+Pixi presents ammo/reload, health/armour, crosshair, retained minimap, fullscreen
+injury, compass/heard pings, hitmarkers/damage arcs, bandage/grenade inventory and
+FPS. Its canvas sits below native centre/chrome/menu layers. Injury is independent
+of readout fading. HUD fade, independent capped DPR, static-paused/absent-content
+redraw suppression, paused-FPS invalidation and failure-isolated teardown remain.
+`HealthFx`, `Crosshair`, `Hitmarkers`, `DamageArcs`, `Compass` and `AmmoPanel`
+retain animation/derived state, not legacy elements. Hit/arc/heard-ping pools use
+null nodes with the same bounded lifetime/reuse policy; native killfeed pools still
+own elements. Inventory pulses use unscaled UI time (280ms each direction); FPS
+samples wall time every500ms. Existing gameplay snapshots/events remain authority.
+
+Minimap's detached Canvas2D terrain bake remains one-time; `minimap.ts` no longer
+owns a live canvas/widget/draw loop. Pixi retains terrain, fitted name/code labels,
+48-contact capacity, search radii/height cues, clipping/fades and player ordering.
+FOV/search changes transform retained geometry. Chosen simple accessory icons and
+magazine bar stay. `pixi-type.ts` owns32/16/12px bottom-HUD value/count/label tiers.
+Radio inventory indication and dormant projected markers remain absent.
+
+The old HTML presenters/CSS, HTML fallback and comparison switches are removed.
+Legacy `pixi`, `combat`, `compass`, `underlays`, `icons` query flags do not select
+another backend. Standalone pause/ammo prototypes and unused `@pixi/ui` are retired.
+A required HUD initialization failure propagates to the native boot/reload dialog;
+readiness/gameplay must not start with no HUD. Preserve the original error even
+if partial cleanup fails.
+
+Start/error controls, menus/shop, score/status, killfeed, prompts/progress,
+banners/countdown and the field-radio panel remain native. The independent market
+inspection renderer is unchanged. This is not a wholesale UI framework/migration.
+See [current HUD contract and qualification](docs/hud.md). Historical experiment
+reports under `docs/experiments/pixi-*.md` describe their named revisions, not
+current runtime switches, defaults or new performance claims.
 
 ## Models
 

@@ -1,82 +1,70 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 
 import { Crosshair } from '../../src/ui/crosshair.ts';
 import { HealthFx } from '../../src/ui/health.ts';
 import { PixiMinimap } from '../../src/ui/pixi-minimap.ts';
 
-const element = () => ({
-  styles: new Map(),
-  textContent: '',
-  style: {
-    setProperty(key, value) {
-      this.owner.styles.set(key, value);
-    },
-  },
-  classList: { toggle() {} },
-  appendChild() {},
-  setAttribute() {},
-  remove() {},
-});
-const make = () => {
-  const node = element();
-  node.style.owner = node;
-  return node;
-};
-const old = globalThis.document;
-try {
-  globalThis.document = { createElement: make };
-  const native = new Crosshair(make()),
-    model = new Crosshair(make());
-  const domHealth = new HealthFx(make()),
-    gpuHealth = new HealthFx(make());
-  for (let i = 0; i < 180; i++) {
-    const state = Object.freeze({
-      move: (i % 30) / 30,
-      ads: i > 70,
-      crouch: i < 20,
-      airborne: i > 150,
-      health: i % 100,
-      maxHealth: 100,
-      armour: i % 151,
-      hurt: 0.4,
-      pulse: (i % 9) / 9,
-    });
-    if (i % 20 === 0) {
-      native.onFire();
-      model.onFire();
-      domHealth.onDamage();
-      gpuHealth.onDamage();
-      domHealth.onArmour(25);
-      gpuHealth.onArmour(25);
-    }
-    native.update(1 / 60, state);
-    model.update(1 / 60, state, false);
-    domHealth.update(1 / 60, state);
-    gpuHealth.update(1 / 60, state, false);
-    for (const key of [
-      'kick',
-      'kickVel',
-      'moveSpread',
-      'adsBlend',
-      'visible',
-      'gap',
-      'bladeLength',
-      'bladeAlpha',
-      'dotScale',
-      'dotAlpha',
-    ])
-      assert.equal(model[key], native[key]);
-    for (const key of ['hpShown', 'hurt', 'beatEnergy', 'armourShown', 'armourFlash', 'flashT'])
-      assert.equal(gpuHealth[key], domHealth[key]);
-  }
-  assert.equal(model.blades[0].styles.size, 0, 'hidden native crosshair is not presented');
-  assert.equal(gpuHealth.hpFill.styles.size, 0, 'hidden native vitals are not presented');
-  assert(gpuHealth.bloodWrap.styles.size > 0, 'native injury overlay remains active');
-} finally {
-  if (old === undefined) delete globalThis.document;
-  else globalThis.document = old;
-}
+// Ignore platform-level floating-point ulps, not animation changes.
+const stable = (value) =>
+  JSON.stringify(value, (_, v) => (typeof v === 'number' ? Number(v.toFixed(10)) : v));
 
+// Golden trajectory captured at 3cb261b5 before removing native presentation.
+const golden = createHash('sha256'),
+  native = new Crosshair(),
+  domHealth = new HealthFx();
+for (let i = 0; i < 180; i++) {
+  const state = Object.freeze({
+    move: (i % 30) / 30,
+    ads: i > 70,
+    crouch: i < 20,
+    airborne: i > 150,
+    health: i % 100,
+    maxHealth: 100,
+    armour: i % 151,
+    hurt: 0.4,
+    pulse: (i % 9) / 9,
+  });
+  if (i % 20 === 0) {
+    native.onFire();
+    domHealth.onDamage();
+    domHealth.onArmour(25);
+  }
+  native.update(1 / 60, state);
+  domHealth.update(1 / 60, state);
+  golden.update(
+    stable({
+      cross: Object.fromEntries(
+        [
+          'kick',
+          'kickVel',
+          'moveSpread',
+          'adsBlend',
+          'visible',
+          'gap',
+          'bladeLength',
+          'bladeAlpha',
+          'dotScale',
+          'dotAlpha',
+        ].map((k) => [k, native[k]])
+      ),
+      health: Object.fromEntries(
+        ['hpShown', 'hurt', 'beatEnergy', 'armourShown', 'armourFlash', 'flashT'].map((k) => [
+          k,
+          domHealth[k],
+        ])
+      ),
+    })
+  );
+}
+assert.equal(
+  golden.digest('hex'),
+  'fb84e0434b8b663c89d5df5b8091e6a3a26b0c7a880ca779cf54b44376f9af0b',
+  'accepted crosshair/vitals timing is unchanged'
+);
+assert(!('root' in native));
+assert(!('vitals' in domHealth));
+assert(!('bloodWrap' in domHealth));
 const minimap = new PixiMinimap(),
   map = { baked: null, viewSpan: 60 };
 const state = {
@@ -118,5 +106,5 @@ assert.equal(minimap.objectives[0].node.visible, false);
 assert.equal(minimap.pulses[0].node.visible, false);
 minimap.stage.destroy({ children: true });
 console.log(
-  'ok Pixi HUD: shared native model parity, no duplicate presentation, retained minimap projection/clipping/fades/objectives/pulses'
+  'ok Pixi HUD: accepted golden timing, no native widgets, retained minimap projection/clipping/fades/objectives/pulses'
 );

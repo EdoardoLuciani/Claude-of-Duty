@@ -1,5 +1,11 @@
 # PixiJS UI experiment
 
+> **Historical experiment.** The [current gameplay HUD](../hud.md) now uses Pixi
+> by default. Its old HTML presenters/fallback, URL comparison switches and
+> standalone experiment harnesses are retired. Commands and measurements below
+> refer to their named historical revisions, not current runtime options; use
+> Git history to reproduce them. No new performance claim accompanies promotion.
+
 ## Try it
 
 Run the game with `?pixi=1`, then press Escape to open the pause menu. A Pixi panel

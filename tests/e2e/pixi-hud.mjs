@@ -11,7 +11,7 @@ import {
   parseArgs,
 } from '../../tools/lib/browser-harness.mjs';
 import { combatLane } from '../../tools/lib/combat-fixture.js';
-import { waitForGame, captureNative } from '../../tools/lib/native-render.mjs';
+import { waitForGame } from '../../tools/lib/native-render.mjs';
 import { createCombatProfile, validateCombatProfile } from '../../tools/lib/profile-combat.js';
 import { capturePixi } from '../lib/pixi-capture.mjs';
 
@@ -30,28 +30,20 @@ const browser = await launchChromium({
 });
 const results = [];
 try {
-  const modes = [];
-  for (let i = 0; i < rounds; i++)
-    modes.push(
-      ...(args.combat || args.compass
-        ? i % 2
-          ? ['hud', args.compass ? 'bearing' : 'legacy']
-          : [args.compass ? 'bearing' : 'legacy', 'hud']
-        : args.underlays
-          ? i % 2
-            ? ['hud', 'html']
-            : ['html', 'hud']
-          : i % 2
-            ? ['hud', 'dom']
-            : ['dom', 'hud'])
-    );
-  modes.push('retina', 'unavailable');
+  assert(!args.combat && !args.compass && !args.underlays, 'HTML comparison modes are retired');
+  const modes = [
+    ...Array.from({ length: rounds }, () => 'hud'),
+    'retina',
+    'old-flags',
+    'unavailable',
+  ];
   for (const [run, mode] of modes.entries()) {
     const page = await browser.newPage({
       viewport: mode === 'retina' ? { width: 960, height: 900 } : { width: 1920, height: 1080 },
       deviceScaleFactor: mode === 'retina' ? 2 : 1,
     });
-    if (args.preview) {
+    {
+      // Metadata-only preflight avoids cold Chromium adapter startup races.
       await page.goto(`http://localhost:${port}/LICENSE.txt`);
       await page.waitForFunction(
         async () =>
@@ -64,10 +56,14 @@ try {
     const errors = [];
     collectBrowserErrors(page, errors, { validationMessages: true });
     await page.addInitScript((unavailable) => {
+      // Dev-mode module graphs exceed the browser's default 250 resource entries.
+      performance.setResourceTimingBufferSize(10000);
       const adapter = navigator.gpu.requestAdapter.bind(navigator.gpu);
       let count = 0;
       navigator.gpu.requestAdapter = (...a) =>
-        unavailable && ++count > 1 ? Promise.resolve(null) : adapter(...a);
+        unavailable && sessionStorage.getItem('allowHud') !== '1' && ++count > 1
+          ? Promise.resolve(null)
+          : adapter(...a);
       window.__GPU_PROBE__ = { devices: 0, destroys: 0, webgl: 0 };
       const make = GPUAdapter.prototype.requestDevice,
         destroy = GPUDevice.prototype.destroy,
@@ -86,8 +82,57 @@ try {
       };
     }, mode === 'unavailable');
     await page.goto(
-      `http://localhost:${port}/?capture=1&lockstep=1&q=${args.quality ?? 'high'}${mode === 'dom' ? '' : '&pixi=hud'}${mode === 'html' ? '&underlays=html' : ''}${mode === 'legacy' ? '&combat=html' : mode === 'bearing' ? '&compass=html' : ''}`
+      `http://localhost:${port}/?capture=1&lockstep=1&q=${args.quality ?? 'high'}${mode === 'old-flags' ? '&pixi=ammo&underlays=html&combat=html&compass=html&icons=text' : ''}`
     );
+    if (mode === 'unavailable') {
+      await page.waitForSelector('#engine-failure', { timeout: 20000 });
+      const failed = await page.evaluate(() => {
+        const dialog = document.getElementById('engine-failure');
+        return {
+          ...window.__GPU_PROBE__,
+          message: dialog.textContent,
+          reload: !!dialog.querySelector('button'),
+          pixi: !!document.querySelector('canvas.ow-pixi-hud'),
+          ready: window.__READY__ === true,
+          enginePublished: !!window.__ENGINE__,
+          legacy: document.querySelectorAll(
+            '.ow-ammo,.ow-cross,.ow-vitals,.ow-blood,.ow-compass,.ow-fps,.ow-minimap,.ow-hit,.ow-dmg'
+          ).length,
+        };
+      });
+      assert.match(failed.message, /Could not query matching adapter metadata/);
+      assert(failed.reload);
+      assert.equal(failed.pixi, false);
+      assert.equal(failed.ready, false);
+      assert.equal(failed.enginePublished, false);
+      assert.equal(failed.legacy, 0);
+      assert.equal(failed.devices, 1);
+      assert.equal(failed.destroys, 0);
+      assert.equal(failed.webgl, 0);
+      // Unblock the next navigation and activate the real native Reload button.
+      await page.evaluate(() => sessionStorage.setItem('allowHud', '1'));
+      await Promise.all([
+        page.waitForEvent('load'),
+        page.locator('#engine-failure button').click(),
+      ]);
+      await waitForGame(page);
+      assert.equal(await page.evaluate(() => !!window.__ENGINE__.ctx.get('ui').pixiHud), true);
+      await page.evaluate(() => window.__ENGINE__.dispose());
+      assert.equal(await page.evaluate(() => window.__GPU_PROBE__.destroys), 1);
+      assert.deepEqual(
+        errors.filter(
+          (x) =>
+            !x.includes('Could not query matching adapter metadata') &&
+            !x.includes('THREE.TSL: Return statement used')
+        ),
+        []
+      );
+      results.push({ run, mode, failed, reloadRecovered: true });
+      await writeFile(resolve(out, 'results.json'), JSON.stringify(results, null, 2));
+      console.log(JSON.stringify({ run, mode, failed }));
+      await page.close();
+      continue;
+    }
     const device = await waitForGame(page);
     // Known upstream prewarm warning; all other errors/validation failures fail.
     errors.splice(
@@ -99,63 +144,51 @@ try {
       const e = window.__ENGINE__,
         ui = e.ctx.get('ui'),
         p = ui.pixiHud;
-      window.__NATIVE_COUNTS__ = { map: 0, ammo: 0 };
-      for (const [obj, key, name] of [
-        [ui.minimap, 'draw', 'map'],
-        [ui.ammo, '_updateReadout', 'ammo'],
-      ]) {
-        const fn = obj[key];
-        obj[key] = function (...a) {
-          window.__NATIVE_COUNTS__[name]++;
-          return fn.apply(this, a);
-        };
-      }
       return {
         ...window.__GPU_PROBE__,
         pixi: !!p,
         shared: p?.renderer.gpu.device === e.ctx.get('render').renderer.backend.device,
         passive:
-          !p ||
-          (p.stage.eventMode === 'none' && getComputedStyle(p.canvas).pointerEvents === 'none'),
-        nativeInjury: getComputedStyle(ui.hurtLayer).display !== 'none',
-        markerUiPresent:
-          'markers' in ui ||
-          'spawnGrenade' in ui ||
-          'worldLayer' in ui ||
-          (!!p && 'worldMarkers' in p),
-        markerElements: document.querySelectorAll('.ow-mk, .ow-nade').length,
-        gpuUnderlays: p?.gpuUnderlays ?? false,
-        gpuCombat: p?.gpuCombat ?? false,
-        gpuCompass: p?.gpuCompass ?? false,
-        nativeCompass: getComputedStyle(ui.compass.root).display !== 'none',
-        nativeFps: getComputedStyle(ui.fps).display !== 'none',
-        nativeMap: getComputedStyle(ui.minimap.root).display !== 'none',
-        nativeVitals: getComputedStyle(ui.health.vitals).display !== 'none',
-        nativeCrosshair: getComputedStyle(ui.crosshair.root).display !== 'none',
-        nativeEquipment: getComputedStyle(ui.ammo.equip).display !== 'none',
-        equipmentItems: ui.ammo.equip.childElementCount,
-        radioInventoryPresent:
-          'slotR' in ui.ammo || 'slotRn' in ui.ammo || (p?.combat.slots.length ?? 2) !== 2,
+          p?.stage.eventMode === 'none' && getComputedStyle(p.canvas).pointerEvents === 'none',
+        legacyElements: document.querySelectorAll(
+          '.ow-ammo,.ow-cross,.ow-vitals,.ow-blood,.ow-lowbeat,.ow-hitflash,.ow-compass,.ow-fps,.ow-minimap,.ow-hit,.ow-dmg'
+        ).length,
+        legacyModels:
+          'draw' in ui.minimap ||
+          '_updateReadout' in ui.ammo ||
+          'root' in ui.crosshair ||
+          'vitals' in ui.health ||
+          'hurtLayer' in ui ||
+          'pixiExperiment' in ui,
+        stateOnlyPools: [
+          ...ui.hit.pool.items,
+          ...ui.arcs.pool.items,
+          ...ui.compass.pingPool.items,
+        ].every((x) => x.node === null),
+        equipmentItems: p?.combat.slots.length,
+        radioInventoryPresent: 'slotR' in ui.ammo || 'slotRn' in ui.ammo,
+        markerUiPresent: 'markers' in ui || 'spawnGrenade' in ui || 'worldLayer' in ui,
+        markerElements: document.querySelectorAll('.ow-mk,.ow-nade').length,
         loads: performance
           .getEntriesByType('resource')
           .filter((e) => /pixi/i.test(e.name))
           .map((e) => e.name),
       };
     });
-    assert.equal(setup.pixi, mode !== 'dom' && mode !== 'unavailable');
+    assert.equal(
+      setup.pixi,
+      true,
+      'default and retired URLs always initialize the complete Pixi HUD'
+    );
     assert.equal(setup.devices, 1);
     assert.equal(setup.webgl, 0);
     assert(setup.passive);
-    assert.equal(setup.gpuCombat, setup.pixi && mode !== 'legacy');
-    assert.equal(setup.gpuCompass, setup.gpuCombat && mode !== 'bearing');
-    assert.equal(setup.nativeEquipment, !setup.gpuCombat);
-    assert.equal(setup.equipmentItems, 2, 'HTML inventory contains only bandage and grenade');
+    assert(setup.shared);
+    assert.equal(setup.legacyElements, 0);
+    assert.equal(setup.legacyModels, false);
+    assert(setup.stateOnlyPools);
+    assert.equal(setup.equipmentItems, 2);
     assert.equal(setup.radioInventoryPresent, false);
-    assert.equal(setup.nativeFps, !setup.gpuCombat);
-    assert.equal(setup.nativeCompass, !setup.gpuCompass);
-    assert.equal(setup.nativeMap, !setup.pixi);
-    assert.equal(setup.nativeVitals, !setup.pixi);
-    assert.equal(setup.nativeCrosshair, !setup.pixi);
     if (setup.pixi) {
       assert(setup.shared);
       assert.equal(
@@ -174,15 +207,13 @@ try {
         'shared bottom-HUD typography and aligned numeric baselines'
       );
     }
-    assert.equal(setup.gpuUnderlays, setup.pixi && mode !== 'html');
-    assert.equal(setup.nativeInjury, !setup.gpuUnderlays);
     assert.equal(setup.markerUiPresent, false);
     assert.equal(setup.markerElements, 0);
-    if (mode === 'dom') assert.deepEqual(setup.loads, [], 'default path does not fetch Pixi');
+    assert(setup.loads.length > 0, 'default path loads Pixi');
     let combat = null,
       metrics = null,
       checks = null;
-    if (!['retina', 'unavailable'].includes(mode)) {
+    if (mode === 'hud') {
       await page.addScriptTag({
         content: `window.__PROFILE__={lane:${combatLane.toString()},create:${createCombatProfile.toString()}};`,
       });
@@ -220,7 +251,7 @@ try {
             compassModel.push(performance.now() - t);
           }
         };
-        if (p?.gpuCompass)
+        if (p)
           p.compass.update = function (...a) {
             const t = performance.now();
             try {
@@ -249,10 +280,9 @@ try {
             steps.push(performance.now() - start);
             f.after();
             const s = ui.state;
-            if (p?.gpuCombat && p.combat.fps.text !== ui.fpsText)
-              throw Error('FPS presentation mismatch');
-            const ammo = p ? p.ammo.current.text : ui.ammo.cur.textContent;
-            const hp = p ? p.hp.text : ui.health.hpVal.textContent;
+            if (p.combat.fps.text !== ui.fpsText) throw Error('FPS presentation mismatch');
+            const ammo = p.ammo.current.text,
+              hp = p.hp.text;
             if (p && p.maxHp.text !== '/' + Math.round(s.maxHealth || 100))
               throw Error('health maximum readout mismatch');
             if (
@@ -288,7 +318,8 @@ try {
           compassModelMs: summary(compassModel),
           compassViewMs: compassView.length ? summary(compassView) : null,
           report: f.report,
-          native: window.__NATIVE_COUNTS__,
+          nativeElements: document.querySelectorAll('.ow-ammo,.ow-vitals,.ow-cross,.ow-minimap')
+            .length,
           mapUploads: p?.minimap.uploads ?? 0,
           textures: p?.renderer.texture.managedTextures.length ?? 0,
         };
@@ -302,11 +333,11 @@ try {
             (after.find((m) => m.name === key).value - before.find((m) => m.name === key).value)) /
           900;
       if (setup.pixi) {
-        assert.deepEqual(combat.native, { map: 0, ammo: 0 });
+        assert.equal(combat.nativeElements, 0);
         assert.equal(combat.mapUploads, 1);
       }
     }
-    // Identical settled capture state for both backends; readback outside timing.
+    // Settled validation pose; GPU readback is outside timing.
     await page.evaluate(async () => {
       const e = window.__ENGINE__,
         ui = e.ctx.get('ui'),
@@ -324,13 +355,13 @@ try {
       await window.__PUMP__(180);
     });
     if (setup.pixi) {
-      const pixels = await capturePixi(page, resolve(out, `${run}-${mode}.png`), 'hud');
+      const pixels = await capturePixi(page, resolve(out, `${run}-${mode}.png`));
       assert.deepEqual(pixels.panelAlpha, [0, 0], 'health/ammo panel areas stay transparent');
       assert(
         pixels.readoutPixels.every((count) => count > 10),
         'floating readouts actually render, including resized/DPR-2 captures'
       );
-    } else await captureNative(page, resolve(out, `${run}-${mode}.png`));
+    }
     if (setup.pixi) {
       const feedback = await page.evaluate(async () => {
         const e = window.__ENGINE__,
@@ -339,11 +370,10 @@ try {
         const oldWeapon = ui._weaponState,
           oldPlayer = ui._playerState,
           oldFps = ui._updateFps;
-        const fixture = { oldWeapon, oldPlayer, oldFps, mutations: 0 };
+        const fixture = { oldWeapon, oldPlayer, oldFps };
         window.__COMBAT_FIXTURE__ = fixture;
         ui._updateFps = () => {};
         ui.fpsText = '123 FPS';
-        if (!p.gpuCombat) ui.fps.textContent = ui.fpsText;
         let empty = true;
         ui._weaponState = function () {
           return {
@@ -356,28 +386,8 @@ try {
         ui._playerState = function () {
           return { ...oldPlayer.call(this), bandages: empty ? 0 : 12, healing: !empty };
         };
-        const observer = new MutationObserver((records) => {
-          fixture.mutations += records.length;
-        });
-        const roots = [];
-        if (p.gpuCombat)
-          roots.push(
-            ui.ammo.equip,
-            ui.fps,
-            ...ui.hit.pool.items.map((it) => it.node),
-            ...ui.arcs.pool.items.map((it) => it.node)
-          );
-        if (p.gpuCompass) roots.push(ui.compass.root);
-        for (const root of roots)
-          observer.observe(root, {
-            subtree: true,
-            attributes: true,
-            childList: true,
-            characterData: true,
-          });
-        fixture.observer = observer;
         await window.__PUMP__(1);
-        if (p.gpuCombat && !p.combat.slots.every((slot) => slot.node.alpha === 0.34))
+        if (!p.combat.slots.every((slot) => slot.node.alpha === 0.34))
           throw Error('empty equipment opacity');
         empty = false;
         ui.compass.ping(ui.compass.heading - 35);
@@ -394,7 +404,7 @@ try {
           ui.hit.clear();
           const item = ui.hit.spawn(kind);
           await window.__PUMP__(3);
-          if (p.gpuCombat) {
+          if (p) {
             const view = p.combat.hitSlots[item.i],
               state = ui.hit.visuals[item.i];
             if (
@@ -420,19 +430,18 @@ try {
             if (p.combat.slots.map((s) => s.label.text).join() !== '12,3')
               throw Error('equipment count parity');
           }
-          if (p.gpuCompass && p.compass.pings.filter((n) => n.visible).length < 2)
+          if (p.compass.pings.filter((n) => n.visible).length < 2)
             throw Error('heard bearing pings missing');
         }, kind);
-        await capturePixi(page, resolve(out, `${run}-${mode}-feedback-${kind}.png`), 'hud');
+        await capturePixi(page, resolve(out, `${run}-${mode}-feedback-${kind}.png`));
       }
-      feedback.mutations = await page.evaluate(async () => {
+      feedback.nativeElements = await page.evaluate(async () => {
         const ui = window.__ENGINE__.ctx.get('ui'),
           f = window.__COMBAT_FIXTURE__;
         ui.hit.clear();
         ui.arcs.clear();
-        ui.compass.pingPool.releaseAll(ui.compass.present);
-        const n = f.mutations + f.observer.takeRecords().length;
-        f.observer.disconnect();
+        ui.compass.pingPool.releaseAll();
+        const n = document.querySelectorAll('.ow-hit,.ow-dmg,.ow-compass,.ow-equip,.ow-fps').length;
         ui._weaponState = f.oldWeapon;
         ui._playerState = f.oldPlayer;
         ui._updateFps = f.oldFps;
@@ -440,43 +449,25 @@ try {
         delete window.__COMBAT_FIXTURE__;
         return n;
       });
-      assert.equal(
-        feedback.mutations,
-        0,
-        'replaced combat DOM must never update, including spawn/clear/FPS/pulses'
-      );
+      assert.equal(feedback.nativeElements, 0, 'retired combat DOM must not exist or be recreated');
       await page.evaluate(async () => {
-        const e = window.__ENGINE__,
-          ui = e.ctx.get('ui');
-        window.__UNDERLAY_MUTATIONS__ = 0;
-        window.__UNDERLAY_OBSERVER__ = new MutationObserver((records) => {
-          window.__UNDERLAY_MUTATIONS__ += records.length;
-        });
-        for (const root of [ui.hurtLayer])
-          window.__UNDERLAY_OBSERVER__.observe(root, {
-            attributes: true,
-            childList: true,
-            characterData: true,
-            subtree: true,
-          });
+        const e = window.__ENGINE__;
         e.ctx.get('player').health.armour = 0;
         e.ctx.get('player').applyDamage(65, null);
         await window.__PUMP__(6);
       });
-      const underlayMutations = await page.evaluate(() => {
-        const n = window.__UNDERLAY_MUTATIONS__ + window.__UNDERLAY_OBSERVER__.takeRecords().length;
-        window.__UNDERLAY_OBSERVER__.disconnect();
-        return n;
-      });
-      if (setup.gpuUnderlays)
-        assert.equal(underlayMutations, 0, 'migrated native layers are not updated behind Pixi');
-      else assert(underlayMutations > 0);
-      const injured = await capturePixi(page, resolve(out, `${run}-${mode}-injured.png`), 'hud');
-      if (setup.gpuUnderlays)
-        assert(
-          injured.cornerAlpha.some((alpha) => alpha > 0),
-          'injury really renders into GPU target'
-        );
+      assert.equal(
+        await page.evaluate(
+          () => document.querySelectorAll('.ow-blood,.ow-lowbeat,.ow-hitflash').length
+        ),
+        0,
+        'native injury presenter is absent'
+      );
+      const injured = await capturePixi(page, resolve(out, `${run}-${mode}-injured.png`));
+      assert(
+        injured.cornerAlpha.some((alpha) => alpha > 0),
+        'injury really renders into GPU target'
+      );
       const independentInjury = await page.evaluate(async () => {
         const ui = window.__ENGINE__.ctx.get('ui'),
           p = ui.pixiHud;
@@ -484,11 +475,10 @@ try {
         await window.__PUMP__(60);
         const ok =
           !p.chrome.visible &&
-          (!p.gpuUnderlays ||
-            (p.injury.mesh.visible &&
-              p.injury.mesh.parent === p.stage &&
-              p.stage.alpha === 1 &&
-              Number(p.canvas.style.opacity || 1) === 1));
+          p.injury.mesh.visible &&
+          p.injury.mesh.parent === p.stage &&
+          p.stage.alpha === 1 &&
+          Number(p.canvas.style.opacity || 1) === 1;
         ui.setHudVisible(true);
         return ok;
       });
@@ -517,7 +507,7 @@ try {
         player.health.reset(true);
         player.health.armour = 150;
         await window.__PUMP__(60);
-        // Injury and vitals share the existing health state in both renderers.
+        // Injury and vitals consume the same existing health state.
         player.applyDamage(10);
         await window.__PUMP__(3);
         const armour = p.armourFill.scale.x;
@@ -538,7 +528,7 @@ try {
           const draws = p.draws;
           await window.__PUMP__(30);
           if (p.draws !== draws) throw Error('paused static HUD redraws');
-          if (p.gpuCombat) {
+          if (p) {
             ui.fpsText = '123 FPS';
             await window.__PUMP__(1);
             if (p.combat.fps.text !== '123 FPS' || p.draws !== draws + 1)
@@ -640,7 +630,7 @@ try {
       p?.dispose();
       return {
         ...window.__GPU_PROBE__,
-        canvases: document.querySelectorAll('.ow-pixi-hud-slice').length,
+        canvases: document.querySelectorAll('.ow-pixi-hud').length,
       };
     });
     assert.equal(teardown.destroys, 1, 'only Three destroys the borrowed device');
@@ -652,9 +642,6 @@ try {
       mode,
       browser: browser.version(),
       quality: args.quality ?? 'high',
-      underlayComparison: !!args.underlays,
-      combatComparison: !!args.combat,
-      compassComparison: !!args.compass,
       uncapped: !!args.uncapped,
       device,
       setup,

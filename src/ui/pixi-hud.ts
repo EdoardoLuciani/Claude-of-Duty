@@ -44,22 +44,13 @@ const WATCH = [
   'time',
 ] as const;
 
-interface HudOptions {
-  injury?: boolean;
-  combat?: boolean;
-  compass?: boolean;
-}
-
-/** Bounded gameplay HUD experiment, not a replacement UI framework. */
-export class PixiHudSlice {
+/** Gameplay HUD presentation on one passive, borrowed-device WebGPU canvas. */
+export class PixiHud {
   readonly canvas = document.createElement('canvas');
   readonly renderer = new WebGPURenderer();
   readonly stage = new Container();
   readonly chrome = new Container();
   readonly injury = new PixiInjury();
-  readonly gpuUnderlays: boolean;
-  readonly gpuCombat: boolean;
-  readonly gpuCompass: boolean;
   readonly combat = new PixiCombat();
   readonly compass = new PixiCompass();
   readonly ammo = new PixiAmmoView();
@@ -84,18 +75,13 @@ export class PixiHudSlice {
   private lastState = new Map<string, unknown>();
   draws = 0;
 
-  static async create(
-    parent: HTMLElement,
-    before: HTMLElement,
-    game: Renderer,
-    options: HudOptions = {}
-  ): Promise<PixiHudSlice> {
+  static async create(parent: HTMLElement, before: HTMLElement, game: Renderer): Promise<PixiHud> {
     const restore = restrictPixiCanvases();
-    let hud: PixiHudSlice | null = null;
+    let hud: PixiHud | null = null;
     try {
       // Construct only after recording the restoration boundary: even field
       // initializer / text / graphics failures must restore the global adapter.
-      hud = new PixiHudSlice(options);
+      hud = new PixiHud();
       hud.restoreAdapter = restore;
       await initPixiRenderer(
         hud.renderer,
@@ -109,6 +95,8 @@ export class PixiHudSlice {
     } catch (error) {
       try {
         hud?.dispose();
+      } catch (cleanupError) {
+        console.warn('[ui] HUD initialization cleanup failed', cleanupError);
       } finally {
         restore();
       }
@@ -116,15 +104,12 @@ export class PixiHudSlice {
     }
   }
 
-  private constructor(options: HudOptions) {
-    this.gpuUnderlays = options.injury !== false;
-    this.gpuCombat = options.combat !== false;
-    this.gpuCompass = this.gpuCombat && options.compass !== false;
-    this.canvas.className = 'ow-pixi-hud-slice';
+  private constructor() {
+    this.canvas.className = 'ow-pixi-hud';
     this.canvas.setAttribute('role', 'img');
     this.canvas.setAttribute(
       'aria-label',
-      'Experimental gameplay HUD: ammo, health, crosshair, minimap, injury, compass, combat feedback, equipment and FPS'
+      'Gameplay HUD: ammo, health, crosshair, minimap, injury, compass, combat feedback, equipment and FPS'
     );
     this.canvas.style.cssText = 'position:absolute;inset:0;pointer-events:none;visibility:hidden';
     this.stage.eventMode = 'none';
@@ -142,12 +127,6 @@ export class PixiHudSlice {
       this.combat.equipment,
       this.combat.fps
     );
-    this.combat.arcs.visible =
-      this.combat.hits.visible =
-      this.combat.equipment.visible =
-      this.combat.fps.visible =
-        this.gpuCombat;
-    this.compass.stage.visible = this.gpuCompass;
     this.hp.anchor.y = this.maxHp.anchor.y = 1;
     this.vitals.addChild(text('HEALTH', 14, 6, HUD_TYPE.label, 0xa9bac5), this.hp, this.maxHp);
     this.vitals.addChild(
@@ -210,14 +189,12 @@ export class PixiHudSlice {
   ): void {
     if (this.disposed) return;
     if (!this.enabled) return;
-    // Injury opacity is independent of HUD/menu/death fading, as in HTML.
+    // Injury opacity stays independent of readout/menu/death fading.
     const alpha = Number(opacity.toFixed(3));
     if (this.chrome.alpha !== alpha) this.dirty = true;
     this.chrome.alpha = alpha;
     this.chrome.visible = alpha >= 0.004;
-    if (this.gpuUnderlays) {
-      this.dirty = this.injury.update(health) || this.dirty;
-    }
+    this.dirty = this.injury.update(health) || this.dirty;
     const visible = this.chrome.visible || this.injury.mesh.visible;
     setStyle(this.canvas, 'visibility', visible ? '' : 'hidden');
     if (!visible) return;
@@ -227,8 +204,8 @@ export class PixiHudSlice {
         this.dirty = true;
       }
     }
-    if (this.gpuCombat) this.dirty = this.combat.update(models) || this.dirty;
-    if (this.gpuCompass) this.dirty = this.compass.update(models.compass) || this.dirty;
+    this.dirty = this.combat.update(models) || this.dirty;
+    this.dirty = this.compass.update(models.compass) || this.dirty;
     this.ammo.update(dt, s);
     const max = s.maxHealth || 100,
       hp = Math.round(Math.max(0, Math.min(max, s.health ?? max)));

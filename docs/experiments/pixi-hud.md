@@ -1,5 +1,11 @@
 # Playable Pixi HUD slice
 
+> **Historical experiment.** The [current gameplay HUD](../hud.md) now uses Pixi
+> by default. Its old HTML presenters/fallback, URL comparison switches and
+> standalone experiment harnesses are retired. Commands and measurements below
+> refer to their named historical revisions, not current runtime options; use
+> Git history to reproduce them. No new performance claim accompanies promotion.
+
 Current visuals deliberately simplify CSS details: [Pixi-to-Pixi simplification](pixi-simplify.md)
 records the changed compass/combat/ammo/health/accessories and measured before/after.
 The [minimap/type follow-up](pixi-minimap.md) keeps the chosen simple icons,
