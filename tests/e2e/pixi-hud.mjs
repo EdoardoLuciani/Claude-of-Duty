@@ -251,15 +251,14 @@ try {
             compassModel.push(performance.now() - t);
           }
         };
-        if (p)
-          p.compass.update = function (...a) {
-            const t = performance.now();
-            try {
-              return viewUpdate.apply(this, a);
-            } finally {
-              compassView.push(performance.now() - t);
-            }
-          };
+        p.compass.update = function (...a) {
+          const t = performance.now();
+          try {
+            return viewUpdate.apply(this, a);
+          } finally {
+            compassView.push(performance.now() - t);
+          }
+        };
         ui.lateUpdate = function (...a) {
           const at = performance.now();
           try {
@@ -283,7 +282,7 @@ try {
             if (p.combat.fps.text !== ui.fpsText) throw Error('FPS presentation mismatch');
             const ammo = p.ammo.current.text,
               hp = p.hp.text;
-            if (p && p.maxHp.text !== '/' + Math.round(s.maxHealth || 100))
+            if (p.maxHp.text !== '/' + Math.round(s.maxHealth || 100))
               throw Error('health maximum readout mismatch');
             if (
               Number(ammo) !== s.ammo ||
@@ -291,16 +290,15 @@ try {
             )
               throw Error('live HUD readout mismatch');
             if (
-              p &&
-              (Math.abs(p.hpFill.scale.x - ui.health.hpShown) > 1e-6 ||
-                p.reticle.visible !== ui.crosshair.visible >= 0.004)
+              Math.abs(p.hpFill.scale.x - ui.health.hpShown) > 1e-6 ||
+              p.reticle.visible !== ui.crosshair.visible >= 0.004
             )
               throw Error('live animated state mismatch');
           }
         } finally {
           ui.lateUpdate = late;
           ui.compass.update = modelUpdate;
-          if (p) p.compass.update = viewUpdate;
+          p.compass.update = viewUpdate;
           f.dispose();
         }
         const summary = (a) => {
@@ -404,7 +402,7 @@ try {
           ui.hit.clear();
           const item = ui.hit.spawn(kind);
           await window.__PUMP__(3);
-          if (p) {
+          {
             const view = p.combat.hitSlots[item.i],
               state = ui.hit.visuals[item.i];
             if (
@@ -528,7 +526,7 @@ try {
           const draws = p.draws;
           await window.__PUMP__(30);
           if (p.draws !== draws) throw Error('paused static HUD redraws');
-          if (p) {
+          {
             ui.fpsText = '123 FPS';
             await window.__PUMP__(1);
             if (p.combat.fps.text !== '123 FPS' || p.draws !== draws + 1)
