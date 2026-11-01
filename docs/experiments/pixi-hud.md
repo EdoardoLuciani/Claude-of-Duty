@@ -2,6 +2,9 @@
 
 Current visuals deliberately simplify CSS details: [Pixi-to-Pixi simplification](pixi-simplify.md)
 records the changed compass/combat/ammo/health/accessories and measured before/after.
+The [minimap/type follow-up](pixi-minimap.md) keeps the chosen simple icons,
+retires their comparison modes, standardizes bottom-HUD typography and measures
+isolated minimap update/draw CPU before and after simplification.
 The original four-widget implementation/measurements below are historical.
 
 Use `?pixi=hud` for ammo/reload, health/armour, crosshair and a live minimap.

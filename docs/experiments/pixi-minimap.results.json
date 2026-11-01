@@ -1,0 +1,7672 @@
+{
+  "baseline": "3cb261b5",
+  "candidate": "this revision; runtime/test source SHA256 below",
+  "scope": "Isolated 178x202 resolution-1 RenderTexture, one borrowed-device WebGPU renderer. CPU update and CPU command submission only; not GPU duration/compositor/full-HUD marginal cost or game FPS.",
+  "environment": {
+    "hardware": "native AMD RDNA4",
+    "browser": "156.0.8078.73",
+    "viewport": "1920x1080",
+    "dpr": 1,
+    "quality": "High",
+    "worldVersion": "v1.1.0",
+    "webgpuOnly": true
+  },
+  "method": {
+    "warmDraws": 240,
+    "warmUpdatesPerDraw": 20,
+    "drawSamples": 1200,
+    "updateBatch": 20,
+    "precomputedStates": 1024,
+    "fixtureMathOutsideTimings": true,
+    "timerGranularityMs": 0.1,
+    "selection": "All complete ABBA blocks retained: two each turn/pan/ads/pan-fov, three busy. A 180s runner timeout left two busy trials from an incomplete next block; excluded as a block, retained below. No outlier filtering.",
+    "rawTimings": "Full ordered sample arrays and captures retained under each trial artifact path; committed histograms retain every measured value/count (not temporal ordering)."
+  },
+  "candidateSha256": {
+    "src/ui/pixi-minimap.ts": "4c30b4844f5f0a09298d6339d872b57798f83497b04c67dfe7ee7513daa74ac6",
+    "src/ui/pixi-type.ts": "2990b6e16b564663f6defa30e06342bb28e69a0a1497b5b5187eda33d8a654f6",
+    "src/ui/pixi-ammo-view.ts": "5152d78aa09e9c38c6a976b18b636e02c70dddf0dfdef21525f6fb34a72d6a54",
+    "src/ui/pixi-hud.ts": "08ff6b7b9ff268dbae2024cb56e21c38b2c4251567e5989a66942ddbf93da8bb",
+    "src/ui/pixi-combat.ts": "285715cbcab4788698ca120422c8dafbc2cfbc02c2ceabd73dcb34606ad007e0",
+    "src/ui/pixi-accessory-icons.ts": "f0ede8bc1b3e3e9b3a79bb1ddaa2801cd2091db611a78700a8d6e6b901996975",
+    "tests/e2e/pixi-minimap-cost.mjs": "65051b45b04aa9405282114bd9803b652688d780cdfa8766958de9a72fc61a62"
+  },
+  "summary": [
+    {
+      "scenario": "turn",
+      "before": {
+        "runs": 4,
+        "updateCpu": 0.001562500000582085,
+        "drawCpu": 0.017104166655335575,
+        "inclusiveCpu": 0.018687499987427143,
+        "nodes": 111,
+        "instructions": 104
+      },
+      "after": {
+        "runs": 4,
+        "updateCpu": 0.0009374999996895636,
+        "drawCpu": 0.01577083334016303,
+        "inclusiveCpu": 0.017020833340939137,
+        "nodes": 80,
+        "instructions": 102
+      }
+    },
+    {
+      "scenario": "pan",
+      "before": {
+        "runs": 4,
+        "updateCpu": 0.001615625000170751,
+        "drawCpu": 0.02449999999332552,
+        "inclusiveCpu": 0.026562499995343387,
+        "nodes": 114,
+        "instructions": 106
+      },
+      "after": {
+        "runs": 4,
+        "updateCpu": 0.0013031250005976058,
+        "drawCpu": 0.021270833323554447,
+        "inclusiveCpu": 0.022666666651299846,
+        "nodes": 83,
+        "instructions": 104
+      }
+    },
+    {
+      "scenario": "ads",
+      "before": {
+        "runs": 4,
+        "updateCpu": 0.0027072916669615634,
+        "drawCpu": 0.03285416666030263,
+        "inclusiveCpu": 0.03595833332821106,
+        "nodes": 114,
+        "instructions": 106
+      },
+      "after": {
+        "runs": 4,
+        "updateCpu": 0.0013343750000931393,
+        "drawCpu": 0.021333333322933565,
+        "inclusiveCpu": 0.02285416666030263,
+        "nodes": 83,
+        "instructions": 104
+      }
+    },
+    {
+      "scenario": "pan-fov",
+      "before": {
+        "runs": 4,
+        "updateCpu": 0.0038729166657430433,
+        "drawCpu": 0.047520833345285306,
+        "inclusiveCpu": 0.051770833348079276,
+        "nodes": 114,
+        "instructions": 106
+      },
+      "after": {
+        "runs": 4,
+        "updateCpu": 0.0013666666664260822,
+        "drawCpu": 0.020187500005122275,
+        "inclusiveCpu": 0.02191666667194416,
+        "nodes": 83,
+        "instructions": 104
+      }
+    },
+    {
+      "scenario": "busy",
+      "before": {
+        "runs": 6,
+        "updateCpu": 0.011937500000129159,
+        "drawCpu": 0.08638888887698866,
+        "inclusiveCpu": 0.09819444444237484,
+        "nodes": 120,
+        "instructions": 110
+      },
+      "after": {
+        "runs": 6,
+        "updateCpu": 0.007712500000734587,
+        "drawCpu": 0.03477777776256618,
+        "inclusiveCpu": 0.04293055554334488,
+        "nodes": 89,
+        "instructions": 108
+      }
+    }
+  ],
+  "runs": [
+    {
+      "version": "before",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "turn",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0015750000015832572,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.01858333329980572,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.01933333329545955,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 111,
+      "instructions": 104,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 0,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-final/0",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 830
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 133
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 229
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 8
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 986
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 94
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 112
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 5
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 2
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 978
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 99
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 114
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 5
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 3
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "after",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "turn",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0009083333336748225,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.01508333332836628,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.016583333325882754,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 80,
+      "instructions": 102,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 0,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-final/1",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 982
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 85
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 133
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 1030
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 64
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 95
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 10
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 1012
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 72
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 105
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 10
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "after",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "turn",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0010083333331470739,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.016916666670391958,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.01808333333892127,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 80,
+      "instructions": 102,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 0,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-final/2",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 959
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 98
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 142
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 1
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 1001
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 77
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 118
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 3
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 989
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 81
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 124
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 4
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 2
+          }
+        ]
+      }
+    },
+    {
+      "version": "before",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "turn",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.001604166666977116,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.0175,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.019249999991928536,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 111,
+      "instructions": 104,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 0,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-final/3",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 825
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 145
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 220
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 7
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 3
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 994
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 81
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 121
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 3
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 974
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 91
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 130
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 4
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "before",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "turn",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0016458333341094445,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.016499999997516474,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.01816666666418314,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 111,
+      "instructions": 104,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 0,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-final/4",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 815
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 146
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 229
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 7
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 3
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 1007
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 76
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 112
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 4
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 987
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 84
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 124
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 4
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "after",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "turn",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0009916666663872748,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.0152500000068297,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.016583333347613614,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 80,
+      "instructions": 102,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 0,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-final/5",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 965
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 95
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 137
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 2
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 1
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 1021
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 68
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 108
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 2
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 1006
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 71
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 119
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 3
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "after",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "turn",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0008416666655490831,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.015833333355064195,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.016833333351338905,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 80,
+      "instructions": 102,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 0,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-final/6",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 1001
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 86
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 110
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 2
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 1
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 1013
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 67
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 118
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 1
+          },
+          {
+            "ms": 0.29999999701976776,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 1001
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 73
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 124
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 1
+          },
+          {
+            "ms": 0.29999999701976776,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "before",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "turn",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0014249999996585226,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.015833333324020107,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.017999999998137353,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 111,
+      "instructions": 104,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 0,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-final/7",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 864
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 136
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 194
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 3
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 3
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 1016
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 75
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 103
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 4
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 2
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 990
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 83
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 121
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 4
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 2
+          }
+        ]
+      }
+    },
+    {
+      "version": "before",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "pan-fov",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.003849999999472191,
+        "median": 0.004999999888241291,
+        "p95": 0.009999999962747096
+      },
+      "drawCpu": {
+        "mean": 0.046416666675359014,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.05041666666977108,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 114,
+      "instructions": 106,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 1,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-final/8",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 393
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 283
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 409
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 87
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 26
+          },
+          {
+            "ms": 0.014999999850988387,
+            "count": 1
+          },
+          {
+            "ms": 0.015000000037252903,
+            "count": 1
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 672
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 198
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 304
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 19
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 4
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 3
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 635
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 211
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 317
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 27
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 7
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 3
+          }
+        ]
+      }
+    },
+    {
+      "version": "after",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "pan-fov",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0012791666657043066,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.020750000026697912,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.02275000002235174,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 83,
+      "instructions": 104,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 1,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-final/9",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 894
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 128
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 177
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 1
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 959
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 86
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 148
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 4
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 2
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 937
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 96
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 158
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 5
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 3
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "after",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "pan-fov",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0014583333334885617,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.019583333320915698,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.021249999996895592,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 83,
+      "instructions": 104,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 1,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-final/10",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 858
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 133
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 201
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 6
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 2
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 975
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 92
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 124
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 5
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 3
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 955
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 97
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 139
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 5
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 3
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "before",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "pan-fov",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0037749999978889423,
+        "median": 0.004999999888241291,
+        "p95": 0.009999999962747096
+      },
+      "drawCpu": {
+        "mean": 0.05158333336003125,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.055500000044703485,
+        "median": 0.09999999776482582,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 114,
+      "instructions": 106,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 1,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-final/11",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 399
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 300
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 400
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 72
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 25
+          },
+          {
+            "ms": 0.015000000037252903,
+            "count": 4
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 625
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 206
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 332
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 27
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 6
+          },
+          {
+            "ms": 0.29999999701976776,
+            "count": 1
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 2
+          },
+          {
+            "ms": 0.6000000014901161,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 585
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 217
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 355
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 28
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 10
+          },
+          {
+            "ms": 0.29999999701976776,
+            "count": 1
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 3
+          },
+          {
+            "ms": 0.6000000014901161,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "before",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "pan-fov",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.004104166666045716,
+        "median": 0.004999999888241291,
+        "p95": 0.009999999962747096
+      },
+      "drawCpu": {
+        "mean": 0.046833333342025676,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.05208333334885538,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 114,
+      "instructions": 106,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 1,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-final/12",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 335
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 306
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 439
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 92
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 28
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 675
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 194
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 296
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 25
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 8
+          },
+          {
+            "ms": 0.29999999701976776,
+            "count": 1
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 623
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 209
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 322
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 33
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 11
+          },
+          {
+            "ms": 0.29999999701976776,
+            "count": 1
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "after",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "pan-fov",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0014249999990376407,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.019583333351959786,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.0217500000136594,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 83,
+      "instructions": 104,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 1,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-final/13",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 865
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 139
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 189
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 4
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 3
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 972
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 82
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 139
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 6
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 946
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 94
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 153
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 6
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "after",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "pan-fov",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.00130416666747382,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.0208333333209157,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.021916666654869913,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 83,
+      "instructions": 104,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 1,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-final/14",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 895
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 114
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 183
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 6
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 2
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 958
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 100
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 134
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 4
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 4
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 946
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 104
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 141
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 5
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 4
+          }
+        ]
+      }
+    },
+    {
+      "version": "before",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "pan-fov",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0037624999995653236,
+        "median": 0.004999999888241291,
+        "p95": 0.009999999962747096
+      },
+      "drawCpu": {
+        "mean": 0.04525000000372529,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.049083333328987164,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 114,
+      "instructions": 106,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 1,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-final/15",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 396
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 288
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 417
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 76
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 23
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 686
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 192
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 296
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 22
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 2
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          },
+          {
+            "ms": 0.4000000022351742,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 641
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 212
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 320
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 23
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 2
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          },
+          {
+            "ms": 0.4000000022351742,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "before",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "busy",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.011262500003290498,
+        "median": 0.009999999962747096,
+        "p95": 0.015000000037252903
+      },
+      "drawCpu": {
+        "mean": 0.08341666659961144,
+        "median": 0.09999999776482582,
+        "p95": 0.19999999925494194
+      },
+      "inclusiveCpu": {
+        "mean": 0.09299999993915359,
+        "median": 0.10000000149011612,
+        "p95": 0.19999999925494194
+      },
+      "nodes": 120,
+      "instructions": 110,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 48,
+      "pulses": 3,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-final/16",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0.004999999888241291,
+            "count": 42
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 55
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 561
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 157
+          },
+          {
+            "ms": 0.014999999850988387,
+            "count": 62
+          },
+          {
+            "ms": 0.015000000037252903,
+            "count": 313
+          },
+          {
+            "ms": 0.019999999925494193,
+            "count": 5
+          },
+          {
+            "ms": 0.02000000011175871,
+            "count": 1
+          },
+          {
+            "ms": 0.025,
+            "count": 3
+          },
+          {
+            "ms": 0.029999999888241292,
+            "count": 1
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 328
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 327
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 427
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 85
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 26
+          },
+          {
+            "ms": 0.29999999701976776,
+            "count": 1
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 4
+          },
+          {
+            "ms": 0.3999999985098839,
+            "count": 1
+          },
+          {
+            "ms": 0.6000000014901161,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 255
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 338
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 447
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 118
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 35
+          },
+          {
+            "ms": 0.29999999701976776,
+            "count": 1
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 4
+          },
+          {
+            "ms": 0.3999999985098839,
+            "count": 1
+          },
+          {
+            "ms": 0.6000000014901161,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "after",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "busy",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0077583333342334925,
+        "median": 0.009999999962747096,
+        "p95": 0.014999999850988387
+      },
+      "drawCpu": {
+        "mean": 0.03441666663003465,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.04383333331284424,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 89,
+      "instructions": 108,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 48,
+      "pulses": 3,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-final/17",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 35
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 210
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 334
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 444
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 108
+          },
+          {
+            "ms": 0.014999999850988387,
+            "count": 12
+          },
+          {
+            "ms": 0.015000000037252903,
+            "count": 50
+          },
+          {
+            "ms": 0.019999999925494193,
+            "count": 4
+          },
+          {
+            "ms": 0.02000000011175871,
+            "count": 3
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 801
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 167
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 221
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 8
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 2
+          },
+          {
+            "ms": 0.5,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 701
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 196
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 279
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 19
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 4
+          },
+          {
+            "ms": 0.5,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "after",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "busy",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.007337500000527628,
+        "median": 0.005000000074505806,
+        "p95": 0.010000000149011612
+      },
+      "drawCpu": {
+        "mean": 0.03533333333209157,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.04341666666790843,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 89,
+      "instructions": 108,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 48,
+      "pulses": 3,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-final/18",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 37
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 241
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 367
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 413
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 102
+          },
+          {
+            "ms": 0.014999999850988387,
+            "count": 6
+          },
+          {
+            "ms": 0.015000000037252903,
+            "count": 31
+          },
+          {
+            "ms": 0.019999999925494193,
+            "count": 1
+          },
+          {
+            "ms": 0.02000000011175871,
+            "count": 2
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 792
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 158
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 236
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 10
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 3
+          },
+          {
+            "ms": 0.3999999985098839,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 699
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 192
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 291
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 14
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 3
+          },
+          {
+            "ms": 0.3999999985098839,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "before",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "busy",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.011258333333457353,
+        "median": 0.009999999962747096,
+        "p95": 0.015000000037252903
+      },
+      "drawCpu": {
+        "mean": 0.08424999997951091,
+        "median": 0.09999999776482582,
+        "p95": 0.19999999925494194
+      },
+      "inclusiveCpu": {
+        "mean": 0.09574999999254942,
+        "median": 0.10000000149011612,
+        "p95": 0.19999999925494194
+      },
+      "nodes": 120,
+      "instructions": 110,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 48,
+      "pulses": 3,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-final/19",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0.004999999888241291,
+            "count": 45
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 58
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 571
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 149
+          },
+          {
+            "ms": 0.014999999850988387,
+            "count": 71
+          },
+          {
+            "ms": 0.015000000037252903,
+            "count": 284
+          },
+          {
+            "ms": 0.019999999925494193,
+            "count": 10
+          },
+          {
+            "ms": 0.02000000011175871,
+            "count": 7
+          },
+          {
+            "ms": 0.025,
+            "count": 4
+          },
+          {
+            "ms": 0.029999999888241292,
+            "count": 1
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 306
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 323
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 461
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 81
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 24
+          },
+          {
+            "ms": 0.29999999701976776,
+            "count": 1
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 2
+          },
+          {
+            "ms": 0.3999999985098839,
+            "count": 1
+          },
+          {
+            "ms": 0.4000000022351742,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 230
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 327
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 473
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 126
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 37
+          },
+          {
+            "ms": 0.29999999701976776,
+            "count": 1
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 4
+          },
+          {
+            "ms": 0.3999999985098839,
+            "count": 1
+          },
+          {
+            "ms": 0.4000000022351742,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "before",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "busy",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.01264999999975143,
+        "median": 0.010000000149011612,
+        "p95": 0.015000000037252903
+      },
+      "drawCpu": {
+        "mean": 0.08699999999254943,
+        "median": 0.09999999776482582,
+        "p95": 0.19999999925494194
+      },
+      "inclusiveCpu": {
+        "mean": 0.09841666667101284,
+        "median": 0.10000000149011612,
+        "p95": 0.19999999925494194
+      },
+      "nodes": 120,
+      "instructions": 110,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 48,
+      "pulses": 3,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-busy/0",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0.004999999888241291,
+            "count": 15
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 19
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 515
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 124
+          },
+          {
+            "ms": 0.014999999850988387,
+            "count": 94
+          },
+          {
+            "ms": 0.015000000037252903,
+            "count": 404
+          },
+          {
+            "ms": 0.019999999925494193,
+            "count": 13
+          },
+          {
+            "ms": 0.02000000011175871,
+            "count": 6
+          },
+          {
+            "ms": 0.0650000000372529,
+            "count": 1
+          },
+          {
+            "ms": 0.06999999992549419,
+            "count": 1
+          },
+          {
+            "ms": 0.075,
+            "count": 3
+          },
+          {
+            "ms": 0.07999999988824129,
+            "count": 2
+          },
+          {
+            "ms": 0.0800000000745058,
+            "count": 2
+          },
+          {
+            "ms": 0.0900000000372529,
+            "count": 1
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 316
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 309
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 468
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 86
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 16
+          },
+          {
+            "ms": 0.29999999701976776,
+            "count": 1
+          },
+          {
+            "ms": 1.3999999985098839,
+            "count": 1
+          },
+          {
+            "ms": 1.4000000022351742,
+            "count": 1
+          },
+          {
+            "ms": 1.5,
+            "count": 1
+          },
+          {
+            "ms": 1.7000000029802322,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 228
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 325
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 492
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 120
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 30
+          },
+          {
+            "ms": 0.29999999701976776,
+            "count": 1
+          },
+          {
+            "ms": 1.3999999985098839,
+            "count": 1
+          },
+          {
+            "ms": 1.5,
+            "count": 2
+          },
+          {
+            "ms": 1.7000000029802322,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "after",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "busy",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.00792916666980199,
+        "median": 0.009999999962747096,
+        "p95": 0.015000000037252903
+      },
+      "drawCpu": {
+        "mean": 0.03533333329483867,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.04316666662072142,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 89,
+      "instructions": 108,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 48,
+      "pulses": 3,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-busy/1",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 26
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 210
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 320
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 436
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 127
+          },
+          {
+            "ms": 0.014999999850988387,
+            "count": 10
+          },
+          {
+            "ms": 0.015000000037252903,
+            "count": 67
+          },
+          {
+            "ms": 0.019999999925494193,
+            "count": 4
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 797
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 162
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 222
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 16
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 1
+          },
+          {
+            "ms": 0.29999999701976776,
+            "count": 2
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 708
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 198
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 270
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 20
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 2
+          },
+          {
+            "ms": 0.29999999701976776,
+            "count": 2
+          }
+        ]
+      }
+    },
+    {
+      "version": "after",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "busy",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.007758333334543926,
+        "median": 0.009999999962747096,
+        "p95": 0.010000000149011612
+      },
+      "drawCpu": {
+        "mean": 0.03316666663313905,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.0403333333072563,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 89,
+      "instructions": 108,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 48,
+      "pulses": 3,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-busy/2",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 27
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 220
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 321
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 457
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 120
+          },
+          {
+            "ms": 0.014999999850988387,
+            "count": 5
+          },
+          {
+            "ms": 0.015000000037252903,
+            "count": 48
+          },
+          {
+            "ms": 0.02000000011175871,
+            "count": 2
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 816
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 159
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 212
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 10
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 2
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 738
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 183
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 260
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 15
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 2
+          },
+          {
+            "ms": 0.29999999701976776,
+            "count": 1
+          },
+          {
+            "ms": 0.3999999985098839,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "before",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "busy",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.01180000000074487,
+        "median": 0.009999999962747096,
+        "p95": 0.015000000037252903
+      },
+      "drawCpu": {
+        "mean": 0.08258333333147069,
+        "median": 0.09999999776482582,
+        "p95": 0.19999999925494194
+      },
+      "inclusiveCpu": {
+        "mean": 0.09499999998758236,
+        "median": 0.10000000149011612,
+        "p95": 0.19999999925494194
+      },
+      "nodes": 120,
+      "instructions": 110,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 48,
+      "pulses": 3,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-busy/3",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0.004999999888241291,
+            "count": 23
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 37
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 542
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 135
+          },
+          {
+            "ms": 0.014999999850988387,
+            "count": 85
+          },
+          {
+            "ms": 0.015000000037252903,
+            "count": 357
+          },
+          {
+            "ms": 0.019999999925494193,
+            "count": 7
+          },
+          {
+            "ms": 0.02000000011175871,
+            "count": 6
+          },
+          {
+            "ms": 0.025,
+            "count": 8
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 336
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 299
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 445
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 93
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 22
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 3
+          },
+          {
+            "ms": 0.4000000022351742,
+            "count": 2
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 246
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 321
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 454
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 134
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 40
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 3
+          },
+          {
+            "ms": 0.4000000022351742,
+            "count": 2
+          }
+        ]
+      }
+    },
+    {
+      "version": "before",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "busy",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.012020833331936157,
+        "median": 0.010000000149011612,
+        "p95": 0.015000000037252903
+      },
+      "drawCpu": {
+        "mean": 0.09233333333395422,
+        "median": 0.10000000149011612,
+        "p95": 0.19999999925494194
+      },
+      "inclusiveCpu": {
+        "mean": 0.10658333335382243,
+        "median": 0.10000000149011612,
+        "p95": 0.20000000298023224
+      },
+      "nodes": 120,
+      "instructions": 110,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 48,
+      "pulses": 3,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-busy/4",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0.004999999888241291,
+            "count": 36
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 34
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 521
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 124
+          },
+          {
+            "ms": 0.014999999850988387,
+            "count": 85
+          },
+          {
+            "ms": 0.015000000037252903,
+            "count": 342
+          },
+          {
+            "ms": 0.019999999925494193,
+            "count": 25
+          },
+          {
+            "ms": 0.02000000011175871,
+            "count": 25
+          },
+          {
+            "ms": 0.025,
+            "count": 4
+          },
+          {
+            "ms": 0.029999999888241292,
+            "count": 3
+          },
+          {
+            "ms": 0.030000000074505807,
+            "count": 1
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 277
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 301
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 449
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 131
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 34
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 5
+          },
+          {
+            "ms": 0.3999999985098839,
+            "count": 2
+          },
+          {
+            "ms": 0.5,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 193
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 298
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 454
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 191
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 53
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 6
+          },
+          {
+            "ms": 0.3999999985098839,
+            "count": 4
+          },
+          {
+            "ms": 0.5,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "after",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "busy",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.007762499998323502,
+        "median": 0.009999999962747096,
+        "p95": 0.014999999850988387
+      },
+      "drawCpu": {
+        "mean": 0.035000000027939675,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.04175000002918144,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 89,
+      "instructions": 108,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 48,
+      "pulses": 3,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-busy/5",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 24
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 226
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 338
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 441
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 101
+          },
+          {
+            "ms": 0.014999999850988387,
+            "count": 16
+          },
+          {
+            "ms": 0.015000000037252903,
+            "count": 50
+          },
+          {
+            "ms": 0.019999999925494193,
+            "count": 2
+          },
+          {
+            "ms": 0.02000000011175871,
+            "count": 1
+          },
+          {
+            "ms": 0.025,
+            "count": 1
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 794
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 150
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 242
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 9
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 5
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 725
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 170
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 280
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 19
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 5
+          },
+          {
+            "ms": 0.29999999701976776,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "after",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "busy",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0077291666669769814,
+        "median": 0.009999999962747096,
+        "p95": 0.010000000149011612
+      },
+      "drawCpu": {
+        "mean": 0.03541666665735344,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.045083333322157464,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 89,
+      "instructions": 108,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 48,
+      "pulses": 3,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-busy/6",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 24
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 237
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 319
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 441
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 127
+          },
+          {
+            "ms": 0.014999999850988387,
+            "count": 7
+          },
+          {
+            "ms": 0.015000000037252903,
+            "count": 39
+          },
+          {
+            "ms": 0.019999999925494193,
+            "count": 2
+          },
+          {
+            "ms": 0.02000000011175871,
+            "count": 3
+          },
+          {
+            "ms": 0.025,
+            "count": 1
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 796
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 155
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 229
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 17
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 2
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 688
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 196
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 288
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 23
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 4
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "before",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "busy",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.012633333331594648,
+        "median": 0.010000000149011612,
+        "p95": 0.015000000037252903
+      },
+      "drawCpu": {
+        "mean": 0.08875000002483527,
+        "median": 0.09999999776482582,
+        "p95": 0.19999999925494194
+      },
+      "inclusiveCpu": {
+        "mean": 0.10041666671012839,
+        "median": 0.10000000149011612,
+        "p95": 0.19999999925494194
+      },
+      "nodes": 120,
+      "instructions": 110,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 48,
+      "pulses": 3,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-busy/7",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0.004999999888241291,
+            "count": 11
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 23
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 523
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 112
+          },
+          {
+            "ms": 0.014999999850988387,
+            "count": 99
+          },
+          {
+            "ms": 0.015000000037252903,
+            "count": 406
+          },
+          {
+            "ms": 0.019999999925494193,
+            "count": 10
+          },
+          {
+            "ms": 0.02000000011175871,
+            "count": 6
+          },
+          {
+            "ms": 0.0649999998509884,
+            "count": 1
+          },
+          {
+            "ms": 0.06999999992549419,
+            "count": 1
+          },
+          {
+            "ms": 0.0700000001117587,
+            "count": 1
+          },
+          {
+            "ms": 0.075,
+            "count": 5
+          },
+          {
+            "ms": 0.0800000000745058,
+            "count": 1
+          },
+          {
+            "ms": 0.0849999999627471,
+            "count": 1
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 316
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 294
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 458
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 100
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 27
+          },
+          {
+            "ms": 0.4000000022351742,
+            "count": 1
+          },
+          {
+            "ms": 1.2999999970197678,
+            "count": 1
+          },
+          {
+            "ms": 1.300000000745058,
+            "count": 1
+          },
+          {
+            "ms": 1.3999999985098839,
+            "count": 1
+          },
+          {
+            "ms": 1.5,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 232
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 297
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 484
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 146
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 35
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          },
+          {
+            "ms": 0.4000000022351742,
+            "count": 1
+          },
+          {
+            "ms": 1.2999999970197678,
+            "count": 1
+          },
+          {
+            "ms": 1.300000000745058,
+            "count": 1
+          },
+          {
+            "ms": 1.3999999985098839,
+            "count": 1
+          },
+          {
+            "ms": 1.5,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "before",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "pan",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0016624999997827002,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.023499999999379118,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.02558333333892127,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 114,
+      "instructions": 106,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 1,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-controls/0",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 811
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 155
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 224
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 6
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 4
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 930
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 106
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 153
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 6
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 4
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 907
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 113
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 167
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 7
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 5
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "after",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "pan",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.001400000000527757,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.020499999991928537,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.021833333323399227,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 83,
+      "instructions": 104,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 1,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-controls/1",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 870
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 128
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 196
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 3
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 3
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 958
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 98
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 140
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 3
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 943
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 104
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 148
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 4
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "after",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "pan",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0011958333336127365,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.022166666658595204,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.023416666655490796,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 83,
+      "instructions": 104,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 1,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-controls/2",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 914
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 112
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 173
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 1
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 947
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 97
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 144
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 11
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 932
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 104
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 152
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 11
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "before",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "pan",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0016291666673496454,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.024999999984477956,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.026083333318432173,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 114,
+      "instructions": 106,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 1,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-controls/3",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 814
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 148
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 233
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 4
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 1
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 905
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 121
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 169
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 4
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 893
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 125
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 176
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 5
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "before",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "pan",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0015875000000620967,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.024333333326503635,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.02658333332898716,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 114,
+      "instructions": 106,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 1,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-controls/4",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 828
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 144
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 219
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 8
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 1
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 919
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 111
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 161
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 6
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 1
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 2
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 893
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 120
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 177
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 7
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 1
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 2
+          }
+        ]
+      }
+    },
+    {
+      "version": "after",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "pan",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0013416666678773934,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.020166666647419333,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.02166666663872699,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 83,
+      "instructions": 104,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 1,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-controls/5",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 882
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 118
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 196
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 3
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 1
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 963
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 99
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 133
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 4
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 945
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 109
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 141
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 4
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "after",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "pan",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0012750000003725359,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.022249999996274708,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.023749999987582367,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 83,
+      "instructions": 104,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 1,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-controls/6",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 901
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 114
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 178
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 6
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 1
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 937
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 105
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 155
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 2
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 919
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 115
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 163
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 2
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "before",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "pan",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0015833333334885622,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.025166666662941376,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.027999999995032946,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 114,
+      "instructions": 106,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 1,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-controls/7",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 831
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 143
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 215
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 8
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 3
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 909
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 113
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 168
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 8
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 1
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 878
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 125
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 184
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 10
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 2
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "before",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "ads",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.00274999999798211,
+        "median": 0.004999999888241291,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.034250000041599074,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.03708333337058624,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 114,
+      "instructions": 106,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 1,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-controls/8",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 585
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 239
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 332
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 37
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 6
+          },
+          {
+            "ms": 0.015000000037252903,
+            "count": 1
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 808
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 138
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 238
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 11
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 3
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          },
+          {
+            "ms": 0.4000000022351742,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 777
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 151
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 253
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 13
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 4
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          },
+          {
+            "ms": 0.4000000022351742,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "after",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "ads",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.001250000000776109,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.020416666629413764,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.02174999996709327,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 83,
+      "instructions": 104,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 1,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-controls/9",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 909
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 108
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 174
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 7
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 2
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 960
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 106
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 129
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 4
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 945
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 110
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 139
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 5
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "after",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "ads",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0013541666657353511,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.022583333334575097,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.02458333334575097,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 83,
+      "instructions": 104,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 1,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-controls/10",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 877
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 134
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 187
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 2
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 950
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 94
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 138
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 12
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 5
+          },
+          {
+            "ms": 0.5,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 926
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 100
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 156
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 12
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 5
+          },
+          {
+            "ms": 0.5,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "before",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "ads",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0026666666682188494,
+        "median": 0.004999999888241291,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.03224999996833503,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.03608333330291013,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 114,
+      "instructions": 106,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 1,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-controls/11",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 594
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 221
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 351
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 25
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 9
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 829
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 152
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 204
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 12
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 2
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 786
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 167
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 229
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 15
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 2
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "before",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "ads",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0027500000026387246,
+        "median": 0.004999999888241291,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.0335833332904925,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.03608333329049249,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 114,
+      "instructions": 106,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 1,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-controls/12",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 585
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 212
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 358
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 35
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 10
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 814
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 162
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 208
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 11
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 4
+          },
+          {
+            "ms": 0.29999999701976776,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 787
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 172
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 223
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 12
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 4
+          },
+          {
+            "ms": 0.29999999701976776,
+            "count": 1
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "after",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "ads",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0014500000006519337,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.021333333325261872,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.022749999991307657,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 83,
+      "instructions": 104,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 1,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-controls/13",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 859
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 130
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 204
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 5
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 2
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 952
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 99
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 141
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 6
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 2
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 937
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 104
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 149
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 8
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 2
+          }
+        ]
+      }
+    },
+    {
+      "version": "after",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "ads",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0012833333332091638,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.02100000000248353,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.022333333337058624,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 83,
+      "instructions": 104,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 1,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-controls/14",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 899
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 118
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 176
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 6
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 1
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 957
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 91
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 144
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 7
+          },
+          {
+            "ms": 0.29999999701976776,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 941
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 97
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 154
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 7
+          },
+          {
+            "ms": 0.29999999701976776,
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "version": "before",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "ads",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.0026624999990065693,
+        "median": 0,
+        "p95": 0.005000000074505806
+      },
+      "drawCpu": {
+        "mean": 0.03133333334078391,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.034583333348855376,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 114,
+      "instructions": 106,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 5,
+      "pulses": 1,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-controls/15",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 605
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 229
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 322
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 33
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 11
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 842
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 136
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 207
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 10
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 4
+          },
+          {
+            "ms": 0.5,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 807
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 147
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 227
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 12
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 6
+          },
+          {
+            "ms": 0.5,
+            "count": 1
+          }
+        ]
+      }
+    }
+  ],
+  "excludedIncompleteBlock": [
+    {
+      "version": "before",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "busy",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.011941666664245038,
+        "median": 0.009999999962747096,
+        "p95": 0.015000000037252903
+      },
+      "drawCpu": {
+        "mean": 0.08841666672689219,
+        "median": 0.10000000149011612,
+        "p95": 0.19999999925494194
+      },
+      "inclusiveCpu": {
+        "mean": 0.10041666671012839,
+        "median": 0.10000000149011612,
+        "p95": 0.20000000298023224
+      },
+      "nodes": 120,
+      "instructions": 110,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 48,
+      "pulses": 3,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-final/20",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0.004999999888241291,
+            "count": 34
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 41
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 539
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 117
+          },
+          {
+            "ms": 0.014999999850988387,
+            "count": 79
+          },
+          {
+            "ms": 0.015000000037252903,
+            "count": 332
+          },
+          {
+            "ms": 0.019999999925494193,
+            "count": 30
+          },
+          {
+            "ms": 0.02000000011175871,
+            "count": 19
+          },
+          {
+            "ms": 0.025,
+            "count": 8
+          },
+          {
+            "ms": 0.05,
+            "count": 1
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 311
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 283
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 447
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 110
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 39
+          },
+          {
+            "ms": 0.29999999701976776,
+            "count": 1
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 6
+          },
+          {
+            "ms": 0.3999999985098839,
+            "count": 1
+          },
+          {
+            "ms": 0.4000000022351742,
+            "count": 2
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 236
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 295
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 448
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 155
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 50
+          },
+          {
+            "ms": 0.29999999701976776,
+            "count": 1
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 11
+          },
+          {
+            "ms": 0.3999999985098839,
+            "count": 1
+          },
+          {
+            "ms": 0.4000000022351742,
+            "count": 3
+          }
+        ]
+      }
+    },
+    {
+      "version": "after",
+      "browser": "156.0.8078.73",
+      "device": {
+        "vendor": "amd",
+        "architecture": "rdna-4",
+        "fallback": false
+      },
+      "scenario": "busy",
+      "samples": 1200,
+      "updateBatch": 20,
+      "updateCpu": {
+        "mean": 0.00750416666750473,
+        "median": 0.005000000074505806,
+        "p95": 0.010000000149011612
+      },
+      "drawCpu": {
+        "mean": 0.032916666691501936,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "inclusiveCpu": {
+        "mean": 0.04058333332960804,
+        "median": 0,
+        "p95": 0.10000000149011612
+      },
+      "nodes": 89,
+      "instructions": 108,
+      "uploads": 1,
+      "labels": 20,
+      "contacts": 48,
+      "pulses": 3,
+      "expectedLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "actualLabels": [
+        "LIVING\nW5",
+        "SHOP\nW1",
+        "SHOP\nW2",
+        "RUIN\nW3",
+        "WORKSHOP\nW4",
+        "STORAGE\nE5",
+        "SHOP\nE1",
+        "SHOP\nE2",
+        "RUIN\nE3",
+        "STORAGE\nE4",
+        "BS3",
+        "BW1",
+        "BW2",
+        "BE1",
+        "BE2",
+        "BE3",
+        "BS1",
+        "BS2",
+        "BN1",
+        "BN2"
+      ],
+      "artifact": "/tmp/pixi-map-final/21",
+      "timingHistograms": {
+        "updates": [
+          {
+            "ms": 0,
+            "count": 31
+          },
+          {
+            "ms": 0.004999999888241291,
+            "count": 234
+          },
+          {
+            "ms": 0.005000000074505806,
+            "count": 350
+          },
+          {
+            "ms": 0.009999999962747096,
+            "count": 432
+          },
+          {
+            "ms": 0.010000000149011612,
+            "count": 108
+          },
+          {
+            "ms": 0.014999999850988387,
+            "count": 3
+          },
+          {
+            "ms": 0.015000000037252903,
+            "count": 40
+          },
+          {
+            "ms": 0.019999999925494193,
+            "count": 1
+          },
+          {
+            "ms": 0.02000000011175871,
+            "count": 1
+          }
+        ],
+        "draw": [
+          {
+            "ms": 0,
+            "count": 823
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 137
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 225
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 10
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 3
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          },
+          {
+            "ms": 0.3999999985098839,
+            "count": 1
+          }
+        ],
+        "total": [
+          {
+            "ms": 0,
+            "count": 739
+          },
+          {
+            "ms": 0.09999999776482582,
+            "count": 176
+          },
+          {
+            "ms": 0.10000000149011612,
+            "count": 262
+          },
+          {
+            "ms": 0.19999999925494194,
+            "count": 17
+          },
+          {
+            "ms": 0.20000000298023224,
+            "count": 4
+          },
+          {
+            "ms": 0.30000000074505806,
+            "count": 1
+          },
+          {
+            "ms": 0.3999999985098839,
+            "count": 1
+          }
+        ]
+      }
+    }
+  ],
+  "excludedPilot": {
+    "reason": "Initial diagnostic update scopes included fixture advancement/trigonometry; corrected before every trial above. Not used in final claims.",
+    "artifacts": "/tmp/pixi-map-initial",
+    "runs": [
+      {
+        "version": "before",
+        "browser": "156.0.8078.73",
+        "device": {
+          "vendor": "amd",
+          "architecture": "rdna-4",
+          "fallback": false
+        },
+        "scenario": "turn",
+        "samples": 1200,
+        "updateBatch": 20,
+        "updateCpu": {
+          "mean": 0.0017791666671012915,
+          "median": 0,
+          "p95": 0.005000000074505806
+        },
+        "drawCpu": {
+          "mean": 0.017083333327124518,
+          "median": 0,
+          "p95": 0.10000000149011612
+        },
+        "inclusiveCpu": {
+          "mean": 0.018666666665424905,
+          "median": 0,
+          "p95": 0.10000000149011612
+        },
+        "nodes": 111,
+        "instructions": 104,
+        "uploads": 1,
+        "labels": 20,
+        "contacts": 5,
+        "pulses": 0
+      },
+      {
+        "version": "before",
+        "browser": "156.0.8078.73",
+        "device": {
+          "vendor": "amd",
+          "architecture": "rdna-4",
+          "fallback": false
+        },
+        "scenario": "pan-fov",
+        "samples": 1200,
+        "updateBatch": 20,
+        "updateCpu": {
+          "mean": 0.004224999997454314,
+          "median": 0.004999999888241291,
+          "p95": 0.009999999962747096
+        },
+        "drawCpu": {
+          "mean": 0.04775000002856056,
+          "median": 0,
+          "p95": 0.10000000149011612
+        },
+        "inclusiveCpu": {
+          "mean": 0.05225000004904966,
+          "median": 0,
+          "p95": 0.10000000149011612
+        },
+        "nodes": 114,
+        "instructions": 106,
+        "uploads": 1,
+        "labels": 20,
+        "contacts": 5,
+        "pulses": 1
+      },
+      {
+        "version": "before",
+        "browser": "156.0.8078.73",
+        "device": {
+          "vendor": "amd",
+          "architecture": "rdna-4",
+          "fallback": false
+        },
+        "scenario": "busy",
+        "samples": 1200,
+        "updateBatch": 20,
+        "updateCpu": {
+          "mean": 0.014179166664990061,
+          "median": 0.015000000037252903,
+          "p95": 0.019999999925494193
+        },
+        "drawCpu": {
+          "mean": 0.09558333337306976,
+          "median": 0.10000000149011612,
+          "p95": 0.19999999925494194
+        },
+        "inclusiveCpu": {
+          "mean": 0.10716666671447456,
+          "median": 0.10000000149011612,
+          "p95": 0.20000000298023224
+        },
+        "nodes": 120,
+        "instructions": 110,
+        "uploads": 1,
+        "labels": 20,
+        "contacts": 48,
+        "pulses": 3
+      }
+    ]
+  }
+}

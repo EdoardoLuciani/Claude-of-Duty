@@ -7,7 +7,7 @@ import type { DamageArcs } from './damage.ts';
 import { KINDS, R_IN, R_OUT } from './hitmarkers.ts';
 import type { Hitmarkers, HitmarkerKind } from './hitmarkers.ts';
 import { accessoryIcon } from './pixi-accessory-icons.ts';
-import type { AccessoryIconStyle } from './pixi-accessory-icons.ts';
+import { HUD_TYPE } from './pixi-type.ts';
 
 export interface CombatModels {
   hit: Hitmarkers;
@@ -50,8 +50,6 @@ function arc(): Graphics {
   return g;
 }
 
-const EQUIPMENT_LABELS = ['BANDAGES', 'FRAGS'];
-
 /** Retained presentation only; native owners advance all combat lifetimes. */
 interface HitSlot {
   node: Container;
@@ -62,7 +60,7 @@ interface HitSlot {
 interface EquipmentView {
   node: Container;
   label: Text;
-  symbol: Graphics | null;
+  symbol: Graphics;
   count: number;
 }
 export class PixiCombat {
@@ -96,28 +94,23 @@ export class PixiCombat {
   });
   readonly slots: EquipmentView[];
 
-  readonly iconStyle: AccessoryIconStyle;
-
-  constructor(iconStyle: AccessoryIconStyle = 'simple') {
-    this.iconStyle = iconStyle;
+  constructor() {
     this.fps.anchor.set(1, 0);
     this.slots = Array.from({ length: 2 }, (_, i): EquipmentView => {
       const label = new Text({
         text: '',
         style: {
           fontFamily: 'Arial',
-          fontSize: 11,
+          fontSize: HUD_TYPE.secondary,
           fontWeight: '600',
           fill: 0xffffff,
           stroke: { color: 0x080c10, width: 1.5 },
         },
       });
-      const symbol = iconStyle !== 'text' ? accessoryIcon(i, iconStyle) : null;
-      const node = symbol ? new Container() : label;
-      if (symbol) {
-        label.position.set(21, 1);
-        node.addChild(symbol, label);
-      }
+      const symbol = accessoryIcon(i),
+        node = new Container();
+      label.position.set(26, 0);
+      node.addChild(symbol, label);
       this.equipment.addChild(node);
       return { node, label, symbol, count: -1 };
     });
@@ -175,20 +168,16 @@ export class PixiCombat {
         v = models.ammo.equipment[i];
       if (slot.count !== v.count) {
         slot.count = v.count;
-        slot.label.text = slot.symbol ? String(v.count) : `${EQUIPMENT_LABELS[i]} ${v.count}`;
+        slot.label.text = String(v.count);
         layout = dirty = true;
       }
       const tint = v.active ? 0xffb02a : 0xa9bac5;
       const iconTint = v.active ? 0xffb02a : 0xffffff;
-      if (
-        slot.node.alpha !== v.alpha ||
-        slot.label.tint !== tint ||
-        (slot.symbol && slot.symbol.tint !== iconTint)
-      )
+      if (slot.node.alpha !== v.alpha || slot.label.tint !== tint || slot.symbol.tint !== iconTint)
         dirty = true;
       slot.node.alpha = v.alpha;
       slot.label.tint = tint;
-      if (slot.symbol) slot.symbol.tint = iconTint;
+      slot.symbol.tint = iconTint;
     }
     if (layout) {
       let right = 0;
