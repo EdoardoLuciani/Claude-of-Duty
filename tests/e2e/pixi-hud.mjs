@@ -86,7 +86,7 @@ try {
       };
     }, mode === 'unavailable');
     await page.goto(
-      `http://localhost:${port}/?capture=1&lockstep=1&q=${args.quality ?? 'high'}${mode === 'dom' ? '' : '&pixi=hud'}${mode === 'html' ? '&underlays=html' : ''}${mode === 'legacy' ? '&combat=html' : mode === 'bearing' ? '&compass=html' : ''}`
+      `http://localhost:${port}/?capture=1&lockstep=1&q=${args.quality ?? 'high'}${mode === 'dom' ? '' : '&pixi=hud'}${mode === 'html' ? '&underlays=html' : ''}${mode === 'legacy' ? '&combat=html' : mode === 'bearing' ? '&compass=html' : ''}${args.icons ? '&icons=' + encodeURIComponent(String(args.icons)) : ''}`
     );
     const device = await waitForGame(page);
     // Known upstream prewarm warning; all other errors/validation failures fail.
@@ -126,6 +126,7 @@ try {
         markerElements: document.querySelectorAll('.ow-mk, .ow-nade').length,
         gpuUnderlays: p?.gpuUnderlays ?? false,
         gpuCombat: p?.gpuCombat ?? false,
+        iconStyle: p?.combat.iconStyle ?? null,
         gpuCompass: p?.gpuCompass ?? false,
         nativeCompass: getComputedStyle(ui.compass.root).display !== 'none',
         nativeFps: getComputedStyle(ui.fps).display !== 'none',
@@ -151,7 +152,13 @@ try {
     assert.equal(setup.nativeMap, !setup.pixi);
     assert.equal(setup.nativeVitals, !setup.pixi);
     assert.equal(setup.nativeCrosshair, !setup.pixi);
-    if (setup.pixi) assert(setup.shared);
+    if (setup.pixi) {
+      assert(setup.shared);
+      assert.equal(
+        setup.iconStyle,
+        ['text', 'original'].includes(args.icons) ? args.icons : 'simple'
+      );
+    }
     assert.equal(setup.gpuUnderlays, setup.pixi && mode !== 'html');
     assert.equal(setup.nativeInjury, !setup.gpuUnderlays);
     assert.equal(setup.markerUiPresent, false);
@@ -397,7 +404,10 @@ try {
                 p.combat.arcSlots[i].rotation !== ui.arcs.visuals[i].rotation
               )
                 throw Error('damage arc direction');
-            if (p.combat.slots.map((s) => s.node.text).join() !== 'BANDAGES 12,FRAGS 3,RADIO 2')
+            if (
+              p.combat.slots.map((s) => s.label.text).join() !==
+              (p.combat.iconStyle === 'text' ? 'BANDAGES 12,FRAGS 3,RADIO 2' : '12,3,RADIO 2')
+            )
               throw Error('equipment count parity');
           }
           if (p.gpuCompass && p.compass.pings.filter((n) => n.visible).length < 2)
