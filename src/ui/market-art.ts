@@ -20,10 +20,10 @@ export const MARKET_ART: Record<SupplyId, { src: string; alt: string }> = {
   },
   bandage: {
     src: '/images/market/bandage.webp',
-    alt: 'Painted rolled off-white field dressing with a short loose gauze tail.',
+    alt: 'Painted upright off-white field dressing with a complete spiral top and a loose tail to the side.',
   },
   carpet: {
     src: '/images/market/carpet.webp',
-    alt: 'Painted olive twin-propeller bomber representing a radio-called carpet-bomb strike.',
+    alt: 'Painted line of bomb explosions along an empty industrial avenue, with a twin-propeller bomber overhead.',
   },
 };

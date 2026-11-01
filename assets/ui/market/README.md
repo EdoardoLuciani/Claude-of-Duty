@@ -16,20 +16,26 @@ interactive 3D inspection models; small card silhouettes remain SVGs.
 - Optimization: RGB conversion, Lanczos resize to 960 × 640, WebP quality 85,
   method 6 using Pillow. No cropping, compositing or retouching.
 
-Bandage and Ammo Refill reuse the approved painted studies. Grenade Pack depicts
-one intact M67-style grenade, matching the purchase of one grenade. Armour Plate
-shows one standalone ceramic insert rather than a vest. Carpet Bomb is represented
-by a conventional twin-propeller bomber, matching `src/radio/index.ts`, not a modern
-stealth jet. The aircraft is illustrative support artwork, not a new 3D asset.
+Ammo Refill reuses the approved painted study. After reviewing replacement
+prototypes, the owner selected **Bandage B: upright**, with a complete spiral top,
+and **Strike B: ground-level blasts**, showing a line of explosions along an empty
+industrial avenue with a conventional twin-propeller bomber overhead. Carpet Bomb
+therefore depicts the air attack itself, not an isolated aircraft. The twin-prop
+silhouette matches `src/radio/index.ts`; this is illustrative support artwork, not
+a new 3D asset. Grenade Pack depicts one intact M67-style grenade, matching the
+purchase of one grenade. Armour Plate shows one standalone ceramic insert, not a
+vest.
 
 ## Future additions
 
 Use the composition and painted-art direction recorded in the existing prompts:
 three-quarter view, clear isolated silhouette, restrained ivory/olive/ochre palette,
 deliberate brushwork, charcoal background, simplified material detail, no lettering,
-logos, people or battlefield effects. Add an item-specific subject that accurately
-represents the catalog purchase. Review the result at actual inspection-panel size,
-then optimize it with the same settings and update its provenance and alternative
+logos or people. Physical supplies remain isolated objects; support abilities may
+use a painted action scene to convey their effect, such as the selected air-strike
+illustration. Add an item-specific subject that accurately represents the catalog
+purchase. Review the result at actual inspection-panel size, then optimize it with
+the same settings and update its provenance and alternative
 text. Generations are stochastic; prompts and settings document intent, not an
 exactly reproducible image.
 
