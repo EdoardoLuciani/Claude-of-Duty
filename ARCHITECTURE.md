@@ -305,9 +305,8 @@ if partial cleanup fails.
 Start/error controls, menus/shop, score/status, killfeed, prompts/progress,
 banners/countdown and the field-radio panel remain native. The independent market
 inspection renderer is unchanged. This is not a wholesale UI framework/migration.
-See [current HUD contract and qualification](docs/hud.md). Historical experiment
-reports under `docs/experiments/pixi-*.md` describe their named revisions, not
-current runtime switches, defaults or new performance claims.
+See the [HUD contract and smoke checks](docs/hud.md). Earlier experiment reports
+and capture harnesses are available in Git history at `d5858ebc`.
 
 ## Models
 
