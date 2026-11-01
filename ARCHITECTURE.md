@@ -321,8 +321,13 @@ adapters retain their separate ownership.
 skeletons and mixers are inspection-owned; geometry, materials and maps are borrowed
 from gameplay and must not be disposed by the caller. UI drops the clone on selection,
 close/restart/error and releases its renderer/environment at teardown. Controls use
-DOM input, not the paused simulation clock. Only explicit weapon Buy/Swap buttons
-purchase; selecting or inspecting a weapon never changes loadout or credits.
+DOM input, not the paused simulation clock. Only explicit Buy/Swap buttons
+purchase; selecting or inspecting an item never changes loadout or credits.
+Non-weapon market items use the exhaustive local artwork map in
+`src/ui/market-art.ts`. Image selection invalidates pending weapon clones and hides
+3D-only controls; image errors leave purchases usable.
+Artwork generation is offline-only; model, prompts and processing live in
+`assets/ui/market/`, with optimized runtime WebPs in `public/images/market/`.
 
 `build/models.mjs` owns explicit gltfpack runtime-model cooking and per-model
 profiles (`npm run models:cook`). Normal builds consume committed `.runtime.glb`

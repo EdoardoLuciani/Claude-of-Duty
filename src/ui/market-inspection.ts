@@ -3,18 +3,21 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import * as THREE from 'three/webgpu';
 
 import { isMesh } from '../core/three-guards.ts';
-import type { WeaponId } from '../weapons/defs.ts';
+import { isWeaponId } from '../weapons/defs.ts';
 import type { WeaponSystem } from '../weapons/index.ts';
+import { MARKET_ART, type MarketItemId } from './market-art.ts';
 import { el, setText } from './util.ts';
 
 type InspectionModel = Awaited<ReturnType<WeaponSystem['createInspectionModel']>>;
 
-/** One lazy, demand-rendered studio for the whole market, independent of sim time. */
+/** Local supply artwork and one lazy weapon studio, independent of sim time. */
 export class MarketInspection {
   root: HTMLElement;
   canvas: HTMLCanvasElement;
   title: HTMLElement;
   status: HTMLElement;
+  threeControls: HTMLElement;
+  image: HTMLImageElement | null = null;
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(35, 1, 0.01, 100);
   controls: OrbitControls;
@@ -22,7 +25,7 @@ export class MarketInspection {
   environment: THREE.RenderTarget | null = null;
   model: InspectionModel | null = null;
   ready: Promise<void> | null = null;
-  activeId: WeaponId | null = null;
+  activeId: MarketItemId | null = null;
   active = false;
   disposed = false;
   failed = false;
@@ -39,10 +42,12 @@ export class MarketInspection {
   constructor(parent: HTMLElement, weapons: WeaponSystem) {
     this.weapons = weapons;
     this.root = el('section', 'ow-market-inspection', parent);
-    this.root.setAttribute('aria-label', 'Weapon inspection');
-    el('div', 'ow-market-sec-l', this.root, 'WEAPON INSPECTION');
-    this.title = el('h2', 'ow-market-inspect-title', this.root, 'HOVER OR FOCUS A WEAPON');
-    this.canvas = el('canvas', 'ow-market-inspect-canvas', this.root);
+    this.root.setAttribute('aria-label', 'Item inspection');
+    el('div', 'ow-market-sec-l', this.root, 'ITEM INSPECTION');
+    this.title = el('h2', 'ow-market-inspect-title', this.root, 'HOVER OR FOCUS AN ITEM');
+    const view = el('div', 'ow-market-inspect-view', this.root);
+    this.canvas = el('canvas', 'ow-market-inspect-canvas', view);
+    this.canvas.hidden = true;
     this.canvas.tabIndex = 0;
     this.canvas.setAttribute(
       'aria-label',
@@ -55,7 +60,9 @@ export class MarketInspection {
       'Inspect without spending credits'
     );
     this.status.setAttribute('role', 'status');
-    const toolbar = el('div', 'ow-market-inspect-tools', this.root);
+    this.threeControls = el('div', 'ow-market-inspect-3d', this.root);
+    this.threeControls.hidden = true;
+    const toolbar = el('div', 'ow-market-inspect-tools', this.threeControls);
     const button = (label: string, action: () => void): HTMLButtonElement => {
       const btn = el('button', null, toolbar, label);
       btn.type = 'button';
@@ -65,18 +72,18 @@ export class MarketInspection {
     button('ZOOM IN', (): void => this.zoom(0.8));
     button('ZOOM OUT', (): void => this.zoom(1.25));
     button('RESET', (): void => this.reset());
-    el('p', 'ow-market-inspect-help', this.root, 'Drag to rotate · Scroll to zoom');
+    el('p', 'ow-market-inspect-help', this.threeControls, 'Drag to rotate · Scroll to zoom');
     el(
       'p',
       'ow-market-inspect-help',
-      this.root,
+      this.threeControls,
       'Keyboard: arrows rotate · + / − zoom · Home reset'
     );
     el(
       'p',
       'ow-market-inspect-help',
       this.root,
-      'Click a weapon card to keep it selected. Only BUY / SWAP spends credits.'
+      'Click any card to keep it selected. Only BUY / SWAP spends credits.'
     );
 
     this.controls = new OrbitControls(this.camera, this.canvas);
@@ -140,19 +147,51 @@ export class MarketInspection {
   }
 
   private fail(): void {
-    ++this.revision;
     this.clearModel();
     this.failed = true;
     this.controls.enabled = false;
+    // A late device-loss notification must not replace a working supply illustration.
+    if (this.activeId && !isWeaponId(this.activeId)) return;
+    ++this.revision;
+    this.canvas.hidden = true;
+    this.threeControls.hidden = true;
     setText(this.status, '3D preview unavailable. Purchases and resupply still work.');
   }
 
-  async select(id: WeaponId, label: string): Promise<void> {
+  async select(id: MarketItemId, label: string): Promise<void> {
     if (!this.active || this.disposed || id === this.activeId) return;
     this.activeId = id;
     const revision = ++this.revision;
     this.clearModel();
+    this.clearImage();
     setText(this.title, label);
+    const weapon = isWeaponId(id);
+    this.canvas.hidden = true;
+    this.threeControls.hidden = !weapon;
+    this.controls.enabled = weapon && !this.failed;
+    if (!weapon) {
+      const art = MARKET_ART[id];
+      const image = el('img', 'ow-market-inspect-art');
+      this.image = image;
+      image.alt = art.alt;
+      image.width = 960;
+      image.height = 640;
+      image.hidden = true;
+      image.onload = (): void => {
+        if (revision !== this.revision || this.disposed) return;
+        image.hidden = false;
+        setText(this.status, 'Preview only · field supply illustration');
+      };
+      image.onerror = (): void => {
+        if (revision !== this.revision || this.disposed) return;
+        image.hidden = true;
+        setText(this.status, 'Artwork unavailable. Purchases and resupply still work.');
+      };
+      setText(this.status, 'Loading illustration…');
+      this.canvas.after(image);
+      image.src = art.src;
+      return;
+    }
     if (this.failed) {
       this.fail();
       return;
@@ -186,8 +225,10 @@ export class MarketInspection {
       this.framing.copy(bounds).translate(center.negate());
       this.controls.minDistance = radius * 0.65;
       this.camera.near = radius * 0.01;
+      this.canvas.hidden = false;
       this.reset();
-      setText(this.status, 'Preview only · current weapon configuration');
+      this.update();
+      if (!this.failed) setText(this.status, 'Preview only · current weapon configuration');
     } catch {
       if (!this.disposed && revision === this.revision) this.fail();
     }
@@ -231,6 +272,7 @@ export class MarketInspection {
   }
 
   private key(event: KeyboardEvent): void {
+    if (!this.controls.enabled) return;
     const x = Number(event.key === 'ArrowRight') - Number(event.key === 'ArrowLeft');
     const y = Number(event.key === 'ArrowUp') - Number(event.key === 'ArrowDown');
     if (x || y) {
@@ -250,7 +292,15 @@ export class MarketInspection {
   }
 
   update(): void {
-    if (!this.active || !this.renderer || this.disposed || this.failed) return;
+    if (
+      !this.active ||
+      !this.activeId ||
+      !isWeaponId(this.activeId) ||
+      !this.renderer ||
+      this.disposed ||
+      this.failed
+    )
+      return;
     const width = Math.max(1, Math.round(this.canvas.clientWidth));
     const height = Math.max(1, Math.round(this.canvas.clientHeight));
     if (width !== this.width || height !== this.height) {
@@ -276,8 +326,20 @@ export class MarketInspection {
     this.activeId = null;
     ++this.revision;
     this.clearModel();
-    setText(this.title, 'HOVER OR FOCUS A WEAPON');
+    this.clearImage();
+    this.canvas.hidden = true;
+    this.threeControls.hidden = true;
+    setText(this.title, 'HOVER OR FOCUS AN ITEM');
     setText(this.status, 'Inspect without spending credits');
+  }
+
+  private clearImage(): void {
+    if (!this.image) return;
+    this.image.onload = null;
+    this.image.onerror = null;
+    this.image.removeAttribute('src');
+    this.image.remove();
+    this.image = null;
   }
 
   private clearModel(): void {
