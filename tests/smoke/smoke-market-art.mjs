@@ -30,7 +30,7 @@ for (const [id, art] of Object.entries(MARKET_ART)) {
   const source = provenance.images[id];
   assert.equal(source.file, art.src);
   assert.equal(source.model, 'gpt-image-2.5-sunburst');
-  assert.match(source.prompt, /HAND-PAINTED TACTICAL INVENTORY ILLUSTRATION/);
+  assert.match(source.prompt, /HAND-PAINTED TACTICAL (?:GAME )?INVENTORY ILLUSTRATION/);
   assert.equal(source.bytes, bytes.length);
   assert.equal(source.sha256, createHash('sha256').update(bytes).digest('hex'));
 }
