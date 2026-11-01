@@ -15,7 +15,6 @@ const models = {
     equipment: [
       { count: 2, active: false, alpha: 0.9 },
       { count: 3, active: false, alpha: 0.9 },
-      { count: 1, active: false, alpha: 0.9 },
     ],
   },
   fpsText: '60 FPS',
@@ -25,11 +24,11 @@ for (const style of ['text', 'original', 'simple']) {
   for (const slot of view.slots) Object.defineProperty(slot.node, 'width', { get: () => 30 }); // real font/layout checked in browser
   const geometry = view.slots.map((s) => s.symbol?.context.instructions);
   assert.equal(view.slots.filter((s) => s.symbol).length, style === 'text' ? 0 : 2);
-  assert.equal(view.slots[2].symbol, null, 'radio stays text in every comparison');
+  assert.equal(view.slots.length, 2, 'radio inventory indicator is removed, not hidden');
   view.update(models);
   assert.deepEqual(
     view.slots.map((s) => s.label.text),
-    style === 'text' ? ['BANDAGES 2', 'FRAGS 3', 'RADIO 1'] : ['2', '3', 'RADIO 1']
+    style === 'text' ? ['BANDAGES 2', 'FRAGS 3'] : ['2', '3']
   );
   assert.equal(view.update(models), false, 'unchanged paused icons must not redraw');
   models.ammo.equipment[0] = { count: 0, active: false, alpha: 0.34 };
@@ -58,5 +57,5 @@ for (const style of ['text', 'original', 'simple']) {
   models.ammo.equipment[1] = { count: 3, active: false, alpha: 0.9 };
 }
 console.log(
-  'ok accessory variants: original/simple silhouettes, text control, counts/empty/active/pause, retained geometry and unchanged radio'
+  'ok accessory variants: original/simple silhouettes, text control, counts/empty/active/pause, retained geometry and no radio inventory slot'
 );

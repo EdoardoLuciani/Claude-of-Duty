@@ -1,8 +1,13 @@
 # Grenade/bandage icon cost and appearance choice
 
 The magazine remains the simplified full bar. Only **bandage and grenade
-inventory icons** are being compared; the radio stays text. This does not restore
-the removed projected grenade danger warnings or objective UI.
+inventory icons** are compared. After these measurements, the operator requested
+removal of the radio inventory indicator: its count/icon and unused UI snapshot
+fields are now gone in HTML and Pixi, with regression checks for exactly two
+inventory entries. Radio mechanics and the separate field-radio panel are
+unchanged. The historical table/captures below included radio text in every
+variant; they are not new performance claims for this removal. This does not
+restore the removed projected grenade danger warnings or objective UI.
 
 Use:
 

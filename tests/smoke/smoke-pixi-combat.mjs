@@ -51,6 +51,9 @@ try {
     compass: new Compass(make()),
     ammo: new AmmoPanel(make()),
   };
+  assert.equal(native.ammo.equipment.length, 2);
+  assert.equal('slotR' in native.ammo, false, 'native radio inventory element is not created');
+  assert.equal('slotRn' in native.ammo, false);
   gpu.hit.present =
     gpu.arcs.present =
     gpu.compass.present =

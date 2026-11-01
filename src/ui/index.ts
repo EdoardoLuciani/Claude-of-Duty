@@ -85,8 +85,6 @@ interface HudState {
   weaponName: string;
   fireMode: WeaponMode;
   lethalCount: number;
-  radioEquipped: boolean;
-  carpetCount: number;
   cooking?: boolean;
   grenadeEquipped?: boolean;
   move: number;
@@ -233,8 +231,6 @@ export class UiSystem {
       weaponName: 'M4A1',
       fireMode: 'auto',
       lethalCount: 2,
-      radioEquipped: false,
-      carpetCount: 1,
       move: 0,
       sprint: false,
       crouch: false,
@@ -732,8 +728,6 @@ export class UiSystem {
       s.lethalCount = ws.lethalCount;
       s.cooking = ws.cooking;
       s.grenadeEquipped = ws.grenadeEquipped;
-      s.radioEquipped = ws.radioEquipped;
-      s.carpetCount = ws.carpetCount;
     }
 
     const gameState = ctx.peek('game')?.getHudState?.();
