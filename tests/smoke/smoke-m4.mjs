@@ -507,7 +507,41 @@ function step(seconds) {
     );
   }
 }
-wp.setWeaponImmediate('rifle');
+wp.debugPose('ads');
+step(0.3);
+close(vm.adsT, 1);
+close(camera.fov, 42);
+vm.rig.updateMatrixWorld(true);
+camera.updateMatrixWorld(true);
+// Measure the actual projected rear bore, not just an eye-relief literal. Keep
+// the opening usable at 1080p without magnifying the front aiming tip excessively.
+const project = (point) => point.project(camera).multiply(new THREE.Vector3(960, 540, 1));
+const sightScreen = project(point('SOCKET_sight'));
+const cup = model.root.getObjectByName('MaTech_open_aperture');
+let boreRadius = Infinity;
+for (const index of new Set(cup.geometry.index.array)) {
+  const vertex = project(
+    new THREE.Vector3()
+      .fromBufferAttribute(cup.geometry.attributes.position, index)
+      .applyMatrix4(cup.matrixWorld)
+  );
+  boreRadius = Math.min(boreRadius, Math.hypot(vertex.x - sightScreen.x, vertex.y - sightScreen.y));
+}
+assert(boreRadius * 2 > 90 && boreRadius * 2 < 110, 'rear bore should span about 100 px at 1080p');
+// Check the solved aim datum before the ordinary breathing/sway layers.
+const solvedSight = new THREE.Vector3()
+  .fromArray(model.nodes.sight)
+  .applyQuaternion(vm._adsQuat)
+  .add(vm._adsPos);
+close(solvedSight.x, 0);
+close(solvedSight.y, 0);
+close(solvedSight.z, -WEAPON_DEFS.rifle.eyeRelief);
+const tipCorners = new THREE.Box3().setFromObject(model.root.getObjectByName('Front_sight_tip'));
+const tipMin = project(tipCorners.min.clone());
+const tipMax = project(tipCorners.max.clone());
+assert(Math.abs(tipMax.x - tipMin.x) < 12, 'front paint tip must not obscure distant targets');
+assert(checkM4Sights(model.root).apertureObstructed === 0, 'ADS keeps the authored bore clear');
+wp.debugPose('idle');
 step(0.2);
 assert(!vm.reticle.visible && !vm.scopeOverlay.visible);
 assert(wp.tryFire());
