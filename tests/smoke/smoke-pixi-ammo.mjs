@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 
-import { AmmoPanel, filledMagazinePips } from '../../src/ui/ammo.ts';
-import { PixiAmmoHud } from '../../src/ui/pixi-ammo.ts';
+import { filledMagazinePips } from '../../src/ui/ammo.ts';
+import { PixiAmmoView } from '../../src/ui/pixi-ammo-view.ts';
 
 for (const [ammo, mag, reserve, reload, progress, expected] of [
   [30, 30, 90, false, 0, 30],
@@ -48,8 +48,7 @@ const text = () => ({ text: '', scale: scale(), width: 100, tint: 0xffffff, alph
 const oldDocument = globalThis.document;
 try {
   globalThis.document = { createElement: make, createElementNS: make };
-  const dom = new AmmoPanel(make());
-  const gpu = Object.create(PixiAmmoHud.prototype);
+  const gpu = Object.create(PixiAmmoView.prototype);
   Object.assign(gpu, {
     disposed: false,
     enabled: false,
@@ -78,27 +77,36 @@ try {
     for (const reloading of [false, true])
       for (const progress of [0, 0.2, 0.45, 0.7, 1]) {
         const s = Object.freeze({ ...sample, reloading, reloadProgress: progress, time: 1.23 });
-        dom.update(1 / 60, s);
         gpu.update(1 / 60, s);
-        assert.equal(gpu.current.text, dom.cur.textContent);
-        assert.equal(gpu.reserve.text, `/ ${dom.res.textContent}`);
-        assert.equal(gpu.name.text, dom.name.textContent);
-        assert.equal(gpu.mode.text, dom.mode.textContent);
+        assert.equal(gpu.current.text, String(Math.max(0, s.ammo | 0)));
+        assert.equal(gpu.reserve.text, `/ ${Math.max(0, s.reserve | 0)}`);
+        assert.equal(gpu.name.text, s.weaponName);
+        assert.equal(gpu.mode.text, (s.fireMode ?? 'auto').toUpperCase());
         assert.equal(
           gpu.prompt.text,
-          dom.reload.styles.get('display') === 'none' ? '' : dom.reload.textContent
+          reloading ? 'RELOADING' : s.ammo <= 0 ? 'PRESS R TO RELOAD' : ''
         );
-        assert.equal(gpu.prompt.alpha, Number(dom.reload.styles.get('opacity')));
-        const color = dom.root.classes.has('ow-ammo-empty')
-          ? 0xff5145
-          : dom.root.classes.has('ow-ammo-low')
-            ? 0xffb02a
-            : 0xe7f2ef;
+        assert.equal(
+          gpu.prompt.alpha,
+          !reloading && s.ammo <= 0
+            ? Number((0.55 + 0.45 * Math.abs(Math.sin(s.time * 3.8))).toFixed(3))
+            : 1
+        );
+        const color =
+          s.ammo <= 0
+            ? 0xff5145
+            : s.ammo / Math.max(1, s.magSize | 0 || 30) <= 0.34
+              ? 0xffb02a
+              : 0xe7f2ef;
         assert.equal(gpu.current.tint, color);
         assert.equal(gpu.current.scale.x, 1, 'simplified number has no decorative shot punch');
-        const domFilled = dom.pips.filter(
-          (p) => p.styles.get('display') !== 'none' && !p.classes.has('off')
-        ).length;
+        const domFilled = filledMagazinePips(
+          Math.max(0, s.ammo | 0),
+          Math.max(1, s.magSize | 0 || 30),
+          s.reserve,
+          reloading,
+          progress
+        );
         assert.equal(
           gpu.magFill.scale.x,
           domFilled / Math.min(30, Math.max(1, s.magSize | 0 || 30)),
@@ -106,11 +114,10 @@ try {
         );
         assert.equal(gpu.bar.visible, reloading);
       }
-  dom.dispose();
 } finally {
   if (oldDocument === undefined) delete globalThis.document;
   else globalThis.document = oldDocument;
 }
 console.log(
-  'ok Pixi ammo: canonical pips and HTML/Pixi semantic parity across reload/weapon edge cases'
+  'ok Pixi ammo: canonical fill and Pixi readout semantics across reload/weapon edge cases'
 );

@@ -1,5 +1,11 @@
 # Grenade/bandage icon cost and appearance choice
 
+> **Historical experiment.** The [current gameplay HUD](../hud.md) now uses Pixi
+> by default. Its old HTML presenters/fallback, URL comparison switches and
+> standalone experiment harnesses are retired. Commands and measurements below
+> refer to their named historical revisions, not current runtime options; use
+> Git history to reproduce them. No new performance claim accompanies promotion.
+
 **Decision:** the operator chose the simple silhouettes. They are now the only
 Pixi inventory icons; original/text implementations and URL options are retired.
 The typography/minimap follow-up is documented in [pixi-minimap.md](pixi-minimap.md).

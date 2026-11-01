@@ -1,4 +1,4 @@
-import { el, setStyle, clamp, clamp01, damp, ease } from './util.ts';
+import { clamp, clamp01, damp, ease } from './util.ts';
 
 /**
  * Dynamic four-blade reticle.
@@ -22,9 +22,6 @@ export interface CrosshairState {
 }
 
 export class Crosshair {
-  declare root: HTMLElement;
-  declare blades: HTMLElement[];
-  declare dot: HTMLElement;
   declare k: number;
   declare gap: number;
   declare kick: number;
@@ -33,17 +30,11 @@ export class Crosshair {
   declare adsBlend: number;
   declare hitPulse: number;
   declare visible: number;
-  declare _rot: number[];
   bladeLength = 1;
   bladeAlpha = 1;
   dotScale = 1;
   dotAlpha = 1;
-  constructor(parent: HTMLElement) {
-    this.root = el('div', 'ow-cross', parent);
-    this.blades = new Array<HTMLElement>(4);
-    for (let i = 0; i < 4; i++) this.blades[i] = el('div', 'ow-blade', this.root);
-    this.dot = el('div', 'ow-dot', this.root);
-
+  constructor() {
     this.k = 1;
     this.gap = 6;
     this.kick = 0;
@@ -52,9 +43,6 @@ export class Crosshair {
     this.adsBlend = 0;
     this.hitPulse = 0;
     this.visible = 1;
-
-    // preallocated transform scratch — string concat only, no objects
-    this._rot = [0, 90, 180, 270];
   }
 
   /** Called on every shot. `amount` scales with weapon recoil. */
@@ -76,7 +64,7 @@ export class Crosshair {
    * @param {object} s { move:0..1, sprint:bool, ads:bool, crouch:bool,
    *                     baseSpread:px, hidden:bool }
    */
-  update(dt: number, s: CrosshairState, present = true): void {
+  update(dt: number, s: CrosshairState): void {
     // --- spring kick -------------------------------------------------------
     const stiff = 150;
     const dampC = 15;
@@ -110,27 +98,9 @@ export class Crosshair {
     this.bladeAlpha = vis * Math.min(1, bright);
     this.dotScale = 1 + this.hitPulse * 1.1;
     this.dotAlpha = vis * (0.85 + 0.15 * this.hitPulse);
-    if (!present) return;
-    for (let i = 0; i < 4; i++) {
-      const b = this.blades[i];
-      setStyle(
-        b,
-        'transform',
-        `rotate(${this._rot[i]}deg) translateY(${(-gap).toFixed(2)}px) scaleY(${len.toFixed(3)})`
-      );
-      setStyle(b, 'opacity', (vis * Math.min(1, bright)).toFixed(3));
-    }
-    const dotScale = 1 + this.hitPulse * 1.1;
-    setStyle(this.dot, 'transform', `scale(${dotScale.toFixed(3)})`);
-    setStyle(this.dot, 'opacity', (vis * (0.85 + 0.15 * this.hitPulse)).toFixed(3));
-    setStyle(this.root, 'display', vis < 0.004 ? 'none' : '');
   }
 
   setScale(k: number): void {
     this.k = k;
-  }
-
-  dispose(): void {
-    this.root.remove();
   }
 }

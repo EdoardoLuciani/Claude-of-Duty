@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 import type { EngineContext } from '../core/context.ts';
 import type { Rng } from '../core/rng.ts';
-import { el, clamp, clamp01, lerp, FONT_STACK } from './util.ts';
+import { clamp01, lerp } from './util.ts';
 interface Traversable {
   from: [number, number, number];
   to: [number, number, number];
@@ -102,10 +102,6 @@ const MASS_SHADE = 'rgba(6,11,16,.45)'; // south/east edge
 const MASS_RIM = 'rgba(8,14,19,.85)'; // drawn footprint outline
 const DOOR_INK = 'rgba(42,150,96,.95)';
 const SHOP_INK = 'rgba(30,140,170,.95)';
-const NAME_INK = 'rgba(12,19,25,.92)'; // the loud line of a label
-const CODE_INK = 'rgba(12,19,25,.60)'; // its building code, under the name
-const BARE_INK = 'rgba(196,214,226,.28)'; // a code on a mass too dark for it
-
 const ramp = (a: readonly number[], b: readonly number[], t: number): string =>
   'rgb(' +
   Math.round(lerp(a[0], b[0], t)) +
@@ -137,27 +133,9 @@ function labelKind(spec: object): string | null {
   return typeof furnish.kind === 'string' && furnish.kind ? furnish.kind.toUpperCase() : null;
 }
 
-/**
- * Tactical minimap, top left.
- *
- * The map is a plan of the level, drawn from the world's own layout data: real
- * footprint polygons, the street network as the negative space between them,
- * crisp dark outlines, hatched ruins, the door openings, and a label on every
- * building — what it is for, and its code. Once baked, per-frame cost is a
- * single drawImage, a handful of labels, and blips. A world-less context keeps
- * the scrolling grid plate instead of a second map pipeline.
- *
- * Player arrow stays centred and rotates (map is north-up, matching the
- * compass strip); enemy blips come from `getHudActors()` (LOS / recent shot).
- */
+/** One-time authored terrain bake/data; PixiMinimap owns all live presentation. */
 export class Minimap {
-  root: HTMLElement;
-  canvas: HTMLCanvasElement;
-  g: CanvasRenderingContext2D;
-  scaleTag: HTMLElement;
   rng: Rng;
-  k: number;
-  cssSize: number;
   span: number;
   viewSpan: number;
   centre: THREE.Vector2;
@@ -166,20 +144,8 @@ export class Minimap {
   bakeTries: number;
   bakeDone: boolean;
   _probe: THREE.Vector3;
-  px!: number;
-  constructor(parent: HTMLElement, rng: Rng) {
-    this.root = el('div', 'ow-minimap', parent);
-    this.canvas = el('canvas', null, this.root);
-    this.g = this.canvas.getContext('2d')!;
-    for (const c of ['tl', 'tr', 'bl', 'br']) el('div', 'ow-mm-corner ' + c, this.root);
-    el('div', 'ow-mm-n', this.root, 'N');
-    const tag = el('div', 'ow-mm-tag', this.root);
-    el('span', null, tag, 'ZONE 07');
-    this.scaleTag = el('span', null, tag, '60M');
-
+  constructor(rng: Rng) {
     this.rng = rng;
-    this.k = 1;
-    this.cssSize = 178;
     this.span = 190; // metres covered by the bake
     this.viewSpan = 60; // metres visible in the widget
     this.centre = new THREE.Vector2(0, 0);
@@ -190,19 +156,6 @@ export class Minimap {
     this.bakeDone = false;
 
     this._probe = new THREE.Vector3();
-
-    this.resize(1);
-  }
-
-  resize(k: number): void {
-    this.k = k;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const px = Math.round(this.cssSize * k * dpr);
-    if (this.canvas.width !== px) {
-      this.canvas.width = px;
-      this.canvas.height = px;
-    }
-    this.px = px;
   }
 
   /* --------------------------------------------------------------- bake --- */
@@ -397,302 +350,8 @@ export class Minimap {
     return true;
   }
 
-  /* --------------------------------------------------------------- draw --- */
-
-  /**
-   * @param {object} s { x, z, heading(deg), fov(deg),
-   *                     blips:[{x,z,kind,heading,fade}], objectives:[{x,z,label}] }
-   */
-  draw(s: MinimapState): void {
-    const g = this.g;
-    const S = this.px;
-    if (!S) return;
-    const half = S * 0.5;
-    const ppm = S / this.viewSpan; // canvas pixels per metre
-
-    g.setTransform(1, 0, 0, 1, 0, 0);
-    g.clearRect(0, 0, S, S);
-
-    // base plate — never pure black, always slightly blue. Opaque, and every
-    // layer above it is opaque or drawn over it, so the widget composites as a
-    // single solid tile: nothing in the scene can show through the map. While
-    // the bake is still coming, this plate is the whole panel.
-    g.fillStyle = PLATE;
-    g.fillRect(0, 0, S, S);
-
-    g.save();
-    g.beginPath();
-    g.rect(0, 0, S, S);
-    g.clip();
-
-    const cx = s.x ?? 0;
-    const cz = s.z ?? 0;
-
-    if (this.baked) {
-      const B = this.baked.width;
-      const bppm = B / this.span;
-      const srcW = this.viewSpan * bppm;
-      const sx = (cx - this.centre.x) * bppm + B * 0.5 - srcW * 0.5;
-      const sy = (cz - this.centre.y) * bppm + B * 0.5 - srcW * 0.5;
-      g.imageSmoothingEnabled = true;
-      g.imageSmoothingQuality = 'high';
-      g.drawImage(this.baked, sx, sy, srcW, srcW, 0, 0, S, S);
-    }
-
-    // 10m grid, phase-locked to world space so it scrolls with the player
-    const u = S / this.cssSize; // canvas pixels per css reference pixel
-    g.lineWidth = 1;
-    g.strokeStyle = 'rgba(10,17,23,.20)';
-    g.beginPath();
-    const n0x = Math.floor((cx - this.viewSpan * 0.5) / 10);
-    const n1x = Math.ceil((cx + this.viewSpan * 0.5) / 10);
-    for (let n = n0x; n <= n1x; n++) {
-      const X = Math.round((n * 10 - cx) * ppm + half) + 0.5;
-      g.moveTo(X, 0);
-      g.lineTo(X, S);
-    }
-    const n0z = Math.floor((cz - this.viewSpan * 0.5) / 10);
-    const n1z = Math.ceil((cz + this.viewSpan * 0.5) / 10);
-    for (let n = n0z; n <= n1z; n++) {
-      const Y = Math.round((n * 10 - cz) * ppm + half) + 0.5;
-      g.moveTo(0, Y);
-      g.lineTo(S, Y);
-    }
-    g.stroke();
-
-    // view cone
-    const heading = ((s.heading ?? 0) * Math.PI) / 180;
-    const fov = ((s.fov ?? 80) * 0.5 * Math.PI) / 180;
-    const coneR = S * 0.42;
-    const grad = g.createRadialGradient(half, half, 2, half, half, coneR);
-    grad.addColorStop(0, 'rgba(222,242,255,.26)');
-    grad.addColorStop(0.7, 'rgba(222,242,255,.075)');
-    grad.addColorStop(1, 'rgba(214,238,255,0)');
-    g.fillStyle = grad;
-    g.beginPath();
-    g.moveTo(half, half);
-    g.arc(half, half, coneR, -Math.PI / 2 + heading - fov, -Math.PI / 2 + heading + fov);
-    g.closePath();
-    g.fill();
-    g.strokeStyle = 'rgba(226,244,255,.17)';
-    g.lineWidth = 1;
-    g.stroke();
-
-    // building names — above the cone so the wedge cannot wash them out, below
-    // the objectives and blips so the contacts still own the panel
-    this._drawLabels(g, s, ppm, half, S, u);
-
-    // objectives
-    const objs = s.objectives;
-    if (objs) {
-      g.font = `700 ${(9.5 * u).toFixed(1)}px system-ui, sans-serif`;
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      const r = 6 * u;
-      for (let i = 0; i < objs.length; i++) {
-        const o = objs[i];
-        const dx = clamp((o.x - cx) * ppm + half, r + 1, S - r - 1);
-        const dy = clamp((o.z - cz) * ppm + half, r + 1, S - r - 1);
-        g.fillStyle = 'rgba(121,210,255,.94)';
-        g.strokeStyle = 'rgba(4,14,20,.8)';
-        g.lineWidth = 1;
-        g.beginPath();
-        g.rect(dx - r, dy - r, r * 2, r * 2);
-        g.fill();
-        g.stroke();
-        g.fillStyle = '#06171f';
-        g.fillText(o.label ?? '', dx, dy + 0.5);
-      }
-    }
-
-    // blips
-    const blips = s.blips;
-    if (blips) {
-      // Off-map contacts stay off.
-      const rim = 9 * u;
-      for (let i = 0; i < blips.length; i++) {
-        const b = blips[i];
-        const dx = (b.x - cx) * ppm + half;
-        const dy = (b.z - cz) * ppm + half;
-        if (dx < rim || dx > S - rim || dy < rim || dy > S - rim) continue;
-        const fade = b.fade ?? 1;
-        if (fade <= 0.01) continue;
-        const enemy = b.kind !== 'friend';
-        const r = 3.4 * u;
-        g.save();
-        g.globalAlpha = fade;
-        g.translate(dx, dy);
-        g.rotate(((b.heading ?? 0) * Math.PI) / 180);
-        g.fillStyle = enemy ? 'rgba(255,74,58,.96)' : 'rgba(126,196,255,.95)';
-        g.shadowColor = enemy ? 'rgba(255,60,40,.85)' : 'rgba(120,190,255,.7)';
-        g.shadowBlur = 6 * u;
-        g.beginPath();
-        g.moveTo(0, -r * 1.5);
-        g.lineTo(r * 1.15, r * 1.1);
-        g.lineTo(-r * 1.15, r * 1.1);
-        g.closePath();
-        g.fill();
-        // a dark rim: on light footprints the red no longer owns the panel on
-        // its own, and a contact has to stay the loudest mark on the map. Round
-        // joins, or the miter on that sharp nose doubles the stroke width into
-        // a spike past the tip.
-        g.shadowBlur = 0;
-        g.lineWidth = 1.1 * u;
-        g.lineJoin = 'round';
-        g.strokeStyle = 'rgba(6,10,14,.70)';
-        g.stroke();
-        g.restore();
-      }
-    }
-
-    // Coarse intel search areas. Keep rooms, routes and hostile blips readable.
-    const pulses = s.pulses;
-    if (pulses && pulses.length) {
-      const wobble = 0.62 + 0.38 * Math.sin((s.pulseTime ?? 0) * 3.4);
-      for (let i = 0; i < pulses.length; i++) {
-        const p = pulses[i];
-        const dx = (p.x - cx) * ppm + half;
-        const dy = (p.z - cz) * ppm + half;
-        const rad = (p.radius ?? 12) * ppm;
-        if (rad < 2) continue;
-        g.beginPath();
-        g.arc(dx, dy, rad, 0, Math.PI * 2);
-        g.fillStyle = `rgba(255, 168, 32, ${(0.08 + 0.05 * wobble).toFixed(3)})`;
-        g.fill();
-        g.lineWidth = Math.max(1, 1.5 * u);
-        g.strokeStyle = `rgba(255, 214, 96, ${(0.92 * wobble).toFixed(3)})`;
-        g.stroke();
-        const height = (p.y ?? 0) - (s.playerY ?? 0);
-        if (Math.abs(height) > 2) {
-          g.fillStyle = 'rgba(255, 214, 96, 0.9)';
-          g.font = `bold ${Math.max(11, 13 * u)}px sans-serif`;
-          g.textAlign = 'center';
-          g.fillText(height > 0 ? '↑' : '↓', dx, dy - rad - 3 * u);
-        }
-      }
-    }
-
-    // player arrow
-    g.save();
-    g.translate(half, half);
-    g.rotate(heading);
-    const pr = 4.8 * u;
-    g.beginPath();
-    g.moveTo(0, -pr * 1.55);
-    g.lineTo(pr * 1.15, pr * 1.3);
-    g.lineTo(0, pr * 0.6);
-    g.lineTo(-pr * 1.15, pr * 1.3);
-    g.closePath();
-    g.fillStyle = '#f6fcff';
-    g.strokeStyle = 'rgba(2,6,10,.85)';
-    g.lineWidth = 1.6 * u;
-    g.lineJoin = 'round';
-    g.shadowColor = 'rgba(180,225,255,.85)';
-    g.shadowBlur = 5 * u;
-    g.stroke();
-    g.fill();
-    g.shadowBlur = 0;
-    g.restore();
-
-    // edge falloff so the map sinks into the frame instead of ending abruptly
-    const vg = g.createRadialGradient(half, half, S * 0.28, half, half, S * 0.72);
-    vg.addColorStop(0, 'rgba(0,0,0,0)');
-    vg.addColorStop(1, 'rgba(0,0,0,.17)');
-    g.fillStyle = vg;
-    g.fillRect(0, 0, S, S);
-
-    g.restore();
-  }
-
-  /**
-   * Building labels: what the building is for, with its code under it.
-   *
-   * A mass you can walk into is named in the floor plan's vocabulary (SHOP,
-   * STORAGE, LIVING, WORKSHOP, RUIN); a background block has no such name and
-   * carries its code alone, in a light ink, because it is dark enough that dark
-   * ink on it lands at a contrast no one can read. So every mass on the map can
-   * be called out, but only the enterable ones are announced.
-   *
-   * A label is only drawn when it fits the footprint under it — measured, with
-   * one step down in type size before giving up, because a name that spills
-   * onto the dark ground is the one thing this palette cannot carry — and it
-   * fades out over the last few pixels before the frame edge, so a word is never
-   * chopped in half. Both are why this runs live rather than in the bake: the
-   * map pans underneath the labels.
-   */
-  _drawLabels(
-    g: CanvasRenderingContext2D,
-    s: MinimapState,
-    ppm: number,
-    half: number,
-    S: number,
-    u: number
-  ): void {
-    const cx = s.x ?? 0;
-    const cz = s.z ?? 0;
-    const SIZE = 9; // name, css px at k=1
-    const CODE = 7.5; // code, css px at k=1
-    g.save();
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    for (let i = 0; i < this.labels.length; i++) {
-      const L = this.labels[i];
-      const dx = (L.x - cx) * ppm + half;
-      const dy = (L.z - cz) * ppm + half;
-      const room = L.w * ppm + 2 * u; // 2 css px a label may overhang its mass
-
-      let size = SIZE * u;
-      let tw = 0;
-      if (L.text) {
-        g.font = `700 ${size.toFixed(1)}px ${FONT_STACK}`;
-        tw = g.measureText(L.text).width;
-        if (tw > room) {
-          size = SIZE * 0.8 * u;
-          g.font = `700 ${size.toFixed(1)}px ${FONT_STACK}`;
-          tw = g.measureText(L.text).width;
-          if (tw > room) continue;
-        }
-      }
-      // kept under the name it sits beneath, as well as under CODE, so a name
-      // that had to shrink does not end up outranked by its own code
-      const csize = Math.min(CODE * u, size * 0.85);
-      g.font = `600 ${csize.toFixed(1)}px ${FONT_STACK}`;
-      const cw = g.measureText(L.code).width;
-      const boxW = Math.max(tw, cw);
-      if (boxW > room) continue;
-
-      // fade on the label's own box, not its anchor: a half-drawn word reads
-      // as a glitch, a word that dims out reads as the map running out. Both
-      // axes take a half-extent. The name sits 0.62 above the anchor and the
-      // code 0.78 below it, each about half a cap tall, so the block reaches
-      // 1.2 * size either way — not the 1.7 the two lines add up to, which was
-      // retiring names ~1.5 m further in from the top and bottom rim than the
-      // glyphs need (and half of `csize` for a code with no name above it).
-      const halfW = boxW * 0.5;
-      const halfH = L.text ? size * 1.2 : csize * 0.5;
-      const edge = Math.min(
-        Math.min(dx - halfW, S - dx - halfW),
-        Math.min(dy - halfH, S - dy - halfH)
-      );
-      const a = clamp01((edge - u) / (10 * u));
-      if (a <= 0.02) continue;
-      g.globalAlpha = a;
-
-      if (L.text) {
-        g.font = `700 ${size.toFixed(1)}px ${FONT_STACK}`;
-        g.fillStyle = NAME_INK;
-        g.fillText(L.text, dx, dy - size * 0.62);
-      }
-      g.font = `600 ${csize.toFixed(1)}px ${FONT_STACK}`;
-      g.fillStyle = L.text ? CODE_INK : BARE_INK;
-      g.fillText(L.code, dx, L.text ? dy + size * 0.78 : dy + 0.5);
-    }
-    g.restore();
-  }
-
   dispose(): void {
     this.baked = null;
     this.labels = [];
-    this.root.remove();
   }
 }

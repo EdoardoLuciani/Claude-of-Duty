@@ -1,74 +1,28 @@
 import type { ElementPool, PoolRecord } from './pool-types.ts';
-import { el, svg, setStyle, Pool, ease, clamp01 } from './util.ts';
+import { Pool, ease, clamp01 } from './util.ts';
 
 export const SEG = 7;
 export const SEG_STEP = 8.2; // degrees between segment centres
 export const SEG_ARC = 8.9; // degrees each segment covers (slight overlap = solid arc)
-export const BELL = [0.1, 0.28, 0.62, 1, 0.62, 0.28, 0.1];
 export const R_MAIN = 112;
-export const R_THIN = 124;
 
-function pt(deg: number, r: number): string {
-  const a = (deg * Math.PI) / 180;
-  return `${(Math.sin(a) * r).toFixed(2)} ${(-Math.cos(a) * r).toFixed(2)}`;
-}
-
-function arcPath(cDeg: number, r: number): string {
-  const a0 = cDeg - SEG_ARC / 2;
-  const a1 = cDeg + SEG_ARC / 2;
-  return `M ${pt(a0, r)} A ${r} ${r} 0 0 1 ${pt(a1, r)}`;
-}
-
-/**
- * Directional damage indicators.
- *
- * A fading arc segment at ~112px radius pointing at the shooter. The fall-off
- * across the arc is built from seven discrete segments on a bell curve rather
- * than an SVG gradient — it reads sharper, matches CoD's stepped look, and
- * costs one path each.
- *
- * The world direction is stored per indicator and the arc is re-oriented every
- * frame, so turning toward the shooter sweeps the arc to the centre.
- */
+/** World-relative damage direction and fade state; no DOM presenter. */
 export class DamageArcs {
-  present = true;
   readonly visuals = Array.from(
     { length: 6 },
     (): { rotation: number; scale: number; alpha: number } => ({ rotation: 0, scale: 1, alpha: 0 })
   );
-  declare pool: ElementPool;
-  declare life: number;
-
-  constructor(parent: HTMLElement) {
-    this.pool = new Pool(
-      6,
-      (): HTMLDivElement => {
-        const node = el('div', 'ow-dmg');
-        const s = svg('svg', { viewBox: '-170 -170 340 340' }, node);
-        const back = svg('g', { fill: 'none', stroke: 'rgba(0,0,0,.5)', 'stroke-width': 9.5 }, s);
-        const main = svg('g', { fill: 'none', stroke: '#ff3f31', 'stroke-width': 5.6 }, s);
-        const thin = svg('g', { fill: 'none', stroke: '#ff6a52', 'stroke-width': 1.5 }, s);
-        for (let i = 0; i < SEG; i++) {
-          const c = (i - (SEG - 1) / 2) * SEG_STEP;
-          svg('path', { d: arcPath(c, R_MAIN), opacity: (BELL[i] * 0.9).toFixed(2) }, back);
-          svg('path', { d: arcPath(c, R_MAIN), opacity: BELL[i].toFixed(2) }, main);
-          svg('path', { d: arcPath(c, R_THIN), opacity: (BELL[i] * 0.4).toFixed(2) }, thin);
-        }
-        return node;
-      },
-      parent
-    );
-    this.life = 2.0;
-  }
+  readonly pool: ElementPool<null> = new Pool(6, (): null => null);
+  life = 2;
 
   /**
    * @param {number} dx world X of the direction player -> source (need not be unit)
    * @param {number} dz world Z of that direction
    * @param {number} intensity 0..1, scales opacity and the spawn punch
    */
-  spawn(dx: number, dz: number, intensity = 1): PoolRecord {
+  spawn(dx: number, dz: number, intensity = 1): PoolRecord<null> {
     const len = Math.hypot(dx, dz) || 1;
-    const it = this.pool.acquire(this.present);
+    const it = this.pool.acquire();
     it.life = this.life;
     it.a = dx / len;
     it.b = dz / len;
@@ -85,7 +39,7 @@ export class DamageArcs {
       it.t += dt;
       const u = it.t / it.life;
       if (u >= 1) {
-        this.pool.release(it, this.present);
+        this.pool.release(it);
         continue;
       }
       const deg = (Math.atan2(it.a * rx + it.b * rz, it.a * fx + it.b * fz) * 180) / Math.PI;
@@ -98,17 +52,10 @@ export class DamageArcs {
       visual.rotation = (deg * Math.PI) / 180;
       visual.scale = scale;
       visual.alpha = alpha;
-      if (!this.present) continue;
-      setStyle(it.node, 'transform', `rotate(${deg.toFixed(2)}deg) scale(${scale.toFixed(3)})`);
-      setStyle(it.node, 'opacity', alpha.toFixed(3));
     }
   }
 
   clear(): void {
-    this.pool.releaseAll(this.present);
-  }
-
-  dispose(): void {
-    for (const it of this.pool.items) it.node.remove();
+    this.pool.releaseAll();
   }
 }

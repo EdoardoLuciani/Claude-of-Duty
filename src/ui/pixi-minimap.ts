@@ -22,7 +22,7 @@ function move(node: Container, x: number, y: number): boolean {
   return changed;
 }
 
-/** Same authored map bake/data as HTML; no per-frame Canvas2D drawing/uploads. */
+/** Retained authored terrain/contacts; no per-frame Canvas2D drawing/uploads. */
 export class PixiMinimap {
   readonly stage = new Container();
   readonly viewport = new Container();

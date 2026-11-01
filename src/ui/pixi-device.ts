@@ -2,7 +2,7 @@ import { DOMAdapter } from 'pixi.js';
 import type { WebGPURenderer } from 'pixi.js';
 import type { Renderer } from 'three/webgpu';
 
-/** One opt-in Pixi instance at a time. Restore even if its constructor fails. */
+/** The gameplay HUD uses one Pixi instance. Restore even if its constructor fails. */
 export function restrictPixiCanvases(): () => void {
   const adapter = DOMAdapter.get();
   DOMAdapter.set({
@@ -30,7 +30,7 @@ export async function initPixiRenderer(
 ): Promise<void> {
   const backend = game.backend;
   if (!('device' in backend) || !(backend.device instanceof GPUDevice))
-    throw new Error('The Pixi experiment requires the initialized WebGPU device');
+    throw new Error('The gameplay HUD requires the initialized WebGPU device');
   // Three does not retain its adapter; this queries metadata, not a new device.
   const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
   if (!adapter || adapter.info.vendor !== backend.device.adapterInfo.vendor)

@@ -1,5 +1,11 @@
 # Simpler Pixi HUD: before/after, not HTML/Pixi
 
+> **Historical experiment.** The [current gameplay HUD](../hud.md) now uses Pixi
+> by default. Its old HTML presenters/fallback, URL comparison switches and
+> standalone experiment harnesses are retired. Commands and measurements below
+> refer to their named historical revisions, not current runtime options; use
+> Git history to reproduce them. No new performance claim accompanies promotion.
+
 Later, the operator requested a [bandage/grenade icon comparison](pixi-accessory-icons.md).
 The magazine bar remains; accessory text/original/simple silhouettes are selectable.
 This report's text-only measurements remain historical, not icon-cost attribution.
