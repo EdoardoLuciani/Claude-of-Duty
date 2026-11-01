@@ -61,7 +61,6 @@
  *   collider.setFromObject(object3D, hx,hy,hz)   removeCollider(c)
  *
  * DEBUG
- *   setDebugDraw(bool, {triangles, nodes, rays, radius})   toggleDebugDraw()
  *   stats -> { triangles, nodes, buildMs, bodies, awake, ragdolls, ... }
  *
  * CONSTANTS
@@ -71,7 +70,7 @@
 import * as THREE from 'three';
 
 import { UNITS } from '../core/config.ts';
-import type { EngineContext } from '../core/context.ts';
+import type { SystemId, EngineContext } from '../core/context.ts';
 import type { BulletSegmentEvent } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
 import { StaticWorld } from './bvh.ts';
@@ -87,6 +86,8 @@ import {
 import { Ballistics, type ActorRegionImpact } from './penetration.ts';
 import { Ragdoll, humanoidSpec, specFromSkeleton } from './ragdoll.ts';
 import { RigidBody, RigidBodyWorld } from './rigidbody.ts';
+import type { RigidBodyOptions } from './rigidbody.ts';
+import type { SurfaceName } from './surfaces.ts';
 import {
   LAYER,
   MASK,
@@ -104,39 +105,16 @@ interface Vector3Like {
   y: number;
   z: number;
 }
-export type PhysicsRigidBodyOptions = {
-  shape?: 'box' | 'sphere' | 'capsule';
-  halfExtents?: Vector3Like;
-  radius?: number;
-  halfHeight?: number;
-  mass?: number;
-  restitution?: number;
-  friction?: number;
-  linearDamping?: number;
-  angularDamping?: number;
-  gravityScale?: number;
-  surface?: number;
-  surfaceType?: string;
-  mask?: number;
-  layer?: number;
-  ccd?: boolean;
-  lifetime?: number;
-  position?: Vector3Like;
-  quaternion?: THREE.Quaternion;
-  velocity?: Vector3Like;
-  angularVelocity?: Vector3Like;
-  object3D?: THREE.Object3D | null;
-  userData?: unknown;
-  onSleep?: ((body: RigidBody) => void) | null;
-  onImpact?: RigidBody['onImpact'];
-};
+export interface PhysicsRigidBodyOptions extends RigidBodyOptions {
+  surfaceType?: SurfaceName;
+}
 export interface PhysicsHit {
   hit: boolean;
   point: THREE.Vector3;
   normal: THREE.Vector3;
   distance: number;
   fraction: number;
-  surface: string;
+  surface: SurfaceName;
   surfaceIndex: number;
   ballisticSurfaceIndex: number;
   staticObject: number;
@@ -152,10 +130,15 @@ export interface PhysicsHit {
   triangle: number;
   frontFace: boolean;
 }
+/** Only identity fields participate in excluding a prior ray contact. */
+export type RaycastIgnore = Partial<
+  Pick<PhysicsHit, 'staticObject' | 'solid' | 'collider' | 'body' | 'ragdoll' | 'ragdollBone'>
+>;
+
 interface StaticOptions {
   mask?: number;
   layer?: number;
-  ballisticSurface?: string | number;
+  ballisticSurface?: SurfaceName | number;
   sheetThickness?: number;
   userData?: unknown;
 }
@@ -167,7 +150,7 @@ interface ExplosionEvent {
 }
 
 function isCollisionMesh(object: THREE.Object3D): object is THREE.Mesh | THREE.InstancedMesh {
-  return (object as THREE.Mesh).isMesh === true;
+  return object instanceof THREE.Mesh;
 }
 
 function makePublicHit(): PhysicsHit {
@@ -203,8 +186,8 @@ export interface ColliderOptions {
   hy?: number;
   hz?: number;
   layer?: number;
-  surface?: string;
-  ballisticSurface?: string;
+  surface?: SurfaceName;
+  ballisticSurface?: SurfaceName;
   sheetThickness?: number;
   owner?: unknown;
   part?: string;
@@ -260,8 +243,9 @@ export class Collider {
     this.matrix = new THREE.Matrix4();
     this.inverse = new THREE.Matrix4();
     this.layer = opts.layer ?? LAYER.ACTOR;
-    this.surfaceIndex = surfaceIndex(opts.surface ?? 'flesh');
-    this.ballisticSurfaceIndex = surfaceIndex(opts.ballisticSurface, this.surfaceIndex);
+    this.surfaceIndex = surfaceIndex(opts.surface === undefined ? 'flesh' : opts.surface);
+    this.ballisticSurfaceIndex =
+      opts.ballisticSurface === undefined ? this.surfaceIndex : surfaceIndex(opts.ballisticSurface);
     this.sheetThickness = opts.sheetThickness ?? 0;
     this.owner = opts.owner ?? null;
     this.part = opts.part ?? null;
@@ -358,7 +342,7 @@ interface ImpactRecord {
   point: THREE.Vector3;
   normal: THREE.Vector3;
   incident: THREE.Vector3;
-  surface: string;
+  surface: SurfaceName;
   surfaceIndex: number;
   damage: number;
   exit: boolean;
@@ -398,10 +382,6 @@ export class PhysicsSystem {
   declare _blastTarget: THREE.Vector3;
   declare _blastWaypoint: THREE.Vector3;
   declare _explicitStatics: number;
-  declare _pendingDemo: boolean;
-  declare debug: import('./debug.ts').PhysicsDebugView | null;
-  declare _debugPromise: Promise<import('./debug.ts').PhysicsDebugView | null> | null;
-  declare _disposed: boolean;
   declare _loggedTris: number;
   declare _onExplosion: (event: {
     position: THREE.Vector3;
@@ -412,8 +392,8 @@ export class PhysicsSystem {
   declare stats: PhysicsStats;
   declare _rayCount: number;
 
-  static id = 'physics';
-  static deps = [];
+  static readonly id = 'physics';
+  static readonly deps: SystemId[] = [];
 
   constructor() {
     this.staticWorld = new StaticWorld();
@@ -470,11 +450,6 @@ export class PhysicsSystem {
     this._blastTarget = new THREE.Vector3();
     this._blastWaypoint = new THREE.Vector3();
     this._explicitStatics = 0;
-    this._pendingDemo = false;
-
-    this.debug = null;
-    this._debugPromise = null;
-    this._disposed = false;
     this._loggedTris = -1;
     this.stats = {
       triangles: 0,
@@ -497,29 +472,8 @@ export class PhysicsSystem {
     this.rng = ctx.rng.fork();
     this.ballistics.rng = this.rng;
 
-    this._onExplosion = (e) => this.explode(e);
+    this._onExplosion = (e): void => this.explode(e);
     ctx.events.on('explosion', this._onExplosion);
-
-    // Dev escape hatch: ?physdebug=1 turns the collision wireframe on from the
-    // URL, and ?physdemo=1 also drops a ragdoll and some debris. Neither is
-    // reachable in normal play.
-    if (typeof location !== 'undefined') {
-      const q = new URLSearchParams(location.search);
-      const debugRequested = q.get('physdebug') === '1';
-      const demoRequested = q.get('physdemo') === '1';
-      if (debugRequested || demoRequested) await this._ensureDebugView();
-      if (debugRequested) this.setDebugDraw(true, { triangles: true, radius: 30 });
-      if (demoRequested) {
-        this._pendingDemo = true;
-        // Shots re-pose the camera after boot; respawn in front of the new view.
-        ctx.events.on('shot:applied', () => {
-          this.bodies.clear();
-          for (const rd of this.ragdolls) rd.dispose();
-          this.ragdolls.length = 0;
-          this._pendingDemo = true;
-        });
-      }
-    }
   }
 
   /* ================================================================== */
@@ -534,12 +488,12 @@ export class PhysicsSystem {
    */
   addStatic(
     mesh: THREE.Mesh | THREE.InstancedMesh,
-    surfaceType?: string | number,
+    surfaceType?: SurfaceName | number,
     opts: StaticOptions = {}
   ): number {
     if (!mesh) return -1;
     const mask = opts.mask ?? opts.layer ?? LAYER.STATIC;
-    const id = this.staticWorld.addMesh(mesh, surfaceType as string | number, mask, opts);
+    const id = this.staticWorld.addMesh(mesh, surfaceType, mask, opts);
     if (id >= 0) this._explicitStatics++;
     return id;
   }
@@ -547,24 +501,33 @@ export class PhysicsSystem {
   /** Register every Mesh under an Object3D. Returns the handle list. */
   addStaticGroup(
     root: THREE.Object3D,
-    surfaceType?: string | number,
+    surfaceType?: SurfaceName | number,
     opts: StaticOptions = {}
   ): number[] {
     const ids: number[] = [];
     if (!root) return ids;
     root.updateWorldMatrix(true, true);
-    root.traverse((o: THREE.Object3D) => {
-      if (!isCollisionMesh(o)) return;
-      if (o.userData?.collision === false || o.userData?.noCollision) return;
-      const metadataSurface: unknown = o.userData?.surface;
-      const resolvedSurface =
-        surfaceType ??
-        (typeof metadataSurface === 'string' || typeof metadataSurface === 'number'
-          ? metadataSurface
-          : undefined);
-      const id = this.addStatic(o, resolvedSurface, opts);
-      if (id >= 0) ids.push(id);
-    });
+    const registered = this._explicitStatics;
+    try {
+      root.traverse((o: THREE.Object3D): void => {
+        if (!isCollisionMesh(o)) return;
+        if (o.userData?.collision === false || o.userData?.noCollision) return;
+        const metadataSurface: unknown = o.userData?.surface;
+        const resolvedSurface =
+          surfaceType === undefined
+            ? metadataSurface === undefined
+              ? undefined
+              : surfaceIndex(metadataSurface)
+            : surfaceType;
+        const id = this.addStatic(o, resolvedSurface, opts);
+        if (id >= 0) ids.push(id);
+      });
+    } catch (error) {
+      // A failed group returns no handles: do not leave unreachable partial registrations.
+      for (let i = ids.length - 1; i >= 0; i--) this.removeStatic(ids[i]);
+      this._explicitStatics = registered;
+      throw error;
+    }
     return ids;
   }
 
@@ -574,12 +537,12 @@ export class PhysicsSystem {
     return id >= 0 ? this.staticWorld.removeObject(id) : false;
   }
 
-  rebuildStatic() {
+  rebuildStatic(): void {
     this.staticWorld.build();
     this._syncStats();
   }
 
-  get triangleCount() {
+  get triangleCount(): number {
     return this.staticWorld.triCount;
   }
 
@@ -624,7 +587,7 @@ export class PhysicsSystem {
     mask?: number,
     ignoreOwner?: unknown,
     ignoreActors?: unknown[] | null,
-    ignoreHit?: Partial<PhysicsHit> | null
+    ignoreHit?: RaycastIgnore | null
   ): PhysicsHit;
   raycast(
     ox: number,
@@ -637,7 +600,7 @@ export class PhysicsSystem {
     mask?: number,
     ignoreOwner?: unknown,
     ignoreActors?: unknown[] | null,
-    ignoreHit?: Partial<PhysicsHit> | null
+    ignoreHit?: RaycastIgnore | null
   ): PhysicsHit;
   raycast(
     a: number | Vector3Like,
@@ -645,27 +608,30 @@ export class PhysicsSystem {
     c?: number,
     d?: number,
     e?: unknown,
-    f?: unknown,
-    g?: unknown,
+    f?: number | unknown[] | null,
+    g?: number | RaycastIgnore | null,
     h?: number,
     ignoreOwner: unknown = null,
     ignoreActors: unknown[] | null = null,
-    ignoreHit: Partial<PhysicsHit> | null = null
+    ignoreHit: RaycastIgnore | null = null
   ): PhysicsHit {
     let ox: number, oy: number, oz: number, dx: number, dy: number, dz: number;
     let maxDist: number, mask: number;
     if (typeof a === 'number') {
-      oy = b as number;
+      if (typeof b !== 'number') throw new Error('[physics] numeric ray requires numeric y');
+      oy = b;
       oz = c ?? 0;
       dx = d ?? 0;
-      dy = (e as number) ?? 0;
-      dz = (f as number) ?? 0;
+      dy = typeof e === 'number' ? e : 0;
+      dz = typeof f === 'number' ? f : 0;
       ox = a;
       maxDist = typeof g === 'number' ? g : 1000;
       mask = h ?? MASK.ALL;
     } else {
+      if (typeof b === 'number')
+        throw new Error('[physics] vector ray requires a vector direction');
       const origin = a,
-        direction = b as Vector3Like;
+        direction = b;
       ox = origin.x;
       oy = origin.y;
       oz = origin.z;
@@ -675,8 +641,8 @@ export class PhysicsSystem {
       maxDist = c ?? 1000;
       mask = d ?? MASK.ALL;
       ignoreOwner = e ?? null;
-      ignoreActors = (f as unknown[] | null) ?? null;
-      ignoreHit = (g as Partial<PhysicsHit> | null) ?? null;
+      ignoreActors = Array.isArray(f) ? f : null;
+      ignoreHit = typeof g === 'object' ? g : null;
     }
     const out = this._nextHit();
     const l = Math.hypot(dx, dy, dz);
@@ -763,9 +729,6 @@ export class PhysicsSystem {
       out.normal.set(-dx, -dy, -dz);
       out.distance = maxDist;
       out.surface = 'concrete';
-    }
-    if (this.debug?.enabled) {
-      this.debug.logRay(ox, oy, oz, out.point.x, out.point.y, out.point.z);
     }
     return out;
   }
@@ -945,7 +908,7 @@ export class PhysicsSystem {
     out: PhysicsHit,
     ignoreOwner: unknown,
     ignoreActors: unknown[] | null,
-    ignoreHit: Partial<PhysicsHit> | null | undefined
+    ignoreHit: RaycastIgnore | null | undefined
   ): number {
     if ((mask & LAYER.RAGDOLL) === 0) return best;
     for (let r = 0; r < this.ragdolls.length; r++) {
@@ -1042,17 +1005,20 @@ export class PhysicsSystem {
     let ox: number, oy: number, oz: number, dx: number, dy: number, dz: number;
     let maxDist: number, mask: number;
     if (typeof a === 'number') {
+      if (typeof b !== 'number') throw new Error('[physics] numeric ray requires numeric y');
       ox = a;
-      oy = b as number;
+      oy = b;
       oz = c ?? 0;
       dx = d ?? 0;
-      dy = (e as number) ?? 0;
-      dz = (f as number) ?? 0;
+      dy = e ?? 0;
+      dz = f ?? 0;
       maxDist = g ?? 1000;
       mask = h ?? MASK.SIGHT;
     } else {
+      if (typeof b === 'number')
+        throw new Error('[physics] vector ray requires a vector direction');
       const origin = a,
-        direction = b as Vector3Like;
+        direction = b;
       ox = origin.x;
       oy = origin.y;
       oz = origin.z;
@@ -1233,7 +1199,7 @@ export class PhysicsSystem {
   /* Characters                                                         */
   /* ================================================================== */
 
-  createCharacter(opts = {}) {
+  createCharacter(opts = {}): CharacterController {
     const c = new CharacterController(this.staticWorld, {
       radius: UNITS.playerRadius,
       height: UNITS.playerHeight,
@@ -1267,7 +1233,7 @@ export class PhysicsSystem {
     this.ballistics.publish(shot);
   }
 
-  nextShotId() {
+  nextShotId(): number {
     return ++this._shotId;
   }
 
@@ -1354,8 +1320,8 @@ export class PhysicsSystem {
    */
   explode(e: ExplosionEvent | THREE.Vector3): void {
     if (!e) return;
-    const event = 'position' in e ? (e as ExplosionEvent) : null;
-    const pos = event ? event.position : (e as THREE.Vector3);
+    const event = 'position' in e ? e : null;
+    const pos = 'position' in e ? e.position : e;
     const radius = event?.radius ?? 5;
     const strength = event ? (event.impulse ?? (event.damage ?? 100) * 0.9) : 90;
     this.bodies.applyRadialImpulse(pos.x, pos.y, pos.z, radius, strength * 0.06);
@@ -1389,8 +1355,8 @@ export class PhysicsSystem {
   /* ================================================================== */
 
   addRigidBody(opts: PhysicsRigidBodyOptions = {}): RigidBody {
-    const b = new RigidBody(opts as ConstructorParameters<typeof RigidBody>[0]);
-    if (opts.surfaceType) b.surface = surfaceIndex(opts.surfaceType);
+    const b = new RigidBody(opts);
+    if (opts.surfaceType !== undefined) b.surface = surfaceIndex(opts.surfaceType);
     this.bodies.add(b);
     return b;
   }
@@ -1405,7 +1371,7 @@ export class PhysicsSystem {
     velocity: Vector3Like,
     opts: {
       size?: number;
-      surface?: string;
+      surface?: SurfaceName;
       shape?: 'box' | 'sphere' | 'capsule';
       mass?: number;
       restitution?: number;
@@ -1416,7 +1382,7 @@ export class PhysicsSystem {
     } = {}
   ): RigidBody {
     const s = opts.size ?? 0.08;
-    const si = surfaceIndex(opts.surface ?? 'concrete');
+    const si = surfaceIndex(opts.surface === undefined ? 'concrete' : opts.surface);
     const b = this.addRigidBody({
       shape: opts.shape ?? 'box',
       halfExtents: { x: s, y: s * 0.7, z: s * 0.85 },
@@ -1482,10 +1448,12 @@ export class PhysicsSystem {
     if (!skeleton?.bones?.length) return null;
     const { spec, boneMap } = specFromSkeleton(skeleton, opts);
     if (!spec.length) return null;
-    const rd = this.createRagdoll({ ...opts, bones: spec, transform: undefined });
+    const { transform, ...options } = opts;
+    void transform;
+    const rd = this.createRagdoll({ ...options, bones: spec });
     rd.adoptSkeleton(
       skeleton,
-      boneMap.map((bone) => bone ?? null)
+      boneMap.map((bone): THREE.Bone<THREE.Object3DEventMap> | null => bone ?? null)
     );
     rd.actor = opts.actor ?? skinnedMesh;
     return rd;
@@ -1524,11 +1492,6 @@ export class PhysicsSystem {
       this._syncStats();
     }
 
-    if (this._pendingDemo && this.staticWorld.triCount > 0) {
-      this._pendingDemo = false;
-      this._spawnDemo();
-    }
-
     this.bodies.step(h);
     for (let i = 0; i < this.ragdolls.length; i++) this.ragdolls[i].step(h);
 
@@ -1557,19 +1520,18 @@ export class PhysicsSystem {
     }
   }
 
-  lateUpdate(dt: number, ctx: PhysicsContext): void {
+  lateUpdate(): void {
     for (let i = 0; i < this.ragdolls.length; i++) {
       const rd = this.ragdolls[i];
       if (rd.bones3D) rd.writeToSkeleton();
     }
-    if (this.debug?.enabled) this.debug.rebuild(this, ctx.camera, dt);
     this.stats.bodies = this.bodies.bodies.length;
     this.stats.ragdolls = this.ragdolls.length;
     this.stats.characters = this.characters.length;
     this.stats.colliders = this.colliders.length;
   }
 
-  _syncStats() {
+  _syncStats(): void {
     this.stats.triangles = this.staticWorld.triCount;
     this.stats.nodes = this.staticWorld.nodeCount;
     this.stats.buildMs = this.staticWorld.buildMs;
@@ -1587,98 +1549,8 @@ export class PhysicsSystem {
     }
   }
 
-  /* ================================================================== */
-  /* Debug                                                              */
-  /* ================================================================== */
-
-  async _ensureDebugView(): Promise<import('./debug.ts').PhysicsDebugView | null> {
-    if (this.debug) return this.debug;
-    if (!this._debugPromise) {
-      this._debugPromise = import('./debug.ts').then(({ PhysicsDebugView }) => {
-        if (this._disposed || !this.ctx.scene) return null;
-        this.debug = new PhysicsDebugView(this.ctx.scene);
-        return this.debug;
-      });
-    }
-    return this._debugPromise;
-  }
-
-  /**
-   * Toggle the collision wireframe. Its multi-megabyte buffers are loaded and
-   * allocated only on first use.
-   *   phys.setDebugDraw(true, { nodes: true, radius: 25 })
-   */
-  setDebugDraw(
-    on: boolean,
-    opts: { triangles?: boolean; nodes?: boolean; rays?: boolean; radius?: number } = {}
-  ): boolean {
-    if (on && !this.debug) {
-      void this._ensureDebugView().then((view) => {
-        if (view) this.setDebugDraw(true, opts);
-      });
-      return false;
-    }
-    if (!this.debug) return false;
-    if (opts.triangles !== undefined) this.debug.showTriangles = opts.triangles;
-    if (opts.nodes !== undefined) this.debug.showNodes = opts.nodes;
-    if (opts.rays !== undefined) this.debug.showRays = opts.rays;
-    if (opts.radius !== undefined) this.debug.radius = opts.radius;
-    this.debug.setEnabled(on);
-    return this.debug.enabled;
-  }
-
-  toggleDebugDraw(): boolean {
-    this.setDebugDraw(!this.debug?.enabled);
-    return this.debug?.enabled ?? false;
-  }
-
-  /** Named states for dev overlays / the capture harness. */
-  debugState(name: string): PhysicsStats {
-    if (name === 'collision') this.setDebugDraw(true, { triangles: true, nodes: false });
-    else if (name === 'bvh') this.setDebugDraw(true, { triangles: false, nodes: true });
-    else if (name === 'demo') this._spawnDemo();
-    else if (name === 'off') this.setDebugDraw(false);
-    return this.stats;
-  }
-
-  /**
-   * Drop a ragdoll and a pile of debris in front of the camera and turn the
-   * wireframe on. Purely a verification aid for whoever is looking at the
-   * collision system; nothing in the game calls it.
-   */
-  _spawnDemo() {
-    this.setDebugDraw(true, { triangles: true, radius: 30 });
-    const cam = this.ctx.camera;
-    if (!cam) return this.stats;
-    const fwd = _v.set(0, 0, -1).applyQuaternion(cam.quaternion);
-    const cx = cam.position.x + fwd.x * 6;
-    const cz = cam.position.z + fwd.z * 6;
-    const floor = this.groundHeight(cx, cz, cam.position.y + 20);
-    const base = Number.isFinite(floor) ? floor : 0;
-    const r = this.rng;
-    for (let i = 0; i < 14; i++) {
-      this.spawnDebris(
-        { x: cx + r.signed() * 1.6, y: base + 1.2 + i * 0.22, z: cz + r.signed() * 1.6 },
-        { x: r.signed() * 2, y: 0, z: r.signed() * 2 },
-        {
-          size: 0.09 + r.float() * 0.06,
-          surface: r.pick(['concrete', 'wood', 'metal']),
-          lifetime: 1e9,
-        }
-      );
-    }
-    const m = _m4.makeTranslation(cx + 1.5, base + 1.15, cz);
-    const rd = this.createRagdoll({ transform: m, height: 1.82, mass: 84 });
-    rd.setVelocity(-1.2, 0.2, 0.4);
-    return this.stats;
-  }
-
   dispose(): void {
-    this._disposed = true;
     this.ctx?.events.off('explosion', this._onExplosion);
-    this.debug?.dispose();
-    this.debug = null;
-    this._debugPromise = null;
     this.bodies.clear();
     for (const rd of this.ragdolls) rd.dispose();
     this.ragdolls.length = 0;

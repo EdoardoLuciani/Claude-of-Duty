@@ -1,3 +1,5 @@
+import type { Vector3 } from 'three';
+import type { FnNode } from 'three/src/nodes/tsl/TSLCore.js';
 import {
   Fn,
   If,
@@ -21,6 +23,7 @@ import {
   vec3,
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
+import type { ConstNode, VarNode } from 'three/webgpu';
 
 import { fbm3, skHash33 } from './noise.ts';
 
@@ -44,23 +47,23 @@ const SK_GAL_POLE = vec3(-0.4288, 0.7146, 0.5522);
 const SK_GAL_CORE = vec3(0.7549, -0.2154, -0.6194);
 
 /** Tanner Helland's blackbody fit, moved to linear light and normalised. */
-const skBlackbody = Fn<[Node<'float'>], Node<'vec3'>>(([kelvin]) => {
+const skBlackbody = Fn<[Node<'float'>], Node<'vec3'>>(([kelvin]): Node<'vec3'> => {
   const t = clamp(kelvin, 1200, 40000).div(100);
   const r = float(1).toVar();
-  If(t.greaterThan(66), () => {
+  If(t.greaterThan(66), (): void => {
     r.assign(clamp(float(1.29293619).mul(pow(t.sub(60), -0.13320476)), 0, 1));
   });
   const g = float(0).toVar();
-  If(t.lessThanEqual(66), () => {
+  If(t.lessThanEqual(66), (): void => {
     g.assign(clamp(float(0.39008158).mul(log(t)).sub(0.63184144), 0, 1));
-  }).Else(() => {
+  }).Else((): void => {
     g.assign(clamp(float(1.12989086).mul(pow(t.sub(60), -0.07551485)), 0, 1));
   });
   const b = float(1).toVar();
-  If(t.lessThan(66), () => {
-    If(t.lessThanEqual(19), () => {
+  If(t.lessThan(66), (): void => {
+    If(t.lessThanEqual(19), (): void => {
       b.assign(0);
-    }).Else(() => {
+    }).Else((): void => {
       b.assign(
         clamp(
           float(0.54320679)
@@ -77,7 +80,7 @@ const skBlackbody = Fn<[Node<'float'>], Node<'vec3'>>(([kelvin]) => {
 });
 
 /** Kasten-Young relative airmass. 1 overhead, ~38 at the horizon. */
-const skAirmass = Fn<[Node<'float'>], Node<'float'>>(([cosZenith]) => {
+const skAirmass = Fn<[Node<'float'>], Node<'float'>>(([cosZenith]): Node<'float'> => {
   const z = degrees(acos(clamp(cosZenith, -1, 1)));
   return float(1).div(
     max(cosZenith, 0).add(float(0.50572).mul(pow(max(0, float(96.07995).sub(z)), -1.6364)))
@@ -106,76 +109,92 @@ interface SkyStarUniforms {
   uCelestial: Node<'mat3'>;
 }
 
-const starLayer = ({ N, keep, gain, seed, sigma }: StarLayerOptions, uStarParams: StarUniforms) =>
-  Fn<[Node<'vec3'>, Node<'float'>, Node<'float'>], Node<'vec3'>>(([dir, twinkle, band]) => {
-    const result = vec3(0).toVar();
-    const cell = floor(dir.mul(N)).add(seed);
-    const h = skHash33(cell);
-    const exist = step(float(1).sub(keep), h.x);
-    If(exist.greaterThan(0.5), () => {
-      const h2 = skHash33(cell.add(91.7));
-      const starDir = normalize(floor(dir.mul(N)).add(0.5).add(h2.sub(0.5).mul(0.94)));
-      // sin(separation) — cheaper and better conditioned than acos near zero.
-      const d = length(starDir.cross(dir));
+const starLayer = (
+  { N, keep, gain, seed, sigma }: StarLayerOptions,
+  uStarParams: StarUniforms
+): FnNode<
+  [
+    Vector3 | Node<'vec3'>,
+    number | Node<'float'> | Node<'uint'>,
+    number | Node<'float'> | Node<'uint'>,
+  ],
+  Node<'vec3'>
+> =>
+  Fn<[Node<'vec3'>, Node<'float'>, Node<'float'>], Node<'vec3'>>(
+    ([dir, twinkle, band]): VarNode<'vec3', ConstNode<'vec3', Vector3>> => {
+      const result = vec3(0).toVar();
+      const cell = floor(dir.mul(N)).add(seed);
+      const h = skHash33(cell);
+      const exist = step(float(1).sub(keep), h.x);
+      If(exist.greaterThan(0.5), (): void => {
+        const h2 = skHash33(cell.add(91.7));
+        const starDir = normalize(floor(dir.mul(N)).add(0.5).add(h2.sub(0.5).mul(0.94)));
+        // sin(separation) — cheaper and better conditioned than acos near zero.
+        const d = length(starDir.cross(dir));
 
-      // Magnitude power law: most cells hold something you would never notice.
-      const mag = pow(h.y, 5.5);
-      const flux = float(gain)
-        .mul(mag.add(0.0016))
-        .mul(float(1).add(band.mul(1.4)));
+        // Magnitude power law: most cells hold something you would never notice.
+        const mag = pow(h.y, 5.5);
+        const flux = float(gain)
+          .mul(mag.add(0.0016))
+          .mul(float(1).add(band.mul(1.4)));
 
-      // Core plus a faint diffraction skirt; the skirt is what makes the bright
-      // ones read as stars rather than as dead pixels once bloom gets to them.
-      const core = exp(
-        d
-          .mul(d)
-          .negate()
-          .div(sigma * sigma)
-      );
-      const skirt = float(0.055).mul(exp(d.negate().div(sigma * 3.4)));
+        // Core plus a faint diffraction skirt; the skirt is what makes the bright
+        // ones read as stars rather than as dead pixels once bloom gets to them.
+        const core = exp(
+          d
+            .mul(d)
+            .negate()
+            .div(sigma * sigma)
+        );
+        const skirt = float(0.055).mul(exp(d.negate().div(sigma * 3.4)));
 
-      const tw = float(1).add(
-        twinkle.mul(
-          sin(uStarParams.z.mul(float(7).add(h.z.mul(19))).add(h2.x.mul(43))).add(
-            float(0.6).mul(sin(uStarParams.z.mul(float(23).add(h2.y.mul(31)))))
+        const tw = float(1).add(
+          twinkle.mul(
+            sin(uStarParams.z.mul(float(7).add(h.z.mul(19))).add(h2.x.mul(43))).add(
+              float(0.6).mul(sin(uStarParams.z.mul(float(23).add(h2.y.mul(31)))))
+            )
           )
-        )
-      );
-      const kelvin = mix(2600, 22000, pow(h2.z, 1.9));
-      // Normalised blackbody, pulled back toward white — see SK_STAR_TINT.
-      const tint = mix(vec3(1), skBlackbody(kelvin), SK_STAR_TINT);
-      result.assign(tint.mul(flux.mul(core.add(skirt)).mul(max(0, tw))));
-    });
-    return result;
-  });
+        );
+        const kelvin = mix(2600, 22000, pow(h2.z, 1.9));
+        // Normalised blackbody, pulled back toward white — see SK_STAR_TINT.
+        const tint = mix(vec3(1), skBlackbody(kelvin), SK_STAR_TINT);
+        result.assign(tint.mul(flux.mul(core.add(skirt)).mul(max(0, tw))));
+      });
+      return result;
+    }
+  );
 
-const skMilkyWay = (octaves: number) =>
-  Fn<[Node<'vec3'>, Node<'float'>], Node<'vec3'>>(([eq, gain]) => {
-    const lat = dot(eq, SK_GAL_POLE);
-    // Two nested bands: a tight bright spine inside a broad halo.
-    const spineBand = exp(pow(abs(lat).div(0.048), 1.55).negate());
-    const halo = exp(pow(abs(lat).div(0.165), 1.3).negate());
-    const band = clamp(spineBand.mul(0.78).add(halo.mul(0.48)), 0, 1.4);
-    const col = vec3(0).toVar();
-    If(band.greaterThan(0.002), () => {
-      const toCore = dot(eq, SK_GAL_CORE);
-      const bulge = exp(pow(max(0, float(1).sub(toCore)).div(0.22), 1.1).negate());
-      const q = eq.mul(9.0);
-      const clumps = fbm3(octaves)(q);
-      // Dust lanes: a second, sharper field subtracted, biased to the spine.
-      const dust = fbm3(Math.max(2, octaves - 1))(eq.mul(21.0).add(3.7));
-      const lane = smoothstep(0.36, 0.68, dust).mul(spineBand);
-      // High clump contrast is what separates a galaxy from a painted stripe.
-      let density = band
-        .mul(float(0.2).add(clumps.mul(clumps).mul(1.35)))
-        .mul(float(1).sub(lane.mul(0.8)));
-      density = density.mul(float(1).add(bulge.mul(2.6)));
-      // Warm toward the obscured core, cool blue-white in the outer arms.
-      const tint = mix(vec3(0.72, 0.8, 1.06), vec3(1.1, 0.86, 0.62), bulge.mul(0.85));
-      col.assign(tint.mul(density.mul(gain)));
-    });
-    return col;
-  });
+const skMilkyWay = (
+  octaves: number
+): FnNode<[Vector3 | Node<'vec3'>, number | Node<'float'> | Node<'uint'>], Node<'vec3'>> =>
+  Fn<[Node<'vec3'>, Node<'float'>], Node<'vec3'>>(
+    ([eq, gain]): VarNode<'vec3', ConstNode<'vec3', Vector3>> => {
+      const lat = dot(eq, SK_GAL_POLE);
+      // Two nested bands: a tight bright spine inside a broad halo.
+      const spineBand = exp(pow(abs(lat).div(0.048), 1.55).negate());
+      const halo = exp(pow(abs(lat).div(0.165), 1.3).negate());
+      const band = clamp(spineBand.mul(0.78).add(halo.mul(0.48)), 0, 1.4);
+      const col = vec3(0).toVar();
+      If(band.greaterThan(0.002), (): void => {
+        const toCore = dot(eq, SK_GAL_CORE);
+        const bulge = exp(pow(max(0, float(1).sub(toCore)).div(0.22), 1.1).negate());
+        const q = eq.mul(9.0);
+        const clumps = fbm3(octaves)(q);
+        // Dust lanes: a second, sharper field subtracted, biased to the spine.
+        const dust = fbm3(Math.max(2, octaves - 1))(eq.mul(21.0).add(3.7));
+        const lane = smoothstep(0.36, 0.68, dust).mul(spineBand);
+        // High clump contrast is what separates a galaxy from a painted stripe.
+        let density = band
+          .mul(float(0.2).add(clumps.mul(clumps).mul(1.35)))
+          .mul(float(1).sub(lane.mul(0.8)));
+        density = density.mul(float(1).add(bulge.mul(2.6)));
+        // Warm toward the obscured core, cool blue-white in the outer arms.
+        const tint = mix(vec3(0.72, 0.8, 1.06), vec3(1.1, 0.86, 0.62), bulge.mul(0.85));
+        col.assign(tint.mul(density.mul(gain)));
+      });
+      return col;
+    }
+  );
 
 /**
  * Build the night-sky function. `points` chooses whether the three star layers
@@ -185,7 +204,7 @@ const skMilkyWay = (octaves: number) =>
 export function createNightSkyNodes(
   shared: SkyStarUniforms,
   { points = true, mwOctaves = 5 }: { points?: boolean; mwOctaves?: number } = {}
-) {
+): FnNode<[Vector3 | Node<'vec3'>], Node<'vec3'>> {
   const { uStarParams, uCelestial } = shared;
   const milky = skMilkyWay(mwOctaves);
   const layers = points
@@ -196,7 +215,7 @@ export function createNightSkyNodes(
       ]
     : null;
 
-  return Fn<[Node<'vec3'>], Node<'vec3'>>(([dir]) => {
+  return Fn<[Node<'vec3'>], Node<'vec3'>>(([dir]): Node<'vec3'> => {
     // Shared inputs must be evaluated before the conditional star layers.
     // Otherwise TSL can first cache airmass inside one layer's `exist` branch
     // and reuse its zero-initialized temporary outside that branch, imprinting

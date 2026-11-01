@@ -17,11 +17,18 @@ export function discoverAuthoredHands(
 ): Record<HandSide, AuthoredHand> {
   const hand = (prefix: string): AuthoredHand => ({
     wrist: node(`hand_${prefix}`),
-    fingers: Array.from({ length: 4 }, (_, i) => ({
-      root: node(`${prefix}_finger_${i}_root`),
-      joints: Array.from({ length: 3 }, (_, j) => node(`${prefix}_finger_${i}_${j}`)),
-    })),
-    thumb: ['thumb_base', 'thumb_0', 'thumb_1'].map((name) => node(`${prefix}_${name}`)),
+    fingers: Array.from(
+      { length: 4 },
+      (_, i): { root: THREE.Object3D; joints: THREE.Object3D[] } => ({
+        root: node(`${prefix}_finger_${i}_root`),
+        joints: Array.from({ length: 3 }, (_, j): THREE.Object3D =>
+          node(`${prefix}_finger_${i}_${j}`)
+        ),
+      })
+    ),
+    thumb: ['thumb_base', 'thumb_0', 'thumb_1'].map((name): THREE.Object3D =>
+      node(`${prefix}_${name}`)
+    ),
   });
   return { left: hand('L'), right: hand('R') };
 }

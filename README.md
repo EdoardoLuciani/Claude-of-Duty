@@ -1,6 +1,6 @@
 # Claude of Duty
 
-A browser FPS built with pinned Three.js `187dev`, Vite and **WebGPU only**. Procedural and
+A browser FPS built with Three.js r187 (`0.187.0`), Vite and **WebGPU only**. Procedural and
 Blender-authored assets load locally; no runtime CDN or WebGL fallback.
 [Updates](https://shumer.dev/newsletter) · [Engine contract](ARCHITECTURE.md) ·
 [Contributor instructions](AGENTS.md)
@@ -16,9 +16,21 @@ npm run build
 
 Node.js 24.x is required; Node-run tools and smoke tests load migrated `.ts`
 modules using native type stripping. Runtime TypeScript uses explicit `.ts`
-imports and is checked by `npm run typecheck`. `npm run lint` bans explicit `any`
-and unsafe assignment, argument, call, member access and return through its
-type-aware pass; regular rules also cover `src/`, `tools/`, and `tests/`.
+imports and is checked by `npm run typecheck`. `npm run lint` requires explicit
+return types on every TypeScript function, method, getter and callback (including
+contextually typed functions and functions returning functions). Constructors and
+setters have no return annotation; JavaScript helpers are outside this rule.
+The compiler also checks implicit missing returns, missing `override` modifiers,
+switch fallthrough, and exact optional properties: omit unset patch fields rather
+than writing `undefined` over required defaults. Lint rejects floating/misused promises and unsafe narrowing
+assertions (including `as unknown as T`), as well as explicit `any` and unsafe
+assignment, argument, call, member access and return. Numeric enum assignments
+must use enum members rather than unchecked numbers. Runtime boundaries must
+validate unknown data; owned records should be constructed with their full type.
+Regular lint rules cover `src/`, `build/`, `tools/`, and `tests/`. Missing return annotations
+fail CI's lint step, not `tsc` itself. The narrow declaration additions in
+`src/render/three-types.d.ts` describe APIs verified against the pinned Three.js
+source; review them alongside the Three/@types upgrade checks.
 `npm run build` runs typecheck and lint first via `prebuild`. Remaining JavaScript
 helpers run alongside TypeScript; broad `checkJs` adoption is deferred.
 
@@ -42,20 +54,26 @@ navigation topology. Never hand-edit generated assets or rebuild Blender assets
 just to format source.
 
 A WebGPU-capable browser/device is required. Normal builds use committed world
-and Blender assets, with no Blender requirement. Change world source in
-`tools/worldgen/`, regenerate with `npm run world`, then run `npm run world:validate`.
+and Blender assets, with no Blender requirement. Change map content in
+`tools/worldgen/level/`; the [world editing map](tools/worldgen/README.md) identifies
+shape, placement and build locations. Regenerate with `npm run world`, then run
+`npm run world:validate`.
+Runtime-model optimization is explicit: `npm run models:cook -- p320` uses the
+[shared gltfpack build recipe](build/README.md). Normal dev/build/CI consumes the
+committed `.runtime.glb`; it does not require gltfpack. All seven authored weapons
+use cooked runtime assets. Native exports remain authoring references; each model
+has its own geometry, material and animation acceptance gates.
 
-**Three.js pin:** GitHub commit `e27dfa95ae7f453b5d7a9a36ffdb563f7c9b529b`,
-not a moving `dev` dependency. Its package version still says `0.186.0`; runtime
-source reports `187dev`. `tools/compensate-three.mjs` selects the pinned ESM source
-exports because committed bundles still lag the latest source fixes. This pin
-includes native builder-local buffer names and declaration collision handling
+**Three.js pin:** published npm release `three@0.187.0`, with matching
+`@types/three@0.187.0` and lockfile integrity hashes. The release bundles include the
+upstream fixes, so no postinstall source-export correction or local Three edits
+are needed. Native builder-local buffer names and declaration collision handling
 ([#34872](https://github.com/mrdoob/three.js/pull/34872)), plus per-object reference
 attributes that let compatible instanced meshes safely share shader builds
-([#35007](https://github.com/mrdoob/three.js/pull/35007)). The local WGSL edit is retired; its
-reviewed upstream source remains hash-verified without modification. Commit, version
-and hash guards validate all targets before writing; review them on every upgrade.
+([#35007](https://github.com/mrdoob/three.js/pull/35007)), remain upstream-owned.
 Upstream also owns Fresnel and TRAA cleanup—those local corrections remain removed.
+Review the release/export/shared-core and upstream source/bundle smoke guards, plus
+`src/render/three-types.d.ts`, on every Three/@types upgrade.
 Preserve the native buffer isolation/reuse guards plus native
 startup/first-use/lifetime/failure checks. Compatible native instancing now shares
 shader-builder state and GPU programs/pipelines, never object buffers. Upstream
@@ -63,6 +81,12 @@ keeps builds that embed object-specific data out of the shared builder cache.
 Other renderer follow-ups: [#370](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/370).
 
 ## Play
+
+The gameplay HUD uses **PixiJS/WebGPU by default**—no query parameter is needed.
+The migrated HUD has no legacy HTML backend or fallback. Native menus, startup/error
+controls and the field-radio panel stay accessible; HUD initialization failure
+shows the native Reload error dialog instead of starting without readouts.
+[HUD ownership, boundaries and checks](docs/hud.md).
 
 After loading, select **Start** to capture the mouse and begin. Pending or denied
 mouse capture keeps the run frozen; select **Retry Start** to retry (there is no
@@ -98,10 +122,23 @@ mouse capture succeeds. Terminal errors require Reload. Quality changes restart
 the run; Defaults resets settings, not bindings. Gamepad sticks move/look; no
 buttons are bound. F7/F8 are telemetry-only.
 
-Survive escalating squads, earn credits and shop between waves. M4/P320 are the
-starting weapons; MCX, EVOLYS, MPX and AX338 are shop options. The day/night clock
+Survive escalating squads, earn credits and shop between waves. Hover or focus a
+market item to preview it; click its card (Enter/Space on the focused card) to
+keep it selected. Supplies use locally bundled painted illustrations; weapons retain
+interactive 3D previews. Drag to orbit around the weapon and scroll to zoom; panning is
+disabled. In the focused 3D view, arrows rotate, +/- zoom and Home resets.
+Toolbar buttons also provide zoom and reset. Inspection never spends credits:
+use the explicit Buy/Swap button to purchase supplies or weapons.
+This first customization increment previews the current authored configurations;
+separate attachment purchases and iron-sight-only defaults are not implemented yet.
+
+M4/P320 are the starting weapons; MCX, EVOLYS, MPX and AX338 are shop options.
+The day/night clock
 starts at 16:30 and advances nine hours per ten active minutes. Pause/shop freeze
 it; the first 21:00 triggers a three-minute streetlight outage, not an interior outage.
+
+For edit locations, source/generated ownership and regeneration commands, see the
+[asset and world editing map](docs/assets.md).
 
 Asset regeneration/reference notes: [arms](assets/player/arms/README.md),
 [M4](assets/weapons/m4a1-block-ii/README.md), [MCX](assets/weapons/mcx-virtus/README.md),
@@ -126,8 +163,7 @@ performance acceptance.
 
 For local telemetry open `/?telemetry=1`: **F7** marks a moment (optional note),
 **F8** stops/downloads `cod-telemetry-<timestamp>.tgz`. It contains JSON and marked
-view JPEGs; nothing uploads. Analyze with
-`node tools/analyze-telemetry.mjs <run.tgz> [--out summary.json]`.
+view JPEGs; nothing uploads.
 Console: `__TELEMETRY__.mark('note')`, `.summary()`, `.stop()`, `.download()`.
 Unclamped wall-time hitches (>50 ms and >3× recent frame time) include resource/
 node-builder deltas and available long-task attribution; these are activity clues,
@@ -139,9 +175,7 @@ continues unless it failed; the reload-required error is exposed through
 
 ## Automation
 
-Owner-authorized issues run through an issue → `develop` pipeline: DeepSeek V4 Flash
-via OpenCode Go implements; Grok 4.6 via OpenRouter reviews with read-only GitHub
-access. CI, fix limits and squash merge are deterministic; only the owner promotes
-to `main`. Actions secrets: `CODEX_API_KEY`, `OPENROUTER_API_KEY`,
-`AI_CI_TRIGGER_TOKEN` (fine-grained PAT: Contents/Issues/PR read-write). Enable
-**Allow GitHub Actions to create and approve pull requests**.
+The `Validate` GitHub Actions workflow runs on pull requests and pushes to `main`
+and `develop`. It checks formatting, types, lint, tests and the production build.
+Changes go through pull requests into `develop`; only the owner promotes to `main`.
+AI implementation, review, fix and automatic merge workflows have been retired.

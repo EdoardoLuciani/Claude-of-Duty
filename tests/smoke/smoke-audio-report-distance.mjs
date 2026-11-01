@@ -45,8 +45,8 @@ function meanReportEnergy(kind, count) {
   for (let i = 1; i <= count; i++) energy += masters.files[`${kind}-${i}`].monoEnergy;
   return energy / count;
 }
-assert.equal(Object.keys(REPORT_DISTANT_MATCH).length, 5);
-for (const kind of ['rifle', 'pistol', 'lmg', 'sniper', 'shotgun']) {
+assert.equal(Object.keys(REPORT_DISTANT_MATCH).length, 6);
+for (const kind of ['rifle', 'pistol', 'lmg', 'sniper', 'shotgun', 'ak']) {
   const profile = WEAPON_PROFILES[kind];
   const close = meanReportEnergy(kind, 3);
   const distant = meanReportEnergy(profile.distantSample, 2);
@@ -111,11 +111,8 @@ Object.assign(audio, {
 for (const profile of Object.values(WEAPON_PROFILES)) {
   for (distance of [0.5, 2, 20, 45, 45.001, 70, 320]) {
     assert(audio._playAt('shot', distance, 0, 0, { profile }, 'weapons'));
-    assert.equal(
-      acquired.atten,
-      profile.samplePunch === false ? reportDistanceGain(distance, profile) : undefined
-    );
-    assert(acquired.atten === undefined || (acquired.atten > 0 && acquired.atten <= 1));
+    assert.equal(acquired.atten, reportDistanceGain(distance, profile));
+    assert(acquired.atten > 0 && acquired.atten <= 1);
     assert.equal(acquired.gain, 1, 'emitter gain remains unity');
     assert.equal(acquired.when, 2 + distance / 343);
     assert.equal(built.dist, distance);
@@ -127,7 +124,7 @@ for (const profile of Object.values(WEAPON_PROFILES)) {
     assert.equal(reportDistantMix(distance, profile, true) === 1, false);
   }
 }
-for (const kind of ['step', 'explosion', 'bark', 'ambient', 'whizz']) {
+for (const kind of ['step', 'bark', 'ambient', 'whizz']) {
   assert(audio._playAt(kind, distance, 0, 0));
   assert.equal(acquired.atten, undefined, `${kind}: no report-only falloff`);
 }

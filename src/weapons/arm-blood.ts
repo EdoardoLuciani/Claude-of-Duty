@@ -172,7 +172,7 @@ export function createArmBlood(): ArmBlood {
         localizedBlood
       );
       // Same graph at full health and injured: no mid-combat permutations.
-      material.customProgramCacheKey = () => 'arm-blood-tsl-v2';
+      material.customProgramCacheKey = (): string => 'arm-blood-tsl-v2';
     },
   };
 }

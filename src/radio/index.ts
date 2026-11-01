@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 
-import type { EngineContext, EngineSystems } from '../core/context.ts';
+import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 
 /**
  * RADIO — carpet-bomb strike: bomber, falling bombs, blast chain.
@@ -76,7 +76,7 @@ const GEO = {
   bombGlow: new THREE.SphereGeometry(0.06, 6, 6),
 };
 
-function bomberMesh() {
+function bomberMesh(): THREE.Group {
   const g = new THREE.Group();
   const fus = new THREE.Mesh(GEO.fus, matBody);
   fus.rotation.x = Math.PI / 2;
@@ -113,7 +113,7 @@ function bomberMesh() {
   return g;
 }
 
-function bombMesh() {
+function bombMesh(): THREE.Group {
   const g = new THREE.Group();
   const body = new THREE.Mesh(GEO.bombBody, matBomb);
   body.rotation.x = Math.PI / 2;
@@ -154,8 +154,8 @@ interface Strike {
 type RadioContext = Pick<EngineContext, 'scene' | 'get' | 'peek' | 'events'>;
 
 export class RadioSystem {
-  static id = 'radio';
-  static deps = ['world'];
+  static readonly id = 'radio';
+  static readonly deps: SystemId[] = ['world'];
   ctx!: RadioContext;
   _world!: EngineSystems['world'];
   _physics!: EngineSystems['physics'] | null;
@@ -175,11 +175,16 @@ export class RadioSystem {
     this.active = [];
     this._warmed = false;
     this._off = [];
-    this._off.push(ctx.events.on('game:restart', () => this.clearStrike()));
+    this._off.push(ctx.events.on('game:restart', (): void => this.clearStrike()));
   }
 
   /** Warm real MRT/forward variants without starting a strike or drawing geometry. */
-  async prewarmMaterials() {
+  async prewarmMaterials(): Promise<
+    | { ok: false; reason: string }
+    | { ok: true; graphWarm: Awaited<ReturnType<EngineSystems['render']['_warmGraph']>> }
+    | { ok: false; error: string }
+    | undefined
+  > {
     if (this._warmed) return;
     const render = this.ctx.peek('render');
     const renderer = render?.renderer;
@@ -206,7 +211,7 @@ export class RadioSystem {
   /* ==================================================================== */
 
   /** Start a strike. No-op while one is already airborne. */
-  callStrike() {
+  callStrike(): boolean {
     if (this.active.length) return false;
     const bounds = this._world?.bounds;
     if (!bounds) return false;
@@ -343,6 +348,7 @@ export class RadioSystem {
   _detonate(bomb: Bomb, groundY: number): void {
     bomb.mesh.position.y = groundY + CARPET.blastHeight;
     this.ctx.events.emit('explosion', {
+      kind: 'bomb',
       position: bomb.mesh.position,
       radius: CARPET.radius,
       damage: CARPET.damage,

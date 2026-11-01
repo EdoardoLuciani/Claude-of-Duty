@@ -32,19 +32,19 @@ export class StartGate {
     this.button.type = 'button';
     this.button.style.cssText =
       'padding:.8rem 2.5rem;border:1px solid #65b9ab;background:#13231f;color:#e2eee9;font:inherit;letter-spacing:.12em;cursor:pointer';
-    this.button.onclick = () => this.requestControl();
-    this.panel.oncancel = (event) => event.preventDefault();
-    this.panel.onkeydown = (event) => {
+    this.button.onclick = (): void => this.requestControl();
+    this.panel.oncancel = (event): void => event.preventDefault();
+    this.panel.onkeydown = (event): void => {
       event.stopPropagation();
       // A held New Game key must not activate the newly focused Start button.
       if (event.repeat && (event.key === 'Enter' || event.key === ' ')) event.preventDefault();
     };
-    this.panel.onkeyup = (event) => event.stopPropagation();
+    this.panel.onkeyup = (event): void => event.stopPropagation();
     this.panel.append(title, this.status, this.button);
     document.body.append(this.panel);
     document.addEventListener('pointerlockchange', this.lockChanged);
     document.addEventListener('pointerlockerror', this.lockDenied);
-    this.offError = engine.events.on('engine:error', () => this.end());
+    this.offError = engine.events.on('engine:error', (): void => this.end());
     this.suspend();
   }
 
@@ -95,7 +95,7 @@ export class StartGate {
     }
     try {
       const request = this.engine.canvas.requestPointerLock();
-      request?.catch(() => {
+      request?.catch((): void => {
         if (generation === this.generation) this.lockDenied();
       });
     } catch {
@@ -117,7 +117,7 @@ export class StartGate {
     cancelAnimationFrame(this.frame);
     // Never resume inside retained UI dispatch: earlier pose hooks must run on
     // the first active frame, before revealing the separate first-person scene.
-    this.frame = requestAnimationFrame(() => {
+    this.frame = requestAnimationFrame((): void => {
       if (
         this.ended ||
         this.engine.error ||

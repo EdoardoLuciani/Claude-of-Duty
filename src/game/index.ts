@@ -21,7 +21,7 @@
  */
 
 import type { AiSystem } from '../ai/index.ts';
-import type { EngineContext } from '../core/context.ts';
+import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
 import type { SearchState } from './search-assist.ts';
 import { resetSearchState, tickSearchAssist } from './search-assist.ts';
@@ -53,8 +53,8 @@ export class GameSystem {
   declare _search: SearchState;
   declare _off: Array<() => void>;
 
-  static id = 'game';
-  static deps = ['ai'];
+  static readonly id = 'game';
+  static readonly deps: SystemId[] = ['ai'];
 
   async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
@@ -82,7 +82,7 @@ export class GameSystem {
 
     // AI handles damage first (the dependency guarantees listener order) and
     // marks the shared payload `killed` when this hit actually ended the actor.
-    on('damage:dealt', (e) => {
+    on('damage:dealt', (e): void => {
       const target = e?.target;
       if (!e?.killed || !target || typeof target !== 'object' || this._isPlayerTarget(target))
         return;
@@ -99,14 +99,14 @@ export class GameSystem {
       this.addScore(points, e.headshot ? 'headshot' : 'elimination');
     });
 
-    on('wave:complete', (e) => {
+    on('wave:complete', (e): void => {
       const wave = Math.max(1, (e?.wave ?? 0) | 0);
       const points = wave * SCORE.wave;
       this.addScore(points, 'wave');
     });
 
-    on('player:death', () => resetSearchState(this._search));
-    on('game:restart', () => this.reset());
+    on('player:death', (): void => resetSearchState(this._search));
+    on('game:restart', (): void => this.reset());
   }
 
   _isPlayerTarget(target: unknown): boolean {

@@ -427,7 +427,7 @@ export function ribbon(
   const pts = opts.upright
     ? superEllipse(ht, half, 4, opts.seg ?? 8)
     : superEllipse(half, ht, 4, opts.seg ?? 8);
-  return tube(points, () => pts, { ...opts, capStart: true, capEnd: true });
+  return tube(points, (): Vec2[] => pts, { ...opts, capStart: true, capEnd: true });
 }
 
 /* ------------------------------------------------------------------ */
@@ -619,7 +619,7 @@ export interface CharacterBuild {
   vertices: number;
   triangles: number;
   parts: {
-    name?: string;
+    name?: string | undefined;
     material: string;
     start: number | undefined;
     count: number | undefined;
@@ -748,12 +748,14 @@ export class CharacterBuilder {
       triangles: iTotal / 3,
       // vertex range per part, so the albedo audit in selftest.mjs can report
       // the effective value of every single piece of kit
-      parts: order.map((p) => ({
-        name: p.name,
-        material: p.material,
-        start: p._vo!,
-        count: p._vn!,
-      })),
+      parts: order.map(
+        (p): { name: string | undefined; material: string; start: number; count: number } => ({
+          name: p.name,
+          material: p.material,
+          start: p._vo!,
+          count: p._vn!,
+        })
+      ),
     };
   }
 
@@ -774,7 +776,7 @@ export class CharacterBuilder {
       }
       return;
     }
-    const cands = (part.bones ?? ['Hips']).map((nm: string) => rig.index(nm));
+    const cands = (part.bones ?? ['Hips']).map((nm: string): number => rig.index(nm));
     const bias = part.bias ?? null;
     const power = part.power ?? 3.2;
     const wBuf = new Float64Array(cands.length);
@@ -854,7 +856,7 @@ export class CharacterBuilder {
   _shade(order: BuilderPart[], pos: Float32Array, nrm: Float32Array, col: Float32Array): void {
     const occ = this.occluders;
     const nz = this.noise;
-    const groundDirt = (y: number) => Math.max(0, 1 - Math.max(0, y - 0.02) / 0.55);
+    const groundDirt = (y: number): number => Math.max(0, 1 - Math.max(0, y - 0.02) / 0.55);
     for (const part of order) {
       const n = part._vn!,
         vo = part._vo!;

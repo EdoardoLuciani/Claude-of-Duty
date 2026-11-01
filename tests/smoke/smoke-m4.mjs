@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { Rng } from '../../src/core/rng.ts';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
-import { makeM4Model, M4_URL } from '../../src/weapons/m4.ts';
+import { makeM4Model } from '../../src/weapons/m4.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
 import { checkM4Sights } from '../../tools/lib/m4-sight-checks.js';
@@ -20,7 +20,7 @@ assert(
   blend.subarray(0, 7).equals(Buffer.from('BLENDER')) || blend.readUInt32LE(0) === 0xfd2fb528,
   'editable packed Blender source'
 );
-const bytes = readFileSync(new URL(M4_URL));
+const bytes = readFileSync(new URL('m4a1-block-ii.glb', dir));
 const json = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)));
 const primitives = json.nodes
   .filter((n) => n.mesh !== undefined)
@@ -39,32 +39,40 @@ assert(
     bytes.length <= 10 * 1024 * 1024
 );
 assert.equal(json.images.length, 4, 'three shared maps plus the selected receiver albedo');
-// Selected balanced finish: preserve metal/dielectric separation and authored maps.
-for (const [prefix, roughness, normal, metal] of [
-  ['01', 0.44, 0.08, 1],
-  ['02', 0.56, 0.16, 1],
-  ['03', 0.8, 0.55, 0],
-  ['05', 0.56, 0.16, 1],
-  ['07', 0.67, 0.18, 1],
+// The same finish factors now live in vertex colours/UV metadata, not material slots.
+const model = makeM4Model(await parseGLB(bytes));
+for (const [tint, roughness, normal, metal] of [
+  [[0.041, 0.043, 0.046], 0.44, 0.08, 1],
+  [[0.235, 0.15, 0.084], 0.56, 0.16, 1],
+  [[0.026, 0.029, 0.032], 0.8, 0.55, 0],
+  [[0.071, 0.078, 0.086], 0.56, 0.16, 1],
+  [[0.145, 0.155, 0.164], 0.67, 0.18, 1],
 ]) {
-  const material = json.materials.find((m) => m.name.startsWith(`${prefix} |`));
-  assert(material, `${prefix}: missing finish`);
-  const pbr = material.pbrMetallicRoughness;
-  assert(Math.abs(pbr.roughnessFactor - roughness) < 1e-6);
-  assert(Math.abs(material.normalTexture.scale - normal) < 1e-6);
-  assert.equal(pbr.metallicFactor ?? 1, metal);
-  assert.equal(material.extensions?.KHR_materials_clearcoat?.clearcoatFactor ?? 0, 0);
+  let finish;
+  model.root.traverse((mesh) => {
+    if (!mesh.isMesh || finish) return;
+    const { color, uv1, uv2 } = mesh.geometry.attributes;
+    for (let i = 0; i < color.count; i++)
+      if (
+        tint.every(
+          (v, axis) => Math.round(color.getComponent(i, axis) * 65535) === Math.round(v * 65535)
+        )
+      ) {
+        finish = [uv1.getX(i), uv2.getX(i), uv1.getY(i)];
+        break;
+      }
+  });
+  assert(finish, `${tint}: missing finish`);
+  for (const [i, value] of [roughness, normal, metal].entries())
+    assert(Math.abs(finish[i] - value) < 1e-6);
 }
-const receiverMaterial = json.materials.find((m) => m.name.startsWith('01 |'));
-const polymerMaterial = json.materials.find((m) => m.name.startsWith('03 |'));
+assert.equal(json.materials[0].extensions?.KHR_materials_clearcoat?.clearcoatFactor ?? 0, 0);
 const imageFor = (texture) => json.textures[texture.index].source;
 assert.notEqual(
-  imageFor(receiverMaterial.pbrMetallicRoughness.baseColorTexture),
-  imageFor(polymerMaterial.pbrMetallicRoughness.baseColorTexture),
+  imageFor(json.materials[0].emissiveTexture),
+  imageFor(json.materials[0].pbrMetallicRoughness.baseColorTexture),
   'receiver-only albedo, not a global texture replacement'
 );
-for (const [i, value] of [0.041, 0.043, 0.046].entries())
-  assert(Math.abs(receiverMaterial.pbrMetallicRoughness.baseColorFactor[i] - value) < 1e-6);
 assert(
   json.buffers.every((b) => !b.uri) && json.images.every((i) => i.bufferView !== undefined),
   'local self-contained GLB'
@@ -78,8 +86,8 @@ for (const image of json.images) {
   assert.equal(bytes.readUInt32BE(offset + 20), 1024);
 }
 assert.equal(json.animations.length, 8);
-const albedoStats = (material) => {
-  const image = json.images[imageFor(material.pbrMetallicRoughness.baseColorTexture)];
+const albedoStats = (name) => {
+  const image = json.images.find((image) => image.name === name);
   const view = json.bufferViews[image.bufferView];
   const start = binaryStart + (view.byteOffset ?? 0);
   const pixels = PNG.sync.read(bytes.subarray(start, start + view.byteLength)).data;
@@ -92,8 +100,8 @@ const albedoStats = (material) => {
   const mean = sum / (pixels.length / 4);
   return { mean, sd: Math.sqrt(squares / (pixels.length / 4) - mean ** 2) };
 };
-const receiverAlbedo = albedoStats(receiverMaterial);
-const sharedAlbedo = albedoStats(polymerMaterial);
+const receiverAlbedo = albedoStats('m4_receiver_surface');
+const sharedAlbedo = albedoStats('m4_surface');
 assert(
   Math.abs(receiverAlbedo.mean - sharedAlbedo.mean) < 1,
   'preserve mean albedo within PNG quantization'
@@ -124,7 +132,6 @@ for (const clip of json.animations) {
     if (channel.target.path === 'scale')
       assert.equal(clip.samplers[channel.sampler].interpolation, 'STEP');
 }
-const model = makeM4Model(await parseGLB(bytes));
 assert.equal(model.id, 'rifle');
 assert.equal(model.label, 'M4A1');
 assert.equal(model.nodes.opticGlass, undefined);
@@ -187,7 +194,25 @@ close(firstHit('receiver_mesh', [0.004, 0.075, -0.4738], [0, 0, 1]).z, -0.4733, 
 // Open rear cup: first rendered surface is the front post/paint, not its
 // axis/socket. Allow 30 µm for the polygon chord and 10 µm paint clearance.
 close(firstHit('M4_RIG', [0, 0.1394, 0.06], [0, 0, -1]).z, -0.3027, 0.00003);
-const guard = new THREE.Box3().setFromObject(model.root.getObjectByName('handguard'));
+const guard = new THREE.Box3(),
+  guardPoint = new THREE.Vector3();
+const guardInverse = model.root.matrixWorld.clone().invert();
+model.root.traverse((mesh) => {
+  if (!mesh.isMesh) return;
+  const { position, color } = mesh.geometry.attributes;
+  for (let i = 0; i < position.count; i++)
+    if (
+      [0.235, 0.15, 0.084].every(
+        (v, axis) => Math.round(color.getComponent(i, axis) * 65535) === Math.round(v * 65535)
+      )
+    )
+      guard.expandByPoint(
+        guardPoint
+          .fromBufferAttribute(position, i)
+          .applyMatrix4(mesh.matrixWorld)
+          .applyMatrix4(guardInverse)
+      );
+});
 close(guard.max.z - guard.min.z, 0.31115, 0.001);
 close(guard.max.x - guard.min.x, 0.056642, 0.001);
 close(guard.max.y - guard.min.y, 0.05715, 0.001);
@@ -339,7 +364,7 @@ for (const [name, out, drop, insert] of [
           `${name}/${t.toFixed(4)}: ${o.name} permanently collapsed under visible spare`
         );
       });
-      assert.equal(meshes, 4, 'rendered spare body/follower and brass/projectiles');
+      assert.equal(meshes, 2, 'consolidated spare body/follower and brass/projectiles');
       const bounds = new THREE.Box3().setFromObject(anim.spare);
       assert(
         bounds.max.y - bounds.min.y > 0.14,
@@ -482,7 +507,41 @@ function step(seconds) {
     );
   }
 }
-wp.setWeaponImmediate('rifle');
+wp.debugPose('ads');
+step(0.3);
+close(vm.adsT, 1);
+close(camera.fov, 42);
+vm.rig.updateMatrixWorld(true);
+camera.updateMatrixWorld(true);
+// Measure the actual projected rear bore, not just an eye-relief literal. Keep
+// the opening usable at 1080p without magnifying the front aiming tip excessively.
+const project = (point) => point.project(camera).multiply(new THREE.Vector3(960, 540, 1));
+const sightScreen = project(point('SOCKET_sight'));
+const cup = model.root.getObjectByName('MaTech_open_aperture');
+let boreRadius = Infinity;
+for (const index of new Set(cup.geometry.index.array)) {
+  const vertex = project(
+    new THREE.Vector3()
+      .fromBufferAttribute(cup.geometry.attributes.position, index)
+      .applyMatrix4(cup.matrixWorld)
+  );
+  boreRadius = Math.min(boreRadius, Math.hypot(vertex.x - sightScreen.x, vertex.y - sightScreen.y));
+}
+assert(boreRadius * 2 > 90 && boreRadius * 2 < 110, 'rear bore should span about 100 px at 1080p');
+// Check the solved aim datum before the ordinary breathing/sway layers.
+const solvedSight = new THREE.Vector3()
+  .fromArray(model.nodes.sight)
+  .applyQuaternion(vm._adsQuat)
+  .add(vm._adsPos);
+close(solvedSight.x, 0);
+close(solvedSight.y, 0);
+close(solvedSight.z, -WEAPON_DEFS.rifle.eyeRelief);
+const tipCorners = new THREE.Box3().setFromObject(model.root.getObjectByName('Front_sight_tip'));
+const tipMin = project(tipCorners.min.clone());
+const tipMax = project(tipCorners.max.clone());
+assert(Math.abs(tipMax.x - tipMin.x) < 12, 'front paint tip must not obscure distant targets');
+assert(checkM4Sights(model.root).apertureObstructed === 0, 'ADS keeps the authored bore clear');
+wp.debugPose('idle');
 step(0.2);
 assert(!vm.reticle.visible && !vm.scopeOverlay.visible);
 assert(wp.tryFire());
@@ -516,7 +575,7 @@ for (const proxy of wp._magPools.get('rifle')) {
   proxy.group.traverse((o) => {
     if (o.isMesh) parts++;
   });
-  assert.equal(parts, 2, 'discarded shell/follower, not dummy loaded cartridges');
+  assert.equal(parts, 1, 'consolidated discarded shell/follower, not dummy loaded cartridges');
 }
 wp.state.mag = 0;
 wp.state.chambered = false;

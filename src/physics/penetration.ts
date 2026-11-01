@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import type { EventWeapon } from '../core/events.ts';
 import type { PhysicsSystem } from './index.ts';
 import { rayCapsule, rayCapsuleFar, rayObbFar, makeHitRecord } from './math.ts';
+import type { SurfaceName } from './surfaces.ts';
 import { SURFACE_PROPS, surfaceName, MASK } from './surfaces.ts';
 
 export const MAX_BULLET_LAYERS = 6;
@@ -22,7 +23,7 @@ interface ShotImpact {
   point: THREE.Vector3;
   normal: THREE.Vector3;
   incident: THREE.Vector3;
-  surface: string;
+  surface: SurfaceName;
   surfaceIndex: number;
   exit: boolean;
   damage: number;
@@ -176,13 +177,22 @@ export class Ballistics {
       tracer: false,
       stopReason: 'range',
     };
-    this._paths = Array.from({ length: MAX_BULLET_LAYERS * 2 }, () => ({
-      from: new THREE.Vector3(),
-      to: new THREE.Vector3(),
-      distance: 0,
-      damage: 0,
-      endDamage: 0,
-    }));
+    this._paths = Array.from(
+      { length: MAX_BULLET_LAYERS * 2 },
+      (): {
+        from: THREE.Vector3;
+        to: THREE.Vector3;
+        distance: number;
+        damage: number;
+        endDamage: number;
+      } => ({
+        from: new THREE.Vector3(),
+        to: new THREE.Vector3(),
+        distance: 0,
+        damage: 0,
+        endDamage: 0,
+      })
+    );
     this._pathCount = 0;
     this._hitActors = [];
     this._exit = makeHitRecord();

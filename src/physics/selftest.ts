@@ -27,7 +27,7 @@ const ok = (cond: boolean, label: string, detail = ''): void => {
     console.log(`  ok    ${label}${detail ? '  (' + detail + ')' : ''}`);
   }
 };
-const section = (t: string) => console.log(`\n\x1b[1m${t}\x1b[0m`);
+const section = (t: string): void => console.log(`\n\x1b[1m${t}\x1b[0m`);
 
 /* ------------------------------------------------------------------ */
 /* Test level                                                          */
@@ -447,7 +447,7 @@ section('Bullet penetration');
   const impacts: { surface: string; exit: boolean; damage: number; x: number }[] = [];
   const off = events.on(
     'bullet:impact',
-    (e: { surface: string; exit: boolean; damage: number; point: THREE.Vector3 }) =>
+    (e: { surface: string; exit: boolean; damage: number; point: THREE.Vector3 }): number =>
       impacts.push({ surface: e.surface, exit: e.exit, damage: e.damage, x: e.point.x })
   );
 
@@ -461,8 +461,8 @@ section('Bullet penetration');
     maxDist: 50,
     mask: MASK.BULLET,
   });
-  const woodEntry = impacts.filter((i) => !i.exit && i.surface === 'wood');
-  const woodExit = impacts.filter((i) => i.exit && i.surface === 'wood');
+  const woodEntry = impacts.filter((i): boolean => !i.exit && i.surface === 'wood');
+  const woodExit = impacts.filter((i): boolean => i.exit && i.surface === 'wood');
   ok(woodEntry.length === 1, 'entry impact on wood', `${woodEntry.length}`);
   ok(woodExit.length === 1, 'exit impact on wood', `${woodExit.length}`);
   ok(
@@ -498,7 +498,7 @@ section('Bullet penetration');
     mask: MASK.BULLET,
   });
   ok(
-    impacts.some((i) => i.exit),
+    impacts.some((i): boolean => i.exit),
     'AP round defeats the same wall',
     `${impacts.length} impacts`
   );
@@ -525,7 +525,7 @@ section('Bullet penetration');
       maxDist: 40,
       mask: MASK.BULLET,
     });
-    const entries = impacts.filter((i) => !i.exit).length;
+    const entries = impacts.filter((i): boolean => !i.exit).length;
     ok(
       entries === 3,
       'penetrates three stacked panels',
@@ -720,8 +720,8 @@ section('Hitbox colliders');
   // One round, one actor: overlapping head+torso must not stack damage, and a
   // ray that clips the head must credit the head even if the torso is wider.
   const dealt: { target: unknown; headshot?: boolean; amount: number }[] = [];
-  const offD = events.on('damage:dealt', (e) => {
-    dealt.push({ target: e.target, headshot: e.headshot, amount: e.amount });
+  const offD = events.on('damage:dealt', (e): void => {
+    dealt.push({ target: e.target, headshot: e.headshot === true, amount: e.amount });
   });
   phys.fireBullet({
     origin: { x: 0, y: 1.65, z: 0 },
@@ -743,39 +743,6 @@ section('Hitbox colliders');
   offD();
   phys.removeCollider(head);
   phys.removeCollider(torso);
-}
-
-/* ---------------- debug view ---------------- */
-section('Debug view');
-{
-  const { PhysicsDebugView } = await import('./debug.ts');
-  const view = new PhysicsDebugView(new THREE.Scene());
-  view.setEnabled(true);
-  view.begin();
-  const m = new THREE.Matrix4().compose(
-    new THREE.Vector3(1, 2, 3),
-    new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.6),
-    new THREE.Vector3(1, 1, 1)
-  );
-  view.obb(m, 0.5, 0.25, 0.75);
-  ok(view._v === 24, 'obb emits 12 edges', `${view._v / 2} lines`);
-  // every edge length must match one of the three box dimensions
-  let good = 0;
-  for (let i = 0; i < view._v; i += 2) {
-    const a = i * 3,
-      b = (i + 1) * 3;
-    const p = view.positions;
-    const len = Math.hypot(p[b] - p[a], p[b + 1] - p[a + 1], p[b + 2] - p[a + 2]);
-    if (Math.abs(len - 1.0) < 1e-4 || Math.abs(len - 0.5) < 1e-4 || Math.abs(len - 1.5) < 1e-4)
-      good++;
-  }
-  ok(good === 12, 'obb edge lengths match the half-extents', `${good}/12`);
-  view.begin();
-  view.capsule(0, 1, 0, 0, 2, 0, 0.3, [1, 1, 1]);
-  ok(view._v > 40 && view._v < 400, 'capsule wireframe is bounded', `${view._v} verts`);
-  view.rebuild(phys, new THREE.PerspectiveCamera(), 1 / 60);
-  ok(view._v > 0 && view.geometry.drawRange.count === view._v, 'rebuild sets the draw range');
-  view.dispose();
 }
 
 /* ---------------- determinism ---------------- */
@@ -830,8 +797,9 @@ section('Determinism');
 console.log(
   `\n${failures === 0 ? '\x1b[32mPASS' : '\x1b[31mFAIL'}\x1b[0m  ${checks - failures}/${checks} checks`
 );
-(globalThis as typeof globalThis & { process: { exitCode: number } }).process.exitCode =
-  failures === 0 ? 0 : 1;
+const runtime: object = globalThis;
+if ('process' in runtime && typeof runtime.process === 'object' && runtime.process !== null)
+  Object.assign(runtime.process, { exitCode: failures === 0 ? 0 : 1 });
 
 /** Reference implementation for cross-checking the BVH. */
 interface TriangleSource {

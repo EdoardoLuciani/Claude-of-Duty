@@ -1,4 +1,6 @@
 import type { Texture } from 'three';
+import type { Vector3 } from 'three';
+import type { FnNode } from 'three/src/nodes/tsl/TSLCore.js';
 import {
   Fn,
   If,
@@ -23,6 +25,7 @@ import {
   vec4,
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
+import type { ConstNode, JoinNode, VarNode } from 'three/webgpu';
 
 import { skHG, SK_PI } from './atmosphere-tsl.ts';
 import { skIGN, skVal3 } from './noise.ts';
@@ -69,7 +72,7 @@ export interface VolumetricBuildOptions {
   invProj?: Node<'mat4'>;
   camWorld?: Node<'mat4'>;
   camPos?: Node<'vec3'>;
-  visibility?: (worldPos: Node<'vec3'>, noise?: Node<'float'>) => Node<'float'>;
+  visibility?: ((worldPos: Node<'vec3'>, noise?: Node<'float'>) => Node<'float'>) | undefined;
   frame?: Node<'float'>;
   uv?: Node<'vec2'>;
   coordinate?: Node<'vec2'>;
@@ -78,7 +81,29 @@ export interface VolumetricBuildOptions {
 export function createVolumetricNodes(
   shared: VolumetricShared,
   { steps = 40, march = true }: { steps?: number; march?: boolean } = {}
-) {
+): {
+  createNode: ({
+    color,
+    depth,
+    invProj,
+    camWorld,
+    camPos,
+    visibility,
+    frame,
+    uv,
+    coordinate,
+  }: VolumetricBuildOptions) => Node<'vec3'>;
+  skFogDensity: FnNode<[Vector3 | Node<'vec3'>], Node<'float'>>;
+  skFogAmbient: FnNode<[number | Node<'float'> | Node<'uint'>], Node<'vec3'>>;
+  skHeightIntegral: FnNode<
+    [
+      number | Node<'float'> | Node<'uint'>,
+      number | Node<'float'> | Node<'uint'>,
+      number | Node<'float'> | Node<'uint'>,
+    ],
+    Node<'float'>
+  >;
+} {
   const { uFog, uFog2, uFogExt, uPhase, uKeyDir, uKeyIrr, uFogDrift, ambientTex, skCloudShadow } =
     shared;
 
@@ -87,7 +112,7 @@ export function createVolumetricNodes(
    * the ambient LUT are the two ends of that axis — whole-sky average (cool) and
    * horizon band average (warm) — so distance separates by hue, not by grey.
    */
-  const skFogAmbient = Fn<[Node<'float'>], Node<'vec3'>>(([cosKey]) => {
+  const skFogAmbient = Fn<[Node<'float'>], Node<'vec3'>>(([cosKey]): Node<'vec3'> => {
     const cool = texture(ambientTex, vec2(0.25, 0.5)).rgb;
     const hor = texture(ambientTex, vec2(0.75, 0.5)).rgb;
     const keyHue = uKeyIrr.div(max(1e-4, max(uKeyIrr.x, max(uKeyIrr.y, uKeyIrr.z))));
@@ -97,27 +122,29 @@ export function createVolumetricNodes(
   });
 
   /** Dual-lobe HG: a forward peak for the shafts, a broad back lobe behind you. */
-  const skFogPhase = (cosTheta: Node<'float'>) =>
+  const skFogPhase = (cosTheta: Node<'float'>): Node<'float'> =>
     mix(skHG(cosTheta, uPhase.x), skHG(cosTheta, uPhase.y), uPhase.z);
 
   /**
    * The shaft gain applied to the *anisotropic excess only*, so the knob lifts
    * the forward peak without veiling every pixel with the isotropic floor.
    */
-  const skFogInscatterPhase = Fn<[Node<'float'>], Node<'float'>>(([cosTheta]) => {
+  const skFogInscatterPhase = Fn<[Node<'float'>], Node<'float'>>(([cosTheta]): Node<'float'> => {
     const iso = 1 / (4 * SK_PI);
     const p = skFogPhase(cosTheta);
     return p.add(max(0, p.sub(iso)).mul(uFog2.y.sub(1)));
   });
 
   /** Near-field ramp: twelve metres of real air scatters nothing measurable. */
-  const skFogNearRamp = Fn<[Node<'float'>], Node<'float'>>(([t]) => smoothstep(0, 12, t));
+  const skFogNearRamp = Fn<[Node<'float'>], Node<'float'>>(([t]): Node<'float'> =>
+    smoothstep(0, 12, t)
+  );
 
   /** Normalised density: 1 at the fog base, exponential above, wind-torn. */
-  const skFogDensity = Fn<[Node<'vec3'>], Node<'float'>>(([p]) => {
+  const skFogDensity = Fn<[Node<'vec3'>], Node<'float'>>(([p]): VarNode<'float', Node<'float'>> => {
     const h = exp(p.y.sub(uFog.z).negate().mul(uFog.y));
     const result = h.toVar();
-    If(uFog2.w.greaterThan(0.001), () => {
+    If(uFog2.w.greaterThan(0.001), (): void => {
       const q = p.mul(uPhase.w).add(uFogDrift);
       const n = skVal3(q)
         .mul(0.63)
@@ -132,13 +159,13 @@ export function createVolumetricNodes(
    * transmittance applied to geometry is smooth at full resolution.
    */
   const skHeightIntegral = Fn<[Node<'float'>, Node<'float'>, Node<'float'>], Node<'float'>>(
-    ([y0, dy, t]) => {
+    ([y0, dy, t]): VarNode<'float', ConstNode<'float', number>> => {
       const d0 = exp(y0.sub(uFog.z).negate().mul(uFog.y));
       const x = dy.mul(uFog.y).mul(t);
       const result = float(0).toVar();
-      If(abs(x).lessThan(1e-4), () => {
+      If(abs(x).lessThan(1e-4), (): void => {
         result.assign(d0.mul(t));
-      }).Else(() => {
+      }).Else((): void => {
         result.assign(d0.mul(float(1).sub(exp(x.negate()))).div(dy.mul(uFog.y)));
       });
       return result;
@@ -147,7 +174,7 @@ export function createVolumetricNodes(
 
   /** World ray through the current screen UV, normalised on the z = -1 plane. */
   const skRayFor = Fn<[Node<'vec2'>, Node<'mat4'>, Node<'mat4'>], Node<'vec4'>>(
-    ([uv, invProj, camWorld]) => {
+    ([uv, invProj, camWorld]): JoinNode<'vec4'> => {
       // Native screen/texture UV has its origin at the top left; camera NDC
       // points up. Flip only the reconstruction coordinate, not the depth/color
       // sample. Otherwise ground pixels march skyward and mirror the sun's lobe.
@@ -177,7 +204,7 @@ export function createVolumetricNodes(
     uv = screenUV,
     coordinate = screenCoordinate,
   }: VolumetricBuildOptions): Node<'vec3'> {
-    const fogged = Fn(() => {
+    const fogged = Fn((): VarNode<'vec3', Node<'vec3'>> => {
       // TSL evaluates expressions where they are consumed, not where JS
       // declares them. Materialise the ray so the march cannot rebuild it.
       const ray = skRayFor(uv, invProj, camWorld).toVar('fogRay');
@@ -189,17 +216,16 @@ export function createVolumetricNodes(
       const colorNode = (
         'sample' in color && typeof color.sample === 'function' ? color.sample(uv) : color
       ) as Node<'vec3'> | Node<'vec4'>;
-      const depthValue = (
-        'sample' in depth && typeof depth.sample === 'function' ? depth.sample(uv).r : depth
-      ) as Node<'float'>;
+      const depthValue =
+        'sample' in depth && typeof depth.sample === 'function' ? depth.sample(uv).r : depth;
       const sky = depthValue.lessThanEqual(1e-6);
       // The sky dome already integrates atmospheric scattering over the full
       // view ray. Fogging its cleared-depth pixels a second time replaces the
       // clouds and blue sky with a featureless grey haze.
-      const dist = sky.select(float(0), min(depthValue.mul(rayLen), uFog.w)) as Node<'float'>;
+      const dist = sky.select(float(0), min(depthValue.mul(rayLen), uFog.w)).toFloat();
       const outCol = colorNode.rgb.toVar();
 
-      If(dist.greaterThan(0.02), () => {
+      If(dist.greaterThan(0.02), (): void => {
         const cosKey = dot(dir, uKeyDir).toVar();
         const phase = skFogInscatterPhase(cosKey).toVar();
         const ambient = skFogAmbient(cosKey).mul(uFog2.z).toVar();
@@ -220,7 +246,7 @@ export function createVolumetricNodes(
           const L = vec3(0).toVar();
           const T = float(1).toVar();
           const prev = float(0).toVar();
-          Loop(steps, ({ i }) => {
+          Loop(steps, ({ i }): void => {
             const f = i.toFloat().add(dith).div(steps);
             const t = dist
               .mul(
@@ -232,10 +258,10 @@ export function createVolumetricNodes(
               .add(dist.mul(f.mul(f).mul(f)).mul(0.65));
             const dt = t.sub(prev).toVar();
             prev.assign(t);
-            If(dt.greaterThan(1e-5), () => {
+            If(dt.greaterThan(1e-5), (): void => {
               const wp = camPos.add(dir.mul(t));
               const dens = skFogDensity(wp);
-              If(dens.greaterThan(1e-4), () => {
+              If(dens.greaterThan(1e-4), (): void => {
                 const sigmaS = uFog.x.mul(dens).mul(skFogNearRamp(t));
                 const sigmaE = max(1e-7, uFog2.x.mul(dens));
                 let vis = mix(cloudNear, cloudFar, f);

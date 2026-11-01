@@ -114,6 +114,16 @@ assert(Math.abs(body.linearVelocity.y - arc.vy) < 1e-6);
 assert(Math.abs(body.linearVelocity.x - arc.vh) < 1e-6);
 const { closest } = measureFlight(live.phys, body, land, arc.tAir + 0.1);
 assert(closest < GRENADE.landingTolerance, `live landing agrees with safety arc: ${closest} m`);
+const detonations = [];
+live.ai.ctx.events = { emit: (type, payload) => detonations.push({ type, payload }) };
+live.ai._updateGrenades(GRENADE_FUSE);
+assert.equal(detonations.length, 1);
+assert.equal(detonations[0].type, 'explosion');
+assert.equal(
+  detonations[0].payload.kind,
+  'grenade',
+  'AI grenade selects the recorded grenade bank'
+);
 
 // Grazing sides: a 60 mm gap clears a 50 mm sphere, but a 40 mm gap blocks it.
 // The old live CCD core was 90 mm despite prediction sweeping only 50 mm.

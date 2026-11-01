@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 
+import type { EngineSystems } from '../core/context.ts';
 import { P } from './atlas.ts';
 import { resetSpawn } from './particles.ts';
 import { V, cone } from './util.ts';
@@ -57,6 +58,14 @@ class Emitter {
   }
 }
 
+/** Column controls exclude pooled position, lifetime bookkeeping and activation state. */
+export type ColumnOptions = Partial<
+  Pick<
+    Emitter,
+    'duration' | 'rate' | 'radius' | 'rise' | 'dark' | 'life' | 'growth' | 'ember' | 'haze'
+  >
+>;
+
 interface AmbienceOptions {
   motes?: number;
   box?: number;
@@ -77,7 +86,7 @@ interface FxApi {
     amount: number,
     tile: number
   ): void;
-  physics?: { groundHeight?(x: number, z: number, y: number): number };
+  physics?: Pick<EngineSystems['physics'], 'groundHeight'> | undefined;
 }
 
 export class Ambience {
@@ -126,7 +135,7 @@ export class Ambience {
   }
 
   /** Finite-duration smoke column (explosions, burning wreck). */
-  addColumn(x: number, y: number, z: number, o: Partial<Emitter> = {}): void {
+  addColumn(x: number, y: number, z: number, o: ColumnOptions = {}): void {
     const e = this._acquire();
     e.active = true;
     e.age = 0;

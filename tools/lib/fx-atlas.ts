@@ -1,3 +1,5 @@
+import type { DataTexture } from 'three';
+
 import type { Rng } from '../../src/core/rng.ts';
 import { makeTexture } from '../../src/fx/atlas.ts';
 import { Noise, clamp01, smoothstep, encodeSrgb } from '../../src/fx/noise.ts';
@@ -17,7 +19,7 @@ type DecalPainter = (noise: Noise, x: number, y: number, radius: number, out: nu
  */
 const PARTICLE_PAINTERS: ParticlePainter[] = [
   // 0 — SMOKE_A: billowing puff, wispy eroded rim
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const w = n.warped(x * 2.05 + 3.7, y * 2.05 - 1.4, 0.8, 5);
     const lump = n.worley(x * 2.4 + 7.1, y * 2.4 + 2.3);
     const tear = n.fbm(x * 7.4 - 6.2, y * 7.4 + 3.9, 3);
@@ -34,7 +36,7 @@ const PARTICLE_PAINTERS: ParticlePainter[] = [
     out[3] = a;
   },
   // 1 — SMOKE_B: cauliflower lobes, denser core
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const cw = 1 - n.worley(x * 3.05 - 4.3, y * 3.05 + 6.7);
     const f = n.fbm(x * 1.9 + 12.2, y * 1.9 - 3.3, 4);
     const tear = n.fbm(x * 8.8 + 1.7, y * 8.8 - 4.4, 3);
@@ -49,7 +51,7 @@ const PARTICLE_PAINTERS: ParticlePainter[] = [
     out[3] = a;
   },
   // 2 — WISP: torn filaments, drifts and dissipates
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const fil = n.ridged(x * 2.6 + 1.3, y * 1.05 - 6.0, 4);
     const body = smoothstep(0, 0.75, 1 - Math.hypot(x * 1.05, y * 0.78));
     let a = clamp01(smoothstep(0.28, 0.85, fil) * 1.15 + 0.16) * body * body;
@@ -61,7 +63,7 @@ const PARTICLE_PAINTERS: ParticlePainter[] = [
     out[3] = a * 0.9;
   },
   // 3 — DUST: fine grained, sharp-ish falloff, grit specks
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const w = n.warped(x * 3.3 + 21.1, y * 3.3 + 5.9, 0.55, 5);
     const grit = n.fbm(x * 15.5 + 3.3, y * 15.5 - 7.7, 2);
     let a = smoothstep(0, 0.5, 1 - r * 1.04 + (w - 0.5) * 0.86);
@@ -76,7 +78,7 @@ const PARTICLE_PAINTERS: ParticlePainter[] = [
     out[3] = a;
   },
   // 4 — SPARK: point with a tight bloom halo
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const core = Math.exp(-r * r * 26);
     const glow = Math.exp(-r * r * 4.5) * 0.4;
     const a = clamp01(core + glow) * smoothstep(1.0, 0.85, r);
@@ -86,7 +88,7 @@ const PARTICLE_PAINTERS: ParticlePainter[] = [
     out[3] = a;
   },
   // 5 — STREAK: capsule along +Y, bright head, fading tail (tracers, spark trails)
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const halfW = 0.26 * (0.55 + 0.45 * smoothstep(-1.0, 0.6, y));
     const q = Math.abs(x) / halfW;
     const core = Math.exp(-q * q * 3.0);
@@ -104,7 +106,7 @@ const PARTICLE_PAINTERS: ParticlePainter[] = [
   //     +X. Deliberately one-sided and asymmetric: muzzle.js stamps a handful of
   //     these at independent rolls, so any radial symmetry in the sprite itself
   //     rebuilds the cartoon starburst this replaces. There is no spike term.
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const u = clamp01((x + 1) * 0.5); // 0 at the root, 1 at the tip
     // Width: swells just past the crown where the gas is still choked, then
     // tapers to a torn point. Half-width in painter units.
@@ -142,7 +144,7 @@ const PARTICLE_PAINTERS: ParticlePainter[] = [
   // 7 — FLASH_CORE: the choked, boiling gas ball right at the crown. Drawn
   //     small and very hot, so what has to survive clipping is the *silhouette*:
   //     the radius is warped per-direction and the interior churns.
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const ang = Math.atan2(y, x);
     const lump = n.fbm(Math.cos(ang) * 1.7 + 30.1, Math.sin(ang) * 1.7 + 9.4, 3);
     const churn = n.fbm(x * 3.1 - 5.5, y * 3.1 + 2.2, 4);
@@ -156,7 +158,7 @@ const PARTICLE_PAINTERS: ParticlePainter[] = [
     out[3] = clamp01(a);
   },
   // 8 — CHIP: solid angular fleck of masonry
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const ang = Math.atan2(y, x);
     const shape =
       0.52 +
@@ -171,7 +173,7 @@ const PARTICLE_PAINTERS: ParticlePainter[] = [
     out[3] = a;
   },
   // 9 — SPLINTER: tapered sliver with visible grain
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const bend = 0.16 * Math.sin(y * 2.1 + 1.3);
     const w = 0.155 * (1 - 0.72 * Math.abs(y)) * (0.7 + 0.6 * n.fbm(y * 4.4 + 2.2, 7.7, 2));
     const d = Math.abs(x - bend) / Math.max(0.02, w);
@@ -184,7 +186,7 @@ const PARTICLE_PAINTERS: ParticlePainter[] = [
     out[3] = a;
   },
   // 10 — DROPLET: teardrop with a specular highlight (blood, water)
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const yy = y * 0.92;
     const head = Math.hypot(x, (yy - 0.16) * 1.05) / 0.5;
     const tailW = 0.42 * clamp01(0.9 - yy * 0.75);
@@ -198,7 +200,7 @@ const PARTICLE_PAINTERS: ParticlePainter[] = [
     out[3] = a;
   },
   // 11 — MIST: very soft aerosol cloud (blood mist, fine spray)
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const f = n.fbm(x * 5.2 + 31.4, y * 5.2 - 12.6, 5);
     let a = smoothstep(0.04, 0.9, (1 - r) * 0.95 + (f - 0.5) * 0.95) * 0.78;
     a *= smoothstep(1.02, 0.5, r);
@@ -209,7 +211,7 @@ const PARTICLE_PAINTERS: ParticlePainter[] = [
     out[3] = a;
   },
   // 12 — SPLASH: sheet of water, dense at the base, shredding at the crown
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const width = 0.66 - 0.3 * smoothstep(-1, 1, y);
     const col = 1 - Math.abs(x) / Math.max(0.05, width);
     const body = n.warped(x * 2.4 + 2.4, y * 1.5 - 9.1, 0.7, 4);
@@ -227,7 +229,7 @@ const PARTICLE_PAINTERS: ParticlePainter[] = [
     out[3] = a;
   },
   // 13 — RING: shockwave / ripple annulus
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const ang = Math.atan2(y, x);
     const wob = 1 + 0.055 * (n.fbm(Math.cos(ang) * 3.1 + 6.6, Math.sin(ang) * 3.1 - 2.2, 3) - 0.5);
     const t = (r * wob - 0.74) / 0.16;
@@ -239,7 +241,7 @@ const PARTICLE_PAINTERS: ParticlePainter[] = [
     out[3] = clamp01(a) * smoothstep(1.0, 0.94, r);
   },
   // 14 — FIRE: dense billow, white-hot core to deep orange rim
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const w = n.warped(x * 2.5 + 9.2, y * 2.5 + 17.5, 0.95, 5);
     let a = smoothstep(0.08, 0.6, 1 - r * 0.98 + (w - 0.5) * 0.8);
     a *= smoothstep(1.02, 0.6, r);
@@ -250,7 +252,7 @@ const PARTICLE_PAINTERS: ParticlePainter[] = [
     out[3] = a;
   },
   // 15 — MOTE: airborne speck, slightly irregular
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const j = 1 + 0.3 * (n.fbm(x * 5 + 44.2, y * 5 - 17.3, 2) - 0.5);
     const a = Math.exp(-(r * j) * (r * j) * 11) * 0.95;
     out[0] = 1;
@@ -292,7 +294,7 @@ const TWO_PI = Math.PI * 2;
  */
 const MIX = new Float64Array(4);
 
-function mixReset() {
+function mixReset(): void {
   MIX[0] = MIX[1] = MIX[2] = MIX[3] = 0;
 }
 
@@ -361,7 +363,7 @@ function radialSpall(n: Noise, ang: number, r: number, seed: number, count: numb
  */
 const DECAL_PAINTERS: DecalPainter[] = [
   // 0 — bullet hole in concrete: bore, pulverised rim, contact AO, spall cracks
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const ang = Math.atan2(y, x);
     const jit = n.fbm(Math.cos(ang) * 2.6 + 3.1, Math.sin(ang) * 2.6 - 7.4, 3) - 0.5;
     const rb = 0.185 * (1 + jit * 0.36);
@@ -387,7 +389,7 @@ const DECAL_PAINTERS: DecalPainter[] = [
     out[6] = 0;
   },
   // 1 — deeper concrete hit: the bore sits in a blown-out spall crater
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const ang = Math.atan2(y, x);
     const lobes = 0.26 + 0.13 * n.fbm(Math.cos(ang) * 1.7 + 20.5, Math.sin(ang) * 1.7 + 6.6, 3);
     const erode = n.fbm(x * 6.6 + 14.2, y * 6.6 - 8.1, 4);
@@ -414,7 +416,7 @@ const DECAL_PAINTERS: DecalPainter[] = [
     out[6] = 0;
   },
   // 2 — bullet hole in steel: torn petals of bare bright metal
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const ang = Math.atan2(y, x);
     // Irregular angular profile: a clean harmonic reads as a stamped hexagon,
     // so the petal function is warped by noise and eroded radially.
@@ -446,7 +448,7 @@ const DECAL_PAINTERS: DecalPainter[] = [
     out[6] = clamp01(bare * 0.85);
   },
   // 3 — bullet hole in wood: bore, torn fibre lip, contact AO
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const ang = Math.atan2(y, x);
     const fib = n.fbm(x * 1.6 + 5.5, y * 11.0 - 2.2, 4); // grain runs along X
     const rb = 0.16 * (1 + (fib - 0.5) * 0.34);
@@ -477,7 +479,7 @@ const DECAL_PAINTERS: DecalPainter[] = [
   // The reference failure lived here: `0.6 + 0.28*crumb + 0.16*powder` put the
   // rim at up to 0.9 albedo against a 0.35 wall, which is why the measured hole
   // came out 1.3 stops brighter than the plaster around it.
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const ang = Math.atan2(y, x);
     const jit = n.fbm(Math.cos(ang) * 2.2 + 14.4, Math.sin(ang) * 2.2 + 3.3, 3) - 0.5;
     const rb = 0.195 * (1 + jit * 0.4);
@@ -505,7 +507,7 @@ const DECAL_PAINTERS: DecalPainter[] = [
     out[6] = 0;
   },
   // 5 — glass: radial + concentric crack web, almost no fill
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const ang = Math.atan2(y, x);
     const radial = Math.pow(
       clamp01(1 - Math.abs(Math.sin(ang * 5.5 + n.fbm(r * 3 + 2, ang + 4, 3) * 6)) * 1.6),
@@ -534,7 +536,7 @@ const DECAL_PAINTERS: DecalPainter[] = [
     out[6] = 0;
   },
   // 6 — blood splat with satellite droplets
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const ang = Math.atan2(y, x);
     const edge = 0.44 + 0.3 * n.fbm(Math.cos(ang) * 2.1 + 6.5, Math.sin(ang) * 2.1 - 9.9, 3);
     const wob = n.fbm(x * 5.5 - 3.3, y * 5.5 + 1.7, 4);
@@ -553,7 +555,7 @@ const DECAL_PAINTERS: DecalPainter[] = [
     out[6] = 0;
   },
   // 7 — heavier blood with runs (roll-aligned to gravity by the decal system)
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const ang = Math.atan2(y, x);
     const edge = 0.4 + 0.22 * n.fbm(Math.cos(ang) * 1.8 + 16.5, Math.sin(ang) * 1.8 + 2.2, 3);
     let a = smoothstep(edge, edge - 0.12, Math.hypot(x, (y + 0.12) * 1.18));
@@ -584,7 +586,7 @@ const DECAL_PAINTERS: DecalPainter[] = [
     out[6] = 0;
   },
   // 8 — scorch: soot with radial streaks
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const ang = Math.atan2(y, x);
     const streak = 0.55 + 0.55 * n.fbm(Math.cos(ang) * 3.3 + 4.4, Math.sin(ang) * 3.3 - 8.8, 4);
     const body = smoothstep(0.98 * streak, 0.05, r);
@@ -600,7 +602,7 @@ const DECAL_PAINTERS: DecalPainter[] = [
     out[6] = 0;
   },
   // 9 — dirt impact: dark damp crater with an ejecta collar
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const ang = Math.atan2(y, x);
     const rh = 0.26 + 0.09 * (n.fbm(Math.cos(ang) * 1.9 + 9.1, Math.sin(ang) * 1.9 - 3.7, 3) - 0.5);
     const crater = smoothstep(rh + 0.09, rh - 0.05, r);
@@ -617,7 +619,7 @@ const DECAL_PAINTERS: DecalPainter[] = [
     out[6] = 0;
   },
   // 10 — sand impact: pale cone crater, fine ripples
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const ang = Math.atan2(y, x);
     const rh = 0.3 + 0.07 * (n.fbm(Math.cos(ang) * 2.4 + 1.1, Math.sin(ang) * 2.4 + 8.3, 3) - 0.5);
     const crater = smoothstep(rh + 0.13, rh - 0.06, r);
@@ -644,7 +646,7 @@ const DECAL_PAINTERS: DecalPainter[] = [
     out[6] = 0;
   },
   // 11 — ricochet scrape: long gouge with bright abraded metal
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     // The round skids along +X: the gouge is deepest where it bit and tapers
     // out, with abrasion striae running *along* travel, never across it.
     const wander = (n.fbm(x * 2.6 + 2.2, 1.7, 3) - 0.5) * 0.22;
@@ -669,7 +671,7 @@ const DECAL_PAINTERS: DecalPainter[] = [
     out[6] = clamp01(gouge * 0.85);
   },
   // 12 — water ripple: normal-dominated concentric rings
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const wob = 1 + 0.06 * (n.fbm(x * 3 + 6, y * 3 - 2, 3) - 0.5);
     const rings = Math.sin(r * wob * 22) * Math.exp(-r * r * 2.6);
     const a = clamp01(Math.exp(-r * r * 2.2) * 0.6) * smoothstep(1.0, 0.85, r);
@@ -682,7 +684,7 @@ const DECAL_PAINTERS: DecalPainter[] = [
     out[6] = 0;
   },
   // 13 — small glass punch-through
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const ang = Math.atan2(y, x);
     const rad = Math.pow(
       clamp01(1 - Math.abs(Math.sin(ang * 4.5 + n.fbm(r * 4 + 1, ang * 2, 3) * 5)) * 1.5),
@@ -702,7 +704,7 @@ const DECAL_PAINTERS: DecalPainter[] = [
     out[6] = 0;
   },
   // 14 — generic dust smudge (explosion soiling, sandbag hits, scuffs)
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const w = n.warped(x * 2.2 + 18.8, y * 2.2 - 5.5, 0.8, 5);
     const a = clamp01(smoothstep(0.05, 0.75, 1 - r + (w - 0.5) * 0.9)) * 0.7;
     const l = clamp01(0.22 + 0.22 * w);
@@ -715,7 +717,7 @@ const DECAL_PAINTERS: DecalPainter[] = [
     out[6] = 0;
   },
   // 15 — torn fabric / foliage puncture
-  (n, x, y, r, out) => {
+  (n, x, y, r, out): void => {
     const ang = Math.atan2(y, x);
     const rip = Math.pow(
       clamp01(
@@ -751,7 +753,10 @@ const DECAL_RELIEF = [
   2.6, 3.0, 2.2, 2.4, 2.3, 1.4, 0.8, 0.7, 0.35, 2.4, 1.9, 1.6, 1.1, 1.5, 0.2, 1.7,
 ];
 
-export function buildParticleAtlas(rng: Rng, size = 1024) {
+export function buildParticleAtlas(
+  rng: Rng,
+  size = 1024
+): { texture: DataTexture; cols: number; size: number } {
   const n = new Noise(rng);
   const tile = size / ATLAS_COLS;
   const data = new Uint8Array(size * size * 4);
@@ -788,7 +793,10 @@ export function buildParticleAtlas(rng: Rng, size = 1024) {
  * Bake the decal atlas: albedo+alpha, a normal map derived from the painted
  * height field, and packed ORM.
  */
-export function buildDecalAtlas(rng: Rng, size = 1024) {
+export function buildDecalAtlas(
+  rng: Rng,
+  size = 1024
+): { albedo: DataTexture; normal: DataTexture; orm: DataTexture; cols: number; size: number } {
   const n = new Noise(rng);
   const tile = size / ATLAS_COLS;
   const albedo = new Uint8Array(size * size * 4);

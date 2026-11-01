@@ -1,6 +1,7 @@
-import type { BufferGeometry, Camera, Material, Mesh, Object3D, Texture } from 'three';
+import { Mesh, InstancedMesh } from 'three';
+import type { BufferGeometry, Camera, Material, Object3D, Texture } from 'three';
+import type { MaterialEventMap, PerspectiveCamera, Scene } from 'three';
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
-import type MeshStandardNodeMaterial from 'three/src/materials/nodes/MeshStandardNodeMaterial.js';
 import { lightPosition, lightTargetPosition, sharedUniformGroup, uniform } from 'three/tsl';
 import {
   Color,
@@ -13,9 +14,12 @@ import {
   Vector3,
 } from 'three/webgpu';
 import { Light, SpotLight } from 'three/webgpu';
-import type { Renderer, Node, UniformNode } from 'three/webgpu';
+import { UniformNode } from 'three/webgpu';
+import type { Renderer, Node } from 'three/webgpu';
+import type { PassNode } from 'three/webgpu';
 
-import type { EngineContext } from '../core/context.ts';
+import type { SystemId, EngineContext } from '../core/context.ts';
+import { isMesh } from '../core/three-guards.ts';
 import { StableCSMShadowNode } from './csm-webgpu.ts';
 import { IndirectFill } from './indirect-webgpu.ts';
 import { createGradeLut } from './lut.ts';
@@ -45,10 +49,7 @@ interface RegisteredLight {
   priority?: number;
 }
 type RenderGraph = ReturnType<typeof createWorldViewPipeline>;
-type GroupedPositionNode = Omit<Node, 'groupNode' | 'setGroup'> & {
-  groupNode: Node | null;
-  setGroup(group: Node | null): void;
-};
+type GroupedPositionNode = UniformNode<unknown, unknown>;
 
 function copyDirectional(target: DirectionalLight, source: DirectionalLight): void {
   target.color.copy(source.color);
@@ -70,7 +71,7 @@ export class RenderSystem {
   declare passes: PostPass[];
   declare lights: RegisteredLight[];
   declare _lightPositionGroup: ReturnType<typeof sharedUniformGroup>;
-  declare _lightUniformGroups: Map<GroupedPositionNode, Node | null>;
+  declare _lightUniformGroups: Map<GroupedPositionNode, import('three/webgpu').UniformGroupNode>;
   declare grade: ReturnType<typeof createGradeLut>;
   declare settings: RenderSettings;
   declare _exposure: number;
@@ -85,9 +86,7 @@ export class RenderSystem {
   declare _skyKey: DirectionalLight;
   declare _skySecondary: DirectionalLight;
   declare indirect: IndirectFill;
-  declare activeSun: DirectionalLight & {
-    shadow: DirectionalLight['shadow'] & { shadowNode: StableCSMShadowNode };
-  };
+  declare activeSun: DirectionalLight;
   declare sunDir: Vector3;
   declare viewSun: DirectionalLight;
   declare viewFill: DirectionalLight;
@@ -121,8 +120,8 @@ export class RenderSystem {
   declare _warmTask: Promise<{ ms: number; geometries: number; frameUnchanged: boolean }> | null;
   declare _meterTask: Promise<void> | null;
 
-  static id = 'render';
-  static deps = [];
+  static readonly id = 'render';
+  static readonly deps: SystemId[] = [];
 
   async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
@@ -131,7 +130,7 @@ export class RenderSystem {
     this.sunDir = ctx.get('sky').keyDirection;
     this._warmAbort = new AbortController();
     this._fogFrame = uniform(0);
-    this.renderer = await createWebGpuRenderer(ctx.canvas, (error) => {
+    this.renderer = await createWebGpuRenderer(ctx.canvas, (error): void => {
       if (this._disposing) return;
       this._warmAbort.abort(error);
       ctx.engine.fail('render', 'deviceLost', error);
@@ -174,7 +173,7 @@ export class RenderSystem {
     ctx.scene.add(this._skyKey, this._skyKey.target, this._skySecondary, this._skySecondary.target);
     this.indirect = new IndirectFill(ctx);
     this.indirect.sunDir.value = this.sunDir;
-    this.activeSun = this._skyKey as typeof this.activeSun;
+    this.activeSun = this._skyKey;
     this.viewSun = new DirectionalLight(0xffffff, 0);
     this.viewFill = new DirectionalLight(0xffffff, 0);
     this.viewSun.name = 'ow-view-world-key';
@@ -188,18 +187,21 @@ export class RenderSystem {
     this._viewProbeWorld = null;
     this._viewProbeVersion = -1;
     this._viewSkyVisibility = 1;
-    this._viewSkyDirections = Array.from({ length: VIEW_LIGHTING.skySamples }, (_, i) => {
+    this._viewSkyDirections = Array.from({ length: VIEW_LIGHTING.skySamples }, (_, i): Vector3 => {
       const y = (i + 0.5) / VIEW_LIGHTING.skySamples;
       const radius = Math.sqrt(1 - y * y),
         angle = i * Math.PI * (3 - Math.sqrt(5));
       return new Vector3(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
     });
-    this.viewPracticals = Array.from({ length: VIEW_LIGHTING.practicalCount }, () => {
-      const light = new PointLight(0xffffff, 0);
-      light.name = 'ow-view-practical';
-      ctx.viewScene.add(light);
-      return { light, source: null, score: 0, irradiance: 0 };
-    });
+    this.viewPracticals = Array.from(
+      { length: VIEW_LIGHTING.practicalCount },
+      (): { light: PointLight; source: null; score: number; irradiance: number } => {
+        const light = new PointLight(0xffffff, 0);
+        light.name = 'ow-view-practical';
+        ctx.viewScene.add(light);
+        return { light, source: null, score: 0, irradiance: 0 };
+      }
+    );
     ctx.viewScene.add(this.viewSun, this.viewSun.target, this.viewFill, this.viewFill.target);
     this.resize(ctx.canvas.clientWidth || 1280, ctx.canvas.clientHeight || 720);
   }
@@ -239,7 +241,7 @@ export class RenderSystem {
       // Postprocessing draws with an orthographic fullscreen camera. Its
       // built-in camera accessors are NOT the gameplay camera used by fog.
       fog: sky.createFogNode
-        ? (inputs: FogInputs) =>
+        ? (inputs: FogInputs): Node<'vec3'> =>
             sky.createFogNode!({
               ...inputs,
               invProj: uniform(this.ctx.camera.projectionMatrixInverse),
@@ -250,8 +252,8 @@ export class RenderSystem {
             })
         : null,
       fogCompute: this.q.volumetrics,
-      warp: haze ? (node: Node<'vec4'>) => haze.warpNode(node) : null,
-      afterDepth: haze ? () => haze.render(this.renderer, this.ctx.camera) : null,
+      warp: haze ? (node: Node<'vec4'>): Node<'vec4'> => haze.warpNode(node) : null,
+      afterDepth: haze ? (): boolean => haze.render(this.renderer, this.ctx.camera) : null,
       postPasses: this.passes,
     };
     this._graph = createWorldViewPipeline(
@@ -274,7 +276,9 @@ export class RenderSystem {
   }
 
   _shareLightPosition(node: Node): void {
-    const grouped = node as GroupedPositionNode;
+    if (!(node instanceof UniformNode))
+      throw new Error('[render] light position must be a uniform node');
+    const grouped = node;
     if (this._lightUniformGroups.has(grouped)) return;
     this._lightUniformGroups.set(grouped, grouped.groupNode);
     grouped.setGroup(this._lightPositionGroup);
@@ -293,11 +297,11 @@ export class RenderSystem {
       object.layers.enable(1);
       return;
     }
-    const mesh = object as Mesh;
-    if (!mesh.isMesh) return;
-    const instanced = object as import('three').InstancedMesh;
+    if (!isMesh(object)) return;
+    const mesh = object;
+    const instanced = object;
     if (
-      instanced.isInstancedMesh &&
+      instanced instanceof InstancedMesh &&
       mesh.userData.owStatic &&
       !(
         instanced.instanceMatrix as typeof instanced.instanceMatrix & {
@@ -317,8 +321,8 @@ export class RenderSystem {
     }
     const material = mesh.material;
     if (Array.isArray(material)) {
-      for (const entry of material) this.indirect.patch(entry as MeshStandardNodeMaterial);
-    } else this.indirect.patch(material as MeshStandardNodeMaterial | null);
+      for (const entry of material) this.indirect.patch(entry);
+    } else this.indirect.patch(material);
     let opaque = !!material && !Array.isArray(material) && !material.transparent;
     if (Array.isArray(material)) {
       opaque = true;
@@ -338,12 +342,12 @@ export class RenderSystem {
       this._tagLight(object);
       return;
     }
-    const mesh = object as Mesh;
-    if (!mesh.isMesh) return;
+    if (!isMesh(object)) return;
+    const mesh = object;
     const material = mesh.material;
     if (Array.isArray(material)) {
-      for (const entry of material) this.indirect.patch(entry as MeshStandardNodeMaterial);
-    } else this.indirect.patch(material as MeshStandardNodeMaterial | null);
+      for (const entry of material) this.indirect.patch(entry);
+    } else this.indirect.patch(material);
   };
 
   _syncSun(ctx: EngineContext): void {
@@ -387,7 +391,7 @@ export class RenderSystem {
     if (this._meterElapsed >= METER_INTERVAL && !this._metering) {
       this._meterElapsed %= METER_INTERVAL;
       this._meterTask = this._meter();
-      this._meterTask.catch((e) => console.warn('[render] exposure meter', e));
+      this._meterTask.catch((e): void => console.warn('[render] exposure meter', e));
     }
   }
 
@@ -431,11 +435,11 @@ export class RenderSystem {
     light: DirectionalLight | PointLight,
     opts: { range?: number; priority?: number } = {}
   ): DirectionalLight | PointLight {
-    if (!this.lights.some((l) => l.light === light)) this.lights.push({ light, ...opts });
+    if (!this.lights.some((l): boolean => l.light === light)) this.lights.push({ light, ...opts });
     return light;
   }
   removeLight(light: DirectionalLight | PointLight): void {
-    this.lights = this.lights.filter((l) => l.light !== light);
+    this.lights = this.lights.filter((l): boolean => l.light !== light);
   }
   async prewarmLightShadow(
     light: DirectionalLight | SpotLight
@@ -461,14 +465,14 @@ export class RenderSystem {
     const sky = this.ctx.get('sky');
     this.indirect.update(sky.keyLight, sky);
   }
-  _releaseGraph() {
+  _releaseGraph(): void {
     const meter = this._meterPass,
       graph = this._graph;
     // Readback may retain targets, but must not retain scene callback ownership.
     graph?.detach();
     this._meterPass = null;
     this._graph = null;
-    const dispose = () => {
+    const dispose = (): void => {
       meter?.dispose();
       graph?.dispose();
     };
@@ -480,10 +484,10 @@ export class RenderSystem {
     if (typeof pass.asNode !== 'function')
       throw new Error('[render] post pass must expose asNode() for the WebGPU graph');
     this.passes.push(pass);
-    this.passes.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    this.passes.sort((a, b): number => (a.order ?? 0) - (b.order ?? 0));
     pass.resize?.(this.screenSize.width, this.screenSize.height);
     this._releaseGraph();
-    return () => {
+    return (): void => {
       this.passes.splice(this.passes.indexOf(pass), 1);
       this._releaseGraph();
     };
@@ -522,12 +526,21 @@ export class RenderSystem {
       renderObject = this.renderer.getRenderObjectFunction();
     const xr = this.renderer.xr.enabled,
       shadows = this.renderer.shadowMap.enabled;
-    const cameraMasks: Array<[Camera, number]> = [camera, this.ctx.viewCamera].map((c) => [
-      c,
-      c.layers.mask,
-    ]);
+    const cameraMasks: Array<[Camera, number]> = [camera, this.ctx.viewCamera].map(
+      (c): [PerspectiveCamera, number] => [c, c.layers.mask]
+    );
     const sceneStates = [this.ctx.scene, this.ctx.viewScene].map(
-      (scene) =>
+      (
+        scene
+      ): readonly [
+        Scene,
+        {
+          readonly name: string;
+          readonly overrideMaterial: Material<MaterialEventMap> | null;
+          readonly background: Texture | Color | null;
+          readonly backgroundNode: Node | null | undefined;
+        },
+      ] =>
         [
           scene,
           {
@@ -539,14 +552,16 @@ export class RenderSystem {
         ] as const
     );
     const passFlags = [graph.prePass, graph.worldPass, graph.viewPass].map(
-      (pass) => [pass, pass.opaque, pass.transparent] as const
+      (pass): readonly [PassNode, boolean, boolean] =>
+        [pass, pass.opaque, pass.transparent] as const
     );
     // compileAsync() uses a different nested render-context key. Exercise the
     // native graph without any world/view geometry, simulation or RNG.
     for (const scene of [this.ctx.scene, this.ctx.viewScene])
-      scene.traverse((object) => {
-        const mesh = object as Mesh;
-        if (!mesh.isMesh || (mesh.material as Material | null)?.visible === false) return;
+      scene.traverse((object): void => {
+        if (!isMesh(object)) return;
+        const mesh = object;
+        if (!Array.isArray(mesh.material) && mesh.material?.visible === false) return;
         saved.push([mesh, mesh.visible, mesh.frustumCulled, mesh.layers.mask]);
         mesh.visible = true;
         mesh.frustumCulled = false;
@@ -574,7 +589,7 @@ export class RenderSystem {
             pass.transparent = transparent;
           }
         await warmFrame(
-          () => graph.render(),
+          (): void => graph.render(),
           this._warmAbort.signal,
           started + WARM_GRAPH_TIMEOUT_MS
         );
@@ -596,12 +611,7 @@ export class RenderSystem {
       for (const [geometry, [start, count]] of ranges) geometry.setDrawRange(start, count);
       // The pinned TRAA node attaches these runtime helpers, though its public
       // declaration omits them. Keep the rest of the graph type inferred.
-      const taaPass = graph.taaPass as
-        | (NonNullable<typeof graph.taaPass> & {
-            setSize(width: number, height: number): void;
-            clearViewOffset(): void;
-          })
-        | null;
+      const taaPass = graph.taaPass;
       // Force native history initialization from the first real beauty frame.
       taaPass?.setSize(1, 1);
       // TRAA's after-pipeline callback is not run if rendering throws.
@@ -651,8 +661,8 @@ export class RenderSystem {
   async dispose(): Promise<void> {
     this._disposing = true;
     this._warmAbort.abort(new Error('Renderer disposed during warmup'));
-    await this._warmTask?.catch(() => {});
-    await this._meterTask?.catch(() => {});
+    await this._warmTask?.catch((): void => {});
+    await this._meterTask?.catch((): void => {});
     this._meterPass?.dispose();
     this._graph?.dispose();
     this._volumeShadow?.dispose();

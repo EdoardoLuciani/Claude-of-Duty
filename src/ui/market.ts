@@ -1,36 +1,12 @@
 import type { EngineContext } from '../core/context.ts';
 import type { MarketSystem } from '../market/index.ts';
 import { marketIcon } from './market-icons.ts';
+import { MarketInspection } from './market-inspection.ts';
 import { el, setText, setStyle, setClass, damp } from './util.ts';
 
-type MarketId =
-  | 'ammo'
-  | 'grenade'
-  | 'armour'
-  | 'bandage'
-  | 'pistol'
-  | 'smg'
-  | 'rifle'
-  | 'mcx'
-  | 'shotgun'
-  | 'lmg'
-  | 'sniper'
-  | 'carpet';
-type MarketAction = 'buy' | 'swap' | 'equipped' | 'max';
-type MarketSlot = 'kit' | 'secondary' | 'primary' | 'strike';
-interface MarketItem {
-  id: MarketId;
-  label: string;
-  blurb: string;
-  cost: number;
-  max: number;
-  step: number;
-  unit: string;
-  slot: MarketSlot;
-  level: number;
-  affordable: boolean;
-  action: MarketAction;
-}
+type MarketItem = ReturnType<MarketSystem['getHudState']>['items'][number];
+type MarketAction = MarketItem['action'];
+type MarketSlot = MarketItem['slot'];
 type MarketApi = MarketSystem;
 type MarketContext = Pick<EngineContext, 'get' | 'peek'>;
 interface MarketCard {
@@ -63,8 +39,8 @@ function targetCard(target: EventTarget | null): HTMLElement | null {
  * the shop is open (see market/index.js), so this overlay — like the
  * game-over screen — animates on raw wall-clock time, never on dt.
  *
- * Cards are the purchase confirmation: clicking a card (or activating its
- * button with Enter/Space) applies one unit immediately. The panel stays open
+ * All cards select an inspection; only explicit purchase buttons buy.
+ * The panel stays open
  * until the player explicitly leaves (SKIP or Esc). Number keys do not buy.
  */
 export class MarketOverlay {
@@ -82,6 +58,9 @@ export class MarketOverlay {
   _onClick: (event: MouseEvent) => void;
   _onOver: (event: MouseEvent) => void;
   _onKey: (event: KeyboardEvent) => void;
+  _onFocus: (event: FocusEvent) => void;
+  inspection: MarketInspection;
+  _selectedId: string | null = null;
   constructor(parent: HTMLElement, ctx: MarketContext) {
     this.ctx = ctx;
     this.market = ctx.get('market');
@@ -96,6 +75,9 @@ export class MarketOverlay {
     this.credits = el('b', null, cred, '000000');
     el('i', null, cred, 'CREDITS');
 
+    const body = el('div', 'ow-market-body', panel);
+    const catalog = el('div', 'ow-market-catalog', body);
+    this.inspection = new MarketInspection(body, ctx.get('weapons'));
     this.cards = [];
     const items = this.market.getHudState().items;
     let secN = 1,
@@ -104,7 +86,7 @@ export class MarketOverlay {
     for (const item of items) {
       if (item.slot !== lastSlot) {
         lastSlot = item.slot;
-        const block = el('div', 'ow-market-sec', panel);
+        const block = el('div', 'ow-market-sec', catalog);
         const h = el('div', 'ow-market-sec-h', block);
         el('span', 'ow-market-sec-n', h, String(secN++).padStart(2, '0'));
         el('span', 'ow-market-sec-l', h, SECTION[item.slot]);
@@ -117,8 +99,13 @@ export class MarketOverlay {
     const foot = el('div', 'ow-market-foot', panel);
     const skip = el('button', 'ow-market-skip', foot, 'SKIP ▸');
     skip.type = 'button';
-    skip.addEventListener('click', () => this.skip());
-    el('div', 'ow-market-hint', foot, 'ESC SKIP · CLICK / ENTER TO BUY');
+    skip.addEventListener('click', (): void => this.skip());
+    el(
+      'div',
+      'ow-market-hint',
+      foot,
+      'ESC SKIP · SELECT AN ITEM TO INSPECT · BUY / SWAP TO PURCHASE'
+    );
 
     this.active = false;
     this.shown = 0;
@@ -128,7 +115,14 @@ export class MarketOverlay {
 
     this._onClick = (e: MouseEvent): void => {
       const card = targetCard(e.target);
-      if (card) this._buy(card.dataset.item);
+      if (!this.active || !card) return;
+      const item = this.market
+        .getHudState()
+        .items.find((it): boolean => it.id === card.dataset.item);
+      if (!item) return;
+      this._selectedId = item.id;
+      this._preview(item.id);
+      if (e.target instanceof Element && e.target.closest('.ow-market-buy')) this._buy(item.id);
     };
     this._onOver = (e: MouseEvent): void => {
       if (!this.active) return;
@@ -136,10 +130,25 @@ export class MarketOverlay {
       const id = card?.dataset?.item ?? null;
       if (id === this._hoverId) return;
       this._hoverId = id;
-      if (id) this.ctx.peek('ui')?.sfx?.('market_hover', 0.4);
+      if (id) {
+        this.ctx.peek('ui')?.sfx?.('market_hover', 0.4);
+        if (!this._selectedId) this._preview(id);
+      }
+    };
+    this._onFocus = (e): void => {
+      const id = targetCard(e.target)?.dataset.item;
+      if (this.active && id && !this._selectedId) this._preview(id);
     };
     this._onKey = (e: KeyboardEvent): void => {
       if (!this.active) return;
+      if (
+        (e.code === 'Enter' || e.code === 'Space') &&
+        e.target instanceof HTMLElement &&
+        e.target.matches('.ow-market-card[data-item]')
+      ) {
+        e.preventDefault();
+        e.target.click();
+      }
       if (e.code === 'Escape') {
         e.preventDefault();
         this.skip();
@@ -147,6 +156,7 @@ export class MarketOverlay {
     };
     this.root.addEventListener('click', this._onClick);
     this.root.addEventListener('mouseover', this._onOver);
+    this.root.addEventListener('focusin', this._onFocus);
     addEventListener('keydown', this._onKey);
 
     setStyle(this.root, 'display', 'none');
@@ -163,6 +173,9 @@ export class MarketOverlay {
     const meta = el('div', 'ow-market-meta', card);
     const stock = el('div', 'ow-market-stock', meta);
     const gun = item.action === 'equipped' || item.action === 'swap';
+    card.tabIndex = 0;
+    card.setAttribute('role', 'group');
+    card.setAttribute('aria-label', `${item.label}, select to inspect`);
     const pipMax = item.unit === 'pct' || gun ? 0 : Math.floor(item.max / item.step);
     const pips: HTMLElement[] = [];
     if (pipMax > 0) {
@@ -176,6 +189,7 @@ export class MarketOverlay {
 
     const btn = el('button', 'ow-market-buy', card, 'BUY');
     btn.type = 'button';
+    btn.setAttribute('aria-label', `Purchase ${item.label} for ${item.cost} credits`);
     this.cards.push({ card, btn, count, pips, fill });
     return card;
   }
@@ -186,12 +200,25 @@ export class MarketOverlay {
     this.shown = 0;
     this.wave = wave;
     this._hoverId = null;
+    this._selectedId = null;
+    for (const row of this.cards) setClass(row.card, 'inspecting', false);
+    this.inspection.active = true;
+    this.inspection.controls.enabled = false;
     document.exitPointerLock?.();
   }
 
   hide(): void {
     this.active = false;
     this._hoverId = null;
+    this._selectedId = null;
+    this.inspection.hide();
+  }
+
+  _preview(id: string): void {
+    const item = this.market.getHudState().items.find((it): boolean => it.id === id);
+    if (!item) return;
+    for (const row of this.cards) setClass(row.card, 'inspecting', row.card.dataset.item === id);
+    void this.inspection.select(item.id, item.label);
   }
 
   skip(): void {
@@ -199,7 +226,7 @@ export class MarketOverlay {
   }
 
   _buy(itemId: string | undefined): void {
-    const id = this.market.getHudState().items.find((item) => item.id === itemId)?.id;
+    const id = this.market.getHudState().items.find((item): boolean => item.id === itemId)?.id;
     if (id === undefined || !this.market.buy(id)) {
       this.ctx.peek('ui')?.sfx?.('market_deny', 0.75);
       return;
@@ -220,6 +247,7 @@ export class MarketOverlay {
     setStyle(this.root, 'pointer-events', this.active ? 'auto' : 'none');
     setStyle(this.root, 'opacity', this.shown.toFixed(3));
 
+    this.inspection.update();
     const s = this.market.getHudState();
     this._pulse = Math.max(0, this._pulse - rawDt * 3);
     const cred = String(Math.max(0, Math.round(s.credits))).padStart(6, '0');
@@ -252,51 +280,26 @@ export class MarketOverlay {
   dispose(): void {
     this.root.removeEventListener('click', this._onClick);
     this.root.removeEventListener('mouseover', this._onOver);
+    this.root.removeEventListener('focusin', this._onFocus);
+    this.inspection.dispose();
     removeEventListener('keydown', this._onKey);
     this.root.remove();
   }
 }
 
-/**
- * Countdown to the shop: shown during the post-wave grace period so the
- * player knows the market is coming and how long they have to loot ammo.
- * A prompt-style chip (seconds in the keycap, draining bar) anchored under
- * the scorebar — its own element, because ammo crates drive ui.setPrompt
- * and would overwrite a shared one at the interaction-prompt anchor.
- */
+/** Independent post-wave countdown; uses raw time while the shop freezes simulation. */
 export class MarketCountdown {
-  root: HTMLElement;
-  key: HTMLElement;
-  fill: HTMLElement;
-  shown: number;
-  delay: number;
-  constructor(parent: HTMLElement, delay: number) {
-    this.root = el('div', 'ow-mkt-count', parent);
-    this.key = el('div', 'ow-mkt-count-key', this.root, '10');
-    const col = el('div', null, this.root);
-    el('div', 'ow-mkt-count-txt', col, 'SUPPLY MARKET IN');
-    const bar = el('div', 'ow-mkt-count-bar', col);
-    this.fill = el('i', null, bar);
-    this.shown = 0;
+  shown = 0;
+  value = '10';
+  fraction = 1;
+  readonly delay: number;
+  constructor(delay: number) {
     this.delay = delay;
-    setStyle(this.root, 'display', 'none');
   }
-
-  /** Driven from ui.lateUpdate with RAW dt — survives the frozen sim. */
   update(rawDt: number, marketIn: number): void {
-    const active = marketIn > 0;
-    this.shown = damp(this.shown, active ? 1 : 0, active ? 14 : 9, rawDt);
-    if (this.shown < 0.005) {
-      setStyle(this.root, 'display', 'none');
-      return;
-    }
-    setStyle(this.root, 'display', '');
-    setStyle(this.root, 'opacity', this.shown.toFixed(3));
-    setText(this.key, String(Math.max(1, marketIn)));
-    setStyle(this.fill, 'transform', `scaleX(${(Math.max(0, marketIn) / this.delay).toFixed(3)})`);
-  }
-
-  dispose(): void {
-    this.root.remove();
+    this.shown = damp(this.shown, marketIn > 0 ? 1 : 0, marketIn > 0 ? 14 : 9, rawDt);
+    if (this.shown < 0.005) return;
+    this.value = String(Math.max(1, marketIn));
+    this.fraction = Number((Math.max(0, marketIn) / this.delay).toFixed(3));
   }
 }

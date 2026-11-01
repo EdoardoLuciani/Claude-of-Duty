@@ -4,7 +4,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 /** Offline spent 12g, in the casing pool's 45 mm / 4.95 mm reference basis.
  * The event supplies the actual 70 mm / 11.05 mm dimensions. Split vertices
  * keep plastic/metal PBR discontinuous without material groups or extra draws.
- * Red matches tools/blender/m590.py; unlike the insert hull the mouth is open.
+ * Red matches tools/blender/m590/build.py; unlike the insert hull the mouth is open.
  */
 export function buildSpentHull() {
   const part = (profile, color, metalness, roughness) => {

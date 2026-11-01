@@ -21,15 +21,15 @@ try {
         calls.push(method);
         if (method === phase) throw new Error(`broken ${phase}`);
       };
-    engine.registry.add(sys);
-    engine.registry.add({
+    engine.registry.add(sys.constructor.id, sys);
+    engine.registry.add('after', {
       constructor: { id: 'after' },
       fixedUpdate: () => calls.push('after-fixed'),
       update: () => calls.push('after-update'),
       lateUpdate: () => calls.push('after-late'),
     });
     let renders = 0;
-    engine.registry.add({
+    engine.registry.add('render', {
       constructor: { id: 'render' },
       render() {
         renders++;
@@ -78,7 +78,7 @@ try {
       throw new Error('broken diagnostic');
     });
     engine.events.on('engine:error', (e) => errors.push(e));
-    engine.registry.add({
+    engine.registry.add('broken', {
       constructor: { id: 'broken' },
       update() {
         engine.events.emit('outer', {});
@@ -86,7 +86,7 @@ try {
       },
       resize: origin === 'resize-hook' ? fault : () => {},
     });
-    engine.registry.add({
+    engine.registry.add('after', {
       constructor: { id: 'after' },
       update: () => calls.push('later update'),
       resize: () => calls.push('later resize'),
@@ -126,14 +126,14 @@ try {
     config: { fov: 80, deterministic: true },
   });
   const resizeCalls = [];
-  resized.registry.add({
+  resized.registry.add('reported', {
     constructor: { id: 'reported' },
     resize(_w, _h, ctx) {
       resizeCalls.push('reported');
       ctx.engine.fail('reported', 'resize', new Error('reported without throwing'));
     },
   });
-  resized.registry.add({
+  resized.registry.add('later', {
     constructor: { id: 'later' },
     resize() {
       resizeCalls.push('later');
@@ -154,14 +154,14 @@ try {
   const failures = [];
   let laterInit = false;
   boot.events.on('engine:error', (event) => failures.push(event));
-  boot.registry.add({
+  boot.registry.add('render', {
     constructor: { id: 'render' },
     async init(ctx) {
       await Promise.resolve();
       ctx.engine.fail('render', 'deviceLost', new Error('lost during init'));
     },
   });
-  boot.registry.add({
+  boot.registry.add('later', {
     constructor: { id: 'later', deps: ['render'] },
     init() {
       laterInit = true;

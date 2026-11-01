@@ -16,6 +16,7 @@ import {
   vec3,
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
+import type { StructNode } from 'three/webgpu';
 
 import { authoredColor } from '../color-tsl.ts';
 import {
@@ -38,7 +39,7 @@ import { Surface } from './surface.ts';
 export const concreteSurface = Fn<
   [Node<'vec2'>, Node<'float'>, Node<'vec3'>, Node<'vec3'>, Node<'vec4'>],
   ReturnType<typeof Surface>
->(([coords, seed, , , param]) => {
+>(([coords, seed, , , param]): StructNode => {
   const alb = vec3(0.5).toVar(),
     h = float(0.5).toVar();
   const rough = float(0.5).toVar(),
@@ -300,7 +301,7 @@ export const concreteSurface = Fn<
 
 // BRICK: authored channel stack migrated from surfaces-arch.js.
 export const brickSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof Surface>>(
-  ([coords, seed]) => {
+  ([coords, seed]): StructNode => {
     const alb = vec3(0.5).toVar(),
       h = float(0.5).toVar();
     const rough = float(0.5).toVar(),
@@ -555,7 +556,7 @@ export const brickSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof 
 
 // PLASTER: authored channel stack migrated from surfaces-arch.js.
 export const plasterSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof Surface>>(
-  ([coords, seed]) => {
+  ([coords, seed]): StructNode => {
     const alb = vec3(0.5).toVar(),
       h = float(0.5).toVar();
     const rough = float(0.5).toVar(),
@@ -789,7 +790,7 @@ export const plasterSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeo
 
 // TILE: authored channel stack migrated from surfaces-arch.js.
 export const tileSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof Surface>>(
-  ([coords, seed]) => {
+  ([coords, seed]): StructNode => {
     const alb = vec3(0.5).toVar(),
       h = float(0.5).toVar();
     const rough = float(0.5).toVar(),

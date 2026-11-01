@@ -4,22 +4,36 @@ import type { Material } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { MeshPhysicalNodeMaterial } from 'three/webgpu';
 
+import { isClosable } from '../core/guards.ts';
+import { isSingleMaterialMesh, isTexture } from '../core/three-guards.ts';
 import { createWeaponMaterial } from './asset-material.ts';
 import { BANDAGE_SEGMENTS } from './bandage-path.ts';
 
+type BandageMesh = THREE.Mesh<THREE.BufferGeometry, Material>;
+
 /** Authored with the player arms in assets/player/arms/player-arms.blend. */
-export async function loadBandage() {
+export async function loadBandage(): Promise<{
+  wrap: BandageMesh;
+  roll: THREE.Group;
+  body: BandageMesh;
+  cap: BandageMesh;
+  tail: BandageMesh;
+  dispose(): void;
+}> {
   const gltf = await new GLTFLoader().loadAsync(
     `${import.meta.env.BASE_URL}models/player/bandage.glb`
   );
-  type BandageMesh = THREE.Mesh<THREE.BufferGeometry, Material>;
-  const wrap = gltf.scene.getObjectByName('Bandage_wrap') as BandageMesh | undefined;
-  const body = gltf.scene.getObjectByName('Bandage_roll') as BandageMesh | undefined;
-  const cap = gltf.scene.getObjectByName('Bandage_cap') as BandageMesh | undefined;
+
+  const wrap = gltf.scene.getObjectByName('Bandage_wrap');
+  const body = gltf.scene.getObjectByName('Bandage_roll');
+  const cap = gltf.scene.getObjectByName('Bandage_cap');
   if (
-    !wrap?.isMesh ||
-    !body?.isMesh ||
-    !cap?.isMesh ||
+    !isSingleMaterialMesh(wrap) ||
+    Array.isArray(wrap.material) ||
+    !isSingleMaterialMesh(body) ||
+    Array.isArray(body.material) ||
+    !isSingleMaterialMesh(cap) ||
+    Array.isArray(cap.material) ||
     wrap.geometry.index?.count !== BANDAGE_SEGMENTS * 24
   ) {
     throw new Error('Bandage: stale Blender export (run tools/blender/player_bandage.py)');
@@ -27,6 +41,7 @@ export async function loadBandage() {
   const replacements = new Map<Material, MeshPhysicalNodeMaterial>();
   for (const mesh of [wrap, body, cap]) {
     const source = mesh.material;
+    if (Array.isArray(source)) throw new Error('Bandage: expected single material');
     let replacement = replacements.get(source);
     if (!replacement) {
       replacement = createWeaponMaterial(source);
@@ -76,16 +91,15 @@ export async function loadBandage() {
     body,
     cap,
     tail,
-    dispose() {
+    dispose(): void {
       const textures = new Set<THREE.Texture>();
       for (const mat of new Set([wrap.material, body.material, cap.material])) {
-        for (const value of Object.values(mat as object))
-          if (value instanceof THREE.Texture)
-            textures.add(value as THREE.Texture<unknown, THREE.TextureEventMap>);
+        for (const value of Object.values(mat as object)) if (isTexture(value)) textures.add(value);
         mat.dispose();
       }
       for (const tex of textures) {
-        (tex.source?.data as { close?: () => void } | undefined)?.close?.();
+        const image: unknown = tex.source?.data;
+        if (isClosable(image)) image.close();
         tex.dispose();
       }
       wrap.geometry.dispose();

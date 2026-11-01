@@ -11,7 +11,6 @@
 /**
  * Condensed system stacks — no webfonts, crisp at any size.
  *
- * Verified against the capture browser with `node src/ui/preview.mjs --fonts`:
  * "Avenir Next Condensed" (four weights) carries the body text, "DIN Condensed"
  * (very narrow, bold only) carries display numerals, and both degrade through
  * Arial Narrow / Helvetica Neue on machines without them.
@@ -33,10 +32,10 @@ import type { PoolRecord as BasePoolRecord } from './pool-types.ts';
 type CachedElement = Element & {
   style: CSSStyleDeclaration;
   _owText?: string;
-  _ows?: Record<string, string>;
-  _owc?: Record<string, boolean>;
+  _ows?: Map<string, string>;
+  _owc?: Map<string, boolean>;
 };
-type PoolRecord<Node extends HTMLElement = HTMLElement> = BasePoolRecord<Node>;
+type PoolRecord<Node extends HTMLElement | null = HTMLElement> = BasePoolRecord<Node>;
 
 export function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -95,17 +94,17 @@ export function setText(node: CachedElement, value: string | number): void {
 
 /** Write any style property only on change. */
 export function setStyle(node: CachedElement, prop: string, value: string): void {
-  const styles = node._ows ?? (node._ows = Object.create(null) as Record<string, string>);
-  if (styles[prop] !== value) {
-    styles[prop] = value;
+  const styles = node._ows ?? (node._ows = new Map());
+  if (styles.get(prop) !== value) {
+    styles.set(prop, value);
     node.style.setProperty(prop, value);
   }
 }
 
 export function setClass(node: CachedElement, cls: string, on: boolean): void {
-  const classes = node._owc ?? (node._owc = Object.create(null) as Record<string, boolean>);
-  if (classes[cls] !== on) {
-    classes[cls] = on;
+  const classes = node._owc ?? (node._owc = new Map());
+  if (classes.get(cls) !== on) {
+    classes.set(cls, on);
     node.classList.toggle(cls, on);
   }
 }
@@ -113,28 +112,29 @@ export function setClass(node: CachedElement, cls: string, on: boolean): void {
 /* --------------------------------------------------------------- easing --- */
 
 export const ease: Record<string, (t: number) => number> = {
-  linear: (t) => t,
-  inQuad: (t) => t * t,
-  outQuad: (t) => t * (2 - t),
-  outCubic: (t) => 1 - (1 - t) ** 3,
-  inOutCubic: (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2),
-  outQuint: (t) => 1 - (1 - t) ** 5,
-  outExpo: (t) => (t >= 1 ? 1 : 1 - 2 ** (-10 * t)),
-  inOutSine: (t) => -(Math.cos(Math.PI * t) - 1) / 2,
+  linear: (t): number => t,
+  inQuad: (t): number => t * t,
+  outQuad: (t): number => t * (2 - t),
+  outCubic: (t): number => 1 - (1 - t) ** 3,
+  inOutCubic: (t): number => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2),
+  outQuint: (t): number => 1 - (1 - t) ** 5,
+  outExpo: (t): number => (t >= 1 ? 1 : 1 - 2 ** (-10 * t)),
+  inOutSine: (t): number => -(Math.cos(Math.PI * t) - 1) / 2,
   /** Overshoot then settle — hitmarker / banner punch. */
-  outBack: (t) => {
+  outBack: (t): number => {
     const c = 1.9;
     const u = t - 1;
     return 1 + (c + 1) * u * u * u + c * u * u;
   },
   /** Damped oscillation, k = number of bounces. */
-  outElastic: (t) => {
+  outElastic: (t): number => {
     if (t <= 0) return 0;
     if (t >= 1) return 1;
     return 1 - 2 ** (-9 * t) * Math.cos(t * 22);
   },
   /** Fast attack, slow release — good for anything that must feel "snappy". */
-  punch: (t) => (t < 0.18 ? ease.outQuint(t / 0.18) : 1 - ease.inOutSine((t - 0.18) / 0.82)),
+  punch: (t): number =>
+    t < 0.18 ? ease.outQuint(t / 0.18) : 1 - ease.inOutSine((t - 0.18) / 0.82),
 };
 
 /* ----------------------------------------------------------------- math --- */
@@ -158,10 +158,10 @@ export function metres(d: number): string {
 /* ------------------------------------------------------------------ pool --- */
 
 /**
- * Fixed-size element pool. `make()` builds one element; records carry their own
+ * Fixed-size lifetime pool. `make()` builds an element or returns null for Pixi-owned visuals; records carry their own
  * animation state. Nothing is allocated after construction.
  */
-export class Pool<Node extends HTMLElement = HTMLElement> {
+export class Pool<Node extends HTMLElement | null = HTMLElement> {
   items: PoolRecord<Node>[];
   count: number;
   _next: number;
@@ -169,8 +169,8 @@ export class Pool<Node extends HTMLElement = HTMLElement> {
     this.items = new Array<PoolRecord<Node>>(count);
     for (let i = 0; i < count; i++) {
       const node = make(i);
-      if (parent) parent.appendChild(node);
-      node.style.display = 'none';
+      if (node && parent) parent.appendChild(node);
+      if (node) node.style.display = 'none';
       this.items[i] = { node, alive: false, t: 0, life: 1, i, a: 0, b: 0, c: 0, d: 0, s: '' };
     }
     this.count = count;
@@ -187,7 +187,7 @@ export class Pool<Node extends HTMLElement = HTMLElement> {
         this._next = (it.i + 1) % this.count;
         it.alive = true;
         it.t = 0;
-        it.node.style.display = '';
+        if (it.node) it.node.style.display = '';
         return it;
       }
       const age = it.t / (it.life || 1);
@@ -198,14 +198,14 @@ export class Pool<Node extends HTMLElement = HTMLElement> {
     }
     best!.alive = true;
     best!.t = 0;
-    best!.node.style.display = '';
+    if (best!.node) best!.node!.style.display = '';
     return best!;
   }
 
   release(it: PoolRecord<Node>): void {
     if (!it.alive) return;
     it.alive = false;
-    it.node.style.display = 'none';
+    if (it.node) it.node.style.display = 'none';
   }
 
   releaseAll(): void {

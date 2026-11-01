@@ -1,75 +1,14 @@
-import { el, svg, setText, setStyle, setClass, clamp01, ease } from './util.ts';
+import type { WeaponMode } from '../weapons/defs.ts';
 
-const MAX_PIPS = 30;
+export const MAX_PIPS = 30;
 
-/** Tracking / size steps the weapon name falls back through when it overflows. */
-const NAME_FIT = [
-  ['.22em', 'calc(12.5px * var(--k))'],
-  ['.14em', 'calc(12.5px * var(--k))'],
-  ['.1em', 'calc(11px * var(--k))'],
-  ['.06em', 'calc(9.5px * var(--k))'],
-];
-
-function fragIcon(parent: HTMLElement): SVGSVGElement {
-  const s = svg('svg', { viewBox: '0 0 16 20', fill: 'rgba(255,255,255,.92)' }, parent);
-  svg('path', { d: 'M6.4 0h3.2v2.1h1.5l1.1 2H3.8l1.1-2h1.5z' }, s);
-  svg(
-    'path',
-    {
-      d: 'M8 4.6c3.1 0 5.6 2.9 5.6 7.1S11.1 20 8 20 2.4 15.9 2.4 11.7 4.9 4.6 8 4.6z',
-    },
-    s
-  );
-  const g = svg('g', { stroke: 'rgba(0,0,0,.5)', 'stroke-width': 0.9 }, s);
-  for (const y of [9.5, 13, 16.2]) svg('line', { x1: 3, y1: y, x2: 13, y2: y }, g);
-  svg('line', { x1: 8, y1: 5, x2: 8, y2: 19.6 }, g);
-  return s;
-}
-
-function bandageIcon(parent: HTMLElement): SVGSVGElement {
-  const s = svg('svg', { viewBox: '0 0 16 20', fill: 'rgba(255,255,255,.92)' }, parent);
-  svg('rect', { x: 2.2, y: 5.2, width: 11.6, height: 7.4, rx: 1.6 }, s);
-  svg('rect', { x: 3.6, y: 6.6, width: 8.8, height: 4.6, rx: 0.8, fill: 'rgba(0,0,0,.4)' }, s);
-  svg('path', { d: 'M6.4 12.6h2l1.2 5.4H7.2z' }, s);
-  return s;
-}
-
-function radioIcon(parent: HTMLElement): SVGSVGElement {
-  const s = svg('svg', { viewBox: '0 0 16 20', fill: 'rgba(255,255,255,.92)' }, parent);
-  svg('path', { d: 'M6 1.2h4v1.2h1.3l.8 1.5H3.9l.8-1.5H6z' }, s);
-  svg('rect', { x: 2.6, y: 4.4, width: 10.8, height: 13.6, rx: 1.6 }, s);
-  svg('rect', { x: 4.4, y: 7, width: 7.2, height: 4.4, rx: 0.5, fill: 'rgba(0,0,0,.55)' }, s);
-  const g = svg('g', { fill: 'rgba(0,0,0,.4)' }, s);
-  for (let i = 0; i < 3; i++)
-    svg('rect', { x: 5, y: 13.4 + i * 1.4, width: 6, height: 0.7, rx: 0.35 }, g);
-  svg('rect', { x: 12.2, y: 4.6, width: 1.4, height: 2.6, rx: 0.6 }, s);
-  return s;
-}
-
-/**
- * Ammo / weapon readout, bottom right.
- *
- *              ▲ 2          equipment — its OWN row
- *   [AUTO]        M4A1
- *              28 / 210
- *   ▮▮▮▮▮▮▮▮▮▮▯▯▯▯▯▯▯        magazine state, one pip per round
- *
- * Layout contract: the panel is a single column of fixed width pinned to the
- * right margin (`--ammo-w` in style.ts) and every row is an explicit grid with
- * an 8 px gutter, so all rows share one left edge and no run can grow sideways
- * into another. The equipment counts used to be an absolutely positioned strip
- * that happened to land on the head row and collided with it.
- *
- * Deliberately understated: three ink levels, no boxes, no icons bigger than
- * the type. The only colour is the low-ammo amber and the empty-mag red.
- */
-interface AmmoState {
+export interface AmmoState {
   ammo: number;
   magSize: number;
   reserve: number;
   weaponName?: string;
   name?: string;
-  fireMode?: string;
+  fireMode?: WeaponMode;
   reloading?: boolean;
   reloadProgress?: number;
   time?: number;
@@ -78,188 +17,53 @@ interface AmmoState {
   lethalCount?: number;
   cooking?: boolean;
   grenadeEquipped?: boolean;
-  carpetCount?: number;
-  radioEquipped?: boolean;
 }
+export function filledMagazinePips(
+  ammo: number,
+  magSize: number,
+  reserve: number,
+  reloading: boolean,
+  progress: number
+): number {
+  let count = ammo;
+  if (reloading) {
+    const after = Math.min(magSize, ammo + Math.max(0, reserve | 0));
+    count = progress < 0.45 ? ammo * (1 - progress / 0.45) : after * ((progress - 0.45) / 0.55);
+  }
+  return count <= 0.001
+    ? 0
+    : Math.max(1, Math.round((count / magSize) * Math.min(MAX_PIPS, magSize)));
+}
+
+export interface EquipmentSlot {
+  count: number;
+  active: boolean;
+  elapsed: number;
+  alpha: number;
+}
+
+function updateSlot(slot: EquipmentSlot, count: number, active: boolean, dt: number): void {
+  slot.elapsed = active ? (slot.active ? slot.elapsed + dt : 0) : 0;
+  slot.count = count;
+  slot.active = active;
+  if (!active) {
+    slot.alpha = count <= 0 ? 0.34 : 0.9;
+    return;
+  }
+  // Same 280ms each way; a smooth cosine instead of solving a CSS Bezier.
+  slot.alpha = 0.35 + 0.325 * (1 - Math.cos(slot.elapsed * (Math.PI / 0.28)));
+}
+
+/** Inventory pulse state; Pixi owns all presentation. */
 export class AmmoPanel {
-  declare root: HTMLElement;
-  declare equip: HTMLElement;
-  declare slotB: HTMLElement;
-  declare slotBn: HTMLElement;
-  declare slotL: HTMLElement;
-  declare slotLn: HTMLElement;
-  declare slotR: HTMLElement;
-  declare slotRn: HTMLElement;
-  declare mode: HTMLElement;
-  declare name: HTMLElement;
-  declare cur: HTMLElement;
-  declare sep: HTMLElement;
-  declare res: HTMLElement;
-  declare mag: HTMLElement;
-  declare pips: HTMLElement[];
-  declare reload: HTMLElement;
-  declare reloadFill: HTMLElement;
-  declare reloadBar: HTMLElement;
-  declare punch: number;
-  declare _lastAmmo: number;
-  declare _lastPips: number;
-  declare _lastCount: number;
-  declare _lastName: string | null;
-  declare _lastMode: string | null;
-  constructor(parent: HTMLElement) {
-    this.root = el('div', 'ow-ammo', parent);
-
-    this.equip = el('div', 'ow-equip', this.root);
-    this.slotB = el('div', 'ow-slot', this.equip);
-    bandageIcon(this.slotB);
-    this.slotBn = el('span', null, this.slotB, '2');
-    this.slotL = el('div', 'ow-slot', this.equip);
-    fragIcon(this.slotL);
-    this.slotLn = el('span', null, this.slotL, '2');
-    this.slotR = el('div', 'ow-slot', this.equip);
-    radioIcon(this.slotR);
-    this.slotRn = el('span', null, this.slotR, '1');
-
-    const head = el('div', 'ow-ammo-head', this.root);
-    this.mode = el('div', 'ow-ammo-mode', head, 'AUTO');
-    this.name = el('div', 'ow-ammo-name', head, 'M4A1');
-
-    const row = el('div', 'ow-ammo-row', this.root);
-    this.cur = el('div', 'ow-ammo-cur', row, '30');
-    this.sep = el('div', 'ow-ammo-sep', row, '/');
-    this.res = el('div', 'ow-ammo-res', row, '210');
-
-    this.mag = el('div', 'ow-mag', this.root);
-    this.pips = new Array<HTMLElement>(MAX_PIPS);
-    for (let i = 0; i < MAX_PIPS; i++) this.pips[i] = el('b', null, this.mag);
-
-    this.reload = el('div', 'ow-reload', this.root, 'RELOADING');
-    const bar = el('div', 'ow-reload-bar', this.root);
-    this.reloadFill = el('i', null, bar);
-    this.reloadBar = bar;
-
-    this.punch = 0;
-    this._lastAmmo = -1;
-    this._lastPips = -1;
-    this._lastCount = -1;
-    this._lastName = null;
-    this._lastMode = null;
-    setStyle(this.reload, 'display', 'none');
-    setStyle(this.reloadBar, 'display', 'none');
-  }
-
-  /**
-   * @param {object} s { name, mode, ammo, reserve, magSize, reloading,
-   *                     reloadProgress, lethal, lethalCount }
-   */
-  update(dt: number, s: AmmoState): void {
-    const ammo = Math.max(0, s.ammo | 0);
-    const magSize = Math.max(1, s.magSize | 0 || 30);
-
-    if (this._lastAmmo !== ammo) {
-      if (this._lastAmmo >= 0 && ammo < this._lastAmmo) this.punch = 1;
-      this._lastAmmo = ammo;
-      setText(this.cur, ammo);
-    }
-    setText(this.res, Math.max(0, s.reserve | 0));
-    this._fitName(String(s.weaponName ?? s.name ?? 'M4A1'));
-    // The badge reads AUTO / BURST / SEMI; uppercase once per mode change
-    // rather than once per frame.
-    const mode = s.fireMode ?? 'AUTO';
-    if (mode !== this._lastMode) {
-      this._lastMode = mode;
-      setText(this.mode, mode.toUpperCase());
-    }
-
-    this.punch = Math.max(0, this.punch - dt * 6.5);
-    const p = 1 - 0.075 * ease.outQuad(this.punch);
-    setStyle(this.cur, 'transform', `scale(${p.toFixed(3)})`);
-
-    const frac = ammo / magSize;
-    setClass(this.root, 'ow-ammo-low', ammo > 0 && frac <= 0.34);
-    setClass(this.root, 'ow-ammo-empty', ammo === 0);
-
-    const reloading = !!s.reloading;
-    const reloadP = clamp01(s.reloadProgress ?? 0);
-
-    // --- magazine pips ----------------------------------------------------
-    // The strip shows the state of the magazine that is *in the gun*. During a
-    // reload that is not the pre-reload count: the old mag leaves (strip
-    // empties) and the fresh one seats (strip fills to what the gun will
-    // actually hold). Drawing a nearly full strip next to RELOADING and a
-    // progress bar is a straight contradiction.
-    const pipCount = Math.min(MAX_PIPS, magSize);
-    if (pipCount !== this._lastPips) {
-      this._lastPips = pipCount;
-      for (let i = 0; i < MAX_PIPS; i++)
-        setStyle(this.pips[i], 'display', i < pipCount ? '' : 'none');
-    }
-    let pipAmmo = ammo;
-    if (reloading) {
-      const after = Math.min(magSize, ammo + Math.max(0, s.reserve | 0));
-      pipAmmo =
-        reloadP < 0.45
-          ? ammo * (1 - reloadP / 0.45) // mag out
-          : after * ((reloadP - 0.45) / 0.55); // mag in
-    }
-    const filled = pipAmmo <= 0.001 ? 0 : Math.max(1, Math.round((pipAmmo / magSize) * pipCount));
-    if (filled !== this._lastCount) {
-      this._lastCount = filled;
-      for (let i = 0; i < pipCount; i++) {
-        const on = i < filled;
-        setClass(this.pips[i], 'off', !on);
-        setClass(this.pips[i], 'warn', on && !reloading && filled / pipCount <= 0.34);
-      }
-    }
-
-    // --- reload state -----------------------------------------------------
-    setStyle(this.reload, 'display', reloading || (ammo === 0 && !reloading) ? '' : 'none');
-    setText(this.reload, reloading ? 'RELOADING' : 'PRESS R TO RELOAD');
-    if (!reloading && ammo === 0) {
-      // pulse the prompt so an empty gun is impossible to miss
-      const pulse = 0.55 + 0.45 * Math.abs(Math.sin((s.time ?? 0) * 3.8));
-      setStyle(this.reload, 'opacity', pulse.toFixed(3));
-    } else {
-      setStyle(this.reload, 'opacity', '1');
-    }
-    setStyle(this.reloadBar, 'display', reloading ? '' : 'none');
-    if (reloading) setStyle(this.reloadFill, 'transform', `scaleX(${reloadP.toFixed(3)})`);
-
-    // --- equipment --------------------------------------------------------
-    const bc = s.bandages ?? 0;
-    setText(this.slotBn, bc);
-    setClass(this.slotB, 'empty', bc <= 0);
-    setClass(this.slotB, 'cooking', !!s.healing);
-
-    const lc = s.lethalCount ?? 0;
-    setText(this.slotLn, lc);
-    setClass(this.slotL, 'empty', lc <= 0);
-    setClass(this.slotL, 'cooking', !!s.cooking || !!s.grenadeEquipped);
-
-    const cc = s.carpetCount ?? 0;
-    setText(this.slotRn, cc);
-    setClass(this.slotR, 'empty', cc <= 0);
-    setClass(this.slotR, 'cooking', !!s.radioEquipped);
-  }
-
-  /**
-   * Measure the weapon-name glyph run against the column it has to live in and
-   * step tracking, then size, down until it fits. A long name is the only run
-   * in the block that can push its row out of the grid, and it changes on a
-   * weapon swap, so it is measured exactly once per name.
-   */
-  _fitName(name: string): void {
-    if (this._lastName === name) return;
-    this._lastName = name;
-    setText(this.name, name);
-    for (let i = 0; i < NAME_FIT.length; i++) {
-      setStyle(this.name, 'letter-spacing', NAME_FIT[i][0]);
-      setStyle(this.name, 'font-size', NAME_FIT[i][1]);
-      if (this.name.scrollWidth <= this.name.clientWidth + 1) break;
-    }
-  }
-
-  dispose(): void {
-    this.root.remove();
+  readonly equipment: EquipmentSlot[] = Array.from({ length: 2 }, (): EquipmentSlot => ({
+    count: 0,
+    active: false,
+    elapsed: 0,
+    alpha: 0.34,
+  }));
+  update(dt: number, s: AmmoState, rawDt = dt): void {
+    updateSlot(this.equipment[0], s.bandages ?? 0, !!s.healing, rawDt);
+    updateSlot(this.equipment[1], s.lethalCount ?? 0, !!s.cooking || !!s.grenadeEquipped, rawDt);
   }
 }

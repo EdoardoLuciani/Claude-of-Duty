@@ -12,13 +12,13 @@ for (const failure of [null, 'update', 'render', 'missing']) {
   engine.onFirstRender = () => {
     completed++;
   };
-  engine.registry.add({
+  engine.registry.add('game', {
     constructor: { id: 'game' },
     update() {
       if (failure === 'update') engine.fail('game', 'update', Error('controlled update failure'));
     },
   });
-  engine.registry.add({
+  engine.registry.add('render', {
     constructor: { id: 'render' },
     ...(failure === 'missing'
       ? {}

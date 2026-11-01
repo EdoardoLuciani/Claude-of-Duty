@@ -1,8 +1,8 @@
 import { AiSystem } from './ai/index.ts';
 import { AudioSystem } from './audio/index.ts';
-import { createConfig } from './core/config.ts';
-import type { QualityName } from './core/config.ts';
+import { createConfig, QUALITY_PRESETS } from './core/config.ts';
 import { Engine } from './core/engine.ts';
+import { hasOwn } from './core/guards.ts';
 import { ModelSystem } from './core/models.ts';
 import { prewarm } from './core/prewarm.ts';
 import { FxSystem } from './fx/index.ts';
@@ -35,10 +35,11 @@ const capture = params.get('capture') === '1';
 // free-run. See the long comment in src/dev/shots.ts.
 const lockstep = capture && params.get('lockstep') === '1';
 
+const quality = params.get('q');
 const config = createConfig({
   // 'high' is the default (see src/core/config.ts); pass ?q=ultra for the
   // larger shadow and FX budgets.
-  quality: (params.get('q') as QualityName | null) ?? 'high',
+  quality: quality !== null && hasOwn(QUALITY_PRESETS, quality) ? quality : 'high',
   deterministic: capture || params.has('deterministic'),
 });
 
@@ -49,7 +50,7 @@ const engine = new Engine({ canvas, config });
 // DOM input is blocked by the HTML shell; also gate native/gamepad consumers.
 engine.input.enabled = false;
 engine.setGameplaySuspended(!capture);
-engine.onFirstRender = () => {
+engine.onFirstRender = (): void => {
   engine.input.enabled = capture;
   window.__STARTUP__.complete();
   engine.ctx.get('ui').startGate?.ready();
@@ -79,13 +80,13 @@ if (params.get('telemetry') === '1') {
   engine.add(TelemetrySystem);
 }
 
-function showFailure(message: string) {
+function showFailure(message: string): void {
   const panel = document.createElement('dialog');
   panel.id = 'engine-failure';
   panel.setAttribute('role', 'alertdialog');
   panel.setAttribute('aria-label', 'Gameplay stopped');
-  panel.oncancel = (event) => event.preventDefault();
-  panel.onkeydown = (event) => {
+  panel.oncancel = (event): void => event.preventDefault();
+  panel.onkeydown = (event): void => {
     if (event.code !== 'F8') event.stopPropagation(); // Block global menu hotkeys, retain telemetry export.
   };
   panel.style.cssText =
@@ -93,7 +94,7 @@ function showFailure(message: string) {
   panel.textContent = `${message}\n\nGameplay stopped. Reload to restart safely.\n\n`;
   const reload = document.createElement('button');
   reload.textContent = 'Reload game';
-  reload.onclick = () => location.reload();
+  reload.onclick = (): void => location.reload();
   panel.appendChild(reload);
   document.body.appendChild(panel);
   panel.showModal(); // Make underlying shop/menu controls inert too.
@@ -101,7 +102,7 @@ function showFailure(message: string) {
   document.exitPointerLock();
   reload.focus();
 }
-engine.events.on('engine:error', ({ system, method, message }) => {
+engine.events.on('engine:error', ({ system, method, message }): void => {
   showFailure(`ENGINE FAILURE — ${system}.${method}\n${message}`);
 });
 
@@ -157,7 +158,7 @@ if (lockstep) {
   window.__READY__ = true;
 } else {
   let warm = 0;
-  const readyProbe = () => {
+  const readyProbe = (): void => {
     if (engine.error) return;
     if (++warm >= BOOT_FRAMES) {
       window.__READY__ = true;
@@ -171,5 +172,9 @@ if (lockstep) {
 window.__ENGINE__ = engine;
 
 if (import.meta.hot) {
-  import.meta.hot.dispose(() => engine.dispose());
+  import.meta.hot.dispose((): Promise<void> =>
+    engine
+      .dispose()
+      .catch((error: unknown): void => console.error('[engine] HMR disposal failed', error))
+  );
 }

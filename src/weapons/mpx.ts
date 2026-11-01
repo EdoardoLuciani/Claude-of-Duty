@@ -1,8 +1,11 @@
 import * as THREE from 'three';
-import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { Renderer } from 'three/webgpu';
 
 import handReference from '../../assets/weapons/sig-mpx/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: 'json' };
+import { isMesh } from '../core/three-guards.ts';
+import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
 import {
@@ -16,7 +19,8 @@ import {
 import { authoredModel, requiredNode } from './authored-model.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 
-export const MPX_URL = new URL('../../assets/weapons/sig-mpx/mpx.glb', import.meta.url).href;
+export const MPX_URL = new URL('../../assets/weapons/sig-mpx/mpx.runtime.glb', import.meta.url)
+  .href;
 export const MPX_EJECT_DELAY = 0.025;
 const ALIASES: Record<string, string> = {
   reloadTac: 'Reload_Tactical',
@@ -27,21 +31,21 @@ const ALIASES: Record<string, string> = {
 };
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
 
-export function makeMPXModel(gltf: GLTF) {
+export function makeMPXModel(gltf: GLTF): MPXModel {
   const scene = gltf.scene;
   // Source remains +X-forward for reproducible photo/DCC review. Normalize
   // the full native hierarchy and curves once; no extra runtime orientation rig.
   const basis = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
   const inverse = basis.clone().invert(),
     geometries = new Set<THREE.BufferGeometry>();
-  scene.traverse((o) => {
+  scene.traverse((o): void => {
     o.position.applyQuaternion(basis);
     o.quaternion.premultiply(basis).multiply(inverse);
     const x = o.scale.x;
     o.scale.x = o.scale.z;
     o.scale.z = x;
-    if (o instanceof THREE.Mesh) {
-      const mesh = o as THREE.Mesh<THREE.BufferGeometry, THREE.Material | THREE.Material[]>;
+    if (isMesh(o)) {
+      const mesh = o;
       if (!geometries.has(mesh.geometry)) {
         mesh.geometry.applyQuaternion(basis);
         geometries.add(mesh.geometry);
@@ -65,9 +69,19 @@ export function makeMPXModel(gltf: GLTF) {
         }
       }
     }
+  scene.updateMatrixWorld(true);
   const { root, animations, point } = authoredModel(gltf, 'MPX_RIG', REQUIRED, scene);
+  const idle = animations.find((clip): boolean => clip.name === 'Idle');
+  // gltfpack deduplicates the wholly constant Idle to t=0. glTF has no
+  // explicit clip duration; retain only this observed authored two-second hold.
+  if (
+    idle?.duration === 0 &&
+    idle.tracks.length > 0 &&
+    idle.tracks.every((track): boolean => track.times.length === 1 && track.times[0] === 0)
+  )
+    idle.duration = manifest.clips.Idle.duration;
   const model = {
-    id: 'smg',
+    id: 'smg' as const,
     label: 'SIG MPX',
     scene,
     root,
@@ -97,14 +111,16 @@ export function makeMPXModel(gltf: GLTF) {
     shell: { caseLen: 0.0192, rimR: 0.00478 },
     magSize: { len: 0.192 },
   };
-  const converted = convertWeaponScene(scene, (source, material) => {
+  const converted = convertWeaponScene(scene, (source, material): void => {
     // Keep authored reflectance; only optical sheets/interior have view-pass policies.
-    if (source.name.startsWith('11 |') || source.name.startsWith('12 |')) {
+    if (source.name.startsWith('11 |')) {
       // World colour is already behind the separate weapon pass. Use one
       // faint coating per optical sheet, not a foggy stack of solid discs or
       // transmission sampling a viewmodel-only render target.
       material.transparent = true;
-      material.opacity = source.name.startsWith('11 |') ? 0.02 : 0.01;
+      // Only the body lenses remain transparent; solid caps need no selector.
+      material.opacity = 0.02;
+      material.clearcoat = 0.25;
       material.depthWrite = false;
       material.side = THREE.DoubleSide;
       material.forceSinglePass = true;
@@ -123,13 +139,47 @@ export function makeMPXModel(gltf: GLTF) {
   return { ...model, ...converted };
 }
 
-export async function loadMPX() {
-  return makeMPXModel(await new GLTFLoader().loadAsync(MPX_URL));
+export async function loadMPX(renderer: Pick<Renderer, 'hasFeature'>): Promise<MPXModel> {
+  return makeMPXModel(await loadWeaponGLTF(renderer, MPX_URL));
 }
 
 /** Samples the actual Blender curves, including fingers. Upper/forearm IK is
  * the only runtime solve; wrists and finger contact are not reconstructed. */
-type MPXModel = ReturnType<typeof makeMPXModel>;
+type MPXModel = {
+  materials: Set<THREE.Material>;
+  textures: Set<THREE.Texture>;
+  id: 'smg';
+  label: string;
+  scene: THREE.Group;
+  root: THREE.Object3D;
+  animations: THREE.AnimationClip[];
+  reactiveFire: boolean;
+  handPoses: {
+    left: typeof handReference.sides.left.grip;
+    right: { fingers: number[][]; fingerSpread: number[]; thumb: number[]; thumbBase: number[] };
+  };
+  nodes: {
+    muzzle: [number, number, number];
+    eject: [number, number, number];
+    sight: [number, number, number];
+    ejectDir: number[];
+    gripR: { pos: number[]; finger: number[]; back: number[] };
+    gripL: { pos: number[]; finger: number[]; back: number[] };
+    magSeat: { pos: [number, number, number]; rot: number[] };
+    opticGlass: {
+      center: [number, number, number];
+      apertureR: number;
+      windowW: number;
+      windowH: number;
+      reticle: string;
+      dotMoa: number;
+      minDotPixels: number;
+      dotOpacity: number;
+    };
+  };
+  shell: { caseLen: number; rimR: number };
+  magSize: { len: number };
+};
 type MPXArm = HandRig;
 export class MPXAnimation {
   model!: MPXModel;
@@ -153,15 +203,17 @@ export class MPXAnimation {
     this.root = model.root;
     this.mixer = new THREE.AnimationMixer(this.root);
     this.actions = createAuthoredActions(this.mixer, model.animations);
-    const node = (name: string) => requiredNode(this.root, name);
+    const node = (name: string): THREE.Object3D => requiredNode(this.root, name);
     this.bolt = node('bolt');
-    this.boltRest = this.bolt.position.clone();
     this.poseMatrix = this.root.matrix;
     this.magazine = node('magazine');
     this.spare = node('magazine_spare');
     this.magazineBody = node('magazine_mesh');
     this.rounds = node('magazine_rounds');
     this.hands = discoverAuthoredHands(node);
+    // Inspection may clone a live reload/lockback pose, not the authored rest pose.
+    this._sample('Idle', 0);
+    this.boltRest = this.bolt.position.clone();
     this.reset();
   }
 
@@ -183,6 +235,9 @@ export class MPXAnimation {
   reset(): void {
     this.fireTime = Infinity;
     this._sample('Idle', 0);
+    // Mixer caches cannot observe our out-of-band lockback override.
+    this.bolt.position.copy(this.boltRest);
+    this.root.updateMatrixWorld(true);
   }
 
   update(

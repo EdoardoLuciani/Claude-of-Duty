@@ -28,13 +28,23 @@ function readShotOptions(value: unknown): ShotOptions {
  * A shot is `{ pos:[x,y,z], look:[x,y,z], fov?, time?, apply?(engine) }`.
  * `time` is hour-of-day 0..24 handed to the sky system.
  */
-function grenadeShot(doc: string, pose: (viewmodel: ViewModel) => void) {
+function grenadeShot(
+  doc: string,
+  pose: (viewmodel: ViewModel) => void
+): {
+  pos: number[];
+  look: number[];
+  fov: number;
+  time: number;
+  apply: (e: Engine) => void;
+  doc: string;
+} {
   return {
     pos: [6, 1.7, 10],
     look: [-2, 1.8, -2],
     fov: 80,
     time: 16.5,
-    apply: (e: Engine) => {
+    apply: (e: Engine): void => {
       const w = e.ctx.peek('weapons');
       w?.debugPose?.('idle');
       const vm = w?.viewmodel;
@@ -97,7 +107,7 @@ export const SHOTS: Record<string, ShotDefinition> = {
     look: [-2, 1.8, -2],
     fov: 80,
     time: 16.5,
-    apply: (e) => e.ctx.peek('weapons')?.debugPose?.('idle'),
+    apply: (e): string | undefined => e.ctx.peek('weapons')?.debugPose?.('idle'),
     doc: 'Hip-fire viewmodel — weapon silhouette, materials, hand rig.',
   },
   ads: {
@@ -107,7 +117,7 @@ export const SHOTS: Record<string, ShotDefinition> = {
     // zoom the player actually sees at full ADS.
     fov: 50,
     time: 16.5,
-    apply: (e) => e.ctx.peek('weapons')?.debugPose?.('ads'),
+    apply: (e): string | undefined => e.ctx.peek('weapons')?.debugPose?.('ads'),
     doc: 'Aiming down sights — optic alignment, depth of field, reticle.',
   },
   muzzle: {
@@ -115,23 +125,23 @@ export const SHOTS: Record<string, ShotDefinition> = {
     look: [-2, 1.8, -2],
     fov: 80,
     time: 16.5,
-    apply: (e, o) => e.ctx.peek('weapons')?.debugPose?.('fire', o),
+    apply: (e, o): string | undefined => e.ctx.peek('weapons')?.debugPose?.('fire', o),
     doc: 'Mid-recoil with muzzle flash — flash shape, light spill, shell eject.',
   },
-  grenade: grenadeShot('Grenade idle hold — frag seated in the right palm.', (vm) => {
+  grenade: grenadeShot('Grenade idle hold — frag seated in the right palm.', (vm): void => {
     vm.holdGrenade();
   }),
-  grenadeCookLong: grenadeShot('Long-throw cook — right hand cocked by the ear.', (vm) => {
+  grenadeCookLong: grenadeShot('Long-throw cook — right hand cocked by the ear.', (vm): void => {
     vm.holdGrenade();
     vm.cookGrenade('long');
     vm._cookBlend = 1;
   }),
-  grenadeCookShort: grenadeShot('Short-throw cook — compact chest cock.', (vm) => {
+  grenadeCookShort: grenadeShot('Short-throw cook — compact chest cock.', (vm): void => {
     vm.holdGrenade();
     vm.cookGrenade('short');
     vm._cookBlend = 1;
   }),
-  grenadeThrowLong: grenadeShot('Long throw at the release beat — overhead heave.', (vm) => {
+  grenadeThrowLong: grenadeShot('Long throw at the release beat — overhead heave.', (vm): void => {
     vm.holdGrenade();
     vm.cookGrenade('long');
     vm._cookBlend = 1;
@@ -139,20 +149,23 @@ export const SHOTS: Record<string, ShotDefinition> = {
     vm._throwT = vm._throwReleaseAt;
     vm.onClipEvent = null;
   }),
-  grenadeThrowShort: grenadeShot('Short throw at the release beat — compact snap toss.', (vm) => {
-    vm.holdGrenade();
-    vm.cookGrenade('short');
-    vm._cookBlend = 1;
-    vm.throwGrenade('short');
-    vm._throwT = vm._throwReleaseAt;
-    vm.onClipEvent = null;
-  }),
+  grenadeThrowShort: grenadeShot(
+    'Short throw at the release beat — compact snap toss.',
+    (vm): void => {
+      vm.holdGrenade();
+      vm.cookGrenade('short');
+      vm._cookBlend = 1;
+      vm.throwGrenade('short');
+      vm._throwT = vm._throwReleaseAt;
+      vm.onClipEvent = null;
+    }
+  ),
   radio: {
     pos: [6, 1.7, 10],
     look: [-2, 1.8, -2],
     fov: 80,
     time: 16.5,
-    apply: (e) => {
+    apply: (e): void => {
       e.ctx.peek('weapons')?.debugPose?.('idle');
       const w = e.ctx.peek('weapons');
       if (w) {
@@ -168,7 +181,7 @@ export const SHOTS: Record<string, ShotDefinition> = {
     look: [-4, 2.2, -6],
     fov: 75,
     time: 16.5,
-    apply: (e) => {
+    apply: (e): void => {
       e.ctx.peek('weapons')?.debugPose?.('idle');
       e.ctx.peek('radio')?.callStrike?.();
     },
@@ -181,7 +194,8 @@ export const SHOTS: Record<string, ShotDefinition> = {
     look: [-6, 1.7, -4],
     fov: 80,
     time: 16.5,
-    apply: (e) => e.ctx.peek('ai')?.debugStage?.('firefight'),
+    apply: (e): import('../ai/index.ts').AiStats | undefined =>
+      e.ctx.peek('ai')?.debugStage?.('firefight'),
     doc: 'Enemies mid-firefight — character quality, animation, impact FX.',
   },
   impacts: {
@@ -192,20 +206,29 @@ export const SHOTS: Record<string, ShotDefinition> = {
     look: [-1.8, 1.5, 9.0],
     fov: 60,
     time: 16.5,
-    apply: (e) => e.ctx.peek('fx')?.debugBurst?.('wall'),
+    apply: (e): { staged: string; at?: number[]; surface?: string } | undefined =>
+      e.ctx.peek('fx')?.debugBurst?.('wall'),
     doc: 'Bullet impacts on a wall — decals, debris, dust puffs, sparks.',
-  },
-  hud: {
-    pos: [12, 1.75, 18],
-    look: [-4, 2.2, -6],
-    fov: 80,
-    time: 16.5,
-    apply: (e) => e.ctx.peek('ui')?.debugState?.('combat'),
-    doc: 'Full HUD in combat — layout, typography, readability, hit feedback.',
   },
 };
 
-function shotRenderInfo(engine: Engine) {
+function shotRenderInfo(engine: Engine): {
+  calls: number | null;
+  tris: number | null;
+  programs: number | null;
+  textures: number | null;
+  geometries: number | null;
+  ms: number;
+  rendererFrame: number | null;
+  renderCallsTotal: number | null;
+  renderCallsFrame: number | null;
+  drawCallsFrame: number | null;
+  computeCallsTotal: number | null;
+  computeCallsFrame: number | null;
+  shaderStagesLive: number | null;
+  webglProgramsLive: number | null;
+  frame: number;
+} {
   const r = engine.ctx.peek('render');
   const counters = rendererCounters(r?.renderer);
   return {
@@ -234,7 +257,11 @@ declare global {
 export function installShotApi(
   engine: Engine,
   { capture = false, lockstep = false }: { capture?: boolean; lockstep?: boolean } = {}
-) {
+): {
+  pump: (frames?: number) => Promise<number>;
+  present: (frames?: number) => Promise<number>;
+  lockstep: boolean;
+} {
   window.__SHOTS__ = SHOTS;
 
   /**
@@ -242,7 +269,12 @@ export function installShotApi(
    * the shutter. Shots whose subject is a transient (a muzzle flash lives ~52 ms)
    * need it so they can land the event on the captured frame instead of guessing.
    */
-  window.__APPLY_SHOT__ = (name: string, options: unknown = {}) => {
+  window.__APPLY_SHOT__ = (
+    name: string,
+    options: unknown = {}
+  ):
+    | { error: string; available: string[]; applied?: undefined; pos?: undefined; fov?: undefined }
+    | { applied: string; pos: number[]; fov: number; error?: undefined; available?: undefined } => {
     const shot = SHOTS[name];
     if (!shot) return { error: `unknown shot "${name}"`, available: Object.keys(SHOTS) };
 
@@ -264,13 +296,10 @@ export function installShotApi(
     player?.teleport?.(cam.position, cam.rotation);
 
     // Shots are applied back to back in one browser session, so clear the
-    // previous shot's *looping* debug state first. Without this the `muzzle`
-    // shot's scripted burst is still emptying the magazine during `combat`, and
-    // `impacts` keeps walking rounds across a wall behind the HUD shot.
+    // previous shot's looping debug state before staging the next one.
     engine.ctx.peek('weapons')?.debugPose?.('idle');
     engine.ctx.peek('radio')?.clearStrike?.();
     engine.ctx.peek('fx')?.debugBurst?.('none');
-    engine.ctx.peek('ui')?.debugState?.('clean');
 
     if (shot.time !== undefined) engine.ctx.peek('sky')?.setTimeOfDay?.(shot.time);
     shot.apply?.(engine, readShotOptions(options));
@@ -289,8 +318,8 @@ export function installShotApi(
     // was 0 whenever `_last` had been stamped with a real clock and 1/60 when it
     // had not — a boot-path-dependent one-frame difference in every accumulator.
     let fake = 0;
-    engine.step = ((orig) =>
-      function (this: Engine) {
+    engine.step = ((orig): ((this: Engine) => void) =>
+      function (this: Engine): void {
         this._last = fake;
         fake += 1000 / 60;
         return orig.call(this, fake);
@@ -298,8 +327,8 @@ export function installShotApi(
   }
 
   window.__RENDER_INFO__ = null;
-  engine.events.on('resize', () => {});
-  const snapInfo = () => {
+  engine.events.on('resize', (): void => {});
+  const snapInfo = (): void => {
     window.__RENDER_INFO__ = shotRenderInfo(engine);
   };
 
@@ -324,16 +353,16 @@ export function installShotApi(
    * the screenshot is being taken.
    */
   if (lockstep) {
-    engine.start = function () {
+    engine.start = function (): void {
       this._running = true;
     };
     window.__LOCKSTEP__ = true;
 
     /** Advance exactly `n` engine frames, one per rAF so each is presented. */
-    window.__PUMP__ = (n = 1) =>
-      new Promise((resolve, reject) => {
+    window.__PUMP__ = (n = 1): Promise<number> =>
+      new Promise((resolve, reject): void => {
         let i = 0;
-        const tick = () => {
+        const tick = (): void => {
           try {
             engine.step();
           } catch (err) {
@@ -353,19 +382,20 @@ export function installShotApi(
 
     /** Yield `n` rAFs WITHOUT stepping, so the compositor picks up the last
      *  rendered frame before the screenshot. Advances no simulation state. */
-    window.__PRESENT__ = (n = 2) =>
-      new Promise((resolve) => {
+    window.__PRESENT__ = (n = 2): Promise<number> =>
+      new Promise((resolve): void => {
         let i = 0;
-        const tick = () => (++i >= n ? resolve(engine.time.frame) : requestAnimationFrame(tick));
+        const tick = (): number | void =>
+          ++i >= n ? resolve(engine.time.frame) : requestAnimationFrame(tick);
         requestAnimationFrame(tick);
       });
   } else {
     window.__LOCKSTEP__ = false;
     // Free-running: the engine drives itself, __PUMP__ just waits out n frames.
-    window.__PUMP__ = (n = 1) =>
-      new Promise((resolve, reject) => {
+    window.__PUMP__ = (n = 1): Promise<number> =>
+      new Promise((resolve, reject): void => {
         let i = 0;
-        const tick = () => {
+        const tick = (): void => {
           if (engine.error) {
             reject(new Error(`engine failure: ${JSON.stringify(engine.error)}`));
             return;
@@ -376,7 +406,7 @@ export function installShotApi(
         requestAnimationFrame(tick);
       });
     window.__PRESENT__ = window.__PUMP__;
-    const info = () => {
+    const info = (): void => {
       snapInfo();
       requestAnimationFrame(info);
     };

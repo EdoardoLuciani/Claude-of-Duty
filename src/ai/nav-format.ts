@@ -2,7 +2,7 @@
 // Kept separate from the WASM module so invalid assets fail before native import.
 import { INFANTRY } from './capabilities.ts';
 import { LADDER, LADDER_MOTOR_VERSION, type LadderDescriptor } from './ladder.ts';
-import { isRecord, isNumberArray } from './validation.ts';
+import { isRecord, isNumberArray, isNumber } from './validation.ts';
 export const NAV_VERSION = 2;
 export const NAV_LADDER_FLAG = 2,
   NAV_LINK_RADIUS = 0.7;
@@ -53,8 +53,8 @@ export interface NavMetadata {
   profile?: typeof NAV_PROFILE;
   config?: typeof NAV_CONFIG;
   bounds: { min: number[]; max: number[] };
-  sourceHash?: string;
-  collisionAsset?: string;
+  sourceHash?: string | undefined;
+  collisionAsset?: string | undefined;
   ladderMotorVersion?: number;
   ladders?: readonly LadderDescriptor[];
 }
@@ -68,7 +68,7 @@ const bytes = (b: ByteInput): Uint8Array =>
   b instanceof ArrayBuffer
     ? new Uint8Array(b)
     : new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
-const check = (ok: unknown, why: string): void => {
+const check: (ok: unknown, why: string) => asserts ok = (ok, why): asserts ok => {
   if (!ok) throw new Error(`[nav] ${why}`);
 };
 export async function navHash(buffer: ByteInput): Promise<string> {
@@ -76,7 +76,7 @@ export async function navHash(buffer: ByteInput): Promise<string> {
     new Uint8Array(
       await globalThis.crypto.subtle.digest('SHA-256', new Uint8Array(bytes(buffer)).buffer)
     ),
-    (b) => b.toString(16).padStart(2, '0')
+    (b): string => b.toString(16).padStart(2, '0')
   ).join('');
 }
 
@@ -88,66 +88,84 @@ function checkedLadders(
 ): readonly LadderDescriptor[] {
   check(Array.isArray(value) && value.length <= 1024, 'invalid ladder descriptors');
   return Object.freeze(
-    (value as unknown[]).map((v, i) => {
-      if (
-        !isRecord(v) ||
-        v.id !== i + 1 ||
-        v.volumeIndex !== i ||
-        typeof v.radius !== 'number' ||
-        !Number.isFinite(v.radius) ||
-        v.radius <= 0 ||
-        v.radius > 2 ||
-        !isRecord(v.normal) ||
-        !Array.isArray(v.points) ||
-        v.points.length !== 4
-      )
-        throw new Error('[nav] invalid ladder descriptor');
-      const point = (p: unknown): { x: number; y: number; z: number } => {
+    value.map(
+      (
+        v: unknown,
+        i
+      ): Readonly<{
+        id: number;
+        volumeIndex: number;
+        normal: Readonly<{ x: number; y: number; z: number }>;
+        radius: number;
+        points: LadderDescriptor['points'];
+      }> => {
         if (
-          !isRecord(p) ||
-          ![p.x, p.y, p.z].every((n) => typeof n === 'number' && Number.isFinite(n))
+          !isRecord(v) ||
+          v.id !== i + 1 ||
+          v.volumeIndex !== i ||
+          typeof v.radius !== 'number' ||
+          !Number.isFinite(v.radius) ||
+          v.radius <= 0 ||
+          v.radius > 2 ||
+          !isRecord(v.normal) ||
+          !Array.isArray(v.points) ||
+          v.points.length !== 4
         )
-          throw new Error('[nav] invalid ladder point');
-        return { x: p.x as number, y: p.y as number, z: p.z as number };
-      };
-      const normal = point(v.normal),
-        points = v.points.map(point) as unknown as LadderDescriptor['points'];
-      const [lower, bottom, top, upper] = points;
-      check(
-        normal.y === 0 &&
-          Math.abs(Math.hypot(normal.x, normal.z) - 1) <= 1e-6 &&
-          lower.y === bottom.y &&
-          top.y === upper.y &&
-          bottom.x === top.x &&
-          bottom.z === top.z &&
-          top.y > bottom.y &&
-          top.y - bottom.y <= 12 &&
-          lower.x === bottom.x + normal.x * LADDER.lowerOffset &&
-          lower.z === bottom.z + normal.z * LADDER.lowerOffset &&
-          upper.x === top.x + normal.x * LADDER.upperOffset &&
-          upper.z === top.z + normal.z * LADDER.upperOffset,
-        'invalid ladder geometry'
-      );
-      for (let k = 0; k < 3; k++) {
-        const span = Math.hypot(
-          points[k + 1].x - points[k].x,
-          points[k + 1].y - points[k].y,
-          points[k + 1].z - points[k].z
+          throw new Error('[nav] invalid ladder descriptor');
+        const point = (p: unknown): { x: number; y: number; z: number } => {
+          if (!isRecord(p) || !isNumber(p.x) || !isNumber(p.y) || !isNumber(p.z))
+            throw new Error('[nav] invalid ladder point');
+          return { x: p.x, y: p.y, z: p.z };
+        };
+        const normal = point(v.normal),
+          points: LadderDescriptor['points'] = [
+            point(v.points[0]),
+            point(v.points[1]),
+            point(v.points[2]),
+            point(v.points[3]),
+          ];
+        const [lower, bottom, top, upper] = points;
+        check(
+          normal.y === 0 &&
+            Math.abs(Math.hypot(normal.x, normal.z) - 1) <= 1e-6 &&
+            lower.y === bottom.y &&
+            top.y === upper.y &&
+            bottom.x === top.x &&
+            bottom.z === top.z &&
+            top.y > bottom.y &&
+            top.y - bottom.y <= 12 &&
+            lower.x === bottom.x + normal.x * LADDER.lowerOffset &&
+            lower.z === bottom.z + normal.z * LADDER.lowerOffset &&
+            upper.x === top.x + normal.x * LADDER.upperOffset &&
+            upper.z === top.z + normal.z * LADDER.upperOffset,
+          'invalid ladder geometry'
         );
-        check(Number.isFinite(span) && span > 0, 'invalid ladder span');
-      }
-      for (const p of points)
-        for (const [axis, n] of [p.x, p.y, p.z].entries()) {
-          check(n >= bounds.min[axis] && n <= bounds.max[axis], 'ladder outside bounds');
+        for (let k = 0; k < 3; k++) {
+          const span = Math.hypot(
+            points[k + 1].x - points[k].x,
+            points[k + 1].y - points[k].y,
+            points[k + 1].z - points[k].z
+          );
+          check(Number.isFinite(span) && span > 0, 'invalid ladder span');
         }
-      return Object.freeze({
-        id: i + 1,
-        volumeIndex: i,
-        normal: Object.freeze(normal),
-        radius: v.radius,
-        points: Object.freeze(points.map(Object.freeze)) as LadderDescriptor['points'],
-      });
-    })
+        for (const p of points)
+          for (const [axis, n] of [p.x, p.y, p.z].entries()) {
+            check(n >= bounds.min[axis] && n <= bounds.max[axis], 'ladder outside bounds');
+          }
+        return Object.freeze({
+          id: i + 1,
+          volumeIndex: i,
+          normal: Object.freeze(normal),
+          radius: v.radius,
+          points: Object.freeze([
+            Object.freeze(points[0]),
+            Object.freeze(points[1]),
+            Object.freeze(points[2]),
+            Object.freeze(points[3]),
+          ] as const),
+        });
+      }
+    )
   );
 }
 
@@ -407,7 +425,7 @@ export async function unpackNav(
     await globalThis.crypto.subtle.digest('SHA-256', new Uint8Array(b.subarray(HEADER)).buffer)
   );
   check(
-    digest.every((v, i) => v === b[32 + i]),
+    digest.every((v, i): boolean => v === b[32 + i]),
     'bake checksum mismatch'
   );
   if (expected.sha256) check((await navHash(b)) === expected.sha256, 'manifest nav hash mismatch');

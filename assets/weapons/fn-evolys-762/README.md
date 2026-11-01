@@ -20,7 +20,26 @@ Accessory loadout, unpublished depths/cloth and mechanism internals aren't certi
 ## Source/runtime contract
 
 Python is the weapon-authoring authority; `fn-evolys-762.blend/.glb` are generated
-packed preview/runtime products, never build inputs. `manifest.json` records
+packed preview/native-export products, never build inputs. The derived
+`fn-evolys-762.runtime.glb` uses gltfpack 1.3 with the shared cook flags and no
+additional simplification flags, loaded through the shared KTX2/meshopt adapter. See the local guide's
+[ordinary rigid export](../../../tools/blender/evolys/README.md#ordinary-rigid-export-current)
+for the current representation and validation limits. Receiver, handguard and
+optic share ordinary static geometry; the rotated stock retains its native local
+mesh. Bolt, charging handle, feed cover and trigger remain ordinary meshes under
+their authored controls. Only the independent eight-joint deforming belt is skinned.
+Both pouches retain their separate animation/visibility ownership. There are ten
+primitive instances total, nine in loaded Idle, and two unchanged materials.
+The stock/head oracle checks all 4,922 actual ordinary stock triangles against
+the unchanged 120 mm envelope. Native/runtime geometry and gameplay tests pass;
+parent native AMD RDNA-4 / r187 measurements confirm uploaded geometry
+**3,360,060 → 2,479,560 B** (−26.2%) and geometry-plus-logical-texture subtotal
+**7,554,444 → 6,673,944 B**, with unchanged textures. Only the belt skin remains.
+Isolated loaded-Idle beauty draws rise 5 → 10; CPU/GPU microbench timings do not
+establish whole-game FPS. Matched views, RGBA fallback, market/production and
+combined 160 tests passed; fresh independent review found no issues. These
+subtotals exclude other renderer resources/palette buffers/driver padding and
+do not clear general factory/human sign-off. `manifest.json` records
 events/belt, `hand-reference.json` is read-only versioned hand calibration, and
 `photo-review.json` freezes review registration. Shared review-arm appearance is
 also read-only and excluded from export. See the [edit map and build stages](../../../tools/blender/evolys/README.md).
@@ -37,7 +56,7 @@ Keep all event/balance/chamber/+1 values and one live pooled case per shot.
 Runtime ADS framing enlarges the weapon-only sight picture and uses a world-sized 3.25 MOA dot with a five-pixel readability floor;
 no segmented ring/halo. Physical window, lens material and authored grips are unchanged.
 
-Eight cartridges/links, one skin/three primitives, 12.7 mm pitch: finish the last
+Eight cartridges/links, one skin/one atlas primitive, 12.7 mm pitch: finish the last
 stroke, then stop. Only insertion restores spent belt; switch/reset/interruption
 cannot resurrect it. Mirror native scale keys around mixer-cached constants.
 Keep physical pouch/feed passages, curve/tail enclosure and synchronized DCC skins.
@@ -47,13 +66,13 @@ Caps: <150k triangles, ≤48 primitives, ≤18 materials, three 1024² maps, ≤
 
 ```sh
 # Only when intentionally changing shared calibration/contact inputs:
-# node tools/evolys-hand-reference.mjs
-blender -b -t 4 --python-exit-code 1 --python tools/blender/evolys_762.py
+# node tools/blender/evolys/hand-reference.mjs
+blender -b -t 2 --python-exit-code 1 --python tools/blender/evolys/build.py
 # Full scratch build, without touching committed products/calibration:
-blender -b -t 4 --python-exit-code 1 --python tools/blender/evolys_762.py -- \
+blender -b -t 2 --python-exit-code 1 --python tools/blender/evolys/build.py -- \
   --output /tmp/evolys-review --quick
 blender -b assets/weapons/fn-evolys-762/fn-evolys-762.blend \
-  --python-exit-code 1 --python tools/blender/evolys_check.py
+  --python-exit-code 1 --python tools/blender/evolys/check.py
 node tests/smoke/smoke-evolys.mjs
 node tests/smoke/smoke-evolys-clearance.mjs
 ```

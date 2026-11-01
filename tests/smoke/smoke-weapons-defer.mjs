@@ -104,4 +104,16 @@ function makeWp() {
   assert(wp.owns('rifle') && !wp.owns('lmg'));
 }
 
+{
+  const wp = makeWp();
+  for (const id of ['unknown', '__proto__', 'constructor', 'toString']) {
+    assert.equal(wp.setWeapon(id), false, 'debug/DOM strings must be validated');
+    assert.equal(wp.setWeaponImmediate(id), false);
+  }
+  assert.equal(wp.equipPrimary('pistol'), false, 'JS callers still get runtime slot validation');
+  assert.equal(wp.equipSecondary('rifle'), false);
+  assert.equal(wp.activeId, 'rifle');
+  assert.deepEqual([...wp.owned], ['rifle', 'pistol']);
+}
+
 console.log('ok  smoke-weapons-defer');

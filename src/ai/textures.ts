@@ -23,6 +23,8 @@
  */
 
 import * as THREE from 'three';
+
+import { hasOwn } from '../core/guards.ts';
 interface NoiseRandom {
   float(): number;
   int(min: number, max: number): number;
@@ -495,12 +497,11 @@ export function makeCamoSampler(
   B: CamoBudget = budgetFor(cfg)
 ): CamoSampler {
   const pre = measureCamo(nz, cfg);
-  const fn = ((u: number, v: number, out: Texel): void => {
+  const fn = (u: number, v: number, out: Texel): void => {
     camoTexel(nz, cfg, u, v, out);
     applyBudget(out, pre.mean, B);
-  }) as CamoSampler;
-  fn.srcMean = pre.mean;
-  return fn;
+  };
+  return Object.assign(fn, { srcMean: pre.mean });
 }
 
 function applyBudget(out: Texel, srcMean: number, B: CamoBudget): void {
@@ -588,7 +589,7 @@ export class SoldierMaterials {
     // noise is touched, and the figure goes chalky without anybody noticing.
     this.camoStats = {};
     for (const name of opts.camo ?? ['arid', 'woodland']) {
-      const cfg = CAMO[name as keyof typeof CAMO] ?? CAMO.arid;
+      const cfg = hasOwn(CAMO, name) ? CAMO[name] : CAMO.arid;
       const sample = makeCamoSampler(nz, cfg);
       let s = 0;
       let s2 = 0;
@@ -597,7 +598,7 @@ export class SoldierMaterials {
       let n = 0;
       this.sets[`camo_${name}`] = bake(
         size,
-        (u, v, out) => {
+        (u, v, out): void => {
           sample(u, v, out);
           const l = lum3(out.r, out.g, out.b);
           s += l;
@@ -627,7 +628,7 @@ export class SoldierMaterials {
     // blob" read at 25 m.
     this.sets.nylon = bake(
       size,
-      (u, v, out) => {
+      (u, v, out): void => {
         // 1000D cordura at 0.26 m/tile: the basket weave is 1 mm, the binding
         // tape and bar-tacks are the things this tile actually has to carry
         const tu = u * 26,
@@ -670,7 +671,7 @@ export class SoldierMaterials {
     // pouches bolted to it. Quilted stitch grid, scuffed high points.
     this.sets.plate = bake(
       size,
-      (u, v, out) => {
+      (u, v, out): void => {
         // quilting: a diamond stitch grid pressed into the laminate, and the
         // panels between it bulging over the foam
         const qu = cellDist(u * 5 + v * 2.5);
@@ -721,7 +722,7 @@ export class SoldierMaterials {
     // ---- skin ---------------------------------------------------------
     this.sets.skin = bake(
       size,
-      (u, v, out) => {
+      (u, v, out): void => {
         const pores = nz.fbm(u, v, 150, 3);
         const macro = nz.fbm(u, v, 11, 3);
         const fine = nz.fbm(u, v, 320, 2);
@@ -748,7 +749,7 @@ export class SoldierMaterials {
     // ---- glass-filled polymer: weapon furniture, knee pads, buckles ---
     this.sets.polymer = bake(
       size,
-      (u, v, out) => {
+      (u, v, out): void => {
         // moulded pebble stipple + parting-line sheen
         const stip = nz.fbm(u, v, 128, 3);
         const peb = smooth(0.45, 0.62, nz.fbm(u, v, 64, 2));
@@ -769,7 +770,7 @@ export class SoldierMaterials {
     // ---- parkerised / phosphated steel --------------------------------
     this.sets.steel = bake(
       size,
-      (u, v, out) => {
+      (u, v, out): void => {
         const grain = nz.fbm(u * 0.25, v * 3.0, 90, 3);
         const scratch = smooth(0.8, 1.0, nz.ridge(u * 0.3, v * 6.0, 40, 3));
         const pits = smooth(0.72, 0.9, nz.fbm(u, v, 190, 2));
@@ -791,7 +792,7 @@ export class SoldierMaterials {
     // ---- vulcanised rubber: boot soles, sling pads --------------------
     this.sets.rubber = bake(
       size,
-      (u, v, out) => {
+      (u, v, out): void => {
         // lug pattern: deep sipes cut between raised blocks
         const lug = Math.max(
           ridgeLine(cellDist(u * 9), 0.085),
@@ -821,7 +822,7 @@ export class SoldierMaterials {
     // ripstop cloth: 2-over-2 twill at ~1.5 mm plus the 7 mm ripstop lattice
     this.details.cloth = bakeDetail(
       dsize,
-      (u, v, out) => {
+      (u, v, out): void => {
         const threads = 33; // 50 mm / 1.5 mm
         const tu = u * threads,
           tv = v * threads;
@@ -844,7 +845,7 @@ export class SoldierMaterials {
     // nylon webbing / cordura: chunky basket weave with a resin sheen
     this.details.nylon = bakeDetail(
       dsize,
-      (u, v, out) => {
+      (u, v, out): void => {
         const cellsU = 25,
           cellsV = 25; // 2 mm basket
         const cu = Math.abs(((((u * cellsU) % 1) + 1) % 1) - 0.5);

@@ -9,10 +9,10 @@ import manifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: '
 import { Rng } from '../../src/core/rng.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import { Arm } from '../../src/weapons/hands.ts';
-import { makeMPXModel, MPXAnimation, MPX_URL, MPX_EJECT_DELAY } from '../../src/weapons/mpx.ts';
+import { makeMPXModel, MPXAnimation, MPX_EJECT_DELAY } from '../../src/weapons/mpx.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { parseGLB } from '../../tools/lib/glb-fixture.mjs';
-const bytes = readFileSync(new URL(MPX_URL));
+const bytes = readFileSync(new URL('../../assets/weapons/sig-mpx/mpx.glb', import.meta.url));
 const gltf = await parseGLB(bytes);
 const model = makeMPXModel(gltf),
   anim = new MPXAnimation(model),
@@ -24,7 +24,7 @@ assert(
 assert.equal(model.id, 'smg');
 assert.equal(model.reactiveFire, true);
 assert(model.materials.size <= 16, 'runtime material budget includes any glTF fallback');
-for (const prefix of ['11 |', '12 |']) {
+for (const prefix of ['11 |']) {
   const material = [...model.materials].find((m) => m.name.startsWith(prefix));
   assert(material && material.transparent && material.forceSinglePass && !material.depthWrite);
   assert(
@@ -33,7 +33,7 @@ for (const prefix of ['11 |', '12 |']) {
   );
 }
 const interior = [...model.materials].find((m) => m.name.startsWith('15 |'));
-assert(interior && !interior.transparent && interior.metalness === 0 && interior.roughness > 0.9);
+assert(interior && !interior.transparent && interior.metalnessMap && interior.roughness > 0.9);
 assert(interior.envMapIntensity <= 0.03 && interior.specularIntensity <= 0.02);
 assert.equal(Object.keys(anim.actions).length, 8);
 assert.equal(def.magSize, 30);
@@ -68,7 +68,7 @@ assert.deepEqual(
   'reticle/framing work must not change recoil'
 );
 assert.equal(def.suppressed, true);
-assert.equal(def.audio, 'suppressed');
+assert.equal(def.audio, 'mpx');
 // Shared glTF accessors must be converted once per track, not mutated again
 // through another clip. Check known game-space idle wrists and finger curls.
 for (const side of ['left', 'right']) {

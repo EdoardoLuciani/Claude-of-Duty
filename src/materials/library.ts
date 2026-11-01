@@ -1,5 +1,10 @@
 import * as THREE from 'three';
 
+import { hasOwn } from '../core/guards.ts';
+import type { SurfaceName } from '../physics/surfaces.ts';
+import type { SurfaceAuthoringParams, SurfaceMaterialOptions } from './shader-tsl.ts';
+import type { SURFACES_TSL } from './surfaces-index-tsl.ts';
+
 /**
  * The surface library.
  *
@@ -9,23 +14,24 @@ import * as THREE from 'three';
  * `three` — properties applied straight to the THREE material.
  * `surface` — the shared physics/FX surface vocabulary from ARCHITECTURE.md.
  */
-interface BakeDefinition {
+export interface BakeDefinition {
   size: number;
   worldSize: number;
   relief: number;
   seed: number;
-  param?: number[];
+  param?: [number, number, number, number];
   tintA?: number;
   tintB?: number;
 }
 interface MaterialDefinition {
-  surface: string;
+  surface: SurfaceName;
   bake: BakeDefinition;
-  mat: Record<string, unknown>;
-  three?: Record<string, unknown>;
+  mat: Partial<SurfaceAuthoringParams>;
+  three?: SurfaceMaterialOptions;
 }
 
-export const LIBRARY: Record<string, MaterialDefinition> = {
+export type MaterialName = keyof typeof SURFACES_TSL;
+export const LIBRARY: Record<MaterialName, MaterialDefinition> = {
   // ------------------------------------------------------------ masonry ----
   concrete: {
     surface: 'concrete',
@@ -375,7 +381,7 @@ export const LIBRARY: Record<string, MaterialDefinition> = {
 };
 
 /** Alias -> library key, so callers can ask for the physics surface name. */
-export const ALIASES: Record<string, string> = {
+export const ALIASES = {
   metal: 'metal_painted',
   steel: 'metal_brushed',
   rust: 'metal_rust',
@@ -388,8 +394,8 @@ export const ALIASES: Record<string, string> = {
   plank: 'wood',
   leaf: 'foliage',
   window: 'glass',
-};
+} satisfies Record<string, MaterialName>;
 
 export function resolveName(name: string): string {
-  return LIBRARY[name] ? name : (ALIASES[name] ?? name);
+  return hasOwn(ALIASES, name) ? ALIASES[name] : name;
 }

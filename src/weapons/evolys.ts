@@ -1,8 +1,11 @@
 import * as THREE from 'three';
-import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { Renderer } from 'three/webgpu';
 
 import handReference from '../../assets/weapons/fn-evolys-762/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/fn-evolys-762/manifest.json' with { type: 'json' };
+import { hasOwn } from '../core/guards.ts';
+import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
 import {
@@ -17,7 +20,7 @@ import { authoredModel, requiredNode } from './authored-model.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 
 export const EVOLYS_URL = new URL(
-  '../../assets/weapons/fn-evolys-762/fn-evolys-762.glb',
+  '../../assets/weapons/fn-evolys-762/fn-evolys-762.runtime.glb',
   import.meta.url
 ).href;
 const ALIASES: Record<string, string> = {
@@ -29,12 +32,23 @@ const ALIASES: Record<string, string> = {
 };
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
 
-export function makeEvolysModel(gltf: GLTF) {
+export function makeEvolysModel(gltf: GLTF): EvolysModel {
   const scene = gltf.scene;
   const { root, animations, point } = authoredModel(gltf, 'EVOLYS_RIG', REQUIRED, scene);
+  // gltfpack retains constant channels but reduces their keys to t=0. Idle is
+  // entirely constant, so recover its authored duration from the weapon source.
+  for (const clip of animations) {
+    if (
+      clip.name === 'Idle' &&
+      clip.duration === 0 &&
+      clip.tracks.length > 0 &&
+      clip.tracks.every((track): boolean => track.times.length === 1 && track.times[0] === 0)
+    )
+      clip.duration = Math.fround(manifest.clips.Idle.duration);
+  }
   const sight = point('SOCKET_sight');
   const model = {
-    id: 'lmg',
+    id: 'lmg' as const,
     label: 'EVOLYS-7.62',
     scene,
     root,
@@ -66,7 +80,7 @@ export function makeEvolysModel(gltf: GLTF) {
     shell: { caseLen: 0.051, rimR: 0.005975 },
     magSize: { len: 0.125 },
   };
-  const converted = convertWeaponScene(scene, (source, material) => {
+  const converted = convertWeaponScene(scene, (source, material): void => {
     if (source.name.startsWith('10 |')) {
       material.transparent = true;
       material.opacity = 0.13;
@@ -80,14 +94,50 @@ export function makeEvolysModel(gltf: GLTF) {
   return { ...model, ...converted };
 }
 
-export async function loadEvolys() {
-  return makeEvolysModel(await new GLTFLoader().loadAsync(EVOLYS_URL));
+export async function loadEvolys(renderer: Pick<Renderer, 'hasFeature'>): Promise<EvolysModel> {
+  return makeEvolysModel(await loadWeaponGLTF(renderer, EVOLYS_URL));
 }
 
 /** Native Blender mechanism/belt/hand tracks, under shared ADS/sway/recoil.
  * Only ammunition-tail visibility is runtime-driven. No per-shot belt objects,
  * new textures, duplicate cases, frame allocations or second animation rig. */
-type EvolysModel = ReturnType<typeof makeEvolysModel>;
+type EvolysModel = {
+  materials: Set<THREE.Material>;
+  textures: Set<THREE.Texture>;
+  id: 'lmg';
+  label: string;
+  scene: THREE.Group;
+  root: THREE.Object3D;
+  animations: THREE.AnimationClip[];
+  reactiveFire: boolean;
+  handPoses: {
+    left: typeof handReference.sides.left.grip;
+    right: typeof handReference.sides.left.grip;
+  };
+  nodes: {
+    muzzle: [number, number, number];
+    eject: [number, number, number];
+    sight: [number, number, number];
+    ejectDir: number[];
+    gripR: { pos: number[]; finger: number[]; back: number[] };
+    gripL: { pos: number[]; finger: number[]; back: number[] };
+    magSeat: { pos: [number, number, number]; rot: number[] };
+    triggerPivot: { pos: [number, number, number]; rot: number[] };
+    handguard: { axis: number[]; dir: number[]; r: number; z0: number; z1: number };
+    opticGlass: {
+      center: [number, number, number];
+      apertureR: number;
+      windowW: number;
+      windowH: number;
+      reticle: string;
+      dotMoa: number;
+      minDotPixels: number;
+      dotOpacity: number;
+    };
+  };
+  shell: { caseLen: number; rimR: number };
+  magSize: { len: number };
+};
 type EvolysArm = HandRig;
 export class EvolysAnimation {
   model!: EvolysModel;
@@ -113,14 +163,16 @@ export class EvolysAnimation {
     this.root = model.root;
     this.mixer = new THREE.AnimationMixer(this.root);
     this.actions = createAuthoredActions(this.mixer, model.animations);
-    const node = (name: string) => requiredNode(this.root, name);
+    const node = (name: string): THREE.Object3D => requiredNode(this.root, name);
     this.pouch = node('pouch');
     this.spare = node('pouch_spare');
     this.cover = node('feed_cover');
     this.bolt = node('bolt');
     this.charging = node('charging_handle');
     this.belt = node('belt_mesh');
-    this.bones = Array.from({ length: manifest.belt.rounds }, (_, i) => node(`belt_${i}`));
+    this.bones = Array.from({ length: manifest.belt.rounds }, (_, i): THREE.Object3D =>
+      node(`belt_${i}`)
+    );
     this.hands = discoverAuthoredHands(node);
     this.poseMatrix = this.root.matrix;
     this.remainingRounds = 100;
@@ -175,16 +227,17 @@ export class EvolysAnimation {
     if (gesture) this._sample(gesture, clipTime);
     else if (firing) this._sample(empty ? 'Last_Shot' : 'Fire', this.fireTime);
     else this._sample('Idle', this.idleTime % manifest.clips.Idle.duration);
-    const info = gesture
-      ? (manifest.clips[gesture as keyof typeof manifest.clips] as {
-          beltClearTime?: number;
-          beltInsertTime?: number;
-        })
-      : undefined;
+    const info = gesture && hasOwn(manifest.clips, gesture) ? manifest.clips[gesture] : undefined;
+    const clearTime =
+      info && 'beltClearTime' in info && typeof info.beltClearTime === 'number'
+        ? info.beltClearTime
+        : undefined;
+    const insertTime =
+      info && 'beltInsertTime' in info && typeof info.beltInsertTime === 'number'
+        ? info.beltInsertTime
+        : undefined;
     const loaded =
-      !info?.beltClearTime ||
-      clipTime < info.beltClearTime ||
-      (info.beltInsertTime !== undefined && clipTime >= info.beltInsertTime);
+      !clearTime || clipTime < clearTime || (insertTime !== undefined && clipTime >= insertTime);
     this._beltVisibility(remainingRounds, firing, loaded);
     this.root.updateMatrixWorld(true);
   }
@@ -201,6 +254,11 @@ export class EvolysAnimation {
   dispose(): void {
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.root);
+    const skeletons = new Set<THREE.Skeleton>();
+    this.root.traverse((node): void => {
+      if (node instanceof THREE.SkinnedMesh) skeletons.add(node.skeleton);
+    });
+    for (const skeleton of skeletons) skeleton.dispose();
     disposeWeaponMaterials(this.model);
   }
 }

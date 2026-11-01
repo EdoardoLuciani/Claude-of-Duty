@@ -1,5 +1,8 @@
+import type { Vector2, Vector3 } from 'three';
+import type { FnNode } from 'three/src/nodes/tsl/TSLCore.js';
 import { Fn, dot, float, fract, max, mix, vec2, vec3 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
+import type { JoinNode } from 'three/webgpu';
 
 /**
  * Procedural noise shared by the stars, the clouds and the fog — the TSL port
@@ -14,35 +17,35 @@ import type { Node } from 'three/webgpu';
  * replaces.
  */
 
-const rot2 = (p: Node<'vec2'>) =>
+const rot2 = (p: Node<'vec2'>): JoinNode<'vec2'> =>
   vec2(p.x.mul(0.8).sub(p.y.mul(0.6)), p.x.mul(0.6).add(p.y.mul(0.8)));
 
 // Share pure shader functions across octaves and consumers. Keep the authored
 // arithmetic and octave counts; only the TSL/WGSL expansion changes.
-export const skHash12 = Fn<[Node<'vec2'>], Node<'float'>>(([p]) => {
+export const skHash12 = Fn<[Node<'vec2'>], Node<'float'>>(([p]): Node<'float'> => {
   const p3 = fract(vec3(p.x, p.y, p.x).mul(0.1031)).toVar();
   p3.addAssign(dot(p3, p3.yzx.add(33.33)));
   return fract(p3.x.add(p3.y).mul(p3.z));
 }).setLayout({ name: 'ow_skHash12', type: 'float', inputs: [{ name: 'p', type: 'vec2' }] });
 
-export const skHash13 = Fn<[Node<'vec3'>], Node<'float'>>(([p]) => {
+export const skHash13 = Fn<[Node<'vec3'>], Node<'float'>>(([p]): Node<'float'> => {
   const q = fract(p.mul(0.1031)).toVar();
   q.addAssign(dot(q, q.yzx.add(33.33)));
   return fract(q.x.add(q.y).mul(q.z));
 }).setLayout({ name: 'ow_skHash13', type: 'float', inputs: [{ name: 'p', type: 'vec3' }] });
 
-export const skHash33 = Fn<[Node<'vec3'>], Node<'vec3'>>(([p]) => {
+export const skHash33 = Fn<[Node<'vec3'>], Node<'vec3'>>(([p]): Node<'vec3'> => {
   const q = fract(p.mul(vec3(0.1031, 0.11369, 0.13787))).toVar();
   q.addAssign(dot(q, q.yxz.add(19.19)));
   return fract(vec3(q.x.add(q.y).mul(q.z), q.x.add(q.z).mul(q.y), q.y.add(q.z).mul(q.x)));
 }).setLayout({ name: 'ow_skHash33', type: 'vec3', inputs: [{ name: 'p', type: 'vec3' }] });
 
 /** Interleaved gradient noise (Jimenez) — the right dither for a raymarch. */
-export const skIGN = Fn<[Node<'vec2'>], Node<'float'>>(([p]) =>
+export const skIGN = Fn<[Node<'vec2'>], Node<'float'>>(([p]): Node<'float'> =>
   fract(fract(dot(p, vec2(0.06711056, 0.00583715))).mul(52.9829189))
 ).setLayout({ name: 'ow_skIGN', type: 'float', inputs: [{ name: 'p', type: 'vec2' }] });
 
-export const skVal2 = Fn<[Node<'vec2'>], Node<'float'>>(([p]) => {
+export const skVal2 = Fn<[Node<'vec2'>], Node<'float'>>(([p]): Node<'float'> => {
   const i = p.floor().toVar();
   const f0 = p.fract().toVar();
   const f = f0
@@ -56,7 +59,7 @@ export const skVal2 = Fn<[Node<'vec2'>], Node<'float'>>(([p]) => {
   );
 }).setLayout({ name: 'ow_skVal2', type: 'float', inputs: [{ name: 'p', type: 'vec2' }] });
 
-export const skVal3 = Fn<[Node<'vec3'>], Node<'float'>>(([p]) => {
+export const skVal3 = Fn<[Node<'vec3'>], Node<'float'>>(([p]): Node<'float'> => {
   const i = p.floor().toVar();
   const f0 = p.fract().toVar();
   const f = f0
@@ -78,8 +81,8 @@ export const skVal3 = Fn<[Node<'vec3'>], Node<'float'>>(([p]) => {
   );
 }).setLayout({ name: 'ow_skVal3', type: 'float', inputs: [{ name: 'p', type: 'vec3' }] });
 
-export const fbm2 = (octaves: number) =>
-  Fn<[Node<'vec2'>], Node<'float'>>(([p]) => {
+export const fbm2 = (octaves: number): FnNode<[Vector2 | Node<'vec2'>], Node<'float'>> =>
+  Fn<[Node<'vec2'>], Node<'float'>>(([p]): Node<'float'> => {
     const a = float(0.5).toVar();
     const s = float(0).toVar();
     const n = float(0).toVar();
@@ -94,8 +97,8 @@ export const fbm2 = (octaves: number) =>
   });
 
 /** Ridged variant — fibrous cirrus streaks and wind-torn fog wisps. */
-export const ridge2 = (octaves: number) =>
-  Fn<[Node<'vec2'>], Node<'float'>>(([p]) => {
+export const ridge2 = (octaves: number): FnNode<[Vector2 | Node<'vec2'>], Node<'float'>> =>
+  Fn<[Node<'vec2'>], Node<'float'>>(([p]): Node<'float'> => {
     const a = float(0.5).toVar();
     const s = float(0).toVar();
     const n = float(0).toVar();
@@ -109,8 +112,8 @@ export const ridge2 = (octaves: number) =>
     return s.div(max(n, 1e-4));
   });
 
-export const fbm3 = (octaves: number) =>
-  Fn<[Node<'vec3'>], Node<'float'>>(([p]) => {
+export const fbm3 = (octaves: number): FnNode<[Vector3 | Node<'vec3'>], Node<'float'>> =>
+  Fn<[Node<'vec3'>], Node<'float'>>(([p]): Node<'float'> => {
     const a = float(0.5).toVar();
     const s = float(0).toVar();
     const n = float(0).toVar();

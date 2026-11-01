@@ -1,4 +1,4 @@
-import type { Camera, DirectionalLight } from 'three';
+import type { DirectionalLight, Material } from 'three';
 import type NodeBuilder from 'three/src/nodes/core/NodeBuilder.js';
 import {
   Break,
@@ -23,10 +23,10 @@ import {
   uniformArray,
   vec3,
 } from 'three/tsl';
-import { EnvironmentNode, MeshStandardNodeMaterial, Vector3, Vector4 } from 'three/webgpu';
-import type { Node } from 'three/webgpu';
+import { EnvironmentNode, MeshStandardNodeMaterial, Node, Vector3, Vector4 } from 'three/webgpu';
 
 import type { EngineContext, EngineSystems } from '../core/context.ts';
+import { isRecord } from '../core/guards.ts';
 
 // Retained world indirect budget. Diffuse IBL is trimmed; world specular and
 // clearcoat stay intact. The view path additionally applies local visibility.
@@ -47,10 +47,11 @@ class IndirectEnvironmentNode extends EnvironmentNode {
     this.view = view;
   }
 
-  setup(builder: NodeBuilder): ReturnType<EnvironmentNode['setup']> {
+  override setup(builder: NodeBuilder): ReturnType<EnvironmentNode['setup']> {
     super.setup(builder);
     const f = this.fill;
-    const context = builder.context as unknown as LightingNodeContext;
+    const context = builder.context;
+    if (!isLightingContext(context)) throw new Error('[render] missing native lighting context');
     const ao = context.ambientOcclusion;
     const indoor = this.view ? f.viewVisibility : f.roomGate(positionWorld, ao);
     const up = clamp(normalWorld.y, -1, 1);
@@ -84,17 +85,22 @@ type IndirectContext = Pick<EngineContext, 'viewCamera' | 'peek'>;
 type IndirectSky = Pick<EngineSystems['sky'], 'ambientColor' | 'indirectScale'>;
 type IndirectLight = Pick<DirectionalLight, 'intensity' | 'color'>;
 type NodeValue<T extends string, V> = Node<T> & { value: V };
-type UniformVec4Array = ReturnType<typeof uniformArray> & {
-  element(index: Node<'int'>): Node<'vec4'>;
-  value: unknown;
-  update(): void;
-};
+type UniformVec4Array = ReturnType<typeof uniformArray<'vec4'>>;
 interface LightingNodeContext {
   ambientOcclusion: Node<'float'>;
   iblIrradiance: Node<'vec3'>;
   radiance: Node<'vec3'>;
   irradiance: Node<'vec3'>;
-  lightingModel: { clearcoatRadiance?: Node<'vec3'> };
+  lightingModel: { clearcoatRadiance?: Node<'vec3'> | null };
+}
+export function isLightingContext(value: unknown): value is LightingNodeContext {
+  if (!isRecord(value) || !isRecord(value.lightingModel)) return false;
+  for (const name of ['ambientOcclusion', 'iblIrradiance', 'radiance', 'irradiance']) {
+    const node = value[name];
+    if (!(node instanceof Node)) return false;
+  }
+  const clearcoat = value.lightingModel.clearcoatRadiance;
+  return clearcoat == null || clearcoat instanceof Node;
 }
 export class IndirectFill {
   declare ctx: IndirectContext;
@@ -131,10 +137,10 @@ export class IndirectFill {
     this.viewVisibility = uniform(1).setGroup(renderGroup);
     this.roomXf = uniform(new Vector4(1, 0, 0, 0));
     this.roomCount = uniform(0, 'int');
-    this.rooms = Array.from({ length: MAX_ROOMS }, () => new Vector4());
-    this.roomsY = Array.from({ length: MAX_ROOMS }, () => new Vector4());
-    this.roomBoxes = uniformArray(this.rooms, 'vec4') as unknown as UniformVec4Array;
-    this.roomHeights = uniformArray(this.roomsY, 'vec4') as unknown as UniformVec4Array;
+    this.rooms = Array.from({ length: MAX_ROOMS }, (): Vector4 => new Vector4());
+    this.roomsY = Array.from({ length: MAX_ROOMS }, (): Vector4 => new Vector4());
+    this.roomBoxes = uniformArray<'vec4'>(this.rooms, 'vec4');
+    this.roomHeights = uniformArray<'vec4'>(this.roomsY, 'vec4');
     // Node updateType stops CPU packing; a shared immutable binding group also
     // prevents per-object GPU uploads. Publish once when world data is ready.
     this.roomGroup = sharedUniformGroup('owRooms', 1, 'none');
@@ -147,51 +153,50 @@ export class IndirectFill {
     this._tmp = new Vector3();
     this._tmp2 = new Vector3();
     this._patched = new WeakSet();
-    this.roomGate = Fn<[Node<'vec3'>, Node<'float'>], Node<'float'>>(([worldPos, ao]) => {
-      const lx = worldPos.x
-        .mul(this.roomXf.x)
-        .add(worldPos.z.mul(this.roomXf.y))
-        .add(this.roomXf.z);
-      const lz = worldPos.z
-        .mul(this.roomXf.x)
-        .sub(worldPos.x.mul(this.roomXf.y))
-        .add(this.roomXf.w);
-      const indoor = float(0).toVar();
-      Loop(MAX_ROOMS, ({ i }) => {
-        If(i.greaterThanEqual(this.roomCount), () => {
-          Break();
+    this.roomGate = Fn<[Node<'vec3'>, Node<'float'>], Node<'float'>>(
+      ([worldPos, ao]): Node<'float'> => {
+        const lx = worldPos.x
+          .mul(this.roomXf.x)
+          .add(worldPos.z.mul(this.roomXf.y))
+          .add(this.roomXf.z);
+        const lz = worldPos.z
+          .mul(this.roomXf.x)
+          .sub(worldPos.x.mul(this.roomXf.y))
+          .add(this.roomXf.w);
+        const indoor = float(0).toVar();
+        Loop(MAX_ROOMS, ({ i }): void => {
+          If(i.greaterThanEqual(this.roomCount), (): void => {
+            Break();
+          });
+          const r = this.roomBoxes.element(i),
+            ry = this.roomHeights.element(i);
+          const dx = r.z.sub(abs(lx.sub(r.x))),
+            dz = r.w.sub(abs(lz.sub(r.y)));
+          const dy = min(worldPos.y.sub(ry.x), ry.y.sub(worldPos.y));
+          indoor.assign(max(indoor, smoothstep(0.06, 0.3, min(min(dx, dz), dy))));
         });
-        const r = this.roomBoxes.element(i) as unknown as Node<'vec4'>,
-          ry = this.roomHeights.element(i) as unknown as Node<'vec4'>;
-        const dx = r.z.sub(abs(lx.sub(r.x))),
-          dz = r.w.sub(abs(lz.sub(r.y)));
-        const dy = min(worldPos.y.sub(ry.x), ry.y.sub(worldPos.y));
-        indoor.assign(max(indoor, smoothstep(0.06, 0.3, min(min(dx, dz), dy))));
-      });
-      const aoGate = mix(1, smoothstep(0.45, 0.98, ao), 0.6);
-      return mix(INTERIOR_FLOOR, 1, clamp(min(float(1).sub(indoor), aoGate), 0, 1));
-    }) as unknown as typeof this.roomGate;
+        const aoGate = mix(1, smoothstep(0.45, 0.98, ao), 0.6);
+        return mix(INTERIOR_FLOOR, 1, clamp(min(float(1).sub(indoor), aoGate), 0, 1));
+      }
+    );
   }
 
-  patch(material: MeshStandardNodeMaterial | null | undefined): void {
-    if (!material?.isMeshStandardNodeMaterial || this._patched.has(material)) return;
+  patch(material: Material | null | undefined): void {
+    if (!(material instanceof MeshStandardNodeMaterial) || this._patched.has(material)) return;
     if (material.userData?.owNoPatch) return;
     this._patched.add(material);
     const original = material.setupEnvironment.bind(material);
     const viewCamera = this.ctx.viewCamera;
-    const wrapEnvironment = (node: Node, view: boolean) =>
+    const wrapEnvironment = (node: Node, view: boolean): IndirectEnvironmentNode =>
       new IndirectEnvironmentNode(node, this, view);
     // NodeMaterial's public lighting hook: preserve the actual environment
     // sampling and add diffuse-only fill in the same PBR lighting context.
-    material.setupEnvironment = function (builder: NodeBuilder) {
+    material.setupEnvironment = function (builder: NodeBuilder): EnvironmentNode | null {
       const env = original(builder);
       // Shared library materials can appear in BOTH passes. Viewmodel prewarm
       // compiles them in a temporary scene, but always with the view camera.
-      return env instanceof EnvironmentNode
-        ? wrapEnvironment(
-            env.envNode as Node,
-            (builder as NodeBuilder & { camera: Camera }).camera === viewCamera
-          )
+      return env instanceof EnvironmentNode && env.envNode !== null
+        ? wrapEnvironment(env.envNode, builder.camera === viewCamera)
         : env;
     };
     material.needsUpdate = true; // also correct materials compiled before they were registered
@@ -248,8 +253,8 @@ export class IndirectFill {
     this.roomCount.value = count;
     // Usually shader setup follows this call. Also handle an already-compiled
     // early variant: pack its allocated arrays and invalidate the binding once.
-    if (this.roomBoxes.value) this.roomBoxes.update();
-    if (this.roomHeights.value) this.roomHeights.update();
+    if (this.roomBoxes.value) this.roomBoxes.updateBuffer();
+    if (this.roomHeights.value) this.roomHeights.updateBuffer();
     this.roomGroup.needsUpdate = true;
     this._roomsReady = true;
     console.info(`[render] indirect gate: ${count} interior volumes`);

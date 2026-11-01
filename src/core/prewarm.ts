@@ -5,8 +5,11 @@ import type { Engine } from './engine.ts';
 /** Strict-WebGPU material warmup; never creates or requests a WebGL context. */
 export async function prewarm(
   engine: Engine,
-  { onProgress = () => {} }: { onProgress?: (progress: number) => void } = {}
-) {
+  { onProgress = (): void => {} }: { onProgress?: (progress: number) => void } = {}
+): Promise<
+  | { ok: boolean; reason: string; hooks?: undefined; ms?: undefined }
+  | { ok: boolean; hooks: Record<string, unknown>; ms: number; reason?: undefined }
+> {
   const render = engine.ctx.peek('render');
   const renderer = render?.renderer;
   if (!renderer) return { ok: false, reason: 'no renderer' };
@@ -31,7 +34,7 @@ export async function prewarm(
       if (typeof system.prewarmMaterials !== 'function') continue;
       // Real registry entries validate metadata at registration. Isolated warmup
       // fixtures can omit it; preserve the original property-key coercion.
-      const id = String((system.constructor as { id?: string }).id);
+      const id = String('id' in system.constructor ? system.constructor.id : undefined);
       try {
         hooks[id] = (await system.prewarmMaterials(engine.ctx)) ?? { ok: true };
       } catch (error) {
@@ -52,7 +55,8 @@ export async function prewarm(
   }
   return {
     ok: Object.values(hooks).every(
-      (hook) => !(typeof hook === 'object' && hook !== null && 'ok' in hook && hook.ok === false)
+      (hook): boolean =>
+        !(typeof hook === 'object' && hook !== null && 'ok' in hook && hook.ok === false)
     ),
     hooks,
     ms: Math.round(performance.now() - start),

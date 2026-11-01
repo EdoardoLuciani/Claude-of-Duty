@@ -3,7 +3,10 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { attribute } from 'three/tsl';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 
+import type { EngineSystems } from '../core/context.ts';
 import type { EventWeapon } from '../core/events.ts';
+import { isMesh } from '../core/three-guards.ts';
+import type { RigidBody } from '../physics/rigidbody.ts';
 import { P, buildBrassTextures } from './atlas.ts';
 import { resetSpawn } from './particles.ts';
 
@@ -41,7 +44,7 @@ interface ShellSlot extends CaseScale {
   shotgun: boolean;
   alive: boolean;
   age: number;
-  body: ShellRigidBody | null;
+  body: RigidBody | null;
   proxy: THREE.Object3D;
   pos: THREE.Vector3;
   vel: THREE.Vector3;
@@ -49,45 +52,11 @@ interface ShellSlot extends CaseScale {
   spin: THREE.Vector3;
   fade: number;
 }
-interface ShellRigidBody {
-  userData?: unknown;
-}
-interface ShellPhysics {
-  addRigidBody?:
-    | ((options: {
-        shape: 'box';
-        halfExtents: { x: number; y: number; z: number };
-        radius: number;
-        mass: number;
-        position: THREE.Vector3;
-        quaternion: THREE.Quaternion;
-        velocity: THREE.Vector3;
-        angularVelocity: THREE.Vector3;
-        restitution: number;
-        friction: number;
-        linearDamping: number;
-        angularDamping: number;
-        lifetime: number;
-        surfaceType: 'metal';
-        object3D: THREE.Object3D;
-        onImpact: (
-          body: ShellRigidBody,
-          px: number,
-          py: number,
-          pz: number,
-          nx: number,
-          ny: number,
-          nz: number,
-          speed: number
-        ) => void;
-      }) => ShellRigidBody | null)
-    | null;
-  removeRigidBody?(body: ShellRigidBody): void;
-}
+type ShellPhysics = Pick<EngineSystems['physics'], 'addRigidBody' | 'removeRigidBody'>;
 interface ShellFx {
   rng: import('../core/rng.ts').Rng;
   gravity: number;
-  physics?: ShellPhysics;
+  physics?: ShellPhysics | undefined;
   audioPing(x: number, y: number, z: number, gain: number): void;
   emitLit(spawn: ReturnType<typeof resetSpawn>): void;
 }
@@ -101,9 +70,9 @@ export interface ShellOptions {
 
 export async function loadSpentHullGeometry(): Promise<THREE.BufferGeometry> {
   const gltf = await new GLTFLoader().loadAsync('/models/fx/spent12g.glb');
-  const mesh = gltf.scene.getObjectByName('spent12g') as THREE.Mesh;
+  const mesh = gltf.scene.getObjectByName('spent12g');
   if (
-    !mesh?.isMesh ||
+    !isMesh(mesh) ||
     !mesh.geometry.hasAttribute('_shellpbr') ||
     !mesh.geometry.hasAttribute('color')
   ) {
@@ -124,7 +93,7 @@ export function setCaseScale<T extends CaseScale>(
   return out;
 }
 
-function caseProfile() {
+function caseProfile(): THREE.Vector2[] {
   // metres; a 5.56x45 case is 45 mm long, 9.6 mm at the base
   const pts: THREE.Vector2[] = [];
   const add = (r: number, y: number): number => pts.push(new THREE.Vector2(r, y));
@@ -235,7 +204,7 @@ export class ShellSystem {
 
   spawn(
     position: THREE.Vector3,
-    velocity?: Partial<THREE.Vector3> | null,
+    velocity?: Partial<Pick<THREE.Vector3, 'x' | 'y' | 'z'>> | null,
     opts: ShellOptions = {}
   ): ShellSlot {
     const fx = this.fx;
@@ -314,7 +283,7 @@ export class ShellSystem {
   }
 
   _onImpact = (
-    _body: ShellRigidBody,
+    _body: RigidBody,
     px: number,
     py: number,
     pz: number,

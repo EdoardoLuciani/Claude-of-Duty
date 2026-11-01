@@ -49,7 +49,8 @@ for (const [dir, banks, provenance, count, maxDuration, maxBytes, maxDecoded] of
       bytes += data.length;
       seconds += duration;
     }
-    if (dir === 'foley') assert.equal(cuts.size, urls.length, kind + ': distinct source crops');
+    if (dir === 'foley' || dir === 'explosions')
+      assert.equal(cuts.size, urls.length, kind + ': distinct source crops');
   }
   assert.equal(names.length, count, dir);
   assert.deepEqual(

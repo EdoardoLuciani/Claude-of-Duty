@@ -1,14 +1,14 @@
 # Engine contract
 
-Browser FPS: pinned Three.js 187dev + WebGPU only. Assets and WASM are local; no WebGL fallback.
+Browser FPS: Three.js r187 (`0.187.0`) + WebGPU only. Assets and WASM are local; no WebGL fallback.
 Read this before changing a subsystem. Workflow and validation: [AGENTS.md](AGENTS.md).
 
 ## Ownership and subsystem API
 
 Own only your assigned subsystem. Shared/lead-owned: `src/core/`, `src/main.ts`,
 `src/dev/`, `tools/`, `vite.config.js`. Coordinate changes across owners.
-Use `ctx.get(id)` rather than importing other subsystems. Existing constant
-couplings (`ai` → `weapons`, `weapons/preview` → `materials`) are exceptions.
+Use `ctx.get(id)` rather than importing other subsystems. The existing constant
+coupling `ai` → `weapons` is an exception.
 
 | id / directory                                      | responsibility                                              |
 | --------------------------------------------------- | ----------------------------------------------------------- |
@@ -24,7 +24,7 @@ couplings (`ai` → `weapons`, `weapons/preview` → `materials`) are exceptions
 | `ai`                                                | Soldiers, squads, navigation, perception, waves             |
 | `game`                                              | Survival state, score/rewards, HUD threat cues              |
 | `market`                                            | Between-wave shop/economy                                   |
-| `intel`                                             | Cache spawning, interaction, credits and archive            |
+| `intel`                                             | Cache spawning, interaction and credits                     |
 | `radio`                                             | Strike, bomber, bombs, blast chain                          |
 | `ui`                                                | HUD, menus, overlays                                        |
 | `audio`                                             | Synthesis/recordings, spatialization, occlusion             |
@@ -38,6 +38,11 @@ Teardown is reverse-order and failure-isolated.
 `canvas`, `config`, `events`, `input`, `time`, `rng`, `get/peek/has(id)`.
 `src/core/context.ts` owns the provider-keyed `EngineContext`; subsystem types
 come from their implementations, not independently handwritten consumer APIs.
+`Engine.add()` checks a constructor's literal static ID against that provider map.
+Direct registration is `registry.add(id, instance)`; the engine's registry checks
+the same ID/instance relationship. A standalone `Registry` promises only lifecycle
+hooks unless given an explicit provider map. Registration also invalidates ordering
+and hook caches.
 `src/core/bindings.ts` owns static physical defaults, action IDs, binding labels and
 action-backed contextual control reference. Input snapshots actions; gameplay
 consumers own state machines. UI adapts this metadata into the existing pause
@@ -54,12 +59,17 @@ state; dispose owned resources, not borrowed textures/geometry.
 
 Use `ctx.events`; [src/core/events.ts](src/core/events.ts) owns event names and
 typed plain-object payloads. Add/change the type and its producers/consumers
-together. Architectural semantics not captured by those types:
+together. Weapon identities use `WeaponId | 'ai_rifle'`; compact weapon descriptors
+require an ID. Free-form external names belong at the input/audio adapter boundary,
+not on gameplay events. Actor handles may remain opaque where only identity matters.
+Event names and payloads stay correlated even when dispatching unions (pass a
+correlated tuple rather than an independent union key and payload).
+Architectural semantics not captured by those types:
 
 - `bullet:segment` is reached free flight, clipped to collisions/range, excluding
   material interiors. Audio/suppression/tracers consume it rather than rebuilding
   rays from `weapon:fire`. Deduplicate near misses by shot; copy pooled vectors.
-  `shot:resolved` is telemetry, not another damage path; `bullet:tracer` is dev staging.
+  `shot:resolved` is telemetry, not another damage path.
 - `damage:dealt` means damage **to** target; exclude player targets from hitmarkers.
   Targets alone apply health damage. Physics emits once per actor/round using the
   highest reached region, with range/penetration/region scaling already applied.
@@ -72,6 +82,14 @@ together. Architectural semantics not captured by those types:
 - A wave clear allows 10 s ammo-looting grace, then one player-dismissed shop
   session. The shop freezes scaled time and the longer AI wave countdown.
 - `ai:footstep` is one boot per animated stride plant; cull by distance.
+  `ai:bark` requests recorded contact on visual acquisition, reload on actual
+  reload start, or an outgoing-grenade announcement after a successful launch.
+  Its `voice` is the actor's immutable sequential ID: audio distributes four
+  fixed identities evenly by ID, varying takes rather than pitch/speaker.
+  `position` is that actor's retained position, not pooled scratch. Speech uses
+  one tracked spatial slot, duration/actor cooldowns and no queue; grenade
+  announcements can preempt ordinary lines. Pause/shop/death/error stop it,
+  and restart clears speech history. Unsupported intents remain silent.
   `hud:search` is a coarse 45° last-enemy sector; pause/shop freeze its timer.
 - Intel chooses unused sites, initially 18 m from player / 24 m from live cases,
   preferring sites absent from the last five drops. History survives reloads/runs
@@ -81,7 +99,7 @@ together. Architectural semantics not captured by those types:
   evidence within 75 m; detector pings never alert AI. Spark cadence is 0.16 s,
   using pooled FX without lights/decals. Also stop audio on shop/pause/death/
   restart/terminal error. Securing pays 500 shop credits independently of score;
-  cards are archived names, not implemented perks. Intel yields to busy hands
+  Intel yields to busy hands
   and has aimed-visible interaction priority over ammo. Prompts use owner-scoped
   `ui.setPrompt(p, owner)` / `ui.clearPrompt(owner)`.
 - The first `engine:error` is terminal: abort the failed synchronous dispatch,
@@ -93,7 +111,10 @@ together. Architectural semantics not captured by those types:
 ## Physics and world contracts
 
 Surface names: `concrete, metal, wood, dirt, sand, glass, water, foliage, fabric,
-flesh, rubber, plaster`.
+flesh, rubber, plaster`. `src/physics/surfaces.ts` owns `SurfaceName`; carry it through
+physics results, events, FX and audio. Explicit collision/ballistic metadata is
+validated, never guessed or silently replaced. Only unlabelled mesh/material names
+use `guessSurface`; world query/visual authoring labels are a separate vocabulary.
 
 `physics.fireBullet({ origin, dir, shooter, damage, penetration, maxDist,
 maxRange?, travelled?, from?, dropoff?, weapon?, shot?, mask?, emit? })` returns
@@ -119,6 +140,10 @@ clear flush remaining reached contacts before telemetry/retirement. Extreme
 sideways/backwards scatter may require that terminal flush rather than normal
 forward completion. Instantaneous/AI damage publication remains immediate.
 Targets own health; range/region scaling is already applied and must not repeat.
+AI transitions use `AiState` from `agent.ts`; player locomotion uses `PlayerMoveState`,
+with presentation-only `lean` added by `PlayerState`. Keep `WeaponMode` semantic
+through HUD polling (uppercase only for display), and mixer-owned `BusName`
+through dry/spatial/send routing.
 
 Collision `surface` is the impact finish; optional `ballisticSurface` determines
 penetration. Preserve cooked `_solid` IDs; unlabelled geometry uses connected
@@ -127,8 +152,11 @@ Only explicit `sheetThickness` authorizes single-sided penetration; missing exit
 stop as `unknown-thickness`, overlapping solids as `overlapping-solids`.
 No nominal fallback or layered-solid approximation.
 
-JS in `tools/worldgen/` is world-authoring authority; `placements/` owns
-free-standing prop transforms. `npm run world` builds meshes and cooks collision
+JS in `tools/worldgen/` is world-authoring authority. Map-specific layout,
+configuration, intel sites and free-standing prop transforms live in `level/`;
+`level/placements/` is data-only, while `placement.js` owns validation, placement
+execution and clutter clearance. The [world editing map](tools/worldgen/README.md)
+connects content, geometry and baking. `npm run world` builds meshes and cooks collision
 with meshoptimizer from the canonical instance buckets. Visual-only bucket
 coalescing may join non-distance-LOD clouds within the existing 64 m X/Z span;
 it must not change collision inputs or navigation. Both transient outputs use
@@ -227,22 +255,95 @@ Unexpected GPU loss is terminal and stops the loop; intentional destruction is
 not a gameplay failure. Init/prewarm must not publish readiness after loss.
 Detach owned callbacks/lights and finish failure-isolated teardown. Upstream now
 owns TRAA depth/history disposal; keep first-build and active-history lifetime
-regressions, not external disposal of its private textures. The Git dependency's
-ESM exports use source so committed stale bundles cannot hide the pinned fixes.
-Keep the source-export correction and upstream buffer-name verification
-exact-commit/hash guarded; see README upgrade checks. Builder-local WGSL buffer
+regressions, not external disposal of its private textures. The published npm
+release uses unmodified ESM bundles; no postinstall source-export correction is
+needed. Keep release/export/shared-core and upstream source/bundle regressions;
+see README upgrade checks. Builder-local WGSL buffer
 names enable native program/pipeline reuse. Upstream reference attributes bind each
 instanced mesh's own buffers while compatible meshes share shader-builder state;
 object-specific builds remain uncached. Preserve pixel-level buffer isolation and
 reuse regressions rather than restoring obsolete per-object cache-key IDs.
 
 Bakes use native top-left texture UVs and shared `QuadMesh` geometry: no extra Y
-flip or disposal of borrowed geometry. Preview PNGs redirect the output target
-with an untagged attachment, avoiding double sRGB. Gameplay readback uses its
-explicit display-transform path. Standalone FX reuses depth/world/view/haze
-composition with its ACES transform; first-person refraction uses world coordinates.
+flip or disposal of borrowed geometry. Gameplay readback uses its explicit
+display-transform path. First-person refraction uses world coordinates.
+
+## Gameplay HUD and native controls
+
+The gameplay HUD always uses `ui/pixi-hud.ts` (`PixiHud`), including without URL
+flags. One passive, display-resolution WebGPU canvas borrows Three's initialized
+GPUDevice through `ui/pixi-device.ts`. No WebGL, additional HUD device,
+Application/render ticker or shared renderer-cache ownership. Only Three destroys
+the borrowed device; Pixi owns its stage, geometry, shaders, textures and canvas.
+The restricted DOM adapter must restore on construction/init/disposal failure.
+
+Pixi presents ammo/reload, health/armour, crosshair, retained minimap, fullscreen
+injury, compass/heard pings, hitmarkers/damage arcs, bandage/grenade inventory,
+FPS, score/status, killfeed, prompts/progress and banners/countdown. Its canvas sits below native centre/chrome/menu layers. Injury is independent
+of readout fading. HUD fade, independent capped DPR, static-paused/absent-content
+redraw suppression, paused-FPS invalidation and failure-isolated teardown remain.
+`HealthFx`, `Crosshair`, `Hitmarkers`, `DamageArcs`, `Compass` and `AmmoPanel`
+retain animation/derived state, not legacy elements. Hit/arc/heard-ping pools use
+null nodes with the same bounded lifetime/reuse policy. Killfeed's six-row pool
+also uses null nodes; `pixi-feedback.ts` presents its retained rows and other passive
+messages. Prompt ownership, progress, banner timing and score/status priority stay
+in the controllers; the independently anchored supply countdown uses raw time. Inventory pulses use unscaled UI time (280ms each direction); FPS
+samples wall time every500ms. Existing gameplay snapshots/events remain authority.
+
+Minimap's detached Canvas2D terrain bake remains one-time; `minimap.ts` no longer
+owns a live canvas/widget/draw loop. Pixi retains terrain, fitted name/code labels,
+48-contact capacity, search radii/height cues, clipping/fades and player ordering.
+FOV/search changes transform retained geometry. Chosen simple accessory icons and
+magazine bar stay. `pixi-type.ts` owns32/16/12px bottom-HUD value/count/label tiers.
+Radio inventory indication and dormant projected markers remain absent.
+
+The old HTML presenters/CSS, HTML fallback and comparison switches are removed.
+Legacy `pixi`, `combat`, `compass`, `underlays`, `icons` query flags do not select
+another backend. Standalone pause/ammo prototypes and unused `@pixi/ui` are retired.
+A required HUD initialization failure propagates to the native boot/reload dialog;
+readiness/gameplay must not start with no HUD. Preserve the original error even
+if partial cleanup fails.
+
+Start/error controls, menus/shop/game-over and the field-radio panel remain native. The independent market
+inspection renderer is unchanged. This is not a wholesale UI framework/migration.
+See the [HUD contract and smoke checks](docs/hud.md). Earlier experiment reports
+and capture harnesses are available in Git history at `d5858ebc`.
 
 ## Models
+
+The [asset/world editing map](docs/assets.md) connects authoring tools, products
+and runtime consumers. Weapon authoring entry points and checks live together in
+`tools/blender/<weapon>/build.py` and `check.py`; asset products and runtime
+adapters retain their separate ownership.
+
+`weapons.createInspectionModel(id)` returns an independent rest-pose scene and
+`dispose()` for the market's single demand-rendered WebGPU studio. Cloned transforms,
+skeletons and mixers are inspection-owned; geometry, materials and maps are borrowed
+from gameplay and must not be disposed by the caller. UI drops the clone on selection,
+close/restart/error and releases its renderer/environment at teardown. Controls use
+DOM input, not the paused simulation clock. Only explicit Buy/Swap buttons
+purchase; selecting or inspecting an item never changes loadout or credits.
+Non-weapon market items use the exhaustive local artwork map in
+`src/ui/market-art.ts`. Image selection invalidates pending weapon clones and hides
+3D-only controls; image errors leave purchases usable.
+Artwork generation is offline-only; model, prompts and processing live in
+`assets/ui/market/`, with optimized runtime WebPs in `public/images/market/`.
+
+`build/models.mjs` owns explicit gltfpack runtime-model cooking and per-model
+profiles (`npm run models:cook`). Normal builds consume committed `.runtime.glb`
+products; they do not run the encoder. All seven authored weapons opt in.
+Adding profiles requires adapter, animation and visual validation rather than
+blanket simplification. Editable Blender sources remain authoring references.
+M4/MCX adapters decode packed finish metadata in small weapon-local physical-node
+graphs; their consolidated GLBs require those adapters for material fidelity.
+M4, MPX and AX338 rigid assemblies use ordinary meshes; EVOLYS skins only its
+deforming belt. Keep static bodies out of mechanical skins merely to reduce
+primitive counts; preserve independent moving controls and magazine ownership.
+
+`src/weapons/asset-loader.ts` serializes compressed model loads to bound Basis
+worker/memory use and owns per-load decoder/error cleanup. Material conversion
+shares equivalent static map clones only when source, UV channel/transform,
+color space and sampler state match, avoiding duplicate WebGPU uploads for UV1.
 
 `tools/export-models.mjs` runs the same procedural builders offline with a fixed
 seed; runtime never builds meshes. Regenerate ALL procedural models, since
@@ -258,6 +359,13 @@ STEP-scale visibility owned/reset by the adapter, never detachable-magazine
 parts or drop pools. Native metres, sockets, grips and provisional 89 mm travel
 remain asset-owned; damage, 6+1 accounting and per-shell interruption remain in
 the common weapon system.
+`src/weapons/defs.ts` owns the weapon tuning schema, IDs, slot IDs and fire modes;
+check authored data against that schema rather than inferring its contract from
+current values. Keep internal state keyed by `WeaponId`; narrow DOM/URL/debug
+strings with `isWeaponId` at entry. Authored models carry literal adapter IDs,
+and the loader table checks complete ID coverage and per-ID adapter returns.
+The market UI derives its item contract from `MarketSystem.getHudState()`.
+
 Preserve shared IK, ADS/sway/recoil and pooled casings. Source/regen/reference
 contracts live beside each asset. Weapons force physical materials and borrow
 source maps. Arms consolidate authored Physical finishes into one opaque material
@@ -271,12 +379,26 @@ FX particle/decal PNGs are required runtime assets; generation
 lives in `tools/lib/fx-atlas.ts` and the offline texture exporter. Missing/invalid
 atlases reject FX initialization. Recorded audio fetch/decode failures disable the
 audio graph rather than substituting synthesis. Physical hits and movement/body/
-equipment foley, bomber loops, nonverbal reactions and sparse environmental events
-use required recordings. Radio owns aircraft pose/pass lifetime; audio owns source
+equipment foley, bomber loops, nonverbal reactions, explosions and sparse environmental
+events use required recordings. Explosions carry optional `kind: 'grenade' | 'bomb'`
+(legacy default: grenade); audio blends recorded close/mid/far perspectives with no
+synthetic blast layers. Radio owns aircraft pose/pass lifetime; audio owns source
 cleanup. Radio textures supplement intentional electronic tones. Do not invent
 ambient human/tactical actors.
-Remaining synthesis includes legacy AK/generic-suppressed reports and reinforcement,
-shell casings/dry fire, tactical speech and intentional UI cues.
+Tactical contact/reload/outgoing-grenade speech uses required offline-generated,
+locally bundled Opus recordings with source hashes, prompts and processing in
+`src/audio/samples/callouts/provenance.json`; authoring/rights notes live in
+`assets/audio/tactical-callouts/README.md`. No runtime TTS or credential access.
+Reached-segment bullet near-misses, material-mapped casing drops, family-matched dry
+fire and grenade throw foley also use required recordings. Physical grenade
+handling uses the foley bus; the pin cue is silent pending a suitable recording,
+and cooking the fuse has no synthetic warning beep. Empty
+triggers play a click without emitting a shot, muzzle flash or AI-hearing evidence.
+All firearm reports, including close/distant AK and background gunfire, use required
+recordings without synthetic reinforcement. MCX/MPX select explicit suppressed
+recordings; unsupported generic-suppressed requests stay silent rather than using
+another gun's report. Remaining synthesis is intentional UI/electronic feedback,
+healing-completion cues, tinnitus and shop music/reverb. Other spoken intents remain deferred.
 
 `models.getSoldier(name)` returns `{ name, geometry, slots, boneNames, weapon,
 stats, variant }`. Merge GLTF primitives into one skinned geometry with slot
@@ -315,6 +437,21 @@ that build unused contexts or repeat it in a world hook.
 
 Diagnostic counter/readback contracts live in `src/dev/render-info.ts`; they do not
 change warmup staging or renderer-info reset scheduling.
+
+## Type contracts
+
+Optional override/patch fields mean omission, not an explicit `undefined` write
+(`exactOptionalPropertyTypes`). Config, material/bake and weather patches also
+skip undefined values from untyped JS/debug callers via `applyDefinedPatch`.
+Snapshots, telemetry and defaulted inputs may explicitly permit undefined where
+that means unavailable or use the default. Use straightforward assignments there;
+do not manufacture property omission when consumers do not distinguish it.
+Required-state patches remain strict.
+Material authoring options are closed and use native Three material parameter
+types, not node-graph inputs. Physical-only values require `physical: true`;
+callers cannot downgrade a library-authored physical finish to a standard material.
+Live uniforms, pooled bookkeeping and internally supplied world/time inputs
+are not authoring options. Keep finite catalogs exhaustive and sparse maps sparse.
 
 ## Quality
 

@@ -1,8 +1,8 @@
 /**
  * AUDIO — recorded weapon fire/physical hits, spatialisation and mix
  *
- * Recorded assets are required. Synthesis supplies authored reinforcement,
- * casings/dry fire, voices, ambience and UI—not failed-load recovery.
+ * Physical sounds and firearm reports require recordings. Synthesis supplies
+ * intentional electronic/UI cues, never missing-asset recovery.
  *
  * ───────────────────────────────────────────────────────────────────────────
  * PUBLIC API   const audio = ctx.get('audio')
@@ -12,9 +12,8 @@
  *   audio.deafness                     0..1 concussion; UI/post may read this
  *   audio.play(kind, position, opts)   one-shot; position null = head-locked
  *   audio.startAircraft(position)     tracked recorded loop handle: move/stop
- *   audio.bark(kind, position, opts)   enemy voice: 'spot' | 'reload' |
- *                                      'grenade' | 'flank' | 'suppress' |
- *                                      'advance' | 'hurt' | 'death' | 'copy'
+ *   audio.bark(kind, position, opts)   recorded enemy voice: 'spot' | 'reload' |
+ *                                      'grenade' (our throw) | 'hurt' | 'death'
  *   audio.ui(kind)                     'hitmarker'|'headshot'|'kill'|'damage'
  *   audio.setMasterVolume(v)  audio.setBusVolume(bus, v)
  *   audio.setAmbienceIntensity(v)      scales the distant-battle scheduler
@@ -29,32 +28,28 @@
  * player:state, player:heartbeat, explosion. Optional `ai:bark` is picked up too.
  */
 
-import type { EngineContext } from '../core/context.ts';
+import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName, ReloadPhase } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
+import type { SurfaceName } from '../physics/surfaces.ts';
 import { AircraftVoice, AIRCRAFT_MIX, type AircraftPosition } from './aircraft.ts';
 import { Ambience, ONE_SHOTS, AMBIENT_EVENT_GAIN } from './ambience.ts';
+import { CalloutPlayer, isCalloutKind } from './callouts.ts';
+import { CASING_BANK, COMBAT_MIX, dryBank, nearMissGain } from './combat.ts';
 import { NoiseBank, SPEED_OF_SOUND, clamp, gain as mkGain } from './dsp.ts';
-import type { EnvironmentKind } from './environment.ts';
-import { shellCasing, explosion, uiSound, heartbeat, intelSiren } from './foley.ts';
+import { isEnvironmentKind } from './environment.ts';
+import { EXPLOSION_MIX, explosionDistanceGain, type ExplosionKind } from './explosions.ts';
+import { uiSound, heartbeat, intelSiren } from './foley.ts';
 import { classifySpace, SPACE_KEYS } from './ir.ts';
 import { Mixer } from './mixer.ts';
+import type { BusName } from './mixer.ts';
 import { TentRadio } from './music.ts';
 import { radioCue } from './radio.ts';
 import { reactionKind } from './reactions.ts';
 import { WeaponSampleBank } from './samples.ts';
 import { SpatialField } from './spatial.ts';
 import type { WeaponProfile } from './types.ts';
-import { bark as voxBark, barkFor } from './vox.ts';
-import {
-  WEAPON_PROFILES,
-  reportDistanceGain,
-  resolveProfile,
-  weaponShot,
-  weaponPunch,
-  bulletWhizz,
-  dryFire,
-} from './weapons.ts';
+import { WEAPON_PROFILES, reportDistanceGain, resolveProfile } from './weapons.ts';
 
 const PROBE_RAYS = 9;
 const PROBE_DIST = 40;
@@ -65,41 +60,41 @@ const GESTURES = ['pointerdown', 'mousedown', 'keydown', 'touchstart', 'wheel', 
 /** An enemy boot is at the edge of the mix here, and gone by the fade below it. */
 const AI_STEP_RANGE = 32;
 const AI_STEP_FADE = 12;
+const CALLOUT_BLOCK = { pause: 1, shop: 2, death: 4, error: 8 } as const;
 
 type Vec3Like = { x: number; y: number; z: number };
 interface AudioOptions {
-  profile?: WeaponProfile;
-  firstPerson?: boolean;
-  miss?: number;
-  gain?: number;
-  surface?: string;
-  energy?: number;
-  amount?: number;
-  armourAbsorbed?: number;
-  plateBreak?: boolean;
-  gait?: string;
-  level?: number;
-  gear?: number;
-  flight?: number;
-  phase?: ReloadPhase;
-  reloadWeapon?: string;
-  radius?: number;
-  bark?: string;
-  f0?: number;
-  tract?: number;
-  radio?: boolean;
-  which?: string;
-  send?: number;
-  maxDist?: number;
-  noDelay?: boolean;
-  extraDelay?: number;
-  occlusion?: number;
-  tracked?: boolean;
-  dist?: number;
-  voice?: number;
-  priority?: number;
-  bus?: string;
-  force?: boolean;
+  profile?: WeaponProfile | undefined;
+  firstPerson?: boolean | undefined;
+  miss?: number | undefined;
+  gain?: number | undefined;
+  surface?: SurfaceName | undefined;
+  energy?: number | undefined;
+  amount?: number | undefined;
+  armourAbsorbed?: number | undefined;
+  plateBreak?: boolean | undefined;
+  gait?: string | undefined;
+  level?: number | undefined;
+  gear?: number | undefined;
+  flight?: number | undefined;
+  phase?: ReloadPhase | undefined;
+  reloadWeapon?: string | undefined;
+  dryWeapon?: string | undefined;
+  explosionKind?: ExplosionKind | undefined;
+  bark?: string | undefined;
+  radio?: boolean | undefined;
+  which?: string | undefined;
+  send?: number | undefined;
+  maxDist?: number | undefined;
+  noDelay?: boolean | undefined;
+  extraDelay?: number | undefined;
+  occlusion?: number | undefined;
+  tracked?: boolean | undefined;
+  dist?: number | undefined;
+  voice?: number | undefined;
+  priority?: number | undefined;
+  bus?: BusName | undefined;
+  force?: boolean | undefined;
 }
 type AudioRuntimeContext = Pick<EngineContext, 'rng' | 'camera' | 'events' | 'peek'>;
 interface SpaceMetrics {
@@ -163,7 +158,7 @@ const UI_ALIAS: Record<string, string> = {
 };
 
 /** Default bus per voice kind, so callers do not have to know the mix layout. */
-const BUS_FOR: Record<string, string> = {
+const BUS_FOR: Partial<Record<string, BusName>> = {
   shot: 'weapons',
   explosion: 'weapons',
   dryfire: 'weapons',
@@ -180,9 +175,7 @@ const BUS_FOR: Record<string, string> = {
   market_hover: 'ui',
   market_deny: 'ui',
   grenade_warn: 'ui',
-  grenade_pin: 'ui',
-  grenade_tick: 'ui',
-  grenade_throw: 'ui',
+  grenade_throw: 'foley',
   radio_open: 'ui',
   radio_denied: 'ui',
   radio_strike: 'ui',
@@ -254,7 +247,8 @@ export class AudioSystem {
   declare _budget: AudioBudget;
   declare _lastBarkTime: number;
   declare _lastReactionEnd: number;
-  declare _lastEnemyFire: number;
+  declare _callouts: CalloutPlayer | null;
+  declare _calloutBlocks: number;
   declare _stance: string | null;
   declare _ads: boolean;
   declare stats: AudioStats;
@@ -263,8 +257,8 @@ export class AudioSystem {
   declare _ambienceApi: AmbienceApi | null;
   declare _aircraft: Set<AircraftVoice>;
 
-  static id = 'audio';
-  static deps = [];
+  static readonly id = 'audio';
+  static readonly deps: SystemId[] = [];
 
   constructor() {
     this.running = false;
@@ -313,7 +307,8 @@ export class AudioSystem {
     this._budget = { impact: 0, step: 0, aiStep: 0, shell: 0, whizz: 0 };
     this._lastBarkTime = -99;
     this._lastReactionEnd = -99;
-    this._lastEnemyFire = -99;
+    this._callouts = null;
+    this._calloutBlocks = 0;
 
     this._stance = null;
     this._ads = false;
@@ -349,9 +344,9 @@ export class AudioSystem {
     // Web Audio needs a user gesture. Arm every plausible one; the first to
     // land builds the graph. Capture mode never gestures, so shots render in
     // silence and stay byte-identical.
-    const kick = () => {
+    const kick = (): void => {
       this._disarmGesture();
-      this.start().catch(() => {});
+      this.start().catch((): void => {});
     };
     this._gestureHandler = kick;
     if (typeof addEventListener === 'function') {
@@ -360,7 +355,7 @@ export class AudioSystem {
     if (typeof window !== 'undefined') window.__AUDIO__ = this;
   }
 
-  _disarmGesture() {
+  _disarmGesture(): void {
     if (!this._gestureHandler) return;
     for (const ev of GESTURES) removeEventListener(ev, this._gestureHandler);
     this._gestureHandler = null;
@@ -370,7 +365,7 @@ export class AudioSystem {
    * Build the graph. Safe to call repeatedly; resolves false when audio is
    * unavailable (no AudioContext, blocked autoplay, headless renderer, ...).
    */
-  async start() {
+  async start(): Promise<boolean> {
     if (this.running) return true;
     if (this.failed) return false;
     // A pointer gesture and a menu/API call can land in the same task. Without
@@ -386,7 +381,7 @@ export class AudioSystem {
     }
   }
 
-  async _startGraph() {
+  async _startGraph(): Promise<boolean> {
     try {
       const AC = globalThis.AudioContext;
       if (!AC) throw new Error('no AudioContext');
@@ -400,7 +395,7 @@ export class AudioSystem {
       const samples = (this.samples = new WeaponSampleBank(actx));
       await samples.load();
       const mixer = (this.mixer = new Mixer(actx, this.rng.fork(), {}));
-      mixer.energyMix.onprocessorerror = () => {
+      mixer.energyMix.onprocessorerror = (): void => {
         console.error('[audio] energy processor failed; disabling audio');
         this.stats.errors++;
         this.failed = true;
@@ -408,6 +403,7 @@ export class AudioSystem {
       };
       mixer.buildReverbs();
       this.field = new SpatialField(actx, mixer, this.ctx);
+      this._callouts = new CalloutPlayer(actx, this.field, samples, this.rng.fork());
       const ambience = (this.ambience = new Ambience(this.rng.fork()));
       ambience.start();
       const tentRadio = (this.tentRadio = new TentRadio(actx, mixer, this.rng.fork()));
@@ -428,9 +424,11 @@ export class AudioSystem {
     }
   }
 
-  _teardown() {
+  _teardown(): void {
     this._onIntelOperation({ active: false });
     this._lastReactionEnd = -99;
+    this._callouts?.reset();
+    this._callouts = null;
     this._stopAircraft(true);
     try {
       this.tentRadio?.dispose();
@@ -448,7 +446,7 @@ export class AudioSystem {
     this.running = false;
   }
 
-  dispose() {
+  dispose(): void {
     this._disarmGesture();
     for (const off of this._offs) off();
     this._offs.length = 0;
@@ -489,14 +487,15 @@ export class AudioSystem {
 
       /* ---- subsystems -------------------------------------------- */
       this.mixer!.update(dt);
+      this._callouts?.update();
       this.field!.update();
       for (const voice of this._aircraft) if (voice.ended) this._aircraft.delete(voice);
       this.deafness = this.mixer!.deafness;
       if (!this._ambienceApi) {
         this._ambienceApi = {
-          distantVolley: () => this._distantVolley(),
-          distantBoom: () => this._distantBoom(),
-          oneShot: () => this._ambientOneShot(),
+          distantVolley: (): void => this._distantVolley(),
+          distantBoom: (): void => this._distantBoom(),
+          oneShot: (): void => this._ambientOneShot(),
         };
       }
       this.ambience!.update(dt, this._ambienceApi);
@@ -641,53 +640,40 @@ export class AudioSystem {
    * Build a voice by name. `when` is absolute context time, `dist` is metres
    * from the listener — voices use it to rebalance their own layers.
    */
-  _build(kind: string, when: number, dist: number, o: AudioOptions) {
+  _build(
+    kind: string,
+    when: number,
+    dist: number,
+    o: AudioOptions
+  ): import('./types.ts').AudioVoice {
     const actx = this.actx!,
       bank = this.bank!;
     const rng = this.rng;
     switch (kind) {
-      case 'shot': {
-        const profile: WeaponProfile = o.profile ?? WEAPON_PROFILES.rifle;
-        // Complete authored reports carry their own decay. The sample bank selects
-        // distant enemy perspectives; MCX/MPX retain suppressed sources at range.
-        // Unmodified legacy profiles keep their procedural distant model.
-        if (o.firstPerson || dist <= 45 || profile.samplePunch === false) {
-          const recorded = this.samples!.shot(profile, rng, {
-            when,
-            distance: dist,
-            firstPerson: o.firstPerson,
-          });
-          if (profile.samplePunch === false) return recorded;
-          const punch = weaponPunch(actx, bank, rng, profile, {
-            when,
-            distance: dist,
-            firstPerson: o.firstPerson,
-          });
-          const out = mkGain(actx, 1);
-          recorded.node.connect(out);
-          punch.node.connect(out);
-          return {
-            node: out,
-            end: Math.max(recorded.end, punch.end),
-            send: Math.max(recorded.send ?? 0, punch.send ?? 0),
-          };
-        }
-        return weaponShot(actx, bank, rng, profile, {
+      case 'shot':
+        return this.samples!.shot(o.profile ?? WEAPON_PROFILES.rifle, rng, {
           when,
           distance: dist,
           firstPerson: o.firstPerson,
-          echoBoost:
-            0.75 +
-            this._space.street * 0.7 +
-            this._space.tight * 0.35 +
-            this._space.tunnel * 0.8 +
-            this._space.open * 0.2,
         });
-      }
       case 'whizz':
-        return bulletWhizz(actx, bank, rng, { when, miss: o.miss, gain: o.gain });
+        return this.samples!.combat('whizz', rng, {
+          when,
+          level: nearMissGain(o.miss) * (o.level ?? 1),
+          send: COMBAT_MIX.whizzSend,
+        });
       case 'dryfire':
-        return dryFire(actx, bank, rng, { when });
+        return this.samples!.combat(dryBank(o.dryWeapon ?? o.profile?.sample), rng, {
+          when,
+          level: o.level,
+          send: COMBAT_MIX.drySend,
+        });
+      case 'grenade_throw':
+        return this.samples!.combat('grenade-throw', rng, {
+          when,
+          level: o.level,
+          send: COMBAT_MIX.handlingSend,
+        });
       case 'damage':
         return this.samples!.damage(rng, {
           when,
@@ -715,35 +701,24 @@ export class AudioSystem {
           gear: o.gear,
         });
       case 'shell':
-        return shellCasing(actx, bank, rng, {
-          when,
-          surface: o.surface,
-          level: o.level,
-          flight: o.flight,
-        });
+        return this.samples!.combat(
+          CASING_BANK[o.surface ?? 'concrete'] ?? 'casing-concrete',
+          rng,
+          {
+            when,
+            level: o.level,
+            delay: o.flight ?? COMBAT_MIX.casingFlight,
+            send: COMBAT_MIX.casingSend,
+          }
+        );
       case 'reload':
         return this.samples!.reload(o.reloadWeapon ?? '', o.phase, rng, { when });
-      case 'explosion': {
-        if (dist > 50)
-          return explosion(actx, bank, rng, {
-            when,
-            distance: dist,
-            radius: o.radius,
-            level: o.level,
-          });
-        const recorded = this.samples!.explosion(rng, { when });
-        const synthetic = explosion(actx, bank, rng, {
+      case 'explosion':
+        return this.samples!.explosion(o.explosionKind ?? 'grenade', rng, {
           when,
           distance: dist,
-          radius: o.radius,
-          // The required recording carries the blast; synthesis reinforces it.
-          level: (o.level ?? 1) * 0.48,
+          level: o.level,
         });
-        const out = mkGain(actx, 1);
-        recorded.node.connect(out);
-        synthetic.node.connect(out);
-        return { node: out, end: synthetic.end, send: synthetic.send };
-      }
       case 'radio_open':
       case 'radio_strike':
       case 'intel_call': {
@@ -766,17 +741,11 @@ export class AudioSystem {
           this._lastReactionEnd = Math.max(this._lastReactionEnd, voice.end);
           return voice;
         }
-        return voxBark(actx, bank, rng, {
-          when,
-          bark: o.bark,
-          f0: o.f0,
-          tract: o.tract,
-          level: o.level,
-          radio: o.radio,
-        });
+        throw new Error('[audio] unknown recorded reaction: ' + o.bark);
       }
       case 'ambient':
-        return this.samples!.environment(o.which as EnvironmentKind, rng, { when, level: o.level });
+        if (!isEnvironmentKind(o.which)) throw new Error('[audio] unknown environment: ' + o.which);
+        return this.samples!.environment(o.which, rng, { when, level: o.level });
       default:
         return uiSound(actx, bank, rng, kind, { when, level: o.level });
     }
@@ -792,7 +761,7 @@ export class AudioSystem {
     y: number,
     z: number,
     o: AudioOptions = {},
-    bus = 'foley',
+    bus: BusName = 'foley',
     priority = 0.5
   ): boolean {
     if (!this.running || this.actx!.state === 'suspended') return false;
@@ -816,9 +785,11 @@ export class AudioSystem {
         // Selected presentation reference + fixed digital-bank energy matching.
         // The sample selector and correction share the same perspective rule.
         atten:
-          kind === 'shot' && (o.profile ?? WEAPON_PROFILES.rifle).samplePunch === false
+          kind === 'shot'
             ? reportDistanceGain(dist, o.profile ?? WEAPON_PROFILES.rifle, o.firstPerson)
-            : undefined,
+            : kind === 'explosion'
+              ? explosionDistanceGain(dist, o.explosionKind ?? 'grenade')
+              : undefined,
         send: o.send ?? voice.send ?? 0.3,
         gain: o.gain ?? 1,
         endTime: voice.end,
@@ -843,7 +814,7 @@ export class AudioSystem {
   }
 
   /** Head-locked one-shot: own weapon, UI, player grunts, heartbeat. */
-  _playDry(kind: string, o: AudioOptions = {}, bus = 'foley', send = 0.15): boolean {
+  _playDry(kind: string, o: AudioOptions = {}, bus: BusName = 'foley', send = 0.15): boolean {
     if (!this.running || this.actx!.state === 'suspended') return false;
     const actx = this.actx!,
       mixer = this.mixer!;
@@ -908,6 +879,8 @@ export class AudioSystem {
     position: Vec3Like | AudioOptions | number | null = null,
     opts?: AudioOptions | number
   ): boolean {
+    // Rejected pin donor: silence until a convincing replacement is approved.
+    if (kind === 'grenade_pin') return false;
     if (typeof opts === 'number') opts = { gain: opts };
     if (typeof position === 'number') {
       opts = { gain: position };
@@ -935,6 +908,7 @@ export class AudioSystem {
   }
 
   ui(kind: string, level = 1): boolean {
+    if (kind === 'grenade_pin') return false;
     const k = UI_ALIAS[kind] ?? kind;
     return this._playDry(k, { level }, BUS_FOR[k] ?? 'ui', k === 'heartbeat' ? 0.1 : 0);
   }
@@ -958,35 +932,44 @@ export class AudioSystem {
     );
   }
 
-  /** Enemy vocalisation. `kind` is semantic — see barkFor() in vox.js. */
+  /** Intent-correct nearby speech and separate nonverbal reactions. Never invent a cue. */
   bark(kind: string, position: Vec3Like | null = null, opts: AudioOptions = {}): boolean {
-    if (!this.running) return false;
-    const now = this.actx!.currentTime;
+    if (!this.running || this.actx!.state === 'suspended') return false;
     const reaction = reactionKind(kind);
-    if (
-      !opts.force &&
-      (now - this._lastBarkTime < 0.42 || (reaction && now < this._lastReactionEnd))
-    )
-      return false; // no overlapping recorded efforts
+    if (!reaction) {
+      if (this._calloutBlocks || !position || opts.radio || !isCalloutKind(kind)) return false;
+      try {
+        const played = this._callouts?.play(kind, position, opts.voice ?? 0, opts.level) ?? false;
+        if (played) this.stats.events++;
+        return played;
+      } catch (error) {
+        this._error(error);
+        return false;
+      }
+    }
+    const now = this.actx!.currentTime;
+    if (!opts.force && (now - this._lastBarkTime < 0.42 || now < this._lastReactionEnd))
+      return false;
     this._lastBarkTime = now;
-    const seed = (opts.voice ?? 0) | 0;
-    const o = {
-      bark: reaction ?? barkFor(kind, this.rng),
-      voice: seed,
-      f0: 96 + ((seed * 37) % 41),
-      tract: 0.95 + ((seed * 13) % 11) / 100,
-      level: opts.level ?? 1,
-      radio: opts.radio ?? false,
-      send: opts.send,
-    };
-    if (position) return this._playAt('bark', position.x, position.y, position.z, o, 'voice', 0.85);
-    return this._playDry('bark', o, 'voice', 0.25);
+    const o = { bark: reaction, voice: opts.voice ?? 0, level: opts.level ?? 1, send: opts.send };
+    const played = position
+      ? this._playAt('bark', position.x, position.y, position.z, o, 'voice', 0.85)
+      : this._playDry('bark', o, 'voice', 0.25);
+    if (played) this._callouts?.stop(o.voice);
+    return played;
+  }
+
+  _blockCallouts(reason: number, blocked: boolean): void {
+    if (blocked) {
+      this._calloutBlocks |= reason;
+      this._callouts?.stop();
+    } else this._calloutBlocks &= ~reason;
   }
 
   setMasterVolume(v: number): void {
     this.mixer?.setMasterVolume(v);
   }
-  setBusVolume(bus: string, v: number): void {
+  setBusVolume(bus: BusName, v: number): void {
     this.mixer?.setBusVolume(bus, v);
   }
   setAmbienceIntensity(v: number): void {
@@ -1024,54 +1007,63 @@ export class AudioSystem {
       this._offs.push(ev.on(name, fn));
     };
 
-    on('weapon:fire', (p) => this._onFire(p));
-    on('weapon:reload', (p) => this._onReload(p));
-    on('weapon:shell', (p) => this._onShell(p));
-    on('bullet:impact', (p) => this._onImpact(p));
-    on('bullet:segment', (p) => this._onBulletSegment(p));
-    on('explosion', (p) => this._onExplosion(p));
-    on('player:footstep', (p) => this._onFootstep(p));
-    on('ai:footstep', (p) => this._onAiFootstep(p));
-    on('player:land', (p) => this._onLand(p));
-    on('player:state', (p) => this._onPlayerState(p));
-    on('damage:dealt', (p) => this._onDamageDealt(p));
-    on('damage:taken', (p) => this._onDamageTaken(p));
+    on('weapon:fire', (p): void => this._onFire(p));
+    on('weapon:reload', (p): void => this._onReload(p));
+    on('weapon:shell', (p): void => this._onShell(p));
+    on('bullet:impact', (p): void => this._onImpact(p));
+    on('bullet:segment', (p): void => this._onBulletSegment(p));
+    on('explosion', (p): void => this._onExplosion(p));
+    on('player:footstep', (p): void => this._onFootstep(p));
+    on('ai:footstep', (p): void => this._onAiFootstep(p));
+    on('player:land', (p): void => this._onLand(p));
+    on('player:state', (p): void => this._onPlayerState(p));
+    on('damage:dealt', (p): void => this._onDamageDealt(p));
+    on('damage:taken', (p): void => this._onDamageTaken(p));
     // Head-locked warning: keep it above the gunfire ducking on the foley bus.
-    on('player:heartbeat', (p) =>
+    on('player:heartbeat', (p): boolean =>
       this._playDry('heartbeat', { level: Math.min(1, 0.25 + p.strength * 1.3) }, 'ui', 0)
     );
-    on('actor:death', (p) => this._onDeath(p));
-    // Optional: emitted by `ai` if it wants scripted chatter.
-    on('ai:bark', (p) => this.bark(p?.kind ?? 'spot', p?.position, { voice: p?.voice ?? 0 }));
-    on('intel:operation', (e) => this._onIntelOperation(e));
-    const stopIntel = () => this._onIntelOperation({ active: false });
-    on('game:restart', () => {
+    on('actor:death', (p): void => this._onDeath(p));
+    on('ai:bark', (p): boolean => this.bark(p.kind, p.position, { voice: p.voice }));
+    on('intel:operation', (e): void => this._onIntelOperation(e));
+    const stopIntel = (): void => this._onIntelOperation({ active: false });
+    on('game:restart', (): void => {
       stopIntel();
       this._lastReactionEnd = -99;
+      this._lastBarkTime = -99;
+      this._callouts?.reset();
+      this._calloutBlocks &= CALLOUT_BLOCK.pause | CALLOUT_BLOCK.error;
       this._stopAircraft();
       this.mixer?.resetHearing();
       this.deafness = this.stats.deafness = 0;
     });
-    on('player:death', stopIntel);
-    on('engine:error', () => {
+    on('player:death', (): void => {
       stopIntel();
+      this._blockCallouts(CALLOUT_BLOCK.death, true);
+    });
+    on('engine:error', (): void => {
+      stopIntel();
+      this._blockCallouts(CALLOUT_BLOCK.error, true);
       this._stopAircraft(true);
     });
-    on('ui:pause', (e) => {
+    on('ui:pause', (e): void => {
+      this._blockCallouts(CALLOUT_BLOCK.pause, e.paused);
       if (e.paused) {
         stopIntel();
         this._pauseAircraft();
       }
     });
-    on('market:open', () => {
+    on('market:open', (): void => {
+      this._blockCallouts(CALLOUT_BLOCK.shop, true);
       stopIntel();
       this._pauseAircraft();
       if (!this.running) return;
-      this.tentRadio?.start()?.catch?.(() => {});
+      this.tentRadio?.start()?.catch?.((): void => {});
       this.mixer?.setBusVolume('ambience', 0.28);
       this.mixer?.setBusVolume('foley', 0.5);
     });
-    on('market:close', () => {
+    on('market:close', (): void => {
+      this._blockCallouts(CALLOUT_BLOCK.shop, false);
       this.tentRadio?.stop();
       this.mixer?.setBusVolume('ambience', 1);
       this.mixer?.setBusVolume('foley', 1);
@@ -1081,19 +1073,20 @@ export class AudioSystem {
   _onFire(p: EngineEventMap['weapon:fire']): void {
     if (!this.running || !p) return;
     const field = this.field!,
-      mixer = this.mixer!,
-      actx = this.actx!;
+      mixer = this.mixer!;
     const w = p.weapon;
-    const name = typeof w === 'string' ? w : (w?.audio ?? w?.id ?? w?.name ?? w?.kind);
-    let profile = resolveProfile(name);
-    // The real MPX definition deliberately retains its generic suppressed tag.
-    // Select its dedicated 9mm report without changing unrelated suppressed guns.
-    if (w && typeof w === 'object' && w.id === 'smg' && w.suppressed) profile = WEAPON_PROFILES.mpx;
-    if (w && typeof w === 'object' && w.suppressed && !profile.suppressed)
-      profile = WEAPON_PROFILES.suppressed;
+    const name = typeof w === 'string' ? w : (w?.audio ?? w?.id);
+    const profile = resolveProfile(name);
+    // Removing the unused generic fallback must not substitute an unsuppressed report.
+    if (!profile || (w && typeof w === 'object' && w.suppressed && !profile.suppressed)) return;
 
     if (p.empty) {
-      this._playDry('dryfire', {}, 'weapons', 0.15);
+      this._playDry(
+        'dryfire',
+        { dryWeapon: typeof w === 'string' ? w : (w?.id ?? name) },
+        'weapons',
+        0.15
+      );
       return;
     }
 
@@ -1106,38 +1099,12 @@ export class AudioSystem {
     const firstPerson = p.firstPerson ?? dist < 2.6;
 
     if (firstPerson) {
-      // Complete reports already contain their decay: no extra room branch.
-      // Legacy isolated takes retain their separately tuned environment send.
-      const send =
-        profile.samplePunch === false
-          ? 0
-          : (0.35 +
-              this._space.tight * 0.5 +
-              this._space.street * 0.9 +
-              this._space.tunnel * 1.0 +
-              this._space.room * 0.75) *
-            0.6;
-      this._playDry(
-        'shot',
-        {
-          profile,
-          firstPerson: true,
-          gain: profile.samplePunch === false ? 1 : (profile.firstPersonGain ?? 1.18),
-        },
-        'weapons',
-        send
-      );
+      // The complete recording owns its action and decay; no additional body or reverb.
+      this._playDry('shot', { profile, firstPerson: true, gain: 1 }, 'weapons', 0);
       mixer.duck(0.55, 0.1);
     } else {
       this._playAt('shot', x, y, z, { profile, firstPerson: false, gain: 1 }, 'weapons', 0.95);
       mixer.duck(clamp(0.5 - dist * 0.004, 0.12, 0.5), 0.08);
-      // Enemies opening fire get occasional chatter, so firefights feel alive
-      // even before `ai` grows its own bark logic.
-      const now = actx.currentTime;
-      if (now - this._lastEnemyFire > 4.5 && this.rng.float() < 0.45) {
-        this._lastEnemyFire = now;
-        this.bark(this.rng.float() < 0.6 ? 'spot' : 'suppress', p.origin, { level: 0.9 });
-      }
     }
   }
 
@@ -1167,7 +1134,7 @@ export class AudioSystem {
     const dist = field.distanceTo(x, y, z);
     if (dist > 22) return;
     // Find what it will land on, so brass on sand does not ring like concrete.
-    let surface = 'concrete';
+    let surface: SurfaceName = 'concrete';
     const phys = this.ctx.peek('physics');
     if (phys?.raycast) {
       const h = phys.raycast(x, y + 0.2, z, 0, -1, 0, 6, phys.MASK?.WORLD);
@@ -1256,14 +1223,9 @@ export class AudioSystem {
       pos.y,
       pos.z,
       {
-        // 0.62 reverb send, not 1.0: a full send through the 1.6 s open-space IR
-        // rang the tail past 3 s and read as a warehouse echo. The direct boom
-        // carries the hit; the room only colours it.
-        radius: p.radius ?? 6,
+        explosionKind: p.kind ?? 'grenade',
         level: 1,
-        send: 0.62,
-        // Calibrated below unity so ordinary blasts do not lean on the limiter.
-        gain: 0.8,
+        gain: EXPLOSION_MIX.gain,
       },
       'weapons',
       1
@@ -1395,6 +1357,7 @@ export class AudioSystem {
   }
 
   _onDeath(p: EngineEventMap['actor:death']): void {
+    this._callouts?.forget(actorVoice(p?.actor));
     if (!this.running) return;
     const pt = p?.point;
     if (!pt) return;
@@ -1469,7 +1432,7 @@ export class AudioSystem {
       lp.y + rng.range(0, 8),
       lp.z + Math.sin(a) * d,
       {
-        radius: rng.range(6, 16),
+        explosionKind: 'bomb',
         level: 1,
         maxDist: 400,
         occlusion: 0,
@@ -1507,7 +1470,31 @@ export class AudioSystem {
   }
 
   /** Snapshot for the dev overlay. */
-  report() {
+  report(): {
+    running: boolean;
+    failed: boolean;
+    state: string;
+    sampleRate: number;
+    firearmSamples: number;
+    voices: number;
+    dropped: number;
+    stolen: number;
+    occlusionRays: number;
+    space: string;
+    spaceWeights: {
+      tight: number;
+      room: number;
+      street: number;
+      tunnel: number;
+      open: number;
+    } | null;
+    enclosure: number;
+    meanFree: number;
+    deafness: number;
+    outputSafety: string;
+    events: number;
+    errors: number;
+  } {
     return {
       running: this.running,
       failed: this.failed,

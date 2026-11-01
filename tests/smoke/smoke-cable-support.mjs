@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { Rng } from '../../src/core/rng.ts';
 import { buildWorld } from '../../tools/worldgen/build.js';
 import { Assembler } from '../../tools/worldgen/builder.js';
-import { SET_PIECES } from '../../tools/worldgen/layout.js';
+import { SET_PIECES } from '../../tools/worldgen/level/layout.js';
 
 // Match the exporter stream, including authored facade openings and ruin cuts.
 const root = new Rng(0x5eed1234);

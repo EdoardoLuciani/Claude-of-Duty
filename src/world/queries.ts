@@ -3,7 +3,7 @@ import type { WorldManifest, WorldLadder } from '../core/model-metadata.ts';
 
 type BuildingFootprint = NonNullable<WorldManifest['buildings']>[number]['spec'];
 type WorldQueryMetadata = Pick<WorldManifest, 'query' | 'volumes'> & {
-  buildings?: readonly (BuildingFootprint | { spec: BuildingFootprint })[];
+  buildings?: readonly (BuildingFootprint | { spec: BuildingFootprint })[] | undefined;
 };
 type ClimbLadder = WorldLadder & { nx: number; nz: number };
 
@@ -28,14 +28,14 @@ export class WorldQueries {
   declare ladders: WorldLadder[];
 
   constructor(meta: WorldQueryMetadata) {
-    this.buildings = (meta.buildings ?? []).map((building) =>
+    this.buildings = (meta.buildings ?? []).map((building): BuildingFootprint =>
       'spec' in building ? building.spec : building
     );
     const street = meta.query?.street;
     if (!street) throw new Error('[world] manifest is missing query.street metadata');
     this.street = street;
     this.alleys = meta.query?.alleys ?? [];
-    this.ladders = (meta.volumes ?? []).filter((volume) => volume.kind === 'ladder');
+    this.ladders = (meta.volumes ?? []).filter((volume): boolean => volume.kind === 'ladder');
   }
 
   /** Ladder whose catch cylinder contains the world-space point, or null. */

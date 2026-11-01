@@ -4,6 +4,17 @@ Python is the source of truth. Generated weapon blends, GLBs, maps and manifests
 are products, never fallback build inputs. Normal Vite builds use committed
 assets and need no Blender. Imports must not build objects or reset scenes.
 
+Start with the [asset/world editing map](../../docs/assets.md). Each weapon has
+one tooling directory here: `m4/`, `mcx/`, `p320/`, `evolys/`, `mpx/`, `ax338/`,
+`m590/`. Its `build.py` and `check.py` sit beside its geometry, animation and export
+helpers. Where applicable, `actions.py` authors clips and `hand-reference.mjs`
+explicitly refits calibration; MCX authors clips in `animations.py` and has no
+separate hand-calibration stage. Run commands from the repository root.
+
+Committed blends/manifests retain the source-path notes from their last export.
+They are not rewritten or rebuilt for this tooling relocation; use the current
+asset README commands below rather than historical paths embedded in products.
+
 Use **Blender 5.2.2** and its bundled glTF exporter. Each asset README owns its
 build/check commands, declared inputs, references and acceptance limits:
 [M4](../../assets/weapons/m4a1-block-ii/README.md),
@@ -13,6 +24,7 @@ build/check commands, declared inputs, references and acceptance limits:
 [MPX](../../assets/weapons/sig-mpx/README.md),
 [AX338](../../assets/weapons/ax338/README.md),
 [M590](../../assets/weapons/m590/README.md).
+Standalone attachments: [EXPS3-0](../../assets/attachments/eotech-exps3-0/README.md).
 
 - Build factory-empty into an absolute `--output` scratch directory first.
   `--render` is optional; `--quick` changes preview samples/resolution only.

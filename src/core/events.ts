@@ -1,17 +1,19 @@
 import type { Vector3 } from 'three';
 
-import type { WEAPON_DEFS } from '../weapons/defs.ts';
+import type { SurfaceName } from '../physics/surfaces.ts';
+import type { PlayerState } from '../player/index.ts';
+import type { PlayerStance } from '../player/tuning.ts';
+import type { WeaponClass, WeaponId } from '../weapons/defs.ts';
 
-/** Both gameplay definitions and compact dev/audio descriptors are supported. */
-export type EventWeapon =
-  | string
-  | (Partial<Pick<(typeof WEAPON_DEFS)[keyof typeof WEAPON_DEFS], 'id' | 'class'>> & {
-      audio?: string;
-      name?: string;
-      kind?: string;
-      suppressed?: boolean;
-    })
-  | null;
+/** Gameplay and AI identities are closed; compact descriptors must identify a weapon. */
+export type EventWeaponId = WeaponId | 'ai_rifle';
+export interface EventWeaponDescriptor {
+  id: EventWeaponId;
+  class?: WeaponClass;
+  audio?: string;
+  suppressed?: boolean;
+}
+export type EventWeapon = EventWeaponId | EventWeaponDescriptor | null;
 /** Mechanical beats also cover post-shot manual actions; end is hand settle only. */
 export type ReloadPhase =
   | 'start'
@@ -24,6 +26,9 @@ export type ReloadPhase =
   | 'charge'
   | 'boltopen'
   | 'boltclose';
+
+/** Spoken tactical intents currently backed by local recordings; grenade means our throw. */
+export type AiCalloutKind = 'spot' | 'reload' | 'grenade';
 
 export interface EngineError {
   system: string;
@@ -57,7 +62,7 @@ export interface BulletSegmentEvent {
 export interface BulletImpactEvent {
   point: Vector3;
   normal: Vector3;
-  surface: string;
+  surface: SurfaceName;
   incident: Vector3;
   damage: number;
   exit: boolean;
@@ -103,7 +108,6 @@ export interface EngineEventMap {
   };
   'bullet:impact': BulletImpactEvent;
   'bullet:segment': BulletSegmentEvent;
-  'bullet:tracer': { from: Vector3; to: Vector3; speed: number };
   'shot:resolved': {
     shooter: unknown;
     weapon: EventWeapon;
@@ -134,12 +138,12 @@ export interface EngineEventMap {
   'score:change': { score: number; delta: number; reason: string; kills: number };
   'market:open': { wave: number };
   'market:close': Record<string, never>;
-  'player:land': { velocity: number; surface: string; position?: Vector3 };
+  'player:land': { velocity: number; surface: SurfaceName; position?: Vector3 };
   'player:footstep': {
     position: Vector3;
-    surface: string;
+    surface: SurfaceName;
     running: boolean;
-    stance: string;
+    stance: PlayerStance;
     left?: boolean;
     speed?: number;
     gait?: string;
@@ -147,20 +151,21 @@ export interface EngineEventMap {
   };
   'ai:footstep': {
     position: Vector3;
-    surface: string;
+    surface: SurfaceName;
     gait: string;
     actor?: unknown;
     left?: boolean;
     speed?: number;
   };
-  'ai:bark': { kind: string; position: Vector3; voice: number };
+  /** position is the actor's retained position; voice is its immutable, sequential ID. */
+  'ai:bark': { kind: AiCalloutKind; position: Vector3; voice: number };
   'player:state': {
-    stance: string;
+    stance: PlayerStance;
     sprinting: boolean;
     sliding: boolean;
     ads: boolean;
     adsProgress?: number;
-    state?: string;
+    state?: PlayerState;
     crouched?: boolean;
     tacticalSprint?: boolean;
     grounded?: boolean;
@@ -202,8 +207,6 @@ export interface EngineEventMap {
   'intel:secured': {
     id: string;
     position: Vector3;
-    card: string;
-    cardLabel: string;
     credits: number;
   };
   'hud:heard': { bearing: number };
@@ -211,6 +214,8 @@ export interface EngineEventMap {
   'game:restart': { source?: string };
   'radio:strike': { position: Vector3 };
   explosion: {
+    /** Recorded ordnance identity; omitted legacy events retain the grenade default. */
+    kind?: 'grenade' | 'bomb';
     position: Vector3;
     radius: number;
     damage: number;

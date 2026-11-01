@@ -3,9 +3,10 @@ import * as TSL from 'three/tsl';
 import { MeshBasicNodeMaterial, MeshPhysicalNodeMaterial } from 'three/webgpu';
 import type { Node, UniformNode } from 'three/webgpu';
 
+import { hasOwn } from '../core/guards.ts';
 import { loadArmAsset } from './arm-asset.ts';
 import { createWeaponMaterial } from './asset-material.ts';
-import { AX338Animation } from './ax338.ts';
+import { createWeaponAnimation } from './authored-animation.ts';
 import { loadBandage } from './bandage-mesh.ts';
 import {
   BANDAGE_PATH,
@@ -17,13 +18,11 @@ import {
 } from './bandage-path.ts';
 import { makeSampleResult } from './clips.ts';
 import type { Clip } from './clips.ts';
-import { EvolysAnimation } from './evolys.ts';
+import type { WeaponDef } from './defs.ts';
 import { triCount, mergeAll } from './geometry.ts';
 import { grenadeMesh } from './grenade-mesh.ts';
 import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from './grip-contacts.ts';
 import { Arm } from './hands.ts';
-import { M4Animation } from './m4.ts';
-import { M590Animation } from './m590.ts';
 import type { ReticleMaterials } from './materials-tsl.ts';
 import {
   Spring,
@@ -37,20 +36,14 @@ import {
   wrapPi,
   TAU,
 } from './mathx.ts';
-import { MCXAnimation } from './mcx.ts';
-import { MPXAnimation } from './mpx.ts';
-import { P320Animation } from './p320.ts';
 import { radioMesh, radioScreenTexture } from './radio-mesh.ts';
-import { isWeaponAdapter } from './runtime-types.ts';
 import type {
   ClipResult,
   ViewPoseKey,
   ViewState,
-  WeaponDef,
   WeaponEntry,
   WeaponModelRecord,
   WeaponNodes,
-  WeaponAnimation,
   ViewmodelContext,
 } from './runtime-types.ts';
 import { SNIPER_RETICLE, sniperMradScale, sniperReticleCoverage } from './sniper-reticle.ts';
@@ -229,7 +222,11 @@ const GRENADE_THROW_SHORT_KEYS = [
 ];
 
 /** Right-handed hand basis from a finger direction and a back-of-hand direction. */
-function handBasis(out: THREE.Quaternion, finger: ArrayLike<number>, back: ArrayLike<number>) {
+function handBasis(
+  out: THREE.Quaternion,
+  finger: ArrayLike<number>,
+  back: ArrayLike<number>
+): THREE.Quaternion {
   _v.set(-finger[0], -finger[1], -finger[2]).normalize(); // hand +Z
   _v2.set(back[0], back[1], back[2]);
   _v2.addScaledVector(_v, -_v2.dot(_v));
@@ -298,7 +295,7 @@ export class Viewmodel {
   declare _adsPos: THREE.Vector3;
   declare _adsQuat: THREE.Quaternion;
   declare _sightLocal: THREE.Vector3;
-  declare weapons: Map<string, WeaponEntry>;
+  declare weapons: Map<WeaponEntry['id'], WeaponEntry>;
   declare _basePos: THREE.Vector3;
   declare _baseQuat: THREE.Quaternion;
   declare _handPos: THREE.Vector3;
@@ -330,10 +327,8 @@ export class Viewmodel {
   declare onClipEvent: ((name: string, clipName: string) => void) | null;
   declare recPos: Spring3;
   declare recRot: Spring3;
-  declare rigOverride: { position: THREE.Vector3; quaternion: THREE.Quaternion } | null;
   declare settle: Spring3;
   declare sprintT: number;
-  declare trackCamera: boolean;
   declare triggerT: number;
   declare triggerTarget: number;
 
@@ -411,7 +406,7 @@ export class Viewmodel {
     // native view copies, never patch or dispose their global shared materials.
     this._propMaterials = new Map();
     for (const root of [this.grenade, this.radio])
-      root.traverse((o) => {
+      root.traverse((o): void => {
         if (!isMesh(o) || !(o.material instanceof THREE.MeshStandardMaterial)) return;
         const source = o.material;
         if (!this._propMaterials.has(source))
@@ -554,7 +549,14 @@ export class Viewmodel {
     this.scopeMask = mask;
 
     // Distance from p to the segment a-b, then the authored w-feathered edge.
-    const line = (p: Node<'vec2'>, ax: number, ay: number, bx: number, by: number, w: number) => {
+    const line = (
+      p: Node<'vec2'>,
+      ax: number,
+      ay: number,
+      bx: number,
+      by: number,
+      w: number
+    ): Node<'float'> => {
       const a = TSL.vec2(ax, ay);
       const pa = p.sub(a);
       const ba = TSL.vec2(bx, by).sub(a);
@@ -662,9 +664,6 @@ export class Viewmodel {
     this._sightLocal = new THREE.Vector3();
 
     this.debugFrozen = false;
-    /** Set false by the preview harness to leave the cameras alone. */
-    this.trackCamera = true;
-    this.rigOverride = null;
   }
 
   /* ====================================================================== */
@@ -677,28 +676,13 @@ export class Viewmodel {
       throw new Error(`[weapons] ${model?.id}: missing authored weapon scene/rig/clips`);
     let tris = 0;
     const meshes: THREE.Mesh[] = [];
-    const animation: WeaponAnimation | null = isWeaponAdapter(model, 'rifle')
-      ? new M4Animation(model)
-      : isWeaponAdapter(model, 'pistol')
-        ? new P320Animation(model)
-        : isWeaponAdapter(model, 'lmg')
-          ? new EvolysAnimation(model)
-          : isWeaponAdapter(model, 'smg')
-            ? new MPXAnimation(model)
-            : isWeaponAdapter(model, 'sniper')
-              ? new AX338Animation(model)
-              : isWeaponAdapter(model, 'shotgun')
-                ? new M590Animation(model)
-                : isWeaponAdapter(model, 'mcx')
-                  ? new MCXAnimation(model, def)
-                  : null;
-    if (!animation) throw new Error(`[weapons] unsupported authored weapon ${model.id}`);
+    const animation = createWeaponAnimation(model, def);
     const group = new THREE.Object3D();
     group.name = `weapon-${model.id}`;
     group.visible = false;
     this.rig.add(group);
     group.add(model.scene);
-    model.scene.traverse((node: THREE.Object3D) => {
+    model.scene.traverse((node: THREE.Object3D): void => {
       if (!isMesh(node)) return;
       meshes.push(node);
       tris += triCount(node.geometry);
@@ -745,8 +729,9 @@ export class Viewmodel {
   }
 
   // Refine the baseline poses against weapon-specific thumb/trigger targets.
-  _fitGripContacts(w: WeaponEntry) {
-    const contact = GRIP_CONTACTS[w.id as keyof typeof GRIP_CONTACTS];
+  _fitGripContacts(w: WeaponEntry): void {
+    if (!hasOwn(GRIP_CONTACTS, w.id)) return;
+    const contact = GRIP_CONTACTS[w.id];
     if (!contact) return;
     this.armR.hand.position.fromArray(w.gripR.pos);
     handBasis(
@@ -778,7 +763,7 @@ export class Viewmodel {
   }
 
   // MCX retains fitted support-hand posing; weapon AO belongs to the authored asset.
-  _fitSupportHand(w: WeaponEntry) {
+  _fitSupportHand(w: WeaponEntry): void {
     const nodes: WeaponNodes = w.model.nodes;
     const hg = nodes.supportContact ?? nodes.handguard;
     const gL = w.gripL;
@@ -795,7 +780,7 @@ export class Viewmodel {
     this.armL.setPose(poseName);
   }
 
-  setActive(id: string) {
+  setActive(id: WeaponEntry['id']): WeaponEntry | null {
     const w = this.weapons.get(id);
     if (!w || w === this.active) return this.active;
     if (this.active) {
@@ -819,7 +804,7 @@ export class Viewmodel {
   /*  clip playback                                                         */
   /* ====================================================================== */
 
-  play(name: string) {
+  play(name: string): number {
     const w = this.active;
     if (!w) return 0;
     const clip = w.clips[name];
@@ -831,18 +816,18 @@ export class Viewmodel {
     return clip.duration;
   }
 
-  stopClip() {
+  stopClip(): void {
     this.active?.animation.reset();
     this.clip = null;
     this.clipResult.active = false;
     this.clipResult.lhand.weight = 0;
   }
 
-  get clipPlaying() {
+  get clipPlaying(): boolean {
     return this.clip !== null;
   }
 
-  get clipName() {
+  get clipName(): string | null {
     return this.clip?.name ?? null;
   }
 
@@ -851,7 +836,7 @@ export class Viewmodel {
   /* ====================================================================== */
 
   /** Arm a grenade: stow the weapon, grenade in the right hand. */
-  holdGrenade() {
+  holdGrenade(): void {
     if (this._grenadeState === 1) return;
     // The radio and the grenade are exclusive holds — one ends the other.
     if (this._radioState === 1) this.endRadio();
@@ -867,7 +852,7 @@ export class Viewmodel {
   }
 
   /** Pin pulled: blend from the idle hold into the cook pose for `type`. */
-  cookGrenade(type: string = 'long') {
+  cookGrenade(type: string = 'long'): void {
     if (this._grenadeState !== 1) return;
     this._cookType = type === 'short' ? 'short' : 'long';
   }
@@ -875,7 +860,7 @@ export class Viewmodel {
   /** Release: the arm throws; fires `grenade:release` at the release beat.
    *  `type` selects the animation: 'long' (overhead heave) or 'short'
    *  (compact toss) — each has its own keyframes and release timing. */
-  throwGrenade(type: string = 'long') {
+  throwGrenade(type: string = 'long'): void {
     if (this._grenadeState !== 1) return;
     this._grenadeState = 2;
     this._throwT = 0;
@@ -894,7 +879,7 @@ export class Viewmodel {
   }
 
   /** End the grenade state without throwing (overcook / death / reset). */
-  endGrenade() {
+  endGrenade(): void {
     if (this._grenadeState === 0) return;
     this._grenadeState = 0;
     this._throwT = 0;
@@ -906,7 +891,7 @@ export class Viewmodel {
     if (w) w.group.visible = true;
   }
 
-  holdRadio() {
+  holdRadio(): void {
     if (this._radioState === 1) return;
     if (this._grenadeState === 1) this.endGrenade();
     if (this._bandageState === 1) this.endBandage();
@@ -916,7 +901,7 @@ export class Viewmodel {
     if (w) w.group.visible = false;
   }
 
-  endRadio() {
+  endRadio(): void {
     if (this._radioState === 0) return;
     this._radioState = 0;
     if (this.radio) this.radio.visible = false;
@@ -924,7 +909,7 @@ export class Viewmodel {
     if (w) w.group.visible = true;
   }
 
-  holdBandage() {
+  holdBandage(): void {
     if (this._bandageState === 1) return;
     if (this._grenadeState) this.endGrenade();
     if (this._radioState === 1) this.endRadio();
@@ -936,11 +921,11 @@ export class Viewmodel {
     this._syncBandage(0);
   }
 
-  setBandageProgress(p: number) {
+  setBandageProgress(p: number): void {
     this._bandageProgress = clamp01(p);
   }
 
-  endBandage() {
+  endBandage(): void {
     if (this._bandageState === 0) return;
     this._bandageState = 0;
     this._bandageProgress = 0;
@@ -950,7 +935,7 @@ export class Viewmodel {
     if (w) w.group.visible = true;
   }
 
-  setRadioScreen(count: number) {
+  setRadioScreen(count: number): void {
     const screen = this.radioScreen;
     if (!screen) return;
     const old = screen.material.map;
@@ -963,7 +948,7 @@ export class Viewmodel {
    * position at the release beat, in viewScene space (= world space because
    * the anchor tracks the camera). Falls back to the camera position.
    */
-  grenadeReleaseWorld(out: THREE.Vector3) {
+  grenadeReleaseWorld(out: THREE.Vector3): THREE.Vector3 {
     if (!this.grenade) {
       out.copy(this.ctx.camera.position);
       return out;
@@ -974,7 +959,7 @@ export class Viewmodel {
   }
 
   /** Lerp two grenade pose keys into the shared hand targets. */
-  _applyGrenadePose(a: ViewPoseKey, b: ViewPoseKey, w: number) {
+  _applyGrenadePose(a: ViewPoseKey, b: ViewPoseKey, w: number): void {
     this._handPos.set(
       a.hand[0] + (b.hand[0] - a.hand[0]) * w,
       a.hand[1] + (b.hand[1] - a.hand[1]) * w,
@@ -1012,7 +997,7 @@ export class Viewmodel {
   }
 
   /** Sample the grenade hand pose into the shared hand targets. */
-  _solveGrenadeHands() {
+  _solveGrenadeHands(): void {
     if (this._grenadeState === 2) {
       const t = smootherstep(0, 1, clamp01(this._throwT / this._throwDuration));
       const keys = this._throwKeys;
@@ -1043,7 +1028,7 @@ export class Viewmodel {
   }
 
   /** Static radio hold: right hand grips it at chest height, left hangs. */
-  _solveRadioHands() {
+  _solveRadioHands(): void {
     this._handPos.set(RADIO_HOLD.hand[0], RADIO_HOLD.hand[1], RADIO_HOLD.hand[2]);
     handBasis(this._handQuat, RADIO_HOLD.finger, RADIO_HOLD.back);
     if (this.armR.pose !== 'radio') this.armR.setPose('radio');
@@ -1055,7 +1040,7 @@ export class Viewmodel {
   }
 
   /** Left forearm presented; right hand winds the bandage as progress advances. */
-  _solveBandageHands() {
+  _solveBandageHands(): void {
     const p = this._bandageProgress;
     const wind = clamp01((p - 0.2) / 0.62);
     const finish = smootherstep(0, 1, (p - 0.93) / 0.07);
@@ -1136,7 +1121,7 @@ export class Viewmodel {
     this._syncBandage(lerp(a[9], b[9], f));
   }
 
-  _syncBandage(feed: number) {
+  _syncBandage(feed: number): void {
     const asset = this.bandageAsset;
     if (!asset) return;
     const section = Math.floor(feed * BANDAGE_SEGMENTS);
@@ -1201,7 +1186,7 @@ export class Viewmodel {
    * shot (from the deterministic pattern) so the visual climb matches where the
    * bullets are actually going.
    */
-  addRecoil(pitch: number, yaw: number, first = false) {
+  addRecoil(pitch: number, yaw: number, first = false): void {
     const w = this.active;
     if (!w) return;
     w.animation.fire();
@@ -1239,11 +1224,11 @@ export class Viewmodel {
     );
   }
 
-  jump() {
+  jump(): void {
     this.jumpSpring.kick(-1.2);
   }
 
-  land(speed: number = 3) {
+  land(speed: number = 3): void {
     this.landSpring.kick(clamp(speed * 0.45, 0.4, 3.4));
   }
 
@@ -1252,7 +1237,7 @@ export class Viewmodel {
   /* ====================================================================== */
 
   /** Load authored skins before adding weapons (which fits contact poses). */
-  async loadArms() {
+  async loadArms(): Promise<void> {
     this.armAsset = await loadArmAsset();
     this.armR.attachAsset(this.armAsset);
     this.armL.attachAsset(this.armAsset);
@@ -1266,9 +1251,9 @@ export class Viewmodel {
   /**
    * @param {number} dt
    * @param {object} s  { ads, sprint, lowReady, speed, crouch, airborne,
-   *                      trigger, empty, cycleTime }
+   *                      trigger, empty }
    */
-  update(dt: number, s: ViewState) {
+  update(dt: number, s: ViewState): void {
     const w = this.active;
     if (!w) return;
     const def = w.def;
@@ -1490,12 +1475,6 @@ export class Viewmodel {
       this.rig.position.set(0, -0.35 * (1 - present + stow), 0);
       this.rig.quaternion.identity();
     }
-    // The standalone preview harness pins the rig so the weapon can be framed
-    // in its own space; everything downstream reads the composed transform.
-    if (this.rigOverride) {
-      this.rig.position.copy(this.rigOverride.position);
-      this.rig.quaternion.copy(this.rigOverride.quaternion);
-    }
     this.rig.updateMatrix();
     this.rig.updateMatrixWorld(true);
 
@@ -1519,7 +1498,7 @@ export class Viewmodel {
 
   /* ---------------------------------------------------------------------- */
 
-  _solveHands(w: WeaponEntry, res: ClipResult) {
+  _solveHands(w: WeaponEntry, res: ClipResult): void {
     if (this._bandageState) {
       // Raise/stow the authored pose as a unit. Neither elbow nor upper arm
       // participates in the winding motion; only the right forearm and hand do.
@@ -1618,7 +1597,7 @@ export class Viewmodel {
    * weapon sways, and why it vignettes out when you look through the tube from
    * an angle.
    */
-  _updateReticle(w: WeaponEntry, ads: number) {
+  _updateReticle(w: WeaponEntry, ads: number): void {
     const optic = w.optic;
     if (!optic || optic.kind === 'scope') {
       this.reticle.visible = false;
@@ -1714,7 +1693,7 @@ export class Viewmodel {
     this.dotHalo.material.opacity = alpha * 0.06;
   }
 
-  _updateScope(w: WeaponEntry, ads: number) {
+  _updateScope(w: WeaponEntry, ads: number): void {
     // Holster 'end' calls setActive() earlier in this same update(). Always
     // drive visibility from the live weapon so we don't undig the one we hid.
     if (this.active) w = this.active;
@@ -1747,8 +1726,7 @@ export class Viewmodel {
   /* ====================================================================== */
 
   /** Copy the gameplay camera onto the viewmodel anchor and view camera. */
-  syncToCamera() {
-    if (!this.trackCamera) return;
+  syncToCamera(): void {
     const cam = this.ctx.camera;
     const vcam = this.ctx.viewCamera;
     cam.updateMatrixWorld();
@@ -1762,21 +1740,21 @@ export class Viewmodel {
   }
 
   /** Muzzle position in WORLD space (for the flash and the shell). */
-  muzzleWorld(out: THREE.Vector3) {
+  muzzleWorld(out: THREE.Vector3): THREE.Vector3 {
     const w = this.active;
     if (!w) return out.set(0, 0, 0);
     w.group.updateMatrixWorld();
     return requiredSocket(w.model.root, 'SOCKET_muzzle').getWorldPosition(out);
   }
 
-  ejectWorld(out: THREE.Vector3) {
+  ejectWorld(out: THREE.Vector3): THREE.Vector3 {
     const w = this.active;
     if (!w) return out.set(0, 0, 0);
     w.group.updateMatrixWorld();
     return requiredSocket(w.model.root, 'SOCKET_ejection').getWorldPosition(out);
   }
 
-  ejectVelocity(out: THREE.Vector3, speed = 2.6) {
+  ejectVelocity(out: THREE.Vector3, speed = 2.6): THREE.Vector3 {
     const w = this.active;
     if (!w) return out.set(0, 0, 0);
     out.copy(w.ejectDir);
@@ -1786,7 +1764,7 @@ export class Viewmodel {
   }
 
   /** Bore direction in world space. */
-  boreDir(out: THREE.Vector3) {
+  boreDir(out: THREE.Vector3): THREE.Vector3 {
     const w = this.active;
     if (!w) return out.set(0, 0, -1);
     out.set(0, 0, -1);
@@ -1795,7 +1773,7 @@ export class Viewmodel {
     return out;
   }
 
-  dispose() {
+  dispose(): void {
     for (const w of this.weapons.values()) {
       w.animation.dispose();
       for (const m of w.meshes) m.geometry.dispose();
@@ -1806,7 +1784,7 @@ export class Viewmodel {
     this.armAsset?.dispose();
     // Radio geometry is instance-owned; the grenade's geometry is shared with
     // world projectiles and must not be released with the arm skin.
-    this.radio?.traverse((o) => {
+    this.radio?.traverse((o): void => {
       if (isMesh(o)) o.geometry.dispose();
     });
     for (const material of this._propMaterials.values()) material.dispose();

@@ -1,8 +1,11 @@
 import * as THREE from 'three';
-import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { Renderer } from 'three/webgpu';
 
 import handReference from '../../assets/weapons/p320-compact/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/p320-compact/manifest.json' with { type: 'json' };
+import { isSkinnedMesh } from '../core/three-guards.ts';
+import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
 import {
@@ -17,7 +20,7 @@ import { authoredModel, requiredNode } from './authored-model.ts';
 import { buildMagazineClips, type Clip } from './clips.ts';
 
 export const P320_URL = new URL(
-  '../../assets/weapons/p320-compact/p320-compact.glb',
+  '../../assets/weapons/p320-compact/p320-compact.runtime.glb',
   import.meta.url
 ).href;
 export const P320_EJECT_DELAY = 2 / 60;
@@ -30,11 +33,11 @@ const ALIASES: Record<string, string> = {
 };
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
 
-export function makeP320Model(gltf: GLTF) {
+export function makeP320Model(gltf: GLTF): P320Model {
   const scene = gltf.scene;
   const { root, animations, point } = authoredModel(gltf, 'P320_RIG', REQUIRED, scene);
   const model = {
-    id: 'pistol',
+    id: 'pistol' as const,
     label: 'P320 Compact',
     scene,
     root,
@@ -52,7 +55,7 @@ export function makeP320Model(gltf: GLTF) {
     shell: { caseLen: 0.0192, rimR: 0.00478 },
     magSize: { len: 0.09 },
   };
-  const converted = convertWeaponScene(scene, (_source, material) => {
+  const converted = convertWeaponScene(scene, (_source, material): void => {
     for (const value of Object.values(material as object)) {
       if (value instanceof THREE.Texture) value.anisotropy = 8;
     }
@@ -60,13 +63,39 @@ export function makeP320Model(gltf: GLTF) {
   return { ...model, ...converted };
 }
 
-export async function loadP320() {
-  return makeP320Model(await new GLTFLoader().loadAsync(P320_URL));
+export async function loadP320(
+  renderer: Pick<Renderer, 'hasFeature'>,
+  url = P320_URL
+): Promise<P320Model> {
+  return makeP320Model(await loadWeaponGLTF(renderer, url));
 }
 
 /** Samples the actual Blender curves, including fingers. Upper/forearm IK is
  * the only runtime solve; wrists and finger contact are not reconstructed. */
-type P320Model = ReturnType<typeof makeP320Model>;
+type P320Model = {
+  materials: Set<THREE.Material>;
+  textures: Set<THREE.Texture>;
+  id: 'pistol';
+  label: string;
+  scene: THREE.Group;
+  root: THREE.Object3D;
+  animations: THREE.AnimationClip[];
+  handPoses: {
+    left: typeof handReference.sides.left.grip;
+    right: typeof handReference.sides.left.grip;
+  };
+  nodes: {
+    muzzle: [number, number, number];
+    eject: [number, number, number];
+    sight: [number, number, number];
+    ejectDir: number[];
+    gripR: { pos: number[]; finger: number[]; back: number[] };
+    gripL: { pos: number[]; finger: number[]; back: number[] };
+    magSeat: { pos: number[]; rot: number[] };
+  };
+  shell: { caseLen: number; rimR: number };
+  magSize: { len: number };
+};
 type P320Arm = HandRig;
 export class P320Animation {
   model!: P320Model;
@@ -80,8 +109,11 @@ export class P320Animation {
   magazine!: THREE.Object3D;
   spare!: THREE.Object3D;
   magazineRound!: THREE.Object3D;
+  skin!: THREE.SkinnedMesh;
   hands!: Record<HandSide, AuthoredHand>;
   poseQ = new THREE.Quaternion();
+  private magazineRoundAuthoredScale = new THREE.Vector3();
+  private magazineRoundScaleOverridden = false;
   idleTime = 0;
   name: string | null = null;
   fireTime!: number;
@@ -90,7 +122,7 @@ export class P320Animation {
     this.root = model.root;
     this.mixer = new THREE.AnimationMixer(this.root);
     this.actions = createAuthoredActions(this.mixer, model.animations);
-    const node = (name: string) => requiredNode(this.root, name);
+    const node = (name: string): THREE.Object3D => requiredNode(this.root, name);
     this.slide = node('slide');
     this.barrel = node('barrel');
     this.slideRest = this.slide.position.clone();
@@ -98,6 +130,9 @@ export class P320Animation {
     this.magazine = node('magazine');
     this.spare = node('magazine_spare');
     this.magazineRound = node('magazine_round');
+    const skin = node('P320_surface');
+    if (!isSkinnedMesh(skin)) throw new Error('P320: missing mechanical skin');
+    this.skin = skin;
     this.hands = discoverAuthoredHands(node);
     this.reset();
   }
@@ -107,6 +142,12 @@ export class P320Animation {
   }
 
   _sample(name: string, time: number): void {
+    // PropertyMixer skips unchanged constant channels. Undo our visibility
+    // override before sampling so authored hidden/visible scales stay authoritative.
+    if (this.magazineRoundScaleOverridden) {
+      this.magazineRound.scale.copy(this.magazineRoundAuthoredScale);
+      this.magazineRoundScaleOverridden = false;
+    }
     sampleAuthoredAction(this, name, time);
     this.root.updateMatrix();
     this.poseQ.copy(this.root.quaternion);
@@ -146,6 +187,13 @@ export class P320Animation {
       this.barrel.rotation.x = THREE.MathUtils.degToRad(3.5);
     }
     this.magazineRound.visible = magazineLoaded;
+    // Bone visibility does not hide its weighted vertices. Preserve the native
+    // scale before collapsing the cartridge, then restore it in _sample().
+    if (!magazineLoaded) {
+      this.magazineRoundAuthoredScale.copy(this.magazineRound.scale);
+      this.magazineRound.scale.setScalar(0);
+      this.magazineRoundScaleOverridden = true;
+    }
     this.root.updateMatrixWorld(true);
   }
 
@@ -161,6 +209,7 @@ export class P320Animation {
   dispose(): void {
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.root);
+    this.skin.skeleton.dispose();
     disposeWeaponMaterials(this.model);
   }
 }

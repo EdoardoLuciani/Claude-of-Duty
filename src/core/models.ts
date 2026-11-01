@@ -1,11 +1,12 @@
-/** Loads cached soldier GLBs/metadata and the cooked world; player weapons own their adapters. */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-import type { EngineContext } from './context.ts';
+import type { SystemId, EngineContext } from './context.ts';
 import { parseSoldierMetadata, parseWorldManifest, parseWorldAssets } from './model-metadata.ts';
 import type { SoldierRecord, WorldPrefetch } from './model-metadata.ts';
+/** Loads cached soldier GLBs/metadata and the cooked world; player weapons own their adapters. */
+import { isSkinnedMesh } from './three-guards.ts';
 export type {
   SoldierRecord,
   SoldierMetadata,
@@ -22,7 +23,7 @@ const BASE = 'models';
 
 /** Observe a prefetch so a rejection is not unhandled before the consumer awaits it. */
 function watch<T>(promise: Promise<T>): Promise<T> {
-  promise.catch(() => {});
+  promise.catch((): void => {});
   return promise;
 }
 
@@ -33,10 +34,10 @@ export class ModelSystem {
   declare worldPrefetch: Promise<WorldPrefetch>;
   declare worldNav: ArrayBuffer;
 
-  static id = 'models';
-  static deps = [];
+  static readonly id = 'models';
+  static readonly deps: SystemId[] = [];
 
-  async init(ctx: EngineContext) {
+  async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
     this.loader = new GLTFLoader();
     this._soldiers = new Map();
@@ -85,8 +86,8 @@ export class ModelSystem {
   }
 
   async _loadGLB(url: string): Promise<GLTF> {
-    return new Promise<GLTF>((resolve, reject) => {
-      this.loader.load(url, resolve, undefined, (err: unknown) => {
+    return new Promise<GLTF>((resolve, reject): void => {
+      this.loader.load(url, resolve, undefined, (err: unknown): void => {
         const message =
           typeof err === 'object' && err !== null && 'message' in err ? err.message : err;
         reject(new Error(`[models] failed to load ${url}: ${String(message ?? err)}`));
@@ -125,13 +126,13 @@ export class ModelSystem {
 
     const meta = parseSoldierMetadata(metadata);
     const meshes: THREE.SkinnedMesh[] = [];
-    gltf.scene.traverse((node: THREE.Object3D) => {
-      if (node instanceof THREE.SkinnedMesh) meshes.push(node as THREE.SkinnedMesh);
+    gltf.scene.traverse((node: THREE.Object3D): void => {
+      if (isSkinnedMesh(node)) meshes.push(node);
     });
     if (!meshes.length) throw new Error(`[models] ${name}.glb: no skinned mesh`);
 
     const geometry = meshes.length === 1 ? meshes[0].geometry : mergePrimitives(meshes);
-    const boneNames = (meshes[0].skeleton?.bones ?? []).map((bone) => bone.name);
+    const boneNames = (meshes[0].skeleton?.bones ?? []).map((bone): string => bone.name);
 
     const record = {
       // `name` is what the JSON METADATA claims the variant is (validated by
@@ -162,21 +163,30 @@ export class ModelSystem {
  * reproduces the original authored vertex array exactly.
  */
 export function mergePrimitives(meshes: THREE.SkinnedMesh[]): THREE.BufferGeometry {
-  const parts = meshes.map((m) => {
-    const g = m.geometry;
-    const index = g.getIndex()!;
-    const src = index.array;
-    let lo = Infinity;
-    let hi = -1;
-    for (let i = 0; i < index.count; i++) {
-      const v = src[i];
-      if (v < lo) lo = v;
-      if (v > hi) hi = v;
+  const parts = meshes.map(
+    (
+      m
+    ): {
+      g: THREE.BufferGeometry<THREE.NormalBufferAttributes, THREE.BufferGeometryEventMap>;
+      index: THREE.BufferAttribute<THREE.BufferAttributeEventMap>;
+      lo: number;
+      count: number;
+    } => {
+      const g = m.geometry;
+      const index = g.getIndex()!;
+      const src = index.array;
+      let lo = Infinity;
+      let hi = -1;
+      for (let i = 0; i < index.count; i++) {
+        const v = src[i];
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      }
+      return { g, index, lo, count: hi - lo + 1 };
     }
-    return { g, index, lo, count: hi - lo + 1 };
-  });
-  const totalVerts = parts.reduce((s, p) => s + p.count, 0);
-  const totalIdx = parts.reduce((s, p) => s + p.index.count, 0);
+  );
+  const totalVerts = parts.reduce((s, p): number => s + p.count, 0);
+  const totalIdx = parts.reduce((s, p): number => s + p.index.count, 0);
 
   const first = meshes[0]!;
   const attrNames = Object.keys(first.geometry.attributes);
@@ -184,7 +194,25 @@ export function mergePrimitives(meshes: THREE.SkinnedMesh[]): THREE.BufferGeomet
   for (const name of attrNames) {
     const a0 = first.geometry.attributes[name]!;
     const itemSize = a0.itemSize;
-    const ArrayCtor = a0.array.constructor as { new (length: number): THREE.TypedArray };
+    const source = a0.array;
+    const ArrayCtor =
+      source instanceof Float32Array
+        ? Float32Array
+        : source instanceof Float64Array
+          ? Float64Array
+          : source instanceof Uint32Array
+            ? Uint32Array
+            : source instanceof Int32Array
+              ? Int32Array
+              : source instanceof Uint16Array
+                ? Uint16Array
+                : source instanceof Int16Array
+                  ? Int16Array
+                  : source instanceof Uint8ClampedArray
+                    ? Uint8ClampedArray
+                    : source instanceof Int8Array
+                      ? Int8Array
+                      : Uint8Array;
     const arr = new ArrayCtor(totalVerts * itemSize);
     let off = 0;
     for (const p of parts) {

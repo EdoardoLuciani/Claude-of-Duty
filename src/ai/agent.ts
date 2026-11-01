@@ -24,6 +24,7 @@
 import * as THREE from 'three';
 
 import type { EngineContext } from '../core/context.ts';
+import type { EngineEventMap } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
 import type { PhysicsSystem } from '../physics/index.ts';
 import { makeHitRecord } from '../physics/math.ts';
@@ -53,7 +54,9 @@ const STATE = {
   FLANK: 'flank',
   RETREAT: 'retreat',
   DEAD: 'dead',
-};
+} as const;
+
+export type AiState = (typeof STATE)[keyof typeof STATE];
 
 export { STATE };
 
@@ -105,7 +108,7 @@ const MUZZLE_AIM_DOT = 0.72;
 const PATH_FAIL_WAIT = 0.35;
 const PATH_FAIL_WAIT_MAX = 2.5;
 const PATROL_ALT_MAX = 2;
-const PATH_OBJECTIVE = {
+const PATH_OBJECTIVE: Partial<Record<AiState, string>> = {
   [STATE.ALERT]: 'search',
   [STATE.PATROL]: 'patrol',
   [STATE.FLANK]: 'flank',
@@ -211,7 +214,7 @@ export class Agent {
   declare health: number;
   declare maxHealth: number;
   declare alive: boolean;
-  declare state: string;
+  declare state: AiState;
   declare stateTime: number;
   declare squad: Squad | null;
   declare team: number;
@@ -351,7 +354,7 @@ export class Agent {
   declare _boneA: THREE.Vector3;
   declare _boneB: THREE.Vector3;
   declare _muzzleDir: THREE.Vector3;
-  declare _stepPayload: { position: THREE.Vector3; surface: string; gait: string };
+  declare _stepPayload: EngineEventMap['ai:footstep'];
   declare clip: string;
   declare _searchPending: boolean;
   declare _searchGeometry: Float64Array;
@@ -359,7 +362,7 @@ export class Agent {
   declare _waitingNav: boolean;
   declare _repositionAdmitted: boolean;
   declare _positionPlan:
-    | { investigate: boolean; state: string; center: THREE.Vector3; retryAt?: number }
+    | { investigate: boolean; state: AiState; center: THREE.Vector3; retryAt?: number }
     | null
     | undefined;
   declare navStart: NavCache;
@@ -417,7 +420,7 @@ export class Agent {
       weapon: def.weapon,
       rng: this.rng.fork(),
       scale: this.scale,
-      probe: (x, z, fromY, out) => this.ai.probeGround(x, z, fromY, out),
+      probe: (x, z, fromY, out): boolean => this.ai.probeGround(x, z, fromY, out),
     });
 
     /* ---------------- physics ---------------- */
@@ -438,7 +441,15 @@ export class Agent {
       : null;
     this.velocity = new THREE.Vector3();
     this.grounded = true;
-    const navCache = () => ({
+    const navCache = (): {
+      nav: null;
+      version: number;
+      ref: number;
+      radius: number;
+      height: number;
+      position: THREE.Vector3;
+      point: THREE.Vector3;
+    } => ({
       nav: null,
       version: -1,
       ref: 0,
@@ -551,13 +562,16 @@ export class Agent {
     this.coverFailure = null;
     this._combatClock = 0;
     this._failedCoverIndex = 0;
-    this._failedCovers = Array.from({ length: 6 }, () => ({
-      x: 0,
-      y: 0,
-      z: 0,
-      until: 0,
-      threat: new THREE.Vector3(),
-    }));
+    this._failedCovers = Array.from(
+      { length: 6 },
+      (): { x: number; y: number; z: number; until: number; threat: THREE.Vector3 } => ({
+        x: 0,
+        y: 0,
+        z: 0,
+        until: 0,
+        threat: new THREE.Vector3(),
+      })
+    );
     this._peekTravel = 0;
     this._elevatedRouteChecked = false;
     this._peekSettle = 0;
@@ -647,11 +661,11 @@ export class Agent {
   /* frame                                                              */
   /* ================================================================== */
 
-  get eye() {
+  get eye(): THREE.Vector3 {
     return this._eye.set(this.position.x, this.position.y + this.eyeHeight, this.position.z);
   }
 
-  update(dt: number) {
+  update(dt: number): void {
     if (!this.alive) return;
     if (dt <= 0) {
       this._drive(0);
@@ -700,7 +714,7 @@ export class Agent {
   /* perception                                                         */
   /* ================================================================== */
 
-  _sense(dt: number) {
+  _sense(dt: number): void {
     this.visualAge += dt;
     this.targetSample = -1;
     const disabled = this.ai.ctx?.peek?.('player')?.hitbox?.enabled === false;
@@ -739,6 +753,12 @@ export class Agent {
       this._noteEvidence(player, EVIDENCE.VISUAL, 0);
       this.alertness = 1;
       if (this.awareness >= 1) {
+        if (!this.hasTarget)
+          this.ctx.events.emit('ai:bark', {
+            kind: 'spot',
+            position: this.position,
+            voice: this.id,
+          });
         this.hasTarget = true;
         this.target = player;
       }
@@ -749,7 +769,7 @@ export class Agent {
   }
 
   /** A gunshot or footstep heard from `pos` with a given loudness (metres). */
-  hear(pos: THREE.Vector3, loudness: number, kind = EVIDENCE.SOUND) {
+  hear(pos: THREE.Vector3, loudness: number, kind = EVIDENCE.SOUND): void {
     if (!this.alive) return;
     const d = this.position.distanceTo(pos);
     if (d > loudness) return;
@@ -766,7 +786,7 @@ export class Agent {
 
   /** Impact locations are danger, not shooter locations. Penetration exits
    * cannot stack a dozen suppression impulses from one round in one frame. */
-  hearImpact(pos: THREE.Vector3) {
+  hearImpact(pos: THREE.Vector3): void {
     const d = this.position.distanceTo(pos);
     if (d >= 12) return;
     this.alertness = Math.max(this.alertness, 0.5);
@@ -777,7 +797,7 @@ export class Agent {
   }
 
   /** Record a contact. Reports never rejuvenate an unexpired clock. */
-  _noteEvidence(pos: THREE.Vector3, kind: string, age: number) {
+  _noteEvidence(pos: THREE.Vector3, kind: string, age: number): boolean {
     const had = this.lastKnownAge < 1e6;
     if (kind === EVIDENCE.REPORT) {
       if (had && this.lastKnownAge < EVIDENCE_TTL) return false;
@@ -823,7 +843,7 @@ export class Agent {
   }
 
   /** Rounds cracking past raise suppression, which drives the flinch + duck. */
-  suppress(amount: number) {
+  suppress(amount: number): void {
     if (!this.alive) return;
     this.suppression = Math.min(COMBAT.suppressMax, this.suppression + amount);
     this.alertness = 1;
@@ -833,7 +853,7 @@ export class Agent {
   /* behaviour                                                          */
   /* ================================================================== */
 
-  _setState(s: string) {
+  _setState(s: AiState): void {
     if (this.ladder) return;
     if (this.state === s) return;
     const prev = this.state;
@@ -857,7 +877,7 @@ export class Agent {
     }
   }
 
-  _clearSearch() {
+  _clearSearch(): void {
     if (this.ladder) return;
     if (this._searchPending) this.ai.grid?.worker?.cancel(`${this.id}:observation`);
     this._searchPending = false;
@@ -874,12 +894,12 @@ export class Agent {
     this.hasMoveTarget = false;
   }
 
-  _finishSearch(outcome: string) {
+  _finishSearch(outcome: string): void {
     if (this.searchOutcome === SEARCH_OUTCOME.ACTIVE) this.searchOutcome = outcome;
     this._clearSearch();
   }
 
-  _beginSearch() {
+  _beginSearch(): void {
     this._clearSearch();
     if (this.lastKnownAge >= EVIDENCE_TTL) return;
     this.searchOutcome = SEARCH_OUTCOME.ACTIVE;
@@ -887,7 +907,7 @@ export class Agent {
     this._rebuildSearch();
   }
 
-  _rebuildSearch() {
+  _rebuildSearch(): void {
     if (this.ladder) return;
     this.ai.grid?.worker?.cancel(`${this.id}:observation`);
     this._searchTravelUntil = 0;
@@ -901,14 +921,19 @@ export class Agent {
     if (!this._searchPending) this._goSearchCandidate();
   }
 
-  _buildSearchCandidates() {
+  _buildSearchCandidates(): typeof NAV_PENDING | typeof NAV_CANCELLED | undefined {
     const worker = this.ai.grid?.worker;
     return worker
-      ? worker.run(this.id, 'observation', () => this._scanSearchCandidates(), this.position)
+      ? worker.run(
+          this.id,
+          'observation',
+          (): typeof NAV_PENDING | typeof NAV_CANCELLED | undefined => this._scanSearchCandidates(),
+          this.position
+        )
       : this._scanSearchCandidates();
   }
 
-  _scanSearchCandidates() {
+  _scanSearchCandidates(): typeof NAV_PENDING | typeof NAV_CANCELLED | undefined {
     this._searchCount = 0;
     const origin = this._searchOrigin;
     const grid = this.ai.grid;
@@ -935,7 +960,7 @@ export class Agent {
       }
       return;
     }
-    const push = (x: number, y: number, z: number) => {
+    const push = (x: number, y: number, z: number): void => {
       if (this._searchCount >= SEARCH_CANDIDATES) return;
       if (grid) {
         const goal = grid.sampleGround(x, z, y, this._v);
@@ -964,9 +989,10 @@ export class Agent {
         d = this._searchGeometry[i * 2 + 1];
       push(origin.x + Math.cos(ang) * d, origin.y, origin.z + Math.sin(ang) * d);
     }
+    return undefined;
   }
 
-  _goSearchCandidate() {
+  _goSearchCandidate(): void {
     while (this._searchIndex < this._searchCount) {
       const p = this._searchCand[this._searchIndex];
       this.searchPoint.copy(p);
@@ -983,7 +1009,7 @@ export class Agent {
     }
   }
 
-  _tickSearch(dt: number) {
+  _tickSearch(dt: number): void {
     const deadline =
       !this._searchReached && this._searchTravelUntil > 0
         ? this._searchTravelUntil
@@ -1048,7 +1074,7 @@ export class Agent {
     }
   }
 
-  _think(dt: number) {
+  _think(dt: number): void {
     if (this.ladder) {
       this.wantFire = false;
       return;
@@ -1230,7 +1256,7 @@ export class Agent {
 
   // Pause the existing route/state rather than inventing a second movement
   // executor. Hysteresis keeps a nearby visible opponent from toggling run/aim.
-  _engageClose(dt: number) {
+  _engageClose(dt: number): boolean {
     if (this.ladder) return false;
     this._engageCooldown = Math.max(0, this._engageCooldown - dt);
     this._engageHold = Math.max(0, this._engageHold - dt);
@@ -1286,7 +1312,7 @@ export class Agent {
     return true;
   }
 
-  _tryElevation(dt: number) {
+  _tryElevation(dt: number): boolean {
     const sq = this.squad;
     if (sq?.elevated !== this || !this.cover || this.state === STATE.SUPPRESSED) return false;
     const target =
@@ -1336,14 +1362,14 @@ export class Agent {
     return true;
   }
 
-  _canFireAtLastKnown() {
+  _canFireAtLastKnown(): boolean {
     return (
       this.targetVisible ||
       (this.lastKnownKind === EVIDENCE.VISUAL && this.lastKnownAge < TACTICS.suppressFireAge)
     );
   }
 
-  _fallbackStuck(dt: number, target: THREE.Vector3, dist: number) {
+  _fallbackStuck(dt: number, target: THREE.Vector3, dist: number): boolean {
     if (!(this.pathPending && !this.hasMoveTarget)) {
       this._relocWait = 0;
       return false;
@@ -1354,7 +1380,7 @@ export class Agent {
     return true;
   }
 
-  _abandonMove(target: THREE.Vector3, dist: number) {
+  _abandonMove(target: THREE.Vector3, dist: number): void {
     const expose =
       this.hasTarget &&
       dist < this.weaponRange &&
@@ -1374,14 +1400,14 @@ export class Agent {
     }
   }
 
-  _firingLaneClear(target: THREE.Vector3) {
+  _firingLaneClear(target: THREE.Vector3): boolean {
     if (!this._muzzleClear(target)) return false;
     const from = this.animator.muzzleWorld;
     this._muzzleDir.copy(target).sub(from).normalize();
     return !this._shotBlockedByFriend(from, this._muzzleDir);
   }
 
-  _muzzleOk(target: THREE.Vector3) {
+  _muzzleOk(target: THREE.Vector3): boolean {
     if (!this._muzzleClear(target)) return false;
     const from = this.animator.muzzleWorld;
     const dir = this.animator.muzzleDir;
@@ -1392,13 +1418,13 @@ export class Agent {
     return (dir.x * dx + dir.y * dy + dir.z * dz) / len >= MUZZLE_AIM_DOT;
   }
 
-  _enterCombat() {
+  _enterCombat(): void {
     this._setState(STATE.COMBAT);
     this.cover = null;
     this.repathTimer = 0;
   }
 
-  _combat(dt: number) {
+  _combat(dt: number): void {
     if (this.ladder) return;
     const target =
       this.hasTarget || (this.lastKnownAge < 5 && this.lastKnownKind === EVIDENCE.VISUAL)
@@ -1455,7 +1481,7 @@ export class Agent {
       const maxTravel = this.cover ? TACTICS.coverReplaceTravel : TACTICS.coverTravel;
       const pick = this.ai.cover?.pick(this.position, target, {
         id: this.id,
-        squad: sq?.members,
+        squad: sq?.members ?? [],
         minRange: 7,
         maxRange: 30,
         maxTravel,
@@ -1567,7 +1593,7 @@ export class Agent {
     this._tryGrenade(target, dist);
   }
 
-  _tryGrenade(target: THREE.Vector3, dist: number) {
+  _tryGrenade(target: THREE.Vector3, dist: number): void {
     if (this.ladder) return;
     const sq = this.squad;
     const flush = !!(sq?.wantFlush && this.hasGrenade);
@@ -1590,7 +1616,7 @@ export class Agent {
     }
   }
 
-  _goOffAxis(threat: THREE.Vector3) {
+  _goOffAxis(threat: THREE.Vector3): boolean {
     const sq = this.squad;
     if (sq) {
       if (!sq.hasWrapDest) sq.pickWrapDest(this.position, threat);
@@ -1608,7 +1634,7 @@ export class Agent {
     return this._goTo(this._v2);
   }
 
-  _tryWrap(dt: number, sq: Squad | null, target: THREE.Vector3) {
+  _tryWrap(dt: number, sq: Squad | null, target: THREE.Vector3): boolean {
     if (!sq || this.role !== 'wrap' || this._wrapDone) return false;
     if (
       sq.alive > 1 &&
@@ -1663,7 +1689,7 @@ export class Agent {
   /* cover peek                                                         */
   /* ================================================================== */
 
-  _rememberFailedPosition(p: THREE.Vector3Like) {
+  _rememberFailedPosition(p: THREE.Vector3Like): void {
     const f = this._failedCovers[this._failedCoverIndex];
     this._failedCoverIndex = (this._failedCoverIndex + 1) % this._failedCovers.length;
     f.x = p.x;
@@ -1673,7 +1699,7 @@ export class Agent {
     f.until = this._combatClock + TACTICS.failedCoverAge;
   }
 
-  _rejectCover(reason: string) {
+  _rejectCover(reason: string): void {
     if (this.cover) this._rememberFailedPosition(this.cover);
     this.coverFailure = reason;
     this._coverPathMax = Infinity;
@@ -1687,20 +1713,23 @@ export class Agent {
 
   // One bounded scan, no path solves. Actual routes still pass through _goTo
   // and the shared two-solves/frame scheduler. Never consult the live player.
-  _pickObservationPoints(target: THREE.Vector3, local: boolean) {
+  _pickObservationPoints(
+    target: THREE.Vector3,
+    local: boolean
+  ): void | typeof NAV_PENDING | typeof NAV_CANCELLED {
     const grid = this.ai.grid;
     const from = local ? (this._positionPlan?.center ?? this.position) : this.position;
     return grid?.worker
       ? grid.worker.run(
           this.id,
           'observation',
-          () => this._scanObservationPoints(target, local, from),
+          (): void => this._scanObservationPoints(target, local, from),
           from
         )
       : this._scanObservationPoints(target, local, from);
   }
 
-  _scanObservationPoints(target: THREE.Vector3, local: boolean, from: THREE.Vector3) {
+  _scanObservationPoints(target: THREE.Vector3, local: boolean, from: THREE.Vector3): void {
     this._searchCount = 0;
     this._positionScores.fill(Infinity);
     const grid = this.ai.grid;
@@ -1789,7 +1818,7 @@ export class Agent {
     }
   }
 
-  _startReposition(reason: string) {
+  _startReposition(reason: string): void {
     if (
       this._positionPlan ||
       this._repositioning ||
@@ -1815,7 +1844,7 @@ export class Agent {
     this._finishRepositionPlan();
   }
 
-  _finishRepositionPlan() {
+  _finishRepositionPlan(): void {
     if (!this._positionPlan) return;
     const { investigate, state } = this._positionPlan;
     if (
@@ -1852,7 +1881,7 @@ export class Agent {
     }
   }
 
-  _updateReposition() {
+  _updateReposition(): boolean {
     if (!this._repositioning) return false;
     const arrived =
       !this.pathPending &&
@@ -1893,7 +1922,7 @@ export class Agent {
     return true;
   }
 
-  _endPeek() {
+  _endPeek(): void {
     this.squad?.releasePeek(this);
     this.peeking = false;
     this._returning = false;
@@ -1904,7 +1933,7 @@ export class Agent {
   }
 
   /** Local 1-metre step — does not spend the A* budget. */
-  _stepTo(dest: THREE.Vector3, objective: string | null = 'local') {
+  _stepTo(dest: THREE.Vector3, objective: string | null = 'local'): void {
     if (this.ladder) return;
     this.route.ladderSteps.length = 0;
     if (!this.path[0]) this.path[0] = new THREE.Vector3();
@@ -1917,11 +1946,11 @@ export class Agent {
     this.pathObjective = objective;
   }
 
-  _muzzleClear(target: THREE.Vector3) {
+  _muzzleClear(target: THREE.Vector3): boolean {
     return this.phys.lineOfSight(this.animator.muzzleWorld, target, this.phys.MASK.SIGHT);
   }
 
-  _updatePeek(sq: Squad | null, target: THREE.Vector3, dist: number, dt: number) {
+  _updatePeek(sq: Squad | null, target: THREE.Vector3, dist: number, dt: number): void {
     const recent =
       this.lastKnownAge < 2.8 ||
       (sq?.elevated === this && sq.contactAge < TACTICS.elevatedContactAge);
@@ -2043,14 +2072,14 @@ export class Agent {
   /* movement                                                           */
   /* ================================================================== */
 
-  _notePathFail() {
+  _notePathFail(): void {
     if (this.pathObjective !== 'patrol') return;
     this._failStreak++;
     this._failWait = PATH_FAIL_WAIT;
   }
 
   /** Next patrol point, then a bounded local wander. False = nothing left. */
-  _pickNextPatrol() {
+  _pickNextPatrol(): boolean {
     const pts = this.patrolPoints;
     const n = pts?.length ?? 0;
     if (!pts || !n) return false;
@@ -2066,7 +2095,7 @@ export class Agent {
     return true;
   }
 
-  _pickLocalAlt(out: THREE.Vector3) {
+  _pickLocalAlt(out: THREE.Vector3): THREE.Vector3 | null {
     const grid = this.ai.grid;
     if (!grid) return null;
     const origin = this._v,
@@ -2089,7 +2118,7 @@ export class Agent {
     return null;
   }
 
-  _goTo(dest: THREE.Vector3) {
+  _goTo(dest: THREE.Vector3): boolean {
     if (this.ladder) {
       this._pendingDest.copy(dest);
       this.ladder.deferred = true;
@@ -2178,11 +2207,11 @@ export class Agent {
     return true;
   }
 
-  _cancelRouteProof() {
+  _cancelRouteProof(): void {
     this.ai.grid?.worker?.cancel(`${this.id}:path`);
   }
 
-  _releaseLadder() {
+  _releaseLadder(): void {
     const l = this.ladder;
     if (!l) return;
     l.motor?.cancel();
@@ -2343,7 +2372,7 @@ export class Agent {
     return null;
   }
 
-  _finishLadder(l: LiveLadder) {
+  _finishLadder(l: LiveLadder): void {
     this.pathIndex = l.step.exitIndex + 1;
     this._releaseLadder();
     this._safeSurface = 0;
@@ -2358,7 +2387,7 @@ export class Agent {
     if (l.deferred) this._goTo(this._pendingDest);
   }
 
-  _poseLadder(l: LiveLadder) {
+  _poseLadder(l: LiveLadder): void {
     this.animator.setClimb(
       !l.hold && !l.finished,
       l.travel,
@@ -2368,7 +2397,7 @@ export class Agent {
     );
   }
 
-  _moveLadder(dt: number) {
+  _moveLadder(dt: number): void {
     const l = this.ladder,
       c = this.controller;
     if (!l || !c || dt <= 0) return;
@@ -2541,7 +2570,7 @@ export class Agent {
     const result = worker.run(
       this.id,
       'ladder',
-      () =>
+      (): boolean =>
         worker.checkLadder(l.descriptor, l.step.direction, this.position, l.cursor, {
           radius: c.radius,
           height: c.height,
@@ -2568,7 +2597,7 @@ export class Agent {
     this._poseLadder(l);
   }
 
-  _move(dt: number) {
+  _move(dt: number): void {
     if (this.ladder) {
       this._moveLadder(dt);
       return;
@@ -2757,7 +2786,7 @@ export class Agent {
   }
 
   /** Bounded, physically executable local steps. Never snap across a seam. */
-  _unstickDest(out: THREE.Vector3) {
+  _unstickDest(out: THREE.Vector3): THREE.Vector3 | null {
     const grid = this.ai.grid;
     if (!grid) return null;
     const start = grid.project(this.position, this._v2);
@@ -2779,7 +2808,7 @@ export class Agent {
     return null;
   }
 
-  _rememberSafePosition() {
+  _rememberSafePosition(): void {
     if (this.ladder) return;
     const grid = this.ai.grid;
     if (!grid || !this.grounded || this._recoveryCount > 0 || this._recovering || this.vaultT >= 0)
@@ -2804,7 +2833,7 @@ export class Agent {
     this._safeVersion = grid.physics.staticWorld.version;
   }
 
-  _rollback() {
+  _rollback(): boolean {
     if (this.ladder) return false;
     const grid = this.ai.grid;
     // A rebuilt collision scene invalidates the checkpoint. Surface overlap
@@ -2841,7 +2870,7 @@ export class Agent {
     return true;
   }
 
-  _recoverMove() {
+  _recoverMove(): void {
     if (this.ladder) return;
     if (this._recovering || this.pathPending || this._recoveryWait > 0 || this.vaultT >= 0) return;
     if (!this._recoveryCount) this._recoveryOrigin.copy(this.position);
@@ -2875,7 +2904,7 @@ export class Agent {
   }
 
   /** Include failed starts with no remaining movement target in the watchdog. */
-  _tickNoProgress(dt: number) {
+  _tickNoProgress(dt: number): void {
     if (this.ladder) return;
     this._recoveryWait = Math.max(0, this._recoveryWait - dt);
     if (this.vaultT >= 0) return;
@@ -2931,7 +2960,7 @@ export class Agent {
     }
   }
 
-  _tryVault() {
+  _tryVault(): void {
     if (this.ladder) return;
     if (!this.hasMoveTarget || this.pathPending || !this.ai.grid || !this.controller) return;
     this.vaultCooldown = 2.5;
@@ -2976,7 +3005,7 @@ export class Agent {
     this.animator.vault(INFANTRY.vaultDuration);
   }
 
-  _moveVault(dt: number) {
+  _moveVault(dt: number): void {
     const c = this.controller;
     if (!c) throw new Error('[ai] vault requires a live controller');
     let blocked =
@@ -3008,7 +3037,7 @@ export class Agent {
   /* shooting                                                           */
   /* ================================================================== */
 
-  _updateFireBlock() {
+  _updateFireBlock(): void {
     if (this.ladder) {
       this.fireBlock = 'ladder';
       return;
@@ -3047,7 +3076,7 @@ export class Agent {
     this.fireBlock = reason;
   }
 
-  _shoot(dt: number) {
+  _shoot(dt: number): void {
     if (this.ladder) {
       this.wantFire = false;
       this.fireBlock = 'ladder';
@@ -3150,7 +3179,7 @@ export class Agent {
     an.fire(1);
   }
 
-  _shotBlockedByFriend(origin: THREE.Vector3, dir: THREE.Vector3) {
+  _shotBlockedByFriend(origin: THREE.Vector3, dir: THREE.Vector3): boolean {
     const agents = this.ai.agents;
     // Keep a conservative near-teammate margin for planning. Actual hitbox
     // contacts (including penetration and deflection) are rejected by
@@ -3198,7 +3227,7 @@ export class Agent {
     return true;
   }
 
-  _breakFriendlyPeek() {
+  _breakFriendlyPeek(): void {
     this._engaging = false;
     this._engageCooldown = FRIENDLY_HOLD;
     this._friendlyBlock = 0;
@@ -3210,7 +3239,7 @@ export class Agent {
     this.peekTimer = this.rng.range(0.5, 1.1);
   }
 
-  _grenadeUnsafe(target: THREE.Vector3) {
+  _grenadeUnsafe(target: THREE.Vector3): boolean {
     const from = this.animator.muzzleWorld;
     const land = this._v3;
     if (this.ai.predictGrenadeLand(from, target, land) < 0) return true;
@@ -3225,12 +3254,12 @@ export class Agent {
     return false;
   }
 
-  _throwGrenade(target: THREE.Vector3) {
+  _throwGrenade(target: THREE.Vector3): void {
+    const from = this._v.copy(this.animator.muzzleWorld);
+    if (!this.ai.throwGrenade(this, from, target)) return;
     this.grenadeCooldown = this.rng.range(16, 34);
     this.hasGrenade = false;
     this.ctx.events.emit('ai:bark', { kind: 'grenade', position: this.position, voice: this.id });
-    const from = this._v.copy(this.animator.muzzleWorld);
-    this.ai.throwGrenade(this, from, target);
   }
 
   /* ================================================================== */
@@ -3246,7 +3275,7 @@ export class Agent {
    * @param point   world impact point
    * @param dir     incident direction (unit)
    */
-  applyDamage(amount: number, part: string, point: THREE.Vector3, dir?: THREE.Vector3) {
+  applyDamage(amount: number, part: string, point: THREE.Vector3, dir?: THREE.Vector3): void {
     if (!this.alive) return;
     this.health -= amount;
     this.alertness = 1;
@@ -3281,13 +3310,13 @@ export class Agent {
   }
 
   /** Which side of the body a world point is on: <0 right, >0 left. */
-  _sideOf(p: THREE.Vector3) {
+  _sideOf(p: THREE.Vector3): number {
     const dx = p.x - this.position.x;
     const dz = p.z - this.position.z;
     return dx * Math.cos(this.yaw) - dz * Math.sin(this.yaw);
   }
 
-  die(point: THREE.Vector3, dir: THREE.Vector3 | null, amount = 30) {
+  die(point: THREE.Vector3, dir: THREE.Vector3 | null, amount = 30): void {
     if (!this.alive) return;
     // Evaluate the current controller-rooted pose before handing it to ragdoll.
     if (this.ladder) {
@@ -3340,7 +3369,10 @@ export class Agent {
    * animator left — the death has no pop. `radiusRatio` fattens the capsules
    * (its default is thin enough that a settled body reads as a pancake).
    */
-  _makeRagdoll(impulse: THREE.Vector3, point: THREE.Vector3) {
+  _makeRagdoll(
+    impulse: THREE.Vector3,
+    point: THREE.Vector3
+  ): import('../physics/ragdoll.ts').Ragdoll | null {
     const phys = this.phys;
     if (!phys) return null;
     // Fat capsules that start half-buried in the floor tunnel straight through
@@ -3380,7 +3412,7 @@ export class Agent {
   /* drive the visual                                                   */
   /* ================================================================== */
 
-  _drive(dt: number) {
+  _drive(dt: number): void {
     this.group.position.copy(this.position);
     this.group.rotation.y = this.yaw;
     this.group.updateMatrixWorld(true);
@@ -3439,7 +3471,7 @@ export class Agent {
   }
 
   /** Push the hit capsules onto the animated skeleton. */
-  syncHitboxes() {
+  syncHitboxes(): void {
     if (!this.alive) return;
     const an = this.animator;
     for (let i = 0; i < this.colliders.length; i++) {
@@ -3461,7 +3493,7 @@ export class Agent {
     }
   }
 
-  dispose() {
+  dispose(): void {
     this._releaseLadder();
     this._cancelRouteProof();
     this._endPeek();

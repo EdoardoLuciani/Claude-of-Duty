@@ -31,7 +31,9 @@ import {
 } from 'three/webgpu';
 import type { DataArrayTexture } from 'three/webgpu';
 import type { Node, Texture } from 'three/webgpu';
+import type { TextureNode, VaryingNode } from 'three/webgpu';
 
+import { isClosable } from '../core/guards.ts';
 import { loadPngTexture } from '../core/pngtex.ts';
 import { soldierSurface } from './soldier.ts';
 import type { VariantName } from './soldier.ts';
@@ -60,7 +62,7 @@ class SoldierNodeMaterial extends MeshStandardNodeMaterial {
       .mul(rimScale);
   }
 
-  setupOutput(
+  override setupOutput(
     builder: Parameters<MeshStandardNodeMaterial['setupOutput']>[0],
     output: Parameters<MeshStandardNodeMaterial['setupOutput']>[1] & {
       rgb: ReturnType<typeof vec3>;
@@ -79,8 +81,8 @@ export interface CamoStats {
   sd: number;
 }
 interface SoldierManifest {
-  sets?: string[];
-  details?: string[];
+  sets?: string[] | undefined;
+  details?: string[] | undefined;
   camoStats?: Record<string, CamoStats>;
 }
 function parseManifest(value: unknown): SoldierManifest {
@@ -213,7 +215,7 @@ export class SoldierMaterialsNode {
       loadPngTexture(`${base}/${name}.png`, { srgb, aniso: anisotropy });
     const sets: Record<string, SoldierTextureSet> = {};
     await Promise.all(
-      (manifest.sets ?? []).map(async (name) => {
+      (manifest.sets ?? []).map(async (name): Promise<void> => {
         const [albedo, orm, normal] = await Promise.all([
           load(`ai-${name}-albedo`, true),
           load(`ai-${name}-orm`, false),
@@ -224,15 +226,15 @@ export class SoldierMaterialsNode {
     );
     const details: Record<string, Texture> = {};
     await Promise.all(
-      (manifest.details ?? []).map(async (name) => {
+      (manifest.details ?? []).map(async (name): Promise<void> => {
         details[name] = await load(`ai-detail-${name}`, false);
       })
     );
     const library = new SoldierMaterialsNode(sets, details, manifest.camoStats ?? {});
     const names = Object.keys(sets);
-    library.layers = new Map([...names, 'glass'].map((name, i) => [name, i]));
-    const maps = (field: keyof SoldierTextureSet) => [
-      ...names.map((name) => sets[name][field]),
+    library.layers = new Map([...names, 'glass'].map((name, i): [string, number] => [name, i]));
+    const maps = (field: keyof SoldierTextureSet): (Texture | null)[] => [
+      ...names.map((name): Texture => sets[name][field]),
       null,
     ];
     library.arrays = {
@@ -330,14 +332,16 @@ export class SoldierMaterialsNode {
     // A tiny immutable lookup texture stays in the native material bindings.
     // Another shared uniform group would exceed the game's four-group limit.
     const pixels = new Float32Array(slots.length * 3 * 4);
-    [colors, base, detail].forEach((row, y) =>
-      row.forEach((value, x) => value.toArray(pixels, (y * slots.length + x) * 4))
+    [colors, base, detail].forEach((row, y): void =>
+      row.forEach((value, x): ArrayLike<number> =>
+        value.toArray(pixels, (y * slots.length + x) * 4)
+      )
     );
     const table = new DataTexture(pixels, slots.length, 3, RGBAFormat, FloatType);
     table.needsUpdate = true;
     this.surfaceTables.push(table);
     // Resolve finishes at vertices, not with dependent lookups at every pixel.
-    const read = (row: number) =>
+    const read = (row: number): VaryingNode<'vec4'> =>
       varying(textureLoad(table, ivec2(surface.toInt(), row))).setInterpolation('flat');
     const c = read(0),
       b = read(1),
@@ -348,7 +352,7 @@ export class SoldierMaterialsNode {
       rim
     );
     const coords = uv();
-    const sample = (map: DataArrayTexture) => texture(map, coords).depth(c.w);
+    const sample = (map: DataArrayTexture): TextureNode<'vec4'> => texture(map, coords).depth(c.w);
     const orm = sample(this.arrays.orm);
     const micro = texture(this.arrays.detail, coords.mul(d.x)).depth(d.y);
     mat.colorNode = sample(this.arrays.albedo).rgb.mul(c.rgb);
@@ -374,12 +378,14 @@ export class SoldierMaterialsNode {
     for (const set of Object.values(this.sets)) {
       for (const texture of [set.albedo, set.orm, set.normal]) {
         texture.dispose();
-        (texture.image as ImageBitmap | null)?.close?.();
+        const image = texture.image;
+        if (isClosable(image)) image.close();
       }
     }
     for (const texture of Object.values(this.details)) {
       texture.dispose();
-      (texture.image as ImageBitmap | null)?.close?.();
+      const image = texture.image;
+      if (isClosable(image)) image.close();
     }
     this.materials.clear();
     this.combined.clear();

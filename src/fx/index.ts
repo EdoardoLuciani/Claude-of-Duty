@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 
 import { UNITS } from '../core/config.ts';
-import type { EngineContext, EngineSystems } from '../core/context.ts';
+import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName, EventWeapon } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
+import type { SurfaceName } from '../physics/surfaces.ts';
 import { Ambience } from './ambience.ts';
 import { loadFxAtlases, P, D } from './atlas.ts';
 import { DecalSystem } from './decals.ts';
@@ -48,7 +49,7 @@ interface FxImpactEvent {
   point: THREE.Vector3;
   normal: THREE.Vector3;
   incident?: THREE.Vector3;
-  surface: string;
+  surface: SurfaceName;
   damage: number;
   exit?: boolean;
   actor?: unknown;
@@ -59,13 +60,19 @@ export type FxContext = Pick<
   'scene' | 'viewScene' | 'camera' | 'viewCamera' | 'config' | 'time' | 'rng' | 'events' | 'peek'
 >;
 type DecalWorld = NonNullable<Parameters<DecalSystem['add']>[0]['world']>;
-type FxDecalOptions = Parameters<DecalSystem['add']>[0] & { noFallback?: boolean };
+type DecalOptions = Parameters<DecalSystem['add']>[0];
+/** Projection inputs and world/time bookkeeping belong to FX, not its callers. */
+export type FxDecalOptions = Partial<
+  Omit<DecalOptions, 'point' | 'normal' | 'world' | 'now' | 'mask'>
+> & {
+  noFallback?: boolean;
+};
 interface FxTargetFrame {
   point: THREE.Vector3;
   normal: THREE.Vector3;
   tangent: THREE.Vector3;
   bitangent: THREE.Vector3;
-  surface: string;
+  surface: SurfaceName;
   world: DecalWorld | null;
   distance: number;
   spanU: number;
@@ -116,7 +123,7 @@ export class FxSystem {
   declare _tmpA: THREE.Vector3;
   declare _tmpB: THREE.Vector3;
   declare _camPos: THREE.Vector3;
-  declare _decalOpts: FxDecalOptions;
+  declare _decalOpts: DecalOptions;
   declare _off: Array<() => void>;
   declare _script: Array<{ t: number; fn: () => void }>;
   declare _scriptTime: number;
@@ -129,8 +136,8 @@ export class FxSystem {
   declare _target: FxTargetFrame | undefined;
   declare _probes: Float32Array | undefined;
   declare _warmScene: THREE.Scene;
-  static id = 'fx';
-  static deps = ['render', 'materials'];
+  static readonly id = 'fx';
+  static readonly deps: SystemId[] = ['render', 'materials'];
 
   async init(ctx: FxContext): Promise<void> {
     this.ctx = ctx;
@@ -166,7 +173,11 @@ export class FxSystem {
     /** Particles spawned per impact scale with the budget. */
     this.pScale = clamp(budget / 12000, 0.4, 1.25);
 
-    const mk = (capacity: number, modeName: 'lit' | 'additive', renderOrder: number) =>
+    const mk = (
+      capacity: number,
+      modeName: 'lit' | 'additive',
+      renderOrder: number
+    ): ParticleLayer =>
       new ParticleLayer({
         capacity,
         mode: modeName,
@@ -259,19 +270,18 @@ export class FxSystem {
       this._off.push(off);
     };
     this._off = [];
-    on('bullet:impact', (e) => this.onImpact(e));
-    on('intel:secured', (e) => this.onIntelSpark(e));
-    on('intel:spark', (e) => this.onIntelSpark(e));
-    on('bullet:segment', (e) => {
+    on('bullet:impact', (e): void => this.onImpact(e));
+    on('intel:secured', (e): void => this.onIntelSpark(e));
+    on('intel:spark', (e): void => this.onIntelSpark(e));
+    on('bullet:segment', (e): void => {
       if (e.tracer) this.tracer(e.from, e.to, e.speed);
     });
-    on('bullet:tracer', (e) => this.tracer(e.from, e.to, e.speed)); // explicit dev staging
-    on('weapon:fire', (e) => this.onWeaponFire(e));
-    on('weapon:shell', (e) => this.spawnShell(e.position, e.velocity, e));
-    on('explosion', (e) => this.explosion(e));
-    on('actor:death', (e) => this.onActorDeath(e));
-    on('player:land', (e) => this.onLand(e));
-    on('player:footstep', (e) => this.onFootstep(e));
+    on('weapon:fire', (e): void => this.onWeaponFire(e));
+    on('weapon:shell', (e): void => this.spawnShell(e.position, e.velocity, e));
+    on('explosion', (e): void => this.explosion(e));
+    on('actor:death', (e): void => this.onActorDeath(e));
+    on('player:land', (e): void => this.onLand(e));
+    on('player:footstep', (e): void => this.onFootstep(e));
 
     // ---- dev burst script ------------------------------------------------
     this._script = [];
@@ -296,7 +306,7 @@ export class FxSystem {
     //
     // Gated on a viewmodel already existing: `render` decides whether to run the
     // viewmodel pass at all by counting viewScene's children, and in an FX-only
-    // scene (src/fx/preview.ts) adding ours would turn that pass on. In that case
+    // scene adding ours would turn that pass on. In that case
     // the lazy attach on first use still applies.
     if (this._viewmodelPresent()) this._attachView();
 
@@ -306,7 +316,7 @@ export class FxSystem {
     );
   }
 
-  resize() {
+  resize(): void {
     // RenderSystem.resize runs first; haze's offsets live at half the internal
     // drawing resolution, not half the CSS viewport size.
     const { width, height } = this.render!.screenSize;
@@ -317,19 +327,19 @@ export class FxSystem {
   /*  emit helpers (bound so recipe modules can pass them around)          */
   /* ===================================================================== */
 
-  emitAdd = (s: typeof SP) => this.add.emit(s, this.now);
-  emitLit = (s: typeof SP) => this.lit.emit(s, this.now);
-  emitMote = (s: typeof SP) => this.motes.emit(s, this.now);
-  emitViewAdd = (s: typeof SP) => {
+  emitAdd = (s: typeof SP): number => this.add.emit(s, this.now);
+  emitLit = (s: typeof SP): number => this.lit.emit(s, this.now);
+  emitMote = (s: typeof SP): number => this.motes.emit(s, this.now);
+  emitViewAdd = (s: typeof SP): number => {
     this._attachView();
     return this.viewAdd.emit(s, this.now);
   };
-  emitViewLit = (s: typeof SP) => {
+  emitViewLit = (s: typeof SP): number => {
     this._attachView();
     return this.viewLit.emit(s, this.now);
   };
 
-  _attachView() {
+  _attachView(): void {
     if (this._viewAttached) return;
     this._viewAttached = true;
     this.ctx.viewScene.add(this.viewAdd.mesh);
@@ -349,8 +359,8 @@ export class FxSystem {
   /** Does viewScene already draw something of its own (i.e. is there a weapon)? */
   _viewmodelPresent(): boolean {
     let found = false;
-    this.ctx.viewScene?.traverse((o) => {
-      if (found || !(o as THREE.Mesh).isMesh) return;
+    this.ctx.viewScene?.traverse((o): void => {
+      if (found || !(o instanceof THREE.Mesh)) return;
       if (o === this.viewAdd?.mesh || o === this.viewLit?.mesh) return;
       found = true;
     });
@@ -408,7 +418,10 @@ export class FxSystem {
     const haze = await this.hazeSys.prewarm(
       renderer,
       ctx.camera,
-      render?._warmGraph ? () => render._warmGraph!() : null
+      render?._warmGraph
+        ? (): Promise<{ ms: number; geometries: number; frameUnchanged: boolean }> =>
+            render._warmGraph!()
+        : null
     );
     return { ok: haze.ok, haze };
   }
@@ -512,10 +525,10 @@ export class FxSystem {
     weapon?: EventWeapon;
     view?: boolean;
     viewSpace?: boolean;
-    intensity?: number;
-    light?: number;
-    scale?: number;
-  }) {
+    intensity?: number | undefined;
+    light?: number | undefined;
+    scale?: number | undefined;
+  }): ReturnType<typeof muzzleFlash> {
     this.now = this.ctx.time.elapsed;
     let pos = o.position;
     let dir = o.direction;
@@ -544,17 +557,17 @@ export class FxSystem {
     this._flashArg.light = o.light;
     this._flashArg.scale = o.scale;
     this._flashArg.view = o.view === true || o.viewSpace === true;
-    return muzzleFlash(this, this._flashArg as Parameters<typeof muzzleFlash>[1]);
+    return muzzleFlash(this, this._flashArg);
   }
 
-  _flashArg = {
-    position: null as THREE.Vector3 | null,
-    direction: null as THREE.Vector3 | null,
-    lightPos: null as THREE.Vector3 | null,
-    weapon: undefined as Parameters<typeof muzzleFlash>[1]['weapon'],
-    intensity: 1 as number | undefined,
-    light: 1 as number | undefined,
-    scale: undefined as number | undefined,
+  _flashArg: Parameters<typeof muzzleFlash>[1] = {
+    position: new THREE.Vector3(),
+    direction: new THREE.Vector3(),
+    lightPos: new THREE.Vector3(),
+    weapon: undefined,
+    intensity: 1,
+    light: 1,
+    scale: undefined,
     view: false,
   };
   _lightPos = new THREE.Vector3();
@@ -599,7 +612,7 @@ export class FxSystem {
     to: THREE.Vector3,
     speed: number | undefined,
     opts: Parameters<typeof spawnTracer>[4] = {}
-  ) {
+  ): void {
     if (!from || !to) return;
     this.now = this.ctx.time.elapsed;
     spawnTracer(this, from, to, speed ?? 0, opts);
@@ -624,9 +637,9 @@ export class FxSystem {
    * @param {THREE.Vector3} normal
    */
   addDecal(
-    point: THREE.Vector3,
-    normal: THREE.Vector3,
-    opts: Partial<FxDecalOptions> = {}
+    point: THREE.Vector3Like,
+    normal: THREE.Vector3Like,
+    opts: FxDecalOptions = {}
   ): boolean {
     if (this._suppressDecals) return false;
     const o = this._decalOpts;
@@ -1047,8 +1060,8 @@ export class FxSystem {
           .addScaledVector(target.tangent, side * 1.6);
         this.explosion({ position: this._tmpA, radius: 3.6, damage: 120 });
       };
-      at(0.02, () => boom(-1));
-      at(0.56, () => boom(1));
+      at(0.02, (): void => boom(-1));
+      at(0.56, (): void => boom(1));
       this._stageWallHits(at, target, 6, 0.1, 0.95);
       return { staged: 'explosion', at: target.point.toArray() };
     }
@@ -1058,9 +1071,9 @@ export class FxSystem {
       this._scriptPeriod = 0.44;
       for (let i = 0; i < 8; i++) {
         const t = i * 0.055;
-        at(t, () => this._stageMuzzle());
-        if (i % 3 === 0) at(t + 0.01, () => this._stageShell());
-        if (i % 2 === 0) at(t + 0.004, () => this._stageTracer(target));
+        at(t, (): void => this._stageMuzzle());
+        if (i % 3 === 0) at(t + 0.01, (): void => this._stageShell());
+        if (i % 2 === 0) at(t + 0.004, (): void => this._stageTracer(target));
       }
       return { staged: 'muzzle' };
     }
@@ -1068,14 +1081,18 @@ export class FxSystem {
     if (kind === 'combat' || kind === 'firefight') {
       this._scriptPeriod = 1.6;
       this._stageWallHits(at, target, 9, 0.04, 1.2);
-      at(1.3, () => this._impactAt(target, rng.signed() * 0.7, rng.range(-0.2, 0.5), 'metal'));
-      at(1.42, () => this._impactAt(target, rng.signed() * 0.6, rng.range(-0.2, 0.5), null));
-      at(1.5, () => this._impactAt(target, rng.signed() * 0.5, rng.range(-0.1, 0.6), 'metal'));
-      at(1.36, () => this._stageTracer(target));
-      at(1.44, () => this._stageCrossfire());
-      at(1.12, () => this._stageShell());
-      at(1.34, () => this._stageShell());
-      at(1.52, () => this._stageMuzzle());
+      at(1.3, (): void =>
+        this._impactAt(target, rng.signed() * 0.7, rng.range(-0.2, 0.5), 'metal')
+      );
+      at(1.42, (): void => this._impactAt(target, rng.signed() * 0.6, rng.range(-0.2, 0.5), null));
+      at(1.5, (): void =>
+        this._impactAt(target, rng.signed() * 0.5, rng.range(-0.1, 0.6), 'metal')
+      );
+      at(1.36, (): void => this._stageTracer(target));
+      at(1.44, (): void => this._stageCrossfire());
+      at(1.12, (): void => this._stageShell());
+      at(1.34, (): void => this._stageShell());
+      at(1.52, (): void => this._stageMuzzle());
       return { staged: 'combat' };
     }
 
@@ -1095,10 +1112,10 @@ export class FxSystem {
         `n=(${target.normal.x.toFixed(2)},${target.normal.y.toFixed(2)},${target.normal.z.toFixed(2)}) ` +
         `support=${this._targetSupport ?? -1} span=${target.spanU.toFixed(2)}x${target.spanV.toFixed(2)}`
     );
-    at(0.3, () => this._stageCrossfire());
-    at(0.74, () => this._stageCrossfire());
-    at(0.18, () => this._stageShell());
-    at(0.52, () => this._stageShell());
+    at(0.3, (): void => this._stageCrossfire());
+    at(0.74, (): void => this._stageCrossfire());
+    at(0.18, (): void => this._stageShell());
+    at(0.52, (): void => this._stageShell());
     return { staged: kind, at: target.point.toArray(), surface: target.surface };
   }
 
@@ -1120,12 +1137,17 @@ export class FxSystem {
       const u = Math.sin(f * 3.9 + 0.4) * su + rng.signed() * su * 0.13;
       const v = Math.cos(f * 2.4) * sv + rng.signed() * sv * 0.35;
       const surf = i % 3 === 2 ? 'metal' : null;
-      at(t, () => this._impactAt(target, u, v, surf));
+      at(t, (): void => this._impactAt(target, u, v, surf));
     }
   }
 
   /** Fake a bullet:impact at an offset on the staged surface. */
-  _impactAt(target: FxTargetFrame, u: number, v: number, surfaceOverride?: string | null): void {
+  _impactAt(
+    target: FxTargetFrame,
+    u: number,
+    v: number,
+    surfaceOverride?: SurfaceName | null
+  ): void {
     this._p
       .copy(target.point)
       .addScaledVector(target.tangent, u)
@@ -1166,7 +1188,7 @@ export class FxSystem {
    * weapon, so the flash is welded to the bore rather than to a hardcoded offset
    * from the eye. The offset is only the fallback for an FX-only scene.
    */
-  _stageMuzzle() {
+  _stageMuzzle(): void {
     const cam = this.ctx.camera;
     cam.updateMatrixWorld();
     const wp = this.ctx.peek('weapons');
@@ -1185,7 +1207,7 @@ export class FxSystem {
     });
   }
 
-  _stageShell() {
+  _stageShell(): void {
     const cam = this.ctx.camera;
     cam.updateMatrixWorld();
     this._tmpA.set(0.2, -0.1, -0.45).applyMatrix4(cam.matrixWorld);
@@ -1221,7 +1243,7 @@ export class FxSystem {
   }
 
   /** Incoming round crossing the frame — reads as a firefight, not a range. */
-  _stageCrossfire() {
+  _stageCrossfire(): void {
     const cam = this.ctx.camera;
     const rng = this.rng;
     this._tmpA
@@ -1234,7 +1256,7 @@ export class FxSystem {
   }
 
   /** Surface name per probe hit; sized once, reused (see `_findTarget`). */
-  _probeSurf = new Array<string>(63).fill('concrete');
+  _probeSurf = new Array<SurfaceName>(63).fill('concrete');
   _probeCount = 0;
 
   _findTarget(): FxTargetFrame {
@@ -1252,7 +1274,7 @@ export class FxSystem {
     });
     this._camPos.setFromMatrixPosition(cam.matrixWorld);
     const ph = this.physics;
-    let best = null;
+    let best: Pick<FxTargetFrame, 'point' | 'normal' | 'surface' | 'distance'> | null = null;
     let bestDist = Infinity;
     if (ph?.raycast && (ph.staticWorld?.triCount ?? 0) > 0) {
       // Fan of probes: prefer something in the 1.5-9 m band, which is where a
@@ -1321,7 +1343,7 @@ export class FxSystem {
           best = best ?? {
             point: new THREE.Vector3(),
             normal: new THREE.Vector3(),
-            surface: '',
+            surface: 'concrete',
             distance: 0,
           };
           best.point.set(probes[a], probes[a + 1], probes[a + 2]);
@@ -1417,7 +1439,7 @@ export class FxSystem {
 
   /* ===================================================================== */
 
-  dispose() {
+  dispose(): void {
     for (const off of this._off ?? []) off();
     this._off = [];
     for (const l of [this.lit, this.add, this.motes, this.viewAdd, this.viewLit]) {

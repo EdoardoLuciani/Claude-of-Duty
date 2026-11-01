@@ -7,7 +7,6 @@ import {
   bindingLabel,
 } from '../../src/core/bindings.ts';
 import { CONTROL_SECTIONS } from '../../src/ui/controls.ts';
-import { CombatDemo } from '../../src/ui/demo.ts';
 import { PauseMenu } from '../../src/ui/menu.ts';
 import { Prompt } from '../../src/ui/prompts.ts';
 import { RadioPanel } from '../../src/ui/radio.ts';
@@ -153,21 +152,15 @@ assert.deepEqual(
 );
 menu.dispose();
 assert.equal(menu.root.removed, true);
-const prompt = new Prompt(makeEl());
-assert.equal(
-  prompt.key.textContent,
-  bindingLabel('use'),
-  'initial prompt key derives from interact'
-);
+const prompt = new Prompt();
+assert.equal(prompt.key, bindingLabel('use'), 'initial prompt key derives from interact');
 prompt.set({ text: 'ammo', progress: 0.4 });
-assert.equal(
-  prompt.key.textContent,
-  bindingLabel('use'),
-  'fallback prompt key derives from interact'
-);
+assert.equal(prompt.key, bindingLabel('use'), 'fallback prompt key derives from interact');
+assert.equal(prompt.progress, 0.4);
+assert(prompt.hasProgress);
 prompt.set({ key: bindingLabel('heal'), text: 'bandaging' });
-assert.equal(prompt.key.textContent, bindingLabel('heal'), 'contextual prompt override preserved');
-prompt.dispose();
+assert.equal(prompt.key, bindingLabel('heal'), 'contextual prompt override preserved');
+assert.equal(prompt.hasProgress, false);
 const radio = new RadioPanel(makeEl(), { peek: () => ({ radioEquipped: true, carpetBombs: 2 }) });
 const radioNodes = flatten(radio.root);
 assert.ok(radioNodes.some((node) => node.textContent === `${bindingLabel('radio')} STOWS`));
@@ -177,27 +170,6 @@ for (const action of ['slot1', 'slot2', 'slot3']) {
 radio.update(1);
 assert.equal(radio.rows[0].charge.textContent, 'x2');
 radio.dispose();
-let demoPrompt;
-const demo = new CombatDemo();
-demo.start({
-  state: {},
-  health: {},
-  killfeed: {
-    clear() {},
-    push() {
-      return {};
-    },
-  },
-  arcs: { clear() {} },
-  hit: { clear() {} },
-  markers: { clear() {} },
-  setObjectives() {},
-  setBlips() {},
-  setPrompt(value) {
-    demoPrompt = value;
-  },
-});
-assert.equal(demoPrompt.key, bindingLabel('use'), 'capture demo cannot show stale F interaction');
 console.log(
-  'smoke-menu-controls: ok (concise reference, canonical labels, native rows, contextual prompts and radio/demo labels)'
+  'smoke-menu-controls: ok (concise reference, canonical labels, native rows, contextual prompts and radio labels)'
 );

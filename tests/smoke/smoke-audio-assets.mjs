@@ -5,14 +5,18 @@ import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import { WEAPON_PROFILES } from '../../src/audio/weapons.ts';
 import { AUDIO_BANKS } from '../lib/audio-banks.mjs';
 
-const total = 40 + AUDIO_BANKS.reduce((n, bank) => n + bank[3], 0);
+const total = 39 + AUDIO_BANKS.reduce((n, bank) => n + bank[3], 0);
 const failedUrls = ['smg-1', ...AUDIO_BANKS.map(([, banks]) => Object.values(banks)[0][0])];
 const fetch = globalThis.fetch;
 try {
   for (const failure of [null, ...failedUrls, 'decode']) {
     let decodes = 0;
     globalThis.fetch = async (url) => ({
-      ok: !failure || failure === 'decode' || !url.includes(failure),
+      // Match one asset, not e.g. both smg-1.opus and dry-smg-1.opus.
+      ok:
+        !failure ||
+        failure === 'decode' ||
+        !(url === failure || url.endsWith('/' + failure + '.opus')),
       status: 404,
       arrayBuffer: async () => new ArrayBuffer(1),
     });
@@ -48,7 +52,7 @@ try {
     /smg recordings are not loaded/,
     'a missing weapon recording must not use a rifle take'
   );
-  assert.throws(() => missing.explosion({}), /recording is not loaded/);
+  assert.throws(() => missing.explosion('grenade', {}), /recordings are not loaded/);
   const audio = new AudioSystem();
   audio.samples = missing;
   audio.rng = {};
@@ -57,7 +61,7 @@ try {
     /smg recordings are not loaded/,
     'near recorded fire must not synthesize a substitute'
   );
-  assert.throws(() => audio._build('explosion', 0, 0, {}), /recording is not loaded/);
+  assert.throws(() => audio._build('explosion', 0, 0, {}), /recordings are not loaded/);
 } finally {
   globalThis.fetch = fetch;
 }

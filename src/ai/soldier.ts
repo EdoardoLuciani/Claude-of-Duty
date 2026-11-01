@@ -208,7 +208,7 @@ const bp = (name: string): Vec3 => {
  * @returns { geometry, materials: THREE.Material[], weapon, stats }
  */
 export interface SoldierMaterialFactory {
-  get(name: string, options?: Record<string, unknown>): THREE.Material;
+  get(name: string, options?: SoldierMaterialOptions): THREE.Material;
   glass(): THREE.Material;
 }
 export interface BuildSoldierResult {
@@ -216,7 +216,7 @@ export interface BuildSoldierResult {
   materials: THREE.Material[];
   slots: string[];
   parts: {
-    name?: string;
+    name?: string | undefined;
     material: string;
     start: number | undefined;
     count: number | undefined;
@@ -874,7 +874,7 @@ export function buildSoldier(
   // Guard the prewarm contract: see MATERIAL_SLOTS.
   if (
     built.materialNames.join() !==
-    MATERIAL_SLOTS.filter((s) => built.materialNames.includes(s)).join()
+    MATERIAL_SLOTS.filter((s): boolean => built.materialNames.includes(s)).join()
   ) {
     console.warn(
       `[ai] material slot order changed (${built.materialNames.join()}); ` +
@@ -932,7 +932,7 @@ export function resolveMaterials(
   slots: readonly string[],
   materials: SoldierMaterialFactory
 ): THREE.Material[] {
-  return slots.map((slot) => {
+  return slots.map((slot): THREE.Material<THREE.MaterialEventMap> => {
     const { set, options } = soldierSurface(name, slot);
     return slot === 'glass' ? materials.glass() : materials.get(set, { ...options });
   });
@@ -947,13 +947,21 @@ export function soldierSurface(
   options: SoldierMaterialOptions;
 } {
   const V = VARIANTS[name];
-  const detail = (set: string, matName: string, normal: number, rough: number) => ({
+  const detail = (
+    set: string,
+    matName: string,
+    normal: number,
+    rough: number
+  ): { set: string; scale: number; normal: number; rough: number } => ({
     set,
     scale: MATERIALS[matName].tile / DETAIL_TILE,
     normal,
     rough,
   });
-  const options = (set: string, value: SoldierMaterialOptions = {}) => ({ set, options: value });
+  const options = (
+    set: string,
+    value: SoldierMaterialOptions = {}
+  ): { set: string; options: SoldierMaterialOptions } => ({ set, options: value });
   switch (slot) {
     case 'cloth':
       return options(`camo_${V.camo}`, {

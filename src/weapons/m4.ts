@@ -1,8 +1,10 @@
 import * as THREE from 'three';
-import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { Renderer } from 'three/webgpu';
 
 import handReference from '../../assets/weapons/m4a1-block-ii/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/m4a1-block-ii/manifest.json' with { type: 'json' };
+import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
 import {
@@ -15,9 +17,10 @@ import {
 } from './authored-hands.ts';
 import { authoredModel, requiredNode } from './authored-model.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
+import { configureM4Finishes } from './m4-finishes.ts';
 
 export const M4_URL = new URL(
-  '../../assets/weapons/m4a1-block-ii/m4a1-block-ii.glb',
+  '../../assets/weapons/m4a1-block-ii/m4a1-block-ii.runtime.glb',
   import.meta.url
 ).href;
 const ALIASES: Record<string, string> = {
@@ -29,11 +32,27 @@ const ALIASES: Record<string, string> = {
 };
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
 
-export function makeM4Model(gltf: GLTF) {
+export function makeM4Model(gltf: GLTF): M4Model {
   const scene = gltf.scene;
   const { root, animations, point } = authoredModel(gltf, 'M4_RIG', REQUIRED, scene);
+  // Only gltfpack's observed wholly constant, single-key Idle loses its end.
+  // Never repair a moving clip or conceal a damaged authored endpoint.
+  for (const clip of animations) {
+    const authored = Object.entries(manifest.clips).find(([name]): boolean => name === clip.name);
+    if (!authored) throw new Error(`[M4_RIG] unknown ${clip.name} clip`);
+    const duration = authored[1].duration;
+    if (
+      clip.name === 'Idle' &&
+      clip.duration === 0 &&
+      clip.tracks.length > 0 &&
+      clip.tracks.every((track): boolean => track.times.length === 1 && track.times[0] === 0)
+    )
+      clip.duration = duration;
+    else if (Math.abs(clip.duration - duration) > 1e-6)
+      throw new Error(`[M4_RIG] invalid ${clip.name} duration ${clip.duration}`);
+  }
   const model = {
-    id: 'rifle',
+    id: 'rifle' as const,
     label: 'M4A1',
     scene,
     root,
@@ -54,7 +73,8 @@ export function makeM4Model(gltf: GLTF) {
     shell: { caseLen: 0.0447, rimR: 0.00478 },
     magSize: { len: 0.16 },
   };
-  const converted = convertWeaponScene(scene, (_source, material) => {
+  const converted = convertWeaponScene(scene, (_source, material): void => {
+    configureM4Finishes(material);
     for (const value of Object.values(material as object)) {
       if (value instanceof THREE.Texture) value.anisotropy = 8;
     }
@@ -62,13 +82,39 @@ export function makeM4Model(gltf: GLTF) {
   return { ...model, ...converted };
 }
 
-export async function loadM4() {
-  return makeM4Model(await new GLTFLoader().loadAsync(M4_URL));
+export async function loadM4(renderer: Pick<Renderer, 'hasFeature'>): Promise<M4Model> {
+  return makeM4Model(await loadWeaponGLTF(renderer, M4_URL));
 }
 
 /** Blender owns mechanisms and wrist/finger choreography; the existing recoil,
  * shared arm skin, upper/forearm IK and ammunition/event system remain in charge. */
-type M4Model = ReturnType<typeof makeM4Model>;
+type M4Model = {
+  materials: Set<THREE.Material>;
+  textures: Set<THREE.Texture>;
+  id: 'rifle';
+  label: string;
+  scene: THREE.Group;
+  root: THREE.Object3D;
+  animations: THREE.AnimationClip[];
+  reactiveFire: boolean;
+  handPoses: {
+    left: typeof handReference.sides.left.grip;
+    right: typeof handReference.sides.left.grip;
+  };
+  nodes: {
+    muzzle: [number, number, number];
+    eject: [number, number, number];
+    sight: [number, number, number];
+    ejectDir: number[];
+    gripR: { pos: number[]; finger: number[]; back: number[] };
+    gripL: { pos: number[]; finger: number[]; back: number[] };
+    magSeat: { pos: number[]; rot: number[] };
+    triggerPivot: { pos: [number, number, number]; rot: number[] };
+    handguard: { axis: number[]; dir: number[]; r: number; z0: number; z1: number };
+  };
+  shell: { caseLen: number; rimR: number };
+  magSize: { len: number };
+};
 type M4Arm = HandRig;
 export class M4Animation {
   model!: M4Model;
@@ -100,7 +146,7 @@ export class M4Animation {
     this.root = model.root;
     this.mixer = new THREE.AnimationMixer(this.root);
     this.actions = createAuthoredActions(this.mixer, model.animations);
-    const node = (name: string) => requiredNode(this.root, name);
+    const node = (name: string): THREE.Object3D => requiredNode(this.root, name);
     this.bolt = node('bolt');
     this.boltRest = this.bolt.position.clone();
     this.boltHead = node('bolt_head');

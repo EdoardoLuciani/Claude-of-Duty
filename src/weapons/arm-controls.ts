@@ -48,18 +48,18 @@ export function createArmControls(
     [0.049, 0.031, 0.023],
     [0.046, 0.029, 0.022],
     [0.038, 0.024, 0.02],
-  ].map((a) => a.map((v) => v * s));
+  ].map((a): number[] => a.map((v): number => v * s));
   arm._segRadius = [
     [0.0102, 0.0096, 0.0086, 0.0062],
     [0.0104, 0.0098, 0.0088, 0.0064],
     [0.01, 0.0094, 0.0084, 0.006],
     [0.0092, 0.0086, 0.0078, 0.0056],
-  ].map((a) => a.map((v) => v * s * 0.86));
+  ].map((a): number[] => a.map((v): number => v * s * 0.86));
   const xs = [0.0298, 0.0102, -0.0104, -0.0298];
-  arm.fingerSpread = xs.map((x) => -x * 2.2);
+  arm.fingerSpread = xs.map((x): number => -x * 2.2);
   arm._spreadFrom = new Float32Array(4);
   arm._spreadTo = new Float32Array(4);
-  arm.fingers = xs.map((x, i) => {
+  arm.fingers = xs.map((x, i): { root: THREE.Object3D; joints: THREE.Object3D[] } => {
     const root = new THREE.Object3D();
     root.position.set(x * s, -0.006 * s, -0.096 * s);
     root.rotation.y = -x * 2.2;

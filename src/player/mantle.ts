@@ -21,6 +21,7 @@
 
 import * as THREE from 'three';
 
+import type { SurfaceName } from '../physics/surfaces.ts';
 import { clamp01, smootherstep, smoothstep, DEG } from './springs.ts';
 import { MOVE } from './tuning.ts';
 
@@ -39,14 +40,14 @@ interface LedgeResult {
   landY: number;
   landZ: number;
   distance: number;
-  surface: string;
+  surface: SurfaceName;
 }
 interface LedgeHit {
   hit: boolean;
   distance: number;
   point: THREE.Vector3;
   normal: THREE.Vector3;
-  surface: string;
+  surface: SurfaceName;
 }
 interface LedgePhysics {
   MASK: { CHARACTER: number; WORLD: number };
@@ -249,7 +250,7 @@ export class MantleMotion {
   side: number;
   height: number;
   exitSpeed: number;
-  surface: string;
+  surface: SurfaceName;
   px: number;
   py: number;
   pz: number;
@@ -336,7 +337,7 @@ export class MantleMotion {
     this.camRoll = 0;
   }
 
-  get progress() {
+  get progress(): number {
     return this.duration > 0 ? clamp01(this.t / this.duration) : 1;
   }
 

@@ -1,20 +1,18 @@
-/** Al-Maktaba: spawning, interruptible cache interaction and archived card names.
+/** Al-Maktaba: spawning and interruptible cache interaction.
  * Limits live in tuning.ts; event contracts live in ARCHITECTURE.md.
  */
 import * as THREE from 'three';
-import type { MeshBasicNodeMaterial } from 'three/webgpu';
+import { MeshBasicNodeMaterial } from 'three/webgpu';
 
 import type { AudioSystem } from '../audio/index.ts';
 import { bindingLabel } from '../core/bindings.ts';
-import type { EngineContext } from '../core/context.ts';
+import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
 import type { MarketSystem } from '../market/index.ts';
 import type { PhysicsSystem } from '../physics/index.ts';
 import type { PlayerSystem } from '../player/index.ts';
 import type { WorldSystem } from '../world/index.ts';
-import type { CardId } from './cards.ts';
-import { cardById, drawCard, shuffleDeck } from './cards.ts';
 import { makeKit, makeCrate } from './prop.ts';
 import { randomMarker, rollBudget } from './spawn.ts';
 import { INTEL, lureInterval } from './tuning.ts';
@@ -37,7 +35,6 @@ interface IntelPrompt {
 interface IntelHud {
   holding: boolean;
   progress: number;
-  card: string;
   secured: number;
   pulses: Array<{ x: number; y: number; z: number; radius: number }>;
   pulseTime: number;
@@ -54,8 +51,6 @@ export class IntelSystem {
   declare markers: IntelMarker[];
   declare _recent: string[];
   declare _yaw: number;
-  declare _deck: CardId[];
-  declare _drawn: CardId[];
   declare _used: Set<string>;
   declare _alive: IntelCache[];
   declare _aim: THREE.Vector3;
@@ -89,8 +84,8 @@ export class IntelSystem {
   declare secured: number;
   declare budget: number;
 
-  static id = 'intel';
-  static deps = ['world', 'player', 'market', 'ui', 'ai'];
+  static readonly id = 'intel';
+  static readonly deps: SystemId[] = ['world', 'player', 'market', 'ui', 'ai'];
 
   async init(ctx: IntelContext): Promise<void> {
     this.ctx = ctx;
@@ -111,7 +106,7 @@ export class IntelSystem {
           for (const id of ids) {
             if (
               typeof id === 'string' &&
-              this.markers.some((m) => m.id === id) &&
+              this.markers.some((m): boolean => m.id === id) &&
               !this._recent.includes(id)
             )
               this._recent.push(id);
@@ -125,8 +120,6 @@ export class IntelSystem {
     const origin = world.levelToWorld(0, 0, 0);
     const forward = world.levelToWorld(0, 0, -1);
     this._yaw = Math.atan2(origin.x - forward.x, origin.z - forward.z);
-    this._deck = [];
-    this._drawn = [];
     this._used = new Set();
     this._alive = [];
     this._aim = new THREE.Vector3();
@@ -137,20 +130,21 @@ export class IntelSystem {
     this._sparkPayload = { position: new THREE.Vector3() };
     this._operationPayload = { active: false, position: new THREE.Vector3() };
     this._prompt = { key: bindingLabel('use'), text: 'Secure intel', sub: '', progress: 0 };
-    this._hud = { holding: false, progress: 0, card: '', secured: 0, pulses: [], pulseTime: 0 };
-    this._pulseSlots = Array.from({ length: INTEL.aliveMax }, () => ({
-      x: 0,
-      y: 0,
-      z: 0,
-      radius: INTEL.pulseRadius,
-    }));
+    this._hud = { holding: false, progress: 0, secured: 0, pulses: [], pulseTime: 0 };
+    this._pulseSlots = Array.from(
+      { length: INTEL.aliveMax },
+      (): { x: number; y: number; z: number; radius: 12 } => ({
+        x: 0,
+        y: 0,
+        z: 0,
+        radius: INTEL.pulseRadius,
+      })
+    );
     this._spawnPayload = { id: '', position: new THREE.Vector3() };
     this._noisePayload = { position: new THREE.Vector3(), loudness: INTEL.pryLoudness };
     this._securePayload = {
       id: '',
       position: new THREE.Vector3(),
-      card: '',
-      cardLabel: '',
       credits: INTEL.credits,
     };
     this._availablePayload = { count: 0 };
@@ -162,14 +156,24 @@ export class IntelSystem {
       priority: 0.5,
     };
     this._kit = makeKit(ctx.get('materials'));
-    this._pool = Array.from({ length: INTEL.aliveMax }, () => ({
-      id: '',
-      x: 0,
-      y: 0,
-      z: 0,
-      group: makeCrate(this._kit),
-      open: 0,
-    }));
+    this._pool = Array.from(
+      { length: INTEL.aliveMax },
+      (): {
+        id: string;
+        x: number;
+        y: number;
+        z: number;
+        group: THREE.Group & { lid: THREE.Group };
+        open: number;
+      } => ({
+        id: '',
+        x: 0,
+        y: 0,
+        z: 0,
+        group: makeCrate(this._kit),
+        open: 0,
+      })
+    );
     this._off = [];
     const on = <K extends keyof IntelEventMap>(
       type: K,
@@ -177,12 +181,12 @@ export class IntelSystem {
     ): void => {
       this._off.push(ctx.events.on(type, fn));
     };
-    on('wave:complete', (e) => this._onWaveComplete(e));
-    on('damage:taken', () => {
+    on('wave:complete', (e): void => this._onWaveComplete(e));
+    on('damage:taken', (): void => {
       this._hitFrame = ctx.time.frame;
       this._interrupt();
     });
-    on('game:restart', () => this.reset());
+    on('game:restart', (): void => this.reset());
     this.reset();
   }
 
@@ -190,7 +194,6 @@ export class IntelSystem {
     const h = this._hud;
     h.holding = this._holding !== null;
     h.progress = this._holding ? this._hold / INTEL.hold : 0;
-    h.card = this._drawn[this._drawn.length - 1] ?? '';
     h.secured = this.secured;
     h.pulseTime = this.ctx.time.elapsed;
     h.pulses.length = this._alive.length;
@@ -220,7 +223,10 @@ export class IntelSystem {
     // HDR lens feeds the existing bloom; no extra point-light shader variants.
     const pulse = 0.5 - 0.5 * Math.cos((ctx.time.elapsed * 2 * Math.PI) / INTEL.beaconPeriod);
     const glow = INTEL.beaconDim + (INTEL.beaconBright - INTEL.beaconDim) * pulse * pulse;
-    (this._kit.mats.beacon as MeshBasicNodeMaterial).color.setRGB(glow, glow * 0.008, glow * 0.002);
+    const beacon = this._kit.mats.beacon;
+    if (!(beacon instanceof MeshBasicNodeMaterial))
+      throw new Error('[intel] beacon must be a basic node material');
+    beacon.color.setRGB(glow, glow * 0.008, glow * 0.002);
     this._tickLure();
     if (this._announceAt && ctx.time.elapsed >= this._announceAt) {
       this._announceAt = 0;
@@ -363,7 +369,7 @@ export class IntelSystem {
   }
 
   _spawn(marker: IntelMarker): IntelCache | null {
-    const cache = this._pool.find((slot) => !this._alive.includes(slot));
+    const cache = this._pool.find((slot): boolean => !this._alive.includes(slot));
     if (!cache || this._used.has(marker.id)) return null;
     cache.id = marker.id;
     cache.x = marker.x;
@@ -396,15 +402,11 @@ export class IntelSystem {
 
   _secure(cache: IntelCache): void {
     if (!this._alive.includes(cache)) return;
-    const card = drawCard(this._deck);
-    if (card) this._drawn.push(card);
     this.secured++;
     this.market.addCredits(INTEL.credits);
     const e = this._securePayload;
     e.id = cache.id;
     e.position.set(cache.x, cache.y + INTEL.targetHeight, cache.z);
-    e.card = card ?? '';
-    e.cardLabel = cardById(card ?? '')?.label ?? 'Intel';
     this._despawn(cache);
     this._interrupt();
     this._clearPrompt();
@@ -474,14 +476,11 @@ export class IntelSystem {
     this._clearPrompt();
     while (this._alive.length) this._despawn(this._alive[this._alive.length - 1]);
     this._used.clear();
-    this._drawn.length = 0;
     this.secured = 0;
     this._beepAt = this._announceAt = this._lastWave = 0;
     this._hitFrame = -1;
     this._awaitRelease = false;
     this.budget = this.ctx.config.deterministic ? 0 : rollBudget(this.rng);
-    if (this.budget) shuffleDeck(this.rng, this._deck);
-    else this._deck.length = 0;
   }
 
   /** Compile pooled props at boot without spawning, consuming RNG or drawing. */

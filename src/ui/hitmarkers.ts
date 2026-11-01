@@ -1,32 +1,24 @@
 import type { ElementPool, PoolRecord } from './pool-types.ts';
-import { el, svg, setStyle, Pool, ease, clamp01 } from './util.ts';
+import { Pool, ease, clamp01 } from './util.ts';
 
-const R_IN = 13; // well outside the reticle blades, so the two never merge
-const R_OUT = 28.5;
-const D = Math.SQRT1_2;
+export const R_IN = 13; // well outside the reticle blades, so the two never merge
+export const R_OUT = 28.5;
 
-/** kind -> { colour, weight, scale, life, ring } */
-type HitmarkerKind = 'hit' | 'armour' | 'head' | 'kill';
-
-type HitmarkerNode = HTMLDivElement & {
-  _ring: SVGCircleElement;
-  _main: SVGGElement;
-};
+export type HitmarkerKind = 'hit' | 'armour' | 'head' | 'kill';
 
 interface HitmarkerStyle {
   c: string;
-  w: number;
   s: number;
   life: number;
   ring: number;
   spin: number;
 }
 
-const KINDS: Record<HitmarkerKind, HitmarkerStyle> = {
-  hit: { c: '#f6fafc', w: 1.8, s: 1.0, life: 0.26, ring: 0, spin: 0 },
-  armour: { c: '#8fdcff', w: 2.0, s: 1.03, life: 0.28, ring: 0.5, spin: 0 },
-  head: { c: '#ffc247', w: 2.2, s: 1.08, life: 0.32, ring: 0.3, spin: 0 },
-  kill: { c: '#ff4433', w: 2.7, s: 1.18, life: 0.42, ring: 1, spin: 9 },
+export const KINDS: Record<HitmarkerKind, HitmarkerStyle> = {
+  hit: { c: '#f6fafc', s: 1.0, life: 0.26, ring: 0, spin: 0 },
+  armour: { c: '#8fdcff', s: 1.03, life: 0.28, ring: 0.5, spin: 0 },
+  head: { c: '#ffc247', s: 1.08, life: 0.32, ring: 0.3, spin: 0 },
+  kill: { c: '#ff4433', s: 1.18, life: 0.42, ring: 1, spin: 9 },
 };
 
 /**
@@ -37,67 +29,35 @@ const KINDS: Record<HitmarkerKind, HitmarkerStyle> = {
  * slower than this feels like a notification instead of a hit.
  */
 export class Hitmarkers {
-  declare pool: ElementPool<HitmarkerNode>;
-
-  constructor(parent: HTMLElement) {
-    this.pool = new Pool(
-      10,
-      () => {
-        const node = el('div', 'ow-hit') as HitmarkerNode;
-        const s = svg('svg', { viewBox: '-28 -28 56 56' }, node);
-
-        const ring = svg(
-          'circle',
-          {
-            r: 30,
-            fill: 'none',
-            stroke: '#fff',
-            'stroke-width': 1.4,
-            opacity: 0,
-          },
-          s
-        );
-
-        // dark backing strokes first so the marker keeps contrast on snow/sky
-        const back = svg('g', { stroke: 'rgba(0,0,0,.7)', 'stroke-width': 4.0, fill: 'none' }, s);
-        const main = svg('g', { stroke: '#fff', 'stroke-width': 2.2, fill: 'none' }, s);
-        for (const g of [back, main]) {
-          for (let q = 0; q < 4; q++) {
-            const sx = q === 0 || q === 3 ? 1 : -1;
-            const sy = q < 2 ? -1 : 1;
-            svg(
-              'line',
-              {
-                x1: (R_IN * D * sx).toFixed(2),
-                y1: (R_IN * D * sy).toFixed(2),
-                x2: (R_OUT * D * sx).toFixed(2),
-                y2: (R_OUT * D * sy).toFixed(2),
-                'stroke-linecap': 'square',
-              },
-              g
-            );
-          }
-        }
-        node._ring = ring;
-        node._main = main;
-        return node;
-      },
-      parent
-    );
-  }
+  readonly visuals = Array.from(
+    { length: 10 },
+    (): {
+      kind: HitmarkerKind;
+      scale: number;
+      alpha: number;
+      rotation: number;
+      ringScale: number;
+      ringAlpha: number;
+    } => ({
+      kind: 'hit' as HitmarkerKind,
+      scale: 1,
+      alpha: 0,
+      rotation: 0,
+      ringScale: 1,
+      ringAlpha: 0,
+    })
+  );
+  readonly pool: ElementPool<null> = new Pool(10, (): null => null);
 
   /** @param {'hit'|'armour'|'head'|'kill'} kind */
-  spawn(kind: HitmarkerKind = 'hit'): PoolRecord<HitmarkerNode> {
+  spawn(kind: HitmarkerKind = 'hit'): PoolRecord<null> {
     const k = KINDS[kind] ?? KINDS.hit;
     const it = this.pool.acquire();
     it.life = k.life;
     it.a = k.s;
     it.b = k.ring;
     it.c = k.spin;
-    it.node._main.setAttribute('stroke', k.c);
-    it.node._main.setAttribute('stroke-width', String(k.w));
-    it.node._ring.setAttribute('stroke', k.c);
-    if (k.ring <= 0) setStyle(it.node._ring, 'opacity', '0');
+    this.visuals[it.i].kind = kind in KINDS ? kind : 'hit';
     return it;
   }
 
@@ -117,28 +77,17 @@ export class Hitmarkers {
       const scale = it.a * (0.62 + 0.38 * ease.outBack(inT));
       const alpha = u < 0.55 ? 1 : 1 - ease.inOutSine((u - 0.55) / 0.45);
       const rot = it.c * ease.outCubic(inT);
-      setStyle(
-        it.node,
-        'transform',
-        `scale(${scale.toFixed(3)})` + (it.c ? ` rotate(${rot.toFixed(2)}deg)` : '')
-      );
-      setStyle(it.node, 'opacity', alpha.toFixed(3));
-
-      if (it.b > 0) {
-        const rt = clamp01(u / 0.6);
-        const rs = 0.55 + 1.15 * ease.outQuint(rt);
-        const ro = it.b * (1 - ease.outQuad(rt));
-        it.node._ring.setAttribute('transform', `scale(${rs.toFixed(3)})`);
-        setStyle(it.node._ring, 'opacity', ro.toFixed(3));
-      }
+      const visual = this.visuals[i];
+      visual.scale = scale;
+      visual.alpha = alpha;
+      visual.rotation = (rot * Math.PI) / 180;
+      const rt = clamp01(u / 0.6);
+      visual.ringScale = 0.55 + 1.15 * ease.outQuint(rt);
+      visual.ringAlpha = it.b * (1 - ease.outQuad(rt));
     }
   }
 
   clear(): void {
     this.pool.releaseAll();
-  }
-
-  dispose(): void {
-    for (const it of this.pool.items) it.node.remove();
   }
 }

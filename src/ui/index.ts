@@ -1,21 +1,21 @@
 import * as THREE from 'three';
 
 import { bindingLabel } from '../core/bindings.ts';
-import type { EngineContext } from '../core/context.ts';
+import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName } from '../core/events.ts';
+import type { WeaponMode } from '../weapons/defs.ts';
 import { AmmoPanel } from './ammo.ts';
 import { Compass, ScoreBar } from './compass.ts';
 import { Crosshair } from './crosshair.ts';
 import { DamageArcs } from './damage.ts';
-import { CombatDemo } from './demo.ts';
 import { GameOverScreen } from './gameover.ts';
 import { HealthFx } from './health.ts';
 import { Hitmarkers } from './hitmarkers.ts';
 import { Killfeed } from './killfeed.ts';
-import { WorldMarkers } from './markers.ts';
 import { MarketOverlay, MarketCountdown } from './market.ts';
 import { PauseMenu } from './menu.ts';
 import { Minimap } from './minimap.ts';
+import type { PixiHud } from './pixi-hud.ts';
 import { Prompt, Banner } from './prompts.ts';
 import { RadioPanel } from './radio.ts';
 import { StartGate } from './start.ts';
@@ -30,7 +30,7 @@ const HEAL_KEY = bindingLabel('heal');
  * HUD / UI subsystem
  * ===========================================================================
  *
- * A DOM+CSS overlay (see style.ts for the design system) driven entirely from
+ * A shared-device Pixi gameplay HUD plus native menus/radio, driven entirely from
  * `lateUpdate`, after the camera has reached its final transform for the frame.
  * Nothing animates on a CSS keyframe or transition: every value is integrated
  * from `dt` here, which is what makes the capture harness deterministic and
@@ -44,12 +44,9 @@ const HEAL_KEY = bindingLabel('heal');
  *   ui.killfeed.push({attacker,victim,headshot,mine,attackerFriendly})
  *   ui.banner.show(title, sub, life)    kill / objective confirmation
  *   ui.setPrompt({key,text,sub,progress}, owner?) / ui.clearPrompt(owner?)
- *   ui.setObjectives([{position,label,name}])
- *   ui.setBlips([{x,z,kind:'enemy'|'friend',heading}])
- *   ui.spawnGrenade(worldPos, fuse)
  *   ui.setHudVisible(bool)              hide everything (cinematics)
  *   ui.pause() / ui.resume() / ui.menu.toggle()
- *   ui.debugState('combat'|'menu'|'clean'|'market')
+ *   ui.debugState('market')
  *
  * ---------------------------------------------------------------------------
  * WHAT THIS SUBSYSTEM READS FROM OTHERS (optional providers, complete snapshots)
@@ -85,10 +82,8 @@ interface HudState {
   reloading: boolean;
   reloadProgress: number;
   weaponName: string;
-  fireMode: string;
+  fireMode: WeaponMode;
   lethalCount: number;
-  radioEquipped: boolean;
-  carpetCount: number;
   cooking?: boolean;
   grenadeEquipped?: boolean;
   move: number;
@@ -103,7 +98,6 @@ interface HudState {
   waveTotal: number;
   waveIncoming: boolean;
   nextWaveIn: number;
-  simulate: boolean;
   time: number;
 }
 interface Blip {
@@ -113,30 +107,12 @@ interface Blip {
   heading: number;
   fade?: number;
 }
-interface BlipInput {
-  x?: number;
-  z?: number;
-  position?: THREE.Vector3;
-  kind?: 'enemy' | 'friend';
-  friendly?: boolean;
-  heading?: number;
-  fade?: number;
-}
-interface HudObjective {
-  position: THREE.Vector3;
-  label: string;
-  name?: string;
-  color?: string;
-  _mm?: { x: number; z: number; label: string };
-  _cmp?: { bearing: number; label: string; color?: string };
-}
 interface MinimapFrame {
   x: number;
   z: number;
   heading: number;
   fov: number;
   blips: Blip[] | null;
-  objectives: { x: number; z: number; label: string }[] | null;
   pulses?: { x: number; z: number; y?: number; radius?: number }[] | null;
   pulseTime?: number;
   playerY?: number;
@@ -144,17 +120,14 @@ interface MinimapFrame {
 type UiContext = EngineContext;
 
 export class UiSystem {
-  static id = 'ui';
-  static deps = ['render', 'game', 'market'];
+  static readonly id = 'ui';
+  static readonly deps: SystemId[] = ['render', 'game', 'market'];
   ctx!: UiContext;
   rng!: import('../core/rng.ts').Rng;
   root!: HTMLElement;
-  hurtLayer!: HTMLElement;
-  worldLayer!: HTMLElement;
   centreLayer!: HTMLElement;
   chromeLayer!: HTMLElement;
   health!: HealthFx;
-  markers!: WorldMarkers;
   arcs!: DamageArcs;
   crosshair!: Crosshair;
   hit!: Hitmarkers;
@@ -167,13 +140,14 @@ export class UiSystem {
   banner!: Banner;
   menu!: PauseMenu;
   startGate: StartGate | null = null;
+  pixiHud: PixiHud | null = null;
   gameOver!: GameOverScreen;
   shop!: MarketOverlay;
   marketCountdown!: MarketCountdown;
   radio!: RadioPanel;
-  fps!: HTMLElement;
   _fpsSince: number | null = null;
   _fpsFrames = 0;
+  fpsText = '— FPS';
   state!: HudState;
   k!: number;
   vw!: number;
@@ -187,15 +161,11 @@ export class UiSystem {
   _bakeFrame!: number;
   _pos!: THREE.Vector3;
   _tmp!: THREE.Vector3;
-  _objectives!: HudObjective[];
-  _compassObjs!: { bearing: number; label: string; color?: string }[];
   _blips!: Blip[];
   _blipCount!: number;
   _blipView!: Blip[];
   _mmState?: MinimapFrame;
-  _mmObjs?: { x: number; z: number; label: string }[];
   _promptOwner?: unknown;
-  demo!: CombatDemo | null;
   _unsubs!: (() => void)[];
 
   async init(ctx: UiContext): Promise<void> {
@@ -207,26 +177,23 @@ export class UiSystem {
     this.root = el('div', 'ow-hud', host);
 
     // Stacking order: hurt overlays sit under the HUD, the menu over everything.
-    this.hurtLayer = el('div', 'ow-layer', this.root);
-    this.worldLayer = el('div', 'ow-layer', this.root);
     this.centreLayer = el('div', 'ow-layer', this.root);
     this.chromeLayer = el('div', 'ow-layer', this.root);
 
-    this.health = new HealthFx(this.hurtLayer, this.chromeLayer);
-    this.markers = new WorldMarkers(this.worldLayer);
+    this.health = new HealthFx();
     this.rng.fork(); // Keep the minimap's noise stream unchanged after removing damage popups.
-    this.arcs = new DamageArcs(this.centreLayer);
-    this.crosshair = new Crosshair(this.centreLayer);
-    this.hit = new Hitmarkers(this.centreLayer);
-    this.minimap = new Minimap(this.chromeLayer, this.rng.fork());
-    this.compass = new Compass(this.chromeLayer);
-    this.scoreBar = new ScoreBar(this.chromeLayer);
-    this.killfeed = new Killfeed(this.chromeLayer);
-    this.ammo = new AmmoPanel(this.chromeLayer);
-    this.prompt = new Prompt(this.chromeLayer);
-    this.banner = new Banner(this.chromeLayer);
+    this.arcs = new DamageArcs();
+    this.crosshair = new Crosshair();
+    this.hit = new Hitmarkers();
+    this.minimap = new Minimap(this.rng.fork());
+    this.compass = new Compass();
+    this.scoreBar = new ScoreBar();
+    this.killfeed = new Killfeed();
+    this.ammo = new AmmoPanel();
+    this.prompt = new Prompt();
+    this.banner = new Banner();
     this.menu = new PauseMenu(this.root, ctx);
-    this.gameOver = new GameOverScreen(this.root, ctx, () => {
+    this.gameOver = new GameOverScreen(this.root, ctx, (): void => {
       if (this.startGate) this.startGate.restart();
       else {
         ctx.events.emit('game:restart', { source: 'game-over' });
@@ -234,9 +201,8 @@ export class UiSystem {
       }
     });
     this.shop = new MarketOverlay(this.root, ctx);
-    this.marketCountdown = new MarketCountdown(this.chromeLayer, ctx.get('market').delay);
+    this.marketCountdown = new MarketCountdown(ctx.get('market').delay);
     this.radio = new RadioPanel(this.chromeLayer, ctx);
-    this.fps = el('div', 'ow-fps', this.chromeLayer, '— FPS');
 
     /** Single source of truth for everything the HUD draws. */
     this.state = {
@@ -257,10 +223,8 @@ export class UiSystem {
       reloading: false,
       reloadProgress: 0,
       weaponName: 'M4A1',
-      fireMode: 'AUTO',
+      fireMode: 'auto',
       lethalCount: 2,
-      radioEquipped: false,
-      carpetCount: 1,
       move: 0,
       sprint: false,
       crouch: false,
@@ -273,8 +237,6 @@ export class UiSystem {
       waveTotal: 0,
       waveIncoming: false,
       nextWaveIn: 0,
-      /** true when no player/weapons subsystem is driving us (stub-safe demo) */
-      simulate: false,
       time: 0,
     };
 
@@ -291,25 +253,23 @@ export class UiSystem {
 
     this._pos = new THREE.Vector3();
     this._tmp = new THREE.Vector3();
-    this._objectives = [];
-    this._compassObjs = [];
     this._blips = new Array<Blip>(MAX_BLIPS);
     for (let i = 0; i < MAX_BLIPS; i++) this._blips[i] = { x: 0, z: 0, kind: 'enemy', heading: 0 };
     this._blipCount = 0;
     this._blipView = [];
 
-    this.demo = null;
-
     this._unsubs = [];
-    const on = <K extends EngineEventName>(type: K, fn: (event: EngineEventMap[K]) => void) =>
-      this._unsubs.push(ctx.events.on(type, fn));
+    const on = <K extends EngineEventName>(
+      type: K,
+      fn: (event: EngineEventMap[K]) => void
+    ): number => this._unsubs.push(ctx.events.on(type, fn));
 
-    on('weapon:fire', (e) => {
+    on('weapon:fire', (e): void => {
       const recoil = 'recoil' in e && typeof e.recoil === 'number' ? e.recoil : 1;
       this.crosshair.onFire(recoil);
     });
 
-    on('weapon:reload', (e) => {
+    on('weapon:reload', (e): void => {
       const s = this.state;
       if (e?.phase === 'start') {
         s.reloading = true;
@@ -319,7 +279,7 @@ export class UiSystem {
       }
     });
 
-    on('damage:dealt', (e) => {
+    on('damage:dealt', (e): void => {
       if (!e) return;
       // The payload means "damage dealt TO e.target". `ai` uses it for enemy
       // rounds that connect with the player, which must not draw a hitmarker or
@@ -348,7 +308,7 @@ export class UiSystem {
       }
     });
 
-    on('damage:taken', (e) => {
+    on('damage:taken', (e): void => {
       const amount = e?.amount ?? 10;
       if (e?.health !== undefined) this.state.health = e.health;
       else this.state.health = Math.max(0, this.state.health - amount);
@@ -367,11 +327,11 @@ export class UiSystem {
       if (amount > 0) this.hurt(amount, dx, dz);
     });
 
-    on('score:change', (e) => {
+    on('score:change', (e): void => {
       if (e?.score !== undefined) this.state.score = e.score;
     });
 
-    on('wave:start', (e) => {
+    on('wave:start', (e): void => {
       if (!e) return;
       this.state.wave = e.wave ?? this.state.wave;
       this.state.enemiesRemaining = e.enemies ?? this.state.enemiesRemaining;
@@ -383,7 +343,7 @@ export class UiSystem {
       }
     });
 
-    on('wave:complete', (e) => {
+    on('wave:complete', (e): void => {
       if (!e) return;
       this.state.enemiesRemaining = 0;
       this.state.waveIncoming = true;
@@ -395,11 +355,15 @@ export class UiSystem {
       this.sfx('objective', 0.7);
     });
 
-    on('market:open', (e) => {
+    on('engine:error', (): void => {
+      this.shop.hide();
+      this.pixiHud?.setVisible(false);
+    });
+    on('market:open', (e): void => {
       this.shop.show(e?.wave ?? 0);
       this.sfx('market_open', 0.85);
     });
-    on('market:close', () => {
+    on('market:close', (): void => {
       this.shop.hide();
       this.sfx('market_close', 0.7);
       // The shop released the pointer and possibly consumed the Escape that
@@ -409,24 +373,24 @@ export class UiSystem {
       this.ctx.input?.requestPointerLock?.();
     });
 
-    on('explosion', (e) => {
+    on('explosion', (e): void => {
       if (!e?.position) return;
       this._tmp.copy(e.position).sub(this._playerPos());
       const d = this._tmp.length();
       if (d < (e.radius ?? 6) * 2.5) this.crosshair.onFlinch(0.6);
     });
 
-    on('radio:strike', () => {
+    on('radio:strike', (): void => {
       this.banner.show('CARPET BOMB INBOUND', 'TAKE COVER', 4);
       this.sfx('radio_strike', 0.7);
     });
 
-    on('hud:heard', (e) => {
+    on('hud:heard', (e): void => {
       if (!e) return;
       this.compass.ping(e.bearing);
       this.sfx('compass_ping', 0.4);
     });
-    on('hud:search', (e) => {
+    on('hud:search', (e): void => {
       if (!e) return;
       this.compass.ping(e.bearing);
       this.banner.show(
@@ -437,7 +401,7 @@ export class UiSystem {
       this.sfx('compass_ping', 0.45);
     });
 
-    on('player:state', (e) => {
+    on('player:state', (e): void => {
       if (!e) return;
       const s = this.state;
       if (e.ads !== undefined) s.ads = !!e.ads;
@@ -447,27 +411,27 @@ export class UiSystem {
 
     // Clear the combat chrome while the world camera cranes into the death
     // shot; leaving ammo, crosshair and minimap over it defeats the cinematic.
-    on('player:death', () => {
+    on('player:death', (): void => {
       this.hudTarget = 0;
       this._hadPointerLock = false;
       const run = ctx.peek('game')?.getHudState?.() ?? this.state;
       this.gameOver.show(run, ctx.peek('market')?.credits ?? 0);
     });
-    on('player:respawn', () => {
+    on('player:respawn', (): void => {
       this.hudTarget = 1;
       this.gameOver.hide();
     });
-    on('player:heal', (e) => {
+    on('player:heal', (e): void => {
       if (e?.phase === 'complete') {
         const amt = Math.round(e.amount ?? 0);
         this.banner.show('Bandage Applied', amt > 0 ? `+${amt} HP` : 'STABILISED', 1.6);
       }
     });
-    on('ammo:pickup', (e) => {
+    on('ammo:pickup', (e): void => {
       this.banner.show('Ammunition Recovered', `+${e?.amount ?? 0} ROUNDS`, 1.5);
       this.sfx('objective', 0.45);
     });
-    on('intel:available', (e) => {
+    on('intel:available', (e): void => {
       const n = Math.max(1, e?.count ?? 1);
       this.banner.show(
         'Intel Cache Active',
@@ -476,14 +440,13 @@ export class UiSystem {
       );
       this.sfx('intel_call', 0.55);
     });
-    on('intel:secured', (e) => {
-      const label = e?.cardLabel || 'Cache secured';
+    on('intel:secured', (e): void => {
       const credits = e?.credits ?? 0;
-      this.banner.show('Intel Secured', `+${credits} CREDITS · ${label} ARCHIVED`, 3);
+      this.banner.show('Intel Secured', `+${credits} CREDITS`, 3);
       this.sfx('market_buy', 0.75);
     });
 
-    on('game:restart', () => {
+    on('game:restart', (): void => {
       this.state.score = 0;
       this.state.wave = 1;
       this.state.enemiesRemaining = 0;
@@ -493,16 +456,20 @@ export class UiSystem {
       this.killfeed.clear();
       this.arcs.clear();
       this.hit.clear();
-      this.markers.clear();
       this.clearPrompt();
     });
 
     this.resize(ctx.canvas.clientWidth || innerWidth, ctx.canvas.clientHeight || innerHeight, ctx);
+    // A HUD failure is a boot failure: main.ts keeps its native reload/error dialog.
+    // Never start gameplay with an invisible HUD or a retired HTML fallback.
+    const { PixiHud } = await import('./pixi-hud.ts');
+    this.pixiHud = await PixiHud.create(this.root, this.centreLayer, ctx.get('render').renderer);
+    this.pixiHud.resize(this.vw, this.vh, this.k);
   }
 
   /* ------------------------------------------------------------- helpers -- */
 
-  _weaponState() {
+  _weaponState(): ReturnType<EngineSystems['weapons']['getHudState']> | null {
     const w = this.ctx.peek('weapons');
     if (!w || typeof w.getHudState !== 'function') return null;
     return w.getHudState() ?? null;
@@ -518,13 +485,13 @@ export class UiSystem {
     );
   }
 
-  _playerState() {
+  _playerState(): ReturnType<EngineSystems['player']['getHudState']> | null {
     const p = this.ctx.peek('player');
     if (!p || typeof p.getHudState !== 'function') return null;
     return p.getHudState() ?? null;
   }
 
-  _playerPos() {
+  _playerPos(): THREE.Vector3 {
     const p = this.ctx.peek('player');
     const pos = p?.position;
     if (pos && pos.isVector3) return this._pos.copy(pos);
@@ -551,7 +518,7 @@ export class UiSystem {
   }
 
   /** Incoming damage: arc toward the source, screen flash, reticle flinch. */
-  hurt(amount = 10, dirX = 0, dirZ = 1) {
+  hurt(amount = 10, dirX = 0, dirZ = 1): void {
     const i = clamp01(amount / 40);
     this.arcs.spawn(dirX, dirZ, 0.45 + i * 0.55);
     this.health.onDamage(i);
@@ -568,35 +535,11 @@ export class UiSystem {
     this.prompt.set(p);
   }
 
-  clearPrompt(owner: unknown = null) {
+  clearPrompt(owner: unknown = null): void {
     if (owner !== null && this._promptOwner !== owner) return;
     this._promptOwner = null;
     this._healPrompt = false;
     this.prompt.clear();
-  }
-
-  setObjectives(list: { position: THREE.Vector3; label: string; name: string }[]): void {
-    this._objectives = list ?? [];
-  }
-
-  /** Copies into a preallocated array — the caller's array is not retained. */
-  setBlips(list: BlipInput[]): void {
-    const n = Math.min(list?.length ?? 0, MAX_BLIPS);
-    for (let i = 0; i < n; i++) {
-      const src = list[i];
-      const dst = this._blips[i];
-      dst.x = src.x ?? src.position?.x ?? 0;
-      dst.z = src.z ?? src.position?.z ?? 0;
-      dst.kind = src.kind ?? (src.friendly ? 'friend' : 'enemy');
-      dst.heading = src.heading ?? 0;
-      dst.fade = src.fade ?? 1;
-    }
-    this._blipCount = n;
-  }
-
-  spawnGrenade(worldPos: THREE.Vector3, fuse = 2.4): void {
-    this.markers.spawnGrenade(worldPos, fuse);
-    this.sfx('grenade_warn', 0.6);
   }
 
   setHudVisible(v: boolean): void {
@@ -607,62 +550,36 @@ export class UiSystem {
     this.startGate = new StartGate(this.ctx.engine);
   }
 
-  pause() {
+  pause(): void {
     if (this.ctx.engine.gameplaySuspended) return;
     this.menu.show();
   }
 
-  resume() {
+  resume(): void {
     if (this.ctx.engine.gameplaySuspended) return;
     this.menu.close();
   }
 
   /* --------------------------------------------------------------- debug -- */
 
-  /**
-   * Populate a representative state for screenshots / critics.
-   * 'combat' runs the scripted firefight timeline in demo.ts.
-   */
-  debugState(name = 'combat') {
-    if (name === 'clean') {
-      this.demo?.stop(this);
-      this.demo = null;
-      this.state.simulate = false;
-      this.killfeed.clear();
-      this.arcs.clear();
-      this.hit.clear();
-      this.markers.clear();
-      this.clearPrompt();
-      return { state: 'clean' };
+  /** Prepare the market state for integration checks. */
+  debugState(name: 'market'): { state: string } {
+    if (name !== 'market') throw new Error('Unknown UI debug state');
+    this.menu.close();
+    this.killfeed.clear();
+    this.clearPrompt();
+    const rifle = this.ctx.peek('weapons')?.states?.get('rifle');
+    if (rifle) rifle.reserve = Math.round((rifle.def?.reserve ?? 90) * 0.4);
+    const hp = this.ctx.peek('player')?.health;
+    if (hp) hp.armour = 50;
+    const m = this.ctx.peek('market');
+    if (m) {
+      m.credits = 1850;
+      if (!m.open) m.openShop(3);
     }
-    if (name === 'menu') {
-      this.debugState('combat');
-      this.menu.show();
-      return { state: 'menu' };
-    }
-    if (name === 'market') {
-      this.demo?.stop(this);
-      this.demo = null;
-      this.state.simulate = false;
-      this.menu.close();
-      this.killfeed.clear();
-      this.clearPrompt();
-      const rifle = this.ctx.peek('weapons')?.states?.get('rifle');
-      if (rifle) rifle.reserve = Math.round((rifle.def?.reserve ?? 90) * 0.4);
-      const hp = this.ctx.peek('player')?.health;
-      if (hp) hp.armour = 50;
-      const m = this.ctx.peek('market');
-      if (m) {
-        m.credits = 1850;
-        if (!m.open) m.openShop(3);
-      }
-      this.shop.show(3);
-      this.shop.shown = 1;
-      return { state: 'market' };
-    }
-    if (!this.demo) this.demo = new CombatDemo();
-    this.demo.start(this);
-    return { state: 'combat', frames: 'timeline keyed to frame 90' };
+    this.shop.show(3);
+    this.shop.shown = 1;
+    return { state: 'market' };
   }
 
   /* -------------------------------------------------------------- frame --- */
@@ -675,7 +592,7 @@ export class UiSystem {
     this._fpsFrames++;
     const elapsed = now - this._fpsSince;
     if (elapsed < 500) return;
-    this.fps.textContent = `${Math.round((this._fpsFrames * 1000) / elapsed)} FPS`;
+    this.fpsText = `${Math.round((this._fpsFrames * 1000) / elapsed)} FPS`;
     this._fpsSince = now;
     this._fpsFrames = 0;
   }
@@ -684,11 +601,13 @@ export class UiSystem {
     // Wall time, not scaled/clamped gameplay time: accurate through pause and hitches.
     this._updateFps();
     const t = ctx.time;
-    const rawDt = clamp(t.raw - this._lastRaw, 0, 0.1);
+    const rawElapsed = Math.max(0, t.raw - this._lastRaw);
+    const rawDt = clamp(rawElapsed, 0, 0.1);
     this._lastRaw = t.raw;
     // The native Start dialog exclusively owns waiting input/presentation.
     // Resume happens between frames; reveal only after normal active pose hooks.
     if (this.startGate && !this.startGate.afterPose()) {
+      this.pixiHud?.setVisible(false);
       this._hadPointerLock = false;
       return;
     }
@@ -717,9 +636,7 @@ export class UiSystem {
     this.shop.update(rawDt);
 
     // ---- external state --------------------------------------------------
-    // `simulate` means a scripted debug timeline owns the HUD numbers; letting
-    // the live weapon/player state through would fight it every frame.
-    const ws = s.simulate ? null : this._weaponState();
+    const ws = this._weaponState();
     if (ws) {
       if (ws.name) s.weaponName = ws.name;
       if (ws.mode) s.fireMode = ws.mode;
@@ -733,11 +650,9 @@ export class UiSystem {
       s.lethalCount = ws.lethalCount;
       s.cooking = ws.cooking;
       s.grenadeEquipped = ws.grenadeEquipped;
-      s.radioEquipped = ws.radioEquipped;
-      s.carpetCount = ws.carpetCount;
     }
 
-    const gameState = s.simulate ? null : ctx.peek('game')?.getHudState?.();
+    const gameState = ctx.peek('game')?.getHudState?.();
     if (gameState) {
       s.score = gameState.score;
       s.wave = gameState.wave;
@@ -747,13 +662,13 @@ export class UiSystem {
       s.nextWaveIn = gameState.nextWaveIn;
     }
 
-    const marketState = s.simulate ? null : ctx.peek('market')?.getHudState?.();
+    const marketState = ctx.peek('market')?.getHudState?.();
     if (marketState) {
       s.credits = marketState.credits;
       s.marketIn = marketState.marketIn;
     }
 
-    const ps = s.simulate ? null : this._playerState();
+    const ps = this._playerState();
     if (ps) {
       s.health = ps.health;
       s.maxHealth = ps.maxHealth;
@@ -771,9 +686,6 @@ export class UiSystem {
     }
 
     const pos = this._playerPos();
-
-    // ---- demo timeline ---------------------------------------------------
-    if (this.demo?.active) this.demo.update(this, dt);
 
     // ---- ai blips --------------------------------------------------------
     this._collectBlips();
@@ -797,14 +709,13 @@ export class UiSystem {
     this.hudVisible = damp(this.hudVisible, hudGoal, 10, rawDt);
     const hudOp = this.hudVisible.toFixed(3);
     setStyle(this.chromeLayer, 'opacity', hudOp);
-    setStyle(this.worldLayer, 'opacity', hudOp);
     setStyle(this.centreLayer, 'opacity', hudOp);
 
     this.crosshair.update(dt, s);
     this.hit.update(dt);
     this.arcs.update(dt, rx, rz, fx, fz);
     this.health.update(dt, s);
-    this.ammo.update(dt, s);
+    this.ammo.update(dt, s, rawElapsed);
     this.killfeed.update(dt);
     this.scoreBar.update(s);
     if (s.healing) {
@@ -823,11 +734,7 @@ export class UiSystem {
     this.marketCountdown.update(rawDt, s.marketIn);
     this.radio.update(rawDt);
 
-    this._buildCompassObjectives(pos);
-    this.compass.update(heading, this._compassObjs, dt);
-
-    this.markers.updateObjectives(this._objectives, ctx.camera, this.vw, this.vh, this.k);
-    this.markers.updateGrenades(dt, ctx.camera, this.vw, this.vh, this.k);
+    this.compass.update(heading, dt);
 
     // ---- minimap ---------------------------------------------------------
     if (!this.minimap.bakeDone && ++this._bakeFrame > 6 && this._bakeFrame % 20 === 0) {
@@ -841,7 +748,6 @@ export class UiSystem {
       heading: 0,
       fov: 80,
       blips: null,
-      objectives: null,
     };
     this._mmState.x = pos.x;
     this._mmState.z = pos.z;
@@ -853,21 +759,22 @@ export class UiSystem {
     this._mmState.pulses = intelHud?.pulses ?? null;
     this._mmState.pulseTime = intelHud?.pulseTime ?? 0;
     this._mmState.playerY = ctx.peek('player')?.feetPosition?.y ?? 0;
-    this._mmState.objectives = this._mmObjs ?? (this._mmObjs = []);
-    this._mmObjs.length = 0;
-    for (const o of this._objectives) {
-      if (!o.position) continue;
-      this._mmObjs.push(o._mm ?? (o._mm = { x: 0, z: 0, label: o.label }));
-      const last = this._mmObjs[this._mmObjs.length - 1];
-      last.x = o.position.x;
-      last.z = o.position.z;
-      last.label = o.label;
+    if (this.pixiHud) {
+      this.pixiHud.setVisible(!ctx.engine.error);
+      this.pixiHud.update(
+        dt,
+        s,
+        this.health,
+        this.crosshair,
+        this.minimap,
+        this._mmState,
+        this.hudVisible,
+        this
+      );
     }
-    this.minimap.draw(this._mmState);
   }
 
-  _collectBlips() {
-    if (this.demo?.active) return; // demo drives its own contacts
+  _collectBlips(): void {
     const ai = this.ctx.peek('ai');
     const list = typeof ai?.getHudActors === 'function' ? ai.getHudActors() : null;
     if (!Array.isArray(list)) return;
@@ -886,25 +793,6 @@ export class UiSystem {
     this._blipCount = n;
   }
 
-  _buildCompassObjectives(
-    pos: THREE.Vector3
-  ): { bearing: number; label: string; color?: string }[] {
-    const out = this._compassObjs;
-    out.length = 0;
-    for (const o of this._objectives) {
-      if (!o.position) continue;
-      const dx = o.position.x - pos.x;
-      const dz = o.position.z - pos.z;
-      const bearing = (Math.atan2(dx, -dz) * 180) / Math.PI;
-      out.push(o._cmp ?? (o._cmp = { bearing: 0, label: o.label, color: o.color }));
-      const last = out[out.length - 1];
-      last.bearing = bearing;
-      last.label = o.label;
-      last.color = o.color;
-    }
-    return out;
-  }
-
   resize(w: number, h: number, _ctx: UiContext = this.ctx): void {
     void _ctx;
     this.vw = w;
@@ -914,32 +802,26 @@ export class UiSystem {
     this.k = clamp(Math.min(w / 1920, h / 1080), 0.25, 2.4);
     this.root.style.setProperty('--k', this.k.toFixed(4));
     this.crosshair.setScale(this.k);
-    this.compass.setScale(this.k);
-    this.minimap.resize(this.k);
+    this.pixiHud?.resize(w, h, this.k);
   }
 
   dispose(): void {
-    this.startGate?.dispose();
-    for (const off of this._unsubs) off();
-    this._unsubs.length = 0;
-    this.crosshair.dispose();
-    this.hit.dispose();
-    this.arcs.dispose();
-    this.health.dispose();
-    this.ammo.dispose();
-    this.killfeed.dispose();
-    this.compass.dispose();
-    this.scoreBar.dispose();
-    this.minimap.dispose();
-    this.markers.dispose();
-    this.prompt.dispose();
-    this.banner.dispose();
-    this.menu.dispose();
-    this.gameOver.dispose();
-    this.shop.dispose();
-    this.marketCountdown.dispose();
-    this.radio.dispose();
-    this.root.remove();
-    removeStyles();
+    // Clear ownership first; a GPU cleanup failure must not skip native controls.
+    const pixi = this.pixiHud;
+    this.pixiHud = null;
+    try {
+      pixi?.dispose();
+    } finally {
+      this.startGate?.dispose();
+      for (const off of this._unsubs) off();
+      this._unsubs.length = 0;
+      this.minimap.dispose();
+      this.menu.dispose();
+      this.gameOver.dispose();
+      this.shop.dispose();
+      this.radio.dispose();
+      this.root.remove();
+      removeStyles();
+    }
   }
 }

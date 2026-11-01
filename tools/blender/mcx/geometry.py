@@ -74,7 +74,9 @@ def build_geometry(materials):
             obj.matrix_parent_inverse = parent.matrix_world.inverted()
         if bevel:
             mod = obj.modifiers.new('Machined edge radius', 'BEVEL')
-            mod.width = bevel; mod.segments = 2
+            # Sub-millimetre machined chamfers need one segment; the large
+            # rounded forging/grip transitions override this below.
+            mod.width = bevel; mod.segments = 1
             if mat == anodized:
                 obj.data.materials.append(edge); mod.material = 1
             mod = obj.modifiers.new('Weighted corner normals', 'WEIGHTED_NORMAL')

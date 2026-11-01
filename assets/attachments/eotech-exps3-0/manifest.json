@@ -1,0 +1,132 @@
+{
+  "asset": "EOTECH EXPS3-0 | reference-backed original Blender art",
+  "source": "tools/blender/exps3.py",
+  "sourceSha256": "b9292fb428ee74585fafd6aee61cafbc7463e20920f9f95156dbcef92fa1b602",
+  "bakeSource": "tools/blender/exps3_bake.py",
+  "bakeSourceSha256": "b389812eb582bd539c92758d53c5caaaedfb66b7080058aa842ce903eff4ddc9",
+  "optimization": {
+    "highSourceTriangles": 44617,
+    "targetTriangles": 11972,
+    "bodyPrimitive": "EXPS3_body",
+    "glassPrimitive": "EXPS3_glass",
+    "atlas": {
+      "baseColor": [
+        1024,
+        1024
+      ],
+      "normal": [
+        1024,
+        1024
+      ],
+      "orm": [
+        1024,
+        1024
+      ]
+    },
+    "uvAllocation": {
+      "print": {
+        "surfaceMm2": 3913.5842851633242,
+        "uvArea": 0.2467404210474342,
+        "triangles": 230,
+        "relativeAreaWeight": 32,
+        "texelsPerMm": 8.13079032375602
+      },
+      "relief": {
+        "surfaceMm2": 2158.162795882699,
+        "uvArea": 0.05315625772345811,
+        "triangles": 947,
+        "relativeAreaWeight": 12,
+        "texelsPerMm": 5.0820046145266105
+      },
+      "edge": {
+        "surfaceMm2": 5827.244101955484,
+        "uvArea": 0.0474599456647411,
+        "triangles": 1990,
+        "relativeAreaWeight": 4,
+        "texelsPerMm": 2.9223482558068805
+      },
+      "casting": {
+        "surfaceMm2": 1890.7069736280807,
+        "uvArea": 0.001945539261214435,
+        "triangles": 1155,
+        "relativeAreaWeight": 0.5,
+        "texelsPerMm": 1.0387423617751501
+      },
+      "plain": {
+        "surfaceMm2": 50622.92383790178,
+        "uvArea": 0.10184366186149418,
+        "triangles": 5784,
+        "relativeAreaWeight": 1,
+        "texelsPerMm": 1.4524237678133696
+      },
+      "hidden": {
+        "surfaceMm2": 11004.264829649534,
+        "uvArea": 0.0027588781667873263,
+        "triangles": 818,
+        "relativeAreaWeight": 0.125,
+        "texelsPerMm": 0.5127264252307762
+      }
+    },
+    "decodedTextureBytesRGBA8": 12582912,
+    "textureMemoryNote": "12MiB before mips (~16MiB with full mips), versus36MiB/48MiB for the previous2K/2K/1K atlas. Glass uses no textures. No GPU compression or FPS claim.",
+    "packing": "ORM: R=1 (unoccluded), G=roughness, B=metallic; no baked studio illumination",
+    "projectionMm": {
+      "cage": 1.5,
+      "maxRay": 3
+    },
+    "projection": "Corresponding parts exploded for bake only; exact stored native positions restored before save/export.",
+    "sourceRetained": "Hidden SOURCE_HIGH collection; factory-empty recipe, not an old blend input",
+    "boundsNote": "Baked cap polarity mark no longer adds0.14mm of physical width; nominal body width58.4mm."
+  },
+  "blendSha256": "31fef2505a5ca6bfff86b96d4f2fc12f1b06ac52d19d82d2d57b77fbe628e2a4",
+  "blender": "5.2.2 LTS",
+  "units": "metres",
+  "axes": {
+    "right": "+X",
+    "up": "+Y",
+    "forward": "-Z"
+  },
+  "nominalEnvelopeMm": [
+    58.4,
+    73.7,
+    96.5
+  ],
+  "mountOrigin": "rail top centre; SOCKET_mount at [0,0,0]",
+  "opticalDatum": "provisional photo-derived 48.2mm above the current rail datum; not manufacturer-certified",
+  "opticalWindow": {
+    "nominalPaneMm": [
+      30,
+      23
+    ],
+    "clearOpeningMm": [
+      30,
+      22
+    ],
+    "clearCornerRadiusMm": 5.4,
+    "centreAboveArtDatumMm": 48.2,
+    "carrierOuterMm": [
+      39,
+      30.4
+    ],
+    "gasketOuterMm": [
+      33,
+      25
+    ],
+    "batteryRoofMm": 36.7,
+    "axialLowerClearanceMm": 0.5,
+    "status": "clear opening and centre inferred from registered photos; not an approved ADS/eye-box specification"
+  },
+  "reticle": {
+    "ringMoa": 68,
+    "dotMoa": 1,
+    "geometryBaked": false
+  },
+  "stats": {
+    "triangles": 11972,
+    "primitives": 2,
+    "materials": 2,
+    "bytes": 1685588,
+    "images": 3
+  },
+  "sha256": "c95d0d737488506cc4386554089f9258976a22473ba74621517b85d6c5fe59eb"
+}
