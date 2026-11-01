@@ -44,8 +44,12 @@ the original sight centre and 2.60 mm post are unchanged. The upper 1.4 mm
 neon-green tip is retained. The lower support clears the opening by 0.1 mm
 while remaining attached; the historical untrimmed support occluded the bore.
 Preserve paint/opacity, aperture rays, aim datum and solid attachment checks.
-Selected runtime ADS framing is 60 mm eye relief / 42° vertical weapon FOV;
-world zoom, sight dimensions and ballistics are independent.
+User-selected runtime ADS framing is 30 mm eye relief / 42° vertical weapon FOV.
+Compared with the original 60 mm eye relief, the closer eye makes the rear
+opening roughly 2× wider on screen while barely enlarging the distant front
+post. This is about 32% wider than the intermediate 40 mm framing, at the same
+FOV. The rear cup also appears larger: this is a visibility/framing trade-off,
+not a change to its bore, world zoom, sensitivity or ballistics.
 
 ## Rebuild/check (root, Blender 5.2.2)
 
