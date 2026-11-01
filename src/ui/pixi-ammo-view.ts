@@ -2,7 +2,7 @@ import { Container, Graphics, Text } from 'pixi.js';
 
 import { filledMagazinePips, MAX_PIPS } from './ammo.ts';
 import type { AmmoState } from './ammo.ts';
-import { clamp01, ease } from './util.ts';
+import { clamp01 } from './util.ts';
 
 export const AMMO_WIDTH = 248;
 export const AMMO_HEIGHT = 146;
@@ -20,7 +20,7 @@ export class PixiAmmoView {
   private name: Text;
   private mode: Text;
   private prompt: Text;
-  private pips: Graphics[] = [];
+  private magFill = new Graphics().rect(0, 0, 216, 4).fill(0xffffff);
   private bar = new Graphics()
     .rect(0, 0, 216, 3)
     .fill(0x263943)
@@ -28,7 +28,6 @@ export class PixiAmmoView {
   private fill = new Graphics().rect(0, 0, 216, 3).fill(INK);
   dirty = true;
   protected disposed = false;
-  punch = 0;
   private lastAmmo = -1;
   private lastReserve = -1;
   private lastMode: AmmoState['fireMode'] | null = null;
@@ -45,15 +44,9 @@ export class PixiAmmoView {
     this.reserve = this.text('/ 210', 131, 62, 21, MUTED);
     this.prompt = this.text('', WIDTH / 2, 119, 11, AMBER);
     this.prompt.anchor.x = 0.5;
-    for (let i = 0; i < MAX_PIPS; i++) {
-      const pip = new Graphics()
-        .rect(0, 0, 5, 7)
-        .fill(0xffffff)
-        .stroke({ color: 0x080c10, width: 1 });
-      pip.y = 101;
-      this.pips.push(pip);
-      this.stage.addChild(pip);
-    }
+    this.stage.addChild(new Graphics().rect(16, 102, 216, 4).fill(0x35434c));
+    this.magFill.position.set(16, 102);
+    this.stage.addChild(this.magFill);
     this.bar.position.set(16, 138);
     this.fill.position.copyFrom(this.bar.position);
     this.stage.addChild(this.bar, this.fill);
@@ -81,12 +74,11 @@ export class PixiAmmoView {
     this.dirty = true;
   }
 
-  update(dt: number, s: AmmoState): void {
+  update(_dt: number, s: AmmoState): void {
     if (this.disposed) return;
     const ammo = Math.max(0, s.ammo | 0),
       mag = Math.max(1, s.magSize | 0 || 30);
     if (ammo !== this.lastAmmo) {
-      if (this.lastAmmo >= 0 && ammo < this.lastAmmo) this.punch = 1;
       this.lastAmmo = ammo;
       this.current.text = String(ammo);
       this.dirty = true;
@@ -110,12 +102,6 @@ export class PixiAmmoView {
       this.lastMode = mode;
       this.label(this.mode, mode.toUpperCase());
     }
-    this.punch = Math.max(0, this.punch - dt * 6.5);
-    const scale = Math.round((1 - 0.075 * ease.outQuad(this.punch)) * 1000) / 1000;
-    if (this.current.scale.x !== scale) {
-      this.current.scale.set(scale);
-      this.dirty = true;
-    }
     const color = ammo === 0 ? RED : ammo / mag <= 0.34 ? AMBER : INK;
     if (this.current.tint !== color) {
       this.current.tint = color;
@@ -125,17 +111,11 @@ export class PixiAmmoView {
       progress = clamp01(s.reloadProgress ?? 0);
     const count = Math.min(MAX_PIPS, mag);
     const filled = filledMagazinePips(ammo, mag, reserve, reloading, progress);
-    for (let i = 0; i < MAX_PIPS; i++) {
-      const pip = this.pips[i],
-        visible = i < count;
-      const tint = i < filled ? (!reloading && filled / count <= 0.34 ? AMBER : INK) : 0x35434c;
-      const x = WIDTH - 16 - count * 7 + i * 7;
-      if (pip.visible !== visible || pip.tint !== tint || pip.x !== x) {
-        pip.visible = visible;
-        pip.tint = tint;
-        pip.x = x;
-        this.dirty = true;
-      }
+    const fraction = clamp01(filled / count);
+    if (this.magFill.scale.x !== fraction || this.magFill.tint !== color) {
+      this.magFill.scale.x = fraction;
+      this.magFill.tint = color;
+      this.dirty = true;
     }
     this.label(this.prompt, reloading ? 'RELOADING' : ammo === 0 ? 'PRESS R TO RELOAD' : '');
     const alpha =

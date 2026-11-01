@@ -115,16 +115,8 @@ function updateSlot(slot: EquipmentSlot, count: number, active: boolean, dt: num
     slot.alpha = count <= 0 ? 0.34 : 0.9;
     return;
   }
-  // The original CSS ease-in-out, 280ms each way, now shared by both presenters.
-  const cycle = slot.elapsed % 0.56;
-  const x = cycle < 0.28 ? cycle / 0.28 : (0.56 - cycle) / 0.28;
-  let t = x;
-  for (let i = 0; i < 6; i++) {
-    const bx = 1.26 * t - 0.78 * t * t + 0.52 * t * t * t;
-    const dx = 1.26 - 1.56 * t + 1.56 * t * t;
-    t = clamp01(t - (bx - x) / dx);
-  }
-  slot.alpha = 0.35 + 0.65 * (3 * t * t - 2 * t * t * t);
+  // Same 280ms each way; a smooth cosine instead of solving a CSS Bezier.
+  slot.alpha = 0.35 + 0.325 * (1 - Math.cos(slot.elapsed * (Math.PI / 0.28)));
 }
 
 export class AmmoPanel {

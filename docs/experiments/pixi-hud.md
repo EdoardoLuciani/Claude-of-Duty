@@ -1,5 +1,9 @@
 # Playable Pixi HUD slice
 
+Current visuals deliberately simplify CSS details: [Pixi-to-Pixi simplification](pixi-simplify.md)
+records the changed compass/combat/ammo/health/accessories and measured before/after.
+The original four-widget implementation/measurements below are historical.
+
 Use `?pixi=hud` for ammo/reload, health/armour, crosshair and a live minimap.
 Omit the parameter for the unchanged native HUD. The later
 [injury extension](pixi-underlays.md) also moves fullscreen injury to Pixi.

@@ -308,6 +308,11 @@ mesh owns its geometry/WGSL program, never borrowed device/textures. This is not
 the no-UI benchmark state. See [initial slice](docs/experiments/pixi-hud.md) and
 [injury migration and historical comparison](docs/experiments/pixi-underlays.md).
 Current extension ownership/limits/measurements: [combat UI](docs/experiments/pixi-combat.md).
+Presentation is intentionally not CSS-pixel-parity:24 compass ticks/simple backing,
+one tinted hit X, one outlined damage arc, cosine equipment pulse, text accessory
+counts, one magazine-fill bar and plain health/armour bars. Shared state/events,
+low-health/empty/reload cues, unscaled pulse period and FPS sampling remain.
+See [Pixi-to-Pixi simplification measurements](docs/experiments/pixi-simplify.md).
 
 ## Models
 
