@@ -6,7 +6,8 @@ import { HUD_TYPE } from './pixi-type.ts';
 import { clamp01 } from './util.ts';
 
 export const AMMO_WIDTH = 248;
-export const AMMO_HEIGHT = 146;
+// Align the magazine bar with the health widget's lower (armour) bar.
+export const AMMO_HEIGHT = 110;
 const WIDTH = AMMO_WIDTH;
 const INK = 0xe7f2ef,
   MUTED = 0xa9bac5,
@@ -43,12 +44,13 @@ export class PixiAmmoView {
     this.current.style.fill = 0xffffff;
     this.reserve = this.text('/ 210', 131, 96, HUD_TYPE.secondary, MUTED);
     this.reserve.anchor.y = 1;
-    this.prompt = this.text('', WIDTH / 2, 119, HUD_TYPE.label, AMBER);
+    // Warnings/reload feedback live above the readout, not below the bottom bar.
+    this.prompt = this.text('', WIDTH / 2, 4, HUD_TYPE.label, AMBER);
     this.prompt.anchor.x = 0.5;
     this.stage.addChild(new Graphics().rect(16, 102, 216, 4).fill(0x35434c));
     this.magFill.position.set(16, 102);
     this.stage.addChild(this.magFill);
-    this.bar.position.set(16, 138);
+    this.bar.position.set(16, 22);
     this.fill.position.copyFrom(this.bar.position);
     this.stage.addChild(this.bar, this.fill);
   }

@@ -287,46 +287,19 @@ export class MarketOverlay {
   }
 }
 
-/**
- * Countdown to the shop: shown during the post-wave grace period so the
- * player knows the market is coming and how long they have to loot ammo.
- * A prompt-style chip (seconds in the keycap, draining bar) anchored under
- * the scorebar — its own element, because ammo crates drive ui.setPrompt
- * and would overwrite a shared one at the interaction-prompt anchor.
- */
+/** Independent post-wave countdown; uses raw time while the shop freezes simulation. */
 export class MarketCountdown {
-  root: HTMLElement;
-  key: HTMLElement;
-  fill: HTMLElement;
-  shown: number;
-  delay: number;
-  constructor(parent: HTMLElement, delay: number) {
-    this.root = el('div', 'ow-mkt-count', parent);
-    this.key = el('div', 'ow-mkt-count-key', this.root, '10');
-    const col = el('div', null, this.root);
-    el('div', 'ow-mkt-count-txt', col, 'SUPPLY MARKET IN');
-    const bar = el('div', 'ow-mkt-count-bar', col);
-    this.fill = el('i', null, bar);
-    this.shown = 0;
+  shown = 0;
+  value = '10';
+  fraction = 1;
+  readonly delay: number;
+  constructor(delay: number) {
     this.delay = delay;
-    setStyle(this.root, 'display', 'none');
   }
-
-  /** Driven from ui.lateUpdate with RAW dt — survives the frozen sim. */
   update(rawDt: number, marketIn: number): void {
-    const active = marketIn > 0;
-    this.shown = damp(this.shown, active ? 1 : 0, active ? 14 : 9, rawDt);
-    if (this.shown < 0.005) {
-      setStyle(this.root, 'display', 'none');
-      return;
-    }
-    setStyle(this.root, 'display', '');
-    setStyle(this.root, 'opacity', this.shown.toFixed(3));
-    setText(this.key, String(Math.max(1, marketIn)));
-    setStyle(this.fill, 'transform', `scaleX(${(Math.max(0, marketIn) / this.delay).toFixed(3)})`);
-  }
-
-  dispose(): void {
-    this.root.remove();
+    this.shown = damp(this.shown, marketIn > 0 ? 1 : 0, marketIn > 0 ? 14 : 9, rawDt);
+    if (this.shown < 0.005) return;
+    this.value = String(Math.max(1, marketIn));
+    this.fraction = Number((Math.max(0, marketIn) / this.delay).toFixed(3));
   }
 }

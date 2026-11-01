@@ -152,21 +152,15 @@ assert.deepEqual(
 );
 menu.dispose();
 assert.equal(menu.root.removed, true);
-const prompt = new Prompt(makeEl());
-assert.equal(
-  prompt.key.textContent,
-  bindingLabel('use'),
-  'initial prompt key derives from interact'
-);
+const prompt = new Prompt();
+assert.equal(prompt.key, bindingLabel('use'), 'initial prompt key derives from interact');
 prompt.set({ text: 'ammo', progress: 0.4 });
-assert.equal(
-  prompt.key.textContent,
-  bindingLabel('use'),
-  'fallback prompt key derives from interact'
-);
+assert.equal(prompt.key, bindingLabel('use'), 'fallback prompt key derives from interact');
+assert.equal(prompt.progress, 0.4);
+assert(prompt.hasProgress);
 prompt.set({ key: bindingLabel('heal'), text: 'bandaging' });
-assert.equal(prompt.key.textContent, bindingLabel('heal'), 'contextual prompt override preserved');
-prompt.dispose();
+assert.equal(prompt.key, bindingLabel('heal'), 'contextual prompt override preserved');
+assert.equal(prompt.hasProgress, false);
 const radio = new RadioPanel(makeEl(), { peek: () => ({ radioEquipped: true, carpetBombs: 2 }) });
 const radioNodes = flatten(radio.root);
 assert.ok(radioNodes.some((node) => node.textContent === `${bindingLabel('radio')} STOWS`));
