@@ -1,100 +1,37 @@
 # Gameplay HUD
 
-The gameplay HUD uses **PixiJS/WebGPU by default**, with no opt-in URL parameter
-and no legacy HTML presenter/fallback for its migrated widgets. The operator
-accepted the simplified appearance and explicitly approved promotion.
+PixiJS/WebGPU is the default gameplay HUD. No opt-in flag or legacy HTML backend
+is available; old presenter-selection query flags are ignored.
 
-## What renders where
+Pixi renders ammo/reload, health/armour, crosshair, minimap, injury,
+compass/heard pings, hitmarkers/damage arcs, bandage/grenade inventory and FPS.
+Native HTML retains startup/error controls, menus/shop/game-over, score/status,
+killfeed, prompts/progress, banners/countdown and the field-radio panel.
+The independent Three WebGPU market-inspection renderer is unchanged.
 
-| Presentation                                                                   | Owner                                           |
-| ------------------------------------------------------------------------------ | ----------------------------------------------- |
-| Ammo/name/mode/reload, health/armour, reticle, minimap                         | Pixi HUD                                        |
-| Blood edges/heartbeat/hit flash                                                | Pixi injury mesh, independent of readout fading |
-| Compass/heard pings, hitmarkers/damage arcs                                    | Pixi retained geometry                          |
-| Bandage/grenade inventory and wall-clock FPS                                   | Pixi HUD                                        |
-| Start/error controls, pause/shop/game-over menus                               | Native HTML                                     |
-| Score/status, killfeed, prompts/progress, banners/countdown, field-radio panel | Native HTML                                     |
-| Independent market weapon-inspection studio                                    | Existing Three WebGPU renderer, unchanged       |
+## Ownership and behavior
 
-The radio inventory indicator stays removed; radio gameplay/charges/market and
-its request panel are unchanged. The chosen simple icons, magazine bar, minimap
-simplifications and32/16/12px bottom-readout hierarchy remain.
+- Three owns the shared GPUDevice. Pixi owns one passive canvas and its renderer,
+  stage, geometry, shaders and textures. No WebGL, extra HUD device or render ticker.
+- Existing gameplay snapshots/events remain authoritative. HUD models own derived
+  animation and bounded pool state, not hidden legacy elements.
+- The engine drives updates. Settled paused/hidden content does not redraw;
+  changed wall-clock FPS samples can invalidate once during pause.
+- Injury fades independently of readouts. Inventory pulses use unscaled UI time;
+  FPS samples every 500 ms. DPR is capped independently at 2.
+- Minimap terrain is baked once on a detached Canvas2D surface, uploaded once and
+  presented with retained dynamic cues. There is no live Canvas2D drawing loop.
+- Preserve the chosen simple icons, magazine bar and 32/16/12 px bottom-readout tiers.
+  Radio inventory indication remains absent; radio gameplay/panel remain intact.
+- Required HUD initialization failures propagate to the native boot/reload dialog,
+  never to an HTML fallback or gameplay without readouts. Preserve the original
+  error and restore Pixi's DOM adapter even if partial cleanup fails.
+- Teardown releases Pixi resources without destroying Three's device or skipping
+  native-control cleanup.
 
-## State, rendering and lifetime
+## Checks
 
-- Three owns the shared GPUDevice. One passive Pixi canvas owns only its stage,
-  geometry/shaders/textures and renderer resources. No WebGL or extra HUD device.
-- Engine `lateUpdate` advances state and presents once; no Pixi Application or
-  independent render ticker. Paused static frames do not redraw after settling.
-  A changed500ms FPS sample can invalidate once even during pause.
-- Existing player/weapon/game snapshots and events remain authoritative.
-  `HealthFx`, `Crosshair`, `Hitmarkers`, `DamageArcs`, `Compass` and `AmmoPanel`
-  retain animation/derived state but do not create hidden legacy elements.
-- Hit/arc/heard-ping pools use null nodes, retaining the same bounded oldest-first
-  reuse/lifetimes. The common pool still supports native killfeed elements.
-- `minimap.ts` owns the detached, one-time authored Canvas2D bake and labels, not
-  a live widget/canvas/draw loop. Pixi retains the uploaded terrain and dynamic cues.
-- Startup, HUD fade, injury independence, pointer transparency, independent DPR
-  cap2, resize and failure-isolated teardown preserve the accepted behavior.
-
-The old `pixi`, `combat`, `compass`, `underlays` and `icons` query controls no longer
-select a different backend. Old bookmarked URLs still load the complete default
-HUD. Standalone pause/ammo prototypes and unused `@pixi/ui` are removed; pinned
-`pixi.js` remains. HTML/SVG/CSS implementations for migrated widgets are deleted,
-not hidden behind a feature flag.
-
-## Failure behavior
-
-A required HUD import/constructor/renderer initialization failure propagates to
-`main.ts`'s existing native **BOOT FAILURE / Reload game** dialog. Do not publish
-readiness, begin gameplay without a HUD, destroy Three's device, or silently
-restore the removed HTML path. Preserve the original initialization error even
-if partial cleanup also fails; always restore Pixi's restricted DOM adapter.
-Native error/start/menu controls remain usable without the HUD renderer.
-
-## Qualification
-
-Fresh `npm ci`, **157 smoke tests**, format/typecheck/lint and production build.
-Reference trajectories captured from `3cb261b5` preserve recoil, vitals,
-injury, compass, hit/arc lifetimes/pooling and inventory pulse values after DOM
-removal (10-decimal rounding ignores platform floating-point ulps). Ammo edge-case/reload/low/empty/numeric/bar tests use canonical state,
-not a retired native renderer. FPS tests assert its shared sampled string.
-
-```sh
-node tests/e2e/pixi-hud.mjs --preview --uncapped --rounds=1 --port=5261 --out=/tmp/pixi-mainline-qualified
-```
-
-Production native AMD RDNA4/Chromium156 qualification covers:
-
-- No-parameter default, portrait/DPR2 and retired-URL flags all render the full
-  HUD, with one borrowed device, zero WebGL, no legacy elements/models/draw loops
-  and null-node state pools. Health/ammo, all hit kinds, world-relative damage
-  arcs/pings, empty/multi-digit equipment and injury actually render.
-- Menu/pause/static redraw versus live paused FPS, hidden HUD, reload/switch,
-  shop/death/restart/Start/terminal behavior and teardown. Only Three destroys
-  the borrowed device; repeated HUD disposal does not do so.
-- One terrain upload; texture sources plateau58/58/58 (DPR2:56/56/56). Counts are
-  not VRAM bytes. No GPU validation/device-loss errors.
-- Injected Pixi adapter-metadata failure leaves the native boot/reload dialog,
-  zero legacy widgets, no readiness/public engine and no premature device destroy.
-  Activating its real Reload button after unblocking initialization reaches normal
-  HUD readiness; normal engine teardown destroys the device once.
-
-Latest integrated qualification includes develop`fdd9f2a3` (market-art update),
-157 smoke tests, production HUD qualification and the independent market-inspection
-suite (five supply illustrations, seven weapons, selection/fallback/race/purchase
-and lifetime checks). No upstream market/world assets are part of this HUD delta.
-
-Logs/captures: `/tmp/pixi-mainline-integrated-tests.log`,
-`/tmp/pixi-mainline-integrated-qa/`, `/tmp/pixi-mainline-integrated-qa.log`,
-`/tmp/pixi-mainline-market.log`. Source-mode checks also passed at
-`/tmp/pixi-mainline-source-final/`.
-Before/after promotion captures normalize health/ammo and inject123FPS outside
-measurement; screenshots are not benchmark evidence. Qualification is not a new
-performance comparison or second-hardware/long-session certification.
-
-Historical methods/results stay under `docs/experiments/pixi-*.md` and in Git.
-Use their named revisions, or `8664e572` for the last complete opt-in implementation
-and comparison scripts. Those runtime switches and standalone/performance
-experiment harnesses are retired from the mainline checkout; the focused default
-HUD qualification above replaces its native-versus-Pixi browser matrix.
+`npm test` includes `smoke-pixi-ui.mjs` for shared-device guards, initialization
+error preservation, adapter restoration and failure-isolated/idempotent teardown.
+Run typecheck, lint and build as usual. Earlier experiment reports and the larger
+HUD test/capture harnesses remain available in Git history at `d5858ebc`.
