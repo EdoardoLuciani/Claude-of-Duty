@@ -54,7 +54,6 @@ try {
     disposed: false,
     enabled: false,
     dirty: true,
-    punch: 0,
     lastAmmo: -1,
     lastReserve: -1,
     lastMode: null,
@@ -63,7 +62,7 @@ try {
     name: text(),
     mode: text(),
     prompt: text(),
-    pips: Array.from({ length: 30 }, () => ({ x: 0, visible: true, tint: 0xffffff })),
+    magFill: { scale: scale(), tint: 0xffffff },
     bar: { visible: true },
     fill: { visible: true, scale: scale() },
   });
@@ -96,13 +95,15 @@ try {
             ? 0xffb02a
             : 0xe7f2ef;
         assert.equal(gpu.current.tint, color);
-        assert.equal(gpu.punch, dom.punch);
-        assert.equal(gpu.current.scale.x, Number(dom.cur.styles.get('transform').slice(6, -1)));
+        assert.equal(gpu.current.scale.x, 1, 'simplified number has no decorative shot punch');
         const domFilled = dom.pips.filter(
           (p) => p.styles.get('display') !== 'none' && !p.classes.has('off')
         ).length;
-        const gpuFilled = gpu.pips.filter((p) => p.visible && p.tint !== 0x35434c).length;
-        assert.equal(gpuFilled, domFilled);
+        assert.equal(
+          gpu.magFill.scale.x,
+          domFilled / Math.min(30, Math.max(1, s.magSize | 0 || 30)),
+          'single magazine bar retains the same fill/reload quantity'
+        );
         assert.equal(gpu.bar.visible, reloading);
       }
   dom.dispose();

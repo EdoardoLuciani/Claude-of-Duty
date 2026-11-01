@@ -231,6 +231,8 @@ try {
               throw Error('FPS presentation mismatch');
             const ammo = p ? p.ammo.current.text : ui.ammo.cur.textContent;
             const hp = p ? p.hp.text : ui.health.hpVal.textContent;
+            if (p && p.maxHp.text !== '/' + Math.round(s.maxHealth || 100))
+              throw Error('health maximum readout mismatch');
             if (
               Number(ammo) !== s.ammo ||
               Number(hp) !== Math.round(Math.max(0, Math.min(s.maxHealth, s.health)))
@@ -377,7 +379,14 @@ try {
               state = ui.hit.visuals[item.i];
             if (
               !view.node.visible ||
-              !view.variants[kind].visible ||
+              view.kind !== kind ||
+              view.mark.tint !==
+                Number.parseInt(
+                  { hit: '#f6fafc', armour: '#8fdcff', head: '#ffc247', kill: '#ff4433' }[
+                    kind
+                  ].slice(1),
+                  16
+                ) ||
               view.node.scale.x !== state.scale ||
               view.ring.alpha !== state.ringAlpha
             )
@@ -388,7 +397,7 @@ try {
                 p.combat.arcSlots[i].rotation !== ui.arcs.visuals[i].rotation
               )
                 throw Error('damage arc direction');
-            if (p.combat.slots.map((s) => s.count.text).join() !== '12,3,2')
+            if (p.combat.slots.map((s) => s.node.text).join() !== 'BANDAGES 12,FRAGS 3,RADIO 2')
               throw Error('equipment count parity');
           }
           if (p.gpuCompass && p.compass.pings.filter((n) => n.visible).length < 2)
@@ -491,8 +500,9 @@ try {
         // Injury and vitals share the existing health state in both renderers.
         player.applyDamage(10);
         await window.__PUMP__(3);
-        const armour = p.plates.map((n) => n.scale.x);
-        if (armour.every((v) => v === 1)) throw Error('armour damage not presented');
+        const armour = p.armourFill.scale.x;
+        if (armour >= 1 || Math.abs(armour - ui.state.armour / (ui.state.maxArmour || 150)) > 1e-8)
+          throw Error('armour damage/count not presented');
         player.health.armour = 0;
         player.health.value = 20;
         await window.__PUMP__(30);

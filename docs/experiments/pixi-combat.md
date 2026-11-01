@@ -5,7 +5,11 @@ directional damage arcs, bandage/grenade/radio counts and highlights, and FPS.
 Menus/status/killfeed/prompts/banners/radio-panel/countdown remain native.
 The removed projected objective/grenade-warning feature is not restored.
 
-## Ownership and presentation
+Current visuals are further simplified, including ammo/health/accessory readouts:
+see [simplification and Pixi-before/after measurements](pixi-simplify.md).
+The initial presentation details below are retained for the historical results.
+
+## Ownership and presentation (initial expansion)
 
 - Existing `Compass`, `Hitmarkers`, `DamageArcs` and `AmmoPanel` owners retain
   state/events/lifetimes. Both backends consume the same derived values. Pool

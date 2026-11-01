@@ -1,9 +1,10 @@
-import { Container, FillGradient, Graphics, Text } from 'pixi.js';
+import { Container, Graphics, Text } from 'pixi.js';
 
 import { CARD, PPD, STRIP_W } from './compass.ts';
 import type { Compass } from './compass.ts';
 import { clamp01 } from './util.ts';
 
+const TICK_STEP = 15;
 const fade = (x: number): number => clamp01(Math.min(x, STRIP_W - x) / (STRIP_W * 0.16));
 
 const xFor = (bearing: number, heading: number): number =>
@@ -16,35 +17,17 @@ export class PixiCompass {
   readonly labels: { bearing: number; node: Text }[] = [];
   readonly pings: Graphics[] = [];
   private heading = NaN;
-  private gradient = new FillGradient({
-    start: { x: 0, y: 0 },
-    end: { x: 0, y: 1 },
-    colorStops: [
-      { offset: 0, color: 'rgba(3,6,9,0)' },
-      { offset: 0.2, color: 'rgba(3,6,9,0.45)' },
-      { offset: 0.66, color: 'rgba(3,6,9,0.45)' },
-      { offset: 0.88, color: 'rgba(3,6,9,0.2)' },
-      { offset: 1, color: 'rgba(3,6,9,0)' },
-    ],
-  });
 
   constructor() {
-    const scrim = new Graphics(),
-      base = new Graphics();
-    // Static horizontal feather, shared vertical gradient texture. No filter pass.
-    for (let i = 0; i < 64; i++) {
-      const x = ((i + 0.5) * STRIP_W) / 64;
-      scrim.rect((i * STRIP_W) / 64, 0, STRIP_W / 64, 41).fill({
-        fill: this.gradient,
-        alpha: fade(x) * clamp01(Math.min(x, STRIP_W - x) / (STRIP_W * 0.2)),
-      });
-      base
-        .rect((i * STRIP_W) / 64, 18, STRIP_W / 64, 1)
-        .fill({ color: 0xffffff, alpha: 0.4 * fade(x) * (1 - Math.abs((2 * x) / STRIP_W - 1)) });
-    }
-    this.stage.addChild(scrim, base);
-    for (let a = 0; a < 360; a += 5) {
-      const major = a % 15 === 0;
+    this.stage.addChild(
+      new Graphics()
+        .roundRect(0, 0, STRIP_W, 33, 4)
+        .fill({ color: 0x030609, alpha: 0.35 })
+        .rect(10, 18, STRIP_W - 20, 1)
+        .fill({ color: 0xffffff, alpha: 0.25 })
+    );
+    for (let a = 0; a < 360; a += TICK_STEP) {
+      const major = !!CARD[a];
       const tick = new Graphics()
         .rect(0, 19, major ? 1.5 : 1, major ? 7.5 : 4)
         .fill({ color: 0xffffff, alpha: major ? 0.95 : 0.7 })
@@ -88,7 +71,7 @@ export class PixiCompass {
       this.heading = model.heading;
       for (let i = 0; i < this.ticks.length; i++) {
         const node = this.ticks[i],
-          x = xFor(i * 5, model.heading);
+          x = xFor(i * TICK_STEP, model.heading);
         node.x = x;
         node.visible = x >= 0 && x <= STRIP_W;
         node.alpha = fade(x);
@@ -115,9 +98,5 @@ export class PixiCompass {
       node.alpha = alpha;
     }
     return dirty;
-  }
-
-  dispose(): void {
-    this.gradient.destroy();
   }
 }

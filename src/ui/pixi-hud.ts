@@ -59,12 +59,12 @@ export class PixiHudSlice {
   readonly minimap = new PixiMinimap();
   readonly vitals = new Container();
   readonly reticle = new Container();
-  private hp = text('100', 14, 24, 38);
-  private hpScale = 1;
-  private maxHp = text('/100', 108, 46, 12, 0xa9bac5);
+  private hp = text('100', 14, 28, 28);
+  private maxHp = text('/100', 102, 40, 14, 0xa9bac5);
   private hpFill = new Graphics().rect(0, 0, 168, 7).fill(0xffffff);
   private armour = new Container();
-  private plates: Graphics[] = [];
+  private armourFill = new Graphics().rect(0, 0, 168, 4).fill(0x79d2ff);
+  private armourText = text('ARMOUR', 14, 88, 10, 0x79d2ff);
   private blades: Graphics[] = [];
   private dot = new Graphics()
     .circle(0, 0, 1.1)
@@ -147,20 +147,13 @@ export class PixiHudSlice {
     );
     this.hpFill.position.set(14, 72);
     this.vitals.addChild(this.hpFill);
-    const dividers = new Graphics();
-    for (let i = 1; i < 5; i++) dividers.rect(14 + (i * 168) / 5, 72, 1, 7).fill(0x0a141c);
-    this.vitals.addChild(dividers, this.armour);
-    this.armour.addChild(text('ARMOUR', 14, 91, 9, 0x79d2ff));
-    for (let i = 0; i < 3; i++) {
-      const x = 78 + i * 36;
-      this.armour.addChild(
-        new Graphics().rect(x, 94, 31, 5).fill(0x35434c).stroke({ color: 0x080c10, width: 1 })
-      );
-      const plate = new Graphics().rect(0, 0, 31, 5).fill(0x79d2ff);
-      plate.position.set(x, 94);
-      this.plates.push(plate);
-      this.armour.addChild(plate);
-    }
+    this.vitals.addChild(this.armour);
+    this.armour.addChild(
+      this.armourText,
+      new Graphics().rect(14, 104, 168, 4).fill(0x35434c),
+      this.armourFill
+    );
+    this.armourFill.position.set(14, 104);
     for (let i = 0; i < 4; i++) {
       const blade = new Graphics()
         .rect(-0.8, -4, 1.6, 8)
@@ -231,32 +224,29 @@ export class PixiHudSlice {
     this.ammo.update(dt, s);
     const max = s.maxHealth || 100,
       hp = Math.round(Math.max(0, Math.min(max, s.health ?? max)));
-    if (this.hp.text !== String(hp)) {
-      this.hp.text = String(hp);
+    const value = String(hp);
+    if (this.hp.text !== value) {
+      this.hp.text = value;
       this.hp.scale.set(1);
-      this.hpScale = Math.min(1, 84 / Math.max(1, this.hp.width));
+      this.hp.scale.set(Math.min(1, 80 / Math.max(1, this.hp.width)));
       this.dirty = true;
     }
-    if (this.maxHp.text !== '/' + Math.round(max)) {
-      this.maxHp.text = '/' + Math.round(max);
+    const maxLabel = '/' + Math.round(max);
+    if (this.maxHp.text !== maxLabel) {
+      this.maxHp.text = maxLabel;
       this.dirty = true;
     }
     const fraction = clamp01((s.health ?? max) / max),
       tint = fraction <= 0.28 ? 0xff5145 : fraction < 0.5 ? 0xffb02a : 0xe7f2ef;
     this.hp.tint = this.hpFill.tint = tint;
-    this.hp.scale.set(this.hpScale * (1 + health.beatEnergy * 0.05));
     this.hpFill.scale.x = clamp01(health.hpShown);
     const plateTint = health.armourFlash > 0.01 ? 0xc9efff : 0xffffff;
-    if (this.armour.alpha !== health.armourShown || this.plates[0]?.tint !== plateTint)
+    if (this.armour.alpha !== health.armourShown || this.armourFill.tint !== plateTint)
       this.dirty = true;
     this.armour.alpha = health.armourShown;
     this.armour.visible = health.armourShown >= 0.01;
-    for (let i = 0; i < 3; i++) {
-      this.plates[i].scale.x = clamp01(
-        ((s.armour ?? 0) - (i * (s.maxArmour || 150)) / 3) / ((s.maxArmour || 150) / 3)
-      );
-      this.plates[i].tint = plateTint;
-    }
+    this.armourFill.scale.x = clamp01((s.armour ?? 0) / (s.maxArmour || 150));
+    this.armourFill.tint = plateTint;
     for (let i = 0; i < this.blades.length; i++) {
       const blade = this.blades[i],
         angle = (i * Math.PI) / 2,
@@ -286,11 +276,7 @@ export class PixiHudSlice {
       try {
         this.injury.dispose();
       } finally {
-        try {
-          this.stage.destroy({ children: true, texture: true, textureSource: true });
-        } finally {
-          this.compass.dispose();
-        }
+        this.stage.destroy({ children: true, texture: true, textureSource: true });
       }
     } finally {
       try {
