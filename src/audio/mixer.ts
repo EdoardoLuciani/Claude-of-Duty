@@ -56,12 +56,12 @@ interface PendingConcussion {
 const TINNITUS_GAIN = 0.008;
 const HEARING_SETTLE_SECONDS = 0.03;
 
-// Anchor the rendered current value explicitly before replacing a target/ramp.
-// Native automation tests catch discontinuities when hold alone is followed by
-// a new ramp without a value event at its start.
+// All callers replace hearing automation at the current audio time. Sample
+// before cancelling, then anchor the new envelope to avoid jumping back to an
+// old target. No future-time hold or value-curve cancellation is needed here.
 function holdHearingParam(param: AudioParam, time: number): void {
   const value = param.value;
-  param.cancelAndHoldAtTime(time);
+  param.cancelScheduledValues(time);
   param.setValueAtTime(value, time);
 }
 const CONCUSSION_CUTOFF_RATIO = 0.075; // full concussion bottoms out at 1.5 kHz
