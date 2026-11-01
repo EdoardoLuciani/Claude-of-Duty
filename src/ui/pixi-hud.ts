@@ -5,6 +5,7 @@ import type { AmmoState } from './ammo.ts';
 import type { Crosshair } from './crosshair.ts';
 import type { HealthFx, HealthState } from './health.ts';
 import type { Minimap, MinimapState } from './minimap.ts';
+import type { AccessoryIconStyle } from './pixi-accessory-icons.ts';
 import { PixiAmmoView, AMMO_WIDTH, AMMO_HEIGHT } from './pixi-ammo-view.ts';
 import { PixiCombat } from './pixi-combat.ts';
 import type { CombatModels } from './pixi-combat.ts';
@@ -53,7 +54,7 @@ export class PixiHudSlice {
   readonly gpuUnderlays: boolean;
   readonly gpuCombat: boolean;
   readonly gpuCompass: boolean;
-  readonly combat = new PixiCombat();
+  readonly combat: PixiCombat;
   readonly compass = new PixiCompass();
   readonly ammo = new PixiAmmoView();
   readonly minimap = new PixiMinimap();
@@ -81,7 +82,12 @@ export class PixiHudSlice {
     parent: HTMLElement,
     before: HTMLElement,
     game: Renderer,
-    options: { injury?: boolean; combat?: boolean; compass?: boolean } = {}
+    options: {
+      injury?: boolean;
+      combat?: boolean;
+      compass?: boolean;
+      icons?: AccessoryIconStyle;
+    } = {}
   ): Promise<PixiHudSlice> {
     const restore = restrictPixiCanvases();
     let hud: PixiHudSlice | null = null;
@@ -109,7 +115,13 @@ export class PixiHudSlice {
     }
   }
 
-  private constructor(options: { injury?: boolean; combat?: boolean; compass?: boolean }) {
+  private constructor(options: {
+    injury?: boolean;
+    combat?: boolean;
+    compass?: boolean;
+    icons?: AccessoryIconStyle;
+  }) {
+    this.combat = new PixiCombat(options.icons);
     this.gpuUnderlays = options.injury !== false;
     this.gpuCombat = options.combat !== false;
     this.gpuCompass = this.gpuCombat && options.compass !== false;

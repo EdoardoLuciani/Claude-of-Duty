@@ -313,6 +313,11 @@ one tinted hit X, one outlined damage arc, cosine equipment pulse, text accessor
 counts, one magazine-fill bar and plain health/armour bars. Shared state/events,
 low-health/empty/reload cues, unscaled pulse period and FPS sampling remain.
 See [Pixi-to-Pixi simplification measurements](docs/experiments/pixi-simplify.md).
+Bandage/grenade inventory visuals are selectable for comparison:
+`&icons=simple` (default), `&icons=original`, or `&icons=text`; radio remains text.
+Both icon styles retain geometry, updating counts/layout only on stock changes.
+The magazine stays a bar. [Icon measurements](docs/experiments/pixi-accessory-icons.md)
+record the negligible measured cost difference; operator visual choice is pending.
 
 ## Models
 

@@ -33,9 +33,9 @@ assert.equal(magazine.current.text, '15');
 assert.equal(magazine.reserve.text, '/ 90');
 magazine.stage.destroy({ children: true });
 
-const combat = new PixiCombat();
+const combat = new PixiCombat('text');
 for (const slot of combat.slots)
-  assert.equal('symbol' in slot, false, 'accessories use compact text, not vector icons');
+  assert.equal(slot.symbol, null, 'text control has no accessory graphics');
 assert.equal(combat.hitSlots.length, 10);
 for (const slot of combat.hitSlots) {
   assert.equal(slot.node.children.length, 2, 'one common X plus ring, not four shape variants');

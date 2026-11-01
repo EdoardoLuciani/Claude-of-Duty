@@ -1,5 +1,9 @@
 # Simpler Pixi HUD: before/after, not HTML/Pixi
 
+Later, the operator requested a [bandage/grenade icon comparison](pixi-accessory-icons.md).
+The magazine bar remains; accessory text/original/simple silhouettes are selectable.
+This report's text-only measurements remain historical, not icon-cost attribution.
+
 Both builds use the complete opt-in Pixi HUD, WebGPU device, v1.1.0 assets and
 game code. Baseline: `3a90a615`. The user explicitly authorized visual differences
 instead of reproducing CSS pixel-for-pixel. Menus/native default/fallback remain.

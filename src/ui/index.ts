@@ -476,6 +476,7 @@ export class UiSystem {
     if (pixiMode === 'hud') {
       try {
         const { PixiHudSlice } = await import('./pixi-hud.ts');
+        const icons = new URLSearchParams(location.search).get('icons');
         this.pixiHud = await PixiHudSlice.create(
           this.root,
           this.centreLayer,
@@ -484,6 +485,7 @@ export class UiSystem {
             injury: new URLSearchParams(location.search).get('underlays') !== 'html',
             combat: new URLSearchParams(location.search).get('combat') !== 'html',
             compass: new URLSearchParams(location.search).get('compass') !== 'html',
+            icons: icons === 'original' || icons === 'text' ? icons : 'simple',
           }
         );
         this.pixiHud.resize(this.vw, this.vh, this.k);
