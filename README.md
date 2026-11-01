@@ -121,8 +121,7 @@ keep it selected. Supplies use locally bundled painted illustrations; weapons re
 interactive 3D previews. Drag to orbit around the weapon and scroll to zoom; panning is
 disabled. In the focused 3D view, arrows rotate, +/- zoom and Home resets.
 Toolbar buttons also provide zoom and reset. Inspection never spends credits:
-use the explicit Buy/Swap button to purchase supplies or weapons. Clicking a card
-only selects it, so inspecting resupply no longer buys it accidentally.
+use the explicit Buy/Swap button to purchase supplies or weapons.
 This first customization increment previews the current authored configurations;
 separate attachment purchases and iron-sight-only defaults are not implemented yet.
 
