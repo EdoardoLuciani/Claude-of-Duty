@@ -1,4 +1,4 @@
-import { el, setStyle, clamp, clamp01, damp, ease } from './util.ts';
+import { clamp, clamp01, damp, ease } from './util.ts';
 
 /**
  * Dynamic four-blade reticle.
@@ -11,7 +11,7 @@ import { el, setStyle, clamp, clamp01, damp, ease } from './util.ts';
  *
  * ADS hides the whole reticle over 70ms (the optic reticle is the weapon's job).
  */
-interface CrosshairState {
+export interface CrosshairState {
   move?: number;
   sprint?: boolean;
   ads?: boolean;
@@ -22,36 +22,18 @@ interface CrosshairState {
 }
 
 export class Crosshair {
-  declare root: HTMLElement;
-  declare blades: HTMLElement[];
-  declare dot: HTMLElement;
-  declare k: number;
-  declare gap: number;
-  declare kick: number;
-  declare kickVel: number;
-  declare moveSpread: number;
-  declare adsBlend: number;
-  declare hitPulse: number;
-  declare visible: number;
-  declare _rot: number[];
-  constructor(parent: HTMLElement) {
-    this.root = el('div', 'ow-cross', parent);
-    this.blades = new Array<HTMLElement>(4);
-    for (let i = 0; i < 4; i++) this.blades[i] = el('div', 'ow-blade', this.root);
-    this.dot = el('div', 'ow-dot', this.root);
-
-    this.k = 1;
-    this.gap = 6;
-    this.kick = 0;
-    this.kickVel = 0;
-    this.moveSpread = 0;
-    this.adsBlend = 0;
-    this.hitPulse = 0;
-    this.visible = 1;
-
-    // preallocated transform scratch — string concat only, no objects
-    this._rot = [0, 90, 180, 270];
-  }
+  k = 1;
+  gap = 6;
+  kick = 0;
+  kickVel = 0;
+  moveSpread = 0;
+  adsBlend = 0;
+  hitPulse = 0;
+  visible = 1;
+  bladeLength = 1;
+  bladeAlpha = 1;
+  dotScale = 1;
+  dotAlpha = 1;
 
   /** Called on every shot. `amount` scales with weapon recoil. */
   onFire(amount = 1): void {
@@ -101,26 +83,14 @@ export class Crosshair {
     const vis = this.visible;
 
     const bright = 1 - 0.25 * this.adsBlend + 0.5 * ease.outQuad(this.hitPulse);
-    for (let i = 0; i < 4; i++) {
-      const b = this.blades[i];
-      setStyle(
-        b,
-        'transform',
-        `rotate(${this._rot[i]}deg) translateY(${(-gap).toFixed(2)}px) scaleY(${len.toFixed(3)})`
-      );
-      setStyle(b, 'opacity', (vis * Math.min(1, bright)).toFixed(3));
-    }
-    const dotScale = 1 + this.hitPulse * 1.1;
-    setStyle(this.dot, 'transform', `scale(${dotScale.toFixed(3)})`);
-    setStyle(this.dot, 'opacity', (vis * (0.85 + 0.15 * this.hitPulse)).toFixed(3));
-    setStyle(this.root, 'display', vis < 0.004 ? 'none' : '');
+    this.gap = gap;
+    this.bladeLength = len;
+    this.bladeAlpha = vis * Math.min(1, bright);
+    this.dotScale = 1 + this.hitPulse * 1.1;
+    this.dotAlpha = vis * (0.85 + 0.15 * this.hitPulse);
   }
 
   setScale(k: number): void {
     this.k = k;
-  }
-
-  dispose(): void {
-    this.root.remove();
   }
 }

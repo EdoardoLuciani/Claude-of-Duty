@@ -1,4 +1,4 @@
-export interface PoolRecord<Node extends HTMLElement = HTMLElement> {
+export interface PoolRecord<Node extends HTMLElement | null = HTMLElement> {
   node: Node;
   alive: boolean;
   t: number;
@@ -10,8 +10,7 @@ export interface PoolRecord<Node extends HTMLElement = HTMLElement> {
   d: number;
   s: string;
 }
-
-export interface ElementPool<Node extends HTMLElement = HTMLElement> {
+export interface ElementPool<Node extends HTMLElement | null = HTMLElement> {
   items: PoolRecord<Node>[];
   acquire(): PoolRecord<Node>;
   release(item: PoolRecord<Node>): void;
