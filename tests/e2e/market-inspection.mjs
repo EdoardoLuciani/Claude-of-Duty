@@ -58,6 +58,64 @@ try {
     });
   const initial = await state();
   assert.equal(initial.scale, 0);
+  // Every supply is inspectable even with a disabled BUY button, without starting WebGPU.
+  await page.evaluate(() => {
+    window.__ENGINE__.ctx.get('market').credits = 0;
+  });
+  for (const id of ['bandage', 'ammo', 'grenade', 'armour', 'carpet']) {
+    await page.locator(`[data-item="${id}"]`).focus();
+    await page.waitForFunction((id) => {
+      const p = window.__ENGINE__.ctx.get('ui').shop.inspection;
+      return p.activeId === id && p.image?.naturalWidth === 960 && !p.image.hidden;
+    }, id);
+    assert.equal((await state()).credits, 0);
+    assert.equal((await state()).model, false);
+    assert.equal(await page.locator('.ow-market-inspect-canvas').isVisible(), false);
+    assert.equal(await page.locator('.ow-market-inspect-3d').isVisible(), false);
+    assert(await page.locator('.ow-market-inspect-art').getAttribute('alt'));
+    assert.equal(
+      await page.evaluate(() => window.__ENGINE__.ctx.get('ui').shop.inspection.renderer),
+      null,
+      'illustrations never initialize the 3D renderer'
+    );
+    if (args.artOut) {
+      await page.evaluate(async () => {
+        window.__ENGINE__.ctx.get('market').credits = 1850;
+        await window.__PUMP__(2);
+      });
+      await captureNative(page, resolve(`${args.artOut}-${id}.png`));
+      await page.evaluate(async () => {
+        window.__ENGINE__.ctx.get('market').credits = 0;
+        await window.__PUMP__(2);
+      });
+    }
+  }
+  await page.locator('[data-item="bandage"] .ow-market-name').click();
+  await page.locator('[data-item="rifle"]').hover();
+  assert.equal((await state()).preview, 'bandage', 'supply selection pins without purchasing');
+  assert.equal((await state()).credits, 0);
+  await page.locator('[data-item="ammo"]').focus();
+  await page.keyboard.press('Space');
+  assert.equal((await state()).preview, 'ammo', 'keyboard selects supplies without purchasing');
+  assert.equal((await state()).credits, 0);
+  // A genuine decode error leaves a clear fallback, not a stale image or 3D controls.
+  await page.evaluate(() => {
+    window.__ENGINE__.ctx.get('ui').shop.inspection.image.src = 'data:image/webp;base64,AA==';
+  });
+  await page.waitForFunction(() =>
+    window.__ENGINE__.ctx
+      .get('ui')
+      .shop.inspection.status.textContent.includes('Artwork unavailable')
+  );
+  assert.equal(await page.locator('.ow-market-inspect-art').isVisible(), false);
+  assert.equal(await page.locator('.ow-market-inspect-3d').isVisible(), false);
+  await page.evaluate(() => {
+    const market = window.__ENGINE__.ctx.get('market');
+    market.closeShop();
+    market.openShop(3);
+  });
+  assert.equal(await page.locator('.ow-market-inspect-art').count(), 0, 'close clears artwork');
+
   // All seven weapons, including equipped/unaffordable cards, are focusable.
   await page.evaluate(() => {
     window.__ENGINE__.ctx.get('market').credits = 0;
@@ -319,6 +377,80 @@ try {
       probe.dispose();
     }
   });
+  // Switching to artwork must invalidate an already requested weapon clone and its callbacks.
+  const artworkRace = await page.evaluate(async () => {
+    const ctx = window.__ENGINE__.ctx;
+    const w = ctx.get('weapons');
+    const p = ctx.get('ui').shop.inspection;
+    const probe = new p.constructor(document.createElement('div'), w);
+    probe.active = true;
+    probe.ready = Promise.resolve();
+    const model = await w.createInspectionModel('rifle');
+    let disposals = 0;
+    const dispose = model.dispose;
+    model.dispose = () => {
+      disposals++;
+      dispose();
+    };
+    let deliver, started;
+    const pending = new Promise((resolve) => {
+      deliver = resolve;
+    });
+    const requested = new Promise((resolve) => {
+      started = resolve;
+    });
+    const original = w.createInspectionModel;
+    w.createInspectionModel = () => {
+      started();
+      return pending;
+    };
+    try {
+      const task = probe.select('rifle', 'rifle');
+      await requested;
+      await probe.select('bandage', 'Bandage');
+      const oldImage = probe.image;
+      const lateImageLoad = oldImage.onload;
+      deliver(model);
+      await task;
+      const cancelled = probe.model === null && model.scene.parent === null && disposals === 1;
+      await probe.select('ammo', 'Ammo Refill');
+      const status = probe.status.textContent;
+      lateImageLoad();
+      const afterLateLoad = probe.status.textContent;
+      probe.fail();
+      const afterFailure = {
+        id: probe.activeId,
+        hasImage: probe.image !== null,
+        status: probe.status.textContent,
+      };
+      probe.hide();
+      return {
+        cancelled,
+        status,
+        afterLateLoad,
+        oldImageDetached: oldImage.parentNode === null,
+        afterFailure,
+        imageAfterClose: probe.image,
+      };
+    } finally {
+      w.createInspectionModel = original;
+      probe.dispose();
+    }
+  });
+  assert.equal(artworkRace.cancelled, true, 'artwork disposes a late weapon clone');
+  assert.equal(artworkRace.oldImageDetached, true);
+  assert.equal(artworkRace.afterLateLoad, artworkRace.status, 'obsolete image loads are ignored');
+  assert.deepEqual(
+    artworkRace.afterFailure,
+    {
+      id: 'ammo',
+      hasImage: true,
+      status: artworkRace.status,
+    },
+    'a 3D failure preserves the supply illustration'
+  );
+  assert.equal(artworkRace.imageAfterClose, null);
+
   assert.equal(initFailure.originalError, true, 'cleanup preserves the original init failure');
   assert.equal(initFailure.failed, true);
   assert.equal(initFailure.model, null);
@@ -326,7 +458,7 @@ try {
   assert.equal(initFailure.enabled, false);
   assert.match(initFailure.status, /3D preview unavailable/);
 
-  // Explicit purchase remains authoritative; resupply retains card-click behavior.
+  // Explicit purchase is authoritative for supplies too; browsing never spends credits.
   await page.evaluate(() => {
     window.__ENGINE__.ctx.get('market').credits = 2000;
   });
@@ -334,6 +466,8 @@ try {
   await page.locator('[data-item="mcx"] .ow-market-buy').click();
   assert.equal((await state()).credits, 900);
   await page.locator('[data-item="grenade"] .ow-market-name').click();
+  assert.equal((await state()).credits, 900, 'selecting a supply never purchases it');
+  await page.locator('[data-item="grenade"] .ow-market-buy').click();
   assert.equal((await state()).credits, 700);
   const renderer = await page.evaluateHandle(
     () => window.__ENGINE__.ctx.get('ui').shop.inspection.renderer
@@ -397,6 +531,14 @@ try {
     await window.__PUMP__(2);
   });
   assert.equal((await state()).failed, true);
+  await page.evaluate(() =>
+    window.__ENGINE__.ctx.get('ui').shop.inspection.select('bandage', 'Bandage')
+  );
+  await page.waitForFunction(() => {
+    const p = window.__ENGINE__.ctx.get('ui').shop.inspection;
+    return p.image?.naturalWidth === 960 && !p.image.hidden;
+  });
+  assert.equal(await page.locator('.ow-market-inspect-3d').isVisible(), false);
   await page.locator('[data-item="grenade"] .ow-market-buy').click();
   assert.equal((await state()).credits, 1800);
   await page.keyboard.press('Escape');
@@ -410,7 +552,7 @@ try {
   assert.equal((await state()).scale, 0);
   assert.deepEqual(errors, []);
   console.log(
-    'Market inspection: seven weapons, paused controls, selection, purchases, resource reuse and lifecycle passed.'
+    'Market inspection: five supply illustrations, seven 3D weapons, safe selection, fallbacks, races, purchases and lifecycle passed.'
   );
 } finally {
   await browser.close();
