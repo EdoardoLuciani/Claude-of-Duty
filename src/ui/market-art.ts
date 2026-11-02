@@ -5,7 +5,8 @@ export type MarketItemId = ReturnType<MarketSystem['getHudState']>['items'][numb
 type SupplyId = Exclude<MarketItemId, WeaponId>;
 
 // UI smoke checks also import this map directly in Node, outside Vite.
-const baseUrl = import.meta.env?.BASE_URL ?? '/';
+const deploymentBase = import.meta.env?.BASE_URL ?? '/';
+const baseUrl = deploymentBase.endsWith('/') ? deploymentBase : `${deploymentBase}/`;
 
 /** Offline-authored illustrations only; the market never calls a generation service. */
 export const MARKET_ART: Record<SupplyId, { src: string; alt: string }> = {
