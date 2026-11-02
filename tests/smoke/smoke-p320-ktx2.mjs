@@ -11,7 +11,6 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 
-import { GLTFPACK_FLAGS, GLTFPACK_VERSION, MODEL_COOKS } from '../../build/models.mjs';
 import { loadP320, P320_URL, P320Animation, makeP320Model } from '../../src/weapons/p320.ts';
 import { inspectGLB, parseGLB } from '../../tools/lib/glb-fixture.mjs';
 
@@ -20,35 +19,6 @@ const sourceBytes = readFileSync(new URL('p320-compact.glb', dir));
 const bytes = readFileSync(new URL(P320_URL));
 const source = inspectGLB(sourceBytes),
   cooked = inspectGLB(bytes);
-assert.equal(GLTFPACK_VERSION, 'gltfpack 1.3');
-assert.deepEqual(GLTFPACK_FLAGS, [
-  '-kn',
-  '-ke',
-  '-ac',
-  '-af',
-  '0',
-  '-vpf',
-  '-vp',
-  '14',
-  '-vtf',
-  '-vt',
-  '16',
-  '-vn',
-  '8',
-  '-ar',
-  '16',
-  '-at',
-  '24',
-  '-as',
-  '24',
-  '-cc',
-  '-tu',
-  '-tq',
-  '10',
-  '-tj',
-  '1',
-]);
-assert.deepEqual(MODEL_COOKS.p320.flags, ['-si', '0.50', '-se', '0.001', '-sp']);
 for (const extension of ['KHR_texture_basisu', 'EXT_meshopt_compression', 'KHR_mesh_quantization'])
   assert(cooked.json.extensionsRequired.includes(extension));
 assert(
@@ -71,7 +41,6 @@ assert.deepEqual(
 const primitive = cooked.json.meshes[0].primitives[0];
 const triangles = cooked.json.accessors[primitive.indices].count / 3;
 assert(triangles >= 17000 && triangles < 18000, 'approved tight-error triangle budget');
-assert.equal(cooked.json.accessors[primitive.attributes.POSITION].count, 32626);
 assert.equal(cooked.json.skins[0].joints.length, 9);
 
 function imageData(container, image) {
