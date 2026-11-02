@@ -14,7 +14,7 @@ import { PixiFeedback } from './pixi-feedback.ts';
 import type { FeedbackModels } from './pixi-feedback.ts';
 import { PixiInjury } from './pixi-injury.ts';
 import { PixiMinimap } from './pixi-minimap.ts';
-import { HUD_TYPE } from './pixi-type.ts';
+import { HUD_TYPE, setHudTextResolution } from './pixi-type.ts';
 import { clamp01, setStyle } from './util.ts';
 
 function text(value: string, x: number, y: number, size: number, fill = 0xe7f2ef): Text {
@@ -75,6 +75,8 @@ export class PixiHud {
   private disposed = false;
   private dirty = true;
   private enabled = false;
+  private viewportWidth = 1;
+  private viewportHeight = 1;
   private lastState = new Map<string, unknown>();
   draws = 0;
 
@@ -158,8 +160,13 @@ export class PixiHud {
 
   resize(w: number, h: number, k: number): void {
     if (this.disposed) return;
+    this.viewportWidth = w;
+    this.viewportHeight = h;
     this.renderer.resize(Math.max(1, w), Math.max(1, h), Math.min(devicePixelRatio || 1, 2));
     this.stage.scale.set(k);
+    const textResolution = this.renderer.resolution * Math.max(1, k);
+    setHudTextResolution(this.stage, textResolution);
+    this.minimap.textResolution = textResolution;
     this.injury.resize(w, h, k);
     this.feedback.resize(w, h, k);
     this.ammo.stage.position.set(w / k - 26 - AMMO_WIDTH, h / k - 26 - AMMO_HEIGHT);
@@ -194,6 +201,10 @@ export class PixiHud {
   ): void {
     if (this.disposed) return;
     if (!this.enabled) return;
+    // Moving between monitors can change DPR without a window resize event.
+    // Reuse logical inputs, not renderer.screen dimensions rounded through physical pixels.
+    if (this.renderer.resolution !== Math.min(devicePixelRatio || 1, 2))
+      this.resize(this.viewportWidth, this.viewportHeight, this.stage.scale.x);
     // Injury opacity stays independent of readout/menu/death fading.
     const alpha = Number(opacity.toFixed(3));
     if (this.chrome.alpha !== alpha) this.dirty = true;

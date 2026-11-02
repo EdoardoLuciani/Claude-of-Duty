@@ -18,7 +18,10 @@ The independent Three WebGPU market-inspection renderer is unchanged.
 - The engine drives updates. Settled paused/hidden content does not redraw;
   changed wall-clock FPS samples can invalidate once during pause.
 - Injury fades independently of readouts. Inventory pulses use unscaled UI time;
-  FPS samples every 500 ms. DPR is capped independently at 2.
+  FPS samples every 500 ms. HUD canvas DPR is capped independently at 2.
+- Text bitmap density includes HUD enlargement on resize; smaller layouts keep
+  renderer-density text. Late minimap labels inherit the current density. Animated
+  transforms do not change text resolution or trigger per-frame rasterization.
 - Passive messages use `pixi-feedback.ts`; controllers retain prompt ownership,
   progress, banner timing, six pooled killfeed rows and status priority. The supply
   countdown uses raw time and its own anchor, independent of interaction prompts.

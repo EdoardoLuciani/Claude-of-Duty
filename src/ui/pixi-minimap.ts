@@ -7,15 +7,6 @@ const SIZE = 178,
   HALF = SIZE / 2;
 const INK = 0xe7f2ef;
 
-function label(value: string, size: number, color: number): Text {
-  const text = new Text({
-    text: value,
-    style: { fontFamily: 'Arial', fontSize: size, fontWeight: '600', fill: color },
-  });
-  text.anchor.set(0.5);
-  return text;
-}
-
 function move(node: Container, x: number, y: number): boolean {
   const changed = node.x !== x || node.y !== y;
   node.position.set(x, y);
@@ -50,6 +41,17 @@ export class PixiMinimap {
   private pulses: { node: Container; ring: Graphics; text: Text; radius: number }[] = [];
   private fov = -1;
   uploads = 0;
+  textResolution = 1;
+
+  private label(value: string, size: number, color: number): Text {
+    const text = new Text({
+      text: value,
+      resolution: this.textResolution,
+      style: { fontFamily: 'Arial', fontSize: size, fontWeight: '600', fill: color },
+    });
+    text.anchor.set(0.5);
+    return text;
+  }
 
   constructor() {
     this.stage.eventMode = 'none';
@@ -75,9 +77,9 @@ export class PixiMinimap {
     this.stage.addChild(
       new Graphics().rect(0, 0, SIZE, SIZE).stroke({ color: 0x85a5ab, alpha: 0.7, width: 1 })
     );
-    const north = label('N', 10, INK);
+    const north = this.label('N', 10, INK);
     north.position.set(HALF, 8);
-    const zone = label('ZONE 07     ·     60M', 9, 0xa9bac5);
+    const zone = this.label('ZONE 07     ·     60M', 9, 0xa9bac5);
     zone.position.set(HALF, SIZE + 12);
     this.stage.addChild(north, zone);
   }
@@ -92,7 +94,7 @@ export class PixiMinimap {
     this.terrain.addChild(sprite);
     for (const l of map.labels) {
       const room = l.w * ppm + 2;
-      const node = label(
+      const node = this.label(
         l.text ? `${l.text}\n${l.code}` : l.code,
         8.5,
         l.text ? 0x0c1319 : 0xc4d6e2
@@ -175,7 +177,7 @@ export class PixiMinimap {
       const objective = objectives?.[i];
       if (!entry && objective) {
         const node = new Container(),
-          text = label('', 9.5, 0x06171f);
+          text = this.label('', 9.5, 0x06171f);
         node.addChild(
           new Graphics().rect(-6, -6, 12, 12).fill(0x79d2ff).stroke({ color: 0x040e14, width: 1 }),
           text
@@ -209,7 +211,7 @@ export class PixiMinimap {
             .circle(0, 0, 1)
             .fill({ color: 0xffa820, alpha: 0.13 })
             .stroke({ color: 0xffd660, alpha: 0.92, width: 0.04 }),
-          text = label('', 13, 0xffd660);
+          text = this.label('', 13, 0xffd660);
         node.addChild(ring, text);
         entry = { node, ring, text, radius: -1 };
         this.pulses.push(entry);
