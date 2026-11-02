@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { Container, DOMAdapter, Text, WebGPURenderer } from 'pixi.js';
+import { Container, DOMAdapter, Text, ViewSystem, WebGPURenderer } from 'pixi.js';
 
 import { ScoreBar } from '../../src/ui/compass.ts';
 import { UiSystem } from '../../src/ui/index.ts';
@@ -162,29 +162,61 @@ try {
   if (oldDocument === undefined) delete globalThis.document;
   else globalThis.document = oldDocument;
 }
+const dprCanvas = { width: 1918, height: 1078, style: { setProperty() {} } },
+  dprView = new ViewSystem({ uid: -1 }),
+  layoutNode = Object.assign(new Container(), { style: {} });
+dprView.init({ canvas: dprCanvas, width: 1918, height: 1078, resolution: 1, autoDensity: true });
+let dprResizes = 0;
 const dprHud = Object.assign(Object.create(PixiHud.prototype), {
   enabled: true,
-  renderer: { resolution: 1, screen: { width: 1920, height: 1080 } },
-  stage: { scale: { x: 1 } },
-  chrome: { alpha: 0 },
-  injury: { update: () => false, mesh: { visible: false } },
-  canvas: { style: { setProperty() {} } },
-  resize(w, h, k) {
-    assert.deepEqual([w, h, k], [1920, 1080, 1]);
-    this.renderer.resolution = 2;
-    dprResizes++;
+  renderer: {
+    get resolution() {
+      return dprView.resolution;
+    },
+    get screen() {
+      return dprView.screen;
+    },
+    resize(w, h, resolution) {
+      dprView.resize(w, h, resolution);
+      dprResizes++;
+    },
   },
+  stage: new Container(),
+  chrome: { alpha: 0 },
+  injury: { resize() {}, update: () => false, mesh: { visible: false } },
+  feedback: { resize() {} },
+  minimap: { stage: layoutNode },
+  ammo: { stage: layoutNode },
+  vitals: layoutNode,
+  reticle: new Container(),
+  compass: { stage: layoutNode },
+  combat: { hits: layoutNode, arcs: layoutNode, equipment: layoutNode, fps: layoutNode },
+  canvas: dprCanvas,
 });
-let dprResizes = 0;
 try {
-  Object.defineProperty(globalThis, 'devicePixelRatio', { value: 2, configurable: true });
-  dprHud.update(0, null, null, null, null, null, 0, null);
-  dprHud.update(0, null, null, null, null, null, 0, null);
-  assert.equal(dprResizes, 1, 'DPR-only changes resize once, even while readouts are hidden');
+  Object.defineProperty(globalThis, 'devicePixelRatio', { value: 1, configurable: true });
+  dprHud.resize(1918, 1078, 1);
+  for (const dpr of [1.25, 2, 1]) {
+    Object.defineProperty(globalThis, 'devicePixelRatio', { value: dpr, configurable: true });
+    dprHud.update(0, null, null, null, null, null, 0, null);
+    dprHud.update(0, null, null, null, null, null, 0, null);
+    assert.deepEqual(
+      [dprHud.reticle.x, dprHud.reticle.y],
+      [959, 539],
+      'rounded pixels do not feed back into logical layout'
+    );
+  }
+  assert.equal(dprResizes, 4, 'initial layout plus one resize per DPR change, even while hidden');
+  assert.deepEqual([dprCanvas.width, dprCanvas.height], [1918, 1078]);
+  assert.deepEqual([dprCanvas.style.width, dprCanvas.style.height], ['1918px', '1078px']);
 } finally {
   if (descriptors.devicePixelRatio)
     Object.defineProperty(globalThis, 'devicePixelRatio', descriptors.devicePixelRatio);
   else delete globalThis.devicePixelRatio;
+  dprView.destroy();
+  dprHud.stage.destroy();
+  dprHud.reticle.destroy();
+  layoutNode.destroy();
 }
 const textStage = new Container(),
   textProbe = new Text({ text: '100', style: { fontSize: 32 } }),
