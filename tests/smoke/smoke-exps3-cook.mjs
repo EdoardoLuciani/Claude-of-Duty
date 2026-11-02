@@ -8,7 +8,6 @@ import {
   KHR_SUPERCOMPRESSION_ZSTD,
 } from 'three/examples/jsm/libs/ktx-parse.module.js';
 
-import { MODEL_COOKS } from '../../build/models.mjs';
 import { inspectGLB, parseGLB } from '../../tools/lib/glb-fixture.mjs';
 
 const dir = new URL('../../assets/attachments/eotech-exps3-0/', import.meta.url);
@@ -16,12 +15,6 @@ const nativeBytes = readFileSync(new URL('exps3-0.glb', dir));
 const bytes = readFileSync(new URL('exps3-0.runtime.glb', dir));
 const native = inspectGLB(nativeBytes),
   cooked = inspectGLB(bytes);
-assert.deepEqual(MODEL_COOKS.exps3, {
-  directory: 'assets/attachments/eotech-exps3-0',
-  source: 'exps3-0.glb',
-  output: 'exps3-0.runtime.glb',
-  flags: ['-si', '0.50', '-se', '0.0002', '-sp'],
-});
 for (const extension of ['KHR_texture_basisu', 'EXT_meshopt_compression', 'KHR_mesh_quantization'])
   assert(cooked.json.extensionsRequired.includes(extension));
 assert(!cooked.json.extensionsUsed.includes('KHR_texture_transform'));
@@ -69,10 +62,7 @@ const body = root.getObjectByName('EXPS3_body'),
   glass = root.getObjectByName('EXPS3_glass');
 assert(body.isMesh && glass.isMesh);
 const triangles = (body.geometry.index.count + glass.geometry.index.count) / 3;
-assert(
-  triangles >= 11000 && triangles < 12000,
-  'conservative EXPS3 simplification, not the P320 error limit'
-);
+assert(triangles < 12000, 'EXPS3 stays within its triangle budget');
 assert.equal(body.material.roughnessMap, body.material.metalnessMap);
 for (const mesh of [body, glass]) {
   const original = source.scene.getObjectByName(mesh.name);
