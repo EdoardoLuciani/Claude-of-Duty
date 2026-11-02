@@ -9,8 +9,15 @@ import { isWeaponId } from '../../src/weapons/defs.ts';
 
 // Exercise Vite's actual BASE_URL replacement without regenerating unrelated assets.
 process.env.VITEST = 'true';
+const deploymentBases = new Map([
+  ['/', '/'],
+  ['/nested-market-test/', '/nested-market-test/'],
+  ['/nested-market-test', '/nested-market-test/'],
+  ['./', './'],
+  ['', './'],
+]);
 const artworkByBase = new Map();
-for (const base of ['/', '/nested-market-test/']) {
+for (const [base] of deploymentBases) {
   const { output } = await build({
     root: fileURLToPath(new URL('../../', import.meta.url)),
     base,
@@ -55,11 +62,13 @@ for (const [id, art] of Object.entries(MARKET_ART)) {
   assert(bytes.length > 1000 && bytes.length < 160_000, id + ' is a locally optimized WebP');
   const source = provenance.images[id];
   assert.equal(source.file, art.src);
-  assert.equal(
-    artworkByBase.get('/nested-market-test/')[id].src,
-    '/nested-market-test' + art.src,
-    id + ' artwork honors a non-root deployment base'
-  );
+  for (const [base, expectedBase] of deploymentBases) {
+    assert.equal(
+      artworkByBase.get(base)[id].src,
+      expectedBase + art.src.slice(1),
+      `${id} artwork honors deployment base ${JSON.stringify(base)}`
+    );
+  }
   assert.equal(source.model, 'gpt-image-2.5-sunburst');
   assert.match(source.prompt, /HAND-PAINTED TACTICAL (?:GAME )?INVENTORY ILLUSTRATION/);
   assert.equal(source.bytes, bytes.length);
