@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { DOMAdapter, WebGPURenderer } from 'pixi.js';
+import { Container, DOMAdapter, Text, WebGPURenderer } from 'pixi.js';
 
 import { ScoreBar } from '../../src/ui/compass.ts';
 import { UiSystem } from '../../src/ui/index.ts';
@@ -9,6 +9,8 @@ import { MarketCountdown } from '../../src/ui/market.ts';
 import { PixiAmmoView, AMMO_HEIGHT } from '../../src/ui/pixi-ammo-view.ts';
 import { initPixiRenderer } from '../../src/ui/pixi-device.ts';
 import { PixiHud } from '../../src/ui/pixi-hud.ts';
+import { PixiMinimap } from '../../src/ui/pixi-minimap.ts';
+import { setHudTextResolution } from '../../src/ui/pixi-type.ts';
 import { Prompt, Banner } from '../../src/ui/prompts.ts';
 
 await assert.rejects(
@@ -160,6 +162,59 @@ try {
   if (oldDocument === undefined) delete globalThis.document;
   else globalThis.document = oldDocument;
 }
+const dprHud = Object.assign(Object.create(PixiHud.prototype), {
+  enabled: true,
+  renderer: { resolution: 1, screen: { width: 1920, height: 1080 } },
+  stage: { scale: { x: 1 } },
+  chrome: { alpha: 0 },
+  injury: { update: () => false, mesh: { visible: false } },
+  canvas: { style: { setProperty() {} } },
+  resize(w, h, k) {
+    assert.deepEqual([w, h, k], [1920, 1080, 1]);
+    this.renderer.resolution = 2;
+    dprResizes++;
+  },
+});
+let dprResizes = 0;
+try {
+  Object.defineProperty(globalThis, 'devicePixelRatio', { value: 2, configurable: true });
+  dprHud.update(0, null, null, null, null, null, 0, null);
+  dprHud.update(0, null, null, null, null, null, 0, null);
+  assert.equal(dprResizes, 1, 'DPR-only changes resize once, even while readouts are hidden');
+} finally {
+  if (descriptors.devicePixelRatio)
+    Object.defineProperty(globalThis, 'devicePixelRatio', descriptors.devicePixelRatio);
+  else delete globalThis.devicePixelRatio;
+}
+const textStage = new Container(),
+  textProbe = new Text({ text: '100', style: { fontSize: 32 } }),
+  mapView = new PixiMinimap();
+textStage.addChild(textProbe, mapView.stage);
+mapView.textResolution = 8 / 3;
+setHudTextResolution(textStage, mapView.textResolution);
+assert.equal(textProbe.resolution, 8 / 3, 'enlarged HUD text uses matching raster density');
+assert.equal(textProbe.style.fontSize, 32);
+assert.equal(textProbe.scale.x, 1, 'density changes do not change layout scale');
+let textUpdates = 0;
+const viewUpdate = textProbe.onViewUpdate;
+textProbe.onViewUpdate = () => {
+  textUpdates++;
+  viewUpdate.call(textProbe);
+};
+setHudTextResolution(textStage, mapView.textResolution);
+assert.equal(textUpdates, 0, 'unchanged density does not invalidate text');
+const mapData = { baked: null, viewSpan: 60 },
+  mapState = { pulses: [{ x: 0, z: 0, y: 5 }] };
+mapView.update(mapData, mapState);
+assert.equal(mapView.pulses[0].text.resolution, 8 / 3, 'late labels inherit HUD density');
+mapView.textResolution = 2;
+setHudTextResolution(textStage, 2);
+assert.equal(textUpdates, 1);
+assert.equal(mapView.pulses[0].text.resolution, 2, 'existing late labels follow density changes');
+mapView.update(mapData, { pulses: [...mapState.pulses, { x: 1, z: 1, y: -5 }] });
+assert.equal(mapView.pulses[1].text.resolution, 2);
+textProbe.onViewUpdate = viewUpdate;
+textStage.destroy({ children: true });
 const ammoView = new PixiAmmoView();
 assert.equal(AMMO_HEIGHT - ammoView.magFill.y, 8, 'magazine shares armour-bar bottom inset');
 assert(ammoView.prompt.y >= 0 && ammoView.prompt.y + 16 <= ammoView.bar.y);
