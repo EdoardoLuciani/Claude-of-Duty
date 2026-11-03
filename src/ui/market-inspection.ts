@@ -200,7 +200,15 @@ export class MarketInspection {
     try {
       this.ready ??= this.initRenderer();
       await this.ready;
-      if (this.disposed || revision !== this.revision || this.failed) return;
+    } catch (error) {
+      if (!this.disposed && !this.failed) {
+        console.warn('[market] inspection renderer initialization failed', error);
+        this.fail();
+      }
+      return;
+    }
+    if (this.disposed || revision !== this.revision || this.failed) return;
+    try {
       const model = await this.weapons.createInspectionModel(id);
       if (this.disposed || revision !== this.revision || !this.active) {
         model.dispose();
@@ -229,8 +237,14 @@ export class MarketInspection {
       this.reset();
       this.update();
       if (!this.failed) setText(this.status, 'Preview only · current weapon configuration');
-    } catch {
-      if (!this.disposed && revision === this.revision) this.fail();
+    } catch (error) {
+      if (this.disposed || revision !== this.revision) return;
+      console.warn(`[market] inspection unavailable for ${id}`, error);
+      this.clearModel();
+      this.controls.enabled = false;
+      this.canvas.hidden = true;
+      this.threeControls.hidden = true;
+      setText(this.status, 'Weapon preview unavailable. Select another item to inspect.');
     }
   }
 
@@ -297,6 +311,7 @@ export class MarketInspection {
       !this.activeId ||
       !isWeaponId(this.activeId) ||
       !this.renderer ||
+      !this.model ||
       this.disposed ||
       this.failed
     )
@@ -315,7 +330,8 @@ export class MarketInspection {
     this.dirty = false;
     try {
       this.renderer.render(this.scene, this.camera);
-    } catch {
+    } catch (error) {
+      console.warn('[market] inspection render failed', error);
       this.fail();
     }
   }
