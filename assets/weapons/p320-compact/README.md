@@ -21,7 +21,6 @@ blender -b -t 8 --python-exit-code 1 --python tools/blender/p320/build.py
 blender -b -t 8 assets/weapons/p320-compact/p320-compact.blend \
   --python-exit-code 1 --python tools/blender/p320/check.py
 npm run models:cook -- p320
-node tests/smoke/smoke-p320.mjs
 ```
 
 Use `--output /tmp/p320-review --render --quick` for scratch source builds.

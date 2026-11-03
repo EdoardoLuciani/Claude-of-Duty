@@ -22,7 +22,6 @@ blender -b -t 2 --python-exit-code 1 --python tools/blender/m590/build.py
 blender -b -t 2 assets/weapons/m590/m590.blend --python-exit-code 1 \
   --python tools/blender/m590/check.py
 npm run models:cook -- m590
-node tests/smoke/smoke-m590.mjs
 ```
 
 Use `--output /tmp/m590-review` for scratch builds. Preserve one mixer,
