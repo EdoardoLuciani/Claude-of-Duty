@@ -42,107 +42,70 @@ interface ViewKick {
 
 export class CameraRig {
   ctx: CameraContext;
-  eye: number;
-  bobPhase: number;
-  bobWeight: number;
-  bobRoll: number;
-  bobPitch: number;
   dip: Spring;
   step: Spring;
   punch: Spring;
-  kickPitch: RecoilAxis;
-  kickYaw: RecoilAxis;
-  kickRoll: RecoilAxis;
-  strafeRoll: number;
-  turnRoll: number;
-  slideRoll: number;
-  airRoll: number;
-  trauma: number;
-  shakeTime: number;
-  fireVibe: number;
-  fireVibeTime: number;
-  fireVibeAmp: number;
   fireVibeDuration: number;
   fireVibeAdsScale: number;
-  breathPhase: number;
   baseFov: number;
   fov: number;
-  fovMove: number;
-  fovAds: number;
-  slideBlend: number;
-  slideSide: number;
-  viewKick: ViewKick;
-  bobOffset: THREE.Vector3;
-  offset: THREE.Vector3;
-  eyePosition: THREE.Vector3;
-  rotation: THREE.Euler;
-  forward: THREE.Vector3;
-  _fwd: THREE.Vector3;
-  _right: THREE.Vector3;
+  // ---- smoothed stance -------------------------------------------------
+  eye: number = 1.66;
+  // ---- bob -------------------------------------------------------------
+  bobPhase: number = 0;
+  bobWeight: number = 0;
+  bobRoll: number = 0;
+  bobPitch: number = 0;
+  /** Second, independent channel: `weapons` pushes into this one. */
+  kickPitch: RecoilAxis = new RecoilAxis(11, 0.58, 0.22, 0.28);
+  kickYaw: RecoilAxis = new RecoilAxis(11.5, 0.6, 0.22, 0.28);
+  kickRoll: RecoilAxis = new RecoilAxis(9, 0.62, 0.22, 0.22);
+  // ---- rolls -----------------------------------------------------------
+  strafeRoll: number = 0;
+  turnRoll: number = 0;
+  slideRoll: number = 0;
+  airRoll: number = 0;
+  // ---- shake -----------------------------------------------------------
+  trauma: number = 0;
+  shakeTime: number = 0;
+  // Cosmetic; sampled in applyFireVibe, never composed into this.rotation.
+  fireVibe: number = 0;
+  fireVibeTime: number = 0;
+  fireVibeAmp: number = 1;
+  // ---- breathing -------------------------------------------------------
+  breathPhase: number = 0;
+  fovMove: number = 1;
+  fovAds: number = 1;
+  // ---- slide -----------------------------------------------------------
+  slideBlend: number = 0;
+  slideSide: number = 1;
+  // ---- outputs (read by weapons for counter-motion) --------------------
+  viewKick: ViewKick = { pitch: 0, yaw: 0, roll: 0, punch: 0 };
+  bobOffset: THREE.Vector3 = new THREE.Vector3();
+  offset: THREE.Vector3 = new THREE.Vector3();
+  eyePosition: THREE.Vector3 = new THREE.Vector3();
+  rotation: THREE.Euler = new THREE.Euler(0, 0, 0, 'YXZ');
+  forward: THREE.Vector3 = new THREE.Vector3(0, 0, -1);
+  // scratch
+  _fwd: THREE.Vector3 = new THREE.Vector3();
+  _right: THREE.Vector3 = new THREE.Vector3();
+
   constructor(ctx: CameraContext) {
     this.ctx = ctx;
     const C = CAMERA;
-
-    // ---- smoothed stance -------------------------------------------------
-    this.eye = 1.66;
-
-    // ---- bob -------------------------------------------------------------
-    this.bobPhase = 0;
-    this.bobWeight = 0;
-    this.bobRoll = 0;
-    this.bobPitch = 0;
 
     // ---- springs ---------------------------------------------------------
     this.dip = new Spring(C.land.freq, C.land.damping, 0); // landing
     this.step = new Spring(C.step.freq, C.step.damping, 0); // footfall
     // Sightline recoil lives in movement.pitch/yaw; only transients live here.
     this.punch = new Spring(C.recoil.punchFreq, C.recoil.punchDamping, 0);
-    /** Second, independent channel: `weapons` pushes into this one. */
-    this.kickPitch = new RecoilAxis(11, 0.58, 0.22, 0.28);
-    this.kickYaw = new RecoilAxis(11.5, 0.6, 0.22, 0.28);
-    this.kickRoll = new RecoilAxis(9, 0.62, 0.22, 0.22);
 
-    // ---- rolls -----------------------------------------------------------
-    this.strafeRoll = 0;
-    this.turnRoll = 0;
-    this.slideRoll = 0;
-    this.airRoll = 0;
-
-    // ---- shake -----------------------------------------------------------
-    this.trauma = 0;
-    this.shakeTime = 0;
-
-    // Cosmetic; sampled in applyFireVibe, never composed into this.rotation.
-    this.fireVibe = 0;
-    this.fireVibeTime = 0;
-    this.fireVibeAmp = 1;
     this.fireVibeDuration = C.fireVibe.duration;
     this.fireVibeAdsScale = C.fireVibe.adsScale;
-
-    // ---- breathing -------------------------------------------------------
-    this.breathPhase = 0;
 
     // ---- fov -------------------------------------------------------------
     this.baseFov = ctx.config.fov;
     this.fov = this.baseFov;
-    this.fovMove = 1;
-    this.fovAds = 1;
-
-    // ---- slide -----------------------------------------------------------
-    this.slideBlend = 0;
-    this.slideSide = 1;
-
-    // ---- outputs (read by weapons for counter-motion) --------------------
-    this.viewKick = { pitch: 0, yaw: 0, roll: 0, punch: 0 };
-    this.bobOffset = new THREE.Vector3();
-    this.offset = new THREE.Vector3();
-    this.eyePosition = new THREE.Vector3();
-    this.rotation = new THREE.Euler(0, 0, 0, 'YXZ');
-    this.forward = new THREE.Vector3(0, 0, -1);
-
-    // scratch
-    this._fwd = new THREE.Vector3();
-    this._right = new THREE.Vector3();
   }
 
   reset(eye: number): void {

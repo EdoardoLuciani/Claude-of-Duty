@@ -57,50 +57,11 @@ interface PlayerHudState {
 }
 
 export class PlayerSystem {
-  declare isPlayer: boolean;
   declare movement: PlayerMovement;
   declare rig: CameraRig;
   declare health: Health;
   declare healCtrl: HealController;
-  declare lowHealthPass: LowHealthPass | null;
-  declare hitbox: PlayerHitbox | null;
-  declare _nearMissShots: Float64Array;
-  declare _nearMissCursor: number;
-  declare controlEnabled: boolean;
-  declare adsAmount: number;
-  declare _adsExternal: boolean;
-  declare _adsExternalAge: number;
-  declare adsRequested: boolean;
-  declare _lookFrame: number;
-  declare _prevYaw: number;
-  declare _death: {
-    active: boolean;
-    elapsed: number;
-    duration: number;
-    target: THREE.Vector3;
-    startPosition: THREE.Vector3;
-    endPosition: THREE.Vector3;
-    startQuaternion: THREE.Quaternion;
-    endQuaternion: THREE.Quaternion;
-    startFov: number;
-    endFov: number;
-  };
   declare _deathLook: THREE.PerspectiveCamera;
-  declare _deathUp: THREE.Vector3;
-  declare _statePayload: PlayerEventsMap['player:state'];
-  declare _landPayload: PlayerEventsMap['player:land'] & { position: THREE.Vector3 };
-  declare _stepPayload: PlayerEventsMap['player:footstep'];
-  declare _mantlePayload: PlayerEventsMap['player:mantle'];
-  declare _jumpPayload: PlayerEventsMap['player:jump'];
-  declare _hudState: PlayerHudState;
-  declare _tmp: THREE.Vector3;
-  declare _prev: { state: PlayerState | null; stance: Movement['stance'] | null } & Required<
-    Pick<
-      PlayerEventsMap['player:state'],
-      'sprinting' | 'tacticalSprint' | 'sliding' | 'grounded' | 'ads' | 'mantling'
-    >
-  >;
-  declare _offEvents: Array<() => void>;
   declare ctx: PlayerContext;
   declare physics: PlayerPhysics;
   declare rng: Rng;
@@ -113,105 +74,121 @@ export class PlayerSystem {
   static readonly id = 'player';
   static readonly deps: SystemId[] = ['physics', 'world', 'render'];
 
+  /** Lets `ai` / `physics` recognise the local player from an owner pointer. */
+  isPlayer: boolean = true;
+  lowHealthPass: LowHealthPass | null = null;
+  hitbox: PlayerHitbox | null = null;
+  _nearMissShots: Float64Array = new Float64Array(64);
+  _nearMissCursor: number = 0;
+  controlEnabled: boolean = true;
+  adsAmount: number = 0;
+  _adsExternal: boolean = false;
+  _adsExternalAge: number = 0;
+  adsRequested: boolean = false;
+  _lookFrame: number = -1;
+  _prevYaw: number = 0;
+  // Death camera. The local body is not rendered in first person, so death
+  // hands a corpse to `ai` and then cranes the world camera above it. All
+  // values are retained here so the one-off transition allocates nothing per
+  // frame.
+  _death: {
+    active: boolean;
+    elapsed: number;
+    duration: number;
+    target: THREE.Vector3;
+    startPosition: THREE.Vector3;
+    endPosition: THREE.Vector3;
+    startQuaternion: THREE.Quaternion;
+    endQuaternion: THREE.Quaternion;
+    startFov: number;
+    endFov: number;
+  } = {
+    active: false,
+    elapsed: 0,
+    duration: 3.2,
+    target: new THREE.Vector3(),
+    startPosition: new THREE.Vector3(),
+    endPosition: new THREE.Vector3(),
+    startQuaternion: new THREE.Quaternion(),
+    endQuaternion: new THREE.Quaternion(),
+    startFov: 0,
+    endFov: 54,
+  };
+  _deathUp: THREE.Vector3 = new THREE.Vector3(0, 1, 0);
+  // preallocated event payloads
+  _statePayload: PlayerEventsMap['player:state'] = {
+    stance: 'stand',
+    sprinting: false,
+    sliding: false,
+    ads: false,
+    state: 'stand',
+    grounded: true,
+    airborne: false,
+    mantling: false,
+    lean: 0,
+    speed: 0,
+    health: HEALTH.max,
+    healthFraction: 1,
+    crouched: false,
+  };
+  _landPayload: PlayerEventsMap['player:land'] & { position: THREE.Vector3 } = {
+    velocity: 0,
+    surface: 'concrete',
+    position: new THREE.Vector3(),
+  };
+  _stepPayload: PlayerEventsMap['player:footstep'] = {
+    position: new THREE.Vector3(),
+    surface: 'concrete',
+    running: false,
+    left: false,
+    speed: 0,
+    stance: 'stand',
+  };
+  _mantlePayload: PlayerEventsMap['player:mantle'] = { kind: 'none', height: 0 };
+  _jumpPayload: PlayerEventsMap['player:jump'] = { position: new THREE.Vector3() };
+  // Preallocated HUD snapshot polled by `ui` (see getHudState).
+  _hudState: PlayerHudState = {
+    health: HEALTH.max,
+    maxHealth: HEALTH.max,
+    dead: false,
+    armour: 0,
+    maxArmour: HEALTH.maxArmour,
+    bandages: HEALING.startCount,
+    healing: false,
+    healProgress: 0,
+    hurt: 0,
+    pulse: 0,
+    move: 0,
+    sprint: false,
+    crouch: false,
+    ads: false,
+    airborne: false,
+    suppression: 0,
+    position: null,
+  };
+  _tmp: THREE.Vector3 = new THREE.Vector3();
+  /** Last emitted discrete state, compared field-wise so no string is built. */
+  _prev: { state: PlayerState | null; stance: Movement['stance'] | null } & Required<
+    Pick<
+      PlayerEventsMap['player:state'],
+      'sprinting' | 'tacticalSprint' | 'sliding' | 'grounded' | 'ads' | 'mantling'
+    >
+  > = {
+    state: null,
+    stance: null,
+    sprinting: false,
+    tacticalSprint: false,
+    sliding: false,
+    grounded: true,
+    ads: false,
+    mantling: false,
+  };
+  _offEvents: Array<() => void> = [];
+
   constructor() {
-    /** Lets `ai` / `physics` recognise the local player from an owner pointer. */
-    this.isPlayer = true;
-    this.lowHealthPass = null;
-    this.hitbox = null;
-    this._nearMissShots = new Float64Array(64);
-    this._nearMissCursor = 0;
-
-    this.controlEnabled = true;
-    this.adsAmount = 0;
-    this._adsExternal = false;
-    this._adsExternalAge = 0;
-    this.adsRequested = false;
-
-    this._lookFrame = -1;
-    this._prevYaw = 0;
-
-    // Death camera. The local body is not rendered in first person, so death
-    // hands a corpse to `ai` and then cranes the world camera above it. All
-    // values are retained here so the one-off transition allocates nothing per
-    // frame.
-    this._death = {
-      active: false,
-      elapsed: 0,
-      duration: 3.2,
-      target: new THREE.Vector3(),
-      startPosition: new THREE.Vector3(),
-      endPosition: new THREE.Vector3(),
-      startQuaternion: new THREE.Quaternion(),
-      endQuaternion: new THREE.Quaternion(),
-      startFov: 0,
-      endFov: 54,
-    };
     // A Camera's lookAt uses -Z as forward; a plain Object3D uses +Z and would
     // make the final quaternion face exactly away from the corpse.
     this._deathLook = new THREE.PerspectiveCamera();
-    this._deathUp = new THREE.Vector3(0, 1, 0);
-
-    // preallocated event payloads
-    this._statePayload = {
-      stance: 'stand',
-      sprinting: false,
-      sliding: false,
-      ads: false,
-      state: 'stand',
-      grounded: true,
-      airborne: false,
-      mantling: false,
-      lean: 0,
-      speed: 0,
-      health: HEALTH.max,
-      healthFraction: 1,
-      crouched: false,
-    };
-    this._landPayload = { velocity: 0, surface: 'concrete', position: new THREE.Vector3() };
-    this._stepPayload = {
-      position: new THREE.Vector3(),
-      surface: 'concrete',
-      running: false,
-      left: false,
-      speed: 0,
-      stance: 'stand',
-    };
-    this._mantlePayload = { kind: 'none', height: 0 };
-    this._jumpPayload = { position: new THREE.Vector3() };
-    // Preallocated HUD snapshot polled by `ui` (see getHudState).
-    this._hudState = {
-      health: HEALTH.max,
-      maxHealth: HEALTH.max,
-      dead: false,
-      armour: 0,
-      maxArmour: HEALTH.maxArmour,
-      bandages: HEALING.startCount,
-      healing: false,
-      healProgress: 0,
-      hurt: 0,
-      pulse: 0,
-      move: 0,
-      sprint: false,
-      crouch: false,
-      ads: false,
-      airborne: false,
-      suppression: 0,
-      position: null,
-    };
-
-    this._tmp = new THREE.Vector3();
-    /** Last emitted discrete state, compared field-wise so no string is built. */
-    this._prev = {
-      state: null,
-      stance: null,
-      sprinting: false,
-      tacticalSprint: false,
-      sliding: false,
-      grounded: true,
-      ads: false,
-      mantling: false,
-    };
-    this._offEvents = [];
   }
 
   /* ==================================================================== */

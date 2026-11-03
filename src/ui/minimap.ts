@@ -136,26 +136,17 @@ function labelKind(spec: object): string | null {
 /** One-time authored terrain bake/data; PixiMinimap owns all live presentation. */
 export class Minimap {
   rng: Rng;
-  span: number;
-  viewSpan: number;
-  centre: THREE.Vector2;
-  baked: HTMLCanvasElement | null;
-  labels: MapLabel[];
-  bakeTries: number;
-  bakeDone: boolean;
-  _probe: THREE.Vector3;
+  span: number = 190; // metres covered by the bake
+  viewSpan: number = 60; // metres visible in the widget
+  centre: THREE.Vector2 = new THREE.Vector2(0, 0);
+  baked: HTMLCanvasElement | null = null;
+  labels: MapLabel[] = [];
+  bakeTries: number = 0;
+  bakeDone: boolean = false;
+  _probe: THREE.Vector3 = new THREE.Vector3();
+
   constructor(rng: Rng) {
     this.rng = rng;
-    this.span = 190; // metres covered by the bake
-    this.viewSpan = 60; // metres visible in the widget
-    this.centre = new THREE.Vector2(0, 0);
-
-    this.baked = null;
-    this.labels = [];
-    this.bakeTries = 0;
-    this.bakeDone = false;
-
-    this._probe = new THREE.Vector3();
   }
 
   /* --------------------------------------------------------------- bake --- */

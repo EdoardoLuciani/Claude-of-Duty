@@ -485,57 +485,7 @@ export async function packTgz(
 interface TelemetryEvent extends Record<string, unknown> {
   type: string;
 }
-type TelemetryMark = {
-  pose: {
-    feet: RecordedVector | null;
-    eye: RecordedVector | null;
-    forward: (number | null)[];
-    yaw: number | null;
-    pitch: number | null;
-    fov: number | null;
-    stance: 'stand' | 'crouch' | 'prone';
-    height: number | null;
-    radius: number | null;
-  };
-  aim: {
-    visual: {
-      mesh: string;
-      palette: {} | null;
-      instanceGroup: {} | null;
-      instanceIndex: number | null | undefined;
-      distance: number | null;
-      point: RecordedVector | null;
-      normal: (number | null)[] | null;
-    } | null;
-    physics: {
-      mesh: string | null;
-      surface: string;
-      distance: number | null;
-      point: RecordedVector | null;
-      normal: RecordedVector | null;
-    } | null;
-    gap: number | null;
-  };
-  fit: {
-    opening: { lintelY: number | null; openLowY: number | null };
-    stand?: { pass: boolean; distance: number | null; surface: string | null } | undefined;
-    crouch?: { pass: boolean; distance: number | null; surface: string | null } | undefined;
-    prone?: { pass: boolean; distance: number | null; surface: string | null } | undefined;
-  };
-  near: {
-    building: string | null;
-    buildingLook: string | null;
-    groundFeet: number | null;
-    groundHit: number | null;
-    instances: {
-      group: {};
-      index: number;
-      palette: {} | null;
-      distance: number | null;
-      position: (number | null)[];
-      bbox: { min: (number | null)[]; max: (number | null)[] };
-    }[];
-  };
+type TelemetryMark = MarkProbe & {
   t: number | null;
   raw: number | null;
   frame: number;

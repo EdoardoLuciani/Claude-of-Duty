@@ -168,20 +168,13 @@ export class MCXAnimation {
   frameQ!: THREE.Quaternion;
   inverseQ!: THREE.Quaternion;
   mixer!: THREE.AnimationMixer;
-  actions!: Record<string, THREE.AnimationAction>;
   magazine!: THREE.Object3D;
   spare!: THREE.Object3D;
   bolt!: THREE.Object3D;
   boltBone!: THREE.Object3D;
   private skeletons = new Set<THREE.Skeleton>();
   charging!: THREE.Object3D;
-  poseMatrix!: THREE.Matrix4;
   poseQ = new THREE.Quaternion();
-  partMatrix!: THREE.Matrix4;
-  target!: THREE.Vector3;
-  targetQ!: THREE.Quaternion;
-  magPoint!: THREE.Vector3;
-  chargePoint!: THREE.Vector3;
   magQ!: THREE.Quaternion;
   chargeQ!: THREE.Quaternion;
   idleTime = 0;
@@ -189,6 +182,15 @@ export class MCXAnimation {
   fireTime!: number;
   gesture!: string | null;
   gestureTime!: number;
+  actions: Record<string, THREE.AnimationAction> = {};
+  poseMatrix: THREE.Matrix4 = new THREE.Matrix4();
+  partMatrix: THREE.Matrix4 = new THREE.Matrix4();
+  target: THREE.Vector3 = new THREE.Vector3();
+  targetQ: THREE.Quaternion = new THREE.Quaternion();
+  // Fit-only contacts follow the revised magazine seat and OEM latch bow.
+  magPoint: THREE.Vector3 = new THREE.Vector3(-0.007, -0.16, -0.039);
+  chargePoint: THREE.Vector3 = new THREE.Vector3(-0.184, 0.02, -0.05);
+
   constructor(model: MCXModel, def: MCXDefinition) {
     this.model = model;
     this.def = def;
@@ -202,7 +204,6 @@ export class MCXAnimation {
     this.frameQ = this.frame.quaternion.clone();
     this.inverseQ = this.frameQ.clone().invert();
     this.mixer = new THREE.AnimationMixer(this.root);
-    this.actions = {};
     for (const source of model.animations) {
       // The single showcase casing must not replay under the gun on every
       // shot. Live fire emits independent .300 cases via the existing FX pool.
@@ -222,13 +223,6 @@ export class MCXAnimation {
     });
     this.charging = this.root.getObjectByName('charging_handle')!;
     this.root.getObjectByName('spent_case')!.visible = false;
-    this.poseMatrix = new THREE.Matrix4();
-    this.partMatrix = new THREE.Matrix4();
-    this.target = new THREE.Vector3();
-    this.targetQ = new THREE.Quaternion();
-    // Fit-only contacts follow the revised magazine seat and OEM latch bow.
-    this.magPoint = new THREE.Vector3(-0.007, -0.16, -0.039);
-    this.chargePoint = new THREE.Vector3(-0.184, 0.02, -0.05);
     this.magQ = handQuaternion([0.1, 0.72, -0.68], [-0.86, 0.34, -0.38]);
     this.chargeQ = handQuaternion([0.55, 0.2, 0.81], [-0.2, 0.94, -0.27]);
     this.reset();

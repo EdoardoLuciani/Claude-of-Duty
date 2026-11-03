@@ -138,9 +138,10 @@ export class M4Animation {
   poseMatrix!: THREE.Matrix4;
   idleTime = 0;
   name: string | null = null;
-  coverOpen!: boolean;
   wasOpen!: boolean;
   fireTime!: number;
+  coverOpen: boolean = false;
+
   constructor(model: M4Model) {
     this.model = model;
     this.root = model.root;
@@ -172,7 +173,6 @@ export class M4Animation {
     this.reviewCase = node('spent_case');
     this.hands = discoverAuthoredHands(node);
     this.poseMatrix = this.root.matrix;
-    this.coverOpen = false;
     this.reset();
   }
 

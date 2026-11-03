@@ -32,22 +32,22 @@ function isColorTextureNode(node: Node<'vec4'>): node is ColorTextureNode {
   );
 }
 export class HazeSystem {
-  declare enabled: boolean;
   declare scene: THREE.Scene;
   declare layer: InstanceType<typeof ParticleLayer>;
-  declare rt: THREE.RenderTarget | null;
-  declare size: THREE.Vector2;
   declare uStrength: ReturnType<typeof uniform<'vec2'>>;
   declare uActive: ReturnType<typeof uniform<'float'>>;
-  declare _warmCam: THREE.Camera | null;
   declare _camera: THREE.Camera | null | undefined;
   declare _live: boolean;
   declare distortTexNode: ReturnType<typeof uniformTexture>;
-  declare _warp: Node<'vec4'> | null;
-  declare _warpColor: ColorTextureNode | null;
+
+  enabled: boolean = true;
+  rt: THREE.RenderTarget | null = null;
+  size: THREE.Vector2 = new THREE.Vector2(1, 1);
+  _warmCam: THREE.Camera | null = null;
+  _warp: Node<'vec4'> | null = null;
+  _warpColor: ColorTextureNode | null = null;
 
   constructor(o: HazeOptions) {
-    this.enabled = true;
     this.scene = new THREE.Scene();
     this.scene.matrixAutoUpdate = false;
 
@@ -63,16 +63,11 @@ export class HazeSystem {
     this.scene.add(this.layer.mesh);
     this.layer.mesh.visible = true; // visibility is driven by instanceCount
 
-    this.rt = null;
-    this.size = new THREE.Vector2(1, 1);
     this.uStrength = uniform(new THREE.Vector2(0.013, 0));
     this.uActive = uniform(0);
-    this._warmCam = null;
 
     this.distortTexNode = uniformTexture(_placeholder());
     this.distortTexNode.name = 'fx-distort-sample';
-    this._warp = null;
-    this._warpColor = null;
   }
 
   /** Warm offset sprites in their actual target without drawing geometry. */

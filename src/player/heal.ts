@@ -62,25 +62,21 @@ interface HealHudState {
 
 export class HealController {
   declare player: HealPlayer;
-  declare bandages: number;
-  declare active: boolean;
-  declare progress: number;
-  declare elapsed: number;
-  declare _payload: HealPayload;
+
+  bandages: number = HEALING.startCount;
+  active: boolean = false;
+  progress: number = 0;
+  elapsed: number = 0;
+  _payload: HealPayload = {
+    phase: 'start',
+    amount: 0,
+    health: 0,
+    bandages: HEALING.startCount,
+    reason: '',
+  };
 
   constructor(player: HealPlayer) {
     this.player = player;
-    this.bandages = HEALING.startCount;
-    this.active = false;
-    this.progress = 0;
-    this.elapsed = 0;
-    this._payload = {
-      phase: 'start',
-      amount: 0,
-      health: 0,
-      bandages: HEALING.startCount,
-      reason: '',
-    };
   }
 
   reset(): void {

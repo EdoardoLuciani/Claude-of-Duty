@@ -68,16 +68,17 @@ class Emitter {
   distGain!: GainNode;
   sendGain!: GainNode;
   panner!: PannerNode;
-  free!: boolean;
-  endTime!: number;
-  priority!: number;
-  busName!: BusName;
-  attached!: AudioNode | null;
-  tracked!: boolean;
-  pos!: Point3;
-  _connected!: AudioNode | false;
-  _sendConnected!: AudioNode | false;
   userGain!: number;
+  free: boolean = true;
+  endTime: number = 0;
+  priority: number = 0;
+  busName: BusName = 'foley';
+  attached: AudioNode | null = null;
+  tracked: boolean = false;
+  pos: Point3 = { x: 0, y: 0, z: 0 };
+  _connected: AudioNode | false = false;
+  _sendConnected: AudioNode | false = false;
+
   constructor(actx: BaseAudioContext, mixer: Mixer) {
     this.actx = actx;
     this.mixer = mixer;
@@ -103,16 +104,6 @@ class Emitter {
     this.airLP.connect(this.distGain);
     this.distGain.connect(this.panner);
     this.distGain.connect(this.sendGain);
-
-    this.free = true;
-    this.endTime = 0;
-    this.priority = 0;
-    this.busName = 'foley';
-    this.attached = null;
-    this.tracked = false;
-    this.pos = { x: 0, y: 0, z: 0 };
-    this._connected = false;
-    this._sendConnected = false;
   }
 
   _setPos(x: number, y: number, z: number, when: number): void {
@@ -215,32 +206,30 @@ export class SpatialField {
   actx!: BaseAudioContext;
   mixer!: Mixer;
   ctx!: SpatialContext | null;
-  emitters!: Emitter[];
-  _lp!: Point3;
-  _occOrigin!: Point3;
-  _occDir!: Point3;
-  _trackCursor!: number;
-  stats!: { active: number; stolen: number; dropped: number; occlusionRays: number };
-  occlusionEnabled!: boolean;
   /**
    * @param {BaseAudioContext} actx
    * @param {import('./mixer.ts').Mixer} mixer
    * @param {object} ctx engine context (for physics raycasts); may be null
    */
+  emitters: Emitter[] = [];
+  // Preallocated scratch — update() must never allocate.
+  _lp: Point3 = { x: 0, y: 1.6, z: 0 };
+  _occOrigin: Point3 = { x: 0, y: 0, z: 0 };
+  _occDir: Point3 = { x: 0, y: 0, z: 0 };
+  _trackCursor: number = 0;
+  stats: { active: number; stolen: number; dropped: number; occlusionRays: number } = {
+    active: 0,
+    stolen: 0,
+    dropped: 0,
+    occlusionRays: 0,
+  };
+  occlusionEnabled: boolean = true;
+
   constructor(actx: BaseAudioContext, mixer: Mixer, ctx: SpatialContext | null) {
     this.actx = actx;
     this.mixer = mixer;
     this.ctx = ctx;
-    this.emitters = [];
     for (let i = 0; i < MAX_EMITTERS; i++) this.emitters.push(new Emitter(actx, mixer));
-
-    // Preallocated scratch — update() must never allocate.
-    this._lp = { x: 0, y: 1.6, z: 0 };
-    this._occOrigin = { x: 0, y: 0, z: 0 };
-    this._occDir = { x: 0, y: 0, z: 0 };
-    this._trackCursor = 0;
-    this.stats = { active: 0, stolen: 0, dropped: 0, occlusionRays: 0 };
-    this.occlusionEnabled = true;
   }
 
   /** Feed the AudioListener from the render camera. Called once per frame. */
