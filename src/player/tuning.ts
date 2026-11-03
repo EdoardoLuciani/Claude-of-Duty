@@ -281,8 +281,6 @@ export const CAMERA = {
     moveTau: 0.13,
   },
 
-  /** Camera never gets closer than this to a wall when leaning/mantling. */
-  wallPad: 0.09,
   pitchLimit: 88 * DEG,
 } as const;
 

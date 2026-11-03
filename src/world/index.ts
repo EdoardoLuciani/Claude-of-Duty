@@ -68,7 +68,6 @@ export class WorldSystem {
   declare _xform: THREE.Matrix4;
   declare _inv: THREE.Matrix4;
   declare buildings: WorldManifest['buildings'];
-  declare volumes: NonNullable<WorldManifest['volumes']>;
   declare spawnPoints: Array<{ position: THREE.Vector3; yaw: number; tag: string }>;
   declare bounds: THREE.Box3;
   declare stats: WorldManifest['stats'];
@@ -108,7 +107,6 @@ export class WorldSystem {
     this._xform = new THREE.Matrix4().fromArray(meta.transform);
     this._inv = this._xform.clone().invert();
     this.buildings = meta.buildings;
-    this.volumes = meta.volumes ?? [];
     this.spawnPoints = meta.spawns.map(
       (spawn): { position: THREE.Vector3; yaw: number; tag: string } => ({
         position: new THREE.Vector3().fromArray(spawn.position),
