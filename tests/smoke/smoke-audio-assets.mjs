@@ -5,8 +5,8 @@ import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import { WEAPON_PROFILES } from '../../src/audio/weapons.ts';
 import { AUDIO_BANKS } from '../lib/audio-banks.mjs';
 
-const total = 39 + AUDIO_BANKS.reduce((n, bank) => n + bank[3], 0);
-const failedUrls = ['smg-1', ...AUDIO_BANKS.map(([, banks]) => Object.values(banks)[0][0])];
+const total = 39 + AUDIO_BANKS.reduce((n, [, count]) => n + count, 0);
+const failedUrls = ['smg-1', ...AUDIO_BANKS.map(([banks]) => Object.values(banks)[0][0])];
 const fetch = globalThis.fetch;
 try {
   for (const failure of [null, ...failedUrls, 'decode']) {
