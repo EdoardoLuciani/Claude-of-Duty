@@ -219,117 +219,79 @@ function actorVoice(actor: unknown): number {
 }
 
 export class AudioSystem {
-  declare running: boolean;
-  declare failed: boolean;
-  declare actx: AudioContext | null;
-  declare mixer: Mixer | null;
-  declare field: SpatialField | null;
-  declare ambience: Ambience | null;
-  declare bank: NoiseBank | null;
-  declare samples: WeaponSampleBank | null;
   declare tentRadio: TentRadio | null;
-  declare _starting: Promise<boolean> | null;
-  declare deafness: number;
   declare ctx: AudioRuntimeContext;
   declare rng: Rng;
-  declare _probeDirs: Vec3Like[];
-  declare _probeHits: Float64Array;
-  declare _space: SpaceMetrics;
-  declare _probeTimer: number;
-  declare _lastProbe: Vec3Like;
-  declare _origin: Vec3Like;
-  declare _whizzShots: Float64Array;
-  declare _whizzCursor: number;
-  declare _dry: DryVoice[];
-  declare _dryCursor: number;
-  declare _intelOperating: boolean;
-  declare _intelAlarm: ReturnType<typeof intelSiren> | null;
-  declare _budget: AudioBudget;
-  declare _lastBarkTime: number;
-  declare _lastReactionEnd: number;
-  declare _callouts: CalloutPlayer | null;
-  declare _calloutBlocks: number;
-  declare _stance: string | null;
-  declare _ads: boolean;
-  declare stats: AudioStats;
-  declare _offs: Array<() => void>;
-  declare _gestureHandler: (() => void) | null;
-  declare _ambienceApi: AmbienceApi | null;
-  declare _aircraft: Set<AircraftVoice>;
 
   static readonly id = 'audio';
   static readonly deps: SystemId[] = [];
 
-  constructor() {
-    this.running = false;
-    this.failed = false;
-    this.actx = null;
-    this.mixer = null;
-    this.field = null;
-    this.ambience = null;
-    this.bank = null;
-    this.samples = null;
-    this._starting = null;
-    this.deafness = 0;
+  running: boolean = false;
+  failed: boolean = false;
+  actx: AudioContext | null = null;
+  mixer: Mixer | null = null;
+  field: SpatialField | null = null;
+  ambience: Ambience | null = null;
+  bank: NoiseBank | null = null;
+  samples: WeaponSampleBank | null = null;
+  _starting: Promise<boolean> | null = null;
+  deafness: number = 0;
+  /* preallocated scratch — update() allocates nothing */
+  _probeDirs: Vec3Like[] = [];
+  _probeHits: Float64Array = new Float64Array(PROBE_RAYS);
+  _space: SpaceMetrics = {
+    tight: 0,
+    room: 0,
+    street: 0.35,
+    tunnel: 0,
+    open: 0.65,
+    enclosure: 0,
+    meanFree: PROBE_DIST,
+    ceiling: PROBE_DIST,
+  };
+  _probeTimer: number = 0;
+  _lastProbe: Vec3Like = { x: 1e9, y: 0, z: 0 };
+  _origin: Vec3Like = { x: 0, y: 0, z: 0 };
+  _whizzShots: Float64Array = new Float64Array(64);
+  _whizzCursor: number = 0;
+  /* dry (head-locked) voice bookkeeping */
+  _dry: DryVoice[] = [];
+  _dryCursor: number = 0;
+  _intelOperating: boolean = false;
+  _intelAlarm: ReturnType<typeof intelSiren> | null = null;
+  /* per-frame rate limits */
+  _budget: AudioBudget = { impact: 0, step: 0, aiStep: 0, shell: 0, whizz: 0 };
+  _lastBarkTime: number = -99;
+  _lastReactionEnd: number = -99;
+  _callouts: CalloutPlayer | null = null;
+  _calloutBlocks: number = 0;
+  _stance: string | null = null;
+  _ads: boolean = false;
+  stats: AudioStats = {
+    voices: 0,
+    dropped: 0,
+    stolen: 0,
+    rays: 0,
+    deafness: 0,
+    space: 'open',
+    started: false,
+    contextState: 'none',
+    events: 0,
+    errors: 0,
+  };
+  _offs: Array<() => void> = [];
+  _gestureHandler: (() => void) | null = null;
+  _ambienceApi: AmbienceApi | null = null;
+  _aircraft: Set<AircraftVoice> = new Set();
 
-    /* preallocated scratch — update() allocates nothing */
-    this._probeDirs = [];
+  constructor() {
     for (let i = 0; i < PROBE_RAYS - 1; i++) {
       const a = (i / (PROBE_RAYS - 1)) * Math.PI * 2;
       this._probeDirs.push({ x: Math.cos(a), y: 0.06, z: Math.sin(a) });
     }
     this._probeDirs.push({ x: 0, y: 1, z: 0 });
-    this._probeHits = new Float64Array(PROBE_RAYS);
-    this._space = {
-      tight: 0,
-      room: 0,
-      street: 0.35,
-      tunnel: 0,
-      open: 0.65,
-      enclosure: 0,
-      meanFree: PROBE_DIST,
-      ceiling: PROBE_DIST,
-    };
-    this._probeTimer = 0;
-    this._lastProbe = { x: 1e9, y: 0, z: 0 };
-    this._origin = { x: 0, y: 0, z: 0 };
-    this._whizzShots = new Float64Array(64);
-    this._whizzCursor = 0;
 
-    /* dry (head-locked) voice bookkeeping */
-    this._dry = [];
     for (let i = 0; i < DRY_SLOTS; i++) this._dry.push({ node: null, send: null, end: 0 });
-    this._dryCursor = 0;
-    this._intelOperating = false;
-    this._intelAlarm = null;
-
-    /* per-frame rate limits */
-    this._budget = { impact: 0, step: 0, aiStep: 0, shell: 0, whizz: 0 };
-    this._lastBarkTime = -99;
-    this._lastReactionEnd = -99;
-    this._callouts = null;
-    this._calloutBlocks = 0;
-
-    this._stance = null;
-    this._ads = false;
-
-    this.stats = {
-      voices: 0,
-      dropped: 0,
-      stolen: 0,
-      rays: 0,
-      deafness: 0,
-      space: 'open',
-      started: false,
-      contextState: 'none',
-      events: 0,
-      errors: 0,
-    };
-
-    this._offs = [];
-    this._gestureHandler = null;
-    this._ambienceApi = null;
-    this._aircraft = new Set();
   }
 
   /* ================================================================ */

@@ -118,40 +118,7 @@ export const SP = {
   flags: 0,
 };
 
-export function resetSpawn(): {
-  x: number;
-  y: number;
-  z: number;
-  vx: number;
-  vy: number;
-  vz: number;
-  size0: number;
-  size1: number;
-  sizeCurve: number;
-  life: number;
-  delay: number;
-  drag: number;
-  gravity: number;
-  rot: number;
-  spin: number;
-  stretch: number;
-  r0: number;
-  g0: number;
-  b0: number;
-  i0: number;
-  r1: number;
-  g1: number;
-  b1: number;
-  i1: number;
-  tile: number;
-  soft: number;
-  alpha: number;
-  alphaCurve: number;
-  turb: number;
-  turbFreq: number;
-  seed: number;
-  flags: number;
-} {
+export function resetSpawn(): typeof SP {
   const s = SP;
   s.x = s.y = s.z = 0;
   s.vx = s.vy = s.vz = 0;
@@ -178,6 +145,23 @@ export function resetSpawn(): {
   s.seed = 0;
   s.flags = 0;
   return s;
+}
+
+export function setSpawnColorRamp(
+  s: typeof SP,
+  r0: number,
+  g0: number,
+  b0: number,
+  r1: number,
+  g1: number,
+  b1: number
+): void {
+  s.r0 = r0;
+  s.g0 = g0;
+  s.b0 = b0;
+  s.r1 = r1;
+  s.g1 = g1;
+  s.b1 = b1;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -495,19 +479,12 @@ function buildParticleMaterial(o: ParticleOptions): {
 export class ParticleLayer {
   declare capacity: number;
   declare mode: ParticleOptions['mode'];
-  declare cursor: number;
-  declare highWater: number;
-  declare expireAt: number;
-  declare spawned: number;
   declare array: Float32Array;
   declare ibuf: THREE.InstancedInterleavedBuffer;
   declare geometry: THREE.InstancedBufferGeometry;
   declare material: MeshBasicNodeMaterial;
   declare uniforms: ReturnType<typeof buildParticleMaterial>['uniforms'];
   declare mesh: THREE.Mesh;
-  declare _dirtyLo: number;
-  declare _dirtyHi: number;
-  declare _wrapped: boolean;
   /**
    * @param {object} o
    * @param {number} o.capacity     hard cap, from config.q.particleBudget
@@ -516,13 +493,17 @@ export class ParticleLayer {
    * @param {number} o.cols         atlas columns
    * @param {number} [o.renderOrder]
    */
+  cursor: number = 0;
+  highWater: number = 0;
+  expireAt: number = -1;
+  spawned: number = 0;
+  _dirtyLo: number = Infinity;
+  _dirtyHi: number = -Infinity;
+  _wrapped: boolean = false;
+
   constructor(o: ParticleOptions) {
     this.capacity = Math.max(16, o.capacity | 0);
     this.mode = o.mode;
-    this.cursor = 0;
-    this.highWater = 0;
-    this.expireAt = -1;
-    this.spawned = 0;
 
     this.array = new Float32Array(this.capacity * STRIDE);
     this.ibuf = new THREE.InstancedInterleavedBuffer(this.array, STRIDE, 1);
@@ -566,10 +547,6 @@ export class ParticleLayer {
     // heuristic from counting our sprites as geometry.
     this.mesh.userData.owProbe = true;
     this.mesh.castShadow = false;
-
-    this._dirtyLo = Infinity;
-    this._dirtyHi = -Infinity;
-    this._wrapped = false;
   }
 
   /** True while anything might still be alive. */

@@ -428,9 +428,9 @@ assert.ok(live.canStand(w5.from) && entry.probeGround(), 'W5 starts supported an
 map.physics.removeCharacter(entry);
 assert.equal(
   map.meta.navigation.sha256,
-  // Authoring relocation and the release exporter label refresh provenance only.
+  // Runtime initialization cleanup refreshes source provenance only.
   // The physical payload hash below verifies unchanged topology and cover.
-  'd1cb9801425a5e4c1cbbbd7e9335f53538cff657eed995e8e7cb0645a47b8bd8',
+  '2e089a242e80d130a4104da69b5de0fb99c3839c9790f3a45a666a57625c1df2',
   're-measure recorded fixture outcomes after changing baked assets'
 );
 const physicalPayload = map.surfaceRaw.subarray(64 + map.surfaceRaw.readUInt32LE(8));

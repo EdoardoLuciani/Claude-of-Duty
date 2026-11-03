@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 import type { EngineSystems } from '../core/context.ts';
 import { P } from './atlas.ts';
-import { resetSpawn } from './particles.ts';
+import { resetSpawn, setSpawnColorRamp } from './particles.ts';
 import { V, cone } from './util.ts';
 
 /**
@@ -24,38 +24,21 @@ const TWO_PI = Math.PI * 2;
 const MAX_EMITTERS = 24;
 
 class Emitter {
-  active: boolean;
-  age: number;
-  duration: number;
-  acc: number;
-  rate: number;
-  x: number;
-  y: number;
-  z: number;
-  radius: number;
-  rise: number;
-  dark: number;
-  life: number;
-  growth: number;
-  ember: number;
-  haze: number;
-  constructor() {
-    this.active = false;
-    this.age = 0;
-    this.duration = Infinity;
-    this.acc = 0;
-    this.rate = 6;
-    this.x = 0;
-    this.y = 0;
-    this.z = 0;
-    this.radius = 0.25;
-    this.rise = 1.2;
-    this.dark = 0.16;
-    this.life = 2.6;
-    this.growth = 3;
-    this.ember = 0;
-    this.haze = 0;
-  }
+  active: boolean = false;
+  age: number = 0;
+  duration: number = Infinity;
+  acc: number = 0;
+  rate: number = 6;
+  x: number = 0;
+  y: number = 0;
+  z: number = 0;
+  radius: number = 0.25;
+  rise: number = 1.2;
+  dark: number = 0.16;
+  life: number = 2.6;
+  growth: number = 3;
+  ember: number = 0;
+  haze: number = 0;
 }
 
 /** Column controls exclude pooled position, lifetime bookkeeping and activation state. */
@@ -91,34 +74,27 @@ interface FxApi {
 
 export class Ambience {
   fx: FxApi;
-  emitters: Emitter[];
   moteCount: number;
-  moteLife: number;
-  moteAcc: number;
   moteBox: number;
   moteEnabled: boolean;
-  sunFactor: number;
-  shimmerAcc: number;
   shimmerEnabled: boolean;
-  _fwd: THREE.Vector3;
-  _warm: number;
+  emitters: Emitter[] = [];
+  moteLife: number = 9;
+  moteAcc: number = 0;
+  sunFactor: number = 1;
+  shimmerAcc: number = 0;
+  _fwd: THREE.Vector3 = new THREE.Vector3();
+  _warm: number = 0;
+
   constructor(fx: FxApi, opts: AmbienceOptions = {}) {
     this.fx = fx;
-    this.emitters = [];
     for (let i = 0; i < MAX_EMITTERS; i++) this.emitters.push(new Emitter());
 
     this.moteCount = opts.motes ?? 240;
-    this.moteLife = 9;
-    this.moteAcc = 0;
     this.moteBox = opts.box ?? 22;
     this.moteEnabled = this.moteCount > 0;
-    this.sunFactor = 1;
 
-    this.shimmerAcc = 0;
     this.shimmerEnabled = opts.shimmer !== false;
-
-    this._fwd = new THREE.Vector3();
-    this._warm = 0;
   }
 
   /* --------------------------------------------------------------------- */
@@ -177,12 +153,7 @@ export class Ambience {
     s.rot = rng.float() * TWO_PI;
     s.spin = rng.signed() * 0.35;
     const d = e.dark;
-    s.r0 = d;
-    s.g0 = d * 0.97;
-    s.b0 = d * 0.94;
-    s.r1 = d * 1.9;
-    s.g1 = d * 1.86;
-    s.b1 = d * 1.8;
+    setSpawnColorRamp(s, d, d * 0.97, d * 0.94, d * 1.9, d * 1.86, d * 1.8);
     s.alpha = rng.range(0.3, 0.55);
     s.alphaCurve = 1.7;
     s.soft = 0.8;
@@ -205,13 +176,8 @@ export class Ambience {
       t.life = rng.range(0.8, 1.9);
       t.drag = 0.9;
       t.gravity = 1.2;
-      t.r0 = 1;
-      t.g0 = 0.5;
-      t.b0 = 0.16;
+      setSpawnColorRamp(t, 1, 0.5, 0.16, 0.9, 0.14, 0.02);
       t.i0 = rng.range(3, 9);
-      t.r1 = 0.9;
-      t.g1 = 0.14;
-      t.b1 = 0.02;
       t.i1 = 0.1;
       t.flags = 1;
       t.alphaCurve = 1.2;
@@ -271,13 +237,8 @@ export class Ambience {
       s.drag = 0.22;
       s.gravity = -0.02;
       const b = bright * rng.range(0.35, 1.5);
-      s.r0 = 1;
-      s.g0 = 0.96;
-      s.b0 = 0.9;
+      setSpawnColorRamp(s, 1, 0.96, 0.9, 1, 0.94, 0.88);
       s.i0 = b;
-      s.r1 = 1;
-      s.g1 = 0.94;
-      s.b1 = 0.88;
       s.i1 = b * 0.6;
       s.alpha = rng.range(0.25, 0.7);
       s.alphaCurve = 1.1;

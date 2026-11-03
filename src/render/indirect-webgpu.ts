@@ -111,18 +111,19 @@ export class IndirectFill {
   declare viewVisibility: NodeValue<'float', number>;
   declare roomXf: NodeValue<'vec4', Vector4>;
   declare roomCount: NodeValue<'int', number>;
-  declare rooms: Vector4[];
-  declare roomsY: Vector4[];
   declare roomBoxes: UniformVec4Array;
   declare roomHeights: UniformVec4Array;
   declare roomGroup: ReturnType<typeof sharedUniformGroup>;
-  declare _hue: Vector3;
-  declare _ground: Vector3;
-  declare _tmp: Vector3;
-  declare _tmp2: Vector3;
-  declare _patched: WeakSet<MeshStandardNodeMaterial>;
   declare _roomsReady: boolean;
   declare roomGate: (worldPos: Node<'vec3'>, ao: Node<'float'>) => Node<'float'>;
+
+  rooms: Vector4[] = Array.from({ length: MAX_ROOMS }, (): Vector4 => new Vector4());
+  roomsY: Vector4[] = Array.from({ length: MAX_ROOMS }, (): Vector4 => new Vector4());
+  _hue: Vector3 = new Vector3();
+  _ground: Vector3 = new Vector3();
+  _tmp: Vector3 = new Vector3();
+  _tmp2: Vector3 = new Vector3();
+  _patched: WeakSet<MeshStandardNodeMaterial> = new WeakSet();
 
   constructor(ctx: IndirectContext) {
     this.ctx = ctx;
@@ -137,8 +138,6 @@ export class IndirectFill {
     this.viewVisibility = uniform(1).setGroup(renderGroup);
     this.roomXf = uniform(new Vector4(1, 0, 0, 0));
     this.roomCount = uniform(0, 'int');
-    this.rooms = Array.from({ length: MAX_ROOMS }, (): Vector4 => new Vector4());
-    this.roomsY = Array.from({ length: MAX_ROOMS }, (): Vector4 => new Vector4());
     this.roomBoxes = uniformArray<'vec4'>(this.rooms, 'vec4');
     this.roomHeights = uniformArray<'vec4'>(this.roomsY, 'vec4');
     // Node updateType stops CPU packing; a shared immutable binding group also
@@ -148,11 +147,6 @@ export class IndirectFill {
     this.roomHeights.setGroup(this.roomGroup);
     this.roomBoxes.updateType = 'none';
     this.roomHeights.updateType = 'none';
-    this._hue = new Vector3();
-    this._ground = new Vector3();
-    this._tmp = new Vector3();
-    this._tmp2 = new Vector3();
-    this._patched = new WeakSet();
     this.roomGate = Fn<[Node<'vec3'>, Node<'float'>], Node<'float'>>(
       ([worldPos, ao]): Node<'float'> => {
         const lx = worldPos.x

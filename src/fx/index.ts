@@ -13,7 +13,13 @@ import { HazeSystem } from './haze.ts';
 import { spawnImpact, spawnExit, spawnIntelSparks } from './impacts.ts';
 import { LightPool } from './lights.ts';
 import { muzzleFlash } from './muzzle.ts';
-import { ParticleLayer, resetSpawn, disposeQuadSource, SP } from './particles.ts';
+import {
+  ParticleLayer,
+  resetSpawn,
+  disposeQuadSource,
+  SP,
+  setSpawnColorRamp,
+} from './particles.ts';
 import { ShellSystem, loadSpentHullGeometry, type ShellOptions } from './shells.ts';
 import { spawnTracer } from './tracers.ts';
 import { V, cone } from './util.ts';
@@ -770,12 +776,7 @@ export class FxSystem {
       s.drag = 5;
       s.gravity = -3.5;
       s.rot = rng.float() * 6.283;
-      s.r0 = 0.3;
-      s.g0 = 0.03;
-      s.b0 = 0.026;
-      s.r1 = 0.15;
-      s.g1 = 0.015;
-      s.b1 = 0.013;
+      setSpawnColorRamp(s, 0.3, 0.03, 0.026, 0.15, 0.015, 0.013);
       s.alpha = rng.range(0.4, 0.75);
       s.alphaCurve = 1.5;
       s.soft = 0.2;
@@ -833,12 +834,7 @@ export class FxSystem {
       s.gravity = -0.6;
       s.rot = rng.float() * 6.283;
       s.spin = rng.signed() * 1.2;
-      s.r0 = 0.48;
-      s.g0 = 0.44;
-      s.b0 = 0.39;
-      s.r1 = 0.4;
-      s.g1 = 0.37;
-      s.b1 = 0.33;
+      setSpawnColorRamp(s, 0.48, 0.44, 0.39, 0.4, 0.37, 0.33);
       s.alpha = rng.range(0.25, 0.5) * strength;
       s.alphaCurve = 1.6;
       s.soft = 0.3;
@@ -869,12 +865,7 @@ export class FxSystem {
     s.drag = 3.4;
     s.gravity = -0.5;
     s.rot = rng.float() * 6.283;
-    s.r0 = 0.46;
-    s.g0 = 0.42;
-    s.b0 = 0.37;
-    s.r1 = 0.4;
-    s.g1 = 0.36;
-    s.b1 = 0.32;
+    setSpawnColorRamp(s, 0.46, 0.42, 0.37, 0.4, 0.36, 0.32);
     s.alpha = rng.range(0.1, 0.22);
     s.alphaCurve = 1.7;
     s.soft = 0.25;

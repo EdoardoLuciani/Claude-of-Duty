@@ -32,21 +32,30 @@ export class Engine {
   camera: THREE.PerspectiveCamera;
   viewScene: THREE.Scene;
   viewCamera: THREE.PerspectiveCamera;
-  time: EngineTime;
   ctx: EngineContext;
-  _accum: number;
-  _last: number;
-  _running: boolean;
   private _gameplaySuspended = false;
   /** One-shot rendered-frame boundary; graph warmup never calls step(). */
   onFirstRender: (() => void) | null = null;
-  error: EngineError | null;
   _onResize: () => void;
   _loop = (now: number): void => {
     if (!this._running) return;
     requestAnimationFrame(this._loop);
     this.step(now);
   };
+
+  time: EngineTime = {
+    /** Seconds since start, scaled. */ elapsed: 0,
+    /** Unscaled wall-clock seconds since start. */ raw: 0,
+    /** Last frame delta, scaled and clamped. */ dt: 0,
+    /** Fixed step. */ fixed: FIXED_DT,
+    /** Interpolation alpha between the last two physics steps, 0..1. */ alpha: 0,
+    scale: 1,
+    frame: 0,
+  };
+  _accum: number = 0;
+  _last: number = 0;
+  _running: boolean = false;
+  error: EngineError | null = null; // Fatal simulation failure; only reloading may clear it.
 
   constructor({ canvas, config }: { canvas: HTMLCanvasElement; config: RuntimeConfig }) {
     this.canvas = canvas;
@@ -65,16 +74,6 @@ export class Engine {
     this.viewScene = new THREE.Scene();
     this.viewCamera = new THREE.PerspectiveCamera(60, 1, 0.005, 12);
 
-    this.time = {
-      /** Seconds since start, scaled. */ elapsed: 0,
-      /** Unscaled wall-clock seconds since start. */ raw: 0,
-      /** Last frame delta, scaled and clamped. */ dt: 0,
-      /** Fixed step. */ fixed: FIXED_DT,
-      /** Interpolation alpha between the last two physics steps, 0..1. */ alpha: 0,
-      scale: 1,
-      frame: 0,
-    };
-
     this.ctx = {
       engine: this,
       scene: this.scene,
@@ -92,10 +91,6 @@ export class Engine {
       has: (id: SystemId): boolean => this.registry.has(id),
     };
 
-    this._accum = 0;
-    this._last = 0;
-    this._running = false;
-    this.error = null; // Fatal simulation failure; only reloading may clear it.
     this._onResize = (): void => this.resize();
   }
 

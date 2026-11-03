@@ -99,88 +99,50 @@ interface ContactBuffer {
 }
 
 export class StaticWorld {
-  declare objects: Array<StaticObject | null>;
-  declare _freeIds: number[];
-  declare triCount: number;
-  declare pos: Float32Array;
-  declare nrm: Float32Array;
-  declare surface: Uint8Array;
-  declare mask: Uint16Array;
-  declare object: Int32Array;
-  declare solid: Int32Array;
-  declare triIndex: Uint32Array;
-  declare nodeBounds: Float32Array;
-  declare nodeMeta: Int32Array;
-  declare nodeCount: number;
-  declare maxDepth: number;
-  declare dirty: boolean;
-  declare buildMs: number;
-  declare version: number;
-  declare _cent: Float32Array;
-  declare _taabb: Float32Array;
-  declare _stackNode: Int32Array;
-  declare _stackT: Float32Array;
-  declare _buildStack: Int32Array;
-  declare _cl: ReturnType<typeof makeClosest>;
-  declare _cl2: ReturnType<typeof makeClosest>;
-  declare _cand: Int32Array;
-  declare _candCount: number;
-  declare contacts: ContactBuffer;
-  declare aabb: WorldAabb;
-  declare stats: WorldStats;
-
-  constructor() {
-    this.objects = []; // { id, name, mesh, surface, mask, tris, triCount, alive, aabb }
-    this._freeIds = [];
-
-    this.triCount = 0;
-    this.pos = new Float32Array(0);
-    this.nrm = new Float32Array(0);
-    this.surface = new Uint8Array(0);
-    this.mask = new Uint16Array(0);
-    this.object = new Int32Array(0);
-    this.solid = new Int32Array(0);
-
-    this.triIndex = new Uint32Array(0);
-    this.nodeBounds = new Float32Array(0);
-    this.nodeMeta = new Int32Array(0);
-    this.nodeCount = 0;
-    this.maxDepth = 0;
-
-    this.dirty = false;
-    this.buildMs = 0;
-    this.version = 0;
-
-    // scratch
-    this._cent = new Float32Array(0);
-    this._taabb = new Float32Array(0);
-    this._stackNode = new Int32Array(128);
-    this._stackT = new Float32Array(128);
-    this._buildStack = new Int32Array(3 * 4096);
-    this._cl = makeClosest();
-    this._cl2 = makeClosest();
-    this._cand = new Int32Array(4096);
-    this._candCount = 0;
-
-    // shared contact buffer for overlap queries
-    this.contacts = {
-      count: 0,
-      capacity: 256,
-      nx: new Float32Array(256),
-      ny: new Float32Array(256),
-      nz: new Float32Array(256),
-      px: new Float32Array(256),
-      py: new Float32Array(256),
-      pz: new Float32Array(256),
-      depth: new Float32Array(256),
-      /** Parameter along the query segment where the contact sits, 0..1. */
-      s: new Float32Array(256),
-      tri: new Int32Array(256),
-    };
-
-    this.aabb = { minx: 0, miny: 0, minz: 0, maxx: 0, maxy: 0, maxz: 0 };
-    this.stats = { rayTests: 0, nodeTests: 0, triTests: 0 };
-  }
+  objects: Array<StaticObject | null> = []; // { id, name, mesh, surface, mask, tris, triCount, alive, aabb }
+  _freeIds: number[] = [];
+  triCount: number = 0;
+  pos: Float32Array = new Float32Array(0);
+  nrm: Float32Array = new Float32Array(0);
+  surface: Uint8Array = new Uint8Array(0);
+  mask: Uint16Array = new Uint16Array(0);
+  object: Int32Array = new Int32Array(0);
+  solid: Int32Array = new Int32Array(0);
+  triIndex: Uint32Array = new Uint32Array(0);
+  nodeBounds: Float32Array = new Float32Array(0);
+  nodeMeta: Int32Array = new Int32Array(0);
+  nodeCount: number = 0;
+  maxDepth: number = 0;
+  dirty: boolean = false;
+  buildMs: number = 0;
+  version: number = 0;
+  // scratch
+  _cent: Float32Array = new Float32Array(0);
+  _taabb: Float32Array = new Float32Array(0);
+  _stackNode: Int32Array = new Int32Array(128);
+  _stackT: Float32Array = new Float32Array(128);
+  _buildStack: Int32Array = new Int32Array(3 * 4096);
+  _cl: ReturnType<typeof makeClosest> = makeClosest();
+  _cl2: ReturnType<typeof makeClosest> = makeClosest();
+  _cand: Int32Array = new Int32Array(4096);
+  _candCount: number = 0;
+  // shared contact buffer for overlap queries
+  contacts: ContactBuffer = {
+    count: 0,
+    capacity: 256,
+    nx: new Float32Array(256),
+    ny: new Float32Array(256),
+    nz: new Float32Array(256),
+    px: new Float32Array(256),
+    py: new Float32Array(256),
+    pz: new Float32Array(256),
+    depth: new Float32Array(256),
+    /** Parameter along the query segment where the contact sits, 0..1. */
+    s: new Float32Array(256),
+    tri: new Int32Array(256),
+  };
+  aabb: WorldAabb = { minx: 0, miny: 0, minz: 0, maxx: 0, maxy: 0, maxz: 0 };
+  stats: WorldStats = { rayTests: 0, nodeTests: 0, triTests: 0 };
 
   /* ---------------------------------------------------------------- */
   /* Registration                                                      */

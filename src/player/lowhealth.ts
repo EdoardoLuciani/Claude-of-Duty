@@ -24,13 +24,12 @@ interface HealthEffect {
 }
 /** Low-health treatment in linear HDR, before exposure and tone mapping. */
 export class LowHealthPass {
-  name: string;
-  order: number;
   state: UniformNode<'vec3', Vector3>;
   aspect: UniformNode<'vec2', Vector2>;
+  name: string = 'player:lowhealth';
+  order: number = 40;
+
   constructor() {
-    this.name = 'player:lowhealth';
-    this.order = 40;
     this.state = uniform(new Vector3());
     this.aspect = uniform(new Vector2(1, 1));
   }

@@ -81,66 +81,102 @@ type MovementPhysics = Pick<
 export class Movement {
   declare ctx: MovementContext;
   declare player: unknown;
-  declare physics: MovementPhysics | null;
-  declare character: CharacterController | null;
-  declare probe: LedgeProbe | null;
-  declare mantleMotion: MantleMotion;
-  declare climbMotion: ClimbMotion;
-  declare state: PlayerMoveState;
-  declare prevState: PlayerMoveState;
-  declare stateTime: number;
-  declare stance: PlayerStance;
-  declare stanceWant: PlayerStance;
-  declare sprinting: boolean;
-  declare tacticalSprint: boolean;
-  declare sliding: boolean;
-  declare grounded: boolean;
-  declare wasGrounded: boolean;
-  declare airTime: number;
-  declare speed: number;
-  declare horizontalSpeed: number;
-  declare blocked: boolean;
-  declare yaw: number;
-  declare pitch: number;
-  declare yawRate: number;
-  declare adsAmount: number;
-  declare controlEnabled: boolean;
-  declare leanAmount: number;
-  declare leanAllowed: number;
-  declare leanOffsetX: number;
-  declare leanOffsetZ: number;
-  declare _leanProbeTimer: number;
-  declare _coyote: number;
-  declare _jumpBuffer: number;
-  declare _jumpCooldown: number;
-  declare _sprintHoldTime: number;
-  declare _lastSprintPress: number;
-  declare _tacSprintTime: number;
-  declare _tacSprintLock: number;
-  declare _slideTime: number;
-  declare _slideCooldown: number;
-  declare _slideSide: number;
-  declare _mantleCooldown: number;
-  declare _climbCooldown: number;
-  declare _ledgeProbeTimer: number;
-  declare _stepDistance: number;
-  declare _bobPhase: number;
-  declare _footLeft: boolean;
-  declare _footHold: number;
-  declare _tacSprintRequested: boolean;
-  declare _edgeFrame: number;
-  declare jumped: boolean;
-  declare slideStarted: boolean;
-  declare slideEnded: boolean;
-  declare cmd: MovementInput;
-  declare _cmdFrame: number;
-  declare _prevHeld: HeldInput;
-  declare prevPosition: THREE.Vector3;
-  declare position: THREE.Vector3;
-  declare velocity: THREE.Vector3;
-  declare renderPosition: THREE.Vector3;
-  declare landEvent: { pending: boolean; speed: number; surface: SurfaceName };
-  declare stepEvent: {
+
+  physics: MovementPhysics | null = null;
+  character: CharacterController | null = null;
+  probe: LedgeProbe | null = null;
+  mantleMotion: MantleMotion = new MantleMotion();
+  climbMotion: ClimbMotion = { active: false, x: 0, y: 0, z: 0, y0: 0, y1: 0, nx: 1, nz: 0 };
+  // ---- authored state ------------------------------------------------
+  state: PlayerMoveState = 'stand';
+  prevState: PlayerMoveState = 'stand';
+  stateTime: number = 0;
+  stance: PlayerStance = 'stand'; // physical stance: stand | crouch | prone
+  stanceWant: PlayerStance = 'stand';
+  sprinting: boolean = false;
+  tacticalSprint: boolean = false;
+  sliding: boolean = false;
+  grounded: boolean = true;
+  wasGrounded: boolean = true;
+  airTime: number = 0;
+  speed: number = 0;
+  horizontalSpeed: number = 0;
+  blocked: boolean = false;
+  // ---- yaw/pitch are owned here so movement and camera never disagree --
+  yaw: number = 0;
+  pitch: number = 0;
+  yawRate: number = 0;
+  // ---- externally driven ---------------------------------------------
+  /** 0..1 aim-down-sight blend. `weapons` may drive this via setAdsProgress. */
+  adsAmount: number = 0;
+  controlEnabled: boolean = true;
+  // ---- lean ----------------------------------------------------------
+  leanAmount: number = 0;
+  leanAllowed: number = 0;
+  leanOffsetX: number = 0;
+  leanOffsetZ: number = 0;
+  _leanProbeTimer: number = 0;
+  // ---- timers --------------------------------------------------------
+  _coyote: number = 0;
+  _jumpBuffer: number = 0;
+  _jumpCooldown: number = 0;
+  _sprintHoldTime: number = 0;
+  _lastSprintPress: number = -10;
+  _tacSprintTime: number = 0;
+  _tacSprintLock: number = 0;
+  _slideTime: number = 0;
+  _slideCooldown: number = 0;
+  _slideSide: number = 1;
+  _mantleCooldown: number = 0;
+  _climbCooldown: number = 0;
+  _ledgeProbeTimer: number = 0;
+  _stepDistance: number = 0;
+  _bobPhase: number = 0;
+  _footLeft: boolean = false;
+  _footHold: number = 0;
+  _tacSprintRequested: boolean = false;
+  _edgeFrame: number = -1;
+  /** One-shot flags consumed (and cleared) by PlayerSystem each frame. */
+  jumped: boolean = false;
+  slideStarted: boolean = false;
+  slideEnded: boolean = false;
+  // ---- input snapshot (latched once per rendered frame) ---------------
+  cmd: MovementInput = {
+    x: 0,
+    y: 0,
+    moveX: 0,
+    moveY: 0,
+    jump: false,
+    jumpHeld: false,
+    crouchPressed: false,
+    cronePressed: false,
+    pronePressed: false,
+    sprintHeld: false,
+    sprintPressed: false,
+    leanL: false,
+    leanR: false,
+    ads: false,
+  };
+  _cmdFrame: number = -1;
+  _prevHeld: HeldInput = {
+    jump: false,
+    crouch: false,
+    prone: false,
+    sprint: false,
+  };
+  // ---- interpolation for the camera ----------------------------------
+  prevPosition: THREE.Vector3 = new THREE.Vector3();
+  position: THREE.Vector3 = new THREE.Vector3();
+  velocity: THREE.Vector3 = new THREE.Vector3();
+  renderPosition: THREE.Vector3 = new THREE.Vector3();
+  // ---- events / outputs ----------------------------------------------
+  /** Set on the step we land; consumed by PlayerSystem. */
+  landEvent: { pending: boolean; speed: number; surface: SurfaceName } = {
+    pending: false,
+    speed: 0,
+    surface: 'concrete',
+  };
+  stepEvent: {
     pending: boolean;
     running: boolean;
     surface: SurfaceName;
@@ -148,135 +184,31 @@ export class Movement {
     y: number;
     z: number;
     left: boolean;
+  } = {
+    pending: false,
+    running: false,
+    surface: 'concrete',
+    x: 0,
+    y: 0,
+    z: 0,
+    left: false,
   };
-  declare mantleEvent: { pending: boolean; kind: string; height: number };
-  declare _fwd: THREE.Vector3;
-  declare _right: THREE.Vector3;
-  declare _wish: THREE.Vector3;
-  declare _p0: THREE.Vector3;
-  declare _p1: THREE.Vector3;
-  declare _prevVy: number;
+  mantleEvent: { pending: boolean; kind: string; height: number } = {
+    pending: false,
+    kind: 'none',
+    height: 0,
+  };
+  // scratch
+  _fwd: THREE.Vector3 = new THREE.Vector3();
+  _right: THREE.Vector3 = new THREE.Vector3();
+  _wish: THREE.Vector3 = new THREE.Vector3();
+  _p0: THREE.Vector3 = new THREE.Vector3();
+  _p1: THREE.Vector3 = new THREE.Vector3();
+  _prevVy: number = 0;
 
   constructor(ctx: MovementContext, player: unknown) {
     this.ctx = ctx;
     this.player = player;
-    this.physics = null;
-    this.character = null;
-    this.probe = null;
-    this.mantleMotion = new MantleMotion();
-    this.climbMotion = { active: false, x: 0, y: 0, z: 0, y0: 0, y1: 0, nx: 1, nz: 0 };
-
-    // ---- authored state ------------------------------------------------
-    this.state = 'stand';
-    this.prevState = 'stand';
-    this.stateTime = 0;
-    this.stance = 'stand'; // physical stance: stand | crouch | prone
-    this.stanceWant = 'stand';
-    this.sprinting = false;
-    this.tacticalSprint = false;
-    this.sliding = false;
-    this.grounded = true;
-    this.wasGrounded = true;
-    this.airTime = 0;
-    this.speed = 0;
-    this.horizontalSpeed = 0;
-    this.blocked = false;
-
-    // ---- yaw/pitch are owned here so movement and camera never disagree --
-    this.yaw = 0;
-    this.pitch = 0;
-    this.yawRate = 0;
-
-    // ---- externally driven ---------------------------------------------
-    /** 0..1 aim-down-sight blend. `weapons` may drive this via setAdsProgress. */
-    this.adsAmount = 0;
-    this.controlEnabled = true;
-
-    // ---- lean ----------------------------------------------------------
-    this.leanAmount = 0;
-    this.leanAllowed = 0;
-    this.leanOffsetX = 0;
-    this.leanOffsetZ = 0;
-    this._leanProbeTimer = 0;
-
-    // ---- timers --------------------------------------------------------
-    this._coyote = 0;
-    this._jumpBuffer = 0;
-    this._jumpCooldown = 0;
-    this._sprintHoldTime = 0;
-    this._lastSprintPress = -10;
-    this._tacSprintTime = 0;
-    this._tacSprintLock = 0;
-    this._slideTime = 0;
-    this._slideCooldown = 0;
-    this._slideSide = 1;
-    this._mantleCooldown = 0;
-    this._climbCooldown = 0;
-    this._ledgeProbeTimer = 0;
-    this._stepDistance = 0;
-    this._bobPhase = 0;
-    this._footLeft = false;
-    this._footHold = 0;
-    this._tacSprintRequested = false;
-    this._edgeFrame = -1;
-
-    /** One-shot flags consumed (and cleared) by PlayerSystem each frame. */
-    this.jumped = false;
-    this.slideStarted = false;
-    this.slideEnded = false;
-
-    // ---- input snapshot (latched once per rendered frame) ---------------
-    this.cmd = {
-      x: 0,
-      y: 0,
-      moveX: 0,
-      moveY: 0,
-      jump: false,
-      jumpHeld: false,
-      crouchPressed: false,
-      cronePressed: false,
-      pronePressed: false,
-      sprintHeld: false,
-      sprintPressed: false,
-      leanL: false,
-      leanR: false,
-      ads: false,
-    };
-    this._cmdFrame = -1;
-    this._prevHeld = {
-      jump: false,
-      crouch: false,
-      prone: false,
-      sprint: false,
-    };
-
-    // ---- interpolation for the camera ----------------------------------
-    this.prevPosition = new THREE.Vector3();
-    this.position = new THREE.Vector3();
-    this.velocity = new THREE.Vector3();
-    this.renderPosition = new THREE.Vector3();
-
-    // ---- events / outputs ----------------------------------------------
-    /** Set on the step we land; consumed by PlayerSystem. */
-    this.landEvent = { pending: false, speed: 0, surface: 'concrete' };
-    this.stepEvent = {
-      pending: false,
-      running: false,
-      surface: 'concrete',
-      x: 0,
-      y: 0,
-      z: 0,
-      left: false,
-    };
-    this.mantleEvent = { pending: false, kind: 'none', height: 0 };
-
-    // scratch
-    this._fwd = new THREE.Vector3();
-    this._right = new THREE.Vector3();
-    this._wish = new THREE.Vector3();
-    this._p0 = new THREE.Vector3();
-    this._p1 = new THREE.Vector3();
-    this._prevVy = 0;
   }
 
   /* ==================================================================== */
@@ -555,12 +487,8 @@ export class Movement {
 
     if (this.stanceWant === this.stance) return;
     const target = STANCE[this.stanceWant];
-    if (target.height <= this.stanceDef.height) {
-      // Shrinking always succeeds.
-      c.height = target.height;
-      c.stepHeight = target.stepHeight;
-      this.stance = this.stanceWant;
-    } else if (c.canFit(target.height)) {
+    // Shrinking always succeeds.
+    if (target.height <= this.stanceDef.height || c.canFit(target.height)) {
       c.height = target.height;
       c.stepHeight = target.stepHeight;
       this.stance = this.stanceWant;

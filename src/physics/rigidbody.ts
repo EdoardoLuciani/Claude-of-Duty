@@ -77,7 +77,6 @@ type StaticCollisionWorld = Pick<
 export class RigidBody {
   declare id: number;
   declare shape: BodyShape;
-  declare active: boolean;
   declare hx: number;
   declare hy: number;
   declare hz: number;
@@ -85,12 +84,6 @@ export class RigidBody {
   declare halfHeight: number;
   declare mass: number;
   declare invMass: number;
-  declare position: THREE.Vector3;
-  declare quaternion: THREE.Quaternion;
-  declare linearVelocity: THREE.Vector3;
-  declare angularVelocity: THREE.Vector3;
-  declare prevPosition: THREE.Vector3;
-  declare prevQuaternion: THREE.Quaternion;
   declare restitution: number;
   declare friction: number;
   declare linearDamping: number;
@@ -100,27 +93,36 @@ export class RigidBody {
   declare mask: number;
   declare layer: number;
   declare ccd: boolean;
-  declare sleeping: boolean;
-  declare sleepTimer: number;
   declare lifetime: number;
-  declare age: number;
   declare object3D: THREE.Object3D | null;
   declare userData: unknown;
   declare onSleep: RigidBodyOptions['onSleep'];
   declare onImpact: RigidBodyOptions['onImpact'];
-  declare _impactCooldown: number;
-  declare invInertiaLocal: THREE.Vector3;
-  declare invInertiaWorld: THREE.Matrix3;
   declare probes: Float32Array;
   declare probeCount: number;
-  declare probeRadius: number;
   declare boundRadius: number;
   declare minExtent: number;
+
+  active: boolean = true;
+  position: THREE.Vector3 = new THREE.Vector3();
+  quaternion: THREE.Quaternion = new THREE.Quaternion();
+  linearVelocity: THREE.Vector3 = new THREE.Vector3();
+  angularVelocity: THREE.Vector3 = new THREE.Vector3();
+  prevPosition: THREE.Vector3 = new THREE.Vector3();
+  prevQuaternion: THREE.Quaternion = new THREE.Quaternion();
+  sleeping: boolean = false;
+  sleepTimer: number = 0;
+  age: number = 0;
+  /** Impact reporting throttle so one bounce doesn't emit 8 events. */
+  _impactCooldown: number = 0;
+  invInertiaLocal: THREE.Vector3 = new THREE.Vector3();
+  invInertiaWorld: THREE.Matrix3 = new THREE.Matrix3();
+  /** Smallest probe radius — the resolution of discrete contact detection. */
+  probeRadius: number = Infinity;
 
   constructor(opts: RigidBodyOptions = {}) {
     this.id = _nextId++;
     this.shape = opts.shape ?? 'box';
-    this.active = true;
 
     const hx = opts.halfExtents?.x ?? opts.halfExtents?.[0] ?? 0.1;
     const hy = opts.halfExtents?.y ?? opts.halfExtents?.[1] ?? 0.1;
@@ -134,13 +136,6 @@ export class RigidBody {
     this.mass = opts.mass ?? 1;
     this.invMass = this.mass > 0 ? 1 / this.mass : 0;
 
-    this.position = new THREE.Vector3();
-    this.quaternion = new THREE.Quaternion();
-    this.linearVelocity = new THREE.Vector3();
-    this.angularVelocity = new THREE.Vector3();
-    this.prevPosition = new THREE.Vector3();
-    this.prevQuaternion = new THREE.Quaternion();
-
     this.restitution = opts.restitution ?? 0.25;
     this.friction = opts.friction ?? 0.6;
     /** Exponential air drag, 1/s. */
@@ -152,27 +147,18 @@ export class RigidBody {
     this.layer = opts.layer ?? 0;
     this.ccd = opts.ccd ?? true;
 
-    this.sleeping = false;
-    this.sleepTimer = 0;
     this.lifetime = opts.lifetime ?? Infinity;
-    this.age = 0;
 
     this.object3D = opts.object3D ?? null;
     this.userData = opts.userData ?? null;
     this.onSleep = opts.onSleep ?? null;
     this.onImpact = opts.onImpact ?? null;
-    /** Impact reporting throttle so one bounce doesn't emit 8 events. */
-    this._impactCooldown = 0;
 
-    this.invInertiaLocal = new THREE.Vector3();
-    this.invInertiaWorld = new THREE.Matrix3();
     this._computeInertia();
 
     // Local-space contact probes: [x,y,z,r] * n
     this.probes = buildProbes(this);
     this.probeCount = this.probes.length / 4;
-    /** Smallest probe radius — the resolution of discrete contact detection. */
-    this.probeRadius = Infinity;
     for (let i = 0; i < this.probeCount; i++) {
       if (this.probes[i * 4 + 3] < this.probeRadius) this.probeRadius = this.probes[i * 4 + 3];
     }
@@ -321,34 +307,23 @@ const SLEEP_TIME = 0.45;
 export class RigidBodyWorld {
   declare world: StaticCollisionWorld;
   declare gravity: number;
-  declare bodies: RigidBody[];
-  declare maxBodies: number;
-  declare solverIterations: number;
-  declare _cn: Float32Array;
-  declare _cp: Float32Array;
-  declare _cd: Float32Array;
-  declare _cf: Float32Array;
-  declare _ce: Float32Array;
-  declare _cs: Int32Array;
-  declare _hit: ReturnType<typeof makeHitRecord>;
-  declare _awake: number;
+
+  bodies: RigidBody[] = [];
+  maxBodies: number = 256;
+  solverIterations: number = 4;
+  // contact scratch
+  _cn: Float32Array = new Float32Array(MAX_CONTACTS * 3);
+  _cp: Float32Array = new Float32Array(MAX_CONTACTS * 3);
+  _cd: Float32Array = new Float32Array(MAX_CONTACTS);
+  _cf: Float32Array = new Float32Array(MAX_CONTACTS); // friction coefficient
+  _ce: Float32Array = new Float32Array(MAX_CONTACTS); // restitution
+  _cs: Int32Array = new Int32Array(MAX_CONTACTS); // surface index
+  _hit: ReturnType<typeof makeHitRecord> = makeHitRecord();
+  _awake: number = 0;
 
   constructor(staticWorld: StaticCollisionWorld, gravity = -20.6) {
     this.world = staticWorld;
     this.gravity = gravity;
-    this.bodies = [];
-    this.maxBodies = 256;
-    this.solverIterations = 4;
-
-    // contact scratch
-    this._cn = new Float32Array(MAX_CONTACTS * 3);
-    this._cp = new Float32Array(MAX_CONTACTS * 3);
-    this._cd = new Float32Array(MAX_CONTACTS);
-    this._cf = new Float32Array(MAX_CONTACTS); // friction coefficient
-    this._ce = new Float32Array(MAX_CONTACTS); // restitution
-    this._cs = new Int32Array(MAX_CONTACTS); // surface index
-    this._hit = makeHitRecord();
-    this._awake = 0;
   }
 
   add(body: RigidBody): RigidBody {

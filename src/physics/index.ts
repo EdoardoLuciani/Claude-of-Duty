@@ -202,18 +202,10 @@ export interface ColliderOptions {
 export class Collider {
   declare id: number;
   declare shape: 'capsule' | 'sphere' | 'box';
-  declare ax: number;
-  declare ay: number;
-  declare az: number;
-  declare bx: number;
-  declare by: number;
-  declare bz: number;
   declare radius: number;
   declare hx: number;
   declare hy: number;
   declare hz: number;
-  declare matrix: THREE.Matrix4;
-  declare inverse: THREE.Matrix4;
   declare layer: number;
   declare surfaceIndex: number;
   declare ballisticSurfaceIndex: number;
@@ -227,21 +219,22 @@ export class Collider {
     | null;
   declare userData: Record<string, unknown> | null;
 
+  ax: number = 0;
+  ay: number = 0;
+  az: number = 0;
+  bx: number = 0;
+  by: number = 0;
+  bz: number = 0;
+  matrix: THREE.Matrix4 = new THREE.Matrix4();
+  inverse: THREE.Matrix4 = new THREE.Matrix4();
+
   constructor(opts: ColliderOptions) {
     this.id = _colliderId++;
     this.shape = opts.shape ?? 'capsule';
-    this.ax = 0;
-    this.ay = 0;
-    this.az = 0;
-    this.bx = 0;
-    this.by = 0;
-    this.bz = 0;
     this.radius = opts.radius ?? 0.2;
     this.hx = opts.hx ?? 0.2;
     this.hy = opts.hy ?? 0.2;
     this.hz = opts.hz ?? 0.2;
-    this.matrix = new THREE.Matrix4();
-    this.inverse = new THREE.Matrix4();
     this.layer = opts.layer ?? LAYER.ACTOR;
     this.surfaceIndex = surfaceIndex(opts.surface === undefined ? 'flesh' : opts.surface);
     this.ballisticSurfaceIndex =
@@ -357,66 +350,72 @@ interface ImpactRecord {
 export class PhysicsSystem {
   declare staticWorld: StaticWorld;
   declare bodies: RigidBodyWorld;
-  declare characters: CharacterController[];
-  declare ragdolls: Ragdoll[];
-  declare colliders: Collider[];
   declare ballistics: Ballistics;
-  declare LAYER: typeof LAYER;
-  declare MASK: typeof MASK;
-  declare SURFACE: typeof SURFACE;
-  declare SURFACE_NAMES: typeof SURFACE_NAMES;
-  declare SURFACE_PROPS: typeof SURFACE_PROPS;
-  declare gravity: number;
-  declare maxRagdolls: number;
   declare ctx: PhysicsContext;
   declare rng: Rng;
-  declare _hitPool: Array<ReturnType<typeof makePublicHit>>;
-  declare _hitCursor: number;
-  declare _impactPool: ImpactRecord[];
-  declare _impactCursor: number;
-  declare _shotId: number;
-  declare _segmentEvent: BulletSegmentEvent;
-  declare _raw: ReturnType<typeof makeHitRecord>;
-  declare _raw2: ReturnType<typeof makeHitRecord>;
-  declare _cl: ReturnType<typeof makeClosest>;
-  declare _blastTarget: THREE.Vector3;
-  declare _blastWaypoint: THREE.Vector3;
-  declare _explicitStatics: number;
-  declare _loggedTris: number;
   declare _onExplosion: (event: {
     position: THREE.Vector3;
     radius: number;
     damage: number;
     impulse?: number;
   }) => void;
-  declare stats: PhysicsStats;
-  declare _rayCount: number;
 
   static readonly id = 'physics';
   static readonly deps: SystemId[] = [];
 
+  characters: CharacterController[] = [];
+  ragdolls: Ragdoll[] = [];
+  colliders: Collider[] = [];
+  LAYER: typeof LAYER = LAYER;
+  MASK: typeof MASK = MASK;
+  SURFACE: typeof SURFACE = SURFACE;
+  SURFACE_NAMES: typeof SURFACE_NAMES = SURFACE_NAMES;
+  SURFACE_PROPS: typeof SURFACE_PROPS = SURFACE_PROPS;
+  gravity: number = UNITS.gravity;
+  maxRagdolls: number = 8;
+  _hitPool: Array<ReturnType<typeof makePublicHit>> = [];
+  _hitCursor: number = 0;
+  _impactPool: ImpactRecord[] = [];
+  _impactCursor: number = 0;
+  _shotId: number = 0;
+  _segmentEvent: BulletSegmentEvent = {
+    from: new THREE.Vector3(),
+    to: new THREE.Vector3(),
+    shooter: null,
+    shot: 0,
+    weapon: null,
+    speed: 800,
+    tracer: false,
+  };
+  _raw: ReturnType<typeof makeHitRecord> = makeHitRecord();
+  _raw2: ReturnType<typeof makeHitRecord> = makeHitRecord();
+  _cl: ReturnType<typeof makeClosest> = makeClosest();
+  _blastTarget: THREE.Vector3 = new THREE.Vector3();
+  _blastWaypoint: THREE.Vector3 = new THREE.Vector3();
+  _explicitStatics: number = 0;
+  _loggedTris: number = -1;
+  stats: PhysicsStats = {
+    triangles: 0,
+    nodes: 0,
+    objects: 0,
+    buildMs: 0,
+    bodies: 0,
+    awake: 0,
+    ragdolls: 0,
+    characters: 0,
+    colliders: 0,
+    raycasts: 0,
+    stepMs: 0,
+  };
+  _rayCount: number = 0;
+
   constructor() {
     this.staticWorld = new StaticWorld();
     this.bodies = new RigidBodyWorld(this.staticWorld, UNITS.gravity);
-    this.characters = [];
-    this.ragdolls = [];
-    this.colliders = [];
     this.ballistics = new Ballistics(this);
 
-    this.LAYER = LAYER;
-    this.MASK = MASK;
-    this.SURFACE = SURFACE;
-    this.SURFACE_NAMES = SURFACE_NAMES;
-    this.SURFACE_PROPS = SURFACE_PROPS;
-
-    this.gravity = UNITS.gravity;
-    this.maxRagdolls = 8;
-
-    this._hitPool = [];
     for (let i = 0; i < HIT_POOL; i++) this._hitPool.push(makePublicHit());
-    this._hitCursor = 0;
 
-    this._impactPool = [];
     for (let i = 0; i < IMPACT_POOL; i++) {
       this._impactPool.push({
         point: new THREE.Vector3(),
@@ -432,39 +431,6 @@ export class PhysicsSystem {
         part: null,
       });
     }
-    this._impactCursor = 0;
-    this._shotId = 0;
-    this._segmentEvent = {
-      from: new THREE.Vector3(),
-      to: new THREE.Vector3(),
-      shooter: null,
-      shot: 0,
-      weapon: null,
-      speed: 800,
-      tracer: false,
-    };
-
-    this._raw = makeHitRecord();
-    this._raw2 = makeHitRecord();
-    this._cl = makeClosest();
-    this._blastTarget = new THREE.Vector3();
-    this._blastWaypoint = new THREE.Vector3();
-    this._explicitStatics = 0;
-    this._loggedTris = -1;
-    this.stats = {
-      triangles: 0,
-      nodes: 0,
-      objects: 0,
-      buildMs: 0,
-      bodies: 0,
-      awake: 0,
-      ragdolls: 0,
-      characters: 0,
-      colliders: 0,
-      raycasts: 0,
-      stepMs: 0,
-    };
-    this._rayCount = 0;
   }
 
   async init(ctx: PhysicsContext): Promise<void> {
