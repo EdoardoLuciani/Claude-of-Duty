@@ -8,14 +8,13 @@ const dir = import.meta.dirname;
 for (const file of readdirSync(dir).sort()) {
   if (!file.startsWith('smoke-') || !file.endsWith('.mjs')) continue;
   // Longer wall-clock allowance only; physical simulation limits stay intact.
-  const longSweep = ['smoke-ax338-contact.mjs', 'smoke-ai-ladder-live.mjs'].includes(file);
+  const longSweep = file === 'smoke-ai-ladder-live.mjs';
   const integrationSweep = ['smoke-ai-ladder.mjs', 'smoke-audio-reloads.mjs'].includes(file);
   const geometrySweep = [
     'smoke-ai-access.mjs',
     'smoke-cable-support.mjs',
     'smoke-floating-props.mjs',
     'smoke-export-cache.mjs',
-    'smoke-evolys-clearance.mjs',
   ].includes(file);
   test(
     file,
