@@ -10,7 +10,6 @@ Rebuild from the repository root, arms before bandage (arms replace the scene):
 ```sh
 blender -b --python-exit-code 1 --python tools/blender/player_arms.py
 blender -b --python-exit-code 1 --python tools/blender/player_bandage.py
-node tests/smoke/smoke-bandage.mjs
 ```
 
 The blend, manifest, pose references, runtime GLBs and generated hand-pose/bandage

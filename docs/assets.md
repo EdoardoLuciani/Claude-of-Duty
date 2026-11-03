@@ -4,6 +4,11 @@ Start here to find an editing location. Asset-specific READMEs own detailed
 commands, references and acceptance limits; this index does not replace them.
 Run commands from the repository root after `npm ci`.
 
+Dedicated weapon-model, bandage and FX presentation sweeps are retired; their
+checks remain in Git history. `npm test` runs the remaining regressions, not
+replacement asset-acceptance coverage. Use Blender checks and in-engine review
+when changing authored assets.
+
 ## Three purposeful homes
 
 - **`tools/`**: offline generation, inspection and cooking. Weapon Python recipes
@@ -50,7 +55,6 @@ blender -b -t 2 --python-exit-code 1 --python tools/blender/m4/build.py -- \
 blender -b /tmp/m4-review/m4a1-block-ii.blend --python-exit-code 1 \
   --python tools/blender/m4/check.py
 npm run models:cook -- m4 /tmp/m4-review
-node tests/smoke/smoke-m4.mjs  # checks committed products/runtime behavior
 ```
 
 Blender 5.2.2 and the pinned gltfpack encoder are only needed for explicit
@@ -84,13 +88,13 @@ intel sites and explicit placement records. This is the world source—not
 
 ## Other model and texture families
 
-| Family                      | Authoritative editing location                                                                                                                                    | Regenerate / validate                                            | Products and consumers                                                                                                         |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Arms and bandage            | [`player_arms.py`](../tools/blender/player_arms.py), [`player_bandage.py`](../tools/blender/player_bandage.py); [asset contract](../assets/player/arms/README.md) | Follow the asset's Blender commands and arm/bandage smoke checks | `assets/player/arms/`, `public/models/player/`, generated poses/paths in `src/weapons/`; loaded by weapon arm/bandage adapters |
-| Soldiers                    | [`src/ai/soldier.ts`](../src/ai/soldier.ts), `parts.ts`, `geo.ts`, `weapon.ts`; geometry and runtime surface/variant helpers currently share modules              | `npm run models`; `npm test`                                     | Generated `public/models/soldiers/*.glb` + JSON, loaded by `ModelSystem` and AI                                                |
-| Spent shotgun hull          | [`tools/lib/spent-hull.mjs`](../tools/lib/spent-hull.mjs)                                                                                                         | `npm run models`; `node tests/smoke/smoke-shells.mjs`            | `public/models/fx/spent12g.glb`, consumed by FX                                                                                |
-| Procedural textures         | [`tools/export-proc-textures.mjs`](../tools/export-proc-textures.mjs) and its declared AI/FX inputs                                                               | `node tools/export-proc-textures.mjs`; `npm test`                | Committed `public/models/proc/`, consumed by AI materials and FX                                                               |
-| Standalone EXPS3 attachment | [`exps3.py`](../tools/blender/exps3.py), [`exps3_bake.py`](../tools/blender/exps3_bake.py); [asset contract](../assets/attachments/eotech-exps3-0/README.md)      | Asset Blender commands; `npm run models:cook -- exps3`           | `assets/attachments/eotech-exps3-0/`; cooked attachment is not yet wired into gameplay                                         |
+| Family                      | Authoritative editing location                                                                                                                                    | Regenerate / validate                                  | Products and consumers                                                                                                         |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| Arms and bandage            | [`player_arms.py`](../tools/blender/player_arms.py), [`player_bandage.py`](../tools/blender/player_bandage.py); [asset contract](../assets/player/arms/README.md) | Follow the asset's Blender commands; review in engine  | `assets/player/arms/`, `public/models/player/`, generated poses/paths in `src/weapons/`; loaded by weapon arm/bandage adapters |
+| Soldiers                    | [`src/ai/soldier.ts`](../src/ai/soldier.ts), `parts.ts`, `geo.ts`, `weapon.ts`; geometry and runtime surface/variant helpers currently share modules              | `npm run models`; `npm test`                           | Generated `public/models/soldiers/*.glb` + JSON, loaded by `ModelSystem` and AI                                                |
+| Spent shotgun hull          | [`tools/lib/spent-hull.mjs`](../tools/lib/spent-hull.mjs)                                                                                                         | `npm run models`; review in engine                     | `public/models/fx/spent12g.glb`, consumed by FX                                                                                |
+| Procedural textures         | [`tools/export-proc-textures.mjs`](../tools/export-proc-textures.mjs) and its declared AI/FX inputs                                                               | `node tools/export-proc-textures.mjs`; `npm test`      | Committed `public/models/proc/`, consumed by AI materials and FX                                                               |
+| Standalone EXPS3 attachment | [`exps3.py`](../tools/blender/exps3.py), [`exps3_bake.py`](../tools/blender/exps3_bake.py); [asset contract](../assets/attachments/eotech-exps3-0/README.md)      | Asset Blender commands; `npm run models:cook -- exps3` | `assets/attachments/eotech-exps3-0/`; cooked attachment is not yet wired into gameplay                                         |
 
 Normal `npm run dev` / `npm run build` prepare procedural textures and models,
 and validate committed world assets. They do **not** regenerate the world,

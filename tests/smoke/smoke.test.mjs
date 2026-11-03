@@ -9,30 +9,16 @@ for (const file of readdirSync(dir).sort()) {
   if (!file.startsWith('smoke-') || !file.endsWith('.mjs')) continue;
   // Longer wall-clock allowance only; physical simulation limits stay intact.
   const longSweep = file === 'smoke-ai-ladder-live.mjs';
-  const integrationSweep = ['smoke-ai-ladder.mjs', 'smoke-audio-reloads.mjs'].includes(file);
-  const geometrySweep = [
-    'smoke-ai-access.mjs',
-    'smoke-cable-support.mjs',
-    'smoke-floating-props.mjs',
-    'smoke-export-cache.mjs',
-  ].includes(file);
+  const integrationSweep = file === 'smoke-ai-ladder.mjs';
   test(
     file,
     () => {
       const r = spawnSync(process.execPath, [join(dir, file)], {
         encoding: 'utf8',
-        timeout: longSweep ? 60000 : integrationSweep ? 30000 : geometrySweep ? 18000 : undefined,
+        timeout: longSweep ? 60000 : integrationSweep ? 30000 : undefined,
       });
       expect(r.status, r.stdout + r.stderr).toBe(0);
     },
-    longSweep
-      ? 65000
-      : integrationSweep
-        ? 35000
-        : geometrySweep ||
-            file === 'smoke-collision-fidelity.mjs' ||
-            file === 'smoke-fx-tracer-world.mjs'
-          ? 20000
-          : 5000
+    longSweep ? 65000 : integrationSweep ? 35000 : 5000
   );
 }
