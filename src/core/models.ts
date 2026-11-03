@@ -151,6 +151,14 @@ export class ModelSystem {
   }
 }
 
+/** The vertex interval referenced by one indexed glTF primitive. */
+interface PrimitiveSlice {
+  g: THREE.BufferGeometry;
+  index: THREE.BufferAttribute;
+  lo: number;
+  count: number;
+}
+
 /**
  * glTF loads multi-material meshes as one object per primitive; the game
  * expects ONE skinned geometry with material groups (one draw call per slot),
@@ -163,28 +171,19 @@ export class ModelSystem {
  * reproduces the original authored vertex array exactly.
  */
 export function mergePrimitives(meshes: THREE.SkinnedMesh[]): THREE.BufferGeometry {
-  const parts = meshes.map(
-    (
-      m
-    ): {
-      g: THREE.BufferGeometry<THREE.NormalBufferAttributes, THREE.BufferGeometryEventMap>;
-      index: THREE.BufferAttribute<THREE.BufferAttributeEventMap>;
-      lo: number;
-      count: number;
-    } => {
-      const g = m.geometry;
-      const index = g.getIndex()!;
-      const src = index.array;
-      let lo = Infinity;
-      let hi = -1;
-      for (let i = 0; i < index.count; i++) {
-        const v = src[i];
-        if (v < lo) lo = v;
-        if (v > hi) hi = v;
-      }
-      return { g, index, lo, count: hi - lo + 1 };
+  const parts = meshes.map((m): PrimitiveSlice => {
+    const g = m.geometry;
+    const index = g.getIndex()!;
+    const src = index.array;
+    let lo = Infinity;
+    let hi = -1;
+    for (let i = 0; i < index.count; i++) {
+      const v = src[i];
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
     }
-  );
+    return { g, index, lo, count: hi - lo + 1 };
+  });
   const totalVerts = parts.reduce((s, p): number => s + p.count, 0);
   const totalIdx = parts.reduce((s, p): number => s + p.index.count, 0);
 
