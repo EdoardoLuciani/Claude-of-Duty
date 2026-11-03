@@ -22,7 +22,6 @@ blender -b -t 2 --python-exit-code 1 --python tools/blender/mpx/build.py
 blender -b -t 2 assets/weapons/sig-mpx/mpx.blend \
   --python-exit-code 1 --python tools/blender/mpx/check.py
 npm run models:cook -- mpx
-node tests/smoke/smoke-mpx.mjs
 ```
 
 Use `--output /tmp/mpx-review` for scratch builds. The registered cook retains

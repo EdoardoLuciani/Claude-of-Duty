@@ -21,7 +21,6 @@ blender -b --threads 2 --python-exit-code 1 --python tools/blender/m4/build.py -
 blender -b assets/weapons/m4a1-block-ii/m4a1-block-ii.blend \
   --python-exit-code 1 --python tools/blender/m4/check.py
 npm run models:cook -- m4
-node tests/smoke/smoke-m4.mjs
 ```
 
 Use `--output /tmp/m4-review` for scratch builds. Refit hands only intentionally.
