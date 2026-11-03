@@ -18,11 +18,3 @@ export function mutateSource(source, before, after) {
   assert.notEqual(result, source, 'negative control must alter source');
   return result;
 }
-
-export async function routeSourceMutation(page, file, before, after, transform = (body) => body) {
-  await page.route(`**/${file}*`, async (route) => {
-    const response = await route.fetch();
-    const body = transform(mutateSource(await response.text(), before, after));
-    await route.fulfill({ response, body });
-  });
-}

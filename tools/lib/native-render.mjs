@@ -21,14 +21,6 @@ export function assertHardwareDevice(device, selected = '') {
   return device;
 }
 
-/** The same policy also runs before analytic browser fixtures draw anything. */
-export async function installDevicePolicy(page) {
-  await page.addInitScript({
-    content: `window.__ASSERT_HARDWARE_DEVICE__ = device =>
-    (${assertHardwareDevice.toString()})(device, ${JSON.stringify(process.env.MESA_VK_DEVICE_SELECT ?? '')});`,
-  });
-}
-
 export async function verifyPreviewNative(page) {
   const device = await page.evaluate(() => {
     const r = window.__PREVIEW_RENDERER__;
