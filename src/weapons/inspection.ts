@@ -29,11 +29,11 @@ export function createWeaponInspection(entry: WeaponEntry): {
     scene,
     dispose(): void {
       scene.removeFromParent();
+      // The authored animation owns its cloned skeletons (as it does in gameplay).
       animation.dispose();
       scene.traverse((node): void => {
         // Release renderer-side records, not the borrowed geometry/materials/maps.
         node.dispose();
-        if (node instanceof THREE.SkinnedMesh) node.skeleton.dispose();
       });
     },
   };

@@ -515,7 +515,7 @@ try {
   });
   assert.equal((await state()).model, false);
   assert.equal((await state()).credits, 0);
-  // A failed preview must not disable the ordinary shop.
+  // A failed weapon preview must not disable other weapons or the ordinary shop.
   await page.evaluate(async () => {
     const ctx = window.__ENGINE__.ctx;
     ctx.get('market').openShop(5);
@@ -530,7 +530,13 @@ try {
     ctx.get('market').credits = 2000;
     await window.__PUMP__(2);
   });
-  assert.equal((await state()).failed, true);
+  assert.equal((await state()).failed, false);
+  assert.equal((await state()).model, false);
+  await page.evaluate(() =>
+    window.__ENGINE__.ctx.get('ui').shop.inspection.select('pistol', 'Pistol')
+  );
+  assert.equal((await state()).model, true, 'healthy weapon renders after another model fails');
+  assert.equal((await state()).failed, false);
   await page.evaluate(() =>
     window.__ENGINE__.ctx.get('ui').shop.inspection.select('bandage', 'Bandage')
   );

@@ -318,14 +318,17 @@ adapters retain their separate ownership.
 
 `weapons.createInspectionModel(id)` returns an independent rest-pose scene and
 `dispose()` for the market's single demand-rendered WebGPU studio. Cloned transforms,
-skeletons and mixers are inspection-owned; geometry, materials and maps are borrowed
-from gameplay and must not be disposed by the caller. UI drops the clone on selection,
+skeletons and mixers are inspection-owned, with skeleton cleanup delegated to the
+authored animation adapter; geometry, materials and maps are borrowed from gameplay
+and must not be disposed by the caller. UI drops the clone on selection,
 close/restart/error and releases its renderer/environment at teardown. Controls use
 DOM input, not the paused simulation clock. Only explicit Buy/Swap buttons
 purchase; selecting or inspecting an item never changes loadout or credits.
 Non-weapon market items use the exhaustive local artwork map in
 `src/ui/market-art.ts`. Image selection invalidates pending weapon clones and hides
-3D-only controls; image errors leave purchases usable.
+3D-only controls; image errors leave purchases usable. Weapon-model failures affect
+only that selection; another weapon can still be inspected. Renderer initialization,
+render or device-loss failures disable 3D inspection without disabling purchases.
 Artwork generation is offline-only; model, prompts and processing live in
 `assets/ui/market/`, with optimized runtime WebPs in `public/images/market/`.
 
