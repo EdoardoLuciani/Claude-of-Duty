@@ -20,8 +20,6 @@ blender -b -t 2 --python-exit-code 1 --python tools/blender/ax338/build.py
 blender -b -t 2 assets/weapons/ax338/ax338.blend --python-exit-code 1 \
   --python tools/blender/ax338/check.py
 npm run models:cook -- ax338
-node tests/smoke/smoke-ax338.mjs
-node tests/smoke/smoke-sniper-reticle.mjs
 ```
 
 Use `--output /tmp/ax338-review` for scratch builds.

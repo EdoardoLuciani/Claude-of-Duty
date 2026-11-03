@@ -20,7 +20,6 @@ blender -b -t 2 --python-exit-code 1 --python tools/blender/evolys/build.py
 blender -b assets/weapons/fn-evolys-762/fn-evolys-762.blend \
   --python-exit-code 1 --python tools/blender/evolys/check.py
 npm run models:cook -- evolys
-node tests/smoke/smoke-evolys.mjs
 ```
 
 Use `--output /tmp/evolys-review --quick` for scratch builds.
