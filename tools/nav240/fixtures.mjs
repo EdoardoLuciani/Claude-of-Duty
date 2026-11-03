@@ -118,19 +118,6 @@ export async function loadMap() {
   }
   return { name: 'map', physics, bounds, cases, meta, surfaceRaw };
 }
-export const OBSTRUCTED_MAP_GOALS = ['W2/entrance', 'W4/stairs-up', 'W4/stairs-down'];
-export function addClearStairCases(fixture) {
-  const original = fixture.cases.find((c) => c.name === 'W4/stairs-up');
-  const axis = original.to.clone().sub(original.from);
-  axis.y = 0;
-  axis.normalize();
-  const from = original.from.clone().addScaledVector(axis, 0.5),
-    to = original.to.clone().addScaledVector(axis, -0.3);
-  fixture.cases.push(
-    { name: 'W4/clear-stairs-up', from, to },
-    { name: 'W4/clear-stairs-down', from: to, to: from }
-  );
-}
 // September 26 capture: exact world-space upstairs objectives plus the occupied
 // W2 setback terrace. Testing only the stair landing missed its facade barrier.
 export function addFollowupCases(fixture) {
