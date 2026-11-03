@@ -111,8 +111,7 @@ for (const ending of ['release', 'complete', 'grenade'])
     ui.hudTarget = ui.hudVisible = 1;
     ui._blipCount = 0;
     ui._blipView = [];
-    ui._weaponState = () => null;
-    ui._playerState = () => ({
+    player.getHudState = () => ({
       health: player.health.value,
       maxHealth: player.health.max,
       armour: player.health.armour,

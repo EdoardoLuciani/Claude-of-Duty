@@ -1,7 +1,7 @@
 import { Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 
 import type { Minimap, MinimapState } from './minimap.ts';
-import { clamp, clamp01 } from './util.ts';
+import { clamp01 } from './util.ts';
 
 const SIZE = 178,
   HALF = SIZE / 2;
@@ -37,7 +37,6 @@ export class PixiMinimap {
     opacity: number;
   }[] = [];
   private contacts: Graphics[] = [];
-  private objectives: { node: Container; text: Text }[] = [];
   private pulses: { node: Container; ring: Graphics; text: Text; radius: number }[] = [];
   private fov = -1;
   uploads = 0;
@@ -171,36 +170,6 @@ export class PixiMinimap {
       node.alpha = alpha;
     }
     this.contactCount = count;
-    const objectives = s.objectives;
-    for (let i = 0; i < Math.max(objectives?.length ?? 0, this.objectives.length); i++) {
-      let entry = this.objectives[i];
-      const objective = objectives?.[i];
-      if (!entry && objective) {
-        const node = new Container(),
-          text = this.label('', 9.5, 0x06171f);
-        node.addChild(
-          new Graphics().rect(-6, -6, 12, 12).fill(0x79d2ff).stroke({ color: 0x040e14, width: 1 }),
-          text
-        );
-        entry = { node, text };
-        this.objectives.push(entry);
-        this.viewport.addChild(node);
-      }
-      if (!entry) continue;
-      if (entry.node.visible !== !!objective) changed = true;
-      entry.node.visible = !!objective;
-      if (!objective) continue;
-      changed =
-        move(
-          entry.node,
-          clamp((objective.x - x) * ppm + HALF, 7, SIZE - 7),
-          clamp((objective.z - z) * ppm + HALF, 7, SIZE - 7)
-        ) || changed;
-      if (entry.text.text !== (objective.label ?? '')) {
-        entry.text.text = objective.label ?? '';
-        changed = true;
-      }
-    }
     const pulses = s.pulses;
     for (let i = 0; i < Math.max(pulses?.length ?? 0, this.pulses.length); i++) {
       let entry = this.pulses[i];
