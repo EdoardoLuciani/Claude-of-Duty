@@ -50,6 +50,23 @@ try {
       if (liveMeshes[i].isSkinnedMesh)
         assert.notEqual(previewMeshes[i].skeleton, liveMeshes[i].skeleton);
     }
+    const skeletonDisposals = new Map();
+    const liveSkeletonDisposals = new Map();
+    for (const [meshes, counts] of [
+      [previewMeshes, skeletonDisposals],
+      [liveMeshes, liveSkeletonDisposals],
+    ]) {
+      for (const mesh of meshes) {
+        if (!mesh.isSkinnedMesh || counts.has(mesh.skeleton)) continue;
+        const skeleton = mesh.skeleton;
+        const dispose = skeleton.dispose.bind(skeleton);
+        counts.set(skeleton, 0);
+        skeleton.dispose = () => {
+          counts.set(skeleton, counts.get(skeleton) + 1);
+          dispose();
+        };
+      }
+    }
     let objectDisposals = 0;
     let liveObjectDisposals = 0;
     for (const mesh of previewMeshes) mesh.addEventListener('dispose', () => objectDisposals++);
@@ -58,6 +75,10 @@ try {
     inspection.dispose();
     assert.equal(objectDisposals, previewMeshes.length, id + ' releases every cloned mesh');
     assert.equal(liveObjectDisposals, 0, id + ' never disposes gameplay objects');
+    for (const count of skeletonDisposals.values())
+      assert.equal(count, 1, id + ' disposes each cloned skeleton exactly once');
+    for (const count of liveSkeletonDisposals.values())
+      assert.equal(count, 0, id + ' never disposes borrowed gameplay skeletons');
     for (const [node, position, quaternion, scale, visible] of snapshot) {
       assert.deepEqual(node.position.toArray(), position, id + ' live position');
       assert.deepEqual(node.quaternion.toArray(), quaternion, id + ' live orientation');
