@@ -15,7 +15,7 @@ import { Assembler } from '../../tools/worldgen/builder.js';
 import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from '../../tools/worldgen/level/config.js';
 import { buildCollision } from '../../tools/worldgen/pack.js';
 
-// --- world + collision BVH (same recipe as smoke-collision-fidelity) --------
+// --- world + collision BVH (same seeded recipe as the world exporter) ------
 function worldRng() {
   const root = new Rng(0x5eed1234);
   root.fork();
