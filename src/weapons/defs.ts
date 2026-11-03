@@ -83,9 +83,6 @@ export interface WeaponDef {
   adsFovScale?: number;
   adsSensScale?: number;
   viewFov: number;
-  reloadTac: number;
-  reloadEmpty: number;
-  inspectTime: number;
   drawTime: number;
   holsterTime: number;
   hipPos: TuningVector;
@@ -156,9 +153,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     adsFovScale: 0.28,
     adsSensScale: 0.28,
     viewFov: 0.86,
-    reloadTac: 2.6,
-    reloadEmpty: 3.3,
-    inspectTime: 4,
     drawTime: 0.62,
     holsterTime: 0.4,
     hipPos: [0.118, -0.192, -0.3],
@@ -226,9 +220,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     /* --- handling (seconds) --- */
     adsTime: 0.22,
     viewFov: 0.7, // 42° weapon FOV; keep the front post readable without extra world zoom.
-    reloadTac: 2.1,
-    reloadEmpty: 2.9,
-    inspectTime: 3.2,
     drawTime: 0.62,
     holsterTime: 0.4,
     /* --- pose ---
@@ -297,9 +288,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     fireVibe: { amp: 0.72, duration: 0.048, adsScale: 0.4 },
     adsTime: 0.185,
     viewFov: 0.145, // Large housing without a near-eye tunnel; weapon-only 8.7°.
-    reloadTac: 1.85,
-    reloadEmpty: 2.5,
-    inspectTime: 2.9,
     drawTime: 0.52,
     holsterTime: 0.34,
     // Keep the existing reactive hip pose; the suppressor socket is at its exit.
@@ -367,9 +355,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     fireVibe: { amp: 0.88, duration: 0.058, adsScale: 0.4 },
     adsTime: 0.32,
     viewFov: 0.48, // Readable RMR window while retaining its existing eye/arm placement.
-    reloadTac: 3.4,
-    reloadEmpty: 4.8,
-    inspectTime: 3.6,
     drawTime: 0.75,
     holsterTime: 0.5,
     // Forward support grip clears the pouch; a less-bladed shoulder keeps
@@ -434,9 +419,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     adsTime: 0.16,
     viewFov: 0.7, // Larger irons without pulling a two-handed pistol back to the face.
     // Blender clips: magazine/contact beats live in the asset manifest.
-    reloadTac: 2.4,
-    reloadEmpty: 2.7,
-    inspectTime: 3.3,
     drawTime: 0.5,
     holsterTime: 0.4,
     /* A pistol is held out on the arms rather than braced on the shoulder, so
@@ -498,9 +480,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     fireVibe: { amp: 1.4, duration: 0.078, adsScale: 0.55 },
     adsTime: 0.2,
     viewFov: 0.72, // Modest ghost-ring enlargement; a closer eye worsens the prototype wrist.
-    reloadTac: 0.55,
-    reloadEmpty: 0.95,
-    inspectTime: 3.0,
     drawTime: 0.7,
     holsterTime: 0.45,
     action: 'pump',
@@ -567,9 +546,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     adsFovScale: 0.25,
     viewFov: 0.72,
     adsSensScale: 0.25,
-    reloadTac: 2.8,
-    reloadEmpty: 3.6,
-    inspectTime: 3.6,
     drawTime: 0.88,
     holsterTime: 0.56,
     hipPos: [0.124, -0.2, -0.34],

@@ -225,9 +225,8 @@ export class MarketOverlay {
     this.market.closeShop(); // emits market:close -> ui hides this overlay
   }
 
-  _buy(itemId: string | undefined): void {
-    const id = this.market.getHudState().items.find((item): boolean => item.id === itemId)?.id;
-    if (id === undefined || !this.market.buy(id)) {
+  _buy(itemId: MarketItem['id']): void {
+    if (!this.market.buy(itemId)) {
       this.ctx.peek('ui')?.sfx?.('market_deny', 0.75);
       return;
     }
