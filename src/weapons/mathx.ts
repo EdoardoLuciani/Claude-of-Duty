@@ -59,14 +59,14 @@ export class Spring {
   f: number;
   z: number;
   x: number;
-  v: number;
   target: number;
+
+  v: number = 0;
 
   constructor(f = 12, z = 1, value = 0) {
     this.f = f;
     this.z = z;
     this.x = value;
-    this.v = 0;
     this.target = value;
   }
 

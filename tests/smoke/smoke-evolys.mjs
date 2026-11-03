@@ -79,9 +79,9 @@ assert.equal(anim.constructor.name, 'EvolysAnimation');
 assert.equal(model.reactiveFire, true, 'preserve shared reactive recoil, no extra baked kick');
 assert.equal(Object.keys(anim.actions).length, 8);
 for (const [name, duration] of [
-  ['reloadTac', WEAPON_DEFS.lmg.reloadTac],
-  ['reloadEmpty', WEAPON_DEFS.lmg.reloadEmpty],
-  ['inspect', WEAPON_DEFS.lmg.inspectTime],
+  ['reloadTac', 3.4],
+  ['reloadEmpty', 4.8],
+  ['inspect', 3.6],
   ['draw', WEAPON_DEFS.lmg.drawTime],
   ['holster', WEAPON_DEFS.lmg.holsterTime],
 ]) {

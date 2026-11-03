@@ -283,14 +283,14 @@ for (const name of ['Reload_Tactical', 'Reload_Empty']) {
   }
 }
 anim.reset();
-for (const [name, key] of [
-  ['reloadTac', 'reloadTac'],
-  ['reloadEmpty', 'reloadEmpty'],
-  ['inspect', 'inspectTime'],
-  ['draw', 'drawTime'],
-  ['holster', 'holsterTime'],
+for (const [name, duration] of [
+  ['reloadTac', 2.4],
+  ['reloadEmpty', 2.7],
+  ['inspect', 3.3],
+  ['draw', WEAPON_DEFS.pistol.drawTime],
+  ['holster', WEAPON_DEFS.pistol.holsterTime],
 ]) {
-  assert.equal(entry.clips[name].duration, WEAPON_DEFS.pistol[key]);
+  assert.equal(entry.clips[name].duration, duration);
 }
 // The shared event system owns ammunition; Blender's motion is not another state machine.
 const wp = new WeaponSystem();

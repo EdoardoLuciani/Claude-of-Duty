@@ -125,28 +125,19 @@ type ContactKind = keyof typeof CONTACT_URLS;
 type SpecialBufferKey = 'heartbeatBuffer';
 export class WeaponSampleBank {
   actx: BaseAudioContext;
-  buffers: Partial<Record<SampleKind, AudioBuffer[]>>;
-  indices: Partial<Record<SampleKind, number>>;
-  heartbeatBuffer: AudioBuffer | null;
-  aircraftBuffers: AudioBuffer[];
-  aircraftIndex: number;
-  hitBuffers: Partial<Record<ContactKind, AudioBuffer[]>>;
-  hitIndices: Partial<Record<ContactKind, number>>;
-  reloadBuffers: Partial<Record<ReloadKind, AudioBuffer[]>>;
-  reloadIndices: Partial<Record<ReloadKind, number>>;
-  loaded: number;
+  buffers: Partial<Record<SampleKind, AudioBuffer[]>> = {};
+  indices: Partial<Record<SampleKind, number>> = {};
+  heartbeatBuffer: AudioBuffer | null = null;
+  aircraftBuffers: AudioBuffer[] = [];
+  aircraftIndex: number = -1;
+  hitBuffers: Partial<Record<ContactKind, AudioBuffer[]>> = {};
+  hitIndices: Partial<Record<ContactKind, number>> = {};
+  reloadBuffers: Partial<Record<ReloadKind, AudioBuffer[]>> = {};
+  reloadIndices: Partial<Record<ReloadKind, number>> = {};
+  loaded: number = 0;
+
   constructor(actx: BaseAudioContext) {
     this.actx = actx;
-    this.buffers = {};
-    this.indices = {};
-    this.heartbeatBuffer = null;
-    this.aircraftBuffers = [];
-    this.aircraftIndex = -1;
-    this.hitBuffers = {};
-    this.hitIndices = {};
-    this.reloadBuffers = {};
-    this.reloadIndices = {};
-    this.loaded = 0;
   }
 
   async load(): Promise<number> {

@@ -192,65 +192,6 @@ export class WeaponSystem {
   set pickups(value: AmmoPickups | null) {
     this._pickups = value;
   }
-  declare states: Map<WeaponId, WeaponState>;
-  declare owned: Set<WeaponId>;
-  declare activeId: WeaponId;
-  declare debugMode: string | null;
-  declare disabled: boolean;
-  private _warmTask: Promise<WeaponWarmupReport> | null = null;
-  declare _fireTimer: number;
-  declare _burstLeft: number;
-  declare _burstCooldown: number;
-  /** Mode-change latch: the new mode needs a fresh trigger press. */
-  declare _triggerLatched: boolean;
-  declare _spread: number;
-  declare _shotIndex: number;
-  declare _sinceShot: number;
-  declare _switchTo: WeaponId | null;
-  declare _muzzle: THREE.Vector3;
-  declare _dir: THREE.Vector3;
-  declare _right: THREE.Vector3;
-  declare _up: THREE.Vector3;
-  declare _tmp: THREE.Vector3;
-  declare _camDir: THREE.Vector3;
-  declare _baseDir: THREE.Vector3;
-  declare _firePayload: {
-    actor: string;
-    weapon: WeaponState['def'];
-    origin: THREE.Vector3;
-    dir: THREE.Vector3;
-    seed: number;
-  };
-  declare _reloadPayload: { weapon: WeaponState['def']; phase: ReloadPhase; retained: boolean };
-  declare _shellPayload: {
-    position: THREE.Vector3;
-    velocity: THREE.Vector3;
-    weapon: WeaponState['def'];
-    fxClass: string;
-    caseLen: number;
-    caseRadius: number;
-    spin: number;
-  };
-  declare _pendingShots: number;
-  declare _shellQueue: Array<{ t: number; weapon: WeaponId | null }>;
-  declare _droppedMags: DroppedMagazine[];
-  declare _grenades: LiveGrenade[];
-  declare grenades: number;
-  declare grenadeEquipped: boolean;
-  declare radioEquipped: boolean;
-  declare healing: boolean;
-  declare carpetBombs: number;
-  declare cooking: boolean;
-  declare _cookAction: 'fire' | 'ads' | null;
-  declare _throwType: string;
-  declare _cookTime: number;
-  declare _throwing: boolean;
-  declare _throwReleased: boolean;
-  declare _throwFuse: number;
-  declare _throwPos: THREE.Vector3;
-  declare _boomPos: THREE.Vector3;
-  declare _state: WeaponPoseState;
-  declare _hudState: WeaponHudState;
   declare _restTask: Promise<void>;
   declare player: EngineSystems['player'] | null;
   declare fx: EngineSystems['fx'] | null;
@@ -261,7 +202,6 @@ export class WeaponSystem {
   declare stats: WeaponStats;
   declare _magPools: Map<WeaponId, DroppedMagazine[]>;
   declare _tubeLoop: boolean;
-  declare _disc: { x: number; y: number };
   declare _fireSeed: number;
   declare _debugFrame: number;
   declare _scriptFrames: number[] | null;
@@ -270,108 +210,126 @@ export class WeaponSystem {
   static readonly id = 'weapons';
   static readonly deps: SystemId[] = ['materials', 'physics', 'models'];
 
+  states: Map<WeaponId, WeaponState> = new Map();
+  /** One primary plus one secondary; the pistol is the starting secondary. */
+  owned: Set<WeaponId> = new Set(['rifle', 'pistol']);
+  activeId: WeaponId = 'rifle';
+  debugMode: string | null = null;
+  disabled: boolean = false;
+  private _warmTask: Promise<WeaponWarmupReport> | null = null;
+  _fireTimer: number = 0;
+  _burstLeft: number = 0;
+  _burstCooldown: number = 0;
+  /** Mode-change latch: the new mode needs a fresh trigger press. */
+  _triggerLatched: boolean = false;
+  _spread: number = 0;
+  _shotIndex: number = 0;
+  _sinceShot: number = 10;
+  _switchTo: WeaponId | null = null;
+  _muzzle: THREE.Vector3 = new THREE.Vector3();
+  _dir: THREE.Vector3 = new THREE.Vector3();
+  _right: THREE.Vector3 = new THREE.Vector3();
+  _up: THREE.Vector3 = new THREE.Vector3();
+  _tmp: THREE.Vector3 = new THREE.Vector3();
+  _camDir: THREE.Vector3 = new THREE.Vector3();
+  _baseDir: THREE.Vector3 = new THREE.Vector3();
+  _disc: { x: number; y: number } = { x: 0, y: 0 };
+  _firePayload: {
+    actor: string;
+    weapon: WeaponState['def'];
+    origin: THREE.Vector3;
+    dir: THREE.Vector3;
+    seed: number;
+  } = {
+    actor: 'player',
+    weapon: WEAPON_DEFS.rifle,
+    origin: new THREE.Vector3(),
+    dir: new THREE.Vector3(),
+    seed: 0,
+  };
+  _reloadPayload: { weapon: WeaponState['def']; phase: ReloadPhase; retained: boolean } = {
+    weapon: WEAPON_DEFS.rifle,
+    phase: 'start',
+    retained: false,
+  };
+  // `weapon:shell` carries the canonical { position, velocity } plus the real
+  // case dimensions and a spin, so fx can size and tumble the brass instead of
+  // guessing: a 9x19 case is less than half the length of a 5.56x45 one.
+  _shellPayload: {
+    position: THREE.Vector3;
+    velocity: THREE.Vector3;
+    weapon: WeaponState['def'];
+    fxClass: string;
+    caseLen: number;
+    caseRadius: number;
+    spin: number;
+  } = {
+    position: new THREE.Vector3(),
+    velocity: new THREE.Vector3(),
+    weapon: WEAPON_DEFS.rifle,
+    fxClass: 'rifle',
+    caseLen: 0.0446,
+    caseRadius: 0.00495,
+    spin: 0,
+  };
+  _pendingShots: number = 0;
+  // Deferred shell ejections (a case leaves the port a few ms after the shot).
+  _shellQueue: Array<{ t: number; weapon: WeaponId | null }> = [];
+  _droppedMags: DroppedMagazine[] = [];
+  _grenades: LiveGrenade[] = []; // live thrown grenades: { body, mesh, fuse }
+  grenades: number = GRENADES_PER_LIFE;
+  /** Grenade in the hand: G drew it, the weapon is stowed. Equipping is
+   *  free — stowing (G again, or a weapon switch) spends nothing. */
+  grenadeEquipped: boolean = false;
+  radioEquipped: boolean = false;
+  healing: boolean = false;
+  carpetBombs: number = CARPET_STRIKES_PER_LIFE;
+  /** The initiating fire/ADS action is held; the fuse burns. Releasing
+   *  that action commits the throw. */
+  cooking: boolean = false;
+  _cookAction: 'fire' | 'ads' | null = null;
+  _throwType: string = 'long'; // decided by the action at cook start
+  _cookTime: number = 0;
+  _throwing: boolean = false; // release accepted; arm anim in flight
+  _throwReleased: boolean = false; // release beat fired: the grenade is out
+  _throwFuse: number = 0; // fuse decided at release, spent at the release beat
+  _throwPos: THREE.Vector3 = new THREE.Vector3();
+  _boomPos: THREE.Vector3 = new THREE.Vector3();
+  _state: WeaponPoseState = {
+    ads: false,
+    sprint: false,
+    lowReady: false,
+    speed: 0,
+    crouch: false,
+    airborne: false,
+    trigger: false,
+    empty: false,
+    magazineLoaded: true,
+    remainingRounds: 0,
+  };
+  // Preallocated HUD snapshot handed to `ui` (see getHudState).
+  _hudState: WeaponHudState = {
+    name: '',
+    mode: 'auto',
+    ammo: 0,
+    reserve: 0,
+    magSize: 0,
+    reloading: false,
+    reloadProgress: 0,
+    ads: false,
+    spread: 0,
+    firing: false,
+    lethalCount: GRENADES_PER_LIFE,
+    cooking: false,
+    grenadeEquipped: false,
+    radioEquipped: false,
+    carpetCount: CARPET_STRIKES_PER_LIFE,
+  };
+
   constructor() {
-    this.states = new Map();
-    /** One primary plus one secondary; the pistol is the starting secondary. */
-    this.owned = new Set(['rifle', 'pistol']);
-    this.activeId = 'rifle';
-    this.debugMode = null;
-    this.disabled = false;
-
-    this._fireTimer = 0;
-    this._burstLeft = 0;
-    this._burstCooldown = 0;
-    this._triggerLatched = false;
-    this._spread = 0;
-    this._shotIndex = 0;
-    this._sinceShot = 10;
-    this._switchTo = null;
-
-    this._muzzle = new THREE.Vector3();
-    this._dir = new THREE.Vector3();
-    this._right = new THREE.Vector3();
-    this._up = new THREE.Vector3();
-    this._tmp = new THREE.Vector3();
-    this._camDir = new THREE.Vector3();
-    this._baseDir = new THREE.Vector3();
-    this._disc = { x: 0, y: 0 };
-    this._firePayload = {
-      actor: 'player',
-      weapon: WEAPON_DEFS.rifle,
-      origin: new THREE.Vector3(),
-      dir: new THREE.Vector3(),
-      seed: 0,
-    };
-    this._reloadPayload = { weapon: WEAPON_DEFS.rifle, phase: 'start', retained: false };
-    // `weapon:shell` carries the canonical { position, velocity } plus the real
-    // case dimensions and a spin, so fx can size and tumble the brass instead of
-    // guessing: a 9x19 case is less than half the length of a 5.56x45 one.
-    this._shellPayload = {
-      position: new THREE.Vector3(),
-      velocity: new THREE.Vector3(),
-      weapon: WEAPON_DEFS.rifle,
-      fxClass: 'rifle',
-      caseLen: 0.0446,
-      caseRadius: 0.00495,
-      spin: 0,
-    };
-    this._pendingShots = 0;
-
-    // Deferred shell ejections (a case leaves the port a few ms after the shot).
-    this._shellQueue = [];
     for (let i = 0; i < 8; i++) {
       this._shellQueue.push({ t: -1, weapon: null });
     }
-    this._droppedMags = [];
-    this._grenades = []; // live thrown grenades: { body, mesh, fuse }
-    this.grenades = GRENADES_PER_LIFE;
-    /** Grenade in the hand: G drew it, the weapon is stowed. Equipping is
-     *  free — stowing (G again, or a weapon switch) spends nothing. */
-    this.grenadeEquipped = false;
-    this.radioEquipped = false;
-    this.healing = false;
-    this.carpetBombs = CARPET_STRIKES_PER_LIFE;
-    /** The initiating fire/ADS action is held; the fuse burns. Releasing
-     *  that action commits the throw. */
-    this.cooking = false;
-    this._cookAction = null;
-    this._throwType = 'long'; // decided by the action at cook start
-    this._cookTime = 0;
-    this._throwing = false; // release accepted; arm anim in flight
-    this._throwReleased = false; // release beat fired: the grenade is out
-    this._throwFuse = 0; // fuse decided at release, spent at the release beat
-    this._throwPos = new THREE.Vector3();
-    this._boomPos = new THREE.Vector3();
-    this._state = {
-      ads: false,
-      sprint: false,
-      lowReady: false,
-      speed: 0,
-      crouch: false,
-      airborne: false,
-      trigger: false,
-      empty: false,
-      magazineLoaded: true,
-      remainingRounds: 0,
-    };
-    // Preallocated HUD snapshot handed to `ui` (see getHudState).
-    this._hudState = {
-      name: '',
-      mode: 'auto',
-      ammo: 0,
-      reserve: 0,
-      magSize: 0,
-      reloading: false,
-      reloadProgress: 0,
-      ads: false,
-      spread: 0,
-      firing: false,
-      lethalCount: GRENADES_PER_LIFE,
-      cooking: false,
-      grenadeEquipped: false,
-      radioEquipped: false,
-      carpetCount: CARPET_STRIKES_PER_LIFE,
-    };
   }
 
   /* ====================================================================== */
@@ -1273,11 +1231,10 @@ export class WeaponSystem {
         // Share the viewmodel's geometry and materials; the world copy needs no
         // resources of its own.
         magazine.traverse((object: THREE.Object3D): void => {
-          if (isWeaponMesh(object)) {
-            const o = object;
-            const m = new THREE.Mesh(o.geometry, o.material);
-            m.position.copy(o.position);
-            m.quaternion.copy(o.quaternion);
+          if (object instanceof THREE.Mesh) {
+            const m = new THREE.Mesh(object.geometry, object.material);
+            m.position.copy(object.position);
+            m.quaternion.copy(object.quaternion);
             m.castShadow = true;
             group.add(m);
           }
@@ -1998,8 +1955,4 @@ export class WeaponSystem {
 function requiredTuning(value: number | undefined, name: string): number {
   if (value === undefined) throw new Error(`[weapons] missing ${name} tuning`);
   return value;
-}
-
-function isWeaponMesh(object: THREE.Object3D): object is THREE.Mesh {
-  return object instanceof THREE.Mesh;
 }

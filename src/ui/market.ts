@@ -49,18 +49,19 @@ export class MarketOverlay {
   root: HTMLElement;
   waveLine: HTMLElement;
   credits: HTMLElement;
-  cards: MarketCard[];
-  active: boolean;
-  shown: number;
-  wave: number;
-  _pulse: number;
-  _hoverId: string | null;
   _onClick: (event: MouseEvent) => void;
   _onOver: (event: MouseEvent) => void;
   _onKey: (event: KeyboardEvent) => void;
   _onFocus: (event: FocusEvent) => void;
   inspection: MarketInspection;
   _selectedId: string | null = null;
+  cards: MarketCard[] = [];
+  active: boolean = false;
+  shown: number = 0;
+  wave: number = 0;
+  _pulse: number = 0;
+  _hoverId: string | null = null;
+
   constructor(parent: HTMLElement, ctx: MarketContext) {
     this.ctx = ctx;
     this.market = ctx.get('market');
@@ -78,7 +79,6 @@ export class MarketOverlay {
     const body = el('div', 'ow-market-body', panel);
     const catalog = el('div', 'ow-market-catalog', body);
     this.inspection = new MarketInspection(body, ctx.get('weapons'));
-    this.cards = [];
     const items = this.market.getHudState().items;
     let secN = 1,
       lastSlot: MarketSlot | '' = '',
@@ -106,12 +106,6 @@ export class MarketOverlay {
       foot,
       'ESC SKIP · SELECT AN ITEM TO INSPECT · BUY / SWAP TO PURCHASE'
     );
-
-    this.active = false;
-    this.shown = 0;
-    this.wave = 0;
-    this._pulse = 0;
-    this._hoverId = null;
 
     this._onClick = (e: MouseEvent): void => {
       const card = targetCard(e.target);
@@ -225,9 +219,8 @@ export class MarketOverlay {
     this.market.closeShop(); // emits market:close -> ui hides this overlay
   }
 
-  _buy(itemId: string | undefined): void {
-    const id = this.market.getHudState().items.find((item): boolean => item.id === itemId)?.id;
-    if (id === undefined || !this.market.buy(id)) {
+  _buy(itemId: MarketItem['id']): void {
+    if (!this.market.buy(itemId)) {
       this.ctx.peek('ui')?.sfx?.('market_deny', 0.75);
       return;
     }

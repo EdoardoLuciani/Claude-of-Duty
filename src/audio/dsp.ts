@@ -115,10 +115,10 @@ export function fillNoise(out: Float32Array, kind: NoiseKind, rng: AudioRandom):
  */
 export class NoiseBank {
   actx: BaseAudioContext;
-  buffers: Partial<Record<NoiseKind, AudioBuffer>>;
+  buffers: Partial<Record<NoiseKind, AudioBuffer>> = {};
+
   constructor(actx: BaseAudioContext, rng: AudioRandom, seconds = 2.2) {
     this.actx = actx;
-    this.buffers = {};
     const kinds: NoiseKind[] = ['white', 'pink', 'brown', 'crackle'];
     for (const kind of kinds) {
       const len = Math.max(1, Math.floor(actx.sampleRate * seconds));

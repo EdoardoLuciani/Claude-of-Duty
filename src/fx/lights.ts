@@ -26,9 +26,9 @@ interface LightRegistrar {
   addLight?(light: THREE.PointLight, options: { range: number; priority: number }): void;
 }
 export class LightPool {
-  lights: LightEntry[];
+  lights: LightEntry[] = [];
+
   constructor(scene: THREE.Scene, count = 4) {
-    this.lights = [];
     for (let i = 0; i < count; i++) {
       const l = new THREE.PointLight(0xffffff, 0, 14, 2);
       l.castShadow = false;

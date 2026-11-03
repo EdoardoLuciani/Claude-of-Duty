@@ -78,33 +78,28 @@ interface LedgeCharacter {
 
 export class LedgeProbe {
   physics: LedgePhysics | null;
-  _p0: THREE.Vector3;
-  _p1: THREE.Vector3;
-  _dir: THREE.Vector3;
-  _origin: THREE.Vector3;
-  result: LedgeResult;
+  // Preallocated query scratch — nothing here allocates per probe.
+  _p0: THREE.Vector3 = new THREE.Vector3();
+  _p1: THREE.Vector3 = new THREE.Vector3();
+  _dir: THREE.Vector3 = new THREE.Vector3();
+  _origin: THREE.Vector3 = new THREE.Vector3();
+  /** Last successful result. Reused; copy anything you keep. */
+  result: LedgeResult = {
+    kind: LEDGE_NONE,
+    fast: false,
+    obstacleHeight: 0,
+    topY: 0,
+    lipX: 0,
+    lipZ: 0,
+    landX: 0,
+    landY: 0,
+    landZ: 0,
+    distance: 0,
+    surface: 'concrete',
+  };
+
   constructor(physics: LedgePhysics | null) {
     this.physics = physics;
-    // Preallocated query scratch — nothing here allocates per probe.
-    this._p0 = new THREE.Vector3();
-    this._p1 = new THREE.Vector3();
-    this._dir = new THREE.Vector3();
-    this._origin = new THREE.Vector3();
-
-    /** Last successful result. Reused; copy anything you keep. */
-    this.result = {
-      kind: LEDGE_NONE,
-      fast: false,
-      obstacleHeight: 0,
-      topY: 0,
-      lipX: 0,
-      lipZ: 0,
-      landX: 0,
-      landY: 0,
-      landZ: 0,
-      distance: 0,
-      surface: 'concrete',
-    };
   }
 
   /**
@@ -234,58 +229,31 @@ interface MantleCharacter {
   position: import('../physics/character.ts').CharacterController['position'];
 }
 export class MantleMotion {
-  active: boolean;
-  kind: LedgeKind;
-  t: number;
-  duration: number;
-  startX: number;
-  startY: number;
-  startZ: number;
-  topY: number;
-  landX: number;
-  landY: number;
-  landZ: number;
-  fx: number;
-  fz: number;
-  side: number;
-  height: number;
-  exitSpeed: number;
-  surface: SurfaceName;
-  px: number;
-  py: number;
-  pz: number;
-  camY: number;
-  camForward: number;
-  camPitch: number;
-  camRoll: number;
-  constructor() {
-    this.active = false;
-    this.kind = LEDGE_NONE;
-    this.t = 0;
-    this.duration = 0.6;
-    this.startX = 0;
-    this.startY = 0;
-    this.startZ = 0;
-    this.topY = 0;
-    this.landX = 0;
-    this.landY = 0;
-    this.landZ = 0;
-    this.fx = 0;
-    this.fz = 1;
-    this.side = 1;
-    this.height = 0;
-    this.exitSpeed = 0;
-    this.surface = 'concrete';
-
-    /** Output — written by `evaluate()`, read by the controller and camera. */
-    this.px = 0;
-    this.py = 0;
-    this.pz = 0;
-    this.camY = 0;
-    this.camForward = 0;
-    this.camPitch = 0;
-    this.camRoll = 0;
-  }
+  active: boolean = false;
+  kind: LedgeKind = LEDGE_NONE;
+  t: number = 0;
+  duration: number = 0.6;
+  startX: number = 0;
+  startY: number = 0;
+  startZ: number = 0;
+  topY: number = 0;
+  landX: number = 0;
+  landY: number = 0;
+  landZ: number = 0;
+  fx: number = 0;
+  fz: number = 1;
+  side: number = 1;
+  height: number = 0;
+  exitSpeed: number = 0;
+  surface: SurfaceName = 'concrete';
+  /** Output — written by `evaluate()`, read by the controller and camera. */
+  px: number = 0;
+  py: number = 0;
+  pz: number = 0;
+  camY: number = 0;
+  camForward: number = 0;
+  camPitch: number = 0;
+  camRoll: number = 0;
 
   /** @param {object} ledge a LedgeProbe.result */
   begin(

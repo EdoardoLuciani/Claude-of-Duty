@@ -141,7 +141,11 @@ function tick(state, now, agents, origin = ORIGIN) {
     lastKnown: { x: 9, y: 0, z: 9 },
     lastKnownAge: 12,
   });
-  const ai = { agents: Array.from({ length: 6 }, () => agent()) };
+  const wave = { number: 3, remaining: 6, total: 8, incoming: true, nextIn: 10 };
+  const ai = {
+    agents: Array.from({ length: 6 }, () => agent()),
+    getWaveState: () => wave,
+  };
   const ctx = {
     config: { deterministic: false },
     time: { elapsed: 0, scale: 1, dt: 1 / 60 },
@@ -163,6 +167,15 @@ function tick(state, now, agents, origin = ORIGIN) {
   };
   const game = new GameSystem();
   await game.init(ctx);
+  assert.deepEqual(game.getHudState(), {
+    score: 0,
+    kills: 0,
+    wave: wave.number,
+    enemiesRemaining: wave.remaining,
+    waveTotal: wave.total,
+    waveIncoming: wave.incoming,
+    nextWaveIn: wave.nextIn,
+  });
   let t = 0;
   const pump = (dt = 0) => {
     t += dt;

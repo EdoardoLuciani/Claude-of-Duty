@@ -163,20 +163,7 @@ export class SurfaceNav {
   components!: Map<number, number>;
   meta!: NavMeta;
   query!: NavMeshQuery;
-  coverPoints!: NavCoverPoint[];
-  lastOutcome!: string | null;
-  lastReason!: string | null;
-  startSurface!: number;
-  goalSurface!: number;
-  resolvedFloor!: number;
   stats!: NavStats;
-  _a!: THREE.Vector3;
-  _b!: THREE.Vector3;
-  _sample!: THREE.Vector3;
-  _arc!: THREE.Vector3;
-  _p0!: THREE.Vector3;
-  _p1!: THREE.Vector3;
-  _source!: THREE.Vector3;
   _probe!: NavController | null;
   readonly ladders: readonly LadderDescriptor[];
   readonly ladderLinks = new Map<number, LadderLink>();
@@ -215,6 +202,20 @@ export class SurfaceNav {
     }
   }
 
+  coverPoints: NavCoverPoint[] = [];
+  lastOutcome: string | null = null;
+  lastReason: string | null = null;
+  startSurface: number = 0;
+  goalSurface: number = 0;
+  resolvedFloor: number = NaN;
+  _a: THREE.Vector3 = new THREE.Vector3();
+  _b: THREE.Vector3 = new THREE.Vector3();
+  _sample: THREE.Vector3 = new THREE.Vector3();
+  _arc: THREE.Vector3 = new THREE.Vector3();
+  _p0: THREE.Vector3 = new THREE.Vector3();
+  _p1: THREE.Vector3 = new THREE.Vector3();
+  _source: THREE.Vector3 = new THREE.Vector3();
+
   constructor(
     physics: NavPhysics,
     mesh: ReturnType<typeof importNavMesh>['navMesh'],
@@ -230,12 +231,6 @@ export class SurfaceNav {
     this.routeFilter = new QueryFilter();
     this.walkingComponents = navigationComponents(mesh, true);
     this.ladders = meta.ladders ?? [];
-    this.coverPoints = [];
-    this.lastOutcome = null;
-    this.lastReason = null;
-    this.startSurface = 0;
-    this.goalSurface = 0;
-    this.resolvedFloor = NaN;
     this.stats = {
       polygons: components.size,
       queries: 0,
@@ -243,13 +238,6 @@ export class SurfaceNav {
       endpointChecks: 0,
       cacheHits: 0,
     };
-    this._a = new THREE.Vector3();
-    this._b = new THREE.Vector3();
-    this._sample = new THREE.Vector3();
-    this._arc = new THREE.Vector3();
-    this._p0 = new THREE.Vector3();
-    this._p1 = new THREE.Vector3();
-    this._source = new THREE.Vector3();
     // Reuse one real controller for short attachment checks, never a per-request
     // character allocation or a simulation of the entire route. Not a game actor.
     this._probe = physics.createCharacter({
@@ -781,30 +769,25 @@ export class CoverMap {
   grid!: SurfaceNav | null;
   physics!: NavPhysics;
   points!: NavCoverPoint[];
-  byComponent!: Map<number, NavCoverPoint[]>;
-  _v!: THREE.Vector3;
-  _v2!: THREE.Vector3;
-  _v3!: THREE.Vector3;
   _candidates!: (NavCoverPoint | null)[];
-  _scores!: Float64Array;
-  lastReject!: string | null;
+  byComponent: Map<number, NavCoverPoint[]> = new Map();
+  _v: THREE.Vector3 = new THREE.Vector3();
+  _v2: THREE.Vector3 = new THREE.Vector3();
+  _v3: THREE.Vector3 = new THREE.Vector3();
+  _scores: Float64Array = new Float64Array(TACTICS.coverCandidates);
+  lastReject: string | null = null;
+
   constructor(nav: SurfaceNav | null, physics: NavPhysics) {
     this.grid = nav;
     this.physics = physics;
     this.points = nav?.coverPoints ?? [];
-    this.byComponent = new Map();
     for (const p of this.points) {
       p.component = nav?.walkingComponents?.get(p.surface) ?? p.component;
       let list = this.byComponent.get(p.component);
       if (!list) this.byComponent.set(p.component, (list = []));
       list.push(p);
     }
-    this._v = new THREE.Vector3();
-    this._v2 = new THREE.Vector3();
-    this._v3 = new THREE.Vector3();
     this._candidates = new Array<NavCoverPoint | null>(TACTICS.coverCandidates).fill(null);
-    this._scores = new Float64Array(TACTICS.coverCandidates);
-    this.lastReject = null;
   }
   pick(
     pos: THREE.Vector3,

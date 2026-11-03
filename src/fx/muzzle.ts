@@ -1,5 +1,5 @@
 import { P } from './atlas.ts';
-import { resetSpawn } from './particles.ts';
+import { resetSpawn, setSpawnColorRamp } from './particles.ts';
 import { V, C, C2, basis, blackbody, clampCone, cone, towardHemi, COS55 } from './util.ts';
 
 /**
@@ -230,16 +230,11 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   // the automatic-fire cadence is 50 ms, so this is exactly "always one lit".
   s.life = 0.062;
   s.drag = 10;
-  s.r0 = gr;
-  s.g0 = gg;
-  s.b0 = gb;
+  setSpawnColorRamp(s, gr, gg, gb, tr, tg, tb);
   s.i0 = 17 * gain;
   // i1 is NOT zero: the last third of the burn is cooling gas, still bright
   // enough to read as fire. With a zero tail and a 50 ms auto-fire cadence, one
   // frame in three caught the flash mid-fade and showed nothing but sparks.
-  s.r1 = tr;
-  s.g1 = tg;
-  s.b1 = tb;
   s.i1 = 4.5 * gain;
   s.alphaCurve = 0.7;
   s.soft = 0.15;
@@ -258,13 +253,8 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   s.sizeCurve = 0.4;
   s.life = 0.046;
   s.drag = 12;
-  s.r0 = cr;
-  s.g0 = cg;
-  s.b0 = cb;
+  setSpawnColorRamp(s, cr, cg, cb, gr, gg, gb);
   s.i0 = 38 * gain;
-  s.r1 = gr;
-  s.g1 = gg;
-  s.b1 = gb;
   s.i1 = 6 * gain;
   s.alphaCurve = 0.6;
   s.soft = 0.12;
@@ -324,13 +314,8 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     // Deep orange and an order of magnitude under the core: the core owns the
     // white, the gas around it stays fire-coloured. Only a strong channel
     // *ratio* survives the tone curve as amber rather than as more white.
-    s.r0 = gr;
-    s.g0 = gg;
-    s.b0 = gb;
+    setSpawnColorRamp(s, gr, gg, gb, tr, tg, tb);
     s.i0 = (8 + rng.float() * 6) * gain * choke;
-    s.r1 = tr;
-    s.g1 = tg;
-    s.b1 = tb;
     s.i1 = 1.6 * gain * choke;
     s.alphaCurve = 0.75;
     s.soft = 0.15;
@@ -353,13 +338,8 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   s.stretch = 0.28 * prof.jet;
   s.life = 0.044;
   s.drag = 14;
-  s.r0 = 1;
-  s.g0 = 0.8;
-  s.b0 = 0.5;
+  setSpawnColorRamp(s, 1, 0.8, 0.5, 1, 0.4, 0.1);
   s.i0 = 9 * gain;
-  s.r1 = 1;
-  s.g1 = 0.4;
-  s.b1 = 0.1;
   s.i1 = 0;
   s.alphaCurve = 0.6;
   s.soft = 0.12;
@@ -399,13 +379,8 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     s.life = rng.range(0.1, 0.4);
     s.drag = 3.2;
     s.gravity = -11;
-    s.r0 = C.r;
-    s.g0 = C.g;
-    s.b0 = C.b;
+    setSpawnColorRamp(s, C.r, C.g, C.b, C2.r, C2.g, C2.b);
     s.i0 = rng.range(5, 11) * emberGain;
-    s.r1 = C2.r;
-    s.g1 = C2.g;
-    s.b1 = C2.b;
     s.i1 = 0.15;
     s.flags = 1;
     s.alphaCurve = 0.5;
@@ -453,13 +428,8 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     s.drag = 7;
     s.rot = rot;
     s.spin = spin;
-    s.r0 = 1;
-    s.g0 = 0.5;
-    s.b0 = 0.17;
+    setSpawnColorRamp(s, 1, 0.5, 0.17, 1, 0.26, 0.05);
     s.i0 = (0.5 + rng.float() * 0.7) * gain;
-    s.r1 = 1;
-    s.g1 = 0.26;
-    s.b1 = 0.05;
     s.i1 = 0;
     s.alphaCurve = 1.1;
     s.soft = 0.2;
@@ -484,12 +454,7 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     s.rot = rot;
     s.spin = spin;
     // warm, lit by its own flash while it is still hot -> plain grey as it cools
-    s.r0 = 0.62;
-    s.g0 = 0.57;
-    s.b0 = 0.52;
-    s.r1 = 0.44;
-    s.g1 = 0.44;
-    s.b1 = 0.44;
+    setSpawnColorRamp(s, 0.62, 0.57, 0.52, 0.44, 0.44, 0.44);
     s.alpha = rng.range(0.26, 0.44) * (0.7 + prof.smoke * 0.4) * emberGain;
     s.alphaCurve = 1.35;
     s.soft = 0.22;
@@ -521,12 +486,7 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     s.gravity = 0.36;
     s.rot = rng.float() * TWO_PI;
     s.spin = rng.signed() * 1.6;
-    s.r0 = 0.5;
-    s.g0 = 0.49;
-    s.b0 = 0.47;
-    s.r1 = 0.42;
-    s.g1 = 0.41;
-    s.b1 = 0.4;
+    setSpawnColorRamp(s, 0.5, 0.49, 0.47, 0.42, 0.41, 0.4);
     s.alpha = rng.range(0.1, 0.2) * (0.6 + prof.smoke * 0.5) * emberGain;
     s.alphaCurve = 1.8;
     s.soft = 0.25;

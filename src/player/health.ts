@@ -61,59 +61,43 @@ interface DamageOptions {
 export class Health {
   declare ctx: HealthContext;
   declare rig: DamageRig | null;
-  declare max: number;
-  declare value: number;
-  declare armour: number;
-  declare maxArmour: number;
-  declare dead: boolean;
-  declare lastDamageTime: number;
-  declare suppression: number;
-  declare hitFlash: number;
-  declare beatPhase: number;
-  declare beatAge: number;
-  declare pulse: number;
-  declare effect: number;
-  declare _payload: DamageTakenPayload;
-  declare _statePayload: HealthStatePayload;
-  declare _beat: { strength: number; fraction: number };
+
+  max: number = HEALTH.max;
+  value: number = HEALTH.max;
+  /** Consumable buffer, bought at the market. Absorbs before health; no regen. */
+  armour: number = 0;
+  maxArmour: number = HEALTH.maxArmour;
+  dead: boolean = false;
+  lastDamageTime: number = -100;
+  suppression: number = 0;
+  hitFlash: number = 0;
+  // Beat phase controls cadence; age tracks the recording's two visual thumps.
+  beatPhase: number = 0;
+  beatAge: number = 1; // silence until the first recorded beat
+  pulse: number = 0;
+  effect: number = 0; // 0..1 overall low-health treatment weight
+  _payload: DamageTakenPayload = {
+    amount: 0,
+    from: new THREE.Vector3(),
+    health: 0,
+    direction: 0,
+    armourAbsorbed: 0,
+    armour: 0,
+    plateBreak: false,
+  };
+  _statePayload: HealthStatePayload = {
+    health: HEALTH.max,
+    fraction: 1,
+    low: false,
+    suppression: 0,
+    dead: false,
+    effect: 0,
+  };
+  _beat: { strength: number; fraction: number } = { strength: 0, fraction: 1 };
 
   constructor(ctx: HealthContext, rig: DamageRig | null) {
     this.ctx = ctx;
     this.rig = rig;
-    this.max = HEALTH.max;
-    this.value = HEALTH.max;
-    /** Consumable buffer, bought at the market. Absorbs before health; no regen. */
-    this.armour = 0;
-    this.maxArmour = HEALTH.maxArmour;
-    this.dead = false;
-    this.lastDamageTime = -100;
-    this.suppression = 0;
-    this.hitFlash = 0;
-
-    // Beat phase controls cadence; age tracks the recording's two visual thumps.
-    this.beatPhase = 0;
-    this.beatAge = 1; // silence until the first recorded beat
-    this.pulse = 0;
-    this.effect = 0; // 0..1 overall low-health treatment weight
-
-    this._payload = {
-      amount: 0,
-      from: new THREE.Vector3(),
-      health: 0,
-      direction: 0,
-      armourAbsorbed: 0,
-      armour: 0,
-      plateBreak: false,
-    };
-    this._statePayload = {
-      health: HEALTH.max,
-      fraction: 1,
-      low: false,
-      suppression: 0,
-      dead: false,
-      effect: 0,
-    };
-    this._beat = { strength: 0, fraction: 1 };
   }
 
   get fraction(): number {

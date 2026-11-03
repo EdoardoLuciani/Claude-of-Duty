@@ -92,9 +92,6 @@ export class Arm {
   root!: THREE.Object3D;
   shoulder!: THREE.Vector3;
   pole!: THREE.Vector3;
-  bodyUp!: THREE.Vector3;
-  bodyRight!: THREE.Vector3;
-  poses!: Record<string, HandPoseData>;
   pose!: string;
   controls!: Record<string, THREE.Bone>;
   skeleton!: THREE.Skeleton | null;
@@ -120,6 +117,10 @@ export class Arm {
   _poseTime!: number;
   _poseDuration!: number;
   _poseBlend!: number;
+  bodyUp: THREE.Vector3 = new THREE.Vector3(0, 1, 0);
+  bodyRight: THREE.Vector3 = new THREE.Vector3(1, 0, 0);
+  poses: Record<string, HandPoseData> = {};
+
   constructor(side: number, opts: ArmOptions = {}) {
     this.side = side;
     this.scale = opts.scale ?? 1;
@@ -133,9 +134,6 @@ export class Arm {
       opts.shoulderZ ?? 0.12
     );
     this.pole = new THREE.Vector3(side * 0.46, -0.86, 0.22).normalize();
-    this.bodyUp = new THREE.Vector3(0, 1, 0);
-    this.bodyRight = new THREE.Vector3(1, 0, 0);
-    this.poses = {};
     createArmControls(this);
     this.setPose(opts.pose ?? 'wrap');
   }
