@@ -90,9 +90,9 @@ for (const side of ['left', 'right']) {
 }
 const clips = anim.clips();
 for (const [name, duration] of [
-  ['reloadTac', def.reloadTac],
-  ['reloadEmpty', def.reloadEmpty],
-  ['inspect', def.inspectTime],
+  ['reloadTac', 1.85],
+  ['reloadEmpty', 2.5],
+  ['inspect', 2.9],
   ['draw', def.drawTime],
   ['holster', def.holsterTime],
 ])

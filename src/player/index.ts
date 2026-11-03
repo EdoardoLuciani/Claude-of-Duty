@@ -957,7 +957,6 @@ export class PlayerSystem {
    * THREE.Euler, an object with `.y`, or a yaw in radians.
    */
   teleport(eyeOrPos: THREE.Vector3, rot: THREE.Euler | { x?: number; y?: number } | number): void {
-    if (!eyeOrPos) return;
     const eyeH = STANCE.stand.eye;
     const feetY = eyeOrPos.y - eyeH;
     if (typeof rot === 'number') {

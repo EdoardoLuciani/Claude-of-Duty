@@ -45,15 +45,6 @@ import { V, cone } from './util.ts';
  * before evaluating hazeSys.warpNode() on the resolved world texture, before the separate first-person composite.
  * The warp resamples that texture before bloom; it cannot take a colour expression.
  */
-interface FxImpactEvent {
-  point: THREE.Vector3;
-  normal: THREE.Vector3;
-  incident?: THREE.Vector3;
-  surface: SurfaceName;
-  damage: number;
-  exit?: boolean;
-  actor?: unknown;
-}
 type FxEventMap = EngineEventMap;
 export type FxContext = Pick<
   EngineContext,
@@ -467,39 +458,23 @@ export class FxSystem {
 
   /** Electrical arcs from the exposed cache controller, also on completion. */
   onIntelSpark(e: FxEventMap['intel:spark']): void {
-    if (!e?.position) return;
     this.now = this.ctx.time.elapsed;
     spawnIntelSparks(this, e.position);
   }
 
   /** Handle a `bullet:impact` payload. */
-  onImpact(e: FxImpactEvent): void {
-    if (!e || !e.point) return;
+  onImpact(e: FxEventMap['bullet:impact']): void {
     this.now = this.ctx.time.elapsed;
-    if (!e.normal) return;
-    let energy = clamp(0.7 + (e.damage ?? 25) / 55, 0.7, 1.7);
+    let energy = clamp(0.7 + e.damage / 55, 0.7, 1.7);
     if (e.exit === true) energy *= 0.75;
     const spawn = e.exit === true ? spawnExit : spawnImpact;
-    spawn(this, e.point, e.normal, e.incident ?? this._defaultIncident(e), e.surface, energy);
+    spawn(this, e.point, e.normal, e.incident, e.surface, energy);
     this.stats.spawned++;
   }
 
-  _defaultIncident(e: FxImpactEvent): THREE.Vector3 {
-    this._d2.set(-e.normal.x, -e.normal.y, -e.normal.z);
-    return this._d2;
-  }
-
   /** `weapon:fire` — set `e.fx === false` to suppress and drive FX yourself. */
-  onWeaponFire(
-    e: FxEventMap['weapon:fire'] & {
-      fx?: boolean;
-      viewSpace?: boolean;
-      intensity?: number;
-      light?: number;
-      flashScale?: number;
-    }
-  ): void {
-    if (!e || e.fx === false || !e.origin || !e.dir) return;
+  onWeaponFire(e: FxEventMap['weapon:fire']): void {
+    if (e.fx === false) return;
     this.now = this.ctx.time.elapsed;
     this._camPos.setFromMatrixPosition(this.ctx.camera.matrixWorld);
     const firstPerson = this._camPos.distanceToSquared(e.origin) < 2.25;
@@ -540,7 +515,6 @@ export class FxSystem {
       // light and leave the sprites where they are.
       this._fromView(pos);
       this._lightPos.copy(this._p2);
-      o = this._viewArg(o);
     } else {
       this._lightPos.copy(pos);
       if (o.view) {
@@ -571,12 +545,6 @@ export class FxSystem {
     view: false,
   };
   _lightPos = new THREE.Vector3();
-
-  /** Mark an options object as already being in viewmodel space. */
-  _viewArg<T extends { view?: boolean }>(o: T): T {
-    this._flashArg.view = true;
-    return o;
-  }
 
   /** Viewmodel-scene point -> world space (for the punctual light). */
   _fromView(pos: THREE.Vector3): THREE.Vector3 {

@@ -1284,11 +1284,10 @@ export class WeaponSystem {
         // Share the viewmodel's geometry and materials; the world copy needs no
         // resources of its own.
         magazine.traverse((object: THREE.Object3D): void => {
-          if (isWeaponMesh(object)) {
-            const o = object;
-            const m = new THREE.Mesh(o.geometry, o.material);
-            m.position.copy(o.position);
-            m.quaternion.copy(o.quaternion);
+          if (object instanceof THREE.Mesh) {
+            const m = new THREE.Mesh(object.geometry, object.material);
+            m.position.copy(object.position);
+            m.quaternion.copy(object.quaternion);
             m.castShadow = true;
             group.add(m);
           }
@@ -2009,8 +2008,4 @@ export class WeaponSystem {
 function requiredTuning(value: number | undefined, name: string): number {
   if (value === undefined) throw new Error(`[weapons] missing ${name} tuning`);
   return value;
-}
-
-function isWeaponMesh(object: THREE.Object3D): object is THREE.Mesh {
-  return object instanceof THREE.Mesh;
 }

@@ -468,11 +468,7 @@ export class SkySystem {
     this._applyWeather();
     this._applyFog();
     // Turbidity is baked into all three LUTs, so it needs the static bake too.
-    if (patch.turbidity !== undefined) {
-      this.luts.bakeStatic(this.renderer);
-      this._skyDirty = true;
-      this._envDirty = true;
-    }
+    if (patch.turbidity !== undefined) this.luts.bakeStatic(this.renderer);
     this._skyDirty = true;
     this._envDirty = true;
     return this;
