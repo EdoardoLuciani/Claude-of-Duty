@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import { bindingLabel } from '../core/bindings.ts';
-import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
+import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName } from '../core/events.ts';
 import type { WeaponMode } from '../weapons/defs.ts';
 import { AmmoPanel } from './ammo.ts';
@@ -271,16 +271,15 @@ export class UiSystem {
 
     on('weapon:reload', (e): void => {
       const s = this.state;
-      if (e?.phase === 'start') {
+      if (e.phase === 'start') {
         s.reloading = true;
         s.reloadProgress = 0;
-      } else if (e?.phase === 'end') {
+      } else if (e.phase === 'end') {
         s.reloading = false;
       }
     });
 
     on('damage:dealt', (e): void => {
-      if (!e) return;
       // The payload means "damage dealt TO e.target". `ai` uses it for enemy
       // rounds that connect with the player, which must not draw a hitmarker or
       // a "YOU killed" killfeed row — that arrives as `damage:taken` below.
@@ -309,49 +308,36 @@ export class UiSystem {
     });
 
     on('damage:taken', (e): void => {
-      const amount = e?.amount ?? 10;
-      if (e?.health !== undefined) this.state.health = e.health;
-      else this.state.health = Math.max(0, this.state.health - amount);
-      let dx = 0;
-      let dz = 1;
-      if (e?.from) {
-        this._tmp.copy(e.from).sub(this._playerPos());
-        dx = this._tmp.x;
-        dz = this._tmp.z;
-      }
+      this.state.health = e.health;
+      this._tmp.copy(e.from).sub(this._playerPos());
       // HUD only: audio owns all health/armour sound layers from this event.
-      const absorbed = e?.armourAbsorbed ?? 0;
-      if (absorbed > 0) {
-        this.health.onArmour(absorbed, e?.plateBreak);
-      }
-      if (amount > 0) this.hurt(amount, dx, dz);
+      if (e.armourAbsorbed > 0) this.health.onArmour(e.armourAbsorbed, e.plateBreak);
+      if (e.amount > 0) this.hurt(e.amount, this._tmp.x, this._tmp.z);
     });
 
     on('score:change', (e): void => {
-      if (e?.score !== undefined) this.state.score = e.score;
+      this.state.score = e.score;
     });
 
     on('wave:start', (e): void => {
-      if (!e) return;
-      this.state.wave = e.wave ?? this.state.wave;
-      this.state.enemiesRemaining = e.enemies ?? this.state.enemiesRemaining;
-      this.state.waveTotal = e.enemies ?? this.state.waveTotal;
+      this.state.wave = e.wave;
+      this.state.enemiesRemaining = e.enemies;
+      this.state.waveTotal = e.enemies;
       this.state.waveIncoming = false;
-      if ((e.wave ?? 0) > 1) {
-        this.banner.show(`Wave ${e.wave}`, `${e.enemies ?? 0} HOSTILES INBOUND`, 2.1);
+      if (e.wave > 1) {
+        this.banner.show(`Wave ${e.wave}`, `${e.enemies} HOSTILES INBOUND`, 2.1);
         this.sfx('objective', 0.6);
       }
     });
 
     on('wave:complete', (e): void => {
-      if (!e) return;
       this.state.enemiesRemaining = 0;
       this.state.waveIncoming = true;
-      this.state.nextWaveIn = e.delay ?? 0;
-      const points = Math.max(1, e.wave ?? 1) * 250;
+      this.state.nextWaveIn = e.delay;
+      const points = Math.max(1, e.wave) * 250;
       // The shop opens after a 10 s grace period (see MARKET_DELAY), so the
       // banner has the moment to itself before the countdown takes over.
-      this.banner.show(`Wave ${e.wave ?? this.state.wave} Cleared`, `+${points} · WAVE BONUS`, 2.4);
+      this.banner.show(`Wave ${e.wave} Cleared`, `+${points} · WAVE BONUS`, 2.4);
       this.sfx('objective', 0.7);
     });
 
@@ -360,7 +346,7 @@ export class UiSystem {
       this.pixiHud?.setVisible(false);
     });
     on('market:open', (e): void => {
-      this.shop.show(e?.wave ?? 0);
+      this.shop.show(e.wave);
       this.sfx('market_open', 0.85);
     });
     on('market:close', (): void => {
@@ -374,10 +360,9 @@ export class UiSystem {
     });
 
     on('explosion', (e): void => {
-      if (!e?.position) return;
       this._tmp.copy(e.position).sub(this._playerPos());
       const d = this._tmp.length();
-      if (d < (e.radius ?? 6) * 2.5) this.crosshair.onFlinch(0.6);
+      if (d < e.radius * 2.5) this.crosshair.onFlinch(0.6);
     });
 
     on('radio:strike', (): void => {
@@ -386,12 +371,10 @@ export class UiSystem {
     });
 
     on('hud:heard', (e): void => {
-      if (!e) return;
       this.compass.ping(e.bearing);
       this.sfx('compass_ping', 0.4);
     });
     on('hud:search', (e): void => {
-      if (!e) return;
       this.compass.ping(e.bearing);
       this.banner.show(
         `Search ${e.sector}`,
@@ -402,11 +385,10 @@ export class UiSystem {
     });
 
     on('player:state', (e): void => {
-      if (!e) return;
       const s = this.state;
-      if (e.ads !== undefined) s.ads = !!e.ads;
-      if (e.sprinting !== undefined) s.sprint = !!e.sprinting;
-      if (e.stance !== undefined) s.crouch = e.stance === 'crouch' || e.stance === 'prone';
+      s.ads = e.ads;
+      s.sprint = e.sprinting;
+      s.crouch = e.stance === 'crouch' || e.stance === 'prone';
     });
 
     // Clear the combat chrome while the world camera cranes into the death
@@ -414,7 +396,7 @@ export class UiSystem {
     on('player:death', (): void => {
       this.hudTarget = 0;
       this._hadPointerLock = false;
-      const run = ctx.peek('game')?.getHudState?.() ?? this.state;
+      const run = ctx.peek('game')?.getHudState() ?? this.state;
       this.gameOver.show(run, ctx.peek('market')?.credits ?? 0);
     });
     on('player:respawn', (): void => {
@@ -422,17 +404,17 @@ export class UiSystem {
       this.gameOver.hide();
     });
     on('player:heal', (e): void => {
-      if (e?.phase === 'complete') {
-        const amt = Math.round(e.amount ?? 0);
+      if (e.phase === 'complete') {
+        const amt = Math.round(e.amount);
         this.banner.show('Bandage Applied', amt > 0 ? `+${amt} HP` : 'STABILISED', 1.6);
       }
     });
     on('ammo:pickup', (e): void => {
-      this.banner.show('Ammunition Recovered', `+${e?.amount ?? 0} ROUNDS`, 1.5);
+      this.banner.show('Ammunition Recovered', `+${e.amount} ROUNDS`, 1.5);
       this.sfx('objective', 0.45);
     });
     on('intel:available', (e): void => {
-      const n = Math.max(1, e?.count ?? 1);
+      const n = e.count;
       this.banner.show(
         'Intel Cache Active',
         n > 1 ? `${n} SEARCH AREAS ON MINIMAP` : 'SEARCH THE AMBER AREA · LISTEN FOR THE SIGNAL',
@@ -441,7 +423,7 @@ export class UiSystem {
       this.sfx('intel_call', 0.55);
     });
     on('intel:secured', (e): void => {
-      const credits = e?.credits ?? 0;
+      const credits = e.credits;
       this.banner.show('Intel Secured', `+${credits} CREDITS`, 3);
       this.sfx('market_buy', 0.75);
     });
@@ -469,12 +451,6 @@ export class UiSystem {
 
   /* ------------------------------------------------------------- helpers -- */
 
-  _weaponState(): ReturnType<EngineSystems['weapons']['getHudState']> | null {
-    const w = this.ctx.peek('weapons');
-    if (!w || typeof w.getHudState !== 'function') return null;
-    return w.getHudState() ?? null;
-  }
-
   /** True when a `damage:dealt` payload is aimed at the local player. */
   _isPlayerTarget(t: unknown): boolean {
     if (!t) return false;
@@ -483,12 +459,6 @@ export class UiSystem {
       t === this.ctx.peek('player') ||
       (typeof t === 'object' && 'isPlayer' in t && t.isPlayer === true)
     );
-  }
-
-  _playerState(): ReturnType<EngineSystems['player']['getHudState']> | null {
-    const p = this.ctx.peek('player');
-    if (!p || typeof p.getHudState !== 'function') return null;
-    return p.getHudState() ?? null;
   }
 
   _playerPos(): THREE.Vector3 {
@@ -636,10 +606,10 @@ export class UiSystem {
     this.shop.update(rawDt);
 
     // ---- external state --------------------------------------------------
-    const ws = this._weaponState();
+    const ws = ctx.peek('weapons')?.getHudState();
     if (ws) {
-      if (ws.name) s.weaponName = ws.name;
-      if (ws.mode) s.fireMode = ws.mode;
+      s.weaponName = ws.name;
+      s.fireMode = ws.mode;
       s.ammo = ws.ammo;
       s.reserve = ws.reserve;
       s.magSize = ws.magSize;
@@ -652,7 +622,7 @@ export class UiSystem {
       s.grenadeEquipped = ws.grenadeEquipped;
     }
 
-    const gameState = ctx.peek('game')?.getHudState?.();
+    const gameState = ctx.peek('game')?.getHudState();
     if (gameState) {
       s.score = gameState.score;
       s.wave = gameState.wave;
@@ -662,13 +632,13 @@ export class UiSystem {
       s.nextWaveIn = gameState.nextWaveIn;
     }
 
-    const marketState = ctx.peek('market')?.getHudState?.();
+    const marketState = ctx.peek('market')?.getHudState();
     if (marketState) {
       s.credits = marketState.credits;
       s.marketIn = marketState.marketIn;
     }
 
-    const ps = this._playerState();
+    const ps = ctx.peek('player')?.getHudState();
     if (ps) {
       s.health = ps.health;
       s.maxHealth = ps.maxHealth;
@@ -755,7 +725,7 @@ export class UiSystem {
     this._mmState.fov = ctx.camera.fov;
     this._mmState.blips = this._blipView;
     const intel = this.ctx.peek('intel');
-    const intelHud = intel?.getHudState?.();
+    const intelHud = intel?.getHudState();
     this._mmState.pulses = intelHud?.pulses ?? null;
     this._mmState.pulseTime = intelHud?.pulseTime ?? 0;
     this._mmState.playerY = ctx.peek('player')?.feetPosition?.y ?? 0;
@@ -776,13 +746,12 @@ export class UiSystem {
 
   _collectBlips(): void {
     const ai = this.ctx.peek('ai');
-    const list = typeof ai?.getHudActors === 'function' ? ai.getHudActors() : null;
-    if (!Array.isArray(list)) return;
+    if (!ai) return;
+    const list = ai.getHudActors();
     let n = 0;
     for (let i = 0; i < list.length && n < MAX_BLIPS; i++) {
       const a = list[i];
-      const p = a?.position;
-      if (!p || a.alive === false || ('dead' in a && a.dead === true)) continue;
+      const p = a.position;
       const b = this._blips[n++];
       b.x = a.hudX ?? p.x;
       b.z = a.hudZ ?? p.z;
