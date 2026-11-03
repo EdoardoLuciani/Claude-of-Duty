@@ -43,11 +43,6 @@ interface MapLabel {
   w: number;
   text: string | null;
 }
-interface MapObjective {
-  x: number;
-  z: number;
-  label?: string;
-}
 interface MapBlip {
   x: number;
   z: number;
@@ -66,7 +61,6 @@ export interface MinimapState {
   z?: number;
   heading?: number;
   fov?: number;
-  objectives?: MapObjective[] | null;
   blips?: MapBlip[] | null;
   pulses?: MapPulse[] | null;
   pulseTime?: number;

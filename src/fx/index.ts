@@ -587,7 +587,6 @@ export class FxSystem {
     speed: number | undefined,
     opts: Parameters<typeof spawnTracer>[4] = {}
   ): void {
-    if (!from || !to) return;
     this.now = this.ctx.time.elapsed;
     spawnTracer(this, from, to, speed ?? 0, opts);
   }
@@ -600,7 +599,6 @@ export class FxSystem {
 
   /** Eject a casing or spent shotgun hull as a pooled physics body. */
   spawnShell(position: THREE.Vector3, velocity: THREE.Vector3, opts: ShellOptions = {}): void {
-    if (!position) return;
     this.now = this.ctx.time.elapsed;
     this.shells.spawn(position, velocity, opts);
   }
@@ -754,11 +752,9 @@ export class FxSystem {
   /* ===================================================================== */
 
   onActorDeath(e: FxEventMap['actor:death']): void {
-    if (!e?.point) return;
     this.now = this.ctx.time.elapsed;
     const rng = this.rng;
     // a heavier burst of mist than a body shot, plus spatter on the ground
-    this._n.set(0, 1, 0);
     for (let i = 0; i < Math.round(8 * this.pScale) + 3; i++) {
       cone(V, rng, 0, 1, 0, 1.4, 0.7);
       const s = resetSpawn();
@@ -801,7 +797,7 @@ export class FxSystem {
   }
 
   onLand(e: FxEventMap['player:land']): void {
-    const v = Math.abs(e?.velocity ?? 0);
+    const v = Math.abs(e.velocity);
     if (v < 3.2) return;
     this.now = this.ctx.time.elapsed;
     const rng = this.rng;
@@ -846,7 +842,7 @@ export class FxSystem {
   }
 
   onFootstep(e: FxEventMap['player:footstep']): void {
-    if (!e?.running || !e.position) return;
+    if (!e.running) return;
     if (this.rng.float() > 0.55) return;
     this.now = this.ctx.time.elapsed;
     const rng = this.rng;

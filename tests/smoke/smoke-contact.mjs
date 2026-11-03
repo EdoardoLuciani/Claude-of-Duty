@@ -9,6 +9,7 @@ import * as THREE from 'three';
 
 import { FIRE_JITTER, LOS_RANGE, hudContact, fireJitter } from '../../src/ai/contact.ts';
 import { AiSystem } from '../../src/ai/index.ts';
+import { UiSystem } from '../../src/ui/index.ts';
 
 function agent(partial = {}) {
   return {
@@ -189,5 +190,20 @@ ai._updateContacts(ctx);
 assert.equal(front.lastSeen, 14, 're-acquire after grace');
 assert.equal(front.lastSeenX, 3, 'new snapshot after the previous contact dies');
 assert.equal(front.lastSeenZ, -12);
+
+// UI consumes the AI-filtered snapshot, rather than repeating its visibility rules.
+ai._hudList = [];
+for (const flags of [{ alive: false }, { staged: true }, { silentDeath: true }, { team: 0 }])
+  ai.agents.push(hudAgent(0, -5, { lastSeen: 14, ...flags }));
+const ui = Object.assign(new UiSystem(), {
+  ctx: { peek: (id) => (id === 'ai' ? ai : null) },
+  _blips: Array.from({ length: 48 }, () => ({})),
+});
+ui._collectBlips();
+assert.equal(ui._blipCount, 1, 'only the live, visible enemy reaches the UI');
+assert.deepEqual(ui._blips[0], { x: 3, z: -12, kind: 'enemy', heading: 0, fade: 1 });
+ctx.time.elapsed = 17;
+ui._collectBlips();
+assert.equal(ui._blipCount, 0, 'expired contacts clear the UI snapshot');
 
 console.log('  ok  contact minimap rules');
