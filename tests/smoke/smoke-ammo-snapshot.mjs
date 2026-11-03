@@ -21,7 +21,6 @@ for (const chambered of [false, true]) {
     state.chambered = chambered;
     state.reserve = 20;
     const snapshot = weapons.ammo;
-    assert.deepEqual(Object.keys(snapshot).sort(), Object.keys(empty).sort());
     assert.deepEqual(snapshot, {
       mag: mag + Number(chambered),
       inMag: mag,

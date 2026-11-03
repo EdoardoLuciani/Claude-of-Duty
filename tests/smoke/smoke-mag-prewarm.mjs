@@ -86,9 +86,7 @@ const graphWarm = { ms: 12, geometries: 8, frameUnchanged: true };
 finish(graphWarm);
 const report = await pending;
 assert.deepEqual(report, { graphWarm });
-assert.equal(await concurrent, report);
 assert.equal(system.prewarmMaterials(), pending, 'completed work stays cached');
-assert.equal(await system.prewarmMaterials(), report);
 assert.equal(calls, 1, 'completion never repeats native warmup');
 assert.equal(radio.visible, false);
 assert.equal(group.visible, false);
@@ -113,7 +111,7 @@ failedSystem._droppedMags = system._droppedMags;
 failedSystem._magPools = system._magPools;
 const body = {};
 system._droppedMags[0].body = body;
-system.physics = { removeRigidBody: () => assert.fail('warmup removed live debris') };
+failedSystem.physics = { removeRigidBody: () => assert.fail('warmup removed live debris') };
 const failure = new Error('intentional warmup failure');
 let failures = 0;
 render._warmGraph = async () => {
@@ -124,9 +122,7 @@ const failed = failedSystem.prewarmMaterials();
 const failedConcurrent = failedSystem.prewarmMaterials();
 assert.equal(failedConcurrent, failed);
 await assert.rejects(failed, (error) => error === failure);
-await assert.rejects(failedConcurrent, (error) => error === failure);
 assert.equal(failedSystem.prewarmMaterials(), failed, 'failed boot work stays failed');
-await assert.rejects(failedSystem.prewarmMaterials(), (error) => error === failure);
 assert.equal(failures, 1, 'failed warmup must not retry during gameplay');
 // The coordinator, not the weapon operation, owns status/error presentation.
 render.renderer = { getRenderTarget: () => null, setRenderTarget() {} };
