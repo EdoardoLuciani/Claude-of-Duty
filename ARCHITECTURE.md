@@ -368,6 +368,8 @@ current values. Keep internal state keyed by `WeaponId`; narrow DOM/URL/debug
 strings with `isWeaponId` at entry. Authored models carry literal adapter IDs,
 and the loader table checks complete ID coverage and per-ID adapter returns.
 The market UI derives its item contract from `MarketSystem.getHudState()`.
+`weapons.ammo` always returns one complete snapshot, including `inMag: 0` when
+there is no active state. `mag` includes the chamber; `inMag` excludes it.
 
 Preserve shared IK, ADS/sway/recoil and pooled casings. Source/regen/reference
 contracts live beside each asset. Weapons force physical materials and borrow
@@ -429,7 +431,10 @@ that build unused contexts or repeat it in a world hook.
   target state. Failure is terminal except diagnostic `?prewarm=0`.
 - Weapons await deferred models and reveal hidden weapon/optic/grenade ancestors,
   dropped magazines and a temporary ammo visual. Boot-only; no gameplay retry,
-  pickup ID/body or RNG consumption.
+  pickup ID/body or RNG consumption. Their warmup hook shares one promise across
+  concurrent/completed calls and returns a graph diagnostic report. Once started,
+  failures remain rejected (no gameplay retry); the coordinator owns error/status
+  reporting. Calls before graph/viewmodel readiness reject without caching work.
 - AI cannot cache successful warmup before graph creation. Temporary meshes borrow
   real geometry/groups and cast/receive shadows; dispose only their skeletons.
   Await player/AI flashlight warming while the temporary skinned caster is attached.

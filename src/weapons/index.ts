@@ -54,6 +54,21 @@ const GRENADE_LONG_SPEED = 30; // m/s — LONG throw, over double the reach
 const GRENADE_SHORT_UP = 1.2; // vertical bias (m/s) of the short toss
 const GRENADE_LONG_UP = 2.6; // vertical bias (m/s) — a lofted arc, not a laser
 
+interface AmmoSnapshot {
+  /** Rounds available in the weapon, including its chamber. */
+  mag: number;
+  inMag: number;
+  chambered: boolean;
+  reserve: number;
+  magSize: number;
+  total: number;
+  empty: boolean;
+}
+
+interface WeaponWarmupReport {
+  graphWarm: Awaited<ReturnType<EngineSystems['render']['_warmGraph']>>;
+}
+
 interface WeaponPoseState {
   ads: boolean;
   sprint: boolean;
@@ -185,7 +200,6 @@ export class WeaponSystem {
   declare ui: EngineSystems['ui'] | null;
   declare _off: Array<() => void>;
   declare stats: WeaponStats;
-  declare _warming: boolean;
   declare _magPools: Map<WeaponId, DroppedMagazine[]>;
   declare _tubeLoop: boolean;
   declare _fireSeed: number;
@@ -202,7 +216,7 @@ export class WeaponSystem {
   activeId: WeaponId = 'rifle';
   debugMode: string | null = null;
   disabled: boolean = false;
-  _warmed: boolean = false;
+  private _warmTask: Promise<WeaponWarmupReport> | null = null;
   _fireTimer: number = 0;
   _burstLeft: number = 0;
   _burstCooldown: number = 0;
@@ -439,21 +453,18 @@ export class WeaponSystem {
   }
 
   /** Boot-only native warmup; never run zero-range graph draws during gameplay. */
-  async prewarmMaterials(): Promise<
-    | { ok: boolean; reason: string; graphWarm?: undefined; error?: undefined }
-    | {
-        ok: boolean;
-        graphWarm: { ms: number; geometries: number; frameUnchanged: boolean };
-        reason?: undefined;
-        error?: undefined;
-      }
-    | { ok: boolean; error: string; reason?: undefined; graphWarm?: undefined }
-    | undefined
-  > {
-    if (this._warmed || this._warming) return;
+  prewarmMaterials(): Promise<WeaponWarmupReport> {
+    if (this._warmTask) return this._warmTask;
     const render = this.ctx.peek('render');
-    if (!render?._graph || !this._viewmodel?.radio) return { ok: false, reason: 'graph not ready' };
-    this._warming = true;
+    // An early caller may try again after initialization. Once work starts, all
+    // callers share its result, including failure: boot warmup never retries in gameplay.
+    if (!render?._graph || !this._viewmodel?.radio)
+      return Promise.reject(new Error('[weapons] warmup graph or viewmodel not ready'));
+    this._warmTask = this._prewarmMaterials(render);
+    return this._warmTask;
+  }
+
+  private async _prewarmMaterials(render: EngineSystems['render']): Promise<WeaponWarmupReport> {
     const visible: Array<[THREE.Object3D, boolean]> = [];
     let pickup;
     try {
@@ -492,14 +503,10 @@ export class WeaponSystem {
       const graphWarm = flashlight
         ? await render.prewarmLightShadow(flashlight)
         : await render._warmGraph();
-      this._warmed = true;
-      return { ok: true, graphWarm };
-    } catch (error: unknown) {
-      return { ok: false, error: String(error instanceof Error ? error.message : error) };
+      return { graphWarm };
     } finally {
       for (const [group, value] of visible) group.visible = value;
       pickup?.removeFromParent();
-      this._warming = false;
     }
   }
 
@@ -579,27 +586,10 @@ export class WeaponSystem {
     });
   }
 
-  get ammo():
-    | {
-        mag: number;
-        chambered: boolean;
-        reserve: number;
-        magSize: number;
-        total: number;
-        empty: boolean;
-        inMag?: undefined;
-      }
-    | {
-        mag: number;
-        inMag: number;
-        chambered: boolean;
-        reserve: number;
-        magSize: number;
-        total: number;
-        empty: boolean;
-      } {
+  get ammo(): AmmoSnapshot {
     const s = this.state;
-    if (!s) return { mag: 0, chambered: false, reserve: 0, magSize: 0, total: 0, empty: true };
+    if (!s)
+      return { mag: 0, inMag: 0, chambered: false, reserve: 0, magSize: 0, total: 0, empty: true };
     const mag = s.mag;
     const ch = s.chambered ? 1 : 0;
     return {
