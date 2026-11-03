@@ -219,10 +219,6 @@ export class Ragdoll {
   declare friction: number;
   declare userData: unknown;
   declare actor: unknown;
-  declare alive: boolean;
-  declare sleeping: boolean;
-  declare sleepTimer: number;
-  declare age: number;
   declare spec: BoneSpec[];
   declare boneCount: number;
   declare particleCount: number;
@@ -242,21 +238,12 @@ export class Ragdoll {
   declare qy: Float64Array;
   declare qz: Float64Array;
   declare invMass: Float64Array;
-  declare bones3D: Array<THREE.Bone | null> | null;
   declare skeleton: THREE.Skeleton | null;
   declare boneLocalOffset: Float64Array;
   declare boneRestDirection: Float64Array;
   declare boneRestOffset: Float64Array;
   declare attachmentBones: Int32Array;
-  declare aabb: RagdollBounds;
   declare selfPairs: Uint16Array | Int32Array;
-  declare _m4: THREE.Matrix4;
-  declare _m4b: THREE.Matrix4;
-  declare _q: THREE.Quaternion;
-  declare _v3: THREE.Vector3;
-  declare _v3b: THREE.Vector3;
-  declare _scale: THREE.Vector3;
-  declare _ss: ReturnType<typeof makeClosest>;
   declare _sleepWritten: boolean;
   /**
    * @param {StaticWorld} world
@@ -266,6 +253,21 @@ export class Ragdoll {
    *   gravity    m/s^2 (negative)
    *   iterations Gauss-Seidel iterations per fixed step
    */
+  alive: boolean = true;
+  sleeping: boolean = false;
+  sleepTimer: number = 0;
+  age: number = 0;
+  // skeleton binding (filled by adoptSkeleton)
+  bones3D: Array<THREE.Bone | null> | null = null;
+  _m4: THREE.Matrix4 = new THREE.Matrix4();
+  _m4b: THREE.Matrix4 = new THREE.Matrix4();
+  _q: THREE.Quaternion = new THREE.Quaternion();
+  _v3: THREE.Vector3 = new THREE.Vector3();
+  _v3b: THREE.Vector3 = new THREE.Vector3();
+  _scale: THREE.Vector3 = new THREE.Vector3(1, 1, 1);
+  aabb: RagdollBounds = { minx: 0, miny: 0, minz: 0, maxx: 0, maxy: 0, maxz: 0 };
+  _ss: ReturnType<typeof makeClosest> = makeClosest();
+
   constructor(world: RagdollWorld | null, opts: RagdollOptions = {}) {
     this.id = _nextRagdollId++;
     this.world = world;
@@ -276,10 +278,6 @@ export class Ragdoll {
     this.friction = opts.friction ?? 0.72;
     this.userData = opts.userData ?? null;
     this.actor = opts.actor ?? null;
-    this.alive = true;
-    this.sleeping = false;
-    this.sleepTimer = 0;
-    this.age = 0;
 
     const spec = opts.bones ?? humanoidSpec(opts.height ?? 1.8, opts.mass ?? 82);
     this.spec = spec;
@@ -364,15 +362,6 @@ export class Ragdoll {
       this._initUp(i);
     }
 
-    // skeleton binding (filled by adoptSkeleton)
-    this.bones3D = null;
-    this._m4 = new THREE.Matrix4();
-    this._m4b = new THREE.Matrix4();
-    this._q = new THREE.Quaternion();
-    this._v3 = new THREE.Vector3();
-    this._v3b = new THREE.Vector3();
-    this._scale = new THREE.Vector3(1, 1, 1);
-
     // Retain branch offsets in the parent's frame, not loose distance tethers
     // that would let shoulders orbit around the torso.
     const attachments = [];
@@ -396,10 +385,8 @@ export class Ragdoll {
     }
     this.attachmentBones = Int32Array.from(attachments);
 
-    this.aabb = { minx: 0, miny: 0, minz: 0, maxx: 0, maxy: 0, maxz: 0 };
     this._updateAabb();
 
-    this._ss = makeClosest();
     this.selfPairs = this._buildSelfPairs();
   }
 

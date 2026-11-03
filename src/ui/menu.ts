@@ -26,15 +26,17 @@ export class PauseMenu {
   ctx: MenuContext;
   root: HTMLElement;
   rows: HTMLElement;
-  qBtns: HTMLButtonElement[];
   sens: SliderApi;
   fov: SliderApi;
   shake: SliderApi;
-  invBtns: InvertButton[];
   resumeBtn: HTMLButtonElement;
-  open: boolean;
-  shown: number;
   _prevScale?: number;
+  // ---- quality preset --------------------------------------------------
+  qBtns: HTMLButtonElement[] = [];
+  invBtns: InvertButton[] = [];
+  open: boolean = false;
+  shown: number = 0;
+
   constructor(parent: HTMLElement, ctx: MenuContext) {
     this.ctx = ctx;
     this.root = el('div', 'ow-menu', parent);
@@ -48,8 +50,6 @@ export class PauseMenu {
 
     this.rows = el('div', null, inner);
 
-    // ---- quality preset --------------------------------------------------
-    this.qBtns = [];
     const qRow = this._row('Graphics Preset');
     const seg = el('div', 'ow-seg', qRow);
     for (const p of PRESETS) {
@@ -86,7 +86,6 @@ export class PauseMenu {
     // ---- invert look -----------------------------------------------------
     const invRow = this._row('Invert Look');
     const invSeg = el('div', 'ow-seg', invRow);
-    this.invBtns = [];
     const invertOptions: [string, boolean][] = [
       ['off', false],
       ['on', true],
@@ -134,8 +133,6 @@ export class PauseMenu {
       }
     }
 
-    this.open = false;
-    this.shown = 0;
     setStyle(this.root, 'display', 'none');
     setStyle(this.root, 'cursor', 'default');
     this.syncFromConfig();

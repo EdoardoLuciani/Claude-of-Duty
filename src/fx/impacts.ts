@@ -1,7 +1,7 @@
 import type { SurfaceName } from '../physics/surfaces.ts';
 import { P, D } from './atlas.ts';
 import { screenAngle } from './muzzle.ts';
-import { resetSpawn } from './particles.ts';
+import { resetSpawn, setSpawnColorRamp } from './particles.ts';
 import {
   V,
   V2,
@@ -139,13 +139,8 @@ function spark(
   s.delay = o.delay ?? 0;
   s.drag = o.drag ?? rng.range(1.4, 2.6);
   s.gravity = o.gravity ?? -14;
-  s.r0 = C.r;
-  s.g0 = C.g;
-  s.b0 = C.b;
+  setSpawnColorRamp(s, C.r, C.g, C.b, C2.r, C2.g, C2.b);
   s.i0 = (o.intensity ?? 1) * rng.range(6, 13);
-  s.r1 = C2.r;
-  s.g1 = C2.g;
-  s.b1 = C2.b;
   s.i1 = 0.2;
   s.flags = 1;
   s.alphaCurve = 0.45;
@@ -282,13 +277,8 @@ function concrete(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: numb
   s.sizeCurve = 0.42;
   s.life = 0.07;
   s.drag = 6;
-  s.r0 = 1;
-  s.g0 = 0.72;
-  s.b0 = 0.4;
+  setSpawnColorRamp(s, 1, 0.72, 0.4, 1, 0.4, 0.12);
   s.i0 = 10 * e;
-  s.r1 = 1;
-  s.g1 = 0.4;
-  s.b1 = 0.12;
   s.i1 = 0;
   s.alphaCurve = 0.7;
   s.soft = 0.25;
@@ -340,13 +330,8 @@ function concrete(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: numb
     // thrown into the light and the ones thrown away from it. A flat tint here
     // is what sampled as the uniform rgb(163,156,145) grey-white blur.
     const lit = 0.68 + 0.72 * Math.max(0, V2.x * sun.x + V2.y * sun.y + V2.z * sun.z);
-    s.r0 = 0.56 * lit;
-    s.g0 = 0.462 * lit;
-    s.b0 = 0.33 * lit;
+    setSpawnColorRamp(s, 0.56 * lit, 0.462 * lit, 0.33 * lit, 0.45 * lit, 0.365 * lit, 0.26 * lit);
     s.i0 = 1;
-    s.r1 = 0.45 * lit;
-    s.g1 = 0.365 * lit;
-    s.b1 = 0.26 * lit;
     s.i1 = 1;
     s.alpha = rng.range(0.4, 0.72) * (band === 2 ? 0.7 : 1);
     s.alphaCurve = 1.5;
@@ -380,12 +365,7 @@ function concrete(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: numb
     s.gravity = -1.2;
     s.rot = rng.float() * TWO_PI;
     s.spin = rng.signed() * 2.2;
-    s.r0 = 0.58;
-    s.g0 = 0.475;
-    s.b0 = 0.34;
-    s.r1 = 0.47;
-    s.g1 = 0.38;
-    s.b1 = 0.27;
+    setSpawnColorRamp(s, 0.58, 0.475, 0.34, 0.47, 0.38, 0.27);
     s.alpha = rng.range(0.35, 0.6);
     s.alphaCurve = 1.2;
     s.soft = 0.08;
@@ -413,13 +393,8 @@ function concrete(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: numb
     s.gravity = -19;
     s.rot = rng.float() * TWO_PI;
     s.spin = rng.signed() * 22;
-    s.r0 = 0.5;
-    s.g0 = 0.48;
-    s.b0 = 0.45;
+    setSpawnColorRamp(s, 0.5, 0.48, 0.45, 0.42, 0.4, 0.38);
     s.i0 = 1;
-    s.r1 = 0.42;
-    s.g1 = 0.4;
-    s.b1 = 0.38;
     s.i1 = 1;
     s.alphaCurve = 0.25;
     s.soft = 0.06;
@@ -474,12 +449,7 @@ function concrete(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: numb
     s.gravity = 0.28; // buoyant
     s.rot = rng.float() * TWO_PI;
     s.spin = rng.signed() * 0.5;
-    s.r0 = 0.55;
-    s.g0 = 0.49;
-    s.b0 = 0.4;
-    s.r1 = 0.46;
-    s.g1 = 0.41;
-    s.b1 = 0.34;
+    setSpawnColorRamp(s, 0.55, 0.49, 0.4, 0.46, 0.41, 0.34);
     s.alpha = rng.range(0.28, 0.46);
     s.alphaCurve = 1.35;
     s.soft = 0.14;
@@ -540,12 +510,7 @@ function plaster(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: numbe
     // neutral, and it carries a full stop of lambert between the sub-puffs
     // thrown into the sun and the ones thrown away from it.
     const lit = 0.68 + 0.74 * Math.max(0, V2.x * PSUN.x + V2.y * PSUN.y + V2.z * PSUN.z);
-    s.r0 = 0.74 * lit;
-    s.g0 = 0.63 * lit;
-    s.b0 = 0.465 * lit;
-    s.r1 = 0.63 * lit;
-    s.g1 = 0.53 * lit;
-    s.b1 = 0.385 * lit;
+    setSpawnColorRamp(s, 0.74 * lit, 0.63 * lit, 0.465 * lit, 0.63 * lit, 0.53 * lit, 0.385 * lit);
     s.alpha = rng.range(0.42, 0.72) * (band === 2 ? 0.7 : 1);
     s.alphaCurve = 1.6;
     s.soft = 0.09;
@@ -573,12 +538,7 @@ function plaster(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: numbe
     s.gravity = -19;
     s.rot = rng.float() * TWO_PI;
     s.spin = rng.signed() * 18;
-    s.r0 = 0.72;
-    s.g0 = 0.65;
-    s.b0 = 0.52;
-    s.r1 = 0.64;
-    s.g1 = 0.575;
-    s.b1 = 0.46;
+    setSpawnColorRamp(s, 0.72, 0.65, 0.52, 0.64, 0.575, 0.46);
     s.alphaCurve = 0.25;
     s.soft = 0.06;
     s.seed = rng.float();
@@ -604,12 +564,7 @@ function plaster(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: numbe
     s.gravity = -1.1;
     s.rot = rng.float() * TWO_PI;
     s.spin = rng.signed() * 2.2;
-    s.r0 = 0.77;
-    s.g0 = 0.66;
-    s.b0 = 0.485;
-    s.r1 = 0.65;
-    s.g1 = 0.55;
-    s.b1 = 0.4;
+    setSpawnColorRamp(s, 0.77, 0.66, 0.485, 0.65, 0.55, 0.4);
     s.alpha = rng.range(0.35, 0.6);
     s.alphaCurve = 1.2;
     s.soft = 0.08;
@@ -648,13 +603,8 @@ function metal(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number)
   s.life = 0.07;
   s.drag = 8;
   s.rot = screenAngle(fx, false, rx, ry, rz) + rng.signed() * 0.2;
-  s.r0 = 1;
-  s.g0 = 0.6;
-  s.b0 = 0.26;
+  setSpawnColorRamp(s, 1, 0.6, 0.26, 1, 0.5, 0.16);
   s.i0 = 9 * e;
-  s.r1 = 1;
-  s.g1 = 0.5;
-  s.b1 = 0.16;
   s.i1 = 0;
   s.alphaCurve = 0.6;
   s.soft = 0.2;
@@ -673,13 +623,8 @@ function metal(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number)
   // 24, not 40: a ricochet is a spark burst, not a light bulb. Above ~30 the
   // bloom turns the whole hit into a white ball and the spark shower behind it
   // stops reading.
-  s.r0 = 1;
-  s.g0 = 0.97;
-  s.b0 = 0.92;
+  setSpawnColorRamp(s, 1, 0.97, 0.92, 1, 0.55, 0.2);
   s.i0 = 24 * e;
-  s.r1 = 1;
-  s.g1 = 0.55;
-  s.b1 = 0.2;
   s.i1 = 0;
   s.alphaCurve = 0.5;
   s.soft = 0.2;
@@ -738,13 +683,8 @@ function metal(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number)
     s.gravity = -13;
     blackbody(C, 2100);
     blackbody(C2, 1150);
-    s.r0 = C.r;
-    s.g0 = C.g;
-    s.b0 = C.b;
+    setSpawnColorRamp(s, C.r, C.g, C.b, C2.r, C2.g, C2.b);
     s.i0 = rng.range(5, 10);
-    s.r1 = C2.r;
-    s.g1 = C2.g;
-    s.b1 = C2.b;
     s.i1 = 0.1;
     s.alphaCurve = 0.7;
     s.flags = 1;
@@ -773,12 +713,7 @@ function metal(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number)
     s.gravity = 0.4;
     s.rot = rng.float() * TWO_PI;
     s.spin = rng.signed() * 1.4;
-    s.r0 = 0.2;
-    s.g0 = 0.19;
-    s.b0 = 0.18;
-    s.r1 = 0.26;
-    s.g1 = 0.25;
-    s.b1 = 0.24;
+    setSpawnColorRamp(s, 0.2, 0.19, 0.18, 0.26, 0.25, 0.24);
     s.alpha = rng.range(0.3, 0.5);
     s.alphaCurve = 1.7;
     s.soft = 0.1;
@@ -839,12 +774,7 @@ function wood(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number):
     s.gravity = -18;
     s.rot = rng.float() * TWO_PI;
     s.spin = rng.signed() * 26;
-    s.r0 = 0.44;
-    s.g0 = 0.3;
-    s.b0 = 0.16;
-    s.r1 = 0.36;
-    s.g1 = 0.24;
-    s.b1 = 0.13;
+    setSpawnColorRamp(s, 0.44, 0.3, 0.16, 0.36, 0.24, 0.13);
     s.alphaCurve = 0.25;
     s.soft = 0.06;
     s.seed = rng.float();
@@ -871,12 +801,7 @@ function wood(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number):
     s.gravity = -0.9;
     s.rot = rng.float() * TWO_PI;
     s.spin = rng.signed() * 1.4;
-    s.r0 = 0.46;
-    s.g0 = 0.34;
-    s.b0 = 0.2;
-    s.r1 = 0.38;
-    s.g1 = 0.28;
-    s.b1 = 0.17;
+    setSpawnColorRamp(s, 0.46, 0.34, 0.2, 0.38, 0.28, 0.17);
     s.alpha = rng.range(0.5, 0.8);
     s.alphaCurve = 1.5;
     s.soft = 0.09;
@@ -918,12 +843,7 @@ function ground(fx: ImpactFx, p: Vec3Like, n: Vec3Like, e: number, sand: boolean
     s.gravity = -1.6;
     s.rot = rng.float() * TWO_PI;
     s.spin = rng.signed() * 1.1;
-    s.r0 = cr;
-    s.g0 = cg;
-    s.b0 = cb;
-    s.r1 = cr * 0.85;
-    s.g1 = cg * 0.85;
-    s.b1 = cb * 0.85;
+    setSpawnColorRamp(s, cr, cg, cb, cr * 0.85, cg * 0.85, cb * 0.85);
     s.alpha = rng.range(0.6, 0.95);
     s.alphaCurve = 1.4;
     s.soft = 0.14;
@@ -951,12 +871,7 @@ function ground(fx: ImpactFx, p: Vec3Like, n: Vec3Like, e: number, sand: boolean
     s.gravity = -19;
     s.rot = rng.float() * TWO_PI;
     s.spin = rng.signed() * 20;
-    s.r0 = cr * 0.8;
-    s.g0 = cg * 0.8;
-    s.b0 = cb * 0.8;
-    s.r1 = cr * 0.7;
-    s.g1 = cg * 0.7;
-    s.b1 = cb * 0.7;
+    setSpawnColorRamp(s, cr * 0.8, cg * 0.8, cb * 0.8, cr * 0.7, cg * 0.7, cb * 0.7);
     s.alphaCurve = 0.3;
     s.soft = 0.06;
     s.seed = rng.float();
@@ -1011,12 +926,7 @@ function glass(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like): void {
     s.gravity = -19;
     s.rot = rng.float() * TWO_PI;
     s.spin = rng.signed() * 30;
-    s.r0 = 0.72;
-    s.g0 = 0.8;
-    s.b0 = 0.84;
-    s.r1 = 0.6;
-    s.g1 = 0.68;
-    s.b1 = 0.72;
+    setSpawnColorRamp(s, 0.72, 0.8, 0.84, 0.6, 0.68, 0.72);
     s.alpha = 0.85;
     s.alphaCurve = 0.3;
     s.soft = 0.06;
@@ -1027,13 +937,8 @@ function glass(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like): void {
       s.tile = P.SPARK;
       s.size0 = rng.range(0.01, 0.02);
       s.size1 = s.size0;
-      s.r0 = 0.85;
-      s.g0 = 0.95;
-      s.b0 = 1;
+      setSpawnColorRamp(s, 0.85, 0.95, 1, 0.8, 0.9, 1);
       s.i0 = rng.range(3, 8);
-      s.r1 = 0.8;
-      s.g1 = 0.9;
-      s.b1 = 1;
       s.i1 = 0.2;
       s.alpha = 1;
       s.alphaCurve = 1;
@@ -1059,12 +964,7 @@ function glass(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like): void {
     s.drag = 4.2;
     s.gravity = -3;
     s.rot = rng.float() * TWO_PI;
-    s.r0 = 0.8;
-    s.g0 = 0.86;
-    s.b0 = 0.9;
-    s.r1 = 0.7;
-    s.g1 = 0.76;
-    s.b1 = 0.8;
+    setSpawnColorRamp(s, 0.8, 0.86, 0.9, 0.7, 0.76, 0.8);
     s.alpha = 0.5;
     s.alphaCurve = 1.6;
     s.soft = 0.1;
@@ -1105,12 +1005,7 @@ function water(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number)
     s.gravity = -13;
     s.rot = rng.signed() * 0.25;
     s.spin = rng.signed() * 0.6;
-    s.r0 = 0.7;
-    s.g0 = 0.76;
-    s.b0 = 0.8;
-    s.r1 = 0.6;
-    s.g1 = 0.68;
-    s.b1 = 0.72;
+    setSpawnColorRamp(s, 0.7, 0.76, 0.8, 0.6, 0.68, 0.72);
     s.alpha = rng.range(0.6, 0.9);
     s.alphaCurve = 1.5;
     s.soft = 0.1;
@@ -1135,12 +1030,7 @@ function water(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number)
     s.life = rng.range(0.4, 0.9);
     s.drag = 0.7;
     s.gravity = -19;
-    s.r0 = 0.72;
-    s.g0 = 0.78;
-    s.b0 = 0.82;
-    s.r1 = 0.66;
-    s.g1 = 0.72;
-    s.b1 = 0.76;
+    setSpawnColorRamp(s, 0.72, 0.78, 0.82, 0.66, 0.72, 0.76);
     s.alpha = 0.8;
     s.alphaCurve = 0.4;
     s.soft = 0.05;
@@ -1162,12 +1052,7 @@ function water(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number)
     s.drag = 3.4;
     s.gravity = -1.4;
     s.rot = rng.float() * TWO_PI;
-    s.r0 = 0.78;
-    s.g0 = 0.83;
-    s.b0 = 0.86;
-    s.r1 = 0.7;
-    s.g1 = 0.75;
-    s.b1 = 0.78;
+    setSpawnColorRamp(s, 0.78, 0.83, 0.86, 0.7, 0.75, 0.78);
     s.alpha = 0.4;
     s.alphaCurve = 1.7;
     s.soft = 0.12;
@@ -1214,12 +1099,7 @@ function flesh(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number)
     s.gravity = -3.2;
     s.rot = rng.float() * TWO_PI;
     s.spin = rng.signed() * 2;
-    s.r0 = 0.34;
-    s.g0 = 0.035;
-    s.b0 = 0.03;
-    s.r1 = 0.16;
-    s.g1 = 0.016;
-    s.b1 = 0.014;
+    setSpawnColorRamp(s, 0.34, 0.035, 0.03, 0.16, 0.016, 0.014);
     s.alpha = rng.range(0.6, 0.95);
     s.alphaCurve = 1.5;
     s.soft = 0.08;
@@ -1246,12 +1126,7 @@ function flesh(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number)
     s.life = rng.range(0.35, 0.8);
     s.drag = 0.9;
     s.gravity = -19;
-    s.r0 = 0.3;
-    s.g0 = 0.03;
-    s.b0 = 0.025;
-    s.r1 = 0.22;
-    s.g1 = 0.022;
-    s.b1 = 0.018;
+    setSpawnColorRamp(s, 0.3, 0.03, 0.025, 0.22, 0.022, 0.018);
     s.alpha = 0.95;
     s.alphaCurve = 0.35;
     s.soft = 0.05;
@@ -1284,12 +1159,7 @@ function foliage(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like): void {
     s.gravity = -8;
     s.rot = rng.float() * TWO_PI;
     s.spin = rng.signed() * 16;
-    s.r0 = 0.14;
-    s.g0 = 0.22;
-    s.b0 = 0.08;
-    s.r1 = 0.11;
-    s.g1 = 0.17;
-    s.b1 = 0.06;
+    setSpawnColorRamp(s, 0.14, 0.22, 0.08, 0.11, 0.17, 0.06);
     s.alphaCurve = 0.4;
     s.soft = 0.06;
     s.seed = rng.float();
@@ -1325,19 +1195,9 @@ function soft(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, rubber: boo
     s.rot = rng.float() * TWO_PI;
     s.spin = rng.signed() * 1.5;
     if (rubber) {
-      s.r0 = 0.1;
-      s.g0 = 0.095;
-      s.b0 = 0.09;
-      s.r1 = 0.08;
-      s.g1 = 0.078;
-      s.b1 = 0.075;
+      setSpawnColorRamp(s, 0.1, 0.095, 0.09, 0.08, 0.078, 0.075);
     } else {
-      s.r0 = 0.5;
-      s.g0 = 0.45;
-      s.b0 = 0.38;
-      s.r1 = 0.42;
-      s.g1 = 0.38;
-      s.b1 = 0.32;
+      setSpawnColorRamp(s, 0.5, 0.45, 0.38, 0.42, 0.38, 0.32);
     }
     s.alpha = rng.range(0.45, 0.7);
     s.alphaCurve = 1.5;

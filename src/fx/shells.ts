@@ -120,13 +120,14 @@ export class ShellSystem {
   mesh: THREE.InstancedMesh;
   hullMesh: THREE.InstancedMesh;
   hullMaterial: MeshStandardNodeMaterial;
-  slots: ShellSlot[];
-  cursor: number;
-  _lastCount: number;
-  _m: THREE.Matrix4;
-  _q: THREE.Quaternion;
-  _e: THREE.Euler;
-  _s: THREE.Vector3;
+  slots: ShellSlot[] = [];
+  cursor: number = 0;
+  _lastCount: number = 0;
+  _m: THREE.Matrix4 = new THREE.Matrix4();
+  _q: THREE.Quaternion = new THREE.Quaternion();
+  _e: THREE.Euler = new THREE.Euler();
+  _s: THREE.Vector3 = new THREE.Vector3(1, 1, 1);
+
   constructor(fx: ShellFx, hullGeometry: THREE.BufferGeometry) {
     this.fx = fx;
     const geo = new THREE.LatheGeometry(caseProfile(), 16);
@@ -175,7 +176,6 @@ export class ShellSystem {
     this.hullMesh.name = 'fx-spent12g';
     this.hullMesh.userData.owProbe = true;
 
-    this.slots = [];
     for (let i = 0; i < CAPACITY; i++) {
       this.slots.push({
         shotgun: false,
@@ -194,12 +194,6 @@ export class ShellSystem {
       });
       this.slots[i].proxy.matrixAutoUpdate = false;
     }
-    this.cursor = 0;
-    this._lastCount = 0;
-    this._m = new THREE.Matrix4();
-    this._q = new THREE.Quaternion();
-    this._e = new THREE.Euler();
-    this._s = new THREE.Vector3(1, 1, 1);
   }
 
   spawn(

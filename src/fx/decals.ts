@@ -66,12 +66,7 @@ export class DecalSystem {
    */
   capacity: number;
   cols: number;
-  vertsPerDecal: number;
   maxVerts: number;
-  cursor: number;
-  highWater: number;
-  expireAt: number;
-  count: number;
   pos: Float32Array;
   nrm: Float32Array;
   uvs: Float32Array;
@@ -84,20 +79,22 @@ export class DecalSystem {
   uNow: ReturnType<typeof uniform<'float'>>;
   material: MeshStandardNodeMaterial;
   mesh: THREE.Mesh;
-  _polyA: Float32Array;
-  _polyB: Float32Array;
-  _dirtyLo: number;
-  _dirtyHi: number;
-  _wrapped: boolean;
+  vertsPerDecal: number = 36;
+  cursor: number = 0;
+  highWater: number = 0;
+  expireAt: number = -1;
+  count: number = 0;
+  // scratch (allocated once)
+  _polyA: Float32Array = new Float32Array(MAX_POLY * 3);
+  _polyB: Float32Array = new Float32Array(MAX_POLY * 3);
+  _dirtyLo: number = Infinity;
+  _dirtyHi: number = -Infinity;
+  _wrapped: boolean = false;
+
   constructor(o: DecalSystemOptions) {
     this.capacity = Math.max(8, o.capacity | 0);
     this.cols = o.cols;
-    this.vertsPerDecal = 36;
     this.maxVerts = this.capacity * this.vertsPerDecal;
-    this.cursor = 0;
-    this.highWater = 0;
-    this.expireAt = -1;
-    this.count = 0;
 
     this.pos = new Float32Array(this.maxVerts * 3);
     this.nrm = new Float32Array(this.maxVerts * 3);
@@ -160,13 +157,6 @@ export class DecalSystem {
     this.mesh.castShadow = false;
     this.mesh.userData.owProbe = true;
     this.mesh.visible = false;
-
-    // scratch (allocated once)
-    this._polyA = new Float32Array(MAX_POLY * 3);
-    this._polyB = new Float32Array(MAX_POLY * 3);
-    this._dirtyLo = Infinity;
-    this._dirtyHi = -Infinity;
-    this._wrapped = false;
   }
 
   /** Clip polygon `src`/`n` against plane axis (0..2) sign (+1/-1) limit. */

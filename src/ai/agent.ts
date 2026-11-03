@@ -441,15 +441,7 @@ export class Agent {
       : null;
     this.velocity = new THREE.Vector3();
     this.grounded = true;
-    const navCache = (): {
-      nav: null;
-      version: number;
-      ref: number;
-      radius: number;
-      height: number;
-      position: THREE.Vector3;
-      point: THREE.Vector3;
-    } => ({
+    const navCache = (): NavCache => ({
       nav: null,
       version: -1,
       ref: 0,

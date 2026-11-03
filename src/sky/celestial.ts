@@ -105,32 +105,22 @@ export function dirFromAltAz(
  */
 export class Celestial {
   site: CelestialSite;
-  sun: THREE.Vector3;
-  moon: THREE.Vector3;
-  sunAlt: number;
-  sunAz: number;
-  moonAlt: number;
-  moonAz: number;
-  moonPhase: number;
-  moonElongation: number;
-  _aa: AltAzResult;
-  _m: THREE.Matrix4;
-  _tilt: THREE.Matrix4;
+  sun: THREE.Vector3 = new THREE.Vector3(0, 1, 0);
+  moon: THREE.Vector3 = new THREE.Vector3(0, -1, 0);
+  sunAlt: number = 0;
+  sunAz: number = 0;
+  moonAlt: number = 0;
+  moonAz: number = 0;
+  /** Illuminated fraction of the lunar disc, 0..1. */
+  moonPhase: number = 1;
+  /** Angular separation sun-moon; drives the terminator on the disc. */
+  moonElongation: number = Math.PI;
+  _aa: AltAzResult = { alt: 0, az: 0 };
+  _m: THREE.Matrix4 = new THREE.Matrix4();
+  _tilt: THREE.Matrix4 = new THREE.Matrix4();
+
   constructor(site: CelestialSite = SITE) {
     this.site = { ...site };
-    this.sun = new THREE.Vector3(0, 1, 0);
-    this.moon = new THREE.Vector3(0, -1, 0);
-    this.sunAlt = 0;
-    this.sunAz = 0;
-    this.moonAlt = 0;
-    this.moonAz = 0;
-    /** Illuminated fraction of the lunar disc, 0..1. */
-    this.moonPhase = 1;
-    /** Angular separation sun-moon; drives the terminator on the disc. */
-    this.moonElongation = Math.PI;
-    this._aa = { alt: 0, az: 0 };
-    this._m = new THREE.Matrix4();
-    this._tilt = new THREE.Matrix4();
   }
 
   setHour(hour: number): this {

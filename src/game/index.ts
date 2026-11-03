@@ -100,7 +100,7 @@ export class GameSystem {
     });
 
     on('wave:complete', (e): void => {
-      const wave = Math.max(1, (e?.wave ?? 0) | 0);
+      const wave = Math.max(1, e.wave | 0);
       const points = wave * SCORE.wave;
       this.addScore(points, 'wave');
     });
@@ -147,18 +147,16 @@ export class GameSystem {
 
   /** Quiet-survivor compass cue. Uses elapsed time so pause/shop cannot advance it. */
   update(_dt: number, ctx: EngineContext): void {
-    if (ctx.config?.deterministic) return;
+    if (ctx.config.deterministic) return;
     const player = ctx.peek('player');
     if (player?.dead) {
       resetSearchState(this._search);
       return;
     }
-    const agents = this.ai?.agents;
-    if (!agents) return;
     const cue = tickSearchAssist(
       this._search,
       ctx.time.elapsed,
-      agents,
+      this.ai.agents,
       player?.position ?? ctx.camera.position
     );
     if (cue) ctx.events.emit('hud:search', cue);
@@ -166,15 +164,15 @@ export class GameSystem {
 
   /** Stable, allocation-free snapshot polled by the HUD. */
   getHudState(): HudState {
-    const wave = this.ai.getWaveState?.();
+    const wave = this.ai.getWaveState();
     const out = this._hud;
     out.score = this.score;
     out.kills = this.kills;
-    out.wave = wave?.number ?? 0;
-    out.enemiesRemaining = wave?.remaining ?? 0;
-    out.waveTotal = wave?.total ?? 0;
-    out.waveIncoming = wave?.incoming ?? false;
-    out.nextWaveIn = wave?.nextIn ?? 0;
+    out.wave = wave.number;
+    out.enemiesRemaining = wave.remaining;
+    out.waveTotal = wave.total;
+    out.waveIncoming = wave.incoming;
+    out.nextWaveIn = wave.nextIn;
     return out;
   }
 

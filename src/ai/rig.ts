@@ -121,31 +121,20 @@ export const BONES: BoneSpec[] = [
 const LEAF_STUB = 0.075;
 
 export class Rig {
-  names: string[];
-  parent: number[];
-  children: number[][];
-  bindPos: THREE.Vector3[];
-  bindQuat: THREE.Quaternion[];
-  localPos: THREE.Vector3[];
-  localQuat: THREE.Quaternion[];
-  tail: THREE.Vector3[];
-  length: number[];
-  _map: Map<string, number>;
-  count: number;
-  eyeHeight: number;
+  names: string[] = [];
+  parent: number[] = [];
+  children: number[][] = [];
+  bindPos: THREE.Vector3[] = []; // Vector3, world (actor) space
+  bindQuat: THREE.Quaternion[] = []; // Quaternion, world
+  localPos: THREE.Vector3[] = []; // Vector3, parent space
+  localQuat: THREE.Quaternion[] = []; // Quaternion, parent space
+  tail: THREE.Vector3[] = []; // Vector3 — end of the bone (child or stub)
+  length: number[] = [];
+  _map: Map<string, number> = new Map();
+  count: number = BONES.length;
+  eyeHeight: number = 1.665;
 
   constructor() {
-    this.names = [];
-    this.parent = [];
-    this.children = [];
-    this.bindPos = []; // Vector3, world (actor) space
-    this.bindQuat = []; // Quaternion, world
-    this.localPos = []; // Vector3, parent space
-    this.localQuat = []; // Quaternion, parent space
-    this.tail = []; // Vector3 — end of the bone (child or stub)
-    this.length = [];
-    this._map = new Map();
-
     for (let i = 0; i < BONES.length; i++) {
       const [name, parent] = BONES[i];
       this.names.push(name);
@@ -235,9 +224,6 @@ export class Rig {
         this.localQuat.push(inv.clone().multiply(this.bindQuat[i]));
       }
     }
-
-    this.count = BONES.length;
-    this.eyeHeight = 1.665;
   }
 
   index(name: string): number {

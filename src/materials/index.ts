@@ -80,15 +80,10 @@ export class MaterialSystemNode {
   declare _injectedRenderer: Renderer | undefined;
   declare renderer: Renderer;
   declare ctx: MaterialContext;
-  declare _sets: Map<string, MaterialTextureSet>;
-  declare _materials: Map<string, MeshStandardNodeMaterial>;
   private readonly _controls = new WeakMap<
     MeshStandardNodeMaterial,
     { params: SurfaceParams; controls: MaterialControls }
   >();
-  declare _targets: Array<{ dispose(): void }>;
-  declare _shared: MaterialSharedData | null;
-  declare _groundY: number;
   declare _quality: number;
   declare _anisotropy: number;
   private readonly _missing = new Set<string>();
@@ -96,13 +91,14 @@ export class MaterialSystemNode {
   static readonly id = 'materials';
   static readonly deps: SystemId[] = ['render'];
 
+  _sets: Map<string, MaterialTextureSet> = new Map();
+  _materials: Map<string, MeshStandardNodeMaterial> = new Map();
+  _targets: Array<{ dispose(): void }> = [];
+  _shared: MaterialSharedData | null = null;
+  _groundY: number = 0;
+
   constructor({ renderer }: { renderer?: Renderer } = {}) {
     this._injectedRenderer = renderer;
-    this._sets = new Map();
-    this._materials = new Map();
-    this._targets = [];
-    this._shared = null;
-    this._groundY = 0;
   }
 
   async init(ctx: MaterialContext): Promise<void> {

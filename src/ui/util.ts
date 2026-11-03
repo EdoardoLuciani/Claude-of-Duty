@@ -164,7 +164,8 @@ export function metres(d: number): string {
 export class Pool<Node extends HTMLElement | null = HTMLElement> {
   items: PoolRecord<Node>[];
   count: number;
-  _next: number;
+  _next: number = 0;
+
   constructor(count: number, make: (index: number) => Node, parent?: HTMLElement | null) {
     this.items = new Array<PoolRecord<Node>>(count);
     for (let i = 0; i < count; i++) {
@@ -174,7 +175,6 @@ export class Pool<Node extends HTMLElement | null = HTMLElement> {
       this.items[i] = { node, alive: false, t: 0, life: 1, i, a: 0, b: 0, c: 0, d: 0, s: '' };
     }
     this.count = count;
-    this._next = 0;
   }
 
   /** Oldest-first reuse so a burst never starves. */

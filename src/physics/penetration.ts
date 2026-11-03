@@ -115,25 +115,61 @@ interface ResolvedPath {
 
 export class Ballistics {
   declare phys: BallisticsPhysics;
-  declare rng: { gauss(): number } | null;
-  declare _impacts: ShotImpact[];
-  declare _segments: TraceSegment[];
-  declare result: ShotResult;
-  declare _continuation: FlightContinuation;
-  declare _hitActors: unknown[];
-  declare _exit: ReturnType<typeof makeHitRecord>;
-  declare _paths: ResolvedPath[];
-  declare _pathCount: number;
-  declare _thick: ThicknessResult;
-  declare _matrix: THREE.Matrix4;
-  declare _inverse: THREE.Matrix4;
-  declare _one: THREE.Vector3;
+
+  rng: { gauss(): number } | null = null;
+  _impacts: ShotImpact[] = [];
+  _segments: TraceSegment[] = [];
+  _continuation: FlightContinuation = {
+    position: new THREE.Vector3(),
+    dir: new THREE.Vector3(),
+    travelled: 0,
+    damage: 0,
+    penetration: 0,
+  };
+  result: ShotResult = {
+    deferActorDamage: false,
+    continuation: null,
+    impacts: [],
+    segments: [],
+    origin: new THREE.Vector3(),
+    end: new THREE.Vector3(),
+    shooter: null,
+    weapon: null,
+    shot: 0,
+    speed: 800,
+    tracer: false,
+    stopReason: 'range',
+  };
+  _paths: ResolvedPath[] = Array.from(
+    { length: MAX_BULLET_LAYERS * 2 },
+    (): {
+      from: THREE.Vector3;
+      to: THREE.Vector3;
+      distance: number;
+      damage: number;
+      endDamage: number;
+    } => ({
+      from: new THREE.Vector3(),
+      to: new THREE.Vector3(),
+      distance: 0,
+      damage: 0,
+      endDamage: 0,
+    })
+  );
+  _pathCount: number = 0;
+  _hitActors: unknown[] = [];
+  _exit: ReturnType<typeof makeHitRecord> = makeHitRecord();
+  _thick: ThicknessResult = {
+    distance: Infinity,
+    point: new THREE.Vector3(),
+    normal: new THREE.Vector3(),
+  };
+  _matrix: THREE.Matrix4 = new THREE.Matrix4();
+  _inverse: THREE.Matrix4 = new THREE.Matrix4();
+  _one: THREE.Vector3 = new THREE.Vector3(1, 1, 1);
 
   constructor(phys: BallisticsPhysics) {
     this.phys = phys;
-    this.rng = null;
-    this._impacts = [];
-    this._segments = [];
     for (let i = 0; i < MAX_BULLET_LAYERS * 2; i++) {
       this._impacts.push({
         point: new THREE.Vector3(),
@@ -156,50 +192,6 @@ export class Ballistics {
     for (let i = 0; i <= MAX_BULLET_LAYERS; i++) {
       this._segments.push({ from: new THREE.Vector3(), to: new THREE.Vector3(), impact: -1 });
     }
-    this._continuation = {
-      position: new THREE.Vector3(),
-      dir: new THREE.Vector3(),
-      travelled: 0,
-      damage: 0,
-      penetration: 0,
-    };
-    this.result = {
-      deferActorDamage: false,
-      continuation: null,
-      impacts: [],
-      segments: [],
-      origin: new THREE.Vector3(),
-      end: new THREE.Vector3(),
-      shooter: null,
-      weapon: null,
-      shot: 0,
-      speed: 800,
-      tracer: false,
-      stopReason: 'range',
-    };
-    this._paths = Array.from(
-      { length: MAX_BULLET_LAYERS * 2 },
-      (): {
-        from: THREE.Vector3;
-        to: THREE.Vector3;
-        distance: number;
-        damage: number;
-        endDamage: number;
-      } => ({
-        from: new THREE.Vector3(),
-        to: new THREE.Vector3(),
-        distance: 0,
-        damage: 0,
-        endDamage: 0,
-      })
-    );
-    this._pathCount = 0;
-    this._hitActors = [];
-    this._exit = makeHitRecord();
-    this._thick = { distance: Infinity, point: new THREE.Vector3(), normal: new THREE.Vector3() };
-    this._matrix = new THREE.Matrix4();
-    this._inverse = new THREE.Matrix4();
-    this._one = new THREE.Vector3(1, 1, 1);
   }
 
   /** Returns a pooled ShotResult, valid until the next call. Damage is muzzle damage. */

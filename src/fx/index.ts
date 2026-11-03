@@ -13,7 +13,13 @@ import { HazeSystem } from './haze.ts';
 import { spawnImpact, spawnExit, spawnIntelSparks } from './impacts.ts';
 import { LightPool } from './lights.ts';
 import { muzzleFlash } from './muzzle.ts';
-import { ParticleLayer, resetSpawn, disposeQuadSource, SP } from './particles.ts';
+import {
+  ParticleLayer,
+  resetSpawn,
+  disposeQuadSource,
+  SP,
+  setSpawnColorRamp,
+} from './particles.ts';
 import { ShellSystem, loadSpentHullGeometry, type ShellOptions } from './shells.ts';
 import { spawnTracer } from './tracers.ts';
 import { V, cone } from './util.ts';
@@ -45,15 +51,6 @@ import { V, cone } from './util.ts';
  * before evaluating hazeSys.warpNode() on the resolved world texture, before the separate first-person composite.
  * The warp resamples that texture before bloom; it cannot take a colour expression.
  */
-interface FxImpactEvent {
-  point: THREE.Vector3;
-  normal: THREE.Vector3;
-  incident?: THREE.Vector3;
-  surface: SurfaceName;
-  damage: number;
-  exit?: boolean;
-  actor?: unknown;
-}
 type FxEventMap = EngineEventMap;
 export type FxContext = Pick<
   EngineContext,
@@ -467,39 +464,23 @@ export class FxSystem {
 
   /** Electrical arcs from the exposed cache controller, also on completion. */
   onIntelSpark(e: FxEventMap['intel:spark']): void {
-    if (!e?.position) return;
     this.now = this.ctx.time.elapsed;
     spawnIntelSparks(this, e.position);
   }
 
   /** Handle a `bullet:impact` payload. */
-  onImpact(e: FxImpactEvent): void {
-    if (!e || !e.point) return;
+  onImpact(e: FxEventMap['bullet:impact']): void {
     this.now = this.ctx.time.elapsed;
-    if (!e.normal) return;
-    let energy = clamp(0.7 + (e.damage ?? 25) / 55, 0.7, 1.7);
+    let energy = clamp(0.7 + e.damage / 55, 0.7, 1.7);
     if (e.exit === true) energy *= 0.75;
     const spawn = e.exit === true ? spawnExit : spawnImpact;
-    spawn(this, e.point, e.normal, e.incident ?? this._defaultIncident(e), e.surface, energy);
+    spawn(this, e.point, e.normal, e.incident, e.surface, energy);
     this.stats.spawned++;
   }
 
-  _defaultIncident(e: FxImpactEvent): THREE.Vector3 {
-    this._d2.set(-e.normal.x, -e.normal.y, -e.normal.z);
-    return this._d2;
-  }
-
   /** `weapon:fire` — set `e.fx === false` to suppress and drive FX yourself. */
-  onWeaponFire(
-    e: FxEventMap['weapon:fire'] & {
-      fx?: boolean;
-      viewSpace?: boolean;
-      intensity?: number;
-      light?: number;
-      flashScale?: number;
-    }
-  ): void {
-    if (!e || e.fx === false || !e.origin || !e.dir) return;
+  onWeaponFire(e: FxEventMap['weapon:fire']): void {
+    if (e.fx === false) return;
     this.now = this.ctx.time.elapsed;
     this._camPos.setFromMatrixPosition(this.ctx.camera.matrixWorld);
     const firstPerson = this._camPos.distanceToSquared(e.origin) < 2.25;
@@ -540,7 +521,6 @@ export class FxSystem {
       // light and leave the sprites where they are.
       this._fromView(pos);
       this._lightPos.copy(this._p2);
-      o = this._viewArg(o);
     } else {
       this._lightPos.copy(pos);
       if (o.view) {
@@ -571,12 +551,6 @@ export class FxSystem {
     view: false,
   };
   _lightPos = new THREE.Vector3();
-
-  /** Mark an options object as already being in viewmodel space. */
-  _viewArg<T extends { view?: boolean }>(o: T): T {
-    this._flashArg.view = true;
-    return o;
-  }
 
   /** Viewmodel-scene point -> world space (for the punctual light). */
   _fromView(pos: THREE.Vector3): THREE.Vector3 {
@@ -802,12 +776,7 @@ export class FxSystem {
       s.drag = 5;
       s.gravity = -3.5;
       s.rot = rng.float() * 6.283;
-      s.r0 = 0.3;
-      s.g0 = 0.03;
-      s.b0 = 0.026;
-      s.r1 = 0.15;
-      s.g1 = 0.015;
-      s.b1 = 0.013;
+      setSpawnColorRamp(s, 0.3, 0.03, 0.026, 0.15, 0.015, 0.013);
       s.alpha = rng.range(0.4, 0.75);
       s.alphaCurve = 1.5;
       s.soft = 0.2;
@@ -865,12 +834,7 @@ export class FxSystem {
       s.gravity = -0.6;
       s.rot = rng.float() * 6.283;
       s.spin = rng.signed() * 1.2;
-      s.r0 = 0.48;
-      s.g0 = 0.44;
-      s.b0 = 0.39;
-      s.r1 = 0.4;
-      s.g1 = 0.37;
-      s.b1 = 0.33;
+      setSpawnColorRamp(s, 0.48, 0.44, 0.39, 0.4, 0.37, 0.33);
       s.alpha = rng.range(0.25, 0.5) * strength;
       s.alphaCurve = 1.6;
       s.soft = 0.3;
@@ -901,12 +865,7 @@ export class FxSystem {
     s.drag = 3.4;
     s.gravity = -0.5;
     s.rot = rng.float() * 6.283;
-    s.r0 = 0.46;
-    s.g0 = 0.42;
-    s.b0 = 0.37;
-    s.r1 = 0.4;
-    s.g1 = 0.36;
-    s.b1 = 0.32;
+    setSpawnColorRamp(s, 0.46, 0.42, 0.37, 0.4, 0.36, 0.32);
     s.alpha = rng.range(0.1, 0.22);
     s.alphaCurve = 1.7;
     s.soft = 0.25;

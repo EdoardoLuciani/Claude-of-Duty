@@ -156,8 +156,9 @@ export class EvolysAnimation {
   poseMatrix!: THREE.Matrix4;
   idleTime = 0;
   name: string | null = null;
-  remainingRounds!: number;
   fireTime!: number;
+  remainingRounds: number = 100;
+
   constructor(model: EvolysModel) {
     this.model = model;
     this.root = model.root;
@@ -175,7 +176,6 @@ export class EvolysAnimation {
     );
     this.hands = discoverAuthoredHands(node);
     this.poseMatrix = this.root.matrix;
-    this.remainingRounds = 100;
     this.reset();
   }
 

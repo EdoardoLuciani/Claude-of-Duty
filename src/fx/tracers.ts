@@ -1,5 +1,5 @@
 import { P } from './atlas.ts';
-import { resetSpawn } from './particles.ts';
+import { resetSpawn, setSpawnColorRamp } from './particles.ts';
 
 /**
  * Tracers.
@@ -82,13 +82,8 @@ export function spawnTracer(
   s.gravity = -1.2;
   // Anchored trail: the particle is the head; the projected segment trails it.
   s.flags = 2;
-  s.r0 = 1;
-  s.g0 = 0.52 * warm;
-  s.b0 = 0.18 * warm;
+  setSpawnColorRamp(s, 1, 0.52 * warm, 0.18 * warm, 1, 0.4 * warm, 0.12 * warm);
   s.i0 = 26;
-  s.r1 = 1;
-  s.g1 = 0.4 * warm;
-  s.b1 = 0.12 * warm;
   s.i1 = 16;
   s.alphaCurve = 0.25;
   s.soft = 0.1;
@@ -111,13 +106,8 @@ export function spawnTracer(
   s.drag = 0.02;
   s.gravity = -1.2;
   s.flags = 2;
-  s.r0 = 1;
-  s.g0 = 0.33 * warm;
-  s.b0 = 0.1 * warm;
+  setSpawnColorRamp(s, 1, 0.33 * warm, 0.1 * warm, 1, 0.24 * warm, 0.06 * warm);
   s.i0 = 5.5;
-  s.r1 = 1;
-  s.g1 = 0.24 * warm;
-  s.b1 = 0.06 * warm;
   s.i1 = 2.5;
   s.alphaCurve = 0.3;
   s.soft = 0.14;
@@ -138,13 +128,8 @@ export function spawnTracer(
   s.life = life;
   s.drag = 0.02;
   s.gravity = -1.2;
-  s.r0 = 1;
-  s.g0 = 0.85;
-  s.b0 = 0.6;
+  setSpawnColorRamp(s, 1, 0.85, 0.6, 1, 0.6, 0.3);
   s.i0 = 30;
-  s.r1 = 1;
-  s.g1 = 0.6;
-  s.b1 = 0.3;
   s.i1 = 18;
   s.alphaCurve = 0.2;
   s.soft = 0.08;

@@ -104,15 +104,8 @@ export class Mixer {
   reverbSend!: GainNode;
   sendHP!: BiquadFilterNode;
   sendLP!: BiquadFilterNode;
-  spaces!: Partial<Record<SpaceName, ReverbSpace>>;
   spaceNames!: SpaceName[];
   reverbReturn!: GainNode;
-  _irReady!: boolean;
-  spaceWeights!: Record<SpaceName, number>;
-  _tin!: TinnitusVoice | null;
-  _pendingConcussion!: PendingConcussion | null;
-  _concussionAttackUntil!: number;
-  deafness!: number;
   /** Load the local audio-thread processor once per context; no silent fallback. */
   static prepare(actx: BaseAudioContext): Promise<void> {
     let ready = preparedContexts.get(actx);
@@ -129,6 +122,21 @@ export class Mixer {
    * @param {BaseAudioContext} actx
    * @param {import('../core/rng.ts').Rng} rng
    */
+  spaces: Partial<Record<SpaceName, ReverbSpace>> = {};
+  _irReady: boolean = false;
+  spaceWeights: Record<SpaceName, number> = {
+    tight: 0,
+    room: 0,
+    street: 0.35,
+    tunnel: 0,
+    open: 0.65,
+  };
+  /* ---- tinnitus (built on demand, torn down when silent) -------- */
+  _tin: TinnitusVoice | null = null;
+  _pendingConcussion: PendingConcussion | null = null;
+  _concussionAttackUntil: number = 0;
+  deafness: number = 0; // 0..1, public: UI/render may read this
+
   constructor(actx: BaseAudioContext, rng: Rng, opts: { masterVolume?: number } = {}) {
     this.actx = actx;
     this.rng = rng;
@@ -224,7 +232,6 @@ export class Mixer {
     this.reverbSend.connect(this.sendHP);
     this.sendHP.connect(this.sendLP);
 
-    this.spaces = {};
     this.spaceNames = Object.keys(IR_SPECS).filter((name): name is SpaceName =>
       hasOwn(IR_SPECS, name)
     );
@@ -234,15 +241,6 @@ export class Mixer {
     // it must never lay a second, warehouse-sized tail over every report.
     this.reverbReturn = gain(actx, 0.26);
     this.reverbReturn.connect(this.worldSum);
-    this._irReady = false;
-
-    this.spaceWeights = { tight: 0, room: 0, street: 0.35, tunnel: 0, open: 0.65 };
-
-    /* ---- tinnitus (built on demand, torn down when silent) -------- */
-    this._tin = null;
-    this._pendingConcussion = null;
-    this._concussionAttackUntil = 0;
-    this.deafness = 0; // 0..1, public: UI/render may read this
   }
 
   /**

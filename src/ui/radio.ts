@@ -12,9 +12,10 @@ export class RadioPanel {
   declare ctx: RadioContext;
   declare root: HTMLElement;
   declare panel: HTMLElement;
-  declare rows: RadioRow[];
-  declare shown: number;
-  declare _lastCount: number;
+  rows: RadioRow[] = [];
+  shown: number = 0;
+  _lastCount: number = -1;
+
   constructor(parent: HTMLElement, ctx: RadioContext) {
     this.ctx = ctx;
 
@@ -24,7 +25,6 @@ export class RadioPanel {
     el('div', 'ow-radio-title', head, 'FIELD RADIO');
     el('div', 'ow-radio-hint', head, `${bindingLabel('radio')} STOWS`);
 
-    this.rows = [];
     const defs = [
       { key: bindingLabel('slot1'), name: 'CARPET BOMB', secret: false },
       { key: bindingLabel('slot2'), name: 'REQUEST', secret: true },
@@ -42,8 +42,6 @@ export class RadioPanel {
       this.rows.push({ row, charge });
     }
 
-    this.shown = 0;
-    this._lastCount = -1;
     setStyle(this.root, 'display', 'none');
   }
 

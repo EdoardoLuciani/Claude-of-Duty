@@ -196,12 +196,6 @@ export class SoldierMaterialsNode {
   declare sets: Record<string, SoldierTextureSet>;
   declare details: Record<string, Texture>;
   declare camoStats: Record<string, CamoStats>;
-  declare bakeMs: number;
-  declare materials: Map<string, SoldierNodeMaterial>;
-  declare combined: Map<VariantName, SoldierNodeMaterial>;
-  declare layers: Map<string, number>;
-  declare surfaceTables: DataTexture[];
-  declare arrays: Record<'albedo' | 'orm' | 'normal' | 'detail', DataArrayTexture> | null;
 
   static async fromCache({
     base = 'models/proc',
@@ -251,6 +245,13 @@ export class SoldierMaterialsNode {
     return library;
   }
 
+  bakeMs: number = 0;
+  materials: Map<string, SoldierNodeMaterial> = new Map();
+  combined: Map<VariantName, SoldierNodeMaterial> = new Map();
+  layers: Map<string, number> = new Map();
+  surfaceTables: DataTexture[] = [];
+  arrays: Record<'albedo' | 'orm' | 'normal' | 'detail', DataArrayTexture> | null = null;
+
   constructor(
     sets: Record<string, SoldierTextureSet>,
     details: Record<string, Texture>,
@@ -259,12 +260,6 @@ export class SoldierMaterialsNode {
     this.sets = sets;
     this.details = details;
     this.camoStats = camoStats;
-    this.bakeMs = 0;
-    this.materials = new Map();
-    this.combined = new Map();
-    this.layers = new Map();
-    this.surfaceTables = [];
-    this.arrays = null;
   }
 
   get(setName: string, opts: SoldierMaterialOptions = {}): SoldierNodeMaterial {

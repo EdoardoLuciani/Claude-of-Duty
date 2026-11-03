@@ -59,12 +59,6 @@ export class AmmoPickups {
   owner!: AmmoOwner;
   ctx!: AmmoContext;
   rng!: Rng;
-  lifetime!: number;
-  items!: AmmoPickup[];
-  _nextId!: number;
-  _nearest!: AmmoPickup | null;
-  _hold!: number;
-  _prompting!: boolean;
   geometries!: Record<'case' | 'edge' | 'latch' | 'ring', THREE.BufferGeometry>;
   _visual: THREE.Group | null = null;
   _batches: THREE.InstancedMesh[] = [];
@@ -74,16 +68,17 @@ export class AmmoPickups {
   materials!: Record<'case' | 'edge' | 'latch', MeshStandardNodeMaterial> & {
     glow: THREE.MeshBasicMaterial;
   };
+  lifetime: number = 180;
+  items: AmmoPickup[] = [];
+  _nextId: number = 1;
+  _nearest: AmmoPickup | null = null;
+  _hold: number = 0;
+  _prompting: boolean = false;
+
   constructor(owner: AmmoOwner) {
     this.owner = owner;
     this.ctx = owner.ctx;
     this.rng = owner.rng;
-    this.lifetime = 180;
-    this.items = [];
-    this._nextId = 1;
-    this._nearest = null;
-    this._hold = 0;
-    this._prompting = false;
     this._makeAssets();
   }
 

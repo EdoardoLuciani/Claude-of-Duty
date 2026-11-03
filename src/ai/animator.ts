@@ -35,16 +35,14 @@ const DEG = Math.PI / 180;
 class Poser {
   rig!: Rig;
   d3!: Float32Array;
-  hipOff!: THREE.Vector3;
-  w!: number;
-  _idx!: Map<string, number>;
+  hipOff: THREE.Vector3 = new THREE.Vector3();
+  w: number = 1;
+  // name -> index cache for the clip helpers
+  _idx: Map<string, number> = new Map();
+
   constructor(rig: Rig) {
     this.rig = rig;
     this.d3 = new Float32Array(rig.count * 3);
-    this.hipOff = new THREE.Vector3();
-    this.w = 1;
-    // name -> index cache for the clip helpers
-    this._idx = new Map();
     for (let i = 0; i < rig.count; i++) this._idx.set(rig.names[i], i);
   }
 
@@ -109,28 +107,7 @@ export class Animator {
   rng: unknown;
   probe!: AnimatorOptions['probe'];
   scale!: number;
-  enabled!: boolean;
   P!: Poser;
-  state!: AnimatorState;
-  phase!: number;
-  footfall!: boolean;
-  _stepClock!: number;
-  prevClip!: ClipName;
-  blend!: number;
-  time!: number;
-  recoilT!: number;
-  recoilK!: number;
-  hitT!: number;
-  hitRegion!: string;
-  hitSide!: number;
-  hitK!: number;
-  reloadT!: number;
-  reloadDur!: number;
-  vaultT!: number;
-  vaultDur!: number;
-  turnT!: number;
-  turnDir!: number;
-  footIk!: boolean;
   iSpine!: number;
   iSpine1!: number;
   iSpine2!: number;
@@ -145,29 +122,6 @@ export class Animator {
   foregripLocal!: THREE.Vector3;
   magLocal!: THREE.Vector3;
   ejectLocal!: THREE.Vector3;
-  _q!: THREE.Quaternion;
-  _q2!: THREE.Quaternion;
-  _q3!: THREE.Quaternion;
-  _qa!: THREE.Quaternion;
-  _qb!: THREE.Quaternion;
-  _qc!: THREE.Quaternion;
-  _qd!: THREE.Quaternion;
-  _e!: THREE.Euler;
-  _v!: THREE.Vector3;
-  _v2!: THREE.Vector3;
-  _v3!: THREE.Vector3;
-  _v4!: THREE.Vector3;
-  _v5!: THREE.Vector3;
-  _pole!: THREE.Vector3;
-  _elbow!: THREE.Vector3;
-  _target!: THREE.Vector3;
-  _up!: THREE.Vector3;
-  _probeOut!: { y: number; nx: number; ny: number; nz: number; hit: boolean };
-  _footY!: [number, number];
-  _footN!: [THREE.Vector3, THREE.Vector3];
-  muzzleWorld!: THREE.Vector3;
-  muzzleDir!: THREE.Vector3;
-  ejectWorld!: THREE.Vector3;
   climbing = false;
   climbTravel = 0;
   climbDirection: LadderDirection = 'up';
@@ -177,6 +131,69 @@ export class Animator {
    * @param bones  this instance's THREE.Bone array (same order as the rig)
    * @param opts   { weapon, rng, probe, scale }
    */
+  enabled: boolean = true;
+  state: AnimatorState = {
+    clip: 'idle',
+    speed: 0,
+    crouch: false,
+    aimTarget: null,
+    lookTarget: null,
+    aimWeight: 1,
+    suppress: 0,
+    hurt: 0,
+  };
+  phase: number = 0;
+  /** True for one `update()` when a boot lands; the agent turns it into `ai:footstep`. */
+  footfall: boolean = false;
+  _stepClock: number = 0;
+  prevClip: ClipName = 'idle';
+  blend: number = 1; // weight of the current clip vs the previous one
+  time: number = 0;
+  // one-shot timers (negative = inactive)
+  recoilT: number = -1;
+  recoilK: number = 1;
+  hitT: number = -1;
+  hitRegion: string = 'torso';
+  hitSide: number = 1;
+  hitK: number = 1;
+  reloadT: number = -1;
+  reloadDur: number = 2.4;
+  vaultT: number = -1;
+  vaultDur: number = 0.85;
+  turnT: number = -1;
+  turnDir: number = 1;
+  footIk: boolean = true;
+  /* ---- scratch ---- */
+  _q: THREE.Quaternion = new THREE.Quaternion();
+  _q2: THREE.Quaternion = new THREE.Quaternion();
+  _q3: THREE.Quaternion = new THREE.Quaternion();
+  _qa: THREE.Quaternion = new THREE.Quaternion();
+  _qb: THREE.Quaternion = new THREE.Quaternion();
+  _qc: THREE.Quaternion = new THREE.Quaternion();
+  _qd: THREE.Quaternion = new THREE.Quaternion();
+  _e: THREE.Euler = new THREE.Euler();
+  _v: THREE.Vector3 = new THREE.Vector3();
+  _v2: THREE.Vector3 = new THREE.Vector3();
+  _v3: THREE.Vector3 = new THREE.Vector3();
+  _v4: THREE.Vector3 = new THREE.Vector3();
+  _v5: THREE.Vector3 = new THREE.Vector3();
+  _pole: THREE.Vector3 = new THREE.Vector3();
+  _elbow: THREE.Vector3 = new THREE.Vector3();
+  _target: THREE.Vector3 = new THREE.Vector3();
+  _up: THREE.Vector3 = new THREE.Vector3(0, 1, 0);
+  _probeOut: { y: number; nx: number; ny: number; nz: number; hit: boolean } = {
+    y: 0,
+    nx: 0,
+    ny: 1,
+    nz: 0,
+    hit: false,
+  };
+  _footY: [number, number] = [0, 0];
+  _footN: [THREE.Vector3, THREE.Vector3] = [new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 1, 0)];
+  muzzleWorld: THREE.Vector3 = new THREE.Vector3();
+  muzzleDir: THREE.Vector3 = new THREE.Vector3(0, 0, 1);
+  ejectWorld: THREE.Vector3 = new THREE.Vector3();
+
   constructor(rig: Rig, bones: THREE.Bone[], opts: AnimatorOptions = {}) {
     this.rig = rig;
     this.bones = bones;
@@ -184,43 +201,8 @@ export class Animator {
     this.rng = opts.rng ?? null;
     this.probe = opts.probe ?? null;
     this.scale = opts.scale ?? 1;
-    this.enabled = true;
 
     this.P = new Poser(rig);
-
-    this.state = {
-      clip: 'idle',
-      speed: 0,
-      crouch: false,
-      aimTarget: null,
-      lookTarget: null,
-      aimWeight: 1,
-      suppress: 0,
-      hurt: 0,
-    };
-
-    this.phase = 0;
-    /** True for one `update()` when a boot lands; the agent turns it into `ai:footstep`. */
-    this.footfall = false;
-    this._stepClock = 0;
-    this.prevClip = 'idle';
-    this.blend = 1; // weight of the current clip vs the previous one
-    this.time = 0;
-
-    // one-shot timers (negative = inactive)
-    this.recoilT = -1;
-    this.recoilK = 1;
-    this.hitT = -1;
-    this.hitRegion = 'torso';
-    this.hitSide = 1;
-    this.hitK = 1;
-    this.reloadT = -1;
-    this.reloadDur = 2.4;
-    this.vaultT = -1;
-    this.vaultDur = 0.85;
-    this.turnT = -1;
-    this.turnDir = 1;
-    this.footIk = true;
 
     /* ---- indices we touch often ---- */
     this.iSpine = rig.index('Spine');
@@ -246,31 +228,6 @@ export class Animator {
     this.foregripLocal = this.weapon ? toLocal(this.weapon.foregrip) : new THREE.Vector3(0, 0, 0.2);
     this.magLocal = this.weapon ? toLocal(this.weapon.magBottom) : new THREE.Vector3(0, -0.2, 0);
     this.ejectLocal = this.weapon ? toLocal(this.weapon.ejection) : new THREE.Vector3(0, 0, 0);
-
-    /* ---- scratch ---- */
-    this._q = new THREE.Quaternion();
-    this._q2 = new THREE.Quaternion();
-    this._q3 = new THREE.Quaternion();
-    this._qa = new THREE.Quaternion();
-    this._qb = new THREE.Quaternion();
-    this._qc = new THREE.Quaternion();
-    this._qd = new THREE.Quaternion();
-    this._e = new THREE.Euler();
-    this._v = new THREE.Vector3();
-    this._v2 = new THREE.Vector3();
-    this._v3 = new THREE.Vector3();
-    this._v4 = new THREE.Vector3();
-    this._v5 = new THREE.Vector3();
-    this._pole = new THREE.Vector3();
-    this._elbow = new THREE.Vector3();
-    this._target = new THREE.Vector3();
-    this._up = new THREE.Vector3(0, 1, 0);
-    this._probeOut = { y: 0, nx: 0, ny: 1, nz: 0, hit: false };
-    this._footY = [0, 0];
-    this._footN = [new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 1, 0)];
-    this.muzzleWorld = new THREE.Vector3();
-    this.muzzleDir = new THREE.Vector3(0, 0, 1);
-    this.ejectWorld = new THREE.Vector3();
   }
 
   setState(s: Partial<AnimatorState>): void {
