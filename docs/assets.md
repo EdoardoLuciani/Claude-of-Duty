@@ -11,7 +11,7 @@ when changing authored assets.
 
 ## Three purposeful homes
 
-- **`tools/`**: offline generation, inspection and cooking. Weapon Python recipes
+- **`tools/`**: offline generation, inspection and cooking. Model Python recipes
   are authoritative; their generated `.blend` files are editable review products,
   not fallback build inputs.
 - **`assets/`**: per-asset reference/calibration inputs and generated authoring,
@@ -91,14 +91,13 @@ intel sites and explicit placement records. This is the world source—not
 | Family                      | Authoritative editing location                                                                                                                                    | Regenerate / validate                                  | Products and consumers                                                                                                         |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
 | Arms and bandage            | [`player_arms.py`](../tools/blender/player_arms.py), [`player_bandage.py`](../tools/blender/player_bandage.py); [asset contract](../assets/player/arms/README.md) | Follow the asset's Blender commands; review in engine  | `assets/player/arms/`, `public/models/player/`, generated poses/paths in `src/weapons/`; loaded by weapon arm/bandage adapters |
-| Soldiers                    | [`src/ai/soldier.ts`](../src/ai/soldier.ts), `parts.ts`, `geo.ts`, `weapon.ts`; geometry and runtime surface/variant helpers currently share modules              | `npm run models`; `npm test`                           | Generated `public/models/soldiers/*.glb` + JSON, loaded by `ModelSystem` and AI                                                |
+| Soldiers                    | [`tools/blender/soldiers/`](../tools/blender/soldiers/); [asset contract](../assets/soldiers/README.md). Runtime RIG/registry/surfaces remain in `src/ai/`        | Explicit Blender author/cook; `npm run models` stages  | Committed `assets/soldiers/` products stage to ignored `public/models/soldiers/*.glb` + JSON; loaded by `ModelSystem` and AI   |
 | Spent shotgun hull          | [`tools/lib/spent-hull.mjs`](../tools/lib/spent-hull.mjs)                                                                                                         | `npm run models`; review in engine                     | `public/models/fx/spent12g.glb`, consumed by FX                                                                                |
 | Procedural textures         | [`tools/export-proc-textures.mjs`](../tools/export-proc-textures.mjs) and its declared AI/FX inputs                                                               | `node tools/export-proc-textures.mjs`; `npm test`      | Committed `public/models/proc/`, consumed by AI materials and FX                                                               |
 | Standalone EXPS3 attachment | [`exps3.py`](../tools/blender/exps3.py), [`exps3_bake.py`](../tools/blender/exps3_bake.py); [asset contract](../assets/attachments/eotech-exps3-0/README.md)      | Asset Blender commands; `npm run models:cook -- exps3` | `assets/attachments/eotech-exps3-0/`; cooked attachment is not yet wired into gameplay                                         |
 
-Normal `npm run dev` / `npm run build` prepare procedural textures and models,
-and validate committed world assets. They do **not** regenerate the world,
-Blender assets or cooked weapons. `npm run assets` currently exports procedural
-models and validates the world; run the texture exporter separately when using
-that command rather than Vite. No preparation-command redesign is part of this
-organization change.
+Normal `npm run dev` / `npm run build` prepare procedural textures, stage committed
+soldiers, generate the spent hull and validate committed world assets. They do
+**not** regenerate the world, Blender assets or cooked weapons. `npm run assets`
+stages soldiers/generates the hull and validates the world; run the texture
+exporter separately when using that command rather than Vite.
