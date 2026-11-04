@@ -1,24 +1,7 @@
-/**
- * AI — one enemy: body, senses, brain, gun.
- *
- * PERCEPTION is deliberately imperfect. A target has to be inside a 100 degree
- * cone, in line of sight through the physics BVH, and then *stay* there for a
- * reaction delay that scales with angle off-centre and distance before the
- * agent acknowledges it. Gunshots and footsteps arrive as events and only give
- * a direction with uncertainty, not exact coordinates. Alert then searches a
- * few reachable spots around that evidence instead of chasing an unseen player.
- *
- * BEHAVIOUR is a small state machine:
- *   idle / patrol -> alert -> combat -> suppressed -> flank -> retreat -> dead
- * Combat runs a peek-and-shoot loop from a scored cover point, with the squad
- * handing out permission to peek so they never all lean out at once, plus
- * suppressing fire, grenades and repositioning when the player stops moving.
- * Squad intent (pin / wrap / flush) can override that loop.
- *
- * DAMAGE is per-bone: capsule colliders for head, chest, pelvis, arms and legs
- * are pushed into `physics` every frame, so a headshot is a headshot because of
- * where the round landed, not because of a random roll. Death hands the live
- * skeleton to the ragdoll solver with the bullet's impulse.
+/** Enemy body, perception, combat and per-bone damage.
+ * Sight requires cone/LOS plus a reaction delay; hearing supplies uncertain evidence.
+ * Squad intent coordinates cover, peeking, suppression, grenades and repositioning.
+ * Death transfers the live skeleton and impact impulse to physics.
  */
 
 import * as THREE from 'three';
@@ -386,7 +369,6 @@ export class Agent {
     this.def = def;
     this.scale = def.variant.scale ?? 1;
 
-    /* ---------------- body ---------------- */
     const { bones, skeleton, root } = RIG.createSkeleton();
     this.bones = bones;
     this.skeleton = skeleton;
@@ -423,7 +405,6 @@ export class Agent {
       probe: (x, z, fromY, out): boolean => this.ai.probeGround(x, z, fromY, out),
     });
 
-    /* ---------------- physics ---------------- */
     const phys = this.ctx.peek('physics');
     // Operational agents follow physics initialization; isolated brain fixtures
     // deliberately omit it and retain the original no-controller construction.
@@ -470,7 +451,6 @@ export class Agent {
       }
     }
 
-    /* ---------------- stats ---------------- */
     this.health = 100;
     this.maxHealth = 100;
     this.alive = true;
@@ -482,7 +462,6 @@ export class Agent {
     // it must not masquerade as an enemy kill in the killfeed/wave director.
     this.silentDeath = opts.silentDeath === true;
 
-    /* ---------------- perception ---------------- */
     this.eyeHeight = RIG.eyeHeight * this.scale;
     this.viewRange = COMBAT.viewRange;
     this.viewCos = Math.cos((COMBAT.viewConeDeg * Math.PI) / 180 / 2);
@@ -520,7 +499,6 @@ export class Agent {
     this._repositionUntil = 0;
     this._positionRetry = 0;
 
-    /* ---------------- combat ---------------- */
     this.weaponRange = COMBAT.viewRange;
     this.fireRate = this.variantName === 'irregular' ? COMBAT.fireRateIrregular : COMBAT.fireRate;
     this.burstLeft = 0;
@@ -568,7 +546,6 @@ export class Agent {
     this._elevatedRouteChecked = false;
     this._peekSettle = 0;
 
-    /* ---------------- navigation ---------------- */
     this.path = [];
     this.route = { points: this.path, ladderSteps: [] };
     this.ladder = null;
@@ -621,13 +598,11 @@ export class Agent {
     this._holdMove = false;
     this._clearSearch();
 
-    /* ---------------- LOD ---------------- */
     /** set by AiSystem._updateRelevance: nothing this actor does reaches a pixel */
     this.lodIrrelevant = false;
     this._animSkip = 0;
     this._animAccum = 0;
 
-    /* ---------------- scratch ---------------- */
     this._v = new THREE.Vector3();
     this._v2 = new THREE.Vector3();
     this._v3 = new THREE.Vector3();
@@ -648,10 +623,6 @@ export class Agent {
     if (!cover) throw new Error('[ai] cover used before navigation readiness');
     return cover;
   }
-
-  /* ================================================================== */
-  /* frame                                                              */
-  /* ================================================================== */
 
   get eye(): THREE.Vector3 {
     return this._eye.set(this.position.x, this.position.y + this.eyeHeight, this.position.z);
@@ -701,10 +672,6 @@ export class Agent {
     this._updateFireBlock();
     this._drive(dt);
   }
-
-  /* ================================================================== */
-  /* perception                                                         */
-  /* ================================================================== */
 
   _sense(dt: number): void {
     this.visualAge += dt;
@@ -840,10 +807,6 @@ export class Agent {
     this.suppression = Math.min(COMBAT.suppressMax, this.suppression + amount);
     this.alertness = 1;
   }
-
-  /* ================================================================== */
-  /* behaviour                                                          */
-  /* ================================================================== */
 
   _setState(s: AiState): void {
     if (this.ladder) return;
@@ -1677,10 +1640,6 @@ export class Agent {
     return false;
   }
 
-  /* ================================================================== */
-  /* cover peek                                                         */
-  /* ================================================================== */
-
   _rememberFailedPosition(p: THREE.Vector3Like): void {
     const f = this._failedCovers[this._failedCoverIndex];
     this._failedCoverIndex = (this._failedCoverIndex + 1) % this._failedCovers.length;
@@ -2059,10 +2018,6 @@ export class Agent {
     this._peekSettle = 0;
     this._stepTo(this.firePos);
   }
-
-  /* ================================================================== */
-  /* movement                                                           */
-  /* ================================================================== */
 
   _notePathFail(): void {
     if (this.pathObjective !== 'patrol') return;
@@ -3025,10 +2980,6 @@ export class Agent {
     }
   }
 
-  /* ================================================================== */
-  /* shooting                                                           */
-  /* ================================================================== */
-
   _updateFireBlock(): void {
     if (this.ladder) {
       this.fireBlock = 'ladder';
@@ -3254,10 +3205,6 @@ export class Agent {
     this.ctx.events.emit('ai:bark', { kind: 'grenade', position: this.position, voice: this.id });
   }
 
-  /* ================================================================== */
-  /* damage                                                             */
-  /* ================================================================== */
-
   /**
    * Take a hit. NOTE: named `applyDamage`, not `damage` — the weapon's damage
    * value is a field on this object and a method of the same name would be
@@ -3399,10 +3346,6 @@ export class Agent {
     }
     return rd;
   }
-
-  /* ================================================================== */
-  /* drive the visual                                                   */
-  /* ================================================================== */
 
   _drive(dt: number): void {
     this.group.position.copy(this.position);

@@ -1,17 +1,6 @@
-/**
- * The movement state machine.
- *
- * Runs at the fixed 120 Hz step so the feel is framerate-independent and
- * reproducible in capture mode. Collision is *entirely* delegated to
- * `physics.createCharacter()` — this file only ever owns velocity and asks the
- * controller to resolve a displacement.
- *
- * States: stand · crouch · prone · sprint · tacsprint · slide · jump · fall ·
- *         mantle · vault · climb   (+ lean, an additive modifier on any grounded state)
- *
- * Every transition is interruptible. Nothing here waits for an animation to
- * finish except the rooted mantle, and even that can be cut short by taking
- * damage or by control being disabled.
+/** Fixed-step player locomotion; the character controller owns collision, this class owns velocity.
+ * Grounded lean is additive to stance. Transitions are interruptible; rooted motion may also
+ * be cancelled by damage or disabled control. State tuning lives in tuning.ts.
  */
 
 import * as THREE from 'three';
@@ -211,10 +200,6 @@ export class Movement {
     this.player = player;
   }
 
-  /* ==================================================================== */
-  /* setup                                                                */
-  /* ==================================================================== */
-
   init(
     physics: MovementPhysics,
     spawn: { x: number; y: number; z: number } | null = null
@@ -257,10 +242,6 @@ export class Movement {
   get eyeHeight(): number {
     return STANCE[this.stance].eye;
   }
-
-  /* ==================================================================== */
-  /* input                                                                */
-  /* ==================================================================== */
 
   /**
    * Latch the input snapshot for this rendered frame. Called from the first
@@ -323,10 +304,6 @@ export class Movement {
       this._lastSprintPress = now;
     }
   }
-
-  /* ==================================================================== */
-  /* the fixed step                                                       */
-  /* ==================================================================== */
 
   step(h: number): void {
     const c = this.character;
@@ -463,10 +440,6 @@ export class Movement {
     }
   }
 
-  /* ==================================================================== */
-  /* stance                                                               */
-  /* ==================================================================== */
-
   _updateStance(cmd: MovementInput, rawInput: number): void {
     const c = this._character;
     if (this.sliding) {
@@ -495,10 +468,6 @@ export class Movement {
     }
     // else: blocked by a ceiling — keep asking every step until it clears.
   }
-
-  /* ==================================================================== */
-  /* sprint / tactical sprint                                             */
-  /* ==================================================================== */
 
   _updateSprint(cmd: MovementInput, rawInput: number, forwardIntent: number): void {
     const c = this._character;
@@ -537,10 +506,6 @@ export class Movement {
       }
     }
   }
-
-  /* ==================================================================== */
-  /* slide                                                                */
-  /* ==================================================================== */
 
   _updateSlide(cmd: MovementInput, h: number, wish: THREE.Vector3, wishLen: number): void {
     const c = this._character;
@@ -685,10 +650,6 @@ export class Movement {
     return this.sliding ? clamp01(this._slideTime / MOVE.slide.duration) : 0;
   }
 
-  /* ==================================================================== */
-  /* jump                                                                 */
-  /* ==================================================================== */
-
   _updateJump(): boolean {
     if (this.sliding) return false;
     if (this._jumpBuffer <= 0) return false;
@@ -719,10 +680,6 @@ export class Movement {
     this.jumped = true;
     this._setState('jump');
   }
-
-  /* ==================================================================== */
-  /* acceleration                                                         */
-  /* ==================================================================== */
 
   targetSpeed(): number {
     let base;
@@ -799,10 +756,6 @@ export class Movement {
     v.x += wish.x * gain;
     v.z += wish.z * gain;
   }
-
-  /* ==================================================================== */
-  /* climb                                                                */
-  /* ==================================================================== */
 
   _tryClimb(moveY: number): boolean {
     if (this.sliding || this.stance === 'prone') return false;
@@ -898,10 +851,6 @@ export class Movement {
     const m = this.climbMotion;
     this._leaveClimb(m.x, m.y, m.z, 0, 0, 0);
   }
-
-  /* ==================================================================== */
-  /* mantle / vault                                                       */
-  /* ==================================================================== */
 
   _tryLedge(
     h: number,
@@ -1019,10 +968,6 @@ export class Movement {
     this._resolveState();
   }
 
-  /* ==================================================================== */
-  /* lean                                                                 */
-  /* ==================================================================== */
-
   _updateLean(h: number, cmd: MovementInput): void {
     let want = (cmd.leanR ? 1 : 0) - (cmd.leanL ? 1 : 0);
     if (this.sprinting || this.sliding || !this.grounded || this.stance === 'prone') want = 0;
@@ -1058,10 +1003,6 @@ export class Movement {
     }
     return 0;
   }
-
-  /* ==================================================================== */
-  /* post-move                                                            */
-  /* ==================================================================== */
 
   _postMove(): void {
     const c = this._character;
@@ -1138,10 +1079,6 @@ export class Movement {
     e.left = this._footLeft;
   }
 
-  /* ==================================================================== */
-  /* state resolution                                                     */
-  /* ==================================================================== */
-
   _resolveState(): void {
     if (this.mantleMotion.active || this.climbMotion.active) return;
     let next: PlayerMoveState;
@@ -1174,10 +1111,6 @@ export class Movement {
     this.renderPosition.lerpVectors(this.prevPosition, this.position, clamp01(alpha));
     return this.renderPosition;
   }
-
-  /* ==================================================================== */
-  /* external control                                                     */
-  /* ==================================================================== */
 
   teleport(x: number, y: number, z: number): void {
     if (!this.character) return;

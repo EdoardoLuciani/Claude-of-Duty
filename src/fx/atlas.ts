@@ -6,9 +6,6 @@ import type { Rng } from '../core/rng.ts';
 import { Noise, clamp01 } from './noise.ts';
 
 /** Runtime atlas layout/loaders. Particle/decal generation lives in tools/lib. */
-// ---------------------------------------------------------------------------
-//  particle atlas layout (4x4)
-// ---------------------------------------------------------------------------
 export const P = {
   SMOKE_A: 0,
   SMOKE_B: 1,
@@ -28,9 +25,6 @@ export const P = {
   MOTE: 15,
 };
 
-// ---------------------------------------------------------------------------
-//  decal atlas layout (4x4)
-// ---------------------------------------------------------------------------
 export const D = {
   HOLE_CONCRETE: 0,
   HOLE_CONCRETE_B: 1,

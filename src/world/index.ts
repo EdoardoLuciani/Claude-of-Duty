@@ -29,28 +29,9 @@ function isWorldMesh(object: THREE.Object3D): object is WorldMesh {
 // the WebGPU owner intentionally no longer culls or rewrites light identities.
 const PRACTICAL_GAIN = 0.55;
 
-/**
- * WORLD — level geometry, the modular building kit, props, set dressing and
- * static collision.
- *
- * A ~120 x 120 m Middle-Eastern market street: one main street with a plaza,
- * flanking alleys, twenty buildings (three enterable), an arched gate, and
- * several thousand props. `tools/worldgen/` is the authored source; runtime
- * loads committed visual/collision GLBs and manifest-driven metadata.
- * `tools/export-world.mjs` owns deterministic export and collision cooking.
- *
- * PUBLIC API — `const world = ctx.get('world')`
- *   world.setStreetlightPower(0..1) capture/debug power override
- *   world.root                THREE.Group holding everything
- *   world.bounds              THREE.Box3 of the playable area, world space
- *   world.spawnPoints         [{ position:Vector3, yaw:number, tag:string }]
- *   world.spawn(i)            one of the above
- *   world.groundHeight(x, z)  cheap analytic floor height (physics is exact)
- *   world.isOpen(x, z)        true where a character can stand outdoors
- *   world.stats               { staticTris, instTris, instances, drawCalls }
- *   world.levelToWorld(x,y,z,out) / world.worldToLevel(x,y,z,out)
- *   world.ladderAt(x,y,z)     authored ladder catch, world space, or null
- *   world.intelMarkers        [{ id, tag, x, y, z }] from WORLD/MARKERS/INTEL
+/** Runtime world loading uses committed visual/collision GLBs and manifest metadata.
+ * Author map content in tools/worldgen; tools/export-world.mjs owns export/collision cooking.
+ * Public transforms, spawns and ladder/intel queries use the parsed manifest.
  */
 
 export class WorldSystem {

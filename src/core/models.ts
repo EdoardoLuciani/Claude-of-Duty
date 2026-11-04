@@ -101,10 +101,6 @@ export class ModelSystem {
     return r.json();
   }
 
-  /* ================================================================== */
-  /*  soldiers                                                           */
-  /* ================================================================== */
-
   /**
    * @param {string} name  variant name ('vanguard' | 'irregular' | 'breacher')
    * @returns {Promise<object>} soldier record:

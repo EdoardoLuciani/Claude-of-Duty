@@ -1,29 +1,7 @@
-/*
- * MARKET — between-wave supply shop.
- *
- * Owns the run's credits economy and the shop session. Credits mirror the
- * score's rewards 1:1 (score:change deltas: kills, headshots, wave bonuses)
- * but are a separate pool: score is the run's record, credits are the shop's
- * fuel.
- *
- * Every wave clear arms a 10 s grace period (time to collect ammo), then the
- * shop opens and freezes the sim clock (time.scale = 0), which also holds the
- * AI wave countdown — no AI code needs to know the market exists. One session
- * per wave; the player leaves with Skip/Esc.
- *
- * PUBLIC API — `const market = ctx.get('market')`
- *   market.credits
- *   market.addCredits(n)    intel payout; does not touch the score
- *   market.open
- *   market.openShop() / market.closeShop()
- *   market.buy(itemId)      -> boolean — applies instantly (bandage adds inventory, does not heal)
- *   market.getHudState()    -> { credits, marketIn, items:[{id,label,cost,
- *                               level,max,step,unit,blurb,slot,action,
- *                               affordable}] }
- *                               (pooled, copy on read)
- *
- * Events consumed: score:change, wave:complete, game:restart.
- * Events emitted:  market:open {wave}, market:close.
+/** Between-wave credits and shop sessions.
+ * Score deltas fund credits 1:1; intel credits are independent. Purchases do not alter score.
+ * A wave clear starts the looting grace period, then one shop session freezes scaled time.
+ * HUD snapshots are pooled; copy rather than retain them.
  */
 
 import type { SystemId, EngineContext } from '../core/context.ts';

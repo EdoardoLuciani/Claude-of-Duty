@@ -1,21 +1,8 @@
 import { FONT_STACK, FONT_DISPLAY, FONT_MONO } from './util.ts';
 
-/**
- * All HUD styling lives here as one injected stylesheet.
- *
- * Design system
- * -------------
- *  scale     every dimension is `calc(N * var(--k))` where --k is set from the
- *            fitted 1920x1080 reference size. Both viewport axes constrain
- *            this uniform scale, preserving proportions in narrow windows.
- *  spacing   4px grid: --u. Screen margins are 6u (24px @1080p), the same
- *            margin CoD uses (~2.2% of height).
- *  type      one condensed system stack, uppercase, tabular figures, three
- *            ink levels (94% / 58% / 30%) and one accent per semantic:
- *            amber = caution, red = threat, cyan = friendly/objective.
- *  contrast  every text run carries a two-stop shadow (tight dark + wide
- *            dark bloom) so it survives a blown-out sky *and* a black
- *            interior without a scrim behind it.
+/** Injected native-menu/overlay stylesheet; gameplay HUD presentation is Pixi-owned.
+ * --k uniformly fits the 1920x1080 reference in both viewport axes; --u is a 4 px grid.
+ * Condensed/tabular type, semantic accents and tight+wide shadows preserve scene contrast.
  */
 
 const CSS = `

@@ -395,10 +395,6 @@ export class SkySystem {
     );
   }
 
-  // =========================================================================
-  //  public API
-  // =========================================================================
-
   get timeOfDay(): number {
     return this.hour;
   }
@@ -485,10 +481,6 @@ export class SkySystem {
     return cloudSunOcclusion(x, z, this.celestial.sun, p);
   }
 
-  // =========================================================================
-  //  frame
-  // =========================================================================
-
   update(dt: number, ctx: SkyContext): void {
     // Cloud drift is deterministic (driven by ctx.time.elapsed) so capture mode
     // reproduces the exact same sky every run.
@@ -521,10 +513,6 @@ export class SkySystem {
     // Cheap when nothing moves; the dirty flag is only set by a real sun move.
     if (this._envDirty && this._envAge > 0.25) this._bakeEnv();
   }
-
-  // =========================================================================
-  //  internals
-  // =========================================================================
 
   _applyWeather(): void {
     const w = this.weather;

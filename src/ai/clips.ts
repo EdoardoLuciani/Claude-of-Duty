@@ -1,19 +1,6 @@
-/**
- * AI — animation content.
- *
- * Poses are authored as **local euler deltas in degrees** on top of the bind
- * pose. The rig is built so that every bone's local axes mean the same thing:
- *
- *   x  flexion   — positive bends the bone forward (knee extends, spine bows)
- *   y  twist     — roll about the bone's own length
- *   z  lateral   — positive tips the bone toward the character's right
- *
- * That makes a walk cycle readable as anatomy rather than as quaternion soup,
- * and lets layers be blended by simple lerp of the delta arrays.
- *
- * Locomotion curves are hand-tuned against reference gait: the knee flexes
- * hardest just after toe-off, the pelvis drops through mid-stance and rolls
- * toward the stance leg, and the spine counter-rotates against the pelvis.
+/** Pose content uses local Euler deltas in degrees above the bind pose.
+ * Axes: X flexion, Y twist along the bone, Z lateral toward character-right.
+ * Blend delta arrays; locomotion counter-rotates spine and pelvis around stance.
  */
 
 import type { LadderDirection, LadderPhase } from './ladder.ts';
@@ -31,10 +18,6 @@ const lobe = (x: number, k = 1.4): number => {
   const s = sin(x);
   return s > 0 ? s ** k : 0;
 };
-
-/* ------------------------------------------------------------------ */
-/* base stance                                                        */
-/* ------------------------------------------------------------------ */
 
 /** Weight on the left leg, knees soft, weapon at low ready. */
 export function idle(P: PoseWriter, ph: number): void {
@@ -92,10 +75,6 @@ export function aimAdd(P: PoseWriter, w = 1): void {
   P.d('ForearmR', -12 * w, 0, 0);
   P.d('UpperArmL', 8 * w, 0, -6 * w);
 }
-
-/* ------------------------------------------------------------------ */
-/* locomotion                                                         */
-/* ------------------------------------------------------------------ */
 
 function gait(P: PoseWriter, ph: number, k: GaitParams): void {
   const t = ph * TAU;
@@ -286,9 +265,7 @@ export function climb(
   P.d('FootL', 16 - 4 * s, 0, 0);
 }
 
-/* ------------------------------------------------------------------ */
 /* one-shots (t is 0..1 over the clip's duration)                     */
-/* ------------------------------------------------------------------ */
 
 /** Pivot on the balls of the feet: the trailing foot lifts and re-plants. */
 export function turnStep(P: PoseWriter, t: number, dir: number): void {

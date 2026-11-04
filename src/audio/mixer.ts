@@ -1,25 +1,6 @@
-/**
- * AUDIO / MIXER
- *
- * The signal path, top down:
- *
- *   voices ──► bus (weapons | foley | ambience | voice | ui | music)
- *                │           optional compressor for foley / ambience / voice
- *                │           one category gain (balance × volume × duck)
- *                ▼
- *   ┌── worldSum ─┬─► dry weight ─────────┬─► hearing gain ─┐
- *   │      ▲      └─► LP / shelf / wet ───┘                 │
- *   │   reverb returns        (complementary hearing fade)  ▼
- *   │      ▲                         masterSum ─► energy / peak gain ─► volume
- *   │   convolver x5 (space blend)           ▲
- *   │      ▲                                 │
- *   └── reverbSend ◄─ per-voice send    ui bus + tinnitus (bypass the muffle,
- *                                        so HUD and the ring stay audible)
- *
- * Ducking is a manual sidechain: gunfire pushes `ambience`/`foley` down with a
- * fast setTargetAtTime and lets them float back over ~400 ms. The audible
- * post-compressor level changes without altering compressor drive or forgetting
- * the user's volume setting.
+/** Voices feed category buses, world dry/reverb sums, hearing gain, then master limiting/volume.
+ * UI and tinnitus bypass hearing muffling. Reverb sends are per voice with five blended spaces.
+ * Gunfire sidechains post-compressor category gain, preserving compressor drive and user volume.
  */
 
 import { hasOwn } from '../core/guards.ts';

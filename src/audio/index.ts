@@ -1,31 +1,6 @@
-/**
- * AUDIO — recorded weapon fire/physical hits, spatialisation and mix
- *
- * Physical sounds and firearm reports require recordings. Synthesis supplies
- * intentional electronic/UI cues, never missing-asset recovery.
- *
- * ───────────────────────────────────────────────────────────────────────────
- * PUBLIC API   const audio = ctx.get('audio')
- * ───────────────────────────────────────────────────────────────────────────
- *   audio.running                      graph is live (needs a user gesture)
- *   audio.start()                      force-start (returns Promise<boolean>)
- *   audio.deafness                     0..1 concussion; UI/post may read this
- *   audio.play(kind, position, opts)   one-shot; position null = head-locked
- *   audio.startAircraft(position)     tracked recorded loop handle: move/stop
- *   audio.bark(kind, position, opts)   recorded enemy voice: 'spot' | 'reload' |
- *                                      'grenade' (our throw) | 'hurt' | 'death'
- *   audio.ui(kind)                     'hitmarker'|'headshot'|'kill'|'damage'
- *   audio.setMasterVolume(v)  audio.setBusVolume(bus, v)
- *   audio.setAmbienceIntensity(v)      scales the distant-battle scheduler
- *   audio.report()                     diagnostics snapshot
- *
- * All of it is a no-op — never a throw — before the graph exists, so callers
- * never have to check whether audio started.
- *
- * Driven off the canonical events in ARCHITECTURE.md: weapon:fire,
- * weapon:reload, weapon:shell, bullet:impact, bullet:segment, damage:dealt,
- * damage:taken, actor:death, player:land, player:footstep, ai:footstep,
- * player:state, player:heartbeat, explosion. Optional `ai:bark` is picked up too.
+/** Recorded firearm/physical audio, spatialisation and mix.
+ * Synthesis is intentional electronic/UI feedback, never missing-recording recovery.
+ * Public playback is a no-op before graph startup; event contracts live in ARCHITECTURE.md.
  */
 
 import type { SystemId, EngineContext } from '../core/context.ts';
@@ -294,10 +269,6 @@ export class AudioSystem {
     for (let i = 0; i < DRY_SLOTS; i++) this._dry.push({ node: null, send: null, end: 0 });
   }
 
-  /* ================================================================ */
-  /* lifecycle                                                        */
-  /* ================================================================ */
-
   async init(ctx: AudioRuntimeContext): Promise<void> {
     this.ctx = ctx;
     this.rng = ctx.rng.fork();
@@ -415,10 +386,6 @@ export class AudioSystem {
     this._teardown();
     if (typeof window !== 'undefined' && window.__AUDIO__ === this) delete window.__AUDIO__;
   }
-
-  /* ================================================================ */
-  /* frame                                                            */
-  /* ================================================================ */
 
   update(dt: number, ctx: AudioRuntimeContext): void {
     if (!this.running) return;
@@ -560,10 +527,6 @@ export class AudioSystem {
     for (const voice of this._aircraft) voice.setPaused(true);
   }
 
-  /* ================================================================ */
-  /* environment probe                                                */
-  /* ================================================================ */
-
   _probeSpace(ctx: AudioRuntimeContext, x: number, y: number, z: number): void {
     const phys = ctx.peek('physics');
     const hits = this._probeHits;
@@ -593,10 +556,6 @@ export class AudioSystem {
     }
     this.stats.space = best;
   }
-
-  /* ================================================================ */
-  /* voice plumbing                                                   */
-  /* ================================================================ */
 
   /**
    * Build a voice by name. `when` is absolute context time, `dist` is metres
@@ -826,10 +785,6 @@ export class AudioSystem {
     }
   }
 
-  /* ================================================================ */
-  /* public helpers                                                   */
-  /* ================================================================ */
-
   /**
    * Fire a one-shot. Tolerant on purpose: other subsystems call this with
    * several different conventions and audio must never be the thing that throws.
@@ -937,10 +892,6 @@ export class AudioSystem {
   setAmbienceIntensity(v: number): void {
     if (this.ambience) this.ambience.intensity = clamp(v, 0, 3);
   }
-
-  /* ================================================================ */
-  /* events                                                           */
-  /* ================================================================ */
 
   _onIntelOperation(e: { active?: boolean }): void {
     this._intelOperating = e.active === true;
@@ -1340,10 +1291,6 @@ export class AudioSystem {
       0.6
     );
   }
-
-  /* ================================================================ */
-  /* ambience callbacks                                               */
-  /* ================================================================ */
 
   /** A burst of gunfire a long way off, with correct propagation delay. */
   _distantVolley(): void {

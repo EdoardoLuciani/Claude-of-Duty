@@ -1,24 +1,6 @@
-/**
- * AUDIO / SPATIALISATION
- *
- * A pool of reusable 3D emitter chains. Each chain is:
- *
- *   input ─► occlusionLP ─► airLP ─► distanceGain ─┬─► panner (HRTF) ─► bus
- *                                                  └─► sendGain ─► reverb send
- *
- * Notes on the design decisions, because they are not the obvious ones:
- *
- *  - The PannerNode's own distance model is switched OFF (rolloffFactor 0) and
- *    attenuation is applied by `distanceGain` instead. That is what lets the
- *    reverb send be *post* distance attenuation but *pre* panning, which is how
- *    a far source correctly ends up wetter than a near one.
- *  - `airLP` is air absorption, `occlusionLP` is geometry. They are separate so
- *    a distant *and* occluded source stacks both losses, as it should.
- *  - The whole chain is built once and only the panner→bus edge is connected
- *    while the emitter is in use; a free emitter is detached from the graph so
- *    the (expensive) HRTF convolution is not evaluated for silence.
- *  - Propagation delay is not a DelayNode: every voice is *scheduled* at
- *    `now + dist/343`, which is sample-accurate and free.
+/** Reusable spatial chains: occlusion LP -> air LP -> distance gain -> HRTF bus.
+ * Reverb branches after distance gain but before panning; native distance rolloff is disabled.
+ * Idle emitters detach their panner/bus edge. Propagation uses scheduled start time + distance/343.
  */
 
 import type { EngineContext } from '../core/context.ts';

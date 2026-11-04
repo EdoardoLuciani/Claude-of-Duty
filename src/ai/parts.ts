@@ -86,10 +86,6 @@ export function place(
   return transformMesh(mesh, m);
 }
 
-/* ================================================================== */
-/* Torso                                                              */
-/* ================================================================== */
-
 /**
  * The jacket shell: lofted horizontal sections from the hem to the neck with a
  * real spinal curve, a deeper chest than back, and layered fold noise. This is
@@ -184,28 +180,9 @@ export function collar(nz: Noise): MeshRecord {
   return m;
 }
 
-/* ================================================================== */
-/* Limbs                                                              */
-/* ================================================================== */
-
-/**
- * Sleeve / trouser leg: a tube down a 3-point bone chain with an elliptical
- * cross-section that is wider than deep, plus fold noise at the joints.
- *
- * CLOTH FOLDS (`opts.crease`) — isotropic fbm on a tube gives a lumpy tube, not
- * cloth. Real sleeves and trousers crease in bands that run *around* the limb,
- * they bunch where the limb bends, and they gather at the cuff where the fabric
- * is stopped by a hem. So the crease field is parameterised by arc length `s`
- * down the bone chain, not by world position:
- *
- *   - transverse bands at 5-7 cm, ridged so each one is a sharp line with a soft
- *     valley either side (that is what a pressed crease looks like in light);
- *   - a x2.4 gather inside the elbow / behind the knee (`s` near the joint, on
- *     the bend side), which is the single most legible fold on a walking figure;
- *   - a x1.8 gather at the cuff, where the fabric stacks on the boot or glove.
- *
- * `opts.bend` is the direction the joint folds toward in bind space (default
- * -Z, i.e. behind the knee / inside the elbow for a figure facing +Z).
+/** Limb cloth is an elliptical tube along a three-point bone chain. Creases use arc length,
+ * not isotropic world noise: ridged 5-7 cm transverse bands, 2.4x joint gather and 1.8x cuff gather.
+ * opts.bend is the bind-space fold direction, default -Z for the knee/elbow interior.
  */
 export function limbTube(
   nz: Noise,
@@ -307,10 +284,6 @@ export function shoulderCap(nz: Noise, shoulder: Vec3, side: number): MeshRecord
   displace(m, (x, y, z): number => nz.fbm3(x * 30, y * 30, z * 30, 3) * 0.004);
   return m;
 }
-
-/* ================================================================== */
-/* Head                                                              */
-/* ================================================================== */
 
 /** Skull + jaw, lofted from anatomical sections. `base` = Head bone position. */
 export function headMesh(nz: Noise, base: Vec3, p: HeadOptions = {}): MeshRecord {
@@ -538,10 +511,6 @@ export function sunglasses(base: Vec3): { lens: MeshRecord; frame: MeshRecord } 
   computeNormals(frame);
   return { lens, frame };
 }
-
-/* ================================================================== */
-/* Helmet                                                             */
-/* ================================================================== */
 
 /**
  * High-cut ballistic helmet with a scalloped ear cut, a brim lip, side rails
@@ -809,10 +778,6 @@ export function headScarf(nz: Noise, base: Vec3): MeshRecord {
   return out;
 }
 
-/* ================================================================== */
-/* Load-bearing gear                                                  */
-/* ================================================================== */
-
 /** One plate: a curved slab with a soft edge. */
 function plate(
   hx: number,
@@ -1019,10 +984,6 @@ export function kneePad(nz: Noise, knee: Vec3, side = 0): MeshRecord {
   computeNormals(out);
   return out;
 }
-
-/* ================================================================== */
-/* Boots, gloves                                                      */
-/* ================================================================== */
 
 /** Inward toe cant so a left boot is not a clone of the right. */
 function cantLast(mesh: MeshRecord, ankle: Vec3, side: number): MeshRecord {

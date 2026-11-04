@@ -1,19 +1,5 @@
-/**
- * Every number that defines how the player feels, in one place.
- *
- * Calibration notes — these are matched to Modern Warfare (2019) / MWII, which
- * are authored in inches at 20 units = 1 ft. Converted:
- *   base run          150 u/s  -> 4.57 m/s
- *   sprint            230 u/s  -> 7.01 m/s
- *   tactical sprint   275 u/s  -> 8.38 m/s
- *   crouch walk        80 u/s  -> 2.44 m/s
- *   prone              33 u/s  -> 1.01 m/s
- *   jump apex         ~39 u    -> 0.60 m   (with 800 u/s^2 -> ~20.6 m/s^2 gravity)
- *   slide burst       290 u/s  -> 8.84 m/s, ~0.9 s to bleed out
- *   stance change      ~0.2 s  crouch<->stand, ~0.75 s to/from prone
- *
- * Gravity comes from UNITS.gravity (-20.6 m/s^2) so the jump arc matches the
- * rest of the game's physics rather than a private constant.
+/** Player tuning uses metres/seconds; reference locomotion was calibrated from 20 units/foot.
+ * Gravity comes from UNITS.gravity so jump and collision simulation share one arc.
  */
 
 import { UNITS } from '../core/config.ts';

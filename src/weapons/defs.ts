@@ -1,22 +1,5 @@
-/**
- * Weapon data.
- *
- * Ballistics are real: 5.56x45 leaves a 14.5" barrel at ~880 m/s, 9x19 from a
- * 4.5" barrel at ~360 m/s, and both drop under gravity on the way to the
- * target. Rates of fire, magazine capacities and ADS times are the real ones
- * too (an M4A1 is 800 rpm and aims down sights in about 220 ms).
- *
- * Every weapon is zeroed at `zeroRange`: the round crosses the sight line
- * there and falls away past it (see `tryFire`), which is the subsonic .300 BLK
- * long before it is the carbines.
- *
- * Recoil is split into the same layers as a modern shooter:
- *   - `pattern`  deterministic vertical/horizontal sightline movement a player
- *                can memorise and counter. Generated once from a fixed seed.
- *   - sightline  every shot adds its pattern amount to the player's look and
- *                holds until countered. ADS/stance brace this layer.
- *   - `spread`   a random cone that grows with sustained fire and shrinks when
- *                aiming, crouched or still. This is the part you cannot learn.
+/** Canonical weapon tuning: ballistics, handling, fire modes and deterministic recoil patterns.
+ * zeroRange is the sight-line crossing; learned sightline recoil is separate from random spread.
  */
 
 export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx'] as const;

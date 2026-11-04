@@ -1,25 +1,7 @@
-/**
- * AI — offline procedural texture baker for the enemy characters.
- * Runtime loading and node materials live in textures-tsl.js.
- *
- * Tiling PBR sets, all generated on the CPU during export from tileable value noise:
- * camouflage ripstop cloth (one bake per uniform pattern), cordura nylon
- * webbing, laminated plate-carrier shell, skin, glass-filled polymer,
- * parkerised steel and boot rubber. Each set is albedo (sRGB) + tangent normal
- * (Sobel of a height field) + a packed ORM (r = AO, g = roughness,
- * b = metalness), which is exactly the layout MeshStandardMaterial samples when
- * the same texture is bound to aoMap / roughnessMap / metalnessMap.
- *
- * TWO-SCALE CAMOUFLAGE — a single tile cannot carry both a 0.4 m macro blotch
- * and a 1.5 mm weave: that is a 300:1 frequency ratio, which needs a 2 k map and
- * seconds of CPU bake. So the system is split the way a shipping engine splits
- * it. The *base* tile is large (0.78 m of cloth over 512 px = 1.5 mm/texel) and
- * carries the macro blotch field, the 3 cm pixel layer, panel seams and folds —
- * everything that has to survive at 25 m. A second, small *detail* tile (5 cm
- * over 512 px = 0.1 mm/texel) carries the weave, the ripstop lattice and the
- * nylon ribbing, and is blended in inside the shader as a tangent-space normal
- * plus a roughness delta. Both scales are therefore present at every distance,
- * and the macro pattern is not averaged into flat tan by the mip chain.
+/** Offline CPU soldier texture baking; runtime loading lives in textures-tsl.ts.
+ * Outputs are sRGB albedo, tangent-space Sobel normals and packed AO/roughness/metalness.
+ * Large base tiles retain camouflage, seams and folds at range; 5 cm detail tiles supply
+ * weave/ribbing as normal and roughness deltas without erasing macro contrast.
  */
 
 import * as THREE from 'three';
@@ -49,10 +31,6 @@ interface MaterialsOptions {
   anisotropy?: number;
   camo?: string[];
 }
-
-/* ------------------------------------------------------------------ */
-/* Tileable value noise                                                */
-/* ------------------------------------------------------------------ */
 
 export class TileNoise {
   tab!: Float32Array;
@@ -117,10 +95,6 @@ export class TileNoise {
     return s / norm;
   }
 }
-
-/* ------------------------------------------------------------------ */
-/* helpers                                                             */
-/* ------------------------------------------------------------------ */
 
 const srgb = (v: number): number => {
   const c = v <= 0 ? 0 : v >= 1 ? 1 : v;
@@ -273,10 +247,6 @@ function bakeDetail(
   return dataTexture(buf, size, false, aniso);
 }
 
-/* ------------------------------------------------------------------ */
-/* Pattern definitions                                                 */
-/* ------------------------------------------------------------------ */
-
 /**
  * Two-scale blotch camouflage in the spirit of Multicam / MARPAT.
  *
@@ -380,49 +350,10 @@ function garmentRelief(nz: TileNoise, u: number, v: number): number {
   return h;
 }
 
-/**
- * ALBEDO BUDGET for the uniform cloth, in linear luminance.
- *
- * The bake used to be trusted to land in budget by construction and it did not:
- * measured mean was 0.171 with pale blotches at 0.386 — simultaneously under
- * budget on average and *over* it on the pale family, which is a chalky figure
- * with no dark structure. So the bake is measured and remapped instead of hoped
- * at: the mean is forced onto `mean`, the macro spread is stretched by
- * `contrast`, and every texel is clamped into [min,max]. `SoldierMaterials`
- * prints what it actually achieved, and selftest.mjs fails the audit if it
- * drifts.
- *
- * WHY 0.104 AND NOT THE 0.20-0.22 REAL-WORLD FIGURE — measured off the shipping
- * frame, not guessed. A flat-grey reference figure was rendered in the `hero`
- * framing next to the sunlit set dressing and read back per channel:
- *
- *     albedo 0.17 -> 155 sRGB      sunlit stucco wall -> 118 sRGB
- *     albedo 0.09 -> 124 sRGB      sunlit sandbags    ->  91 sRGB
- *     albedo 0.05 ->  96 sRGB
- *
- * i.e. the environment's *sunlit* surfaces currently behave like 0.05-0.09
- * albedo, so a physically-honest 0.21 uniform renders far brighter than sunlit
- * plaster and the soldier reads as a white mannequin — the exact defect this
- * round exists to kill.
- *
- * ROUND 3 — the 0.145 calibration was still a stop too bright *on screen*. Read
- * back off `shots/r3/combat.png` (a hostile at ~32 m, sun behind camera-left):
- *
- *     enemy torso           rgb(170,148,115)  screen lin 0.310
- *     wall directly behind  rgb(127,122,115)  screen lin 0.196
- *     balcony figure (ads)  rgb(224,217,210)  screen lin 0.699  vs sky 0.94
- *
- * i.e. the soldier rendered 1.6x the building he stood in front of, and against
- * a blown 250-L sky he had 3 % contrast and vanished. The whole kit therefore
- * comes down another 0.72x: cloth 0.104 desert / 0.092 olive / 0.083 wolf grey,
- * pale blotches capped at 0.152, which puts the finished uniform at 0.075-0.11
- * linear — real coyote/multicam in dust is 0.08-0.14 and this is the bottom of
- * that. The macro window is still 3.8:1 (0.040-0.152) so the pattern keeps its
- * internal value structure, and `contrast` goes 1.4 -> 1.5 so the macro blotches
- * do not flatten as the window narrows. Screen contrast at the outline is then
- * finished by the edge-darkening term in textures-tsl.js. If `world`/`materials` raise
- * the environment albedo to physical values, these four numbers plus `KIT_CAL`
- * are the only thing that has to move.
+/** Cloth calibration uses measured linear luminance: remap to mean, stretch contrast,
+ * then clamp to the configured min/max. Macro contrast must survive mip averaging.
+ * Values are matched to the authored environment, not raw real-world cloth reflectance.
+ * If environment albedo changes, retune CLOTH_BUDGET and KIT_CAL together.
  */
 export const CLOTH_BUDGET = { mean: 0.104, min: 0.04, max: 0.152, contrast: 1.5, sat: 1.35 };
 
@@ -431,17 +362,9 @@ export const CLOTH_BUDGET = { mean: 0.104, min: 0.04, max: 0.152, contrast: 1.5,
  * stretch and the saturation are shared, because they are what stops any of the
  * three from reading as a flat mannequin.
  */
-/**
- * The same calibration applied to the rest of the kit. The GEAR vertex tints in
- * `soldier.js` express the *hierarchy* (cloth > pouches > webbing > boots) as
- * fractions of their base bake, so when the cloth came down to meet the world's
- * albedo the nylon and laminate bakes had to come with it or the pouches would
- * end up paler than the uniform they are strapped to — which is precisely the
- * "no internal value structure" read. 0.104 / 0.205 = 0.51.
- *
- * The finished per-part values this lands (printed by `node src/ai/selftest.mjs`)
- * are the ones the art direction asked for: carrier and helmet cover 0.045-0.07,
- * pouches / slings / webbing 0.05-0.09, boots 0.03-0.05, skin 0.16-0.22.
+/** KIT_CAL scales nylon/laminate with cloth while preserving vertex-tint hierarchy
+ * (cloth > pouches > webbing > boots). The calibrated factor is 0.104/0.205, about 0.51.
+ * Retune alongside CLOTH_BUDGET if world albedo changes.
  */
 export const KIT_CAL = 0.51;
 
@@ -480,16 +403,7 @@ export function measureCamo(
   return { mean, sd: Math.sqrt(Math.max(0, s2 / (n * n) - mean * mean)), min: mn, max: mx };
 }
 
-/**
- * Force one baked texel into the budget: recentre the mean, stretch the macro
- * contrast about it, clamp, and push the hue a little further from neutral —
- * a desaturated tan at these values is what makes cloth read as plaster.
- */
-/**
- * The one place the finished cloth texel comes from: raw pattern -> budget.
- * Both the bake and `selftest.mjs` go through this, so the audit reports the map
- * that actually ships rather than the pattern before it was remapped.
- */
+/** Finished cloth sampling: raw pattern -> recentered/stretched budget -> clamp/hue adjustment. */
 type CamoSampler = ((u: number, v: number, out: Texel) => void) & { srcMean: number };
 export function makeCamoSampler(
   nz: TileNoise,
@@ -812,7 +726,6 @@ export class SoldierMaterials {
       1.4
     );
 
-    /* ---------------- detail tiles: the high-frequency half -------------- */
     // 5 cm of surface per tile. Blended into the base normal + roughness inside
     // the shader, so a 1.5 mm weave survives no matter how large the base tile
     // has to be to carry the macro camo blotches.

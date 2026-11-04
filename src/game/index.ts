@@ -1,23 +1,5 @@
-/*
- * SURVIVAL GAME MODE — player score and wave progression.
- *
- * The game has one score: the local player's. Enemy eliminations are worth
- * 100 points, headshots add 50, and clearing a wave awards 250 points per wave.
- * AI owns spawning/progression; this system turns those events into durable
- * run state for the HUD and end-of-run screen.
- *
- * Last-enemy search assist (search-assist.ts) emits a coarse compass sector
- * after a quiet stretch — never an exact marker, never a free kill.
- *
- * PUBLIC API — `const game = ctx.get('game')`
- *   game.score
- *   game.kills
- *   game.addScore(points, reason)
- *   game.getHudState() -> { score, kills, wave, enemiesRemaining,
- *                           waveTotal, waveIncoming, nextWaveIn }
- *
- * Events consumed: damage:dealt, wave:complete, player:death, game:restart.
- * Events emitted: score:change, hud:search.
+/** Survival score and HUD run state; AI owns wave spawning/progression.
+ * Search assistance reports only a coarse last-enemy sector, never an exact marker.
  */
 
 import type { AiSystem } from '../ai/index.ts';

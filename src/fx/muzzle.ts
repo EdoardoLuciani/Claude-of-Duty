@@ -2,29 +2,10 @@ import { P } from './atlas.ts';
 import { resetSpawn, setSpawnColorRamp } from './particles.ts';
 import { V, C, C2, basis, blackbody, clampCone, cone, towardHemi, COS55 } from './util.ts';
 
-/**
- * Muzzle flash.
- *
- * A real flash is burning propellant leaving the bore: a small incandescent
- * core at the crown, an asymmetric set of lobes thrown by whatever device is on
- * the muzzle, a forward gas jet, unburnt powder grains, and then half a second
- * of smoke that drifts off the barrel. All of it varies shot to shot — CoD's
- * flashes never repeat, and neither do these: lobe count, roll, scale, colour
- * temperature and jet length are all re-rolled every trigger pull.
- *
- * Shape rules learnt the hard way, because breaking any of them turns the flash
- * back into the cartoon 7-petal sticker this file used to draw:
- *
- *   - The FLASH_LOBE sprite is ONE one-sided tongue (root at its -X edge), never
- *     a radial star. Stacking stars on stars is what makes a flower.
- *   - Every lobe gets an independent roll about the bore and a 15-40 deg pitch
- *     off it, so the composite silhouette is lopsided and never repeats.
- *   - The core is small, tight and blinding; the gas around it is an order of
- *     magnitude dimmer and deeply tinted, so only the core clips to white.
- *   - The whole burning phase lasts 2-3 frames at 60 Hz. What lingers is smoke.
- *
- * The flash also drives a real point light for two or three frames, a haze
- * puff, and (through the caller) recoil-side smoke that lingers.
+/** Muzzle flash layers a small incandescent core, asymmetric tongues, gas jet, grains and smoke.
+ * FLASH_LOBE is a one-sided tongue rooted at -X, never a radial star. Independently roll
+ * lobes about the bore and pitch them 15-40 degrees; keep surrounding gas dimmer than the core.
+ * Burning lasts 2-3 frames at 60 Hz; the light/haze are brief and smoke persists.
  */
 
 interface Vec3Like {
@@ -145,24 +126,9 @@ function profileFor(weapon?: string | MuzzleWeapon): MuzzleProfile {
   return MUZZLE_PROFILES.rifle;
 }
 
-/**
- * @param {object} fx     the FxSystem (provides emit helpers, rng, now)
- * @param {object} o
- * @param {{x,y,z}} o.position   muzzle crown, world space
- * @param {{x,y,z}} o.direction  bore axis, unit
- * @param {string|object} [o.weapon]
- * @param {number} [o.intensity] extra scale (ADS/first shot)
- * @param {number} [o.scale]     geometric size multiplier, independent of the
- *   radiance. An enemy flash has to be the right SIZE to read as a flash at
- *   20 m while being an order of magnitude dimmer than the player's, and one
- *   number cannot do both: scaling `intensity` alone shrank the enemy's core to
- *   three millimetres and it vanished.
- * @param {number} [o.light]     light-only multiplier, independent of the
- *   sprites. An enemy stands 0.6 m from his own crown, so at player strength the
- *   punctual flash puts more irradiance on his chest than the midday sun does
- *   and he reads as a glowing billboard; `ai` uses this to keep the flash a
- *   highlight in daylight while the sprites stay legible.
- * @param {boolean} [o.view]     emit into the viewmodel layers instead
+/** Muzzle crown is world-space; bore direction is unit length. view selects first-person layers.
+ * Keep geometric scale, sprite intensity and light gain independent: distant flashes must stay
+ * legible without over-lighting the shooter's nearby chest.
  */
 export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   const rng = fx.rng;

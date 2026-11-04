@@ -44,22 +44,9 @@ import { SK_PI, SK_GROUND_R, skMiePhase } from './atmosphere-tsl.ts';
 import { ATMO } from './atmosphere.ts';
 import { fbm3 } from './noise.ts';
 
-/**
- * The visible sky — TSL port of the authored GLSL dome.
- *
- * One `skSample(rayDir)` function holds the whole identity, in the same layer
- * order as before:
- *   sky-view LUT  -> Rayleigh + Mie + ozone + multiple scattering
- *   aureoles      -> the Mie forward peak the LUT resolution destroys
- *   sun disc      -> limb darkened, extinguished by the view-path transmittance
- *   moon disc     -> procedural albedo, real terminator from the sun direction
- *   night sky     -> Milky Way, star layers, airglow, occluded by the decks
- *   clouds        -> cirrus then cumulus, lit by the same irradiances
- *   ground        -> first-bounce albedo below the horizon (matters for IBL)
- *
- * The screen variant keeps the star points and the solar disc; the environment
- * variant drops both (quality 0 in the old shader) so the PMREM integrates the
- * sky the camera actually sees without a four-decade disc in the input.
+/** Sky layers: LUT scattering, aureoles, sun, moon, night/stars, cirrus/cumulus, then ground bounce.
+ * Screen sampling keeps stars and the solar disc. Environment sampling omits both so PMREM
+ * integrates the same sky without extreme point/disc radiance.
  */
 
 const owSkLum = Fn<[Node<'vec3'>], Node<'float'>>(([c]): Node<'float'> =>
