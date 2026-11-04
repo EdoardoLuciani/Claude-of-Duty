@@ -94,8 +94,6 @@ function cyl(
   return m;
 }
 
-/* ------------------------------------------------------------------ */
-
 /**
  * Build a weapon. `style`:
  *   'carbine' — flat-top 5.56 carbine, short optic, collapsible stock

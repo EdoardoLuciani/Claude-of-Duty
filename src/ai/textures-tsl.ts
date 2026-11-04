@@ -21,7 +21,6 @@ import {
   vec4,
 } from 'three/tsl';
 import {
-  Color,
   FrontSide,
   MeshStandardNodeMaterial,
   Vector4,
@@ -130,65 +129,14 @@ interface SoldierDetail {
   scale: number;
   normal: number;
   rough: number;
-  texture?: Texture;
 }
 export interface SoldierMaterialOptions {
   tint?: readonly [number, number, number];
-  side?: typeof FrontSide;
   rough?: number;
   metal?: number;
   ao?: number;
-  rim?: number;
   normalScale?: number;
-  name?: string;
-  key?: string;
-  detail?: Omit<SoldierDetail, 'texture'>;
-}
-
-/** Soldier maps retain their CPU-authored camouflage, packed ORM and GLB UVs. */
-export function createSoldierNodeMaterial(
-  set: SoldierTextureSet,
-  opts: SoldierMaterialOptions = {},
-  detail: SoldierDetail | null = null
-): SoldierNodeMaterial {
-  const color = opts.tint
-    ? new Color(opts.tint[0], opts.tint[1], opts.tint[2])
-    : new Color(1, 1, 1);
-  const mat = new SoldierNodeMaterial(
-    {
-      vertexColors: true,
-      side: opts.side ?? FrontSide,
-      dithering: true,
-      roughness: opts.rough ?? 1,
-      metalness: opts.metal ?? 1,
-      color,
-    },
-    opts.rim ?? 1
-  );
-  const baseUv = uv();
-  const orm = texture(set.orm, baseUv);
-  mat.colorNode = texture(set.albedo, baseUv).rgb.mul(vec3(color.r, color.g, color.b));
-  mat.aoNode = float(1).add(orm.r.sub(1).mul(opts.ao ?? 0.85));
-  const detailSample = detail ? texture(detail.texture, baseUv.mul(detail.scale)) : null;
-  mat.roughnessNode = clamp(
-    orm.g
-      .mul(opts.rough ?? 1)
-      .add(detailSample ? detailSample.a.sub(0.5).mul(detail?.rough ?? 0) : 0),
-    0.04,
-    1
-  );
-  mat.metalnessNode = orm.b.mul(opts.metal ?? 1);
-  const n = texture(set.normal, baseUv).rgb.mul(2).sub(1);
-  const slope = detailSample
-    ? detailSample.xy
-        .mul(2)
-        .sub(1)
-        .mul(detail?.normal ?? 0)
-    : 0;
-  const combined = normalize(vec3(n.xy.mul(opts.normalScale ?? 1).add(slope), n.z));
-  mat.normalNode = normalMap(combined.mul(0.5).add(0.5));
-  mat.name = opts.name ?? 'ai_node';
-  return mat;
+  detail?: SoldierDetail;
 }
 
 /** Committed procedural GLB maps, no WebGL material or shader dependency. */
@@ -246,7 +194,6 @@ export class SoldierMaterialsNode {
   }
 
   bakeMs: number = 0;
-  materials: Map<string, SoldierNodeMaterial> = new Map();
   combined: Map<VariantName, SoldierNodeMaterial> = new Map();
   layers: Map<string, number> = new Map();
   surfaceTables: DataTexture[] = [];
@@ -260,44 +207,6 @@ export class SoldierMaterialsNode {
     this.sets = sets;
     this.details = details;
     this.camoStats = camoStats;
-  }
-
-  get(setName: string, opts: SoldierMaterialOptions = {}): SoldierNodeMaterial {
-    const detail = opts.detail;
-    const key = `${setName}|${opts.key ?? ''}|${(opts.tint ?? []).join(',')}|${opts.rough ?? ''}|${
-      opts.metal ?? ''
-    }|${opts.ao ?? 0.85}|${opts.normalScale ?? 1}|${opts.rim ?? 1}|${opts.side ?? FrontSide}|${
-      detail ? `${detail.set},${detail.scale},${detail.normal},${detail.rough}` : ''
-    }`;
-    let mat = this.materials.get(key);
-    if (mat) return mat;
-    const set = this.sets[setName];
-    if (!set) throw new Error(`[ai] unknown material set "${setName}"`);
-    const d =
-      detail && this.details[detail.set] ? { ...detail, texture: this.details[detail.set] } : null;
-    mat = createSoldierNodeMaterial(set, { ...opts, name: `ai_${setName}` }, d);
-    this.materials.set(key, mat);
-    return mat;
-  }
-
-  glass(tint: readonly [number, number, number] = [0.06, 0.07, 0.08]): SoldierNodeMaterial {
-    const key = `glass|${tint.join(',')}`;
-    let mat = this.materials.get(key);
-    if (mat) return mat;
-    // Half-strength rim preserves the goggle sheen without blooming into sky.
-    mat = new SoldierNodeMaterial(
-      {
-        color: new Color(...tint),
-        roughness: 0.11,
-        metalness: 0,
-        vertexColors: true,
-        envMapIntensity: 1.4,
-      },
-      0.5
-    );
-    mat.name = 'ai_glass';
-    this.materials.set(key, mat);
-    return mat;
   }
 
   /** One opaque material per variant; every triangle selects its authored finish. */
@@ -369,7 +278,6 @@ export class SoldierMaterialsNode {
     this.arrays = null;
     for (const table of this.surfaceTables) table.dispose();
     this.surfaceTables.length = 0;
-    for (const mat of this.materials.values()) mat.dispose();
     for (const set of Object.values(this.sets)) {
       for (const texture of [set.albedo, set.orm, set.normal]) {
         texture.dispose();
@@ -382,7 +290,6 @@ export class SoldierMaterialsNode {
       const image = texture.image;
       if (isClosable(image)) image.close();
     }
-    this.materials.clear();
     this.combined.clear();
   }
 }

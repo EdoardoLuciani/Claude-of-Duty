@@ -1,22 +1,6 @@
-/**
- * Ledge detection and the rooted mantle / vault motion.
- *
- * Detection is done entirely with `physics` capsule sweeps and rays — this file
- * never touches triangles itself. Three questions have to be answered before a
- * mantle may commit, and all three are asked every time:
- *
- *   1. is there a near-vertical face in front of me?           (forward sweep)
- *   2. where is its lip, and is the lip a walkable surface?     (downward ray)
- *   3. can my capsule actually stand on the far side of it?     (capsule check)
- *
- * If any answer is no we fall through and the player keeps running into the
- * wall, which is the correct failure mode — a mantle that teleports you into
- * geometry is far worse than one that does not trigger.
- *
- * The motion itself is *rooted*: once committed, the capsule is driven along a
- * parametric curve and collision is not consulted again (the destination was
- * already proven clear). That is how every shooter does it; sweeping during the
- * climb catches the very lip you are climbing.
+/** Rooted mantle/vault detection requires a near-vertical face, a walkable lip and clear landing.
+ * Once committed, follow the proven-clear curve without resweeping the climbed lip.
+ * Failed detection leaves ordinary movement in control.
  */
 
 import * as THREE from 'three';

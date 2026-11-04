@@ -10,7 +10,7 @@ import { bakeDetail, bakeMacro, bakeSurface } from './forge-tsl.ts';
 import type { SurfaceNode } from './forge-tsl.ts';
 import { LIBRARY, resolveName } from './library.ts';
 import type { BakeDefinition } from './library.ts';
-import { bakeMasks, setMask } from './masks.ts';
+import { bakeMasks } from './masks.ts';
 import { DEFAULT_PARAMS } from './params.ts';
 import type {
   SurfaceParams,
@@ -259,32 +259,12 @@ export class MaterialSystemNode {
     return mat;
   }
 
-  variant(name: string, opts: MaterialOptions = {}): MeshStandardNodeMaterial {
-    return this.get(name, opts);
-  }
-  names(): string[] {
-    return Object.keys(SURFACES_TSL);
-  }
-  surfaceOf(name: string): import('../physics/surfaces.ts').SurfaceName {
-    const key = resolveName(name);
-    return hasOwn(LIBRARY, key) ? LIBRARY[key].surface : 'concrete';
-  }
   bakeMasks(
     geometry: BufferGeometry,
     opts: Parameters<typeof bakeMasks>[1]
   ): ReturnType<typeof bakeMasks> {
     return bakeMasks(geometry, opts);
   }
-  setMask(
-    geometry: BufferGeometry,
-    opts: Parameters<typeof setMask>[1]
-  ): ReturnType<typeof setMask> {
-    return setMask(geometry, opts);
-  }
-  get detailNormal(): Texture | null {
-    return this._shared?.detailNormal ?? null;
-  }
-
   tune(
     material: MeshStandardNodeMaterial,
     changes: MaterialChanges = {}
@@ -320,5 +300,5 @@ export class MaterialSystemNode {
 }
 
 export { MaterialSystemNode as MaterialSystem };
-export { bakeMasks, setMask } from './masks.ts';
+export { bakeMasks } from './masks.ts';
 export { LIBRARY, resolveName } from './library.ts';

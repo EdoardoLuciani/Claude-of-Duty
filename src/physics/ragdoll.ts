@@ -1,20 +1,7 @@
-/**
- * Ragdolls — an articulated chain of capsules solved with position-based
- * dynamics (Gauss-Seidel, a handful of iterations per fixed step).
- *
- * Each bone is a segment of two particles. Chain joints share particles;
- * offset branches (shoulders and hips) need explicit attachment constraints
- * in the parent's frame so whole limbs cannot drift away from the torso.
- *
- * Constraints, applied in order every iteration:
- *   1. bone length      (hard distance, stiffness 1)
- *   2. cone limit       (swing of a bone relative to its parent)
- *   3. branch attachment (offset held in the parent's frame)
- *   4. world contact    (capsule vs static BVH + Coulomb friction)
- * Twist is transported/clamped after the position solve.
- *
- * `ai` hands over a dead actor with createRagdoll()/adoptSkeleton() and we own
- * the bone transforms from that moment on.
+/** Capsule-chain PBD ragdolls; physics owns bone transforms after skeleton adoption.
+ * Shared particles join the chain; shoulder/hip offsets use parent-frame attachments.
+ * Iterations solve length, cone, attachment and world-contact/friction constraints;
+ * twist is transported and clamped after the positional solve.
  */
 
 import * as THREE from 'three';
@@ -92,10 +79,6 @@ interface SkeletonSpecOptions {
 function isBone(object: THREE.Object3D | null): object is THREE.Bone {
   return object instanceof THREE.Bone;
 }
-
-/* ------------------------------------------------------------------ */
-/* Default humanoid rig                                                */
-/* ------------------------------------------------------------------ */
 
 /**
  * A 15-capsule humanoid sized from a total height, in the actor's local frame
@@ -200,8 +183,6 @@ export function humanoidSpec(height = 1.8, scaleMass = 82): BoneSpec[] {
     /*14 */ b('shinR', hip * 1.05, y(0.29), 0, hip * 1.05, y(0.055), 0, 0.048, 0.045, 13, 70, 20),
   ];
 }
-
-/* ------------------------------------------------------------------ */
 
 const MAX_PARTICLE_STEP = 0.35; // metres per fixed step, anti-explosion clamp
 const SLEEP_MOTION = 0.0022;
@@ -976,10 +957,6 @@ export class Ragdoll {
     a.maxy = maxy;
     a.maxz = maxz;
   }
-
-  /* ---------------------------------------------------------------- */
-  /* Read-back                                                         */
-  /* ---------------------------------------------------------------- */
 
   /** World-space capsule of bone i: writes head/tail/radius into `out`. */
   getBoneCapsule(i: number, out: CapsuleOut): CapsuleOut {

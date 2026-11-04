@@ -1,25 +1,7 @@
-/**
- * Swept-capsule character controller — collide and slide.
- *
- * The controller is kinematic: `player` (or `ai`) sets a desired displacement
- * each fixed step and we resolve it against the static BVH. Nothing here
- * integrates forces; velocity is owned by the caller and only *clipped* by us,
- * so the movement state machine keeps full authority over feel.
- *
- * Resolution per move():
- *   1. depenetrate  — push out of anything we are already inside
- *   2. lift         — grounded moves raise the capsule by stepHeight first, so
- *                     a stair tread is simply invisible to the horizontal sweep
- *   3. slide        — up to N swept sweeps, clipping the remaining motion
- *                     against every plane we touch (Quake-style plane stack so
- *                     creases don't launch or trap the player)
- *   4. drop         — come back down by the lift plus gravity plus the stair
- *                     descent snap, refusing to cling to unwalkable faces
- *   5. ground probe — publish grounded / normal / surface for this frame
- *
- * The sweep is a true continuous test (see StaticWorld.sweepCapsule), so there
- * is no tunnelling regardless of speed — a 300 m/s displacement resolves
- * correctly in one step.
+/** Kinematic swept-capsule collide-and-slide; callers own forces and velocity.
+ * Depenetrate, slide, depenetrate again, then probe ground. Only grounded, non-jumping
+ * horizontal moves use stepHeight lift/drop. Continuous sweeps prevent tunnelling;
+ * descent snap refuses unwalkable faces.
  */
 
 import type { StaticWorld } from './bvh.ts';

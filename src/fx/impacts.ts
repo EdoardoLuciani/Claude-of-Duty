@@ -16,18 +16,9 @@ import {
   COS55,
 } from './util.ts';
 
-/**
- * Per-surface impact recipes.
- *
- * Each one is built from the same vocabulary — a sub-frame flash, ejecta on the
- * reflected cone, a dust/aerosol puff that expands and slows, something that
- * lingers, and a decal — but the timings, colours, masses and drag are picked
- * per material so the frames read differently: sparks skitter off steel,
- * concrete coughs pale dust and spall, wet dirt throws heavy clods that arc,
- * glass sprays glinting shards, flesh atomises.
- *
- * Numbers are metres / seconds / radians. Velocities are what a rifle round
- * actually throws: chips at 4-10 m/s, sparks at 6-16 m/s, aerosols under 3 m/s.
+/** Material-specific flash/ejecta, aerosols, lingering particles and decal recipes.
+ * Units are metres, seconds and radians; chips/sparks are fast ballistic ejecta,
+ * while aerosol velocities remain low.
  */
 
 import type { EngineSystems } from '../core/context.ts';
@@ -87,23 +78,9 @@ const TWO_PI = Math.PI * 2;
 const RAY_O = { x: 0, y: 0, z: 0 };
 const RAY_D = { x: 0, y: 0, z: 0 };
 
-/**
- * One incandescent spark, authored the way a real one behaves.
- *
- *   - COLOUR is a blackbody ramp, 2500 K at birth down to 1200 K at death, so it
- *     goes orange-white -> deep red instead of staying a white capsule.
- *   - DIRECTION is forced into the impact-normal hemisphere: ejecta that travels
- *     back into the wall (or back toward the shooter) is the single loudest tell
- *     that a spark system is a random-direction emitter.
- *   - LENGTH comes out of the velocity (the shader multiplies `stretch` by the
- *     screen-space speed), so a fast flier is a streak and a tumbling ember is a
- *     speck — they are no longer identical capsules.
- *   - GRAVITY + DRAG give it an arc, and up to two BOUNCES are spawned as
- *     follow-up particles at the surface the first leg actually hits, delayed by
- *     the flight time. That is what makes sparks skitter along a floor instead
- *     of vanishing mid-air.
- *
- * @param {number} bounces how many follow-up legs to spawn (0-2)
+/** Incandescent sparks cool along a blackbody ramp (~2500 K to 1200 K).
+ * Keep launch directions in the impact-normal hemisphere; stretch follows screen-space speed.
+ * Gravity/drag form the arc; 0-2 extra legs bounce at traced surfaces, delayed by flight time.
  */
 function spark(
   fx: ImpactFx,
@@ -215,18 +192,8 @@ export function spawnIntelSparks(fx: ImpactFx, point: Vec3Like): void {
   }
 }
 
-/**
- * A bullet hole is TWO decals, never one.
- *
- * A 5.56 mm round makes a 6-12 mm bore with a crater a couple of centimetres
- * across. The hole tile therefore gets 4.5-7.5 cm of decal — one round of this
- * project shipped it at 16-24 cm, which is why the holes read as wads of chewing
- * gum stuck to the wall rather than as perforations.
- *
- * What actually reads at three metres is not the bore, it is the dust and scorch
- * *around* it, and that is a completely different footprint: 18-30 cm, 8-15 %
- * opacity, no rim structure whatsoever. Painting the two into one tile is what
- * forces the compromise that ruins both.
+/** Separate the 4.5-7.5 cm bore/crater decal from its 18-30 cm, 8-15% dust/scorch halo.
+ * Combining their scales makes holes oversized or suppresses the readable aftermath.
  */
 function bulletHole(fx: ImpactFx, p: Vec3Like, n: Vec3Like, o: BulletHoleOptions): void {
   const rng = fx.rng;

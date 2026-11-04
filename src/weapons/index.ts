@@ -115,54 +115,10 @@ interface LiveGrenade {
   fuse: number;
 }
 
-/**
- * WEAPONS — weapon meshes, the first-person viewmodel rig, ADS, recoil, sway,
- * bob, reload/inspect animation and projectile ballistics.
- *
- * ────────────────────────────────────────────────────────────────────────────
- * WHAT LIVES HERE
- *   geometry.js   hard-surface kit: chamfered boxes, lathes, extrusions,
- *                 screws, rings, and the Assembly
- *                 that merges everything down to a handful of draw calls.
- *   parts.js      shared hardware, stocks, grips, triggers and cartridges.
- *   m4/mcx/p320/evolys/mpx/ax338/m590.js Blender loaders and authored-animation adapters.
- *   hands.js      gloved hands + sleeved arms, two-bone IK from the hand.
- *   viewmodel.js  the animation stack (sway/bob/lag/recoil/ADS/clips).
- *   clips.js      keyframed reload / inspect / draw timelines.
- *   ballistics.js travelling projectiles with gravity and drag.
- *   defs.js       every tuning number, plus the deterministic recoil patterns.
- *
- * ────────────────────────────────────────────────────────────────────────────
- * PUBLIC API — `const wp = ctx.get('weapons')`
- * ────────────────────────────────────────────────────────────────────────────
- *   wp.current            { id, label, class, mode, magSize, ... } (the def)
- *   wp.ammo               { mag, chambered, reserve, magSize, total, empty }
- *   wp.fireMode           'auto' | 'burst' | 'semi'
- *   wp.spreadDegrees      live cone half-angle — drive the crosshair gap with it
- *   wp.adsProgress        0..1
- *   wp.reloading / wp.firing / wp.switching / wp.inspecting
- *   wp.weaponIds          equipped primary + secondary (spawn: rifle/pistol)
- *   wp.setWeapon(id)      draw/holster animated swap
- *   wp.nextWeapon()
- *   wp.cycleFireMode()    next mode needs a fresh press; release/press clears the latch
- *                        even if the release was missed while paused/frozen
- *   wp.reload()           no-op if full or empty of reserve
- *   wp.inspect()
- *   wp.tryFire()          honours fire mode + rpm; returns true if a shot left
- *   wp.viewmodel          the rig (fx/ui may read muzzle/eject transforms)
- *   wp.muzzleWorld(v3)    world-space muzzle, for anything that needs it
- *   wp.debugPose(kind)    'idle' | 'ads' | 'fire'  (the capture harness)
- *   wp.stats              { tris, drawCalls, live, fired }
- *
- * EVENTS EMITTED  (all canonical, see ARCHITECTURE.md)
- *   weapon:fire    { actor, weapon, origin, dir, seed }
- *   weapon:shell   { position, velocity }
- *   weapon:reload  { weapon, phase: ReloadPhase, retained?: boolean } (also manual actions)
- *   shot:resolved  { shooter, weapon, from, to, result, target, part, damage, pellet }
- *                    (only while the telemetry subsystem is present)
- * `bullet:segment` / `bullet:impact` come from physics, which owns resolved paths.
- * Anything else (ammo counts, fire mode, the current weapon) is a getter on
- * this object rather than an event.
+/** Weapons, loadout, handling, authored animation and timed projectile flight.
+ * Asset adapters own meshes/mechanisms; shared arms and viewmodel own IK and procedural motion.
+ * Fire-mode changes require a fresh press; missed releases while paused must not retain the latch.
+ * Physics publishes reached bullet paths and damage. Payloads and ownership: ARCHITECTURE.md.
  */
 export class WeaponSystem {
   declare ctx: EngineContext;
@@ -331,10 +287,6 @@ export class WeaponSystem {
       this._shellQueue.push({ t: -1, weapon: null });
     }
   }
-
-  /* ====================================================================== */
-  /*  init                                                                  */
-  /* ====================================================================== */
 
   async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
@@ -510,10 +462,6 @@ export class WeaponSystem {
     }
   }
 
-  /* ====================================================================== */
-  /*  public getters                                                        */
-  /* ====================================================================== */
-
   _requireState(id: WeaponId): WeaponState {
     const state = this.states.get(id);
     if (!state) throw new Error(`[weapons] unknown weapon ${id}`);
@@ -680,10 +628,6 @@ export class WeaponSystem {
     h.carpetCount = this.carpetBombs;
     return h;
   }
-
-  /* ====================================================================== */
-  /*  weapon management                                                     */
-  /* ====================================================================== */
 
   /** Add rounds to reserve without bypassing the weapon's authored cap. */
   addReserve(amount: number, id = this.activeId): number {
@@ -862,10 +806,6 @@ export class WeaponSystem {
     this.player?.cancelHeal?.(reason);
   }
 
-  /* ====================================================================== */
-  /*  firing                                                                */
-  /* ====================================================================== */
-
   canFire(): boolean {
     const s = this.state;
     if (this.disabled || this.player?.dead === true || !s) return false;
@@ -1021,10 +961,6 @@ export class WeaponSystem {
       }
     }
   }
-
-  /* ====================================================================== */
-  /*  reload / clip callbacks                                               */
-  /* ====================================================================== */
 
   _onClipEvent(name: string, clipName: string): void {
     const s = this.state;
@@ -1253,10 +1189,6 @@ export class WeaponSystem {
     return best;
   }
 
-  /* ====================================================================== */
-  /*  frame                                                                 */
-  /* ====================================================================== */
-
   _setDeathDisabled(on: boolean): void {
     this.disabled = !!on;
     if (!this._viewmodel) return;
@@ -1275,10 +1207,6 @@ export class WeaponSystem {
   fixedUpdate(h: number): void {
     this.sim.fixedUpdate(h);
   }
-
-  /* ====================================================================== */
-  /*  grenades                                                              */
-  /* ====================================================================== */
 
   /**
    * Grenade flow: G equips the grenade (weapon stowed). While it is in hand,
@@ -1516,10 +1444,6 @@ export class WeaponSystem {
     }
     this._grenades.length = 0;
   }
-
-  /* ====================================================================== */
-  /*  field radio (accessory)                                               */
-  /* ====================================================================== */
 
   /** X toggles the radio. Its open panel uses Digit1-3 for request selection. */
   _updateRadio(input: EngineContext['input'], live: boolean): void {
@@ -1798,10 +1722,6 @@ export class WeaponSystem {
     }
   }
 
-  /* ====================================================================== */
-  /*  capture harness                                                       */
-  /* ====================================================================== */
-
   /**
    * Freeze the viewmodel in a photogenic state.
    * The harness applies a shot, then pumps `SETTLE` frames before grabbing the
@@ -1933,8 +1853,6 @@ export class WeaponSystem {
       }
     }
   }
-
-  /* ====================================================================== */
 
   dispose(): void {
     for (const off of this._off ?? []) off();

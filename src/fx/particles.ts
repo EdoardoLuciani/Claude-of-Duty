@@ -38,34 +38,11 @@ import { MeshBasicNodeMaterial } from 'three/webgpu';
 import type { Node } from 'three/webgpu';
 import type { JoinNode, TextureNode, UniformNode } from 'three/webgpu';
 
-/**
- * GPU particle system — strict WebGPU / TSL.
- *
- * One instanced quad per particle. The whole simulation lives in the vertex
- * stage as a closed-form solution of
- *
- *     dv/dt = -k v + g          =>   v(t) = v0 e^-kt + g/k (1 - e^-kt)
- *                                    x(t) = x0 + (v0 - g/k)(1 - e^-kt)/k + g t / k
- *
- * plus a per-particle turbulence term, so the CPU never touches a particle
- * again after it is spawned: no per-frame simulation, no per-frame allocation,
- * no readback. Spawning writes 32 floats into a preallocated interleaved ring
- * buffer and uploads only the dirty span.
- *
- * Two blend modes share the code:
- *   ADDITIVE  premultiplied ONE/ONE — sparks, muzzle flash, fire, tracers.
- *             Order independent, so no sorting is needed.
- *   LIT/alpha src-alpha over — smoke, dust, blood. Shaded with a spherical
- *             fake normal bent by the sprite's own density gradient, wrapped
- *             sun term plus a forward-scatter lobe, so a puff reads as volume.
- *
- * Both fade softly against `render.depthTexture` (positive view depth in
- * metres) so nothing shows a hard intersection line with the world.
- *
- * The translation is mechanical: the GLSL vertex/fragment pair became TSL node
- * graphs, and every uniform keeps its name and value shape so the rest of the
- * FX subsystem drives it unchanged. `texture()` decodes the sRGB atlas exactly
- * as WebGL's sRGB internal format did, so the sprite radiance is unchanged.
+/** Instanced GPU particles: dv/dt=-kv+g, integrated analytically in the vertex stage.
+ * x(t)=x0+(v0-g/k)(1-exp(-kt))/k+gt/k, plus per-particle turbulence.
+ * Spawns write 32 floats to a bounded ring; only dirty ranges upload, with no CPU simulation/readback.
+ * Additive ONE/ONE and lit source-over layers share the code. Soft intersections use positive
+ * view-space depth in metres; sRGB atlas decoding stays native.
  */
 
 export const STRIDE = 32;
@@ -164,10 +141,6 @@ export function setSpawnColorRamp(
   s.b1 = b1;
 }
 
-/* ------------------------------------------------------------------------- */
-/*  shared resources                                                         */
-/* ------------------------------------------------------------------------- */
-
 interface ParticleOptions {
   capacity: number;
   mode: 'additive' | 'lit' | 'distort';
@@ -206,10 +179,6 @@ function quadSource(): THREE.PlaneGeometry {
   }
   return quadGeoSource;
 }
-
-/* ------------------------------------------------------------------------- */
-/*  TSL material                                                             */
-/* ------------------------------------------------------------------------- */
 
 /**
  * Build the particle node material.
@@ -467,10 +436,6 @@ function buildParticleMaterial(o: ParticleOptions): {
 
   return { material, uniforms };
 }
-
-/* ------------------------------------------------------------------------- */
-/*  ring-buffer storage                                                      */
-/* ------------------------------------------------------------------------- */
 
 /**
  * A fixed-capacity ring of particles backed by one interleaved buffer.

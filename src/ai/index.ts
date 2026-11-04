@@ -1,46 +1,7 @@
-/**
- * AI — enemy characters, navigation, perception, cover selection and combat
- * behaviour.
- *
- * WHAT LIVES WHERE
- *   rig.js        25-bone skeleton, bind pose, weapon anchor points
- *   geo.js        loft/tube toolkit, skin binder, baked vertex AO
- *   parts.js      body and kit: jacket, plate carrier, pouches, helmet, boots
- *   weapon.js     the carried carbine / long rifle, baked into the character
- *   textures.js   tiling PBR sets: camo cloth, cordura, skin, polymer, steel
- *   soldier.js    variant assembly -> one skinned geometry + material list
- *   clips.js      hand-authored pose layers (idle/walk/run/crouch/hit/recoil…)
- *   animator.js   layered blending + aim, look-at, arm and foot IK
- *   nav.js        baked Recast surfaces, physical attachments, Detour queries,
- *                 floor-owned cover scoring and claims
- *   agent.js      one enemy: senses, state machine, gun, hit zones, death
- *   contact.ts    player-facing minimap rules (LOS / shots / compass pings)
- *   intent.js     squad job (pin / wrap / flush) from contact + deaths
- *   squad.js      peek rotation, contact sharing, flank, grenades, intent
- *
- * PUBLIC API — `const ai = ctx.get('ai')`
- *   ai.prewarmShadowCaster(light)         native shadow depth with a dummy soldier
- *   ai.spawn(variant, position, yaw, opts) -> Agent
- *   ai.agents                              live Agent list
- *   ai.getWaveState()                      current wave, enemies and countdown
- *   ai.startWave(number, config)            explicitly begin a wave
- *   ai.debugStage('firefight')             staged combat tableau for captures
- *   ai.prewarmMaterials()                  await: build + compile every character
- *                                          shader without spawning anything
- *   ai.grid / ai.cover                     navigation + cover queries
- *   ai.stats                               { agents, alive, navMs, coverPts,
- *                                            pathsDeferred, lodIrrelevant }
- *
- * FRAME BUDGETS — navigation and the garrison are built during init(), not on
- * the first frame of play; A* is rationed to `ai.pathsPerFrame` solves per frame;
- * and an actor that provably cannot reach a pixel this frame (see
- * `_updateRelevance`) animates at a third rate and leaves the shadow cascades.
- *
- * EVENTS consumed: weapon:fire, bullet:segment, bullet:impact, damage:dealt, explosion,
- *   player:footstep, intel:noise
- * EVENTS emitted: weapon:fire (enemy muzzle), weapon:shell,
- *   shot:resolved (telemetry only), damage:dealt (blast damage),
- *   actor:death, ai:footstep, wave:start, wave:complete, hud:heard
+/** Soldiers, navigation, perception, squads and wave progression.
+ * Build navigation and the garrison during init; frame queries use bounded budgets.
+ * Prewarm borrows real materials/geometry without actors, simulation, IDs or RNG consumption.
+ * API/event and worker ownership contracts live in ARCHITECTURE.md.
  */
 
 import * as THREE from 'three';
@@ -378,22 +339,9 @@ export class AiSystem {
     await this.prewarmMaterials();
   }
 
-  /**
-   * Build every character material and compile its WebGPU variants without
-   * spawning a gameplay actor or drawing to the display.
-   *
-   * This replaced the former unsafe approach of staging a firefight during
-   * pre-warm, which left actors and decals behind and blew the pixel gate.
-   * Nothing here is a gameplay object.
-   *
-   *  - One material per variant, with authored surface labels selecting texture
-   *    layers and finishes. Preparing it draws no random numbers or triangles.
-   *  - use throwaway skinned meshes borrowing the actual model geometry/groups
-   *    in the production graph (world MRT and native shadows), with zero draw
-   *    ranges restored by render. Remove the meshes and owned skeleton afterward;
-   *    no gameplay simulation, actor IDs or random numbers are consumed.
-   *
-   * Idempotent and never throws — report failure to the boot readiness gate.
+  /** Prewarm all material variants using temporary skinned meshes borrowing actual geometry/groups.
+   * Use the production MRT/shadow graph with zero draw ranges restored by render; detach meshes
+   * and dispose only owned skeletons. No gameplay actors, IDs, clock or RNG advancement.
    */
   async prewarmMaterials(): Promise<AiPrewarm> {
     if (this._prewarmed) return this._prewarmed;
@@ -497,10 +445,6 @@ export class AiSystem {
     g.setIndex(new THREE.BufferAttribute(new Uint16Array([0, 1, 2]), 1));
     return g;
   }
-
-  /* ================================================================== */
-  /* events                                                             */
-  /* ================================================================== */
 
   _wireEvents(ctx: EngineContext): void {
     this._off = [];
@@ -614,16 +558,8 @@ export class AiSystem {
     return Math.hypot(px - dx * t, py - dy * t, pz - dz * t);
   }
 
-  /* ================================================================== */
-  /* assets                                                             */
-  /* ================================================================== */
-
-  /**
-   * Fail-fast validation for a loaded soldier record. Every consumer binds by
-   * INDEX: agents bind the geometry to their own RIG skeleton via skinIndex,
-   * and resolveMaterials() maps material slots to geometry groups by position.
-   * A model that disagrees with this build must fail the boot rather than
-   * spawn broken actors later. Throws with expected/actual detail.
+  /** Validate skin indices against RIG order and GLB groups against finish-slot order.
+   * Reject mismatches at boot with expected/actual details, before spawning actors.
    */
   _validateSoldierRecord(name: string, rec: SoldierRecord): void {
     const problems = [];
@@ -709,10 +645,6 @@ export class AiSystem {
   get phys(): PhysicsSystem {
     return this._phys ?? (this._phys = this.ctx.get('physics'));
   }
-
-  /* ================================================================== */
-  /* navigation                                                         */
-  /* ================================================================== */
 
   async _buildNav(): Promise<void> {
     const phys = this.phys,
@@ -800,10 +732,6 @@ export class AiSystem {
     out.y -= 0.1;
     return out;
   }
-
-  /* ================================================================== */
-  /* spawning                                                           */
-  /* ================================================================== */
 
   spawn(variantName: string, position: THREE.Vector3, yaw = 0, opts: AgentOptions = {}): Agent {
     const a = new Agent(this, { variant: variantName, position, yaw, ...opts });
@@ -1097,10 +1025,6 @@ export class AiSystem {
     if (!this.ctx.config.deterministic && this.grid) this.startWave(1);
   }
 
-  /* ================================================================== */
-  /* firing                                                             */
-  /* ================================================================== */
-
   /** 0 at night, 1 in full daylight. Drives both flash gains below. */
   _daylight(): number {
     const sky = this._sky ?? (this._sky = this.ctx.peek('sky'));
@@ -1117,18 +1041,9 @@ export class AiSystem {
     return 0.12 + 0.5 * (1 - this._daylight());
   }
 
-  /**
-   * LIGHT gain, deliberately separate and two orders of magnitude smaller.
-   *
-   * The crown sits 0.6 m from the shooter's own chest, so a player-strength
-   * 90 cd flash puts 90/0.36 = 250 W/m^2 on him against 4 W/m^2 of sun. That is
-   * the whole reason the soldiers used to render BRIGHTER than the sunlit stucco
-   * behind them: they were being lit, on the frame the shutter fell, by their own
-   * muzzle flash. A real flash is ~1 ms inside a 16 ms frame, so the honest
-   * time-averaged contribution in daylight is a highlight on the receiver and
-   * nothing more; after dark it is the only light there is and gets to earn its
-   * keep. Measured: torso 0.44 -> 0.13 linear, i.e. from 1.9x the sunlit wall to
-   * 0.55x, which is what an 0.19-albedo uniform in shade should be.
+  /** Light gain is independent of sprite size/intensity. The crown is near the shooter's chest:
+   * daylight muzzle illumination should be a brief highlight, not brighter than sunlight;
+   * night flashes may provide the dominant local light.
    */
   _flashLight(): number {
     const day = this._daylight();
@@ -1317,10 +1232,6 @@ export class AiSystem {
     }
   }
 
-  /* ================================================================== */
-  /* frame                                                              */
-  /* ================================================================== */
-
   update(dt: number, ctx: EngineContext): void {
     this._planningAlive ??= new Set();
     this._planningAlive.clear();
@@ -1440,10 +1351,6 @@ export class AiSystem {
     }
     g.end();
   }
-
-  /* ================================================================== */
-  /* frame budgets and LOD                                              */
-  /* ================================================================== */
 
   /**
    * Shared surface query, rationed. Returns the waypoint count, or -1 when this
@@ -1695,25 +1602,11 @@ export class AiSystem {
     return this._sun.normalize();
   }
 
-  /**
-   * Decide, per actor, whether anything it does this frame can reach a pixel.
-   *
-   * An actor is IRRELEVANT only when both of these hold:
-   *   1. its (already 1.45x inflated) bounding sphere, grown by a further 4 m,
-   *      misses the camera frustum — so it is not drawn, and no screen-space
-   *      effect can sample it either, because it is not in the depth buffer;
-   *   2. the volume its key-light shadow could possibly darken misses the frustum too.
-   *      For a directional light that volume is exactly the actor's sphere swept
-   *      along -keyDirection: a visible surface can only be shadowed by this actor if
-   *      the ray from that surface toward the key light passes through it. Sweeping to
-   *      where the ray leaves the level below the floor covers every receiver,
-   *      ground or wall, and the 4 m of slack absorbs both the soft-shadow filter
-   *      radius (up to ~1 m of cascade texels) and a frame of camera motion.
-   *
-   * Irrelevant actors animate at a third of the rate and are dropped from the
-   * shadow cascades through the native `castShadow` flag. They
-   * are still simulated, still shootable, still make noise — only the parts that
-   * can exclusively affect pixels are skipped.
+  /** An actor is pixel-irrelevant only if both its inflated sphere (+4 m slack) and its
+   * potential directional-shadow volume miss the camera frustum. Sweep the latter along
+   * -keyDirection until below the level to cover ground/wall receivers and filter/camera slack.
+   * Only animation/shadows are reduced (one-third rate, castShadow=false); simulation,
+   * hearing and damage remain active.
    */
   _updateRelevance(ctx: EngineContext): void {
     const cam = ctx.camera;
@@ -1757,10 +1650,6 @@ export class AiSystem {
     this._lodStats.irrelevant = irrelevant;
     this.stats.lodIrrelevant = irrelevant;
   }
-
-  /* ================================================================== */
-  /* staged tableau for the capture harness                             */
-  /* ================================================================== */
 
   /**
    * Pin an agent into a photogenic combat beat: it still animates, aims and
@@ -2017,8 +1906,6 @@ export class AiSystem {
     }
     return this.stats;
   }
-
-  /* ================================================================== */
 
   dispose(): void {
     for (const off of this._off ?? []) off();

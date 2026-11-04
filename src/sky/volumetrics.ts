@@ -30,27 +30,11 @@ import type { ConstNode, JoinNode, VarNode } from 'three/webgpu';
 import { skHG, SK_PI } from './atmosphere-tsl.ts';
 import { skIGN, skVal3 } from './noise.ts';
 
-/**
- * Volumetric fog, light shafts and aerial perspective — TSL port.
- *
- * The production graph marches shadowed inscatter and composites analytic
- * per-channel transmittance at full resolution, before the first-person pass.
- * It has no temporal fog history; world TAA is resolved upstream.
- *
- * SCATTERING vs EXTINCTION. These are separate uniforms and deliberately not
- * tied by a single-scattering albedo. Extinction is set by the visibility we
- * want down the street; the inscatter gain is set by how readable the shafts
- * need to be. A physically closed system either has invisible shafts outdoors
- * or milk at 200 m.
- *
- * DEPTH CONTRACT — the node needs the world-pass **linear view depth in metres,
- * positive**, exactly the contract the WebGL renderer published as
- * `r.depthTexture`. A cleared background must read as zero so it bypasses fog;
- * the sky dome already integrates atmospheric scattering over its view ray.
- *
- * VISIBILITY CONTRACT — `visibility(worldPos, pixelNoise)` is an optional TSL function
- * returning sun/moon visibility in 0..1 (the upstream CSM). When it is absent
- * the shafts still carry the cumulus cloud shadow, but not building occlusion.
+/** World fog marches shadowed inscatter and composites per-channel analytic transmittance before
+ * the first-person pass. TAA resolves upstream; fog owns no temporal history.
+ * Scattering gain and extinction are independently tuned. Depth is positive view metres;
+ * zero background bypasses fog because the sky already integrates atmospheric scattering.
+ * Optional visibility(worldPos,pixelNoise) supplies CSM occlusion; cloud shadow remains without it.
  */
 interface VolumetricShared {
   uFog: Node<'vec4'>;

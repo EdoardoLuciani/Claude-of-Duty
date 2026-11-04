@@ -10,19 +10,9 @@ import type { RigidBody } from '../physics/rigidbody.ts';
 import { P, buildBrassTextures } from './atlas.ts';
 import { resetSpawn } from './particles.ts';
 
-/**
- * Ejected shell casings.
- *
- * Real rigid bodies through `physics.addRigidBody` when physics is up: they
- * tumble on a proper inertia tensor, bounce off the world's BVH, come to rest,
- * and report their impacts so audio can ping and a puff of dust can lift off
- * the floor. One InstancedMesh draws all of them, so a firefight's worth of
- * brass costs one draw call. Shotgun hulls use one additional instanced draw
- * when both variants are live, sharing the same bounded slots and bodies.
- *
- * The casing itself is a lathed 5.56-profile case — rim, body taper, shoulder,
- * neck and a hollow mouth — in brass (metalness 1, F0 tinted, roughness map with
- * drawing marks and extractor scuffing) so it catches the sun as it spins.
+/** Bounded casing slots use rigid bodies and one brass InstancedMesh; shotgun hulls add one draw.
+ * Bodies own tumble/collision/sleep and publish contact audio/dust. Brass uses a hollow
+ * 5.56-profile lathe with independent calibre length/radius scaling.
  */
 
 const CAPACITY = 14;

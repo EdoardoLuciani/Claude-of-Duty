@@ -1,19 +1,6 @@
-/**
- * AI — procedural geometry toolkit for the enemy characters.
- *
- * Everything a soldier is made of is lofted from rings of 2D profiles: limbs are
- * tapered tubes along the bone chain, the plate carrier and its pouches are
- * rounded boxes (superellipse rings under a rounding envelope), the helmet and
- * the optic are revolves, the slings and straps are extruded ribbons. One core
- * routine (`loft`) builds all of them, which keeps the vertex layout, the UV
- * convention and the normal handling identical everywhere.
- *
- * UV CONVENTION — u,v are stored in **metres of surface** (u around the ring,
- * v along the path). The builder divides by the material's tile size when it
- * writes the attribute, so the same physical texel density holds on a boot, a
- * sleeve and a magazine without any per-part tuning.
- *
- * Nothing here runs per frame; it is all boot-time work.
+/** Offline soldier geometry: lofted profiles, skin binding and vertex shading.
+ * UVs store surface metres around/across each part; the builder divides by material tile size
+ * so boots, sleeves and equipment share physical texel density.
  */
 
 import * as THREE from 'three';
@@ -67,10 +54,6 @@ export type DisplaceFn = (
   index: number
 ) => number;
 export type WarpFn = (vertex: THREE.Vector3, index: number) => void;
-
-/* ------------------------------------------------------------------ */
-/* Deterministic gradient noise                                        */
-/* ------------------------------------------------------------------ */
 
 const G3 = [
   [1, 1, 0],
@@ -158,10 +141,6 @@ export class Noise {
     return s / norm;
   }
 }
-
-/* ------------------------------------------------------------------ */
-/* Mesh records                                                        */
-/* ------------------------------------------------------------------ */
 
 /** A mesh under construction: flat arrays, no GPU resources. */
 export function emptyMesh(): MeshRecord {
@@ -430,10 +409,6 @@ export function ribbon(
   return tube(points, (): Vec2[] => pts, { ...opts, capStart: true, capEnd: true });
 }
 
-/* ------------------------------------------------------------------ */
-/* Mesh ops                                                            */
-/* ------------------------------------------------------------------ */
-
 export function computeNormals(m: MeshRecord, from = 0): MeshRecord {
   const P = m.p,
     N = m.n,
@@ -577,10 +552,6 @@ export function appendMesh(dst: MeshRecord, src: MeshRecord): MeshRecord {
   return dst;
 }
 
-/* ------------------------------------------------------------------ */
-/* Character builder — parts, materials, skin weights, baked AO        */
-/* ------------------------------------------------------------------ */
-
 /**
  * Collects parts into one interleaved BufferGeometry with one geometry group
  * per material, computes skin weights against the rig's bind-pose segments and
@@ -602,7 +573,6 @@ export interface BuilderPart {
   grime?: number;
   dirt?: number;
   dust?: number;
-  name?: string;
   uvOffset?: Vec2;
   _vo?: number;
   _vn?: number;
@@ -618,12 +588,6 @@ export interface CharacterBuild {
   materialNames: string[];
   vertices: number;
   triangles: number;
-  parts: {
-    name?: string | undefined;
-    material: string;
-    start: number | undefined;
-    count: number | undefined;
-  }[];
 }
 
 export class CharacterBuilder {
@@ -645,7 +609,7 @@ export class CharacterBuilder {
   /**
    * @param mesh  mesh record (metres, actor bind space)
    * @param o     { material, bones, bone, colour, wear, grime, dirt, dust,
-   *                tile, name }
+   *                tile }
    *   bones   candidate bone names for smooth binding
    *   bone    single bone name for a rigid part (overrides `bones`)
    */
@@ -746,16 +710,6 @@ export class CharacterBuilder {
       materialNames: matNames,
       vertices: vTotal,
       triangles: iTotal / 3,
-      // vertex range per part, so the albedo audit in selftest.mjs can report
-      // the effective value of every single piece of kit
-      parts: order.map(
-        (p): { name: string | undefined; material: string; start: number; count: number } => ({
-          name: p.name,
-          material: p.material,
-          start: p._vo!,
-          count: p._vn!,
-        })
-      ),
     };
   }
 
