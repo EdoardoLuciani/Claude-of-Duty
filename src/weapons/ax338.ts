@@ -134,7 +134,6 @@ export class AX338Animation {
   hands!: Record<HandSide, AuthoredHand>;
   rotationControls: THREE.Object3D[];
   poseQ = new THREE.Quaternion();
-  poseMatrix!: THREE.Matrix4;
   idleTime = 0;
   name: string | null = null;
   fireTime!: number;
@@ -156,7 +155,6 @@ export class AX338Animation {
       this.rotationControls.push(hand.wrist, ...hand.thumb);
       for (const finger of hand.fingers) this.rotationControls.push(finger.root, ...finger.joints);
     }
-    this.poseMatrix = this.root.matrix;
     this.reset();
   }
 

@@ -33,7 +33,6 @@ interface MovementInput {
   jump: boolean;
   jumpHeld: boolean;
   crouchPressed: boolean;
-  cronePressed: boolean;
   pronePressed: boolean;
   sprintHeld: boolean;
   sprintPressed: boolean;
@@ -138,7 +137,6 @@ export class Movement {
     jump: false,
     jumpHeld: false,
     crouchPressed: false,
-    cronePressed: false,
     pronePressed: false,
     sprintHeld: false,
     sprintPressed: false,

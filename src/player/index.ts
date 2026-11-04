@@ -86,7 +86,6 @@ export class PlayerSystem {
   _adsExternalAge: number = 0;
   adsRequested: boolean = false;
   _lookFrame: number = -1;
-  _prevYaw: number = 0;
   // Death camera. The local body is not rendered in first person, so death
   // hands a corpse to `ai` and then cranes the world camera above it. All
   // values are retained here so the one-off transition allocates nothing per
@@ -207,7 +206,6 @@ export class PlayerSystem {
     this.movement.init(this.physics, spawn.feet);
     this.movement.yaw = spawn.yaw;
     this.movement.pitch = 0;
-    this._prevYaw = spawn.yaw;
     this.rig.reset(STANCE.stand.eye);
     this.rig.update(1 / 60, this.movement, this.health);
     this.rig.applyTo(ctx.camera);
@@ -331,7 +329,6 @@ export class PlayerSystem {
     else if (m.yaw < -Math.PI) m.yaw += Math.PI * 2;
 
     m.yawRate = dt > 1e-5 ? dYaw / dt : 0;
-    this._prevYaw = m.yaw;
   }
 
   fixedUpdate(h: number, ctx: PlayerContext): void {
@@ -800,9 +797,6 @@ export class PlayerSystem {
   }
   get viewKick(): CameraRig['viewKick'] {
     return this.rig.viewKick;
-  }
-  get cameraRig(): CameraRig {
-    return this.rig;
   }
   get height(): number {
     return STANCE[this.movement.stance].height;

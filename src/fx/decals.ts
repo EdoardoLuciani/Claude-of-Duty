@@ -41,14 +41,6 @@ interface DecalOptions {
 }
 
 export class DecalSystem {
-  /**
-   * @param {object} o
-   * @param {number} o.capacity      config.q.decalBudget
-   * @param {THREE.Texture} o.albedo
-   * @param {THREE.Texture} o.normal
-   * @param {THREE.Texture} o.orm
-   * @param {number} o.cols          atlas columns
-   */
   capacity: number;
   cols: number;
   maxVerts: number;
@@ -76,6 +68,7 @@ export class DecalSystem {
   _dirtyHi: number = -Infinity;
   _wrapped: boolean = false;
 
+  /** Capacity comes from config.q.decalBudget; cols counts atlas columns. */
   constructor(o: DecalSystemOptions) {
     this.capacity = Math.max(8, o.capacity | 0);
     this.cols = o.cols;

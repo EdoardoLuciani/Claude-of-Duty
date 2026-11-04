@@ -1,16 +1,8 @@
 import * as THREE from 'three';
 
-/**
- * Procedurally generated 33^3 colour grading LUT (Data3DTexture, RGBA8).
- *
- * No external .cube file — the grade is *computed*, which means it can be
- * re-authored per time-of-day and stays inside the "no external assets" rule.
- *
- * The transform is a real colourist chain applied in display-referred space:
- *   ASC-CDL slope/offset/power per channel  ->  split tone (cool shadows,
- *   warm highlights, the modern shooter signature)  ->  luminance-preserving
- *   saturation  ->  highlight desaturation (film shoulder behaviour)  ->
- *   a filmic S-curve pivoted on 18% grey.
+/** Procedural 33^3 RGBA8 grading LUT in display-referred space.
+ * Chain: ASC-CDL, split tone, luminance-preserving saturation, highlight
+ * desaturation, then a filmic S-curve about mid-grey.
  */
 
 const SIZE = 33;
@@ -48,53 +40,19 @@ export const GRADE_PRESETS: Record<string, GradePreset> = {
     power: [1.0, 1.005, 1.02],
     shadowTint: [-0.001, 0.006, 0.022],
     highlightTint: [0.03, 0.014, -0.006],
-    // Display-space saturation. It has to be well over unity because AgX's
-    // inset/outset pair is a *desaturating* transform by construction and the
-    // shoulder takes another chunk out of anything bright: measured on the
-    // 16:30 frame the zenith came out of the tone map at B-R = +15 code values
-    // for a sky whose scene radiance is 3:1 blue over red.
+    // Display-space saturation compensates for AgX's desaturating transform and shoulder.
     saturation: 1.2,
-    // Global contrast, as a power about a pivot.
-    //
-    // The pivot is the CODE VALUE that must not move, and it has to sit at
-    // mid-grey or the "contrast" is really an exposure lift: at 0.42 (code 107)
-    // everything above a fairly dark mid-tone got brighter, which is half of
-    // why 18% scene grey was landing on code 153 instead of ~120 and the whole
-    // frame read as a milky pastel wash with no blacks in it. AgX puts 18%
-    // scene grey near 0.50 display, so that is where the pivot belongs.
+    // Pivot at display code 0.5, where AgX maps 18% scene grey, to avoid an exposure lift.
     contrast: 1.28,
     pivot: 0.5,
-    // Film loses chroma in the shoulder, but 0.28 on top of AgX's own
-    // desaturation is what turned the sunset into a cream void and the noon
-    // zenith into grey. A tenth is enough to keep a specular hit from going
-    // neon without bleaching the sky.
+    // Mild shoulder desaturation avoids neon speculars without bleaching the sky.
     highlightDesat: 0.1,
-    // Toe lift, in code values / 255. A modern shooter frame does keep a couple
-    // of code values of atmosphere in its darkest corner rather than a true
-    // zero — but 0.017 (four and a half codes) added to a curve that was
-    // already lifting the low mids is a grey veil over the bottom third of the
-    // histogram. 0.008 is two codes: visible as "not a hole", invisible as haze.
+    // Toe lift in code values / 255: about two codes, retaining dark detail without a veil.
     toe: 0.008,
-    // Shoulder knee, in code values. The grade runs in display space, so the
-    // contrast power routinely pushes 0.8 up past 1.0 and *something* has to
-    // roll it off; an exponential approach to 1.0 from this knee keeps cloud
-    // and specular separation that a hard divide-by would flatten to 3 codes.
+    // Display-space knee: roll off contrast outputs above 1 without flattening highlights.
     shoulder: 0.6,
-    // Shoulder softness, in the SAME post-contrast units as the knee. The
-    // exponential is divided through by its own value at the largest output the
-    // contrast power can produce — pivot * (1/pivot)^contrast — so that
-    //   scurve(1) == 1 EXACTLY
-    // and display white is actually reachable.
-    //
-    // This is the fix for "p99.9 = 230, nothing above 88% luminance, milky
-    // pastel wash". The shoulder used to be UNNORMALISED with a knee of 0.66 and
-    // a softness of (1 - k), so input 1.0 landed on
-    //   0.66 + 0.34 * (1 - e^-1) = 0.875  ->  223 code values,
-    // and the sky, the sunlit stucco and every specular highlight piled up inside
-    // 220..232. The knee comes DOWN rather than up, with a much longer softness:
-    // that reproduces the old curve to within 3 code values everywhere below
-    // 0.83 — the mid-tones were never the problem — while the last fifth
-    // continues to 255 instead of asymptoting 32 codes short of it.
+    // Softness uses post-contrast units. Normalisation in shoulderParams makes
+    // scurve(1) == 1 so display white remains reachable.
     shoulderSoft: 1.2,
   },
 };
@@ -146,15 +104,12 @@ function applyGrade(
   gg += (l2 - gg) * hd;
   b += (l2 - b) * hd;
 
-  // filmic S-curve around the pivot, with a lifted toe for that "there is
-  // atmosphere in the shadows" look rather than crushed black
+  // Filmic S-curve with a lifted toe.
   const scurve = (x: number): number => {
     const t = Math.max(0, x);
     // contrast as a power about the pivot: the pivot itself never moves
     let c = t <= 0 ? 0 : g.pivot * Math.pow(t / g.pivot, g.contrast);
-    // Soft shoulder so the top end rolls off instead of clipping flat, but
-    // NORMALISED so that the shoulder still arrives at 1.0. Without the
-    // division by `sh.norm` the curve asymptotes short of white.
+    // Normalise the soft shoulder by sh.norm to reach white at input 1.
     if (c > sh.k) {
       c = sh.k + (1 - sh.k) * ((1 - Math.exp(-(c - sh.k) / sh.s)) / sh.norm);
     }

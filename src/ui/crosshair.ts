@@ -1,15 +1,7 @@
 import { clamp, clamp01, damp, ease } from './util.ts';
 
-/**
- * Dynamic four-blade reticle.
- *
- * Spread model (all in HUD pixels at k=1):
- *   gap = base + move*MOVE + fire kick + flinch
- * The kick is a spring so a burst punches the blades out and they settle back
- * with a little overshoot instead of linearly interpolating — that overshoot is
- * most of what makes firing feel mechanical rather than animated.
- *
- * ADS hides the whole reticle over 70ms (the optic reticle is the weapon's job).
+/** Four-blade reticle in HUD pixels at k=1: gap = base + move*MOVE + fire kick + flinch.
+ * Spring kick overshoots on recovery. ADS hides it over 70 ms; weapons own optic reticles.
  */
 export interface CrosshairState {
   move?: number;

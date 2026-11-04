@@ -25,16 +25,9 @@ import type { ConstNode, VarNode } from 'three/webgpu';
 import { skHG, skRaySphere, SK_GROUND_R, SK_PI } from './atmosphere-tsl.ts';
 import { fbm2, ridge2, skVal2 } from './noise.ts';
 
-/**
- * Two procedural cloud decks on the sky shell — TSL port.
- *
- * The shape, the lighting and every constant are the authored GLSL; only the
- * spelling changed. The octave counts are compile-time factory parameters so a
- * single pass can ask for the screen-quality decks and the environment bake for
- * the cheaper ones, exactly as the `quality` flag used to do inside the shader.
- *
- * Radiance convention: sunLow/sunHigh arrive as *irradiance* in scene light
- * units, so every direct term is divided by pi to become framebuffer radiance.
+/** Two cloud decks with compile-time octave counts for screen/environment quality.
+ * sunLow/sunHigh are irradiance in scene light units; divide direct terms by pi
+ * to obtain framebuffer radiance.
  */
 
 const SK_CUMULUS_KM = 1.5;

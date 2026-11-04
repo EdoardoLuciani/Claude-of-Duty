@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 import type { EngineSystems } from '../core/context.ts';
 import { P } from './atlas.ts';
-import { resetSpawn, setSpawnColorRamp } from './particles.ts';
+import { resetSpawn, setSpawnColorRamp, setSpawnPosition, setSpawnVelocity } from './particles.ts';
 import { V, cone } from './util.ts';
 
 /** Dust motes follow the camera, heat shimmer sits ahead on sunlit ground, and finite smoke
@@ -149,12 +149,8 @@ export class Ambience {
 
     if (e.ember > 0 && rng.float() < e.ember) {
       const t = resetSpawn();
-      t.x = s.x;
-      t.y = e.y;
-      t.z = s.z;
-      t.vx = rng.signed() * 0.5;
-      t.vy = rng.range(1.2, 3.2);
-      t.vz = rng.signed() * 0.5;
+      setSpawnPosition(t, s.x, e.y, s.z);
+      setSpawnVelocity(t, rng.signed() * 0.5, rng.range(1.2, 3.2), rng.signed() * 0.5);
       t.tile = P.SPARK;
       t.size0 = rng.range(0.006, 0.014);
       t.size1 = t.size0 * 0.5;
@@ -205,9 +201,7 @@ export class Ambience {
       s.x = cx + rng.signed() * half;
       s.y = cy + rng.signed() * half * 0.42;
       s.z = cz + rng.signed() * half;
-      s.vx = rng.signed() * 0.09;
-      s.vy = rng.range(-0.05, 0.06);
-      s.vz = rng.signed() * 0.09;
+      setSpawnVelocity(s, rng.signed() * 0.09, rng.range(-0.05, 0.06), rng.signed() * 0.09);
       s.tile = P.MOTE;
       s.size0 = rng.range(0.0035, 0.011);
       s.size1 = s.size0;

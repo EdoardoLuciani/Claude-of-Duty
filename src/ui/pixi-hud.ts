@@ -1,4 +1,4 @@
-import { Container, Graphics, Text, WebGPURenderer } from 'pixi.js';
+import { Container, Graphics, WebGPURenderer } from 'pixi.js';
 import type { Renderer } from 'three/webgpu';
 
 import type { AmmoState } from './ammo.ts';
@@ -14,23 +14,8 @@ import { PixiFeedback } from './pixi-feedback.ts';
 import type { FeedbackModels } from './pixi-feedback.ts';
 import { PixiInjury } from './pixi-injury.ts';
 import { PixiMinimap } from './pixi-minimap.ts';
-import { HUD_TYPE, setHudTextResolution } from './pixi-type.ts';
+import { HUD_TYPE, hudText as text, setHudTextResolution } from './pixi-type.ts';
 import { clamp01, setStyle } from './util.ts';
-
-function text(value: string, x: number, y: number, size: number, fill = 0xe7f2ef): Text {
-  const node = new Text({
-    text: value,
-    style: {
-      fontFamily: 'Arial',
-      fontSize: size,
-      fontWeight: '600',
-      fill,
-      stroke: { color: 0x080c10, width: size >= 20 ? 2 : 1, join: 'round' },
-    },
-  });
-  node.position.set(x, y);
-  return node;
-}
 
 const WATCH = [
   'health',

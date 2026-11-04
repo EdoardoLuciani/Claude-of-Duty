@@ -298,15 +298,9 @@ export class AiSystem {
         `(${this.materials.bakeMs.toFixed(0)}ms texture bake)`
     );
 
-    // Preload the soldier models from their exported GLBs (see
-    // tools/export-models.mjs). The geometry used to be built here from the
-    // procedural part library on first spawn — 93/58/57 ms per variant — and
-    // every draw moved the shared RNG stream; loading it instead is pure parse.
-    // Each record is VALIDATED before it is cached: agents bind the geometry
-    // to their own RIG skeleton by index and the material slots to geometry
-    // groups by position, so an incompatible asset must fail the boot loudly
-    // instead of spawning broken actors later (reachable via a stale export or
-    // a stale deployed build — the exporter now regenerates unconditionally).
+    // Load exported soldiers without consuming gameplay RNG. Validate bone order
+    // and material groups before caching: agents bind their own skeletons by index,
+    // so incompatible or stale assets must fail boot rather than break later spawns.
     this._loadedVariants = new Map();
     const models = ctx.get('models');
     const variantNames = Object.keys(VARIANTS);

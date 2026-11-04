@@ -20,14 +20,9 @@ import type {
 import { createSurfaceNodeMaterial } from './shader-tsl.ts';
 import { isGeneratedSurface, SURFACES_TSL } from './surfaces-index-tsl.ts';
 
-/**
- * Production material library for the strict-WebGPU renderer.
- *
- * `src/materials/index.ts` re-exports this as `MaterialSystem`; it is the only
- * production material path (there is no WebGL backend toggle). `init()`
- * requires an initialized strict-WebGPU renderer and bakes the shared detail
- * and macro maps, then bakes each authored surface lazily into packed
- * albedo+height / ORM / normal render targets on first request.
+/** Strict-WebGPU material library. Requires an initialized renderer to bake shared
+ * detail/macro maps; authored surfaces bake lazily into packed albedo+height,
+ * ORM and normal render targets on first request.
  */
 interface MaterialTextureSet {
   name: string;
