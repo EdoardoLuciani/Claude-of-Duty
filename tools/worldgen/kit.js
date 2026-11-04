@@ -586,7 +586,6 @@ export function shopfront(A, pm, o, rng, opts = {}) {
   if (opts.counter !== false) {
     A.add('wood_dark', box, LL(pm, x, 0.42, t + 0.28, 0, w * 0.82, 0.08, 0.7), {
       masks: [0.8, 0.5, 0.2],
-      support: 'counter',
     });
     A.add('wood_dark', box, LL(pm, x - w * 0.34, 0.21, t + 0.28, 0, 0.09, 0.42, 0.62), {
       masks: [0.7, 0.6, 0.3],
@@ -610,7 +609,6 @@ export function shopfront(A, pm, o, rng, opts = {}) {
       if (opts.shelves !== false) {
         A.add('wood_prop', BOX_FINE(A), LL(pm, bx, sy, t + 0.17, 0, 1.3, 0.045, 0.34), {
           masks: [0.85, 0.4, 0.15],
-          support: 'shelf',
         });
         for (const b of [-1, 1]) {
           A.add(
@@ -705,7 +703,6 @@ export function balcony(A, pm, x, y, w, rng, opts = {}) {
   // slab, slightly sagging feel via thickness taper
   A.add(key, BOX_SOFT(A), LL(pm, x, y + 0.06, -d / 2, 0, w, 0.13, d), {
     masks: [0.45, 0.55, 0.3],
-    support: 'balcony',
   });
   // brackets underneath
   for (let i = -1; i <= 1; i += 2) {
@@ -836,7 +833,6 @@ export function stairRun(A, pm, x, y, z, w, steps, rise, run, opts = {}) {
       LL(pm, x, y + (i + 0.5) * rise, z + (i + 0.5) * run - nosing / 2, 0, w, rise, run + nosing),
       {
         masks: [0.7, 0.35, 0.15],
-        support: 'stair',
       }
     );
   }
@@ -846,7 +842,7 @@ export function stairRun(A, pm, x, y, z, w, steps, rise, run, opts = {}) {
         key,
         box,
         LL(pm, x + sx * (w / 2 - 0.03), y + H / 2 - 0.06, z + D / 2, 0, 0.06, 0.22, len, -ang),
-        { masks: [0.55, 0.5, 0.25], support: 'stair' }
+        { masks: [0.55, 0.5, 0.25] }
       );
     }
   }

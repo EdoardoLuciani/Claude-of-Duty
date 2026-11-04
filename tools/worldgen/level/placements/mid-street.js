@@ -845,7 +845,6 @@ export const midStreet = [
     rotationDeg: [175.889011115, -55.822743741, 169.787445269],
     scale: [0.845594658, 0.845594658, 0.845594658],
     masks: [1, 1.167241247, 1],
-    support: 'balcony',
   },
 
   // can
@@ -1408,7 +1407,6 @@ export const midStreet = [
     rotationDeg: [-1.190122976, 47.481231832, 2.171598786],
     scale: [1.101043692, 1.101043692, 1.101043692],
     masks: [1, 1.109322072, 1],
-    support: 'balcony',
   },
   {
     id: 'crate_b/0033',
@@ -1831,7 +1829,6 @@ export const midStreet = [
     rotationDeg: [176.450909323, 30.296785792, -174.170156251],
     scale: [0.992127254, 0.992127254, 0.992127254],
     masks: [1, 1.174863898, 1],
-    support: 'balcony',
   },
   {
     id: 'jerry_can/0014',
@@ -1840,7 +1837,6 @@ export const midStreet = [
     rotationDeg: [-173.462973647, 30.519928137, 177.785893786],
     scale: [0.96395284, 0.96395284, 0.96395284],
     masks: [1, 1.066432383, 1],
-    support: 'balcony',
   },
 
   // jersey
@@ -5181,7 +5177,6 @@ export const midStreet = [
     rotationDeg: [0, 22.689656566, 0],
     scale: [0.904598584, 0.904598584, 0.904598584],
     masks: [1, 1.290889327, 1],
-    support: 'balcony',
   },
 
   // tray
