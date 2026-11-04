@@ -36,6 +36,8 @@ const MATERIALS: Record<string, { tile: number }> = {
   glass: { tile: 1.0 },
 };
 
+export { MATERIALS as SOLDIER_MATERIALS };
+
 /** Multiply baked roughness so its relative variation remains visible.
  * Cloth, laminate and boots use separate multipliers to distinguish their specular lobes at range.
  */
