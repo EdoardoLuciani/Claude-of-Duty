@@ -1,10 +1,10 @@
 # Native soldier authoring
 
 `vanguard`, `irregular` and `breacher` are supported; unknown names and rifle
-styles fail explicitly. This offline recipe is not wired into normal builds:
-current runtime outputs and the old Node builder remain unchanged. Soldier
-outputs are currently generated/ignored; the finished migration will commit
-canonical products for Blender-free builds. No mesh product is an authoring input.
+styles fail explicitly. Python owns geometry; canonical products are committed in
+`assets/soldiers/`. Normal `npm run models` validates and stages GLB/JSON into the
+ignored `public/models/soldiers/` delivery directory without Blender. No mesh
+product is an authoring input.
 
 The runtime reference's feature flags select covered/bare helmets, down/parked
 oval goggles, tied cloth headwrap, shooting shades, fabric wrap/hard half-mask,
@@ -12,8 +12,69 @@ visible beard edges, knee pads, full carrier/thin chest rig and carbine/long AK.
 Both rigs have actual panels, straps and loaded pouches; the AK has fixed
 wood-tone laminate furniture, a curved magazine, gas tube and iron sights.
 
+## Author and cook the complete family
+
 ```sh
-E=/home/edoardo/.cache/cod-blender-soldiers/all-variants
+node tools/blender/soldiers/export.mjs --output /absolute/scratch/soldiers
+# Optional: --seed 0x5eed1234 --blender /absolute/path/to/blender
+```
+
+This explicit command requires Blender **5.2.2**. The executable defaults to
+`BLENDER` or `blender`; the seed defaults to uint32 `0x5eed1234`. It computes a
+reference in an owned temporary directory, factory-empty builds all registered
+variants, then encodes their new packed meshes with the existing Three
+GLTFExporter assembly. It never reads a previous blend/mesh/GLB as generation
+input. Temporary reference/mesh payloads are removed even on failure.
+
+Products are flat `<name>.blend`, `<name>.glb`, `<name>.json`, plus one
+`manifest.json`. All three variants finish staging before any product is
+published. Each file uses a same-directory temporary write and rename; the
+manifest is published last. An authoring attempt invalidates the old manifest
+up front, so failures—including publication failures—cannot leave an apparently
+valid success marker. Already published files are not rolled back; without the
+manifest the reader refuses the family. Use one authoring writer per output
+directory. Blend binary bytes may differ between runs; runtime GLB/JSON bytes
+are deterministic on the tested host. Manifest differences may therefore include
+blend hashes, but contain no timestamps or absolute authoring/output paths.
+
+### Blender-free normal-build boundary
+
+`export.mjs` exports these direct Node APIs for the parent exporter:
+
+- `loadCommittedSoldiers(directory = ASSET_ROOT)` returns
+  `[{ name, glb: Buffer, json: Buffer, meta }]` for the entire registry.
+- `ASSET_ROOT` is the canonical `assets/soldiers/` directory.
+- `soldierInputHash(root?)` hashes the declared LF-normalized source text and
+  `Three.REVISION`, not computed reference floats, mtimes or machine paths.
+- `SOURCE_INPUTS` lists relative sources; `soldierInputPaths(root?)` returns
+  absolute paths for an outer cache's dependency list.
+- `soldierProductPaths(directory?)` returns manifest + GLB/JSON paths for the
+  outer cache. Editable blends are not runtime dependencies.
+- `exportSoldiers({ output, seed?, blender? })` is the explicit authoring API;
+  only this API/CLI invokes Blender.
+
+The reader checks manifest version, uint32 seed, current source hash, pinned
+Blender/Three versions, exact catalog, GLB/JSON SHA256, GLB header/length, and
+canonical metadata/positive statistics/five finite sockets. It never invokes
+Blender or reads large blend binaries. Missing, stale or corrupt products fail
+with a regeneration command—there is no public-product/procedural fallback.
+Imports are side-effect-free, and reading works with `BLENDER=/missing` and no
+Blender in `PATH`. The normal exporter retains its locking, atomic writes,
+cache invalidation and missing-output recovery. Source or formatting changes in declared
+inputs require final products to be regenerated afterward.
+
+The cook validates finite float32 attributes, unit normals, normalized ordered
+four-joint weights, canonical 25-bone indices, complete disjoint surfaces and
+mesh statistics before allocating Three resources. It disposes owned geometry,
+materials and skeleton even when encoding fails. This is a deliberate exception
+to the weapon guide's stock Blender glTF boundary: Python owns generation;
+Node GLTFExporter preserves canonical bone order, tiny weights and float colors.
+There are no stock-export repairs, exporter hooks or runtime material adapters.
+
+## Inspect the intermediate authoring payload
+
+```sh
+E=/tmp/soldier-review
 node tools/blender/soldiers/reference.mjs "$E/reference.json"
 for V in vanguard irregular breacher; do
   blender -b -t 2 --python-exit-code 1 --python tools/blender/soldiers/build.py -- \
@@ -58,9 +119,9 @@ noise. JSON integers express canonical U16 joint indices; the Node cook must
 select U16/U32 element indices according to vertex count. No stock glTF export,
 repair, runtime adapter, or tiny-weight pruning is involved.
 
-Next boundary is the existing Node GLTFExporter cook, then actual runtime
-material/animation and visual review of all three variants. The checker validates
-attributes, disjoint surfaces, normalized skinning, rigid rifle geometry near
+Review generated products in the game before publication; the ordinary exporter
+only stages them and does not replace visual/animation acceptance. The checker
+validates attributes, disjoint surfaces, normalized skinning, rigid rifle geometry near
 sockets, bounds and separate-process repeatability; it is structural acceptance,
 not appearance or ladder-motion acceptance. Same-host repeatability is tested;
 there is no cross-platform bitwise guarantee or baseline pixel/array golden gate.

@@ -348,11 +348,18 @@ worker/memory use and owns per-load decoder/error cleanup. Material conversion
 shares equivalent static map clones only when source, UV channel/transform,
 color space and sampler state match, avoiding duplicate WebGPU uploads for UV1.
 
-`tools/export-models.mjs` runs the same procedural builders offline with a fixed
-seed; runtime never builds meshes. Regenerate ALL procedural models, since
-transitive builder inputs invalidate naive per-file caches. Export uses atomic
-writes and a cache lock. Vite dev/build runs it; preview uses existing `dist`.
-Normal builds need no Blender.
+`tools/blender/soldiers/` owns seeded, parametric soldier geometry from an empty
+Blender scene. An explicit reference bridge reads the runtime RIG, variant registry
+and material scales; it does not duplicate IK or consume old mesh products. A final
+Node GLTFExporter cook preserves the runtime joint/attribute format. Commit the
+recipe and canonical `assets/soldiers/` products together after visual/pose checks.
+
+`tools/export-models.mjs` validates/stages those committed soldiers and generates
+the spent hull. Missing/stale/corrupt authoring products fail, never trigger Blender
+or a procedural fallback. Content hashing covers shared sources and all runtime
+products; missing outputs force a full restage. Atomic writes and the cache lock
+remain. Vite dev/build runs it; preview uses existing `dist`. Normal builds need no
+Blender; explicit soldier regeneration does.
 
 M4/MCX/P320/EVOLYS/MPX/AX338/M590 use committed GLBs and weapon-owned adapters
 under `src/weapons/`; procedural player-weapon exports are retired. M590 is a
