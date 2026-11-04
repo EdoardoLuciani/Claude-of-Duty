@@ -1,26 +1,6 @@
-/**
- * AI — the animation runtime: a small layered blend tree plus the three IK
- * solvers that make an armed character believable.
- *
- * LAYERS, in evaluation order
- *   1  locomotion base      idle / walk / run / crouch-walk / crouch-idle,
- *                           crossfaded, phase driven by real ground speed so
- *                           the feet never skate
- *   2  additive             aim, suppression flinch, reload body language,
- *                           firing recoil, per-region hit reactions
- *   3  one-shots            turn-in-place, vault (override weight ramps)
- *
- * IK, after the pose is written to the bones
- *   A  aim      — the spine chain is rotated until the weapon's bore points at
- *                 the aim target; the residual is spread over Spine1/Spine2 and
- *                 clamped, so the AI has to physically turn to cover a wide arc
- *   B  look-at  — neck and head lead the aim, clamped to human limits
- *   C  arm      — two-bone solve puts the support hand back on the handguard
- *                 (or on the magazine during a reload) after the spine moved
- *   D  foot     — ground probe per foot, pelvis drops to keep both feet
- *                 planted, two-bone solve per leg, sole aligned to the normal
- *
- * Everything is preallocated: `update()` does not allocate.
+/** Allocation-free soldier animation: locomotion, additive layers, then one-shots.
+ * After writing bones, normal-path IK runs feet, aim, look-at, then support hand, subject to guards.
+ * Locomotion phase follows measured ground travel; aim residual is clamped across the spine.
  */
 
 import * as THREE from 'three';
@@ -263,8 +243,6 @@ export class Animator {
     }
   }
 
-  /* ---------------- one-shot triggers ---------------- */
-
   fire(strength = 1): void {
     if (this.climbing) return;
     this.recoilT = 0;
@@ -304,8 +282,6 @@ export class Animator {
     this.turnT = 0;
     this.turnDir = dir >= 0 ? 1 : -1;
   }
-
-  /* ---------------- main ---------------- */
 
   update(dt: number, now: number): void {
     this.footfall = false;
@@ -441,8 +417,6 @@ export class Animator {
     }
   }
 
-  /* ---------------- helpers on world transforms ---------------- */
-
   _wp(i: number, out: THREE.Vector3): THREE.Vector3 {
     const m = this.bones[i].matrixWorld.elements;
     return out.set(m[12], m[13], m[14]);
@@ -478,8 +452,6 @@ export class Animator {
     return b;
   }
 
-  /* ---------------- A: aim ---------------- */
-
   _aimIk(target: THREE.Vector3, weight: number): void {
     const spread: [number, number][] = [
       [this.iSpine, 0.12],
@@ -512,8 +484,6 @@ export class Animator {
     }
   }
 
-  /* ---------------- B: look-at ---------------- */
-
   _lookAt(target: THREE.Vector3, weight: number): void {
     // the head's forward is its local +Z
     const chain: [number, number][] = [
@@ -537,8 +507,6 @@ export class Animator {
       this._applyWorld(bi, this._q3);
     }
   }
-
-  /* ---------------- C: support hand ---------------- */
 
   _supportHandIk(): void {
     const bodyRoot = this.bones[0].parent;
@@ -565,8 +533,6 @@ export class Animator {
     this._pole.set(0.6, -1, -0.25).applyQuaternion(bodyRoot.getWorldQuaternion(this._q2));
     this._twoBone(this.armL, t, this._pole);
   }
-
-  /* ---------------- D: feet ---------------- */
 
   _footIk(): void {
     if (!this.probe) return;
@@ -623,8 +589,6 @@ export class Animator {
     }
   }
 
-  /* ---------------- two-bone solver ---------------- */
-
   /**
    * Classic analytic two-bone IK. `chain` = [upper, lower, end] bone indices.
    * Preserves the bones' twist and never over-extends.
@@ -664,8 +628,6 @@ export class Animator {
     if (toT.lengthSq() < 1e-10) return;
     this._aimBone(il, toT.normalize());
   }
-
-  /* ---------------- outputs for FX / ballistics ---------------- */
 
   _updateMuzzle(): void {
     const hand = this.bones[this.iHandR];

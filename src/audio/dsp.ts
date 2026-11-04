@@ -1,17 +1,5 @@
-/**
- * AUDIO / DSP TOOLKIT
- *
- * Low-level Web Audio helpers shared by every synthesis voice in this
- * directory. Everything here is written against `BaseAudioContext` so the exact
- * same code path renders in an `OfflineAudioContext` as in
- * the live `AudioContext` — that is how this subsystem is verified without a
- * user gesture or a speaker.
- *
- * Rules honoured here:
- *  - no randomness except through an injected `Rng` (ctx.rng.fork())
- *  - buffers and curve tables are built once and shared
- *  - every node a voice creates hangs off a single top gain so the caller can
- *    disconnect the whole voice in one call when its tail has decayed
+/** Shared deterministic Web Audio primitives for live and OfflineAudioContext rendering.
+ * Inject RNG; build reusable buffers/curves once. Each voice owns a top gain for teardown.
  */
 
 export const SPEED_OF_SOUND = 343; // m/s, 20 C dry air
@@ -32,10 +20,6 @@ interface ResonatorPartial {
   g?: number;
   decay?: number;
 }
-
-/* ------------------------------------------------------------------ */
-/* Noise                                                              */
-/* ------------------------------------------------------------------ */
 
 /**
  * Fill a Float32Array with one of the classic noise colours.
@@ -150,10 +134,6 @@ export class NoiseBank {
   }
 }
 
-/* ------------------------------------------------------------------ */
-/* Envelopes                                                          */
-/* ------------------------------------------------------------------ */
-
 const FLOOR = 1e-4;
 
 /**
@@ -230,10 +210,6 @@ export function sweep(
   return t0 + dur;
 }
 
-/* ------------------------------------------------------------------ */
-/* Nodes                                                              */
-/* ------------------------------------------------------------------ */
-
 export function biquad(
   actx: BaseAudioContext,
   type: BiquadFilterType,
@@ -274,10 +250,6 @@ export function series(...nodes: [AudioNode, ...AudioNode[]]): AudioNode {
   return nodes[nodes.length - 1]!;
 }
 
-/* ------------------------------------------------------------------ */
-/* Waveshaping                                                        */
-/* ------------------------------------------------------------------ */
-
 const CURVE_CACHE = new Map<string, Curve>();
 
 /**
@@ -312,10 +284,6 @@ export function shaper(
   w.oversample = oversample;
   return w;
 }
-
-/* ------------------------------------------------------------------ */
-/* Resonators                                                         */
-/* ------------------------------------------------------------------ */
 
 /**
  * Excite a bank of high-Q bandpasses with a short noise burst: the cheapest
@@ -352,21 +320,8 @@ export function struckResonator(
   return out;
 }
 
-/* ------------------------------------------------------------------ */
-/* Misc                                                               */
-/* ------------------------------------------------------------------ */
-
 export function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
-}
-
-export function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
-
-/** Semitone ratio — pitch jitter is expressed musically, not as a raw factor. */
-export function semis(n: number): number {
-  return Math.pow(2, n / 12);
 }
 
 /** Air absorption: how much high end survives `dist` metres of atmosphere. */

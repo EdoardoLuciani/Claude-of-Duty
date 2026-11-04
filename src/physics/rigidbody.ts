@@ -1,17 +1,6 @@
-/**
- * Rigid bodies for debris, gibs, casings and dropped weapons.
- *
- * Full 6-DoF: semi-implicit Euler integration, an inertia tensor rotated into
- * world space each step, sequential-impulse contact resolution with Coulomb
- * friction and restitution, Baumgarte position correction with slop, and an
- * island-free sleep system (a body that stops moving is skipped entirely, so a
- * street littered with a hundred settled shells costs nothing).
- *
- * Shapes are approximated for *contact generation* by a small set of local
- * "probe" spheres — 8 corners for a box, 1 for a sphere, 2..3 for a capsule.
- * That gives correct resting behaviour (a box on a floor produces four
- * contacts and lies flat) at a fraction of the cost of full SAT clipping, and
- * it is exactly what shipped debris systems do.
+/** 6-DoF debris/casings: semi-implicit Euler, rotated inertia, sequential impulses,
+ * Coulomb friction/restitution, Baumgarte correction and sleep skipping.
+ * Contact proxies are local spheres: eight box corners, one sphere, or two/three capsule probes.
  */
 
 import * as THREE from 'three';
@@ -292,8 +281,6 @@ function buildProbes(body: RigidBody): Float32Array {
       }
   return p;
 }
-
-/* ------------------------------------------------------------------ */
 
 const MAX_CONTACTS = 48;
 const SLOP = 0.0015;

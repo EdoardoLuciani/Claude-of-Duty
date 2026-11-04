@@ -1,20 +1,6 @@
-/**
- * AI — the soldier skeleton.
- *
- * 25 bones, authored in metres in the actor's bind space: feet on y = 0, the
- * character facing +Z. Because Y is up and Z is forward in a right-handed
- * frame, the character's own **right** side is at negative X (right =
- * forward x up) — every `*R` bone lives at x < 0. Get this backwards and the
- * rifle ends up in the wrong hand.
- *
- * Bone axis convention matches what `physics`'s ragdoll expects when it adopts
- * the skeleton: local **+Y runs down the bone** toward its child and local +Z
- * points roughly forward, so a death hand-off doesn't pop.
- *
- * The bind pose is not a T-pose. It is a genuine patrol carry — stock in the
- * right shoulder pocket, support hand on the handguard — which means the
- * geometry is modelled where the limbs actually are and the skin weights never
- * have to survive a 90 degree shoulder rotation.
+/** Soldier rig: 25 bones, metres, feet at Y=0, facing +Z; character-right is -X.
+ * Local +Y points down each bone, +Z roughly forward, matching ragdoll adoption.
+ * The bind pose is patrol carry rather than a T-pose.
  */
 
 import * as THREE from 'three';
@@ -52,10 +38,6 @@ function solveElbow(S: Vec3, W: Vec3, l1: number, l2: number, pole: Vec3): THREE
   return s.clone().addScaledVector(axis, a).addScaledVector(perp, h);
 }
 
-/* -------------------------------------------------------------------- */
-/* Hand targets — derived from where the weapon sits in the bind pose.  */
-/* -------------------------------------------------------------------- */
-
 /** Bore line of the carried weapon in bind pose: origin + direction. */
 export const BORE_ORIGIN: Vec3 = [-0.148, 1.398, -0.078];
 export const BORE_DIR: Vec3 = ((): [number, number, number] => {
@@ -80,10 +62,6 @@ const SHOULDER_L: Vec3 = [0.172, 1.425, 0.004];
 
 const ELBOW_R = solveElbow(SHOULDER_R, GRIP_R, UPPER_ARM, FOREARM, [-0.35, -1, -0.45]);
 const ELBOW_L = solveElbow(SHOULDER_L, GRIP_L, UPPER_ARM, FOREARM, [0.55, -1, -0.2]);
-
-/* -------------------------------------------------------------------- */
-/* Bone table                                                           */
-/* -------------------------------------------------------------------- */
 
 /** name, parent, bind world position, optional up hint, optional leaf dir. */
 export const BONES: BoneSpec[] = [

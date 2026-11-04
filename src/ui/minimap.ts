@@ -69,21 +69,9 @@ export interface MinimapState {
 
 const VBAKE = 1024; // vector layout map: CPU-drawn once, so detail is nearly free
 
-/*
- * The map is drawn as a plan of the level, and its value ladder is deliberately
- * inverted against the rest of the HUD: the out-of-play ground is the darkest
- * thing on the panel, background blocks sit a step above it, the street is
- * lighter again so the road reads as the negative space between the masses, and
- * the buildings you can walk into are the lightest tone on the panel with a full
- * outline around them. Only that last step is new — the walkable floor is what
- * the eye should find first — and the three below it are load-bearing: lift the
- * blocks to meet the street and the road stops reading as a road.
- *
- * Names are the floor plan's own vocabulary (SHOP, STORAGE, LIVING, WORKSHOP,
- * RUIN), read off the furnish rectangles the world already authors. Keep an eye
- * on the top of the range: the lightest tone is capped below the sky so the
- * panel stays a corner of the frame rather than the first thing the eye lands
- * on, and contacts keep their dark rim so they stay the loudest marks here.
+/** Map value order is intentional: out-of-play ground darkest, blocks darker than streets,
+ * enterable floors lightest with full outlines. Contacts retain the strongest contrast.
+ * Room names come from authored furnishing; background masses keep only their codes.
  */
 const PLATE = '#1b232a'; // out-of-play ground, also the plate under everything
 const STREET = '#63717e';
@@ -142,8 +130,6 @@ export class Minimap {
   constructor(rng: Rng) {
     this.rng = rng;
   }
-
-  /* --------------------------------------------------------------- bake --- */
 
   tryBake(ctx: MinimapContext): void {
     if (this.bakeDone || this.bakeTries > 6) return;

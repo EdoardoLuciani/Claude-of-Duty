@@ -19,10 +19,6 @@ interface HeartbeatOptions extends VoiceOptions {
   buffer: AudioBuffer;
 }
 
-/* ------------------------------------------------------------------ */
-/* UI                                                                 */
-/* ------------------------------------------------------------------ */
-
 /** Non-diegetic feedback. Short, dry, and deliberately synthetic. */
 export function uiSound(
   actx: BaseAudioContext,

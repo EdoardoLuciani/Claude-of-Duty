@@ -1,23 +1,8 @@
 import * as THREE from 'three';
 
-/**
- * Where the sun and moon actually are.
- *
- * Standard spherical astronomy: declination from the day of year, hour angle
- * from local solar time, then the altitude/azimuth transform for the site
- * latitude. Nothing is hand-placed, so the shots that matter come out of one
- * consistent sky rather than three separate art passes.
- *
- * Site and date are chosen so the graded times land where the shot list says
- * they should (lat 45N, summer solstice, sunset at 19.71):
- *
- *   16.50  sun +32.0 deg, azimuth 272 (due west)   — hard afternoon key
- *   19.20  sun  +4.6 deg, azimuth 299 (WNW)        — golden hour, disc in frame
- *   01.50  sun -18.6 deg                           — full night
- *          moon +21.7 deg, azimuth 288 (W)         — half-lit, in frame
- *
- * Azimuth convention: 0 = north = -Z, 90 = east = +X. `northAngle` rotates the
- * whole celestial sphere for art direction without touching the astronomy.
+/** Solar/lunar altitude and azimuth derive from site latitude, date and local solar hour.
+ * Azimuth: north=-Z at 0 degrees, east=+X at 90 degrees; northAngle rotates art direction.
+ * The authored 45N solstice site places sunset near 19.71 solar hours.
  */
 
 export const SITE = {

@@ -1,14 +1,6 @@
-/**
- * Surface & layer vocabulary.
- *
- * The twelve surface names are fixed by ARCHITECTURE.md — impact FX, decals,
- * footstep audio and this system all key off the same enum. Physics stores the
- * *index* per triangle (one byte) and hands the *name* back to callers, so
- * nobody outside this directory has to care about the packing.
- *
- * The numbers below are game-tuned but physically motivated: penetration depth
- * is roughly how much of the material a 7.62 x 51 round will defeat, friction
- * is a dry kinetic coefficient, restitution is measured drop-bounce.
+/** Canonical collision surfaces/layers shared by physics, FX and audio.
+ * Triangles store byte indices; public results expose names. Penetration depths are game-tuned
+ * against a reference round; friction is kinetic and restitution controls bounce.
  */
 
 import { hasOwn } from '../core/guards.ts';
@@ -254,10 +246,6 @@ export function guessSurface(name: string | null | undefined, fallback = SURFACE
 export function surfaceName(i: number): SurfaceName {
   return SURFACE_NAMES[i] ?? 'concrete';
 }
-
-/* ------------------------------------------------------------------ */
-/* Collision layers                                                    */
-/* ------------------------------------------------------------------ */
 
 export const LAYER = {
   /** Immovable level geometry. */ STATIC: 1 << 0,

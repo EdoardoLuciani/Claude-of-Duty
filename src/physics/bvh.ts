@@ -1,23 +1,7 @@
-/**
- * Static world: triangle soup + binned-SAH BVH.
- *
- * `world` registers meshes through PhysicsSystem.addStatic(); we bake them into
- * world space once, concatenate everything into flat typed arrays, and build a
- * BVH over the result. Nothing here allocates after build() — queries run on
- * preallocated stacks and write into caller-supplied records.
- *
- * Layout
- *   pos      Float32Array, 9 floats per triangle (a.xyz b.xyz c.xyz), world space
- *   nrm      Float32Array, 3 floats per triangle (unit geometric normal)
- *   surface  Uint8Array,   surface enum index per triangle
- *   mask     Uint16Array,  collision layer bits per triangle
- *   object   Int32Array,   owner object id per triangle
- *
- * Nodes
- *   nodeBounds Float32Array, 6 per node
- *   nodeMeta   Int32Array,   2 per node — [leftFirst, count]
- *                            count > 0 : leaf, triIndex[leftFirst .. +count)
- *                            count = 0 : interior, children at leftFirst, +1
+/** Allocation-free queries over a world-space, binned-SAH triangle BVH.
+ * Per triangle: 9 position floats, 3 normal floats, Uint8 surface, Uint16 mask, Int32 owner.
+ * Node bounds have 6 floats; metadata is [leftFirst,count]. Positive count denotes a leaf
+ * over triIndex; zero denotes children at leftFirst and leftFirst+1. Queries borrow scratch.
  */
 
 import * as THREE from 'three';
@@ -125,7 +109,6 @@ export class StaticWorld {
   _cl: ReturnType<typeof makeClosest> = makeClosest();
   _cl2: ReturnType<typeof makeClosest> = makeClosest();
   _cand: Int32Array = new Int32Array(4096);
-  _candCount: number = 0;
   // shared contact buffer for overlap queries
   contacts: ContactBuffer = {
     count: 0,
@@ -143,10 +126,6 @@ export class StaticWorld {
   };
   aabb: WorldAabb = { minx: 0, miny: 0, minz: 0, maxx: 0, maxy: 0, maxz: 0 };
   stats: WorldStats = { rayTests: 0, nodeTests: 0, triTests: 0 };
-
-  /* ---------------------------------------------------------------- */
-  /* Registration                                                      */
-  /* ---------------------------------------------------------------- */
 
   /**
    * Bake a mesh (or InstancedMesh) into world-space triangles.
@@ -236,10 +215,6 @@ export class StaticWorld {
     }
     return -1;
   }
-
-  /* ---------------------------------------------------------------- */
-  /* Build                                                             */
-  /* ---------------------------------------------------------------- */
 
   build(): void {
     const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
@@ -596,10 +571,6 @@ export class StaticWorld {
     this.nodeBounds[o + 5] = mxz + p;
   }
 
-  /* ---------------------------------------------------------------- */
-  /* Queries                                                           */
-  /* ---------------------------------------------------------------- */
-
   /**
    * Closest-hit ray query. `out` is a hit record (see math.makeHitRecord).
    * Returns true on hit. Both faces are tested — bullet penetration needs the
@@ -894,7 +865,6 @@ export class StaticWorld {
     maxz: number,
     mask: number
   ): number {
-    this._candCount = 0;
     if (this.nodeCount === 0) return 0;
     const nb = this.nodeBounds;
     const meta = this.nodeMeta;
@@ -959,15 +929,11 @@ export class StaticWorld {
       if (hitR) stack[sp++] = r;
       if (sp >= stack.length - 2) break; // stack is sized from tree depth; never hit in practice
     }
-    this._candCount = n;
     return n;
   }
 
   get candidates(): Int32Array<ArrayBufferLike> {
     return this._cand;
-  }
-  get candidateCount(): number {
-    return this._candCount;
   }
 
   /**
@@ -1096,28 +1062,7 @@ export class StaticWorld {
       }
       if (hitT < 0 || hitT >= best) continue;
 
-      // Recover the contact normal at the impact configuration.
-      const ox = dx * hitT,
-        oy = dy * hitT,
-        oz = dz * hitT;
-      segTriangleClosest(
-        p0x + ox,
-        p0y + oy,
-        p0z + oz,
-        p1x + ox,
-        p1y + oy,
-        p1z + oz,
-        ax,
-        ay,
-        az,
-        bx,
-        by,
-        bz,
-        cx,
-        cy,
-        cz,
-        cl
-      );
+      // The accepting iteration already retained the closest points at hitT.
       let nx = cl.ax - cl.bx,
         ny = cl.ay - cl.by,
         nz = cl.az - cl.bz;
@@ -1262,10 +1207,6 @@ export class StaticWorld {
     return k;
   }
 
-  surfaceOf(tri: number): number {
-    return this.surface[tri] ?? 0;
-  }
-
   dispose(): void {
     this.objects.length = 0;
     this.pos = new Float32Array(0);
@@ -1288,10 +1229,6 @@ function surfaceArea(
   if (dx < 0 || dy < 0 || dz < 0) return 0;
   return 2 * (dx * dy + dy * dz + dz * dx);
 }
-
-/* ------------------------------------------------------------------ */
-/* Mesh baking                                                         */
-/* ------------------------------------------------------------------ */
 
 /**
  * Flatten a Mesh / InstancedMesh into world-space triangles.

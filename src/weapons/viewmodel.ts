@@ -48,34 +48,10 @@ import type {
 } from './runtime-types.ts';
 import { SNIPER_RETICLE, sniperMradScale, sniperReticleCoverage } from './sniper-reticle.ts';
 
-/**
- * THE VIEWMODEL RIG.
- *
- * Everything the player looks at for the whole game happens in this file. It is
- * a stack of *additive procedural layers* over one base pose — no baked clips
- * for anything continuous:
- *
- *   base      hip / ADS / sprint / low-ready pose blend
- *   sway      layered incommensurate noise, so idle never visibly loops
- *   bob       stride-driven figure-eight, scaled by speed and stance
- *   lag       the gun TRAILS camera rotation on a spring, overshoots, settles.
- *             This is the single detail that makes a viewmodel feel real.
- *   recoil    per-shot rotational + positional impulse, spring-damper return
- *   clip      keyframed reload / inspect / draw additive offset
- *
- * ADS alignment is computed, not authored: the rig solves for the translation
- * that puts the weapon's sight node exactly on the camera axis at the right eye
- * relief, so the optic is pixel-centred at full ADS whatever the weapon.
- *
- * The scene graph:
- *   viewScene
- *     anchor          <- copies the world camera transform every frame, so the
- *                        gun is lit and shadowed as if it were in the world
- *       rig           <- the animation stack writes here
- *         weapon      <- body meshes + moving-part groups
- *         armL/armR   <- two-bone IK, hands welded to the weapon's grips
- *       reticle       <- collimated dot, placed on the optical axis in camera
- *                        space so it behaves like real glass
+/** First-person pose stack: base hip/ADS/sprint/low-ready, sway, stride bob, lag, recoil, then clips.
+ * ADS translation aligns the authored sight to camera axis at the selected eye relief.
+ * viewScene -> anchor (world-camera transform) -> rig -> weapon and two-bone IK arms;
+ * the collimated reticle remains on the optical axis in camera space.
  */
 
 const _v = new THREE.Vector3();
@@ -435,39 +411,10 @@ export class Viewmodel {
     this.reticle = new THREE.Object3D();
     this.reticle.name = 'ow-reticle';
     this.anchor.add(this.reticle);
-    /**
-     * A 2 MOA dot with a soft halo, a dark keyline and a 12-segment outer ring.
-     *
-     * All four are authored at UNIT radius and scaled together by the dot's
-     * angular size in `_updateReticle`, so the whole reticle is one shape that
-     * grows and shrinks as a unit — proportions can never drift.
-     *
-     *   core     the emitter. 0xff1a08 at intensity 1.35, and the intensity is
-     *            measured — twice, because the first analysis was wrong.
-     *
-     *            The old note here reasoned about how much GREEN the emitter adds
-     *            and concluded 3.2 was safe. It is not, and the reason is the tone
-     *            curve, not the additive maths: the frame is graded with AgX (see
-     *            render/composite.js), and AgX's whole signature is that it
-     *            DESATURATES as it approaches display white. A pixel whose red
-     *            channel is 3.2 over a mid-grey background comes out of the curve
-     *            at rgb(255,248,239) whatever its green and blue were — measured on
-     *            ads.png, a white dot, exactly what the previous note said it had
-     *            fixed. There is no colour available up there.
-     *            0.95 keeps the core on the near-linear part of the curve, where a
-     *            saturated red stays a saturated red, and the halo + ring below are
-     *            what carry the "it is an emitter" read instead of raw radiance.
-     *   halo     1.6x the core radius, ~6% alpha. This is the bloom seed and the
-     *            reason the dot looks like it is BEHIND glass. It has to stay
-     *            tight; the old 0.0095 rad / 0.34 alpha halo was 23 px across and
-     *            was what actually read on screen — a soft salmon blob.
-     *   rim      a NORMALLY blended dark keyline. Additive blending cannot draw
-     *            anything darker than what is behind it, so without a separate
-     *            ring the dot dissolves the moment it crosses a blown-out sky.
-     *   ring     12 arc segments at 3.2x the dot radius, 35% of its radiance.
-     *            A bare dot at 8 px is indistinguishable from a dead subpixel;
-     *            the segmented ring is what makes it read as an EMITTER, and it
-     *            is the standard 65 MOA circle-dot every modern sight ships.
+    /** Unit-radius reticle layers scale together by angular size in _updateReticle.
+     * Keep core radiance below AgX's desaturating shoulder; halo/ring convey emission.
+     * The halo stays tight. A normally blended dark rim preserves contrast against bright sky,
+     * which additive layers alone cannot provide.
      */
     const core = new THREE.CircleGeometry(1, 32);
     const halo = new THREE.CircleGeometry(1.6, 32);
@@ -666,10 +613,6 @@ export class Viewmodel {
     this.debugFrozen = false;
   }
 
-  /* ====================================================================== */
-  /*  construction                                                          */
-  /* ====================================================================== */
-
   /** Mount a required authored GLB and its weapon-local animation adapter. */
   addWeapon(model: WeaponModelRecord, def: WeaponDef): WeaponEntry {
     if (!model?.scene || !model.root || !model.animations)
@@ -800,10 +743,6 @@ export class Viewmodel {
     return w;
   }
 
-  /* ====================================================================== */
-  /*  clip playback                                                         */
-  /* ====================================================================== */
-
   play(name: string): number {
     const w = this.active;
     if (!w) return 0;
@@ -823,17 +762,9 @@ export class Viewmodel {
     this.clipResult.lhand.weight = 0;
   }
 
-  get clipPlaying(): boolean {
-    return this.clip !== null;
-  }
-
   get clipName(): string | null {
     return this.clip?.name ?? null;
   }
-
-  /* ====================================================================== */
-  /*  grenade (arm hold + throw)                                            */
-  /* ====================================================================== */
 
   /** Arm a grenade: stow the weapon, grenade in the right hand. */
   holdGrenade(): void {
@@ -1177,10 +1108,6 @@ export class Viewmodel {
     asset.tail.geometry.computeVertexNormals();
   }
 
-  /* ====================================================================== */
-  /*  impulses                                                              */
-  /* ====================================================================== */
-
   /**
    * Per-shot viewmodel kick. `pitch`/`yaw` are the aim-space recoil for this
    * shot (from the deterministic pattern) so the visual climb matches where the
@@ -1232,10 +1159,6 @@ export class Viewmodel {
     this.landSpring.kick(clamp(speed * 0.45, 0.4, 3.4));
   }
 
-  /* ====================================================================== */
-  /*  frame update                                                          */
-  /* ====================================================================== */
-
   /** Load authored skins before adding weapons (which fits contact poses). */
   async loadArms(): Promise<void> {
     this.armAsset = await loadArmAsset();
@@ -1263,10 +1186,8 @@ export class Viewmodel {
     this.armR.updatePose(dt);
     this.armL.updatePose(dt);
 
-    /* -------- camera-relative anchor ---------------------------------- */
     this.syncToCamera();
 
-    /* -------- angular velocity for the lag layer ---------------------- */
     _e.setFromQuaternion(this.anchor.quaternion, 'YXZ');
     const yaw = _e.y;
     const pitch = _e.x;
@@ -1284,7 +1205,6 @@ export class Viewmodel {
     this._prevPitch = pitch;
     this._hasPrev = true;
 
-    /* -------- blends --------------------------------------------------- */
     const adsRate = 1 / Math.max(0.05, def.adsTime);
     // Pumping keeps held ADS; its authored handling motion remains additive.
     const wantAds =
@@ -1301,7 +1221,6 @@ export class Viewmodel {
     this.triggerTarget = s.trigger ? 1 : 0;
     this.triggerT = damp(this.triggerT, this.triggerTarget, 26, dt);
 
-    /* -------- base pose ------------------------------------------------ */
     const hipP = def.hipPos;
     const hipR = def.hipRot;
     this._basePos.set(hipP[0], hipP[1], hipP[2]);
@@ -1328,7 +1247,6 @@ export class Viewmodel {
       this._baseQuat.slerp(this._tmpQuat, this.lowReadyT);
     }
 
-    /* -------- ADS pose: solved, not authored --------------------------- */
     if (ads > 1e-4) {
       const cant = def.adsCant;
       _e.set(cant[0], cant[1], cant[2], 'XYZ');
@@ -1340,7 +1258,6 @@ export class Viewmodel {
       this._baseQuat.slerp(this._adsQuat, ads);
     }
 
-    /* -------- additive layers ------------------------------------------ */
     const swayScale = def.swayScale * lerp(1, 0.22, ads) * lerp(1, 1.5, this.sprintT);
     this.noiseT += dt;
     const n = this.noise;
@@ -1360,7 +1277,6 @@ export class Viewmodel {
     let ry = swayX * 0.028 * swayScale;
     let rz = swayZ * 0.017 * swayScale;
 
-    /* -------- movement bob --------------------------------------------- */
     const speed = s.speed ?? 0;
     const bobAmt =
       def.bobScale * clamp01(speed / 4.2) * lerp(1, 0.28, ads) * (s.airborne ? 0.25 : 1);
@@ -1377,7 +1293,6 @@ export class Viewmodel {
     rx += Math.cos(bp * 2) * 0.014 * bobAmt;
     ry += Math.sin(bp + 0.6) * 0.019 * bobAmt;
 
-    /* -------- weapon lag ---------------------------------------------- */
     const lagScale = lerp(1, 0.42, ads);
     const av = this._angVel;
     this.lag.step(
@@ -1399,7 +1314,6 @@ export class Viewmodel {
     ry += this.lagRot.y;
     rz += this.lagRot.z;
 
-    /* -------- recoil + settle ----------------------------------------- */
     this.recPos.step(dt, 0, 0, 0);
     this.recRot.step(dt, 0, 0, 0);
     this.settle.step(dt, 0, 0, 0);
@@ -1410,13 +1324,11 @@ export class Viewmodel {
     ry += this.recRot.y + this.settle.x;
     rz += this.recRot.z + this.settle.z;
 
-    /* -------- jump / land --------------------------------------------- */
     this.jumpSpring.step(dt, 0);
     this.landSpring.step(dt, 0);
     py -= this.landSpring.x * 0.014 + this.jumpSpring.x * 0.006;
     rx -= this.landSpring.x * 0.05;
 
-    /* -------- clip (reload / inspect / draw) -------------------------- */
     const res = this.clipResult;
     if (this.clip) {
       this.clipT += dt;
@@ -1440,7 +1352,6 @@ export class Viewmodel {
       }
     }
 
-    /* -------- grenade cook / throw ----------------------------------- */
     if (this._grenadeState === 1) {
       const k = dt / GRENADE_COOK_BLEND_T;
       this._cookBlend = clamp01(this._cookBlend + (this._cookType ? k : -k));
@@ -1462,7 +1373,6 @@ export class Viewmodel {
       }
     }
 
-    /* -------- compose -------------------------------------------------- */
     this.rig.position.set(this._basePos.x + px, this._basePos.y + py, this._basePos.z + pz);
     _e.set(rx, ry, rz, 'XYZ');
     _q.setFromEuler(_e);
@@ -1480,10 +1390,8 @@ export class Viewmodel {
 
     // Baked parts must be sampled before solving arms and querying sockets.
     w.animation.update(dt, this.clipName, this.clipT, s.empty, s.magazineLoaded, s.remainingRounds);
-    /* -------- hands (first: the magazine can be held by one) ---------- */
     this._solveHands(w, res);
 
-    /* -------- viewmodel FOV ------------------------------------------- */
     const fovBase = 60;
     const targetFov = fovBase * lerp(1, def.viewFov, ads);
     const vcam = this.ctx.viewCamera;
@@ -1495,8 +1403,6 @@ export class Viewmodel {
     this._updateReticle(w, ads);
     this._updateScope(w, ads);
   }
-
-  /* ---------------------------------------------------------------------- */
 
   _solveHands(w: WeaponEntry, res: ClipResult): void {
     if (this._bandageState) {
@@ -1651,34 +1557,9 @@ export class Viewmodel {
       this.dotCore.material.opacity = alpha * (optic.dotOpacity ?? 1);
       return;
     }
-    /**
-     * SIZE. Angular, so it is FOV-independent within a stance — but not constant
-     * across stances, because the requirement is a fixed number of PIXELS.
-     *
-     * A geometrically honest 2 MOA emitter subtends 0.58 mrad, which at the
-     * viewmodel camera's 0.97 mrad/px (60 deg over 1080 px) is 0.6 px: a dead
-     * subpixel, which is exactly what the old 0.0012 rad dot measured as. Every
-     * shipped red dot cheats this, and cheats it in the same direction — the
-     * reticle is drawn at a legible size and grows as you come into the glass,
-     * because that is the perceptual experience of putting your eye behind a
-     * collimator. But the previous values (0.00385 -> 0.00655 rad) were tuned
-     * when the reticle was the ONLY thing on screen: at full ADS the core read
-     * as a 16 px opaque disc that covered the target, and the ring as a 50 px
-     * circle. The first pass halved that (0.0022 -> 0.0032 rad) and it still
-     * read as a fat blob, so the dot now goes down to a geometrically honest
-     * 2-3 MOA emitter:
-     *   hipfire  0.0012 rad -> 1.2 px radius,  2.5 px dot
-     *   ADS      0.0016 rad -> 1.9 px radius,  3.8 px dot   (0.83 mrad/px)
-     * with the halo at 1.6x the core. The segmented ring keeps its own scale
-     * factor (authored at 3.2x, then scaled 1.6x on top -> ~5.1x the dot) so it
-     * stays a legible ~20 px circle while the dot inside it becomes a true pin
-     * point — the classic small-dot-in-ring sight picture.
-     *
-     * TRANSPARENCY. The dot is additive-blended, so it already never occludes —
-     * it adds light over whatever is behind it. The "opaque disc" read came
-     * from running the core at full alpha. The opacities below hold it at
-     * roughly 60% so the target stays legible through the dot, while the dark
-     * keyline (rim) keeps the edge readable against a blown-out sky.
+    /** Legacy circle-dot blends fixed hip/ADS angular radii; only the dot-only branch above
+     * applies a pixel-readability floor. Scale the ring independently to preserve a fine centre.
+     * Additive dot opacity leaves targets visible; the normally blended rim supplies sky contrast.
      */
     const coreR = s * lerp(0.0012, 0.0016, ads);
     this.dotCore.scale.setScalar(coreR);
@@ -1720,10 +1601,6 @@ export class Viewmodel {
       u.uMradScale.value = sniperMradScale(this.ctx.camera.fov, this.ctx.camera.zoom);
     }
   }
-
-  /* ====================================================================== */
-  /*  world-space queries for firing                                        */
-  /* ====================================================================== */
 
   /** Copy the gameplay camera onto the viewmodel anchor and view camera. */
   syncToCamera(): void {

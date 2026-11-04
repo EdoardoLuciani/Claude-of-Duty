@@ -191,10 +191,6 @@ export class PlayerSystem {
     this._deathLook = new THREE.PerspectiveCamera();
   }
 
-  /* ==================================================================== */
-  /* init                                                                 */
-  /* ==================================================================== */
-
   async init(ctx: PlayerContext): Promise<void> {
     this.ctx = ctx;
     this.physics = ctx.get('physics');
@@ -292,10 +288,6 @@ export class PlayerSystem {
     return out;
   }
 
-  /* ==================================================================== */
-  /* look                                                                 */
-  /* ==================================================================== */
-
   /**
    * Mouse/stick look is consumed once per rendered frame. It happens in the
    * first fixed step when there is one (so movement uses this frame's yaw with
@@ -341,10 +333,6 @@ export class PlayerSystem {
     m.yawRate = dt > 1e-5 ? dYaw / dt : 0;
     this._prevYaw = m.yaw;
   }
-
-  /* ==================================================================== */
-  /* frame                                                                */
-  /* ==================================================================== */
 
   fixedUpdate(h: number, ctx: PlayerContext): void {
     if (!this.movement) return;
@@ -649,10 +637,6 @@ export class PlayerSystem {
     }
   }
 
-  /* ==================================================================== */
-  /* incoming damage                                                      */
-  /* ==================================================================== */
-
   _onDamageDealt(e: PlayerEventsMap['damage:dealt']): void {
     if (!e) return;
     const t = e.target;
@@ -719,10 +703,6 @@ export class PlayerSystem {
     if (e.shot) this._nearMissShots[this._nearMissCursor++ % this._nearMissShots.length] = e.shot;
     this.health.addSuppression(HEALTH.suppression.perNearMiss * (1 - distance / radius));
   }
-
-  /* ==================================================================== */
-  /* public API                                                           */
-  /* ==================================================================== */
 
   /**
    * HUD adapter polled by `ui` every lateUpdate. Shape is fixed by the contract

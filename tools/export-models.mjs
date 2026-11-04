@@ -86,13 +86,6 @@ const LOCK_GRACE_MS = Number(process.env.MODELS_LOCK_GRACE_MS ?? 10000);
 /** Fixed seed so exports are reproducible. */
 const SEED = 0x5eed1234;
 
-/** A materials stub for the builders: geometry-only export, real materials are
- *  resolved at runtime against the exported slot names. */
-const stubMaterials = {
-  get: (key) => new THREE.MeshStandardMaterial({ name: key, metalness: 0.4, roughness: 0.6 }),
-  glass: () => new THREE.MeshStandardMaterial({ name: 'glass', metalness: 0, roughness: 0.05 }),
-};
-
 const exporter = new GLTFExporter();
 
 /** Write through a temp file + atomic rename: readers never see partial data. */
@@ -192,7 +185,7 @@ async function withLock(fn) {
 
 function buildSoldierScene(name) {
   const rng = new Rng(SEED);
-  const built = buildSoldier(name, { rng, materials: stubMaterials });
+  const built = buildSoldier(name, { rng });
   const { skeleton, root: rootBone } = RIG.createSkeleton();
 
   const scene = new THREE.Scene();

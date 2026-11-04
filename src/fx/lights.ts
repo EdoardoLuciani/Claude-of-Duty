@@ -1,17 +1,8 @@
 import * as THREE from 'three';
 
-/**
- * Pooled flash lights.
- *
- * Forward rendering recompiles every material when the number of visible lights
- * changes, so the pool is allocated once, added to the scene once, and never
- * removed — idle lights simply sit at zero intensity. That keeps the shader
- * permutation count constant no matter how much is exploding.
- *
- * Intensity follows a physical-ish curve: an instantaneous rise, then an
- * exponential decay whose time constant is the effect's own, so a muzzle flash
- * lights the wall for two or three frames and a fireball for a third of a
- * second.
+/** Allocate pooled lights once and keep their identities/visibility stable; idle intensity is zero.
+ * Light-count changes alter shader permutations. Flashes rise immediately and decay exponentially
+ * with the authored effect time constant.
  */
 interface LightEntry {
   light: THREE.PointLight;

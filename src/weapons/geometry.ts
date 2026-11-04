@@ -27,10 +27,6 @@ function normalizeAttributes(geo: THREE.BufferGeometry): THREE.BufferGeometry {
   return geo;
 }
 
-/* ========================================================================== */
-/*  primitives                                                                */
-/* ========================================================================== */
-
 /**
  * Chamfered box. `chamfer` is the bevel radius in metres; `seg` 1 gives a hard
  * 45-degree chamfer, 2-3 gives a rounded fillet.

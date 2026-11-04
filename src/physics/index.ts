@@ -1,70 +1,7 @@
-/**
- * PHYSICS — broadphase, raycasts, character collision, rigid bodies, ragdolls,
- * bullet penetration.
- *
- * No physics library: a binned-SAH BVH over the level's triangle soup, a swept
- * capsule character controller, an impulse rigid-body solver and a PBD ragdoll
- * solver, all stepped at 120 Hz from `fixedUpdate` and all deterministic off
- * `ctx.rng`.
- *
- * ────────────────────────────────────────────────────────────────────────────
- * PUBLIC API  —  const phys = ctx.get('physics')
- * ────────────────────────────────────────────────────────────────────────────
- * STATIC WORLD
- *   addStatic(mesh, surfaceType?, opts?)   -> handle   (world: call me!)
- *   addStaticGroup(object3D, surfaceType?) -> handle[]  traverses children
- *   removeStatic(handleOrMesh)
- *   rebuildStatic()                        force an immediate BVH rebuild
- *
- * QUERIES  (world space, metres; `dir` need not be normalised)
- *   raycast(origin, dir, maxDist, mask?)   -> Hit   (always an object; check .hit)
- *   raycastAny(origin, dir, maxDist, mask?)-> bool  cheap visibility test
- *   lineOfSight(from, to, mask?)           -> bool
- *   explosionExposure(origin, feet, eye)   -> 0..1, including short detours
- *   sphereCast(origin, dir, radius, maxDist, mask?)  -> Hit
- *   capsuleCast(p0, p1, radius, dir, maxDist, mask?) -> Hit
- *   overlapCapsule(p0, p1, radius, mask?)  -> contact count
- *   checkCapsule(p0, p1, radius, mask?)    -> bool, true when clear
- *   groundHeight(x, z, fromY?, mask?)      -> y of the floor, or -Infinity
- *
- *   Hit = { hit, point:Vector3, normal:Vector3, distance, surface:string,
- *           surfaceIndex, object, collider, body, ragdoll, actor, part,
- *           triangle, frontFace, fraction }
- *   Records come from a 64-deep ring pool: read or copy now, never stash.
- *
- * CHARACTER  (player / ai)
- *   createCharacter({radius, height, position, stepHeight, slopeLimit}) -> CharacterController
- *   removeCharacter(c)
- *   c.move(dx,dy,dz)  c.position  c.velocity  c.grounded  c.groundNormal
- *   c.groundSurfaceName  c.touchingCeiling  c.setHeight(h)  c.canFit(h)
- *   c.teleport(x,y,z)  c.landingSpeed  c.steppedUp  c.lastMoveBlocked
- *
- * BALLISTICS  (weapons)
- *   fireBullet({origin, dir, shooter, damage, penetration, maxDist, ...}) -> ShotResult
- *   ShotResult: {impacts, segments, end, stopReason, ...}, pooled until next shot.
- *   emits resolved `bullet:segment`, `bullet:impact`, and `damage:dealt`.
- *   explode({position, radius, damage, impulse})
- *
- * DYNAMICS  (fx, weapons)
- *   addRigidBody({shape, halfExtents|radius, mass, position, velocity, ...}) -> RigidBody
- *   spawnDebris(position, velocity, {size, surface, lifetime, object3D})
- *   removeRigidBody(b)   b.applyImpulse(ix,iy,iz, px,py,pz)   b.sleeping
- *
- * RAGDOLLS  (ai)
- *   createRagdoll({bones?, transform, height, mass, velocity, impulse, point}) -> Ragdoll
- *   createRagdollFromSkeleton(skinnedMesh, {impulse, point, actor}) -> Ragdoll
- *   removeRagdoll(r)
- *
- * HITBOXES / DYNAMIC COLLIDERS  (ai)
- *   addCollider({shape:'capsule'|'sphere'|'box', layer, surface, owner, part}) -> collider
- *   collider.setSegment(ax,ay,az,bx,by,bz)  collider.setSphere(x,y,z,r)
- *   collider.setFromObject(object3D, hx,hy,hz)   removeCollider(c)
- *
- * DEBUG
- *   stats -> { triangles, nodes, buildMs, bodies, awake, ragdolls, ... }
- *
- * CONSTANTS
- *   phys.LAYER, phys.MASK, phys.SURFACE, phys.SURFACE_NAMES, phys.SURFACE_PROPS
+/** 120 Hz physics: static BVH, character sweeps, rigid bodies, ragdolls and penetration.
+ * Queries use world-space metres; directions need not be normalised. Miss floor height is -Infinity.
+ * Hit records come from a 64-slot ring: read/copy immediately. Bullet results last until the next shot.
+ * Targets own health; resolved paths drive feedback and damage. Full contracts: ARCHITECTURE.md.
  */
 
 import * as THREE from 'three';
@@ -442,10 +379,6 @@ export class PhysicsSystem {
     ctx.events.on('explosion', this._onExplosion);
   }
 
-  /* ================================================================== */
-  /* Static world registration                                          */
-  /* ================================================================== */
-
   /**
    * Register a mesh as static collision. `surfaceType` is one of the twelve
    * names in ARCHITECTURE.md; omit it and we infer per material group, so a
@@ -511,10 +444,6 @@ export class PhysicsSystem {
   get triangleCount(): number {
     return this.staticWorld.triCount;
   }
-
-  /* ================================================================== */
-  /* Queries                                                            */
-  /* ================================================================== */
 
   _nextHit(): PhysicsHit {
     const h = this._hitPool[this._hitCursor];
@@ -1141,29 +1070,11 @@ export class PhysicsSystem {
     return this.overlapCapsule(p0, p1, radius, mask) === 0;
   }
 
-  overlapSphere(center: Vector3Like, radius: number, mask = MASK.CHARACTER): number {
-    return this.staticWorld.overlapCapsule(
-      center.x,
-      center.y,
-      center.z,
-      center.x,
-      center.y,
-      center.z,
-      radius,
-      mask,
-      0
-    );
-  }
-
   /** Floor height under (x, z). Returns -Infinity if there is no floor. */
   groundHeight(x: number, z: number, fromY = 200, mask = MASK.WORLD): number {
     const h = this.raycast(x, fromY, z, 0, -1, 0, 1000, mask);
     return h.hit ? h.point.y : -Infinity;
   }
-
-  /* ================================================================== */
-  /* Characters                                                         */
-  /* ================================================================== */
 
   createCharacter(opts = {}): CharacterController {
     const c = new CharacterController(this.staticWorld, {
@@ -1179,10 +1090,6 @@ export class PhysicsSystem {
     const i = this.characters.indexOf(c);
     if (i >= 0) this.characters.splice(i, 1);
   }
-
-  /* ================================================================== */
-  /* Ballistics                                                         */
-  /* ================================================================== */
 
   /**
    * Trace a round through the world, penetrating what it can.
@@ -1316,10 +1223,6 @@ export class PhysicsSystem {
     }
   }
 
-  /* ================================================================== */
-  /* Rigid bodies                                                       */
-  /* ================================================================== */
-
   addRigidBody(opts: PhysicsRigidBodyOptions = {}): RigidBody {
     const b = new RigidBody(opts);
     if (opts.surfaceType !== undefined) b.surface = surfaceIndex(opts.surfaceType);
@@ -1367,10 +1270,6 @@ export class PhysicsSystem {
     b.angularVelocity.set(r.signed() * 14, r.signed() * 14, r.signed() * 14);
     return b;
   }
-
-  /* ================================================================== */
-  /* Ragdolls                                                           */
-  /* ================================================================== */
 
   createRagdoll(
     opts: ConstructorParameters<typeof Ragdoll>[1] & {
@@ -1431,10 +1330,6 @@ export class PhysicsSystem {
     rd.dispose();
   }
 
-  /* ================================================================== */
-  /* Dynamic colliders / hitboxes                                       */
-  /* ================================================================== */
-
   addCollider(opts: ColliderOptions = {}): Collider {
     const c = new Collider(opts);
     this.colliders.push(c);
@@ -1445,10 +1340,6 @@ export class PhysicsSystem {
     const i = this.colliders.indexOf(c);
     if (i >= 0) this.colliders.splice(i, 1);
   }
-
-  /* ================================================================== */
-  /* Frame                                                              */
-  /* ================================================================== */
 
   fixedUpdate(h: number): void {
     const t0 = performance.now();
@@ -1525,8 +1416,6 @@ export class PhysicsSystem {
     this.staticWorld.dispose();
   }
 }
-
-/* ------------------------------------------------------------------ */
 
 function segmentHitsAabb(
   ox: number,

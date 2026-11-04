@@ -5,19 +5,8 @@ import { P } from './atlas.ts';
 import { resetSpawn, setSpawnColorRamp } from './particles.ts';
 import { V, cone } from './util.ts';
 
-/**
- * Always-on atmosphere.
- *
- * Three things, all subtle enough that you notice them only when they are gone:
- *
- *  - **Dust motes.** A population of tiny forward-scattering specks kept alive
- *    in a box that follows the camera, drifting on the same analytic turbulence
- *    as everything else. They are what makes a shaft of light look like air
- *    instead of a gradient.
- *  - **Heat shimmer.** Refraction sprites laid on the ground ahead of the
- *    player while the sun is high, so hot surfaces boil slightly.
- *  - **Explosion smoke.** Finite columns from the same emitter pool explosions
- *    already call through `addColumn`.
+/** Dust motes follow the camera, heat shimmer sits ahead on sunlit ground, and finite smoke
+ * columns share the bounded emitter pool used by explosions.
  */
 
 const TWO_PI = Math.PI * 2;
@@ -96,10 +85,6 @@ export class Ambience {
 
     this.shimmerEnabled = opts.shimmer !== false;
   }
-
-  /* --------------------------------------------------------------------- */
-  /*  emitters                                                            */
-  /* --------------------------------------------------------------------- */
 
   _acquire(): Emitter {
     let oldest = null;
@@ -192,10 +177,6 @@ export class Ambience {
     }
   }
 
-  /* --------------------------------------------------------------------- */
-  /*  motes + shimmer                                                     */
-  /* --------------------------------------------------------------------- */
-
   _motes(dt: number, now: number, camera: THREE.Camera): void {
     const fx = this.fx;
     const rng = fx.rng;
@@ -277,8 +258,6 @@ export class Ambience {
       rng.float() < 0.5 ? P.SMOKE_A : P.MIST
     );
   }
-
-  /* --------------------------------------------------------------------- */
 
   update(dt: number, now: number, camera: THREE.Camera): void {
     for (const e of this.emitters) {
