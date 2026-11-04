@@ -1,13 +1,6 @@
-/**
- * Health, armour, suppression and the damage-direction model.
- *
- * There is no passive regeneration: health only returns through player-activated
- * bandages. Damage publishes the attacker position and view-space angle for
- * HUD feedback, alongside a matching camera impulse. UI owns indicator lifetime.
- *
- * Suppression is a separate 0..1 pool fed by near misses, hits and blasts. It
- * widens the breathing sway and adds a little shake — the same trick CoD uses to
- * make being shot at feel dangerous without taking control away.
+/** Health, plates, suppression and directional damage feedback.
+ * No passive regeneration: only completed bandages restore health. UI owns indicator lifetime.
+ * Suppression is independent of health and drives sway/shake without taking control.
  */
 
 import * as THREE from 'three';
@@ -129,8 +122,6 @@ export class Health {
     this._emitState();
   }
 
-  /* ==================================================================== */
-
   /**
    * @param {number} amount
    * @param {THREE.Vector3|null} from  world position of the attacker/blast
@@ -228,8 +219,6 @@ export class Health {
   addSuppression(a: number): void {
     this.suppression = clamp01(this.suppression + a);
   }
-
-  /* ==================================================================== */
 
   update(dt: number): void {
     const H = HEALTH;

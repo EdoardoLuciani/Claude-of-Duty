@@ -1,17 +1,6 @@
-/**
- * Allocation-free geometric kernel for the physics system.
- *
- * Every routine here takes scalar components and writes into a caller-supplied
- * "out" record, so the hot paths (BVH traversal, capsule sweeps, contact
- * generation) never touch the allocator. Records are plain objects with fixed
- * shapes so V8 keeps them monomorphic.
- *
- * Conventions
- *  - Right-handed, Y-up, metres.
- *  - A capsule is the Minkowski sum of a segment (p0..p1) and a sphere of
- *    radius r. p0/p1 are the *sphere centres*, not the tips.
- *  - Triangle winding is CCW when seen from the front face; the geometric
- *    normal is normalize(cross(b-a, c-a)).
+/** Allocation-free scalar geometry with caller-owned result records; right-handed, Y-up, metres.
+ * Capsule endpoints are sphere centres, not tips. Front-facing triangles are CCW;
+ * geometric normal = normalize(cross(b-a,c-a)).
  */
 
 export const EPS = 1e-9;
@@ -69,10 +58,6 @@ export function makeHitRecord(): HitRecord {
     body: null,
   };
 }
-
-/* ------------------------------------------------------------------ */
-/* Ray primitives                                                      */
-/* ------------------------------------------------------------------ */
 
 /**
  * Möller–Trumbore. Returns the ray parameter t (distance if dir is unit) or
@@ -163,10 +148,6 @@ export function rayAabb(
   if (hi < 0 || lo > hi || lo > tmax) return Infinity;
   return lo < 0 ? 0 : lo;
 }
-
-/* ------------------------------------------------------------------ */
-/* Closest-feature queries                                             */
-/* ------------------------------------------------------------------ */
 
 /** Ericson, Real-Time Collision Detection §5.1.5. Writes out.b* = point on tri. */
 export function closestPtPointTriangle(
@@ -482,10 +463,6 @@ export function segTriangleClosest(
   out.d2 = best;
   return best;
 }
-
-/* ------------------------------------------------------------------ */
-/* Analytic sweeps used for dynamic (non-BVH) proxies                  */
-/* ------------------------------------------------------------------ */
 
 /** Ray vs sphere. Returns entry distance or -1. */
 export function raySphere(

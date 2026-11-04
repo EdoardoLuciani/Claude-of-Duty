@@ -26,8 +26,6 @@ export const FONT_DISPLAY =
 
 export const FONT_MONO = '"SF Mono",ui-monospace,"Roboto Mono",Menlo,monospace';
 
-/* ------------------------------------------------------------------ dom --- */
-
 import type { PoolRecord as BasePoolRecord } from './pool-types.ts';
 type CachedElement = Element & {
   style: CSSStyleDeclaration;
@@ -109,8 +107,6 @@ export function setClass(node: CachedElement, cls: string, on: boolean): void {
   }
 }
 
-/* --------------------------------------------------------------- easing --- */
-
 export const ease: Record<string, (t: number) => number> = {
   inQuad: (t): number => t * t,
   outQuad: (t): number => t * (2 - t),
@@ -125,8 +121,6 @@ export const ease: Record<string, (t: number) => number> = {
   },
 };
 
-/* ----------------------------------------------------------------- math --- */
-
 export const clamp = (v: number, a: number, b: number): number => (v < a ? a : v > b ? b : v);
 export const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
 export const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
@@ -135,15 +129,6 @@ export const lerp = (a: number, b: number, t: number): number => a + (b - a) * t
 export function damp(current: number, target: number, rate: number, dt: number): number {
   return target + (current - target) * Math.exp(-rate * dt);
 }
-
-/* ------------------------------------------------------------- format --- */
-
-/** Distance readout: <10m one decimal, else integer. */
-export function metres(d: number): string {
-  return d < 10 ? d.toFixed(1) + 'M' : (d | 0) + 'M';
-}
-
-/* ------------------------------------------------------------------ pool --- */
 
 /**
  * Fixed-size lifetime pool. `make()` builds an element or returns null for Pixi-owned visuals; records carry their own

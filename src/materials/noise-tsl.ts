@@ -161,7 +161,6 @@ function shapedFbm(
   );
 }
 export const billow5 = shapedFbm(5, true);
-export const ridged4 = shapedFbm(4, false);
 
 // Returns F1, F2 and the two id hashes of the closest periodic cell.
 export const worley = Fn<[Node<'vec2'>, Node<'vec2'>, Node<'float'>], Node<'vec4'>>(

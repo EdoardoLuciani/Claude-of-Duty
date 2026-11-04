@@ -25,44 +25,10 @@ import { el, clamp, clamp01, damp, setStyle } from './util.ts';
 const MAX_BLIPS = 48;
 const HEAL_KEY = bindingLabel('heal');
 
-/**
- * ===========================================================================
- * HUD / UI subsystem
- * ===========================================================================
- *
- * A shared-device Pixi gameplay HUD plus native menus/radio, driven entirely from
- * `lateUpdate`, after the camera has reached its final transform for the frame.
- * Nothing animates on a CSS keyframe or transition: every value is integrated
- * from `dt` here, which is what makes the capture harness deterministic and
- * lets the whole HUD freeze correctly when the game is paused.
- *
- * ---------------------------------------------------------------------------
- * PUBLIC API — `const ui = ctx.get('ui')`
- * ---------------------------------------------------------------------------
- *   ui.hitmarker(kind)                  'hit' | 'armour' | 'head' | 'kill'
- *   ui.hurt(amount, dirX, dirZ)         directional arc + flash + flinch
- *   ui.killfeed.push({attacker,victim,headshot,mine,attackerFriendly})
- *   ui.banner.show(title, sub, life)    kill / objective confirmation
- *   ui.setPrompt({key,text,sub,progress}, owner?) / ui.clearPrompt(owner?)
- *   ui.setHudVisible(bool)              hide everything (cinematics)
- *   ui.pause() / ui.resume() / ui.menu.toggle()
- *   ui.debugState('market')
- *
- * ---------------------------------------------------------------------------
- * WHAT THIS SUBSYSTEM READS FROM OTHERS (optional providers, complete snapshots)
- * ---------------------------------------------------------------------------
- *   weapons.getHudState() -> { name, mode, ammo, reserve, magSize, reloading,
- *                              reloadProgress, ads, spread, lethalCount }
- *   player.getHudState()  -> { health, maxHealth, armour, maxArmour,
- *                              bandages, healing, healProgress,
- *                              move, sprint, crouch, ads, airborne, position }
- *   ai.getHudActors()     -> [agent] (position, hudX, hudZ, hudFade)
- *   audio.playUi(id, gain) — hit ticks, heartbeat, warnings
- *
- * Events consumed: weapon:fire, weapon:reload, damage:dealt, damage:taken,
- * player:state, score:change, wave:start, wave:complete, explosion, hud:heard,
- * hud:search, intel:secured, intel:available, resize.
- * Events emitted:  ui:pause.
+/** Shared-device Pixi HUD with native menus/radio; lateUpdate follows the final camera pose.
+ * Controllers retain animation/derived state and read complete optional-provider snapshots.
+ * UI raw-time animation and gameplay-scaled animation remain distinct for pause/captures.
+ * Canonical APIs and event payloads live in subsystem types and ARCHITECTURE.md.
  */
 interface HudState {
   health: number;
@@ -479,8 +445,6 @@ export class UiSystem {
     }
   }
 
-  /* ---------------------------------------------------------------- api --- */
-
   hitmarker(kind: 'hit' | 'armour' | 'head' | 'kill' = 'hit'): void {
     // Audio consumes damage:dealt once; this adapter owns only HUD feedback.
     this.hit.spawn(kind);
@@ -551,8 +515,6 @@ export class UiSystem {
     this.shop.shown = 1;
     return { state: 'market' };
   }
-
-  /* -------------------------------------------------------------- frame --- */
 
   _updateFps(now = performance.now()): void {
     if (this._fpsSince === null) {

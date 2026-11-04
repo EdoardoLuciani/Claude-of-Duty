@@ -231,23 +231,3 @@ export function bakeMasks(
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   return geometry;
 }
-
-/**
- * Push wear/grime straight onto an already-authored colour attribute without
- * recomputing curvature — used by callers that know their own topology.
- */
-export function setMask(
-  geometry: THREE.BufferGeometry,
-  { wear = 0, grime = 0, ao = 0 }: Pick<MaskOptions, 'wear' | 'grime' | 'ao'> = {}
-): THREE.BufferGeometry {
-  const pos = geometry.getAttribute('position');
-  if (!pos) return geometry;
-  const colors = new Float32Array(pos.count * 3);
-  for (let i = 0; i < pos.count; i++) {
-    colors[i * 3 + 0] = wear;
-    colors[i * 3 + 1] = grime;
-    colors[i * 3 + 2] = ao;
-  }
-  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  return geometry;
-}

@@ -174,10 +174,6 @@ export function makeSampleResult(): ClipSample {
   };
 }
 
-/* ========================================================================== */
-/*  clip construction                                                         */
-/* ========================================================================== */
-
 const v3 = (x: number, y: number, z: number): Vec3 => [x, y, z];
 
 /** MCX retains additive draw/holster; its other clips are authored. */

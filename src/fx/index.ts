@@ -24,32 +24,11 @@ import { ShellSystem, loadSpentHullGeometry, type ShellOptions } from './shells.
 import { spawnTracer } from './tracers.ts';
 import { V, cone } from './util.ts';
 
-/**
- * FX — GPU particles, impacts, decals, muzzle flash, tracers, shells,
- * explosions, refraction and ambience.
- *
- * Everything visible here is built from two procedurally baked atlases and a
- * handful of instanced draw calls:
- *
- *   world additive particles   1 draw   sparks, flash, fire, tracers, embers
- *   world lit particles        1 draw   smoke, dust, blood, debris, splinters
- *   dust motes                 1 draw   always-on atmosphere
- *   decals                     1 draw   projected onto the physics BVH
- *   shell casings              1–2 draws   instanced rigid bodies
- *   refraction sprites         1 draw   + one half-res post pass
- *
- * The simulation is entirely in the vertex shader (see particles.js), so the
- * per-frame CPU cost of ten thousand live particles is six uniform writes and
- * one buffer sub-upload of whatever was spawned this frame. Budgets come from
- * `config.q.particleBudget` / `decalBudget` and are hard caps: every layer is a
- * ring, and a ring never allocates.
- *
- * Native particles/decals/casings render in the forward world pass; transparent
- * FX stay out of the opaque prepass. Soft FX sample render.depthTexture as
- * positive view-space metres with screenUV; null depth disables softness.
- * The render owner draws hazeSys.render() into its half-resolution RG target
- * before evaluating hazeSys.warpNode() on the resolved world texture, before the separate first-person composite.
- * The warp resamples that texture before bloom; it cannot take a colour expression.
+/** Bounded GPU particle/decal rings, instanced casings and haze; quality settings set hard caps.
+ * Forward transparent FX stay out of the opaque prepass. Soft FX borrow positive view-depth
+ * in metres with screenUV; absent depth disables softness.
+ * Render draws haze's private half-resolution RG target, then warps the resolved world texture
+ * before the first-person composite and bloom. The warp needs a texture, not a colour expression.
  */
 type FxEventMap = EngineEventMap;
 export type FxContext = Pick<
@@ -320,10 +299,6 @@ export class FxSystem {
     this.hazeSys.resize(width, height);
   }
 
-  /* ===================================================================== */
-  /*  emit helpers (bound so recipe modules can pass them around)          */
-  /* ===================================================================== */
-
   emitAdd = (s: typeof SP): number => this.add.emit(s, this.now);
   emitLit = (s: typeof SP): number => this.lit.emit(s, this.now);
   emitMote = (s: typeof SP): number => this.motes.emit(s, this.now);
@@ -363,10 +338,6 @@ export class FxSystem {
     });
     return found;
   }
-
-  /* ===================================================================== */
-  /*  shader pre-warm                                                      */
-  /* ===================================================================== */
 
   /**
    * Compile real FX meshes without reparenting them or spawning particles.
@@ -457,10 +428,6 @@ export class FxSystem {
     if (!this._physics) this._physics = this.ctx.peek('physics');
     return this._physics ?? undefined;
   }
-
-  /* ===================================================================== */
-  /*  public API                                                           */
-  /* ===================================================================== */
 
   /** Electrical arcs from the exposed cache controller, also on completion. */
   onIntelSpark(e: FxEventMap['intel:spark']): void {
@@ -747,10 +714,6 @@ export class FxSystem {
     a.playShell(this._tmpA, gain);
   }
 
-  /* ===================================================================== */
-  /*  gameplay reactions                                                   */
-  /* ===================================================================== */
-
   onActorDeath(e: FxEventMap['actor:death']): void {
     this.now = this.ctx.time.elapsed;
     const rng = this.rng;
@@ -869,10 +832,6 @@ export class FxSystem {
     this.emitLit(s);
   }
 
-  /* ===================================================================== */
-  /*  frame                                                                */
-  /* ===================================================================== */
-
   update(dt: number, ctx: FxContext): void {
     this.now = ctx.time.elapsed;
     this._syncLighting(ctx);
@@ -967,10 +926,6 @@ export class FxSystem {
     l.uniforms.uUpView.value.copy(this._upView);
     l.uniforms.uFog.value.copy(this._fog);
   }
-
-  /* ===================================================================== */
-  /*  debug staging                                                        */
-  /* ===================================================================== */
 
   /**
    * Stage a photogenic moment for the screenshot harness.
@@ -1130,18 +1085,8 @@ export class FxSystem {
     this._suppressDecals = false;
   }
 
-  /**
-   * Staged muzzle flash for the capture harness.
-   *
-   * `view: true`, because that is the path a real trigger pull takes
-   * (`onWeaponFire` sets it for anything inside 1.5 m of the eye) and it is the
-   * only path that reaches `viewFlash` — i.e. the only one that lights the
-   * weapon. Staging this at `view: false` meant the harness photographed a flash
-   * that could not, by construction, put any warm light on the handguard.
-   *
-   * The crown comes from the weapon's own muzzle transform when there is a
-   * weapon, so the flash is welded to the bore rather than to a hardcoded offset
-   * from the eye. The offset is only the fallback for an FX-only scene.
+  /** Stage view-space muzzle FX to match real first-person firing and reach viewFlash lighting.
+   * Use the weapon's muzzle transform; only FX-only scenes fall back to an eye-relative offset.
    */
   _stageMuzzle(): void {
     const cam = this.ctx.camera;
@@ -1391,8 +1336,6 @@ export class FxSystem {
       if (e.t > from && e.t <= to) e.fn();
     }
   }
-
-  /* ===================================================================== */
 
   dispose(): void {
     for (const off of this._off ?? []) off();

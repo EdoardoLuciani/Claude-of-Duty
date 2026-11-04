@@ -206,10 +206,6 @@ export class RadioSystem {
     }
   }
 
-  /* ==================================================================== */
-  /*  strike                                                              */
-  /* ==================================================================== */
-
   /** Start a strike. No-op while one is already airborne. */
   callStrike(): boolean {
     if (this.active.length) return false;
@@ -265,10 +261,6 @@ export class RadioSystem {
       this._audio?.startAircraft?.(plane.position) ?? null;
     return true;
   }
-
-  /* ==================================================================== */
-  /*  frame                                                               */
-  /* ==================================================================== */
 
   update(dt: number): void {
     if (!this.active.length) return;

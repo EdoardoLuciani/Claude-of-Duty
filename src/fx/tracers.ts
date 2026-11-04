@@ -1,20 +1,9 @@
 import { P } from './atlas.ts';
 import { resetSpawn, setSpawnColorRamp } from './particles.ts';
 
-/**
- * Tracers.
- *
- * A tracer is a burning pellet in the base of the round, so what you see is a
- * short, very bright, velocity-aligned streak that *travels* — the fact that it
- * takes time to cross the street is most of the read. Real muzzle velocity
- * (~900 m/s) crosses a 30 m street in 33 ms, i.e. two frames, so like every
- * shipped shooter we clamp the visual speed into a range that reads on screen
- * while keeping the departure and arrival times honest.
- *
- * Three sprites: a hot head, the streak core (HDR, blooms), and a longer, dimmer
- * afterglow behind it. The core and afterglow are anchored trails (particle flag
- * bit 1): the shader projects their world-space head and tail independently so
- * incoming rounds remain correctly foreshortened instead of streaking sideways.
+/** Tracers have a hot head, bright core and dimmer afterglow; clamp visual speed for legibility.
+ * Core/afterglow use anchored trails (particle flag bit 1): project head and tail separately
+ * so incoming rounds foreshorten correctly. Preserve reached departure/arrival timing.
  */
 
 const MIN_SPEED = 55;

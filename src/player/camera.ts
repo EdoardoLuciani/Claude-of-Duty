@@ -1,25 +1,6 @@
-/**
- * Camera feel.
- *
- * Everything a modern shooter does to make a floating pair of eyes read as a
- * body, layered so no single effect ever dominates:
- *
- *   eye height        stance-smoothed, so crouching is a movement not a cut
- *   view bob          1:2 Lissajous (figure-eight) locked to footstep cadence
- *   step micro-shift  a per-footfall vertical spring on top of the bob
- *   landing impact    dip + pitch + roll from the actual impact speed
- *   strafe / turn roll a degree of bank into the direction of travel
- *   slide             deep dip, forward push and a shoulder roll
- *   mantle            curve-driven offsets handed over by MantleMotion
- *   breathing sway    two detuned sines, amplified by ADS, wounds, suppression
- *   recoil            sightline movement shares the player's clamped look state
- *   kick              returning rotation + positional punch feedback
- *   trauma shake      noise-driven, decays, used by explosions and heavy hits
- *   firing vibe       short per-shot oscillation, cosmetic, not trauma
- *   FOV               critically-damped springs: ADS crisp, sprint breathing
- *
- * Position offsets are built in the *yaw* basis (not the full view basis) so
- * looking up does not turn vertical bob into forward/backward lurch.
+/** Camera presentation layers stance, cadence-locked bob, land/slide/mantle, sway and transients.
+ * Sightline recoil stays in clamped player look; returning kick and fire vibration are cosmetic.
+ * Build position offsets in yaw space so looking up cannot turn vertical bob into forward motion.
  */
 
 import * as THREE from 'three';
@@ -129,10 +110,6 @@ export class CameraRig {
     this.fovAds = 1;
   }
 
-  /* ==================================================================== */
-  /* impulses — the public feel API                                       */
-  /* ==================================================================== */
-
   /** Returning rotation and positional punch for weapon/environment feedback. */
   addKick(pitch = 0, yaw = 0, roll = 0, punch = 0): void {
     this.kickPitch.kick(pitch);
@@ -193,10 +170,6 @@ export class CameraRig {
     this.dip.impulse(-0.9);
     this.addTrauma(0.12);
   }
-
-  /* ==================================================================== */
-  /* per-frame composition                                                */
-  /* ==================================================================== */
 
   /**
    * @param {number} dt

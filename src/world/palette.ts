@@ -1,17 +1,8 @@
 import type { MaterialSystemNode } from '../materials/index.ts';
 
-/**
- * WORLD — the surface palette.
- *
- * A named set of material variants pulled from the `materials` library. Keeping
- * them in one table means the level uses a deliberate, limited palette (which is
- * what makes a real map read as one place) and that every mesh sharing a key
- * merges into the same draw call.
- *
- * `surface` is the impact finish; `ballisticSurface` optionally describes the
- * structure underneath. `sheetThickness` explicitly marks single-sided sheets.
- * `tint` is a linear multiply
- * on the baked albedo, so values stay inside 0.02–0.9 reflectance.
+/** Canonical world finishes/variants; meshes sharing a key can batch together.
+ * surface controls impacts; optional ballisticSurface describes the underlying structure.
+ * Only sheetThickness authorises single-sided sheets. Tint multiplies linear baked albedo.
  */
 export const PALETTE = {
   // ---------------------------------------------------------- architecture --

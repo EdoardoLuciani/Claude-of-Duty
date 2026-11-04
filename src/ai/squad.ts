@@ -1,13 +1,5 @@
-/**
- * AI — squad coordination.
- *
- * The squad exists to stop four individually-sensible soldiers from behaving
- * like one four-headed idiot: it hands out permission to peek so they alternate
- * instead of all leaning out together, shares contact reports so one man
- * spotting you alerts the rest (after a believable call-out delay), rations
- * grenades, and allows only one flanker at a time.
- *
- * Intent (intent.js) is the squad job this fight: pin, wrap, or flush.
+/** Squads share delayed contact reports and coordinate peeking, grenades and one flanker.
+ * Intent selects pin, wrap or flush without replacing each agent's state machine.
  */
 
 import * as THREE from 'three';
