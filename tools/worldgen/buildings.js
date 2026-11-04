@@ -190,7 +190,6 @@ function terrace(A, spec, y) {
   const sz = horiz ? spec.d : d;
   A.add('roof_screed', BOX(A), LL(IDENT, cx, y - 0.13, cz, 0, sx + 0.08, 0.26, sz + 0.08), {
     masks: [0.45, 0.3, 0.15],
-    support: 'floor',
   });
   // parapet along the exposed edge, low enough to fight over from the terrace
   const ph = 0.92;
@@ -360,7 +359,7 @@ export function buildBuilding(A, rng, spec) {
         'floor_concrete',
         BOX(A),
         LL(IDENT, fs.x, fy - 0.06, fs.z, 0, fs.w - t * 2, 0.16, fs.d - t * 2),
-        { masks: [0.2, 0.8, 0.6], support: 'floor' }
+        { masks: [0.2, 0.8, 0.6] }
       );
     }
   }
@@ -604,7 +603,6 @@ function buildFacade(A, rng, spec, info, ctx) {
           // facade/decoration RNG stream (and thus unrelated buildings).
           A.add('floor_concrete', BOX(A), LL(pm, bx, -0.1, t * 0.5, 0, o.w, 0.2, t * 2), {
             masks: [0.3, 0.55, 0.35],
-            support: 'floor',
           });
         }
         const bwid = Math.min(bw - 0.35, 2.6);
@@ -861,7 +859,6 @@ function interiorSlab(A, spec, y, t, level, roof = false) {
   if (!hole) {
     A.add(key, BOX(A), LL(IDENT, spec.x, y - thick / 2, spec.z, 0, iw, thick, id), {
       masks: roof ? [0.45, 0.25, 0.12] : [0.3, 0.55, 0.35],
-      support: 'floor',
     });
   } else {
     // picture-frame decomposition around the void
@@ -885,7 +882,6 @@ function interiorSlab(A, spec, y, t, level, roof = false) {
       if (w < 0.05 || d < 0.05) continue;
       A.add(key, BOX(A), LL(IDENT, (ax + bx) / 2, y - thick / 2, (az + bz) / 2, 0, w, thick, d), {
         masks: roof ? [0.45, 0.25, 0.12] : [0.3, 0.55, 0.35],
-        support: 'floor',
       });
     }
   }
@@ -996,7 +992,6 @@ function buildExteriorStairs(A, spec, info) {
         LL(flight, 0, g.rise / 2, (g.run - g.landW) / 2, 0, g.sw, g.rise, g.landW + g.run),
         {
           masks: [0.55, 0.5, 0.25],
-          support: 'stair',
         }
       );
     }
@@ -1015,7 +1010,6 @@ function buildExteriorStairs(A, spec, info) {
       LL(wall, g.landX, g.toY - 0.07, (inward - g.landD) / 2, 0, g.landW, 0.14, g.landD + inward),
       {
         masks: [0.55, 0.5, 0.25],
-        support: 'floor',
       }
     );
     const rk = { railKey: fl.railKey ?? 'metal_rust' };
@@ -1126,7 +1120,7 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
     'floor_concrete',
     BOX(A),
     LL(IDENT, g0.x, groundFloorY - 0.07, g0.z, 0, g0.w - t * 2, 0.14, g0.d - t * 2),
-    { masks: [0.3, 0.6, 0.4], support: 'floor' }
+    { masks: [0.3, 0.6, 0.4] }
   );
 
   const rooms = spec.rooms ?? [];
@@ -1219,7 +1213,6 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
       if (fl.landing !== false) {
         A.add('concrete_dark', BOX(A), LL(pm, 0, H - 0.1, D + 0.55, 0, sw + 0.1, 0.2, 1.1), {
           masks: [0.4, 0.5, 0.3],
-          support: 'floor',
         });
       }
     }

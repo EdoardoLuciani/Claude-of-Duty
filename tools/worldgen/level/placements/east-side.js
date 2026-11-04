@@ -521,7 +521,6 @@ export const eastSide = [
     rotationDeg: [-38.559444552, -80.186257387, -40.407327761],
     scale: [0.933873324, 0.933873324, 0.933873324],
     masks: [1, 1.259261565, 1],
-    support: 'balcony',
   },
   {
     id: 'box_card_b/0021',
@@ -530,7 +529,6 @@ export const eastSide = [
     rotationDeg: [7.083245163, -31.080235972, -2.111229054],
     scale: [1.013833708, 1.013833708, 1.013833708],
     masks: [1, 1.362113053, 1],
-    support: 'balcony',
   },
   {
     id: 'box_card_b/0034',
@@ -769,7 +767,6 @@ export const eastSide = [
     rotationDeg: [175.455933943, -31.49768176, 178.119493168],
     scale: [0.853105795, 0.853105795, 0.853105795],
     masks: [1, 1.35712879, 1],
-    support: 'balcony',
   },
   {
     id: 'bucket/0034',
@@ -1598,7 +1595,6 @@ export const eastSide = [
     rotationDeg: [-3.355277961, 42.4214719, -2.836482809],
     scale: [1.005125919, 1.005125919, 1.005125919],
     masks: [1, 1.031363518, 1],
-    support: 'balcony',
   },
   {
     id: 'crate_b/0062',
@@ -2354,7 +2350,6 @@ export const eastSide = [
     rotationDeg: [61.708522926, -83.589566988, 66.250356344],
     scale: [0.888903645, 0.888903645, 0.888903645],
     masks: [1, 1.374489771, 1],
-    support: 'balcony',
   },
 
   // litter
@@ -3571,7 +3566,6 @@ export const eastSide = [
     rotationDeg: [-180, -7.843135802, -180],
     scale: [0.956490957, 0.956490957, 0.956490957],
     masks: [1, 1.276292627, 1],
-    support: 'balcony',
   },
 
   // tyre
@@ -3632,7 +3626,6 @@ export const eastSide = [
     rotationDeg: [177.218827806, -59.323670687, -177.871634344],
     scale: [0.984455473, 0.984455473, 0.984455473],
     masks: [1, 1.386964772, 1],
-    support: 'balcony',
   },
   {
     id: 'tyre_small/0040',

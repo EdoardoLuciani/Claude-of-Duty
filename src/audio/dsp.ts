@@ -364,11 +364,6 @@ export function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-/** Semitone ratio — pitch jitter is expressed musically, not as a raw factor. */
-export function semis(n: number): number {
-  return Math.pow(2, n / 12);
-}
-
 /** Air absorption: how much high end survives `dist` metres of atmosphere. */
 export function airCutoff(dist: number): number {
   // ~ -1.5 dB/100 m at 1 kHz, far more at 8 kHz. Tuned by ear against real
