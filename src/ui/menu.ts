@@ -11,16 +11,8 @@ interface SliderApi {
 }
 type InvertButton = [HTMLButtonElement, boolean];
 
-/**
- * Pause / settings menu.
- *
- * Wired straight into `ctx.config`: the quality segments reload with `?q=`
- * (passes are chosen at init), the sliders write `config.sensitivity` and
- * `config.fov` (and push the FOV into the live camera), and every other change
- * is announced on the event bus so render/player can react without importing
- * this module.
- *
- * Events emitted: `ui:pause` {paused}. Settings update the shared config directly.
+/** Settings write shared config directly; quality reloads with ?q= because passes
+ * are chosen at init. FOV also updates the live camera. Emits ui:pause {paused}.
  */
 export class PauseMenu {
   ctx: MenuContext;

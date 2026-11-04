@@ -4,17 +4,9 @@ import { Fn, dot, float, fract, max, mix, vec2, vec3 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import type { JoinNode } from 'three/webgpu';
 
-/**
- * Procedural noise shared by the stars, the clouds and the fog — the TSL port
- * of the GLSL that used to live here. Every consumer references these same
- * functions, so the clouds in the sky and the cloud shadows in the fog cannot
- * disagree.
- *
- * Octave counts are compile-time constants: `fbm2(5)` returns a `Fn` whose JS
- * loop is unrolled while the node graph is built. A caller that wants a
- * different count (the environment bake uses fewer) asks for a different
- * function; there is no runtime octave argument, exactly like the shader this
- * replaces.
+/** Shared noise keeps sky clouds and fog cloud shadows consistent.
+ * Octave counts are compile-time factory parameters: fbm2(5) returns an unrolled Fn.
+ * Environment bakes request cheaper variants; there is no runtime octave argument.
  */
 
 const rot2 = (p: Node<'vec2'>): JoinNode<'vec2'> =>

@@ -1,5 +1,5 @@
 import { P } from './atlas.ts';
-import { resetSpawn, setSpawnColorRamp } from './particles.ts';
+import { resetSpawn, setSpawnColorRamp, setSpawnPosition, setSpawnVelocity } from './particles.ts';
 
 /** Tracers have a hot head, bright core and dimmer afterglow; clamp visual speed for legibility.
  * Core/afterglow use anchored trails (particle flag bit 1): project head and tail separately
@@ -56,12 +56,8 @@ export function spawnTracer(
 
   // core streak
   let s = resetSpawn();
-  s.x = ox;
-  s.y = oy;
-  s.z = oz;
-  s.vx = dx * v;
-  s.vy = dy * v;
-  s.vz = dz * v;
+  setSpawnPosition(s, ox, oy, oz);
+  setSpawnVelocity(s, dx * v, dy * v, dz * v);
   s.tile = P.STREAK;
   s.size0 = 0.055;
   s.size1 = 0.04;
@@ -81,12 +77,8 @@ export function spawnTracer(
 
   // afterglow: longer, dimmer, sits behind the core
   s = resetSpawn();
-  s.x = ox;
-  s.y = oy;
-  s.z = oz;
-  s.vx = dx * v;
-  s.vy = dy * v;
-  s.vz = dz * v;
+  setSpawnPosition(s, ox, oy, oz);
+  setSpawnVelocity(s, dx * v, dy * v, dz * v);
   s.tile = P.STREAK;
   s.size0 = 0.09;
   s.size1 = 0.07;
@@ -105,12 +97,8 @@ export function spawnTracer(
 
   // incandescent head
   s = resetSpawn();
-  s.x = ox;
-  s.y = oy;
-  s.z = oz;
-  s.vx = dx * v;
-  s.vy = dy * v;
-  s.vz = dz * v;
+  setSpawnPosition(s, ox, oy, oz);
+  setSpawnVelocity(s, dx * v, dy * v, dz * v);
   s.tile = P.SPARK;
   s.size0 = 0.05;
   s.size1 = 0.042;

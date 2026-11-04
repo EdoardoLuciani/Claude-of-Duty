@@ -124,6 +124,18 @@ export function resetSpawn(): typeof SP {
   return s;
 }
 
+export function setSpawnPosition(s: typeof SP, x: number, y: number, z: number): void {
+  s.x = x;
+  s.y = y;
+  s.z = z;
+}
+
+export function setSpawnVelocity(s: typeof SP, x: number, y: number, z: number): void {
+  s.vx = x;
+  s.vy = y;
+  s.vz = z;
+}
+
 export function setSpawnColorRamp(
   s: typeof SP,
   r0: number,
@@ -180,16 +192,7 @@ function quadSource(): THREE.PlaneGeometry {
   return quadGeoSource;
 }
 
-/**
- * Build the particle node material.
- *
- * @param {object} o
- * @param {'additive'|'lit'|'distort'} o.mode
- * @param {THREE.Texture} o.atlas
- * @param {number} o.cols
- * @param {number} [o.renderOrder]
- * @returns {{material: MeshBasicNodeMaterial, uniforms: object}}
- */
+/** Build the particle node material. */
 function buildParticleMaterial(o: ParticleOptions): {
   material: MeshBasicNodeMaterial;
   uniforms: {
@@ -450,14 +453,6 @@ export class ParticleLayer {
   declare material: MeshBasicNodeMaterial;
   declare uniforms: ReturnType<typeof buildParticleMaterial>['uniforms'];
   declare mesh: THREE.Mesh;
-  /**
-   * @param {object} o
-   * @param {number} o.capacity     hard cap, from config.q.particleBudget
-   * @param {'additive'|'lit'|'distort'} o.mode
-   * @param {THREE.Texture} o.atlas
-   * @param {number} o.cols         atlas columns
-   * @param {number} [o.renderOrder]
-   */
   cursor: number = 0;
   highWater: number = 0;
   expireAt: number = -1;
@@ -466,6 +461,7 @@ export class ParticleLayer {
   _dirtyHi: number = -Infinity;
   _wrapped: boolean = false;
 
+  /** Capacity is a hard cap from config.q.particleBudget; cols counts atlas columns. */
   constructor(o: ParticleOptions) {
     this.capacity = Math.max(16, o.capacity | 0);
     this.mode = o.mode;

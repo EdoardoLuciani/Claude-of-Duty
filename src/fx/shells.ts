@@ -8,7 +8,7 @@ import type { EventWeapon } from '../core/events.ts';
 import { isMesh } from '../core/three-guards.ts';
 import type { RigidBody } from '../physics/rigidbody.ts';
 import { P, buildBrassTextures } from './atlas.ts';
-import { resetSpawn } from './particles.ts';
+import { resetSpawn, setSpawnPosition, setSpawnVelocity } from './particles.ts';
 
 /** Bounded casing slots use rigid bodies and one brass InstancedMesh; shotgun hulls add one draw.
  * Bodies own tumble/collision/sleep and publish contact audio/dust. Brass uses a hollow
@@ -283,12 +283,8 @@ export class ShellSystem {
     fx.audioPing(px, py, pz, gain);
     // a tick of dust and a metallic glint where it struck
     const s = resetSpawn();
-    s.x = px;
-    s.y = py + 0.005;
-    s.z = pz;
-    s.vx = nx * 0.25;
-    s.vy = ny * 0.3 + 0.15;
-    s.vz = nz * 0.25;
+    setSpawnPosition(s, px, py + 0.005, pz);
+    setSpawnVelocity(s, nx * 0.25, ny * 0.3 + 0.15, nz * 0.25);
     s.tile = P.DUST;
     s.size0 = 0.012;
     s.size1 = 0.07;

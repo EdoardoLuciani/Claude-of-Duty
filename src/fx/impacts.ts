@@ -1,7 +1,7 @@
 import type { SurfaceName } from '../physics/surfaces.ts';
 import { P, D } from './atlas.ts';
 import { screenAngle } from './muzzle.ts';
-import { resetSpawn, setSpawnColorRamp } from './particles.ts';
+import { resetSpawn, setSpawnColorRamp, setSpawnPosition, setSpawnVelocity } from './particles.ts';
 import {
   V,
   V2,
@@ -98,12 +98,8 @@ function spark(
   const kelvinHot = o.kelvin ?? 2600;
   blackbody(C, kelvinHot * rng.range(0.92, 1.08));
   blackbody(C2, 1200);
-  s.x = x;
-  s.y = y;
-  s.z = z;
-  s.vx = dx * speed;
-  s.vy = dy * speed;
-  s.vz = dz * speed;
+  setSpawnPosition(s, x, y, z);
+  setSpawnVelocity(s, dx * speed, dy * speed, dz * speed);
   s.tile = P.STREAK;
   s.size0 = o.size ?? rng.range(0.007, 0.016);
   s.size1 = s.size0 * 0.4;
@@ -235,9 +231,7 @@ function concrete(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: numb
 
   // muzzle-side flash of pulverised, incandescent grit — two frames only
   let s = resetSpawn();
-  s.x = p.x + n.x * 0.01;
-  s.y = p.y + n.y * 0.01;
-  s.z = p.z + n.z * 0.01;
+  setSpawnPosition(s, p.x + n.x * 0.01, p.y + n.y * 0.01, p.z + n.z * 0.01);
   s.tile = P.FLASH_CORE;
   s.size0 = 0.045 * e;
   s.size1 = 0.19 * e;
@@ -252,14 +246,9 @@ function concrete(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: numb
   s.seed = rng.float();
   fx.emitAdd(s);
 
-  // Dust cough, in THREE sub-puffs with different lifetimes and sizes: a single
-  // population expanding at one rate is a smudge, three staggered ones read as
-  // an aerosol. Colour is the struck surface's own albedo — warm ochre concrete
-  // dust, not the cold grey-blue it used to be, which is what a neutral grey
-  // particle becomes once the blue sky term lights it.
-  //
-  // `sunSide` self-shadows the puff along the sun: the sub-puffs launched away
-  // from the sun start dimmer, so the cluster has a lit side and a shadow side.
+  // Three staggered sub-puffs read as an aerosol. Use the struck surface's albedo
+  // to avoid neutral dust turning blue under sky lighting. sunSide darkens
+  // sub-puffs thrown away from the sun for cluster-level self-shadowing.
   const nDust = Math.round(9 * q) + 3;
   const sun = fx.sunWorld();
   for (let i = 0; i < nDust; i++) {
@@ -271,12 +260,8 @@ function concrete(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: numb
     s = resetSpawn();
     discOn(V, rng, n.x, n.y, n.z, 0.09);
     const off = rng.range(0.05, 0.16);
-    s.x = p.x + V.x + n.x * off;
-    s.y = p.y + V.y + n.y * off;
-    s.z = p.z + V.z + n.z * off;
-    s.vx = V2.x * sp;
-    s.vy = V2.y * sp + 0.45;
-    s.vz = V2.z * sp;
+    setSpawnPosition(s, p.x + V.x + n.x * off, p.y + V.y + n.y * off, p.z + V.z + n.z * off);
+    setSpawnVelocity(s, V2.x * sp, V2.y * sp + 0.45, V2.z * sp);
     s.tile = band === 2 ? P.SMOKE_A : P.DUST;
     s.size0 = rng.range(0.045, 0.1) * e * (band === 0 ? 0.8 : 1);
     s.size1 = rng.range(0.3, 0.62) * e * (band === 2 ? 1.35 : 1);
@@ -317,12 +302,8 @@ function concrete(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: numb
     cone(V2, rng, rx, ry, rz, 0.34, 1.6);
     const sp = rng.range(3.4, 7.5);
     s = resetSpawn();
-    s.x = p.x + n.x * 0.02;
-    s.y = p.y + n.y * 0.02;
-    s.z = p.z + n.z * 0.02;
-    s.vx = V2.x * sp;
-    s.vy = V2.y * sp + 0.2;
-    s.vz = V2.z * sp;
+    setSpawnPosition(s, p.x + n.x * 0.02, p.y + n.y * 0.02, p.z + n.z * 0.02);
+    setSpawnVelocity(s, V2.x * sp, V2.y * sp + 0.2, V2.z * sp);
     s.tile = P.DUST;
     s.size0 = rng.range(0.025, 0.05) * e;
     s.size1 = rng.range(0.14, 0.26) * e;
@@ -346,12 +327,8 @@ function concrete(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: numb
     cone(V2, rng, rx, ry, rz, 0.85, 1.4);
     const sp = rng.range(3.5, 9.5);
     s = resetSpawn();
-    s.x = p.x + n.x * 0.01;
-    s.y = p.y + n.y * 0.01;
-    s.z = p.z + n.z * 0.01;
-    s.vx = V2.x * sp;
-    s.vy = V2.y * sp;
-    s.vz = V2.z * sp;
+    setSpawnPosition(s, p.x + n.x * 0.01, p.y + n.y * 0.01, p.z + n.z * 0.01);
+    setSpawnVelocity(s, V2.x * sp, V2.y * sp, V2.z * sp);
     s.tile = P.CHIP;
     s.size0 = rng.range(0.008, 0.026);
     s.size1 = s.size0 * 0.9;
@@ -404,9 +381,7 @@ function concrete(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: numb
     s.x = p.x + n.x * 0.16 + V2.x * 0.07;
     s.y = p.y + n.y * 0.16 + V2.y * 0.07;
     s.z = p.z + n.z * 0.16 + V2.z * 0.07;
-    s.vx = V2.x * 0.35;
-    s.vy = 0.42 + rng.range(0, 0.25);
-    s.vz = V2.z * 0.35;
+    setSpawnVelocity(s, V2.x * 0.35, 0.42 + rng.range(0, 0.25), V2.z * 0.35);
     s.tile = i % 2 ? P.WISP : P.SMOKE_B;
     s.size0 = rng.range(0.12, 0.2) * e;
     s.size1 = rng.range(0.7, 1.2) * e;
@@ -453,12 +428,8 @@ function plaster(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: numbe
     const sp = rng.range(0.6, 2.2);
     s = resetSpawn();
     const off = rng.range(0.05, 0.14);
-    s.x = p.x + n.x * off;
-    s.y = p.y + n.y * off;
-    s.z = p.z + n.z * off;
-    s.vx = V2.x * sp;
-    s.vy = V2.y * sp + 0.4;
-    s.vz = V2.z * sp;
+    setSpawnPosition(s, p.x + n.x * off, p.y + n.y * off, p.z + n.z * off);
+    setSpawnVelocity(s, V2.x * sp, V2.y * sp + 0.4, V2.z * sp);
     s.tile = i % 2 ? P.DUST : P.MIST;
     const band = i % 3;
     s.size0 = rng.range(0.05, 0.11) * e * (band === 0 ? 0.8 : 1);
@@ -491,12 +462,8 @@ function plaster(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: numbe
     cone(V2, rng, rx, ry, rz, 0.95, 1.3);
     const sp = rng.range(2, 6);
     s = resetSpawn();
-    s.x = p.x + n.x * 0.01;
-    s.y = p.y + n.y * 0.01;
-    s.z = p.z + n.z * 0.01;
-    s.vx = V2.x * sp;
-    s.vy = V2.y * sp;
-    s.vz = V2.z * sp;
+    setSpawnPosition(s, p.x + n.x * 0.01, p.y + n.y * 0.01, p.z + n.z * 0.01);
+    setSpawnVelocity(s, V2.x * sp, V2.y * sp, V2.z * sp);
     s.tile = P.CHIP;
     s.size0 = rng.range(0.007, 0.02);
     s.size1 = s.size0;
@@ -516,12 +483,8 @@ function plaster(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: numbe
     cone(V2, rng, rx, ry, rz, 0.32, 1.6);
     const sp = rng.range(3, 6.5);
     s = resetSpawn();
-    s.x = p.x + n.x * 0.02;
-    s.y = p.y + n.y * 0.02;
-    s.z = p.z + n.z * 0.02;
-    s.vx = V2.x * sp;
-    s.vy = V2.y * sp + 0.2;
-    s.vz = V2.z * sp;
+    setSpawnPosition(s, p.x + n.x * 0.02, p.y + n.y * 0.02, p.z + n.z * 0.02);
+    setSpawnVelocity(s, V2.x * sp, V2.y * sp + 0.2, V2.z * sp);
     s.tile = P.DUST;
     s.size0 = rng.range(0.022, 0.045) * e;
     s.size1 = rng.range(0.12, 0.24) * e;
@@ -578,9 +541,7 @@ function metal(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number)
   s.seed = rng.float();
   fx.emitAdd(s);
   s = resetSpawn();
-  s.x = p.x + n.x * 0.012;
-  s.y = p.y + n.y * 0.012;
-  s.z = p.z + n.z * 0.012;
+  setSpawnPosition(s, p.x + n.x * 0.012, p.y + n.y * 0.012, p.z + n.z * 0.012);
   s.tile = P.FLASH_CORE;
   s.size0 = 0.03 * e;
   s.size1 = 0.11 * e;
@@ -635,12 +596,8 @@ function metal(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number)
     clampCone(V2, n.x, n.y, n.z, COS55);
     const sp = rng.range(2, 6);
     s = resetSpawn();
-    s.x = p.x;
-    s.y = p.y;
-    s.z = p.z;
-    s.vx = V2.x * sp;
-    s.vy = V2.y * sp;
-    s.vz = V2.z * sp;
+    setSpawnPosition(s, p.x, p.y, p.z);
+    setSpawnVelocity(s, V2.x * sp, V2.y * sp, V2.z * sp);
     s.tile = P.SPARK;
     s.size0 = rng.range(0.008, 0.016);
     s.size1 = s.size0 * 0.6;
@@ -665,12 +622,8 @@ function metal(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number)
   for (let i = 0; i < nSm; i++) {
     cone(V2, rng, n.x, n.y, n.z, 1.1, 0.7);
     s = resetSpawn();
-    s.x = p.x + n.x * 0.1;
-    s.y = p.y + n.y * 0.1;
-    s.z = p.z + n.z * 0.1;
-    s.vx = V2.x * 0.7;
-    s.vy = V2.y * 0.7 + 0.5;
-    s.vz = V2.z * 0.7;
+    setSpawnPosition(s, p.x + n.x * 0.1, p.y + n.y * 0.1, p.z + n.z * 0.1);
+    setSpawnVelocity(s, V2.x * 0.7, V2.y * 0.7 + 0.5, V2.z * 0.7);
     s.tile = P.WISP;
     s.size0 = 0.05;
     s.size1 = rng.range(0.3, 0.5);
@@ -727,12 +680,8 @@ function wood(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number):
     cone(V2, rng, rx, ry, rz, 0.9, 1.3);
     const sp = rng.range(2.5, 7.5);
     s = resetSpawn();
-    s.x = p.x + n.x * 0.01;
-    s.y = p.y + n.y * 0.01;
-    s.z = p.z + n.z * 0.01;
-    s.vx = V2.x * sp;
-    s.vy = V2.y * sp;
-    s.vz = V2.z * sp;
+    setSpawnPosition(s, p.x + n.x * 0.01, p.y + n.y * 0.01, p.z + n.z * 0.01);
+    setSpawnVelocity(s, V2.x * sp, V2.y * sp, V2.z * sp);
     s.tile = i % 4 === 0 ? P.CHIP : P.SPLINTER;
     s.size0 = rng.range(0.014, 0.045);
     s.size1 = s.size0;
@@ -753,12 +702,8 @@ function wood(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number):
     const sp = rng.range(0.6, 2);
     s = resetSpawn();
     const off = rng.range(0.05, 0.12);
-    s.x = p.x + n.x * off;
-    s.y = p.y + n.y * off;
-    s.z = p.z + n.z * off;
-    s.vx = V2.x * sp;
-    s.vy = V2.y * sp + 0.35;
-    s.vz = V2.z * sp;
+    setSpawnPosition(s, p.x + n.x * off, p.y + n.y * off, p.z + n.z * off);
+    setSpawnVelocity(s, V2.x * sp, V2.y * sp + 0.35, V2.z * sp);
     s.tile = P.DUST;
     s.size0 = rng.range(0.04, 0.09) * e;
     s.size1 = rng.range(0.24, 0.44) * e;
@@ -795,12 +740,8 @@ function ground(fx: ImpactFx, p: Vec3Like, n: Vec3Like, e: number, sand: boolean
     const sp = rng.range(1.6, 4.2) * e;
     s = resetSpawn();
     discOn(V, rng, n.x, n.y, n.z, 0.06);
-    s.x = p.x + V.x;
-    s.y = p.y + V.y + 0.01;
-    s.z = p.z + V.z;
-    s.vx = V2.x * sp;
-    s.vy = V2.y * sp;
-    s.vz = V2.z * sp;
+    setSpawnPosition(s, p.x + V.x, p.y + V.y + 0.01, p.z + V.z);
+    setSpawnVelocity(s, V2.x * sp, V2.y * sp, V2.z * sp);
     s.tile = i % 3 === 0 ? P.SMOKE_B : P.DUST;
     s.size0 = rng.range(0.06, 0.13) * e;
     s.size1 = rng.range(0.55, 1.0) * e;
@@ -824,12 +765,8 @@ function ground(fx: ImpactFx, p: Vec3Like, n: Vec3Like, e: number, sand: boolean
     cone(V2, rng, n.x, n.y, n.z, 0.95, 1.1);
     const sp = rng.range(3, 9);
     s = resetSpawn();
-    s.x = p.x;
-    s.y = p.y + 0.01;
-    s.z = p.z;
-    s.vx = V2.x * sp;
-    s.vy = V2.y * sp;
-    s.vz = V2.z * sp;
+    setSpawnPosition(s, p.x, p.y + 0.01, p.z);
+    setSpawnVelocity(s, V2.x * sp, V2.y * sp, V2.z * sp);
     s.tile = P.CHIP;
     s.size0 = rng.range(0.008, sand ? 0.02 : 0.035);
     s.size1 = s.size0;
@@ -879,12 +816,8 @@ function glass(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like): void {
     cone(V2, rng, ax, ay, az, 1.0, 1.2);
     const sp = rng.range(2.5, 8);
     s = resetSpawn();
-    s.x = p.x;
-    s.y = p.y;
-    s.z = p.z;
-    s.vx = V2.x * sp;
-    s.vy = V2.y * sp;
-    s.vz = V2.z * sp;
+    setSpawnPosition(s, p.x, p.y, p.z);
+    setSpawnVelocity(s, V2.x * sp, V2.y * sp, V2.z * sp);
     s.tile = rng.float() < 0.4 ? P.SPLINTER : P.CHIP;
     s.size0 = rng.range(0.01, 0.038);
     s.size1 = s.size0;
@@ -917,12 +850,8 @@ function glass(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like): void {
   for (let i = 0; i < nMist; i++) {
     cone(V2, rng, fx0, fy0, fz0, 1.2, 0.7);
     s = resetSpawn();
-    s.x = p.x;
-    s.y = p.y;
-    s.z = p.z;
-    s.vx = V2.x * 1.6;
-    s.vy = V2.y * 1.6;
-    s.vz = V2.z * 1.6;
+    setSpawnPosition(s, p.x, p.y, p.z);
+    setSpawnVelocity(s, V2.x * 1.6, V2.y * 1.6, V2.z * 1.6);
     s.tile = P.MIST;
     s.size0 = 0.05;
     s.size1 = rng.range(0.28, 0.45);
@@ -957,12 +886,8 @@ function water(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number)
   for (let i = 0; i < nCol; i++) {
     s = resetSpawn();
     discOn(V, rng, n.x, n.y, n.z, 0.05);
-    s.x = p.x + V.x;
-    s.y = p.y + 0.02;
-    s.z = p.z + V.z;
-    s.vx = V.x * 2.5;
-    s.vy = rng.range(2.4, 4.6) * e;
-    s.vz = V.z * 2.5;
+    setSpawnPosition(s, p.x + V.x, p.y + 0.02, p.z + V.z);
+    setSpawnVelocity(s, V.x * 2.5, rng.range(2.4, 4.6) * e, V.z * 2.5);
     s.tile = P.SPLASH;
     s.size0 = rng.range(0.07, 0.13) * e;
     s.size1 = rng.range(0.3, 0.55) * e;
@@ -984,12 +909,8 @@ function water(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number)
     cone(V2, rng, n.x, n.y, n.z, 0.85, 0.9);
     const sp = rng.range(2.5, 7.5);
     s = resetSpawn();
-    s.x = p.x;
-    s.y = p.y + 0.02;
-    s.z = p.z;
-    s.vx = V2.x * sp;
-    s.vy = V2.y * sp;
-    s.vz = V2.z * sp;
+    setSpawnPosition(s, p.x, p.y + 0.02, p.z);
+    setSpawnVelocity(s, V2.x * sp, V2.y * sp, V2.z * sp);
     s.tile = P.DROPLET;
     s.size0 = rng.range(0.008, 0.026);
     s.size1 = s.size0 * 0.9;
@@ -1007,9 +928,7 @@ function water(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number)
   // fine mist over the impact
   for (let i = 0; i < Math.round(3 * q) + 1; i++) {
     s = resetSpawn();
-    s.x = p.x;
-    s.y = p.y + 0.05;
-    s.z = p.z;
+    setSpawnPosition(s, p.x, p.y + 0.05, p.z);
     s.vy = 0.7;
     s.tile = P.MIST;
     s.size0 = 0.08;
@@ -1051,12 +970,8 @@ function flesh(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number)
     cone(V2, rng, ax, ay, az, 0.95, 0.8);
     const sp = rng.range(1.2, 4.5);
     s = resetSpawn();
-    s.x = p.x - n.x * 0.02;
-    s.y = p.y - n.y * 0.02;
-    s.z = p.z - n.z * 0.02;
-    s.vx = V2.x * sp;
-    s.vy = V2.y * sp + 0.3;
-    s.vz = V2.z * sp;
+    setSpawnPosition(s, p.x - n.x * 0.02, p.y - n.y * 0.02, p.z - n.z * 0.02);
+    setSpawnVelocity(s, V2.x * sp, V2.y * sp + 0.3, V2.z * sp);
     s.tile = i % 3 === 0 ? P.SMOKE_A : P.MIST;
     s.size0 = rng.range(0.035, 0.075) * e;
     s.size1 = rng.range(0.16, 0.34) * e;
@@ -1080,12 +995,8 @@ function flesh(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number)
     cone(V2, rng, ax, ay, az, 1.1, 1.2);
     const sp = rng.range(2, 8);
     s = resetSpawn();
-    s.x = p.x;
-    s.y = p.y;
-    s.z = p.z;
-    s.vx = V2.x * sp;
-    s.vy = V2.y * sp;
-    s.vz = V2.z * sp;
+    setSpawnPosition(s, p.x, p.y, p.z);
+    setSpawnVelocity(s, V2.x * sp, V2.y * sp, V2.z * sp);
     s.tile = P.DROPLET;
     s.size0 = rng.range(0.007, 0.022);
     s.size1 = s.size0;
@@ -1112,12 +1023,8 @@ function foliage(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like): void {
     cone(V2, rng, V.x, V.y, V.z, 1.3, 1);
     const sp = rng.range(1.5, 5);
     const s = resetSpawn();
-    s.x = p.x;
-    s.y = p.y;
-    s.z = p.z;
-    s.vx = V2.x * sp;
-    s.vy = V2.y * sp;
-    s.vz = V2.z * sp;
+    setSpawnPosition(s, p.x, p.y, p.z);
+    setSpawnVelocity(s, V2.x * sp, V2.y * sp, V2.z * sp);
     s.tile = rng.float() < 0.5 ? P.CHIP : P.SPLINTER;
     s.size0 = rng.range(0.012, 0.035);
     s.size1 = s.size0;
@@ -1146,12 +1053,8 @@ function soft(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, rubber: boo
     cone(V2, rng, rx, ry, rz, 1.1, 0.8);
     const sp = rng.range(0.8, 3);
     const s = resetSpawn();
-    s.x = p.x + n.x * 0.02;
-    s.y = p.y + n.y * 0.02;
-    s.z = p.z + n.z * 0.02;
-    s.vx = V2.x * sp;
-    s.vy = V2.y * sp + 0.3;
-    s.vz = V2.z * sp;
+    setSpawnPosition(s, p.x + n.x * 0.02, p.y + n.y * 0.02, p.z + n.z * 0.02);
+    setSpawnVelocity(s, V2.x * sp, V2.y * sp + 0.3, V2.z * sp);
     s.tile = i % 2 ? P.DUST : P.MIST;
     s.size0 = rng.range(0.04, 0.08);
     s.size1 = rng.range(0.2, 0.36);
@@ -1176,12 +1079,8 @@ function soft(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, rubber: boo
     cone(V2, rng, rx, ry, rz, 1, 1.2);
     const sp = rng.range(1.5, 4.5);
     const s = resetSpawn();
-    s.x = p.x;
-    s.y = p.y;
-    s.z = p.z;
-    s.vx = V2.x * sp;
-    s.vy = V2.y * sp;
-    s.vz = V2.z * sp;
+    setSpawnPosition(s, p.x, p.y, p.z);
+    setSpawnVelocity(s, V2.x * sp, V2.y * sp, V2.z * sp);
     s.tile = P.SPLINTER;
     s.size0 = rng.range(0.01, 0.03);
     s.size1 = s.size0;
@@ -1260,9 +1159,7 @@ export function spawnExit(
     s.x = point.x + normal.x * 0.01;
     s.y = point.y + normal.y * 0.01;
     s.z = point.z + normal.z * 0.01;
-    s.vx = V2.x * speed;
-    s.vy = V2.y * speed;
-    s.vz = V2.z * speed;
+    setSpawnVelocity(s, V2.x * speed, V2.y * speed, V2.z * speed);
     s.tile = chip ? P.CHIP : P.DUST;
     s.size0 = rng.range(chip ? 0.006 : 0.05, chip ? 0.018 : 0.1) * energy;
     s.size1 = chip ? s.size0 : s.size0 * 4;

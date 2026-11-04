@@ -10,15 +10,8 @@ export const SITE = {
   dayOfYear: 172, // summer solstice
   /** Rotates north in world space. 0 keeps north at -Z. */
   northAngleDeg: 0,
-  /**
-   * Moon hour angle offset from the sun, degrees, and lunar declination.
-   *
-   * 244 / +28 (the moon's real declination limit) puts the moon at altitude 22 /
-   * azimuth 288 at 01:30, which is INSIDE the night shot's frustum — the old
-   * 216.8 / +12 put it at azimuth 250, twenty degrees off the left edge, so the
-   * one frame that exists to show a moonlit street had no moon in it. At this
-   * declination it is also 58% illuminated, so the terminator reads and the disc
-   * is a sphere rather than a flat white dot.
+  /** Moon hour-angle offset and declination in degrees. 244 / +28 places the moon
+   * at altitude 22 / azimuth 288 in the 01:30 capture, with a visible terminator.
    */
   moonHourOffsetDeg: 244.0,
   moonDeclinationDeg: 28.0,

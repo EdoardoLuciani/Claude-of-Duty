@@ -27,17 +27,9 @@ import type { ConstNode, VarNode } from 'three/webgpu';
 
 import { fbm3, skHash33 } from './noise.ts';
 
-/**
- * Night sky: a real starfield and a Milky Way band, both procedural — TSL port.
- *
- * "White dots on black" is the tell of a WebGL demo, so the authored detail is
- * preserved exactly: three density layers with a magnitude power law, blackbody
- * colour with the luminance normalised out, Kasten-Young airmass extinction,
- * airmass-weighted scintillation, and a Milky Way with fbm dust lanes.
- *
- * Radiance is in the same scene units as everything else, so on a bright
- * afternoon the stars are simply four orders of magnitude below the sky and
- * vanish on their own — there is no "hide the stars in daytime" switch.
+/** Procedural starfield and Milky Way: three magnitude-law density layers,
+ * luminance-normalised blackbody colour, Kasten-Young extinction, airmass-weighted
+ * scintillation and fbm dust lanes. Scene-unit radiance naturally hides stars in daylight.
  */
 
 const SK_STAR_TINT = 0.11;

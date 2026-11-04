@@ -47,14 +47,8 @@ export class LightPool {
     }
   }
 
-  /**
-   * @param {number} x @param {number} y @param {number} z
-   * @param {number} r @param {number} g @param {number} b   linear colour
-   * @param {number} peak      candela at t=0
-   * @param {number} duration  seconds until it is free again
-   * @param {number} decay     exponential decay rate, 1/s
-   * @param {number} distance  falloff cutoff, metres
-   * @param {number} priority  higher wins when the pool is full
+  /** Linear RGB; peak in candela at t=0, duration in seconds, decay in 1/s,
+   * distance cutoff in metres. Higher priority wins when the pool is full.
    */
   flash(
     x: number,
