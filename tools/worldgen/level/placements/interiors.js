@@ -824,14 +824,6 @@ export const interiors = [
     masks: [1, 1.2, 1],
   },
   {
-    id: 'interior/E1/ground/crate_b/003',
-    prototype: 'crate_b',
-    position: [11.816825, 0.43, 10.2],
-    rotationDeg: [0, 6.2536, 0],
-    scale: [1.010145, 1.010145, 1.010145],
-    masks: [1, 1.2, 1],
-  },
-  {
     id: 'interior/E1/ground/crate_c/001',
     prototype: 'crate_c',
     position: [7.574101, 0.974941, 22.828067],
@@ -870,14 +862,6 @@ export const interiors = [
     rotationDeg: [0, -19.347785, 0],
     scale: [1.016188, 1.016188, 1.016188],
     masks: [1, 0.9139835046371445, 1],
-  },
-  {
-    id: 'interior/E1/ground/crate_flat/002',
-    prototype: 'crate_flat',
-    position: [11.009058, 0.42, 9.328925],
-    rotationDeg: [0, -0.551594, 0],
-    scale: [1.057302, 1.057302, 1.057302],
-    masks: [1, 0.7560654739383608, 1],
   },
   {
     id: 'interior/E1/ground/dust-skirt/252',
@@ -966,14 +950,6 @@ export const interiors = [
     masks: [1, 1.3, 1],
   },
   {
-    id: 'interior/E1/ground/plank_a/001',
-    prototype: 'plank_a',
-    position: [9.974389, 0.44, 9.575736],
-    rotationDeg: [0, 64.152424, 0],
-    scale: [1, 1, 1],
-    masks: [1, 1.3, 1],
-  },
-  {
     id: 'interior/E1/ground/plank_a/002',
     prototype: 'plank_a',
     position: [8.247666, 0.44, 14.265441],
@@ -1014,14 +990,6 @@ export const interiors = [
     masks: [1, 1.2, 1],
   },
   {
-    id: 'interior/E1/ground/sandbag_a/004',
-    prototype: 'sandbag_a',
-    position: [9.2, 0.43, 16.540974],
-    rotationDeg: [0, 210.643297, 0],
-    scale: [0.946909, 0.946909, 0.946909],
-    masks: [1, 1.2, 1],
-  },
-  {
     id: 'interior/E1/ground/sandbag_a/005',
     prototype: 'sandbag_a',
     position: [14.364005, 0.43, 8.53525],
@@ -1052,22 +1020,6 @@ export const interiors = [
     rotationDeg: [0, 45.474963, 0],
     scale: [0.935336, 0.935336, 0.935336],
     masks: [1, 1.2636027761967852, 1],
-  },
-  {
-    id: 'interior/E1/ground/sandbag_b/002',
-    prototype: 'sandbag_b',
-    position: [7.547682, 0.63, 15.346956],
-    rotationDeg: [0, 267.741669, 0],
-    scale: [0.912635, 0.912635, 0.912635],
-    masks: [1, 1.2, 1],
-  },
-  {
-    id: 'interior/E1/ground/sandbag_b/003',
-    prototype: 'sandbag_b',
-    position: [7.949786, 0.44, 16.023445],
-    rotationDeg: [0, 50.208133, 0],
-    scale: [0.904205, 0.904205, 0.904205],
-    masks: [1, 1.2, 1],
   },
   {
     id: 'interior/E1/ground/sandbag_b/004',
@@ -1589,27 +1541,11 @@ export const interiors = [
     masks: [1, 1.5, 1],
   },
   {
-    id: 'interior/E3/ground/bucket/001',
-    prototype: 'bucket',
-    position: [7.34, 0.42, -19.536],
-    rotationDeg: [0, 50.974953, 0],
-    scale: [1, 1, 1],
-    masks: [1, 1.4, 1],
-  },
-  {
     id: 'interior/E3/ground/bucket/002',
     prototype: 'bucket',
     position: [11.063097, 0.43, -29.268643],
     rotationDeg: [0, 11.105801, 0],
     scale: [1.006792, 1.006792, 1.006792],
-    masks: [1, 1.2, 1],
-  },
-  {
-    id: 'interior/E3/ground/bucket/003',
-    prototype: 'bucket',
-    position: [7.19999, 0.43, -19.41373],
-    rotationDeg: [0, 17.333933, 0],
-    scale: [1.009256, 1.009256, 1.009256],
     masks: [1, 1.2, 1],
   },
   {
@@ -1946,14 +1882,6 @@ export const interiors = [
     position: [7.74907, 0.43, -14.607328],
     rotationDeg: [0, 213.023973, 0],
     scale: [0.909123, 0.909123, 0.909123],
-    masks: [1, 1.2, 1],
-  },
-  {
-    id: 'interior/E3/ground/sandbag_b/004',
-    prototype: 'sandbag_b',
-    position: [7.235865, 0.43, -17.952347],
-    rotationDeg: [0, 281.709403, 0],
-    scale: [0.933708, 0.933708, 0.933708],
     masks: [1, 1.2, 1],
   },
   {
@@ -2580,14 +2508,6 @@ export const interiors = [
     masks: [1, 1.2, 1],
   },
   {
-    id: 'interior/W2/ground/barrel_wood/002',
-    prototype: 'barrel_wood',
-    position: [-20.119219, 0.42, -1.942458],
-    rotationDeg: [0, 175.63123, 0],
-    scale: [1, 1, 1],
-    masks: [1, 1.2, 1],
-  },
-  {
     id: 'interior/W2/ground/bottle/001',
     prototype: 'bottle',
     position: [-12.965592, 0.67, -5.366079],
@@ -2716,14 +2636,6 @@ export const interiors = [
     masks: [1, 1.2, 1],
   },
   {
-    id: 'interior/W2/ground/bucket/003',
-    prototype: 'bucket',
-    position: [-20.66, 0.42, -1.8536],
-    rotationDeg: [0, 261.905801, 0],
-    scale: [1, 1, 1],
-    masks: [1, 1.4, 1],
-  },
-  {
     id: 'interior/W2/ground/bucket/004',
     prototype: 'bucket',
     position: [-20.021158, 0.43, -0.880734],
@@ -2844,46 +2756,6 @@ export const interiors = [
     masks: [1, 1.2, 1],
   },
   {
-    id: 'interior/W2/ground/crate_b/005',
-    prototype: 'crate_b',
-    position: [-20.7771, 0.43, 1.539367],
-    rotationDeg: [0, 191.70088, 0],
-    scale: [0.890012, 0.890012, 0.890012],
-    masks: [1, 1.2, 1],
-  },
-  {
-    id: 'interior/W2/ground/crate_flat/001',
-    prototype: 'crate_flat',
-    position: [-7.197196, 0.44, -2.526222],
-    rotationDeg: [0, 261.237893, 0],
-    scale: [0.976033, 0.976033, 0.976033],
-    masks: [1, 1.0082144393818453, 1],
-  },
-  {
-    id: 'interior/W2/ground/crate_flat/002',
-    prototype: 'crate_flat',
-    position: [-7.477332, 0.6, -2.566127],
-    rotationDeg: [0, 295.863329, 0],
-    scale: [0.962667, 0.962667, 0.962667],
-    masks: [1, 1.057386927283369, 1],
-  },
-  {
-    id: 'interior/W2/ground/crate_flat/003',
-    prototype: 'crate_flat',
-    position: [-7.427603, 0.44, -2.294673],
-    rotationDeg: [0, 24.047887, 0],
-    scale: [0.95498, 0.95498, 0.95498],
-    masks: [1, 1.004370091087185, 1],
-  },
-  {
-    id: 'interior/W2/ground/crate_flat/004',
-    prototype: 'crate_flat',
-    position: [-7.363451, 0.6, -0.379953],
-    rotationDeg: [0, 60.666015, 0],
-    scale: [1.028736, 1.028736, 1.028736],
-    masks: [1, 1.1161307766335085, 1],
-  },
-  {
     id: 'interior/W2/ground/crate_flat/005',
     prototype: 'crate_flat',
     position: [-12.530091, 1.31854, 3.834572],
@@ -2971,13 +2843,6 @@ export const interiors = [
     position: [-15.602044, 0.434, -5.354663],
     rotationDeg: [0, -116.618556, 0],
     scale: [0.51, 1, 0.51],
-  },
-  {
-    id: 'interior/W2/ground/dust-skirt/060',
-    prototype: 'dust_skirt',
-    position: [-20.119219, 0.424, -1.942458],
-    rotationDeg: [0, -83.97046, 0],
-    scale: [0.28, 1, 0.28],
   },
   {
     id: 'interior/W2/ground/dust-skirt/072',
@@ -3193,14 +3058,6 @@ export const interiors = [
     rotationDeg: [0, 7.408059, 0],
     scale: [1, 1, 1],
     masks: [1, 1, 1],
-  },
-  {
-    id: 'interior/W2/ground/tray/001',
-    prototype: 'tray',
-    position: [-7.122974, 0.44, -0.099279],
-    rotationDeg: [0, 346.745012, 0],
-    scale: [1.020152, 1.020152, 1.020152],
-    masks: [1, 1.14227411611937, 1],
   },
   {
     id: 'interior/W2/ground/tyre_small/001',
@@ -3466,14 +3323,6 @@ export const interiors = [
     position: [-13.191898, 0.43, -15.767619],
     rotationDeg: [0, 99.58577, 0],
     scale: [0.83564, 0.83564, 0.83564],
-    masks: [1, 1.2, 1],
-  },
-  {
-    id: 'interior/W3/ground/box_card_a/001',
-    prototype: 'box_card_a',
-    position: [-8.991992, 0.43, -25.460588],
-    rotationDeg: [0, 187.646205, 0],
-    scale: [0.951849, 0.951849, 0.951849],
     masks: [1, 1.2, 1],
   },
   {
@@ -4010,14 +3859,6 @@ export const interiors = [
 
   // W5 ground — majlis: floor seating, low table, no dining chairs
   {
-    id: 'interior/W5/ground/mattress/001',
-    prototype: 'mattress',
-    position: [-17.45, 0.16, 28.4],
-    rotationDeg: [0, 90, 0],
-    scale: [1, 1, 1],
-    masks: [1, 1.1, 1],
-  },
-  {
     id: 'interior/W5/ground/mattress/002',
     prototype: 'mattress',
     position: [-17.45, 0.16, 32.6],
@@ -4162,14 +4003,6 @@ export const interiors = [
     masks: [1, 1.2, 1],
   },
   {
-    id: 'interior/E5/ground/jerry_can/001',
-    prototype: 'jerry_can',
-    position: [17.6, 0.16, 29.15],
-    rotationDeg: [0, 40, 0],
-    scale: [0.9, 0.9, 0.9],
-    masks: [1, 1.2, 1],
-  },
-  {
     id: 'interior/E5/ground/box_card_b/001',
     prototype: 'box_card_b',
     position: [17.5, 0.16, 30.4],
@@ -4203,22 +4036,6 @@ export const interiors = [
 
   // W4 back store — gas, timber, grain
   {
-    id: 'interior/W4/ground/shelf/001',
-    prototype: 'shelf',
-    position: [-21.85, 0.16, -37.9],
-    rotationDeg: [0, 90, 0],
-    scale: [1, 1, 1],
-    masks: [1, 1, 1],
-  },
-  {
-    id: 'interior/W4/ground/shelf/002',
-    prototype: 'shelf',
-    position: [-21.85, 0.16, -36.3],
-    rotationDeg: [0, 90, 0],
-    scale: [0.95, 0.95, 0.95],
-    masks: [1, 1.1, 1],
-  },
-  {
     id: 'interior/W4/ground/sack/001',
     prototype: 'sack',
     position: [-20.35, 0.16, -38.45],
@@ -4241,22 +4058,6 @@ export const interiors = [
     rotationDeg: [0, 80, 0],
     scale: [1.05, 1.05, 1.05],
     masks: [1, 1.05, 1],
-  },
-  {
-    id: 'interior/W4/ground/gas_bottle/001',
-    prototype: 'gas_bottle',
-    position: [-21.45, 0.16, -35.05],
-    rotationDeg: [0, 10, 0],
-    scale: [1, 1, 1],
-    masks: [1, 1.15, 1],
-  },
-  {
-    id: 'interior/W4/ground/gas_bottle/002',
-    prototype: 'gas_bottle',
-    position: [-21.2, 0.16, -34.7],
-    rotationDeg: [0, -8, 0],
-    scale: [1, 1, 1],
-    masks: [1, 1.2, 1],
   },
   {
     id: 'interior/W4/ground/crate_b/001',
@@ -4289,20 +4090,6 @@ export const interiors = [
     rotationDeg: [0, 28, 0],
     scale: [1, 1, 1],
     masks: [1, 1.3, 1],
-  },
-  {
-    id: 'interior/W4/ground/dust_skirt/001',
-    prototype: 'dust_skirt',
-    position: [-21.85, 0.164, -37.9],
-    rotationDeg: [0, 10, 0],
-    scale: [0.42, 1, 0.42],
-  },
-  {
-    id: 'interior/W4/ground/dust_skirt/002',
-    prototype: 'dust_skirt',
-    position: [-21.85, 0.164, -36.3],
-    rotationDeg: [0, 50, 0],
-    scale: [0.4, 1, 0.4],
   },
   // W4 break-room nook — crate stools, tea on a small table
   {
@@ -4489,22 +4276,6 @@ export const interiors = [
     rotationDeg: [0, -90, 0],
     scale: [0.96, 0.96, 0.96],
     masks: [1, 1.1, 1],
-  },
-  {
-    id: 'interior/E4/ground/gas_bottle/001',
-    prototype: 'gas_bottle',
-    position: [11.25, 0.16, -44.75],
-    rotationDeg: [0, 5, 0],
-    scale: [1, 1, 1],
-    masks: [1, 1.15, 1],
-  },
-  {
-    id: 'interior/E4/ground/gas_bottle/002',
-    prototype: 'gas_bottle',
-    position: [11.55, 0.16, -44.45],
-    rotationDeg: [0, -12, 0],
-    scale: [1, 1, 1],
-    masks: [1, 1.2, 1],
   },
   {
     id: 'interior/E4/ground/crate_flat/001',
