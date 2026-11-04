@@ -102,7 +102,6 @@ export class M590Animation {
   actions: Record<string, THREE.AnimationAction>;
   shellInsert: THREE.Object3D;
   private skeletons = new Set<THREE.Skeleton>();
-  poseMatrix: THREE.Matrix4;
   hands: Record<HandSide, AuthoredHand>;
   poseQ = new THREE.Quaternion();
   idleTime = 0;
@@ -111,7 +110,6 @@ export class M590Animation {
   constructor(model: ReturnType<typeof makeM590Model>) {
     this.model = model;
     this.root = model.root;
-    this.poseMatrix = this.root.matrix;
     this.mixer = new THREE.AnimationMixer(this.root);
     this.actions = createAuthoredActions(this.mixer, model.animations);
     const node = (name: string): THREE.Object3D => requiredNode(this.root, name);

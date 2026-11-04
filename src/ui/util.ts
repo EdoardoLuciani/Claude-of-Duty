@@ -8,12 +8,8 @@
  *    driven from update() so capture frames are deterministic.
  */
 
-/**
- * Condensed system stacks — no webfonts, crisp at any size.
- *
- * "Avenir Next Condensed" (four weights) carries the body text, "DIN Condensed"
- * (very narrow, bold only) carries display numerals, and both degrade through
- * Arial Narrow / Helvetica Neue on machines without them.
+/** Local condensed font stacks: Avenir Next Condensed for body, DIN Condensed for
+ * display numerals, with Arial Narrow / Helvetica Neue fallbacks. No webfonts.
  */
 export const FONT_STACK =
   '"Avenir Next Condensed","DIN Alternate","Roboto Condensed","Arial Narrow",' +

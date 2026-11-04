@@ -292,13 +292,8 @@ export class Minimap {
     g.setTransform(1, 0, 0, 1, 0, 0);
     this.labels = labels;
 
-    // ---- grain: no HUD surface is a flat colour --------------------------
-    // A 64² noise tile stamped over the bake, rather than a per-pixel pass with
-    // an rng call in it: at VBAKE that loop alone was a million iterations and
-    // a full-image readback on the main thread, which is what turned the bake
-    // into a visible hitch. This is not that grain — it is stronger per pixel
-    // (±3.8 against ±2.75) and it repeats every 11.9 m of ground — but at 3%
-    // alpha it does the same job for the cost of one fill.
+    // Stamp a 64² noise tile at 3% alpha rather than running a full-bake pixel/RNG
+    // pass and readback on the main thread. It repeats every 11.9 m of ground.
     const tile = document.createElement('canvas');
     tile.width = 64;
     tile.height = 64;

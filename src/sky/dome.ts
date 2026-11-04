@@ -305,14 +305,9 @@ _domeGeometry.boundingSphere = new Sphere(new Vector3(), 1e8);
  */
 const SKY_UV = positionGeometry.xy.mul(0.5).add(0.5).toVarying('vSkyUv');
 
-/**
- * The visible sky as a full-screen triangle drawn in the world scene — the TSL
- * equivalent of the GLSL dome. The ray is rebuilt from the camera matrices, so
- * it picks up the renderer's jitter/velocity exactly as the rest of the frame
- * does, and nothing about the triangle's transform can rotate it.
- *
- * It opts out of the prepass and native shadow casting, so
- * the world owner keeps it out of the depth/normal prepass and the cascades.
+/** World-scene full-screen sky. Camera-matrix ray reconstruction follows jitter
+ * and velocity independently of the triangle transform. Excluded from opaque
+ * depth/normal prepass and native shadow casting.
  */
 export function createSkyDome(skyScreen: SkyNodeFn): Mesh {
   const material = new MeshBasicNodeMaterial({

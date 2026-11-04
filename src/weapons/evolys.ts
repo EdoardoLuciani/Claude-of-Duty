@@ -153,7 +153,6 @@ export class EvolysAnimation {
   bones!: THREE.Object3D[];
   hands!: Record<HandSide, AuthoredHand>;
   poseQ = new THREE.Quaternion();
-  poseMatrix!: THREE.Matrix4;
   idleTime = 0;
   name: string | null = null;
   fireTime!: number;
@@ -175,7 +174,6 @@ export class EvolysAnimation {
       node(`belt_${i}`)
     );
     this.hands = discoverAuthoredHands(node);
-    this.poseMatrix = this.root.matrix;
     this.reset();
   }
 

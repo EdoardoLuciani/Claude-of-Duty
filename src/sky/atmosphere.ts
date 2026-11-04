@@ -10,16 +10,9 @@ export const SCENE_LUX = 25000;
 /** Extraterrestrial solar illuminance, in scene light units. */
 export const SUN_ILLUMINANCE_TOP = 128000 / SCENE_LUX; // 5.12
 
-/**
- * Moonlight, in scene light units. A real full moon is 0.27 lux — 1e-5 units —
- * which is four stops below anything a display can show alongside a muzzle
- * flash. Every shipped game renders "day for night" instead; this is that
- * decision, made once, in one place, rather than smeared across the shaders.
- * 0.03 is the reviewed night baseline: one tenth of the former 0.30.
- * The same level drives the ground, atmosphere and clouds, leaving lamp pools
- * distinct without turning the sky into blue daytime.
- * Ratios *within* the night (moon disc : moonlit sky : moonlit ground) stay
- * physical, so the frame still behaves like a photograph of a moonlit street.
+/** Moonlight in scene light units. The reviewed 0.03 baseline exaggerates physical
+ * moonlight for display readability while keeping lamp pools distinct. Disc, sky
+ * and ground share the level so their relative photometry stays consistent.
  */
 export const MOON_ILLUMINANCE_NIGHT = 0.03;
 

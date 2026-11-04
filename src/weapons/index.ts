@@ -686,7 +686,6 @@ export class WeaponSystem {
       this.viewmodel.stopClip();
       this.viewmodel.setActive(this.activeId);
       this.viewmodel.adsT = 0;
-      this.viewmodel.adsTarget = 0;
       this.viewmodel.play('draw');
     }
   }
@@ -787,7 +786,6 @@ export class WeaponSystem {
     this.healing = true;
     this._viewmodel?.stopClip?.();
     this._viewmodel?.holdBandage?.();
-    if (this._viewmodel) this._viewmodel.adsTarget = 0;
     return true;
   }
 
@@ -1199,7 +1197,6 @@ export class WeaponSystem {
       this._pendingShots = 0;
       this._state.ads = false;
       this._state.trigger = false;
-      this.viewmodel.adsTarget = 0;
       this.viewmodel.stopClip();
     }
   }
@@ -1768,26 +1765,9 @@ export class WeaponSystem {
     this._state.sprint = false;
     this._state.speed = 0;
     this._state.trigger = false;
-    // Frames (at the harness's fixed 60 Hz) on which to fire for the 'fire'
-    // shot. The burst has to land at the END of the harness's settle window: a
-    // flash core lives 52 ms (~3 frames), so the last rounds must leave the
-    // barrel a frame or two before the grab or there is nothing to photograph.
-    // `grabFrame` is how many frames the harness will pump — it is a CLI flag
-    // (`--settle`), so it cannot be hard-coded here. The offsets below straddle
-    // the grab because the harness pumps on its own rAF chain, which can land a
-    // frame either side of the engine's.
-    // A flash core lives 52 ms — about three frames at 60 Hz — while the exact
-    // frame the shutter lands on is only known to within a handful of frames
-    // (the harness pumps its settle count on its own rAF chain, then the
-    // screenshot RPC costs a few more). So: three spaced rounds early to fill
-    // the frame with drifting smoke, brass in flight and a tracer, then a
-    // sustained tail on a 2-frame cadence, so a flash is lit continuously
-    // across the whole uncertainty window.
-    //
-    // The cadence was 3 frames, which is the flash core's own lifetime rounded
-    // UP: measured across settle 86/88/90/92/94, frame 90 landed in the trough
-    // between two cores and photographed a dying flash (10k hot pixels against
-    // 26-29k on either side). Two frames guarantees overlap.
+    // At the harness's fixed 60 Hz, early rounds populate smoke, brass and tracers.
+    // A two-frame tail overlaps flash lifetimes across the uncertain grab window:
+    // --settle controls grabFrame, but harness rAF and screenshot RPC can drift.
     if (kind === 'fire') {
       const grab = Math.round(opts?.grabFrame ?? 90);
       const frames = [grab - 26, grab - 19, grab - 12];

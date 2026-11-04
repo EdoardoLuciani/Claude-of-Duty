@@ -2,7 +2,7 @@ import { Container, Graphics, Text } from 'pixi.js';
 
 import { filledMagazinePips, MAX_PIPS } from './ammo.ts';
 import type { AmmoState } from './ammo.ts';
-import { HUD_TYPE } from './pixi-type.ts';
+import { HUD_TYPE, hudText } from './pixi-type.ts';
 import { clamp01 } from './util.ts';
 
 export const AMMO_WIDTH = 248;
@@ -56,17 +56,7 @@ export class PixiAmmoView {
   }
 
   private text(value: string, x: number, y: number, fontSize: number, fill = INK): Text {
-    const text = new Text({
-      text: value,
-      style: {
-        fontFamily: 'Arial',
-        fontSize,
-        fontWeight: '600',
-        fill,
-        stroke: { color: 0x080c10, width: fontSize >= 20 ? 2 : 1, join: 'round' },
-      },
-    });
-    text.position.set(x, y);
+    const text = hudText(value, x, y, fontSize, fill);
     this.stage.addChild(text);
     return text;
   }

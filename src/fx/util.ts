@@ -98,14 +98,8 @@ export function cone<T extends VectorTriple>(
   return out;
 }
 
-/**
- * Force a direction into the hemisphere around an axis by mirroring whatever
- * component points the wrong way, keeping a minimum forward bias.
- *
- * Ejecta that leaves a surface *into* the surface is the single loudest tell
- * that a spark system is a random-direction emitter: real sparks off a wall
- * only ever occupy the normal hemisphere, and sparks off a muzzle only ever
- * leave down-bore. `bias` is the minimum cosine kept against the axis.
+/** Mirror into the axis hemisphere; bias is the minimum forward cosine.
+ * Keeps impact ejecta above the surface and muzzle embers down-bore.
  */
 export function towardHemi<T extends VectorTriple>(
   out: T,
@@ -129,17 +123,9 @@ export function towardHemi<T extends VectorTriple>(
   return out;
 }
 
-/**
- * Hard cone clamp: force a direction to lie within `cosMax` of an axis, keeping
- * whatever tangential direction it already had.
- *
- * `towardHemi` only guarantees a particle is not travelling *into* the surface,
- * which still leaves a full 180 deg fan — including sparks flying sideways past
- * the camera, which is the loudest tell of a random-direction emitter. Ejecta
- * from a rifle impact leaves inside roughly +-55 deg of the normal, and muzzle
- * embers inside +-55 deg of the bore, so that is what this enforces.
- *
- * @param {number} cosMax cosine of the half-angle, e.g. cos(55 deg) = 0.574
+/** Clamp within cosMax of the axis while preserving tangential direction.
+ * Unlike towardHemi's 180-degree fan, this bounds impact/muzzle ejecta to a cone.
+ * cosMax is the half-angle cosine, e.g. cos(55 degrees) = 0.574.
  */
 export function clampCone<T extends VectorTriple>(
   out: T,
@@ -170,13 +156,8 @@ export function clampCone<T extends VectorTriple>(
 /** cos(55 deg) — the ejecta cone half-angle shared by impacts and the muzzle. */
 export const COS55 = 0.5735764;
 
-/**
- * Planckian locus, normalised so the brightest channel is 1: the colour a
- * cooling steel spark actually goes through. 2500 K is a fresh spark leaving
- * the impact (orange-white), 1200 K is the same particle a third of a second
- * later (deep red, barely visible). Sampled from a fit of the CIE blackbody
- * table, which is cheap and monotonic — the important thing is that R:G:B
- * separates as it cools instead of every spark being white.
+/** CIE blackbody fit, normalised to a brightest channel of 1. Cooling sparks
+ * shift from orange-white (~2500 K) to deep red (~1200 K), not constant white.
  */
 export function blackbody<T extends RGB>(out: T, kelvin: number): T {
   const t = clamp(kelvin, 1000, 6500) / 100;

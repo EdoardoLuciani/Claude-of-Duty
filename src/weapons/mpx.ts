@@ -188,7 +188,6 @@ export class MPXAnimation {
   actions!: Record<string, THREE.AnimationAction>;
   bolt!: THREE.Object3D;
   boltRest!: THREE.Vector3;
-  poseMatrix!: THREE.Matrix4;
   magazine!: THREE.Object3D;
   spare!: THREE.Object3D;
   magazineBody!: THREE.Object3D;
@@ -205,7 +204,6 @@ export class MPXAnimation {
     this.actions = createAuthoredActions(this.mixer, model.animations);
     const node = (name: string): THREE.Object3D => requiredNode(this.root, name);
     this.bolt = node('bolt');
-    this.poseMatrix = this.root.matrix;
     this.magazine = node('magazine');
     this.spare = node('magazine_spare');
     this.magazineBody = node('magazine_mesh');

@@ -117,13 +117,8 @@ export const skHG = Fn<[Node<'float'>, Node<'float'>], Node<'float'>>(
   }
 );
 
-/**
- * Build the TSL atmosphere lookups bound to the shared uniform/texture records.
- *
- * `shared` carries the live uniform nodes (`uViewPos`, `uMieScale`) and the LUT
- * textures created by `luts.js`. The functions close over those records, so one
- * write to a shared uniform updates the bakes, the dome, the fog and the
- * environment material at once — the same trick the GLSL uniforms used.
+/** Atmosphere lookups borrow live uniforms (uViewPos/uMieScale) and LUT textures
+ * from luts.ts. Shared records keep bakes, dome, fog and environment in sync.
  */
 interface AtmosphereNodesContext {
   transmittanceTex: Texture;

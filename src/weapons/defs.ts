@@ -545,15 +545,8 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
   },
 };
 
-/**
- * Generate the deterministic recoil pattern for a weapon.
- *
- * The shape is what a player learns: a strong vertical climb for the first few
- * shots, then the vertical settles while the muzzle starts to wander sideways
- * in a smooth, repeatable S. Everything comes from one fixed seed so the same
- * weapon always kicks the same way — including in capture mode.
- *
- * @returns {Float32Array} pairs of [pitch, yaw] in radians, length n*2.
+/** Seeded recoil: early vertical climb settles into a repeatable sideways S.
+ * Returns n [pitch, yaw] pairs (n*2 floats) in radians, identical in gameplay and capture mode.
  */
 interface RecoilDefinition {
   recoil: {
