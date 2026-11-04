@@ -16,7 +16,6 @@ export const RADIO_URLS = {
     new URL('./samples/radio/radio-static-3.opus', import.meta.url).href,
   ],
 } as const;
-export type RadioBank = keyof typeof RADIO_URLS;
 export type RadioKind = 'radio_open' | 'radio_strike' | 'intel_call';
 export const RADIO_PARTS = {
   radio_open: ['radio-click', 'radio-static'],
