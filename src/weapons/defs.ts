@@ -546,7 +546,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
 };
 
 /** Seeded recoil: early vertical climb settles into a repeatable sideways S.
- * Returns n*2 [pitch, yaw] pairs in radians, identical in gameplay and capture mode.
+ * Returns n [pitch, yaw] pairs (n*2 floats) in radians, identical in gameplay and capture mode.
  */
 interface RecoilDefinition {
   recoil: {
