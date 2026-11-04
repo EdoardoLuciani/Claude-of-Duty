@@ -2,17 +2,8 @@ import * as THREE from 'three';
 
 import type { Rng } from '../core/rng.ts';
 
-/**
- * Curvature-driven vertex masks.
- *
- * Convex edges get *wear* (paint chipped off, corners rubbed back to the
- * substrate); concave creases get *grime* and extra AO. Baking this per-vertex
- * costs nothing at runtime and is what stops modular kit pieces from reading as
- * clean extruded boxes.
- *
- * Writes a 3-component `color` attribute:  r = wear, g = grime, b = extra AO.
- * All channels default to 0, which the material shader treats as "no effect",
- * so it is always safe to add.
+/** Curvature masks: convex wear, concave grime/AO. Writes color RGB as
+ * wear/grime/extra AO; zero means no effect in the material shader.
  */
 
 /** One triangle's three positions, in doubles — Vector3 arithmetic in disguise. */
@@ -86,17 +77,9 @@ export function bakeMasks(
   const posArr = plainXYZ(pos);
   const nrmArr = plainXYZ(nrm);
 
-  // Hard-edged kit geometry duplicates its vertices per face, so raw vertex
-  // adjacency never crosses an edge and every box would come out perfectly
-  // clean. Cluster by position first so adjacency (and therefore curvature)
-  // spans the seam.
-  //
-  // This used to build a `${x},${y},${z}` string per vertex and hash that,
-  // which was over half of the whole bake (measured: 50-65 ms of the 110-118 ms
-  // this function costs at boot, over 202k vertices). Same grouping, no strings:
-  // hash the quantised triple to an int, chain the buckets, and compare the
-  // quantised coordinates exactly on collision. Cluster ids are still handed
-  // out in first-seen order, so every downstream sum is bit-identical.
+  // Cluster duplicate positions so curvature adjacency spans hard-edge seams.
+  // Hash quantised triples into chained buckets; compare coordinates on collision.
+  // First-seen cluster order preserves downstream floating-point sums.
   const cluster = new Int32Array(count);
   const qx = new Float64Array(count);
   const qy = new Float64Array(count);

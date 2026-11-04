@@ -3,11 +3,9 @@
  */
 
 export const SPEED_OF_SOUND = 343; // m/s, 20 C dry air
-type NoiseKind = 'white' | 'pink' | 'brown' | 'crackle';
+type NoiseKind = 'white' | 'pink';
 type Curve = Float32Array<ArrayBuffer>;
 interface AudioRandom {
-  u32(): number;
-  float(): number;
   signed(): number;
   range(min: number, max: number): number;
 }
@@ -25,8 +23,6 @@ interface ResonatorPartial {
  * Fill a Float32Array with one of the classic noise colours.
  *  white  — flat spectrum, the raw material of cracks and hiss
  *  pink   — -3 dB/oct (Paul Kellet's economy filter), city beds, tails
- *  brown  — -6 dB/oct leaky integrator, wind and rumble
- *  crackle— sparse impulsive grains, debris and foliage
  */
 export function fillNoise(out: Float32Array, kind: NoiseKind, rng: AudioRandom): Float32Array {
   const n = out.length;
@@ -52,40 +48,6 @@ export function fillNoise(out: Float32Array, kind: NoiseKind, rng: AudioRandom):
       }
       break;
     }
-    case 'brown': {
-      let last = 0;
-      for (let i = 0; i < n; i++) {
-        const w = rng.signed();
-        last = (last + 0.019 * w) * 0.9985;
-        out[i] = last * 5.2;
-      }
-      break;
-    }
-    case 'crackle': {
-      out.fill(0);
-      // Poisson-ish grain train; each grain is a decaying two-pole ping so the
-      // buffer already has material character rather than pure clicks.
-      let i = 0;
-      while (i < n) {
-        i += 12 + ((rng.u32() % 260) | 0);
-        if (i >= n) break;
-        const amp = rng.range(0.25, 1) * (rng.float() < 0.12 ? 1.8 : 0.7);
-        const w = rng.range(0.05, 0.45); // radians/sample
-        const dec = Math.exp(-rng.range(0.004, 0.05));
-        let a = amp;
-        for (let k = 0; k < 220 && i + k < n; k++) {
-          out[i + k] += Math.sin(w * k) * a;
-          a *= dec;
-          if (a < 1e-4) break;
-        }
-      }
-      // Keep the peak sane; grains overlap.
-      let peak = 1e-6;
-      for (let k = 0; k < n; k++) peak = Math.max(peak, Math.abs(out[k]));
-      const g = 0.9 / peak;
-      for (let k = 0; k < n; k++) out[k] *= g;
-      break;
-    }
     default:
       for (let i = 0; i < n; i++) out[i] = rng.signed();
   }
@@ -103,7 +65,7 @@ export class NoiseBank {
 
   constructor(actx: BaseAudioContext, rng: AudioRandom, seconds = 2.2) {
     this.actx = actx;
-    const kinds: NoiseKind[] = ['white', 'pink', 'brown', 'crackle'];
+    const kinds: NoiseKind[] = ['white', 'pink'];
     for (const kind of kinds) {
       const len = Math.max(1, Math.floor(actx.sampleRate * seconds));
       const buf = actx.createBuffer(2, len, actx.sampleRate);

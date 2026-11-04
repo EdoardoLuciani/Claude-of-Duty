@@ -32,16 +32,9 @@ function targetCard(target: EventTarget | null): HTMLElement | null {
   return target instanceof Element ? (target.closest('[data-item]') as HTMLElement | null) : null;
 }
 
-/**
- * Between-wave supply shop overlay.
- *
- * A centered modal over a dimmed world. The simulation clock is frozen while
- * the shop is open (see market/index.js), so this overlay — like the
- * game-over screen — animates on raw wall-clock time, never on dt.
- *
- * All cards select an inspection; only explicit purchase buttons buy.
- * The panel stays open
- * until the player explicitly leaves (SKIP or Esc). Number keys do not buy.
+/** Between-wave shop animates on raw wall time while simulation is frozen.
+ * Cards select inspections; only explicit purchase buttons buy. SKIP/Esc leaves;
+ * number keys do not buy.
  */
 export class MarketOverlay {
   ctx: MarketContext;

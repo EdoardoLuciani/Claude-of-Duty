@@ -285,7 +285,6 @@ export class Viewmodel {
   declare _prevPitch: number;
   declare _prevYaw: number;
   declare adsT: number;
-  declare adsTarget: number;
   declare bobPhase: number;
   declare clip: Clip | null;
   declare clipPrevT: number;
@@ -306,7 +305,6 @@ export class Viewmodel {
   declare settle: Spring3;
   declare sprintT: number;
   declare triggerT: number;
-  declare triggerTarget: number;
 
   constructor(ctx: ViewmodelContext, mats: ReticleMaterials) {
     this.ctx = ctx;
@@ -565,13 +563,11 @@ export class Viewmodel {
     this.active = null;
 
     this.adsT = 0;
-    this.adsTarget = 0;
     this.sprintT = 0;
     this.lowReadyT = 0;
     this.bobPhase = 0;
     this.noiseT = 0;
     this.triggerT = 0;
-    this.triggerTarget = 0;
 
     this.lag = new Spring3(5.4, 0.46);
     this.lagRot = new Spring3(6.2, 0.42);
@@ -1171,11 +1167,6 @@ export class Viewmodel {
     this.armL.forePivot.add(this.bandageAsset.wrap, this.bandageAsset.tail);
   }
 
-  /**
-   * @param {number} dt
-   * @param {object} s  { ads, sprint, lowReady, speed, crouch, airborne,
-   *                      trigger, empty }
-   */
   update(dt: number, s: ViewState): void {
     const w = this.active;
     if (!w) return;
@@ -1209,7 +1200,6 @@ export class Viewmodel {
     // Pumping keeps held ADS; its authored handling motion remains additive.
     const wantAds =
       this.clip && this.clip.name !== 'draw' && this.clip.name !== 'pump' ? 0 : s.ads ? 1 : 0;
-    this.adsTarget = wantAds;
     // Linear rate with a smootherstep shaping: a spring here reads as mushy.
     this.adsT = clamp01(this.adsT + (wantAds ? adsRate : -adsRate * 1.25) * dt);
     const ads = smootherstep(0, 1, this.adsT);
@@ -1218,8 +1208,7 @@ export class Viewmodel {
     this.sprintT = damp(this.sprintT, sprintTarget, 9, dt);
     this.lowReadyT = damp(this.lowReadyT, s.lowReady ? 1 : 0, 8, dt);
 
-    this.triggerTarget = s.trigger ? 1 : 0;
-    this.triggerT = damp(this.triggerT, this.triggerTarget, 26, dt);
+    this.triggerT = damp(this.triggerT, s.trigger ? 1 : 0, 26, dt);
 
     const hipP = def.hipPos;
     const hipR = def.hipRot;

@@ -4,7 +4,7 @@ import type { ScoreBar } from './compass.ts';
 import { KILLFEED_CAPACITY } from './killfeed.ts';
 import type { Killfeed } from './killfeed.ts';
 import type { MarketCountdown } from './market.ts';
-import { HUD_TYPE } from './pixi-type.ts';
+import { HUD_TYPE, hudText } from './pixi-type.ts';
 import type { Prompt, Banner } from './prompts.ts';
 import { clamp01 } from './util.ts';
 
@@ -30,18 +30,7 @@ const INK = 0xe7f2ef,
   MUTED = 0xa9bac5,
   AMBER = 0xffb02a;
 function label(value = '', size: number = HUD_TYPE.label, color = INK, x = 0, y = 0): Text {
-  const node = new Text({
-    text: value,
-    style: {
-      fontFamily: 'Arial',
-      fontSize: size,
-      fontWeight: '600',
-      fill: color,
-      stroke: { color: 0x080c10, width: size >= 20 ? 2 : 1, join: 'round' },
-    },
-  });
-  node.position.set(x, y);
-  return node;
+  return hudText(value, x, y, size, color);
 }
 function rect(color: number, alpha = 1): Graphics {
   return new Graphics().rect(0, 0, 1, 1).fill({ color, alpha });

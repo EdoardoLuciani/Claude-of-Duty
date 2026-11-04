@@ -135,7 +135,6 @@ export class M4Animation {
   reviewCase!: THREE.Object3D;
   hands!: Record<HandSide, AuthoredHand>;
   poseQ = new THREE.Quaternion();
-  poseMatrix!: THREE.Matrix4;
   idleTime = 0;
   name: string | null = null;
   wasOpen!: boolean;
@@ -172,7 +171,6 @@ export class M4Animation {
     // physical casing at its original scheduled event, never a duplicate mesh.
     this.reviewCase = node('spent_case');
     this.hands = discoverAuthoredHands(node);
-    this.poseMatrix = this.root.matrix;
     this.reset();
   }
 

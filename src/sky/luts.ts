@@ -35,16 +35,8 @@ import {
 } from './atmosphere-tsl.ts';
 import { hdrTarget, floatTarget, BakePass } from './bake.ts';
 
-/**
- * The three atmosphere LUTs plus a 1x1 ambient probe — TSL port.
- *
- * Cost, measured on an M-series GPU:
- *   transmittance  256x64,  40 steps       ~0.15 ms   once, at boot
- *   multiscatter    32x32,  64 dirs x 20   ~0.9 ms    once, at boot
- *   sky-view       384x192, 40 steps       ~0.6 ms    only when the sun moves
- *   ambient probe    2x1,   64 taps        negligible only when the sun moves
- *
- * Nothing here runs per frame. A static time of day costs zero.
+/** Three atmosphere LUTs and a 2x1 ambient probe. Transmittance and multiscatter
+ * bake at boot or on turbidity changes; sky-view and ambient follow lighting changes.
  */
 
 const MS_STEPS = 20;

@@ -5,7 +5,7 @@ import type { JoinNode } from 'three/webgpu';
 
 import type { RenderSystem } from '../render/index-webgpu.ts';
 import { P } from './atlas.ts';
-import { ParticleLayer, resetSpawn } from './particles.ts';
+import { ParticleLayer, resetSpawn, setSpawnPosition } from './particles.ts';
 
 /**
  * Screen-space refraction: depth-tested distortion sprites accumulate offsets
@@ -151,9 +151,7 @@ export class HazeSystem {
     seed = 0
   ): void {
     const s = resetSpawn();
-    s.x = x;
-    s.y = y;
-    s.z = z;
+    setSpawnPosition(s, x, y, z);
     s.size0 = radius;
     s.size1 = radius * grow;
     s.sizeCurve = 0.5;
@@ -210,13 +208,7 @@ export class HazeSystem {
     }
   }
 
-  /**
-   * Build the TSL warp for a resolved colour texture node. Cache the result:
-   * build it once when the pipeline is assembled, not per frame.
-   *
-   * @param {import('three/tsl').Node} colorNode a texture node (pass output)
-   * @returns {import('three/tsl').Node<vec4>}
-   */
+  /** Warp a resolved colour texture; cache at pipeline assembly, not per frame. */
   warpNode(colorSource: Node<'vec4'> | THREE.Texture): Node<'vec4'> {
     const colorNode =
       colorSource instanceof THREE.Texture ? uniformTexture(colorSource) : colorSource;
