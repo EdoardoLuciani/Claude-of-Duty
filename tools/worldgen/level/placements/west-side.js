@@ -401,7 +401,6 @@ export const westSide = [
     rotationDeg: [178.338546277, -39.182483554, 174.839452941],
     scale: [0.945932535, 0.945932535, 0.945932535],
     masks: [1, 1.299201501, 1],
-    support: 'balcony',
   },
   {
     id: 'box_card_b/0020',
@@ -410,7 +409,6 @@ export const westSide = [
     rotationDeg: [-2.032521312, -9.048552917, -3.243287915],
     scale: [1.122204979, 1.122204979, 1.122204979],
     masks: [1, 1.169528126, 1],
-    support: 'balcony',
   },
   {
     id: 'box_card_b/0033',
@@ -705,7 +703,6 @@ export const westSide = [
     rotationDeg: [-172.491404578, 35.032540672, -178.859877493],
     scale: [1.065715265, 1.065715265, 1.065715265],
     masks: [1, 1.171186832, 1],
-    support: 'balcony',
   },
   {
     id: 'bucket/0009',
@@ -714,7 +711,6 @@ export const westSide = [
     rotationDeg: [84.508200006, -87.903220617, 88.166814332],
     scale: [1.070029249, 1.070029249, 1.070029249],
     masks: [1, 1.365226443, 1],
-    support: 'balcony',
   },
   {
     id: 'bucket/0010',
@@ -723,7 +719,6 @@ export const westSide = [
     rotationDeg: [-1.181128183, 7.30781997, 3.750912708],
     scale: [1.001008548, 1.001008548, 1.001008548],
     masks: [1, 1.2548104, 1],
-    support: 'balcony',
   },
   {
     id: 'bucket/0011',
@@ -732,7 +727,6 @@ export const westSide = [
     rotationDeg: [-173.465424334, -13.651608594, 177.632165106],
     scale: [1.045525668, 1.045525668, 1.045525668],
     masks: [1, 1.287651784, 1],
-    support: 'balcony',
   },
   {
     id: 'bucket/0015',
@@ -2678,7 +2672,6 @@ export const westSide = [
     rotationDeg: [178.331275561, 13.902871269, -178.234804764],
     scale: [0.904077772, 0.904077772, 0.904077772],
     masks: [1, 1.066152002, 1],
-    support: 'balcony',
   },
   {
     id: 'planter/0007',
@@ -2687,7 +2680,6 @@ export const westSide = [
     rotationDeg: [54.55041308, -86.139495905, 56.037804292],
     scale: [0.960582645, 0.960582645, 0.960582645],
     masks: [1, 1.024148049, 1],
-    support: 'balcony',
   },
   {
     id: 'planter/0012',
@@ -3524,7 +3516,6 @@ export const westSide = [
     rotationDeg: [-166.460072308, 79.462983545, 164.299957958],
     scale: [0.938845863, 0.938845863, 0.938845863],
     masks: [1, 1.396183383, 1],
-    support: 'balcony',
   },
   {
     id: 'tyre_small/0015',
@@ -3533,7 +3524,6 @@ export const westSide = [
     rotationDeg: [-11.123964528, 64.078007114, 5.920937147],
     scale: [0.88894651, 0.88894651, 0.88894651],
     masks: [1, 1.074829304, 1],
-    support: 'balcony',
   },
   {
     id: 'tyre_small/0018',

@@ -11,8 +11,8 @@ This directory is authoritative world source; normal builds consume committed
 - [Runtime palette](../../src/world/palette.ts): surface appearance.
 
 Records use level-space metres, degree rotations and unique instance IDs.
-`support: 'balcony'` is diagnostic, not geometry. `placement.js` owns validation,
-transforms/masks and clutter clearance. Preserve record/prototype/RNG order.
+`placement.js` owns validation, transforms/masks and clutter clearance.
+Preserve record/prototype/RNG order.
 
 `build.js` → `Assembler`/`builder.js` → `tools/export-world.mjs` →
 visual GLB, `pack.js` collision and `nav-bake.js` navigation →

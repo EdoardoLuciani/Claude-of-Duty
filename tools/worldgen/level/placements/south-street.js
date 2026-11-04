@@ -287,7 +287,6 @@ export const southStreet = [
     rotationDeg: [121.228214948, 83.754806949, -127.515703073],
     scale: [1.037025385, 1.037025385, 1.037025385],
     masks: [1, 1.180590812, 1],
-    support: 'balcony',
   },
   {
     id: 'box_card_b/0026',
@@ -958,7 +957,6 @@ export const southStreet = [
     rotationDeg: [-1.638396194, -16.353032012, 4.939770962],
     scale: [0.890210648, 0.890210648, 0.890210648],
     masks: [1, 1.212611222, 1],
-    support: 'balcony',
   },
   {
     id: 'bucket/0028',
@@ -1860,7 +1858,6 @@ export const southStreet = [
     rotationDeg: [-8.583517648, 84.276504185, 9.860717741],
     scale: [0.902391919, 0.902391919, 0.902391919],
     masks: [1, 1.063438142, 1],
-    support: 'balcony',
   },
   {
     id: 'jerry_can/0027',
@@ -3174,7 +3171,6 @@ export const southStreet = [
     rotationDeg: [176.198158852, -41.54919018, 176.055881754],
     scale: [0.939255504, 0.939255504, 0.939255504],
     masks: [1, 1.325215296, 1],
-    support: 'balcony',
   },
   {
     id: 'planter/0022',
@@ -3183,7 +3179,6 @@ export const southStreet = [
     rotationDeg: [178.622675468, -20.356793115, 179.318595136],
     scale: [0.816651204, 0.816651204, 0.816651204],
     masks: [1, 1.397438476, 1],
-    support: 'balcony',
   },
 
   // rebar
@@ -4528,7 +4523,6 @@ export const southStreet = [
     rotationDeg: [0, -10.50571604, 0],
     scale: [0.989721528, 0.989721528, 0.989721528],
     masks: [1, 1.187843924, 1],
-    support: 'balcony',
   },
   {
     id: 'stool/0024',
@@ -4537,7 +4531,6 @@ export const southStreet = [
     rotationDeg: [0, 20.437648362, 0],
     scale: [1.030114542, 1.030114542, 1.030114542],
     masks: [1, 1.199278618, 1],
-    support: 'balcony',
   },
 
   // tyre
@@ -4662,7 +4655,6 @@ export const southStreet = [
     rotationDeg: [2.104283159, -44.146196452, 6.646305888],
     scale: [1.084555431, 1.084555431, 1.084555431],
     masks: [1, 1.247509049, 1],
-    support: 'balcony',
   },
 
   // water_tank
