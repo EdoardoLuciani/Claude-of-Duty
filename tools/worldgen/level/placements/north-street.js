@@ -793,7 +793,6 @@ export const northStreet = [
     rotationDeg: [174.562659316, 14.224404297, -176.239704724],
     scale: [1.033071023, 1.033071023, 1.033071023],
     masks: [1, 1.115138747, 1],
-    support: 'balcony',
   },
   {
     id: 'crate_b/0057',
@@ -870,7 +869,6 @@ export const northStreet = [
     rotationDeg: [5.509285503, -65.922124369, 6.997986091],
     scale: [0.905682373, 0.905682373, 0.905682373],
     masks: [1, 1.156285737, 1],
-    support: 'balcony',
   },
 
   // litter
@@ -1567,7 +1565,6 @@ export const northStreet = [
     rotationDeg: [-179.54512402, -42.336626237, -178.243555237],
     scale: [0.956672667, 0.956672667, 0.956672667],
     masks: [1, 1.01765446, 1],
-    support: 'balcony',
   },
   {
     id: 'planter/0016',
@@ -2336,7 +2333,6 @@ export const northStreet = [
     rotationDeg: [-42.356850548, -80.747677311, -46.954729718],
     scale: [0.981513961, 0.981513961, 0.981513961],
     masks: [1, 1.252202895, 1],
-    support: 'balcony',
   },
   {
     id: 'tyre_small/0033',

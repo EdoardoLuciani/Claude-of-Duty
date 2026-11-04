@@ -915,7 +915,6 @@ export const market = [
     rotationDeg: [33.714485049, 80.000775284, -34.350371054],
     scale: [0.936309307, 0.936309307, 0.936309307],
     masks: [1, 1.012782415, 1],
-    support: 'balcony',
   },
   {
     id: 'bucket/0019',
@@ -924,7 +923,6 @@ export const market = [
     rotationDeg: [5.347622693, -27.616991115, 5.561099946],
     scale: [0.834728328, 0.834728328, 0.834728328],
     masks: [1, 1.024693702, 1],
-    support: 'balcony',
   },
 
   // can
@@ -1787,7 +1785,6 @@ export const market = [
     rotationDeg: [-3.230924836, 19.019303211, -3.682430535],
     scale: [1.093244076, 1.093244076, 1.093244076],
     masks: [1, 1.0361875, 1],
-    support: 'balcony',
   },
 
   // jersey
@@ -3300,7 +3297,6 @@ export const market = [
     rotationDeg: [-175.145624611, 51.065569425, 178.430675055],
     scale: [0.86049845, 0.86049845, 0.86049845],
     masks: [1, 1.011740334, 1],
-    support: 'balcony',
   },
 
   // produce
