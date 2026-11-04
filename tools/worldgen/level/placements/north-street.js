@@ -265,14 +265,6 @@ export const northStreet = [
     masks: [1, 1.119499458, 1],
   },
   {
-    id: 'brick_a/0089',
-    prototype: 'brick_a',
-    position: [-6.325165278, 0.154, 26.970594498],
-    rotationDeg: [178.500441789, 34.63157128, -176.049162244],
-    scale: [0.929840754, 0.929840754, 0.929840754],
-    masks: [1, 1.389524907, 1],
-  },
-  {
     id: 'brick_a/0097',
     prototype: 'brick_a',
     position: [-5.789600801, 0.154, 37.466284357],
@@ -339,22 +331,6 @@ export const northStreet = [
     masks: [1, 1.153921498, 1],
   },
   {
-    id: 'brick_b/0081',
-    prototype: 'brick_b',
-    position: [6.356048185, 0.231638116, 33.206121932],
-    rotationDeg: [-15.706103555, 16.18616736, 22.474305834],
-    scale: [0.862424753, 0.862424753, 0.862424753],
-    masks: [1, 1.422833394, 1],
-  },
-  {
-    id: 'brick_b/0082',
-    prototype: 'brick_b',
-    position: [5.995815347, 0.236217041, 33.521212686],
-    rotationDeg: [-68.559691237, 69.040640943, 64.110240329],
-    scale: [0.591333251, 0.591333251, 0.591333251],
-    masks: [1, 1.231847625, 1],
-  },
-  {
     id: 'brick_b/0083',
     prototype: 'brick_b',
     position: [5.745356714, 0.242622103, 40.108837449],
@@ -393,14 +369,6 @@ export const northStreet = [
     rotationDeg: [22.871461388, 80.863019812, -21.480688566],
     scale: [0.978342726, 0.978342726, 0.978342726],
     masks: [1, 1.31400813, 1],
-  },
-  {
-    id: 'brick_b/0141',
-    prototype: 'brick_b',
-    position: [5.551717493, 0.154, 33.211644775],
-    rotationDeg: [-2.282514655, -18.032234104, 0.880198584],
-    scale: [1.143308403, 1.143308403, 1.143308403],
-    masks: [1, 1.362106205, 1],
   },
   {
     id: 'brick_b/0142',
@@ -703,14 +671,6 @@ export const northStreet = [
     masks: [1, 1.139182717, 1],
   },
   {
-    id: 'cinder/0109',
-    prototype: 'cinder',
-    position: [6.178447691, 0.16, 33.446126725],
-    rotationDeg: [0, -76.985719999, 0],
-    scale: [0.670770678, 0.670770678, 0.670770678],
-    masks: [1, 1.069519905, 1],
-  },
-  {
     id: 'cinder/0112',
     prototype: 'cinder',
     position: [-5.062781386, 0.16, 34.074009569],
@@ -835,13 +795,6 @@ export const northStreet = [
     rotationDeg: [-180, -74.018321044, -180],
     scale: [0.31570198, 1, 0.31570198],
   },
-  {
-    id: 'dust_skirt/0129',
-    prototype: 'dust_skirt',
-    position: [5.242424975, 0.135, 32.076382488],
-    rotationDeg: [0, -16.988837355, 0],
-    scale: [0.283535595, 1, 0.283535595],
-  },
 
   // glass_shards
   {
@@ -903,14 +856,6 @@ export const northStreet = [
     rotationDeg: [0, 2.287551742, 0],
     scale: [0.670088396, 0.670088396, 0.670088396],
     masks: [1, 1.139893247, 1],
-  },
-  {
-    id: 'litter/0128',
-    prototype: 'litter',
-    position: [-6.127509759, 0.16, 27.906787693],
-    rotationDeg: [0, 36.662790752, 0],
-    scale: [0.743543865, 0.743543865, 0.743543865],
-    masks: [1, 1.402394177, 1],
   },
   {
     id: 'litter/0130',
@@ -1001,14 +946,6 @@ export const northStreet = [
     masks: [1, 1.238674587, 1],
   },
   {
-    id: 'litter/0186',
-    prototype: 'litter',
-    position: [-5.415851684, 0.16, 27.564818036],
-    rotationDeg: [0, 69.364577309, 0],
-    scale: [0.942838951, 0.942838951, 0.942838951],
-    masks: [1, 1.381357472, 1],
-  },
-  {
     id: 'litter/0191',
     prototype: 'litter',
     position: [5.818978291, 0.16, 39.076030383],
@@ -1023,14 +960,6 @@ export const northStreet = [
     rotationDeg: [0, -17.677396863, 0],
     scale: [0.655634979, 0.655634979, 0.655634979],
     masks: [1, 1.274543342, 1],
-  },
-  {
-    id: 'litter/0214',
-    prototype: 'litter',
-    position: [-6.291703795, 0.16, 27.583517284],
-    rotationDeg: [-180, 43.4637737, -180],
-    scale: [1.171925914, 1.171925914, 1.171925914],
-    masks: [1, 1.329416823, 1],
   },
   {
     id: 'litter/0221',
@@ -1265,22 +1194,6 @@ export const northStreet = [
     masks: [1, 1.5, 1],
   },
   {
-    id: 'litter/0381',
-    prototype: 'litter',
-    position: [6.386443826, 0.165, 33.258065299],
-    rotationDeg: [0, 89.243541547, 0],
-    scale: [0.965339208, 0.965339208, 0.965339208],
-    masks: [1, 1.5, 1],
-  },
-  {
-    id: 'litter/0382',
-    prototype: 'litter',
-    position: [6.236963475, 0.165, 34.034455056],
-    rotationDeg: [0, -60.33287115, 0],
-    scale: [1.03472751, 1.03472751, 1.03472751],
-    masks: [1, 1.5, 1],
-  },
-  {
     id: 'litter/0397',
     prototype: 'litter',
     position: [5.842888934, 0.165, 43.460180366],
@@ -1377,14 +1290,6 @@ export const northStreet = [
     masks: [1, 1.5, 1],
   },
   {
-    id: 'litter/0481',
-    prototype: 'litter',
-    position: [6.374293325, 0.165, 31.844408951],
-    rotationDeg: [-180, -86.072485031, -180],
-    scale: [0.999180537, 0.999180537, 0.999180537],
-    masks: [1, 1.5, 1],
-  },
-  {
     id: 'litter/0482',
     prototype: 'litter',
     position: [5.926762134, 0.165, 41.982210153],
@@ -1472,14 +1377,6 @@ export const northStreet = [
     scale: [0.729849575, 0.729849575, 0.729849575],
     masks: [1, 1.5, 1],
   },
-  {
-    id: 'litter/0504',
-    prototype: 'litter',
-    position: [6.426682918, 0.165, 33.546542979],
-    rotationDeg: [-180, -52.096219054, -180],
-    scale: [1.128926659, 1.128926659, 1.128926659],
-    masks: [1, 1.5, 1],
-  },
 
   // plank_a
   {
@@ -1489,14 +1386,6 @@ export const northStreet = [
     rotationDeg: [2.580132472, -42.474924033, 2.009363073],
     scale: [0.673539137, 0.673539137, 0.673539137],
     masks: [1, 1.4, 1],
-  },
-  {
-    id: 'plank_a/0008',
-    prototype: 'plank_a',
-    position: [6.309018376, 0.156, 32.568280944],
-    rotationDeg: [3.60608741, -32.763452064, -0.739431716],
-    scale: [1.197121044, 1.197121044, 1.197121044],
-    masks: [1, 1.089789385, 1],
   },
   {
     id: 'plank_a/0013',
@@ -1765,14 +1654,6 @@ export const northStreet = [
     masks: [1, 1.220288307, 1],
   },
   {
-    id: 'rock_b/0098',
-    prototype: 'rock_b',
-    position: [-4.597694877, 0.165, 28.641584298],
-    rotationDeg: [0, -45.383732493, 0],
-    scale: [1.002127529, 1.002127529, 1.002127529],
-    masks: [1, 1.4, 1],
-  },
-  {
     id: 'rock_b/0108',
     prototype: 'rock_b',
     position: [-5.527468999, 0.176556161, 46.885626002],
@@ -1797,14 +1678,6 @@ export const northStreet = [
     masks: [1, 1.41758093, 1],
   },
   {
-    id: 'rock_b/0159',
-    prototype: 'rock_b',
-    position: [-6.195135247, 0.16, 28.606915158],
-    rotationDeg: [0, -27.149315205, 0],
-    scale: [0.71864181, 0.71864181, 0.71864181],
-    masks: [1, 1.324503566, 1],
-  },
-  {
     id: 'rock_b/0161',
     prototype: 'rock_b',
     position: [-6.161809478, 0.16, 40.381455037],
@@ -1813,28 +1686,12 @@ export const northStreet = [
     masks: [1, 1.215236902, 1],
   },
   {
-    id: 'rock_b/0164',
-    prototype: 'rock_b',
-    position: [5.751481552, 0.16, 34.159999074],
-    rotationDeg: [-180, -70.392428074, -180],
-    scale: [0.961980147, 0.961980147, 0.961980147],
-    masks: [1, 1.163447553, 1],
-  },
-  {
     id: 'rock_b/0166',
     prototype: 'rock_b',
     position: [5.662185716, 0.16, 28.213856222],
     rotationDeg: [-180, -80.511743362, -180],
     scale: [1.001394303, 1.001394303, 1.001394303],
     masks: [1, 1.062968803, 1],
-  },
-  {
-    id: 'rock_b/0168',
-    prototype: 'rock_b',
-    position: [-5.394260473, 0.16, 26.992193038],
-    rotationDeg: [0, 66.369040006, 0],
-    scale: [1.064615808, 1.064615808, 1.064615808],
-    masks: [1, 1.224301484, 1],
   },
   {
     id: 'rock_b/0170',
@@ -2167,14 +2024,6 @@ export const northStreet = [
     masks: [1, 1.250365415, 1],
   },
   {
-    id: 'shrub/0057',
-    prototype: 'shrub',
-    position: [4.528773249, 0.155, 33.205920738],
-    rotationDeg: [0, 68.884185377, 0],
-    scale: [0.969267814, 0.969267814, 0.969267814],
-    masks: [1, 1.381795914, 1],
-  },
-  {
     id: 'shrub/0063',
     prototype: 'shrub',
     position: [-4.537744083, 0.155, 36.283198414],
@@ -2353,14 +2202,6 @@ export const northStreet = [
 
   // weeds
   {
-    id: 'weeds/0042',
-    prototype: 'weeds',
-    position: [-5.260355199, 0.16, 27.859494195],
-    rotationDeg: [0, 0.824500046, 0],
-    scale: [0.927812425, 0.927812425, 0.927812425],
-    masks: [1, 1.329797629, 1],
-  },
-  {
     id: 'weeds/0050',
     prototype: 'weeds',
     position: [5.65120471, 0.16, 24.225255326],
@@ -2391,14 +2232,6 @@ export const northStreet = [
     rotationDeg: [0, -14.980385695, 0],
     scale: [0.799137518, 0.799137518, 0.799137518],
     masks: [1, 1.270878151, 1],
-  },
-  {
-    id: 'weeds/0065',
-    prototype: 'weeds',
-    position: [-6.262017219, 0.16, 27.325082678],
-    rotationDeg: [-180, -28.862395414, -180],
-    scale: [1.064226506, 1.064226506, 1.064226506],
-    masks: [1, 1.279595376, 1],
   },
   {
     id: 'weeds/0074',
@@ -2465,14 +2298,6 @@ export const northStreet = [
     masks: [1, 1.178233522, 1],
   },
   {
-    id: 'weeds/0131',
-    prototype: 'weeds',
-    position: [4.641206729, 0.155, 31.816981221],
-    rotationDeg: [-180, -19.403559029, -180],
-    scale: [0.755945116, 0.755945116, 0.755945116],
-    masks: [1, 1.294793467, 1],
-  },
-  {
     id: 'weeds/0133',
     prototype: 'weeds',
     position: [6.329136767, 0.155, 25.020488956],
@@ -2529,28 +2354,12 @@ export const northStreet = [
     masks: [1, 1.262358794, 1],
   },
   {
-    id: 'weeds/0163',
-    prototype: 'weeds',
-    position: [-6.28495057, 0.155, 27.239779749],
-    rotationDeg: [0, 7.136363566, 0],
-    scale: [0.630086056, 0.630086056, 0.630086056],
-    masks: [1, 1.216660202, 1],
-  },
-  {
     id: 'weeds/0167',
     prototype: 'weeds',
     position: [4.616861166, 0.155, 40.652065733],
     rotationDeg: [0, 22.213302411, 0],
     scale: [0.674165461, 0.674165461, 0.674165461],
     masks: [1, 1.026485712, 1],
-  },
-  {
-    id: 'weeds/0172',
-    prototype: 'weeds',
-    position: [-4.635276459, 0.155, 29.417064888],
-    rotationDeg: [-180, 39.600193159, -180],
-    scale: [0.825584292, 0.825584292, 0.825584292],
-    masks: [1, 1.383010826, 1],
   },
   {
     id: 'weeds/0177',
@@ -2575,14 +2384,6 @@ export const northStreet = [
     rotationDeg: [-180, -76.164269197, -180],
     scale: [1.243113009, 1.243113009, 1.243113009],
     masks: [1, 1.168144023, 1],
-  },
-  {
-    id: 'weeds/0189',
-    prototype: 'weeds',
-    position: [-4.55242761, 0.155, 28.176824905],
-    rotationDeg: [-180, -35.529669675, -180],
-    scale: [0.789856661, 0.789856661, 0.789856661],
-    masks: [1, 1.109646623, 1],
   },
   {
     id: 'weeds/0190',
