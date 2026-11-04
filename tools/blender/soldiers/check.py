@@ -1,4 +1,4 @@
-"""Strict pilot payload checks (stdlib Python, no Blender or baseline meshes).
+"""Strict native soldier payload checks (stdlib Python, no Blender or baseline meshes).
 
 python tools/blender/soldiers/check.py ABS_REFERENCE ABS_PAYLOAD [SAME_SEED SECOND_SEED]
 """
@@ -13,9 +13,10 @@ def check(reference, path):
     payload = json.loads(path.read_text())
     mesh = payload['mesh']
     count = payload['stats']['vertices']
-    assert payload['version'] == 1 and payload['name'] == 'vanguard'
+    assert payload['version'] == 1 and payload['name'] in ('vanguard', 'irregular', 'breacher')
+    assert isinstance(payload['seed'], int) and 0 <= payload['seed'] <= 0xffffffff
     assert payload['slots'] == reference['slots']
-    assert payload['variant'] == reference['variants']['vanguard']
+    assert payload['variant'] == reference['variants'][payload['name']]
     assert len(reference['rig']['names']) == 25
     for attr, size in [('position', 3), ('normal', 3), ('uv', 2), ('color', 3),
                        ('skinIndex', 4), ('skinWeight', 4)]:
@@ -50,7 +51,8 @@ def check(reference, path):
         assert len(set(j for j, w in zip(joints, weights) if w > 0)) == sum(w > 0 for w in weights)
     # Weapon surfaces are real geometry and rigid HandR, not armature-order indices.
     hand = reference['rig']['names'].index('HandR')
-    for slot in ('steel', 'glass', 'polymer'):
+    slots = ('steel', 'polymer', 'glass') if payload['variant']['weapon'] == 'carbine' else ('steel', 'polymer')
+    for slot in slots:
         rigid_hand = 0
         for vertex in surfaces[reference['slots'].index(slot)]:
             js = mesh['skinIndex'][vertex*4:vertex*4+4]
@@ -65,13 +67,32 @@ def check(reference, path):
     muzzle, stock = payload['weapon']['muzzle'], payload['weapon']['stockTop']
     bore = reference['rig']['boreDir']
     delta = [muzzle[i]-stock[i] for i in range(3)]
-    assert abs(sum(delta[i]*bore[i] for i in range(3))-.665) < 2e-6
-    assert math.dist(delta, [v*.665 for v in bore]) < 2e-6
+    span = .730 if payload['variant']['weapon'] == 'ak' else .665
+    assert abs(sum(delta[i]*bore[i] for i in range(3))-span) < 2e-6
+    assert math.dist(delta, [v*span for v in bore]) < 2e-6
+    # Every socket must remain near the same rigid HandR geometry it describes.
+    weapon_vertices = {i for surface in surfaces for i in surface
+                       if mesh['skinIndex'][i*4] == hand and mesh['skinWeight'][i*4] == 1}
+    edges = set()
+    for start in range(0, len(mesh['index']), 3):
+        triangle = mesh['index'][start:start+3]
+        if all(i in weapon_vertices for i in triangle):
+            edges.update(tuple(sorted((triangle[j], triangle[(j+1)%3]))) for j in range(3))
+    def edge_distance(point, edge):
+        a, b = [mesh['position'][i*3:i*3+3] for i in edge]
+        d = [b[i]-a[i] for i in range(3)]
+        length2 = sum(v*v for v in d)
+        t = max(0, min(1, sum((point[i]-a[i])*d[i] for i in range(3))/length2)) if length2 else 0
+        return math.dist(point, [a[i]+d[i]*t for i in range(3)])
+    for name, point in payload['weapon'].items():
+        nearest = min(edge_distance(point, edge) for edge in edges)
+        assert nearest < .045, (name, nearest)
     # Actor bind-space bounds/contact sanity, not a baseline golden oracle.
     axes = [mesh['position'][i::3] for i in range(3)]
     bounds = [[min(axis), max(axis)] for axis in axes]
     assert abs(bounds[1][0]) < .005 and 1.79 < bounds[1][1] < 1.86, bounds
-    result = {'path': str(path), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
+    result = {'path': str(path), 'name': payload['name'], 'seed': payload['seed'],
+              'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
               **payload['stats'], 'groups': [g['count'] for g in mesh['groups']], 'bounds': bounds}
     print(json.dumps(result))
     return payload
@@ -82,10 +103,12 @@ def main():
     reference = json.loads(paths[0].read_text())
     first = check(reference, paths[1])
     if len(paths) > 2:
-        check(reference, paths[2])
+        repeat = check(reference, paths[2])
+        assert repeat['name'] == first['name'] and repeat['seed'] == first['seed']
         assert paths[1].read_bytes() == paths[2].read_bytes(), 'same-seed nondeterminism'
     if len(paths) > 3:
         second = check(reference, paths[3])
+        assert first['name'] == second['name'] and first['seed'] != second['seed']
         assert first['mesh'] != second['mesh'], 'second seed did not change geometry/tints'
         assert first['weapon'] == second['weapon'], 'seed changed weapon calibration'
     print('PASS: finite attributes, topology, disjoint slots, weights, rig indices, weapon, determinism')
