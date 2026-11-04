@@ -1,0 +1,84 @@
+{
+  "name": "vanguard",
+  "slots": [
+    "cloth",
+    "gear",
+    "boot",
+    "rubber",
+    "plate",
+    "polymer",
+    "skin",
+    "glass",
+    "steel"
+  ],
+  "weapon": {
+    "muzzle": [
+      -0.06655006110668182,
+      1.3276416063308716,
+      0.6302603483200073
+    ],
+    "foregrip": [
+      -0.09684067219495773,
+      1.3035138845443726,
+      0.3668636977672577
+    ],
+    "magBottom": [
+      -0.11644021421670914,
+      1.1197936534881592,
+      0.1964329183101654
+    ],
+    "ejection": [
+      -0.13772450387477875,
+      1.3825863599777222,
+      0.20391741394996643
+    ],
+    "stockTop": [
+      -0.14215217530727386,
+      1.3933825492858887,
+      -0.02714931033551693
+    ]
+  },
+  "stats": {
+    "vertices": 24742,
+    "triangles": 21604
+  },
+  "variant": {
+    "camo": "arid",
+    "clothTint": [
+      1.03,
+      1,
+      0.94
+    ],
+    "gearTint": [
+      1.08,
+      0.98,
+      0.8
+    ],
+    "plateTint": [
+      1.02,
+      0.96,
+      0.84
+    ],
+    "skinTint": [
+      1,
+      0.94,
+      0.88
+    ],
+    "helmet": true,
+    "helmetCover": true,
+    "helmetTint": [
+      0.72,
+      0.72,
+      0.68
+    ],
+    "goggles": true,
+    "gogglesDown": true,
+    "faceWrap": true,
+    "beard": false,
+    "kneePads": true,
+    "fullCarrier": true,
+    "weapon": "carbine",
+    "bulk": 1,
+    "scale": 1
+  }
+}
