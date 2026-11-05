@@ -1,4 +1,4 @@
-import type { ElementPool, PoolRecord } from './pool-types.ts';
+import type { PoolRecord } from './util.ts';
 import { Pool, ease, clamp01 } from './util.ts';
 
 export const R_IN = 13; // well outside the reticle blades, so the two never merge
@@ -47,10 +47,10 @@ export class Hitmarkers {
       ringAlpha: 0,
     })
   );
-  readonly pool: ElementPool<null> = new Pool(10, (): null => null);
+  readonly pool = new Pool(10);
 
   /** @param {'hit'|'armour'|'head'|'kill'} kind */
-  spawn(kind: HitmarkerKind = 'hit'): PoolRecord<null> {
+  spawn(kind: HitmarkerKind = 'hit'): PoolRecord {
     const k = KINDS[kind] ?? KINDS.hit;
     const it = this.pool.acquire();
     it.life = k.life;
@@ -65,13 +65,8 @@ export class Hitmarkers {
     const items = this.pool.items;
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
-      if (!it.alive) continue;
-      it.t += dt;
+      if (!this.pool.advance(it, dt)) continue;
       const u = it.t / it.life;
-      if (u >= 1) {
-        this.pool.release(it);
-        continue;
-      }
       // snap in over the first 34% of life, then hold, then fall off
       const inT = clamp01(u / 0.34);
       const scale = it.a * (0.62 + 0.38 * ease.outBack(inT));

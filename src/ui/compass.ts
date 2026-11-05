@@ -21,7 +21,7 @@ export class Compass {
     x: 0,
     alpha: 0,
   }));
-  readonly pingPool = new Pool(8, (): null => null);
+  readonly pingPool = new Pool(8);
   ping(bearing: number): void {
     const it = this.pingPool.acquire();
     it.a = bearing;
@@ -31,12 +31,7 @@ export class Compass {
     this.heading = ((heading % 360) + 360) % 360;
     for (let i = 0; i < this.pingPool.items.length; i++) {
       const it = this.pingPool.items[i];
-      if (!it.alive) continue;
-      it.t += dt;
-      if (it.t >= it.life) {
-        this.pingPool.release(it);
-        continue;
-      }
+      if (!this.pingPool.advance(it, dt)) continue;
       let rel = it.a - this.heading;
       while (rel > 180) rel -= 360;
       while (rel < -180) rel += 360;
