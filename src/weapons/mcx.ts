@@ -6,7 +6,8 @@ import manifest from '../../assets/weapons/mcx-virtus/manifest.json' with { type
 import { isSkinnedMesh } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
-import { authoredModel } from './authored-model.ts';
+import { disposeAuthoredMixer } from './authored-actions.ts';
+import { authoredModel, type AuthoredModelData, type AuthoredNodes } from './authored-model.ts';
 import { buildEquipClips, buildMagazineClips } from './clips.ts';
 import { smootherstep } from './mathx.ts';
 import { configureMCXFinishes } from './mcx-finishes.ts';
@@ -117,17 +118,9 @@ function handQuaternion(
 }
 
 /** Baked rigid-part animation under the shared movement/ADS/arm rig. */
-type MCXModel = {
-  materials: Set<THREE.Material>;
-  textures: Set<THREE.Texture>;
-  id: 'mcx';
-  scene: THREE.Group;
-  root: THREE.Object3D;
-  animations: THREE.AnimationClip[];
-  nodes: {
-    muzzle: [number, number, number];
-    eject: [number, number, number];
-    sight: [number, number, number];
+type MCXModel = AuthoredModelData<
+  'mcx',
+  AuthoredNodes & {
     ejectDir: [number, number, number];
     gripR: {
       pos: [number, number, number];
@@ -153,10 +146,8 @@ type MCXModel = {
       center: [number, number, number];
       apertureR: number;
     };
-  };
-  shell: { caseLen: number; rimR: number };
-  magSize: { len: number };
-};
+  }
+>;
 type MCXDefinition = Parameters<typeof buildEquipClips>[1];
 export class MCXAnimation {
   model!: MCXModel;
@@ -334,8 +325,7 @@ export class MCXAnimation {
   }
 
   dispose(): void {
-    this.mixer.stopAllAction();
-    this.mixer.uncacheRoot(this.root);
+    disposeAuthoredMixer(this);
     for (const skeleton of this.skeletons) skeleton.dispose();
     this.skeletons.clear();
     disposeWeaponMaterials(this.model);

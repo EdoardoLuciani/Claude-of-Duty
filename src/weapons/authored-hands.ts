@@ -1,16 +1,14 @@
 import * as THREE from 'three';
 
+import type { Arm } from './hands.ts';
+
 export type HandSide = 'left' | 'right';
 export interface AuthoredHand {
   wrist: THREE.Object3D;
   fingers: { root: THREE.Object3D; joints: THREE.Object3D[] }[];
   thumb: THREE.Object3D[];
 }
-export interface HandRig {
-  fingers: { root: THREE.Object3D; joints: THREE.Object3D[] }[];
-  thumb: { root: THREE.Object3D; joints: THREE.Object3D[] };
-  updateFlex(): void;
-}
+export type HandRig = Pick<Arm, 'fingers' | 'thumb' | 'updateFlex'>;
 
 export function discoverAuthoredHands(
   node: (name: string) => THREE.Object3D
@@ -33,14 +31,20 @@ export function discoverAuthoredHands(
   return { left: hand('L'), right: hand('R') };
 }
 
+interface AuthoredHandsState {
+  root: THREE.Object3D;
+  hands: Record<HandSide, AuthoredHand>;
+}
+
 export function authoredHandTarget(
-  root: THREE.Object3D,
-  hand: AuthoredHand,
+  this: AuthoredHandsState,
+  side: HandSide,
   position: THREE.Vector3,
   quaternion: THREE.Quaternion
 ): void {
-  position.copy(hand.wrist.position).applyMatrix4(root.matrix);
-  quaternion.copy(root.quaternion).multiply(hand.wrist.quaternion);
+  const hand = this.hands[side];
+  position.copy(hand.wrist.position).applyMatrix4(this.root.matrix);
+  quaternion.copy(this.root.quaternion).multiply(hand.wrist.quaternion);
 }
 
 export function applyAuthoredHand(arm: HandRig, authored: AuthoredHand): void {
@@ -52,4 +56,9 @@ export function applyAuthoredHand(arm: HandRig, authored: AuthoredHand): void {
   arm.thumb.root.quaternion.copy(authored.thumb[0].quaternion);
   for (let j = 0; j < 2; j++) arm.thumb.joints[j].quaternion.copy(authored.thumb[j + 1].quaternion);
   arm.updateFlex();
+}
+
+export function applyAuthoredHands(this: AuthoredHandsState, left: HandRig, right: HandRig): void {
+  applyAuthoredHand(left, this.hands.left);
+  applyAuthoredHand(right, this.hands.right);
 }
