@@ -1,83 +1,23 @@
+import { recordingUrls } from './recordings.ts';
 /** Required recorded combat foley; source crops and design limits live beside the assets. */
 import { clamp } from './dsp.ts';
 
 export const COMBAT_URLS = {
-  whizz: [
-    new URL('./samples/combat/whizz-1.opus', import.meta.url).href,
-    new URL('./samples/combat/whizz-2.opus', import.meta.url).href,
-    new URL('./samples/combat/whizz-3.opus', import.meta.url).href,
-    new URL('./samples/combat/whizz-4.opus', import.meta.url).href,
-    new URL('./samples/combat/whizz-5.opus', import.meta.url).href,
-  ],
-  'casing-concrete': [
-    new URL('./samples/combat/casing-concrete-1.opus', import.meta.url).href,
-    new URL('./samples/combat/casing-concrete-2.opus', import.meta.url).href,
-    new URL('./samples/combat/casing-concrete-3.opus', import.meta.url).href,
-  ],
-  'casing-metal': [
-    new URL('./samples/combat/casing-metal-1.opus', import.meta.url).href,
-    new URL('./samples/combat/casing-metal-2.opus', import.meta.url).href,
-    new URL('./samples/combat/casing-metal-3.opus', import.meta.url).href,
-  ],
-  'casing-wood': [
-    new URL('./samples/combat/casing-wood-1.opus', import.meta.url).href,
-    new URL('./samples/combat/casing-wood-2.opus', import.meta.url).href,
-    new URL('./samples/combat/casing-wood-3.opus', import.meta.url).href,
-  ],
-  'casing-earth': [
-    new URL('./samples/combat/casing-earth-1.opus', import.meta.url).href,
-    new URL('./samples/combat/casing-earth-2.opus', import.meta.url).href,
-    new URL('./samples/combat/casing-earth-3.opus', import.meta.url).href,
-  ],
-  'casing-foliage': [
-    new URL('./samples/combat/casing-foliage-1.opus', import.meta.url).href,
-    new URL('./samples/combat/casing-foliage-2.opus', import.meta.url).href,
-  ],
-  'casing-soft': [
-    new URL('./samples/combat/casing-soft-1.opus', import.meta.url).href,
-    new URL('./samples/combat/casing-soft-2.opus', import.meta.url).href,
-    new URL('./samples/combat/casing-soft-3.opus', import.meta.url).href,
-  ],
-  'casing-water': [
-    new URL('./samples/combat/casing-water-1.opus', import.meta.url).href,
-    new URL('./samples/combat/casing-water-2.opus', import.meta.url).href,
-    new URL('./samples/combat/casing-water-3.opus', import.meta.url).href,
-  ],
-  'dry-ar': [
-    new URL('./samples/combat/dry-ar-1.opus', import.meta.url).href,
-    new URL('./samples/combat/dry-ar-2.opus', import.meta.url).href,
-    new URL('./samples/combat/dry-ar-3.opus', import.meta.url).href,
-  ],
-  'dry-ak': [
-    new URL('./samples/combat/dry-ak-1.opus', import.meta.url).href,
-    new URL('./samples/combat/dry-ak-2.opus', import.meta.url).href,
-    new URL('./samples/combat/dry-ak-3.opus', import.meta.url).href,
-  ],
-  'dry-pistol': [
-    new URL('./samples/combat/dry-pistol-1.opus', import.meta.url).href,
-    new URL('./samples/combat/dry-pistol-2.opus', import.meta.url).href,
-    new URL('./samples/combat/dry-pistol-3.opus', import.meta.url).href,
-  ],
-  'dry-smg': [
-    new URL('./samples/combat/dry-smg-1.opus', import.meta.url).href,
-    new URL('./samples/combat/dry-smg-2.opus', import.meta.url).href,
-    new URL('./samples/combat/dry-smg-3.opus', import.meta.url).href,
-  ],
-  'dry-bolt': [
-    new URL('./samples/combat/dry-bolt-1.opus', import.meta.url).href,
-    new URL('./samples/combat/dry-bolt-2.opus', import.meta.url).href,
-    new URL('./samples/combat/dry-bolt-3.opus', import.meta.url).href,
-  ],
-  'dry-shotgun': [
-    new URL('./samples/combat/dry-shotgun-1.opus', import.meta.url).href,
-    new URL('./samples/combat/dry-shotgun-2.opus', import.meta.url).href,
-    new URL('./samples/combat/dry-shotgun-3.opus', import.meta.url).href,
-  ],
-  'grenade-throw': [
-    new URL('./samples/combat/grenade-throw-1.opus', import.meta.url).href,
-    new URL('./samples/combat/grenade-throw-2.opus', import.meta.url).href,
-    new URL('./samples/combat/grenade-throw-3.opus', import.meta.url).href,
-  ],
+  whizz: recordingUrls('combat/whizz', 5),
+  'casing-concrete': recordingUrls('combat/casing-concrete', 3),
+  'casing-metal': recordingUrls('combat/casing-metal', 3),
+  'casing-wood': recordingUrls('combat/casing-wood', 3),
+  'casing-earth': recordingUrls('combat/casing-earth', 3),
+  'casing-foliage': recordingUrls('combat/casing-foliage', 2),
+  'casing-soft': recordingUrls('combat/casing-soft', 3),
+  'casing-water': recordingUrls('combat/casing-water', 3),
+  'dry-ar': recordingUrls('combat/dry-ar', 3),
+  'dry-ak': recordingUrls('combat/dry-ak', 3),
+  'dry-pistol': recordingUrls('combat/dry-pistol', 3),
+  'dry-smg': recordingUrls('combat/dry-smg', 3),
+  'dry-bolt': recordingUrls('combat/dry-bolt', 3),
+  'dry-shotgun': recordingUrls('combat/dry-shotgun', 3),
+  'grenade-throw': recordingUrls('combat/grenade-throw', 3),
 } as const;
 export type CombatKind = keyof typeof COMBAT_URLS;
 export const COMBAT_MIX = {

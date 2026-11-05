@@ -1,3 +1,4 @@
+import { recordingUrls } from './recordings.ts';
 /** Offline-authored speech. Actor IDs select a stable cast member, never a pitch shift. */
 import type { AiCalloutKind } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
@@ -7,66 +8,18 @@ import type { SpatialField } from './spatial.ts';
 
 export const CALLOUT_CAST = ['orus', 'algenib', 'alnilam', 'iapetus'] as const;
 export const CALLOUT_URLS = {
-  'orus-spot': [
-    new URL('./samples/callouts/orus-spot-1.opus', import.meta.url).href,
-    new URL('./samples/callouts/orus-spot-2.opus', import.meta.url).href,
-    new URL('./samples/callouts/orus-spot-3.opus', import.meta.url).href,
-  ],
-  'orus-reload': [
-    new URL('./samples/callouts/orus-reload-1.opus', import.meta.url).href,
-    new URL('./samples/callouts/orus-reload-2.opus', import.meta.url).href,
-    new URL('./samples/callouts/orus-reload-3.opus', import.meta.url).href,
-  ],
-  'orus-grenade': [
-    new URL('./samples/callouts/orus-grenade-1.opus', import.meta.url).href,
-    new URL('./samples/callouts/orus-grenade-2.opus', import.meta.url).href,
-    new URL('./samples/callouts/orus-grenade-3.opus', import.meta.url).href,
-  ],
-  'algenib-spot': [
-    new URL('./samples/callouts/algenib-spot-1.opus', import.meta.url).href,
-    new URL('./samples/callouts/algenib-spot-2.opus', import.meta.url).href,
-    new URL('./samples/callouts/algenib-spot-3.opus', import.meta.url).href,
-  ],
-  'algenib-reload': [
-    new URL('./samples/callouts/algenib-reload-1.opus', import.meta.url).href,
-    new URL('./samples/callouts/algenib-reload-2.opus', import.meta.url).href,
-    new URL('./samples/callouts/algenib-reload-3.opus', import.meta.url).href,
-  ],
-  'algenib-grenade': [
-    new URL('./samples/callouts/algenib-grenade-1.opus', import.meta.url).href,
-    new URL('./samples/callouts/algenib-grenade-2.opus', import.meta.url).href,
-    new URL('./samples/callouts/algenib-grenade-3.opus', import.meta.url).href,
-  ],
-  'alnilam-spot': [
-    new URL('./samples/callouts/alnilam-spot-1.opus', import.meta.url).href,
-    new URL('./samples/callouts/alnilam-spot-2.opus', import.meta.url).href,
-    new URL('./samples/callouts/alnilam-spot-3.opus', import.meta.url).href,
-  ],
-  'alnilam-reload': [
-    new URL('./samples/callouts/alnilam-reload-1.opus', import.meta.url).href,
-    new URL('./samples/callouts/alnilam-reload-2.opus', import.meta.url).href,
-    new URL('./samples/callouts/alnilam-reload-3.opus', import.meta.url).href,
-  ],
-  'alnilam-grenade': [
-    new URL('./samples/callouts/alnilam-grenade-1.opus', import.meta.url).href,
-    new URL('./samples/callouts/alnilam-grenade-2.opus', import.meta.url).href,
-    new URL('./samples/callouts/alnilam-grenade-3.opus', import.meta.url).href,
-  ],
-  'iapetus-spot': [
-    new URL('./samples/callouts/iapetus-spot-1.opus', import.meta.url).href,
-    new URL('./samples/callouts/iapetus-spot-2.opus', import.meta.url).href,
-    new URL('./samples/callouts/iapetus-spot-3.opus', import.meta.url).href,
-  ],
-  'iapetus-reload': [
-    new URL('./samples/callouts/iapetus-reload-1.opus', import.meta.url).href,
-    new URL('./samples/callouts/iapetus-reload-2.opus', import.meta.url).href,
-    new URL('./samples/callouts/iapetus-reload-3.opus', import.meta.url).href,
-  ],
-  'iapetus-grenade': [
-    new URL('./samples/callouts/iapetus-grenade-1.opus', import.meta.url).href,
-    new URL('./samples/callouts/iapetus-grenade-2.opus', import.meta.url).href,
-    new URL('./samples/callouts/iapetus-grenade-3.opus', import.meta.url).href,
-  ],
+  'orus-spot': recordingUrls('callouts/orus-spot', 3),
+  'orus-reload': recordingUrls('callouts/orus-reload', 3),
+  'orus-grenade': recordingUrls('callouts/orus-grenade', 3),
+  'algenib-spot': recordingUrls('callouts/algenib-spot', 3),
+  'algenib-reload': recordingUrls('callouts/algenib-reload', 3),
+  'algenib-grenade': recordingUrls('callouts/algenib-grenade', 3),
+  'alnilam-spot': recordingUrls('callouts/alnilam-spot', 3),
+  'alnilam-reload': recordingUrls('callouts/alnilam-reload', 3),
+  'alnilam-grenade': recordingUrls('callouts/alnilam-grenade', 3),
+  'iapetus-spot': recordingUrls('callouts/iapetus-spot', 3),
+  'iapetus-reload': recordingUrls('callouts/iapetus-reload', 3),
+  'iapetus-grenade': recordingUrls('callouts/iapetus-grenade', 3),
 } as const;
 export type CalloutBank = keyof typeof CALLOUT_URLS;
 export const CALLOUT_MIX = {
