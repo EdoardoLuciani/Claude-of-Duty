@@ -490,7 +490,7 @@ export class FxSystem {
   _lightPos = new THREE.Vector3();
 
   /** Viewmodel-scene point -> world space (for the punctual light). */
-  _fromView(pos: THREE.Vector3): THREE.Vector3 {
+  _fromView(pos: THREE.Vector3Like): THREE.Vector3 {
     const cam = this.ctx.camera;
     const vcam = this.ctx.viewCamera;
     cam.updateMatrixWorld();
@@ -605,7 +605,7 @@ export class FxSystem {
   }
 
   /** Blood on whatever is behind the body we just hit. */
-  bloodSpatterBehind(point: THREE.Vector3, incident: THREE.Vector3): void {
+  bloodSpatterBehind(point: THREE.Vector3Like, incident: THREE.Vector3Like): void {
     const ph = this.physics;
     if (!ph?.raycast) return;
     this._tmpA.copy(point);

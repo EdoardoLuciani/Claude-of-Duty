@@ -3,11 +3,11 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { attribute } from 'three/tsl';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 
-import type { EngineSystems } from '../core/context.ts';
 import type { EventWeapon } from '../core/events.ts';
 import { isMesh } from '../core/three-guards.ts';
 import type { RigidBody } from '../physics/rigidbody.ts';
 import { P, buildBrassTextures } from './atlas.ts';
+import type { FxSystem } from './index.ts';
 import { resetSpawn, setSpawnPosition, setSpawnVelocity } from './particles.ts';
 
 /** Bounded casing slots use rigid bodies and one brass InstancedMesh; shotgun hulls add one draw.
@@ -42,14 +42,7 @@ interface ShellSlot extends CaseScale {
   spin: THREE.Vector3;
   fade: number;
 }
-type ShellPhysics = Pick<EngineSystems['physics'], 'addRigidBody' | 'removeRigidBody'>;
-interface ShellFx {
-  rng: import('../core/rng.ts').Rng;
-  gravity: number;
-  physics?: ShellPhysics | undefined;
-  audioPing(x: number, y: number, z: number, gain: number): void;
-  emitLit(spawn: ReturnType<typeof resetSpawn>): void;
-}
+type ShellFx = Pick<FxSystem, 'rng' | 'gravity' | 'physics' | 'audioPing' | 'emitLit'>;
 export interface ShellOptions {
   caseLen?: number;
   caseRadius?: number;

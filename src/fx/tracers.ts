@@ -1,4 +1,7 @@
+import type { Vector3Like as Vec3Like } from 'three';
+
 import { P } from './atlas.ts';
+import type { FxSystem } from './index.ts';
 import { resetSpawn, setSpawnColorRamp, setSpawnPosition, setSpawnVelocity } from './particles.ts';
 
 /** Tracers have a hot head, bright core and dimmer afterglow; clamp visual speed for legibility.
@@ -8,24 +11,16 @@ import { resetSpawn, setSpawnColorRamp, setSpawnPosition, setSpawnVelocity } fro
 
 const MIN_SPEED = 55;
 const MAX_SPEED = 340;
-interface Point3 {
-  x: number;
-  y: number;
-  z: number;
-}
 interface TracerOptions {
   flightTime?: number;
   warm?: number;
 }
-interface TracerEmitter {
-  rng: { float(): number };
-  emitAdd(spawn: ReturnType<typeof resetSpawn>): void;
-}
+type TracerEmitter = Pick<FxSystem, 'rng' | 'emitAdd'>;
 
 export function spawnTracer(
   fx: TracerEmitter,
-  from: Point3,
-  to: Point3,
+  from: Vec3Like,
+  to: Vec3Like,
   speed: number,
   opts?: TracerOptions
 ): void {
@@ -55,7 +50,7 @@ export function spawnTracer(
   const oz = from.z + dz * muzzleOffset;
 
   // core streak
-  let s = resetSpawn();
+  const s = resetSpawn();
   setSpawnPosition(s, ox, oy, oz);
   setSpawnVelocity(s, dx * v, dy * v, dz * v);
   s.tile = P.STREAK;
@@ -75,18 +70,11 @@ export function spawnTracer(
   s.seed = rng.float();
   fx.emitAdd(s);
 
+  // Reuse the flight setup: emit copies the descriptor into the GPU ring.
   // afterglow: longer, dimmer, sits behind the core
-  s = resetSpawn();
-  setSpawnPosition(s, ox, oy, oz);
-  setSpawnVelocity(s, dx * v, dy * v, dz * v);
-  s.tile = P.STREAK;
   s.size0 = 0.09;
   s.size1 = 0.07;
   s.stretch = 0.6;
-  s.life = life;
-  s.drag = 0.02;
-  s.gravity = -1.2;
-  s.flags = 2;
   setSpawnColorRamp(s, 1, 0.33 * warm, 0.1 * warm, 1, 0.24 * warm, 0.06 * warm);
   s.i0 = 5.5;
   s.i1 = 2.5;
@@ -96,15 +84,11 @@ export function spawnTracer(
   fx.emitAdd(s);
 
   // incandescent head
-  s = resetSpawn();
-  setSpawnPosition(s, ox, oy, oz);
-  setSpawnVelocity(s, dx * v, dy * v, dz * v);
   s.tile = P.SPARK;
+  s.stretch = 0;
+  s.flags = 0;
   s.size0 = 0.05;
   s.size1 = 0.042;
-  s.life = life;
-  s.drag = 0.02;
-  s.gravity = -1.2;
   setSpawnColorRamp(s, 1, 0.85, 0.6, 1, 0.6, 0.3);
   s.i0 = 30;
   s.i1 = 18;

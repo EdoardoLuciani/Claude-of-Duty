@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
-import type { EngineSystems } from '../core/context.ts';
 import { P } from './atlas.ts';
+import type { FxSystem } from './index.ts';
 import { resetSpawn, setSpawnColorRamp, setSpawnPosition, setSpawnVelocity } from './particles.ts';
 import { V, cone } from './util.ts';
 
@@ -43,26 +43,10 @@ interface AmbienceOptions {
   box?: number;
   shimmer?: boolean;
 }
-interface FxApi {
-  rng: import('../core/rng.ts').Rng;
-  emitLit(spawn: ReturnType<typeof resetSpawn>): void;
-  emitAdd(spawn: ReturnType<typeof resetSpawn>): void;
-  emitMote(spawn: ReturnType<typeof resetSpawn>): void;
-  haze(
-    x: number,
-    y: number,
-    z: number,
-    radius: number,
-    life: number,
-    growth: number,
-    amount: number,
-    tile: number
-  ): void;
-  physics?: Pick<EngineSystems['physics'], 'groundHeight'> | undefined;
-}
+type AmbienceFx = Pick<FxSystem, 'rng' | 'emitLit' | 'emitAdd' | 'emitMote' | 'haze' | 'physics'>;
 
 export class Ambience {
-  fx: FxApi;
+  fx: AmbienceFx;
   moteCount: number;
   moteBox: number;
   moteEnabled: boolean;
@@ -75,7 +59,7 @@ export class Ambience {
   _fwd: THREE.Vector3 = new THREE.Vector3();
   _warm: number = 0;
 
-  constructor(fx: FxApi, opts: AmbienceOptions = {}) {
+  constructor(fx: AmbienceFx, opts: AmbienceOptions = {}) {
     this.fx = fx;
     for (let i = 0; i < MAX_EMITTERS; i++) this.emitters.push(new Emitter());
 

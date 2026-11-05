@@ -1,4 +1,7 @@
+import type { Vector3Like as Vec3Like } from 'three';
+
 import { P } from './atlas.ts';
+import type { FxSystem } from './index.ts';
 import { resetSpawn, setSpawnColorRamp, setSpawnPosition, setSpawnVelocity } from './particles.ts';
 import { V, C, C2, basis, blackbody, clampCone, cone, towardHemi, COS55 } from './util.ts';
 
@@ -8,15 +11,6 @@ import { V, C, C2, basis, blackbody, clampCone, cone, towardHemi, COS55 } from '
  * Burning lasts 40-62 ms; the light/haze are brief and smoke persists.
  */
 
-interface Vec3Like {
-  x: number;
-  y: number;
-  z: number;
-}
-interface CameraLike {
-  updateMatrixWorld(): void;
-  matrixWorldInverse: { elements: ArrayLike<number> };
-}
 interface MuzzleProfile {
   scale: number;
   lobes: number;
@@ -33,24 +27,20 @@ interface MuzzleWeapon {
   kind?: string;
   name?: string;
 }
-interface MuzzleFx {
-  rng: {
-    float(): number;
-    signed(): number;
-    int(min: number, max: number): number;
-    range(min: number, max: number): number;
-  };
-  pScale: number;
-  ctx: { camera?: CameraLike; viewCamera?: CameraLike };
-  emitAdd(this: void, spawn: object): void;
-  emitViewAdd(this: void, spawn: object): void;
-  emitLit(this: void, spawn: object): void;
-  emitViewLit(this: void, spawn: object): void;
-  lights?: { flash(...args: number[]): void };
-  viewFlash(...args: number[]): void;
-  _fromView(position: Vec3Like): Vec3Like;
-  haze(...args: number[]): void;
-}
+type MuzzleFx = Pick<
+  FxSystem,
+  | 'rng'
+  | 'pScale'
+  | 'ctx'
+  | 'emitAdd'
+  | 'emitViewAdd'
+  | 'emitLit'
+  | 'emitViewLit'
+  | 'lights'
+  | 'viewFlash'
+  | '_fromView'
+  | 'haze'
+>;
 interface MuzzleOptions {
   position: Vec3Like;
   direction: Vec3Like;
@@ -173,9 +163,6 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   s.seed = rng.float();
   emitAdd(s);
   // the white-hot heart: a third of the diameter, twice the radiance, gone first
-  s = resetSpawn();
-  setSpawnPosition(s, p.x, p.y, p.z);
-  s.tile = P.FLASH_CORE;
   s.size0 = 0.036 * sc;
   s.size1 = 0.056 * sc;
   s.sizeCurve = 0.4;
@@ -331,27 +318,20 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     s.seed = seed;
     emitAdd(s);
 
-    s = resetSpawn();
-    setSpawnPosition(s, px, py, pz);
-    setSpawnVelocity(s, vx, vy, vz);
-    s.tile = tile;
+    // The lit puff shares the emitted hot puff's pose, motion and seed.
     s.size0 = size0;
     s.size1 = size1;
-    s.sizeCurve = 0.5;
     s.life = rng.range(0.3, 0.55) * (0.7 + prof.smoke * 0.5);
     s.delay = delay;
-    s.drag = 7;
     s.gravity = 0.5;
-    s.rot = rot;
-    s.spin = spin;
     // warm, lit by its own flash while it is still hot -> plain grey as it cools
     setSpawnColorRamp(s, 0.62, 0.57, 0.52, 0.44, 0.44, 0.44);
+    s.i0 = 1;
     s.alpha = rng.range(0.26, 0.44) * (0.7 + prof.smoke * 0.4) * emberGain;
     s.alphaCurve = 1.35;
     s.soft = 0.22;
     s.turb = 0.05;
     s.turbFreq = 2.4;
-    s.seed = seed;
     emitLit(s);
   }
 
