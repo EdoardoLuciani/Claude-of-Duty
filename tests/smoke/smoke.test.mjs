@@ -9,7 +9,7 @@ for (const file of readdirSync(dir).sort()) {
   if (!file.startsWith('smoke-') || !file.endsWith('.mjs')) continue;
   // Longer wall-clock allowance only; physical simulation limits stay intact.
   const longSweep = file === 'smoke-ai-ladder-live.mjs';
-  const integrationSweep = file === 'smoke-ai-ladder.mjs';
+  const integrationSweep = file === 'smoke-ai-ladder.mjs' || file === 'smoke-ai-ladder-worker.mjs';
   test(
     file,
     () => {
