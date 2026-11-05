@@ -113,75 +113,36 @@ export function humanoidSpec(height = 1.8, scaleMass = 82): BoneSpec[] {
   });
   const sh = h * 0.105; // half shoulder width
   const hip = h * 0.055;
-  return [
+  const spec = [
     /* 0 */ b('pelvis', 0, y(0.53), 0, 0, y(0.63), 0, 0.085, 0.14, -1, 0, 0),
     /* 1 */ b('spine', 0, y(0.63), 0, 0, y(0.74), 0, 0.082, 0.12, 0, 22, 18),
     /* 2 */ b('chest', 0, y(0.74), 0, 0, y(0.83), 0, 0.088, 0.19, 1, 20, 15),
     /* 3 */ b('neck', 0, y(0.83), 0, 0, y(0.875), 0, 0.042, 0.02, 2, 30, 25),
     /* 4 */ b('head', 0, y(0.875), 0, 0, y(0.97), 0.01, 0.062, 0.07, 3, 42, 30),
-    /* 5 */ b('upperArmL', -sh, y(0.815), 0, -sh - h * 0.015, y(0.65), 0, 0.045, 0.027, 2, 85, 60),
-    /* 6 */ b(
-      'forearmL',
-      -sh - h * 0.015,
-      y(0.65),
-      0,
-      -sh - h * 0.02,
-      y(0.5),
-      0,
-      0.037,
-      0.018,
-      5,
-      80,
-      45
-    ),
-    /* 7 */ b(
-      'handL',
-      -sh - h * 0.02,
-      y(0.5),
-      0,
-      -sh - h * 0.02,
-      y(0.44),
-      0,
-      0.032,
-      0.006,
-      6,
-      55,
-      40
-    ),
-    /* 8 */ b('upperArmR', sh, y(0.815), 0, sh + h * 0.015, y(0.65), 0, 0.045, 0.027, 2, 85, 60),
-    /* 9 */ b(
-      'forearmR',
-      sh + h * 0.015,
-      y(0.65),
-      0,
-      sh + h * 0.02,
-      y(0.5),
-      0,
-      0.037,
-      0.018,
-      8,
-      80,
-      45
-    ),
-    /*10 */ b(
-      'handR',
-      sh + h * 0.02,
-      y(0.5),
-      0,
-      sh + h * 0.02,
-      y(0.44),
-      0,
-      0.032,
-      0.006,
-      9,
-      55,
-      40
-    ),
-    /*11 */ b('thighL', -hip, y(0.53), 0, -hip * 1.05, y(0.29), 0, 0.062, 0.1, 0, 75, 35),
-    /*12 */ b('shinL', -hip * 1.05, y(0.29), 0, -hip * 1.05, y(0.055), 0, 0.048, 0.045, 11, 70, 20),
-    /*13 */ b('thighR', hip, y(0.53), 0, hip * 1.05, y(0.29), 0, 0.062, 0.1, 0, 75, 35),
-    /*14 */ b('shinR', hip * 1.05, y(0.29), 0, hip * 1.05, y(0.055), 0, 0.048, 0.045, 13, 70, 20),
   ];
+  for (let side = -1; side <= 1; side += 2) {
+    const suffix = side < 0 ? 'L' : 'R';
+    const shoulder = side * sh;
+    const elbow = shoulder + side * h * 0.015;
+    const wrist = shoulder + side * h * 0.02;
+    const parent = spec.length;
+    spec.push(
+      b(`upperArm${suffix}`, shoulder, y(0.815), 0, elbow, y(0.65), 0, 0.045, 0.027, 2, 85, 60),
+      b(`forearm${suffix}`, elbow, y(0.65), 0, wrist, y(0.5), 0, 0.037, 0.018, parent, 80, 45),
+      b(`hand${suffix}`, wrist, y(0.5), 0, wrist, y(0.44), 0, 0.032, 0.006, parent + 1, 55, 40)
+    );
+  }
+  for (let side = -1; side <= 1; side += 2) {
+    const suffix = side < 0 ? 'L' : 'R';
+    const thigh = side * hip;
+    const shin = thigh * 1.05;
+    const parent = spec.length;
+    spec.push(
+      b(`thigh${suffix}`, thigh, y(0.53), 0, shin, y(0.29), 0, 0.062, 0.1, 0, 75, 35),
+      b(`shin${suffix}`, shin, y(0.29), 0, shin, y(0.055), 0, 0.048, 0.045, parent, 70, 20)
+    );
+  }
+  return spec;
 }
 
 const MAX_PARTICLE_STEP = 0.35; // metres per fixed step, anti-explosion clamp
@@ -371,6 +332,28 @@ export class Ragdoll {
     this.selfPairs = this._buildSelfPairs();
   }
 
+  _closestBones(i: number, j: number): number {
+    const a = this.boneHead[i],
+      b = this.boneTail[i];
+    const c = this.boneHead[j],
+      d = this.boneTail[j];
+    return closestPtSegSeg(
+      this.px[a],
+      this.py[a],
+      this.pz[a],
+      this.px[b],
+      this.py[b],
+      this.pz[b],
+      this.px[c],
+      this.py[c],
+      this.pz[c],
+      this.px[d],
+      this.py[d],
+      this.pz[d],
+      this._ss
+    );
+  }
+
   /**
    * Bone pairs worth testing against each other. Bones that share a joint are
    * excluded (they always touch), and so is any pair that already overlaps in
@@ -387,21 +370,8 @@ export class Ragdoll {
           bj = this.boneTail[j];
         if (ai === aj || ai === bj || bi === aj || bi === bj) continue;
         const rad = this.boneRadius[i] + this.boneRadius[j];
-        closestPtSegSeg(
-          this.px[ai],
-          this.py[ai],
-          this.pz[ai],
-          this.px[bi],
-          this.py[bi],
-          this.pz[bi],
-          this.px[aj],
-          this.py[aj],
-          this.pz[aj],
-          this.px[bj],
-          this.py[bj],
-          this.pz[bj],
-          this._ss ?? (this._ss = makeClosest())
-        );
+        this._ss ??= makeClosest();
+        this._closestBones(i, j);
         if (this._ss.d2 < rad * rad * 0.95) continue;
         pairs.push(i, j);
       }
@@ -791,21 +761,7 @@ export class Ragdoll {
       const b0 = this.boneHead[j],
         b1 = this.boneTail[j];
       const rad = (this.boneRadius[i] + this.boneRadius[j]) * 0.92;
-      const d2 = closestPtSegSeg(
-        this.px[a0],
-        this.py[a0],
-        this.pz[a0],
-        this.px[a1],
-        this.py[a1],
-        this.pz[a1],
-        this.px[b0],
-        this.py[b0],
-        this.pz[b0],
-        this.px[b1],
-        this.py[b1],
-        this.pz[b1],
-        cl
-      );
+      const d2 = this._closestBones(i, j);
       if (d2 >= rad * rad) continue;
       const d = Math.sqrt(d2);
       let nx, ny, nz;
