@@ -1,10 +1,8 @@
 import { gain } from './dsp.ts';
+import { recordingUrls } from './recordings.ts';
 import type { SpatialField } from './spatial.ts';
 
-export const AIRCRAFT_URLS = [
-  new URL('./samples/aircraft/propeller-1.opus', import.meta.url).href,
-  new URL('./samples/aircraft/propeller-2.opus', import.meta.url).href,
-] as const;
+export const AIRCRAFT_URLS = recordingUrls('aircraft/propeller', 2);
 export const AIRCRAFT_MIX = {
   gain: 12.5,
   send: 0.08,

@@ -23,6 +23,7 @@ import { HIT_MIX, HIT_URLS, type DamageSoundOptions } from './hits.ts';
 import { FALL_BANK, FOLEY_MIX, IMPACT_BANK, STEP_BANK, type FoleyOptions } from './physical.ts';
 import { RADIO_URLS, RADIO_MIX, RADIO_PARTS, type RadioKind } from './radio.ts';
 import { REACTION_URLS, REACTION_MIX, reactionBank, type ReactionKind } from './reactions.ts';
+import { recordingUrls, recordingUrl } from './recordings.ts';
 import { RELOAD_MIX, RELOAD_URLS, reloadKind, type ReloadKind } from './reloads.ts';
 import type { AudioVoice, SampleKind, SampleOptions, WeaponProfile } from './types.ts';
 import { REPORT_DISTANT_MATCH, reportDistantMix } from './weapons.ts';
@@ -38,77 +39,24 @@ import { REPORT_DISTANT_MATCH, reportDistantMix } from './weapons.ts';
  * have separate owner-requested public provenance in samples/ak-provenance.json.
  */
 const URLS = {
-  mpx: [
-    new URL('./samples/mpx-1.opus', import.meta.url).href,
-    new URL('./samples/mpx-2.opus', import.meta.url).href,
-    new URL('./samples/mpx-3.opus', import.meta.url).href,
-  ],
-  'rifle-distant': [
-    new URL('./samples/rifle-distant-1.opus', import.meta.url).href,
-    new URL('./samples/rifle-distant-2.opus', import.meta.url).href,
-  ],
-  'pistol-distant': [
-    new URL('./samples/pistol-distant-1.opus', import.meta.url).href,
-    new URL('./samples/pistol-distant-2.opus', import.meta.url).href,
-  ],
-  'lmg-distant': [
-    new URL('./samples/lmg-distant-1.opus', import.meta.url).href,
-    new URL('./samples/lmg-distant-2.opus', import.meta.url).href,
-  ],
-  'sniper-distant': [
-    new URL('./samples/sniper-distant-1.opus', import.meta.url).href,
-    new URL('./samples/sniper-distant-2.opus', import.meta.url).href,
-  ],
-  'shotgun-distant': [
-    new URL('./samples/shotgun-distant-1.opus', import.meta.url).href,
-    new URL('./samples/shotgun-distant-2.opus', import.meta.url).href,
-  ],
-  mcx: [
-    new URL('./samples/mcx-1.opus', import.meta.url).href,
-    new URL('./samples/mcx-2.opus', import.meta.url).href,
-  ],
-  rifle: [
-    new URL('./samples/rifle-1.opus', import.meta.url).href,
-    new URL('./samples/rifle-2.opus', import.meta.url).href,
-    new URL('./samples/rifle-3.opus', import.meta.url).href,
-  ],
-  sniper: [
-    new URL('./samples/sniper-1.opus', import.meta.url).href,
-    new URL('./samples/sniper-2.opus', import.meta.url).href,
-    new URL('./samples/sniper-3.opus', import.meta.url).href,
-  ],
-  ak: [
-    new URL('./samples/ak-1.opus', import.meta.url).href,
-    new URL('./samples/ak-2.opus', import.meta.url).href,
-    new URL('./samples/ak-3.opus', import.meta.url).href,
-  ],
-  'ak-distant': [
-    new URL('./samples/ak-distant-1.opus', import.meta.url).href,
-    new URL('./samples/ak-distant-2.opus', import.meta.url).href,
-  ],
-  lmg: [
-    new URL('./samples/lmg-1.opus', import.meta.url).href,
-    new URL('./samples/lmg-2.opus', import.meta.url).href,
-    new URL('./samples/lmg-3.opus', import.meta.url).href,
-  ],
-  smg: [
-    new URL('./samples/smg-1.opus', import.meta.url).href,
-    new URL('./samples/smg-2.opus', import.meta.url).href,
-    new URL('./samples/smg-3.opus', import.meta.url).href,
-  ],
-  pistol: [
-    new URL('./samples/pistol-1.opus', import.meta.url).href,
-    new URL('./samples/pistol-2.opus', import.meta.url).href,
-    new URL('./samples/pistol-3.opus', import.meta.url).href,
-  ],
-  shotgun: [
-    new URL('./samples/shotgun-1.opus', import.meta.url).href,
-    new URL('./samples/shotgun-2.opus', import.meta.url).href,
-    new URL('./samples/shotgun-3.opus', import.meta.url).href,
-  ],
-} satisfies Record<SampleKind, string[]>;
+  mpx: recordingUrls('mpx', 3),
+  'rifle-distant': recordingUrls('rifle-distant', 2),
+  'pistol-distant': recordingUrls('pistol-distant', 2),
+  'lmg-distant': recordingUrls('lmg-distant', 2),
+  'sniper-distant': recordingUrls('sniper-distant', 2),
+  'shotgun-distant': recordingUrls('shotgun-distant', 2),
+  mcx: recordingUrls('mcx', 2),
+  rifle: recordingUrls('rifle', 3),
+  sniper: recordingUrls('sniper', 3),
+  ak: recordingUrls('ak', 3),
+  'ak-distant': recordingUrls('ak-distant', 2),
+  lmg: recordingUrls('lmg', 3),
+  smg: recordingUrls('smg', 3),
+  pistol: recordingUrls('pistol', 3),
+  shotgun: recordingUrls('shotgun', 3),
+} satisfies Record<SampleKind, readonly string[]>;
 
-const HEARTBEAT_URL = new URL('./samples/heartbeat.opus', import.meta.url).href;
+const HEARTBEAT_URL = recordingUrl('heartbeat');
 
 /** Required decoded recordings. Any fetch/decode failure rejects the bank. */
 const CONTACT_URLS = {
@@ -122,7 +70,6 @@ const CONTACT_URLS = {
   ...EXPLOSION_URLS,
 };
 type ContactKind = keyof typeof CONTACT_URLS;
-type SpecialBufferKey = 'heartbeatBuffer';
 export class WeaponSampleBank {
   actx: BaseAudioContext;
   buffers: Partial<Record<SampleKind, AudioBuffer[]>> = {};
@@ -141,41 +88,19 @@ export class WeaponSampleBank {
   }
 
   async load(): Promise<number> {
-    const jobs = [];
-    for (const kind of Object.keys(URLS).filter((key): key is keyof typeof URLS =>
-      hasOwn(URLS, key)
-    )) {
-      const urls = URLS[kind];
-      this.buffers[kind] = new Array<AudioBuffer>(urls.length);
-      this.indices[kind] = 0;
-      urls.forEach((url, index): number =>
-        jobs.push(this._loadInto(this.buffers[kind]!, index, url))
-      );
-    }
-    jobs.push(this._loadSpecial('heartbeatBuffer', HEARTBEAT_URL));
+    const jobs = this._loadBank(URLS, this.buffers, this.indices, 0);
+    jobs.push(
+      this._loadBuffer(HEARTBEAT_URL).then((buffer): void => {
+        this.heartbeatBuffer = buffer;
+      })
+    );
     this.aircraftBuffers = new Array<AudioBuffer>(AIRCRAFT_URLS.length);
     this.aircraftIndex = -1;
     AIRCRAFT_URLS.forEach((url, index): number =>
       jobs.push(this._loadInto(this.aircraftBuffers, index, url))
     );
-    for (const kind of Object.keys(CONTACT_URLS).filter((key): key is keyof typeof CONTACT_URLS =>
-      hasOwn(CONTACT_URLS, key)
-    )) {
-      this.hitBuffers[kind] = new Array<AudioBuffer>(CONTACT_URLS[kind].length);
-      this.hitIndices[kind] = -1;
-      CONTACT_URLS[kind].forEach((url, index): number =>
-        jobs.push(this._loadInto(this.hitBuffers[kind]!, index, url))
-      );
-    }
-    for (const kind of Object.keys(RELOAD_URLS).filter((key): key is keyof typeof RELOAD_URLS =>
-      hasOwn(RELOAD_URLS, key)
-    )) {
-      this.reloadBuffers[kind] = new Array<AudioBuffer>(RELOAD_URLS[kind].length);
-      this.reloadIndices[kind] = -1;
-      RELOAD_URLS[kind].forEach((url, index): number =>
-        jobs.push(this._loadInto(this.reloadBuffers[kind]!, index, url))
-      );
-    }
+    jobs.push(...this._loadBank(CONTACT_URLS, this.hitBuffers, this.hitIndices, -1));
+    jobs.push(...this._loadBank(RELOAD_URLS, this.reloadBuffers, this.reloadIndices, -1));
     // Finish all decodes before start() tears down a failed bank.
     for (const result of await Promise.allSettled(jobs))
       if (result.status === 'rejected') throw result.reason;
@@ -194,8 +119,19 @@ export class WeaponSampleBank {
     buffers[index] = await this._loadBuffer(url);
   }
 
-  async _loadSpecial(field: SpecialBufferKey, url: string): Promise<void> {
-    this[field] = await this._loadBuffer(url);
+  private _loadBank<K extends string>(
+    urls: Record<K, readonly string[]>,
+    buffers: Partial<Record<K, AudioBuffer[]>>,
+    indices: Partial<Record<K, number>>,
+    initialIndex: number
+  ): Promise<void>[] {
+    const jobs: Promise<void>[] = [];
+    for (const kind of Object.keys(urls).filter((key): key is K => hasOwn(urls, key))) {
+      const takes = (buffers[kind] = new Array<AudioBuffer>(urls[kind].length));
+      indices[kind] = initialIndex;
+      urls[kind].forEach((url, index): number => jobs.push(this._loadInto(takes, index, url)));
+    }
+    return jobs;
   }
 
   /** One RNG draw per cue; a one-take bank necessarily repeats its only take. */
@@ -229,6 +165,23 @@ export class WeaponSampleBank {
     return this.aircraftBuffers[this.aircraftIndex];
   }
 
+  /** Natural-rate finite cues share scheduling, but callers retain take/RNG policy. */
+  private _playRecording(
+    buffer: AudioBuffer,
+    level: number,
+    when: number | undefined,
+    send: number,
+    delay = 0
+  ): AudioVoice {
+    const src = this.actx.createBufferSource();
+    src.buffer = buffer;
+    const out = gain(this.actx, level);
+    src.connect(out);
+    const start = (when ?? this.actx.currentTime) + delay;
+    src.start(start);
+    return { node: out, end: start + buffer.duration + 0.02, send };
+  }
+
   /** Recorded handling only: unsupported cues and missing assets never synthesize. */
   reload(
     weapon: string,
@@ -239,14 +192,13 @@ export class WeaponSampleBank {
     const kind = reloadKind(weapon, phase);
     if (!kind) throw new Error(`[audio] no recorded reload cue for ${weapon}/${phase}`);
     const buffer = this._nextTake(kind, this.reloadBuffers, this.reloadIndices, rng, 'reload');
-    const src = this.actx.createBufferSource();
-    src.buffer = buffer;
     // Preserve authored attack timing and action duration; vary takes, not pitch.
-    const out = gain(this.actx, RELOAD_MIX.gain * rng.range(0.97, 1.03));
-    src.connect(out);
-    const when = o.when ?? this.actx.currentTime;
-    src.start(when);
-    return { node: out, end: when + src.buffer.duration + 0.02, send: RELOAD_MIX.send };
+    return this._playRecording(
+      buffer,
+      RELOAD_MIX.gain * rng.range(0.97, 1.03),
+      o.when,
+      RELOAD_MIX.send
+    );
   }
 
   /** Stable recorded identity; no pitch shifting and no immediate repeated take. */
@@ -257,13 +209,12 @@ export class WeaponSampleBank {
     o: { when?: number | undefined; level?: number | undefined } = {}
   ): AudioVoice {
     const buffer = this._nextTake(reactionBank(voice, kind), this.hitBuffers, this.hitIndices, rng);
-    const src = this.actx.createBufferSource();
-    src.buffer = buffer;
-    const out = gain(this.actx, REACTION_MIX.gain * (o.level ?? 1));
-    src.connect(out);
-    const when = o.when ?? this.actx.currentTime;
-    src.start(when);
-    return { node: out, end: when + src.buffer.duration + 0.02, send: REACTION_MIX.send };
+    return this._playRecording(
+      buffer,
+      REACTION_MIX.gain * (o.level ?? 1),
+      o.when,
+      REACTION_MIX.send
+    );
   }
 
   /** Local speech, natural rate and stable identity; caller owns interruption/cleanup. */
@@ -302,13 +253,7 @@ export class WeaponSampleBank {
     o: { when?: number | undefined; level?: number | undefined } = {}
   ): AudioVoice {
     const buffer = this._nextTake(environmentBank(kind), this.hitBuffers, this.hitIndices, rng);
-    const src = this.actx.createBufferSource();
-    src.buffer = buffer;
-    const out = gain(this.actx, ENVIRONMENT_GAIN[kind] * (o.level ?? 1));
-    src.connect(out);
-    const when = o.when ?? this.actx.currentTime;
-    src.start(when);
-    return { node: out, end: when + src.buffer.duration + 0.02, send: 0.65 };
+    return this._playRecording(buffer, ENVIRONMENT_GAIN[kind] * (o.level ?? 1), o.when, 0.65);
   }
 
   /** One finite click/static composite; receive-only intel never invents a button press. */
@@ -489,13 +434,13 @@ export class WeaponSampleBank {
     } = {}
   ): AudioVoice {
     const buffer = this._nextTake(kind, this.hitBuffers, this.hitIndices, rng, 'combat');
-    const src = this.actx.createBufferSource();
-    src.buffer = buffer;
-    const out = gain(this.actx, o.level ?? 1);
-    src.connect(out);
-    const when = (o.when ?? this.actx.currentTime) + Math.max(0, o.delay ?? 0);
-    src.start(when);
-    return { node: out, end: when + buffer.duration + 0.02, send: o.send ?? 0 };
+    return this._playRecording(
+      buffer,
+      o.level ?? 1,
+      o.when,
+      o.send ?? 0,
+      Math.max(0, o.delay ?? 0)
+    );
   }
 
   /** Required recorded blast at every distance, with no synthetic reinforcement. */
