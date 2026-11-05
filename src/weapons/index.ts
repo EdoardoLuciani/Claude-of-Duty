@@ -30,7 +30,7 @@ import { lerp, DEG } from './mathx.ts';
 import { MCX_EJECT_DELAY } from './mcx.ts';
 import { MPX_EJECT_DELAY } from './mpx.ts';
 import { P320_EJECT_DELAY } from './p320.ts';
-import type { WeaponModelRecord, WeaponState } from './runtime-types.ts';
+import type { ViewState, WeaponModelRecord, WeaponState } from './runtime-types.ts';
 import { Viewmodel } from './viewmodel.ts';
 import type { ViewModel } from './viewmodel.ts';
 
@@ -69,18 +69,7 @@ interface WeaponWarmupReport {
   graphWarm: Awaited<ReturnType<EngineSystems['render']['_warmGraph']>>;
 }
 
-interface WeaponPoseState {
-  ads: boolean;
-  sprint: boolean;
-  lowReady: boolean;
-  speed: number;
-  crouch: boolean;
-  airborne: boolean;
-  trigger: boolean;
-  empty: boolean;
-  magazineLoaded: boolean;
-  remainingRounds: number;
-}
+type WeaponPoseState = Required<ViewState>;
 interface WeaponHudState {
   name: string;
   mode: WeaponMode;

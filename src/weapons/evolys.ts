@@ -7,29 +7,22 @@ import manifest from '../../assets/weapons/fn-evolys-762/manifest.json' with { t
 import { hasOwn } from '../core/guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
-import { createAuthoredActions, sampleAuthoredAction } from './authored-actions.ts';
+import { sampleAuthoredFire, MAGAZINE_ALIASES, disposeAuthoredMixer } from './authored-actions.ts';
 import {
-  applyAuthoredHand,
-  authoredHandTarget,
-  discoverAuthoredHands,
-  type AuthoredHand,
-  type HandRig,
-  type HandSide,
-} from './authored-hands.ts';
-import { authoredModel, requiredNode } from './authored-model.ts';
+  authoredModel,
+  requiredNode,
+  type AuthoredModelData,
+  type AuthoredNodes,
+} from './authored-model.ts';
+import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
+import type { WeaponAnimation } from './runtime-types.ts';
 
 export const EVOLYS_URL = new URL(
   '../../assets/weapons/fn-evolys-762/fn-evolys-762.runtime.glb',
   import.meta.url
 ).href;
-const ALIASES: Record<string, string> = {
-  reloadTac: 'Reload_Tactical',
-  reloadEmpty: 'Reload_Empty',
-  inspect: 'Inspect',
-  draw: 'Draw',
-  holster: 'Holster',
-};
+const ALIASES = MAGAZINE_ALIASES;
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
 
 export function makeEvolysModel(gltf: GLTF): EvolysModel {
@@ -101,26 +94,9 @@ export async function loadEvolys(renderer: Pick<Renderer, 'hasFeature'>): Promis
 /** Native Blender mechanism/belt/hand tracks, under shared ADS/sway/recoil.
  * Only ammunition-tail visibility is runtime-driven. No per-shot belt objects,
  * new textures, duplicate cases, frame allocations or second animation rig. */
-type EvolysModel = {
-  materials: Set<THREE.Material>;
-  textures: Set<THREE.Texture>;
-  id: 'lmg';
-  label: string;
-  scene: THREE.Group;
-  root: THREE.Object3D;
-  animations: THREE.AnimationClip[];
-  reactiveFire: boolean;
-  handPoses: {
-    left: typeof handReference.sides.left.grip;
-    right: typeof handReference.sides.left.grip;
-  };
-  nodes: {
-    muzzle: [number, number, number];
-    eject: [number, number, number];
-    sight: [number, number, number];
-    ejectDir: number[];
-    gripR: { pos: number[]; finger: number[]; back: number[] };
-    gripL: { pos: number[]; finger: number[]; back: number[] };
+type EvolysModel = AuthoredModelData<
+  'lmg',
+  AuthoredNodes & {
     magSeat: { pos: [number, number, number]; rot: number[] };
     triggerPivot: { pos: [number, number, number]; rot: number[] };
     handguard: { axis: number[]; dir: number[]; r: number; z0: number; z1: number };
@@ -134,129 +110,93 @@ type EvolysModel = {
       minDotPixels: number;
       dotOpacity: number;
     };
+  }
+> & {
+  label: string;
+  reactiveFire: boolean;
+  handPoses: {
+    left: typeof handReference.sides.left.grip;
+    right: typeof handReference.sides.right.grip;
   };
-  shell: { caseLen: number; rimR: number };
-  magSize: { len: number };
 };
-type EvolysArm = HandRig;
-export class EvolysAnimation {
-  model!: EvolysModel;
-  root!: THREE.Object3D;
-  mixer!: THREE.AnimationMixer;
-  actions!: Record<string, THREE.AnimationAction>;
-  pouch!: THREE.Object3D;
-  spare!: THREE.Object3D;
-  cover!: THREE.Object3D;
-  bolt!: THREE.Object3D;
-  charging!: THREE.Object3D;
-  belt!: THREE.Object3D;
-  bones!: THREE.Object3D[];
-  hands!: Record<HandSide, AuthoredHand>;
-  poseQ = new THREE.Quaternion();
-  idleTime = 0;
-  name: string | null = null;
-  fireTime!: number;
-  remainingRounds: number = 100;
+export function createEvolysAnimation(model: EvolysModel): WeaponAnimation {
+  const rig = createAuthoredRig(model);
+  const node = (name: string): THREE.Object3D => requiredNode(rig.root, name);
+  const pouch = node('pouch');
+  const spare = node('pouch_spare');
+  node('feed_cover');
+  node('bolt');
+  node('charging_handle');
+  const belt = node('belt_mesh');
+  const bones = Array.from({ length: manifest.belt.rounds }, (_, i): THREE.Object3D =>
+    node(`belt_${i}`)
+  );
+  let lastRounds = 100;
+  const animation = {
+    ...rig,
+    clips(): Record<string, Clip> {
+      return buildManifestClips(ALIASES, manifest.clips);
+    },
 
-  constructor(model: EvolysModel) {
-    this.model = model;
-    this.root = model.root;
-    this.mixer = new THREE.AnimationMixer(this.root);
-    this.actions = createAuthoredActions(this.mixer, model.animations);
-    const node = (name: string): THREE.Object3D => requiredNode(this.root, name);
-    this.pouch = node('pouch');
-    this.spare = node('pouch_spare');
-    this.cover = node('feed_cover');
-    this.bolt = node('bolt');
-    this.charging = node('charging_handle');
-    this.belt = node('belt_mesh');
-    this.bones = Array.from({ length: manifest.belt.rounds }, (_, i): THREE.Object3D =>
-      node(`belt_${i}`)
-    );
-    this.hands = discoverAuthoredHands(node);
-    this.reset();
-  }
+    _sample(name: string, time: number): void {
+      sampleAuthoredPose(this, name, time);
+      pouch.visible = pouch.scale.x > 0.5;
+      spare.visible = spare.scale.x > 0.5;
+    },
 
-  clips(): Record<string, Clip> {
-    return buildManifestClips(ALIASES, manifest.clips);
-  }
+    reset(): void {
+      this.fireTime = Infinity;
+      this.idleTime = 0;
+      this._sample('Idle', 0);
+      this._beltVisibility(lastRounds, false);
+    },
 
-  _sample(name: string, time: number): void {
-    sampleAuthoredAction(this, name, time);
-    this.root.updateMatrix();
-    this.poseQ.copy(this.root.quaternion);
-    this.pouch.visible = this.pouch.scale.x > 0.5;
-    this.spare.visible = this.spare.scale.x > 0.5;
-  }
+    _beltVisibility(rounds: number, departing: boolean, loaded = true): void {
+      const count = Math.min(bones.length, Math.max(0, rounds) + (departing ? 1 : 0));
+      for (let i = 0; i < bones.length; i++) {
+        // Explicitly restore scales: mixer caches constant native values and
+        // cannot see our ammunition masks from the preceding frame.
+        bones[i].scale.setScalar(loaded && i < count ? 1 : 0);
+      }
+      belt.visible = loaded && count > 0;
+    },
 
-  fire(): void {
-    this.fireTime = 0;
-  }
-  reset(): void {
-    this.fireTime = Infinity;
-    this.idleTime = 0;
-    this._sample('Idle', 0);
-    this._beltVisibility(this.remainingRounds, false);
-  }
+    update(
+      dt: number,
+      clipName: string,
+      clipTime: number,
+      empty: boolean,
+      magazineLoaded = !empty,
+      remainingRounds = magazineLoaded ? 100 : 0
+    ): void {
+      lastRounds = remainingRounds;
+      const gesture = sampleAuthoredFire(this, manifest.clips, dt, clipName, clipTime, empty);
+      const firing = !gesture && this.fireTime < manifest.clips.Fire.duration;
+      const info = gesture && hasOwn(manifest.clips, gesture) ? manifest.clips[gesture] : undefined;
+      const clearTime =
+        info && 'beltClearTime' in info && typeof info.beltClearTime === 'number'
+          ? info.beltClearTime
+          : undefined;
+      const insertTime =
+        info && 'beltInsertTime' in info && typeof info.beltInsertTime === 'number'
+          ? info.beltInsertTime
+          : undefined;
+      const loaded =
+        !clearTime || clipTime < clearTime || (insertTime !== undefined && clipTime >= insertTime);
+      this._beltVisibility(remainingRounds, firing, loaded);
+      this.root.updateMatrixWorld(true);
+    },
 
-  _beltVisibility(rounds: number, departing: boolean, loaded = true): void {
-    const count = Math.min(this.bones.length, Math.max(0, rounds) + (departing ? 1 : 0));
-    for (let i = 0; i < this.bones.length; i++) {
-      // Explicitly restore scales: mixer caches constant native values and
-      // cannot see our ammunition masks from the preceding frame.
-      this.bones[i].scale.setScalar(loaded && i < count ? 1 : 0);
-    }
-    this.belt.visible = loaded && count > 0;
-  }
-
-  update(
-    dt: number,
-    clipName: string,
-    clipTime: number,
-    empty: boolean,
-    magazineLoaded = !empty,
-    remainingRounds = magazineLoaded ? 100 : 0
-  ): void {
-    this.remainingRounds = remainingRounds;
-    this.idleTime += dt;
-    this.fireTime += dt;
-    const gesture = ALIASES[clipName];
-    const firing = !gesture && this.fireTime < manifest.clips.Fire.duration;
-    if (gesture) this._sample(gesture, clipTime);
-    else if (firing) this._sample(empty ? 'Last_Shot' : 'Fire', this.fireTime);
-    else this._sample('Idle', this.idleTime % manifest.clips.Idle.duration);
-    const info = gesture && hasOwn(manifest.clips, gesture) ? manifest.clips[gesture] : undefined;
-    const clearTime =
-      info && 'beltClearTime' in info && typeof info.beltClearTime === 'number'
-        ? info.beltClearTime
-        : undefined;
-    const insertTime =
-      info && 'beltInsertTime' in info && typeof info.beltInsertTime === 'number'
-        ? info.beltInsertTime
-        : undefined;
-    const loaded =
-      !clearTime || clipTime < clearTime || (insertTime !== undefined && clipTime >= insertTime);
-    this._beltVisibility(remainingRounds, firing, loaded);
-    this.root.updateMatrixWorld(true);
-  }
-
-  handTarget(side: HandSide, pos: THREE.Vector3, q: THREE.Quaternion): void {
-    authoredHandTarget(this.root, this.hands[side], pos, q);
-  }
-
-  applyHands(left: EvolysArm, right: EvolysArm): void {
-    applyAuthoredHand(left, this.hands.left);
-    applyAuthoredHand(right, this.hands.right);
-  }
-
-  dispose(): void {
-    this.mixer.stopAllAction();
-    this.mixer.uncacheRoot(this.root);
-    const skeletons = new Set<THREE.Skeleton>();
-    this.root.traverse((node): void => {
-      if (node instanceof THREE.SkinnedMesh) skeletons.add(node.skeleton);
-    });
-    for (const skeleton of skeletons) skeleton.dispose();
-    disposeWeaponMaterials(this.model);
-  }
+    dispose(): void {
+      disposeAuthoredMixer(this);
+      const skeletons = new Set<THREE.Skeleton>();
+      this.root.traverse((node): void => {
+        if (node instanceof THREE.SkinnedMesh) skeletons.add(node.skeleton);
+      });
+      for (const skeleton of skeletons) skeleton.dispose();
+      disposeWeaponMaterials(this.model);
+    },
+  };
+  animation.reset();
+  return animation;
 }
