@@ -140,6 +140,62 @@ assert.throws(
 assert.equal(service.current, null);
 assert.equal(service.jobs.size, 0, 'failed attempt releases unsent jobs');
 
+// Retry pruning and whole-scope cancellation share removal, not proof admission.
+const pruning = new AttachmentQueries(nav, { workerFactory: () => new FakeWorker() });
+await pruning.start();
+const targets = [10, 11, 12, 13, 14].map((x) => new THREE.Vector3(x, 0, 0));
+const ask = (index) => pruning.request(a, targets[index], 0.36, 1.8, 80);
+assert.equal(
+  pruning.run(7, 'path', () => {
+    ask(0);
+    ask(1);
+    ask(2);
+  }),
+  NAV_PENDING
+);
+assert.equal(
+  pruning.run(8, 'path', () => ask(3)),
+  NAV_PENDING
+);
+const [firstId, keptId, thirdId, otherId] = pruning.jobs.keys();
+const scope = pruning.scopes.get('7:path');
+const messages = pruning.worker.messages;
+const beforePruning = messages.length;
+assert.equal(
+  pruning.run(7, 'path', () => {
+    ask(1);
+    ask(4);
+  }),
+  NAV_PENDING
+);
+const newId = [...pruning.jobs.keys()].at(-1);
+assert.deepEqual([...pruning.jobs.keys()], [keptId, otherId, newId]);
+assert.deepEqual(
+  [...scope.proofs.values()].map((proof) => proof.id),
+  [keptId, newId]
+);
+assert.deepEqual(
+  messages.slice(beforePruning).map((message) => message.type),
+  ['cancel', 'queries']
+);
+assert.deepEqual(messages[beforePruning].ids, [firstId, thirdId], 'cancel in submission order');
+assert.equal(pruning.stats.cancelled, 2);
+assert.equal(pruning.stats.pending, 3);
+pruning.receive({ type: 'result', id: keptId, value: true, ms: 0, moves: 0 });
+const proofCount = pruning.proofs.size;
+pruning.cancel('7:path');
+assert.deepEqual(messages.at(-1), { type: 'cancel', ids: [newId] });
+assert.deepEqual([...pruning.jobs.keys()], [otherId], 'unrelated actor work survives');
+assert.equal(pruning.scopes.has('7:path'), false);
+assert.equal(pruning.stats.cancelled, 3);
+assert.equal(pruning.stats.pending, 1);
+assert.equal(pruning.proofs.size, proofCount, 'scope cancellation retains completed static proofs');
+pruning.receive({ type: 'result', id: newId, value: true, ms: 0, moves: 0 });
+assert.equal(pruning.proofs.size, proofCount, 'cancelled results cannot enter the proof cache');
+assert.equal(pruning.stats.stale, 1);
+pruning.dispose();
+assert.equal(pruning.stats.pending, 0);
+
 // A ready lower-ranked candidate cannot leapfrog an unresolved better one,
 // and a pending attempt cannot release or acquire live cover claims.
 const points = [0, 2].map((x) => ({

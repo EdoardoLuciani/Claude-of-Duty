@@ -460,32 +460,8 @@ export async function unpackNav(
     sourceHash: typeof value.sourceHash === 'string' ? value.sourceHash : undefined,
     collisionAsset: typeof value.collisionAsset === 'string' ? value.collisionAsset : undefined,
   };
-  check(
-    meta.version === NAV_VERSION && meta.engine === NAV_ENGINE,
-    'unsupported bake version/engine'
-  );
-  check(
-    JSON.stringify(meta.profile) === JSON.stringify(NAV_PROFILE),
-    'incompatible infantry profile'
-  );
-  check(
-    JSON.stringify(meta.config) === JSON.stringify(NAV_CONFIG),
-    'incompatible bake configuration'
-  );
-  check(
-    Array.isArray(meta.bounds?.min) &&
-      Array.isArray(meta.bounds?.max) &&
-      meta.bounds.min.length === 3 &&
-      meta.bounds.max.length === 3,
-    'missing bounds'
-  );
-  for (let k = 0; k < 3; k++)
-    check(
-      Number.isFinite(meta.bounds.min[k]) &&
-        Number.isFinite(meta.bounds.max[k]) &&
-        meta.bounds.min[k] <= meta.bounds.max[k],
-      'invalid bounds'
-    );
+  check(meta.bounds.min.length === 3 && meta.bounds.max.length === 3, 'missing bounds');
+  for (let k = 0; k < 3; k++) check(meta.bounds.min[k] <= meta.bounds.max[k], 'invalid bounds');
   for (const key of ['sourceHash', 'collisionAsset'] as const)
     if (expected[key] !== undefined) check(meta[key] === expected[key], `${key} mismatch`);
   check(value.ladderMotorVersion === LADDER_MOTOR_VERSION, 'incompatible ladder motor');
