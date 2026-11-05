@@ -1,5 +1,8 @@
+import type { Vector3Like as Vec3Like } from 'three';
+
 import type { SurfaceName } from '../physics/surfaces.ts';
 import { P, D } from './atlas.ts';
+import type { FxSystem } from './index.ts';
 import { screenAngle } from './muzzle.ts';
 import { resetSpawn, setSpawnColorRamp, setSpawnPosition, setSpawnVelocity } from './particles.ts';
 import {
@@ -21,34 +24,19 @@ import {
  * while aerosol velocities remain low.
  */
 
-import type { EngineSystems } from '../core/context.ts';
-import type { FxDecalOptions } from './index.ts';
-
-interface Vec3Like {
-  x: number;
-  y: number;
-  z: number;
-}
-interface ImpactRng {
-  float(): number;
-  range(min: number, max: number): number;
-  signed(): number;
-}
-interface ImpactFx {
-  rng: ImpactRng;
-  pScale: number;
-  emitAdd(spawn: object): void;
-  emitLit(spawn: object): void;
-  physics?: Pick<EngineSystems['physics'], 'MASK' | 'raycast'> | undefined;
-  addDecal(point: Vec3Like, normal: Vec3Like, options: FxDecalOptions): void;
-  haze(...args: number[]): void;
-  sunWorld(): Vec3Like;
-  bloodSpatterBehind(point: Vec3Like, incident: Vec3Like): void;
-  ctx: {
-    camera?: { updateMatrixWorld(): void; matrixWorldInverse: { elements: ArrayLike<number> } };
-    viewCamera?: { updateMatrixWorld(): void; matrixWorldInverse: { elements: ArrayLike<number> } };
-  };
-}
+type ImpactFx = Pick<
+  FxSystem,
+  | 'rng'
+  | 'pScale'
+  | 'emitAdd'
+  | 'emitLit'
+  | 'physics'
+  | 'addDecal'
+  | 'haze'
+  | 'sunWorld'
+  | 'bloodSpatterBehind'
+  | 'ctx'
+>;
 interface SparkOptions {
   kelvin?: number;
   size?: number;
