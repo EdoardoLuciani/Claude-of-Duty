@@ -22,7 +22,7 @@ interface KillfeedRow {
 
 /** Six bounded rows, newest first, with the original 5.6s lifetime. */
 export class Killfeed {
-  readonly pool = new Pool(KILLFEED_CAPACITY, (): null => null);
+  readonly pool = new Pool(KILLFEED_CAPACITY);
   readonly rows = Array.from({ length: KILLFEED_CAPACITY }, (): KillfeedRow => ({
     attacker: '',
     victim: '',
@@ -49,12 +49,7 @@ export class Killfeed {
   }
   update(dt: number): void {
     for (const it of this.pool.items) {
-      if (!it.alive) continue;
-      it.t += dt;
-      if (it.t >= it.life) {
-        this.pool.release(it);
-        continue;
-      }
+      if (!this.pool.advance(it, dt)) continue;
       const inT = clamp01(it.t / 0.16),
         outT = clamp01((it.t - (it.life - 0.45)) / 0.45),
         row = this.rows[it.i];

@@ -25,47 +25,45 @@ import { el, clamp, clamp01, damp, setStyle } from './util.ts';
 const MAX_BLIPS = 48;
 const HEAL_KEY = bindingLabel('heal');
 
-/** Shared-device Pixi HUD with native menus/radio; lateUpdate follows the final camera pose.
- * Controllers retain animation/derived state and read complete optional-provider snapshots.
- * UI raw-time animation and gameplay-scaled animation remain distinct for pause/captures.
- * Canonical APIs and event payloads live in subsystem types and ARCHITECTURE.md.
- */
-interface HudState {
-  health: number;
-  maxHealth: number;
-  armour: number;
-  maxArmour: number;
-  bandages: number;
-  healing: boolean;
-  healProgress: number;
-  hurt: number;
-  pulse: number;
-  credits: number;
-  marketIn: number;
-  ammo: number;
-  reserve: number;
-  magSize: number;
-  reloading: boolean;
-  reloadProgress: number;
-  weaponName: string;
+const HUD_DEFAULTS = {
+  health: 100,
+  maxHealth: 100,
+  armour: 0,
+  maxArmour: 150,
+  bandages: 2,
+  healing: false,
+  healProgress: 0,
+  hurt: 0,
+  pulse: 0,
+  credits: 0,
+  marketIn: 0,
+  ammo: 30,
+  reserve: 210,
+  magSize: 30,
+  reloading: false,
+  reloadProgress: 0,
+  weaponName: 'M4A1',
+  fireMode: 'auto' as const,
+  lethalCount: 2,
+  move: 0,
+  sprint: false,
+  crouch: false,
+  ads: false,
+  airborne: false,
+  baseSpread: 5.5,
+  score: 0,
+  wave: 0,
+  enemiesRemaining: 0,
+  waveTotal: 0,
+  waveIncoming: false,
+  nextWaveIn: 0,
+  time: 0,
+};
+type HudState = Omit<typeof HUD_DEFAULTS, 'fireMode'> & {
   fireMode: WeaponMode;
-  lethalCount: number;
   cooking?: boolean;
   grenadeEquipped?: boolean;
-  move: number;
-  sprint: boolean;
-  crouch: boolean;
-  ads: boolean;
-  airborne: boolean;
-  baseSpread: number;
-  score: number;
-  wave: number;
-  enemiesRemaining: number;
-  waveTotal: number;
-  waveIncoming: boolean;
-  nextWaveIn: number;
-  time: number;
-}
+};
 interface Blip {
   x: number;
   z: number;
@@ -85,6 +83,11 @@ interface MinimapFrame {
 }
 type UiContext = EngineContext;
 
+/** Shared-device Pixi HUD with native menus/radio; lateUpdate follows the final camera pose.
+ * Controllers retain animation/derived state and read complete optional-provider snapshots.
+ * UI raw-time animation and gameplay-scaled animation remain distinct for pause/captures.
+ * Canonical APIs and event payloads live in subsystem types and ARCHITECTURE.md.
+ */
 export class UiSystem {
   static readonly id = 'ui';
   static readonly deps: SystemId[] = ['render', 'game', 'market'];
@@ -170,41 +173,7 @@ export class UiSystem {
     this.marketCountdown = new MarketCountdown(ctx.get('market').delay);
     this.radio = new RadioPanel(this.chromeLayer, ctx);
 
-    /** Single source of truth for everything the HUD draws. */
-    this.state = {
-      health: 100,
-      maxHealth: 100,
-      armour: 0,
-      maxArmour: 150,
-      bandages: 2,
-      healing: false,
-      healProgress: 0,
-      hurt: 0,
-      pulse: 0,
-      credits: 0,
-      marketIn: 0,
-      ammo: 30,
-      reserve: 210,
-      magSize: 30,
-      reloading: false,
-      reloadProgress: 0,
-      weaponName: 'M4A1',
-      fireMode: 'auto',
-      lethalCount: 2,
-      move: 0,
-      sprint: false,
-      crouch: false,
-      ads: false,
-      airborne: false,
-      baseSpread: 5.5,
-      score: 0,
-      wave: 0,
-      enemiesRemaining: 0,
-      waveTotal: 0,
-      waveIncoming: false,
-      nextWaveIn: 0,
-      time: 0,
-    };
+    this.state = { ...HUD_DEFAULTS };
 
     this.k = 1;
     this.vw = 1920;

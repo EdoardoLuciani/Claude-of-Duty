@@ -4,7 +4,7 @@ import type { ScoreBar } from './compass.ts';
 import { KILLFEED_CAPACITY } from './killfeed.ts';
 import type { Killfeed } from './killfeed.ts';
 import type { MarketCountdown } from './market.ts';
-import { HUD_TYPE, hudText } from './pixi-type.ts';
+import { HUD_TYPE, hudText, fitHudText, writeHudText, poseHudNode } from './pixi-type.ts';
 import type { Prompt, Banner } from './prompts.ts';
 import { clamp01 } from './util.ts';
 
@@ -56,36 +56,6 @@ function skull(): Graphics {
     .rect(6.5, 10, 1, 2)
     .fill(0x080c10);
 }
-function fit(node: Text, width: number): void {
-  node.scale.set(1);
-  node.scale.set(Math.min(1, Math.max(1, width) / Math.max(1, node.width)));
-}
-function write(node: Text, value: string, width = 0): boolean {
-  if (node.text === value) return false;
-  node.text = value;
-  if (width) fit(node, width);
-  return true;
-}
-function pose(
-  node: Container,
-  visible: boolean,
-  alpha: number,
-  x: number,
-  y: number,
-  scale = 1
-): boolean {
-  const changed =
-    node.visible !== visible ||
-    (visible && (node.alpha !== alpha || node.x !== x || node.y !== y || node.scale.x !== scale));
-  node.visible = visible;
-  if (visible) {
-    node.alpha = alpha;
-    node.position.set(x, y);
-    node.scale.set(scale);
-  }
-  return changed;
-}
-
 /** Plain text, bars and backings; all timing/pooling stays in the controllers. */
 export class PixiFeedback {
   readonly stage = new Container();
@@ -180,16 +150,16 @@ export class PixiFeedback {
       c = models.marketCountdown,
       s = models.scoreBar;
     if (this.promptKey !== p.key) {
-      write(this.key, `[${p.key}]`, 58);
+      writeHudText(this.key, `[${p.key}]`, 58);
       this.promptKey = p.key;
       dirty = true;
     }
-    let promptLayout = write(this.verb, p.text);
-    promptLayout = write(this.sub, p.sub) || promptLayout;
+    let promptLayout = writeHudText(this.verb, p.text);
+    promptLayout = writeHudText(this.sub, p.sub) || promptLayout;
     if (promptLayout || this.layoutDirty) {
       const width = Math.min(280, this.width / 2 + 46);
-      fit(this.verb, width);
-      fit(this.sub, width);
+      fitHudText(this.verb, width);
+      fitHudText(this.sub, width);
       dirty = true;
     }
     const fraction = Number(clamp01(p.progress).toFixed(3));
@@ -202,7 +172,7 @@ export class PixiFeedback {
     this.progressFill.scale.x = 160 * fraction;
     this.progressTrack.y = this.progressFill.y = p.sub ? 24 : 8;
     dirty =
-      pose(
+      poseHudNode(
         this.prompt,
         p.shown >= 0.005,
         p.alpha,
@@ -210,15 +180,16 @@ export class PixiFeedback {
         this.height * 0.58 + p.y * this.cssPixel
       ) || dirty;
 
-    const bannerLayout = write(this.title, b.title);
-    const subLayout = write(this.subtitle, b.sub);
+    const bannerLayout = writeHudText(this.title, b.title);
+    const subLayout = writeHudText(this.subtitle, b.sub);
     if (bannerLayout || subLayout || this.layoutDirty) {
-      fit(this.title, Math.min(440, this.width - 100));
-      fit(this.subtitle, Math.min(440, this.width - 100));
+      fitHudText(this.title, Math.min(440, this.width - 100));
+      fitHudText(this.subtitle, Math.min(440, this.width - 100));
       dirty = true;
     }
     dirty =
-      pose(this.banner, b.t < 1, b.alpha, this.width / 2, this.height * 0.31, b.scale) || dirty;
+      poseHudNode(this.banner, b.t < 1, b.alpha, this.width / 2, this.height * 0.31, b.scale) ||
+      dirty;
     if (this.countdownValue !== c.value) {
       this.seconds.text = c.value + 's';
       this.countdownValue = c.value;
@@ -227,14 +198,19 @@ export class PixiFeedback {
     if (this.countFill.scale.x !== 150 * c.fraction) dirty = true;
     this.countFill.scale.x = 150 * c.fraction;
     dirty =
-      pose(this.countdown, c.shown >= 0.005, Number(c.shown.toFixed(3)), this.width / 2, 92.2) ||
-      dirty;
-    dirty = write(this.scoreValue, s.score, 74) || dirty;
-    dirty = write(this.waveValue, s.wave, 24) || dirty;
-    dirty = write(this.creditValue, s.credits, 74) || dirty;
-    dirty = write(this.status, s.status, 160) || dirty;
+      poseHudNode(
+        this.countdown,
+        c.shown >= 0.005,
+        Number(c.shown.toFixed(3)),
+        this.width / 2,
+        92.2
+      ) || dirty;
+    dirty = writeHudText(this.scoreValue, s.score, 74) || dirty;
+    dirty = writeHudText(this.waveValue, s.wave, 24) || dirty;
+    dirty = writeHudText(this.creditValue, s.credits, 74) || dirty;
+    dirty = writeHudText(this.status, s.status, 160) || dirty;
     dirty =
-      pose(
+      poseHudNode(
         this.score,
         true,
         1,
@@ -249,8 +225,8 @@ export class PixiFeedback {
         entry = feed.rows[i],
         alive = feed.pool.items[i].alive;
       if (alive && (slot.sequence !== entry.sequence || this.layoutDirty)) {
-        write(slot.attacker, entry.attacker, 140);
-        write(slot.victim, entry.victim, 140);
+        writeHudText(slot.attacker, entry.attacker, 140);
+        writeHudText(slot.victim, entry.victim, 140);
         slot.attacker.tint = entry.attackerFriendly ? (entry.mine ? 0xffffff : 0x8fc8ff) : 0xff7a63;
         slot.victim.tint = entry.attackerFriendly ? 0xff7a63 : 0x8fc8ff;
         slot.skull.visible = entry.headshot;
@@ -273,7 +249,7 @@ export class PixiFeedback {
         for (let j = 0; j < feed.rows.length; j++)
           if (feed.pool.items[j].alive && feed.rows[j].sequence > entry.sequence) rank++;
       dirty =
-        pose(
+        poseHudNode(
           slot.node,
           alive,
           entry.alpha,

@@ -14,7 +14,7 @@ import { PixiFeedback } from './pixi-feedback.ts';
 import type { FeedbackModels } from './pixi-feedback.ts';
 import { PixiInjury } from './pixi-injury.ts';
 import { PixiMinimap } from './pixi-minimap.ts';
-import { HUD_TYPE, hudText as text, setHudTextResolution } from './pixi-type.ts';
+import { HUD_TYPE, hudText as text, setHudTextResolution, writeHudText } from './pixi-type.ts';
 import { clamp01, setStyle } from './util.ts';
 
 const WATCH = [
@@ -211,18 +211,8 @@ export class PixiHud {
     this.ammo.update(dt, s);
     const max = s.maxHealth || 100,
       hp = Math.round(Math.max(0, Math.min(max, s.health ?? max)));
-    const value = String(hp);
-    if (this.hp.text !== value) {
-      this.hp.text = value;
-      this.hp.scale.set(1);
-      this.hp.scale.set(Math.min(1, 80 / Math.max(1, this.hp.width)));
-      this.dirty = true;
-    }
-    const maxLabel = '/' + Math.round(max);
-    if (this.maxHp.text !== maxLabel) {
-      this.maxHp.text = maxLabel;
-      this.dirty = true;
-    }
+    this.dirty = writeHudText(this.hp, String(hp), 80) || this.dirty;
+    this.dirty = writeHudText(this.maxHp, '/' + Math.round(max)) || this.dirty;
     const fraction = clamp01((s.health ?? max) / max),
       tint = fraction <= 0.28 ? 0xff5145 : fraction < 0.5 ? 0xffb02a : 0xe7f2ef;
     this.hp.tint = this.hpFill.tint = tint;
