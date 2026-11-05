@@ -50,7 +50,7 @@ export const rubberSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof
       clamp(color, 0.02, 0.35),
       clamp(height, 0, 1),
       clamp(rough, 0.55, 0.99),
-      float(0),
+      0,
       clamp(ao, 0.3, 1)
     );
   }
