@@ -74,7 +74,7 @@ export const sandSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof S
       clamp(color, 0.02, 0.82),
       clamp(height, 0, 1),
       clamp(rough, 0.35, 0.99),
-      float(0),
+      0,
       clamp(ao, 0.8, 1)
     );
   }

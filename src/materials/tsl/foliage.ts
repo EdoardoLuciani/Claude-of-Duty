@@ -68,6 +68,6 @@ export const foliageSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeo
       0.95
     );
     const ao = clamp(float(0.55).add(float(1).sub(d.mul(0.3)).mul(0.45)), 0.3, 1);
-    return Surface(albedo, cover, rough, float(0), ao);
+    return Surface(albedo, cover, rough, 0, ao);
   }
 );
