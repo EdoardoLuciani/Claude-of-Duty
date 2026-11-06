@@ -7,7 +7,7 @@ import type { DamageArcs } from './damage.ts';
 import { KINDS, R_IN, R_OUT } from './hitmarkers.ts';
 import type { Hitmarkers, HitmarkerKind } from './hitmarkers.ts';
 import { accessoryIcon } from './pixi-accessory-icons.ts';
-import { HUD_TYPE } from './pixi-type.ts';
+import { HUD_TYPE, poseHudNode, writeHudText } from './pixi-type.ts';
 
 export interface CombatModels {
   hit: Hitmarkers;
@@ -123,44 +123,20 @@ export class PixiCombat {
         { node, mark, ring } = slot,
         v = models.hit.visuals[i];
       const alive = models.hit.pool.items[i].alive;
-      if (
-        node.visible !== alive ||
-        (alive &&
-          (node.scale.x !== v.scale ||
-            node.rotation !== v.rotation ||
-            node.alpha !== v.alpha ||
-            ring.scale.x !== v.ringScale ||
-            ring.alpha !== v.ringAlpha ||
-            slot.kind !== v.kind))
-      )
-        dirty = true;
-      if (alive && slot.kind !== v.kind) {
+      dirty = poseHudNode(node, alive, v.alpha, node.x, node.y, v.scale, v.rotation) || dirty;
+      if (!alive) continue;
+      if (slot.kind !== v.kind) {
         slot.kind = v.kind;
         mark.tint = ring.tint = Number.parseInt(KINDS[v.kind].c.slice(1), 16);
+        dirty = true;
       }
-      node.visible = alive;
-      if (!alive) continue;
-      node.scale.set(v.scale);
-      node.rotation = v.rotation;
-      node.alpha = v.alpha;
-      ring.scale.set(v.ringScale);
-      ring.alpha = v.ringAlpha;
+      dirty = poseHudNode(ring, true, v.ringAlpha, ring.x, ring.y, v.ringScale) || dirty;
     }
     for (let i = 0; i < this.arcSlots.length; i++) {
       const node = this.arcSlots[i],
         v = models.arcs.visuals[i],
         alive = models.arcs.pool.items[i].alive;
-      if (
-        node.visible !== alive ||
-        (alive &&
-          (node.scale.x !== v.scale || node.rotation !== v.rotation || node.alpha !== v.alpha))
-      )
-        dirty = true;
-      node.visible = alive;
-      if (!alive) continue;
-      node.scale.set(v.scale);
-      node.rotation = v.rotation;
-      node.alpha = v.alpha;
+      dirty = poseHudNode(node, alive, v.alpha, node.x, node.y, v.scale, v.rotation) || dirty;
     }
     let layout = false;
     for (let i = 0; i < this.slots.length; i++) {
@@ -187,10 +163,6 @@ export class PixiCombat {
         right = node.x - 16;
       }
     }
-    if (this.fps.text !== models.fpsText) {
-      this.fps.text = models.fpsText;
-      dirty = true;
-    }
-    return dirty;
+    return writeHudText(this.fps, models.fpsText) || dirty;
   }
 }

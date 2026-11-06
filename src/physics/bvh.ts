@@ -263,12 +263,8 @@ export class StaticWorld {
     const cent = this._cent;
     const ta = this._taabb;
     const nrm = this.nrm;
-    let gminx = Infinity,
-      gminy = Infinity,
-      gminz = Infinity;
-    let gmaxx = -Infinity,
-      gmaxy = -Infinity,
-      gmaxz = -Infinity;
+    const worldMin = new Float64Array(3).fill(Infinity);
+    const worldMax = new Float64Array(3).fill(-Infinity);
     for (let i = 0; i < total; i++) {
       const p = i * 9;
       const ax = pos[p],
@@ -303,36 +299,23 @@ export class StaticWorld {
       nrm[i * 3 + 1] = ny;
       nrm[i * 3 + 2] = nz;
 
-      const mnx = Math.min(ax, bx, cx),
-        mny = Math.min(ay, by, cy),
-        mnz = Math.min(az, bz, cz);
-      const mxx = Math.max(ax, bx, cx),
-        mxy = Math.max(ay, by, cy),
-        mxz = Math.max(az, bz, cz);
-      const b = i * 6;
-      ta[b] = mnx;
-      ta[b + 1] = mny;
-      ta[b + 2] = mnz;
-      ta[b + 3] = mxx;
-      ta[b + 4] = mxy;
-      ta[b + 5] = mxz;
-      cent[i * 3] = (mnx + mxx) * 0.5;
-      cent[i * 3 + 1] = (mny + mxy) * 0.5;
-      cent[i * 3 + 2] = (mnz + mxz) * 0.5;
+      for (let axis = 0; axis < 3; axis++) {
+        const min = Math.min(pos[p + axis], pos[p + 3 + axis], pos[p + 6 + axis]);
+        const max = Math.max(pos[p + axis], pos[p + 3 + axis], pos[p + 6 + axis]);
+        ta[i * 6 + axis] = min;
+        ta[i * 6 + 3 + axis] = max;
+        cent[i * 3 + axis] = (min + max) * 0.5;
+        if (min < worldMin[axis]) worldMin[axis] = min;
+        if (max > worldMax[axis]) worldMax[axis] = max;
+      }
       this.triIndex[i] = i;
-      if (mnx < gminx) gminx = mnx;
-      if (mny < gminy) gminy = mny;
-      if (mnz < gminz) gminz = mnz;
-      if (mxx > gmaxx) gmaxx = mxx;
-      if (mxy > gmaxy) gmaxy = mxy;
-      if (mxz > gmaxz) gmaxz = mxz;
     }
-    this.aabb.minx = gminx;
-    this.aabb.miny = gminy;
-    this.aabb.minz = gminz;
-    this.aabb.maxx = gmaxx;
-    this.aabb.maxy = gmaxy;
-    this.aabb.maxz = gmaxz;
+    this.aabb.minx = worldMin[0];
+    this.aabb.miny = worldMin[1];
+    this.aabb.minz = worldMin[2];
+    this.aabb.maxx = worldMax[0];
+    this.aabb.maxy = worldMax[1];
+    this.aabb.maxz = worldMax[2];
 
     this._buildNodes(total);
     this.dirty = false;
@@ -378,40 +361,24 @@ export class StaticWorld {
       if (count <= LEAF_SIZE || depth > 60) continue;
 
       const nb = node * 6;
-      // centroid bounds
-      let cminx = Infinity,
-        cminy = Infinity,
-        cminz = Infinity;
-      let cmaxx = -Infinity,
-        cmaxy = -Infinity,
-        cmaxz = -Infinity;
-      for (let i = start; i < start + count; i++) {
-        const t = idx[i] * 3;
-        const x = cent[t],
-          y = cent[t + 1],
-          z = cent[t + 2];
-        if (x < cminx) cminx = x;
-        if (x > cmaxx) cmaxx = x;
-        if (y < cminy) cminy = y;
-        if (y > cmaxy) cmaxy = y;
-        if (z < cminz) cminz = z;
-        if (z > cmaxz) cmaxz = z;
-      }
-      const ex = cmaxx - cminx,
-        ey = cmaxy - cminy,
-        ez = cmaxz - cminz;
+      // Pick the widest centroid axis; strict improvement preserves X/Y/Z ties.
       let axis = 0,
-        extent = ex,
-        cmin = cminx;
-      if (ey > extent) {
-        axis = 1;
-        extent = ey;
-        cmin = cminy;
-      }
-      if (ez > extent) {
-        axis = 2;
-        extent = ez;
-        cmin = cminz;
+        extent = -Infinity,
+        cmin = Infinity;
+      for (let candidate = 0; candidate < 3; candidate++) {
+        let min = Infinity,
+          max = -Infinity;
+        for (let i = start; i < start + count; i++) {
+          const value = cent[idx[i] * 3 + candidate];
+          if (value < min) min = value;
+          if (value > max) max = value;
+        }
+        const size = max - min;
+        if (candidate === 0 || size > extent) {
+          axis = candidate;
+          extent = size;
+          cmin = min;
+        }
       }
       if (extent < 1e-7) continue; // degenerate cluster -> leaf
 
@@ -544,31 +511,19 @@ export class StaticWorld {
   _nodeBoundsFromRange(node: number, start: number, count: number): void {
     const ta = this._taabb;
     const idx = this.triIndex;
-    let mnx = Infinity,
-      mny = Infinity,
-      mnz = Infinity;
-    let mxx = -Infinity,
-      mxy = -Infinity,
-      mxz = -Infinity;
-    for (let i = start; i < start + count; i++) {
-      const b = idx[i] * 6;
-      if (ta[b] < mnx) mnx = ta[b];
-      if (ta[b + 1] < mny) mny = ta[b + 1];
-      if (ta[b + 2] < mnz) mnz = ta[b + 2];
-      if (ta[b + 3] > mxx) mxx = ta[b + 3];
-      if (ta[b + 4] > mxy) mxy = ta[b + 4];
-      if (ta[b + 5] > mxz) mxz = ta[b + 5];
+    // Float32 storage can round a bound inwards; retain the original padding.
+    const padding = 1e-5;
+    for (let axis = 0; axis < 3; axis++) {
+      let min = Infinity,
+        max = -Infinity;
+      for (let i = start; i < start + count; i++) {
+        const b = idx[i] * 6 + axis;
+        if (ta[b] < min) min = ta[b];
+        if (ta[b + 3] > max) max = ta[b + 3];
+      }
+      this.nodeBounds[node * 6 + axis] = min - padding;
+      this.nodeBounds[node * 6 + 3 + axis] = max + padding;
     }
-    // Float32 storage can round a bound inwards; pad by a hair so we never
-    // reject a triangle that actually straddles the plane.
-    const p = 1e-5;
-    const o = node * 6;
-    this.nodeBounds[o] = mnx - p;
-    this.nodeBounds[o + 1] = mny - p;
-    this.nodeBounds[o + 2] = mnz - p;
-    this.nodeBounds[o + 3] = mxx + p;
-    this.nodeBounds[o + 4] = mxy + p;
-    this.nodeBounds[o + 5] = mxz + p;
   }
 
   /**
@@ -872,15 +827,7 @@ export class StaticWorld {
     const ta = this._taabb;
     const stack = this._stackNode;
     let sp = 0;
-    if (
-      nb[0] > maxx ||
-      nb[3] < minx ||
-      nb[1] > maxy ||
-      nb[4] < miny ||
-      nb[2] > maxz ||
-      nb[5] < minz
-    )
-      return 0;
+    if (!overlapsBounds(nb, 0, minx, miny, minz, maxx, maxy, maxz)) return 0;
     stack[sp++] = 0;
     let n = 0;
     let cand = this._cand;
@@ -893,9 +840,7 @@ export class StaticWorld {
           const tri = idx[i];
           if ((this.mask[tri] & mask) === 0) continue;
           const b = tri * 6;
-          if (ta[b] > maxx || ta[b + 3] < minx) continue;
-          if (ta[b + 1] > maxy || ta[b + 4] < miny) continue;
-          if (ta[b + 2] > maxz || ta[b + 5] < minz) continue;
+          if (!overlapsBounds(ta, b, minx, miny, minz, maxx, maxy, maxz)) continue;
           if (n >= cand.length) {
             const bigger = new Int32Array(cand.length * 2);
             bigger.set(cand);
@@ -906,27 +851,9 @@ export class StaticWorld {
         continue;
       }
       const l = meta[node * 2];
-      const r = l + 1;
-      const lo = l * 6,
-        ro = r * 6;
-      const hitL = !(
-        nb[lo] > maxx ||
-        nb[lo + 3] < minx ||
-        nb[lo + 1] > maxy ||
-        nb[lo + 4] < miny ||
-        nb[lo + 2] > maxz ||
-        nb[lo + 5] < minz
-      );
-      const hitR = !(
-        nb[ro] > maxx ||
-        nb[ro + 3] < minx ||
-        nb[ro + 1] > maxy ||
-        nb[ro + 4] < miny ||
-        nb[ro + 2] > maxz ||
-        nb[ro + 5] < minz
-      );
-      if (hitL) stack[sp++] = l;
-      if (hitR) stack[sp++] = r;
+      for (let child = l; child <= l + 1; child++) {
+        if (overlapsBounds(nb, child * 6, minx, miny, minz, maxx, maxy, maxz)) stack[sp++] = child;
+      }
       if (sp >= stack.length - 2) break; // stack is sized from tree depth; never hit in practice
     }
     return n;
@@ -1213,6 +1140,26 @@ export class StaticWorld {
     this.nodeCount = 0;
     this.triCount = 0;
   }
+}
+
+function overlapsBounds(
+  bounds: Float32Array,
+  offset: number,
+  minx: number,
+  miny: number,
+  minz: number,
+  maxx: number,
+  maxy: number,
+  maxz: number
+): boolean {
+  return !(
+    bounds[offset] > maxx ||
+    bounds[offset + 3] < minx ||
+    bounds[offset + 1] > maxy ||
+    bounds[offset + 4] < miny ||
+    bounds[offset + 2] > maxz ||
+    bounds[offset + 5] < minz
+  );
 }
 
 function surfaceArea(

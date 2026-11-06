@@ -22,14 +22,12 @@ export const FONT_DISPLAY =
 
 export const FONT_MONO = '"SF Mono",ui-monospace,"Roboto Mono",Menlo,monospace';
 
-import type { PoolRecord as BasePoolRecord } from './pool-types.ts';
 type CachedElement = Element & {
   style: CSSStyleDeclaration;
   _owText?: string;
   _ows?: Map<string, string>;
   _owc?: Map<string, boolean>;
 };
-type PoolRecord<Node extends HTMLElement | null = HTMLElement> = BasePoolRecord<Node>;
 
 export function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -126,58 +124,66 @@ export function damp(current: number, target: number, rate: number, dt: number):
   return target + (current - target) * Math.exp(-rate * dt);
 }
 
-/**
- * Fixed-size lifetime pool. `make()` builds an element or returns null for Pixi-owned visuals; records carry their own
- * animation state. Nothing is allocated after construction.
- */
-export class Pool<Node extends HTMLElement | null = HTMLElement> {
-  items: PoolRecord<Node>[];
-  count: number;
-  _next: number = 0;
+export interface PoolRecord {
+  readonly node: null;
+  alive: boolean;
+  t: number;
+  life: number;
+  i: number;
+  a: number;
+  b: number;
+  c: number;
+}
 
-  constructor(count: number, make: (index: number) => Node, parent?: HTMLElement | null) {
-    this.items = new Array<PoolRecord<Node>>(count);
-    for (let i = 0; i < count; i++) {
-      const node = make(i);
-      if (node && parent) parent.appendChild(node);
-      if (node) node.style.display = 'none';
-      this.items[i] = { node, alive: false, t: 0, life: 1, i, a: 0, b: 0, c: 0, d: 0, s: '' };
-    }
-    this.count = count;
+/** Fixed-size retained animation state; Pixi owns the visual objects. */
+export class Pool {
+  readonly items: PoolRecord[];
+  private next = 0;
+
+  constructor(count: number) {
+    this.items = Array.from({ length: count }, (_, i): PoolRecord => ({
+      node: null,
+      alive: false,
+      t: 0,
+      life: 1,
+      i,
+      a: 0,
+      b: 0,
+      c: 0,
+    }));
   }
 
-  /** Oldest-first reuse so a burst never starves. */
-  acquire(): PoolRecord<Node> {
-    let best: PoolRecord<Node> | null = null;
-    let bestT = -Infinity;
-    for (let i = 0; i < this.count; i++) {
-      const it = this.items[(this._next + i) % this.count];
-      if (!it.alive) {
-        this._next = (it.i + 1) % this.count;
-        it.alive = true;
-        it.t = 0;
-        if (it.node) it.node.style.display = '';
-        return it;
+  /** Free slots rotate; a full pool reuses the greatest normalized age. */
+  acquire(): PoolRecord {
+    let best = this.items[this.next];
+    let bestAge = -Infinity;
+    for (let i = 0; i < this.items.length; i++) {
+      const item = this.items[(this.next + i) % this.items.length];
+      if (!item.alive) {
+        this.next = (item.i + 1) % this.items.length;
+        best = item;
+        break;
       }
-      const age = it.t / (it.life || 1);
-      if (age > bestT) {
-        bestT = age;
-        best = it;
+      const age = item.t / (item.life || 1);
+      if (age > bestAge) {
+        bestAge = age;
+        best = item;
       }
     }
-    best!.alive = true;
-    best!.t = 0;
-    if (best!.node) best!.node!.style.display = '';
-    return best!;
+    best.alive = true;
+    best.t = 0;
+    return best;
   }
 
-  release(it: PoolRecord<Node>): void {
-    if (!it.alive) return;
-    it.alive = false;
-    if (it.node) it.node.style.display = 'none';
+  /** Advance one slot in its controller's loop, without callbacks or allocations. */
+  advance(item: PoolRecord, dt: number): boolean {
+    if (!item.alive) return false;
+    item.t += dt;
+    if (item.t >= item.life) item.alive = false;
+    return item.alive;
   }
 
   releaseAll(): void {
-    for (let i = 0; i < this.count; i++) this.release(this.items[i]);
+    for (const item of this.items) item.alive = false;
   }
 }

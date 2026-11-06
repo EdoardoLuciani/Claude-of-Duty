@@ -393,40 +393,30 @@ export function segTriangleClosest(
 
   let best = Infinity;
 
-  // segment endpoints vs triangle face
-  closestPtPointTriangle(p0x, p0y, p0z, ax, ay, az, bx, by, bz, cx, cy, cz, _tmp);
-  let ex = p0x - _tmp.bx,
-    ey = p0y - _tmp.by,
-    ez = p0z - _tmp.bz;
-  let d = ex * ex + ey * ey + ez * ez;
-  if (d < best) {
-    best = d;
-    out.ax = p0x;
-    out.ay = p0y;
-    out.az = p0z;
-    out.bx = _tmp.bx;
-    out.by = _tmp.by;
-    out.bz = _tmp.bz;
-    out.s = 0;
-  }
-  closestPtPointTriangle(p1x, p1y, p1z, ax, ay, az, bx, by, bz, cx, cy, cz, _tmp);
-  ex = p1x - _tmp.bx;
-  ey = p1y - _tmp.by;
-  ez = p1z - _tmp.bz;
-  d = ex * ex + ey * ey + ez * ez;
-  if (d < best) {
-    best = d;
-    out.ax = p1x;
-    out.ay = p1y;
-    out.az = p1z;
-    out.bx = _tmp.bx;
-    out.by = _tmp.by;
-    out.bz = _tmp.bz;
-    out.s = 1;
+  // Endpoints before edges, with strict improvement, retain the original tie order.
+  for (let endpoint = 0; endpoint < 2; endpoint++) {
+    const px = endpoint === 0 ? p0x : p1x;
+    const py = endpoint === 0 ? p0y : p1y;
+    const pz = endpoint === 0 ? p0z : p1z;
+    closestPtPointTriangle(px, py, pz, ax, ay, az, bx, by, bz, cx, cy, cz, _tmp);
+    const ex = px - _tmp.bx,
+      ey = py - _tmp.by,
+      ez = pz - _tmp.bz;
+    const d = ex * ex + ey * ey + ez * ez;
+    if (d < best) {
+      best = d;
+      out.ax = px;
+      out.ay = py;
+      out.az = pz;
+      out.bx = _tmp.bx;
+      out.by = _tmp.by;
+      out.bz = _tmp.bz;
+      out.s = endpoint;
+    }
   }
 
-  // segment vs the three triangle edges
-  d = closestPtSegSeg(p0x, p0y, p0z, p1x, p1y, p1z, ax, ay, az, bx, by, bz, _tmp);
+  // Segment vs triangle edges AB, BC, CA; strict improvement preserves tie order.
+  let d = closestPtSegSeg(p0x, p0y, p0z, p1x, p1y, p1z, ax, ay, az, bx, by, bz, _tmp);
   if (d < best) {
     best = d;
     out.ax = _tmp.ax;
@@ -607,22 +597,6 @@ export function rayCapsuleFar(
 
   const EPS_T = 1e-4;
   let best = -1;
-  const consider = (
-    t: number,
-    px: number,
-    py: number,
-    pz: number,
-    cap: 'a' | 'b' | 'cyl'
-  ): void => {
-    if (t <= EPS_T || t > maxDist) return;
-    if (cap === 'a') {
-      if ((px - ax) * abx + (py - ay) * aby + (pz - az) * abz > 0) return;
-    } else if (cap === 'b') {
-      if ((px - bx) * abx + (py - by) * aby + (pz - bz) * abz < 0) return;
-    }
-    if (t > best) best = t;
-  };
-
   const aox = ox - ax,
     aoy = oy - ay,
     aoz = oz - az;
@@ -644,31 +618,40 @@ export function rayCapsuleFar(
     if (disc >= 0) {
       const sq = Math.sqrt(disc);
       const inv = 1 / (2 * A);
-      const t0 = (-B - sq) * inv;
-      const t1 = (-B + sq) * inv;
-      const k0 = n + t0 * m;
-      const k1 = n + t1 * m;
-      if (k0 >= 0 && k0 <= 1) consider(t0, 0, 0, 0, 'cyl');
-      if (k1 >= 0 && k1 <= 1) consider(t1, 0, 0, 0, 'cyl');
+      for (let root = 0; root < 2; root++) {
+        const t = (root === 0 ? -B - sq : -B + sq) * inv;
+        const k = n + t * m;
+        if (k >= 0 && k <= 1) {
+          if (t <= EPS_T || t > maxDist) continue;
+          if (t > best) best = t;
+        }
+      }
     }
   }
 
-  const considerSphere = (cx: number, cy: number, cz: number, cap: 'a' | 'b'): void => {
+  for (let cap = 0; cap < 2; cap++) {
+    const cx = cap === 0 ? ax : bx;
+    const cy = cap === 0 ? ay : by;
+    const cz = cap === 0 ? az : bz;
     const mx = ox - cx,
       my = oy - cy,
       mz = oz - cz;
     const b = mx * dx + my * dy + mz * dz;
     const c = mx * mx + my * my + mz * mz - r * r;
     const disc = b * b - c;
-    if (disc < 0) return;
+    if (disc < 0) continue;
     const sq = Math.sqrt(disc);
-    const tNear = -b - sq;
-    const tFar = -b + sq;
-    consider(tNear, ox + dx * tNear, oy + dy * tNear, oz + dz * tNear, cap);
-    consider(tFar, ox + dx * tFar, oy + dy * tFar, oz + dz * tFar, cap);
-  };
-  considerSphere(ax, ay, az, 'a');
-  considerSphere(bx, by, bz, 'b');
+    for (let root = 0; root < 2; root++) {
+      const t = root === 0 ? -b - sq : -b + sq;
+      if (t <= EPS_T || t > maxDist) continue;
+      const px = ox + dx * t,
+        py = oy + dy * t,
+        pz = oz + dz * t;
+      const projection = (px - cx) * abx + (py - cy) * aby + (pz - cz) * abz;
+      if (cap === 0 ? projection > 0 : projection < 0) continue;
+      if (t > best) best = t;
+    }
+  }
   return best;
 }
 

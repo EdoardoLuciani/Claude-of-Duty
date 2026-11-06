@@ -52,7 +52,7 @@ export const brushedMetalSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<
       clamp(height, 0, 1),
       clamp(rough, 0.08, 0.95),
       clamp(metal, 0, 1),
-      float(1)
+      1
     );
   }
 );

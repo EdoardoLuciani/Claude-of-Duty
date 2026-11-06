@@ -110,6 +110,24 @@ function segmentDistanceSq(
   return (x - px - dx * t) ** 2 + (z - pz - dz * t) ** 2;
 }
 
+/** Conservative animation/shadow reach shared by relevance and rollback safety. */
+function sphereReachesView(
+  frustum: THREE.Frustum,
+  sphere: THREE.Sphere,
+  sweep: THREE.Sphere,
+  sun: THREE.Vector3
+): boolean {
+  if (frustum.intersectsSphere(sphere)) return true;
+  const max = Math.min(320, (sphere.center.y + 6) / Math.max(0.06, sun.y));
+  const step = Math.max(2, sphere.radius * 0.9);
+  sweep.radius = sphere.radius;
+  for (let t = step; t <= max; t += step) {
+    sweep.center.copy(sphere.center).addScaledVector(sun, -t);
+    if (frustum.intersectsSphere(sweep)) return true;
+  }
+  return false;
+}
+
 export type AiActor = Agent;
 
 export class AiSystem {
@@ -1575,13 +1593,7 @@ export class AiSystem {
       const p = i ? destination : a.position;
       s.center.copy(p);
       s.center.y += a.height / 2;
-      if (this._frustum.intersectsSphere(s)) return false;
-      const max = Math.min(320, (s.center.y + 6) / Math.max(0.06, sun.y));
-      this._sweep.radius = s.radius;
-      for (let t = Math.max(2, s.radius * 0.9); t <= max; t += Math.max(2, s.radius * 0.9)) {
-        this._sweep.center.copy(s.center).addScaledVector(sun, -t);
-        if (this._frustum.intersectsSphere(this._sweep)) return false;
-      }
+      if (sphereReachesView(this._frustum, s, this._sweep, sun)) return false;
     }
     return true;
   }
@@ -1607,9 +1619,6 @@ export class AiSystem {
     this._mvp.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
     this._frustum.setFromProjectionMatrix(this._mvp);
     const sun = this._sunDirection();
-    // how far a shadow ray can travel before it is under the level
-    const floorY = -6;
-    const sunY = Math.max(0.06, sun.y);
     let irrelevant = 0;
 
     for (let i = 0; i < this.agents.length; i++) {
@@ -1623,20 +1632,7 @@ export class AiSystem {
       }
       const s = this._sphere.copy(bs).applyMatrix4(a.mesh.matrixWorld);
       s.radius += 4;
-      let visible = this._frustum.intersectsSphere(s);
-      if (!visible) {
-        const sweep = this._sweep;
-        const tMax = Math.min(320, (s.center.y - floorY) / sunY);
-        const step = Math.max(2, s.radius * 0.9);
-        sweep.radius = s.radius;
-        for (let t = step; t <= tMax; t += step) {
-          sweep.center.copy(s.center).addScaledVector(sun, -t);
-          if (this._frustum.intersectsSphere(sweep)) {
-            visible = true;
-            break;
-          }
-        }
-      }
+      const visible = sphereReachesView(this._frustum, s, this._sweep, sun);
       a.lodIrrelevant = !visible;
       if (!visible) irrelevant++;
       a.mesh.castShadow = visible;

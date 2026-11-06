@@ -1,4 +1,7 @@
+import type { Vector3Like as Vec3Like } from 'three';
+
 import { P } from './atlas.ts';
+import type { FxSystem } from './index.ts';
 import { resetSpawn, setSpawnColorRamp, setSpawnPosition, setSpawnVelocity } from './particles.ts';
 
 /** Tracers have a hot head, bright core and dimmer afterglow; clamp visual speed for legibility.
@@ -8,24 +11,16 @@ import { resetSpawn, setSpawnColorRamp, setSpawnPosition, setSpawnVelocity } fro
 
 const MIN_SPEED = 55;
 const MAX_SPEED = 340;
-interface Point3 {
-  x: number;
-  y: number;
-  z: number;
-}
 interface TracerOptions {
   flightTime?: number;
   warm?: number;
 }
-interface TracerEmitter {
-  rng: { float(): number };
-  emitAdd(spawn: ReturnType<typeof resetSpawn>): void;
-}
+type TracerEmitter = Pick<FxSystem, 'rng' | 'emitAdd'>;
 
 export function spawnTracer(
   fx: TracerEmitter,
-  from: Point3,
-  to: Point3,
+  from: Vec3Like,
+  to: Vec3Like,
   speed: number,
   opts?: TracerOptions
 ): void {
