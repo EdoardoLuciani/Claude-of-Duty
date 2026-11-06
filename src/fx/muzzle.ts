@@ -163,6 +163,9 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   s.seed = rng.float();
   emitAdd(s);
   // the white-hot heart: a third of the diameter, twice the radiance, gone first
+  s = resetSpawn();
+  setSpawnPosition(s, p.x, p.y, p.z);
+  s.tile = P.FLASH_CORE;
   s.size0 = 0.036 * sc;
   s.size1 = 0.056 * sc;
   s.sizeCurve = 0.4;
@@ -318,20 +321,27 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     s.seed = seed;
     emitAdd(s);
 
-    // The lit puff shares the emitted hot puff's pose, motion and seed.
+    s = resetSpawn();
+    setSpawnPosition(s, px, py, pz);
+    setSpawnVelocity(s, vx, vy, vz);
+    s.tile = tile;
     s.size0 = size0;
     s.size1 = size1;
+    s.sizeCurve = 0.5;
     s.life = rng.range(0.3, 0.55) * (0.7 + prof.smoke * 0.5);
     s.delay = delay;
+    s.drag = 7;
     s.gravity = 0.5;
+    s.rot = rot;
+    s.spin = spin;
     // warm, lit by its own flash while it is still hot -> plain grey as it cools
     setSpawnColorRamp(s, 0.62, 0.57, 0.52, 0.44, 0.44, 0.44);
-    s.i0 = 1;
     s.alpha = rng.range(0.26, 0.44) * (0.7 + prof.smoke * 0.4) * emberGain;
     s.alphaCurve = 1.35;
     s.soft = 0.22;
     s.turb = 0.05;
     s.turbFreq = 2.4;
+    s.seed = seed;
     emitLit(s);
   }
 

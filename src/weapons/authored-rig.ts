@@ -42,7 +42,10 @@ export function sampleAuthoredPose(state: AuthoredRig, name: string, time: numbe
   state.poseQ.copy(state.root.quaternion);
 }
 
-/** Shared native mixer and hands; weapon-local functions still own mechanisms and visibility. */
+/** Shared native mixer and hands; weapon-local functions own mechanisms and visibility.
+ * Spread into the final adapter before use: its receiver owns the mutable clocks.
+ * Keep receiver methods (not arrows); reset must dispatch the adapter's _sample override.
+ */
 export function createAuthoredRig(model: RigModel): AuthoredRig {
   const root = model.root;
   const mixer = new THREE.AnimationMixer(root);

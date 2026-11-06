@@ -370,9 +370,8 @@ export class Ragdoll {
           bj = this.boneTail[j];
         if (ai === aj || ai === bj || bi === aj || bi === bj) continue;
         const rad = this.boneRadius[i] + this.boneRadius[j];
-        this._ss ??= makeClosest();
-        this._closestBones(i, j);
-        if (this._ss.d2 < rad * rad * 0.95) continue;
+        const d2 = this._closestBones(i, j);
+        if (d2 < rad * rad * 0.95) continue;
         pairs.push(i, j);
       }
     }

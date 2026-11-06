@@ -415,24 +415,39 @@ export function segTriangleClosest(
     }
   }
 
-  for (let edge = 0; edge < 3; edge++) {
-    const ex = edge === 0 ? ax : edge === 1 ? bx : cx;
-    const ey = edge === 0 ? ay : edge === 1 ? by : cy;
-    const ez = edge === 0 ? az : edge === 1 ? bz : cz;
-    const fx = edge === 0 ? bx : edge === 1 ? cx : ax;
-    const fy = edge === 0 ? by : edge === 1 ? cy : ay;
-    const fz = edge === 0 ? bz : edge === 1 ? cz : az;
-    const d = closestPtSegSeg(p0x, p0y, p0z, p1x, p1y, p1z, ex, ey, ez, fx, fy, fz, _tmp);
-    if (d < best) {
-      best = d;
-      out.ax = _tmp.ax;
-      out.ay = _tmp.ay;
-      out.az = _tmp.az;
-      out.bx = _tmp.bx;
-      out.by = _tmp.by;
-      out.bz = _tmp.bz;
-      out.s = _tmp.s;
-    }
+  // Segment vs triangle edges AB, BC, CA; strict improvement preserves tie order.
+  let d = closestPtSegSeg(p0x, p0y, p0z, p1x, p1y, p1z, ax, ay, az, bx, by, bz, _tmp);
+  if (d < best) {
+    best = d;
+    out.ax = _tmp.ax;
+    out.ay = _tmp.ay;
+    out.az = _tmp.az;
+    out.bx = _tmp.bx;
+    out.by = _tmp.by;
+    out.bz = _tmp.bz;
+    out.s = _tmp.s;
+  }
+  d = closestPtSegSeg(p0x, p0y, p0z, p1x, p1y, p1z, bx, by, bz, cx, cy, cz, _tmp);
+  if (d < best) {
+    best = d;
+    out.ax = _tmp.ax;
+    out.ay = _tmp.ay;
+    out.az = _tmp.az;
+    out.bx = _tmp.bx;
+    out.by = _tmp.by;
+    out.bz = _tmp.bz;
+    out.s = _tmp.s;
+  }
+  d = closestPtSegSeg(p0x, p0y, p0z, p1x, p1y, p1z, cx, cy, cz, ax, ay, az, _tmp);
+  if (d < best) {
+    best = d;
+    out.ax = _tmp.ax;
+    out.ay = _tmp.ay;
+    out.az = _tmp.az;
+    out.bx = _tmp.bx;
+    out.by = _tmp.by;
+    out.bz = _tmp.bz;
+    out.s = _tmp.s;
   }
 
   out.d2 = best;

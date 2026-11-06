@@ -133,6 +133,21 @@ assert.equal(second.fireTime, Infinity);
 first.reset();
 assert.equal(first.fireTime, Infinity);
 assert.equal(first.name, 'Idle');
+// Copied methods update the final adapter, and reset dispatches its sampling override.
+const composed = {
+  ...first,
+  _sample(name, time) {
+    assert.equal(this, composed);
+    samples.push([name, time]);
+  },
+};
+composed.fire();
+assert.equal(composed.fireTime, 0);
+assert.equal(first.fireTime, Infinity, 'the intermediate rig is not the mutable receiver');
+composed.reset();
+assert.equal(composed.fireTime, Infinity);
+assert.deepEqual(samples.pop(), ['Idle', 0]);
+assert.equal(second.fireTime, Infinity);
 first.dispose();
 second.dispose();
 assert.equal(disposed, 2);

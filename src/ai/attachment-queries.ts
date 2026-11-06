@@ -294,7 +294,16 @@ export class AttachmentQueries {
       this.current = null;
     }
     if (scope.cancelled) return NAV_CANCELLED;
-    this.cancelJobs(scope, true);
+    const obsolete = [];
+    for (const [id, job] of this.jobs)
+      if (job.scope === scope && !scope.used.has(id)) {
+        obsolete.push(id);
+        this.jobs.delete(id);
+        scope.proofs.delete(job.identity);
+      }
+    if (obsolete.length) this.send({ type: 'cancel', ids: obsolete });
+    this.stats.cancelled += obsolete.length;
+    this.stats.pending = this.jobs.size;
     if (scope.unsent.length) this.send({ type: 'queries', jobs: scope.unsent });
     if (scope.pending) {
       scope.waiting = true;
@@ -487,22 +496,18 @@ export class AttachmentQueries {
     }
     this.samples.push(sample);
   }
-  private cancelJobs(scope: PlanningScope, unusedOnly: boolean): void {
-    const ids = [];
-    for (const [id, job] of this.jobs)
-      if (job.scope === scope && (!unusedOnly || !scope.used.has(id))) {
-        ids.push(id);
-        this.jobs.delete(id);
-        if (unusedOnly) scope.proofs.delete(job.identity);
-      }
-    if (ids.length && (unusedOnly || this.connection)) this.send({ type: 'cancel', ids });
-    this.stats.cancelled += ids.length;
-    this.stats.pending = this.jobs.size;
-  }
   cancel(key: string): void {
     const scope = this.scopes.get(key);
     if (!scope) return;
-    this.cancelJobs(scope, false);
+    const ids = [];
+    for (const [id, job] of this.jobs)
+      if (job.scope === scope) {
+        ids.push(id);
+        this.jobs.delete(id);
+      }
+    if (ids.length && this.connection) this.send({ type: 'cancel', ids });
+    this.stats.cancelled += ids.length;
+    this.stats.pending = this.jobs.size;
     this.scopes.delete(key);
   }
   failure(error: unknown): Error {
