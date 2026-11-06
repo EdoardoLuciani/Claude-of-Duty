@@ -70,7 +70,9 @@ function check(name, seed, scale, run, bounce = false) {
   run(fx);
   // Include the next draws, not just visible output: even discarded draws are a contract.
   const next = Array.from({ length: 8 }, () => fx.rng.u32());
-  results[name] = createHash('sha256').update(JSON.stringify({ calls, next })).digest('hex');
+  const payload = JSON.stringify({ calls, next });
+  if (process.env.DUMP_CHARACTERIZATION) console.log(name, payload);
+  results[name] = createHash('sha256').update(payload).digest('hex');
 }
 
 for (const surface of [...Object.keys(IMPACTS), 'unknown']) {
@@ -204,7 +206,11 @@ const expected = {
   'explosion:12': 'fcc94e5e60d62751ab8a61bfebc16f2e879dff232e5eb8439acec1376fe176ef',
   ambience: '58b5e2ea67b29b7c3ebb13fb9423e858ea0b43136b7714b09ec2fdf9605ecb15',
 };
-assert.deepEqual(results, expected, 'full ordered payloads and RNG state retain base recipes');
+assert.deepEqual(
+  results,
+  expected,
+  'FX characterization changed; inspect ordered payloads/RNG with DUMP_CHARACTERIZATION=1'
+);
 
 // A real particle layer verifies bounded slot reuse, exact packing and upload/expiry lifecycle.
 const texture = new THREE.Texture();

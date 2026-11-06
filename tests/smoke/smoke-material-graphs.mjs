@@ -54,10 +54,11 @@ for (const [name, surface] of Object.entries(SURFACES_TSL)) {
   });
   builder.compute = compute;
   builder.build();
+  if (process.env.DUMP_CHARACTERIZATION) console.log(`${name}\n${builder.computeShader}`);
   assert.equal(
     createHash('sha256').update(builder.computeShader).digest('hex'),
     expected[name],
-    name
+    `${name}: WGSL characterization changed; inspect with DUMP_CHARACTERIZATION=1`
   );
 }
 console.log(

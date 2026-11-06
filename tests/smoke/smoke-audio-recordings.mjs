@@ -10,7 +10,11 @@ import { AUDIO_BANKS } from '../lib/audio-banks.mjs';
 
 const root = new URL('../../src/audio/samples/', import.meta.url);
 const relative = (url) => url.slice(root.href.length);
-const hash = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+const hash = (name, value) => {
+  const payload = JSON.stringify(value);
+  if (process.env.DUMP_CHARACTERIZATION) console.log(name, payload);
+  return createHash('sha256').update(payload).digest('hex');
+};
 // Pinned from the explicit URL lists at af113a8: keys, bank order and take order.
 const bankHashes = [
   'ed7a94239eb143caeac51388245143d042c700e02e6d7fe8193282357c388127',
@@ -26,7 +30,12 @@ const bankHashes = [
 ];
 for (const [index, [banks]] of AUDIO_BANKS.entries()) {
   const catalog = Object.entries(banks).map(([kind, urls]) => [kind, urls.map(relative)]);
-  assert.equal(hash(catalog), bankHashes[index], `unchanged catalog: ${Object.keys(banks)[0]}`);
+  const name = Object.keys(banks)[0];
+  assert.equal(
+    hash(`catalog:${name}`, catalog),
+    bankHashes[index],
+    `${name}: catalog characterization changed; inspect with DUMP_CHARACTERIZATION=1`
+  );
 }
 
 const fetched = [];
@@ -54,7 +63,11 @@ try {
 } finally {
   globalThis.fetch = fetch;
 }
-assert.equal(hash(fetched), 'ee24c46687630e01e3e2ff6632d4103e6e95e25a35b5bf6cbbcf654a67381964');
+assert.equal(
+  hash('fetch-order', fetched),
+  'ee24c46687630e01e3e2ff6632d4103e6e95e25a35b5bf6cbbcf654a67381964',
+  'fetch-order characterization changed; inspect with DUMP_CHARACTERIZATION=1'
+);
 const localFiles = readdirSync(root, { recursive: true }).filter((name) => name.endsWith('.opus'));
 assert.deepEqual([...fetched].sort(), localFiles.sort(), 'every local recording is loaded once');
 for (const [banks] of AUDIO_BANKS) {

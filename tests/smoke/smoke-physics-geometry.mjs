@@ -23,12 +23,19 @@ import { LAYER, MASK } from '../../src/physics/surfaces.ts';
 const rng = new Rng(0x51a7);
 const scalar = () => rng.signed() * 4;
 const vector = () => new THREE.Vector3(scalar(), scalar(), scalar());
-const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+const digest = (name, value) => {
+  const payload = JSON.stringify(value);
+  if (process.env.DUMP_CHARACTERIZATION) console.log(name, payload);
+  return createHash('sha256').update(payload).digest('hex');
+};
 const snapshots = {};
 assert.equal(
-  digest([0, 1.6, 1.8, 2.15].map((h) => humanoidSpec(h, 75))),
+  digest(
+    'humanoidSpec',
+    [0, 1.6, 1.8, 2.15].map((h) => humanoidSpec(h, 75))
+  ),
   '81ece50f5ad13380f4e626626c814aa1e5439ec654363bf726ae5573100fa6f8',
-  'bilateral spec preserves bone order, parent indices, dimensions and tuning'
+  'humanoid spec characterization changed; inspect with DUMP_CHARACTERIZATION=1'
 );
 const world = new StaticWorld();
 for (let i = 0; i < 24; i++) {
@@ -44,7 +51,7 @@ floor.position.y = -0.25;
 world.addMesh(floor, 'concrete');
 world.build();
 assert.ok(world.nodeCount > 1, 'exercise interior nodes, not only a root leaf');
-snapshots.build = digest([
+snapshots.build = digest('build', [
   world.aabb,
   world.nodeCount,
   world.maxDepth,
@@ -100,7 +107,7 @@ for (let i = 0; i < 350; i++) {
     )
   );
 }
-snapshots.bvh = digest(queries);
+snapshots.bvh = digest('bvh', queries);
 
 const geometry = [],
   closest = makeClosest();
@@ -126,7 +133,7 @@ for (let i = 0; i < 600; i++) {
   const obbArgs = [p.x, p.y, p.z, d.x, d.y, d.z, inv, 1, 2, 0.5, 15];
   geometry.push(rayObb(...obbArgs), rayObbFar(...obbArgs));
 }
-snapshots.math = digest(geometry);
+snapshots.math = digest('math', geometry);
 // Near hits include t=0 on an axial interior ray; far hits seek a true exit.
 const axial = [0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 1, 0, 1, 10];
 assert.equal(rayCapsule(...axial), 0);
@@ -200,7 +207,7 @@ for (let i = 0; i < 160; i++) {
     { ...rd.aabb }
   );
 }
-snapshots.solvers = digest([simulation, impacts, Array.from(rd.selfPairs)]);
+snapshots.solvers = digest('solvers', [simulation, impacts, Array.from(rd.selfPairs)]);
 
 const physics = new PhysicsSystem();
 physics.staticWorld = world;
@@ -233,13 +240,17 @@ for (let i = 0; i < 500; i++) {
     ragdoll: result.ragdoll ? true : null,
   });
 }
-snapshots.publicHits = digest(publicHits);
+snapshots.publicHits = digest('publicHits', publicHits);
 // Captured on af113a8 before the structural changes; exact (unrounded) outputs.
-assert.deepEqual(snapshots, {
-  build: '4ac2f26927526a51680cf8a098302fdc9c2b3b5babd82b67ceb16830efff5f3c',
-  bvh: 'f9a2b55ec11ff633efbc49c3e09da6368157e4c2b11fa2a295fc9807298978dc',
-  math: 'aac060cbe64dfbe52898c6ae90ed5016f34e629202124ef43eac17a44ce40dc1',
-  solvers: '526ac3a0a9af4367f44a86ab23515463481be2830590526684574d24850bd2ab',
-  publicHits: '732013d47ebf3958d1930b022c153b0b3c482f3a6b5164f6fd24ed291aaf6601',
-});
+assert.deepEqual(
+  snapshots,
+  {
+    build: '4ac2f26927526a51680cf8a098302fdc9c2b3b5babd82b67ceb16830efff5f3c',
+    bvh: 'f9a2b55ec11ff633efbc49c3e09da6368157e4c2b11fa2a295fc9807298978dc',
+    math: 'aac060cbe64dfbe52898c6ae90ed5016f34e629202124ef43eac17a44ce40dc1',
+    solvers: '526ac3a0a9af4367f44a86ab23515463481be2830590526684574d24850bd2ab',
+    publicHits: '732013d47ebf3958d1930b022c153b0b3c482f3a6b5164f6fd24ed291aaf6601',
+  },
+  'physics characterization changed; inspect section payloads with DUMP_CHARACTERIZATION=1'
+);
 console.log('smoke-physics-geometry: ok');
