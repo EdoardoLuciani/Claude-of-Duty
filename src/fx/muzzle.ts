@@ -1,4 +1,7 @@
+import type { Vector3Like as Vec3Like } from 'three';
+
 import { P } from './atlas.ts';
+import type { FxSystem } from './index.ts';
 import { resetSpawn, setSpawnColorRamp, setSpawnPosition, setSpawnVelocity } from './particles.ts';
 import { V, C, C2, basis, blackbody, clampCone, cone, towardHemi, COS55 } from './util.ts';
 
@@ -8,15 +11,6 @@ import { V, C, C2, basis, blackbody, clampCone, cone, towardHemi, COS55 } from '
  * Burning lasts 40-62 ms; the light/haze are brief and smoke persists.
  */
 
-interface Vec3Like {
-  x: number;
-  y: number;
-  z: number;
-}
-interface CameraLike {
-  updateMatrixWorld(): void;
-  matrixWorldInverse: { elements: ArrayLike<number> };
-}
 interface MuzzleProfile {
   scale: number;
   lobes: number;
@@ -33,24 +27,20 @@ interface MuzzleWeapon {
   kind?: string;
   name?: string;
 }
-interface MuzzleFx {
-  rng: {
-    float(): number;
-    signed(): number;
-    int(min: number, max: number): number;
-    range(min: number, max: number): number;
-  };
-  pScale: number;
-  ctx: { camera?: CameraLike; viewCamera?: CameraLike };
-  emitAdd(this: void, spawn: object): void;
-  emitViewAdd(this: void, spawn: object): void;
-  emitLit(this: void, spawn: object): void;
-  emitViewLit(this: void, spawn: object): void;
-  lights?: { flash(...args: number[]): void };
-  viewFlash(...args: number[]): void;
-  _fromView(position: Vec3Like): Vec3Like;
-  haze(...args: number[]): void;
-}
+type MuzzleFx = Pick<
+  FxSystem,
+  | 'rng'
+  | 'pScale'
+  | 'ctx'
+  | 'emitAdd'
+  | 'emitViewAdd'
+  | 'emitLit'
+  | 'emitViewLit'
+  | 'lights'
+  | 'viewFlash'
+  | '_fromView'
+  | 'haze'
+>;
 interface MuzzleOptions {
   position: Vec3Like;
   direction: Vec3Like;

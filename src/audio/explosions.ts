@@ -1,44 +1,15 @@
+import { recordingUrls } from './recordings.ts';
 /** Recorded ordnance identities and continuous close/mid/far perspective changes. */
 import { clamp } from './dsp.ts';
 
 export type ExplosionKind = 'grenade' | 'bomb';
 export const EXPLOSION_URLS = {
-  'grenade-close': [
-    new URL('./samples/explosions/grenade-close-1.opus', import.meta.url).href,
-    new URL('./samples/explosions/grenade-close-2.opus', import.meta.url).href,
-    new URL('./samples/explosions/grenade-close-3.opus', import.meta.url).href,
-    new URL('./samples/explosions/grenade-close-4.opus', import.meta.url).href,
-  ],
-  'grenade-mid': [
-    new URL('./samples/explosions/grenade-mid-1.opus', import.meta.url).href,
-    new URL('./samples/explosions/grenade-mid-2.opus', import.meta.url).href,
-    new URL('./samples/explosions/grenade-mid-3.opus', import.meta.url).href,
-    new URL('./samples/explosions/grenade-mid-4.opus', import.meta.url).href,
-  ],
-  'grenade-far': [
-    new URL('./samples/explosions/grenade-far-1.opus', import.meta.url).href,
-    new URL('./samples/explosions/grenade-far-2.opus', import.meta.url).href,
-    new URL('./samples/explosions/grenade-far-3.opus', import.meta.url).href,
-    new URL('./samples/explosions/grenade-far-4.opus', import.meta.url).href,
-  ],
-  'bomb-close': [
-    new URL('./samples/explosions/bomb-close-1.opus', import.meta.url).href,
-    new URL('./samples/explosions/bomb-close-2.opus', import.meta.url).href,
-    new URL('./samples/explosions/bomb-close-3.opus', import.meta.url).href,
-    new URL('./samples/explosions/bomb-close-4.opus', import.meta.url).href,
-  ],
-  'bomb-mid': [
-    new URL('./samples/explosions/bomb-mid-1.opus', import.meta.url).href,
-    new URL('./samples/explosions/bomb-mid-2.opus', import.meta.url).href,
-    new URL('./samples/explosions/bomb-mid-3.opus', import.meta.url).href,
-    new URL('./samples/explosions/bomb-mid-4.opus', import.meta.url).href,
-  ],
-  'bomb-far': [
-    new URL('./samples/explosions/bomb-far-1.opus', import.meta.url).href,
-    new URL('./samples/explosions/bomb-far-2.opus', import.meta.url).href,
-    new URL('./samples/explosions/bomb-far-3.opus', import.meta.url).href,
-    new URL('./samples/explosions/bomb-far-4.opus', import.meta.url).href,
-  ],
+  'grenade-close': recordingUrls('explosions/grenade-close', 4),
+  'grenade-mid': recordingUrls('explosions/grenade-mid', 4),
+  'grenade-far': recordingUrls('explosions/grenade-far', 4),
+  'bomb-close': recordingUrls('explosions/bomb-close', 4),
+  'bomb-mid': recordingUrls('explosions/bomb-mid', 4),
+  'bomb-far': recordingUrls('explosions/bomb-far', 4),
 } as const;
 export type ExplosionBank = keyof typeof EXPLOSION_URLS;
 

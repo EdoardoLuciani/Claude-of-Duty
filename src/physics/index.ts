@@ -628,6 +628,51 @@ export class PhysicsSystem {
     return out;
   }
 
+  _setDynamicHit(out: PhysicsHit, t: number): void {
+    out.hit = true;
+    out.distance = t;
+    out.staticObject = out.solid = -1;
+    out.actor = out.part = null;
+    out.collider = null;
+    out.body = null;
+    out.ragdoll = null;
+    out.triangle = -1;
+    out.frontFace = true;
+  }
+
+  _capsuleNormal(
+    point: THREE.Vector3,
+    out: THREE.Vector3,
+    ax: number,
+    ay: number,
+    az: number,
+    bx: number,
+    by: number,
+    bz: number,
+    dx: number,
+    dy: number,
+    dz: number
+  ): void {
+    closestPtSegSeg(
+      point.x,
+      point.y,
+      point.z,
+      point.x,
+      point.y,
+      point.z,
+      ax,
+      ay,
+      az,
+      bx,
+      by,
+      bz,
+      this._cl
+    );
+    out.set(point.x - this._cl.bx, point.y - this._cl.by, point.z - this._cl.bz);
+    if (out.lengthSq() < 1e-12) out.set(-dx, -dy, -dz);
+    else out.normalize();
+  }
+
   _raycastColliders(
     ox: number,
     oy: number,
@@ -652,22 +697,16 @@ export class PhysicsSystem {
           : rayCapsule(ox, oy, oz, dx, dy, dz, c.ax, c.ay, c.az, c.bx, c.by, c.bz, c.radius, best);
       if (t < 0 || t >= best) continue;
       best = t;
-      out.hit = true;
-      out.distance = t;
       out.point.set(ox + dx * t, oy + dy * t, oz + dz * t);
+      this._setDynamicHit(out, t);
       this._colliderNormal(c, out.point, out.normal, dx, dy, dz);
       out.surfaceIndex = c.surfaceIndex;
       out.ballisticSurfaceIndex = c.ballisticSurfaceIndex;
       out.sheetThickness = c.sheetThickness;
-      out.staticObject = out.solid = -1;
       out.object = c.owner;
       out.collider = c;
       out.actor = c.owner;
       out.part = c.part;
-      out.body = null;
-      out.ragdoll = null;
-      out.triangle = -1;
-      out.frontFace = true;
     }
     return best;
   }
@@ -690,24 +729,7 @@ export class PhysicsSystem {
       else outN.set(0, 0, Math.sign(_v.z) || 1);
       outN.transformDirection(c.matrix);
     } else {
-      closestPtSegSeg(
-        point.x,
-        point.y,
-        point.z,
-        point.x,
-        point.y,
-        point.z,
-        c.ax,
-        c.ay,
-        c.az,
-        c.bx,
-        c.by,
-        c.bz,
-        this._cl
-      );
-      outN.set(point.x - this._cl.bx, point.y - this._cl.by, point.z - this._cl.bz);
-      if (outN.lengthSq() < 1e-12) outN.set(-dx, -dy, -dz);
-      else outN.normalize();
+      this._capsuleNormal(point, outN, c.ax, c.ay, c.az, c.bx, c.by, c.bz, dx, dy, dz);
     }
     if (outN.x * dx + outN.y * dy + outN.z * dz > 0) outN.multiplyScalar(-1);
   }
@@ -747,28 +769,25 @@ export class PhysicsSystem {
       } else {
         _m4.compose(b.position, b.quaternion, _one);
         _m4i.copy(_m4).invert();
-        t =
-          b.shape === 'capsule'
-            ? rayObb(
-                ox,
-                oy,
-                oz,
-                dx,
-                dy,
-                dz,
-                _m4i.elements,
-                b.radius,
-                b.halfHeight + b.radius,
-                b.radius,
-                best
-              )
-            : rayObb(ox, oy, oz, dx, dy, dz, _m4i.elements, b.hx, b.hy, b.hz, best);
+        const capsule = b.shape === 'capsule';
+        t = rayObb(
+          ox,
+          oy,
+          oz,
+          dx,
+          dy,
+          dz,
+          _m4i.elements,
+          capsule ? b.radius : b.hx,
+          capsule ? b.halfHeight + b.radius : b.hy,
+          capsule ? b.radius : b.hz,
+          best
+        );
       }
       if (t < 0 || t >= best) continue;
       best = t;
-      out.hit = true;
-      out.distance = t;
       out.point.set(ox + dx * t, oy + dy * t, oz + dz * t);
+      this._setDynamicHit(out, t);
       out.normal.set(
         out.point.x - b.position.x,
         out.point.y - b.position.y,
@@ -779,14 +798,8 @@ export class PhysicsSystem {
       out.surfaceIndex = b.surface;
       out.ballisticSurfaceIndex = b.surface;
       out.sheetThickness = 0;
-      out.staticObject = out.solid = -1;
-      out.actor = out.part = null;
-      out.frontFace = true;
       out.object = b.object3D ?? null;
       out.body = b;
-      out.collider = null;
-      out.ragdoll = null;
-      out.triangle = -1;
     }
     return best;
   }
@@ -832,44 +845,29 @@ export class PhysicsSystem {
         );
         if (t < 0 || t >= best) continue;
         best = t;
-        out.hit = true;
-        out.distance = t;
         out.point.set(ox + dx * t, oy + dy * t, oz + dz * t);
-        closestPtSegSeg(
-          out.point.x,
-          out.point.y,
-          out.point.z,
-          out.point.x,
-          out.point.y,
-          out.point.z,
+        this._setDynamicHit(out, t);
+        this._capsuleNormal(
+          out.point,
+          out.normal,
           rd.px[a],
           rd.py[a],
           rd.pz[a],
           rd.px[c],
           rd.py[c],
           rd.pz[c],
-          this._cl
+          dx,
+          dy,
+          dz
         );
-        out.normal.set(
-          out.point.x - this._cl.bx,
-          out.point.y - this._cl.by,
-          out.point.z - this._cl.bz
-        );
-        if (out.normal.lengthSq() < 1e-12) out.normal.set(-dx, -dy, -dz);
-        else out.normal.normalize();
         out.surfaceIndex = SURFACE.flesh;
         out.ragdoll = rd;
         out.object = rd.actor;
         out.actor = null; // Corpses affect ballistics, not living-actor damage.
         out.ballisticSurfaceIndex = out.surfaceIndex;
-        out.staticObject = out.solid = -1;
         out.sheetThickness = 0;
         out.ragdollBone = i;
-        out.frontFace = true;
         out.part = rd.spec[i]?.name ?? null;
-        out.collider = null;
-        out.body = null;
-        out.triangle = -1;
       }
     }
     return best;

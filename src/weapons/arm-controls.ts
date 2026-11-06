@@ -1,31 +1,9 @@
 import * as THREE from 'three';
 
-import type { ArmRig } from './arm-asset.ts';
+import type { Arm } from './hands.ts';
 
 /** Named controls shared by Blender's skin weights and the gameplay IK. */
-export function createArmControls(
-  arm: ArmRig & {
-    flexJoints: Array<{ bone: THREE.Object3D; source: THREE.Object3D }>;
-    handInner: THREE.Object3D;
-    upperPivot: THREE.Object3D;
-    forePivot: THREE.Object3D;
-    hand: THREE.Object3D;
-    _segLength: number[][];
-    _segRadius: number[][];
-    fingerSpread: number[];
-    _spreadFrom: Float32Array;
-    _spreadTo: Float32Array;
-    fingers: Array<{ root: THREE.Object3D; joints: THREE.Object3D[] }>;
-    thumbWeb: THREE.Object3D;
-    thumbRest: THREE.Quaternion;
-    _poseFrom: Float32Array;
-    _poseTo: Float32Array;
-    _thumbFrom: THREE.Quaternion;
-    _thumbTo: THREE.Quaternion;
-    _poseTime: number;
-    _poseDuration: number;
-  }
-): void {
+export function createArmControls(arm: Arm): void {
   const s = arm.scale;
   arm.controls = {};
   arm.flexJoints = [];

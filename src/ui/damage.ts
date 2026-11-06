@@ -1,4 +1,4 @@
-import type { ElementPool, PoolRecord } from './pool-types.ts';
+import type { PoolRecord } from './util.ts';
 import { Pool, ease, clamp01 } from './util.ts';
 
 export const SEG = 7;
@@ -12,7 +12,7 @@ export class DamageArcs {
     { length: 6 },
     (): { rotation: number; scale: number; alpha: number } => ({ rotation: 0, scale: 1, alpha: 0 })
   );
-  readonly pool: ElementPool<null> = new Pool(6, (): null => null);
+  readonly pool = new Pool(6);
   life = 2;
 
   /**
@@ -20,7 +20,7 @@ export class DamageArcs {
    * @param {number} dz world Z of that direction
    * @param {number} intensity 0..1, scales opacity and the spawn punch
    */
-  spawn(dx: number, dz: number, intensity = 1): PoolRecord<null> {
+  spawn(dx: number, dz: number, intensity = 1): PoolRecord {
     const len = Math.hypot(dx, dz) || 1;
     const it = this.pool.acquire();
     it.life = this.life;
@@ -35,13 +35,8 @@ export class DamageArcs {
     const items = this.pool.items;
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
-      if (!it.alive) continue;
-      it.t += dt;
+      if (!this.pool.advance(it, dt)) continue;
       const u = it.t / it.life;
-      if (u >= 1) {
-        this.pool.release(it);
-        continue;
-      }
       const deg = (Math.atan2(it.a * rx + it.b * rz, it.a * fx + it.b * fz) * 180) / Math.PI;
       // punch in fast, hold, then a long tail — 2s total
       const inT = clamp01(it.t / 0.09);

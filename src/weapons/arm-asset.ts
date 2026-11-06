@@ -6,28 +6,13 @@ import { isClosable } from '../core/guards.ts';
 import { isTexture } from '../core/three-guards.ts';
 import { createArmBlood, addArmBloodCoordinates } from './arm-blood.ts';
 import { createArmSurfaceMaterial } from './arm-surfaces.ts';
+import type { Arm } from './hands.ts';
 
 type ArmSkinnedMesh = THREE.SkinnedMesh<THREE.BufferGeometry, THREE.Material | THREE.Material[]>;
 export interface ArmAsset {
   meshes: ArmSkinnedMesh[];
   blood: ReturnType<typeof createArmBlood>;
   dispose(): void;
-}
-export interface ArmRig {
-  controls: Record<string, THREE.Bone>;
-  pose: string;
-  scale: number;
-  side: number;
-  upperPivot: THREE.Object3D;
-  forePivot: THREE.Object3D;
-  hand: THREE.Object3D;
-  fingers: { joints: THREE.Object3D[] }[];
-  thumb: { root: THREE.Object3D; joints: THREE.Object3D[] };
-  updateFlex(): void;
-  root: THREE.Object3D;
-  skeleton: THREE.Skeleton | null;
-  skins: THREE.SkinnedMesh[];
-  setPose(pose: string): void;
 }
 
 /** Owned by a Viewmodel, never a global cache: disposal/restart stays local. */
@@ -151,7 +136,7 @@ export async function loadArmAsset(): Promise<ArmAsset> {
 }
 
 /** Rebind Blender weights to the gameplay contact rig in its neutral pose. */
-export function bindArmAsset(arm: ArmRig, asset: ArmAsset): void {
+export function bindArmAsset(arm: Arm, asset: ArmAsset): void {
   const controls = arm.controls;
   const oldPose = arm.pose;
   arm.upperPivot.position.set(0, 0, 0.63 * arm.scale);

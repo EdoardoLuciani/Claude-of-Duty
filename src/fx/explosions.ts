@@ -1,49 +1,18 @@
-import type { Rng } from '../core/rng.ts';
+import type { Vector3Like as Vec3Like } from 'three';
+
 import { P } from './atlas.ts';
-import type { LightPool } from './lights.ts';
+import type { FxSystem } from './index.ts';
 import { resetSpawn, setSpawnColorRamp, setSpawnPosition, setSpawnVelocity } from './particles.ts';
 import { V, V2, cone, discOn } from './util.ts';
 
-interface Point3 {
-  x: number;
-  y: number;
-  z: number;
-}
-type ExplosionOptions = { radius?: number; up?: Point3; position?: Point3 } & (
+type ExplosionOptions = { radius?: number; up?: Vec3Like; position?: Vec3Like } & (
   | { x: number; y: number; z: number }
-  | { position: Point3 }
+  | { position: Vec3Like }
 );
-interface ExplosionFx {
-  rng: Rng;
-  pScale: number;
-  emitAdd(spawn: ReturnType<typeof resetSpawn>): void;
-  emitLit(spawn: ReturnType<typeof resetSpawn>): void;
-  hazeRing(
-    x: number,
-    y: number,
-    z: number,
-    radius: number,
-    duration: number,
-    strength: number,
-    speed: number
-  ): void;
-  addSmokeColumn(
-    x: number,
-    y: number,
-    z: number,
-    options: {
-      radius: number;
-      duration: number;
-      rate: number;
-      rise: number;
-      dark: number;
-      life: number;
-      growth: number;
-    }
-  ): void;
-  lights?: LightPool;
-  scorch(x: number, y: number, z: number, radius: number): void;
-}
+type ExplosionFx = Pick<
+  FxSystem,
+  'rng' | 'pScale' | 'emitAdd' | 'emitLit' | 'hazeRing' | 'addSmokeColumn' | 'lights' | 'scorch'
+>;
 
 /**
  * Explosions.

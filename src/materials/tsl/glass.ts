@@ -30,6 +30,6 @@ export const glassSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof 
     const ao = float(1).sub(dirty.mul(0.1));
     // Keep the authored dark sRGB tint after linearization; a 0.02 linear floor
     // would lift all clean channels to grey before any lighting or transparency.
-    return Surface(clamp(c, 0, 0.5), height, clamp(rough, 0.02, 0.7), float(0), ao);
+    return Surface(clamp(c, 0, 0.5), height, clamp(rough, 0.02, 0.7), 0, ao);
   }
 );

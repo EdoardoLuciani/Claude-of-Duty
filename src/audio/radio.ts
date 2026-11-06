@@ -1,3 +1,4 @@
+import { recordingUrls } from './recordings.ts';
 /** Recorded physical radio components; useful functional tones stay synthesized. */
 import type { Rng } from '../core/rng.ts';
 import type { NoiseBank } from './dsp.ts';
@@ -5,16 +6,8 @@ import { gain } from './dsp.ts';
 import { uiSound } from './foley.ts';
 import type { AudioVoice } from './types.ts';
 export const RADIO_URLS = {
-  'radio-click': [
-    new URL('./samples/radio/radio-click-1.opus', import.meta.url).href,
-    new URL('./samples/radio/radio-click-2.opus', import.meta.url).href,
-    new URL('./samples/radio/radio-click-3.opus', import.meta.url).href,
-  ],
-  'radio-static': [
-    new URL('./samples/radio/radio-static-1.opus', import.meta.url).href,
-    new URL('./samples/radio/radio-static-2.opus', import.meta.url).href,
-    new URL('./samples/radio/radio-static-3.opus', import.meta.url).href,
-  ],
+  'radio-click': recordingUrls('radio/radio-click', 3),
+  'radio-static': recordingUrls('radio/radio-static', 3),
 } as const;
 export type RadioKind = 'radio_open' | 'radio_strike' | 'intel_call';
 export const RADIO_PARTS = {

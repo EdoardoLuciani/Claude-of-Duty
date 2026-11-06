@@ -161,6 +161,14 @@ notes are temporary: retired scripts stay in Git history, not a second maintaine
 tool catalogue. `npm test` is the correctness gate; it is not visual or combat-
 performance acceptance.
 
+The material-graph, FX-recipe, physics-geometry and audio-recording smoke hashes
+are **characterization**, not the definition of correct behavior. To inspect a
+failure, run e.g. `DUMP_CHARACTERIZATION=1 node tests/smoke/smoke-fx-recipes.mjs > /tmp/fx-current.txt`.
+Run the same test/seed with the previous implementation and pinned dependencies;
+diff the dumps (WGSL, ordered payloads/RNG, query histories or recording order).
+Review the change against the behavioral assertions and any required visual checks
+before manually updating an expected hash. There is no automatic baseline update.
+
 For local telemetry open `/?telemetry=1`: **F7** marks a moment (optional note),
 **F8** stops/downloads `cod-telemetry-<timestamp>.tgz`. It contains JSON and marked
 view JPEGs; nothing uploads.

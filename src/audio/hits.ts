@@ -1,21 +1,9 @@
+import { recordingUrls } from './recordings.ts';
 /** Authored physical contacts. Master edits/provenance: samples/hits/provenance.json. */
 export const HIT_URLS = {
-  flesh: [
-    new URL('./samples/hits/flesh-1.opus', import.meta.url).href,
-    new URL('./samples/hits/flesh-2.opus', import.meta.url).href,
-    new URL('./samples/hits/flesh-3.opus', import.meta.url).href,
-    new URL('./samples/hits/flesh-4.opus', import.meta.url).href,
-  ],
-  armour: [
-    new URL('./samples/hits/armour-1.opus', import.meta.url).href,
-    new URL('./samples/hits/armour-2.opus', import.meta.url).href,
-    new URL('./samples/hits/armour-3.opus', import.meta.url).href,
-  ],
-  break: [
-    new URL('./samples/hits/break-1.opus', import.meta.url).href,
-    new URL('./samples/hits/break-2.opus', import.meta.url).href,
-    new URL('./samples/hits/break-3.opus', import.meta.url).href,
-  ],
+  flesh: recordingUrls('hits/flesh', 4),
+  armour: recordingUrls('hits/armour', 3),
+  break: recordingUrls('hits/break', 3),
 } as const;
 export interface DamageSoundOptions {
   when?: number | undefined;
