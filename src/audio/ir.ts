@@ -1,22 +1,6 @@
-/**
- * AUDIO / PROCEDURAL IMPULSE RESPONSES
- *
- * There are no .wav files in this project, so every reverb is a synthesized
- * impulse response rendered into an AudioBuffer at load time and handed to a
- * ConvolverNode.
- *
- * An IR here is built from three physically motivated parts:
- *   1. discrete early reflections  — computed from a box-ish room's image
- *      sources, each one filtered by the absorption of the wall it bounced off.
- *      These are what tell you the size and shape of a room.
- *   2. a diffuse late field        — noise whose density ramps in and whose
- *      envelope decays exponentially, with a *frequency dependent* decay so the
- *      high end dies first (real rooms always do).
- *   3. a slap/flutter component    — for streets and corridors, regular-ish
- *      repeats that give a gunshot its characteristic "crack-tack-tack" tail.
- *
- * Rendering cost is a few ms per IR and it happens once, lazily, after the
- * first user gesture.
+/** Procedural impulse responses, built once after the first audio gesture.
+ * Combine material-filtered image-source reflections, a frequency-dependent diffuse tail
+ * and regular slap/flutter repeats for street and corridor reverberation.
  */
 
 import type { Rng } from '../core/rng.ts';
@@ -43,19 +27,9 @@ export interface SpaceWeights extends Record<SpaceName, number> {
   median?: number;
 }
 
-/**
- * @typedef {object} IRSpec
- * @property {number} seconds      total length
- * @property {number} rt60         -60 dB time of the diffuse field
- * @property {number} predelay     seconds before the first reflection
- * @property {number} hfDamp       0..1, how much faster the high end decays
- * @property {number} bright       0..1, spectral tilt of the whole tail
- * @property {number} diffusion    0..1, 0 = discrete taps only, 1 = dense wash
- * @property {number} width        0..1, inter-channel decorrelation
- * @property {number[]} taps       early reflection delays in seconds
- * @property {number} tapGain      overall early reflection level
- * @property {number} slaps        number of regular flutter repeats
- * @property {number} slapTime     spacing of the flutter repeats
+/** IR controls: seconds/predelay/taps/slapTime are seconds; rt60 is the diffuse -60 dB time.
+ * hfDamp controls high-frequency decay, bright spectral tilt, diffusion tap-to-wash density,
+ * width stereo decorrelation, tapGain reflection level and slaps flutter count.
  */
 
 /** The blendable space names, in a fixed order. */

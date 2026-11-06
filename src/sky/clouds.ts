@@ -1,30 +1,7 @@
-/**
- * Two procedural cloud decks on the sky shell — CPU half.
- *
- * The shader lives in `clouds-tsl.js`. This file keeps the deterministic CPU
- * twin of the low-frequency coverage field, because the sun's cloud-occlusion
- * factor has to be sampled on the CPU (it drives the `DirectionalLight`) from
- * the same field the sky shader draws. Correlated, not faked.
- *
- *   cumulus  1.5 km   coverage-eroded fbm with a fake vertical extent produced
- *                     by parallax-shifting the sample along the view ray, so the
- *                     deck has billows and a silhouette instead of reading as a
- *                     printed pattern. Self-shadowed with three taps toward the
- *                     sun, powder-darkened bases, silver rims from a forward
- *                     Henyey-Greenstein lobe.
- *   cirrus   7.8 km   two decorrelated families of ridged fbm, each stretched
- *                     3.5:1 about its own bearing, each bearing 75 degrees from
- *                     the other, cut into fallstreaks and gated by its own
- *                     kilometre-scale patch mask so the layer arrives in fronts.
- *
- * Both are intersected against the planet shell rather than a flat plane, and
- * both fade out with the *distance* to that intersection, which is what stops a
- * grazing deck collapsing into a hard grey wall along the horizon.
- *
- * The low-frequency coverage field `skCloudMacro` is four analytic waves rather
- * than noise, for one specific reason: it has to be evaluated identically on the
- * CPU (see cloudMacro below) so the sun's cloud-occlusion factor matches the
- * cloud the shader is actually drawing.
+/** CPU twin of the cloud coverage field; clouds-tsl.ts renders the same field on planetary shells.
+ * Cumulus is low, parallax-eroded and self-shadowed; cirrus combines decorrelated stretched ridges.
+ * Distance fading avoids a horizon wall. Keep analytic cloudMacro waves identical on CPU/GPU
+ * so directional-light occlusion matches the visible deck.
  */
 
 /**

@@ -2,8 +2,7 @@
 // unknown. Keep absent measurements absent rather than manufacturing counters.
 export function field(value: unknown, key: string): unknown {
   if (!value || typeof value !== 'object') return undefined;
-  const result: unknown = Reflect.get(value, key);
-  return result;
+  return Reflect.get(value, key);
 }
 
 export function numberField(value: unknown, key: string): number | null {

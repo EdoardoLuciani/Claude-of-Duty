@@ -10,7 +10,7 @@ import {
   reportDistantMix,
 } from '../../src/audio/weapons.ts';
 
-const kinds = ['rifle', 'mcx', 'pistol', 'lmg', 'smg', 'mpx', 'sniper', 'shotgun'];
+const kinds = ['rifle', 'mcx', 'pistol', 'lmg', 'smg', 'mpx', 'sniper', 'shotgun', 'ak'];
 const param = () => ({ value: 0 });
 const node = () => ({
   connections: [],
@@ -24,9 +24,8 @@ const node = () => ({
 for (const kind of kinds) {
   const profile = WEAPON_PROFILES[kind];
   assert.equal(profile.sample, kind);
-  assert.equal(profile.sampleAction, false);
-  assert.equal(profile.samplePunch, false);
-  assert.equal(profile.sampleSend, 0, 'complete reports use recorded decay, no added reverb');
+  assert.equal('sampleAction' in profile, false, 'no legacy action-layer controls');
+  assert.equal('samplePunch' in profile, false, 'no synthesized report branch');
   assert.equal('sampleGain' in profile, false, 'no separate authored per-profile level');
   assert.equal('firstPersonGain' in profile, false, 'no extra authored own-shot boost');
   const sources = [];
@@ -80,6 +79,7 @@ for (const kind of kinds) {
     assert.notEqual(voice.node.channelCount, 1, 'never force player source mono');
     assert.deepEqual(source.starts, [[when]], 'no source offset or truncation');
     assert(voice.end >= when + source.buffer.duration);
+    assert.equal(voice.send, 0, 'complete reports use recorded decay, no added reverb');
   }
   assert.equal(filters, 0, 'no player high/low-pass, including suppressed MCX');
   const audio = new AudioSystem();

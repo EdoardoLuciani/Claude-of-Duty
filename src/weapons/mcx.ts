@@ -1,15 +1,21 @@
 import * as THREE from 'three';
-import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { Renderer } from 'three/webgpu';
 
 import manifest from '../../assets/weapons/mcx-virtus/manifest.json' with { type: 'json' };
+import { isSkinnedMesh } from '../core/three-guards.ts';
+import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
-import { authoredModel } from './authored-model.ts';
+import { disposeAuthoredMixer } from './authored-actions.ts';
+import { authoredModel, type AuthoredModelData, type AuthoredNodes } from './authored-model.ts';
 import { buildEquipClips, buildMagazineClips } from './clips.ts';
 import { smootherstep } from './mathx.ts';
+import { configureMCXFinishes } from './mcx-finishes.ts';
 
-// Vite bundles the committed Blender export; never rebuild Blender at game boot.
-export const MCX_URL = new URL('../../assets/weapons/mcx-virtus/mcx-virtus.glb', import.meta.url)
-  .href;
+export const MCX_URL = new URL(
+  '../../assets/weapons/mcx-virtus/mcx-virtus.runtime.glb',
+  import.meta.url
+).href;
 const ALIASES: Record<string, string> = {
   reloadTac: 'Reload_Tactical',
   reloadEmpty: 'Reload_Empty',
@@ -21,7 +27,7 @@ const ONE = new THREE.Vector3(1, 1, 1);
 
 // Authored +X forward/+Y up/+Z right -> game -Z forward/+Y up/+X right.
 // Move the origin to the shooting-hand web, not the Blender chamber origin.
-export function makeMCXModel(gltf: GLTF) {
+export function makeMCXModel(gltf: GLTF): MCXModel {
   const scene = new THREE.Group();
   scene.name = 'mcx-coordinate-frame';
   scene.rotation.y = Math.PI / 2;
@@ -35,7 +41,7 @@ export function makeMCXModel(gltf: GLTF) {
   );
   const sight = point('SOCKET_sight');
   const model = {
-    id: 'mcx',
+    id: 'mcx' as const,
     scene,
     root,
     animations,
@@ -73,7 +79,7 @@ export function makeMCXModel(gltf: GLTF) {
   // transmission pass; the gameplay scope supplies the magnified sight picture.
   const converted = convertWeaponScene(
     scene,
-    (original, material) => {
+    (original, material): void => {
       // Intentional scope approximation, not exposure calibration: the gameplay
       // scope supplies the sight picture. Keep its established thin-alpha tint
       // instead of adding a second full-scene transmission pass.
@@ -86,6 +92,8 @@ export function makeMCXModel(gltf: GLTF) {
         material.metalness = 0;
         material.roughness = 0.12;
         material.specularIntensity = 0.25;
+      } else if (original.name === 'MCX | opaque finishes') {
+        configureMCXFinishes(material);
       }
     },
     true
@@ -93,8 +101,8 @@ export function makeMCXModel(gltf: GLTF) {
   return { ...model, ...converted };
 }
 
-export async function loadMCX() {
-  return makeMCXModel(await new GLTFLoader().loadAsync(MCX_URL));
+export async function loadMCX(renderer: Pick<Renderer, 'hasFeature'>): Promise<MCXModel> {
+  return makeMCXModel(await loadWeaponGLTF(renderer, MCX_URL));
 }
 
 function handQuaternion(
@@ -110,7 +118,36 @@ function handQuaternion(
 }
 
 /** Baked rigid-part animation under the shared movement/ADS/arm rig. */
-type MCXModel = ReturnType<typeof makeMCXModel>;
+type MCXModel = AuthoredModelData<
+  'mcx',
+  AuthoredNodes & {
+    ejectDir: [number, number, number];
+    gripR: {
+      pos: [number, number, number];
+      finger: [number, number, number];
+      back: [number, number, number];
+    };
+    gripL: {
+      pos: [number, number, number];
+      finger: [number, number, number];
+      back: [number, number, number];
+    };
+    handguard: {
+      axis: [number, number, number];
+      dir: [number, number, number];
+      r: number;
+      z0: number;
+      z1: number;
+    };
+    magSeat: { pos: [number, number, number]; rot: number[] };
+    opticGlass: {
+      kind: string;
+      reticle: string;
+      center: [number, number, number];
+      apertureR: number;
+    };
+  }
+>;
 type MCXDefinition = Parameters<typeof buildEquipClips>[1];
 export class MCXAnimation {
   model!: MCXModel;
@@ -122,18 +159,13 @@ export class MCXAnimation {
   frameQ!: THREE.Quaternion;
   inverseQ!: THREE.Quaternion;
   mixer!: THREE.AnimationMixer;
-  actions!: Record<string, THREE.AnimationAction>;
   magazine!: THREE.Object3D;
   spare!: THREE.Object3D;
   bolt!: THREE.Object3D;
+  boltBone!: THREE.Object3D;
+  private skeletons = new Set<THREE.Skeleton>();
   charging!: THREE.Object3D;
-  poseMatrix!: THREE.Matrix4;
   poseQ = new THREE.Quaternion();
-  partMatrix!: THREE.Matrix4;
-  target!: THREE.Vector3;
-  targetQ!: THREE.Quaternion;
-  magPoint!: THREE.Vector3;
-  chargePoint!: THREE.Vector3;
   magQ!: THREE.Quaternion;
   chargeQ!: THREE.Quaternion;
   idleTime = 0;
@@ -141,10 +173,21 @@ export class MCXAnimation {
   fireTime!: number;
   gesture!: string | null;
   gestureTime!: number;
+  actions: Record<string, THREE.AnimationAction> = {};
+  poseMatrix: THREE.Matrix4 = new THREE.Matrix4();
+  partMatrix: THREE.Matrix4 = new THREE.Matrix4();
+  target: THREE.Vector3 = new THREE.Vector3();
+  targetQ: THREE.Quaternion = new THREE.Quaternion();
+  // Fit-only contacts follow the revised magazine seat and OEM latch bow.
+  magPoint: THREE.Vector3 = new THREE.Vector3(-0.007, -0.16, -0.039);
+  chargePoint: THREE.Vector3 = new THREE.Vector3(-0.184, 0.02, -0.05);
+
   constructor(model: MCXModel, def: MCXDefinition) {
     this.model = model;
     this.def = def;
-    this.fireSpeed = (def as MCXDefinition & { fireAnimationSpeed: number }).fireAnimationSpeed;
+    if (!('fireAnimationSpeed' in def) || typeof def.fireAnimationSpeed !== 'number')
+      throw new Error('MCX: missing authored fire animation speed');
+    this.fireSpeed = def.fireAnimationSpeed;
     this.root = model.root;
     this.frame = model.scene;
     this.frame.updateMatrix();
@@ -152,11 +195,10 @@ export class MCXAnimation {
     this.frameQ = this.frame.quaternion.clone();
     this.inverseQ = this.frameQ.clone().invert();
     this.mixer = new THREE.AnimationMixer(this.root);
-    this.actions = {};
     for (const source of model.animations) {
       // The single showcase casing must not replay under the gun on every
       // shot. Live fire emits independent .300 cases via the existing FX pool.
-      const tracks = source.tracks.filter((t) => !t.name.startsWith('spent_case.'));
+      const tracks = source.tracks.filter((t): boolean => !t.name.startsWith('spent_case.'));
       const clip = new THREE.AnimationClip(source.name, source.duration, tracks);
       const action = this.mixer.clipAction(clip);
       action.setLoop(THREE.LoopOnce, 1);
@@ -166,27 +208,24 @@ export class MCXAnimation {
     this.magazine = this.root.getObjectByName('magazine')!;
     this.spare = this.root.getObjectByName('magazine_spare')!;
     this.bolt = this.root.getObjectByName('bolt')!;
+    this.boltBone = this.root.getObjectByName('MECH_bolt')!;
+    this.root.traverse((object): void => {
+      if (isSkinnedMesh(object)) this.skeletons.add(object.skeleton);
+    });
     this.charging = this.root.getObjectByName('charging_handle')!;
     this.root.getObjectByName('spent_case')!.visible = false;
-    this.poseMatrix = new THREE.Matrix4();
-    this.partMatrix = new THREE.Matrix4();
-    this.target = new THREE.Vector3();
-    this.targetQ = new THREE.Quaternion();
-    // Fit-only contacts follow the revised magazine seat and OEM latch bow.
-    this.magPoint = new THREE.Vector3(-0.007, -0.16, -0.039);
-    this.chargePoint = new THREE.Vector3(-0.184, 0.02, -0.05);
     this.magQ = handQuaternion([0.1, 0.72, -0.68], [-0.86, 0.34, -0.38]);
     this.chargeQ = handQuaternion([0.55, 0.2, 0.81], [-0.2, 0.94, -0.27]);
     this.reset();
   }
 
-  clips() {
+  clips(): { [x: string]: import('./clips.ts').Clip } {
     return {
       ...buildEquipClips(this.model.nodes, this.def),
       ...buildMagazineClips(
         ALIASES,
         manifest.clips,
-        (source) => this.actions[source].getClip().duration
+        (source): number => this.actions[source].getClip().duration
       ),
     };
   }
@@ -217,6 +256,10 @@ export class MCXAnimation {
     this.gesture = null;
     this.gestureTime = 0;
     this._sample('Idle', 0);
+    // Mixer property caching may skip an unchanged Idle value after our
+    // out-of-band empty-state override; reset both contact and visible skin.
+    this.bolt.position.x = 0;
+    this.boltBone.position.x = 0;
   }
 
   update(dt: number, clipName: string, clipTime: number, empty: boolean): void {
@@ -228,7 +271,10 @@ export class MCXAnimation {
     else if (this.fireTime < this.actions.Fire.getClip().duration)
       this._sample('Fire', this.fireTime);
     else this._sample('Idle', this.idleTime % this.actions.Idle.getClip().duration);
-    if (empty && !this.gesture && this.fireTime >= 7 / 60) this.bolt.position.x = -0.068;
+    if (empty && !this.gesture && this.fireTime >= 7 / 60) {
+      this.bolt.position.x = -0.068;
+      this.boltBone.position.x = this.bolt.position.x;
+    }
     this.frame.updateMatrixWorld(true);
   }
 
@@ -268,7 +314,7 @@ export class MCXAnimation {
     quat.slerp(this.targetQ, weight);
   }
 
-  get leftPose() {
+  get leftPose(): 'pinch' | null {
     if (
       this.gesture?.startsWith('reload') &&
       this.gestureTime > 0.2 &&
@@ -279,8 +325,9 @@ export class MCXAnimation {
   }
 
   dispose(): void {
-    this.mixer.stopAllAction();
-    this.mixer.uncacheRoot(this.root);
+    disposeAuthoredMixer(this);
+    for (const skeleton of this.skeletons) skeleton.dispose();
+    this.skeletons.clear();
     disposeWeaponMaterials(this.model);
   }
 }

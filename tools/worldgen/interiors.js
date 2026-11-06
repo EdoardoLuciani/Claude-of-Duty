@@ -94,7 +94,7 @@ export function wallBacking(r, side, t0, t1, y0, y1) {
  * WORLD — procedural interior micro-detail.
  *
  * Gameplay-significant furniture and floor props are explicitly authored in
- * placements/interiors.js. This module only builds attached dressing and small
+ * level/placements/interiors.js. This module only builds attached dressing and small
  * debris whose exact transform does not affect traversal.
  */
 
@@ -266,7 +266,6 @@ function dressWalls(A, rng, r) {
         if (!inVoid(r, sx, sz)) {
           A.add('wood_prop_dark', BOX(A), LL(IDENT, sx, sy, sz, s.yaw, sLen, 0.035, 0.28), {
             masks: [0.85, 0.5, 0.15],
-            support: 'shelf',
           });
           for (const bt of [-1, 1]) {
             const [bx, bz] = at(s, st + bt * (sLen / 2 - 0.12), 0.1);
@@ -481,7 +480,7 @@ function furnishWorkshop(A, rng, r, cx, cz, w, d) {
     'wood_prop_dark',
     BOX(A),
     LL(IDENT, cx, y + 0.82, cz, alongX ? 0 : Math.PI / 2, tw, 0.09, 0.72),
-    { masks: [0.8, 0.55, 0.25], support: 'counter' }
+    { masks: [0.8, 0.55, 0.25] }
   );
   for (const sx of [-1, 1]) {
     for (const sz of [-1, 1]) {
@@ -545,7 +544,6 @@ function furnishShop(A, rng, r, cx, cz, w, d) {
   if (clear) {
     A.add('wood_prop_dark', BOX(A), LL(IDENT, ccx, y + 0.9, ccz, 0, cSX, 0.06, cSZ), {
       masks: [0.9, 0.4, 0.1],
-      support: 'counter',
     });
     A.add(
       'wood_prop_dark',

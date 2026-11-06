@@ -134,7 +134,7 @@ export function navigationComponents(
       refs.push(base + j);
     }
   }
-  const parent = Int32Array.from({ length: refs.length }, (_, i) => i);
+  const parent = Int32Array.from({ length: refs.length }, (_, i): number => i);
   const root = (i: number): number => {
     while (parent[i] !== i) {
       parent[i] = parent[parent[i]];
@@ -153,7 +153,7 @@ export function navigationComponents(
       if (a !== b) parent[Math.max(a, b)] = Math.min(a, b);
     }
   }
-  return new Map(refs.map((ref, i) => [ref, root(i) + 1]));
+  return new Map(refs.map((ref, i): [number, number] => [ref, root(i) + 1]));
 }
 
 /** One offline-baked surface authority. No grid, online bake or fallback solver. */
@@ -163,20 +163,7 @@ export class SurfaceNav {
   components!: Map<number, number>;
   meta!: NavMeta;
   query!: NavMeshQuery;
-  coverPoints!: NavCoverPoint[];
-  lastOutcome!: string | null;
-  lastReason!: string | null;
-  startSurface!: number;
-  goalSurface!: number;
-  resolvedFloor!: number;
   stats!: NavStats;
-  _a!: THREE.Vector3;
-  _b!: THREE.Vector3;
-  _sample!: THREE.Vector3;
-  _arc!: THREE.Vector3;
-  _p0!: THREE.Vector3;
-  _p1!: THREE.Vector3;
-  _source!: THREE.Vector3;
   _probe!: NavController | null;
   readonly ladders: readonly LadderDescriptor[];
   readonly ladderLinks = new Map<number, LadderLink>();
@@ -215,6 +202,20 @@ export class SurfaceNav {
     }
   }
 
+  coverPoints: NavCoverPoint[] = [];
+  lastOutcome: string | null = null;
+  lastReason: string | null = null;
+  startSurface: number = 0;
+  goalSurface: number = 0;
+  resolvedFloor: number = NaN;
+  _a: THREE.Vector3 = new THREE.Vector3();
+  _b: THREE.Vector3 = new THREE.Vector3();
+  _sample: THREE.Vector3 = new THREE.Vector3();
+  _arc: THREE.Vector3 = new THREE.Vector3();
+  _p0: THREE.Vector3 = new THREE.Vector3();
+  _p1: THREE.Vector3 = new THREE.Vector3();
+  _source: THREE.Vector3 = new THREE.Vector3();
+
   constructor(
     physics: NavPhysics,
     mesh: ReturnType<typeof importNavMesh>['navMesh'],
@@ -230,12 +231,6 @@ export class SurfaceNav {
     this.routeFilter = new QueryFilter();
     this.walkingComponents = navigationComponents(mesh, true);
     this.ladders = meta.ladders ?? [];
-    this.coverPoints = [];
-    this.lastOutcome = null;
-    this.lastReason = null;
-    this.startSurface = 0;
-    this.goalSurface = 0;
-    this.resolvedFloor = NaN;
     this.stats = {
       polygons: components.size,
       queries: 0,
@@ -243,13 +238,6 @@ export class SurfaceNav {
       endpointChecks: 0,
       cacheHits: 0,
     };
-    this._a = new THREE.Vector3();
-    this._b = new THREE.Vector3();
-    this._sample = new THREE.Vector3();
-    this._arc = new THREE.Vector3();
-    this._p0 = new THREE.Vector3();
-    this._p1 = new THREE.Vector3();
-    this._source = new THREE.Vector3();
     // Reuse one real controller for short attachment checks, never a per-request
     // character allocation or a simulation of the entire route. Not a game actor.
     this._probe = physics.createCharacter({
@@ -331,7 +319,13 @@ export class SurfaceNav {
   }
 
   // Read-only diagnostics: nearest baked surface, not a physical attachment.
-  inspect(p: THREE.Vector3) {
+  inspect(p: THREE.Vector3): {
+    success: boolean;
+    status: number;
+    nearestRef: number;
+    nearestPoint: { x: number; y: number; z: number };
+    isOverPoly: boolean;
+  } {
     return this.query.findNearestPoly(p, { halfExtents: EXTENTS });
   }
 
@@ -365,7 +359,7 @@ export class SurfaceNav {
       // send its full budget to the worker. Never prefix static/long candidates.
       const immediate =
         from === this.worker.current?.origin && distance < 0.12
-          ? () => checkAttachment.call(this, from, to, radius, height, maxSteps, 1)
+          ? (): boolean | null => checkAttachment.call(this, from, to, radius, height, maxSteps, 1)
           : null;
       return this.worker.request(from, to, radius, height, maxSteps, immediate);
     }
@@ -775,30 +769,25 @@ export class CoverMap {
   grid!: SurfaceNav | null;
   physics!: NavPhysics;
   points!: NavCoverPoint[];
-  byComponent!: Map<number, NavCoverPoint[]>;
-  _v!: THREE.Vector3;
-  _v2!: THREE.Vector3;
-  _v3!: THREE.Vector3;
   _candidates!: (NavCoverPoint | null)[];
-  _scores!: Float64Array;
-  lastReject!: string | null;
+  byComponent: Map<number, NavCoverPoint[]> = new Map();
+  _v: THREE.Vector3 = new THREE.Vector3();
+  _v2: THREE.Vector3 = new THREE.Vector3();
+  _v3: THREE.Vector3 = new THREE.Vector3();
+  _scores: Float64Array = new Float64Array(TACTICS.coverCandidates);
+  lastReject: string | null = null;
+
   constructor(nav: SurfaceNav | null, physics: NavPhysics) {
     this.grid = nav;
     this.physics = physics;
     this.points = nav?.coverPoints ?? [];
-    this.byComponent = new Map();
     for (const p of this.points) {
       p.component = nav?.walkingComponents?.get(p.surface) ?? p.component;
       let list = this.byComponent.get(p.component);
       if (!list) this.byComponent.set(p.component, (list = []));
       list.push(p);
     }
-    this._v = new THREE.Vector3();
-    this._v2 = new THREE.Vector3();
-    this._v3 = new THREE.Vector3();
     this._candidates = new Array<NavCoverPoint | null>(TACTICS.coverCandidates).fill(null);
-    this._scores = new Float64Array(TACTICS.coverCandidates);
-    this.lastReject = null;
   }
   pick(
     pos: THREE.Vector3,
@@ -810,7 +799,7 @@ export class CoverMap {
       ? this.grid.worker.run(
           opts.id ?? -1,
           opts.elevated ? 'elevation' : 'cover',
-          () => this._pick(pos, threat, opts),
+          (): BakedCoverPoint | null => this._pick(pos, threat, opts),
           pos
         )
       : this._pick(pos, threat, opts);
@@ -971,7 +960,12 @@ export class CoverMap {
   ): number | null | typeof NAV_PENDING | typeof NAV_CANCELLED {
     const grid = this.grid;
     if (actor !== undefined && grid?.worker)
-      return grid.worker.run(actor, 'peek', () => this.peekOffset(cover, threat, eyeH, out));
+      return grid.worker.run(
+        actor,
+        'peek',
+        (): number | typeof NAV_PENDING | typeof NAV_CANCELLED | null =>
+          this.peekOffset(cover, threat, eyeH, out)
+      );
     if (!grid) return null;
     // Low cover may expose by standing; high cover must be physically rounded.
     // Zero is a valid standing peek, null means there is no executable shot.

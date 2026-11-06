@@ -1,25 +1,11 @@
-/**
- * AUDIO / DSP TOOLKIT
- *
- * Low-level Web Audio helpers shared by every synthesis voice in this
- * directory. Everything here is written against `BaseAudioContext` so the exact
- * same code path renders in an `OfflineAudioContext` as in
- * the live `AudioContext` — that is how this subsystem is verified without a
- * user gesture or a speaker.
- *
- * Rules honoured here:
- *  - no randomness except through an injected `Rng` (ctx.rng.fork())
- *  - buffers and curve tables are built once and shared
- *  - every node a voice creates hangs off a single top gain so the caller can
- *    disconnect the whole voice in one call when its tail has decayed
+/** Shared deterministic Web Audio primitives for live and OfflineAudioContext rendering.
+ * Inject RNG; build reusable buffers/curves once. Each voice owns a top gain for teardown.
  */
 
 export const SPEED_OF_SOUND = 343; // m/s, 20 C dry air
-type NoiseKind = 'white' | 'pink' | 'brown' | 'crackle';
+type NoiseKind = 'white' | 'pink';
 type Curve = Float32Array<ArrayBuffer>;
 interface AudioRandom {
-  u32(): number;
-  float(): number;
   signed(): number;
   range(min: number, max: number): number;
 }
@@ -33,16 +19,10 @@ interface ResonatorPartial {
   decay?: number;
 }
 
-/* ------------------------------------------------------------------ */
-/* Noise                                                              */
-/* ------------------------------------------------------------------ */
-
 /**
  * Fill a Float32Array with one of the classic noise colours.
  *  white  — flat spectrum, the raw material of cracks and hiss
  *  pink   — -3 dB/oct (Paul Kellet's economy filter), city beds, tails
- *  brown  — -6 dB/oct leaky integrator, wind and rumble
- *  crackle— sparse impulsive grains, debris and foliage
  */
 export function fillNoise(out: Float32Array, kind: NoiseKind, rng: AudioRandom): Float32Array {
   const n = out.length;
@@ -68,40 +48,6 @@ export function fillNoise(out: Float32Array, kind: NoiseKind, rng: AudioRandom):
       }
       break;
     }
-    case 'brown': {
-      let last = 0;
-      for (let i = 0; i < n; i++) {
-        const w = rng.signed();
-        last = (last + 0.019 * w) * 0.9985;
-        out[i] = last * 5.2;
-      }
-      break;
-    }
-    case 'crackle': {
-      out.fill(0);
-      // Poisson-ish grain train; each grain is a decaying two-pole ping so the
-      // buffer already has material character rather than pure clicks.
-      let i = 0;
-      while (i < n) {
-        i += 12 + ((rng.u32() % 260) | 0);
-        if (i >= n) break;
-        const amp = rng.range(0.25, 1) * (rng.float() < 0.12 ? 1.8 : 0.7);
-        const w = rng.range(0.05, 0.45); // radians/sample
-        const dec = Math.exp(-rng.range(0.004, 0.05));
-        let a = amp;
-        for (let k = 0; k < 220 && i + k < n; k++) {
-          out[i + k] += Math.sin(w * k) * a;
-          a *= dec;
-          if (a < 1e-4) break;
-        }
-      }
-      // Keep the peak sane; grains overlap.
-      let peak = 1e-6;
-      for (let k = 0; k < n; k++) peak = Math.max(peak, Math.abs(out[k]));
-      const g = 0.9 / peak;
-      for (let k = 0; k < n; k++) out[k] *= g;
-      break;
-    }
     default:
       for (let i = 0; i < n; i++) out[i] = rng.signed();
   }
@@ -115,11 +61,11 @@ export function fillNoise(out: Float32Array, kind: NoiseKind, rng: AudioRandom):
  */
 export class NoiseBank {
   actx: BaseAudioContext;
-  buffers: Record<NoiseKind, AudioBuffer>;
+  buffers: Partial<Record<NoiseKind, AudioBuffer>> = {};
+
   constructor(actx: BaseAudioContext, rng: AudioRandom, seconds = 2.2) {
     this.actx = actx;
-    this.buffers = {} as Record<NoiseKind, AudioBuffer>;
-    const kinds: NoiseKind[] = ['white', 'pink', 'brown', 'crackle'];
+    const kinds: NoiseKind[] = ['white', 'pink'];
     for (const kind of kinds) {
       const len = Math.max(1, Math.floor(actx.sampleRate * seconds));
       const buf = actx.createBuffer(2, len, actx.sampleRate);
@@ -134,6 +80,7 @@ export class NoiseBank {
   source(kind: NoiseKind, rng: AudioRandom | null, rate = 1, loop = false): OffsetBufferSource {
     const src = this.actx.createBufferSource();
     const buf = this.buffers[kind] ?? this.buffers.white;
+    if (!buf) throw new Error('[audio] noise bank is disposed');
     src.buffer = buf;
     src.playbackRate.value = rate;
     src.loop = loop;
@@ -141,19 +88,13 @@ export class NoiseBank {
       src.loopStart = 0;
       src.loopEnd = buf.duration;
     }
-    const offsetSrc = src as OffsetBufferSource;
-    offsetSrc._offset = rng ? rng.range(0, buf.duration * 0.7) : 0;
-    return offsetSrc;
+    return Object.assign(src, { _offset: rng ? rng.range(0, buf.duration * 0.7) : 0 });
   }
 
   dispose(): void {
-    this.buffers = {} as Record<NoiseKind, AudioBuffer>;
+    this.buffers = {};
   }
 }
-
-/* ------------------------------------------------------------------ */
-/* Envelopes                                                          */
-/* ------------------------------------------------------------------ */
 
 const FLOOR = 1e-4;
 
@@ -231,10 +172,6 @@ export function sweep(
   return t0 + dur;
 }
 
-/* ------------------------------------------------------------------ */
-/* Nodes                                                              */
-/* ------------------------------------------------------------------ */
-
 export function biquad(
   actx: BaseAudioContext,
   type: BiquadFilterType,
@@ -275,10 +212,6 @@ export function series(...nodes: [AudioNode, ...AudioNode[]]): AudioNode {
   return nodes[nodes.length - 1]!;
 }
 
-/* ------------------------------------------------------------------ */
-/* Waveshaping                                                        */
-/* ------------------------------------------------------------------ */
-
 const CURVE_CACHE = new Map<string, Curve>();
 
 /**
@@ -313,10 +246,6 @@ export function shaper(
   w.oversample = oversample;
   return w;
 }
-
-/* ------------------------------------------------------------------ */
-/* Resonators                                                         */
-/* ------------------------------------------------------------------ */
 
 /**
  * Excite a bank of high-Q bandpasses with a short noise burst: the cheapest
@@ -353,21 +282,8 @@ export function struckResonator(
   return out;
 }
 
-/* ------------------------------------------------------------------ */
-/* Misc                                                               */
-/* ------------------------------------------------------------------ */
-
 export function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
-}
-
-export function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
-
-/** Semitone ratio — pitch jitter is expressed musically, not as a raw factor. */
-export function semis(n: number): number {
-  return Math.pow(2, n / 12);
 }
 
 /** Air absorption: how much high end survives `dist` metres of atmosphere. */

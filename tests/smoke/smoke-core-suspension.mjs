@@ -15,7 +15,7 @@ function makeEngine() {
 const engine = makeEngine();
 const calls = [];
 for (const id of ['game', 'ui', 'telemetry']) {
-  engine.registry.add({
+  engine.registry.add(id, {
     constructor: { id },
     fixedUpdate: () => calls.push(`${id}:fixed`),
     update: () => calls.push(`${id}:update`),
@@ -33,7 +33,7 @@ engine.input.beginFrame = () => {
   beginFrame();
 };
 engine.input.endFrame = () => ends++;
-engine.registry.add({
+engine.registry.add('render', {
   constructor: { id: 'render' },
   render: () => renders++,
 });
@@ -112,21 +112,24 @@ for (const phase of ['fixedUpdate', 'update', 'lateUpdate']) {
     hooks.push(phase);
     gated.setGameplaySuspended(true);
   };
-  gated.registry.add(trigger);
-  gated.registry.add({
+  gated.registry.add(trigger.constructor.id, trigger);
+  gated.registry.add('after', {
     constructor: { id: 'after' },
     fixedUpdate: () => hooks.push('after-fixed'),
     update: () => hooks.push('after-update'),
     lateUpdate: () => hooks.push('after-late'),
   });
-  gated.registry.add({
+  gated.registry.add('ui', {
     constructor: { id: 'ui' },
     lateUpdate: (dt) => {
       assert.equal(dt, 0);
       hooks.push('ui');
     },
   });
-  gated.registry.add({ constructor: { id: 'render' }, render: () => hooks.push('render') });
+  gated.registry.add('render', {
+    constructor: { id: 'render' },
+    render: () => hooks.push('render'),
+  });
   gated.step(FIXED_DT * 1000);
   const boundary = hooks.indexOf(phase);
   assert(boundary >= 0);
@@ -147,14 +150,14 @@ try {
     let drawCalls = 0;
     let firstRender = 0;
     failed.onFirstRender = () => firstRender++;
-    failed.registry.add({
+    failed.registry.add('ui', {
       constructor: { id: 'ui' },
       lateUpdate() {
         uiCalls++;
         if (phase === 'lateUpdate') throw new Error('waiting UI failed');
       },
     });
-    failed.registry.add({
+    failed.registry.add('render', {
       constructor: { id: 'render' },
       render() {
         drawCalls++;

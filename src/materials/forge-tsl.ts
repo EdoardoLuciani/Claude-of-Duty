@@ -1,3 +1,4 @@
+import type { RenderTargetEventMap, Texture } from 'three';
 import { float, uv, vec2, vec3 } from 'three/tsl';
 import {
   HalfFloatType,
@@ -17,8 +18,7 @@ import { normalFromHeight } from './normal-tsl.ts';
 import { detailSurface, macroSurface } from './surfaces-tsl.ts';
 
 export interface SurfaceNode {
-  get(name: 'albedo'): Node<'vec3'>;
-  get(name: 'height' | 'ao' | 'rough' | 'metal'): Node<'float'>;
+  get(name: 'albedo' | 'height' | 'ao' | 'rough' | 'metal'): Node;
 }
 interface SurfaceBakeInput {
   size: number;
@@ -28,7 +28,11 @@ interface SurfaceBakeInput {
 }
 
 /** Bake the shared, linear RGBA macro map on the initialized WebGPU renderer. */
-export function bakeMacro(renderer: Renderer, size = 256, seed = 2) {
+export function bakeMacro(
+  renderer: Renderer,
+  size = 256,
+  seed = 2
+): RenderTarget<Texture, RenderTargetEventMap> {
   const target = new RenderTarget(size, size, {
     depthBuffer: false,
     generateMipmaps: true,
@@ -66,7 +70,14 @@ export function bakeMacro(renderer: Renderer, size = 256, seed = 2) {
 }
 
 /** Bake linear micro albedo/height and its tangent-space Sobel normal. */
-export function bakeDetail(renderer: Renderer, size = 1024, seed = 1) {
+export function bakeDetail(
+  renderer: Renderer,
+  size = 1024,
+  seed = 1
+): {
+  albedo: RenderTarget<Texture, RenderTargetEventMap>;
+  normal: RenderTarget<Texture, RenderTargetEventMap>;
+} {
   const options = {
     depthBuffer: false,
     generateMipmaps: true,
@@ -132,7 +143,11 @@ export function bakeDetail(renderer: Renderer, size = 1024, seed = 1) {
 export function bakeSurface(
   renderer: Renderer,
   { size, worldSize, relief, surface }: SurfaceBakeInput
-) {
+): {
+  albedo: RenderTarget<Texture, RenderTargetEventMap>;
+  orm: RenderTarget<Texture, RenderTargetEventMap>;
+  normal: RenderTarget<Texture, RenderTargetEventMap>;
+} {
   const options = {
     depthBuffer: false,
     generateMipmaps: true,
@@ -162,17 +177,21 @@ export function bakeSurface(
   const quad = new QuadMesh(material);
   const previous = renderer.getRenderTarget();
   try {
-    material.colorNode = vec3(surface.get('height'));
+    material.colorNode = vec3(surface.get('height').toFloat());
     renderer.setRenderTarget(height);
     quad.render(renderer);
 
-    material.colorNode = surface.get('albedo');
-    material.opacityNode = surface.get('height');
+    material.colorNode = surface.get('albedo').toVec3();
+    material.opacityNode = surface.get('height').toFloat();
     material.needsUpdate = true;
     renderer.setRenderTarget(albedo);
     quad.render(renderer);
 
-    material.colorNode = vec3(surface.get('ao'), surface.get('rough'), surface.get('metal'));
+    material.colorNode = vec3(
+      surface.get('ao').toFloat(),
+      surface.get('rough').toFloat(),
+      surface.get('metal').toFloat()
+    );
     material.opacityNode = float(1);
     material.needsUpdate = true;
     renderer.setRenderTarget(orm);

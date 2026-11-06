@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "seed": 1592594996,
+  "inputHash": "6d3b173ab2938b216e7fd2c79b7d9b05551214b3fe602fe4cdc28f1dc6a1314d",
+  "blenderVersion": "5.2.2",
+  "threeRevision": "187",
+  "files": {
+    "vanguard.blend": "73cf313c41335da9745d63e58320e3e388ad715ae01d48e4a7dd63aa78765332",
+    "vanguard.glb": "d164e4bb24d70f2e7ab4fd99a1b5d2cde8d7b8caaeb30d8526e3cc7cf3f38cc7",
+    "vanguard.json": "4b9d545cf4b52bc7e6c553a797b1e223ab80436cb4d2a188d5d38583fe0d30b2",
+    "irregular.blend": "7d52855d745d9d617832a7e58486f5f8e1ea38229c1d409bbcc91e56d53107fc",
+    "irregular.glb": "366f7aa9a76af164c73e0aa2fdd6062ce95b82fcd0bd6f4d2fa1fc1db7d7be2f",
+    "irregular.json": "f20c29533cf6e586449cf4b2634e4a852ace3d77b6080173f2c017cc1bf6bf59",
+    "breacher.blend": "70e478b20fb8fb743fb576c7c2e44651497e26045ea47b75b7b28b41677efb53",
+    "breacher.glb": "f7f034731980c20e224982225da623542abbd6fd85c84b0bcae93cbc377ab233",
+    "breacher.json": "3eff10a1f0ea3d2850f5fa4939c88069d31ee9c8837d7eb919866d56ebf0045b"
+  }
+}

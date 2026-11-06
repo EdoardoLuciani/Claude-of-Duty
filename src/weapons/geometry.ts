@@ -27,10 +27,6 @@ function normalizeAttributes(geo: THREE.BufferGeometry): THREE.BufferGeometry {
   return geo;
 }
 
-/* ========================================================================== */
-/*  primitives                                                                */
-/* ========================================================================== */
-
 /**
  * Chamfered box. `chamfer` is the bevel radius in metres; `seg` 1 gives a hard
  * 45-degree chamfer, 2-3 gives a rounded fillet.
@@ -153,7 +149,10 @@ export function mergeAll(
   const clean = list.filter((geo): geo is THREE.BufferGeometry => Boolean(geo));
   if (!clean.length) return null;
   if (clean.length === 1) return clean[0];
-  const nonIndexed = clean.map((g) => (g.getIndex() ? g.toNonIndexed() : g));
+  const nonIndexed = clean.map(
+    (g): THREE.BufferGeometry<THREE.NormalBufferAttributes, THREE.BufferGeometryEventMap> =>
+      g.getIndex() ? g.toNonIndexed() : g
+  );
   for (const g of nonIndexed) normalizeAttributes(g);
   const merged = mergeGeometries(nonIndexed, false);
   for (let i = 0; i < clean.length; i++) {

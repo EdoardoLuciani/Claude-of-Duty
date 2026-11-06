@@ -159,34 +159,29 @@ export class TentRadio {
   actx: BaseAudioContext;
   mixer: Mixer;
   rng: Rng;
-  _buf: AudioBuffer | null;
-  _warm: Promise<AudioBuffer | null> | null;
-  _src: AudioBufferSourceNode | null;
-  _gain: GainNode | null;
-  _lfo: OscillatorNode | null;
   _lfoG?: GainNode | null;
-  playing: boolean;
+  _buf: AudioBuffer | null = null;
+  _warm: Promise<AudioBuffer | null> | null = null;
+  _src: AudioBufferSourceNode | null = null;
+  _gain: GainNode | null = null;
+  _lfo: OscillatorNode | null = null;
+  playing: boolean = false;
+
   constructor(actx: BaseAudioContext, mixer: Mixer, rng: Rng) {
     this.actx = actx;
     this.mixer = mixer;
     this.rng = rng;
-    this._buf = null;
-    this._warm = null;
-    this._src = null;
-    this._gain = null;
-    this._lfo = null;
-    this.playing = false;
   }
 
   /** Kick off the offline render; first `start()` awaits this. */
   warm(): Promise<AudioBuffer | null> {
     if (this._warm) return this._warm;
     this._warm = renderBed(this.actx.sampleRate, this.rng)
-      .then((buf) => {
+      .then((buf): AudioBuffer | null => {
         this._buf = buf;
         return buf;
       })
-      .catch(() => {
+      .catch((): null => {
         this._buf = null;
         return null;
       });
@@ -246,7 +241,7 @@ export class TentRadio {
     } catch {
       /* already stopped */
     }
-    setTimeout(() => {
+    setTimeout((): void => {
       try {
         src?.disconnect();
       } catch {

@@ -12,7 +12,10 @@ interface ControlSection {
 
 /** Concise presentation only; physical key labels come from canonical bindings. */
 function quick(actions: readonly ActionId[], description: string): ControlReference {
-  return { keys: actions.flatMap((action) => bindingLabels(action)), description };
+  return {
+    keys: actions.flatMap((action): readonly string[] => bindingLabels(action)),
+    description,
+  };
 }
 
 export const CONTROL_SECTIONS: ControlSection[] = [
@@ -20,9 +23,9 @@ export const CONTROL_SECTIONS: ControlSection[] = [
     title: 'Movement & look',
     controls: [
       {
-        keys: [0, 1].map((alias) =>
+        keys: [0, 1].map((alias): string =>
           (['forward', 'left', 'back', 'right'] as const)
-            .map((action) => bindingLabels(action)[alias])
+            .map((action): string => bindingLabels(action)[alias])
             .join(' ')
         ),
         description: 'Move (hold)',

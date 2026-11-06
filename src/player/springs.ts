@@ -69,15 +69,14 @@ export class Spring {
   declare freq: number;
   declare damping: number;
   declare value: number;
-  declare velocity: number;
-  declare target: number;
+
+  velocity: number = 0;
+  target: number = 0;
 
   constructor(freq = 8, damping = 0.7, value = 0) {
     this.freq = freq;
     this.damping = damping;
     this.value = value;
-    this.velocity = 0;
-    this.target = 0;
   }
 
   reset(value = 0): this {
@@ -127,17 +126,16 @@ export class Spring {
  */
 export class RecoilAxis {
   declare spring: Spring;
-  declare residual: number;
   declare residualTau: number;
   declare residualShare: number;
-  declare value: number;
+
+  residual: number = 0;
+  value: number = 0;
 
   constructor(freq = 9.5, damping = 0.52, residualTau = 0.3, residualShare = 0.34) {
     this.spring = new Spring(freq, damping, 0);
-    this.residual = 0;
     this.residualTau = residualTau;
     this.residualShare = residualShare;
-    this.value = 0;
   }
 
   reset(): void {

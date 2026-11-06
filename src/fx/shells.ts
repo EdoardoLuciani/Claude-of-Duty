@@ -4,22 +4,15 @@ import { attribute } from 'three/tsl';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 
 import type { EventWeapon } from '../core/events.ts';
+import { isMesh } from '../core/three-guards.ts';
+import type { RigidBody } from '../physics/rigidbody.ts';
 import { P, buildBrassTextures } from './atlas.ts';
-import { resetSpawn } from './particles.ts';
+import type { FxSystem } from './index.ts';
+import { resetSpawn, setSpawnPosition, setSpawnVelocity } from './particles.ts';
 
-/**
- * Ejected shell casings.
- *
- * Real rigid bodies through `physics.addRigidBody` when physics is up: they
- * tumble on a proper inertia tensor, bounce off the world's BVH, come to rest,
- * and report their impacts so audio can ping and a puff of dust can lift off
- * the floor. One InstancedMesh draws all of them, so a firefight's worth of
- * brass costs one draw call. Shotgun hulls use one additional instanced draw
- * when both variants are live, sharing the same bounded slots and bodies.
- *
- * The casing itself is a lathed 5.56-profile case — rim, body taper, shoulder,
- * neck and a hollow mouth — in brass (metalness 1, F0 tinted, roughness map with
- * drawing marks and extractor scuffing) so it catches the sun as it spins.
+/** Bounded casing slots use rigid bodies and one brass InstancedMesh; shotgun hulls add one draw.
+ * Bodies own tumble/collision/sleep and publish contact audio/dust. Brass uses a hollow
+ * 5.56-profile lathe with independent calibre length/radius scaling.
  */
 
 const CAPACITY = 14;
@@ -41,7 +34,7 @@ interface ShellSlot extends CaseScale {
   shotgun: boolean;
   alive: boolean;
   age: number;
-  body: ShellRigidBody | null;
+  body: RigidBody | null;
   proxy: THREE.Object3D;
   pos: THREE.Vector3;
   vel: THREE.Vector3;
@@ -49,48 +42,7 @@ interface ShellSlot extends CaseScale {
   spin: THREE.Vector3;
   fade: number;
 }
-interface ShellRigidBody {
-  userData?: unknown;
-}
-interface ShellPhysics {
-  addRigidBody?:
-    | ((options: {
-        shape: 'box';
-        halfExtents: { x: number; y: number; z: number };
-        radius: number;
-        mass: number;
-        position: THREE.Vector3;
-        quaternion: THREE.Quaternion;
-        velocity: THREE.Vector3;
-        angularVelocity: THREE.Vector3;
-        restitution: number;
-        friction: number;
-        linearDamping: number;
-        angularDamping: number;
-        lifetime: number;
-        surfaceType: 'metal';
-        object3D: THREE.Object3D;
-        onImpact: (
-          body: ShellRigidBody,
-          px: number,
-          py: number,
-          pz: number,
-          nx: number,
-          ny: number,
-          nz: number,
-          speed: number
-        ) => void;
-      }) => ShellRigidBody | null)
-    | null;
-  removeRigidBody?(body: ShellRigidBody): void;
-}
-interface ShellFx {
-  rng: import('../core/rng.ts').Rng;
-  gravity: number;
-  physics?: ShellPhysics;
-  audioPing(x: number, y: number, z: number, gain: number): void;
-  emitLit(spawn: ReturnType<typeof resetSpawn>): void;
-}
+type ShellFx = Pick<FxSystem, 'rng' | 'gravity' | 'physics' | 'audioPing' | 'emitLit'>;
 export interface ShellOptions {
   caseLen?: number;
   caseRadius?: number;
@@ -101,9 +53,9 @@ export interface ShellOptions {
 
 export async function loadSpentHullGeometry(): Promise<THREE.BufferGeometry> {
   const gltf = await new GLTFLoader().loadAsync('/models/fx/spent12g.glb');
-  const mesh = gltf.scene.getObjectByName('spent12g') as THREE.Mesh;
+  const mesh = gltf.scene.getObjectByName('spent12g');
   if (
-    !mesh?.isMesh ||
+    !isMesh(mesh) ||
     !mesh.geometry.hasAttribute('_shellpbr') ||
     !mesh.geometry.hasAttribute('color')
   ) {
@@ -124,7 +76,7 @@ export function setCaseScale<T extends CaseScale>(
   return out;
 }
 
-function caseProfile() {
+function caseProfile(): THREE.Vector2[] {
   // metres; a 5.56x45 case is 45 mm long, 9.6 mm at the base
   const pts: THREE.Vector2[] = [];
   const add = (r: number, y: number): number => pts.push(new THREE.Vector2(r, y));
@@ -151,13 +103,14 @@ export class ShellSystem {
   mesh: THREE.InstancedMesh;
   hullMesh: THREE.InstancedMesh;
   hullMaterial: MeshStandardNodeMaterial;
-  slots: ShellSlot[];
-  cursor: number;
-  _lastCount: number;
-  _m: THREE.Matrix4;
-  _q: THREE.Quaternion;
-  _e: THREE.Euler;
-  _s: THREE.Vector3;
+  slots: ShellSlot[] = [];
+  cursor: number = 0;
+  _lastCount: number = 0;
+  _m: THREE.Matrix4 = new THREE.Matrix4();
+  _q: THREE.Quaternion = new THREE.Quaternion();
+  _e: THREE.Euler = new THREE.Euler();
+  _s: THREE.Vector3 = new THREE.Vector3(1, 1, 1);
+
   constructor(fx: ShellFx, hullGeometry: THREE.BufferGeometry) {
     this.fx = fx;
     const geo = new THREE.LatheGeometry(caseProfile(), 16);
@@ -206,7 +159,6 @@ export class ShellSystem {
     this.hullMesh.name = 'fx-spent12g';
     this.hullMesh.userData.owProbe = true;
 
-    this.slots = [];
     for (let i = 0; i < CAPACITY; i++) {
       this.slots.push({
         shotgun: false,
@@ -225,17 +177,11 @@ export class ShellSystem {
       });
       this.slots[i].proxy.matrixAutoUpdate = false;
     }
-    this.cursor = 0;
-    this._lastCount = 0;
-    this._m = new THREE.Matrix4();
-    this._q = new THREE.Quaternion();
-    this._e = new THREE.Euler();
-    this._s = new THREE.Vector3(1, 1, 1);
   }
 
   spawn(
     position: THREE.Vector3,
-    velocity?: Partial<THREE.Vector3> | null,
+    velocity?: Partial<Pick<THREE.Vector3, 'x' | 'y' | 'z'>> | null,
     opts: ShellOptions = {}
   ): ShellSlot {
     const fx = this.fx;
@@ -314,7 +260,7 @@ export class ShellSystem {
   }
 
   _onImpact = (
-    _body: ShellRigidBody,
+    _body: RigidBody,
     px: number,
     py: number,
     pz: number,
@@ -330,12 +276,8 @@ export class ShellSystem {
     fx.audioPing(px, py, pz, gain);
     // a tick of dust and a metallic glint where it struck
     const s = resetSpawn();
-    s.x = px;
-    s.y = py + 0.005;
-    s.z = pz;
-    s.vx = nx * 0.25;
-    s.vy = ny * 0.3 + 0.15;
-    s.vz = nz * 0.25;
+    setSpawnPosition(s, px, py + 0.005, pz);
+    setSpawnVelocity(s, nx * 0.25, ny * 0.3 + 0.15, nz * 0.25);
     s.tile = P.DUST;
     s.size0 = 0.012;
     s.size1 = 0.07;

@@ -3,9 +3,10 @@ import * as TSL from 'three/tsl';
 import { MeshBasicNodeMaterial, MeshPhysicalNodeMaterial } from 'three/webgpu';
 import type { Node, UniformNode } from 'three/webgpu';
 
+import { hasOwn } from '../core/guards.ts';
 import { loadArmAsset } from './arm-asset.ts';
 import { createWeaponMaterial } from './asset-material.ts';
-import { AX338Animation } from './ax338.ts';
+import { createWeaponAnimation } from './authored-animation.ts';
 import { loadBandage } from './bandage-mesh.ts';
 import {
   BANDAGE_PATH,
@@ -17,13 +18,11 @@ import {
 } from './bandage-path.ts';
 import { makeSampleResult } from './clips.ts';
 import type { Clip } from './clips.ts';
-import { EvolysAnimation } from './evolys.ts';
+import type { WeaponDef } from './defs.ts';
 import { triCount, mergeAll } from './geometry.ts';
 import { grenadeMesh } from './grenade-mesh.ts';
 import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from './grip-contacts.ts';
 import { Arm } from './hands.ts';
-import { M4Animation } from './m4.ts';
-import { M590Animation } from './m590.ts';
 import type { ReticleMaterials } from './materials-tsl.ts';
 import {
   Spring,
@@ -37,52 +36,22 @@ import {
   wrapPi,
   TAU,
 } from './mathx.ts';
-import { MCXAnimation } from './mcx.ts';
-import { MPXAnimation } from './mpx.ts';
-import { P320Animation } from './p320.ts';
 import { radioMesh, radioScreenTexture } from './radio-mesh.ts';
-import { isWeaponAdapter } from './runtime-types.ts';
 import type {
   ClipResult,
   ViewPoseKey,
   ViewState,
-  WeaponDef,
   WeaponEntry,
   WeaponModelRecord,
   WeaponNodes,
-  WeaponAnimation,
   ViewmodelContext,
 } from './runtime-types.ts';
 import { SNIPER_RETICLE, sniperMradScale, sniperReticleCoverage } from './sniper-reticle.ts';
 
-/**
- * THE VIEWMODEL RIG.
- *
- * Everything the player looks at for the whole game happens in this file. It is
- * a stack of *additive procedural layers* over one base pose — no baked clips
- * for anything continuous:
- *
- *   base      hip / ADS / sprint / low-ready pose blend
- *   sway      layered incommensurate noise, so idle never visibly loops
- *   bob       stride-driven figure-eight, scaled by speed and stance
- *   lag       the gun TRAILS camera rotation on a spring, overshoots, settles.
- *             This is the single detail that makes a viewmodel feel real.
- *   recoil    per-shot rotational + positional impulse, spring-damper return
- *   clip      keyframed reload / inspect / draw additive offset
- *
- * ADS alignment is computed, not authored: the rig solves for the translation
- * that puts the weapon's sight node exactly on the camera axis at the right eye
- * relief, so the optic is pixel-centred at full ADS whatever the weapon.
- *
- * The scene graph:
- *   viewScene
- *     anchor          <- copies the world camera transform every frame, so the
- *                        gun is lit and shadowed as if it were in the world
- *       rig           <- the animation stack writes here
- *         weapon      <- body meshes + moving-part groups
- *         armL/armR   <- two-bone IK, hands welded to the weapon's grips
- *       reticle       <- collimated dot, placed on the optical axis in camera
- *                        space so it behaves like real glass
+/** First-person pose stack: base hip/ADS/sprint/low-ready, sway, stride bob, lag, recoil, then clips.
+ * ADS translation aligns the authored sight to camera axis at the selected eye relief.
+ * viewScene -> anchor (world-camera transform) -> rig -> weapon and two-bone IK arms;
+ * the collimated reticle remains on the optical axis in camera space.
  */
 
 const _v = new THREE.Vector3();
@@ -229,7 +198,11 @@ const GRENADE_THROW_SHORT_KEYS = [
 ];
 
 /** Right-handed hand basis from a finger direction and a back-of-hand direction. */
-function handBasis(out: THREE.Quaternion, finger: ArrayLike<number>, back: ArrayLike<number>) {
+function handBasis(
+  out: THREE.Quaternion,
+  finger: ArrayLike<number>,
+  back: ArrayLike<number>
+): THREE.Quaternion {
   _v.set(-finger[0], -finger[1], -finger[2]).normalize(); // hand +Z
   _v2.set(back[0], back[1], back[2]);
   _v2.addScaledVector(_v, -_v2.dot(_v));
@@ -298,7 +271,7 @@ export class Viewmodel {
   declare _adsPos: THREE.Vector3;
   declare _adsQuat: THREE.Quaternion;
   declare _sightLocal: THREE.Vector3;
-  declare weapons: Map<string, WeaponEntry>;
+  declare weapons: Map<WeaponEntry['id'], WeaponEntry>;
   declare _basePos: THREE.Vector3;
   declare _baseQuat: THREE.Quaternion;
   declare _handPos: THREE.Vector3;
@@ -312,7 +285,6 @@ export class Viewmodel {
   declare _prevPitch: number;
   declare _prevYaw: number;
   declare adsT: number;
-  declare adsTarget: number;
   declare bobPhase: number;
   declare clip: Clip | null;
   declare clipPrevT: number;
@@ -330,12 +302,9 @@ export class Viewmodel {
   declare onClipEvent: ((name: string, clipName: string) => void) | null;
   declare recPos: Spring3;
   declare recRot: Spring3;
-  declare rigOverride: { position: THREE.Vector3; quaternion: THREE.Quaternion } | null;
   declare settle: Spring3;
   declare sprintT: number;
-  declare trackCamera: boolean;
   declare triggerT: number;
-  declare triggerTarget: number;
 
   constructor(ctx: ViewmodelContext, mats: ReticleMaterials) {
     this.ctx = ctx;
@@ -411,7 +380,7 @@ export class Viewmodel {
     // native view copies, never patch or dispose their global shared materials.
     this._propMaterials = new Map();
     for (const root of [this.grenade, this.radio])
-      root.traverse((o) => {
+      root.traverse((o): void => {
         if (!isMesh(o) || !(o.material instanceof THREE.MeshStandardMaterial)) return;
         const source = o.material;
         if (!this._propMaterials.has(source))
@@ -440,39 +409,10 @@ export class Viewmodel {
     this.reticle = new THREE.Object3D();
     this.reticle.name = 'ow-reticle';
     this.anchor.add(this.reticle);
-    /**
-     * A 2 MOA dot with a soft halo, a dark keyline and a 12-segment outer ring.
-     *
-     * All four are authored at UNIT radius and scaled together by the dot's
-     * angular size in `_updateReticle`, so the whole reticle is one shape that
-     * grows and shrinks as a unit — proportions can never drift.
-     *
-     *   core     the emitter. 0xff1a08 at intensity 1.35, and the intensity is
-     *            measured — twice, because the first analysis was wrong.
-     *
-     *            The old note here reasoned about how much GREEN the emitter adds
-     *            and concluded 3.2 was safe. It is not, and the reason is the tone
-     *            curve, not the additive maths: the frame is graded with AgX (see
-     *            render/composite.js), and AgX's whole signature is that it
-     *            DESATURATES as it approaches display white. A pixel whose red
-     *            channel is 3.2 over a mid-grey background comes out of the curve
-     *            at rgb(255,248,239) whatever its green and blue were — measured on
-     *            ads.png, a white dot, exactly what the previous note said it had
-     *            fixed. There is no colour available up there.
-     *            0.95 keeps the core on the near-linear part of the curve, where a
-     *            saturated red stays a saturated red, and the halo + ring below are
-     *            what carry the "it is an emitter" read instead of raw radiance.
-     *   halo     1.6x the core radius, ~6% alpha. This is the bloom seed and the
-     *            reason the dot looks like it is BEHIND glass. It has to stay
-     *            tight; the old 0.0095 rad / 0.34 alpha halo was 23 px across and
-     *            was what actually read on screen — a soft salmon blob.
-     *   rim      a NORMALLY blended dark keyline. Additive blending cannot draw
-     *            anything darker than what is behind it, so without a separate
-     *            ring the dot dissolves the moment it crosses a blown-out sky.
-     *   ring     12 arc segments at 3.2x the dot radius, 35% of its radiance.
-     *            A bare dot at 8 px is indistinguishable from a dead subpixel;
-     *            the segmented ring is what makes it read as an EMITTER, and it
-     *            is the standard 65 MOA circle-dot every modern sight ships.
+    /** Unit-radius reticle layers scale together by angular size in _updateReticle.
+     * Keep core radiance below AgX's desaturating shoulder; halo/ring convey emission.
+     * The halo stays tight. A normally blended dark rim preserves contrast against bright sky,
+     * which additive layers alone cannot provide.
      */
     const core = new THREE.CircleGeometry(1, 32);
     const halo = new THREE.CircleGeometry(1.6, 32);
@@ -554,7 +494,14 @@ export class Viewmodel {
     this.scopeMask = mask;
 
     // Distance from p to the segment a-b, then the authored w-feathered edge.
-    const line = (p: Node<'vec2'>, ax: number, ay: number, bx: number, by: number, w: number) => {
+    const line = (
+      p: Node<'vec2'>,
+      ax: number,
+      ay: number,
+      bx: number,
+      by: number,
+      w: number
+    ): Node<'float'> => {
       const a = TSL.vec2(ax, ay);
       const pa = p.sub(a);
       const ba = TSL.vec2(bx, by).sub(a);
@@ -616,13 +563,11 @@ export class Viewmodel {
     this.active = null;
 
     this.adsT = 0;
-    this.adsTarget = 0;
     this.sprintT = 0;
     this.lowReadyT = 0;
     this.bobPhase = 0;
     this.noiseT = 0;
     this.triggerT = 0;
-    this.triggerTarget = 0;
 
     this.lag = new Spring3(5.4, 0.46);
     this.lagRot = new Spring3(6.2, 0.42);
@@ -662,14 +607,7 @@ export class Viewmodel {
     this._sightLocal = new THREE.Vector3();
 
     this.debugFrozen = false;
-    /** Set false by the preview harness to leave the cameras alone. */
-    this.trackCamera = true;
-    this.rigOverride = null;
   }
-
-  /* ====================================================================== */
-  /*  construction                                                          */
-  /* ====================================================================== */
 
   /** Mount a required authored GLB and its weapon-local animation adapter. */
   addWeapon(model: WeaponModelRecord, def: WeaponDef): WeaponEntry {
@@ -677,28 +615,13 @@ export class Viewmodel {
       throw new Error(`[weapons] ${model?.id}: missing authored weapon scene/rig/clips`);
     let tris = 0;
     const meshes: THREE.Mesh[] = [];
-    const animation: WeaponAnimation | null = isWeaponAdapter(model, 'rifle')
-      ? new M4Animation(model)
-      : isWeaponAdapter(model, 'pistol')
-        ? new P320Animation(model)
-        : isWeaponAdapter(model, 'lmg')
-          ? new EvolysAnimation(model)
-          : isWeaponAdapter(model, 'smg')
-            ? new MPXAnimation(model)
-            : isWeaponAdapter(model, 'sniper')
-              ? new AX338Animation(model)
-              : isWeaponAdapter(model, 'shotgun')
-                ? new M590Animation(model)
-                : isWeaponAdapter(model, 'mcx')
-                  ? new MCXAnimation(model, def)
-                  : null;
-    if (!animation) throw new Error(`[weapons] unsupported authored weapon ${model.id}`);
+    const animation = createWeaponAnimation(model, def);
     const group = new THREE.Object3D();
     group.name = `weapon-${model.id}`;
     group.visible = false;
     this.rig.add(group);
     group.add(model.scene);
-    model.scene.traverse((node: THREE.Object3D) => {
+    model.scene.traverse((node: THREE.Object3D): void => {
       if (!isMesh(node)) return;
       meshes.push(node);
       tris += triCount(node.geometry);
@@ -745,8 +668,9 @@ export class Viewmodel {
   }
 
   // Refine the baseline poses against weapon-specific thumb/trigger targets.
-  _fitGripContacts(w: WeaponEntry) {
-    const contact = GRIP_CONTACTS[w.id as keyof typeof GRIP_CONTACTS];
+  _fitGripContacts(w: WeaponEntry): void {
+    if (!hasOwn(GRIP_CONTACTS, w.id)) return;
+    const contact = GRIP_CONTACTS[w.id];
     if (!contact) return;
     this.armR.hand.position.fromArray(w.gripR.pos);
     handBasis(
@@ -778,7 +702,7 @@ export class Viewmodel {
   }
 
   // MCX retains fitted support-hand posing; weapon AO belongs to the authored asset.
-  _fitSupportHand(w: WeaponEntry) {
+  _fitSupportHand(w: WeaponEntry): void {
     const nodes: WeaponNodes = w.model.nodes;
     const hg = nodes.supportContact ?? nodes.handguard;
     const gL = w.gripL;
@@ -795,7 +719,7 @@ export class Viewmodel {
     this.armL.setPose(poseName);
   }
 
-  setActive(id: string) {
+  setActive(id: WeaponEntry['id']): WeaponEntry | null {
     const w = this.weapons.get(id);
     if (!w || w === this.active) return this.active;
     if (this.active) {
@@ -815,11 +739,7 @@ export class Viewmodel {
     return w;
   }
 
-  /* ====================================================================== */
-  /*  clip playback                                                         */
-  /* ====================================================================== */
-
-  play(name: string) {
+  play(name: string): number {
     const w = this.active;
     if (!w) return 0;
     const clip = w.clips[name];
@@ -831,27 +751,19 @@ export class Viewmodel {
     return clip.duration;
   }
 
-  stopClip() {
+  stopClip(): void {
     this.active?.animation.reset();
     this.clip = null;
     this.clipResult.active = false;
     this.clipResult.lhand.weight = 0;
   }
 
-  get clipPlaying() {
-    return this.clip !== null;
-  }
-
-  get clipName() {
+  get clipName(): string | null {
     return this.clip?.name ?? null;
   }
 
-  /* ====================================================================== */
-  /*  grenade (arm hold + throw)                                            */
-  /* ====================================================================== */
-
   /** Arm a grenade: stow the weapon, grenade in the right hand. */
-  holdGrenade() {
+  holdGrenade(): void {
     if (this._grenadeState === 1) return;
     // The radio and the grenade are exclusive holds — one ends the other.
     if (this._radioState === 1) this.endRadio();
@@ -867,7 +779,7 @@ export class Viewmodel {
   }
 
   /** Pin pulled: blend from the idle hold into the cook pose for `type`. */
-  cookGrenade(type: string = 'long') {
+  cookGrenade(type: string = 'long'): void {
     if (this._grenadeState !== 1) return;
     this._cookType = type === 'short' ? 'short' : 'long';
   }
@@ -875,7 +787,7 @@ export class Viewmodel {
   /** Release: the arm throws; fires `grenade:release` at the release beat.
    *  `type` selects the animation: 'long' (overhead heave) or 'short'
    *  (compact toss) — each has its own keyframes and release timing. */
-  throwGrenade(type: string = 'long') {
+  throwGrenade(type: string = 'long'): void {
     if (this._grenadeState !== 1) return;
     this._grenadeState = 2;
     this._throwT = 0;
@@ -894,7 +806,7 @@ export class Viewmodel {
   }
 
   /** End the grenade state without throwing (overcook / death / reset). */
-  endGrenade() {
+  endGrenade(): void {
     if (this._grenadeState === 0) return;
     this._grenadeState = 0;
     this._throwT = 0;
@@ -906,7 +818,7 @@ export class Viewmodel {
     if (w) w.group.visible = true;
   }
 
-  holdRadio() {
+  holdRadio(): void {
     if (this._radioState === 1) return;
     if (this._grenadeState === 1) this.endGrenade();
     if (this._bandageState === 1) this.endBandage();
@@ -916,7 +828,7 @@ export class Viewmodel {
     if (w) w.group.visible = false;
   }
 
-  endRadio() {
+  endRadio(): void {
     if (this._radioState === 0) return;
     this._radioState = 0;
     if (this.radio) this.radio.visible = false;
@@ -924,7 +836,7 @@ export class Viewmodel {
     if (w) w.group.visible = true;
   }
 
-  holdBandage() {
+  holdBandage(): void {
     if (this._bandageState === 1) return;
     if (this._grenadeState) this.endGrenade();
     if (this._radioState === 1) this.endRadio();
@@ -936,11 +848,11 @@ export class Viewmodel {
     this._syncBandage(0);
   }
 
-  setBandageProgress(p: number) {
+  setBandageProgress(p: number): void {
     this._bandageProgress = clamp01(p);
   }
 
-  endBandage() {
+  endBandage(): void {
     if (this._bandageState === 0) return;
     this._bandageState = 0;
     this._bandageProgress = 0;
@@ -950,7 +862,7 @@ export class Viewmodel {
     if (w) w.group.visible = true;
   }
 
-  setRadioScreen(count: number) {
+  setRadioScreen(count: number): void {
     const screen = this.radioScreen;
     if (!screen) return;
     const old = screen.material.map;
@@ -963,7 +875,7 @@ export class Viewmodel {
    * position at the release beat, in viewScene space (= world space because
    * the anchor tracks the camera). Falls back to the camera position.
    */
-  grenadeReleaseWorld(out: THREE.Vector3) {
+  grenadeReleaseWorld(out: THREE.Vector3): THREE.Vector3 {
     if (!this.grenade) {
       out.copy(this.ctx.camera.position);
       return out;
@@ -974,7 +886,7 @@ export class Viewmodel {
   }
 
   /** Lerp two grenade pose keys into the shared hand targets. */
-  _applyGrenadePose(a: ViewPoseKey, b: ViewPoseKey, w: number) {
+  _applyGrenadePose(a: ViewPoseKey, b: ViewPoseKey, w: number): void {
     this._handPos.set(
       a.hand[0] + (b.hand[0] - a.hand[0]) * w,
       a.hand[1] + (b.hand[1] - a.hand[1]) * w,
@@ -1012,7 +924,7 @@ export class Viewmodel {
   }
 
   /** Sample the grenade hand pose into the shared hand targets. */
-  _solveGrenadeHands() {
+  _solveGrenadeHands(): void {
     if (this._grenadeState === 2) {
       const t = smootherstep(0, 1, clamp01(this._throwT / this._throwDuration));
       const keys = this._throwKeys;
@@ -1043,7 +955,7 @@ export class Viewmodel {
   }
 
   /** Static radio hold: right hand grips it at chest height, left hangs. */
-  _solveRadioHands() {
+  _solveRadioHands(): void {
     this._handPos.set(RADIO_HOLD.hand[0], RADIO_HOLD.hand[1], RADIO_HOLD.hand[2]);
     handBasis(this._handQuat, RADIO_HOLD.finger, RADIO_HOLD.back);
     if (this.armR.pose !== 'radio') this.armR.setPose('radio');
@@ -1055,7 +967,7 @@ export class Viewmodel {
   }
 
   /** Left forearm presented; right hand winds the bandage as progress advances. */
-  _solveBandageHands() {
+  _solveBandageHands(): void {
     const p = this._bandageProgress;
     const wind = clamp01((p - 0.2) / 0.62);
     const finish = smootherstep(0, 1, (p - 0.93) / 0.07);
@@ -1136,7 +1048,7 @@ export class Viewmodel {
     this._syncBandage(lerp(a[9], b[9], f));
   }
 
-  _syncBandage(feed: number) {
+  _syncBandage(feed: number): void {
     const asset = this.bandageAsset;
     if (!asset) return;
     const section = Math.floor(feed * BANDAGE_SEGMENTS);
@@ -1192,16 +1104,12 @@ export class Viewmodel {
     asset.tail.geometry.computeVertexNormals();
   }
 
-  /* ====================================================================== */
-  /*  impulses                                                              */
-  /* ====================================================================== */
-
   /**
    * Per-shot viewmodel kick. `pitch`/`yaw` are the aim-space recoil for this
    * shot (from the deterministic pattern) so the visual climb matches where the
    * bullets are actually going.
    */
-  addRecoil(pitch: number, yaw: number, first = false) {
+  addRecoil(pitch: number, yaw: number, first = false): void {
     const w = this.active;
     if (!w) return;
     w.animation.fire();
@@ -1239,20 +1147,16 @@ export class Viewmodel {
     );
   }
 
-  jump() {
+  jump(): void {
     this.jumpSpring.kick(-1.2);
   }
 
-  land(speed: number = 3) {
+  land(speed: number = 3): void {
     this.landSpring.kick(clamp(speed * 0.45, 0.4, 3.4));
   }
 
-  /* ====================================================================== */
-  /*  frame update                                                          */
-  /* ====================================================================== */
-
   /** Load authored skins before adding weapons (which fits contact poses). */
-  async loadArms() {
+  async loadArms(): Promise<void> {
     this.armAsset = await loadArmAsset();
     this.armR.attachAsset(this.armAsset);
     this.armL.attachAsset(this.armAsset);
@@ -1263,12 +1167,7 @@ export class Viewmodel {
     this.armL.forePivot.add(this.bandageAsset.wrap, this.bandageAsset.tail);
   }
 
-  /**
-   * @param {number} dt
-   * @param {object} s  { ads, sprint, lowReady, speed, crouch, airborne,
-   *                      trigger, empty, cycleTime }
-   */
-  update(dt: number, s: ViewState) {
+  update(dt: number, s: ViewState): void {
     const w = this.active;
     if (!w) return;
     const def = w.def;
@@ -1278,10 +1177,8 @@ export class Viewmodel {
     this.armR.updatePose(dt);
     this.armL.updatePose(dt);
 
-    /* -------- camera-relative anchor ---------------------------------- */
     this.syncToCamera();
 
-    /* -------- angular velocity for the lag layer ---------------------- */
     _e.setFromQuaternion(this.anchor.quaternion, 'YXZ');
     const yaw = _e.y;
     const pitch = _e.x;
@@ -1299,12 +1196,10 @@ export class Viewmodel {
     this._prevPitch = pitch;
     this._hasPrev = true;
 
-    /* -------- blends --------------------------------------------------- */
     const adsRate = 1 / Math.max(0.05, def.adsTime);
     // Pumping keeps held ADS; its authored handling motion remains additive.
     const wantAds =
       this.clip && this.clip.name !== 'draw' && this.clip.name !== 'pump' ? 0 : s.ads ? 1 : 0;
-    this.adsTarget = wantAds;
     // Linear rate with a smootherstep shaping: a spring here reads as mushy.
     this.adsT = clamp01(this.adsT + (wantAds ? adsRate : -adsRate * 1.25) * dt);
     const ads = smootherstep(0, 1, this.adsT);
@@ -1313,10 +1208,8 @@ export class Viewmodel {
     this.sprintT = damp(this.sprintT, sprintTarget, 9, dt);
     this.lowReadyT = damp(this.lowReadyT, s.lowReady ? 1 : 0, 8, dt);
 
-    this.triggerTarget = s.trigger ? 1 : 0;
-    this.triggerT = damp(this.triggerT, this.triggerTarget, 26, dt);
+    this.triggerT = damp(this.triggerT, s.trigger ? 1 : 0, 26, dt);
 
-    /* -------- base pose ------------------------------------------------ */
     const hipP = def.hipPos;
     const hipR = def.hipRot;
     this._basePos.set(hipP[0], hipP[1], hipP[2]);
@@ -1343,7 +1236,6 @@ export class Viewmodel {
       this._baseQuat.slerp(this._tmpQuat, this.lowReadyT);
     }
 
-    /* -------- ADS pose: solved, not authored --------------------------- */
     if (ads > 1e-4) {
       const cant = def.adsCant;
       _e.set(cant[0], cant[1], cant[2], 'XYZ');
@@ -1355,7 +1247,6 @@ export class Viewmodel {
       this._baseQuat.slerp(this._adsQuat, ads);
     }
 
-    /* -------- additive layers ------------------------------------------ */
     const swayScale = def.swayScale * lerp(1, 0.22, ads) * lerp(1, 1.5, this.sprintT);
     this.noiseT += dt;
     const n = this.noise;
@@ -1375,7 +1266,6 @@ export class Viewmodel {
     let ry = swayX * 0.028 * swayScale;
     let rz = swayZ * 0.017 * swayScale;
 
-    /* -------- movement bob --------------------------------------------- */
     const speed = s.speed ?? 0;
     const bobAmt =
       def.bobScale * clamp01(speed / 4.2) * lerp(1, 0.28, ads) * (s.airborne ? 0.25 : 1);
@@ -1392,7 +1282,6 @@ export class Viewmodel {
     rx += Math.cos(bp * 2) * 0.014 * bobAmt;
     ry += Math.sin(bp + 0.6) * 0.019 * bobAmt;
 
-    /* -------- weapon lag ---------------------------------------------- */
     const lagScale = lerp(1, 0.42, ads);
     const av = this._angVel;
     this.lag.step(
@@ -1414,7 +1303,6 @@ export class Viewmodel {
     ry += this.lagRot.y;
     rz += this.lagRot.z;
 
-    /* -------- recoil + settle ----------------------------------------- */
     this.recPos.step(dt, 0, 0, 0);
     this.recRot.step(dt, 0, 0, 0);
     this.settle.step(dt, 0, 0, 0);
@@ -1425,13 +1313,11 @@ export class Viewmodel {
     ry += this.recRot.y + this.settle.x;
     rz += this.recRot.z + this.settle.z;
 
-    /* -------- jump / land --------------------------------------------- */
     this.jumpSpring.step(dt, 0);
     this.landSpring.step(dt, 0);
     py -= this.landSpring.x * 0.014 + this.jumpSpring.x * 0.006;
     rx -= this.landSpring.x * 0.05;
 
-    /* -------- clip (reload / inspect / draw) -------------------------- */
     const res = this.clipResult;
     if (this.clip) {
       this.clipT += dt;
@@ -1455,7 +1341,6 @@ export class Viewmodel {
       }
     }
 
-    /* -------- grenade cook / throw ----------------------------------- */
     if (this._grenadeState === 1) {
       const k = dt / GRENADE_COOK_BLEND_T;
       this._cookBlend = clamp01(this._cookBlend + (this._cookType ? k : -k));
@@ -1477,7 +1362,6 @@ export class Viewmodel {
       }
     }
 
-    /* -------- compose -------------------------------------------------- */
     this.rig.position.set(this._basePos.x + px, this._basePos.y + py, this._basePos.z + pz);
     _e.set(rx, ry, rz, 'XYZ');
     _q.setFromEuler(_e);
@@ -1490,21 +1374,13 @@ export class Viewmodel {
       this.rig.position.set(0, -0.35 * (1 - present + stow), 0);
       this.rig.quaternion.identity();
     }
-    // The standalone preview harness pins the rig so the weapon can be framed
-    // in its own space; everything downstream reads the composed transform.
-    if (this.rigOverride) {
-      this.rig.position.copy(this.rigOverride.position);
-      this.rig.quaternion.copy(this.rigOverride.quaternion);
-    }
     this.rig.updateMatrix();
     this.rig.updateMatrixWorld(true);
 
     // Baked parts must be sampled before solving arms and querying sockets.
     w.animation.update(dt, this.clipName, this.clipT, s.empty, s.magazineLoaded, s.remainingRounds);
-    /* -------- hands (first: the magazine can be held by one) ---------- */
     this._solveHands(w, res);
 
-    /* -------- viewmodel FOV ------------------------------------------- */
     const fovBase = 60;
     const targetFov = fovBase * lerp(1, def.viewFov, ads);
     const vcam = this.ctx.viewCamera;
@@ -1517,9 +1393,7 @@ export class Viewmodel {
     this._updateScope(w, ads);
   }
 
-  /* ---------------------------------------------------------------------- */
-
-  _solveHands(w: WeaponEntry, res: ClipResult) {
+  _solveHands(w: WeaponEntry, res: ClipResult): void {
     if (this._bandageState) {
       // Raise/stow the authored pose as a unit. Neither elbow nor upper arm
       // participates in the winding motion; only the right forearm and hand do.
@@ -1618,7 +1492,7 @@ export class Viewmodel {
    * weapon sways, and why it vignettes out when you look through the tube from
    * an angle.
    */
-  _updateReticle(w: WeaponEntry, ads: number) {
+  _updateReticle(w: WeaponEntry, ads: number): void {
     const optic = w.optic;
     if (!optic || optic.kind === 'scope') {
       this.reticle.visible = false;
@@ -1672,34 +1546,9 @@ export class Viewmodel {
       this.dotCore.material.opacity = alpha * (optic.dotOpacity ?? 1);
       return;
     }
-    /**
-     * SIZE. Angular, so it is FOV-independent within a stance — but not constant
-     * across stances, because the requirement is a fixed number of PIXELS.
-     *
-     * A geometrically honest 2 MOA emitter subtends 0.58 mrad, which at the
-     * viewmodel camera's 0.97 mrad/px (60 deg over 1080 px) is 0.6 px: a dead
-     * subpixel, which is exactly what the old 0.0012 rad dot measured as. Every
-     * shipped red dot cheats this, and cheats it in the same direction — the
-     * reticle is drawn at a legible size and grows as you come into the glass,
-     * because that is the perceptual experience of putting your eye behind a
-     * collimator. But the previous values (0.00385 -> 0.00655 rad) were tuned
-     * when the reticle was the ONLY thing on screen: at full ADS the core read
-     * as a 16 px opaque disc that covered the target, and the ring as a 50 px
-     * circle. The first pass halved that (0.0022 -> 0.0032 rad) and it still
-     * read as a fat blob, so the dot now goes down to a geometrically honest
-     * 2-3 MOA emitter:
-     *   hipfire  0.0012 rad -> 1.2 px radius,  2.5 px dot
-     *   ADS      0.0016 rad -> 1.9 px radius,  3.8 px dot   (0.83 mrad/px)
-     * with the halo at 1.6x the core. The segmented ring keeps its own scale
-     * factor (authored at 3.2x, then scaled 1.6x on top -> ~5.1x the dot) so it
-     * stays a legible ~20 px circle while the dot inside it becomes a true pin
-     * point — the classic small-dot-in-ring sight picture.
-     *
-     * TRANSPARENCY. The dot is additive-blended, so it already never occludes —
-     * it adds light over whatever is behind it. The "opaque disc" read came
-     * from running the core at full alpha. The opacities below hold it at
-     * roughly 60% so the target stays legible through the dot, while the dark
-     * keyline (rim) keeps the edge readable against a blown-out sky.
+    /** Legacy circle-dot blends fixed hip/ADS angular radii; only the dot-only branch above
+     * applies a pixel-readability floor. Scale the ring independently to preserve a fine centre.
+     * Additive dot opacity leaves targets visible; the normally blended rim supplies sky contrast.
      */
     const coreR = s * lerp(0.0012, 0.0016, ads);
     this.dotCore.scale.setScalar(coreR);
@@ -1714,7 +1563,7 @@ export class Viewmodel {
     this.dotHalo.material.opacity = alpha * 0.06;
   }
 
-  _updateScope(w: WeaponEntry, ads: number) {
+  _updateScope(w: WeaponEntry, ads: number): void {
     // Holster 'end' calls setActive() earlier in this same update(). Always
     // drive visibility from the live weapon so we don't undig the one we hid.
     if (this.active) w = this.active;
@@ -1742,13 +1591,8 @@ export class Viewmodel {
     }
   }
 
-  /* ====================================================================== */
-  /*  world-space queries for firing                                        */
-  /* ====================================================================== */
-
   /** Copy the gameplay camera onto the viewmodel anchor and view camera. */
-  syncToCamera() {
-    if (!this.trackCamera) return;
+  syncToCamera(): void {
     const cam = this.ctx.camera;
     const vcam = this.ctx.viewCamera;
     cam.updateMatrixWorld();
@@ -1762,21 +1606,21 @@ export class Viewmodel {
   }
 
   /** Muzzle position in WORLD space (for the flash and the shell). */
-  muzzleWorld(out: THREE.Vector3) {
+  muzzleWorld(out: THREE.Vector3): THREE.Vector3 {
     const w = this.active;
     if (!w) return out.set(0, 0, 0);
     w.group.updateMatrixWorld();
     return requiredSocket(w.model.root, 'SOCKET_muzzle').getWorldPosition(out);
   }
 
-  ejectWorld(out: THREE.Vector3) {
+  ejectWorld(out: THREE.Vector3): THREE.Vector3 {
     const w = this.active;
     if (!w) return out.set(0, 0, 0);
     w.group.updateMatrixWorld();
     return requiredSocket(w.model.root, 'SOCKET_ejection').getWorldPosition(out);
   }
 
-  ejectVelocity(out: THREE.Vector3, speed = 2.6) {
+  ejectVelocity(out: THREE.Vector3, speed = 2.6): THREE.Vector3 {
     const w = this.active;
     if (!w) return out.set(0, 0, 0);
     out.copy(w.ejectDir);
@@ -1786,7 +1630,7 @@ export class Viewmodel {
   }
 
   /** Bore direction in world space. */
-  boreDir(out: THREE.Vector3) {
+  boreDir(out: THREE.Vector3): THREE.Vector3 {
     const w = this.active;
     if (!w) return out.set(0, 0, -1);
     out.set(0, 0, -1);
@@ -1795,7 +1639,7 @@ export class Viewmodel {
     return out;
   }
 
-  dispose() {
+  dispose(): void {
     for (const w of this.weapons.values()) {
       w.animation.dispose();
       for (const m of w.meshes) m.geometry.dispose();
@@ -1806,7 +1650,7 @@ export class Viewmodel {
     this.armAsset?.dispose();
     // Radio geometry is instance-owned; the grenade's geometry is shared with
     // world projectiles and must not be released with the arm skin.
-    this.radio?.traverse((o) => {
+    this.radio?.traverse((o): void => {
       if (isMesh(o)) o.geometry.dispose();
     });
     for (const material of this._propMaterials.values()) material.dispose();

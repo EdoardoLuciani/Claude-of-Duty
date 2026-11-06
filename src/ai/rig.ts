@@ -1,20 +1,6 @@
-/**
- * AI — the soldier skeleton.
- *
- * 25 bones, authored in metres in the actor's bind space: feet on y = 0, the
- * character facing +Z. Because Y is up and Z is forward in a right-handed
- * frame, the character's own **right** side is at negative X (right =
- * forward x up) — every `*R` bone lives at x < 0. Get this backwards and the
- * rifle ends up in the wrong hand.
- *
- * Bone axis convention matches what `physics`'s ragdoll expects when it adopts
- * the skeleton: local **+Y runs down the bone** toward its child and local +Z
- * points roughly forward, so a death hand-off doesn't pop.
- *
- * The bind pose is not a T-pose. It is a genuine patrol carry — stock in the
- * right shoulder pocket, support hand on the handguard — which means the
- * geometry is modelled where the limbs actually are and the skin weights never
- * have to survive a 90 degree shoulder rotation.
+/** Soldier rig: 25 bones, metres, feet at Y=0, facing +Z; character-right is -X.
+ * Local +Y points down each bone, +Z roughly forward, matching ragdoll adoption.
+ * The bind pose is patrol carry rather than a T-pose.
  */
 
 import * as THREE from 'three';
@@ -52,13 +38,9 @@ function solveElbow(S: Vec3, W: Vec3, l1: number, l2: number, pole: Vec3): THREE
   return s.clone().addScaledVector(axis, a).addScaledVector(perp, h);
 }
 
-/* -------------------------------------------------------------------- */
-/* Hand targets — derived from where the weapon sits in the bind pose.  */
-/* -------------------------------------------------------------------- */
-
 /** Bore line of the carried weapon in bind pose: origin + direction. */
 export const BORE_ORIGIN: Vec3 = [-0.148, 1.398, -0.078];
-export const BORE_DIR: Vec3 = (() => {
+export const BORE_DIR: Vec3 = ((): [number, number, number] => {
   const v = new THREE.Vector3(0.115, -0.1, 1).normalize();
   return [v.x, v.y, v.z];
 })();
@@ -80,10 +62,6 @@ const SHOULDER_L: Vec3 = [0.172, 1.425, 0.004];
 
 const ELBOW_R = solveElbow(SHOULDER_R, GRIP_R, UPPER_ARM, FOREARM, [-0.35, -1, -0.45]);
 const ELBOW_L = solveElbow(SHOULDER_L, GRIP_L, UPPER_ARM, FOREARM, [0.55, -1, -0.2]);
-
-/* -------------------------------------------------------------------- */
-/* Bone table                                                           */
-/* -------------------------------------------------------------------- */
 
 /** name, parent, bind world position, optional up hint, optional leaf dir. */
 export const BONES: BoneSpec[] = [
@@ -121,31 +99,20 @@ export const BONES: BoneSpec[] = [
 const LEAF_STUB = 0.075;
 
 export class Rig {
-  names: string[];
-  parent: number[];
-  children: number[][];
-  bindPos: THREE.Vector3[];
-  bindQuat: THREE.Quaternion[];
-  localPos: THREE.Vector3[];
-  localQuat: THREE.Quaternion[];
-  tail: THREE.Vector3[];
-  length: number[];
-  _map: Map<string, number>;
-  count: number;
-  eyeHeight: number;
+  names: string[] = [];
+  parent: number[] = [];
+  children: number[][] = [];
+  bindPos: THREE.Vector3[] = []; // Vector3, world (actor) space
+  bindQuat: THREE.Quaternion[] = []; // Quaternion, world
+  localPos: THREE.Vector3[] = []; // Vector3, parent space
+  localQuat: THREE.Quaternion[] = []; // Quaternion, parent space
+  tail: THREE.Vector3[] = []; // Vector3 — end of the bone (child or stub)
+  length: number[] = [];
+  _map: Map<string, number> = new Map();
+  count: number = BONES.length;
+  eyeHeight: number = 1.665;
 
   constructor() {
-    this.names = [];
-    this.parent = [];
-    this.children = [];
-    this.bindPos = []; // Vector3, world (actor) space
-    this.bindQuat = []; // Quaternion, world
-    this.localPos = []; // Vector3, parent space
-    this.localQuat = []; // Quaternion, parent space
-    this.tail = []; // Vector3 — end of the bone (child or stub)
-    this.length = [];
-    this._map = new Map();
-
     for (let i = 0; i < BONES.length; i++) {
       const [name, parent] = BONES[i];
       this.names.push(name);
@@ -189,7 +156,7 @@ export class Rig {
         tail.copy(this.bindPos[kids[0]]);
         if (kids.length > 1) {
           // a branch point (Hips, Spine2): aim at the average of the chain kids
-          const primary = kids.find((k) => !/Clavicle|UpLeg/.test(this.names[k]));
+          const primary = kids.find((k): boolean => !/Clavicle|UpLeg/.test(this.names[k]));
           if (primary !== undefined) tail.copy(this.bindPos[primary]);
           else {
             tail.set(0, 0, 0);
@@ -235,9 +202,6 @@ export class Rig {
         this.localQuat.push(inv.clone().multiply(this.bindQuat[i]));
       }
     }
-
-    this.count = BONES.length;
-    this.eyeHeight = 1.665;
   }
 
   index(name: string): number {

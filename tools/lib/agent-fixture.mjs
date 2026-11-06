@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 import { Agent } from '../../src/ai/agent.ts';
 import { AiSystem } from '../../src/ai/index.ts';
+import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
 
 // Exercise the real constructor, not a second, incomplete copy of Agent state.
@@ -11,7 +12,7 @@ const geometry = new THREE.BoxGeometry();
 const model = { geometry, materials: [], variant: { scale: 1 }, weapon: null };
 export function makeAgent(over = {}) {
   const ai = {
-    ctx: { peek: () => null },
+    ctx: { peek: () => null, events: new EventBus() },
     rng: new Rng(1),
     root: new THREE.Group(),
     variant: () => model,

@@ -1,13 +1,5 @@
-/**
- * AI — squad coordination.
- *
- * The squad exists to stop four individually-sensible soldiers from behaving
- * like one four-headed idiot: it hands out permission to peek so they alternate
- * instead of all leaning out together, shares contact reports so one man
- * spotting you alerts the rest (after a believable call-out delay), rations
- * grenades, and allows only one flanker at a time.
- *
- * Intent (intent.js) is the squad job this fight: pin, wrap, or flush.
+/** Squads share delayed contact reports and coordinate peeking, grenades and one flanker.
+ * Intent selects pin, wrap or flush without replacing each agent's state machine.
  */
 
 import * as THREE from 'three';
@@ -44,81 +36,46 @@ interface PeekDeath {
 
 export class Squad {
   id!: number;
-  members!: SquadAgent[];
   rng!: SquadRng;
-  ai!: SquadAI | null;
-  peekTokens!: number;
-  peekHolders!: Set<number>;
-  grenadeCooldown!: number;
-  flanker!: SquadAgent | null;
-  contact!: THREE.Vector3;
-  hasContact!: boolean;
-  contactAge!: number;
-  time!: number;
-  intent!: SquadIntent;
-  why!: string;
-  wantFlush!: boolean;
-  banned!: CoverCluster | null | undefined;
-  planted!: boolean;
-  plantAge!: number;
-  plantHold!: number;
-  _plantPos!: THREE.Vector3;
-  _hasPlantPos!: boolean;
-  peekDeaths!: PeekDeath[];
-  wrapper!: SquadAgent | null;
-  wrapSide!: number;
-  wrapDest!: THREE.Vector3;
-  hasWrapDest!: boolean;
-  flushUsed!: boolean;
-  flushFails!: number;
-  _peekAt!: Map<number, number>;
-  holder!: SquadAgent | null;
-  elevated!: SquadAgent | null;
-  _pressureWait!: number;
-  _elevatedWait!: number;
-  _unsupported!: number;
-  _elevatedCursor!: number;
-  elevatedSince!: number;
-  elevationStatus!: string | null;
+  members: SquadAgent[] = [];
+  ai: SquadAI | null = null;
+  peekTokens: number = 1;
+  peekHolders: Set<number> = new Set();
+  grenadeCooldown: number = 6;
+  flanker: SquadAgent | null = null;
+  contact: THREE.Vector3 = new THREE.Vector3();
+  hasContact: boolean = false;
+  contactAge: number = Infinity;
+  time: number = 0;
+  intent: SquadIntent = INTENT.PIN;
+  why: string = 'default';
+  wantFlush: boolean = false;
+  banned: CoverCluster | null | undefined = null;
+  planted: boolean = false;
+  plantAge: number = 0;
+  plantHold: number = 0;
+  _plantPos: THREE.Vector3 = new THREE.Vector3();
+  _hasPlantPos: boolean = false;
+  peekDeaths: PeekDeath[] = [];
+  wrapper: SquadAgent | null = null;
+  wrapSide: number = 1;
+  wrapDest: THREE.Vector3 = new THREE.Vector3();
+  hasWrapDest: boolean = false;
+  flushUsed: boolean = false;
+  flushFails: number = 0;
+  _peekAt: Map<number, number> = new Map();
+  holder: SquadAgent | null = null;
+  elevated: SquadAgent | null = null;
+  _pressureWait: number = 0;
+  _elevatedWait: number = TACTICS.elevatedCheck;
+  _unsupported: number = 0;
+  _elevatedCursor: number = 0;
+  elevatedSince: number = 0;
+  elevationStatus: string | null = 'waiting';
+
   constructor(rng: SquadRng) {
     this.id = _nextSquad++;
-    this.members = [];
     this.rng = rng;
-    this.ai = null;
-    this.peekTokens = 1;
-    this.peekHolders = new Set();
-    this.grenadeCooldown = 6;
-    this.flanker = null;
-    this.contact = new THREE.Vector3();
-    this.hasContact = false;
-    this.contactAge = Infinity;
-
-    this.time = 0;
-    this.intent = INTENT.PIN;
-    this.why = 'default';
-    this.wantFlush = false;
-    this.banned = null;
-    this.planted = false;
-    this.plantAge = 0;
-    this.plantHold = 0;
-    this._plantPos = new THREE.Vector3();
-    this._hasPlantPos = false;
-    this.peekDeaths = [];
-    this.wrapper = null;
-    this.wrapSide = 1;
-    this.wrapDest = new THREE.Vector3();
-    this.hasWrapDest = false;
-    this.flushUsed = false;
-    this.flushFails = 0;
-    this._peekAt = new Map();
-    this.holder = null;
-    this.elevated = null;
-    this._pressureWait = 0;
-    this._elevatedWait = TACTICS.elevatedCheck;
-    this._unsupported = 0;
-    this._elevatedCursor = 0;
-    this.elevatedSince = 0;
-    this.elevationStatus = 'waiting';
   }
 
   add(agent: SquadAgent): SquadAgent {
@@ -150,7 +107,7 @@ export class Squad {
     return this.members.length;
   }
 
-  get alive() {
+  get alive(): number {
     let n = 0;
     for (const m of this.members) if (m.alive) n++;
     return n;
@@ -409,7 +366,7 @@ export class Squad {
 
     if (this.intent === INTENT.WRAP) {
       const threat = this.hasContact ? this.contact : alive[0].lastKnown;
-      const far = threat && alive.some((m) => m.position.distanceTo(threat) > LONG_RANGE);
+      const far = threat && alive.some((m): boolean => m.position.distanceTo(threat) > LONG_RANGE);
       const offX = this.why === 'unseen-deaths' || far;
       if (offX) {
         this.pickWrapDest(alive[0].position, threat);
@@ -424,7 +381,7 @@ export class Squad {
         return;
       }
       const candidates = alive.filter(
-        (m) => !m._wrapDone && m !== this.elevated && m !== this.holder
+        (m): boolean => !m._wrapDone && m !== this.elevated && m !== this.holder
       );
       const pool = candidates.length ? candidates : alive;
       this.wrapper = this._pickWrapper(pool);
@@ -617,7 +574,7 @@ export class Squad {
     this.flanker = agent;
   }
 
-  requestGrenade() {
+  requestGrenade(): boolean {
     if (this.wantFlush && !this.flushUsed) {
       this.flushUsed = true;
       this.flushFails = 0;

@@ -30,7 +30,7 @@ export const ACTIONS = {
 const GAME_KEYS: ReadonlySet<string> = new Set(
   Object.values(DEFAULT_BINDINGS)
     .flat()
-    .filter((binding) => !binding.startsWith('Mouse'))
+    .filter((binding): boolean => !binding.startsWith('Mouse'))
 );
 
 type InputConfig = { sensitivity: number; invertY: boolean };
@@ -50,52 +50,39 @@ type InputHandlers = {
 export class Input {
   declare canvas: HTMLCanvasElement;
   declare config: InputConfig;
-  declare down: Set<string>;
-  declare _pressed: Set<string>;
-  declare _released: Set<string>;
-  declare _pendingDown: Set<string>;
-  declare _pendingUp: Set<string>;
-  declare look: Point2;
-  declare _rawLook: Point2;
-  declare wheel: number;
-  declare _pendingWheel: number;
-  declare pointerLocked: boolean;
-  declare _gameplayFocus: boolean;
-  declare enabled: boolean;
-  declare frozen: boolean;
-  declare gamepadIndex: number | null;
-  declare stick: { moveX: number; moveY: number; lookX: number; lookY: number };
   declare _bound: InputHandlers;
   declare _keyboardCapture: AddEventListenerOptions;
+
+  down: Set<string> = new Set(); // codes currently held
+  _pressed: Set<string> = new Set(); // went down this frame
+  _released: Set<string> = new Set(); // went up this frame
+  _pendingDown: Set<string> = new Set();
+  _pendingUp: Set<string> = new Set();
+  /** Accumulated pointer delta for this frame, in radians after sensitivity. */
+  look: Point2 = { x: 0, y: 0 };
+  _rawLook: Point2 = { x: 0, y: 0 };
+  wheel: number = 0;
+  _pendingWheel: number = 0;
+  pointerLocked: boolean = false;
+  // Keyboard events can still drive movement when pointer lock is denied or
+  // while the pointer-lock transition is in flight. Remember that the canvas
+  // was clicked so browser shortcuts are suppressed for that active game
+  // session too.
+  _gameplayFocus: boolean = false;
+  enabled: boolean = true;
+  /** Set true by capture mode so scripted shots aren't fought by real input. */
+  frozen: boolean = false;
+  gamepadIndex: number | null = null;
+  stick: { moveX: number; moveY: number; lookX: number; lookY: number } = {
+    moveX: 0,
+    moveY: 0,
+    lookX: 0,
+    lookY: 0,
+  };
 
   constructor(canvas: HTMLCanvasElement, config: InputConfig) {
     this.canvas = canvas;
     this.config = config;
-
-    this.down = new Set(); // codes currently held
-    this._pressed = new Set(); // went down this frame
-    this._released = new Set(); // went up this frame
-    this._pendingDown = new Set();
-    this._pendingUp = new Set();
-
-    /** Accumulated pointer delta for this frame, in radians after sensitivity. */
-    this.look = { x: 0, y: 0 };
-    this._rawLook = { x: 0, y: 0 };
-    this.wheel = 0;
-    this._pendingWheel = 0;
-
-    this.pointerLocked = false;
-    // Keyboard events can still drive movement when pointer lock is denied or
-    // while the pointer-lock transition is in flight. Remember that the canvas
-    // was clicked so browser shortcuts are suppressed for that active game
-    // session too.
-    this._gameplayFocus = false;
-    this.enabled = true;
-    /** Set true by capture mode so scripted shots aren't fought by real input. */
-    this.frozen = false;
-
-    this.gamepadIndex = null;
-    this.stick = { moveX: 0, moveY: 0, lookX: 0, lookY: 0 };
 
     this._bound = {
       keydown: this._onKeyDown.bind(this),
@@ -106,11 +93,11 @@ export class Input {
       wheel: this._onWheel.bind(this),
       lockchange: this._onLockChange.bind(this),
       blur: this._onBlur.bind(this),
-      contextmenu: (e) => e.preventDefault(),
+      contextmenu: (e): void => e.preventDefault(),
     };
   }
 
-  attach() {
+  attach(): void {
     // Capture keyboard events before UI/browser-facing handlers. This matters
     // for modifier shortcuts: the browser must see preventDefault() before it
     // decides what Ctrl/Meta/Alt + a game key means.
@@ -126,7 +113,7 @@ export class Input {
     this.canvas.addEventListener('contextmenu', this._bound.contextmenu);
   }
 
-  detach() {
+  detach(): void {
     removeEventListener('keydown', this._bound.keydown, this._keyboardCapture);
     removeEventListener('keyup', this._bound.keyup, this._keyboardCapture);
     removeEventListener('mousedown', this._bound.mousedown);
@@ -138,14 +125,14 @@ export class Input {
     this.canvas.removeEventListener('contextmenu', this._bound.contextmenu);
   }
 
-  requestPointerLock() {
+  requestPointerLock(): void {
     // Chrome returns a promise that rejects if the document is not eligible
     // (headless capture, an iframe, a lock request too soon after an exit).
     // An unhandled rejection there shows up as a page error in the harness, so
     // swallow it: failing to lock is not a game error.
     try {
       const p = this.canvas.requestPointerLock?.();
-      if (p && typeof p.catch === 'function') p.catch(() => {});
+      void Promise.resolve(p).catch((): void => {});
     } catch {
       /* not eligible — keep running unlocked */
     }
@@ -223,13 +210,13 @@ export class Input {
     this._pendingWheel += Math.sign(e.deltaY);
   }
 
-  _onLockChange() {
+  _onLockChange(): void {
     this.pointerLocked = document.pointerLockElement === this.canvas;
     if (!this.pointerLocked) this._onBlur();
   }
 
   /** Losing focus must release every held key, or the player runs forever. */
-  _onBlur() {
+  _onBlur(): void {
     this._gameplayFocus = false;
     // Discard not-yet-snapshotted gameplay presses, but keep the modal Escape
     // intent if the browser delivers pointerlockchange before beginFrame().
@@ -341,15 +328,15 @@ export class Input {
     return this._released.has(code);
   }
 
-  get fire() {
+  get fire(): boolean {
     return this.action('fire');
   }
 
-  get firePressed() {
+  get firePressed(): boolean {
     return this.actionPressed('fire');
   }
 
-  get ads() {
+  get ads(): boolean {
     return this.action('ads');
   }
 

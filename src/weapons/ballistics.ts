@@ -95,72 +95,51 @@ class PendingActorHit {
 }
 
 class Projectile {
-  alive: boolean;
-  pos: THREE.Vector3;
-  prev: THREE.Vector3;
-  origin: THREE.Vector3;
-  vel: THREE.Vector3;
-  damage: number;
-  penetration: number;
-  dragK: number;
-  travelled: number;
-  maxRange: number;
-  age: number;
-  dropoff: number;
-  weapon: EventWeapon;
-  pellet: number;
-  mask: number | undefined;
-  shooter: unknown;
-  shot: number;
-  speed: number;
-  tracer: boolean;
   hitActors: unknown[] = [];
-  pending = Array.from({ length: MAX_BULLET_LAYERS }, () => new PendingActorHit());
+  pending = Array.from({ length: MAX_BULLET_LAYERS }, (): PendingActorHit => new PendingActorHit());
   path: NonNullable<Parameters<PhysicsSystem['selectBulletRegion']>[3]>;
   layers = 0;
   materialTime = 0;
   hasImpact = false;
   impact: ResolvedImpact = { point: new THREE.Vector3(), actor: null, part: null, amount: 0 };
 
+  alive: boolean = false;
+  pos: THREE.Vector3 = new THREE.Vector3();
+  prev: THREE.Vector3 = new THREE.Vector3();
+  origin: THREE.Vector3 = new THREE.Vector3();
+  vel: THREE.Vector3 = new THREE.Vector3();
+  damage: number = 30;
+  penetration: number = 1;
+  dragK: number = 0.3;
+  travelled: number = 0;
+  maxRange: number = 400;
+  age: number = 0;
+  dropoff: number = 0.5;
+  weapon: EventWeapon = null;
+  pellet: number = 0;
+  mask: number | undefined = undefined;
+  shooter: unknown = null;
+  shot: number = 0;
+  speed: number = 800;
+  tracer: boolean = false;
+
   constructor() {
-    this.alive = false;
-    this.pos = new THREE.Vector3();
-    this.prev = new THREE.Vector3();
-    this.origin = new THREE.Vector3();
     this.path = { from: this.prev, to: this.pos, distance: 0, damage: 0, endDamage: 0 };
-    this.vel = new THREE.Vector3();
-    this.damage = 30;
-    this.penetration = 1;
-    this.dragK = 0.3;
-    this.travelled = 0;
-    this.maxRange = 400;
-    this.age = 0;
-    this.dropoff = 0.5;
-    this.weapon = null;
-    this.pellet = 0;
-    this.mask = undefined;
-    this.shooter = null;
-    this.shot = 0;
-    this.speed = 800;
-    this.tracer = false;
   }
 }
 
 export class ProjectileSim {
   ctx: ProjectileContext;
-  pool: Projectile[];
-  live: Projectile[];
-  _hitDir: THREE.Vector3;
-  stats: { fired: number; impacts: number; live: number };
   _physics: ProjectilePhysics | null | undefined;
+
+  pool: Projectile[] = [];
+  live: Projectile[] = [];
+  _hitDir: THREE.Vector3 = new THREE.Vector3();
+  stats: { fired: number; impacts: number; live: number } = { fired: 0, impacts: 0, live: 0 };
 
   constructor(ctx: ProjectileContext) {
     this.ctx = ctx;
-    this.pool = [];
     for (let i = 0; i < MAX_LIVE; i++) this.pool.push(new Projectile());
-    this.live = [];
-    this._hitDir = new THREE.Vector3();
-    this.stats = { fired: 0, impacts: 0, live: 0 };
   }
 
   get physics(): ProjectilePhysics | null | undefined {
@@ -260,7 +239,7 @@ export class ProjectileSim {
             damage: p.damage,
             penetration: p.penetration,
             dropoff: p.dropoff,
-            mask: p.mask,
+            mask: p.mask ?? phys.MASK.BULLET,
             shooter: p.shooter,
             weapon: p.weapon,
             shot: p.shot,

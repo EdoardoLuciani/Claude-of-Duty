@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { Fn, clamp, screenUV, uniform, uniformTexture, vec2, vec4 } from 'three/tsl';
 import type { Node, Renderer } from 'three/webgpu';
+import type { JoinNode } from 'three/webgpu';
 
 import type { RenderSystem } from '../render/index-webgpu.ts';
 import { P } from './atlas.ts';
-import { ParticleLayer, resetSpawn } from './particles.ts';
+import { ParticleLayer, resetSpawn, setSpawnPosition } from './particles.ts';
 
 /**
  * Screen-space refraction: depth-tested distortion sprites accumulate offsets
@@ -22,23 +23,31 @@ interface ColorTextureNode extends Node<'vec4'> {
   sample(uv: Node<'vec2'>): Node<'vec4'>;
 }
 
+function isColorTextureNode(node: Node<'vec4'>): node is ColorTextureNode {
+  return (
+    'isTextureNode' in node &&
+    node.isTextureNode === true &&
+    'sample' in node &&
+    typeof node.sample === 'function'
+  );
+}
 export class HazeSystem {
-  declare enabled: boolean;
   declare scene: THREE.Scene;
   declare layer: InstanceType<typeof ParticleLayer>;
-  declare rt: THREE.RenderTarget | null;
-  declare size: THREE.Vector2;
   declare uStrength: ReturnType<typeof uniform<'vec2'>>;
   declare uActive: ReturnType<typeof uniform<'float'>>;
-  declare _warmCam: THREE.Camera | null;
   declare _camera: THREE.Camera | null | undefined;
   declare _live: boolean;
   declare distortTexNode: ReturnType<typeof uniformTexture>;
-  declare _warp: Node<'vec4'> | null;
-  declare _warpColor: ColorTextureNode | null;
+
+  enabled: boolean = true;
+  rt: THREE.RenderTarget | null = null;
+  size: THREE.Vector2 = new THREE.Vector2(1, 1);
+  _warmCam: THREE.Camera | null = null;
+  _warp: Node<'vec4'> | null = null;
+  _warpColor: ColorTextureNode | null = null;
 
   constructor(o: HazeOptions) {
-    this.enabled = true;
     this.scene = new THREE.Scene();
     this.scene.matrixAutoUpdate = false;
 
@@ -54,16 +63,11 @@ export class HazeSystem {
     this.scene.add(this.layer.mesh);
     this.layer.mesh.visible = true; // visibility is driven by instanceCount
 
-    this.rt = null;
-    this.size = new THREE.Vector2(1, 1);
     this.uStrength = uniform(new THREE.Vector2(0.013, 0));
     this.uActive = uniform(0);
-    this._warmCam = null;
 
     this.distortTexNode = uniformTexture(_placeholder());
     this.distortTexNode.name = 'fx-distort-sample';
-    this._warp = null;
-    this._warpColor = null;
   }
 
   /** Warm offset sprites in their actual target without drawing geometry. */
@@ -71,7 +75,11 @@ export class HazeSystem {
     renderer: Renderer,
     camera: THREE.Camera | null | undefined = this._camera,
     drawGraph: RenderSystem['_warmGraph'] | null = null
-  ) {
+  ): Promise<
+    | { ok: boolean; reason: string; error?: undefined }
+    | { ok: boolean; reason?: undefined; error?: undefined }
+    | { ok: boolean; error: string; reason?: undefined }
+  > {
     if (!renderer || !this.rt) return { ok: false, reason: 'target not ready' };
     const cam = camera ?? (this._warmCam ??= new THREE.PerspectiveCamera());
     const geometry = this.layer.geometry,
@@ -143,9 +151,7 @@ export class HazeSystem {
     seed = 0
   ): void {
     const s = resetSpawn();
-    s.x = x;
-    s.y = y;
-    s.z = z;
+    setSpawnPosition(s, x, y, z);
     s.size0 = radius;
     s.size1 = radius * grow;
     s.sizeCurve = 0.5;
@@ -202,22 +208,16 @@ export class HazeSystem {
     }
   }
 
-  /**
-   * Build the TSL warp for a resolved colour texture node. Cache the result:
-   * build it once when the pipeline is assembled, not per frame.
-   *
-   * @param {import('three/tsl').Node} colorNode a texture node (pass output)
-   * @returns {import('three/tsl').Node<vec4>}
-   */
+  /** Warp a resolved colour texture; cache at pipeline assembly, not per frame. */
   warpNode(colorSource: Node<'vec4'> | THREE.Texture): Node<'vec4'> {
-    const colorNode: ColorTextureNode = (colorSource as ColorTextureNode).isTextureNode
-      ? (colorSource as ColorTextureNode)
-      : (uniformTexture(colorSource as THREE.Texture) as ColorTextureNode);
+    const colorNode =
+      colorSource instanceof THREE.Texture ? uniformTexture(colorSource) : colorSource;
+    if (!isColorTextureNode(colorNode)) throw new Error('[fx] haze warp requires a texture node');
     if (this._warp && this._warpColor === colorNode) return this._warp;
     const distort = this.distortTexNode;
     const strength = this.uStrength;
     const active = this.uActive;
-    this._warp = Fn(() => {
+    this._warp = Fn((): JoinNode<'vec4'> => {
       // Particle offsets are camera-space (Y up); native texture UVs point down.
       const raw = distort.sample(screenUV).xy.mul(vec2(1, -1)).mul(strength.x).mul(active);
       const d = clamp(raw, vec2(-0.03), vec2(0.03));
@@ -231,7 +231,7 @@ export class HazeSystem {
     return this._warp;
   }
 
-  dispose() {
+  dispose(): void {
     this.layer.dispose();
     this.rt?.dispose();
     this.distortTexNode.dispose?.();

@@ -1,64 +1,30 @@
 # SIG MPX
 
-**Gates 1–2 approved; animation/gameplay/optic Gate 3 remains pending.**
-Original game art, not CAD/scan or an endorsed/licensed replica.
-Black select-fire 8-inch MPX, deployed factory stock, bare M-LOK guard,
-30-round magazine, folded irons, ROMEO4T (not PRO), 1.41-inch mount/no spacer,
-MPX-specific SRD9 at the actual barrel endpoint. No handstop or copied serial.
+Black select-fire 8-inch MPX, deployed stock, ROMEO4T and MPX-specific SRD9.
+Solid 1.5 mm polymer cap lids are approved; closed lids intentionally occlude
+the optic. General animation/gameplay/optic human acceptance remains outstanding.
+Original art, not a certified replica.
 
-## Primary reference authority
+[Source map](../../../tools/blender/mpx/README.md) ·
+[Shared workflow](../../../tools/blender/README.md)
 
-| Source | Authority / limitation |
-|---|---|
-| [2019 SIG catalog](https://www.sigsauer.com/pub/media/sigsauer/resources/2019_DEFENSE_CATLOG_web.pdf), printed p.23 / PDF p.25 | Labelled 8-inch base inset, not the large suppressed hero's barrel configuration. |
-| Same catalog, printed p.43 / PDF p.45 | MIL-SRD9-MPX: 175×35 mm with mount, not generic pistol SRD9. |
-| [2021 LE catalog](https://www.sigsauer.com/media/sigsauer/resources/2021_LE_CATALOG_DEL.pdf), printed pp.15–16 / PDF pp.16–17 | Opposite-side/stock details; SD guard doesn't identify barrel length. |
-| [MPX manual REV02](https://www.sigsauer.com/media/sigsauer/resources/OPERATORS__MANUAL_MPX_1811295-01_REV02_LR.pdf), PDF pp.26–28 | Controls/rear charging handle; not MP5 side cocking. |
-| [ROMEO4T](https://www.sigsauer.com/romeo4t-1x20-mm.html) / [manual](https://www.sigsauer.com/media/sigsauer/resources/7402901-01_R00.pdf) | Approved 85.5×46×63.5 mm accessory envelope, 20 mm aperture, 2 MOA dot. |
+The adapter converts +X-forward/+Z-up/−Y-right once and samples eight clips.
+Ordinary meshes preserve actual cap pivots, mechanisms, independent magazines and
+rounds. Preserve lockback, cancellation, chamber accounting and pooled ejection.
+Three materials retain original finish colors and UV0 grain, with UV1 finish tiles.
+Body lenses stay at 2% opacity; the world-sized 2 MOA dot has a six-pixel floor.
+Hand calibration/review-arm inputs are read-only. Normal builds use local assets.
 
-The catalog's inconsistent MPX K dimensions are unusable. The optic manual's
-84.6 mm closed-cover length differs from the approved product-page 85.5 mm;
-measure the complete accessory, not body alone. Body/rim/battery cap, 64 mm lens
-spacing, hidden depths/finish are inferred, not an optical prescription.
-Reference fingerprints/registration remain in `photo-review.json`; no X/Y warp.
-History: [#360](https://github.com/EdoardoLuciani/Claude-of-Duty/pull/360).
-
-## Source/runtime contract
-
-The [source-first edit/build guide](../../../tools/blender/mpx/README.md) owns
-geometry/PBR, action stages and declared read-only calibration/review-arm inputs.
-`src/weapons/mpx.ts` converts +X-forward/+Z-up/−Y-right once; copy shared sampler
-arrays before conversion. Eight native clips preserve shared IK/ADS/sway/recoil.
-No duplicate arms, root recoil or review casing; all DCC controls need NLA tracks.
-Keep exact balance/events, partial-mag retention, empty-mag discard, chamber/+1,
-lockback/cancellation/reset and one live case per shot. Handle is non-reciprocating;
-empty reload uses bolt release. Sound isn't a verified MPX recording.
-Caps: <110k triangles, ≤40 primitives, ≤16 materials including glTF fallback,
-three 1024² maps, ≤10 MiB. Normal builds need no Blender/network.
-
-Optics use absorptive inward faces and double-sided single-pass sheets, 2% lens/
-1% cover opacity. Dot is nominal 2 MOA in world-camera space with a six-pixel
-minimum diameter, no ring/halo; size after projection update. Weapon-only ADS FOV/shoulder
-fit is explicit readability policy, not target magnification. Keep 20 mm aperture,
-mount axis, open caps, fixed battery rim, wrist/contact and eight-action reach gates.
-
-## Rebuild/check (root, Blender 5.2.2)
+Run from the repository root with Blender 5.2.2 and gltfpack 1.3:
 
 ```sh
-blender -b -t 4 --python-exit-code 1 --python tools/blender/mpx.py -- \
-  --output /tmp/mpx-review
-# Omit --output to regenerate committed products after review.
-# Refit calibration only as a separately approved change:
-# node tools/mpx-hand-reference.mjs
-blender -b assets/weapons/sig-mpx/mpx.blend --python-exit-code 1 \
-  --python tools/blender/mpx_check.py
-node tests/smoke/smoke-mpx-asset.mjs
-node tests/smoke/smoke-mpx.mjs
+blender -b -t 2 --python-exit-code 1 --python tools/blender/mpx/build.py
+blender -b -t 2 assets/weapons/sig-mpx/mpx.blend \
+  --python-exit-code 1 --python tools/blender/mpx/check.py
+npm run models:cook -- mpx
 ```
 
-Previews use Eevee without ray tracing; common flags follow the shared workflow.
-The [approved UV-repeatability limitation](../../../tools/blender/mpx/README.md#approved-repeatability-limit)
-retains the atlas and explicitly leaves GLB byte-repeatability unmet for evaluated
-UV bytes. Maps/manifest and non-UV payloads still require exact comparison.
-Technical gates don't certify all-triangle clearance or final appearance;
-Gate 3 human approval, finish/highlight/FX/audio review remain outstanding.
+Use `--output /tmp/mpx-review` for scratch builds. The registered cook retains
+material boundaries and 16-bit colors; do not adopt more aggressive optic-rim
+simplification. The source map records the UV-repeatability limitation.
+Historical representation/storage comparisons remain in Git, not an FPS claim.

@@ -1,3 +1,10 @@
+import type {
+  Vector3,
+  Vector4,
+  MeshStandardMaterialParameters,
+  MeshPhysicalMaterialParameters,
+} from 'three';
+import type { MeshPhysicalNodeMaterialNodeProperties } from 'three/src/materials/nodes/MeshPhysicalNodeMaterial.js';
 import type TextureNode from 'three/src/nodes/accessors/TextureNode.js';
 import type NodeBuilder from 'three/src/nodes/core/NodeBuilder.js';
 import {
@@ -40,8 +47,23 @@ import {
 } from 'three/tsl';
 import { Color, MeshPhysicalNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu';
 import type { Node, Texture } from 'three/webgpu';
+import type { ConstNode, JoinNode, NormalMapNode, VarNode, VertexColorNode } from 'three/webgpu';
 
 import { hash11 } from './noise-tsl.ts';
+
+// Three adds shader-node fields to its base parameters; the surface system owns those inputs.
+type MaterialGraphInputs = keyof MeshPhysicalNodeMaterialNodeProperties;
+
+/** Physical-only values require the physical constructor; shader graphs are not authoring options. */
+export type SurfaceMaterialOptions =
+  | (Omit<MeshStandardMaterialParameters, MaterialGraphInputs> & { physical?: false })
+  | (Omit<MeshPhysicalMaterialParameters, MaterialGraphInputs> & { physical: true });
+
+/** Authored values exclude live uniforms installed and owned by MaterialSystem. */
+export type SurfaceAuthoringParams = Omit<
+  SurfaceParams,
+  'tileNode' | 'normalAmpNode' | 'weatherNode' | 'parallaxNode' | 'groundNode' | 'tintNode'
+>;
 
 export interface SurfaceParams {
   uvMode: 'planar' | 'triplanar' | 'mesh';
@@ -93,12 +115,13 @@ interface SharedSurfaceMaps {
   keyDir?: Node<'vec3'>;
   keyColor?: Node<'vec3'>;
 }
-const tint = (hex: number | string) => {
+const tint = (hex: number | string): ConstNode<'vec3', Vector3> => {
   const c = new Color(hex);
   return vec3(c.r, c.g, c.b);
 };
-const sample = (map: Texture | TextureNode, coords: Node<'vec2'>) => texture(map, coords);
-const axisNormal = (n: Node<'vec3'>, axis: 0 | 1 | 2, sign: Node<'float'>) =>
+const sample = (map: Texture | TextureNode, coords: Node<'vec2'>): TextureNode<'vec4'> =>
+  texture(map, coords);
+const axisNormal = (n: Node<'vec3'>, axis: 0 | 1 | 2, sign: Node<'float'>): JoinNode<'vec3'> =>
   axis === 0
     ? vec3(sign.mul(n.z), n.y, sign.negate().mul(n.x))
     : axis === 1
@@ -113,7 +136,7 @@ function axisFrame(
   axis: 0 | 1 | 2,
   scale: number | Node<'float'>,
   offset: Node<'vec2'>
-) {
+): { uv: Node<'vec2'>; sign: Node<'float'>; axis: 0 | 2 | 1 } {
   const component = axis === 0 ? n.x : axis === 1 ? n.y : n.z;
   const s = step(0, component).mul(2).sub(1);
   const coords =
@@ -134,7 +157,7 @@ export function parallaxUV(
   depth: number | Node<'float'>,
   fade: Node<'float'>,
   maxLayers: number
-) {
+): VarNode<'vec2', Node<'vec2'>> {
   const depthNode = typeof depth === 'number' ? float(depth) : depth;
   const coords = uv0.toVar();
   // Explicit assignments keep derivatives outside the non-uniform march branch.
@@ -142,7 +165,7 @@ export function parallaxUV(
     dy = vec2(0).toVar();
   dx.assign(dFdx(uv0));
   dy.assign(dFdy(uv0));
-  If(depthNode.greaterThan(0).and(fade.greaterThan(0.001)), () => {
+  If(depthNode.greaterThan(0).and(fade.greaterThan(0.001)), (): void => {
     const nl = max(mix(float(maxLayers), 8, clamp(abs(vt.z), 0, 1)).mul(fade), 4).toVar();
     const layer = float(1).div(nl).toVar();
     const stepUv = vt.xy
@@ -151,12 +174,12 @@ export function parallaxUV(
       .mul(fade)
       .mul(layer)
       .toVar();
-    const height = (at: Node<'vec2'>) => texture(map, at).grad(dx, dy).a.oneMinus();
+    const height = (at: Node<'vec2'>): Node<'float'> => texture(map, at).grad(dx, dy).a.oneMinus();
     const cur = float(0).toVar();
     const h = height(coords).toVar();
-    Loop(48, ({ i }) => {
+    Loop(48, ({ i }): void => {
       // Break appends itself to the TSL stack; returning it appends it twice.
-      If(cur.greaterThanEqual(h).or(float(i).greaterThanEqual(nl)), () => {
+      If(cur.greaterThanEqual(h).or(float(i).greaterThanEqual(nl)), (): void => {
         Break();
       });
       coords.subAssign(stepUv);
@@ -174,7 +197,11 @@ export function parallaxUV(
   return coords;
 }
 
-function runoff(sAxis: Node<'float'>, y: Node<'float'>, wobble: Node<'float'>) {
+function runoff(
+  sAxis: Node<'float'>,
+  y: Node<'float'>,
+  wobble: Node<'float'>
+): { amount: Node<'float'>; random: Node<'float'>; below: Node<'float'> } {
   const u = sAxis.mul(1.55),
     cell = u.floor(),
     lat = fract(u);
@@ -210,14 +237,21 @@ export function createSurfaceNodeMaterial(
   set: SurfaceTextureSet,
   p: SurfaceParams,
   shared: SharedSurfaceMaps,
-  threeProps: { physical?: boolean; [key: string]: unknown } = {}
-) {
+  threeProps: SurfaceMaterialOptions = {}
+): MeshStandardNodeMaterial {
   const { physical, ...props } = threeProps;
   const Ctor = physical ? MeshPhysicalNodeMaterial : MeshStandardNodeMaterial;
   const mat = new Ctor({ color: 0xffffff, roughness: 1, metalness: 1, dithering: true, ...props });
   // A JS record of shared expressions, not a TSL function returning a struct:
   // consuming color/opacity must not also build the unrelated normal channels.
-  const channels = (() => {
+  const channels = ((): {
+    color: Node<'vec3'>;
+    opacity: Node<'float'>;
+    normal: Node<'vec3'> | NormalMapNode;
+    rough: Node<'float'>;
+    metal: Node<'float'>;
+    ao: Node<'float'>;
+  } => {
     const projected = p.uvMode !== 'mesh';
     const scale = p.tileNode ?? (projected ? 1 / p.scale : p.scale);
     const normalAmp = p.normalAmpNode ?? p.normalStrength;
@@ -232,12 +266,8 @@ export function createSurfaceNodeMaterial(
     const surfN = p.localSpace ? localN : geometricN;
     const faceN = frontFacing.select(surfN, surfN.negate());
     const maskColor = p.vertexMasks
-      ? Fn((builder: NodeBuilder) =>
-          (
-            builder as NodeBuilder & { hasGeometryAttribute(name: string): boolean }
-          ).hasGeometryAttribute('color')
-            ? vertexColor()
-            : vec4(0)
+      ? Fn((builder: NodeBuilder): ConstNode<'vec4', Vector4> | VertexColorNode =>
+          builder.hasGeometryAttribute('color') ? vertexColor() : vec4(0)
         )()
       : null;
 
@@ -267,7 +297,7 @@ export function createSurfaceNodeMaterial(
         : null;
     const tangent = axisT ? normalize(axisT.sub(faceN.mul(dot(axisT, faceN)))).toVar() : null;
     const bitangent = axisT ? cross(faceN, tangent!).toVar() : null;
-    const anchoredNormal = (n: Node<'vec3'>) =>
+    const anchoredNormal = (n: Node<'vec3'>): Node<'vec3'> =>
       tangent!.mul(n.x).add(bitangent!.mul(n.y)).add(faceN.mul(n.z));
     const baseUV = projected ? frame.uv : uv().mul(scale).add(offset);
     const dist = length(cameraPosition.sub(worldP));
@@ -287,11 +317,13 @@ export function createSurfaceNodeMaterial(
       ).mul(scale);
       const map = set.albedo;
       const layers = p.parallaxLayers ?? 22;
-      coords = Fn(() => parallaxUV(map, baseUV, vt, depth, fade, layers))().toVar();
+      coords = Fn((): VarNode<'vec2', Node<'vec2'>> =>
+        parallaxUV(map, baseUV, vt, depth, fade, layers)
+      )().toVar();
     }
 
     let alb: Node<'vec4'>, orm: Node<'vec3'>, nT: Node<'vec3'> | undefined, nP: Node<'vec3'> | null;
-    const unpack = (tex: Node<'vec4'>) =>
+    const unpack = (tex: Node<'vec4'>): Node<'vec3'> =>
       normalize(
         vec3(
           tex.r.mul(2).sub(1).mul(normalAmp),
@@ -299,9 +331,9 @@ export function createSurfaceNodeMaterial(
           tex.b.mul(2).sub(1)
         )
       );
-    const mapAt = (f: { uv: Node<'vec2'> }) => sample(set.albedo, f.uv);
-    const ormAt = (f: { uv: Node<'vec2'> }) => sample(set.orm, f.uv).rgb;
-    const normalAt = (f: { uv: Node<'vec2'>; sign: Node<'float'> }) =>
+    const mapAt = (f: { uv: Node<'vec2'> }): TextureNode<'vec4'> => sample(set.albedo, f.uv);
+    const ormAt = (f: { uv: Node<'vec2'> }): Node<'vec3'> => sample(set.orm, f.uv).rgb;
+    const normalAt = (f: { uv: Node<'vec2'>; sign: Node<'float'> }): Node<'vec3'> =>
       unpack(sample(set.normal, f.uv));
     if (p.uvMode === 'triplanar') {
       alb = mapAt(fx).mul(w.x).add(mapAt(fy).mul(w.y)).add(mapAt(fz).mul(w.z)).toVar();
@@ -476,7 +508,7 @@ export function createSurfaceNodeMaterial(
       color = color.mul(lip.mul(0.13).add(1)).toVar();
       height = clamp(height.add(mask.mul(0.07)).add(lip.mul(0.05)), 0, 1).toVar();
     }
-    if (p.weather.some((x) => x > 0)) {
+    if (p.weather.some((x): boolean => x > 0)) {
       const dust = clamp(worldN.y, 0, 1)
         .pow(2)
         .mul(weather.x)

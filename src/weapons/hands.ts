@@ -63,8 +63,8 @@ interface FitGripOptions {
   thumb?: Vec3;
   thumbPole?: Vec3;
   index?: Vec3;
-  fingers?: number[][];
-  spread?: number[];
+  fingers?: number[][] | undefined;
+  spread?: number[] | undefined;
 }
 
 /** Aim local -Z along `dir`, with +Y toward `up`, all in rig space.
@@ -92,9 +92,6 @@ export class Arm {
   root!: THREE.Object3D;
   shoulder!: THREE.Vector3;
   pole!: THREE.Vector3;
-  bodyUp!: THREE.Vector3;
-  bodyRight!: THREE.Vector3;
-  poses!: Record<string, HandPoseData>;
   pose!: string;
   controls!: Record<string, THREE.Bone>;
   skeleton!: THREE.Skeleton | null;
@@ -120,6 +117,10 @@ export class Arm {
   _poseTime!: number;
   _poseDuration!: number;
   _poseBlend!: number;
+  bodyUp: THREE.Vector3 = new THREE.Vector3(0, 1, 0);
+  bodyRight: THREE.Vector3 = new THREE.Vector3(1, 0, 0);
+  poses: Record<string, HandPoseData> = {};
+
   constructor(side: number, opts: ArmOptions = {}) {
     this.side = side;
     this.scale = opts.scale ?? 1;
@@ -133,9 +134,6 @@ export class Arm {
       opts.shoulderZ ?? 0.12
     );
     this.pole = new THREE.Vector3(side * 0.46, -0.86, 0.22).normalize();
-    this.bodyUp = new THREE.Vector3(0, 1, 0);
-    this.bodyRight = new THREE.Vector3(1, 0, 0);
-    this.poses = {};
     createArmControls(this);
     this.setPose(opts.pose ?? 'wrap');
   }
@@ -235,8 +233,8 @@ export class Arm {
 
     // Fit thumb abduction and roll before flexion. This cylinder contact still
     // contributes weapon AO, even though fitGrip later refines the thumb pose.
-    const thumbBase = (base.thumbBase ?? [0, 0, 0]).slice() as Vec3;
-    this.thumb.root.rotation.fromArray(thumbBase);
+    const thumbBase = (base.thumbBase ?? [0, 0, 0]).slice();
+    this.thumb.root.rotation.set(thumbBase[0], thumbBase[1], thumbBase[2]);
     const tr = THUMB.r2 * this.scale;
     const tlen = THUMB.l1 * this.scale;
     const tLocal: Vec3 = [0, -tr * 1.05, -tlen * 0.55];
@@ -303,7 +301,7 @@ export class Arm {
     const base = this.poses[this.pose] ?? POSES[this.pose];
     const pose = {
       ...base,
-      fingers: (fingers ?? base.fingers).map((a) => a.slice()),
+      fingers: (fingers ?? base.fingers).map((a): number[] => a.slice()),
       fingerSpread: (spread ?? base.fingerSpread ?? this.fingerSpread).slice(),
     };
     this.poses[name] = pose;
@@ -402,8 +400,8 @@ export class Arm {
       this._poseTo[n++] = -p.thumb[j];
     }
     this._thumbFrom.copy(this.thumb.root.quaternion);
-    const thumbBase = (p.thumbBase ?? [0, 0, 0]) as Vec3;
-    this.thumb.root.rotation.fromArray(thumbBase);
+    const thumbBase = p.thumbBase ?? [0, 0, 0];
+    this.thumb.root.rotation.set(thumbBase[0], thumbBase[1], thumbBase[2]);
     this._thumbTo.copy(this.thumb.root.quaternion);
     this.thumb.root.quaternion.copy(this._thumbFrom);
     this._poseTime = 0;

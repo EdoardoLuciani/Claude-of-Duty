@@ -1,12 +1,13 @@
 import { Fn, clamp, float, mix, smoothstep, vec2 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
+import type { StructNode } from 'three/webgpu';
 
 import { authoredColor } from '../color-tsl.ts';
 import { fbm01, fbm3, fbm4, fbm5, scratches, shear, shearPeriod, worley } from '../noise-tsl.ts';
 import { Surface } from './surface.ts';
 
 export const glassSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof Surface>>(
-  ([coords, seed]) => {
+  ([coords, seed]): StructNode => {
     const period = vec2(8);
     const p = coords.mul(period).add(seed.mul(2.2));
     const smear = fbm01(fbm4(shear(p.mul(3), 1, 6), shearPeriod(period.mul(3), 6), 0.5));
@@ -29,6 +30,6 @@ export const glassSurface = Fn<[Node<'vec2'>, Node<'float'>], ReturnType<typeof 
     const ao = float(1).sub(dirty.mul(0.1));
     // Keep the authored dark sRGB tint after linearization; a 0.02 linear floor
     // would lift all clean channels to grey before any lighting or transparency.
-    return Surface(clamp(c, 0, 0.5), height, clamp(rough, 0.02, 0.7), float(0), ao);
+    return Surface(clamp(c, 0, 0.5), height, clamp(rough, 0.02, 0.7), 0, ao);
   }
 );

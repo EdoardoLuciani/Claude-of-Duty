@@ -17,12 +17,13 @@ export class GameOverScreen {
   declare title: HTMLElement;
   declare summary: HTMLElement;
   declare button: HTMLButtonElement;
-  declare active: boolean;
-  declare elapsed: number;
-  declare shown: number;
-  declare delay: number;
   declare _click: () => void;
   declare _key: (event: KeyboardEvent) => void;
+  active: boolean = false;
+  elapsed: number = 0;
+  shown: number = 0;
+  delay: number = 2.85;
+
   constructor(parent: HTMLElement, ctx: unknown, onRestart: (() => void) | null) {
     this.ctx = ctx;
     this.onRestart = onRestart;
@@ -35,12 +36,8 @@ export class GameOverScreen {
     this.button = el('button', 'ow-gameover-button', panel, 'NEW GAME');
     el('div', 'ow-gameover-hint', panel, 'ENTER / SPACE');
 
-    this.active = false;
-    this.elapsed = 0;
-    this.shown = 0;
-    this.delay = 2.85;
-    this._click = () => this.restart();
-    this._key = (e) => {
+    this._click = (): void => this.restart();
+    this._key = (e): void => {
       if (!this.active || this.elapsed < this.delay) return;
       if (e.code !== 'Enter' && e.code !== 'Space') return;
       e.preventDefault();

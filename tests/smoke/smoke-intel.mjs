@@ -10,7 +10,6 @@ import { Input } from '../../src/core/input.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { spawnIntelSparks } from '../../src/fx/impacts.ts';
-import { shuffleDeck, drawCard, CARDS } from '../../src/intel/cards.ts';
 import { IntelSystem } from '../../src/intel/index.ts';
 import { randomMarker, rollBudget } from '../../src/intel/spawn.ts';
 import { INTEL, lureInterval } from '../../src/intel/tuning.ts';
@@ -18,7 +17,7 @@ import { MarketSystem } from '../../src/market/index.ts';
 import { UiSystem } from '../../src/ui/index.ts';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
-import { INTEL_POINTS } from '../../tools/worldgen/intel.js';
+import { INTEL_POINTS } from '../../tools/worldgen/level/intel.js';
 
 assert.deepEqual(DEFAULT_BINDINGS.use, ['KeyT'], 'approved interact default is T');
 assert.deepEqual(DEFAULT_BINDINGS.flashlight, ['KeyF'], 'approved flashlight default is F');
@@ -146,14 +145,6 @@ for (let i = 0; i < 100; i++) {
     'same seed and state reproduce selection'
   );
 }
-const deck = [];
-shuffleDeck(new Rng(1), deck);
-assert.equal(deck.length, 6);
-assert.equal(new Set(deck).size, 6);
-assert.equal(CARDS.length, 6);
-while (deck.length) assert(drawCard(deck));
-assert.equal(drawCard(deck), null);
-
 async function harness(deterministic = false, markerList = markers) {
   const player = {
     dead: false,
@@ -591,8 +582,7 @@ assert.equal(intel.secured, 0, 'claim must not pay before four seconds');
 step(0.25);
 assert.equal(intel.secured, 1);
 assert.equal(ctx.market.credits, 500);
-assert.equal(intel._drawn.length, 1);
-assert(emitted.some((e) => e.type === 'intel:secured' && e.cardLabel && e.credits === 500));
+assert(emitted.some((e) => e.type === 'intel:secured' && e.credits === 500));
 assert(intel.blocksUse(), 'held T after completion cannot spill into ammunition');
 intel._secure(cache);
 assert.equal(ctx.market.credits, 500, 'securing twice is harmless');
@@ -645,21 +635,20 @@ assert.equal(emitted.filter((e) => e.type === 'intel:noise').length, noise);
 assert.equal(intel.getHudState().pulses.length, 2);
 assert.equal(intel.getHudState().pulses[0].y, again.y);
 intel.reset();
-assert.equal(intel._drawn.length, 0);
 assert.equal(intel._used.size, 0);
 assert.equal(intel.secured, 0);
 assert.equal(intel._alive.length, 0);
 assert.equal(intel._lastWave, 0);
 assert.equal(intel._announceAt, 0);
 assert(intel._pool.every((p) => !p.group.visible && !p.group.parent));
-const cards = new Set();
-for (let i = 0; i < 6; i++) {
-  const spawned = intel._spawn({ id: `card-${i}`, x: i * 2, y: 0, z: 0 });
+for (let i = 0; i < 7; i++) {
+  const spawned = intel._spawn({ id: `cache-${i}`, x: i * 2, y: 0, z: 0 });
   intel._secure(spawned);
-  cards.add(intel.getHudState().card);
+  const event = emitted.filter((e) => e.type === 'intel:secured').at(-1);
+  assert.equal(event.credits, INTEL.credits);
+  assert.equal(event.id, `cache-${i}`);
 }
-assert.equal(cards.size, 6, 'six names drawn without repetition');
-assert.equal(intel.getHudState().secured, 6);
+assert.equal(intel.getHudState().secured, 7);
 intel.dispose();
 ctx.events.emit('wave:complete', { wave: 20 });
 assert.equal(intel._alive.length, 0, 'dispose unsubscribes');

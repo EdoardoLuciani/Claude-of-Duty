@@ -1,20 +1,11 @@
 import type { MaterialSystemNode } from '../materials/index.ts';
 
-/**
- * WORLD — the surface palette.
- *
- * A named set of material variants pulled from the `materials` library. Keeping
- * them in one table means the level uses a deliberate, limited palette (which is
- * what makes a real map read as one place) and that every mesh sharing a key
- * merges into the same draw call.
- *
- * `surface` is the impact finish; `ballisticSurface` optionally describes the
- * structure underneath. `sheetThickness` explicitly marks single-sided sheets.
- * `tint` is a linear multiply
- * on the baked albedo, so values stay inside 0.02–0.9 reflectance.
+/** Canonical world finishes/variants; meshes sharing a key can batch together.
+ * surface controls impacts; optional ballisticSurface describes the underlying structure.
+ * Only sheetThickness authorises single-sided sheets. Tint multiplies linear baked albedo.
  */
 export const PALETTE = {
-  // ---------------------------------------------------------- architecture --
+  // architecture
   plaster_cream: {
     name: 'plaster',
     surface: 'plaster',
@@ -61,11 +52,7 @@ export const PALETTE = {
     surface: 'concrete',
     opts: { vertexMasks: true, tint: 0xa9a49a, scale: 2.5 },
   },
-  /**
-   * Prop-scale concrete. A 2.5 m texture tile across a 0.5 m block shows a
-   * single smear of noise and reads as untextured plastic; small objects need
-   * their own, much tighter tiling.
-   */
+  /** Tighter tiling preserves visible concrete texture on sub-metre props. */
   concrete_prop: {
     name: 'concrete',
     surface: 'concrete',
@@ -99,32 +86,21 @@ export const PALETTE = {
     opts: { vertexMasks: true, tint: 0xa9a08d, scale: 1.4 },
   },
 
-  // ----------------------------------------------------------------- ground --
-  /**
-   * The street itself. A black tarmac road makes a sunlit Levantine town read
-   * as a wet European city at dusk — the actual surface is old tarmac buried
-   * under years of blown sand and dust, so the base is warm compacted earth and
-   * the asphalt only shows through where wheels have polished it.
-   */
+  // ground
+  /** Sand-buried tarmac: warm compacted earth, with asphalt exposed in tyre ruts. */
   road_dust: {
     name: 'gravel',
     surface: 'dirt',
     opts: {
       vertexMasks: true,
       tint: 0xc9b896,
-      // 2.2 m, not 1.5: the aggregate reads as 25-45 mm stone instead of a
-      // 15 mm rash, and the macro relief band lands on ruts rather than on
-      // individual pebbles.
+      // 2.2 m tiling resolves 25-45 mm aggregate and puts macro relief on ruts.
       scale: 2.2,
-      // de-tile: a repeating cracked-earth tile down a 100 m street is the most
-      // obvious tell in any procedural level.
+      // Suppress visible tiling along long streets.
       detile: 0.9,
-      // .w is cavity grime. On gravel the height field IS the aggregate, so
-      // this darkens every interstice: at 0.4 the road histogram was bimodal
-      // (mass at 32-80 and 144-176 with a hollow middle) — dither, not surface.
+      // .w is cavity grime; keep it low to avoid over-darkening every aggregate gap.
       weather: [0.4, 0.04, 0.08, 0.14],
-      // No edge wear on a road. The vertex wear mask exists to rub through the
-      // arris of a prop; on a 100 m plane it just brightens every stone crown.
+      // Disable prop-edge wear: it would brighten every road stone crown.
       wear: [0, 0.5, 0.45, 0],
     },
   },
@@ -133,11 +109,7 @@ export const PALETTE = {
     surface: 'concrete',
     opts: { vertexMasks: true, tint: 0x9d968a, scale: 3.2, detile: 0.6, wear: [0, 0.55, 0.45, 0] },
   },
-  /**
-   * The driving line: tarmac polished bare by tyres and stained with oil. A
-   * clear stop darker than `road_dust`, because a rut the same value as the dust
-   * around it is invisible and the road goes back to being one flat plane.
-   */
+  /** Polished, oil-stained driving line; darker than road_dust so ruts remain visible. */
   road_rut: {
     name: 'asphalt',
     surface: 'concrete',
@@ -165,13 +137,8 @@ export const PALETTE = {
     surface: 'dirt',
     opts: { vertexMasks: true, scale: 1.8, wear: [0, 0.5, 0.45, 0] },
   },
-  /**
-   * The contact fillet swept up against anything standing on the ground (see
-   * Assembler.put / props.dustSkirt). It has to read as the ground's own grit
-   * piled up, so it is the same generator as the road at a slightly darker,
-   * greyer tint, with the grime mask doing the work at the contact line. The
-   * first attempt used `dirt`, which is a stop lighter and carries mud cracks:
-   * every prop got a pale polygonal plate around it.
+  /** Contact grit (Assembler.put / props.dustSkirt) shares the road's gravel
+   * generator, with darker, greyer tint and contact-line grime rather than mud cracks.
    */
   dust_skirt: {
     name: 'gravel',
@@ -185,14 +152,9 @@ export const PALETTE = {
     },
   },
 
-  // ------------------------------------------------------------------ metal --
+  // metal
   metal_rust: { name: 'metal_rust', surface: 'metal', opts: { vertexMasks: true, scale: 1.1 } },
-  /**
-   * Prop-scale rust. A 1.1 m tile wrapped round a 0.6 m oil drum shows one smear
-   * of noise and the drum reads as pink plastic — the same trap as
-   * `concrete_prop` / `wood_prop`. Drums and buckets are eye-level silhouette
-   * breakers in the mid-ground, so they need tiling that resolves at 3 m.
-   */
+  /** Sub-metre rust tiling resolves texture on drums and buckets at eye level. */
   metal_rust_prop: {
     name: 'metal_rust',
     surface: 'metal',
@@ -227,13 +189,9 @@ export const PALETTE = {
     opts: { vertexMasks: true, scale: 2.2 },
   },
 
-  // ---------------------------------------------------------------- organic --
+  // organic
   wood: { name: 'wood', surface: 'wood', opts: { vertexMasks: true, scale: 1.8 } },
-  /**
-   * Prop-scale timber. A 1.8 m grain tile across a 0.5 m crate slat shows one
-   * soft smear; crates, pallets, planks and stall tables need ~0.5 m tiling
-   * before the grain, the saw marks and the dirt in the joints read at all.
-   */
+  /** ~0.5 m timber tiling keeps grain and saw marks visible on crate slats and planks. */
   wood_prop: {
     name: 'wood',
     surface: 'wood',
@@ -284,15 +242,8 @@ export const PALETTE = {
     sheetThickness: 0.002,
     opts: { vertexMasks: true, tint: 0xbcb298, scale: 0.26, three: { side: 2 } },
   },
-  /**
-   * Hessian. The weave has to be fine — a 0.5 m tile turns every sandbag into a
-   * picnic basket, and sandbags are the most-repeated prop in the level.
-   *
-   * The tint is deliberately well under a bright sand value: an emplacement is
-   * dozens of square metres of one material low in the frame, and at the old
-   * value it was the brightest thing in the bottom two thirds of the night shot
-   * with nothing lighting it. Filled hessian is a mid-tone — 0.18-0.24 linear —
-   * darker than the plaster behind it and darker than the dust it sits on.
+  /** Fine hessian weave avoids oversized fibres on repeated sandbags.
+   * Filled hessian is a 0.18-0.24 linear mid-tone, darker than plaster and road dust.
    */
   burlap: {
     name: 'burlap',
@@ -304,16 +255,9 @@ export const PALETTE = {
   glass: { name: 'glass', surface: 'glass', opts: { scale: 2.0 } },
   foliage: { name: 'foliage', surface: 'foliage', opts: { vertexMasks: true } },
 
-  // ------------------------------------------------------------- apertures --
-  /**
-   * The dark core BEHIND a window opening. A window is not a grey rectangle: it
-   * is a hole with a dark room behind it, and the only thing that sells it is a
-   * genuinely dark backing plane set 15-25 cm back from the glass so the reveal
-   * casts onto it and the opening parallaxes as the camera moves. Final linear
-   * albedo lands around 0.03 (the tint is a linear multiply on the baked
-   * plaster albedo), which is the reflectance of an unlit room seen from a
-   * sunlit street — dark, but still carrying plaster texture rather than being
-   * a black hole.
+  // apertures
+  /** Dark plaster backing 15-25 cm behind glass provides reveal shadows and parallax.
+   * Linear albedo is ~0.03 after tint multiplication, retaining texture in unlit rooms.
    */
   window_void: {
     name: 'plaster',
@@ -326,11 +270,7 @@ export const PALETTE = {
       weather: [0.2, 0.7, 0.2, 0.7],
     },
   },
-  /**
-   * The dark shell inside a non-enterable building. Seen through doorways and
-   * blown-out holes as well as windows, so it sits a stop above `window_void`:
-   * dark, readable, never a white blank.
-   */
+  /** Non-enterable interior, a stop above window_void for readable doors and breaches. */
   interior_shell: {
     name: 'plaster',
     surface: 'plaster',
@@ -343,12 +283,7 @@ export const PALETTE = {
       weather: [0.25, 0.8, 0.3, 0.65],
     },
   },
-  /**
-   * Window glass. Distinct from the `glass` used on bottles and shards purely
-   * so the roughness can be forced down: below 0.62 the render's SSR/IBL path
-   * kicks in and the pane picks up the sky, which is what stops a window
-   * reading as taped-over paper.
-   */
+  /** Separate from bottle glass so low roughness and sky reflections remain controllable. */
   window_glass: {
     name: 'glass',
     surface: 'glass',
@@ -373,7 +308,7 @@ export const PALETTE = {
     },
   },
 
-  // ---------------------------------------------------------------- emissive --
+  // emissive
   /** Bare interior bulb. Tiny surface, so it needs real radiance to read. */
   emissive_warm: {
     name: 'plaster',
@@ -384,11 +319,7 @@ export const PALETTE = {
       three: { emissive: 0xffd39a, emissiveIntensity: 12, toneMapped: true },
     },
   },
-  /**
-   * A lit room seen from the street. Much dimmer than `emissive_warm`: this is a
-   * whole wall of a room catching a bulb, not the bulb itself, and at daylight
-   * exposure it only has to lift the opening off the dark-core value.
-   */
+  /** Whole-room glow is dimmer than the bulb; just lift the opening above window_void. */
   window_glow: {
     name: 'plaster',
     surface: 'plaster',
@@ -412,8 +343,8 @@ export const PALETTE = {
   string,
   {
     name: string;
-    surface: string;
-    ballisticSurface?: string;
+    surface: import('../physics/surfaces.ts').SurfaceName;
+    ballisticSurface?: import('../physics/surfaces.ts').SurfaceName;
     sheetThickness?: number;
     opts: Parameters<MaterialSystemNode['get']>[1];
   }

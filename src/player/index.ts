@@ -6,7 +6,7 @@
 
 import * as THREE from 'three';
 
-import type { EngineContext } from '../core/context.ts';
+import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
 import type { PhysicsSystem } from '../physics/index.ts';
@@ -15,6 +15,7 @@ import { HealController } from './heal.ts';
 import { Health } from './health.ts';
 import { LowHealthPass } from './lowhealth.ts';
 import { Movement } from './movement.ts';
+import type { PlayerMoveState } from './movement.ts';
 import { clamp, clamp01, lerp, approach, DEG } from './springs.ts';
 import {
   STANCE,
@@ -26,6 +27,9 @@ import {
   JUMP_SPEED,
   FLASHLIGHT,
 } from './tuning.ts';
+
+/** Presentation adds leaning without inventing a locomotion transition. */
+export type PlayerState = PlayerMoveState | 'lean';
 
 type PlayerMovement = Movement;
 type PlayerHitbox = ReturnType<PhysicsSystem['addCollider']>;
@@ -53,23 +57,40 @@ interface PlayerHudState {
 }
 
 export class PlayerSystem {
-  declare isPlayer: boolean;
   declare movement: PlayerMovement;
   declare rig: CameraRig;
   declare health: Health;
   declare healCtrl: HealController;
-  declare lowHealthPass: LowHealthPass | null;
-  declare hitbox: PlayerHitbox | null;
-  declare _nearMissShots: Float64Array;
-  declare _nearMissCursor: number;
-  declare controlEnabled: boolean;
-  declare adsAmount: number;
-  declare _adsExternal: boolean;
-  declare _adsExternalAge: number;
-  declare adsRequested: boolean;
-  declare _lookFrame: number;
-  declare _prevYaw: number;
-  declare _death: {
+  declare _deathLook: THREE.PerspectiveCamera;
+  declare ctx: PlayerContext;
+  declare physics: PlayerPhysics;
+  declare rng: Rng;
+  declare flashlightOn: boolean;
+  declare flashlight: THREE.SpotLight;
+  declare _unregisterPass: (() => void) | null;
+  declare adsFovScale: number;
+  declare adsSensScale: number;
+
+  static readonly id = 'player';
+  static readonly deps: SystemId[] = ['physics', 'world', 'render'];
+
+  /** Lets `ai` / `physics` recognise the local player from an owner pointer. */
+  isPlayer: boolean = true;
+  lowHealthPass: LowHealthPass | null = null;
+  hitbox: PlayerHitbox | null = null;
+  _nearMissShots: Float64Array = new Float64Array(64);
+  _nearMissCursor: number = 0;
+  controlEnabled: boolean = true;
+  adsAmount: number = 0;
+  _adsExternal: boolean = false;
+  _adsExternalAge: number = 0;
+  adsRequested: boolean = false;
+  _lookFrame: number = -1;
+  // Death camera. The local body is not rendered in first person, so death
+  // hands a corpse to `ai` and then cranes the world camera above it. All
+  // values are retained here so the one-off transition allocates nothing per
+  // frame.
+  _death: {
     active: boolean;
     elapsed: number;
     duration: number;
@@ -80,146 +101,94 @@ export class PlayerSystem {
     endQuaternion: THREE.Quaternion;
     startFov: number;
     endFov: number;
+  } = {
+    active: false,
+    elapsed: 0,
+    duration: 3.2,
+    target: new THREE.Vector3(),
+    startPosition: new THREE.Vector3(),
+    endPosition: new THREE.Vector3(),
+    startQuaternion: new THREE.Quaternion(),
+    endQuaternion: new THREE.Quaternion(),
+    startFov: 0,
+    endFov: 54,
   };
-  declare _deathLook: THREE.PerspectiveCamera;
-  declare _deathUp: THREE.Vector3;
-  declare _statePayload: PlayerEventsMap['player:state'];
-  declare _landPayload: PlayerEventsMap['player:land'] & { position: THREE.Vector3 };
-  declare _stepPayload: PlayerEventsMap['player:footstep'];
-  declare _mantlePayload: PlayerEventsMap['player:mantle'];
-  declare _jumpPayload: PlayerEventsMap['player:jump'];
-  declare _hudState: PlayerHudState;
-  declare _tmp: THREE.Vector3;
-  declare _prev: Required<
+  _deathUp: THREE.Vector3 = new THREE.Vector3(0, 1, 0);
+  // preallocated event payloads
+  _statePayload: PlayerEventsMap['player:state'] = {
+    stance: 'stand',
+    sprinting: false,
+    sliding: false,
+    ads: false,
+    state: 'stand',
+    grounded: true,
+    airborne: false,
+    mantling: false,
+    lean: 0,
+    speed: 0,
+    health: HEALTH.max,
+    healthFraction: 1,
+    crouched: false,
+  };
+  _landPayload: PlayerEventsMap['player:land'] & { position: THREE.Vector3 } = {
+    velocity: 0,
+    surface: 'concrete',
+    position: new THREE.Vector3(),
+  };
+  _stepPayload: PlayerEventsMap['player:footstep'] = {
+    position: new THREE.Vector3(),
+    surface: 'concrete',
+    running: false,
+    left: false,
+    speed: 0,
+    stance: 'stand',
+  };
+  _mantlePayload: PlayerEventsMap['player:mantle'] = { kind: 'none', height: 0 };
+  _jumpPayload: PlayerEventsMap['player:jump'] = { position: new THREE.Vector3() };
+  // Preallocated HUD snapshot polled by `ui` (see getHudState).
+  _hudState: PlayerHudState = {
+    health: HEALTH.max,
+    maxHealth: HEALTH.max,
+    dead: false,
+    armour: 0,
+    maxArmour: HEALTH.maxArmour,
+    bandages: HEALING.startCount,
+    healing: false,
+    healProgress: 0,
+    hurt: 0,
+    pulse: 0,
+    move: 0,
+    sprint: false,
+    crouch: false,
+    ads: false,
+    airborne: false,
+    suppression: 0,
+    position: null,
+  };
+  _tmp: THREE.Vector3 = new THREE.Vector3();
+  /** Last emitted discrete state, compared field-wise so no string is built. */
+  _prev: { state: PlayerState | null; stance: Movement['stance'] | null } & Required<
     Pick<
       PlayerEventsMap['player:state'],
-      | 'state'
-      | 'stance'
-      | 'sprinting'
-      | 'tacticalSprint'
-      | 'sliding'
-      | 'grounded'
-      | 'ads'
-      | 'mantling'
+      'sprinting' | 'tacticalSprint' | 'sliding' | 'grounded' | 'ads' | 'mantling'
     >
-  >;
-  declare _offEvents: Array<() => void>;
-  declare ctx: PlayerContext;
-  declare physics: PlayerPhysics;
-  declare rng: Rng;
-  declare flashlightOn: boolean;
-  declare flashlight: THREE.SpotLight;
-  declare _unregisterPass: (() => void) | null;
-  declare adsFovScale: number;
-  declare adsSensScale: number;
-
-  static id = 'player';
-  static deps = ['physics', 'world', 'render'];
+  > = {
+    state: null,
+    stance: null,
+    sprinting: false,
+    tacticalSprint: false,
+    sliding: false,
+    grounded: true,
+    ads: false,
+    mantling: false,
+  };
+  _offEvents: Array<() => void> = [];
 
   constructor() {
-    /** Lets `ai` / `physics` recognise the local player from an owner pointer. */
-    this.isPlayer = true;
-    this.lowHealthPass = null;
-    this.hitbox = null;
-    this._nearMissShots = new Float64Array(64);
-    this._nearMissCursor = 0;
-
-    this.controlEnabled = true;
-    this.adsAmount = 0;
-    this._adsExternal = false;
-    this._adsExternalAge = 0;
-    this.adsRequested = false;
-
-    this._lookFrame = -1;
-    this._prevYaw = 0;
-
-    // Death camera. The local body is not rendered in first person, so death
-    // hands a corpse to `ai` and then cranes the world camera above it. All
-    // values are retained here so the one-off transition allocates nothing per
-    // frame.
-    this._death = {
-      active: false,
-      elapsed: 0,
-      duration: 3.2,
-      target: new THREE.Vector3(),
-      startPosition: new THREE.Vector3(),
-      endPosition: new THREE.Vector3(),
-      startQuaternion: new THREE.Quaternion(),
-      endQuaternion: new THREE.Quaternion(),
-      startFov: 0,
-      endFov: 54,
-    };
     // A Camera's lookAt uses -Z as forward; a plain Object3D uses +Z and would
     // make the final quaternion face exactly away from the corpse.
     this._deathLook = new THREE.PerspectiveCamera();
-    this._deathUp = new THREE.Vector3(0, 1, 0);
-
-    // preallocated event payloads
-    this._statePayload = {
-      stance: 'stand',
-      sprinting: false,
-      sliding: false,
-      ads: false,
-      state: 'stand',
-      grounded: true,
-      airborne: false,
-      mantling: false,
-      lean: 0,
-      speed: 0,
-      health: HEALTH.max,
-      healthFraction: 1,
-      crouched: false,
-    };
-    this._landPayload = { velocity: 0, surface: 'concrete', position: new THREE.Vector3() };
-    this._stepPayload = {
-      position: new THREE.Vector3(),
-      surface: 'concrete',
-      running: false,
-      left: false,
-      speed: 0,
-      stance: 'stand',
-    };
-    this._mantlePayload = { kind: 'none', height: 0 };
-    this._jumpPayload = { position: new THREE.Vector3() };
-    // Preallocated HUD snapshot polled by `ui` (see getHudState).
-    this._hudState = {
-      health: HEALTH.max,
-      maxHealth: HEALTH.max,
-      dead: false,
-      armour: 0,
-      maxArmour: HEALTH.maxArmour,
-      bandages: HEALING.startCount,
-      healing: false,
-      healProgress: 0,
-      hurt: 0,
-      pulse: 0,
-      move: 0,
-      sprint: false,
-      crouch: false,
-      ads: false,
-      airborne: false,
-      suppression: 0,
-      position: null,
-    };
-
-    this._tmp = new THREE.Vector3();
-    /** Last emitted discrete state, compared field-wise so no string is built. */
-    this._prev = {
-      state: '',
-      stance: '',
-      sprinting: false,
-      tacticalSprint: false,
-      sliding: false,
-      grounded: true,
-      ads: false,
-      mantling: false,
-    };
-    this._offEvents = [];
   }
-
-  /* ==================================================================== */
-  /* init                                                                 */
-  /* ==================================================================== */
 
   async init(ctx: PlayerContext): Promise<void> {
     this.ctx = ctx;
@@ -237,7 +206,6 @@ export class PlayerSystem {
     this.movement.init(this.physics, spawn.feet);
     this.movement.yaw = spawn.yaw;
     this.movement.pitch = 0;
-    this._prevYaw = spawn.yaw;
     this.rig.reset(STANCE.stand.eye);
     this.rig.update(1 / 60, this.movement, this.health);
     this.rig.applyTo(ctx.camera);
@@ -291,11 +259,11 @@ export class PlayerSystem {
     ): void => {
       this._offEvents.push(ctx.events.on(type, fn));
     };
-    on('damage:dealt', (e) => this._onDamageDealt(e));
-    on('explosion', (e) => this._onExplosion(e));
-    on('bullet:segment', (e) => this._onBulletSegment(e));
-    on('player:death', (e) => this._beginDeath(e));
-    on('game:restart', () => this.respawn(0));
+    on('damage:dealt', (e): void => this._onDamageDealt(e));
+    on('explosion', (e): void => this._onExplosion(e));
+    on('bullet:segment', (e): void => this._onBulletSegment(e));
+    on('player:death', (e): void => this._beginDeath(e));
+    on('game:restart', (): void => this.respawn(0));
 
     console.info(
       `[player] spawn ${spawn.feet.x.toFixed(1)}, ${spawn.feet.y.toFixed(2)}, ` +
@@ -317,10 +285,6 @@ export class PlayerSystem {
     out.feet.y = Number.isFinite(gy) ? gy + 0.03 : out.feet.y + 0.2;
     return out;
   }
-
-  /* ==================================================================== */
-  /* look                                                                 */
-  /* ==================================================================== */
 
   /**
    * Mouse/stick look is consumed once per rendered frame. It happens in the
@@ -365,12 +329,7 @@ export class PlayerSystem {
     else if (m.yaw < -Math.PI) m.yaw += Math.PI * 2;
 
     m.yawRate = dt > 1e-5 ? dYaw / dt : 0;
-    this._prevYaw = m.yaw;
   }
-
-  /* ==================================================================== */
-  /* frame                                                                */
-  /* ==================================================================== */
 
   fixedUpdate(h: number, ctx: PlayerContext): void {
     if (!this.movement) return;
@@ -663,7 +622,7 @@ export class PlayerSystem {
       q.ads !== s.ads ||
       q.mantling !== s.mantling
     ) {
-      q.state = s.state;
+      q.state = state;
       q.stance = s.stance;
       q.sprinting = s.sprinting;
       q.tacticalSprint = s.tacticalSprint;
@@ -674,10 +633,6 @@ export class PlayerSystem {
       this.ctx.events.emit('player:state', s);
     }
   }
-
-  /* ==================================================================== */
-  /* incoming damage                                                      */
-  /* ==================================================================== */
 
   _onDamageDealt(e: PlayerEventsMap['damage:dealt']): void {
     if (!e) return;
@@ -746,10 +701,6 @@ export class PlayerSystem {
     this.health.addSuppression(HEALTH.suppression.perNearMiss * (1 - distance / radius));
   }
 
-  /* ==================================================================== */
-  /* public API                                                           */
-  /* ==================================================================== */
-
   /**
    * HUD adapter polled by `ui` every lateUpdate. Shape is fixed by the contract
    * documented at the top of src/ui/index.ts. Preallocated and mutated in place.
@@ -778,94 +729,91 @@ export class PlayerSystem {
     return h;
   }
 
-  get position() {
+  get position(): THREE.Vector3 {
     return this.movement.renderPosition;
   }
-  get feetPosition() {
+  get feetPosition(): THREE.Vector3 {
     return this.movement.position;
   }
-  get eyePosition() {
+  get eyePosition(): THREE.Vector3 {
     return this.rig.eyePosition;
   }
-  get velocity() {
+  get velocity(): THREE.Vector3 {
     return this.movement.velocity;
   }
-  get forward() {
+  get forward(): THREE.Vector3 {
     return this.rig.forward;
   }
-  get yaw() {
+  get yaw(): number {
     return this.movement.yaw;
   }
-  get pitch() {
+  get pitch(): number {
     return this.movement.pitch;
   }
-  get speed() {
+  get speed(): number {
     return this.movement.speed;
   }
-  get horizontalSpeed() {
+  get horizontalSpeed(): number {
     return this.movement.horizontalSpeed;
   }
-  get character() {
+  get character(): import('../physics/character.ts').CharacterController | null {
     return this.movement.character;
   }
-  get state() {
+  get state(): PlayerState | undefined {
     return this._statePayload.state;
   }
-  get stance() {
+  get stance(): 'stand' | 'crouch' | 'prone' {
     return this.movement.stance;
   }
-  get sprinting() {
+  get sprinting(): boolean {
     return this.movement.sprinting;
   }
-  get tacticalSprint() {
+  get tacticalSprint(): boolean {
     return this.movement.tacticalSprint;
   }
-  get sliding() {
+  get sliding(): boolean {
     return this.movement.sliding;
   }
-  get slideProgress() {
+  get slideProgress(): number {
     return this.movement.slideProgress;
   }
-  get grounded() {
+  get grounded(): boolean {
     return this.movement.grounded;
   }
-  get airborne() {
+  get airborne(): boolean {
     return !this.movement.grounded;
   }
-  get mantling() {
+  get mantling(): boolean {
     return this.movement.mantleMotion.active || this.movement.climbMotion.active;
   }
-  get leanAmount() {
+  get leanAmount(): number {
     return this.movement.leanAmount;
   }
-  get eyeHeight() {
+  get eyeHeight(): number {
     return this.rig.eye;
   }
-  get adsProgress() {
+  get adsProgress(): number {
     return this.adsAmount;
   }
-  get viewKick() {
+  get viewKick(): CameraRig['viewKick'] {
     return this.rig.viewKick;
   }
-  get cameraRig() {
-    return this.rig;
-  }
-  get height() {
+  get height(): number {
     return STANCE[this.movement.stance].height;
   }
-  get maxHealth() {
+  get maxHealth(): number {
     return this.health.max;
   }
-  get healthFraction() {
+  get healthFraction(): number {
     return this.health.fraction;
   }
-  get dead() {
+  get dead(): boolean {
     return this.health.dead;
   }
-  get suppression() {
+  get suppression(): number {
     return this.health.suppression;
   }
-  get bobPhase() {
+  get bobPhase(): number {
     return this.rig.bobPhase;
   }
 
@@ -927,7 +875,7 @@ export class PlayerSystem {
   cancelHeal(reason: string): boolean {
     return this.healCtrl?.cancel(reason) ?? false;
   }
-  get bandages() {
+  get bandages(): number {
     return this.healCtrl?.bandages ?? 0;
   }
   addSuppression(a: number): void {
@@ -960,7 +908,6 @@ export class PlayerSystem {
    * THREE.Euler, an object with `.y`, or a yaw in radians.
    */
   teleport(eyeOrPos: THREE.Vector3, rot: THREE.Euler | { x?: number; y?: number } | number): void {
-    if (!eyeOrPos) return;
     const eyeH = STANCE.stand.eye;
     const feetY = eyeOrPos.y - eyeH;
     if (typeof rot === 'number') {
@@ -975,7 +922,7 @@ export class PlayerSystem {
     this.rig.eyePosition.set(eyeOrPos.x, eyeOrPos.y, eyeOrPos.z);
     this.rig.fov = this.ctx.config.fov;
     this._lookFrame = this.ctx.time.frame;
-    this._prev.state = '';
+    this._prev.state = null;
   }
 
   respawn(index = 0): void {
@@ -999,7 +946,13 @@ export class PlayerSystem {
   }
 
   /** Named states for dev overlays and future shots. */
-  debugState(name: string) {
+  debugState(name: string): {
+    state: PlayerState | undefined;
+    stance: 'stand' | 'crouch' | 'prone';
+    speed: number;
+    health: number;
+    ads: number;
+  } {
     const m = this.movement;
     switch (name) {
       case 'sprint':
@@ -1062,7 +1015,17 @@ export class PlayerSystem {
   }
 
   /** Snapshot for the dev HUD / debugging. */
-  get stats() {
+  get stats(): {
+    state: PlayerState | undefined;
+    stance: 'stand' | 'crouch' | 'prone';
+    speed: number;
+    vertical: number;
+    grounded: boolean;
+    lean: number;
+    fov: number;
+    health: number;
+    suppression: number;
+  } {
     const m = this.movement;
     return {
       state: this.state,

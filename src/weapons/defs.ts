@@ -1,29 +1,95 @@
-/**
- * Weapon data.
- *
- * Ballistics are real: 5.56x45 leaves a 14.5" barrel at ~880 m/s, 9x19 from a
- * 4.5" barrel at ~360 m/s, and both drop under gravity on the way to the
- * target. Rates of fire, magazine capacities and ADS times are the real ones
- * too (an M4A1 is 800 rpm and aims down sights in about 220 ms).
- *
- * Every weapon is zeroed at `zeroRange`: the round crosses the sight line
- * there and falls away past it (see `tryFire`), which is the subsonic .300 BLK
- * long before it is the carbines.
- *
- * Recoil is split into the same layers as a modern shooter:
- *   - `pattern`  deterministic vertical/horizontal sightline movement a player
- *                can memorise and counter. Generated once from a fixed seed.
- *   - sightline  every shot adds its pattern amount to the player's look and
- *                holds until countered. ADS/stance brace this layer.
- *   - `spread`   a random cone that grows with sustained fire and shrinks when
- *                aiming, crouched or still. This is the part you cannot learn.
+/** Canonical weapon tuning: ballistics, handling, fire modes and deterministic recoil patterns.
+ * zeroRange is the sight-line crossing; learned sightline recoil is separate from random spread.
  */
 
-export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx'];
-export const PRIMARY_IDS = ['rifle', 'lmg', 'sniper', 'mcx'];
-export const SECONDARY_IDS = ['pistol', 'smg', 'shotgun'];
+export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx'] as const;
+export type WeaponId = (typeof WEAPON_IDS)[number];
+export const PRIMARY_IDS = ['rifle', 'lmg', 'sniper', 'mcx'] as const satisfies readonly WeaponId[];
+export const SECONDARY_IDS = ['pistol', 'smg', 'shotgun'] as const satisfies readonly WeaponId[];
+export type PrimaryWeaponId = (typeof PRIMARY_IDS)[number];
+export type SecondaryWeaponId = (typeof SECONDARY_IDS)[number];
+export type WeaponMode = 'auto' | 'burst' | 'semi';
+export type WeaponClass = 'carbine' | 'smg' | 'pistol' | 'lmg' | 'shotgun' | 'sniper';
+type TuningVector = [number, number, number];
 
-export const WEAPON_DEFS = {
+/** Authored tuning is checked against this contract, not inferred into one. */
+export interface WeaponDef {
+  id: WeaponId;
+  label: string;
+  class: WeaponClass;
+  caliber: string;
+  audio?: string;
+  suppressed?: boolean;
+  rpm: number;
+  modes: [WeaponMode, ...WeaponMode[]];
+  burstCount?: number;
+  burstRpm?: number;
+  burstDelay?: number;
+  boltAction?: boolean;
+  boltTime?: number;
+  action?: 'pump';
+  reloadStyle?: 'tube';
+  magSize: number;
+  reserve: number;
+  pellets?: number;
+  fireAnimationSpeed?: number;
+  muzzleVelocity: number;
+  damage: number;
+  penetration: number;
+  dropoff: number;
+  maxRange: number;
+  dragK: number;
+  zeroRange: number;
+  spreadHip: number;
+  spreadAds: number;
+  spreadPerShot: number;
+  spreadMax: number;
+  spreadDecay: number;
+  recoil: {
+    pitch: number;
+    yaw: number;
+    kickBack: number;
+    kickUp: number;
+    roll: number;
+    punch: number;
+    freq: number;
+    damping: number;
+    adsScale: number;
+    crouchScale: number;
+    patternLength: number;
+    patternSeed: number;
+    climbShape: [number, ...number[]];
+    drift: number;
+  };
+  fireVibe: { amp: number; duration: number; adsScale: number };
+  adsTime: number;
+  adsFovScale?: number;
+  adsSensScale?: number;
+  viewFov: number;
+  drawTime: number;
+  holsterTime: number;
+  hipPos: TuningVector;
+  hipRot: TuningVector;
+  adsCant: TuningVector;
+  eyeRelief: number;
+  sprintPos: TuningVector;
+  sprintRot: TuningVector;
+  lowReadyPos: TuningVector;
+  lowReadyRot: TuningVector;
+  swayScale: number;
+  bobScale: number;
+  magLen?: number;
+  firingShoulderZ?: number;
+  adsFiringShoulderZ?: number;
+  supportShoulderZ?: number;
+}
+
+/** Untrusted DOM/URL/debug input is narrowed once before entering weapon state. */
+export function isWeaponId(value: unknown): value is WeaponId {
+  return typeof value === 'string' && Object.hasOwn(WEAPON_DEFS, value);
+}
+
+export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
   mcx: {
     id: 'mcx',
     label: 'MCX VIRTUS',
@@ -70,9 +136,6 @@ export const WEAPON_DEFS = {
     adsFovScale: 0.28,
     adsSensScale: 0.28,
     viewFov: 0.86,
-    reloadTac: 2.6,
-    reloadEmpty: 3.3,
-    inspectTime: 4,
     drawTime: 0.62,
     holsterTime: 0.4,
     hipPos: [0.118, -0.192, -0.3],
@@ -139,10 +202,7 @@ export const WEAPON_DEFS = {
     fireVibe: { amp: 1, duration: 0.062, adsScale: 0.42 },
     /* --- handling (seconds) --- */
     adsTime: 0.22,
-    viewFov: 0.7, // Selected framing F: 42° weapon FOV, independent of world zoom.
-    reloadTac: 2.1,
-    reloadEmpty: 2.9,
-    inspectTime: 3.2,
+    viewFov: 0.7, // 42° weapon FOV; keep the front post readable without extra world zoom.
     drawTime: 0.62,
     holsterTime: 0.4,
     /* --- pose ---
@@ -151,8 +211,8 @@ export const WEAPON_DEFS = {
     hipPos: [0.118, -0.185, -0.3],
     hipRot: [-0.05, 0.081, -0.135],
     adsCant: [0, 0, 0.004],
-    // Selected framing F: close rear aperture without magnifying the front post excessively.
-    eyeRelief: 0.06,
+    // Bring the eye closer to open the rear aperture; its bore and aim datum stay authored.
+    eyeRelief: 0.03,
     /* Sprint: gun dropped and angled across the body, muzzle down-left.
      * Carried over by the same delta as the hip pose so the blend does not
      * translate the weapon 90 mm sideways on the way into a sprint. */
@@ -168,7 +228,7 @@ export const WEAPON_DEFS = {
     id: 'smg',
     label: 'SIG MPX',
     class: 'smg',
-    audio: 'suppressed',
+    audio: 'mpx',
     suppressed: true,
     caliber: '9x19',
     rpm: 950,
@@ -211,9 +271,6 @@ export const WEAPON_DEFS = {
     fireVibe: { amp: 0.72, duration: 0.048, adsScale: 0.4 },
     adsTime: 0.185,
     viewFov: 0.145, // Large housing without a near-eye tunnel; weapon-only 8.7°.
-    reloadTac: 1.85,
-    reloadEmpty: 2.5,
-    inspectTime: 2.9,
     drawTime: 0.52,
     holsterTime: 0.34,
     // Keep the existing reactive hip pose; the suppressor socket is at its exit.
@@ -281,9 +338,6 @@ export const WEAPON_DEFS = {
     fireVibe: { amp: 0.88, duration: 0.058, adsScale: 0.4 },
     adsTime: 0.32,
     viewFov: 0.48, // Readable RMR window while retaining its existing eye/arm placement.
-    reloadTac: 3.4,
-    reloadEmpty: 4.8,
-    inspectTime: 3.6,
     drawTime: 0.75,
     holsterTime: 0.5,
     // Forward support grip clears the pouch; a less-bladed shoulder keeps
@@ -348,9 +402,6 @@ export const WEAPON_DEFS = {
     adsTime: 0.16,
     viewFov: 0.7, // Larger irons without pulling a two-handed pistol back to the face.
     // Blender clips: magazine/contact beats live in the asset manifest.
-    reloadTac: 2.4,
-    reloadEmpty: 2.7,
-    inspectTime: 3.3,
     drawTime: 0.5,
     holsterTime: 0.4,
     /* A pistol is held out on the arms rather than braced on the shoulder, so
@@ -412,9 +463,6 @@ export const WEAPON_DEFS = {
     fireVibe: { amp: 1.4, duration: 0.078, adsScale: 0.55 },
     adsTime: 0.2,
     viewFov: 0.72, // Modest ghost-ring enlargement; a closer eye worsens the prototype wrist.
-    reloadTac: 0.55,
-    reloadEmpty: 0.95,
-    inspectTime: 3.0,
     drawTime: 0.7,
     holsterTime: 0.45,
     action: 'pump',
@@ -481,9 +529,6 @@ export const WEAPON_DEFS = {
     adsFovScale: 0.25,
     viewFov: 0.72,
     adsSensScale: 0.25,
-    reloadTac: 2.8,
-    reloadEmpty: 3.6,
-    inspectTime: 3.6,
     drawTime: 0.88,
     holsterTime: 0.56,
     hipPos: [0.124, -0.2, -0.34],
@@ -500,15 +545,8 @@ export const WEAPON_DEFS = {
   },
 };
 
-/**
- * Generate the deterministic recoil pattern for a weapon.
- *
- * The shape is what a player learns: a strong vertical climb for the first few
- * shots, then the vertical settles while the muzzle starts to wander sideways
- * in a smooth, repeatable S. Everything comes from one fixed seed so the same
- * weapon always kicks the same way — including in capture mode.
- *
- * @returns {Float32Array} pairs of [pitch, yaw] in radians, length n*2.
+/** Seeded recoil: early vertical climb settles into a repeatable sideways S.
+ * Returns n [pitch, yaw] pairs (n*2 floats) in radians, identical in gameplay and capture mode.
  */
 interface RecoilDefinition {
   recoil: {

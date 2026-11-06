@@ -1,27 +1,12 @@
-/**
- * Static world: triangle soup + binned-SAH BVH.
- *
- * `world` registers meshes through PhysicsSystem.addStatic(); we bake them into
- * world space once, concatenate everything into flat typed arrays, and build a
- * BVH over the result. Nothing here allocates after build() — queries run on
- * preallocated stacks and write into caller-supplied records.
- *
- * Layout
- *   pos      Float32Array, 9 floats per triangle (a.xyz b.xyz c.xyz), world space
- *   nrm      Float32Array, 3 floats per triangle (unit geometric normal)
- *   surface  Uint8Array,   surface enum index per triangle
- *   mask     Uint16Array,  collision layer bits per triangle
- *   object   Int32Array,   owner object id per triangle
- *
- * Nodes
- *   nodeBounds Float32Array, 6 per node
- *   nodeMeta   Int32Array,   2 per node — [leftFirst, count]
- *                            count > 0 : leaf, triIndex[leftFirst .. +count)
- *                            count = 0 : interior, children at leftFirst, +1
+/** Allocation-free queries over a world-space, binned-SAH triangle BVH.
+ * Per triangle: 9 position floats, 3 normal floats, Uint8 surface, Uint16 mask, Int32 owner.
+ * Node bounds have 6 floats; metadata is [leftFirst,count]. Positive count denotes a leaf
+ * over triIndex; zero denotes children at leftFirst and leftFirst+1. Queries borrow scratch.
  */
 
 import * as THREE from 'three';
 
+import { isRecord } from '../core/guards.ts';
 import {
   rayAabb,
   rayTriangle,
@@ -32,6 +17,7 @@ import {
 } from './math.ts';
 import { solidIds } from './solids.ts';
 import { surfaceIndex, guessSurface, LAYER } from './surfaces.ts';
+import type { SurfaceName } from './surfaces.ts';
 
 const BINS = 12;
 const LEAF_SIZE = 6;
@@ -65,7 +51,7 @@ interface BakedMesh {
   uniformSurface: number;
 }
 interface StaticMeshOptions {
-  ballisticSurface?: number | string;
+  ballisticSurface?: number | SurfaceName;
   sheetThickness?: number;
   userData?: unknown;
 }
@@ -97,92 +83,49 @@ interface ContactBuffer {
 }
 
 export class StaticWorld {
-  declare objects: Array<StaticObject | null>;
-  declare _freeIds: number[];
-  declare triCount: number;
-  declare pos: Float32Array;
-  declare nrm: Float32Array;
-  declare surface: Uint8Array;
-  declare mask: Uint16Array;
-  declare object: Int32Array;
-  declare solid: Int32Array;
-  declare triIndex: Uint32Array;
-  declare nodeBounds: Float32Array;
-  declare nodeMeta: Int32Array;
-  declare nodeCount: number;
-  declare maxDepth: number;
-  declare dirty: boolean;
-  declare buildMs: number;
-  declare version: number;
-  declare _cent: Float32Array;
-  declare _taabb: Float32Array;
-  declare _stackNode: Int32Array;
-  declare _stackT: Float32Array;
-  declare _buildStack: Int32Array;
-  declare _cl: ReturnType<typeof makeClosest>;
-  declare _cl2: ReturnType<typeof makeClosest>;
-  declare _cand: Int32Array;
-  declare _candCount: number;
-  declare contacts: ContactBuffer;
-  declare aabb: WorldAabb;
-  declare stats: WorldStats;
-
-  constructor() {
-    this.objects = []; // { id, name, mesh, surface, mask, tris, triCount, alive, aabb }
-    this._freeIds = [];
-
-    this.triCount = 0;
-    this.pos = new Float32Array(0);
-    this.nrm = new Float32Array(0);
-    this.surface = new Uint8Array(0);
-    this.mask = new Uint16Array(0);
-    this.object = new Int32Array(0);
-    this.solid = new Int32Array(0);
-
-    this.triIndex = new Uint32Array(0);
-    this.nodeBounds = new Float32Array(0);
-    this.nodeMeta = new Int32Array(0);
-    this.nodeCount = 0;
-    this.maxDepth = 0;
-
-    this.dirty = false;
-    this.buildMs = 0;
-    this.version = 0;
-
-    // scratch
-    this._cent = new Float32Array(0);
-    this._taabb = new Float32Array(0);
-    this._stackNode = new Int32Array(128);
-    this._stackT = new Float32Array(128);
-    this._buildStack = new Int32Array(3 * 4096);
-    this._cl = makeClosest();
-    this._cl2 = makeClosest();
-    this._cand = new Int32Array(4096);
-    this._candCount = 0;
-
-    // shared contact buffer for overlap queries
-    this.contacts = {
-      count: 0,
-      capacity: 256,
-      nx: new Float32Array(256),
-      ny: new Float32Array(256),
-      nz: new Float32Array(256),
-      px: new Float32Array(256),
-      py: new Float32Array(256),
-      pz: new Float32Array(256),
-      depth: new Float32Array(256),
-      /** Parameter along the query segment where the contact sits, 0..1. */
-      s: new Float32Array(256),
-      tri: new Int32Array(256),
-    };
-
-    this.aabb = { minx: 0, miny: 0, minz: 0, maxx: 0, maxy: 0, maxz: 0 };
-    this.stats = { rayTests: 0, nodeTests: 0, triTests: 0 };
-  }
-
-  /* ---------------------------------------------------------------- */
-  /* Registration                                                      */
-  /* ---------------------------------------------------------------- */
+  objects: Array<StaticObject | null> = []; // { id, name, mesh, surface, mask, tris, triCount, alive, aabb }
+  _freeIds: number[] = [];
+  triCount: number = 0;
+  pos: Float32Array = new Float32Array(0);
+  nrm: Float32Array = new Float32Array(0);
+  surface: Uint8Array = new Uint8Array(0);
+  mask: Uint16Array = new Uint16Array(0);
+  object: Int32Array = new Int32Array(0);
+  solid: Int32Array = new Int32Array(0);
+  triIndex: Uint32Array = new Uint32Array(0);
+  nodeBounds: Float32Array = new Float32Array(0);
+  nodeMeta: Int32Array = new Int32Array(0);
+  nodeCount: number = 0;
+  maxDepth: number = 0;
+  dirty: boolean = false;
+  buildMs: number = 0;
+  version: number = 0;
+  // scratch
+  _cent: Float32Array = new Float32Array(0);
+  _taabb: Float32Array = new Float32Array(0);
+  _stackNode: Int32Array = new Int32Array(128);
+  _stackT: Float32Array = new Float32Array(128);
+  _buildStack: Int32Array = new Int32Array(3 * 4096);
+  _cl: ReturnType<typeof makeClosest> = makeClosest();
+  _cl2: ReturnType<typeof makeClosest> = makeClosest();
+  _cand: Int32Array = new Int32Array(4096);
+  // shared contact buffer for overlap queries
+  contacts: ContactBuffer = {
+    count: 0,
+    capacity: 256,
+    nx: new Float32Array(256),
+    ny: new Float32Array(256),
+    nz: new Float32Array(256),
+    px: new Float32Array(256),
+    py: new Float32Array(256),
+    pz: new Float32Array(256),
+    depth: new Float32Array(256),
+    /** Parameter along the query segment where the contact sits, 0..1. */
+    s: new Float32Array(256),
+    tri: new Int32Array(256),
+  };
+  aabb: WorldAabb = { minx: 0, miny: 0, minz: 0, maxx: 0, maxy: 0, maxz: 0 };
+  stats: WorldStats = { rayTests: 0, nodeTests: 0, triTests: 0 };
 
   /**
    * Bake a mesh (or InstancedMesh) into world-space triangles.
@@ -190,7 +133,7 @@ export class StaticWorld {
    */
   addMesh(
     mesh: THREE.Mesh | THREE.InstancedMesh,
-    surface: number | string,
+    surface: number | SurfaceName | undefined,
     mask = LAYER.STATIC,
     opts: StaticMeshOptions = {}
   ): number {
@@ -198,12 +141,11 @@ export class StaticWorld {
     const baked = bakeMesh(mesh, surface);
     if (!baked || baked.count === 0) return -1;
     const rawMetadata: unknown = mesh.userData;
-    const metadata: Record<string, unknown> =
-      rawMetadata && typeof rawMetadata === 'object'
-        ? (rawMetadata as Record<string, unknown>)
-        : {};
-    const ballisticSurface = opts.ballisticSurface ?? metadata.ballisticSurface;
+    const metadata: Record<string, unknown> = isRecord(rawMetadata) ? rawMetadata : {};
+    const ballisticSurface =
+      opts.ballisticSurface === undefined ? metadata.ballisticSurface : opts.ballisticSurface;
     const sheetThickness = opts.sheetThickness ?? metadata.sheetThickness;
+    const ballisticIndex = ballisticSurface === undefined ? null : surfaceIndex(ballisticSurface);
 
     const id = this._freeIds.length ? this._freeIds.pop()! : this.objects.length;
     const obj = {
@@ -216,10 +158,7 @@ export class StaticWorld {
       tris: baked.pos,
       triCount: baked.count,
       solids: baked.solids,
-      ballisticSurface:
-        typeof ballisticSurface === 'string' || typeof ballisticSurface === 'number'
-          ? surfaceIndex(ballisticSurface, baked.uniformSurface)
-          : null,
+      ballisticSurface: ballisticIndex,
       sheetThickness: typeof sheetThickness === 'number' ? sheetThickness : 0,
       alive: true,
       userData: opts.userData ?? null,
@@ -233,12 +172,12 @@ export class StaticWorld {
   addTriangles(
     positions: Float32Array,
     count: number,
-    surface: number | string,
+    surface: number | SurfaceName,
     mask = LAYER.STATIC,
     name = 'raw'
   ): number {
-    const id = this._freeIds.length ? this._freeIds.pop()! : this.objects.length;
     const s = surfaceIndex(surface);
+    const id = this._freeIds.length ? this._freeIds.pop()! : this.objects.length;
     const surfaces = new Uint8Array(count);
     surfaces.fill(s);
     this.objects[id] = {
@@ -276,10 +215,6 @@ export class StaticWorld {
     }
     return -1;
   }
-
-  /* ---------------------------------------------------------------- */
-  /* Build                                                             */
-  /* ---------------------------------------------------------------- */
 
   build(): void {
     const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
@@ -328,12 +263,8 @@ export class StaticWorld {
     const cent = this._cent;
     const ta = this._taabb;
     const nrm = this.nrm;
-    let gminx = Infinity,
-      gminy = Infinity,
-      gminz = Infinity;
-    let gmaxx = -Infinity,
-      gmaxy = -Infinity,
-      gmaxz = -Infinity;
+    const worldMin = new Float64Array(3).fill(Infinity);
+    const worldMax = new Float64Array(3).fill(-Infinity);
     for (let i = 0; i < total; i++) {
       const p = i * 9;
       const ax = pos[p],
@@ -368,36 +299,23 @@ export class StaticWorld {
       nrm[i * 3 + 1] = ny;
       nrm[i * 3 + 2] = nz;
 
-      const mnx = Math.min(ax, bx, cx),
-        mny = Math.min(ay, by, cy),
-        mnz = Math.min(az, bz, cz);
-      const mxx = Math.max(ax, bx, cx),
-        mxy = Math.max(ay, by, cy),
-        mxz = Math.max(az, bz, cz);
-      const b = i * 6;
-      ta[b] = mnx;
-      ta[b + 1] = mny;
-      ta[b + 2] = mnz;
-      ta[b + 3] = mxx;
-      ta[b + 4] = mxy;
-      ta[b + 5] = mxz;
-      cent[i * 3] = (mnx + mxx) * 0.5;
-      cent[i * 3 + 1] = (mny + mxy) * 0.5;
-      cent[i * 3 + 2] = (mnz + mxz) * 0.5;
+      for (let axis = 0; axis < 3; axis++) {
+        const min = Math.min(pos[p + axis], pos[p + 3 + axis], pos[p + 6 + axis]);
+        const max = Math.max(pos[p + axis], pos[p + 3 + axis], pos[p + 6 + axis]);
+        ta[i * 6 + axis] = min;
+        ta[i * 6 + 3 + axis] = max;
+        cent[i * 3 + axis] = (min + max) * 0.5;
+        if (min < worldMin[axis]) worldMin[axis] = min;
+        if (max > worldMax[axis]) worldMax[axis] = max;
+      }
       this.triIndex[i] = i;
-      if (mnx < gminx) gminx = mnx;
-      if (mny < gminy) gminy = mny;
-      if (mnz < gminz) gminz = mnz;
-      if (mxx > gmaxx) gmaxx = mxx;
-      if (mxy > gmaxy) gmaxy = mxy;
-      if (mxz > gmaxz) gmaxz = mxz;
     }
-    this.aabb.minx = gminx;
-    this.aabb.miny = gminy;
-    this.aabb.minz = gminz;
-    this.aabb.maxx = gmaxx;
-    this.aabb.maxy = gmaxy;
-    this.aabb.maxz = gmaxz;
+    this.aabb.minx = worldMin[0];
+    this.aabb.miny = worldMin[1];
+    this.aabb.minz = worldMin[2];
+    this.aabb.maxx = worldMax[0];
+    this.aabb.maxy = worldMax[1];
+    this.aabb.maxz = worldMax[2];
 
     this._buildNodes(total);
     this.dirty = false;
@@ -443,40 +361,24 @@ export class StaticWorld {
       if (count <= LEAF_SIZE || depth > 60) continue;
 
       const nb = node * 6;
-      // centroid bounds
-      let cminx = Infinity,
-        cminy = Infinity,
-        cminz = Infinity;
-      let cmaxx = -Infinity,
-        cmaxy = -Infinity,
-        cmaxz = -Infinity;
-      for (let i = start; i < start + count; i++) {
-        const t = idx[i] * 3;
-        const x = cent[t],
-          y = cent[t + 1],
-          z = cent[t + 2];
-        if (x < cminx) cminx = x;
-        if (x > cmaxx) cmaxx = x;
-        if (y < cminy) cminy = y;
-        if (y > cmaxy) cmaxy = y;
-        if (z < cminz) cminz = z;
-        if (z > cmaxz) cmaxz = z;
-      }
-      const ex = cmaxx - cminx,
-        ey = cmaxy - cminy,
-        ez = cmaxz - cminz;
+      // Pick the widest centroid axis; strict improvement preserves X/Y/Z ties.
       let axis = 0,
-        extent = ex,
-        cmin = cminx;
-      if (ey > extent) {
-        axis = 1;
-        extent = ey;
-        cmin = cminy;
-      }
-      if (ez > extent) {
-        axis = 2;
-        extent = ez;
-        cmin = cminz;
+        extent = -Infinity,
+        cmin = Infinity;
+      for (let candidate = 0; candidate < 3; candidate++) {
+        let min = Infinity,
+          max = -Infinity;
+        for (let i = start; i < start + count; i++) {
+          const value = cent[idx[i] * 3 + candidate];
+          if (value < min) min = value;
+          if (value > max) max = value;
+        }
+        const size = max - min;
+        if (candidate === 0 || size > extent) {
+          axis = candidate;
+          extent = size;
+          cmin = min;
+        }
       }
       if (extent < 1e-7) continue; // degenerate cluster -> leaf
 
@@ -609,36 +511,20 @@ export class StaticWorld {
   _nodeBoundsFromRange(node: number, start: number, count: number): void {
     const ta = this._taabb;
     const idx = this.triIndex;
-    let mnx = Infinity,
-      mny = Infinity,
-      mnz = Infinity;
-    let mxx = -Infinity,
-      mxy = -Infinity,
-      mxz = -Infinity;
-    for (let i = start; i < start + count; i++) {
-      const b = idx[i] * 6;
-      if (ta[b] < mnx) mnx = ta[b];
-      if (ta[b + 1] < mny) mny = ta[b + 1];
-      if (ta[b + 2] < mnz) mnz = ta[b + 2];
-      if (ta[b + 3] > mxx) mxx = ta[b + 3];
-      if (ta[b + 4] > mxy) mxy = ta[b + 4];
-      if (ta[b + 5] > mxz) mxz = ta[b + 5];
+    // Float32 storage can round a bound inwards; retain the original padding.
+    const padding = 1e-5;
+    for (let axis = 0; axis < 3; axis++) {
+      let min = Infinity,
+        max = -Infinity;
+      for (let i = start; i < start + count; i++) {
+        const b = idx[i] * 6 + axis;
+        if (ta[b] < min) min = ta[b];
+        if (ta[b + 3] > max) max = ta[b + 3];
+      }
+      this.nodeBounds[node * 6 + axis] = min - padding;
+      this.nodeBounds[node * 6 + 3 + axis] = max + padding;
     }
-    // Float32 storage can round a bound inwards; pad by a hair so we never
-    // reject a triangle that actually straddles the plane.
-    const p = 1e-5;
-    const o = node * 6;
-    this.nodeBounds[o] = mnx - p;
-    this.nodeBounds[o + 1] = mny - p;
-    this.nodeBounds[o + 2] = mnz - p;
-    this.nodeBounds[o + 3] = mxx + p;
-    this.nodeBounds[o + 4] = mxy + p;
-    this.nodeBounds[o + 5] = mxz + p;
   }
-
-  /* ---------------------------------------------------------------- */
-  /* Queries                                                           */
-  /* ---------------------------------------------------------------- */
 
   /**
    * Closest-hit ray query. `out` is a hit record (see math.makeHitRecord).
@@ -934,7 +820,6 @@ export class StaticWorld {
     maxz: number,
     mask: number
   ): number {
-    this._candCount = 0;
     if (this.nodeCount === 0) return 0;
     const nb = this.nodeBounds;
     const meta = this.nodeMeta;
@@ -942,15 +827,7 @@ export class StaticWorld {
     const ta = this._taabb;
     const stack = this._stackNode;
     let sp = 0;
-    if (
-      nb[0] > maxx ||
-      nb[3] < minx ||
-      nb[1] > maxy ||
-      nb[4] < miny ||
-      nb[2] > maxz ||
-      nb[5] < minz
-    )
-      return 0;
+    if (!overlapsBounds(nb, 0, minx, miny, minz, maxx, maxy, maxz)) return 0;
     stack[sp++] = 0;
     let n = 0;
     let cand = this._cand;
@@ -963,9 +840,7 @@ export class StaticWorld {
           const tri = idx[i];
           if ((this.mask[tri] & mask) === 0) continue;
           const b = tri * 6;
-          if (ta[b] > maxx || ta[b + 3] < minx) continue;
-          if (ta[b + 1] > maxy || ta[b + 4] < miny) continue;
-          if (ta[b + 2] > maxz || ta[b + 5] < minz) continue;
+          if (!overlapsBounds(ta, b, minx, miny, minz, maxx, maxy, maxz)) continue;
           if (n >= cand.length) {
             const bigger = new Int32Array(cand.length * 2);
             bigger.set(cand);
@@ -976,38 +851,16 @@ export class StaticWorld {
         continue;
       }
       const l = meta[node * 2];
-      const r = l + 1;
-      const lo = l * 6,
-        ro = r * 6;
-      const hitL = !(
-        nb[lo] > maxx ||
-        nb[lo + 3] < minx ||
-        nb[lo + 1] > maxy ||
-        nb[lo + 4] < miny ||
-        nb[lo + 2] > maxz ||
-        nb[lo + 5] < minz
-      );
-      const hitR = !(
-        nb[ro] > maxx ||
-        nb[ro + 3] < minx ||
-        nb[ro + 1] > maxy ||
-        nb[ro + 4] < miny ||
-        nb[ro + 2] > maxz ||
-        nb[ro + 5] < minz
-      );
-      if (hitL) stack[sp++] = l;
-      if (hitR) stack[sp++] = r;
+      for (let child = l; child <= l + 1; child++) {
+        if (overlapsBounds(nb, child * 6, minx, miny, minz, maxx, maxy, maxz)) stack[sp++] = child;
+      }
       if (sp >= stack.length - 2) break; // stack is sized from tree depth; never hit in practice
     }
-    this._candCount = n;
     return n;
   }
 
-  get candidates() {
+  get candidates(): Int32Array<ArrayBufferLike> {
     return this._cand;
-  }
-  get candidateCount() {
-    return this._candCount;
   }
 
   /**
@@ -1136,28 +989,7 @@ export class StaticWorld {
       }
       if (hitT < 0 || hitT >= best) continue;
 
-      // Recover the contact normal at the impact configuration.
-      const ox = dx * hitT,
-        oy = dy * hitT,
-        oz = dz * hitT;
-      segTriangleClosest(
-        p0x + ox,
-        p0y + oy,
-        p0z + oz,
-        p1x + ox,
-        p1y + oy,
-        p1z + oz,
-        ax,
-        ay,
-        az,
-        bx,
-        by,
-        bz,
-        cx,
-        cy,
-        cz,
-        cl
-      );
+      // The accepting iteration already retained the closest points at hitT.
       let nx = cl.ax - cl.bx,
         ny = cl.ay - cl.by,
         nz = cl.az - cl.bz;
@@ -1302,16 +1134,32 @@ export class StaticWorld {
     return k;
   }
 
-  surfaceOf(tri: number): number {
-    return this.surface[tri] ?? 0;
-  }
-
   dispose(): void {
     this.objects.length = 0;
     this.pos = new Float32Array(0);
     this.nodeCount = 0;
     this.triCount = 0;
   }
+}
+
+function overlapsBounds(
+  bounds: Float32Array,
+  offset: number,
+  minx: number,
+  miny: number,
+  minz: number,
+  maxx: number,
+  maxy: number,
+  maxz: number
+): boolean {
+  return !(
+    bounds[offset] > maxx ||
+    bounds[offset + 3] < minx ||
+    bounds[offset + 1] > maxy ||
+    bounds[offset + 4] < miny ||
+    bounds[offset + 2] > maxz ||
+    bounds[offset + 5] < minz
+  );
 }
 
 function surfaceArea(
@@ -1329,10 +1177,6 @@ function surfaceArea(
   return 2 * (dx * dy + dy * dz + dz * dx);
 }
 
-/* ------------------------------------------------------------------ */
-/* Mesh baking                                                         */
-/* ------------------------------------------------------------------ */
-
 /**
  * Flatten a Mesh / InstancedMesh into world-space triangles.
  * Handles indexed and non-indexed geometry, multi-material groups (each group
@@ -1340,7 +1184,7 @@ function surfaceArea(
  */
 export function bakeMesh(
   mesh: THREE.Mesh | THREE.InstancedMesh,
-  surfaceOverride?: number | string
+  surfaceOverride?: number | SurfaceName
 ): BakedMesh | null {
   const geo = mesh.geometry;
   if (!geo || !geo.attributes || !geo.attributes.position) return null;
@@ -1349,8 +1193,8 @@ export function bakeMesh(
   const triPerInstance = ((index ? index.count : posAttr.count) / 3) | 0;
   if (triPerInstance === 0) return null;
 
-  const instancedMesh = mesh as THREE.InstancedMesh;
-  const isInstanced = instancedMesh.isInstancedMesh === true && instancedMesh.count > 0;
+  const instancedMesh = mesh instanceof THREE.InstancedMesh ? mesh : null;
+  const isInstanced = instancedMesh !== null && instancedMesh.count > 0;
   const instances = isInstanced ? mesh.count : 1;
   const total = triPerInstance * instances;
 
@@ -1368,19 +1212,18 @@ export function bakeMesh(
   // Per-group surface resolution.
   const groups = geo.groups && geo.groups.length ? geo.groups : null;
   const baseSurface =
-    surfaceOverride !== undefined && surfaceOverride !== null
+    surfaceOverride !== undefined
       ? surfaceIndex(surfaceOverride)
-      : surfaceIndex(
-          mesh.userData?.surface ?? materialName(mesh.material) ?? mesh.name,
-          guessSurface(mesh.name)
-        );
+      : mesh.userData?.surface !== undefined
+        ? surfaceIndex(mesh.userData.surface)
+        : materialSurface(mesh.material, guessSurface(mesh.name));
   const groupSurface = groups
-    ? groups.map((g, gi) => {
-        if (surfaceOverride !== undefined && surfaceOverride !== null) return baseSurface;
+    ? groups.map((g, gi): number => {
+        if (surfaceOverride !== undefined) return baseSurface;
         const mat = Array.isArray(mesh.material)
           ? mesh.material[g.materialIndex ?? gi]
           : mesh.material;
-        return surfaceIndex(mat?.userData?.surface ?? mat?.name ?? mesh.name, baseSurface);
+        return materialSurface(mat, baseSurface);
       })
     : null;
 
@@ -1390,7 +1233,7 @@ export function bakeMesh(
 
   for (let inst = 0; inst < instances; inst++) {
     if (isInstanced) {
-      instancedMesh.getMatrixAt(inst, _m4);
+      instancedMesh!.getMatrixAt(inst, _m4);
       _m4.premultiply(mesh.matrixWorld);
     } else {
       _m4.copy(mesh.matrixWorld);
@@ -1449,9 +1292,12 @@ export function bakeMesh(
   return { pos: out, count: w, surfaces, solids, uniformSurface: baseSurface };
 }
 
-function materialName(m: THREE.Material | THREE.Material[] | null | undefined): string | null {
-  if (!m) return null;
-  if (Array.isArray(m)) return m[0]?.name ?? null;
-  const surface: unknown = m.userData?.surface;
-  return typeof surface === 'string' ? surface : (m.name ?? null);
+/** Metadata is explicit even without geometry groups; only native names are inferred. */
+function materialSurface(
+  materials: THREE.Material | THREE.Material[] | null | undefined,
+  fallback: number
+): number {
+  const material = Array.isArray(materials) ? materials[0] : materials;
+  const explicit: unknown = material?.userData?.surface;
+  return explicit === undefined ? guessSurface(material?.name, fallback) : surfaceIndex(explicit);
 }
