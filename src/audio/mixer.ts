@@ -1,31 +1,13 @@
-/**
- * AUDIO / MIXER
- *
- * The signal path, top down:
- *
- *   voices ──► bus (weapons | foley | ambience | voice | ui | music)
- *                │           optional compressor for foley / ambience / voice
- *                │           one category gain (balance × volume × duck)
- *                ▼
- *   ┌── worldSum ─┬─► dry weight ─────────┬─► hearing gain ─┐
- *   │      ▲      └─► LP / shelf / wet ───┘                 │
- *   │   reverb returns        (complementary hearing fade)  ▼
- *   │      ▲                         masterSum ─► energy / peak gain ─► volume
- *   │   convolver x5 (space blend)           ▲
- *   │      ▲                                 │
- *   └── reverbSend ◄─ per-voice send    ui bus + tinnitus (bypass the muffle,
- *                                        so HUD and the ring stay audible)
- *
- * Ducking is a manual sidechain: gunfire pushes `ambience`/`foley` down with a
- * fast setTargetAtTime and lets them float back over ~400 ms. The audible
- * post-compressor level changes without altering compressor drive or forgetting
- * the user's volume setting.
+/** Voices feed category buses, world dry/reverb sums, hearing gain, then master limiting/volume.
+ * UI and tinnitus bypass hearing muffling. Reverb sends are per voice with five blended spaces.
+ * Gunfire sidechains post-compressor category gain, preserving compressor drive and user volume.
  */
 
+import { hasOwn } from '../core/guards.ts';
 import type { Rng } from '../core/rng.ts';
 import { biquad, gain, clamp, osc } from './dsp.ts';
 import { IR_SPECS, generateIR, type SpaceName } from './ir.ts';
-type BusName = keyof typeof BUS_DEFS;
+export type BusName = keyof typeof BUS_DEFS;
 interface MixerBus {
   input: AudioNode;
   level: GainNode;
@@ -55,12 +37,12 @@ interface PendingConcussion {
 const TINNITUS_GAIN = 0.008;
 const HEARING_SETTLE_SECONDS = 0.03;
 
-// Anchor the rendered current value explicitly before replacing a target/ramp.
-// Native automation tests catch discontinuities when hold alone is followed by
-// a new ramp without a value event at its start.
+// All callers replace hearing automation at the current audio time. Sample
+// before cancelling, then anchor the new envelope to avoid jumping back to an
+// old target. No future-time hold or value-curve cancellation is needed here.
 function holdHearingParam(param: AudioParam, time: number): void {
   const value = param.value;
-  param.cancelAndHoldAtTime(time);
+  param.cancelScheduledValues(time);
   param.setValueAtTime(value, time);
 }
 const CONCUSSION_CUTOFF_RATIO = 0.075; // full concussion bottoms out at 1.5 kHz
@@ -83,7 +65,7 @@ const BUS_DEFS = {
   ui: { trim: 0.45, comp: null },
   music: { trim: 0.6, comp: null },
 };
-const BUS_NAMES = Object.keys(BUS_DEFS) as BusName[];
+const BUS_NAMES = Object.keys(BUS_DEFS).filter((name): name is BusName => hasOwn(BUS_DEFS, name));
 const preparedContexts = new WeakMap<BaseAudioContext, Promise<void>>();
 
 export class Mixer {
@@ -103,20 +85,13 @@ export class Mixer {
   reverbSend!: GainNode;
   sendHP!: BiquadFilterNode;
   sendLP!: BiquadFilterNode;
-  spaces!: Partial<Record<SpaceName, ReverbSpace>>;
   spaceNames!: SpaceName[];
   reverbReturn!: GainNode;
-  _irReady!: boolean;
-  spaceWeights!: Record<SpaceName, number>;
-  _tin!: TinnitusVoice | null;
-  _pendingConcussion!: PendingConcussion | null;
-  _concussionAttackUntil!: number;
-  deafness!: number;
   /** Load the local audio-thread processor once per context; no silent fallback. */
   static prepare(actx: BaseAudioContext): Promise<void> {
     let ready = preparedContexts.get(actx);
     if (!ready) {
-      ready = import('./energy-worklet.ts?worker&url').then(({ default: url }) =>
+      ready = import('./energy-worklet.ts?worker&url').then(({ default: url }): Promise<void> =>
         actx.audioWorklet.addModule(url)
       );
       preparedContexts.set(actx, ready);
@@ -128,6 +103,21 @@ export class Mixer {
    * @param {BaseAudioContext} actx
    * @param {import('../core/rng.ts').Rng} rng
    */
+  spaces: Partial<Record<SpaceName, ReverbSpace>> = {};
+  _irReady: boolean = false;
+  spaceWeights: Record<SpaceName, number> = {
+    tight: 0,
+    room: 0,
+    street: 0.35,
+    tunnel: 0,
+    open: 0.65,
+  };
+  /* ---- tinnitus (built on demand, torn down when silent) -------- */
+  _tin: TinnitusVoice | null = null;
+  _pendingConcussion: PendingConcussion | null = null;
+  _concussionAttackUntil: number = 0;
+  deafness: number = 0; // 0..1, public: UI/render may read this
+
   constructor(actx: BaseAudioContext, rng: Rng, opts: { masterVolume?: number } = {}) {
     this.actx = actx;
     this.rng = rng;
@@ -172,8 +162,7 @@ export class Mixer {
     this.muffleGain.connect(this.masterSum);
 
     /* ---- buses ---------------------------------------------------- */
-    this.buses = {} as Record<BusName, MixerBus>;
-    for (const name of BUS_NAMES) {
+    const createBus = (name: BusName): MixerBus => {
       const def = BUS_DEFS[name];
       const level = gain(actx, def.trim);
       let comp: DynamicsCompressorNode | null = null;
@@ -190,7 +179,7 @@ export class Mixer {
       // Keep category volume/balance out of the compressor detector. Ducking
       // now controls the audible post-compressor level too, not its drive.
       level.connect(name === 'ui' || name === 'music' ? this.masterSum : this.worldSum);
-      this.buses[name] = {
+      return {
         input: comp ?? level,
         level,
         send: gain(actx, def.trim),
@@ -199,7 +188,15 @@ export class Mixer {
         volume: 1,
         duckAmount: 0,
       };
-    }
+    };
+    this.buses = {
+      weapons: createBus('weapons'),
+      foley: createBus('foley'),
+      ambience: createBus('ambience'),
+      voice: createBus('voice'),
+      ui: createBus('ui'),
+      music: createBus('music'),
+    };
 
     /* ---- reverb ---------------------------------------------------- */
     // One send bus fanning into five convolvers; the space probe crossfades
@@ -216,23 +213,15 @@ export class Mixer {
     this.reverbSend.connect(this.sendHP);
     this.sendHP.connect(this.sendLP);
 
-    this.spaces = {};
-    this.spaceNames = Object.keys(IR_SPECS) as SpaceName[];
+    this.spaceNames = Object.keys(IR_SPECS).filter((name): name is SpaceName =>
+      hasOwn(IR_SPECS, name)
+    );
     // Wet return. The send chain already scales with distance and the IRs are
     // peak-normalised to 0.42. The real firearm recordings already contain
     // their outdoor decay, so this return only establishes the local space;
     // it must never lay a second, warehouse-sized tail over every report.
     this.reverbReturn = gain(actx, 0.26);
     this.reverbReturn.connect(this.worldSum);
-    this._irReady = false;
-
-    this.spaceWeights = { tight: 0, room: 0, street: 0.35, tunnel: 0, open: 0.65 };
-
-    /* ---- tinnitus (built on demand, torn down when silent) -------- */
-    this._tin = null;
-    this._pendingConcussion = null;
-    this._concussionAttackUntil = 0;
-    this.deafness = 0; // 0..1, public: UI/render may read this
   }
 
   /**
@@ -295,13 +284,13 @@ export class Mixer {
   }
 
   /** Bus input node a voice should connect to. */
-  bus(name: string): AudioNode {
-    return (this.buses[name as BusName] ?? this.buses.foley).input;
+  bus(name: BusName): AudioNode {
+    return this.buses[name].input;
   }
 
   /** Category-controlled input to the shared room field. */
-  sendBus(name: string): AudioNode {
-    return (this.buses[name as BusName] ?? this.buses.foley).send;
+  sendBus(name: BusName): AudioNode {
+    return this.buses[name].send;
   }
 
   /**
@@ -428,7 +417,7 @@ export class Mixer {
     // Native time and source completion, not a future gameplay frame, own cleanup.
     tin.nodes[0].addEventListener(
       'ended',
-      () => {
+      (): void => {
         for (const node of tin.nodes) node.disconnect();
         tin.g.disconnect();
       },
@@ -503,8 +492,9 @@ export class Mixer {
     this.masterGain.gain.setTargetAtTime(this.masterVolume, this.actx.currentTime, 0.03);
   }
 
-  setBusVolume(name: string, v: number): void {
-    const b = this.buses[name as BusName];
+  setBusVolume(name: BusName, v: number): void {
+    if (!hasOwn(this.buses, name)) return;
+    const b = this.buses[name];
     if (!b) return;
     b.volume = clamp(v, 0, 2);
     this._setBusLevel(b, 0.05);
@@ -532,16 +522,14 @@ export class Mixer {
       this._tin.g.disconnect();
       this._tin = null;
     }
-    for (const name of Object.keys(this.spaces) as SpaceName[]) {
-      const space = this.spaces[name];
+    for (const space of Object.values(this.spaces)) {
       if (!space) continue;
       space.conv.disconnect();
       space.conv.buffer = null;
       space.gain.disconnect();
     }
     this.spaces = {};
-    for (const name of Object.keys(this.buses) as BusName[]) {
-      const b = this.buses[name];
+    for (const b of Object.values(this.buses)) {
       b.level.disconnect();
       b.send.disconnect();
       b.comp?.disconnect();

@@ -1,23 +1,8 @@
 import * as THREE from 'three';
 
-/**
- * Where the sun and moon actually are.
- *
- * Standard spherical astronomy: declination from the day of year, hour angle
- * from local solar time, then the altitude/azimuth transform for the site
- * latitude. Nothing is hand-placed, so the shots that matter come out of one
- * consistent sky rather than three separate art passes.
- *
- * Site and date are chosen so the graded times land where the shot list says
- * they should (lat 45N, summer solstice, sunset at 19.71):
- *
- *   16.50  sun +32.0 deg, azimuth 272 (due west)   — hard afternoon key
- *   19.20  sun  +4.6 deg, azimuth 299 (WNW)        — golden hour, disc in frame
- *   01.50  sun -18.6 deg                           — full night
- *          moon +21.7 deg, azimuth 288 (W)         — half-lit, in frame
- *
- * Azimuth convention: 0 = north = -Z, 90 = east = +X. `northAngle` rotates the
- * whole celestial sphere for art direction without touching the astronomy.
+/** Solar/lunar altitude and azimuth derive from site latitude, date and local solar hour.
+ * Azimuth: north=-Z at 0 degrees, east=+X at 90 degrees; northAngle rotates art direction.
+ * The authored 45N solstice site places sunset near 19.71 solar hours.
  */
 
 export const SITE = {
@@ -25,15 +10,8 @@ export const SITE = {
   dayOfYear: 172, // summer solstice
   /** Rotates north in world space. 0 keeps north at -Z. */
   northAngleDeg: 0,
-  /**
-   * Moon hour angle offset from the sun, degrees, and lunar declination.
-   *
-   * 244 / +28 (the moon's real declination limit) puts the moon at altitude 22 /
-   * azimuth 288 at 01:30, which is INSIDE the night shot's frustum — the old
-   * 216.8 / +12 put it at azimuth 250, twenty degrees off the left edge, so the
-   * one frame that exists to show a moonlit street had no moon in it. At this
-   * declination it is also 58% illuminated, so the terminator reads and the disc
-   * is a sphere rather than a flat white dot.
+  /** Moon hour-angle offset and declination in degrees. 244 / +28 places the moon
+   * at altitude 22 / azimuth 288 in the 01:30 capture, with a visible terminator.
    */
   moonHourOffsetDeg: 244.0,
   moonDeclinationDeg: 28.0,
@@ -105,32 +83,22 @@ export function dirFromAltAz(
  */
 export class Celestial {
   site: CelestialSite;
-  sun: THREE.Vector3;
-  moon: THREE.Vector3;
-  sunAlt: number;
-  sunAz: number;
-  moonAlt: number;
-  moonAz: number;
-  moonPhase: number;
-  moonElongation: number;
-  _aa: AltAzResult;
-  _m: THREE.Matrix4;
-  _tilt: THREE.Matrix4;
+  sun: THREE.Vector3 = new THREE.Vector3(0, 1, 0);
+  moon: THREE.Vector3 = new THREE.Vector3(0, -1, 0);
+  sunAlt: number = 0;
+  sunAz: number = 0;
+  moonAlt: number = 0;
+  moonAz: number = 0;
+  /** Illuminated fraction of the lunar disc, 0..1. */
+  moonPhase: number = 1;
+  /** Angular separation sun-moon; drives the terminator on the disc. */
+  moonElongation: number = Math.PI;
+  _aa: AltAzResult = { alt: 0, az: 0 };
+  _m: THREE.Matrix4 = new THREE.Matrix4();
+  _tilt: THREE.Matrix4 = new THREE.Matrix4();
+
   constructor(site: CelestialSite = SITE) {
     this.site = { ...site };
-    this.sun = new THREE.Vector3(0, 1, 0);
-    this.moon = new THREE.Vector3(0, -1, 0);
-    this.sunAlt = 0;
-    this.sunAz = 0;
-    this.moonAlt = 0;
-    this.moonAz = 0;
-    /** Illuminated fraction of the lunar disc, 0..1. */
-    this.moonPhase = 1;
-    /** Angular separation sun-moon; drives the terminator on the disc. */
-    this.moonElongation = Math.PI;
-    this._aa = { alt: 0, az: 0 };
-    this._m = new THREE.Matrix4();
-    this._tilt = new THREE.Matrix4();
   }
 
   setHour(hour: number): this {

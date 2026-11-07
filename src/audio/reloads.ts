@@ -1,114 +1,30 @@
 import type { ReloadPhase } from '../core/events.ts';
+import { recordingUrls } from './recordings.ts';
 
 /** Recorded donors and crop/layer provenance live in samples/reloads/provenance.json. */
 export const RELOAD_URLS = {
-  'ar-out': [
-    new URL('./samples/reloads/ar-out-1.opus', import.meta.url).href,
-    new URL('./samples/reloads/ar-out-2.opus', import.meta.url).href,
-    new URL('./samples/reloads/ar-out-3.opus', import.meta.url).href,
-  ],
-  'ar-in': [
-    new URL('./samples/reloads/ar-in-1.opus', import.meta.url).href,
-    new URL('./samples/reloads/ar-in-2.opus', import.meta.url).href,
-    new URL('./samples/reloads/ar-in-3.opus', import.meta.url).href,
-  ],
-  'ar-charge': [
-    new URL('./samples/reloads/ar-charge-1.opus', import.meta.url).href,
-    new URL('./samples/reloads/ar-charge-2.opus', import.meta.url).href,
-  ],
-  'ar-close': [
-    new URL('./samples/reloads/ar-close-1.opus', import.meta.url).href,
-    new URL('./samples/reloads/ar-close-2.opus', import.meta.url).href,
-    new URL('./samples/reloads/ar-close-3.opus', import.meta.url).href,
-  ],
-  'pistol-out': [
-    new URL('./samples/reloads/pistol-out-1.opus', import.meta.url).href,
-    new URL('./samples/reloads/pistol-out-2.opus', import.meta.url).href,
-    new URL('./samples/reloads/pistol-out-3.opus', import.meta.url).href,
-  ],
-  'pistol-in': [
-    new URL('./samples/reloads/pistol-in-1.opus', import.meta.url).href,
-    new URL('./samples/reloads/pistol-in-2.opus', import.meta.url).href,
-    new URL('./samples/reloads/pistol-in-3.opus', import.meta.url).href,
-  ],
-  'pistol-close': [
-    new URL('./samples/reloads/pistol-close-1.opus', import.meta.url).href,
-    new URL('./samples/reloads/pistol-close-2.opus', import.meta.url).href,
-    new URL('./samples/reloads/pistol-close-3.opus', import.meta.url).href,
-  ],
-  'smg-out': [
-    new URL('./samples/reloads/smg-out-1.opus', import.meta.url).href,
-    new URL('./samples/reloads/smg-out-2.opus', import.meta.url).href,
-    new URL('./samples/reloads/smg-out-3.opus', import.meta.url).href,
-  ],
-  'smg-in': [
-    new URL('./samples/reloads/smg-in-1.opus', import.meta.url).href,
-    new URL('./samples/reloads/smg-in-2.opus', import.meta.url).href,
-    new URL('./samples/reloads/smg-in-3.opus', import.meta.url).href,
-  ],
-  'smg-close': [
-    new URL('./samples/reloads/smg-close-1.opus', import.meta.url).href,
-    new URL('./samples/reloads/smg-close-2.opus', import.meta.url).href,
-    new URL('./samples/reloads/smg-close-3.opus', import.meta.url).href,
-  ],
-  'sniper-out': [
-    new URL('./samples/reloads/sniper-out-1.opus', import.meta.url).href,
-    new URL('./samples/reloads/sniper-out-2.opus', import.meta.url).href,
-    new URL('./samples/reloads/sniper-out-3.opus', import.meta.url).href,
-  ],
-  'sniper-in': [
-    new URL('./samples/reloads/sniper-in-1.opus', import.meta.url).href,
-    new URL('./samples/reloads/sniper-in-2.opus', import.meta.url).href,
-    new URL('./samples/reloads/sniper-in-3.opus', import.meta.url).href,
-  ],
-  'bolt-open': [
-    new URL('./samples/reloads/bolt-open-1.opus', import.meta.url).href,
-    new URL('./samples/reloads/bolt-open-2.opus', import.meta.url).href,
-    new URL('./samples/reloads/bolt-open-3.opus', import.meta.url).href,
-  ],
-  'bolt-close': [
-    new URL('./samples/reloads/bolt-close-1.opus', import.meta.url).href,
-    new URL('./samples/reloads/bolt-close-2.opus', import.meta.url).href,
-    new URL('./samples/reloads/bolt-close-3.opus', import.meta.url).href,
-  ],
-  'bolt-charge': [
-    new URL('./samples/reloads/bolt-charge-1.opus', import.meta.url).href,
-    new URL('./samples/reloads/bolt-charge-2.opus', import.meta.url).href,
-  ],
-  pump: [
-    new URL('./samples/reloads/pump-1.opus', import.meta.url).href,
-    new URL('./samples/reloads/pump-2.opus', import.meta.url).href,
-    new URL('./samples/reloads/pump-3.opus', import.meta.url).href,
-  ],
-  'pump-open': [
-    new URL('./samples/reloads/pump-open-1.opus', import.meta.url).href,
-    new URL('./samples/reloads/pump-open-2.opus', import.meta.url).href,
-  ],
-  'pump-close': [
-    new URL('./samples/reloads/pump-close-1.opus', import.meta.url).href,
-    new URL('./samples/reloads/pump-close-2.opus', import.meta.url).href,
-    new URL('./samples/reloads/pump-close-3.opus', import.meta.url).href,
-  ],
-  'shell-in': [
-    new URL('./samples/reloads/shell-in-1.opus', import.meta.url).href,
-    new URL('./samples/reloads/shell-in-2.opus', import.meta.url).href,
-    new URL('./samples/reloads/shell-in-3.opus', import.meta.url).href,
-  ],
-  gear: [
-    new URL('./samples/reloads/gear-1.opus', import.meta.url).href,
-    new URL('./samples/reloads/gear-2.opus', import.meta.url).href,
-    new URL('./samples/reloads/gear-3.opus', import.meta.url).href,
-  ],
-  'pouch-out': [
-    new URL('./samples/reloads/pouch-out-1.opus', import.meta.url).href,
-    new URL('./samples/reloads/pouch-out-2.opus', import.meta.url).href,
-    new URL('./samples/reloads/pouch-out-3.opus', import.meta.url).href,
-  ],
-  'pouch-in': [
-    new URL('./samples/reloads/pouch-in-1.opus', import.meta.url).href,
-    new URL('./samples/reloads/pouch-in-2.opus', import.meta.url).href,
-    new URL('./samples/reloads/pouch-in-3.opus', import.meta.url).href,
-  ],
+  'ar-out': recordingUrls('reloads/ar-out', 3),
+  'ar-in': recordingUrls('reloads/ar-in', 3),
+  'ar-charge': recordingUrls('reloads/ar-charge', 2),
+  'ar-close': recordingUrls('reloads/ar-close', 3),
+  'pistol-out': recordingUrls('reloads/pistol-out', 3),
+  'pistol-in': recordingUrls('reloads/pistol-in', 3),
+  'pistol-close': recordingUrls('reloads/pistol-close', 3),
+  'smg-out': recordingUrls('reloads/smg-out', 3),
+  'smg-in': recordingUrls('reloads/smg-in', 3),
+  'smg-close': recordingUrls('reloads/smg-close', 3),
+  'sniper-out': recordingUrls('reloads/sniper-out', 3),
+  'sniper-in': recordingUrls('reloads/sniper-in', 3),
+  'bolt-open': recordingUrls('reloads/bolt-open', 3),
+  'bolt-close': recordingUrls('reloads/bolt-close', 3),
+  'bolt-charge': recordingUrls('reloads/bolt-charge', 2),
+  pump: recordingUrls('reloads/pump', 3),
+  'pump-open': recordingUrls('reloads/pump-open', 2),
+  'pump-close': recordingUrls('reloads/pump-close', 3),
+  'shell-in': recordingUrls('reloads/shell-in', 3),
+  gear: recordingUrls('reloads/gear', 3),
+  'pouch-out': recordingUrls('reloads/pouch-out', 3),
+  'pouch-in': recordingUrls('reloads/pouch-in', 3),
 } as const;
 export type ReloadKind = keyof typeof RELOAD_URLS;
 

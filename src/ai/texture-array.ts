@@ -8,6 +8,8 @@ import {
 } from 'three/webgpu';
 import type { Texture } from 'three/webgpu';
 
+import { isImageBitmap } from '../core/guards.ts';
+
 /** Pack the equal-sized soldier bakes without resampling or atlas edge bleeding. */
 export function soldierTextureArray(
   maps: readonly (Texture | null)[],
@@ -15,8 +17,9 @@ export function soldierTextureArray(
   srgb: boolean,
   anisotropy: number
 ): DataArrayTexture {
-  const first = maps.find((map) => map !== null)?.image as ImageBitmap;
-  if (!first?.width || !first.height) throw new Error('[ai] missing soldier texture array images');
+  const first = maps.find((map): map is Texture => map !== null)?.image;
+  if (!isImageBitmap(first) || !first.width || !first.height)
+    throw new Error('[ai] missing soldier texture array images');
   const { width, height } = first;
   const canvas = new OffscreenCanvas(width, height);
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -24,8 +27,9 @@ export function soldierTextureArray(
   const stride = width * height * 4;
   const pixels = new Uint8Array(stride * maps.length);
   for (let layer = 0; layer < maps.length; layer++) {
-    const image = maps[layer]?.image as ImageBitmap | undefined;
+    const image = maps[layer]?.image;
     if (image) {
+      if (!isImageBitmap(image)) throw new Error('[ai] invalid soldier texture image');
       if (image.width !== width || image.height !== height)
         throw new Error('[ai] soldier texture array layers must have matching dimensions');
       ctx.clearRect(0, 0, width, height);

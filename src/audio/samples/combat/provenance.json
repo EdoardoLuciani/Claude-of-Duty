@@ -1,0 +1,860 @@
+{
+  "format": "mono 48000 Hz Opus, 96 kbps VBR, zero header gain",
+  "rights": "Owner requested the selected professional-library replacements in a public PR in this implementation session. Original masters remain private; retain applicable library entitlement/licence records. Edited media do not inherit the code licence. Review mixes stay local and are not uploaded to the PR.",
+  "design": "Owner-selected Blastwave pass-bys 54507 through 54511 only (54504-54506 rejected at audition), material-dependent generic casing drops, family-matched dry-fire donors, isolated cloth throw movements. No synthesized layers or pitch variants. Sand donors stand in for dry earth; carpet for fabric/rubber; concrete for glass/plaster. Casings are not calibre-specific or verified 12-gauge hull recordings. Dry donors are M16, AK47, Glock45, MP5, Remington700 and Pumpgun, not claimed exact recordings of the in-game models. The rejected generic-metal pin donor is removed; pin audio is intentionally silent pending an approved suitable recording. Only these combat-foley paths change; voices, reports, other UI tones, explosions and master safety remain separate. The synthetic grenade cook-warning cue is removed at owner request.",
+  "processing": "Decode to mono arithmetic mean, resample 48 kHz, high-pass/low-pass per crop; trim to 5 ms before first 5 ms RMS block exceeding max(-70 dBFS, 4% of peak block RMS), retain the authored crop/tail. 1 ms linear entrance and 10 ms linear exit fades. Scale maximum sliding-window RMS to the listed target subject to -3 dBFS sample-peak headroom. No compression or limiting. Output hashes bind actual Opus files.",
+  "sources": {
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropCement_BW_99.wav": {
+      "sha256": "29769c54502dde7e49e127ac30c538c5f8ce304fd2e341aaf14edf89a630dbfc",
+      "channels": 2,
+      "description": "Bullet Shell, .223 Caliber, Drop On Cement"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropCement_BW_44.wav": {
+      "sha256": "caa8f53efd9943eec10b4bc58c798476ccb94c7b85e0b5eecb1c64d69108e21e",
+      "channels": 2,
+      "description": "Bullet Shell, 9mm, Drop On Cement"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropCement_BW_98.wav": {
+      "sha256": "9792f14e81afaf6f1dc39a252a4dfdc915f9f0236b78dda43d3110ba0d6a0c08",
+      "channels": 2,
+      "description": "Bullet Shell, .44 Magnum, Drop On Cement"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropMetal_BW._10.wav": {
+      "sha256": "902dccdc58902d70124a498bbcecbeb225f23e254f9556328dda88e9bf8becac",
+      "channels": 2,
+      "description": "Bullet Shell, .40 Caliber, Drop On Metal"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropMetal_BW._12.wav": {
+      "sha256": "71f105b6933f71df93da78896b531f494557f4419d62f3ec3a0e6546a7025401",
+      "channels": 2,
+      "description": "Bullet Shell, 9mm, Drop On Metal"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropMetal_BW._13.wav": {
+      "sha256": "31f810131d42a83b80b63ffb3cf7faf7d0175bb9fd136d6fcd97c5883987172e",
+      "channels": 2,
+      "description": "Bullet Shell, .223 Caliber, Drop On Metal"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropWood_BW.5476.wav": {
+      "sha256": "775ea3a6820d61241c49e110027373cb750b60de996998dc9c8f25492680d6be",
+      "channels": 2,
+      "description": "Bullet Shell, 30-30 Caliber, Drop On Wood"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropWood_BW.5477.wav": {
+      "sha256": "c7f10965751d6c31bda4c3cf7a37145481b4b16a8dc6ae008afa8da5c784f640",
+      "channels": 2,
+      "description": "Bullet Shell, 38 Special, Drop On Wood"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropWood_BW.5474.wav": {
+      "sha256": "b1aba5c4cc0cfe55e46e0d50cc8a5affe433eb8650bdd632cfda159706e9ffa6",
+      "channels": 2,
+      "description": "Bullet Shell, .45 Caliber, Drop On Hollow Wood"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropSand_BW.5456.wav": {
+      "sha256": "ea789522f53e39f09f6cfeb170c611453488347b4b3be50e575f3fa2d5b988eb",
+      "channels": 2,
+      "description": "Bullet Shell, .223 Caliber, Drop On Sand"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropSand_BW.5474.wav": {
+      "sha256": "1fd28c29d2e774bd5eee557a1a82538c930d41ce286acc0f183c9ed78af2559f",
+      "channels": 2,
+      "description": "Bullet Shell, .45 Caliber, Drop On Sand"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropSand_BW.5476.wav": {
+      "sha256": "66e08343f523726992c570a1b7228e3dba50668bcaa9abda3a1c7ac01301c28e",
+      "channels": 2,
+      "description": "Bullet Shell, 30-30 Caliber, Drop On Sand"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropLeaves_BW._1.wav": {
+      "sha256": "3132e13455f6b5d95f751cfd3ae83022280272f8098cb018c685cad51e950bee",
+      "channels": 2,
+      "description": "Bullet Shell, .308 Caliber, Drop On Leaves"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropLeaves_BW.54.wav": {
+      "sha256": "bec19e202b0396ad6aa78b01e5a4ef432573bd4feef71db02c82bb97880d37fd",
+      "channels": 2,
+      "description": "Bullet Shell, .40 Caliber, Drop On Leaves"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropCarpet_BW._1.wav": {
+      "sha256": "d37b11ec7a4fa0f25933097579f7abcbb628c4fadb3ad083e14a7a416af9e01b",
+      "channels": 2,
+      "description": "Bullet Shell, .38 Special, Drop On Carpet"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropCarpet_BW._2.wav": {
+      "sha256": "7f86e67eb33c05a574e48748219c1bdc842b986a2b3a87de134ffdb5eb572c2b",
+      "channels": 2,
+      "description": "Bullet Shell, 30-30 Caliber, Drop On Carpet"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropCarpet_BW._3.wav": {
+      "sha256": "b838d97f624097fbb1709ffc3d8a4000819233435d2d0579411aa29499d5955a",
+      "channels": 2,
+      "description": "Bullet Shell, .223 Caliber, Drop On Carpet"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropPuddle_BW._1.wav": {
+      "sha256": "032b58b2568515424d08442de42cc7c46885de66aa9f3f6df768968050b2fefa",
+      "channels": 2,
+      "description": "Bullet Shell, .223 Caliber, Drop On Puddle"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropPuddle_BW._2.wav": {
+      "sha256": "9909365ec8a62e3acb193b8f5de45a0592e4e5c6a8a878d9458cc3e1bd2e49a9",
+      "channels": 2,
+      "description": "Bullet Shell, .45 Caliber, Drop On Puddle"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropPuddle_BW._3.wav": {
+      "sha256": "17ba7b13df276221965d1582e3b644b3eb721e4b15aacd34ba08716e8203a4e0",
+      "channels": 2,
+      "description": "Bullet Shell, .40 Caliber, Drop On Puddle"
+    },
+    "BOOM Library - Gun Handling/M16/M16 Dry Fire 01.wav": {
+      "sha256": "34108d8c63b3b6abf260b4ac38c512e5fd221579f06bdad666f7711176b9370e",
+      "channels": 1,
+      "description": "Colt M16 RIFLE DRY FIRE Pulling the trigger without ammunition. Gun, foley. Close, mono."
+    },
+    "BOOM Library - Gun Handling/AK47/AK47 Dry Fire 01.wav": {
+      "sha256": "61f55c11696c8258c6073ac59500fb7d0af6c89c1ff9729b28af516ae35efb9d",
+      "channels": 1,
+      "description": "Izhmash AK 47 RIFLE DRY FIRE Pulling the trigger without ammunition. Gun, foley. Close, mono."
+    },
+    "BOOM Library - Gun Handling/Glock 45/Glock 45 Dry Fire 01.wav": {
+      "sha256": "ff7ed2a86a6c913fa63e13d0ca2d6fe719a48df1fa91dd0f9c4fa9f6663611aa",
+      "channels": 1,
+      "description": "Glock 45 PISTOL DRY FIRE Pulling the trigger without ammunition. Gun, foley. Close, mono."
+    },
+    "BOOM Library - Gun Handling/HK MP5/HK MP5 Dry Fire 01.wav": {
+      "sha256": "b201e37354e21cf621807c0f2524334a7b8129f10a19fe170d2ef94eef8442de",
+      "channels": 1,
+      "description": "Heckler & Koch MP 5 SUBMACHINE GUN DRY FIRE Pulling the trigger without ammunition. Rifle, foley. Close, mono."
+    },
+    "BOOM Library - Gun Handling/Remington 700/Remington 700 Dry Fire 01.wav": {
+      "sha256": "fd987000a4c01c47bee23c49c5c57a8344e1f0739d1b2bc0dd13e554b78790c4",
+      "channels": 1,
+      "description": "Remington 700 RIFLE DRY FIRE Pulling the trigger without ammunition. Sniper, Gun, foley. Close, mono."
+    },
+    "BOOM Library - Gun Handling/Pumpgun/Pumpgun Dry Fire 01.wav": {
+      "sha256": "11aa7a89644443d6255c3303f842aa370776a550f63acdecfaddfdb380edffeb",
+      "channels": 1,
+      "description": "PUMP GUN RIFLE DRY FIRE Pulling the trigger without ammunition. Rifle, Gun, Shotgun, foley. Close, mono."
+    },
+    "BOOM.Library.Close.Combat.WAV.DVDR/Close.Combat.Construction.Kit/CloseCombat_ConstructionKit_48kHz/CC-CK Whoosh Cloth Medium 02.wav": {
+      "sha256": "486cf357260d92b677c5be173014d26dbb98732c1c5b3c1226e93aa0451b5bfb",
+      "channels": 2,
+      "description": "WHOOSH MOVEMENT CLOTH Fast, rustling cloth movement."
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54507.wav": {
+      "sha256": "e2b9b4577c673657fed995c193a3d4177a9fba8ab86af45dc77e6b123f19166c",
+      "channels": 2,
+      "description": "Bullet Pass By, Whiz"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54508.wav": {
+      "sha256": "416896a230a3fbf666a04ade93e45872c796664ce527acb5897a7b221c33f5e4",
+      "channels": 2,
+      "description": "Bullet Pass By, Whiz"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54509.wav": {
+      "sha256": "739851b26bab9dc52da92434dbe5fb35b7763d3c3913913720152926ec11d544",
+      "channels": 2,
+      "description": "Bullet Pass By, Whiz"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54510.wav": {
+      "sha256": "b6ba4afaa1e8d8a75217271e0f42ff0e253be6cf71bb13ab941e41d4bd76a0d5",
+      "channels": 2,
+      "description": "Bullet Pass By, Whiz"
+    },
+    "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54511.wav": {
+      "sha256": "0030fcdcad8177956194f2514d399294b07280255274bcd93fe92a5a3b97b302",
+      "channels": 2,
+      "description": "Bullet Pass By, Whiz"
+    }
+  },
+  "files": {
+    "whizz-1": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54507.wav",
+          "start": 0.02,
+          "duration": 0.108,
+          "filter": "highpass=130,lowpass=16000"
+        }
+      ],
+      "duration": 0.108,
+      "level": 2.3201849460601807,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -10,
+      "sha256": "a856fa2fce9044a49ec72ea08bb72c6ab48ec4f1e23119bcb0c467b56929acb1"
+    },
+    "whizz-2": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54508.wav",
+          "start": 0.02,
+          "duration": 0.19866666666666666,
+          "filter": "highpass=130,lowpass=16000"
+        }
+      ],
+      "duration": 0.19866666666666666,
+      "level": 1.5748906135559082,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -10,
+      "sha256": "be328ed12eeac63ea614ceb1e2cf70e4ffb42e07dac88ab7baf03714b88718e8"
+    },
+    "whizz-3": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54509.wav",
+          "start": 0.0,
+          "duration": 0.112,
+          "filter": "highpass=130,lowpass=16000"
+        }
+      ],
+      "duration": 0.112,
+      "level": 3.4584882259368896,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -10,
+      "sha256": "219d151e96b952e39684b240bd242d71d7c359e2bdf91fb4bd233532a2b8ab57"
+    },
+    "whizz-4": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54510.wav",
+          "start": 0.005,
+          "duration": 0.18166666666666667,
+          "filter": "highpass=130,lowpass=16000"
+        }
+      ],
+      "duration": 0.18166666666666667,
+      "level": 5.287038803100586,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -10,
+      "sha256": "cfe42a0a14e581fd8a76d1c3c52a61832db4f86219034774bcf1afbe1a80bce3"
+    },
+    "whizz-5": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletPassBy_BW.54511.wav",
+          "start": 0.005,
+          "duration": 0.139,
+          "filter": "highpass=130,lowpass=16000"
+        }
+      ],
+      "duration": 0.139,
+      "level": 4.934896945953369,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -10,
+      "sha256": "934bf933f1326e0dd67ce50ac403d973c7f883ce9fd621a09d8ba483e6107bb4"
+    },
+    "casing-concrete-1": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropCement_BW_99.wav",
+          "start": 0.0,
+          "duration": 0.752,
+          "filter": "highpass=200,lowpass=12000"
+        }
+      ],
+      "duration": 0.752,
+      "level": 0.3902975565388269,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -31,
+      "sha256": "be5c5cb0b9da649e5f2016521eb433d887b1c74da169286375305f9b3125fabf"
+    },
+    "casing-concrete-2": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropCement_BW_44.wav",
+          "start": 0.0,
+          "duration": 1.0133333333333334,
+          "filter": "highpass=200,lowpass=12000"
+        }
+      ],
+      "duration": 1.0133333333333334,
+      "level": 0.4368619359923687,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -31,
+      "sha256": "6207115cbd7761825fb8561e07ad5659d4f1bedc0d6cfcc73db055633e6b6cae"
+    },
+    "casing-concrete-3": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropCement_BW_98.wav",
+          "start": 0.0,
+          "duration": 0.608,
+          "filter": "highpass=200,lowpass=12000"
+        }
+      ],
+      "duration": 0.608,
+      "level": 0.8405872947221218,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -31,
+      "sha256": "4796222b910ad1cfce1c4af94c487939d2ae9b27dec98cf351431b8b938a3181"
+    },
+    "casing-metal-1": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropMetal_BW._10.wav",
+          "start": 0.0,
+          "duration": 0.496,
+          "filter": "highpass=200,lowpass=12000"
+        }
+      ],
+      "duration": 0.496,
+      "level": 0.2584755127190176,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -31,
+      "sha256": "3b08d63ef1a7c49abaf6294d66af429dfd89bb91ccbf7c83a4952040bf5eb0d9"
+    },
+    "casing-metal-2": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropMetal_BW._12.wav",
+          "start": 0.0,
+          "duration": 1.1093333333333333,
+          "filter": "highpass=200,lowpass=12000"
+        }
+      ],
+      "duration": 1.1093333333333333,
+      "level": 0.3015888450863787,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -31,
+      "sha256": "3409bf0c42f63124600ceb00780f623b724db2ff4a9a40d10e36019b651f8656"
+    },
+    "casing-metal-3": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropMetal_BW._13.wav",
+          "start": 0.0,
+          "duration": 0.5973333333333334,
+          "filter": "highpass=200,lowpass=12000"
+        }
+      ],
+      "duration": 0.5973333333333334,
+      "level": 0.3028748526542595,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -31,
+      "sha256": "6b077638b60be3f174c23b320817ef7fe6972aedddb6c22d16359edb45153465"
+    },
+    "casing-wood-1": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropWood_BW.5476.wav",
+          "start": 0.0,
+          "duration": 0.7946666666666666,
+          "filter": "highpass=200,lowpass=12000"
+        }
+      ],
+      "duration": 0.7946666666666666,
+      "level": 0.27305516834034466,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -31,
+      "sha256": "bab2ed07b6b3de32c76ed15513b7f804b13501da23534bc296cb51cffe6c7d87"
+    },
+    "casing-wood-2": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropWood_BW.5477.wav",
+          "start": 0.0,
+          "duration": 0.9653333333333334,
+          "filter": "highpass=200,lowpass=12000"
+        }
+      ],
+      "duration": 0.9653333333333334,
+      "level": 0.43833994256439823,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -31,
+      "sha256": "346514289db95da25b7463b7f074d81ae4864f3be1ff0f84ba01dd6dc88a31b7"
+    },
+    "casing-wood-3": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropWood_BW.5474.wav",
+          "start": 0.0,
+          "duration": 1.1946666666666668,
+          "filter": "highpass=200,lowpass=12000"
+        }
+      ],
+      "duration": 1.1946666666666668,
+      "level": 0.3280052033387884,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -31,
+      "sha256": "9d52b6a86fc121bb1dd66ca4fa6f786d30df0ff66769f2a44e9abe65dd8c7790"
+    },
+    "casing-earth-1": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropSand_BW.5456.wav",
+          "start": 0.0,
+          "duration": 0.49066666666666664,
+          "filter": "highpass=200,lowpass=12000"
+        }
+      ],
+      "duration": 0.49066666666666664,
+      "level": 1.5028077623506086,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -36,
+      "sha256": "eab6c4392d5bc6cfaffe700a95f7d3743f2fbc03880d27fd04cf8cb495785474"
+    },
+    "casing-earth-2": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropSand_BW.5474.wav",
+          "start": 0.0,
+          "duration": 0.464,
+          "filter": "highpass=200,lowpass=12000"
+        }
+      ],
+      "duration": 0.464,
+      "level": 1.4868775456866374,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -36,
+      "sha256": "c2dd987e63b7aaaca1aebcfbe4bd56a1dd941b51c5750adb9e9aa1518134f740"
+    },
+    "casing-earth-3": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropSand_BW.5476.wav",
+          "start": 0.0,
+          "duration": 0.688,
+          "filter": "highpass=200,lowpass=12000"
+        }
+      ],
+      "duration": 0.688,
+      "level": 0.833496780392832,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -36,
+      "sha256": "1885a0f4ae002c42296b824a8837dbf3d5eb11a7c71c656db1002edc4df14a28"
+    },
+    "casing-foliage-1": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropLeaves_BW._1.wav",
+          "start": 0.0,
+          "duration": 0.448,
+          "filter": "highpass=200,lowpass=12000"
+        }
+      ],
+      "duration": 0.448,
+      "level": 0.25592190565115397,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -36,
+      "sha256": "30e5f37dc7927468e2ca06b17e7fe3424526c850e582bf0fd67de0934e13369b"
+    },
+    "casing-foliage-2": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropLeaves_BW.54.wav",
+          "start": 0.0,
+          "duration": 0.512,
+          "filter": "highpass=200,lowpass=12000"
+        }
+      ],
+      "duration": 0.512,
+      "level": 0.23599896365246198,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -36,
+      "sha256": "30f88ccb3195d832dcf4c669987522b3c22542bb2b88474ca220cab3d63a6d3b"
+    },
+    "casing-soft-1": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropCarpet_BW._1.wav",
+          "start": 0.0,
+          "duration": 0.24,
+          "filter": "highpass=200,lowpass=12000"
+        }
+      ],
+      "duration": 0.24,
+      "level": 0.14136117499130552,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -36,
+      "sha256": "43c2abdd08c04cd52b04801e9581c28d91bc0f29dfc586b78f2243a81aed8620"
+    },
+    "casing-soft-2": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropCarpet_BW._2.wav",
+          "start": 0.0,
+          "duration": 0.8106666666666666,
+          "filter": "highpass=200,lowpass=12000"
+        }
+      ],
+      "duration": 0.8106666666666666,
+      "level": 0.16678523638270634,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -36,
+      "sha256": "51e5b46629bb59eda5721d174bb561ffb04309152be1ef27ff90a172c5775dd6"
+    },
+    "casing-soft-3": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropCarpet_BW._3.wav",
+          "start": 0.0,
+          "duration": 0.6026666666666667,
+          "filter": "highpass=200,lowpass=12000"
+        }
+      ],
+      "duration": 0.6026666666666667,
+      "level": 0.12529609831929164,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -36,
+      "sha256": "7bd77adbc4063f77a4630c7696c95b4f5958ca3457c9d7d8ff401f701d9a0049"
+    },
+    "casing-water-1": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropPuddle_BW._1.wav",
+          "start": 0.0,
+          "duration": 0.3466666666666667,
+          "filter": "highpass=200,lowpass=12000"
+        }
+      ],
+      "duration": 0.3466666666666667,
+      "level": 0.4435280858051188,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -36,
+      "sha256": "9b24ec9d69d9eef82d3f18e062c99e14075032386aec3c15e25fde1de70aecea"
+    },
+    "casing-water-2": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropPuddle_BW._2.wav",
+          "start": 0.0,
+          "duration": 0.4693333333333333,
+          "filter": "highpass=200,lowpass=12000"
+        }
+      ],
+      "duration": 0.4693333333333333,
+      "level": 0.29125841752391785,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -36,
+      "sha256": "3aa17dd8fbee29bc87ede32835ed695c069c2964f96827192ecd026aae630dc9"
+    },
+    "casing-water-3": {
+      "layers": [
+        {
+          "source": "Bullets, Casings and Impacts [Blastwave FX]/BulletShellDropPuddle_BW._3.wav",
+          "start": 0.0,
+          "duration": 0.6773333333333333,
+          "filter": "highpass=200,lowpass=12000"
+        }
+      ],
+      "duration": 0.6773333333333333,
+      "level": 0.5178121764157587,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -36,
+      "sha256": "cae526867ccf570f7f2bf9ee6b171556dea7815d458cbfeea736eb255a2df94a"
+    },
+    "dry-ar-1": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/M16/M16 Dry Fire 01.wav",
+          "start": 0.375,
+          "duration": 0.145,
+          "filter": "highpass=150,lowpass=12000"
+        }
+      ],
+      "duration": 0.145,
+      "level": 0.927275175494199,
+      "rmsWindowSeconds": 0.02,
+      "targetWindowRmsDb": -20,
+      "sha256": "e45c5cc986b8e93f8dcaa7ecb699c6ea75fed5172c5b107a8b54a5481bcc3644"
+    },
+    "dry-ar-2": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/M16/M16 Dry Fire 01.wav",
+          "start": 1.545,
+          "duration": 0.145,
+          "filter": "highpass=150,lowpass=12000"
+        }
+      ],
+      "duration": 0.145,
+      "level": 0.7012612920007689,
+      "rmsWindowSeconds": 0.02,
+      "targetWindowRmsDb": -20,
+      "sha256": "e8d2797a760a56ac64f3aa8957709624945c7e4705dc570946e8a504380cd7c7"
+    },
+    "dry-ar-3": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/M16/M16 Dry Fire 01.wav",
+          "start": 2.995,
+          "duration": 0.145,
+          "filter": "highpass=150,lowpass=12000"
+        }
+      ],
+      "duration": 0.145,
+      "level": 0.72534954751625,
+      "rmsWindowSeconds": 0.02,
+      "targetWindowRmsDb": -20,
+      "sha256": "793d1ce883a98bad94e8432ff93bd17e4a0c37bde8e39c8e27ddb4d1ef371f6c"
+    },
+    "dry-ak-1": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/AK47/AK47 Dry Fire 01.wav",
+          "start": 0.205,
+          "duration": 0.145,
+          "filter": "highpass=150,lowpass=12000"
+        }
+      ],
+      "duration": 0.145,
+      "level": 0.36987334176150777,
+      "rmsWindowSeconds": 0.02,
+      "targetWindowRmsDb": -20,
+      "sha256": "c8a0049793fa5f662812d9ff00a968e2451ddc516a9166841ba55cf648e9306a"
+    },
+    "dry-ak-2": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/AK47/AK47 Dry Fire 01.wav",
+          "start": 2.265,
+          "duration": 0.145,
+          "filter": "highpass=150,lowpass=12000"
+        }
+      ],
+      "duration": 0.145,
+      "level": 0.3723807284953565,
+      "rmsWindowSeconds": 0.02,
+      "targetWindowRmsDb": -20,
+      "sha256": "7a969a84f31d420ed6c3ba85fc81d9177355edb9d5dd9f9bdef1b968f81e329b"
+    },
+    "dry-ak-3": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/AK47/AK47 Dry Fire 01.wav",
+          "start": 4.215,
+          "duration": 0.15,
+          "filter": "highpass=150,lowpass=12000"
+        }
+      ],
+      "duration": 0.15,
+      "level": 0.44032523951546737,
+      "rmsWindowSeconds": 0.02,
+      "targetWindowRmsDb": -20,
+      "sha256": "6a668b7d745c98f697c7adffc85eb199deefe582869d4694472cc0a5ecf905b2"
+    },
+    "dry-pistol-1": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Glock 45/Glock 45 Dry Fire 01.wav",
+          "start": 0.31,
+          "duration": 0.145,
+          "filter": "highpass=150,lowpass=12000"
+        }
+      ],
+      "duration": 0.145,
+      "level": 1.1699045153844578,
+      "rmsWindowSeconds": 0.02,
+      "targetWindowRmsDb": -20,
+      "sha256": "cdabbdb3bfc50cf650e15d28c202c5dde141c66041faa54e31c315250e0caaec"
+    },
+    "dry-pistol-2": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Glock 45/Glock 45 Dry Fire 01.wav",
+          "start": 1.97,
+          "duration": 0.145,
+          "filter": "highpass=150,lowpass=12000"
+        }
+      ],
+      "duration": 0.145,
+      "level": 1.1481325972593475,
+      "rmsWindowSeconds": 0.02,
+      "targetWindowRmsDb": -20,
+      "sha256": "cb37df7264578c38fa93905d140879519ef02685cfca1f09f96829f5514fa3dd"
+    },
+    "dry-pistol-3": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Glock 45/Glock 45 Dry Fire 01.wav",
+          "start": 3.835,
+          "duration": 0.145,
+          "filter": "highpass=150,lowpass=12000"
+        }
+      ],
+      "duration": 0.145,
+      "level": 1.0341114005784058,
+      "rmsWindowSeconds": 0.02,
+      "targetWindowRmsDb": -20,
+      "sha256": "e30fd579ad4cde5b7ac9a1d82df7d9ab001a167a3eb48f6679c0dfb31130c43b"
+    },
+    "dry-smg-1": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/HK MP5/HK MP5 Dry Fire 01.wav",
+          "start": 0.34500000000000003,
+          "duration": 0.145,
+          "filter": "highpass=150,lowpass=12000"
+        }
+      ],
+      "duration": 0.145,
+      "level": 0.9051573979762205,
+      "rmsWindowSeconds": 0.02,
+      "targetWindowRmsDb": -20,
+      "sha256": "da86298e512672298991adefc59b27487f7736111f0d8195bc006a7d02d8d230"
+    },
+    "dry-smg-2": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/HK MP5/HK MP5 Dry Fire 01.wav",
+          "start": 2.06,
+          "duration": 0.145,
+          "filter": "highpass=150,lowpass=12000"
+        }
+      ],
+      "duration": 0.145,
+      "level": 1.0249867772761718,
+      "rmsWindowSeconds": 0.02,
+      "targetWindowRmsDb": -20,
+      "sha256": "267c8c5e2c81e2415e247e0184e5e08647746ed044febbd4be3ca14f5b990fe8"
+    },
+    "dry-smg-3": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/HK MP5/HK MP5 Dry Fire 01.wav",
+          "start": 3.82,
+          "duration": 0.145,
+          "filter": "highpass=150,lowpass=12000"
+        }
+      ],
+      "duration": 0.145,
+      "level": 0.9087759742005992,
+      "rmsWindowSeconds": 0.02,
+      "targetWindowRmsDb": -20,
+      "sha256": "1c26c7c205ab2ce0e1b5e2d7638b3d4eeb18dbf066ffa4026bcee7729b8416ba"
+    },
+    "dry-bolt-1": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Remington 700/Remington 700 Dry Fire 01.wav",
+          "start": 0.16,
+          "duration": 0.145,
+          "filter": "highpass=150,lowpass=12000"
+        }
+      ],
+      "duration": 0.145,
+      "level": 0.4858665792676556,
+      "rmsWindowSeconds": 0.02,
+      "targetWindowRmsDb": -20,
+      "sha256": "52bbc29b6e0ab4debe78fce80026f370fb82e17f02971264682e970c1c0b02c2"
+    },
+    "dry-bolt-2": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Remington 700/Remington 700 Dry Fire 01.wav",
+          "start": 1.4749999999999999,
+          "duration": 0.145,
+          "filter": "highpass=150,lowpass=12000"
+        }
+      ],
+      "duration": 0.145,
+      "level": 0.4526564131466716,
+      "rmsWindowSeconds": 0.02,
+      "targetWindowRmsDb": -20,
+      "sha256": "6ce54c8b757a8a4109db782c5df45af8a3e3bcb11cfe1f7be59c191e53e75d59"
+    },
+    "dry-bolt-3": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Remington 700/Remington 700 Dry Fire 01.wav",
+          "start": 2.755,
+          "duration": 0.145,
+          "filter": "highpass=150,lowpass=12000"
+        }
+      ],
+      "duration": 0.145,
+      "level": 0.4756815037388956,
+      "rmsWindowSeconds": 0.02,
+      "targetWindowRmsDb": -20,
+      "sha256": "bb75264d5708786a78f84e97cc9881c6f5d270e0eee152c999a282280fe12cf8"
+    },
+    "dry-shotgun-1": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Pumpgun/Pumpgun Dry Fire 01.wav",
+          "start": 0.125,
+          "duration": 0.145,
+          "filter": "highpass=150,lowpass=12000"
+        }
+      ],
+      "duration": 0.145,
+      "level": 0.664021948970027,
+      "rmsWindowSeconds": 0.02,
+      "targetWindowRmsDb": -20,
+      "sha256": "5826eca5edb1daa49c24431e1da91529eccb227c4f6681bbe53b6a636ac9050b"
+    },
+    "dry-shotgun-2": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Pumpgun/Pumpgun Dry Fire 01.wav",
+          "start": 1.355,
+          "duration": 0.15,
+          "filter": "highpass=150,lowpass=12000"
+        }
+      ],
+      "duration": 0.15,
+      "level": 0.6385464253724473,
+      "rmsWindowSeconds": 0.02,
+      "targetWindowRmsDb": -20,
+      "sha256": "6c51176ee15b5cd4b3fee15b8300c11de326527e66a30c5d58e2e2fdd5afae81"
+    },
+    "dry-shotgun-3": {
+      "layers": [
+        {
+          "source": "BOOM Library - Gun Handling/Pumpgun/Pumpgun Dry Fire 01.wav",
+          "start": 2.9450000000000003,
+          "duration": 0.145,
+          "filter": "highpass=150,lowpass=12000"
+        }
+      ],
+      "duration": 0.145,
+      "level": 0.6400315557273032,
+      "rmsWindowSeconds": 0.02,
+      "targetWindowRmsDb": -20,
+      "sha256": "ed19bd5bb3b8795e31530bd1cf0a240cd918d593d2a79b0b30c934d05f989bff"
+    },
+    "grenade-throw-1": {
+      "layers": [
+        {
+          "source": "BOOM.Library.Close.Combat.WAV.DVDR/Close.Combat.Construction.Kit/CloseCombat_ConstructionKit_48kHz/CC-CK Whoosh Cloth Medium 02.wav",
+          "start": 0.04,
+          "duration": 0.48,
+          "filter": "highpass=100,lowpass=10000"
+        }
+      ],
+      "duration": 0.48,
+      "level": 1.2678117159065556,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -22,
+      "sha256": "a2862a8247baf8b1e5349e27de217f2c92358cee62bcaa3519e6f99fd35dcea8"
+    },
+    "grenade-throw-2": {
+      "layers": [
+        {
+          "source": "BOOM.Library.Close.Combat.WAV.DVDR/Close.Combat.Construction.Kit/CloseCombat_ConstructionKit_48kHz/CC-CK Whoosh Cloth Medium 02.wav",
+          "start": 1.74,
+          "duration": 0.475,
+          "filter": "highpass=100,lowpass=10000"
+        }
+      ],
+      "duration": 0.475,
+      "level": 0.8782047440018724,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -22,
+      "sha256": "9958015bb81f39810b251c9b520e0568f91742af05a1bcc101e11b6e7f1d090b"
+    },
+    "grenade-throw-3": {
+      "layers": [
+        {
+          "source": "BOOM.Library.Close.Combat.WAV.DVDR/Close.Combat.Construction.Kit/CloseCombat_ConstructionKit_48kHz/CC-CK Whoosh Cloth Medium 02.wav",
+          "start": 3.625,
+          "duration": 0.48,
+          "filter": "highpass=100,lowpass=10000"
+        }
+      ],
+      "duration": 0.48,
+      "level": 1.0192529822576966,
+      "rmsWindowSeconds": 0.1,
+      "targetWindowRmsDb": -22,
+      "sha256": "01d19b4f71241d7d70710bc97dafcb137158043612d0cf0cbd74fe949bce93d8"
+    }
+  }
+}

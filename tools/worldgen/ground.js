@@ -1,10 +1,9 @@
 import * as THREE from 'three';
 
-import { Rng } from '../../src/core/rng.ts';
 import { BOX, BOX_SOFT, IDENT, LL } from './kit.js';
-import { STREET, ALLEYS } from './layout.js';
+import { STREET, ALLEYS } from './level/layout.js';
 import { ALLEY_MOUTHS, groundY } from './queries.js';
-import { fbm3, patchGeometry, paintMasks } from './util.js';
+import { fbm3, keyedRng, patchGeometry, paintMasks } from './util.js';
 
 /**
  * WORLD — ground plane, road, kerbs and the stuff wind piles against them.
@@ -14,7 +13,7 @@ import { fbm3, patchGeometry, paintMasks } from './util.js';
  * the alleys are dirt. Collision is a handful of flat boxes rather than the
  * visual triangles, which keeps the BVH tiny and the character controller smooth.
  */
-export function buildGround(A, rng) {
+export function buildGround(A) {
   const { halfWidth: HW, kerb: KB, walkH: WH, zMin, zMax } = STREET;
 
   // ------------------------------------------------------------- terrain --
@@ -37,7 +36,7 @@ export function buildGround(A, rng) {
     out[1] = 0.25 + fbm3(x * 0.3, 1.1, z * 0.3, 2) * 0.4;
     out[0] = 0.2;
   });
-  A.add('sand', terrain, null, { support: 'ground' });
+  A.add('sand', terrain);
   terrain.dispose();
 
   // ---------------------------------------------------------------- road --
@@ -61,12 +60,13 @@ export function buildGround(A, rng) {
     out[0] = 0.2 + n * 0.3;
   });
   road.translate(0, 0, (zMin + zMax) / 2);
-  A.add('road_dust', road, null, { support: 'ground' });
+  A.add('road_dust', road);
   road.dispose();
 
   // Old tarmac showing through the dust where wheels have polished it: long
   // patches in the ruts, and a scatter of intact pavement elsewhere.
   for (let i = 0; i < 30; i++) {
+    const rng = keyedRng('ground-tarmac', i);
     const rut = rng.float() < 0.62;
     const x = rut
       ? (rng.float() < 0.5 ? -1 : 1) * rng.range(1.2, 2.1)
@@ -94,6 +94,7 @@ export function buildGround(A, rng) {
 
   // ------------------------------------------------------- pavement slabs --
   for (const side of [-1, 1]) {
+    const rng = keyedRng('pavement', side);
     const cx = (side * (KB + HW)) / 2;
     const wSlab = KB - HW;
     const mouths = ALLEY_MOUTHS.filter((mouth) => mouth.side === side);
@@ -102,7 +103,6 @@ export function buildGround(A, rng) {
       const to = Math.min(zMax, mouth.z1);
       A.add('dirt', BOX(A), LL(IDENT, cx, 0.035, (from + to) / 2, 0, wSlab, 0.07, to - from), {
         masks: [0.2, 0.7, 0.4],
-        support: 'ground',
       });
     }
 
@@ -110,8 +110,7 @@ export function buildGround(A, rng) {
     while (z < zMax) {
       const segLen = rng.range(3.2, 6.5);
       const gap = rng.float() < 0.12 ? rng.range(0.6, 1.6) : 0.06;
-      // Keep the old draw schedule so correcting a mouth cannot reshuffle the
-      // buildings and dressing generated after the ground.
+      // Slabs over an alley's edge stay at kerb height without a stain patch.
       let legacyMouth = false;
       for (const a of ALLEYS) {
         const [ax0, az0, ax1, az1] = a.rect;
@@ -136,7 +135,6 @@ export function buildGround(A, rng) {
         const cz = (from + to) / 2;
         A.add('concrete', BOX_SOFT(A), LL(IDENT, cx, h / 2, cz, 0, wSlab - 0.05, h, to - from), {
           masks: [0.6, 0.45, 0.2],
-          support: 'ground',
         });
         A.add(
           'concrete',
@@ -144,7 +142,6 @@ export function buildGround(A, rng) {
           LL(IDENT, side * (HW + 0.11), (h + 0.022) / 2, cz, 0, 0.22, h + 0.022, to - from),
           {
             masks: [0.95, 0.35, 0.1],
-            support: 'ground',
           }
         );
       }
@@ -176,7 +173,6 @@ export function buildGround(A, rng) {
       LL(IDENT, (xa + xb) / 2, 0.03, (za + zb) / 2, 0, xb - xa, 0.06, zb - za),
       {
         masks: [0.2, 0.6, 0.35],
-        support: 'ground',
       }
     );
   }
@@ -188,10 +184,8 @@ export function buildGround(A, rng) {
   // mud washes in over the gravel, and loose stones lie across the line. So each
   // boundary gets a scatter of irregular patches of BOTH materials straddling
   // it, at 0.6-1.2 m, plus a line of pebbles.
-  // Its own fixed-seed stream: the seam scatter must not shift the draw sequence
-  // the rest of the level's placement depends on.
-  const sr = new Rng(0x5ea31d);
   const seam = (ax, az, bx, bz, keyA, keyB) => {
+    const sr = keyedRng('seam', ax, az, bx, bz, keyA, keyB);
     const len = Math.hypot(bx - ax, bz - az);
     const n = Math.max(6, Math.round(len / 1.15));
     const tx = (bx - ax) / len;
@@ -280,6 +274,7 @@ export function buildGround(A, rng) {
   // Sand blown against the kerbs and building lines: the single cheapest thing
   // that stops a street reading as a clean box of geometry.
   for (let i = 0; i < 130; i++) {
+    const rng = keyedRng('ground-drift', i);
     const side = rng.float() < 0.5 ? -1 : 1;
     const againstWall = rng.float() < 0.55;
     const x = againstWall
@@ -299,6 +294,7 @@ export function buildGround(A, rng) {
     });
   }
   for (let i = 0; i < 26; i++) {
+    const rng = keyedRng('ground-stain', i);
     const g = patchGeometry(rng, rng.range(0.5, 1.8), { lobes: 10, wobble: 0.6 });
     const px = rng.range(-HW + 0.4, HW - 0.4);
     A.addOnce(
@@ -319,6 +315,7 @@ export function buildGround(A, rng) {
   }
   // manholes and gully gratings
   for (let i = 0; i < 7; i++) {
+    const rng = keyedRng('manhole', i);
     const z = rng.range(zMin + 6, zMax - 6);
     const x = rng.range(-2.5, 2.5);
     const ring = A.cache('manhole', () => {
@@ -337,7 +334,7 @@ export function buildGround(A, rng) {
   }
   for (const side of [-1, 1]) {
     for (let i = 0; i < 5; i++) {
-      const z = rng.range(zMin + 8, zMax - 8);
+      const z = keyedRng('gully', side, i).range(zMin + 8, zMax - 8);
       A.add(
         'metal_dark',
         BOX(A),

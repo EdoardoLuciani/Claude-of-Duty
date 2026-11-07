@@ -1,26 +1,11 @@
-/**
- * Ledge detection and the rooted mantle / vault motion.
- *
- * Detection is done entirely with `physics` capsule sweeps and rays — this file
- * never touches triangles itself. Three questions have to be answered before a
- * mantle may commit, and all three are asked every time:
- *
- *   1. is there a near-vertical face in front of me?           (forward sweep)
- *   2. where is its lip, and is the lip a walkable surface?     (downward ray)
- *   3. can my capsule actually stand on the far side of it?     (capsule check)
- *
- * If any answer is no we fall through and the player keeps running into the
- * wall, which is the correct failure mode — a mantle that teleports you into
- * geometry is far worse than one that does not trigger.
- *
- * The motion itself is *rooted*: once committed, the capsule is driven along a
- * parametric curve and collision is not consulted again (the destination was
- * already proven clear). That is how every shooter does it; sweeping during the
- * climb catches the very lip you are climbing.
+/** Rooted mantle/vault detection requires a near-vertical face, a walkable lip and clear landing.
+ * Once committed, follow the proven-clear curve without resweeping the climbed lip.
+ * Failed detection leaves ordinary movement in control.
  */
 
 import * as THREE from 'three';
 
+import type { SurfaceName } from '../physics/surfaces.ts';
 import { clamp01, smootherstep, smoothstep, DEG } from './springs.ts';
 import { MOVE } from './tuning.ts';
 
@@ -39,14 +24,14 @@ interface LedgeResult {
   landY: number;
   landZ: number;
   distance: number;
-  surface: string;
+  surface: SurfaceName;
 }
 interface LedgeHit {
   hit: boolean;
   distance: number;
   point: THREE.Vector3;
   normal: THREE.Vector3;
-  surface: string;
+  surface: SurfaceName;
 }
 interface LedgePhysics {
   MASK: { CHARACTER: number; WORLD: number };
@@ -77,33 +62,28 @@ interface LedgeCharacter {
 
 export class LedgeProbe {
   physics: LedgePhysics | null;
-  _p0: THREE.Vector3;
-  _p1: THREE.Vector3;
-  _dir: THREE.Vector3;
-  _origin: THREE.Vector3;
-  result: LedgeResult;
+  // Preallocated query scratch — nothing here allocates per probe.
+  _p0: THREE.Vector3 = new THREE.Vector3();
+  _p1: THREE.Vector3 = new THREE.Vector3();
+  _dir: THREE.Vector3 = new THREE.Vector3();
+  _origin: THREE.Vector3 = new THREE.Vector3();
+  /** Last successful result. Reused; copy anything you keep. */
+  result: LedgeResult = {
+    kind: LEDGE_NONE,
+    fast: false,
+    obstacleHeight: 0,
+    topY: 0,
+    lipX: 0,
+    lipZ: 0,
+    landX: 0,
+    landY: 0,
+    landZ: 0,
+    distance: 0,
+    surface: 'concrete',
+  };
+
   constructor(physics: LedgePhysics | null) {
     this.physics = physics;
-    // Preallocated query scratch — nothing here allocates per probe.
-    this._p0 = new THREE.Vector3();
-    this._p1 = new THREE.Vector3();
-    this._dir = new THREE.Vector3();
-    this._origin = new THREE.Vector3();
-
-    /** Last successful result. Reused; copy anything you keep. */
-    this.result = {
-      kind: LEDGE_NONE,
-      fast: false,
-      obstacleHeight: 0,
-      topY: 0,
-      lipX: 0,
-      lipZ: 0,
-      landX: 0,
-      landY: 0,
-      landZ: 0,
-      distance: 0,
-      surface: 'concrete',
-    };
   }
 
   /**
@@ -233,58 +213,31 @@ interface MantleCharacter {
   position: import('../physics/character.ts').CharacterController['position'];
 }
 export class MantleMotion {
-  active: boolean;
-  kind: LedgeKind;
-  t: number;
-  duration: number;
-  startX: number;
-  startY: number;
-  startZ: number;
-  topY: number;
-  landX: number;
-  landY: number;
-  landZ: number;
-  fx: number;
-  fz: number;
-  side: number;
-  height: number;
-  exitSpeed: number;
-  surface: string;
-  px: number;
-  py: number;
-  pz: number;
-  camY: number;
-  camForward: number;
-  camPitch: number;
-  camRoll: number;
-  constructor() {
-    this.active = false;
-    this.kind = LEDGE_NONE;
-    this.t = 0;
-    this.duration = 0.6;
-    this.startX = 0;
-    this.startY = 0;
-    this.startZ = 0;
-    this.topY = 0;
-    this.landX = 0;
-    this.landY = 0;
-    this.landZ = 0;
-    this.fx = 0;
-    this.fz = 1;
-    this.side = 1;
-    this.height = 0;
-    this.exitSpeed = 0;
-    this.surface = 'concrete';
-
-    /** Output — written by `evaluate()`, read by the controller and camera. */
-    this.px = 0;
-    this.py = 0;
-    this.pz = 0;
-    this.camY = 0;
-    this.camForward = 0;
-    this.camPitch = 0;
-    this.camRoll = 0;
-  }
+  active: boolean = false;
+  kind: LedgeKind = LEDGE_NONE;
+  t: number = 0;
+  duration: number = 0.6;
+  startX: number = 0;
+  startY: number = 0;
+  startZ: number = 0;
+  topY: number = 0;
+  landX: number = 0;
+  landY: number = 0;
+  landZ: number = 0;
+  fx: number = 0;
+  fz: number = 1;
+  side: number = 1;
+  height: number = 0;
+  exitSpeed: number = 0;
+  surface: SurfaceName = 'concrete';
+  /** Output — written by `evaluate()`, read by the controller and camera. */
+  px: number = 0;
+  py: number = 0;
+  pz: number = 0;
+  camY: number = 0;
+  camForward: number = 0;
+  camPitch: number = 0;
+  camRoll: number = 0;
 
   /** @param {object} ledge a LedgeProbe.result */
   begin(
@@ -336,7 +289,7 @@ export class MantleMotion {
     this.camRoll = 0;
   }
 
-  get progress() {
+  get progress(): number {
     return this.duration > 0 ? clamp01(this.t / this.duration) : 1;
   }
 

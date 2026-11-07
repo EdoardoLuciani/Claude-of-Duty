@@ -1,31 +1,9 @@
 import * as THREE from 'three';
 
-import type { ArmRig } from './arm-asset.ts';
+import type { Arm } from './hands.ts';
 
 /** Named controls shared by Blender's skin weights and the gameplay IK. */
-export function createArmControls(
-  arm: ArmRig & {
-    flexJoints: Array<{ bone: THREE.Object3D; source: THREE.Object3D }>;
-    handInner: THREE.Object3D;
-    upperPivot: THREE.Object3D;
-    forePivot: THREE.Object3D;
-    hand: THREE.Object3D;
-    _segLength: number[][];
-    _segRadius: number[][];
-    fingerSpread: number[];
-    _spreadFrom: Float32Array;
-    _spreadTo: Float32Array;
-    fingers: Array<{ root: THREE.Object3D; joints: THREE.Object3D[] }>;
-    thumbWeb: THREE.Object3D;
-    thumbRest: THREE.Quaternion;
-    _poseFrom: Float32Array;
-    _poseTo: Float32Array;
-    _thumbFrom: THREE.Quaternion;
-    _thumbTo: THREE.Quaternion;
-    _poseTime: number;
-    _poseDuration: number;
-  }
-): void {
+export function createArmControls(arm: Arm): void {
   const s = arm.scale;
   arm.controls = {};
   arm.flexJoints = [];
@@ -48,18 +26,18 @@ export function createArmControls(
     [0.049, 0.031, 0.023],
     [0.046, 0.029, 0.022],
     [0.038, 0.024, 0.02],
-  ].map((a) => a.map((v) => v * s));
+  ].map((a): number[] => a.map((v): number => v * s));
   arm._segRadius = [
     [0.0102, 0.0096, 0.0086, 0.0062],
     [0.0104, 0.0098, 0.0088, 0.0064],
     [0.01, 0.0094, 0.0084, 0.006],
     [0.0092, 0.0086, 0.0078, 0.0056],
-  ].map((a) => a.map((v) => v * s * 0.86));
+  ].map((a): number[] => a.map((v): number => v * s * 0.86));
   const xs = [0.0298, 0.0102, -0.0104, -0.0298];
-  arm.fingerSpread = xs.map((x) => -x * 2.2);
+  arm.fingerSpread = xs.map((x): number => -x * 2.2);
   arm._spreadFrom = new Float32Array(4);
   arm._spreadTo = new Float32Array(4);
-  arm.fingers = xs.map((x, i) => {
+  arm.fingers = xs.map((x, i): { root: THREE.Object3D; joints: THREE.Object3D[] } => {
     const root = new THREE.Object3D();
     root.position.set(x * s, -0.006 * s, -0.096 * s);
     root.rotation.y = -x * 2.2;

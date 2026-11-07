@@ -113,9 +113,9 @@ export function updateViewLighting(r: RenderLightingState, ctx: ViewLightingCont
     slot.score = 0;
   }
   for (const entry of r.lights) {
-    const light = entry.light as THREE.PointLight;
+    const light = entry.light;
     if (
-      !light.isPointLight ||
+      !(light instanceof THREE.PointLight) ||
       !light.visible ||
       light.intensity <= 0 ||
       light.userData.owDayIntensity === undefined

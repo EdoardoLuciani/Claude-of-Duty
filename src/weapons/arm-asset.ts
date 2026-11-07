@@ -2,38 +2,17 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
+import { isClosable } from '../core/guards.ts';
+import { isTexture } from '../core/three-guards.ts';
 import { createArmBlood, addArmBloodCoordinates } from './arm-blood.ts';
 import { createArmSurfaceMaterial } from './arm-surfaces.ts';
+import type { Arm } from './hands.ts';
 
-function isCloseableImage(value: unknown): value is ImageBitmap {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'close' in value &&
-    typeof value.close === 'function'
-  );
-}
 type ArmSkinnedMesh = THREE.SkinnedMesh<THREE.BufferGeometry, THREE.Material | THREE.Material[]>;
 export interface ArmAsset {
   meshes: ArmSkinnedMesh[];
   blood: ReturnType<typeof createArmBlood>;
   dispose(): void;
-}
-export interface ArmRig {
-  controls: Record<string, THREE.Bone>;
-  pose: string;
-  scale: number;
-  side: number;
-  upperPivot: THREE.Object3D;
-  forePivot: THREE.Object3D;
-  hand: THREE.Object3D;
-  fingers: { joints: THREE.Object3D[] }[];
-  thumb: { root: THREE.Object3D; joints: THREE.Object3D[] };
-  updateFlex(): void;
-  root: THREE.Object3D;
-  skeleton: THREE.Skeleton | null;
-  skins: THREE.SkinnedMesh[];
-  setPose(pose: unknown): void;
 }
 
 /** Owned by a Viewmodel, never a global cache: disposal/restart stays local. */
@@ -44,16 +23,16 @@ export async function loadArmAsset(): Promise<ArmAsset> {
   gltf.scene.updateMatrixWorld(true);
   const meshes: ArmSkinnedMesh[] = [];
   const blood = createArmBlood();
-  gltf.scene.traverse((object) => {
+  gltf.scene.traverse((object): void => {
     if (object instanceof THREE.SkinnedMesh) meshes.push(object as ArmSkinnedMesh);
   });
   if (!meshes.length) throw new Error('Player arms: no deformation meshes in arms.glb');
-  const names = meshes[0].skeleton.bones.map((bone) => bone.name);
+  const names = meshes[0].skeleton.bones.map((bone): string => bone.name);
   const sources: THREE.MeshPhysicalMaterial[] = [];
   const pieces: THREE.BufferGeometry[] = [];
   for (const mesh of meshes) {
     if (
-      mesh.skeleton.bones.some((bone, i) => bone.name !== names[i]) ||
+      mesh.skeleton.bones.some((bone, i): boolean => bone.name !== names[i]) ||
       mesh.skeleton.bones.length !== names.length
     )
       throw new Error('Player arms: inconsistent exported bone order');
@@ -74,7 +53,9 @@ export async function loadArmAsset(): Promise<ArmAsset> {
       const end = Math.min(index.count, range.start + range.count, group.start + group.count);
       if (!source?.visible || end <= start) continue;
       const surface = sources.length;
-      sources.push(source as THREE.MeshPhysicalMaterial);
+      if (!(source instanceof THREE.MeshPhysicalMaterial))
+        throw new Error('Player arms: expected physical material');
+      sources.push(source);
       const geometry = mesh.geometry.clone();
       geometry.setIndex(new THREE.BufferAttribute(index.array.slice(start, end), 1));
       geometry.clearGroups();
@@ -96,24 +77,24 @@ export async function loadArmAsset(): Promise<ArmAsset> {
   const merged = new THREE.SkinnedMesh(geometry, material);
   merged.name = 'Player_arm';
   merged.skeleton = meshes[0].skeleton;
-  const skeletons = new Set(meshes.map((mesh) => mesh.skeleton));
+  const skeletons = new Set(meshes.map((mesh): THREE.Skeleton => mesh.skeleton));
   // The merged source retains just one skeleton for bone-name validation. Each
   // gameplay hand still creates its own skeleton and transformed geometry below.
   skeletons.delete(merged.skeleton);
   for (const skeleton of skeletons) skeleton.dispose();
   const textures = new Set<THREE.Texture>();
   const sourceMaterials = new Set(
-    meshes.flatMap((mesh) => (Array.isArray(mesh.material) ? mesh.material : [mesh.material]))
+    meshes.flatMap((mesh): THREE.Material<THREE.MaterialEventMap>[] =>
+      Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+    )
   );
   for (const source of sourceMaterials) {
-    for (const value of Object.values(source))
-      if (value instanceof THREE.Texture)
-        textures.add(value as THREE.Texture<unknown, THREE.TextureEventMap>);
+    for (const value of Object.values(source)) if (isTexture(value)) textures.add(value);
     source.dispose();
   }
-  const images = new Set<ImageBitmap>();
+  const images = new Set<{ close(): void }>();
   for (const texture of textures) {
-    if (isCloseableImage(texture.source?.data)) images.add(texture.source.data);
+    if (isClosable(texture.source?.data)) images.add(texture.source.data);
     texture.dispose();
   }
   for (const image of images) image.close();
@@ -122,7 +103,7 @@ export async function loadArmAsset(): Promise<ArmAsset> {
   return {
     meshes,
     blood,
-    dispose() {
+    dispose(): void {
       const geometries = new Set<THREE.BufferGeometry>();
       const materials = new Set<THREE.Material>();
       const textures = new Set<THREE.Texture>();
@@ -133,8 +114,7 @@ export async function loadArmAsset(): Promise<ArmAsset> {
         for (const mat of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
           materials.add(mat);
           for (const value of Object.values(mat as object)) {
-            if (value instanceof THREE.Texture)
-              textures.add(value as THREE.Texture<unknown, THREE.TextureEventMap>);
+            if (isTexture(value)) textures.add(value);
           }
         }
       }
@@ -142,9 +122,9 @@ export async function loadArmAsset(): Promise<ArmAsset> {
       for (const g of geometries) g.dispose();
       for (const s of skeletons) s.dispose();
       for (const m of materials) m.dispose();
-      const images = new Set<ImageBitmap>();
+      const images = new Set<{ close(): void }>();
       for (const t of textures) {
-        if (isCloseableImage(t.source?.data)) images.add(t.source.data);
+        if (isClosable(t.source?.data)) images.add(t.source.data);
         t.dispose();
       }
       // Texture clones can share decoded ImageBitmaps. GPU disposal does not
@@ -156,7 +136,7 @@ export async function loadArmAsset(): Promise<ArmAsset> {
 }
 
 /** Rebind Blender weights to the gameplay contact rig in its neutral pose. */
-export function bindArmAsset(arm: ArmRig, asset: ArmAsset): void {
+export function bindArmAsset(arm: Arm, asset: ArmAsset): void {
   const controls = arm.controls;
   const oldPose = arm.pose;
   arm.upperPivot.position.set(0, 0, 0.63 * arm.scale);
@@ -178,21 +158,21 @@ export function bindArmAsset(arm: ArmRig, asset: ArmAsset): void {
     arm.scale,
     arm.scale
   );
-  const names = asset.meshes[0].skeleton.bones.map((b) => b.name);
-  const bones = names.map((name: string) => {
+  const names = asset.meshes[0].skeleton.bones.map((b): string => b.name);
+  const bones = names.map((name: string): THREE.Bone<THREE.Object3DEventMap> => {
     const control = controls[name];
     if (!control) throw new Error(`Player arms: unknown Blender bone ${name}`);
     return control;
   });
   const skeleton = new THREE.Skeleton(
     bones,
-    bones.map((b) => b.matrixWorld.clone().invert())
+    bones.map((b): THREE.Matrix4 => b.matrixWorld.clone().invert())
   );
   arm.skeleton = skeleton;
   for (const source of asset.meshes) {
     if (
       source.skeleton.bones.length !== names.length ||
-      source.skeleton.bones.some((b, i) => b.name !== names[i])
+      source.skeleton.bones.some((b, i): boolean => b.name !== names[i])
     ) {
       throw new Error('Player arms: inconsistent exported bone order');
     }

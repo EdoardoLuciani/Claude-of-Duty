@@ -1,33 +1,13 @@
+import { recordingUrls } from './recordings.ts';
 /** Required sparse environmental recordings; no continuous bed. */
 export const ENVIRONMENT_URLS = {
-  'environment-dog': [
-    new URL('./samples/environment/environment-dog-1.opus', import.meta.url).href,
-    new URL('./samples/environment/environment-dog-2.opus', import.meta.url).href,
-  ],
-  'environment-birds': [
-    new URL('./samples/environment/environment-birds-1.opus', import.meta.url).href,
-    new URL('./samples/environment/environment-birds-2.opus', import.meta.url).href,
-  ],
-  'environment-creak': [
-    new URL('./samples/environment/environment-creak-1.opus', import.meta.url).href,
-    new URL('./samples/environment/environment-creak-2.opus', import.meta.url).href,
-  ],
-  'environment-settle': [
-    new URL('./samples/environment/environment-settle-1.opus', import.meta.url).href,
-    new URL('./samples/environment/environment-settle-2.opus', import.meta.url).href,
-  ],
-  'environment-vehicle': [
-    new URL('./samples/environment/environment-vehicle-1.opus', import.meta.url).href,
-    new URL('./samples/environment/environment-vehicle-2.opus', import.meta.url).href,
-  ],
-  'environment-heli': [
-    new URL('./samples/environment/environment-heli-1.opus', import.meta.url).href,
-    new URL('./samples/environment/environment-heli-2.opus', import.meta.url).href,
-  ],
-  'environment-siren': [
-    new URL('./samples/environment/environment-siren-1.opus', import.meta.url).href,
-    new URL('./samples/environment/environment-siren-2.opus', import.meta.url).href,
-  ],
+  'environment-dog': recordingUrls('environment/environment-dog', 2),
+  'environment-birds': recordingUrls('environment/environment-birds', 2),
+  'environment-creak': recordingUrls('environment/environment-creak', 2),
+  'environment-settle': recordingUrls('environment/environment-settle', 2),
+  'environment-vehicle': recordingUrls('environment/environment-vehicle', 2),
+  'environment-heli': recordingUrls('environment/environment-heli', 2),
+  'environment-siren': recordingUrls('environment/environment-siren', 2),
 } as const;
 export type EnvironmentBank = keyof typeof ENVIRONMENT_URLS;
 export const ENVIRONMENT_KINDS = [
@@ -49,6 +29,9 @@ export const ENVIRONMENT_GAIN = {
   vehicle: 0.6,
   heli: 4,
 } as const;
+export function isEnvironmentKind(kind: unknown): kind is EnvironmentKind {
+  return ENVIRONMENT_KINDS.some((candidate): boolean => candidate === kind);
+}
 export function environmentBank(kind: EnvironmentKind): EnvironmentBank {
-  return ('environment-' + kind) as EnvironmentBank;
+  return `environment-${kind}`;
 }

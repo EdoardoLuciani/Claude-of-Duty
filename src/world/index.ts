@@ -1,11 +1,15 @@
 import * as THREE from 'three';
 
-import type { EngineContext, EngineSystems } from '../core/context.ts';
+import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
+import { hasOwn } from '../core/guards.ts';
 import type { WorldManifest } from '../core/model-metadata.ts';
 import type { Rng } from '../core/rng.ts';
+import { parseSurfaceName } from '../physics/surfaces.ts';
 import { tickStreetlightOutage } from './lighting.ts';
 import { PALETTE } from './palette.ts';
 import { WorldQueries } from './queries.ts';
+
+type WorldMaterial = ReturnType<EngineSystems['materials']['get']>;
 
 type WorldMesh = THREE.Mesh & {
   isInstancedMesh?: boolean;
@@ -18,36 +22,16 @@ type WorldMesh = THREE.Mesh & {
   };
 };
 function isWorldMesh(object: THREE.Object3D): object is WorldMesh {
-  const candidate = object as THREE.Mesh & { isInstancedMesh?: boolean };
-  return candidate.isMesh === true || candidate.isInstancedMesh === true;
+  return object instanceof THREE.Mesh;
 }
 // The WebGL renderer applied this to room bulbs and street lamps after the
 // world's day/night mix. Preserve that authored practical-to-sun ratio here;
 // the WebGPU owner intentionally no longer culls or rewrites light identities.
 const PRACTICAL_GAIN = 0.55;
 
-/**
- * WORLD — level geometry, the modular building kit, props, set dressing and
- * static collision.
- *
- * A ~120 x 120 m Middle-Eastern market street: one main street with a plaza,
- * flanking alleys, twenty buildings (three enterable), an arched gate, and
- * several thousand props. `tools/worldgen/` is the authored source; runtime
- * loads committed visual/collision GLBs and manifest-driven metadata.
- * `tools/export-world.mjs` owns deterministic export and collision cooking.
- *
- * PUBLIC API — `const world = ctx.get('world')`
- *   world.setStreetlightPower(0..1) capture/debug power override
- *   world.root                THREE.Group holding everything
- *   world.bounds              THREE.Box3 of the playable area, world space
- *   world.spawnPoints         [{ position:Vector3, yaw:number, tag:string }]
- *   world.spawn(i)            one of the above
- *   world.groundHeight(x, z)  cheap analytic floor height (physics is exact)
- *   world.isOpen(x, z)        true where a character can stand outdoors
- *   world.stats               { staticTris, instTris, instances, drawCalls }
- *   world.levelToWorld(x,y,z,out) / world.worldToLevel(x,y,z,out)
- *   world.ladderAt(x,y,z)     authored ladder catch, world space, or null
- *   world.intelMarkers        [{ id, tag, x, y, z }] from WORLD/MARKERS/INTEL
+/** Runtime world loading uses committed visual/collision GLBs and manifest metadata.
+ * Author map content in tools/worldgen; tools/export-world.mjs owns export/collision cooking.
+ * Public transforms, spawns and ladder/intel queries use the parsed manifest.
  */
 
 export class WorldSystem {
@@ -55,7 +39,7 @@ export class WorldSystem {
   declare rng: Rng;
   declare materials: EngineSystems['materials'];
   declare renderSystem: EngineSystems['render'] | null;
-  declare _mats: Map<keyof typeof PALETTE, THREE.Material>;
+  declare _mats: Map<keyof typeof PALETTE, WorldMaterial>;
   declare meshes: WorldMesh[] | null;
   declare collisionMeshes: WorldMesh[] | null;
   declare lodGroups: WorldMesh[] | null;
@@ -65,7 +49,6 @@ export class WorldSystem {
   declare _xform: THREE.Matrix4;
   declare _inv: THREE.Matrix4;
   declare buildings: WorldManifest['buildings'];
-  declare volumes: NonNullable<WorldManifest['volumes']>;
   declare spawnPoints: Array<{ position: THREE.Vector3; yaw: number; tag: string }>;
   declare bounds: THREE.Box3;
   declare stats: WorldManifest['stats'];
@@ -77,13 +60,13 @@ export class WorldSystem {
   declare _offRestart: (() => void) | null;
   declare bulbs: THREE.PointLight[] | null;
   declare lamps: THREE.PointLight[] | null;
-  declare lampLens: (THREE.Material & { emissiveIntensity: number }) | null;
+  declare lampLens: WorldMaterial | null;
   declare _lampMix: number;
   declare _lampPower: number;
   declare _sky: EngineSystems['sky'] | null;
 
-  static id = 'world';
-  static deps = ['materials', 'physics', 'models'];
+  static readonly id = 'world';
+  static readonly deps: SystemId[] = ['materials', 'physics', 'models'];
 
   async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
@@ -105,32 +88,39 @@ export class WorldSystem {
     this._xform = new THREE.Matrix4().fromArray(meta.transform);
     this._inv = this._xform.clone().invert();
     this.buildings = meta.buildings;
-    this.volumes = meta.volumes ?? [];
-    this.spawnPoints = meta.spawns.map((spawn) => ({
-      position: new THREE.Vector3().fromArray(spawn.position),
-      yaw: spawn.forward ? Math.atan2(-spawn.forward[0], -spawn.forward[2]) : spawn.yaw,
-      tag: spawn.tag,
-    }));
+    this.spawnPoints = meta.spawns.map(
+      (spawn): { position: THREE.Vector3; yaw: number; tag: string } => ({
+        position: new THREE.Vector3().fromArray(spawn.position),
+        yaw: spawn.forward ? Math.atan2(-spawn.forward[0], -spawn.forward[2]) : spawn.yaw,
+        tag: spawn.tag,
+      })
+    );
     this.bounds = new THREE.Box3(
       new THREE.Vector3().fromArray(meta.bounds.min),
       new THREE.Vector3().fromArray(meta.bounds.max)
     );
     this.stats = meta.stats;
     this.queries = new WorldQueries(meta);
-    this.intelMarkers = (meta.WORLD?.MARKERS?.INTEL ?? []).map((marker) => ({
-      id: marker.id,
-      tag: marker.tag ?? marker.id,
-      x: marker.position[0],
-      y: marker.position[1],
-      z: marker.position[2],
-    }));
+    this.intelMarkers = (meta.WORLD?.MARKERS?.INTEL ?? []).map(
+      (marker): { id: string; tag: string; x: number; y: number; z: number } => ({
+        id: marker.id,
+        tag: marker.tag ?? marker.id,
+        x: marker.position[0],
+        y: marker.position[1],
+        z: marker.position[2],
+      })
+    );
 
     const placeholders = new Set<THREE.Material>();
-    this.root.traverse((object) => {
+    this.root.traverse((object): void => {
       if (!isWorldMesh(object)) return;
-      const palette = object.userData?.palette as keyof typeof PALETTE;
-      if (!PALETTE[palette]) throw new Error(`[world] unknown palette on ${object.name}`);
-      if (Array.isArray(object.material)) object.material.forEach((m) => placeholders.add(m));
+      const palette: unknown = object.userData?.palette;
+      if (typeof palette !== 'string' || !hasOwn(PALETTE, palette))
+        throw new Error(`[world] unknown palette on ${object.name}`);
+      if (Array.isArray(object.material))
+        object.material.forEach((m): Set<THREE.Material<THREE.MaterialEventMap>> =>
+          placeholders.add(m)
+        );
       else if (object.material) placeholders.add(object.material);
       object.material = this._material(palette);
       object.castShadow = object.userData.castShadow !== false;
@@ -159,12 +149,13 @@ export class WorldSystem {
     this._collisionMaterial = new THREE.MeshBasicMaterial({ visible: false });
     const collisionPlaceholders = new Set<THREE.Material>();
     const physics = ctx.peek('physics');
-    this.collisionRoot.traverse((object) => {
+    this.collisionRoot.traverse((object): void => {
       if (!isWorldMesh(object)) return;
-      const surface = object.userData?.surface as string | undefined;
-      if (!surface) throw new Error(`[world] missing collision surface on ${object.name}`);
+      const surface = parseSurfaceName(object.userData?.surface);
       if (Array.isArray(object.material))
-        object.material.forEach((m) => collisionPlaceholders.add(m));
+        object.material.forEach((m): Set<THREE.Material<THREE.MaterialEventMap>> =>
+          collisionPlaceholders.add(m)
+        );
       else if (object.material) collisionPlaceholders.add(object.material);
       object.material = this._collisionMaterial;
       object.visible = false;
@@ -178,7 +169,7 @@ export class WorldSystem {
     this._addLights(meta.lights);
     this._outage = { elapsed: -1 };
     this._streetlightPower = 1;
-    this._offRestart = ctx.events.on('game:restart', () => {
+    this._offRestart = ctx.events.on('game:restart', (): void => {
       this._outage.elapsed = -1;
       this.setStreetlightPower(1);
     });
@@ -190,7 +181,7 @@ export class WorldSystem {
     );
   }
 
-  _material(key: keyof typeof PALETTE): THREE.Material {
+  _material(key: keyof typeof PALETTE): WorldMaterial {
     let material = this._mats.get(key);
     if (!material) {
       const def = PALETTE[key];
@@ -225,7 +216,7 @@ export class WorldSystem {
       add(light, { range: entry.range, priority: entry.priority });
       (interior ? this.bulbs : this.lamps).push(light);
     }
-    this.lampLens = this._material('lamp_lens') as THREE.Material & { emissiveIntensity: number };
+    this.lampLens = this._material('lamp_lens');
     this._lampMix = -1;
     this._lampPower = -1;
     // Keep these same PointLight instances visible on WebGPU. TSL hashes light

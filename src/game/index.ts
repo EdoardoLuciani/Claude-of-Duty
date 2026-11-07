@@ -1,27 +1,9 @@
-/*
- * SURVIVAL GAME MODE — player score and wave progression.
- *
- * The game has one score: the local player's. Enemy eliminations are worth
- * 100 points, headshots add 50, and clearing a wave awards 250 points per wave.
- * AI owns spawning/progression; this system turns those events into durable
- * run state for the HUD and end-of-run screen.
- *
- * Last-enemy search assist (search-assist.ts) emits a coarse compass sector
- * after a quiet stretch — never an exact marker, never a free kill.
- *
- * PUBLIC API — `const game = ctx.get('game')`
- *   game.score
- *   game.kills
- *   game.addScore(points, reason)
- *   game.getHudState() -> { score, kills, wave, enemiesRemaining,
- *                           waveTotal, waveIncoming, nextWaveIn }
- *
- * Events consumed: damage:dealt, wave:complete, player:death, game:restart.
- * Events emitted: score:change, hud:search.
+/** Survival score and HUD run state; AI owns wave spawning/progression.
+ * Search assistance reports only a coarse last-enemy sector, never an exact marker.
  */
 
 import type { AiSystem } from '../ai/index.ts';
-import type { EngineContext } from '../core/context.ts';
+import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
 import type { SearchState } from './search-assist.ts';
 import { resetSearchState, tickSearchAssist } from './search-assist.ts';
@@ -53,8 +35,8 @@ export class GameSystem {
   declare _search: SearchState;
   declare _off: Array<() => void>;
 
-  static id = 'game';
-  static deps = ['ai'];
+  static readonly id = 'game';
+  static readonly deps: SystemId[] = ['ai'];
 
   async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
@@ -82,7 +64,7 @@ export class GameSystem {
 
     // AI handles damage first (the dependency guarantees listener order) and
     // marks the shared payload `killed` when this hit actually ended the actor.
-    on('damage:dealt', (e) => {
+    on('damage:dealt', (e): void => {
       const target = e?.target;
       if (!e?.killed || !target || typeof target !== 'object' || this._isPlayerTarget(target))
         return;
@@ -99,14 +81,14 @@ export class GameSystem {
       this.addScore(points, e.headshot ? 'headshot' : 'elimination');
     });
 
-    on('wave:complete', (e) => {
-      const wave = Math.max(1, (e?.wave ?? 0) | 0);
+    on('wave:complete', (e): void => {
+      const wave = Math.max(1, e.wave | 0);
       const points = wave * SCORE.wave;
       this.addScore(points, 'wave');
     });
 
-    on('player:death', () => resetSearchState(this._search));
-    on('game:restart', () => this.reset());
+    on('player:death', (): void => resetSearchState(this._search));
+    on('game:restart', (): void => this.reset());
   }
 
   _isPlayerTarget(target: unknown): boolean {
@@ -147,18 +129,16 @@ export class GameSystem {
 
   /** Quiet-survivor compass cue. Uses elapsed time so pause/shop cannot advance it. */
   update(_dt: number, ctx: EngineContext): void {
-    if (ctx.config?.deterministic) return;
+    if (ctx.config.deterministic) return;
     const player = ctx.peek('player');
     if (player?.dead) {
       resetSearchState(this._search);
       return;
     }
-    const agents = this.ai?.agents;
-    if (!agents) return;
     const cue = tickSearchAssist(
       this._search,
       ctx.time.elapsed,
-      agents,
+      this.ai.agents,
       player?.position ?? ctx.camera.position
     );
     if (cue) ctx.events.emit('hud:search', cue);
@@ -166,15 +146,15 @@ export class GameSystem {
 
   /** Stable, allocation-free snapshot polled by the HUD. */
   getHudState(): HudState {
-    const wave = this.ai.getWaveState?.();
+    const wave = this.ai.getWaveState();
     const out = this._hud;
     out.score = this.score;
     out.kills = this.kills;
-    out.wave = wave?.number ?? 0;
-    out.enemiesRemaining = wave?.remaining ?? 0;
-    out.waveTotal = wave?.total ?? 0;
-    out.waveIncoming = wave?.incoming ?? false;
-    out.nextWaveIn = wave?.nextIn ?? 0;
+    out.wave = wave.number;
+    out.enemiesRemaining = wave.remaining;
+    out.waveTotal = wave.total;
+    out.waveIncoming = wave.incoming;
+    out.nextWaveIn = wave.nextIn;
     return out;
   }
 

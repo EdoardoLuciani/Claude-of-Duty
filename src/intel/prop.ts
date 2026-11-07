@@ -57,7 +57,7 @@ export function makeKit(materials?: IntelMaterials): IntelKit {
     y: number,
     z: number
   ): void => {
-    const segments = (size: number) => Math.max(2, Math.min(12, Math.ceil(size / 0.06)));
+    const segments = (size: number): number => Math.max(2, Math.min(12, Math.ceil(size / 0.06)));
     add(
       kind,
       new THREE.BoxGeometry(w, h, d, segments(w), segments(h), segments(d)).translate(x, y, z)
@@ -138,7 +138,7 @@ export function makeKit(materials?: IntelMaterials): IntelKit {
     geos,
     mats,
     lidKinds,
-    dispose() {
+    dispose(): void {
       for (const geo of Object.values(geos)) geo.dispose();
       for (const mat of owned) mat.dispose();
       for (const texture of textures) texture.dispose();
@@ -147,13 +147,12 @@ export function makeKit(materials?: IntelMaterials): IntelKit {
 }
 
 export function makeCrate(kit: IntelKit): IntelCrate {
-  const root = new THREE.Group() as IntelCrate;
-  root.name = 'intel-cache';
   const lid = new THREE.Group();
+  const root = Object.assign(new THREE.Group(), { lid });
+  root.name = 'intel-cache';
   lid.name = 'intel-lid';
   lid.position.set(0, 0.38, -0.23);
   root.add(lid);
-  root.lid = lid;
   for (const kind of Object.keys(kit.geos)) {
     const mesh = new THREE.Mesh(kit.geos[kind], kit.mats[kind]);
     mesh.receiveShadow = true;

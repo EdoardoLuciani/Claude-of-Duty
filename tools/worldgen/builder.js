@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 import { PALETTE } from './palette.js';
-import { SupportIndex } from './support-index.js';
 import { Accum, trs } from './util.js';
 
 /**
@@ -28,14 +27,12 @@ const _UP = new THREE.Vector3(0, 1, 0);
 const CHUNK = 64;
 
 export class Assembler {
-  constructor({ materials, rng, trackSupports = false }) {
+  constructor({ materials }) {
     this.materials = materials;
-    this.rng = rng;
     this._mats = new Map(); // palette key -> THREE.Material
     this._static = new Map(); // palette key -> Accum
     this._protos = new Map(); // id -> { geo, key, instances[], masks[], opts }
     this._geoCache = new Map(); // kit piece key -> BufferGeometry
-    this.supportIndex = trackSupports ? new SupportIndex() : null;
     this.meshes = [];
     /**
      * LEVEL -> WORLD. The map is authored around a street running down -Z, then
@@ -51,12 +48,6 @@ export class Assembler {
     this.interiorLights = [];
     /** Filled by dressing.js: where a street lamp wants a point light. */
     this.lampAnchors = [];
-    /**
-     * Whether put() drops a contact fillet under skirted prototypes. Turn it
-     * off around a stack — the second crate in a pile is standing on the first,
-     * not on the ground, and a dust ring floating at 60 cm is worse than none.
-     */
-    this.skirts = true;
     this.stats = { staticTris: 0, instTris: 0, instances: 0, drawCalls: 0 };
   }
 
@@ -111,9 +102,7 @@ export class Assembler {
       a = new Accum(`world:${key}`);
       this._static.set(key, a);
     }
-    const transformed = this._x(matrix);
-    this.supportIndex?.addGeometry(geo, transformed, opts?.support ?? null, key);
-    a.add(geo, transformed, opts);
+    a.add(geo, this._x(matrix), opts);
     return this;
   }
 
@@ -209,7 +198,7 @@ export class Assembler {
     this.place(id, _m, masks);
     // Ground it. The fillet is never tilted and never rotated with the prop:
     // it is a pile of dust, not part of the object.
-    if (this.skirts && p && p.skirt > 0 && this._protos.has('dust_skirt')) {
+    if (p && p.skirt > 0 && this._protos.has('dust_skirt')) {
       const rr = p.skirt * s;
       trs(_m, x, y + 0.004, z, (x * 2.7 + z * 1.9) % 6.283, rr, 1, rr);
       this.place('dust_skirt', _m, null);

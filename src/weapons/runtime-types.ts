@@ -3,7 +3,7 @@ import type * as THREE from 'three';
 import type { EngineContext, EngineSystems } from '../core/context.ts';
 import type { loadAX338 } from './ax338.ts';
 import type { Clip, ClipSample } from './clips.ts';
-import type { WEAPON_DEFS } from './defs.ts';
+import type { WeaponDef, WeaponId, WeaponMode } from './defs.ts';
 import type { loadEvolys } from './evolys.ts';
 import type { Arm } from './hands.ts';
 import type { loadM4 } from './m4.ts';
@@ -12,23 +12,6 @@ import type { loadMCX } from './mcx.ts';
 import type { loadMPX } from './mpx.ts';
 import type { loadP320 } from './p320.ts';
 
-type Definitions = (typeof WEAPON_DEFS)[keyof typeof WEAPON_DEFS];
-type UnionKeys<T> = T extends T ? keyof T : never;
-type UnionValue<T, K extends PropertyKey> = T extends T
-  ? K extends keyof T
-    ? T[K]
-    : never
-  : never;
-/** Common tuning is required; weapon-specific tuning is optional on a live slot. */
-export type WeaponDef = { [K in keyof Definitions]: Definitions[K] } & {
-  [K in Exclude<UnionKeys<Definitions>, keyof Definitions>]?: UnionValue<Definitions, K>;
-} & {
-  cycleTime?: number;
-  firingShoulderZ?: number;
-  adsFiringShoulderZ?: number;
-  supportShoulderZ?: number;
-};
-type WeaponMode = WeaponDef['modes'][number];
 export interface WeaponState {
   def: WeaponDef;
   pattern: Float32Array;
@@ -47,7 +30,7 @@ export type AuthoredModels = {
   sniper: Awaited<ReturnType<typeof loadAX338>>;
   shotgun: Awaited<ReturnType<typeof loadM590>>;
 };
-export type AuthoredWeaponModel = AuthoredModels[keyof AuthoredModels];
+export type AuthoredWeaponModel = AuthoredModels[WeaponId];
 export interface GripData {
   pos: number[];
   finger?: number[];
@@ -93,15 +76,8 @@ export interface WeaponNodes {
   handguard?: { axis: number[]; dir: number[]; r: number; z0: number; z1: number };
 }
 export type WeaponModelRecord = AuthoredWeaponModel;
-/** Each authored loader owns one adapter identity. */
-export function isWeaponAdapter<K extends keyof AuthoredModels>(
-  model: WeaponModelRecord,
-  id: K
-): model is AuthoredModels[K] {
-  return model.id === id;
-}
 export interface WeaponEntry {
-  id: string;
+  id: WeaponId;
   def: WeaponDef;
   model: WeaponModelRecord;
   group: THREE.Object3D;

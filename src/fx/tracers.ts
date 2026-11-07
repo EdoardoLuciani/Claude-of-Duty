@@ -1,42 +1,26 @@
-import { P } from './atlas.ts';
-import { resetSpawn } from './particles.ts';
+import type { Vector3Like as Vec3Like } from 'three';
 
-/**
- * Tracers.
- *
- * A tracer is a burning pellet in the base of the round, so what you see is a
- * short, very bright, velocity-aligned streak that *travels* — the fact that it
- * takes time to cross the street is most of the read. Real muzzle velocity
- * (~900 m/s) crosses a 30 m street in 33 ms, i.e. two frames, so like every
- * shipped shooter we clamp the visual speed into a range that reads on screen
- * while keeping the departure and arrival times honest.
- *
- * Three sprites: a hot head, the streak core (HDR, blooms), and a longer, dimmer
- * afterglow behind it. The core and afterglow are anchored trails (particle flag
- * bit 1): the shader projects their world-space head and tail independently so
- * incoming rounds remain correctly foreshortened instead of streaking sideways.
+import { P } from './atlas.ts';
+import type { FxSystem } from './index.ts';
+import { resetSpawn, setSpawnColorRamp, setSpawnPosition, setSpawnVelocity } from './particles.ts';
+
+/** Tracers have a hot head, bright core and dimmer afterglow; clamp visual speed for legibility.
+ * Core/afterglow use anchored trails (particle flag bit 1): project head and tail separately
+ * so incoming rounds foreshorten correctly. Preserve reached departure/arrival timing.
  */
 
 const MIN_SPEED = 55;
 const MAX_SPEED = 340;
-interface Point3 {
-  x: number;
-  y: number;
-  z: number;
-}
 interface TracerOptions {
   flightTime?: number;
   warm?: number;
 }
-interface TracerEmitter {
-  rng: { float(): number };
-  emitAdd(spawn: ReturnType<typeof resetSpawn>): void;
-}
+type TracerEmitter = Pick<FxSystem, 'rng' | 'emitAdd'>;
 
 export function spawnTracer(
   fx: TracerEmitter,
-  from: Point3,
-  to: Point3,
+  from: Vec3Like,
+  to: Vec3Like,
   speed: number,
   opts?: TracerOptions
 ): void {
@@ -67,12 +51,8 @@ export function spawnTracer(
 
   // core streak
   let s = resetSpawn();
-  s.x = ox;
-  s.y = oy;
-  s.z = oz;
-  s.vx = dx * v;
-  s.vy = dy * v;
-  s.vz = dz * v;
+  setSpawnPosition(s, ox, oy, oz);
+  setSpawnVelocity(s, dx * v, dy * v, dz * v);
   s.tile = P.STREAK;
   s.size0 = 0.055;
   s.size1 = 0.04;
@@ -82,13 +62,8 @@ export function spawnTracer(
   s.gravity = -1.2;
   // Anchored trail: the particle is the head; the projected segment trails it.
   s.flags = 2;
-  s.r0 = 1;
-  s.g0 = 0.52 * warm;
-  s.b0 = 0.18 * warm;
+  setSpawnColorRamp(s, 1, 0.52 * warm, 0.18 * warm, 1, 0.4 * warm, 0.12 * warm);
   s.i0 = 26;
-  s.r1 = 1;
-  s.g1 = 0.4 * warm;
-  s.b1 = 0.12 * warm;
   s.i1 = 16;
   s.alphaCurve = 0.25;
   s.soft = 0.1;
@@ -97,12 +72,8 @@ export function spawnTracer(
 
   // afterglow: longer, dimmer, sits behind the core
   s = resetSpawn();
-  s.x = ox;
-  s.y = oy;
-  s.z = oz;
-  s.vx = dx * v;
-  s.vy = dy * v;
-  s.vz = dz * v;
+  setSpawnPosition(s, ox, oy, oz);
+  setSpawnVelocity(s, dx * v, dy * v, dz * v);
   s.tile = P.STREAK;
   s.size0 = 0.09;
   s.size1 = 0.07;
@@ -111,13 +82,8 @@ export function spawnTracer(
   s.drag = 0.02;
   s.gravity = -1.2;
   s.flags = 2;
-  s.r0 = 1;
-  s.g0 = 0.33 * warm;
-  s.b0 = 0.1 * warm;
+  setSpawnColorRamp(s, 1, 0.33 * warm, 0.1 * warm, 1, 0.24 * warm, 0.06 * warm);
   s.i0 = 5.5;
-  s.r1 = 1;
-  s.g1 = 0.24 * warm;
-  s.b1 = 0.06 * warm;
   s.i1 = 2.5;
   s.alphaCurve = 0.3;
   s.soft = 0.14;
@@ -126,25 +92,16 @@ export function spawnTracer(
 
   // incandescent head
   s = resetSpawn();
-  s.x = ox;
-  s.y = oy;
-  s.z = oz;
-  s.vx = dx * v;
-  s.vy = dy * v;
-  s.vz = dz * v;
+  setSpawnPosition(s, ox, oy, oz);
+  setSpawnVelocity(s, dx * v, dy * v, dz * v);
   s.tile = P.SPARK;
   s.size0 = 0.05;
   s.size1 = 0.042;
   s.life = life;
   s.drag = 0.02;
   s.gravity = -1.2;
-  s.r0 = 1;
-  s.g0 = 0.85;
-  s.b0 = 0.6;
+  setSpawnColorRamp(s, 1, 0.85, 0.6, 1, 0.6, 0.3);
   s.i0 = 30;
-  s.r1 = 1;
-  s.g1 = 0.6;
-  s.b1 = 0.3;
   s.i1 = 18;
   s.alphaCurve = 0.2;
   s.soft = 0.08;

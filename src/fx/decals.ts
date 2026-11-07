@@ -2,25 +2,10 @@ import * as THREE from 'three';
 import { attribute, smoothstep, uniform } from 'three/tsl';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 
-/**
- * Projected decals.
- *
- * A decal is a box projector. We pull the static world's triangle soup out of
- * the physics BVH (`queryAabb` -> world-space triangles), reject any triangle
- * whose normal deviates too far from the impact normal, clip what is left
- * against the six planes of the projector box (Sutherland–Hodgman) and fan the
- * resulting polygons into a preallocated vertex ring.
- *
- * That gives what a screen-space decal cannot: the decal wraps around corners
- * and window reveals, and it *cannot* smear across a perpendicular face,
- * because the perpendicular face is discarded before clipping. The box's
- * thickness also depth-clips the projection, so a bullet hole on a wall never
- * appears on the pillar 40 cm behind it.
- *
- * Everything is one draw call, one MeshStandardMaterial (so it inherits the
- * renderer's cascaded shadows, AO and IBL), with its own albedo/normal/ORM
- * atlas so a bullet hole has real relief, and a time-based fade driven entirely
- * on the GPU: the CPU touches a decal exactly once, when it is created.
+/** World-space box-projected decals: query BVH triangles, reject steep normals, clip against
+ * six planes (Sutherland-Hodgman), then fan into a preallocated vertex ring.
+ * Angular rejection prevents perpendicular smears; projector depth prevents bleed-through.
+ * One physical atlas material inherits world lighting/shadows; GPU lifetime fade avoids per-frame CPU work.
  */
 
 const MAX_POLY = 24;
@@ -56,22 +41,9 @@ interface DecalOptions {
 }
 
 export class DecalSystem {
-  /**
-   * @param {object} o
-   * @param {number} o.capacity      config.q.decalBudget
-   * @param {THREE.Texture} o.albedo
-   * @param {THREE.Texture} o.normal
-   * @param {THREE.Texture} o.orm
-   * @param {number} o.cols          atlas columns
-   */
   capacity: number;
   cols: number;
-  vertsPerDecal: number;
   maxVerts: number;
-  cursor: number;
-  highWater: number;
-  expireAt: number;
-  count: number;
   pos: Float32Array;
   nrm: Float32Array;
   uvs: Float32Array;
@@ -84,20 +56,23 @@ export class DecalSystem {
   uNow: ReturnType<typeof uniform<'float'>>;
   material: MeshStandardNodeMaterial;
   mesh: THREE.Mesh;
-  _polyA: Float32Array;
-  _polyB: Float32Array;
-  _dirtyLo: number;
-  _dirtyHi: number;
-  _wrapped: boolean;
+  vertsPerDecal: number = 36;
+  cursor: number = 0;
+  highWater: number = 0;
+  expireAt: number = -1;
+  count: number = 0;
+  // scratch (allocated once)
+  _polyA: Float32Array = new Float32Array(MAX_POLY * 3);
+  _polyB: Float32Array = new Float32Array(MAX_POLY * 3);
+  _dirtyLo: number = Infinity;
+  _dirtyHi: number = -Infinity;
+  _wrapped: boolean = false;
+
+  /** Capacity comes from config.q.decalBudget; cols counts atlas columns. */
   constructor(o: DecalSystemOptions) {
     this.capacity = Math.max(8, o.capacity | 0);
     this.cols = o.cols;
-    this.vertsPerDecal = 36;
     this.maxVerts = this.capacity * this.vertsPerDecal;
-    this.cursor = 0;
-    this.highWater = 0;
-    this.expireAt = -1;
-    this.count = 0;
 
     this.pos = new Float32Array(this.maxVerts * 3);
     this.nrm = new Float32Array(this.maxVerts * 3);
@@ -160,13 +135,6 @@ export class DecalSystem {
     this.mesh.castShadow = false;
     this.mesh.userData.owProbe = true;
     this.mesh.visible = false;
-
-    // scratch (allocated once)
-    this._polyA = new Float32Array(MAX_POLY * 3);
-    this._polyB = new Float32Array(MAX_POLY * 3);
-    this._dirtyLo = Infinity;
-    this._dirtyHi = -Infinity;
-    this._wrapped = false;
   }
 
   /** Clip polygon `src`/`n` against plane axis (0..2) sign (+1/-1) limit. */
@@ -208,23 +176,9 @@ export class DecalSystem {
     return m;
   }
 
-  /**
-   * Project a decal.
-   *
-   * @param {object} o
-   * @param {THREE.Vector3} o.point   surface point
-   * @param {THREE.Vector3} o.normal  surface normal
-   * @param {number} o.size           edge length in metres
-   * @param {number} o.tile           atlas tile index
-   * @param {number} [o.roll]         rotation about the normal, radians
-   * @param {number} [o.life]         seconds
-   * @param {number} [o.fade]         normalised age at which fading starts
-   * @param {number} [o.opacity]
-   * @param {number} [o.maxAngle]     reject triangles beyond this deviation
-   * @param {number} [o.depth]        projector half-thickness in metres
-   * @param {boolean} [o.flip]        mirror the sprite for variety
-   * @param {object} o.world          physics StaticWorld
-   * @param {number} o.now
+  /** Project onto the supplied StaticWorld at point/normal. size and depth are metres;
+   * roll is radians, life is seconds, fade is normalised age, maxAngle is degrees.
+   * Reject steep faces; tile selects the atlas and flip mirrors it.
    */
   add(o: DecalOptions): boolean {
     const world = o.world;

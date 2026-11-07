@@ -1,32 +1,25 @@
 # MCX source map
 
-[Shared authoring workflow](../README.md) ·
-[Asset, references and build/check commands](../../../assets/weapons/mcx-virtus/README.md)
+[Shared workflow](../README.md) ·
+[Asset and commands](../../../assets/weapons/mcx-virtus/README.md)
 
-| Concern                                                   | Source                                        |
-| --------------------------------------------------------- | --------------------------------------------- |
-| Stage order and paths                                     | `../mcx_virtus.py`                            |
-| Finishes and three seeded 1024² maps                      | `materials.py`: `FINISHES`, `build_materials` |
-| Named assemblies, rigid pivots and sockets                | `geometry.py`: `build_*`, `build_geometry`    |
-| Six clips, poses, visibility and events                   | `animations.py`: `build_animations`           |
-| Surface projection, runtime preparation and native export | `export.py`                                   |
-| Fixed review cameras/lights                               | `studio.py`                                   |
+- `build.py`: stages/paths; `materials.py`: seeded maps and finishes.
+- `geometry.py`: assemblies/pivots/sockets; `animations.py`: six clips/events.
+- `export.py`: surface projection/export; `finishes.py`: pigment/scalar packing.
+- `studio.py`: fixed review cameras/lights.
 
-Metres, +X forward, -Y ejection side. Preserve runtime names, sockets and events.
-This is a weapon-local recipe, not a cross-weapon framework; helpers depend on
-its local materials/pivots. Write connected shader multipliers and defaults;
-base color is sRGB, roughness/normal maps are data.
+Metres, +X forward, −Y ejection side. Preserve names, sockets and event timing.
+The 10 cm repeating rest-space planar UVs are for shared detail, not unique atlases.
+Save editable Idle/modifiers before deterministic triangulation/runtime preparation.
+Sample motion at 60 Hz with LINEAR keys, CONSTANT/STEP visibility and explicit resets.
+One single-influence mechanical skin retains original helper controls; magazines
+and showcase case remain independent. No exporter hooks or GLB repair.
 
-This pilot intentionally replaced packed UVs/triangle ordering with dominant
-rest-space face-plane projection, one repeat per 10 cm. Apply the same rule to
-evaluated, deterministically triangulated runtime faces to avoid modifier UV
-rounding. It is for shared detail maps, not unique painted atlases; it was not a
-byte-preserving material-only change. Shape, maps, sockets and gameplay timings
-were not retuned by that migration.
-
-Save the editable packed preview with modifiers and Idle before export prep.
-Sample sparse motion natively at **60 Hz** into LINEAR keys; visibility stays
-CONSTANT/STEP with explicit resets. Mute tracks, restore rest transforms, evaluate
-modifiers and join in name order under ten rigid parents. Stock Actions export
-merges matching track names with forced sampling off. No GLB repair or alternate
-saved-source/material-only path.
+Opaque pigments use per-corner colors; UV1 selects padded 64² scalar tiles.
+Original UV0 albedo/full-normal pixels remain; roughness grain uses its source
+mean. Two materials separate opaque finishes and glass. The MCX adapter preserves
+per-finish normal strengths/fiber emission and glass overrides; do not compensate
+with lighting. Original source materials remain editable in the saved blend.
+The registered cook adds `-si 0.65 -se 0.0002 -sp -vc 16`; keep named helpers.
+The absent `magazineBody` still prevents world-magazine drops. Storage/draw counts
+do not establish FPS improvement; historical measurements remain in Git.

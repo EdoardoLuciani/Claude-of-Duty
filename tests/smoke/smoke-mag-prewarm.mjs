@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import * as THREE from 'three/webgpu';
 
+import { prewarm } from '../../src/core/prewarm.ts';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 
@@ -64,18 +65,29 @@ let loaded;
 system._restTask = new Promise((resolve) => {
   loaded = resolve;
 });
+render._graph = null;
+await assert.rejects(system.prewarmMaterials(), /not ready/, 'early calls must not report success');
+render._graph = {};
 const pending = system.prewarmMaterials();
-assert.equal(system._warming, true);
-await system.prewarmMaterials(); // no overlapping async graph warmups
+const concurrent = system.prewarmMaterials();
+assert.equal(concurrent, pending, 'concurrent callers share the same work');
+let settled = false;
+concurrent.then(() => {
+  settled = true;
+});
+await Promise.resolve();
+assert.equal(settled, false, 'concurrent callers must wait for completion');
 assert.equal(calls, 0, 'boot awaits deferred assets before warming');
 assert.equal(scene.children.length, 0);
 loaded();
 await Promise.resolve();
 assert.equal(calls, 1);
-finish();
-await pending;
-assert.equal(system._warming, false);
-assert.equal(system._warmed, true);
+const graphWarm = { ms: 12, geometries: 8, frameUnchanged: true };
+finish(graphWarm);
+const report = await pending;
+assert.deepEqual(report, { graphWarm });
+assert.equal(system.prewarmMaterials(), pending, 'completed work stays cached');
+assert.equal(calls, 1, 'completion never repeats native warmup');
 assert.equal(radio.visible, false);
 assert.equal(group.visible, false);
 assert.equal(scopeOverlay.visible || reticle.visible, false);
@@ -90,18 +102,46 @@ for (const p of system._droppedMags) {
   assert.equal(p.group.children[0].material, material);
 }
 // Failure restores visibility and leaves an existing pool/body untouched.
-system._warmed = false;
+const failedSystem = new WeaponSystem();
+failedSystem.ctx = system.ctx;
+failedSystem.viewmodel = system.viewmodel;
+failedSystem.pickups = system.pickups;
+failedSystem._restTask = Promise.resolve();
+failedSystem._droppedMags = system._droppedMags;
+failedSystem._magPools = system._magPools;
 const body = {};
 system._droppedMags[0].body = body;
-system.physics = { removeRigidBody: () => assert.fail('warmup removed live debris') };
+failedSystem.physics = { removeRigidBody: () => assert.fail('warmup removed live debris') };
+const failure = new Error('intentional warmup failure');
+let failures = 0;
 render._warmGraph = async () => {
-  throw new Error('intentional warmup failure');
+  failures++;
+  throw failure;
 };
-const failed = await system.prewarmMaterials();
-assert.equal(failed.ok, false);
-assert.match(failed.error, /intentional warmup failure/);
-assert.equal(system._warming, false);
-assert.equal(system._warmed, false);
+const failed = failedSystem.prewarmMaterials();
+const failedConcurrent = failedSystem.prewarmMaterials();
+assert.equal(failedConcurrent, failed);
+await assert.rejects(failed, (error) => error === failure);
+assert.equal(failedSystem.prewarmMaterials(), failed, 'failed boot work stays failed');
+assert.equal(failures, 1, 'failed warmup must not retry during gameplay');
+// The coordinator, not the weapon operation, owns status/error presentation.
+render.renderer = { getRenderTarget: () => null, setRenderTarget() {} };
+for (const [provider, ok] of [
+  [system, true],
+  [failedSystem, false],
+]) {
+  const summary = await prewarm({
+    camera: new THREE.PerspectiveCamera(),
+    scene,
+    viewScene,
+    ctx: system.ctx,
+    registry: { ordered: [provider] },
+  });
+  assert.equal(summary.ok, ok);
+  if (ok) assert.equal(summary.hooks.weapons, report);
+  else assert.deepEqual(summary.hooks.weapons, { ok: false, reason: failure.message });
+}
+assert.equal(failures, 1);
 assert.equal(radio.visible, false);
 assert.equal(group.visible, false);
 assert(system._droppedMags.every((p) => !p.group.visible));

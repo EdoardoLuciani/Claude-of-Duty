@@ -7,21 +7,26 @@ import {
   buildPerimeter,
 } from './dressing.js';
 import { buildGround } from './ground.js';
-import { BUILDINGS } from './layout.js';
-import { clearDoorwayClutter, clearVolumeClutter, placeBaked } from './placements/index.js';
+import { BUILDINGS } from './level/layout.js';
+import { clearDoorwayClutter, clearVolumeClutter, placeBaked } from './placement.js';
 import { registerProps } from './props.js';
+import { keyedRng } from './util.js';
 
-/** Populate an Assembler with the complete authored level. */
-export function buildWorld(A, rng) {
-  registerProps(A, rng);
-  registerDressingProps(A, rng);
-  buildGround(A, rng);
+/**
+ * Populate an Assembler with the complete authored level. Each element draws
+ * from its own `keyedRng` stream; there is no level-wide random sequence.
+ */
+export function buildWorld(A) {
+  registerProps(A);
+  registerDressingProps(A);
+  buildGround(A);
 
   const buildings = [];
   for (const spec of BUILDINGS) {
-    const info = buildBuilding(A, rng, spec);
+    const info = buildBuilding(A, spec);
     buildings.push(info);
     if (spec.collapse) {
+      const rng = keyedRng('collapse', spec.id);
       collapseRoof(A, rng, spec, info, {
         x: spec.x + rng.range(-2, 2),
         z: spec.z + rng.range(-2, 2),
@@ -29,11 +34,11 @@ export function buildWorld(A, rng) {
     }
   }
 
-  buildGate(A, rng);
-  buildPerimeter(A, rng);
+  buildGate(A);
+  buildPerimeter(A);
 
-  dressStreet(A, rng);
-  dressBuildings(A, rng, buildings);
+  dressStreet(A);
+  dressBuildings(A, buildings);
   placeBaked(A);
   clearDoorwayClutter(
     A,

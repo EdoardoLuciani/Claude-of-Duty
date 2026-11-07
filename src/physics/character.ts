@@ -1,25 +1,7 @@
-/**
- * Swept-capsule character controller — collide and slide.
- *
- * The controller is kinematic: `player` (or `ai`) sets a desired displacement
- * each fixed step and we resolve it against the static BVH. Nothing here
- * integrates forces; velocity is owned by the caller and only *clipped* by us,
- * so the movement state machine keeps full authority over feel.
- *
- * Resolution per move():
- *   1. depenetrate  — push out of anything we are already inside
- *   2. lift         — grounded moves raise the capsule by stepHeight first, so
- *                     a stair tread is simply invisible to the horizontal sweep
- *   3. slide        — up to N swept sweeps, clipping the remaining motion
- *                     against every plane we touch (Quake-style plane stack so
- *                     creases don't launch or trap the player)
- *   4. drop         — come back down by the lift plus gravity plus the stair
- *                     descent snap, refusing to cling to unwalkable faces
- *   5. ground probe — publish grounded / normal / surface for this frame
- *
- * The sweep is a true continuous test (see StaticWorld.sweepCapsule), so there
- * is no tunnelling regardless of speed — a 300 m/s displacement resolves
- * correctly in one step.
+/** Kinematic swept-capsule collide-and-slide; callers own forces and velocity.
+ * Depenetrate, slide, depenetrate again, then probe ground. Only grounded, non-jumping
+ * horizontal moves use stepHeight lift/drop. Continuous sweeps prevent tunnelling;
+ * descent snap refuses unwalkable faces.
  */
 
 import type { StaticWorld } from './bvh.ts';
@@ -58,26 +40,31 @@ export class CharacterController {
   declare snapDistance: number;
   declare mask: number;
   declare maxIterations: number;
-  declare position: CharacterVector;
-  declare velocity: CharacterVector;
-  declare groundNormal: CharacterVector;
-  declare wallNormal: CharacterVector;
-  declare grounded: boolean;
-  declare wasGrounded: boolean;
-  declare groundSurface: number;
-  declare groundDistance: number;
-  declare groundObject: number;
-  declare onSteepSlope: boolean;
-  declare touchingCeiling: boolean;
-  declare touchingWall: boolean;
-  declare lastMoveBlocked: boolean;
-  declare steppedUp: number;
-  declare landingSpeed: number;
-  declare enabled: boolean;
-  declare _hit: ReturnType<typeof makeHitRecord>;
-  declare _hit2: ReturnType<typeof makeHitRecord>;
-  declare _planes: Float32Array;
-  declare _startPos: CharacterVector;
+
+  /** Feet position (bottom of the capsule), the authoritative transform. */
+  position: CharacterVector = { x: 0, y: 0, z: 0 };
+  /** Velocity is owned by the caller; move() clips it against contacts. */
+  velocity: CharacterVector = { x: 0, y: 0, z: 0 };
+  grounded: boolean = false;
+  wasGrounded: boolean = false;
+  groundNormal: CharacterVector = { x: 0, y: 1, z: 0 };
+  groundSurface: number = 0;
+  groundDistance: number = 0;
+  groundObject: number = -1;
+  onSteepSlope: boolean = false;
+  touchingCeiling: boolean = false;
+  touchingWall: boolean = false;
+  wallNormal: CharacterVector = { x: 0, y: 0, z: 0 };
+  lastMoveBlocked: boolean = false;
+  steppedUp: number = 0;
+  /** Impact speed along the ground normal on the frame we landed. */
+  landingSpeed: number = 0;
+  enabled: boolean = true;
+  // preallocated scratch
+  _hit: ReturnType<typeof makeHitRecord> = makeHitRecord();
+  _hit2: ReturnType<typeof makeHitRecord> = makeHitRecord();
+  _planes: Float32Array = new Float32Array(MAX_PLANES * 3);
+  _startPos: CharacterVector = { x: 0, y: 0, z: 0 };
 
   constructor(world: StaticWorld, opts: CharacterOptions = {}) {
     this.world = world;
@@ -91,33 +78,6 @@ export class CharacterController {
     this.snapDistance = opts.snapDistance ?? 0.32;
     this.mask = opts.mask ?? MASK.CHARACTER;
     this.maxIterations = opts.maxIterations ?? 5;
-
-    /** Feet position (bottom of the capsule), the authoritative transform. */
-    this.position = { x: 0, y: 0, z: 0 };
-    /** Velocity is owned by the caller; move() clips it against contacts. */
-    this.velocity = { x: 0, y: 0, z: 0 };
-
-    this.grounded = false;
-    this.wasGrounded = false;
-    this.groundNormal = { x: 0, y: 1, z: 0 };
-    this.groundSurface = 0;
-    this.groundDistance = 0;
-    this.groundObject = -1;
-    this.onSteepSlope = false;
-    this.touchingCeiling = false;
-    this.touchingWall = false;
-    this.wallNormal = { x: 0, y: 0, z: 0 };
-    this.lastMoveBlocked = false;
-    this.steppedUp = 0;
-    /** Impact speed along the ground normal on the frame we landed. */
-    this.landingSpeed = 0;
-    this.enabled = true;
-
-    // preallocated scratch
-    this._hit = makeHitRecord();
-    this._hit2 = makeHitRecord();
-    this._planes = new Float32Array(MAX_PLANES * 3);
-    this._startPos = { x: 0, y: 0, z: 0 };
 
     if (opts.position) this.setPosition(opts.position.x, opts.position.y, opts.position.z);
   }
@@ -650,7 +610,7 @@ export class CharacterController {
     return SURFACE_PROPS[this.groundSurface]?.friction ?? 0.9;
   }
 
-  get groundSurfaceName(): string {
+  get groundSurfaceName(): import('./surfaces.ts').SurfaceName {
     return surfaceName(this.groundSurface);
   }
 

@@ -316,7 +316,10 @@ resetLive();
 pressG();
 assert.equal(wp.grenadeEquipped, false, 'with zero grenades G does not equip');
 
-// ---- overcook detonates in the hand ----------------------------------------
+// ---- overcook detonates in the hand, without synthetic fuse warnings --------
+const cookAudio = [],
+  previousAudio = wp.audio;
+wp.audio = { playUi: (kind) => cookAudio.push(kind) };
 wp.grenades = 2; // a market pack — the harness skipped init()
 pressG();
 input.firePressed = true;
@@ -330,6 +333,13 @@ assert.equal(wp.cooking, false, 'overcook ends the cook');
 assert.equal(wp.grenadeEquipped, false, 'overcook drops the grenade in the hand');
 const booms = events.filter((e) => e.type === 'explosion');
 assert.equal(booms.length, 1, 'overcook emits exactly one explosion');
+assert.deepEqual(
+  cookAudio,
+  [],
+  'arming and holding the full fuse are silent: no rejected pin donor or warning beep'
+);
+wp.audio = previousAudio;
+assert.equal(booms[0].payload.kind, 'grenade', 'overcook selects grenade audio');
 assert.equal(booms[0].payload.damage, GRENADE_DAMAGE, 'blast carries the tuned damage');
 assert.equal(booms[0].payload.radius, GRENADE_RADIUS, 'blast carries the tuned radius');
 assert.equal(wp.grenades, 1, 'the overcooked grenade stays spent');
@@ -342,6 +352,7 @@ wp._spawnGrenade(new THREE.Vector3(0, 1.6, 0), { x: 0, y: 0, z: 0 }, 0.001);
 step(); // fuse expires: the blast fires
 const dets = events.filter((e) => e.type === 'explosion');
 assert.equal(dets.length, 1, 'fuse expiry emits exactly one explosion');
+assert.equal(dets[0].payload.kind, 'grenade', 'thrown grenade selects grenade audio');
 assert.equal(dets[0].payload.damage, GRENADE_DAMAGE, 'detonation carries the tuned damage');
 assert.equal(dets[0].payload.radius, GRENADE_RADIUS, 'detonation carries the tuned radius');
 assert.equal(wp._grenades.length, 0, 'the spent grenade is cleared');
@@ -680,6 +691,10 @@ let guard = 0;
 while (radio.active.length && guard++ < 60 * 60) radio.update(1 / 60);
 assert(guard < 60 * 60, 'strike clears within 60 s of sim time');
 const strikeBooms = strikeEvents.filter((e) => e.type === 'explosion');
+assert(
+  strikeBooms.every((e) => e.payload.kind === 'bomb'),
+  'all strike bombs select bomb audio'
+);
 assert(strikeBooms.length >= 40, `a carpet bomb drops a lot of bombs (got ${strikeBooms.length})`);
 assert(
   strikeBooms.every((e) => e.payload.radius === CARPET.radius),

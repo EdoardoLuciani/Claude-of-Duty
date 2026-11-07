@@ -1,19 +1,13 @@
 /**
- * AI — soldier assembly. Turns the part library into a finished, skinned,
- * surface-labelled character. One geometry per visual variant, shared by every
- * instance of that variant; only the skeleton is per-instance.
+ * Soldier registry and surface contracts. Blender owns geometry authoring in
+ * tools/blender/soldiers/; instances share geometry and own their skeletons.
  */
-
 import * as THREE from 'three';
 
-import type { Rng } from '../core/rng.ts';
-import type { Vec3 } from './geo.ts';
-import { CharacterBuilder, Noise } from './geo.ts';
-import * as P from './parts.ts';
-import { RIG, GRIP_R, BORE_DIR } from './rig.ts';
 import type { SoldierMaterialOptions } from './textures-tsl.ts';
 import { CLOTH_TILE } from './textures.ts';
-import { buildWeapon } from './weapon.ts';
+
+type Vec3 = [number, number, number];
 
 /**
  * Metres of surface per texture tile. `cloth` is deliberately large: it is the
@@ -36,68 +30,15 @@ const MATERIALS: Record<string, { tile: number }> = {
   glass: { tile: 1.0 },
 };
 
-/**
- * Roughness multiplier per material set, applied on top of the baked roughness
- * map so the *relative* variation the bake carries is preserved.
- *
- *   cloth 0.85   matte ripstop, map averages 0.905
- *   plate 0.55   laminate over foam, map averages 0.62
- *   boot  0.70   waxed leather / rubber, cordura map averages 0.79
- *
- * These three are the values the silhouette needs: at 25 m the only thing that
- * separates a plate carrier from the jacket under it is the width of its
- * specular lobe.
+export { MATERIALS as SOLDIER_MATERIALS };
+
+/** Multiply baked roughness so its relative variation remains visible.
+ * Cloth, laminate and boots use separate multipliers to distinguish their specular lobes at range.
  */
 const ROUGH = { cloth: 0.85 / 0.905, plate: 0.55 / 0.62, boot: 0.7 / 0.79 };
 
 /** Detail tile size in metres — must match `bakeDetail` in textures.js. */
 const DETAIL_TILE = 0.05;
-
-/**
- * ALBEDO BUDGET (linear, after the vertex tint multiplies the map)
- *
- * MEASURED, not asserted — `node src/ai/selftest.mjs` prints this table from the
- * geometry and the real bakes, and `SoldierMaterials` prints the cloth map's mean
- * and range at boot. Current values:
- *
- *   uniform cloth      0.092-0.094   map mean 0.104, every texel in 0.040-0.152
- *   helmet cover       0.064         deliberately off the uniform value
- *   mag/admin pouches  0.058-0.076
- *   knee + elbow pads  0.057-0.063
- *   carrier            0.047         laminate, and smoother than the cloth
- *   webbing / sling    0.051-0.054
- *   boots              0.032
- *   gloves             0.032-0.048
- *   skin               0.152-0.190
- *
- * Real desert multicam is 0.18-0.32 and that is what this used to target, but the
- * environment it stands in currently behaves like 0.05-0.09 albedo on screen
- * (see the measurement table in textures.js), so a physically-honest uniform
- * rendered brighter than sunlit plaster and read as a white mannequin. The whole
- * kit is therefore scaled by one documented constant, `KIT_CAL`, which keeps the
- * *hierarchy* — cloth brightest, pouches under it, carrier under that, boots and
- * gloves darkest — because that internal value structure is what breaks the "one
- * extruded blob" read at 25 m. Raise `CLOTH_BUDGET.mean` and `KIT_CAL` together
- * if the world's albedo is ever brought up to physical values.
- */
-const GEAR: Record<string, Vec3> = {
-  webbing: [0.7, 0.7, 0.7],
-  sling: [0.7, 0.7, 0.7],
-  pouch: [0.84, 0.84, 0.84],
-  pouchAlt: [0.76, 0.76, 0.76],
-  dump: [0.72, 0.72, 0.72],
-  belt: [0.62, 0.61, 0.57],
-  pad: [0.55, 0.55, 0.55],
-  strap: [0.56, 0.56, 0.56],
-  wrap: [0.56, 0.54, 0.5],
-  glove: [0.38, 0.372, 0.363],
-  boot: [0.22, 0.209, 0.198],
-  lace: [0.21, 0.204, 0.198],
-  // A hard ballistic mask is moulded polymer, not webbing: near-black with a
-  // clean sheen, which is what makes the lower face read as a mask at 35 m
-  // instead of another patch of tan cloth.
-  mask: [0.62, 0.63, 0.66],
-};
 
 /**
  * Visual variants. Each is a different silhouette, not a recolour: helmet vs
@@ -198,710 +139,10 @@ export const VARIANTS: Record<VariantName, VariantDef> = {
   },
 };
 
-const bp = (name: string): Vec3 => {
-  const v = RIG.bindPos[RIG.index(name)];
-  return [v.x, v.y, v.z];
-};
-
 /**
- * Build one variant.
- * @returns { geometry, materials: THREE.Material[], weapon, stats }
- */
-export interface SoldierMaterialFactory {
-  get(name: string, options?: Record<string, unknown>): THREE.Material;
-  glass(): THREE.Material;
-}
-export interface BuildSoldierResult {
-  geometry: THREE.BufferGeometry;
-  materials: THREE.Material[];
-  slots: string[];
-  parts: {
-    name?: string;
-    material: string;
-    start: number | undefined;
-    count: number | undefined;
-  }[];
-  weapon: ReturnType<typeof buildWeapon>;
-  stats: { vertices: number; triangles: number };
-  variant: VariantDef;
-}
-export function buildSoldier(
-  name: VariantName,
-  { rng, materials }: { rng: Rng; materials: SoldierMaterialFactory }
-): BuildSoldierResult {
-  const V = VARIANTS[name] ?? VARIANTS.vanguard;
-  const nz = new Noise(rng.fork());
-  const B = new CharacterBuilder(RIG, { noise: nz, materials: MATERIALS });
-
-  const shR = bp('UpperArmR'),
-    elR = bp('ForearmR'),
-    wrR = bp('HandR');
-  const shL = bp('UpperArmL'),
-    elL = bp('ForearmL'),
-    wrL = bp('HandL');
-  const hipR = bp('UpLegR'),
-    knR = bp('LegR'),
-    anR = bp('FootR');
-  const hipL = bp('UpLegL'),
-    knL = bp('LegL'),
-    anL = bp('FootL');
-  const head = bp('Head');
-
-  /* ---------------- occlusion proxies (drives baked vertex AO) -------- */
-  B.occlude([0, 0.95, -0.01], [0, 1.42, 0.0], 0.155, 1.0); // torso core
-  B.occlude([0, 1.17, 0.13], [0, 1.4, 0.138], 0.11, 1.0); // front plate
-  B.occlude([0, 1.2, -0.105], [0, 1.4, -0.112], 0.105, 0.8); // back plate
-  B.occlude([-0.17, 1.16, 0.02], [-0.17, 1.3, 0.02], 0.055, 0.7); // right side
-  B.occlude([0.17, 1.16, 0.02], [0.17, 1.3, 0.02], 0.055, 0.7);
-  B.occlude([0, 1.6, 0.0], [0, 1.8, -0.01], 0.122, 1.0); // helmet interior
-  B.occlude([-0.09, 1.655, 0.05], [0.09, 1.655, 0.05], 0.055, 1.0); // brim shadow
-  B.occlude(shR, elR, 0.058, 0.7);
-  B.occlude(shL, elL, 0.058, 0.7);
-  B.occlude(hipR, knR, 0.085, 0.8);
-  B.occlude(hipL, knL, 0.085, 0.8);
-  B.occlude([0, 0.9, -0.01], [0, 1.05, -0.01], 0.15, 0.8); // belt line
-  // strap crossings — shoulder yokes and the diagonal sling run. These are the
-  // places a real uniform is darkest: sweat, webbing dye and ground-in dust all
-  // collect where nylon rubs cloth.
-  B.occlude([-0.085, 1.42, 0.06], [-0.085, 1.42, -0.06], 0.048, 1.0);
-  B.occlude([0.085, 1.42, 0.06], [0.085, 1.42, -0.06], 0.048, 1.0);
-  B.occlude([-0.13, 1.4, 0.055], [0.1, 1.1, 0.115], 0.032, 0.9); // sling diagonal
-  B.occlude([-0.02, 1.02, 0.1], [-0.02, 1.02, -0.1], 0.1, 0.6); // carrier hem
-  // cuffs, elbows and knees: the three places a uniform is always ground in
-  B.occlude(wrR, [wrR[0], wrR[1] + 0.05, wrR[2]], 0.044, 0.9);
-  B.occlude(wrL, [wrL[0], wrL[1] + 0.05, wrL[2]], 0.044, 0.9);
-  B.occlude(elR, [elR[0], elR[1] - 0.02, elR[2] - 0.01], 0.052, 0.8);
-  B.occlude(elL, [elL[0], elL[1] - 0.02, elL[2] - 0.01], 0.052, 0.8);
-  B.occlude(knR, [knR[0], knR[1] - 0.03, knR[2] + 0.01], 0.072, 0.8);
-  B.occlude(knL, [knL[0], knL[1] - 0.03, knL[2] + 0.01], 0.072, 0.8);
-  B.occlude([anR[0], anR[1] + 0.09, anR[2]], [anR[0], anR[1] + 0.15, anR[2]], 0.062, 0.8);
-  B.occlude([anL[0], anL[1] + 0.09, anL[2]], [anL[0], anL[1] + 0.15, anL[2]], 0.062, 0.8);
-  B.occlude(
-    GRIP_R,
-    [
-      GRIP_R[0] + BORE_DIR[0] * 0.4,
-      GRIP_R[1] + BORE_DIR[1] * 0.4 + 0.09,
-      GRIP_R[2] + BORE_DIR[2] * 0.4,
-    ],
-    0.045,
-    0.6
-  );
-  for (let i = 0; i < 3; i++) {
-    const x = (i - 1) * 0.078;
-    B.occlude([x, 1.2, 0.16], [x, 1.28, 0.164], 0.04, 0.8); // mag pouches
-  }
-
-  /* ---------------- uniform ------------------------------------------ */
-  B.add(P.jacketTorso(nz, { bulk: V.bulk }), {
-    material: 'cloth',
-    bones: [
-      'Hips',
-      'Spine',
-      'Spine1',
-      'Spine2',
-      'Neck',
-      'ClavicleR',
-      'ClavicleL',
-      'UpperArmR',
-      'UpperArmL',
-    ],
-    bias: [1, 1, 1, 1, 0.8, 0.55, 0.55, 0.3, 0.3],
-    colour: [1, 1, 1],
-    grime: 0.85,
-    dirt: 0.2,
-    dust: 0.34,
-    wear: 0.08,
-    name: 'jacket',
-  });
-  B.add(P.pelvis(nz), {
-    material: 'cloth',
-    bones: ['Hips', 'Spine', 'UpLegR', 'UpLegL'],
-    bias: [1, 0.7, 0.5, 0.5],
-    colour: [0.97, 0.97, 0.97],
-    grime: 0.9,
-    dirt: 0.35,
-    dust: 0.2,
-    name: 'pelvis',
-  });
-  B.add(P.collar(nz), {
-    material: 'cloth',
-    bones: ['Neck', 'Spine2', 'Head'],
-    bias: [1, 0.8, 0.3],
-    colour: [0.92, 0.92, 0.91],
-    grime: 1.0,
-    dust: 0.3,
-    name: 'collar',
-  });
-
-  // sleeves
-  for (const [sh, el, wr, side, suffix] of [
-    [shR, elR, wrR, -1, 'R'],
-    [shL, elL, wrL, 1, 'L'],
-  ] as [Vec3, Vec3, Vec3, number, string][]) {
-    // deltoid cap. The sleeve tube alone meets the torso in a socket, which is
-    // half of the "tube arms" read; this gives the shoulder an actual shape and
-    // a highlight to catch the key light on.
-    B.add(P.shoulderCap(nz, sh, side), {
-      material: 'cloth',
-      bones: [`Clavicle${suffix}`, `UpperArm${suffix}`, 'Spine2'],
-      bias: [0.8, 1, 0.4],
-      colour: [1, 1, 1],
-      grime: 0.7,
-      dust: 0.5,
-      wear: 0.06,
-      name: `shoulder${suffix}`,
-    });
-    B.add(
-      P.limbTube(
-        nz,
-        [sh[0] + side * 0.012, sh[1] + 0.055, sh[2]],
-        el,
-        wr,
-        [0.05, 0.062, 0.056, 0.05, 0.046, 0.042, 0.038],
-        {
-          rings: 22,
-          seg: 16,
-          fold: 0.0016,
-          // 3 mm creases: at 35 m that is sub-pixel as displacement but the normals
-          // it generates are what put light and shade *inside* the sleeve outline.
-          crease: 0.003,
-          bend: [0, 0, -1], // sleeve bunches inside the elbow
-        }
-      ),
-      {
-        material: 'cloth',
-        bones: [
-          `Clavicle${suffix}`,
-          `UpperArm${suffix}`,
-          `Forearm${suffix}`,
-          `Hand${suffix}`,
-          'Spine2',
-        ],
-        bias: [0.5, 1, 1, 0.7, 0.25],
-        colour: [1, 1, 1],
-        grime: 0.8,
-        dirt: 0.15,
-        dust: 0.3,
-        wear: 0.12,
-        name: `sleeve${suffix}`,
-      }
-    );
-    // elbow reinforcement patch
-    B.add(
-      P.limbTube(
-        nz,
-        [el[0] * 0.98 + sh[0] * 0.02, el[1] + 0.05, el[2] - 0.005],
-        el,
-        [el[0] * 0.98 + wr[0] * 0.02, el[1] - 0.05, el[2] + 0.004],
-        [0.05, 0.054, 0.05],
-        { rings: 5, seg: 14, fold: 0.001 }
-      ),
-      {
-        material: 'gear',
-        bones: [`UpperArm${suffix}`, `Forearm${suffix}`],
-        bias: [1, 1],
-        colour: GEAR.pad,
-        grime: 1.0,
-        dirt: 0.25,
-        dust: 0.22,
-        wear: 0.16,
-        name: `elbowPad${suffix}`,
-      }
-    );
-  }
-
-  // trousers
-  for (const [hip, kn, an, suffix] of [
-    [hipR, knR, anR, 'R'],
-    [hipL, knL, anL, 'L'],
-  ] as [Vec3, Vec3, Vec3, string][]) {
-    B.add(
-      P.limbTube(
-        nz,
-        hip,
-        kn,
-        [an[0], an[1] + 0.085, an[2] + 0.008],
-        [0.09, 0.085, 0.076, 0.068, 0.062, 0.06, 0.064],
-        {
-          rings: 24,
-          seg: 17,
-          fold: 0.0018,
-          // trousers crease harder than sleeves and stack on the boot cuff
-          crease: 0.0042,
-          bend: [0, 0, -1], // gathers behind the knee
-        }
-      ),
-      {
-        material: 'cloth',
-        bones: ['Hips', `UpLeg${suffix}`, `Leg${suffix}`, `Foot${suffix}`],
-        bias: [0.6, 1, 1, 0.5],
-        colour: [0.98, 0.98, 0.97],
-        grime: 0.8,
-        dirt: 0.72,
-        dust: 0.22,
-        wear: 0.1,
-        name: `leg${suffix}`,
-      }
-    );
-    // cargo pocket on the outer thigh
-    const side = suffix === 'R' ? -1 : 1;
-    B.add(
-      P.pouch(nz, {
-        hx: 0.052,
-        hy: 0.07,
-        hz: 0.026,
-        x: hip[0] + side * 0.062,
-        y: hip[1] - 0.16,
-        z: 0.026,
-        rz: side * 0.06,
-        ry: side * 0.55,
-        bend: 0.11,
-      }),
-      {
-        material: 'cloth',
-        bones: [`UpLeg${suffix}`, 'Hips'],
-        bias: [1, 0.4],
-        colour: [0.95, 0.95, 0.94],
-        grime: 0.9,
-        dirt: 0.5,
-        dust: 0.4,
-        wear: 0.16,
-        name: `cargo${suffix}`,
-      }
-    );
-    if (V.kneePads) {
-      B.add(P.kneePad(nz, kn, side), {
-        material: 'gear',
-        bones: [`Leg${suffix}`, `UpLeg${suffix}`],
-        bias: [1, 0.5],
-        colour: GEAR.pad,
-        grime: 1.0,
-        dirt: 0.9,
-        dust: 0.28,
-        wear: 0.2,
-        name: `knee${suffix}`,
-      });
-    }
-    // boots
-    B.add(P.boot(nz, an, side), {
-      material: 'boot',
-      bones: [`Leg${suffix}`, `Foot${suffix}`, `Toe${suffix}`],
-      bias: [0.55, 1, 0.6],
-      colour: GEAR.boot,
-      grime: 0.9,
-      dirt: 0.85,
-      dust: 0.5,
-      wear: 0.3,
-      name: `boot${suffix}`,
-    });
-    B.add(P.bootSole(an, side), {
-      material: 'rubber',
-      bones: [`Foot${suffix}`, `Toe${suffix}`],
-      bias: [1, 0.8],
-      grime: 0.9,
-      dirt: 1.0,
-      name: `sole${suffix}`,
-    });
-    B.add(P.bootLaces(an, side), {
-      material: 'boot',
-      bone: `Foot${suffix}`,
-      colour: GEAR.lace,
-      grime: 0.9,
-      dirt: 0.85,
-      name: `laces${suffix}`,
-    });
-  }
-
-  /* ---------------- load-bearing gear -------------------------------- */
-  B.add(P.plateCarrier(nz, V), {
-    material: 'plate',
-    bones: ['Spine', 'Spine1', 'Spine2', 'ClavicleR', 'ClavicleL'],
-    bias: [0.7, 1, 1, 0.45, 0.45],
-    colour: [0.72, 0.72, 0.72],
-    grime: 0.85,
-    dirt: 0.3,
-    dust: 0.3,
-    wear: 0.18,
-    name: 'carrier',
-  });
-  B.add(P.carrierWebbing(), {
-    material: 'gear',
-    bones: ['Spine1', 'Spine2'],
-    bias: [1, 1],
-    colour: GEAR.webbing,
-    grime: 1.0,
-    dust: 0.3,
-    wear: 0.26,
-    name: 'webbing',
-  });
-
-  // magazine pouches across the front, deliberately not evenly loaded
-  const nPouch: number = V.fullCarrier ? 3 : 2;
-  for (let i = 0; i < nPouch; i++) {
-    const t = nPouch === 1 ? 0.5 : i / (nPouch - 1);
-    const x = (t - 0.5) * (nPouch > 2 ? 0.156 : 0.09);
-    B.add(
-      P.pouch(nz, {
-        hx: 0.033,
-        hy: 0.056,
-        hz: 0.034,
-        x,
-        y: 1.236 + rng.range(-0.006, 0.006),
-        z: 0.148,
-        rx: -0.1,
-        rz: rng.range(-0.05, 0.05),
-        lidTilt: i === 1 ? -0.5 : 0,
-        bend: 0.26,
-      }),
-      {
-        material: 'gear',
-        bones: ['Spine1', 'Spine2', 'Spine'],
-        bias: [1, 0.8, 0.4],
-        colour: i === 1 ? GEAR.pouchAlt : GEAR.pouch,
-        grime: 0.9,
-        dirt: 0.25,
-        dust: 0.5,
-        wear: 0.3,
-        name: `magPouch${i}`,
-      }
-    );
-    // a magazine sticking out of the open pouch
-    if (i === 1) {
-      const mag = P.pouch(nz, {
-        hx: 0.0145,
-        hy: 0.042,
-        hz: 0.023,
-        x,
-        y: 1.308,
-        z: 0.152,
-        rx: -0.12,
-      });
-      B.add(mag, {
-        material: 'polymer',
-        bones: ['Spine1', 'Spine2'],
-        bias: [1, 0.8],
-        grime: 0.4,
-        wear: 0.2,
-        name: 'spareMag',
-      });
-    }
-  }
-
-  // radio on the left chest, admin pouch on the right, IFAK on the belt
-  B.add(
-    P.pouch(nz, {
-      hx: 0.032,
-      hy: 0.058,
-      hz: 0.028,
-      x: 0.112,
-      y: 1.336,
-      z: 0.118,
-      ry: 0.35,
-      rz: 0.1,
-      bend: 0.24,
-    }),
-    {
-      material: 'gear',
-      bones: ['Spine2', 'ClavicleL', 'Spine1'],
-      bias: [1, 0.5, 0.5],
-      colour: GEAR.pouchAlt,
-      grime: 0.9,
-      dust: 0.5,
-      wear: 0.22,
-      name: 'radio',
-    }
-  );
-  // antenna
-  {
-    const ant = P.pouch(nz, {
-      hx: 0.005,
-      hy: 0.075,
-      hz: 0.005,
-      x: 0.116,
-      y: 1.424,
-      z: 0.104,
-      rx: -0.18,
-    });
-    B.add(ant, {
-      material: 'polymer',
-      bones: ['Spine2', 'ClavicleL'],
-      bias: [1, 0.6],
-      grime: 0.3,
-      name: 'antenna',
-    });
-  }
-  B.add(P.belt(nz), {
-    material: 'gear',
-    bones: ['Hips', 'Spine'],
-    bias: [1, 0.5],
-    colour: GEAR.belt,
-    grime: 1.0,
-    dirt: 0.4,
-    dust: 0.25,
-    wear: 0.26,
-    name: 'belt',
-  });
-  B.add(P.hipPouch(nz, -1), {
-    material: 'gear',
-    bones: ['Hips', 'Spine'],
-    bias: [1, 0.4],
-    colour: GEAR.dump,
-    grime: 0.95,
-    dirt: 0.6,
-    dust: 0.45,
-    wear: 0.26,
-    name: 'dumpPouch',
-  });
-
-  /* ---------------- head --------------------------------------------- */
-  const wrapped = V.faceWrap;
-  B.add(P.headMesh(nz, head, {}), {
-    material: 'skin',
-    bone: 'Head',
-    colour: [1, 1, 1],
-    grime: 0.3,
-    dirt: 0.06,
-    name: 'head',
-  });
-  B.add(P.nose(nz, head), { material: 'skin', bone: 'Head', grime: 0.25, name: 'nose' });
-  B.add(P.ear(nz, head, -1), { material: 'skin', bone: 'Head', grime: 0.45, name: 'earR' });
-  B.add(P.ear(nz, head, 1), { material: 'skin', bone: 'Head', grime: 0.45, name: 'earL' });
-  for (const side of [-1, 1]) {
-    B.add(P.eyeball(head, side), {
-      material: 'polymer',
-      bone: 'Head',
-      colour: [0.55, 0.5, 0.45],
-      grime: 0.2,
-      name: 'eye',
-    });
-  }
-  // neck
-  B.add(
-    P.limbTube(
-      nz,
-      [head[0], head[1] - 0.1, head[2] - 0.012],
-      [head[0], head[1] - 0.05, head[2] - 0.008],
-      [head[0], head[1], head[2]],
-      [0.058, 0.056, 0.054],
-      { rings: 5, seg: 14, fold: 0.001 }
-    ),
-    {
-      material: 'skin',
-      bones: ['Neck', 'Head', 'Spine2'],
-      bias: [1, 0.7, 0.4],
-      grime: 0.5,
-      name: 'neck',
-    }
-  );
-
-  if (wrapped) {
-    // A hard ballistic mask is moulded polymer on the *same* geometry: the seam
-    // and the bridge fold read as the mask's edge and nose vent instead of a
-    // cloth hem, and it lands far darker than any cloth in the kit, which is
-    // what gives that variant a legible face at range.
-    B.add(P.faceWrap(nz, head, V), {
-      material: V.maskHard ? 'polymer' : 'gear',
-      bones: ['Head', 'Neck'],
-      bias: [1, 0.5],
-      colour: V.maskHard ? GEAR.mask : V.helmet ? GEAR.wrap : [0.78, 0.74, 0.66],
-      grime: V.maskHard ? 0.5 : 0.85,
-      dirt: V.maskHard ? 0.1 : 0.2,
-      dust: V.maskHard ? 0.2 : 0.3,
-      wear: V.maskHard ? 0.3 : 0.1,
-      name: 'faceWrap',
-    });
-  }
-
-  if (V.helmet) {
-    // A covered helmet is CLOTH, not plastic: the camo cover is the single
-    // biggest reason a helmet reads as a helmet rather than a bowling ball. Its
-    // tint deliberately lands off the uniform value so the head separates from
-    // the torso at range. A bare shell goes on the laminate set instead.
-    B.add(P.helmet(nz, head, V), {
-      material: V.helmetCover ? 'cloth' : 'plate',
-      bone: 'Head',
-      colour: V.helmetTint ?? [1, 1, 1],
-      grime: 0.6,
-      dirt: 0.2,
-      dust: 0.55,
-      wear: 0.4,
-      name: 'helmet',
-    });
-    B.add(P.helmetHardware(nz, head), {
-      material: 'polymer',
-      bone: 'Head',
-      grime: 0.5,
-      wear: 0.3,
-      name: 'helmetHW',
-    });
-    B.add(P.chinStrap(head), {
-      material: 'gear',
-      bones: ['Head', 'Neck'],
-      bias: [1, 0.4],
-      colour: GEAR.strap,
-      grime: 0.95,
-      dust: 0.25,
-      wear: 0.18,
-      name: 'chinStrap',
-    });
-    if (V.goggles) {
-      const g = P.goggles(head, V.gogglesDown);
-      B.add(g.frame, {
-        material: 'polymer',
-        bone: 'Head',
-        grime: 0.4,
-        wear: 0.35,
-        name: 'goggleFrame',
-      });
-      B.add(g.strap, {
-        material: 'gear',
-        bone: 'Head',
-        colour: GEAR.strap,
-        grime: 0.85,
-        dust: 0.3,
-        name: 'goggleStrap',
-      });
-      B.add(P.goggleLens(head, V.gogglesDown), {
-        material: 'glass',
-        bone: 'Head',
-        colour: [1, 1, 1],
-        grime: 0.15,
-        name: 'goggleLens',
-      });
-    }
-  } else if (V.headWrap) {
-    const wrap = P.headScarf(nz, head);
-    B.add(wrap, {
-      // hue comes from the variant's cloth tint; the VALUE sits below the uniform
-      // so the head is never the brightest thing on the figure
-      material: 'cloth',
-      bone: 'Head',
-      colour: [0.82, 0.8, 0.76],
-      grime: 0.8,
-      dirt: 0.25,
-      dust: 0.4,
-      wear: 0.14,
-      name: 'shemagh',
-    });
-  }
-
-  if (V.shades) {
-    const s = P.sunglasses(head);
-    B.add(s.frame, {
-      material: 'polymer',
-      bone: 'Head',
-      grime: 0.4,
-      wear: 0.3,
-      name: 'shadeFrame',
-    });
-    B.add(s.lens, {
-      material: 'glass',
-      bone: 'Head',
-      colour: [1, 1, 1],
-      grime: 0.2,
-      name: 'shadeLens',
-    });
-  }
-
-  /* ---------------- hands + weapon ----------------------------------- */
-  const bore = new THREE.Vector3(...BORE_DIR).normalize();
-  const palmR = new THREE.Vector3(-0.55, 0.35, -0.75).normalize();
-  const palmL = new THREE.Vector3(0.75, 0.3, -0.6).normalize();
-  const gripAxisR = new THREE.Vector3(0.18, 0.92, -0.34).normalize(); // down the grip
-  const gripAxisL = bore.clone();
-
-  B.add(
-    P.glove(nz, wrR, [gripAxisR.x, gripAxisR.y, gripAxisR.z], [palmR.x, palmR.y, palmR.z], -1),
-    {
-      material: 'boot',
-      bones: ['HandR', 'ForearmR'],
-      bias: [1, 0.35],
-      colour: GEAR.glove,
-      grime: 0.9,
-      dirt: 0.3,
-      dust: 0.25,
-      wear: 0.28,
-      name: 'gloveR',
-    }
-  );
-  B.add(P.knuckleGuard(wrR, [gripAxisR.x, gripAxisR.y, gripAxisR.z], [palmR.x, palmR.y, palmR.z]), {
-    material: 'polymer',
-    bone: 'HandR',
-    grime: 0.5,
-    wear: 0.35,
-    name: 'knuckleR',
-  });
-  B.add(P.glove(nz, wrL, [gripAxisL.x, gripAxisL.y, gripAxisL.z], [palmL.x, palmL.y, palmL.z], 1), {
-    material: 'boot',
-    bones: ['HandL', 'ForearmL'],
-    bias: [1, 0.35],
-    colour: GEAR.glove,
-    grime: 0.9,
-    dirt: 0.3,
-    dust: 0.25,
-    wear: 0.28,
-    name: 'gloveL',
-  });
-  B.add(P.knuckleGuard(wrL, [gripAxisL.x, gripAxisL.y, gripAxisL.z], [palmL.x, palmL.y, palmL.z]), {
-    material: 'polymer',
-    bone: 'HandL',
-    grime: 0.5,
-    wear: 0.35,
-    name: 'knuckleL',
-  });
-
-  const W = buildWeapon(nz, V.weapon, rng);
-  B.add(W.steel, { material: 'steel', bone: 'HandR', grime: 0.55, wear: 0.25, name: 'wpnSteel' });
-  B.add(W.polymer, { material: 'polymer', bone: 'HandR', grime: 0.5, wear: 0.3, name: 'wpnPoly' });
-  B.add(W.rubber, { material: 'rubber', bone: 'HandR', grime: 0.6, name: 'wpnRubber' });
-  if (W.glass.p.length) {
-    B.add(W.glass, { material: 'glass', bone: 'HandR', grime: 0.1, name: 'wpnGlass' });
-  }
-
-  // sling: body-bound so it stays on the chest as the arms move
-  B.add(P.sling(W.foregrip, W.stockTop), {
-    material: 'gear',
-    bones: ['Spine2', 'Spine1', 'ClavicleR', 'ClavicleL', 'Hips'],
-    bias: [1, 0.8, 0.5, 0.5, 0.3],
-    colour: GEAR.sling,
-    grime: 1.0,
-    dust: 0.2,
-    wear: 0.22,
-    name: 'sling',
-  });
-
-  const built = B.build();
-  // Guard the prewarm contract: see MATERIAL_SLOTS.
-  if (
-    built.materialNames.join() !==
-    MATERIAL_SLOTS.filter((s) => built.materialNames.includes(s)).join()
-  ) {
-    console.warn(
-      `[ai] material slot order changed (${built.materialNames.join()}); ` +
-        'update MATERIAL_SLOTS to match the exported surface labels'
-    );
-  }
-  const mats = resolveMaterials(name, built.materialNames, materials);
-
-  return {
-    geometry: built.geometry,
-    materials: mats,
-    /** Material slot names, in geometry group order (see MATERIAL_SLOTS). */
-    slots: built.materialNames,
-    parts: built.parts,
-    weapon: W,
-    stats: { vertices: built.vertices, triangles: built.triangles },
-    variant: V,
-  };
-}
-
-/**
- * Every material slot a soldier's geometry is grouped by, IN THE ORDER
- * `CharacterBuilder.build()` emits them — which is the order the parts are added
- * above, deduplicated. All three variants use all nine.
- *
- * These remain authoring/GLB surface labels. Runtime uses one material and a
- * per-vertex surface ID, so this order no longer controls separate material draws.
+ * Canonical authoring/GLB surface order, shared with the Blender reference.
+ * All three variants use all nine. Runtime draws one material and selects each
+ * finish by per-vertex surface ID, not by splitting material draws.
  */
 export const MATERIAL_SLOTS = Object.freeze([
   'cloth',
@@ -915,29 +156,6 @@ export const MATERIAL_SLOTS = Object.freeze([
   'steel',
 ]);
 
-/**
- * Resolve a variant's material slot names to real materials.
- *
- * Used by the offline builder. Runtime uses the same recipes in one material;
- * neither recipe lookup nor material creation consumes the gameplay RNG.
- *
- * `detail` is the second half of the two-scale system: the base tile carries the
- * macro camo and the garment seams, this tile carries the weave and the webbing
- * ribbing. `scale` converts the base tile's UVs (metres / tile) into the detail
- * tile's, so the physical size of a thread is identical on a sleeve, a pouch and
- * a boot without any per-part tuning.
- */
-export function resolveMaterials(
-  name: VariantName,
-  slots: readonly string[],
-  materials: SoldierMaterialFactory
-): THREE.Material[] {
-  return slots.map((slot) => {
-    const { set, options } = soldierSurface(name, slot);
-    return slot === 'glass' ? materials.glass() : materials.get(set, { ...options });
-  });
-}
-
 /** Keep authored finishes as data, not separate runtime draws. */
 export function soldierSurface(
   name: VariantName,
@@ -947,17 +165,24 @@ export function soldierSurface(
   options: SoldierMaterialOptions;
 } {
   const V = VARIANTS[name];
-  const detail = (set: string, matName: string, normal: number, rough: number) => ({
+  const detail = (
+    set: string,
+    matName: string,
+    normal: number,
+    rough: number
+  ): { set: string; scale: number; normal: number; rough: number } => ({
     set,
     scale: MATERIALS[matName].tile / DETAIL_TILE,
     normal,
     rough,
   });
-  const options = (set: string, value: SoldierMaterialOptions = {}) => ({ set, options: value });
+  const options = (
+    set: string,
+    value: SoldierMaterialOptions = {}
+  ): { set: string; options: SoldierMaterialOptions } => ({ set, options: value });
   switch (slot) {
     case 'cloth':
       return options(`camo_${V.camo}`, {
-        key: name,
         tint: V.clothTint,
         rough: ROUGH.cloth,
         metal: 1,
@@ -968,7 +193,6 @@ export function soldierSurface(
       });
     case 'plate':
       return options('plate', {
-        key: name,
         tint: V.plateTint,
         rough: ROUGH.plate,
         normalScale: 1.0,
@@ -976,27 +200,25 @@ export function soldierSurface(
       });
     case 'gear':
       return options('nylon', {
-        key: name,
         tint: V.gearTint,
         normalScale: 1.1,
         detail: detail('nylon', 'gear', 0.5, 0.14),
       });
     case 'boot':
       return options('nylon', {
-        key: `${name}_boot`,
         tint: V.gearTint,
         rough: ROUGH.boot,
         normalScale: 1.1,
         detail: detail('nylon', 'boot', 0.5, 0.1),
       });
     case 'skin':
-      return options('skin', { key: name, tint: V.skinTint, normalScale: 0.8, ao: 0.6 });
+      return options('skin', { tint: V.skinTint, normalScale: 0.8, ao: 0.6 });
     case 'polymer':
-      return options('polymer', { key: name, normalScale: 1.0 });
+      return options('polymer', { normalScale: 1.0 });
     case 'steel':
-      return options('steel', { key: name, normalScale: 1.0 });
+      return options('steel', { normalScale: 1.0 });
     case 'rubber':
-      return options('rubber', { key: name, normalScale: 1.2 });
+      return options('rubber', { normalScale: 1.2 });
     case 'glass':
       return options('glass', {
         tint: [0.06, 0.07, 0.08],
@@ -1004,10 +226,9 @@ export function soldierSurface(
         metal: 0,
         ao: 0,
         normalScale: 0,
-        rim: 0.5,
       });
     default:
-      return options('polymer', { key: name });
+      return options('polymer');
   }
 }
 

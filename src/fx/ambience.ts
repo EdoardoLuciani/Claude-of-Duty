@@ -1,120 +1,74 @@
 import * as THREE from 'three';
 
 import { P } from './atlas.ts';
-import { resetSpawn } from './particles.ts';
+import type { FxSystem } from './index.ts';
+import { resetSpawn, setSpawnColorRamp, setSpawnPosition, setSpawnVelocity } from './particles.ts';
 import { V, cone } from './util.ts';
 
-/**
- * Always-on atmosphere.
- *
- * Three things, all subtle enough that you notice them only when they are gone:
- *
- *  - **Dust motes.** A population of tiny forward-scattering specks kept alive
- *    in a box that follows the camera, drifting on the same analytic turbulence
- *    as everything else. They are what makes a shaft of light look like air
- *    instead of a gradient.
- *  - **Heat shimmer.** Refraction sprites laid on the ground ahead of the
- *    player while the sun is high, so hot surfaces boil slightly.
- *  - **Explosion smoke.** Finite columns from the same emitter pool explosions
- *    already call through `addColumn`.
+/** Dust motes follow the camera, heat shimmer sits ahead on sunlit ground, and finite smoke
+ * columns share the bounded emitter pool used by explosions.
  */
 
 const TWO_PI = Math.PI * 2;
 const MAX_EMITTERS = 24;
 
 class Emitter {
-  active: boolean;
-  age: number;
-  duration: number;
-  acc: number;
-  rate: number;
-  x: number;
-  y: number;
-  z: number;
-  radius: number;
-  rise: number;
-  dark: number;
-  life: number;
-  growth: number;
-  ember: number;
-  haze: number;
-  constructor() {
-    this.active = false;
-    this.age = 0;
-    this.duration = Infinity;
-    this.acc = 0;
-    this.rate = 6;
-    this.x = 0;
-    this.y = 0;
-    this.z = 0;
-    this.radius = 0.25;
-    this.rise = 1.2;
-    this.dark = 0.16;
-    this.life = 2.6;
-    this.growth = 3;
-    this.ember = 0;
-    this.haze = 0;
-  }
+  active: boolean = false;
+  age: number = 0;
+  duration: number = Infinity;
+  acc: number = 0;
+  rate: number = 6;
+  x: number = 0;
+  y: number = 0;
+  z: number = 0;
+  radius: number = 0.25;
+  rise: number = 1.2;
+  dark: number = 0.16;
+  life: number = 2.6;
+  growth: number = 3;
+  ember: number = 0;
+  haze: number = 0;
 }
+
+/** Column controls exclude pooled position, lifetime bookkeeping and activation state. */
+export type ColumnOptions = Partial<
+  Pick<
+    Emitter,
+    'duration' | 'rate' | 'radius' | 'rise' | 'dark' | 'life' | 'growth' | 'ember' | 'haze'
+  >
+>;
 
 interface AmbienceOptions {
   motes?: number;
   box?: number;
   shimmer?: boolean;
 }
-interface FxApi {
-  rng: import('../core/rng.ts').Rng;
-  emitLit(spawn: ReturnType<typeof resetSpawn>): void;
-  emitAdd(spawn: ReturnType<typeof resetSpawn>): void;
-  emitMote(spawn: ReturnType<typeof resetSpawn>): void;
-  haze(
-    x: number,
-    y: number,
-    z: number,
-    radius: number,
-    life: number,
-    growth: number,
-    amount: number,
-    tile: number
-  ): void;
-  physics?: { groundHeight?(x: number, z: number, y: number): number };
-}
+type AmbienceFx = Pick<FxSystem, 'rng' | 'emitLit' | 'emitAdd' | 'emitMote' | 'haze' | 'physics'>;
 
 export class Ambience {
-  fx: FxApi;
-  emitters: Emitter[];
+  fx: AmbienceFx;
   moteCount: number;
-  moteLife: number;
-  moteAcc: number;
   moteBox: number;
   moteEnabled: boolean;
-  sunFactor: number;
-  shimmerAcc: number;
   shimmerEnabled: boolean;
-  _fwd: THREE.Vector3;
-  _warm: number;
-  constructor(fx: FxApi, opts: AmbienceOptions = {}) {
+  emitters: Emitter[] = [];
+  moteLife: number = 9;
+  moteAcc: number = 0;
+  sunFactor: number = 1;
+  shimmerAcc: number = 0;
+  _fwd: THREE.Vector3 = new THREE.Vector3();
+  _warm: number = 0;
+
+  constructor(fx: AmbienceFx, opts: AmbienceOptions = {}) {
     this.fx = fx;
-    this.emitters = [];
     for (let i = 0; i < MAX_EMITTERS; i++) this.emitters.push(new Emitter());
 
     this.moteCount = opts.motes ?? 240;
-    this.moteLife = 9;
-    this.moteAcc = 0;
     this.moteBox = opts.box ?? 22;
     this.moteEnabled = this.moteCount > 0;
-    this.sunFactor = 1;
 
-    this.shimmerAcc = 0;
     this.shimmerEnabled = opts.shimmer !== false;
-
-    this._fwd = new THREE.Vector3();
-    this._warm = 0;
   }
-
-  /* --------------------------------------------------------------------- */
-  /*  emitters                                                            */
-  /* --------------------------------------------------------------------- */
 
   _acquire(): Emitter {
     let oldest = null;
@@ -126,7 +80,7 @@ export class Ambience {
   }
 
   /** Finite-duration smoke column (explosions, burning wreck). */
-  addColumn(x: number, y: number, z: number, o: Partial<Emitter> = {}): void {
+  addColumn(x: number, y: number, z: number, o: ColumnOptions = {}): void {
     const e = this._acquire();
     e.active = true;
     e.age = 0;
@@ -168,12 +122,7 @@ export class Ambience {
     s.rot = rng.float() * TWO_PI;
     s.spin = rng.signed() * 0.35;
     const d = e.dark;
-    s.r0 = d;
-    s.g0 = d * 0.97;
-    s.b0 = d * 0.94;
-    s.r1 = d * 1.9;
-    s.g1 = d * 1.86;
-    s.b1 = d * 1.8;
+    setSpawnColorRamp(s, d, d * 0.97, d * 0.94, d * 1.9, d * 1.86, d * 1.8);
     s.alpha = rng.range(0.3, 0.55);
     s.alphaCurve = 1.7;
     s.soft = 0.8;
@@ -184,25 +133,16 @@ export class Ambience {
 
     if (e.ember > 0 && rng.float() < e.ember) {
       const t = resetSpawn();
-      t.x = s.x;
-      t.y = e.y;
-      t.z = s.z;
-      t.vx = rng.signed() * 0.5;
-      t.vy = rng.range(1.2, 3.2);
-      t.vz = rng.signed() * 0.5;
+      setSpawnPosition(t, s.x, e.y, s.z);
+      setSpawnVelocity(t, rng.signed() * 0.5, rng.range(1.2, 3.2), rng.signed() * 0.5);
       t.tile = P.SPARK;
       t.size0 = rng.range(0.006, 0.014);
       t.size1 = t.size0 * 0.5;
       t.life = rng.range(0.8, 1.9);
       t.drag = 0.9;
       t.gravity = 1.2;
-      t.r0 = 1;
-      t.g0 = 0.5;
-      t.b0 = 0.16;
+      setSpawnColorRamp(t, 1, 0.5, 0.16, 0.9, 0.14, 0.02);
       t.i0 = rng.range(3, 9);
-      t.r1 = 0.9;
-      t.g1 = 0.14;
-      t.b1 = 0.02;
       t.i1 = 0.1;
       t.flags = 1;
       t.alphaCurve = 1.2;
@@ -216,10 +156,6 @@ export class Ambience {
       fx.haze(e.x, e.y + r * 0.6, e.z, r * 1.4, 2.4, 0.9, e.haze, P.SMOKE_A);
     }
   }
-
-  /* --------------------------------------------------------------------- */
-  /*  motes + shimmer                                                     */
-  /* --------------------------------------------------------------------- */
 
   _motes(dt: number, now: number, camera: THREE.Camera): void {
     const fx = this.fx;
@@ -249,9 +185,7 @@ export class Ambience {
       s.x = cx + rng.signed() * half;
       s.y = cy + rng.signed() * half * 0.42;
       s.z = cz + rng.signed() * half;
-      s.vx = rng.signed() * 0.09;
-      s.vy = rng.range(-0.05, 0.06);
-      s.vz = rng.signed() * 0.09;
+      setSpawnVelocity(s, rng.signed() * 0.09, rng.range(-0.05, 0.06), rng.signed() * 0.09);
       s.tile = P.MOTE;
       s.size0 = rng.range(0.0035, 0.011);
       s.size1 = s.size0;
@@ -262,13 +196,8 @@ export class Ambience {
       s.drag = 0.22;
       s.gravity = -0.02;
       const b = bright * rng.range(0.35, 1.5);
-      s.r0 = 1;
-      s.g0 = 0.96;
-      s.b0 = 0.9;
+      setSpawnColorRamp(s, 1, 0.96, 0.9, 1, 0.94, 0.88);
       s.i0 = b;
-      s.r1 = 1;
-      s.g1 = 0.94;
-      s.b1 = 0.88;
       s.i1 = b * 0.6;
       s.alpha = rng.range(0.25, 0.7);
       s.alphaCurve = 1.1;
@@ -307,8 +236,6 @@ export class Ambience {
       rng.float() < 0.5 ? P.SMOKE_A : P.MIST
     );
   }
-
-  /* --------------------------------------------------------------------- */
 
   update(dt: number, now: number, camera: THREE.Camera): void {
     for (const e of this.emitters) {

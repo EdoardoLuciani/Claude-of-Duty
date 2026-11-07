@@ -36,35 +36,13 @@ import {
 } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import type { Node } from 'three/webgpu';
+import type { JoinNode, TextureNode, UniformNode } from 'three/webgpu';
 
-/**
- * GPU particle system — strict WebGPU / TSL.
- *
- * One instanced quad per particle. The whole simulation lives in the vertex
- * stage as a closed-form solution of
- *
- *     dv/dt = -k v + g          =>   v(t) = v0 e^-kt + g/k (1 - e^-kt)
- *                                    x(t) = x0 + (v0 - g/k)(1 - e^-kt)/k + g t / k
- *
- * plus a per-particle turbulence term, so the CPU never touches a particle
- * again after it is spawned: no per-frame simulation, no per-frame allocation,
- * no readback. Spawning writes 32 floats into a preallocated interleaved ring
- * buffer and uploads only the dirty span.
- *
- * Two blend modes share the code:
- *   ADDITIVE  premultiplied ONE/ONE — sparks, muzzle flash, fire, tracers.
- *             Order independent, so no sorting is needed.
- *   LIT/alpha src-alpha over — smoke, dust, blood. Shaded with a spherical
- *             fake normal bent by the sprite's own density gradient, wrapped
- *             sun term plus a forward-scatter lobe, so a puff reads as volume.
- *
- * Both fade softly against `render.depthTexture` (positive view depth in
- * metres) so nothing shows a hard intersection line with the world.
- *
- * The translation is mechanical: the GLSL vertex/fragment pair became TSL node
- * graphs, and every uniform keeps its name and value shape so the rest of the
- * FX subsystem drives it unchanged. `texture()` decodes the sRGB atlas exactly
- * as WebGL's sRGB internal format did, so the sprite radiance is unchanged.
+/** Instanced GPU particles: dv/dt=-kv+g, integrated analytically in the vertex stage.
+ * x(t)=x0+(v0-g/k)(1-exp(-kt))/k+gt/k, plus per-particle turbulence.
+ * Spawns write 32 floats to a bounded ring; only dirty ranges upload, with no CPU simulation/readback.
+ * Additive ONE/ONE and lit source-over layers share the code. Soft intersections use positive
+ * view-space depth in metres; sRGB atlas decoding stays native.
  */
 
 export const STRIDE = 32;
@@ -117,7 +95,7 @@ export const SP = {
   flags: 0,
 };
 
-export function resetSpawn() {
+export function resetSpawn(): typeof SP {
   const s = SP;
   s.x = s.y = s.z = 0;
   s.vx = s.vy = s.vz = 0;
@@ -146,9 +124,34 @@ export function resetSpawn() {
   return s;
 }
 
-/* ------------------------------------------------------------------------- */
-/*  shared resources                                                         */
-/* ------------------------------------------------------------------------- */
+export function setSpawnPosition(s: typeof SP, x: number, y: number, z: number): void {
+  s.x = x;
+  s.y = y;
+  s.z = z;
+}
+
+export function setSpawnVelocity(s: typeof SP, x: number, y: number, z: number): void {
+  s.vx = x;
+  s.vy = y;
+  s.vz = z;
+}
+
+export function setSpawnColorRamp(
+  s: typeof SP,
+  r0: number,
+  g0: number,
+  b0: number,
+  r1: number,
+  g1: number,
+  b1: number
+): void {
+  s.r0 = r0;
+  s.g0 = g0;
+  s.b0 = b0;
+  s.r1 = r1;
+  s.g1 = g1;
+  s.b1 = b1;
+}
 
 interface ParticleOptions {
   capacity: number;
@@ -189,21 +192,23 @@ function quadSource(): THREE.PlaneGeometry {
   return quadGeoSource;
 }
 
-/* ------------------------------------------------------------------------- */
-/*  TSL material                                                             */
-/* ------------------------------------------------------------------------- */
-
-/**
- * Build the particle node material.
- *
- * @param {object} o
- * @param {'additive'|'lit'|'distort'} o.mode
- * @param {THREE.Texture} o.atlas
- * @param {number} o.cols
- * @param {number} [o.renderOrder]
- * @returns {{material: MeshBasicNodeMaterial, uniforms: object}}
- */
-function buildParticleMaterial(o: ParticleOptions) {
+/** Build the particle node material. */
+function buildParticleMaterial(o: ParticleOptions): {
+  material: MeshBasicNodeMaterial;
+  uniforms: {
+    uTime: UniformNode<'float', number>;
+    uAtlas: UniformNode<'vec2', THREE.Vector2>;
+    uSprite: TextureNode<'vec4'>;
+    uDepth: TextureNode<'vec4'>;
+    uSoftEnable: UniformNode<'vec2', THREE.Vector2>;
+    uSunDir: UniformNode<'vec3', THREE.Vector3>;
+    uSunCol: UniformNode<'vec3', THREE.Vector3>;
+    uAmbTop: UniformNode<'vec3', THREE.Vector3>;
+    uAmbBot: UniformNode<'vec3', THREE.Vector3>;
+    uUpView: UniformNode<'vec3', THREE.Vector3>;
+    uFog: UniformNode<'vec4', THREE.Vector4>;
+  };
+} {
   const additive = o.mode === 'additive';
   const distort = o.mode === 'distort';
 
@@ -238,7 +243,7 @@ function buildParticleMaterial(o: ParticleOptions) {
   const vSoft = varying(float(1), 'vSoft');
   const vQ = varying(vec2(0), 'vQ');
 
-  const vertex = Fn(() => {
+  const vertex = Fn((): Node<'vec4'> => {
     const t = uniforms.uTime.sub(aLife.x);
     const n = t.mul(aLife.y);
     const alive = t.greaterThanEqual(0).and(n.lessThan(1));
@@ -310,10 +315,7 @@ function buildParticleMaterial(o: ParticleOptions) {
     const headNdc = headClip.xy.div(max(headClip.w, 1e-4));
     const tailNdc = tailClip.xy.div(max(tailClip.w, 1e-4));
     // P[0][0], P[1][1] — column-major element access, same as GLSL.
-    const projection = cameraProjectionMatrix as unknown as {
-      element(index: number): { element(index: number): Node<'float'> };
-    };
-    const pdiag = vec2(projection.element(0).element(0), projection.element(1).element(1));
+    const pdiag = vec2(cameraProjectionMatrix.element(0).x, cameraProjectionMatrix.element(1).y);
     const segment = headNdc.sub(tailNdc).mul(headClip.w).div(pdiag);
     const segmentLen = length(segment);
     const alongA = select(segmentLen.greaterThan(1e-5), segment.div(segmentLen), along0);
@@ -356,7 +358,7 @@ function buildParticleMaterial(o: ParticleOptions) {
     return select(alive, clip, vec4(0.0, 0.0, 2.0, 1.0));
   })();
 
-  const fragment = Fn(() => {
+  const fragment = Fn((): JoinNode<'vec4'> => {
     Discard(vCol.a.lessThanEqual(0.0));
     const tex = uniforms.uSprite.sample(vUv);
     let a = tex.a.mul(vCol.a);
@@ -438,10 +440,6 @@ function buildParticleMaterial(o: ParticleOptions) {
   return { material, uniforms };
 }
 
-/* ------------------------------------------------------------------------- */
-/*  ring-buffer storage                                                      */
-/* ------------------------------------------------------------------------- */
-
 /**
  * A fixed-capacity ring of particles backed by one interleaved buffer.
  * Allocation happens exactly once, in the constructor.
@@ -449,34 +447,24 @@ function buildParticleMaterial(o: ParticleOptions) {
 export class ParticleLayer {
   declare capacity: number;
   declare mode: ParticleOptions['mode'];
-  declare cursor: number;
-  declare highWater: number;
-  declare expireAt: number;
-  declare spawned: number;
   declare array: Float32Array;
   declare ibuf: THREE.InstancedInterleavedBuffer;
   declare geometry: THREE.InstancedBufferGeometry;
   declare material: MeshBasicNodeMaterial;
   declare uniforms: ReturnType<typeof buildParticleMaterial>['uniforms'];
   declare mesh: THREE.Mesh;
-  declare _dirtyLo: number;
-  declare _dirtyHi: number;
-  declare _wrapped: boolean;
-  /**
-   * @param {object} o
-   * @param {number} o.capacity     hard cap, from config.q.particleBudget
-   * @param {'additive'|'lit'|'distort'} o.mode
-   * @param {THREE.Texture} o.atlas
-   * @param {number} o.cols         atlas columns
-   * @param {number} [o.renderOrder]
-   */
+  cursor: number = 0;
+  highWater: number = 0;
+  expireAt: number = -1;
+  spawned: number = 0;
+  _dirtyLo: number = Infinity;
+  _dirtyHi: number = -Infinity;
+  _wrapped: boolean = false;
+
+  /** Capacity is a hard cap from config.q.particleBudget; cols counts atlas columns. */
   constructor(o: ParticleOptions) {
     this.capacity = Math.max(16, o.capacity | 0);
     this.mode = o.mode;
-    this.cursor = 0;
-    this.highWater = 0;
-    this.expireAt = -1;
-    this.spawned = 0;
 
     this.array = new Float32Array(this.capacity * STRIDE);
     this.ibuf = new THREE.InstancedInterleavedBuffer(this.array, STRIDE, 1);
@@ -520,14 +508,10 @@ export class ParticleLayer {
     // heuristic from counting our sprites as geometry.
     this.mesh.userData.owProbe = true;
     this.mesh.castShadow = false;
-
-    this._dirtyLo = Infinity;
-    this._dirtyHi = -Infinity;
-    this._wrapped = false;
   }
 
   /** True while anything might still be alive. */
-  get active() {
+  get active(): boolean {
     return this.mesh.visible;
   }
 

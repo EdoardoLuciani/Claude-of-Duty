@@ -1,31 +1,8 @@
 import * as THREE from 'three';
 
-/**
- * AI — grounding occlusion under every actor.
- *
- * The cascades resolve a 1.7 m figure's cast shadow, but they cannot resolve the
- * millimetre-scale wedge of sky occlusion directly under a boot: at 2048 px over
- * a 12 m cascade one texel is 6 mm, and the depth bias needed to stop a skinned
- * mesh self-shadowing eats exactly that. The result is the classic "actor
- * floating a centimetre off the floor" read, which no amount of cast-shadow
- * quality fixes.
- *
- * So each actor also carries projected occlusion sprites: one broad body-sized
- * ellipse under the pelvis and one tight lobe under each foot.
- *
- * HOW THE DARKENING IS DONE — alpha-over with a near-black source colour, which
- * is algebraically dst*(1-a) plus a whisper of sky blue. That is a *multiply*,
- * so it works at any exposure, over sunlit sand and shadowed concrete alike, and
- * can never paint a grey silhouette onto the floor the way an additive or
- * opaque decal would. It is also the one blend path in three that needs no
- * custom shader: a hand-written ShaderMaterial here (tried first) is a silent
- * single point of failure, and a contact shadow that quietly stops rendering is
- * worse than none at all.
- *
- * Per-instance strength is the quad's SIZE, not a shader uniform: a foot leaving
- * the ground has a smaller and softer contact patch, so shrinking the sprite is
- * both cheaper and more correct than fading it. Two InstancedMeshes (body, feet)
- * carry the two strength levels, so the whole system is two draw calls.
+/** Grounding uses a body ellipse and two foot lobes to supplement shadow-map contact detail.
+ * Near-black alpha-over approximates multiplication across exposure, with a small sky-blue term.
+ * Contact strength changes sprite size as feet lift; body/foot instances remain two draws.
  */
 
 /** Radial occlusion sprite. rgb white, alpha = occlusion. */

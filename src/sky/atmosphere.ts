@@ -1,58 +1,8 @@
-/**
- * Physical atmosphere model — constants and the CPU half.
- *
- * This is Bruneton's scattering integral evaluated the way Hillaire 2020
- * ("A Scalable and Production Ready Sky and Atmosphere Rendering Technique")
- * does it: three small LUTs instead of a per-pixel double raymarch.
- *
- *   transmittance   256 x 64   T(altitude, cos zenith)      baked once
- *   multiscatter     32 x 32   psi_ms(altitude, cos zenith) baked once
- *   sky-view        384 x 192  L(azimuth, altitude)         rebaked when the sun moves
- *
- * The GPU half — the media sampling, the phase functions and the raymarch —
- * lives in `atmosphere-tsl.js`. This file stays plain JS so the CPU photometry
- * (sun/moon light colours and the LUT parameterisation) can be shared and
- * unit-tested without a GPU.
- *
- * Media, in Hillaire's units (lengths in megametres, coefficients in Mm^-1):
- *   Rayleigh   exponential, scale height 8 km,   sigma_s = (5.802, 13.558, 33.1)
- *   Mie        exponential, scale height 1.2 km, sigma_s = 3.996, sigma_a = 4.40
- *   Ozone      tent centred at 25 km,            sigma_a = (0.650, 1.881, 0.085)
- *
- * The ozone layer is not a nicety: it is what removes the green from the deep
- * zenith blue and what turns the twilight band violet instead of brown.
- *
- * ---------------------------------------------------------------------------
- * PHOTOMETRIC SCALE — read this before changing a number anywhere in src/sky/
- * ---------------------------------------------------------------------------
- * Preserve the engine's authored photometric scale: every subsystem is tuned
- * against a working light unit of "25 klx":
- *
- *     1 light intensity unit      =  SCENE_LUX (25000) lux
- *     1 framebuffer radiance unit =  SCENE_LUX cd/m^2
- *
- * Derive the second from the first and do not guess at it, because a factor of
- * pi here is 1.65 stops of sky. three's Lambert BRDF carries the 1/pi: a white
- * surface facing a light of intensity I writes b = I/pi into the buffer, while
- * its physical radiance is L = (I * SCENE_LUX) / pi cd/m^2. Therefore
- * L = b * SCENE_LUX, and a scattering integral that already evaluates a
- * *radiance* — which sigma_s * P(theta) * E is, once E is expressed in scene
- * light units — is written to the buffer as-is. It must NOT be multiplied by pi
- * on the way out.
- *
- * That multiplication used to be here, and it is exactly why every daylight
- * shot read as milk: the sky came out 1.65 stops hotter than the surfaces it was
- * lighting, so a sunlit stucco wall was *darker* than the sky behind it, the
- * cumulus deck was darker than the gap between the clouds, and the AgX shoulder
- * dumped what was left of the hue. The cloud decks and the ground bounce divide
- * their irradiance by pi to reach the same convention.
- *
- * Consequences, all of which fall out of the model rather than being dialled in:
- *   extraterrestrial solar illuminance 128 klx -> 5.12 units
- *   noon sun after atmospheric extinction      -> ~3.9 units   (matches 4.3)
- *   clear zenith sky ~1500 cd/m^2              -> ~0.06 radiance units
- *   sunlit stucco (albedo 0.4, 45 deg)         -> ~0.32 radiance units
- *   whole-sky diffuse illuminance              -> ~15% of the sun
+/** CPU constants/photometry for Hillaire-style transmittance, multiscatter and sky-view LUTs.
+ * Lengths use megametres and medium coefficients Mm^-1; retain Rayleigh/Mie/ozone profiles.
+ * 1 light unit = SCENE_LUX lux and 1 radiance unit = SCENE_LUX cd/m².
+ * Three's Lambert BRDF already includes 1/pi: write integrated sky radiance as-is,
+ * never multiply it by pi. Cloud irradiance and ground bounce divide by pi.
  */
 
 export const SCENE_LUX = 25000;
@@ -60,16 +10,9 @@ export const SCENE_LUX = 25000;
 /** Extraterrestrial solar illuminance, in scene light units. */
 export const SUN_ILLUMINANCE_TOP = 128000 / SCENE_LUX; // 5.12
 
-/**
- * Moonlight, in scene light units. A real full moon is 0.27 lux — 1e-5 units —
- * which is four stops below anything a display can show alongside a muzzle
- * flash. Every shipped game renders "day for night" instead; this is that
- * decision, made once, in one place, rather than smeared across the shaders.
- * 0.03 is the reviewed night baseline: one tenth of the former 0.30.
- * The same level drives the ground, atmosphere and clouds, leaving lamp pools
- * distinct without turning the sky into blue daytime.
- * Ratios *within* the night (moon disc : moonlit sky : moonlit ground) stay
- * physical, so the frame still behaves like a photograph of a moonlit street.
+/** Moonlight in scene light units. The reviewed 0.03 baseline exaggerates physical
+ * moonlight for display readability while keeping lamp pools distinct. Disc, sky
+ * and ground share the level so their relative photometry stays consistent.
  */
 export const MOON_ILLUMINANCE_NIGHT = 0.03;
 

@@ -21,7 +21,6 @@ import {
   vec4,
 } from 'three/tsl';
 import {
-  Color,
   FrontSide,
   MeshStandardNodeMaterial,
   Vector4,
@@ -31,7 +30,9 @@ import {
 } from 'three/webgpu';
 import type { DataArrayTexture } from 'three/webgpu';
 import type { Node, Texture } from 'three/webgpu';
+import type { TextureNode, VaryingNode } from 'three/webgpu';
 
+import { isClosable } from '../core/guards.ts';
 import { loadPngTexture } from '../core/pngtex.ts';
 import { soldierSurface } from './soldier.ts';
 import type { VariantName } from './soldier.ts';
@@ -60,7 +61,7 @@ class SoldierNodeMaterial extends MeshStandardNodeMaterial {
       .mul(rimScale);
   }
 
-  setupOutput(
+  override setupOutput(
     builder: Parameters<MeshStandardNodeMaterial['setupOutput']>[0],
     output: Parameters<MeshStandardNodeMaterial['setupOutput']>[1] & {
       rgb: ReturnType<typeof vec3>;
@@ -79,8 +80,8 @@ export interface CamoStats {
   sd: number;
 }
 interface SoldierManifest {
-  sets?: string[];
-  details?: string[];
+  sets?: string[] | undefined;
+  details?: string[] | undefined;
   camoStats?: Record<string, CamoStats>;
 }
 function parseManifest(value: unknown): SoldierManifest {
@@ -128,65 +129,14 @@ interface SoldierDetail {
   scale: number;
   normal: number;
   rough: number;
-  texture?: Texture;
 }
 export interface SoldierMaterialOptions {
   tint?: readonly [number, number, number];
-  side?: typeof FrontSide;
   rough?: number;
   metal?: number;
   ao?: number;
-  rim?: number;
   normalScale?: number;
-  name?: string;
-  key?: string;
-  detail?: Omit<SoldierDetail, 'texture'>;
-}
-
-/** Soldier maps retain their CPU-authored camouflage, packed ORM and GLB UVs. */
-export function createSoldierNodeMaterial(
-  set: SoldierTextureSet,
-  opts: SoldierMaterialOptions = {},
-  detail: SoldierDetail | null = null
-): SoldierNodeMaterial {
-  const color = opts.tint
-    ? new Color(opts.tint[0], opts.tint[1], opts.tint[2])
-    : new Color(1, 1, 1);
-  const mat = new SoldierNodeMaterial(
-    {
-      vertexColors: true,
-      side: opts.side ?? FrontSide,
-      dithering: true,
-      roughness: opts.rough ?? 1,
-      metalness: opts.metal ?? 1,
-      color,
-    },
-    opts.rim ?? 1
-  );
-  const baseUv = uv();
-  const orm = texture(set.orm, baseUv);
-  mat.colorNode = texture(set.albedo, baseUv).rgb.mul(vec3(color.r, color.g, color.b));
-  mat.aoNode = float(1).add(orm.r.sub(1).mul(opts.ao ?? 0.85));
-  const detailSample = detail ? texture(detail.texture, baseUv.mul(detail.scale)) : null;
-  mat.roughnessNode = clamp(
-    orm.g
-      .mul(opts.rough ?? 1)
-      .add(detailSample ? detailSample.a.sub(0.5).mul(detail?.rough ?? 0) : 0),
-    0.04,
-    1
-  );
-  mat.metalnessNode = orm.b.mul(opts.metal ?? 1);
-  const n = texture(set.normal, baseUv).rgb.mul(2).sub(1);
-  const slope = detailSample
-    ? detailSample.xy
-        .mul(2)
-        .sub(1)
-        .mul(detail?.normal ?? 0)
-    : 0;
-  const combined = normalize(vec3(n.xy.mul(opts.normalScale ?? 1).add(slope), n.z));
-  mat.normalNode = normalMap(combined.mul(0.5).add(0.5));
-  mat.name = opts.name ?? 'ai_node';
-  return mat;
+  detail?: SoldierDetail;
 }
 
 /** Committed procedural GLB maps, no WebGL material or shader dependency. */
@@ -194,12 +144,6 @@ export class SoldierMaterialsNode {
   declare sets: Record<string, SoldierTextureSet>;
   declare details: Record<string, Texture>;
   declare camoStats: Record<string, CamoStats>;
-  declare bakeMs: number;
-  declare materials: Map<string, SoldierNodeMaterial>;
-  declare combined: Map<VariantName, SoldierNodeMaterial>;
-  declare layers: Map<string, number>;
-  declare surfaceTables: DataTexture[];
-  declare arrays: Record<'albedo' | 'orm' | 'normal' | 'detail', DataArrayTexture> | null;
 
   static async fromCache({
     base = 'models/proc',
@@ -213,7 +157,7 @@ export class SoldierMaterialsNode {
       loadPngTexture(`${base}/${name}.png`, { srgb, aniso: anisotropy });
     const sets: Record<string, SoldierTextureSet> = {};
     await Promise.all(
-      (manifest.sets ?? []).map(async (name) => {
+      (manifest.sets ?? []).map(async (name): Promise<void> => {
         const [albedo, orm, normal] = await Promise.all([
           load(`ai-${name}-albedo`, true),
           load(`ai-${name}-orm`, false),
@@ -224,15 +168,15 @@ export class SoldierMaterialsNode {
     );
     const details: Record<string, Texture> = {};
     await Promise.all(
-      (manifest.details ?? []).map(async (name) => {
+      (manifest.details ?? []).map(async (name): Promise<void> => {
         details[name] = await load(`ai-detail-${name}`, false);
       })
     );
     const library = new SoldierMaterialsNode(sets, details, manifest.camoStats ?? {});
     const names = Object.keys(sets);
-    library.layers = new Map([...names, 'glass'].map((name, i) => [name, i]));
-    const maps = (field: keyof SoldierTextureSet) => [
-      ...names.map((name) => sets[name][field]),
+    library.layers = new Map([...names, 'glass'].map((name, i): [string, number] => [name, i]));
+    const maps = (field: keyof SoldierTextureSet): (Texture | null)[] => [
+      ...names.map((name): Texture => sets[name][field]),
       null,
     ];
     library.arrays = {
@@ -249,6 +193,12 @@ export class SoldierMaterialsNode {
     return library;
   }
 
+  bakeMs: number = 0;
+  combined: Map<VariantName, SoldierNodeMaterial> = new Map();
+  layers: Map<string, number> = new Map();
+  surfaceTables: DataTexture[] = [];
+  arrays: Record<'albedo' | 'orm' | 'normal' | 'detail', DataArrayTexture> | null = null;
+
   constructor(
     sets: Record<string, SoldierTextureSet>,
     details: Record<string, Texture>,
@@ -257,50 +207,6 @@ export class SoldierMaterialsNode {
     this.sets = sets;
     this.details = details;
     this.camoStats = camoStats;
-    this.bakeMs = 0;
-    this.materials = new Map();
-    this.combined = new Map();
-    this.layers = new Map();
-    this.surfaceTables = [];
-    this.arrays = null;
-  }
-
-  get(setName: string, opts: SoldierMaterialOptions = {}): SoldierNodeMaterial {
-    const detail = opts.detail;
-    const key = `${setName}|${opts.key ?? ''}|${(opts.tint ?? []).join(',')}|${opts.rough ?? ''}|${
-      opts.metal ?? ''
-    }|${opts.ao ?? 0.85}|${opts.normalScale ?? 1}|${opts.rim ?? 1}|${opts.side ?? FrontSide}|${
-      detail ? `${detail.set},${detail.scale},${detail.normal},${detail.rough}` : ''
-    }`;
-    let mat = this.materials.get(key);
-    if (mat) return mat;
-    const set = this.sets[setName];
-    if (!set) throw new Error(`[ai] unknown material set "${setName}"`);
-    const d =
-      detail && this.details[detail.set] ? { ...detail, texture: this.details[detail.set] } : null;
-    mat = createSoldierNodeMaterial(set, { ...opts, name: `ai_${setName}` }, d);
-    this.materials.set(key, mat);
-    return mat;
-  }
-
-  glass(tint: readonly [number, number, number] = [0.06, 0.07, 0.08]): SoldierNodeMaterial {
-    const key = `glass|${tint.join(',')}`;
-    let mat = this.materials.get(key);
-    if (mat) return mat;
-    // Half-strength rim preserves the goggle sheen without blooming into sky.
-    mat = new SoldierNodeMaterial(
-      {
-        color: new Color(...tint),
-        roughness: 0.11,
-        metalness: 0,
-        vertexColors: true,
-        envMapIntensity: 1.4,
-      },
-      0.5
-    );
-    mat.name = 'ai_glass';
-    this.materials.set(key, mat);
-    return mat;
   }
 
   /** One opaque material per variant; every triangle selects its authored finish. */
@@ -330,14 +236,16 @@ export class SoldierMaterialsNode {
     // A tiny immutable lookup texture stays in the native material bindings.
     // Another shared uniform group would exceed the game's four-group limit.
     const pixels = new Float32Array(slots.length * 3 * 4);
-    [colors, base, detail].forEach((row, y) =>
-      row.forEach((value, x) => value.toArray(pixels, (y * slots.length + x) * 4))
+    [colors, base, detail].forEach((row, y): void =>
+      row.forEach((value, x): ArrayLike<number> =>
+        value.toArray(pixels, (y * slots.length + x) * 4)
+      )
     );
     const table = new DataTexture(pixels, slots.length, 3, RGBAFormat, FloatType);
     table.needsUpdate = true;
     this.surfaceTables.push(table);
     // Resolve finishes at vertices, not with dependent lookups at every pixel.
-    const read = (row: number) =>
+    const read = (row: number): VaryingNode<'vec4'> =>
       varying(textureLoad(table, ivec2(surface.toInt(), row))).setInterpolation('flat');
     const c = read(0),
       b = read(1),
@@ -348,7 +256,7 @@ export class SoldierMaterialsNode {
       rim
     );
     const coords = uv();
-    const sample = (map: DataArrayTexture) => texture(map, coords).depth(c.w);
+    const sample = (map: DataArrayTexture): TextureNode<'vec4'> => texture(map, coords).depth(c.w);
     const orm = sample(this.arrays.orm);
     const micro = texture(this.arrays.detail, coords.mul(d.x)).depth(d.y);
     mat.colorNode = sample(this.arrays.albedo).rgb.mul(c.rgb);
@@ -370,18 +278,18 @@ export class SoldierMaterialsNode {
     this.arrays = null;
     for (const table of this.surfaceTables) table.dispose();
     this.surfaceTables.length = 0;
-    for (const mat of this.materials.values()) mat.dispose();
     for (const set of Object.values(this.sets)) {
       for (const texture of [set.albedo, set.orm, set.normal]) {
         texture.dispose();
-        (texture.image as ImageBitmap | null)?.close?.();
+        const image = texture.image;
+        if (isClosable(image)) image.close();
       }
     }
     for (const texture of Object.values(this.details)) {
       texture.dispose();
-      (texture.image as ImageBitmap | null)?.close?.();
+      const image = texture.image;
+      if (isClosable(image)) image.close();
     }
-    this.materials.clear();
     this.combined.clear();
   }
 }

@@ -1,20 +1,7 @@
-/**
- * Ragdolls — an articulated chain of capsules solved with position-based
- * dynamics (Gauss-Seidel, a handful of iterations per fixed step).
- *
- * Each bone is a segment of two particles. Chain joints share particles;
- * offset branches (shoulders and hips) need explicit attachment constraints
- * in the parent's frame so whole limbs cannot drift away from the torso.
- *
- * Constraints, applied in order every iteration:
- *   1. bone length      (hard distance, stiffness 1)
- *   2. cone limit       (swing of a bone relative to its parent)
- *   3. branch attachment (offset held in the parent's frame)
- *   4. world contact    (capsule vs static BVH + Coulomb friction)
- * Twist is transported/clamped after the position solve.
- *
- * `ai` hands over a dead actor with createRagdoll()/adoptSkeleton() and we own
- * the bone transforms from that moment on.
+/** Capsule-chain PBD ragdolls; physics owns bone transforms after skeleton adoption.
+ * Shared particles join the chain; shoulder/hip offsets use parent-frame attachments.
+ * Iterations solve length, cone, attachment and world-contact/friction constraints;
+ * twist is transported and clamped after the positional solve.
  */
 
 import * as THREE from 'three';
@@ -93,10 +80,6 @@ function isBone(object: THREE.Object3D | null): object is THREE.Bone {
   return object instanceof THREE.Bone;
 }
 
-/* ------------------------------------------------------------------ */
-/* Default humanoid rig                                                */
-/* ------------------------------------------------------------------ */
-
 /**
  * A 15-capsule humanoid sized from a total height, in the actor's local frame
  * (feet at y = 0, +Z forward). Proportions are the standard 7.5-head figure.
@@ -104,7 +87,7 @@ function isBone(object: THREE.Object3D | null): object is THREE.Bone {
 export function humanoidSpec(height = 1.8, scaleMass = 82): BoneSpec[] {
   const h = height;
   const M = scaleMass;
-  const y = (f: number) => h * f;
+  const y = (f: number): number => h * f;
   const b = (
     name: string,
     hx: number,
@@ -130,78 +113,37 @@ export function humanoidSpec(height = 1.8, scaleMass = 82): BoneSpec[] {
   });
   const sh = h * 0.105; // half shoulder width
   const hip = h * 0.055;
-  return [
+  const spec = [
     /* 0 */ b('pelvis', 0, y(0.53), 0, 0, y(0.63), 0, 0.085, 0.14, -1, 0, 0),
     /* 1 */ b('spine', 0, y(0.63), 0, 0, y(0.74), 0, 0.082, 0.12, 0, 22, 18),
     /* 2 */ b('chest', 0, y(0.74), 0, 0, y(0.83), 0, 0.088, 0.19, 1, 20, 15),
     /* 3 */ b('neck', 0, y(0.83), 0, 0, y(0.875), 0, 0.042, 0.02, 2, 30, 25),
     /* 4 */ b('head', 0, y(0.875), 0, 0, y(0.97), 0.01, 0.062, 0.07, 3, 42, 30),
-    /* 5 */ b('upperArmL', -sh, y(0.815), 0, -sh - h * 0.015, y(0.65), 0, 0.045, 0.027, 2, 85, 60),
-    /* 6 */ b(
-      'forearmL',
-      -sh - h * 0.015,
-      y(0.65),
-      0,
-      -sh - h * 0.02,
-      y(0.5),
-      0,
-      0.037,
-      0.018,
-      5,
-      80,
-      45
-    ),
-    /* 7 */ b(
-      'handL',
-      -sh - h * 0.02,
-      y(0.5),
-      0,
-      -sh - h * 0.02,
-      y(0.44),
-      0,
-      0.032,
-      0.006,
-      6,
-      55,
-      40
-    ),
-    /* 8 */ b('upperArmR', sh, y(0.815), 0, sh + h * 0.015, y(0.65), 0, 0.045, 0.027, 2, 85, 60),
-    /* 9 */ b(
-      'forearmR',
-      sh + h * 0.015,
-      y(0.65),
-      0,
-      sh + h * 0.02,
-      y(0.5),
-      0,
-      0.037,
-      0.018,
-      8,
-      80,
-      45
-    ),
-    /*10 */ b(
-      'handR',
-      sh + h * 0.02,
-      y(0.5),
-      0,
-      sh + h * 0.02,
-      y(0.44),
-      0,
-      0.032,
-      0.006,
-      9,
-      55,
-      40
-    ),
-    /*11 */ b('thighL', -hip, y(0.53), 0, -hip * 1.05, y(0.29), 0, 0.062, 0.1, 0, 75, 35),
-    /*12 */ b('shinL', -hip * 1.05, y(0.29), 0, -hip * 1.05, y(0.055), 0, 0.048, 0.045, 11, 70, 20),
-    /*13 */ b('thighR', hip, y(0.53), 0, hip * 1.05, y(0.29), 0, 0.062, 0.1, 0, 75, 35),
-    /*14 */ b('shinR', hip * 1.05, y(0.29), 0, hip * 1.05, y(0.055), 0, 0.048, 0.045, 13, 70, 20),
   ];
+  for (let side = -1; side <= 1; side += 2) {
+    const suffix = side < 0 ? 'L' : 'R';
+    const shoulder = side * sh;
+    const elbow = shoulder + side * h * 0.015;
+    const wrist = shoulder + side * h * 0.02;
+    const parent = spec.length;
+    spec.push(
+      b(`upperArm${suffix}`, shoulder, y(0.815), 0, elbow, y(0.65), 0, 0.045, 0.027, 2, 85, 60),
+      b(`forearm${suffix}`, elbow, y(0.65), 0, wrist, y(0.5), 0, 0.037, 0.018, parent, 80, 45),
+      b(`hand${suffix}`, wrist, y(0.5), 0, wrist, y(0.44), 0, 0.032, 0.006, parent + 1, 55, 40)
+    );
+  }
+  for (let side = -1; side <= 1; side += 2) {
+    const suffix = side < 0 ? 'L' : 'R';
+    const thigh = side * hip;
+    const shin = thigh * 1.05;
+    const parent = spec.length;
+    spec.push(
+      b(`thigh${suffix}`, thigh, y(0.53), 0, shin, y(0.29), 0, 0.062, 0.1, 0, 75, 35),
+      b(`shin${suffix}`, shin, y(0.29), 0, shin, y(0.055), 0, 0.048, 0.045, parent, 70, 20)
+    );
+  }
+  return spec;
 }
-
-/* ------------------------------------------------------------------ */
 
 const MAX_PARTICLE_STEP = 0.35; // metres per fixed step, anti-explosion clamp
 const SLEEP_MOTION = 0.0022;
@@ -219,10 +161,6 @@ export class Ragdoll {
   declare friction: number;
   declare userData: unknown;
   declare actor: unknown;
-  declare alive: boolean;
-  declare sleeping: boolean;
-  declare sleepTimer: number;
-  declare age: number;
   declare spec: BoneSpec[];
   declare boneCount: number;
   declare particleCount: number;
@@ -242,21 +180,12 @@ export class Ragdoll {
   declare qy: Float64Array;
   declare qz: Float64Array;
   declare invMass: Float64Array;
-  declare bones3D: Array<THREE.Bone | null> | null;
   declare skeleton: THREE.Skeleton | null;
   declare boneLocalOffset: Float64Array;
   declare boneRestDirection: Float64Array;
   declare boneRestOffset: Float64Array;
   declare attachmentBones: Int32Array;
-  declare aabb: RagdollBounds;
   declare selfPairs: Uint16Array | Int32Array;
-  declare _m4: THREE.Matrix4;
-  declare _m4b: THREE.Matrix4;
-  declare _q: THREE.Quaternion;
-  declare _v3: THREE.Vector3;
-  declare _v3b: THREE.Vector3;
-  declare _scale: THREE.Vector3;
-  declare _ss: ReturnType<typeof makeClosest>;
   declare _sleepWritten: boolean;
   /**
    * @param {StaticWorld} world
@@ -266,6 +195,21 @@ export class Ragdoll {
    *   gravity    m/s^2 (negative)
    *   iterations Gauss-Seidel iterations per fixed step
    */
+  alive: boolean = true;
+  sleeping: boolean = false;
+  sleepTimer: number = 0;
+  age: number = 0;
+  // skeleton binding (filled by adoptSkeleton)
+  bones3D: Array<THREE.Bone | null> | null = null;
+  _m4: THREE.Matrix4 = new THREE.Matrix4();
+  _m4b: THREE.Matrix4 = new THREE.Matrix4();
+  _q: THREE.Quaternion = new THREE.Quaternion();
+  _v3: THREE.Vector3 = new THREE.Vector3();
+  _v3b: THREE.Vector3 = new THREE.Vector3();
+  _scale: THREE.Vector3 = new THREE.Vector3(1, 1, 1);
+  aabb: RagdollBounds = { minx: 0, miny: 0, minz: 0, maxx: 0, maxy: 0, maxz: 0 };
+  _ss: ReturnType<typeof makeClosest> = makeClosest();
+
   constructor(world: RagdollWorld | null, opts: RagdollOptions = {}) {
     this.id = _nextRagdollId++;
     this.world = world;
@@ -276,10 +220,6 @@ export class Ragdoll {
     this.friction = opts.friction ?? 0.72;
     this.userData = opts.userData ?? null;
     this.actor = opts.actor ?? null;
-    this.alive = true;
-    this.sleeping = false;
-    this.sleepTimer = 0;
-    this.age = 0;
 
     const spec = opts.bones ?? humanoidSpec(opts.height ?? 1.8, opts.mass ?? 82);
     this.spec = spec;
@@ -364,15 +304,6 @@ export class Ragdoll {
       this._initUp(i);
     }
 
-    // skeleton binding (filled by adoptSkeleton)
-    this.bones3D = null;
-    this._m4 = new THREE.Matrix4();
-    this._m4b = new THREE.Matrix4();
-    this._q = new THREE.Quaternion();
-    this._v3 = new THREE.Vector3();
-    this._v3b = new THREE.Vector3();
-    this._scale = new THREE.Vector3(1, 1, 1);
-
     // Retain branch offsets in the parent's frame, not loose distance tethers
     // that would let shoulders orbit around the torso.
     const attachments = [];
@@ -396,11 +327,31 @@ export class Ragdoll {
     }
     this.attachmentBones = Int32Array.from(attachments);
 
-    this.aabb = { minx: 0, miny: 0, minz: 0, maxx: 0, maxy: 0, maxz: 0 };
     this._updateAabb();
 
-    this._ss = makeClosest();
     this.selfPairs = this._buildSelfPairs();
+  }
+
+  _closestBones(i: number, j: number): number {
+    const a = this.boneHead[i],
+      b = this.boneTail[i];
+    const c = this.boneHead[j],
+      d = this.boneTail[j];
+    return closestPtSegSeg(
+      this.px[a],
+      this.py[a],
+      this.pz[a],
+      this.px[b],
+      this.py[b],
+      this.pz[b],
+      this.px[c],
+      this.py[c],
+      this.pz[c],
+      this.px[d],
+      this.py[d],
+      this.pz[d],
+      this._ss
+    );
   }
 
   /**
@@ -419,22 +370,8 @@ export class Ragdoll {
           bj = this.boneTail[j];
         if (ai === aj || ai === bj || bi === aj || bi === bj) continue;
         const rad = this.boneRadius[i] + this.boneRadius[j];
-        closestPtSegSeg(
-          this.px[ai],
-          this.py[ai],
-          this.pz[ai],
-          this.px[bi],
-          this.py[bi],
-          this.pz[bi],
-          this.px[aj],
-          this.py[aj],
-          this.pz[aj],
-          this.px[bj],
-          this.py[bj],
-          this.pz[bj],
-          this._ss ?? (this._ss = makeClosest())
-        );
-        if (this._ss.d2 < rad * rad * 0.95) continue;
+        const d2 = this._closestBones(i, j);
+        if (d2 < rad * rad * 0.95) continue;
         pairs.push(i, j);
       }
     }
@@ -823,21 +760,7 @@ export class Ragdoll {
       const b0 = this.boneHead[j],
         b1 = this.boneTail[j];
       const rad = (this.boneRadius[i] + this.boneRadius[j]) * 0.92;
-      const d2 = closestPtSegSeg(
-        this.px[a0],
-        this.py[a0],
-        this.pz[a0],
-        this.px[a1],
-        this.py[a1],
-        this.pz[a1],
-        this.px[b0],
-        this.py[b0],
-        this.pz[b0],
-        this.px[b1],
-        this.py[b1],
-        this.pz[b1],
-        cl
-      );
+      const d2 = this._closestBones(i, j);
       if (d2 >= rad * rad) continue;
       const d = Math.sqrt(d2);
       let nx, ny, nz;
@@ -990,10 +913,6 @@ export class Ragdoll {
     a.maxz = maxz;
   }
 
-  /* ---------------------------------------------------------------- */
-  /* Read-back                                                         */
-  /* ---------------------------------------------------------------- */
-
   /** World-space capsule of bone i: writes head/tail/radius into `out`. */
   getBoneCapsule(i: number, out: CapsuleOut): CapsuleOut {
     const a = this.boneHead[i],
@@ -1052,8 +971,9 @@ export class Ragdoll {
   ): this {
     const bones = new Array<THREE.Bone | null>(this.boneCount).fill(null);
     for (let i = 0; i < this.boneCount; i++) {
-      const entries = boneMap as Record<string, THREE.Bone | string | null | undefined>;
-      const entry = entries?.[i] ?? entries?.[this.spec[i].name] ?? null;
+      const entry = Array.isArray(boneMap)
+        ? (boneMap[i] ?? null)
+        : (boneMap[i] ?? boneMap[this.spec[i].name] ?? null);
       if (!entry) continue;
       bones[i] = typeof entry === 'string' ? (skeleton.getBoneByName(entry) ?? null) : entry;
     }
@@ -1157,10 +1077,7 @@ export function specFromSkeleton(
     if (len < 1e-4) continue;
     const si = spec.length;
     specIndexOfBone.set(bone, si);
-    const parentSpec =
-      isBone(bone.parent) && specIndexOfBone.has(bone.parent)
-        ? specIndexOfBone.get(bone.parent)
-        : -1;
+    const parentSpec = isBone(bone.parent) ? (specIndexOfBone.get(bone.parent) ?? -1) : -1;
     spec.push({
       name: bone.name || `bone${i}`,
       head: [v.x, v.y, v.z] as const,

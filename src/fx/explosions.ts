@@ -1,49 +1,18 @@
-import type { Rng } from '../core/rng.ts';
+import type { Vector3Like as Vec3Like } from 'three';
+
 import { P } from './atlas.ts';
-import type { LightPool } from './lights.ts';
-import { resetSpawn } from './particles.ts';
+import type { FxSystem } from './index.ts';
+import { resetSpawn, setSpawnColorRamp, setSpawnPosition, setSpawnVelocity } from './particles.ts';
 import { V, V2, cone, discOn } from './util.ts';
 
-interface Point3 {
-  x: number;
-  y: number;
-  z: number;
-}
-type ExplosionOptions = { radius?: number; up?: Point3; position?: Point3 } & (
+type ExplosionOptions = { radius?: number; up?: Vec3Like; position?: Vec3Like } & (
   | { x: number; y: number; z: number }
-  | { position: Point3 }
+  | { position: Vec3Like }
 );
-interface ExplosionFx {
-  rng: Rng;
-  pScale: number;
-  emitAdd(spawn: ReturnType<typeof resetSpawn>): void;
-  emitLit(spawn: ReturnType<typeof resetSpawn>): void;
-  hazeRing(
-    x: number,
-    y: number,
-    z: number,
-    radius: number,
-    duration: number,
-    strength: number,
-    speed: number
-  ): void;
-  addSmokeColumn(
-    x: number,
-    y: number,
-    z: number,
-    options: {
-      radius: number;
-      duration: number;
-      rate: number;
-      rise: number;
-      dark: number;
-      life: number;
-      growth: number;
-    }
-  ): void;
-  lights?: LightPool;
-  scorch(x: number, y: number, z: number, radius: number): void;
-}
+type ExplosionFx = Pick<
+  FxSystem,
+  'rng' | 'pScale' | 'emitAdd' | 'emitLit' | 'hazeRing' | 'addSmokeColumn' | 'lights' | 'scorch'
+>;
 
 /**
  * Explosions.
@@ -63,7 +32,7 @@ const TWO_PI = Math.PI * 2;
 export function explode(fx: ExplosionFx, o: ExplosionOptions): boolean {
   const rng = fx.rng;
   const q = fx.pScale;
-  const p: Point3 = o.position ?? (o as Point3);
+  const p = 'x' in o ? o : o.position;
   const R = Math.max(0.6, o.radius ?? 5);
   const up = o.up ?? { x: 0, y: 1, z: 0 };
   const px = p.x;
@@ -72,22 +41,15 @@ export function explode(fx: ExplosionFx, o: ExplosionOptions): boolean {
 
   // ---- core flash ---------------------------------------------------------
   let s = resetSpawn();
-  s.x = px;
-  s.y = py;
-  s.z = pz;
+  setSpawnPosition(s, px, py, pz);
   s.tile = P.FLASH_CORE;
   s.size0 = R * 0.35;
   s.size1 = R * 1.5;
   s.sizeCurve = 0.3;
   s.life = 0.085;
   s.drag = 5;
-  s.r0 = 1;
-  s.g0 = 0.95;
-  s.b0 = 0.85;
+  setSpawnColorRamp(s, 1, 0.95, 0.85, 1, 0.42, 0.1);
   s.i0 = 85;
-  s.r1 = 1;
-  s.g1 = 0.42;
-  s.b1 = 0.1;
   s.i1 = 0;
   s.alphaCurve = 0.5;
   s.soft = 0.5;
@@ -101,12 +63,8 @@ export function explode(fx: ExplosionFx, o: ExplosionOptions): boolean {
     const sp = rng.range(1.5, 5.5) * (R / 4);
     s = resetSpawn();
     discOn(V2, rng, up.x, up.y, up.z, R * 0.16);
-    s.x = px + V2.x;
-    s.y = py + V2.y + R * 0.05;
-    s.z = pz + V2.z;
-    s.vx = V.x * sp;
-    s.vy = V.y * sp + 1.4;
-    s.vz = V.z * sp;
+    setSpawnPosition(s, px + V2.x, py + V2.y + R * 0.05, pz + V2.z);
+    setSpawnVelocity(s, V.x * sp, V.y * sp + 1.4, V.z * sp);
     s.tile = P.FIRE;
     s.size0 = R * rng.range(0.18, 0.34);
     s.size1 = R * rng.range(0.7, 1.15);
@@ -139,12 +97,8 @@ export function explode(fx: ExplosionFx, o: ExplosionOptions): boolean {
     cone(V, rng, up.x, up.y, up.z, 1.4, 0.7);
     const sp = rng.range(1.2, 4) * (R / 4);
     s = resetSpawn();
-    s.x = px + V.x * R * 0.12;
-    s.y = py + R * 0.08;
-    s.z = pz + V.z * R * 0.12;
-    s.vx = V.x * sp;
-    s.vy = V.y * sp + 1.0;
-    s.vz = V.z * sp;
+    setSpawnPosition(s, px + V.x * R * 0.12, py + R * 0.08, pz + V.z * R * 0.12);
+    setSpawnVelocity(s, V.x * sp, V.y * sp + 1.0, V.z * sp);
     s.tile = i % 2 ? P.SMOKE_A : P.SMOKE_B;
     s.size0 = R * rng.range(0.2, 0.34);
     s.size1 = R * rng.range(0.8, 1.35);
@@ -155,12 +109,7 @@ export function explode(fx: ExplosionFx, o: ExplosionOptions): boolean {
     s.gravity = 0.9;
     s.rot = rng.float() * TWO_PI;
     s.spin = rng.signed() * 0.9;
-    s.r0 = 0.1;
-    s.g0 = 0.095;
-    s.b0 = 0.09;
-    s.r1 = 0.19;
-    s.g1 = 0.185;
-    s.b1 = 0.18;
+    setSpawnColorRamp(s, 0.1, 0.095, 0.09, 0.19, 0.185, 0.18);
     s.alpha = rng.range(0.55, 0.85);
     s.alphaCurve = 1.5;
     s.soft = 0.7;
@@ -173,22 +122,15 @@ export function explode(fx: ExplosionFx, o: ExplosionOptions): boolean {
   // ---- shockwave ----------------------------------------------------------
   fx.hazeRing(px, py, pz, R * 0.25, 9.0, 0.34, 2.2);
   s = resetSpawn();
-  s.x = px;
-  s.y = py;
-  s.z = pz;
+  setSpawnPosition(s, px, py, pz);
   s.tile = P.RING;
   s.size0 = R * 0.35;
   s.size1 = R * 2.4;
   s.sizeCurve = 0.42;
   s.life = 0.2;
   s.drag = 6;
-  s.r0 = 1;
-  s.g0 = 0.9;
-  s.b0 = 0.78;
+  setSpawnColorRamp(s, 1, 0.9, 0.78, 1, 0.6, 0.3);
   s.i0 = 3.2;
-  s.r1 = 1;
-  s.g1 = 0.6;
-  s.b1 = 0.3;
   s.i1 = 0;
   s.alphaCurve = 1.1;
   s.soft = 1.2;
@@ -203,12 +145,8 @@ export function explode(fx: ExplosionFx, o: ExplosionOptions): boolean {
     const dz = Math.sin(a);
     const sp = rng.range(4, 9) * (R / 4);
     s = resetSpawn();
-    s.x = px + dx * R * 0.2;
-    s.y = py - R * 0.05;
-    s.z = pz + dz * R * 0.2;
-    s.vx = dx * sp;
-    s.vy = rng.range(0.3, 1.4);
-    s.vz = dz * sp;
+    setSpawnPosition(s, px + dx * R * 0.2, py - R * 0.05, pz + dz * R * 0.2);
+    setSpawnVelocity(s, dx * sp, rng.range(0.3, 1.4), dz * sp);
     s.tile = i % 3 === 0 ? P.SMOKE_B : P.DUST;
     s.size0 = R * rng.range(0.12, 0.22);
     s.size1 = R * rng.range(0.55, 0.95);
@@ -218,12 +156,7 @@ export function explode(fx: ExplosionFx, o: ExplosionOptions): boolean {
     s.gravity = -0.5;
     s.rot = rng.float() * TWO_PI;
     s.spin = rng.signed() * 1;
-    s.r0 = 0.42;
-    s.g0 = 0.36;
-    s.b0 = 0.29;
-    s.r1 = 0.34;
-    s.g1 = 0.3;
-    s.b1 = 0.25;
+    setSpawnColorRamp(s, 0.42, 0.36, 0.29, 0.34, 0.3, 0.25);
     s.alpha = rng.range(0.4, 0.7);
     s.alphaCurve = 1.5;
     s.soft = 0.5;
@@ -239,12 +172,8 @@ export function explode(fx: ExplosionFx, o: ExplosionOptions): boolean {
     cone(V, rng, up.x, up.y, up.z, 1.35, 0.8);
     const sp = rng.range(6, 20) * (0.6 + R / 8);
     s = resetSpawn();
-    s.x = px;
-    s.y = py + 0.05;
-    s.z = pz;
-    s.vx = V.x * sp;
-    s.vy = V.y * sp;
-    s.vz = V.z * sp;
+    setSpawnPosition(s, px, py + 0.05, pz);
+    setSpawnVelocity(s, V.x * sp, V.y * sp, V.z * sp);
     s.tile = rng.float() < 0.3 ? P.SPLINTER : P.CHIP;
     s.size0 = rng.range(0.01, 0.05);
     s.size1 = s.size0;
@@ -253,12 +182,7 @@ export function explode(fx: ExplosionFx, o: ExplosionOptions): boolean {
     s.gravity = -19;
     s.rot = rng.float() * TWO_PI;
     s.spin = rng.signed() * 26;
-    s.r0 = 0.24;
-    s.g0 = 0.21;
-    s.b0 = 0.18;
-    s.r1 = 0.2;
-    s.g1 = 0.18;
-    s.b1 = 0.16;
+    setSpawnColorRamp(s, 0.24, 0.21, 0.18, 0.2, 0.18, 0.16);
     s.alphaCurve = 0.3;
     s.soft = 0.06;
     s.seed = rng.float();
@@ -269,12 +193,8 @@ export function explode(fx: ExplosionFx, o: ExplosionOptions): boolean {
     cone(V, rng, up.x, up.y, up.z, 1.4, 0.9);
     const sp = rng.range(4, 14);
     s = resetSpawn();
-    s.x = px;
-    s.y = py + 0.05;
-    s.z = pz;
-    s.vx = V.x * sp;
-    s.vy = V.y * sp;
-    s.vz = V.z * sp;
+    setSpawnPosition(s, px, py + 0.05, pz);
+    setSpawnVelocity(s, V.x * sp, V.y * sp, V.z * sp);
     s.tile = P.STREAK;
     s.size0 = rng.range(0.012, 0.03);
     s.size1 = s.size0 * 0.4;
@@ -282,13 +202,8 @@ export function explode(fx: ExplosionFx, o: ExplosionOptions): boolean {
     s.life = rng.range(0.5, 1.4);
     s.drag = 1.1;
     s.gravity = -13;
-    s.r0 = 1;
-    s.g0 = 0.6;
-    s.b0 = 0.22;
+    setSpawnColorRamp(s, 1, 0.6, 0.22, 1, 0.18, 0.03);
     s.i0 = rng.range(8, 20);
-    s.r1 = 1;
-    s.g1 = 0.18;
-    s.b1 = 0.03;
     s.i1 = 0.2;
     s.flags = 1;
     s.alphaCurve = 0.6;

@@ -32,3 +32,47 @@ export function sampleAuthoredAction(state: AuthoredActionState, name: string, t
   action.time = Math.min(time, action.getClip().duration);
   state.mixer.update(0);
 }
+
+/** Detachable-magazine adapters share these authored gesture names; frozen because
+ * every adapter reads the same object (extend by spreading, as AX338 does). */
+export const MAGAZINE_ALIASES: Readonly<Record<string, string>> = Object.freeze({
+  reloadTac: 'Reload_Tactical',
+  reloadEmpty: 'Reload_Empty',
+  inspect: 'Inspect',
+  draw: 'Draw',
+  holster: 'Holster',
+});
+
+interface AuthoredFireState {
+  idleTime: number;
+  fireTime: number;
+  _sample(name: string, time: number): void;
+}
+
+/** Advance clocks once, then let the adapter apply its own mechanical overrides. */
+export function sampleAuthoredFire(
+  state: AuthoredFireState,
+  clips: { Fire: { duration: number }; Idle: { duration: number } },
+  dt: number,
+  clipName: string | null,
+  clipTime: number,
+  empty: boolean,
+  aliases: Record<string, string> = MAGAZINE_ALIASES
+): string | undefined {
+  state.idleTime += dt;
+  state.fireTime += dt;
+  const gesture = clipName === null ? undefined : aliases[clipName];
+  if (gesture) state._sample(gesture, clipTime);
+  else if (state.fireTime < clips.Fire.duration)
+    state._sample(empty ? 'Last_Shot' : 'Fire', state.fireTime);
+  else state._sample('Idle', state.idleTime % clips.Idle.duration);
+  return gesture;
+}
+
+export function disposeAuthoredMixer(state: {
+  mixer: THREE.AnimationMixer;
+  root: THREE.Object3D;
+}): void {
+  state.mixer.stopAllAction();
+  state.mixer.uncacheRoot(state.root);
+}

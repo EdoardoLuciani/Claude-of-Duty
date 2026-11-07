@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import { STREET } from './layout.js';
+import { STREET } from './level/layout.js';
 import {
   chamferBox,
   plainBox,
@@ -59,6 +59,12 @@ export const BOX_SOFT = (A) => A.cache('box:0.03', () => chamferBox(1, 1, 1, 0.0
 export const BOX_THIN = (A) => A.cache('box:plain', () => plainBox());
 /** Single quad for glass panes. */
 export const PANE = (A) => A.cache('pane', () => quad(1, 1));
+/**
+ * Centimetre-rounded size for cache keys. Cached shapes are built from the
+ * rounded key, never from whichever caller happened to create the entry first,
+ * so editing one building cannot reshape a leaf on another.
+ */
+const cm = (v) => Math.round(v * 100) / 100;
 
 /** Merge a unit chamfer box scaled to a slab. */
 export function slab(A, key, pm, x, y, z, sx, sy, sz, opts = null, ry = 0) {
@@ -199,26 +205,25 @@ export function windowUnit(A, pm, o, rng, opts = {}) {
     A.add(frameKey, box, LL(pm, x, y + h * 0.16, depth, 0, w - 0.1, 0.04, fd * 0.85), null);
   } else {
     // An open casement: the sash swung inward off its hinge, catching light on
-    // its edge against the dark room behind it.
+    // its edge against the dark room behind it. A walkable room (`back:false`)
+    // gets no swung leaves: they are collision at head height across its routes.
     openL = true;
     openR = state === 'open' || rng.float() < 0.4;
-    const sw = w / 2 - 0.03;
-    const sash = A.cache(`sash:${sw.toFixed(2)}:${h.toFixed(2)}`, () => sashLeaf(sw, h - 0.06));
-    A.add(
-      frameKey,
-      sash,
-      LL(pm, x - w / 2 + 0.04, y, depth + 0.02, rng.range(-1.35, -0.75), 1, 1, 1),
-      { masks: [0.8, 0.45, 0.2] }
-    );
-    if (openR) {
+    const sw = cm(w / 2 - 0.03);
+    const sh = cm(h);
+    const leaf = (hx, yaw) =>
       A.add(
         frameKey,
-        sash,
-        LL(pm, x + w / 2 - 0.04, y, depth + 0.02, rng.range(0.75, 1.35), 1, 1, 1),
+        A.cache(`sash:${sw}:${sh}`, () => sashLeaf(sw, sh - 0.06)),
+        LL(pm, hx, y, depth + 0.02, yaw, 1, 1, 1),
         { masks: [0.8, 0.45, 0.2] }
       );
-    } else {
+    const leaves = opts.back !== false;
+    if (leaves) leaf(x - w / 2 + 0.04, rng.range(-1.35, -0.75));
+    if (!openR) {
       A.add(frameKey, box, LL(pm, x, y, depth, 0, 0.045, h - 0.1, fd * 0.85), null);
+    } else if (leaves) {
+      leaf(x + w / 2 - 0.04, rng.range(0.75, 1.35));
     }
   }
 
@@ -334,10 +339,9 @@ export function windowUnit(A, pm, o, rng, opts = {}) {
   // shutters — one closed, one hanging open at an angle
   if (opts.shutters) {
     const key = opts.shutterKey ?? 'metal_blue';
-    const sw = w / 2 - 0.01;
-    const louvre = A.cache(`shutter:${sw.toFixed(2)}:${h.toFixed(2)}`, () =>
-      shutterLeaf(sw, h - 0.03)
-    );
+    const sw = cm(w / 2 - 0.01);
+    const sh = cm(h);
+    const louvre = A.cache(`shutter:${sw}:${sh}`, () => shutterLeaf(sw, sh - 0.03));
     // `state:'shuttered'` means shut for the afternoon — both leaves flat on the
     // reveal, which is a completely different silhouette from a half-open pair.
     const shut = state === 'shuttered';
@@ -524,10 +528,9 @@ export function doorUnit(A, pm, o, rng, opts = {}) {
   if (opts.leaf !== false) {
     const key = opts.leafKey ?? 'metal_green';
     const ang = opts.open ?? 0;
-    const leafW = w - 0.06;
-    const leaf = A.cache(`doorleaf:${leafW.toFixed(2)}:${h.toFixed(2)}`, () =>
-      doorLeaf(leafW, h - 0.06)
-    );
+    const leafW = cm(w - 0.06);
+    const leafH = cm(h);
+    const leaf = A.cache(`doorleaf:${leafW}:${leafH}`, () => doorLeaf(leafW, leafH - 0.06));
     // hinge at the left jamb: rotate about the hinge, not the centre
     const hx = x - leafW / 2;
     const cs = Math.cos(ang);
@@ -577,7 +580,8 @@ export function shopfront(A, pm, o, rng, opts = {}) {
   const drop = opts.drop ?? rng.range(0.15, 0.85);
   if (drop > 0.02) {
     const sh = h * drop;
-    const shutter = A.cache(`roller:${w.toFixed(2)}`, () => rollerShutter(w, 1));
+    const rw = cm(w);
+    const shutter = A.cache(`roller:${rw}`, () => rollerShutter(rw, 1));
     A.add('corrugated', shutter, LL(pm, x, y + h / 2 - 0.18 - sh / 2, 0.05, 0, 1, sh, 1), {
       masks: [0.85, 0.6, 0.15],
     });
@@ -586,7 +590,6 @@ export function shopfront(A, pm, o, rng, opts = {}) {
   if (opts.counter !== false) {
     A.add('wood_dark', box, LL(pm, x, 0.42, t + 0.28, 0, w * 0.82, 0.08, 0.7), {
       masks: [0.8, 0.5, 0.2],
-      support: 'counter',
     });
     A.add('wood_dark', box, LL(pm, x - w * 0.34, 0.21, t + 0.28, 0, 0.09, 0.42, 0.62), {
       masks: [0.7, 0.6, 0.3],
@@ -596,87 +599,6 @@ export function shopfront(A, pm, o, rng, opts = {}) {
     });
   }
 
-  /**
-   * Inside dressing beside the opening. The wall a shop is seen through is the
-   * biggest surface in any interior shot, and bare render there is the fastest
-   * way to make an interior look like an empty box.
-   */
-  if (opts.inside !== false) {
-    const thin = BOX_THIN(A);
-    for (const sx of [-1, 1]) {
-      const bx = x + sx * (w / 2 + 0.75);
-      // wall shelf with goods
-      const sy = 1.35 + (rng?.range ? rng.range(-0.1, 0.25) : 0);
-      if (opts.shelves !== false) {
-        A.add('wood_prop', BOX_FINE(A), LL(pm, bx, sy, t + 0.17, 0, 1.3, 0.045, 0.34), {
-          masks: [0.85, 0.4, 0.15],
-          support: 'shelf',
-        });
-        for (const b of [-1, 1]) {
-          A.add(
-            'metal_rust',
-            thin,
-            LL(pm, bx + b * 0.5, sy - 0.12, t + 0.09, 0, 0.03, 0.24, 0.18),
-            { masks: [0.9, 0.6, 0.2] }
-          );
-        }
-      }
-      // conduit up the wall into a junction box
-      A.add('metal_dark', thin, LL(pm, bx + 0.62, 1.5, t + 0.03, 0, 0.045, 2.6, 0.045), {
-        masks: [0.7, 0.5, 0.2],
-      });
-      A.add('metal_dark', BOX_FINE(A), LL(pm, bx + 0.62, 1.42, t + 0.06, 0, 0.16, 0.22, 0.09), {
-        masks: [0.8, 0.5, 0.2],
-      });
-    }
-    // a bolt of cloth hung on the inside wall over the counter
-    if (rng && rng.float() < 0.7) {
-      const c = clothGeometry(rng.range(0.9, 1.5), rng.range(1.1, 1.7), {
-        segX: 7,
-        segY: 8,
-        sag: 0.05,
-        wrinkle: 0.055,
-        twist: 0.06,
-        thickness: 0.003,
-        fray: 0.02,
-        rng,
-      });
-      A.addOnce(
-        rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']),
-        c,
-        LL(
-          pm,
-          x + (rng.float() < 0.5 ? -1 : 1) * (w / 2 + rng.range(0.9, 1.5)),
-          1.75,
-          t + 0.08,
-          Math.PI
-        ),
-        { masks: [0.3, 0.45, 0.2] }
-      );
-    }
-  } else if (opts.preserveInsideRng && rng) {
-    // Ground-floor suites replace the old decorative shop backing. Consume the
-    // same keyed dressing draws so later authored facades and stable placements
-    // do not reroll simply because the opening became traversable.
-    rng.range(-0.1, 0.25);
-    rng.range(-0.1, 0.25);
-    if (rng.float() < 0.7) {
-      const c = clothGeometry(rng.range(0.9, 1.5), rng.range(1.1, 1.7), {
-        segX: 7,
-        segY: 8,
-        sag: 0.05,
-        wrinkle: 0.055,
-        twist: 0.06,
-        thickness: 0.003,
-        fray: 0.02,
-        rng,
-      });
-      c.dispose();
-      rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']);
-      rng.float();
-      rng.range(0.9, 1.5);
-    }
-  }
   return o;
 }
 
@@ -705,7 +627,6 @@ export function balcony(A, pm, x, y, w, rng, opts = {}) {
   // slab, slightly sagging feel via thickness taper
   A.add(key, BOX_SOFT(A), LL(pm, x, y + 0.06, -d / 2, 0, w, 0.13, d), {
     masks: [0.45, 0.55, 0.3],
-    support: 'balcony',
   });
   // brackets underneath
   for (let i = -1; i <= 1; i += 2) {
@@ -836,7 +757,6 @@ export function stairRun(A, pm, x, y, z, w, steps, rise, run, opts = {}) {
       LL(pm, x, y + (i + 0.5) * rise, z + (i + 0.5) * run - nosing / 2, 0, w, rise, run + nosing),
       {
         masks: [0.7, 0.35, 0.15],
-        support: 'stair',
       }
     );
   }
@@ -846,7 +766,7 @@ export function stairRun(A, pm, x, y, z, w, steps, rise, run, opts = {}) {
         key,
         box,
         LL(pm, x + sx * (w / 2 - 0.03), y + H / 2 - 0.06, z + D / 2, 0, 0.06, 0.22, len, -ang),
-        { masks: [0.55, 0.5, 0.25], support: 'stair' }
+        { masks: [0.55, 0.5, 0.25] }
       );
     }
   }
@@ -1141,10 +1061,6 @@ export function drainpipe(A, pm, x, yTop, h, opts = {}) {
  * the way a decal artist builds one — the floor sits ~flush with the wall and the
  * RIM is raised, so the shading gradient reads as a depression. Nothing ever
  * breaks the silhouette by more than a couple of millimetres.
- *
- * The rng is drawn exactly 16 times, matching the old implementation, because
- * `registerProps` shares one stream with the whole level build: changing the
- * draw count here silently re-rolls every window state and roof prop downstream.
  */
 export function pockGeometry(rng, r = 0.05) {
   const SEG = 8;
@@ -1155,7 +1071,7 @@ export function pockGeometry(rng, r = 0.05) {
     [0.8, 0.075],
     [1.0, 0.004],
   ];
-  // chipped rim: per-segment radius and crest-height jitter. 8 + 8 = 16 draws.
+  // chipped rim: per-segment radius and crest-height jitter
   const jr = [];
   const jz = [];
   for (let s = 0; s < SEG; s++) jr.push(1 + (rng.float() - 0.5) * 0.42);

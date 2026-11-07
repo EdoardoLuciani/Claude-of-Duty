@@ -1,29 +1,11 @@
-/**
- * AUDIO / SPATIALISATION
- *
- * A pool of reusable 3D emitter chains. Each chain is:
- *
- *   input ─► occlusionLP ─► airLP ─► distanceGain ─┬─► panner (HRTF) ─► bus
- *                                                  └─► sendGain ─► reverb send
- *
- * Notes on the design decisions, because they are not the obvious ones:
- *
- *  - The PannerNode's own distance model is switched OFF (rolloffFactor 0) and
- *    attenuation is applied by `distanceGain` instead. That is what lets the
- *    reverb send be *post* distance attenuation but *pre* panning, which is how
- *    a far source correctly ends up wetter than a near one.
- *  - `airLP` is air absorption, `occlusionLP` is geometry. They are separate so
- *    a distant *and* occluded source stacks both losses, as it should.
- *  - The whole chain is built once and only the panner→bus edge is connected
- *    while the emitter is in use; a free emitter is detached from the graph so
- *    the (expensive) HRTF convolution is not evaluated for silence.
- *  - Propagation delay is not a DelayNode: every voice is *scheduled* at
- *    `now + dist/343`, which is sample-accurate and free.
+/** Reusable spatial chains: occlusion LP -> air LP -> distance gain -> HRTF bus.
+ * Reverb branches after distance gain but before panning; native distance rolloff is disabled.
+ * Idle emitters detach their panner/bus edge. Propagation uses scheduled start time + distance/343.
  */
 
 import type { EngineContext } from '../core/context.ts';
 import { airCutoff, clamp, gain, biquad } from './dsp.ts';
-import type { Mixer } from './mixer.ts';
+import type { BusName, Mixer } from './mixer.ts';
 interface Point3 {
   x: number;
   y: number;
@@ -34,16 +16,16 @@ interface EmitterOptions {
   x: number;
   y: number;
   z: number;
-  when?: number;
-  dist?: number;
-  occlusion?: number;
-  atten?: number;
-  priority?: number;
-  endTime?: number;
-  bus?: string;
-  tracked?: boolean;
-  gain?: number;
-  send?: number;
+  when?: number | undefined;
+  dist?: number | undefined;
+  occlusion?: number | undefined;
+  atten?: number | undefined;
+  priority?: number | undefined;
+  endTime?: number | undefined;
+  bus?: BusName | undefined;
+  tracked?: boolean | undefined;
+  gain?: number | undefined;
+  send?: number | undefined;
 }
 
 const MAX_EMITTERS = 40;
@@ -68,16 +50,17 @@ class Emitter {
   distGain!: GainNode;
   sendGain!: GainNode;
   panner!: PannerNode;
-  free!: boolean;
-  endTime!: number;
-  priority!: number;
-  busName!: string;
-  attached!: AudioNode | null;
-  tracked!: boolean;
-  pos!: Point3;
-  _connected!: AudioNode | false;
-  _sendConnected!: AudioNode | false;
   userGain!: number;
+  free: boolean = true;
+  endTime: number = 0;
+  priority: number = 0;
+  busName: BusName = 'foley';
+  attached: AudioNode | null = null;
+  tracked: boolean = false;
+  pos: Point3 = { x: 0, y: 0, z: 0 };
+  _connected: AudioNode | false = false;
+  _sendConnected: AudioNode | false = false;
+
   constructor(actx: BaseAudioContext, mixer: Mixer) {
     this.actx = actx;
     this.mixer = mixer;
@@ -103,16 +86,6 @@ class Emitter {
     this.airLP.connect(this.distGain);
     this.distGain.connect(this.panner);
     this.distGain.connect(this.sendGain);
-
-    this.free = true;
-    this.endTime = 0;
-    this.priority = 0;
-    this.busName = 'foley';
-    this.attached = null;
-    this.tracked = false;
-    this.pos = { x: 0, y: 0, z: 0 };
-    this._connected = false;
-    this._sendConnected = false;
   }
 
   _setPos(x: number, y: number, z: number, when: number): void {
@@ -215,32 +188,30 @@ export class SpatialField {
   actx!: BaseAudioContext;
   mixer!: Mixer;
   ctx!: SpatialContext | null;
-  emitters!: Emitter[];
-  _lp!: Point3;
-  _occOrigin!: Point3;
-  _occDir!: Point3;
-  _trackCursor!: number;
-  stats!: { active: number; stolen: number; dropped: number; occlusionRays: number };
-  occlusionEnabled!: boolean;
   /**
    * @param {BaseAudioContext} actx
    * @param {import('./mixer.ts').Mixer} mixer
    * @param {object} ctx engine context (for physics raycasts); may be null
    */
+  emitters: Emitter[] = [];
+  // Preallocated scratch — update() must never allocate.
+  _lp: Point3 = { x: 0, y: 1.6, z: 0 };
+  _occOrigin: Point3 = { x: 0, y: 0, z: 0 };
+  _occDir: Point3 = { x: 0, y: 0, z: 0 };
+  _trackCursor: number = 0;
+  stats: { active: number; stolen: number; dropped: number; occlusionRays: number } = {
+    active: 0,
+    stolen: 0,
+    dropped: 0,
+    occlusionRays: 0,
+  };
+  occlusionEnabled: boolean = true;
+
   constructor(actx: BaseAudioContext, mixer: Mixer, ctx: SpatialContext | null) {
     this.actx = actx;
     this.mixer = mixer;
     this.ctx = ctx;
-    this.emitters = [];
     for (let i = 0; i < MAX_EMITTERS; i++) this.emitters.push(new Emitter(actx, mixer));
-
-    // Preallocated scratch — update() must never allocate.
-    this._lp = { x: 0, y: 1.6, z: 0 };
-    this._occOrigin = { x: 0, y: 0, z: 0 };
-    this._occDir = { x: 0, y: 0, z: 0 };
-    this._trackCursor = 0;
-    this.stats = { active: 0, stolen: 0, dropped: 0, occlusionRays: 0 };
-    this.occlusionEnabled = true;
   }
 
   /** Feed the AudioListener from the render camera. Called once per frame. */

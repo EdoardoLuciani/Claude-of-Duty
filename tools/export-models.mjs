@@ -1,51 +1,18 @@
 #!/usr/bin/env node
 /**
- * MODEL EXPORTER — turns the procedural model builders into proper GLB assets.
+ * Stage committed Blender-authored soldiers and generate the offline spent hull.
+ * Normal Vite/build/play never needs Blender. Soldier recipes and explicit
+ * regeneration live in tools/blender/soldiers/; products live in assets/soldiers/.
  *
- * Soldier meshes are authored as code (src/ai/soldier.ts): parameterised
- * assemblies driven by published dimensions. Player weapons use committed
- * Blender assets and are not generated here. Building them at every boot costs
- * ~0.5 s of CPU (weapons) plus a first-spawn hitch per soldier variant, so this
- * tool runs the SAME builders once, offline, and bakes the result into GLB
- * files that the game loads at runtime (src/core/models.ts).
- *
- *   node tools/export-models.mjs          # export everything
- *   node tools/export-models.mjs --force  # ignore up-to-date files
- *
- * Output layout (served by vite from public/):
- *   public/models/soldiers/{vanguard,irregular,breacher}.glb + .json
- *   public/models/fx/spent12g.glb (one primitive, vertex color + _SHELLPBR)
- *
- * The pipeline is deterministic: soldiers draw from a fixed RNG seed so a
- * rebuild of an unchanged tree is byte-identical. A content hash over the
- * exporter and its authoring inputs skips the rebuild when outputs already
- * exist; `--force` ignores that cache. A per-file mtime check cannot see
- * shared inputs (geometry.ts, rig.ts, geo.ts, ...). Writes go
- * through a temp file + rename so a reader never observes a half-written
- * asset, and a pid lock (node_modules/.cache) serialises concurrent
- * invocations (the vite dev watcher and the predev/prebuild hooks can overlap).
- *
- * Round-trip guarantees (verified in the loader):
- *  - positions/normals/uvs/colors are written as FLOAT accessors — lossless.
- *  - skinIndex/skinWeight survive (JOINTS_0/WEIGHTS_0).
- *  - material GROUPS on a soldier become one glTF primitive each and are
- *    re-merged into a single BufferGeometry with groups on load, so the game
- *    keeps its one-draw-call-per-material character.
- *  - the skeleton is exported in RIG bone order; the loader asserts it.
- *  - each mesh carries `userData.mat` (its material slot) via glTF extras.
+ * Content hashing covers shared inputs and canonical products. Missing outputs
+ * force a full restage; --force bypasses the cache. Keep the pid lock and atomic
+ * writes: overlapping asset commands must never publish half-written files.
+ * Runtime retains canonical RIG joints, FLOAT attributes and nine surface groups.
  */
 
 import { createHash, randomUUID } from 'node:crypto';
-import {
-  writeFileSync,
-  mkdirSync,
-  statSync,
-  renameSync,
-  readFileSync,
-  rmSync,
-  existsSync,
-} from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { writeFileSync, mkdirSync, renameSync, readFileSync, rmSync, existsSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // three's GLTFExporter reads Blobs back with FileReader, which Node lacks.
@@ -62,12 +29,15 @@ if (typeof globalThis.FileReader === 'undefined') {
   };
 }
 
-import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 
 import { RIG } from '../src/ai/rig.ts';
-import { buildSoldier, VARIANTS } from '../src/ai/soldier.ts';
-import { Rng } from '../src/core/rng.ts';
+import { VARIANTS } from '../src/ai/soldier.ts';
+import {
+  loadCommittedSoldiers,
+  soldierInputPaths,
+  soldierProductPaths,
+} from './blender/soldiers/export.mjs';
 import { buildSpentHull } from './lib/spent-hull.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -83,16 +53,6 @@ const LOCK_TIMEOUT_MS = 60000;
  *  Overridable so tests can exercise the grace path quickly. */
 const LOCK_GRACE_MS = Number(process.env.MODELS_LOCK_GRACE_MS ?? 10000);
 
-/** Fixed seed so exports are reproducible. */
-const SEED = 0x5eed1234;
-
-/** A materials stub for the builders: geometry-only export, real materials are
- *  resolved at runtime against the exported slot names. */
-const stubMaterials = {
-  get: (key) => new THREE.MeshStandardMaterial({ name: key, metalness: 0.4, roughness: 0.6 }),
-  glass: () => new THREE.MeshStandardMaterial({ name: 'glass', metalness: 0, roughness: 0.05 }),
-};
-
 const exporter = new GLTFExporter();
 
 /** Write through a temp file + atomic rename: readers never see partial data. */
@@ -106,10 +66,6 @@ function writeAtomic(file, data) {
 async function writeGLB(scene, file) {
   const buffer = await exporter.parseAsync(scene, { binary: true });
   writeAtomic(file, Buffer.from(buffer));
-}
-
-function writeJSON(obj, file) {
-  writeAtomic(file, JSON.stringify(obj, null, 2));
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -190,53 +146,12 @@ async function withLock(fn) {
 /*  soldiers                                                              */
 /* ====================================================================== */
 
-function buildSoldierScene(name) {
-  const rng = new Rng(SEED);
-  const built = buildSoldier(name, { rng, materials: stubMaterials });
-  const { skeleton, root: rootBone } = RIG.createSkeleton();
-
-  const scene = new THREE.Scene();
-  const root = new THREE.Group();
-  root.name = `${name}-model`;
-  scene.add(root);
-  root.add(rootBone);
-
-  const placeholders = (built.slots ?? built.materialNames).map(
-    (slot) => new THREE.MeshStandardMaterial({ name: slot })
-  );
-  const mesh = new THREE.SkinnedMesh(built.geometry, placeholders);
-  mesh.name = `${name}-body`;
-  mesh.bind(skeleton);
-  root.add(mesh);
-  scene.updateMatrixWorld(true);
-
-  const meta = {
-    name,
-    slots: built.slots,
-    weapon: {
-      muzzle: built.weapon.muzzle,
-      foregrip: built.weapon.foregrip,
-      magBottom: built.weapon.magBottom,
-      ejection: built.weapon.ejection,
-      stockTop: built.weapon.stockTop,
-    },
-    stats: built.stats,
-    variant: built.variant,
-  };
-  return { scene, meta };
-}
-
-async function exportSoldier(name) {
-  const glb = join(OUT, 'soldiers', `${name}.glb`);
-  const json = join(OUT, 'soldiers', `${name}.json`);
-  const t0 = performance.now();
-  const { scene, meta } = buildSoldierScene(name);
-  await writeGLB(scene, glb);
-  writeJSON(meta, json);
-  const kb = statSync(glb).size / 1024;
+function stageSoldier({ name, glb, json, meta }) {
+  writeAtomic(join(OUT, 'soldiers', `${name}.glb`), glb);
+  writeAtomic(join(OUT, 'soldiers', `${name}.json`), json);
   console.log(
-    `[models] ${name}: ${(meta.stats.triangles / 1000).toFixed(1)}k tris, ${kb.toFixed(0)} KB glb ` +
-      `in ${(performance.now() - t0).toFixed(0)}ms`
+    `[models] staged ${name}: ${(meta.stats.triangles / 1000).toFixed(1)}k tris, ` +
+      `${(glb.length / 1024).toFixed(0)} KB glb`
   );
 }
 
@@ -247,12 +162,8 @@ function modelSourceHash() {
     'src/weapons/geometry.ts',
     'src/weapons/defs.ts',
     'src/weapons/mathx.ts',
-    'src/ai/soldier.ts',
-    'src/ai/rig.ts',
-    'src/ai/geo.ts',
-    'src/ai/parts.ts',
-    'src/ai/weapon.ts',
-    'src/ai/textures.ts',
+    ...soldierInputPaths().map((file) => relative(ROOT, file)),
+    ...soldierProductPaths().map((file) => relative(ROOT, file)),
     'src/core/rng.ts',
   ].sort();
   const hash = createHash('sha256');
@@ -263,6 +174,11 @@ function modelSourceHash() {
     hash.update('\0');
   }
   return hash.digest('hex').slice(0, 16);
+}
+
+function assertInputsStable(expected) {
+  if (modelSourceHash() !== expected)
+    throw new Error('[models] inputs changed during staging; rerun npm run models');
 }
 
 function outputsPresent() {
@@ -288,6 +204,8 @@ await withLock(async () => {
       rmSync(join(OUT, 'weapons', `${id}.${ext}`), { force: true });
   }
   const hash = modelSourceHash();
+  const soldiers = loadCommittedSoldiers();
+  assertInputsStable(hash);
   if (
     !FORCE &&
     outputsPresent() &&
@@ -299,7 +217,7 @@ await withLock(async () => {
   }
   rmSync(HASH_STAMP, { force: true });
 
-  for (const name of Object.keys(VARIANTS)) await exportSoldier(name);
+  for (const product of soldiers) stageSoldier(product);
   const hull = buildSpentHull();
   await writeGLB(hull, join(OUT, 'fx/spent12g.glb'));
   hull.geometry.dispose();
@@ -317,6 +235,7 @@ await withLock(async () => {
     }
     console.log(`[models] skeleton ok: ${names.length} bones in RIG order`);
   }
+  assertInputsStable(hash);
   writeAtomic(HASH_STAMP, hash + '\n');
 });
 

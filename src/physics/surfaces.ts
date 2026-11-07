@@ -1,15 +1,9 @@
-/**
- * Surface & layer vocabulary.
- *
- * The twelve surface names are fixed by ARCHITECTURE.md — impact FX, decals,
- * footstep audio and this system all key off the same enum. Physics stores the
- * *index* per triangle (one byte) and hands the *name* back to callers, so
- * nobody outside this directory has to care about the packing.
- *
- * The numbers below are game-tuned but physically motivated: penetration depth
- * is roughly how much of the material a 7.62 x 51 round will defeat, friction
- * is a dry kinetic coefficient, restitution is measured drop-bounce.
+/** Canonical collision surfaces/layers shared by physics, FX and audio.
+ * Triangles store byte indices; public results expose names. Penetration depths are game-tuned
+ * against a reference round; friction is kinetic and restitution controls bounce.
  */
+
+import { hasOwn } from '../core/guards.ts';
 
 export const SURFACE_NAMES = [
   'concrete',
@@ -25,7 +19,17 @@ export const SURFACE_NAMES = [
   'rubber',
   'plaster',
 ] as const;
-type SurfaceName = (typeof SURFACE_NAMES)[number];
+export type SurfaceName = (typeof SURFACE_NAMES)[number];
+
+export function isSurfaceName(value: unknown): value is SurfaceName {
+  return typeof value === 'string' && hasOwn(SURFACE, value);
+}
+
+/** Explicit authored metadata must use the canonical vocabulary, never fuzzy inference. */
+export function parseSurfaceName(value: unknown): SurfaceName {
+  if (!isSurfaceName(value)) throw new Error(`[physics] invalid surface: ${String(value)}`);
+  return value;
+}
 interface SurfaceProps {
   penDepth: number;
   energyLoss: number;
@@ -37,7 +41,21 @@ interface SurfaceProps {
   shatters: boolean;
 }
 
-export const SURFACE: Record<SurfaceName, number> = {} as Record<SurfaceName, number>;
+// Seed every required key, then derive indices from the canonical order.
+export const SURFACE = {
+  concrete: 0,
+  metal: 0,
+  wood: 0,
+  dirt: 0,
+  sand: 0,
+  glass: 0,
+  water: 0,
+  foliage: 0,
+  fabric: 0,
+  flesh: 0,
+  rubber: 0,
+  plaster: 0,
+} satisfies Record<SurfaceName, number>;
 for (let i = 0; i < SURFACE_NAMES.length; i++) SURFACE[SURFACE_NAMES[i]] = i;
 
 /**
@@ -187,15 +205,17 @@ export const SURFACE_PROPS: SurfaceProps[] = [
   },
 ];
 
-/** Resolve a surface name (or index, or undefined) to a valid index. */
-export function surfaceIndex(s: unknown, fallback = SURFACE.concrete): number {
-  if (typeof s === 'number') return s >= 0 && s < SURFACE_NAMES.length ? s | 0 : fallback;
-  if (typeof s === 'string') {
-    const i = SURFACE[s as SurfaceName];
-    if (i !== undefined) return i;
-    return guessSurface(s, fallback);
-  }
-  return fallback;
+/** Parse an explicit surface name/index. Omitted values and label inference belong to callers. */
+export function surfaceIndex(value: unknown): number {
+  if (isSurfaceName(value)) return SURFACE[value];
+  if (
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= 0 &&
+    value < SURFACE_NAMES.length
+  )
+    return value;
+  throw new Error(`[physics] invalid surface: ${String(value)}`);
 }
 
 const GUESS: [RegExp, number][] = [
@@ -223,13 +243,9 @@ export function guessSurface(name: string | null | undefined, fallback = SURFACE
   return fallback;
 }
 
-export function surfaceName(i: number): string {
+export function surfaceName(i: number): SurfaceName {
   return SURFACE_NAMES[i] ?? 'concrete';
 }
-
-/* ------------------------------------------------------------------ */
-/* Collision layers                                                    */
-/* ------------------------------------------------------------------ */
 
 export const LAYER = {
   /** Immovable level geometry. */ STATIC: 1 << 0,

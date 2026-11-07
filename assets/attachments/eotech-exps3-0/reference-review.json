@@ -1,0 +1,55 @@
+{
+  "asset": "EOTECH EXPS3-0, black, CR123 / side controls / raised QD base",
+  "accessed": "2026-10-25",
+  "sources": [
+    {
+      "publisher": "EOTECH",
+      "url": "https://www.eotechinc.com/products/eotech-hws-exps3",
+      "establishes": [
+        "L x W x H 96.5 x 58.4 x 73.7 mm",
+        "CR123 battery",
+        "side controls and quick-detach mounting",
+        "EXPS3-0: 68 MOA ring and 1 MOA dot"
+      ]
+    },
+    {
+      "publisher": "EOTECH operator manual, served by OpticsPlanet",
+      "url": "https://www.opticsplanet.com/i/pdf/opplanet-eotech-exps3-manual.pdf",
+      "sha256": "65a295921c46be53853b872d7a3047902e59c195103ebd2ad5eb7b0e7350d533",
+      "establishes": [
+        "Equipment description, printed page 5: nominal envelope",
+        "Display window, printed page 6: 30 x 23 mm, front glass 3.17 mm and rear laminate 4.76 mm",
+        "Components/controls and adjustment locations",
+        "Optical reticle is a projected virtual image, not a physical mesh on the glass"
+      ],
+      "unitConflict": "The same window line prints 1.20 x 0.85 inches and 30 x 23 mm; these are not exact conversions. Art retains nominal30x23mm physical panes; clear bezel opening is separately photo-inferred at30x22mm. The inconsistent manual line does not certify either as an exact clear-bore specification."
+    },
+    {
+      "publisher": "EOTECH photo gallery",
+      "url": "https://www.eotechinc.com/products/eotech-hws-exps3"
+    },
+    {
+      "publisher": "Militia Armory, higher-resolution copies of EOTECH product photography",
+      "url": "https://www.militia-armory.com/product/eotech-exps3-0-holographic-weapon-sight/"
+    }
+  ],
+  "photoRights": "Photographs remain their owners’ reference material. They are not committed, embedded in the Blender file, used as textures, or shipped in the GLB. Original geometry, finishes, warning text and vector mark reconstruction only; EOTECH identifies the reference subject, not endorsement.",
+  "limitations": [
+    "Original reference-backed game art, not manufacturer CAD, a scan, or claimed final human visual acceptance.",
+    "48.2mm optical centre above the existing art datum and30x22mm clear opening are provisionally inferred from registered photos. Manufacturer specs do not certify these datums. Confirm actual mounting/rail seating and M4 ADS/co-witness separately.",
+    "Window curvature, internal holographic laminate/laser, hidden battery internals, exact fastener threads and detailed mount tolerances are not reconstructed.",
+    "Public photos are not calibrated views; silhouettes and apparent small features do not certify all dimensions or surface finish.",
+    "Glass uses a single neutral AR-tinted PBR approximation for front glass and rear laminate; a spectral AR coating and real hologram are not simulated.",
+    "No price, purchase rules, mounted gameplay model, ADS/reticle implementation, stat effects or default-M4 change in this asset-first PR."
+  ],
+  "historicalReview": "Frozen photo-registration profiles, initial-build comparisons and isolated rendering measurements are archived in Git at c4c62f10:assets/attachments/eotech-exps3-0/reference-review.json. They describe historical products, not current acceptance. Current product data lives in manifest.json.",
+  "authoringNotes": {
+    "authoringUVs": "Native Blender UV projection uses a 1/65536 binary UV lattice, including Boolean-interpolated UVs, before save/render/export. No GLB rewriting or exporter hooks.",
+    "ocioCompatibility": {
+      "reason": "This host ships Blender OCIO 2.5 configuration with OCIO library 2.4.2. Default config fails; color management was NOT disabled.",
+      "profile": "https://raw.githubusercontent.com/blender/blender/v4.4.3/release/datafiles/colormanagement/config.ocio",
+      "sha256": "6a072a5e34fb520a35ee858b3b46271504ddd325fc112d2a78a8be75ea333f56",
+      "processLocal": "OCIO=/tmp/exps3-ocio/config.ocio, with luts/ and filmic/ pointing at installed Blender data; AgX preserved."
+    }
+  }
+}

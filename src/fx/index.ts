@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 
 import { UNITS } from '../core/config.ts';
-import type { EngineContext, EngineSystems } from '../core/context.ts';
+import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName, EventWeapon } from '../core/events.ts';
 import type { Rng } from '../core/rng.ts';
+import type { SurfaceName } from '../physics/surfaces.ts';
 import { Ambience } from './ambience.ts';
 import { loadFxAtlases, P, D } from './atlas.ts';
 import { DecalSystem } from './decals.ts';
@@ -12,60 +13,44 @@ import { HazeSystem } from './haze.ts';
 import { spawnImpact, spawnExit, spawnIntelSparks } from './impacts.ts';
 import { LightPool } from './lights.ts';
 import { muzzleFlash } from './muzzle.ts';
-import { ParticleLayer, resetSpawn, disposeQuadSource, SP } from './particles.ts';
+import {
+  ParticleLayer,
+  resetSpawn,
+  disposeQuadSource,
+  SP,
+  setSpawnColorRamp,
+  setSpawnPosition,
+  setSpawnVelocity,
+} from './particles.ts';
 import { ShellSystem, loadSpentHullGeometry, type ShellOptions } from './shells.ts';
 import { spawnTracer } from './tracers.ts';
 import { V, cone } from './util.ts';
 
-/**
- * FX — GPU particles, impacts, decals, muzzle flash, tracers, shells,
- * explosions, refraction and ambience.
- *
- * Everything visible here is built from two procedurally baked atlases and a
- * handful of instanced draw calls:
- *
- *   world additive particles   1 draw   sparks, flash, fire, tracers, embers
- *   world lit particles        1 draw   smoke, dust, blood, debris, splinters
- *   dust motes                 1 draw   always-on atmosphere
- *   decals                     1 draw   projected onto the physics BVH
- *   shell casings              1–2 draws   instanced rigid bodies
- *   refraction sprites         1 draw   + one half-res post pass
- *
- * The simulation is entirely in the vertex shader (see particles.js), so the
- * per-frame CPU cost of ten thousand live particles is six uniform writes and
- * one buffer sub-upload of whatever was spawned this frame. Budgets come from
- * `config.q.particleBudget` / `decalBudget` and are hard caps: every layer is a
- * ring, and a ring never allocates.
- *
- * Native particles/decals/casings render in the forward world pass; transparent
- * FX stay out of the opaque prepass. Soft FX sample render.depthTexture as
- * positive view-space metres with screenUV; null depth disables softness.
- * The render owner draws hazeSys.render() into its half-resolution RG target
- * before evaluating hazeSys.warpNode() on the resolved world texture, before the separate first-person composite.
- * The warp resamples that texture before bloom; it cannot take a colour expression.
+/** Bounded GPU particle/decal rings, instanced casings and haze; quality settings set hard caps.
+ * Forward transparent FX stay out of the opaque prepass. Soft FX borrow positive view-depth
+ * in metres with screenUV; absent depth disables softness.
+ * Render draws haze's private half-resolution RG target, then warps the resolved world texture
+ * before the first-person composite and bloom. The warp needs a texture, not a colour expression.
  */
-interface FxImpactEvent {
-  point: THREE.Vector3;
-  normal: THREE.Vector3;
-  incident?: THREE.Vector3;
-  surface: string;
-  damage: number;
-  exit?: boolean;
-  actor?: unknown;
-}
 type FxEventMap = EngineEventMap;
 export type FxContext = Pick<
   EngineContext,
   'scene' | 'viewScene' | 'camera' | 'viewCamera' | 'config' | 'time' | 'rng' | 'events' | 'peek'
 >;
 type DecalWorld = NonNullable<Parameters<DecalSystem['add']>[0]['world']>;
-type FxDecalOptions = Parameters<DecalSystem['add']>[0] & { noFallback?: boolean };
+type DecalOptions = Parameters<DecalSystem['add']>[0];
+/** Projection inputs and world/time bookkeeping belong to FX, not its callers. */
+export type FxDecalOptions = Partial<
+  Omit<DecalOptions, 'point' | 'normal' | 'world' | 'now' | 'mask'>
+> & {
+  noFallback?: boolean;
+};
 interface FxTargetFrame {
   point: THREE.Vector3;
   normal: THREE.Vector3;
   tangent: THREE.Vector3;
   bitangent: THREE.Vector3;
-  surface: string;
+  surface: SurfaceName;
   world: DecalWorld | null;
   distance: number;
   spanU: number;
@@ -116,7 +101,7 @@ export class FxSystem {
   declare _tmpA: THREE.Vector3;
   declare _tmpB: THREE.Vector3;
   declare _camPos: THREE.Vector3;
-  declare _decalOpts: FxDecalOptions;
+  declare _decalOpts: DecalOptions;
   declare _off: Array<() => void>;
   declare _script: Array<{ t: number; fn: () => void }>;
   declare _scriptTime: number;
@@ -129,8 +114,8 @@ export class FxSystem {
   declare _target: FxTargetFrame | undefined;
   declare _probes: Float32Array | undefined;
   declare _warmScene: THREE.Scene;
-  static id = 'fx';
-  static deps = ['render', 'materials'];
+  static readonly id = 'fx';
+  static readonly deps: SystemId[] = ['render', 'materials'];
 
   async init(ctx: FxContext): Promise<void> {
     this.ctx = ctx;
@@ -166,7 +151,11 @@ export class FxSystem {
     /** Particles spawned per impact scale with the budget. */
     this.pScale = clamp(budget / 12000, 0.4, 1.25);
 
-    const mk = (capacity: number, modeName: 'lit' | 'additive', renderOrder: number) =>
+    const mk = (
+      capacity: number,
+      modeName: 'lit' | 'additive',
+      renderOrder: number
+    ): ParticleLayer =>
       new ParticleLayer({
         capacity,
         mode: modeName,
@@ -219,7 +208,7 @@ export class FxSystem {
       shimmer: budget >= 4000,
     });
 
-    // ---- lighting inputs (follow the renderer's active sun) ---------------
+    // lighting inputs (follow the renderer's active sun)
     this._ambTop = new THREE.Vector3(0.42, 0.5, 0.66);
     this._ambBot = new THREE.Vector3(0.2, 0.17, 0.14);
     this._sunCol = new THREE.Vector3(1, 0.93, 0.82);
@@ -227,7 +216,7 @@ export class FxSystem {
     this._upView = new THREE.Vector3(0, 1, 0);
     this._fog = new THREE.Vector4(0.62, 0.66, 0.72, 0);
 
-    // ---- scratch ---------------------------------------------------------
+    // scratch
     this._p = new THREE.Vector3();
     this._n = new THREE.Vector3();
     this._d = new THREE.Vector3();
@@ -253,51 +242,36 @@ export class FxSystem {
       now: 0,
     };
 
-    // ---- events ----------------------------------------------------------
+    // events
     const on = <K extends EngineEventName>(type: K, fn: (event: FxEventMap[K]) => void): void => {
       const off = ctx.events.on(type, fn);
       this._off.push(off);
     };
     this._off = [];
-    on('bullet:impact', (e) => this.onImpact(e));
-    on('intel:secured', (e) => this.onIntelSpark(e));
-    on('intel:spark', (e) => this.onIntelSpark(e));
-    on('bullet:segment', (e) => {
+    on('bullet:impact', (e): void => this.onImpact(e));
+    on('intel:secured', (e): void => this.onIntelSpark(e));
+    on('intel:spark', (e): void => this.onIntelSpark(e));
+    on('bullet:segment', (e): void => {
       if (e.tracer) this.tracer(e.from, e.to, e.speed);
     });
-    on('bullet:tracer', (e) => this.tracer(e.from, e.to, e.speed)); // explicit dev staging
-    on('weapon:fire', (e) => this.onWeaponFire(e));
-    on('weapon:shell', (e) => this.spawnShell(e.position, e.velocity, e));
-    on('explosion', (e) => this.explosion(e));
-    on('actor:death', (e) => this.onActorDeath(e));
-    on('player:land', (e) => this.onLand(e));
-    on('player:footstep', (e) => this.onFootstep(e));
+    on('weapon:fire', (e): void => this.onWeaponFire(e));
+    on('weapon:shell', (e): void => this.spawnShell(e.position, e.velocity, e));
+    on('explosion', (e): void => this.explosion(e));
+    on('actor:death', (e): void => this.onActorDeath(e));
+    on('player:land', (e): void => this.onLand(e));
+    on('player:footstep', (e): void => this.onFootstep(e));
 
-    // ---- dev burst script ------------------------------------------------
+    // dev burst script
     this._script = [];
     this._scriptTime = 0;
     this._scriptPeriod = 0;
 
     this.stats = { spawned: 0, decals: 0, live: 0 };
 
-    // ---- shader pre-warm -------------------------------------------------
-    // MEASURED: the first trigger pull compiled 12 WebGL programs in one frame
-    // (80-160 ms), and not one of them belonged to a particle. Attaching the
-    // viewmodel-space layers adds this.viewLights to viewScene, which changes
-    // that scene's *light count*, and three bakes the light counts into every
-    // program cache key — so the whole viewmodel (weapon, gloves, optic glass,
-    // lens rings) recompiled on the frame the player first shot.
-    //
-    // Attaching here instead means the viewmodel's programs are built once, with
-    // their final light count, by the boot-time compile that already happens
-    // before the first rendered frame. Nothing is spawned and both meshes stay
-    // invisible, so this is pixel-neutral by construction: the two pooled lights
-    // sit at intensity 0 (an exactly-zero contribution) until something flashes.
-    //
-    // Gated on a viewmodel already existing: `render` decides whether to run the
-    // viewmodel pass at all by counting viewScene's children, and in an FX-only
-    // scene (src/fx/preview.ts) adding ours would turn that pass on. In that case
-    // the lazy attach on first use still applies.
+    // Attach stable view light identities before native graph prewarm to avoid
+    // rebuilding first-person lighting on the first shot. Pooled lights start dark.
+    // Without a viewmodel, defer attachment until first use: adding children here
+    // would otherwise enable the separate first-person pass in FX-only scenes.
     if (this._viewmodelPresent()) this._attachView();
 
     console.info(
@@ -306,39 +280,32 @@ export class FxSystem {
     );
   }
 
-  resize() {
+  resize(): void {
     // RenderSystem.resize runs first; haze's offsets live at half the internal
     // drawing resolution, not half the CSS viewport size.
     const { width, height } = this.render!.screenSize;
     this.hazeSys.resize(width, height);
   }
 
-  /* ===================================================================== */
-  /*  emit helpers (bound so recipe modules can pass them around)          */
-  /* ===================================================================== */
-
-  emitAdd = (s: typeof SP) => this.add.emit(s, this.now);
-  emitLit = (s: typeof SP) => this.lit.emit(s, this.now);
-  emitMote = (s: typeof SP) => this.motes.emit(s, this.now);
-  emitViewAdd = (s: typeof SP) => {
+  emitAdd = (s: typeof SP): number => this.add.emit(s, this.now);
+  emitLit = (s: typeof SP): number => this.lit.emit(s, this.now);
+  emitMote = (s: typeof SP): number => this.motes.emit(s, this.now);
+  emitViewAdd = (s: typeof SP): number => {
     this._attachView();
     return this.viewAdd.emit(s, this.now);
   };
-  emitViewLit = (s: typeof SP) => {
+  emitViewLit = (s: typeof SP): number => {
     this._attachView();
     return this.viewLit.emit(s, this.now);
   };
 
-  _attachView() {
+  _attachView(): void {
     if (this._viewAttached) return;
     this._viewAttached = true;
     this.ctx.viewScene.add(this.viewAdd.mesh);
     this.ctx.viewScene.add(this.viewLit.mesh);
-    // The viewmodel scene has its own light rig and never sees ctx.scene's
-    // punctual lights, so the muzzle flash needs a mirrored pool in there or the
-    // weapon is the one object in frame a flash cannot light. Two lights, added
-    // once and left at zero between shots: the shader permutation count has to
-    // stay constant or every weapon material recompiles mid-firefight.
+    // viewScene cannot see world punctual lights. Keep its two pooled lights
+    // attached and dark between shots so native lighting identities stay stable.
     if (!this.viewLights) {
       this.viewLights = new LightPool(this.ctx.viewScene, 2);
       // NOT registered with render.addLight: that budgets/culls against world
@@ -349,17 +316,13 @@ export class FxSystem {
   /** Does viewScene already draw something of its own (i.e. is there a weapon)? */
   _viewmodelPresent(): boolean {
     let found = false;
-    this.ctx.viewScene?.traverse((o) => {
-      if (found || !(o as THREE.Mesh).isMesh) return;
+    this.ctx.viewScene?.traverse((o): void => {
+      if (found || !(o instanceof THREE.Mesh)) return;
       if (o === this.viewAdd?.mesh || o === this.viewLit?.mesh) return;
       found = true;
     });
     return found;
   }
-
-  /* ===================================================================== */
-  /*  shader pre-warm                                                      */
-  /* ===================================================================== */
 
   /**
    * Compile real FX meshes without reparenting them or spawning particles.
@@ -408,38 +371,26 @@ export class FxSystem {
     const haze = await this.hazeSys.prewarm(
       renderer,
       ctx.camera,
-      render?._warmGraph ? () => render._warmGraph!() : null
+      render?._warmGraph
+        ? (): Promise<{ ms: number; geometries: number; frameUnchanged: boolean }> =>
+            render._warmGraph!()
+        : null
     );
     return { ok: haze.ok, haze };
   }
 
-  /**
-   * Flash light inside the viewmodel scene.
-   *
-   * Peak is derived from the renderer's viewmodel key so the kick is a fixed
-   * number of stops at any time of day: ~2.6x the key at the handguard (0.3 m
-   * back down the bore), which 1/d^2 turns into a blown rim at the crown and a
-   * soft warm wash by the magwell. Held for 55 ms with a slow temporal decay so
-   * it survives 3-4 frames — a flash that dies inside one frame is a flash the
-   * player never sees.
+  /** View-scene spill tracks the viewmodel key for consistent relative brightness.
+   * Inverse-square falloff gives a bright crown and a softer wash toward the magwell.
+   * The 90 ms lifetime and 8/s decay keep it visible across several frames.
    */
   viewFlash(x: number, y: number, z: number, r: number, g: number, b: number, strength = 1): void {
     this._attachView();
     const pool = this.viewLights;
     if (!pool) return;
     const key = this.render?.viewLightLevel ?? this.render?.viewSun?.intensity ?? 2.5;
-    // 0.72 cd per unit of key puts ~19 W/m^2 on the handguard 0.3 m back down the
-    // bore. That is what it takes to land the front third of the handguard and the
-    // top of the hand in the L 190-235 band on the flash frame, with 1/d^2 giving
-    // the warm falloff back to the magwell for free. At the old 0.26 the kick was
-    // under a stop and measured as "zero warm gradient anywhere".
+    // 0.72 cd per key unit keeps the handguard's warm gradient legible.
     const peak = Math.max(0.04, key * 0.72 * clamp(strength, 0.05, 2.2));
-    // Lifted off the bore axis: a source sitting exactly on the axis rakes the
-    // top of the receiver at N.L ~ 0.15 and the kick disappears. Real flash gas
-    // is a ball around the crown, so 4 cm of height buys the whole top surface.
-    //
-    // 90 ms at decay 8, matched to the world light: a view flash that is dead
-    // after one 33 ms frame is a flash the capture never photographs.
+    // Lift 4 cm off the bore: an on-axis source grazes the receiver (N.L ~0.15).
     pool.flash(x, y + 0.04, z, r, g, b, peak, 0.09, 8, 1.6, 2);
   }
 
@@ -448,45 +399,25 @@ export class FxSystem {
     return this._physics ?? undefined;
   }
 
-  /* ===================================================================== */
-  /*  public API                                                           */
-  /* ===================================================================== */
-
   /** Electrical arcs from the exposed cache controller, also on completion. */
   onIntelSpark(e: FxEventMap['intel:spark']): void {
-    if (!e?.position) return;
     this.now = this.ctx.time.elapsed;
     spawnIntelSparks(this, e.position);
   }
 
   /** Handle a `bullet:impact` payload. */
-  onImpact(e: FxImpactEvent): void {
-    if (!e || !e.point) return;
+  onImpact(e: FxEventMap['bullet:impact']): void {
     this.now = this.ctx.time.elapsed;
-    if (!e.normal) return;
-    let energy = clamp(0.7 + (e.damage ?? 25) / 55, 0.7, 1.7);
+    let energy = clamp(0.7 + e.damage / 55, 0.7, 1.7);
     if (e.exit === true) energy *= 0.75;
     const spawn = e.exit === true ? spawnExit : spawnImpact;
-    spawn(this, e.point, e.normal, e.incident ?? this._defaultIncident(e), e.surface, energy);
+    spawn(this, e.point, e.normal, e.incident, e.surface, energy);
     this.stats.spawned++;
   }
 
-  _defaultIncident(e: FxImpactEvent): THREE.Vector3 {
-    this._d2.set(-e.normal.x, -e.normal.y, -e.normal.z);
-    return this._d2;
-  }
-
   /** `weapon:fire` — set `e.fx === false` to suppress and drive FX yourself. */
-  onWeaponFire(
-    e: FxEventMap['weapon:fire'] & {
-      fx?: boolean;
-      viewSpace?: boolean;
-      intensity?: number;
-      light?: number;
-      flashScale?: number;
-    }
-  ): void {
-    if (!e || e.fx === false || !e.origin || !e.dir) return;
+  onWeaponFire(e: FxEventMap['weapon:fire']): void {
+    if (e.fx === false) return;
     this.now = this.ctx.time.elapsed;
     this._camPos.setFromMatrixPosition(this.ctx.camera.matrixWorld);
     const firstPerson = this._camPos.distanceToSquared(e.origin) < 2.25;
@@ -512,10 +443,10 @@ export class FxSystem {
     weapon?: EventWeapon;
     view?: boolean;
     viewSpace?: boolean;
-    intensity?: number;
-    light?: number;
-    scale?: number;
-  }) {
+    intensity?: number | undefined;
+    light?: number | undefined;
+    scale?: number | undefined;
+  }): ReturnType<typeof muzzleFlash> {
     this.now = this.ctx.time.elapsed;
     let pos = o.position;
     let dir = o.direction;
@@ -527,7 +458,6 @@ export class FxSystem {
       // light and leave the sprites where they are.
       this._fromView(pos);
       this._lightPos.copy(this._p2);
-      o = this._viewArg(o);
     } else {
       this._lightPos.copy(pos);
       if (o.view) {
@@ -544,29 +474,23 @@ export class FxSystem {
     this._flashArg.light = o.light;
     this._flashArg.scale = o.scale;
     this._flashArg.view = o.view === true || o.viewSpace === true;
-    return muzzleFlash(this, this._flashArg as Parameters<typeof muzzleFlash>[1]);
+    return muzzleFlash(this, this._flashArg);
   }
 
-  _flashArg = {
-    position: null as THREE.Vector3 | null,
-    direction: null as THREE.Vector3 | null,
-    lightPos: null as THREE.Vector3 | null,
-    weapon: undefined as Parameters<typeof muzzleFlash>[1]['weapon'],
-    intensity: 1 as number | undefined,
-    light: 1 as number | undefined,
-    scale: undefined as number | undefined,
+  _flashArg: Parameters<typeof muzzleFlash>[1] = {
+    position: new THREE.Vector3(),
+    direction: new THREE.Vector3(),
+    lightPos: new THREE.Vector3(),
+    weapon: undefined,
+    intensity: 1,
+    light: 1,
+    scale: undefined,
     view: false,
   };
   _lightPos = new THREE.Vector3();
 
-  /** Mark an options object as already being in viewmodel space. */
-  _viewArg<T extends { view?: boolean }>(o: T): T {
-    this._flashArg.view = true;
-    return o;
-  }
-
   /** Viewmodel-scene point -> world space (for the punctual light). */
-  _fromView(pos: THREE.Vector3): THREE.Vector3 {
+  _fromView(pos: THREE.Vector3Like): THREE.Vector3 {
     const cam = this.ctx.camera;
     const vcam = this.ctx.viewCamera;
     cam.updateMatrixWorld();
@@ -599,8 +523,7 @@ export class FxSystem {
     to: THREE.Vector3,
     speed: number | undefined,
     opts: Parameters<typeof spawnTracer>[4] = {}
-  ) {
-    if (!from || !to) return;
+  ): void {
     this.now = this.ctx.time.elapsed;
     spawnTracer(this, from, to, speed ?? 0, opts);
   }
@@ -613,20 +536,15 @@ export class FxSystem {
 
   /** Eject a casing or spent shotgun hull as a pooled physics body. */
   spawnShell(position: THREE.Vector3, velocity: THREE.Vector3, opts: ShellOptions = {}): void {
-    if (!position) return;
     this.now = this.ctx.time.elapsed;
     this.shells.spawn(position, velocity, opts);
   }
 
-  /**
-   * Project a decal onto the static world.
-   * @param {THREE.Vector3} point
-   * @param {THREE.Vector3} normal
-   */
+  /** Project a decal onto the static world. */
   addDecal(
-    point: THREE.Vector3,
-    normal: THREE.Vector3,
-    opts: Partial<FxDecalOptions> = {}
+    point: THREE.Vector3Like,
+    normal: THREE.Vector3Like,
+    opts: FxDecalOptions = {}
   ): boolean {
     if (this._suppressDecals) return false;
     const o = this._decalOpts;
@@ -687,7 +605,7 @@ export class FxSystem {
   }
 
   /** Blood on whatever is behind the body we just hit. */
-  bloodSpatterBehind(point: THREE.Vector3, incident: THREE.Vector3): void {
+  bloodSpatterBehind(point: THREE.Vector3Like, incident: THREE.Vector3Like): void {
     const ph = this.physics;
     if (!ph?.raycast) return;
     this._tmpA.copy(point);
@@ -704,14 +622,9 @@ export class FxSystem {
     });
   }
 
-  /**
-   * World-space direction toward the sun, for self-shadowing a particle cluster.
-   *
-   * The lit-particle shader already shades each sprite, but every sub-puff of a
-   * dust cloud gets the same treatment, so the cloud has no lit side. Recipes use
-   * this to bias the *authored* colour of each sub-puff by which way it was
-   * thrown: the ones going into the light start pale, the ones going away start
-   * in their own shadow. Falls back to straight up before `sky` reports in.
+  /** World-space sun direction for recipe-level cluster self-shadowing: sub-puffs
+   * thrown away from the light start darker. Per-sprite lighting alone gives every
+   * sub-puff the same treatment. Falls back to up until sky is available.
    */
   sunWorld(): { x: number; y: number; z: number } {
     const d = this.render?.sunDir;
@@ -762,22 +675,14 @@ export class FxSystem {
     a.playShell(this._tmpA, gain);
   }
 
-  /* ===================================================================== */
-  /*  gameplay reactions                                                   */
-  /* ===================================================================== */
-
   onActorDeath(e: FxEventMap['actor:death']): void {
-    if (!e?.point) return;
     this.now = this.ctx.time.elapsed;
     const rng = this.rng;
     // a heavier burst of mist than a body shot, plus spatter on the ground
-    this._n.set(0, 1, 0);
     for (let i = 0; i < Math.round(8 * this.pScale) + 3; i++) {
       cone(V, rng, 0, 1, 0, 1.4, 0.7);
       const s = resetSpawn();
-      s.x = e.point.x;
-      s.y = e.point.y;
-      s.z = e.point.z;
+      setSpawnPosition(s, e.point.x, e.point.y, e.point.z);
       s.vx = V.x * rng.range(0.6, 2.4);
       s.vy = V.y * rng.range(0.4, 1.6);
       s.vz = V.z * rng.range(0.6, 2.4);
@@ -789,12 +694,7 @@ export class FxSystem {
       s.drag = 5;
       s.gravity = -3.5;
       s.rot = rng.float() * 6.283;
-      s.r0 = 0.3;
-      s.g0 = 0.03;
-      s.b0 = 0.026;
-      s.r1 = 0.15;
-      s.g1 = 0.015;
-      s.b1 = 0.013;
+      setSpawnColorRamp(s, 0.3, 0.03, 0.026, 0.15, 0.015, 0.013);
       s.alpha = rng.range(0.4, 0.75);
       s.alphaCurve = 1.5;
       s.soft = 0.2;
@@ -819,7 +719,7 @@ export class FxSystem {
   }
 
   onLand(e: FxEventMap['player:land']): void {
-    const v = Math.abs(e?.velocity ?? 0);
+    const v = Math.abs(e.velocity);
     if (v < 3.2) return;
     this.now = this.ctx.time.elapsed;
     const rng = this.rng;
@@ -837,12 +737,8 @@ export class FxSystem {
       const a = rng.float() * 6.283;
       const sp = rng.range(0.7, 2.4) * strength;
       const s = resetSpawn();
-      s.x = x + Math.cos(a) * 0.22;
-      s.y = y + 0.03;
-      s.z = z + Math.sin(a) * 0.22;
-      s.vx = Math.cos(a) * sp;
-      s.vy = rng.range(0.1, 0.6);
-      s.vz = Math.sin(a) * sp;
+      setSpawnPosition(s, x + Math.cos(a) * 0.22, y + 0.03, z + Math.sin(a) * 0.22);
+      setSpawnVelocity(s, Math.cos(a) * sp, rng.range(0.1, 0.6), Math.sin(a) * sp);
       s.tile = P.DUST;
       s.size0 = rng.range(0.05, 0.1);
       s.size1 = rng.range(0.3, 0.55);
@@ -852,12 +748,7 @@ export class FxSystem {
       s.gravity = -0.6;
       s.rot = rng.float() * 6.283;
       s.spin = rng.signed() * 1.2;
-      s.r0 = 0.48;
-      s.g0 = 0.44;
-      s.b0 = 0.39;
-      s.r1 = 0.4;
-      s.g1 = 0.37;
-      s.b1 = 0.33;
+      setSpawnColorRamp(s, 0.48, 0.44, 0.39, 0.4, 0.37, 0.33);
       s.alpha = rng.range(0.25, 0.5) * strength;
       s.alphaCurve = 1.6;
       s.soft = 0.3;
@@ -869,7 +760,7 @@ export class FxSystem {
   }
 
   onFootstep(e: FxEventMap['player:footstep']): void {
-    if (!e?.running || !e.position) return;
+    if (!e.running) return;
     if (this.rng.float() > 0.55) return;
     this.now = this.ctx.time.elapsed;
     const rng = this.rng;
@@ -888,22 +779,13 @@ export class FxSystem {
     s.drag = 3.4;
     s.gravity = -0.5;
     s.rot = rng.float() * 6.283;
-    s.r0 = 0.46;
-    s.g0 = 0.42;
-    s.b0 = 0.37;
-    s.r1 = 0.4;
-    s.g1 = 0.36;
-    s.b1 = 0.32;
+    setSpawnColorRamp(s, 0.46, 0.42, 0.37, 0.4, 0.36, 0.32);
     s.alpha = rng.range(0.1, 0.22);
     s.alphaCurve = 1.7;
     s.soft = 0.25;
     s.seed = rng.float();
     this.emitLit(s);
   }
-
-  /* ===================================================================== */
-  /*  frame                                                                */
-  /* ===================================================================== */
 
   update(dt: number, ctx: FxContext): void {
     this.now = ctx.time.elapsed;
@@ -1000,18 +882,8 @@ export class FxSystem {
     l.uniforms.uFog.value.copy(this._fog);
   }
 
-  /* ===================================================================== */
-  /*  debug staging                                                        */
-  /* ===================================================================== */
-
-  /**
-   * Stage a photogenic moment for the screenshot harness.
-   *
-   * The capture pumps ~90 fixed frames after applying a shot, so a single burst
-   * would be long gone by the time the PNG is written. Instead we run a looping
-   * timeline: old hits that have left decals and hanging dust, a couple of hits
-   * caught mid-expansion, and one hit two frames old with its flash and sparks
-   * still hot — which is what a real combat frame looks like.
+  /** Loop staged FX across the capture's ~90-frame settle window, retaining old
+   * decals/dust alongside fresh flashes instead of letting a single burst expire.
    */
   debugBurst(kind = 'wall'): { staged: string; at?: number[]; surface?: string } {
     // 'none' stops a previously staged loop. The capture harness applies shots
@@ -1047,8 +919,8 @@ export class FxSystem {
           .addScaledVector(target.tangent, side * 1.6);
         this.explosion({ position: this._tmpA, radius: 3.6, damage: 120 });
       };
-      at(0.02, () => boom(-1));
-      at(0.56, () => boom(1));
+      at(0.02, (): void => boom(-1));
+      at(0.56, (): void => boom(1));
       this._stageWallHits(at, target, 6, 0.1, 0.95);
       return { staged: 'explosion', at: target.point.toArray() };
     }
@@ -1058,9 +930,9 @@ export class FxSystem {
       this._scriptPeriod = 0.44;
       for (let i = 0; i < 8; i++) {
         const t = i * 0.055;
-        at(t, () => this._stageMuzzle());
-        if (i % 3 === 0) at(t + 0.01, () => this._stageShell());
-        if (i % 2 === 0) at(t + 0.004, () => this._stageTracer(target));
+        at(t, (): void => this._stageMuzzle());
+        if (i % 3 === 0) at(t + 0.01, (): void => this._stageShell());
+        if (i % 2 === 0) at(t + 0.004, (): void => this._stageTracer(target));
       }
       return { staged: 'muzzle' };
     }
@@ -1068,24 +940,23 @@ export class FxSystem {
     if (kind === 'combat' || kind === 'firefight') {
       this._scriptPeriod = 1.6;
       this._stageWallHits(at, target, 9, 0.04, 1.2);
-      at(1.3, () => this._impactAt(target, rng.signed() * 0.7, rng.range(-0.2, 0.5), 'metal'));
-      at(1.42, () => this._impactAt(target, rng.signed() * 0.6, rng.range(-0.2, 0.5), null));
-      at(1.5, () => this._impactAt(target, rng.signed() * 0.5, rng.range(-0.1, 0.6), 'metal'));
-      at(1.36, () => this._stageTracer(target));
-      at(1.44, () => this._stageCrossfire());
-      at(1.12, () => this._stageShell());
-      at(1.34, () => this._stageShell());
-      at(1.52, () => this._stageMuzzle());
+      at(1.3, (): void =>
+        this._impactAt(target, rng.signed() * 0.7, rng.range(-0.2, 0.5), 'metal')
+      );
+      at(1.42, (): void => this._impactAt(target, rng.signed() * 0.6, rng.range(-0.2, 0.5), null));
+      at(1.5, (): void =>
+        this._impactAt(target, rng.signed() * 0.5, rng.range(-0.1, 0.6), 'metal')
+      );
+      at(1.36, (): void => this._stageTracer(target));
+      at(1.44, (): void => this._stageCrossfire());
+      at(1.12, (): void => this._stageShell());
+      at(1.34, (): void => this._stageShell());
+      at(1.52, (): void => this._stageMuzzle());
       return { staged: 'combat' };
     }
 
-    // Default: the 'impacts' shot — sustained fire walking across a wall.
-    //
-    // The cadence matters more than the choreography. The harness decides when
-    // it presses the shutter, so rounds land every 60 ms on a 0.9 s loop: at any
-    // phase the newest hit is younger than one cadence (flash and sparks still
-    // hot), the ones before it are mid-expansion, and several loops' worth of
-    // decals and hanging dust have already built up behind them.
+    // Impacts: walk sustained fire across a wall every 50 ms on a 0.9 s loop,
+    // retaining fresh sparks, expanding dust and accumulated decals at any grab phase.
     this._scriptPeriod = 0.9;
     // 50 ms cadence against a 75 ms flash: strictly shorter than the flash
     // lifetime, so there is *always* a hot impact somewhere in the frame.
@@ -1095,10 +966,10 @@ export class FxSystem {
         `n=(${target.normal.x.toFixed(2)},${target.normal.y.toFixed(2)},${target.normal.z.toFixed(2)}) ` +
         `support=${this._targetSupport ?? -1} span=${target.spanU.toFixed(2)}x${target.spanV.toFixed(2)}`
     );
-    at(0.3, () => this._stageCrossfire());
-    at(0.74, () => this._stageCrossfire());
-    at(0.18, () => this._stageShell());
-    at(0.52, () => this._stageShell());
+    at(0.3, (): void => this._stageCrossfire());
+    at(0.74, (): void => this._stageCrossfire());
+    at(0.18, (): void => this._stageShell());
+    at(0.52, (): void => this._stageShell());
     return { staged: kind, at: target.point.toArray(), surface: target.surface };
   }
 
@@ -1120,12 +991,17 @@ export class FxSystem {
       const u = Math.sin(f * 3.9 + 0.4) * su + rng.signed() * su * 0.13;
       const v = Math.cos(f * 2.4) * sv + rng.signed() * sv * 0.35;
       const surf = i % 3 === 2 ? 'metal' : null;
-      at(t, () => this._impactAt(target, u, v, surf));
+      at(t, (): void => this._impactAt(target, u, v, surf));
     }
   }
 
   /** Fake a bullet:impact at an offset on the staged surface. */
-  _impactAt(target: FxTargetFrame, u: number, v: number, surfaceOverride?: string | null): void {
+  _impactAt(
+    target: FxTargetFrame,
+    u: number,
+    v: number,
+    surfaceOverride?: SurfaceName | null
+  ): void {
     this._p
       .copy(target.point)
       .addScaledVector(target.tangent, u)
@@ -1153,20 +1029,10 @@ export class FxSystem {
     this._suppressDecals = false;
   }
 
-  /**
-   * Staged muzzle flash for the capture harness.
-   *
-   * `view: true`, because that is the path a real trigger pull takes
-   * (`onWeaponFire` sets it for anything inside 1.5 m of the eye) and it is the
-   * only path that reaches `viewFlash` — i.e. the only one that lights the
-   * weapon. Staging this at `view: false` meant the harness photographed a flash
-   * that could not, by construction, put any warm light on the handguard.
-   *
-   * The crown comes from the weapon's own muzzle transform when there is a
-   * weapon, so the flash is welded to the bore rather than to a hardcoded offset
-   * from the eye. The offset is only the fallback for an FX-only scene.
+  /** Stage view-space muzzle FX to match real first-person firing and reach viewFlash lighting.
+   * Use the weapon's muzzle transform; only FX-only scenes fall back to an eye-relative offset.
    */
-  _stageMuzzle() {
+  _stageMuzzle(): void {
     const cam = this.ctx.camera;
     cam.updateMatrixWorld();
     const wp = this.ctx.peek('weapons');
@@ -1185,7 +1051,7 @@ export class FxSystem {
     });
   }
 
-  _stageShell() {
+  _stageShell(): void {
     const cam = this.ctx.camera;
     cam.updateMatrixWorld();
     this._tmpA.set(0.2, -0.1, -0.45).applyMatrix4(cam.matrixWorld);
@@ -1221,7 +1087,7 @@ export class FxSystem {
   }
 
   /** Incoming round crossing the frame — reads as a firefight, not a range. */
-  _stageCrossfire() {
+  _stageCrossfire(): void {
     const cam = this.ctx.camera;
     const rng = this.rng;
     this._tmpA
@@ -1234,7 +1100,7 @@ export class FxSystem {
   }
 
   /** Surface name per probe hit; sized once, reused (see `_findTarget`). */
-  _probeSurf = new Array<string>(63).fill('concrete');
+  _probeSurf = new Array<SurfaceName>(63).fill('concrete');
   _probeCount = 0;
 
   _findTarget(): FxTargetFrame {
@@ -1252,26 +1118,12 @@ export class FxSystem {
     });
     this._camPos.setFromMatrixPosition(cam.matrixWorld);
     const ph = this.physics;
-    let best = null;
+    let best: Pick<FxTargetFrame, 'point' | 'normal' | 'surface' | 'distance'> | null = null;
     let bestDist = Infinity;
     if (ph?.raycast && (ph.staticWorld?.triCount ?? 0) > 0) {
-      // Fan of probes: prefer something in the 1.5-9 m band, which is where a
-      // wall being shot at actually lives in a screenshot.
-      //
-      // The fan has to be *dense*. A 5x5 grid on 0.14/0.10 rad steps stepped
-      // straight over the facing wall in the `impacts` framing and only ever
-      // landed grazing hits on tabletops and awnings (face < 0.3), which fell
-      // through to the decal-less virtual plane below — an impacts shot with no
-      // bullet holes in it. 9x7 on ~0.075/0.08 rad finds it.
-      // Two passes. The first records every probe hit; the second scores each one
-      // by how many of the OTHERS lie on the same plane.
-      //
-      // Distance-and-centredness alone is not enough: as soon as the level gains
-      // a lamp post or a 12 cm pillar between the camera and the wall, the fan
-      // scores the pillar highest and the whole burst — the point of the shot —
-      // gets walked across a sliver of geometry 20 px wide where the decals
-      // cannot be read at all. Planarity support is what distinguishes "a wall"
-      // from "a prop that happens to be 5 m away".
+      // Dense 9x7 probes find facing walls rather than skipping to grazing props.
+      // Record hits, then score coplanar support so a broad wall beats a centred
+      // post or narrow pillar. Prefer targets in the 1.5-9 m screenshot band.
       const probes = this._probes ?? (this._probes = new Float32Array(63 * 8));
       let np = 0;
       for (let i = 0; i < 63; i++) {
@@ -1321,7 +1173,7 @@ export class FxSystem {
           best = best ?? {
             point: new THREE.Vector3(),
             normal: new THREE.Vector3(),
-            surface: '',
+            surface: 'concrete',
             distance: 0,
           };
           best.point.set(probes[a], probes[a + 1], probes[a + 2]);
@@ -1355,12 +1207,8 @@ export class FxSystem {
     t.bitangent.copy(this._tmpA).addScaledVector(t.normal, -t.normal.dot(this._tmpA)).normalize();
     t.tangent.crossVectors(t.bitangent, t.normal).normalize();
 
-    // How big is the thing we picked? Measure the co-planar probe hits in the
-    // surface's own frame so the burst can be walked across whatever we found
-    // rather than across a fixed 2.7 m. Sweeping 2.7 m over a 0.4 m pilaster
-    // threw fifteen of eighteen rounds off it and onto whatever was behind,
-    // which is how an "impacts" shot ends up with its decals scattered over the
-    // far side of a market street.
+    // Measure coplanar support in the surface frame to keep the staged burst
+    // on the selected face rather than spraying past narrow pillars.
     t.spanU = 0.35;
     t.spanV = 0.25;
     const pr = this._probes;
@@ -1415,9 +1263,7 @@ export class FxSystem {
     }
   }
 
-  /* ===================================================================== */
-
-  dispose() {
+  dispose(): void {
     for (const off of this._off ?? []) off();
     this._off = [];
     for (const l of [this.lit, this.add, this.motes, this.viewAdd, this.viewLit]) {

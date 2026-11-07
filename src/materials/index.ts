@@ -3,23 +3,26 @@ import { float, uniform, uv, vec3, vec4 } from 'three/tsl';
 import { Color, MeshStandardNodeMaterial, Vector3, Vector4 } from 'three/webgpu';
 import type { Renderer, Texture, Node } from 'three/webgpu';
 
+import type { SystemId } from '../core/context.ts';
+import { hasOwn } from '../core/guards.ts';
+import { applyDefinedPatch } from '../core/patch.ts';
 import { bakeDetail, bakeMacro, bakeSurface } from './forge-tsl.ts';
 import type { SurfaceNode } from './forge-tsl.ts';
 import { LIBRARY, resolveName } from './library.ts';
-import { bakeMasks, setMask } from './masks.ts';
+import type { BakeDefinition } from './library.ts';
+import { bakeMasks } from './masks.ts';
 import { DEFAULT_PARAMS } from './params.ts';
-import type { SurfaceParams } from './shader-tsl.ts';
+import type {
+  SurfaceParams,
+  SurfaceAuthoringParams,
+  SurfaceMaterialOptions,
+} from './shader-tsl.ts';
 import { createSurfaceNodeMaterial } from './shader-tsl.ts';
-import { GENERATED_SURFACES, SURFACES_TSL } from './surfaces-index-tsl.ts';
+import { isGeneratedSurface, SURFACES_TSL } from './surfaces-index-tsl.ts';
 
-/**
- * Production material library for the strict-WebGPU renderer.
- *
- * `src/materials/index.ts` re-exports this as `MaterialSystem`; it is the only
- * production material path (there is no WebGL backend toggle). `init()`
- * requires an initialized strict-WebGPU renderer and bakes the shared detail
- * and macro maps, then bakes each authored surface lazily into packed
- * albedo+height / ORM / normal render targets on first request.
+/** Strict-WebGPU material library. Requires an initialized renderer to bake shared
+ * detail/macro maps; authored surfaces bake lazily into packed albedo+height,
+ * ORM and normal render targets on first request.
  */
 interface MaterialTextureSet {
   name: string;
@@ -47,19 +50,9 @@ interface MaterialContext {
     id: 'sky'
   ): { keyDirection?: Vector3; keyLight?: { color: Color; intensity: number } } | null;
 }
-interface MaterialOptions extends Partial<SurfaceParams> {
-  [key: string]: unknown;
-  bake?: Partial<{
-    size: number;
-    worldSize: number;
-    relief: number;
-    seed: number;
-    param: number[];
-    tintA: number;
-    tintB: number;
-  }>;
-  three?: Record<string, unknown>;
-  groundY?: number;
+export interface MaterialOptions extends Partial<SurfaceAuthoringParams> {
+  bake?: Partial<BakeDefinition>;
+  three?: SurfaceMaterialOptions;
 }
 interface MaterialChanges {
   scale?: number;
@@ -82,25 +75,25 @@ export class MaterialSystemNode {
   declare _injectedRenderer: Renderer | undefined;
   declare renderer: Renderer;
   declare ctx: MaterialContext;
-  declare _sets: Map<string, MaterialTextureSet>;
-  declare _materials: Map<string, MeshStandardNodeMaterial>;
-  declare _targets: Array<{ dispose(): void }>;
-  declare _shared: MaterialSharedData | null;
-  declare _groundY: number;
+  private readonly _controls = new WeakMap<
+    MeshStandardNodeMaterial,
+    { params: SurfaceParams; controls: MaterialControls }
+  >();
   declare _quality: number;
   declare _anisotropy: number;
-  declare _missing: Set<string>;
+  private readonly _missing = new Set<string>();
 
-  static id = 'materials';
-  static deps = ['render'];
+  static readonly id = 'materials';
+  static readonly deps: SystemId[] = ['render'];
+
+  _sets: Map<string, MaterialTextureSet> = new Map();
+  _materials: Map<string, MeshStandardNodeMaterial> = new Map();
+  _targets: Array<{ dispose(): void }> = [];
+  _shared: MaterialSharedData | null = null;
+  _groundY: number = 0;
 
   constructor({ renderer }: { renderer?: Renderer } = {}) {
     this._injectedRenderer = renderer;
-    this._sets = new Map();
-    this._materials = new Map();
-    this._targets = [];
-    this._shared = null;
-    this._groundY = 0;
   }
 
   async init(ctx: MaterialContext): Promise<void> {
@@ -149,8 +142,7 @@ export class MaterialSystemNode {
 
   _resolve(name: string): keyof typeof SURFACES_TSL {
     const key = resolveName(name);
-    if (Object.hasOwn(SURFACES_TSL, key)) return key as keyof typeof SURFACES_TSL;
-    if (!this._missing) this._missing = new Set();
+    if (hasOwn(SURFACES_TSL, key)) return key;
     if (!this._missing.has(name)) {
       this._missing.add(name);
       console.warn(`[materials] unknown surface "${name}" — falling back to concrete`);
@@ -161,7 +153,8 @@ export class MaterialSystemNode {
   getTextureSet(name: string, opts: MaterialOptions = {}): MaterialTextureSet {
     if (!this._shared) throw new Error('[materials] init before requesting textures');
     const key = this._resolve(name);
-    const bake = { ...LIBRARY[key].bake, ...opts.bake };
+    const bake = { ...LIBRARY[key].bake };
+    applyDefinedPatch(bake, opts.bake ?? {});
     bake.size = this._size(bake.size);
     const cacheKey = `${key}|${bake.size}|${bake.seed}|${bake.worldSize}|${bake.relief}|${bake.tintA ?? ''}|${bake.tintB ?? ''}|${(
       bake.param ?? []
@@ -170,22 +163,24 @@ export class MaterialSystemNode {
     if (set) return set;
     const tintA = new Color(bake.tintA ?? 0xffffff);
     const tintB = new Color(bake.tintB ?? 0xffffff);
-    const args: Node[] = [uv(), float(bake.seed ?? 1)];
-    if (GENERATED_SURFACES.has(key)) {
+    const coords = uv(),
+      seed = float(bake.seed ?? 1);
+    let surface: SurfaceNode;
+    if (isGeneratedSurface(key)) {
       const p = bake.param ?? [0, 0, 0, 0];
-      args.push(
+      surface = SURFACES_TSL[key](
+        coords,
+        seed,
         vec3(tintA.r, tintA.g, tintA.b),
         vec3(tintB.r, tintB.g, tintB.b),
         vec4(p[0], p[1], p[2], p[3])
       );
-    }
+    } else surface = SURFACES_TSL[key](coords, seed);
     const targets = bakeSurface(this.renderer, {
       size: bake.size,
       worldSize: bake.worldSize,
       relief: bake.relief,
-      surface: (SURFACES_TSL[key] as unknown as (...nodes: Node[]) => Node)(
-        ...args
-      ) as unknown as SurfaceNode,
+      surface,
     });
     for (const target of Object.values(targets)) {
       target.texture.anisotropy = this._anisotropy;
@@ -208,20 +203,21 @@ export class MaterialSystemNode {
     const matKey =
       key +
       '|' +
-      Object.keys(opts)
-        .sort()
-        .map((k) => `${k}=${JSON.stringify(opts[k])}`)
+      Object.entries(opts)
+        .sort(([a], [b]): number => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([k, value]): string => `${k}=${JSON.stringify(value)}`)
         .join(',');
     const cached = this._materials.get(matKey);
     if (cached) return cached;
     const def = LIBRARY[key];
+    if (def.three?.physical && opts.three?.physical === false)
+      throw new Error(`[materials] "${key}" requires its authored physical material`);
     const set = this.getTextureSet(key, opts);
-    const p = { ...DEFAULT_PARAMS, ...def.mat, ...opts } as unknown as SurfaceParams & {
-      bake?: MaterialOptions['bake'];
-      three?: MaterialOptions['three'];
-    };
-    delete p.bake;
-    delete p.three;
+    const { bake, three, ...surface } = opts;
+    void bake;
+    const p: SurfaceParams = { ...DEFAULT_PARAMS };
+    applyDefinedPatch(p, def.mat);
+    applyDefinedPatch(p, surface);
     p.groundY = opts.groundY ?? this._groundY;
     const layerCap =
       this.ctx?.config?.quality === 'low'
@@ -242,53 +238,35 @@ export class MaterialSystemNode {
       weather: uniform(new Vector4(...p.weather)),
     };
     p.tileNode = controls.tile;
-    p.tintNode = controls.tint as unknown as Node<'vec3'>;
+    p.tintNode = controls.tint.toVec3();
     p.parallaxNode = controls.parallax;
     p.normalAmpNode = controls.normal;
     p.groundNode = controls.ground;
     p.weatherNode = controls.weather;
     const shared = this._shared;
     if (!shared) throw new Error('[materials] init before requesting materials');
-    const mat = createSurfaceNodeMaterial(set, p, shared, { ...def.three, ...opts.three });
+    const mat = createSurfaceNodeMaterial(set, p, shared, { ...def.three, ...three });
     mat.name = matKey;
     mat.userData.owParams = p;
     mat.userData.owControls = controls;
+    this._controls.set(mat, { params: p, controls });
     this._materials.set(matKey, mat);
     return mat;
   }
 
-  variant(name: string, opts: MaterialOptions = {}): MeshStandardNodeMaterial {
-    return this.get(name, opts);
-  }
-  names(): string[] {
-    return Object.keys(SURFACES_TSL);
-  }
-  surfaceOf(name: string): string {
-    return LIBRARY[resolveName(name)]?.surface ?? 'concrete';
-  }
   bakeMasks(
     geometry: BufferGeometry,
     opts: Parameters<typeof bakeMasks>[1]
   ): ReturnType<typeof bakeMasks> {
     return bakeMasks(geometry, opts);
   }
-  setMask(
-    geometry: BufferGeometry,
-    opts: Parameters<typeof setMask>[1]
-  ): ReturnType<typeof setMask> {
-    return setMask(geometry, opts);
-  }
-  get detailNormal() {
-    return this._shared?.detailNormal ?? null;
-  }
-
   tune(
     material: MeshStandardNodeMaterial,
     changes: MaterialChanges = {}
   ): MeshStandardNodeMaterial {
-    const c = material.userData.owControls as MaterialControls | undefined;
-    if (!c) return material;
-    const p = material.userData.owParams as SurfaceParams;
+    const owned = this._controls.get(material);
+    if (!owned) return material;
+    const { controls: c, params: p } = owned;
     if (changes.scale !== undefined) {
       c.tile.value = p.uvMode === 'mesh' ? changes.scale : 1 / changes.scale;
       p.scale = changes.scale;
@@ -317,5 +295,5 @@ export class MaterialSystemNode {
 }
 
 export { MaterialSystemNode as MaterialSystem };
-export { bakeMasks, setMask } from './masks.ts';
+export { bakeMasks } from './masks.ts';
 export { LIBRARY, resolveName } from './library.ts';
