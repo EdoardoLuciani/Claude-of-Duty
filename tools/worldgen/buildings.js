@@ -1189,7 +1189,6 @@ function buildInterior(A, spec, info, t, groundH, upperH, floors) {
       for (const r of plan.furnish) {
         furnishRoom(A, keyedRng('room', spec.id, f, r.x0, r.z0, r.kind), {
           kind: r.kind,
-          detail: r.detail,
           // so furnishing never stacks a shelf across a shopfront opening
           street: spec.streetSide,
           x0: x0 + r.x0 * iw,
