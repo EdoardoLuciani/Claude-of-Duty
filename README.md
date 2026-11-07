@@ -19,10 +19,11 @@ required. Bun installs dependencies from `bun.lock`, type-checks (`bun check`) a
 formats (`bun fmt`); packages are cached in `~/.bun/install/cache`, so warm
 reinstalls are near-instant. Node runs Vite, Vitest, Oxlint and all tools; Node-run
 tools and smoke tests load migrated `.ts` modules using native type stripping.
-Runtime TypeScript uses explicit `.ts` imports and is checked by `bun run typecheck`. `bun run lint` requires explicit
-return types on every TypeScript function, method, getter and callback (including
-contextually typed functions and functions returning functions). Constructors and
-setters have no return annotation; JavaScript helpers are outside this rule.
+Runtime TypeScript uses explicit `.ts` imports and is checked by `bun run typecheck`.
+`bun run lint` requires explicit return types on every TypeScript function, method,
+getter and callback (including contextually typed functions and functions returning
+functions). Constructors and setters have no return annotation; JavaScript helpers
+are outside this rule.
 The compiler also checks implicit missing returns, missing `override` modifiers,
 switch fallthrough, and exact optional properties: omit unset patch fields rather
 than writing `undefined` over required defaults. Lint rejects floating/misused promises and unsafe narrowing
