@@ -29,6 +29,9 @@ export class PixiAmmoView {
     .stroke({ color: 0x080c10, width: 1 });
   private fill = new Graphics().rect(0, 0, 216, 3).fill(INK);
   dirty = true;
+  private lastAmmo = -1;
+  private lastReserve = -1;
+  private lastMode: AmmoState['fireMode'] | null = null;
 
   constructor() {
     this.stage.eventMode = 'none';
@@ -58,18 +61,20 @@ export class PixiAmmoView {
     return text;
   }
 
-  private label(text: Text, value: string): void {
-    this.dirty = writeHudText(text, value) || this.dirty;
+  private label(text: Text, value: string, width = 0): void {
+    this.dirty = writeHudText(text, value, width) || this.dirty;
   }
 
   update(_dt: number, s: AmmoState): void {
     const ammo = Math.max(0, s.ammo | 0),
       mag = Math.max(1, s.magSize | 0 || 30),
-      reserve = Math.max(0, s.reserve | 0);
-    this.label(this.current, String(ammo));
-    this.label(this.reserve, `/ ${reserve}`);
-    this.dirty = writeHudText(this.name, s.weaponName ?? s.name ?? 'M4A1', 166) || this.dirty;
-    this.label(this.mode, (s.fireMode ?? 'auto').toUpperCase());
+      reserve = Math.max(0, s.reserve | 0),
+      mode = s.fireMode ?? 'auto';
+    // Build per-frame label strings only when their source value changes.
+    if (ammo !== this.lastAmmo) this.label(this.current, String((this.lastAmmo = ammo)));
+    if (reserve !== this.lastReserve) this.label(this.reserve, `/ ${(this.lastReserve = reserve)}`);
+    this.label(this.name, s.weaponName ?? s.name ?? 'M4A1', 166);
+    if (mode !== this.lastMode) this.label(this.mode, (this.lastMode = mode).toUpperCase());
     const color = ammo === 0 ? RED : ammo / mag <= 0.34 ? AMBER : INK;
     if (this.current.tint !== color) {
       this.current.tint = color;

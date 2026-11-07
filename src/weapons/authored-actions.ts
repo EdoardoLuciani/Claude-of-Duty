@@ -33,14 +33,15 @@ export function sampleAuthoredAction(state: AuthoredActionState, name: string, t
   state.mixer.update(0);
 }
 
-/** Detachable-magazine adapters share these authored gesture names. */
-export const MAGAZINE_ALIASES: Record<string, string> = {
+/** Detachable-magazine adapters share these authored gesture names; frozen because
+ * every adapter reads the same object (extend by spreading, as AX338 does). */
+export const MAGAZINE_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   reloadTac: 'Reload_Tactical',
   reloadEmpty: 'Reload_Empty',
   inspect: 'Inspect',
   draw: 'Draw',
   holster: 'Holster',
-};
+});
 
 interface AuthoredFireState {
   idleTime: number;
