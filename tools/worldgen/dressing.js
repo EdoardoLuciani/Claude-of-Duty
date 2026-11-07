@@ -1333,7 +1333,12 @@ export function buildGate(A) {
   for (const lx of [-0.6, 0.6]) {
     const sx = bags.x + Math.cos(bags.ry) * lx;
     const sz = bags.z - Math.sin(bags.ry) * lx;
-    groundSkirt(A, rng, sx, bagY, sz, 0.44, { pebbles: rng.int(1, 3), key: 'sand', grime: 0.7 });
+    const skirt = keyedRng('bag-skirt', sx, sz); // own stream: gate edits never re-roll it
+    groundSkirt(A, skirt, sx, bagY, sz, 0.44, {
+      pebbles: skirt.int(1, 3),
+      key: 'sand',
+      grime: 0.7,
+    });
   }
   // spalled corners and a bullet-scarred face
   rubbleMound(A, rng, -span / 2 - 1.0, 0, z + 1.4, 1.2, 16, { key: 'concrete' });
