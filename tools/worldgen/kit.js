@@ -59,6 +59,12 @@ export const BOX_SOFT = (A) => A.cache('box:0.03', () => chamferBox(1, 1, 1, 0.0
 export const BOX_THIN = (A) => A.cache('box:plain', () => plainBox());
 /** Single quad for glass panes. */
 export const PANE = (A) => A.cache('pane', () => quad(1, 1));
+/**
+ * Centimetre-rounded size for cache keys. Cached shapes are built from the
+ * rounded key, never from whichever caller happened to create the entry first,
+ * so editing one building cannot reshape a leaf on another.
+ */
+const cm = (v) => Math.round(v * 100) / 100;
 
 /** Merge a unit chamfer box scaled to a slab. */
 export function slab(A, key, pm, x, y, z, sx, sy, sz, opts = null, ry = 0) {
@@ -199,26 +205,27 @@ export function windowUnit(A, pm, o, rng, opts = {}) {
     A.add(frameKey, box, LL(pm, x, y + h * 0.16, depth, 0, w - 0.1, 0.04, fd * 0.85), null);
   } else {
     // An open casement: the sash swung inward off its hinge, catching light on
-    // its edge against the dark room behind it.
+    // its edge against the dark room behind it. A walkable room (`walkable`)
+    // gets no swung leaves: they are collision at head height across its routes.
     openL = true;
     openR = state === 'open' || rng.float() < 0.4;
-    const sw = w / 2 - 0.03;
-    const sash = A.cache(`sash:${sw.toFixed(2)}:${h.toFixed(2)}`, () => sashLeaf(sw, h - 0.06));
-    A.add(
-      frameKey,
-      sash,
-      LL(pm, x - w / 2 + 0.04, y, depth + 0.02, rng.range(-1.35, -0.75), 1, 1, 1),
-      { masks: [0.8, 0.45, 0.2] }
-    );
-    if (openR) {
-      A.add(
-        frameKey,
-        sash,
-        LL(pm, x + w / 2 - 0.04, y, depth + 0.02, rng.range(0.75, 1.35), 1, 1, 1),
-        { masks: [0.8, 0.45, 0.2] }
-      );
-    } else {
+    const sw = cm(w / 2 - 0.03);
+    const sh = cm(h);
+    const sash = A.cache(`sash:${sw}:${sh}`, () => sashLeaf(sw, sh - 0.06));
+    const leaves = !opts.walkable;
+    if (leaves) {
+      const yaw = rng.range(-1.35, -0.75);
+      A.add(frameKey, sash, LL(pm, x - w / 2 + 0.04, y, depth + 0.02, yaw, 1, 1, 1), {
+        masks: [0.8, 0.45, 0.2],
+      });
+    }
+    if (!openR) {
       A.add(frameKey, box, LL(pm, x, y, depth, 0, 0.045, h - 0.1, fd * 0.85), null);
+    } else if (leaves) {
+      const yaw = rng.range(0.75, 1.35);
+      A.add(frameKey, sash, LL(pm, x + w / 2 - 0.04, y, depth + 0.02, yaw, 1, 1, 1), {
+        masks: [0.8, 0.45, 0.2],
+      });
     }
   }
 
@@ -334,10 +341,9 @@ export function windowUnit(A, pm, o, rng, opts = {}) {
   // shutters — one closed, one hanging open at an angle
   if (opts.shutters) {
     const key = opts.shutterKey ?? 'metal_blue';
-    const sw = w / 2 - 0.01;
-    const louvre = A.cache(`shutter:${sw.toFixed(2)}:${h.toFixed(2)}`, () =>
-      shutterLeaf(sw, h - 0.03)
-    );
+    const sw = cm(w / 2 - 0.01);
+    const sh = cm(h);
+    const louvre = A.cache(`shutter:${sw}:${sh}`, () => shutterLeaf(sw, sh - 0.03));
     // `state:'shuttered'` means shut for the afternoon — both leaves flat on the
     // reveal, which is a completely different silhouette from a half-open pair.
     const shut = state === 'shuttered';
@@ -524,10 +530,9 @@ export function doorUnit(A, pm, o, rng, opts = {}) {
   if (opts.leaf !== false) {
     const key = opts.leafKey ?? 'metal_green';
     const ang = opts.open ?? 0;
-    const leafW = w - 0.06;
-    const leaf = A.cache(`doorleaf:${leafW.toFixed(2)}:${h.toFixed(2)}`, () =>
-      doorLeaf(leafW, h - 0.06)
-    );
+    const leafW = cm(w - 0.06);
+    const leafH = cm(h);
+    const leaf = A.cache(`doorleaf:${leafW}:${leafH}`, () => doorLeaf(leafW, leafH - 0.06));
     // hinge at the left jamb: rotate about the hinge, not the centre
     const hx = x - leafW / 2;
     const cs = Math.cos(ang);
@@ -577,7 +582,8 @@ export function shopfront(A, pm, o, rng, opts = {}) {
   const drop = opts.drop ?? rng.range(0.15, 0.85);
   if (drop > 0.02) {
     const sh = h * drop;
-    const shutter = A.cache(`roller:${w.toFixed(2)}`, () => rollerShutter(w, 1));
+    const rw = cm(w);
+    const shutter = A.cache(`roller:${rw}`, () => rollerShutter(rw, 1));
     A.add('corrugated', shutter, LL(pm, x, y + h / 2 - 0.18 - sh / 2, 0.05, 0, 1, sh, 1), {
       masks: [0.85, 0.6, 0.15],
     });
@@ -651,28 +657,6 @@ export function shopfront(A, pm, o, rng, opts = {}) {
         ),
         { masks: [0.3, 0.45, 0.2] }
       );
-    }
-  } else if (opts.preserveInsideRng && rng) {
-    // Ground-floor suites replace the old decorative shop backing. Consume the
-    // same keyed dressing draws so later authored facades and stable placements
-    // do not reroll simply because the opening became traversable.
-    rng.range(-0.1, 0.25);
-    rng.range(-0.1, 0.25);
-    if (rng.float() < 0.7) {
-      const c = clothGeometry(rng.range(0.9, 1.5), rng.range(1.1, 1.7), {
-        segX: 7,
-        segY: 8,
-        sag: 0.05,
-        wrinkle: 0.055,
-        twist: 0.06,
-        thickness: 0.003,
-        fray: 0.02,
-        rng,
-      });
-      c.dispose();
-      rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']);
-      rng.float();
-      rng.range(0.9, 1.5);
     }
   }
   return o;
@@ -1137,10 +1121,6 @@ export function drainpipe(A, pm, x, yTop, h, opts = {}) {
  * the way a decal artist builds one — the floor sits ~flush with the wall and the
  * RIM is raised, so the shading gradient reads as a depression. Nothing ever
  * breaks the silhouette by more than a couple of millimetres.
- *
- * The rng is drawn exactly 16 times, matching the old implementation, because
- * `registerProps` shares one stream with the whole level build: changing the
- * draw count here silently re-rolls every window state and roof prop downstream.
  */
 export function pockGeometry(rng, r = 0.05) {
   const SEG = 8;
@@ -1151,7 +1131,7 @@ export function pockGeometry(rng, r = 0.05) {
     [0.8, 0.075],
     [1.0, 0.004],
   ];
-  // chipped rim: per-segment radius and crest-height jitter. 8 + 8 = 16 draws.
+  // chipped rim: per-segment radius and crest-height jitter
   const jr = [];
   const jz = [];
   for (let s = 0; s < SEG; s++) jr.push(1 + (rng.float() - 0.5) * 0.42);

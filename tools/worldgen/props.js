@@ -10,6 +10,7 @@ import {
   fillMasks,
   fbm3,
   warpGeometry,
+  keyedRng,
 } from './util.js';
 
 /**
@@ -1026,10 +1027,7 @@ function palmFrond(len = 2.6) {
   return g;
 }
 
-function shrub(rng, s = 0.8) {
-  // Old 7-card shrub took 56 samples. Keep that so later prototypes and ground stay put.
-  for (let i = 0; i < 55; i++) rng.float();
-  const r = rng.fork();
+function shrub(r, s = 0.8) {
   const list = [];
   const n = 16;
   for (let i = 0; i < n; i++) {
@@ -1053,10 +1051,7 @@ function shrub(rng, s = 0.8) {
   return g;
 }
 
-function weedTuft(rng) {
-  // Old 4-card tuft took 28 samples. Same reason as shrub().
-  for (let i = 0; i < 27; i++) rng.float();
-  const r = rng.fork();
+function weedTuft(r) {
   const list = [];
   const n = 10;
   for (let i = 0; i < n; i++) {
@@ -1170,19 +1165,21 @@ export function burntCar() {
  * Register every instanced prototype. Called once, before the level is built.
  * Prototype ids are the vocabulary dressing.js and interiors.js draw from.
  */
-export function registerProps(A, rng) {
+export function registerProps(A) {
   const P = (id, key, geo, opts = {}) => A.proto(id, { geo, key, ...opts });
+  // Each prototype owns its stream: adding or editing one never reshapes another.
+  const R = (id) => keyedRng('prop', id);
 
   // containers
-  P('crate_a', 'wood_prop', crate(rng, 0.64), { skirt: 0.37 });
-  P('crate_b', 'wood_prop', crate(rng, 0.48));
-  P('crate_c', 'wood_prop_dark', crate(rng, 0.82), { skirt: 0.45 });
-  P('crate_flat', 'wood_prop', crate(rng, 0.55, false));
-  P('box_card_a', 'wood_pale', cardboardBox(rng, 0.46));
-  P('box_card_b', 'wood_pale', cardboardBox(rng, 0.34));
-  P('barrel_rust', 'metal_rust_prop', barrel(rng), { skirt: 0.28 });
-  P('barrel_blue', 'metal_blue', barrel(rng, 0.28, 0.9, 2), { skirt: 0.26 });
-  P('barrel_wood', 'wood_prop_dark', barrel(rng, 0.31, 0.78, 4), { skirt: 0.28 });
+  P('crate_a', 'wood_prop', crate(R('crate_a'), 0.64), { skirt: 0.37 });
+  P('crate_b', 'wood_prop', crate(R('crate_b'), 0.48));
+  P('crate_c', 'wood_prop_dark', crate(R('crate_c'), 0.82), { skirt: 0.45 });
+  P('crate_flat', 'wood_prop', crate(R('crate_flat'), 0.55, false));
+  P('box_card_a', 'wood_pale', cardboardBox(R('box_card_a'), 0.46));
+  P('box_card_b', 'wood_pale', cardboardBox(R('box_card_b'), 0.34));
+  P('barrel_rust', 'metal_rust_prop', barrel(R('barrel_rust')), { skirt: 0.28 });
+  P('barrel_blue', 'metal_blue', barrel(R('barrel_blue'), 0.28, 0.9, 2), { skirt: 0.26 });
+  P('barrel_wood', 'wood_prop_dark', barrel(R('barrel_wood'), 0.31, 0.78, 4), { skirt: 0.28 });
   P('gas_bottle', 'metal_green', gasBottle(), { skirt: 0.18 });
   P('bucket', 'metal_rust_prop', bucket());
   P('jerry_can', 'metal_green', jerryCan());
@@ -1191,21 +1188,31 @@ export function registerProps(A, rng) {
 
   // cover
   // The cloth is the impact finish; the filled volume, not fabric, stops rounds.
-  P('sandbag_a', 'burlap', sandbag(rng, 0), { ballisticSurface: 'sand', sheetThickness: 0 });
-  P('sandbag_b', 'burlap', sandbag(rng, 1), { ballisticSurface: 'sand', sheetThickness: 0 });
-  P('sandbag_c', 'burlap', sandbag(rng, 2), { ballisticSurface: 'sand', sheetThickness: 0 });
+  P('sandbag_a', 'burlap', sandbag(R('sandbag_a'), 0), {
+    ballisticSurface: 'sand',
+    sheetThickness: 0,
+  });
+  P('sandbag_b', 'burlap', sandbag(R('sandbag_b'), 1), {
+    ballisticSurface: 'sand',
+    sheetThickness: 0,
+  });
+  P('sandbag_c', 'burlap', sandbag(R('sandbag_c'), 2), {
+    ballisticSurface: 'sand',
+    sheetThickness: 0,
+  });
   P('jersey', 'concrete_prop', jerseyBarrier(), { skirt: 0.69, maxDist: 0 });
-  P('block_big', 'concrete_prop', concreteBlock(rng, 1.25, 0.95, 0.85), { skirt: 0.63 });
-  P('block_small', 'concrete_dark', concreteBlock(rng, 0.55, 0.42, 0.4), { skirt: 0.31 });
+  P('block_big', 'concrete_prop', concreteBlock(R('block_big'), 1.25, 0.95, 0.85), { skirt: 0.63 });
+  P('block_small', 'concrete_dark', concreteBlock(R('block_small'), 0.55, 0.42, 0.4), {
+    skirt: 0.31,
+  });
   const T = (id, r, opts = {}) => {
-    // Consume exactly the original one sample per prototype; visuals must not
-    // advance the world RNG or move any later placement/support geometry.
-    const stagger = rng.float() * 6.28;
+    // Visual and canonical tyres share one stagger so collision matches.
+    const stagger = R(id).float() * 6.28;
     P(id, 'rubber', tyre(stagger, r), { visualGeo: tyre(stagger, r, true), ...opts });
   };
   T('tyre', 0.33, { skirt: 0.33 });
   T('tyre_small', 0.26);
-  P('pallet', 'wood_prop', pallet(rng), { skirt: 0.51 });
+  P('pallet', 'wood_prop', pallet(R('pallet')), { skirt: 0.51 });
 
   // furniture
   P('table', 'wood_prop_dark', table(1.5, 0.78, 0.8), { skirt: 0.57 });
@@ -1225,15 +1232,21 @@ export function registerProps(A, rng) {
   P('lamp_glass', 'lamp_lens', lampGlass(), { chunk: false, castShadow: false });
 
   // debris
-  P('brick_a', 'brick', brickChunk(rng), { castShadow: false });
-  P('brick_b', 'brick', brickChunk(rng), { castShadow: false });
-  P('rock_a', 'concrete_prop', rockGeometry(rng, 0.26, 0, 0.7), { maxDist: 90, castShadow: false });
-  P('rock_b', 'concrete_dark', rockGeometry(rng, 0.17, 0, 0.8), { maxDist: 70, castShadow: false });
-  P('slab_shard', 'concrete_prop', slabShard(rng), { castShadow: false });
-  P('rebar', 'metal_rust', rebarBundle(rng));
-  P('plank_a', 'wood_prop', plank(rng), { maxDist: 90, castShadow: false });
-  P('plank_b', 'wood_prop_dark', plank(rng), { maxDist: 90, castShadow: false });
-  P('litter', 'wood_pale', litterPaper(rng), { maxDist: 45, castShadow: false });
+  P('brick_a', 'brick', brickChunk(R('brick_a')), { castShadow: false });
+  P('brick_b', 'brick', brickChunk(R('brick_b')), { castShadow: false });
+  P('rock_a', 'concrete_prop', rockGeometry(R('rock_a'), 0.26, 0, 0.7), {
+    maxDist: 90,
+    castShadow: false,
+  });
+  P('rock_b', 'concrete_dark', rockGeometry(R('rock_b'), 0.17, 0, 0.8), {
+    maxDist: 70,
+    castShadow: false,
+  });
+  P('slab_shard', 'concrete_prop', slabShard(R('slab_shard')), { castShadow: false });
+  P('rebar', 'metal_rust', rebarBundle(R('rebar')));
+  P('plank_a', 'wood_prop', plank(R('plank_a')), { maxDist: 90, castShadow: false });
+  P('plank_b', 'wood_prop_dark', plank(R('plank_b')), { maxDist: 90, castShadow: false });
+  P('litter', 'wood_pale', litterPaper(R('litter')), { maxDist: 45, castShadow: false });
   /**
    * Contact fillets. Registered last so `put()` can find it, and never given a
    * skirt of its own. maxDist keeps them off the far half of the map, where
@@ -1244,11 +1257,11 @@ export function registerProps(A, rng) {
   P('can', 'steel', can(), { maxDist: 45, castShadow: false });
 
   // vegetation
-  const palm = palmTree(rng, 5.4);
+  const palm = palmTree(R('palm_trunk'), 5.4);
   P('palm_trunk', 'wood_dark', palm, { skirt: 0.57, chunk: false });
   P('palm_frond', 'foliage', palmFrond(2.7), { chunk: false, receiveShadow: true });
-  P('shrub', 'foliage', shrub(rng, 0.85));
-  P('weeds', 'foliage', weedTuft(rng), { maxDist: 40 });
+  P('shrub', 'foliage', shrub(R('shrub'), 0.85));
+  P('weeds', 'foliage', weedTuft(R('weeds')), { maxDist: 40 });
   P('planter', 'concrete_prop', planter(), { skirt: 0.33 });
 
   // signage
@@ -1258,6 +1271,6 @@ export function registerProps(A, rng) {
   // damage
   // 3.2 cm base radius: the callers scale it 0.5-1.5x, so pocks land at 3-10 cm
   // across. At the old 5.5 cm base a single rifle strike was 16 cm wide.
-  P('pock', 'concrete_dark', pockGeometry(rng, 0.032), { maxDist: 65, castShadow: false });
+  P('pock', 'concrete_dark', pockGeometry(R('pock'), 0.032), { maxDist: 65, castShadow: false });
   return A;
 }

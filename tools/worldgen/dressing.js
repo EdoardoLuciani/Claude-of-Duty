@@ -25,6 +25,7 @@ import {
   driftBerm,
   chamferBox,
   fillMasks,
+  keyedRng,
   paintMasks,
   rockGeometry,
   tubeY,
@@ -40,6 +41,9 @@ import {
  */
 
 const _m = new THREE.Matrix4();
+const _v = new THREE.Vector3();
+// Aerial footprint, including its crossbars.
+const _size = new THREE.Vector3(1, 0, 1);
 
 /**
  * A dirt/rubble skirt at the base of a heavy prop.
@@ -91,7 +95,7 @@ export function groundSkirt(A, rng, x, y, z, radius, opts = {}) {
 
 // =============================================================== prototypes ==
 /** Props that only the dressing pass uses. */
-export function registerDressingProps(A, rng) {
+export function registerDressingProps(A) {
   const P = (id, key, geo, opts = {}) => A.proto(id, { geo, key, ...opts });
 
   P('wreck', 'metal_dark', burntCar(), { chunk: false });
@@ -119,6 +123,7 @@ export function registerDressingProps(A, rng) {
     'glass_shards',
     'glass',
     (() => {
+      const rng = keyedRng('prop', 'glass_shards');
       const list = [];
       for (let i = 0; i < 9; i++) {
         const s = 0.03 + rng.float() * 0.06;
@@ -185,6 +190,7 @@ export function registerDressingProps(A, rng) {
     'produce',
     'burlap',
     (() => {
+      const rng = keyedRng('prop', 'produce');
       const list = [];
       for (let i = 0; i < 7; i++) {
         const g = rockGeometry(rng, rng.range(0.055, 0.1), 0, 0.8);
@@ -249,17 +255,17 @@ export function registerDressingProps(A, rng) {
 }
 
 // ================================================================== street ==
-export function dressStreet(A, rng) {
-  marketStalls(A, rng);
-  barrierGrounding(A, rng);
-  wreckScorch(A, rng);
-  palmGrounding(A, rng);
-  streetLampGrounding(A, rng);
-  overheadLines(A, rng);
-  facadeHangings(A, rng);
-  rubbleDust(A, rng);
-  streetRubble(A, rng);
-  streetFloor(A, rng);
+export function dressStreet(A) {
+  marketStalls(A);
+  barrierGrounding(A);
+  wreckScorch(A);
+  palmGrounding(A);
+  streetLampGrounding(A);
+  overheadLines(A);
+  facadeHangings(A);
+  rubbleDust(A);
+  streetRubble(A);
+  streetFloor(A);
 }
 
 // --- the street floor -------------------------------------------------------
@@ -273,7 +279,7 @@ export function dressStreet(A, rng) {
  * hard geometric line where wall meets ground, which otherwise reads as a
  * Z-fighting seam in every establishing shot.
  */
-function streetFloor(A, rng) {
+function streetFloor(A) {
   const { halfWidth: HW, kerb: KB, walkH: WH, zMin, zMax } = STREET;
 
   // ---- 0. the wall-to-ground junction ----
@@ -285,6 +291,7 @@ function streetFloor(A, rng) {
   // segment-by-segment height jitter keeps its top edge from ruling a second
   // straight line 20 cm up.
   for (const side of [-1, 1]) {
+    const rng = keyedRng('street-junction', side);
     let z = zMin;
     while (z < zMax) {
       const seg = rng.range(0.5, 1.1);
@@ -338,6 +345,7 @@ function streetFloor(A, rng) {
 
   // ---- 1. drift berms banked against the building line, both sides ----
   for (const side of [-1, 1]) {
+    const rng = keyedRng('street-berm', side);
     let z = zMin + 1;
     while (z < zMax - 2) {
       const len = rng.range(2.2, 6.5);
@@ -362,6 +370,7 @@ function streetFloor(A, rng) {
 
   // ---- 2. the kerb line: sand spilling off the pavement into the gutter ----
   for (let i = 0; i < 70; i++) {
+    const rng = keyedRng('street-kerb', i);
     const side = rng.float() < 0.5 ? -1 : 1;
     const cz = rng.range(zMin + 2, zMax - 2);
     const len = rng.range(1.2, 3.4);
@@ -381,6 +390,7 @@ function streetFloor(A, rng) {
   // Two ruts, laid as long overlapping strips so the line wanders instead of
   // ruling a straight edge down the middle of the frame.
   for (const side of [-1, 1]) {
+    const rng = keyedRng('street-rut', side);
     let z = zMin + 2;
     while (z < zMax - 3) {
       const len = rng.range(5.0, 13.0);
@@ -420,6 +430,7 @@ function streetFloor(A, rng) {
   }
   // a couple of turning scuffs where vehicles have swung across the road
   for (let i = 0; i < 8; i++) {
+    const rng = keyedRng('street-scuff', i);
     const z = rng.range(zMin + 5, zMax - 5);
     const g = patchGeometry(rng, rng.range(0.5, 1.1), { lobes: 12, wobble: 0.5 });
     const x = rng.range(-HW + 0.6, HW - 0.6);
@@ -451,13 +462,14 @@ function streetFloor(A, rng) {
     [5.55, -1.2, 0.72],
     [5.45, -26.5, 0.55],
   ])
-    groundSkirt(A, rng, x, groundY(x, z), z, radius, { pebbles: 0 });
+    groundSkirt(A, keyedRng('set-piece-skirt', x, z), x, groundY(x, z), z, radius, { pebbles: 0 });
 }
 
 // --- market stalls ----------------------------------------------------------
-function marketStalls(A, rng) {
+function marketStalls(A) {
   const canopy = ['fabric_red', 'fabric_teal', 'fabric_cream'];
   for (const [x, z, ry, w] of SET_PIECES.stalls) {
+    const rng = keyedRng('stall', x, z);
     const y = groundY(x, z);
     for (const t of [-0.42, 0.42]) {
       groundSkirt(A, rng, x + Math.cos(ry) * w * t, y, z - Math.sin(ry) * w * t, 0.4, {
@@ -492,8 +504,9 @@ function marketStalls(A, rng) {
 }
 
 // --- barriers ---------------------------------------------------------------
-function barrierGrounding(A, rng) {
+function barrierGrounding(A) {
   for (const [x, z, ry] of SET_PIECES.jerseys) {
+    const rng = keyedRng('jersey-skirt', x, z);
     const y = groundY(x, z);
     for (const t of [-0.55, 0.55]) {
       groundSkirt(A, rng, x + Math.sin(ry) * t * 1.1, y, z + Math.cos(ry) * t * 1.1, 0.52, {
@@ -510,6 +523,7 @@ function barrierGrounding(A, rng) {
     [4.0, -37.5, 0.12],
     [-2.0, -41.0, 1.5],
   ]) {
+    const rng = keyedRng('barrier-skirt', x, z);
     const y = groundY(x, z);
     for (const t of [-0.4, 0.4]) {
       groundSkirt(A, rng, x + Math.cos(ry) * t, y, z - Math.sin(ry) * t, 0.62, { pebbles: 0 });
@@ -615,8 +629,9 @@ export function sandbagWall(A, rng, x, z, ry, len, courses = 3, baseY = null) {
 }
 
 // --- wrecks -----------------------------------------------------------------
-function wreckScorch(A, rng) {
+function wreckScorch(A) {
   for (const [x, z] of SET_PIECES.wrecks) {
+    const rng = keyedRng('wreck-scorch', x, z);
     const y = groundY(x, z);
     const scorch = patchGeometry(rng, rng.range(2.6, 3.4), { lobes: 11, wobble: 0.5 });
     A.addOnce('asphalt', scorch, LL(IDENT, x, y + 0.008, z, rng.float() * 6.28, 1, 1, 0.7), {
@@ -626,9 +641,10 @@ function wreckScorch(A, rng) {
 }
 
 // --- palms ------------------------------------------------------------------
-function palmGrounding(A, rng) {
+function palmGrounding(A) {
   for (const [x, z] of SET_PIECES.palms) {
     if (x === -9 && z === -10.2) continue; // west-alley spawn occupies this palm base
+    const rng = keyedRng('palm-ground', x, z);
     const y = groundY(x, z);
     const patch = patchGeometry(rng, rng.range(0.9, 1.4), { lobes: 10, wobble: 0.45 });
     A.addOnce('dirt', patch, LL(IDENT, x, y + 0.02, z, rng.float() * 6.28), {
@@ -638,8 +654,9 @@ function palmGrounding(A, rng) {
 }
 
 // --- street lamps -----------------------------------------------------------
-function streetLampGrounding(A, rng) {
+function streetLampGrounding(A) {
   for (const [x, z] of SET_PIECES.lamps) {
+    const rng = keyedRng('lamp-ground', x, z);
     const y = groundY(x, z);
     const ry = x < 0 ? 0 : Math.PI;
     const armX = x + Math.cos(ry) * 0.88;
@@ -650,7 +667,7 @@ function streetLampGrounding(A, rng) {
 }
 
 // --- cables, laundry --------------------------------------------------------
-function overheadLines(A, rng) {
+function overheadLines(A) {
   const insulator = (x, y, z) => {
     A.add('concrete_dark', BOX_FINE(A), LL(IDENT, x, y, z, 0, 0.24, 0.16, 0.1), {
       masks: [0.6, 0.5, 0.2],
@@ -681,6 +698,7 @@ function overheadLines(A, rng) {
 
   const SAG = 0.42;
   for (const [x0, y0, z0, x1, y1, z1] of SET_PIECES.laundry) {
+    const rng = keyedRng('laundry', x0, y0, z0, x1, y1, z1);
     const line = catenaryTube([x0, y0, z0], [x1, y1, z1], SAG, 0.012, { seg: 12, radial: 4 });
     A.addOnce('metal_dark', line, null, { masks: [0.3, 0.6, 0.2] });
     const dx = x1 - x0;
@@ -722,8 +740,9 @@ function overheadLines(A, rng) {
 }
 
 // --- hanging rugs on facades ------------------------------------------------
-function facadeHangings(A, rng) {
+function facadeHangings(A) {
   for (const [x, y, z, ry, w, h] of SET_PIECES.hangings) {
+    const rng = keyedRng('hanging', x, y, z);
     // A rug on a facade is the biggest single piece of cloth in the frame, so it
     // is also the one that most obviously reads as a sheet of glass if it has no
     // thickness, no hem and no slack. Heavy gauge, deep folds, frayed bottom.
@@ -774,8 +793,9 @@ function facadeHangings(A, rng) {
 }
 
 // --- rubble -----------------------------------------------------------------
-function rubbleDust(A, rng) {
+function rubbleDust(A) {
   for (const [x, z, radius, count] of SET_PIECES.rubble) {
+    const rng = keyedRng('rubble', x, z);
     const y = groundY(x, z);
     rubbleMound(A, rng, x, y, z, radius, count, { key: 'concrete' });
     const patch = patchGeometry(rng, radius * 1.5, { lobes: 12, wobble: 0.4 });
@@ -785,7 +805,7 @@ function rubbleDust(A, rng) {
   }
 }
 
-function streetRubble(A, rng) {
+function streetRubble(A) {
   for (const [x, z] of [
     [-5.4, 16.5],
     [5.5, 11.0],
@@ -796,6 +816,7 @@ function streetRubble(A, rng) {
     [-5.3, -25.5],
     [5.5, -33.0],
   ]) {
+    const rng = keyedRng('street-rubble', x, z);
     rubbleMound(A, rng, x, groundY(x, z), z, rng.range(1.1, 1.9), rng.int(18, 30), {
       key: 'concrete_prop',
     });
@@ -807,9 +828,9 @@ function streetRubble(A, rng) {
  * Facade services and roof clutter, driven by the anchors each building
  * returned while it was being generated.
  */
-export function dressBuildings(A, rng, infos) {
-  for (const info of infos) dressBuilding(A, rng, info);
-  alleyLines(A, rng);
+export function dressBuildings(A, infos) {
+  for (const info of infos) dressBuilding(A, keyedRng('dress', info.spec.id), info);
+  alleyLines(A);
 }
 
 function dressBuilding(A, rng, info) {
@@ -907,24 +928,30 @@ function dressBuilding(A, rng, info) {
   const rz0 = rs.z - rs.d / 2 + 1.0;
   const rz1 = rs.z + rs.d / 2 - 1.0;
   const roofY = top + 0.02;
+  // Collision-cooked roof dressing must not lid the roof stair hole or block the
+  // ladder climb-out beside it (1.1 m exit + capsule radius).
+  const hole = spec.stairHoles?.[info.floorY.length];
+  const blocksHole = (b) =>
+    !!hole &&
+    b.max.x > hole.x0 - 1.2 &&
+    b.min.x < hole.x1 + 1.2 &&
+    b.max.z > hole.z0 - 1.2 &&
+    b.min.z < hole.z1 + 1.2;
   // dust and grit blown into the roof corners
   for (let i = 0; i < 4; i++) {
     const g = patchGeometry(rng, rng.range(0.6, 1.6), { lobes: 9, wobble: 0.5 });
-    A.addOnce(
-      'dirt',
-      g,
-      LL(
-        IDENT,
-        rng.range(rx0, rx1),
-        roofY + 0.012,
-        rng.range(rz0, rz1),
-        rng.float() * 6.28,
-        1,
-        1,
-        0.7
-      ),
-      { masks: [0.1, 0.85, 0.5] }
+    const matrix = LL(
+      IDENT,
+      rng.range(rx0, rx1),
+      roofY + 0.012,
+      rng.range(rz0, rz1),
+      rng.float() * 6.28,
+      1,
+      1,
+      0.7
     );
+    if (blocksHole(g.boundingBox.clone().applyMatrix4(matrix))) g.dispose();
+    else A.addOnce('dirt', g, matrix, { masks: [0.1, 0.85, 0.5] });
   }
   // rooftop laundry line between the parapets
   if (rs.w > 10 && rng.float() < 0.4) {
@@ -982,6 +1009,7 @@ function dressBuilding(A, rng, info) {
     const px = rng.range(rx0, rx1);
     const pz = rng.range(rz0, rz1);
     const h = rng.range(1.4, 3.2);
+    if (blocksHole(new THREE.Box3().setFromCenterAndSize(_v.set(px, roofY, pz), _size))) continue;
     const pipe = A.cache('aerial', () => tubeY(0.018, 1, { radial: 5 }));
     A.add('metal_rust', pipe, LL(IDENT, px, roofY, pz, 0, 1, h, 1), { masks: [0.9, 0.5, 0.1] });
     for (let k = 0; k < 4; k++) {
@@ -1007,7 +1035,7 @@ function dressBuilding(A, rng, info) {
 }
 
 /** Cables and washing lines strung across the alleys between buildings. */
-function alleyLines(A, rng) {
+function alleyLines(A) {
   const spans = [
     [-6.6, 5.0, 21.0, -6.6, 5.4, 24.0],
     [-6.6, 4.2, -9.0, -6.6, 4.6, -11.5],
@@ -1017,6 +1045,7 @@ function alleyLines(A, rng) {
     [8.6, 6.2, 2.2, 8.6, 5.8, 7.2],
   ];
   for (const [x0, y0, z0, x1, y1, z1] of spans) {
+    const rng = keyedRng('alley-line', x0, y0, z0, x1, y1, z1);
     const t = catenaryTube([x0, y0, z0], [x1, y1, z1], 0.5, 0.016, {
       seg: 10,
       radial: 4,
@@ -1200,7 +1229,8 @@ function merlonRun(A, rng, x0, x1, z, t, yTop, opts = {}) {
  * regular pitch — the largest flat surface in most frames, sitting exactly where
  * the eye lands.
  */
-export function buildGate(A, rng) {
+export function buildGate(A) {
+  const rng = keyedRng('gate');
   const {
     z,
     depth,
@@ -1486,7 +1516,7 @@ export function buildGate(A, rng) {
  * The map edge: a continuous wall of compound walls, blocked side streets and
  * distant infill so the playable 120 m reads as part of a bigger town.
  */
-export function buildPerimeter(A, rng) {
+export function buildPerimeter(A) {
   const R = 58;
   const segs = [
     // [x0,z0,x1,z1] runs of compound wall
@@ -1496,6 +1526,7 @@ export function buildPerimeter(A, rng) {
     [R, -R, R, R],
   ];
   for (const [x0, z0, x1, z1] of segs) {
+    const rng = keyedRng('perimeter-wall', x0, z0, x1, z1);
     const dx = x1 - x0;
     const dz = z1 - z0;
     const len = Math.hypot(dx, dz);
@@ -1524,6 +1555,7 @@ export function buildPerimeter(A, rng) {
     [0, STREET.zMin - 1.5],
   ];
   for (const [bx, bz] of blocks) {
+    const rng = keyedRng('perimeter-block', bx, bz);
     for (let i = -1; i <= 1; i++) {
       A.put('jersey', bx + i * 2.1, 0.02, bz, 0.02 + rng.range(-0.05, 0.05), 1, [1, 1.2, 1]);
     }
