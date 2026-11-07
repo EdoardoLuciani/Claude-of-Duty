@@ -12,7 +12,10 @@ This directory is authoritative world source; normal builds consume committed
 
 Records use level-space metres, degree rotations and unique instance IDs.
 `placement.js` owns validation, transforms/masks and clutter clearance.
-Preserve record/prototype/RNG order.
+Preserve record order. Procedural detail draws only from `keyedRng(...)` streams
+named after the element that owns them (building, facade, room, set piece), so an
+edit re-rolls that element alone; `smoke-world-locality.mjs` enforces this. Never
+pass one stream across elements or add draws to keep another element stable.
 
 `build.js` → `Assembler`/`builder.js` → `tools/export-world.mjs` →
 visual GLB, `pack.js` collision and `nav-bake.js` navigation →
