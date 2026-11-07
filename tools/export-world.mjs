@@ -19,7 +19,6 @@ import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 
 import { NAV_VERSION } from '../src/ai/nav-format.ts';
-import { Rng } from '../src/core/rng.ts';
 import { buildWorld } from './worldgen/build.js';
 import { Assembler } from './worldgen/builder.js';
 import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from './worldgen/level/config.js';
@@ -38,7 +37,6 @@ const args = Object.fromEntries(
 const OUT = resolve(ROOT, String(args.out ?? 'public/models/world'));
 const CACHE = resolve(ROOT, 'node_modules/.cache');
 const LOCK = join(CACHE, 'claude-of-duty-world.lock');
-const SEED = 0x5eed1234;
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 
 if (typeof globalThis.FileReader === 'undefined') {
@@ -112,13 +110,6 @@ function run(command, commandArgs) {
   });
 }
 
-function worldRng() {
-  const root = new Rng(SEED);
-  root.fork();
-  root.fork();
-  return root.fork();
-}
-
 function assetName(kind, data, ext = 'glb.gz') {
   const hash = createHash('sha256').update(data).digest('hex').slice(0, 12);
   return `level-${kind}.${hash}.${ext}`;
@@ -138,11 +129,11 @@ async function compileWorld() {
       return material;
     },
   };
-  const A = new Assembler({ materials, rng: worldRng() });
+  const A = new Assembler({ materials });
 
   try {
     A.setTransform(LEVEL_YAW, LEVEL_TX, LEVEL_TZ);
-    const buildings = buildWorld(A, A.rng);
+    const buildings = buildWorld(A);
     const visualRoot = new THREE.Group();
     visualRoot.name = 'world';
     // Keep collision/nav on the canonical buckets, independent of visual compaction.

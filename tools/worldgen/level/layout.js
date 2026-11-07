@@ -50,13 +50,8 @@ export const BUILDINGS = [
     damage: 0.15,
     balconies: 0.3,
     // The full-width terrace is the street frontage; separate balcony rails
-    // inside it duplicate that form. Consume their dressing rolls only.
-    omitBalconies: {
-      1: {
-        0: { preserveDressing: true },
-        2.799999999999999: { preserveDressing: true },
-      },
-    },
+    // inside it duplicate that form.
+    omitBalconies: { 1: { 0: true, 2.799999999999999: true } },
     doorBays: { 0: 2, 1: 1 },
     enterable: true,
     interiorFloors: 1,
@@ -78,7 +73,7 @@ export const BUILDINGS = [
       // Meet the last tread (z=30.347); the old 30.50 edge left a 15 cm gap.
       1: { x0: -18.2, x1: -17.04, z0: 25.59, z1: 30.32, rails: ['east'], railKey: 'metal_rust' },
       2: {
-        x0: -9.82,
+        x0: -9.9,
         x1: -9.04,
         z0: 26.34,
         z1: 27.14,
@@ -194,7 +189,7 @@ export const BUILDINGS = [
     stairHoles: {
       // Meet the last tread (z=-1.6584), rather than relying on capsule bridging.
       1: { x0: -21.16, x1: -19.9, z0: -7.6, z1: -1.69, rails: ['east'] },
-      2: { x0: -21.16, x1: -20.38, z0: 0.81, z1: 1.61, rails: ['north', 'south'] },
+      2: { x0: -21.16, x1: -20.3, z0: 0.81, z1: 1.61, rails: ['north', 'south'] },
     },
     rooms: [
       {
@@ -261,7 +256,7 @@ export const BUILDINGS = [
     stairHoles: {
       2: {
         x0: -19.16,
-        x1: -18.38,
+        x1: -18.3,
         z0: -21.4,
         z1: -20.6,
         rails: ['north', 'south'],
@@ -319,9 +314,7 @@ export const BUILDINGS = [
         landing: false,
       },
     ],
-    // Clear the retained ceiling conduit (wall inset .045, radius .016)
-    // with the .36 m standing capsule; widen only the inward hatch edge.
-    ladders: [{ floor: 1, wall: 'east', along: 0.5, key: 'wood_dark', catchInset: 0.46 }],
+    ladders: [{ floor: 1, wall: 'east', along: 0.5, key: 'wood_dark' }],
     stairHoles: {
       1: { x0: -21.79, x1: -20.53, z0: -38.29, z1: -33.54, rails: ['east'] },
       2: { x0: -10.5, x1: -9.64, z0: -33.65, z1: -32.85, rails: ['north', 'south'] },
@@ -368,9 +361,7 @@ export const BUILDINGS = [
         landing: false,
       },
     ],
-    // Rungs project .075 m from the wall: .46 leaves .025 m beyond the
-    // .36 m standing radius. Match the inward hatch edge to that shaft.
-    ladders: [{ floor: 1, wall: 'east', along: 0.18, catchInset: 0.46 }],
+    ladders: [{ floor: 1, wall: 'east', along: 0.18 }],
     stairHoles: {
       1: { x0: 7.2, x1: 8.51, z0: 27.59, z1: 32.35, rails: ['east'] },
       2: {
@@ -608,7 +599,7 @@ export const BUILDINGS = [
       2: { x0: 18.36, x1: 19.82, z0: -44.32, z1: -39.97, rails: ['west'] },
       3: {
         x0: 6.84,
-        x1: 7.62,
+        x1: 7.7,
         z0: -43.66,
         z1: -42.86,
         rails: ['north', 'south'],

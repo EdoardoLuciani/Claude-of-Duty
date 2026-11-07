@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 
-import { Rng } from '../../src/core/rng.ts';
 import { furnishRoom } from './interiors.js';
 import {
   facadeWall,
@@ -23,7 +22,7 @@ import {
   LL,
   worldOf,
 } from './kit.js';
-import { fbm3, runoffStreak } from './util.js';
+import { fbm3, keyedRng, runoffStreak } from './util.js';
 
 /**
  * WORLD — building assembly.
@@ -97,7 +96,7 @@ function occupiedFloorCount(spec) {
   for (const fl of spec.stairFlights ?? []) top = Math.max(top, fl.floor + 2);
   return Math.min(spec.floors ?? n, Math.max(n, top));
 }
-export function sinkAdds(A) {
+function sinkAdds(A) {
   return {
     cache: (id, fn) => A.cache(id, fn),
     has: (id) => A.has(id),
@@ -107,15 +106,6 @@ export function sinkAdds(A) {
     putS() {},
   };
 }
-function stableSeed(value) {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < value.length; i++) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return hash >>> 0;
-}
-
 /**
  * Per-floor footprint. `spec.setback = { from, depth, side? }` pulls every floor
  * at or above `from` back from one face, leaving a roof terrace over the floor
@@ -240,7 +230,8 @@ function terrace(A, spec, y) {
  * @returns {object} anchors for the dressing pass:
  *   { facades:[{side, x, y, ry, wx, wz, nx, nz}], roof:{...}, balconies:[] }
  */
-export function buildBuilding(A, rng, spec) {
+export function buildBuilding(A, spec) {
+  const rng = keyedRng('building', spec.id);
   const t = spec.t ?? 0.34;
   const floors = spec.floors ?? 3;
   const groundH = spec.groundH ?? 3.45;
@@ -286,7 +277,8 @@ export function buildBuilding(A, rng, spec) {
     info.floorY.push(y);
     for (let side = 0; side < 4; side++) {
       if (spec.skipSides?.includes(side)) continue;
-      buildFacade(A, rng, fs, info, { side, f, y, h, t, wallKey, streetSide, floors });
+      const facadeRng = keyedRng('facade', spec.id, f, side);
+      buildFacade(A, facadeRng, fs, info, { side, f, y, h, t, wallKey, streetSide, floors });
     }
     // ---- floor / ceiling slab of the NEXT level ----
     y += h;
@@ -318,9 +310,7 @@ export function buildBuilding(A, rng, spec) {
 
   // ----------------------------------------------------------- interiors ---
   if (spec.enterable) {
-    // Keep new suite furnishing from rerolling later facades and stable props.
-    const interiorRng = spec.interiorFloors ? new Rng(stableSeed(`interior:${spec.id}`)) : rng;
-    buildInterior(A, interiorRng, spec, info, t, groundH, upperH, floors);
+    buildInterior(A, spec, info, t, groundH, upperH, floors);
     buildExteriorStairs(A, spec, info);
     const accessibleFloors = occupiedFloorCount(spec);
     if (accessibleFloors < floors) {
@@ -436,13 +426,14 @@ function buildFacade(A, rng, spec, info, ctx) {
   const cut = spec.wallCuts?.find((c) => c.side === side && c.f === f);
   const clearBal = spec.exteriorStairs?.some((s) => s.side === side && s.clearBalconies);
   const reservedBays = stairReservedBays(spec, side, f, info, len, bw, bays);
+  // A walkable room stands behind this floor's windows (not a dark backing card).
+  const walkable = f < occupiedFloorCount(spec);
 
   for (let b = 0; b < bays; b++) {
     const bx = -len / 2 + (b + 0.5) * bw;
     const reserved = reservedBays.has(b);
-    // A reserved bay still runs its facade element, so the RNG stream is
-    // unchanged, but the adds land in a sink. Its opening is recorded for the
-    // damage passes and left out of the cut.
+    // A reserved bay still runs its facade element, but the adds land in a
+    // sink; its opening is left out of the cut and the damage passes.
     const kitA = reserved || (cut && Math.abs(bx - cut.x) < bw * 0.5) ? sinkAdds(A) : A;
     const pushOpening = (o) => {
       o.reserved = reserved;
@@ -484,8 +475,6 @@ function buildFacade(A, rng, spec, info, ctx) {
         const o = { x: bx, y: doorH / 2, w: usable ? 1.8 : 1.12, h: doorH, kind };
         pushOpening(o);
         deco.push(() => {
-          const legacyOpenRoll = rng.float();
-          if (legacyOpenRoll < 0.45) rng.range(0.5, 1.6);
           return doorUnit(kitA, pm, o, rng, {
             t,
             // Rest usable leaves against the inner return, outside traversal.
@@ -506,12 +495,12 @@ function buildFacade(A, rng, spec, info, ctx) {
       }
       case 'shop': {
         const sw = Math.min(bw - 0.75, 3.1);
-        const o = { x: bx, y: 1.32, w: sw, h: 2.58, kind };
+        const o = { x: bx, y: 1.32, w: sw, h: 2.58, kind, authored: !!forced };
         pushOpening(o);
         // Never fully shuttered: a market street with every shop closed is dead,
         // and a shutter over an interior sightline blocks the shot.
         let drop = forced?.drop ?? (rng.float() < 0.5 ? rng.range(0.1, 0.55) : 0);
-        // Enterable openings stay walkable; kit inside-dressing is interiors.js.
+        // Enterable openings stay walkable; inside dressing is interiors.js.
         // Only explicitly authored shop bays are traversal routes.
         const usable = floorIsEnterable(spec, f) && !!forced;
         if (usable) drop = 0;
@@ -519,13 +508,10 @@ function buildFacade(A, rng, spec, info, ctx) {
           shopfront(kitA, pm, o, rng, {
             t,
             drop,
-            // Interior dressing performs its own opening-aware support checks.
-            inside: false,
             counter: !usable,
-            preserveInsideRng: !!spec.interiorFloors || !spec.enterable,
           })
         );
-        // Clearance-only repairs retain existing door hints and interior RNG.
+        // Clearance-only repairs retain existing door hints.
         if (usable && !reserved && !forced.clearanceOnly) {
           info.traversable.push({
             kind: 'shop',
@@ -565,7 +551,7 @@ function buildFacade(A, rng, spec, info, ctx) {
             t,
             broken,
             state: st,
-            back: !floorIsEnterable(spec, f),
+            back: !walkable,
             grille: f === 0 && st !== 'boarded' && rng.float() < 0.55,
             shutters: f > 0 && (st === 'shuttered' || rng.float() < 0.4),
             shutterKey: spec.shutterKey ?? rng.pick(['metal_blue', 'metal_green', 'wood_dark']),
@@ -585,7 +571,7 @@ function buildFacade(A, rng, spec, info, ctx) {
             t,
             broken: rng.float() < 0.2,
             state: st,
-            back: !floorIsEnterable(spec, f),
+            back: !walkable,
             shutters: false,
             curtain: st === 'curtain' || rng.float() < 0.3,
             lintel: false,
@@ -599,36 +585,24 @@ function buildFacade(A, rng, spec, info, ctx) {
         const o = { x: bx, y: 1.12, w: ww, h: 2.24, kind };
         pushOpening(o);
         if (forced?.floorBridge && !reserved) {
-          // Fill the floor seam at this existing opening without changing the
-          // facade/decoration RNG stream (and thus unrelated buildings).
+          // Fill the floor seam at this existing opening.
           A.add('floor_concrete', BOX(A), LL(pm, bx, -0.1, t * 0.5, 0, o.w, 0.2, t * 2), {
             masks: [0.3, 0.55, 0.35],
           });
         }
         const bwid = Math.min(bw - 0.35, 2.6);
         deco.push(() => {
-          const legacyOpenRoll = rng.float();
-          const legacyOpen = legacyOpenRoll < 0.5 ? rng.range(0.6, 1.5) : 0;
+          const leafOpen = rng.float() < 0.5 ? rng.range(0.6, 1.5) : 0;
           doorUnit(kitA, pm, o, rng, {
             t,
-            open: floorIsEnterable(spec, f) ? Math.PI / 2 : legacyOpen,
+            open: floorIsEnterable(spec, f) ? Math.PI / 2 : leafOpen,
             leafKey: 'wood_dark',
           });
           const balY = 0.02;
           const depth = rng.range(1.0, 1.35);
           const railing = rng.float() < 0.45 ? 'concrete' : 'metal';
-          // Keep the balcony RNG sequence stable when an authored obstruction
-          // requires this bay to remain clear.
-          // Boolean omissions retain their existing no-anchor semantics.
-          // { preserveDressing: true } retains a sink-only authoring anchor
-          // so later buildings keep the same dressing RNG sequence.
-          const omission = spec.omitBalconies?.[side]?.[bx];
-          if (omission) {
-            if (omission.preserveDressing && !reserved && !clearBal) {
-              info.balconies.push({ side, x: bx, y: balY, w: bwid, d: depth, pm, omitted: true });
-            }
-            return;
-          }
+          // An authored obstruction keeps this bay clear of a balcony.
+          if (spec.omitBalconies?.[side]?.[bx]) return;
           const bal = balcony(clearBal ? sinkAdds(A) : kitA, pm, bx, balY, bwid, rng, {
             depth,
             railing,
@@ -673,8 +647,9 @@ function buildFacade(A, rng, spec, info, ctx) {
       w: o.w,
       y0: wp[1] - o.h / 2,
       y1: wp[1] + o.h / 2,
-      // Kept for furnishing to see the authored wall and to hold the RNG stream.
+      // Kept for furnishing to see the authored wall.
       reserved: !!o.reserved,
+      authored: !!o.authored,
     });
   }
   let wallHoles = openings.filter((o) => !o.reserved);
@@ -713,12 +688,8 @@ function buildFacade(A, rng, spec, info, ctx) {
   // The world knows where the water comes off: sills, shopfront heads, awning
   // bars and balcony slabs. A facade with no runs below its openings reads as
   // freshly painted, which is the one thing a street like this never is.
-  //
-  // Drawn from a stream keyed to this panel's identity rather than from `rng`, so
-  // adding or tuning the weathering never re-rolls the level's layout.
-  const wr = new Rng(
-    (Math.round((spec.x + 512) * 977 + (spec.z + 512) * 7919) ^ (side * 131 + f * 1237)) >>> 0
-  );
+  // Its own stream, so tuning the weathering never re-rolls the facade.
+  const wr = keyedRng('runoff', spec.id, f, side);
   for (const o of openings) {
     if (o.kind === 'ragged' || o.reserved) continue;
     // A cut replaced this bay's opening: the run off the removed window's sill
@@ -788,8 +759,9 @@ function buildFacade(A, rng, spec, info, ctx) {
     const pw = rng.range(0.35, 1.0);
     const ph = rng.range(0.3, 0.8);
     const g = spallPatch(rng, pw, ph, 0.03);
-    // Same skip as pocks: a brick patch in a doorway reads as a floating wall.
-    if (inOpening(sx, sy, pw * 0.5, ph * 0.5, openings, 0.12)) continue;
+    // Same skip as pocks: a brick patch in a doorway reads as a floating wall,
+    // and is cooked collision. Test the real holes, including authored cuts.
+    if (inOpening(sx, sy, pw * 0.5, ph * 0.5, wallHoles, 0.12)) continue;
     A.addOnce('brick_fine', g, LL(pm, sx, sy, 0.01, 0, 1, 1, 1));
   }
   // patched render — a slightly different mix where somebody repaired it. Kept
@@ -802,7 +774,7 @@ function buildFacade(A, rng, spec, info, ctx) {
     const g = spallPatch(rng, pw, ph, 0.02);
     // Same value family as the wall: a bright white patch on cream render reads
     // as a sheet of paper stuck to the building.
-    if (!inOpening(px, py, pw * 0.5, ph * 0.5, openings, 0.12)) {
+    if (!inOpening(px, py, pw * 0.5, ph * 0.5, wallHoles, 0.12)) {
       A.addOnce(PATCH_KEY[wallKey] ?? 'plaster_sand', g, LL(pm, px, py, 0.013, 0, 1, 1, 1));
     }
   }
@@ -820,19 +792,7 @@ function buildFacade(A, rng, spec, info, ctx) {
         if (Math.abs(px) > len / 2 - 0.15) continue;
         if (py < 0.15 || py > h - 0.15) continue;
         // skip pocks that would land inside an opening
-        let inHole = false;
-        for (const o of openings) {
-          if (
-            px > o.x - o.w / 2 - 0.05 &&
-            px < o.x + o.w / 2 + 0.05 &&
-            py > o.y - o.h / 2 - 0.05 &&
-            py < o.y + o.h / 2 + 0.05
-          ) {
-            inHole = true;
-            break;
-          }
-        }
-        if (inHole) continue;
+        if (inOpening(px, py, 0, 0, wallHoles, 0.05)) continue;
         // Just proud of the render. The pock is a raised-rim crater now, not a
         // solid cone, so burying the origin 4 mm inside the wall (which is what
         // hid the old cone's base) would sink the whole thing out of sight.
@@ -1070,7 +1030,10 @@ function buildLadders(A, spec, info, t) {
     _p.set(ox, y0, oz);
     _s.set(1, 1, 1);
     ladderRun(A, new THREE.Matrix4().compose(_p, _q, _s), y1 - y0, { w, key: ld.key });
-    const catchInset = ld.catchInset ?? 0.38;
+    // Rungs project .075 m from the wall: .46 leaves .025 m beyond the .36 m
+    // standing capsule, so climbing never relies on collision simplification
+    // happening to drop the rungs. Roof hatches are .86 m deep to match.
+    const catchInset = ld.catchInset ?? 0.46;
     info.ladders.push({
       x: ox + nx * catchInset,
       z: oz + nz * catchInset,
@@ -1110,7 +1073,7 @@ function fenceHole(A, hole, y) {
 }
 
 // ============================================================= interiors ====
-function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
+function buildInterior(A, spec, info, t, groundH, upperH, floors) {
   const it = 0.16; // partition thickness
   const g0 = floorSpec(spec, 0);
   const groundFloorY = spec.interiorFloors ? 0.16 : Math.max(0.13, spec.plinthH ?? 0.42);
@@ -1160,6 +1123,7 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
         );
         _s.set(1, 1, 1);
         const pm = new THREE.Matrix4().compose(_p, _q, _s);
+        const rng = keyedRng('partition', spec.id, f, ax, az, bx, bz);
         const holes = [];
         if (doorAt !== undefined && doorAt !== null) {
           holes.push({ x: -len / 2 + doorAt * len, y: 1.18, w: 1.05, h: 2.36 });
@@ -1223,7 +1187,7 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
     // furnishing
     if (plan?.furnish) {
       for (const r of plan.furnish) {
-        furnishRoom(A, rng, {
+        furnishRoom(A, keyedRng('room', spec.id, f, r.x0, r.z0, r.kind), {
           kind: r.kind,
           detail: r.detail,
           // so furnishing never stacks a shelf across a shopfront opening
@@ -1251,6 +1215,7 @@ function buildInterior(A, rng, spec, info, t, groundH, upperH, floors) {
 
   // roof access: a stair penthouse box with an open doorway
   if (spec.roofAccess && roofHole) {
+    const rng = keyedRng('roof-access', spec.id);
     const px = (roofHole.x0 + roofHole.x1) / 2;
     const pz = roofHole.z1 + 1.35;
     const y = info.roofY;
