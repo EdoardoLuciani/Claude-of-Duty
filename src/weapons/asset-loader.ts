@@ -1,21 +1,21 @@
+import { LoaderUtils, type CompressedTexture } from 'three';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import type { Renderer } from 'three/webgpu';
 
-// Deferred weapons load concurrently; serialize transcoding to bound worker/memory use.
-let previousLoad: Promise<void> = Promise.resolve();
-
-export function loadWeaponGLTF(renderer: Pick<Renderer, 'hasFeature'>, url: string): Promise<GLTF> {
-  const loaded = previousLoad.then((): Promise<GLTF> => loadGLTF(renderer, url));
-  previousLoad = loaded.then(
-    (): void => {},
-    (): void => {}
-  );
-  return loaded;
+type FeatureRenderer = Pick<Renderer, 'hasFeature'>;
+interface LoaderSession {
+  decoder: KTX2Loader;
+  tail: Promise<void>;
+  abort: AbortController;
+  disposal: Promise<void> | null;
 }
+const sessions = new WeakMap<FeatureRenderer, LoaderSession>();
 
-async function loadGLTF(renderer: Pick<Renderer, 'hasFeature'>, url: string): Promise<GLTF> {
+function sessionFor(renderer: FeatureRenderer): LoaderSession {
+  const existing = sessions.get(renderer);
+  if (existing) return existing;
   const decoder = new KTX2Loader().setWorkerLimit(2);
   // Our strict native Renderer has no isWebGPURenderer flag. Use the public
   // worker config rather than detectSupport()'s WebGL renderer branch.
@@ -28,83 +28,137 @@ async function loadGLTF(renderer: Pick<Renderer, 'hasFeature'>, url: string): Pr
     dxtSupported: false,
     pvrtcSupported: false,
   };
-  // Image fetches can finish after geometry has already rejected the GLTF load.
-  let closed = false;
-  const closedError = new Error('Weapon texture decoder closed');
-  const init = decoder.init.bind(decoder);
-  decoder.init = (): Promise<void> => (closed ? Promise.reject(closedError) : init());
-  const transcodes: Promise<MessageEvent<unknown>>[] = [];
   const postMessage = decoder.workerPool.postMessage.bind(decoder.workerPool);
   decoder.workerPool.postMessage = (
     message: unknown,
     transfer?: Transferable[]
-  ): Promise<MessageEvent<unknown>> => {
-    if (closed) return Promise.reject(closedError);
-    const task = postMessage(message, transfer).then(
-      (event: MessageEvent<unknown>): MessageEvent<unknown> => {
-        const reply = event.data;
-        // The pinned loader reads success data before checking worker errors.
-        if (
-          typeof reply === 'object' &&
-          reply !== null &&
-          'type' in reply &&
-          reply.type === 'error' &&
-          'error' in reply
-        )
-          throw reply.error;
-        return event;
-      }
-    );
-    transcodes.push(task);
-    return task;
+  ): Promise<MessageEvent<unknown>> =>
+    postMessage(message, transfer).then((event: MessageEvent<unknown>): MessageEvent<unknown> => {
+      const reply = event.data;
+      // The pinned loader reads success data before checking worker errors.
+      if (
+        typeof reply === 'object' &&
+        reply !== null &&
+        'type' in reply &&
+        reply.type === 'error' &&
+        'error' in reply
+      )
+        throw reply.error;
+      return event;
+    });
+  const session = {
+    decoder,
+    tail: Promise.resolve(),
+    abort: new AbortController(),
+    disposal: null,
   };
-  // GLTFLoader converts image failures to null textures; retain their original cause.
+  sessions.set(renderer, session);
+  return session;
+}
+
+/** Fetch immediately; only parsing/transcoding is queued to bound peak memory.
+ * One renderer-scoped Basis worker pool survives across the whole boot batch.
+ */
+export function loadWeaponGLTF(renderer: FeatureRenderer, url: string): Promise<GLTF> {
+  const session = sessionFor(renderer);
+  const download = fetch(url, { signal: session.abort.signal }).then(
+    async (response): Promise<ArrayBuffer> => {
+      if (!response.ok) throw new Error(`[weapons] failed to load ${url}: HTTP ${response.status}`);
+      return response.arrayBuffer();
+    }
+  );
+  // A later download can fail before its turn in the parse queue.
+  void download.catch((): void => {});
+  const loaded = session.tail.then(async (): Promise<GLTF> => {
+    const data = await download;
+    if (session.abort.signal.aborted) throw new Error('Weapon loader closed');
+    return parseGLTF(session.decoder, data, LoaderUtils.extractUrlBase(url));
+  });
+  session.tail = loaded.then(
+    (): void => {},
+    (): void => {}
+  );
+  return loaded;
+}
+
+/** Called after boot loading, or on initialization failure/teardown. */
+export function disposeWeaponLoader(renderer: FeatureRenderer): Promise<void> {
+  const session = sessions.get(renderer);
+  if (!session) return Promise.resolve();
+  if (session.disposal) return session.disposal;
+  session.abort.abort();
+  session.disposal = (async (): Promise<void> => {
+    await session.tail;
+    // Do not decrement Three's active-loader count for PNG-only diagnostic loads.
+    if (session.decoder.transcoderPending) {
+      await session.decoder.transcoderPending.catch((): void => {});
+      session.decoder.dispose();
+    }
+    sessions.delete(renderer);
+  })();
+  return session.disposal;
+}
+
+async function parseGLTF(decoder: KTX2Loader, data: ArrayBuffer, path: string): Promise<GLTF> {
+  // Per-model callback scope only: this facade never initializes a transcoder
+  // or starts workers. Late callbacks from a failed GLTF cannot contaminate the
+  // next model's errors or enqueue work after this scope has closed.
+  const textures = new KTX2Loader();
+  textures.workerConfig = decoder.workerConfig;
+  let closed = false;
+  let completed = false;
+  const closedError = new Error('Weapon texture scope closed');
   let textureFailed = false;
   let textureFailure: unknown;
-  const recordTextureFailure = (error: unknown): void => {
+  const pending: Promise<CompressedTexture>[] = [];
+  const recordFailure = (error: unknown): void => {
     if (!textureFailed) {
       textureFailed = true;
       textureFailure = error;
     }
   };
-  // r187 parses embedded KTX2 bufferViews directly, bypassing load().
-  const parseTexture = decoder.parse.bind(decoder);
-  decoder.parse = (buffer, onLoad, onError): void => {
-    try {
-      parseTexture(buffer, onLoad, (error): void => {
-        recordTextureFailure(error);
-        onError?.(error);
-      });
-    } catch (error) {
-      recordTextureFailure(error);
-      throw error;
+  textures.parse = (buffer, onLoad, onError): void => {
+    if (closed) {
+      onError?.(closedError);
+      return;
     }
+    const task = new Promise<CompressedTexture>((resolve, reject): void => {
+      decoder.parse(buffer, resolve, reject);
+    });
+    pending.push(task);
+    void task.then(
+      (texture): void => {
+        if (!closed) onLoad?.(texture);
+      },
+      (error: unknown): void => {
+        recordFailure(error);
+        onError?.(error);
+      }
+    );
   };
-  const loadTexture = decoder.load.bind(decoder);
-  decoder.load = (source, onLoad, onProgress, onError): void => {
+  const loadTexture = textures.load.bind(textures);
+  textures.load = (source, onLoad, onProgress, onError): void => {
+    if (closed) {
+      onError?.(closedError);
+      return;
+    }
     loadTexture(source, onLoad, onProgress, (error): void => {
-      recordTextureFailure(error);
+      recordFailure(error);
       onError?.(error);
     });
   };
-  // UASTC data maps fall back to RGBA when ASTC/BC7 are unavailable, avoiding
-  // lower-quality transcoding of normal/ORM channels into color-only formats.
   try {
     const gltf = await new GLTFLoader()
       .setMeshoptDecoder(MeshoptDecoder)
-      .setKTX2Loader(decoder)
-      .loadAsync(url);
-    await decoder.transcoderPending;
+      .setKTX2Loader(textures)
+      .parseAsync(data, path);
     if (textureFailed) throw textureFailure;
+    completed = true;
     return gltf;
   } finally {
     closed = true;
-    // PNG diagnostic loads never initialize the decoder or increment its count.
-    if (decoder.transcoderPending) {
-      // Prevent late worker-URL creation; preserve any load/initialization error.
-      await decoder.transcoderPending.catch((): void => {});
-      await Promise.allSettled(transcodes);
-      decoder.dispose();
-    }
+    const results = await Promise.allSettled(pending);
+    if (!completed)
+      for (const result of results) if (result.status === 'fulfilled') result.value.dispose();
   }
 }
