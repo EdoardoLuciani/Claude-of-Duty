@@ -14,7 +14,7 @@ bun run lint
 bun run build
 ```
 
-Node.js 24.x and Bun (version pinned by `packageManager` in `package.json`) are
+Node.js 26.x and Bun (version pinned by `packageManager` in `package.json`) are
 required. Bun installs dependencies from `bun.lock`, type-checks (`bun check`) and
 formats (`bun fmt`); packages are cached in `~/.bun/install/cache`, so warm
 reinstalls are near-instant. Node runs Vite, Vitest, Oxlint and all tools; Node-run
