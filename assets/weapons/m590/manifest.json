@@ -5,7 +5,7 @@
   "blenderForward": "+Y",
   "blenderUp": "+Z",
   "runtimeBasis": "-Z forward / +Y up / +X right; no adapter basis transform",
-  "source": "tools/blender/m590.py + tools/blender/m590/ + tools/blender/m590_actions.py + tools/m590-hand-reference.mjs",
+  "source": "tools/blender/m590/build.py + tools/blender/m590/ + tools/blender/m590/actions.py + tools/blender/m590/hand-reference.mjs",
   "stats": {
     "triangleInstances": 72206,
     "primitives": 2,
