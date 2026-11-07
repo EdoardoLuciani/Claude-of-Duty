@@ -18,7 +18,7 @@ bun run build:ci     # code-only build used by CI: generates no models
 Node.js 26.x and Bun (version pinned by `packageManager` in `package.json`) are
 required. Bun installs dependencies from `bun.lock`, type-checks (`bun check`) and
 formats (`bun fmt`); packages are cached in `~/.bun/install/cache`, so warm
-reinstalls are near-instant. Node runs Vite, Vitest, Oxlint and all tools; Node-run
+reinstalls are near-instant. Node runs Vite, Oxlint, the `node:test` smoke runner and all tools; Node-run
 tools and smoke tests load migrated `.ts` modules using native type stripping.
 Runtime TypeScript uses explicit `.ts` imports and is checked by `bun run typecheck`.
 `bun run lint` requires explicit return types on every TypeScript function, method,
