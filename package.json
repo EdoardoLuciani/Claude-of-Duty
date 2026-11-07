@@ -3,7 +3,6 @@
   "version": "1.1.0",
   "private": true,
   "license": "ISC",
-  "author": "",
   "type": "module",
   "scripts": {
     "assets": "bun run models && bun run world:validate",
