@@ -122,7 +122,7 @@ export function cookModel(
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [id, directory] = process.argv.slice(2);
-  assert(process.argv.length <= 4, 'usage: npm run models:cook -- [model-id [asset-directory]]');
+  assert(process.argv.length <= 4, 'usage: bun run models:cook -- [model-id [asset-directory]]');
   const ids = id ? [id] : Object.keys(MODEL_COOKS);
   for (const name of ids) {
     assert(

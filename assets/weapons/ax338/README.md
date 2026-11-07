@@ -19,7 +19,7 @@ Run from the repository root with Blender 5.2.2 and gltfpack 1.3:
 blender -b -t 2 --python-exit-code 1 --python tools/blender/ax338/build.py
 blender -b -t 2 assets/weapons/ax338/ax338.blend --python-exit-code 1 \
   --python tools/blender/ax338/check.py
-npm run models:cook -- ax338
+bun run models:cook -- ax338
 ```
 
 Use `--output /tmp/ax338-review` for scratch builds.

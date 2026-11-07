@@ -2,7 +2,7 @@
 
 `vanguard`, `irregular` and `breacher` are supported; unknown names and rifle
 styles fail explicitly. Python owns geometry; canonical products are committed in
-`assets/soldiers/`. Normal `npm run models` validates and stages GLB/JSON into the
+`assets/soldiers/`. Normal `bun run models` validates and stages GLB/JSON into the
 ignored `public/models/soldiers/` delivery directory without Blender. No mesh
 product is an authoring input.
 

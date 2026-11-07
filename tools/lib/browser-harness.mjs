@@ -111,7 +111,7 @@ function gpuAngleArgs() {
 /**
  * Launch Chromium with the local GPU backend. Prefer Playwright's managed
  * binary, but fall back to a system browser when package and browser revisions
- * are temporarily out of sync (common after npm install in headless CI).
+ * are temporarily out of sync (common after bun install in headless CI).
  */
 // Current gameplay/previews are native-only. Legacy comparison callers opt out.
 export async function launchChromium({ webgpu = true, ...options } = {}) {

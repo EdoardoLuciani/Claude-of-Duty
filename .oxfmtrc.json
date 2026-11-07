@@ -1,5 +1,4 @@
 {
-  "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "singleQuote": true,
   "semi": true,
   "tabWidth": 2,
@@ -22,7 +21,6 @@
     "AGENTS.md",
     ".github/**",
     ".agents/**",
-    "**/*-lock.json",
     "**/*.lock",
     "**/*.lock.*",
     "assets/**",

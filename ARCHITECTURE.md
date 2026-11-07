@@ -156,7 +156,7 @@ JS in `tools/worldgen/` is world-authoring authority. Map-specific layout,
 configuration, intel sites and free-standing prop transforms live in `level/`;
 `level/placements/` is data-only, while `placement.js` owns validation, placement
 execution and clutter clearance. The [world editing map](tools/worldgen/README.md)
-connects content, geometry and baking. `npm run world` builds meshes and cooks collision
+connects content, geometry and baking. `bun run world` builds meshes and cooks collision
 with meshoptimizer from the canonical instance buckets. Visual-only bucket
 coalescing may join non-distance-LOD clouds within the existing 64 m X/Z span;
 it must not change collision inputs or navigation. Both transient outputs use
@@ -168,7 +168,7 @@ Manifest v2 and content-hashed GLBs live in
 `public/models/world/`. Preserve instancing/masks.
 Never author separate collision geometry or hand-edit generated files. Commit
 source + manifest + generated runtime assets together. Validate with
-`npm run world -- --check`, world/physics tests and screenshots.
+`bun run world -- --check`, world/physics tests and screenshots.
 
 ## AI physical planning
 
@@ -335,7 +335,7 @@ Artwork generation is offline-only; model, prompts and processing live in
 `assets/ui/market/`, with optimized runtime WebPs in `public/images/market/`.
 
 `build/models.mjs` owns explicit gltfpack runtime-model cooking and per-model
-profiles (`npm run models:cook`). Normal builds consume committed `.runtime.glb`
+profiles (`bun run models:cook`). Normal builds consume committed `.runtime.glb`
 products; they do not run the encoder. All seven authored weapons opt in.
 Adding profiles requires adapter, animation and visual validation rather than
 blanket simplification. Editable Blender sources remain authoring references.

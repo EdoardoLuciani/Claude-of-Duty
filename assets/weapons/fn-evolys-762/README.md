@@ -19,7 +19,7 @@ Run from the repository root with Blender 5.2.2 and gltfpack 1.3:
 blender -b -t 2 --python-exit-code 1 --python tools/blender/evolys/build.py
 blender -b assets/weapons/fn-evolys-762/fn-evolys-762.blend \
   --python-exit-code 1 --python tools/blender/evolys/check.py
-npm run models:cook -- evolys
+bun run models:cook -- evolys
 ```
 
 Use `--output /tmp/evolys-review --quick` for scratch builds.

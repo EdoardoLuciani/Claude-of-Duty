@@ -9,11 +9,11 @@ Install native **gltfpack 1.3 with BasisU support** from the
 [official release](https://github.com/zeux/meshoptimizer/releases/tag/v1.3), then:
 
 ```sh
-GLTFPACK=/absolute/path/gltfpack npm run models:cook -- p320
+GLTFPACK=/absolute/path/gltfpack bun run models:cook -- p320
 # All registered profiles (seven weapons and standalone EXPS3):
-npm run models:cook
+bun run models:cook
 # Use the same profile on a scratch native export:
-npm run models:cook -- p320 /tmp/p320-review
+bun run models:cook -- p320 /tmp/p320-review
 ```
 
 The encoder writes to a temporary directory before replacing the destination.

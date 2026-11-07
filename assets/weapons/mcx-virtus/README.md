@@ -19,7 +19,7 @@ Run from the repository root with Blender 5.2.2 and gltfpack 1.3:
 blender -b --python-exit-code 1 --python tools/blender/mcx/build.py
 blender -b assets/weapons/mcx-virtus/mcx-virtus.blend \
   --python-exit-code 1 --python tools/blender/mcx/check.py
-npm run models:cook -- mcx
+bun run models:cook -- mcx
 ```
 
 Use `-- --output /tmp/mcx-review` for scratch builds. Normal builds use committed

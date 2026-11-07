@@ -11,7 +11,7 @@ Run from the repository root with Blender 5.2.2, compatible AgX and gltfpack 1.3
 
 ```sh
 blender -b -t 8 --python-exit-code 1 --python tools/blender/exps3.py
-npm run models:cook -- exps3
+bun run models:cook -- exps3
 ```
 
 Use `--output /tmp/exps3-review --render` for scratch review.
