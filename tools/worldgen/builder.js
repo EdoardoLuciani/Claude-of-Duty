@@ -48,12 +48,6 @@ export class Assembler {
     this.interiorLights = [];
     /** Filled by dressing.js: where a street lamp wants a point light. */
     this.lampAnchors = [];
-    /**
-     * Whether put() drops a contact fillet under skirted prototypes. Turn it
-     * off around a stack — the second crate in a pile is standing on the first,
-     * not on the ground, and a dust ring floating at 60 cm is worse than none.
-     */
-    this.skirts = true;
     this.stats = { staticTris: 0, instTris: 0, instances: 0, drawCalls: 0 };
   }
 
@@ -204,7 +198,7 @@ export class Assembler {
     this.place(id, _m, masks);
     // Ground it. The fillet is never tilted and never rotated with the prop:
     // it is a pile of dust, not part of the object.
-    if (this.skirts && p && p.skirt > 0 && this._protos.has('dust_skirt')) {
+    if (p && p.skirt > 0 && this._protos.has('dust_skirt')) {
       const rr = p.skirt * s;
       trs(_m, x, y + 0.004, z, (x * 2.7 + z * 1.9) % 6.283, rr, 1, rr);
       this.place('dust_skirt', _m, null);
