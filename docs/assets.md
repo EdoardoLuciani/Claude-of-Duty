@@ -2,7 +2,7 @@
 
 Start here to find an editing location. Asset-specific READMEs own detailed
 commands, references and acceptance limits; this index does not replace them.
-Run commands from the repository root after `bun install`.
+Run commands from the repository root after `bun ci`.
 
 Dedicated weapon-model, bandage and FX presentation sweeps are retired; their
 checks remain in Git history. `bun run test` runs the remaining regressions, not

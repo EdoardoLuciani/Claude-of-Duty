@@ -21,7 +21,6 @@
     "AGENTS.md",
     ".github/**",
     ".agents/**",
-    "**/*-lock.json",
     "**/*.lock",
     "**/*.lock.*",
     "assets/**",

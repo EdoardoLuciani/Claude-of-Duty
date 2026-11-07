@@ -24,7 +24,7 @@ The assembler owns geometry lifetime; support/collision/navigation use canonical
 geometry even when visuals have derivatives. Never author separate collision
 meshes or hand-edit products. Navigation shares runtime controller algorithms.
 
-Run from the repository root after `bun install`:
+Run from the repository root after `bun ci`:
 
 ```sh
 bun run world

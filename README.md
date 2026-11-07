@@ -6,7 +6,7 @@ Blender-authored assets load locally; no runtime CDN or WebGL fallback.
 [Contributor instructions](AGENTS.md)
 
 ```sh
-bun install --frozen-lockfile
+bun ci
 bun run dev          # exports procedural models, validates world assets, serves :5173
 bun run test
 bun run typecheck
@@ -31,7 +31,7 @@ assignment, argument, call, member access and return. Numeric enum assignments
 must use enum members rather than unchecked numbers. Runtime boundaries must
 validate unknown data; owned records should be constructed with their full type.
 Regular lint rules cover `src/`, `build/`, `tools/`, and `tests/`. Missing return annotations
-fail CI's lint step, not `tsc` itself. The narrow declaration additions in
+fail CI's lint step, not the typecheck itself. The narrow declaration additions in
 `src/render/three-types.d.ts` describe APIs verified against the pinned Three.js
 source; review them alongside the Three/@types upgrade checks.
 `bun run build` runs typecheck and lint first via `prebuild`. Remaining JavaScript

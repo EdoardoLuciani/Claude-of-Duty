@@ -15,7 +15,7 @@
     "test": "vitest run",
     "typecheck": "bun check",
     "format": "bun fmt src build tools tests docs README.md ARCHITECTURE.md prompt.md index.html vite.config.js tsconfig.json .oxlintrc.json .oxfmtrc.json package.json",
-    "format:check": "bun fmt --check src build tools tests docs README.md ARCHITECTURE.md prompt.md index.html vite.config.js tsconfig.json .oxlintrc.json .oxfmtrc.json package.json",
+    "format:check": "bun run format --check",
     "lint": "oxlint src build tools tests --deny-warnings && oxlint --type-aware src --ignore-pattern '**/*.js' --ignore-pattern '**/*.mjs' --deny-warnings",
     "dev": "vite",
     "prebuild": "bun run typecheck && bun run lint",

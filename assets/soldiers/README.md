@@ -39,7 +39,7 @@ The manifest binds declared source content, Three revision and product hashes.
 Source text and JSON hashes normalize LF/CRLF; binary hashes remain exact.
 Changing a declared recipe/calibration input requires regeneration. Missing,
 stale or corrupt products fail visibly rather than silently rebuilding/falling
-back. Normal `bun install`, build and play **do not require Blender**: the locked model
+back. Normal `bun ci`, build and play **do not require Blender**: the locked model
 exporter stages committed GLB/JSON to ignored public URLs. It does not read blends.
 
 Same-host repeated generation is checked; blend bytes need not match and there

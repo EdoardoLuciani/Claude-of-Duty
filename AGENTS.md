@@ -18,13 +18,13 @@ before subsystem changes: it owns directory assignments, APIs and event contract
 ## Commands and invariants
 
 ```sh
-bun install --frozen-lockfile # preferred clean install (pinned Bun; tools run on Node 24)
-bun run test                  # Vitest runs tests/smoke/ scripts
-bun run lint                  # oxlint src tools tests --deny-warnings
-bun run build                 # must pass
-bun run world:validate        # required when world/prop assets change
-bun run world                 # compile world source and cook collision
-bun run dev                   # local server; not needed for CI-only work
+bun ci                 # preferred clean install
+bun run test           # Vitest runs tests/smoke/ scripts
+bun run lint           # oxlint src tools tests --deny-warnings
+bun run build          # must pass
+bun run world:validate # required when world/prop assets change
+bun run world          # compile world source and cook collision
+bun run dev            # local server; not needed for CI-only work
 ```
 
 - Tests and build must pass from a clean install: no missing imports/exports or
