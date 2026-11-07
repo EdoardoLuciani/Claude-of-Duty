@@ -529,103 +529,6 @@ function barrierGrounding(A) {
   }
 }
 
-// --- sandbags ---------------------------------------------------------------
-/**
- * A course-laid sandbag wall.
- *
- * What makes a stack of bags read as cover rather than as a tray of bread rolls:
- *
- *  - three different bag silhouettes, picked so neighbours rarely match;
- *  - the bags INTERPENETRATE. Real bags are laid wet-soft and squash into each
- *    other; 1-2 cm of overlap along the run and between courses is what closes
- *    the daylight gaps that turn a wall into a lattice;
- *  - squash grows with the number of bags above, so the bottom course is
- *    visibly flatter and wider than the top one;
- *  - per-bag yaw ±12°, non-uniform scale 0.90-1.12, and 2-4 cm of row-pitch
- *    jitter so no two courses line up;
- *  - the odd header bag laid across the run, and per-bag weathering variation.
- *
- * `baseY` puts the run on a roof or a rampart walkway instead of the street.
- */
-export function sandbagWall(A, rng, x, z, ry, len, courses = 3, baseY = null) {
-  const y = baseY ?? groundY(x, z);
-  const BAG_W = 0.5;
-  const BAG_H = 0.17;
-  const IDS = ['sandbag_a', 'sandbag_b', 'sandbag_c'];
-  let cy = y + 0.01;
-  let prev = -1;
-  for (let c = 0; c < courses; c++) {
-    // load from the bags above: the bottom of a five-high wall carries most of it
-    const load = (courses - 1 - c) / Math.max(1, courses - 1);
-    const squash = 1 - load * 0.19; // vertical
-    const spread = 1 + load * 0.07; // and it bulges out sideways
-    // 2-4 cm of row-pitch jitter, so course seams never stack vertically
-    const pitch = BAG_W - rng.range(0.02, 0.04);
-    const per = Math.max(2, Math.round(len / pitch));
-    const stagger = (c % 2) * pitch * 0.5 + rng.range(-0.03, 0.03);
-    const shrink = c === courses - 1 && courses > 2 ? 1 : 0;
-    const bagH = BAG_H * squash;
-    for (let i = shrink; i < per - shrink; i++) {
-      const lx = -len / 2 + stagger + (i + 0.5) * pitch;
-      if (Math.abs(lx) > len / 2) continue;
-      // never the same silhouette twice in a row
-      let pick = rng.int(0, 2);
-      if (pick === prev) pick = (pick + 1 + rng.int(0, 1)) % 3;
-      prev = pick;
-      // Headers: bags turned across the run. Real emplacements are laid part
-      // stretcher, part header, and the mix is what stops a run reading as a
-      // row of identical parallel loaves.
-      const header = rng.float() < 0.3;
-      const lz = rng.range(-0.03, 0.03) + (header ? rng.range(-0.05, 0.05) : 0);
-      const px = x + Math.cos(ry) * lx + Math.sin(ry) * lz;
-      const pz = z - Math.sin(ry) * lx + Math.cos(ry) * lz;
-      A.putS(
-        IDS[pick],
-        px,
-        cy, // the bag prop's origin is its base, so scale never lifts it
-        pz,
-        ry + (header ? Math.PI / 2 : 0) + rng.range(-0.21, 0.21),
-        rng.range(0.9, 1.12) * spread,
-        rng.range(0.9, 1.06) * squash,
-        rng.range(0.94, 1.12) * spread,
-        [1, rng.range(0.7, 1.6), rng.range(0.85, 1.3)],
-        rng.range(-0.09, 0.09),
-        rng.range(-0.11, 0.11)
-      );
-    }
-    // the next course beds 1.5-2.5 cm into this one
-    cy += bagH - rng.range(0.015, 0.025);
-  }
-  if (baseY !== null) return; // a rampart run: no ground clutter behind it
-  // spilled sand and grit along the foot of the run: bags leak, and the line
-  // where the bottom course meets the deck is otherwise a ruled edge
-  const skirts = Math.max(2, Math.round(len / 1.1));
-  for (let i = 0; i < skirts; i++) {
-    const lx = -len / 2 + ((i + 0.5) / skirts) * len;
-    groundSkirt(A, rng, x + Math.cos(ry) * lx, y, z - Math.sin(ry) * lx, 0.44, {
-      pebbles: rng.int(1, 3),
-      key: 'sand',
-      grime: 0.7,
-    });
-  }
-  // ammo tins and a jerry can behind the wall
-  for (let i = 0; i < rng.int(1, 3); i++) {
-    const lx = rng.range(-len / 2, len / 2);
-    const px = x + Math.cos(ry) * lx + Math.sin(ry) * 0.7;
-    const pz = z - Math.sin(ry) * lx + Math.cos(ry) * 0.7;
-    if (!isOpen(px, pz, 0.3)) continue;
-    A.put(
-      rng.pick(['jerry_can', 'crate_b', 'box_card_a', 'gas_bottle']),
-      px,
-      groundY(px, pz),
-      pz,
-      rng.float() * 6.28,
-      1,
-      [1, 1.3, 1]
-    );
-  }
-}
-
 // --- wrecks -----------------------------------------------------------------
 function wreckScorch(A) {
   for (const [x, z] of SET_PIECES.wrecks) {
@@ -1228,7 +1131,6 @@ export function buildGate(A) {
     depth,
     span,
     height,
-    outerW,
     bodyH,
     xL0,
     xL1,
@@ -1367,16 +1269,8 @@ export function buildGate(A) {
   A.add('metal_rust', BOX(A), LL(IDENT, xT1 - 0.5, hT + 1.9, zT, 0, 0.06, 3.4, 0.06, 0.04, 0.07), {
     masks: [0.95, 0.5, 0],
   });
-  A.put('sat_dish', xT0 + 0.9, hT + 0.3, zT + 0.4, 0.7, 1, [1, 1.3, 1]);
-
-  // sandbag emplacements on the ramparts, and a crate of ammunition
-  sandbagWall(A, rng, xL0 + 1.9, z - 0.15, 0.0, 2.4, 3, hL + 0.16);
-  sandbagWall(A, rng, xR0 + 1.7, zR - 0.15, 0.0, 1.9, 3, hR + 0.16);
-  sandbagWall(A, rng, (xT0 + xT1) / 2, zT - 0.25, 0.0, 2.2, 4, hT + 0.16);
-  A.skirts = false;
-  A.put('crate_c', xL1 - 1.2, hL + 0.16, z - 0.6, 0.4, 1, [1, 1.3, 1]);
-  A.put('barrel_rust', xR0 + 0.6, hR + 0.16, zR - 0.5, 0.2, 1, [1, 1.4, 1]);
-  A.skirts = true;
+  // Rampart sandbags, the dish, ammunition and the checkpoint clutter below
+  // are authored props in level/placements/south-street.js.
 
   // The spandrel over the arch, built as a wall panel with a pointed hole so
   // the arch has real depth and a reveal.
@@ -1431,35 +1325,15 @@ export function buildGate(A) {
     depth: 0.34,
     set: 0.02,
   });
-  sandbagWall(A, rng, -0.9, z + 0.15, 0.0, 2.0, 3, bodyH + 0.34);
 
-  // guard hut and checkpoint clutter under the arch
-  A.put('block_big', 0.0, 0.0, z + 3.2, 0.1, 1, [1, 1.2, 1]);
-  const checkpointBarriers = [
-    [-3.6, z + 3.2, 0.1],
-    [2.4, z + 2.2, 1.6],
-    [-1.4, z - 2.4, 1.5],
-    [2.0, z - 2.8, 0.2],
-  ];
-  for (const [bx, bz, br] of checkpointBarriers) {
-    A.put('jersey', bx, 0, bz, br, 1, [1, rng.range(0.9, 1.3), 1]);
-  }
-  sandbagWall(A, rng, -1.9, z + 4.6, 0.1, 2.4, 4);
-  sandbagWall(A, rng, 2.1, z - 4.4, 0.0, 2.0, 3, 0);
-  for (let i = 0; i < 24; i++) {
-    const px = rng.range(-outerW / 2, outerW / 2);
-    const pz = z + rng.range(-5, 5);
-    if (Math.abs(px) > span / 2 && Math.abs(pz - z) < t / 2 + 0.3) continue;
-    if (checkpointBarriers.some(([bx, bz]) => Math.hypot(px - bx, pz - bz) < 1.2)) continue;
-    A.put(
-      rng.pick(['brick_a', 'brick_b', 'rock_b', 'litter', 'cinder', 'can', 'weeds', 'plank_b']),
-      px,
-      groundY(px, pz) + 0.02,
-      pz,
-      rng.float() * 6.28,
-      rng.range(0.6, 1.2),
-      [1, 1.4, 1]
-    );
+  // Spilled sand along the foot of the ground-level sandbag run, whose bags
+  // are in level/placements/south-street.js (centre x, z and yaw).
+  const bags = { x: -1.9, z: z + 4.6, ry: 0.1 };
+  const bagY = groundY(bags.x, bags.z);
+  for (const lx of [-0.6, 0.6]) {
+    const sx = bags.x + Math.cos(bags.ry) * lx;
+    const sz = bags.z - Math.sin(bags.ry) * lx;
+    groundSkirt(A, rng, sx, bagY, sz, 0.44, { pebbles: rng.int(1, 3), key: 'sand', grime: 0.7 });
   }
   // spalled corners and a bullet-scarred face
   rubbleMound(A, rng, -span / 2 - 1.0, 0, z + 1.4, 1.2, 16, { key: 'concrete' });
@@ -1540,32 +1414,15 @@ export function buildPerimeter(A) {
       });
     }
   }
-  // Blocked cross-streets: rubble barricades and stacked barriers rather than
-  // an invisible wall, so the boundary is diegetic.
+  // Blocked cross-streets: rubble barricades rather than an invisible wall, so
+  // the boundary is diegetic. Barriers and debris are in level/placements/.
   const blocks = [
     [0, STREET.zMax + 1.5],
     [0, STREET.zMin - 1.5],
   ];
   for (const [bx, bz] of blocks) {
     const rng = keyedRng('perimeter-block', bx, bz);
-    for (let i = -1; i <= 1; i++) {
-      A.put('jersey', bx + i * 2.1, 0.02, bz, 0.02 + rng.range(-0.05, 0.05), 1, [1, 1.2, 1]);
-    }
     rubbleMound(A, rng, bx - 3.4, 0, bz, 2.2, 30);
     rubbleMound(A, rng, bx + 3.6, 0, bz, 2.0, 26);
-    for (let i = 0; i < 14; i++) {
-      const px = bx + rng.range(-7, 7);
-      const pz = bz + rng.range(-2, 2);
-      if (Math.abs(px - bx) < 3.2 && Math.abs(pz - bz) < 1.1) continue;
-      A.put(
-        rng.pick(['brick_a', 'brick_b', 'cinder', 'rock_a', 'slab_shard', 'rebar']),
-        px,
-        groundY(px, pz) + 0.03,
-        pz,
-        rng.float() * 6.28,
-        rng.range(0.7, 1.3),
-        [1, 1.4, 1]
-      );
-    }
   }
 }

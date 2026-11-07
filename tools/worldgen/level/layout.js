@@ -378,7 +378,7 @@ export const BUILDINGS = [
         // Storeroom on the street, apartment through a doorway in the spine.
         walls: [[0.56, 0.0, 0.56, 1.0, 0.5]],
         furnish: [
-          { kind: 'storage', detail: true, x0: 0.0, z0: 0.0, x1: 0.56, z1: 1.0 },
+          { kind: 'storage', x0: 0.0, z0: 0.0, x1: 0.56, z1: 1.0 },
           { kind: 'living', x0: 0.56, z0: 0.0, x1: 1.0, z1: 1.0 },
         ],
       },
@@ -504,7 +504,7 @@ export const BUILDINGS = [
         furnish: [
           { kind: 'shop', x0: 0.0, z0: 0.0, x1: 0.56, z1: 0.56 },
           { kind: 'ruin', x0: 0.0, z0: 0.56, x1: 0.56, z1: 1.0 },
-          { kind: 'storage', detail: true, x0: 0.56, z0: 0.0, x1: 1.0, z1: 1.0 },
+          { kind: 'storage', x0: 0.56, z0: 0.0, x1: 1.0, z1: 1.0 },
         ],
       },
     ],
@@ -610,7 +610,7 @@ export const BUILDINGS = [
       {
         // Open warehouse — the old spine wall boxed off half the floor.
         walls: [],
-        furnish: [{ kind: 'storage', detail: true, x0: 0.0, z0: 0.0, x1: 1.0, z1: 1.0 }],
+        furnish: [{ kind: 'storage', x0: 0.0, z0: 0.0, x1: 1.0, z1: 1.0 }],
       },
     ],
   },
@@ -772,7 +772,6 @@ export const GATE = {
   depth: 3.2,
   span: 5.6,
   height: 4.9,
-  outerW: 17,
   /** Height over the arch spandrel — deliberately the LOWEST part of the mass. */
   bodyH: 6.7,
   /** West block. */
@@ -822,13 +821,6 @@ export const SET_PIECES = {
     [-1.0, -24.0, 1.55],
     [1.2, -30.0, 0.2],
     [-3.0, -34.0, 0.0],
-  ],
-  /** Sandbag emplacements: [x, z, ry, length] */
-  sandbagWalls: [
-    [-3.6, 11.0, 0.0, 3.0],
-    [3.6, -2.0, 0.0, 2.6],
-    [-1.6, -18.5, 1.57, 2.4],
-    [3.4, -27.0, 0.0, 3.2],
   ],
   /** Burnt-out vehicles: [x, z, ry, rollDeg] */
   wrecks: [
