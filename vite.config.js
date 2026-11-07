@@ -6,23 +6,17 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)));
-// Code-only builds (`bun run build:ci`) generate no models; they only validate the committed world.
-const ASSET_TASKS = process.env.OW_SKIP_ASSETS
-  ? ['validate-world-assets.mjs']
-  : ['build-assets.mjs'];
-
+/** Generated assets; tools/build-assets.mjs honours OW_SKIP_ASSETS (`bun run build:ci`). */
 async function runAssetTasks() {
-  for (const file of ASSET_TASKS) {
-    const code = await new Promise((done) => {
-      const child = spawn(process.execPath, [resolve(ROOT, 'tools', file)], {
-        cwd: ROOT,
-        stdio: 'inherit',
-      });
-      child.on('error', () => done(1));
-      child.on('exit', (value) => done(value ?? 1));
+  const code = await new Promise((done) => {
+    const child = spawn(process.execPath, [resolve(ROOT, 'tools/build-assets.mjs')], {
+      cwd: ROOT,
+      stdio: 'inherit',
     });
-    if (code !== 0) throw new Error(`[assets] ${file} failed with exit code ${code}`);
-  }
+    child.on('error', () => done(1));
+    child.on('exit', (value) => done(value ?? 1));
+  });
+  if (code !== 0) throw new Error(`[assets] build-assets.mjs failed with exit code ${code}`);
 }
 
 export default defineConfig(async ({ isPreview }) => {
