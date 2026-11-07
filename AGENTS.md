@@ -18,7 +18,7 @@ before subsystem changes: it owns directory assignments, APIs and event contract
 ## Commands and invariants
 
 ```sh
-bun install --frozen-lockfile # preferred clean install (pinned Bun; tools run on Node 24)
+bun install --frozen-lockfile # preferred clean install (pinned Bun; tools run on Node 26)
 bun run test                  # Vitest runs tests/smoke/ scripts
 bun run lint                  # oxlint src tools tests --deny-warnings
 bun run build                 # must pass
