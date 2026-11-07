@@ -143,7 +143,6 @@ export function furnishRoom(A, rng, r) {
 
   if (kind === 'shop') furnishShop(A, rng, r, cx, cz, w, d);
   else if (kind === 'living') furnishLiving(A, rng, r, cx, cz);
-  else if (kind === 'storage' && r.detail) furnishStorage(A, rng, r, cx, cz, w, d);
   else if (kind === 'workshop') furnishWorkshop(A, rng, r, cx, cz, w, d);
   else if (kind === 'ruin') furnishRuin(A, rng, r, cx, cz);
 
@@ -450,23 +449,6 @@ function hangingBulb(A, rng, x, yCeil, z) {
     masks: [0.6, 0.4, 0],
   });
   if (A.interiorLights.length < 15) A.interiorLights.push({ x, y: yCeil - drop - 0.05, z });
-}
-
-// --------------------------------------------------------------- storage --
-function furnishStorage(A, rng, r, cx, cz, w, d) {
-  const { y } = r;
-  const alongX = w >= d;
-  for (const offset of [-0.75, 0.75]) {
-    const px = cx + (alongX ? offset : 0);
-    const pz = cz + (alongX ? 0 : offset);
-    const prototype = rng.pick(['crate_a', 'crate_b', 'box_card_a']);
-    const ry = rng.range(-0.2, 0.2);
-    if (!inDoorway(r, px, pz)) A.put(prototype, px, y, pz, ry, 1, [1, 1.15, 1]);
-  }
-  const bx = cx + (alongX ? 0 : 0.9);
-  const bz = cz + (alongX ? 0.9 : 0);
-  const bry = rng.float() * 6.28;
-  if (!inDoorway(r, bx, bz)) A.put('barrel_rust', bx, y, bz, bry, 1, [1, 1.2, 1]);
 }
 
 // -------------------------------------------------------------- workshop --
