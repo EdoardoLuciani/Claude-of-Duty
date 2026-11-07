@@ -27,9 +27,8 @@ const _UP = new THREE.Vector3(0, 1, 0);
 const CHUNK = 64;
 
 export class Assembler {
-  constructor({ materials, rng }) {
+  constructor({ materials }) {
     this.materials = materials;
-    this.rng = rng;
     this._mats = new Map(); // palette key -> THREE.Material
     this._static = new Map(); // palette key -> Accum
     this._protos = new Map(); // id -> { geo, key, instances[], masks[], opts }
