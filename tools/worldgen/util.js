@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 
+import { Rng } from '../../src/core/rng.ts';
+
 /**
  * WORLD — geometry toolkit.
  *
@@ -24,6 +26,26 @@ const _v1 = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 const _n = new THREE.Vector3();
 const _nm = new THREE.Matrix3();
+
+// ----------------------------------------------------------------- random --
+/** FNV-1a hash of a stable name. */
+function stableSeed(value) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
+/**
+ * A random stream owned by one named element (`'facade', id, floor, side`).
+ * Every element draws only from its own stream, so editing, adding or removing
+ * one element never re-rolls any other.
+ */
+export function keyedRng(...parts) {
+  return new Rng(stableSeed(parts.join(':')));
+}
 
 // ------------------------------------------------------------------ noise --
 /** Deterministic 3D value hash in [0,1). No Math.random anywhere. */

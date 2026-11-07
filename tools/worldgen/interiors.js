@@ -27,6 +27,14 @@ const overlap = (a0, a1, b0, b1) =>
     Math.min(Math.max(a0, a1), Math.max(b0, b1)) - Math.max(Math.min(a0, a1), Math.min(b0, b1))
   );
 
+/** Flat patches are cooked collision: any part over a stair void caps the shaft. */
+function patchOverVoid(r, g, matrix) {
+  const b = g.boundingBox.clone().applyMatrix4(matrix);
+  return (r.voids ?? []).some(
+    (v) => b.max.x > v.x0 && b.min.x < v.x1 && b.max.z > v.z0 && b.min.z < v.z1
+  );
+}
+
 function inVoid(r, x, z) {
   for (const v of r.voids ?? []) {
     if (x >= v.x0 && x <= v.x1 && z >= v.z0 && z <= v.z1) return true;
@@ -114,16 +122,8 @@ export function furnishRoom(A, rng, r) {
     const pz = rng.range(z0 + 0.3, z1 - 0.3);
     const pry = rng.float() * 6.28;
     const matrix = LL(IDENT, px, y + 0.012, pz, pry);
-    const bounds = g.boundingBox.clone().applyMatrix4(matrix);
-    // A patch whose centre misses the opening can still hang across the stairs.
-    if (
-      !(r.voids ?? []).some(
-        (v) =>
-          bounds.max.x > v.x0 && bounds.min.x < v.x1 && bounds.max.z > v.z0 && bounds.min.z < v.z1
-      )
-    ) {
-      A.addOnce('dirt', g, matrix, { masks: [0.1, 0.8, 0.5] });
-    } else g.dispose();
+    if (!patchOverVoid(r, g, matrix)) A.addOnce('dirt', g, matrix, { masks: [0.1, 0.8, 0.5] });
+    else g.dispose();
   }
   for (let i = 0; i < rng.int(4, 9); i++) {
     const px = rng.range(x0 + 0.2, x1 - 0.2);
@@ -344,10 +344,9 @@ function dressWalls(A, rng, r) {
       const g = patchGeometry(rng, rng.range(0.3, 0.75), { lobes: 9, wobble: 0.55 });
       const wry = rng.float() * 6.28;
       const wsz = rng.range(0.35, 0.6);
-      if (!inVoid(r, wx, wz)) {
-        A.addOnce('dirt', g, LL(IDENT, wx, y + 0.011, wz, wry, 1, 1, wsz), {
-          masks: [0.1, 0.85, 0.55],
-        });
+      const matrix = LL(IDENT, wx, y + 0.011, wz, wry, 1, 1, wsz);
+      if (!patchOverVoid(r, g, matrix)) {
+        A.addOnce('dirt', g, matrix, { masks: [0.1, 0.85, 0.55] });
       } else g.dispose();
       if (rng.float() < 0.7) {
         const [cx2, cz2] = at(s, wt + rng.range(-0.3, 0.3), rng.range(0.06, 0.34));
@@ -521,9 +520,11 @@ function furnishShop(A, rng, r, cx, cz, w, d) {
   let ccx = alongZ ? (r.street === 1 ? x1 - 1.3 : x0 + 1.3) : cx;
   let ccz = alongZ ? cz : frontZ ? cz - frontZ * (d * 0.5 - 1.3) : cz + d * 0.18;
   let clen = Math.min((alongZ ? d : w) - 1.4, 4.4);
-  const shop = r.facadeOpenings.find(
+  // Face the authored shop (the bay a sightline depends on) over any rolled one.
+  const shops = r.facadeOpenings.filter(
     (opening) => opening.kind === 'shop' && opening.side === r.street
   );
+  const shop = shops.find((opening) => opening.authored) ?? shops[0];
   if (shop) {
     clen = Math.min(clen, Math.max(1.2, shop.w - 0.4));
     if (alongZ) ccz = shop.z;
@@ -531,15 +532,25 @@ function furnishShop(A, rng, r, cx, cz, w, d) {
   }
   const cSX = alongZ ? 0.74 : clen;
   const cSZ = alongZ ? clen : 0.74;
-  let clear = true;
-  for (let i = 0; i <= 6; i++) {
+  // The counter stands 1.3 m inside the frontage, beyond inDoorway's reach:
+  // keep it off the straight approach to any other doorway in that wall (the
+  // shop it faces is sized to walk around).
+  const front = alongZ ? (r.street === 1 ? x1 : x0) : frontZ < 0 ? r.z1 : r.z0;
+  const along = (p) => (alongZ ? p.z : p.x);
+  const across = (p) => (alongZ ? p.x : p.z);
+  let clear =
+    (!alongZ && !frontZ) ||
+    !r.doors.some(
+      (door) =>
+        Math.abs(across(door) - front) < 0.6 &&
+        Math.abs(along(door) - (alongZ ? ccz : ccx)) < clen / 2 + 0.6 &&
+        !(shop && Math.abs(along(door) - along(shop)) < 0.05)
+    );
+  for (let i = 0; clear && i <= 6; i++) {
     const t = -clen / 2 + (i / 6) * clen;
     const px = ccx + (alongZ ? 0 : t);
     const pz = ccz + (alongZ ? t : 0);
-    if (inDoorway(r, px, pz)) {
-      clear = false;
-      break;
-    }
+    if (inDoorway(r, px, pz)) clear = false;
   }
   if (clear) {
     A.add('wood_prop_dark', BOX(A), LL(IDENT, ccx, y + 0.9, ccz, 0, cSX, 0.06, cSZ), {
@@ -656,13 +667,11 @@ function furnishLiving(A, rng, r, cx, cz) {
 // ------------------------------------------------------------------- ruin --
 function furnishRuin(A, rng, r, cx, cz) {
   const { y } = r;
-  // Reuse the mound offset for the sheet, retaining the old RNG draw count.
+  // The sheet shares the mound's offset.
   const mx = cx + rng.range(-1, 1);
   const mz = cz + rng.range(-1, 1);
   const mr = rng.range(1.4, 2.2);
   if (!inDoorway(r, mx, mz, mr + 0.45)) rubbleMound(A, rng, mx, y, mz, mr, 22);
-  rng.range(-1.5, 1.5); // old sheet x offset, consumed for stream stability
-  rng.range(-1.5, 1.5); // old sheet z offset
   const sYaw = rng.float() * 6.28;
   const sheet = clothGeometry(1.4, 1.1, {
     segX: 7,
