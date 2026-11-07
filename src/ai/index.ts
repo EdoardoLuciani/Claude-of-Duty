@@ -619,7 +619,7 @@ export class AiSystem {
       throw new Error(
         `[ai] soldier model "${name}" is incompatible with this build:\n - ` +
           problems.join('\n - ') +
-          '\nRegenerate the assets with: npm run models'
+          '\nRegenerate the assets with: bun run models'
       );
     }
   }
@@ -631,7 +631,7 @@ export class AiSystem {
       const rec = this._loadedVariants?.get(name);
       if (!rec) {
         throw new Error(
-          `[ai] required soldier model "${name}" was not loaded; regenerate assets with: npm run models`
+          `[ai] required soldier model "${name}" was not loaded; regenerate assets with: bun run models`
         );
       }
       // One native material ignores the GLB's authoring groups when drawing.

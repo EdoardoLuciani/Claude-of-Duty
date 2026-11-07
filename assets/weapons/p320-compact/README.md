@@ -20,7 +20,7 @@ Run from the repository root with Blender 5.2.2 and gltfpack 1.3:
 blender -b -t 8 --python-exit-code 1 --python tools/blender/p320/build.py
 blender -b -t 8 assets/weapons/p320-compact/p320-compact.blend \
   --python-exit-code 1 --python tools/blender/p320/check.py
-npm run models:cook -- p320
+bun run models:cook -- p320
 ```
 
 Use `--output /tmp/p320-review --render --quick` for scratch source builds.

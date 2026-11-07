@@ -39,7 +39,7 @@ The independent Three WebGPU market-inspection renderer is unchanged.
 
 ## Checks
 
-`npm test` includes `smoke-pixi-ui.mjs` for shared-device guards, initialization
+`bun run test` includes `smoke-pixi-ui.mjs` for shared-device guards, initialization
 error preservation, adapter restoration, failure-isolated/idempotent teardown and
 passive-message state/timing contracts. `smoke-hud-redraw.mjs` checks active/paused
 redraw suppression and invalidation for vitals, reticle, injury, reload and feedback.

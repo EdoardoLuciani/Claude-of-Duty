@@ -6,17 +6,20 @@ Blender-authored assets load locally; no runtime CDN or WebGL fallback.
 [Contributor instructions](AGENTS.md)
 
 ```sh
-npm ci
-npm run dev          # exports procedural models, validates world assets, serves :5173
-npm test
-npm run typecheck
-npm run lint
-npm run build
+bun install --frozen-lockfile
+bun run dev          # exports procedural models, validates world assets, serves :5173
+bun run test
+bun run typecheck
+bun run lint
+bun run build
 ```
 
-Node.js 24.x is required; Node-run tools and smoke tests load migrated `.ts`
-modules using native type stripping. Runtime TypeScript uses explicit `.ts`
-imports and is checked by `npm run typecheck`. `npm run lint` requires explicit
+Node.js 24.x and Bun (version pinned by `packageManager` in `package.json`) are
+required. Bun installs dependencies from `bun.lock`, type-checks (`bun check`) and
+formats (`bun fmt`); packages are cached in `~/.bun/install/cache`, so warm
+reinstalls are near-instant. Node runs Vite, Vitest, Oxlint and all tools; Node-run
+tools and smoke tests load migrated `.ts` modules using native type stripping.
+Runtime TypeScript uses explicit `.ts` imports and is checked by `bun run typecheck`. `bun run lint` requires explicit
 return types on every TypeScript function, method, getter and callback (including
 contextually typed functions and functions returning functions). Constructors and
 setters have no return annotation; JavaScript helpers are outside this rule.
@@ -31,13 +34,13 @@ Regular lint rules cover `src/`, `build/`, `tools/`, and `tests/`. Missing retur
 fail CI's lint step, not `tsc` itself. The narrow declaration additions in
 `src/render/three-types.d.ts` describe APIs verified against the pinned Three.js
 source; review them alongside the Three/@types upgrade checks.
-`npm run build` runs typecheck and lint first via `prebuild`. Remaining JavaScript
+`bun run build` runs typecheck and lint first via `prebuild`. Remaining JavaScript
 helpers run alongside TypeScript; broad `checkJs` adoption is deferred.
 
 ### Formatting
 
-Run `npm run format` to write formatting; `npm run format:check` checks it in CI.
-Both use the pinned [Oxfmt](https://oxc.rs/docs/guide/usage/formatter) from `npm ci`.
+Run `bun run format` to write formatting; `bun run format:check` checks it in CI.
+Both use `bun fmt` from the pinned Bun, which reads the Oxfmt-format `.oxfmtrc.json`.
 The command scope is in `package.json`; style and exclusions are in `.oxfmtrc.json`.
 Generated files, assets, reports, lockfiles, shared skills and protected workflow/
 agent instructions are excluded. Python, shell and SVG are not formatted.
@@ -48,7 +51,7 @@ initialization dependencies. Package sorting preserves script order and conditio
 exports/imports precedence. Keep bulk formatting separate from functional changes.
 
 Source-byte caches can change after formatting: dev/build refresh procedural
-exports; shared physics/navigation inputs also require `npm run world`. Review and
+exports; shared physics/navigation inputs also require `bun run world`. Review and
 commit provenance refreshes separately, verifying unchanged geometry, collision and
 navigation topology. Never hand-edit generated assets or rebuild Blender assets
 just to format source.
@@ -56,9 +59,9 @@ just to format source.
 A WebGPU-capable browser/device is required. Normal builds use committed world
 and Blender assets, with no Blender requirement. Change map content in
 `tools/worldgen/level/`; the [world editing map](tools/worldgen/README.md) identifies
-shape, placement and build locations. Regenerate with `npm run world`, then run
-`npm run world:validate`.
-Runtime-model optimization is explicit: `npm run models:cook -- p320` uses the
+shape, placement and build locations. Regenerate with `bun run world`, then run
+`bun run world:validate`.
+Runtime-model optimization is explicit: `bun run models:cook -- p320` uses the
 [shared gltfpack build recipe](build/README.md). Normal dev/build/CI consumes the
 committed `.runtime.glb`; it does not require gltfpack. All seven authored weapons
 use cooked runtime assets. Native exports remain authoring references; each model
@@ -158,7 +161,7 @@ Tests are not final human visual acceptance; see each asset's remaining limits.
 Keep capture/profile primitives and focused correctness checks. Task-specific
 screenshot matrices, reels, map reports, GPU investigations and their methodology
 notes are temporary: retired scripts stay in Git history, not a second maintained
-tool catalogue. `npm test` is the correctness gate; it is not visual or combat-
+tool catalogue. `bun run test` is the correctness gate; it is not visual or combat-
 performance acceptance.
 
 The material-graph, FX-recipe, physics-geometry and audio-recording smoke hashes

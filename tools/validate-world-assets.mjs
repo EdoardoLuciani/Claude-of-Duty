@@ -251,7 +251,7 @@ if (manifest.version === 2) {
   const expectedSourceHash = worldSourceHash(ROOT);
   if (manifest.sourceHash !== expectedSourceHash) {
     fail(
-      `manifest sourceHash is ${manifest.sourceHash ?? '<missing>'}, expected ${expectedSourceHash}; run npm run world`
+      `manifest sourceHash is ${manifest.sourceHash ?? '<missing>'}, expected ${expectedSourceHash}; run bun run world`
     );
   }
 }

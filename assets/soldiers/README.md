@@ -24,9 +24,9 @@ node tools/blender/soldiers/export.mjs --output /tmp/soldier-review
 # Optional --seed 0x5eed1234 --blender /absolute/path/to/blender
 # After structural, in-engine material and pose review, regenerate canonical files:
 node tools/blender/soldiers/export.mjs --output "$(pwd)/assets/soldiers"
-npm run models
-npm test
-npm run build
+bun run models
+bun run test
+bun run build
 ```
 
 The explicit author command stages the complete family before publishing
@@ -39,7 +39,7 @@ The manifest binds declared source content, Three revision and product hashes.
 Source text and JSON hashes normalize LF/CRLF; binary hashes remain exact.
 Changing a declared recipe/calibration input requires regeneration. Missing,
 stale or corrupt products fail visibly rather than silently rebuilding/falling
-back. Normal `npm ci`, build and play **do not require Blender**: the locked model
+back. Normal `bun install`, build and play **do not require Blender**: the locked model
 exporter stages committed GLB/JSON to ignored public URLs. It does not read blends.
 
 Same-host repeated generation is checked; blend bytes need not match and there

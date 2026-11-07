@@ -24,17 +24,17 @@ The assembler owns geometry lifetime; support/collision/navigation use canonical
 geometry even when visuals have derivatives. Never author separate collision
 meshes or hand-edit products. Navigation shares runtime controller algorithms.
 
-Run from the repository root after `npm ci`:
+Run from the repository root after `bun install`:
 
 ```sh
-npm run world
-npm run world:validate
-npm run world -- --check
-npm test
-npm run build
+bun run world
+bun run world:validate
+bun run world -- --check
+bun run test
+bun run build
 ```
 
-Use `npm run world -- --out=/tmp/world-review` for isolated output.
+Use `bun run world -- --out=/tmp/world-review` for isolated output.
 Commit source and regenerated assets together. Paths/source bytes affect provenance;
 compare physical payloads separately from expected hash changes. `source-hash.js`
 covers recursive JS/TS and the exporter. Other model families retain their own
