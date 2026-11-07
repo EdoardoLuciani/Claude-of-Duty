@@ -23,8 +23,7 @@ export const P320_URL = new URL(
   import.meta.url
 ).href;
 export const P320_EJECT_DELAY = 2 / 60;
-const ALIASES = MAGAZINE_ALIASES;
-const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
+const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES)];
 
 export function makeP320Model(gltf: GLTF): P320Model {
   const scene = gltf.scene;
@@ -89,7 +88,7 @@ export function createP320Animation(model: P320Model): WeaponAnimation {
   const animation = {
     ...rig,
     clips(): Record<string, Clip> {
-      return buildMagazineClips(ALIASES, manifest.clips);
+      return buildMagazineClips(MAGAZINE_ALIASES, manifest.clips);
     },
 
     _sample(name: string, time: number): void {

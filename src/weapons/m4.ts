@@ -22,8 +22,7 @@ export const M4_URL = new URL(
   '../../assets/weapons/m4a1-block-ii/m4a1-block-ii.runtime.glb',
   import.meta.url
 ).href;
-const ALIASES = MAGAZINE_ALIASES;
-const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
+const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES)];
 
 export function makeM4Model(gltf: GLTF): M4Model {
   const scene = gltf.scene;
@@ -127,7 +126,7 @@ export function createM4Animation(model: M4Model): WeaponAnimation {
     ...rig,
     magazineBody,
     clips(): Record<string, Clip> {
-      return buildManifestClips(ALIASES, manifest.clips);
+      return buildManifestClips(MAGAZINE_ALIASES, manifest.clips);
     },
 
     _sample(name: string, time: number): void {
