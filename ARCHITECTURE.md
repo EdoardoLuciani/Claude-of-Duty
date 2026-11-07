@@ -280,8 +280,10 @@ The restricted DOM adapter must restore on construction/init/disposal failure.
 Pixi presents ammo/reload, health/armour, crosshair, retained minimap, fullscreen
 injury, compass/heard pings, hitmarkers/damage arcs, bandage/grenade inventory,
 FPS, score/status, killfeed, prompts/progress and banners/countdown. Its canvas sits below native centre/chrome/menu layers. Injury is independent
-of readout fading. HUD fade, independent capped DPR, static-paused/absent-content
+of readout fading. HUD fade, independent capped DPR, settled active/paused and absent-content
 redraw suppression, paused-FPS invalidation and failure-isolated teardown remain.
+Controllers advance every frame; presenters invalidate only changed visible values,
+with subpixel-quantized easing tails and value-cached health/ammo text.
 `HealthFx`, `Crosshair`, `Hitmarkers`, `DamageArcs`, `Compass` and `AmmoPanel`
 retain animation/derived state, not legacy elements. Hit/arc/heard-ping pools use
 null nodes with the same bounded lifetime/reuse policy. Killfeed's six-row pool
@@ -343,8 +345,10 @@ M4, MPX and AX338 rigid assemblies use ordinary meshes; EVOLYS skins only its
 deforming belt. Keep static bodies out of mechanical skins merely to reduce
 primitive counts; preserve independent moving controls and magazine ownership.
 
-`src/weapons/asset-loader.ts` serializes compressed model loads to bound Basis
-worker/memory use and owns per-load decoder/error cleanup. Material conversion
+`src/weapons/asset-loader.ts` fetches models concurrently, queues parsing to bound
+peak memory and shares one two-worker Basis transcoder per renderer during boot.
+Per-model texture scopes isolate failures and drain pending work; boot completion,
+initialization failure and teardown release the shared decoder. Material conversion
 shares equivalent static map clones only when source, UV channel/transform,
 color space and sampler state match, avoiding duplicate WebGPU uploads for UV1.
 
