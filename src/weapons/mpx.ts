@@ -21,8 +21,7 @@ import type { WeaponAnimation } from './runtime-types.ts';
 export const MPX_URL = new URL('../../assets/weapons/sig-mpx/mpx.runtime.glb', import.meta.url)
   .href;
 export const MPX_EJECT_DELAY = 0.025;
-const ALIASES = MAGAZINE_ALIASES;
-const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
+const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES)];
 
 export function makeMPXModel(gltf: GLTF): MPXModel {
   const scene = gltf.scene;
@@ -176,7 +175,7 @@ export function createMPXAnimation(model: MPXModel): WeaponAnimation {
     ...rig,
     magazineBody,
     clips(): Record<string, Clip> {
-      return buildManifestClips(ALIASES, manifest.clips);
+      return buildManifestClips(MAGAZINE_ALIASES, manifest.clips);
     },
 
     _sample(name: string, time: number): void {
