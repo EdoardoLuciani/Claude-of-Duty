@@ -17,20 +17,6 @@ import { PixiMinimap } from './pixi-minimap.ts';
 import { HUD_TYPE, hudText as text, setHudTextResolution, writeHudText } from './pixi-type.ts';
 import { clamp01, setStyle } from './util.ts';
 
-const WATCH = [
-  'health',
-  'maxHealth',
-  'armour',
-  'maxArmour',
-  'ammo',
-  'reserve',
-  'weaponName',
-  'fireMode',
-  'reloading',
-  'reloadProgress',
-  'time',
-] as const;
-
 /** Gameplay HUD presentation on one passive, borrowed-device WebGPU canvas. */
 export class PixiHud {
   readonly canvas = document.createElement('canvas');
@@ -62,7 +48,8 @@ export class PixiHud {
   private enabled = false;
   private viewportWidth = 1;
   private viewportHeight = 1;
-  private lastState = new Map<string, unknown>();
+  private lastHp = -1;
+  private lastMaxHp = -1;
   draws = 0;
 
   static async create(parent: HTMLElement, before: HTMLElement, game: Renderer): Promise<PixiHud> {
@@ -191,7 +178,7 @@ export class PixiHud {
     if (this.renderer.resolution !== Math.min(devicePixelRatio || 1, 2))
       this.resize(this.viewportWidth, this.viewportHeight, this.stage.scale.x);
     // Injury opacity stays independent of readout/menu/death fading.
-    const alpha = Number(opacity.toFixed(3));
+    const alpha = Math.round(opacity * 1000) / 1000;
     if (this.chrome.alpha !== alpha) this.dirty = true;
     this.chrome.alpha = alpha;
     this.chrome.visible = alpha >= 0.004;
@@ -199,47 +186,79 @@ export class PixiHud {
     const visible = this.chrome.visible || this.injury.mesh.visible;
     setStyle(this.canvas, 'visibility', visible ? '' : 'hidden');
     if (!visible) return;
-    for (const key of WATCH) {
-      if (this.lastState.get(key) !== s[key]) {
-        this.lastState.set(key, s[key]);
-        this.dirty = true;
-      }
-    }
     this.dirty = this.combat.update(models) || this.dirty;
     this.dirty = this.feedback.update(models) || this.dirty;
     this.dirty = this.compass.update(models.compass) || this.dirty;
     this.ammo.update(dt, s);
     const max = s.maxHealth || 100,
       hp = Math.round(Math.max(0, Math.min(max, s.health ?? max)));
-    this.dirty = writeHudText(this.hp, String(hp), 80) || this.dirty;
-    this.dirty = writeHudText(this.maxHp, '/' + Math.round(max)) || this.dirty;
+    if (hp !== this.lastHp) {
+      this.lastHp = hp;
+      this.dirty = writeHudText(this.hp, String(hp), 80) || this.dirty;
+    }
+    const maxHp = Math.round(max);
+    if (maxHp !== this.lastMaxHp) {
+      this.lastMaxHp = maxHp;
+      this.dirty = writeHudText(this.maxHp, '/' + maxHp) || this.dirty;
+    }
     const fraction = clamp01((s.health ?? max) / max),
       tint = fraction <= 0.28 ? 0xff5145 : fraction < 0.5 ? 0xffb02a : 0xe7f2ef;
+    // Quantize rendered poses, not controller state: exponential easing must
+    // eventually settle rather than invalidating for invisible floating-point tails.
+    const hpFill = Math.round(clamp01(health.hpShown) * 10000) / 10000;
+    if (this.hp.tint !== tint || this.hpFill.scale.x !== hpFill) this.dirty = true;
     this.hp.tint = this.hpFill.tint = tint;
-    this.hpFill.scale.x = clamp01(health.hpShown);
-    const plateTint = health.armourFlash > 0.01 ? 0xc9efff : 0xffffff;
-    if (this.armour.alpha !== health.armourShown || this.armourFill.tint !== plateTint)
+    this.hpFill.scale.x = hpFill;
+    const plateTint = health.armourFlash > 0.01 ? 0xc9efff : 0xffffff,
+      armourAlpha = Math.round(health.armourShown * 1000) / 1000,
+      armourVisible = health.armourShown >= 0.01,
+      armourFill = clamp01((s.armour ?? 0) / (s.maxArmour || 150));
+    if (
+      this.armour.visible !== armourVisible ||
+      (armourVisible &&
+        (this.armour.alpha !== armourAlpha ||
+          this.armourFill.tint !== plateTint ||
+          this.armourFill.scale.x !== armourFill))
+    )
       this.dirty = true;
-    this.armour.alpha = health.armourShown;
-    this.armour.visible = health.armourShown >= 0.01;
-    this.armourFill.scale.x = clamp01((s.armour ?? 0) / (s.maxArmour || 150));
+    this.armour.alpha = armourAlpha;
+    this.armour.visible = armourVisible;
+    this.armourFill.scale.x = armourFill;
     this.armourFill.tint = plateTint;
-    for (let i = 0; i < this.blades.length; i++) {
-      const blade = this.blades[i],
-        angle = (i * Math.PI) / 2,
-        gap = crosshair.gap / crosshair.k;
-      blade.position.set(Math.sin(angle) * gap, -Math.cos(angle) * gap);
-      blade.rotation = angle;
-      blade.scale.y = crosshair.bladeLength;
-      blade.alpha = crosshair.bladeAlpha;
+    const reticleVisible = crosshair.visible >= 0.004;
+    if (this.reticle.visible !== reticleVisible) this.dirty = true;
+    this.reticle.visible = reticleVisible;
+    if (reticleVisible) {
+      const gap = Math.round((crosshair.gap / crosshair.k) * 1000) / 1000,
+        length = Math.round(crosshair.bladeLength * 10000) / 10000,
+        bladeAlpha = Math.round(crosshair.bladeAlpha * 1000) / 1000,
+        dotScale = Math.round(crosshair.dotScale * 10000) / 10000,
+        dotAlpha = Math.round(crosshair.dotAlpha * 1000) / 1000;
+      for (let i = 0; i < this.blades.length; i++) {
+        const blade = this.blades[i],
+          angle = (i * Math.PI) / 2,
+          x = Math.sin(angle) * gap,
+          y = -Math.cos(angle) * gap;
+        if (
+          blade.x !== x ||
+          blade.y !== y ||
+          blade.scale.y !== length ||
+          blade.alpha !== bladeAlpha
+        )
+          this.dirty = true;
+        blade.position.set(x, y);
+        blade.rotation = angle;
+        blade.scale.y = length;
+        blade.alpha = bladeAlpha;
+      }
+      if (this.dot.scale.x !== dotScale || this.dot.alpha !== dotAlpha) this.dirty = true;
+      this.dot.scale.set(dotScale);
+      this.dot.alpha = dotAlpha;
     }
-    this.dot.scale.set(crosshair.dotScale);
-    this.dot.alpha = crosshair.dotAlpha;
-    this.reticle.visible = crosshair.visible >= 0.004;
     this.dirty = this.minimap.update(map, mapState) || this.ammo.dirty || this.dirty;
-    // One render driven by the engine, never an Application/ticker. During a
-    // paused static frame only resize/reveal/value changes require a redraw.
-    if (dt <= 0 && !this.dirty) return;
+    // Controllers still advance every frame. Draw only when their presentation
+    // changes, including during gameplay; time alone is not a visual change.
+    if (!this.dirty) return;
     this.renderer.render(this.stage);
     this.draws++;
     this.dirty = false;
