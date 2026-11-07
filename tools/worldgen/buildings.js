@@ -690,6 +690,26 @@ function buildFacade(A, rng, spec, info, ctx) {
   // freshly painted, which is the one thing a street like this never is.
   // Its own stream, so tuning the weathering never re-rolls the facade.
   const wr = keyedRng('runoff', spec.id, f, side);
+  // Stains are geometry and enter cooked collision. Keep their full bounds out
+  // of real openings, including cornice runs and explicitly authored wall cuts.
+  const addRunoff = (g, x, y, depth) => {
+    g.computeBoundingBox();
+    const { min, max } = g.boundingBox;
+    if (
+      inOpening(
+        x + (min.x + max.x) / 2,
+        y + (min.y + max.y) / 2,
+        (max.x - min.x) / 2,
+        (max.y - min.y) / 2,
+        wallHoles,
+        0.02
+      )
+    ) {
+      g.dispose();
+      return;
+    }
+    A.addOnce(wallKey, g, LL(pm, x, y, depth, 0, 1, 1, 1));
+  };
   for (const o of openings) {
     if (o.kind === 'ragged' || o.reserved) continue;
     // A cut replaced this bay's opening: the run off the removed window's sill
@@ -702,7 +722,7 @@ function buildFacade(A, rng, spec, info, ctx) {
     const g = runoffStreak(wr, o.w * wr.range(0.6, 1.0), run, {
       amount: wr.range(0.72, 1.0),
     });
-    A.addOnce(wallKey, g, LL(pm, o.x + wr.range(-0.1, 0.1), sillY - 0.03, -0.012, 0, 1, 1, 1));
+    addRunoff(g, o.x + wr.range(-0.1, 0.1), sillY - 0.03, -0.012);
     // a second, narrower run off one corner of the sill: water finds a low spot
     if (wr.float() < 0.55) {
       const sgn = wr.float() < 0.5 ? -1 : 1;
@@ -711,11 +731,7 @@ function buildFacade(A, rng, spec, info, ctx) {
         amount: wr.range(0.8, 1.0),
         cols: 3,
       });
-      A.addOnce(
-        wallKey,
-        g2,
-        LL(pm, o.x + sgn * o.w * wr.range(0.32, 0.5), sillY - 0.02, -0.013, 0, 1, 1, 1)
-      );
+      addRunoff(g2, o.x + sgn * o.w * wr.range(0.32, 0.5), sillY - 0.02, -0.013);
     }
   }
   // and one long run off the string course / cornice per open facade
@@ -724,11 +740,7 @@ function buildFacade(A, rng, spec, info, ctx) {
       amount: wr.range(0.78, 1.0),
       cols: 4,
     });
-    A.addOnce(
-      wallKey,
-      g,
-      LL(pm, wr.range(-len / 2 + 0.4, len / 2 - 0.4), h - 0.16, -0.012, 0, 1, 1, 1)
-    );
+    addRunoff(g, wr.range(-len / 2 + 0.4, len / 2 - 0.4), h - 0.16, -0.012);
   }
 
   // ---- string course between floors ----

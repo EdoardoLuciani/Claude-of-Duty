@@ -5,6 +5,7 @@ import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts'
 import type { ReloadPhase } from '../core/events.ts';
 import { Rng } from '../core/rng.ts';
 import { AmmoPickups } from './ammo-pickups.ts';
+import { disposeWeaponLoader } from './asset-loader.ts';
 import { ProjectileSim, dropAt } from './ballistics.ts';
 import {
   WEAPON_DEFS,
@@ -292,13 +293,24 @@ export class WeaponSystem {
     const spawn = [...this.owned];
     const rest = WEAPON_IDS.filter((id): boolean => !this.owned.has(id));
     let tris = 0;
-    const load = (id: WeaponId): Promise<WeaponModelRecord> =>
-      loadWeapon(id, ctx.get('render').renderer);
-    const records = await Promise.all(spawn.map(load));
-    for (let i = 0; i < spawn.length; i++) {
-      tris += this.viewmodel.addWeapon(records[i], this._requireState(spawn[i]).def).tris;
+    const renderer = ctx.get('render').renderer;
+    const load = (id: WeaponId): Promise<WeaponModelRecord> => loadWeapon(id, renderer);
+    try {
+      const records = await Promise.all(spawn.map(load));
+      for (let i = 0; i < spawn.length; i++) {
+        tris += this.viewmodel.addWeapon(records[i], this._requireState(spawn[i]).def).tris;
+      }
+      this._restTask = (async (): Promise<void> => {
+        try {
+          await this._mountRest(rest, load);
+        } finally {
+          await disposeWeaponLoader(renderer);
+        }
+      })();
+    } catch (error) {
+      await disposeWeaponLoader(renderer);
+      throw error;
     }
-    this._restTask = this._mountRest(rest, load);
     this.viewmodel.setActive(this.activeId);
     this.viewmodel.play('draw');
     this._pickups = new AmmoPickups(this);
@@ -1823,7 +1835,11 @@ export class WeaponSystem {
     }
   }
 
-  dispose(): void {
+  async dispose(): Promise<void> {
+    const renderer = this.ctx?.peek('render')?.renderer;
+    if (renderer) await disposeWeaponLoader(renderer);
+    // Deferred mounts must finish before their viewmodel is destroyed (HMR/init failure).
+    await this._restTask?.catch((): void => {});
     for (const off of this._off ?? []) off();
     this._sim?.clear();
     this._clearGrenades();
