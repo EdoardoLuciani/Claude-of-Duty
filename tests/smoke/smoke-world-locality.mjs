@@ -9,7 +9,7 @@ import { BUILDINGS } from '../../tools/worldgen/level/layout.js';
 
 const box = new THREE.Box3();
 
-/** Every merged piece and instance as `key min max`, counted. */
+/** Every merged piece and surviving instance as `key min max` -> { n, x, z }. */
 function emitted() {
   const out = new Map();
   const record = (key, geo, matrix) => {
@@ -17,18 +17,16 @@ function emitted() {
     box.copy(geo.boundingBox);
     if (matrix) box.applyMatrix4(matrix);
     const k = `${key} ${box.min.toArray().map((v) => v.toFixed(4))} ${box.max.toArray().map((v) => v.toFixed(4))}`;
-    out.set(k, (out.get(k) ?? 0) + 1);
+    const e = out.get(k) ?? { n: 0, x: box.min.x, z: box.min.z };
+    e.n++;
+    out.set(k, e);
   };
   const A = new Assembler({ materials: { get: (name) => ({ name }) } });
-  const add = A.add.bind(A);
-  const place = A.place.bind(A);
-  A.add = (key, geo, matrix, opts) => (record(key, geo, matrix), add(key, geo, matrix, opts));
-  A.place = (id, matrix, masks) => {
-    const proto = A._protos.get(id);
-    if (proto) record(id, proto.geo, matrix);
-    return place(id, matrix, masks);
-  };
+  // Record merged pieces without merging them: nothing reads the batches here.
+  A.add = (key, geo, matrix) => (record(key, geo, matrix), A);
   buildWorld(A);
+  // Instances after clutter clearance, so culling differences count too.
+  for (const [id, proto] of A._protos) for (const m of proto.matrices) record(id, proto.geo, m);
   return out;
 }
 
@@ -40,15 +38,15 @@ spec.damage = (damage ?? 0.2) + 0.25; // changes the draw count of every W2 faca
 const after = emitted();
 spec.damage = damage;
 
-const near = (k) => {
-  const [x, , z] = k.split(' ')[1].split(',').map(Number);
-  return Math.abs(x - spec.x) < spec.w / 2 + 3 && Math.abs(z - spec.z) < spec.d / 2 + 3;
-};
+const near = ({ x, z }) =>
+  Math.abs(x - spec.x) < spec.w / 2 + 3 && Math.abs(z - spec.z) < spec.d / 2 + 3;
 let local = 0;
 const leaked = [];
 for (const k of new Set([...before.keys(), ...after.keys()])) {
-  if ((before.get(k) ?? 0) === (after.get(k) ?? 0)) continue;
-  if (near(k)) local++;
+  const a = before.get(k);
+  const b = after.get(k);
+  if (a?.n === b?.n) continue;
+  if (near(a ?? b)) local++;
   else leaked.push(k);
 }
 assert.ok(local > 0, 'the edit changes W2 itself');

@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 
 import { BOX, BOX_FINE, BOX_THIN, IDENT, LL, rubbleMound } from './kit.js';
-import { clothGeometry, patchGeometry, chamferBox, fillMasks } from './util.js';
+import { clothGeometry, patchGeometry, chamferBox, fillMasks, overlapsRect } from './util.js';
+
+const _box = new THREE.Box3();
 
 function inDoorway(r, x, z, rad = 1.25) {
   for (const d of r.doors) {
@@ -29,10 +31,8 @@ const overlap = (a0, a1, b0, b1) =>
 
 /** Flat patches are cooked collision: any part over a stair void caps the shaft. */
 function patchOverVoid(r, g, matrix) {
-  const b = g.boundingBox.clone().applyMatrix4(matrix);
-  return (r.voids ?? []).some(
-    (v) => b.max.x > v.x0 && b.min.x < v.x1 && b.max.z > v.z0 && b.min.z < v.z1
-  );
+  _box.copy(g.boundingBox).applyMatrix4(matrix);
+  return (r.voids ?? []).some((v) => overlapsRect(_box, v));
 }
 
 function inVoid(r, x, z) {
@@ -520,10 +520,17 @@ function furnishShop(A, rng, r, cx, cz, w, d) {
   let ccx = alongZ ? (r.street === 1 ? x1 - 1.3 : x0 + 1.3) : cx;
   let ccz = alongZ ? cz : frontZ ? cz - frontZ * (d * 0.5 - 1.3) : cz + d * 0.18;
   let clen = Math.min((alongZ ? d : w) - 1.4, 4.4);
-  // Face the authored shop (the bay a sightline depends on) over any rolled one.
-  const shops = r.facadeOpenings.filter(
-    (opening) => opening.kind === 'shop' && opening.side === r.street
-  );
+  // Face a shop in this room, the authored one (a sightline depends on it) first.
+  const [lo, hi] = alongZ ? [r.z0, r.z1] : [x0, x1];
+  const shops = r.facadeOpenings.filter((opening) => {
+    const at = alongZ ? opening.z : opening.x;
+    return (
+      opening.kind === 'shop' &&
+      opening.side === r.street &&
+      at >= Math.min(lo, hi) &&
+      at <= Math.max(lo, hi)
+    );
+  });
   const shop = shops.find((opening) => opening.authored) ?? shops[0];
   if (shop) {
     clen = Math.min(clen, Math.max(1.2, shop.w - 0.4));

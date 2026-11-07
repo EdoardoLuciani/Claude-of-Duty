@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 
-import { sinkAdds } from './buildings.js';
 import {
   BOX,
   BOX_FINE,
@@ -26,6 +25,7 @@ import {
   chamferBox,
   fillMasks,
   keyedRng,
+  overlapsRect,
   paintMasks,
   rockGeometry,
   tubeY,
@@ -41,9 +41,7 @@ import {
  */
 
 const _m = new THREE.Matrix4();
-const _v = new THREE.Vector3();
-// Aerial footprint, including its crossbars.
-const _size = new THREE.Vector3(1, 0, 1);
+const _box = new THREE.Box3();
 
 /**
  * A dirt/rubble skirt at the base of a heavy prop.
@@ -891,7 +889,6 @@ function dressBuilding(A, rng, info) {
   // ---- balconies get lived in ----
   for (const bal of info.balconies) {
     const pm = bal.pm;
-    const target = bal.omitted ? sinkAdds(A) : A;
     // rug over the railing — instantly reads as inhabited
     if (rng.float() < 0.55) {
       const cloth = clothGeometry(rng.range(0.8, 1.4), rng.range(0.7, 1.1), {
@@ -904,7 +901,7 @@ function dressBuilding(A, rng, info) {
         rng,
       });
       const wp = worldOf(pm, bal.x + rng.range(-0.3, 0.3), bal.y + 0.95, -bal.d - 0.03);
-      target.addOnce(
+      A.addOnce(
         rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']),
         cloth,
         LL(IDENT, wp[0], wp[1], wp[2], ryOf(pm) + Math.PI),
@@ -912,9 +909,6 @@ function dressBuilding(A, rng, info) {
       );
     }
   }
-
-  // Sink-only anchors are authoring state, not playable balconies.
-  info.balconies = info.balconies.filter((bal) => !bal.omitted);
 
   // ---- roof detail ----
   // Roofs are playable ground in this map (balconies and parapets are the
@@ -931,12 +925,7 @@ function dressBuilding(A, rng, info) {
   // Collision-cooked roof dressing must not lid the roof stair hole or block the
   // ladder climb-out beside it (1.1 m exit + capsule radius).
   const hole = spec.stairHoles?.[info.floorY.length];
-  const blocksHole = (b) =>
-    !!hole &&
-    b.max.x > hole.x0 - 1.2 &&
-    b.min.x < hole.x1 + 1.2 &&
-    b.max.z > hole.z0 - 1.2 &&
-    b.min.z < hole.z1 + 1.2;
+  const blocksHole = (b) => !!hole && overlapsRect(b, hole, 1.2);
   // dust and grit blown into the roof corners
   for (let i = 0; i < 4; i++) {
     const g = patchGeometry(rng, rng.range(0.6, 1.6), { lobes: 9, wobble: 0.5 });
@@ -950,7 +939,7 @@ function dressBuilding(A, rng, info) {
       1,
       0.7
     );
-    if (blocksHole(g.boundingBox.clone().applyMatrix4(matrix))) g.dispose();
+    if (blocksHole(_box.copy(g.boundingBox).applyMatrix4(matrix))) g.dispose();
     else A.addOnce('dirt', g, matrix, { masks: [0.1, 0.85, 0.5] });
   }
   // rooftop laundry line between the parapets
@@ -1009,7 +998,10 @@ function dressBuilding(A, rng, info) {
     const px = rng.range(rx0, rx1);
     const pz = rng.range(rz0, rz1);
     const h = rng.range(1.4, 3.2);
-    if (blocksHole(new THREE.Box3().setFromCenterAndSize(_v.set(px, roofY, pz), _size))) continue;
+    // Footprint including the crossbars.
+    _box.min.set(px - 0.5, roofY, pz - 0.5);
+    _box.max.set(px + 0.5, roofY, pz + 0.5);
+    if (blocksHole(_box)) continue;
     const pipe = A.cache('aerial', () => tubeY(0.018, 1, { radial: 5 }));
     A.add('metal_rust', pipe, LL(IDENT, px, roofY, pz, 0, 1, h, 1), { masks: [0.9, 0.5, 0.1] });
     for (let k = 0; k < 4; k++) {

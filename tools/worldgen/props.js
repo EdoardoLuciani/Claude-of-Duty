@@ -553,8 +553,7 @@ function tiedBunch() {
 }
 
 function grainSack() {
-  // Standing hessian sack with a gathered, tied-off neck. Fixed seed so
-  // registering it does not consume the world RNG. Profile: fat slumped
+  // Standing hessian sack with a gathered, tied-off neck. Profile: fat slumped
   // belly low, tapering shoulder, cinched neck, twine ring, floppy crown.
   const w = 0.42,
     h = 0.54,
