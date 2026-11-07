@@ -47,6 +47,16 @@ export function keyedRng(...parts) {
   return new Rng(stableSeed(parts.join(':')));
 }
 
+/** True when a box's X/Z footprint overlaps `rect` {x0, x1, z0, z1} grown by `pad`. */
+export function overlapsRect(box, rect, pad = 0) {
+  return (
+    box.max.x > rect.x0 - pad &&
+    box.min.x < rect.x1 + pad &&
+    box.max.z > rect.z0 - pad &&
+    box.min.z < rect.z1 + pad
+  );
+}
+
 // ------------------------------------------------------------------ noise --
 /** Deterministic 3D value hash in [0,1). No Math.random anywhere. */
 export function hash3(x, y, z) {

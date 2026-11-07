@@ -205,27 +205,25 @@ export function windowUnit(A, pm, o, rng, opts = {}) {
     A.add(frameKey, box, LL(pm, x, y + h * 0.16, depth, 0, w - 0.1, 0.04, fd * 0.85), null);
   } else {
     // An open casement: the sash swung inward off its hinge, catching light on
-    // its edge against the dark room behind it. A walkable room (`walkable`)
+    // its edge against the dark room behind it. A walkable room (`back:false`)
     // gets no swung leaves: they are collision at head height across its routes.
     openL = true;
     openR = state === 'open' || rng.float() < 0.4;
     const sw = cm(w / 2 - 0.03);
     const sh = cm(h);
-    const sash = A.cache(`sash:${sw}:${sh}`, () => sashLeaf(sw, sh - 0.06));
-    const leaves = !opts.walkable;
-    if (leaves) {
-      const yaw = rng.range(-1.35, -0.75);
-      A.add(frameKey, sash, LL(pm, x - w / 2 + 0.04, y, depth + 0.02, yaw, 1, 1, 1), {
-        masks: [0.8, 0.45, 0.2],
-      });
-    }
+    const leaf = (hx, yaw) =>
+      A.add(
+        frameKey,
+        A.cache(`sash:${sw}:${sh}`, () => sashLeaf(sw, sh - 0.06)),
+        LL(pm, hx, y, depth + 0.02, yaw, 1, 1, 1),
+        { masks: [0.8, 0.45, 0.2] }
+      );
+    const leaves = opts.back !== false;
+    if (leaves) leaf(x - w / 2 + 0.04, rng.range(-1.35, -0.75));
     if (!openR) {
       A.add(frameKey, box, LL(pm, x, y, depth, 0, 0.045, h - 0.1, fd * 0.85), null);
     } else if (leaves) {
-      const yaw = rng.range(0.75, 1.35);
-      A.add(frameKey, sash, LL(pm, x + w / 2 - 0.04, y, depth + 0.02, yaw, 1, 1, 1), {
-        masks: [0.8, 0.45, 0.2],
-      });
+      leaf(x + w / 2 - 0.04, rng.range(0.75, 1.35));
     }
   }
 
@@ -601,64 +599,6 @@ export function shopfront(A, pm, o, rng, opts = {}) {
     });
   }
 
-  /**
-   * Inside dressing beside the opening. The wall a shop is seen through is the
-   * biggest surface in any interior shot, and bare render there is the fastest
-   * way to make an interior look like an empty box.
-   */
-  if (opts.inside !== false) {
-    const thin = BOX_THIN(A);
-    for (const sx of [-1, 1]) {
-      const bx = x + sx * (w / 2 + 0.75);
-      // wall shelf with goods
-      const sy = 1.35 + (rng?.range ? rng.range(-0.1, 0.25) : 0);
-      if (opts.shelves !== false) {
-        A.add('wood_prop', BOX_FINE(A), LL(pm, bx, sy, t + 0.17, 0, 1.3, 0.045, 0.34), {
-          masks: [0.85, 0.4, 0.15],
-        });
-        for (const b of [-1, 1]) {
-          A.add(
-            'metal_rust',
-            thin,
-            LL(pm, bx + b * 0.5, sy - 0.12, t + 0.09, 0, 0.03, 0.24, 0.18),
-            { masks: [0.9, 0.6, 0.2] }
-          );
-        }
-      }
-      // conduit up the wall into a junction box
-      A.add('metal_dark', thin, LL(pm, bx + 0.62, 1.5, t + 0.03, 0, 0.045, 2.6, 0.045), {
-        masks: [0.7, 0.5, 0.2],
-      });
-      A.add('metal_dark', BOX_FINE(A), LL(pm, bx + 0.62, 1.42, t + 0.06, 0, 0.16, 0.22, 0.09), {
-        masks: [0.8, 0.5, 0.2],
-      });
-    }
-    // a bolt of cloth hung on the inside wall over the counter
-    if (rng && rng.float() < 0.7) {
-      const c = clothGeometry(rng.range(0.9, 1.5), rng.range(1.1, 1.7), {
-        segX: 7,
-        segY: 8,
-        sag: 0.05,
-        wrinkle: 0.055,
-        twist: 0.06,
-        thickness: 0.003,
-        fray: 0.02,
-        rng,
-      });
-      A.addOnce(
-        rng.pick(['fabric_red', 'fabric_teal', 'fabric_cream']),
-        c,
-        LL(
-          pm,
-          x + (rng.float() < 0.5 ? -1 : 1) * (w / 2 + rng.range(0.9, 1.5)),
-          1.75,
-          t + 0.08,
-          Math.PI
-        ),
-        { masks: [0.3, 0.45, 0.2] }
-      );
-    }
-  }
   return o;
 }
 

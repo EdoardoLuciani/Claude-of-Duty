@@ -50,13 +50,8 @@ export const BUILDINGS = [
     damage: 0.15,
     balconies: 0.3,
     // The full-width terrace is the street frontage; separate balcony rails
-    // inside it duplicate that form. Consume their dressing rolls only.
-    omitBalconies: {
-      1: {
-        0: { preserveDressing: true },
-        2.799999999999999: { preserveDressing: true },
-      },
-    },
+    // inside it duplicate that form.
+    omitBalconies: { 1: { 0: true, 2.799999999999999: true } },
     doorBays: { 0: 2, 1: 1 },
     enterable: true,
     interiorFloors: 1,
