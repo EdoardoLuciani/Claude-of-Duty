@@ -1,8 +1,8 @@
 # Runtime model cooking
 
-`models.mjs` is the shared offline gltfpack build stage. Regeneration is explicit;
-ordinary dev/build/CI uses committed runtime GLBs, with no encoder requirement.
-Native Blender exports remain authoring references. No metadata sidecars are
+`models.mjs` is the shared gltfpack build stage. `bun run dev` / `bun run build`
+cook stale models through `tools/build-assets.mjs`; `bun run build:ci` cooks
+nothing. Runtime and native exports are ignored build products. No metadata sidecars are
 emitted: settings and opt-in profiles live in `MODEL_COOKS`/`GLTFPACK_FLAGS`.
 
 Install native **gltfpack 1.3 with BasisU support** from the

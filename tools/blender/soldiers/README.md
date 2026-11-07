@@ -1,9 +1,9 @@
 # Native soldier authoring
 
 `vanguard`, `irregular` and `breacher` are supported; unknown names and rifle
-styles fail explicitly. Python owns geometry; canonical products are committed in
-`assets/soldiers/`. Normal `bun run models` validates and stages GLB/JSON into the
-ignored `public/models/soldiers/` delivery directory without Blender. No mesh
+styles fail explicitly. Python owns geometry; dev/build generate the ignored
+products in `assets/soldiers/` (via `tools/build-assets.mjs`). `bun run models`
+validates and stages GLB/JSON into the ignored `public/models/soldiers/` directory. No mesh
 product is an authoring input.
 
 The runtime reference's feature flags select covered/bare helmets, down/parked
@@ -37,7 +37,7 @@ directory. Blend binary bytes may differ between runs; runtime GLB/JSON bytes
 are deterministic on the tested host. Manifest differences may therefore include
 blend hashes, but contain no timestamps or absolute authoring/output paths.
 
-### Blender-free normal-build boundary
+### Node reader boundary
 
 `export.mjs` exports these direct Node APIs for the parent exporter:
 

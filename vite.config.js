@@ -6,7 +6,10 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)));
-const ASSET_TASKS = ['export-proc-textures.mjs', 'export-models.mjs', 'validate-world-assets.mjs'];
+// Code-only builds (`bun run build:ci`) generate no models; they only validate the committed world.
+const ASSET_TASKS = process.env.OW_SKIP_ASSETS
+  ? ['validate-world-assets.mjs']
+  : ['build-assets.mjs'];
 
 async function runAssetTasks() {
   for (const file of ASSET_TASKS) {
@@ -23,7 +26,7 @@ async function runAssetTasks() {
 }
 
 export default defineConfig(async ({ isPreview }) => {
-  // World export is explicit; normal builds only validate the committed assets.
+  // Generated models are built here; world export stays explicit (committed, validated).
   if (!isPreview && !process.env.VITEST) await runAssetTasks();
 
   let revision = 'unknown';

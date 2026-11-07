@@ -1,8 +1,9 @@
 # Weapon authoring
 
 Python is the source of truth. Generated weapon blends, GLBs, maps and manifests
-are products, never fallback build inputs. Normal Vite builds use committed
-assets and need no Blender. Imports must not build objects or reset scenes.
+are products, never fallback build inputs. `bun run dev` / `bun run build` run
+these builds through `tools/build-assets.mjs` when inputs change; products are
+ignored, except weapon manifests that code imports. Imports must not build objects or reset scenes.
 
 Start with the [asset/world editing map](../../docs/assets.md). Each weapon has
 one tooling directory here: `m4/`, `mcx/`, `p320/`, `evolys/`, `mpx/`, `ax338/`,
@@ -11,9 +12,8 @@ helpers. Where applicable, `actions.py` authors clips and `hand-reference.mjs`
 explicitly refits calibration; MCX authors clips in `animations.py` and has no
 separate hand-calibration stage. Run commands from the repository root.
 
-Committed blends/manifests retain the source-path notes from their last export.
-They are not rewritten or rebuilt for this tooling relocation; use the current
-asset README commands below rather than historical paths embedded in products.
+Committed manifests may retain source-path notes from an older export; use the
+current asset README commands below rather than historical paths embedded in products.
 
 Use **Blender 5.2.2** and its bundled glTF exporter. Each asset README owns its
 build/check commands, declared inputs, references and acceptance limits:
@@ -46,5 +46,5 @@ Standalone attachments: [EXPS3-0](../../assets/attachments/eotech-exps3-0/README
   paths/metadata need not be byte-identical; same-host evidence is not universal
   cross-platform determinism. Explicit asset exceptions remain narrow.
 - Run source, smoke and hardware-WebGPU checks; export success is not visual
-  acceptance. Commit the recipe with reviewed generated products. Preserve
+  acceptance. Commit the recipe with its regenerated weapon manifest. Preserve
   existing contact, interruption and ammo gates, not just output counts.

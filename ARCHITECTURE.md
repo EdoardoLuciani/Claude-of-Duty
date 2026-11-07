@@ -335,8 +335,8 @@ Artwork generation is offline-only; model, prompts and processing live in
 `assets/ui/market/`, with optimized runtime WebPs in `public/images/market/`.
 
 `build/models.mjs` owns explicit gltfpack runtime-model cooking and per-model
-profiles (`bun run models:cook`). Normal builds consume committed `.runtime.glb`
-products; they do not run the encoder. All seven authored weapons opt in.
+profiles (`bun run models:cook`). `tools/build-assets.mjs` builds and cooks stale
+models during dev/build; products are ignored, not committed. All seven authored weapons opt in.
 Adding profiles requires adapter, animation and visual validation rather than
 blanket simplification. Editable Blender sources remain authoring references.
 M4/MCX adapters decode packed finish metadata in small weapon-local physical-node
@@ -355,17 +355,16 @@ color space and sampler state match, avoiding duplicate WebGPU uploads for UV1.
 `tools/blender/soldiers/` owns seeded, parametric soldier geometry from an empty
 Blender scene. An explicit reference bridge reads the runtime RIG, variant registry
 and material scales; it does not duplicate IK or consume old mesh products. A final
-Node GLTFExporter cook preserves the runtime joint/attribute format. Commit the
-recipe and canonical `assets/soldiers/` products together after visual/pose checks.
+Node GLTFExporter cook preserves the runtime joint/attribute format. The
+`assets/soldiers/` products are generated during dev/build, not committed.
 
-`tools/export-models.mjs` validates/stages those committed soldiers and generates
+`tools/export-models.mjs` validates/stages those generated soldiers and generates
 the spent hull. Missing/stale/corrupt authoring products fail, never trigger Blender
 or a procedural fallback. Content hashing covers shared sources and all runtime
 products; missing outputs force a full restage. Atomic writes and the cache lock
-remain. Vite dev/build runs it; preview uses existing `dist`. Normal builds need no
-Blender; explicit soldier regeneration does.
+remain. Vite dev/build runs it after the Blender steps; preview uses existing `dist`.
 
-M4/MCX/P320/EVOLYS/MPX/AX338/M590 use committed GLBs and weapon-owned adapters
+M4/MCX/P320/EVOLYS/MPX/AX338/M590 use generated GLBs and weapon-owned adapters
 under `src/weapons/`; procedural player-weapon exports are retired. M590 is a
 provisional in-game review prototype, not strict 1:1/final visual acceptance.
 Its seven event-only Clips sample one native mixer; `shell_insert` uses authored

@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 /**
- * Stage committed Blender-authored soldiers and generate the offline spent hull.
- * Normal Vite/build/play never needs Blender. Soldier recipes and explicit
- * regeneration live in tools/blender/soldiers/; products live in assets/soldiers/.
+ * Stage Blender-authored soldiers and generate the offline spent hull. This script
+ * never runs Blender: tools/build-assets.mjs regenerates assets/soldiers/ first.
  *
  * Content hashing covers shared inputs and canonical products. Missing outputs
  * force a full restage; --force bypasses the cache. Keep the pid lock and atomic

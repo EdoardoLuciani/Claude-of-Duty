@@ -39,11 +39,10 @@ The manifest binds declared source content, Three revision and product hashes.
 Source text and JSON hashes normalize LF/CRLF; binary hashes remain exact.
 Changing a declared recipe/calibration input requires regeneration. Missing,
 stale or corrupt products fail visibly rather than silently rebuilding/falling
-back. Normal `bun ci`, build and play **do not require Blender**: the locked model
-exporter stages committed GLB/JSON to ignored public URLs. It does not read blends.
+back. Products are ignored, not committed: `bun run dev` / `bun run build`
+regenerate them when inputs change, then stage GLB/JSON to ignored public URLs.
 
 Same-host repeated generation is checked; blend bytes need not match and there
 is no cross-platform bitwise or old-pixel guarantee. Rig/skin/surface/socket
 contracts, runtime material acceptance and real animation/ladder clearance checks
-remain required. Commit the recipe and reviewed generated products together;
-never hand-edit the manifest or runtime files.
+remain required. Commit the recipe; never hand-edit the manifest or runtime files.

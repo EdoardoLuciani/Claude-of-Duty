@@ -1,4 +1,4 @@
-/** Explicit Blender authoring and Blender-free committed-product reading. */
+/** Blender soldier authoring and a Blender-free reader for the generated products. */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
