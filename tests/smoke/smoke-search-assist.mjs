@@ -184,6 +184,36 @@ function tick(state, now, agents, origin = ORIGIN) {
     waveIncoming: wave.incoming,
     nextWaveIn: wave.nextIn,
   });
+  // Issue 608: AI-on-AI grenade kills must not award player score/shop credits.
+  const kill = { target: agent(), amount: 250, killed: true, explosion: true };
+  for (const source of [agent(), { team: 0 }, null, undefined]) {
+    ctx.events.emit('damage:dealt', { ...kill, source });
+    assert.equal(game.score, 0, 'non-player kills give no score');
+    assert.equal(game.kills, 0, 'non-player kills give no kill credit');
+  }
+  assert.equal(events.filter((e) => e.type === 'score:change').length, 0);
+  for (const source of ['player', player, { isPlayer: true }]) {
+    for (const headshot of [false, true]) {
+      const score = game.score;
+      const kills = game.kills;
+      const points = headshot ? 150 : 100;
+      ctx.events.emit('damage:dealt', { ...kill, source, headshot });
+      assert.equal(game.score, score + points, 'player kills retain normal rewards');
+      assert.equal(game.kills, kills + 1);
+      assert.deepEqual(events.at(-1), {
+        type: 'score:change',
+        payload: {
+          score: game.score,
+          delta: points,
+          reason: headshot ? 'headshot' : 'elimination',
+          kills: game.kills,
+        },
+      });
+    }
+  }
+  game.reset();
+  events.length = 0;
+
   let t = 0;
   const pump = (dt = 0) => {
     t += dt;
