@@ -645,4 +645,117 @@ for (const reason of [
   nav.dispose();
 }
 
+/* frame-rate independent cadence (issue 605): fire eligibility is held fixed */
+{
+  const STEADY = (fps) => () => 1 / fps;
+  let seed = 605;
+  const jitter = () => {
+    seed = (seed * 16807) % 2147483647;
+    return 1 / 240 + (seed / 2147483647) * (1 / 24 - 1 / 240);
+  };
+  const SOURCES = [
+    ['30', STEADY(30)],
+    ['60', STEADY(60)],
+    ['120', STEADY(120)],
+    ['144', STEADY(144)],
+    ['10 (dt clamp)', STEADY(10)],
+    ['jitter', jitter],
+  ];
+  const shooter = (over = {}) => {
+    const a = stubAgent({ repathTimer: 9, wantFire: true, ...over });
+    a.animator.reload = function () {
+      this.reloading = true;
+    };
+    a.ai.emitReload = () => {};
+    const times = [];
+    let t = 0;
+    a.ai.onAgentFire = () => {
+      if (a.hold) return false; // a resolved-shot friendly rejection
+      times.push(t);
+      return true;
+    };
+    const step = (dt) => {
+      t += dt;
+      const before = times.length;
+      a.fireCooldown -= dt;
+      a.burstCooldown -= dt;
+      a.wantFire = true;
+      aimMuzzle(a);
+      a._shoot(dt);
+      return times.length - before;
+    };
+    return { a, times, step };
+  };
+  const endless = { ...rng, int: () => 1e6 };
+
+  // A continuous burst sustains the authored fire rate at any frame rate.
+  for (const fireRate of [COMBAT.fireRate, COMBAT.fireRateIrregular]) {
+    const counts = [];
+    for (const [label, nextDt] of SOURCES) {
+      const { a, times, step } = shooter({ rng: endless, fireRate, ammo: 1e6, magSize: 1e6 });
+      while (times.length < 2 || times.at(-1) - times[0] < 10) step(nextDt());
+      const expected = 1 + (times.at(-1) - times[0]) * fireRate;
+      assert.ok(
+        Math.abs(times.length - expected) <= 1,
+        `AI ${fireRate}/s @ ${label}: ${times.length} rounds, expected ~${expected.toFixed(1)}`
+      );
+      for (let i = 1; i < times.length; i++) {
+        assert.ok(times[i] - times[0] >= i / fireRate - 1e-9, `AI @ ${label}: round ${i} early`);
+      }
+      assert.equal(1e6 - a.ammo, times.length, `AI @ ${label}: one cartridge per round`);
+      counts.push(times.length);
+    }
+    assert.ok(Math.max(...counts) - Math.min(...counts) <= 1, 'AI cadence varies with FPS');
+  }
+
+  // Intentional burst gaps survive: each burst is burstMin rounds at the fire
+  // rate, and the next burst starts no sooner than the gap after the last.
+  const gap = (COMBAT.burstGapMin + COMBAT.burstGapMax) * 0.5;
+  for (const [label, nextDt] of SOURCES) {
+    const { times, step } = shooter({ ammo: 1e6, magSize: 1e6 });
+    let maxDt = 0;
+    while (times.length < 10 * COMBAT.burstMin) step((maxDt = Math.max(maxDt, nextDt())));
+    for (let b = 0; b < 10; b++) {
+      const first = times[b * COMBAT.burstMin];
+      const last = times[(b + 1) * COMBAT.burstMin - 1];
+      const span = (COMBAT.burstMin - 1) / COMBAT.fireRate;
+      assert.ok(last - first >= span - 1e-9, `AI burst @ ${label}: early round`);
+      assert.ok(last - first < span + maxDt + 1e-9, `AI burst @ ${label}: late round`);
+      if (b > 0) {
+        const prev = times[(b - 1) * COMBAT.burstMin];
+        assert.ok(first - prev >= gap - 1e-9, `AI burst @ ${label}: gap skipped`);
+      }
+    }
+  }
+
+  // Friendly holds and reloads do not bank rounds: the first clear frame fires
+  // at most once and the authored interval follows.
+  for (const name of ['friendly hold', 'reload']) {
+    const { a, times, step } = shooter({ rng: endless, ammo: 1e6, magSize: 1e6 });
+    for (let i = 0; i < 30; i++) step(DT);
+    if (name === 'reload') a.ammo = 0;
+    else a.hold = true;
+    const before = times.length;
+    for (let i = 0; i < 60; i++) step(DT);
+    assert.equal(times.length, before, `${name}: no rounds during the block`);
+    assert.equal(a.ammo, name === 'reload' ? a.magSize : 1e6 - before, `${name}: ammo kept`);
+    a.hold = false;
+    a.animator.reloading = false;
+    const resumed = times.length;
+    assert.equal(step(DT), 1, `${name}: the clear frame fires one round`);
+    while (times.length === resumed + 1) step(DT);
+    assert.ok(times.at(-1) - times[resumed] >= 1 / COMBAT.fireRate - 1e-9, `${name}: banked round`);
+  }
+
+  // Overload: a 1 s hitch fires at most maxShotsPerFrame rounds; no backlog.
+  {
+    const { a, step } = shooter({ rng: endless, ammo: 1e6, magSize: 1e6 });
+    step(DT);
+    assert.equal(step(1), COMBAT.maxShotsPerFrame, 'AI hitch catches up to the bound');
+    assert.equal(step(DT), 1, 'the next frame fires one due round');
+    assert.equal(step(DT), 0, 'and does not drain a backlog');
+    assert.equal(1e6 - a.ammo, 2 + COMBAT.maxShotsPerFrame);
+  }
+}
+
 console.log('ok  smoke-ai-fire');

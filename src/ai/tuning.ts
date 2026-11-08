@@ -37,6 +37,8 @@ export const COMBAT = {
 
   fireRate: 10.5,
   fireRateIrregular: 8.2,
+  /** Catch-up bound for rounds owed by one long frame (dt is clamped to 0.1 s). */
+  maxShotsPerFrame: 3,
   magSize: 30,
   damage: 17,
   penetration: 0.9,

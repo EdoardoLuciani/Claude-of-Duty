@@ -8,7 +8,7 @@ import { Input } from '../../src/core/input.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
 import { WEAPON_IDS } from '../../src/weapons/defs.ts';
-import { WeaponSystem, GRENADE_FUSE } from '../../src/weapons/index.ts';
+import { WeaponSystem, GRENADE_FUSE, MAX_SHOTS_PER_FRAME } from '../../src/weapons/index.ts';
 
 function makeHarness() {
   const input = new Input({}, { sensitivity: 1, invertY: false });
@@ -774,6 +774,205 @@ for (const blocked of ['disabled', 'frozen', 'dead', 'controls', 'input']) {
   } finally {
     pickups.dispose();
   }
+}
+
+/* ======================================================================== */
+/*  frame-rate independent cadence (issue 605)                              */
+/* ======================================================================== */
+
+// Frame-time sources: fixed rates, the engine's 0.1 s clamp, and 24-240 FPS jitter.
+const steady = (fps) => () => 1 / fps;
+const jittered = (seed) => {
+  const r = new Rng(seed);
+  return () => 1 / 240 + r.float() * (1 / 24 - 1 / 240);
+};
+const FRAME_SOURCES = [
+  ['30', steady(30)],
+  ['60', steady(60)],
+  ['120', steady(120)],
+  ['144', steady(144)],
+  ['10 (dt clamp)', steady(10)],
+  ['jitter', jittered(605)],
+];
+
+// Real update() + lateUpdate(): record accepted rounds, fire events and seeds.
+function cadenceHarness(id) {
+  const h = makeHarness();
+  const { wp, frame, shots } = h;
+  wp.activeId = id;
+  wp.state.mag = 1e6;
+  const events = { fire: 0, shell: 0, seeds: [] };
+  wp.ctx.events.emit = (type, e) => {
+    if (type === 'weapon:fire') {
+      events.fire++;
+      events.seeds.push(e.seed);
+    } else if (type === 'weapon:shell') events.shell++;
+  };
+  Object.assign(wp.viewmodel, { update() {}, boreDir() {}, ejectWorld() {}, ejectVelocity() {} });
+  const pellets = Math.max(1, wp.state.def.pellets ?? 1);
+  const times = [];
+  let t = 0;
+  const step = (opts = {}) => {
+    const dt = opts.dt ?? 1 / 60;
+    t += dt;
+    const before = shots.fired;
+    frame({ ...opts, dt });
+    wp.lateUpdate(dt, wp.ctx);
+    const n = (shots.fired - before) / pellets;
+    for (let i = 0; i < n; i++) times.push(t);
+    assert(wp._fireTimer >= 0, 'no negative cooldown survives a frame');
+    return n;
+  };
+  return { ...h, events, times, step };
+}
+
+// Held AUTO delivers the authored rpm at any frame rate, one round's accounting each.
+for (const id of ['rifle', 'smg', 'mcx', 'lmg']) {
+  const counts = [];
+  for (const [label, nextDt] of FRAME_SOURCES) {
+    const { wp, step, times, events, shots } = cadenceHarness(id);
+    const interval = 60 / wp.state.def.rpm;
+    const total = () => wp.ammo.mag + wp.ammo.reserve;
+    const ammo0 = total();
+    step({ down: ['Mouse0'], dt: nextDt() });
+    while (times.length < 2 || times.at(-1) - times[0] < 10) step({ dt: nextDt() });
+    const expected = 1 + (times.at(-1) - times[0]) / interval;
+    assert(
+      Math.abs(times.length - expected) <= 1,
+      `${id} @ ${label} FPS: ${times.length} rounds, expected ~${expected.toFixed(1)}`
+    );
+    // Carried frame remainders never let a round outrun the authored cadence.
+    for (let i = 1; i < times.length; i++) {
+      assert(times[i] - times[0] >= i * interval - 1e-9, `${id} @ ${label}: round ${i} early`);
+    }
+    assert.equal(ammo0 - total(), times.length, `${id} @ ${label}: one cartridge per round`);
+    assert.equal(shots.fired, times.length, `${id} @ ${label}: one projectile per round`);
+    assert.equal(events.fire, times.length, `${id} @ ${label}: one fire event per round`);
+    counts.push(times.length);
+  }
+  assert(Math.max(...counts) - Math.min(...counts) <= 1, `${id} cadence varies with FPS`);
+}
+
+// BURST keeps the burst rpm inside a burst at any frame rate; one burst per press.
+for (const [label, nextDt] of FRAME_SOURCES) {
+  const { wp, step, times, tap } = cadenceHarness('rifle');
+  tap('KeyB');
+  assert.equal(wp.fireMode, 'burst');
+  const interval = 60 / wp.state.def.burstRpm;
+  const count = wp.state.def.burstCount;
+  for (let burst = 0; burst < 20; burst++) {
+    const start = times.length;
+    step({ down: ['Mouse0'], dt: nextDt() });
+    let maxDt = 0;
+    while (times.length < start + count) step({ dt: (maxDt = Math.max(maxDt, nextDt())) });
+    const span = times.at(-1) - times[start];
+    assert(span >= (count - 1) * interval - 1e-9, `burst @ ${label}: rounds came early`);
+    assert(span < (count - 1) * interval + maxDt + 1e-9, `burst @ ${label}: rounds came late`);
+    step({ up: ['Mouse0'], dt: nextDt() });
+    for (let i = 0; i < 30; i++) step();
+    assert.equal(times.length, start + count, `burst @ ${label}: exactly one burst per press`);
+  }
+}
+
+// SEMI fires one round per press and never inside the authored interval, even
+// with a press every other frame at high or jittered frame rates.
+for (const [label, nextDt] of FRAME_SOURCES) {
+  const { wp, step, times } = cadenceHarness('pistol');
+  const interval = 60 / wp.state.def.rpm;
+  for (let i = 0; i < 400; i++) {
+    assert(step({ down: ['Mouse0'], dt: nextDt() }) <= 1, `semi @ ${label}: one round per press`);
+    assert.equal(step({ up: ['Mouse0'], dt: nextDt() }), 0, `semi @ ${label}: release fires`);
+  }
+  assert(times.length > 1, `semi @ ${label}: presses fire`);
+  for (let i = 1; i < times.length; i++) {
+    assert(times[i] - times[i - 1] >= interval - 1e-9, `semi @ ${label}: early round`);
+  }
+}
+
+// An interrupted AUTO pull never releases rounds owed for the blocked time:
+// the resumed frame fires at most once, then the authored interval follows.
+const INTERRUPTIONS = [
+  ['pause', { dt: 0 }],
+  [
+    'controls',
+    { on: (h) => (h.player.controlEnabled = false), off: (h) => (h.player.controlEnabled = true) },
+  ],
+  ['input frozen', { on: (h) => (h.input.frozen = true), off: (h) => (h.input.frozen = false) }],
+  [
+    'reload',
+    {
+      on: (h) => {
+        h.wp.state.mag = 10;
+        assert(h.wp.reload());
+      },
+      off: (h) => h.wp.viewmodel.stopClip(),
+    },
+  ],
+  ['radio', { on: (h) => h.tap('KeyX'), off: (h) => h.tap('KeyX') }],
+  [
+    'switch',
+    {
+      on: (h) => h.tap('Digit2'),
+      off: (h) => {
+        h.wp._onClipEvent('end', 'holster');
+        h.tap('Digit1');
+        h.wp._onClipEvent('end', 'holster');
+      },
+    },
+  ],
+  [
+    'death/restart',
+    {
+      on: (h) => h.wp._setDeathDisabled(true),
+      off: (h) => {
+        h.wp.resetForNewGame();
+        h.wp._setDeathDisabled(false);
+        h.wp.state.mag = 1e6;
+      },
+    },
+  ],
+];
+for (const [name, gate] of INTERRUPTIONS) {
+  const h = cadenceHarness('rifle');
+  const { wp, step, times } = h;
+  const interval = 60 / wp.state.def.rpm;
+  step({ down: ['Mouse0'] });
+  for (let i = 0; i < 20; i++) step();
+  const before = times.length;
+  gate.on?.(h);
+  for (let i = 0; i < 60; i++) step({ dt: gate.dt ?? 1 / 60 });
+  assert.equal(times.length, before, `${name}: no rounds while interrupted`);
+  gate.off?.(h);
+  assert.equal(wp.activeId, 'rifle', `${name}: resumes on the rifle`);
+  for (let i = 0; i < 30 && times.length === before; i++) step();
+  assert(times.length - before <= 1, `${name}: the resumed frame fires at most one round`);
+  const resumed = times.length;
+  assert(resumed > before, `${name}: the held pull resumes`);
+  while (times.length === resumed) step();
+  assert(
+    times[resumed] - times[resumed - 1] >= interval - 1e-9,
+    `${name}: no banked round follows the resume`
+  );
+}
+
+// Overload: one 1 s hitch fires at most MAX_SHOTS_PER_FRAME rounds with full
+// accounting and a seed each; the remainder is dropped, not banked.
+{
+  const { wp, step, times, events, shots } = cadenceHarness('rifle');
+  const total = () => wp.ammo.mag + wp.ammo.reserve;
+  const ammo0 = total();
+  step({ down: ['Mouse0'] });
+  assert.equal(step({ dt: 1 }), MAX_SHOTS_PER_FRAME, 'a hitch catches up to the bound');
+  assert.equal(wp._fireTimer, 0, 'rounds beyond the bound are dropped');
+  assert.equal(step(), 1, 'the next frame resumes with one due round');
+  assert.equal(step(), 0, 'and does not drain a backlog');
+  step({ up: ['Mouse0'] });
+  assert.equal(ammo0 - total(), times.length);
+  assert.equal(shots.fired, times.length);
+  assert.equal(events.fire, times.length);
+  assert.equal(new Set(events.seeds).size, events.seeds.length, 'each round reports its own seed');
+  for (let i = 0; i < 10; i++) step();
+  assert.equal(events.shell, times.length, 'one ejected case per round');
 }
 
 console.log(

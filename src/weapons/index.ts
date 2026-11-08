@@ -38,6 +38,10 @@ import type { ViewModel } from './viewmodel.ts';
 const GRENADES_PER_LIFE = 2;
 const GRENADES_MAX = 6; // bought at the market, +1 per pack
 const SLOT_IDS = [...PRIMARY_IDS, ...SECONDARY_IDS];
+/** Catch-up bound for held AUTO/BURST fire within one frame. The engine clamps
+ *  dt to 0.1 s, which needs at most two 1100 rpm rounds; due rounds beyond the
+ *  bound are dropped rather than banked into later frames. */
+export const MAX_SHOTS_PER_FRAME = 3;
 /** s — must exceed the flight time of any LONG throw so it lands before it
  *  goes off. A 30 m/s heave aimed straight up stays airborne ~3.2 s under
  *  the world's -20.6 gravity, so anything shorter airbursts mid-arc.
@@ -148,7 +152,6 @@ export class WeaponSystem {
   declare stats: WeaponStats;
   declare _magPools: Map<WeaponId, DroppedMagazine[]>;
   declare _tubeLoop: boolean;
-  declare _fireSeed: number;
   declare _debugFrame: number;
   declare _scriptFrames: number[] | null;
   declare radioSys: EngineSystems['radio'] | null;
@@ -219,6 +222,7 @@ export class WeaponSystem {
     spin: 0,
   };
   _pendingShots: number = 0;
+  _fireSeeds = new Uint32Array(MAX_SHOTS_PER_FRAME);
   // Deferred shell ejections (a case leaves the port a few ms after the shot).
   _shellQueue: Array<{ t: number; weapon: WeaponId | null }> = [];
   _droppedMags: DroppedMagazine[] = [];
@@ -926,8 +930,8 @@ export class WeaponSystem {
     this._spread = Math.min(def.spreadMax, this._spread + def.spreadPerShot);
     this._sinceShot = 0;
     this.stats.fired++;
+    this._fireSeeds[Math.min(this._pendingShots, MAX_SHOTS_PER_FRAME - 1)] = seed;
     this._pendingShots++;
-    this._fireSeed = seed;
 
     if (boltAction) {
       this._fireTimer = def.boltTime ?? 1.1;
@@ -1578,7 +1582,7 @@ export class WeaponSystem {
       }
       if (input.actionPressed('cycleWeapon')) this.nextWeapon();
       if (input.wheel) this.nextWeapon();
-      this._runTrigger(dt, input.fire, input.firePressed, def, s);
+      this._runTrigger(input.fire, input.firePressed, def, s);
       st.trigger = input.fire && this.canFire();
       // Auto-reload on a dry trigger pull, like every modern shooter.
       if (input.firePressed && st.empty) this.reload();
@@ -1588,6 +1592,9 @@ export class WeaponSystem {
     } else {
       st.trigger = false;
     }
+    // A cooldown that ran out this frame may credit its overshoot only to a
+    // round fired in this same frame; idle or gated time never banks shots.
+    if (this._fireTimer < 0) this._fireTimer = 0;
 
     // Push the ADS curve to the player so camera FOV / move speed follow it.
     player?.setAdsProgress?.(this.disabled ? 0 : this.viewmodel.adsT);
@@ -1605,14 +1612,12 @@ export class WeaponSystem {
     this.stats.fired = this.sim.stats.fired;
   }
 
-  /** Fire-mode state machine. */
-  _runTrigger(
-    dt: number,
-    held: boolean,
-    pressed: boolean,
-    def: WeaponState['def'],
-    s: WeaponState
-  ): void {
+  /**
+   * Fire-mode state machine. Held AUTO and queued BURST rounds add their
+   * interval to the timer instead of resetting it, so the remainder of a frame
+   * counts toward the next round and cadence does not depend on frame rate.
+   */
+  _runTrigger(held: boolean, pressed: boolean, def: WeaponState['def'], s: WeaponState): void {
     // A new mode needs a fresh press. Either release or press clears the latch,
     // so a release missed while paused/frozen cannot strand the next press,
     // even when another gate refuses that press's shot.
@@ -1620,16 +1625,22 @@ export class WeaponSystem {
     if (this._triggerLatched) return;
     switch (s.mode) {
       case 'auto':
-        if (held) this.tryFire();
+        for (let n = 0; held && n < MAX_SHOTS_PER_FRAME && this._fireTimer <= 0; n++) {
+          const carry = this._fireTimer;
+          if (!this.tryFire()) break;
+          this._fireTimer += carry;
+        }
         break;
       case 'burst':
         if (pressed && this._burstLeft === 0 && this._burstCooldown <= 0) {
           this._burstLeft = requiredTuning(def.burstCount, 'burstCount');
         }
-        if (this._burstLeft > 0 && this._fireTimer <= 0) {
+        for (let n = 0; this._burstLeft > 0 && n < MAX_SHOTS_PER_FRAME; n++) {
+          const carry = this._fireTimer;
+          if (carry > 0) break;
           if (this.tryFire()) {
             this._burstLeft--;
-            this._fireTimer = 60 / requiredTuning(def.burstRpm, 'burstRpm');
+            this._fireTimer = 60 / requiredTuning(def.burstRpm, 'burstRpm') + carry;
             if (this._burstLeft === 0)
               this._burstCooldown = requiredTuning(def.burstDelay, 'burstDelay');
           } else {
@@ -1672,8 +1683,8 @@ export class WeaponSystem {
       vm.muzzleWorld(this._firePayload.origin);
       vm.boreDir(this._firePayload.dir);
       if (def) this._firePayload.weapon = def;
-      this._firePayload.seed = this._fireSeed >>> 0;
       for (let i = 0; i < this._pendingShots; i++) {
+        this._firePayload.seed = this._fireSeeds[Math.min(i, MAX_SHOTS_PER_FRAME - 1)];
         ctx.events.emit('weapon:fire', this._firePayload);
       }
       this._pendingShots = 0;
