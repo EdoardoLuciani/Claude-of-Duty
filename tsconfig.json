@@ -17,5 +17,5 @@
     "allowImportingTsExtensions": true,
     "skipLibCheck": true
   },
-  "include": ["src"]
+  "include": ["src", "tests", "tools/lib/**/*.ts", "tools/nav240/**/*.ts"]
 }

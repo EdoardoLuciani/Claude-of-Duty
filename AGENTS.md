@@ -31,8 +31,8 @@ bun run dev            # local server; not needed for CI-only work
   assets available only on another branch. Do not weaken/delete tests to pass CI.
   If a test is wrong, fix it and explain why in the PR.
 - Use `bun run format` and `bun run format:check` (`bun fmt`); scope and exclusions
-  are documented in README.md. ES modules: `.ts` in bundled runtime source,
-  `.mjs` for directly executed Node scripts.
+  are documented in README.md. ES modules: `.ts` in runtime source, tests and
+  typed test helpers (Node 26 strips erasable types); `.mjs` for other Node scripts.
 - No new runtime dependencies without approval. Approved: `three` and pinned
   `@recast-navigation/core` + `@recast-navigation/wasm` for offline-baked navigation.
 - Avoid hot-path allocations; keep draw calls/state changes low. Put tuning in

@@ -1,4 +1,4 @@
-import { launchChromium } from './lib/browser-harness.mjs';
+import { launchChromium } from './lib/browser-harness.ts';
 const b = await launchChromium({
   headless: true,
   args: [
