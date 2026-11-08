@@ -40,7 +40,7 @@ export const GLTFPACK_FLAGS = [
 ];
 // Opt assets in here after validating their adapters and visual/animation fidelity.
 // Simplification is model-specific, never a blanket default for all models.
-// `output` is repo-relative: weapons are served from public/, the EXPS3 is not wired yet.
+// `output` is repo-relative: weapons are served from public/, standalone attachments are not wired yet.
 export const MODEL_COOKS = {
   m590: {
     directory: 'assets/weapons/m590',
@@ -77,6 +77,13 @@ export const MODEL_COOKS = {
     source: 'mpx.glb',
     output: 'public/models/weapons/mpx.runtime.glb',
     flags: ['-km', '-vc', '16', '-si', '0.7', '-se', '0.0002', '-sp'],
+  },
+  tor_mini: {
+    directory: 'assets/attachments/steiner-tor-mini',
+    source: 'tor-mini.glb',
+    output: 'assets/attachments/steiner-tor-mini/tor-mini.runtime.glb',
+    // Preserve the small aperture, screw slots and pressure-pad silhouettes.
+    flags: [],
   },
   exps3: {
     directory: 'assets/attachments/eotech-exps3-0',

@@ -96,10 +96,16 @@ intel sites and explicit placement records. This is the world source—not
 | Procedural textures         | [`tools/export-proc-textures.ts`](../tools/export-proc-textures.ts) and its declared AI/FX inputs                                                                 | `bun tools/export-proc-textures.ts`; `bun run test`    | Generated `public/models/proc/`, consumed by AI materials and FX                                                               |
 | Standalone EXPS3 attachment | [`exps3.py`](../tools/blender/exps3.py), [`exps3_bake.py`](../tools/blender/exps3_bake.py); [asset contract](../assets/attachments/eotech-exps3-0/README.md)      | Asset Blender commands; `bun run models:cook -- exps3` | `assets/attachments/eotech-exps3-0/`; cooked attachment is not yet wired into gameplay                                         |
 
+The standalone [TOR Mini laser](../assets/attachments/steiner-tor-mini/README.md)
+is authored by [`tools/blender/tor_mini/`](../tools/blender/tor_mini/), with native
+Blender validation and `bun run models:cook -- tor_mini`. It is generated alongside
+the EXPS3, independently of player arms, and is not wired into gameplay yet.
+
 Normal `bun run dev` / `bun run build` (and `bun run assets`) run
-`tools/build-assets.ts`: arms and bandage, each weapon and its cook, EXPS3 and
-soldiers in Blender, then procedural textures and soldier/hull staging. The Bun
-world generation/validation runs alongside these steps. Each Blender step reruns only when its declared inputs (scripts,
+`tools/build-assets.ts`: arms and bandage, each weapon and its cook, standalone
+attachments and soldiers in Blender, then procedural textures and soldier/hull
+staging. The Bun world generation/validation runs alongside these steps. Each
+Blender step reruns only when its declared inputs (scripts,
 authored JSON, upstream steps) change; hashes live in ignored `.cache/assets/`
 and `--force` rebuilds all. These products are ignored, not committed; weapon
 `manifest.json`, `src/weapons/hand-poses.ts` and `bandage-path.ts` stay committed
