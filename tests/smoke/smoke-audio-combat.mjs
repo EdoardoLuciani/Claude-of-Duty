@@ -20,7 +20,7 @@ assert.equal(
 );
 assert.deepEqual(
   COMBAT_URLS.whizz.map((url) => {
-    const name = new URL(url).pathname.split('/').at(-1).replace('.opus', '');
+    const name = url.split('/').at(-1).replace('.opus', '');
     return provenance.files[name].layers[0].source.split('/').at(-1);
   }),
   [507, 508, 509, 510, 511].map((n) => `BulletPassBy_BW.54${n}.wav`),
@@ -41,7 +41,7 @@ for (const [key, urls] of Object.entries(COMBAT_URLS)) {
     crops = new Set();
   let previous = -1;
   for (const url of urls) {
-    const name = new URL(url).pathname.split('/').at(-1).replace('.opus', '');
+    const name = url.split('/').at(-1).replace('.opus', '');
     const file = provenance.files[name];
     crops.add(JSON.stringify(file.layers.map((l) => [l.source, l.start, l.delay ?? 0])));
   }

@@ -35,7 +35,7 @@ export function portOpen(port, host = '127.0.0.1') {
 /** Bun binary: `bun run` exposes it via npm_execpath without putting it on PATH; plain
  *  `node` runs fall back to the installer's default location, then PATH. */
 const INSTALLED_BUN = join(process.env.BUN_INSTALL ?? join(homedir(), '.bun'), 'bin', 'bun');
-export const BUN = basename(process.env.npm_execpath ?? '').startsWith('bun')
+const BUN = basename(process.env.npm_execpath ?? '').startsWith('bun')
   ? process.env.npm_execpath
   : existsSync(INSTALLED_BUN)
     ? INSTALLED_BUN

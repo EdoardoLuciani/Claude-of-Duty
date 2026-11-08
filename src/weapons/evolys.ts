@@ -18,10 +18,7 @@ import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
-export const EVOLYS_URL = new URL(
-  '../../assets/weapons/fn-evolys-762/fn-evolys-762.runtime.glb',
-  import.meta.url
-).href;
+export const EVOLYS_URL = '/models/weapons/fn-evolys-762.runtime.glb';
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES)];
 
 export function makeEvolysModel(gltf: GLTF): EvolysModel {

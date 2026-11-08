@@ -401,7 +401,7 @@ synthetic blast layers. Radio owns aircraft pose/pass lifetime; audio owns sourc
 cleanup. Radio textures supplement intentional electronic tones. Do not invent
 ambient human/tactical actors.
 Tactical contact/reload/outgoing-grenade speech uses required offline-generated,
-locally bundled Opus recordings with source hashes, prompts and processing in
+local Opus recordings (`public/audio/samples/`) with source hashes, prompts and processing in
 `src/audio/samples/callouts/provenance.json`; authoring/rights notes live in
 `assets/audio/tactical-callouts/README.md`. No runtime TTS or credential access.
 Reached-segment bullet near-misses, material-mapped casing drops, family-matched dry

@@ -1,17 +1,17 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { basename, join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { readdirSync } from 'node:fs';
 
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
-import { BUN } from '../../tools/lib/browser-harness.mjs';
 import { AUDIO_BANKS } from '../lib/audio-banks.mjs';
 
-const root = new URL('../../src/audio/samples/', import.meta.url);
-const relative = (url) => url.slice(root.href.length);
+// Served from public/audio/samples/ at this fixed path.
+const PREFIX = '/audio/samples/';
+const root = new URL('../../public/audio/samples/', import.meta.url);
+const relative = (url) => {
+  assert(url.startsWith(PREFIX), `${url}: served from ${PREFIX}`);
+  return url.slice(PREFIX.length);
+};
 const hash = (name, value) => {
   const payload = JSON.stringify(value);
   if (process.env.DUMP_CHARACTERIZATION) console.log(name, payload);
@@ -52,7 +52,6 @@ const bank = new WeaponSampleBank({
 const fetch = globalThis.fetch;
 try {
   globalThis.fetch = async (url) => {
-    assert(url.startsWith(root.href), 'raw Node imports retain local file URLs');
     fetched.push(relative(url));
     return { ok: true, arrayBuffer: async () => new TextEncoder().encode(relative(url)).buffer };
   };
@@ -110,34 +109,6 @@ assert(
 );
 assert.equal(bank.loaded, 0);
 
-// Exercise the bundler plugin's glob expansion, separately from raw Node's file fallback.
-// Bun bundles in a subprocess (this script stays on Node); assets land beside the entry,
-// and bundled URLs resolve against the page, here that output directory.
-const outdir = mkdtempSync(join(tmpdir(), 'ow-recordings-'));
-globalThis.location = { href: `${pathToFileURL(outdir).href}/` };
-try {
-  const source = (path) => JSON.stringify(fileURLToPath(new URL(path, import.meta.url)));
-  execFileSync(BUN, [
-    '-e',
-    `import plugin from ${source('../../build/bun-plugin.mjs')};
-    await Bun.build({ entrypoints: [${source('../../src/audio/recordings.ts')}],
-      outdir: ${JSON.stringify(outdir)}, target: 'browser', plugins: [plugin] });`,
-  ]);
-  const bundled = await import(pathToFileURL(join(outdir, 'recordings.js')).href);
-  for (const name of fetched) {
-    const url = bundled.recordingUrl(name.slice(0, -'.opus'.length));
-    assert(url.startsWith(pathToFileURL(outdir).href), `${name}: emitted beside the bundle`);
-    assert.notEqual(basename(url), basename(name), `${name}: content-hashed file name`);
-    assert.deepEqual(readFileSync(new URL(url)), readFileSync(new URL(name, root)), name);
-  }
-  assert.deepEqual(
-    bundled.recordingUrls('mpx', 3),
-    [1, 2, 3].map((i) => bundled.recordingUrl(`mpx-${i}`))
-  );
-  assert.throws(() => bundled.recordingUrl('not-a-recording'), /missing bundled recording/);
-} finally {
-  rmSync(outdir, { recursive: true, force: true });
-}
 console.log(
-  '375 unchanged ordered recordings: raw Node, reverse decode completion, disposal and bundled URL bytes'
+  '375 unchanged ordered recordings: raw Node, reverse decode completion, disposal and local files'
 );

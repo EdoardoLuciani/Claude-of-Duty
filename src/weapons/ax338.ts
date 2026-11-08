@@ -17,8 +17,7 @@ import { createAuthoredRig } from './authored-rig.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
-export const AX338_URL = new URL('../../assets/weapons/ax338/ax338.runtime.glb', import.meta.url)
-  .href;
+export const AX338_URL = '/models/weapons/ax338.runtime.glb';
 const ALIASES = { ...MAGAZINE_ALIASES, cycle: 'Bolt_Cycle' };
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
 

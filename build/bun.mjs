@@ -14,6 +14,8 @@ import plugin from './bun-plugin.mjs';
 const ROOT = resolve(import.meta.dirname, '..');
 const DIST = join(ROOT, 'dist');
 const PUBLIC = join(ROOT, 'public');
+// KTX2Loader's transcoder, served at /basis/ (src/weapons/asset-loader.ts).
+const BASIS = join(ROOT, 'node_modules/three/examples/jsm/libs/basis');
 const { positionals, values } = parseArgs({
   allowPositionals: true,
   options: { port: { type: 'string' } },
@@ -33,10 +35,10 @@ function runAssetTasks() {
 }
 
 /** Static file under `dir`; refuses paths that escape it. */
-async function serveStatic(dir, request) {
+async function serveStatic(dir, pathname) {
   let path = '';
   try {
-    path = normalize(join(dir, decodeURIComponent(new URL(request.url).pathname)));
+    path = normalize(join(dir, decodeURIComponent(pathname)));
   } catch {
     // Malformed percent-encoding: treat as not found rather than a handler error.
   }
@@ -73,6 +75,7 @@ if (command === 'build') {
   });
   // Bun has no public/ convention: copy it verbatim, as served in dev.
   cpSync(PUBLIC, DIST, { recursive: true });
+  cpSync(BASIS, join(DIST, 'basis'), { recursive: true });
   await Bun.write(join(DIST, 'LICENSE.txt'), Bun.file(join(ROOT, 'LICENSE')));
   const bytes = result.outputs.reduce((sum, output) => sum + output.size, 0);
   console.log(
@@ -85,12 +88,17 @@ if (command === 'build') {
   listen(5173, {
     routes: { '/': html, '/index.html': html },
     development: { hmr: !process.env.OW_NO_HMR },
-    fetch: (request) => serveStatic(PUBLIC, request),
+    fetch: ({ url }) => {
+      const { pathname } = new URL(url);
+      return pathname.startsWith('/basis/')
+        ? serveStatic(BASIS, pathname.slice('/basis'.length))
+        : serveStatic(PUBLIC, pathname);
+    },
   });
 } else if (command === 'preview') {
   listen(4173, {
     routes: { '/': new Response(Bun.file(join(DIST, 'index.html'))) },
-    fetch: (request) => serveStatic(DIST, request),
+    fetch: ({ url }) => serveStatic(DIST, new URL(url).pathname),
   });
 } else {
   console.error('usage: bun build/bun.mjs dev|build|preview [--port N]');
