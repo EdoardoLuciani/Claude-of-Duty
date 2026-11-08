@@ -16,4 +16,5 @@ The blend, manifest, pose references, runtime GLBs and generated hand-pose/banda
 paths are the maintained products. Bandaging makes three turns at 20–82%:
 44 mm strip, 20 mm advance/turn, 60 mm travel and 24 mm overlap. Keep fixed support
 joints, shared helix timing, clearance and gameplay cancellation.
-Normal builds need no Blender. In-engine appearance still requires human review.
+Dev/build regenerate these when inputs change; only `pose-reference.json` and the
+generated `src/weapons/` paths are committed. In-engine appearance still requires human review.

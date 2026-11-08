@@ -192,7 +192,7 @@
       ]
     }
   },
-  "source": "tools/blender/mpx.py + tools/blender/mpx/animations.py + tools/blender/mpx_actions.py",
+  "source": "tools/blender/mpx/build.py + tools/blender/mpx/animations.py + tools/blender/mpx/actions.py",
   "runtimeBasis": "GLB +X forward / +Y up / +Z right; adapter rotates basis +90 degrees around Y once",
   "textures": {
     "resolution": 1024,

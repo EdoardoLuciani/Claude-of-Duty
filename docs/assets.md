@@ -57,11 +57,11 @@ blender -b /tmp/m4-review/m4a1-block-ii.blend --python-exit-code 1 \
 bun run models:cook -- m4 /tmp/m4-review
 ```
 
-Blender 5.2.2 and the pinned gltfpack encoder are only needed for explicit
-authoring/cooking. See the [shared authoring workflow](../tools/blender/README.md)
-and [cooking recipe](../build/README.md). Committed manifests/blends may name the
-old tool paths from their last export; current README commands supersede those
-historical notes. Products are not rebuilt just to update embedded paths.
+Blender 5.2.2 and the pinned gltfpack encoder are needed by `bun run dev` /
+`bun run build` whenever a Blender step is stale (see below). See the
+[shared authoring workflow](../tools/blender/README.md) and
+[cooking recipe](../build/README.md). Committed weapon manifests may name old tool
+paths from their last export; current README commands supersede those notes.
 
 Gameplay tuning belongs in [`src/weapons/defs.ts`](../src/weapons/defs.ts);
 runtime handling/IK stays in `src/weapons/`, separate from Blender-authored motion.
@@ -91,13 +91,17 @@ intel sites and explicit placement records. This is the world source—not
 | Family                      | Authoritative editing location                                                                                                                                    | Regenerate / validate                                  | Products and consumers                                                                                                         |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
 | Arms and bandage            | [`player_arms.py`](../tools/blender/player_arms.py), [`player_bandage.py`](../tools/blender/player_bandage.py); [asset contract](../assets/player/arms/README.md) | Follow the asset's Blender commands; review in engine  | `assets/player/arms/`, `public/models/player/`, generated poses/paths in `src/weapons/`; loaded by weapon arm/bandage adapters |
-| Soldiers                    | [`tools/blender/soldiers/`](../tools/blender/soldiers/); [asset contract](../assets/soldiers/README.md). Runtime RIG/registry/surfaces remain in `src/ai/`        | Explicit Blender author/cook; `bun run models` stages  | Committed `assets/soldiers/` products stage to ignored `public/models/soldiers/*.glb` + JSON; loaded by `ModelSystem` and AI   |
+| Soldiers                    | [`tools/blender/soldiers/`](../tools/blender/soldiers/); [asset contract](../assets/soldiers/README.md). Runtime RIG/registry/surfaces remain in `src/ai/`        | Explicit Blender author/cook; `bun run models` stages  | Generated `assets/soldiers/` products stage to ignored `public/models/soldiers/*.glb` + JSON; loaded by `ModelSystem` and AI   |
 | Spent shotgun hull          | [`tools/lib/spent-hull.mjs`](../tools/lib/spent-hull.mjs)                                                                                                         | `bun run models`; review in engine                     | `public/models/fx/spent12g.glb`, consumed by FX                                                                                |
-| Procedural textures         | [`tools/export-proc-textures.mjs`](../tools/export-proc-textures.mjs) and its declared AI/FX inputs                                                               | `node tools/export-proc-textures.mjs`; `bun run test`  | Committed `public/models/proc/`, consumed by AI materials and FX                                                               |
+| Procedural textures         | [`tools/export-proc-textures.mjs`](../tools/export-proc-textures.mjs) and its declared AI/FX inputs                                                               | `node tools/export-proc-textures.mjs`; `bun run test`  | Generated `public/models/proc/`, consumed by AI materials and FX                                                               |
 | Standalone EXPS3 attachment | [`exps3.py`](../tools/blender/exps3.py), [`exps3_bake.py`](../tools/blender/exps3_bake.py); [asset contract](../assets/attachments/eotech-exps3-0/README.md)      | Asset Blender commands; `bun run models:cook -- exps3` | `assets/attachments/eotech-exps3-0/`; cooked attachment is not yet wired into gameplay                                         |
 
-Normal `bun run dev` / `bun run build` prepare procedural textures, stage committed
-soldiers, generate the spent hull and validate committed world assets. They do
-**not** regenerate the world, Blender assets or cooked weapons. `bun run assets`
-stages soldiers/generates the hull and validates the world; run the texture
-exporter separately when using that command rather than Vite.
+Normal `bun run dev` / `bun run build` (and `bun run assets`) run
+`tools/build-assets.mjs`: arms and bandage, each weapon and its cook, EXPS3 and
+soldiers in Blender, then procedural textures, soldier/hull staging and world
+validation. Each Blender step reruns only when its declared inputs (scripts,
+authored JSON, upstream steps) change; hashes live in ignored `.cache/assets/`
+and `--force` rebuilds all. These products are ignored, not committed; weapon
+`manifest.json`, `src/weapons/hand-poses.ts` and `bandage-path.ts` stay committed
+because code imports them. `bun run build:ci` skips generation (code only). The
+world is **not** regenerated; it stays committed.

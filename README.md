@@ -7,11 +7,12 @@ Blender-authored assets load locally; no runtime CDN or WebGL fallback.
 
 ```sh
 bun ci
-bun run dev          # exports procedural models, validates world assets, serves :5173
+bun run dev          # builds stale generated assets, validates world assets, serves :5173
 bun run test
 bun run typecheck
 bun run lint
 bun run build
+bun run build:ci     # code-only build used by CI: generates no models
 ```
 
 Node.js 26.x and Bun (version pinned by `packageManager` in `package.json`) are
@@ -57,14 +58,16 @@ commit provenance refreshes separately, verifying unchanged geometry, collision 
 navigation topology. Never hand-edit generated assets or rebuild Blender assets
 just to format source.
 
-A WebGPU-capable browser/device is required. Normal builds use committed world
-and Blender assets, with no Blender requirement. Change map content in
+A WebGPU-capable browser/device is required. `bun run dev` / `bun run build` run
+`tools/build-assets.mjs`: Blender models, gltfpack cooks, procedural textures and
+the spent hull are generated, not committed. Each step reruns only when its inputs
+change; the first build needs **Blender 5.2.2** and **gltfpack 1.3** on `PATH` (or
+`BLENDER`/`GLTFPACK`) and takes several minutes. The world stays committed. Change map content in
 `tools/worldgen/level/`; the [world editing map](tools/worldgen/README.md) identifies
 shape, placement and build locations. Regenerate with `bun run world`, then run
 `bun run world:validate`.
-Runtime-model optimization is explicit: `bun run models:cook -- p320` uses the
-[shared gltfpack build recipe](build/README.md). Normal dev/build/CI consumes the
-committed `.runtime.glb`; it does not require gltfpack. All seven authored weapons
+Runtime models are cooked with the [shared gltfpack build recipe](build/README.md)
+during dev/build; `bun run models:cook -- p320` reruns one cook. All seven authored weapons
 use cooked runtime assets. Native exports remain authoring references; each model
 has its own geometry, material and animation acceptance gates.
 

@@ -1,4 +1,4 @@
-/** Explicit Blender authoring and Blender-free committed-product reading. */
+/** Blender soldier authoring and a Blender-free reader for the generated products. */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
@@ -27,10 +27,10 @@ export const SOURCE_INPUTS = Object.freeze([
   'src/ai/textures.ts', // CLOTH_TILE is the only external material calibration.
 ]);
 const NAMES = Object.keys(VARIANTS);
-const BLENDER_VERSION = '5.2.2';
+export const BLENDER_VERSION = '5.2.2';
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 // Git may check text out with CRLF; unchanged source/JSON must not require Blender.
-const canonicalText = (bytes) => Buffer.from(bytes.toString('utf8').replace(/\r\n/g, '\n'));
+export const canonicalText = (bytes) => Buffer.from(bytes.toString('utf8').replace(/\r\n/g, '\n'));
 
 /** Absolute paths for the parent's cache dependency list; no file access or spawn. */
 export function soldierInputPaths(root = ROOT) {

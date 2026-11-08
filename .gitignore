@@ -31,9 +31,24 @@ demo/
 .tmp-rend/
 revcrops/
 
-# Generated models; the committed world/proc tiles are the exception.
+# Generated models (tools/build-assets.mjs); only the world is committed.
 public/models/*
 !public/models/world/
 !public/models/world/**
-!public/models/proc/
-!public/models/proc/**
+
+# Blender/gltfpack products, rebuilt by `bun run build`/`bun run dev` when their
+# inputs change. Weapon manifest.json stays committed: weapon code imports it.
+assets/weapons/*/*.blend
+assets/weapons/*/*.glb
+assets/weapons/*/*.png
+assets/weapons/*/textures/
+assets/attachments/*/*.blend
+assets/attachments/*/*.glb
+assets/attachments/*/*.png
+assets/attachments/*/manifest.json
+assets/player/arms/*.blend
+assets/player/arms/manifest.json
+assets/soldiers/*.blend
+assets/soldiers/*.glb
+assets/soldiers/*.json
+.cache/

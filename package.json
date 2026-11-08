@@ -5,7 +5,7 @@
   "license": "ISC",
   "type": "module",
   "scripts": {
-    "assets": "bun run models && bun run world:validate",
+    "assets": "node tools/build-assets.mjs",
     "models": "node tools/export-models.mjs",
     "models:cook": "node build/models.mjs",
     "world": "node tools/export-world.mjs",
@@ -19,6 +19,7 @@
     "dev": "vite",
     "prebuild": "bun run typecheck && bun run lint",
     "build": "vite build",
+    "build:ci": "OW_SKIP_ASSETS=1 bun run build",
     "build:sourcemap": "OW_SOURCEMAP=1 vite build",
     "preview": "vite preview --port 4173",
     "shot": "node tools/capture.mjs"
