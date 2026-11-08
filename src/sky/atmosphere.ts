@@ -16,6 +16,8 @@ export const SUN_ILLUMINANCE_TOP = 128000 / SCENE_LUX; // 5.12
  */
 export const MOON_ILLUMINANCE_NIGHT = 0.03;
 
+type RGB = [number, number, number];
+
 export const ATMO = {
   groundRadiusMM: 6.36,
   atmosphereRadiusMM: 6.46,
@@ -30,9 +32,8 @@ export const ATMO = {
   ozoneCentreKM: 25.0,
   ozoneWidthKM: 15.0,
   groundAlbedo: 0.24,
-};
+} satisfies Record<string, number | RGB>; // per-channel coefficients infer as RGB tuples
 
-type RGB = [number, number, number];
 function mediumJs(altKM: number, mieScale: number, out: RGB): RGB {
   const rDen = Math.exp(-altKM / ATMO.rayleighScaleHeightKM);
   const mDen = Math.exp(-altKM / ATMO.mieScaleHeightKM);

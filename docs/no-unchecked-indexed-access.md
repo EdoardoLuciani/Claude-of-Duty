@@ -117,6 +117,39 @@ clips. `smoke-search-assist.mjs` adds the full finite bearing range and non-fini
 Against the original source, every valid-input assertion passes; only the new
 absence/fail-fast assertions fail.
 
+## Small-subsystem pass
+
+The second PR fixes every non-typed-buffer diagnostic in dev, market, core, render, intel,
+sky, radio, audio and fx that has a direct fix, using the same patterns. The total goes from
+2,408 to **2,256**, and market, sky and intel now report zero.
+
+| Pattern                     | Examples                                                                                                                                                                                                                           |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Precise finite-key record   | `IMPACTS` `satisfies Record<SurfaceName, ImpactRecipe>` (the checker enforces coverage of every surface); `MUZZLE_PROFILES`; gait/gear mix types with a required `walk` fallback; a profile-name type guard replacing an `as` cast |
+| Tuple instead of `number[]` | atmosphere coefficients, sun/moon tints, night ambient hue, the three star layers, the tinnitus node list                                                                                                                          |
+| Read once, then narrow      | `const [first] = meshes`, a local strike object instead of `active[length - 1]`, a precomputed `lastDrop`, the four volumetric taps built as a sum                                                                                 |
+| Pool owns its slot          | each intel cache owns its HUD pulse (the minimap reads pulses by index, not identity)                                                                                                                                              |
+| Fail fast at the read       | callout actor, stale sample round-robin index (previously a context-free `TypeError` later), atlas texture count, stereo worklet output                                                                                            |
+| `for…of` / manual counter   | loops whose index is unused, or used only for instance-matrix writes                                                                                                                                                               |
+
+Not fixed here, because each needs the same proof-convention decision as typed buffers:
+
+- **Ring cursors** (`(cursor + i) % length`): audio dry slots, spatial track cursor, fx shell
+  spawn.
+- **Reverse loops that splice while iterating**: radio `active` and `bombs`. Converting them to
+  forward iteration would change processing (event) order.
+- **Values derived from typed buffers**: core `lo`/`hi`, the IR median, fx probe surfaces,
+  the noise permutation and the decal `FAN`.
+
+`.entries()` is **not** allocation-free. Over 10⁶ warmed calls on a 48-element array it
+caused 1,774 scavenges, against 3 for an indexed loop and 12 for `for…of` with a manual
+counter. Use it only on cold paths (asset load, IR/music generation, telemetry export).
+
+Equivalence checks (not committed): a full radio strike pass emits a byte-identical event
+stream before and after the change (61 events). The music score data was transcribed
+unchanged. New tests cover non-finite strike bounds, stale sample indices and `series()`
+wiring.
+
 ## Enforcement
 
 A scoped gate is **not** installed.
@@ -128,7 +161,7 @@ A scoped gate is **not** installed.
 - A gate made of those 83 files would cover leaves only, and keeping its file list up to
   date would be a new hand-maintained baseline in a protected manifest/workflow. That is
   disproportionate while the flag is not the target configuration.
-- Use the command above ad hoc. Compare the total against the 2,408 recorded here, and
+- Use the command above ad hoc. Compare the total against the latest count recorded here, and
   check that a touched file does not gain diagnostics.
 
 ## Remaining blockers and follow-up

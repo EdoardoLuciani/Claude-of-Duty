@@ -125,10 +125,11 @@ export class ModelSystem {
     gltf.scene.traverse((node: THREE.Object3D): void => {
       if (isSkinnedMesh(node)) meshes.push(node);
     });
-    if (!meshes.length) throw new Error(`[models] ${name}.glb: no skinned mesh`);
+    const [first] = meshes;
+    if (!first) throw new Error(`[models] ${name}.glb: no skinned mesh`);
 
-    const geometry = meshes.length === 1 ? meshes[0].geometry : mergePrimitives(meshes);
-    const boneNames = (meshes[0].skeleton?.bones ?? []).map((bone): string => bone.name);
+    const geometry = meshes.length === 1 ? first.geometry : mergePrimitives(meshes);
+    const boneNames = (first.skeleton?.bones ?? []).map((bone): string => bone.name);
 
     const record = {
       // `name` is what the JSON METADATA claims the variant is (validated by
@@ -234,9 +235,9 @@ export function mergePrimitives(meshes: THREE.SkinnedMesh[]): THREE.BufferGeomet
   out.setIndex(new THREE.BufferAttribute(idxArr, 1));
 
   let start = 0;
-  for (let i = 0; i < parts.length; i++) {
-    out.addGroup(start, parts[i].index.count, i);
-    start += parts[i].index.count;
+  for (const [i, p] of parts.entries()) {
+    out.addGroup(start, p.index.count, i);
+    start += p.index.count;
   }
   return out;
 }

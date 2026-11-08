@@ -236,12 +236,15 @@ export class IndirectFill {
     for (const building of world.buildings) {
       const sp = building?.spec;
       if (!sp?.enterable || sp.collapse || sp.ruin) continue;
-      if (count === MAX_ROOMS) break;
-      this.rooms[count].set(sp.x, sp.z, sp.w * 0.5, sp.d * 0.5);
+      // Both uniform pools hold MAX_ROOMS entries; stop when they are full.
+      const room = this.rooms[count];
+      const roomY = this.roomsY[count];
+      if (!room || !roomY) break;
+      room.set(sp.x, sp.z, sp.w * 0.5, sp.d * 0.5);
       let top = (building.roofY ?? 12) - 0.06;
       const sb = sp.setback?.from;
       if (sb !== undefined && building.floorY?.[sb] !== undefined) top = building.floorY[sb] - 0.06;
-      this.roomsY[count].set(-0.8, top, 0, 0);
+      roomY.set(-0.8, top, 0, 0);
       count++;
     }
     this.roomCount.value = count;

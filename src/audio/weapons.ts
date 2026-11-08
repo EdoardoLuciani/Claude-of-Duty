@@ -72,12 +72,15 @@ export const WEAPON_PROFILES = {
   lmg: { sample: 'lmg', distantSample: 'lmg-distant' },
 } satisfies Record<string, WeaponProfile>;
 
+function isProfileName(name: string): name is keyof typeof WEAPON_PROFILES {
+  return Object.hasOwn(WEAPON_PROFILES, name);
+}
+
 /** Map whatever the weapons subsystem calls its guns onto a profile. */
 export function resolveProfile(name?: string | null): WeaponProfile | null {
   if (!name) return WEAPON_PROFILES.rifle;
   const k = String(name).toLowerCase();
-  if (Object.hasOwn(WEAPON_PROFILES, k))
-    return (WEAPON_PROFILES as Record<string, WeaponProfile>)[k];
+  if (isProfileName(k)) return WEAPON_PROFILES[k];
   if (/mcx|virtus/.test(k)) return WEAPON_PROFILES.mcx;
   if (/mpx/.test(k)) return WEAPON_PROFILES.mpx;
   // No generic suppressed recording: unknown suppressed identities stay silent.

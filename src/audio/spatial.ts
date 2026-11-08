@@ -318,8 +318,7 @@ export class SpatialField {
   acquire(opts: EmitterOptions): Emitter | null {
     const now = this.actx.currentTime;
     let em = null;
-    for (let i = 0; i < this.emitters.length; i++) {
-      const e = this.emitters[i];
+    for (const e of this.emitters) {
       if (e.free) {
         em = e;
         break;
@@ -330,8 +329,7 @@ export class SpatialField {
       let worst = null,
         worstScore = Infinity;
       const pri = opts.priority ?? 0.5;
-      for (let i = 0; i < this.emitters.length; i++) {
-        const e = this.emitters[i];
+      for (const e of this.emitters) {
         if (e.tracked) continue; // never steal a bed/loop
         const score = e.priority * 4 + Math.max(0, e.endTime - now);
         if (score < worstScore) {
@@ -401,8 +399,7 @@ export class SpatialField {
   update(): void {
     const now = this.actx.currentTime;
     let active = 0;
-    for (let i = 0; i < this.emitters.length; i++) {
-      const e = this.emitters[i];
+    for (const e of this.emitters) {
       if (e.free) continue;
       if (!e.tracked && now > e.endTime) {
         e.detach();

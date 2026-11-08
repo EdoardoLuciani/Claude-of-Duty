@@ -90,20 +90,19 @@ function chime(
  *   Dm9 | Bbmaj7 | Gm11 | A7sus
  */
 function score(actx: BaseAudioContext, dest: AudioNode): void {
-  const chords = [
-    [50, 57, 60, 64, 65], // D3 A3 C4 E4 F4
-    [46, 53, 57, 62], // Bb2 F3 A3 D4
-    [43, 50, 53, 58, 60], // G2 D3 F3 Bb3 C4
-    [45, 52, 55, 60], // A2 E3 G3 C4
+  // One entry per bar (BARS): bass root, then the voiced chord.
+  const bars: Array<[root: number, notes: number[]]> = [
+    [38, [50, 57, 60, 64, 65]], // D2 | D3 A3 C4 E4 F4
+    [34, [46, 53, 57, 62]], // Bb1 | Bb2 F3 A3 D4
+    [43, [43, 50, 53, 58, 60]], // G2 | G2 D3 F3 Bb3 C4
+    [45, [45, 52, 55, 60]], // A2 | A2 E3 G3 C4
   ];
-  const roots = [38, 34, 43, 45]; // D2 Bb1 G2 A2
-  for (let bar = 0; bar < BARS; bar++) {
+  for (const [bar, [root, notes]] of bars.entries()) {
     const t = 0.04 + bar * BAR;
     const hold = BAR * 0.92;
-    bass(actx, dest, midi(roots[bar]), t, hold, 0.22);
-    const notes = chords[bar];
-    for (let i = 0; i < notes.length; i++) {
-      rhodes(actx, dest, midi(notes[i]), t + i * 0.03, hold, 0.07 - i * 0.006);
+    bass(actx, dest, midi(root), t, hold, 0.22);
+    for (const [i, note] of notes.entries()) {
+      rhodes(actx, dest, midi(note), t + i * 0.03, hold, 0.07 - i * 0.006);
     }
   }
   // Sparse melody so the loop has a shape, not just pads.

@@ -98,6 +98,8 @@ export async function loadFxAtlases(size: number): Promise<{
     throw failed.reason;
   }
   const [texture, albedo, normal, orm] = textures;
+  // Four loads were requested and none was rejected, so all four are present.
+  if (!texture || !albedo || !normal || !orm) throw new Error('[fx] atlas loaded too few textures');
   return {
     particles: { texture, cols: ATLAS_COLS, size },
     decals: { albedo, normal, orm, cols: ATLAS_COLS, size },

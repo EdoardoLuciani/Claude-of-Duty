@@ -70,6 +70,13 @@ const CONTACT_URLS = {
   ...EXPLOSION_URLS,
 };
 type ContactKind = keyof typeof CONTACT_URLS;
+/** Round-robin indices are kept modulo the bank size; a miss means a stale index. */
+function loaded(buffers: readonly AudioBuffer[], index: number, label: string): AudioBuffer {
+  const buffer = buffers[index];
+  if (!buffer) throw new RangeError(`[audio] ${label} recording ${index} is not loaded`);
+  return buffer;
+}
+
 export class WeaponSampleBank {
   actx: BaseAudioContext;
   buffers: Partial<Record<SampleKind, AudioBuffer[]>> = {};
@@ -153,7 +160,7 @@ export class WeaponSampleBank {
         ? rng.u32() % choices.length
         : (previous + 1 + (rng.u32() % Math.max(1, choices.length - 1))) % choices.length;
     indices[kind] = index;
-    return choices[index];
+    return loaded(choices, index, kind);
   }
 
   nextAircraft(rng: Rng): AudioBuffer {
@@ -162,7 +169,7 @@ export class WeaponSampleBank {
       this.aircraftIndex < 0
         ? rng.u32() % this.aircraftBuffers.length
         : (this.aircraftIndex + 1) % this.aircraftBuffers.length;
-    return this.aircraftBuffers[this.aircraftIndex];
+    return loaded(this.aircraftBuffers, this.aircraftIndex, 'aircraft');
   }
 
   /** Natural-rate finite cues share scheduling, but callers retain take/RNG policy. */
@@ -386,7 +393,7 @@ export class WeaponSampleBank {
     if (!choices?.length) throw new Error(`[audio] ${kind} recordings are not loaded`);
     const index = this.indices[kind] ?? 0;
     this.indices[kind] = (index + 1) % choices.length;
-    const buffer = choices[index];
+    const buffer = loaded(choices, index, kind);
     const actx = this.actx;
     const t0 = o.when ?? actx.currentTime;
     const src = actx.createBufferSource();

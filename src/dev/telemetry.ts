@@ -356,9 +356,18 @@ function pushWorst<K extends string, T extends Record<K, number | null>>(
     list.push(rec);
     return false;
   }
-  let min = 0;
-  for (let i = 1; i < list.length; i++) if ((list[i][key] ?? 0) < (list[min][key] ?? 0)) min = i;
-  if ((rec[key] ?? 0) <= (list[min][key] ?? 0)) return true;
+  // The first record seeds the scan (as before, including NaN timings); a zero-capacity
+  // list rejects everything.
+  let min = -1;
+  let least = 0;
+  for (const [i, item] of list.entries()) {
+    const value = item[key] ?? 0;
+    if (min < 0 || value < least) {
+      min = i;
+      least = value;
+    }
+  }
+  if (min < 0 || (rec[key] ?? 0) <= least) return true;
   list[min] = rec;
   return false;
 }
@@ -1728,9 +1737,9 @@ export class TelemetrySystem {
     const files = [
       { name: 'telemetry.json', data: new TextEncoder().encode(JSON.stringify(this.snapshot())) },
     ];
-    for (let i = 0; i < this.markers.length; i++) {
+    for (const [i, marker] of this.markers.entries()) {
       const blob = this._shots[i];
-      const name = this.markers[i].screenshot;
+      const name = marker.screenshot;
       if (!blob || !name) continue;
       files.push({
         name,

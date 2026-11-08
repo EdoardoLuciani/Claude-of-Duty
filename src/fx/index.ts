@@ -1256,11 +1256,7 @@ export class FxSystem {
   }
 
   _fire(from: number, to: number): void {
-    const list = this._script;
-    for (let i = 0; i < list.length; i++) {
-      const e = list[i];
-      if (e.t > from && e.t <= to) e.fn();
-    }
+    for (const e of this._script) if (e.t > from && e.t <= to) e.fn();
   }
 
   dispose(): void {

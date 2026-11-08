@@ -147,6 +147,8 @@ interface Strike {
   speed: number;
   travel: number;
   drops: number[];
+  /** Travel of the final drop; the strike stays airborne until just past it. */
+  lastDrop: number;
   dropIdx: number;
   bombs: Bomb[];
   engine: ReturnType<EngineSystems['audio']['startAircraft']>;
@@ -234,6 +236,9 @@ export class RadioSystem {
 
     const drops = [];
     for (let t = tMin; t <= tMax + 1e-3; t += CARPET.dropStep) drops.push(t - tMin);
+    // Finite bounds always yield the t = tMin drop; non-finite bounds have no bomb line.
+    const lastDrop = drops.at(-1);
+    if (lastDrop === undefined) return false;
 
     const start = new THREE.Vector3(cx + dx * startT, ALTITUDE, cz + dz * startT);
     const dir = new THREE.Vector3(dx, 0, dz);
@@ -243,22 +248,23 @@ export class RadioSystem {
     plane.rotation.z = 0.05;
     this.ctx.scene.add(plane);
 
-    this.active.push({
+    const strike: Strike = {
       plane,
       start,
       dir,
       speed: CARPET.planeSpeed,
       travel: 0,
       drops,
+      lastDrop,
       dropIdx: 0,
       bombs: [],
       engine: null,
-    });
+    };
+    this.active.push(strike);
 
     this.ctx.events.emit('radio:strike', { position: start });
     this._audio = this._audio ?? this.ctx.peek('audio');
-    this.active[this.active.length - 1].engine =
-      this._audio?.startAircraft?.(plane.position) ?? null;
+    strike.engine = this._audio?.startAircraft?.(plane.position) ?? null;
     return true;
   }
 
@@ -279,13 +285,15 @@ export class RadioSystem {
         for (const prop of props) if (prop instanceof THREE.Mesh) prop.rotation.z += dt * 26;
       }
 
-      while (s.dropIdx < s.drops.length && s.travel >= s.drops[s.dropIdx]) {
+      let next = s.drops[s.dropIdx];
+      while (next !== undefined && s.travel >= next) {
         s.dropIdx++;
         for (const off of CARPET.lateral) this._dropBomb(s, off);
+        next = s.drops[s.dropIdx];
       }
       // Audio may still be loading on the gesture that launched the strike.
       // Attach at the current plane position once ready; never restart mid-flight.
-      const airborne = s.travel < s.drops[s.drops.length - 1] + LEAD + 30;
+      const airborne = s.travel < s.lastDrop + LEAD + 30;
       if (airborne) {
         if (!s.engine || s.engine.ended)
           s.engine = audio?.startAircraft?.(s.plane.position) ?? null;

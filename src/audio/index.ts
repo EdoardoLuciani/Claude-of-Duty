@@ -431,8 +431,7 @@ export class AudioSystem {
 
       /* ---- head-locked voice teardown ---------------------------- */
       const now = actx.currentTime;
-      for (let i = 0; i < this._dry.length; i++) {
-        const d = this._dry[i];
+      for (const d of this._dry) {
         if (!d.node || now < d.end) continue;
         try {
           d.node.disconnect();
@@ -536,9 +535,11 @@ export class AudioSystem {
       o.x = x;
       o.y = y;
       o.z = z;
-      for (let i = 0; i < PROBE_RAYS; i++) {
-        const h = phys.raycast(o, this._probeDirs[i], PROBE_DIST, mask);
-        hits[i] = h?.hit ? h.distance : PROBE_DIST;
+      // One probe direction per ray (PROBE_RAYS entries, built at boot).
+      let i = 0;
+      for (const dir of this._probeDirs) {
+        const h = phys.raycast(o, dir, PROBE_DIST, mask);
+        hits[i++] = h?.hit ? h.distance : PROBE_DIST;
       }
     } else {
       for (let i = 0; i < PROBE_RAYS; i++) hits[i] = PROBE_DIST;

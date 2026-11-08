@@ -80,7 +80,7 @@ export function screenAngle(
 /** Per-class signature; unknown weapons use rifle. `light` is reference peak candela.
  * World spill applies a separate gain and cutoff; the view flash scales against REF_LIGHT.
  */
-export const MUZZLE_PROFILES: Record<string, MuzzleProfile> = {
+export const MUZZLE_PROFILES = {
   rifle: { scale: 1.0, lobes: 3, jet: 1.0, light: 200, smoke: 1.0, temp: 1.0, sparks: 8 },
   carbine: { scale: 0.92, lobes: 3, jet: 0.9, light: 175, smoke: 0.9, temp: 1.02, sparks: 7 },
   smg: { scale: 0.78, lobes: 3, jet: 0.75, light: 135, smoke: 0.7, temp: 1.05, sparks: 6 },
@@ -89,7 +89,9 @@ export const MUZZLE_PROFILES: Record<string, MuzzleProfile> = {
   sniper: { scale: 1.35, lobes: 3, jet: 1.6, light: 290, smoke: 1.4, temp: 0.95, sparks: 10 },
   lmg: { scale: 1.15, lobes: 4, jet: 1.1, light: 235, smoke: 1.2, temp: 0.98, sparks: 9 },
   suppressed: { scale: 0.34, lobes: 2, jet: 0.4, light: 36, smoke: 1.6, temp: 1.1, sparks: 2 },
-};
+} satisfies Record<string, MuzzleProfile>;
+/** Substring-match order (declaration order), hoisted so per-shot lookup allocates nothing. */
+const PROFILE_ENTRIES: ReadonlyArray<[string, MuzzleProfile]> = Object.entries(MUZZLE_PROFILES);
 
 /** The `light` a rifle carries, i.e. the reference the view flash is scaled on. */
 const REF_LIGHT = MUZZLE_PROFILES.rifle.light;
@@ -101,7 +103,7 @@ function profileFor(weapon?: string | MuzzleWeapon): MuzzleProfile {
     typeof weapon === 'string' ? weapon : (weapon.class ?? weapon.id ?? weapon.kind ?? weapon.name);
   if (!key) return MUZZLE_PROFILES.rifle;
   const k = String(key).toLowerCase();
-  for (const name in MUZZLE_PROFILES) if (k.includes(name)) return MUZZLE_PROFILES[name];
+  for (const [name, profile] of PROFILE_ENTRIES) if (k.includes(name)) return profile;
   return MUZZLE_PROFILES.rifle;
 }
 

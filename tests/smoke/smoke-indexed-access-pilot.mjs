@@ -7,10 +7,17 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+import * as THREE from 'three';
+
+import { series } from '../../src/audio/dsp.ts';
+import { WeaponSampleBank } from '../../src/audio/samples.ts';
+import { WEAPON_PROFILES } from '../../src/audio/weapons.ts';
 import { parseWorldManifest } from '../../src/core/model-metadata.ts';
+import { RadioSystem } from '../../src/radio/index.ts';
 import { GRADE_PRESETS, createGradeLut } from '../../src/render/lut.ts';
 import { buildMagazineClips, buildManifestClips } from '../../src/weapons/clips.ts';
 import { WorldSystem } from '../../src/world/index.ts';
+import { audioFixture } from '../lib/audio-banks.mjs';
 
 /* ---- metadata vec3: exactly three finite coordinates ----------------------- */
 const level = readFileSync(
@@ -90,4 +97,47 @@ for (const build of [buildManifestClips, buildMagazineClips])
     /animation manifest has no clip 'Inspect'/
   );
 
-console.log('ALL PASS: indexed-access pilot boundaries keep valid inputs and reject absent data');
+/* ---- audio: series wiring and round-robin bank reads ------------------------ */
+const wired = [];
+const audioNode = (name) => ({ name, connect: (next) => wired.push([name, next.name]) });
+const [n1, n2, n3] = ['a', 'b', 'c'].map(audioNode);
+assert.equal(series(n1), n1, 'a single node is its own tail');
+assert.equal(series(n1, n2, n3), n3);
+assert.deepEqual(wired, [
+  ['a', 'b'],
+  ['b', 'c'],
+]);
+const { actx } = audioFixture(0);
+const bank = new WeaponSampleBank(actx);
+const kind = WEAPON_PROFILES.rifle.sample;
+bank.buffers[kind] = [{ duration: 0.4 }, { duration: 0.5 }];
+bank.shot(WEAPON_PROFILES.rifle, null);
+assert.equal(bank.indices[kind], 1, 'valid round robin advances');
+bank.indices[kind] = 5; // stale index from a larger, since-replaced bank
+assert.throws(() => bank.shot(WEAPON_PROFILES.rifle, null), /recording 5 is not loaded/);
+
+/* ---- radio: a strike needs a finite bomb line ------------------------------ */
+const added = [];
+const emitted = [];
+const radioWorld = (bounds) => ({ bounds, spawn: () => ({ yaw: 0.3 }) });
+const radio = Object.assign(new RadioSystem(), {
+  ctx: {
+    scene: { add: (o) => added.push(o) },
+    events: { emit: (type) => emitted.push(type) },
+    peek: () => undefined,
+  },
+  active: [],
+  _off: [],
+});
+radio._world = radioWorld(new THREE.Box3(new THREE.Vector3(NaN, 0, 0), new THREE.Vector3(1, 1, 1)));
+assert.equal(radio.callStrike(), false, 'non-finite bounds give no drop line');
+assert.deepEqual([added.length, emitted.length, radio.active.length], [0, 0, 0]);
+radio._world = radioWorld(
+  new THREE.Box3(new THREE.Vector3(-10, 0, -10), new THREE.Vector3(10, 5, 10))
+);
+assert.equal(radio.callStrike(), true);
+const [strike] = radio.active;
+assert.equal(strike.lastDrop, strike.drops.at(-1));
+assert.equal(strike.drops[0], 0, 'the first drop is at the start of the bomb line');
+
+console.log('ALL PASS: indexed-access boundaries keep valid inputs and reject absent data');
