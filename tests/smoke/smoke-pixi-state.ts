@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 
-import { Container } from 'pixi.js';
+import { Container, Text } from 'pixi.js';
 
+import type { AmmoState } from '../../src/ui/ammo.ts';
 import { AmmoPanel } from '../../src/ui/ammo.ts';
 import { Compass, STRIP_W } from '../../src/ui/compass.ts';
 import { DamageArcs } from '../../src/ui/damage.ts';
 import { Hitmarkers, KINDS } from '../../src/ui/hitmarkers.ts';
+import type { HitmarkerKind } from '../../src/ui/hitmarkers.ts';
 import { Killfeed } from '../../src/ui/killfeed.ts';
 import { PixiAmmoView } from '../../src/ui/pixi-ammo-view.ts';
 import { PixiCombat } from '../../src/ui/pixi-combat.ts';
@@ -18,8 +20,10 @@ for (const [i, t, life] of [
   [0, 2, 10],
   [1, 0.4, 1],
   [2, 1, 10],
-])
-  Object.assign(pool.items[i], { t, life });
+] as const) {
+  pool.items[i].t = t;
+  pool.items[i].life = life;
+}
 assert.equal(pool.acquire(), pool.items[1], 'full pool reuses normalized age, not absolute age');
 assert.equal(pool.items[1].t, 0);
 assert.equal(pool.advance(pool.items[0], 0), true);
@@ -33,13 +37,17 @@ assert.equal(pool.acquire().i, 1, 'clearing preserves free-slot rotation');
 pool.releaseAll();
 for (let i = 0; i < 3; i++) pool.acquire();
 assert.equal(pool.acquire().i, 2, 'equal-age reuse begins at the retained rotation cursor');
-assert(pool.items.every((item) => item.node === null));
+assert(pool.items.every((item): boolean => item.node === null));
 
 const hit = new Hitmarkers(),
   arcs = new DamageArcs(),
   compass = new Compass(),
   feed = new Killfeed();
+function isHitmarkerKind(value: string): value is HitmarkerKind {
+  return Object.hasOwn(KINDS, value);
+}
 for (const kind of Object.keys(KINDS)) {
+  assert(isHitmarkerKind(kind));
   const marker = hit.spawn(kind);
   assert.equal(marker.life, KINDS[kind].life);
   hit.update(0);
@@ -77,18 +85,20 @@ for (const [retained, capacity] of [
   [arcs.pool, 6],
   [compass.pingPool, 8],
   [feed.pool, 6],
-]) {
+] as const) {
   assert.equal(retained.items.length, capacity);
-  assert.equal(retained.items.filter((item) => item.alive).length, capacity);
-  assert(retained.items.every((item) => item.node === null));
+  assert.equal(retained.items.filter((item): boolean => item.alive).length, capacity);
+  assert(retained.items.every((item): boolean => item.node === null));
 }
 feed.update(0.16);
-assert(feed.rows.some((row) => row.attacker === 'ACTOR 19' && row.alpha === 1));
+assert(feed.rows.some((row): boolean => row.attacker === 'ACTOR 19' && row.alpha === 1));
 hit.clear();
 arcs.clear();
 feed.clear();
 assert(
-  [hit.pool, arcs.pool, feed.pool].every((retained) => retained.items.every((item) => !item.alive))
+  [hit.pool, arcs.pool, feed.pool].every((retained): boolean =>
+    retained.items.every((item): boolean => !item.alive)
+  )
 );
 
 const node = new Container();
@@ -109,19 +119,13 @@ node.destroy();
 
 // Model text measurement without a browser canvas; fitting must reset the old scale first.
 let measurements = 0;
-const label = {
-  text: '',
-  scale: {
-    x: 1,
-    set(value) {
-      this.x = value;
-    },
-  },
-  get width() {
+const label = new Text({ text: '' });
+Object.defineProperty(label, 'width', {
+  get: (): number => {
     measurements++;
-    return this.text.length * 10 * this.scale.x;
+    return label.text.length * 10 * label.scale.x;
   },
-};
+});
 assert.equal(writeHudText(label, 'long weapon name', 40), true);
 assert.equal(label.scale.x, 0.25);
 const measured = measurements;
@@ -131,7 +135,7 @@ assert.equal(writeHudText(label, 'short', 40), true);
 assert.equal(label.scale.x, 0.8, 'shorter replacement is fitted independently of the old scale');
 
 const ammoView = new PixiAmmoView();
-const ammoState = { ammo: 30, magSize: 30, reserve: 210, fireMode: 'auto' };
+const ammoState: AmmoState = { ammo: 30, magSize: 30, reserve: 210, fireMode: 'auto' };
 ammoView.update(0, ammoState);
 ammoView.dirty = false;
 ammoView.update(0, ammoState);
@@ -139,7 +143,7 @@ assert.equal(ammoView.dirty, false, 'unchanged ammo text and bars settle');
 ammoView.update(0, { ...ammoState, ammo: 29, reserve: 209, fireMode: 'semi' });
 assert.equal(ammoView.dirty, true);
 assert.deepEqual(
-  [ammoView.current.text, ammoView.reserve.text, ammoView.mode.text],
+  [ammoView['current'].text, ammoView['reserve'].text, ammoView['mode'].text],
   ['29', '/ 209', 'SEMI']
 );
 ammoView.dirty = false;
@@ -150,7 +154,8 @@ ammoView.stage.destroy({ children: true });
 const combat = new PixiCombat(),
   ammo = new AmmoPanel();
 // Equipment layout is independent of glyph rasterization, which needs a browser canvas.
-for (const slot of combat.slots) Object.defineProperty(slot.node, 'width', { get: () => 20 });
+for (const slot of combat.slots)
+  Object.defineProperty(slot.node, 'width', { get: (): number => 20 });
 const models = { hit, arcs, compass, ammo, fpsText: '60 FPS' };
 assert.equal(combat.update(models), true);
 assert.equal(combat.update(models), false);
@@ -166,8 +171,8 @@ hit.update(1);
 arcs.update(2, 1, 0, 0, -1);
 assert.equal(combat.update(models), true, 'expiry invalidates once');
 assert.equal(combat.update(models), false);
-assert(combat.hitSlots.every((slot) => !slot.node.visible));
-assert(combat.arcSlots.every((slot) => !slot.visible));
+assert(combat.hitSlots.every((slot): boolean => !slot.node.visible));
+assert(combat.arcSlots.every((slot): boolean => !slot.visible));
 assert.equal(
   combat.update({ ...models, fpsText: '61 FPS' }),
   true,

@@ -1,78 +1,138 @@
 import assert from 'node:assert/strict';
 
 import { Container, DOMAdapter, Text, ViewSystem, WebGPURenderer } from 'pixi.js';
+import * as THREE from 'three/webgpu';
 
+import { Rng } from '../../src/core/rng.ts';
 import { ScoreBar } from '../../src/ui/compass.ts';
+import { Crosshair } from '../../src/ui/crosshair.ts';
+import type { GameOverScreen } from '../../src/ui/gameover.ts';
+import { HealthFx } from '../../src/ui/health.ts';
 import { UiSystem } from '../../src/ui/index.ts';
 import { Killfeed } from '../../src/ui/killfeed.ts';
 import { MarketCountdown } from '../../src/ui/market.ts';
+import type { MarketOverlay } from '../../src/ui/market.ts';
+import type { PauseMenu } from '../../src/ui/menu.ts';
+import { Minimap } from '../../src/ui/minimap.ts';
 import { PixiAmmoView, AMMO_HEIGHT } from '../../src/ui/pixi-ammo-view.ts';
 import { initPixiRenderer } from '../../src/ui/pixi-device.ts';
 import { PixiHud } from '../../src/ui/pixi-hud.ts';
 import { PixiMinimap } from '../../src/ui/pixi-minimap.ts';
 import { setHudTextResolution } from '../../src/ui/pixi-type.ts';
 import { Prompt, Banner } from '../../src/ui/prompts.ts';
+import type { RadioPanel } from '../../src/ui/radio.ts';
+import type { StartGate } from '../../src/ui/start.ts';
+import { fixture } from '../lib/fixture.ts';
+import {
+  createRetainedHud,
+  installUiDocument,
+  deleteGlobal,
+  captureMethod,
+} from '../lib/ui-fixture.ts';
 
+const restoreDocument = installUiDocument();
+const game = new THREE.Renderer(
+  new THREE.WebGPUBackend({ canvas: document.createElement('canvas') })
+);
 await assert.rejects(
-  initPixiRenderer({}, { backend: {} }, {}, 1, 1),
+  initPixiRenderer(
+    new WebGPURenderer(),
+    fixture<THREE.Renderer>({ backend: fixture<THREE.Renderer['backend']>({}) }),
+    document.createElement('canvas'),
+    1,
+    1
+  ),
   /requires the initialized WebGPU device/
 );
 const adapter = DOMAdapter.get(),
   oldDocument = globalThis.document;
 try {
-  globalThis.document = {
-    createElement() {
-      throw Error('constructor failed');
-    },
-  };
-  await assert.rejects(PixiHud.create({}, {}, {}), /constructor failed/);
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    writable: true,
+    value: fixture<Document>({
+      createElement(): never {
+        throw Error('constructor failed');
+      },
+    }),
+  });
+  await assert.rejects(
+    PixiHud.create(fixture<HTMLElement>({}), fixture<HTMLElement>({}), game),
+    /constructor failed/
+  );
   assert.equal(DOMAdapter.get(), adapter, 'constructor failure restores adapter');
 } finally {
-  if (oldDocument === undefined) delete globalThis.document;
+  if (oldDocument === undefined) deleteGlobal('document');
   else globalThis.document = oldDocument;
 }
 
 // Partial renderer init/cleanup must preserve the original boot error and adapter.
 const descriptors = Object.fromEntries(
-  ['navigator', 'GPUDevice', 'devicePixelRatio', 'document'].map((k) => [
-    k,
-    Object.getOwnPropertyDescriptor(globalThis, k),
-  ])
+  ['navigator', 'GPUDevice', 'devicePixelRatio', 'document'].map(
+    (k): [string, PropertyDescriptor | undefined] => [
+      k,
+      Object.getOwnPropertyDescriptor(globalThis, k),
+    ]
+  )
 );
-const init = WebGPURenderer.prototype.init,
-  destroy = WebGPURenderer.prototype.destroy,
+const init = captureMethod(WebGPURenderer.prototype, 'init'),
+  destroy = captureMethod(WebGPURenderer.prototype, 'destroy'),
   warn = console.warn;
 try {
-  class Device {}
-  const device = Object.assign(new Device(), { adapterInfo: { vendor: 'test' } });
+  const device = fixture<GPUDevice>({ adapterInfo: fixture<GPUAdapterInfo>({ vendor: 'test' }) });
+  class Device {
+    static [Symbol.hasInstance](candidate: unknown): boolean {
+      return candidate === device;
+    }
+  }
+  class InitializedBackend extends THREE.WebGPUBackend {
+    device = device;
+  }
+  const backend = new InitializedBackend({ canvas: document.createElement('canvas') });
+  const initializedGame = new THREE.Renderer(backend);
   for (const [key, value] of Object.entries({
     GPUDevice: Device,
     devicePixelRatio: 1,
-    navigator: { gpu: { requestAdapter: async () => ({ info: { vendor: 'test' } }) } },
+    navigator: {
+      gpu: {
+        requestAdapter: async (): Promise<{ info: { vendor: string } }> => ({
+          info: { vendor: 'test' },
+        }),
+      },
+    },
     document: {
-      createElement: () => ({
+      createElement: (): {
+        style: {};
+        getContext(): null;
+        setAttribute(): void;
+        remove(): void;
+      } => ({
         style: {},
-        getContext() {
+        getContext(): null {
           return null;
         },
-        setAttribute() {},
-        remove() {},
+        setAttribute(): void {},
+        remove(): void {},
       }),
     },
   }))
     Object.defineProperty(globalThis, key, { value, configurable: true });
-  WebGPURenderer.prototype.init = async function (options) {
-    assert.equal(options.gpu.device, device);
+  WebGPURenderer.prototype.init = async function (options): Promise<never> {
+    assert.equal(options?.gpu?.device, device);
     throw Error('HUD init failed');
   };
   let cleaned = 0;
-  WebGPURenderer.prototype.destroy = function () {
+  WebGPURenderer.prototype.destroy = function (): never {
     cleaned++;
     throw Error('cleanup failed');
   };
-  console.warn = () => {};
+  console.warn = (): void => {};
   await assert.rejects(
-    PixiHud.create({ clientWidth: 1, clientHeight: 1 }, {}, { backend: { device } }),
+    PixiHud.create(
+      fixture<HTMLElement>({ clientWidth: 1, clientHeight: 1 }),
+      fixture<HTMLElement>({}),
+      initializedGame
+    ),
     /HUD init failed/
   );
   assert.equal(cleaned, 1);
@@ -83,123 +143,139 @@ try {
   console.warn = warn;
   for (const [key, descriptor] of Object.entries(descriptors))
     if (descriptor) Object.defineProperty(globalThis, key, descriptor);
-    else delete globalThis[key];
+    else deleteGlobal(key);
 }
 
+// Restore the regular CPU-only environment after the constructor/init failure boundaries.
+installUiDocument();
 for (const failure of [null, 'injury', 'stage', 'renderer']) {
-  const hud = Object.create(PixiHud.prototype);
+  const hud = createRetainedHud();
   let stages = 0,
     renderers = 0,
     removed = 0;
-  Object.assign(hud, {
-    disposed: false,
-    restoreAdapter: () => DOMAdapter.set(adapter),
-    injury: {
-      dispose() {
-        if (failure === 'injury') throw Error('injury');
-      },
-    },
-    stage: {
-      destroy() {
-        stages++;
-        if (failure === 'stage') throw Error('stage');
-      },
-    },
-    renderer: {
-      destroy() {
-        renderers++;
-        if (failure === 'renderer') throw Error('renderer');
-      },
-    },
-    canvas: {
-      remove() {
-        removed++;
-      },
-    },
-  });
-  DOMAdapter.set({ ...adapter, getBaseUrl: () => 'mainline-test' });
-  if (failure) assert.throws(() => hud.dispose(), new RegExp(failure));
+  hud['restoreAdapter'] = (): void => DOMAdapter.set(adapter);
+  hud.injury.dispose = (): void => {
+    if (failure === 'injury') throw Error('injury');
+  };
+  hud.stage.destroy = (): void => {
+    stages++;
+    if (failure === 'stage') throw Error('stage');
+  };
+  hud.renderer.destroy = (): void => {
+    renderers++;
+    if (failure === 'renderer') throw Error('renderer');
+  };
+  hud.canvas.remove = (): void => {
+    removed++;
+  };
+  DOMAdapter.set({ ...adapter, getBaseUrl: (): string => 'mainline-test' });
+  if (failure) assert.throws((): void => hud.dispose(), new RegExp(failure));
   else hud.dispose();
   assert.equal(DOMAdapter.get(), adapter);
   assert.equal(stages, 1);
   assert.equal(renderers, 1);
   assert.equal(removed, 1);
   hud.dispose();
-  hud.update(0);
+  hud.update(
+    0,
+    { ammo: 0, magSize: 0, reserve: 0 },
+    new HealthFx(),
+    new Crosshair(),
+    new Minimap(new Rng(1)),
+    {},
+    0,
+    fixture<Parameters<PixiHud['update']>[7]>({})
+  );
   assert.equal(renderers, 1, 'disposed HUD cannot draw or destroy twice');
 }
-const ui = Object.create(UiSystem.prototype),
-  cleaned = [];
-ui.pixiHud = {
-  dispose() {
-    throw Error('Pixi cleanup failed');
-  },
+const ui = new UiSystem(),
+  cleaned: string[] = [];
+ui.pixiHud = createRetainedHud();
+ui.pixiHud.dispose = (): never => {
+  throw Error('Pixi cleanup failed');
 };
-ui.startGate = {
-  dispose() {
+ui.startGate = fixture<StartGate>({
+  dispose(): void {
     cleaned.push('start');
   },
-};
-ui._unsubs = [() => cleaned.push('events')];
-const widgets = ['minimap', 'menu', 'gameOver', 'shop', 'radio'];
-for (const key of widgets)
-  ui[key] = {
-    dispose() {
-      cleaned.push(key);
-    },
-  };
-ui.root = {
-  remove() {
-    cleaned.push('root');
+});
+ui._unsubs = [
+  (): void => {
+    cleaned.push('events');
   },
+];
+const widgets = ['minimap', 'menu', 'gameOver', 'shop', 'radio'];
+ui.minimap = new Minimap(new Rng(1));
+ui.minimap.dispose = (): void => {
+  cleaned.push('minimap');
+};
+ui.menu = fixture<PauseMenu>({
+  dispose(): void {
+    cleaned.push('menu');
+  },
+});
+ui.gameOver = fixture<GameOverScreen>({
+  dispose(): void {
+    cleaned.push('gameOver');
+  },
+});
+ui.shop = fixture<MarketOverlay>({
+  dispose(): void {
+    cleaned.push('shop');
+  },
+});
+ui.radio = fixture<RadioPanel>({
+  dispose(): void {
+    cleaned.push('radio');
+  },
+});
+ui.root = document.createElement('div');
+ui.root.remove = (): void => {
+  cleaned.push('root');
 };
 try {
-  globalThis.document = { getElementById: () => null };
-  assert.throws(() => ui.dispose(), /Pixi cleanup failed/);
+  assert.throws((): void => ui.dispose(), /Pixi cleanup failed/);
   assert.deepEqual(cleaned, ['start', 'events', ...widgets, 'root']);
   assert.equal(ui.pixiHud, null);
 } finally {
-  if (oldDocument === undefined) delete globalThis.document;
+  if (oldDocument === undefined) deleteGlobal('document');
   else globalThis.document = oldDocument;
 }
-const dprCanvas = { width: 1918, height: 1078, style: { setProperty() {} } },
-  dprView = new ViewSystem({ uid: -1 }),
-  layoutNode = Object.assign(new Container(), { style: {} });
+const dprHud = createRetainedHud();
+const dprCanvas = dprHud.canvas;
+dprCanvas.width = 1918;
+dprCanvas.height = 1078;
+const dprView = new ViewSystem(dprHud.renderer);
 dprView.init({ canvas: dprCanvas, width: 1918, height: 1078, resolution: 1, autoDensity: true });
 let dprResizes = 0;
-const dprHud = Object.assign(Object.create(PixiHud.prototype), {
-  enabled: true,
-  renderer: {
-    get resolution() {
-      return dprView.resolution;
-    },
-    get screen() {
-      return dprView.screen;
-    },
-    resize(w, h, resolution) {
-      dprView.resize(w, h, resolution);
-      dprResizes++;
-    },
-  },
-  stage: new Container(),
-  chrome: { alpha: 0 },
-  injury: { resize() {}, update: () => false, mesh: { visible: false } },
-  feedback: { resize() {} },
-  minimap: { stage: layoutNode },
-  ammo: { stage: layoutNode },
-  vitals: layoutNode,
-  reticle: new Container(),
-  compass: { stage: layoutNode },
-  combat: { hits: layoutNode, arcs: layoutNode, equipment: layoutNode, fps: layoutNode },
-  canvas: dprCanvas,
+Object.defineProperty(dprHud.renderer, 'resolution', { get: (): number => dprView.resolution });
+Object.defineProperty(dprHud.renderer, 'screen', {
+  get: (): typeof dprView.screen => dprView.screen,
 });
+dprHud.renderer.resize = (w: number, h: number, resolution?: number): void => {
+  dprView.resize(w, h, resolution ?? 1);
+  dprResizes++;
+};
+dprHud.injury.update = (): boolean => false;
+dprHud.setVisible(true);
+const hiddenFrame = (): void =>
+  dprHud.update(
+    0,
+    { ammo: 0, magSize: 0, reserve: 0 },
+    new HealthFx(),
+    new Crosshair(),
+    new Minimap(new Rng(1)),
+    {},
+    0,
+    fixture<Parameters<PixiHud['update']>[7]>({})
+  );
 try {
   Object.defineProperty(globalThis, 'devicePixelRatio', { value: 1, configurable: true });
   dprHud.resize(1918, 1078, 1);
   for (const dpr of [1.25, 2, 1]) {
     Object.defineProperty(globalThis, 'devicePixelRatio', { value: dpr, configurable: true });
-    dprHud.update(0, null, null, null, null, null, 0, null);
-    dprHud.update(0, null, null, null, null, null, 0, null);
+    hiddenFrame();
+    hiddenFrame();
     assert.deepEqual(
       [dprHud.reticle.x, dprHud.reticle.y],
       [959, 539],
@@ -212,11 +288,10 @@ try {
 } finally {
   if (descriptors.devicePixelRatio)
     Object.defineProperty(globalThis, 'devicePixelRatio', descriptors.devicePixelRatio);
-  else delete globalThis.devicePixelRatio;
+  else deleteGlobal('devicePixelRatio');
   dprView.destroy();
   dprHud.stage.destroy();
   dprHud.reticle.destroy();
-  layoutNode.destroy();
 }
 const textStage = new Container(),
   textProbe = new Text({ text: '100', style: { fontSize: 32 } }),
@@ -228,32 +303,36 @@ assert.equal(textProbe.resolution, 8 / 3, 'enlarged HUD text uses matching raste
 assert.equal(textProbe.style.fontSize, 32);
 assert.equal(textProbe.scale.x, 1, 'density changes do not change layout scale');
 let textUpdates = 0;
-const viewUpdate = textProbe.onViewUpdate;
-textProbe.onViewUpdate = () => {
+const viewUpdate = captureMethod(textProbe, 'onViewUpdate');
+textProbe.onViewUpdate = (): void => {
   textUpdates++;
   viewUpdate.call(textProbe);
 };
 setHudTextResolution(textStage, mapView.textResolution);
 assert.equal(textUpdates, 0, 'unchanged density does not invalidate text');
-const mapData = { baked: null, viewSpan: 60 },
+const mapData = new Minimap(new Rng(1)),
   mapState = { pulses: [{ x: 0, z: 0, y: 5 }] };
 mapView.update(mapData, mapState);
-assert.equal(mapView.pulses[0].text.resolution, 8 / 3, 'late labels inherit HUD density');
+assert.equal(mapView['pulses'][0].text.resolution, 8 / 3, 'late labels inherit HUD density');
 mapView.textResolution = 2;
 setHudTextResolution(textStage, 2);
 assert.equal(textUpdates, 1);
-assert.equal(mapView.pulses[0].text.resolution, 2, 'existing late labels follow density changes');
+assert.equal(
+  mapView['pulses'][0].text.resolution,
+  2,
+  'existing late labels follow density changes'
+);
 mapView.update(mapData, { pulses: [...mapState.pulses, { x: 1, z: 1, y: -5 }] });
-assert.equal(mapView.pulses[1].text.resolution, 2);
+assert.equal(mapView['pulses'][1].text.resolution, 2);
 textProbe.onViewUpdate = viewUpdate;
 textStage.destroy({ children: true });
 const ammoView = new PixiAmmoView();
-assert.equal(AMMO_HEIGHT - ammoView.magFill.y, 8, 'magazine shares armour-bar bottom inset');
-assert(ammoView.prompt.y >= 0 && ammoView.prompt.y + 16 <= ammoView.bar.y);
-assert(ammoView.bar.y + 3 < ammoView.mode.y, 'reload feedback stays above the readout');
+assert.equal(AMMO_HEIGHT - ammoView['magFill'].y, 8, 'magazine shares armour-bar bottom inset');
+assert(ammoView['prompt'].y >= 0 && ammoView['prompt'].y + 16 <= ammoView['bar'].y);
+assert(ammoView['bar'].y + 3 < ammoView['mode'].y, 'reload feedback stays above the readout');
 ammoView.update(0, { ammo: 0, magSize: 30, reserve: 210, reloading: true, reloadProgress: 0.5 });
-assert(ammoView.bar.visible && ammoView.fill.scale.x === 0.5);
-assert.equal(ammoView.prompt.text, 'RELOADING');
+assert(ammoView['bar'].visible && ammoView['fill'].scale.x === 0.5);
+assert.equal(ammoView['prompt'].text, 'RELOADING');
 ammoView.stage.destroy({ children: true });
 const prompt = new Prompt(),
   banner = new Banner(),
@@ -283,16 +362,16 @@ assert.equal(banner.t, 1);
 for (let i = 0; i < 8; i++)
   feed.push({ attacker: `player ${i}`, victim: 'enemy', mine: true, headshot: i === 7 });
 feed.update(0.16);
-assert.equal(feed.pool.items.filter((x) => x.alive).length, 6);
-assert.equal(Math.max(...feed.rows.map((r) => r.sequence)), 8);
-assert(feed.pool.items.every((x) => x.node === null));
+assert.equal(feed.pool.items.filter((x): boolean => x.alive).length, 6);
+assert.equal(Math.max(...feed.rows.map((r): number => r.sequence)), 8);
+assert(feed.pool.items.every((x): boolean => x.node === null));
 feed.update(0);
-assert(feed.rows.some((r) => r.headshot && r.alpha === 1));
+assert(feed.rows.some((r): boolean => r.headshot && r.alpha === 1));
 feed.update(6);
-assert(feed.pool.items.every((x) => !x.alive));
+assert(feed.pool.items.every((x): boolean => !x.alive));
 feed.push({});
 feed.clear();
-assert(feed.pool.items.every((x) => !x.alive));
+assert(feed.pool.items.every((x): boolean => !x.alive));
 score.update({
   score: 123,
   credits: 45,
@@ -313,7 +392,9 @@ count.update(0.1, 5);
 assert.equal(count.value, '5');
 assert.equal(count.fraction, 0.5);
 assert(count.shown > 0);
-assert([prompt, banner, feed, score, count].every((m) => !('root' in m)));
+assert([prompt, banner, feed, score, count].every((m): boolean => !('root' in m)));
 console.log(
   'ok mainline HUD: guarded shared device, constructor/init/cleanup isolation, adapter restoration and native-control teardown'
 );
+
+restoreDocument();

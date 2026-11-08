@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+
 /**
  * Node smoke test for the market and armour systems — no browser.
  * Exercises the credits mirror (score:change), the post-wave grace period,
@@ -7,10 +9,15 @@
  */
 import { MarketSystem, MARKET_DELAY } from '../../src/market/index.ts';
 import { Health } from '../../src/player/health.ts';
-import { SECONDARY_IDS } from '../../src/weapons/defs.ts';
+import { WEAPON_IDS, PRIMARY_IDS } from '../../src/weapons/defs.ts';
+import type { WeaponId } from '../../src/weapons/defs.ts';
+import { WeaponSystem } from '../../src/weapons/index.ts';
+import { createTestContext } from '../lib/context.ts';
+import type { TestProviders } from '../lib/context.ts';
+import { UiPlayer, captureMethod } from '../lib/ui-fixture.ts';
 
 let failures = 0;
-const check = (name, cond) => {
+const check = (name: string, cond: unknown): void => {
   if (cond) console.log(`  ok  ${name}`);
   else {
     failures++;
@@ -18,122 +25,64 @@ const check = (name, cond) => {
   }
 };
 
-// ---- fake context -------------------------------------------------------
-const listeners = {};
-const fakeCtx = {
-  time: { scale: 1, elapsed: 0 },
-  events: {
-    on: (type, fn) => {
-      (listeners[type] ??= []).push(fn);
-    },
-    emit: (type, payload) => {
-      for (const fn of listeners[type] ?? []) fn(payload);
-    },
-  },
-  weapons: {
-    grenades: 2,
-    carpetBombs: 1,
-    owned: new Set(['rifle', 'pistol']),
-    states: new Map([
-      ['rifle', { mag: 30, chambered: true, reserve: 30, def: { magSize: 30, reserve: 90 } }],
-      ['mcx', { mag: 30, chambered: true, reserve: 180, def: { magSize: 30, reserve: 180 } }],
-      ['pistol', { mag: 17, chambered: true, reserve: 40, def: { magSize: 17, reserve: 68 } }],
-      ['smg', { mag: 32, chambered: true, reserve: 60, def: { magSize: 32, reserve: 224 } }],
-      ['lmg', { mag: 100, chambered: true, reserve: 150, def: { magSize: 100, reserve: 150 } }],
-      ['shotgun', { mag: 6, chambered: true, reserve: 30, def: { magSize: 6, reserve: 30 } }],
-      ['sniper', { mag: 10, chambered: true, reserve: 30, def: { magSize: 10, reserve: 30 } }],
-    ]),
-    owns(id) {
-      return this.owned.has(id);
-    },
-    addGrenades(n) {
-      this.grenades = Math.min(6, this.grenades + n);
-    },
-    addCarpetBombs(n) {
-      this.carpetBombs = Math.min(3, this.carpetBombs + n);
-    },
-    ammoFraction() {
-      let have = 0,
-        max = 0;
-      this.states.forEach((s, id) => {
-        if (!this.owned.has(id)) return;
-        have += s.reserve;
-        max += s.def.reserve;
-      });
-      return max > 0 ? have / max : 1;
-    },
-    refillAmmo() {
-      this.states.forEach((s, id) => {
-        if (this.owned.has(id)) s.reserve = s.def.reserve;
-      });
-    },
-    equipPrimary(id) {
-      if (this.owned.has(id)) return false;
-      for (const p of ['rifle', 'lmg', 'sniper', 'mcx']) if (p !== id) this.owned.delete(p);
-      this.owned.add(id);
-      const s = this.states.get(id);
-      s.mag = s.def.magSize;
-      s.chambered = true;
-      s.reserve = s.def.reserve;
-      return true;
-    },
-    equipSecondary(id) {
-      if (this.owned.has(id)) return false;
-      for (const weapon of SECONDARY_IDS) {
-        if (weapon !== id) this.owned.delete(weapon);
-      }
-      this.owned.add(id);
-      const s = this.states.get(id);
-      s.mag = s.def.magSize;
-      s.chambered = true;
-      s.reserve = s.def.reserve;
-      return true;
-    },
-  },
-  player: {
-    dead: false,
-    controlEnabled: true,
-    setControlEnabled(on) {
-      this.controlEnabled = on;
-    },
-    health: {
-      armour: 0,
-      addArmour(n) {
-        this.armour = Math.min(150, this.armour + n);
-      },
-    },
-    bandages: 2,
-    addBandages(n) {
-      const before = this.bandages;
-      this.bandages = Math.min(4, this.bandages + n);
-      return this.bandages - before;
-    },
-  },
-  get: (id) => (id === 'weapons' ? fakeCtx.weapons : fakeCtx.player),
-  peek: (id) => fakeCtx.get(id),
+// ---- real providers -------------------------------------------------------
+const providers: TestProviders = {};
+const context = createTestContext({ providers });
+const player = new UiPlayer(context);
+const weapons = new WeaponSystem();
+weapons.ctx = context;
+weapons.player = player;
+weapons._hasMesh = (): boolean => true;
+weapons.setWeaponImmediate = (): boolean => true;
+const reserves: Record<WeaponId, [number, number]> = {
+  rifle: [30, 90],
+  mcx: [180, 180],
+  pistol: [40, 68],
+  smg: [60, 224],
+  lmg: [150, 150],
+  shotgun: [30, 30],
+  sniper: [30, 30],
 };
+for (const id of WEAPON_IDS) {
+  const state = weapons._makeState(id);
+  state.reserve = reserves[id][0];
+  state.def = { ...state.def, reserve: reserves[id][1] };
+  weapons.states.set(id, state);
+}
+providers.weapons = weapons;
+providers.player = player;
 
 const market = new MarketSystem();
-await market.init(fakeCtx);
-const item = (id) => market.getHudState().items.find((it) => it.id === id);
+await market.init(context);
+type MarketItem = ReturnType<MarketSystem['getHudState']>['items'][number];
+const item = (id: MarketItem['id']): MarketItem => {
+  const found = market.getHudState().items.find((it): boolean => it.id === id);
+  assert(found);
+  return found;
+};
+const weaponState = (id: WeaponId): ReturnType<WeaponSystem['_makeState']> => {
+  const state = weapons.states.get(id);
+  assert(state);
+  return state;
+};
 check('delay constant is 10s', MARKET_DELAY === 10);
 check(
   'catalog is resupply / secondary / primary / ordnance',
   market
     .getHudState()
-    .items.map((it) => it.id)
+    .items.map((it): MarketItem['id'] => it.id)
     .join() === 'ammo,grenade,armour,bandage,pistol,smg,shotgun,rifle,mcx,lmg,sniper,carpet'
 );
 check(
   'every row has a blurb and slot',
-  market.getHudState().items.every((it) => it.blurb && it.slot && it.action)
+  market.getHudState().items.every((it): boolean => Boolean(it.blurb && it.slot && it.action))
 );
 check('bandage card advertises H hold-to-heal', item('bandage').blurb.includes('hold H'));
 check(
   'spawn guns: M4 + pistol, other guns available to swap',
-  fakeCtx.weapons.owns('rifle') &&
-    fakeCtx.weapons.owns('pistol') &&
-    !fakeCtx.weapons.owns('smg') &&
+  weapons.owns('rifle') &&
+    weapons.owns('pistol') &&
+    !weapons.owns('smg') &&
     item('rifle').action === 'equipped' &&
     item('smg').action === 'swap' &&
     item('lmg').action === 'swap' &&
@@ -142,7 +91,8 @@ check(
 );
 
 // ---- credits mirror score:change 1:1 ------------------------------------
-const earn = (delta) => fakeCtx.events.emit('score:change', { delta });
+const earn = (delta: number): void =>
+  context.events.emit('score:change', { score: 0, delta, reason: 'test', kills: 0 });
 earn(100);
 earn(150);
 earn(0);
@@ -151,45 +101,42 @@ check('credits mirror positive score deltas', market.credits === 250);
 
 // ---- wave clear arms the grace period, then opens the shop ---------------
 earn(250);
-fakeCtx.events.emit('wave:complete', { wave: 1, nextWave: 2, delay: 20 });
+context.events.emit('wave:complete', { wave: 1, nextWave: 2, delay: 20 });
 check('wave bonus +250 (via score:change)', market.credits === 500);
 check('shop NOT open yet (grace period)', market.open === false);
-check('time still running during grace', fakeCtx.time.scale === 1);
+check('time still running during grace', context.time.scale === 1);
 check('countdown shows 10s', market.getHudState().marketIn === 10);
-fakeCtx.time.elapsed += 9;
+context.time.elapsed += 9;
 market.update();
 check('still closed at 9s', market.open === false);
-fakeCtx.time.elapsed += 1;
+context.time.elapsed += 1;
 market.update();
 check('shop opens when the window elapses', market.open === true);
 check(
   'time and controls frozen while open',
-  fakeCtx.time.scale === 0 && fakeCtx.player.controlEnabled === false
+  context.time.scale === 0 && player.controlEnabled === false
 );
 check('countdown cleared once open', market.getHudState().marketIn === 0);
 
 // ---- purchasing ----------------------------------------------------------
 check(
   'buy armour applies +50 for 250 credits',
-  market.buy('armour') && fakeCtx.player.health.armour === 50 && market.credits === 250
+  market.buy('armour') && player.health.armour === 50 && market.credits === 250
 );
 earn(100);
 check(
   'buy bandage adds inventory and does not heal',
   market.buy('bandage') &&
-    fakeCtx.player.bandages === 3 &&
+    player.bandages === 3 &&
     market.credits === 250 &&
-    fakeCtx.player.health.armour === 50
+    player.health.armour === 50
 );
 earn(150);
 check(
   'buy grenade applies +1 for 200 credits',
-  market.buy('grenade') && fakeCtx.weapons.grenades === 3 && market.credits === 200
+  market.buy('grenade') && weapons.grenades === 3 && market.credits === 200
 );
-check(
-  'unaffordable purchase is unchanged',
-  !market.buy('armour') && fakeCtx.player.health.armour === 50
-);
+check('unaffordable purchase is unchanged', !market.buy('armour') && player.health.armour === 50);
 
 // ---- ammo refill ---------------------------------------------------------
 check(
@@ -200,8 +147,8 @@ market.credits = 99999;
 check('ammo is buyable below full', item('ammo').affordable && market.buy('ammo'));
 check(
   'refill tops reserves and disables itself',
-  fakeCtx.weapons.states.get('rifle').reserve === 90 &&
-    fakeCtx.weapons.states.get('pistol').reserve === 68 &&
+  weaponState('rifle').reserve === 90 &&
+    weaponState('pistol').reserve === 68 &&
     !item('ammo').affordable &&
     !market.buy('ammo') &&
     item('ammo').action === 'max'
@@ -209,20 +156,20 @@ check(
 market.closeShop();
 check(
   'closed purchases fail and time/controls resume',
-  !market.buy('grenade') && fakeCtx.time.scale === 1 && fakeCtx.player.controlEnabled
+  !market.buy('grenade') && context.time.scale === 1 && player.controlEnabled
 );
 
 // ---- dead player blocks the auto-open ------------------------------------
-fakeCtx.events.emit('wave:complete', { wave: 2 }); // arm the timer
-fakeCtx.player.dead = true;
-fakeCtx.time.elapsed += MARKET_DELAY;
+context.events.emit('wave:complete', { wave: 2, nextWave: 3, delay: 20 }); // arm the timer
+player.dead = true;
+context.time.elapsed += MARKET_DELAY;
 market.update();
 check('no open over the death screen', market.open === false);
-fakeCtx.player.dead = false;
+player.dead = false;
 market.update();
 check('opens once alive again', market.open === true);
 market.closeShop();
-fakeCtx.events.emit('game:restart', {});
+context.events.emit('game:restart', {});
 check(
   'restart clears the pending timer',
   market.getHudState().marketIn === 0 && market.open === false
@@ -230,19 +177,19 @@ check(
 
 // ---- caps ----------------------------------------------------------------
 market.credits = 99999;
-fakeCtx.time.scale = 0.5;
+context.time.scale = 0.5;
 market.openShop(2);
 for (let i = 0; i < 3; i++) market.buy('armour');
-check('armour caps at 150', fakeCtx.player.health.armour === 150);
+check('armour caps at 150', player.health.armour === 150);
 check('buy at cap rejected', market.buy('armour') === false);
 for (let i = 0; i < 3; i++) market.buy('grenade');
-check('grenades cap at 6', fakeCtx.weapons.grenades === 6);
+check('grenades cap at 6', weapons.grenades === 6);
 check('buy at cap rejected', market.buy('grenade') === false);
 const bandageCredits = market.credits;
-while (fakeCtx.player.bandages < 4) {
+while (player.bandages < 4) {
   if (!market.buy('bandage')) break;
 }
-check('bandages cap at 4', fakeCtx.player.bandages === 4);
+check('bandages cap at 4', player.bandages === 4);
 check(
   'bandage buy at cap rejected without charging',
   market.buy('bandage') === false && market.credits === bandageCredits - 100
@@ -250,10 +197,7 @@ check(
 
 // ---- primary weapon purchases (LMG replaces the M4, and back) ------------
 market.credits = 99999;
-check(
-  'spawn loadout: M4 owned, LMG not',
-  fakeCtx.weapons.owns('rifle') && !fakeCtx.weapons.owns('lmg')
-);
+check('spawn loadout: M4 owned, LMG not', weapons.owns('rifle') && !weapons.owns('lmg'));
 check('LMG buyable while M4 equipped', item('lmg').affordable && item('lmg').action === 'swap');
 check(
   'M4 not buyable while equipped',
@@ -262,8 +206,8 @@ check(
 check(
   'buy LMG replaces M4 and deducts 1200',
   market.buy('lmg') &&
-    fakeCtx.weapons.owns('lmg') &&
-    !fakeCtx.weapons.owns('rifle') &&
+    weapons.owns('lmg') &&
+    !weapons.owns('rifle') &&
     market.credits === 99999 - 1200
 );
 check('cannot buy a weapon already equipped', !market.buy('lmg') && !item('lmg').affordable);
@@ -271,31 +215,28 @@ check(
   'M4 becomes buyable with LMG equipped',
   item('rifle').affordable && item('rifle').action === 'swap'
 );
-check(
-  'buy M4 replaces LMG',
-  market.buy('rifle') && fakeCtx.weapons.owns('rifle') && !fakeCtx.weapons.owns('lmg')
-);
+check('buy M4 replaces LMG', market.buy('rifle') && weapons.owns('rifle') && !weapons.owns('lmg'));
 check('M4 purchase rejected when equipped again', !market.buy('rifle'));
-check('carpet is the last catalog row', market.getHudState().items.at(-1).id === 'carpet');
+check('carpet is the last catalog row', market.getHudState().items.at(-1)?.id === 'carpet');
 check(
   'buy AX-338 replaces M4 and deducts 1500',
   market.buy('sniper') &&
-    fakeCtx.weapons.owns('sniper') &&
-    !fakeCtx.weapons.owns('rifle') &&
-    !fakeCtx.weapons.owns('lmg') &&
+    weapons.owns('sniper') &&
+    !weapons.owns('rifle') &&
+    !weapons.owns('lmg') &&
     market.credits === 99999 - 1200 - 900 - 1500
 );
 check(
   'buy LMG replaces AX-338',
-  market.buy('lmg') && fakeCtx.weapons.owns('lmg') && !fakeCtx.weapons.owns('sniper')
+  market.buy('lmg') && weapons.owns('lmg') && !weapons.owns('sniper')
 );
 
 const beforeMCX = market.credits;
 check(
   'buy MCX replaces LMG and deducts 1100',
   market.buy('mcx') &&
-    fakeCtx.weapons.owns('mcx') &&
-    !fakeCtx.weapons.owns('lmg') &&
+    weapons.owns('mcx') &&
+    !weapons.owns('lmg') &&
     market.credits === beforeMCX - 1100
 );
 check(
@@ -303,26 +244,20 @@ check(
   item('mcx').slot === 'primary' && item('rifle').action === 'swap'
 );
 check('cannot buy MCX twice', !market.buy('mcx'));
-check(
-  'M4 can replace MCX',
-  market.buy('rifle') && fakeCtx.weapons.owns('rifle') && !fakeCtx.weapons.owns('mcx')
-);
+check('M4 can replace MCX', market.buy('rifle') && weapons.owns('rifle') && !weapons.owns('mcx'));
 {
-  const real = fakeCtx.weapons.equipPrimary.bind(fakeCtx.weapons);
-  fakeCtx.weapons.equipPrimary = () => false;
+  const real = weapons.equipPrimary.bind(weapons);
+  weapons.equipPrimary = (): false => false;
   const credits = market.credits;
   check('failed gun buy does not charge', !market.buy('lmg') && market.credits === credits);
-  check(
-    'failed gun buy leaves ownership',
-    fakeCtx.weapons.owns('rifle') && !fakeCtx.weapons.owns('lmg')
-  );
-  fakeCtx.weapons.equipPrimary = real;
+  check('failed gun buy leaves ownership', weapons.owns('rifle') && !weapons.owns('lmg'));
+  weapons.equipPrimary = real;
 }
 
 // ---- secondary weapon purchases replace the equipped secondary -----------
 check(
   'spawn loadout: pistol owned, SMG and shotgun not',
-  fakeCtx.weapons.owns('pistol') && !fakeCtx.weapons.owns('smg') && !fakeCtx.weapons.owns('shotgun')
+  weapons.owns('pistol') && !weapons.owns('smg') && !weapons.owns('shotgun')
 );
 check(
   'P320 offered as a 400-credit secondary',
@@ -343,8 +278,8 @@ const beforeSmg = market.credits;
 check(
   'buy MPX replaces pistol and deducts 800',
   market.buy('smg') &&
-    fakeCtx.weapons.owns('smg') &&
-    !fakeCtx.weapons.owns('pistol') &&
+    weapons.owns('smg') &&
+    !weapons.owns('pistol') &&
     market.credits === beforeSmg - 800
 );
 check('cannot rebuy the equipped MPX', !market.buy('smg'));
@@ -353,23 +288,24 @@ const beforeShotgun = market.credits;
 check(
   'buy shotgun replaces MPX and deducts 1000',
   market.buy('shotgun') &&
-    fakeCtx.weapons.owns('shotgun') &&
-    !fakeCtx.weapons.owns('smg') &&
-    !fakeCtx.weapons.owns('pistol') &&
+    weapons.owns('shotgun') &&
+    !weapons.owns('smg') &&
+    !weapons.owns('pistol') &&
     market.credits === beforeShotgun - 1000
 );
 check('cannot rebuy the shotgun', !market.buy('shotgun'));
 check('MPX becomes buyable with shotgun equipped', item('smg').affordable);
 check(
   'buy MPX replaces shotgun',
-  market.buy('smg') && fakeCtx.weapons.owns('smg') && !fakeCtx.weapons.owns('shotgun')
+  market.buy('smg') && weapons.owns('smg') && !weapons.owns('shotgun')
 );
 
 // ---- pistol can be bought back after either secondary upgrade ------------
-for (const previous of ['smg', 'shotgun']) {
-  if (!fakeCtx.weapons.owns(previous)) fakeCtx.weapons.equipSecondary(previous);
-  const primary = ['rifle', 'mcx', 'lmg', 'sniper'].find((id) => fakeCtx.weapons.owns(id));
-  const pistol = fakeCtx.weapons.states.get('pistol');
+for (const previous of ['smg', 'shotgun'] as const) {
+  if (!weapons.owns(previous)) weapons.equipSecondary(previous);
+  const primary = PRIMARY_IDS.find((id): boolean => weapons.owns(id));
+  assert(primary);
+  const pistol = weaponState('pistol');
   pistol.mag = 0;
   pistol.chambered = false;
   pistol.reserve = 0;
@@ -380,18 +316,18 @@ for (const previous of ['smg', 'shotgun']) {
       !item('pistol').affordable &&
       !market.buy('pistol') &&
       market.credits === 399 &&
-      fakeCtx.weapons.owns(previous) &&
-      !fakeCtx.weapons.owns('pistol')
+      weapons.owns(previous) &&
+      !weapons.owns('pistol')
   );
   market.credits = 400;
   check('P320 buyable at exactly 400', item('pistol').affordable);
   check(
     `buy P320 replaces ${previous}, preserves primary, and deducts 400`,
     market.buy('pistol') &&
-      fakeCtx.weapons.owns('pistol') &&
-      !fakeCtx.weapons.owns('smg') &&
-      !fakeCtx.weapons.owns('shotgun') &&
-      fakeCtx.weapons.owns(primary) &&
+      weapons.owns('pistol') &&
+      !weapons.owns('smg') &&
+      !weapons.owns('shotgun') &&
+      weapons.owns(primary) &&
       market.credits === 0
   );
   check(
@@ -404,19 +340,19 @@ for (const previous of ['smg', 'shotgun']) {
       !market.buy('pistol')
   );
 }
-fakeCtx.weapons.equipSecondary('smg');
+weapons.equipSecondary('smg');
 market.credits = 400;
 {
-  const real = fakeCtx.weapons.equipSecondary;
-  fakeCtx.weapons.equipSecondary = () => false;
+  const real = captureMethod(weapons, 'equipSecondary');
+  weapons.equipSecondary = (): false => false;
   check(
     'failed pistol equip does not charge or change ownership',
     !market.buy('pistol') &&
       market.credits === 400 &&
-      fakeCtx.weapons.owns('smg') &&
-      !fakeCtx.weapons.owns('pistol')
+      weapons.owns('smg') &&
+      !weapons.owns('pistol')
   );
-  fakeCtx.weapons.equipSecondary = real;
+  weapons.equipSecondary = real;
 }
 market.closeShop();
 check(
@@ -432,38 +368,35 @@ market.credits = 99999;
 check('carpet strike buyable for 1500', item('carpet').affordable);
 check(
   'buy adds a charge and deducts 1500',
-  market.buy('carpet') && fakeCtx.weapons.carpetBombs === 2 && market.credits === 99999 - 1500
+  market.buy('carpet') && weapons.carpetBombs === 2 && market.credits === 99999 - 1500
 );
 market.buy('carpet');
-check('charges cap at 3', fakeCtx.weapons.carpetBombs === 3);
+check('charges cap at 3', weapons.carpetBombs === 3);
 check('buy at cap rejected', market.buy('carpet') === false);
 market.closeShop();
-check('close restores the previous time scale', fakeCtx.time.scale === 0.5);
-fakeCtx.time.scale = 1;
+check('close restores the previous time scale', context.time.scale === 0.5);
+context.time.scale = 1;
 market.credits = 99999;
 check('carpet unbuyable with the shop closed', market.buy('carpet') === false);
 
 // ---- armour damage -------------------------------------------------------
-let damage;
-const health = new Health(
-  {
-    time: { elapsed: 0 },
-    camera: { rotation: { y: 0 }, position: { x: 0, y: 0, z: 0 } },
-    events: {
-      emit: (type, p) => {
-        if (type === 'damage:taken') damage = { ...p };
-      },
-    },
-  },
-  null
-);
+let damage: import('../../src/core/events.ts').EngineEventMap['damage:taken'] | undefined;
+const healthContext = createTestContext();
+healthContext.events.on('damage:taken', (payload): void => {
+  damage = { ...payload };
+});
+const health = new Health(healthContext, null);
+const lastDamage = (): NonNullable<typeof damage> => {
+  assert(damage);
+  return damage;
+};
 health.addArmour(50);
 health.damage(20, null);
 const absorbed =
   health.armour === 35 &&
   health.value === 100 &&
-  damage.amount === 0 &&
-  damage.armourAbsorbed === 15 &&
+  lastDamage().amount === 0 &&
+  lastDamage().armourAbsorbed === 15 &&
   health.hitFlash === 0;
 health.damage(80, null);
 check(
@@ -471,20 +404,23 @@ check(
   absorbed &&
     health.armour === 0 &&
     health.value === 75 &&
-    damage.amount === 25 &&
-    damage.plateBreak
+    lastDamage().amount === 25 &&
+    lastDamage().plateBreak
 );
 health.damage(20, null);
 check(
   'bare health takes full damage after plates are gone',
-  health.armour === 0 && health.value === 55 && damage.amount === 20 && !damage.plateBreak
+  health.armour === 0 &&
+    health.value === 55 &&
+    lastDamage().amount === 20 &&
+    !lastDamage().plateBreak
 );
 
 // ---- restart -------------------------------------------------------------
 market.openShop(3);
-fakeCtx.events.emit('game:restart', {});
+context.events.emit('game:restart', {});
 check('restart zeroes credits', market.credits === 0);
-check('restart force-closes an open shop', market.open === false && fakeCtx.time.scale === 1);
+check('restart force-closes an open shop', market.open === false && context.time.scale === 1);
 earn(100);
 check('earns again after restart', market.credits === 100);
 

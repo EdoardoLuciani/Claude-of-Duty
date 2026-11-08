@@ -2,37 +2,91 @@ import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
 
+import type { EngineEventMap } from '../../src/core/events.ts';
 import { Rng } from '../../src/core/rng.ts';
+import { IntelSystem } from '../../src/intel/index.ts';
+import { UiSystem } from '../../src/ui/index.ts';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
+import { WeaponSystem } from '../../src/weapons/index.ts';
+import { createTestContext } from '../lib/context.ts';
+import type { TestProviders } from '../lib/context.ts';
+import { fixture } from '../lib/fixture.ts';
+import { UiInput, UiPlayer } from '../lib/ui-fixture.ts';
 
-function harness() {
-  const scene = new THREE.Scene(),
-    prompts = [],
-    cleared = [],
-    events = [];
-  const player = { feetPosition: new THREE.Vector3(), controlEnabled: true };
-  const input = { enabled: true, frozen: false, use: false, action: () => input.use };
-  const ui = {
-    setPrompt: (p, owner) => prompts.push({ ...p, owner }),
-    clearPrompt: (owner) => cleared.push(owner),
+type PromptData = Parameters<UiSystem['setPrompt']>[0];
+interface AmmoHarness {
+  pickups: AmmoPickups;
+  owner: ConstructorParameters<typeof AmmoPickups>[0] & {
+    state: ReturnType<WeaponSystem['_makeState']>;
+    current: NonNullable<WeaponSystem['current']>;
   };
-  const intel = { blocked: false, blocksUse: () => intel.blocked };
-  const ctx = {
-    scene,
-    camera: new THREE.PerspectiveCamera(),
-    time: { elapsed: 0, scale: 1 },
-    input,
-    events: { emit: (name, payload) => events.push({ name, payload }) },
-    peek: (name) => ({ player, ui, intel })[name],
+  ctx: import('../../src/core/context.ts').EngineContext;
+  input: UiInput;
+  player: UiPlayer;
+  intel: { blocked: boolean };
+  prompts: (PromptData & { owner: unknown })[];
+  cleared: unknown[];
+  events: { name: 'ammo:pickup'; payload: EngineEventMap['ammo:pickup'] }[];
+}
+function rngState(rng: Rng): {
+  s0: number;
+  s1: number;
+  s2: number;
+  s3: number;
+  spare: number | undefined;
+} {
+  return { s0: rng.s0, s1: rng.s1, s2: rng.s2, s3: rng.s3, spare: rng['_spare'] };
+}
+function isInstancedMesh(value: unknown): value is THREE.InstancedMesh {
+  return value instanceof THREE.InstancedMesh;
+}
+function harness(): AmmoHarness {
+  const prompts: (PromptData & { owner: unknown })[] = [],
+    cleared: unknown[] = [];
+  const events: { name: 'ammo:pickup'; payload: EngineEventMap['ammo:pickup'] }[] = [];
+  const input = new UiInput();
+  const providers: TestProviders = {};
+  const ctx = createTestContext({ input, providers });
+  const player = new UiPlayer(ctx);
+  const ui = new UiSystem();
+  ui.setPrompt = (p: PromptData, owner: unknown): void => {
+    prompts.push({ ...p, owner });
   };
+  ui.clearPrompt = (owner: unknown): void => {
+    cleared.push(owner);
+  };
+  const intel = new IntelSystem();
+  let blocked = false;
+  intel.blocksUse = (): boolean => blocked;
+  const intelControl = {
+    get blocked(): boolean {
+      return blocked;
+    },
+    set blocked(value: boolean) {
+      blocked = value;
+    },
+  };
+  providers.player = player;
+  providers.ui = ui;
+  providers.intel = intel;
+  ctx.events.on('ammo:pickup', (payload): void => {
+    events.push({ name: 'ammo:pickup', payload });
+  });
+  const weapons = new WeaponSystem();
+  const state = weapons._makeState('rifle');
+  state.reserve = 0;
+  state.def = { ...state.def, reserve: 90 };
   const owner = {
     ctx,
     rng: new Rng(123),
     player,
-    ammo: { total: 0, magSize: 30 },
-    state: { reserve: 0, def: { reserve: 90, magSize: 30 } },
-    current: 'rifle',
-    addReserve(n) {
+    ammo: { mag: 0, inMag: 0, chambered: false, reserve: 0, total: 0, magSize: 30, empty: true },
+    state,
+    current: state.def,
+    disabled: false,
+    grenadeEquipped: false,
+    radioEquipped: false,
+    addReserve(n: number): number {
       this.state.reserve += n;
       return n;
     },
@@ -43,24 +97,30 @@ function harness() {
     ctx,
     input,
     player,
-    intel,
+    intel: intelControl,
     prompts,
     cleared,
     events,
   };
 }
 
-function matricesMatch(pickups) {
+function matricesMatch(pickups: AmmoPickups): void {
   const actual = new THREE.Matrix4();
   for (const mesh of pickups._batches) {
-    const count = pickups.items.length ? Math.max(...pickups.items.map((p) => p.slot)) + 1 : 0;
+    const count = pickups.items.length
+      ? Math.max(...pickups.items.map((p): number => p.slot)) + 1
+      : 0;
     assert.equal(mesh.count, count, 'bounded sparse draw range');
     assert(count <= 32);
     for (const item of pickups.items) {
       item.group.updateMatrix();
       mesh.getMatrixAt(item.slot, actual);
-      actual.elements.forEach((n, j) => assert(Math.abs(n - item.group.matrix.elements[j]) < 1e-6));
+      actual.elements.forEach((n, j): void =>
+        assert(Math.abs(n - item.group.matrix.elements[j]) < 1e-6)
+      );
+      assert(mesh.geometry.boundingSphere);
       const sphere = mesh.geometry.boundingSphere.clone().applyMatrix4(actual);
+      assert(mesh.boundingSphere);
       assert(
         mesh.boundingSphere.center.distanceTo(sphere.center) + sphere.radius <=
           mesh.boundingSphere.radius + 1e-5,
@@ -82,12 +142,12 @@ function matricesMatch(pickups) {
 // batches, no lights, and exactly the old vertex positions/normals/UVs baked in.
 {
   const { pickups, owner } = harness();
-  const rngBefore = { ...owner.rng };
+  const rngBefore = rngState(owner.rng);
   const visual = pickups._makeVisual();
   assert.equal(pickups._makeVisual(), visual);
   assert.equal(pickups.items.length, 0);
   assert.equal(pickups._nextId, 1);
-  assert.deepEqual({ ...owner.rng }, rngBefore);
+  assert.deepEqual(rngState(owner.rng), rngBefore);
   assert.equal(visual.parent, null);
   assert.equal(visual.children.length, 4);
   const old = {
@@ -99,9 +159,9 @@ function matricesMatch(pickups) {
     latch: [new THREE.BoxGeometry(0.075, 0.065, 0.035).translate(0, 0.18, 0.155)],
     ring: [new THREE.TorusGeometry(0.29, 0.011, 6, 28).rotateX(Math.PI / 2).translate(0, 0.035, 0)],
   };
-  for (const [i, name] of ['case', 'edge', 'latch', 'ring'].entries()) {
+  for (const [i, name] of (['case', 'edge', 'latch', 'ring'] as const).entries()) {
     const mesh = visual.children[i];
-    assert(mesh.isInstancedMesh);
+    assert(isInstancedMesh(mesh));
     assert.equal(mesh.instanceMatrix.usage, THREE.DynamicDrawUsage);
     assert.equal(mesh.instanceMatrix.count, 32);
     assert.equal(mesh.castShadow, name !== 'ring');
@@ -110,12 +170,12 @@ function matricesMatch(pickups) {
     if (name === 'edge')
       assert.equal(mesh.geometry.groups.length, 0, 'merged edge is one draw, not material groups');
     for (const attribute of ['position', 'normal', 'uv']) {
-      const expected = old[name].flatMap((g) => [...g.attributes[attribute].array]);
-      const actual = [...mesh.geometry.attributes[attribute].array];
+      const expected = old[name].flatMap((g): number[] => [...g.attributes[attribute].array]);
+      const actual: number[] = [...mesh.geometry.attributes[attribute].array];
       assert.equal(actual.length, expected.length);
-      actual.forEach((n, j) => assert(Math.abs(n - expected[j]) < 1e-7));
+      actual.forEach((n, j): void => assert(Math.abs(n - expected[j]) < 1e-7));
     }
-    old[name].forEach((g) => g.dispose());
+    old[name].forEach((g): void => g.dispose());
   }
   pickups.dispose();
 }
@@ -137,23 +197,23 @@ function matricesMatch(pickups) {
     matricesMatch(pickups);
   }
   assert.deepEqual(
-    pickups.items.map((p) => p.id),
-    Array.from({ length: 32 }, (_, i) => i + 2)
+    pickups.items.map((p): number => p.id),
+    Array.from({ length: 32 }, (_, i): number => i + 2)
   );
   assert.equal(ctx.scene.children.length, 1);
   assert.equal(ctx.scene.children[0].children.length, 4);
   for (const index of [0, 15, 29]) {
     const removed = pickups.items[index];
-    const ids = pickups.items.filter((p) => p !== removed).map((p) => p.id);
-    const slots = pickups.items.filter((p) => p !== removed).map((p) => p.slot);
+    const ids = pickups.items.filter((p): boolean => p !== removed).map((p): number => p.id);
+    const slots = pickups.items.filter((p): boolean => p !== removed).map((p): number => p.slot);
     pickups._remove(removed);
     assert.deepEqual(
-      pickups.items.map((p) => p.slot),
+      pickups.items.map((p): number => p.slot),
       slots
     );
     assert.equal(pickups._slots[removed.slot], null);
     assert.deepEqual(
-      pickups.items.map((p) => p.id),
+      pickups.items.map((p): number => p.id),
       ids
     );
     matricesMatch(pickups);
@@ -170,7 +230,7 @@ function matricesMatch(pickups) {
   const batches = [...pickups._batches];
   pickups.clear();
   assert.equal(ctx.scene.children.length, 0);
-  assert(pickups._batches.every((m) => m.count === 0));
+  assert(pickups._batches.every((m): boolean => m.count === 0));
   const reused = pickups.spawn({ x: -40, y: 10, z: 25 });
   assert.equal(reused.id, 34, 'restart does not reset IDs');
   assert.deepEqual(pickups._batches, batches, 'reuse buffers, not fresh GPU pools');
@@ -182,13 +242,20 @@ function matricesMatch(pickups) {
   pickups.update(0.01);
   assert.equal(pickups.items.length, 0);
   matricesMatch(pickups);
-  const disposed = [];
+  const disposed: unknown[] = [];
   for (const resource of [
     ...batches,
     ...Object.values(pickups.geometries),
     ...Object.values(pickups.materials),
-  ])
-    resource.addEventListener('dispose', () => disposed.push(resource));
+  ]) {
+    const listener = (): void => {
+      disposed.push(resource);
+    };
+    if (resource instanceof THREE.InstancedMesh) resource.addEventListener('dispose', listener);
+    else if (resource instanceof THREE.BufferGeometry)
+      resource.addEventListener('dispose', listener);
+    else resource.addEventListener('dispose', listener);
+  }
   pickups.dispose();
   assert.equal(disposed.length, 12, 'all four instance buffers, geometries and materials disposed');
   assert.equal(new Set(disposed).size, 12);
@@ -205,7 +272,7 @@ function matricesMatch(pickups) {
   input.use = true;
   pickups.update(0.2);
   assert.equal(pickups._nearest, nearest);
-  assert.equal(prompts.at(-1).owner, 'ammo');
+  assert.equal(prompts.at(-1)?.owner, 'ammo');
   input.use = false;
   pickups.update(0.04);
   assert.equal(pickups._hold, 0.1);
@@ -215,31 +282,105 @@ function matricesMatch(pickups) {
   assert.equal(cleared.at(-1), 'ammo');
   pickups.update(0.2);
   assert.equal(pickups._nearest, first);
-  for (const [object, key, blocked] of [
-    [intel, 'blocked', true],
-    [owner, 'disabled', true],
-    [owner, 'grenadeEquipped', true],
-    [owner, 'radioEquipped', true],
-    [input, 'frozen', true],
-    [input, 'enabled', false],
-    [h.player, 'dead', true],
-    [h.player, 'controlEnabled', false],
-    [ctx.time, 'scale', 0],
-    [h.player, 'healCtrl', { active: true }],
-  ]) {
-    const previous = object[key];
-    object[key] = blocked;
-    pickups.update(0.5);
-    assert.equal(pickups._nearest, null);
-    assert.equal(owner.state.reserve, 0);
-    object[key] = previous;
-  }
+  const block =
+    (apply: () => void, restore: () => void): (() => void) =>
+    (): void => {
+      apply();
+      pickups.update(0.5);
+      assert.equal(pickups._nearest, null);
+      assert.equal(owner.state.reserve, 0);
+      restore();
+    };
+  for (const checkBlock of [
+    block(
+      (): void => {
+        intel.blocked = true;
+      },
+      (): void => {
+        intel.blocked = false;
+      }
+    ),
+    block(
+      (): void => {
+        owner.disabled = true;
+      },
+      (): void => {
+        owner.disabled = false;
+      }
+    ),
+    block(
+      (): void => {
+        owner.grenadeEquipped = true;
+      },
+      (): void => {
+        owner.grenadeEquipped = false;
+      }
+    ),
+    block(
+      (): void => {
+        owner.radioEquipped = true;
+      },
+      (): void => {
+        owner.radioEquipped = false;
+      }
+    ),
+    block(
+      (): void => {
+        input.frozen = true;
+      },
+      (): void => {
+        input.frozen = false;
+      }
+    ),
+    block(
+      (): void => {
+        input.enabled = false;
+      },
+      (): void => {
+        input.enabled = true;
+      }
+    ),
+    block(
+      (): void => {
+        h.player.dead = true;
+      },
+      (): void => {
+        h.player.dead = false;
+      }
+    ),
+    block(
+      (): void => {
+        h.player.controlEnabled = false;
+      },
+      (): void => {
+        h.player.controlEnabled = true;
+      }
+    ),
+    block(
+      (): void => {
+        ctx.time.scale = 0;
+      },
+      (): void => {
+        ctx.time.scale = 1;
+      }
+    ),
+    block(
+      (): void => {
+        h.player.healCtrl.active = true;
+      },
+      (): void => {
+        h.player.healCtrl.active = false;
+      }
+    ),
+  ])
+    checkBlock();
   pickups.update(0.45);
   assert.equal(owner.state.reserve, 45);
   assert.equal(pickups.items.length, 0);
   assert.equal(events[0].name, 'ammo:pickup');
   assert.equal(events[0].payload.amount, 45);
-  assert.equal(events[0].payload.weapon, 'rifle');
+  assert.equal(events[0].payload.weapon, owner.current);
+  assert.equal(owner.current.id, 'rifle');
   assert(events[0].payload.position.equals(first.group.position));
   matricesMatch(pickups);
   pickups.spawn({ x: 0, y: 0, z: 0 });
@@ -257,18 +398,30 @@ function matricesMatch(pickups) {
   const { pickups, ctx } = harness();
   const a = pickups.spawn({ x: 2, y: 0, z: 0 });
   const b = pickups.spawn({ x: 3, y: 0, z: 0 });
-  const markRendered = () => {
+  const renderer = fixture<THREE.WebGLRenderer>({});
+  const material = new THREE.MeshBasicMaterial();
+  const markRendered = (): void => {
     ctx.camera.layers.set(1);
     for (const mesh of pickups._batches.slice(0, 3))
-      mesh.onAfterRender(null, ctx.scene, ctx.camera);
+      mesh.onAfterRender(
+        renderer,
+        ctx.scene,
+        ctx.camera,
+        mesh.geometry,
+        material,
+        new THREE.Group()
+      );
     pickups._syncVisuals();
   };
-  const flags = (slot) =>
-    pickups._batches.slice(0, 3).map((m) => m.geometry.getAttribute('ammoHistoryValid').getX(slot));
+  const flags = (slot: number): number[] =>
+    pickups._batches
+      .slice(0, 3)
+      .map((m): number => m.geometry.getAttribute('ammoHistoryValid').getX(slot));
   assert.deepEqual(flags(a.slot), [0, 0, 0]);
   const shadow = new THREE.PerspectiveCamera();
   shadow.layers.set(1);
-  for (const mesh of pickups._batches.slice(0, 3)) mesh.onAfterRender(null, ctx.scene, shadow);
+  for (const mesh of pickups._batches.slice(0, 3))
+    mesh.onAfterRender(renderer, ctx.scene, shadow, mesh.geometry, material, new THREE.Group());
   pickups._syncVisuals();
   assert.deepEqual(flags(a.slot), [0, 0, 0], 'shadow callbacks cannot validate velocity history');
   markRendered();
@@ -284,11 +437,11 @@ function matricesMatch(pickups) {
   markRendered();
   assert.deepEqual(flags(replacement.slot), [1, 1, 1]);
   pickups.clear();
-  const versions = pickups._batches.map((m) => m.instanceMatrix.version);
+  const versions = pickups._batches.map((m): number => m.instanceMatrix.version);
   pickups.update(0);
   pickups.update(0);
   assert.deepEqual(
-    pickups._batches.map((m) => m.instanceMatrix.version),
+    pickups._batches.map((m): number => m.instanceMatrix.version),
     versions,
     'empty frames do not dirty matrices'
   );
@@ -303,21 +456,42 @@ function matricesMatch(pickups) {
 {
   const { pickups, owner } = harness();
   const actor = { position: new THREE.Vector3(1, 2, 3) };
-  assert.equal(pickups.onActorDeath({ actor: { ...actor, friendly: true } }), null);
-  assert.equal(pickups.onActorDeath({ actor: { ...actor, isPlayerCorpse: true } }), null);
-  assert.equal(pickups.onActorDeath({ actor: null }), null);
+  assert.equal(
+    pickups.onActorDeath({
+      actor: { ...actor, friendly: true },
+      point: actor.position,
+      impulse: new THREE.Vector3(),
+    }),
+    null
+  );
+  assert.equal(
+    pickups.onActorDeath({
+      actor: { ...actor, isPlayerCorpse: true },
+      point: actor.position,
+      impulse: new THREE.Vector3(),
+    }),
+    null
+  );
+  assert.equal(
+    pickups.onActorDeath({ actor: null, point: actor.position, impulse: new THREE.Vector3() }),
+    null
+  );
   const expected = new Rng(123);
-  const item = pickups.onActorDeath({ actor });
+  const item = pickups.onActorDeath({ actor, point: actor.position, impulse: new THREE.Vector3() });
+  assert(item);
   assert.equal(item.group.rotation.y, expected.range(0, Math.PI * 2));
   assert.equal(item.phase, expected.range(0, Math.PI * 2));
   owner.ammo.total = 999;
   const shouldDrop = expected.float() < 0.38;
-  assert.equal(!!pickups.onActorDeath({ actor }), shouldDrop);
+  assert.equal(
+    !!pickups.onActorDeath({ actor, point: actor.position, impulse: new THREE.Vector3() }),
+    shouldDrop
+  );
   if (shouldDrop) {
     expected.range(0, Math.PI * 2);
     expected.range(0, Math.PI * 2);
   }
-  assert.deepEqual({ ...owner.rng }, { ...expected });
+  assert.deepEqual(rngState(owner.rng), rngState(expected));
   pickups.dispose();
 }
 console.log(
