@@ -9,16 +9,15 @@
     "primitives": 16,
     "materials": 3,
     "images": 3,
-    "bytes": 8327412
+    "bytes": 8312276
   },
   "clips": {
     "Idle": {
       "frames": [
         0,
-        240
+        0
       ],
-      "duration": 2,
-      "loop": true,
+      "duration": 0,
       "events": []
     },
     "Fire": {
@@ -27,7 +26,6 @@
         7.578947368421053
       ],
       "duration": 0.06315789473684211,
-      "loop": false,
       "events": [
         {
           "time": 0.025,
@@ -41,7 +39,6 @@
         7.578947368421053
       ],
       "duration": 0.06315789473684211,
-      "loop": false,
       "events": [
         {
           "time": 0.025,
@@ -55,7 +52,6 @@
         222.0
       ],
       "duration": 1.85,
-      "loop": false,
       "events": [
         {
           "time": 0.037000000000000005,
@@ -99,7 +95,6 @@
         300.0
       ],
       "duration": 2.5,
-      "loop": false,
       "events": [
         {
           "time": 0.05,
@@ -155,7 +150,6 @@
         348.0
       ],
       "duration": 2.9,
-      "loop": false,
       "events": [
         {
           "time": 2.8999,
@@ -169,7 +163,6 @@
         62.400000000000006
       ],
       "duration": 0.52,
-      "loop": false,
       "events": [
         {
           "time": 0.5199,
@@ -183,7 +176,6 @@
         40.800000000000004
       ],
       "duration": 0.34,
-      "loop": false,
       "events": [
         {
           "time": 0.33990000000000004,

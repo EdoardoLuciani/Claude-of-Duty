@@ -90,7 +90,8 @@ def validate_export(doc, binary, clips):
         for channel in animation['channels']:
             if channel['target']['path'] == 'scale':
                 sampler = animation['samplers'][channel['sampler']]
-                assert sampler['interpolation'] == 'STEP'
+                # A one-key pose (Idle) has nothing to interpolate; the exporter labels it LINEAR.
+                assert sampler['interpolation'] == 'STEP' or doc['accessors'][sampler['input']]['count'] == 1
                 if doc['nodes'][channel['target']['node']]['name'] == 'shell_insert' and animation['name'].startswith('Reload'):
                     appear, hide = ((.44, .70) if animation['name'] == 'Reload_Empty' else (.34, .84))
                     acc = doc['accessors'][sampler['input']]

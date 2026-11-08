@@ -5,10 +5,9 @@
     "Idle": {
       "frames": [
         0,
-        240
+        0
       ],
-      "duration": 2,
-      "loop": true,
+      "duration": 0,
       "events": []
     },
     "Fire": {
@@ -17,7 +16,6 @@
         14.399999999999999
       ],
       "duration": 0.12,
-      "loop": false,
       "events": []
     },
     "Last_Shot": {
@@ -26,7 +24,6 @@
         14.399999999999999
       ],
       "duration": 0.12,
-      "loop": false,
       "events": []
     },
     "Bolt_Cycle": {
@@ -35,7 +32,6 @@
         132.0
       ],
       "duration": 1.1,
-      "loop": false,
       "events": [
         {
           "time": 0.24200000000000002,
@@ -61,7 +57,6 @@
         336.0
       ],
       "duration": 2.8,
-      "loop": false,
       "events": [
         {
           "time": 0.055999999999999994,
@@ -95,7 +90,6 @@
         432.0
       ],
       "duration": 3.6,
-      "loop": false,
       "events": [
         {
           "time": 0.07200000000000001,
@@ -133,7 +127,6 @@
         432.0
       ],
       "duration": 3.6,
-      "loop": false,
       "events": [
         {
           "time": 3.582,
@@ -147,7 +140,6 @@
         105.6
       ],
       "duration": 0.88,
-      "loop": false,
       "events": [
         {
           "time": 0.8756,
@@ -161,7 +153,6 @@
         67.2
       ],
       "duration": 0.56,
-      "loop": false,
       "events": [
         {
           "time": 0.5572,
@@ -175,7 +166,7 @@
     "primitives": 11,
     "materials": 2,
     "images": 3,
-    "bytes": 12615752
+    "bytes": 12602020
   },
   "textureResolution": 1024,
   "contactGeometry": {

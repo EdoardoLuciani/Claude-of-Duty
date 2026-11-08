@@ -47,6 +47,8 @@ def export_asset(output, asset, parents, separate, clips):
             accessor=doc['accessors'][sampler['input']]
             assert abs(accessor['max'][0]-duration)<1e-7, (animation['name'], accessor['max'])
         for channel in animation['channels']:
+            sampler=animation['samplers'][channel['sampler']]
             expected='STEP' if channel['target']['path']=='scale' else 'LINEAR'
-            assert animation['samplers'][channel['sampler']]['interpolation']==expected
+            # A one-key pose (Idle) has nothing to interpolate; the exporter labels it LINEAR.
+            assert sampler['interpolation']==expected or doc['accessors'][sampler['input']]['count']==1
     return stats

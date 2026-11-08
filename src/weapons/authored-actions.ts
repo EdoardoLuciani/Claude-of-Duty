@@ -44,28 +44,26 @@ export const MAGAZINE_ALIASES: Readonly<Record<string, string>> = Object.freeze(
 });
 
 interface AuthoredFireState {
-  idleTime: number;
   fireTime: number;
   _sample(name: string, time: number): void;
 }
 
-/** Advance clocks once, then let the adapter apply its own mechanical overrides. */
+/** Advance the fire clock once, then let the adapter apply its own mechanical overrides. */
 export function sampleAuthoredFire(
   state: AuthoredFireState,
-  clips: { Fire: { duration: number }; Idle: { duration: number } },
+  clips: { Fire: { duration: number } },
   dt: number,
   clipName: string | null,
   clipTime: number,
   empty: boolean,
   aliases: Record<string, string> = MAGAZINE_ALIASES
 ): string | undefined {
-  state.idleTime += dt;
   state.fireTime += dt;
   const gesture = clipName === null ? undefined : aliases[clipName];
   if (gesture) state._sample(gesture, clipTime);
   else if (state.fireTime < clips.Fire.duration)
     state._sample(empty ? 'Last_Shot' : 'Fire', state.fireTime);
-  else state._sample('Idle', state.idleTime % clips.Idle.duration);
+  else state._sample('Idle', 0);
   return gesture;
 }
 

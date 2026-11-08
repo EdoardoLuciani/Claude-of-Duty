@@ -131,7 +131,6 @@ export function createEvolysAnimation(model: EvolysModel): WeaponAnimation {
 
     reset(): void {
       this.fireTime = Infinity;
-      this.idleTime = 0;
       this._sample('Idle', 0);
       this._beltVisibility(lastRounds, false);
     },

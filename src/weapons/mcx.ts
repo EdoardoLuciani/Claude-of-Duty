@@ -166,7 +166,6 @@ export class MCXAnimation {
   poseQ = new THREE.Quaternion();
   magQ: THREE.Quaternion = handQuaternion([0.1, 0.72, -0.68], [-0.86, 0.34, -0.38]);
   chargeQ: THREE.Quaternion = handQuaternion([0.55, 0.2, 0.81], [-0.2, 0.94, -0.27]);
-  idleTime = 0;
   name: string | null = null;
   fireTime!: number;
   gesture!: string | null;
@@ -255,14 +254,13 @@ export class MCXAnimation {
   }
 
   update(dt: number, clipName: string, clipTime: number, empty: boolean): void {
-    this.idleTime += dt;
     this.fireTime += dt * this.fireSpeed;
     this.gesture = ALIASES[clipName] ? clipName : null;
     this.gestureTime = clipTime;
     if (this.gesture) this._sample(ALIASES[clipName], clipTime);
     else if (this.fireTime < this.actions.Fire.getClip().duration)
       this._sample('Fire', this.fireTime);
-    else this._sample('Idle', this.idleTime % this.actions.Idle.getClip().duration);
+    else this._sample('Idle', 0);
     if (empty && !this.gesture && this.fireTime >= 7 / 60) {
       this.bolt.position.x = -0.068;
       this.boltBone.position.x = this.bolt.position.x;

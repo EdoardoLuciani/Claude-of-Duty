@@ -5,10 +5,9 @@
     "Idle": {
       "frames": [
         0,
-        240
+        0
       ],
-      "duration": 2,
-      "loop": true,
+      "duration": 0,
       "events": []
     },
     "Fire": {
@@ -17,7 +16,6 @@
         9.0
       ],
       "duration": 0.075,
-      "loop": false,
       "events": [
         {
           "time": 0.03375,
@@ -31,7 +29,6 @@
         9.0
       ],
       "duration": 0.075,
-      "loop": false,
       "events": [
         {
           "time": 0.03375,
@@ -45,7 +42,6 @@
         252.0
       ],
       "duration": 2.1,
-      "loop": false,
       "events": [
         {
           "time": 0.042,
@@ -79,7 +75,6 @@
         348.0
       ],
       "duration": 2.9,
-      "loop": false,
       "events": [
         {
           "time": 0.057999999999999996,
@@ -117,7 +112,6 @@
         384.0
       ],
       "duration": 3.2,
-      "loop": false,
       "events": [
         {
           "time": 3.184,
@@ -131,7 +125,6 @@
         74.4
       ],
       "duration": 0.62,
-      "loop": false,
       "events": [
         {
           "time": 0.6169,
@@ -145,7 +138,6 @@
         48.0
       ],
       "duration": 0.4,
-      "loop": false,
       "events": [
         {
           "time": 0.398,
@@ -159,7 +151,7 @@
     "primitives": 18,
     "materials": 1,
     "meshes": 16,
-    "bytes": 9914424,
+    "bytes": 9898656,
     "images": 4
   },
   "textureResolution": 1024,

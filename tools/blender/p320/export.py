@@ -86,8 +86,10 @@ def export_asset(asset, coords, output):
     doc = json.loads(raw[20:20 + length])
     for animation in doc['animations']:
         for channel in animation['channels']:
-            if channel['target']['path'] == 'scale':
-                assert animation['samplers'][channel['sampler']]['interpolation'] == 'STEP'
+            sampler = animation['samplers'][channel['sampler']]
+            # A one-key pose (Idle) has nothing to interpolate; the exporter labels it LINEAR.
+            if channel['target']['path'] == 'scale' and doc['accessors'][sampler['input']]['count'] > 1:
+                assert sampler['interpolation'] == 'STEP'
     primitives = [p for node in doc['nodes'] if 'mesh' in node
                   for p in doc['meshes'][node['mesh']]['primitives']]
     stats = {

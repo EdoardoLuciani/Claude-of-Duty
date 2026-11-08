@@ -5,10 +5,9 @@
     "Idle": {
       "frames": [
         0,
-        240
+        0
       ],
-      "duration": 2,
-      "loop": true,
+      "duration": 0,
       "events": []
     },
     "Fire": {
@@ -17,7 +16,6 @@
         10.285714285714286
       ],
       "duration": 0.08571428571428572,
-      "loop": false,
       "events": [
         {
           "time": 0.014,
@@ -35,7 +33,6 @@
         10.285714285714286
       ],
       "duration": 0.08571428571428572,
-      "loop": false,
       "events": [
         {
           "time": 0.014,
@@ -53,7 +50,6 @@
         408.0
       ],
       "duration": 3.4,
-      "loop": false,
       "events": [
         {
           "time": 0.068,
@@ -81,7 +77,6 @@
         576.0
       ],
       "duration": 4.8,
-      "loop": false,
       "events": [
         {
           "time": 0.096,
@@ -117,7 +112,6 @@
         432.0
       ],
       "duration": 3.6,
-      "loop": false,
       "events": [
         {
           "time": 3.582,
@@ -131,7 +125,6 @@
         90.0
       ],
       "duration": 0.75,
-      "loop": false,
       "events": [
         {
           "time": 0.74625,
@@ -145,7 +138,6 @@
         60.0
       ],
       "duration": 0.5,
-      "loop": false,
       "events": [
         {
           "time": 0.4975,
@@ -159,7 +151,7 @@
     "primitives": 10,
     "materials": 2,
     "images": 3,
-    "bytes": 7735068
+    "bytes": 7718180
   },
   "textureResolution": 1024,
   "belt": {
