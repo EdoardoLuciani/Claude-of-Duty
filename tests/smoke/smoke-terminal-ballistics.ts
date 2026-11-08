@@ -25,7 +25,7 @@ import type { SurfaceName } from '../../src/physics/surfaces.ts';
 import { Health } from '../../src/player/health.ts';
 import { PlayerSystem } from '../../src/player/index.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
-import { makeAgent } from '../../tools/lib/agent-fixture.ts';
+import { makeAgent } from '../lib/agent-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 import { fixture as checkedFixture } from '../lib/fixture.ts';
 

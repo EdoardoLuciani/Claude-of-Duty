@@ -51,7 +51,6 @@ const logs: string[] = [];
 let failed: Error | null = null;
 try {
   browser = await launchChromium({
-    webgpu: true,
     headless: true,
     ...(args.executable ? { executablePath: String(args.executable) } : {}),
     args: [

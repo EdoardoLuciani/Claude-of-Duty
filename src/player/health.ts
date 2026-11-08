@@ -5,7 +5,8 @@
 
 import * as THREE from 'three';
 
-import { clamp01, approach, lerp, DEG } from './springs.ts';
+import { DEG, clamp01, lerp } from '../core/math.ts';
+import { approach } from './springs.ts';
 import { HEALTH } from './tuning.ts';
 
 interface DamageTakenPayload {
@@ -193,7 +194,7 @@ export class Health {
       // to move after this synchronous dispatch.
       this.ctx.events.emit('player:death', {
         position: this.ctx.camera.position.clone(),
-        from: from?.clone?.() ?? null,
+        from: from?.clone() ?? null,
         amount: dealt,
       });
       // (death allocations are fine — this happens once)

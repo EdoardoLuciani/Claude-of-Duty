@@ -173,7 +173,10 @@ export class AmmoPickups {
     this._hiddenMatrix.setPosition(this.items[0].group.position);
     for (let batch = 0; batch < this._batches.length; batch++) {
       const mesh = this._batches[batch];
-      const valid = mesh.geometry.getAttribute('ammoHistoryValid');
+      const geometry = mesh.geometry;
+      const valid = geometry.hasAttribute('ammoHistoryValid')
+        ? geometry.getAttribute('ammoHistoryValid')
+        : null;
       mesh.count = count;
       for (let slot = 0; slot < count; slot++) {
         const item = this._slots[slot];
@@ -188,7 +191,7 @@ export class AmmoPickups {
   }
 
   onActorDeath(e: EngineEventMap['actor:death']): AmmoPickup | null {
-    const actor = e?.actor;
+    const actor = e.actor;
     const actorObject =
       (typeof actor === 'object' || typeof actor === 'function') && actor !== null ? actor : null;
     if (
@@ -202,9 +205,7 @@ export class AmmoPickups {
     const low = ammo.total <= ammo.magSize * 1.25;
     if (!low && this.rng.float() >= 0.38) return null;
     const position = actorObject && 'position' in actorObject ? actorObject.position : null;
-    const source = isPosition(position) ? position : e.point;
-    if (!source) return null;
-    return this.spawn(source);
+    return this.spawn(isPosition(position) ? position : e.point);
   }
 
   spawn(position: Pick<THREE.Vector3, 'x' | 'y' | 'z'>): AmmoPickup {
@@ -253,7 +254,7 @@ export class AmmoPickups {
       this.ctx.time.scale <= 0 ||
       this.ctx.input.frozen ||
       !this.ctx.input.enabled ||
-      player.healCtrl?.active ||
+      player.healCtrl.active ||
       this.owner.grenadeEquipped ||
       this.owner.radioEquipped ||
       this.ctx.peek('intel')?.blocksUse()
@@ -262,9 +263,9 @@ export class AmmoPickups {
       return;
     }
 
-    const pos = player.feetPosition ?? player.position;
+    const pos = player.feetPosition;
     const state = this.owner.state;
-    if (!pos || !state || state.reserve >= state.def.reserve) {
+    if (!state || state.reserve >= state.def.reserve) {
       this._clearInteraction();
       return;
     }
@@ -292,7 +293,7 @@ export class AmmoPickups {
     else this._hold = Math.max(0, this._hold - dt * 2.5);
 
     const amount = Math.min(state.def.reserve - state.reserve, Math.ceil(state.def.magSize * 1.5));
-    this.ctx.peek('ui')?.setPrompt?.(
+    this.ctx.peek('ui')?.setPrompt(
       {
         key: bindingLabel('use'),
         text: 'Resupply ammunition',
@@ -320,7 +321,7 @@ export class AmmoPickups {
   _clearInteraction(): void {
     this._nearest = null;
     this._hold = 0;
-    if (this._prompting) this.ctx.peek('ui')?.clearPrompt?.('ammo');
+    if (this._prompting) this.ctx.peek('ui')?.clearPrompt('ammo');
     this._prompting = false;
   }
 

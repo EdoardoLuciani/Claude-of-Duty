@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { bindingLabel } from '../core/bindings.ts';
 import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName } from '../core/events.ts';
+import { clamp, clamp01, damp } from '../core/math.ts';
 import type { WeaponMode } from '../weapons/defs.ts';
 import { AmmoPanel } from './ammo.ts';
 import { Compass, ScoreBar } from './compass.ts';
@@ -20,7 +21,7 @@ import { Prompt, Banner } from './prompts.ts';
 import { RadioPanel } from './radio.ts';
 import { StartGate } from './start.ts';
 import { installStyles, removeStyles } from './style.ts';
-import { el, clamp, clamp01, damp, setStyle } from './util.ts';
+import { el, setStyle } from './util.ts';
 
 const MAX_BLIPS = 48;
 const HEAL_KEY = bindingLabel('heal');
@@ -96,17 +97,17 @@ export class UiSystem {
   root!: HTMLElement;
   centreLayer!: HTMLElement;
   chromeLayer!: HTMLElement;
-  health!: HealthFx;
-  arcs!: DamageArcs;
-  crosshair!: Crosshair;
-  hit!: Hitmarkers;
+  health: HealthFx = new HealthFx();
+  arcs: DamageArcs = new DamageArcs();
+  crosshair: Crosshair = new Crosshair();
+  hit: Hitmarkers = new Hitmarkers();
   minimap!: Minimap;
-  compass!: Compass;
-  scoreBar!: ScoreBar;
-  killfeed!: Killfeed;
-  ammo!: AmmoPanel;
-  prompt!: Prompt;
-  banner!: Banner;
+  compass: Compass = new Compass();
+  scoreBar: ScoreBar = new ScoreBar();
+  killfeed: Killfeed = new Killfeed();
+  ammo: AmmoPanel = new AmmoPanel();
+  prompt: Prompt = new Prompt();
+  banner: Banner = new Banner();
   menu!: PauseMenu;
   startGate: StartGate | null = null;
   pixiHud: PixiHud | null = null;
@@ -117,25 +118,25 @@ export class UiSystem {
   _fpsSince: number | null = null;
   _fpsFrames = 0;
   fpsText = '— FPS';
-  state!: HudState;
-  k!: number;
-  vw!: number;
-  vh!: number;
-  hudVisible!: number;
+  state: HudState = { ...HUD_DEFAULTS };
+  k: number = 1;
+  vw: number = 1920;
+  vh: number = 1080;
+  hudVisible: number = 1;
   hudTarget!: number;
   _lastRaw!: number;
   _hadPointerLock!: boolean;
   _marketJustClosed!: boolean;
-  _healPrompt!: boolean;
-  _bakeFrame!: number;
-  _pos!: THREE.Vector3;
-  _tmp!: THREE.Vector3;
-  _blips!: Blip[];
-  _blipCount!: number;
-  _blipView!: Blip[];
+  _healPrompt: boolean = false;
+  _bakeFrame: number = 0;
+  _pos: THREE.Vector3 = new THREE.Vector3();
+  _tmp: THREE.Vector3 = new THREE.Vector3();
+  _blips: Blip[] = new Array<Blip>(MAX_BLIPS);
+  _blipCount: number = 0;
+  _blipView: Blip[] = [];
   _mmState?: MinimapFrame;
   _promptOwner?: unknown;
-  _unsubs!: (() => void)[];
+  _unsubs: (() => void)[] = [];
 
   async init(ctx: UiContext): Promise<void> {
     this.ctx = ctx;
@@ -149,51 +150,27 @@ export class UiSystem {
     this.centreLayer = el('div', 'ow-layer', this.root);
     this.chromeLayer = el('div', 'ow-layer', this.root);
 
-    this.health = new HealthFx();
     this.rng.fork(); // Keep the minimap's noise stream unchanged after removing damage popups.
-    this.arcs = new DamageArcs();
-    this.crosshair = new Crosshair();
-    this.hit = new Hitmarkers();
     this.minimap = new Minimap(this.rng.fork());
-    this.compass = new Compass();
-    this.scoreBar = new ScoreBar();
-    this.killfeed = new Killfeed();
-    this.ammo = new AmmoPanel();
-    this.prompt = new Prompt();
-    this.banner = new Banner();
     this.menu = new PauseMenu(this.root, ctx);
     this.gameOver = new GameOverScreen(this.root, ctx, (): void => {
       if (this.startGate) this.startGate.restart();
       else {
         ctx.events.emit('game:restart', { source: 'game-over' });
-        ctx.input?.requestPointerLock?.();
+        ctx.input.requestPointerLock();
       }
     });
     this.shop = new MarketOverlay(this.root, ctx);
     this.marketCountdown = new MarketCountdown(ctx.get('market').delay);
     this.radio = new RadioPanel(this.chromeLayer, ctx);
 
-    this.state = { ...HUD_DEFAULTS };
-
-    this.k = 1;
-    this.vw = 1920;
-    this.vh = 1080;
-    this.hudVisible = 1;
     this.hudTarget = 1;
     this._lastRaw = ctx.time.raw;
     this._hadPointerLock = false;
     this._marketJustClosed = false; // one frame after the shop closes
-    this._healPrompt = false;
-    this._bakeFrame = 0;
 
-    this._pos = new THREE.Vector3();
-    this._tmp = new THREE.Vector3();
-    this._blips = new Array<Blip>(MAX_BLIPS);
     for (let i = 0; i < MAX_BLIPS; i++) this._blips[i] = { x: 0, z: 0, kind: 'enemy', heading: 0 };
-    this._blipCount = 0;
-    this._blipView = [];
 
-    this._unsubs = [];
     const on = <K extends EngineEventName>(
       type: K,
       fn: (event: EngineEventMap[K]) => void
@@ -291,7 +268,7 @@ export class UiSystem {
       // closed it — keep the pause machinery out of this frame entirely.
       this._hadPointerLock = false;
       this._marketJustClosed = true;
-      this.ctx.input?.requestPointerLock?.();
+      this.ctx.input.requestPointerLock();
     });
 
     on('explosion', (e): void => {
@@ -399,7 +376,7 @@ export class UiSystem {
   _playerPos(): THREE.Vector3 {
     const p = this.ctx.peek('player');
     const pos = p?.position;
-    if (pos && pos.isVector3) return this._pos.copy(pos);
+    if (pos) return this._pos.copy(pos);
     return this._pos.copy(this.ctx.camera.position);
   }
 
@@ -408,7 +385,7 @@ export class UiSystem {
     const a = this.ctx.peek('audio');
     if (!a) return;
     try {
-      a.playUi?.(id, gain);
+      a.playUi(id, gain);
     } catch {
       /* audio is optional feedback — never let it break the HUD */
     }
@@ -445,10 +422,6 @@ export class UiSystem {
     this.prompt.clear();
   }
 
-  setHudVisible(v: boolean): void {
-    this.hudTarget = v ? 1 : 0;
-  }
-
   installStartGate(): void {
     this.startGate = new StartGate(this.ctx.engine);
   }
@@ -466,13 +439,13 @@ export class UiSystem {
   /* --------------------------------------------------------------- debug -- */
 
   /** Prepare the market state for integration checks. */
-  debugState(name: 'market'): { state: string } {
+  debugState(name: string): { state: string } {
     if (name !== 'market') throw new Error('Unknown UI debug state');
     this.menu.close();
     this.killfeed.clear();
     this.clearPrompt();
-    const rifle = this.ctx.peek('weapons')?.states?.get('rifle');
-    if (rifle) rifle.reserve = Math.round((rifle.def?.reserve ?? 90) * 0.4);
+    const rifle = this.ctx.peek('weapons')?.states.get('rifle');
+    if (rifle) rifle.reserve = Math.round(rifle.def.reserve * 0.4);
     const hp = this.ctx.peek('player')?.health;
     if (hp) hp.armour = 50;
     const m = this.ctx.peek('market');
@@ -616,7 +589,7 @@ export class UiSystem {
     this.hit.update(dt);
     this.arcs.update(dt, rx, rz, fx, fz);
     this.health.update(dt, s);
-    this.ammo.update(dt, s, rawElapsed);
+    this.ammo.update(s, rawElapsed);
     this.killfeed.update(dt);
     this.scoreBar.update(s);
     if (s.healing) {
@@ -624,7 +597,7 @@ export class UiSystem {
         key: HEAL_KEY,
         text: 'BANDAGING',
         sub: `${Math.max(0, s.bandages | 0)} LEFT`,
-        progress: s.healProgress ?? 0,
+        progress: s.healProgress,
       });
       this._healPrompt = true;
     } else if (this._healPrompt) {
@@ -659,7 +632,7 @@ export class UiSystem {
     const intelHud = intel?.getHudState();
     this._mmState.pulses = intelHud?.pulses ?? null;
     this._mmState.pulseTime = intelHud?.pulseTime ?? 0;
-    this._mmState.playerY = ctx.peek('player')?.feetPosition?.y ?? 0;
+    this._mmState.playerY = ctx.peek('player')?.feetPosition.y ?? 0;
     if (this.pixiHud) {
       this.pixiHud.setVisible(!ctx.engine.error);
       this.pixiHud.update(

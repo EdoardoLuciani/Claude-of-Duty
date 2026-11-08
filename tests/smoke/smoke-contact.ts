@@ -12,7 +12,7 @@ import { FIRE_JITTER, LOS_RANGE, hudContact, fireJitter } from '../../src/ai/con
 import { AiSystem } from '../../src/ai/index.ts';
 import type { EngineEventMap } from '../../src/core/events.ts';
 import { UiSystem } from '../../src/ui/index.ts';
-import { makeAgent } from '../../tools/lib/agent-fixture.ts';
+import { makeAgent } from '../lib/agent-fixture.ts';
 import { BrainPlayer, brainPhysics } from '../lib/ai-brain-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 

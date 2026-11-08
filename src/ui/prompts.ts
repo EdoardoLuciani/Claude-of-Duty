@@ -1,5 +1,6 @@
 import { bindingLabel } from '../core/bindings.ts';
-import { ease, clamp01, damp } from './util.ts';
+import { clamp01, damp } from '../core/math.ts';
+import { ease } from './util.ts';
 
 const USE_KEY = bindingLabel('use');
 interface PromptData {
@@ -47,8 +48,8 @@ export class Banner {
   alpha = 0;
   scale = 1;
   show(title: string, sub: string, life = 2.1): void {
-    this.title = (title ?? '').toUpperCase();
-    this.sub = (sub ?? '').toUpperCase();
+    this.title = title.toUpperCase();
+    this.sub = sub.toUpperCase();
     this.life = life;
     this.t = 0;
   }

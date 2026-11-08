@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 
 import { isClosable } from '../core/guards.ts';
+import { clamp01 } from '../core/math.ts';
 import { loadPngTexture } from '../core/pngtex.ts';
 import type { Rng } from '../core/rng.ts';
-import { Noise, clamp01 } from './noise.ts';
+import { Noise } from './noise.ts';
 
 /** Runtime atlas layout/loaders. Particle/decal generation lives in tools/lib. */
 export const P = {

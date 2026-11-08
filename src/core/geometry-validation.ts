@@ -2,9 +2,10 @@ import type { BufferGeometry } from 'three';
 
 /** Establish triangle/vertex bounds once, before geometry kernels follow indices. */
 export function validateTriangleGeometry(geometry: BufferGeometry, label: string): void {
+  if (!geometry.hasAttribute('position'))
+    throw new Error(`${label}: position must contain complete xyz vertices`);
   const position = geometry.getAttribute('position');
   if (
-    !position ||
     !Number.isInteger(position.itemSize) ||
     position.itemSize < 3 ||
     !Number.isInteger(position.count)

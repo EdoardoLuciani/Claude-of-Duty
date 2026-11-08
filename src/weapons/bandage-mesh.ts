@@ -95,7 +95,7 @@ export async function loadBandage(): Promise<{
         mat.dispose();
       }
       for (const tex of textures) {
-        const image: unknown = tex.source?.data;
+        const image: unknown = tex.source.data;
         if (isClosable(image)) image.close();
         tex.dispose();
       }

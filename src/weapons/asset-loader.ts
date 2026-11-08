@@ -153,6 +153,7 @@ async function parseGLTF(decoder: KTX2Loader, data: ArrayBuffer, path: string): 
       .setMeshoptDecoder(MeshoptDecoder)
       .setKTX2Loader(textures)
       .parseAsync(data, path);
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- set by the KTX2 loader callback
     if (textureFailed) throw textureFailure;
     completed = true;
     return gltf;

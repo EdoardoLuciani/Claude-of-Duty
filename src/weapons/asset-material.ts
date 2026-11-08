@@ -102,7 +102,7 @@ export function disposeWeaponMaterials(model: {
   for (const material of model.materials) material.dispose();
   const images = new Set<object>();
   for (const texture of model.textures) {
-    const image: unknown = texture.source?.data;
+    const image: unknown = texture.source.data;
     if (
       typeof image === 'object' &&
       image !== null &&

@@ -7,7 +7,6 @@ export interface AmmoState {
   magSize: number;
   reserve: number;
   weaponName?: string;
-  name?: string;
   fireMode?: WeaponMode;
   reloading?: boolean;
   reloadProgress?: number;
@@ -62,7 +61,7 @@ export class AmmoPanel {
     elapsed: 0,
     alpha: 0.34,
   }));
-  update(dt: number, s: AmmoState, rawDt = dt): void {
+  update(s: AmmoState, rawDt: number): void {
     updateSlot(this.equipment[0], s.bandages ?? 0, !!s.healing, rawDt);
     updateSlot(this.equipment[1], s.lethalCount ?? 0, !!s.cooking || !!s.grenadeEquipped, rawDt);
   }

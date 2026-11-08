@@ -13,7 +13,7 @@ import {
 
 import { AiSystem } from '../../src/ai/index.ts';
 import type { SkySystem } from '../../src/sky/index.ts';
-import { makeAgent } from '../../tools/lib/agent-fixture.ts';
+import { makeAgent } from '../lib/agent-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
 

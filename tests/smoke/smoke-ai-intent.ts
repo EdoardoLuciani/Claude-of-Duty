@@ -19,7 +19,7 @@ import {
 import type { SurfaceNav } from '../../src/ai/nav.ts';
 import { Squad } from '../../src/ai/squad.ts';
 import { WorldSystem } from '../../src/world/index.ts';
-import { makeAgent, makeAi } from '../../tools/lib/agent-fixture.ts';
+import { makeAgent, makeAi } from '../lib/agent-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
 

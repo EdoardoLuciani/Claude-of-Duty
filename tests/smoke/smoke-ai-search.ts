@@ -22,10 +22,10 @@ import { AttachmentQueries, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/atta
 import { AiSystem } from '../../src/ai/index.ts';
 import type { SurfaceNav } from '../../src/ai/nav.ts';
 import { Squad } from '../../src/ai/squad.ts';
-import { makeAgent, makeAi, makeRng } from '../../tools/lib/agent-fixture.ts';
-import { testNav } from '../../tools/lib/test-nav.ts';
+import { makeAgent, makeAi, makeRng } from '../lib/agent-fixture.ts';
 import { brainPhysics, brainAnimator } from '../lib/ai-brain-fixture.ts';
 import { fixture } from '../lib/fixture.ts';
+import { testNav } from '../lib/test-nav.ts';
 
 const connected = await testNav();
 const disconnected = await testNav([

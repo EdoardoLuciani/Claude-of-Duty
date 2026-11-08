@@ -4,6 +4,14 @@
     {
       "files": ["tests/lib/fixture.ts"],
       "rules": { "typescript/no-unsafe-type-assertion": "off" }
+    },
+    {
+      "files": ["tests/**", "tools/**", "build/**"],
+      "rules": {
+        "typescript/no-unnecessary-condition": "off",
+        "typescript/no-unnecessary-type-assertion": "off",
+        "typescript/no-unnecessary-boolean-literal-compare": "off"
+      }
     }
   ],
   "rules": {
@@ -28,6 +36,9 @@
     "unicorn/no-new-array": "off",
     "oxc/erasing-op": "off",
     "no-control-regex": "off",
-    "no-unused-vars": ["error", { "args": "after-used" }]
+    "no-unused-vars": ["error", { "args": "after-used" }],
+    "typescript/no-unnecessary-condition": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/no-unnecessary-boolean-literal-compare": "error"
   }
 }

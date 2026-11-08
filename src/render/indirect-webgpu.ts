@@ -104,16 +104,22 @@ export function isLightingContext(value: unknown): value is LightingNodeContext 
 }
 export class IndirectFill {
   declare ctx: IndirectContext;
-  declare sky: NodeValue<'vec3', Vector3>;
-  declare ground: NodeValue<'vec3', Vector3>;
-  declare sunDir: NodeValue<'vec3', Vector3>;
-  declare iblScale: NodeValue<'float', number>;
-  declare viewVisibility: NodeValue<'float', number>;
-  declare roomXf: NodeValue<'vec4', Vector4>;
-  declare roomCount: NodeValue<'int', number>;
+  // The custom environment hook is not a material node property, so rigid
+  // unchanged meshes can receive only SHARED refreshes. These genuinely
+  // per-render fields must live in a shared render group, not object uniforms.
+  // Reuse the native group: no extra bind group or identity color-node hack.
+  sky: NodeValue<'vec3', Vector3> = uniform(new Vector3()).setGroup(renderGroup);
+  ground: NodeValue<'vec3', Vector3> = uniform(new Vector3()).setGroup(renderGroup);
+  sunDir: NodeValue<'vec3', Vector3> = uniform(new Vector3(0, 1, 0)).setGroup(renderGroup);
+  iblScale: NodeValue<'float', number> = uniform(IBL_DIFFUSE).setGroup(renderGroup);
+  viewVisibility: NodeValue<'float', number> = uniform(1).setGroup(renderGroup);
+  roomXf: NodeValue<'vec4', Vector4> = uniform(new Vector4(1, 0, 0, 0));
+  roomCount: NodeValue<'int', number> = uniform(0, 'int');
   declare roomBoxes: UniformVec4Array;
   declare roomHeights: UniformVec4Array;
-  declare roomGroup: ReturnType<typeof sharedUniformGroup>;
+  // Node updateType stops CPU packing; a shared immutable binding group also
+  // prevents per-object GPU uploads. Publish once when world data is ready.
+  roomGroup: ReturnType<typeof sharedUniformGroup> = sharedUniformGroup('owRooms', 1, 'none');
   declare _roomsReady: boolean;
   declare roomGate: (worldPos: Node<'vec3'>, ao: Node<'float'>) => Node<'float'>;
 
@@ -127,22 +133,8 @@ export class IndirectFill {
 
   constructor(ctx: IndirectContext) {
     this.ctx = ctx;
-    // The custom environment hook is not a material node property, so rigid
-    // unchanged meshes can receive only SHARED refreshes. These genuinely
-    // per-render fields must live in a shared render group, not object uniforms.
-    // Reuse the native group: no extra bind group or identity color-node hack.
-    this.sky = uniform(new Vector3()).setGroup(renderGroup);
-    this.ground = uniform(new Vector3()).setGroup(renderGroup);
-    this.sunDir = uniform(new Vector3(0, 1, 0)).setGroup(renderGroup);
-    this.iblScale = uniform(IBL_DIFFUSE).setGroup(renderGroup);
-    this.viewVisibility = uniform(1).setGroup(renderGroup);
-    this.roomXf = uniform(new Vector4(1, 0, 0, 0));
-    this.roomCount = uniform(0, 'int');
     this.roomBoxes = uniformArray<'vec4'>(this.rooms, 'vec4');
     this.roomHeights = uniformArray<'vec4'>(this.roomsY, 'vec4');
-    // Node updateType stops CPU packing; a shared immutable binding group also
-    // prevents per-object GPU uploads. Publish once when world data is ready.
-    this.roomGroup = sharedUniformGroup('owRooms', 1, 'none');
     this.roomBoxes.setGroup(this.roomGroup);
     this.roomHeights.setGroup(this.roomGroup);
     this.roomBoxes.updateType = 'none';
@@ -177,7 +169,7 @@ export class IndirectFill {
 
   patch(material: Material | null | undefined): void {
     if (!(material instanceof MeshStandardNodeMaterial) || this._patched.has(material)) return;
-    if (material.userData?.owNoPatch) return;
+    if (material.userData.owNoPatch) return;
     this._patched.add(material);
     const original = material.setupEnvironment.bind(material);
     const viewCamera = this.ctx.viewCamera;
@@ -214,14 +206,14 @@ export class IndirectFill {
     const ground = this._ground.set(c.r * 0.33, c.g * 0.29, c.b * 0.225);
     ground.divideScalar(Math.max(ground.x, ground.y, ground.z, 1e-6));
     this.ground.value.copy(ground).multiplyScalar(GROUND_FILL * light.intensity);
-    this.iblScale.value = IBL_DIFFUSE * (sky.indirectScale ?? 1);
+    this.iblScale.value = IBL_DIFFUSE * sky.indirectScale;
     this._updateRooms();
   }
 
   _updateRooms(): void {
     if (this._roomsReady) return;
     const world = this.ctx.peek('world');
-    if (!world?.buildings || !world.levelToWorld) return;
+    if (!world?.buildings) return;
     const origin = world.levelToWorld(0, 0, 0, this._tmp);
     const ox = origin.x,
       oz = origin.z;
@@ -234,11 +226,11 @@ export class IndirectFill {
     this.roomXf.value.set(cs, sn, -(ox * cs + oz * sn), ox * sn - oz * cs);
     let count = 0;
     for (const building of world.buildings) {
-      const sp = building?.spec;
-      if (!sp?.enterable || sp.collapse || sp.ruin) continue;
+      const sp = building.spec;
+      if (!sp.enterable || sp.collapse || sp.ruin) continue;
       // Both uniform pools hold MAX_ROOMS entries; stop when they are full.
-      const room = this.rooms[count];
-      const roomY = this.roomsY[count];
+      const room = this.rooms.at(count);
+      const roomY = this.roomsY.at(count);
       if (!room || !roomY) break;
       room.set(sp.x, sp.z, sp.w * 0.5, sp.d * 0.5);
       let top = (building.roofY ?? 12) - 0.06;
@@ -250,8 +242,9 @@ export class IndirectFill {
     this.roomCount.value = count;
     // Usually shader setup follows this call. Also handle an already-compiled
     // early variant: pack its allocated arrays and invalidate the binding once.
-    if (this.roomBoxes.value) this.roomBoxes.updateBuffer();
-    if (this.roomHeights.value) this.roomHeights.updateBuffer();
+    // Typed as present, but a uniform array has no packed value until it compiles.
+    if ((this.roomBoxes.value as unknown) !== null) this.roomBoxes.updateBuffer();
+    if ((this.roomHeights.value as unknown) !== null) this.roomHeights.updateBuffer();
     this.roomGroup.needsUpdate = true;
     this._roomsReady = true;
     console.info(`[render] indirect gate: ${count} interior volumes`);

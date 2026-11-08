@@ -4,8 +4,6 @@ import { UiSystem } from '../../src/ui/index.ts';
 import { createTestContext } from '../lib/context.ts';
 
 const ui = new UiSystem();
-assert.equal('fps' in ui, false, 'no retired HTML FPS element');
-
 // The first frame starts sampling; startup/prewarm time is not counted.
 ui._updateFps(10000);
 for (let i = 1; i < 30; i++) ui._updateFps(10000 + (i * 500) / 30);

@@ -151,21 +151,13 @@ function gpuAngleArgs(): string[] {
  * binary, but fall back to a system browser when package and browser revisions
  * are temporarily out of sync (common after bun install in headless CI).
  */
-// Current gameplay/previews are native-only. Legacy comparison callers opt out.
-export async function launchChromium({
-  webgpu = true,
-  ...options
-}: LaunchOptions & { webgpu?: boolean } = {}): Promise<Browser> {
+export async function launchChromium(options: LaunchOptions = {}): Promise<Browser> {
   const launch = {
     ...options,
     args: [
       ...gpuAngleArgs(),
-      ...(webgpu
-        ? [
-            '--enable-unsafe-webgpu',
-            ...(process.platform === 'linux' ? ['--enable-features=Vulkan'] : []),
-          ]
-        : []),
+      '--enable-unsafe-webgpu',
+      ...(process.platform === 'linux' ? ['--enable-features=Vulkan'] : []),
       ...(options.args ?? []),
     ],
   };

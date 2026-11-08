@@ -19,7 +19,7 @@ import {
   sectorLabel,
   tickSearchAssist,
 } from '../../src/game/search-assist.ts';
-import { makeAgent, makeAi } from '../../tools/lib/agent-fixture.ts';
+import { makeAgent, makeAi } from '../lib/agent-fixture.ts';
 import { BrainPlayer } from '../lib/ai-brain-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 

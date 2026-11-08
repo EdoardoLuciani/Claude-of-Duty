@@ -21,7 +21,7 @@ import {
   makeClosest,
 } from './math.ts';
 import { Ballistics, type ActorRegionImpact } from './penetration.ts';
-import { Ragdoll, humanoidSpec, specFromSkeleton } from './ragdoll.ts';
+import { Ragdoll, specFromSkeleton } from './ragdoll.ts';
 import { RigidBody, RigidBodyWorld } from './rigidbody.ts';
 import type { RigidBodyOptions } from './rigidbody.ts';
 import type { SurfaceName } from './surfaces.ts';
@@ -137,7 +137,7 @@ export interface ColliderOptions {
   center?: THREE.Vector3;
 }
 export class Collider {
-  declare id: number;
+  id: number = _colliderId++;
   declare shape: 'capsule' | 'sphere' | 'box';
   declare radius: number;
   declare hx: number;
@@ -166,7 +166,6 @@ export class Collider {
   inverse: THREE.Matrix4 = new THREE.Matrix4();
 
   constructor(opts: ColliderOptions) {
-    this.id = _colliderId++;
     this.shape = opts.shape ?? 'capsule';
     this.radius = opts.radius ?? 0.2;
     this.hx = opts.hx ?? 0.2;
@@ -285,17 +284,17 @@ interface ImpactRecord {
 }
 
 export class PhysicsSystem {
-  declare staticWorld: StaticWorld;
+  staticWorld: StaticWorld = new StaticWorld();
   declare bodies: RigidBodyWorld;
   declare ballistics: Ballistics;
   declare ctx: PhysicsContext;
   declare rng: Rng;
-  declare _onExplosion: (event: {
+  _onExplosion: (event: {
     position: THREE.Vector3;
     radius: number;
     damage: number;
     impulse?: number;
-  }) => void;
+  }) => void = (e): void => this.explode(e);
 
   static readonly id = 'physics';
   static readonly deps: SystemId[] = [];
@@ -347,7 +346,6 @@ export class PhysicsSystem {
   _rayCount: number = 0;
 
   constructor() {
-    this.staticWorld = new StaticWorld();
     this.bodies = new RigidBodyWorld(this.staticWorld, UNITS.gravity);
     this.ballistics = new Ballistics(this);
 
@@ -375,7 +373,6 @@ export class PhysicsSystem {
     this.rng = ctx.rng.fork();
     this.ballistics.rng = this.rng;
 
-    this._onExplosion = (e): void => this.explode(e);
     ctx.events.on('explosion', this._onExplosion);
   }
 
@@ -390,7 +387,6 @@ export class PhysicsSystem {
     surfaceType?: SurfaceName | number,
     opts: StaticOptions = {}
   ): number {
-    if (!mesh) return -1;
     const mask = opts.mask ?? opts.layer ?? LAYER.STATIC;
     const id = this.staticWorld.addMesh(mesh, surfaceType, mask, opts);
     if (id >= 0) this._explicitStatics++;
@@ -404,14 +400,13 @@ export class PhysicsSystem {
     opts: StaticOptions = {}
   ): number[] {
     const ids: number[] = [];
-    if (!root) return ids;
     root.updateWorldMatrix(true, true);
     const registered = this._explicitStatics;
     try {
       root.traverse((o: THREE.Object3D): void => {
         if (!isCollisionMesh(o)) return;
-        if (o.userData?.collision === false || o.userData?.noCollision) return;
-        const metadataSurface: unknown = o.userData?.surface;
+        if (o.userData.collision === false || o.userData.noCollision) return;
+        const metadataSurface: unknown = o.userData.surface;
         const resolvedSurface =
           surfaceType === undefined
             ? metadataSurface === undefined
@@ -1120,8 +1115,8 @@ export class PhysicsSystem {
     e.shot = shot.shot;
     e.shooter = shot.shooter ?? null;
     e.weapon = shot.weapon ?? null;
-    e.speed = shot.speed ?? 800;
-    e.tracer = shot.tracer === true;
+    e.speed = shot.speed;
+    e.tracer = shot.tracer;
     this.ctx.events.emit('bullet:segment', e);
   }
 
@@ -1190,7 +1185,6 @@ export class PhysicsSystem {
    * grenade behind a wall doesn't throw the crate in front of it.
    */
   explode(e: ExplosionEvent | THREE.Vector3): void {
-    if (!e) return;
     const event = 'position' in e ? e : null;
     const pos = 'position' in e ? e.position : e;
     const radius = event?.radius ?? 5;
@@ -1307,8 +1301,8 @@ export class PhysicsSystem {
     opts: ConstructorParameters<typeof Ragdoll>[1] &
       Parameters<typeof specFromSkeleton>[1] & { actor?: unknown; velocity?: THREE.Vector3 } = {}
   ): Ragdoll | null {
-    const skeleton = skinnedMesh?.skeleton ?? skinnedMesh;
-    if (!skeleton?.bones?.length) return null;
+    const skeleton = skinnedMesh.skeleton;
+    if (!skeleton.bones.length) return null;
     const { spec, boneMap } = specFromSkeleton(skeleton, opts);
     if (!spec.length) return null;
     const { transform, ...options } = opts;
@@ -1404,6 +1398,8 @@ export class PhysicsSystem {
     }
   }
 
+  // Engine teardown disposes every system, even one whose init never ran or failed.
+  /* oxlint-disable typescript/no-unnecessary-condition */
   dispose(): void {
     this.ctx?.events.off('explosion', this._onExplosion);
     this.bodies.clear();
@@ -1413,6 +1409,7 @@ export class PhysicsSystem {
     this.colliders.length = 0;
     this.staticWorld.dispose();
   }
+  /* oxlint-enable typescript/no-unnecessary-condition */
 }
 
 function segmentHitsAabb(
@@ -1443,15 +1440,3 @@ function segmentHitsAabb(
   hi = Math.min(hi, Math.max(t0, t1));
   return hi >= Math.max(0, lo) && lo <= len;
 }
-
-export {
-  LAYER,
-  MASK,
-  SURFACE,
-  SURFACE_NAMES,
-  SURFACE_PROPS,
-  humanoidSpec,
-  CharacterController,
-  RigidBody,
-  Ragdoll,
-};

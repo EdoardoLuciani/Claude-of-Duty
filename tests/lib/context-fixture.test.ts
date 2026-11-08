@@ -5,7 +5,7 @@ import { Agent } from '../../src/ai/agent.ts';
 import { AiSystem } from '../../src/ai/index.ts';
 import { Input } from '../../src/core/input.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
-import { makeAgent, makeAi, makeRng } from '../../tools/lib/agent-fixture.ts';
+import { makeAgent, makeAi, makeRng } from './agent-fixture.ts';
 import { createContext, createInput } from './context.ts';
 import type { TestProviders } from './context.ts';
 import { fixture } from './fixture.ts';

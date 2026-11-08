@@ -5,8 +5,9 @@
 
 import * as THREE from 'three';
 
+import { DEG, clamp01 } from '../core/math.ts';
 import type { SurfaceName } from '../physics/surfaces.ts';
-import { clamp01, smootherstep, smoothstep, DEG } from './springs.ts';
+import { smootherstep, smoothstep } from './springs.ts';
 import { MOVE } from './tuning.ts';
 
 export const LEDGE_NONE = 0;

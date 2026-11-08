@@ -24,11 +24,11 @@ import { CoverMap } from '../../src/ai/nav.ts';
 import { Squad } from '../../src/ai/squad.ts';
 import { COMBAT } from '../../src/ai/tuning.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
-import { makeAgent, makeAi } from '../../tools/lib/agent-fixture.ts';
-import { testNav } from '../../tools/lib/test-nav.ts';
+import { makeAgent, makeAi } from '../lib/agent-fixture.ts';
 import { midpointRng, brainPhysics, brainAnimator, coverPoint } from '../lib/ai-brain-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 import { FRAME_SOURCES } from '../lib/frame-sources.ts';
+import { testNav } from '../lib/test-nav.ts';
 
 const pathGrid = await testNav();
 function lastShot(times: number[]): number {

@@ -1,12 +1,12 @@
 import { Container, Graphics, Text } from 'pixi.js';
 
+import { clamp01 } from '../core/math.ts';
 import type { ScoreBar } from './compass.ts';
 import { KILLFEED_CAPACITY } from './killfeed.ts';
 import type { Killfeed } from './killfeed.ts';
 import type { MarketCountdown } from './market.ts';
 import { HUD_TYPE, hudText, fitHudText, writeHudText, poseHudNode } from './pixi-type.ts';
 import type { Prompt, Banner } from './prompts.ts';
-import { clamp01 } from './util.ts';
 
 export interface FeedbackModels {
   prompt: Prompt;

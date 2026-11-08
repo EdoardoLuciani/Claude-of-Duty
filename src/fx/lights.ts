@@ -107,7 +107,7 @@ export class LightPool {
   dispose(): void {
     for (const e of this.lights) {
       e.light.parent?.remove(e.light);
-      e.light.dispose?.();
+      e.light.dispose();
     }
     this.lights.length = 0;
   }

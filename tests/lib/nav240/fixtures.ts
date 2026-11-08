@@ -5,11 +5,11 @@ import { gunzipSync } from 'node:zlib';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-import type { SurfaceNav } from '../../src/ai/nav.ts';
-import { PhysicsSystem } from '../../src/physics/index.ts';
-import { isSurfaceName } from '../../src/physics/surfaces.ts';
-import { parseNavigationMetadata } from '../../tests/lib/nav240-metadata.ts';
-import type { NavigationMetadata } from '../../tests/lib/nav240-metadata.ts';
+import type { SurfaceNav } from '../../../src/ai/nav.ts';
+import { PhysicsSystem } from '../../../src/physics/index.ts';
+import { isSurfaceName } from '../../../src/physics/surfaces.ts';
+import { parseNavigationMetadata } from '../nav240-metadata.ts';
+import type { NavigationMetadata } from '../nav240-metadata.ts';
 export interface NavigationCase {
   name: string;
   from: THREE.Vector3;
@@ -80,7 +80,7 @@ export function physicsFor(scene: THREE.Object3D): PhysicsSystem {
   return physics;
 }
 export async function loadMap(): Promise<MapFixture> {
-  const dir = new URL('../../public/models/world/', import.meta.url);
+  const dir = new URL('../../../public/models/world/', import.meta.url);
   const meta = parseNavigationMetadata(
     JSON.parse(readFileSync(new URL('level.json', dir), 'utf8'))
   );

@@ -4,7 +4,7 @@
  * Positional air absorption, occlusion and attenuation belong to SpatialField.
  */
 import { hasOwn } from '../core/guards.ts';
-import { clamp } from './dsp.ts';
+import { clamp } from '../core/math.ts';
 import type { SampleKind, WeaponProfile } from './types.ts';
 
 /** Approved +12 dB positional presentation vs the previous 0.5 reference.

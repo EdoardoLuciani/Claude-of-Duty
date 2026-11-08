@@ -34,7 +34,6 @@ export const QUALITY_PRESETS = {
     taa: false,
     gtao: false,
     volumetrics: false,
-    bloom: true,
     anisotropy: 4,
     particleBudget: 1500,
     decalBudget: 48,
@@ -48,7 +47,6 @@ export const QUALITY_PRESETS = {
     taa: true,
     gtao: true,
     volumetrics: true,
-    bloom: true,
     anisotropy: 8,
     particleBudget: 4500,
     decalBudget: 96,
@@ -62,7 +60,6 @@ export const QUALITY_PRESETS = {
     taa: true,
     gtao: true,
     volumetrics: true,
-    bloom: true,
     anisotropy: 16,
     particleBudget: 9000,
     decalBudget: 192,
@@ -76,7 +73,6 @@ export const QUALITY_PRESETS = {
     taa: true,
     gtao: true,
     volumetrics: true,
-    bloom: true,
     anisotropy: 16,
     particleBudget: 16000,
     decalBudget: 320,
@@ -98,7 +94,6 @@ export const DEFAULTS = {
   invertY: false,
   /** 0..1 scale on per-shot cosmetic camera vibration. 0 is off, 1 is authored. */
   firingShake: 1,
-  exposure: 1.0,
   /** Capture mode fixes the seed and disables ambient automation; live worker AI remains asynchronous. */
   deterministic: false,
 };

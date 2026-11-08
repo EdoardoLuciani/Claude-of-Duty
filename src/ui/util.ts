@@ -115,15 +115,6 @@ export const ease: Record<string, (t: number) => number> = {
   },
 };
 
-export const clamp = (v: number, a: number, b: number): number => (v < a ? a : v > b ? b : v);
-export const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
-export const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
-
-/** Framerate-independent exponential approach. `rate` = 1/e per second. */
-export function damp(current: number, target: number, rate: number, dt: number): number {
-  return target + (current - target) * Math.exp(-rate * dt);
-}
-
 export interface PoolRecord {
   readonly node: null;
   alive: boolean;

@@ -16,7 +16,7 @@ import { COMBAT, BASELINE, acquireSeconds } from '../../src/ai/tuning.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
-import { makeAgent } from '../../tools/lib/agent-fixture.ts';
+import { makeAgent } from '../lib/agent-fixture.ts';
 import { BrainPlayer, brainAnimator } from '../lib/ai-brain-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 

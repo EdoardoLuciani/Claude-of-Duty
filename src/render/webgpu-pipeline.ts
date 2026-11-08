@@ -113,7 +113,7 @@ export function createWorldViewPipeline(
   const intermediates: Array<{ dispose(): void }> = [];
   const asTexture = (node: Node<'vec3'> | Node<'vec4'>): Node<'vec4'> => {
     const result = convertToTexture(node);
-    if (result !== node && result.isRTTNode) intermediates.push(result);
+    if (result !== node) intermediates.push(result);
     return result; // Existing texture/pass outputs remain borrowed.
   };
   const worldPass = pass(scene, camera, { samples: 0 });
@@ -190,7 +190,7 @@ export function createWorldViewPipeline(
     }
     return undefined;
   };
-  const channels: Record<string, Node> = { output: normalView as Node };
+  const channels: Record<string, Node> = { output: normalView };
   if (taa) channels.velocity = velocity;
   // The native depth attachment is nonlinear; publish positive view metres.
   channels.linearDepth = positionView.z.negate();

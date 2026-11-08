@@ -1,10 +1,11 @@
 import type { AiCalloutKind, ReloadPhase } from '../core/events.ts';
 import { hasOwn } from '../core/guards.ts';
+import { clamp } from '../core/math.ts';
 import type { Rng } from '../core/rng.ts';
 import { AIRCRAFT_URLS } from './aircraft.ts';
 import { CALLOUT_URLS, CALLOUT_MIX, calloutBank } from './callouts.ts';
 import { COMBAT_URLS, type CombatKind } from './combat.ts';
-import { clamp, gain, series } from './dsp.ts';
+import { gain, series } from './dsp.ts';
 import {
   ENVIRONMENT_URLS,
   ENVIRONMENT_GAIN,
@@ -72,7 +73,7 @@ const CONTACT_URLS = {
 type ContactKind = keyof typeof CONTACT_URLS;
 /** Round-robin indices are kept modulo the bank size; a miss means an unloaded slot. */
 function loaded(buffers: readonly AudioBuffer[], index: number, label: string): AudioBuffer {
-  const buffer = buffers[index];
+  const buffer = buffers.at(index);
   if (!buffer) throw new RangeError(`[audio] ${label} recording ${index} is not loaded`);
   return buffer;
 }
@@ -347,7 +348,7 @@ export class WeaponSampleBank {
   step(rng: Rng, o: FoleyOptions = {}): AudioVoice {
     const when = o.when ?? this.actx.currentTime;
     const gait = o.gait ?? 'walk';
-    const pair = STEP_BANK[o.surface ?? 'concrete'] ?? STEP_BANK.concrete;
+    const pair = STEP_BANK[o.surface ?? 'concrete'];
     const fast = gait === 'run' || gait === 'sprint' || gait === 'land';
     const level = (o.level ?? 1) * (FOLEY_MIX.gait[gait] ?? FOLEY_MIX.gait.walk) * FOLEY_MIX.step;
     const out = gain(this.actx, level);
@@ -360,7 +361,7 @@ export class WeaponSampleBank {
       splash.node.connect(out);
       end = Math.max(end, splash.end);
     }
-    const gearLevel = o.gear ?? FOLEY_MIX.gear[gait] ?? FOLEY_MIX.gear.walk;
+    const gearLevel = o.gear ?? FOLEY_MIX.gear[gait];
     if (gearLevel > 0) {
       const gear = this.hit('gear', rng, { when, level: gearLevel * FOLEY_MIX.gearLevel });
       gear.node.connect(out);
@@ -370,7 +371,7 @@ export class WeaponSampleBank {
   }
 
   fall(rng: Rng, o: FoleyOptions = {}): AudioVoice {
-    const voice = this.hit(FALL_BANK[o.surface ?? 'concrete'] ?? FALL_BANK.concrete, rng, {
+    const voice = this.hit(FALL_BANK[o.surface ?? 'concrete'], rng, {
       when: o.when,
       level: (o.level ?? 1) * FOLEY_MIX.fall,
     });

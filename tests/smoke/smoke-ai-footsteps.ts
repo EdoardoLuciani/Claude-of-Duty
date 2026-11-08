@@ -17,7 +17,7 @@ import type { Agent } from '../../src/ai/agent.ts';
 import { Animator } from '../../src/ai/animator.ts';
 import { RIG } from '../../src/ai/rig.ts';
 import type { EngineEventMap } from '../../src/core/events.ts';
-import { makeAgent } from '../../tools/lib/agent-fixture.ts';
+import { makeAgent } from '../lib/agent-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
 

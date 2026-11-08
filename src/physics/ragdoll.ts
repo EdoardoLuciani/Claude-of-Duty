@@ -60,15 +60,6 @@ interface RagdollBounds {
   maxy: number;
   maxz: number;
 }
-interface CapsuleOut {
-  ax: number;
-  ay: number;
-  az: number;
-  bx: number;
-  by: number;
-  bz: number;
-  r: number;
-}
 interface SkeletonSpecOptions {
   mass?: number;
   stubLength?: number;
@@ -152,7 +143,7 @@ const SLEEP_TIME = 0.6;
 let _nextRagdollId = 1;
 
 export class Ragdoll {
-  declare id: number;
+  id: number = _nextRagdollId++;
   declare world: RagdollWorld | null;
   declare gravity: number;
   declare iterations: number;
@@ -211,7 +202,6 @@ export class Ragdoll {
   _ss: ReturnType<typeof makeClosest> = makeClosest();
 
   constructor(world: RagdollWorld | null, opts: RagdollOptions = {}) {
-    this.id = _nextRagdollId++;
     this.world = world;
     this.gravity = opts.gravity ?? -20.6;
     this.iterations = opts.iterations ?? 6;
@@ -713,7 +703,7 @@ export class Ragdoll {
         }
         param += cts.s[k] * d;
         wsum += d;
-        const sp = SURFACE_PROPS[w.surface[cts.tri[k]]];
+        const sp = SURFACE_PROPS.at(w.surface[cts.tri[k]]);
         if (sp) fric = sp.friction;
       }
       const pl = Math.hypot(pushx, pushy, pushz);
@@ -914,20 +904,6 @@ export class Ragdoll {
     a.maxx = maxx;
     a.maxy = maxy;
     a.maxz = maxz;
-  }
-
-  /** World-space capsule of bone i: writes head/tail/radius into `out`. */
-  getBoneCapsule(i: number, out: CapsuleOut): CapsuleOut {
-    const a = this.boneHead[i],
-      c = this.boneTail[i];
-    out.ax = this.px[a];
-    out.ay = this.py[a];
-    out.az = this.pz[a];
-    out.bx = this.px[c];
-    out.by = this.py[c];
-    out.bz = this.pz[c];
-    out.r = this.boneRadius[i];
-    return out;
   }
 
   /**

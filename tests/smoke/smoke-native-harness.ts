@@ -25,13 +25,6 @@ try {
   assert(native.args.includes('--enable-unsafe-webgpu'));
   if (process.platform === 'linux') assert(native.args.includes('--enable-features=Vulkan'));
   assert(native.args.includes('--mute-audio'));
-  await assert.rejects(
-    launchChromium({ webgpu: false }),
-    (error: unknown): boolean => error === launchObserved
-  );
-  const legacy = launched;
-  assert(legacy.args);
-  assert(!legacy.args.includes('--enable-unsafe-webgpu'));
 } finally {
   chromium.launch = launch;
 }
@@ -198,4 +191,4 @@ try {
   Reflect.deleteProperty(globalThis, 'window');
   Reflect.deleteProperty(globalThis, 'ImageData');
 }
-console.log('native default, legacy opt-out and actionable readiness failures passed');
+console.log('native default and actionable readiness failures passed');

@@ -9,6 +9,7 @@ import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { PhysicsSystem, type PhysicsRigidBodyOptions } from '../../src/physics/index.ts';
 import { CameraRig } from '../../src/player/camera.ts';
+import { HealController } from '../../src/player/heal.ts';
 import { Health } from '../../src/player/health.ts';
 import { PlayerSystem } from '../../src/player/index.ts';
 import { Movement } from '../../src/player/movement.ts';
@@ -65,6 +66,7 @@ function makeHarness(): WeaponHarness {
   player.rig = new CameraRig(player.ctx);
   player.rig.eyePosition.set(0, 1.6, 0);
   player.health = new Health(player.ctx, null);
+  player.healCtrl = new HealController(player);
   player.setAdsProgress = (): void => {};
   player.cancelHeal = (reason): boolean => {
     cancellations.push(reason);

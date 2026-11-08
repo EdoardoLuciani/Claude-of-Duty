@@ -134,9 +134,7 @@ export class ShellSystem {
     mat.name = 'fx-brass';
     this.material = mat;
 
-    this.mesh = new THREE.InstancedMesh(geo, mat, CAPACITY) as THREE.InstancedMesh & {
-      dispose(): void;
-    };
+    this.mesh = new THREE.InstancedMesh(geo, mat, CAPACITY);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.frustumCulled = false;
     this.mesh.castShadow = false;
@@ -247,7 +245,7 @@ export class ShellSystem {
         object3D: slot.proxy,
         onImpact: this._onImpact,
       });
-      if (slot.body) slot.body.userData = slot;
+      slot.body.userData = slot;
     }
     return slot;
   }

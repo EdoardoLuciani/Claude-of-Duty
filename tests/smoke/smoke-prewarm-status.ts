@@ -190,6 +190,6 @@ for (const renderer of [
     (): ReturnType<FxSystem['prewarmMaterials']> => fx.prewarmMaterials(),
     /compileAsync|native compile rejection/
   );
-  assert.equal(fx._warmScene.children.length, 0, 'failed FX compile detaches borrowed meshes');
+  assert.equal(fx._warmScene?.children.length, 0, 'failed FX compile detaches borrowed meshes');
 }
 console.log('warmup failure status, async radio readiness and restoration preserved');

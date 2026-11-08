@@ -39,7 +39,7 @@ export function describeSystem(system: object): SystemDescriptor {
   ) {
     throw new Error(`${name} has invalid static deps`);
   }
-  return { id: ctor.id, name, deps: deps === undefined ? [] : (deps as string[]) };
+  return { id: ctor.id, name, deps: deps === undefined ? [] : deps };
 }
 
 /** A constructor's literal ID determines its instance contract, not a union of providers. */

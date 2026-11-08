@@ -5,9 +5,9 @@ import { Vector3 } from 'three';
 
 import type { SurfaceNav } from '../../src/ai/nav.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
-import { testNav } from '../../tools/lib/test-nav.ts';
-import { makeWalker } from '../../tools/nav240/harness.ts';
 import { fixture } from '../lib/fixture.ts';
+import { makeWalker } from '../lib/nav240/harness.ts';
+import { testNav } from '../lib/test-nav.ts';
 
 const grid = await testNav();
 assert(grid.physics instanceof PhysicsSystem);

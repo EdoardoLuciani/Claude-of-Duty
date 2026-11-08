@@ -1,8 +1,9 @@
 import type { EngineContext } from '../core/context.ts';
+import { damp } from '../core/math.ts';
 import type { MarketSystem } from '../market/index.ts';
 import { marketIcon } from './market-icons.ts';
 import { MarketInspection } from './market-inspection.ts';
-import { el, setText, setStyle, setClass, damp } from './util.ts';
+import { el, setText, setStyle, setClass } from './util.ts';
 
 type MarketItem = ReturnType<MarketSystem['getHudState']>['items'][number];
 type MarketAction = MarketItem['action'];
@@ -29,7 +30,7 @@ const SECTION: Record<MarketSlot, string> = {
   strike: 'ORDNANCE',
 };
 function targetCard(target: EventTarget | null): HTMLElement | null {
-  return target instanceof Element ? (target.closest('[data-item]') as HTMLElement | null) : null;
+  return target instanceof Element ? target.closest('[data-item]') : null;
 }
 
 /** Between-wave shop animates on raw wall time while simulation is frozen.
@@ -114,11 +115,11 @@ export class MarketOverlay {
     this._onOver = (e: MouseEvent): void => {
       if (!this.active) return;
       const card = targetCard(e.target);
-      const id = card?.dataset?.item ?? null;
+      const id = card?.dataset.item ?? null;
       if (id === this._hoverId) return;
       this._hoverId = id;
       if (id) {
-        this.ctx.peek('ui')?.sfx?.('market_hover', 0.4);
+        this.ctx.peek('ui')?.sfx('market_hover', 0.4);
         if (!this._selectedId) this._preview(id);
       }
     };
@@ -191,7 +192,7 @@ export class MarketOverlay {
     for (const row of this.cards) setClass(row.card, 'inspecting', false);
     this.inspection.active = true;
     this.inspection.controls.enabled = false;
-    document.exitPointerLock?.();
+    document.exitPointerLock();
   }
 
   hide(): void {
@@ -214,11 +215,11 @@ export class MarketOverlay {
 
   _buy(itemId: MarketItem['id']): void {
     if (!this.market.buy(itemId)) {
-      this.ctx.peek('ui')?.sfx?.('market_deny', 0.75);
+      this.ctx.peek('ui')?.sfx('market_deny', 0.75);
       return;
     }
     this._pulse = 1;
-    this.ctx.peek('ui')?.sfx?.('market_buy', 0.9);
+    this.ctx.peek('ui')?.sfx('market_buy', 0.9);
   }
 
   /** Driven from ui.lateUpdate with RAW dt — the sim clock is frozen here. */
@@ -242,7 +243,7 @@ export class MarketOverlay {
     if (this.wave > 0) setText(this.waveLine, `WAVE ${this.wave} CLEARED`);
 
     for (let i = 0; i < this.cards.length; i++) {
-      const it = s.items[i];
+      const it = s.items.at(i);
       const row = this.cards[i];
       if (!it) continue;
       const units = Math.floor(it.level / it.step);
@@ -251,7 +252,7 @@ export class MarketOverlay {
       setText(row.count, gun ? '' : it.unit === 'pct' ? `${it.level}%` : `${units}/${cap}`);
       if (row.fill) setStyle(row.fill, 'transform', `scaleX(${(it.level / 100).toFixed(3)})`);
       for (let p = 0; p < row.pips.length; p++) setClass(row.pips[p], 'on', p < units);
-      setText(row.btn, ACTION_LABEL[it.action] ?? 'BUY');
+      setText(row.btn, ACTION_LABEL[it.action]);
       row.btn.disabled = !it.affordable;
       setClass(row.card, 'on', it.action === 'equipped');
       setClass(row.card, 'capped', it.action === 'max');
