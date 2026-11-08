@@ -5,8 +5,8 @@
  * OW_SKIP_ASSETS=1 (`bun run build:ci`) builds nothing and only validates the world.
  *
  * Player arms run first, then the bandage, which re-saves player-arms.blend.
- * Every weapon loads that blend, so arm changes rebuild all weapons. The EXPS3
- * sight and soldiers are independent. The Node-only stages (procedural textures,
+ * Every weapon loads that blend, so arm changes rebuild all weapons. Standalone
+ * attachments and soldiers are independent. The Node-only stages (procedural textures,
  * soldier/spent-hull staging, world validation) keep their own caches.
  *
  * Input hashes live in .cache/assets/, outside node_modules so `bun ci` keeps them.
@@ -91,14 +91,16 @@ const SOLDIER_STEP = {
 
 // Blender tool directories a weapon imports beyond its own tools/blender/<id>/.
 const EXTRA_TOOLS = { mpx: ['evolys'] };
+const STANDALONE_TOOLS = {
+  exps3: ['tools/blender/exps3.py', 'tools/blender/exps3_bake.py'],
+  tor_mini: ['tools/blender/tor_mini'],
+};
 
 /** One Blender build plus its gltfpack cook for a MODEL_COOKS entry. */
 function cookStep(id, salt) {
   const { directory, source, output } = MODEL_COOKS[id];
-  const standalone = id === 'exps3';
-  const tools = standalone
-    ? ['tools/blender/exps3.py', 'tools/blender/exps3_bake.py']
-    : [id, ...(EXTRA_TOOLS[id] ?? [])].map((tool) => `tools/blender/${tool}`);
+  const tools =
+    STANDALONE_TOOLS[id] ?? [id, ...(EXTRA_TOOLS[id] ?? [])].map((tool) => `tools/blender/${tool}`);
   return {
     id,
     inputs: [...tools, ...authoredJson(directory)],
@@ -106,7 +108,7 @@ function cookStep(id, salt) {
     salt: [...salt, JSON.stringify(MODEL_COOKS[id]), ...GLTFPACK_FLAGS, GLTFPACK_VERSION],
     outputs: [`${directory}/${source}`, output],
     commands: [
-      blender(standalone ? tools[0] : `tools/blender/${id}/build.py`),
+      blender(id === 'exps3' ? tools[0] : `tools/blender/${id}/build.py`),
       node('build/models.mjs', id),
     ],
   };
@@ -212,12 +214,12 @@ const stages = [stage('validate-world-assets.mjs')];
 if (!process.env.OW_SKIP_ASSETS) {
   mkdirSync(CACHE, { recursive: true });
   // Weapons load the arms blend, so they wait for it and hash its inputs.
-  await pool([ARMS, cookStep('exps3', []), SOLDIER_STEP]);
+  await pool([ARMS, ...Object.keys(STANDALONE_TOOLS).map((id) => cookStep(id, [])), SOLDIER_STEP]);
   if (!failed) {
     const armsHash = inputHash(ARMS);
     await pool(
       Object.keys(MODEL_COOKS)
-        .filter((id) => id !== 'exps3')
+        .filter((id) => !Object.hasOwn(STANDALONE_TOOLS, id))
         .map((id) => cookStep(id, [armsHash]))
     );
   }

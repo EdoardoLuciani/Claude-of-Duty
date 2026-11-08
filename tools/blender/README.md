@@ -24,7 +24,8 @@ build/check commands, declared inputs, references and acceptance limits:
 [MPX](../../assets/weapons/sig-mpx/README.md),
 [AX338](../../assets/weapons/ax338/README.md),
 [M590](../../assets/weapons/m590/README.md).
-Standalone attachments: [EXPS3-0](../../assets/attachments/eotech-exps3-0/README.md).
+Standalone attachments: [EXPS3-0](../../assets/attachments/eotech-exps3-0/README.md),
+[TOR Mini laser](../../assets/attachments/steiner-tor-mini/README.md).
 
 - Build factory-empty into an absolute `--output` scratch directory first.
   `--render` is optional; `--quick` changes preview samples/resolution only.

@@ -10,7 +10,7 @@ Install native **gltfpack 1.3 with BasisU support** from the
 
 ```sh
 GLTFPACK=/absolute/path/gltfpack bun run models:cook -- p320
-# All registered profiles (seven weapons and standalone EXPS3):
+# All registered profiles (seven weapons, standalone EXPS3 and TOR Mini):
 bun run models:cook
 # Use the same profile on a scratch native export:
 bun run models:cook -- p320 /tmp/p320-review
@@ -38,5 +38,7 @@ AX338 keeps full geometry where simplification damaged panel detail.
 M590 keeps its shell separate from the mechanical skin, with exact STEP visibility;
 its source checker narrowly bounds one approved shared-glove contact below 30 µm.
 EXPS3 uses a tighter error limit to preserve its optical
-opening; its cooked attachment is not yet wired into gameplay. Other models are
-not converted by these profiles.
+opening; its cooked attachment is not yet wired into gameplay. TOR Mini preserves
+its native geometry without simplification and also remains standalone; see its
+[asset review/commands](../assets/attachments/steiner-tor-mini/README.md). Other models
+are not converted by these profiles.
