@@ -6,10 +6,10 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 import type { SurfaceNav } from '../../src/ai/nav.ts';
+import { PhysicsSystem } from '../../src/physics/index.ts';
 import { isSurfaceName } from '../../src/physics/surfaces.ts';
 import { parseNavigationMetadata } from '../../tests/lib/nav240-metadata.ts';
 import type { NavigationMetadata } from '../../tests/lib/nav240-metadata.ts';
-import { PhysicsSystem } from '../../src/physics/index.ts';
 export interface NavigationCase {
   name: string;
   from: THREE.Vector3;
@@ -81,7 +81,9 @@ export function physicsFor(scene: THREE.Object3D): PhysicsSystem {
 }
 export async function loadMap(): Promise<MapFixture> {
   const dir = new URL('../../public/models/world/', import.meta.url);
-  const meta = parseNavigationMetadata(JSON.parse(readFileSync(new URL('level.json', dir), 'utf8')));
+  const meta = parseNavigationMetadata(
+    JSON.parse(readFileSync(new URL('level.json', dir), 'utf8'))
+  );
   const bytes = gunzipSync(readFileSync(new URL(meta.assets.collision, dir)));
   const gltf = await new GLTFLoader().parseAsync(
     bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
@@ -243,7 +245,15 @@ export function addAccessCases(fixture: MapFixture): void {
   add('W4/captured-room', w4.from.clone(), room);
   add('W4/landing-to-room', w4.to.clone(), room.clone());
 }
-function box(scene: THREE.Scene, x: number, y: number, z: number, w: number, h: number, d: number): void {
+function box(
+  scene: THREE.Scene,
+  x: number,
+  y: number,
+  z: number,
+  w: number,
+  h: number,
+  d: number
+): void {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshBasicMaterial());
   mesh.position.set(x, y, z);
   scene.add(mesh);
@@ -273,7 +283,12 @@ export function synthetic(): NavigationFixture {
     ['disconnected', [7, 0, 0], [12, 0, 0], false],
     ['crouch-tunnel', [12, 0, 0], [18, 0, 0], false], // standing-only candidate profile
   ];
-  const cases = definitions.map(([name, from, to, reachable]): NavigationCase => ({ name, from: vec(from), to: vec(to), reachable }));
+  const cases = definitions.map(([name, from, to, reachable]): NavigationCase => ({
+    name,
+    from: vec(from),
+    to: vec(to),
+    reachable,
+  }));
   const bounds = new THREE.Box3(vec([-10, -1, -7]), vec([20, 7, 7]));
   const physics = physicsFor(scene);
   return { name: 'synthetic', physics, bounds, cases, grid: null };

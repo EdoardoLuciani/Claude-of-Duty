@@ -1,13 +1,22 @@
 import type { Vector3 } from 'three';
+
 import type { AiSystem } from '../../src/ai/index.ts';
 import type { EventBus } from '../../src/core/registry.ts';
 import type { PhysicsSystem } from '../../src/physics/index.ts';
 import type { WorldSystem } from '../../src/world/index.ts';
 
-export interface FriendlyDamageReport { friendlyHits: number; friendlyDamage: number }
+export interface FriendlyDamageReport {
+  friendlyHits: number;
+  friendlyDamage: number;
+}
 // Controlled rifle fixtures: only the AI team fires. Count all damage to that
 // team's fixture actors, including penetration hits with no `source` field.
-export function observeFriendlyDamage(events: EventBus, actors: readonly { team: number }[], team: number, report: FriendlyDamageReport): () => void {
+export function observeFriendlyDamage(
+  events: EventBus,
+  actors: readonly { team: number }[],
+  team: number,
+  report: FriendlyDamageReport
+): () => void {
   report.friendlyHits = 0;
   report.friendlyDamage = 0;
   return events.on('damage:dealt', ({ target, amount }): void => {
@@ -20,7 +29,12 @@ export function observeFriendlyDamage(events: EventBus, actors: readonly { team:
 
 // Browser E2E placement only: exact clear lanes, not snapping authored offsets
 // into walls and then mistaking a setup failure for a combat failure.
-export function combatLane(ai: AiSystem, world: WorldSystem, physics: PhysicsSystem, slots: readonly (readonly [number, number])[]): { positions: Vector3[]; fx: number; fz: number } {
+export function combatLane(
+  ai: AiSystem,
+  world: WorldSystem,
+  physics: PhysicsSystem,
+  slots: readonly (readonly [number, number])[]
+): { positions: Vector3[]; fx: number; fz: number } {
   if (!ai.grid) throw new Error('combat lane requires navigation');
   const eye = world.spawnPoints[0].position.clone(),
     target = eye.clone();

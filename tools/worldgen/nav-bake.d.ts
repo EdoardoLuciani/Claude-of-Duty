@@ -1,7 +1,8 @@
 import type { Box3, Object3D } from 'three';
+
 import type { NavMetadata } from '../../src/ai/nav-format.ts';
-import type { PhysicsSystem } from '../../src/physics/index.ts';
 import type { WorldLadder } from '../../src/core/model-metadata.ts';
+import type { PhysicsSystem } from '../../src/physics/index.ts';
 
 export interface NavBakeResult {
   buffer: Uint8Array;
@@ -11,5 +12,16 @@ export interface NavBakeResult {
   components: number;
   bakeMs: number;
 }
-export function bakeNav(collisionScene: Object3D, bounds: Box3, provenance?: Partial<NavMetadata>, volumes?: WorldLadder[]): Promise<NavBakeResult>;
-export function bakePhysicsNav(phys: PhysicsSystem, bounds: Box3, provenance?: Partial<NavMetadata>, bvhMs?: number, volumes?: WorldLadder[]): Promise<NavBakeResult>;
+export function bakeNav(
+  collisionScene: Object3D,
+  bounds: Box3,
+  provenance?: Partial<NavMetadata>,
+  volumes?: WorldLadder[]
+): Promise<NavBakeResult>;
+export function bakePhysicsNav(
+  phys: PhysicsSystem,
+  bounds: Box3,
+  provenance?: Partial<NavMetadata>,
+  bvhMs?: number,
+  volumes?: WorldLadder[]
+): Promise<NavBakeResult>;

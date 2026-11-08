@@ -57,7 +57,10 @@ export class NativeWorker extends EventTarget implements Worker {
       this.dispatchEvent(event);
     });
   }
-  postMessage(message: ClientMessage, transfer?: Transferable[] | StructuredSerializeOptions): void {
+  postMessage(
+    message: ClientMessage,
+    transfer?: Transferable[] | StructuredSerializeOptions
+  ): void {
     const list = Array.isArray(transfer) ? transfer : transfer?.transfer;
     const native: NodeTransferable[] = [];
     for (const item of list ?? []) {

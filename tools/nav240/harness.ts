@@ -3,34 +3,65 @@ import * as THREE from 'three';
 import { Agent, STATE } from '../../src/ai/agent.ts';
 import { INFANTRY } from '../../src/ai/capabilities.ts';
 import { NAV_PROFILE } from '../../src/ai/nav-format.ts';
-import { makeAi } from '../lib/agent-fixture.ts';
-import type { FixtureAi } from '../lib/agent-fixture.ts';
 import type { SurfaceNav } from '../../src/ai/nav.ts';
-import type { PhysicsSystem } from '../../src/physics/index.ts';
-import type { CharacterController } from '../../src/physics/character.ts';
 import { applyDefinedPatch } from '../../src/core/patch.ts';
+import type { CharacterController } from '../../src/physics/character.ts';
+import type { PhysicsSystem } from '../../src/physics/index.ts';
+import { makeAi, detachFixtureAgent } from '../lib/agent-fixture.ts';
+import type { FixtureAi } from '../lib/agent-fixture.ts';
 import type { NavigationCase } from './fixtures.ts';
 
-export interface WalkerFixture { physics: PhysicsSystem; grid: SurfaceNav | null }
-export interface PathCandidate {
-  query(from: THREE.Vector3, to: THREE.Vector3): { points: THREE.Vector3[]; outcome: string | null; reason?: string | null };
+export interface WalkerFixture {
+  physics: PhysicsSystem;
+  grid: SurfaceNav | null;
 }
-export interface WalkerOptions { scale?: number; slopeLimit?: number; speed?: number; dt?: number }
-export interface Recovery { from: [number, number, number]; to: [number, number, number] }
+export interface PathCandidate {
+  query(
+    from: THREE.Vector3,
+    to: THREE.Vector3
+  ): { points: THREE.Vector3[]; outcome: string | null; reason?: string | null };
+}
+export interface WalkerOptions {
+  scale?: number;
+  slopeLimit?: number;
+  speed?: number;
+  dt?: number;
+}
+export interface Recovery {
+  from: [number, number, number];
+  to: [number, number, number];
+}
 export class WalkerAgent extends Agent {
   declare controller: CharacterController;
   declare ai: FixtureAi;
   recoveries: Recovery[] = [];
 }
 export interface TraversalResult {
-  name: string; initialOutcome: string | null; finalOutcome: string | null; arrived: boolean; status: string | null;
-  elapsed: number; pathDistance: number; horizontalError: number; floorError: number; maxStall: number; maxJump: number;
-  end: [number, number, number]; recovery: Recovery[]; recoveryAttempts: number; recoveryOutcome: string | null;
-  initialPath: [number, number, number][]; trace: [number, number, number][];
+  name: string;
+  initialOutcome: string | null;
+  finalOutcome: string | null;
+  arrived: boolean;
+  status: string | null;
+  elapsed: number;
+  pathDistance: number;
+  horizontalError: number;
+  floorError: number;
+  maxStall: number;
+  maxJump: number;
+  end: [number, number, number];
+  recovery: Recovery[];
+  recoveryAttempts: number;
+  recoveryOutcome: string | null;
+  initialPath: [number, number, number][];
+  trace: [number, number, number][];
 }
 
 // Independent direct-controller traversal, without consulting the navigator.
-export function canConnect(physics: PhysicsSystem, from: THREE.Vector3, to: THREE.Vector3): boolean {
+export function canConnect(
+  physics: PhysicsSystem,
+  from: THREE.Vector3,
+  to: THREE.Vector3
+): boolean {
   const c = physics.createCharacter({
     radius: NAV_PROFILE.radius,
     height: NAV_PROFILE.height,
@@ -89,9 +120,7 @@ export function makeWalker(
   };
   // Real Agent movement/navigation methods; omit only rendering, senses and gun.
   const a = new WalkerAgent(ai, { position: from });
-  a.group.removeFromParent();
-  a.skeleton.dispose();
-  a.animator.weapon = null;
+  detachFixtureAgent(a);
   applyDefinedPatch<Agent>(a, {
     id,
     ai,
@@ -108,9 +137,7 @@ export function makeWalker(
       stepHeight: INFANTRY.stepHeight,
       slopeLimit,
     }),
-
     desiredSpeed: 1.5,
-
   });
   if (!a.controller) throw new Error('walker requires a controller');
   a.animator.turn = (): void => {};
@@ -124,7 +151,12 @@ export function makeWalker(
   return a;
 }
 
-export function execute(fixture: WalkerFixture, candidate: PathCandidate, sample: NavigationCase, options: WalkerOptions = {}): TraversalResult {
+export function execute(
+  fixture: WalkerFixture,
+  candidate: PathCandidate,
+  sample: NavigationCase,
+  options: WalkerOptions = {}
+): TraversalResult {
   const a = makeWalker(fixture, candidate, sample.from, sample.recorded ?? 1, options);
   a.desiredSpeed = options.speed ?? 1.5;
   const dt = options.dt ?? 1 / 60;

@@ -6,7 +6,11 @@ import { physicsFor } from '../nav240/fixtures.ts';
 import { bakePhysicsNav } from '../worldgen/nav-bake.js';
 
 // Platform tuples: centre X, surface Y, centre Z, width, depth.
-export async function testNav(platforms: readonly (readonly [number, number, number, number, number])[] = [[5.5, 0, 5.5, 16, 16]]): Promise<SurfaceNav> {
+export async function testNav(
+  platforms: readonly (readonly [number, number, number, number, number])[] = [
+    [5.5, 0, 5.5, 16, 16],
+  ]
+): Promise<SurfaceNav> {
   const scene = new THREE.Scene();
   for (const [x, y, z, width, depth] of platforms) {
     const mesh = new THREE.Mesh(
