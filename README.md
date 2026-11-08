@@ -20,7 +20,8 @@ required. Bun installs dependencies from `bun.lock`, type-checks (`bun check`) a
 formats (`bun fmt`); packages are cached in `~/.bun/install/cache`, so warm
 reinstalls are near-instant. Node runs Vite, Oxlint, the `node:test` smoke runner and all tools; Node-run
 tools and smoke tests load migrated `.ts` modules using native type stripping.
-Runtime TypeScript uses explicit `.ts` imports and is checked by `bun run typecheck`.
+Runtime TypeScript uses explicit `.ts` imports and is checked by `bun run typecheck`
+(`noUncheckedIndexedAccess` status: [triage and plan](docs/no-unchecked-indexed-access.md)).
 `bun run lint` requires explicit return types on every TypeScript function, method,
 getter and callback (including contextually typed functions and functions returning
 functions). Constructors and setters have no return annotation; JavaScript helpers

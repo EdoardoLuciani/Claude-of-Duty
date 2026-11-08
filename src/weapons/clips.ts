@@ -124,14 +124,26 @@ export class Clip {
   }
 }
 
+type ManifestClips = Record<
+  string,
+  { duration: number; events: { time: number; event: string }[] }
+>;
+
+/** Aliases name authored asset clips; a missing one is an asset/alias mismatch. */
+function manifestClip(manifest: ManifestClips, source: string): ManifestClips[string] {
+  const info = manifest[source];
+  if (!info) throw new Error(`[weapons] animation manifest has no clip '${source}'`);
+  return info;
+}
+
 /** Keep authored durations and ordered event beats for native weapon aliases. */
 export function buildManifestClips(
   aliases: Record<string, string>,
-  manifest: Record<string, { duration: number; events: { time: number; event: string }[] }>
+  manifest: ManifestClips
 ): Record<string, Clip> {
   const clips: Record<string, Clip> = {};
   for (const [name, source] of Object.entries(aliases)) {
-    const info = manifest[source];
+    const info = manifestClip(manifest, source);
     clips[name] = new Clip(name, info.duration, {
       events: info.events.map((ev): { t: number; name: string } => ({
         t: ev.time,
@@ -145,8 +157,8 @@ export function buildManifestClips(
 /** P320/MCX use asset magazine beats but synthesize reload start/gesture end. */
 export function buildMagazineClips(
   aliases: Record<string, string>,
-  manifest: Record<string, { duration: number; events: { time: number; event: string }[] }>,
-  durationOf = (source: string): number => manifest[source].duration
+  manifest: ManifestClips,
+  durationOf = (source: string): number => manifestClip(manifest, source).duration
 ): Record<string, Clip> {
   const mapping: Record<string, string> = {
     magazine_out: 'magout',
@@ -157,8 +169,11 @@ export function buildMagazineClips(
   for (const [name, source] of Object.entries(aliases)) {
     const duration = durationOf(source);
     const events = name.startsWith('reload') ? [{ t: 0, name: 'start' }] : [];
-    for (const ev of manifest[source].events)
-      if (mapping[ev.event]) events.push({ t: ev.time, name: mapping[ev.event] });
+    for (const ev of manifestClip(manifest, source).events) {
+      // Only magazine beats are mapped; other authored events are intentionally dropped.
+      const mapped = mapping[ev.event];
+      if (mapped) events.push({ t: ev.time, name: mapped });
+    }
     events.push({ t: duration - 0.0001, name: 'end' });
     clips[name] = new Clip(name, duration, { events });
   }

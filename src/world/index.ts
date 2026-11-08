@@ -253,8 +253,7 @@ export class WorldSystem {
     const mixChanged = Math.abs(mix - this._lampMix) > 0.01;
     if (mixChanged || this._lampPower !== this._streetlightPower) {
       this._lampPower = this._streetlightPower;
-      for (let i = 0; i < this.lamps!.length; i++) {
-        const light = this.lamps![i];
+      for (const light of this.lamps!) {
         light.intensity =
           (light.userData.owDayIntensity +
             (light.userData.owNightIntensity - light.userData.owDayIntensity) * mix) *
@@ -270,8 +269,7 @@ export class WorldSystem {
       // interior read as pure tungsten (B-R -93) and sit level with the sunlit
       // street instead of 1.5-2.5 stops under it. Gate the bulb on solar
       // altitude: a weak practical by day, the room's only light after dark.
-      for (let i = 0; i < this.bulbs!.length; i++) {
-        const light = this.bulbs![i];
+      for (const light of this.bulbs!) {
         light.intensity =
           (light.userData.owDayIntensity +
             (light.userData.owNightIntensity - light.userData.owDayIntensity) * mix) *
@@ -281,9 +279,10 @@ export class WorldSystem {
   }
 
   // ---------------------------------------------------------------- queries --
-  spawn(i = 0): WorldSystem['spawnPoints'][number] {
+  /** Wraps `i` over the authored spawns; undefined when the manifest has none. */
+  spawn(i = 0): WorldSystem['spawnPoints'][number] | undefined {
     const n = this.spawnPoints.length;
-    return this.spawnPoints[((i % n) + n) % n];
+    return n ? this.spawnPoints[((i % n) + n) % n] : undefined;
   }
 
   levelToWorld(x: number, y: number, z: number, out = new THREE.Vector3()): THREE.Vector3 {
