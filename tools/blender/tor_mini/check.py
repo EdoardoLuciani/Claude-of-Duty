@@ -12,6 +12,8 @@ import struct
 import bpy
 from mathutils import Vector
 
+MAX_TARGET_TRIANGLES = 6000
+
 
 def check():
     root = bpy.data.objects['ATTACHMENT_tor_mini']
@@ -24,7 +26,7 @@ def check():
     assert len(body.data.uv_layers) == 1
     assert body.data.uv_layers.active.name == 'AtlasUV'
     assert all(len(poly.vertices) == 3 for poly in body.data.polygons)
-    assert 0 < len(body.data.polygons) <= 12000
+    assert 0 < len(body.data.polygons) <= MAX_TARGET_TRIANGLES
     assert all(math.isfinite(v) for vertex in body.data.vertices for v in vertex.co)
     assert all(edge.vertices[0] != edge.vertices[1] for edge in body.data.edges)
     assert all(poly.area > 1e-14 for poly in body.data.polygons)
@@ -37,6 +39,10 @@ def check():
     envelope = (maximum-minimum)*1000
     # Nominal manufacturer envelope; local shape and mounting datum are art-inferred.
     assert 32 < envelope.x < 34 and 52.8 < envelope.y < 53.8 and 30 < envelope.z < 31,envelope
+    # Protect the inner aperture's round outline while simplifying other parts.
+    aperture = {(round(p.x,7),round(p.z,7)) for p in points
+        if abs(p.y-.02489)<1e-7 and abs(math.hypot(p.x,p.z+.0105)-.00178)<1e-7}
+    assert len(aperture) == 32,len(aperture)
     assert root.location.length == 0 and root.scale[:] == (1,1,1)
     assert bpy.data.objects['SOCKET_mount'].location.length == 0
     emitter = bpy.data.objects['SOCKET_laser']
@@ -69,6 +75,7 @@ def check():
     assert 'emissiveTexture' not in doc['materials'][0]
     report = {'status':'PASS','triangles':len(body.data.polygons),
         'envelopeMmXYZ':list(envelope),'atlasSize':2048,'primitives':1,
+        'triangleBudget':MAX_TARGET_TRIANGLES,'apertureSegments':len(aperture),
         'note':'Geometry/export correctness only; visual and weapon-fit approval remain separate'}
     print('TOR_MINI_CHECK',json.dumps(report))
     return report

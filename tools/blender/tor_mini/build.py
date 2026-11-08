@@ -86,7 +86,9 @@ def finish(obj, bevel=.2, smooth=True):
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bm.to_mesh(obj.data)
     bm.free()
-    if bevel:
+    # Sub-0.12 mm edge rounding comes from the detailed source normal bake;
+    # keep geometry for the larger silhouette-defining bevels only.
+    if bevel and (HIGH or bevel >= .12):
         mod = obj.modifiers.new('Manufactured edge radius', 'BEVEL')
         mod.width, mod.segments = bevel * MM, 3 if HIGH else 1
         bpy.ops.object.modifier_apply(modifier=mod.name)
@@ -118,7 +120,10 @@ def box(name, pos, size, mat, root, bevel=.2):
 
 
 def cyl(name, pos, radius, depth, mat, root, axis='Z', bevel=.1, sides=48):
-    bpy.ops.mesh.primitive_cylinder_add(vertices=sides if HIGH else min(sides, 32),
+    if not HIGH:
+        budget = 32 if name == 'Recessed laser window' else 12 if radius < 1 else 16 if radius < 3.5 else 24
+        sides = min(sides,budget)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=sides,
         radius=radius * MM, depth=depth * MM, location=tuple(v * MM for v in pos))
     obj = bpy.context.object
     obj.name, obj.parent = name, root
@@ -170,7 +175,8 @@ def ring(name, pos, outer, inner, depth, mat, root, axis='Y'):
             (2 * sides + j, 2 * sides + i, 3 * sides + i, 3 * sides + j),
             (j, i, 2 * sides + i, 2 * sides + j),
             (sides + i, sides + j, 3 * sides + j, 3 * sides + i)])
-    return finish(mesh(name, verts, faces, mat, root), .07)
+    # Keep all 32 circular outline segments; bake the microscopic rim bevel.
+    return finish(mesh(name, verts, faces, mat, root), .07 if HIGH else 0)
 
 
 def rounded(y0, y1, z0, z1, r, steps=5):
@@ -298,7 +304,7 @@ def geometry(mats):
         None,root,2.0))
     active(boot)
     lip = boot.modifiers.new('Soft moulded relief lip','BEVEL')
-    lip.width,lip.segments = .35*MM,3 if HIGH else 2
+    lip.width,lip.segments = .35*MM,3 if HIGH else 1
     bpy.ops.object.modifier_apply(modifier=lip.name)
     for side in (-1,1):
         # Raised perimeter and deep diamond-pattern pressure pads, on both sides.
@@ -376,7 +382,9 @@ def geometry(mats):
         if obj.type != 'MESH':
             continue
         for poly in obj.data.polygons:
-            if (poly.area > .00001 or obj.name.startswith('Pressure pad diamond')) and max(abs(v) for v in poly.normal) > .999:
+            flat_cap = not HIGH and obj.name in ('Laser aperture bezel',
+                'Aperture inner retaining ring','Recessed laser window')
+            if (poly.area > .00001 or obj.name.startswith('Pressure pad diamond') or flat_cap) and max(abs(v) for v in poly.normal) > .999:
                 poly.use_smooth = False
         active(obj)
         mod = obj.modifiers.new('Final post-machining normals','WEIGHTED_NORMAL')
@@ -434,6 +442,7 @@ def studio(quick):
 
 
 def export(output,root,report):
+    from check import MAX_TARGET_TRIANGLES
     active(root)
     for obj in root.children_recursive:
         obj.select_set(True)
@@ -447,7 +456,7 @@ def export(output,root,report):
     stats = {'triangles':sum(doc['accessors'][p['indices']]['count']//3 for p in prims),
         'primitives':len(prims),'materials':len(doc['materials']),'images':len(doc.get('images',[])),
         'bytes':len(data)}
-    assert stats['triangles'] <= 12000 and stats['primitives'] == 1,stats
+    assert stats['triangles'] <= MAX_TARGET_TRIANGLES and stats['primitives'] == 1,stats
     assert stats['materials'] == 1 and stats['images'] == 3,stats
     manifest = {'asset':'Steiner TOR Mini green 7003 | original reference-backed art',
         'source':'tools/blender/tor_mini/build.py','blender':bpy.app.version_string,

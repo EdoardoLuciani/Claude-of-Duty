@@ -24,7 +24,7 @@ calibrated fit measurement or proof of 1:1/AAA fidelity. It excludes neither all
 photographic perspective nor all shadow/edge differences. The left side and both
 quarters were also inspected, without claiming equivalent numerical registration.
 
-## Fresh-build comparison
+## Initial full-detail build comparison
 
 Blender **5.2.2**, two factory-empty, separate-process builds: one scratch build
 with review rendering, one normal clean-install asset build. Compared native GLB
@@ -40,7 +40,7 @@ This is same-host evidence, not a universal bit-exact Blender/Cycles guarantee.
 Explicit native `EXTEND` bake padding and fractional UV separation replaced an
 earlier adjacency-padding configuration that varied at island borders.
 
-## Geometry and runtime delivery
+## Initial full-detail geometry and runtime delivery
 
 - **9,978 triangles**, one opaque mesh/material/primitive, no animation/skin.
 - Authored envelope: **32.84 × 53.20 × 30.35 mm** in Blender XYZ (width/length/height).
@@ -62,3 +62,62 @@ Review images on the PR distinguish the initial reconstruction from the refined
 candidate using the same hero camera, framing and studio exposure. Other views
 come from the final candidate. No pre-existing shipped laser is implied by the
 "before" image.
+
+## Mesh optimization pass
+
+Selected a **5,924-triangle authored target**, **40.6% fewer triangles** than the
+9,978-triangle baseline. Runtime vertex count fell from **10,819 to 7,363**
+(approximately 32%). One opaque mesh/material/primitive and three 2048² maps
+remain; the standard cook does not simplify further. No flashlight, weapon-fit
+or gameplay changes.
+
+### Trials and selection
+
+First tested attribute-aware gltfpack simplification on the unmodified native
+baseline, preserving the original maps. Representative trials with `-sp -noq`
+(and retained named nodes/extras):
+
+| Target ratio / relative error limit | Actual triangles | Close-up observation |
+| --- | ---: | --- |
+| 0.30 / 0.003 | 6,054 | Conservative reduction; aperture starts to lose detail |
+| 0.50 / 0.004 | 5,506 | Aperture visibly polygonal in the front view |
+| 0.40 / 0.006 | 4,798 | More contour/edge loss despite little change at small screen sizes |
+| 0.25 / 0.012 | 3,870 | Obvious aperture faceting and shading changes; rejected |
+| **Selective authoring reduction** | **5,924** | **Selected: round aperture retained, smaller losses elsewhere** |
+
+Also tried gltfpack position/attribute optimization (`-sv`); it did not resolve
+the aperture trade-off enough to prefer it over the selective target.
+
+The selected recipe leaves the detailed high source intact, but changes the low
+target's small-cylinder budgets (12/16/24 segments by size), removes microscopic
+bevel geometry in favor of its normal bake, and reduces the boot lip's bevel
+segments. Both aperture rings retain **32 circular outline segments**; their
+microscopic bevels are baked, and the low cap normals are explicitly flat to
+avoid shading waves. Pressure-pad diamond relief and larger bevels remain real
+geometry. The atlas is rebaked from the original detailed source, not patched.
+
+### Validation of the selected target
+
+- Eight matched Blender views and nine WebGPU views per candidate, including a
+  small-screen-size proxy (not a mounted gameplay capture). Cameras, exposure,
+  environments and framing matched within each renderer.
+- Old and new cooked GLBs both decoded/compiled/rendered on the same AMD `gcn-5`
+  WebGPU adapter without captured page/console errors. Small fasteners and edge
+  rounding are less detailed; the main silhouette, aperture and pad relief hold up.
+- Native sampled surface differences: 51,085 baseline-to-target samples had
+  maximum **0.0593 mm** / mean **0.00775 mm** distance; 31,415 target-to-baseline
+  samples had maximum **0.0895 mm** / mean **0.00697 mm**. Samples include vertices,
+  triangle centroids and edge midpoints; **not an exact Hausdorff bound**.
+- Separate-process checker passes with the tighter **6,000-triangle budget** and
+  a new explicit **32-segment aperture** gate. Sockets and envelope are unchanged.
+- Two fresh builds have identical position/normal/UV/tangent/index accessor bytes
+  and node/material JSON. Of 4,194,304 pixels per map, base color and ORM each
+  differ at one pixel by at most 1/255; normal differs at 24 pixels by at most
+  2/255. Same-host Cycles rounding evidence, not universal bit-exact textures.
+- Clean install, smoke/lib tests, lint, formatting and full build passed again.
+
+This reduces **mesh processing**, not draw calls or texture memory. Repacking and
+rebaking the unchanged-resolution atlases means the cooked file actually grows
+slightly: **6,176,192 → 6,353,120 bytes** (~5.89 → 6.06 MiB). No download-size,
+VRAM or FPS improvement is claimed. Before/after optimization views are attached
+on the PR; human final visual acceptance and mounted integration remain separate.

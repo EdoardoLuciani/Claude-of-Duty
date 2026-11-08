@@ -8,6 +8,8 @@ import math
 import bpy
 from mathutils import Vector
 
+from check import MAX_TARGET_TRIANGLES
+
 SIZE = 2048
 
 
@@ -56,7 +58,7 @@ def bake_asset(output,root,source):
     bpy.ops.object.modifier_apply(modifier=mod.name)
     body.data.update(calc_edges=True)
     body.data.validate(clean_customdata=False)
-    assert len(body.data.polygons) <= 12000,len(body.data.polygons)
+    assert len(body.data.polygons) <= MAX_TARGET_TRIANGLES,len(body.data.polygons)
     while body.data.uv_layers:
         body.data.uv_layers.remove(body.data.uv_layers[0])
     body.data.uv_layers.new(name='AtlasUV')

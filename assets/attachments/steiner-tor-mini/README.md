@@ -4,6 +4,8 @@ Original reference-backed **green 7003** reconstruction; visual-review candidate
 not manufacturer CAD or final human visual acceptance. No flashlight or gameplay
 changes. References, photo rights and known approximations: [reference-review.json](reference-review.json).
 Measured build/render evidence and open acceptance items: [REVIEW.md](REVIEW.md).
+The optimized target is **5,924 triangles** (down from 9,978), one opaque material,
+with the same 2K map resolution. Detailed high source remains in the blend.
 
 ## Build and inspect
 
@@ -35,11 +37,17 @@ Products (ignored, reproducibly generated):
 - `tor-mini.blend`: hidden `SOURCE_HIGH` detailed components, visible optimized
   `TOR_MINI_body`, packed maps, named sockets and studio cameras.
 - `tor-mini.glb`: native self-contained glTF export, one opaque material/primitive.
-- `tor-mini.runtime.glb`: shared gltfpack meshopt/KTX2 cook; no geometry simplification.
+- `tor-mini.runtime.glb`: shared gltfpack meshopt/KTX2 cook; the authored target
+  is already reduced, so cooking does not simplify its geometry further.
 - `tor-mini-{base-color,normal,orm}.png`: unique 2048² PBR atlas. ORM has R=1,
   G=roughness, B=metallic, with **no baked studio lighting or AO**.
 - `manifest.json`: source hashes, nominal dimensions, socket conventions and counts.
 - `renders/`: front/rear, both sides, top/bottom and two quarters when requested.
+
+The recipe uses fewer radial segments for small fasteners/cutters and bakes
+sub-0.12 mm bevels instead of modeling them. Larger edge radii and pressure-pad
+relief stay in geometry. The aperture retains 32 outline segments; the checker
+protects those segments and enforces a **6,000-triangle** target budget.
 
 Uncompressed RGBA8 maps occupy 48 MiB before mips / approximately 64 MiB with full
 mips. That is not the cooked GPU texture allocation or a gameplay performance claim.
