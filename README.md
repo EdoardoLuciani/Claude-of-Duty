@@ -12,7 +12,7 @@ bun run test
 bun run typecheck
 bun run lint
 bun run build
-bun run build:ci     # code-only build used by CI: generates no models
+bun run build:ci     # CI build: generates the world, skips Blender/model assets
 ```
 
 Node.js 26.x and Bun (version pinned by `packageManager` in `package.json`) are
@@ -66,20 +66,22 @@ side-effect imports. Preserve intentional evaluation boundaries and fix exposed
 initialization dependencies. Package sorting preserves script order and conditional
 exports/imports precedence. Keep bulk formatting separate from functional changes.
 
-Source-byte caches can change after formatting: dev/build refresh procedural
-exports; shared physics/navigation inputs also require `bun run world`. Review and
-commit provenance refreshes separately, verifying unchanged geometry, collision and
-navigation topology. Never hand-edit generated assets or rebuild Blender assets
-just to format source.
+Source-byte caches can change after formatting: dev/build/tests refresh stale
+world products, and dev/build refresh procedural exports. Verify unchanged geometry,
+collision and navigation topology when shared sources change. Generated products stay
+ignored; never hand-edit them or rebuild Blender assets just to format source.
 
 A WebGPU-capable browser/device is required. `bun run dev` / `bun run build` run
-`tools/build-assets.mjs`: Blender models, gltfpack cooks, procedural textures and
-the spent hull are generated, not committed. Each step reruns only when its inputs
-change; the first build needs **Blender 5.2.2** and **gltfpack 1.3** on `PATH` (or
-`BLENDER`/`GLTFPACK`) and takes several minutes. The world stays committed. Change map content in
+`tools/build-assets.mjs`: Blender models, gltfpack cooks, procedural textures,
+the spent hull and the world are generated, not committed. Each step reruns only when
+its inputs change or an output is missing; the first build needs **Blender 5.2.2** and
+**gltfpack 1.3** on `PATH` (or `BLENDER`/`GLTFPACK`) and takes several minutes.
+`bun run test` and `bun run build:ci` generate the Node-only world without Blender.
+Change map content in
 `tools/worldgen/level/`; the [world editing map](tools/worldgen/README.md) identifies
 shape, placement and build locations. Regenerate with `bun run world`, then run
-`bun run world:validate`.
+`bun run world:validate`. Use `bun run world -- --force` to rebuild unchanged inputs;
+`bun run world -- --check` verifies a fresh rebuild against the generated outputs.
 Runtime models are cooked with the [shared gltfpack build recipe](build/README.md)
 during dev/build; `bun run models:cook -- p320` reruns one cook. All seven authored weapons
 use cooked runtime assets. Native exports remain authoring references; each model

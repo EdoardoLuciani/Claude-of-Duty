@@ -2,12 +2,12 @@
 /**
  * Build every generated runtime asset, skipping steps whose inputs are unchanged.
  * Blender 5.2.2 and gltfpack 1.3 are needed only when a Blender step is stale.
- * OW_SKIP_ASSETS=1 (`bun run build:ci`) builds nothing and only validates the world.
+ * OW_SKIP_ASSETS=1 (`bun run build:ci`) skips Blender/model assets, but builds the world.
  *
  * Player arms run first, then the bandage, which re-saves player-arms.blend.
  * Every weapon loads that blend, so arm changes rebuild all weapons. The EXPS3
  * sight and soldiers are independent. The Node-only stages (procedural textures,
- * soldier/spent-hull staging, world validation) keep their own caches.
+ * soldier/spent-hull staging, world generation) keep their own caches.
  *
  * Input hashes live in .cache/assets/, outside node_modules so `bun ci` keeps them.
  * Usage: node tools/build-assets.mjs [--force]   Env: BLENDER, GLTFPACK tool paths.
@@ -207,8 +207,8 @@ async function pool(steps) {
 
 const stage = (file, ...args) => run(node(join(ROOT, 'tools', file), ...args), 'inherit');
 const force = FORCE ? ['--force'] : [];
-// The world check is independent of every generated asset; run it alongside.
-const stages = [stage('validate-world-assets.mjs')];
+// The Node-only world build is independent of Blender assets; run it alongside.
+const stages = [stage('export-world.mjs', ...force)];
 if (!process.env.OW_SKIP_ASSETS) {
   mkdirSync(CACHE, { recursive: true });
   // Weapons load the arms blend, so they wait for it and hash its inputs.

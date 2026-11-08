@@ -78,7 +78,8 @@ intel sites and explicit placement records. This is the world source—not
 - **Appearance palette:** [`src/world/palette.ts`](../src/world/palette.ts), shared
   by authoring and runtime materials.
 - **Compile:** `bun run world`; then `bun run world:validate` and
-  `bun run world -- --check`. Commit source and generated products together.
+  `bun run world -- --check`. Dev/build/tests also generate missing or stale world
+  products. Commit source only; generated products are ignored.
 - **Products:** `public/models/world/level.json` binds visual/collision GLBs and
   baked navigation. Never hand-edit these products or author separate collision.
 - **Consumers:** [`src/core/models.ts`](../src/core/models.ts) loads them;
@@ -97,10 +98,11 @@ intel sites and explicit placement records. This is the world source—not
 
 Normal `bun run dev` / `bun run build` (and `bun run assets`) run
 `tools/build-assets.mjs`: arms and bandage, each weapon and its cook, EXPS3 and
-soldiers in Blender, then procedural textures, soldier/hull staging and world
-validation. Each Blender step reruns only when its declared inputs (scripts,
+soldiers in Blender, then procedural textures and soldier/hull staging. The Node-only
+world generation/validation runs alongside these steps. Each Blender step reruns only when its declared inputs (scripts,
 authored JSON, upstream steps) change; hashes live in ignored `.cache/assets/`
 and `--force` rebuilds all. These products are ignored, not committed; weapon
 `manifest.json`, `src/weapons/hand-poses.ts` and `bandage-path.ts` stay committed
-because code imports them. `bun run build:ci` skips generation (code only). The
-world is **not** regenerated; it stays committed.
+because code imports them. World products, including `level.json`, are also ignored.
+`bun run build:ci` skips Blender/model assets but generates missing or stale world
+products; `bun run test` prepares the world before launching tests.
