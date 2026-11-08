@@ -37,7 +37,7 @@ assert.equal(
 );
 assert.deepEqual(
   COMBAT_URLS.whizz.map((url): string | undefined => {
-    const name = new URL(url).pathname.split('/').at(-1)?.replace('.opus', '');
+    const name = url.split('/').at(-1)?.replace('.opus', '');
     assert(name !== undefined && hasOwn(provenance.files, name));
     return provenance.files[name].layers[0].source.split('/').at(-1);
   }),
@@ -57,7 +57,7 @@ for (const [key, urls] of fixtureEntries(COMBAT_URLS)) {
     crops = new Set();
   let previous = -1;
   for (const url of urls) {
-    const name = new URL(url).pathname.split('/').at(-1)?.replace('.opus', '');
+    const name = url.split('/').at(-1)?.replace('.opus', '');
     assert(name !== undefined && hasOwn(provenance.files, name));
     const file = provenance.files[name];
     crops.add(

@@ -23,15 +23,15 @@
     "world:smoke": "node tests/e2e/world-smoke.ts",
     "test": "node --test tests/smoke/smoke.test.ts && node --test tests/lib/*.test.ts",
     "typecheck": "bun check",
-    "format": "bun fmt src build tools tests docs README.md ARCHITECTURE.md prompt.md index.html vite.config.js tsconfig.json .oxlintrc.json .oxfmtrc.json package.json",
+    "format": "bun fmt src build tools tests docs README.md ARCHITECTURE.md prompt.md index.html tsconfig.json .oxlintrc.json .oxfmtrc.json package.json",
     "format:check": "bun run format --check",
     "lint": "oxlint src build tools tests --deny-warnings && oxlint --type-aware src tests tools/lib tools/nav240 --ignore-pattern '**/*.js' --ignore-pattern '**/*.mjs' --deny-warnings",
-    "dev": "vite",
+    "dev": "bun build/bun.mjs dev",
     "prebuild": "bun run typecheck && bun run lint",
-    "build": "vite build",
+    "build": "bun build/bun.mjs build",
     "build:ci": "OW_SKIP_ASSETS=1 bun run build",
-    "build:sourcemap": "OW_SOURCEMAP=1 vite build",
-    "preview": "vite preview --port 4173",
+    "build:sourcemap": "OW_SOURCEMAP=1 bun build/bun.mjs build",
+    "preview": "bun build/bun.mjs preview",
     "shot": "node tools/capture.mjs"
   },
   "dependencies": {
@@ -48,8 +48,7 @@
     "oxlint": "^1.90.0",
     "oxlint-tsgolint": "^7.0.2005",
     "playwright": "^1.64.1",
-    "pngjs": "^7.0.0",
-    "vite": "^8.3.5"
+    "pngjs": "^7.0.0"
   },
   "engines": {
     "node": "26.x"

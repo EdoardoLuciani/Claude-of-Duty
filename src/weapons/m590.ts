@@ -33,7 +33,7 @@ type M590Model = AuthoredModelData<
   };
 };
 
-export const M590_URL = new URL('../../assets/weapons/m590/m590.runtime.glb', import.meta.url).href;
+export const M590_URL = '/models/weapons/m590.runtime.glb';
 const ALIASES: Record<string, string> = manifest.aliases;
 
 export function makeM590Model(gltf: GLTF): M590Model {

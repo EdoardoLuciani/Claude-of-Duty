@@ -18,8 +18,7 @@ import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
-export const MPX_URL = new URL('../../assets/weapons/sig-mpx/mpx.runtime.glb', import.meta.url)
-  .href;
+export const MPX_URL = '/models/weapons/mpx.runtime.glb';
 export const MPX_EJECT_DELAY = 0.025;
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES)];
 

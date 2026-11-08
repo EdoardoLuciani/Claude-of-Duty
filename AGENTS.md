@@ -1,6 +1,6 @@
 # Working in this repository
 
-Browser FPS: **Three.js + Vite + WebGPU**. Read [ARCHITECTURE.md](ARCHITECTURE.md)
+Browser FPS: **Three.js + Bun + WebGPU**. Read [ARCHITECTURE.md](ARCHITECTURE.md)
 before subsystem changes: it owns directory assignments, APIs and event contracts.
 [README.md](README.md) covers setup/play; `tests/` contains smoke/browser checks,
 `tools/` contains authoring, validation and capture harnesses.

@@ -104,7 +104,7 @@ function cookStep(id, salt) {
     inputs: [...tools, ...authoredJson(directory)],
     // Only this model's cook settings, so one profile edit rebuilds one model.
     salt: [...salt, JSON.stringify(MODEL_COOKS[id]), ...GLTFPACK_FLAGS, GLTFPACK_VERSION],
-    outputs: [`${directory}/${source}`, `${directory}/${output}`],
+    outputs: [`${directory}/${source}`, output],
     commands: [
       blender(standalone ? tools[0] : `tools/blender/${id}/build.py`),
       node('build/models.mjs', id),

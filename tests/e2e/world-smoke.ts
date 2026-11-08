@@ -3,15 +3,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import type { WorldSystem } from '../../src/world/index.ts';
-import {
-  ensureViteServer,
-  launchChromium,
-  stopViteServer,
-} from '../../tools/lib/browser-harness.ts';
+import { ensureDevServer, launchChromium, stopDevServer } from '../../tools/lib/browser-harness.ts';
 import { waitForGame } from '../../tools/lib/native-render.ts';
 
 const port = Number(process.env.PORT ?? 5173);
-const server = await ensureViteServer({ port, attempts: 120 });
+const server = await ensureDevServer({ port, attempts: 120 });
 const browser = await launchChromium({
   headless: true,
   args: ['--ignore-gpu-blocklist', '--mute-audio'],
@@ -261,5 +257,5 @@ try {
   if (failures.length) process.exitCode = 1;
 } finally {
   await browser.close();
-  stopViteServer(server);
+  stopDevServer(server);
 }
