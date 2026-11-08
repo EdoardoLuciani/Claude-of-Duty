@@ -1,8 +1,8 @@
 # Runtime model cooking
 
-`models.mjs` is the shared gltfpack build stage. `bun run dev` / `bun run build`
-cook stale models through `tools/build-assets.mjs`; `bun run build:ci` skips
-these model cooks but generates missing or stale Node-only world assets. Runtime and native exports are ignored build products. No metadata sidecars are
+`models.ts` is the checked TypeScript gltfpack build stage, run with Bun. `bun run dev` / `bun run build`
+cook stale models through `tools/build-assets.ts`; `bun run build:ci` skips
+these model cooks but generates missing or stale Bun world assets. Runtime and native exports are ignored build products. No metadata sidecars are
 emitted: settings and opt-in profiles live in `MODEL_COOKS`/`GLTFPACK_FLAGS`.
 
 Install native **gltfpack 1.3 with BasisU support** from the

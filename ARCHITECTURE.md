@@ -6,28 +6,28 @@ Read this before changing a subsystem. Workflow and validation: [AGENTS.md](AGEN
 ## Ownership and subsystem API
 
 Own only your assigned subsystem. Shared/lead-owned: `src/core/`, `src/main.ts`,
-`src/dev/`, `tools/`, `build/bun.mjs`, `build/bun-plugin.mjs`, `bunfig.toml`. Coordinate changes across owners.
+`src/dev/`, `tools/`, `build/bun.ts`, `build/bun-plugin.ts`, `bunfig.toml`. Coordinate changes across owners.
 Use `ctx.get(id)` rather than importing other subsystems. The existing constant
 coupling `ai` → `weapons` is an exception.
 
-| id / directory                                      | responsibility                                              |
-| --------------------------------------------------- | ----------------------------------------------------------- |
-| `models` (core/models.ts + tools/export-models.mjs) | Lead-owned GLB export/loading                               |
-| `render`                                            | WebGPU renderer, TSL frame graph, CSM, composite            |
-| `materials`                                         | Procedural PBR texture forge, detail/triplanar materials    |
-| `sky`                                               | Atmosphere, day/night, environment, volumetric fog          |
-| `world` + tools/worldgen                            | Level meshes, metadata, props, spawns                       |
-| `physics`                                           | Collision, controllers, rigid bodies, ragdolls, penetration |
-| `player`                                            | Movement, camera, health, armour, healing                   |
-| `weapons`                                           | Definitions, GLB adapters, viewmodel, handling, ballistics  |
-| `fx`                                                | Particles, impacts, decals, tracers, blood, shells          |
-| `ai`                                                | Soldiers, squads, navigation, perception, waves             |
-| `game`                                              | Survival state, score/rewards, HUD threat cues              |
-| `market`                                            | Between-wave shop/economy                                   |
-| `intel`                                             | Cache spawning, interaction and credits                     |
-| `radio`                                             | Strike, bomber, bombs, blast chain                          |
-| `ui`                                                | HUD, menus, overlays                                        |
-| `audio`                                             | Synthesis/recordings, spatialization, occlusion             |
+| id / directory                                     | responsibility                                              |
+| -------------------------------------------------- | ----------------------------------------------------------- |
+| `models` (core/models.ts + tools/export-models.ts) | Lead-owned GLB export/loading                               |
+| `render`                                           | WebGPU renderer, TSL frame graph, CSM, composite            |
+| `materials`                                        | Procedural PBR texture forge, detail/triplanar materials    |
+| `sky`                                              | Atmosphere, day/night, environment, volumetric fog          |
+| `world` + tools/worldgen                           | Level meshes, metadata, props, spawns                       |
+| `physics`                                          | Collision, controllers, rigid bodies, ragdolls, penetration |
+| `player`                                           | Movement, camera, health, armour, healing                   |
+| `weapons`                                          | Definitions, GLB adapters, viewmodel, handling, ballistics  |
+| `fx`                                               | Particles, impacts, decals, tracers, blood, shells          |
+| `ai`                                               | Soldiers, squads, navigation, perception, waves             |
+| `game`                                             | Survival state, score/rewards, HUD threat cues              |
+| `market`                                           | Between-wave shop/economy                                   |
+| `intel`                                            | Cache spawning, interaction and credits                     |
+| `radio`                                            | Strike, bomber, bombs, blast chain                          |
+| `ui`                                               | HUD, menus, overlays                                        |
+| `audio`                                            | Synthesis/recordings, spatialization, occlusion             |
 
 Each system declares `static id`, `static deps`, and implements needed hooks:
 `async init(ctx)`, `fixedUpdate(h, ctx)` (120 Hz), `update(dt, ctx)`,
@@ -334,8 +334,8 @@ render or device-loss failures disable 3D inspection without disabling purchases
 Artwork generation is offline-only; model, prompts and processing live in
 `assets/ui/market/`, with optimized runtime WebPs in `public/images/market/`.
 
-`build/models.mjs` owns explicit gltfpack runtime-model cooking and per-model
-profiles (`bun run models:cook`). `tools/build-assets.mjs` builds and cooks stale
+`build/models.ts` owns explicit gltfpack runtime-model cooking and per-model
+profiles (`bun run models:cook`). `tools/build-assets.ts` builds and cooks stale
 models during dev/build; products are ignored, not committed. All seven authored weapons opt in.
 Adding profiles requires adapter, animation and visual validation rather than
 blanket simplification. Editable Blender sources remain authoring references.
@@ -358,7 +358,7 @@ and material scales; it does not duplicate IK or consume old mesh products. A fi
 Node GLTFExporter cook preserves the runtime joint/attribute format. The
 `assets/soldiers/` products are generated during dev/build, not committed.
 
-`tools/export-models.mjs` validates/stages those generated soldiers and generates
+`tools/export-models.ts` validates/stages those generated soldiers and generates
 the spent hull. Missing/stale/corrupt authoring products fail, never trigger Blender
 or a procedural fallback. Content hashing covers shared sources and all runtime
 products; missing outputs force a full restage. Atomic writes and the cache lock

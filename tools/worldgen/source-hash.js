@@ -15,7 +15,8 @@ function filesUnder(directory) {
 export function worldSourceHash(root) {
   const files = [
     ...filesUnder(join(root, 'tools/worldgen')),
-    join(root, 'tools/export-world.mjs'),
+    join(root, 'tools/export-world.ts'),
+    join(root, 'tools/lib/export-glb.ts'),
     join(root, 'src/core/config.ts'),
     join(root, 'src/core/rng.ts'),
     join(root, 'src/core/geometry-validation.ts'),

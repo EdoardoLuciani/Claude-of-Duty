@@ -17,8 +17,10 @@ Preserve record order. Procedural detail draws only from `keyedRng(...)` streams
 named after the element that owns them (building, facade, room, set piece), so an
 edit re-rolls that element alone; `smoke-world-locality.ts` enforces this. Never
 pass one stream across elements or add draws to keep another element stable.
+Seed with authored identities, not coordinates derived from trigonometry: engine-specific
+last-bit rounding must not reroll dressing (`smoke-world-seed-stability.ts`).
 
-`build.js` → `Assembler`/`builder.js` → `tools/export-world.mjs` →
+`build.js` → `Assembler`/`builder.js` → `tools/export-world.ts` →
 visual GLB, `pack.js` collision and `nav-bake.js` navigation →
 manifest/content-hashed products → runtime model loader.
 The assembler owns geometry lifetime; support/collision/navigation use canonical

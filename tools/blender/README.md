@@ -2,7 +2,7 @@
 
 Python is the source of truth. Generated weapon blends, GLBs, maps and manifests
 are products, never fallback build inputs. `bun run dev` / `bun run build` run
-these builds through `tools/build-assets.mjs` when inputs change; products are
+these builds through `tools/build-assets.ts` when inputs change; products are
 ignored, except weapon manifests that code imports. Imports must not build objects or reset scenes.
 
 Start with the [asset/world editing map](../../docs/assets.md). Each weapon has

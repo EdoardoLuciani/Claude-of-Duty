@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /** Compile the authoritative JS world and cook meshoptimizer collision. */
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -13,54 +13,44 @@ import {
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
 import { gzipSync } from 'node:zlib';
 
 import * as THREE from 'three';
-import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
+
+import { buildWorld } from '#worldgen/build';
+import { Assembler } from '#worldgen/builder';
+import { worldMetadata } from '#worldgen/metadata';
+import { bakeNav } from '#worldgen/nav-bake';
 
 import { NAV_VERSION } from '../src/ai/nav-format.ts';
-import { buildWorld } from './worldgen/build.js';
-import { Assembler } from './worldgen/builder.js';
+import { isRecord } from '../src/core/guards.ts';
+import type { MaterialOptions } from '../src/materials/index.ts';
+import { exportGlb } from './lib/export-glb.ts';
 import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from './worldgen/level/config.js';
-import { worldMetadata } from './worldgen/metadata.js';
-import { bakeNav } from './worldgen/nav-bake.js';
 import { buildCollision } from './worldgen/pack.js';
 import { worldSourceHash } from './worldgen/source-hash.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const args = Object.fromEntries(
-  process.argv.slice(2).map((arg) => {
-    const match = arg.match(/^--([^=]+)(?:=(.*))?$/);
-    return match ? [match[1], match[2] ?? true] : [arg, true];
-  })
-);
+const { values: args } = parseArgs({
+  options: { out: { type: 'string' }, force: { type: 'boolean' }, check: { type: 'boolean' } },
+});
 const OUT = resolve(ROOT, String(args.out ?? 'public/models/world'));
 const CACHE = resolve(ROOT, 'node_modules/.cache');
 const LOCK = join(CACHE, 'claude-of-duty-world.lock');
-const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+const sleep = (ms: number): Promise<void> =>
+  new Promise((done): void => {
+    setTimeout(done, ms);
+  });
 
-if (typeof globalThis.FileReader === 'undefined') {
-  globalThis.FileReader = class {
-    readAsArrayBuffer(blob) {
-      blob.arrayBuffer().then((result) => {
-        this.result = result;
-        queueMicrotask(() => this.onloadend?.());
-      });
-    }
-  };
-}
-
-const exportGlb = (scene) =>
-  new GLTFExporter().parseAsync(scene, { binary: true }).then((value) => Buffer.from(value));
-
-function writeAtomic(file, data) {
+function writeAtomic(file: string, data: string | Uint8Array): void {
   mkdirSync(dirname(file), { recursive: true });
   const temporary = `${file}.tmp-${process.pid}`;
   writeFileSync(temporary, data);
   renameSync(temporary, file);
 }
 
-async function withLock(fn) {
+async function withLock(fn: () => Promise<void>): Promise<void> {
   mkdirSync(CACHE, { recursive: true });
   const started = Date.now();
   while (true) {
@@ -72,14 +62,21 @@ async function withLock(fn) {
       );
       break;
     } catch (error) {
-      if (error.code !== 'EEXIST') throw error;
+      if (!isRecord(error) || error.code !== 'EEXIST') throw error;
       let stale = false;
       try {
-        const owner = JSON.parse(readFileSync(join(LOCK, 'owner.json'), 'utf8'));
+        const owner: unknown = JSON.parse(readFileSync(join(LOCK, 'owner.json'), 'utf8'));
+        if (
+          !isRecord(owner) ||
+          typeof owner.pid !== 'number' ||
+          !Number.isSafeInteger(owner.pid) ||
+          owner.pid <= 0
+        )
+          throw new Error('invalid lock owner');
         try {
           process.kill(owner.pid, 0);
         } catch (signalError) {
-          stale = signalError.code === 'ESRCH';
+          stale = isRecord(signalError) && signalError.code === 'ESRCH';
         }
       } catch {
         stale = Date.now() - started > 10000;
@@ -100,43 +97,46 @@ async function withLock(fn) {
   }
 }
 
-function run(command, commandArgs) {
-  return new Promise((done, reject) => {
+function run(command: string, commandArgs: string[]): Promise<void> {
+  return new Promise((done, reject): void => {
     const child = spawn(command, commandArgs, { cwd: ROOT, stdio: 'inherit' });
     child.on('error', reject);
-    child.on('exit', (code) =>
+    child.on('exit', (code): void =>
       code === 0 ? done() : reject(new Error(`${command} exited with ${code}`))
     );
   });
 }
 
-function assetName(kind, data, ext = 'glb.gz') {
+function assetName(kind: string, data: Uint8Array, ext = 'glb.gz'): string {
   const hash = createHash('sha256').update(data).digest('hex').slice(0, 12);
   return `level-${kind}.${hash}.${ext}`;
 }
 
-function cacheReady() {
+function cacheReady(): boolean {
   if (args.force || args.check) return false;
   try {
-    const manifest = JSON.parse(readFileSync(join(OUT, 'level.json'), 'utf8'));
-    return (
-      manifest.sourceHash === worldSourceHash(ROOT) &&
-      ['visual', 'collision', 'nav'].every(
-        (kind) =>
-          typeof manifest.assets?.[kind] === 'string' &&
-          existsSync(join(OUT, manifest.assets[kind]))
-      )
-    );
+    const manifest: unknown = JSON.parse(readFileSync(join(OUT, 'level.json'), 'utf8'));
+    if (
+      !isRecord(manifest) ||
+      manifest.sourceHash !== worldSourceHash(ROOT) ||
+      !isRecord(manifest.assets)
+    )
+      return false;
+    const assets = manifest.assets;
+    return ['visual', 'collision', 'nav'].every((kind): boolean => {
+      const file = assets[kind];
+      return typeof file === 'string' && existsSync(join(OUT, file));
+    });
   } catch {
     return false;
   }
 }
 
-async function compileWorld() {
+async function compileWorld(): Promise<void> {
   const started = performance.now();
-  const materialCache = new Map();
+  const materialCache = new Map<string, THREE.MeshStandardMaterial>();
   const materials = {
-    get(name, options = {}) {
+    get(name: string, options: MaterialOptions = {}): THREE.MeshStandardMaterial {
       const key = `${name}|${!!options.vertexMasks}`;
       let material = materialCache.get(key);
       if (!material) {
@@ -202,7 +202,7 @@ async function compileWorld() {
       ) + '\n';
 
     if (args.check) {
-      const expected = [
+      const expected: Array<[string, Buffer]> = [
         [join(OUT, visualFile), visualGzip],
         [join(OUT, collisionFile), collisionGzip],
         [join(OUT, navFile), navGzip],
@@ -245,7 +245,7 @@ async function compileWorld() {
   }
 }
 
-await withLock(async () => {
+await withLock(async (): Promise<void> => {
   if (cacheReady()) console.log('[world] up to date');
   else await compileWorld();
   await run(process.execPath, [
