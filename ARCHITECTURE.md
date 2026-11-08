@@ -478,5 +478,5 @@ flat colours or uniform light. Respect albedo/metalness conventions, detail maps
 contact shadows, irregularity and weapon feedback. Finish units, authored asset
 ownership and explicit readability/optics exceptions follow the material policy
 above. Tests under `tests/` and their typed helpers use erasable TypeScript, run directly
-on Node 26, and share the runtime's strict type checking and type-aware lint rules.
+on Bun in isolated test processes, and share the runtime's strict type checking and type-aware lint rules.
 Smoke tests are correctness gates, not visual or combat-performance acceptance.

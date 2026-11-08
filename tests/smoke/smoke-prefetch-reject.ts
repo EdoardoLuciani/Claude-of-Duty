@@ -1,7 +1,7 @@
 /**
  * Eager model prefetches must not become unhandled rejections before boot awaits them.
  *
- *   node tests/smoke/smoke-prefetch-reject.ts
+ *   bun test ./tests/smoke/smoke-prefetch-reject.ts
  */
 import assert from 'node:assert/strict';
 
@@ -16,18 +16,21 @@ const delay = (ms: number): Promise<void> =>
     setTimeout(resolve, ms);
   });
 
-globalThis.fetch = async (url): Promise<Response> => {
-  const href = typeof url === 'string' ? url : url instanceof URL ? url.href : url.url;
-  if (href.includes('soldiers/breacher.json')) {
-    await delay(20);
-    return new Response(null, { status: 503 });
-  }
-  if (href.includes('level.json')) {
-    await delay(80);
-    return Response.json({ version: 2, assets: { visual: 'v.glb', collision: 'c.glb' } });
-  }
-  return new Response(null, { status: 404 });
-};
+globalThis.fetch = Object.assign(
+  async (url: Parameters<typeof fetch>[0]): Promise<Response> => {
+    const href = typeof url === 'string' ? url : url instanceof URL ? url.href : url.url;
+    if (href.includes('soldiers/breacher.json')) {
+      await delay(20);
+      return new Response(null, { status: 503 });
+    }
+    if (href.includes('level.json')) {
+      await delay(80);
+      return Response.json({ version: 2, assets: { visual: 'v.glb', collision: 'c.glb' } });
+    }
+    return new Response(null, { status: 404 });
+  },
+  { preconnect: globalThis.fetch.preconnect }
+);
 
 const unhandled: unknown[] = [];
 const onUnhandled = (reason: unknown): number => unhandled.push(reason);

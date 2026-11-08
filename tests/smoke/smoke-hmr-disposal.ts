@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { stripTypeScriptTypes } from 'node:module';
 import { runInNewContext } from 'node:vm';
+
+import { Transpiler } from 'bun';
+
+const transpiler = new Transpiler({ loader: 'ts', target: 'bun' });
 
 // Execute the actual module registrations without booting the game or renderer.
 type DisposeCallback = (data: Record<string, unknown>) => Promise<void>;
@@ -15,7 +18,7 @@ function registration(
   assert(start >= 0, `${file}: HMR disposal registration is present`);
   const code = source.slice(start).replaceAll('import.meta.hot', 'hot');
   let callback: DisposeCallback | undefined;
-  runInNewContext(stripTypeScriptTypes(code), {
+  runInNewContext(transpiler.transformSync(code), {
     hot: {
       dispose(value: DisposeCallback): void {
         callback = value;

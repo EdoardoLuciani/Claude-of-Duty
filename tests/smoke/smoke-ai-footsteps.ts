@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 
 /**
- * Node smoke test for enemy footsteps the player can hear — no browser.
+ * Bun smoke test for enemy footsteps the player can hear — no browser.
  *
  * The player has always heard their own boots. This covers the other direction:
  * the animator marks the foot plant off its stride phase, the agent turns that
@@ -11,7 +11,7 @@ import * as THREE from 'three';
  * walking, sprinting and crouch-walking each sound like themselves, and an
  * actor in the air or mid-vault makes no sound at all.
  *
- *   node tests/smoke/smoke-ai-footsteps.ts
+ *   bun test ./tests/smoke/smoke-ai-footsteps.ts
  */
 import type { Agent } from '../../src/ai/agent.ts';
 import { Animator } from '../../src/ai/animator.ts';

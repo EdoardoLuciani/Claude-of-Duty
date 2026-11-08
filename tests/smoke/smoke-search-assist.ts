@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 /**
  * Headless regressions for issue 277: last-enemy search assist.
  *
- *   node tests/smoke/smoke-search-assist.ts
+ *   bun test ./tests/smoke/smoke-search-assist.ts
  */
 import * as THREE from 'three';
 

@@ -1,5 +1,5 @@
+import { test } from 'bun:test';
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
 
 import { Agent } from '../../src/ai/agent.ts';
 import { AiSystem } from '../../src/ai/index.ts';
@@ -10,7 +10,7 @@ import { createContext, createInput } from './context.ts';
 import type { TestProviders } from './context.ts';
 import { fixture } from './fixture.ts';
 
-void test('context fixture retains provider identity and fails on missing dependencies', (): void => {
+test('context fixture retains provider identity and fails on missing dependencies', (): void => {
   const physics = new PhysicsSystem();
   const providers: TestProviders = { physics };
   const context = createContext({ providers, input: createInput({ frozen: true }) });
@@ -37,7 +37,7 @@ void test('context fixture retains provider identity and fails on missing depend
   assert.throws((): number => incomplete.required, /missing member required/);
 });
 
-void test('agent fixtures use real instances and preserve original null-weapon anchors', (): void => {
+test('agent fixtures use real instances and preserve original null-weapon anchors', (): void => {
   const ai = makeAi();
   const agent = makeAgent({ ai, health: 73 });
   assert.ok(ai instanceof AiSystem);
@@ -52,7 +52,7 @@ void test('agent fixtures use real instances and preserve original null-weapon a
   assert.deepEqual(agent.animator.ejectLocal.toArray(), [0, 0, 0]);
 });
 
-void test('makeRng retains the existing deterministic fixture sequence', (): void => {
+test('makeRng retains the existing deterministic fixture sequence', (): void => {
   let value = 0.31;
   const next = (): number => (value = (value * 1.7 + 0.13) % 1);
   const rng = makeRng();

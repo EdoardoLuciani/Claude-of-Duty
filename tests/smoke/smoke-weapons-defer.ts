@@ -1,4 +1,4 @@
-/** Node smoke: deferred mounts must not sell ghosts. */
+/** Bun smoke: deferred mounts must not sell ghosts. */
 import assert from 'node:assert/strict';
 
 import { WEAPON_IDS } from '../../src/weapons/defs.ts';

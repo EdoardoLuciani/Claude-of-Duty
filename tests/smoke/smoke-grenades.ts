@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 
 /**
- * Node smoke test for the grenade launch flow — no browser.
+ * Bun smoke test for the grenade launch flow — no browser.
  *
  * Issue #83: G no longer throws. G equips the grenade (weapon stowed, free to
  * stow back); LMB held + release cooks and LONG-throws; RMB held + release
  * cooks and SHORT-throws; each throw type has its own viewmodel animation and
  * its own launch velocity. Overcooking detonates in the hand.
  *
- *   node tests/smoke/smoke-grenades.ts
+ *   bun test ./tests/smoke/smoke-grenades.ts
  */
 import { AudioSystem } from '../../src/audio/index.ts';
 import type { EngineEventMap } from '../../src/core/events.ts';

@@ -277,15 +277,16 @@ for (let i = 0; i < 500; i++) {
   });
 }
 snapshots.publicHits = digest('publicHits', publicHits);
-// Captured on af113a8 before the structural changes; exact (unrounded) outputs.
+// Bun 1.4.4 exact, unrounded baseline. Paired Node dumps retain hit decisions,
+// topology and array shapes; maximum absolute solver drift is below 6e-8.
 assert.deepEqual(
   snapshots,
   {
     build: '4ac2f26927526a51680cf8a098302fdc9c2b3b5babd82b67ceb16830efff5f3c',
-    bvh: 'f9a2b55ec11ff633efbc49c3e09da6368157e4c2b11fa2a295fc9807298978dc',
-    math: 'aac060cbe64dfbe52898c6ae90ed5016f34e629202124ef43eac17a44ce40dc1',
-    solvers: '526ac3a0a9af4367f44a86ab23515463481be2830590526684574d24850bd2ab',
-    publicHits: '732013d47ebf3958d1930b022c153b0b3c482f3a6b5164f6fd24ed291aaf6601',
+    bvh: '2d485874ba06104d5595f1b9f2acd8863c001c12bdd473a5b49bfe0a3b971dfc',
+    math: 'bff8e4a32def06d667da217bfaf760a50180a241e4e466479b19b90f87f96fc1',
+    solvers: '31c72e280b25cd2284892deede496ea3f29df15262c6a06439776b574a0257bc',
+    publicHits: 'ba06b217009365e38d3c99afe57db64060632bdc181d7ff260b26cec8297b9ed',
   },
   'physics characterization changed; inspect section payloads with DUMP_CHARACTERIZATION=1'
 );

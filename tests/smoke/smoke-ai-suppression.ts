@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /** Resolved rounds suppress once per agent even when flight segments interleave. */
 import assert from 'node:assert/strict';
 

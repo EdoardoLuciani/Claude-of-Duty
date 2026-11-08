@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 
 /**
- * Node smoke test for the market and armour systems — no browser.
+ * Bun smoke test for the market and armour systems — no browser.
  * Exercises the credits mirror (score:change), the post-wave grace period,
  * opening/closing (time scale), purchasing rules and reset.
  *
- *   node tests/smoke/smoke-market.ts
+ *   bun test ./tests/smoke/smoke-market.ts
  */
 import { MarketSystem, MARKET_DELAY } from '../../src/market/index.ts';
 import { Health } from '../../src/player/health.ts';

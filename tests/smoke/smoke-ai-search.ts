@@ -5,7 +5,7 @@ import * as THREE from 'three';
 /**
  * Headless regressions for issue 268: evidence ordering and bounded search.
  *
- *   node tests/smoke/smoke-ai-search.ts
+ *   bun test ./tests/smoke/smoke-ai-search.ts
  */
 import type { Agent } from '../../src/ai/agent.ts';
 import {

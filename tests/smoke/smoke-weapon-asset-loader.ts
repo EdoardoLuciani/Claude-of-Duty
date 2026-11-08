@@ -67,16 +67,19 @@ let initializations = 0,
 let lateScope: KTX2Loader | undefined;
 const buffer = (id: number): ArrayBuffer => new Uint8Array([id]).buffer;
 try {
-  globalThis.fetch = (url, options): Promise<Response> => {
-    const request = pending<Response>();
-    assert(options?.signal);
-    options.signal.addEventListener('abort', (): void => request.reject(new Error('aborted')), {
-      once: true,
-    });
-    assert(typeof url === 'string');
-    downloads.set(url, request);
-    return request.promise;
-  };
+  globalThis.fetch = Object.assign(
+    (url: Parameters<typeof fetch>[0], options: Parameters<typeof fetch>[1]): Promise<Response> => {
+      const request = pending<Response>();
+      assert(options?.signal);
+      options.signal.addEventListener('abort', (): void => request.reject(new Error('aborted')), {
+        once: true,
+      });
+      assert(typeof url === 'string');
+      downloads.set(url, request);
+      return request.promise;
+    },
+    { preconnect: saved.fetch.preconnect }
+  );
   KTX2Loader.prototype.init = function (): Promise<void> {
     if (!this.transcoderPending) {
       initializations++;

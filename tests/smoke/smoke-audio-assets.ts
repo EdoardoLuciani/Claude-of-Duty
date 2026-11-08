@@ -14,17 +14,21 @@ const fetch = globalThis.fetch;
 try {
   for (const failure of [null, ...failedUrls, 'decode']) {
     let decodes = 0;
-    globalThis.fetch = async (input): Promise<Response> => {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      return new Response(new ArrayBuffer(1), {
-        status:
-          !failure ||
-          failure === 'decode' ||
-          !(url === failure || url.endsWith('/' + failure + '.opus'))
-            ? 200
-            : 404,
-      });
-    };
+    globalThis.fetch = Object.assign(
+      async (input: Parameters<typeof fetch>[0]): Promise<Response> => {
+        const url =
+          typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+        return new Response(new ArrayBuffer(1), {
+          status:
+            !failure ||
+            failure === 'decode' ||
+            !(url === failure || url.endsWith('/' + failure + '.opus'))
+              ? 200
+              : 404,
+        });
+      },
+      { preconnect: fetch.preconnect }
+    );
     const actx = createAudioContext();
     actx.decodeAudioData = async (): Promise<AudioBuffer> => {
       decodes++;

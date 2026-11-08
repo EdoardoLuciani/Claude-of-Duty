@@ -1,5 +1,5 @@
+import { test } from 'bun:test';
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
 
 import { Vector3 } from 'three';
 
@@ -93,7 +93,7 @@ class RecordingPrompt extends Prompt {
 
 for (const request of ['Digit1', 'Digit2', 'Tab', 'wheel-up', 'wheel-down']) {
   for (const elapsed of [1, HEALING.duration - 0.01])
-    void test(`${request} cancels at ${elapsed}s`, (): void => {
+    test(`${request} cancels at ${elapsed}s`, (): void => {
       const { weapons, player, input, ctx, events } = fixture(
         request === 'Digit1' ? 'pistol' : 'rifle'
       );
@@ -109,7 +109,7 @@ for (const request of ['Digit1', 'Digit2', 'Tab', 'wheel-up', 'wheel-down']) {
 }
 
 for (const ending of ['release', 'complete', 'grenade'])
-  void test(`prompt ownership on ${ending}`, (): void => {
+  test(`prompt ownership on ${ending}`, (): void => {
     const { weapons, player, input, ctx } = fixture();
     const ui = new UiSystem();
     ui.ctx = ctx;
@@ -209,7 +209,7 @@ for (const ending of ['release', 'complete', 'grenade'])
     assert.equal(bandageKey, bindingLabel('heal'));
   });
 
-void test('bandaging continues and completes while walking', (): void => {
+test('bandaging continues and completes while walking', (): void => {
   const { weapons, player, input, ctx, events } = fixture();
   input.down.add('KeyW');
   player.movement.horizontalSpeed = 3;
@@ -240,7 +240,7 @@ for (const motion of [
   'airborne',
   'jumped',
 ] as const) {
-  void test(`bandage reference movement cancellation: ${motion}`, (): void => {
+  test(`bandage reference movement cancellation: ${motion}`, (): void => {
     const { player, events } = fixture();
     if (motion === 'jumped') player.movement.jumped = true;
     else setPlayerMotion(player, motion, true);
@@ -251,7 +251,7 @@ for (const motion of [
   });
 }
 
-void test('menu advertises the actual heal binding', (): void => {
+test('menu advertises the actual heal binding', (): void => {
   const bandage = CONTROL_SECTIONS.flatMap(
     (section): (typeof section.controls)[number][] => section.controls
   ).find((control): boolean => control.description.startsWith('Bandage ('));
@@ -261,7 +261,7 @@ void test('menu advertises the actual heal binding', (): void => {
   assert.equal(bandage.description, `Bandage (hold ${HEALING.duration}s)`);
 });
 
-void test('canonical bandage metadata describes movement interruptions', (): void => {
+test('canonical bandage metadata describes movement interruptions', (): void => {
   const heal = CONTROL_REFERENCE.find((row): boolean => row.action === 'heal');
   assert.ok(heal);
   assert.match(
