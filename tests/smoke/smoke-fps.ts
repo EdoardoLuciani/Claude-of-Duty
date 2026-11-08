@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 
 import { UiSystem } from '../../src/ui/index.ts';
+import { createTestContext } from '../lib/context.ts';
 
 const ui = new UiSystem();
 assert.equal('fps' in ui, false, 'no retired HTML FPS element');
@@ -13,7 +14,8 @@ ui._updateFps(10500);
 assert.equal(ui.fpsText, '60 FPS');
 
 // Sampling resets each window and is independent of paused/scaled game time.
-ui.ctx = { time: { dt: 0, scale: 0, raw: 0 } };
+ui.ctx = createTestContext();
+ui.ctx.time.scale = 0;
 for (let i = 1; i <= 15; i++) ui._updateFps(10500 + (i * 500) / 15);
 assert.equal(ui.fpsText, '30 FPS');
 

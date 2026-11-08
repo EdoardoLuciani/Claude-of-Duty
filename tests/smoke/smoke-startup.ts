@@ -1,29 +1,36 @@
 import assert from 'node:assert/strict';
 
 import { Engine } from '../../src/core/engine.ts';
+import { createConfig } from '../../src/core/config.ts';
+import { Registry, type Subsystem } from '../../src/core/registry.ts';
+import { fixture } from '../lib/fixture.ts';
 
 // Completion belongs to a successful gameplay render, not init, a failed update,
 // an absent render hook, or the diagnostic graph draws performed by prewarm.
 for (const failure of [null, 'update', 'render', 'missing']) {
-  const engine = new Engine({ canvas: {}, config: { fov: 80, deterministic: true } });
-  engine.input.beginFrame = () => {};
+  const engine = new Engine({ canvas: fixture<HTMLCanvasElement>({}), config: createConfig({ fov: 80, deterministic: true }) });
+  // Synthetic lifecycle providers use the standalone registry's hook contract.
+  const registry = new Registry();
+  Object.defineProperty(engine, 'registry', { value: registry });
+  const add = <T extends Subsystem>(id: string, system: T): void => { registry.add(id, system); };
+  engine.input.beginFrame = (): void => {};
   let completed = 0,
     renders = 0;
-  engine.onFirstRender = () => {
+  engine.onFirstRender = (): void => {
     completed++;
   };
-  engine.registry.add('game', {
+  add('game', {
     constructor: { id: 'game' },
-    update() {
+    update(): void {
       if (failure === 'update') engine.fail('game', 'update', Error('controlled update failure'));
     },
   });
-  engine.registry.add('render', {
+  add('render', {
     constructor: { id: 'render' },
     ...(failure === 'missing'
       ? {}
       : {
-          render() {
+          render(): void {
             renders++;
             assert.equal(completed, 0, 'completion cannot precede render returning');
             if (failure === 'render') throw Error('controlled render failure');
@@ -31,7 +38,7 @@ for (const failure of [null, 'update', 'render', 'missing']) {
         }),
   });
   const log = console.error;
-  console.error = () => {};
+  console.error = (): void => {};
   try {
     engine.step(0);
   } finally {
@@ -41,7 +48,7 @@ for (const failure of [null, 'update', 'render', 'missing']) {
   assert.equal(engine.time.frame, 1, 'no extra frame to dismiss loading');
   assert.equal(engine.time.elapsed, 0);
   if (!failure) {
-    engine.registry.get('render').render = () => {
+    registry.get('render').render = (): void => {
       renders++;
     };
     engine.step(0);

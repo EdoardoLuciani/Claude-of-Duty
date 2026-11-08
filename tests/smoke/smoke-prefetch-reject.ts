@@ -5,36 +5,36 @@
  */
 import assert from 'node:assert/strict';
 
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { ModelSystem } from '../../src/core/models.ts';
+import { createTestContext } from '../lib/context.ts';
+import { fixture } from '../lib/fixture.ts';
 
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const delay = (ms: number): Promise<void> => new Promise((resolve): void => { setTimeout(resolve, ms); });
 
-globalThis.fetch = async (url) => {
-  const href = String(url);
+globalThis.fetch = async (url): Promise<Response> => {
+  const href = typeof url === 'string' ? url : url instanceof URL ? url.href : url.url;
   if (href.includes('soldiers/breacher.json')) {
     await delay(20);
-    return { ok: false, status: 503 };
+    return new Response(null, { status: 503 });
   }
   if (href.includes('level.json')) {
     await delay(80);
-    return {
-      ok: true,
-      json: async () => ({ version: 2, assets: { visual: 'v.glb', collision: 'c.glb' } }),
-    };
+    return Response.json({ version: 2, assets: { visual: 'v.glb', collision: 'c.glb' } });
   }
-  return { ok: false, status: 404 };
+  return new Response(null, { status: 404 });
 };
 
-const unhandled = [];
-const onUnhandled = (reason) => unhandled.push(reason);
+const unhandled: unknown[] = [];
+const onUnhandled = (reason: unknown): number => unhandled.push(reason);
 process.on('unhandledRejection', onUnhandled);
 
 const models = new ModelSystem();
-models.loader = { load() {} };
-await models.init({});
+models.loader = fixture<GLTFLoader>({ load(): void {} });
+await models.init(createTestContext());
 await delay(60);
 process.off('unhandledRejection', onUnhandled);
 
-assert.equal(unhandled.length, 0, `unhandled rejection before consumer await: ${unhandled[0]}`);
-await assert.rejects(() => models.getSoldier('breacher'));
+assert.equal(unhandled.length, 0, `unhandled rejection before consumer await: ${String(unhandled[0])}`);
+await assert.rejects((): ReturnType<ModelSystem['getSoldier']> => models.getSoldier('breacher'));
 console.log('smoke-prefetch-reject: ok');

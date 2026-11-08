@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { NoiseBank } from '../../src/audio/dsp.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { SP, resetSpawn, setSpawnPosition, setSpawnVelocity } from '../../src/fx/particles.ts';
+import { fixture } from '../lib/fixture.ts';
 
 const spawn = resetSpawn();
 const defaults = { ...spawn };
@@ -21,17 +22,17 @@ assert.deepEqual(ember, { ...defaults, y: 7 });
 assert.equal(resetSpawn(), spawn);
 assert.deepEqual(spawn, defaults);
 
-const context = {
+const context = fixture<BaseAudioContext>({
   sampleRate: 8000,
-  createBuffer(channels, length, sampleRate) {
+  createBuffer(channels, length, sampleRate): AudioBuffer {
     assert.equal(channels, 2);
-    const data = Array.from({ length: channels }, () => new Float32Array(length));
-    return { duration: length / sampleRate, getChannelData: (channel) => data[channel] };
+    const data = Array.from({ length: channels }, (): Float32Array<ArrayBuffer> => new Float32Array(length));
+    return fixture<AudioBuffer>({ duration: length / sampleRate, getChannelData: (channel): Float32Array<ArrayBuffer> => data[channel] });
   },
-  createBufferSource() {
-    return { playbackRate: { value: 1 } };
+  createBufferSource(): AudioBufferSourceNode {
+    return fixture<AudioBufferSourceNode>({ playbackRate: fixture<AudioParam>({ value: 1 }) });
   },
-};
+});
 const parent = new Rng(0x5eed);
 const bank = new NoiseBank(context, parent.fork(), 0.02);
 assert.deepEqual(Object.keys(bank.buffers), ['white', 'pink']);
@@ -41,10 +42,13 @@ const hashes = {
   white: '3f1c3b8826fd9aa214d7f4ac7aeaa54107fcf27ba6e444d548a444b124ece047',
   pink: 'a54b8f42bdd1e02f228bbac2042def171c46315682a062aaa3fbb4bf2265b02b',
 };
-for (const [kind, expected] of Object.entries(hashes)) {
+for (const kind of ['white', 'pink'] as const) {
+  const expected = hashes[kind];
   const hash = createHash('sha256');
+  const buffer = bank.buffers[kind];
+  assert(buffer);
   for (const channel of [0, 1])
-    hash.update(new Uint8Array(bank.buffers[kind].getChannelData(channel).buffer));
+    hash.update(new Uint8Array(buffer.getChannelData(channel).buffer));
   assert.equal(hash.digest('hex'), expected, `${kind} retains both authored noise channels`);
 }
 const reference = new Rng(0x5eed);
@@ -54,6 +58,6 @@ assert.deepEqual(parent.fork(), reference.fork());
 assert.equal(bank.source('white', null).buffer, bank.buffers.white);
 assert.equal(bank.source('pink', null).buffer, bank.buffers.pink);
 bank.dispose();
-assert.throws(() => bank.source('white', null), /noise bank is disposed/);
+assert.throws((): ReturnType<NoiseBank['source']> => bank.source('white', null), /noise bank is disposed/);
 
 console.log('[shared-primitives] spawn fields, aliasing and stereo-noise/RNG parity passed');

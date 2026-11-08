@@ -13,7 +13,7 @@ assert.equal(
 );
 for (const whitespace of [' ', '\n  ', '\r\n\t'])
   assert.equal(mutateSource('a.b,' + whitespace + 'c.d,', 'a.b, c.d,', 'a.b,'), 'a.b,');
-assert.throws(() => mutateSource('aXb, cXd,', 'a.b, c.d,', ''), /must match/);
-assert.throws(() => mutateSource('missing', marker, ''), /must match/);
-assert.throws(() => mutateSource('same', 'same', 'same'), /must alter/);
+assert.throws((): string => mutateSource('aXb, cXd,', 'a.b, c.d,', ''), /must match/);
+assert.throws((): string => mutateSource('missing', marker, ''), /must match/);
+assert.throws((): string => mutateSource('same', 'same', 'same'), /must alter/);
 console.log('source mutation: formatting-safe, literal, matched and effective controls');
