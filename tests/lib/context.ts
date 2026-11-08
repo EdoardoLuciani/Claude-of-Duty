@@ -2,6 +2,9 @@ import { PerspectiveCamera, Scene } from 'three';
 
 import { createConfig, FIXED_DT } from '../../src/core/config.ts';
 import type { EngineContext, EngineSystems, SystemId } from '../../src/core/context.ts';
+import { Input } from '../../src/core/input.ts';
+import { applyDefinedPatch } from '../../src/core/patch.ts';
+import { fixture } from './fixture.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
 
@@ -46,3 +49,12 @@ export function createTestContext(options: TestContextOptions = {}): EngineConte
   };
 }
 
+
+/** Node-friendly real Input; canvas operations fail unless explicitly supplied. */
+export function createTestInput(overrides: Partial<Input> = {}, canvas: HTMLCanvasElement = fixture<HTMLCanvasElement>({})): Input {
+  const input = new Input(canvas, createConfig({ deterministic: true }));
+  applyDefinedPatch(input, overrides);
+  return input;
+}
+
+export { createTestContext as createContext, createTestInput as createInput };
