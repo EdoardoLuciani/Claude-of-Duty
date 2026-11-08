@@ -34,6 +34,7 @@ export function makeMCXModel(gltf: GLTF): MCXModel {
     gltf,
     'MCX_RIG',
     ['Idle', 'Fire', ...Object.values(ALIASES)],
+    manifest.clips,
     scene
   );
   const sight = point('SOCKET_sight');

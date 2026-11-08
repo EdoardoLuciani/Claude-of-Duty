@@ -24,7 +24,13 @@ const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES
 
 export function makeP320Model(gltf: GLTF): P320Model {
   const scene = gltf.scene;
-  const { root, animations, point } = authoredModel(gltf, 'P320_RIG', REQUIRED, scene);
+  const { root, animations, point } = authoredModel(
+    gltf,
+    'P320_RIG',
+    REQUIRED,
+    manifest.clips,
+    scene
+  );
   const model = {
     id: 'pistol' as const,
     label: 'P320 Compact',

@@ -11,10 +11,38 @@ export function requiredNode(root: THREE.Object3D, name: string): THREE.Object3D
   return node;
 }
 
+/** Authored clip lengths from a weapon manifest; glTF itself stores none. */
+export type AuthoredClips = Readonly<Record<string, { readonly duration: number }>>;
+
+/**
+ * three infers a clip's duration from its last key. gltfpack 1.3 with `-af 0` reduces a
+ * wholly constant clip to one key at t=0, so a still Idle loads as 0 s. Restore only that
+ * collapsed hold; every other clip must keep its authored length, so lost or drifted
+ * animation fails at load instead of playing wrong (or dividing by zero).
+ */
+export function applyAuthoredDuration(
+  clip: THREE.AnimationClip,
+  authored: AuthoredClips,
+  rigName: string
+): void {
+  const expected = Object.hasOwn(authored, clip.name) ? authored[clip.name].duration : NaN;
+  if (!Number.isFinite(expected) || expected <= 0)
+    throw new Error(`[${rigName}] no authored duration for ${clip.name}`);
+  const collapsed =
+    clip.duration === 0 &&
+    clip.tracks.length > 0 &&
+    clip.tracks.every((track): boolean => track.times.length === 1 && track.times[0] === 0);
+  if (clip.name === 'Idle' && collapsed) clip.duration = expected;
+  // Written so NaN fails too; float32 key times round authored lengths by ~1e-7.
+  else if (!(Math.abs(clip.duration - expected) <= 1e-6))
+    throw new Error(`[${rigName}] ${clip.name} lasts ${clip.duration} s, authored ${expected} s`);
+}
+
 export function authoredModel(
   gltf: GLTF,
   rigName: string,
   required: readonly string[],
+  authored: AuthoredClips,
   scene: THREE.Object3D = gltf.scene
 ): {
   root: THREE.Object3D;
@@ -26,6 +54,7 @@ export function authoredModel(
   const animations = required.map((name): THREE.AnimationClip => {
     const clip = gltf.animations.find((clip): boolean => clip.name === name);
     if (!clip) throw new Error(`[${rigName}] missing ${name} clip`);
+    applyAuthoredDuration(clip, authored, rigName);
     return clip;
   });
   const point = (name: string): [number, number, number] => {
