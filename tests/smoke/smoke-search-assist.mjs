@@ -60,6 +60,14 @@ function tick(state, now, agents, origin = ORIGIN) {
     assert.equal(sectorBearing(dx, dz), deg, `${name} bearing`);
     assert.equal(sectorLabel(deg), name);
   }
+  // Every finite bearing maps to one of the eight labels, including wrap and negatives.
+  const labels = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  for (let deg = -720; deg <= 720; deg += 7.5)
+    assert.ok(labels.includes(sectorLabel(deg)), `${deg} is labeled`);
+  assert.equal(sectorLabel(359), 'N');
+  assert.equal(sectorLabel(-45), 'NW');
+  for (const bad of [NaN, Infinity, -Infinity])
+    assert.throws(() => sectorLabel(bad), /non-finite bearing/);
 }
 
 /* ---- trigger / contact / pause ------------------------------------------- */
