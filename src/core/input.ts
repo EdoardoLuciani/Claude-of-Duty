@@ -131,7 +131,7 @@ export class Input {
     // An unhandled rejection there shows up as a page error in the harness, so
     // swallow it: failing to lock is not a game error.
     try {
-      const p = this.canvas.requestPointerLock?.();
+      const p = this.canvas.requestPointerLock();
       void Promise.resolve(p).catch((): void => {});
     } catch {
       /* not eligible — keep running unlocked */
@@ -199,8 +199,8 @@ export class Input {
   _onMouseMove(e: MouseEvent): void {
     if (!this.enabled || !this.pointerLocked || this.frozen) return;
     // movementX/Y is already relative and unaffected by cursor clamping.
-    this._rawLook.x += e.movementX ?? 0;
-    this._rawLook.y += e.movementY ?? 0;
+    this._rawLook.x += e.movementX;
+    this._rawLook.y += e.movementY;
   }
 
   _onWheel(e: WheelEvent): void {
@@ -277,7 +277,8 @@ export class Input {
       this.stick.moveX = this.stick.moveY = this.stick.lookX = this.stick.lookY = 0;
       return;
     }
-    const pads = navigator.getGamepads?.() ?? [];
+    // Node smoke tests (and some embedded browsers) lack the Gamepad API.
+    const pads = (navigator as Partial<Navigator>).getGamepads?.() ?? [];
     const pad =
       pads[this.gamepadIndex ?? 0] ??
       pads.find((candidate): candidate is Gamepad => candidate !== null);
@@ -295,9 +296,7 @@ export class Input {
   }
 
   _actionIn(name: keyof typeof ACTIONS, snapshot: ReadonlySet<string>): boolean {
-    const codes = ACTIONS[name];
-    if (!codes) return false;
-    for (const code of codes) if (snapshot.has(code)) return true;
+    for (const code of ACTIONS[name]) if (snapshot.has(code)) return true;
     return false;
   }
 

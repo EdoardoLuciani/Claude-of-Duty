@@ -224,9 +224,7 @@ export function explode(fx: ExplosionFx, o: ExplosionOptions): boolean {
   });
 
   // ---- light + ground scorch ---------------------------------------------
-  if (fx.lights) {
-    fx.lights.flash(px, py + R * 0.15, pz, 1, 0.72, 0.4, 420 * (R / 4), 0.45, 8, R * 8, 4);
-  }
+  fx.lights.flash(px, py + R * 0.15, pz, 1, 0.72, 0.4, 420 * (R / 4), 0.45, 8, R * 8, 4);
   fx.scorch(px, py, pz, R);
   return true;
 }

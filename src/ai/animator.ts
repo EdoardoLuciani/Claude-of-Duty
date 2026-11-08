@@ -330,8 +330,8 @@ export class Animator {
 
     /* --- layer 1: locomotion, crossfaded --- */
     P.reset();
-    const fn = C.CLIPS[clip] ?? C.idle;
-    const prev = C.CLIPS[this.prevClip] ?? C.idle;
+    const fn = C.CLIPS[clip];
+    const prev = C.CLIPS[this.prevClip];
     if (this.blend < 1) {
       P.w = 1 - this.blend;
       prev(P, this.phase);

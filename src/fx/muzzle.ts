@@ -69,7 +69,6 @@ export function screenAngle(
   dz: number
 ): number {
   const cam = view ? fx.ctx.viewCamera : fx.ctx.camera;
-  if (!cam) return 0;
   cam.updateMatrixWorld();
   const m = cam.matrixWorldInverse.elements;
   const vx = m[0] * dx + m[4] * dy + m[8] * dz;
@@ -381,22 +380,20 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   // Rifle reference peak is 36 cd before lightGain, with a 5*sc metre cutoff: Three's window
   // (1-(d/cutoff)^4)^2 / d^2 confines the warm pool without bleaching distant walls.
   // A 0.09 s lifetime and 16/s decay retain spill across successive frames.
-  if (fx.lights) {
-    const lp = o.lightPos ?? p;
-    fx.lights.flash(
-      lp.x + d.x * 0.1,
-      lp.y + d.y * 0.1,
-      lp.z + d.z * 0.1,
-      cr,
-      cg,
-      cb,
-      prof.light * lightGain * 0.18,
-      0.09,
-      16,
-      5 * sc,
-      2
-    );
-  }
+  const lp = o.lightPos ?? p;
+  fx.lights.flash(
+    lp.x + d.x * 0.1,
+    lp.y + d.y * 0.1,
+    lp.z + d.z * 0.1,
+    cr,
+    cg,
+    cb,
+    prof.light * lightGain * 0.18,
+    0.09,
+    16,
+    5 * sc,
+    2
+  );
 
   // The weapon lives in viewScene and needs its own light; world spill cannot reach it.
   if (view) {

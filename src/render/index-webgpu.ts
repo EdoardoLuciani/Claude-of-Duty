@@ -201,10 +201,7 @@ export class RenderSystem {
     if (this._graph) return this._graph;
     const haze = this.ctx.peek('fx')?.hazeSys;
     const sky = this.ctx.get('sky');
-    if (this.q.volumetrics)
-      this._volumeShadow ??= createVolumetricShadow(
-        this as Parameters<typeof createVolumetricShadow>[0]
-      );
+    if (this.q.volumetrics) this._volumeShadow ??= createVolumetricShadow(this);
     const options: PipelineOptions = {
       gtao: this.q.gtao,
       taa: this.q.taa,
@@ -213,17 +210,15 @@ export class RenderSystem {
       grade: this.grade,
       // Postprocessing draws with an orthographic fullscreen camera. Its
       // built-in camera accessors are NOT the gameplay camera used by fog.
-      fog: sky.createFogNode
-        ? (inputs: FogInputs): Node<'vec3'> =>
-            sky.createFogNode!({
-              ...inputs,
-              invProj: uniform(this.ctx.camera.projectionMatrixInverse),
-              camWorld: uniform(this.ctx.camera.matrixWorld),
-              camPos: uniform(this.ctx.camera.position),
-              frame: this._fogFrame,
-              visibility: this._volumeShadow?.visibility,
-            })
-        : null,
+      fog: (inputs: FogInputs): Node<'vec3'> =>
+        sky.createFogNode({
+          ...inputs,
+          invProj: uniform(this.ctx.camera.projectionMatrixInverse),
+          camWorld: uniform(this.ctx.camera.matrixWorld),
+          camPos: uniform(this.ctx.camera.position),
+          frame: this._fogFrame,
+          visibility: this._volumeShadow?.visibility,
+        }),
       fogCompute: this.q.volumetrics,
       warp: haze ? (node: Node<'vec4'>): Node<'vec4'> => haze.warpNode(node) : null,
       afterDepth: haze ? (): boolean => haze.render(this.renderer, this.ctx.camera) : null,
@@ -244,7 +239,7 @@ export class RenderSystem {
     this.hdrTexture = this._graph.worldPass.renderTarget.texture;
     this.hdrRt = this._graph.worldPass.renderTarget;
     this.viewRt = this._graph.viewPass.renderTarget;
-    this._meterPass = createHdrMeter(this.renderer, this.hdrRt.texture, this.depthTexture!);
+    this._meterPass = createHdrMeter(this.renderer, this.hdrRt.texture, this.depthTexture);
     return this._graph;
   }
 
@@ -296,16 +291,9 @@ export class RenderSystem {
     if (Array.isArray(material)) {
       for (const entry of material) this.indirect.patch(entry);
     } else this.indirect.patch(material);
-    let opaque = !!material && !Array.isArray(material) && !material.transparent;
-    if (Array.isArray(material)) {
-      opaque = true;
-      for (const entry of material) {
-        if (!entry || entry.transparent) {
-          opaque = false;
-          break;
-        }
-      }
-    }
+    const opaque = Array.isArray(material)
+      ? material.every((entry): boolean => !entry.transparent)
+      : !material.transparent;
     if (opaque && !mesh.userData.owNoPrepass) mesh.layers.enable(1);
     else mesh.layers.disable(1);
   };
@@ -534,7 +522,7 @@ export class RenderSystem {
       scene.traverse((object): void => {
         if (!isMesh(object)) return;
         const mesh = object;
-        if (!Array.isArray(mesh.material) && mesh.material?.visible === false) return;
+        if (!Array.isArray(mesh.material) && !mesh.material.visible) return;
         saved.push([mesh, mesh.visible, mesh.frustumCulled, mesh.layers.mask]);
         mesh.visible = true;
         mesh.frustumCulled = false;

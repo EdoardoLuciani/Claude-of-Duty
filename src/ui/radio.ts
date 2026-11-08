@@ -58,7 +58,7 @@ export class RadioPanel {
     setStyle(this.root, 'opacity', this.shown.toFixed(3));
     if (!active) return;
 
-    const count = Math.max(0, wp?.carpetBombs ?? 0);
+    const count = Math.max(0, wp.carpetBombs);
     if (count !== this._lastCount) {
       this._lastCount = count;
       const r = this.rows[0];

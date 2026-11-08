@@ -169,7 +169,7 @@ export class AttachmentQueries {
           gravity: this.nav.physics.gravity,
           mask: this.nav.physics.MASK,
           profile: this.profile,
-          repeatState: this.nav.repeatState !== false,
+          repeatState: this.nav.repeatState,
         },
         data.transfer,
         (message): void => this.receive(message),
@@ -178,6 +178,7 @@ export class AttachmentQueries {
       await connection.initialized;
       if (current() && this.connection === connection) this.ready = true;
     } catch (error) {
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- dispose() may run during the await
       if (!this.disposed && generation === this.generation) throw this.failure(error);
     }
   }
@@ -293,6 +294,7 @@ export class AttachmentQueries {
     } finally {
       this.current = null;
     }
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- cancel() may run during the await
     if (scope.cancelled) return NAV_CANCELLED;
     const obsolete = [];
     for (const [id, job] of this.jobs)
@@ -305,6 +307,7 @@ export class AttachmentQueries {
     this.stats.cancelled += obsolete.length;
     this.stats.pending = this.jobs.size;
     if (scope.unsent.length) this.send({ type: 'queries', jobs: scope.unsent });
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- requests made during the await
     if (scope.pending) {
       scope.waiting = true;
       return NAV_PENDING;

@@ -169,7 +169,7 @@ export class IndirectFill {
 
   patch(material: Material | null | undefined): void {
     if (!(material instanceof MeshStandardNodeMaterial) || this._patched.has(material)) return;
-    if (material.userData?.owNoPatch) return;
+    if (material.userData.owNoPatch) return;
     this._patched.add(material);
     const original = material.setupEnvironment.bind(material);
     const viewCamera = this.ctx.viewCamera;
@@ -206,14 +206,14 @@ export class IndirectFill {
     const ground = this._ground.set(c.r * 0.33, c.g * 0.29, c.b * 0.225);
     ground.divideScalar(Math.max(ground.x, ground.y, ground.z, 1e-6));
     this.ground.value.copy(ground).multiplyScalar(GROUND_FILL * light.intensity);
-    this.iblScale.value = IBL_DIFFUSE * (sky.indirectScale ?? 1);
+    this.iblScale.value = IBL_DIFFUSE * sky.indirectScale;
     this._updateRooms();
   }
 
   _updateRooms(): void {
     if (this._roomsReady) return;
     const world = this.ctx.peek('world');
-    if (!world?.buildings || !world.levelToWorld) return;
+    if (!world?.buildings) return;
     const origin = world.levelToWorld(0, 0, 0, this._tmp);
     const ox = origin.x,
       oz = origin.z;
@@ -226,11 +226,11 @@ export class IndirectFill {
     this.roomXf.value.set(cs, sn, -(ox * cs + oz * sn), ox * sn - oz * cs);
     let count = 0;
     for (const building of world.buildings) {
-      const sp = building?.spec;
-      if (!sp?.enterable || sp.collapse || sp.ruin) continue;
+      const sp = building.spec;
+      if (!sp.enterable || sp.collapse || sp.ruin) continue;
       // Both uniform pools hold MAX_ROOMS entries; stop when they are full.
-      const room = this.rooms[count];
-      const roomY = this.roomsY[count];
+      const room = this.rooms.at(count);
+      const roomY = this.roomsY.at(count);
       if (!room || !roomY) break;
       room.set(sp.x, sp.z, sp.w * 0.5, sp.d * 0.5);
       let top = (building.roofY ?? 12) - 0.06;
@@ -242,8 +242,8 @@ export class IndirectFill {
     this.roomCount.value = count;
     // Usually shader setup follows this call. Also handle an already-compiled
     // early variant: pack its allocated arrays and invalidate the binding once.
-    if (this.roomBoxes.value) this.roomBoxes.updateBuffer();
-    if (this.roomHeights.value) this.roomHeights.updateBuffer();
+    this.roomBoxes.updateBuffer();
+    this.roomHeights.updateBuffer();
     this.roomGroup.needsUpdate = true;
     this._roomsReady = true;
     console.info(`[render] indirect gate: ${count} interior volumes`);

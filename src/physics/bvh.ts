@@ -138,7 +138,6 @@ export class StaticWorld {
     mask = LAYER.STATIC,
     opts: StaticMeshOptions = {}
   ): number {
-    if (!mesh) return -1;
     const baked = bakeMesh(mesh, surface);
     if (!baked || baked.count === 0) return -1;
     const rawMetadata: unknown = mesh.userData;
@@ -1190,7 +1189,7 @@ export function bakeMesh(
   surfaceOverride?: number | SurfaceName
 ): BakedMesh | null {
   const geo = mesh.geometry;
-  if (!geo || !geo.attributes || !geo.attributes.position) return null;
+  if (!geo.hasAttribute('position')) return null;
   validateTriangleGeometry(geo, '[physics] bakeMesh');
   const posAttr = geo.attributes.position;
   const index = geo.index;
@@ -1212,7 +1211,8 @@ export function bakeMesh(
   const out = new Float32Array(total * 9);
   const surfaces = new Uint8Array(total);
   const solids = new Int32Array(total);
-  const solidAttr = geo.getAttribute('_solid');
+  // Optional authored ids; three types getAttribute() as always present.
+  const solidAttr = geo.hasAttribute('_solid') ? geo.getAttribute('_solid') : null;
   if (solidAttr && (solidAttr.itemSize !== 1 || solidAttr.count !== posAttr.count))
     throw new Error('[physics] _solid must contain one id per position vertex');
   const components = solidAttr ? null : solidIds(geo);
@@ -1223,11 +1223,11 @@ export function bakeMesh(
   mesh.updateWorldMatrix(true, false);
 
   // Per-group surface resolution.
-  const groups = geo.groups && geo.groups.length ? geo.groups : null;
+  const groups = geo.groups.length ? geo.groups : null;
   const baseSurface =
     surfaceOverride !== undefined
       ? surfaceIndex(surfaceOverride)
-      : mesh.userData?.surface !== undefined
+      : mesh.userData.surface !== undefined
         ? surfaceIndex(mesh.userData.surface)
         : materialSurface(mesh.material, guessSurface(mesh.name));
   const groupSurface = groups
@@ -1246,7 +1246,7 @@ export function bakeMesh(
 
   for (let inst = 0; inst < instances; inst++) {
     if (isInstanced) {
-      instancedMesh!.getMatrixAt(inst, _m4);
+      instancedMesh.getMatrixAt(inst, _m4);
       _m4.premultiply(mesh.matrixWorld);
     } else {
       _m4.copy(mesh.matrixWorld);
@@ -1311,6 +1311,6 @@ function materialSurface(
   fallback: number
 ): number {
   const material = Array.isArray(materials) ? materials[0] : materials;
-  const explicit: unknown = material?.userData?.surface;
+  const explicit: unknown = material?.userData.surface;
   return explicit === undefined ? guessSurface(material?.name, fallback) : surfaceIndex(explicit);
 }

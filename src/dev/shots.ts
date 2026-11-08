@@ -46,7 +46,7 @@ function grenadeShot(
     time: 16.5,
     apply: (e: Engine): void => {
       const w = e.ctx.peek('weapons');
-      w?.debugPose?.('idle');
+      w?.debugPose('idle');
       const vm = w?.viewmodel;
       if (vm) pose(vm);
     },
@@ -107,7 +107,7 @@ export const SHOTS: Record<string, ShotDefinition> = {
     look: [-2, 1.8, -2],
     fov: 80,
     time: 16.5,
-    apply: (e): string | undefined => e.ctx.peek('weapons')?.debugPose?.('idle'),
+    apply: (e): string | undefined => e.ctx.peek('weapons')?.debugPose('idle'),
     doc: 'Hip-fire viewmodel — weapon silhouette, materials, hand rig.',
   },
   ads: {
@@ -117,7 +117,7 @@ export const SHOTS: Record<string, ShotDefinition> = {
     // zoom the player actually sees at full ADS.
     fov: 50,
     time: 16.5,
-    apply: (e): string | undefined => e.ctx.peek('weapons')?.debugPose?.('ads'),
+    apply: (e): string | undefined => e.ctx.peek('weapons')?.debugPose('ads'),
     doc: 'Aiming down sights — optic alignment, depth of field, reticle.',
   },
   muzzle: {
@@ -125,7 +125,7 @@ export const SHOTS: Record<string, ShotDefinition> = {
     look: [-2, 1.8, -2],
     fov: 80,
     time: 16.5,
-    apply: (e, o): string | undefined => e.ctx.peek('weapons')?.debugPose?.('fire', o),
+    apply: (e, o): string | undefined => e.ctx.peek('weapons')?.debugPose('fire', o),
     doc: 'Mid-recoil with muzzle flash — flash shape, light spill, shell eject.',
   },
   grenade: grenadeShot('Grenade idle hold — frag seated in the right palm.', (vm): void => {
@@ -166,12 +166,12 @@ export const SHOTS: Record<string, ShotDefinition> = {
     fov: 80,
     time: 16.5,
     apply: (e): void => {
-      e.ctx.peek('weapons')?.debugPose?.('idle');
+      e.ctx.peek('weapons')?.debugPose('idle');
       const w = e.ctx.peek('weapons');
       if (w) {
         w.radioEquipped = true;
-        w.viewmodel?.holdRadio();
-        w.viewmodel?.setRadioScreen(1);
+        w.viewmodel.holdRadio();
+        w.viewmodel.setRadioScreen(1);
       }
     },
     doc: 'Field radio held — accessory screen, hand pose, charge readout.',
@@ -182,8 +182,8 @@ export const SHOTS: Record<string, ShotDefinition> = {
     fov: 75,
     time: 16.5,
     apply: (e): void => {
-      e.ctx.peek('weapons')?.debugPose?.('idle');
-      e.ctx.peek('radio')?.callStrike?.();
+      e.ctx.peek('weapons')?.debugPose('idle');
+      e.ctx.peek('radio')?.callStrike();
     },
     doc: 'Mid carpet-bomb strike — bomber, bomb streams and blast chain.',
   },
@@ -195,7 +195,7 @@ export const SHOTS: Record<string, ShotDefinition> = {
     fov: 80,
     time: 16.5,
     apply: (e): import('../ai/index.ts').AiStats | undefined =>
-      e.ctx.peek('ai')?.debugStage?.('firefight'),
+      e.ctx.peek('ai')?.debugStage('firefight'),
     doc: 'Enemies mid-firefight — character quality, animation, impact FX.',
   },
   impacts: {
@@ -207,7 +207,7 @@ export const SHOTS: Record<string, ShotDefinition> = {
     fov: 60,
     time: 16.5,
     apply: (e): { staged: string; at?: number[]; surface?: string } | undefined =>
-      e.ctx.peek('fx')?.debugBurst?.('wall'),
+      e.ctx.peek('fx')?.debugBurst('wall'),
     doc: 'Bullet impacts on a wall — decals, debris, dust puffs, sparks.',
   },
 };
@@ -234,11 +234,11 @@ function shotRenderInfo(engine: Engine): {
   return {
     frame: engine.time.frame,
     ...counters,
-    calls: r?.renderer?.info.render.calls ?? null, // retained cumulative alias
-    tris: r?.renderer?.info.render.triangles ?? null,
+    calls: r?.renderer.info.render.calls ?? null, // retained cumulative alias
+    tris: r?.renderer.info.render.triangles ?? null,
     programs: counters.webglProgramsLive,
-    textures: r?.renderer?.info.memory.textures ?? null,
-    geometries: r?.renderer?.info.memory.geometries ?? null,
+    textures: r?.renderer.info.memory.textures ?? null,
+    geometries: r?.renderer.info.memory.geometries ?? null,
     ms: engine.time.dt * 1000,
   };
 }
@@ -275,14 +275,15 @@ export function installShotApi(
   ):
     | { error: string; available: string[]; applied?: undefined; pos?: undefined; fov?: undefined }
     | { applied: string; pos: number[]; fov: number; error?: undefined; available?: undefined } => {
-    const shot = SHOTS[name];
+    // Untyped harness callers may name any shot.
+    const shot = SHOTS[name] as (typeof SHOTS)[string] | undefined;
     if (!shot) return { error: `unknown shot "${name}"`, available: Object.keys(SHOTS) };
 
     // Freeze live input and hand the camera to the shot.
     engine.input.frozen = true;
     engine.input.enabled = false;
     const player = engine.ctx.peek('player');
-    player?.setControlEnabled?.(false);
+    player?.setControlEnabled(false);
 
     const cam = engine.camera;
     cam.position.fromArray(shot.pos);
@@ -293,15 +294,15 @@ export function installShotApi(
       cam.updateProjectionMatrix();
     }
     // Keep the player capsule under the camera so gameplay systems stay coherent.
-    player?.teleport?.(cam.position, cam.rotation);
+    player?.teleport(cam.position, cam.rotation);
 
     // Shots are applied back to back in one browser session, so clear the
     // previous shot's looping debug state before staging the next one.
-    engine.ctx.peek('weapons')?.debugPose?.('idle');
-    engine.ctx.peek('radio')?.clearStrike?.();
-    engine.ctx.peek('fx')?.debugBurst?.('none');
+    engine.ctx.peek('weapons')?.debugPose('idle');
+    engine.ctx.peek('radio')?.clearStrike();
+    engine.ctx.peek('fx')?.debugBurst('none');
 
-    if (shot.time !== undefined) engine.ctx.peek('sky')?.setTimeOfDay?.(shot.time);
+    if (shot.time !== undefined) engine.ctx.peek('sky')?.setTimeOfDay(shot.time);
     shot.apply?.(engine, readShotOptions(options));
 
     return { applied: name, pos: shot.pos, fov: shot.fov ?? engine.config.fov };

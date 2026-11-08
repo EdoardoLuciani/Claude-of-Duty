@@ -71,12 +71,12 @@ export class Ambience {
   }
 
   _acquire(): Emitter {
-    let oldest = null;
+    let oldest = this.emitters[0];
     for (const e of this.emitters) {
       if (!e.active) return e;
-      if (!oldest || e.age / e.duration > oldest.age / oldest.duration) oldest = e;
+      if (e.age / e.duration > oldest.age / oldest.duration) oldest = e;
     }
-    return oldest!;
+    return oldest;
   }
 
   /** Finite-duration smoke column (explosions, burning wreck). */

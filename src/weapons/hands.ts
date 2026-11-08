@@ -150,7 +150,7 @@ export class Arm {
   ): THREE.Vector3[] {
     const clearance = opts.clearance ?? 0.001;
     const poseName = opts.poseName ?? this.pose;
-    const base = this.poses[poseName] ?? POSES[poseName] ?? POSES.clamp;
+    const base = this.poses[poseName] ?? POSES[poseName];
 
     this.hand.position.copy(handPos);
     this.hand.quaternion.copy(handQuat);
@@ -381,7 +381,7 @@ export class Arm {
 
   /** Immediate for build-time fitting; eased for live animation transitions. */
   setPose(name: string, duration = 0): void {
-    const p = this.poses[name] ?? POSES[name] ?? POSES.wrap;
+    const p = this.poses[name] ?? POSES[name];
     for (let i = 0; i < 4; i++) {
       this._spreadFrom[i] = this.fingers[i].root.rotation.y;
       this._spreadTo[i] = p.fingerSpread?.[i] ?? this.fingerSpread[i];

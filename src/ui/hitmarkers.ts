@@ -50,9 +50,8 @@ export class Hitmarkers {
   );
   readonly pool = new Pool(10);
 
-  /** @param {'hit'|'armour'|'head'|'kill'} kind */
   spawn(kind: HitmarkerKind = 'hit'): PoolRecord {
-    const k = KINDS[kind] ?? KINDS.hit;
+    const k = KINDS[kind];
     const it = this.pool.acquire();
     it.life = k.life;
     it.a = k.s;

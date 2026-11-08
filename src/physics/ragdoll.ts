@@ -703,7 +703,7 @@ export class Ragdoll {
         }
         param += cts.s[k] * d;
         wsum += d;
-        const sp = SURFACE_PROPS[w.surface[cts.tri[k]]];
+        const sp = SURFACE_PROPS.at(w.surface[cts.tri[k]]);
         if (sp) fric = sp.friction;
       }
       const pl = Math.hypot(pushx, pushy, pushz);

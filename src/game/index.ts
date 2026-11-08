@@ -60,9 +60,9 @@ export class GameSystem {
     // AI handles damage first (the dependency guarantees listener order) and
     // marks the shared payload `killed` when this hit actually ended the actor.
     on('damage:dealt', (e): void => {
-      const target = e?.target;
+      const target = e.target;
       if (
-        !e?.killed ||
+        !e.killed ||
         !target ||
         typeof target !== 'object' ||
         this._isPlayerTarget(target) ||

@@ -82,7 +82,7 @@ export function createVolumetricShadow(render: CascadeRender): {
       empty.compareFunction = LessEqualCompare;
       empty.minFilter = empty.magFilter = LinearFilter;
       placeholders.push(empty);
-      const shadow = (): CascadeShadow | undefined => csm()?.lights?.[index]?.shadow;
+      const shadow = (): CascadeShadow | undefined => csm()?.lights[index]?.shadow;
       const matrix = uniform(identity)
         .setGroup(renderGroup)
         .onRenderUpdate((): Matrix4 => shadow()?.matrix ?? identity);
@@ -106,7 +106,7 @@ export function createVolumetricShadow(render: CascadeRender): {
         .setGroup(renderGroup)
         .onRenderUpdate(
           (): number =>
-            (csm()?.breaks?.[index] ?? 0) * Math.min(render.ctx.camera.far, render.q.shadowDistance)
+            (csm()?.breaks[index] ?? 0) * Math.min(render.ctx.camera.far, render.q.shadowDistance)
         );
       return { matrix, depth, params, split };
     }

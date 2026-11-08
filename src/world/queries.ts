@@ -35,7 +35,7 @@ export class WorldQueries {
     if (!street) throw new Error('[world] manifest is missing query.street metadata');
     this.street = street;
     this.alleys = meta.query?.alleys ?? [];
-    this.ladders = (meta.volumes ?? []).filter((volume): boolean => volume.kind === 'ladder');
+    this.ladders = meta.volumes ?? [];
   }
 
   /** Ladder whose catch cylinder contains the world-space point, or null. */

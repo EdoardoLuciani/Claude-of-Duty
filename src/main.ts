@@ -121,11 +121,9 @@ try {
 
 // Capture tooling is not part of the normal game path. Loading it only on
 // request also prevents its telemetry rAF from running during ordinary play.
-let shotApi = null;
-if (capture) {
-  const { installShotApi } = await import('./dev/shots.ts');
-  shotApi = installShotApi(engine, { capture: true, lockstep });
-}
+const shotApi = capture
+  ? (await import('./dev/shots.ts')).installShotApi(engine, { capture: true, lockstep })
+  : null;
 
 // Warm native variants before starting gameplay; see src/core/prewarm.ts.
 // Diagnostics can opt out explicitly with ?prewarm=0.
@@ -152,8 +150,8 @@ engine.start();
 // then raise __READY__; the shot is therefore always applied at engine frame 3, no
 // matter how long boot (or pre-warm) took in wall-clock terms.
 const BOOT_FRAMES = 3;
-if (lockstep) {
-  await shotApi!.pump(BOOT_FRAMES);
+if (lockstep && shotApi) {
+  await shotApi.pump(BOOT_FRAMES);
   window.__READY__ = true;
 } else {
   let warm = 0;

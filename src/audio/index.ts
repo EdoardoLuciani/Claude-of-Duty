@@ -317,7 +317,7 @@ export class AudioSystem {
 
   async _startGraph(): Promise<boolean> {
     try {
-      const AC = globalThis.AudioContext;
+      const AC = (globalThis as Partial<typeof globalThis>).AudioContext;
       if (!AC) throw new Error('no AudioContext');
       const actx = new AC({ latencyHint: 'interactive' });
       this.actx = actx;
@@ -531,7 +531,7 @@ export class AudioSystem {
     const phys = ctx.peek('physics');
     const hits = this._probeHits;
     if (phys?.raycast) {
-      const mask = phys.MASK?.WORLD;
+      const mask = phys.MASK.WORLD;
       const o = this._origin;
       o.x = x;
       o.y = y;
@@ -540,7 +540,7 @@ export class AudioSystem {
       let i = 0;
       for (const dir of this._probeDirs) {
         const h = phys.raycast(o, dir, PROBE_DIST, mask);
-        hits[i++] = h?.hit ? h.distance : PROBE_DIST;
+        hits[i++] = h.hit ? h.distance : PROBE_DIST;
       }
     } else {
       for (let i = 0; i < PROBE_RAYS; i++) hits[i] = PROBE_DIST;
@@ -713,7 +713,7 @@ export class AudioSystem {
             : kind === 'explosion'
               ? explosionDistanceGain(dist, o.explosionKind ?? 'grenade')
               : undefined,
-        send: o.send ?? voice.send ?? 0.3,
+        send: o.send ?? voice.send,
         gain: o.gain ?? 1,
         endTime: voice.end,
         occlusion: o.occlusion,
@@ -750,7 +750,7 @@ export class AudioSystem {
       if (g !== voice.node) voice.node.connect(g);
       g.connect(mixer.bus(bus));
       let sendNode = null;
-      const sendLevel = (o.send ?? send) * (voice.send ?? 1);
+      const sendLevel = (o.send ?? send) * voice.send;
       if (sendLevel > 0.001) {
         sendNode = mkGain(actx, sendLevel);
         g.connect(sendNode);
@@ -769,16 +769,16 @@ export class AudioSystem {
       if (!slot) {
         slot = this._dry[this._dryCursor];
         try {
-          slot!.node!.disconnect();
-          slot!.send?.disconnect();
+          slot.node!.disconnect();
+          slot.send?.disconnect();
         } catch {
           /* noop */
         }
         this._dryCursor = (this._dryCursor + 1) % this._dry.length;
       }
-      slot!.node = g;
-      slot!.send = sendNode;
-      slot!.end = voice.end + 0.05;
+      slot.node = g;
+      slot.send = sendNode;
+      slot.end = voice.end + 0.05;
       this.stats.events++;
       return true;
     } catch (err) {
@@ -970,7 +970,7 @@ export class AudioSystem {
       stopIntel();
       this._pauseAircraft();
       if (!this.running) return;
-      this.tentRadio?.start()?.catch?.((): void => {});
+      this.tentRadio?.start().catch((): void => {});
       this.mixer?.setBusVolume('ambience', 0.28);
       this.mixer?.setBusVolume('foley', 0.5);
     });
@@ -983,7 +983,7 @@ export class AudioSystem {
   }
 
   _onFire(p: EngineEventMap['weapon:fire']): void {
-    if (!this.running || !p) return;
+    if (!this.running) return;
     const field = this.field!,
       mixer = this.mixer!;
     const w = p.weapon;
@@ -1003,10 +1003,9 @@ export class AudioSystem {
     }
 
     const o = p.origin;
-    const lp = field.listenerPos;
-    const x = o?.x ?? lp.x,
-      y = o?.y ?? lp.y,
-      z = o?.z ?? lp.z;
+    const x = o.x,
+      y = o.y,
+      z = o.z;
     const dist = field.distanceTo(x, y, z);
     const firstPerson = p.firstPerson ?? dist < 2.6;
 
@@ -1022,12 +1021,12 @@ export class AudioSystem {
 
   _onReload(p: EngineEventMap['weapon:reload']): void {
     if (!this.running) return;
-    const w = p?.weapon;
+    const w = p.weapon;
     const options = {
-      phase: p?.phase ?? 'end',
+      phase: p.phase,
       reloadWeapon: typeof w === 'string' ? w : (w?.id ?? ''),
     };
-    if (p?.position) {
+    if (p.position) {
       this._playAt('reload', p.position.x, p.position.y, p.position.z, options, 'foley', 0.6);
     } else {
       this._playDry('reload', options, 'foley', 0.22);
@@ -1035,22 +1034,21 @@ export class AudioSystem {
   }
 
   _onShell(p: EngineEventMap['weapon:shell']): void {
-    if (!this.running || !p) return;
+    if (!this.running) return;
     const field = this.field!;
     if (this._budget.shell++ > 2) return;
     const pos = p.position;
-    const lp = field.listenerPos;
-    const x = pos?.x ?? lp.x,
-      y = pos?.y ?? lp.y,
-      z = pos?.z ?? lp.z;
+    const x = pos.x,
+      y = pos.y,
+      z = pos.z;
     const dist = field.distanceTo(x, y, z);
     if (dist > 22) return;
     // Find what it will land on, so brass on sand does not ring like concrete.
     let surface: SurfaceName = 'concrete';
     const phys = this.ctx.peek('physics');
     if (phys?.raycast) {
-      const h = phys.raycast(x, y + 0.2, z, 0, -1, 0, 6, phys.MASK?.WORLD);
-      if (h?.hit) surface = h.surface;
+      const h = phys.raycast(x, y + 0.2, z, 0, -1, 0, 6, phys.MASK.WORLD);
+      if (h.hit) surface = h.surface;
     }
     this._playAt(
       'shell',
@@ -1068,7 +1066,7 @@ export class AudioSystem {
   }
 
   _onImpact(p: EngineEventMap['bullet:impact']): void {
-    if (!this.running || !p) return;
+    if (!this.running) return;
     const field = this.field!;
     if (p.exit) return; // only the entry side gets a sound
     // Player contact precedes armour/health resolution. damage:taken owns the
@@ -1077,7 +1075,6 @@ export class AudioSystem {
     if (isPlayerHandle(p.actor) || (player != null && p.actor === player)) return;
     if (this._budget.impact++ > 4) return;
     const pt = p.point;
-    if (!pt) return;
     const dist = field.distanceTo(pt.x, pt.y, pt.z);
     if (dist > 90) return;
     this._playAt(
@@ -1086,8 +1083,8 @@ export class AudioSystem {
       pt.y,
       pt.z,
       {
-        surface: p.surface ?? 'concrete',
-        energy: clamp((p.damage ?? 30) / 34, 0.35, 1.5),
+        surface: p.surface,
+        energy: clamp(p.damage / 34, 0.35, 1.5),
       },
       'foley',
       0.55
@@ -1097,12 +1094,11 @@ export class AudioSystem {
   }
 
   _onBulletSegment(p: EngineEventMap['bullet:segment']): void {
-    if (!this.running || !p?.from || !p?.to) return;
-    const field = this.field!;
+    if (!this.running) return;
+    const lp = this.field!.listenerPos;
     if (isPlayerHandle(p.shooter)) return;
     if (p.shot && this._whizzShots.includes(p.shot)) return;
     // Closest approach of the trajectory to the listener.
-    const lp = field.listenerPos;
     const ax = p.from.x,
       ay = p.from.y,
       az = p.from.z;
@@ -1124,7 +1120,7 @@ export class AudioSystem {
   }
 
   _onExplosion(p: EngineEventMap['explosion']): void {
-    if (!this.running || !p?.position) return;
+    if (!this.running) return;
     const field = this.field!,
       mixer = this.mixer!;
     const pos = p.position;
@@ -1155,26 +1151,24 @@ export class AudioSystem {
     if (!this.running) return;
     const field = this.field!;
     if (this._budget.step++ > 3) return;
-    const pos = p?.position;
-    const lp = field.listenerPos;
-    const x = pos?.x ?? lp.x,
-      y = pos?.y ?? lp.y - 1.6,
-      z = pos?.z ?? lp.z;
+    const pos = p.position;
+    const x = pos.x,
+      y = pos.y,
+      z = pos.z;
     const dist = field.distanceTo(x, y, z);
     if (dist > 45) return;
-    const stance = p?.stance;
+    const stance = p.stance;
     const gait =
-      p?.gait ??
-      (stance === 'crouch' || stance === 'prone' ? 'crouch' : p?.running ? 'run' : 'walk');
+      p.gait ?? (stance === 'crouch' || stance === 'prone' ? 'crouch' : p.running ? 'run' : 'walk');
     this._playAt(
       'step',
       x,
       y,
       z,
       {
-        surface: p?.surface ?? 'concrete',
+        surface: p.surface,
         gait,
-        level: p?.level ?? (dist < 2 ? 0.72 : 1),
+        level: p.level ?? (dist < 2 ? 0.72 : 1),
       },
       'foley',
       0.4
@@ -1187,7 +1181,7 @@ export class AudioSystem {
    * so a squad that starts walking together cannot eat the emitter pool.
    */
   _onAiFootstep(p: EngineEventMap['ai:footstep']): void {
-    if (!this.running || !p?.position) return;
+    if (!this.running) return;
     const field = this.field!;
     const pos = p.position;
     const dist = field.distanceTo(pos.x, pos.y, pos.z);
@@ -1199,8 +1193,8 @@ export class AudioSystem {
       pos.y,
       pos.z,
       {
-        surface: p.surface ?? 'concrete',
-        gait: p.gait ?? 'walk',
+        surface: p.surface,
+        gait: p.gait,
         level: clamp((AI_STEP_RANGE - dist) / AI_STEP_FADE, 0, 1),
       },
       'foley',
@@ -1211,15 +1205,15 @@ export class AudioSystem {
   _onLand(p: EngineEventMap['player:land']): void {
     if (!this.running) return;
     const lp = this.field!.listenerPos;
-    const pos = p?.position;
-    const v = Math.abs(p?.velocity ?? 4);
+    const pos = p.position;
+    const v = Math.abs(p.velocity);
     this._playAt(
       'step',
       pos?.x ?? lp.x,
       pos?.y ?? lp.y - 1.6,
       pos?.z ?? lp.z,
       {
-        surface: p?.surface ?? 'concrete',
+        surface: p.surface,
         gait: 'land',
         level: clamp(v / 7, 0.35, 1.7),
         gear: 1,
@@ -1231,19 +1225,19 @@ export class AudioSystem {
   }
 
   _onPlayerState(p: EngineEventMap['player:state']): void {
-    if (!this.running || !p) return;
-    if (p.stance !== undefined && p.stance !== this._stance) {
+    if (!this.running) return;
+    if (p.stance !== this._stance) {
       this._stance = p.stance;
       this._playDry('cloth', { level: 0.9 }, 'foley', 0.12);
     }
-    if (p.ads !== undefined && p.ads !== this._ads) {
+    if (p.ads !== this._ads) {
       this._ads = p.ads;
       this._playDry('cloth', { level: 0.45 }, 'foley', 0.1);
     }
   }
 
   _onDamageDealt(p: EngineEventMap['damage:dealt']): void {
-    if (!this.running || !p) return;
+    if (!this.running) return;
     // "Damage dealt TO p.target" — `ai` also uses this for rounds that hit the
     // player, and a hitmarker tick for being shot at is backwards. Incoming
     // damage is handled by _onDamageTaken.
@@ -1258,7 +1252,7 @@ export class AudioSystem {
   }
 
   _onDamageTaken(p: EngineEventMap['damage:taken']): void {
-    if (!this.running || !p) return;
+    if (!this.running) return;
     const amount = Number.isFinite(p.amount) ? Math.max(0, p.amount) : 0;
     const armourAbsorbed = Number.isFinite(p.armourAbsorbed) ? Math.max(0, p.armourAbsorbed) : 0;
     if (amount === 0 && armourAbsorbed === 0) return;
@@ -1269,13 +1263,13 @@ export class AudioSystem {
   }
 
   _onDeath(p: EngineEventMap['actor:death']): void {
-    this._callouts?.forget(actorVoice(p?.actor));
-    if (!this.running) return;
-    const pt = p?.point;
-    if (!pt) return;
-    this.bark('death', pt, { level: 1, force: true, voice: actorVoice(p?.actor) });
+    this._callouts?.forget(actorVoice(p.actor));
+    // Speech is cancelled above even for a death reported without an impact point.
+    const pt = p.point as EngineEventMap['actor:death']['point'] | undefined;
+    if (!this.running || !pt) return;
+    this.bark('death', pt, { level: 1, force: true, voice: actorVoice(p.actor) });
     const phys = this.ctx.peek('physics');
-    const ground = phys?.raycast?.(pt.x, pt.y + 0.5, pt.z, 0, -1, 0, 4, phys.MASK?.WORLD);
+    const ground = phys?.raycast(pt.x, pt.y + 0.5, pt.z, 0, -1, 0, 4, phys.MASK.WORLD);
     this._playAt(
       'bodyfall',
       pt.x,

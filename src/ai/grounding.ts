@@ -165,7 +165,7 @@ export class GroundShadows {
    */
   addActor(agent: GroundedAgent): void {
     const p = agent.position;
-    if (!p || !Number.isFinite(p.y)) return;
+    if (!Number.isFinite(p.y)) return;
     const scale = agent.scale ?? 1;
     const crouch = agent.crouch ? 0.86 : 1;
     if (this._nBody < this.capacity) {
@@ -207,7 +207,7 @@ export class GroundShadows {
   dispose(): void {
     for (const m of [this.body, this.feet]) {
       m.parent?.remove(m);
-      m.dispose?.();
+      m.dispose();
     }
     this._src.dispose();
     this.bodyMat.dispose();

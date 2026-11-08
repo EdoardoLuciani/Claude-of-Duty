@@ -20,8 +20,8 @@ class EnergyMixProcessor extends AudioWorkletProcessor {
   process(inputs: Float32Array[][], outputs: Float32Array[][]): boolean {
     if (!this.running) return false;
     // The node is created with outputChannelCount [2]; anything else is a wiring bug.
-    const outL = outputs[0]?.[0];
-    const outR = outputs[0]?.[1];
+    const outL = outputs.at(0)?.at(0);
+    const outR = outputs.at(0)?.at(1);
     if (!outL || !outR) throw new Error('[audio] energy mix needs one stereo output');
     this.normalizer.process(inputs[0]?.[0], inputs[0]?.[1], outL, outR);
     return true;

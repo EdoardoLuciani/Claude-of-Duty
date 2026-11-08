@@ -59,14 +59,11 @@ export function bakeMasks(
     rng = null,
   } = opts;
 
+  if (!geometry.hasAttribute('position')) return geometry;
   const pos = geometry.getAttribute('position');
-  if (!pos) return geometry;
   validateTriangleGeometry(geometry, '[materials] bakeMasks');
-  let nrm = geometry.getAttribute('normal');
-  if (!nrm) {
-    geometry.computeVertexNormals();
-    nrm = geometry.getAttribute('normal');
-  }
+  if (!geometry.hasAttribute('normal')) geometry.computeVertexNormals();
+  const nrm = geometry.getAttribute('normal');
   const count = pos.count;
   if (!Number.isInteger(nrm.itemSize) || nrm.itemSize < 3 || nrm.count !== count)
     throw new Error('[materials] normal must contain one xyz normal per position vertex');

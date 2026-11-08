@@ -524,8 +524,6 @@ export class Viewmodel {
 
   /** Mount a required authored GLB and its weapon-local animation adapter. */
   addWeapon(model: WeaponModelRecord, def: WeaponDef): WeaponEntry {
-    if (!model?.scene || !model.root || !model.animations)
-      throw new Error(`[weapons] ${model?.id}: missing authored weapon scene/rig/clips`);
     let tris = 0;
     const meshes: THREE.Mesh[] = [];
     const animation = createWeaponAnimation(model, def);
@@ -557,11 +555,11 @@ export class Viewmodel {
       sight: new THREE.Vector3().fromArray(model.nodes.sight),
       muzzle: new THREE.Vector3().fromArray(model.nodes.muzzle),
       eject: new THREE.Vector3().fromArray(model.nodes.eject),
-      ejectDir: new THREE.Vector3().fromArray(model.nodes.ejectDir ?? [1, 0.4, 0.2]).normalize(),
+      ejectDir: new THREE.Vector3().fromArray(model.nodes.ejectDir).normalize(),
       optic: n.opticGlass ?? null,
       gripR: model.nodes.gripR,
       gripL: model.nodes.gripL,
-      magLen: model.magSize?.len ?? 0.2,
+      magLen: model.magSize.len,
       shell: model.shell,
       lhandPose: model.id === 'lmg' ? 'wrap' : 'clamp',
       rhandPose:
@@ -584,7 +582,6 @@ export class Viewmodel {
   _fitGripContacts(w: WeaponEntry): void {
     if (!hasOwn(GRIP_CONTACTS, w.id)) return;
     const contact = GRIP_CONTACTS[w.id];
-    if (!contact) return;
     this.armR.hand.position.fromArray(w.gripR.pos);
     handBasis(
       this.armR.hand.quaternion,
@@ -619,7 +616,7 @@ export class Viewmodel {
     const nodes: WeaponNodes = w.model.nodes;
     const hg = nodes.supportContact ?? nodes.handguard;
     const gL = w.gripL;
-    if (!hg || !gL) return;
+    if (!hg) return;
     this._handPosL.fromArray(gL.pos);
     handBasis(this._handQuatL, gL.finger ?? [0.82, 0.5, -0.28], gL.back ?? [-0.5, 0.32, -0.8]);
     const poseName = `clamp:${w.id}`;
@@ -646,16 +643,16 @@ export class Viewmodel {
     this.recRot.reset();
     this.settle.reset();
     if (w.parts.magazine) w.parts.magazine.visible = true;
-    this.armR.setPose(w.rhandPose ?? 'grip');
+    this.armR.setPose(w.rhandPose);
     // The FITTED clamp for this weapon, not the authored one — see _fitSupportHand.
-    this.armL.setPose(w.lhandPose ?? 'clamp');
+    this.armL.setPose(w.lhandPose);
     return w;
   }
 
   play(name: string): number {
     const w = this.active;
     if (!w) return 0;
-    const clip = w.clips[name];
+    const clip = w.clips[name] as (typeof w.clips)[string] | undefined;
     if (!clip) return 0;
     w.animation.reset();
     this.clip = clip;
@@ -686,7 +683,7 @@ export class Viewmodel {
     this._throwReleased = false;
     this._cookType = null;
     this._cookBlend = 0;
-    if (this.grenade) this.grenade.visible = true;
+    this.grenade.visible = true;
     const w = this.active;
     if (w) w.group.visible = false;
   }
@@ -726,7 +723,7 @@ export class Viewmodel {
     this._throwReleased = false;
     this._cookType = null;
     this._cookBlend = 0;
-    if (this.grenade) this.grenade.visible = false;
+    this.grenade.visible = false;
     const w = this.active;
     if (w) w.group.visible = true;
   }
@@ -736,7 +733,7 @@ export class Viewmodel {
     if (this._grenadeState === 1) this.endGrenade();
     if (this._bandageState === 1) this.endBandage();
     this._radioState = 1;
-    if (this.radio) this.radio.visible = true;
+    this.radio.visible = true;
     const w = this.active;
     if (w) w.group.visible = false;
   }
@@ -744,7 +741,7 @@ export class Viewmodel {
   endRadio(): void {
     if (this._radioState === 0) return;
     this._radioState = 0;
-    if (this.radio) this.radio.visible = false;
+    this.radio.visible = false;
     const w = this.active;
     if (w) w.group.visible = true;
   }
@@ -786,13 +783,9 @@ export class Viewmodel {
   /**
    * World position the thrown grenade leaves from: the grenade mesh's
    * position at the release beat, in viewScene space (= world space because
-   * the anchor tracks the camera). Falls back to the camera position.
+   * the anchor tracks the camera).
    */
   grenadeReleaseWorld(out: THREE.Vector3): THREE.Vector3 {
-    if (!this.grenade) {
-      out.copy(this.ctx.camera.position);
-      return out;
-    }
     this.armR.root.updateMatrixWorld();
     out.setFromMatrixPosition(this.grenade.matrixWorld);
     return out;
@@ -1179,7 +1172,7 @@ export class Viewmodel {
     let ry = swayX * 0.028 * swayScale;
     let rz = swayZ * 0.017 * swayScale;
 
-    const speed = s.speed ?? 0;
+    const speed = s.speed;
     const bobAmt =
       def.bobScale * clamp01(speed / 4.2) * lerp(1, 0.28, ads) * (s.airborne ? 0.25 : 1);
     if (speed > 0.05) {
@@ -1262,7 +1255,7 @@ export class Viewmodel {
       this._throwT += dt;
       if (!this._throwReleased && this._throwT >= this._throwReleaseAt) {
         this._throwReleased = true;
-        if (this.grenade) this.grenade.visible = false;
+        this.grenade.visible = false;
         this.onClipEvent?.('grenade:release', 'grenadeThrow');
       }
       if (this._throwT >= this._throwDuration) {
@@ -1354,7 +1347,7 @@ export class Viewmodel {
     const gR = w.gripR;
     this._handPos.fromArray(gR.pos);
     handBasis(this._handQuat, gR.finger ?? [0, -0.35, -0.94], gR.back ?? [0.95, 0.25, 0.18]);
-    let poseR = w.rhandPose ?? 'grip';
+    let poseR = w.rhandPose;
 
     if (poseR !== this.armR.pose) this.armR.setPose(poseR, 0.1);
     w.animation.handTarget?.('right', this._handPos, this._handQuat);
@@ -1366,7 +1359,7 @@ export class Viewmodel {
     let pos = gL.pos;
     let finger = gL.finger ?? [0.82, 0.5, -0.28];
     let back = gL.back ?? [-0.5, 0.32, -0.8];
-    let pose = w.lhandPose ?? 'clamp';
+    let pose = w.lhandPose;
     if (res.active && res.lhand.weight > 0.5) {
       pos = res.lhand.pos;
       finger = res.lhand.finger;
@@ -1483,25 +1476,21 @@ export class Viewmodel {
     const optic = w.optic;
     const scoped = optic?.kind === 'scope';
     const accessory = this._grenadeState || this._radioState || this._bandageState;
-    if (this.scopeOverlay) this.scopeOverlay.visible = scoped && ads > 0.85 && !accessory;
+    this.scopeOverlay.visible = scoped && ads > 0.85 && !accessory;
     const gunVisible = !scoped || 1 - smootherstep(0.72, 0.96, ads) > 0.02;
     const armsVisible = Boolean(accessory || gunVisible);
-    if (!accessory && w.group) w.group.visible = gunVisible;
-    if (this.armL?.root) this.armL.root.visible = armsVisible;
-    if (this.armR?.root) this.armR.root.visible = armsVisible;
-    if (this.scopeMask) {
-      const u = this.maskUniforms;
-      u.uAlpha.value = smootherstep(0.82, 0.97, ads);
-      u.uAspect.value = this.ctx.viewCamera.aspect;
-      u.uSniper.value = optic?.reticle === 'p4fl' ? 1 : 0;
-    }
-    if (this.scopeReticle) {
-      const u = this.reticleUniforms;
-      u.uAlpha.value = smootherstep(0.88, 0.99, ads);
-      u.uChevron.value = optic?.reticle === 'chevron' ? 1 : 0;
-      u.uAspect.value = this.ctx.viewCamera.aspect;
-      u.uMradScale.value = sniperMradScale(this.ctx.camera.fov, this.ctx.camera.zoom);
-    }
+    if (!accessory) w.group.visible = gunVisible;
+    this.armL.root.visible = armsVisible;
+    this.armR.root.visible = armsVisible;
+    const mask = this.maskUniforms;
+    mask.uAlpha.value = smootherstep(0.82, 0.97, ads);
+    mask.uAspect.value = this.ctx.viewCamera.aspect;
+    mask.uSniper.value = optic?.reticle === 'p4fl' ? 1 : 0;
+    const reticle = this.reticleUniforms;
+    reticle.uAlpha.value = smootherstep(0.88, 0.99, ads);
+    reticle.uChevron.value = optic?.reticle === 'chevron' ? 1 : 0;
+    reticle.uAspect.value = this.ctx.viewCamera.aspect;
+    reticle.uMradScale.value = sniperMradScale(this.ctx.camera.fov, this.ctx.camera.zoom);
   }
 
   /** Copy the gameplay camera onto the viewmodel anchor and view camera. */
@@ -1560,10 +1549,10 @@ export class Viewmodel {
     this.weapons.clear();
     this.armL.dispose();
     this.armR.dispose();
-    this.armAsset?.dispose();
+    this.armAsset.dispose();
     // Radio geometry is instance-owned; the grenade's geometry is shared with
     // world projectiles and must not be released with the arm skin.
-    this.radio?.traverse((o): void => {
+    this.radio.traverse((o): void => {
       if (isMesh(o)) o.geometry.dispose();
     });
     for (const material of this._propMaterials.values()) material.dispose();
@@ -1573,11 +1562,11 @@ export class Viewmodel {
     this.bandageAsset?.wrap.removeFromParent();
     this.bandageAsset?.tail.removeFromParent();
     for (const g of this._reticleGeo) g.dispose();
-    this.scopeMask?.geometry.dispose();
-    this.scopeMask?.material.dispose();
-    this.scopeReticle?.geometry.dispose();
-    this.scopeReticle?.material.dispose();
-    this.radio?.removeFromParent();
+    this.scopeMask.geometry.dispose();
+    this.scopeMask.material.dispose();
+    this.scopeReticle.geometry.dispose();
+    this.scopeReticle.material.dispose();
+    this.radio.removeFromParent();
     this.anchor.removeFromParent();
   }
 }

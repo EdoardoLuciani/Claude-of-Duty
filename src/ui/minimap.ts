@@ -207,12 +207,10 @@ export class Minimap {
 
     // ---- building footprints ---------------------------------------------
     const labels: MapLabel[] = [];
-    for (let i = 0; i < infos.length; i++) {
-      const info = infos[i];
-      const spec = info && 'spec' in info ? info.spec : info;
-      if (!spec || spec.w === undefined || spec.d === undefined) continue;
-      const x0 = (spec.x ?? 0) - spec.w * 0.5;
-      const z0 = (spec.z ?? 0) - spec.d * 0.5;
+    for (const info of infos) {
+      const spec = info.spec;
+      const x0 = spec.x - spec.w * 0.5;
+      const z0 = spec.z - spec.d * 0.5;
       const enterable = 'enterable' in spec && !!spec.enterable;
       // taller mass reads slightly lighter, so the skyline is legible on the map
       const floors = 'floors' in spec && typeof spec.floors === 'number' ? spec.floors : 2;

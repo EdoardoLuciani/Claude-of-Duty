@@ -73,7 +73,7 @@ export class WorldSystem {
     this.rng = ctx.rng.fork(); // preserve the subsystem RNG fork order
     this.materials = ctx.get('materials');
     this.renderSystem = ctx.peek('render');
-    this.materials.setGroundLevel?.(0);
+    this.materials.setGroundLevel(0);
 
     const started = performance.now();
     const { meta, visual, collision } = await ctx.get('models').worldPrefetch;
@@ -109,14 +109,14 @@ export class WorldSystem {
     const placeholders = new Set<THREE.Material>();
     this.root.traverse((object): void => {
       if (!isWorldMesh(object)) return;
-      const palette: unknown = object.userData?.palette;
+      const palette: unknown = object.userData.palette;
       if (typeof palette !== 'string' || !hasOwn(PALETTE, palette))
         throw new Error(`[world] unknown palette on ${object.name}`);
       if (Array.isArray(object.material))
         object.material.forEach((m): Set<THREE.Material<THREE.MaterialEventMap>> =>
           placeholders.add(m)
         );
-      else if (object.material) placeholders.add(object.material);
+      else placeholders.add(object.material);
       object.material = this._material(palette);
       object.castShadow = object.userData.castShadow !== false;
       object.receiveShadow = object.userData.receiveShadow !== false;
@@ -146,12 +146,12 @@ export class WorldSystem {
     const physics = ctx.peek('physics');
     this.collisionRoot.traverse((object): void => {
       if (!isWorldMesh(object)) return;
-      const surface = parseSurfaceName(object.userData?.surface);
+      const surface = parseSurfaceName(object.userData.surface);
       if (Array.isArray(object.material))
         object.material.forEach((m): Set<THREE.Material<THREE.MaterialEventMap>> =>
           collisionPlaceholders.add(m)
         );
-      else if (object.material) collisionPlaceholders.add(object.material);
+      else collisionPlaceholders.add(object.material);
       object.material = this._collisionMaterial;
       object.visible = false;
       object.matrixAutoUpdate = false;
@@ -197,7 +197,7 @@ export class WorldSystem {
     this.lamps = [];
     const add = (light: THREE.PointLight, options: { range: number; priority: number }): void => {
       this.root.add(light);
-      this.renderSystem?.addLight?.(light, options);
+      this.renderSystem?.addLight(light, options);
     };
 
     for (const entry of data) {
@@ -310,9 +310,9 @@ export class WorldSystem {
     const geometries = new Set<THREE.BufferGeometry>();
     for (const mesh of this.meshes ?? []) geometries.add(mesh.geometry);
     for (const mesh of this.collisionMeshes ?? []) geometries.add(mesh.geometry);
-    for (const geometry of geometries) geometry?.dispose();
-    this.root?.parent?.remove(this.root);
-    this._collisionMaterial?.dispose();
+    for (const geometry of geometries) geometry.dispose();
+    this.root.parent?.remove(this.root);
+    this._collisionMaterial.dispose();
     this.bulbs = null;
     this.lamps = null;
     this.meshes = null;

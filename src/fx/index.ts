@@ -115,7 +115,7 @@ export class FxSystem {
   declare _targetSupport: number | undefined;
   declare _target: FxTargetFrame | undefined;
   declare _probes: Float32Array | undefined;
-  declare _warmScene: THREE.Scene;
+  _warmScene: THREE.Scene | null = null;
   static readonly id = 'fx';
   static readonly deps: SystemId[] = ['render', 'materials'];
 
@@ -127,7 +127,7 @@ export class FxSystem {
     this._audio = ctx.peek('audio');
 
     const q = ctx.config.q;
-    const budget = q.particleBudget ?? 6000;
+    const budget = q.particleBudget;
     const big = budget >= 10000;
 
     const t0 = performance.now();
@@ -180,7 +180,7 @@ export class FxSystem {
     this.viewLit.uniforms.uSoftEnable.value.x = 0;
 
     this.decals = new DecalSystem({
-      capacity: q.decalBudget ?? 128,
+      capacity: q.decalBudget,
       albedo: decalAtlas.albedo,
       normal: decalAtlas.normal,
       orm: decalAtlas.orm,
@@ -313,9 +313,9 @@ export class FxSystem {
   /** Does viewScene already draw something of its own (i.e. is there a weapon)? */
   _viewmodelPresent(): boolean {
     let found = false;
-    this.ctx.viewScene?.traverse((o): void => {
+    this.ctx.viewScene.traverse((o): void => {
       if (found || !(o instanceof THREE.Mesh)) return;
-      if (o === this.viewAdd?.mesh || o === this.viewLit?.mesh) return;
+      if (o === this.viewAdd.mesh || o === this.viewLit.mesh) return;
       found = true;
     });
     return found;
@@ -370,7 +370,7 @@ export class FxSystem {
       ctx.camera,
       render?._warmGraph
         ? (): Promise<{ ms: number; geometries: number; frameUnchanged: boolean }> =>
-            render._warmGraph!()
+            render._warmGraph()
         : null
     );
     return { ok: haze.ok, haze };
@@ -384,7 +384,7 @@ export class FxSystem {
     this._attachView();
     const pool = this.viewLights;
     if (!pool) return;
-    const key = this.render?.viewLightLevel ?? this.render?.viewSun?.intensity ?? 2.5;
+    const key = this.render?.viewLightLevel ?? this.render?.viewSun.intensity ?? 2.5;
     // 0.72 cd per key unit keeps the handguard's warm gradient legible.
     const peak = Math.max(0.04, key * 0.72 * clamp(strength, 0.05, 2.2));
     // Lift 4 cm off the bore: an on-axis source grazes the receiver (N.L ~0.15).
@@ -406,8 +406,8 @@ export class FxSystem {
   onImpact(e: FxEventMap['bullet:impact']): void {
     this.now = this.ctx.time.elapsed;
     let energy = clamp(0.7 + e.damage / 55, 0.7, 1.7);
-    if (e.exit === true) energy *= 0.75;
-    const spawn = e.exit === true ? spawnExit : spawnImpact;
+    if (e.exit) energy *= 0.75;
+    const spawn = e.exit ? spawnExit : spawnImpact;
     spawn(this, e.point, e.normal, e.incident, e.surface, energy);
     this.stats.spawned++;
   }
@@ -559,7 +559,7 @@ export class FxSystem {
     o.now = this.now;
     const ph = this.physics;
     o.world = ph?.staticWorld ?? null;
-    o.mask = ph?.MASK?.WORLD ?? 0xffff;
+    o.mask = ph?.MASK.WORLD ?? 0xffff;
     if (opts.noFallback && !o.world) return false;
     const ok = this.decals.add(o);
     if (ok) this.stats.decals++;
@@ -579,7 +579,7 @@ export class FxSystem {
     let nz = 0;
     if (ph?.raycast) {
       const hit = ph.raycast(this._tmpA, this._tmpB, radius * 1.5 + 1, ph.MASK.WORLD);
-      if (hit?.hit) {
+      if (hit.hit) {
         px = hit.point.x;
         py = hit.point.y;
         pz = hit.point.z;
@@ -608,7 +608,7 @@ export class FxSystem {
     this._tmpA.copy(point);
     this._tmpB.copy(incident);
     const hit = ph.raycast(this._tmpA, this._tmpB, 2.6, ph.MASK.WORLD);
-    if (!hit?.hit) return;
+    if (!hit.hit) return;
     this.addDecal(hit.point, hit.normal, {
       tile: this.rng.float() < 0.5 ? D.BLOOD_A : D.BLOOD_B,
       size: this.rng.range(0.32, 0.62),
@@ -625,7 +625,7 @@ export class FxSystem {
    */
   sunWorld(): { x: number; y: number; z: number } {
     const d = this.render?.sunDir;
-    const o = this._sunW ?? (this._sunW = { x: 0, y: 1, z: 0 });
+    const o = this._sunW;
     if (d) {
       o.x = d.x;
       o.y = d.y;
@@ -1010,7 +1010,7 @@ export class FxSystem {
       this._tmpA.copy(this._p).addScaledVector(this._n, 1.2);
       this._tmpB.copy(this._n).multiplyScalar(-1);
       const hit = this.physics.raycast(this._tmpA, this._tmpB, 2.6, this.physics.MASK.WORLD);
-      if (hit?.hit) {
+      if (hit.hit) {
         this._p.copy(hit.point);
         this._n.copy(hit.normal);
       }
@@ -1060,27 +1060,16 @@ export class FxSystem {
   _stageTracer(target: FxTargetFrame): void {
     const cam = this.ctx.camera;
     this._tmpA.set(0.18, -0.12, -0.7).applyMatrix4(cam.matrixWorld);
-    let opts;
-    if (target?.point && target.tangent && target.bitangent) {
-      const rng = this.rng;
-      this._tmpB
-        .copy(target.point)
-        .addScaledVector(target.tangent, rng.signed() * Math.min(1.2, (target.spanU ?? 3) * 0.45))
-        .addScaledVector(
-          target.bitangent,
-          rng.signed() * Math.min(0.35, (target.spanV ?? 1.2) * 0.4)
-        );
-      // Stop on the wall: soft-depth clipping hides the entire anchored quad as
-      // soon as its head passes behind the surface. The capture-only 100 ms
-      // flight keeps the incoming streak readable without inventing hidden
-      // lifetime.
-      opts = _stagedTracerOpts;
-    } else {
-      this._tmpB
-        .set(this.rng.range(-3, 3), this.rng.range(-0.6, 1.4), -46)
-        .applyMatrix4(cam.matrixWorld);
-    }
-    this.tracer(this._tmpA, this._tmpB, 250, opts);
+    const rng = this.rng;
+    this._tmpB
+      .copy(target.point)
+      .addScaledVector(target.tangent, rng.signed() * Math.min(1.2, target.spanU * 0.45))
+      .addScaledVector(target.bitangent, rng.signed() * Math.min(0.35, target.spanV * 0.4));
+    // Stop on the wall: soft-depth clipping hides the entire anchored quad as
+    // soon as its head passes behind the surface. The capture-only 100 ms
+    // flight keeps the incoming streak readable without inventing hidden
+    // lifetime.
+    this.tracer(this._tmpA, this._tmpB, 250, _stagedTracerOpts);
   }
 
   /** Incoming round crossing the frame — reads as a firefight, not a range. */
@@ -1117,7 +1106,7 @@ export class FxSystem {
     const ph = this.physics;
     let best: Pick<FxTargetFrame, 'point' | 'normal' | 'surface' | 'distance'> | null = null;
     let bestDist = Infinity;
-    if (ph?.raycast && (ph.staticWorld?.triCount ?? 0) > 0) {
+    if (ph?.raycast && ph.staticWorld.triCount > 0) {
       // Dense 9x7 probes find facing walls rather than skipping to grazing props.
       // Record hits, then score coplanar support so a broad wall beats a centred
       // post or narrow pillar. Prefer targets in the 1.5-9 m screenshot band.
@@ -1129,7 +1118,7 @@ export class FxSystem {
         this._tmpB.set(0, 0, -1).applyAxisAngle(_axisX, pitch).applyAxisAngle(_axisY, yaw);
         this._tmpB.transformDirection(cam.matrixWorld);
         const hit = ph.raycast(this._camPos, this._tmpB, 40, ph.MASK.WORLD);
-        if (!hit?.hit) continue;
+        if (!hit.hit) continue;
         const d = hit.distance;
         // A grazing hit on a thin prop makes a poor showcase.
         const face = -this._tmpB.dot(hit.normal);
@@ -1143,7 +1132,7 @@ export class FxSystem {
         probes[b + 5] = hit.normal.z;
         probes[b + 6] = d;
         probes[b + 7] = Math.abs(d - 5) + (Math.abs(yaw) + Math.abs(pitch)) * 7 + (1 - face) * 3;
-        this._probeSurf[np] = hit.surface ?? 'concrete';
+        this._probeSurf[np] = hit.surface;
         np++;
       }
       this._probeCount = np;
@@ -1257,7 +1246,7 @@ export class FxSystem {
   }
 
   dispose(): void {
-    for (const off of this._off ?? []) off();
+    for (const off of this._off) off();
     this._off = [];
     for (const l of [this.lit, this.add, this.motes, this.viewAdd, this.viewLit]) {
       l.mesh.parent?.remove(l.mesh);
@@ -1265,7 +1254,8 @@ export class FxSystem {
     }
     this.decals.mesh.parent?.remove(this.decals.mesh);
     this.decals.dispose();
-    if (this.shells) {
+    // Dispose may follow an init that failed before the async shell load.
+    if ((this.shells as ShellSystem | undefined) !== undefined) {
       this.shells.mesh.parent?.remove(this.shells.mesh);
       this.shells.hullMesh.parent?.remove(this.shells.hullMesh);
       this.shells.dispose();

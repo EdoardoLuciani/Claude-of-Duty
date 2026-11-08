@@ -75,7 +75,7 @@ export class HazeSystem {
     | { ok: boolean; reason?: undefined; error?: undefined }
     | { ok: boolean; error: string; reason?: undefined }
   > {
-    if (!renderer || !this.rt) return { ok: false, reason: 'target not ready' };
+    if (!this.rt) return { ok: false, reason: 'target not ready' };
     const cam = camera ?? (this._warmCam ??= new THREE.PerspectiveCamera());
     const geometry = this.layer.geometry,
       { start, count } = geometry.drawRange;
@@ -188,7 +188,7 @@ export class HazeSystem {
    */
   render(renderer: Renderer, camera: THREE.Camera | null | undefined = this._camera): boolean {
     if (!this._live || !this.rt || !camera) return false;
-    const prevTarget = renderer.getRenderTarget?.() ?? null;
+    const prevTarget = renderer.getRenderTarget() ?? null;
     const prev = renderer.getClearColor(_col);
     const prevAlpha = renderer.getClearAlpha();
     try {
@@ -229,7 +229,7 @@ export class HazeSystem {
   dispose(): void {
     this.layer.dispose();
     this.rt?.dispose();
-    this.distortTexNode.dispose?.();
+    this.distortTexNode.dispose();
   }
 }
 

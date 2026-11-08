@@ -99,14 +99,17 @@ export class MaterialSystemNode {
   async init(ctx: MaterialContext): Promise<void> {
     this.ctx = ctx;
     const renderer = this._injectedRenderer ?? ctx.peek?.('render')?.renderer;
-    const backend = renderer?.backend as
-      | (Renderer['backend'] & { isWebGPUBackend?: boolean })
-      | undefined;
-    if (!renderer || backend?.isWebGPUBackend !== true)
+    const backend = renderer?.backend;
+    if (
+      !renderer ||
+      !backend ||
+      !('isWebGPUBackend' in backend) ||
+      backend.isWebGPUBackend !== true
+    )
       throw new Error('[materials] WebGPU renderer required');
     this.renderer = renderer;
-    const q = ctx?.config?.q;
-    const quality = ctx?.config?.quality;
+    const q = ctx.config?.q;
+    const quality = ctx.config?.quality;
     this._quality = quality === 'low' ? 0.5 : quality === 'medium' ? 0.75 : 1;
     this._anisotropy = q?.anisotropy ?? 8;
     const detail = bakeDetail(this.renderer, this._size(1024));
@@ -117,8 +120,8 @@ export class MaterialSystemNode {
       detailAlbedo: detail.albedo.texture,
       macro: macro.texture,
       keyDir: uniform(
-        ctx?.peek?.('sky')?.keyDirection ??
-          ctx?.peek?.('render')?.sunDir ??
+        ctx.peek?.('sky')?.keyDirection ??
+          ctx.peek?.('render')?.sunDir ??
           new Vector3(0.4, 0.8, 0.4).normalize()
       ),
       keyColor: uniform(new Vector3(1, 0.9, 0.8)),
@@ -164,7 +167,7 @@ export class MaterialSystemNode {
     const tintA = new Color(bake.tintA ?? 0xffffff);
     const tintB = new Color(bake.tintB ?? 0xffffff);
     const coords = uv(),
-      seed = float(bake.seed ?? 1);
+      seed = float(bake.seed);
     let surface: SurfaceNode;
     if (isGeneratedSurface(key)) {
       const p = bake.param ?? [0, 0, 0, 0];
@@ -220,11 +223,11 @@ export class MaterialSystemNode {
     applyDefinedPatch(p, surface);
     p.groundY = opts.groundY ?? this._groundY;
     const layerCap =
-      this.ctx?.config?.quality === 'low'
+      this.ctx.config?.quality === 'low'
         ? 8
-        : this.ctx?.config?.quality === 'medium'
+        : this.ctx.config?.quality === 'medium'
           ? 12
-          : this.ctx?.config?.quality === 'ultra'
+          : this.ctx.config?.quality === 'ultra'
             ? 32
             : 16;
     p.parallaxLayers = Math.min(p.parallaxLayers ?? 22, layerCap);

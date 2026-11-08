@@ -71,8 +71,9 @@ export class PlayerSystem {
   declare flashlightOn: boolean;
   declare flashlight: THREE.SpotLight;
   declare _unregisterPass: (() => void) | null;
-  declare adsFovScale: number;
-  declare adsSensScale: number;
+  /** Per-weapon ADS overrides, published by `weapons` once a gun is held. */
+  declare adsFovScale: number | undefined;
+  declare adsSensScale: number | undefined;
 
   static readonly id = 'player';
   static readonly deps: SystemId[] = ['physics', 'world', 'render'];
@@ -274,10 +275,10 @@ export class PlayerSystem {
   _resolveSpawn(): { feet: THREE.Vector3; yaw: number } {
     const world = this.ctx.peek('world');
     const out = { feet: new THREE.Vector3(0, 0.2, 0), yaw: 0 };
-    const sp = world?.spawn?.(0);
+    const sp = world?.spawn(0);
     if (sp?.position) {
       out.feet.copy(sp.position);
-      out.yaw = sp.yaw ?? 0;
+      out.yaw = sp.yaw;
     }
     // Physics owns the exact floor; drop onto it so we never start embedded.
     const gy = this.physics.groundHeight(out.feet.x, out.feet.z, out.feet.y + 6);
@@ -331,7 +332,6 @@ export class PlayerSystem {
   }
 
   fixedUpdate(h: number, ctx: PlayerContext): void {
-    if (!this.movement) return;
     this._consumeLook(ctx.time.dt > 1e-5 ? ctx.time.dt : h);
     this.movement.latchInput(ctx.time.frame);
     if (!this.controlEnabled) return;
@@ -340,7 +340,6 @@ export class PlayerSystem {
   }
 
   update(dt: number, ctx: PlayerContext): void {
-    if (!this.movement) return;
     if (this._death.active && !this.health.dead) this._endDeath();
     this._consumeLook(dt);
     this.movement.latchInput(ctx.time.frame);
@@ -360,7 +359,7 @@ export class PlayerSystem {
     this._updateAds(dt);
     this._drainMovementEvents();
     this.health.update(dt);
-    this.healCtrl?.update(dt);
+    this.healCtrl.update(dt);
 
     if (this.health.dead) {
       this._updateDeathCamera(dt);
@@ -457,7 +456,7 @@ export class PlayerSystem {
       dir.y = Math.max(0.05, dir.y);
       if (dir.lengthSq() < 1e-6) dir.set(0, 0, 1);
     }
-    this.ctx.peek('ai')?.spawnPlayerCorpse?.(this.movement.renderPosition, yaw, dir.normalize());
+    this.ctx.peek('ai')?.spawnPlayerCorpse(this.movement.renderPosition, yaw, dir.normalize());
   }
 
   _updateDeathCamera(dt: number): void {
@@ -634,7 +633,6 @@ export class PlayerSystem {
   }
 
   _onDamageDealt(e: PlayerEventsMap['damage:dealt']): void {
-    if (!e) return;
     const t = e.target;
     if (
       t !== this &&
@@ -654,13 +652,12 @@ export class PlayerSystem {
         ? source.position
         : null;
     const from = e.from ?? sourcePosition ?? e.point ?? null;
-    this.applyDamage(e.amount ?? 0, from, { type: 'bullet' });
+    this.applyDamage(e.amount, from, { type: 'bullet' });
   }
 
   _onExplosion(e: PlayerEventsMap['explosion']): void {
-    if (!e?.position) return;
     const eye = this.ctx.camera.position;
-    const r = e.radius ?? 5;
+    const r = e.radius;
     const d = this._tmp.copy(e.position).distanceTo(eye);
     if (d > r * 1.6) return;
     const exposure = this.physics.explosionExposure(e.position, this.feetPosition, eye);
@@ -668,13 +665,12 @@ export class PlayerSystem {
     this.rig.addTrauma(clamp01(falloff * 1.4));
     this.health.addSuppression(HEALTH.suppression.perExplosion * falloff);
     if (exposure > 0 && falloff > 0.02) {
-      this.applyDamage((e.damage ?? 90) * falloff * exposure, e.position, { type: 'explosion' });
+      this.applyDamage(e.damage * falloff * exposure, e.position, { type: 'explosion' });
     }
   }
 
   _onBulletSegment(e: PlayerEventsMap['bullet:segment']): void {
-    if (!e?.from || !e.to || this.health.dead || e.shooter === this || e.shooter === 'player')
-      return;
+    if (this.health.dead || e.shooter === this || e.shooter === 'player') return;
     if (e.shot && this._nearMissShots.includes(e.shot)) return;
     const eye = this.ctx.camera.position;
     const dx = e.to.x - e.from.x,
@@ -715,7 +711,7 @@ export class PlayerSystem {
     h.dead = hp.dead;
     h.hurt = hp.effect;
     h.pulse = hp.pulse;
-    this.healCtrl?.fillHud(h);
+    this.healCtrl.fillHud(h);
     h.suppression = hp.suppression;
     // 0..1 against tactical sprint, which is the fastest the player can move —
     // `ui` uses this directly as the reticle-bloom weight.
@@ -838,20 +834,20 @@ export class PlayerSystem {
     opts: { yaw?: number; type?: string } = {}
   ): number {
     const dealt = this.health.damage(amount, from ?? null, { yaw: this.movement.yaw, ...opts });
-    if (dealt > 0) this.healCtrl?.cancel('damage');
+    if (dealt > 0) this.healCtrl.cancel('damage');
     return dealt;
   }
   heal(a: number): number {
     return this.health.heal(a);
   }
   addBandages(n: number): number {
-    return this.healCtrl ? this.healCtrl.add(n) : 0;
+    return this.healCtrl.add(n);
   }
   cancelHeal(reason: string): boolean {
-    return this.healCtrl?.cancel(reason) ?? false;
+    return this.healCtrl.cancel(reason);
   }
   get bandages(): number {
-    return this.healCtrl?.bandages ?? 0;
+    return this.healCtrl.bandages;
   }
   addSuppression(a: number): void {
     this.health.addSuppression(a);
@@ -861,7 +857,7 @@ export class PlayerSystem {
     this.controlEnabled = !!on;
     this.movement.controlEnabled = this.controlEnabled;
     if (!on) {
-      this.healCtrl?.cancel('interrupt');
+      this.healCtrl.cancel('interrupt');
       this.movement.latchInput(-2); // flush held keys
       this.movement.velocity.set(0, 0, 0);
       this.movement.sprinting = false;
@@ -888,7 +884,7 @@ export class PlayerSystem {
     if (typeof rot === 'number') {
       this.movement.yaw = rot;
       this.movement.pitch = 0;
-    } else if (rot) {
+    } else {
       this.movement.yaw = rot.y ?? this.movement.yaw;
       this.movement.pitch = clamp(rot.x ?? 0, -CAMERA.pitchLimit, CAMERA.pitchLimit);
     }
@@ -903,14 +899,14 @@ export class PlayerSystem {
   respawn(index = 0): void {
     this.setFlashlightEnabled(false);
     const world = this.ctx.peek('world');
-    const sp = world?.spawn?.(index);
+    const sp = world?.spawn(index);
     this.health.reset(true);
     this.health.addArmour(HEALTH.plateSize);
-    this.healCtrl?.reset();
+    this.healCtrl.reset();
     if (sp?.position) {
       const gy = this.physics.groundHeight(sp.position.x, sp.position.z, sp.position.y + 6);
       const feetY = Number.isFinite(gy) ? gy + 0.03 : sp.position.y;
-      this.movement.yaw = sp.yaw ?? 0;
+      this.movement.yaw = sp.yaw;
       this.movement.pitch = 0;
       this.movement.teleport(sp.position.x, feetY, sp.position.z);
       this.rig.reset(STANCE.stand.eye);
@@ -1016,10 +1012,10 @@ export class PlayerSystem {
   }
 
   dispose(): void {
-    for (const off of this._offEvents) off?.();
+    for (const off of this._offEvents) off();
     this._offEvents.length = 0;
     if (this.hitbox) {
-      this.physics?.removeCollider(this.hitbox);
+      this.physics.removeCollider(this.hitbox);
       this.hitbox = null;
     }
     this.ctx.scene.remove(this.flashlight, this.flashlight.target);
@@ -1027,6 +1023,6 @@ export class PlayerSystem {
     this._unregisterPass?.();
     this.lowHealthPass?.dispose();
     this.lowHealthPass = null;
-    this.movement?.dispose();
+    this.movement.dispose();
   }
 }

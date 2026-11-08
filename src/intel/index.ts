@@ -115,7 +115,7 @@ export class IntelSystem {
     if (!ctx.config.deterministic) {
       try {
         const saved: unknown = JSON.parse(
-          globalThis.localStorage?.getItem('ow:intel-sites:v1') ?? '[]'
+          globalThis.localStorage.getItem('ow:intel-sites:v1') ?? '[]'
         );
         if (Array.isArray(saved)) {
           const ids: unknown[] = saved;
@@ -269,7 +269,7 @@ export class IntelSystem {
       ctx.time.scale > 0 &&
       !ctx.input.frozen &&
       ctx.input.enabled &&
-      !ctx.peek('ui')?.menu?.open &&
+      !ctx.peek('ui')?.menu.open &&
       !this.market.open
     );
   }
@@ -280,7 +280,7 @@ export class IntelSystem {
     return (
       this._canDiscover() &&
       !this.player.mantling &&
-      !this.player.healCtrl?.active &&
+      !this.player.healCtrl.active &&
       !ctx.input.fire &&
       !ctx.input.ads &&
       (ctx.peek('weapons')?.canBeginHeal() ?? true)
@@ -316,7 +316,7 @@ export class IntelSystem {
     if (
       this.ctx.config.deterministic ||
       this.player.dead ||
-      !Number.isInteger(e?.wave) ||
+      !Number.isInteger(e.wave) ||
       e.wave <= this._lastWave
     )
       return;
@@ -356,7 +356,7 @@ export class IntelSystem {
       this._recent.push(cache.id);
       if (this._recent.length > INTEL.recentSites) this._recent.shift();
       try {
-        globalThis.localStorage?.setItem('ow:intel-sites:v1', JSON.stringify(this._recent));
+        globalThis.localStorage.setItem('ow:intel-sites:v1', JSON.stringify(this._recent));
       } catch {
         /* keep the same preference for restarts when storage is blocked */
       }
@@ -454,7 +454,7 @@ export class IntelSystem {
   /** Compile pooled props at boot without spawning, consuming RNG or drawing. */
   async prewarmMaterials(ctx: IntelContext = this.ctx): Promise<{ ok: true }> {
     const render = ctx.get('render');
-    const [first] = this._pool;
+    const first = this._pool.at(0);
     if (!first) throw new Error('[intel] prewarm needs a pooled cache');
     const group = first.group;
     const parent = group.parent,

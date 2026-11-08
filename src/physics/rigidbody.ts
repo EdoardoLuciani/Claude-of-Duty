@@ -235,18 +235,16 @@ export class RigidBody {
     this.linearVelocity.x += ix * this.invMass;
     this.linearVelocity.y += iy * this.invMass;
     this.linearVelocity.z += iz * this.invMass;
-    if (px !== undefined) {
-      const rx = px - this.position.x,
-        ry = py - this.position.y,
-        rz = pz - this.position.z;
-      const tx = ry * iz - rz * iy;
-      const ty = rz * ix - rx * iz;
-      const tz = rx * iy - ry * ix;
-      const w = this.invInertiaWorld.elements;
-      this.angularVelocity.x += w[0] * tx + w[3] * ty + w[6] * tz;
-      this.angularVelocity.y += w[1] * tx + w[4] * ty + w[7] * tz;
-      this.angularVelocity.z += w[2] * tx + w[5] * ty + w[8] * tz;
-    }
+    const rx = px - this.position.x,
+      ry = py - this.position.y,
+      rz = pz - this.position.z;
+    const tx = ry * iz - rz * iy;
+    const ty = rz * ix - rx * iz;
+    const tz = rx * iy - ry * ix;
+    const w = this.invInertiaWorld.elements;
+    this.angularVelocity.x += w[0] * tx + w[3] * ty + w[6] * tz;
+    this.angularVelocity.y += w[1] * tx + w[4] * ty + w[7] * tz;
+    this.angularVelocity.z += w[2] * tx + w[5] * ty + w[8] * tz;
   }
 }
 

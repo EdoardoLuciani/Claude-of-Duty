@@ -172,7 +172,7 @@ export class PixiMinimap {
     this.contactCount = count;
     const pulses = s.pulses;
     for (let i = 0; i < Math.max(pulses?.length ?? 0, this.pulses.length); i++) {
-      let entry = this.pulses[i];
+      let entry = this.pulses.at(i);
       const pulse = pulses?.[i];
       if (!entry && pulse) {
         const node = new Container(),

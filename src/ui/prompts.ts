@@ -48,8 +48,8 @@ export class Banner {
   alpha = 0;
   scale = 1;
   show(title: string, sub: string, life = 2.1): void {
-    this.title = (title ?? '').toUpperCase();
-    this.sub = (sub ?? '').toUpperCase();
+    this.title = title.toUpperCase();
+    this.sub = sub.toUpperCase();
     this.life = life;
     this.t = 0;
   }

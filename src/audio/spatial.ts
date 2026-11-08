@@ -91,13 +91,9 @@ class Emitter {
 
   _setPos(x: number, y: number, z: number, when: number): void {
     const p = this.panner;
-    if (p.positionX) {
-      p.positionX.setValueAtTime(x, when);
-      p.positionY.setValueAtTime(y, when);
-      p.positionZ.setValueAtTime(z, when);
-    } else {
-      p.setPosition(x, y, z);
-    }
+    p.positionX.setValueAtTime(x, when);
+    p.positionY.setValueAtTime(y, when);
+    p.positionZ.setValueAtTime(z, when);
     this.pos.x = x;
     this.pos.y = y;
     this.pos.z = z;
@@ -107,13 +103,9 @@ class Emitter {
   moveTo(x: number, y: number, z: number, smooth = 0.06): void {
     const p = this.panner;
     const t = this.actx.currentTime;
-    if (p.positionX) {
-      p.positionX.setTargetAtTime(x, t, smooth);
-      p.positionY.setTargetAtTime(y, t, smooth);
-      p.positionZ.setTargetAtTime(z, t, smooth);
-    } else {
-      p.setPosition(x, y, z);
-    }
+    p.positionX.setTargetAtTime(x, t, smooth);
+    p.positionY.setTargetAtTime(y, t, smooth);
+    p.positionZ.setTargetAtTime(z, t, smooth);
     this.pos.x = x;
     this.pos.y = y;
     this.pos.z = z;
@@ -135,11 +127,9 @@ class Emitter {
     // Hold NOW, not at the replacement's delayed arrival, so no old event/target
     // can change the next voice's position, filters, distance gain or wet send.
     const t = this.actx.currentTime;
-    if (this.panner.positionX) {
-      holdEmitterParam(this.panner.positionX, t);
-      holdEmitterParam(this.panner.positionY, t);
-      holdEmitterParam(this.panner.positionZ, t);
-    }
+    holdEmitterParam(this.panner.positionX, t);
+    holdEmitterParam(this.panner.positionY, t);
+    holdEmitterParam(this.panner.positionZ, t);
     holdEmitterParam(this.airLP.frequency, t);
     holdEmitterParam(this.occLP.frequency, t);
     holdEmitterParam(this.occHS.gain, t);
@@ -227,7 +217,9 @@ export class SpatialField {
     uy: number,
     uz: number
   ): void {
-    const l = this.actx.listener;
+    // Firefox still has no AudioParam listener position; it uses setPosition().
+    const l = this.actx.listener as Omit<AudioListener, 'positionX'> &
+      Partial<Pick<AudioListener, 'positionX'>>;
     const t = this.actx.currentTime;
     this._lp.x = px;
     this._lp.y = py;
@@ -277,7 +269,7 @@ export class SpatialField {
    */
   occlusionAt(x: number, y: number, z: number): number {
     if (!this.occlusionEnabled) return 0;
-    const phys = this.ctx?.peek?.('physics');
+    const phys = this.ctx?.peek('physics');
     if (!phys?.raycast) return 0;
     const l = this._lp;
     const dx = x - l.x,
@@ -285,7 +277,7 @@ export class SpatialField {
       dz = z - l.z;
     const d = Math.hypot(dx, dy, dz);
     if (d < 0.8) return 0;
-    const mask = phys.MASK?.SIGHT ?? undefined;
+    const mask = phys.MASK.SIGHT;
     let blocked = 0;
     const o = this._occOrigin,
       dir = this._occDir;
@@ -301,7 +293,7 @@ export class SpatialField {
       if (len < 1e-4) continue;
       this.stats.occlusionRays++;
       const hit = phys.raycast(o, dir, len - 0.25, mask);
-      if (hit?.hit) {
+      if (hit.hit) {
         // A thin partition muffles less than a bunker wall: use how far past the
         // first hit the ray continued as a crude thickness proxy.
         blocked += hit.distance < len * 0.9 ? 1 : 0.5;
@@ -387,7 +379,7 @@ export class SpatialField {
     em.airLP.frequency.setTargetAtTime(airCutoff(dist), t, 0.12);
     em.occLP.frequency.setTargetAtTime(clamp(20000 * Math.pow(0.021, occ), 300, 20000), t, 0.12);
     em.occHS.gain.setTargetAtTime(-26 * occ, t, 0.12);
-    em.distGain.gain.setTargetAtTime(clamp(atten * (em.userGain ?? 1), 0, 4), t, 0.1);
+    em.distGain.gain.setTargetAtTime(clamp(atten * em.userGain, 0, 4), t, 0.1);
   }
 
   /** Hand a voice's top node to an emitter and set its teardown time. */

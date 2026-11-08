@@ -161,7 +161,7 @@ export class ProjectileSim {
     }
     if (!p) {
       // Oldest round yields its slot rather than dropping the shot.
-      p = this.live[0];
+      p = this.live.at(0);
       if (!p) return null;
       this._emitResolved(p, p.pos, 'recycled');
       this._retire(p);
@@ -186,7 +186,7 @@ export class ProjectileSim {
     p.pellet = o.pellet ?? 0;
     p.mask = o.mask;
     p.shooter = o.shooter ?? this.ctx.peek('player');
-    p.shot = this.physics?.nextShotId?.() ?? 0;
+    p.shot = this.physics?.nextShotId() ?? 0;
     p.speed = o.speed ?? 800;
     p.tracer = o.tracer === true;
     p.hitActors.length = 0;
@@ -251,7 +251,7 @@ export class ProjectileSim {
             ignoreActors: p.hitActors,
             layers: p.layers,
           });
-          const resolved = shot.impacts.find(isActorEntry) ?? shot.impacts[0] ?? null;
+          const resolved = shot.impacts.find(isActorEntry) ?? shot.impacts.at(0);
           if (resolved && (!p.hasImpact || (!p.impact.actor && resolved.actor))) {
             p.impact.point.copy(resolved.point);
             p.impact.actor = resolved.actor;

@@ -194,7 +194,7 @@ export class Health {
       // to move after this synchronous dispatch.
       this.ctx.events.emit('player:death', {
         position: this.ctx.camera.position.clone(),
-        from: from?.clone?.() ?? null,
+        from: from?.clone() ?? null,
         amount: dealt,
       });
       // (death allocations are fine — this happens once)

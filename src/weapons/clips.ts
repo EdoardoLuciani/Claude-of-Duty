@@ -69,7 +69,7 @@ function sampleTrack(keys: Track | null, t: number, out: ClipSample, blend: Blen
   if (b !== a) {
     const span = b.t - a.t;
     w = span > 1e-6 ? clamp01((t - a.t) / span) : 1;
-    w = (EASE[b.ease ?? 'smooth'] ?? EASE.smooth)(w);
+    w = EASE[b.ease ?? 'smooth'](w);
   }
   blend(a, b, w, out);
   return true;
@@ -132,7 +132,7 @@ type ManifestClips = Record<
 
 /** Aliases name authored asset clips; a missing one is an asset/alias mismatch. */
 function manifestClip(manifest: ManifestClips, source: string): ManifestClips[string] {
-  const info = manifest[source];
+  const info = manifest[source] as ManifestClips[string] | undefined;
   if (!info) throw new Error(`[weapons] animation manifest has no clip '${source}'`);
   return info;
 }
@@ -200,7 +200,7 @@ export function buildEquipClips(
   const hgP = nodes.gripL.pos;
   const wrapFinger = nodes.gripL.finger ?? v3(0.82, 0.5, -0.28);
   const wrapBack = nodes.gripL.back ?? v3(-0.5, 0.32, -0.8);
-  const drawT = def.drawTime ?? 0.62;
+  const drawT = def.drawTime;
   const draw = new Clip('draw', drawT, {
     weapon: [
       { t: 0, p: v3(0.05, -0.3, 0.14), r: v3(-0.85, 0.5, 0.55) },
@@ -222,7 +222,7 @@ export function buildEquipClips(
     events: [{ t: 0.995 * drawT, name: 'end' }],
   });
 
-  const holT = def.holsterTime ?? 0.4;
+  const holT = def.holsterTime;
   const holster = new Clip('holster', holT, {
     weapon: [
       { t: 0, p: v3(0, 0, 0), r: v3(0, 0, 0) },

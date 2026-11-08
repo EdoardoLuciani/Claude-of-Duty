@@ -173,7 +173,7 @@ export class Agent {
   declare pathGoalSurface: number;
   declare vaultVersion: number;
   declare ragdoll: ReturnType<PhysicsSystem['createRagdoll']> | null;
-  declare deadTime: number;
+  declare deadTime: number | undefined;
   declare rng: Rng;
   declare variantName: string;
   declare def: AiVariant;
@@ -376,7 +376,7 @@ export class Agent {
     this.variantName = opts.variant ?? 'vanguard';
     const def = ai.variant(this.variantName);
     this.def = def;
-    this.scale = def.variant.scale ?? 1;
+    this.scale = def.variant.scale;
 
     const { bones, skeleton, root } = RIG.createSkeleton();
     this.bones = bones;
@@ -560,7 +560,7 @@ export class Agent {
   _sense(dt: number): void {
     this.visualAge += dt;
     this.targetSample = -1;
-    const disabled = this.ai.ctx?.peek?.('player')?.hitbox?.enabled === false;
+    const disabled = this.ai.ctx.peek('player')?.hitbox?.enabled === false;
     let player = disabled ? null : this.ai.playerPosition(this._v3);
     if (!player) {
       this.targetVisible = false;
@@ -577,12 +577,11 @@ export class Agent {
     // Each fallback must pass its own cone/range/LOS; awareness advances ONCE.
     for (let sample = 0; sample < 3; sample++) {
       if (sample) player = this.ai.playerPosition(this._v3, sample);
-      if (!player) break;
       const to = this._dir.copy(player).sub(eye);
       dist = to.length();
       const dot = (fx * to.x + fz * to.z) / Math.max(dist, 0.001);
       if (dist >= this.viewRange || (dot <= cone && dist >= COMBAT.closeAcquire)) continue;
-      visible = !this.phys || this.phys.lineOfSight(eye, player, this.phys.MASK.SIGHT);
+      visible = this.phys.lineOfSight(eye, player, this.phys.MASK.SIGHT);
       if (visible) {
         this.targetSample = sample;
         break;
@@ -977,6 +976,7 @@ export class Agent {
           this.hasMoveTarget = false;
           this._failWait = PATH_FAIL_WAIT_MAX;
         } else {
+          // oxlint-disable-next-line typescript/no-unnecessary-condition -- _pickNextPatrol() may queue a path
           this.desiredSpeed = this.hasMoveTarget || this.pathPending ? 1.35 : 0;
         }
         break;
@@ -1499,6 +1499,7 @@ export class Agent {
         this._wrapDone = true;
         this.role = 'hold';
       }
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- _fallbackStuck() may clear the path
       return this.pathPending || this.wantFire;
     }
     // A route already installed by the shared budget is success. Do not solve again.
@@ -1517,6 +1518,7 @@ export class Agent {
       return true;
     }
     // Created this tick, so the give-up above cannot have elapsed yet.
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- _goOffAxis() may queue a path
     if (this.pathPending) {
       this.wantFire = false;
       return true;
@@ -1568,7 +1570,7 @@ export class Agent {
     this._searchCount = 0;
     this._positionScores.fill(Infinity);
     const grid = this.ai.grid;
-    if (!grid || !this.phys) return;
+    if (!grid) return;
     const start = grid.project(from, this._v2);
     if (!start) return;
     const component = grid.components.get(start);
@@ -1861,7 +1863,7 @@ export class Agent {
     this.aimWeight = 0.55;
     this.wantFire = false;
 
-    if (!sq?.peekHolders?.size) {
+    if (!sq?.peekHolders.size) {
       this._peekWait += dt;
       if (this._peekWait >= PEEK_WAIT_GIVE_UP) {
         this._abandonMove(target, dist);
@@ -2563,8 +2565,8 @@ export class Agent {
     const sq = this.squad;
     const reported =
       sq?.elevated === this && (!this.hasTarget || this.lastKnownKind !== EVIDENCE.VISUAL);
-    const look = reported && sq ? sq.contact : this.lastKnown;
-    if (engaged && (reported && sq ? sq.contactAge : this.lastKnownAge) < 8) {
+    const look = reported ? sq.contact : this.lastKnown;
+    if (engaged && (reported ? sq.contactAge : this.lastKnownAge) < 8) {
       this.targetYaw = Math.atan2(look.x - this.position.x, look.z - this.position.z);
     } else if (this.speed > 0.2) {
       this.targetYaw = Math.atan2(this._steer.x, this._steer.z);
@@ -2676,7 +2678,7 @@ export class Agent {
       !this.controller ||
       this._safeVersion !== grid.physics.staticWorld.version ||
       this.position.distanceToSquared(this._safePosition) < 0.25 ||
-      !this.ai.canRollback?.(this, this._safePosition) ||
+      !this.ai.canRollback(this, this._safePosition) ||
       !grid.canStand(this._safePosition, this.radius, this.height)
     )
       return false;
@@ -3002,10 +3004,7 @@ export class Agent {
     const origin = an.muzzleWorld;
     const dir = this._muzzleDir.copy(an.muzzleDir);
     applySpread(dir, this.rng, this.spread * (1 + this.suppression * COMBAT.suppressSpread));
-    if (
-      this._shotBlockedByFriend(origin, dir) ||
-      this.ai.onAgentFire(this, origin, dir) === false
-    ) {
+    if (this._shotBlockedByFriend(origin, dir) || !this.ai.onAgentFire(this, origin, dir)) {
       this.ai.stats.friendlyHolds++;
       this._friendlyBlock += dt;
       if (this._friendlyBlock >= FRIENDLY_HOLD) this._breakFriendlyPeek();
@@ -3055,20 +3054,17 @@ export class Agent {
       }
     }
     if (!blocked) return false;
-    if (phys) {
-      const wall = phys.raycast(
-        origin.x,
-        origin.y,
-        origin.z,
-        dir.x,
-        dir.y,
-        dir.z,
-        bestT - 0.08,
-        phys.MASK.WORLD
-      );
-      if (wall.hit) return false;
-    }
-    return true;
+    const wall = phys.raycast(
+      origin.x,
+      origin.y,
+      origin.z,
+      dir.x,
+      dir.y,
+      dir.z,
+      bestT - 0.08,
+      phys.MASK.WORLD
+    );
+    return !wall.hit;
   }
 
   _breakFriendlyPeek(): void {
@@ -3175,7 +3171,7 @@ export class Agent {
     this.ai.cover?.release(this.id);
     if (this.controller) this.phys.removeCharacter(this.controller);
     this.controller = null;
-    for (const c of this.colliders) this.phys?.removeCollider(c);
+    for (const c of this.colliders) this.phys.removeCollider(c);
     this.colliders.length = 0;
 
     // Impulse is N·s, and the ragdoll turns it into a velocity change on the
@@ -3186,7 +3182,7 @@ export class Agent {
       .copy(dir ?? this._v.set(0, 0, 1))
       .normalize()
       .multiplyScalar(Math.min(5.5, 1.5 + amount * 0.02));
-    const hitPoint = point ?? this._v.copy(this.position).setY(this.position.y + 1.2);
+    const hitPoint = point;
 
     // Own the hand-off: build the capsule spec from the *live* animated pose,
     // hand it to the solver and let it drive the skeleton from here.
@@ -3214,7 +3210,6 @@ export class Agent {
     point: THREE.Vector3
   ): import('../physics/ragdoll.ts').Ragdoll | null {
     const phys = this.phys;
-    if (!phys) return null;
     // Fat capsules that start half-buried in the floor tunnel straight through
     // it: the contact normal flips once a bone's axis is on the far side. Lift
     // the pose clear of the ground for the one frame it takes to build the doll,
@@ -3234,11 +3229,9 @@ export class Agent {
     this.group.position.y -= lift;
     this.group.updateMatrixWorld(true);
     if (!rd) return null;
-    if (impulse && point) {
-      // wide radius: a tight one dumps all of it into whichever light bone is
-      // nearest and whips the limb across the street
-      rd.applyImpulse(point.x, point.y, point.z, impulse.x, impulse.y, impulse.z, 0.85);
-    }
+    // wide radius: a tight one dumps all of it into whichever light bone is
+    // nearest and whips the limb across the street
+    rd.applyImpulse(point.x, point.y, point.z, impulse.x, impulse.y, impulse.z, 0.85);
     return rd;
   }
 
@@ -3328,16 +3321,16 @@ export class Agent {
     this._cancelRouteProof();
     this._endPeek();
     this._clearSearch();
-    this.ai?.cover?.release(this.id);
+    this.ai.cover?.release(this.id);
     this.cover = null;
     this.alive = false;
     this.wantFire = false;
     this.hasMoveTarget = this.pathPending = false;
-    if (this.controller) this.phys?.removeCharacter(this.controller);
+    if (this.controller) this.phys.removeCharacter(this.controller);
     this.controller = null;
-    for (const c of this.colliders) this.phys?.removeCollider(c);
+    for (const c of this.colliders) this.phys.removeCollider(c);
     this.colliders.length = 0;
-    if (this.ragdoll) this.phys?.removeRagdoll(this.ragdoll);
+    if (this.ragdoll) this.phys.removeRagdoll(this.ragdoll);
     this.ragdoll = null;
     this.group.parent?.remove(this.group);
   }

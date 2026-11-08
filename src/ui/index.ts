@@ -157,7 +157,7 @@ export class UiSystem {
       if (this.startGate) this.startGate.restart();
       else {
         ctx.events.emit('game:restart', { source: 'game-over' });
-        ctx.input?.requestPointerLock?.();
+        ctx.input.requestPointerLock();
       }
     });
     this.shop = new MarketOverlay(this.root, ctx);
@@ -268,7 +268,7 @@ export class UiSystem {
       // closed it — keep the pause machinery out of this frame entirely.
       this._hadPointerLock = false;
       this._marketJustClosed = true;
-      this.ctx.input?.requestPointerLock?.();
+      this.ctx.input.requestPointerLock();
     });
 
     on('explosion', (e): void => {
@@ -376,7 +376,7 @@ export class UiSystem {
   _playerPos(): THREE.Vector3 {
     const p = this.ctx.peek('player');
     const pos = p?.position;
-    if (pos && pos.isVector3) return this._pos.copy(pos);
+    if (pos) return this._pos.copy(pos);
     return this._pos.copy(this.ctx.camera.position);
   }
 
@@ -385,7 +385,7 @@ export class UiSystem {
     const a = this.ctx.peek('audio');
     if (!a) return;
     try {
-      a.playUi?.(id, gain);
+      a.playUi(id, gain);
     } catch {
       /* audio is optional feedback — never let it break the HUD */
     }
@@ -439,13 +439,13 @@ export class UiSystem {
   /* --------------------------------------------------------------- debug -- */
 
   /** Prepare the market state for integration checks. */
-  debugState(name: 'market'): { state: string } {
+  debugState(name: string): { state: string } {
     if (name !== 'market') throw new Error('Unknown UI debug state');
     this.menu.close();
     this.killfeed.clear();
     this.clearPrompt();
-    const rifle = this.ctx.peek('weapons')?.states?.get('rifle');
-    if (rifle) rifle.reserve = Math.round((rifle.def?.reserve ?? 90) * 0.4);
+    const rifle = this.ctx.peek('weapons')?.states.get('rifle');
+    if (rifle) rifle.reserve = Math.round(rifle.def.reserve * 0.4);
     const hp = this.ctx.peek('player')?.health;
     if (hp) hp.armour = 50;
     const m = this.ctx.peek('market');
@@ -597,7 +597,7 @@ export class UiSystem {
         key: HEAL_KEY,
         text: 'BANDAGING',
         sub: `${Math.max(0, s.bandages | 0)} LEFT`,
-        progress: s.healProgress ?? 0,
+        progress: s.healProgress,
       });
       this._healPrompt = true;
     } else if (this._healPrompt) {
@@ -632,7 +632,7 @@ export class UiSystem {
     const intelHud = intel?.getHudState();
     this._mmState.pulses = intelHud?.pulses ?? null;
     this._mmState.pulseTime = intelHud?.pulseTime ?? 0;
-    this._mmState.playerY = ctx.peek('player')?.feetPosition?.y ?? 0;
+    this._mmState.playerY = ctx.peek('player')?.feetPosition.y ?? 0;
     if (this.pixiHud) {
       this.pixiHud.setVisible(!ctx.engine.error);
       this.pixiHud.update(

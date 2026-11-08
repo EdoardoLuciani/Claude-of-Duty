@@ -358,7 +358,7 @@ function pushWorst<K extends string, T extends Record<K, number | null>>(
   }
   // The first record seeds the scan (as before, including NaN timings); a zero-capacity
   // list rejects everything. Runs per hitch, so the scan keeps a manual index.
-  const [first] = list;
+  const first = list.at(0);
   if (!first) return true;
   let min = 0;
   let least = first[key] ?? 0;
@@ -862,7 +862,7 @@ export class TelemetrySystem {
   } | null {
     this._raycaster.far = 24;
     this._raycaster.set(origin, dir);
-    const hit = this._raycaster.intersectObjects(world?.meshes ?? [], false)[0];
+    const hit = this._raycaster.intersectObjects(world?.meshes ?? [], false).at(0);
     if (!hit) return null;
     const mesh = hit.object;
     let normal = null;
@@ -880,7 +880,7 @@ export class TelemetrySystem {
       normal = [n3(this._v.x), n3(this._v.y), n3(this._v.z)];
     }
     return {
-      mesh: mesh.name ?? null,
+      mesh: mesh.name,
       palette: field(mesh.userData, 'palette') ?? null,
       instanceGroup:
         mesh instanceof THREE.InstancedMesh
@@ -1084,7 +1084,7 @@ export class TelemetrySystem {
 
   /** Last frame's resource counters, so a hitch can show what jumped inside it. */
   _snapInfo(): void {
-    const info = this.ctx.peek('render')?.renderer?.info;
+    const info = this.ctx.peek('render')?.renderer.info;
     if (!info) return;
     this._prevInfo = {
       programs: programCount(info),
@@ -1113,12 +1113,12 @@ export class TelemetrySystem {
     heapMb: number | null;
     dHeapMb: number | null;
   } {
-    const info = this.ctx.peek('render')?.renderer?.info;
+    const info = this.ctx.peek('render')?.renderer.info;
     const prev = this._prevInfo;
     const programs = programCount(info);
     const nodeBuilders = this._nativeBuilds?.count ?? null;
-    const geometries = info?.memory?.geometries ?? null;
-    const textures = info?.memory?.textures ?? null;
+    const geometries = info?.memory.geometries ?? null;
+    const textures = info?.memory.textures ?? null;
     const heap = heapMb();
     return {
       render: {
@@ -1142,7 +1142,7 @@ export class TelemetrySystem {
   _startObservers(): void {
     this._stopObservers(); // `__TELEMETRY__.start()` twice must not leave two observers
     this._observers = null;
-    const types = globalThis.PerformanceObserver?.supportedEntryTypes ?? [];
+    const types = globalThis.PerformanceObserver.supportedEntryTypes;
     const type = ['long-animation-frame', 'longtask'].find((name): boolean => types.includes(name));
     if (!type) return; // no observer at all: tier 1 still records the gaps
     try {
@@ -1237,12 +1237,12 @@ export class TelemetrySystem {
 
   _time(): number | null {
     const now = this._stopElapsed ?? this.ctx.time.elapsed;
-    return n3(now - (this._startElapsed ?? now));
+    return n3(now - this._startElapsed);
   }
 
   _rawTime(): number | null {
     const now = this._stopRaw ?? this.ctx.time.raw;
-    return n3(now - (this._startRaw ?? now));
+    return n3(now - this._startRaw);
   }
 
   _fillWorldProvenance(): void {
@@ -1278,7 +1278,7 @@ export class TelemetrySystem {
           weapon: weaponId(e.weapon),
           origin: vec(e.origin),
           dir: vec(e.dir),
-          seed: e.seed ?? null,
+          seed: e.seed,
         };
         break;
       case 'shot:resolved':
@@ -1287,13 +1287,13 @@ export class TelemetrySystem {
           weapon: weaponId(e.weapon),
           from: vec(e.from),
           to: vec(e.to),
-          result: e.result ?? null,
+          result: e.result,
           target: entityId(e.target),
           part: e.part ?? null,
           damage: n3(e.damage),
           pellet: e.pellet ?? 0,
-          shot: e.shot ?? null,
-          stopReason: e.stopReason ?? null,
+          shot: e.shot,
+          stopReason: e.stopReason,
         };
         break;
       case 'bullet:impact':
@@ -1301,7 +1301,7 @@ export class TelemetrySystem {
           point: vec(e.point),
           normal: vec(e.normal),
           incident: vec(e.incident),
-          surface: e.surface ?? null,
+          surface: e.surface,
           damage: n3(e.damage),
           exit: !!e.exit,
           target: entityId(e.actor),
@@ -1312,7 +1312,7 @@ export class TelemetrySystem {
         data = {
           actor: entityId(e.actor) ?? 'player',
           weapon: weaponId(e.weapon),
-          phase: e.phase ?? null,
+          phase: e.phase,
         };
         break;
       case 'damage:dealt':
@@ -1342,7 +1342,7 @@ export class TelemetrySystem {
       case 'player:state':
         data = {
           state: e.state ?? null,
-          stance: e.stance ?? null,
+          stance: e.stance,
           sprinting: !!e.sprinting,
           tacticalSprint: !!e.tacticalSprint,
           sliding: !!e.sliding,
@@ -1354,10 +1354,10 @@ export class TelemetrySystem {
       case 'player:footstep':
         data = {
           position: vec(e.position),
-          surface: e.surface ?? null,
+          surface: e.surface,
           running: !!e.running,
           speed: n3(e.speed),
-          stance: e.stance ?? null,
+          stance: e.stance,
         };
         break;
       case 'player:jump':
@@ -1370,10 +1370,10 @@ export class TelemetrySystem {
         };
         break;
       case 'player:mantle':
-        data = { kind: e.kind ?? null, height: n3(e.height) };
+        data = { kind: e.kind, height: n3(e.height) };
         break;
       case 'player:land':
-        data = { position: vec(e.position), velocity: n3(e.velocity), surface: e.surface ?? null };
+        data = { position: vec(e.position), velocity: n3(e.velocity), surface: e.surface };
         break;
       case 'player:death':
         data = { position: vec(e.position), from: vec(e.from), amount: n3(e.amount) };
@@ -1396,21 +1396,21 @@ export class TelemetrySystem {
         };
         break;
       case 'wave:start':
-        data = { wave: e.wave ?? null, enemies: e.enemies ?? null, squads: e.squads ?? null };
+        data = { wave: e.wave, enemies: e.enemies, squads: e.squads };
         break;
       case 'wave:complete':
-        data = { wave: e.wave ?? null, nextWave: e.nextWave ?? null, delay: n3(e.delay) };
+        data = { wave: e.wave, nextWave: e.nextWave, delay: n3(e.delay) };
         break;
       case 'score:change':
         data = {
-          score: e.score ?? null,
-          delta: e.delta ?? null,
-          reason: e.reason ?? null,
-          kills: e.kills ?? null,
+          score: e.score,
+          delta: e.delta,
+          reason: e.reason,
+          kills: e.kills,
         };
         break;
       case 'market:open':
-        data = { wave: e.wave ?? null };
+        data = { wave: e.wave };
         break;
       case 'market:close':
       case 'game:restart':
@@ -1420,20 +1420,20 @@ export class TelemetrySystem {
         data = { bearing: n3(e.bearing) };
         break;
       case 'hud:search':
-        data = { bearing: n3(e.bearing), sector: e.sector ?? null, remaining: e.remaining ?? null };
+        data = { bearing: n3(e.bearing), sector: e.sector, remaining: e.remaining };
         break;
       case 'radio:strike':
         data = { position: vec(e.position) };
         break;
       case 'ai:bark':
         data = {
-          kind: e.kind ?? null,
+          kind: e.kind,
           position: vec(e.position),
           actor: e.voice ? `ai:${e.voice}` : null,
         };
         break;
       case 'engine:error':
-        data = { system: e.system ?? null, method: e.method ?? null, message: e.message ?? null };
+        data = { system: e.system, method: e.method, message: e.message };
         break;
       default:
         data = {};
@@ -1469,15 +1469,15 @@ export class TelemetrySystem {
       t: this._time(),
       raw: this._rawTime(),
       frame: ctx.time.frame,
-      position: vec(p.feetPosition ?? p.position),
+      position: vec(p.feetPosition),
       eye: vec(ctx.camera.position),
       velocity: vec(p.velocity),
-      yaw: n3(p.yaw ?? ctx.camera.rotation.y),
+      yaw: n3(p.yaw),
       pitch: n3(ctx.camera.rotation.x),
       fov: n3(ctx.camera.fov),
       state: p.state ?? null,
-      stance: p.stance ?? null,
-      grounded: p.grounded ?? null,
+      stance: p.stance,
+      grounded: p.grounded,
       sprinting: !!p.sprinting,
       tacticalSprint: !!p.tacticalSprint,
       sliding: !!p.sliding,
@@ -1489,13 +1489,13 @@ export class TelemetrySystem {
       bandages: p.bandages,
       healing: p.healCtrl.active,
       healProgress: n3(p.healCtrl.progress),
-      weapon: w.activeId ?? null,
+      weapon: w.activeId,
       mode: ws?.mode ?? null,
       ammo: ws?.mag ?? null,
       reserve: ws?.reserve ?? null,
       reloading: !!w.reloading,
-      ads: (w.adsProgress ?? 0) > 0.5,
-      grenades: w.grenades ?? null,
+      ads: w.adsProgress > 0.5,
+      grenades: w.grenades,
       actions,
       move: [n3(this._move.x), n3(this._move.y)],
       look: [n3(input.look.x), n3(input.look.y)],
@@ -1577,7 +1577,7 @@ export class TelemetrySystem {
         state: a.state,
         stateTime: n3(a.stateTime),
         squad: a.squad?.id ?? null,
-        role: a.role ?? null,
+        role: a.role,
         crouch: !!a.crouch,
         peeking: !!a.peeking,
         wantFire: !!a.wantFire,
@@ -1589,7 +1589,7 @@ export class TelemetrySystem {
         visualAge: n3(a.visualAge),
         combatAction: a.combatAction ?? null,
         contactKind: a.lastKnownKind ?? null,
-        targetSample: a.targetSample ?? -1,
+        targetSample: a.targetSample,
         observationSearch: !!a._observationSearch,
         coverFailure: a.coverFailure ?? null,
         elevatedRole: a.squad?.elevated === a,
@@ -1599,16 +1599,16 @@ export class TelemetrySystem {
         cover: a.cover ? [n3(a.cover.x), n3(a.cover.y), n3(a.cover.z)] : null,
         coverPosition: a.cover ? vec(a.coverPos) : null,
         moveTarget: a.hasMoveTarget ? vec(a.moveTarget) : null,
-        pathLength: a.pathLen ?? 0,
-        pathIndex: a.pathIndex ?? 0,
+        pathLength: a.pathLen,
+        pathIndex: a.pathIndex,
         pathRequest: a.pathOutcome ? vec(a._pendingDest) : null,
         waypoint: a.hasMoveTarget ? vec(a.path[a.pathIndex]) : null,
         path: a.hasMoveTarget ? a.path.slice(a.pathIndex, a.pathLen).map(vec) : null,
         vault: a.vaultOutcome ?? null,
         vaultT: n3(a.vaultT),
         recovery: a.recoveryOutcome ?? null,
-        recoveryAttempts: a.recoveryAttempts ?? 0,
-        relocations: a.relocations ?? 0,
+        recoveryAttempts: a.recoveryAttempts,
+        relocations: a.relocations,
         rollback: a.lastRollback ?? null,
         searchTravelUntil: n3(a._searchTravelUntil),
         searchUntil: n3(a._searchUntil),
@@ -1753,7 +1753,7 @@ export class TelemetrySystem {
 
   _captureJpeg(): Promise<Blob | null> {
     const src = this.ctx.canvas;
-    if (!src?.width || !src.height) return Promise.resolve(null);
+    if (!src.width || !src.height) return Promise.resolve(null);
     const w = Math.max(1, src.width >> 1);
     const h = Math.max(1, src.height >> 1);
     let off = this._offscreen;
@@ -1814,16 +1814,14 @@ export class TelemetrySystem {
     if (this._noteMark) this._closeNote();
     this._noteMark = mark;
     const input = this.ctx.input;
-    if (input) {
-      this._restoreFrozen = input.frozen;
-      this._restoreEnabled = input.enabled;
-      input.frozen = true;
-      input.enabled = false;
-    }
+    this._restoreFrozen = input.frozen;
+    this._restoreEnabled = input.enabled;
+    input.frozen = true;
+    input.enabled = false;
     const player = this.ctx.peek('player');
     if (player) {
       this._restoreControl = player.controlEnabled;
-      player.setControlEnabled?.(false);
+      player.setControlEnabled(false);
     }
     this._noteInput.value = mark.note || '';
     this._note.style.display = '';
@@ -1836,11 +1834,9 @@ export class TelemetrySystem {
     this._noteMark = null;
     this._note.style.display = 'none';
     const input = this.ctx.input;
-    if (input) {
-      input.frozen = this._restoreFrozen ?? false;
-      input.enabled = this._restoreEnabled ?? true;
-    }
-    this.ctx.peek('player')?.setControlEnabled?.(this._restoreControl ?? true);
+    input.frozen = this._restoreFrozen ?? false;
+    input.enabled = this._restoreEnabled ?? true;
+    this.ctx.peek('player')?.setControlEnabled(this._restoreControl ?? true);
     this._updateBadge(true);
   }
 
@@ -1870,8 +1866,8 @@ export class TelemetrySystem {
     removeEventListener('visibilitychange', this._onVisibility);
     removeEventListener('keydown', this._onKey, true);
     removeEventListener('beforeunload', this._onBeforeUnload);
-    this.badge?.remove();
-    this._note?.remove();
+    this.badge.remove();
+    this._note.remove();
     if (window.__TELEMETRY__ === this.api) delete window.__TELEMETRY__;
   }
 }

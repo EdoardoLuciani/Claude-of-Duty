@@ -254,7 +254,7 @@ export class CameraRig {
     let amp = B.amp;
     amp *= lerp(1, B.adsScale, ads);
     amp *= lerp(1, B.lowHealthScale, 1 - clamp01(health.fraction));
-    amp *= lerp(1, B.suppressionScale, clamp01(health.suppression ?? 0));
+    amp *= lerp(1, B.suppressionScale, clamp01(health.suppression));
     amp *= 1 - B.moveDamp * moveFactor;
     this.breathPhase += dt;
     const bA = Math.sin(this.breathPhase * Math.PI * 2 * B.freqA);
@@ -328,7 +328,7 @@ export class CameraRig {
     else if (m.sprinting) moveTarget = F.sprint;
     else if (!m.grounded && m.velocity.y < -6) moveTarget = F.air;
     this.fovMove = approach(this.fovMove, moveTarget, F.moveTau, dt);
-    const adsFov = this.ctx.peek?.('player')?.adsFovScale ?? cfg.adsFovScale;
+    const adsFov = this.ctx.peek('player')?.adsFovScale ?? cfg.adsFovScale;
     this.fovAds = approach(this.fovAds, lerp(1, adsFov, ads), F.adsTau, dt);
     this.baseFov = cfg.fov;
     this.fov = this.baseFov * this.fovMove * this.fovAds;
@@ -378,11 +378,11 @@ export class CameraRig {
     adsFovScale?: number
   ): void {
     const F = CAMERA.fireVibe;
-    const intensity = clamp01(this.ctx.config?.firingShake ?? 1);
+    const intensity = clamp01(this.ctx.config.firingShake);
     const e = this.fireVibe;
     if (e <= 1e-4 || intensity <= 1e-4) return;
     let atten = lerp(1, this.fireVibeAdsScale, ads);
-    const fovScale = adsFovScale ?? this.ctx.config?.adsFovScale ?? 0.62;
+    const fovScale = adsFovScale ?? this.ctx.config.adsFovScale;
     if (ads > 0 && fovScale < 0.5) {
       atten *= lerp(1, F.opticScale, ads * clamp01((0.62 - fovScale) / 0.37));
     }

@@ -206,11 +206,10 @@ export class RadioSystem {
   /** Start a strike. No-op while one is already airborne. */
   callStrike(): boolean {
     if (this.active.length) return false;
-    const bounds = this._world?.bounds;
-    if (!bounds) return false;
+    const bounds = this._world.bounds;
 
     // Street axis from spawn yaw; forward is (-sin(yaw), -cos(yaw)).
-    const sp = this._world.spawn?.(0);
+    const sp = this._world.spawn(0);
     const yaw = sp?.yaw ?? Math.atan2(-0.832, -0.832);
     const dx = -Math.sin(yaw);
     const dz = -Math.cos(yaw);
@@ -259,7 +258,7 @@ export class RadioSystem {
 
     this.ctx.events.emit('radio:strike', { position: start });
     this._audio = this._audio ?? this.ctx.peek('audio');
-    strike.engine = this._audio?.startAircraft?.(plane.position) ?? null;
+    strike.engine = this._audio?.startAircraft(plane.position) ?? null;
     return true;
   }
 
@@ -280,18 +279,17 @@ export class RadioSystem {
         for (const prop of props) if (prop instanceof THREE.Mesh) prop.rotation.z += dt * 26;
       }
 
-      let next = s.drops[s.dropIdx];
+      let next = s.drops.at(s.dropIdx);
       while (next !== undefined && s.travel >= next) {
         s.dropIdx++;
         for (const off of CARPET.lateral) this._dropBomb(s, off);
-        next = s.drops[s.dropIdx];
+        next = s.drops.at(s.dropIdx);
       }
       // Audio may still be loading on the gesture that launched the strike.
       // Attach at the current plane position once ready; never restart mid-flight.
       const airborne = s.travel < s.lastDrop + LEAD + 30;
       if (airborne) {
-        if (!s.engine || s.engine.ended)
-          s.engine = audio?.startAircraft?.(s.plane.position) ?? null;
+        if (!s.engine || s.engine.ended) s.engine = audio?.startAircraft(s.plane.position) ?? null;
         s.engine?.move(s.plane.position, dt <= 0);
       } else {
         // Bombs over missing ground may survive longer than the visible pass.
@@ -312,7 +310,7 @@ export class RadioSystem {
         );
         bomb.mesh.rotation.z += dt * 2.2;
 
-        const gy = physics?.groundHeight?.(
+        const gy = physics?.groundHeight(
           bomb.mesh.position.x,
           bomb.mesh.position.z,
           bomb.mesh.position.y + 2

@@ -62,11 +62,8 @@ export class PauseMenu {
     // ---- field of view ---------------------------------------------------
     this.fov = this._slider('Field Of View', 65, 120, 1, (v): string => {
       this.ctx.config.fov = v;
-      const cam = this.ctx.camera;
-      if (cam) {
-        cam.fov = v;
-        cam.updateProjectionMatrix();
-      }
+      this.ctx.camera.fov = v;
+      this.ctx.camera.updateProjectionMatrix();
       return String(v | 0);
     });
 
@@ -161,7 +158,7 @@ export class PauseMenu {
       const t = (v - min) / (max - min);
       setStyle(fill, 'width', (t * 100).toFixed(2) + '%');
       setStyle(knob, 'left', (t * 100).toFixed(2) + '%');
-      setText(val, apply(v) ?? String(v));
+      setText(val, apply(v));
     };
     input.addEventListener('input', (): void => paint(parseFloat(input.value)));
     const api = {
@@ -189,9 +186,9 @@ export class PauseMenu {
     for (let i = 0; i < this.qBtns.length; i++)
       this.qBtns[i].classList.toggle('on', PRESETS[i] === cfg.quality);
     for (const [b, v] of this.invBtns) b.classList.toggle('on', !!cfg.invertY === v);
-    this.sens?.set((cfg.sensitivity ?? 0.0022) / 0.0022);
-    this.fov?.set(cfg.fov ?? 80);
-    this.shake?.set(cfg.firingShake ?? 1);
+    this.sens.set(cfg.sensitivity / 0.0022);
+    this.fov.set(cfg.fov);
+    this.shake.set(cfg.firingShake);
   }
 
   toggle(): void {
@@ -208,23 +205,19 @@ export class PauseMenu {
     this.syncFromConfig();
     setStyle(this.root, 'display', '');
     this.resumeBtn.focus();
-    document.exitPointerLock?.();
-    const t = this.ctx.time;
-    if (t) {
-      this._prevScale = t.scale;
-      t.scale = 0;
-    }
-    this.ctx.peek('player')?.setControlEnabled?.(false);
+    document.exitPointerLock();
+    this._prevScale = this.ctx.time.scale;
+    this.ctx.time.scale = 0;
+    this.ctx.peek('player')?.setControlEnabled(false);
     this.ctx.events.emit('ui:pause', { paused: true });
   }
 
   close(): void {
     if (!this.open) return;
     this.open = false;
-    const t = this.ctx.time;
-    if (t) t.scale = this._prevScale ?? 1;
-    this.ctx.peek('player')?.setControlEnabled?.(true);
-    this.ctx.input?.requestPointerLock?.();
+    this.ctx.time.scale = this._prevScale ?? 1;
+    this.ctx.peek('player')?.setControlEnabled(true);
+    this.ctx.input.requestPointerLock();
     this.ctx.events.emit('ui:pause', { paused: false });
   }
 

@@ -126,8 +126,8 @@ function spark(
   RAY_D.y /= l;
   RAY_D.z /= l;
   const reach = Math.min(3.2, speed * 0.22);
-  const hit = ph.raycast(RAY_O, RAY_D, reach, ph.MASK?.WORLD ?? 0xffff);
-  if (!hit?.hit) return;
+  const hit = ph.raycast(RAY_O, RAY_D, reach, ph.MASK.WORLD);
+  if (!hit.hit) return;
   const t = Math.max(0.02, hit.distance / Math.max(1, speed));
   // reflect, lose most of the energy, and keep going with what is left
   reflect(V2, RAY_D.x, RAY_D.y, RAY_D.z, hit.normal.x, hit.normal.y, hit.normal.z);
@@ -1180,5 +1180,12 @@ export function spawnImpact(
   surface: SurfaceName,
   energy: number
 ): void {
-  (IMPACTS[surface] ?? IMPACTS.concrete)(fx, point, normal, incident, energy);
+  // Unknown runtime surfaces (untagged meshes) read as concrete.
+  (Object.hasOwn(IMPACTS, surface) ? IMPACTS[surface] : IMPACTS.concrete)(
+    fx,
+    point,
+    normal,
+    incident,
+    energy
+  );
 }

@@ -51,7 +51,7 @@ export class HealthFx {
     this.beatAlpha = clamp01(this.beatEnergy * 0.55);
     const flashing = this.flashT < 1;
     if (flashing) this.flashT = Math.min(1, this.flashT + dt / 0.19);
-    this.flashAlpha = flashing ? (this.flashPeak ?? 1) * (1 - ease.outQuad(this.flashT)) * 0.8 : 0;
+    this.flashAlpha = flashing ? this.flashPeak * (1 - ease.outQuad(this.flashT)) * 0.8 : 0;
     // --- vitals readout ---------------------------------------------------
     // the bar chases the value so a burst reads as a slide, not a jump; the
     // numeral is the truth and updates immediately

@@ -52,7 +52,9 @@ export function sectorBearing(dx: number, dz: number): number {
 }
 
 export function sectorLabel(bearing: number): (typeof SECTORS)[number] {
-  const sector = SECTORS[Math.round((((bearing % 360) + 360) % 360) / 45) % 8];
+  const sector = SECTORS[Math.round((((bearing % 360) + 360) % 360) / 45) % 8] as
+    | (typeof SECTORS)[number]
+    | undefined;
   // Every finite bearing lands in 0..7; NaN/Infinity would emit an unlabeled cue.
   if (sector === undefined) throw new RangeError(`[search-assist] non-finite bearing ${bearing}`);
   return sector;

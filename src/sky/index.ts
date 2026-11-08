@@ -392,13 +392,13 @@ export class SkySystem {
     this._updateCelestial();
     this._bakeSky();
     this._bakeEnv();
-    if (this.ctx.config.deterministic === true) {
+    if (this.ctx.config.deterministic) {
       const c = this.celestial;
       const sc = this.sunLight.color;
       console.info(
         `[sky] t=${this.hour.toFixed(2)} sunAlt=${((c.sunAlt * 180) / Math.PI).toFixed(1)} ` +
           `sunI=${this.sunLight.intensity.toFixed(3)} sunCol=${sc.r.toFixed(2)},${sc.g.toFixed(2)},${sc.b.toFixed(2)} ` +
-          `moonI=${this.moonLight.intensity.toFixed(4)} beamLum=${(this._beamLuminance ?? 0).toFixed(3)} ` +
+          `moonI=${this.moonLight.intensity.toFixed(4)} beamLum=${this._beamLuminance.toFixed(3)} ` +
           `amb=${this.ambientColor.r.toFixed(3)},${this.ambientColor.g.toFixed(3)},${this.ambientColor.b.toFixed(3)} ` +
           `indirect=${this.indirectScale.toFixed(2)} ` +
           `knee=${this.shared.uSkyRolloff.value.x.toFixed(3)}`
@@ -663,11 +663,7 @@ export class SkySystem {
     this._pmremTarget = this.pmrem.fromEquirectangular(this.envEquirect.texture, this._pmremTarget);
     this._pmremTarget.texture.name = 'sky-env';
     this.envMap = this._pmremTarget.texture;
-    if (this.render.setEnvMap) this.render.setEnvMap(this.envMap);
-    else {
-      this.ctx.scene.environment = this.envMap;
-      this.ctx.viewScene.environment = this.envMap;
-    }
+    this.render.setEnvMap(this.envMap);
 
     this._envSunDir.copy(this.celestial.sun);
     this._envMoonDir.copy(this.celestial.moon);
@@ -692,8 +688,8 @@ export class SkySystem {
     this.pmrem.dispose();
     this.ctx.scene.remove(this.sunLight, this.sunLight.target);
     this.ctx.scene.remove(this.moonLight, this.moonLight.target);
-    this.render.removeLight?.(this.sunLight);
-    this.render.removeLight?.(this.moonLight);
+    this.render.removeLight(this.sunLight);
+    this.render.removeLight(this.moonLight);
     this.sunLight.dispose();
     this.moonLight.dispose();
   }

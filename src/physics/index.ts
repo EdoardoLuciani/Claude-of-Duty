@@ -387,7 +387,6 @@ export class PhysicsSystem {
     surfaceType?: SurfaceName | number,
     opts: StaticOptions = {}
   ): number {
-    if (!mesh) return -1;
     const mask = opts.mask ?? opts.layer ?? LAYER.STATIC;
     const id = this.staticWorld.addMesh(mesh, surfaceType, mask, opts);
     if (id >= 0) this._explicitStatics++;
@@ -401,14 +400,13 @@ export class PhysicsSystem {
     opts: StaticOptions = {}
   ): number[] {
     const ids: number[] = [];
-    if (!root) return ids;
     root.updateWorldMatrix(true, true);
     const registered = this._explicitStatics;
     try {
       root.traverse((o: THREE.Object3D): void => {
         if (!isCollisionMesh(o)) return;
-        if (o.userData?.collision === false || o.userData?.noCollision) return;
-        const metadataSurface: unknown = o.userData?.surface;
+        if (o.userData.collision === false || o.userData.noCollision) return;
+        const metadataSurface: unknown = o.userData.surface;
         const resolvedSurface =
           surfaceType === undefined
             ? metadataSurface === undefined
@@ -1117,8 +1115,8 @@ export class PhysicsSystem {
     e.shot = shot.shot;
     e.shooter = shot.shooter ?? null;
     e.weapon = shot.weapon ?? null;
-    e.speed = shot.speed ?? 800;
-    e.tracer = shot.tracer === true;
+    e.speed = shot.speed;
+    e.tracer = shot.tracer;
     this.ctx.events.emit('bullet:segment', e);
   }
 
@@ -1187,7 +1185,6 @@ export class PhysicsSystem {
    * grenade behind a wall doesn't throw the crate in front of it.
    */
   explode(e: ExplosionEvent | THREE.Vector3): void {
-    if (!e) return;
     const event = 'position' in e ? e : null;
     const pos = 'position' in e ? e.position : e;
     const radius = event?.radius ?? 5;
@@ -1304,8 +1301,8 @@ export class PhysicsSystem {
     opts: ConstructorParameters<typeof Ragdoll>[1] &
       Parameters<typeof specFromSkeleton>[1] & { actor?: unknown; velocity?: THREE.Vector3 } = {}
   ): Ragdoll | null {
-    const skeleton = skinnedMesh?.skeleton ?? skinnedMesh;
-    if (!skeleton?.bones?.length) return null;
+    const skeleton = skinnedMesh.skeleton;
+    if (!skeleton.bones.length) return null;
     const { spec, boneMap } = specFromSkeleton(skeleton, opts);
     if (!spec.length) return null;
     const { transform, ...options } = opts;
@@ -1402,7 +1399,8 @@ export class PhysicsSystem {
   }
 
   dispose(): void {
-    this.ctx?.events.off('explosion', this._onExplosion);
+    // Standalone instances (workers, nav bake, tests) are never initialized.
+    (this.ctx as PhysicsContext | undefined)?.events.off('explosion', this._onExplosion);
     this.bodies.clear();
     for (const rd of this.ragdolls) rd.dispose();
     this.ragdolls.length = 0;
