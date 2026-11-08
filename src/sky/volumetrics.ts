@@ -197,9 +197,8 @@ export function createVolumetricNodes(
 
       // `color`/`depth` may be texture nodes (a `PassNode`'s getTextureNode()) or
       // values already evaluated for this fragment (e.g. TSL's `linearDepth`).
-      const colorNode = (
-        'sample' in color && typeof color.sample === 'function' ? color.sample(uv) : color
-      ) as Node<'vec3'> | Node<'vec4'>;
+      const colorNode =
+        'sample' in color && typeof color.sample === 'function' ? color.sample(uv) : color;
       const depthValue =
         'sample' in depth && typeof depth.sample === 'function' ? depth.sample(uv).r : depth;
       const sky = depthValue.lessThanEqual(1e-6);

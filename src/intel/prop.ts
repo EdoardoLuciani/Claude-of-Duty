@@ -108,7 +108,7 @@ export function makeKit(materials?: IntelMaterials): IntelKit {
   const geos: Record<string, THREE.BufferGeometry> = {};
   const lidKinds = new Set(['lid', 'lidMetal', 'lining', 'label', 'beacon']);
   for (const [kind, list] of Object.entries(parts)) {
-    const geo = mergeGeometries(list)!;
+    const geo = mergeGeometries(list);
     geos[kind] = geo;
     for (const part of list) part.dispose();
     materials?.bakeMasks(geo, { wear: 0.6, grime: 0.65, upWear: 0.04 });

@@ -8,7 +8,7 @@ export async function createWebGpuRenderer(
   canvas: HTMLCanvasElement,
   onDeviceLost?: (error: Error) => void
 ): Promise<Renderer> {
-  if (!globalThis.navigator?.gpu) {
+  if (!(globalThis.navigator as Partial<Navigator>).gpu) {
     throw new Error('WebGPU is required to play. Use a WebGPU-capable browser and device.');
   }
 
@@ -27,11 +27,12 @@ export async function createWebGpuRenderer(
   renderer.onDeviceLost = (info): void => {
     if (info.reason === 'destroyed') return; // Explicit disposal is not a failure.
     defaultDeviceLost.call(renderer, info); // Preserve Three's lost-device state.
-    lost = new Error(`WebGPU device lost (${info.reason}): ${info.message ?? 'unknown GPU error'}`);
+    lost = new Error(`WebGPU device lost (${info.reason}): ${info.message}`);
     onDeviceLost?.(lost);
   };
   try {
     await renderer.init();
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- set by the device-lost callback during init
     if (lost) throw lost;
   } catch (error) {
     // No WebGL fallback was registered; failed device initialization cannot

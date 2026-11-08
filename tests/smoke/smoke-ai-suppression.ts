@@ -10,7 +10,7 @@ import { EventBus } from '../../src/core/registry.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
-import { makeAgent } from '../../tools/lib/agent-fixture.ts';
+import { makeAgent } from '../lib/agent-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 
 const v = (x = 0, y = 1, z = 0): THREE.Vector3 => new THREE.Vector3(x, y, z);

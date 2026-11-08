@@ -29,11 +29,19 @@ export const SCORE = Object.freeze({
 export class GameSystem {
   declare ctx: EngineContext;
   declare ai: AiSystem;
-  declare score: number;
-  declare kills: number;
-  declare _hud: HudState;
-  declare _search: SearchState;
-  declare _off: Array<() => void>;
+  score: number = 0;
+  kills: number = 0;
+  _hud: HudState = {
+    score: 0,
+    kills: 0,
+    wave: 0,
+    enemiesRemaining: 0,
+    waveTotal: 0,
+    waveIncoming: false,
+    nextWaveIn: 0,
+  };
+  _search: SearchState = { quietSince: -1, lastCueAt: -1 };
+  _off: Array<() => void> = [];
 
   static readonly id = 'game';
   static readonly deps: SystemId[] = ['ai'];
@@ -41,20 +49,7 @@ export class GameSystem {
   async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
     this.ai = ctx.get('ai');
-    this.score = 0;
-    this.kills = 0;
-    this._hud = {
-      score: 0,
-      kills: 0,
-      wave: 0,
-      enemiesRemaining: 0,
-      waveTotal: 0,
-      waveIncoming: false,
-      nextWaveIn: 0,
-    };
-    this._search = { quietSince: -1, lastCueAt: -1 };
 
-    this._off = [];
     const on = <K extends GameInputEvent>(
       type: K,
       fn: (event: EngineEventMap[K]) => void
@@ -65,9 +60,9 @@ export class GameSystem {
     // AI handles damage first (the dependency guarantees listener order) and
     // marks the shared payload `killed` when this hit actually ended the actor.
     on('damage:dealt', (e): void => {
-      const target = e?.target;
+      const target = e.target;
       if (
-        !e?.killed ||
+        !e.killed ||
         !target ||
         typeof target !== 'object' ||
         this._isPlayerTarget(target) ||

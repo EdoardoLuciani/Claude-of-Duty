@@ -8,7 +8,9 @@ import {
 } from '@recast-navigation/core';
 import * as THREE from 'three';
 
+import { NAV_PENDING, NAV_CANCELLED, AttachmentQueries } from './attachment-queries.ts';
 import { INFANTRY, vaultPoint } from './capabilities.ts';
+import { ladderMoveBudget, type LadderDescriptor, type LadderDirection } from './ladder.ts';
 import {
   unpackNav,
   NAV_PROFILE,
@@ -18,9 +20,6 @@ import {
   type BakedCoverPoint,
 } from './nav-format.ts';
 import { TACTICS } from './tuning.ts';
-export { unpackNav } from './nav-format.ts';
-import { NAV_PENDING, NAV_CANCELLED, AttachmentQueries } from './attachment-queries.ts';
-import { ladderMoveBudget, type LadderDescriptor, type LadderDirection } from './ladder.ts';
 export { NAV_PENDING, NAV_CANCELLED } from './attachment-queries.ts';
 const EXTENTS = Object.freeze({ x: 1.2, y: INFANTRY.stepHeight, z: 1.2 });
 // Cross-map upper-floor routes exhaust 12k nodes; retain a finite cap and
@@ -267,7 +266,7 @@ export class SurfaceNav {
       if (!h) continue;
       for (let k = 0; k < h.offMeshConCount(); k++) {
         const connection = tile.offMeshCons(k),
-          descriptor = this.ladders[connection.userId() - 1];
+          descriptor = this.ladders[connection.userId() - 1] as LadderDescriptor | undefined;
         if (!descriptor || this.ladderLinks.has(this.mesh.getPolyRefBase(tile) + connection.poly()))
           throw new Error('[nav] unbound ladder');
         const ref = this.mesh.getPolyRefBase(tile) + connection.poly(),
@@ -642,6 +641,7 @@ export class SurfaceNav {
                 };
                 // Pinned Detour may omit offmesh flags when a portal equals the
                 // straight start/end. The complete corridor is authoritative.
+                // oxlint-disable-next-line typescript/no-unnecessary-condition -- cleared by the leg callback
                 for (let i = 0; i < path.polys.size && valid; i++) {
                   const ref = path.polys.get(i);
                   if (this.mesh.getTileAndPolyByRef(ref).poly.getType() === 0) continue;
@@ -769,7 +769,9 @@ export class CoverMap {
   grid!: SurfaceNav | null;
   physics!: NavPhysics;
   points!: NavCoverPoint[];
-  _candidates!: (NavCoverPoint | null)[];
+  _candidates: (NavCoverPoint | null)[] = new Array<NavCoverPoint | null>(
+    TACTICS.coverCandidates
+  ).fill(null);
   byComponent: Map<number, NavCoverPoint[]> = new Map();
   _v: THREE.Vector3 = new THREE.Vector3();
   _v2: THREE.Vector3 = new THREE.Vector3();
@@ -782,12 +784,11 @@ export class CoverMap {
     this.physics = physics;
     this.points = nav?.coverPoints ?? [];
     for (const p of this.points) {
-      p.component = nav?.walkingComponents?.get(p.surface) ?? p.component;
+      p.component = nav?.walkingComponents.get(p.surface) ?? p.component;
       let list = this.byComponent.get(p.component);
       if (!list) this.byComponent.set(p.component, (list = []));
       list.push(p);
     }
-    this._candidates = new Array<NavCoverPoint | null>(TACTICS.coverCandidates).fill(null);
   }
   pick(
     pos: THREE.Vector3,
@@ -817,7 +818,7 @@ export class CoverMap {
       yTol = opts.yTol ?? 1.6;
     if (!this.grid) return null;
     const ref = this.grid.project(pos, this._v3),
-      component = (this.grid.walkingComponents ?? this.grid.components).get(ref);
+      component = this.grid.walkingComponents.get(ref);
     if (component === undefined) return null;
     const points = this.byComponent.get(component);
     if (!ref || !points) return null;
@@ -863,12 +864,7 @@ export class CoverMap {
       }
       if (squad)
         for (const other of squad) {
-          if (
-            !other ||
-            other.id === claimId ||
-            !other.alive ||
-            Math.abs(other.position.y - p.y) > 1.6
-          )
+          if (other.id === claimId || !other.alive || Math.abs(other.position.y - p.y) > 1.6)
             continue;
           const distance = Math.hypot(other.position.x - p.x, other.position.z - p.z);
           if (distance < 3.2) score -= (3.2 - distance) * 1.4;
@@ -912,7 +908,7 @@ export class CoverMap {
       }
       this._v.set(p.x, p.y, p.z);
       const goal = this.grid.project(this._v, this._v3, null, true);
-      if (!goal || (this.grid.walkingComponents ?? this.grid.components).get(goal) !== component) {
+      if (!goal || this.grid.walkingComponents.get(goal) !== component) {
         this.lastReject = 'attachment';
         continue;
       }
@@ -969,7 +965,7 @@ export class CoverMap {
     if (!grid) return null;
     // Low cover may expose by standing; high cover must be physically rounded.
     // Zero is a valid standing peek, null means there is no executable shot.
-    for (let i = cover.high === false ? 0 : 1; i <= 4; i++) {
+    for (let i = cover.high ? 1 : 0; i <= 4; i++) {
       const side = i === 0 ? 0 : i % 2 ? 1 : -1;
       const distance = i <= 2 ? 0.95 : 1.9;
       this._v2.set(
@@ -982,7 +978,7 @@ export class CoverMap {
       // rays before costly physical attachments (most wall samples are blind).
       this._v.set(
         this._v2.x + cover.dz * TACTICS.peekMargin * side,
-        this._v2.y + (eyeH ?? 1.5),
+        this._v2.y + eyeH,
         this._v2.z - cover.dx * TACTICS.peekMargin * side
       );
       if (!this.physics.lineOfSight(this._v, threat, this.physics.MASK.SIGHT)) continue;

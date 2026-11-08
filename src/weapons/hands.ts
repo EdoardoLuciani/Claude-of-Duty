@@ -3,11 +3,13 @@ import * as THREE from 'three';
 import { bindArmAsset, type ArmAsset } from './arm-asset.ts';
 import { createArmControls } from './arm-controls.ts';
 import { HAND_POSES, HAND_POSE_EASE } from './hand-poses.ts';
-export { HAND_POSES } from './hand-poses.ts';
 
 // Gameplay owns contact/IK; Blender owns the skin and authored contact poses.
 const THUMB = { l0: 0.05, l1: 0.032, r1: 0.0102, r2: 0.0078 };
-const POSES: Record<string, HandPoseData> = HAND_POSES;
+// Weapon data names poses by string, so a lookup can miss.
+const POSES: Partial<Record<string, HandPoseData>> = HAND_POSES;
+const CLAMP: HandPoseData = HAND_POSES.clamp;
+const WRAP: HandPoseData = HAND_POSES.wrap;
 const _t = new THREE.Vector3();
 const _dir = new THREE.Vector3();
 const _perp = new THREE.Vector3();
@@ -89,7 +91,7 @@ export class Arm {
   scale!: number;
   l1!: number;
   l2!: number;
-  root!: THREE.Object3D;
+  root: THREE.Object3D = new THREE.Object3D();
   shoulder!: THREE.Vector3;
   pole!: THREE.Vector3;
   pose!: string;
@@ -119,14 +121,13 @@ export class Arm {
   _poseBlend!: number;
   bodyUp: THREE.Vector3 = new THREE.Vector3(0, 1, 0);
   bodyRight: THREE.Vector3 = new THREE.Vector3(1, 0, 0);
-  poses: Record<string, HandPoseData> = {};
+  poses: Partial<Record<string, HandPoseData>> = {};
 
   constructor(side: number, opts: ArmOptions = {}) {
     this.side = side;
     this.scale = opts.scale ?? 1;
     this.l1 = (opts.upper ?? 0.33) * this.scale;
     this.l2 = (opts.fore ?? 0.3) * this.scale;
-    this.root = new THREE.Object3D();
     this.root.name = side < 0 ? 'arm-left' : 'arm-right';
     this.shoulder = new THREE.Vector3(
       side * (opts.shoulderX ?? 0.19),
@@ -152,7 +153,7 @@ export class Arm {
   ): THREE.Vector3[] {
     const clearance = opts.clearance ?? 0.001;
     const poseName = opts.poseName ?? this.pose;
-    const base = this.poses[poseName] ?? POSES[poseName] ?? POSES.clamp;
+    const base = this._lookupPose(poseName) ?? CLAMP;
 
     this.hand.position.copy(handPos);
     this.hand.quaternion.copy(handQuat);
@@ -298,7 +299,8 @@ export class Arm {
     name: string,
     { thumb, thumbPole = [0, 0, 1], index, fingers, spread }: FitGripOptions = {}
   ): void {
-    const base = this.poses[this.pose] ?? POSES[this.pose];
+    const base = this._lookupPose(this.pose);
+    if (!base) throw new Error(`[hands] unknown pose ${this.pose}`);
     const pose = {
       ...base,
       fingers: (fingers ?? base.fingers).map((a): number[] => a.slice()),
@@ -381,9 +383,13 @@ export class Arm {
     this.setPose(name);
   }
 
+  _lookupPose(name: string): HandPoseData | undefined {
+    return this.poses[name] ?? POSES[name];
+  }
+
   /** Immediate for build-time fitting; eased for live animation transitions. */
   setPose(name: string, duration = 0): void {
-    const p = this.poses[name] ?? POSES[name] ?? POSES.wrap;
+    const p = this._lookupPose(name) ?? WRAP;
     for (let i = 0; i < 4; i++) {
       this._spreadFrom[i] = this.fingers[i].root.rotation.y;
       this._spreadTo[i] = p.fingerSpread?.[i] ?? this.fingerSpread[i];

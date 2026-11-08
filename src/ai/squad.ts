@@ -35,7 +35,7 @@ interface PeekDeath {
 }
 
 export class Squad {
-  id!: number;
+  id: number = _nextSquad++;
   rng!: SquadRng;
   members: SquadAgent[] = [];
   ai: SquadAI | null = null;
@@ -74,7 +74,6 @@ export class Squad {
   elevationStatus: string | null = 'waiting';
 
   constructor(rng: SquadRng) {
-    this.id = _nextSquad++;
     this.rng = rng;
   }
 
@@ -135,7 +134,7 @@ export class Squad {
       for (const m of this.members) {
         if (!m.alive || m.hasTarget) continue;
         // a call-out only gives a direction to check, never a free kill
-        if (m._noteEvidence?.(this.contact, 'report', this.contactAge)) {
+        if (m._noteEvidence(this.contact, 'report', this.contactAge)) {
           m.alertness = 1;
           if (m.state === 'idle' || m.state === 'patrol') m._setState('alert');
         }
@@ -156,7 +155,7 @@ export class Squad {
       m.hasTarget &&
       m.targetVisible &&
       m.wantFire &&
-      !m.animator?.reloading &&
+      !m.animator.reloading &&
       m.suppression < TACTICS.strongSuppression &&
       !m._muzzleBlocked &&
       !(m._friendlyBlock > 0)
@@ -178,10 +177,10 @@ export class Squad {
         !m.hasTarget ||
         !m.targetVisible ||
         m.health < 34 ||
-        m.animator?.reloading ||
+        m.animator.reloading ||
         m.suppression >= TACTICS.strongSuppression ||
         m._friendlyBlock > 0 ||
-        !m._firingLaneClear?.(m.lastKnown)
+        !m._firingLaneClear(m.lastKnown)
       )
         continue;
       const value = (this.supports(m) ? 3 : 0) + (m === this.holder ? 1 : 0);
@@ -366,7 +365,7 @@ export class Squad {
 
     if (this.intent === INTENT.WRAP) {
       const threat = this.hasContact ? this.contact : alive[0].lastKnown;
-      const far = threat && alive.some((m): boolean => m.position.distanceTo(threat) > LONG_RANGE);
+      const far = alive.some((m): boolean => m.position.distanceTo(threat) > LONG_RANGE);
       const offX = this.why === 'unseen-deaths' || far;
       if (offX) {
         this.pickWrapDest(alive[0].position, threat);
@@ -452,7 +451,7 @@ export class Squad {
   pickWrapDest(from: THREE.Vector3, threat: THREE.Vector3): boolean {
     const grid = this.ai?.grid;
     this.hasWrapDest = false;
-    if (!grid || !from || !threat) return false;
+    if (!grid) return false;
     const fromRef = grid.project(from, this.wrapDest);
     if (!fromRef) return false;
     const component = grid.components.get(fromRef);
@@ -465,7 +464,7 @@ export class Squad {
     const rx = -fz,
       rz = fx;
     const side = this.wrapSide;
-    const y = threat.y ?? from.y;
+    const y = threat.y;
     const tries = [
       [-5, 12],
       [-8, 10],
@@ -545,9 +544,9 @@ export class Squad {
     if (last >= 0 && this.time - last < 0.55) return false;
     for (const m of this.members) {
       if (m === agent || !m.alive || this.peekHolders.has(m.id)) continue;
-      if (m.state !== 'combat' || !m.cover || !m.coverPos) continue;
-      if (m.peeking || m._returning || (m.peekTimer ?? 0) > 0) continue;
-      if ((m.lastKnownAge ?? Infinity) > 2.8) continue;
+      if (m.state !== 'combat' || !m.cover) continue;
+      if (m.peeking || m._returning || m.peekTimer > 0) continue;
+      if (m.lastKnownAge > 2.8) continue;
       if (m.position.distanceTo(m.coverPos) > 0.85) continue;
       if ((this._peekAt.get(m.id) ?? -1) < last) return false;
     }

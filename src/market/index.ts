@@ -153,12 +153,29 @@ export class MarketSystem {
   declare player: PlayerSystem;
   declare health: Health;
   declare credits: number;
-  declare open: boolean;
-  declare delay: number;
+  open: boolean = false;
+  delay: number = MARKET_DELAY;
   declare _marketAt: number;
   declare _pendingWave: number;
-  declare _hud: HudState;
-  declare _off: Array<() => void>;
+  // Preallocated HUD snapshot, pooled like every other subsystem's.
+  _hud: HudState = {
+    credits: 0,
+    marketIn: 0,
+    items: CATALOG.map((c): HudItem => ({
+      id: c.id,
+      label: c.label,
+      cost: c.cost,
+      max: c.max,
+      step: c.step,
+      unit: 'unit' in c ? c.unit : '',
+      blurb: c.blurb,
+      slot: c.slot,
+      level: 0,
+      affordable: false,
+      action: 'buy',
+    })),
+  };
+  _off: Array<() => void> = [];
   declare _prevScale: number;
   declare _prevControl: boolean;
 
@@ -168,32 +185,10 @@ export class MarketSystem {
     this.player = ctx.get('player');
     this.health = this.player.health;
     this.credits = 0;
-    this.open = false;
-    this.delay = MARKET_DELAY;
     /** When the shop should open (ctx.time.elapsed), 0 when not pending. */
     this._marketAt = 0;
     this._pendingWave = 0;
 
-    // Preallocated HUD snapshot, pooled like every other subsystem's.
-    this._hud = {
-      credits: 0,
-      marketIn: 0,
-      items: CATALOG.map((c): HudItem => ({
-        id: c.id,
-        label: c.label,
-        cost: c.cost,
-        max: c.max,
-        step: c.step,
-        unit: 'unit' in c ? c.unit : '',
-        blurb: c.blurb,
-        slot: c.slot,
-        level: 0,
-        affordable: false,
-        action: 'buy',
-      })),
-    };
-
-    this._off = [];
     const on = <K extends keyof EngineEventMap>(
       type: K,
       fn: (event: EngineEventMap[K]) => void
@@ -204,11 +199,11 @@ export class MarketSystem {
     // Credits mirror the score's rewards 1:1 (kills, headshots, wave bonuses
     // — see score:change in ARCHITECTURE.md); spending is the only divergence.
     on('score:change', (e): void => {
-      this.credits += Math.max(0, e?.delta ?? 0);
+      this.credits += Math.max(0, e.delta);
     });
 
     on('wave:complete', (e): void => {
-      const wave = Math.max(1, (e?.wave ?? 0) | 0);
+      const wave = Math.max(1, e.wave | 0);
       // Arm the grace period; the shop opens from update() once it elapses.
       this._pendingWave = wave;
       this._marketAt = this.ctx.time.elapsed + MARKET_DELAY;
@@ -220,7 +215,7 @@ export class MarketSystem {
   _level(itemId: MarketItemId): number {
     if (itemId === 'grenade') return this.weapons.grenades;
     if (itemId === 'armour') return this.health.armour;
-    if (itemId === 'bandage') return this.player.bandages ?? 0;
+    if (itemId === 'bandage') return this.player.bandages;
     if (itemId === 'ammo') return Math.round(this.weapons.ammoFraction() * 100);
     if (itemId === 'carpet') return this.weapons.carpetBombs;
     return this.weapons.owns(itemId) ? 1 : 0;
@@ -253,7 +248,7 @@ export class MarketSystem {
   closeShop(): void {
     if (!this.open) return;
     this.open = false;
-    this.ctx.time.scale = this._prevScale ?? 1;
+    this.ctx.time.scale = this._prevScale;
     this.player.setControlEnabled(this._prevControl);
     this.ctx.events.emit('market:close', {});
   }
@@ -266,7 +261,7 @@ export class MarketSystem {
     if (itemId === 'grenade') this.weapons.addGrenades(item.step);
     else if (itemId === 'armour') this.health.addArmour(item.step);
     else if (itemId === 'bandage') {
-      if (!this.player.addBandages?.(item.step)) return false;
+      if (!this.player.addBandages(item.step)) return false;
     } else if (itemId === 'ammo') this.weapons.refillAmmo();
     else if (itemId === 'carpet') this.weapons.addCarpetBombs(item.step);
     else if (itemId === 'pistol' || itemId === 'shotgun' || itemId === 'smg') {

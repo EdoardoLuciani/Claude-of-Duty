@@ -214,20 +214,6 @@ export class Rig {
     return this._map.has(name);
   }
 
-  /** Distance from a point to a bone's bind-pose segment. */
-  distanceToBone(i: number, x: number, y: number, z: number): number {
-    const a = this.bindPos[i],
-      b = this.tail[i];
-    const dx = b.x - a.x,
-      dy = b.y - a.y,
-      dz = b.z - a.z;
-    const l2 = dx * dx + dy * dy + dz * dz;
-    let t = l2 > 1e-12 ? ((x - a.x) * dx + (y - a.y) * dy + (z - a.z) * dz) / l2 : 0;
-    if (t < 0) t = 0;
-    else if (t > 1) t = 1;
-    return Math.hypot(x - (a.x + dx * t), y - (a.y + dy * t), z - (a.z + dz * t));
-  }
-
   /** Fresh THREE.Bone hierarchy + Skeleton for one actor instance. */
   createSkeleton(): { bones: THREE.Bone[]; skeleton: THREE.Skeleton; root: THREE.Bone } {
     const bones = [];

@@ -3,7 +3,7 @@
  */
 
 import { UNITS } from '../core/config.ts';
-import { DEG } from './springs.ts';
+import { DEG } from '../core/math.ts';
 
 export const GRAVITY = UNITS.gravity; // negative
 export const JUMP_APEX = 0.6;

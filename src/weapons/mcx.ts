@@ -163,8 +163,8 @@ export class MCXAnimation {
   private skeletons = new Set<THREE.Skeleton>();
   charging!: THREE.Object3D;
   poseQ = new THREE.Quaternion();
-  magQ!: THREE.Quaternion;
-  chargeQ!: THREE.Quaternion;
+  magQ: THREE.Quaternion = handQuaternion([0.1, 0.72, -0.68], [-0.86, 0.34, -0.38]);
+  chargeQ: THREE.Quaternion = handQuaternion([0.55, 0.2, 0.81], [-0.2, 0.94, -0.27]);
   idleTime = 0;
   name: string | null = null;
   fireTime!: number;
@@ -211,8 +211,6 @@ export class MCXAnimation {
     });
     this.charging = this.root.getObjectByName('charging_handle')!;
     this.root.getObjectByName('spent_case')!.visible = false;
-    this.magQ = handQuaternion([0.1, 0.72, -0.68], [-0.86, 0.34, -0.38]);
-    this.chargeQ = handQuaternion([0.55, 0.2, 0.81], [-0.2, 0.94, -0.27]);
     this.reset();
   }
 

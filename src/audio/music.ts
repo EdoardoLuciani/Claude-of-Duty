@@ -136,7 +136,7 @@ function seam(buf: AudioBuffer, ms = 14): void {
 }
 
 async function renderBed(sampleRate: number, rng: Rng): Promise<AudioBuffer | null> {
-  const Offline = globalThis.OfflineAudioContext;
+  const Offline = (globalThis as Partial<typeof globalThis>).OfflineAudioContext;
   if (!Offline) return null;
   const sr = sampleRate || 48000;
   const ctx = new Offline(2, Math.ceil(sr * LOOP), sr);
@@ -190,6 +190,7 @@ export class TentRadio {
   async start(): Promise<void> {
     if (this.playing) return;
     if (!this._buf) await this.warm();
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- warm() and other callers race across the await
     if (!this._buf || this.playing) return;
     this.playing = true;
     const actx = this.actx;

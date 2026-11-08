@@ -5,8 +5,8 @@ import { Vector3 } from 'three';
 import { EVIDENCE, STATE, SEARCH_DURATION } from '../../src/ai/agent.ts';
 import { SurfaceNav } from '../../src/ai/nav.ts';
 import { Rng } from '../../src/core/rng.ts';
-import { loadMap, addFollowupCases, vec } from '../../tools/nav240/fixtures.ts';
-import { execute, makeWalker } from '../../tools/nav240/harness.ts';
+import { loadMap, addFollowupCases, vec } from '../lib/nav240/fixtures.ts';
+import { execute, makeWalker } from '../lib/nav240/harness.ts';
 
 const source = await loadMap(),
   baseCount = source.cases.length;

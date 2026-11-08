@@ -14,9 +14,7 @@ import { TACTICS, acquireSeconds } from '../../src/ai/tuning.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import type { PhysicsSystem } from '../../src/physics/index.ts';
 import { PlayerSystem } from '../../src/player/index.ts';
-import { makeAgent, makeAi } from '../../tools/lib/agent-fixture.ts';
-import { NativeWorker } from '../../tools/lib/attachment-worker-fixture.ts';
-import { loadMap, physicsFor } from '../../tools/nav240/fixtures.ts';
+import { makeAgent, makeAi } from '../lib/agent-fixture.ts';
 import {
   BrainPlayer,
   coverPoint,
@@ -24,8 +22,10 @@ import {
   brainAnimator,
   disposeMesh,
 } from '../lib/ai-brain-fixture.ts';
+import { NativeWorker } from '../lib/attachment-worker-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 import { fixture as partialFixture } from '../lib/fixture.ts';
+import { loadMap, physicsFor } from '../lib/nav240/fixtures.ts';
 
 const v = (x = 0, y = 0, z = 0): THREE.Vector3 => new THREE.Vector3(x, y, z);
 function fixture(

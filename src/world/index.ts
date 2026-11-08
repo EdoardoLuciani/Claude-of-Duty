@@ -39,11 +39,11 @@ export class WorldSystem {
   declare rng: Rng;
   declare materials: EngineSystems['materials'];
   declare renderSystem: EngineSystems['render'] | null;
-  declare _mats: Map<keyof typeof PALETTE, WorldMaterial>;
-  declare meshes: WorldMesh[] | null;
-  declare collisionMeshes: WorldMesh[] | null;
-  declare lodGroups: WorldMesh[] | null;
-  declare _v: THREE.Vector3;
+  _mats: Map<keyof typeof PALETTE, WorldMaterial> = new Map();
+  meshes: WorldMesh[] | null = [];
+  collisionMeshes: WorldMesh[] | null = [];
+  lodGroups: WorldMesh[] | null = [];
+  _v: THREE.Vector3 = new THREE.Vector3();
   declare root: THREE.Group;
   declare collisionRoot: THREE.Group;
   declare _xform: THREE.Matrix4;
@@ -73,12 +73,7 @@ export class WorldSystem {
     this.rng = ctx.rng.fork(); // preserve the subsystem RNG fork order
     this.materials = ctx.get('materials');
     this.renderSystem = ctx.peek('render');
-    this.materials.setGroundLevel?.(0);
-    this._mats = new Map();
-    this.meshes = [];
-    this.collisionMeshes = [];
-    this.lodGroups = [];
-    this._v = new THREE.Vector3();
+    this.materials.setGroundLevel(0);
 
     const started = performance.now();
     const { meta, visual, collision } = await ctx.get('models').worldPrefetch;
@@ -114,14 +109,14 @@ export class WorldSystem {
     const placeholders = new Set<THREE.Material>();
     this.root.traverse((object): void => {
       if (!isWorldMesh(object)) return;
-      const palette: unknown = object.userData?.palette;
+      const palette: unknown = object.userData.palette;
       if (typeof palette !== 'string' || !hasOwn(PALETTE, palette))
         throw new Error(`[world] unknown palette on ${object.name}`);
       if (Array.isArray(object.material))
         object.material.forEach((m): Set<THREE.Material<THREE.MaterialEventMap>> =>
           placeholders.add(m)
         );
-      else if (object.material) placeholders.add(object.material);
+      else placeholders.add(object.material);
       object.material = this._material(palette);
       object.castShadow = object.userData.castShadow !== false;
       object.receiveShadow = object.userData.receiveShadow !== false;
@@ -151,12 +146,12 @@ export class WorldSystem {
     const physics = ctx.peek('physics');
     this.collisionRoot.traverse((object): void => {
       if (!isWorldMesh(object)) return;
-      const surface = parseSurfaceName(object.userData?.surface);
+      const surface = parseSurfaceName(object.userData.surface);
       if (Array.isArray(object.material))
         object.material.forEach((m): Set<THREE.Material<THREE.MaterialEventMap>> =>
           collisionPlaceholders.add(m)
         );
-      else if (object.material) collisionPlaceholders.add(object.material);
+      else collisionPlaceholders.add(object.material);
       object.material = this._collisionMaterial;
       object.visible = false;
       object.matrixAutoUpdate = false;
@@ -202,7 +197,7 @@ export class WorldSystem {
     this.lamps = [];
     const add = (light: THREE.PointLight, options: { range: number; priority: number }): void => {
       this.root.add(light);
-      this.renderSystem?.addLight?.(light, options);
+      this.renderSystem?.addLight(light, options);
     };
 
     for (const entry of data) {
@@ -310,6 +305,8 @@ export class WorldSystem {
     return this.queries.ladderAt(x, y, z);
   }
 
+  // Engine teardown disposes every system, even one whose init never ran or failed.
+  /* oxlint-disable typescript/no-unnecessary-condition */
   dispose(): void {
     this._offRestart?.();
     const geometries = new Set<THREE.BufferGeometry>();
@@ -324,4 +321,5 @@ export class WorldSystem {
     this.collisionMeshes = null;
     this.lodGroups = null;
   }
+  /* oxlint-enable typescript/no-unnecessary-condition */
 }

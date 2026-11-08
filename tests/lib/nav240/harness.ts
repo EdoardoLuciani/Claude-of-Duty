@@ -1,14 +1,14 @@
 import * as THREE from 'three';
 
-import { Agent, STATE } from '../../src/ai/agent.ts';
-import { INFANTRY } from '../../src/ai/capabilities.ts';
-import { NAV_PROFILE } from '../../src/ai/nav-format.ts';
-import type { SurfaceNav } from '../../src/ai/nav.ts';
-import { applyDefinedPatch } from '../../src/core/patch.ts';
-import type { CharacterController } from '../../src/physics/character.ts';
-import type { PhysicsSystem } from '../../src/physics/index.ts';
-import { makeAi, detachFixtureAgent } from '../lib/agent-fixture.ts';
-import type { FixtureAi } from '../lib/agent-fixture.ts';
+import { Agent, STATE } from '../../../src/ai/agent.ts';
+import { INFANTRY } from '../../../src/ai/capabilities.ts';
+import { NAV_PROFILE } from '../../../src/ai/nav-format.ts';
+import type { SurfaceNav } from '../../../src/ai/nav.ts';
+import { applyDefinedPatch } from '../../../src/core/patch.ts';
+import type { CharacterController } from '../../../src/physics/character.ts';
+import type { PhysicsSystem } from '../../../src/physics/index.ts';
+import { makeAi, detachFixtureAgent } from '../agent-fixture.ts';
+import type { FixtureAi } from '../agent-fixture.ts';
 import type { NavigationCase } from './fixtures.ts';
 
 export interface WalkerFixture {

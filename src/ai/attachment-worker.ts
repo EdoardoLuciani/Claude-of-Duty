@@ -136,7 +136,7 @@ self.onmessage = ({ data: value }: MessageEvent<unknown>): void => {
       };
       nav = {
         physics,
-        repeatState: data.repeatState !== false,
+        repeatState: data.repeatState,
         _probe: controller,
         stats: { endpointChecks: 0 },
         _p0: new THREE.Vector3(),
@@ -195,7 +195,7 @@ self.onmessage = ({ data: value }: MessageEvent<unknown>): void => {
         queues.get(job.actor)?.push({ ...job, queuedAt: performance.now() });
       }
       schedule();
-    } else if (data.type === 'cancel') {
+    } else {
       const ids = new Set(data.ids);
       for (const [actor, jobs] of queues) {
         const remaining = jobs.filter((j): boolean => !ids.has(j.id));

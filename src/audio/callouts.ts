@@ -37,7 +37,7 @@ export function isCalloutKind(kind: string): kind is AiCalloutKind {
 /** Sequential, immutable enemy IDs distribute each four spawns evenly across the cast. */
 export function calloutBank(voice: number, kind: AiCalloutKind): CalloutBank {
   const identity = Number.isFinite(voice) ? Math.abs(Math.trunc(voice)) : 0;
-  const actor = CALLOUT_CAST[identity % CALLOUT_CAST.length];
+  const actor = CALLOUT_CAST.at(identity % CALLOUT_CAST.length);
   // identity is a non-negative integer, so the modulo always selects a cast member.
   if (actor === undefined) throw new RangeError(`[audio] no callout actor for voice ${voice}`);
   return `${actor}-${kind}`;

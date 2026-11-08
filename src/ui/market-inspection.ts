@@ -158,6 +158,8 @@ export class MarketInspection {
     setText(this.status, '3D preview unavailable. Purchases and resupply still work.');
   }
 
+  // Each await may race dispose(), a newer selection or a failure; re-read state after it.
+  /* oxlint-disable typescript/no-unnecessary-condition */
   async select(id: MarketItemId, label: string): Promise<void> {
     if (!this.active || this.disposed || id === this.activeId) return;
     this.activeId = id;
@@ -247,6 +249,7 @@ export class MarketInspection {
       setText(this.status, 'Weapon preview unavailable. Select another item to inspect.');
     }
   }
+  /* oxlint-enable typescript/no-unnecessary-condition */
 
   reset(): void {
     this.controls.target.set(0, 0, 0);

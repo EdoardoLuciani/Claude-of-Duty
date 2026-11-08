@@ -1,9 +1,9 @@
 import { Container, Graphics, Text } from 'pixi.js';
 
+import { clamp01 } from '../core/math.ts';
 import { filledMagazinePips, MAX_PIPS } from './ammo.ts';
 import type { AmmoState } from './ammo.ts';
 import { HUD_TYPE, hudText, writeHudText } from './pixi-type.ts';
-import { clamp01 } from './util.ts';
 
 export const AMMO_WIDTH = 248;
 // Align the magazine bar with the health widget's lower (armour) bar.
@@ -73,7 +73,7 @@ export class PixiAmmoView {
     // Build per-frame label strings only when their source value changes.
     if (ammo !== this.lastAmmo) this.label(this.current, String((this.lastAmmo = ammo)));
     if (reserve !== this.lastReserve) this.label(this.reserve, `/ ${(this.lastReserve = reserve)}`);
-    this.label(this.name, s.weaponName ?? s.name ?? 'M4A1', 166);
+    this.label(this.name, s.weaponName ?? 'M4A1', 166);
     if (mode !== this.lastMode) this.label(this.mode, (this.lastMode = mode).toUpperCase());
     const color = ammo === 0 ? RED : ammo / mag <= 0.34 ? AMBER : INK;
     if (this.current.tint !== color) {

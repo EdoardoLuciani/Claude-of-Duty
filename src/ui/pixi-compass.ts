@@ -1,8 +1,8 @@
 import { Container, Graphics, Text } from 'pixi.js';
 
+import { clamp01 } from '../core/math.ts';
 import { CARD, PPD, STRIP_W } from './compass.ts';
 import type { Compass } from './compass.ts';
-import { clamp01 } from './util.ts';
 
 const TICK_STEP = 15;
 const fade = (x: number): number => clamp01(Math.min(x, STRIP_W - x) / (STRIP_W * 0.16));

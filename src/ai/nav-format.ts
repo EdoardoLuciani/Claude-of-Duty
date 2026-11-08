@@ -312,7 +312,7 @@ function validateTiles(b: Uint8Array, ladders: readonly LadderDescriptor[]): Map
     for (let k = 0; k < off; k++) {
       const o = offOffset + k * 36,
         id = d.getUint32(o + 32, true),
-        descriptor = ladders[id - 1];
+        descriptor = ladders[id - 1] as (typeof ladders)[number] | undefined;
       if (!descriptor || ids.has(id)) throw new Error('[nav] unknown/duplicate ladder connection');
       ids.add(id);
       check(

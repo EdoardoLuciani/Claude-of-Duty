@@ -121,7 +121,6 @@ export interface EngineEventMap {
     shot: number;
     stopReason: string;
   };
-  'shot:applied': { name: string; shot: unknown };
   'damage:dealt': DamageDealtEvent;
   'damage:taken': {
     amount: number;

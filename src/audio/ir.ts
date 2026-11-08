@@ -3,8 +3,8 @@
  * and regular slap/flutter repeats for street and corridor reverberation.
  */
 
+import { clamp } from '../core/math.ts';
 import type { Rng } from '../core/rng.ts';
-import { clamp } from './dsp.ts';
 export interface IRSpec {
   seconds: number;
   rt60: number;

@@ -195,6 +195,7 @@ export class Engine {
       steps < MAX_SUBSTEPS
     ) {
       for (const sys of fixedSystems) this._invoke(sys, 'fixedUpdate', FIXED_DT);
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- a system may fail or suspend mid-step
       if (this.error || this._gameplaySuspended) break;
       this._accum -= FIXED_DT;
       steps++;

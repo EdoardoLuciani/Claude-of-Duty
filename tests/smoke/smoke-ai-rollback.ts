@@ -14,11 +14,11 @@ import {
 import { AiSystem } from '../../src/ai/index.ts';
 import type { EngineSystems } from '../../src/core/context.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
-import { makeAgent } from '../../tools/lib/agent-fixture.ts';
-import { testNav } from '../../tools/lib/test-nav.ts';
-import { makeWalker } from '../../tools/nav240/harness.ts';
+import { makeAgent } from '../lib/agent-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
+import { makeWalker } from '../lib/nav240/harness.ts';
+import { testNav } from '../lib/test-nav.ts';
 
 const grid = await testNav([
   [0, 0, 0, 24, 24],

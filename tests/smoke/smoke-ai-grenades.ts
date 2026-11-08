@@ -9,7 +9,7 @@ import { GRENADE } from '../../src/ai/tuning.ts';
 import type { EngineEventMap } from '../../src/core/events.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { GRENADE_FUSE } from '../../src/weapons/index.ts';
-import { makeAgent } from '../../tools/lib/agent-fixture.ts';
+import { makeAgent } from '../lib/agent-fixture.ts';
 import { brainAnimator } from '../lib/ai-brain-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 

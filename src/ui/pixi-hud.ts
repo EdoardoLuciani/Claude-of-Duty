@@ -1,6 +1,7 @@
 import { Container, Graphics, WebGPURenderer } from 'pixi.js';
 import type { Renderer } from 'three/webgpu';
 
+import { clamp01 } from '../core/math.ts';
 import type { AmmoState } from './ammo.ts';
 import type { Crosshair } from './crosshair.ts';
 import type { HealthFx, HealthState } from './health.ts';
@@ -15,7 +16,7 @@ import type { FeedbackModels } from './pixi-feedback.ts';
 import { PixiInjury } from './pixi-injury.ts';
 import { PixiMinimap } from './pixi-minimap.ts';
 import { HUD_TYPE, hudText as text, setHudTextResolution, writeHudText } from './pixi-type.ts';
-import { clamp01, setStyle } from './util.ts';
+import { setStyle } from './util.ts';
 
 /** Gameplay HUD presentation on one passive, borrowed-device WebGPU canvas. */
 export class PixiHud {

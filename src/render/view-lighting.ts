@@ -130,7 +130,7 @@ export function updateViewLighting(r: RenderLightingState, ctx: ViewLightingCont
     const irradiance = light.intensity * attenuation;
     const score = irradiance * Math.max(light.color.r, light.color.g, light.color.b);
     // Replace the weakest pooled slot; the first slot seeds the scan.
-    let slot = r.viewPracticals[0];
+    let slot = r.viewPracticals.at(0);
     if (!slot) continue;
     for (const candidate of r.viewPracticals) if (candidate.score < slot.score) slot = candidate;
     if (score <= slot.score) continue;

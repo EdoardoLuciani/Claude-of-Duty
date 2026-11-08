@@ -33,12 +33,10 @@ interface MaterialsOptions {
 }
 
 export class TileNoise {
-  tab!: Float32Array;
-  perm!: Uint16Array;
+  tab: Float32Array = new Float32Array(4096);
+  perm: Uint16Array = new Uint16Array(4096);
   constructor(rng: NoiseRandom) {
-    this.tab = new Float32Array(4096);
     for (let i = 0; i < 4096; i++) this.tab[i] = rng.float();
-    this.perm = new Uint16Array(4096);
     for (let i = 0; i < 4096; i++) this.perm[i] = rng.int(0, 4095);
   }
 
@@ -478,8 +476,8 @@ export function camoTexel(nz: TileNoise, cfg: CamoConfig, u: number, v: number, 
 
 /** Offline texture sets and their owned bake resources. */
 export class SoldierMaterials {
-  _disposables!: THREE.DataTexture[];
-  sets!: Record<string, TextureSet>;
+  _disposables: THREE.DataTexture[] = [];
+  sets: Record<string, TextureSet> = {};
   details!: Record<string, THREE.DataTexture>;
   camoStats!: Record<string, { mean: number; sd: number; min: number; max: number; was: number }>;
   bakeMs!: number;
@@ -490,8 +488,6 @@ export class SoldierMaterials {
   constructor(rng: NoiseRandom & { fork(): NoiseRandom }, opts: MaterialsOptions = {}) {
     const size = opts.size ?? 512;
     const aniso = opts.anisotropy ?? 8;
-    this._disposables = [];
-    this.sets = {};
     this.details = {};
     this.camoStats = {};
     const nz = new TileNoise(rng.fork());

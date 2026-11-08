@@ -25,19 +25,15 @@ import { NAV_PROFILE } from '../../src/ai/nav-format.ts';
 import type { SurfaceNav } from '../../src/ai/nav.ts';
 import { StaticWorld } from '../../src/physics/bvh.ts';
 import { CharacterController } from '../../src/physics/character.ts';
-import { NativeWorker } from '../../tools/lib/attachment-worker-fixture.ts';
-import {
-  ladderProfiles,
-  ladderCursor as zero,
-  reverseCursor,
-} from '../../tools/lib/ladder-fixture.ts';
-import { loadMap } from '../../tools/nav240/fixtures.ts';
 import {
   MovementWorker,
   mutableLadder,
   type MutableLadderDescriptor,
 } from '../lib/ai-movement-fixture.ts';
+import { NativeWorker } from '../lib/attachment-worker-fixture.ts';
 import { fixture } from '../lib/fixture.ts';
+import { ladderProfiles, ladderCursor as zero, reverseCursor } from '../lib/ladder-fixture.ts';
+import { loadMap } from '../lib/nav240/fixtures.ts';
 
 interface LadderQueryInput extends Omit<
   LadderQuery,

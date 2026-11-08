@@ -52,7 +52,6 @@ export function createLadderDescriptors(
     volumes.map((v, volumeIndex): LadderDescriptor => {
       const { x, z, y0, y1, radius, nx, nz } = v;
       if (
-        v.kind !== 'ladder' ||
         ![x, z, y0, y1, radius, nx, nz].every(Number.isFinite) ||
         nx === undefined ||
         nz === undefined ||
@@ -69,12 +68,12 @@ export function createLadderDescriptors(
           y: y + LADDER.footClearance,
           z: z + nz * offset,
         });
-      const points = Object.freeze([
+      const points: LadderDescriptor['points'] = Object.freeze([
         p(LADDER.lowerOffset, y0),
         p(0, y0),
         p(0, y1),
         p(LADDER.upperOffset, y1),
-      ]) as LadderDescriptor['points'];
+      ] as const);
       if (
         !points.every(finitePoint) ||
         points.slice(1).some((p, i): boolean => !positiveSpan(length(points[i], p)))
@@ -166,6 +165,7 @@ export class LadderMotor {
     this.state = cursor ? { ...cursor } : { segment: 0, distance: 0, pendingTime: 0, moves: 0 };
     const s = this.state;
     if (
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- worker requests are untrusted
       (direction !== 'up' && direction !== 'down') ||
       !Number.isInteger(maxMoves) ||
       maxMoves < 1 ||

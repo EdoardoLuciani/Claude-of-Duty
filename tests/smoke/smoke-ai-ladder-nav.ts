@@ -9,10 +9,10 @@ import type { NavMetadata, ExpectedNav } from '../../src/ai/nav-format.ts';
 import { unpackNav, packNav, NAV_LINK_RADIUS } from '../../src/ai/nav-format.ts';
 import type { NavRoute, NavCache } from '../../src/ai/nav.ts';
 import { SurfaceNav, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/nav.ts';
-import { NativeWorker } from '../../tools/lib/attachment-worker-fixture.ts';
-import { ladderProfiles } from '../../tools/lib/ladder-fixture.ts';
-import { loadMap } from '../../tools/nav240/fixtures.ts';
 import { mutableLadder, type MutableLadderDescriptor } from '../lib/ai-movement-fixture.ts';
+import { NativeWorker } from '../lib/attachment-worker-fixture.ts';
+import { ladderProfiles } from '../lib/ladder-fixture.ts';
+import { loadMap } from '../lib/nav240/fixtures.ts';
 
 // Browser transport only: all route proofs use the production module worker.
 const f = await loadMap();

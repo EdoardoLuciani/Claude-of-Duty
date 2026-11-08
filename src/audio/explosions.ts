@@ -1,6 +1,6 @@
+import { clamp } from '../core/math.ts';
 import { recordingUrls } from './recordings.ts';
 /** Recorded ordnance identities and continuous close/mid/far perspective changes. */
-import { clamp } from './dsp.ts';
 
 export type ExplosionKind = 'grenade' | 'bomb';
 export const EXPLOSION_URLS = {

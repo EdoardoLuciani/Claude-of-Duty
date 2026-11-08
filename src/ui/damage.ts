@@ -1,5 +1,6 @@
+import { clamp01 } from '../core/math.ts';
 import type { PoolRecord } from './util.ts';
-import { Pool, ease, clamp01 } from './util.ts';
+import { Pool, ease } from './util.ts';
 
 export const SEG = 7;
 export const SEG_STEP = 8.2; // degrees between segment centres

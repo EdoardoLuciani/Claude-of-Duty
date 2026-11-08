@@ -5,6 +5,7 @@
  * to run. Nothing in this file runs per frame.
  */
 
+import { clamp01 } from '../core/math.ts';
 import type { Rng } from '../core/rng.ts';
 
 const F = (t: number): number => t * t * t * (t * (t * 6 - 15) + 10); // quintic fade
@@ -147,8 +148,6 @@ export class Noise {
     return Math.min(1, b2 - b1);
   }
 }
-
-export const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 export function smoothstep(a: number, b: number, x: number): number {
   const t = clamp01((x - a) / (b - a || 1e-6));

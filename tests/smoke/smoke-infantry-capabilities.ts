@@ -10,10 +10,10 @@ import { SurfaceNav } from '../../src/ai/nav.ts';
 import { VARIANTS } from '../../src/ai/soldier.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { makeHitRecord } from '../../src/physics/math.ts';
-import { synthetic, loadMap, addAccessCases } from '../../tools/nav240/fixtures.ts';
-import { execute, canConnect } from '../../tools/nav240/harness.ts';
 import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
+import { synthetic, loadMap, addAccessCases } from '../lib/nav240/fixtures.ts';
+import { execute, canConnect } from '../lib/nav240/harness.ts';
 
 const f = synthetic(),
   geometry = new THREE.BoxGeometry(),
