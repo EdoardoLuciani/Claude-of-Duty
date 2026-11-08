@@ -61,7 +61,7 @@ for (const rate of [44100, 48000, 96000]) {
   mono.process(impulse, undefined, a, b);
   assert.deepEqual(a, b, 'mono input upmix does not change detector balance');
   assert(Math.abs(a[delay] - 0.25 * ENERGY_MIX.maxGain) < 1e-7);
-  assert.equal(a.filter((value) => value !== 0).length, 1, 'no extra transient or tail');
+  assert.equal(a.filter((value): boolean => value !== 0).length, 1, 'no extra transient or tail');
 }
 console.log(
   'Energy mix: actual stereo power, target RMS, downward-only gain, lookahead, release and block invariance'

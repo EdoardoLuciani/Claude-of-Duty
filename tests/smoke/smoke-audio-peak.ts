@@ -4,7 +4,7 @@ import { ENERGY_MIX, EnergyPeakController } from '../../src/audio/energy.ts';
 import { LookaheadPeakGain, PEAK_LIMITER } from '../../src/audio/peak.ts';
 
 assert.equal(ENERGY_MIX.maxGain, 1);
-assert.throws(() => new LookaheadPeakGain(48000, 0), RangeError);
+assert.throws((): LookaheadPeakGain => new LookaheadPeakGain(48000, 0), RangeError);
 for (const rate of [44100, 48000, 96000]) {
   const delay = Math.round((rate * ENERGY_MIX.lookaheadMs) / 1000);
   const length = rate * 3;
@@ -45,7 +45,7 @@ for (const rate of [44100, 48000, 96000]) {
     }
   }
   assert(maximum > 0.98, 'actual large peaks preserved up to the declared limit');
-  assert(gains.at(-1) > 0.9999, 'gain releases toward unity during silence');
+  assert(gains[gains.length - 1] > 0.9999, 'gain releases toward unity during silence');
 
   const a = new Float32Array(length),
     b = new Float32Array(length);

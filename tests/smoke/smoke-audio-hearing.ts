@@ -1,55 +1,42 @@
 import assert from 'node:assert/strict';
 
-import { Mixer } from '../../src/audio/mixer.ts';
-
-function parameter(value, nativeHold) {
-  const events = [];
-  const param = {
-    value,
-    events,
-    cancelScheduledValues(time) {
-      events.push(['cancel', time]);
-      this.value = -1; // Cancelling must not discard the sampled pre-cancel value.
-    },
-    setValueAtTime(value, time) {
-      events.push(['set', value, time]);
-      this.value = value;
-    },
-    linearRampToValueAtTime(value, time) {
-      events.push(['ramp', value, time]);
-    },
-    setTargetAtTime(value, time, constant) {
-      events.push(['target', value, time, constant]);
-    },
-  };
-  if (nativeHold) {
-    param.cancelAndHoldAtTime = () => {
-      throw new Error('Current-time hearing automation must not depend on native hold');
-    };
-  }
-  return param;
-}
+import {
+  createAudioContext,
+  FixtureAudioParam,
+  FixtureGainNode,
+  FixtureBiquad,
+  fixtureMixer,
+} from '../lib/audio-fixture.ts';
 
 // Firefox lacks cancelAndHoldAtTime. Use the same cancel-and-anchor path even
 // when native hold exists, preserving the sampled value before cancellation.
 for (const nativeHold of [false, true]) {
-  const params = [0.25, 0.75, 0.8, 2000, -6].map((v) => parameter(v, nativeHold));
-  const [dry, wet, level, cutoff, shelf] = params;
-  const mixer = Object.assign(Object.create(Mixer.prototype), {
-    actx: { currentTime: 10 },
-    muffleDry: { gain: dry },
-    muffleWet: { gain: wet },
-    muffleGain: { gain: level },
-    muffleLP: { frequency: cutoff },
-    muffleHS: { gain: shelf },
-    _pendingConcussion: { level: 1, at: 11, attack: 0.02 },
-    _concussionAttackUntil: 12,
-    deafness: 0.8,
-    _tin: null,
-    _startTinnitus() {},
+  const actx = createAudioContext(10);
+  const mixer = fixtureMixer(actx);
+  const dryNode = new FixtureGainNode(actx),
+    wetNode = new FixtureGainNode(actx),
+    levelNode = new FixtureGainNode(actx);
+  const lp = new FixtureBiquad(actx),
+    hs = new FixtureBiquad(actx);
+  const params = [0.25, 0.75, 0.8, 2000, -6].map((v): FixtureAudioParam => {
+    const param = new FixtureAudioParam(v);
+    if (!nativeHold) Object.defineProperty(param, 'cancelAndHoldAtTime', { value: undefined });
+    return param;
   });
+  [dryNode.gain, wetNode.gain, levelNode.gain, lp.frequency, hs.gain] = params;
+  mixer.muffleDry = dryNode;
+  mixer.muffleWet = wetNode;
+  mixer.muffleGain = levelNode;
+  mixer.muffleLP = lp;
+  mixer.muffleHS = hs;
+  const [dry, wet, level, cutoff, shelf] = params;
+  mixer._pendingConcussion = { level: 1, at: 11, attack: 0.02 };
+  mixer._concussionAttackUntil = 12;
+  mixer.deafness = 0.8;
+  mixer._tin = null;
+  mixer._startTinnitus = (): void => {};
 
-  assert.doesNotThrow(() => mixer.resetHearing(), 'restart works with either AudioParam API');
+  assert.doesNotThrow((): void => mixer.resetHearing(), 'restart works with either AudioParam API');
   assert.equal(mixer._pendingConcussion, null);
   assert.equal(mixer._concussionAttackUntil, 0);
   assert.equal(mixer.deafness, 0);
@@ -65,10 +52,10 @@ for (const nativeHold of [false, true]) {
   assert.deepEqual(cutoff.events[2], ['target', 20000, 10, 0.25]);
   assert.deepEqual(shelf.events[2], ['target', 0, 10, 0.25]);
 
-  mixer.actx.currentTime = 10.01;
-  assert.doesNotThrow(() => mixer.concuss(1), 'concussion can interrupt the reset ramp');
+  actx.currentTime = 10.01;
+  assert.doesNotThrow((): void => mixer.concuss(1), 'concussion can interrupt the reset ramp');
   assert.equal(mixer.deafness, 1);
-  assert.doesNotThrow(() => mixer.resetHearing(), 'repeated restart cancels concussion');
+  assert.doesNotThrow((): void => mixer.resetHearing(), 'repeated restart cancels concussion');
   assert.equal(mixer.deafness, 0);
 }
 console.log(

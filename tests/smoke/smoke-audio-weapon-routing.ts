@@ -1,59 +1,80 @@
 import assert from 'node:assert/strict';
 
+import { Vector3 } from 'three';
+
 import { AudioSystem } from '../../src/audio/index.ts';
+import type { Mixer } from '../../src/audio/mixer.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
+import type { SpatialField } from '../../src/audio/spatial.ts';
+import type { WeaponProfile } from '../../src/audio/types.ts';
 import { WEAPON_PROFILES, resolveProfile } from '../../src/audio/weapons.ts';
+import { Rng } from '../../src/core/rng.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
+import {
+  audioFixture,
+  FixtureAudioBuffer,
+  type FixtureBufferSource,
+  fixtureEntries,
+  fixtureBuffer,
+} from '../lib/audio-fixture.ts';
+import { fixture } from '../lib/fixture.ts';
 
 // Exercise the real event-definition seam and sample bank, with no synthesis nodes.
-const param = () => ({ value: 0 });
-const node = () => ({ connect() {}, gain: param() });
-const sources = [];
-const actx = {
-  currentTime: 3,
-  createGain: node,
-  createBufferSource() {
-    const source = { ...node(), playbackRate: param(), start() {} };
-    sources.push(source);
-    return source;
-  },
+const { actx, sources } = audioFixture(3);
+const createSource = actx.createBufferSource.bind(actx);
+actx.createBufferSource = (): FixtureBufferSource => {
+  const source = createSource();
+  // These report fixtures originally start at zero to detect missing playback-rate writes.
+  source.playbackRate.value = 0;
+  return source;
 };
 const audio = new AudioSystem(),
   samples = new WeaponSampleBank(actx);
-for (const profile of Object.values(WEAPON_PROFILES)) {
-  samples.buffers[profile.sample] = [{ duration: 3, kind: profile.sample }];
+const profiles: WeaponProfile[] = Object.values(WEAPON_PROFILES);
+for (const profile of profiles) {
+  samples.buffers[profile.sample] = [new FixtureAudioBuffer({ duration: 3, kind: profile.sample })];
   if (profile.distantSample)
-    samples.buffers[profile.distantSample] = [{ duration: 4, kind: profile.distantSample }];
+    samples.buffers[profile.distantSample] = [
+      new FixtureAudioBuffer({ duration: 4, kind: profile.distantSample }),
+    ];
 }
-Object.assign(audio, {
-  running: true,
-  actx,
-  samples,
-  rng: {},
-  mixer: { duck() {} },
-  field: { listenerPos: { x: 0, y: 0, z: 0 }, distanceTo: (x) => Math.abs(x) },
+audio.running = true;
+audio.actx = actx;
+audio.samples = samples;
+audio.rng = new Rng(1);
+audio.mixer = fixture<Mixer>({ duck(): void {} });
+audio.field = fixture<SpatialField>({
+  listenerPos: { x: 0, y: 0, z: 0 },
+  distanceTo: (x): number => Math.abs(x),
 });
-let seen;
-function capture(options, distance, path) {
+type Seen = { profile: WeaponProfile | undefined; path: string; buffers: string[] };
+const captureState: { seen: Seen | null } = { seen: null };
+function capture(
+  options: NonNullable<Parameters<AudioSystem['_playAt']>[4]>,
+  distance: number,
+  path: string
+): boolean {
   const before = sources.length;
   const voice = audio._build('shot', 4, distance, options);
-  seen = {
+  captureState.seen = {
     profile: options.profile,
     path,
-    buffers: sources.slice(before).map((s) => s.buffer.kind),
+    buffers: sources.slice(before).map((s): string => fixtureBuffer(s.buffer).kind),
   };
   assert.equal(voice.send, 0, 'recorded decay only');
   assert.equal(voice.node.gain.value, 1, 'no per-profile boost');
   return true;
 }
-audio._playDry = (kind, options, bus, send) => {
+audio._playDry = (kind, options, bus, send): boolean => {
   assert.equal(kind, 'shot');
   assert.equal(bus, 'weapons');
   assert.equal(send, 0);
+  assert(options);
   return capture(options, 0, 'dry');
 };
-audio._playAt = (kind, x, y, z, options) => {
+audio._playAt = (kind, x, y, z, options): boolean => {
   assert.equal(kind, 'shot');
+  assert(options);
   assert.equal(options.gain, 1);
   return capture(options, Math.abs(x), 'spatial');
 };
@@ -65,17 +86,25 @@ const expected = {
   smg: 'mpx',
   sniper: 'sniper',
   shotgun: 'shotgun',
-};
-function expectedBanks(profile, distance) {
+} as const;
+function expectedBanks(profile: WeaponProfile, distance: number): string[] {
   if (!profile.distantSample || distance <= 20) return [profile.sample];
   return distance >= 140 ? [profile.distantSample] : [profile.sample, profile.distantSample];
 }
-for (const [id, key] of Object.entries(expected)) {
+for (const [id, key] of fixtureEntries(expected)) {
   const def = WEAPON_DEFS[id],
     original = JSON.stringify(def);
   for (const distance of [0, 20, 45, 70, 140, 300]) {
-    seen = null;
-    audio._onFire({ weapon: def, origin: { x: distance, y: 0, z: 0 } });
+    captureState.seen = null;
+    audio._onFire({
+      weapon: def,
+      origin: new Vector3(distance, 0, 0),
+      actor: null,
+      dir: new Vector3(),
+      seed: 0,
+    });
+    const seen = latestCapture();
+    assert(seen);
     assert.equal(seen.profile, WEAPON_PROFILES[key], `${id}: real definition selects ${key}`);
     assert.equal(seen.path, distance ? 'spatial' : 'dry');
     assert.deepEqual(seen.buffers, expectedBanks(WEAPON_PROFILES[key], distance));
@@ -95,11 +124,14 @@ for (const [weapon, expectedProfile] of [
   ['mpx', WEAPON_PROFILES.mpx],
   ['mcx', WEAPON_PROFILES.mcx],
   ['ai_rifle', WEAPON_PROFILES.rifle],
-]) {
+] as const) {
   for (const distance of [0, 70, 180]) {
-    audio._onFire({ weapon, origin: { x: distance, y: 0, z: 0 } });
-    assert.equal(seen.profile, expectedProfile);
-    assert.deepEqual(seen.buffers, expectedBanks(expectedProfile, distance));
+    // Compatibility aliases enter through untyped callers, not gameplay event types.
+    Reflect.apply(audio._onFire.bind(audio), audio, [
+      { weapon, origin: new Vector3(distance, 0, 0) },
+    ]);
+    assert.equal(captureState.seen?.profile, expectedProfile);
+    assert.deepEqual(captureState.seen?.buffers, expectedBanks(expectedProfile, distance));
   }
 }
 for (const weapon of [
@@ -108,9 +140,13 @@ for (const weapon of [
   { id: 'mp5', suppressed: true },
   { id: 'rifle', suppressed: true },
 ]) {
-  seen = null;
-  audio._onFire({ weapon, origin: { x: 0, y: 0, z: 0 } });
-  assert.equal(seen, null, 'removed generic routes stay silent, never borrow another report');
+  captureState.seen = null;
+  Reflect.apply(audio._onFire.bind(audio), audio, [{ weapon, origin: new Vector3(0, 0, 0) }]);
+  assert.equal(
+    captureState.seen,
+    null,
+    'removed generic routes stay silent, never borrow another report'
+  );
 }
 assert.equal(resolveProfile('suppressed'), null);
 assert.equal(resolveProfile('silenced-test'), null);
@@ -119,3 +155,7 @@ assert.equal(resolveProfile('mpx-suppressed'), WEAPON_PROFILES.mpx);
 console.log(
   'Actual firearm routing: all seven definitions, recorded AK at every range, dedicated MCX/MPX, unsupported generic-suppressed requests silent'
 );
+
+function latestCapture(): Seen | null {
+  return captureState.seen;
+}

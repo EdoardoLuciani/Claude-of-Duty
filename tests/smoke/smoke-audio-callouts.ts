@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 
+import { Vector3 } from 'three';
+
 import {
   CALLOUT_CAST,
   CALLOUT_MIX,
@@ -8,11 +10,17 @@ import {
   calloutBank,
 } from '../../src/audio/callouts.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
+import type { Mixer } from '../../src/audio/mixer.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import provenance from '../../src/audio/samples/callouts/provenance.json' with { type: 'json' };
+import type { SpatialField } from '../../src/audio/spatial.ts';
+import type { AudioVoice } from '../../src/audio/types.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { audioFixture } from '../lib/audio-banks.ts';
+import { fixtureEntries, at, fixtureBuffer, FixtureAudioBuffer } from '../lib/audio-fixture.ts';
+import { createTestContext } from '../lib/context.ts';
+import { fixture } from '../lib/fixture.ts';
 
 const { actx, sources } = audioFixture();
 actx.state = 'running';
@@ -21,21 +29,27 @@ const rng = new Rng(497),
 assert.deepEqual(CALLOUT_CAST, ['orus', 'algenib', 'alnilam', 'iapetus']);
 assert.equal(Object.values(CALLOUT_URLS).flat().length, 36);
 assert.equal(provenance.files['orus-grenade-1'].text, 'Frag out!');
-for (const [key, urls] of Object.entries(CALLOUT_URLS)) {
+for (const [key, urls] of fixtureEntries(CALLOUT_URLS)) {
   assert.equal(urls.length, 3);
-  bank.hitBuffers[key] = urls.map((_, i) => ({ key, index: i, duration: 1.5 }));
+  bank.hitBuffers[key] = urls.map(
+    (_, i): FixtureAudioBuffer => new FixtureAudioBuffer({ key, index: i, duration: 1.5 })
+  );
 }
 for (let actor = 0; actor < 20; actor++) {
-  const voice = CALLOUT_CAST[actor % 4];
-  for (const kind of ['spot', 'reload', 'grenade']) {
+  const voice: (typeof CALLOUT_CAST)[number] = CALLOUT_CAST[actor % 4];
+  for (const kind of ['spot', 'reload', 'grenade'] as const) {
     assert.equal(calloutBank(actor, kind), voice + '-' + kind);
     let previous = -1;
     for (let i = 0; i < 8; i++) {
       const recorded = bank.callout(kind, actor, rng, { when: 3 });
-      const source = sources.at(-1);
-      assert.equal(source.buffer.key, calloutBank(actor, kind));
-      assert.notEqual(source.buffer.index, previous, 'vary the take, never the identity');
-      previous = source.buffer.index;
+      const source = at(sources, -1);
+      assert.equal(fixtureBuffer(source.buffer).key, calloutBank(actor, kind));
+      assert.notEqual(
+        fixtureBuffer(source.buffer).index,
+        previous,
+        'vary the take, never the identity'
+      );
+      previous = fixtureBuffer(source.buffer).index;
       assert.equal(source.playbackRate.value, 1);
       assert.equal(source.when, 3);
       assert.equal(recorded.end, 4.52);
@@ -47,65 +61,82 @@ for (let actor = 0; actor < 20; actor++) {
 }
 assert.equal(calloutBank(Infinity, 'spot'), 'orus-spot');
 assert.equal(calloutBank(-5, 'reload'), 'algenib-reload');
-assert.throws(() => new WeaponSampleBank(actx).callout('spot', 1, rng), /not loaded/);
+assert.throws(
+  (): AudioVoice & { stop(): void } => new WeaponSampleBank(actx).callout('spot', 1, rng),
+  /not loaded/
+);
 
-const emitters = [],
-  requests = [];
+type Emitter = NonNullable<ReturnType<SpatialField['acquire']>>;
+type EmitterRecord = {
+  detached: boolean;
+  position: { x: number; y: number; z: number };
+  node?: AudioNode;
+  end?: number;
+  emitter: Emitter;
+};
+const emitters: EmitterRecord[] = [],
+  requests: Parameters<SpatialField['acquire']>[0][] = [];
 let refuse = false;
-const field = {
-  distanceTo: (x, y, z) => Math.hypot(x, y, z),
-  acquire(options) {
+const field = fixture<SpatialField>({
+  distanceTo: (x, y, z): number => Math.hypot(x, y, z),
+  acquire(options): Emitter | null {
     requests.push(options);
     if (refuse) return null;
-    const em = {
+    const record: EmitterRecord = {
       detached: false,
-      detach() {
-        this.detached = true;
-      },
-      moveTo(x, y, z) {
-        this.position = { x, y, z };
-      },
+      position: { x: 0, y: 0, z: 0 },
+      emitter: fixture<Emitter>({
+        detach(): void {
+          record.detached = true;
+        },
+        moveTo(x, y, z): void {
+          record.position = { x, y, z };
+        },
+      }),
     };
-    emitters.push(em);
-    return em;
+    emitters.push(record);
+    return record.emitter;
   },
-  hold(em, node, end) {
-    Object.assign(em, { node, end });
+  hold(em, node, end): void {
+    const record = emitters.find((item): boolean => item.emitter === em);
+    assert(record);
+    record.node = node;
+    record.end = end;
   },
-  dispose() {},
-};
+  dispose(): void {},
+});
 const player = new CalloutPlayer(actx, field, bank, rng);
-const pos = { x: 3, y: 0, z: 4 };
+const pos = new Vector3(3, 0, 4);
 assert.equal(player.play('spot', { x: 56, y: 0, z: 0 }, 0), false);
 assert.equal(player.play('spot', { x: NaN, y: 0, z: 0 }, 0), false);
 assert.equal(requests.length, 0, 'inaudible/invalid speech never consumes an emitter or variant');
 assert(player.play('spot', pos, 0));
-const first = sources.at(-1);
-assert.equal(requests.at(-1).bus, 'voice');
-assert.equal(requests.at(-1).tracked, true, 'a line cannot be stolen midway by gunfire');
+const first = at(sources, -1);
+assert.equal(at(requests, -1).bus, 'voice');
+assert.equal(at(requests, -1).tracked, true, 'a line cannot be stolen midway by gunfire');
 assert.equal(first.when, 5 / 343, 'reuse propagation scheduling');
 actx.currentTime = 0.8;
 assert.equal(player.play('reload', pos, 1), false, 'full duration, not the old 0.42 s gate');
 pos.x = 4;
 player.update();
-assert.equal(emitters.at(-1).position.x, 4, 'speech follows its actual speaker');
+assert.equal(at(emitters, -1).position.x, 4, 'speech follows its actual speaker');
 assert(
   player.play('grenade', pos, 0),
   'grenade preempts ordinary speech even for the same recently speaking actor'
 );
 assert(first.stopped && emitters[0].detached);
-const grenade = sources.at(-1);
+const grenade = at(sources, -1);
 assert.equal(player.play('grenade', pos, 3), false, 'no overlapping grenade spam');
 actx.currentTime = 2.5;
 player.update();
-assert(grenade.stopped && emitters.at(-1).detached, 'natural completion releases tracked slot');
+assert(grenade.stopped && at(emitters, -1).detached, 'natural completion releases tracked slot');
 assert.equal(player.play('reload', pos, 1), false, 'leave a quiet gap after a line');
 actx.currentTime = 4;
 assert(player.play('reload', pos, 1));
 player.stop(99);
-assert(!sources.at(-1).stopped, 'other actors do not interrupt this speaker');
+assert(!at(sources, -1).stopped, 'other actors do not interrupt this speaker');
 player.stop(1);
-assert(sources.at(-1).stopped);
+assert(at(sources, -1).stopped);
 actx.currentTime = 6;
 assert.equal(player.play('spot', pos, 1), false, 'per-actor cooldown survives interruption');
 player.forget(1);
@@ -120,13 +151,18 @@ refuse = false;
 // Real event wiring: separate pause/shop/death/error blocks cannot undo each other.
 const events = new EventBus(),
   audio = new AudioSystem();
-Object.assign(audio, { running: true, actx, field, samples: bank, rng, _callouts: player });
-audio.ctx = { events, peek: () => null };
+audio.running = true;
+audio.actx = actx;
+audio.field = field;
+audio.samples = bank;
+audio.rng = rng;
+audio._callouts = player;
+audio.ctx = createTestContext({ events, rng });
 audio._wireEvents(audio.ctx);
-const bark = () => audio.bark('spot', pos, { voice: 0 });
+const bark = (): boolean => audio.bark('spot', pos, { voice: 0 });
 assert(bark());
 events.emit('ui:pause', { paused: true });
-assert(sources.at(-1).stopped);
+assert(at(sources, -1).stopped);
 assert.equal(bark(), false);
 events.emit('market:open', { wave: 1 });
 events.emit('market:close', {});
@@ -134,48 +170,60 @@ assert.equal(bark(), false, 'closing shop cannot undo pause');
 events.emit('ui:pause', { paused: false });
 events.emit('game:restart', {});
 assert(bark());
-events.emit('player:death', {});
+events.emit('player:death', { position: pos, from: null, amount: 0 });
 assert.equal(bark(), false);
 events.emit('ui:pause', { paused: false });
 assert.equal(bark(), false, 'unpausing cannot undo player death');
 events.emit('game:restart', {});
 assert(bark());
-audio._onDeath({ actor: { id: 0 } });
-assert(sources.at(-1).stopped, 'death cancels speech even without an impact point');
+// Deliberately malformed legacy event: cancellation must precede the missing-point guard.
+Reflect.apply(audio._onDeath.bind(audio), audio, [{ actor: { id: 0 } }]);
+assert(at(sources, -1).stopped, 'death cancels speech even without an impact point');
 events.emit('game:restart', {});
 events.emit('ai:bark', { kind: 'reload', position: pos, voice: 2 });
-assert.equal(sources.at(-1).buffer.key, 'alnilam-reload');
+assert.equal(fixtureBuffer(at(sources, -1).buffer).key, 'alnilam-reload');
 events.emit('engine:error', { system: 'test', method: 'update', message: 'terminal' });
-assert(sources.at(-1).stopped);
+assert(at(sources, -1).stopped);
 events.emit('game:restart', {});
 assert.equal(bark(), false, 'terminal failure cannot be undone by a restart event');
 assert.equal(audio.bark('flank', pos), false, 'unimplemented intent never substitutes contact');
 assert.equal(audio.bark('spot', null), false, 'no head-locked phantom nearby enemy');
 assert.equal(audio.bark('spot', pos, { radio: true }), false, 'radio dialogue is out of scope');
 assert(CALLOUT_MIX.spacing > 0);
-actx.close = async () => {
+actx.close = async (): Promise<void> => {
   actx.state = 'closed';
 };
 audio.dispose();
 assert.equal(audio._callouts, null);
-audio.bark = () => {
+audio.bark = (): never => {
   throw Error('disposed audio retained its listener');
 };
-assert.doesNotThrow(() => events.emit('ai:bark', { kind: 'spot', position: pos, voice: 1 }));
+assert.doesNotThrow((): void => events.emit('ai:bark', { kind: 'spot', position: pos, voice: 1 }));
 
 const firing = new AudioSystem();
-Object.assign(firing, {
-  running: true,
-  actx,
-  rng: { float: () => 0 },
-  field: { listenerPos: { x: 0, y: 0, z: 0 }, distanceTo: () => 10 },
-  mixer: { duck() {} },
+firing.running = true;
+firing.actx = actx;
+firing.rng = new Rng(1);
+firing.rng.float = (): number => 0;
+firing.field = fixture<SpatialField>({
+  listenerPos: { x: 0, y: 0, z: 0 },
+  distanceTo: (): number => 10,
 });
-firing._playAt = () => true;
-firing.bark = () => {
+firing.mixer = fixture<Mixer>({ duck(): void {} });
+firing._playAt = (): boolean => true;
+firing.bark = (): never => {
   throw Error('gunfire fabricated tactical intent');
 };
-assert.doesNotThrow(() => firing._onFire({ weapon: 'ai_rifle', origin: pos, firstPerson: false }));
+assert.doesNotThrow((): void =>
+  firing._onFire({
+    weapon: 'ai_rifle',
+    origin: pos,
+    firstPerson: false,
+    actor: null,
+    dir: new Vector3(),
+    seed: 0,
+  })
+);
 console.log(
   'Four stable voices, recorded variations, duration/priority gates and lifecycle-owned spatial speech'
 );

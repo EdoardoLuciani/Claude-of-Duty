@@ -3,58 +3,51 @@ import assert from 'node:assert/strict';
 import { AudioSystem } from '../../src/audio/index.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import reference from '../../src/audio/samples/reference.json' with { type: 'json' };
+import type { SampleKind, WeaponProfile } from '../../src/audio/types.ts';
 import {
   REPORT_DISTANT_MATCH,
   WEAPON_PROFILES,
   reportDistanceGain,
   reportDistantMix,
 } from '../../src/audio/weapons.ts';
+import { hasOwn } from '../../src/core/guards.ts';
+import { Rng } from '../../src/core/rng.ts';
+import {
+  audioFixture,
+  FixtureAudioBuffer,
+  type FixtureBufferSource,
+  FixtureGainNode,
+  fixtureBuffer,
+} from '../lib/audio-fixture.ts';
 
-const kinds = ['rifle', 'mcx', 'pistol', 'lmg', 'smg', 'mpx', 'sniper', 'shotgun', 'ak'];
-const param = () => ({ value: 0 });
-const node = () => ({
-  connections: [],
-  connect(to) {
-    this.connections.push(to);
-  },
-  frequency: param(),
-  Q: param(),
-  gain: param(),
-});
+const kinds = ['rifle', 'mcx', 'pistol', 'lmg', 'smg', 'mpx', 'sniper', 'shotgun', 'ak'] as const;
 for (const kind of kinds) {
-  const profile = WEAPON_PROFILES[kind];
+  const profile: WeaponProfile = WEAPON_PROFILES[kind];
   assert.equal(profile.sample, kind);
   assert.equal('sampleAction' in profile, false, 'no legacy action-layer controls');
   assert.equal('samplePunch' in profile, false, 'no synthesized report branch');
   assert.equal('sampleGain' in profile, false, 'no separate authored per-profile level');
   assert.equal('firstPersonGain' in profile, false, 'no extra authored own-shot boost');
-  const sources = [];
+  const { actx: ctx, sources } = audioFixture(3);
+  const createSource = ctx.createBufferSource.bind(ctx);
+  ctx.createBufferSource = (): FixtureBufferSource => {
+    const source = createSource();
+    source.playbackRate.value = 0;
+    return source;
+  };
   let filters = 0;
-  const ctx = {
-    currentTime: 3,
-    createBiquadFilter() {
-      filters++;
-      return node();
-    },
-    createGain: node,
-    createBufferSource() {
-      const source = {
-        ...node(),
-        playbackRate: param(),
-        starts: [],
-        start(...args) {
-          this.starts.push(args);
-        },
-      };
-      sources.push(source);
-      return source;
-    },
+  const createFilter = ctx.createBiquadFilter.bind(ctx);
+  ctx.createBiquadFilter = (): BiquadFilterNode => {
+    filters++;
+    return createFilter();
   };
   const bank = new WeaponSampleBank(ctx);
-  function readVariants(key, count) {
-    return Array.from({ length: count }, (_, i) => {
-      const duration = reference.files[`${key}-${i + 1}`].frames / reference.masterRate;
-      return { duration, i };
+  function readVariants(key: SampleKind, count: number): FixtureAudioBuffer[] {
+    return Array.from({ length: count }, (_, i): FixtureAudioBuffer => {
+      const name = `${key}-${i + 1}`;
+      assert(hasOwn(reference.files, name));
+      const duration = reference.files[name].frames / reference.masterRate;
+      return new FixtureAudioBuffer({ duration, index: i });
     });
   }
   const variants = kind === 'mcx' ? 2 : 3;
@@ -63,7 +56,8 @@ for (const kind of kinds) {
   if (profile.distantSample)
     bank.buffers[profile.distantSample] = readVariants(profile.distantSample, 2);
   else assert.equal(profile.distantSample, undefined, 'no unsuppressed substitute for MCX');
-  const rng = { range: (a, b) => (a + b) / 2 };
+  const rng = new Rng(1);
+  rng.range = (a, b): number => (a + b) / 2;
   for (let i = 0; i < variants + 1; i++) {
     const when = 4 + i * 0.075;
     const voice = bank.shot(profile, rng, { when, firstPerson: true });
@@ -78,21 +72,25 @@ for (const kind of kinds) {
     );
     assert.notEqual(voice.node.channelCount, 1, 'never force player source mono');
     assert.deepEqual(source.starts, [[when]], 'no source offset or truncation');
-    assert(voice.end >= when + source.buffer.duration);
+    assert(voice.end >= when + fixtureBuffer(source.buffer).duration);
     assert.equal(voice.send, 0, 'complete reports use recorded decay, no added reverb');
   }
   assert.equal(filters, 0, 'no player high/low-pass, including suppressed MCX');
   const audio = new AudioSystem();
-  Object.assign(audio, { actx: ctx, samples: bank, rng });
+  audio.actx = ctx;
+  audio.samples = bank;
+  audio.rng = rng;
   assert.equal(audio._dry.length, 80, 'explicit private full-tail bookkeeping budget');
   for (const distance of [20, 20.001, 44.9, 45, 45.1, 70, 139.999, 140, 150]) {
     const count = sources.length;
     const voice = audio._build('shot', 7, distance, { profile, firstPerson: false });
     const mix = reportDistantMix(distance, profile);
     const blended = mix > 0 && mix < 1;
-    const chosen = mix === 1 ? bank.buffers[profile.distantSample] : buffers;
+    const distant = profile.distantSample ? bank.buffers[profile.distantSample] : undefined;
+    const chosen = mix === 1 ? distant : buffers;
+    assert(chosen);
     assert(
-      chosen.includes(sources[count].buffer),
+      chosen.includes(fixtureBuffer(sources[count].buffer)),
       'primary bank follows transition; suppressed identity retained'
     );
     assert.equal(
@@ -101,9 +99,12 @@ for (const kind of kinds) {
       'two complete perspectives only inside handoff; no synthetic layer'
     );
     if (blended) {
-      assert(bank.buffers[profile.distantSample].includes(sources[count + 1].buffer));
-      const nearGain = sources[count].connections[0].gain.value;
-      const farGain = sources[count + 1].connections[0].gain.value;
+      assert(distant?.includes(fixtureBuffer(sources[count + 1].buffer)));
+      const nearNode = sources[count].connections[0],
+        farNode = sources[count + 1].connections[0];
+      assert(nearNode instanceof FixtureGainNode && farNode instanceof FixtureGainNode);
+      const nearGain = nearNode.gain.value;
+      const farGain = farNode.gain.value;
       assert(Math.abs(nearGain + farGain - 1) < 1e-12, 'convex source mix');
       const theta = (mix * Math.PI) / 2;
       const distanceGain = reportDistanceGain(distance, profile);
@@ -113,9 +114,7 @@ for (const kind of kinds) {
       assert(
         Math.abs(
           farGain * distanceGain -
-            reportDistanceGain(distance) *
-              Math.sin(theta) *
-              REPORT_DISTANT_MATCH[profile.distantSample]
+            reportDistanceGain(distance) * Math.sin(theta) * distantMatch(profile)
         ) < 1e-12
       );
     }
@@ -128,12 +127,18 @@ for (const kind of kinds) {
         'same shot time; no source offset, delay or shortened tail'
       );
       assert.equal(source.playbackRate.value, 1);
-      assert(voice.end >= source.starts[0][0] + source.buffer.duration / source.playbackRate.value);
+      assert(
+        voice.end >=
+          source.starts[0][0] + fixtureBuffer(source.buffer).duration / source.playbackRate.value
+      );
     }
   }
   const count = sources.length;
   audio._build('shot', 9, 70, { profile, firstPerson: true });
-  assert(buffers.includes(sources[count].buffer), 'player always uses close stereo perspective');
+  assert(
+    buffers.includes(fixtureBuffer(sources[count].buffer)),
+    'player always uses close stereo perspective'
+  );
   assert.equal(sources.length, count + 1);
   assert.equal(filters, 0, 'no authored-source repair EQ or bounce filters at any range');
   bank.dispose();
@@ -142,3 +147,10 @@ for (const kind of kinds) {
 console.log(
   'Source-faithful gunshots: stereo, full tails, fixed rate/gain, distant mapping, budgets and cleanup'
 );
+
+function distantMatch(profile: WeaponProfile): number {
+  assert(profile.distantSample);
+  const match = REPORT_DISTANT_MATCH[profile.distantSample];
+  assert(match !== undefined);
+  return match;
+}

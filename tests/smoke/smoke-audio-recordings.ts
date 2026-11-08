@@ -7,10 +7,17 @@ import { build } from 'vite';
 
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import { AUDIO_BANKS } from '../lib/audio-banks.ts';
+import {
+  fixtureBuffer,
+  FixtureAudioBuffer,
+  createAudioContext,
+  fixtureEntries,
+  fixtureKeys,
+} from '../lib/audio-fixture.ts';
 
 const root = new URL('../../src/audio/samples/', import.meta.url);
-const relative = (url) => url.slice(root.href.length);
-const hash = (name, value) => {
+const relative = (url: string): string => url.slice(root.href.length);
+const hash = (name: string, value: unknown): string => {
   const payload = JSON.stringify(value);
   if (process.env.DUMP_CHARACTERIZATION) console.log(name, payload);
   return createHash('sha256').update(payload).digest('hex');
@@ -29,8 +36,11 @@ const bankHashes = [
   '8f88913a61d429b6ea237ac101ff7a856f14b39eef7e5157dbb18a6f69b0203f',
 ];
 for (const [index, [banks]] of AUDIO_BANKS.entries()) {
-  const catalog = Object.entries(banks).map(([kind, urls]) => [kind, urls.map(relative)]);
-  const name = Object.keys(banks)[0];
+  const catalog = fixtureEntries(banks).map(([kind, urls]): (string | string[])[] => [
+    kind,
+    urls.map(relative),
+  ]);
+  const name = fixtureKeys(banks)[0];
   assert.equal(
     hash(`catalog:${name}`, catalog),
     bankHashes[index],
@@ -38,24 +48,26 @@ for (const [index, [banks]] of AUDIO_BANKS.entries()) {
   );
 }
 
-const fetched = [];
-const pending = [];
-const bank = new WeaponSampleBank({
-  decodeAudioData(bytes) {
-    return new Promise((resolve) => {
-      pending.push(() => resolve({ name: new TextDecoder().decode(bytes), duration: 0.5 }));
-    });
-  },
-});
+const fetched: string[] = [];
+const pending: Array<() => void> = [];
+const actx = createAudioContext();
+actx.decodeAudioData = (bytes): Promise<AudioBuffer> =>
+  new Promise((resolve): void => {
+    pending.push((): void =>
+      resolve(new FixtureAudioBuffer({ name: new TextDecoder().decode(bytes), duration: 0.5 }))
+    );
+  });
+const bank = new WeaponSampleBank(actx);
 const fetch = globalThis.fetch;
 try {
-  globalThis.fetch = async (url) => {
+  globalThis.fetch = async (input): Promise<Response> => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     assert(url.startsWith(root.href), 'raw Node imports retain local file URLs');
     fetched.push(relative(url));
-    return { ok: true, arrayBuffer: async () => new TextEncoder().encode(relative(url)).buffer };
+    return new Response(new TextEncoder().encode(relative(url)));
   };
   const loading = bank.load();
-  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve): NodeJS.Immediate => setImmediate(resolve));
   assert.equal(pending.length, 375);
   // Completing decodes backwards must not reorder the takes or their initial cursors.
   for (const finish of pending.reverse()) finish();
@@ -68,33 +80,44 @@ assert.equal(
   'ee24c46687630e01e3e2ff6632d4103e6e95e25a35b5bf6cbbcf654a67381964',
   'fetch-order characterization changed; inspect with DUMP_CHARACTERIZATION=1'
 );
-const localFiles = readdirSync(root, { recursive: true }).filter((name) => name.endsWith('.opus'));
+const localFiles = readdirSync(root, { recursive: true, encoding: 'utf8' }).filter(
+  (name): boolean => name.endsWith('.opus')
+);
 assert.deepEqual([...fetched].sort(), localFiles.sort(), 'every local recording is loaded once');
 for (const [banks] of AUDIO_BANKS) {
-  for (const [kind, urls] of Object.entries(banks)) {
+  for (const [kind, urls] of fixtureEntries(banks)) {
     const reload = urls[0].includes('/reloads/');
     const buffers =
       kind === 'propeller'
         ? bank.aircraftBuffers
-        : (reload ? bank.reloadBuffers : bank.hitBuffers)[kind];
+        : (reload ? fixtureEntries(bank.reloadBuffers) : fixtureEntries(bank.hitBuffers)).find(
+            ([key]): boolean => key === kind
+          )?.[1];
+    assert(buffers);
     assert.deepEqual(
-      buffers.map((buffer) => buffer.name),
+      buffers.map((buffer): string => fixtureBuffer(buffer).name),
       urls.map(relative),
       kind
     );
     if (kind !== 'propeller')
-      assert.equal((reload ? bank.reloadIndices : bank.hitIndices)[kind], -1);
+      assert.equal(
+        (reload ? fixtureEntries(bank.reloadIndices) : fixtureEntries(bank.hitIndices)).find(
+          ([key]): boolean => key === kind
+        )?.[1],
+        -1
+      );
   }
 }
-for (const [kind, buffers] of Object.entries(bank.buffers)) {
+for (const [kind, buffers] of fixtureEntries(bank.buffers)) {
+  assert(buffers);
   assert.equal(bank.indices[kind], 0, 'firearm takes still start at zero, not a random variant');
   assert.deepEqual(
-    buffers.map((buffer) => buffer.name),
-    buffers.map((_, i) => `${kind}-${i + 1}.opus`)
+    buffers.map((buffer): string => fixtureBuffer(buffer).name),
+    buffers.map((_, i): string => `${kind}-${i + 1}.opus`)
   );
 }
 assert.equal(bank.aircraftIndex, -1);
-assert.equal(bank.heartbeatBuffer.name, 'heartbeat.opus');
+assert.equal(fixtureBuffer(bank.heartbeatBuffer).name, 'heartbeat.opus');
 const retained = [
   ...Object.values(bank.buffers),
   ...Object.values(bank.hitBuffers),
@@ -103,7 +126,7 @@ const retained = [
 ];
 bank.dispose();
 assert(
-  retained.every((buffers) => buffers.length === 0),
+  retained.every((buffers): boolean => buffers?.length === 0),
   'dispose clears even borrowed array handles'
 );
 assert.equal(bank.loaded, 0);
@@ -125,13 +148,33 @@ const result = await build({
 });
 const outputs = Array.isArray(result) ? result : [result];
 const chunk = outputs
-  .flatMap((output) => output.output)
-  .find((entry) => entry.type === 'chunk' && entry.isEntry);
-const bundled = await import(
+  .flatMap((output): Extract<Awaited<ReturnType<typeof build>>, { output: unknown }>['output'] => {
+    assert('output' in output);
+    return output.output;
+  })
+  .find((entry): boolean => entry.type === 'chunk' && entry.isEntry);
+assert(chunk?.type === 'chunk');
+const bundled: unknown = await import(
   `data:text/javascript;base64,${Buffer.from(chunk.code).toString('base64')}`
 );
+function isRecordingsModule(value: unknown): value is {
+  recordingUrl(name: string): unknown;
+  recordingUrls(prefix: string, count: number): unknown;
+} {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'recordingUrl' in value &&
+    typeof value.recordingUrl === 'function' &&
+    'recordingUrls' in value &&
+    typeof value.recordingUrls === 'function'
+  );
+}
+assert(isRecordingsModule(bundled));
 for (const name of fetched) {
   const url = bundled.recordingUrl(name.slice(0, -'.opus'.length));
+  assert.equal(typeof url, 'string');
+  assert(typeof url === 'string');
   assert.match(url, /^data:.*;base64,/);
   assert.deepEqual(
     Buffer.from(url.slice(url.indexOf(',') + 1), 'base64'),
@@ -141,9 +184,9 @@ for (const name of fetched) {
 }
 assert.deepEqual(
   bundled.recordingUrls('mpx', 3),
-  [1, 2, 3].map((i) => bundled.recordingUrl(`mpx-${i}`))
+  [1, 2, 3].map((i): unknown => bundled.recordingUrl(`mpx-${i}`))
 );
-assert.throws(() => bundled.recordingUrl('not-a-recording'), /missing bundled recording/);
+assert.throws((): unknown => bundled.recordingUrl('not-a-recording'), /missing bundled recording/);
 console.log(
   '375 unchanged ordered recordings: raw Node, reverse decode completion, disposal and Vite URL bytes'
 );

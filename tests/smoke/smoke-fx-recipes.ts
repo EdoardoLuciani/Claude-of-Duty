@@ -7,56 +7,72 @@ import { Rng } from '../../src/core/rng.ts';
 import { Ambience } from '../../src/fx/ambience.ts';
 import { explode } from '../../src/fx/explosions.ts';
 import { IMPACTS, spawnImpact, spawnExit, spawnIntelSparks } from '../../src/fx/impacts.ts';
+import { FxSystem } from '../../src/fx/index.ts';
+import { LightPool } from '../../src/fx/lights.ts';
 import { MUZZLE_PROFILES, muzzleFlash } from '../../src/fx/muzzle.ts';
 import { ParticleLayer, resetSpawn, STRIDE, disposeQuadSource } from '../../src/fx/particles.ts';
 import { spawnTracer } from '../../src/fx/tracers.ts';
+import { PhysicsSystem, type PhysicsHit } from '../../src/physics/index.ts';
+import { fixtureKeys } from '../lib/audio-fixture.ts';
+import { createTestContext } from '../lib/context.ts';
 
-function recorder(seed, pScale, bounce = false) {
-  const calls = [];
+type RecordedCall = [string, unknown[]];
+function recorder(
+  seed: number,
+  pScale: number,
+  bounce = false
+): { fx: FxSystem; calls: RecordedCall[] } {
+  const calls: RecordedCall[] = [];
   const record =
-    (kind) =>
-    (...args) =>
+    (kind: string): ((...args: unknown[]) => number) =>
+    (...args: unknown[]): number =>
       calls.push([kind, structuredClone(args)]);
   const camera = new THREE.PerspectiveCamera();
   camera.rotation.set(0.1, -0.2, 0.3);
   camera.updateMatrixWorld();
-  const fx = {
-    rng: new Rng(seed),
-    pScale,
-    ctx: { camera, viewCamera: camera },
-    lights: { flash: record('light') },
-    _fromView: (position) => position,
-    sunWorld: () => ({ x: 0.2, y: 0.8, z: -0.3 }),
+  const scene = new THREE.Scene();
+  const fx = new FxSystem();
+  fx.rng = new Rng(seed);
+  fx.pScale = pScale;
+  fx.ctx = createTestContext({ camera, viewCamera: camera, scene, rng: fx.rng });
+  fx.lights = new LightPool(scene);
+  fx.lights.flash = (...args): null => {
+    record('light')(...args);
+    return null;
   };
-  for (const method of [
-    'emitAdd',
-    'emitLit',
-    'emitViewAdd',
-    'emitViewLit',
-    'emitMote',
-    'addDecal',
-    'haze',
-    'hazeRing',
-    'viewFlash',
-    'addSmokeColumn',
-    'scorch',
-    'bloodSpatterBehind',
-  ])
-    fx[method] = record(method);
+  fx._fromView = (position): THREE.Vector3 => new THREE.Vector3(position.x, position.y, position.z);
+  fx.sunWorld = (): THREE.Vector3Like => ({ x: 0.2, y: 0.8, z: -0.3 });
+  fx.emitAdd = record('emitAdd');
+  fx.emitLit = record('emitLit');
+  fx.emitViewAdd = record('emitViewAdd');
+  fx.emitViewLit = record('emitViewLit');
+  fx.emitMote = record('emitMote');
+  fx.addDecal = (...args): boolean => {
+    record('addDecal')(...args);
+    return true;
+  };
+  fx.haze = record('haze');
+  fx.hazeRing = record('hazeRing');
+  fx.viewFlash = record('viewFlash');
+  fx.addSmokeColumn = record('addSmokeColumn');
+  fx.scorch = record('scorch');
+  fx.bloodSpatterBehind = record('bloodSpatterBehind');
+  fx._physics = null;
   if (bounce) {
-    fx.physics = {
-      MASK: { WORLD: 7 },
-      raycast(...args) {
-        record('raycast')(...args);
-        return {
-          hit: true,
-          distance: 0.23,
-          point: { x: 2, y: 1, z: -3 },
-          normal: { x: 0, y: 1, z: 0 },
-        };
-      },
-      groundHeight: () => 0.7,
+    const physics = new PhysicsSystem();
+    // Keep the characterization's synthetic mask, independent of runtime masks.
+    physics.MASK = { ...physics.MASK, WORLD: 7 };
+    physics.raycast = (...args): PhysicsHit => {
+      record('raycast')(...args);
+      const hit = physics._nextHit();
+      hit.hit = true;
+      hit.distance = 0.23;
+      hit.point.set(2, 1, -3);
+      hit.normal.set(0, 1, 0);
+      return hit;
     };
+    physics.groundHeight = (): number => 0.7;
+    fx._physics = physics;
   }
   return { fx, calls };
 }
@@ -64,38 +80,47 @@ function recorder(seed, pScale, bounce = false) {
 const point = new THREE.Vector3(2, 3, -5);
 const normal = new THREE.Vector3(0.2, 0.9, 0.3).normalize();
 const incident = new THREE.Vector3(-0.8, -0.1, 0.4).normalize();
-const results = {};
-function check(name, seed, scale, run, bounce = false) {
+const results: Record<string, string> = {};
+function check(
+  name: string,
+  seed: number,
+  scale: number,
+  run: (fx: FxSystem) => void,
+  bounce = false
+): void {
   const { fx, calls } = recorder(seed, scale, bounce);
   run(fx);
   // Include the next draws, not just visible output: even discarded draws are a contract.
-  const next = Array.from({ length: 8 }, () => fx.rng.u32());
+  const next = Array.from({ length: 8 }, (): number => fx.rng.u32());
   const payload = JSON.stringify({ calls, next });
   if (process.env.DUMP_CHARACTERIZATION) console.log(name, payload);
   results[name] = createHash('sha256').update(payload).digest('hex');
 }
 
-for (const surface of [...Object.keys(IMPACTS), 'unknown']) {
+for (const surface of [...fixtureKeys(IMPACTS), 'unknown' as const]) {
   for (const scale of [0.4, 1.25]) {
     for (const [name, spawn] of [
       ['impact', spawnImpact],
       ['exit', spawnExit],
-    ]) {
+    ] as const) {
       check(
         `${name}:${surface}:${scale}`,
         0x5eed,
         scale,
-        (fx) => {
-          spawn(fx, point, normal, incident, surface, 1.3);
+        (fx): void => {
+          if (surface === 'unknown') {
+            // Deliberate untyped-input compatibility scenario; do not widen production contracts.
+            Reflect.apply(spawn, undefined, [fx, point, normal, incident, surface, 1.3]);
+          } else spawn(fx, point, normal, incident, surface, 1.3);
         },
         true
       );
     }
   }
 }
-for (const weapon of [...Object.keys(MUZZLE_PROFILES), 'unknown']) {
+for (const weapon of [...fixtureKeys(MUZZLE_PROFILES), 'unknown' as const]) {
   for (const view of [false, true]) {
-    check(`muzzle:${weapon}:${view}`, 0xabcd, 0.8, (fx) => {
+    check(`muzzle:${weapon}:${view}`, 0xabcd, 0.8, (fx): void => {
       muzzleFlash(fx, { position: point, direction: incident, weapon, view, intensity: 0.6 });
     });
   }
@@ -105,18 +130,20 @@ for (const [name, options] of Object.entries({
   staged: { flightTime: 0.3, warm: 0.7 },
   invalid: { flightTime: -1 },
 })) {
-  check(`tracer:${name}`, 0x1234, 1, (fx) => spawnTracer(fx, point, normal, 600, options));
+  check(`tracer:${name}`, 0x1234, 1, (fx): void => spawnTracer(fx, point, normal, 600, options));
 }
-check('tracer:short', 0x1234, 1, (fx) => spawnTracer(fx, point, point, 0));
-check('intel', 0xabcd, 1, (fx) => spawnIntelSparks(fx, point));
+check('tracer:short', 0x1234, 1, (fx): void => spawnTracer(fx, point, point, 0));
+check('intel', 0xabcd, 1, (fx): void => spawnIntelSparks(fx, point));
 for (const radius of [0.1, 5, 12]) {
-  check(`explosion:${radius}`, 0xabcd, 0.4, (fx) => explode(fx, { position: point, radius }));
+  check(`explosion:${radius}`, 0xabcd, 0.4, (fx): boolean =>
+    explode(fx, { position: point, radius })
+  );
 }
 check(
   'ambience',
   0x5eed,
   1,
-  (fx) => {
+  (fx): void => {
     const ambience = new Ambience(fx, { motes: 4, shimmer: true });
     ambience.addColumn(1, 2, 3, { rate: 20, duration: 0.4, ember: 1, haze: 1 });
     for (const dt of [0.1, 0.15, 0.2, 0.1]) ambience.update(dt, 1, fx.ctx.camera);

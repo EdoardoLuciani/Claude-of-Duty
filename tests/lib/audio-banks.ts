@@ -10,7 +10,7 @@ import { REACTION_URLS } from '../../src/audio/reactions.ts';
 import { RELOAD_URLS } from '../../src/audio/reloads.ts';
 
 // Runtime banks and independently pinned expected recording counts.
-export const AUDIO_BANKS = [
+export const AUDIO_BANKS: ReadonlyArray<readonly [Record<string, readonly string[]>, number]> = [
   [{ propeller: AIRCRAFT_URLS }, 2],
   [CALLOUT_URLS, 36],
   [ENVIRONMENT_URLS, 14],
@@ -23,28 +23,4 @@ export const AUDIO_BANKS = [
   [COMBAT_URLS, 46],
 ];
 
-export function audioFixture(currentTime = 0) {
-  const sources = [];
-  const actx = {
-    currentTime,
-    createGain: () => ({ gain: { value: 0 }, connect() {}, disconnect() {} }),
-    createBufferSource() {
-      const source = {
-        playbackRate: { value: 1 },
-        connect() {},
-        disconnect() {
-          this.disconnected = true;
-        },
-        stop() {
-          this.stopped = true;
-        },
-        start(when) {
-          this.when = when;
-        },
-      };
-      sources.push(source);
-      return source;
-    },
-  };
-  return { actx, sources };
-}
+export { audioFixture } from './audio-fixture.ts';
