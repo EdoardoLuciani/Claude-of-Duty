@@ -1,24 +1,31 @@
-import { spawnSync } from 'node:child_process';
+import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { readdirSync } from 'node:fs';
+import { availableParallelism } from 'node:os';
 import { join } from 'node:path';
+import { test } from 'node:test';
+import { promisify } from 'node:util';
 
-import { expect, test } from 'vitest';
-
+const run = promisify(execFile);
 const dir = import.meta.dirname;
-for (const file of readdirSync(dir).sort()) {
-  if (!file.startsWith('smoke-') || !file.endsWith('.mjs')) continue;
-  // Longer wall-clock allowance only; physical simulation limits stay intact.
-  const longSweep = file === 'smoke-ai-ladder-live.mjs';
-  const integrationSweep = file === 'smoke-ai-ladder.mjs' || file === 'smoke-ai-ladder-worker.mjs';
-  test(
-    file,
-    () => {
-      const r = spawnSync(process.execPath, [join(dir, file)], {
-        encoding: 'utf8',
-        timeout: longSweep ? 60000 : integrationSweep ? 30000 : undefined,
-      });
-      expect(r.status, r.stdout + r.stderr).toBe(0);
-    },
-    longSweep ? 65000 : integrationSweep ? 35000 : 5000
-  );
-}
+const files = readdirSync(dir)
+  .filter((file) => file.startsWith('smoke-') && file.endsWith('.mjs'))
+  .sort();
+// Hang guard only (wall clock under parallel load); physical simulation limits stay intact.
+const TIMEOUT_MS = 30000;
+
+// Each smoke script is an independent process; run about one per physical core.
+test('smoke', { concurrency: Math.ceil(availableParallelism() / 2) }, (t) => {
+  for (const file of files) {
+    t.test(file, async () => {
+      try {
+        await run(process.execPath, [join(dir, file)], { timeout: TIMEOUT_MS });
+      } catch (error) {
+        const reason = error.killed
+          ? `timed out after ${TIMEOUT_MS} ms`
+          : `exited with ${error.code}`;
+        assert.fail(`${file} ${reason}\n${error.stdout}${error.stderr}`);
+      }
+    });
+  }
+});

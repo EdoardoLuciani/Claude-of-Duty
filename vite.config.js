@@ -21,7 +21,7 @@ async function runAssetTasks() {
 
 export default defineConfig(async ({ isPreview }) => {
   // Generated models are built here; world export stays explicit (committed, validated).
-  if (!isPreview && !process.env.VITEST) await runAssetTasks();
+  if (!isPreview) await runAssetTasks();
 
   let revision = 'unknown';
   try {
