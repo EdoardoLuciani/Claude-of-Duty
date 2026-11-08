@@ -215,10 +215,10 @@ export class UiSystem {
     });
 
     on('damage:dealt', (e): void => {
-      // The payload means "damage dealt TO e.target". `ai` uses it for enemy
-      // rounds that connect with the player, which must not draw a hitmarker or
-      // a "YOU killed" killfeed row — that arrives as `damage:taken` below.
+      // Only player-sourced damage to other actors earns hit/kill feedback.
+      // AI-on-AI damage and damage to the player must not draw a "YOU killed" row.
       if (this._isPlayerTarget(e.target)) return;
+      if (!this._isPlayerTarget(e.source)) return;
       const armoured = ('armour' in e && e.armour === true) || e.part === 'armour';
       const kind = e.killed ? 'kill' : e.headshot ? 'head' : armoured ? 'armour' : 'hit';
       this.hitmarker(kind);
@@ -386,7 +386,7 @@ export class UiSystem {
 
   /* ------------------------------------------------------------- helpers -- */
 
-  /** True when a `damage:dealt` payload is aimed at the local player. */
+  /** True when a damage actor handle identifies the local player. */
   _isPlayerTarget(t: unknown): boolean {
     if (!t) return false;
     return (

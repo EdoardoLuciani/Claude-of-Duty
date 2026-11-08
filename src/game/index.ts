@@ -66,7 +66,13 @@ export class GameSystem {
     // marks the shared payload `killed` when this hit actually ended the actor.
     on('damage:dealt', (e): void => {
       const target = e?.target;
-      if (!e?.killed || !target || typeof target !== 'object' || this._isPlayerTarget(target))
+      if (
+        !e?.killed ||
+        !target ||
+        typeof target !== 'object' ||
+        this._isPlayerTarget(target) ||
+        !this._isPlayerTarget(e.source)
+      )
         return;
       // Staged actors and the visual player corpse are not gameplay enemies.
       if (
