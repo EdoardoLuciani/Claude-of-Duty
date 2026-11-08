@@ -12,42 +12,57 @@ import {
 } from 'three';
 
 import { AiSystem } from '../../src/ai/index.ts';
+import type { EngineSystems } from '../../src/core/context.ts';
+import { PhysicsSystem } from '../../src/physics/index.ts';
+import { makeAgent } from '../../tools/lib/agent-fixture.ts';
 import { testNav } from '../../tools/lib/test-nav.ts';
 import { makeWalker } from '../../tools/nav240/harness.ts';
+import { createTestContext } from '../lib/context.ts';
+import { fixture } from '../lib/fixture.ts';
 
 const grid = await testNav([
   [0, 0, 0, 24, 24],
   [0, 0.9, 0, 1.2, 1.2],
 ]);
-const phys = grid.physics,
-  candidate = {
-    query(from, to) {
-      const points = [];
-      grid.findPath(from, to, points);
-      return { points, outcome: grid.lastOutcome, reason: grid.lastReason };
-    },
-  };
+const phys = grid.physics;
+assert(phys instanceof PhysicsSystem);
+const candidate = {
+  query(
+    from: Vector3,
+    to: Vector3
+  ): { points: Vector3[]; outcome: string | null; reason?: string | null } {
+    const points: Vector3[] = [];
+    grid.findPath(from, to, points);
+    return { points, outcome: grid.lastOutcome, reason: grid.lastReason };
+  },
+};
 const a = makeWalker({ grid, physics: phys }, candidate, new Vector3(-6, 0.008, 0), 1);
 const camera = new PerspectiveCamera(60, 1, 0.1, 100);
 const sky = { keyDirection: new Vector3(0, 1, 0) };
-Object.assign(a.ai, {
-  ctx: { camera, time: { elapsed: 0 }, peek: (id) => (id === 'sky' ? sky : phys) },
-  phys,
-  _frustum: new Frustum(),
-  _mvp: new Matrix4(),
-  _sphere: new Sphere(),
-  _sweep: new Sphere(),
-  _sun: new Vector3(),
-  canRollback: AiSystem.prototype.canRollback,
-  _sunDirection: AiSystem.prototype._sunDirection,
-});
+Object.assign(
+  a.ai,
+  fixture<Partial<AiSystem>>({
+    ctx: createTestContext({
+      camera,
+      providers: { sky: fixture<EngineSystems['sky']>(sky), physics: phys },
+    }),
+    _phys: phys,
+    _frustum: new Frustum(),
+    _mvp: new Matrix4(),
+    _sphere: new Sphere(),
+    _sweep: new Sphere(),
+    _sun: new Vector3(),
+    canRollback: AiSystem.prototype.canRollback.bind(a.ai),
+    _sunDirection: AiSystem.prototype._sunDirection.bind(a.ai),
+  })
+);
 a.ctx = a.ai.ctx;
-function look(x, y, z, tx, ty, tz) {
+function look(x: number, y: number, z: number, tx: number, ty: number, tz: number): void {
   // The guard must refresh camera matrices after a turn, not use last frame's view.
   camera.position.set(x, y, z);
   camera.lookAt(tx, ty, tz);
 }
-function tick() {
+function tick(): void {
   a.ctx.time.elapsed += 3.1;
   a._tickNoProgress(3.1);
 }
@@ -83,11 +98,16 @@ look(-6, 2, 8, -6, 1, 0);
 assert.equal(a.ai.canRollback(a, checkpoint), false, 'visible destination also forbids rollback');
 a.position.copy(old);
 look(0, 2, 20, 0, 2, 21);
-const neighbor = { alive: true, radius: a.radius, height: a.height, position: checkpoint.clone() };
+const neighbor = makeAgent({
+  alive: true,
+  radius: a.radius,
+  height: a.height,
+  position: checkpoint.clone(),
+});
 a.ai.agents.push(neighbor);
 tick();
 assert.equal(a.relocations, 0, 'occupied destination forbids rollback');
-const shorter = { position: a.position, radius: 0.34 * 0.985, height: 1.78 * 0.985 };
+const shorter = makeAgent({ position: a.position, radius: 0.34 * 0.985, height: 1.78 * 0.985 });
 neighbor.position.y = checkpoint.y - shorter.height - 0.01;
 assert.equal(
   a.ai.canRollback(shorter, checkpoint),
@@ -132,6 +152,7 @@ assert.equal(
 );
 assert.equal(a.recoveryOutcome, 'relocated', 'never label rollback as walking arrival');
 assert.ok(a.position.distanceTo(checkpoint) < 0.02);
+assert(a.lastRollback);
 assert.ok(a.lastRollback.from[1] > 0.8);
 assert.ok(a.pathPending, 'resume through the ordinary deferred solve queue');
 assert.equal(a.ai._pathBudget, 0, 'no emergency budget bypass');

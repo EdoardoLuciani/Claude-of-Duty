@@ -4,11 +4,14 @@ import { Vector3, Mesh, BoxGeometry, MeshBasicMaterial } from 'three';
 
 import { INFANTRY } from '../../src/ai/capabilities.ts';
 import { CoverMap } from '../../src/ai/nav.ts';
+import { PhysicsSystem } from '../../src/physics/index.ts';
 import { testNav } from '../../tools/lib/test-nav.ts';
 import { makeWalker } from '../../tools/nav240/harness.ts';
 
 const nav = await testNav(),
-  phys = nav.physics;
+  physics = nav.physics;
+assert(physics instanceof PhysicsSystem);
+const phys = physics;
 const from = new Vector3(1, 0, 1),
   to = new Vector3(2.5, 0, 1),
   next = new Vector3(4, 0, 1);
@@ -25,13 +28,21 @@ assert.equal(
   false,
   'ordinary endpoint probes retain their short budget'
 );
+// Missing continuation is an intentionally incomplete caller input.
 assert.equal(
-  nav.canVault(from, to),
+  Reflect.apply(nav.canVault.bind(nav), nav, [from, to]),
   false,
   'a clear landing alone does not establish continuation'
 );
-const meshes = [];
-function box(x, y, z, w, h, d) {
+const meshes: Mesh<BoxGeometry, MeshBasicMaterial>[] = [];
+function box(
+  x: number,
+  y: number,
+  z: number,
+  w: number,
+  h: number,
+  d: number
+): Mesh<BoxGeometry, MeshBasicMaterial> {
   const mesh = new Mesh(new BoxGeometry(w, h, d), new MeshBasicMaterial());
   mesh.position.set(x, y, z);
   mesh.updateMatrixWorld(true);
@@ -64,8 +75,8 @@ phys.removeStatic(occupied);
 phys.rebuildStatic();
 
 const candidate = {
-  query(start, end) {
-    const points = [],
+  query(start: Vector3, end: Vector3): { points: Vector3[]; outcome: string | null } {
+    const points: Vector3[] = [],
       n = nav.findPath(start, end, points);
     return { outcome: nav.lastOutcome, points: points.slice(0, n) };
   },

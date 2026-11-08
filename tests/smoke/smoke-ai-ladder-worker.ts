@@ -4,6 +4,7 @@ import { writeFileSync } from 'node:fs';
 import { Vector3 } from 'three';
 
 import { AttachmentQueries, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.ts';
+import type { ClientMessage, LadderQuery, QueryKey } from '../../src/ai/attachment-types.ts';
 import {
   parseQueryKey,
   parseClientMessage,
@@ -19,7 +20,10 @@ import {
   ladderMoveBudget,
   LadderMotor,
 } from '../../src/ai/ladder.ts';
+import type { LadderDescriptor } from '../../src/ai/ladder.ts';
 import { NAV_PROFILE } from '../../src/ai/nav-format.ts';
+import type { SurfaceNav } from '../../src/ai/nav.ts';
+import { StaticWorld } from '../../src/physics/bvh.ts';
 import { CharacterController } from '../../src/physics/character.ts';
 import { NativeWorker } from '../../tools/lib/attachment-worker-fixture.ts';
 import {
@@ -28,41 +32,77 @@ import {
   reverseCursor,
 } from '../../tools/lib/ladder-fixture.ts';
 import { loadMap } from '../../tools/nav240/fixtures.ts';
+import {
+  MovementWorker,
+  mutableLadder,
+  type MutableLadderDescriptor,
+} from '../lib/ai-movement-fixture.ts';
+import { fixture } from '../lib/fixture.ts';
+
+interface LadderQueryInput extends Omit<
+  LadderQuery,
+  'kind' | 'motorVersion' | 'direction' | 'descriptor' | 'foot'
+> {
+  foot: { x: number; y: number; z: number };
+  kind: string;
+  motorVersion: number;
+  direction: string;
+  descriptor: MutableLadderDescriptor;
+}
+function mutableQuery(query: LadderQuery): LadderQueryInput {
+  return {
+    ...structuredClone(query),
+    foot: { ...query.foot },
+    descriptor: mutableLadder(query.descriptor),
+  };
+}
 
 // Only the browser transport is adapted. This imports the actual module worker,
 // MessageChannel scheduler, snapshot, native BVH/controller and shared motor.
-const sleep = () => new Promise((resolve) => setTimeout(resolve, 0));
-async function until(fn) {
+const sleep = (): Promise<void> => new Promise((resolve): NodeJS.Timeout => setTimeout(resolve, 0));
+async function until(fn: () => unknown): Promise<void> {
   const end = performance.now() + 10000;
   while (!fn()) {
     assert(performance.now() < end, 'worker check deadline');
     await sleep();
   }
 }
-const f = await loadMap(),
-  descriptors = createLadderDescriptors(f.meta.volumes);
+const f = await loadMap();
+assert(f.meta.volumes);
+const descriptors = createLadderDescriptors(f.meta.volumes);
 assert.equal(descriptors.length, 6);
 const profiles = ladderProfiles();
 const probe = new CharacterController(f.physics.staticWorld, {
   stepHeight: INFANTRY.stepHeight,
   slopeLimit: INFANTRY.slopeRadians,
 });
-const nav = { physics: f.physics, _probe: probe };
+const nav = fixture<SurfaceNav>({ physics: f.physics, _probe: probe, repeatState: true });
 probe.move =
   probe.setPosition =
   probe.probeGround =
-    () => assert.fail('eligibility simulated on the main-thread service controller');
-let transport;
+    (): never => assert.fail('eligibility simulated on the main-thread service controller');
+const transport: { current: NativeWorker | null } = { current: null };
+function currentTransport(): NativeWorker {
+  assert(transport.current);
+  return transport.current;
+}
 const service = new AttachmentQueries(nav, {
   profile: true,
-  workerFactory: () => (transport = new NativeWorker({ record: true })),
+  workerFactory: (): NativeWorker => {
+    const worker = new NativeWorker({ record: true });
+    transport.current = worker;
+    return worker;
+  },
 });
-const options = (d, profile = profiles[0]) => ({
+const options = (
+  d: LadderDescriptor,
+  profile = profiles[0]
+): { radius: number; height: number; maxMoves: number } => ({
   radius: profile.radius,
   height: profile.height,
   maxMoves: ladderMoveBudget(d),
 });
-const payload = (d = descriptors[0]) => ({
+const payload = (d = descriptors[0]): LadderQuery => ({
   kind: 'ladder',
   motorVersion: LADDER_MOTOR_VERSION,
   descriptor: d,
@@ -77,17 +117,21 @@ const payload = (d = descriptors[0]) => ({
   mask: probe.mask,
   enabled: probe.enabled,
 });
-function oracle(query) {
+function oracle(query: LadderQuery): {
+  value: boolean;
+  moves: number;
+  failure: LadderMotor['failure'];
+} {
   const c = new CharacterController(f.physics.staticWorld, { ...query, position: query.foot });
   c.enabled = query.enabled;
   const motor = new LadderMotor(c, query.descriptor, query.direction, query.maxMoves, query.cursor);
   let moves = 0;
   const move = c.move.bind(c);
-  c.move = (...args) => {
+  c.move = (...args): number => {
     moves++;
     return move(...args);
   };
-  c.setPosition = c.teleport = c.setHeight = () => assert.fail('motor relocation/resize');
+  c.setPosition = c.teleport = c.setHeight = (): never => assert.fail('motor relocation/resize');
   try {
     for (let i = 0; i <= query.maxMoves && motor.status === 'active'; i++)
       motor.advance(LADDER.step);
@@ -99,27 +143,40 @@ function oracle(query) {
     motor.cancel();
   }
 }
-const proofs = [],
+const proofs: {
+    label: string;
+    ladder: number;
+    direction: string;
+    value: boolean;
+    moves: number;
+  }[] = [],
   boundaries = [];
 let actor = 0;
-async function parity(query, label, expected = true) {
-  query = parseQueryKey(query);
+async function parity(
+  input: unknown,
+  label: string,
+  expected: boolean | null = true
+): Promise<ReturnType<typeof oracle>> {
+  const query = parseQueryKey(input);
+  assert(!Array.isArray(query));
   service.proofs.delete(queryIdentity(query)); // Replay each case through the actual worker, even if geometrically identical.
   const id = ++actor,
     before = service.stats.submitted;
-  const run = () =>
-    service.run(id, 'ladder', () =>
+  const run = (): boolean | typeof NAV_PENDING | typeof NAV_CANCELLED =>
+    service.run(id, 'ladder', (): boolean =>
       service.checkLadder(query.descriptor, query.direction, query.foot, query.cursor, query)
     );
   assert.equal(run(), NAV_PENDING);
   assert.equal(run(), NAV_PENDING, 'exact retry deduplicates');
   assert.equal(service.stats.submitted, before + 1);
-  const job = [...service.jobs.values()].find((j) => j.scope.actor === id);
+  const job = [...service.jobs.values()].find((j): boolean => j.scope.actor === id);
+  assert(job);
   assert.deepEqual(job.key, query, 'query retains every exact number');
   const native = oracle(query);
-  await until(() => !service.jobs.has(job.id) || service.error);
+  await until((): unknown => !service.jobs.has(job.id) || service.error);
   assert.equal(service.error, null);
-  const result = transport.results.find((r) => r.id === job.id);
+  const result = currentTransport().results.find((r): boolean => r.id === job.id);
+  assert(result);
   assert.equal(result.value, native.value, label);
   assert.equal(result.moves, native.moves, 'worker uses the same native trajectory/budget');
   assert(result.moves <= query.maxMoves - query.cursor.moves);
@@ -138,7 +195,7 @@ try {
   await service.start();
   for (const d of descriptors)
     for (const profile of profiles)
-      for (const direction of ['up', 'down']) {
+      for (const direction of ['up', 'down'] as const) {
         const query = {
           ...payload(d),
           ...options(d, profile),
@@ -175,7 +232,7 @@ try {
   // parent integrates its separate motor fix. Success is required by default;
   // the explicit parity-only mode records this baseline dependency, not release acceptance.
   for (const d of descriptors)
-    for (const direction of ['up', 'down'])
+    for (const direction of ['up', 'down'] as const)
       for (const segment of [0, 1, 2]) {
         const from = d.points[direction === 'up' ? segment : 3 - segment];
         const foot = d.points[direction === 'up' ? segment + 1 : 2 - segment];
@@ -195,7 +252,7 @@ try {
       }
 
   for (const d of descriptors)
-    for (const direction of ['up', 'down'])
+    for (const direction of ['up', 'down'] as const)
       for (const transition of [1, 2]) {
         const query = { ...payload(d), direction, foot: d.points[direction === 'up' ? 0 : 3] };
         const c = new CharacterController(f.physics.staticWorld, {
@@ -230,7 +287,7 @@ try {
   await parity({ ...payload(d), maxMoves: 1 }, 'short budget rejects only its own key', false);
   const fullBefore = service.stats.submitted;
   assert.equal(
-    service.run(++actor, 'full', () =>
+    service.run(++actor, 'full', (): boolean =>
       service.checkLadder(d, 'up', d.points[0], zero(), options(d))
     ),
     true
@@ -242,7 +299,7 @@ try {
   );
   const miss = { ...d.points[0], x: d.points[0].x + 0.001 };
   await parity({ ...payload(d), foot: miss }, 'off-trajectory foot is a physical rejection', false);
-  async function walkingParity(label) {
+  async function walkingParity(label: string): Promise<void> {
     service.clear();
     const from = new Vector3().copy(d.points[0]),
       to = from.clone().addScaledVector(new Vector3().copy(d.normal), 0.2);
@@ -260,10 +317,13 @@ try {
     };
     const native = checkAttachment.call(oracleNav, from, to, 0.36, NAV_PROFILE.height, 80);
     const id = ++actor,
-      run = () =>
-        service.run(id, label, () => service.request(from, to, 0.36, NAV_PROFILE.height, 80));
+      run = (): boolean | typeof NAV_PENDING | typeof NAV_CANCELLED =>
+        service.run(id, label, (): boolean =>
+          service.request(from, to, 0.36, NAV_PROFILE.height, 80)
+        );
     assert.equal(run(), NAV_PENDING);
-    const job = [...service.jobs.values()].find((j) => j.scope.actor === id);
+    const job = [...service.jobs.values()].find((j): boolean => j.scope.actor === id);
+    assert(job);
     assert.deepEqual(job.key, [
       from.x,
       from.y,
@@ -275,7 +335,7 @@ try {
       NAV_PROFILE.height,
       80,
     ]);
-    await until(() => !service.jobs.has(job.id));
+    await until((): boolean => !service.jobs.has(job.id));
     assert.equal(run(), native);
     assert.equal(native, true);
   }
@@ -288,22 +348,24 @@ try {
 
   const base = parseQueryKey(payload()),
     identity = queryIdentity(base);
-  for (const change of [
-    (q) => (q.foot.x += 1e-12),
-    (q) => (q.cursor.pendingTime = 1e-12),
-    (q) => (q.cursor.moves = 1),
-    (q) => q.maxMoves--,
-    (q) => (q.direction = 'down'),
-    (q) => (q.descriptor.radius += 1e-12),
-    (q) => (q.descriptor.points[0].x += 1e-12),
-    (q) => (q.radius += 1e-12),
-    (q) => (q.height += 1e-12),
-    (q) => (q.stepHeight += 1e-12),
-    (q) => (q.snapDistance += 1e-12),
-    (q) => (q.slopeLimit += 1e-12),
-    (q) => q.maxIterations++,
-  ]) {
-    const query = structuredClone(base);
+  assert(!Array.isArray(base));
+  const identityChanges: ((q: LadderQueryInput) => unknown)[] = [
+    (q): number => (q.foot.x += 1e-12),
+    (q): number => (q.cursor.pendingTime = 1e-12),
+    (q): number => (q.cursor.moves = 1),
+    (q): number => q.maxMoves--,
+    (q): string => (q.direction = 'down'),
+    (q): number => (q.descriptor.radius += 1e-12),
+    (q): number => (q.descriptor.points[0].x += 1e-12),
+    (q): number => (q.radius += 1e-12),
+    (q): number => (q.height += 1e-12),
+    (q): number => (q.stepHeight += 1e-12),
+    (q): number => (q.snapDistance += 1e-12),
+    (q): number => (q.slopeLimit += 1e-12),
+    (q): number => q.maxIterations++,
+  ];
+  for (const change of identityChanges) {
+    const query = mutableQuery(base);
     change(query);
     assert.notEqual(
       queryIdentity(parseQueryKey(query)),
@@ -311,7 +373,7 @@ try {
       'exact state/profile/direction has its own proof'
     );
   }
-  const signed = structuredClone(base);
+  const signed = mutableQuery(base);
   signed.descriptor.normal.y = -0;
   assert.notEqual(
     queryIdentity(parseQueryKey(signed)),
@@ -325,55 +387,70 @@ try {
     'walking nine-number identity unchanged'
   );
 
-  const invalid = [
-    (q) => q.motorVersion++,
-    (q) => (q.kind = 'walk'),
-    (q) => (q.direction = 'sideways'),
-    (q) => q.descriptor.points.pop(),
-    (q) => (q.descriptor.points[2] = { ...q.descriptor.points[1] }),
-    (q) => (q.descriptor.points[2].y = Infinity),
-    (q) => (q.descriptor.points[0].x = NaN),
-    (q) => (q.descriptor.normal.x *= 2),
-    (q) => (q.descriptor.normal.y = 0.1),
-    (q) => q.descriptor.id++,
-    (q) => (q.descriptor.volumeIndex = 1024),
-    (q) => (q.descriptor.radius = 0),
-    (q) => (q.descriptor.points[2].y += 13),
-    (q) => (q.foot.x = NaN),
-    (q) => (q.maxMoves = LADDER_QUERY_MAX_MOVES + 1),
-    (q) => (q.maxMoves = 0),
-    (q) => (q.cursor.segment = 3),
-    (q) => (q.cursor.distance = -1),
-    (q) => (q.cursor.distance = Infinity),
-    (q) => (q.cursor.moves = q.maxMoves + 1),
-    (q) => (q.cursor.pendingTime = NaN),
-    (q) => (q.radius = -1),
-    (q) => (q.height = q.radius),
-    (q) => (q.height = Infinity),
-    (q) => (q.stepHeight = -1),
-    (q) => (q.snapDistance = NaN),
-    (q) => (q.slopeLimit = Math.PI),
-    (q) => (q.mask = 0),
-    (q) => (q.enabled = false),
+  const invalid: ((q: LadderQueryInput) => unknown)[] = [
+    (q): number => q.motorVersion++,
+    (q): string => (q.kind = 'walk'),
+    (q): string => (q.direction = 'sideways'),
+    (q): unknown => q.descriptor.points.pop(),
+    (q): unknown => (q.descriptor.points[2] = { ...q.descriptor.points[1] }),
+    (q): number => (q.descriptor.points[2].y = Infinity),
+    (q): number => (q.descriptor.points[0].x = NaN),
+    (q): number => (q.descriptor.normal.x *= 2),
+    (q): number => (q.descriptor.normal.y = 0.1),
+    (q): number => q.descriptor.id++,
+    (q): number => (q.descriptor.volumeIndex = 1024),
+    (q): number => (q.descriptor.radius = 0),
+    (q): number => (q.descriptor.points[2].y += 13),
+    (q): number => (q.foot.x = NaN),
+    (q): number => (q.maxMoves = LADDER_QUERY_MAX_MOVES + 1),
+    (q): number => (q.maxMoves = 0),
+    (q): number => (q.cursor.segment = 3),
+    (q): number => (q.cursor.distance = -1),
+    (q): number => (q.cursor.distance = Infinity),
+    (q): number => (q.cursor.moves = q.maxMoves + 1),
+    (q): number => (q.cursor.pendingTime = NaN),
+    (q): number => (q.radius = -1),
+    (q): number => (q.height = q.radius),
+    (q): number => (q.height = Infinity),
+    (q): number => (q.stepHeight = -1),
+    (q): number => (q.snapDistance = NaN),
+    (q): number => (q.slopeLimit = Math.PI),
+    (q): number => (q.mask = 0),
+    (q): boolean => (q.enabled = false),
     ...['stepHeight', 'snapDistance', 'slopeLimit', 'maxIterations', 'mask', 'enabled'].map(
-      (field) => (q) => (q[field] = null)
+      (field): ((q: LadderQueryInput) => void) =>
+        (q: LadderQueryInput): void => {
+          Object.defineProperty(q, field, { value: null });
+        }
     ),
-    ...[33, 1.5, NaN, Infinity].map((n) => (q) => (q.maxIterations = n)),
+    ...[33, 1.5, NaN, Infinity].map(
+      (n): ((q: LadderQueryInput) => number) =>
+        (q: LadderQueryInput): number =>
+          (q.maxIterations = n)
+    ),
   ];
   const before = [service.stats.submitted, service.stats.motorMoves, service.proofs.size];
   for (const change of invalid) {
-    const query = structuredClone(base);
+    const query = mutableQuery(base);
     change(query);
-    assert.throws(() => parseQueryKey(query), /invalid/);
+    assert.throws((): QueryKey => parseQueryKey(query), /invalid/);
     assert.throws(
-      () => parseClientMessage({ type: 'queries', jobs: [{ id: 1, actor: 1, key: query }] }),
+      (): ClientMessage =>
+        parseClientMessage({ type: 'queries', jobs: [{ id: 1, actor: 1, key: query }] }),
       /invalid/
     );
     if (query.motorVersion === LADDER_MOTOR_VERSION && query.kind === 'ladder') {
+      // Deliberately malformed external input must still reach the runtime validator.
       assert.throws(
-        () =>
-          service.run(++actor, 'invalid', () =>
-            service.checkLadder(query.descriptor, query.direction, query.foot, query.cursor, query)
+        (): unknown =>
+          service.run(++actor, 'invalid', (): unknown =>
+            Reflect.apply(service.checkLadder.bind(service), service, [
+              query.descriptor,
+              query.direction,
+              query.foot,
+              query.cursor,
+              query,
+            ])
           ),
         /invalid/
       );
@@ -387,18 +464,18 @@ try {
 
   service.paused = true;
   assert.equal(
-    service.run(++actor, 'pause', () => assert.fail('pause evaluated caller')),
+    service.run(++actor, 'pause', (): never => assert.fail('pause evaluated caller')),
     NAV_PENDING
   );
   service.paused = false;
   service.clear();
   const movingFoot = new Vector3().copy(d.points[0]),
     movingActor = ++actor;
-  const moving = () =>
+  const moving = (): boolean | typeof NAV_PENDING | typeof NAV_CANCELLED =>
     service.run(
       movingActor,
       'moving',
-      () => service.checkLadder(d, 'up', movingFoot, zero(), options(d)),
+      (): boolean => service.checkLadder(d, 'up', movingFoot, zero(), options(d)),
       movingFoot
     );
   assert.equal(moving(), NAV_PENDING);
@@ -412,10 +489,12 @@ try {
   // Transport test invokes only real onmessage handlers in one turn so queue
   // cancellation happens before MessageChannel begins its full native checks.
   await until(
-    () => transport.results.some((r) => r.id === cancelled) || service.stats.cancelled > 0
+    (): boolean =>
+      currentTransport().results.some((r): boolean => r.id === cancelled) ||
+      service.stats.cancelled > 0
   );
-  const resultsStart = transport.results.length;
-  transport.batch([
+  const resultsStart = currentTransport().results.length;
+  currentTransport().batch([
     {
       type: 'queries',
       jobs: [
@@ -429,12 +508,14 @@ try {
     },
     { type: 'cancel', ids: [900006] },
   ]);
-  await until(() => transport.results.filter((r) => r.id >= 900001).length === 5);
+  await until(
+    (): boolean => currentTransport().results.filter((r): boolean => r.id >= 900001).length === 5
+  );
   assert.deepEqual(
-    transport.results
-      .slice(resultsStart)
-      .filter((r) => r.id >= 900001)
-      .map((r) => r.id),
+    currentTransport()
+      .results.slice(resultsStart)
+      .filter((r): boolean => r.id >= 900001)
+      .map((r): number => r.id),
     [900001, 900004, 900005, 900002, 900003],
     'round-robin actor fairness between bounded full native checks'
   );
@@ -442,7 +523,7 @@ try {
   const generation = service.generation;
   f.physics.staticWorld.version++;
   assert.equal(
-    service.run(++actor, 'revision', () => assert.fail('stale collision admitted')),
+    service.run(++actor, 'revision', (): never => assert.fail('stale collision admitted')),
     NAV_PENDING
   );
   await service.start();
@@ -451,17 +532,19 @@ try {
   await parity(payload(), 'new collision revision');
   probe.snapDistance += 0.001;
   assert.equal(
-    service.run(++actor, 'config', () => assert.fail('stale options admitted')),
+    service.run(++actor, 'config', (): never => assert.fail('stale options admitted')),
     NAV_PENDING
   );
   await service.start();
   await parity(payload(), 'new native settings generation');
   const original = f.physics.staticWorld,
-    replacement = Object.assign(Object.create(Object.getPrototypeOf(original)), original);
+    replacement = Object.assign(new StaticWorld(), original);
   f.physics.staticWorld = replacement;
   probe.world = replacement;
   assert.equal(
-    service.run(++actor, 'replacement', () => assert.fail('same-version replacement admitted')),
+    service.run(++actor, 'replacement', (): never =>
+      assert.fail('same-version replacement admitted')
+    ),
     NAV_PENDING
   );
   await service.start();
@@ -470,7 +553,7 @@ try {
   const submissions = service.stats.submitted;
   replacement.dispose();
   assert.equal(
-    service.run(++actor, 'disposed-source', () =>
+    service.run(++actor, 'disposed-source', (): boolean =>
       service.checkLadder(d, 'up', d.points[0], zero(), options(d))
     ),
     NAV_CANCELLED,
@@ -486,7 +569,7 @@ try {
   await parity(payload(), 'source disposal/reinitialization recovery');
 
   service.clear();
-  service.run(++actor, 'limits', () => {
+  service.run(++actor, 'limits', (): void => {
     for (let i = 0; i < 300; i++)
       service.checkLadder(
         d,
@@ -507,7 +590,7 @@ try {
 
   const bad = structuredClone(base);
   bad.maxIterations = 33;
-  transport.batch([
+  currentTransport().batch([
     {
       type: 'queries',
       jobs: [
@@ -517,43 +600,45 @@ try {
     },
     { type: 'queries', jobs: [{ id: 990003, actor: 1, key: base }] },
   ]);
-  await until(() => service.error);
+  await until((): Error | null => service.error);
+  assert(service.error);
   assert.match(service.error.message, /invalid ladder profile/);
   assert(
-    !transport.results.some((r) => r.id >= 990001),
+    !currentTransport().results.some((r): boolean => r.id >= 990001),
     'malformed batch fails before native checks; worker error is terminal'
   );
-  assert.throws(() => service.run(++actor, 'terminal', () => true), /invalid ladder profile/);
+  assert.throws(
+    (): boolean | typeof NAV_PENDING | typeof NAV_CANCELLED =>
+      service.run(++actor, 'terminal', (): boolean => true),
+    /invalid ladder profile/
+  );
 } finally {
   service.dispose();
 }
 
 // Query deadline and worker message corruption must fail terminally, never run
 // a synchronous native fallback. No collision snapshot regeneration is needed.
-class SilentWorker {
-  postMessage(message) {
-    if (message.type === 'init') queueMicrotask(() => this.onmessage({ data: { type: 'ready' } }));
-  }
-  terminate() {
-    this.terminated = true;
-  }
-}
+
 for (const control of ['deadline', 'malformed', 'inactive', 'death', 'dispose']) {
-  let worker;
-  const s = new AttachmentQueries(nav, { workerFactory: () => (worker = new SilentWorker()) });
+  const worker = new MovementWorker();
+  const s = new AttachmentQueries(nav, { workerFactory: (): MovementWorker => worker });
   try {
     await s.start();
-    s.run(1, 'control', () =>
+    s.run(1, 'control', (): boolean =>
       s.checkLadder(descriptors[0], 'up', descriptors[0].points[0], zero(), options(descriptors[0]))
     );
     const job = [...s.jobs.values()][0];
     if (control === 'deadline') {
       job.sent -= 10001;
-      assert.throws(() => s.update(1, new Set([1])), /deadline/);
+      assert.throws((): void => s.update(1, new Set([1])), /deadline/);
       assert(worker.terminated);
     } else if (control === 'malformed') {
-      worker.onmessage({ data: { type: 'result', id: job.id, value: true, ms: 0, moves: NaN } });
-      assert.throws(() => s.run(1, 'control', () => true), /malformed/);
+      worker.deliver({ type: 'result', id: job.id, value: true, ms: 0, moves: NaN });
+      assert.throws(
+        (): boolean | typeof NAV_PENDING | typeof NAV_CANCELLED =>
+          s.run(1, 'control', (): boolean => true),
+        /malformed/
+      );
       assert(worker.terminated);
     } else if (control === 'inactive' || control === 'death') {
       s.update(control === 'inactive' ? 121 : 1, new Set(control === 'death' ? [] : [1]));
@@ -573,7 +658,7 @@ const report = {
   collision: f.meta.assets.collision,
   proofs,
   boundaries,
-  boundaryDependencyFailures: boundaries.filter((b) => !b.value),
+  boundaryDependencyFailures: boundaries.filter((b): boolean => !b.value),
   stats: service.stats,
   limits: {
     outstanding: 256,

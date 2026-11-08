@@ -1,27 +1,31 @@
 import assert from 'node:assert/strict';
 
+import type { Vector3 } from 'three';
+
 import { SurfaceNav } from '../../src/ai/nav.ts';
 import { makeAi } from '../../tools/lib/agent-fixture.ts';
 import { synthetic, vec } from '../../tools/nav240/fixtures.ts';
-import { makeWalker } from '../../tools/nav240/harness.ts';
+import { makeWalker, WalkerAgent } from '../../tools/nav240/harness.ts';
 import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
 
-const f = synthetic(),
-  bake = await bakePhysicsNav(f.physics, f.bounds);
-f.grid = await SurfaceNav.load(bake.buffer, f.physics);
+const source = synthetic(),
+  bake = await bakePhysicsNav(source.physics, source.bounds);
+const f = { ...source, grid: await SurfaceNav.load(bake.buffer, source.physics) };
 const ai = makeAi(f.grid);
 ai._pathBudget = 0;
-ai.groundAt = (x, z, y) => f.physics.groundHeight(x, z, y);
+ai.groundAt = (x, z, y): number => f.physics.groundHeight(x, z, y);
 let frame = 0;
-const first = new Array(4).fill(null),
-  request = ai.requestPath.bind(ai);
-ai.requestPath = (...args) => {
+const first: (number | null)[] = Array.from({ length: 4 }, (): null => null);
+const request = ai.requestPath.bind(ai);
+ai.requestPath = (...args): number => {
   const n = request(...args);
-  if (n >= 0 && first[args[3].id] === null) first[args[3].id] = frame;
+  const actor = args[3];
+  assert(actor);
+  if (n >= 0 && first[actor.id] === null) first[actor.id] = frame;
   return n;
 };
-const goals = [],
-  reached = new Array(4).fill(false);
+const goals: Vector3[] = [];
+const reached = new Array<boolean>(4).fill(false);
 for (let i = 0; i < 4; i++) {
   const a = makeWalker(f, null, vec([i % 2 ? 4.6 : 3.4, 0, i < 2 ? -4.4 : -5.5]), i);
   a.ai = ai;
@@ -34,6 +38,7 @@ for (; frame < 5400 && !reached.every(Boolean); frame++) {
   const queries = f.grid.stats.queries;
   ai._servePendingPaths();
   for (const a of ai.agents) {
+    assert(a instanceof WalkerAgent);
     a._move(1 / 60);
     a._tickNoProgress(1 / 60);
     if (!a.hasMoveTarget && !a.pathPending) a.desiredSpeed = 0;
@@ -46,9 +51,12 @@ for (; frame < 5400 && !reached.every(Boolean); frame++) {
 assert.deepEqual(first, [0, 0, 1, 1]);
 assert.ok(
   reached.every(Boolean),
-  `crowded stair arrivals: ${reached}; positions ${ai.agents.map((a) => a.position.toArray())}`
+  `crowded stair arrivals: ${String(reached)}; positions ${String(ai.agents.map((a): [number, number, number] => a.position.toArray()))}`
 );
-for (const a of ai.agents) f.physics.removeCharacter(a.controller);
+for (const a of ai.agents) {
+  assert(a.controller);
+  f.physics.removeCharacter(a.controller);
+}
 
 // Actors on vertically separated surfaces must not repel each other in X/Z.
 const lower = makeWalker(f, null, vec([-4, 0, -2]), 10);

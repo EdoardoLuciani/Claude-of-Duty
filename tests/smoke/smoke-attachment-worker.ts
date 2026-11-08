@@ -3,37 +3,44 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 
 import { AttachmentQueries, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.ts';
+import type { AttachmentOracle } from '../../src/ai/attachment-types.ts';
 import { canStand, checkAttachment } from '../../src/ai/attachment.js';
+import type { BakedCoverPoint } from '../../src/ai/nav-format.ts';
+import type { NavCache } from '../../src/ai/nav.ts';
 import { CoverMap, SurfaceNav } from '../../src/ai/nav.ts';
 import { StaticWorld } from '../../src/physics/bvh.ts';
 import { CharacterController } from '../../src/physics/character.ts';
+import type { PhysicsSystem } from '../../src/physics/index.ts';
+import { MASK } from '../../src/physics/surfaces.ts';
+import { MovementWorker } from '../lib/ai-movement-fixture.ts';
+import { fixture } from '../lib/fixture.ts';
 
-class FakeWorker {
-  messages = [];
-  terminated = false;
-  postMessage(message) {
-    this.messages.push(structuredClone(message));
-    if (message.type === 'init') queueMicrotask(() => this.onmessage({ data: { type: 'ready' } }));
-  }
-  terminate() {
-    this.terminated = true;
-  }
-}
 const world = new StaticWorld(),
   controller = new CharacterController(world);
-const nav = {
-  physics: { staticWorld: world, gravity: -20, MASK: { CHARACTER: 259 } },
+const nav = fixture<SurfaceNav>({
+  physics: fixture<PhysicsSystem>({
+    staticWorld: world,
+    gravity: -20,
+    MASK: { ...MASK, CHARACTER: 259 },
+  }),
   _probe: controller,
-};
-let worker;
-const service = new AttachmentQueries(nav, { workerFactory: () => (worker = new FakeWorker()) });
+  repeatState: true,
+});
+const worker = new MovementWorker();
+const service = new AttachmentQueries(nav, { workerFactory: (): MovementWorker => worker });
 await service.start();
 assert(service.ready);
 const a = new THREE.Vector3(),
   b = new THREE.Vector3(1, 0, 0);
-const run = (to = b, radius = 0.36, height = 1.8, steps = 80) =>
-  service.run(1, 'path', () => service.request(a, to, radius, height, steps));
-const result = (id, value) => service.receive({ type: 'result', id, value, ms: 1, moves: 80 });
+const run = (
+  to = b,
+  radius = 0.36,
+  height = 1.8,
+  steps = 80
+): boolean | typeof NAV_PENDING | typeof NAV_CANCELLED =>
+  service.run(1, 'path', (): boolean => service.request(a, to, radius, height, steps));
+const result = (id: number, value: boolean): void =>
+  service.receive({ type: 'result', id, value, ms: 1, moves: 80 });
 assert.equal(run(), NAV_PENDING, 'unknown is pending, never an unreachable path');
 assert.equal(run(), NAV_PENDING);
 assert.equal(service.jobs.size, 1, 'one in-flight proof per exact key');
@@ -50,12 +57,12 @@ assert.equal(run(recordedTarget), NAV_PENDING);
 result([...service.jobs.keys()][0], true);
 assert.equal(run(recordedTarget), true);
 assert.deepEqual(
-  service.samples.map((s) => s.type),
+  service.samples.map((s): string => s.type),
   ['query', 'decision'],
   'profiling keeps query and admission samples'
 );
 assert.equal(
-  service.samples[0].key,
+  service.samples[0].type === 'query' ? service.samples[0].key : undefined,
   undefined,
   'collecting samples alone does not enable detailed worker instrumentation'
 );
@@ -69,15 +76,20 @@ assert.equal(run(b, 0.37), NAV_PENDING);
 assert.equal(run(b, 0.36, 1.9), NAV_PENDING);
 assert.equal(run(b, 0.36, 1.8, 81), NAV_PENDING);
 assert.equal(
-  service.run(1, 'path', () => service.request(b, a, 0.36, 1.8, 80)),
+  service.run(1, 'path', (): boolean => service.request(b, a, 0.36, 1.8, 80)),
   NAV_PENDING,
   'ordered endpoints'
 );
 // Superseding a live origin is not physical failure and must not publish claims.
 const origin = new THREE.Vector3(0.7, 0, 0),
   destination = new THREE.Vector3(15, 0, 0);
-const moving = () =>
-  service.run(1, 'moving', () => service.request(origin, destination, 0.36, 1.8, 80), origin);
+const moving = (): boolean | typeof NAV_PENDING | typeof NAV_CANCELLED =>
+  service.run(
+    1,
+    'moving',
+    (): boolean => service.request(origin, destination, 0.36, 1.8, 80),
+    origin
+  );
 assert.equal(moving(), NAV_PENDING);
 const movingId = [...service.jobs.keys()].at(-1);
 origin.x += 0.01;
@@ -85,7 +97,7 @@ assert.equal(
   service.run(
     1,
     'moving',
-    () => {
+    (): never => {
       throw new Error('superseded plan ran');
     },
     origin
@@ -93,6 +105,7 @@ assert.equal(
   NAV_CANCELLED
 );
 assert.equal(service.stats.superseded, 1);
+assert(movingId !== undefined);
 assert.ok(!service.jobs.has(movingId));
 assert.equal(moving(), NAV_PENDING, 'a later intent can retry the new exact origin');
 service.cancel('1:moving');
@@ -105,7 +118,13 @@ assert.equal(service.jobs.size, 0);
 assert.equal(run(), NAV_PENDING, 'late old-generation responses cannot populate proofs');
 result([...service.jobs.keys()][0], true);
 assert.equal(run(), true);
-for (const field of ['stepHeight', 'slopeLimit', 'snapDistance', 'maxIterations', 'mask']) {
+for (const field of [
+  'stepHeight',
+  'slopeLimit',
+  'snapDistance',
+  'maxIterations',
+  'mask',
+] as const) {
   controller[field] += 1;
   assert.equal(run(), NAV_PENDING, `${field} invalidates`);
   await service.start();
@@ -128,10 +147,10 @@ world.dirty = false;
 assert.equal(run(), NAV_PENDING);
 service.update(1, new Set());
 assert.equal(service.jobs.size, 0, 'dead actors cancel work');
-assert(worker.messages.some((m) => m.type === 'cancel'));
+assert(worker.messages.some((m): boolean => m.type === 'cancel'));
 assert.throws(
-  () =>
-    service.run(1, 'throw', () => {
+  (): unknown =>
+    service.run(1, 'throw', (): never => {
       service.request(a, b, 0.36, 1.8, 80);
       throw new Error('original');
     }),
@@ -141,12 +160,13 @@ assert.equal(service.current, null);
 assert.equal(service.jobs.size, 0, 'failed attempt releases unsent jobs');
 
 // Retry pruning and whole-scope cancellation share removal, not proof admission.
-const pruning = new AttachmentQueries(nav, { workerFactory: () => new FakeWorker() });
+const pruningWorker = new MovementWorker();
+const pruning = new AttachmentQueries(nav, { workerFactory: (): MovementWorker => pruningWorker });
 await pruning.start();
-const targets = [10, 11, 12, 13, 14].map((x) => new THREE.Vector3(x, 0, 0));
-const ask = (index) => pruning.request(a, targets[index], 0.36, 1.8, 80);
+const targets = [10, 11, 12, 13, 14].map((x): THREE.Vector3 => new THREE.Vector3(x, 0, 0));
+const ask = (index: number): boolean => pruning.request(a, targets[index], 0.36, 1.8, 80);
 assert.equal(
-  pruning.run(7, 'path', () => {
+  pruning.run(7, 'path', (): void => {
     ask(0);
     ask(1);
     ask(2);
@@ -154,31 +174,35 @@ assert.equal(
   NAV_PENDING
 );
 assert.equal(
-  pruning.run(8, 'path', () => ask(3)),
+  pruning.run(8, 'path', (): boolean => ask(3)),
   NAV_PENDING
 );
 const [firstId, keptId, thirdId, otherId] = pruning.jobs.keys();
 const scope = pruning.scopes.get('7:path');
-const messages = pruning.worker.messages;
+assert(scope);
+const messages = pruningWorker.messages;
 const beforePruning = messages.length;
 assert.equal(
-  pruning.run(7, 'path', () => {
+  pruning.run(7, 'path', (): void => {
     ask(1);
     ask(4);
   }),
   NAV_PENDING
 );
 const newId = [...pruning.jobs.keys()].at(-1);
+assert(newId !== undefined);
 assert.deepEqual([...pruning.jobs.keys()], [keptId, otherId, newId]);
 assert.deepEqual(
-  [...scope.proofs.values()].map((proof) => proof.id),
+  [...scope.proofs.values()].map((proof): number => proof.id),
   [keptId, newId]
 );
 assert.deepEqual(
-  messages.slice(beforePruning).map((message) => message.type),
+  messages.slice(beforePruning).map((message): string => message.type),
   ['cancel', 'queries']
 );
-assert.deepEqual(messages[beforePruning].ids, [firstId, thirdId], 'cancel in submission order');
+const cancellation = messages[beforePruning];
+assert(cancellation.type === 'cancel');
+assert.deepEqual(cancellation.ids, [firstId, thirdId], 'cancel in submission order');
 assert.equal(pruning.stats.cancelled, 2);
 assert.equal(pruning.stats.pending, 3);
 pruning.receive({ type: 'result', id: keptId, value: true, ms: 0, moves: 0 });
@@ -198,7 +222,7 @@ assert.equal(pruning.stats.pending, 0);
 
 // A ready lower-ranked candidate cannot leapfrog an unresolved better one,
 // and a pending attempt cannot release or acquire live cover claims.
-const points = [0, 2].map((x) => ({
+const points = [0, 2].map((x): BakedCoverPoint => ({
   x,
   y: 0,
   z: 0,
@@ -210,25 +234,27 @@ const points = [0, 2].map((x) => ({
   component: 1,
   claimed: -1,
 }));
-const grid = {
+const grid = fixture<SurfaceNav>({
   worker: service,
   coverPoints: points,
   components: new Map([[1, 1]]),
-  project(p, out, _cache, goal) {
+  walkingComponents: new Map([[1, 1]]),
+  project(p, out, _cache, goal): number {
     out.copy(p);
     return !goal || service.request(p, { x: p.x + 0.2, y: p.y, z: p.z }, 0.36, 1.8, 80) ? 1 : 0;
   },
-};
-const cover = new CoverMap(grid, {});
-cover.protects = () => true;
-cover.peekOffset = () => 0;
-const pick = () => cover.pick(new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0, 10), { id: 1 });
+});
+const cover = new CoverMap(grid, fixture<PhysicsSystem>({}));
+cover.protects = (): true => true;
+cover.peekOffset = (): number => 0;
+const pick = (): ReturnType<CoverMap['pick']> =>
+  cover.pick(new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0, 10), { id: 1 });
 assert.equal(pick(), NAV_PENDING);
 const jobs = [...service.jobs.values()];
 assert.equal(jobs.length, 2);
 result(jobs[1].id, true);
 assert.equal(pick(), NAV_PENDING);
-assert(points.every((p) => p.claimed === -1));
+assert(points.every((p): boolean => p.claimed === -1));
 result(jobs[0].id, false);
 assert.equal(pick(), points[1]);
 assert.equal(points[1].claimed, 1);
@@ -236,15 +262,15 @@ points[1].claimed = 2;
 assert.equal(pick(), null, 'current claims are reevaluated, not returned from a worker snapshot');
 service.clear();
 assert.equal(service.scopes.size, 0);
-worker.onmessage({ data: { type: 'result', id: 999, value: 'false', ms: 0, moves: 0 } });
-assert.throws(() => run(), /malformed/);
+worker.deliver({ type: 'result', id: 999, value: 'false', ms: 0, moves: 0 });
+assert.throws((): boolean | typeof NAV_PENDING | typeof NAV_CANCELLED => run(), /malformed/);
 service.dispose();
 assert(worker.terminated);
 
 // Endpoint caches must share the worker generation, including cached failures.
 const endpointResults = [];
 for (const change of ['controller-config', 'world-identity']) {
-  const makeWorld = (wall) => {
+  const makeWorld = (wall: boolean): StaticWorld => {
     const w = new StaticWorld();
     w.addTriangles(
       new Float32Array([-3, 0, -3, -3, 0, 3, 3, 0, 3, 3, 0, 3, 3, 0, -3, -3, 0, -3]),
@@ -262,18 +288,44 @@ for (const change of ['controller-config', 'world-identity']) {
     w.build();
     return w;
   };
-  const physics = {
+  const physics = fixture<PhysicsSystem>({
     staticWorld: makeWorld(false),
     gravity: -20,
-    MASK: { CHARACTER: 259 },
-    checkCapsule(a, b, r, m) {
-      return this.staticWorld.overlapCapsule(a.x, a.y, a.z, b.x, b.y, b.z, r, m, 0) === 0;
+    MASK: { ...MASK, CHARACTER: 259 },
+    checkCapsule(a, b, r, m): boolean {
+      return (
+        physics.staticWorld.overlapCapsule(
+          a.x,
+          a.y,
+          a.z,
+          b.x,
+          b.y,
+          b.z,
+          r,
+          m ?? physics.MASK.CHARACTER,
+          0
+        ) === 0
+      );
     },
-  };
+  });
   const endpoint = new THREE.Vector3(0.5, 0.008, 0),
     source = new THREE.Vector3(0, 0.008, 0),
     output = new THREE.Vector3();
-  const grid = Object.assign(Object.create(SurfaceNav.prototype), {
+  const grid = fixture<SurfaceNav>({
+    project(...args): ReturnType<SurfaceNav['project']> {
+      return SurfaceNav.prototype.project.apply(this, args);
+    },
+    canStand(...args): ReturnType<SurfaceNav['canStand']> {
+      return SurfaceNav.prototype.canStand.apply(this, args);
+    },
+    canAttach(...args): ReturnType<SurfaceNav['canAttach']> {
+      return SurfaceNav.prototype.canAttach.apply(this, args);
+    },
+    _checkAttachment(...args): ReturnType<SurfaceNav['_checkAttachment']> {
+      return SurfaceNav.prototype._checkAttachment.apply(this, args);
+    },
+    worker: null,
+    repeatState: true,
     physics,
     _probe: new CharacterController(physics.staticWorld),
     _p0: new THREE.Vector3(),
@@ -281,16 +333,40 @@ for (const change of ['controller-config', 'world-identity']) {
     _source: new THREE.Vector3(),
     meta: {},
     components: new Map([[1, 1]]),
-    stats: { endpointChecks: 0, cacheHits: 0 },
-    query: {
-      findNearestPoly: () => ({ success: true, nearestRef: 1, nearestPoint: endpoint }),
-      closestPointOnPoly: () => ({ success: true, isPointOverPoly: true, closestPoint: endpoint }),
-    },
+    walkingComponents: new Map([[1, 1]]),
+    stats: fixture<SurfaceNav['stats'] & AttachmentOracle['stats']>(
+      { endpointChecks: 0, cacheHits: 0 },
+      ['repeatedStates', 'savedMoves']
+    ),
+    query: fixture<SurfaceNav['query']>({
+      findNearestPoly: (): ReturnType<SurfaceNav['query']['findNearestPoly']> => ({
+        success: true,
+        status: 0,
+        nearestRef: 1,
+        nearestPoint: endpoint,
+        isOverPoly: true,
+      }),
+      closestPointOnPoly: (): ReturnType<SurfaceNav['query']['closestPointOnPoly']> => ({
+        success: true,
+        status: 0,
+        isPointOverPoly: true,
+        closestPoint: endpoint,
+      }),
+    }),
   });
-  grid.worker = new AttachmentQueries(grid, { workerFactory: () => new FakeWorker() });
+  grid.worker = new AttachmentQueries(grid, {
+    workerFactory: (): MovementWorker => new MovementWorker(),
+  });
   await grid.worker.start();
-  const cache = { position: new THREE.Vector3(), point: new THREE.Vector3(), ref: 0 };
+  const cache: NavCache = {
+    nav: null,
+    version: 0,
+    position: new THREE.Vector3(),
+    point: new THREE.Vector3(),
+    ref: 0,
+  };
   assert.equal(grid.project(source, output, cache), 1);
+  assert(grid._probe);
   if (change === 'controller-config') grid._probe.enabled = false;
   else {
     const replacement = makeWorld(true);
@@ -321,10 +397,10 @@ for (const change of ['controller-config', 'world-identity']) {
     1,
     `${change}: cached failure must also invalidate`
   );
-  const attach = grid.canAttach;
+  const attach = grid.canAttach.bind(grid);
   let checks = 0,
-    endpoints;
-  grid.canAttach = function (...args) {
+    endpoints: [THREE.Vector3, THREE.Vector3] | undefined;
+  grid.canAttach = function (...args: Parameters<SurfaceNav['canAttach']>): boolean {
     checks++;
     endpoints = [args[0].clone(), args[1].clone()];
     return attach.apply(this, args);
@@ -339,6 +415,7 @@ for (const change of ['controller-config', 'world-identity']) {
   assert.equal(checks, 2, 'height invalidates endpoint reuse');
   grid.project(source, output, cache, true);
   assert.equal(checks, 3, 'direction invalidates endpoint reuse');
+  assert(endpoints);
   assert(endpoints[0].equals(endpoint) && endpoints[1].equals(source));
   grid.worker.dispose();
 }
@@ -354,10 +431,10 @@ assert.deepEqual(
 
 // Teardown while init waits must settle without leaving the deadline timer.
 const stalled = new AttachmentQueries(nav, {
-  workerFactory: () => ({ postMessage() {}, terminate() {} }),
+  workerFactory: (): MovementWorker => new MovementWorker({ silent: true }),
 });
 const start = stalled.start();
-await new Promise((resolve) => setTimeout(resolve, 0));
+await new Promise((resolve): NodeJS.Timeout => setTimeout(resolve, 0));
 stalled.dispose();
 await start;
 assert.equal(stalled.ready, false);
@@ -370,37 +447,46 @@ floor.addTriangles(
   'concrete'
 );
 floor.build();
-const physics = {
+const physics = fixture<PhysicsSystem>({
   staticWorld: floor,
   gravity: -20,
-  MASK: { CHARACTER: 259 },
-  checkCapsule: (a, b, r, m) => floor.overlapCapsule(a.x, a.y, a.z, b.x, b.y, b.z, r, m, 0) === 0,
-};
-const probe = {
+  MASK: { ...MASK, CHARACTER: 259 },
+  checkCapsule: (a, b, r, m): boolean =>
+    floor.overlapCapsule(a.x, a.y, a.z, b.x, b.y, b.z, r, m ?? 259, 0) === 0,
+});
+const probe = fixture<SurfaceNav>({
   physics,
   _probe: new CharacterController(floor),
   _p0: new THREE.Vector3(),
   _p1: new THREE.Vector3(),
   canStand,
-  stats: { endpointChecks: 0 },
-};
+  repeatState: true,
+  stats: fixture<SurfaceNav['stats'] & AttachmentOracle['stats']>({ endpointChecks: 0 }, [
+    'repeatedStates',
+    'savedMoves',
+  ]),
+  canAttach(...args): ReturnType<SurfaceNav['canAttach']> {
+    return SurfaceNav.prototype.canAttach.apply(this, args);
+  },
+});
 let moves = 0,
   unknown = 0,
   fast = 0,
   delegated = false;
-const move = probe._probe.move;
-probe._probe.move = function (...args) {
+assert(probe._probe);
+const move = probe._probe.move.bind(probe._probe);
+probe._probe.move = function (...args): number {
   moves++;
   return move.apply(this, args);
 };
-probe.worker = {
+probe.worker = fixture<AttachmentQueries>({
   active: true,
-  current: {},
-  request() {
+  current: fixture<NonNullable<AttachmentQueries['current']>>({}, ['origin']),
+  request(): false {
     delegated = true;
     return false;
   },
-};
+});
 for (const x of [0, 0.0001, 0.1199999, 0.12, 0.1200001, 0.2, 1])
   for (const y of [0.008, 0.1, 0.4])
     for (const steps of [0, 1, 2, 80]) {

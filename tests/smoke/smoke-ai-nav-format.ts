@@ -3,9 +3,12 @@ import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 
 import { navHash, packNav, unpackNav } from '../../src/ai/nav-format.ts';
+import { isRecord } from '../../src/ai/validation.ts';
 
 const directory = new URL('../../public/models/world/', import.meta.url);
-const level = JSON.parse(readFileSync(new URL('level.json', directory)));
+const level: unknown = JSON.parse(readFileSync(new URL('level.json', directory), 'utf8'));
+assert(isRecord(level) && isRecord(level.assets) && typeof level.assets.nav === 'string');
+assert(isRecord(level.navigation) && typeof level.navigation.sha256 === 'string');
 const original = new Uint8Array(gunzipSync(readFileSync(new URL(level.assets.nav, directory))));
 const baked = await unpackNav(original, { sha256: level.navigation.sha256 });
 const packed = await packNav(baked.meta, baked.nav, baked.components, baked.points);
@@ -17,9 +20,14 @@ assert.deepEqual(
 assert.equal(await navHash(packed), level.navigation.sha256);
 
 // Re-sign mutated metadata so rejection tests reach its schema, not the checksum.
-async function changedMetadata(change) {
+async function changedMetadata(
+  change: (metadata: Record<string, unknown>) => void
+): Promise<Uint8Array<ArrayBuffer>> {
   const oldSize = new DataView(original.buffer).getUint32(8, true);
-  const metadata = JSON.parse(new TextDecoder().decode(original.subarray(64, 64 + oldSize)));
+  const metadata: unknown = JSON.parse(
+    new TextDecoder().decode(original.subarray(64, 64 + oldSize))
+  );
+  assert(isRecord(metadata));
   change(metadata);
   const json = new TextEncoder().encode(JSON.stringify(metadata));
   const size = (json.length + 3) & ~3;
@@ -33,33 +41,43 @@ async function changedMetadata(change) {
   return output;
 }
 
-for (const [key, expected] of [
+const missingFields: [string, RegExp][] = [
   ['version', /unsupported bake version\/engine/],
   ['engine', /unsupported bake version\/engine/],
   ['profile', /incompatible infantry profile/],
   ['config', /incompatible bake configuration/],
-]) {
+];
+for (const [key, expected] of missingFields) {
   await assert.rejects(
-    unpackNav(await changedMetadata((metadata) => delete metadata[key])),
+    unpackNav(
+      await changedMetadata((metadata): void => {
+        delete metadata[key];
+      })
+    ),
     expected,
     `${key} must be checked before constructing normalized metadata`
   );
 }
-for (const [value, expected] of [
+const invalidBounds: [unknown, RegExp][] = [
   [null, /missing bounds/],
   [{ min: null, max: [1, 2, 3] }, /missing bounds/],
   [{ min: [0, '0', 0], max: [1, 2, 3] }, /missing bounds/],
   [{ min: [0, 0], max: [1, 2, 3] }, /missing bounds/],
   [{ min: [0, 0, 0, 0], max: [1, 2, 3] }, /missing bounds/],
   [{ min: [0, 3, 0], max: [1, 2, 3] }, /invalid bounds/],
-]) {
+];
+for (const [value, expected] of invalidBounds) {
   await assert.rejects(
-    unpackNav(await changedMetadata((metadata) => (metadata.bounds = value))),
+    unpackNav(
+      await changedMetadata((metadata): void => {
+        metadata.bounds = value;
+      })
+    ),
     expected
   );
 }
 await assert.rejects(
-  unpackNav(await changedMetadata((metadata) => (metadata.sourceHash = 1))),
+  unpackNav(await changedMetadata((metadata): number => (metadata.sourceHash = 1))),
   /invalid sourceHash/
 );
 console.log('AI nav format: byte-identical round trip and metadata validation/error precedence');

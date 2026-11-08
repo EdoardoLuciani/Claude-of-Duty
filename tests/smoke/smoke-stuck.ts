@@ -3,33 +3,41 @@ import assert from 'node:assert/strict';
 
 import { Vector3 } from 'three';
 
+import type { SurfaceNav } from '../../src/ai/nav.ts';
+import { PhysicsSystem } from '../../src/physics/index.ts';
 import { testNav } from '../../tools/lib/test-nav.ts';
 import { makeWalker } from '../../tools/nav240/harness.ts';
+import { fixture } from '../lib/fixture.ts';
 
-const grid = await testNav(),
-  fixture = { grid, physics: grid.physics };
+const grid = await testNav();
+assert(grid.physics instanceof PhysicsSystem);
+const walkerFixture = { grid, physics: grid.physics };
 const candidate = {
-  query(from, to) {
-    const points = [],
+  query(
+    from: Vector3,
+    to: Vector3
+  ): { points: Vector3[]; outcome: string | null; reason?: string | null } {
+    const points: Vector3[] = [],
       n = grid.findPath(from, to, points);
     return { outcome: grid.lastOutcome, points: points.slice(0, n) };
   },
 };
-const a = makeWalker(fixture, candidate, new Vector3(1, 0, 1), 7);
+const a = makeWalker(walkerFixture, candidate, new Vector3(1, 0, 1), 7);
 const dest = new Vector3(6, 0, 1),
   origin = a.position.clone();
-const requested = [],
+const requested: Vector3[] = [],
   go = a._goTo.bind(a),
   move = a.controller.move.bind(a.controller);
-a._goTo = (p) => {
+a._goTo = (p): boolean => {
   requested.push(p.clone());
   const ok = go(p);
   a.pathIndex = a.pathLen - 1;
   return ok;
 };
 a._goTo(dest);
-a.controller.move = () => {
+a.controller.move = (): number => {
   a.controller.lastMoveBlocked = true;
+  return 0;
 };
 a.ai._pathBudget = 2;
 a._move(1.2);
@@ -83,17 +91,17 @@ assert.equal(a.recoveryAttempts, 3, 'stationary failed routes get a bounded phys
 assert.equal(a.recoveryOutcome, 'moving');
 assert.equal(a.recoveries.length, 0);
 a._tickNoProgress(3.1);
-a.ai.grid = {
-  project() {
+a.ai.grid = fixture<SurfaceNav>({
+  project(): number {
     return 0;
   },
-  sampleGround() {
+  sampleGround(): number {
     return 0;
   },
-  canAttach() {
+  canAttach(): boolean {
     return false;
   },
-};
+});
 a.pathObjective = 'patrol';
 a._recoveryWait = 0;
 a._tickNoProgress(3.1);
@@ -162,6 +170,6 @@ a._stepTo(a.position, 'patrol');
 a._move(0);
 assert.equal(a._recoveryCount, 3, 'a local sidestep does not erase repeated objective failure');
 assert.equal(a._failStreak, 2, 'a recovery sidestep must not clear patrol failure history');
-fixture.physics.removeCharacter(a.controller);
+walkerFixture.physics.removeCharacter(a.controller);
 grid.dispose();
 console.log('ok  physical stuck/no-progress/failed-start recovery, bounded and teleport-free');

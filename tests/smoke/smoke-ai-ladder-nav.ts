@@ -1,18 +1,24 @@
 import assert from 'node:assert/strict';
 
+import type { Vector3Like } from 'three';
 import { Vector3 } from 'three';
 
 import { AttachmentQueries } from '../../src/ai/attachment-queries.ts';
 import { createLadderDescriptors, ladderMoveBudget } from '../../src/ai/ladder.ts';
+import type { NavMetadata, ExpectedNav } from '../../src/ai/nav-format.ts';
 import { unpackNav, packNav, NAV_LINK_RADIUS } from '../../src/ai/nav-format.ts';
+import type { NavRoute, NavCache } from '../../src/ai/nav.ts';
 import { SurfaceNav, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/nav.ts';
 import { NativeWorker } from '../../tools/lib/attachment-worker-fixture.ts';
 import { ladderProfiles } from '../../tools/lib/ladder-fixture.ts';
 import { loadMap } from '../../tools/nav240/fixtures.ts';
+import { mutableLadder, type MutableLadderDescriptor } from '../lib/ai-movement-fixture.ts';
 
 // Browser transport only: all route proofs use the production module worker.
-const f = await loadMap(),
-  descriptors = createLadderDescriptors(f.meta.volumes);
+const f = await loadMap();
+assert(f.meta.volumes);
+const descriptors = createLadderDescriptors(f.meta.volumes);
+assert(f.meta.navigation);
 const expected = { sha256: f.meta.navigation.sha256, ladders: descriptors };
 const bake = await unpackNav(f.surfaceRaw, expected);
 assert.equal(bake.meta.version, 2);
@@ -26,7 +32,7 @@ const nav = await SurfaceNav.load(f.surfaceRaw, f.physics, expected);
 assert.equal(nav.ladderLinks.size, 6);
 assert.equal(new Set(nav.walkingComponents.values()).size, 245);
 assert.equal(new Set(nav.components.values()).size, 239);
-const v = (p) => new Vector3().copy(p);
+const v = (p: Vector3Like): Vector3 => new Vector3().copy(p);
 for (const d of descriptors) {
   const before = [v({ x: 123, y: 456, z: 789 })],
     snapshot = JSON.stringify(before);
@@ -50,23 +56,24 @@ for (const d of descriptors) {
   );
   assert.equal(JSON.stringify(before), snapshot);
 }
-const originalFoot = nav._probe.move,
-  originalOracle = nav._checkAttachment;
+assert(nav._probe);
+const originalFoot = nav._probe.move.bind(nav._probe),
+  originalOracle = nav._checkAttachment.bind(nav);
 let immediateMoves = 0;
-nav._probe.move = function (...args) {
+nav._probe.move = function (...args): number {
   immediateMoves++;
   return originalFoot.apply(this, args);
 };
-nav._checkAttachment = () => assert.fail('route proof executed a full main-thread oracle');
+nav._checkAttachment = (): never => assert.fail('route proof executed a full main-thread oracle');
 const service = (nav.worker = new AttachmentQueries(nav, {
   profile: true,
-  workerFactory: () => new NativeWorker(),
+  workerFactory: (): NativeWorker => new NativeWorker(),
 }));
 const profiles = ladderProfiles();
 let proofCount = 0;
 const nativeSolve = nav.query.findPath.bind(nav.query);
 let graphSolves = 0;
-nav.query.findPath = (...args) => {
+nav.query.findPath = (...args): ReturnType<SurfaceNav['query']['findPath']> => {
   graphSolves++;
   return nativeSolve(...args);
 };
@@ -78,14 +85,14 @@ try {
       for (const profile of profiles) {
         const from = v(d.points[direction === 'up' ? 0 : 3]).addScaledVector(v(d.normal), 0.2);
         const to = v(d.points[direction === 'up' ? 3 : 0]).addScaledVector(v(d.normal), 0.2);
-        const out = {
+        const out: NavRoute = {
           points: [new Vector3(123, 456, 789)],
           ladderSteps: [{ entryIndex: 0, exitIndex: 0, ladderId: 999, direction: 'up' }],
         };
         const snapshot = JSON.stringify(out),
           oldPoint = out.points[0],
           id = ++actor;
-        const cache = () => ({
+        const cache = (): NavCache => ({
           nav: null,
           version: 0,
           position: new Vector3(),
@@ -101,7 +108,12 @@ try {
           immediateMoves = 0;
           graphSolves = 0;
           const counted = nav.stats.queries;
-          result = service.run(id, 'route', () => nav.findRoute(from, to, out, owner), from);
+          result = service.run(
+            id,
+            'route',
+            (): number => nav.findRoute(from, to, out, owner),
+            from
+          );
           assert.ok(graphSolves <= 1, 'no second graph planner for ladder legs');
           assert.equal(
             nav.stats.queries,
@@ -115,9 +127,11 @@ try {
             assert.equal(JSON.stringify(out), snapshot, 'pending never mutates old points/steps');
             assert.equal(out.points[0], oldPoint);
             assert.ok(performance.now() < deadline, 'finite worker route drain');
-            await new Promise((resolve) => setTimeout(resolve, 1));
+            await new Promise((resolve): NodeJS.Timeout => setTimeout(resolve, 1));
           }
         } while (result === NAV_PENDING);
+        assert.equal(typeof result, 'number');
+        assert(typeof result === 'number');
         assert.ok(result > 0, `${d.id}/${direction}/${profile.radius}: ${nav.lastReason}`);
         assert.ok(pending > 0, 'actual worker route admission');
         assert.equal(out.ladderSteps.length, 1);
@@ -144,28 +158,33 @@ try {
         );
         proofCount++;
       }
-  const queries = service.samples.filter((s) => s.type === 'query' && s.key?.kind === 'ladder');
+  const queries = service.samples.filter(
+    (s): boolean =>
+      !!(s.type === 'query' && s.key && !Array.isArray(s.key) && s.key.kind === 'ladder')
+  );
   assert.equal(
     queries.length,
     48,
     'one independently directed full-budget ladder proof per route/profile'
   );
-  for (const { key } of queries) {
+  for (const sample of queries) {
+    assert(sample.type === 'query' && sample.key && !Array.isArray(sample.key));
+    const key = sample.key;
     assert.deepEqual(key.descriptor, descriptors[key.descriptor.id - 1]);
     assert.equal(key.maxMoves, ladderMoveBudget(key.descriptor));
     assert.deepEqual(key.cursor, { segment: 0, distance: 0, pendingTime: 0, moves: 0 });
   }
   // A completed negative physical answer preserves the previously owned route,
   // just as pending does. This is a publication control, not a physical witness.
-  const owned = {
+  const owned: NavRoute = {
     points: [new Vector3(7, 8, 9)],
     ladderSteps: [{ ladderId: 99, direction: 'down', entryIndex: 0, exitIndex: 0 }],
   };
   const snapshot = JSON.stringify(owned),
-    check = service.checkLadder;
-  service.checkLadder = () => false;
+    check = service.checkLadder.bind(service);
+  service.checkLadder = (): false => false;
   assert.equal(
-    service.run(++actor, 'route', () =>
+    service.run(++actor, 'route', (): number =>
       nav.findRoute(v(descriptors[0].points[0]), v(descriptors[0].points[3]), owned)
     ),
     0
@@ -180,8 +199,14 @@ try {
   let result,
     attempts = 0;
   do {
-    result = service.run(actor, 'route', () => nav.findRoute(street, v(e4.points[3]), out), street);
-    if (result === NAV_PENDING) await new Promise((resolve) => setTimeout(resolve, 1));
+    result = service.run(
+      actor,
+      'route',
+      (): number => nav.findRoute(street, v(e4.points[3]), out),
+      street
+    );
+    if (result === NAV_PENDING)
+      await new Promise((resolve): NodeJS.Timeout => setTimeout(resolve, 1));
     assert.ok(attempts++ < 10000);
   } while (result === NAV_PENDING);
   assert.equal(result, 0);
@@ -202,7 +227,7 @@ let tileStart = navStart + 40,
   second;
 for (let i = 0; i < view.getUint32(navStart + 8, true); i++) {
   const t = tileStart + 8,
-    u = (n) => view.getUint32(t + n, true);
+    u = (n: number): number => view.getUint32(t + n, true);
   const poly = t + 100 + u(28) * 12;
   const off = poly + u(24) * 32 + u(32) * 12 + u(36) * 12 + u(40) * 12 + u(44) * 4 + u(48) * 16;
   if (u(52)) {
@@ -215,7 +240,7 @@ for (let i = 0; i < view.getUint32(navStart + 8, true); i++) {
   tileStart = t + view.getUint32(tileStart + 4, true);
 }
 assert.ok(found);
-async function corrupt(change, pattern) {
+async function corrupt(change: (view: DataView) => void, pattern: RegExp): Promise<void> {
   const bytes = raw.slice(),
     d = new DataView(bytes.buffer);
   change(d);
@@ -224,58 +249,64 @@ async function corrupt(change, pattern) {
 }
 const { t, poly, off } = found;
 assert.ok(second);
+const secondOffset = second;
 await corrupt(
-  (d) => d.setUint32(second + 32, view.getUint32(off + 32, true), true),
+  (d): void => d.setUint32(secondOffset + 32, view.getUint32(off + 32, true), true),
   /duplicate ladder connection/
 );
-for (const [change, pattern] of [
-  [(d) => d.setUint32(t + 52, 0, true), /tile counts/],
-  [(d) => d.setUint32(t + 36, view.getUint32(t + 24, true), true), /tile counts/],
-  [(d) => d.setUint32(t + 56, 0, true), /tile counts/],
-  [(d) => d.setUint8(poly + 30, 3), /polygon type/],
-  [(d) => d.setUint8(poly + 31, 0), /polygon type/],
-  [(d) => d.setUint16(poly + 28, 1, true), /polygon type/],
-  [(d) => d.setUint16(poly + 4, 65535, true), /polygon vertex/],
-  [(d) => d.setUint16(poly + 16, 1, true), /offmesh neighbour/],
-  [(d) => d.setUint16(off + 28, 0, true), /offmesh index/],
-  [(d) => d.setUint8(off + 30, 0), /direction/],
-  [(d) => d.setUint8(off + 31, 8), /side/],
-  [(d) => d.setUint32(off + 32, 0, true), /unknown\/duplicate ladder connection/],
-  [(d) => d.setUint32(off + 32, 999, true), /unknown\/duplicate ladder connection/],
-  [(d) => d.setFloat32(off + 24, NaN, true), /radius/],
-  [(d) => d.setFloat32(off + 24, NAV_LINK_RADIUS * 2, true), /radius/],
-  [(d) => d.setFloat32(off, view.getFloat32(off, true) + 1, true), /endpoint mismatch/],
-  [(d) => d.setFloat32(off + 4, NaN, true), /endpoint mismatch/],
-])
-  await corrupt(change, pattern);
-async function metadata(change, pattern, expectedBinding) {
-  const meta = structuredClone(bake.meta);
+const corruptions: [(view: DataView) => void, RegExp][] = [
+  [(d): void => d.setUint32(t + 52, 0, true), /tile counts/],
+  [(d): void => d.setUint32(t + 36, view.getUint32(t + 24, true), true), /tile counts/],
+  [(d): void => d.setUint32(t + 56, 0, true), /tile counts/],
+  [(d): void => d.setUint8(poly + 30, 3), /polygon type/],
+  [(d): void => d.setUint8(poly + 31, 0), /polygon type/],
+  [(d): void => d.setUint16(poly + 28, 1, true), /polygon type/],
+  [(d): void => d.setUint16(poly + 4, 65535, true), /polygon vertex/],
+  [(d): void => d.setUint16(poly + 16, 1, true), /offmesh neighbour/],
+  [(d): void => d.setUint16(off + 28, 0, true), /offmesh index/],
+  [(d): void => d.setUint8(off + 30, 0), /direction/],
+  [(d): void => d.setUint8(off + 31, 8), /side/],
+  [(d): void => d.setUint32(off + 32, 0, true), /unknown\/duplicate ladder connection/],
+  [(d): void => d.setUint32(off + 32, 999, true), /unknown\/duplicate ladder connection/],
+  [(d): void => d.setFloat32(off + 24, NaN, true), /radius/],
+  [(d): void => d.setFloat32(off + 24, NAV_LINK_RADIUS * 2, true), /radius/],
+  [(d): void => d.setFloat32(off, view.getFloat32(off, true) + 1, true), /endpoint mismatch/],
+  [(d): void => d.setFloat32(off + 4, NaN, true), /endpoint mismatch/],
+];
+for (const [change, pattern] of corruptions) await corrupt(change, pattern);
+async function metadata(
+  change: (meta: Omit<NavMetadata, 'ladders'> & { ladders: MutableLadderDescriptor[] }) => void,
+  pattern: RegExp,
+  expectedBinding?: ExpectedNav
+): Promise<void> {
+  assert(bake.meta.ladders);
+  const meta = { ...structuredClone(bake.meta), ladders: bake.meta.ladders.map(mutableLadder) };
   change(meta);
   const bytes = await packNav(meta, bake.nav, bake.components, bake.points);
   await assert.rejects(unpackNav(bytes, expectedBinding), pattern);
 }
-await metadata((m) => {
+await metadata((m): void => {
   m.ladders = [];
 }, /ladder connection/);
-await metadata((m) => {
+await metadata((m): void => {
   m.ladders[0].id = 2;
 }, /ladder descriptor/);
-await metadata((m) => {
+await metadata((m): void => {
   m.ladders[0].normal.x = 0;
 }, /geometry/);
-await metadata((m) => {
+await metadata((m): void => {
   m.ladders[0].points[0].y += 1;
 }, /geometry/);
-await metadata((m) => {
+await metadata((m): void => {
   m.ladders[0].points[2].y = m.ladders[0].points[1].y;
 }, /geometry/);
-await metadata((m) => {
+await metadata((m): void => {
   m.bounds.max[1] = 1;
 }, /outside bounds/);
 // A sub-float32 descriptor change still fails exact authored binding, even
 // though Detour cannot distinguish the new endpoint from the original.
 await metadata(
-  (m) => {
+  (m): void => {
     const d = m.ladders[0];
     d.points[1].x += 1e-10;
     d.points[2].x = d.points[1].x;
@@ -288,13 +319,18 @@ await metadata(
 // Simulate missing/wrong-floor imported attachment, including reverse links.
 // Only the native link under test is corrupted; normal load above used real import.
 const broken = await SurfaceNav.load(f.surfaceRaw, f.physics, expected);
-const [first, binding] = broken.ladderLinks.entries().next().value;
+const entry = broken.ladderLinks.entries().next().value;
+assert(entry);
+const [first, binding] = entry;
 const native = broken.mesh.getTileAndPolyByRef(first),
   firstLink = native.tile.links(native.poly.firstLink());
 const original = firstLink.ref();
 for (const ref of [0, firstLink.edge() === 0 ? binding.upperRef : binding.lowerRef]) {
   firstLink.raw.set_ref(ref);
-  assert.throws(() => new SurfaceNav(f.physics, broken.mesh, bake.components, bake.meta), /ladder/);
+  assert.throws(
+    (): SurfaceNav => new SurfaceNav(f.physics, broken.mesh, bake.components, bake.meta),
+    /ladder/
+  );
 }
 firstLink.raw.set_ref(original);
 const ground = broken.mesh.getTileAndPolyByRef(binding.lowerRef);
@@ -303,7 +339,7 @@ for (let l = ground.poly.firstLink(); l !== 0xffffffff; l = ground.tile.links(l)
   if (link.ref() === first) {
     link.raw.set_ref(0);
     assert.throws(
-      () => new SurfaceNav(f.physics, broken.mesh, bake.components, bake.meta),
+      (): SurfaceNav => new SurfaceNav(f.physics, broken.mesh, bake.components, bake.meta),
       /reverse ladder/
     );
     link.raw.set_ref(first);

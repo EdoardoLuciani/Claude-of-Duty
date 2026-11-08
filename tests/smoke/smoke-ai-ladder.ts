@@ -4,12 +4,14 @@ import { writeFileSync } from 'node:fs';
 import { Scene, Mesh, BoxGeometry, MeshBasicMaterial } from 'three';
 
 import { INFANTRY } from '../../src/ai/capabilities.ts';
+import type { LadderDescriptor, LadderDirection, LadderCursor } from '../../src/ai/ladder.ts';
 import {
   createLadderDescriptors,
   LadderMotor,
   LADDER,
   ladderMoveBudget,
 } from '../../src/ai/ladder.ts';
+import type { WorldLadder } from '../../src/core/model-metadata.ts';
 import { CharacterController } from '../../src/physics/character.ts';
 import {
   ladderProfiles,
@@ -20,9 +22,11 @@ import {
   reverseCursor,
 } from '../../tools/lib/ladder-fixture.ts';
 import { loadMap, physicsFor } from '../../tools/nav240/fixtures.ts';
+import { mutableLadder } from '../lib/ai-movement-fixture.ts';
 
-const f = await loadMap(),
-  descriptors = createLadderDescriptors(f.meta.volumes);
+const f = await loadMap();
+assert(f.meta.volumes);
+const descriptors = createLadderDescriptors(f.meta.volumes);
 assert.equal(descriptors.length, 6);
 const profiles = ladderProfiles();
 const results = [],
@@ -30,7 +34,21 @@ const results = [],
   corrections = [],
   boundaries = [],
   boundaryControls = [];
-function run(c, d, direction, dt, cursor) {
+function run(
+  c: CharacterController,
+  d: LadderDescriptor,
+  direction: LadderDirection,
+  dt: number,
+  cursor?: LadderCursor
+): {
+  calls: number;
+  moves: number;
+  maxMove: number;
+  maxError: number;
+  samples: { phase: string; foot: { x: number; y: number; z: number } }[];
+  final: { x: number; y: number; z: number };
+  supported: boolean;
+} {
   const motor = new LadderMotor(c, d, direction, ladderMoveBudget(d), cursor);
   let calls = 0,
     moves = 0,
@@ -39,17 +57,17 @@ function run(c, d, direction, dt, cursor) {
   const radius = c.radius,
     height = c.height,
     mask = c.mask;
-  const samples = [];
+  const samples: { phase: string; foot: { x: number; y: number; z: number } }[] = [];
   // Initialization above is the only fixture positioning. No motor teleport,
   // capsule resize or mask change can hide a failed physical passage.
   c.setPosition =
     c.teleport =
     c.setHeight =
-      () => {
+      (): never => {
         throw new Error('relocation/resize forbidden');
       };
   const native = c.move.bind(c);
-  c.move = (dx, dy, dz) => {
+  c.move = (dx, dy, dz): number => {
     assert.equal(c.radius, radius);
     assert.equal(c.height, height);
     assert.equal(c.mask, mask);
@@ -117,7 +135,7 @@ function run(c, d, direction, dt, cursor) {
 }
 for (const d of descriptors)
   for (const profile of profiles)
-    for (const direction of ['up', 'down'])
+    for (const direction of ['up', 'down'] as const)
       for (const dt of [1 / 30, 1 / 60, 1 / 120, 0.25]) {
         const c = controller(f.physics.staticWorld, d, direction, profile);
         const result = run(c, d, direction, dt);
@@ -141,7 +159,7 @@ for (const d of descriptors)
 // Exact interrupted cursor continuation and freshly budgeted reverse return.
 for (const d of descriptors)
   for (const profile of profiles)
-    for (const direction of ['up', 'down']) {
+    for (const direction of ['up', 'down'] as const) {
       const c = controller(f.physics.staticWorld, d, direction, profile);
       const motor = new LadderMotor(c, d, direction);
       while (motor.phase !== 'shaft' || motor.cursor.distance < 1.5) {
@@ -185,13 +203,13 @@ for (const d of descriptors)
 // Exact phase boundaries differ from the existing inside-shaft interrupts.
 for (const descriptor of descriptors)
   for (const profile of profiles)
-    for (const direction of ['up', 'down']) {
+    for (const direction of ['up', 'down'] as const) {
       for (const segment of [0, 1, 2])
         for (const mode of segment === 2 ? ['resume'] : ['resume', 'reverse']) {
           const c = controller(f.physics.staticWorld, descriptor, direction, profile);
           let nativeMoves = 0;
           const nativeMove = c.move.bind(c);
-          c.move = (...args) => {
+          c.move = (...args): number => {
             nativeMoves++;
             assert.ok(args.every(Number.isFinite));
             return nativeMove(...args);
@@ -199,7 +217,7 @@ for (const descriptor of descriptors)
           c.setPosition =
             c.teleport =
             c.setHeight =
-              () => {
+              (): never => {
                 throw new Error('boundary relocation/resize forbidden');
               };
           const original = new LadderMotor(c, descriptor, direction);
@@ -285,7 +303,16 @@ for (const descriptor of descriptors)
         }
     }
 
-const volume = { kind: 'ladder', x: 0, z: 0, y0: 0, y1: 3, radius: 0.42, nx: 1, nz: 0 };
+const volume: WorldLadder = {
+  kind: 'ladder',
+  x: 0,
+  z: 0,
+  y0: 0,
+  y1: 3,
+  radius: 0.42,
+  nx: 1,
+  nz: 0,
+};
 for (const change of [
   { nx: undefined },
   { nz: NaN },
@@ -298,17 +325,31 @@ for (const change of [
   { x: Number.MAX_VALUE },
   { z: 1e20, nx: 0, nz: 1 },
 ]) {
-  assert.throws(() => createLadderDescriptors([{ ...volume, ...change }]));
+  // Authoring input can be malformed before the checked descriptor factory.
+  assert.throws((): unknown =>
+    Reflect.apply(createLadderDescriptors, undefined, [[{ ...volume, ...change }]])
+  );
   corrections.push({ guard: 'factory-geometry', change, rejected: true });
 }
 const d = createLadderDescriptors([volume])[0];
-function box(scene, x, y, z, w, h, depth) {
+function box(
+  scene: Scene,
+  x: number,
+  y: number,
+  z: number,
+  w: number,
+  h: number,
+  depth: number
+): Mesh<BoxGeometry, MeshBasicMaterial> {
   const mesh = new Mesh(new BoxGeometry(w, h, depth), new MeshBasicMaterial());
   mesh.position.set(x, y, z);
   scene.add(mesh);
   return mesh;
 }
-function fixture(extra) {
+function fixture(extra?: (scene: Scene) => void): {
+  physics: ReturnType<typeof physicsFor>;
+  c: CharacterController;
+} {
   const scene = new Scene();
   box(scene, 0, -0.2, 0, 8, 0.4, 8);
   box(scene, 2.75, 2.8, 0, 4.5, 0.4, 8);
@@ -317,7 +358,7 @@ function fixture(extra) {
     c = controller(physics.staticWorld, d, 'up', profiles[0]);
   return { physics, c };
 }
-for (const direction of ['up', 'down']) {
+for (const direction of ['up', 'down'] as const) {
   for (const segment of [0, 1, 2]) {
     const { physics } = fixture(),
       points = directedPoints(d, direction);
@@ -337,7 +378,7 @@ for (const direction of ['up', 'down']) {
       };
     let moves = 0;
     const nativeMove = c.move.bind(c);
-    c.move = (...args) => {
+    c.move = (...args): number => {
       moves++;
       return nativeMove(...args);
     };
@@ -381,7 +422,10 @@ for (const direction of ['up', 'down']) {
     const { physics } = fixture(),
       target = directedPoints(d, direction)[3];
     const supportY = direction === 'up' ? 2.8 : -0.2;
-    const support = physics.staticWorld.objects.find((o) => o?.mesh?.position.y === supportY);
+    const support = physics.staticWorld.objects.find(
+      (o): boolean => o?.mesh?.position.y === supportY
+    );
+    assert(support);
     physics.removeStatic(support.id);
     physics.rebuildStatic();
     const c = new CharacterController(physics.staticWorld, {
@@ -399,7 +443,7 @@ for (const direction of ['up', 'down']) {
     });
     let moves = 0;
     const nativeMove = c.move.bind(c);
-    c.move = (...args) => {
+    c.move = (...args): number => {
       moves++;
       return nativeMove(...args);
     };
@@ -434,10 +478,10 @@ for (const direction of ['up', 'down']) {
       moves: 1,
       pendingTime: 0,
     });
-    m.cursor.distance += 1e-7; // Within trajectory EPS but negative remaining is still invalid.
+    Object.defineProperty(m.cursor, 'distance', { value: m.cursor.distance + 1e-7 }); // Within trajectory EPS but negative remaining is still invalid.
     let moves = 0;
     const nativeMove = c.move.bind(c);
-    c.move = (...args) => {
+    c.move = (...args): number => {
       moves++;
       return nativeMove(...args);
     };
@@ -457,7 +501,9 @@ for (const direction of ['up', 'down']) {
   }
 }
 {
-  const { c } = fixture((scene) => box(scene, 0.605, 1, 0, 0.2, 2, 2));
+  const { c } = fixture((scene): Mesh<BoxGeometry, MeshBasicMaterial> =>
+    box(scene, 0.605, 1, 0, 0.2, 2, 2)
+  );
   const before = { ...c.position },
     m = new LadderMotor(c, d, 'up');
   assert.equal(m.failure, 'overlap');
@@ -465,7 +511,9 @@ for (const direction of ['up', 'down']) {
   restored(c);
 }
 {
-  const { c } = fixture((scene) => box(scene, 0, 2.2, 0, 0.3, 0.15, 2));
+  const { c } = fixture((scene): Mesh<BoxGeometry, MeshBasicMaterial> =>
+    box(scene, 0, 2.2, 0, 0.3, 0.15, 2)
+  );
   const m = new LadderMotor(c, d, 'up');
   for (let i = 0; i < 200 && m.status === 'active'; i++) m.advance(1 / 60);
   assert.equal(m.status, 'failed');
@@ -494,10 +542,10 @@ for (const stage of [
   let moved = false,
     supported = false,
     thrown = false;
-  let m;
-  function inject() {
+  let m: LadderMotor;
+  function inject(): void {
     if (stage.includes('overlap'))
-      world.overlapCapsule = (...args) => {
+      world.overlapCapsule = (...args): number => {
         if (stage !== 'post-overlap' || moved) {
           thrown = true;
           throw error;
@@ -505,18 +553,18 @@ for (const stage of [
         return overlap(...args);
       };
     if (stage === 'move')
-      c.move = () => {
+      c.move = (): never => {
         thrown = true;
         throw error;
       };
     if (stage === 'post-overlap')
-      c.move = (...args) => {
+      c.move = (...args): number => {
         const result = nativeMove(...args);
         moved = true;
         return result;
       };
     if (stage.includes('support') || stage === 'terminal-probe')
-      world.sweepCapsule = (...args) => {
+      world.sweepCapsule = (...args): boolean => {
         if (args[6] === c.radius && args[10] === LADDER.supportDistance) {
           if (stage !== 'terminal-probe') {
             thrown = true;
@@ -527,7 +575,7 @@ for (const stage of [
         return sweep(...args);
       };
     if (stage === 'terminal-probe')
-      c.probeGround = () => {
+      c.probeGround = (): boolean => {
         if (supported) {
           thrown = true;
           throw error;
@@ -538,8 +586,8 @@ for (const stage of [
   if (stage.startsWith('constructor')) {
     inject();
     assert.throws(
-      () => new LadderMotor(c, d, 'up'),
-      (caught) => caught === error
+      (): LadderMotor => new LadderMotor(c, d, 'up'),
+      (caught): boolean => caught === error
     );
   } else {
     m = new LadderMotor(c, d, 'up');
@@ -553,8 +601,8 @@ for (const stage of [
     }
     inject();
     assert.throws(
-      () => m.advance(1 / 60),
-      (caught) => caught === error
+      (): ReturnType<LadderMotor['advance']> => m.advance(1 / 60),
+      (caught): boolean => caught === error
     );
     assert.equal(m.status, 'failed');
     assert.equal(m.failure, 'controller');
@@ -572,7 +620,7 @@ for (const change of ['disposed', 'disposed-paused', 'replacement', 'empty-entry
   const before = { ...c.position };
   let moves = 0;
   const nativeMove = c.move.bind(c);
-  c.move = (...args) => {
+  c.move = (...args): number => {
     moves++;
     return nativeMove(...args);
   };
@@ -605,18 +653,19 @@ for (const corruption of [
   'verticalTravel',
 ]) {
   const { c } = fixture();
-  const descriptor = { ...d, points: d.points.map((p) => ({ ...p })) };
+  const descriptor = mutableLadder(d);
   if (corruption === 'foot-entry') c.position.x = NaN;
   const m = new LadderMotor(c, descriptor, 'up');
   if (corruption === 'foot') c.position.z = Infinity;
   if (corruption === 'expected') descriptor.points[1].x = NaN;
   if (corruption === 'collapsed-span') Object.assign(descriptor.points[1], descriptor.points[0]);
-  if (['distance', 'moves', 'pendingTime'].includes(corruption)) m.cursor[corruption] = NaN;
+  if (['distance', 'moves', 'pendingTime'].includes(corruption))
+    Object.defineProperty(m.cursor, corruption, { value: NaN });
   if (corruption === 'verticalTravel') m.verticalTravel = Infinity;
   const before = { ...c.position };
   let moves = 0;
   const nativeMove = c.move.bind(c);
-  c.move = (...args) => {
+  c.move = (...args): number => {
     moves++;
     assert.ok(args.every(Number.isFinite));
     return nativeMove(...args);
@@ -632,7 +681,7 @@ for (const corruption of [
 // even bypassing the checked factory must not pass NaN displacement to physics.
 for (const corruption of ['collapsed-shaft', 'nonfinite-shaft']) {
   const { c } = fixture(),
-    descriptor = { ...d, points: d.points.map((p) => ({ ...p })) };
+    descriptor = mutableLadder(d);
   if (corruption === 'collapsed-shaft') Object.assign(descriptor.points[2], descriptor.points[1]);
   else descriptor.points[2].y = Infinity;
   // Bound the forged infinite geometry independently of its invalid budget.
@@ -644,7 +693,7 @@ for (const corruption of ['collapsed-shaft', 'nonfinite-shaft']) {
   );
   const nativeMove = c.move.bind(c);
   let moves = 0;
-  c.move = (...args) => {
+  c.move = (...args): number => {
     moves++;
     assert.ok(args.every(Number.isFinite));
     return nativeMove(...args);
@@ -664,7 +713,7 @@ for (const corruption of ['collapsed-shaft', 'nonfinite-shaft']) {
     m = new LadderMotor(c, d, 'up');
   const nativeMove = c.move.bind(c);
   let moves = 0;
-  c.move = (...args) => {
+  c.move = (...args): number => {
     moves++;
     const result = nativeMove(...args);
     c.position.x = NaN;
@@ -690,13 +739,15 @@ for (const reason of [
 ]) {
   const { physics, c } = fixture();
   if (reason === 'initial-support') {
-    const floor = physics.staticWorld.objects.find((o) => o?.mesh?.position.y === -0.2);
+    const floor = physics.staticWorld.objects.find((o): boolean => o?.mesh?.position.y === -0.2);
+    assert(floor);
     physics.removeStatic(floor.id);
     physics.rebuildStatic();
   }
   if (reason === 'support') {
     // Supported entry but missing upper platform: no projected-roof success.
-    const top = physics.staticWorld.objects.find((o) => o?.mesh?.position.y === 2.8);
+    const top = physics.staticWorld.objects.find((o): boolean => o?.mesh?.position.y === 2.8);
+    assert(top);
     physics.removeStatic(top.id);
     physics.rebuildStatic();
   }

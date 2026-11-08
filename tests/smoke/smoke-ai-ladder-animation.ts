@@ -3,26 +3,34 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 
 import { Animator } from '../../src/ai/animator.ts';
+import type { LadderDirection, LadderPhase } from '../../src/ai/ladder.ts';
 import { RIG } from '../../src/ai/rig.ts';
 
 let probes = 0;
-function actor() {
+function actor(): Animator {
   const { bones } = RIG.createSkeleton();
   const root = new THREE.Group();
   root.add(bones[0]);
   root.updateMatrixWorld(true);
   const a = new Animator(RIG, bones, {
-    probe() {
+    probe(): false {
       probes++;
       return false;
     },
   });
   return a;
 }
-const pose = (a) => a.bones.flatMap((b) => [...b.position.toArray(), ...b.quaternion.toArray()]);
-const near = (a, b) =>
-  a.forEach((n, i) => assert.ok(Math.abs(n - b[i]) < 1e-7, `${i}: ${n} != ${b[i]}`));
-const at = (a, travel, direction = 'up', phase = 'shaft', dt = 1 / 60) => {
+const pose = (a: Animator): number[] =>
+  a.bones.flatMap((b): number[] => [...b.position.toArray(), ...b.quaternion.toArray()]);
+const near = (a: number[], b: number[]): void =>
+  a.forEach((n, i): void => assert.ok(Math.abs(n - b[i]) < 1e-7, `${i}: ${n} != ${b[i]}`));
+const at = (
+  a: Animator,
+  travel: number,
+  direction: LadderDirection = 'up',
+  phase: LadderPhase = 'shaft',
+  dt = 1 / 60
+): number[] => {
   a.setClimb(true, travel, direction, phase);
   a.update(dt, 999);
   return pose(a);
@@ -44,7 +52,8 @@ a.hit();
 at(a, 0);
 assert.equal(a.reloading, false);
 assert.equal(a.vaulting, false);
-for (const timer of ['recoilT', 'reloadT', 'turnT', 'vaultT', 'hitT']) assert.equal(a[timer], -1);
+for (const timer of ['recoilT', 'reloadT', 'turnT', 'vaultT', 'hitT'] as const)
+  assert.equal(a[timer], -1);
 const rest = at(a, 0),
   raised = at(a, 0.15);
 assert.notDeepEqual(rest, raised, 'actual bones follow travelled metres');
@@ -60,7 +69,7 @@ assert.ok(
 near(rest, at(a, 0.6));
 near(raised, at(a, 0.45, 'down'));
 // Whole-pose periodicity/reversal must also hold between the old sine extrema.
-for (const phase of ['align', 'shaft', 'dismount'])
+for (const phase of ['align', 'shaft', 'dismount'] as const)
   for (const travel of [0.013, 0.173, 0.317, 0.599999]) {
     const sample = at(a, travel, 'up', phase);
     near(sample, at(a, travel + 1.2, 'up', phase));
@@ -70,8 +79,8 @@ at(a, 0.15, 'down');
 assert.ok(
   a.bonePos('FootL', new THREE.Vector3()).y > a.bonePos('FootR', new THREE.Vector3()).y + 0.15
 );
-for (const phase of ['align', 'shaft', 'dismount'])
-  for (const direction of ['up', 'down']) {
+for (const phase of ['align', 'shaft', 'dismount'] as const)
+  for (const direction of ['up', 'down'] as const) {
     const held = at(a, 0.15, direction, phase);
     const beforeProbe = probes;
     a.setState({
@@ -115,7 +124,7 @@ assert.equal(a.climbPhase, 'align');
 // Same retained normal state and clock: exit/reset restores the existing path,
 // including aim/look, foot probes, support IK, muzzle outputs and step cadence.
 const normal = {
-  clip: 'walk',
+  clip: 'walk' as const,
   speed: 1.42,
   aimTarget: new THREE.Vector3(0, 1.5, 10),
   lookTarget: new THREE.Vector3(1, 2, 10),
@@ -136,7 +145,7 @@ for (let i = 0; i < 30; i++) {
 a.reload();
 assert.equal(a.reloading, true, 'normal triggers work again');
 for (const bad of [NaN, Infinity, -1])
-  assert.throws(() => a.setClimb(true, bad, 'up', 'shaft'), /climb travel/);
+  assert.throws((): void => a.setClimb(true, bad, 'up', 'shaft'), /climb travel/);
 console.log(
   '  ok  travel-driven ladder bones, frozen pause, exclusive climb, reset and normal animation'
 );

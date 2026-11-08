@@ -8,13 +8,16 @@ import { Rng } from '../../src/core/rng.ts';
 import { loadMap, addFollowupCases, vec } from '../../tools/nav240/fixtures.ts';
 import { execute, makeWalker } from '../../tools/nav240/harness.ts';
 
-const f = await loadMap(),
-  baseCount = f.cases.length;
-addFollowupCases(f);
-f.grid = await SurfaceNav.load(f.surfaceRaw, f.physics);
+const source = await loadMap(),
+  baseCount = source.cases.length;
+addFollowupCases(source);
+const f = { ...source, grid: await SurfaceNav.load(source.surfaceRaw, source.physics) };
 const candidate = {
-  query(from, to) {
-    const points = [],
+  query(
+    from: Vector3,
+    to: Vector3
+  ): { points: Vector3[]; outcome: string | null; reason?: string | null } {
+    const points: Vector3[] = [],
       n = f.grid.findPath(from, to, points);
     return { points: points.slice(0, n), outcome: f.grid.lastOutcome, reason: f.grid.lastReason };
   },
