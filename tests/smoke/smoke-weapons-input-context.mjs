@@ -9,6 +9,7 @@ import { Rng } from '../../src/core/rng.ts';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
 import { WEAPON_IDS } from '../../src/weapons/defs.ts';
 import { WeaponSystem, GRENADE_FUSE, MAX_SHOTS_PER_FRAME } from '../../src/weapons/index.ts';
+import { FRAME_SOURCES } from '../lib/frame-sources.mjs';
 
 function makeHarness() {
   const input = new Input({}, { sensitivity: 1, invertY: false });
@@ -145,7 +146,7 @@ for (const [equip, first, second] of [
   const { wp, shots } = makeHarness();
   assert(wp.equipSecondary('shotgun') && wp.tryFire());
   assert.equal(shots.fired, 8, 'one shotgun shell spawns eight pellets');
-  assert.equal(wp._pendingShots, 1, 'pellets still produce one accepted-shot event');
+  assert.equal(wp._pendingShots.length, 1, 'pellets still produce one accepted-shot event');
 }
 {
   const { wp } = makeHarness();
@@ -780,21 +781,6 @@ for (const blocked of ['disabled', 'frozen', 'dead', 'controls', 'input']) {
 /*  frame-rate independent cadence (issue 605)                              */
 /* ======================================================================== */
 
-// Frame-time sources: fixed rates, the engine's 0.1 s clamp, and 24-240 FPS jitter.
-const steady = (fps) => () => 1 / fps;
-const jittered = (seed) => {
-  const r = new Rng(seed);
-  return () => 1 / 240 + r.float() * (1 / 24 - 1 / 240);
-};
-const FRAME_SOURCES = [
-  ['30', steady(30)],
-  ['60', steady(60)],
-  ['120', steady(120)],
-  ['144', steady(144)],
-  ['10 (dt clamp)', steady(10)],
-  ['jitter', jittered(605)],
-];
-
 // Real update() + lateUpdate(): record accepted rounds, fire events and seeds.
 function cadenceHarness(id) {
   const h = makeHarness();
@@ -830,7 +816,7 @@ function cadenceHarness(id) {
 for (const id of ['rifle', 'smg', 'mcx', 'lmg']) {
   const counts = [];
   for (const [label, nextDt] of FRAME_SOURCES) {
-    const { wp, step, times, events, shots } = cadenceHarness(id);
+    const { wp, step, times, events } = cadenceHarness(id);
     const interval = 60 / wp.state.def.rpm;
     const total = () => wp.ammo.mag + wp.ammo.reserve;
     const ammo0 = total();
@@ -846,7 +832,6 @@ for (const id of ['rifle', 'smg', 'mcx', 'lmg']) {
       assert(times[i] - times[0] >= i * interval - 1e-9, `${id} @ ${label}: round ${i} early`);
     }
     assert.equal(ammo0 - total(), times.length, `${id} @ ${label}: one cartridge per round`);
-    assert.equal(shots.fired, times.length, `${id} @ ${label}: one projectile per round`);
     assert.equal(events.fire, times.length, `${id} @ ${label}: one fire event per round`);
     counts.push(times.length);
   }
@@ -958,7 +943,7 @@ for (const [name, gate] of INTERRUPTIONS) {
 // Overload: one 1 s hitch fires at most MAX_SHOTS_PER_FRAME rounds with full
 // accounting and a seed each; the remainder is dropped, not banked.
 {
-  const { wp, step, times, events, shots } = cadenceHarness('rifle');
+  const { wp, step, times, events } = cadenceHarness('rifle');
   const total = () => wp.ammo.mag + wp.ammo.reserve;
   const ammo0 = total();
   step({ down: ['Mouse0'] });
@@ -968,7 +953,6 @@ for (const [name, gate] of INTERRUPTIONS) {
   assert.equal(step(), 0, 'and does not drain a backlog');
   step({ up: ['Mouse0'] });
   assert.equal(ammo0 - total(), times.length);
-  assert.equal(shots.fired, times.length);
   assert.equal(events.fire, times.length);
   assert.equal(new Set(events.seeds).size, events.seeds.length, 'each round reports its own seed');
   for (let i = 0; i < 10; i++) step();

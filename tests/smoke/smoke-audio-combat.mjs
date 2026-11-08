@@ -170,7 +170,7 @@ weapon.ctx = {
 };
 assert.equal(weapon.tryFire(), false);
 assert.deepEqual(dryCalls, [['dryfire', null, { dryWeapon: 'rifle' }]]);
-assert.equal(weapon._pendingShots, 0);
+assert.equal(weapon._pendingShots.length, 0);
 assert.equal(weapon._fireTimer, 0.25);
 assert.equal(weapon.tryFire(), false);
 assert.equal(dryCalls.length, 1, 'cooldown prevents duplicate click');

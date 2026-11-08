@@ -221,8 +221,8 @@ export class WeaponSystem {
     caseRadius: 0.00495,
     spin: 0,
   };
-  _pendingShots: number = 0;
-  _fireSeeds = new Uint32Array(MAX_SHOTS_PER_FRAME);
+  /** Seeds of the rounds fired since the last lateUpdate, one per weapon:fire. */
+  _pendingShots: number[] = [];
   // Deferred shell ejections (a case leaves the port a few ms after the shot).
   _shellQueue: Array<{ t: number; weapon: WeaponId | null }> = [];
   _droppedMags: DroppedMagazine[] = [];
@@ -667,7 +667,7 @@ export class WeaponSystem {
     this._spread = 0;
     this._shotIndex = 0;
     this._sinceShot = 10;
-    this._pendingShots = 0;
+    this._pendingShots.length = 0;
     this._switchTo = null;
     this._tubeLoop = false;
     this._sim?.clear();
@@ -930,8 +930,7 @@ export class WeaponSystem {
     this._spread = Math.min(def.spreadMax, this._spread + def.spreadPerShot);
     this._sinceShot = 0;
     this.stats.fired++;
-    this._fireSeeds[Math.min(this._pendingShots, MAX_SHOTS_PER_FRAME - 1)] = seed;
-    this._pendingShots++;
+    this._pendingShots.push(seed);
 
     if (boltAction) {
       this._fireTimer = def.boltTime ?? 1.1;
@@ -1199,7 +1198,7 @@ export class WeaponSystem {
     if (this.disabled) {
       this._burstLeft = 0;
       this._triggerLatched = false;
-      this._pendingShots = 0;
+      this._pendingShots.length = 0;
       this._state.ads = false;
       this._state.trigger = false;
       this.viewmodel.stopClip();
@@ -1635,9 +1634,12 @@ export class WeaponSystem {
         if (pressed && this._burstLeft === 0 && this._burstCooldown <= 0) {
           this._burstLeft = requiredTuning(def.burstCount, 'burstCount');
         }
-        for (let n = 0; this._burstLeft > 0 && n < MAX_SHOTS_PER_FRAME; n++) {
+        for (
+          let n = 0;
+          this._burstLeft > 0 && n < MAX_SHOTS_PER_FRAME && this._fireTimer <= 0;
+          n++
+        ) {
           const carry = this._fireTimer;
-          if (carry > 0) break;
           if (this.tryFire()) {
             this._burstLeft--;
             this._fireTimer = 60 / requiredTuning(def.burstRpm, 'burstRpm') + carry;
@@ -1678,16 +1680,16 @@ export class WeaponSystem {
     vm.update(dt, this._state);
 
     // ---- muzzle flash / audio, now that the pose is final ---------------
-    if (this._pendingShots > 0) {
+    if (this._pendingShots.length > 0) {
       const def = this.current;
       vm.muzzleWorld(this._firePayload.origin);
       vm.boreDir(this._firePayload.dir);
       if (def) this._firePayload.weapon = def;
-      for (let i = 0; i < this._pendingShots; i++) {
-        this._firePayload.seed = this._fireSeeds[Math.min(i, MAX_SHOTS_PER_FRAME - 1)];
+      for (const seed of this._pendingShots) {
+        this._firePayload.seed = seed;
         ctx.events.emit('weapon:fire', this._firePayload);
       }
-      this._pendingShots = 0;
+      this._pendingShots.length = 0;
     }
 
     // ---- deferred shell ejection ---------------------------------------

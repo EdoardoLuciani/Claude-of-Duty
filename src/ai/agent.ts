@@ -3088,45 +3088,49 @@ export class Agent {
     }
     this._muzzleBlocked = false;
     // A long frame may owe more than one round; the bound drops the rest.
-    for (let n = 0; n < COMBAT.maxShotsPerFrame; n++) {
-      if (this.ammo <= 0) {
-        this.animator.reload(this.variantName === 'irregular' ? 2.9 : 2.35);
-        this.ai.emitReload(this);
-        this.ammo = this.magSize;
-        return;
-      }
-      if (this.burstLeft <= 0) {
-        if (this.burstCooldown > 0) return;
-        this.burstLeft = this.rng.int(COMBAT.burstMin, COMBAT.burstMax);
-        this.burstCooldown =
-          this.rng.range(COMBAT.burstGapMin, COMBAT.burstGapMax) +
-          this.suppression * COMBAT.burstGapSuppress;
-      }
-      if (this.fireCooldown > 0) return;
+    for (let n = 0; n < COMBAT.maxShotsPerFrame && this._fireRound(dt); n++);
+  }
 
-      const an = this.animator;
-      const origin = an.muzzleWorld;
-      const dir = this._muzzleDir.copy(an.muzzleDir);
-      applySpread(dir, this.rng, this.spread * (1 + this.suppression * COMBAT.suppressSpread));
-      if (
-        this._shotBlockedByFriend(origin, dir) ||
-        this.ai.onAgentFire(this, origin, dir) === false
-      ) {
-        this.ai.stats.friendlyHolds++;
-        this._friendlyBlock += dt;
-        if (this._friendlyBlock >= FRIENDLY_HOLD) this._breakFriendlyPeek();
-        return;
-      }
-      this._friendlyBlock = 0;
-      // Overshoot of a cooldown that ran out during this frame carries into the
-      // next round, so cadence does not depend on frame rate. Older idle time
-      // (a burst gap, a block, a reload) does not bank rounds.
-      const carry = this.fireCooldown > -dt ? this.fireCooldown : 0;
-      this.fireCooldown = 1 / this.fireRate + carry;
-      this.burstLeft--;
-      this.ammo--;
-      an.fire(1);
+  /** Fire one round if every gate allows it; false ends this frame's fire. */
+  _fireRound(dt: number): boolean {
+    if (this.ammo <= 0) {
+      this.animator.reload(this.variantName === 'irregular' ? 2.9 : 2.35);
+      this.ai.emitReload(this);
+      this.ammo = this.magSize;
+      return false;
     }
+    if (this.burstLeft <= 0) {
+      if (this.burstCooldown > 0) return false;
+      this.burstLeft = this.rng.int(COMBAT.burstMin, COMBAT.burstMax);
+      this.burstCooldown =
+        this.rng.range(COMBAT.burstGapMin, COMBAT.burstGapMax) +
+        this.suppression * COMBAT.burstGapSuppress;
+    }
+    if (this.fireCooldown > 0) return false;
+
+    const an = this.animator;
+    const origin = an.muzzleWorld;
+    const dir = this._muzzleDir.copy(an.muzzleDir);
+    applySpread(dir, this.rng, this.spread * (1 + this.suppression * COMBAT.suppressSpread));
+    if (
+      this._shotBlockedByFriend(origin, dir) ||
+      this.ai.onAgentFire(this, origin, dir) === false
+    ) {
+      this.ai.stats.friendlyHolds++;
+      this._friendlyBlock += dt;
+      if (this._friendlyBlock >= FRIENDLY_HOLD) this._breakFriendlyPeek();
+      return false;
+    }
+    this._friendlyBlock = 0;
+    // Overshoot of a cooldown that ran out during this frame carries into the
+    // next round, so cadence does not depend on frame rate. Older idle time
+    // (a burst gap, a block, a reload) does not bank rounds.
+    const carry = this.fireCooldown > -dt ? this.fireCooldown : 0;
+    this.fireCooldown = 1 / this.fireRate + carry;
+    this.burstLeft--;
+    this.ammo--;
+    an.fire(1);
+    return true;
   }
 
   _shotBlockedByFriend(origin: THREE.Vector3, dir: THREE.Vector3): boolean {

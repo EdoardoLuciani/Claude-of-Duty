@@ -22,6 +22,7 @@ import { Squad } from '../../src/ai/squad.ts';
 import { COMBAT } from '../../src/ai/tuning.ts';
 import { makeAgent, makeAi } from '../../tools/lib/agent-fixture.mjs';
 import { testNav } from '../../tools/lib/test-nav.mjs';
+import { FRAME_SOURCES } from '../lib/frame-sources.mjs';
 
 const DT = 1 / 60;
 const rng = {
@@ -647,20 +648,6 @@ for (const reason of [
 
 /* frame-rate independent cadence (issue 605): fire eligibility is held fixed */
 {
-  const STEADY = (fps) => () => 1 / fps;
-  let seed = 605;
-  const jitter = () => {
-    seed = (seed * 16807) % 2147483647;
-    return 1 / 240 + (seed / 2147483647) * (1 / 24 - 1 / 240);
-  };
-  const SOURCES = [
-    ['30', STEADY(30)],
-    ['60', STEADY(60)],
-    ['120', STEADY(120)],
-    ['144', STEADY(144)],
-    ['10 (dt clamp)', STEADY(10)],
-    ['jitter', jitter],
-  ];
   const shooter = (over = {}) => {
     const a = stubAgent({ repathTimer: 9, wantFire: true, ...over });
     a.animator.reload = function () {
@@ -691,7 +678,7 @@ for (const reason of [
   // A continuous burst sustains the authored fire rate at any frame rate.
   for (const fireRate of [COMBAT.fireRate, COMBAT.fireRateIrregular]) {
     const counts = [];
-    for (const [label, nextDt] of SOURCES) {
+    for (const [label, nextDt] of FRAME_SOURCES) {
       const { a, times, step } = shooter({ rng: endless, fireRate, ammo: 1e6, magSize: 1e6 });
       while (times.length < 2 || times.at(-1) - times[0] < 10) step(nextDt());
       const expected = 1 + (times.at(-1) - times[0]) * fireRate;
@@ -711,7 +698,7 @@ for (const reason of [
   // Intentional burst gaps survive: each burst is burstMin rounds at the fire
   // rate, and the next burst starts no sooner than the gap after the last.
   const gap = (COMBAT.burstGapMin + COMBAT.burstGapMax) * 0.5;
-  for (const [label, nextDt] of SOURCES) {
+  for (const [label, nextDt] of FRAME_SOURCES) {
     const { times, step } = shooter({ ammo: 1e6, magSize: 1e6 });
     let maxDt = 0;
     while (times.length < 10 * COMBAT.burstMin) step((maxDt = Math.max(maxDt, nextDt())));
