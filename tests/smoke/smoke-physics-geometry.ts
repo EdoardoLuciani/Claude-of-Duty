@@ -21,18 +21,18 @@ import { RigidBody, RigidBodyWorld } from '../../src/physics/rigidbody.ts';
 import { LAYER, MASK } from '../../src/physics/surfaces.ts';
 
 const rng = new Rng(0x51a7);
-const scalar = () => rng.signed() * 4;
-const vector = () => new THREE.Vector3(scalar(), scalar(), scalar());
-const digest = (name, value) => {
+const scalar = (): number => rng.signed() * 4;
+const vector = (): THREE.Vector3 => new THREE.Vector3(scalar(), scalar(), scalar());
+const digest = (name: string, value: unknown): string => {
   const payload = JSON.stringify(value);
   if (process.env.DUMP_CHARACTERIZATION) console.log(name, payload);
   return createHash('sha256').update(payload).digest('hex');
 };
-const snapshots = {};
+const snapshots: Record<string, string> = {};
 assert.equal(
   digest(
     'humanoidSpec',
-    [0, 1.6, 1.8, 2.15].map((h) => humanoidSpec(h, 75))
+    [0, 1.6, 1.8, 2.15].map((h): ReturnType<typeof humanoidSpec> => humanoidSpec(h, 75))
   ),
   '81ece50f5ad13380f4e626626c814aa1e5439ec654363bf726ae5573100fa6f8',
   'humanoid spec characterization changed; inspect with DUMP_CHARACTERIZATION=1'
@@ -55,28 +55,30 @@ snapshots.build = digest('build', [
   world.aabb,
   world.nodeCount,
   world.maxDepth,
-  ...[
-    'pos',
-    'nrm',
-    'surface',
-    'mask',
-    'object',
-    'solid',
-    'triIndex',
-    'nodeBounds',
-    'nodeMeta',
-    '_cent',
-    '_taabb',
-  ].map((key) => Array.from(world[key])),
+  ...(
+    [
+      'pos',
+      'nrm',
+      'surface',
+      'mask',
+      'object',
+      'solid',
+      'triIndex',
+      'nodeBounds',
+      'nodeMeta',
+      '_cent',
+      '_taabb',
+    ] as const
+  ).map((key): number[] => Array.from(world[key])),
 ]);
 
-const queries = [];
+const queries: unknown[] = [];
 const hit = makeHitRecord();
 for (let i = 0; i < 350; i++) {
   const p = vector(),
     d = vector().normalize();
   if (i % 7 === 0) d.set(0, -1, 0);
-  const args = [p.x, p.y, p.z, d.x, d.y, d.z, 12, i % 3 ? MASK.ALL : LAYER.STATIC];
+  const args = [p.x, p.y, p.z, d.x, d.y, d.z, 12, i % 3 ? MASK.ALL : LAYER.STATIC] as const;
   const found = world.raycast(...args, hit, i % 5 ? -1 : i % 24, i % 11 ? -1 : i % 24);
   queries.push(found ? { ...hit } : false, world.raycastAny(...args));
   const count = world.queryAabb(p.x - 1, p.y - 1, p.z - 1, p.x + 1, p.y + 1, p.z + 1, MASK.ALL);
@@ -100,19 +102,50 @@ for (let i = 0; i < 350; i++) {
   const n = world.overlapCapsule(p.x, p.y, p.z, p.x, p.y + 1, p.z, 0.4, MASK.ALL, 0.001);
   queries.push(
     Object.fromEntries(
-      ['nx', 'ny', 'nz', 'px', 'py', 'pz', 'depth', 's', 'tri'].map((key) => [
-        key,
-        Array.from(world.contacts[key].subarray(0, n)),
-      ])
+      (['nx', 'ny', 'nz', 'px', 'py', 'pz', 'depth', 's', 'tri'] as const).map(
+        (key): [string, number[]] => [key, Array.from(world.contacts[key].subarray(0, n))]
+      )
     )
   );
 }
 snapshots.bvh = digest('bvh', queries);
 
-const geometry = [],
+const geometry: unknown[] = [],
   closest = makeClosest();
 for (let i = 0; i < 600; i++) {
-  const points = Array.from({ length: 15 }, scalar);
+  const points: [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+  ] = [
+    scalar(),
+    scalar(),
+    scalar(),
+    scalar(),
+    scalar(),
+    scalar(),
+    scalar(),
+    scalar(),
+    scalar(),
+    scalar(),
+    scalar(),
+    scalar(),
+    scalar(),
+    scalar(),
+    scalar(),
+  ];
   if (i % 10 === 0) points.splice(3, 3, ...points.slice(0, 3));
   segTriangleClosest(...points, closest);
   geometry.push({ ...closest });
@@ -121,7 +154,7 @@ for (let i = 0; i < 600; i++) {
     a = vector(),
     b = vector();
   if (i % 10 === 0) b.copy(a);
-  const args = [p.x, p.y, p.z, d.x, d.y, d.z, a.x, a.y, a.z, b.x, b.y, b.z, 1, 15];
+  const args = [p.x, p.y, p.z, d.x, d.y, d.z, a.x, a.y, a.z, b.x, b.y, b.z, 1, 15] as const;
   geometry.push(rayCapsule(...args), rayCapsuleFar(...args));
   const inv = new THREE.Matrix4()
     .compose(
@@ -130,16 +163,17 @@ for (let i = 0; i < 600; i++) {
       new THREE.Vector3(1, 1, 1)
     )
     .invert().elements;
-  const obbArgs = [p.x, p.y, p.z, d.x, d.y, d.z, inv, 1, 2, 0.5, 15];
+  const obbArgs = [p.x, p.y, p.z, d.x, d.y, d.z, inv, 1, 2, 0.5, 15] as const;
   geometry.push(rayObb(...obbArgs), rayObbFar(...obbArgs));
 }
 snapshots.math = digest('math', geometry);
 // Near hits include t=0 on an axial interior ray; far hits seek a true exit.
-const axial = [0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 1, 0, 1, 10];
+const axialRay = [0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 1, 0, 1] as const;
+const axial = [...axialRay, 10] as const;
 assert.equal(rayCapsule(...axial), 0);
 assert.equal(rayCapsuleFar(...axial), 2);
-assert.equal(rayCapsuleFar(...axial.slice(0, -1), 1.999), -1, 'exit must be reached');
-const sideRay = [-3, 0, 0, 1, 0, 0, 0, -1, 0, 0, 1, 0, 1, 10];
+assert.equal(rayCapsuleFar(...axialRay, 1.999), -1, 'exit must be reached');
+const sideRay = [-3, 0, 0, 1, 0, 0, 0, -1, 0, 0, 1, 0, 1, 10] as const;
 assert.equal(rayCapsule(...sideRay), 2);
 assert.equal(rayCapsuleFar(...sideRay), 4);
 assert.equal(
@@ -164,7 +198,7 @@ plane.addTriangles(new Float32Array([1, -2, -2, 1, 2, -2, 1, 0, 2]), 1, 'concret
 plane.build();
 assert.equal(plane.queryAabb(1, -2, -2, 1, 2, 2, MASK.ALL), 1, 'AABB overlap is inclusive');
 assert.equal(plane.queryAabb(1, -2, -2, 1, 2, 2, LAYER.DEBRIS), 0, 'AABB queries retain masks');
-for (const query of ['raycast', 'raycastAny']) {
+for (const query of ['raycast', 'raycastAny'] as const) {
   assert.equal(
     plane[query](0, 0, 0, 1, 0, 0, 1, MASK.ALL, hit),
     false,
@@ -174,8 +208,8 @@ for (const query of ['raycast', 'raycastAny']) {
 }
 
 const bodies = new RigidBodyWorld(world);
-const impacts = [];
-for (const shape of ['sphere', 'box', 'capsule']) {
+const impacts: unknown[] = [];
+for (const shape of ['sphere', 'box', 'capsule'] as const) {
   bodies.add(
     new RigidBody({
       shape,
@@ -183,18 +217,18 @@ for (const shape of ['sphere', 'box', 'capsule']) {
       velocity: vector(),
       angularVelocity: vector(),
       quaternion: new THREE.Quaternion().setFromEuler(new THREE.Euler(0.2, 0.4, 0.1)),
-      onImpact: (_b, ...contact) => impacts.push(contact),
+      onImpact: (_b, ...contact): number => impacts.push(contact),
     })
   );
 }
 const rd = new Ragdoll(world, { transform: new THREE.Matrix4().makeTranslation(0, 1, 0) });
 rd.setVelocity(1, -2, 0.5);
-const simulation = [];
+const simulation: unknown[] = [];
 for (let i = 0; i < 160; i++) {
   bodies.step(1 / 120);
   rd.step(1 / 120);
   simulation.push(
-    bodies.bodies.map((b) => [
+    bodies.bodies.map((b): unknown[] => [
       b.position.toArray(),
       b.quaternion.toArray(),
       b.linearVelocity.toArray(),
@@ -203,7 +237,9 @@ for (let i = 0; i < 160; i++) {
     ])
   );
   simulation.push(
-    ...['px', 'py', 'pz', 'qx', 'qy', 'qz', 'boneUp'].map((key) => Array.from(rd[key])),
+    ...(['px', 'py', 'pz', 'qx', 'qy', 'qz', 'boneUp'] as const).map((key): number[] =>
+      Array.from(rd[key])
+    ),
     { ...rd.aabb }
   );
 }
@@ -213,7 +249,7 @@ const physics = new PhysicsSystem();
 physics.staticWorld = world;
 physics.bodies = bodies;
 physics.ragdolls.push(rd);
-for (const [i, shape] of ['sphere', 'capsule', 'box'].entries()) {
+for (const [i, shape] of (['sphere', 'capsule', 'box'] as const).entries()) {
   const c = physics.addCollider({
     shape,
     owner: { name: shape },
@@ -225,7 +261,7 @@ for (const [i, shape] of ['sphere', 'capsule', 'box'].entries()) {
   if (shape === 'box') c.setMatrix(new THREE.Matrix4().makeTranslation(i, 1, 0));
   else c.setSegment(i, 0.5, 0, i, 1.5, 0, 0.3);
 }
-const publicHits = [];
+const publicHits: unknown[] = [];
 for (let i = 0; i < 500; i++) {
   const p = vector(),
     d = vector();

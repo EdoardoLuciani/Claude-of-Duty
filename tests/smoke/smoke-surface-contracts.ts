@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 import { BoxGeometry, Group, Mesh, MeshBasicMaterial } from 'three';
 
+import { isRecord } from '../../src/core/guards.ts';
 import { parseWorldManifest } from '../../src/core/model-metadata.ts';
 import { StaticWorld, bakeMesh } from '../../src/physics/bvh.ts';
 import { Collider, PhysicsSystem } from '../../src/physics/index.ts';
@@ -26,11 +27,11 @@ for (const [index, name] of SURFACE_NAMES.entries()) {
 }
 for (const invalid of ['metla', 'metal_panel', '', 'constructor', '__proto__', null, {}, NaN]) {
   assert.equal(isSurfaceName(invalid), false);
-  assert.throws(() => parseSurfaceName(invalid), /invalid surface/);
-  assert.throws(() => surfaceIndex(invalid), /invalid surface/);
+  assert.throws((): unknown => parseSurfaceName(invalid), /invalid surface/);
+  assert.throws((): unknown => surfaceIndex(invalid), /invalid surface/);
 }
 for (const invalid of [-1, 0.5, SURFACE_NAMES.length, Infinity, undefined])
-  assert.throws(() => surfaceIndex(invalid), /invalid surface/);
+  assert.throws((): unknown => surfaceIndex(invalid), /invalid surface/);
 assert.equal(guessSurface('steel_panel'), SURFACE.metal);
 assert.equal(guessSurface('xyz', SURFACE.wood), SURFACE.wood);
 
@@ -42,68 +43,103 @@ const group = new Group();
 group.add(mesh);
 const physics = new PhysicsSystem();
 const world = physics.staticWorld;
-assert.equal(bakeMesh(mesh).uniformSurface, SURFACE.metal, 'inference remains supported');
+assert.equal(bakeMesh(mesh)?.uniformSurface, SURFACE.metal, 'inference remains supported');
+// Dynamic calls below exercise deliberately invalid JS input contracts.
 for (const invalid of ['metla', null, 0.5, -1, Infinity]) {
-  assert.throws(() => physics.addStatic(mesh, invalid), /invalid surface/);
+  assert.throws(
+    (): unknown => Reflect.apply(physics.addStatic.bind(physics), physics, [mesh, invalid]),
+    /invalid surface/
+  );
   assert.equal(world.objects.length, 0, 'rejection cannot register a collider');
 }
 mesh.userData.surface = 'metla';
-assert.throws(() => physics.addStatic(mesh), /invalid surface/);
-assert.throws(() => physics.addStaticGroup(group), /invalid surface/);
+assert.throws((): unknown => physics.addStatic(mesh), /invalid surface/);
+assert.throws((): unknown => physics.addStaticGroup(group), /invalid surface/);
 mesh.userData.surface = 'wood';
 material.userData.surface = 'metla';
-assert.throws(() => physics.addStatic(mesh), /invalid surface/);
+assert.throws((): unknown => physics.addStatic(mesh), /invalid surface/);
 delete mesh.userData.surface;
 geometry.clearGroups();
 for (const invalid of ['metla', 'metal_panel', 0.5, null]) {
   material.userData.surface = invalid;
   assert.throws(
-    () => physics.addStatic(mesh),
+    (): unknown => physics.addStatic(mesh),
     /invalid surface/,
     'ungrouped metadata is explicit too'
   );
 }
 material.userData.surface = 'fabric';
-assert.equal(bakeMesh(mesh).uniformSurface, SURFACE.fabric);
+assert.equal(bakeMesh(mesh)?.uniformSurface, SURFACE.fabric);
 delete material.userData.surface;
-assert.equal(bakeMesh(mesh).uniformSurface, SURFACE.metal, 'ungrouped material names still infer');
+assert.equal(bakeMesh(mesh)?.uniformSurface, SURFACE.metal, 'ungrouped material names still infer');
 mesh.userData.surface = 'wood';
 // Group material names intentionally still resolve independently when no override is supplied.
-assert.equal(bakeMesh(mesh, 'wood').uniformSurface, SURFACE.wood);
+assert.equal(bakeMesh(mesh, 'wood')?.uniformSurface, SURFACE.wood);
 
 const id = physics.addStatic(mesh, 'glass', { ballisticSurface: 'metal' });
-assert.equal(world.objects[id].surface, SURFACE.glass);
-assert.equal(world.objects[id].ballisticSurface, SURFACE.metal);
+assert.equal(world.objects[id]?.surface, SURFACE.glass);
+assert.equal(world.objects[id]?.ballisticSurface, SURFACE.metal);
 world.removeObject(id);
 mesh.userData.ballisticSurface = 'metla';
-assert.throws(() => physics.addStatic(mesh, 'wood'), /invalid surface/);
+assert.throws((): unknown => physics.addStatic(mesh, 'wood'), /invalid surface/);
 delete mesh.userData.ballisticSurface;
 assert.equal(physics.addStatic(mesh, 'wood'), id, 'failed validation must not consume a free slot');
 assert.throws(
-  () => physics.addStatic(mesh, 'wood', { ballisticSurface: 'metla' }),
+  (): unknown =>
+    Reflect.apply(physics.addStatic.bind(physics), physics, [
+      mesh,
+      'wood',
+      { ballisticSurface: 'metla' },
+    ]),
   /invalid surface/
 );
-assert.throws(() => new Collider({ surface: 'metla' }), /invalid surface/);
-assert.throws(() => new Collider({ ballisticSurface: 'metla' }), /invalid surface/);
+assert.throws(
+  (): unknown => Reflect.construct(Collider, [{ surface: 'metla' }]),
+  /invalid surface/
+);
+assert.throws(
+  (): unknown => Reflect.construct(Collider, [{ ballisticSurface: 'metla' }]),
+  /invalid surface/
+);
 assert.equal(new Collider({ surface: 'wood' }).ballisticSurfaceIndex, SURFACE.wood);
 assert.equal(new Collider({}).surfaceIndex, SURFACE.flesh, 'omission keeps the actor default');
 for (const metadata of [undefined, 'metal']) {
   if (metadata === undefined) delete mesh.userData.ballisticSurface;
   else mesh.userData.ballisticSurface = metadata;
   assert.throws(
-    () => physics.addStatic(mesh, 'wood', { ballisticSurface: null }),
+    (): unknown =>
+      Reflect.apply(physics.addStatic.bind(physics), physics, [
+        mesh,
+        'wood',
+        { ballisticSurface: null },
+      ]),
     /invalid surface/,
     'explicit null must not select metadata or an omitted-surface default'
   );
 }
 delete mesh.userData.ballisticSurface;
-assert.throws(() => physics.addStaticGroup(group, null), /invalid surface/);
-assert.throws(() => new Collider({ surface: null }), /invalid surface/);
-assert.throws(() => new Collider({ ballisticSurface: null }), /invalid surface/);
+assert.throws(
+  (): unknown => Reflect.apply(physics.addStaticGroup.bind(physics), physics, [group, null]),
+  /invalid surface/
+);
+assert.throws((): unknown => Reflect.construct(Collider, [{ surface: null }]), /invalid surface/);
+assert.throws(
+  (): unknown => Reflect.construct(Collider, [{ ballisticSurface: null }]),
+  /invalid surface/
+);
 for (const invalid of [null, '']) {
-  assert.throws(() => physics.addRigidBody({ surfaceType: invalid }), /invalid surface/);
   assert.throws(
-    () => physics.spawnDebris({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }, { surface: invalid }),
+    (): unknown =>
+      Reflect.apply(physics.addRigidBody.bind(physics), physics, [{ surfaceType: invalid }]),
+    /invalid surface/
+  );
+  assert.throws(
+    (): unknown =>
+      Reflect.apply(physics.spawnDebris.bind(physics), physics, [
+        { x: 0, y: 0, z: 0 },
+        { x: 0, y: 0, z: 0 },
+        { surface: invalid },
+      ]),
     /invalid surface/
   );
 }
@@ -117,19 +153,19 @@ first.userData.surface = 'wood';
 second.userData.surface = 'metla';
 const pair = new Group();
 pair.add(first, second);
-assert.throws(() => groupedPhysics.addStaticGroup(pair), /invalid surface/);
-assert.equal(groupedPhysics.staticWorld.objects.filter((o) => o?.alive).length, 1);
-assert.equal(groupedPhysics.staticWorld.objects[existing].mesh, mesh);
+assert.throws((): unknown => groupedPhysics.addStaticGroup(pair), /invalid surface/);
+assert.equal(groupedPhysics.staticWorld.objects.filter((o): boolean => !!o?.alive).length, 1);
+assert.equal(groupedPhysics.staticWorld.objects[existing]?.mesh, mesh);
 assert.equal(groupedPhysics._explicitStatics, 1, 'rollback restores registration bookkeeping');
 second.userData.surface = 'metal';
 second.userData.ballisticSurface = 'metla';
-assert.throws(() => groupedPhysics.addStaticGroup(pair), /invalid surface/);
-assert.equal(groupedPhysics.staticWorld.objects.filter((o) => o?.alive).length, 1);
+assert.throws((): unknown => groupedPhysics.addStaticGroup(pair), /invalid surface/);
+assert.equal(groupedPhysics.staticWorld.objects.filter((o): boolean => !!o?.alive).length, 1);
 assert.equal(groupedPhysics._explicitStatics, 1, 'rollback also covers rejection inside addStatic');
 delete second.userData.ballisticSurface;
 const handles = groupedPhysics.addStaticGroup(pair);
 assert.equal(handles.length, 2);
-assert.equal(groupedPhysics.staticWorld.objects.filter((o) => o?.alive).length, 3);
+assert.equal(groupedPhysics.staticWorld.objects.filter((o): boolean => !!o?.alive).length, 3);
 assert.equal(groupedPhysics._explicitStatics, 3, 'retry registers each group mesh exactly once');
 assert.deepEqual(handles, [1, 2], 'rolled-back handles remain reusable');
 
@@ -137,17 +173,21 @@ const raw = new StaticWorld();
 const triangles = new Float32Array(9);
 const rawId = raw.addTriangles(triangles, 1, 'wood');
 raw.removeObject(rawId);
-assert.throws(() => raw.addTriangles(triangles, 1, 'metla'), /invalid surface/);
+assert.throws(
+  (): unknown => Reflect.apply(raw.addTriangles.bind(raw), raw, [triangles, 1, 'metla']),
+  /invalid surface/
+);
 assert.equal(
   raw.addTriangles(triangles, 1, 'wood'),
   rawId,
   'raw validation preserves free handles'
 );
-const manifest = JSON.parse(
+const manifest: unknown = JSON.parse(
   readFileSync(new URL('../../public/models/world/level.json', import.meta.url), 'utf8')
 );
+assert(isRecord(manifest) && isRecord(manifest.query));
 // Query alley labels are authoring names (e.g. gravel), not explicit collision finishes.
-assert.deepEqual(parseWorldManifest(manifest).query.alleys, manifest.query.alleys);
+assert.deepEqual(parseWorldManifest(manifest).query?.alleys, manifest.query.alleys);
 geometry.dispose();
 material.dispose();
 console.log(

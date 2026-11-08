@@ -5,34 +5,67 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
+import type { Animator } from '../../src/ai/animator.ts';
 import { AiSystem } from '../../src/ai/index.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
+import type { EngineContext } from '../../src/core/context.ts';
+import type {
+  EngineEventMap,
+  BulletSegmentEvent,
+  BulletImpactEvent,
+  DamageDealtEvent,
+} from '../../src/core/events.ts';
+import { applyDefinedPatch } from '../../src/core/patch.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { FxSystem } from '../../src/fx/index.ts';
-import { PhysicsSystem } from '../../src/physics/index.ts';
+import { PhysicsSystem, type RaycastIgnore } from '../../src/physics/index.ts';
+import type { Ragdoll } from '../../src/physics/ragdoll.ts';
+import type { SurfaceName } from '../../src/physics/surfaces.ts';
+import { Health } from '../../src/player/health.ts';
 import { PlayerSystem } from '../../src/player/index.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { makeAgent } from '../../tools/lib/agent-fixture.ts';
+import { createTestContext } from '../lib/context.ts';
+import { fixture as checkedFixture } from '../lib/fixture.ts';
 
-const v = (x = 0, y = 1, z = 0) => new THREE.Vector3(x, y, z);
-function fixture() {
+const v = (x = 0, y = 1, z = 0): THREE.Vector3 => new THREE.Vector3(x, y, z);
+interface BallisticsFixture {
+  events: EventBus;
+  phys: PhysicsSystem;
+  damage: Array<DamageDealtEvent & { point: THREE.Vector3; from: THREE.Vector3 }>;
+  segments: BulletSegmentEvent[];
+  effects: BulletImpactEvent[];
+}
+function fixture(): BallisticsFixture {
   const events = new EventBus(),
     phys = new PhysicsSystem();
-  phys.ctx = { events, time: { elapsed: 0 } };
-  const damage = [],
-    segments = [],
-    effects = [];
-  events.on('damage:dealt', (e) =>
-    damage.push({ ...e, point: e.point.clone(), from: e.from?.clone() })
-  );
-  events.on('bullet:segment', (e) =>
+  phys.ctx = createTestContext({ events });
+  const damage: BallisticsFixture['damage'] = [],
+    segments: BulletSegmentEvent[] = [],
+    effects: BulletImpactEvent[] = [];
+  events.on('damage:dealt', (e): void => {
+    assert(e.point && e.from);
+    damage.push({ ...e, point: e.point.clone(), from: e.from.clone() });
+  });
+  events.on('bullet:segment', (e): number =>
     segments.push({ ...e, from: e.from.clone(), to: e.to.clone() })
   );
-  events.on('bullet:impact', (e) => effects.push({ ...e, point: e.point.clone() }));
+  events.on('bullet:impact', (e): number => effects.push({ ...e, point: e.point.clone() }));
   return { phys, events, damage, segments, effects };
 }
-function wall(f, surface, thickness, x = 2, opts = {}) {
+function projectileContext(f: BallisticsFixture, telemetry: boolean): EngineContext {
+  const ctx = createTestContext({ events: f.events, providers: { physics: f.phys } });
+  ctx.has = (): boolean => telemetry;
+  return ctx;
+}
+function wall(
+  f: BallisticsFixture,
+  surface: SurfaceName,
+  thickness: number,
+  x = 2,
+  opts: Parameters<PhysicsSystem['addStatic']>[2] = {}
+): THREE.Mesh {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(thickness, 4, 4));
   mesh.position.set(x, 1, 0);
   mesh.updateMatrixWorld(true);
@@ -40,12 +73,23 @@ function wall(f, surface, thickness, x = 2, opts = {}) {
   f.phys.rebuildStatic();
   return mesh;
 }
-function actor(f, x, layer = f.phys.LAYER.ACTOR, radius = 0.1, owner = {}) {
+function actor(
+  f: BallisticsFixture,
+  x: number,
+  layer = f.phys.LAYER.ACTOR,
+  radius = 0.1,
+  owner: unknown = {}
+): ReturnType<PhysicsSystem['addCollider']> {
   const c = f.phys.addCollider({ layer, owner, part: 'torso', surface: 'flesh', radius });
   c.setSegment(x, 0.3, 0, x, 1.5, 0, radius);
   return c;
 }
-function boxProxy(f, rigid, surface, halfExtents) {
+function boxProxy(
+  f: BallisticsFixture,
+  rigid: boolean,
+  surface: SurfaceName,
+  halfExtents: THREE.Vector3
+): void {
   if (rigid)
     f.phys.addRigidBody({
       shape: 'box',
@@ -60,7 +104,10 @@ function boxProxy(f, rigid, surface, halfExtents) {
     c.setMatrix(new THREE.Matrix4().makeTranslation(2, 1, 0));
   }
 }
-function fire(f, opts = {}) {
+function fire(
+  f: BallisticsFixture,
+  opts: Partial<Parameters<PhysicsSystem['fireBullet']>[0]> = {}
+): ReturnType<PhysicsSystem['fireBullet']> {
   return f.phys.fireBullet({
     origin: v(),
     dir: v(1, 0),
@@ -94,7 +141,7 @@ function fire(f, opts = {}) {
   assert.equal(shot.impacts[0].surface, 'fabric', 'cloth still drives its visible impact');
   assert.equal(f.damage.length, 0);
 }
-for (const layerName of ['PLAYER', 'ACTOR']) {
+for (const layerName of ['PLAYER', 'ACTOR'] as const) {
   const f = fixture();
   wall(f, 'wood', 0.05);
   const c = actor(f, 4, f.phys.LAYER[layerName]);
@@ -111,9 +158,9 @@ for (const layerName of ['PLAYER', 'ACTOR']) {
   assert.equal(f.damage[0].source, shooter);
   assert.ok(f.damage[0].from.equals(v()));
   assert.equal(shot.impacts[0].surface, 'wood');
-  assert.ok(shot.impacts.some((i) => i.exit));
+  assert.ok(shot.impacts.some((i): boolean => i.exit));
   assert.ok(
-    f.phys.colliders.every((collider) => collider.enabled),
+    f.phys.colliders.every((collider): boolean => collider.enabled),
     'queries do not toggle shared hitboxes'
   );
 }
@@ -154,7 +201,7 @@ for (const shell of ['mesh', 'sheet', 'collider', 'body', 'merged', 'instanced']
   actor(f, 4);
   const shot = fire(f);
   assert.equal(
-    f.damage.reduce((n, e) => n + e.amount, 0),
+    f.damage.reduce((n, e): number => n + e.amount, 0),
     0,
     `${shell}: ambiguous overlaps cannot remove protection`
   );
@@ -171,7 +218,7 @@ for (const body of [false, true]) {
   fire(f);
   assert.equal(f.damage.length, 1);
   assert.ok(f.damage[0].amount > 0 && f.damage[0].amount < 40);
-  assert.equal(f.effects.filter((e) => e.exit).length, 1);
+  assert.equal(f.effects.filter((e): boolean => e.exit).length, 1);
 }
 // Proxies inside mesh cover are also collisions, not skipped material interiors.
 for (const body of [false, true]) {
@@ -189,7 +236,7 @@ for (const body of [false, true]) {
   actor(f, 4);
   assert.equal(fire(f, { penetration: 2 }).stopReason, 'overlapping-solids');
   assert.deepEqual(
-    f.damage.map((e) => e.target),
+    f.damage.map((e): unknown => e.target),
     [first.owner],
     'a body cannot carry a round past enclosed masonry'
   );
@@ -198,19 +245,24 @@ for (const body of [false, true]) {
 // A corpse's current bone is excluded, not all bones or geometry around it.
 for (const overlap of ['none', 'masonry', 'bone']) {
   const f = fixture();
-  f.phys.ragdolls.push({
-    actor: {},
-    boneCount: overlap === 'bone' ? 2 : 1,
-    boneHead: [0, 2],
-    boneTail: [1, 3],
-    boneRadius: [0.1, 0.05],
-    px: [2, 2, 2, 2],
-    py: [0.3, 1.5, 0.3, 1.5],
-    pz: [0, 0, 0, 0],
-    aabb: { minx: 1.9, maxx: 2.1, miny: 0.2, maxy: 1.6, minz: -0.1, maxz: 0.1 },
-    spec: [{ name: 'torso' }, { name: 'arm' }],
-    applyImpulse() {},
-  });
+  f.phys.ragdolls.push(
+    checkedFixture<Ragdoll>({
+      actor: {},
+      boneCount: overlap === 'bone' ? 2 : 1,
+      boneHead: new Int32Array([0, 2]),
+      boneTail: new Int32Array([1, 3]),
+      boneRadius: new Float32Array([0.1, 0.05]),
+      px: new Float64Array([2, 2, 2, 2]),
+      py: new Float64Array([0.3, 1.5, 0.3, 1.5]),
+      pz: new Float64Array([0, 0, 0, 0]),
+      aabb: { minx: 1.9, maxx: 2.1, miny: 0.2, maxy: 1.6, minz: -0.1, maxz: 0.1 },
+      spec: [
+        { name: 'torso', head: [2, 0.3, 0], tail: [2, 1.5, 0] },
+        { name: 'arm', head: [2, 0.3, 0], tail: [2, 1.5, 0] },
+      ],
+      applyImpulse(): void {},
+    })
+  );
   if (overlap === 'masonry') wall(f, 'concrete', 0.1);
   actor(f, 4);
   const shot = fire(f, { penetration: 2 });
@@ -304,8 +356,8 @@ for (const instanced of [false, true]) {
   const b = f.phys.raycast(v(3), v(1, 0), 20, f.phys.MASK.BULLET);
   assert.notEqual(a.solid, b.solid);
   const shot = fire(f);
-  assert.equal(shot.impacts.filter((i) => !i.exit).length, 2);
-  assert.equal(shot.impacts.filter((i) => i.exit).length, 2);
+  assert.equal(shot.impacts.filter((i): boolean => !i.exit).length, 2);
+  assert.equal(shot.impacts.filter((i): boolean => i.exit).length, 2);
 }
 
 // Analytic proxies have real thickness, even without a triangle backface.
@@ -320,7 +372,7 @@ for (const dynamic of [false, true]) {
   const f = fixture();
   const first = actor(f, 2),
     second = actor(f, 4);
-  f.events.on('damage:dealt', (e) => {
+  f.events.on('damage:dealt', (e): void => {
     if (e.target === first.owner) {
       f.phys.removeCollider(second);
       actor(f, 3, f.phys.LAYER.ACTOR, 0.5);
@@ -328,7 +380,7 @@ for (const dynamic of [false, true]) {
   });
   fire(f, { penetration: 2 });
   assert.deepEqual(
-    f.damage.map((e) => e.target),
+    f.damage.map((e): unknown => e.target),
     [first.owner, second.owner]
   );
 }
@@ -342,14 +394,15 @@ for (const dynamic of [false, true]) {
   head.part = 'head';
   head.damageScale = 3;
   let applied = 0;
-  a.applyDamage = (amount) => {
+  a.applyDamage = (amount): void => {
     applied += amount;
   };
-  const ai = Object.assign(Object.create(AiSystem.prototype), {
+  const ai = new AiSystem();
+  applyDefinedPatch(ai, {
     agents: [a],
-    ctx: { events: f.events },
+    ctx: createTestContext({ events: f.events }),
   });
-  ai.playerPosition = () => {
+  ai.playerPosition = (): never => {
     throw new Error('damage must not depend on player position');
   };
   ai._wireEvents(ai.ctx);
@@ -375,7 +428,7 @@ for (const obstruction of ['concrete', 'wood', 'range', 'body', 'deflect', 'none
   if (obstruction === 'wood') wall(f, 'wood', 0.02, 3);
   const shot = fire(f, {
     maxDist: obstruction === 'range' ? 3 : 20,
-    rng: obstruction === 'deflect' ? { gauss: () => 100 } : null,
+    rng: obstruction === 'deflect' ? { gauss: (): number => 100 } : null,
   });
   assert.equal(f.damage.length, 1, 'one damage event per actor');
   const reachable = obstruction === 'none' || obstruction === 'wood';
@@ -398,7 +451,7 @@ for (const obstruction of ['concrete', 'wood', 'range', 'body', 'deflect', 'none
     );
     assert.ok(f.damage[0].point.x < 2);
   }
-  assert.equal(shot.impacts.filter((i) => !i.exit && i.actor).length, 1);
+  assert.equal(shot.impacts.filter((i): boolean => !i.exit && !!i.actor).length, 1);
 }
 
 // Timed actor contact must retain the highest region on the reached trajectory.
@@ -415,8 +468,9 @@ for (const obstruction of ['concrete', 'wood', 'range', 'body', 'deflect', 'none
   head.damageScale = 4;
   fire(f, { penetration: 2 });
   const instant = f.damage.pop();
+  assert(instant);
   assert.equal(instant.part, 'head');
-  const sim = new ProjectileSim({ events: f.events, peek: () => f.phys, has: () => false });
+  const sim = new ProjectileSim(projectileContext(f, false));
   sim.spawn({
     origin: v(),
     dir: v(1, 0),
@@ -466,18 +520,19 @@ for (const kind of [
   if (kind === 'layers') for (let i = 0; i < 6; i++) wall(f, 'wood', 0.005, 3 + i * 2);
   const other = kind === 'actors' ? actor(f, 3) : null;
   const distant = kind === 'actors' ? actor(f, 8) : null;
-  f.phys.ballistics.rng = { gauss: () => (kind === 'deflect' ? 100 : 0) };
+  f.phys.ballistics.rng = { gauss: (): number => (kind === 'deflect' ? 100 : 0) };
   const opts = { penetration: kind === 'actors' ? 2 : 0.9, maxDist: kind === 'range' ? 3 : 30 };
   fire(f, opts);
-  const instant = f.damage.find((e) => e.target === owner);
-  const instantOthers = f.damage.filter((e) => e.target !== owner);
+  const instant = f.damage.find((e): boolean => e.target === owner);
+  assert(instant);
+  const instantOthers = f.damage.filter((e): boolean => e.target !== owner);
   f.damage.length = f.segments.length = f.effects.length = 0;
-  const sim = new ProjectileSim({ events: f.events, peek: () => f.phys, has: () => true });
-  let resolved,
-    tick = 0;
-  const damageTicks = [];
-  f.events.on('damage:dealt', (e) => damageTicks.push({ target: e.target, tick }));
-  f.events.on('shot:resolved', (e) => {
+  const sim = new ProjectileSim(projectileContext(f, true));
+  let resolved: EngineEventMap['shot:resolved'] | undefined;
+  let tick = 0;
+  const damageTicks: Array<{ target: unknown; tick: number }> = [];
+  f.events.on('damage:dealt', (e): number => damageTicks.push({ target: e.target, tick }));
+  f.events.on('shot:resolved', (e): void => {
     resolved = { ...e, to: e.to.clone() };
   });
   const p = sim.spawn({
@@ -490,11 +545,12 @@ for (const kind of [
     penetration: opts.penetration,
     dropoff: 1,
   });
+  assert(p);
   while (tick < 120 && p.alive) {
     tick++;
     sim.fixedUpdate(1 / 120);
   }
-  const hits = f.damage.filter((e) => e.target === owner);
+  const hits = f.damage.filter((e): boolean => e.target === owner);
   assert.equal(hits.length, 1, `${kind}: one final actor event`);
   assert.equal(hits[0].part, instant.part, `${kind}: shared highest reached region`);
   assert.ok(
@@ -502,6 +558,7 @@ for (const kind of [
     `${kind}: cumulative energy retained`
   );
   assert.ok(hits[0].from.equals(v()), `${kind}: retained muzzle provenance`);
+  assert(resolved);
   assert.equal(resolved.target, owner);
   assert.equal(resolved.part, hits[0].part);
   assert.equal(resolved.damage, hits[0].amount);
@@ -510,19 +567,19 @@ for (const kind of [
   if (kind === 'actors') {
     assert.equal(hits[0].part, 'head', 'arm/B/head must not lock A to its arm');
     assert.deepEqual(
-      f.damage.filter((e) => e.target !== owner).map((e) => e.target),
-      instantOthers.map((e) => e.target)
+      f.damage.filter((e): boolean => e.target !== owner).map((e): unknown => e.target),
+      instantOthers.map((e): unknown => e.target)
     );
     assert.ok(
-      damageTicks.find((e) => e.target === other.owner).tick >= 4,
+      (damageTicks.find((e): boolean => e.target === other?.owner)?.tick ?? -Infinity) >= 4,
       'B inside A extent stays timed'
     );
     assert.ok(
-      damageTicks.find((e) => e.target === distant.owner).tick >= 10,
+      (damageTicks.find((e): boolean => e.target === distant?.owner)?.tick ?? -Infinity) >= 10,
       'actor beyond A and wood stays timed'
     );
     assert.ok(
-      damageTicks.find((e) => e.target === owner).tick < tick,
+      (damageTicks.find((e): boolean => e.target === owner)?.tick ?? Infinity) < tick,
       'A is not delayed to round expiry'
     );
   }
@@ -544,18 +601,20 @@ for (const kind of [
   wall(f, 'wood', 0.02, 3.4);
   const scatter = [0, 0, 400, 0, -800, 0];
   let draws = 0;
-  f.phys.ballistics.rng = { gauss: () => scatter[draws++] ?? 0 };
+  f.phys.ballistics.rng = { gauss: (): number => scatter[draws++] ?? 0 };
   const path = fire(f, { penetration: 2, emit: false }).segments.at(-1);
+  assert(path);
   const z =
     path.from.z + ((path.to.z - path.from.z) * (4 - path.from.x)) / (path.to.x - path.from.x);
   head.setSegment(4, 0.3, z, 4, 1.5, z, 0.1);
   draws = 0;
   fire(f, { penetration: 2 });
   const instant = f.damage.pop();
+  assert(instant);
   assert.equal(instant.part, 'head');
   draws = 0;
   f.segments.length = 0;
-  const sim = new ProjectileSim({ events: f.events, peek: () => f.phys, has: () => false });
+  const sim = new ProjectileSim(projectileContext(f, false));
   sim.spawn({
     origin: v(),
     dir: v(1, 0),
@@ -568,7 +627,7 @@ for (const kind of [
   });
   for (let i = 0; i < 120 && sim.live.length; i++) sim.fixedUpdate(1 / 120);
   assert.ok(
-    f.segments.some((s) => s.to.z < -0.2),
+    f.segments.some((s): boolean => s.to.z < -0.2),
     'flight leaves the initial capsule envelope laterally'
   );
   assert.equal(f.damage.length, 1);
@@ -587,7 +646,7 @@ for (const kind of [
   const head = actor(f, 4, f.phys.LAYER.ACTOR, 0.1, owner);
   head.part = 'head';
   head.damageScale = 4;
-  const sim = new ProjectileSim({ events: f.events, peek: () => f.phys, has: () => false });
+  const sim = new ProjectileSim(projectileContext(f, false));
   sim.spawn({
     origin: v(),
     dir: v(1, 0),
@@ -625,13 +684,13 @@ for (const kind of [
   head.damageScale = 4;
   const firstOther = actor(f, 3, f.phys.LAYER.ACTOR, 0.05, other);
   const lastOther = actor(f, 5, f.phys.LAYER.ACTOR, 0.05, other);
-  f.events.on('damage:dealt', (e) => {
+  f.events.on('damage:dealt', (e): void => {
     if (e.target === owner) {
       f.phys.removeCollider(firstOther);
       f.phys.removeCollider(lastOther);
     }
   });
-  const sim = new ProjectileSim({ events: f.events, peek: () => f.phys, has: () => false });
+  const sim = new ProjectileSim(projectileContext(f, false));
   sim.spawn({
     origin: v(),
     dir: v(1, 0),
@@ -664,7 +723,7 @@ for (const cleanup of ['clear', 'recycle', 'expiry']) {
   const head = actor(f, 4, f.phys.LAYER.ACTOR, 0.1, owner);
   head.part = 'head';
   head.damageScale = 4;
-  const sim = new ProjectileSim({ events: f.events, peek: () => f.phys, has: () => false });
+  const sim = new ProjectileSim(projectileContext(f, false));
   const opts = {
     origin: v(),
     dir: v(1, 0),
@@ -675,8 +734,9 @@ for (const cleanup of ['clear', 'recycle', 'expiry']) {
     penetration: 2,
     dropoff: 1,
   };
-  const p = sim.spawn(opts),
-    oldShot = p.shot;
+  const p = sim.spawn(opts);
+  assert(p);
+  const oldShot = p.shot;
   for (let i = 0; i < 3; i++) sim.fixedUpdate(1 / 120);
   assert.equal(f.damage.length, 0);
   if (cleanup === 'clear') sim.clear();
@@ -703,17 +763,13 @@ for (const cleanup of ['clear', 'recycle', 'expiry']) {
   const f = fixture();
   wall(f, 'wood', 0.05, 5);
   const target = actor(f, 8);
-  let resolved;
-  f.events.on('shot:resolved', (e) => {
+  let resolved: EngineEventMap['shot:resolved'] | undefined;
+  f.events.on('shot:resolved', (e): void => {
     resolved = { ...e };
   });
-  const shooter = { isPlayer: true };
+  const shooter = new PlayerSystem();
   actor(f, 0, f.phys.LAYER.PLAYER, 0.3, shooter);
-  const sim = new ProjectileSim({
-    events: f.events,
-    peek: (id) => (id === 'physics' ? f.phys : shooter),
-    has: () => true,
-  });
+  const sim = new ProjectileSim(projectileContext(f, true));
   sim.spawn({
     origin: v(),
     dir: v(1, 0),
@@ -728,19 +784,23 @@ for (const cleanup of ['clear', 'recycle', 'expiry']) {
   for (let i = 0; i < 120 && sim.live.length; i++) sim.fixedUpdate(1 / 120);
   assert.equal(f.damage.length, 1);
   assert.equal(f.damage[0].target, target.owner);
+  assert(resolved);
   assert.equal(resolved.target, target.owner);
   assert.equal(resolved.damage, f.damage[0].amount);
   assert.ok(f.damage[0].from.equals(v()), 'provenance stays at muzzle, not contact segment');
-  assert.ok(f.segments.every((s) => s.shooter === shooter));
+  assert.ok(f.segments.every((s): boolean => s.shooter === shooter));
 }
 
 // A penetrated sheet cannot turn the remaining player flight into hitscan.
 // Gravity, drag, range falloff and material energy loss continue after the exit.
-function timedFlight(covered, dragK = 0) {
+function timedFlight(
+  covered: boolean,
+  dragK = 0
+): { step: number; hit: BallisticsFixture['damage'][number]; speed: number } {
   const f = fixture();
   if (covered) wall(f, 'wood', 0.02);
   actor(f, 100, f.phys.LAYER.ACTOR, 0.3);
-  const sim = new ProjectileSim({ events: f.events, peek: () => f.phys, has: () => false });
+  const sim = new ProjectileSim(projectileContext(f, false));
   const p = sim.spawn({
     origin: v(),
     dir: v(1, 0),
@@ -751,6 +811,7 @@ function timedFlight(covered, dragK = 0) {
     penetration: 0.9,
     dropoff: 0.5,
   });
+  assert(p);
   let step = 0;
   while (!f.damage.length && step < 120) {
     sim.fixedUpdate(1 / 120);
@@ -758,7 +819,7 @@ function timedFlight(covered, dragK = 0) {
   }
   assert.equal(f.damage.length, 1, 'downstream actor remains reachable');
   assert.ok(
-    f.segments.every((s) => s.from.x < 101 && s.to.x < 101),
+    f.segments.every((s): boolean => s.from.x < 101 && s.to.x < 101),
     'no future segments published'
   );
   const hit = f.damage[0];
@@ -786,7 +847,7 @@ function timedFlight(covered, dragK = 0) {
   const f = fixture();
   wall(f, 'wood', 0.05);
   let draws = 0;
-  f.phys.ballistics.rng = { gauss: () => (++draws % 2 ? 50 : 0) };
+  f.phys.ballistics.rng = { gauss: (): number => (++draws % 2 ? 50 : 0) };
   const z = -(8 - 2.025) * 0.03 * (0.05 / (0.32 * 0.9)) * 50;
   const owner = {},
     target = actor(f, 8, f.phys.LAYER.ACTOR, 0.1, owner);
@@ -794,13 +855,14 @@ function timedFlight(covered, dragK = 0) {
   // A later capsule of the same actor must not cause a second damage event.
   const extra = actor(f, 10, f.phys.LAYER.ACTOR, 0.1, owner);
   const path = fire(f, { emit: false }).segments.at(-1);
+  assert(path);
   const t = (10 - path.from.x) / (path.to.x - path.from.x);
   const extraZ = path.from.z + (path.to.z - path.from.z) * t;
   extra.setSegment(10, 0.3, extraZ, 10, 1.5, extraZ, 0.1);
   draws = 0;
-  const summaries = [];
-  f.events.on('shot:resolved', (e) => summaries.push({ ...e, to: e.to.clone() }));
-  const sim = new ProjectileSim({ events: f.events, peek: () => f.phys, has: () => true });
+  const summaries: EngineEventMap['shot:resolved'][] = [];
+  f.events.on('shot:resolved', (e): number => summaries.push({ ...e, to: e.to.clone() }));
+  const sim = new ProjectileSim(projectileContext(f, true));
   const p = sim.spawn({
     origin: v(),
     dir: v(1, 0),
@@ -811,6 +873,7 @@ function timedFlight(covered, dragK = 0) {
     penetration: 0.9,
     dropoff: 1,
   });
+  assert(p);
   for (let i = 0; i < 120 && p.alive; i++) sim.fixedUpdate(1 / 120);
   assert.equal(f.damage.length, 1, 'scatter reaches the off-lane actor once');
   assert.equal(f.damage[0].target, owner);
@@ -845,7 +908,7 @@ function timedFlight(covered, dragK = 0) {
   const f = fixture();
   wall(f, 'foliage', 1.5, 2);
   actor(f, 4);
-  const sim = new ProjectileSim({ events: f.events, peek: () => f.phys, has: () => false });
+  const sim = new ProjectileSim(projectileContext(f, false));
   const p = sim.spawn({
     origin: v(),
     dir: v(1, 0),
@@ -856,6 +919,7 @@ function timedFlight(covered, dragK = 0) {
     penetration: 2,
     dropoff: 1,
   });
+  assert(p);
   sim.fixedUpdate(1 / 120);
   sim.fixedUpdate(1 / 120);
   assert.ok(p.materialTime > 0, 'interior transit exceeds this tick');
@@ -865,7 +929,7 @@ function timedFlight(covered, dragK = 0) {
   for (let i = 0; i < 117 && p.alive; i++) sim.fixedUpdate(1 / 120);
   assert.equal(f.damage.length, 1);
   assert.ok(
-    f.segments.every((s) => s.to.x <= 1.251 || s.from.x >= 2.749),
+    f.segments.every((s): boolean => s.to.x <= 1.251 || s.from.x >= 2.749),
     'interiors do not emit free-flight segments'
   );
   f.phys.dispose();
@@ -876,9 +940,9 @@ function timedFlight(covered, dragK = 0) {
   const f = fixture();
   for (let i = 0; i < 7; i++) wall(f, 'wood', 0.005, 2 + i * 2);
   actor(f, 18);
-  const sim = new ProjectileSim({ events: f.events, peek: () => f.phys, has: () => true });
+  const sim = new ProjectileSim(projectileContext(f, true));
   let reason;
-  f.events.on('shot:resolved', (e) => {
+  f.events.on('shot:resolved', (e): void => {
     reason = e.stopReason;
   });
   sim.spawn({
@@ -892,7 +956,7 @@ function timedFlight(covered, dragK = 0) {
     dropoff: 1,
   });
   for (let i = 0; i < 120 && sim.live.length; i++) sim.fixedUpdate(1 / 120);
-  assert.equal(f.effects.filter((e) => !e.exit).length, 6);
+  assert.equal(f.effects.filter((e): boolean => !e.exit).length, 6);
   assert.equal(f.damage.length, 0);
   assert.equal(reason, 'layer-limit');
   f.phys.dispose();
@@ -901,7 +965,7 @@ function timedFlight(covered, dragK = 0) {
   const f = fixture();
   wall(f, 'wood', 0.02);
   actor(f, 15);
-  const sim = new ProjectileSim({ events: f.events, peek: () => f.phys, has: () => false });
+  const sim = new ProjectileSim(projectileContext(f, false));
   sim.spawn({
     origin: v(),
     dir: v(1, 0),
@@ -914,14 +978,14 @@ function timedFlight(covered, dragK = 0) {
   });
   for (let i = 0; i < 120 && sim.live.length; i++) sim.fixedUpdate(1 / 120);
   assert.equal(f.damage.length, 0, 'continuation cannot exceed the original range');
-  assert.ok(f.segments.every((s) => s.to.x <= 10.00001));
+  assert.ok(f.segments.every((s): boolean => s.to.x <= 10.00001));
   f.phys.dispose();
 }
 
 // Longer-lived rounds still obey the pool bound when the oldest is recycled.
 {
   const f = fixture(),
-    sim = new ProjectileSim({ events: f.events, peek: () => f.phys, has: () => false });
+    sim = new ProjectileSim(projectileContext(f, false));
   for (let i = 0; i < sim.pool.length + 4; i++) {
     sim.spawn({ origin: v(), dir: v(1, 0), speed: 100, dragK: 0, maxRange: 20 });
   }
@@ -937,24 +1001,38 @@ for (const noDamage of [false, true]) {
   wall(f, 'wood', 0.05);
   const player = { isPlayer: true };
   actor(f, 4, f.phys.LAYER.PLAYER, 0.1, player);
-  const ai = Object.assign(Object.create(AiSystem.prototype), {
+  const ai = new AiSystem();
+  applyDefinedPatch(ai, {
     _phys: f.phys,
-    ctx: {
-      events: f.events,
-      config: { deterministic: true },
-      time: { frame: 1 },
-      has: () => false,
-      peek: () => null,
+    ctx: createTestContext({ events: f.events }),
+    _fireEvent: {
+      actor: null,
+      weapon: 'ai_rifle',
+      seed: 0,
+      origin: v(),
+      dir: v(),
+      intensity: 0.12,
+      light: 0.006,
+      flashScale: 0.8,
     },
-    _fireEvent: { origin: v(), dir: v() },
     _shellEvent: { position: v(), velocity: v() },
   });
-  const agent = {
-    id: 1,
-    weaponDamage: 17,
-    staged: noDamage ? { noDamage: true } : null,
-    animator: { ejectWorld: v() },
-  };
+  const agent = checkedFixture<Parameters<AiSystem['onAgentFire']>[0]>(
+    {
+      id: 1,
+      team: 1,
+      weaponDamage: 17,
+      ...(noDamage
+        ? {
+            staged: checkedFixture<NonNullable<Parameters<AiSystem['onAgentFire']>[0]['staged']>>({
+              noDamage: true,
+            }),
+          }
+        : {}),
+      animator: checkedFixture<Animator>({ ejectWorld: v() }),
+    },
+    ['staged']
+  );
   actor(f, 0, f.phys.LAYER.ACTOR, 0.3, agent);
   ai.onAgentFire(agent, v(), v(1, 0));
   assert.equal(f.damage.length, noDamage ? 0 : 1);
@@ -970,25 +1048,49 @@ for (const friendly of [true, false]) {
     traces = 0,
     recoil = 0,
     fires = 0;
-  f.phys.ballistics.rng = { gauss: () => (++draws % 2 ? 50 : 0) };
+  f.phys.ballistics.rng = { gauss: (): number => (++draws % 2 ? 50 : 0) };
   const cast = f.phys.raycast.bind(f.phys);
-  f.phys.raycast = (...args) => {
+  f.phys.raycast = (
+    a: number | THREE.Vector3Like,
+    b: number | THREE.Vector3Like,
+    c?: number,
+    d?: number,
+    e?: unknown,
+    f?: number | unknown[] | null,
+    g?: number | RaycastIgnore | null,
+    h?: number,
+    owner?: unknown,
+    actors?: unknown[] | null,
+    hit?: RaycastIgnore | null
+  ): ReturnType<PhysicsSystem['raycast']> => {
     traces++;
-    return cast(...args);
+    if (typeof a === 'number') {
+      assert(typeof b === 'number' && typeof e === 'number' && typeof f === 'number');
+      assert(typeof g === 'number' || g === undefined);
+      return cast(a, b, c ?? 0, d ?? 0, e, f, g, h, owner, actors, hit);
+    }
+    assert(typeof b !== 'number');
+    assert(typeof f !== 'number');
+    assert(typeof g !== 'number');
+    return cast(a, b, c, d, e, f, g);
   };
-  const ai = Object.assign(new AiSystem(), {
+  const ai = new AiSystem();
+  applyDefinedPatch(ai, {
     _phys: f.phys,
     agents: [],
-    stats: { friendlyHolds: 0 },
-    _fireEvent: { origin: v(), dir: v() },
-    _shellEvent: { position: v(), velocity: v() },
-    ctx: {
-      events: f.events,
-      config: { deterministic: true },
-      time: { elapsed: 0, frame: 1 },
-      has: () => true,
-      peek: () => null,
+    stats: checkedFixture<AiSystem['stats']>({ friendlyHolds: 0 }),
+    _fireEvent: {
+      actor: null,
+      weapon: 'ai_rifle',
+      seed: 0,
+      origin: v(),
+      dir: v(),
+      intensity: 0.12,
+      light: 0.006,
+      flashScale: 0.8,
     },
+    _shellEvent: { position: v(), velocity: v() },
+    ctx: projectileContext(f, true),
   });
   const a = makeAgent({
     ai,
@@ -1007,19 +1109,28 @@ for (const friendly of [true, false]) {
     burstLeft: 3,
     burstCooldown: 0,
     fireCooldown: 0,
-    rng: { gauss: () => 0 },
+    rng: checkedFixture<Rng>({ gauss: (): number => 0 }),
     weaponDamage: 40,
-    animator: { muzzleWorld: v(), muzzleDir: v(1, 0), ejectWorld: v(), fire: () => recoil++ },
+    animator: checkedFixture<Animator>({
+      reloading: false,
+      vaulting: false,
+      muzzleWorld: v(),
+      muzzleDir: v(1, 0),
+      ejectWorld: v(),
+      fire: (): void => {
+        recoil++;
+      },
+    }),
   });
-  a._muzzleOk = () => true;
-  const target = { alive: true, team: friendly ? 1 : 0, position: v(8, 0, -1.6) };
+  a._muzzleOk = (): boolean => true;
+  const target = makeAgent({ alive: true, team: friendly ? 1 : 0, position: v(8, 0, -1.6) });
   const c = actor(f, 8, f.phys.LAYER.ACTOR, 0.12, target);
   // Scatter at the wood exit is dz/dx = -.03 * (.05 / (.32 * .9)) * 50.
   const z = -(8 - 2.025) * 0.03 * (0.05 / (0.32 * 0.9)) * 50;
   c.setSegment(8, 0.3, z, 8, 1.5, z, 0.12);
   target.position.z = z;
   ai.agents.push(a, target);
-  f.events.on('weapon:fire', () => fires++);
+  f.events.on('weapon:fire', (): number => fires++);
   assert.equal(
     a._shotBlockedByFriend(v(), v(1, 0)),
     false,
@@ -1029,7 +1140,7 @@ for (const friendly of [true, false]) {
   a._shoot(1 / 60);
   const resolved = f.phys.ballistics.result;
   assert.ok(
-    resolved.impacts.some((i) => i.actor === target),
+    resolved.impacts.some((i): boolean => i.actor === target),
     'controlled deflection reaches the off-lane actor'
   );
   assert.equal(draws, 4, 'one resolution: scatter at wood and flesh exits only');
@@ -1052,24 +1163,34 @@ for (const friendly of [true, false]) {
 // Near-miss audio and suppression use clipped segments, not infinite muzzle rays.
 {
   const plays = [];
-  const audio = Object.assign(Object.create(AudioSystem.prototype), {
+  const audio = new AudioSystem();
+  applyDefinedPatch(audio, {
     running: true,
-    field: { listenerPos: v(10) },
-    _budget: { whizz: 0 },
+    field: checkedFixture<NonNullable<AudioSystem['field']>>({ listenerPos: v(10) }),
     _whizzShots: new Float64Array(64),
     _whizzCursor: 0,
-    _playAt: () => plays.push('whizz'),
+    _playAt: (): boolean => {
+      plays.push('whizz');
+      return true;
+    },
   });
   const player = new PlayerSystem();
   let suppressed = 0;
-  player.ctx = { camera: { position: v(10) } };
-  player.health = {
-    dead: false,
-    addSuppression: (n) => {
-      suppressed += n;
-    },
+  player.ctx = createTestContext();
+  player.ctx.camera.position.copy(v(10));
+  player.health = new Health(player.ctx, null);
+  player.health.addSuppression = (n): void => {
+    suppressed += n;
   };
-  const stopped = { from: v(), to: v(2), shot: 1, shooter: {} };
+  const stopped: BulletSegmentEvent = {
+    from: v(),
+    to: v(2),
+    shot: 1,
+    shooter: {},
+    weapon: null,
+    speed: 0,
+    tracer: false,
+  };
   audio._onBulletSegment(stopped);
   player._onBulletSegment(stopped);
   assert.equal(plays.length, 0);
@@ -1088,16 +1209,19 @@ for (const friendly of [true, false]) {
 
 // Exit spall is distinct, outward-going, and never creates an entry-hole decal.
 {
-  const particles = [];
-  const fx = Object.assign(Object.create(FxSystem.prototype), {
-    ctx: { time: { elapsed: 0 } },
+  const particles: Parameters<FxSystem['emitLit']>[0][] = [];
+  const fx = new FxSystem();
+  applyDefinedPatch(fx, {
+    ctx: createTestContext(),
     rng: new Rng(123),
     pScale: 1,
-    stats: { spawned: 0 },
-    emitLit: (s) => particles.push({ ...s }),
-    decal: () => {
-      throw new Error('exit cannot paint an entry crater');
-    },
+    stats: { spawned: 0, decals: 0, live: 0 },
+    emitLit: (s): number => particles.push({ ...s }),
+    decals: checkedFixture<NonNullable<FxSystem['decals']>>({
+      add: (): never => {
+        throw new Error('exit cannot paint an entry crater');
+      },
+    }),
   });
   fx.onImpact({
     point: v(),
@@ -1108,6 +1232,6 @@ for (const friendly of [true, false]) {
     exit: true,
   });
   assert.ok(particles.length > 0);
-  assert.ok(particles.every((p) => p.vx >= 0));
+  assert.ok(particles.every((p): boolean => p.vx >= 0));
 }
 console.log('smoke-terminal-ballistics: ok');

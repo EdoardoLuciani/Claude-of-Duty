@@ -3,9 +3,13 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 
 import { AttachmentQueries, NAV_PENDING } from '../../src/ai/attachment-queries.ts';
+import type { AttachmentOracle, ClientMessage } from '../../src/ai/attachment-types.ts';
 import { checkAttachment, canStand } from '../../src/ai/attachment.js';
+import type { SurfaceNav } from '../../src/ai/nav.ts';
 import { StaticWorld } from '../../src/physics/bvh.ts';
 import { CharacterController } from '../../src/physics/character.ts';
+import { PhysicsSystem } from '../../src/physics/index.ts';
+import { fixture } from '../lib/fixture.ts';
 
 const world = new StaticWorld();
 for (const [x, y, z, w, h, d] of [
@@ -19,25 +23,32 @@ for (const [x, y, z, w, h, d] of [
   mesh.geometry.dispose();
 }
 world.build();
-const physics = {
-  staticWorld: world,
-  gravity: -20,
-  MASK: { CHARACTER: 259 },
-  checkCapsule: (a, b, r, m) => world.overlapCapsule(a.x, a.y, a.z, b.x, b.y, b.z, r, m, 0) === 0,
+const physics = new PhysicsSystem();
+physics.staticWorld = world;
+physics.gravity = -20;
+physics.checkCapsule = (a, b, r, m): boolean =>
+  world.overlapCapsule(a.x, a.y, a.z, b.x, b.y, b.z, r, m ?? physics.MASK.CHARACTER, 0) === 0;
+const stats: SurfaceNav['stats'] & AttachmentOracle['stats'] = {
+  endpointChecks: 0,
+  polygons: 0,
+  queries: 0,
+  queryMs: 0,
+  cacheHits: 0,
 };
-const nav = {
+const nav = fixture<SurfaceNav>({
   physics,
   _probe: new CharacterController(world),
   _p0: new THREE.Vector3(),
   _p1: new THREE.Vector3(),
   canStand,
-  stats: { endpointChecks: 0 },
-};
+  stats,
+});
 const a = new THREE.Vector3(0, 0.008, 0),
   b = new THREE.Vector3(1.5, 0.008, 0);
 let moves = 0;
-const move = nav._probe.move;
-nav._probe.move = function (...args) {
+assert(nav._probe);
+const move = nav._probe.move.bind(nav._probe);
+nav._probe.move = function (...args): number {
   moves++;
   return move.apply(this, args);
 };
@@ -49,28 +60,25 @@ moves = 0;
 assert.equal(checkAttachment.call(nav, a, b, 0.32, 1.78, 80), original);
 assert.equal(original, false);
 assert(moves < originalMoves);
-assert.equal(originalMoves - moves, nav.stats.savedMoves);
+assert.equal(originalMoves - moves, stats.savedMoves);
 for (const variant of ['tiny-progress', 'falling', 'velocity-change']) {
   let count = 0;
-  const c = {
-    position: { x: 0, y: 0, z: 0 },
-    velocity: { x: 0, y: 0, z: 0 },
-    grounded: variant !== 'falling',
-    setPosition(x, y, z) {
-      Object.assign(this.position, { x, y, z });
-    },
-    probeGround() {},
-    move() {
-      count++;
-      if (variant === 'tiny-progress') this.position.x += 1e-12;
-      if (variant === 'velocity-change') this.velocity.y++;
-    },
+  const c = new CharacterController(world);
+  c.grounded = variant !== 'falling';
+  c.probeGround = (): boolean => false;
+  c.move = function (): number {
+    count++;
+    if (variant === 'tiny-progress') this.position.x += 1e-12;
+    if (variant === 'velocity-change') this.velocity.y++;
+    return 0;
   };
-  const fake = {
-    physics: { gravity: -20 },
+  const fake: AttachmentOracle = {
+    physics,
+    _p0: new THREE.Vector3(),
+    _p1: new THREE.Vector3(),
     _probe: c,
     stats: { endpointChecks: 0 },
-    canStand: () => true,
+    canStand: (): boolean => true,
   };
   assert.equal(
     checkAttachment.call(fake, { x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }, 0.32, 1.78, 80),
@@ -81,26 +89,23 @@ for (const variant of ['tiny-progress', 'falling', 'velocity-change']) {
 // A two-state grounded/airborne oscillation is a real repeated cycle, not
 // progress. The local requested vertical velocity repeats with it.
 let cycleMoves = 0;
-const cycle = {
-  position: {},
-  velocity: {},
-  grounded: true,
-  setPosition(x, y, z) {
-    Object.assign(this.position, { x, y, z });
-  },
-  probeGround() {},
-  move() {
-    cycleMoves++;
-    this.grounded = !this.grounded;
-  },
+const cycle = new CharacterController(world);
+cycle.grounded = true;
+cycle.probeGround = (): boolean => false;
+cycle.move = function (): number {
+  cycleMoves++;
+  this.grounded = !this.grounded;
+  return 0;
 };
 assert.equal(
   checkAttachment.call(
     {
-      physics: { gravity: -20 },
+      physics,
+      _p0: new THREE.Vector3(),
+      _p1: new THREE.Vector3(),
       _probe: cycle,
       stats: { endpointChecks: 0 },
-      canStand: () => true,
+      canStand: (): boolean => true,
     },
     { x: 0, y: 0, z: 0 },
     { x: 1, y: 0, z: 0 },
@@ -115,19 +120,20 @@ assert(
   'exact oscillation terminates without changing the failed result'
 );
 // Initial overlap has a special arrival gate; it must not become early failure.
-const c = {
-  position: {},
-  velocity: {},
-  grounded: true,
-  setPosition(x, y, z) {
-    Object.assign(this.position, { x, y, z });
-  },
-  probeGround() {},
-  move() {},
-};
+const c = new CharacterController(world);
+c.grounded = true;
+c.probeGround = (): boolean => false;
+c.move = (): number => 0;
 assert.equal(
   checkAttachment.call(
-    { physics: { gravity: -20 }, _probe: c, stats: { endpointChecks: 0 }, canStand: () => false },
+    {
+      physics,
+      _p0: new THREE.Vector3(),
+      _p1: new THREE.Vector3(),
+      _probe: c,
+      stats: { endpointChecks: 0 },
+      canStand: (): boolean => false,
+    },
     { x: 0, y: 0, z: 0 },
     { x: 0.05, y: 0, z: 0 },
     0.32,
@@ -137,20 +143,27 @@ assert.equal(
   true
 );
 
-class Worker {
-  messages = [];
-  postMessage(message) {
+class QueryWorker {
+  messages: ClientMessage[] = [];
+  onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
+  postMessage(message: ClientMessage): void {
     this.messages.push(message);
-    if (message.type === 'init') queueMicrotask(() => this.onmessage({ data: { type: 'ready' } }));
+    if (message.type === 'init')
+      queueMicrotask((): void => {
+        this.onmessage?.(new MessageEvent('message', { data: { type: 'ready' } }));
+      });
   }
-  terminate() {}
+  terminate(): void {}
 }
-const service = new AttachmentQueries(nav, { workerFactory: () => new Worker() });
+const service = new AttachmentQueries(nav, {
+  workerFactory: (): Worker => fixture<Worker>(new QueryWorker()),
+});
 await service.start();
 const target = new THREE.Vector3(2, 0.008, 0);
-const chain = () =>
+const chain = (): boolean =>
   service.request(a, b, 0.32, 1.78, 80) && service.request(b, target, 0.32, 1.78, 80);
-const run = () => service.run(1, 'dependent-checks', chain, a);
+const run = (): ReturnType<AttachmentQueries['run']> =>
+  service.run(1, 'dependent-checks', chain, a);
 assert.equal(run(), NAV_PENDING);
 assert.equal(service.jobs.size, 1, 'unknown prerequisite does not launch a dependent check');
 assert.equal(run(), NAV_PENDING);

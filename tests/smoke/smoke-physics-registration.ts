@@ -13,7 +13,7 @@ import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
 
-function makeCtx(scene) {
+function makeCtx(scene: THREE.Scene): Parameters<PhysicsSystem['init']>[0] {
   return {
     events: new EventBus(),
     scene,
@@ -23,7 +23,7 @@ function makeCtx(scene) {
   };
 }
 
-function visualGround() {
+function visualGround(): THREE.Mesh {
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshBasicMaterial());
   mesh.rotation.x = -Math.PI / 2;
   mesh.name = 'ground_concrete';
@@ -70,8 +70,8 @@ function visualGround() {
   assert.equal(phys.ragdolls.length, 1, 'one ragdoll from the factory');
   ctx.events.emit('actor:death', {
     actor: { ragdoll: rd, mesh: null, skeleton: { bones: [{ name: 'hips' }] } },
-    point: { x: 0, y: 1, z: 0 },
-    impulse: { x: 2, y: 0, z: 0 },
+    point: new THREE.Vector3(0, 1, 0),
+    impulse: new THREE.Vector3(2, 0, 0),
   });
   assert.equal(phys.ragdolls.length, 1, 'actor:death does not spawn a second ragdoll');
 }

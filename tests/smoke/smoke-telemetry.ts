@@ -6,6 +6,13 @@
 import assert from 'node:assert/strict';
 import { gunzipSync } from 'node:zlib';
 
+import Info from 'three/src/renderers/common/Info.js';
+import WebGPUBackend from 'three/src/renderers/webgpu/WebGPUBackend.js';
+import type { Renderer } from 'three/webgpu';
+
+import { AiSystem } from '../../src/ai/index.ts';
+import type { WorldPrefetch, WorldManifest } from '../../src/core/model-metadata.ts';
+import { ModelSystem } from '../../src/core/models.ts';
 import {
   TelemetrySystem,
   collectProvenance,
@@ -13,9 +20,36 @@ import {
   hitchVerdict,
   packTgz,
 } from '../../src/dev/telemetry.ts';
+import { GameSystem } from '../../src/game/index.ts';
+import { MarketSystem } from '../../src/market/index.ts';
+import { HealController } from '../../src/player/heal.ts';
+import { Health } from '../../src/player/health.ts';
+import { PlayerSystem } from '../../src/player/index.ts';
+import { Movement } from '../../src/player/movement.ts';
+import type { RenderSystem } from '../../src/render/index-webgpu.ts';
+import { WeaponSystem } from '../../src/weapons/index.ts';
+import { createTestContext, createTestInput } from '../lib/context.ts';
+import { fixture } from '../lib/fixture.ts';
+
+function telemetryMeta(revision: string): NonNullable<TelemetrySystem['meta']> {
+  return {
+    schema: 3,
+    startedAt: '',
+    quality: 'high',
+    deterministic: true,
+    viewport: [],
+    userAgent: '',
+    playerHz: 0,
+    enemyHz: 0,
+    observers: null,
+    path: '',
+    transform: null,
+    provenance: { revision, world: 'unknown' },
+  };
+}
 
 let failures = 0;
-const check = (name, cond, extra = '') => {
+const check = (name: string, cond: boolean, extra = ''): void => {
   if (cond) console.log(`  ok  ${name}`);
   else {
     failures++;
@@ -26,28 +60,29 @@ const check = (name, cond, extra = '') => {
 // Provenance is the loaded world, not a newly deployed manifest. An older
 // session's pending read must not overwrite a restarted recording either.
 {
-  let resolve;
+  let resolve: ((value: WorldPrefetch) => void) | undefined;
   const recorder = new TelemetrySystem();
-  const meta = {
+  const meta = fixture<WorldManifest>({
     sourceHash: 'loaded-A',
     assets: { visual: 'visual-A', collision: 'collision-A', nav: 'nav-A' },
-  };
-  const models = {
-    worldPrefetch: new Promise((r) => {
-      resolve = r;
-    }),
-  };
-  recorder.ctx = { get: () => models };
-  const first = (recorder.meta = { provenance: { revision: 'code-A', world: 'unknown' } });
+  });
+  const models = new ModelSystem();
+  models.worldPrefetch = new Promise((r): void => {
+    resolve = r;
+  });
+  recorder.ctx = createTestContext({ providers: { models } });
+  const first = (recorder.meta = telemetryMeta('code-A'));
   const fetch = globalThis.fetch;
-  globalThis.fetch = () => {
+  globalThis.fetch = (): never => {
     throw new Error('must not request deployment B');
   };
   try {
     recorder._fillWorldProvenance();
-    recorder.meta = { provenance: { revision: 'next-session', world: 'unknown' } };
-    resolve({ meta });
+    recorder.meta = telemetryMeta('next-session');
+    assert(resolve);
+    resolve(fixture<WorldPrefetch & { then?: undefined }>({ meta }, ['then']));
     await recorder._provenanceReady;
+    assert(typeof first.provenance.world === 'object');
     assert.equal(first.provenance.world.sourceHash, 'loaded-A');
     assert.equal(first.provenance.world.nav, 'nav-A');
     assert.equal(recorder.meta.provenance.world, 'unknown');
@@ -59,35 +94,51 @@ const check = (name, cond, extra = '') => {
 // Canonical healing events and live inventory/progress survive recording.
 {
   const recorder = new TelemetrySystem();
-  const player = {
-    health: { value: 40, armour: 0 },
-    bandages: 2,
-    healCtrl: { active: true, progress: 0.5 },
-  };
-  const systems = {
-    player,
-    weapons: {},
-    ai: { getWaveState: () => ({}) },
-    game: {},
-    market: {},
-    render: { renderer: { info: { render: {} } } },
-  };
-  recorder.ctx = {
-    time: { elapsed: 0, raw: 0, frame: 1 },
-    camera: { position: {}, rotation: {} },
-    get: (id) => systems[id],
-    input: { action: (name) => name === 'heal', moveVector() {}, look: {} },
-  };
+  const input = createTestInput();
+  input.action = (name): boolean => name === 'heal';
+  const ctx = createTestContext({ input });
+  const player = new PlayerSystem();
+  player.ctx = ctx;
+  player.movement = new Movement(ctx, player);
+  player.health = new Health(ctx, null);
+  player.health.value = 40;
+  player.healCtrl = new HealController(player);
+  player.healCtrl.bandages = 2;
+  player.healCtrl.active = true;
+  player.healCtrl.progress = 0.5;
+  const ai = new AiSystem();
+  ai.ctx = ctx;
+  ai.getWaveState = (): ReturnType<AiSystem['getWaveState']> => ({
+    number: 0,
+    remaining: 0,
+    total: 0,
+    incoming: false,
+    nextIn: 0,
+  });
+  recorder.ctx = createTestContext({
+    input,
+    providers: {
+      player,
+      weapons: new WeaponSystem(),
+      ai,
+      game: new GameSystem(),
+      market: new MarketSystem(),
+      render: fixture<RenderSystem>({
+        renderer: fixture<Renderer>({ info: new Info(), backend: new WebGPUBackend() }),
+      }),
+    },
+  });
+  recorder.ctx.time.frame = 1;
   recorder.recording = true;
   recorder.events = [];
   recorder.playerSamples = [];
-  recorder._move = {};
+  recorder._move = { x: 0, y: 0 };
   recorder._contacts = new Map();
   recorder._samplePlayer();
   const sample = recorder.playerSamples[0];
   assert.deepEqual(sample.actions, ['heal']);
   assert.deepEqual([sample.bandages, sample.healing, sample.healProgress], [2, true, 0.5]);
-  for (const phase of ['start', 'cancel', 'complete'])
+  for (const phase of ['start', 'cancel', 'complete'] as const)
     recorder._recordEvent('player:heal', {
       phase,
       amount: phase === 'complete' ? 50 : 0,
@@ -96,7 +147,7 @@ const check = (name, cond, extra = '') => {
       reason: phase,
     });
   assert.deepEqual(
-    recorder.events.map((e) => e.phase),
+    recorder.events.map((e): unknown => e.phase),
     ['start', 'cancel', 'complete']
   );
   assert.equal(recorder.events[2].amount, 50);
@@ -127,10 +178,10 @@ const jpeg = Uint8Array.from([0xff, 0xd8, 0xff, 0xd9]);
 // the bar instead of logging every frame — an earlier version fed the baseline
 // only from frames under the threshold, so on a 10 fps machine it could never
 // move and all 300 frames of a steady stream were logged.
-const sim = (frames) => {
+const sim = (frames: number[]): { hitches: number[]; threshold: number } => {
   let ema = 16.7;
   let threshold = 0;
-  const hitches = [];
+  const hitches: number[] = [];
   for (const ms of frames) {
     const verdict = hitchVerdict(ema, ms);
     ema = verdict.ema;
@@ -139,7 +190,7 @@ const sim = (frames) => {
   }
   return { hitches, threshold: Math.round(threshold) };
 };
-const steady = (ms, n) => Array(n).fill(ms);
+const steady = (ms: number, n: number): number[] => Array.from({ length: n }, (): number => ms);
 check('60 fps logs only the freeze', sim([...steady(16.7, 300), 2000]).hitches.join() === '2000');
 check(
   '10 fps stops logging its own frames',
@@ -164,9 +215,10 @@ check(
   'missing provenance is unknown',
   collectProvenance().revision === 'unknown' && collectProvenance().world === 'unknown'
 );
+const missingSource = collectProvenance({ world: { visual: 'level-visual.abc.glb.gz' } }).world;
 check(
   'missing world source hash is unknown',
-  collectProvenance({ world: { visual: 'level-visual.abc.glb.gz' } }).world.sourceHash === 'unknown'
+  typeof missingSource === 'object' && missingSource.sourceHash === 'unknown'
 );
 
 if (failures) {

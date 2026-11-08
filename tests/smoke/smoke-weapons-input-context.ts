@@ -5,108 +5,151 @@ import * as THREE from 'three';
 
 import { bindingLabel } from '../../src/core/bindings.ts';
 import { Input } from '../../src/core/input.ts';
+import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
+import { PhysicsSystem, type PhysicsRigidBodyOptions } from '../../src/physics/index.ts';
+import { CameraRig } from '../../src/player/camera.ts';
+import { Health } from '../../src/player/health.ts';
+import { PlayerSystem } from '../../src/player/index.ts';
+import { Movement } from '../../src/player/movement.ts';
+import type { RadioSystem } from '../../src/radio/index.ts';
+import type { UiSystem } from '../../src/ui/index.ts';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
+import { ProjectileSim } from '../../src/weapons/ballistics.ts';
+import { Clip } from '../../src/weapons/clips.ts';
 import { WEAPON_IDS } from '../../src/weapons/defs.ts';
-import { WeaponSystem, GRENADE_FUSE, MAX_SHOTS_PER_FRAME } from '../../src/weapons/index.ts';
+import type { WeaponId } from '../../src/weapons/defs.ts';
+import { GRENADE_FUSE, MAX_SHOTS_PER_FRAME } from '../../src/weapons/index.ts';
+import type { WeaponEntry } from '../../src/weapons/runtime-types.ts';
+import type { Viewmodel } from '../../src/weapons/viewmodel.ts';
+import { ArmedWeaponSystem, weaponState } from '../lib/ballistics-fixture.ts';
+import { createTestContext } from '../lib/context.ts';
+import { fixture } from '../lib/fixture.ts';
 import { FRAME_SOURCES } from '../lib/frame-sources.ts';
 
-function makeHarness() {
-  const input = new Input({}, { sensitivity: 1, invertY: false });
-  input._pollGamepad = () => {};
-  for (const method of ['pressed', 'held', 'released']) {
-    input[method] = () => {
+interface FrameOptions {
+  down?: string[];
+  up?: string[];
+  wheel?: number;
+  dt?: number;
+}
+
+interface WeaponHarness {
+  wp: ArmedWeaponSystem;
+  input: Input;
+  frame(this: void, options?: FrameOptions): void;
+  tap(this: void, ...codes: string[]): void;
+  clips: string[];
+  prompts: Array<Parameters<UiSystem['setPrompt']>[0] & { owner: unknown }>;
+  cancellations: string[];
+  bodies: Array<PhysicsRigidBodyOptions | undefined>;
+  player: PlayerSystem;
+  shots: { live: number; fired: number; impacts: number };
+}
+function makeHarness(): WeaponHarness {
+  const input = new Input(fixture<HTMLCanvasElement>({}), { sensitivity: 1, invertY: false });
+  input._pollGamepad = (): void => {};
+  for (const method of ['pressed', 'held', 'released'] as const) {
+    input[method] = (): never => {
       throw new Error(`weapons must not query raw ${method}`);
     };
   }
-  const wp = new WeaponSystem();
-  const clips = [],
-    prompts = [],
-    cancellations = [],
-    bodies = [];
-  const player = {
-    dead: false,
-    controlEnabled: true,
-    stance: 'stand',
-    state: 'idle',
-    horizontalSpeed: 0,
-    eyePosition: new THREE.Vector3(0, 1.6, 0),
-    feetPosition: new THREE.Vector3(),
-    forward: new THREE.Vector3(0, 0, -1),
-    velocity: new THREE.Vector3(),
-    setAdsProgress() {},
-    cancelHeal(reason) {
-      cancellations.push(reason);
-      wp.endHeal();
-    },
+  const wp = new ArmedWeaponSystem();
+  const clips: string[] = [],
+    prompts: Array<Parameters<UiSystem['setPrompt']>[0] & { owner: unknown }> = [],
+    cancellations: string[] = [],
+    bodies: Array<PhysicsRigidBodyOptions | undefined> = [];
+  const player = new PlayerSystem();
+  player.ctx = createTestContext({ input });
+  player.movement = new Movement(player.ctx, player);
+  player.rig = new CameraRig(player.ctx);
+  player.rig.eyePosition.set(0, 1.6, 0);
+  player.health = new Health(player.ctx, null);
+  player.setAdsProgress = (): void => {};
+  player.cancelHeal = (reason): boolean => {
+    cancellations.push(reason);
+    wp.endHeal();
+    return true;
   };
   wp.player = player;
-  wp.ui = {
-    setPrompt(prompt, owner) {
+  wp.ui = fixture<UiSystem>({
+    setPrompt(prompt, owner): void {
       prompts.push({ ...prompt, owner });
     },
-    clearPrompt() {},
-  };
-  wp.ctx = {
+    clearPrompt(): void {},
+  });
+  wp.ctx = createTestContext({
     input,
-    time: { elapsed: 0, scale: 1 },
     scene: new THREE.Scene(),
     camera: new THREE.PerspectiveCamera(),
-    events: { emit() {} },
-    peek(id) {
-      return id === 'player' ? player : id === 'ui' ? wp.ui : null;
-    },
-  };
+    events: new EventBus(),
+    providers: { player, ui: wp.ui },
+  });
   wp.rng = new Rng(372);
   // A projectile spawn is the only per-pellet side effect of an accepted shot,
   // so counting them measures real trigger output. `update()` copies
   // `sim.stats.fired` back into `wp.stats.fired` every frame.
-  const shots = { live: 0, fired: 0 };
-  wp.sim = {
-    spawn() {
+  const shots = { live: 0, fired: 0, impacts: 0 };
+  wp.sim = fixture<ProjectileSim>({
+    spawn(): null {
       shots.fired++;
+      return null;
     },
-    clear() {},
+    clear(): void {},
     stats: shots,
-  };
+  });
   wp.stats = { tris: 0, drawCalls: 0, live: 0, fired: 0 };
-  wp.physics = {
-    addRigidBody(options) {
-      bodies.push(options);
-      return { position: new THREE.Vector3() };
-    },
+  wp.physics = new PhysicsSystem();
+  const addRigidBody = wp.physics.addRigidBody.bind(wp.physics);
+  wp.physics.addRigidBody = (options): ReturnType<PhysicsSystem['addRigidBody']> => {
+    bodies.push(options);
+    return addRigidBody(options);
   };
-  wp.viewmodel = {
-    anchor: { visible: true },
+  wp.viewmodel = fixture<Viewmodel>({
+    anchor: new THREE.Object3D(),
+    weapons: new Map(
+      WEAPON_IDS.map((id): [WeaponId, WeaponEntry] => [id, fixture<WeaponEntry>({ id })])
+    ),
+    syncToCamera(): void {},
+    grenadeReleaseWorld(out): THREE.Vector3 {
+      return out.copy(wp._throwOrigin());
+    },
+    armAsset: fixture<Viewmodel['armAsset']>({
+      blood: fixture<Viewmodel['armAsset']['blood']>({ setHealthFraction(): void {} }),
+    }),
+    active: null,
     clip: null,
-    clipName: null,
+    get clipName(): string | null {
+      return this.clip?.name ?? null;
+    },
     adsT: 0,
-    setActive() {},
-    stopClip() {
+    setActive(): null {
+      return null;
+    },
+    stopClip(): void {
       this.clip = null;
-      this.clipName = null;
     },
-    play(name) {
-      this.clip = { duration: 1 };
-      this.clipName = name;
+    play(name): number {
+      this.clip = new Clip(name, 1, {});
       clips.push(name);
+      return 1;
     },
-    holdGrenade() {},
-    cookGrenade() {},
-    throwGrenade() {},
-    endGrenade() {},
-    holdRadio() {},
-    endRadio() {},
-    setRadioScreen() {},
-    holdBandage() {},
-    endBandage() {},
-    addRecoil() {},
-    muzzleWorld() {
-      return { x: 0, y: 0, z: 0 };
+    holdGrenade(): void {},
+    cookGrenade(): void {},
+    throwGrenade(): void {},
+    endGrenade(): void {},
+    holdRadio(): void {},
+    endRadio(): void {},
+    setRadioScreen(): void {},
+    holdBandage(): void {},
+    endBandage(): void {},
+    addRecoil(): void {},
+    muzzleWorld(out): THREE.Vector3 {
+      return out.set(0, 0, 0);
     },
-  };
+  });
   for (const id of WEAPON_IDS) wp.states.set(id, wp._makeState(id));
-  const frame = ({ down = [], up = [], wheel = 0, dt = 1 / 60 } = {}) => {
+  const frame = ({ down = [], up = [], wheel = 0, dt = 1 / 60 }: FrameOptions = {}): void => {
     for (const code of down) input._pendingDown.add(code);
     for (const code of up) input._pendingUp.add(code);
     input._pendingWheel = wheel;
@@ -114,7 +157,7 @@ function makeHarness() {
     wp.update(dt, wp.ctx);
     input.endFrame();
   };
-  const tap = (...codes) => frame({ down: codes, up: codes });
+  const tap = (...codes: string[]): void => frame({ down: codes, up: codes });
   return { wp, input, frame, tap, clips, prompts, cancellations, bodies, player, shots };
 }
 
@@ -122,21 +165,28 @@ function makeHarness() {
 for (const [equip, first, second] of [
   ['equipPrimary', 'lmg', 'sniper'],
   ['equipSecondary', 'smg', 'shotgun'],
-]) {
+] as const) {
   const { wp } = makeHarness();
   assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
-  assert(wp[equip](first) && !wp[equip](first), 'cannot rebuy the equipped weapon');
+  assert(
+    (equip === 'equipPrimary' ? wp.equipPrimary(first) : wp.equipSecondary(first)) &&
+      !(equip === 'equipPrimary' ? wp.equipPrimary(first) : wp.equipSecondary(first)),
+    'cannot rebuy the equipped weapon'
+  );
   assert.deepEqual(wp.weaponIds, equip === 'equipPrimary' ? [first, 'pistol'] : ['rifle', first]);
   wp.state.mag = 1;
   assert(wp.reload());
-  assert(wp[equip](second) && !wp.owns(first));
+  assert(
+    (equip === 'equipPrimary' ? wp.equipPrimary(second) : wp.equipSecondary(second)) &&
+      !wp.owns(first)
+  );
   assert.deepEqual(wp.weaponIds, equip === 'equipPrimary' ? [second, 'pistol'] : ['rifle', second]);
   assert(!wp.reloading && wp.tryFire(), 'mid-reload purchase is immediately usable');
-  wp.states.get(first).reserve = 0;
+  weaponState(wp, first).reserve = 0;
   wp.state.reserve = 1;
   wp.refillAmmo();
   assert.equal(wp.state.reserve, wp.current.reserve);
-  assert.equal(wp.states.get(first).reserve, 0, 'refill ignores unowned weapons');
+  assert.equal(weaponState(wp, first).reserve, 0, 'refill ignores unowned weapons');
   assert.equal(wp.ammoFraction(), 1);
   wp.resetForNewGame();
   assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
@@ -166,7 +216,7 @@ for (const [equip, first, second] of [
 // Same-frame operations retain their order, independent of physical event order.
 {
   const { wp, frame } = makeHarness();
-  const order = [];
+  const order: string[] = [];
   for (const method of [
     'reload',
     'cycleFireMode',
@@ -175,13 +225,22 @@ for (const [equip, first, second] of [
     '_runTrigger',
     '_updateGrenade',
     '_updateRadio',
-  ]) {
-    wp[method] = () => {
-      order.push(method);
-    };
+  ] as const) {
+    if (method === 'cycleFireMode') {
+      wp.cycleFireMode = (): undefined => {
+        order.push(method);
+        return undefined;
+      };
+    } else {
+      wp[method] = (): false => {
+        order.push(method);
+        return false;
+      };
+    }
   }
-  wp.setWeapon = (id) => {
+  wp.setWeapon = (id): boolean => {
     order.push(`slot:${id}`);
+    return false;
   };
   frame({
     down: ['KeyX', 'KeyG', 'Mouse0', 'Tab', 'Digit2', 'Digit1', 'KeyI', 'KeyB', 'KeyR'],
@@ -198,15 +257,15 @@ for (const [equip, first, second] of [
     '_runTrigger',
     '_updateGrenade',
     '_updateRadio',
-  ]);
+  ] as const);
 }
 
 // Tab and wheel remain two requests (a pending holster can refuse the second).
 for (const wheel of [-1, 1]) {
   const { wp, frame } = makeHarness();
   const next = wp.nextWeapon.bind(wp);
-  const results = [];
-  wp.nextWeapon = () => {
+  const results: boolean[] = [];
+  wp.nextWeapon = (): boolean => {
     const result = next();
     results.push(result);
     return result;
@@ -261,7 +320,7 @@ for (const accessory of ['KeyG', 'KeyX']) {
 
 // Every automatic weapon offers SEMI next to AUTO, and the real B binding
 // cycles the authored order without skipping or repeating a mode.
-for (const id of ['rifle', 'smg', 'mcx', 'lmg']) {
+for (const id of ['rifle', 'smg', 'mcx', 'lmg'] as const) {
   const { wp, tap } = makeHarness();
   wp.activeId = id;
   const modes = wp.state.def.modes;
@@ -286,7 +345,7 @@ for (const id of ['rifle', 'smg', 'mcx', 'lmg']) {
   wp.activeId = 'lmg';
   tap('KeyB');
   assert.equal(wp.fireMode, 'semi', 'EVOLYS selector reaches SEMI');
-  const total = () => wp.ammo.mag + wp.ammo.reserve;
+  const total = (): number => wp.ammo.mag + wp.ammo.reserve;
   const ammo0 = total();
   frame({ down: ['Mouse0'] });
   assert.equal(shots.fired, 1, 'the press frame fires exactly one round');
@@ -312,7 +371,7 @@ for (const id of ['rifle', 'smg', 'mcx', 'lmg']) {
   const { wp, frame, shots } = makeHarness();
   wp.activeId = 'lmg';
   assert.equal(wp.fireMode, 'auto');
-  const total = () => wp.ammo.mag + wp.ammo.reserve;
+  const total = (): number => wp.ammo.mag + wp.ammo.reserve;
   const ammo0 = total();
   for (let i = 0; i < 60; i++) frame({ down: ['Mouse0'] });
   // 700 rpm over one second: ~11 rounds, far above a single shot.
@@ -414,15 +473,15 @@ for (const id of ['rifle', 'smg', 'mcx', 'lmg']) {
   tap('KeyB'); // semi -> auto, still held
   tap('KeyB'); // auto -> semi: leave the non-default selection dirty too
   assert.equal(wp._triggerLatched, true, 'restart precondition: held selector is latched');
-  assert.equal(wp.states.get('lmg').mode, 'semi');
-  assert.equal(wp.states.get('lmg').modeIndex, 1);
+  assert.equal(weaponState(wp, 'lmg').mode, 'semi');
+  assert.equal(weaponState(wp, 'lmg').modeIndex, 1);
   wp.resetForNewGame();
   assert.equal(wp.activeId, 'rifle');
   assert.equal(wp.fireMode, 'auto', 'a new run starts on the authored first mode');
   assert.equal(wp._triggerLatched, false, 'restart clears the dirty latch');
   assert.equal(wp._burstLeft, 0);
-  assert.equal(wp.states.get('lmg').mode, 'auto', 'restart resets the inactive selector');
-  assert.equal(wp.states.get('lmg').modeIndex, 0, 'restart resets the inactive mode index');
+  assert.equal(weaponState(wp, 'lmg').mode, 'auto', 'restart resets the inactive selector');
+  assert.equal(weaponState(wp, 'lmg').modeIndex, 0, 'restart resets the inactive mode index');
   frame({ up: ['Mouse0'] });
   const before = shots.fired;
   frame({ down: ['Mouse0'] });
@@ -549,7 +608,7 @@ for (const gate of ['frozen', 'disabled']) {
   assert.equal(wp._triggerLatched, true);
   if (gate === 'frozen') input.frozen = true;
   else input.enabled = false;
-  input._onMouseUp({ button: 0 });
+  input._onMouseUp(fixture<MouseEvent>({ button: 0 }));
   assert.equal(input.fire, true, `${gate} handler drops the physical release`);
   for (let i = 0; i < 30; i++) frame();
   assert.equal(wp._triggerLatched, false, `${gate} frames break the pull`);
@@ -598,19 +657,19 @@ for (const gate of ['frozen', 'disabled']) {
 {
   const { wp, tap, prompts } = makeHarness();
   let strikes = 0;
-  wp.radioSys = {
-    callStrike() {
+  wp.radioSys = fixture<RadioSystem>({
+    callStrike(): boolean {
       strikes++;
       return true;
     },
-  };
+  });
   tap('KeyX', 'Digit1');
   assert(wp.radioEquipped && strikes === 0, 'opening frame does not immediately select a request');
   tap('Digit2');
   assert.equal(wp._switchTo, null, 'request 2 never selects the secondary');
-  assert.equal(prompts.at(-1).key, bindingLabel('slot2'));
+  assert.equal(prompts[prompts.length - 1].key, bindingLabel('slot2'));
   tap('Digit3');
-  assert.equal(prompts.at(-1).key, bindingLabel('slot3'));
+  assert.equal(prompts[prompts.length - 1].key, bindingLabel('slot3'));
   tap('Digit3', 'Digit2', 'Digit1');
   assert.equal(strikes, 1);
   assert.equal(wp.carpetBombs, 0);
@@ -618,7 +677,7 @@ for (const gate of ['frozen', 'disabled']) {
   tap('KeyX');
   tap('Digit1');
   assert(wp.radioEquipped);
-  assert.equal(prompts.at(-1).key, bindingLabel('slot1'));
+  assert.equal(prompts[prompts.length - 1].key, bindingLabel('slot1'));
   tap('Tab', 'Digit2');
   assert(
     !wp.radioEquipped && wp._switchTo === 'pistol',
@@ -652,9 +711,9 @@ for (const [code, other, action, type] of [
 ]) {
   const { wp, frame, tap, bodies, prompts } = makeHarness();
   tap('KeyG');
-  assert.equal(prompts.at(-1).key, bindingLabel('fire'));
+  assert.equal(prompts[prompts.length - 1].key, bindingLabel('fire'));
   assert.equal(
-    prompts.at(-1).sub,
+    prompts[prompts.length - 1].sub,
     `${bindingLabel('ads')} SHORT THROW · ${bindingLabel('grenade')} STOWS`
   );
   frame({ down: [code] });
@@ -693,7 +752,7 @@ for (const [code, other, action, type] of [
   // Inject an action release while its held union remains true: the approved
   // actionReleased contract must commit, not rely solely on the held query.
   const released = wp.ctx.input.actionReleased.bind(wp.ctx.input);
-  wp.ctx.input.actionReleased = (action) => action === 'ads' || released(action);
+  wp.ctx.input.actionReleased = (action): boolean => action === 'ads' || released(action);
   frame();
   assert(wp.ctx.input.action('ads') && wp._throwing && !wp.cooking);
 }
@@ -749,7 +808,7 @@ for (const blocked of ['disabled', 'frozen', 'dead', 'controls', 'input']) {
   const { wp, input, player, tap } = makeHarness();
   if (blocked === 'disabled') wp.disabled = true;
   if (blocked === 'frozen') input.frozen = true;
-  if (blocked === 'dead') player.dead = true;
+  if (blocked === 'dead') player.health.dead = true;
   if (blocked === 'controls') player.controlEnabled = false;
   if (blocked === 'input') input.enabled = false;
   const mode = wp.fireMode;
@@ -768,8 +827,8 @@ for (const blocked of ['disabled', 'frozen', 'dead', 'controls', 'input']) {
     pickups.spawn(new THREE.Vector3());
     frame({ down: ['KeyF'], dt: 0.5 });
     assert.equal(wp.state.reserve, 0);
-    assert.equal(prompts.at(-1).key, bindingLabel('use'));
-    assert.equal(prompts.at(-1).owner, 'ammo');
+    assert.equal(prompts[prompts.length - 1].key, bindingLabel('use'));
+    assert.equal(prompts[prompts.length - 1].owner, 'ammo');
     frame({ up: ['KeyF'], down: ['KeyT'], dt: 0.5 });
     assert(wp.state.reserve > 0 && pickups.items.length === 0);
   } finally {
@@ -782,23 +841,32 @@ for (const blocked of ['disabled', 'frozen', 'dead', 'controls', 'input']) {
 /* ======================================================================== */
 
 // Real update() + lateUpdate(): record accepted rounds, fire events and seeds.
-function cadenceHarness(id) {
+interface CadenceHarness extends WeaponHarness {
+  events: { fire: number; shell: number; seeds: number[] };
+  times: number[];
+  step(this: void, options?: FrameOptions): number;
+}
+function cadenceHarness(id: WeaponId): CadenceHarness {
   const h = makeHarness();
   const { wp, frame, shots } = h;
   wp.activeId = id;
   wp.state.mag = 1e6;
-  const events = { fire: 0, shell: 0, seeds: [] };
-  wp.ctx.events.emit = (type, e) => {
-    if (type === 'weapon:fire') {
-      events.fire++;
-      events.seeds.push(e.seed);
-    } else if (type === 'weapon:shell') events.shell++;
-  };
-  Object.assign(wp.viewmodel, { update() {}, boreDir() {}, ejectWorld() {}, ejectVelocity() {} });
+  const events = { fire: 0, shell: 0, seeds: [] as number[] };
+  wp.ctx.events.on('weapon:fire', (e): void => {
+    events.fire++;
+    events.seeds.push(e.seed);
+  });
+  wp.ctx.events.on('weapon:shell', (): void => {
+    events.shell++;
+  });
+  wp.viewmodel.update = (): void => {};
+  wp.viewmodel.boreDir = (out): THREE.Vector3 => out;
+  wp.viewmodel.ejectWorld = (out): THREE.Vector3 => out;
+  wp.viewmodel.ejectVelocity = (out): THREE.Vector3 => out;
   const pellets = Math.max(1, wp.state.def.pellets ?? 1);
-  const times = [];
+  const times: number[] = [];
   let t = 0;
-  const step = (opts = {}) => {
+  const step = (opts: FrameOptions = {}): number => {
     const dt = opts.dt ?? 1 / 60;
     t += dt;
     const before = shots.fired;
@@ -813,16 +881,16 @@ function cadenceHarness(id) {
 }
 
 // Held AUTO delivers the authored rpm at any frame rate, one round's accounting each.
-for (const id of ['rifle', 'smg', 'mcx', 'lmg']) {
-  const counts = [];
+for (const id of ['rifle', 'smg', 'mcx', 'lmg'] as const) {
+  const counts: number[] = [];
   for (const [label, nextDt] of FRAME_SOURCES) {
     const { wp, step, times, events } = cadenceHarness(id);
     const interval = 60 / wp.state.def.rpm;
-    const total = () => wp.ammo.mag + wp.ammo.reserve;
+    const total = (): number => wp.ammo.mag + wp.ammo.reserve;
     const ammo0 = total();
     step({ down: ['Mouse0'], dt: nextDt() });
-    while (times.length < 2 || times.at(-1) - times[0] < 10) step({ dt: nextDt() });
-    const expected = 1 + (times.at(-1) - times[0]) / interval;
+    while (times.length < 2 || times[times.length - 1] - times[0] < 10) step({ dt: nextDt() });
+    const expected = 1 + (times[times.length - 1] - times[0]) / interval;
     assert(
       Math.abs(times.length - expected) <= 1,
       `${id} @ ${label} FPS: ${times.length} rounds, expected ~${expected.toFixed(1)}`
@@ -843,14 +911,15 @@ for (const [label, nextDt] of FRAME_SOURCES) {
   const { wp, step, times, tap } = cadenceHarness('rifle');
   tap('KeyB');
   assert.equal(wp.fireMode, 'burst');
-  const interval = 60 / wp.state.def.burstRpm;
-  const count = wp.state.def.burstCount;
+  const { burstRpm, burstCount: count } = wp.state.def;
+  assert(burstRpm !== undefined && count !== undefined);
+  const interval = 60 / burstRpm;
   for (let burst = 0; burst < 20; burst++) {
     const start = times.length;
     step({ down: ['Mouse0'], dt: nextDt() });
     let maxDt = 0;
     while (times.length < start + count) step({ dt: (maxDt = Math.max(maxDt, nextDt())) });
-    const span = times.at(-1) - times[start];
+    const span = times[times.length - 1] - times[start];
     assert(span >= (count - 1) * interval - 1e-9, `burst @ ${label}: rounds came early`);
     assert(span < (count - 1) * interval + maxDt + 1e-9, `burst @ ${label}: rounds came late`);
     step({ up: ['Mouse0'], dt: nextDt() });
@@ -876,29 +945,48 @@ for (const [label, nextDt] of FRAME_SOURCES) {
 
 // An interrupted AUTO pull never releases rounds owed for the blocked time:
 // the resumed frame fires at most once, then the authored interval follows.
-const INTERRUPTIONS = [
+const INTERRUPTIONS: Array<
+  [string, { dt?: number; on?(h: CadenceHarness): void; off?(h: CadenceHarness): void }]
+> = [
   ['pause', { dt: 0 }],
   [
     'controls',
-    { on: (h) => (h.player.controlEnabled = false), off: (h) => (h.player.controlEnabled = true) },
+    {
+      on: (h): void => {
+        h.player.controlEnabled = false;
+      },
+      off: (h): void => {
+        h.player.controlEnabled = true;
+      },
+    },
   ],
-  ['input frozen', { on: (h) => (h.input.frozen = true), off: (h) => (h.input.frozen = false) }],
+  [
+    'input frozen',
+    {
+      on: (h): void => {
+        h.input.frozen = true;
+      },
+      off: (h): void => {
+        h.input.frozen = false;
+      },
+    },
+  ],
   [
     'reload',
     {
-      on: (h) => {
+      on: (h): void => {
         h.wp.state.mag = 10;
         assert(h.wp.reload());
       },
-      off: (h) => h.wp.viewmodel.stopClip(),
+      off: (h): void => h.wp.viewmodel.stopClip(),
     },
   ],
-  ['radio', { on: (h) => h.tap('KeyX'), off: (h) => h.tap('KeyX') }],
+  ['radio', { on: (h): void => h.tap('KeyX'), off: (h): void => h.tap('KeyX') }],
   [
     'switch',
     {
-      on: (h) => h.tap('Digit2'),
-      off: (h) => {
+      on: (h): void => h.tap('Digit2'),
+      off: (h): void => {
         h.wp._onClipEvent('end', 'holster');
         h.tap('Digit1');
         h.wp._onClipEvent('end', 'holster');
@@ -908,8 +996,8 @@ const INTERRUPTIONS = [
   [
     'death/restart',
     {
-      on: (h) => h.wp._setDeathDisabled(true),
-      off: (h) => {
+      on: (h): void => h.wp._setDeathDisabled(true),
+      off: (h): void => {
         h.wp.resetForNewGame();
         h.wp._setDeathDisabled(false);
         h.wp.state.mag = 1e6;
@@ -944,7 +1032,7 @@ for (const [name, gate] of INTERRUPTIONS) {
 // accounting and a seed each; the remainder is dropped, not banked.
 {
   const { wp, step, times, events } = cadenceHarness('rifle');
-  const total = () => wp.ammo.mag + wp.ammo.reserve;
+  const total = (): number => wp.ammo.mag + wp.ammo.reserve;
   const ammo0 = total();
   step({ down: ['Mouse0'] });
   assert.equal(step({ dt: 1 }), MAX_SHOTS_PER_FRAME, 'a hitch catches up to the bound');

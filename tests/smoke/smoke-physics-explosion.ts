@@ -4,14 +4,16 @@ import { Vector3 } from 'three';
 
 import { PhysicsSystem } from '../../src/physics/index.ts';
 
-function fixture() {
-  const physics = Object.create(PhysicsSystem.prototype);
-  physics.ragdolls = [];
-  physics.radialImpulses = [];
-  physics.bodies = {
-    applyRadialImpulse(...args) {
-      physics.radialImpulses.push(args);
-    },
+class PhysicsSystemWithImpulses extends PhysicsSystem {
+  radialImpulses: RadialImpulse[] = [];
+}
+
+type RadialImpulse = Parameters<PhysicsSystem['bodies']['applyRadialImpulse']>;
+
+function fixture(): PhysicsSystemWithImpulses {
+  const physics = new PhysicsSystemWithImpulses();
+  physics.bodies.applyRadialImpulse = (...args: RadialImpulse): void => {
+    physics.radialImpulses.push(args);
   };
   return physics;
 }
@@ -22,7 +24,7 @@ physics.explode({ position: new Vector3(1, 0, 0), radius: 12, damage: 1400 });
 physics.explode({ position: new Vector3(), radius: 3, damage: 250, impulse: 50 });
 physics.explode(new Vector3(2, 0, 0));
 assert.deepEqual(
-  physics.radialImpulses.map(([x, y, z, radius]) => [x, y, z, radius]),
+  physics.radialImpulses.map(([x, y, z, radius]): number[] => [x, y, z, radius]),
   [
     [0, 0, 0, 4],
     [1, 0, 0, 12],
@@ -30,7 +32,7 @@ assert.deepEqual(
     [2, 0, 0, 5],
   ]
 );
-for (const [actual, expected] of physics.radialImpulses.map(([, , , , strength], i) => [
+for (const [actual, expected] of physics.radialImpulses.map(([, , , , strength], i): number[] => [
   strength,
   [13.5, 75.6, 3, 5.4][i],
 ])) {

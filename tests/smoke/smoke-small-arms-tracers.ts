@@ -6,41 +6,51 @@ import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
 
+import { Animator } from '../../src/ai/animator.ts';
 import { AiSystem } from '../../src/ai/index.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
+import type { EngineEventMap, EngineEventName } from '../../src/core/events.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
-import { WeaponSystem } from '../../src/weapons/index.ts';
+import type { Viewmodel } from '../../src/weapons/viewmodel.ts';
+import { makeAgent } from '../../tools/lib/agent-fixture.ts';
+import { ArmedWeaponSystem } from '../lib/ballistics-fixture.ts';
+import { createTestContext } from '../lib/context.ts';
+import { fixture } from '../lib/fixture.ts';
 
 for (const id of WEAPON_IDS) {
-  assert.equal(WEAPON_DEFS[id].tracerEvery, undefined, `${id} has no tracer cadence`);
+  assert.equal(
+    'tracerEvery' in WEAPON_DEFS[id] ? WEAPON_DEFS[id].tracerEvery : undefined,
+    undefined,
+    `${id} has no tracer cadence`
+  );
 }
 
-const vm = {
-  clipName: null,
-  play(name) {
-    this.clipName = name;
+let clipName: string | null = null;
+const vm = fixture<Viewmodel>({
+  get clipName(): string | null {
+    return clipName;
   },
-  stopClip() {
-    this.clipName = null;
+  play(name): number {
+    clipName = name;
+    return 1;
   },
-  muzzleWorld() {},
-  addRecoil() {},
-};
+  stopClip(): void {
+    clipName = null;
+  },
+  syncToCamera(): void {},
+  muzzleWorld(out): THREE.Vector3 {
+    return out;
+  },
+  addRecoil(): void {},
+});
 
-function makeRifle(seed) {
-  const wp = new WeaponSystem();
-  wp.ctx = {
-    time: { elapsed: 0, scale: 1 },
-    camera: {
-      position: new THREE.Vector3(),
-      quaternion: new THREE.Quaternion(),
-      updateMatrixWorld() {},
-    },
-  };
+function makeRifle(seed: number): ArmedWeaponSystem {
+  const wp = new ArmedWeaponSystem();
+  wp.ctx = createTestContext();
   wp.rng = new Rng(seed);
   wp.stats = { tris: 0, drawCalls: 0, live: 0, fired: 0 };
   wp.viewmodel = vm;
@@ -57,13 +67,14 @@ function makeRifle(seed) {
   return wp;
 }
 
-function fireRifle(wp) {
-  const spawned = [];
-  wp.sim = {
-    spawn(o) {
+function fireRifle(wp: ArmedWeaponSystem): Array<boolean | undefined> {
+  const spawned: Array<boolean | undefined> = [];
+  wp.sim = fixture<ProjectileSim>({
+    spawn(o): null {
       spawned.push(o.tracer);
+      return null;
     },
-  };
+  });
   wp._spread = 1.2;
   for (let i = 0; i < 9; i++) {
     wp.state.chambered = true;
@@ -77,7 +88,7 @@ function fireRifle(wp) {
 {
   const spawned = fireRifle(makeRifle(0x278b00));
   assert.equal(spawned.length, 9);
-  assert(spawned.every((tracer) => tracer === false));
+  assert(spawned.every((tracer): boolean => tracer === false));
 }
 
 const events = new EventBus();
@@ -97,20 +108,17 @@ phys
   })
   .setSegment(0, 1.18, 0, 0, 1.55, 0);
 
-function take(type) {
-  const got = [];
-  return { got, off: events.on(type, (e) => got.push(e)) };
+function take<K extends EngineEventName>(type: K): { got: EngineEventMap[K][]; off(): void } {
+  const got: EngineEventMap[K][] = [];
+  return { got, off: events.on(type, (e): number => got.push(e)) };
 }
 
 {
   const impacts = take('bullet:impact');
   const damage = take('damage:dealt');
-  const sim = new ProjectileSim({
-    events,
-    peek: (id) => (id === 'physics' ? phys : null),
-    has: () => false,
-    rng,
-  });
+  const ctx = createTestContext({ events, providers: { physics: phys }, rng });
+  ctx.has = (): boolean => false;
+  const sim = new ProjectileSim(ctx);
   sim.spawn({
     origin: new THREE.Vector3(0, 1.36, 4),
     dir: new THREE.Vector3(0, 0, -1),
@@ -134,15 +142,11 @@ function take(type) {
   assert.equal(damage.got.length, 1);
 }
 
-const ai = Object.create(AiSystem.prototype);
-ai.ctx = {
-  peek: (id) => (id === 'physics' ? phys : null),
-  events,
-  camera: { matrixWorld: new THREE.Matrix4() },
-  has: () => false,
-  config: { deterministic: false },
-  time: { elapsed: 12, frame: 40 },
-};
+const ai = new AiSystem();
+ai.ctx = createTestContext({ events, providers: { physics: phys } });
+ai.ctx.time.elapsed = 12;
+ai.ctx.time.frame = 40;
+ai.ctx.config.deterministic = false;
 ai._phys = phys;
 ai._v = new THREE.Vector3();
 ai._v2 = new THREE.Vector3();
@@ -157,7 +161,7 @@ ai._fireEvent = {
   flashScale: 0.8,
 };
 ai._shellEvent = { position: new THREE.Vector3(), velocity: new THREE.Vector3() };
-const agent = {
+const agent = makeAgent({
   id: 0,
   ammo: 0,
   team: 1,
@@ -166,8 +170,8 @@ const agent = {
   lastFired: -Infinity,
   fireX: 0,
   fireZ: 0,
-  animator: { ejectWorld: new THREE.Vector3(0.2, 1.2, 8) },
-};
+  animator: fixture<Animator>({ ejectWorld: new THREE.Vector3(0.2, 1.2, 8) }),
+});
 
 {
   const fires = take('weapon:fire');
@@ -184,56 +188,86 @@ const agent = {
 }
 
 {
-  const plays = [];
-  const audio = Object.create(AudioSystem.prototype);
+  const plays: string[] = [];
+  const audio = new AudioSystem();
   audio.running = true;
-  audio.ctx = { peek: () => null };
-  audio.rng = { float: () => 0 };
-  audio.field = {
+  audio.ctx = createTestContext();
+  audio.rng = new Rng(1);
+  audio.rng.float = (): number => 0;
+  audio.field = fixture<NonNullable<AudioSystem['field']>>({
     listenerPos: { x: 0, y: 1.36, z: 0 },
-    distanceTo(x, y, z) {
+    distanceTo(x, y, z): number {
       return Math.hypot(x, y - 1.36, z);
     },
-  };
-  audio._budget = { whizz: 0 };
+  });
+  audio._budget.whizz = 0;
   audio._whizzShots = new Float64Array(64);
   audio._whizzCursor = 0;
-  audio._space = { tight: 0, room: 0, street: 0, tunnel: 0 };
-  audio._lastEnemyFire = 0;
-  audio.actx = { currentTime: 0 };
-  audio.mixer = { duck() {} };
-  audio._playAt = (kind) => plays.push(kind);
-  audio._playDry = () => {};
-  const fire = {
+  audio._space = {
+    tight: 0,
+    room: 0,
+    street: 0,
+    tunnel: 0,
+    open: 0,
+    enclosure: 0,
+    meanFree: 0,
+    ceiling: 0,
+  };
+  audio.actx = fixture<AudioContext>({ currentTime: 0 });
+  audio.mixer = fixture<NonNullable<AudioSystem['mixer']>>({ duck(): void {} });
+  audio._playAt = (kind): boolean => {
+    plays.push(kind);
+    return true;
+  };
+  audio._playDry = (): boolean => true;
+  const fire: EngineEventMap['weapon:fire'] = {
+    actor: null,
+    seed: 0,
     weapon: 'ai_rifle',
-    origin: { x: 1, y: 1.36, z: 20 },
-    dir: { x: 0, y: 0, z: -1 },
+    origin: new THREE.Vector3(1, 1.36, 20),
+    dir: new THREE.Vector3(0, 0, -1),
   };
   for (let i = 0; i < 6; i++) {
     audio._budget.whizz = 0;
     audio._onFire(fire);
   }
   assert.equal(
-    plays.filter((k) => k === 'whizz').length,
+    plays.filter((k): boolean => k === 'whizz').length,
     0,
     'muzzle direction is not a resolved near miss'
   );
   for (let i = 0; i < 6; i++) {
     audio._budget.whizz = 0;
-    audio._onBulletSegment({ from: fire.origin, to: { x: 1, y: 1.36, z: -10 }, shot: i + 1 });
+    audio._onBulletSegment({
+      from: fire.origin,
+      to: new THREE.Vector3(1, 1.36, -10),
+      shooter: null,
+      weapon: null,
+      speed: 0,
+      tracer: false,
+      shot: i + 1,
+    });
   }
   assert.equal(
-    plays.filter((k) => k === 'whizz').length,
+    plays.filter((k): boolean => k === 'whizz').length,
     6,
     'resolved segments preserve whizz feedback'
   );
   audio._budget.whizz = 0;
-  audio._onBulletSegment({ from: fire.origin, to: { x: 1, y: 1.36, z: -10 }, shot: 6 });
-  assert.equal(plays.filter((k) => k === 'whizz').length, 6, 'one whizz per round');
+  audio._onBulletSegment({
+    from: fire.origin,
+    to: new THREE.Vector3(1, 1.36, -10),
+    shooter: null,
+    weapon: null,
+    speed: 0,
+    tracer: false,
+    shot: 6,
+  });
+  assert.equal(plays.filter((k): boolean => k === 'whizz').length, 6, 'one whizz per round');
   plays.length = 0;
   audio._budget.whizz = 0;
-  audio._onFire({ ...fire, origin: { x: 0, y: 1.36, z: 0 } });
-  assert.equal(plays.filter((k) => k === 'whizz').length, 0, 'own muzzle does not whizz');
+  audio._onFire({ ...fire, origin: new THREE.Vector3(0, 1.36, 0) });
+  assert.equal(plays.filter((k): boolean => k === 'whizz').length, 0, 'own muzzle does not whizz');
 }
 
 console.log('smoke-small-arms-tracers: ok');
