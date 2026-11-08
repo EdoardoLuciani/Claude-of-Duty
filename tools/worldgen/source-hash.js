@@ -16,6 +16,7 @@ export function worldSourceHash(root) {
   const files = [
     ...filesUnder(join(root, 'tools/worldgen')),
     join(root, 'tools/export-world.mjs'),
+    join(root, 'src/core/config.ts'),
     join(root, 'src/core/rng.ts'),
     join(root, 'src/core/geometry-validation.ts'),
     join(root, 'src/world/palette.ts'),

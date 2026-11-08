@@ -21,7 +21,7 @@
     "world": "node tools/export-world.mjs",
     "world:validate": "node tools/validate-world-assets.mjs",
     "world:smoke": "node tests/e2e/world-smoke.ts",
-    "test": "node --test tests/smoke/smoke.test.ts && node --test tests/lib/*.test.ts",
+    "test": "node tools/export-world.mjs && node --test tests/smoke/smoke.test.ts && node --test tests/lib/*.test.ts",
     "typecheck": "bun check",
     "format": "bun fmt src build tools tests docs README.md ARCHITECTURE.md prompt.md index.html tsconfig.json .oxlintrc.json .oxfmtrc.json package.json",
     "format:check": "bun run format --check",

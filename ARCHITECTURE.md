@@ -164,10 +164,10 @@ assembler-owned materials and canonical `geo`. A prototype may supply an owned
 `visualGeo` derivative for visual output only; support, collision and navigation
 must retain canonical geometry, topology and RNG/instance inputs. The assembler
 owns both geometries and handles aliased/unused inputs without double disposal.
-Manifest v2 and content-hashed GLBs live in
-`public/models/world/`. Preserve instancing/masks.
+Manifest v2 and content-hashed GLBs live in ignored `public/models/world/`.
+Dev/build/tests generate missing or stale world products. Preserve instancing/masks.
 Never author separate collision geometry or hand-edit generated files. Commit
-source + manifest + generated runtime assets together. Validate with
+world source, not generated products. Validate with
 `bun run world -- --check`, world/physics tests and screenshots.
 
 ## AI physical planning

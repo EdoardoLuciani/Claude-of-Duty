@@ -44,8 +44,8 @@ bun run dev            # local server; not needed for CI-only work
 
 Textures/animations are procedural or Blender-authored; runtime meshes are local
 GLBs. World source lives in `tools/worldgen/`; meshoptimizer cooks collision in
-Node. Normal builds use committed world assets. Change source and regenerate—do
-not hand-edit `public/models/world/**`.
+Node. Dev/build/tests generate missing or stale world assets; products are ignored,
+not committed. Change world source, never hand-edit `public/models/world/**`.
 
 `AGENTS.md`, `.github/workflows/*` and package manifests are protected: changes
 require human review and must be minimal and intentional. Do not modify these

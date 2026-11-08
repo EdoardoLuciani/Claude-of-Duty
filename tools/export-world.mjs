@@ -115,6 +115,23 @@ function assetName(kind, data, ext = 'glb.gz') {
   return `level-${kind}.${hash}.${ext}`;
 }
 
+function cacheReady() {
+  if (args.force || args.check) return false;
+  try {
+    const manifest = JSON.parse(readFileSync(join(OUT, 'level.json'), 'utf8'));
+    return (
+      manifest.sourceHash === worldSourceHash(ROOT) &&
+      ['visual', 'collision', 'nav'].every(
+        (kind) =>
+          typeof manifest.assets?.[kind] === 'string' &&
+          existsSync(join(OUT, manifest.assets[kind]))
+      )
+    );
+  } catch {
+    return false;
+  }
+}
+
 async function compileWorld() {
   const started = performance.now();
   const materialCache = new Map();
@@ -193,7 +210,7 @@ async function compileWorld() {
       ];
       for (const [file, data] of expected) {
         if (!existsSync(file) || !readFileSync(file).equals(data)) {
-          throw new Error(`[world] committed asset is stale: ${file}`);
+          throw new Error(`[world] generated asset is stale: ${file}`);
         }
       }
     } else {
@@ -228,8 +245,11 @@ async function compileWorld() {
   }
 }
 
-await withLock(compileWorld);
-await run(process.execPath, [
-  resolve(ROOT, 'tools/validate-world-assets.mjs'),
-  `--manifest=${join(OUT, 'level.json')}`,
-]);
+await withLock(async () => {
+  if (cacheReady()) console.log('[world] up to date');
+  else await compileWorld();
+  await run(process.execPath, [
+    resolve(ROOT, 'tools/validate-world-assets.mjs'),
+    `--manifest=${join(OUT, 'level.json')}`,
+  ]);
+});
