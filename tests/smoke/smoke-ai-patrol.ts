@@ -1,19 +1,25 @@
+import assert from 'node:assert/strict';
+
+import * as THREE from 'three';
+
 /**
  * Headless regressions for issue 274: patrol/search recovery after route failure.
  *
  *   node tests/smoke/smoke-ai-patrol.ts
  */
-import assert from 'node:assert/strict';
-
-import * as THREE from 'three';
-
+import type { Agent } from '../../src/ai/agent.ts';
 import { STATE, PATH_OUTCOME, EVIDENCE, SEARCH_DURATION } from '../../src/ai/agent.ts';
 import { AiSystem } from '../../src/ai/index.ts';
 import { SurfaceNav } from '../../src/ai/nav.ts';
+import { Squad } from '../../src/ai/squad.ts';
+import { PhysicsSystem } from '../../src/physics/index.ts';
+import { WorldSystem } from '../../src/world/index.ts';
 import { makeAgent as initializedAgent, makeAi, makeRng } from '../../tools/lib/agent-fixture.ts';
 import { testNav } from '../../tools/lib/test-nav.ts';
 import { loadMap } from '../../tools/nav240/fixtures.ts';
 import { makeWalker } from '../../tools/nav240/harness.ts';
+import { brainPhysics, brainAnimator } from '../lib/ai-brain-fixture.ts';
+import { createTestContext } from '../lib/context.ts';
 
 const connected = await testNav();
 // Pads cannot supply an alternative patrol leg within their own component.
@@ -22,7 +28,7 @@ const disconnected = await testNav([
   [10, 0, 10, 1.2, 1.2],
 ]);
 
-function makeAgent(over = {}) {
+function makeAgent(over: Partial<Agent> = {}): Agent {
   const rng = over.rng ?? makeRng();
   const ai = over.ai ?? makeAi(null);
   const a = initializedAgent({
@@ -33,15 +39,15 @@ function makeAgent(over = {}) {
     rng,
     ai,
     repathTimer: 5,
-    phys: { lineOfSight: () => true, MASK: { SIGHT: 1 } },
-    animator: { turn() {} },
+    phys: brainPhysics(),
+    animator: brainAnimator({}),
     ...over,
   });
   if (!ai.agents.includes(a)) ai.agents.push(a);
   return a;
 }
 
-function pump(agents, dt = 1 / 20) {
+function pump(agents: Agent | Agent[], dt = 1 / 20): void {
   const list = Array.isArray(agents) ? agents : [agents];
   const ai = list[0].ai;
   if (ai) ai._pathBudget = ai.pathsPerFrame ?? 2;
@@ -55,20 +61,24 @@ function pump(agents, dt = 1 / 20) {
   }
 }
 
-function countPaths(ai, fn) {
+function countPaths(
+  ai: AiSystem,
+  fn: (step: (dt?: number) => void) => void
+): { total: number; maxFrame: number; deferred: number } {
   let total = 0;
   let maxFrame = 0;
+  let frameSolves = 0;
   const orig = AiSystem.prototype.requestPath.bind(ai);
-  ai.requestPath = function (from, dest, out) {
+  ai.requestPath = function (from, dest, out): number {
     total++;
     const n = orig(from, dest, out);
-    if (n >= 0) this._frameSolves = (this._frameSolves ?? 0) + 1;
+    if (n >= 0) frameSolves++;
     return n;
   };
-  fn((dt) => {
-    ai._frameSolves = 0;
+  fn((dt): void => {
+    frameSolves = 0;
     pump(ai.agents.length ? ai.agents : [], dt);
-    maxFrame = Math.max(maxFrame, ai._frameSolves ?? 0);
+    maxFrame = Math.max(maxFrame, frameSolves);
   });
   return { total, maxFrame, deferred: ai.stats.pathsDeferred };
 }
@@ -77,7 +87,7 @@ function countPaths(ai, fn) {
 for (const goal of [new THREE.Vector3(0.8, 0, 0), new THREE.Vector3(0, 0.2, 0)]) {
   const a = makeAgent({ state: STATE.PATROL, hasMoveTarget: true, moveTarget: goal });
   let advances = 0;
-  a._pickNextPatrol = () => {
+  a._pickNextPatrol = (): boolean => {
     advances++;
     return false;
   };
@@ -89,24 +99,27 @@ for (const goal of [new THREE.Vector3(0.8, 0, 0), new THREE.Vector3(0, 0.2, 0)])
 /* ---- executable queries are not proof of physical patrol progress ------ */
 {
   const candidate = {
-    query(from, to) {
-      const points = [];
+    query(
+      from: THREE.Vector3,
+      to: THREE.Vector3
+    ): { points: THREE.Vector3[]; outcome: string | null; reason: string | null } {
+      const points: THREE.Vector3[] = [];
       connected.findPath(from, to, points);
       return { points, outcome: connected.lastOutcome, reason: connected.lastReason };
     },
   };
+  const physics = connected.physics;
+  assert.ok(physics instanceof PhysicsSystem);
   const start = new THREE.Vector3(1, 0.008, 1),
     goal = new THREE.Vector3(8, 0.008, 8);
-  const a = makeWalker({ grid: connected, physics: connected.physics }, candidate, start, 1);
-  Object.assign(a, {
-    state: STATE.PATROL,
-    patrolPoints: [goal],
-    patrolIndex: 0,
-    rng: makeRng(),
-    _failStreak: 0,
-    _failWait: 0,
-    _holdMove: false,
-  });
+  const a = makeWalker({ grid: connected, physics }, candidate, start, 1);
+  a.state = STATE.PATROL;
+  a.patrolPoints = [goal];
+  a.patrolIndex = 0;
+  a.rng = makeRng();
+  a._failStreak = 0;
+  a._failWait = 0;
+  a._holdMove = false;
   a._goTo(goal);
   a._recoveryCount = 3;
   a._recoveryOrigin.copy(a.position);
@@ -137,31 +150,33 @@ for (const goal of [new THREE.Vector3(0.8, 0, 0), new THREE.Vector3(0, 0.2, 0)])
   assert.ok(a.position.distanceTo(start) >= 3.6, 'reset requires real sustained progress');
   assert.equal(a._recoveryCount, 0);
   assert.equal(a._failStreak, 0);
+  assert.ok(a.controller);
   connected.physics.removeCharacter(a.controller);
 
-  const blocked = makeWalker({ grid: connected, physics: connected.physics }, candidate, start, 2);
-  Object.assign(blocked, {
-    state: STATE.PATROL,
-    patrolPoints: [goal],
-    patrolIndex: 0,
-    rng: makeRng(),
-    _failStreak: 0,
-    _failWait: 0,
-    _holdMove: false,
-  });
-  blocked.controller.move = () => {
-    blocked.controller.lastMoveBlocked = true;
+  const blocked = makeWalker({ grid: connected, physics }, candidate, start, 2);
+  blocked.state = STATE.PATROL;
+  blocked.patrolPoints = [goal];
+  blocked.patrolIndex = 0;
+  blocked.rng = makeRng();
+  blocked._failStreak = 0;
+  blocked._failWait = 0;
+  blocked._holdMove = false;
+  const controller = blocked.controller;
+  assert.ok(controller);
+  controller.move = (): number => {
+    controller.lastMoveBlocked = true;
+    return 0;
   };
   const unstick = blocked._unstickDest.bind(blocked);
   let probes = 0,
     holdFrames = 0,
     alternatives = 0;
-  blocked._unstickDest = (out) => {
+  blocked._unstickDest = (out): THREE.Vector3 | null => {
     probes++;
     return unstick(out);
   };
   const pickAlt = blocked._pickLocalAlt.bind(blocked);
-  blocked._pickLocalAlt = (out) => {
+  blocked._pickLocalAlt = (out): THREE.Vector3 | null => {
     alternatives++;
     return pickAlt(out);
   };
@@ -183,7 +198,7 @@ for (const goal of [new THREE.Vector3(0.8, 0, 0), new THREE.Vector3(0, 0.2, 0)])
   assert.ok(holdFrames >= 60, 'repeated execution failure must reach the patrol hold');
   assert.ok(blocked.position.equals(start), 'fault-injected movement must stay blocked');
   assert.equal(blocked.recoveries.length, 0, 'no relocation credited as progress');
-  connected.physics.removeCharacter(blocked.controller);
+  connected.physics.removeCharacter(controller);
 }
 
 /* ---- invalid / disconnected goals: skip, back off, hold ---------------- */
@@ -198,7 +213,7 @@ for (const goal of [new THREE.Vector3(0.8, 0, 0), new THREE.Vector3(0, 0.2, 0)])
     patrolPoints: [new THREE.Vector3(10, 0, 10), new THREE.Vector3(10, 0, 9)],
   });
   let held = false;
-  const { total, maxFrame } = countPaths(ai, (step) => {
+  const { total, maxFrame } = countPaths(ai, (step): void => {
     for (let i = 0; i < 80; i++) {
       step();
       if (a._holdMove) held = true;
@@ -246,7 +261,7 @@ for (const goal of [new THREE.Vector3(0.8, 0, 0), new THREE.Vector3(0, 0.2, 0)])
     patrolPoints: [new THREE.Vector3(9, 0, 3)],
   });
   const lateStart = late.position.clone();
-  const after = countPaths(ai, (step) => {
+  const after = countPaths(ai, (step): void => {
     for (let i = 0; i < 80; i++) step();
   });
   assert.ok(after.maxFrame <= 2, `post-arrival spilled budget (${after.maxFrame})`);
@@ -261,7 +276,7 @@ for (const goal of [new THREE.Vector3(0.8, 0, 0), new THREE.Vector3(0, 0.2, 0)])
 {
   const ai = makeAi(connected);
   ai.pathsPerFrame = 2;
-  const agents = [0, 1, 2].map((id) =>
+  const agents = [0, 1, 2].map((id): Agent =>
     makeAgent({
       ai,
       id: id + 1,
@@ -271,11 +286,11 @@ for (const goal of [new THREE.Vector3(0.8, 0, 0), new THREE.Vector3(0, 0.2, 0)])
     })
   );
   let pendingSeen = 0;
-  const starts = agents.map((a) => a.position.clone());
-  const { maxFrame, deferred } = countPaths(ai, (step) => {
+  const starts = agents.map((a): THREE.Vector3 => a.position.clone());
+  const { maxFrame, deferred } = countPaths(ai, (step): void => {
     for (let i = 0; i < 40; i++) {
       step();
-      if (agents.some((a) => a.pathPending)) pendingSeen++;
+      if (agents.some((a): boolean => a.pathPending)) pendingSeen++;
     }
   });
   assert.ok(maxFrame <= 2, `shared budget spilled (${maxFrame})`);
@@ -304,7 +319,7 @@ for (const goal of [new THREE.Vector3(0.8, 0, 0), new THREE.Vector3(0, 0.2, 0)])
   a._noteEvidence(new THREE.Vector3(10, 0, 10), EVIDENCE.VISUAL, 0);
   a._setState(STATE.ALERT);
   let held = false;
-  const { total, maxFrame } = countPaths(ai, (step) => {
+  const { total, maxFrame } = countPaths(ai, (step): void => {
     for (let i = 0; i < 200; i++) {
       step();
       if (a._holdMove) held = true;
@@ -322,33 +337,32 @@ for (const goal of [new THREE.Vector3(0.8, 0, 0), new THREE.Vector3(0, 0.2, 0)])
 /* ---- spawn-to-patrol validation: capsule is not enough ----------------- */
 {
   const ai = makeAi(disconnected);
-  const island = { position: new THREE.Vector3(0, 0, 0), yaw: 0 };
-  const far = { position: new THREE.Vector3(10, 0, 10), yaw: 0 };
-  Object.assign(ai, {
-    ctx: { peek: () => ({ spawnPoints: [island, far] }) },
-    _phys: {
-      checkCapsule: () => true,
-      groundHeight: () => 0,
-      MASK: { CHARACTER: 1 },
-    },
-    rng: makeRng(0.2),
-    agents: [],
-    squads: [],
-    _v: new THREE.Vector3(),
-    _v2: new THREE.Vector3(),
-    _v3: new THREE.Vector3(),
-    playerPosition(out) {
-      return out.set(80, 0, 80);
-    },
-    spawn(variant, p, yaw, opts) {
-      const a = { position: p.clone(), patrolPoints: opts.patrol, variant, yaw };
-      this.agents.push(a);
-      return a;
-    },
-    createSquad() {
-      return { add() {}, members: [] };
-    },
-  });
+  const island = { position: new THREE.Vector3(0, 0, 0), yaw: 0, tag: 'test' };
+  const far = { position: new THREE.Vector3(10, 0, 10), yaw: 0, tag: 'test' };
+  const world = new WorldSystem();
+  world.spawnPoints = [island, far];
+  ai.ctx = createTestContext({ providers: { world } });
+  ai._phys = brainPhysics();
+  ai._phys.checkCapsule = (): boolean => true;
+  ai._phys.groundHeight = (): number => 0;
+  ai.rng = makeRng(0.2);
+  ai.agents = [];
+  ai.squads = [];
+  ai._v = new THREE.Vector3();
+  ai._v2 = new THREE.Vector3();
+  ai._v3 = new THREE.Vector3();
+  ai.playerPosition = (out): THREE.Vector3 => out.set(80, 0, 80);
+  ai.spawn = (variant, p, yaw, opts): Agent => {
+    const a = initializedAgent({
+      position: p.clone(),
+      patrolPoints: opts?.patrol ?? null,
+      variantName: variant,
+      yaw: yaw ?? 0,
+    });
+    ai.agents.push(a);
+    return a;
+  };
+  ai.createSquad = (): Squad => new Squad(makeRng());
   const made = AiSystem.prototype.populate.call(ai, { squads: 1, perSquad: 2 });
   assert.equal(made, 0, 'disconnected capsule spawn must not count as a patrol route');
 
@@ -357,7 +371,10 @@ for (const goal of [new THREE.Vector3(0.8, 0, 0), new THREE.Vector3(0, 0.2, 0)])
   const madeOk = AiSystem.prototype.populate.call(ai, { squads: 1, perSquad: 2 });
   assert.ok(madeOk > 0, 'connected spawn+route must still populate');
   for (const a of ai.agents) {
-    assert.ok(a.patrolPoints?.length >= 1, 'usable route must keep at least one end');
+    assert.ok(
+      a.patrolPoints && a.patrolPoints.length >= 1,
+      'usable route must keep at least one end'
+    );
   }
 }
 
@@ -378,15 +395,16 @@ for (const goal of [new THREE.Vector3(0.8, 0, 0), new THREE.Vector3(0, 0.2, 0)])
   let req = 0,
     solverPops = 0;
   const solve = grid.query.findPath.bind(grid.query);
-  grid.query.findPath = (...args) => {
+  grid.query.findPath = (...args): ReturnType<typeof solve> => {
     solverPops++;
     return solve(...args);
   };
   const orig = AiSystem.prototype.requestPath.bind(ai);
-  ai.requestPath = function (from, dest, out) {
+  ai.requestPath = function (from, dest, out): number {
     req++;
     return orig(from, dest, out);
   };
+  assert.ok(a.patrolPoints);
   const ok = a._goTo(a.patrolPoints[0]);
   assert.equal(ok, false);
   assert.equal(a.pathOutcome, PATH_OUTCOME.INVALID);
@@ -399,10 +417,11 @@ for (const goal of [new THREE.Vector3(0.8, 0, 0), new THREE.Vector3(0, 0.2, 0)])
 /* ---- recorded survivor locations: move or a bounded failure ------------ */
 {
   const { meta, surfaceRaw, physics } = await loadMap();
+  assert.ok(meta.navigation);
   const grid = await SurfaceNav.load(surfaceRaw, physics, { sha256: meta.navigation.sha256 });
 
   const patrol = meta.spawns.map(
-    (s) => new THREE.Vector3(s.position[0], s.position[1], s.position[2])
+    (s): THREE.Vector3 => new THREE.Vector3(s.position[0], s.position[1], s.position[2])
   );
   const recorded = [
     { id: 23, position: new THREE.Vector3(22.613, 0.423, 46.092) },
@@ -411,7 +430,7 @@ for (const goal of [new THREE.Vector3(0.8, 0, 0), new THREE.Vector3(0, 0.2, 0)])
   ];
   const ai = makeAi(grid);
   ai.pathsPerFrame = 2;
-  const agents = recorded.map((r) =>
+  const agents = recorded.map((r): Agent =>
     makeAgent({
       ai,
       id: r.id,
@@ -420,8 +439,8 @@ for (const goal of [new THREE.Vector3(0.8, 0, 0), new THREE.Vector3(0, 0.2, 0)])
       patrolPoints: patrol,
     })
   );
-  const starts = agents.map((a) => a.position.clone());
-  const { total, maxFrame } = countPaths(ai, (step) => {
+  const starts = agents.map((a): THREE.Vector3 => a.position.clone());
+  const { total, maxFrame } = countPaths(ai, (step): void => {
     for (let i = 0; i < 120; i++) step(1 / 20);
   });
   assert.ok(maxFrame <= 2, `recorded positions spilled budget (${maxFrame})`);

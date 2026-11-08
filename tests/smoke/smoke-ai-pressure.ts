@@ -2,15 +2,21 @@ import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
 
-import { CoverMap } from '../../src/ai/nav.ts';
+import type { Agent, AiState } from '../../src/ai/agent.ts';
+import type { BakedCoverPoint } from '../../src/ai/nav-format.ts';
+import { SurfaceNav, CoverMap } from '../../src/ai/nav.ts';
 import { Squad } from '../../src/ai/squad.ts';
 import { TACTICS } from '../../src/ai/tuning.ts';
+import type { EngineEventMap } from '../../src/core/events.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { makeAgent, makeAi } from '../../tools/lib/agent-fixture.ts';
 import { observeFriendlyDamage } from '../../tools/lib/combat-fixture.ts';
+import { brainPhysics, brainAnimator, coverPoint } from '../lib/ai-brain-fixture.ts';
+import { createTestContext } from '../lib/context.ts';
+import { fixture } from '../lib/fixture.ts';
 
-function fighter(state = 'combat') {
+function fighter(state: AiState = 'combat'): Agent {
   const ai = makeAi();
   const a = makeAgent({
     ai,
@@ -23,12 +29,11 @@ function fighter(state = 'combat') {
     visualAge: 0,
     lastKnown: new THREE.Vector3(0, 1.2, 8),
     hasGrenade: false,
-    phys: { lineOfSight: () => true, MASK: { SIGHT: 1 } },
-    animator: {
+    phys: brainPhysics(),
+    animator: brainAnimator({
       muzzleWorld: new THREE.Vector3(),
       muzzleDir: new THREE.Vector3(0, 0, 1),
-      turn() {},
-    },
+    }),
   });
   ai.agents.push(a);
   return a;
@@ -37,8 +42,8 @@ function fighter(state = 'combat') {
 // Hearing can keep evidence fresh, but must not prolong visual acquisition.
 {
   const a = fighter();
-  a.ai.playerPosition = (out) => out.set(0, 1.2, 8);
-  a.phys.lineOfSight = () => false;
+  a.ai.playerPosition = (out): THREE.Vector3 => out.set(0, 1.2, 8);
+  a.phys.lineOfSight = (): boolean => false;
   for (let i = 0; i < 50; i++) {
     a.lastKnownAge += 0.1;
     a._sense(0.1);
@@ -49,14 +54,14 @@ function fighter(state = 'combat') {
   assert.ok(a.visualAge > TACTICS.visualMemory);
   assert.ok(a.lastKnownAge < 0.2, 'sound still guides investigation');
   assert.equal(a._canFireAtLastKnown(), false);
-  a.phys.lineOfSight = () => true;
+  a.phys.lineOfSight = (): boolean => true;
   a.yaw = 0;
   for (let i = 0; i < 30; i++) a._sense(0.05);
   assert.equal(a.hasTarget, true, 'real reacquisition restores combat');
   assert.equal(a.visualAge, 0);
 }
 
-for (const state of ['combat', 'flank', 'retreat']) {
+for (const state of ['combat', 'flank', 'retreat'] as const) {
   const a = fighter(state);
   a.hasMoveTarget = true;
   a.pathLen = 1;
@@ -78,10 +83,10 @@ for (const state of ['combat', 'flank', 'retreat']) {
 
 for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 'unseen']) {
   const a = fighter('flank');
-  if (reason === 'reload') a.animator.reloading = true;
+  if (reason === 'reload') a.animator.reloadT = 0;
   if (reason === 'vault') a.vaultT = 0.3;
   if (reason === 'suppression') a.suppression = 1.3;
-  if (reason === 'muzzle') a.phys.lineOfSight = () => false;
+  if (reason === 'muzzle') a.phys.lineOfSight = (): boolean => false;
   if (reason === 'unacquired') a.hasTarget = false;
   if (reason === 'unseen') a.targetVisible = false;
   assert.equal(a._engageClose(0.05), false, reason);
@@ -100,17 +105,19 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
 }
 // A walkable peek with no firing lane is a failure, not a fallback exposure.
 {
-  const p = { x: 0, y: 0, z: 0, dx: 0, dz: 1, high: true, component: 1, claimed: -1 };
-  const grid = {
+  const p = coverPoint({ x: 0, y: 0, z: 0, dx: 0, dz: 1, high: true, component: 1, claimed: -1 });
+  const grid = fixture<SurfaceNav>({
     coverPoints: [p],
+    walkingComponents: new Map([[1, 1]]),
+    worker: null,
     components: new Map([[1, 1]]),
-    project(pos, out) {
+    project(pos, out): number {
       out.copy(pos);
       return 1;
     },
-    lineOfWalk: () => true,
-  };
-  const phys = { MASK: { SIGHT: 1 }, lineOfSight: () => false };
+    lineOfWalk: (): boolean => true,
+  });
+  const phys = brainPhysics(false);
   const cover = new CoverMap(grid, phys),
     out = new THREE.Vector3(),
     threat = new THREE.Vector3(0, 1.5, 12);
@@ -121,15 +128,15 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
     'protected but blind cover is not a fighting position'
   );
   assert.equal(p.claimed, -1);
-  cover.protects = () => true;
-  phys.lineOfSight = () => true;
-  grid.lineOfWalk = () => false;
+  cover.protects = (): boolean => true;
+  phys.lineOfSight = (): boolean => true;
+  grid.lineOfWalk = (): boolean => false;
   assert.equal(
     cover.pick(out, threat, { id: 1 }),
     null,
     'clear sight cannot override a blocked exposure walk'
   );
-  grid.lineOfWalk = () => true;
+  grid.lineOfWalk = (): boolean => true;
   assert.equal(cover.pick(out, threat, { id: 1 }), p);
   const a = fighter();
   a.cover = p;
@@ -155,7 +162,7 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
 // Travel must not consume the firing window; blocked execution still times out.
 {
   const a = fighter();
-  a.cover = { x: 0, y: 0, z: 0, high: true };
+  a.cover = coverPoint({ x: 0, y: 0, z: 0, high: true });
   a.firePos.set(1.9, 0, 0);
   a.peeking = true;
   a.peekTimer = TACTICS.peekFireTime;
@@ -181,10 +188,11 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
   holder.wantFire = true;
   assert.equal(sq.canFlank(mover), true);
   for (const field of ['_muzzleBlocked', 'reloading', '_friendlyBlock']) {
-    if (field === 'reloading') holder.animator.reloading = true;
-    else holder[field] = 1;
+    if (field === 'reloading') holder.animator.reloadT = 0;
+    else if (field === '_muzzleBlocked') holder._muzzleBlocked = true;
+    else holder._friendlyBlock = 1;
     assert.equal(sq.canFlank(mover), false, field);
-    holder.animator.reloading = false;
+    holder.animator.reloadT = -1;
     holder._muzzleBlocked = false;
     holder._friendlyBlock = 0;
   }
@@ -204,17 +212,17 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
   wall.updateMatrixWorld(true);
   phys.addStatic(wall, 'concrete');
   phys.rebuildStatic();
-  phys.ctx = { events: new EventBus() };
+  phys.ctx = createTestContext();
   const a = fighter();
   a.phys = phys;
   a.lastKnown.set(5, 1, 0);
-  const friend = { alive: true, team: a.team, position: new THREE.Vector3(10, 0, 0) };
-  const player = { team: 0 };
+  const friend = makeAgent({ alive: true, team: a.team, position: new THREE.Vector3(10, 0, 0) });
+  const player = makeAgent({ team: 0 });
   a.ai.agents.push(friend);
   for (const [owner, x, layer] of [
     [player, 5, phys.LAYER.PLAYER],
     [friend, 10, phys.LAYER.ACTOR],
-  ]) {
+  ] as const) {
     phys
       .addCollider({ owner, layer, surface: 'flesh', radius: 0.1 })
       .setSegment(x, 0.3, 0, x, 1.5, 0, 0.1);
@@ -241,13 +249,14 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
     maxDist: 200,
   });
   assert.equal(shot.stopReason, 'blocked');
-  assert.equal(shot.impacts.find((i) => !i.exit && i.actor)?.actor, player);
-  assert(!shot.impacts.some((i) => i.actor === friend), 'the ally cannot be reached');
+  assert.equal(shot.impacts.find((i): unknown => !i.exit && i.actor)?.actor, player);
+  assert(!shot.impacts.some((i): boolean => i.actor === friend), 'the ally cannot be reached');
   friend.position.set(3, 0, 0.3);
   assert.equal(a._shotBlockedByFriend(origin, dir), true, 'keep the near-teammate safety margin');
   phys.dispose();
   wall.geometry.dispose();
-  wall.material.dispose();
+  for (const material of Array.isArray(wall.material) ? wall.material : [wall.material])
+    material.dispose();
 }
 
 // Negative control for the browser safety oracle: bypass AI authorization via
@@ -261,25 +270,29 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
   phys.addStatic(wall, 'wood');
   phys.rebuildStatic();
   const events = new EventBus();
-  phys.ctx = { events };
+  phys.ctx = createTestContext({ events });
   const ai = makeAi();
   ai._phys = phys;
-  ai.ctx = {
-    events,
-    config: { deterministic: true },
-    time: { frame: 1 },
-    peek: () => null,
-    has: (id) => id === 'telemetry',
+  ai.ctx = createTestContext({ events });
+  ai.ctx.time.frame = 1;
+  ai._flashGain = ai._flashLight = (): number => 0;
+  ai._fireEvent = {
+    actor: null,
+    weapon: 'ai_rifle',
+    origin: new THREE.Vector3(),
+    dir: new THREE.Vector3(),
+    seed: 0,
+    intensity: 0,
+    light: 0,
+    flashScale: 0,
   };
-  ai._flashGain = ai._flashLight = () => 0;
-  ai._fireEvent = { origin: new THREE.Vector3(), dir: new THREE.Vector3() };
   ai._shellEvent = { position: new THREE.Vector3(), velocity: new THREE.Vector3() };
   ai._v2 = new THREE.Vector3();
   const a = makeAgent({
     ai,
     phys,
     weaponDamage: 25,
-    animator: { ejectWorld: new THREE.Vector3() },
+    animator: brainAnimator({ ejectWorld: new THREE.Vector3() }),
   });
   // The muzzle can start inside the shooter's own animated capsule. It must
   // not hide an ally's head from the safety query.
@@ -292,8 +305,13 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
       radius: 0.3,
     })
     .setSegment(0, 1.65, 0, 0, 1.75, 0, 0.3);
-  const friend = { id: 2, alive: true, team: a.team, position: new THREE.Vector3(0, 0, 4) };
-  const player = { team: 0 };
+  const friend = makeAgent({
+    id: 2,
+    alive: true,
+    team: a.team,
+    position: new THREE.Vector3(0, 0, 4),
+  });
+  const player = makeAgent({ team: 0 });
   ai.agents.push(a, friend, player);
   phys
     .addCollider({
@@ -305,15 +323,15 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
       radius: 0.098,
     })
     .setSegment(0, 1.65, 4, 0, 1.75, 4, 0.098);
-  const report = {},
+  const report = { friendlyHits: 0, friendlyDamage: 0 },
     stop = observeFriendlyDamage(events, ai.agents, a.team, report);
   events.emit('damage:dealt', { target: player, amount: 10 });
   events.emit('damage:dealt', { target: { team: a.team }, amount: 10 });
   assert.equal(report.friendlyHits, 0, 'ignore other teams and actors outside this fixture');
   assert.equal(report.friendlyDamage, 0);
   ai.agents.pop();
-  let summary;
-  const stopShot = events.on('shot:resolved', (e) => {
+  let summary: EngineEventMap['shot:resolved'] | undefined;
+  const stopShot = events.on('shot:resolved', (e): void => {
     summary = e;
   });
   const origin = new THREE.Vector3(0, 1.7, 0),
@@ -335,21 +353,22 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
     maxDist: 200,
   }); // Intentional unsafe shot tests the observer.
   assert.equal(
-    shot.impacts.find((i) => !i.exit && i.actor)?.actor,
+    shot.impacts.find((i): unknown => !i.exit && i.actor)?.actor,
     friend,
     'physical result includes the ally beyond wood'
   );
   assert.equal(report.friendlyHits, 1, 'damage observer catches the penetrated friendly hit');
   assert.ok(report.friendlyDamage > 0 && report.friendlyDamage < a.weaponDamage);
   assert.throws(
-    () => assert.equal(report.friendlyHits, 0),
+    (): void => assert.equal(report.friendlyHits, 0),
     'browser zero-friendly-hit gate must reject the control'
   );
   stop();
   stopShot();
   phys.dispose();
   wall.geometry.dispose();
-  wall.material.dispose();
+  for (const material of Array.isArray(wall.material) ? wall.material : [wall.material])
+    material.dispose();
 }
 
 // A fresh squad report can start one climb, never grant a personal target.
@@ -363,17 +382,17 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
   sq.add(holder);
   sq.add(climber);
   sq.ai = climber.ai;
-  const point = { x: 8, y: 3.5, z: 12, high: true };
+  const point = coverPoint({ x: 8, y: 3.5, z: 12, high: true });
   let picks = 0;
-  sq.ai.cover = {
-    pick(_from, _target, opts) {
+  sq.ai.cover = fixture<CoverMap>({
+    pick(_from, _target, opts): BakedCoverPoint {
       picks++;
-      assert.equal(opts.elevated, true);
+      assert.equal(opts?.elevated, true);
       return point;
     },
-    release() {},
-  };
-  climber._goTo = function (p) {
+    release(): void {},
+  });
+  climber._goTo = function (p): true {
     this.path = [this.position.clone(), new THREE.Vector3().copy(p)];
     this.pathLen = 2;
     this.moveTarget.copy(p);
@@ -415,37 +434,38 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
 {
   const a = fighter(),
     center = new THREE.Vector3(),
-    walks = [];
+    walks: THREE.Vector3[] = [];
   a.position.set(0.02, 0, 0);
   a._positionPlan = { center, state: a.state, investigate: false };
-  a._shotBlockedByFriend = () => false;
-  a.ai.grid = {
+  a._shotBlockedByFriend = (): boolean => false;
+  a.ai.grid = fixture<SurfaceNav>({
+    worker: null,
     components: new Map([[1, 1]]),
-    project(p, out) {
+    project(p, out): number {
       out.copy(p);
       return 1;
     },
-    sampleGround(x, z, y, out) {
+    sampleGround(x, z, y, out): number {
       out.set(x, y, z);
       return 1;
     },
-    lineOfWalk(from) {
+    lineOfWalk(from): true {
       walks.push(from.clone());
       return true;
     },
-  };
+  });
   let routes = 0;
-  a.ai.requestPath = (from) => {
+  a.ai.requestPath = (from): number => {
     routes++;
     assert.equal(from, a.position);
     return 0;
   };
   a._finishRepositionPlan();
-  assert.ok(walks.length > 0 && walks.every((p) => p.equals(center)));
+  assert.ok(walks.length > 0 && walks.every((p): boolean => p.equals(center)));
   assert.equal(routes, 1, 'selection cannot bypass a complete live-foot path');
   assert.equal(a._repositioning, false, 'an unaccepted live route cannot start movement');
   a._positionPlan = { center, state: a.state, investigate: false };
-  a.phys.lineOfSight = () => false;
+  a.phys.lineOfSight = (): boolean => false;
   a._pickObservationPoints(a.lastKnown, true);
   assert.equal(a._searchCount, 0, 'static eligibility cannot replace current firing clearance');
 }
@@ -453,16 +473,20 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
 for (const admitted of [true, false]) {
   const a = fighter(),
     destination = new THREE.Vector3(2, 0, 0);
-  a.ai.grid = { project: () => 0, sampleGround: () => 0 };
+  a.ai.grid = fixture<SurfaceNav>({
+    worker: null,
+    project: (): number => 0,
+    sampleGround: (): number => 0,
+  });
   a.moveTarget.copy(a.position);
   a._positionPlan = { center: a.position.clone(), state: a.state, investigate: false };
-  a._pickObservationPoints = () => {
+  a._pickObservationPoints = (): void => {
     a._searchCount = 1;
     a._searchCand[0].copy(destination);
   };
   a.ai.lastPathOutcome = 'deferred';
   a.ai.lastPathReason = 'attachment-pending';
-  a.ai.requestPath = () => -1;
+  a.ai.requestPath = (): number => -1;
   a._finishRepositionPlan();
   assert(a._repositioning && a.pathPending);
   a._combatClock += TACTICS.firingStepTime * 2;
@@ -470,10 +494,10 @@ for (const admitted of [true, false]) {
   assert(a._repositioning && a.pathPending, 'deferral cannot cancel the new request');
   assert.equal(a.desiredSpeed, 0, 'do not execute the old route as the new reposition');
   assert(
-    !a._failedCovers.some((p) => p.until > a._combatClock),
+    !a._failedCovers.some((p): boolean => p.until > a._combatClock),
     'waiting is not a physical failure'
   );
-  a.ai.requestPath = () => {
+  a.ai.requestPath = (): 0 | 2 => {
     a.path[0] = a.position.clone();
     a.path[1] = destination.clone();
     return admitted ? 2 : 0;
@@ -490,7 +514,7 @@ for (const admitted of [true, false]) {
     assert.equal(a._updateReposition(), false, 'only the accepted destination can report arrival');
   } else {
     assert(
-      a._failedCovers.some((p) => p.x === destination.x && p.until > a._combatClock),
+      a._failedCovers.some((p): boolean => p.x === destination.x && p.until > a._combatClock),
       'reject the requested destination, not the old target'
     );
   }
@@ -499,18 +523,19 @@ for (const admitted of [true, false]) {
 // replace every physical query before its response arrives.
 {
   const a = fighter('alert'),
-    sampled = [];
+    sampled: number[][] = [];
   a._searchOrigin.set(0, 1.2, 8);
   a.lastKnown.set(0.1, 1.2, 8);
   a._searchPending = true;
-  a.ai.grid = {
-    project: () => 1,
+  a.ai.grid = fixture<SurfaceNav>({
+    worker: null,
+    project: (): number => 1,
     components: new Map([[1, 1]]),
-    sampleGround(x, z, y) {
+    sampleGround(x, z, y): number {
       sampled.push([x, y, z]);
       return 0;
     },
-  };
+  });
   a._buildSearchCandidates();
   assert.deepEqual(
     sampled[0],

@@ -1,3 +1,7 @@
+import assert from 'node:assert/strict';
+
+import * as THREE from 'three';
+
 /**
  * Headless regressions for issue 275.
  *
@@ -6,10 +10,7 @@
  *
  *   node tests/smoke/smoke-ai-fire.ts
  */
-import assert from 'node:assert/strict';
-
-import * as THREE from 'three';
-
+import type { Agent } from '../../src/ai/agent.ts';
 import {
   STATE,
   FIRE_BLOCK,
@@ -18,120 +19,110 @@ import {
   PEEK_WAIT_GIVE_UP,
 } from '../../src/ai/agent.ts';
 import { AiSystem } from '../../src/ai/index.ts';
+import type { BakedCoverPoint } from '../../src/ai/nav-format.ts';
+import { CoverMap } from '../../src/ai/nav.ts';
 import { Squad } from '../../src/ai/squad.ts';
 import { COMBAT } from '../../src/ai/tuning.ts';
+import { PhysicsSystem } from '../../src/physics/index.ts';
 import { makeAgent, makeAi } from '../../tools/lib/agent-fixture.ts';
 import { testNav } from '../../tools/lib/test-nav.ts';
+import { midpointRng, brainPhysics, brainAnimator, coverPoint } from '../lib/ai-brain-fixture.ts';
+import { createTestContext } from '../lib/context.ts';
 import { FRAME_SOURCES } from '../lib/frame-sources.ts';
 
+const pathGrid = await testNav();
+function lastShot(times: number[]): number {
+  const time = times.at(-1);
+  assert.notEqual(time, undefined);
+  assert.ok(typeof time === 'number');
+  return time;
+}
 const DT = 1 / 60;
-const rng = {
-  float: () => 0.5,
-  range: (a, b) => (a + b) * 0.5,
-  int: (a) => a,
-  gauss: () => 0,
-};
+const rng = midpointRng();
 
-function stubAgent(over = {}) {
-  const a = makeAgent();
-  Object.assign(
-    a,
-    {
-      id: 1,
-      alive: true,
-      state: STATE.COMBAT,
-      stateTime: 2,
-      hasTarget: true,
-      targetVisible: true,
-      // Navigation wait contracts apply outside the new close-defense interrupt.
-      lastKnown: new THREE.Vector3(0, 1.1, -10),
-      lastKnownAge: 0.2,
-      lastKnownKind: 'visual',
-      position: new THREE.Vector3(0, 0, 10),
-      yaw: Math.PI,
-      targetYaw: Math.PI,
-      peekTimer: 9,
-      wantFire: false,
-      crouch: false,
-      aimWeight: 1,
-      desiredSpeed: 0,
-      speed: 0,
-      aimTarget: new THREE.Vector3(0, 1.1, -10),
-      health: 100,
-      weaponRange: COMBAT.viewRange,
-      fireRate: COMBAT.fireRate,
-      spread: 0,
-      magSize: 30,
-      ammo: 30,
-      burstLeft: 0,
-      fireCooldown: 0,
-      burstCooldown: 0,
-      suppression: 0,
-      hasGrenade: false,
-      grenadeCooldown: 99,
-      role: 'pin',
-      wrapWait: 0,
-      _wrapDone: true,
-      repathTimer: 5,
-      eyeHeight: 1.62,
-      squad: null,
-      rng,
-      ctx: { time: { elapsed: 0, dt: DT, frame: 0 } },
-      ai: {
-        cover: {
-          pick() {
-            return null;
-          },
-          protects() {
-            return true;
-          },
-          release() {},
-          peekOffset(_c, _t, _e, out) {
-            out.copy(a.coverPos);
-            return 0;
-          },
-        },
-        stats: { grenadeHolds: 0, friendlyHolds: 0, pathsDeferred: 0 },
-        agents: [],
-        onAgentFire() {},
-        grid: null,
-      },
-      phys: {
-        lineOfSight: () => true,
-        raycast: () => ({ hit: false }),
-        MASK: { SIGHT: 1, WORLD: 2 },
-      },
-      animator: {
-        muzzleWorld: new THREE.Vector3(0.15, 1.42, 10),
-        muzzleDir: new THREE.Vector3(0, 0, -1),
-        reloading: false,
-        vaulting: false,
-        fire() {},
-        turn() {},
-      },
-    },
-    over
-  );
+function stubAgent(over: Partial<Agent> = {}): Agent {
+  const ai = makeAi();
+  const phys = brainPhysics();
+  const cover = new CoverMap(null, phys);
+  ai.cover = cover;
+  const a = makeAgent({
+    id: 1,
+    alive: true,
+    state: STATE.COMBAT,
+    stateTime: 2,
+    hasTarget: true,
+    targetVisible: true,
+    // Navigation wait contracts apply outside the new close-defense interrupt.
+    lastKnown: new THREE.Vector3(0, 1.1, -10),
+    lastKnownAge: 0.2,
+    lastKnownKind: 'visual',
+    position: new THREE.Vector3(0, 0, 10),
+    yaw: Math.PI,
+    targetYaw: Math.PI,
+    peekTimer: 9,
+    wantFire: false,
+    crouch: false,
+    aimWeight: 1,
+    desiredSpeed: 0,
+    speed: 0,
+    aimTarget: new THREE.Vector3(0, 1.1, -10),
+    health: 100,
+    weaponRange: COMBAT.viewRange,
+    fireRate: COMBAT.fireRate,
+    spread: 0,
+    magSize: 30,
+    ammo: 30,
+    burstLeft: 0,
+    fireCooldown: 0,
+    burstCooldown: 0,
+    suppression: 0,
+    hasGrenade: false,
+    grenadeCooldown: 99,
+    role: 'pin',
+    wrapWait: 0,
+    _wrapDone: true,
+    repathTimer: 5,
+    eyeHeight: 1.62,
+    squad: null,
+    rng,
+    ctx: createTestContext(),
+    ai,
+    phys,
+    animator: brainAnimator({
+      muzzleWorld: new THREE.Vector3(0.15, 1.42, 10),
+      muzzleDir: new THREE.Vector3(0, 0, -1),
+    }),
+    ...over,
+  });
+
+  cover.pick = (): null => null;
+  cover.protects = (): boolean => true;
+  cover.release = (): void => {};
+  cover.peekOffset = (c, _t, _e, out): number => {
+    out.copy(a.coverPos);
+    return 0;
+  };
   if (over.cover) a.coverPos.set(over.cover.x, over.cover.y, over.cover.z);
   a.ai.agents = [a];
   return a;
 }
 
-function aimMuzzle(a) {
+function aimMuzzle(a: Agent): void {
   const o = a.animator.muzzleWorld;
   o.set(a.position.x + 0.15, a.position.y + 1.42, a.position.z);
   a.animator.muzzleDir.copy(a.lastKnown).sub(o).normalize();
 }
 
-function attachShots(a) {
-  const shots = [];
-  a.ai.onAgentFire = (_agent, origin, dir) => {
+function attachShots(a: Agent): { origin: THREE.Vector3; dir: THREE.Vector3 }[] {
+  const shots: Array<{ origin: THREE.Vector3; dir: THREE.Vector3 }> = [];
+  a.ai.onAgentFire = (_agent, origin, dir): boolean => {
     shots.push({ origin: origin.clone(), dir: dir.clone() });
+    return true;
   };
   return shots;
 }
 
-function tickAgent(a, dt = DT) {
+function tickAgent(a: Agent, dt = DT): void {
   a.fireCooldown -= dt;
   a.burstCooldown -= dt;
   a.peekTimer -= dt;
@@ -144,38 +135,42 @@ function tickAgent(a, dt = DT) {
   a._updateFireBlock();
 }
 
-function tickStarved(a, dt = DT) {
+function tickStarved(a: Agent, dt = DT): void {
   const ai = a.ai;
   ai._pathBudget = ai.pathsPerFrame;
-  ai.requestPath({ x: 0, y: 0, z: 0 }, { x: 4, y: 0, z: 0 }, []);
-  ai.requestPath({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 4 }, []);
+  ai.requestPath(new THREE.Vector3(0, 0, 0), new THREE.Vector3(4, 0, 0), []);
+  ai.requestPath(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 4), []);
   tickAgent(a, dt);
 }
 
-function wirePath(a) {
-  a.ai.grid = {
-    findPath(_from, dest, out) {
-      if (!out[0]) out[0] = new THREE.Vector3();
-      out[0].copy(dest);
-      return 1;
-    },
-    findRoute(from, dest, out) {
-      const n = this.findPath(from, dest, out.points);
-      out.ladderSteps.length = 0;
-      return n;
-    },
+function wirePath(a: Agent): void {
+  const grid = pathGrid;
+  grid.findPath = (_from, dest, out): number => {
+    if (!out[0]) out[0] = new THREE.Vector3();
+    out[0].copy(dest);
+    return 1;
   };
+  grid.findRoute = (from, dest, out): number => {
+    const n = grid.findPath(from, dest, out.points);
+    out.ladderSteps.length = 0;
+    return n;
+  };
+  a.ai.grid = grid;
   a.ai.pathsPerFrame = 2;
   a.ai._pathBudget = 2;
-  a.ai.requestPath = AiSystem.prototype.requestPath;
+  a.ai.requestPath = AiSystem.prototype.requestPath.bind(a.ai);
   a.ai.stats.pathsDeferred = 0;
 }
 
-function farCover(x = 8) {
-  return { x, y: 0, z: 10, dx: 1, dz: 0, high: true };
+function farCover(x = 8): BakedCoverPoint {
+  return coverPoint({ x, y: 0, z: 10, dx: 1, dz: 0, high: true });
 }
 
-function run(a, seconds, tick = tickAgent) {
+function run(
+  a: Agent,
+  seconds: number,
+  tick = tickAgent
+): { shots: { origin: THREE.Vector3; dir: THREE.Vector3 }[]; t: number } {
   const shots = attachShots(a);
   let t = 0;
   while (t < seconds) {
@@ -198,7 +193,7 @@ function run(a, seconds, tick = tickAgent) {
 {
   const a = stubAgent({ cover: farCover(), repathTimer: 9 });
   wirePath(a);
-  a.ai.requestPath = function () {
+  a.ai.requestPath = function (): number {
     this.lastPathOutcome = PATH_OUTCOME.UNREACHABLE;
     return 0;
   };
@@ -257,14 +252,15 @@ function run(a, seconds, tick = tickAgent) {
 
 /* 5. two blocked peeks abandon, then a clear muzzle fires */
 {
-  const cover = { x: 0, y: 0, z: 10, dx: 0, dz: -1, high: false };
+  const cover = coverPoint({ x: 0, y: 0, z: 10, dx: 0, dz: -1, high: false });
   const a = stubAgent({ cover, peekTimer: 0, repathTimer: 9 });
   a.firePos.set(0.95, 0, 10);
-  a.ai.cover.peekOffset = (_c, _t, _e, out) => {
+  assert.ok(a.ai.cover);
+  a.ai.cover.peekOffset = (_c, _t, _e, out): number => {
     out.set(0.95, 0, 10);
     return 1;
   };
-  a.phys.lineOfSight = () => false;
+  a.phys.lineOfSight = (): boolean => false;
   a._combat(DT);
   a.position.copy(a.firePos);
   for (let i = 0; i < 22; i++) {
@@ -279,7 +275,7 @@ function run(a, seconds, tick = tickAgent) {
   a.position.copy(a.firePos);
   for (let i = 0; i < 22; i++) a._combat(DT);
   assert.equal(a.cover, null, 'two blocked peeks abandon the point');
-  a.phys.lineOfSight = () => true;
+  a.phys.lineOfSight = (): boolean => true;
   a.peekTimer = 9;
   const shots = attachShots(a);
   tickAgent(a);
@@ -326,7 +322,7 @@ function run(a, seconds, tick = tickAgent) {
     state: STATE.SUPPRESSED,
     suppression: 1.4,
     scale: 1,
-    cover: { x: 0, y: 0, z: 10, high: false },
+    cover: coverPoint({ x: 0, y: 0, z: 10, high: false }),
   });
   const sShots = attachShots(sup);
   tickAgent(sup);
@@ -334,7 +330,7 @@ function run(a, seconds, tick = tickAgent) {
   assert.equal(sup.fireBlock, FIRE_BLOCK.SUPPRESSED);
 
   const rel = stubAgent({ repathTimer: 9 });
-  rel.animator.reloading = true;
+  rel.animator.reloadT = 0;
   const rShots = attachShots(rel);
   rel.wantFire = true;
   rel._shoot(DT);
@@ -379,7 +375,8 @@ for (const state of [STATE.COMBAT, STATE.FLANK, STATE.RETREAT]) {
 }
 {
   const a = stubAgent({ suppression: 1.6, state: STATE.SUPPRESSED, cover: farCover() });
-  a.ai.cover.protects = () => false;
+  assert.ok(a.ai.cover);
+  a.ai.cover.protects = (): boolean => false;
   const shots = attachShots(a);
   tickAgent(a);
   assert.equal(a.cover, null);
@@ -389,7 +386,8 @@ for (const state of [STATE.COMBAT, STATE.FLANK, STATE.RETREAT]) {
 {
   const a = stubAgent({ suppression: 1.6, repathTimer: 0 });
   wirePath(a);
-  a.ai.cover.pick = () => farCover();
+  assert.ok(a.ai.cover);
+  a.ai.cover.pick = (): BakedCoverPoint => farCover();
   const shots = attachShots(a);
   tickAgent(a);
   assert.ok(a.cover && a.hasMoveTarget, 'under pressure, prioritize a route to shelter');
@@ -413,11 +411,11 @@ for (const reason of [
     a.lastKnownAge = reason === 'stale' ? 2 : 0.1;
     if (reason === 'report') a.lastKnownKind = 'report';
   }
-  if (reason === 'muzzle') a.phys.lineOfSight = () => false;
+  if (reason === 'muzzle') a.phys.lineOfSight = (): boolean => false;
   if (reason === 'friendly')
     a.ai.agents.push(stubAgent({ id: 2, position: new THREE.Vector3(0, 0, 5) }));
-  if (reason === 'reload') a.animator.reloading = true;
-  if (reason === 'vault') a.animator.vaulting = true;
+  if (reason === 'reload') a.animator.reloadT = 0;
+  if (reason === 'vault') a.animator.vaultT = 0;
   const shots = attachShots(a);
   a._think(DT);
   aimMuzzle(a);
@@ -430,7 +428,7 @@ for (const reason of [
   if (reason === 'reload') assert.equal(a.fireBlock, FIRE_BLOCK.RELOAD);
 }
 {
-  const cover = { x: 0, y: 0, z: 10, high: false };
+  const cover = coverPoint({ x: 0, y: 0, z: 10, high: false });
   const a = stubAgent({ cover, suppression: 0.8, peeking: true, peekTimer: 0.5 });
   a.firePos.copy(a.position);
   a._updatePeek(null, a.lastKnown, 20, 0.2);
@@ -445,7 +443,7 @@ for (const reason of [
 /* 8. eye LOS / barrel alignment must not authorize a shot through cover */
 {
   const a = stubAgent({ repathTimer: 9, burstLeft: 8 });
-  a.phys.lineOfSight = (from) => from.y >= 1.55;
+  a.phys.lineOfSight = (from): boolean => from.y >= 1.55;
   const shots = attachShots(a);
   a._think(DT);
   assert.equal(a.wantFire, true, 'eyes may still want the shot');
@@ -455,7 +453,7 @@ for (const reason of [
   assert.equal(a.fireBlock, FIRE_BLOCK.MUZZLE);
 
   a.animator.muzzleDir.set(1, 0, 0);
-  a.phys.lineOfSight = () => true;
+  a.phys.lineOfSight = (): boolean => true;
   a.wantFire = true;
   a._muzzleBlocked = false;
   a._shoot(DT);
@@ -467,7 +465,7 @@ for (const reason of [
 /* 9. wrap pending path gives up instead of mute-looping */
 {
   const sq = new Squad(rng);
-  sq.ai = { grid: null, cover: null };
+  sq.ai = makeAi();
   const a = stubAgent({
     role: 'wrap',
     _wrapDone: false,
@@ -486,12 +484,12 @@ for (const reason of [
 
 /* 10. peek-wait with no one peeking recovers; a live token is expected delay */
 {
-  const cover = { x: 0, y: 0, z: 10, dx: 0, dz: -1, high: true };
+  const cover = coverPoint({ x: 0, y: 0, z: 10, dx: 0, dz: -1, high: true });
   const a = stubAgent({ cover, peekTimer: 0.4, repathTimer: 9 });
   const sq = new Squad(rng);
-  sq.ai = { grid: null, cover: null };
+  sq.ai = makeAi();
   sq.add(a);
-  sq.requestPeek = () => false;
+  sq.requestPeek = (): boolean => false;
   const shots = attachShots(a);
   let t = 0;
   while (t < PEEK_WAIT_GIVE_UP - 2 * DT) {
@@ -508,11 +506,11 @@ for (const reason of [
 
   const waiter = stubAgent({ id: 3, cover, peekTimer: 0.4, repathTimer: 9 });
   const sq2 = new Squad(rng);
-  sq2.ai = { grid: null, cover: null };
+  sq2.ai = makeAi();
   sq2.peekHolders.add(99);
   waiter.squad = sq2;
   sq2.members = [waiter];
-  sq2.requestPeek = () => false;
+  sq2.requestPeek = (): boolean => false;
   const { shots: wShots } = run(waiter, PEEK_WAIT_GIVE_UP + 0.3);
   assert.equal(wShots.length, 0, 'a live peek token is expected delay, not a fallback');
   assert.equal(waiter.fireBlock, FIRE_BLOCK.PEEK_WAIT);
@@ -521,7 +519,7 @@ for (const reason of [
 /* 11. one leftover path slot must not cancel a successful wrap retry */
 {
   const sq = new Squad(rng);
-  sq.ai = { grid: null, cover: null };
+  sq.ai = makeAi();
   const a = stubAgent({
     role: 'wrap',
     _wrapDone: false,
@@ -538,7 +536,7 @@ for (const reason of [
   let kept = 0;
   for (let i = 0; i < 59; i++) {
     a.ai._pathBudget = 2;
-    a.ai.requestPath({ x: 0, y: 0, z: 0 }, { x: 4, y: 0, z: 0 }, []);
+    a.ai.requestPath(new THREE.Vector3(0, 0, 0), new THREE.Vector3(4, 0, 0), []);
     tickAgent(a);
     if (a.hasMoveTarget) kept++;
   }
@@ -550,20 +548,16 @@ for (const reason of [
   const point = farCover();
   const a = stubAgent({ cover: point, repathTimer: 9 });
   wirePath(a);
-  a.ai.cover = {
-    pick() {
-      return point;
-    },
-    protects() {
-      return true;
-    },
-    release() {},
-    peekOffset(_c, _t, _e, out) {
-      out.copy(a.coverPos);
-      return 0;
-    },
+  const cover = new CoverMap(null, a.phys);
+  cover.pick = (): BakedCoverPoint => point;
+  cover.protects = (): boolean => true;
+  cover.release = (): void => {};
+  cover.peekOffset = (_c, _t, _e, out): number => {
+    out.copy(a.coverPos);
+    return 0;
   };
-  a.ai.requestPath = function () {
+  a.ai.cover = cover;
+  a.ai.requestPath = function (): number {
     this.lastPathOutcome = PATH_OUTCOME.DEFERRED;
     return -1;
   };
@@ -584,9 +578,10 @@ for (const reason of [
 /* 13. a deferred wrap route must enter flank and actually move */
 {
   const nav = await testNav();
+  assert.ok(nav.physics instanceof PhysicsSystem);
   const start = new THREE.Vector3(1, 0.008, 1);
   const dest = new THREE.Vector3(8, 0.008, 1);
-  const moved = {};
+  const moved = { deferred: 0, immediate: 0 };
   for (const deferred of [false, true]) {
     const ai = makeAi(nav);
     const a = makeAgent({
@@ -604,7 +599,7 @@ for (const reason of [
       _wrapDone: false,
       desiredSpeed: 0,
       phys: nav.physics,
-      animator: { turn() {} },
+      animator: brainAnimator({}),
     });
     ai.agents = [a];
     const sq = new Squad(a.rng);
@@ -648,20 +643,23 @@ for (const reason of [
 
 /* frame-rate independent cadence (issue 605): fire eligibility is held fixed */
 {
-  const shooter = (over = {}) => {
+  const held = new Set<Agent>();
+  const shooter = (
+    over: Partial<Agent> = {}
+  ): { a: Agent; times: number[]; step: (dt: number) => number } => {
     const a = stubAgent({ repathTimer: 9, wantFire: true, ...over });
-    a.animator.reload = function () {
-      this.reloading = true;
+    a.animator.reload = function (): void {
+      this.reloadT = 0;
     };
-    a.ai.emitReload = () => {};
-    const times = [];
+    a.ai.emitReload = (): void => {};
+    const times: number[] = [];
     let t = 0;
-    a.ai.onAgentFire = () => {
-      if (a.hold) return false; // a resolved-shot friendly rejection
+    a.ai.onAgentFire = (): boolean => {
+      if (held.has(a)) return false; // a resolved-shot friendly rejection
       times.push(t);
       return true;
     };
-    const step = (dt) => {
+    const step = (dt: number): number => {
       t += dt;
       const before = times.length;
       a.fireCooldown -= dt;
@@ -673,15 +671,16 @@ for (const reason of [
     };
     return { a, times, step };
   };
-  const endless = { ...rng, int: () => 1e6 };
+  const endless = midpointRng();
+  endless.int = (): number => 1e6;
 
   // A continuous burst sustains the authored fire rate at any frame rate.
   for (const fireRate of [COMBAT.fireRate, COMBAT.fireRateIrregular]) {
     const counts = [];
     for (const [label, nextDt] of FRAME_SOURCES) {
       const { a, times, step } = shooter({ rng: endless, fireRate, ammo: 1e6, magSize: 1e6 });
-      while (times.length < 2 || times.at(-1) - times[0] < 10) step(nextDt());
-      const expected = 1 + (times.at(-1) - times[0]) * fireRate;
+      while (times.length < 2 || lastShot(times) - times[0] < 10) step(nextDt());
+      const expected = 1 + (lastShot(times) - times[0]) * fireRate;
       assert.ok(
         Math.abs(times.length - expected) <= 1,
         `AI ${fireRate}/s @ ${label}: ${times.length} rounds, expected ~${expected.toFixed(1)}`
@@ -721,17 +720,20 @@ for (const reason of [
     const { a, times, step } = shooter({ rng: endless, ammo: 1e6, magSize: 1e6 });
     for (let i = 0; i < 30; i++) step(DT);
     if (name === 'reload') a.ammo = 0;
-    else a.hold = true;
+    else held.add(a);
     const before = times.length;
     for (let i = 0; i < 60; i++) step(DT);
     assert.equal(times.length, before, `${name}: no rounds during the block`);
     assert.equal(a.ammo, name === 'reload' ? a.magSize : 1e6 - before, `${name}: ammo kept`);
-    a.hold = false;
-    a.animator.reloading = false;
+    held.delete(a);
+    a.animator.reloadT = -1;
     const resumed = times.length;
     assert.equal(step(DT), 1, `${name}: the clear frame fires one round`);
     while (times.length === resumed + 1) step(DT);
-    assert.ok(times.at(-1) - times[resumed] >= 1 / COMBAT.fireRate - 1e-9, `${name}: banked round`);
+    assert.ok(
+      lastShot(times) - times[resumed] >= 1 / COMBAT.fireRate - 1e-9,
+      `${name}: banked round`
+    );
   }
 
   // The magazine's last round does not also start the reload in its frame.
@@ -753,4 +755,5 @@ for (const reason of [
   }
 }
 
+pathGrid.dispose();
 console.log('ok  smoke-ai-fire');

@@ -1,3 +1,7 @@
+import assert from 'node:assert/strict';
+
+import * as THREE from 'three';
+
 /**
  * Node smoke test for enemy footsteps the player can hear — no browser.
  *
@@ -9,18 +13,26 @@
  *
  *   node tests/smoke/smoke-ai-footsteps.ts
  */
-import assert from 'node:assert/strict';
-
-import * as THREE from 'three';
-
+import type { Agent } from '../../src/ai/agent.ts';
 import { Animator } from '../../src/ai/animator.ts';
 import { RIG } from '../../src/ai/rig.ts';
+import type { EngineEventMap } from '../../src/core/events.ts';
 import { makeAgent } from '../../tools/lib/agent-fixture.ts';
+import { createTestContext } from '../lib/context.ts';
+import { fixture } from '../lib/fixture.ts';
 
+type Footstep = {
+  t: number;
+  surface: EngineEventMap['ai:footstep']['surface'];
+  gait: EngineEventMap['ai:footstep']['gait'];
+  x: number;
+  y: number;
+  z: number;
+};
 const SURFACE = 'metal';
 
 /** Flat ground under every foot, so the rig's own IK plants them. */
-function flatGround(x, z, fromY, out) {
+function flatGround(_x: number, _z: number, _fromY: number, out: Animator['_probeOut']): boolean {
   out.y = 0;
   out.nx = 0;
   out.ny = 1;
@@ -29,59 +41,55 @@ function flatGround(x, z, fromY, out) {
 }
 
 /** Mean seconds between consecutive events. */
-function meanGap(list) {
-  const gaps = list.slice(1).map((e, i) => e.t - list[i].t);
-  return gaps.reduce((a, b) => a + b, 0) / gaps.length;
+function meanGap(list: Footstep[]): number {
+  const gaps = list.slice(1).map((e, i): number => e.t - list[i].t);
+  return gaps.reduce((a, b): number => a + b, 0) / gaps.length;
 }
 
 /**
  * A soldier that exists only as far as `Animator` and `Agent._drive` care.
  * `lod` puts the actor off-screen, where animation is evaluated one frame in three.
  */
-function soldier(lod = false) {
+function soldier(lod = false): {
+  agent: Agent;
+  animator: Animator;
+  run: (seconds: number, speed: number, dt?: number) => Footstep[];
+} {
   const group = new THREE.Group();
   const { bones } = RIG.createSkeleton();
   group.add(bones[0]);
   group.updateMatrixWorld(true);
 
   const animator = new Animator(RIG, bones, { scale: 1, probe: flatGround });
-  const heard = [];
+  const heard: Footstep[] = [];
   let elapsed = 0;
 
+  const ctx = createTestContext();
+  ctx.events.on('ai:footstep', (p): void => {
+    heard.push({
+      t: elapsed,
+      surface: p.surface,
+      gait: p.gait,
+      x: p.position.x,
+      y: p.position.y,
+      z: p.position.z,
+    });
+  });
   const agent = makeAgent({
     animator,
     group,
     lodIrrelevant: lod,
-    controller: { groundSurfaceName: SURFACE },
-    ctx: {
-      time: {
-        get elapsed() {
-          return elapsed;
-        },
-      },
-      events: {
-        emit(type, p) {
-          if (type !== 'ai:footstep') return;
-          // the payload is reused: copy what we assert on
-          heard.push({
-            t: elapsed,
-            surface: p.surface,
-            gait: p.gait,
-            x: p.position.x,
-            y: p.position.y,
-            z: p.position.z,
-          });
-        },
-      },
-    },
+    controller: fixture<NonNullable<Agent['controller']>>({ groundSurfaceName: SURFACE }),
+    ctx,
   });
 
   /** `seconds` of 60 Hz frames at `speed`, returning what was emitted. */
-  function run(seconds, speed, dt = 1 / 60) {
+  function run(seconds: number, speed: number, dt = 1 / 60): Footstep[] {
     heard.length = 0;
     for (let i = 0, n = Math.round(seconds / dt); i < n; i++) {
       agent.speed = speed;
       elapsed += dt;
+      ctx.time.elapsed = elapsed;
       agent._drive(dt);
     }
     return heard;

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
 
+import type { Agent } from '../../src/ai/agent.ts';
 import { AiSystem } from '../../src/ai/index.ts';
 import {
   INTENT,
@@ -15,7 +16,12 @@ import {
   isBannedCover,
   pickSquadAnchors,
 } from '../../src/ai/intent.ts';
+import type { SurfaceNav } from '../../src/ai/nav.ts';
 import { Squad } from '../../src/ai/squad.ts';
+import { WorldSystem } from '../../src/world/index.ts';
+import { makeAgent, makeAi } from '../../tools/lib/agent-fixture.ts';
+import { createTestContext } from '../lib/context.ts';
+import { fixture } from '../lib/fixture.ts';
 
 assert.equal(PEEK_DEATHS_NEEDED, 2);
 assert.equal(PLANT_HOLD, 3);
@@ -221,20 +227,24 @@ assert.equal(
   'second squad takes the off-axis spawn, not the next-farthest on the same line'
 );
 
-const squadRng = { float: () => 0.5, range: (a, b) => (a + b) * 0.5 };
-const member = (id) => ({
-  id,
-  alive: true,
-  position: new THREE.Vector3(id, 0, 0),
-  lastKnown: new THREE.Vector3(0, 0, 10),
-  _wrapDone: false,
-  peeking: false,
-  state: 'combat',
-  cover: null,
-  repathTimer: 0,
-});
+const squadRng = {
+  float: (): number => 0.5,
+  range: (a: number, b: number): number => (a + b) * 0.5,
+};
+const member = (id: number): Agent =>
+  makeAgent({
+    id,
+    alive: true,
+    position: new THREE.Vector3(id, 0, 0),
+    lastKnown: new THREE.Vector3(0, 0, 10),
+    _wrapDone: false,
+    peeking: false,
+    state: 'combat',
+    cover: null,
+    repathTimer: 0,
+  });
 const squad = new Squad(squadRng);
-squad.ai = { grid: null, cover: null };
+squad.ai = { grid: null, cover: null, ctx: createTestContext() };
 squad.intent = INTENT.WRAP;
 squad.why = 'unseen-deaths';
 squad.members = [member(1), member(2)];
@@ -246,20 +256,14 @@ squad.members = [member(3)];
 squad._assignRoles(squad.members);
 assert.equal(squad.peekTokens, 1, 'last wrapper can still peek');
 
-const emptySpawn = {
-  ctx: { peek: () => ({ spawnPoints: [{ position: new THREE.Vector3(0, 0, 30), yaw: 0 }] }) },
-  grid: {},
-  _v3: new THREE.Vector3(),
-  playerPosition(out) {
-    return out.set(0, 0, 0);
-  },
-  _pickSpawnNear() {
-    return null;
-  },
-  createSquad() {
-    assert.fail('failed anchor created a squad');
-  },
-};
+const world = new WorldSystem();
+world.spawnPoints = [{ position: new THREE.Vector3(0, 0, 30), yaw: 0, tag: 'test' }];
+const emptySpawn = makeAi(fixture<SurfaceNav>({}));
+emptySpawn.ctx = createTestContext({ providers: { world } });
+emptySpawn._v3 = new THREE.Vector3();
+emptySpawn.playerPosition = (out): THREE.Vector3 => out.set(0, 0, 0);
+emptySpawn._pickSpawnNear = (): null => null;
+emptySpawn.createSquad = (): never => assert.fail('failed anchor created a squad');
 assert.equal(AiSystem.prototype.populate.call(emptySpawn, { squads: 1, perSquad: 2 }), 0);
 
 console.log('ok  smoke-ai-intent');

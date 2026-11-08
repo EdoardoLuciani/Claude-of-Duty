@@ -4,28 +4,28 @@ import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
 
+import type { Agent } from '../../src/ai/agent.ts';
 import { AiSystem } from '../../src/ai/index.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import { makeAgent } from '../../tools/lib/agent-fixture.ts';
+import { createTestContext } from '../lib/context.ts';
 
-const v = (x = 0, y = 1, z = 0) => new THREE.Vector3(x, y, z);
+const v = (x = 0, y = 1, z = 0): THREE.Vector3 => new THREE.Vector3(x, y, z);
 for (const pellets of [1, 8, 96]) {
   const events = new EventBus(),
     phys = new PhysicsSystem();
-  phys.ctx = { events };
+  phys.ctx = createTestContext({ events });
   let calls = 0;
-  const a = makeAgent({ position: v(5, 1, 1), eyeHeight: 0, suppress: () => calls++ });
-  const ai = Object.assign(new AiSystem(), { agents: [a], ctx: { events } });
+  const a = makeAgent({ position: v(5, 1, 1), eyeHeight: 0, suppress: (): number => calls++ });
+  const ai = new AiSystem();
+  ai.agents = [a];
+  ai.ctx = createTestContext({ events });
   ai._wireEvents(ai.ctx);
   const shooter = {},
-    sim = new ProjectileSim({
-      events,
-      has: () => false,
-      peek: (id) => (id === 'physics' ? phys : shooter),
-    });
+    sim = new ProjectileSim(createTestContext({ events, providers: { physics: phys } }));
   const def = WEAPON_DEFS.shotgun;
   for (let i = 0; i < pellets; i++)
     sim.spawn({
@@ -45,13 +45,23 @@ for (const pellets of [1, 8, 96]) {
 {
   const events = new EventBus(),
     counts = [0, 0];
-  const agents = counts.map((_, i) =>
-    makeAgent({ position: v(5, 1, 1), eyeHeight: 0, suppress: () => counts[i]++ })
+  const agents = counts.map((_, i): Agent =>
+    makeAgent({ position: v(5, 1, 1), eyeHeight: 0, suppress: (): number => counts[i]++ })
   );
-  const ai = Object.assign(new AiSystem(), { agents, ctx: { events } });
+  const ai = new AiSystem();
+  ai.agents = agents;
+  ai.ctx = createTestContext({ events });
   ai._wireEvents(ai.ctx);
-  const emit = (shot, from = v(), to = v(8), shooter = {}) =>
-    events.emit('bullet:segment', { shot, from, to, shooter });
+  const emit = (shot: number, from = v(), to = v(8), shooter = {}): void =>
+    events.emit('bullet:segment', {
+      shot,
+      from,
+      to,
+      shooter,
+      weapon: 'rifle',
+      speed: 0,
+      tracer: false,
+    });
   // A, B, A, B: another round must not erase the first round's marker.
   for (const shot of [101, 102, 101, 102]) emit(shot);
   assert.deepEqual(counts, [2, 2], 'deduplication belongs to each receiver');

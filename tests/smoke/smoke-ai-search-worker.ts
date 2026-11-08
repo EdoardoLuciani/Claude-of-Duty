@@ -1,58 +1,79 @@
 import assert from 'node:assert/strict';
 
+import * as THREE from 'three';
+
+import type { Agent } from '../../src/ai/agent.ts';
 import { AttachmentQueries, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.ts';
+import type { ClientMessage } from '../../src/ai/attachment-types.ts';
+import { PhysicsSystem } from '../../src/physics/index.ts';
 import { makeAgent, makeAi, makeRng } from '../../tools/lib/agent-fixture.ts';
 import { testNav } from '../../tools/lib/test-nav.ts';
+import { fixture } from '../lib/fixture.ts';
 
-class FakeWorker {
-  messages = [];
-  postMessage(message) {
-    this.messages.push(structuredClone(message));
-    if (message.type === 'init') queueMicrotask(() => this.onmessage({ data: { type: 'ready' } }));
-  }
-  terminate() {}
+function fakeWorker(): Worker {
+  const messages: ClientMessage[] = [];
+  return fixture<Worker>({
+    onmessage: null,
+    onerror: null,
+    onmessageerror: null,
+    postMessage(this: Worker, message: ClientMessage): void {
+      messages.push(structuredClone(message));
+      if (message.type === 'init')
+        queueMicrotask((): void => {
+          this.onmessage?.call(this, new MessageEvent('message', { data: { type: 'ready' } }));
+        });
+    },
+    terminate(): void {},
+  });
 }
 const nav = await testNav(),
   oracle = await testNav();
-const agent = () => {
+assert.ok(nav.physics instanceof PhysicsSystem);
+const agent = (): { a: Agent; draws: () => number } => {
   const rng = makeRng();
   let draws = 0;
-  const float = rng.float;
-  rng.float = () => {
+  const float = rng.float.bind(rng);
+  rng.float = (): number => {
     draws++;
     return float.call(rng);
   };
-  const a = makeAgent({ ai: makeAi(nav), phys: nav.physics, rng });
+  const physics = nav.physics;
+  assert.ok(physics instanceof PhysicsSystem);
+  const a = makeAgent({ ai: makeAi(nav), phys: physics, rng });
   a.position.set(-0.5, 0.008, 0.5);
   a._searchOrigin.copy(a.position).addScalar(0.5);
   a._searchOrigin.y = 0.008;
-  return { a, draws: () => draws };
+  return { a, draws: (): number => draws };
 };
 let checks = 0,
   moves = 0;
-const check = nav._checkAttachment,
-  move = nav._probe.move;
-nav._checkAttachment = function (...args) {
+assert.ok(nav._probe);
+const check = nav._checkAttachment.bind(nav),
+  move = nav._probe.move.bind(nav._probe);
+nav._checkAttachment = function (...args): boolean {
   checks++;
   return check.apply(this, args);
 };
-nav._probe.move = function (...args) {
+nav._probe.move = function (...args): number {
   moves++;
   return move.apply(this, args);
 };
 const baseline = agent();
 assert.equal(baseline.a._buildSearchCandidates(), undefined);
-const expected = baseline.a._searchCand.slice(0, baseline.a._searchCount).map((p) => p.toArray());
+const expected = baseline.a._searchCand
+  .slice(0, baseline.a._searchCount)
+  .map((p): THREE.Vector3Tuple => p.toArray());
 assert.equal(checks, 5);
 assert.equal(moves, 10, 'original ready-but-unscoped repro ran ten native moves');
-nav.worker = new AttachmentQueries(nav, { workerFactory: () => new FakeWorker() });
+nav.worker = new AttachmentQueries(nav, { workerFactory: (): Worker => fakeWorker() });
 const worker = nav.worker;
-const respond = () => {
+const respond = (): void => {
   for (const job of worker.jobs.values()) {
+    assert.ok(Array.isArray(job.key));
     const [x, y, z, tx, ty, tz, radius, height, steps] = job.key;
     const value = oracle._checkAttachment(
-      { x, y, z },
-      { x: tx, y: ty, z: tz },
+      new THREE.Vector3(x, y, z),
+      new THREE.Vector3(tx, ty, tz),
       radius,
       height,
       steps
@@ -60,7 +81,7 @@ const respond = () => {
     worker.receive({ type: 'result', id: job.id, value, ms: 0, moves: 0 });
   }
 };
-const complete = (a) => {
+const complete = (a: Agent): undefined => {
   let result;
   for (let tries = 0; tries < 40; tries++) {
     result = a._buildSearchCandidates();
@@ -86,8 +107,9 @@ try {
   assert.equal(moves, 0);
   assert.equal(worker.stats.submitted, 1);
   assert.equal(a.hasMoveTarget || a.pathPending, false, 'partial candidates cannot admit movement');
-  const scope = worker.scopes.get(`${a.id}:observation`),
-    unsent = scope.unsent,
+  const scope = worker.scopes.get(`${a.id}:observation`);
+  assert.ok(scope);
+  const unsent = scope.unsent,
     used = scope.used;
   assert.equal(a._buildSearchCandidates(), NAV_PENDING);
   assert.equal(scope.unsent, unsent);
@@ -96,7 +118,7 @@ try {
   respond();
   assert.equal(complete(a), undefined);
   assert.deepEqual(
-    a._searchCand.slice(0, a._searchCount).map((p) => p.toArray()),
+    a._searchCand.slice(0, a._searchCount).map((p): THREE.Vector3Tuple => p.toArray()),
     expected,
     'completed worker candidates equal synchronous native candidates'
   );
@@ -111,7 +133,7 @@ try {
   const edge = agent().a;
   let edgeDraws = 0;
   edge._searchOrigin.set(9.7, 0.008, 9.7);
-  edge.rng.float = () => (++edgeDraws % 2 ? 0.125 : (5.2 / 7 - 0.45) / 0.55);
+  edge.rng.float = (): number => (++edgeDraws % 2 ? 0.125 : (5.2 / 7 - 0.45) / 0.55);
   assert.equal(edge._buildSearchCandidates(), NAV_PENDING);
   const draws = edgeDraws,
     geometry = [...edge._searchGeometry];
@@ -157,7 +179,7 @@ try {
 
   const rebuilt = agent().a;
   rebuilt.lastKnown.copy(rebuilt._searchOrigin);
-  rebuilt._goTo = () => assert.fail('pending candidate construction admitted a route');
+  rebuilt._goTo = (): never => assert.fail('pending candidate construction admitted a route');
   rebuilt._rebuildSearch();
   assert.equal(
     rebuilt._searchPending,
@@ -182,14 +204,19 @@ try {
   assert(elevated._searchCount > 0);
   assert.equal(elevated.hasMoveTarget, false);
   worker.failure(new Error('search transport failure'));
-  assert.throws(() => elevated._buildSearchCandidates(), /search transport failure/);
+  assert.throws(
+    (): typeof NAV_PENDING | typeof NAV_CANCELLED | undefined => elevated._buildSearchCandidates(),
+    /search transport failure/
+  );
   assert.equal(checks, 0, 'worker failure never falls back to synchronous eligibility');
   console.log(
     'search worker: before 5 sync checks/10 native moves/0 submissions; after 0 sync checks/0 native moves/1 submission; native candidates/RNG, ready/pending/retry/cancel/expiry/observation/failure'
   );
 } finally {
   nav.dispose();
+  assert.ok(nav.physics instanceof PhysicsSystem);
   nav.physics.dispose();
   oracle.dispose();
+  assert.ok(oracle.physics instanceof PhysicsSystem);
   oracle.physics.dispose();
 }

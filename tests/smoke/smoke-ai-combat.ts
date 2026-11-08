@@ -1,58 +1,58 @@
+import assert from 'node:assert/strict';
+
+import * as THREE from 'three';
+
 /**
  * Headless regressions for issue 267.
  *
  *   node tests/smoke/smoke-ai-combat.ts
  */
-import assert from 'node:assert/strict';
-
-import * as THREE from 'three';
-
+import type { Agent } from '../../src/ai/agent.ts';
 import { STATE } from '../../src/ai/agent.ts';
 import { AiSystem } from '../../src/ai/index.ts';
 import { INTENT, FLUSH_MAX_FAILS } from '../../src/ai/intent.ts';
+import type { BakedCoverPoint } from '../../src/ai/nav-format.ts';
 import { CoverMap, SurfaceNav } from '../../src/ai/nav.ts';
 import { Squad } from '../../src/ai/squad.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
-import { makeAgent } from '../../tools/lib/agent-fixture.ts';
+import { makeAgent, makeAi as fixtureAi } from '../../tools/lib/agent-fixture.ts';
 import { synthetic } from '../../tools/nav240/fixtures.ts';
 import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
+import {
+  midpointRng,
+  BrainPlayer,
+  brainPhysics,
+  brainAnimator,
+  coverPoint,
+} from '../lib/ai-brain-fixture.ts';
+import { createTestContext } from '../lib/context.ts';
 
 const events = new EventBus();
 const phys = new PhysicsSystem();
-phys.ctx = { events, scene: null, camera: null, time: { alpha: 0, elapsed: 0, dt: 1 / 60 } };
-const rng = { float: () => 0.5, range: (a, b) => (a + b) * 0.5, int: (a) => a, gauss: () => 0 };
+phys.ctx = createTestContext({ events });
+phys.ctx.time.dt = 1 / 60;
+const rng = midpointRng();
 
-function makePlayer({ height = 1.78, stance = 'stand' } = {}) {
-  const player = {
-    isPlayer: true,
-    position: new THREE.Vector3(),
-    height,
-    stance,
-    hitbox: phys.addCollider({
-      shape: 'capsule',
-      layer: phys.LAYER.PLAYER,
-      surface: 'flesh',
-      owner: null,
-      part: 'torso',
-      radius: 0.3,
-    }),
-  };
+function makePlayer({
+  height = 1.78,
+  stance = 'stand',
+}: { height?: number; stance?: 'stand' | 'crouch' | 'prone' } = {}): BrainPlayer {
+  const player = new BrainPlayer(phys, height);
+  player.testStance = stance;
   player.hitbox.owner = player;
   const r = 0.3;
   player.hitbox.setSegment(0, r, 0, 0, Math.max(r, height - r), 0, r);
   return player;
 }
 
-function makeAi(player) {
-  const ai = Object.create(AiSystem.prototype);
-  ai.ctx = {
-    peek: (id) => (id === 'player' ? player : id === 'physics' ? phys : null),
+function makeAi(player: BrainPlayer | null): AiSystem {
+  const ai = new AiSystem();
+  ai.ctx = createTestContext({
     events,
-    camera: { matrixWorld: new THREE.Matrix4() },
-    has: () => false,
-    config: { deterministic: true },
-  };
+    providers: { physics: phys, ...(player ? { player } : {}) },
+  });
+  ai.ctx.time.dt = 1 / 60;
   ai._phys = phys;
   ai._v = new THREE.Vector3();
   ai._v2 = new THREE.Vector3();
@@ -62,96 +62,99 @@ function makeAi(player) {
   ai.agents = [];
   ai.squads = [];
   ai._grenades = [];
-  ai.stats = { agents: 0, alive: 0, grenadeHolds: 0, pathsDeferred: 0 };
+  ai.stats = {
+    agents: 0,
+    alive: 0,
+    navMs: 0,
+    coverPts: 0,
+    walkable: 0,
+    friendlyHolds: 0,
+    grenadeHolds: 0,
+    pathsDeferred: 0,
+  };
   return ai;
 }
 
-function fireAt(ai, y, endZ = null) {
+function fireAt(
+  ai: AiSystem,
+  y: number,
+  endZ: number | null = null
+): { t: number | null; n: number } {
   const dealt = [];
-  const off = events.on('damage:dealt', (e) => dealt.push(e));
+  const off = events.on('damage:dealt', (e): number => dealt.push(e));
   const shot = phys.fireBullet({
     origin: new THREE.Vector3(0, y, 8),
     dir: new THREE.Vector3(0, 0, -1),
     damage: 17,
     maxDist: endZ == null ? 200 : 8 - endZ,
   });
-  const hit = shot.impacts.find((i) => !i.exit && i.actor === ai.ctx.peek('player'));
+  const hit = shot.impacts.find((i): boolean => !i.exit && i.actor === ai.ctx.peek('player'));
   off();
   return { t: hit?.distance ?? null, n: dealt.length };
 }
 
-function stubAgent(over = {}) {
-  const a = makeAgent();
-  Object.assign(
-    a,
-    {
-      id: 1,
-      alive: true,
-      state: STATE.COMBAT,
-      stateTime: 2,
-      hasTarget: true,
-      targetVisible: false,
-      lastKnown: new THREE.Vector3(0, 1, 12),
-      lastKnownAge: 0.3,
-      lastKnownKind: 'visual',
-      position: new THREE.Vector3(),
-      cover: { x: 0, y: 0, z: 0, dx: 0, dz: 1, high: false },
-      peekTimer: 0,
-      wantFire: false,
-      crouch: true,
-      aimWeight: 0,
-      desiredSpeed: 0,
-      health: 100,
-      weaponRange: 80,
-      hasGrenade: false,
-      grenadeCooldown: 99,
-      role: 'pin',
-      wrapWait: 0,
-      _wrapDone: true,
-      repathTimer: 5,
-      suppression: 0,
-      eyeHeight: 1.5,
-      squad: null,
-      rng,
-      ai: {
-        cover: {
-          pick() {
-            return a.cover;
-          },
-          protects() {
-            return true;
-          },
-          release() {},
-          peekOffset(c, _t, _e, out) {
-            out.set(c.x + 0.95, c.y, c.z);
-            return 1;
-          },
-        },
-        stats: { grenadeHolds: 0 },
-      },
-      phys: { lineOfSight: () => true, MASK: { SIGHT: 1 } },
-      animator: {
-        muzzleWorld: new THREE.Vector3(0.95, 1.4, 0.2),
-        reloading: false,
-        vaulting: false,
-        turn() {},
-      },
-    },
-    over
-  );
+function stubAgent(over: Partial<Agent> = {}): Agent {
+  const ai = fixtureAi();
+  const phys = brainPhysics();
+  const cover = new CoverMap(null, phys);
+  ai.cover = cover;
+  const a = makeAgent({
+    id: 1,
+    alive: true,
+    state: STATE.COMBAT,
+    stateTime: 2,
+    hasTarget: true,
+    targetVisible: false,
+    lastKnown: new THREE.Vector3(0, 1, 12),
+    lastKnownAge: 0.3,
+    lastKnownKind: 'visual',
+    position: new THREE.Vector3(),
+    cover: coverPoint({ x: 0, y: 0, z: 0, dx: 0, dz: 1, high: false }),
+    peekTimer: 0,
+    wantFire: false,
+    crouch: true,
+    aimWeight: 0,
+    desiredSpeed: 0,
+    health: 100,
+    weaponRange: 80,
+    hasGrenade: false,
+    grenadeCooldown: 99,
+    role: 'pin',
+    wrapWait: 0,
+    _wrapDone: true,
+    repathTimer: 5,
+    suppression: 0,
+    eyeHeight: 1.5,
+    squad: null,
+    rng,
+    ai,
+    phys,
+    animator: brainAnimator({
+      muzzleWorld: new THREE.Vector3(0.95, 1.4, 0.2),
+    }),
+    ...over,
+  });
+
+  cover.pick = (): BakedCoverPoint | null => a.cover;
+  cover.protects = (): boolean => true;
+  cover.release = (): void => {};
+  cover.peekOffset = (c, _t, _e, out): number => {
+    out.set(c.x + 0.95, c.y, c.z);
+    return 1;
+  };
   if (over.cover) a.coverPos.set(over.cover.x, over.cover.y, over.cover.z);
   return a;
 }
 
-function deadAgent(id, cover) {
+function deadAgent(id: number, cover: CoverMap): Agent {
   const a = makeAgent();
   a.id = id;
-  a.ai = { cover };
+  a.ai.cover = cover;
   a.controller = null;
   a.colliders = [];
   a.ragdoll = null;
-  a.group = { parent: null };
-  a.phys = null;
+  a.group = new THREE.Group();
+  a.phys = brainPhysics();
   a.squad = null;
   a.peeking = false;
   a._returning = false;
@@ -168,7 +171,7 @@ for (const s of [
 ]) {
   const player = makePlayer({
     height: s.height,
-    stance: s.stance === 'slide' ? 'crouch' : s.stance,
+    stance: s.stance === 'stand' || s.stance === 'prone' ? s.stance : 'crouch',
   });
   const ai = makeAi(player);
   const body = ai.playerPosition(new THREE.Vector3());
@@ -208,7 +211,7 @@ for (const s of [
   low._combat(0.05);
   assert.equal(low.wantFire, true, 'cleared muzzle may fire');
 
-  low.phys.lineOfSight = () => false;
+  low.phys.lineOfSight = (): boolean => false;
   low.peekTimer = 1;
   // Allow the bounded weapon-raise interval; it must never authorize fire.
   for (let i = 0; i < 8; i++) {
@@ -221,7 +224,10 @@ for (const s of [
   assert.equal(low._returning, true);
   assert.equal(low.fireBlock, 'muzzle', 'muzzle fail is not relocating');
 
-  const high = stubAgent({ cover: { x: 0, y: 0, z: 0, dx: 0, dz: 1, high: true }, crouch: false });
+  const high = stubAgent({
+    cover: coverPoint({ x: 0, y: 0, z: 0, dx: 0, dz: 1, high: true }),
+    crouch: false,
+  });
   high._combat(0.05);
   assert.equal(high.crouch, false, 'high cover stays standing');
   assert.ok(high.firePos.distanceTo(high.coverPos) > 0.85);
@@ -273,10 +279,10 @@ for (const s of [
 {
   const sq = new Squad(rng);
   sq.peekTokens = 1;
-  sq.ai = { grid: null, cover: null };
-  const a1 = { id: 1, alive: true, cover: {}, state: 'combat' };
-  const a2 = { id: 2, alive: true, cover: {}, state: 'combat' };
-  const a3 = { id: 3, alive: true, cover: {}, state: 'combat' };
+  sq.ai = fixtureAi();
+  const a1 = stubAgent({ id: 1 });
+  const a2 = stubAgent({ id: 2 });
+  const a3 = stubAgent({ id: 3 });
   sq.members = [a1, a2, a3];
   sq.time = 10;
   assert.equal(sq.requestPeek(a1), true);
@@ -297,7 +303,7 @@ for (const s of [
   const traveler = stubAgent({ id: 11, position: new THREE.Vector3(15, 0, 0) });
   const sq2 = new Squad(rng);
   sq2.peekTokens = 1;
-  sq2.ai = { grid: null, cover: null };
+  sq2.ai = fixtureAi();
   sq2.members = [ready, traveler];
   sq2.time = 10;
   assert.equal(sq2.requestPeek(ready), true);
@@ -309,7 +315,7 @@ for (const s of [
   const B = stubAgent({ id: 22 });
   const sq3 = new Squad(rng);
   sq3.peekTokens = 1;
-  sq3.ai = { grid: null, cover: null };
+  sq3.ai = fixtureAi();
   sq3.add(A);
   sq3.add(B);
   A.squad = sq3;
@@ -338,7 +344,7 @@ for (const s of [
     to = new THREE.Vector3(0.6, 0, 2.8);
   assert.equal(g.lineOfWalk(from, to), false, 'blocked diagonal is not a walk');
   assert.equal(g.canAttach(from, to), false, 'real collision must reject the direct shortcut');
-  const out = [];
+  const out: THREE.Vector3[] = [];
   const n = g.findPath(from, to, out);
   assert.ok(n >= 2, `detour survives smoothing (n=${n})`);
   const floor = g.resolvedFloor;
@@ -356,11 +362,20 @@ for (const s of [
     prev = out[i];
   }
 
-  const ai = Object.create(AiSystem.prototype);
+  const ai = fixtureAi();
   ai.grid = g;
   ai.pathsPerFrame = 2;
   ai._pathBudget = 2;
-  ai.stats = { pathsDeferred: 0 };
+  ai.stats = {
+    agents: 0,
+    alive: 0,
+    navMs: 0,
+    coverPts: 0,
+    walkable: 0,
+    friendlyHolds: 0,
+    grenadeHolds: 0,
+    pathsDeferred: 0,
+  };
   assert.ok(ai.requestPath(from, to, []) >= 0);
   assert.equal(ai.lastPathOutcome, 'success');
   ai._pathBudget = 2;
@@ -384,10 +399,10 @@ for (const s of [
 
 /* 6. cover reservations on dispose / reset */
 {
-  const cover = new CoverMap(null, null);
+  const cover = new CoverMap(null, phys);
   cover.points = [
-    { x: 0, y: 0, z: 0, dx: 0, dz: 1, high: true, claimed: 7, score: 0 },
-    { x: 4, y: 0, z: 0, dx: 1, dz: 0, high: false, claimed: 8, score: 0 },
+    coverPoint({ x: 0, y: 0, z: 0, dx: 0, dz: 1, high: true, claimed: 7 }),
+    coverPoint({ x: 4, y: 0, z: 0, dx: 1, dz: 0, high: false, claimed: 8 }),
   ];
   deadAgent(7, cover).dispose();
   assert.equal(cover.points[0].claimed, -1);
@@ -397,15 +412,15 @@ for (const s of [
   ai.cover = cover;
   ai.agents = [deadAgent(8, cover)];
   ai.resetForNewGame();
-  assert.ok(cover.points.every((p) => p.claimed === -1));
+  assert.ok(cover.points.every((p): boolean => p.claimed === -1));
   ai.resetForNewGame();
-  assert.ok(cover.points.every((p) => p.claimed === -1));
+  assert.ok(cover.points.every((p): boolean => p.claimed === -1));
 }
 
 /* 7. flush fallback when the throw cannot execute */
 {
   const sq = new Squad(rng);
-  sq.ai = { grid: null, cover: null };
+  sq.ai = fixtureAi();
   const a = stubAgent({
     hasGrenade: true,
     grenadeCooldown: 0,
@@ -414,8 +429,8 @@ for (const s of [
     squad: sq,
   });
   let thrown = 0;
-  a._grenadeUnsafe = () => true;
-  a._throwGrenade = () => {
+  a._grenadeUnsafe = (): boolean => true;
+  a._throwGrenade = (): void => {
     thrown++;
   };
   sq.add(a);
@@ -441,13 +456,13 @@ for (const s of [
     lastKnownAge: 0.2,
   });
   let didThrow = 0;
-  g._grenadeUnsafe = () => false;
-  g._throwGrenade = () => {
+  g._grenadeUnsafe = (): boolean => false;
+  g._throwGrenade = (): void => {
     didThrow++;
     g.hasGrenade = false;
   };
   const sq2 = new Squad(rng);
-  sq2.ai = { grid: null, cover: null };
+  sq2.ai = fixtureAi();
   sq2.wantFlush = true;
   g.squad = sq2;
   sq2.add(g);
@@ -461,10 +476,10 @@ for (const s of [
     state: STATE.SUPPRESSED,
     suppression: 1.3,
     scale: 1,
-    cover: { x: 3, y: 0, z: 0, high: false },
+    cover: coverPoint({ x: 3, y: 0, z: 0, high: false }),
     repathTimer: 0,
   });
-  a._goTo = function (p) {
+  a._goTo = function (p): true {
     this.moveTarget.copy(p);
     this.hasMoveTarget = true;
     return true;
@@ -480,7 +495,8 @@ for (const s of [
   assert.equal(a.desiredSpeed, 0, 'only stop after reaching protected cover');
   assert.equal(a.crouch, true);
   assert.equal(a.wantFire, false, 'duck only when physically protected');
-  a.ai.cover.protects = () => false;
+  assert.ok(a.ai.cover);
+  a.ai.cover.protects = (): boolean => false;
   a._think(0.1);
   assert.equal(a.cover, null, 'elevated exposure invalidates the cover claim');
   assert.equal(a.state, STATE.COMBAT);

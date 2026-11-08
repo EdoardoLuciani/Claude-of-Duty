@@ -1,4 +1,3 @@
-/** Issue #356: height-aware lob, cooked 3D arc clearance and live launch parity. */
 import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
@@ -6,21 +5,30 @@ import * as THREE from 'three';
 import { Agent } from '../../src/ai/agent.ts';
 import { AiSystem } from '../../src/ai/index.ts';
 import { GRENADE } from '../../src/ai/tuning.ts';
+/** Issue #356: height-aware lob, cooked 3D arc clearance and live launch parity. */
+import type { EngineEventMap } from '../../src/core/events.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { GRENADE_FUSE } from '../../src/weapons/index.ts';
+import { makeAgent } from '../../tools/lib/agent-fixture.ts';
+import { brainAnimator } from '../lib/ai-brain-fixture.ts';
+import { createTestContext } from '../lib/context.ts';
 
-function fixture() {
+function fixture(): {
+  ai: AiSystem;
+  phys: PhysicsSystem;
+  addBox: (x: number, y: number, z: number, w: number, h: number, d: number) => void;
+} {
   const phys = new PhysicsSystem(),
-    ai = Object.create(AiSystem.prototype);
+    ai = new AiSystem();
   ai._phys = phys;
-  ai.ctx = { time: { fixed: 1 / 120 }, peek: () => null };
+  ai.ctx = createTestContext();
   ai.root = new THREE.Group();
   ai._grenades = [];
-  ai._grenadeArc = {};
+  ai._grenadeArc = { dx: 0, dz: 0, dist: 0, vy: 0, vh: 0, tAir: 0, y: 0, valid: false };
   ai._grenadePoint = new THREE.Vector3();
   ai._grenadeStep = new THREE.Vector3();
   ai.agents = [];
-  const addBox = (x, y, z, w, h, d) => {
+  const addBox = (x: number, y: number, z: number, w: number, h: number, d: number): void => {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d));
     mesh.position.set(x, y, z);
     mesh.updateMatrixWorld(true);
@@ -30,10 +38,15 @@ function fixture() {
   addBox(0, -0.1, 0, 100, 0.2, 100);
   return { ai, phys, addBox };
 }
-function measureFlight(phys, body, land, duration = GRENADE_FUSE) {
+function measureFlight(
+  phys: PhysicsSystem,
+  body: ReturnType<PhysicsSystem['addRigidBody']>,
+  land: THREE.Vector3,
+  duration = GRENADE_FUSE
+): { closest: number; airborneImpacts: number } {
   let closest = Infinity,
     airborneImpacts = 0;
-  body.onImpact = (_body, _x, y) => {
+  body.onImpact = (_body, _x, y): void => {
     if (y > 1) airborneImpacts++;
   };
   for (let i = 0; i < Math.ceil(duration * 120); i++) {
@@ -49,7 +62,7 @@ const f = fixture();
 assert.equal(f.ai.predictGrenadeLand(from, target, land), 12);
 assert(Math.abs(land.y - GRENADE.radius) < 1e-5, 'aim at the floor, not the remembered eye height');
 const flat = { ...f.ai._grenadeLob(from, target) };
-function endpoint(arc, origin) {
+function endpoint(arc: AiSystem['_grenadeArc'], origin: THREE.Vector3): void {
   const t = arc.tAir;
   assert(Math.abs(origin.y + arc.vy * t + 0.5 * f.phys.gravity * t * t - arc.y) < 1e-6);
   assert(Math.abs(arc.vh * t - arc.dist) < 1e-6);
@@ -92,7 +105,12 @@ for (const obstruction of ['ceiling', 'wall']) {
   else blocked.addBox(6, 3, 0, 0.02, 6, 8);
   if (obstruction === 'ceiling') assert(blocked.phys.lineOfSight(from, target));
   assert.equal(blocked.ai.predictGrenadeLand(from, target, land), -1, obstruction);
-  const agent = { ai: blocked.ai, animator: { muzzleWorld: from }, _v3: land, position: from };
+  const agent = makeAgent({
+    ai: blocked.ai,
+    animator: brainAnimator({ muzzleWorld: from }),
+    _v3: land,
+    position: from,
+  });
   assert(Agent.prototype._grenadeUnsafe.call(agent, target), 'unsafe arc holds the grenade');
 }
 const lowWall = fixture();
@@ -106,7 +124,7 @@ assert.equal(
 const live = fixture();
 assert.equal(live.ai.predictGrenadeLand(from, target, land), 12);
 const arc = { ...live.ai._grenadeArc };
-live.ai.throwGrenade({ animator: { fire() {} } }, from, target);
+live.ai.throwGrenade(makeAgent(), from, target);
 assert.equal(live.ai._grenades.length, 1);
 const body = live.ai._grenades[0].body;
 assert.equal(body.linearDamping, 0, 'no unmodelled drag in the live launch');
@@ -114,8 +132,10 @@ assert(Math.abs(body.linearVelocity.y - arc.vy) < 1e-6);
 assert(Math.abs(body.linearVelocity.x - arc.vh) < 1e-6);
 const { closest } = measureFlight(live.phys, body, land, arc.tAir + 0.1);
 assert(closest < GRENADE.landingTolerance, `live landing agrees with safety arc: ${closest} m`);
-const detonations = [];
-live.ai.ctx.events = { emit: (type, payload) => detonations.push({ type, payload }) };
+const detonations: Array<{ type: 'explosion'; payload: EngineEventMap['explosion'] }> = [];
+live.ai.ctx.events.on('explosion', (payload): number =>
+  detonations.push({ type: 'explosion', payload })
+);
 live.ai._updateGrenades(GRENADE_FUSE);
 assert.equal(detonations.length, 1);
 assert.equal(detonations[0].type, 'explosion');
@@ -132,14 +152,14 @@ for (const gap of [0.06, 0.04]) {
   side.addBox(6, 4, gap + 0.1, 1, 8, 0.2);
   const blocked = gap < GRENADE.radius;
   assert.equal(side.ai.predictGrenadeLand(from, target, land), blocked ? -1 : 12);
-  const agent = {
+  const agent = makeAgent({
     ai: side.ai,
-    animator: { muzzleWorld: from },
+    animator: brainAnimator({ muzzleWorld: from }),
     _v3: land,
     position: new THREE.Vector3(),
-  };
+  });
   assert.equal(Agent.prototype._grenadeUnsafe.call(agent, target), blocked);
-  side.ai.throwGrenade({ animator: { fire() {} } }, from, target);
+  side.ai.throwGrenade(makeAgent(), from, target);
   const grenade = side.ai._grenades[0].body;
   assert.equal(
     Math.max(grenade.probeRadius, grenade.minExtent * 0.9),
@@ -164,11 +184,16 @@ top.addBox(6, height / 2, 0, 0.02, height, 8);
 assert.equal(top.ai.predictGrenadeLand(from, target, land), -1, 'near-clearance wall top');
 assert(
   Agent.prototype._grenadeUnsafe.call(
-    { ai: top.ai, animator: { muzzleWorld: from }, _v3: land, position: new THREE.Vector3() },
+    makeAgent({
+      ai: top.ai,
+      animator: brainAnimator({ muzzleWorld: from }),
+      _v3: land,
+      position: new THREE.Vector3(),
+    }),
     target
   )
 );
-top.ai.throwGrenade({ animator: { fire() {} } }, from, target);
+top.ai.throwGrenade(makeAgent(), from, target);
 const result = measureFlight(top.phys, top.ai._grenades[0].body, land);
 assert(
   result.airborneImpacts > 0 && result.closest > GRENADE.landingTolerance,

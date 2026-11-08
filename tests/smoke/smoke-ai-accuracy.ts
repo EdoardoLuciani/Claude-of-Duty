@@ -1,12 +1,13 @@
+import assert from 'node:assert/strict';
+
+import * as THREE from 'three';
+
 /**
  * Deterministic accuracy / reaction baselines for issue 276.
  *
  *   node tests/smoke/smoke-ai-accuracy.ts
  */
-import assert from 'node:assert/strict';
-
-import * as THREE from 'three';
-
+import type { Agent } from '../../src/ai/agent.ts';
 import { STATE } from '../../src/ai/agent.ts';
 import { Animator } from '../../src/ai/animator.ts';
 import { AiSystem } from '../../src/ai/index.ts';
@@ -16,6 +17,8 @@ import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { makeAgent } from '../../tools/lib/agent-fixture.ts';
+import { BrainPlayer, brainAnimator } from '../lib/ai-brain-fixture.ts';
+import { createTestContext } from '../lib/context.ts';
 
 const DT = 1 / 60;
 const SEEDS = [0x51eed01, 0xa11e5, 0xc0ffee];
@@ -23,66 +26,61 @@ const HEIGHT = { stand: 1.78, crouch: 1.12, prone: 0.7 };
 
 const events = new EventBus();
 const phys = new PhysicsSystem();
-phys.ctx = { events, scene: null, camera: null, time: { alpha: 0, elapsed: 0, dt: DT } };
+phys.ctx = createTestContext({ events });
+phys.ctx.time.dt = DT;
 
-function inRange(name, value, [lo, hi]) {
+function inRange(name: string, value: number, [lo, hi]: readonly [number, number]): void {
   assert.ok(value >= lo && value <= hi, `${name}=${value.toFixed(3)} outside [${lo}, ${hi}]`);
 }
 
-function mean(xs) {
-  return xs.reduce((s, x) => s + x, 0) / xs.length;
+function mean(xs: number[]): number {
+  return xs.reduce((s, x): number => s + x, 0) / xs.length;
 }
 
-function makePlayer(stance = 'stand', world = phys) {
+function makePlayer(stance: 'stand' | 'crouch' | 'prone' = 'stand', world = phys): BrainPlayer {
   const height = HEIGHT[stance];
-  const player = {
-    isPlayer: true,
-    position: new THREE.Vector3(),
-    height,
-    stance,
-    hitbox: world.addCollider({
-      shape: 'capsule',
-      layer: world.LAYER.PLAYER,
-      surface: 'flesh',
-      owner: null,
-      part: 'torso',
-      radius: 0.3,
-    }),
-  };
+  const player = new BrainPlayer(world, height);
+  player.testStance = stance;
   player.hitbox.owner = player;
   syncHitbox(player);
   return player;
 }
 
-function syncHitbox(player) {
+function syncHitbox(player: BrainPlayer): void {
   const r = 0.3,
     h = player.height,
     p = player.position;
   player.hitbox.setSegment(p.x, p.y + r, p.z, p.x, p.y + Math.max(r, h - r), p.z, r);
 }
 
-function makeAi(player, world = phys) {
-  const ai = Object.create(AiSystem.prototype);
-  ai.ctx = {
-    peek: (id) => (id === 'player' ? player : id === 'physics' ? world : null),
+function makeAi(player: BrainPlayer, world = phys): AiSystem {
+  const ai = new AiSystem();
+  ai.ctx = createTestContext({
     events,
-    camera: { matrixWorld: new THREE.Matrix4() },
-    has: () => false,
-    config: { deterministic: true },
-    time: { elapsed: 0, dt: DT, frame: 0 },
-  };
+    providers: { physics: world, ...(player ? { player } : {}) },
+  });
+  ai.ctx.time.dt = DT;
   ai._phys = world;
   ai._v = new THREE.Vector3();
   ai.cover = null;
   ai.grid = null;
   ai.agents = [];
-  ai.stats = { friendlyHolds: 0, grenadeHolds: 0 };
-  ai.playerPosition = AiSystem.prototype.playerPosition;
-  ai.emitReload = () => {};
+  ai.stats = {
+    agents: 0,
+    alive: 0,
+    navMs: 0,
+    coverPts: 0,
+    walkable: 0,
+    friendlyHolds: 0,
+    grenadeHolds: 0,
+    pathsDeferred: 0,
+  };
+  ai.playerPosition = AiSystem.prototype.playerPosition.bind(ai);
+  ai.emitReload = (): void => {};
   return ai;
 }
 
-function makeShooter(ai, dist, rng, over = {}) {
+function makeShooter(ai: AiSystem, dist: number, rng: Rng, over: Partial<Agent> = {}): Agent {
   const a = makeAgent({
     id: 7,
     position: new THREE.Vector3(0, 0, dist),
@@ -118,24 +116,19 @@ function makeShooter(ai, dist, rng, over = {}) {
     rng,
     ai,
     ctx: ai.ctx,
-    phys: ai._phys,
+    phys: ai.phys,
     variantName: 'vanguard',
-    animator: {
+    animator: brainAnimator({
       muzzleWorld: new THREE.Vector3(0.15, 1.42, dist),
       muzzleDir: new THREE.Vector3(0, 0, -1),
-      reloading: false,
-      vaulting: false,
-      fire() {},
-      turn() {},
-      reload() {},
-    },
+    }),
     ...over,
   });
   ai.agents.push(a);
   return a;
 }
 
-function alignMuzzle(a) {
+function alignMuzzle(a: Agent): void {
   const o = a.animator.muzzleWorld;
   o.set(a.position.x + 0.15, a.position.y + 1.42, a.position.z);
   a.animator.muzzleDir.copy(a.aimTarget).sub(o);
@@ -143,15 +136,15 @@ function alignMuzzle(a) {
   else a.animator.muzzleDir.normalize();
 }
 
-function aimAt(a) {
+function aimAt(a: Agent): void {
   const p = a.ai.playerPosition(a._v3);
   a.aimTarget.set(p.x, p.y + COMBAT.aimChest, p.z);
   alignMuzzle(a);
 }
 
-function recordShots(ai, world = phys) {
-  const shots = [];
-  ai.onAgentFire = (_a, origin, dir) => {
+function recordShots(ai: AiSystem, world = phys): boolean[] {
+  const shots: boolean[] = [];
+  ai.onAgentFire = (_a, origin, dir): boolean => {
     const wall = world.raycast(
       origin.x,
       origin.y,
@@ -174,11 +167,12 @@ function recordShots(ai, world = phys) {
       world.LAYER.PLAYER
     );
     shots.push(!!hit.hit);
+    return true;
   };
   return shots;
 }
 
-function dumpShots(a, n) {
+function dumpShots(a: Agent, n: number): void {
   aimAt(a);
   for (let i = 0; i < n; i++) {
     a.fireCooldown = 0;
@@ -186,7 +180,7 @@ function dumpShots(a, n) {
   }
 }
 
-function tickSenseThink(a, dt) {
+function tickSenseThink(a: Agent, dt: number): void {
   a.ctx.time.elapsed += dt;
   a.ctx.time.frame++;
   a.fireCooldown -= dt;
@@ -198,18 +192,18 @@ function tickSenseThink(a, dt) {
 }
 
 /** One aim lerp per frame, then the barrel follows — same order as update/_drive. */
-function tickFire(a, dt) {
+function tickFire(a: Agent, dt: number): void {
   a._shoot(dt);
   alignMuzzle(a);
 }
 
-function hitRate(shots) {
+function hitRate(shots: boolean[]): number {
   return shots.length ? shots.filter(Boolean).length / shots.length : 0;
 }
 
 /* 1. acquisition */
 let acquire10 = 0;
-for (const dist of [10, 25, 50]) {
+for (const dist of [10, 25, 50] as const) {
   const player = makePlayer();
   const ai = makeAi(player);
   const a = makeShooter(ai, dist, new Rng(1), { alertness: 1 });
@@ -226,7 +220,12 @@ for (const dist of [10, 25, 50]) {
 }
 
 /* 2. dispersion */
-function spreadRate(dist, stance, seed, { n = 220, ...over } = {}) {
+function spreadRate(
+  dist: number,
+  stance: BrainPlayer['testStance'],
+  seed: number,
+  { n = 220, ...over }: Partial<Agent> & { n?: number } = {}
+): number {
   const player = makePlayer(stance);
   const ai = makeAi(player);
   const a = makeShooter(ai, dist, new Rng(seed), {
@@ -244,20 +243,20 @@ function spreadRate(dist, stance, seed, { n = 220, ...over } = {}) {
   return hitRate(shots);
 }
 
-const stand10 = mean(SEEDS.map((s) => spreadRate(10, 'stand', s)));
+const stand10 = mean(SEEDS.map((s): number => spreadRate(10, 'stand', s)));
 inRange('spread stand 10m', stand10, BASELINE.spread.stand[10]);
 inRange(
   'spread stand 25m',
-  mean(SEEDS.map((s) => spreadRate(25, 'stand', s))),
+  mean(SEEDS.map((s): number => spreadRate(25, 'stand', s))),
   BASELINE.spread.stand[25]
 );
 inRange(
   'spread stand 50m',
-  mean(SEEDS.map((s) => spreadRate(50, 'stand', s))),
+  mean(SEEDS.map((s): number => spreadRate(50, 'stand', s))),
   BASELINE.spread.stand[50]
 );
-const crouch10 = mean(SEEDS.map((s) => spreadRate(10, 'crouch', s)));
-const prone10 = mean(SEEDS.map((s) => spreadRate(10, 'prone', s)));
+const crouch10 = mean(SEEDS.map((s): number => spreadRate(10, 'crouch', s)));
+const prone10 = mean(SEEDS.map((s): number => spreadRate(10, 'prone', s)));
 inRange('spread crouch 10m', crouch10, BASELINE.spread.crouch[10]);
 inRange('spread prone 10m', prone10, BASELINE.spread.prone[10]);
 assert.ok(prone10 < stand10, `prone ${prone10.toFixed(3)} !< stand ${stand10.toFixed(3)}`);
@@ -267,7 +266,13 @@ assert.ok(
 );
 
 /* 3. aimed fire (lerp + wobble + spread) */
-function runEncounter(dist, stance, move, seed, over = {}) {
+function runEncounter(
+  dist: number,
+  stance: BrainPlayer['testStance'],
+  move: boolean,
+  seed: number,
+  over: Partial<Agent> = {}
+): { ttfs: number | null; shots: number; hits: number; rate: number } {
   const player = makePlayer(stance);
   const ai = makeAi(player);
   const rng = new Rng(seed);
@@ -294,14 +299,21 @@ function runEncounter(dist, stance, move, seed, over = {}) {
 
 let aimedStand10 = 0;
 let ttfs10 = 0;
-for (const dist of [10, 25]) {
-  const runs = SEEDS.map((s) => runEncounter(dist, 'stand', false, s));
+for (const dist of [10, 25] as const) {
+  const runs = SEEDS.map((s): { ttfs: number | null; shots: number; hits: number; rate: number } =>
+    runEncounter(dist, 'stand', false, s)
+  );
   for (const r of runs) {
     assert.ok(r.ttfs != null, `no shot at ${dist}m`);
     assert.ok(r.shots >= 8, `${dist}m only ${r.shots} shots`);
   }
-  const ttfs = mean(runs.map((r) => r.ttfs));
-  const rate = mean(runs.map((r) => r.rate));
+  const ttfs = mean(
+    runs.map((r): number => {
+      assert.ok(r.ttfs != null);
+      return r.ttfs;
+    })
+  );
+  const rate = mean(runs.map((r): number => r.rate));
   inRange(`ttfs ${dist}m`, ttfs, BASELINE.ttfs[dist]);
   inRange(`aimed stand still ${dist}m`, rate, BASELINE.aimed.standStill[dist]);
   if (dist === 10) {
@@ -311,21 +323,21 @@ for (const dist of [10, 25]) {
 }
 inRange(
   'aimed crouch 10m',
-  mean(SEEDS.map((s) => runEncounter(10, 'crouch', false, s).rate)),
+  mean(SEEDS.map((s): number => runEncounter(10, 'crouch', false, s).rate)),
   BASELINE.aimed.crouchStill[10]
 );
 inRange(
   'aimed prone 10m',
-  mean(SEEDS.map((s) => runEncounter(10, 'prone', false, s).rate)),
+  mean(SEEDS.map((s): number => runEncounter(10, 'prone', false, s).rate)),
   BASELINE.aimed.proneStill[10]
 );
-const moving = mean(SEEDS.map((s) => runEncounter(10, 'stand', true, s).rate));
+const moving = mean(SEEDS.map((s): number => runEncounter(10, 'stand', true, s).rate));
 inRange('aimed stand move 10m', moving, BASELINE.aimed.standMove[10]);
 assert.ok(moving < aimedStand10 - 0.08, 'relocation must cut the hit rate');
 assert.ok(ttfs10 - acquire10 <= 0.12, 'ready-weapon decision-to-fire is a beat, not a stall');
 
 const spawnTtfs = mean(
-  SEEDS.map((s) => {
+  SEEDS.map((s): number => {
     const gap = new Rng(s).range(COMBAT.firstBurstMin, COMBAT.firstBurstMax);
     const r = runEncounter(10, 'stand', false, s, { burstCooldown: gap });
     assert.ok(r.ttfs != null, 'spawn burst never fired');

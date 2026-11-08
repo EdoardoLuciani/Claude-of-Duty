@@ -2,19 +2,43 @@ import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
 
+import type { Agent } from '../../src/ai/agent.ts';
 import { AttachmentQueries, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.ts';
 import { AiSystem } from '../../src/ai/index.ts';
-import { SurfaceNav } from '../../src/ai/nav.ts';
+import type { BakedCoverPoint } from '../../src/ai/nav-format.ts';
+import { CoverMap, SurfaceNav } from '../../src/ai/nav.ts';
+import type { NavRoute } from '../../src/ai/nav.ts';
 import { TACTICS, acquireSeconds } from '../../src/ai/tuning.ts';
 import { EventBus } from '../../src/core/registry.ts';
+import type { PhysicsSystem } from '../../src/physics/index.ts';
 import { PlayerSystem } from '../../src/player/index.ts';
 import { makeAgent, makeAi } from '../../tools/lib/agent-fixture.ts';
 import { NativeWorker } from '../../tools/lib/attachment-worker-fixture.ts';
 import { loadMap, physicsFor } from '../../tools/nav240/fixtures.ts';
 import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
+import {
+  BrainPlayer,
+  coverPoint,
+  brainPhysics,
+  brainAnimator,
+  disposeMesh,
+} from '../lib/ai-brain-fixture.ts';
+import { createTestContext } from '../lib/context.ts';
+import { fixture as partialFixture } from '../lib/fixture.ts';
 
-const v = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
-function fixture(height = 1.78, barrier = 0, width = 5) {
+const v = (x = 0, y = 0, z = 0): THREE.Vector3 => new THREE.Vector3(x, y, z);
+function fixture(
+  height = 1.78,
+  barrier = 0,
+  width = 5
+): {
+  a: Agent;
+  ai: AiSystem;
+  phys: PhysicsSystem;
+  player: BrainPlayer;
+  scene: THREE.Scene<THREE.Object3DEventMap>;
+  dispose(): void;
+} {
   const scene = new THREE.Scene();
   if (barrier) {
     const wall = new THREE.Mesh(new THREE.BoxGeometry(width, barrier, 0.15));
@@ -22,17 +46,12 @@ function fixture(height = 1.78, barrier = 0, width = 5) {
     scene.add(wall);
   }
   const phys = physicsFor(scene),
-    player = { position: v(0, 0, 10), height };
-  player.hitbox = phys.addCollider({
-    shape: 'capsule',
-    layer: phys.LAYER.PLAYER,
-    owner: player,
-    radius: 0.3,
-  });
+    player = new BrainPlayer(phys, height);
+  player.position.set(0, 0, 10);
   player.hitbox.setSegment(0, 0.3, 10, 0, Math.max(0.3, height - 0.3), 10, 0.3);
   const ai = makeAi();
-  ai.ctx = { peek: (id) => (id === 'player' ? player : null) };
-  ai.playerPosition = AiSystem.prototype.playerPosition;
+  ai.ctx = createTestContext({ providers: { player } });
+  ai.playerPosition = AiSystem.prototype.playerPosition.bind(ai);
   const a = makeAgent({ ai, phys, yaw: 0 });
   ai.agents.push(a);
   return {
@@ -41,11 +60,10 @@ function fixture(height = 1.78, barrier = 0, width = 5) {
     phys,
     player,
     scene,
-    dispose() {
+    dispose(): void {
       phys.dispose();
-      scene.traverse((o) => {
-        o.geometry?.dispose();
-        o.material?.dispose();
+      scene.traverse((o): void => {
+        disposeMesh(o);
       });
     },
   };
@@ -107,7 +125,7 @@ for (const height of [1.78, 1.12, 0.7]) {
   const f = fixture();
   let rays = 0;
   const los = f.phys.lineOfSight.bind(f.phys);
-  f.phys.lineOfSight = (...args) => {
+  f.phys.lineOfSight = (...args): boolean => {
     rays++;
     return los(...args);
   };
@@ -126,14 +144,12 @@ for (const height of [1.78, 1.12, 0.7]) {
 {
   const f = fixture(1.78, 3, 0.5),
     { player, a, phys } = f;
-  player.movement = {
-    renderPosition: player.position,
-    stance: 'stand',
-    leanAmount: 1,
-    leanOffsetX: 0.36,
-    leanOffsetZ: 0,
-  };
-  player.health = { dead: false };
+  player.movement.renderPosition.copy(player.position);
+  player.movement.stance = 'stand';
+  player.movement.leanAmount = 1;
+  player.movement.leanOffsetX = 0.36;
+  player.movement.leanOffsetZ = 0;
+  player.health.dead = false;
   PlayerSystem.prototype._syncHitbox.call(player);
   assert.equal(player.hitbox.ax, 0);
   assert.equal(player.hitbox.bx, 0.36);
@@ -174,12 +190,25 @@ for (const height of [1.78, 1.12, 0.7]) {
 {
   const ai = makeAi(),
     events = new EventBus();
-  ai._wireEvents({ events });
+  ai._wireEvents(createTestContext({ events }));
   const a = makeAgent({ ai });
   ai.agents.push(a);
-  events.emit('weapon:fire', { weapon: 'sniper', origin: v(0, 2, 20), dir: v(0, 0, -1) });
+  events.emit('weapon:fire', {
+    actor: null,
+    weapon: 'sniper',
+    seed: 0,
+    origin: v(0, 2, 20),
+    dir: v(0, 0, -1),
+  });
   const known = a.lastKnown.clone();
-  events.emit('bullet:impact', { point: v(5, 0, 0) });
+  events.emit('bullet:impact', {
+    point: v(5, 0, 0),
+    normal: v(0, 1, 0),
+    incident: v(0, 0, -1),
+    surface: 'concrete',
+    damage: 0,
+    exit: false,
+  });
   assert.equal(a.lastKnownKind, 'gunfire');
   assert.ok(a.lastKnown.equals(known));
   assert.equal(a.hasTarget, false);
@@ -206,8 +235,9 @@ for (const width of [1, 14]) {
     maxSolves = 0,
     moved = false,
     searched = false;
-  ai.onAgentFire = () => {
+  ai.onAgentFire = (): boolean => {
     shots++;
+    return true;
   };
   const a = makeAgent({
     ai,
@@ -221,10 +251,10 @@ for (const width of [1, 14]) {
     lastKnownAge: 0,
     visualAge: 0,
     hasGrenade: false,
-    ctx: { time: { elapsed: 0 } },
+    ctx: createTestContext(),
     ammo: 100,
     burstCooldown: 0,
-    animator: { muzzleWorld: v(), muzzleDir: v(0, 0, 1), turn() {}, fire() {} },
+    animator: brainAnimator({ muzzleWorld: v(), muzzleDir: v(0, 0, 1) }),
   });
   ai.agents.push(a);
   a.controller = phys.createCharacter({
@@ -252,13 +282,14 @@ for (const width of [1, 14]) {
     if (frame < 40) assert.equal(shots, 0, 'do not shoot through the low wall while settling');
     moved ||= a.combatAction === 'firing-reposition' || (a._firingSearch && a.hasMoveTarget);
     if (a._firingSearch && !searched) {
-      a._firingLaneClear = () => true;
+      const firingLaneClear = a._firingLaneClear.bind(a);
+      a._firingLaneClear = (): boolean => true;
       a._think(dt);
       assert.equal(a.state, 'alert', 'one clear frame cannot cancel the recovery route');
-      a._firingLaneClear = () => false;
+      a._firingLaneClear = (): boolean => false;
       a._think(dt);
       assert.equal(a._searchLaneTime, 0);
-      delete a._firingLaneClear;
+      a._firingLaneClear = firingLaneClear;
       searched = true;
     }
     maxSolves = Math.max(maxSolves, nav.stats.queries - before);
@@ -272,13 +303,16 @@ for (const width of [1, 14]) {
   assert.ok(maxSolves <= 2);
   assert.equal(a.relocations, 0);
   assert.ok(
-    a._failedCovers.some((f) => f.until > 0 && Math.hypot(f.x - initial.x, f.z - initial.z) < 0.1)
+    a._failedCovers.some(
+      (f): boolean => f.until > 0 && Math.hypot(f.x - initial.x, f.z - initial.z) < 0.1
+    )
   );
   // Turning/raising alone must not trigger navigation churn.
   a._laneBlockedTime = 0;
   a._repositioning = false;
   a._positionRetry = 0;
-  a.phys = { ...phys, MASK: phys.MASK, lineOfSight: () => true };
+  a.phys = phys;
+  a.phys.lineOfSight = (): boolean => true;
   a.animator.muzzleDir.set(1, 0, 0);
   a.wantFire = true;
   for (let i = 0; i < 120; i++) a._shoot(1 / 60);
@@ -286,14 +320,13 @@ for (const width of [1, 14]) {
   a._laneBlockedTime = 0.6;
   a._shoot(1 / 60);
   assert.ok(a._laneBlockedTime > 0.5, 'one clear/raising frame only decays obstruction history');
-  a.animator.reloading = true;
+  a.animator.reloadT = 0;
   a._shoot(1 / 60);
   assert.equal(a._laneBlockedTime, 0, 'reload is not a blocked-position failure');
   nav.dispose();
   phys.dispose();
-  scene.traverse((o) => {
-    o.geometry?.dispose();
-    o.material?.dispose();
+  scene.traverse((o): void => {
+    disposeMesh(o);
   });
 }
 
@@ -306,7 +339,7 @@ const map = await loadMap(),
 for (const [from, target, reachable] of [
   [[-3.384, 0.091, -3.351], [-5.65, 8.16, 8.512], true],
   [[-12, 0.074, -17.265], [-12.943, 8.165, -6.762], false],
-]) {
+] as const) {
   const ai = makeAi(grid);
   const a = makeAgent({
     ai,
@@ -315,7 +348,7 @@ for (const [from, target, reachable] of [
     lastKnown: v(...target),
     lastKnownAge: 0,
     lastKnownKind: 'gunfire',
-    animator: { muzzleWorld: v(), turn() {} },
+    animator: brainAnimator({ muzzleWorld: v() }),
   });
   ai.agents.push(a);
   const origin = a.lastKnown.clone(),
@@ -351,14 +384,14 @@ for (const [from, target, reachable] of [
     assert.ok(origin.y - foot.y > 1, 'the elevated clue is not a valid route foot');
     assert.equal(grid.project(foot, v()), roof);
     const service = (grid.worker = new AttachmentQueries(grid, {
-      workerFactory: () => new NativeWorker(),
+      workerFactory: (): NativeWorker => new NativeWorker(),
     }));
-    const nativeCheck = grid._checkAttachment;
-    grid._checkAttachment = () =>
+    const nativeCheck = grid._checkAttachment.bind(grid);
+    grid._checkAttachment = (): never =>
       assert.fail('full route eligibility must not run on the main thread');
     try {
       await service.start();
-      const route = { points: [], ladderSteps: [] },
+      const route: NavRoute = { points: [], ladderSteps: [] },
         deadline = performance.now() + 10000;
       let result,
         pending = 0;
@@ -366,7 +399,7 @@ for (const [from, target, reachable] of [
         result = service.run(
           a.id,
           'route',
-          () => grid.findRoute(a.position, foot, route, a),
+          (): number => grid.findRoute(a.position, foot, route, a),
           a.position
         );
         assert.notEqual(result, NAV_CANCELLED, 'frozen route intent must not be superseded');
@@ -374,11 +407,11 @@ for (const [from, target, reachable] of [
           pending++;
           assert.deepEqual(route, { points: [], ladderSteps: [] }, 'no partial admission');
           assert.ok(performance.now() < deadline, 'bounded worker drain');
-          await new Promise((resolve) => setTimeout(resolve, 1));
+          await new Promise((resolve): NodeJS.Timeout => setTimeout(resolve, 1));
         }
       } while (result === NAV_PENDING);
       assert.ok(pending > 0 && service.stats.submitted > 0, 'actual asynchronous worker proof');
-      assert.ok(result > 0, grid.lastReason);
+      assert.ok(typeof result === 'number' && result > 0, grid.lastReason ?? 'no route reason');
       assert.equal(grid.lastReason, 'complete');
       assert.equal(
         route.ladderSteps.length,
@@ -416,8 +449,8 @@ for (const [from, target, reachable] of [
 for (const deferred of [false, true]) {
   const ai = makeAi(grid),
     from = v(8.182, 9.598, -1.093);
-  let pick = { x: 13.188, y: 9.573, z: 3.48 };
-  ai.cover = { pick: () => pick, release() {} };
+  let pick = coverPoint({ x: 13.188, y: 9.573, z: 3.48 });
+  ai.cover = partialFixture<CoverMap>({ pick: (): BakedCoverPoint => pick, release(): void {} });
   const a = makeAgent({
     ai,
     phys: map.physics,
@@ -444,10 +477,10 @@ for (const deferred of [false, true]) {
   assert.equal(a.cover, null);
   assert.equal(a.hasMoveTarget || a.pathPending, false);
   assert.ok(
-    a._failedCovers.some((f) => f.x === pick.x && f.until > 0),
+    a._failedCovers.some((f): boolean => f.x === pick.x && f.until > 0),
     'do not immediately retry rejected cover'
   );
-  pick = { x: 6.773, y: 9.573, z: -2.676 };
+  pick = coverPoint({ x: 6.773, y: 9.573, z: -2.676 });
   a.repathTimer = 0;
   ai._pathBudget = 2;
   a._combat(0.016);
@@ -476,13 +509,13 @@ for (const deferred of [false, true]) {
     visualAge: TACTICS.suppressFireAge + 0.1,
     hasGrenade: false,
     repathTimer: 10,
-    ctx: { time: { elapsed: 0 } },
-    animator: { muzzleWorld: v() },
+    ctx: createTestContext(),
+    animator: brainAnimator({ muzzleWorld: v() }),
     _muzzleBlocked: true,
   });
   const known = a.lastKnown.clone();
   const service = (grid.worker = new AttachmentQueries(grid, {
-    workerFactory: () => new NativeWorker(),
+    workerFactory: (): NativeWorker => new NativeWorker(),
   }));
   await service.start();
   a._think(0.016);
@@ -500,7 +533,7 @@ for (const deferred of [false, true]) {
     a._think(0.016);
     assert.equal(a.wantFire, false);
     assert.ok(a.lastKnown.equals(known));
-    await new Promise((resolve) => setTimeout(resolve, 1));
+    await new Promise((resolve): NodeJS.Timeout => setTimeout(resolve, 1));
   }
   assert.equal(a.state, 'alert');
   assert.equal(a.hasTarget, true, 'retain acquisition memory');
@@ -522,14 +555,14 @@ for (const deferred of [false, true]) {
   a.lastKnownAge = a.visualAge = 0;
   const goal = a.moveTarget.clone(),
     queries = grid.stats.queries;
-  a.phys = { MASK: { SIGHT: 1 }, lineOfSight: () => false };
+  a.phys = brainPhysics(false);
   a._think(0.016);
   assert.equal(a.state, 'alert', 'eye contact must not cancel a rifle-blocked approach');
   assert.ok(a.hasMoveTarget && a.moveTarget.equals(goal));
   assert.ok(a.desiredSpeed > 0);
   assert.equal(a.wantFire, false);
   assert.equal(grid.stats.queries, queries, 'continue the existing route without another solve');
-  a.phys.lineOfSight = () => true;
+  a.phys.lineOfSight = (): boolean => true;
   a._think(0.016);
   assert.equal(a.state, 'combat', 'personal contact with a clear rifle lane resumes combat');
 

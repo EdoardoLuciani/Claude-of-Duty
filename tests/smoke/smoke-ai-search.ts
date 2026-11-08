@@ -1,12 +1,13 @@
+import assert from 'node:assert/strict';
+
+import * as THREE from 'three';
+
 /**
  * Headless regressions for issue 268: evidence ordering and bounded search.
  *
  *   node tests/smoke/smoke-ai-search.ts
  */
-import assert from 'node:assert/strict';
-
-import * as THREE from 'three';
-
+import type { Agent } from '../../src/ai/agent.ts';
 import {
   STATE,
   EVIDENCE,
@@ -17,11 +18,14 @@ import {
   SEARCH_CANDIDATES,
   SEARCH_DURATION,
 } from '../../src/ai/agent.ts';
-import { NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.ts';
+import { AttachmentQueries, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.ts';
 import { AiSystem } from '../../src/ai/index.ts';
+import type { SurfaceNav } from '../../src/ai/nav.ts';
 import { Squad } from '../../src/ai/squad.ts';
 import { makeAgent, makeAi, makeRng } from '../../tools/lib/agent-fixture.ts';
 import { testNav } from '../../tools/lib/test-nav.ts';
+import { brainPhysics, brainAnimator } from '../lib/ai-brain-fixture.ts';
+import { fixture } from '../lib/fixture.ts';
 
 const connected = await testNav();
 const disconnected = await testNav([
@@ -29,7 +33,7 @@ const disconnected = await testNav([
   [10, 0, 10, 1.2, 1.2],
 ]);
 
-function makeSearchAgent(over = {}) {
+function makeSearchAgent(over: Partial<Agent> = {}): Agent {
   const rng = over.rng ?? makeRng();
   const ai = over.ai ?? makeAi(connected);
   const a = makeAgent({
@@ -40,15 +44,15 @@ function makeSearchAgent(over = {}) {
     rng,
     ai,
     repathTimer: 5,
-    phys: { lineOfSight: () => true, MASK: { SIGHT: 1 } },
-    animator: { turn() {}, muzzleWorld: new THREE.Vector3(0, 1.4, 0) },
+    phys: brainPhysics(),
+    animator: brainAnimator({ muzzleWorld: new THREE.Vector3(0, 1.4, 0) }),
     ...over,
   });
   if (!ai.agents.includes(a)) ai.agents.push(a);
   return a;
 }
 
-function pump(a, dt = 1 / 60) {
+function pump(a: Agent, dt = 1 / 60): void {
   if (a.ai) a.ai._pathBudget = a.ai.pathsPerFrame ?? 2;
   if (a.lastKnownAge < 1e6) a.lastKnownAge += dt;
   a.stateTime += dt;
@@ -167,7 +171,7 @@ const hidden = new THREE.Vector3(10, 0, 1);
   a.hasMoveTarget = false;
   a.pathPending = false;
   const idx = a._searchIndex;
-  a._goTo = function () {
+  a._goTo = function (): false {
     this.pathPending = false;
     this.hasMoveTarget = false;
     return false;
@@ -190,10 +194,10 @@ const hidden = new THREE.Vector3(10, 0, 1);
   a._setState(STATE.ALERT);
   assert.ok(a._searchUntil > 0);
   a.colliders = [];
-  a.group = { parent: null };
+  a.group = new THREE.Group();
   a.ragdoll = null;
   a.controller = null;
-  a.phys = null;
+  a.phys = brainPhysics();
   a.dispose();
   assert.equal(a._searchUntil, 0, 'dispose cancels search');
 }
@@ -253,16 +257,17 @@ const hidden = new THREE.Vector3(10, 0, 1);
   let frames = 0;
   let maxFramePaths = 0;
   const origPath = AiSystem.prototype.requestPath.bind(ai);
-  ai.requestPath = function (from, dest, out) {
-    this._framePaths = (this._framePaths ?? 0) + 1;
+  let framePaths = 0;
+  ai.requestPath = function (from, dest, out): number {
+    framePaths++;
     return origPath(from, dest, out);
   };
 
   for (let i = 0; i < 1800; i++) {
-    ai._framePaths = 0;
+    framePaths = 0;
     pump(a);
     frames++;
-    maxFramePaths = Math.max(maxFramePaths, ai._framePaths ?? 0);
+    maxFramePaths = Math.max(maxFramePaths, framePaths);
     if (a.wantFire) fired++;
     if (a.hasMoveTarget) dests.push(a.moveTarget.clone());
     dests.push(a.searchPoint.clone());
@@ -298,7 +303,7 @@ const hidden = new THREE.Vector3(10, 0, 1);
   a._noteEvidence(seen, EVIDENCE.VISUAL, 0);
   a._setState(STATE.ALERT);
   assert.equal(a.state, STATE.ALERT);
-  ai.playerPosition = (out) => out.copy(seen);
+  ai.playerPosition = (out): THREE.Vector3 => out.copy(seen);
   a.awareness = 1;
   a._sense(0.2);
   assert.equal(a.hasTarget, true);
@@ -313,7 +318,7 @@ const hidden = new THREE.Vector3(10, 0, 1);
   const ai = makeAi(disconnected);
   let paths = 0;
   const origPath = AiSystem.prototype.requestPath.bind(ai);
-  ai.requestPath = function (from, dest, out) {
+  ai.requestPath = function (from, dest, out): number {
     paths++;
     return origPath(from, dest, out);
   };
@@ -322,7 +327,7 @@ const hidden = new THREE.Vector3(10, 0, 1);
     position: new THREE.Vector3(0, 0, 0),
   });
   // Neither direct access nor a useful observation lane exists.
-  a.phys.lineOfSight = () => false;
+  a.phys.lineOfSight = (): boolean => false;
   a._noteEvidence(new THREE.Vector3(10, 0, 10), EVIDENCE.VISUAL, 0);
   a._setState(STATE.ALERT);
   // With no route, a bounded look-in-place now precedes abandoning the cue.
@@ -366,16 +371,17 @@ const hidden = new THREE.Vector3(10, 0, 1);
   const ai = makeAi(disconnected);
   let req = 0;
   const origPath = AiSystem.prototype.requestPath.bind(ai);
-  ai.requestPath = function (from, dest, out) {
+  ai.requestPath = function (from, dest, out): number {
     req++;
     return origPath(from, dest, out);
   };
   const a = makeSearchAgent({ ai, position: new THREE.Vector3(0, 0, 0) });
   // Isolate the queued-solve failure contract. The real candidate selector now
   // rejects disconnected goals before spending a solve (covered separately).
-  a._buildSearchCandidates = function () {
+  a._buildSearchCandidates = function (): undefined {
     this._searchCount = 1;
     this._searchCand[0].copy(this.lastKnown);
+    return undefined;
   };
   a._noteEvidence(new THREE.Vector3(10, 0, 10), EVIDENCE.VISUAL, 0);
   ai._pathBudget = 0;
@@ -396,27 +402,34 @@ const hidden = new THREE.Vector3(10, 0, 1);
 }
 
 /* ---- pending candidate construction still obeys the intent deadline ------ */
-for (const answer of [NAV_PENDING, NAV_CANCELLED]) {
+for (const answer of [NAV_PENDING, NAV_CANCELLED] as const) {
   const a = makeSearchAgent({ state: STATE.ALERT, lastKnown: seen.clone(), lastKnownAge: 1 });
-  const cancelled = [];
-  a.ai.grid = {
-    project: () => 1,
-    sampleGround: () => 0,
+  const cancelled: string[] = [];
+  a.ai.grid = fixture<SurfaceNav>({
+    project: (): number => 1,
+    sampleGround: (): number => 0,
     components: new Map([[1, 1]]),
-    worker: { run: (_actor, _kind, fn) => fn(), cancel: (key) => cancelled.push(key) },
-  };
+    worker: fixture<AttachmentQueries>({
+      pending: false,
+      active: false,
+      run: <T>(_actor: number, _kind: string, fn: () => T): T => fn(),
+      cancel: (key): void => {
+        cancelled.push(key);
+      },
+    }),
+  });
   let attempts = 0,
     moves = 0,
     failures = 0;
-  a._pickObservationPoints = () => {
+  a._pickObservationPoints = (): typeof NAV_PENDING | typeof NAV_CANCELLED => {
     attempts++;
     return answer;
   };
-  a._goTo = () => {
+  a._goTo = (): boolean => {
     moves++;
     return true;
   };
-  a._rememberFailedPosition = () => {
+  a._rememberFailedPosition = (): void => {
     failures++;
   };
   a._searchOrigin.copy(seen);
