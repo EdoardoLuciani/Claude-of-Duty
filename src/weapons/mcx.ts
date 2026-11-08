@@ -34,6 +34,7 @@ export function makeMCXModel(gltf: GLTF): MCXModel {
     gltf,
     'MCX_RIG',
     ['Idle', 'Fire', ...Object.values(ALIASES)],
+    manifest.clips,
     scene
   );
   const sight = point('SOCKET_sight');
@@ -217,11 +218,7 @@ export class MCXAnimation {
   clips(): { [x: string]: import('./clips.ts').Clip } {
     return {
       ...buildEquipClips(this.model.nodes, this.def),
-      ...buildMagazineClips(
-        ALIASES,
-        manifest.clips,
-        (source): number => this.actions[source].getClip().duration
-      ),
+      ...buildMagazineClips(ALIASES, manifest.clips),
     };
   }
 
