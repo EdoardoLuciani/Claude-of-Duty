@@ -89,8 +89,11 @@ const SOLDIER_STEP = {
   commands: [node('tools/blender/soldiers/export.mjs', '--output', SOLDIERS)],
 };
 
-// Blender tool directories a weapon imports beyond its own tools/blender/<id>/.
-const EXTRA_TOOLS = { mpx: ['evolys'] };
+// Shared Blender sources imported beyond a weapon's own tooling directory.
+const SHARED_TOOLS = {
+  evolys: ['tools/blender/review_hands.py'],
+  mpx: ['tools/blender/review_hands.py'],
+};
 
 /** One Blender build plus its gltfpack cook for a MODEL_COOKS entry. */
 function cookStep(id, salt) {
@@ -98,7 +101,7 @@ function cookStep(id, salt) {
   const standalone = id === 'exps3';
   const tools = standalone
     ? ['tools/blender/exps3.py', 'tools/blender/exps3_bake.py']
-    : [id, ...(EXTRA_TOOLS[id] ?? [])].map((tool) => `tools/blender/${tool}`);
+    : [`tools/blender/${id}`, ...(SHARED_TOOLS[id] ?? [])];
   return {
     id,
     inputs: [...tools, ...authoredJson(directory)],

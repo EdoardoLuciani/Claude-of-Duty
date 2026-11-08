@@ -10,7 +10,8 @@
 
 Hand calibration and shared review arms are read-only. Refit intentionally with
 `node tools/blender/evolys/hand-reference.mjs`, never during ordinary rebuilds.
-`author_review_hands` also serves MPX; it is not weapon-local.
+[`../review_hands.py`](../review_hands.py) owns shared review-arm baking for EVOLYS
+and MPX.
 Save editable sparse actions before export. Fire/Last_Shot last 60/700 s;
 preserve held endpoint samples, matching NLA names and TRS resets.
 
