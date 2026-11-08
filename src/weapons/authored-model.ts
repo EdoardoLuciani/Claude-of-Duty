@@ -34,8 +34,9 @@ export function applyAuthoredDuration(
     clip.tracks.every((track): boolean => track.times.length === 1 && track.times[0] === 0)
   )
     clip.duration = expected;
-  // Float32 key times round authored lengths by ~1e-7; the inverted test also rejects NaN.
-  else if (!(Math.abs(clip.duration - expected) <= 1e-6))
+  // Key times are float32: allow one float32 step of rounding (it grows with the length),
+  // never less than 1e-6. The inverted comparison also rejects NaN.
+  else if (!(Math.abs(clip.duration - expected) <= Math.max(1e-6, expected * 2 ** -23)))
     throw new Error(`[${rigName}] ${clip.name} lasts ${clip.duration} s, authored ${expected} s`);
 }
 

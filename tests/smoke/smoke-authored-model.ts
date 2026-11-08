@@ -17,7 +17,11 @@ const clip = (name: string, ...tracks: THREE.KeyframeTrack[]): THREE.AnimationCl
   new THREE.AnimationClip(name, undefined, tracks);
 // gltfpack 1.3 with -af 0: every constant track is one key at t=0.
 const collapsed = (name: string): THREE.AnimationClip => clip(name, track([0]), track([0]));
-const authored = { Idle: { duration: 2 }, Fire: { duration: 0.06315789473684211 } };
+const authored = {
+  Idle: { duration: 2 },
+  Fire: { duration: 0.06315789473684211 },
+  Inspect: { duration: 40.1 },
+};
 const apply = (c: THREE.AnimationClip): void => applyAuthoredDuration(c, authored, 'TEST_RIG');
 
 const idle = collapsed('Idle');
@@ -33,13 +37,18 @@ assert.equal(moving.duration, 2, 'an Idle with motion keeps its own timing');
 const fire = clip('Fire', track([0, Math.fround(authored.Fire.duration)]));
 apply(fire);
 assert.equal(fire.duration, Math.fround(authored.Fire.duration));
+// Float32 rounding grows with length: 40.1 s stores as 40.0999985 s, 1.5e-6 off.
+const long = clip('Inspect', track([0, Math.fround(authored.Inspect.duration)]));
+apply(long);
+assert.equal(long.duration, Math.fround(authored.Inspect.duration));
 
 for (const [bad, message] of [
   [clip('Fire', track([0, 0.07])), /Fire lasts 0\.07\d* s, authored 0\.0631/],
   [collapsed('Fire'), /Fire lasts 0 s/],
   [clip('Idle', track([0, 1])), /Idle lasts 1 s, authored 2 s/],
   [clip('Idle'), /Idle lasts 0 s/],
-  [clip('Inspect', track([0, 1])), /no authored duration for Inspect/],
+  [clip('Inspect', track([0, 40.11])), /Inspect lasts 40\.11\d* s, authored 40\.1 s/],
+  [clip('Reload', track([0, 1])), /no authored duration for Reload/],
 ] as const)
   assert.throws((): void => apply(bad), message);
 

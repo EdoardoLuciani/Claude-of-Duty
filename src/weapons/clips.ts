@@ -167,9 +167,9 @@ export function buildMagazineClips(
   };
   const clips: Record<string, Clip> = {};
   for (const [name, source] of Object.entries(aliases)) {
-    const duration = manifestClip(manifest, source).duration;
+    const { duration, events: authored } = manifestClip(manifest, source);
     const events = name.startsWith('reload') ? [{ t: 0, name: 'start' }] : [];
-    for (const ev of manifestClip(manifest, source).events) {
+    for (const ev of authored) {
       // Only magazine beats are mapped; other authored events are intentionally dropped.
       const mapped = mapping[ev.event];
       if (mapped) events.push({ t: ev.time, name: mapped });

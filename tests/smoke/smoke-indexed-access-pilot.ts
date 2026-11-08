@@ -112,7 +112,7 @@ assert.deepEqual(
   ],
   'only mapped magazine beats survive; unmapped authored events are dropped'
 );
-
+assert.equal(magazine.reload.duration, 2, 'magazine clips keep the authored manifest length');
 for (const build of [buildManifestClips, buildMagazineClips])
   assert.throws(
     (): ReturnType<typeof build> => build({ reload: 'Reload', inspect: 'Inspect' }, manifest),
