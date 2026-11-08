@@ -18,6 +18,7 @@ export function worldSourceHash(root) {
     join(root, 'tools/export-world.mjs'),
     join(root, 'src/core/config.ts'),
     join(root, 'src/core/rng.ts'),
+    join(root, 'src/core/geometry-validation.ts'),
     join(root, 'src/world/palette.ts'),
     join(root, 'src/ai/nav.ts'),
     join(root, 'src/ai/attachment.js'),

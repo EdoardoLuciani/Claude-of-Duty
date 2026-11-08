@@ -169,6 +169,8 @@ export class Noise1 {
   t: Float32Array;
 
   constructor(rng: SignedRng, size = 512) {
+    if (!Number.isInteger(size) || size < 1)
+      throw new RangeError('[weapons] noise table size must be a positive integer');
     this.size = size;
     this.t = new Float32Array(size);
     for (let i = 0; i < size; i++) this.t[i] = rng.signed();
