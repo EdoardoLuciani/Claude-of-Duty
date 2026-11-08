@@ -30,7 +30,7 @@ function isWorldMesh(object: THREE.Object3D): object is WorldMesh {
 const PRACTICAL_GAIN = 0.55;
 
 /** Runtime world loading uses committed visual/collision GLBs and manifest metadata.
- * Author map content in tools/worldgen; tools/export-world.mjs owns export/collision cooking.
+ * Author map content in tools/worldgen; tools/export-world.ts owns export/collision cooking.
  * Public transforms, spawns and ladder/intel queries use the parsed manifest.
  */
 

@@ -1,7 +1,10 @@
 import type { BufferGeometry } from 'three';
 
+import { validateTriangleGeometry } from '../core/geometry-validation.ts';
+
 /** Connected collision components, computed offline (or at registration for test meshes). */
 export function solidIds(geometry: BufferGeometry): { ids: Float32Array; count: number } {
+  validateTriangleGeometry(geometry, '[physics] solidIds');
   const p = geometry.attributes.position;
   const parent = new Uint32Array(p.count);
   const welded = new Map<string, number>();

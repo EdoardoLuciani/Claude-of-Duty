@@ -1,7 +1,7 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Stage Blender-authored soldiers and generate the offline spent hull. This script
- * never runs Blender: tools/build-assets.mjs regenerates assets/soldiers/ first.
+ * never runs Blender: tools/build-assets.ts regenerates assets/soldiers/ first.
  *
  * Content hashing covers shared inputs and canonical products. Missing outputs
  * force a full restage; --force bypasses the cache. Keep the pid lock and atomic
@@ -14,29 +14,15 @@ import { writeFileSync, mkdirSync, renameSync, readFileSync, rmSync, existsSync 
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// three's GLTFExporter reads Blobs back with FileReader, which Node lacks.
-// Shim it over Blob.arrayBuffer(); the exporter assigns `onloadend` right
-// after `readAsArrayBuffer` returns, so the microtask fires after it is set.
-if (typeof globalThis.FileReader === 'undefined') {
-  globalThis.FileReader = class {
-    readAsArrayBuffer(blob) {
-      blob.arrayBuffer().then((buf) => {
-        this.result = buf;
-        queueMicrotask(() => this.onloadend?.());
-      });
-    }
-  };
-}
-
-import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
-
 import { RIG } from '../src/ai/rig.ts';
 import { VARIANTS } from '../src/ai/soldier.ts';
+import { isRecord } from '../src/core/guards.ts';
 import {
   loadCommittedSoldiers,
   soldierInputPaths,
   soldierProductPaths,
 } from './blender/soldiers/export.mjs';
+import { exportGlb } from './lib/export-glb.ts';
 import { buildSpentHull } from './lib/spent-hull.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -52,31 +38,27 @@ const LOCK_TIMEOUT_MS = 60000;
  *  Overridable so tests can exercise the grace path quickly. */
 const LOCK_GRACE_MS = Number(process.env.MODELS_LOCK_GRACE_MS ?? 10000);
 
-const exporter = new GLTFExporter();
-
 /** Write through a temp file + atomic rename: readers never see partial data. */
-function writeAtomic(file, data) {
+function writeAtomic(file: string, data: string | Uint8Array): void {
   mkdirSync(dirname(file), { recursive: true });
   const tmp = `${file}.tmp-${process.pid}`;
   writeFileSync(tmp, data);
   renameSync(tmp, file);
 }
 
-async function writeGLB(scene, file) {
-  const buffer = await exporter.parseAsync(scene, { binary: true });
-  writeAtomic(file, Buffer.from(buffer));
-}
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms: number): Promise<void> =>
+  new Promise((r): void => {
+    setTimeout(r, ms);
+  });
 
 /** A pid is conclusively stale only when ESRCH says it is gone; EPERM means
  *  alive-but-inaccessible, which must keep waiting. */
-function pidAlive(pid) {
+function pidAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;
   } catch (err) {
-    return err.code === 'EPERM';
+    return isRecord(err) && err.code === 'EPERM';
   }
 }
 
@@ -94,7 +76,7 @@ function pidAlive(pid) {
  * own token, so a late-releasing old owner cannot delete a replacement owner's
  * freshly-created lock.
  */
-async function withLock(fn) {
+async function withLock(fn: () => Promise<void>): Promise<void> {
   const token = `${process.pid}-${randomUUID()}`;
   const t0 = Date.now();
   mkdirSync(dirname(LOCK_DIR), { recursive: true }); // ensure .cache exists
@@ -104,24 +86,30 @@ async function withLock(fn) {
       writeFileSync(LOCK_OWNER, JSON.stringify({ pid: process.pid, token, createdAt: Date.now() }));
       break;
     } catch (err) {
-      if (err.code !== 'EEXIST') throw err;
+      if (!isRecord(err) || err.code !== 'EEXIST') throw err;
       // Contention: is the incumbent conclusively dead?
-      let owner = null;
+      let owner: unknown = null;
       try {
         owner = JSON.parse(readFileSync(LOCK_OWNER, 'utf8'));
       } catch {
         owner = null; // missing or half-written owner.json
       }
       const waitingMs = Date.now() - t0;
-      const stale =
-        !owner || !Number.isFinite(owner.pid) ? waitingMs > LOCK_GRACE_MS : !pidAlive(owner.pid);
+      const pid =
+        isRecord(owner) &&
+        typeof owner.pid === 'number' &&
+        Number.isSafeInteger(owner.pid) &&
+        owner.pid > 0
+          ? owner.pid
+          : null;
+      const stale = pid === null ? waitingMs > LOCK_GRACE_MS : !pidAlive(pid);
       if (stale) {
         rmSync(LOCK_DIR, { recursive: true, force: true });
         continue;
       }
       if (waitingMs > LOCK_TIMEOUT_MS) {
         throw new Error(
-          `[models] exporter lock held for >${LOCK_TIMEOUT_MS / 1000}s by pid ${owner?.pid} — remove ${LOCK_DIR}`
+          `[models] exporter lock held for >${LOCK_TIMEOUT_MS / 1000}s by pid ${pid ?? '<unknown>'} — remove ${LOCK_DIR}`
         );
       }
       await sleep(200);
@@ -133,8 +121,8 @@ async function withLock(fn) {
     // Release only our own lock: if a contender stole it after we died (or a
     // new owner took over), the token will not match and the lock must stay.
     try {
-      const own = JSON.parse(readFileSync(LOCK_OWNER, 'utf8'));
-      if (own.token === token) rmSync(LOCK_DIR, { recursive: true, force: true });
+      const own: unknown = JSON.parse(readFileSync(LOCK_OWNER, 'utf8'));
+      if (isRecord(own) && own.token === token) rmSync(LOCK_DIR, { recursive: true, force: true });
     } catch {
       /* lock already gone or replaced */
     }
@@ -145,7 +133,12 @@ async function withLock(fn) {
 /*  soldiers                                                              */
 /* ====================================================================== */
 
-function stageSoldier({ name, glb, json, meta }) {
+function stageSoldier({
+  name,
+  glb,
+  json,
+  meta,
+}: ReturnType<typeof loadCommittedSoldiers>[number]): void {
   writeAtomic(join(OUT, 'soldiers', `${name}.glb`), glb);
   writeAtomic(join(OUT, 'soldiers', `${name}.json`), json);
   console.log(
@@ -154,15 +147,16 @@ function stageSoldier({ name, glb, json, meta }) {
   );
 }
 
-function modelSourceHash() {
+function modelSourceHash(): string {
   const files = [
-    'tools/export-models.mjs',
+    'tools/export-models.ts',
+    'tools/lib/export-glb.ts',
     'tools/lib/spent-hull.mjs',
     'src/weapons/geometry.ts',
     'src/weapons/defs.ts',
     'src/weapons/mathx.ts',
-    ...soldierInputPaths().map((file) => relative(ROOT, file)),
-    ...soldierProductPaths().map((file) => relative(ROOT, file)),
+    ...soldierInputPaths().map((file): string => relative(ROOT, file)),
+    ...soldierProductPaths().map((file): string => relative(ROOT, file)),
     'src/core/rng.ts',
   ].sort();
   const hash = createHash('sha256');
@@ -175,16 +169,18 @@ function modelSourceHash() {
   return hash.digest('hex').slice(0, 16);
 }
 
-function assertInputsStable(expected) {
+function assertInputsStable(expected: string): void {
   if (modelSourceHash() !== expected)
     throw new Error('[models] inputs changed during staging; rerun bun run models');
 }
 
-function outputsPresent() {
-  const stems = Object.keys(VARIANTS).map((name) => `soldiers/${name}`);
+function outputsPresent(): boolean {
+  const stems = Object.keys(VARIANTS).map((name): string => `soldiers/${name}`);
   return (
     existsSync(join(OUT, 'fx/spent12g.glb')) &&
-    stems.every((p) => existsSync(join(OUT, `${p}.glb`)) && existsSync(join(OUT, `${p}.json`)))
+    stems.every(
+      (p): boolean => existsSync(join(OUT, `${p}.glb`)) && existsSync(join(OUT, `${p}.json`))
+    )
   );
 }
 
@@ -196,7 +192,7 @@ const FORCE = process.argv.includes('--force');
 const tStart = performance.now();
 console.log('[models] exporting to', OUT);
 
-await withLock(async () => {
+await withLock(async (): Promise<void> => {
   // Authored replacements must remove stale procedural outputs on cache hits.
   for (const id of ['lmg', 'smg', 'sniper', 'shotgun']) {
     for (const ext of ['glb', 'json'])
@@ -218,7 +214,7 @@ await withLock(async () => {
 
   for (const product of soldiers) stageSoldier(product);
   const hull = buildSpentHull();
-  await writeGLB(hull, join(OUT, 'fx/spent12g.glb'));
+  writeAtomic(join(OUT, 'fx/spent12g.glb'), await exportGlb(hull));
   hull.geometry.dispose();
   hull.material.dispose();
 
@@ -226,7 +222,7 @@ await withLock(async () => {
   // RIG skeleton by index); assert it once at export time.
   {
     const { bones } = RIG.createSkeleton();
-    const names = bones.map((b) => b.name);
+    const names = bones.map((b): string => b.name);
     const expected = RIG.names;
     if (names.join() !== expected.join()) {
       console.error('[models] skeleton bone order diverged from RIG — aborting');

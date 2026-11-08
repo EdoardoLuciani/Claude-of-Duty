@@ -271,7 +271,10 @@ export class Ragdoll {
       this.boneTail[i] = c;
       this.boneRadius[i] = s.radius ?? 0.06;
       this.boneMass[i] = s.mass ?? 4;
-      this.boneParent[i] = s.parent ?? -1;
+      const parent = s.parent ?? -1;
+      if (!Number.isInteger(parent) || parent < -1 || parent >= nb)
+        throw new RangeError(`[physics] bone ${i} parent must be -1 or a valid bone index`);
+      this.boneParent[i] = parent;
       this.boneCone[i] = s.cone ?? 70 * DEG;
       this.boneTwist[i] = s.twist ?? 40 * DEG;
       pm[a] += this.boneMass[i] * 0.5;

@@ -12,19 +12,24 @@ bun run test
 bun run typecheck
 bun run lint
 bun run build
-bun run build:ci     # code-only build used by CI: generates no models
+bun run build:ci     # CI build: generates the world, skips Blender/model assets
 ```
 
 Node.js 26.x and Bun (version pinned by `packageManager` in `package.json`) are
 required. Bun installs dependencies from `bun.lock`, type-checks (`bun check`),
-formats (`bun fmt`), bundles and serves the game (`build/bun.mjs`; the dev server
+formats (`bun fmt`), bundles and serves the game (`build/bun.ts`; the dev server
 reads its plugin from `bunfig.toml`); packages are cached in `~/.bun/install/cache`, so warm
-reinstalls are near-instant. Node runs Oxlint, the `node:test` smoke runner and all tools; Node-run
-tools and smoke tests load migrated `.ts` modules using native type stripping.
-Runtime source, every `tests/**/*.ts` script, and converted test helpers use explicit
-`.ts` imports and share strict checking through `bun run typecheck`. Node runs tests
+reinstalls are near-instant. Bun also runs the checked TypeScript asset orchestrator,
+world exporter, procedural-texture exporter, model staging and gltfpack cook, plus
+the remaining JavaScript world validator. Node still runs Oxlint, the `node:test`
+smoke runner, Blender soldier authoring and browser capture/profile tools.
+Runtime source, every `tests/**/*.ts` script, converted helpers and the migrated
+CLI tools use explicit `.ts` imports and share strict checking through
+`bun run typecheck`. The build entry points have a separate `build/tsconfig.json`
+check so Bun's server globals do not change browser or Node-test types. Both projects
+use the same strict compiler options and type-aware lint rules. Node runs tests
 directly with erasable TypeScript syntax—no loader, build step or Bun test runtime.
-The second, type-aware lint pass covers runtime source, tests and typed test helpers;
+The second, type-aware lint pass covers runtime source, tests, build entry points and typed tools;
 shared JavaScript authoring APIs consumed by tests have `.d.ts` contracts in
 `tests/types/`. Package import aliases select those contracts for checking and the
 unchanged JavaScript modules at runtime, keeping declaration-only edits out of world
@@ -66,20 +71,22 @@ side-effect imports. Preserve intentional evaluation boundaries and fix exposed
 initialization dependencies. Package sorting preserves script order and conditional
 exports/imports precedence. Keep bulk formatting separate from functional changes.
 
-Source-byte caches can change after formatting: dev/build refresh procedural
-exports; shared physics/navigation inputs also require `bun run world`. Review and
-commit provenance refreshes separately, verifying unchanged geometry, collision and
-navigation topology. Never hand-edit generated assets or rebuild Blender assets
-just to format source.
+Source-byte caches can change after formatting: dev/build/tests refresh stale
+world products, and dev/build refresh procedural exports. Verify unchanged geometry,
+collision and navigation topology when shared sources change. Generated products stay
+ignored; never hand-edit them or rebuild Blender assets just to format source.
 
 A WebGPU-capable browser/device is required. `bun run dev` / `bun run build` run
-`tools/build-assets.mjs`: Blender models, gltfpack cooks, procedural textures and
-the spent hull are generated, not committed. Each step reruns only when its inputs
-change; the first build needs **Blender 5.2.2** and **gltfpack 1.3** on `PATH` (or
-`BLENDER`/`GLTFPACK`) and takes several minutes. The world stays committed. Change map content in
+`tools/build-assets.ts`: Blender models, gltfpack cooks, procedural textures,
+the spent hull and the world are generated, not committed. Each step reruns only when
+its inputs change or an output is missing; the first build needs **Blender 5.2.2** and
+**gltfpack 1.3** on `PATH` (or `BLENDER`/`GLTFPACK`) and takes several minutes.
+`bun run test` and `bun run build:ci` generate the world with Bun, without Blender.
+Change map content in
 `tools/worldgen/level/`; the [world editing map](tools/worldgen/README.md) identifies
 shape, placement and build locations. Regenerate with `bun run world`, then run
-`bun run world:validate`.
+`bun run world:validate`. Use `bun run world -- --force` to rebuild unchanged inputs;
+`bun run world -- --check` verifies a fresh rebuild against the generated outputs.
 Runtime models are cooked with the [shared gltfpack build recipe](build/README.md)
 during dev/build; `bun run models:cook -- p320` reruns one cook. All seven authored weapons
 use cooked runtime assets. Native exports remain authoring references; each model

@@ -36,7 +36,7 @@ export function portOpen(port: number, host = '127.0.0.1'): Promise<boolean> {
  *  `node` runs fall back to the installer's default location, then PATH. */
 const INSTALLED_BUN = join(process.env.BUN_INSTALL ?? join(homedir(), '.bun'), 'bin', 'bun');
 const NPM_EXECPATH = process.env.npm_execpath ?? '';
-const BUN = basename(NPM_EXECPATH).startsWith('bun')
+export const BUN = basename(NPM_EXECPATH).startsWith('bun')
   ? NPM_EXECPATH
   : existsSync(INSTALLED_BUN)
     ? INSTALLED_BUN
@@ -63,16 +63,12 @@ export async function ensureDevServer({
 }: DevServerOptions = {}): Promise<ChildProcess | null> {
   if (await portOpen(port)) return null;
 
-  const server = spawn(
-    BUN,
-    ['build/bun.mjs', preview ? 'preview' : 'dev', '--port', String(port)],
-    {
-      cwd: root,
-      stdio,
-      detached: false,
-      env: noHmr ? { ...process.env, OW_NO_HMR: '1' } : process.env,
-    }
-  );
+  const server = spawn(BUN, ['build/bun.ts', preview ? 'preview' : 'dev', '--port', String(port)], {
+    cwd: root,
+    stdio,
+    detached: false,
+    env: noHmr ? { ...process.env, OW_NO_HMR: '1' } : process.env,
+  });
   let startupError: Error | null = null;
   server.once('error', (error): void => {
     startupError = error;

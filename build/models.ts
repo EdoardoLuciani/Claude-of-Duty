@@ -1,5 +1,5 @@
-#!/usr/bin/env node
-/** Explicit runtime-model regeneration; ordinary builds use committed GLBs. */
+#!/usr/bin/env bun
+/** Shared gltfpack cook for generated runtime models. */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync, statSync } from 'node:fs';
@@ -100,10 +100,16 @@ export const MODEL_COOKS = {
   },
 };
 
+export type ModelId = keyof typeof MODEL_COOKS;
+
+export function isModelId(value: string): value is ModelId {
+  return Object.hasOwn(MODEL_COOKS, value);
+}
+
 export function cookModel(
-  { input, output, flags = [] },
+  { input, output, flags = [] }: { input: string; output: string; flags?: string[] },
   encoder = process.env.GLTFPACK ?? 'gltfpack'
-) {
+): void {
   input = resolve(input);
   output = resolve(output);
   assert.notEqual(input, output, 'never overwrite the native authoring export');
@@ -134,7 +140,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const ids = id ? [id] : Object.keys(MODEL_COOKS);
   for (const name of ids) {
     assert(
-      Object.hasOwn(MODEL_COOKS, name),
+      isModelId(name),
       `unknown model ${name}; available: ${Object.keys(MODEL_COOKS).join(', ')}`
     );
     const model = MODEL_COOKS[name],

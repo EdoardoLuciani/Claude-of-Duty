@@ -151,6 +151,62 @@ stream before and after the change (61 events). The music score data was transcr
 unchanged. New tests cover non-finite strike bounds, stale sample indices and `series()`
 wiring.
 
+## Unsound-read audit (#624)
+
+The owner requested a bug-focused pass, not a conversion of every diagnostic. The
+scan followed buffer construction, loop bounds and stored-index provenance in the
+physics, FX, masks, audio, weapons, AI, model-loading and meter reads covered by
+[#624](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/624), plus its ring-cursor
+and reverse-splice cases. This is not an audit of the unrelated ordinary-array
+subsystem follow-ups, or a formal proof against arbitrary mutation of owned state.
+
+One valid-input bug was reproduced: `bakeMesh()` treated an `InstancedMesh` with
+`count = 0` as an ordinary mesh, producing one phantom collision instance. Zero
+instances now produce no collision; noninteger, negative and over-capacity instance
+counts are rejected before reading their matrices.
+
+The other findings were missing boundary checks, not demonstrated failures with
+current gameplay inputs:
+
+- Raw triangle counts could exceed the supplied position buffer, be fractional or
+  NaN, and could consume a recycled object ID before failing.
+- Geometry indices could address missing vertices, and incomplete triangles or xyz
+  attributes could reach collision, connected-component, mask and primitive-merge
+  loops. A small shared `core/geometry-validation.ts` check establishes those bounds
+  at entry, not on every kernel read.
+- Mask normals, collision `_solid` IDs and merged primitive attributes could be
+  shorter than the vertex ranges they accompany. Primitive merging also assumed a
+  nonempty mesh list and nonempty index buffers.
+- Custom ragdoll parents could address missing bones or be silently truncated/wrapped
+  by `Int32Array` conversion. They are checked before conversion.
+- A zero/fractional noise-table size could produce missing samples. Construction now
+  requires a positive integer before consuming RNG.
+- Space classification accepted no horizontal probes or more than its fixed
+  16-element median scratch could hold. It now rejects those shapes without growing
+  the scratch buffer.
+
+The OBB helpers also promised arbitrary `ArrayLike<number>` inputs while reading a
+4×4 matrix. Their signatures now require Three's readonly `Matrix4Tuple`, matching
+all existing callers and rejecting short arrays statically, with no runtime change.
+
+No new non-null assertions, casts, suppression comments, silent defaults, per-read
+hot-loop guards or hot-path allocations are introduced. Fixed-stride internal reads,
+owned pools/rings and radio reverse-splice iteration remain unchanged. The flag stays
+off; the assertion-convention decision in #624 remains open.
+
+`smoke-indexed-access-boundaries.ts` exercises the rejected shapes and the zero-instance
+regression, plus pre-change noise/RNG and mask-byte characterizations. Existing physics
+hashes continue to cover exact build, query and solver output. Regenerated world GLBs
+have byte-identical decompressed contents; navigation tiles, components and cover
+points are unchanged (only provenance metadata/checksums change). The compressed
+asset names also change on this regeneration.
+
+Fresh counts on `b1cca63`, with the expanded TypeScript test/helper scope: **2,800**
+total diagnostics, **2,257** in `src`. After this pass: **2,758** total, **2,215** in
+`src`. The 42 removed diagnostics are the OBB matrix reads; boundary validation does
+not teach TypeScript the remaining numeric bounds, so those warnings intentionally
+remain. These totals supersede the earlier ad hoc count for comparisons on this scope.
+
 ## Enforcement
 
 A scoped gate is **not** installed.

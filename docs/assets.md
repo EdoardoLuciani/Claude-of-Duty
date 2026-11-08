@@ -21,7 +21,7 @@ when changing authored assets.
   need to run an offline builder.
 
 `public/models/` holds assets delivered by fixed public URL, including the cooked
-weapon GLBs in `public/models/weapons/` (`build/models.mjs` writes them there); the
+weapon GLBs in `public/models/weapons/` (`build/models.ts` writes them there); the
 world uses a content-hashed manifest. Do not hand-edit runtime products to change a model.
 
 ## Weapons: shape, finish, animation and checks
@@ -78,7 +78,8 @@ intel sites and explicit placement records. This is the world source—not
 - **Appearance palette:** [`src/world/palette.ts`](../src/world/palette.ts), shared
   by authoring and runtime materials.
 - **Compile:** `bun run world`; then `bun run world:validate` and
-  `bun run world -- --check`. Commit source and generated products together.
+  `bun run world -- --check`. Dev/build/tests also generate missing or stale world
+  products. Commit source only; generated products are ignored.
 - **Products:** `public/models/world/level.json` binds visual/collision GLBs and
   baked navigation. Never hand-edit these products or author separate collision.
 - **Consumers:** [`src/core/models.ts`](../src/core/models.ts) loads them;
@@ -92,7 +93,7 @@ intel sites and explicit placement records. This is the world source—not
 | Arms and bandage            | [`player_arms.py`](../tools/blender/player_arms.py), [`player_bandage.py`](../tools/blender/player_bandage.py); [asset contract](../assets/player/arms/README.md) | Follow the asset's Blender commands; review in engine  | `assets/player/arms/`, `public/models/player/`, generated poses/paths in `src/weapons/`; loaded by weapon arm/bandage adapters |
 | Soldiers                    | [`tools/blender/soldiers/`](../tools/blender/soldiers/); [asset contract](../assets/soldiers/README.md). Runtime RIG/registry/surfaces remain in `src/ai/`        | Explicit Blender author/cook; `bun run models` stages  | Generated `assets/soldiers/` products stage to ignored `public/models/soldiers/*.glb` + JSON; loaded by `ModelSystem` and AI   |
 | Spent shotgun hull          | [`tools/lib/spent-hull.mjs`](../tools/lib/spent-hull.mjs)                                                                                                         | `bun run models`; review in engine                     | `public/models/fx/spent12g.glb`, consumed by FX                                                                                |
-| Procedural textures         | [`tools/export-proc-textures.mjs`](../tools/export-proc-textures.mjs) and its declared AI/FX inputs                                                               | `node tools/export-proc-textures.mjs`; `bun run test`  | Generated `public/models/proc/`, consumed by AI materials and FX                                                               |
+| Procedural textures         | [`tools/export-proc-textures.ts`](../tools/export-proc-textures.ts) and its declared AI/FX inputs                                                                 | `bun tools/export-proc-textures.ts`; `bun run test`    | Generated `public/models/proc/`, consumed by AI materials and FX                                                               |
 | Standalone EXPS3 attachment | [`exps3.py`](../tools/blender/exps3.py), [`exps3_bake.py`](../tools/blender/exps3_bake.py); [asset contract](../assets/attachments/eotech-exps3-0/README.md)      | Asset Blender commands; `bun run models:cook -- exps3` | `assets/attachments/eotech-exps3-0/`; cooked attachment is not yet wired into gameplay                                         |
 
 The standalone [TOR Mini laser](../assets/attachments/steiner-tor-mini/README.md)
@@ -101,11 +102,13 @@ Blender validation and `bun run models:cook -- tor_mini`. It is generated alongs
 the EXPS3, independently of player arms, and is not wired into gameplay yet.
 
 Normal `bun run dev` / `bun run build` (and `bun run assets`) run
-`tools/build-assets.mjs`: arms and bandage, each weapon and its cook, attachments and
-soldiers in Blender, then procedural textures, soldier/hull staging and world
-validation. Each Blender step reruns only when its declared inputs (scripts,
+`tools/build-assets.ts`: arms and bandage, each weapon and its cook, standalone
+attachments and soldiers in Blender, then procedural textures and soldier/hull
+staging. The Bun world generation/validation runs alongside these steps. Each
+Blender step reruns only when its declared inputs (scripts,
 authored JSON, upstream steps) change; hashes live in ignored `.cache/assets/`
 and `--force` rebuilds all. These products are ignored, not committed; weapon
 `manifest.json`, `src/weapons/hand-poses.ts` and `bandage-path.ts` stay committed
-because code imports them. `bun run build:ci` skips generation (code only). The
-world is **not** regenerated; it stays committed.
+because code imports them. World products, including `level.json`, are also ignored.
+`bun run build:ci` skips Blender/model assets but generates missing or stale world
+products; `bun run test` prepares the world before launching tests.

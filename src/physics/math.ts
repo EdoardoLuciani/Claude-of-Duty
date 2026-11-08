@@ -3,6 +3,8 @@
  * geometric normal = normalize(cross(b-a,c-a)).
  */
 
+import type { Matrix4Tuple } from 'three';
+
 export const EPS = 1e-9;
 interface ClosestResult {
   d2: number;
@@ -663,7 +665,7 @@ export function rayObbFar(
   dx: number,
   dy: number,
   dz: number,
-  inv: ArrayLike<number>,
+  inv: Readonly<Matrix4Tuple>,
   hx: number,
   hy: number,
   hz: number,
@@ -691,7 +693,7 @@ export function rayObb(
   dx: number,
   dy: number,
   dz: number,
-  inv: ArrayLike<number>,
+  inv: Readonly<Matrix4Tuple>,
   hx: number,
   hy: number,
   hz: number,

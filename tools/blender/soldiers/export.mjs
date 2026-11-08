@@ -64,7 +64,9 @@ export function validateGLB(glb) {
   assert.equal(glb.length % 4, 0, 'GLB alignment');
 }
 
-/** Pure Node reader. Missing/stale/corrupt products fail; this NEVER invokes Blender. */
+/** Missing/stale/corrupt products fail; this reader never invokes Blender.
+ * @returns {Array<{ name: string, glb: Buffer, json: Buffer, meta: import('../../../src/core/model-metadata.ts').SoldierMetadata }>}
+ */
 export function loadCommittedSoldiers(directory = ASSET_ROOT) {
   try {
     const manifest = JSON.parse(fs.readFileSync(path.join(directory, 'manifest.json'), 'utf8'));

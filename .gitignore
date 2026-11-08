@@ -31,10 +31,8 @@ demo/
 .tmp-rend/
 revcrops/
 
-# Generated models (tools/build-assets.mjs); only the world is committed.
-public/models/*
-!public/models/world/
-!public/models/world/**
+# Generated models, including the world (tools/build-assets.ts).
+public/models/
 
 # Blender/gltfpack products, rebuilt by `bun run build`/`bun run dev` when their
 # inputs change. Weapon manifest.json stays committed: weapon code imports it.
