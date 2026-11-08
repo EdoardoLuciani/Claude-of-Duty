@@ -6,11 +6,15 @@
 import assert from 'node:assert/strict';
 
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
 import { ModelSystem } from '../../src/core/models.ts';
 import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
 
-const delay = (ms: number): Promise<void> => new Promise((resolve): void => { setTimeout(resolve, ms); });
+const delay = (ms: number): Promise<void> =>
+  new Promise((resolve): void => {
+    setTimeout(resolve, ms);
+  });
 
 globalThis.fetch = async (url): Promise<Response> => {
   const href = typeof url === 'string' ? url : url instanceof URL ? url.href : url.url;
@@ -35,6 +39,10 @@ await models.init(createTestContext());
 await delay(60);
 process.off('unhandledRejection', onUnhandled);
 
-assert.equal(unhandled.length, 0, `unhandled rejection before consumer await: ${String(unhandled[0])}`);
+assert.equal(
+  unhandled.length,
+  0,
+  `unhandled rejection before consumer await: ${String(unhandled[0])}`
+);
 await assert.rejects((): ReturnType<ModelSystem['getSoldier']> => models.getSoldier('breacher'));
 console.log('smoke-prefetch-reject: ok');

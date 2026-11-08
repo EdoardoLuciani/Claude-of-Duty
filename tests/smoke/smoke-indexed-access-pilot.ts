@@ -12,16 +12,16 @@ import * as THREE from 'three';
 import { series } from '../../src/audio/dsp.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import { WEAPON_PROFILES } from '../../src/audio/weapons.ts';
-import { parseWorldManifest } from '../../src/core/model-metadata.ts';
 import { isRecord } from '../../src/core/guards.ts';
+import { parseWorldManifest } from '../../src/core/model-metadata.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { RadioSystem } from '../../src/radio/index.ts';
 import { GRADE_PRESETS, createGradeLut } from '../../src/render/lut.ts';
 import { buildMagazineClips, buildManifestClips } from '../../src/weapons/clips.ts';
 import { WorldSystem } from '../../src/world/index.ts';
 import { audioFixture } from '../lib/audio-banks.ts';
-import { fixture } from '../lib/fixture.ts';
 import { createTestContext } from '../lib/context.ts';
+import { fixture } from '../lib/fixture.ts';
 
 /* ---- metadata vec3: exactly three finite coordinates ----------------------- */
 const level = readFileSync(
@@ -46,13 +46,23 @@ assert.deepEqual(
   [0, -1.5, 2]
 );
 for (const short of [[], [1], [1, 2]])
-  assert.throws((): ReturnType<typeof parseWorldManifest> => parseWorldManifest(withSpawnPosition(short)), /three metadata coordinates/);
+  assert.throws(
+    (): ReturnType<typeof parseWorldManifest> => parseWorldManifest(withSpawnPosition(short)),
+    /three metadata coordinates/
+  );
 assert.throws(
   (): ReturnType<typeof parseWorldManifest> => parseWorldManifest(withSpawnPosition([1, 2, 3, 4])),
   /three metadata coordinates/
 );
-assert.throws((): ReturnType<typeof parseWorldManifest> => parseWorldManifest(withSpawnPosition([1, null, 3])), /finite metadata number/);
-assert.throws((): ReturnType<typeof parseWorldManifest> => parseWorldManifest(withSpawnPosition({ 0: 1, 1: 2, 2: 3 })), /metadata array/);
+assert.throws(
+  (): ReturnType<typeof parseWorldManifest> => parseWorldManifest(withSpawnPosition([1, null, 3])),
+  /finite metadata number/
+);
+assert.throws(
+  (): ReturnType<typeof parseWorldManifest> =>
+    parseWorldManifest(withSpawnPosition({ 0: 1, 1: 2, 2: 3 })),
+  /metadata array/
+);
 
 /* ---- world spawn: wraps authored spawns; absent when there are none -------- */
 const a = { position: new THREE.Vector3(), yaw: 0, tag: 'a' };
@@ -102,7 +112,10 @@ assert.deepEqual(
   ],
   'only mapped magazine beats survive; unmapped authored events are dropped'
 );
-assert.equal(buildMagazineClips({ reload: 'Reload' }, manifest, (): number => 3).reload.duration, 3);
+assert.equal(
+  buildMagazineClips({ reload: 'Reload' }, manifest, (): number => 3).reload.duration,
+  3
+);
 for (const build of [buildManifestClips, buildMagazineClips])
   assert.throws(
     (): ReturnType<typeof build> => build({ reload: 'Reload', inspect: 'Inspect' }, manifest),
@@ -132,23 +145,37 @@ assert.deepEqual(wired, [
 const { actx } = audioFixture(0);
 const bank = new WeaponSampleBank(actx);
 const kind = WEAPON_PROFILES.rifle.sample;
-bank.buffers[kind] = [fixture<AudioBuffer>({ duration: 0.4 }), fixture<AudioBuffer>({ duration: 0.5 })];
+bank.buffers[kind] = [
+  fixture<AudioBuffer>({ duration: 0.4 }),
+  fixture<AudioBuffer>({ duration: 0.5 }),
+];
 const rng = new Rng(1);
 bank.shot(WEAPON_PROFILES.rifle, rng);
 assert.equal(bank.indices[kind], 1, 'valid round robin advances');
 bank.indices[kind] = 5; // stale index from a larger, since-replaced bank
-assert.throws((): ReturnType<WeaponSampleBank['shot']> => bank.shot(WEAPON_PROFILES.rifle, rng), /recording 5 is not loaded/);
+assert.throws(
+  (): ReturnType<WeaponSampleBank['shot']> => bank.shot(WEAPON_PROFILES.rifle, rng),
+  /recording 5 is not loaded/
+);
 
 /* ---- radio: a strike needs a finite bomb line ------------------------------ */
 const added: THREE.Object3D[] = [];
 const emitted: string[] = [];
-const radioWorld = (bounds: THREE.Box3): WorldSystem => fixture<WorldSystem>({
-  bounds,
-  spawn: (): WorldSystem['spawnPoints'][number] => ({ yaw: 0.3, position: new THREE.Vector3(), tag: 'test' }),
-});
+const radioWorld = (bounds: THREE.Box3): WorldSystem =>
+  fixture<WorldSystem>({
+    bounds,
+    spawn: (): WorldSystem['spawnPoints'][number] => ({
+      yaw: 0.3,
+      position: new THREE.Vector3(),
+      tag: 'test',
+    }),
+  });
 const radio = new RadioSystem();
 radio.ctx = createTestContext();
-radio.ctx.scene.add = (...objects): THREE.Scene => { added.push(...objects); return radio.ctx.scene; };
+radio.ctx.scene.add = (...objects): THREE.Scene => {
+  added.push(...objects);
+  return radio.ctx.scene;
+};
 radio.ctx.events.on('radio:strike', (): number => emitted.push('radio:strike'));
 radio.active = [];
 radio._off = [];

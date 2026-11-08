@@ -5,7 +5,11 @@ import { runInNewContext } from 'node:vm';
 
 // Execute the actual module registrations without booting the game or renderer.
 type DisposeCallback = (data: Record<string, unknown>) => Promise<void>;
-function registration(file: string, dispose: () => Promise<void>, errors: unknown[][]): DisposeCallback {
+function registration(
+  file: string,
+  dispose: () => Promise<void>,
+  errors: unknown[][]
+): DisposeCallback {
   const source = readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');
   const start = source.lastIndexOf('if (import.meta.hot)');
   assert(start >= 0, `${file}: HMR disposal registration is present`);
@@ -52,7 +56,9 @@ const update = (async (): Promise<void> => {
   await pending;
   imported = true;
 })();
-await new Promise<void>((resolve): void => { setImmediate(resolve); });
+await new Promise<void>((resolve): void => {
+  setImmediate(resolve);
+});
 assert.equal(disposed, false);
 assert.equal(imported, false, `${file}: replacement waits for teardown`);
 finish();

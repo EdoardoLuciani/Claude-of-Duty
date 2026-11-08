@@ -22,12 +22,28 @@ function checkOwned<T extends object>(
   for (const key in defaults) assert.equal(a[key], defaults[key]);
 }
 // Constructor defaults remain per-instance, including nested pooled payloads.
-checkOwned((): StaticWorld => new StaticWorld(), ['objects', 'contacts', '_stackNode'], { triCount: 0, dirty: false });
+checkOwned((): StaticWorld => new StaticWorld(), ['objects', 'contacts', '_stackNode'], {
+  triCount: 0,
+  dirty: false,
+});
 checkOwned((): MantleMotion => new MantleMotion(), [], { active: false, duration: 0.6, fz: 1 });
-checkOwned((): Movement => new Movement(createTestContext(), null), ['cmd', 'position', 'stepEvent'], { state: 'stand', grounded: true });
-checkOwned((): PlayerSystem => new PlayerSystem(), ['_death', '_prev', '_nearMissShots'], { isPlayer: true, controlEnabled: true });
-checkOwned((): AudioSystem => new AudioSystem(), ['_dry', '_probeDirs', '_budget'], { running: false, failed: false });
-checkOwned((): WeaponSystem => new WeaponSystem(), ['states', 'owned', '_shellQueue'], { activeId: 'rifle', grenades: 2 });
+checkOwned(
+  (): Movement => new Movement(createTestContext(), null),
+  ['cmd', 'position', 'stepEvent'],
+  { state: 'stand', grounded: true }
+);
+checkOwned((): PlayerSystem => new PlayerSystem(), ['_death', '_prev', '_nearMissShots'], {
+  isPlayer: true,
+  controlEnabled: true,
+});
+checkOwned((): AudioSystem => new AudioSystem(), ['_dry', '_probeDirs', '_budget'], {
+  running: false,
+  failed: false,
+});
+checkOwned((): WeaponSystem => new WeaponSystem(), ['states', 'owned', '_shellQueue'], {
+  activeId: 'rifle',
+  grenades: 2,
+});
 const audio = new AudioSystem();
 assert.equal(audio._probeDirs.length, 9);
 assert.equal(audio._dry.length, 80);

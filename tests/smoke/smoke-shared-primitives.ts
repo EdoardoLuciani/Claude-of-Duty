@@ -26,8 +26,14 @@ const context = fixture<BaseAudioContext>({
   sampleRate: 8000,
   createBuffer(channels, length, sampleRate): AudioBuffer {
     assert.equal(channels, 2);
-    const data = Array.from({ length: channels }, (): Float32Array<ArrayBuffer> => new Float32Array(length));
-    return fixture<AudioBuffer>({ duration: length / sampleRate, getChannelData: (channel): Float32Array<ArrayBuffer> => data[channel] });
+    const data = Array.from(
+      { length: channels },
+      (): Float32Array<ArrayBuffer> => new Float32Array(length)
+    );
+    return fixture<AudioBuffer>({
+      duration: length / sampleRate,
+      getChannelData: (channel): Float32Array<ArrayBuffer> => data[channel],
+    });
   },
   createBufferSource(): AudioBufferSourceNode {
     return fixture<AudioBufferSourceNode>({ playbackRate: fixture<AudioParam>({ value: 1 }) });
@@ -47,8 +53,7 @@ for (const kind of ['white', 'pink'] as const) {
   const hash = createHash('sha256');
   const buffer = bank.buffers[kind];
   assert(buffer);
-  for (const channel of [0, 1])
-    hash.update(new Uint8Array(buffer.getChannelData(channel).buffer));
+  for (const channel of [0, 1]) hash.update(new Uint8Array(buffer.getChannelData(channel).buffer));
   assert.equal(hash.digest('hex'), expected, `${kind} retains both authored noise channels`);
 }
 const reference = new Rng(0x5eed);
@@ -58,6 +63,9 @@ assert.deepEqual(parent.fork(), reference.fork());
 assert.equal(bank.source('white', null).buffer, bank.buffers.white);
 assert.equal(bank.source('pink', null).buffer, bank.buffers.pink);
 bank.dispose();
-assert.throws((): ReturnType<NoiseBank['source']> => bank.source('white', null), /noise bank is disposed/);
+assert.throws(
+  (): ReturnType<NoiseBank['source']> => bank.source('white', null),
+  /noise bank is disposed/
+);
 
 console.log('[shared-primitives] spawn fields, aliasing and stereo-noise/RNG parity passed');

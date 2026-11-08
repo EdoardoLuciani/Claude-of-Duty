@@ -19,7 +19,11 @@ import { createAuthoredRig } from '../../src/weapons/authored-rig.ts';
 
 // Gesture precedence, interrupted firing, last-shot choice and clock boundaries.
 const samples: [string, number][] = [];
-const state = { idleTime: 0, fireTime: 0, _sample: (...args: [string, number]): number => samples.push(args) };
+const state = {
+  idleTime: 0,
+  fireTime: 0,
+  _sample: (...args: [string, number]): number => samples.push(args),
+};
 const clips = { Fire: { duration: 0.1 }, Idle: { duration: 2 } };
 const sample = (dt: number, name: string | null, time: number, empty = false): string | undefined =>
   sampleAuthoredFire(state, clips, dt, name, time, empty);

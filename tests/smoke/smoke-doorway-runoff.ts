@@ -11,7 +11,9 @@ import { fixture } from '../lib/fixture.ts';
 // E3's keyed cornice runoff used to hang from y=3.29 down to y=1.60,
 // spanning the usable doorway at x=6.488, z=-18.65. Flat stain geometry
 // enters the same collision bake as masonry; it must avoid the opening.
-const assembler = new Assembler({ materials: { get: (name): THREE.Material => fixture<THREE.Material>({ name }) } });
+const assembler = new Assembler({
+  materials: { get: (name): THREE.Material => fixture<THREE.Material>({ name }) },
+});
 registerProps(assembler);
 const patches: THREE.Box3[] = [];
 assembler.add = (key, geometry, matrix): Assembler => {

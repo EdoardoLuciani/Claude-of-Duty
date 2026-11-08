@@ -1,18 +1,23 @@
 import assert from 'node:assert/strict';
 
-import { Engine } from '../../src/core/engine.ts';
 import { createConfig } from '../../src/core/config.ts';
+import { Engine } from '../../src/core/engine.ts';
 import { Registry, type Subsystem } from '../../src/core/registry.ts';
 import { fixture } from '../lib/fixture.ts';
 
 // Completion belongs to a successful gameplay render, not init, a failed update,
 // an absent render hook, or the diagnostic graph draws performed by prewarm.
 for (const failure of [null, 'update', 'render', 'missing']) {
-  const engine = new Engine({ canvas: fixture<HTMLCanvasElement>({}), config: createConfig({ fov: 80, deterministic: true }) });
+  const engine = new Engine({
+    canvas: fixture<HTMLCanvasElement>({}),
+    config: createConfig({ fov: 80, deterministic: true }),
+  });
   // Synthetic lifecycle providers use the standalone registry's hook contract.
   const registry = new Registry();
   Object.defineProperty(engine, 'registry', { value: registry });
-  const add = <T extends Subsystem>(id: string, system: T): void => { registry.add(id, system); };
+  const add = <T extends Subsystem>(id: string, system: T): void => {
+    registry.add(id, system);
+  };
   engine.input.beginFrame = (): void => {};
   let completed = 0,
     renders = 0;

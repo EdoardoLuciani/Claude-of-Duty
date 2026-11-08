@@ -15,21 +15,27 @@ const files = readdirSync(dir)
 const TIMEOUT_MS = 30000;
 
 // Each smoke script is an independent process; run about one per physical core.
-await test('smoke', { concurrency: Math.ceil(availableParallelism() / 2) }, async (t): Promise<void> => {
-  const children: Promise<void>[] = [];
-  for (const file of files) {
-    children.push(t.test(file, async (): Promise<void> => {
-      try {
-        await run(process.execPath, [join(dir, file)], { timeout: TIMEOUT_MS });
-      } catch (error) {
-        assert(error instanceof Error);
-        assert('killed' in error && 'code' in error && 'stdout' in error && 'stderr' in error);
-        const reason = error.killed
-          ? `timed out after ${TIMEOUT_MS} ms`
-          : `exited with ${String(error.code)}`;
-        assert.fail(`${file} ${reason}\n${String(error.stdout)}${String(error.stderr)}`);
-      }
-    }));
+await test(
+  'smoke',
+  { concurrency: Math.ceil(availableParallelism() / 2) },
+  async (t): Promise<void> => {
+    const children: Promise<void>[] = [];
+    for (const file of files) {
+      children.push(
+        t.test(file, async (): Promise<void> => {
+          try {
+            await run(process.execPath, [join(dir, file)], { timeout: TIMEOUT_MS });
+          } catch (error) {
+            assert(error instanceof Error);
+            assert('killed' in error && 'code' in error && 'stdout' in error && 'stderr' in error);
+            const reason = error.killed
+              ? `timed out after ${TIMEOUT_MS} ms`
+              : `exited with ${String(error.code)}`;
+            assert.fail(`${file} ${reason}\n${String(error.stdout)}${String(error.stderr)}`);
+          }
+        })
+      );
+    }
+    await Promise.all(children);
   }
-  await Promise.all(children);
-});
+);

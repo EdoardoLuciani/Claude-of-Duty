@@ -19,12 +19,20 @@ function emitted(): Map<string, Piece> {
     assert(geo.boundingBox);
     box.copy(geo.boundingBox);
     if (matrix) box.applyMatrix4(matrix);
-    const k = `${key} ${box.min.toArray().map((v): string => v.toFixed(4)).join(',')} ${box.max.toArray().map((v): string => v.toFixed(4)).join(',')}`;
+    const k = `${key} ${box.min
+      .toArray()
+      .map((v): string => v.toFixed(4))
+      .join(',')} ${box.max
+      .toArray()
+      .map((v): string => v.toFixed(4))
+      .join(',')}`;
     const e = out.get(k) ?? { n: 0, x: box.min.x, z: box.min.z };
     e.n++;
     out.set(k, e);
   };
-  const A = new Assembler({ materials: { get: (name): THREE.Material => fixture<THREE.Material>({ name }) } });
+  const A = new Assembler({
+    materials: { get: (name): THREE.Material => fixture<THREE.Material>({ name }) },
+  });
   // Record merged pieces without merging them: nothing reads the batches here.
   A.add = (key, geo, matrix): Assembler => (record(key, geo, matrix), A);
   buildWorld(A);

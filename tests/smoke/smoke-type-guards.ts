@@ -17,8 +17,8 @@ import { SURFACE, SURFACE_NAMES } from '../../src/physics/surfaces.ts';
 import { createFogCompute } from '../../src/render/fog-compute-webgpu.ts';
 import { isLightingContext } from '../../src/render/indirect-webgpu.ts';
 import { setClass, setStyle } from '../../src/ui/util.ts';
-import { FixtureImageBitmap, installImageBitmapFixture } from '../lib/image-bitmap.ts';
 import { fixture } from '../lib/fixture.ts';
+import { FixtureImageBitmap, installImageBitmapFixture } from '../lib/image-bitmap.ts';
 
 for (const value of [null, undefined, 1, 'value', [], (): void => {}]) {
   assert.equal(isRecord(value), false);
@@ -162,7 +162,9 @@ zeroBus.emit(0, {});
 assert.equal(zeroCalls, 1, 'numeric -0 and 0 share a channel, like Map');
 const failure = new Error('numeric event failure');
 const reported: [PropertyKey, unknown][] = [];
-const errors = new EventBus<Record<PropertyKey, unknown>>((key, error): number => reported.push([key, error]));
+const errors = new EventBus<Record<PropertyKey, unknown>>((key, error): number =>
+  reported.push([key, error])
+);
 errors.on(1, (): never => {
   throw failure;
 });
@@ -176,19 +178,22 @@ assert.deepEqual(reported, [[1, failure]]);
 // UI caches are allocated once; duplicate writes still stay out of the DOM.
 let styles = 0,
   classes = 0;
-const element = fixture<Parameters<typeof setStyle>[0]>({
-  style: fixture<CSSStyleDeclaration>({
-    setProperty(): void {
-      styles++;
-    },
-  }),
-  classList: fixture<DOMTokenList>({
-    toggle(): boolean {
-      classes++;
-      return true;
-    },
-  }),
-}, ['_ows', '_owc']);
+const element = fixture<Parameters<typeof setStyle>[0]>(
+  {
+    style: fixture<CSSStyleDeclaration>({
+      setProperty(): void {
+        styles++;
+      },
+    }),
+    classList: fixture<DOMTokenList>({
+      toggle(): boolean {
+        classes++;
+        return true;
+      },
+    }),
+  },
+  ['_ows', '_owc']
+);
 for (const key of ['color', 'constructor', '__proto__']) {
   setStyle(element, key, 'red');
   setStyle(element, key, 'red');
