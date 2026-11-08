@@ -30,7 +30,7 @@ export interface PrototypeSpec {
 }
 export interface Prototype {
   id: string;
-  geo: BufferGeometry;
+  geo: BufferGeometry | null;
   visualGeo: BufferGeometry | null;
   key: string;
   ballisticSurface: SurfaceName;

@@ -77,6 +77,7 @@ const exported = rawMarkers.map((row): { id: string; position: [number, number, 
   assert(typeof row === 'object' && row !== null && 'id' in row && 'position' in row);
   assert(typeof row.id === 'string' && Array.isArray(row.position));
   const point: unknown[] = row.position;
+  assert.equal(point.length, 3, 'exported intel positions retain exactly three coordinates');
   assert(
     typeof point[0] === 'number' && typeof point[1] === 'number' && typeof point[2] === 'number'
   );

@@ -39,9 +39,9 @@ The independent Three WebGPU market-inspection renderer is unchanged.
 
 ## Checks
 
-`bun run test` includes `smoke-pixi-ui.mjs` for shared-device guards, initialization
+`bun run test` includes `smoke-pixi-ui.ts` for shared-device guards, initialization
 error preservation, adapter restoration, failure-isolated/idempotent teardown and
-passive-message state/timing contracts. `smoke-hud-redraw.mjs` checks active/paused
+passive-message state/timing contracts. `smoke-hud-redraw.ts` checks active/paused
 redraw suppression and invalidation for vitals, reticle, injury, reload and feedback.
 Run typecheck, lint and build as usual. Earlier experiment reports and the larger
 HUD test/capture harnesses remain available in Git history at `d5858ebc`.

@@ -38,7 +38,10 @@ function emitted(): Map<string, Piece> {
   A.add = (key, geo, matrix): Assembler => (record(key, geo, matrix), A);
   buildWorld(A);
   // Instances after clutter clearance, so culling differences count too.
-  for (const [id, proto] of A._protos) for (const m of proto.matrices) record(id, proto.geo, m);
+  for (const [id, proto] of A._protos) {
+    assert(proto.geo, 'unfinalized prototypes retain their geometry');
+    for (const m of proto.matrices) record(id, proto.geo, m);
+  }
   return out;
 }
 

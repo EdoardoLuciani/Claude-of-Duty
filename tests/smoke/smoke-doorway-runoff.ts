@@ -38,5 +38,8 @@ const opening = new THREE.Box3(
 assert(patches.length > 0, 'retain facade weathering outside the opening');
 assert.equal(patches.filter((patch): boolean => patch.intersectsBox(opening)).length, 0);
 assembler.releaseCache();
-for (const proto of assembler._protos.values()) proto.geo.dispose();
+for (const proto of assembler._protos.values()) {
+  assert(proto.geo, 'unfinalized prototypes retain their geometry');
+  proto.geo.dispose();
+}
 console.log('ok doorway runoff: facade stains do not bridge the E3 traversal opening');
