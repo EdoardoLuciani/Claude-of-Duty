@@ -6,6 +6,7 @@
 
 import * as THREE from 'three';
 
+import { validateTriangleGeometry } from '../core/geometry-validation.ts';
 import { isRecord } from '../core/guards.ts';
 import {
   rayAabb,
@@ -177,6 +178,8 @@ export class StaticWorld {
     name = 'raw'
   ): number {
     const s = surfaceIndex(surface);
+    if (!Number.isInteger(count) || count < 0 || count > positions.length / 9)
+      throw new RangeError('[physics] triangle count must fit the position buffer');
     const id = this._freeIds.length ? this._freeIds.pop()! : this.objects.length;
     const surfaces = new Uint8Array(count);
     surfaces.fill(s);
@@ -1188,20 +1191,30 @@ export function bakeMesh(
 ): BakedMesh | null {
   const geo = mesh.geometry;
   if (!geo || !geo.attributes || !geo.attributes.position) return null;
+  validateTriangleGeometry(geo, '[physics] bakeMesh');
   const posAttr = geo.attributes.position;
   const index = geo.index;
   const triPerInstance = ((index ? index.count : posAttr.count) / 3) | 0;
   if (triPerInstance === 0) return null;
 
   const instancedMesh = mesh instanceof THREE.InstancedMesh ? mesh : null;
-  const isInstanced = instancedMesh !== null && instancedMesh.count > 0;
-  const instances = isInstanced ? mesh.count : 1;
+  const isInstanced = instancedMesh !== null;
+  const instances = instancedMesh ? instancedMesh.count : 1;
+  if (
+    !Number.isInteger(instances) ||
+    instances < 0 ||
+    (instancedMesh && instances > instancedMesh.instanceMatrix.count)
+  )
+    throw new RangeError('[physics] instance count must fit the instance matrix buffer');
+  if (instances === 0) return null;
   const total = triPerInstance * instances;
 
   const out = new Float32Array(total * 9);
   const surfaces = new Uint8Array(total);
   const solids = new Int32Array(total);
   const solidAttr = geo.getAttribute('_solid');
+  if (solidAttr && (solidAttr.itemSize !== 1 || solidAttr.count !== posAttr.count))
+    throw new Error('[physics] _solid must contain one id per position vertex');
   const components = solidAttr ? null : solidIds(geo);
   const ids = solidAttr ? solidAttr.array : components!.ids;
   let solidCount = components?.count ?? 0;
