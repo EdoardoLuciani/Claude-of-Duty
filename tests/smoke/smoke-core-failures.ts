@@ -1,45 +1,47 @@
 import assert from 'node:assert/strict';
 
-import { Engine } from '../../src/core/engine.ts';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+import type { EngineError } from '../../src/core/events.ts';
 import { ModelSystem } from '../../src/core/models.ts';
+import type { FrameHook, Subsystem } from '../../src/core/registry.ts';
+import { addLifecycle, createCoreFixture } from '../lib/core-fixture.ts';
 
 // A partial update is terminal: later gameplay hooks and later frames cannot
 // continue mutating the simulation, even if something tries to unpause it.
 const log = console.error;
-console.error = () => {};
+console.error = (): void => {};
 try {
   for (const phase of ['fixedUpdate', 'update', 'lateUpdate', 'render']) {
-    const engine = new Engine({
-      canvas: {},
-      config: { fov: 80, deterministic: true, sensitivity: 0.001 },
-    });
-    const calls = [],
-      errors = [];
-    const sys = { constructor: { id: 'broken' } };
-    for (const method of ['fixedUpdate', 'update', 'lateUpdate'])
-      sys[method] = () => {
+    const { engine, registry } = createCoreFixture();
+    const calls: string[] = [],
+      errors: EngineError[] = [];
+    const sys: Subsystem = {};
+    const methods: FrameHook[] = ['fixedUpdate', 'update', 'lateUpdate'];
+    for (const method of methods)
+      sys[method] = (): void => {
         calls.push(method);
         if (method === phase) throw new Error(`broken ${phase}`);
       };
-    engine.registry.add(sys.constructor.id, sys);
-    engine.registry.add('after', {
-      constructor: { id: 'after' },
-      fixedUpdate: () => calls.push('after-fixed'),
-      update: () => calls.push('after-update'),
-      lateUpdate: () => calls.push('after-late'),
+    addLifecycle(registry, 'broken', sys);
+    addLifecycle(registry, 'after', {
+      fixedUpdate: (): number => calls.push('after-fixed'),
+      update: (): number => calls.push('after-update'),
+      lateUpdate: (): number => calls.push('after-late'),
     });
     let renders = 0;
-    engine.registry.add('render', {
-      constructor: { id: 'render' },
-      render() {
+    addLifecycle(registry, 'render', {
+      render(): void {
         renders++;
         if (phase === 'render') throw new Error('broken render');
       },
     });
-    engine.events.on('engine:error', (e) => errors.push(e));
+    engine.events.on('engine:error', (e): number => errors.push(e));
     engine._running = true;
     engine.step(20);
     assert.equal(errors.length, 1);
+    assert(engine.error);
     assert.equal(engine.error.method, phase);
     assert.equal(engine.input.enabled, false);
     assert.equal(engine.input.frozen, true);
@@ -57,49 +59,45 @@ try {
     assert.equal(renders, 2, 'simulation failure does not prevent presentation');
   }
   for (const origin of ['update-event', 'external-event', 'resize-hook', 'resize-event']) {
-    const engine = new Engine({
-      canvas: { clientWidth: 1280, clientHeight: 720 },
-      config: { fov: 80, deterministic: true, sensitivity: 0.001 },
-    });
-    const calls = [],
-      errors = [];
-    const fault = () => {
+    const { engine, registry } = createCoreFixture();
+    const calls: string[] = [],
+      errors: EngineError[] = [];
+    const fault = (): void => {
       throw new Error(origin);
     };
     engine.events.on('damage:dealt', fault);
-    engine.events.on('damage:dealt', () => calls.push('later listener'));
-    engine.events.on('outer', () => {
-      engine.events.emit('damage:dealt', {});
+    engine.events.on('damage:dealt', (): number => calls.push('later listener'));
+    engine.events.on('game:restart', (): void => {
+      engine.events.emit('damage:dealt', { target: null, amount: 0 });
       calls.push('continued outer listener');
     });
     // A broken diagnostic subscriber cannot prevent the modal/recorder receiving
     // the original failure or replace it with a recursive engine:error failure.
-    engine.events.on('engine:error', () => {
+    engine.events.on('engine:error', (): void => {
       throw new Error('broken diagnostic');
     });
-    engine.events.on('engine:error', (e) => errors.push(e));
-    engine.registry.add('broken', {
-      constructor: { id: 'broken' },
-      update() {
-        engine.events.emit('outer', {});
+    engine.events.on('engine:error', (e): number => errors.push(e));
+    addLifecycle(registry, 'broken', {
+      update(): void {
+        engine.events.emit('game:restart', {});
         calls.push('continued update');
       },
-      resize: origin === 'resize-hook' ? fault : () => {},
+      resize: origin === 'resize-hook' ? fault : (): void => {},
     });
-    engine.registry.add('after', {
-      constructor: { id: 'after' },
-      update: () => calls.push('later update'),
-      resize: () => calls.push('later resize'),
+    addLifecycle(registry, 'after', {
+      update: (): number => calls.push('later update'),
+      resize: (): number => calls.push('later resize'),
     });
     engine.events.on(
       'resize',
-      origin === 'resize-event' ? fault : () => calls.push('resize notification')
+      origin === 'resize-event' ? fault : (): number => calls.push('resize notification')
     );
-    engine.events.on('resize', () => calls.push('later resize listener'));
+    engine.events.on('resize', (): number => calls.push('later resize listener'));
     if (origin === 'update-event') engine.step(20);
     else if (origin === 'external-event')
-      assert.throws(() => engine.events.emit('outer', {}), /external-event/);
+      assert.throws((): void => engine.events.emit('game:restart', {}), /external-event/);
     else engine.resize();
+    assert(engine.error);
     assert.equal(engine.error.message, origin);
     assert.equal(engine.error.system, origin === 'resize-hook' ? 'broken' : 'events');
     assert.equal(
@@ -121,26 +119,22 @@ try {
   }
   // resize() hooks may report a terminal failure without throwing. Rechecking
   // the error after each hook is not a constant condition (DeepScan #236542430).
-  const resized = new Engine({
-    canvas: { clientWidth: 1280, clientHeight: 720 },
-    config: { fov: 80, deterministic: true },
-  });
-  const resizeCalls = [];
-  resized.registry.add('reported', {
-    constructor: { id: 'reported' },
-    resize(_w, _h, ctx) {
+  const { engine: resized, registry: resizeRegistry } = createCoreFixture();
+  const resizeCalls: string[] = [];
+  addLifecycle(resizeRegistry, 'reported', {
+    resize(_w, _h, ctx): void {
       resizeCalls.push('reported');
       ctx.engine.fail('reported', 'resize', new Error('reported without throwing'));
     },
   });
-  resized.registry.add('later', {
-    constructor: { id: 'later' },
-    resize() {
+  addLifecycle(resizeRegistry, 'later', {
+    resize(): void {
       resizeCalls.push('later');
     },
   });
-  resized.events.on('resize', () => resizeCalls.push('event'));
+  resized.events.on('resize', (): number => resizeCalls.push('event'));
   resized.resize();
+  assert(resized.error);
   assert.equal(resized.error.message, 'reported without throwing');
   assert.deepEqual(
     resizeCalls,
@@ -150,23 +144,26 @@ try {
 
   // An asynchronous terminal failure during init must not mount later systems
   // or allow start() to schedule gameplay after the initialization rejection.
-  const boot = new Engine({ canvas: {}, config: { fov: 80, deterministic: true } });
-  const failures = [];
+  const { engine: boot, registry: bootRegistry } = createCoreFixture();
+  const failures: EngineError[] = [];
   let laterInit = false;
-  boot.events.on('engine:error', (event) => failures.push(event));
-  boot.registry.add('render', {
-    constructor: { id: 'render' },
-    async init(ctx) {
+  boot.events.on('engine:error', (event): number => failures.push(event));
+  addLifecycle(bootRegistry, 'render', {
+    async init(ctx): Promise<void> {
       await Promise.resolve();
       ctx.engine.fail('render', 'deviceLost', new Error('lost during init'));
     },
   });
-  boot.registry.add('later', {
-    constructor: { id: 'later', deps: ['render'] },
-    init() {
-      laterInit = true;
+  addLifecycle(
+    bootRegistry,
+    'later',
+    {
+      init(): void {
+        laterInit = true;
+      },
     },
-  });
+    ['render']
+  );
   await assert.rejects(boot.init(), /lost during init/);
   boot.fail('render', 'deviceLost', new Error('duplicate notification'));
   boot.start();
@@ -174,6 +171,7 @@ try {
   assert.equal(boot._running, false);
   assert.equal(boot.input.enabled, false);
   assert.deepEqual(failures, [boot.error]);
+  assert(boot.error);
   assert.equal(boot.error.message, 'lost during init');
 } finally {
   console.error = log;
@@ -183,10 +181,19 @@ try {
 const fetch = globalThis.fetch;
 try {
   const models = new ModelSystem();
-  models._loadWorldGLB = async () => ({});
-  let meta = { version: 2, assets: { visual: 'visual', collision: 'collision', nav: 'nav.gz' } };
-  globalThis.fetch = async (url) =>
-    url.endsWith('level.json') ? { ok: true, json: async () => meta } : { ok: false, status: 503 };
+  models._loadWorldGLB = async (): Promise<GLTF> =>
+    new GLTFLoader().parseAsync(
+      JSON.stringify({ asset: { version: '2.0' }, scenes: [{ nodes: [] }], scene: 0 }),
+      ''
+    );
+  let meta: { version: number; assets: { visual: string; collision: string; nav?: string } } = {
+    version: 2,
+    assets: { visual: 'visual', collision: 'collision', nav: 'nav.gz' },
+  };
+  globalThis.fetch = async (input): Promise<Response> => {
+    const url = input instanceof Request ? input.url : String(input);
+    return url.endsWith('level.json') ? Response.json(meta) : new Response(null, { status: 503 });
+  };
   await assert.rejects(models._prefetchWorld(), /HTTP 503/, 'retain the real load failure');
   meta = { version: 2, assets: { visual: 'visual', collision: 'collision' } };
   await assert.rejects(models._prefetchWorld(), /missing navigation asset/);

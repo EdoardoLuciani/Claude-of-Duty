@@ -1,26 +1,19 @@
 import assert from 'node:assert/strict';
 
 import { FIXED_DT } from '../../src/core/config.ts';
-import { Engine } from '../../src/core/engine.ts';
-
-function makeEngine() {
-  return new Engine({
-    canvas: { clientWidth: 1280, clientHeight: 720 },
-    config: { fov: 80, deterministic: true, sensitivity: 0.001 },
-  });
-}
+import type { FrameHook, Subsystem } from '../../src/core/registry.ts';
+import { addLifecycle, createCoreFixture } from '../lib/core-fixture.ts';
 
 // Default-off preserves existing callers/capture pumps. Suspension keeps input,
 // raw-time UI, rendering and first-render readiness alive, not gameplay hooks.
-const engine = makeEngine();
-const calls = [];
+const { engine, registry } = createCoreFixture();
+const calls: string[] = [];
 for (const id of ['game', 'ui', 'telemetry']) {
-  engine.registry.add(id, {
-    constructor: { id },
-    fixedUpdate: () => calls.push(`${id}:fixed`),
-    update: () => calls.push(`${id}:update`),
-    lateUpdate: (dt) => calls.push(`${id}:late:${dt}`),
-    resize: () => calls.push(`${id}:resize`),
+  addLifecycle(registry, id, {
+    fixedUpdate: (): number => calls.push(`${id}:fixed`),
+    update: (): number => calls.push(`${id}:update`),
+    lateUpdate: (dt): number => calls.push(`${id}:late:${dt}`),
+    resize: (): number => calls.push(`${id}:resize`),
   });
 }
 let renders = 0;
@@ -28,14 +21,13 @@ let completed = 0;
 let begins = 0;
 let ends = 0;
 const beginFrame = engine.input.beginFrame.bind(engine.input);
-engine.input.beginFrame = () => {
+engine.input.beginFrame = (): void => {
   begins++;
   beginFrame();
 };
-engine.input.endFrame = () => ends++;
-engine.registry.add('render', {
-  constructor: { id: 'render' },
-  render: () => renders++,
+engine.input.endFrame = (): number => ends++;
+addLifecycle(registry, 'render', {
+  render: (): number => renders++,
 });
 assert.equal(engine.gameplaySuspended, false);
 engine.step(10);
@@ -52,7 +44,7 @@ assert.equal(engine.gameplaySuspended, true);
 assert.equal(engine.time.dt, 0);
 assert.equal(engine.time.alpha, 0);
 assert.equal(engine._accum, 0);
-engine.onFirstRender = () => completed++;
+engine.onFirstRender = (): number => completed++;
 calls.length = 0;
 engine.resize();
 assert.deepEqual(calls, ['game:resize', 'ui:resize', 'telemetry:resize']);
@@ -93,7 +85,7 @@ engine.step(10020); // 10 ms wall time, 5 ms scaled; no old fractional backlog
 assert.equal(engine.gameplaySuspended, false);
 assert.equal(engine.time.dt, 0.005);
 assert(Math.abs(engine.time.elapsed - elapsed - 0.005) < 1e-9);
-assert(!calls.some((call) => call.endsWith(':fixed')), 'no suspended-time catch-up');
+assert(!calls.some((call): boolean => call.endsWith(':fixed')), 'no suspended-time catch-up');
 assert(calls.includes('game:update'));
 assert(calls.includes('telemetry:update'));
 assert(Math.abs(engine._accum - 0.005) < 1e-9);
@@ -104,31 +96,29 @@ assert(engine.input.held('KeyW'), 'idempotent calls do not discard active input'
 // A gate raised inside any gameplay hook stops the remaining hooks immediately,
 // including non-dt late hooks. In particular, do not subtract a fixed step from
 // the accumulator after the hook has cleared it.
-for (const phase of ['fixedUpdate', 'update', 'lateUpdate']) {
-  const gated = makeEngine();
-  const hooks = [];
-  const trigger = { constructor: { id: 'trigger' } };
-  trigger[phase] = () => {
+const phases: FrameHook[] = ['fixedUpdate', 'update', 'lateUpdate'];
+for (const phase of phases) {
+  const { engine: gated, registry: gatedRegistry } = createCoreFixture();
+  const hooks: string[] = [];
+  const trigger: Subsystem = {};
+  trigger[phase] = (): void => {
     hooks.push(phase);
     gated.setGameplaySuspended(true);
   };
-  gated.registry.add(trigger.constructor.id, trigger);
-  gated.registry.add('after', {
-    constructor: { id: 'after' },
-    fixedUpdate: () => hooks.push('after-fixed'),
-    update: () => hooks.push('after-update'),
-    lateUpdate: () => hooks.push('after-late'),
+  addLifecycle(gatedRegistry, 'trigger', trigger);
+  addLifecycle(gatedRegistry, 'after', {
+    fixedUpdate: (): number => hooks.push('after-fixed'),
+    update: (): number => hooks.push('after-update'),
+    lateUpdate: (): number => hooks.push('after-late'),
   });
-  gated.registry.add('ui', {
-    constructor: { id: 'ui' },
-    lateUpdate: (dt) => {
+  addLifecycle(gatedRegistry, 'ui', {
+    lateUpdate: (dt): void => {
       assert.equal(dt, 0);
       hooks.push('ui');
     },
   });
-  gated.registry.add('render', {
-    constructor: { id: 'render' },
-    render: () => hooks.push('render'),
+  addLifecycle(gatedRegistry, 'render', {
+    render: (): number => hooks.push('render'),
   });
   gated.step(FIXED_DT * 1000);
   const boundary = hooks.indexOf(phase);
@@ -141,25 +131,23 @@ for (const phase of ['fixedUpdate', 'update', 'lateUpdate']) {
 // Suspension is not a weaker replacement for the terminal-error latch. A UI
 // or render failure while waiting still requires reload and cannot be resumed.
 const log = console.error;
-console.error = () => {};
+console.error = (): void => {};
 try {
   for (const phase of ['lateUpdate', 'render']) {
-    const failed = makeEngine();
+    const { engine: failed, registry: failedRegistry } = createCoreFixture();
     failed.setGameplaySuspended(true);
     let uiCalls = 0;
     let drawCalls = 0;
     let firstRender = 0;
-    failed.onFirstRender = () => firstRender++;
-    failed.registry.add('ui', {
-      constructor: { id: 'ui' },
-      lateUpdate() {
+    failed.onFirstRender = (): number => firstRender++;
+    addLifecycle(failedRegistry, 'ui', {
+      lateUpdate(): void {
         uiCalls++;
         if (phase === 'lateUpdate') throw new Error('waiting UI failed');
       },
     });
-    failed.registry.add('render', {
-      constructor: { id: 'render' },
-      render() {
+    addLifecycle(failedRegistry, 'render', {
+      render(): void {
         drawCalls++;
         if (phase === 'render') throw new Error('waiting render failed');
       },
@@ -167,6 +155,7 @@ try {
     failed._running = true;
     failed.step(20);
     const error = failed.error;
+    assert(error);
     assert.equal(error.method, phase);
     assert.equal(firstRender, 0);
     if (phase === 'render') assert.equal(failed._running, false);
