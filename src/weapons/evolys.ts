@@ -23,13 +23,7 @@ const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES
 
 export function makeEvolysModel(gltf: GLTF): EvolysModel {
   const scene = gltf.scene;
-  const { root, animations, point } = authoredModel(
-    gltf,
-    'EVOLYS_RIG',
-    REQUIRED,
-    manifest.clips,
-    scene
-  );
+  const { root, animations, point } = authoredModel(gltf, 'EVOLYS_RIG', REQUIRED, manifest.clips);
   const sight = point('SOCKET_sight');
   const model = {
     id: 'lmg' as const,

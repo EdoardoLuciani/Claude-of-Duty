@@ -218,11 +218,7 @@ export class MCXAnimation {
   clips(): { [x: string]: import('./clips.ts').Clip } {
     return {
       ...buildEquipClips(this.model.nodes, this.def),
-      ...buildMagazineClips(
-        ALIASES,
-        manifest.clips,
-        (source): number => this.actions[source].getClip().duration
-      ),
+      ...buildMagazineClips(ALIASES, manifest.clips),
     };
   }
 

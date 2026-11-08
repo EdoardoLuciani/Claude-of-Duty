@@ -23,13 +23,7 @@ const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES
 
 export function makeM4Model(gltf: GLTF): M4Model {
   const scene = gltf.scene;
-  const { root, animations, point } = authoredModel(
-    gltf,
-    'M4_RIG',
-    REQUIRED,
-    manifest.clips,
-    scene
-  );
+  const { root, animations, point } = authoredModel(gltf, 'M4_RIG', REQUIRED, manifest.clips);
   const model = {
     id: 'rifle' as const,
     label: 'M4A1',

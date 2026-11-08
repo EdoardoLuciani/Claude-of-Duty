@@ -158,8 +158,7 @@ export function buildManifestClips(
 /** P320/MCX use asset magazine beats but synthesize reload start/gesture end. */
 export function buildMagazineClips(
   aliases: Record<string, string>,
-  manifest: ManifestClips,
-  durationOf = (source: string): number => manifestClip(manifest, source).duration
+  manifest: ManifestClips
 ): Record<string, Clip> {
   const mapping: Record<string, string> = {
     magazine_out: 'magout',
@@ -168,7 +167,7 @@ export function buildMagazineClips(
   };
   const clips: Record<string, Clip> = {};
   for (const [name, source] of Object.entries(aliases)) {
-    const duration = durationOf(source);
+    const duration = manifestClip(manifest, source).duration;
     const events = name.startsWith('reload') ? [{ t: 0, name: 'start' }] : [];
     for (const ev of manifestClip(manifest, source).events) {
       // Only magazine beats are mapped; other authored events are intentionally dropped.

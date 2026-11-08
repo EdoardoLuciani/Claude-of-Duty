@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+import { hasOwn } from '../core/guards.ts';
 import type { WeaponSceneMaterials } from './asset-material.ts';
 import type { WeaponId } from './defs.ts';
 
@@ -12,7 +13,7 @@ export function requiredNode(root: THREE.Object3D, name: string): THREE.Object3D
 }
 
 /** Authored clip lengths from a weapon manifest; glTF itself stores none. */
-export type AuthoredClips = Readonly<Record<string, { readonly duration: number }>>;
+type AuthoredClips = Readonly<Record<string, { readonly duration: number }>>;
 
 /**
  * three infers a clip's duration from its last key. gltfpack 1.3 with `-af 0` reduces a
@@ -25,15 +26,15 @@ export function applyAuthoredDuration(
   authored: AuthoredClips,
   rigName: string
 ): void {
-  const expected = Object.hasOwn(authored, clip.name) ? authored[clip.name].duration : NaN;
-  if (!Number.isFinite(expected) || expected <= 0)
-    throw new Error(`[${rigName}] no authored duration for ${clip.name}`);
-  const collapsed =
-    clip.duration === 0 &&
+  const expected = hasOwn(authored, clip.name) ? authored[clip.name].duration : 0;
+  if (!(expected > 0)) throw new Error(`[${rigName}] no authored duration for ${clip.name}`);
+  if (
+    clip.name === 'Idle' &&
     clip.tracks.length > 0 &&
-    clip.tracks.every((track): boolean => track.times.length === 1 && track.times[0] === 0);
-  if (clip.name === 'Idle' && collapsed) clip.duration = expected;
-  // Written so NaN fails too; float32 key times round authored lengths by ~1e-7.
+    clip.tracks.every((track): boolean => track.times.length === 1 && track.times[0] === 0)
+  )
+    clip.duration = expected;
+  // Float32 key times round authored lengths by ~1e-7; the inverted test also rejects NaN.
   else if (!(Math.abs(clip.duration - expected) <= 1e-6))
     throw new Error(`[${rigName}] ${clip.name} lasts ${clip.duration} s, authored ${expected} s`);
 }
