@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 
 /** Source controls tolerate formatting, never a missing regression marker. */
-export function mutateSource(source, before, after) {
+export function mutateSource(source: string, before: string | RegExp, after: string): string {
   const pattern =
     before instanceof RegExp
       ? before
@@ -9,7 +9,7 @@ export function mutateSource(source, before, after) {
           before
             .trim()
             .split(/\s+/)
-            .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+            .map((part): string => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
             .join('\\s+'),
           'g'
         );

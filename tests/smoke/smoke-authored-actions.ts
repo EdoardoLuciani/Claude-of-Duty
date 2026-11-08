@@ -12,14 +12,16 @@ import {
   applyAuthoredHands,
   authoredHandTarget,
   discoverAuthoredHands,
+  type AuthoredHand,
+  type HandSide,
 } from '../../src/weapons/authored-hands.ts';
 import { createAuthoredRig } from '../../src/weapons/authored-rig.ts';
 
 // Gesture precedence, interrupted firing, last-shot choice and clock boundaries.
-const samples = [];
-const state = { idleTime: 0, fireTime: 0, _sample: (...args) => samples.push(args) };
+const samples: [string, number][] = [];
+const state = { idleTime: 0, fireTime: 0, _sample: (...args: [string, number]): number => samples.push(args) };
 const clips = { Fire: { duration: 0.1 }, Idle: { duration: 2 } };
-const sample = (dt, name, time, empty = false) =>
+const sample = (dt: number, name: string | null, time: number, empty = false): string | undefined =>
   sampleAuthoredFire(state, clips, dt, name, time, empty);
 assert.equal(sample(0.025, 'reloadEmpty', 0.6, true), 'Reload_Empty');
 assert.deepEqual(samples.pop(), ['Reload_Empty', 0.6]);
@@ -41,7 +43,7 @@ assert.equal(sample(0, 'holster', 0.4), 'Holster');
 const root = new THREE.Object3D();
 const mixer = new THREE.AnimationMixer(root);
 const animations = ['Idle', 'Fire'].map(
-  (name) =>
+  (name): THREE.AnimationClip =>
     new THREE.AnimationClip(name, 1, [
       new THREE.NumberKeyframeTrack('.position[x]', [0, 1], [0, 2]),
     ])
@@ -63,8 +65,8 @@ assert.equal(mixer.stats.actions.inUse, 0);
 assert.equal(mixer.stats.actions.total, 0);
 
 // Shared receiver methods retain side-specific authored wrists and every joint.
-const nodes = new Map();
-const hands = discoverAuthoredHands((name) => {
+const nodes = new Map<string, THREE.Object3D>();
+const hands = discoverAuthoredHands((name): THREE.Object3D => {
   const node = new THREE.Object3D();
   node.rotation.set(0.1, nodes.size * 0.01, 0.2);
   nodes.set(name, node);
@@ -73,7 +75,7 @@ const hands = discoverAuthoredHands((name) => {
 root.rotation.set(0.2, 0.3, 0.4);
 root.updateMatrix();
 const rig = { root, hands, handTarget: authoredHandTarget, applyHands: applyAuthoredHands };
-for (const side of ['left', 'right']) {
+for (const side of ['left', 'right'] satisfies HandSide[]) {
   hands[side].wrist.position.set(side === 'left' ? -1 : 1, 2, 3);
   const position = new THREE.Vector3();
   const quaternion = new THREE.Quaternion();
@@ -81,11 +83,16 @@ for (const side of ['left', 'right']) {
   assert(position.equals(hands[side].wrist.position.clone().applyMatrix4(root.matrix)));
   assert(quaternion.equals(root.quaternion.clone().multiply(hands[side].wrist.quaternion)));
 }
-const arm = () => ({
-  ...discoverAuthoredHands(() => new THREE.Object3D()).left,
+type TestArm = Omit<AuthoredHand, 'thumb'> & {
+  thumb: { root: THREE.Object3D; joints: THREE.Object3D[] };
+  updates: number;
+  updateFlex(): void;
+};
+const arm = (): TestArm => ({
+  ...discoverAuthoredHands((): THREE.Object3D => new THREE.Object3D()).left,
   thumb: { root: new THREE.Object3D(), joints: [new THREE.Object3D(), new THREE.Object3D()] },
   updates: 0,
-  updateFlex() {
+  updateFlex(): void {
     this.updates++;
   },
 });
@@ -95,7 +102,7 @@ rig.applyHands(left, right);
 for (const [target, source] of [
   [left, hands.left],
   [right, hands.right],
-]) {
+] satisfies [TestArm, AuthoredHand][]) {
   assert.equal(target.updates, 1);
   for (let i = 0; i < 4; i++) {
     assert(target.fingers[i].root.quaternion.equals(source.fingers[i].root.quaternion));
@@ -114,8 +121,8 @@ for (const [name, node] of nodes) {
 const material = new THREE.MeshPhysicalMaterial();
 const texture = new THREE.Texture();
 let disposed = 0;
-material.addEventListener('dispose', () => disposed++);
-texture.addEventListener('dispose', () => disposed++);
+material.addEventListener('dispose', (): number => disposed++);
+texture.addEventListener('dispose', (): number => disposed++);
 const model = { root, animations, materials: new Set([material]), textures: new Set([texture]) };
 const first = createAuthoredRig(model);
 const second = createAuthoredRig({
@@ -136,7 +143,7 @@ assert.equal(first.name, 'Idle');
 // Copied methods update the final adapter, and reset dispatches its sampling override.
 const composed = {
   ...first,
-  _sample(name, time) {
+  _sample(name: string, time: number): void {
     assert.equal(this, composed);
     samples.push([name, time]);
   },

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import { BufferGeometry, Group, Mesh, MeshBasicMaterial, SkinnedMesh, Texture } from 'three';
 import { float, vec3, vec4 } from 'three/tsl';
+import type { Node } from 'three/webgpu';
 
 import { hasOwn, isClosable, isImageBitmap, isRecord } from '../../src/core/guards.ts';
 import { EventBus } from '../../src/core/registry.ts';
@@ -17,8 +18,9 @@ import { createFogCompute } from '../../src/render/fog-compute-webgpu.ts';
 import { isLightingContext } from '../../src/render/indirect-webgpu.ts';
 import { setClass, setStyle } from '../../src/ui/util.ts';
 import { FixtureImageBitmap, installImageBitmapFixture } from '../lib/image-bitmap.ts';
+import { fixture } from '../lib/fixture.ts';
 
-for (const value of [null, undefined, 1, 'value', [], () => {}]) {
+for (const value of [null, undefined, 1, 'value', [], (): void => {}]) {
   assert.equal(isRecord(value), false);
   assert.equal(isImageBitmap(value), false);
   assert.equal(isClosable(value), false);
@@ -29,8 +31,8 @@ assert.equal(hasOwn({ value: 1 }, 'constructor'), false);
 assert.equal(hasOwn({ value: 1 }, '__proto__'), false);
 const previousBitmap = Object.getOwnPropertyDescriptor(globalThis, 'ImageBitmap');
 try {
-  delete globalThis.ImageBitmap;
-  assert.equal(isImageBitmap({ width: 2, height: 2, close() {} }), false);
+  Reflect.deleteProperty(globalThis, 'ImageBitmap');
+  assert.equal(isImageBitmap({ width: 2, height: 2, close(): void {} }), false);
 } finally {
   if (previousBitmap) Object.defineProperty(globalThis, 'ImageBitmap', previousBitmap);
 }
@@ -39,16 +41,16 @@ try {
   const image = new FixtureImageBitmap({ width: 2, height: 2 });
   assert.equal(isImageBitmap(image), true);
   assert.equal(
-    isImageBitmap({ width: 2, height: 2, close() {} }),
+    isImageBitmap({ width: 2, height: 2, close(): void {} }),
     false,
     'a native canvas rejects plain lookalikes'
   );
-  assert.equal(isImageBitmap({ ...image, width: '2' }), false);
-  assert.equal(isImageBitmap({ ...image, close: true }), false);
+  assert.equal(isImageBitmap(Object.assign({}, image, { width: '2' })), false);
+  assert.equal(isImageBitmap(Object.assign({}, image, { close: true })), false);
 } finally {
   restoreImageBitmap();
 }
-assert.equal(isClosable({ close() {} }), true);
+assert.equal(isClosable({ close(): void {} }), true);
 
 const geometry = new BufferGeometry();
 const material = new MeshBasicMaterial();
@@ -91,7 +93,7 @@ assert.equal(isLightingContext({ ...lighting, lightingModel: { clearcoatRadiance
 assert.equal(isLightingContext({ ...lighting, lightingModel: null }), false);
 
 // Exercise the pinned compute API, not a newer @types-only method such as setCount.
-const fog = createFogCompute(() => vec3(0), { color: vec4(0), depth: float(1) });
+const fog = createFogCompute((): Node<'vec3'> => vec3(0), { color: vec4(0), depth: float(1) });
 assert.deepEqual(fog.computeNode.workgroupSize, [8, 8, 1]);
 assert.deepEqual(fog.computeNode.dispatchSize, [1, 1, 1]);
 assert.equal(fog.computeNode.count, null);
@@ -99,23 +101,25 @@ fog.dispose();
 for (const [index, name] of SURFACE_NAMES.entries()) assert.equal(SURFACE[name], index);
 
 // Mapped listener buckets must preserve arbitrary property keys as Map did.
-const bus = new EventBus();
-const received = [];
+const bus = new EventBus<Record<PropertyKey, unknown>>();
+const received: unknown[] = [];
 for (const key of ['__proto__', 'constructor', 'normal', Symbol('event')]) {
-  const off = bus.on(key, (payload) => received.push(payload));
-  bus.emit(key, key);
+  const off = bus.on(key, (payload): number => received.push(payload));
+  if (typeof key === 'symbol') bus.emit(key, key);
+  else bus.emit(key, key);
   assert.equal(received.at(-1), key);
   off();
   const length = received.length;
-  bus.emit(key, 'ignored');
+  if (typeof key === 'symbol') bus.emit(key, 'ignored');
+  else bus.emit(key, 'ignored');
   assert.equal(received.length, length);
 }
 let once = 0;
-bus.once('__proto__', () => once++);
+bus.once('__proto__', (): number => once++);
 bus.emit('__proto__', {});
 bus.emit('__proto__', {});
 assert.equal(once, 1);
-bus.on('cleared', () => assert.fail('cleared listener ran'));
+bus.on('cleared', (): never => assert.fail('cleared listener ran'));
 bus.clear();
 bus.emit('cleared', {});
 
@@ -125,10 +129,10 @@ for (const [numeric, text] of [
   [0, '0'],
   [NaN, 'NaN'],
   [Infinity, 'Infinity'],
-]) {
-  const keyed = new EventBus();
-  const calls = [];
-  const listener = (payload) => calls.push(payload);
+] satisfies [number, string][]) {
+  const keyed = new EventBus<Record<PropertyKey, unknown>>();
+  const calls: unknown[] = [];
+  const listener = (payload: unknown): number => calls.push(payload);
   const offNumeric = keyed.on(numeric, listener);
   keyed.on(text, listener);
   keyed.emit(numeric, 'number');
@@ -141,49 +145,50 @@ for (const [numeric, text] of [
   keyed.emit(text, 'string remains');
   assert.equal(calls.at(-1), 'string remains');
   let numericOnce = 0;
-  keyed.once(numeric, () => numericOnce++);
+  keyed.once(numeric, (): number => numericOnce++);
   keyed.emit(text, 'does not consume numeric once');
   keyed.emit(numeric, 'once');
   keyed.emit(numeric, 'not twice');
   assert.equal(numericOnce, 1);
-  keyed.on(numeric, () => assert.fail('numeric listener survived clear'));
+  keyed.on(numeric, (): never => assert.fail('numeric listener survived clear'));
   keyed.clear();
   keyed.emit(numeric, 'cleared');
   keyed.emit(text, 'cleared');
 }
-const zeroBus = new EventBus();
+const zeroBus = new EventBus<Record<PropertyKey, unknown>>();
 let zeroCalls = 0;
-zeroBus.on(-0, () => zeroCalls++);
+zeroBus.on(-0, (): number => zeroCalls++);
 zeroBus.emit(0, {});
 assert.equal(zeroCalls, 1, 'numeric -0 and 0 share a channel, like Map');
 const failure = new Error('numeric event failure');
-const reported = [];
-const errors = new EventBus((key, error) => reported.push([key, error]));
-errors.on(1, () => {
+const reported: [PropertyKey, unknown][] = [];
+const errors = new EventBus<Record<PropertyKey, unknown>>((key, error): number => reported.push([key, error]));
+errors.on(1, (): never => {
   throw failure;
 });
-errors.on('1', () => assert.fail('numeric error crossed to string key'));
+errors.on('1', (): never => assert.fail('numeric error crossed to string key'));
 assert.throws(
-  () => errors.emit(1, {}),
-  (error) => error === failure
+  (): void => errors.emit(1, {}),
+  (error: unknown): boolean => error === failure
 );
 assert.deepEqual(reported, [[1, failure]]);
 
 // UI caches are allocated once; duplicate writes still stay out of the DOM.
 let styles = 0,
   classes = 0;
-const element = {
-  style: {
-    setProperty() {
+const element = fixture<Parameters<typeof setStyle>[0]>({
+  style: fixture<CSSStyleDeclaration>({
+    setProperty(): void {
       styles++;
     },
-  },
-  classList: {
-    toggle() {
+  }),
+  classList: fixture<DOMTokenList>({
+    toggle(): boolean {
       classes++;
+      return true;
     },
-  },
-};
+  }),
+}, ['_ows', '_owc']);
 for (const key of ['color', 'constructor', '__proto__']) {
   setStyle(element, key, 'red');
   setStyle(element, key, 'red');
