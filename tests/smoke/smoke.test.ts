@@ -22,8 +22,11 @@ for (const file of files) {
           timeout: TIMEOUT_MS,
         });
       } catch (error) {
-        assert(error instanceof Error);
-        assert('killed' in error && 'code' in error && 'stdout' in error && 'stderr' in error);
+        if (
+          !(error instanceof Error) ||
+          !('killed' in error && 'code' in error && 'stdout' in error && 'stderr' in error)
+        )
+          throw error;
         const reason = error.killed
           ? `timed out after ${TIMEOUT_MS} ms`
           : `exited with ${String(error.code)}`;

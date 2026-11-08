@@ -113,7 +113,7 @@ try {
           const step = e.step.bind(e);
           e.step = function (this: Engine, ...args: Parameters<Engine['step']>): void {
             this.camera.rotation.y += 0.002;
-            step.apply(this, args);
+            step(...args);
           };
           return {
             weapon: w.activeId,

@@ -7,6 +7,7 @@ import { join } from 'node:path';
 
 import {
   REPO_ROOT,
+  collectBrowserErrors,
   ensureDevServer,
   launchChromium,
   parseArgs,
@@ -132,12 +133,7 @@ try {
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: dpr });
   page.setDefaultTimeout(180000);
   const errors: string[] = [];
-  page.on('pageerror', (e): void => {
-    errors.push(e.message);
-  });
-  page.on('console', (m): void => {
-    if (m.type() === 'error') errors.push(m.text());
-  });
+  collectBrowserErrors(page, errors);
   const start = performance.now();
   await page.goto(
     `http://127.0.0.1:${port}/?capture=1&lockstep=1&q=${quality}${args['worker-profile'] ? '&aiWorkerProfile=1' : ''}`,
@@ -231,10 +227,10 @@ try {
       let renderMs = 0;
       let last: FrameSample | null = null;
       let failure: string | null = null;
-      const observedRender = function (this: typeof r, ...args: Parameters<typeof render>): void {
+      const observedRender = (...args: Parameters<typeof render>): void => {
         const start = performance.now();
         try {
-          return render.apply(this, args);
+          return render(...args);
         } finally {
           renderMs = performance.now() - start;
         }
