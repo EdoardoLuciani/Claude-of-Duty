@@ -14,12 +14,12 @@ import { SurfaceNav } from '../../src/ai/nav.ts';
 import { Squad } from '../../src/ai/squad.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { WorldSystem } from '../../src/world/index.ts';
-import { makeAgent as initializedAgent, makeAi, makeRng } from '../../tools/lib/agent-fixture.ts';
-import { testNav } from '../../tools/lib/test-nav.ts';
-import { loadMap } from '../../tools/nav240/fixtures.ts';
-import { makeWalker } from '../../tools/nav240/harness.ts';
+import { makeAgent as initializedAgent, makeAi, makeRng } from '../lib/agent-fixture.ts';
 import { brainPhysics, brainAnimator } from '../lib/ai-brain-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
+import { loadMap } from '../lib/nav240/fixtures.ts';
+import { makeWalker } from '../lib/nav240/harness.ts';
+import { testNav } from '../lib/test-nav.ts';
 
 const connected = await testNav();
 // Pads cannot supply an alternative patrol leg within their own component.

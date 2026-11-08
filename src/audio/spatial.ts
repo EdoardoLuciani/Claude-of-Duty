@@ -4,7 +4,8 @@
  */
 
 import type { EngineContext } from '../core/context.ts';
-import { airCutoff, clamp, gain, biquad } from './dsp.ts';
+import { clamp } from '../core/math.ts';
+import { airCutoff, gain, biquad } from './dsp.ts';
 import type { BusName, Mixer } from './mixer.ts';
 interface Point3 {
   x: number;

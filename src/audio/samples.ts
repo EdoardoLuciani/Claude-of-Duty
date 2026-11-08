@@ -1,10 +1,11 @@
 import type { AiCalloutKind, ReloadPhase } from '../core/events.ts';
 import { hasOwn } from '../core/guards.ts';
+import { clamp } from '../core/math.ts';
 import type { Rng } from '../core/rng.ts';
 import { AIRCRAFT_URLS } from './aircraft.ts';
 import { CALLOUT_URLS, CALLOUT_MIX, calloutBank } from './callouts.ts';
 import { COMBAT_URLS, type CombatKind } from './combat.ts';
-import { clamp, gain, series } from './dsp.ts';
+import { gain, series } from './dsp.ts';
 import {
   ENVIRONMENT_URLS,
   ENVIRONMENT_GAIN,

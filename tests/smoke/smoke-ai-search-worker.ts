@@ -6,9 +6,9 @@ import type { Agent } from '../../src/ai/agent.ts';
 import { AttachmentQueries, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.ts';
 import type { ClientMessage } from '../../src/ai/attachment-types.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
-import { makeAgent, makeAi, makeRng } from '../../tools/lib/agent-fixture.ts';
-import { testNav } from '../../tools/lib/test-nav.ts';
+import { makeAgent, makeAi, makeRng } from '../lib/agent-fixture.ts';
 import { fixture } from '../lib/fixture.ts';
+import { testNav } from '../lib/test-nav.ts';
 
 function fakeWorker(): Worker {
   const messages: ClientMessage[] = [];

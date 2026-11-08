@@ -18,8 +18,7 @@ import { CoverMap, SurfaceNav } from '../../src/ai/nav.ts';
 import { Squad } from '../../src/ai/squad.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
-import { makeAgent, makeAi as fixtureAi } from '../../tools/lib/agent-fixture.ts';
-import { synthetic } from '../../tools/nav240/fixtures.ts';
+import { makeAgent, makeAi as fixtureAi } from '../lib/agent-fixture.ts';
 import {
   midpointRng,
   BrainPlayer,
@@ -28,6 +27,7 @@ import {
   coverPoint,
 } from '../lib/ai-brain-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
+import { synthetic } from '../lib/nav240/fixtures.ts';
 
 const events = new EventBus();
 const phys = new PhysicsSystem();

@@ -1,9 +1,9 @@
 import { Container, Graphics, Text } from 'pixi.js';
 
+import { clamp01 } from '../core/math.ts';
 import { filledMagazinePips, MAX_PIPS } from './ammo.ts';
 import type { AmmoState } from './ammo.ts';
 import { HUD_TYPE, hudText, writeHudText } from './pixi-type.ts';
-import { clamp01 } from './util.ts';
 
 export const AMMO_WIDTH = 248;
 // Align the magazine bar with the health widget's lower (armour) bar.

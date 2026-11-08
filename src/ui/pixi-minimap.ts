@@ -1,7 +1,7 @@
 import { Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 
+import { clamp01 } from '../core/math.ts';
 import type { Minimap, MinimapState } from './minimap.ts';
-import { clamp01 } from './util.ts';
 
 const SIZE = 178,
   HALF = SIZE / 2;

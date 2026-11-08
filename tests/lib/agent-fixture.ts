@@ -9,7 +9,7 @@ import { RIG } from '../../src/ai/rig.ts';
 import { VARIANTS } from '../../src/ai/soldier.ts';
 import { applyDefinedPatch } from '../../src/core/patch.ts';
 import { Rng } from '../../src/core/rng.ts';
-import { createTestContext } from '../../tests/lib/context.ts';
+import { createTestContext } from './context.ts';
 
 // Exercise the real constructor, not a second, incomplete copy of Agent state.
 // Brain-only tests replace presentation/physics explicitly; controller gates

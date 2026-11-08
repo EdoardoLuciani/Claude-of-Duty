@@ -4,8 +4,9 @@
  */
 
 import { hasOwn } from '../core/guards.ts';
+import { clamp } from '../core/math.ts';
 import type { Rng } from '../core/rng.ts';
-import { biquad, gain, clamp, osc } from './dsp.ts';
+import { biquad, gain, osc } from './dsp.ts';
 import { IR_SPECS, generateIR, type SpaceName } from './ir.ts';
 export type BusName = keyof typeof BUS_DEFS;
 interface MixerBus {

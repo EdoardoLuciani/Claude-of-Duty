@@ -5,6 +5,8 @@
 
 import type { Matrix4Tuple } from 'three';
 
+import { clamp } from '../core/math.ts';
+
 export const EPS = 1e-9;
 interface ClosestResult {
   d2: number;
@@ -31,10 +33,6 @@ interface HitRecord {
   object: number;
   frontFace: boolean;
   body: unknown;
-}
-
-export function clamp(v: number, lo: number, hi: number): number {
-  return v < lo ? lo : v > hi ? hi : v;
 }
 
 /** A closest-feature record. Reused everywhere; never allocated per query. */

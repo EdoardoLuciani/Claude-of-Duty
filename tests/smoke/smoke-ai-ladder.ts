@@ -13,6 +13,7 @@ import {
 } from '../../src/ai/ladder.ts';
 import type { WorldLadder } from '../../src/core/model-metadata.ts';
 import { CharacterController } from '../../src/physics/character.ts';
+import { mutableLadder } from '../lib/ai-movement-fixture.ts';
 import {
   ladderProfiles,
   ladderController as controller,
@@ -20,9 +21,8 @@ import {
   directedPoints,
   segmentSpan,
   reverseCursor,
-} from '../../tools/lib/ladder-fixture.ts';
-import { loadMap, physicsFor } from '../../tools/nav240/fixtures.ts';
-import { mutableLadder } from '../lib/ai-movement-fixture.ts';
+} from '../lib/ladder-fixture.ts';
+import { loadMap, physicsFor } from '../lib/nav240/fixtures.ts';
 
 const f = await loadMap();
 assert(f.meta.volumes);

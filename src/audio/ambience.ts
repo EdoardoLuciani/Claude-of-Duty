@@ -1,6 +1,6 @@
+import { clamp } from '../core/math.ts';
 /** Sparse finite environmental recordings and distant combat; no continuous bed. */
 import type { Rng } from '../core/rng.ts';
-import { clamp } from './dsp.ts';
 export { ENVIRONMENT_KINDS as ONE_SHOTS } from './environment.ts';
 interface AmbientTimers {
   volley: number;

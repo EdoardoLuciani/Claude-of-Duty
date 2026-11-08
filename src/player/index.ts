@@ -8,6 +8,7 @@ import * as THREE from 'three';
 
 import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap } from '../core/events.ts';
+import { DEG, clamp, clamp01, lerp } from '../core/math.ts';
 import type { Rng } from '../core/rng.ts';
 import type { PhysicsSystem } from '../physics/index.ts';
 import { CameraRig } from './camera.ts';
@@ -16,7 +17,7 @@ import { Health } from './health.ts';
 import { LowHealthPass } from './lowhealth.ts';
 import { Movement } from './movement.ts';
 import type { PlayerMoveState } from './movement.ts';
-import { clamp, clamp01, lerp, approach, DEG } from './springs.ts';
+import { approach } from './springs.ts';
 import {
   STANCE,
   MOVE,

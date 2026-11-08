@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { bindingLabel } from '../core/bindings.ts';
 import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName } from '../core/events.ts';
+import { clamp, clamp01, damp } from '../core/math.ts';
 import type { WeaponMode } from '../weapons/defs.ts';
 import { AmmoPanel } from './ammo.ts';
 import { Compass, ScoreBar } from './compass.ts';
@@ -20,7 +21,7 @@ import { Prompt, Banner } from './prompts.ts';
 import { RadioPanel } from './radio.ts';
 import { StartGate } from './start.ts';
 import { installStyles, removeStyles } from './style.ts';
-import { el, clamp, clamp01, damp, setStyle } from './util.ts';
+import { el, setStyle } from './util.ts';
 
 const MAX_BLIPS = 48;
 const HEAL_KEY = bindingLabel('heal');

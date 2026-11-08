@@ -5,8 +5,8 @@ import { Vector3, Mesh, BoxGeometry, MeshBasicMaterial } from 'three';
 import { INFANTRY } from '../../src/ai/capabilities.ts';
 import { CoverMap } from '../../src/ai/nav.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
-import { testNav } from '../../tools/lib/test-nav.ts';
-import { makeWalker } from '../../tools/nav240/harness.ts';
+import { makeWalker } from '../lib/nav240/harness.ts';
+import { testNav } from '../lib/test-nav.ts';
 
 const nav = await testNav(),
   physics = nav.physics;

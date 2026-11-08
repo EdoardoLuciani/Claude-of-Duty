@@ -1,4 +1,5 @@
-import { smootherstep, easeOutBack, easeOutCubic, clamp01, lerp } from './mathx.ts';
+import { clamp01, lerp } from '../core/math.ts';
+import { smootherstep, easeOutBack, easeOutCubic } from './mathx.ts';
 
 /** Event timelines plus the MCX's additive draw/holster tracks. */
 

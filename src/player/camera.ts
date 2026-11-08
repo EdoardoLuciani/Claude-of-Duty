@@ -6,9 +6,10 @@
 import * as THREE from 'three';
 
 import type { EngineContext } from '../core/context.ts';
+import { DEG, clamp, clamp01, lerp } from '../core/math.ts';
 import type { Health } from './health.ts';
 import type { Movement } from './movement.ts';
-import { Spring, RecoilAxis, clamp, clamp01, lerp, approach, hashNoise, DEG } from './springs.ts';
+import { Spring, RecoilAxis, approach, hashNoise } from './springs.ts';
 import { CAMERA, MOVE } from './tuning.ts';
 
 type CameraContext = EngineContext;

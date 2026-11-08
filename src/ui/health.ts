@@ -1,4 +1,5 @@
-import { clamp01, damp, ease } from './util.ts';
+import { clamp01, damp } from '../core/math.ts';
+import { ease } from './util.ts';
 
 export interface HealthState {
   health?: number;

@@ -5,7 +5,8 @@
 
 import * as THREE from 'three';
 
-import { clamp01, approach, lerp, DEG } from './springs.ts';
+import { DEG, clamp01, lerp } from '../core/math.ts';
+import { approach } from './springs.ts';
 import { HEALTH } from './tuning.ts';
 
 interface DamageTakenPayload {

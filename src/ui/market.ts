@@ -1,8 +1,9 @@
 import type { EngineContext } from '../core/context.ts';
+import { damp } from '../core/math.ts';
 import type { MarketSystem } from '../market/index.ts';
 import { marketIcon } from './market-icons.ts';
 import { MarketInspection } from './market-inspection.ts';
-import { el, setText, setStyle, setClass, damp } from './util.ts';
+import { el, setText, setStyle, setClass } from './util.ts';
 
 type MarketItem = ReturnType<MarketSystem['getHudState']>['items'][number];
 type MarketAction = MarketItem['action'];

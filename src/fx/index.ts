@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { UNITS } from '../core/config.ts';
 import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName, EventWeapon } from '../core/events.ts';
+import { clamp } from '../core/math.ts';
 import type { Rng } from '../core/rng.ts';
 import type { SurfaceName } from '../physics/surfaces.ts';
 import { Ambience } from './ambience.ts';
@@ -1289,5 +1290,4 @@ const _axisX = new THREE.Vector3(1, 0, 0);
 const _axisY = new THREE.Vector3(0, 1, 0);
 const _stagedTracerOpts = Object.freeze({ flightTime: 0.1 });
 
-const clamp = (v: number, a: number, b: number): number => (v < a ? a : v > b ? b : v);
 const clampI = (v: number, a: number, b: number): number => Math.round(clamp(v, a, b));

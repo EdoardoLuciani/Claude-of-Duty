@@ -4,6 +4,7 @@ import { MeshBasicNodeMaterial, MeshPhysicalNodeMaterial } from 'three/webgpu';
 import type { Node, UniformNode } from 'three/webgpu';
 
 import { hasOwn } from '../core/guards.ts';
+import { clamp, clamp01, damp, lerp } from '../core/math.ts';
 import { loadArmAsset } from './arm-asset.ts';
 import { createWeaponMaterial } from './asset-material.ts';
 import { createWeaponAnimation } from './authored-animation.ts';
@@ -24,18 +25,7 @@ import { grenadeMesh } from './grenade-mesh.ts';
 import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from './grip-contacts.ts';
 import { Arm } from './hands.ts';
 import type { ReticleMaterials } from './materials-tsl.ts';
-import {
-  Spring,
-  Spring3,
-  Noise1,
-  clamp,
-  clamp01,
-  lerp,
-  damp,
-  smootherstep,
-  wrapPi,
-  TAU,
-} from './mathx.ts';
+import { Spring, Spring3, Noise1, smootherstep, wrapPi, TAU } from './mathx.ts';
 import { radioMesh, radioScreenTexture } from './radio-mesh.ts';
 import type {
   ClipResult,

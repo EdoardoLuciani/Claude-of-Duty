@@ -13,8 +13,8 @@ import { StaticWorld } from '../../src/physics/bvh.ts';
 import { CharacterController } from '../../src/physics/character.ts';
 import type { PhysicsSystem } from '../../src/physics/index.ts';
 import { MASK } from '../../src/physics/surfaces.ts';
-import { NativeWorker } from '../../tools/lib/attachment-worker-fixture.ts';
 import { MovementWorker } from '../lib/ai-movement-fixture.ts';
+import { NativeWorker } from '../lib/attachment-worker-fixture.ts';
 import { fixture } from '../lib/fixture.ts';
 
 const turn = (): Promise<void> => new Promise((resolve): NodeJS.Timeout => setTimeout(resolve, 0));

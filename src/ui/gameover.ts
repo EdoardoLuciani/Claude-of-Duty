@@ -1,4 +1,5 @@
-import { el, damp, ease, setStyle } from './util.ts';
+import { damp } from '../core/math.ts';
+import { el, ease, setStyle } from './util.ts';
 
 /**
  * End-of-run overlay. It deliberately waits for the death camera to finish its

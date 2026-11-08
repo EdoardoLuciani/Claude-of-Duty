@@ -1,6 +1,6 @@
+import { clamp } from '../core/math.ts';
 import { recordingUrls } from './recordings.ts';
 /** Required recorded combat foley; source crops and design limits live beside the assets. */
-import { clamp } from './dsp.ts';
 
 export const COMBAT_URLS = {
   whizz: recordingUrls('combat/whizz', 5),

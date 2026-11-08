@@ -1,5 +1,6 @@
+import { clamp01 } from '../core/math.ts';
 import type { PoolRecord } from './util.ts';
-import { Pool, ease, clamp01 } from './util.ts';
+import { Pool, ease } from './util.ts';
 
 export const R_IN = 13; // well outside the reticle blades, so the two never merge
 export const R_OUT = 28.5;

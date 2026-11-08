@@ -5,13 +5,14 @@
 
 import type { SystemId, EngineContext } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName, ReloadPhase } from '../core/events.ts';
+import { clamp } from '../core/math.ts';
 import type { Rng } from '../core/rng.ts';
 import type { SurfaceName } from '../physics/surfaces.ts';
 import { AircraftVoice, AIRCRAFT_MIX, type AircraftPosition } from './aircraft.ts';
 import { Ambience, ONE_SHOTS, AMBIENT_EVENT_GAIN } from './ambience.ts';
 import { CalloutPlayer, isCalloutKind } from './callouts.ts';
 import { CASING_BANK, COMBAT_MIX, dryBank, nearMissGain } from './combat.ts';
-import { NoiseBank, SPEED_OF_SOUND, clamp, gain as mkGain } from './dsp.ts';
+import { NoiseBank, SPEED_OF_SOUND, gain as mkGain } from './dsp.ts';
 import { isEnvironmentKind } from './environment.ts';
 import { EXPLOSION_MIX, explosionDistanceGain, type ExplosionKind } from './explosions.ts';
 import { uiSound, heartbeat, intelSiren } from './foley.ts';

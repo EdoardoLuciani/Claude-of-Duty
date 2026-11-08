@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 
 import type { EngineContext } from '../core/context.ts';
+import { clamp01, lerp } from '../core/math.ts';
 import type { Rng } from '../core/rng.ts';
-import { clamp01, lerp } from './util.ts';
 interface Traversable {
   from: [number, number, number];
   to: [number, number, number];

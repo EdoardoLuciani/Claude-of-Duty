@@ -1,5 +1,6 @@
 import { bindingLabel } from '../core/bindings.ts';
-import { ease, clamp01, damp } from './util.ts';
+import { clamp01, damp } from '../core/math.ts';
+import { ease } from './util.ts';
 
 const USE_KEY = bindingLabel('use');
 interface PromptData {

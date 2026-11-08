@@ -6,7 +6,7 @@ import { Agent } from '../../src/ai/agent.ts';
 import { TACTICS } from '../../src/ai/tuning.ts';
 import { CALLOUT_CAST, calloutBank } from '../../src/audio/callouts.ts';
 import type { EngineEventMap } from '../../src/core/events.ts';
-import { makeAgent } from '../../tools/lib/agent-fixture.ts';
+import { makeAgent } from '../lib/agent-fixture.ts';
 import { BrainPlayer, brainPhysics } from '../lib/ai-brain-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 
