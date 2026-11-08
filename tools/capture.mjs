@@ -2,7 +2,7 @@
 /**
  * Deterministic screenshot harness for the game.
  *
- * Boots vite (if not already up), opens the page in GPU-backed Chromium,
+ * Boots the dev server (if not already up), opens the page in GPU-backed Chromium,
  * waits for `window.__READY__`, optionally runs a named "shot" defined in
  * src/dev/shots.ts, then writes a PNG.
  *
@@ -15,10 +15,10 @@ import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 import {
-  ensureViteServer,
+  ensureDevServer,
   launchChromium,
   parseArgs,
-  stopViteServer,
+  stopDevServer,
 } from './lib/browser-harness.mjs';
 import { captureNative } from './lib/native-render.mjs';
 
@@ -34,7 +34,7 @@ const TIMEOUT = Number(args.timeout ?? 90000);
 // Frames to render before capture: lets TAA converge, streaming settle, LOD pick.
 const SETTLE = Number(args.settle ?? 90);
 
-const server = await ensureViteServer({ port: PORT, attempts: 120 });
+const server = await ensureDevServer({ port: PORT, attempts: 120 });
 
 const browser = await launchChromium({
   webgpu: true,
@@ -156,7 +156,7 @@ try {
     console.error(logs.slice(-60).join('\n'));
   }
   await browser.close();
-  stopViteServer(server);
+  stopDevServer(server);
 }
 
 if (failed) {

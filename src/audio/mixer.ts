@@ -93,9 +93,7 @@ export class Mixer {
   static prepare(actx: BaseAudioContext): Promise<void> {
     let ready = preparedContexts.get(actx);
     if (!ready) {
-      ready = import('./energy-worklet.ts?worker&url').then(({ default: url }): Promise<void> =>
-        actx.audioWorklet.addModule(url)
-      );
+      ready = actx.audioWorklet.addModule(new URL('./energy-worklet.ts', import.meta.url).href);
       preparedContexts.set(actx, ready);
     }
     return ready;

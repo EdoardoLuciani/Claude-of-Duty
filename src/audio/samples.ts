@@ -29,7 +29,7 @@ import type { AudioVoice, SampleKind, SampleOptions, WeaponProfile } from './typ
 import { REPORT_DISTANT_MATCH, reportDistantMix } from './weapons.ts';
 
 /*
- * Legacy firearm bank: PRIVATE local-only review Opus delivery copies, bundled by Vite.
+ * Legacy firearm bank: PRIVATE local-only review Opus delivery copies, bundled with hashed URLs.
  * Float WAV masters remain offline authoring inputs, not runtime imports.
  * Operator authorized local commits; commercial derivatives are NOT cleared
  * for public Git distribution or upload.

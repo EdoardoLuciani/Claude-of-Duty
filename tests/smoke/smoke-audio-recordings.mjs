@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, readdirSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-
-import { build } from 'vite';
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import { AUDIO_BANKS } from '../lib/audio-banks.mjs';
@@ -108,42 +109,37 @@ assert(
 );
 assert.equal(bank.loaded, 0);
 
-// Exercise Vite's actual eager URL transform, separately from raw Node's file fallback.
-// Library output inlines assets, allowing byte-for-byte checks without a server or dist writes.
-const result = await build({
-  configFile: false,
-  logLevel: 'silent',
-  build: {
-    write: false,
-    minify: false,
-    reportCompressedSize: false,
-    lib: {
-      entry: fileURLToPath(new URL('../../src/audio/recordings.ts', import.meta.url)),
-      formats: ['es'],
-    },
-  },
-});
-const outputs = Array.isArray(result) ? result : [result];
-const chunk = outputs
-  .flatMap((output) => output.output)
-  .find((entry) => entry.type === 'chunk' && entry.isEntry);
-const bundled = await import(
-  `data:text/javascript;base64,${Buffer.from(chunk.code).toString('base64')}`
-);
-for (const name of fetched) {
-  const url = bundled.recordingUrl(name.slice(0, -'.opus'.length));
-  assert.match(url, /^data:.*;base64,/);
+// Exercise the bundler plugin's glob expansion, separately from raw Node's file fallback.
+// Bun bundles in a subprocess (this script stays on Node); assets land beside the entry,
+// and bundled URLs resolve against the page, here that output directory.
+const outdir = mkdtempSync(join(tmpdir(), 'ow-recordings-'));
+globalThis.location = { href: `${pathToFileURL(outdir).href}/` };
+try {
+  const execpath = process.env.npm_execpath ?? '';
+  const bun = basename(execpath).startsWith('bun') ? execpath : 'bun';
+  const source = (path) => JSON.stringify(fileURLToPath(new URL(path, import.meta.url)));
+  execFileSync(bun, [
+    '-e',
+    `import plugin from ${source('../../build/bun-plugin.mjs')};
+    const result = await Bun.build({ entrypoints: [${source('../../src/audio/recordings.ts')}],
+      outdir: ${JSON.stringify(outdir)}, target: 'browser', plugins: [plugin] });
+    if (!result.success) throw new AggregateError(result.logs, 'recordings bundle failed');`,
+  ]);
+  const bundled = await import(pathToFileURL(join(outdir, 'recordings.js')).href);
+  for (const name of fetched) {
+    const url = bundled.recordingUrl(name.slice(0, -'.opus'.length));
+    assert(url.startsWith(pathToFileURL(outdir).href), `${name}: emitted beside the bundle`);
+    assert.notEqual(basename(url), basename(name), `${name}: content-hashed file name`);
+    assert.deepEqual(readFileSync(new URL(url)), readFileSync(new URL(name, root)), name);
+  }
   assert.deepEqual(
-    Buffer.from(url.slice(url.indexOf(',') + 1), 'base64'),
-    readFileSync(new URL(name, root)),
-    name
+    bundled.recordingUrls('mpx', 3),
+    [1, 2, 3].map((i) => bundled.recordingUrl(`mpx-${i}`))
   );
+  assert.throws(() => bundled.recordingUrl('not-a-recording'), /missing bundled recording/);
+} finally {
+  rmSync(outdir, { recursive: true, force: true });
 }
-assert.deepEqual(
-  bundled.recordingUrls('mpx', 3),
-  [1, 2, 3].map((i) => bundled.recordingUrl(`mpx-${i}`))
-);
-assert.throws(() => bundled.recordingUrl('not-a-recording'), /missing bundled recording/);
 console.log(
-  '375 unchanged ordered recordings: raw Node, reverse decode completion, disposal and Vite URL bytes'
+  '375 unchanged ordered recordings: raw Node, reverse decode completion, disposal and bundled URL bytes'
 );

@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import {
-  ensureViteServer,
+  ensureDevServer,
   launchChromium,
-  stopViteServer,
+  stopDevServer,
 } from '../../tools/lib/browser-harness.mjs';
 import { waitForGame } from '../../tools/lib/native-render.mjs';
 
 const port = Number(process.env.PORT ?? 5173);
-const server = await ensureViteServer({ port, attempts: 120 });
+const server = await ensureDevServer({ port, attempts: 120 });
 const browser = await launchChromium({
   headless: true,
   args: ['--ignore-gpu-blocklist', '--mute-audio'],
@@ -173,5 +173,5 @@ try {
   if (failures.length) process.exitCode = 1;
 } finally {
   await browser.close();
-  stopViteServer(server);
+  stopDevServer(server);
 }

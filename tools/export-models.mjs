@@ -41,7 +41,7 @@ import { buildSpentHull } from './lib/spent-hull.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'public', 'models');
-// Lock lives outside public/ so vite never serves it and the watcher never
+// Lock lives outside public/ so the dev server never serves it and the watcher never
 // sees it. mkdir is atomic, which makes it a usable mutex; ownership and an
 // init grace period make the mutex safe (see withLock).
 const LOCK_DIR = join(ROOT, 'node_modules', '.cache', 'claude-of-duty-models.lock');

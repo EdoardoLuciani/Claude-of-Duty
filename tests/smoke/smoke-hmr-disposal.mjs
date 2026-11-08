@@ -45,7 +45,7 @@ const callback = registration(
 );
 const pending = callback({});
 assert.equal(typeof pending?.then, 'function', `${file}: return the disposal promise`);
-// Vite's fetchUpdate()/prunePaths() await the callback before replacement.
+// Bun's HMR client awaits a returned disposal promise before replacing the module.
 const update = (async () => {
   await pending;
   imported = true;

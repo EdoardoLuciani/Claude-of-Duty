@@ -17,9 +17,7 @@ export interface ArmAsset {
 
 /** Owned by a Viewmodel, never a global cache: disposal/restart stays local. */
 export async function loadArmAsset(): Promise<ArmAsset> {
-  const gltf = await new GLTFLoader().loadAsync(
-    `${(import.meta as ImportMeta & { env: { BASE_URL: string } }).env.BASE_URL}models/player/arms.glb`
-  );
+  const gltf = await new GLTFLoader().loadAsync('/models/player/arms.glb');
   gltf.scene.updateMatrixWorld(true);
   const meshes: ArmSkinnedMesh[] = [];
   const blood = createArmBlood();

@@ -21,7 +21,7 @@ when changing authored assets.
   need to run an offline builder.
 
 `public/models/` holds assets delivered by public URL. Weapons instead use static
-Vite imports of cooked GLBs in `assets/`; the world uses a content-hashed manifest.
+bundled `new URL(…, import.meta.url)` references to cooked GLBs in `assets/`; the world uses a content-hashed manifest.
 These delivery mechanisms intentionally remain distinct. Do not move or hand-edit
 runtime products to change a model.
 

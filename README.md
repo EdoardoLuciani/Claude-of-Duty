@@ -1,6 +1,6 @@
 # Claude of Duty
 
-A browser FPS built with Three.js r187 (`0.187.0`), Vite and **WebGPU only**. Procedural and
+A browser FPS built with Three.js r187 (`0.187.0`), Bun and **WebGPU only**. Procedural and
 Blender-authored assets load locally; no runtime CDN or WebGL fallback.
 [Updates](https://shumer.dev/newsletter) · [Engine contract](ARCHITECTURE.md) ·
 [Contributor instructions](AGENTS.md)
@@ -16,9 +16,10 @@ bun run build:ci     # code-only build used by CI: generates no models
 ```
 
 Node.js 26.x and Bun (version pinned by `packageManager` in `package.json`) are
-required. Bun installs dependencies from `bun.lock`, type-checks (`bun check`) and
-formats (`bun fmt`); packages are cached in `~/.bun/install/cache`, so warm
-reinstalls are near-instant. Node runs Vite, Oxlint, the `node:test` smoke runner and all tools; Node-run
+required. Bun installs dependencies from `bun.lock`, type-checks (`bun check`),
+formats (`bun fmt`), bundles and serves the game (`build/bun.mjs`; the dev server
+reads its plugin from `bunfig.toml`); packages are cached in `~/.bun/install/cache`, so warm
+reinstalls are near-instant. Node runs Oxlint, the `node:test` smoke runner and all tools; Node-run
 tools and smoke tests load migrated `.ts` modules using native type stripping.
 Runtime TypeScript uses explicit `.ts` imports and is checked by `bun run typecheck`
 (`noUncheckedIndexedAccess` status: [triage and plan](docs/no-unchecked-indexed-access.md)).

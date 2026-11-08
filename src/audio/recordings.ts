@@ -1,13 +1,6 @@
-// Vite bundles the complete local catalog. Raw Node smoke imports have no Vite env
-// and use file URLs instead; do not guard on import.meta.glob itself (Vite replaces calls).
-const RECORDINGS =
-  import.meta.env === undefined
-    ? null
-    : import.meta.glob<string>('./samples/**/*.opus', {
-        eager: true,
-        query: '?url',
-        import: 'default',
-      });
+// Bundles replace this call with every local recording's hashed URL (build/bun-plugin.mjs).
+// Raw Node smoke imports have no import.meta.glob and use file URLs instead.
+const RECORDINGS = import.meta.glob?.('./samples/**/*.opus') ?? null;
 
 /** Explicit numbered takes in authored order, independent of glob enumeration. */
 export function recordingUrls(stem: string, count: number): readonly string[] {
