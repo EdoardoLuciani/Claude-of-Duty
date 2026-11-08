@@ -284,9 +284,7 @@ export class MarketSystem {
       this._marketAt > 0 && !this.open
         ? Math.max(0, Math.ceil(this._marketAt - this.ctx.time.elapsed))
         : 0;
-    const items = h.items;
-    for (let i = 0; i < items.length; i++) {
-      const it = items[i];
+    for (const it of h.items) {
       const lvl = this._level(it.id);
       it.level = lvl;
       it.affordable = lvl < it.max && this.credits >= it.cost;

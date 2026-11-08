@@ -199,7 +199,8 @@ export function createNightSkyNodes(
 ): FnNode<[Vector3 | Node<'vec3'>], Node<'vec3'>> {
   const { uStarParams, uCelestial } = shared;
   const milky = skMilkyWay(mwOctaves);
-  const layers = points
+  type StarLayer = ReturnType<typeof starLayer>;
+  const layers: [StarLayer, StarLayer, StarLayer] | null = points
     ? [
         starLayer({ N: 21.0, keep: 0.3, gain: 1.0, seed: 0.0, sigma: 0.00165 }, uStarParams),
         starLayer({ N: 43.0, keep: 0.2, gain: 0.34, seed: 13.0, sigma: 0.00145 }, uStarParams),

@@ -356,9 +356,22 @@ function pushWorst<K extends string, T extends Record<K, number | null>>(
     list.push(rec);
     return false;
   }
+  // The first record seeds the scan (as before, including NaN timings); a zero-capacity
+  // list rejects everything. Runs per hitch, so the scan keeps a manual index.
+  const [first] = list;
+  if (!first) return true;
   let min = 0;
-  for (let i = 1; i < list.length; i++) if ((list[i][key] ?? 0) < (list[min][key] ?? 0)) min = i;
-  if ((rec[key] ?? 0) <= (list[min][key] ?? 0)) return true;
+  let least = first[key] ?? 0;
+  let i = 0;
+  for (const item of list) {
+    const value = item[key] ?? 0;
+    if (value < least) {
+      min = i;
+      least = value;
+    }
+    i++;
+  }
+  if ((rec[key] ?? 0) <= least) return true;
   list[min] = rec;
   return false;
 }
@@ -1728,9 +1741,9 @@ export class TelemetrySystem {
     const files = [
       { name: 'telemetry.json', data: new TextEncoder().encode(JSON.stringify(this.snapshot())) },
     ];
-    for (let i = 0; i < this.markers.length; i++) {
+    for (const [i, marker] of this.markers.entries()) {
       const blob = this._shots[i];
-      const name = this.markers[i].screenshot;
+      const name = marker.screenshot;
       if (!blob || !name) continue;
       files.push({
         name,

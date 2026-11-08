@@ -25,6 +25,8 @@ interface IntelCache {
   z: number;
   group: ReturnType<typeof makeCrate>;
   open: number;
+  /** HUD pulse owned by this pooled cache, so live caches never outnumber pulses. */
+  pulse: IntelHud['pulses'][number];
 }
 interface IntelPrompt {
   key: string;
@@ -62,7 +64,6 @@ export class IntelSystem {
   declare _operationPayload: IntelEventMap['intel:operation'];
   declare _prompt: IntelPrompt;
   declare _hud: IntelHud;
-  declare _pulseSlots: IntelHud['pulses'];
   declare _spawnPayload: IntelEventMap['intel:spawn'];
   declare _noisePayload: IntelEventMap['intel:noise'];
   declare _securePayload: IntelEventMap['intel:secured'];
@@ -131,15 +132,6 @@ export class IntelSystem {
     this._operationPayload = { active: false, position: new THREE.Vector3() };
     this._prompt = { key: bindingLabel('use'), text: 'Secure intel', sub: '', progress: 0 };
     this._hud = { holding: false, progress: 0, secured: 0, pulses: [], pulseTime: 0 };
-    this._pulseSlots = Array.from(
-      { length: INTEL.aliveMax },
-      (): { x: number; y: number; z: number; radius: 12 } => ({
-        x: 0,
-        y: 0,
-        z: 0,
-        radius: INTEL.pulseRadius,
-      })
-    );
     this._spawnPayload = { id: '', position: new THREE.Vector3() };
     this._noisePayload = { position: new THREE.Vector3(), loudness: INTEL.pryLoudness };
     this._securePayload = {
@@ -156,24 +148,15 @@ export class IntelSystem {
       priority: 0.5,
     };
     this._kit = makeKit(ctx.get('materials'));
-    this._pool = Array.from(
-      { length: INTEL.aliveMax },
-      (): {
-        id: string;
-        x: number;
-        y: number;
-        z: number;
-        group: THREE.Group & { lid: THREE.Group };
-        open: number;
-      } => ({
-        id: '',
-        x: 0,
-        y: 0,
-        z: 0,
-        group: makeCrate(this._kit),
-        open: 0,
-      })
-    );
+    this._pool = Array.from({ length: INTEL.aliveMax }, (): IntelCache => ({
+      id: '',
+      x: 0,
+      y: 0,
+      z: 0,
+      group: makeCrate(this._kit),
+      open: 0,
+      pulse: { x: 0, y: 0, z: 0, radius: INTEL.pulseRadius },
+    }));
     this._off = [];
     const on = <K extends keyof IntelEventMap>(
       type: K,
@@ -197,14 +180,8 @@ export class IntelSystem {
     h.secured = this.secured;
     h.pulseTime = this.ctx.time.elapsed;
     h.pulses.length = this._alive.length;
-    for (let i = 0; i < this._alive.length; i++) {
-      const slot = this._pulseSlots[i];
-      const cache = this._alive[i];
-      slot.x = cache.x;
-      slot.y = cache.y;
-      slot.z = cache.z;
-      h.pulses[i] = slot;
-    }
+    let i = 0;
+    for (const cache of this._alive) h.pulses[i++] = cache.pulse;
     return h;
   }
 
@@ -375,6 +352,9 @@ export class IntelSystem {
     cache.x = marker.x;
     cache.y = marker.y;
     cache.z = marker.z;
+    cache.pulse.x = marker.x;
+    cache.pulse.y = marker.y;
+    cache.pulse.z = marker.z;
     cache.group.visible = true;
     cache.group.position.set(cache.x, cache.y, cache.z);
     // Keep the authored footprint; arbitrary yaw can put a corner through furniture.
@@ -474,7 +454,7 @@ export class IntelSystem {
   reset(): void {
     this._interrupt();
     this._clearPrompt();
-    while (this._alive.length) this._despawn(this._alive[this._alive.length - 1]);
+    for (const cache of this._alive.slice()) this._despawn(cache);
     this._used.clear();
     this.secured = 0;
     this._beepAt = this._announceAt = this._lastWave = 0;
@@ -486,7 +466,9 @@ export class IntelSystem {
   /** Compile pooled props at boot without spawning, consuming RNG or drawing. */
   async prewarmMaterials(ctx: IntelContext = this.ctx): Promise<{ ok: true }> {
     const render = ctx.get('render');
-    const group = this._pool[0].group;
+    const [first] = this._pool;
+    if (!first) throw new Error('[intel] prewarm needs a pooled cache');
+    const group = first.group;
     const parent = group.parent,
       visible = group.visible;
     group.visible = true;

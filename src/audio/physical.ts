@@ -47,11 +47,15 @@ export const FALL_BANK: Record<SurfaceName, FoleyKind> = {
   flesh: 'fall-soft',
   water: 'fall-water',
 };
+/** Per-gait mix; unknown gaits fall back to the always-present walk level. */
+type GaitMix = { walk: number; [gait: string]: number };
+const GAIT_LEVEL: GaitMix = { walk: 0.62, run: 1, sprint: 1.25, crouch: 0.42, land: 1.3 };
+const GEAR_LEVEL: GaitMix = { walk: 0.25, run: 0.7, sprint: 1, crouch: 0.08, land: 1 };
 export const FOLEY_MIX = {
   impact: 1,
   plaster: 0.8,
   step: 1,
-  gait: { walk: 0.62, run: 1, sprint: 1.25, crouch: 0.42, land: 1.3 } as Record<string, number>,
+  gait: GAIT_LEVEL,
   // Fixed surface references measured through the normal graph, not per-event normalization.
   stepLevel: {
     'step-concrete-walk': 1.3,
@@ -66,7 +70,7 @@ export const FOLEY_MIX = {
     'step-sand-walk': 1.28,
     'step-sand-run': 1.2,
   } as Partial<Record<FoleyKind, number>>,
-  gear: { walk: 0.25, run: 0.7, sprint: 1, crouch: 0.08, land: 1 } as Record<string, number>,
+  gear: GEAR_LEVEL,
   gearLevel: 0.45,
   splashLevel: 0.65,
   cloth: 0.85,

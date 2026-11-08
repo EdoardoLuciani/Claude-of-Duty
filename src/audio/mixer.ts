@@ -23,9 +23,11 @@ interface ReverbSpace {
   gain: GainNode;
   live: boolean;
 }
+type TinnitusNode = AudioNode & { stop?: (when?: number) => void };
 interface TinnitusVoice {
   g: GainNode;
-  nodes: (AudioNode & { stop?: (when?: number) => void })[];
+  /** The first node is the source whose `ended` event owns cleanup. */
+  nodes: [TinnitusNode, ...TinnitusNode[]];
   until: number;
 }
 interface PendingConcussion {

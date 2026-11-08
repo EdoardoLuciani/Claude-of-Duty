@@ -206,10 +206,14 @@ export function osc(
   return o;
 }
 
+const chain = (prev: AudioNode, node: AudioNode): AudioNode => {
+  prev.connect(node);
+  return node;
+};
+
 /** Connect a list of nodes head-to-tail; returns the last one. */
 export function series(...nodes: [AudioNode, ...AudioNode[]]): AudioNode {
-  for (let i = 0; i < nodes.length - 1; i++) nodes[i].connect(nodes[i + 1]);
-  return nodes[nodes.length - 1]!;
+  return nodes.reduce(chain);
 }
 
 const CURVE_CACHE = new Map<string, Curve>();

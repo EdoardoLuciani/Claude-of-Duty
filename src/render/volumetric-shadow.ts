@@ -132,23 +132,21 @@ export function createVolumetricShadow(render: CascadeRender): {
         (): void => {
           const uv = vec2(uvz.x, uvz.y.oneMinus());
           const receiver = max(0, uvz.z.sub(layer.params.x));
-          const taps: Node<'float'>[] = [];
-          for (let i = 0; i < 4; i++) {
+          const tap = (i: number): Node<'float'> => {
             const tapUV = uv.add(vogelDiskSample(float(i), float(4), phi).mul(layer.params.y));
-            taps.push(
-              Fn<[], Node<'float'>>((_, builder): Node<'float'> =>
-                builder.shaderStage === 'compute'
-                  ? compareLevel({
-                      depth: layer.depth,
-                      comparison: layer.depth,
-                      uv: tapUV,
-                      receiver,
-                    }).toFloat()
-                  : layer.depth.sample(tapUV).compare(receiver).toFloat()
-              )()
-            );
-          }
-          result.assign(taps[0].add(taps[1]).add(taps[2]).add(taps[3]).mul(0.25));
+            return Fn<[], Node<'float'>>((_, builder): Node<'float'> =>
+              builder.shaderStage === 'compute'
+                ? compareLevel({
+                    depth: layer.depth,
+                    comparison: layer.depth,
+                    uv: tapUV,
+                    receiver,
+                  }).toFloat()
+                : layer.depth.sample(tapUV).compare(receiver).toFloat()
+            )();
+          };
+          // Four Vogel taps, built in order 0..3 as before.
+          result.assign(tap(0).add(tap(1)).add(tap(2)).add(tap(3)).mul(0.25));
         }
       );
       return result;
