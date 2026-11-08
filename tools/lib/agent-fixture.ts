@@ -46,7 +46,7 @@ export function detachFixtureAgent(agent: Agent): void {
   agent.animator = new Animator(RIG, agent.bones, {
     weapon: null,
     rng: agent.animator.rng,
-    probe: agent.animator.probe,
+    probe: agent.animator.probe ?? null,
     scale: agent.scale,
   });
 }
