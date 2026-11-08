@@ -233,6 +233,8 @@ export function classifySpace(
   out?: SpaceWeights
 ): SpaceWeights {
   const horiz = hits.length - 1;
+  if (!Number.isInteger(horiz) || horiz < 1 || horiz > SORT.length)
+    throw new RangeError('[audio] space probes require 1–16 horizontal distances and one ceiling');
   let sum = 0,
     close = 0,
     minD = maxDist,
