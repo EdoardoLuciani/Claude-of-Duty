@@ -7,6 +7,8 @@ import * as THREE from 'three';
  *
  *   node tests/smoke/smoke-ai-combat.ts
  */
+import { bakePhysicsNav } from '#worldgen/nav-bake';
+
 import type { Agent } from '../../src/ai/agent.ts';
 import { STATE } from '../../src/ai/agent.ts';
 import { AiSystem } from '../../src/ai/index.ts';
@@ -18,7 +20,6 @@ import { EventBus } from '../../src/core/registry.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { makeAgent, makeAi as fixtureAi } from '../../tools/lib/agent-fixture.ts';
 import { synthetic } from '../../tools/nav240/fixtures.ts';
-import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
 import {
   midpointRng,
   BrainPlayer,

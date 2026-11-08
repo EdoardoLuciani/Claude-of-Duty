@@ -24,7 +24,10 @@ Runtime source, every `tests/**/*.ts` script, and converted test helpers use exp
 `.ts` imports and share strict checking through `bun run typecheck`. Node runs tests
 directly with erasable TypeScript syntax—no loader, build step or Bun test runtime.
 The second, type-aware lint pass covers runtime source, tests and typed test helpers;
-shared JavaScript authoring APIs consumed by tests have adjacent `.d.ts` declarations.
+shared JavaScript authoring APIs consumed by tests have `.d.ts` contracts in
+`tests/types/`. Package import aliases select those contracts for checking and the
+unchanged JavaScript modules at runtime, keeping declaration-only edits out of world
+asset provenance hashes.
 (`noUncheckedIndexedAccess` status: [triage and plan](docs/no-unchecked-indexed-access.md)).
 `bun run lint` requires explicit return types on every TypeScript function, method,
 getter and callback (including contextually typed functions and functions returning

@@ -3,6 +3,8 @@ import { mock } from 'node:test';
 
 import { Vector3 } from 'three';
 
+import { querySnapshot } from '#query-snapshot';
+
 import { AttachmentQueries, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.ts';
 import type { ClientMessage } from '../../src/ai/attachment-types.ts';
 import { parseSnapshotCopy } from '../../src/ai/attachment-types.ts';
@@ -10,7 +12,6 @@ import type { SurfaceNav } from '../../src/ai/nav.ts';
 import { StaticWorld } from '../../src/physics/bvh.ts';
 import { CharacterController } from '../../src/physics/character.ts';
 import type { PhysicsSystem } from '../../src/physics/index.ts';
-import { querySnapshot } from '../../src/physics/query-snapshot.js';
 import { MASK } from '../../src/physics/surfaces.ts';
 import { NativeWorker } from '../../tools/lib/attachment-worker-fixture.ts';
 import { MovementWorker } from '../lib/ai-movement-fixture.ts';

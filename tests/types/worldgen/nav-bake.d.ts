@@ -1,8 +1,8 @@
 import type { Box3, Object3D } from 'three';
 
-import type { NavMetadata } from '../../src/ai/nav-format.ts';
-import type { WorldLadder } from '../../src/core/model-metadata.ts';
-import type { PhysicsSystem } from '../../src/physics/index.ts';
+import type { NavMetadata } from '../../../src/ai/nav-format.ts';
+import type { WorldLadder } from '../../../src/core/model-metadata.ts';
+import type { PhysicsSystem } from '../../../src/physics/index.ts';
 
 export interface NavBakeResult {
   buffer: Uint8Array;

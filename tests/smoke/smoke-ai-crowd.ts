@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 
 import type { Vector3 } from 'three';
 
+import { bakePhysicsNav } from '#worldgen/nav-bake';
+
 import { SurfaceNav } from '../../src/ai/nav.ts';
 import { makeAi } from '../../tools/lib/agent-fixture.ts';
 import { synthetic, vec } from '../../tools/nav240/fixtures.ts';
 import { makeWalker, WalkerAgent } from '../../tools/nav240/harness.ts';
-import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
 
 const source = synthetic(),
   bake = await bakePhysicsNav(source.physics, source.bounds);

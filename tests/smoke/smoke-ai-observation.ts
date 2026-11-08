@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
 
+import { bakePhysicsNav } from '#worldgen/nav-bake';
+
 import type { Agent } from '../../src/ai/agent.ts';
 import { AttachmentQueries, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.ts';
 import { AiSystem } from '../../src/ai/index.ts';
@@ -15,7 +17,6 @@ import { PlayerSystem } from '../../src/player/index.ts';
 import { makeAgent, makeAi } from '../../tools/lib/agent-fixture.ts';
 import { NativeWorker } from '../../tools/lib/attachment-worker-fixture.ts';
 import { loadMap, physicsFor } from '../../tools/nav240/fixtures.ts';
-import { bakePhysicsNav } from '../../tools/worldgen/nav-bake.js';
 import {
   BrainPlayer,
   coverPoint,

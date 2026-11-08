@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
 
-import { buildWorld } from '../../tools/worldgen/build.js';
-import { Assembler } from '../../tools/worldgen/builder.js';
-import { BUILDINGS } from '../../tools/worldgen/level/layout.js';
+import { buildWorld } from '#worldgen/build';
+import { Assembler } from '#worldgen/builder';
+import { BUILDINGS } from '#worldgen/level/layout';
+
 import { fixture } from '../lib/fixture.ts';
 
 const box = new THREE.Box3();

@@ -1,9 +1,10 @@
 // Small physical fixtures for behaviour tests; all routing uses production Detour.
 import * as THREE from 'three';
 
+import { bakePhysicsNav } from '#worldgen/nav-bake';
+
 import { SurfaceNav } from '../../src/ai/nav.ts';
 import { physicsFor } from '../nav240/fixtures.ts';
-import { bakePhysicsNav } from '../worldgen/nav-bake.js';
 
 // Platform tuples: centre X, surface Y, centre Z, width, depth.
 export async function testNav(

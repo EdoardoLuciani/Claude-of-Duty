@@ -1,7 +1,7 @@
 import type { BufferGeometry, Material, Matrix4, Mesh, Object3D } from 'three';
 
-import type { MaterialOptions } from '../../src/materials/index.ts';
-import type { SurfaceName } from '../../src/physics/surfaces.ts';
+import type { MaterialOptions } from '../../../src/materials/index.ts';
+import type { SurfaceName } from '../../../src/physics/surfaces.ts';
 export type InstanceMasks = [number, number, number];
 export interface AssemblyOptions {
   masks?: InstanceMasks;

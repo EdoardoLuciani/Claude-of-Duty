@@ -5,6 +5,8 @@ import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial, MeshBasicNodeMaterial } from 'three/webgpu';
 
+import { INTEL_POINTS } from '#worldgen/level/intel';
+
 import { AudioSystem } from '../../src/audio/index.ts';
 import { DEFAULT_BINDINGS, bindingLabel } from '../../src/core/bindings.ts';
 import type { EngineContext } from '../../src/core/context.ts';
@@ -26,7 +28,6 @@ import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import type { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { WorldSystem } from '../../src/world/index.ts';
-import { INTEL_POINTS } from '../../tools/worldgen/level/intel.js';
 import { createTestContext, createTestInput } from '../lib/context.ts';
 import type { TestProviders } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';

@@ -8,6 +8,7 @@ import { PhysicsSystem } from '../../src/physics/index.ts';
 import { makeAgent, makeAi, makeRng } from '../../tools/lib/agent-fixture.ts';
 import { createContext, createInput } from './context.ts';
 import type { TestProviders } from './context.ts';
+import { fixture } from './fixture.ts';
 
 void test('context fixture retains provider identity and fails on missing dependencies', (): void => {
   const physics = new PhysicsSystem();
@@ -27,6 +28,13 @@ void test('context fixture retains provider identity and fails on missing depend
   const ai = makeAi();
   providers.ai = ai;
   assert.equal(context.get('ai'), ai);
+  const checked = fixture<{ value: number; optional?: string }>({ value: 1 }, ['optional']);
+  assert.equal(checked.value, 1);
+  assert.equal(checked.optional, undefined);
+  checked.value = 2;
+  assert.equal(checked.value, 2);
+  const incomplete = fixture<{ required: number }>({});
+  assert.throws((): number => incomplete.required, /missing member required/);
 });
 
 void test('agent fixtures use real instances and preserve original null-weapon anchors', (): void => {

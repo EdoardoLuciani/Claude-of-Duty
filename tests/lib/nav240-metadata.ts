@@ -1,7 +1,8 @@
+import type { BuildingSpec, TraversableOpening } from '#worldgen/buildings';
+
 import { isRecord } from '../../src/core/guards.ts';
 import type { ModelVec3, WorldManifest } from '../../src/core/model-metadata.ts';
 import { parseWorldManifest } from '../../src/core/model-metadata.ts';
-import type { BuildingSpec, TraversableOpening } from '../../tools/worldgen/buildings.js';
 
 export interface NavigationBuilding {
   spec: BuildingSpec;

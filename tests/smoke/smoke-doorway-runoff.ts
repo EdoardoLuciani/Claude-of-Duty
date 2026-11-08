@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
 
-import { Assembler } from '../../tools/worldgen/builder.js';
-import { buildBuilding } from '../../tools/worldgen/buildings.js';
-import { BUILDINGS } from '../../tools/worldgen/level/layout.js';
-import { registerProps } from '../../tools/worldgen/props.js';
+import { Assembler } from '#worldgen/builder';
+import { buildBuilding } from '#worldgen/buildings';
+import { BUILDINGS } from '#worldgen/level/layout';
+import { registerProps } from '#worldgen/props';
+
 import { fixture } from '../lib/fixture.ts';
 
 // E3's keyed cornice runoff used to hang from y=3.29 down to y=1.60,

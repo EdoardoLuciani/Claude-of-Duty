@@ -1,7 +1,8 @@
 import type { Matrix4 } from 'three';
 
-import type { Rng } from '../../src/core/rng.ts';
-import type { Assembler } from './builder.js';
+import type { Assembler } from '#worldgen/builder';
+
+import type { Rng } from '../../../src/core/rng.ts';
 
 export interface StairFlight {
   floor: number;
