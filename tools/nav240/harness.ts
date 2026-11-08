@@ -1,12 +1,36 @@
 import * as THREE from 'three';
 
-import { STATE } from '../../src/ai/agent.ts';
+import { Agent, STATE } from '../../src/ai/agent.ts';
 import { INFANTRY } from '../../src/ai/capabilities.ts';
 import { NAV_PROFILE } from '../../src/ai/nav-format.ts';
-import { makeAgent } from '../lib/agent-fixture.ts';
+import { makeAi } from '../lib/agent-fixture.ts';
+import type { FixtureAi } from '../lib/agent-fixture.ts';
+import type { SurfaceNav } from '../../src/ai/nav.ts';
+import type { PhysicsSystem } from '../../src/physics/index.ts';
+import type { CharacterController } from '../../src/physics/character.ts';
+import { applyDefinedPatch } from '../../src/core/patch.ts';
+import type { NavigationCase } from './fixtures.ts';
+
+export interface WalkerFixture { physics: PhysicsSystem; grid: SurfaceNav | null }
+export interface PathCandidate {
+  query(from: THREE.Vector3, to: THREE.Vector3): { points: THREE.Vector3[]; outcome: string | null; reason?: string | null };
+}
+export interface WalkerOptions { scale?: number; slopeLimit?: number; speed?: number; dt?: number }
+export interface Recovery { from: [number, number, number]; to: [number, number, number] }
+export class WalkerAgent extends Agent {
+  declare controller: CharacterController;
+  declare ai: FixtureAi;
+  recoveries: Recovery[] = [];
+}
+export interface TraversalResult {
+  name: string; initialOutcome: string | null; finalOutcome: string | null; arrived: boolean; status: string | null;
+  elapsed: number; pathDistance: number; horizontalError: number; floorError: number; maxStall: number; maxJump: number;
+  end: [number, number, number]; recovery: Recovery[]; recoveryAttempts: number; recoveryOutcome: string | null;
+  initialPath: [number, number, number][]; trace: [number, number, number][];
+}
 
 // Independent direct-controller traversal, without consulting the navigator.
-export function canConnect(physics, from, to) {
+export function canConnect(physics: PhysicsSystem, from: THREE.Vector3, to: THREE.Vector3): boolean {
   const c = physics.createCharacter({
     radius: NAV_PROFILE.radius,
     height: NAV_PROFILE.height,
@@ -36,39 +60,39 @@ export function canConnect(physics, from, to) {
 }
 
 export function makeWalker(
-  fixture,
-  candidate,
-  from,
+  fixture: WalkerFixture,
+  candidate: PathCandidate | null,
+  from: THREE.Vector3,
   id = 1,
-  { scale = INFANTRY.maxScale, slopeLimit = INFANTRY.slopeRadians } = {}
-) {
+  { scale = INFANTRY.maxScale, slopeLimit = INFANTRY.slopeRadians }: WalkerOptions = {}
+): WalkerAgent {
   const physics = fixture.physics;
   const radius = INFANTRY.radius * scale,
     height = INFANTRY.height * scale;
-  const ai = {
-    agents: [],
-    grid: fixture.grid,
-    _pathBudget: 2,
-    deferred: 0,
-    groundAt: (x, z, y) => physics.groundHeight(x, z, y),
-  };
-  ai.requestPath = (start, to, out) => {
+  const ai = makeAi(fixture.grid);
+  ai.groundAt = (x: number, z: number, y: number): number => physics.groundHeight(x, z, y);
+  ai.requestPath = (start, to, out): number => {
     if (ai._pathBudget <= 0) {
       ai.lastPathOutcome = 'deferred';
       ai.deferred++;
       return -1;
     }
     ai._pathBudget--;
+    if (!candidate) throw new Error('walker path request requires a candidate');
     const result = candidate.query(start, to);
     ai.lastPathOutcome = result.outcome;
-    ai.lastPathReason = result.reason;
+    ai.lastPathReason = result.reason ?? null;
     ai.lastPathResFloor = result.points.at(-1)?.y ?? NaN;
     for (let i = 0; i < result.points.length; i++)
       (out[i] ??= new THREE.Vector3()).copy(result.points[i]);
     return result.points.length;
   };
   // Real Agent movement/navigation methods; omit only rendering, senses and gun.
-  const a = makeAgent({
+  const a = new WalkerAgent(ai, { position: from });
+  a.group.removeFromParent();
+  a.skeleton.dispose();
+  a.animator.weapon = null;
+  applyDefinedPatch<Agent>(a, {
     id,
     ai,
     phys: physics,
@@ -84,12 +108,15 @@ export function makeWalker(
       stepHeight: INFANTRY.stepHeight,
       slopeLimit,
     }),
-    animator: { turn() {}, vault() {} },
+
     desiredSpeed: 1.5,
-    recoveries: [],
+
   });
+  if (!a.controller) throw new Error('walker requires a controller');
+  a.animator.turn = (): void => {};
+  a.animator.vault = (): void => {};
   const teleport = a.controller.teleport.bind(a.controller);
-  a.controller.teleport = (x, y, z) => {
+  a.controller.teleport = (x, y, z): void => {
     a.recoveries.push({ from: a.position.toArray(), to: [x, y, z] });
     return teleport(x, y, z);
   };
@@ -97,13 +124,13 @@ export function makeWalker(
   return a;
 }
 
-export function execute(fixture, candidate, sample, options = {}) {
+export function execute(fixture: WalkerFixture, candidate: PathCandidate, sample: NavigationCase, options: WalkerOptions = {}): TraversalResult {
   const a = makeWalker(fixture, candidate, sample.from, sample.recorded ?? 1, options);
   a.desiredSpeed = options.speed ?? 1.5;
   const dt = options.dt ?? 1 / 60;
   a._goTo(sample.to);
   const initialOutcome = a.pathOutcome;
-  const initialPath = a.path.slice(0, a.pathLen).map((p) => p.toArray());
+  const initialPath = a.path.slice(0, a.pathLen).map((p): [number, number, number] => p.toArray());
   let elapsed = 0,
     maxStall = 0,
     stall = 0,

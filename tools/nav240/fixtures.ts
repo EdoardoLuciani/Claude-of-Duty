@@ -5,9 +5,32 @@ import { gunzipSync } from 'node:zlib';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
+import type { SurfaceNav } from '../../src/ai/nav.ts';
+import { isSurfaceName } from '../../src/physics/surfaces.ts';
+import { parseNavigationMetadata } from '../../tests/lib/nav240-metadata.ts';
+import type { NavigationMetadata } from '../../tests/lib/nav240-metadata.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
+export interface NavigationCase {
+  name: string;
+  from: THREE.Vector3;
+  to: THREE.Vector3;
+  recorded?: number;
+  expectedOutcome?: string | undefined;
+  reachable?: boolean;
+}
+export interface NavigationFixture {
+  name: string;
+  physics: PhysicsSystem;
+  bounds: THREE.Box3;
+  cases: NavigationCase[];
+  grid: SurfaceNav | null;
+}
+export interface MapFixture extends NavigationFixture {
+  meta: NavigationMetadata;
+  surfaceRaw: Uint8Array;
+}
 // Measured physical outcomes for anchors 0–7, not merely query results.
-export const RECORDED = [
+export const RECORDED: Array<[number, [number, number, number], string[]]> = [
   [
     20,
     [7.772, 0.077, 2.833],
@@ -43,19 +66,22 @@ export const RECORDED = [
     ['arrived', 'arrived', 'invalid', 'arrived', 'invalid', 'arrived', 'arrived', 'invalid'],
   ],
 ];
-export const vec = (p) => new THREE.Vector3(...p);
-export function physicsFor(scene) {
+export const vec = (p: readonly number[]): THREE.Vector3 => new THREE.Vector3(...p);
+export function physicsFor(scene: THREE.Object3D): PhysicsSystem {
   const physics = new PhysicsSystem();
   scene.updateMatrixWorld(true);
-  scene.traverse((o) => {
-    if (o.isMesh) physics.addStatic(o, o.userData.surface ?? 'concrete');
+  scene.traverse((o): void => {
+    if (!(o instanceof THREE.Mesh)) return;
+    const surface: unknown = o.userData.surface ?? 'concrete';
+    if (!isSurfaceName(surface)) throw new Error('invalid fixture surface');
+    physics.addStatic(o, surface);
   });
   physics.rebuildStatic();
   return physics;
 }
-export async function loadMap() {
+export async function loadMap(): Promise<MapFixture> {
   const dir = new URL('../../public/models/world/', import.meta.url);
-  const meta = JSON.parse(readFileSync(new URL('level.json', dir)));
+  const meta = parseNavigationMetadata(JSON.parse(readFileSync(new URL('level.json', dir), 'utf8')));
   const bytes = gunzipSync(readFileSync(new URL(meta.assets.collision, dir)));
   const gltf = await new GLTFLoader().parseAsync(
     bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
@@ -64,8 +90,8 @@ export async function loadMap() {
   const physics = physicsFor(gltf.scene);
   const bounds = new THREE.Box3(vec(meta.bounds.min), vec(meta.bounds.max)).expandByScalar(2);
   const surfaceRaw = gunzipSync(readFileSync(new URL(meta.assets.nav, dir)));
-  const cases = RECORDED.flatMap(([id, p, outcomes]) =>
-    meta.spawns.map((s, i) => ({
+  const cases: NavigationCase[] = RECORDED.flatMap(([id, p, outcomes]): NavigationCase[] =>
+    meta.spawns.map((s, i): NavigationCase => ({
       name: `enemy-${id}/anchor-${i}`,
       from: vec(p),
       to: vec(s.position),
@@ -107,7 +133,7 @@ export async function loadMap() {
         // The old -.8 m marker embeds the standing capsule in a prop by .116 m;
         // depenetration order is not a supported stair approach. Start at the
         // authored interior doorway instead, retaining the whole stair flight.
-        const entrance = cases.find((c) => c.name === 'W5/entrance');
+        const entrance = cases.find((c): boolean => c.name === 'W5/entrance');
         if (!entrance) throw new Error('W5 stair fixture requires its authored entrance');
         upFrom = entrance.to.clone();
         upFrom.y = physics.groundHeight(upFrom.x, upFrom.z, upFrom.y + 0.5) + 0.008;
@@ -116,18 +142,19 @@ export async function loadMap() {
       cases.push({ name: `${spec.id}/stairs-down`, from: to.clone(), to: from.clone() });
     }
   }
-  return { name: 'map', physics, bounds, cases, meta, surfaceRaw };
+  return { name: 'map', physics, bounds, cases, meta, surfaceRaw, grid: null };
 }
 // September 26 capture: exact world-space upstairs objectives plus the occupied
 // W2 setback terrace. Testing only the stair landing missed its facade barrier.
-export function addFollowupCases(fixture) {
-  for (const [name, from, to] of [
+export function addFollowupCases(fixture: MapFixture): void {
+  const captures: Array<[string, number[], number[]]> = [
     ['capture/7-W2', [-21.916, 0.372, -31.429], [-6.602, 3.484, 10.324]],
     ['capture/9-W2', [-10.564, 0.1, -14.756], [-7.589, 3.473, 6.279]],
     ['capture/7-W5', [-9.431, -0.118, 24.247], [2.301, 3.473, 31.815]],
-  ])
+  ];
+  for (const [name, from, to] of captures)
     fixture.cases.push({ name, from: vec(from), to: vec(to) });
-  const stairs = fixture.cases.find((c) => c.name === 'W2/stairs-up');
+  const stairs = requiredCase(fixture, 'W2/stairs-up');
   const terrace = vec([-4.057, 3.455, 7.614]);
   fixture.cases.push(
     { name: 'W2/apartment-to-terrace', from: stairs.to.clone(), to: terrace },
@@ -137,9 +164,9 @@ export function addFollowupCases(fixture) {
 }
 // All authored walking flights, including exterior chains and upper storeys.
 // Short landing offsets avoid placing a fixture inside a back wall/partition.
-export function addAccessCases(fixture) {
+export function addAccessCases(fixture: MapFixture): void {
   const transform = new THREE.Matrix4().fromArray(fixture.meta.transform);
-  const add = (name, from, to) =>
+  const add = (name: string, from: THREE.Vector3, to: THREE.Vector3): number =>
     fixture.cases.push(
       { name: `access/${name}/up`, from, to },
       { name: `access/${name}/down`, from: to.clone(), to: from.clone() }
@@ -147,9 +174,9 @@ export function addAccessCases(fixture) {
   for (const b of fixture.meta.buildings) {
     const s = b.spec;
     if (!s.enterable) continue;
-    const entrance = fixture.cases.find((c) => c.name === `${s.id}/entrance`);
+    const entrance = fixture.cases.find((c): boolean => c.name === `${s.id}/entrance`);
     const street = entrance?.from.clone();
-    if (street) {
+    if (street && entrance) {
       const outward = entrance.from.clone().sub(entrance.to);
       outward.y = 0;
       street.addScaledVector(outward.normalize(), 0.8);
@@ -193,7 +220,7 @@ export function addAccessCases(fixture) {
     if (last && street) add(`${s.id}/street`, street, last);
   }
   // Real wave-1 spawns whose complete cross-map E4 routes exceed 12k nodes.
-  const e4 = fixture.cases.find((c) => c.name === 'access/E4/street/up').to;
+  const e4 = requiredCase(fixture, 'access/E4/street/up').to;
   add(
     'E4/cross-map-4',
     vec([13.825371742248535, 0.22342976927757263, 30.24120330810547]),
@@ -207,21 +234,21 @@ export function addAccessCases(fixture) {
   // Actual occupied upper-floor evidence, not just the top stair treads.
   add(
     'W3/captured-room',
-    fixture.cases.find((c) => c.name === 'W3/entrance').from.clone(),
+    requiredCase(fixture, 'W3/entrance').from.clone(),
     vec([-15.147, 3.456, -6.893])
   );
   // 19:35:55 capture, t=279.959: W4's landing connected while this room did not.
-  const w4 = fixture.cases.find((c) => c.name === 'access/W4/street/up');
+  const w4 = requiredCase(fixture, 'access/W4/street/up');
   const room = vec([-28.606, 3.456, -16.75]);
   add('W4/captured-room', w4.from.clone(), room);
   add('W4/landing-to-room', w4.to.clone(), room.clone());
 }
-function box(scene, x, y, z, w, h, d) {
+function box(scene: THREE.Scene, x: number, y: number, z: number, w: number, h: number, d: number): void {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshBasicMaterial());
   mesh.position.set(x, y, z);
   scene.add(mesh);
 }
-export function synthetic() {
+export function synthetic(): NavigationFixture {
   const scene = new THREE.Scene();
   // Ground and a roof/upper floor sharing X/Z, deliberately disconnected.
   box(scene, 0, -0.2, 0, 18, 0.4, 12);
@@ -235,7 +262,7 @@ export function synthetic() {
   box(scene, 0, 1.5, 1.5, 0.3, 3, 5);
   box(scene, 15, -0.2, 0, 8, 0.4, 6);
   box(scene, 15, 1.5, 0, 2, 0.3, 6);
-  const cases = [
+  const definitions: Array<[string, number[], number[], boolean]> = [
     ['ground-under-roof', [-6, 0, -2], [-2, 0, -2], true],
     ['upper-floor', [-6, 3.15, -2], [-2, 3.15, -2], true],
     ['wrong-storey', [-4, 0, 0], [-4, 3.15, 0], false],
@@ -245,8 +272,15 @@ export function synthetic() {
     ['corner', [-1.4, 0, 2.8], [1.4, 0, 2.8], true],
     ['disconnected', [7, 0, 0], [12, 0, 0], false],
     ['crouch-tunnel', [12, 0, 0], [18, 0, 0], false], // standing-only candidate profile
-  ].map(([name, from, to, reachable]) => ({ name, from: vec(from), to: vec(to), reachable }));
+  ];
+  const cases = definitions.map(([name, from, to, reachable]): NavigationCase => ({ name, from: vec(from), to: vec(to), reachable }));
   const bounds = new THREE.Box3(vec([-10, -1, -7]), vec([20, 7, 7]));
   const physics = physicsFor(scene);
-  return { name: 'synthetic', physics, bounds, cases };
+  return { name: 'synthetic', physics, bounds, cases, grid: null };
+}
+
+function requiredCase(fixture: NavigationFixture, name: string): NavigationCase {
+  const sample = fixture.cases.find((sample): boolean => sample.name === name);
+  if (!sample) throw new Error(`missing navigation fixture case: ${name}`);
+  return sample;
 }

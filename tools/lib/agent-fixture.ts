@@ -32,14 +32,23 @@ export function makeAgent(over: Partial<Agent> = {}): Agent {
   const a = new Agent(ai, over.position ? { position: over.position } : {});
   a.group.removeFromParent();
   a.skeleton.dispose();
+  a.animator.weapon = null;
   a.id = 1;
   applyDefinedPatch(a, over);
   if (!over.route) a.route.points = a.path;
   return a;
 }
 
-export function makeAi(grid: SurfaceNav | null = null): AiSystem {
-  const ai = new AiSystem();
+export class FixtureAi extends AiSystem {
+  deferred = 0;
+}
+
+export function makeAi(grid: SurfaceNav | null = null): FixtureAi {
+  const ai = new FixtureAi();
+  ai.ctx = createTestContext();
+  ai.rng = new Rng(1);
+  ai.root = new THREE.Group();
+  ai.variant = (): AiVariant => model;
   ai.grid = grid;
   ai.cover = null;
   ai.agents = [];
