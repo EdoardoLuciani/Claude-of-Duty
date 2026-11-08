@@ -247,15 +247,14 @@ def geometry(mats):
     housing = prism('Machined aluminum housing', profile, -12.3, 12.3, body, root, bevel=.55)
     # Aperture recess intersects the housing; the sight is not an emissive fake lens.
     cut(housing, cyl('CUT optical bore', (0,24,-10.5), 2.45, 4, None, root, 'Y', 0))
-    for side in (1,):
-        cut(housing, cyl('CUT windage bore', (side*12.3,8.1,-10.1), 1.8, 1.6,
-            None, root, 'X', 0, 32))
-        cyl('Windage seat '+str(side), (side*11.9,8.1,-10.1), 1.64, .24,
-            mats['dark'], root, 'X', .02, 32)
-        head = cyl('Windage screw '+str(side), (side*12.05,8.1,-10.1), 1.25, .25,
-            mats['steel'], root, 'X', .03, 32)
-        cut(head, cyl('CUT hex socket', (side*12.2,8.1,-10.1), .73, .5,
-            None, root, 'X', 0, 6))
+    cut(housing, cyl('CUT windage bore', (12.3,8.1,-10.1), 1.8, 1.6,
+        None, root, 'X', 0, 32))
+    cyl('Windage seat 1', (11.9,8.1,-10.1), 1.64, .24,
+        mats['dark'], root, 'X', .02, 32)
+    head = cyl('Windage screw 1', (12.05,8.1,-10.1), 1.25, .25,
+        mats['steel'], root, 'X', .03, 32)
+    cut(head, cyl('CUT hex socket', (12.2,8.1,-10.1), .73, .5,
+        None, root, 'X', 0, 6))
     # The upper face is a recessed open rail channel, not an added Picatinny rail.
     base = prism('Mount channel floor',[(-9.5,-4.8),(26.3,-4.8),(26.3,-.15),
         (-.3,-.15),(-7.8,-4.0),(-9.5,-4.0)],-12.3,12.3,mats['mount'],root,bevel=.2)
