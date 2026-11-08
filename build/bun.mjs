@@ -34,7 +34,12 @@ function runAssetTasks() {
 
 /** Static file under `dir`; refuses paths that escape it. */
 async function serveStatic(dir, request) {
-  const path = normalize(join(dir, decodeURIComponent(new URL(request.url).pathname)));
+  let path = '';
+  try {
+    path = normalize(join(dir, decodeURIComponent(new URL(request.url).pathname)));
+  } catch {
+    // Malformed percent-encoding: treat as not found rather than a handler error.
+  }
   const file = path.startsWith(dir + sep) ? Bun.file(path) : null;
   return file && (await file.exists())
     ? new Response(file)
@@ -54,6 +59,7 @@ if (command === 'build') {
   const start = performance.now();
   runAssetTasks();
   rmSync(DIST, { recursive: true, force: true });
+  // Bun.build rejects with the build logs on failure, which exits non-zero.
   const result = await Bun.build({
     entrypoints: [join(ROOT, 'index.html')],
     outdir: DIST,
@@ -65,10 +71,6 @@ if (command === 'build') {
     naming: { chunk: 'assets/[name]-[hash].[ext]', asset: 'assets/[name]-[hash].[ext]' },
     plugins: [plugin],
   });
-  if (!result.success) {
-    for (const log of result.logs) console.error(log);
-    process.exit(1);
-  }
   // Bun has no public/ convention: copy it verbatim, as served in dev.
   cpSync(PUBLIC, DIST, { recursive: true });
   await Bun.write(join(DIST, 'LICENSE.txt'), Bun.file(join(ROOT, 'LICENSE')));
@@ -81,7 +83,7 @@ if (command === 'build') {
   runAssetTasks();
   const { default: html } = await import('../index.html');
   listen(5173, {
-    routes: { '/': html },
+    routes: { '/': html, '/index.html': html },
     development: { hmr: !process.env.OW_NO_HMR },
     fetch: (request) => serveStatic(PUBLIC, request),
   });

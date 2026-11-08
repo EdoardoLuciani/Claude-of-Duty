@@ -1,7 +1,8 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import net from 'node:net';
-import { basename, dirname, resolve } from 'node:path';
+import { homedir } from 'node:os';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { chromium } from 'playwright';
@@ -31,10 +32,14 @@ export function portOpen(port, host = '127.0.0.1') {
   });
 }
 
-/** Bun binary: `bun run` exposes it via npm_execpath without putting it on PATH. */
+/** Bun binary: `bun run` exposes it via npm_execpath without putting it on PATH; plain
+ *  `node` runs fall back to the installer's default location, then PATH. */
+const INSTALLED_BUN = join(process.env.BUN_INSTALL ?? join(homedir(), '.bun'), 'bin', 'bun');
 export const BUN = basename(process.env.npm_execpath ?? '').startsWith('bun')
   ? process.env.npm_execpath
-  : 'bun';
+  : existsSync(INSTALLED_BUN)
+    ? INSTALLED_BUN
+    : 'bun';
 
 /** Start one HMR-free Bun dev (or preview) server unless the requested port is already owned. */
 export async function ensureDevServer({

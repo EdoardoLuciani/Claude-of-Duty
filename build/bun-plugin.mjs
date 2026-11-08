@@ -85,7 +85,9 @@ export default {
             console.warn(`[bundle] ${relative(ROOT, file)} missing; left unbundled`);
             return match;
           }
-          return `new URL(${importUrl(file.endsWith('.ts') ? `ow-bundle:${file.slice(0, -3)}.js` : file)}, location.href)`;
+          // Keep the match's line breaks so later lines (and sourcemaps) stay aligned.
+          const breaks = '\n'.repeat(match.split('\n').length - 1);
+          return `new URL(${importUrl(file.endsWith('.ts') ? `ow-bundle:${file.slice(0, -3)}.js` : file)}, location.href${breaks})`;
         })
         // `import.meta.glob?.('<pattern>')` -> { './match': hashedUrl }; raw Node gets undefined.
         .replace(GLOB_PATTERN, (_, pattern) => {

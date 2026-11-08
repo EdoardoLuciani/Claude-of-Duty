@@ -120,9 +120,8 @@ try {
   execFileSync(BUN, [
     '-e',
     `import plugin from ${source('../../build/bun-plugin.mjs')};
-    const result = await Bun.build({ entrypoints: [${source('../../src/audio/recordings.ts')}],
-      outdir: ${JSON.stringify(outdir)}, target: 'browser', plugins: [plugin] });
-    if (!result.success) throw new AggregateError(result.logs, 'recordings bundle failed');`,
+    await Bun.build({ entrypoints: [${source('../../src/audio/recordings.ts')}],
+      outdir: ${JSON.stringify(outdir)}, target: 'browser', plugins: [plugin] });`,
   ]);
   const bundled = await import(pathToFileURL(join(outdir, 'recordings.js')).href);
   for (const name of fetched) {
