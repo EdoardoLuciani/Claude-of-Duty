@@ -132,7 +132,8 @@ sky, radio, audio and fx that has a direct fix, using the same patterns. The tot
 | Fail fast at the read       | callout actor, stale sample round-robin index (previously a context-free `TypeError` later), atlas texture count, stereo worklet output                                                                                            |
 | `for…of` / manual counter   | loops whose index is unused, or used only for instance-matrix writes                                                                                                                                                               |
 
-Not fixed here, because each needs the same proof-convention decision as typed buffers:
+Not fixed here, because each needs the same proof-convention decision as typed buffers
+([#624](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/624)):
 
 - **Ring cursors** (`(cursor + i) % length`): audio dry slots, spatial track cursor, fx shell
   spawn.
@@ -168,7 +169,8 @@ A scoped gate is **not** installed.
 
 Global enablement needs the following, roughly in this order:
 
-1. **Owner decision for typed-buffer kernels (918 diagnostics, mostly physics/fx/materials).**
+1. **Owner decision for typed-buffer kernels (918 diagnostics, mostly physics/fx/materials;
+   tracked in [#624](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/624)).**
    TypeScript cannot express "this offset is in bounds", and per-read guards are both
    slower and wrong for proven invariants. The realistic options are:
    - a documented, file-local rule allowing `!` only on typed-buffer reads inside a kernel
