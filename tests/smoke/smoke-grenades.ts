@@ -1,3 +1,7 @@
+import assert from 'node:assert/strict';
+
+import * as THREE from 'three';
+
 /**
  * Node smoke test for the grenade launch flow — no browser.
  *
@@ -8,78 +12,35 @@
  *
  *   node tests/smoke/smoke-grenades.ts
  */
-import assert from 'node:assert/strict';
-
-import * as THREE from 'three';
-
+import { AudioSystem } from '../../src/audio/index.ts';
+import type { EngineEventMap } from '../../src/core/events.ts';
+import { Input } from '../../src/core/input.ts';
 import { Rng } from '../../src/core/rng.ts';
+import { PhysicsSystem } from '../../src/physics/index.ts';
+import { RigidBody } from '../../src/physics/rigidbody.ts';
 import { RadioSystem, CARPET } from '../../src/radio/index.ts';
-import { WEAPON_IDS, WEAPON_DEFS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import {
   WeaponSystem,
   GRENADE_RADIUS,
   GRENADE_DAMAGE,
   GRENADE_FUSE,
 } from '../../src/weapons/index.ts';
+import { WorldSystem } from '../../src/world/index.ts';
+import { createTestContext } from '../lib/context.ts';
+import { fixture } from '../lib/fixture.ts';
+import {
+  initializePlayer,
+  presentationViewmodel,
+  initializeWeaponStates,
+  inertProjectileSim,
+} from '../lib/player-fixture.ts';
 
 // ---- fakes ---------------------------------------------------------------
 
-const calls = []; // viewmodel grenade calls, in order
-const bodies = []; // physics addRigidBody captures
-const events = []; // ctx.events emits
-
-const vm = {
-  anchor: { visible: true },
-  clip: null,
-  clipName: null,
-  clipT: 0,
-  boltHold: 0,
-  adsT: 0,
-  adsTarget: 0,
-  active: 'rifle',
-  setActive(id) {
-    this.active = id;
-    return id;
-  },
-  play(name) {
-    this.clip = { name, duration: 1 };
-    this.clipName = name;
-    this.clipT = 0;
-    return 1;
-  },
-  stopClip() {
-    this.clip = null;
-    this.clipName = null;
-    this.clipT = 0;
-  },
-  holdGrenade() {
-    calls.push('hold');
-  },
-  cookGrenade(type) {
-    calls.push(`cook:${type}`);
-  },
-  throwGrenade(type) {
-    calls.push(`throw:${type}`);
-  },
-  endGrenade() {
-    calls.push('end');
-  },
-  holdRadio() {
-    calls.push('holdRadio');
-  },
-  endRadio() {
-    calls.push('endRadio');
-  },
-  setRadioScreen() {},
-  grenadeReleaseWorld(out) {
-    out.set(0, 1.6, 0);
-    return out;
-  },
-  muzzleWorld() {
-    return { x: 0, y: 0, z: 0 };
-  },
-  addRecoil() {},
-};
+const calls: string[] = []; // viewmodel grenade calls, in order
+const bodies: { velocity: THREE.Vector3; fuse: number }[] = []; // physics addRigidBody captures
+type ExplosionEvent = { type: 'explosion'; payload: EngineEventMap['explosion'] };
+const events: ExplosionEvent[] = []; // ctx.events explosion captures
 
 const input = {
   fire: false,
@@ -87,106 +48,75 @@ const input = {
   wheel: 0,
   frozen: false,
   enabled: true,
-  down: new Set(),
+  down: new Set<string>(),
   _gPressed: false,
   _rmbPressed: false,
   _xPressed: false,
   _digit: 0,
   ads: false,
-  actionPressed(name) {
+  actionPressed(name: string): boolean {
     if (name === 'grenade') return this._gPressed;
     if (name === 'radio') return this._xPressed;
     if (name === 'fire') return this.firePressed;
     if (name === 'ads') return this._rmbPressed;
     return name === `slot${this._digit}`;
   },
-  action(name) {
+  action(name: string): boolean {
     if (name === 'fire') return this.down.has('Mouse0');
     if (name === 'ads') return this.down.has('Mouse2');
     return false;
   },
-  actionReleased() {
+  actionReleased(): boolean {
     return false;
   },
 };
 
-const player = {
-  dead: false,
-  controlEnabled: true,
-  sprinting: false,
-  stance: 'stand',
-  airborne: false,
-  state: 'idle',
-  horizontalSpeed: 0,
-  speed: 0,
-  eyePosition: new THREE.Vector3(0, 1.6, 0),
-  forward: new THREE.Vector3(0, 0, -1),
-  velocity: new THREE.Vector3(),
-  addTrauma() {},
-  setAdsProgress() {},
+const ctx = createTestContext({ input: fixture<Input>(input) });
+ctx.camera.position.set(0, 1.6, 0);
+const player = initializePlayer(ctx);
+player.rig.eyePosition.set(0, 1.6, 0);
+player.addTrauma = (): void => {};
+player.setAdsProgress = (): void => {};
+const physics = new PhysicsSystem();
+physics.addRigidBody = (opts): RigidBody => {
+  assert.ok(opts);
+  assert.ok(opts.velocity);
+  bodies.push({
+    velocity: new THREE.Vector3(opts.velocity.x, opts.velocity.y, opts.velocity.z),
+    fuse: 0,
+  });
+  return new RigidBody({ ...opts, position: new THREE.Vector3(0, 1.6, 0) });
 };
-
-const physics = {
-  addRigidBody(opts) {
-    bodies.push({
-      velocity: new THREE.Vector3(opts.velocity.x, opts.velocity.y, opts.velocity.z),
-      fuse: 0,
-    });
-    return { position: new THREE.Vector3(0, 1.6, 0) };
-  },
-  removeRigidBody() {},
-};
-
+physics.removeRigidBody = (): void => {};
 const wp = new WeaponSystem();
-wp.ctx = {
-  time: { elapsed: 0, scale: 1 },
-  camera: {
-    position: new THREE.Vector3(0, 1.6, 0),
-    quaternion: new THREE.Quaternion(),
-    updateMatrixWorld() {},
-  },
-  scene: { add() {} },
-  events: {
-    emit(type, payload) {
-      events.push({ type, payload });
-    },
-  },
-  peek(id) {
-    return id === 'player' ? player : undefined;
-  },
-};
-wp.ctx.input = input;
+wp.ctx = createTestContext({
+  input: ctx.input,
+  camera: ctx.camera,
+  providers: { player },
+});
+wp.ctx.events.on('explosion', (payload): void => {
+  events.push({ type: 'explosion', payload });
+});
 wp.rng = new Rng(0x1234abcd);
-wp.sim = { spawn() {}, clear() {}, stats: { live: 0, fired: 0 } };
+wp.sim = inertProjectileSim(wp.ctx);
 wp.stats = { tris: 0, drawCalls: 0, live: 0, fired: 0 };
+const vm = presentationViewmodel(wp.ctx, calls);
 wp.viewmodel = vm;
 wp.physics = physics;
-for (const id of WEAPON_IDS) {
-  const def = { ...WEAPON_DEFS[id] };
-  def.cycleTime = 60 / def.rpm;
-  wp.states.set(id, {
-    def,
-    pattern: buildRecoilPattern(def, Rng),
-    mag: def.magSize,
-    chambered: true,
-    reserve: def.reserve,
-    mode: def.modes[0],
-    modeIndex: 0,
-  });
-}
+initializeWeaponStates(wp);
 
-const step = (dt = 1 / 60) => wp.update(dt, wp.ctx);
-const pressG = () => {
+const step = (dt = 1 / 60): void => wp.update(dt, wp.ctx);
+const pressG = (): void => {
   input._gPressed = true;
   step();
   input._gPressed = false;
 };
-const pressDigit = (n) => {
+const pressDigit = (n: number): void => {
   input._digit = n;
   step();
   input._digit = 0;
 };
-const resetLive = () => {
+const resetLive = (): void => {
   wp._grenades.length = 0;
   bodies.length = 0;
   events.length = 0;
@@ -317,9 +247,13 @@ pressG();
 assert.equal(wp.grenadeEquipped, false, 'with zero grenades G does not equip');
 
 // ---- overcook detonates in the hand, without synthetic fuse warnings --------
-const cookAudio = [],
+const cookAudio: string[] = [],
   previousAudio = wp.audio;
-wp.audio = { playUi: (kind) => cookAudio.push(kind) };
+wp.audio = new AudioSystem();
+wp.audio.playUi = (kind): boolean => {
+  cookAudio.push(kind);
+  return true;
+};
 wp.grenades = 2; // a market pack — the harness skipped init()
 pressG();
 input.firePressed = true;
@@ -331,7 +265,7 @@ const fuseFrames = Math.ceil(GRENADE_FUSE / (1 / 60));
 for (let i = 0; i < fuseFrames + 5; i++) step();
 assert.equal(wp.cooking, false, 'overcook ends the cook');
 assert.equal(wp.grenadeEquipped, false, 'overcook drops the grenade in the hand');
-const booms = events.filter((e) => e.type === 'explosion');
+const booms = events.filter((e): e is ExplosionEvent => e.type === 'explosion');
 assert.equal(booms.length, 1, 'overcook emits exactly one explosion');
 assert.deepEqual(
   cookAudio,
@@ -350,7 +284,7 @@ input.fire = false;
 resetLive();
 wp._spawnGrenade(new THREE.Vector3(0, 1.6, 0), { x: 0, y: 0, z: 0 }, 0.001);
 step(); // fuse expires: the blast fires
-const dets = events.filter((e) => e.type === 'explosion');
+const dets = events.filter((e): e is ExplosionEvent => e.type === 'explosion');
 assert.equal(dets.length, 1, 'fuse expiry emits exactly one explosion');
 assert.equal(dets[0].payload.kind, 'grenade', 'thrown grenade selects grenade audio');
 assert.equal(dets[0].payload.damage, GRENADE_DAMAGE, 'detonation carries the tuned damage');
@@ -499,17 +433,16 @@ resetLive();
 // ==========================================================================
 //  FIELD RADIO (accessory) — issue #99
 // ==========================================================================
-const pressX = () => {
+const pressX = (): void => {
   input._xPressed = true;
   step();
   input._xPressed = false;
 };
 let strikeCalls = 0;
-wp.radioSys = {
-  callStrike() {
-    strikeCalls++;
-    return true;
-  },
+wp.radioSys = new RadioSystem();
+wp.radioSys.callStrike = (): boolean => {
+  strikeCalls++;
+  return true;
 };
 
 // ---- X equips the radio; stowing is free ----------------------------------
@@ -590,11 +523,8 @@ assert.equal(strikeCalls, 2);
 assert.equal(wp.radioEquipped, false, 'the strike stowed the radio');
 
 // ---- a refused strike (one already airborne) keeps the charge ---------------
-wp.radioSys = {
-  callStrike() {
-    return false;
-  },
-};
+wp.radioSys = new RadioSystem();
+wp.radioSys.callStrike = (): boolean => false;
 pressX();
 assert.equal(wp.radioEquipped, true, 'radio is out again');
 pressDigit(1);
@@ -605,11 +535,8 @@ pressX(); // stow
 
 // ---- the radio never leaves the weapon slot on a reset ---------------------
 wp.radioEquipped = true;
-wp.viewmodel = {
-  ...wp.viewmodel,
-  endRadio() {
-    calls.push('endRadio');
-  },
+wp.viewmodel.endRadio = (): void => {
+  calls.push('endRadio');
 };
 wp.resetForNewGame();
 assert.equal(wp.radioEquipped, false, 'reset stows the radio');
@@ -632,41 +559,29 @@ assert.equal(bodies.length, nBodies, 'hand reset does not drop another live gren
 // ==========================================================================
 //  THE STRIKE (RadioSystem) — the bomber carpets the whole map
 // ==========================================================================
-const strikeEvents = [];
-const added = [];
-const radioCtx = {
-  scene: {
-    add(o) {
-      added.push(o);
-    },
-  },
-  events: {
-    emit(type, payload) {
-      strikeEvents.push({ type, payload });
-    },
-  },
-  peek(id) {
-    if (id === 'world') {
-      return {
-        bounds: new THREE.Box3(new THREE.Vector3(-85, -2, -85), new THREE.Vector3(87, 26, 87)),
-        // The real spawn shape: { position, yaw, tag }. The north-street
-        // forward (0.554, 0, 0.832) encodes to this yaw, and the strike must
-        // derive its flight axis from it (never a synthetic `forward`).
-        spawn: () => ({
-          position: new THREE.Vector3(0, 0, 0),
-          yaw: Math.atan2(-0.554, -0.832),
-          tag: 'street',
-        }),
-      };
-    }
-    if (id === 'physics') return { groundHeight: () => 0 };
-    if (id === 'player') return { isPlayer: true };
-    return undefined;
-  },
-};
+type StrikeEvent =
+  | ExplosionEvent
+  | { type: 'radio:strike'; payload: EngineEventMap['radio:strike'] };
+const strikeEvents: StrikeEvent[] = [];
+const world = new WorldSystem();
+world.bounds = new THREE.Box3(new THREE.Vector3(-85, -2, -85), new THREE.Vector3(87, 26, 87));
+// The real spawn shape: { position, yaw, tag }. The street forward encodes to yaw.
+world.spawnPoints = [
+  { position: new THREE.Vector3(), yaw: Math.atan2(-0.554, -0.832), tag: 'street' },
+];
+const radioPhysics = new PhysicsSystem();
+radioPhysics.groundHeight = (): number => 0;
+const radioCtx = createTestContext({ providers: { world, physics: radioPhysics, player } });
+radioCtx.events.on('explosion', (payload): void => {
+  strikeEvents.push({ type: 'explosion', payload });
+});
+radioCtx.events.on('radio:strike', (payload): void => {
+  strikeEvents.push({ type: 'radio:strike', payload });
+});
+const added = radioCtx.scene.children;
 const radio = new RadioSystem();
 radio.ctx = radioCtx;
-radio._world = radioCtx.peek('world');
+radio._world = world;
 radio.active = [];
 radio._off = [];
 
@@ -675,7 +590,7 @@ assert.equal(radio.active.length, 1, 'one bomber in the air');
 assert.equal(radio.callStrike(), false, 'no second bomber while one is airborne');
 assert.equal(added.length, 1, 'the bomber mesh entered the scene');
 assert(
-  strikeEvents.some((e) => e.type === 'radio:strike'),
+  strikeEvents.some((e): boolean => e.type === 'radio:strike'),
   'a radio:strike event announces the strike'
 );
 // The bomber flies the street axis derived from the spawn yaw — the map's
@@ -690,28 +605,28 @@ assert(
 let guard = 0;
 while (radio.active.length && guard++ < 60 * 60) radio.update(1 / 60);
 assert(guard < 60 * 60, 'strike clears within 60 s of sim time');
-const strikeBooms = strikeEvents.filter((e) => e.type === 'explosion');
+const strikeBooms = strikeEvents.filter((e): e is ExplosionEvent => e.type === 'explosion');
 assert(
-  strikeBooms.every((e) => e.payload.kind === 'bomb'),
+  strikeBooms.every((e): boolean => e.payload.kind === 'bomb'),
   'all strike bombs select bomb audio'
 );
 assert(strikeBooms.length >= 40, `a carpet bomb drops a lot of bombs (got ${strikeBooms.length})`);
 assert(
-  strikeBooms.every((e) => e.payload.radius === CARPET.radius),
+  strikeBooms.every((e): boolean => e.payload.radius === CARPET.radius),
   'bombs carry the tuned radius'
 );
 assert(
-  strikeBooms.every((e) => e.payload.damage === CARPET.damage),
+  strikeBooms.every((e): boolean => e.payload.damage === CARPET.damage),
   'bombs carry the tuned damage'
 );
 assert(
-  strikeBooms.every((e) => e.payload.position.y === CARPET.blastHeight),
+  strikeBooms.every((e): boolean => e.payload.position.y === CARPET.blastHeight),
   'bomb blast origins sit above the ground collision surface'
 );
 // The blast line spans the whole town along the street axis (the map is a
 // rotated square; the town sits in a band along the street).
-const xs = strikeBooms.map((e) => e.payload.position.x);
-const zs = strikeBooms.map((e) => e.payload.position.z);
+const xs = strikeBooms.map((e): number => e.payload.position.x);
+const zs = strikeBooms.map((e): number => e.payload.position.z);
 assert(
   Math.min(...xs) < -55 && Math.max(...xs) > 50,
   `blasts cover the street extent in x (${Math.min(...xs).toFixed(0)}..${Math.max(...xs).toFixed(0)})`

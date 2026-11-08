@@ -1,43 +1,53 @@
-/** Respawn must publish the reset damage capsule before nested restart consumers run. */
 import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
 
 import { AiSystem } from '../../src/ai/index.ts';
+/** Respawn must publish the reset damage capsule before nested restart consumers run. */
+import type { SurfaceNav } from '../../src/ai/nav.ts';
 import { EventBus } from '../../src/core/registry.ts';
+import { StaticWorld } from '../../src/physics/bvh.ts';
+import { CharacterController } from '../../src/physics/character.ts';
+import { PhysicsSystem } from '../../src/physics/index.ts';
 import { Collider } from '../../src/physics/index.ts';
 import { CameraRig } from '../../src/player/camera.ts';
 import { HealController } from '../../src/player/heal.ts';
 import { Health } from '../../src/player/health.ts';
 import { PlayerSystem } from '../../src/player/index.ts';
 import { Movement } from '../../src/player/movement.ts';
+import type { PlayerStance } from '../../src/player/tuning.ts';
 import { HEALTH, HEALING, STANCE } from '../../src/player/tuning.ts';
+import { WorldSystem } from '../../src/world/index.ts';
+import { createTestContext } from '../lib/context.ts';
+import { fixture as partialFixture } from '../lib/fixture.ts';
 
-function fixture(dead, stance) {
+interface RespawnFixture {
+  player: PlayerSystem;
+  events: EventBus;
+  ai: AiSystem;
+  placementOrigins: THREE.Vector3[];
+  populate: () => number;
+}
+function fixture(dead: boolean, stance: PlayerStance): RespawnFixture {
   const player = new PlayerSystem();
-  const spawn = { position: new THREE.Vector3(12, 2, 20), yaw: 0.7 };
-  const world = {
-    spawn: (index) => (index === 0 ? spawn : null),
-    spawnPoints: [spawn, { position: new THREE.Vector3(-60, 2, -40), yaw: 0 }],
-  };
+  const spawn = { position: new THREE.Vector3(12, 2, 20), yaw: 0.7, tag: 'test' };
+  const world = new WorldSystem();
+  world.spawnPoints = [spawn, { position: new THREE.Vector3(-60, 2, -40), yaw: 0, tag: 'test' }];
   const events = new EventBus();
-  const ctx = {
-    events,
-    time: { elapsed: 10 },
-    config: { fov: 75 },
-    camera: new THREE.PerspectiveCamera(),
-    peek: (id) => (id === 'player' ? player : id === 'world' ? world : null),
-  };
+  const ctx = createTestContext({ events, providers: { player, world } });
+  ctx.time.elapsed = 10;
+  ctx.config.fov = 75;
   player.ctx = ctx;
-  player.physics = { groundHeight: () => 2 };
+  player.physics = new PhysicsSystem();
+  player.physics.groundHeight = (): number => 2;
   player.movement = new Movement(ctx, player);
-  player.movement.character = {
-    position: new THREE.Vector3(),
-    grounded: true,
-    teleport(x, y, z) {
-      this.position.set(x, y, z);
-    },
+  const character = new CharacterController(new StaticWorld());
+  character.position = new THREE.Vector3();
+  character.grounded = true;
+  character.teleport = (x, y, z): void => {
+    character.setPosition(x, y, z);
   };
+  player.movement.character = character;
   player.rig = new CameraRig(ctx);
   player.health = new Health(ctx, player.rig);
   player.healCtrl = new HealController(player);
@@ -60,25 +70,25 @@ function fixture(dead, stance) {
   assert.equal(player.hitbox.ax, -35);
   assert.equal(player.hitbox.bx, -34.75, 'old capsule includes lean');
 
-  const ai = Object.assign(Object.create(AiSystem.prototype), {
-    ctx,
-    grid: {},
-    _v3: new THREE.Vector3(),
-  });
-  const placementOrigins = [];
-  ai.playerPosition = function (out, sample) {
+  const ai = new AiSystem();
+  ai.ctx = ctx;
+  // Native navigation is never queried when perSquad is zero; only readiness is used.
+  ai.grid = partialFixture<SurfaceNav>({});
+  ai._v3 = new THREE.Vector3();
+  const placementOrigins: THREE.Vector3[] = [];
+  ai.playerPosition = function (out, sample): THREE.Vector3 {
     const result = AiSystem.prototype.playerPosition.call(this, out, sample);
     placementOrigins.push(result.clone());
     return result;
   };
   // Exercise populate's actual origin selection, without constructing/rendering soldiers.
-  const populate = () => ai.populate({ squads: 1, perSquad: 0 });
-  events.on('game:restart', () => player.respawn());
+  const populate = (): number => ai.populate({ squads: 1, perSquad: 0 });
+  events.on('game:restart', (): void => player.respawn());
   events.on('game:restart', populate);
   return { player, events, ai, placementOrigins, populate };
 }
 
-function assertReset(player) {
+function assertReset(player: PlayerSystem): void {
   assert.equal(player.dead, false);
   assert.equal(player.health.value, HEALTH.max);
   assert.equal(player.health.armour, HEALTH.plateSize);
@@ -89,6 +99,7 @@ function assertReset(player) {
   assert.equal(player.movement.leanOffsetX, 0);
   assert.equal(player.movement.leanOffsetZ, 0);
   assert.deepEqual(player.position.toArray(), [12, 2.03, 20]);
+  assert.ok(player.hitbox);
   assert.equal(player.hitbox.enabled, true, 'reset capsule is enabled synchronously');
   const c = player.hitbox;
   assert.deepEqual([c.ax, c.ay, c.az], [12, 2.03 + 0.3, 20]);
@@ -97,10 +108,10 @@ function assertReset(player) {
 }
 
 for (const dead of [true, false]) {
-  for (const stance of ['crouch', 'prone']) {
+  for (const stance of ['crouch', 'prone'] as const) {
     const { player, events, ai, placementOrigins, populate } = fixture(dead, stance);
     let respawns = 0;
-    events.on('player:respawn', ({ position }) => {
+    events.on('player:respawn', ({ position }): void => {
       respawns++;
       assertReset(player);
       assert.equal(player._death.active, false);

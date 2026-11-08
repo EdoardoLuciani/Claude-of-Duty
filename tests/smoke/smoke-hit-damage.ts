@@ -1,18 +1,20 @@
-/**
- * One round damages an actor once. Capsule hitboxes used to re-enter as 18 mm
- * sheets, so a 33-damage rifle body shot applied ~4× and one-shot 100 HP.
- */
 import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
 
+/**
+ * One round damages an actor once. Capsule hitboxes used to re-enter as 18 mm
+ * sheets, so a 33-damage rifle body shot applied ~4× and one-shot 100 HP.
+ */
+import type { EngineEventMap } from '../../src/core/events.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { LAYER } from '../../src/physics/surfaces.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
+import { createTestContext } from '../lib/context.ts';
 
-const HITBOXES = [
+const HITBOXES: [string, number, number, number, number, number, number, number, number][] = [
   ['head', 0, 1.62, 0, 0, 1.78, 0, 0.098, 4.0],
   ['torso', 0, 1.18, 0, 0, 1.55, 0, 0.185, 1.0],
   ['torso', 0, 0.92, 0, 0, 1.18, 0, 0.175, 0.9],
@@ -25,7 +27,8 @@ const HITBOXES = [
 const events = new EventBus();
 const rng = new Rng(0x5eed1234);
 const phys = new PhysicsSystem();
-phys.ctx = { events, scene: null, camera: null, time: { alpha: 0, elapsed: 0, dt: 1 / 60 }, rng };
+phys.ctx = createTestContext({ events, rng });
+phys.ctx.time.dt = 1 / 60;
 phys.rng = rng.fork();
 phys.ballistics.rng = phys.rng;
 
@@ -44,9 +47,11 @@ for (const [part, ax, ay, az, bx, by, bz, r, dmg] of HITBOXES) {
     .setSegment(ax, ay, az, bx, by, bz);
 }
 
-function fire(y) {
-  const dealt = [];
-  const off = events.on('damage:dealt', (e) => dealt.push(e));
+function fire(y: number): EngineEventMap['damage:dealt'][] {
+  const dealt: EngineEventMap['damage:dealt'][] = [];
+  const off = events.on('damage:dealt', (e): void => {
+    dealt.push(e);
+  });
   phys.fireBullet({
     origin: { x: 0, y, z: 4 },
     dir: { x: 0, y: 0, z: -1 },
@@ -68,14 +73,11 @@ assert.equal(head.length, 1, `head events=${head.length}`);
 assert.equal(head[0].headshot, true);
 assert.ok(head[0].amount > 110 && head[0].amount < 145, `head amount=${head[0].amount}`);
 
-const sim = new ProjectileSim({
-  events,
-  peek: (id) => (id === 'physics' ? phys : null),
-  has: () => false,
-  rng,
+const sim = new ProjectileSim(createTestContext({ events, rng, providers: { physics: phys } }));
+const proj: number[] = [];
+events.on('damage:dealt', (e): void => {
+  proj.push(e.amount);
 });
-const proj = [];
-events.on('damage:dealt', (e) => proj.push(e.amount));
 sim.spawn({
   origin: new THREE.Vector3(0, 1.36, 4),
   dir: new THREE.Vector3(0, 0, -1),

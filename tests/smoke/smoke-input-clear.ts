@@ -2,9 +2,21 @@ import assert from 'node:assert/strict';
 
 import { CONTROL_REFERENCE, DEFAULT_BINDINGS } from '../../src/core/bindings.ts';
 import { Input } from '../../src/core/input.ts';
+import { fixture } from '../lib/fixture.ts';
+
+function keyEvent(code: string, repeat = false): KeyboardEvent {
+  return fixture<KeyboardEvent>({
+    code,
+    repeat,
+    ctrlKey: false,
+    metaKey: false,
+    altKey: false,
+    preventDefault(): void {},
+  });
+}
 
 // Keep canonical coverage/conflict checks without a second literal binding table.
-const owners = new Map();
+const owners = new Map<string, string>();
 for (const [action, codes] of Object.entries(DEFAULT_BINDINGS)) {
   assert(codes.length > 0);
   for (const code of codes) {
@@ -13,11 +25,11 @@ for (const [action, codes] of Object.entries(DEFAULT_BINDINGS)) {
   }
 }
 assert.deepEqual(
-  new Set(CONTROL_REFERENCE.map((row) => row.action)),
+  new Set(CONTROL_REFERENCE.map((row): string => row.action)),
   new Set(Object.keys(DEFAULT_BINDINGS))
 );
 
-const input = new Input({}, { sensitivity: 0.001, invertY: false });
+const input = new Input(fixture<HTMLCanvasElement>({}), { sensitivity: 0.001, invertY: false });
 input.pointerLocked = true;
 input._gameplayFocus = true;
 input.gamepadIndex = 2;
@@ -35,7 +47,7 @@ for (const codes of [
 }
 input.look.x = input.look.y = input._rawLook.x = input._rawLook.y = 20;
 input.wheel = input._pendingWheel = 3;
-Object.assign(input.stick, { moveX: 1, moveY: -1, lookX: 0.5, lookY: -0.5 });
+input.stick = { moveX: 1, moveY: -1, lookX: 0.5, lookY: -0.5 };
 input.clear();
 for (const codes of [
   input.down,
@@ -58,9 +70,9 @@ assert.equal(input.frozen, false);
 
 // Holding the keyboard activation key through the handoff must not replay it
 // via repeat. Its release must not generate a gameplay release edge either.
-input._onKeyDown({ code: 'Space', repeat: true, preventDefault() {} });
-input._onKeyUp({ code: 'Space', preventDefault() {} });
-input._onMouseUp({ button: 0 });
+input._onKeyDown(keyEvent('Space', true));
+input._onKeyUp(keyEvent('Space'));
+input._onMouseUp(fixture<MouseEvent>({ button: 0 }));
 input.beginFrame();
 assert.equal(input.actionPressed('jump'), false);
 assert.equal(input.actionReleased('jump'), false);
@@ -75,10 +87,10 @@ assert.equal(input.wheel, 0);
 
 // New physical actions work normally; clearing is a one-time handoff, not a
 // new input mode or pointer-lock policy.
-input._onKeyDown({ code: 'Space', repeat: false, preventDefault() {} });
-input._onMouseDown({ target: input.canvas, button: 0 });
-input._onMouseMove({ movementX: 5, movementY: -2 });
-input._onWheel({ target: input.canvas, deltaY: -1 });
+input._onKeyDown(keyEvent('Space'));
+input._onMouseDown(fixture<MouseEvent>({ target: input.canvas, button: 0 }));
+input._onMouseMove(fixture<MouseEvent>({ movementX: 5, movementY: -2 }));
+input._onWheel(fixture<WheelEvent>({ target: input.canvas, deltaY: -1 }));
 input.beginFrame();
 assert.equal(input.actionPressed('jump'), true);
 assert.equal(input.firePressed, true);
@@ -87,28 +99,28 @@ assert.equal(input.wheel, -1);
 
 // Alias edges retain physical-key semantics; a same-frame tap retains both edges.
 input.clear();
-input._onKeyDown({ code: 'ControlLeft', preventDefault() {} });
+input._onKeyDown(keyEvent('ControlLeft'));
 input.beginFrame();
 assert(input.action('crouch') && input.actionPressed('crouch'));
-input._onKeyDown({ code: 'KeyC', preventDefault() {} });
+input._onKeyDown(keyEvent('KeyC'));
 input.beginFrame();
 assert(input.action('crouch') && input.actionPressed('crouch'));
-input._onKeyUp({ code: 'ControlLeft', preventDefault() {} });
+input._onKeyUp(keyEvent('ControlLeft'));
 input.beginFrame();
 assert(input.action('crouch') && input.actionReleased('crouch'));
-input._onKeyUp({ code: 'KeyC', preventDefault() {} });
-input._onKeyDown({ code: 'KeyZ', preventDefault() {} });
-input._onKeyUp({ code: 'KeyZ', preventDefault() {} });
+input._onKeyUp(keyEvent('KeyC'));
+input._onKeyDown(keyEvent('KeyZ'));
+input._onKeyUp(keyEvent('KeyZ'));
 input.beginFrame();
 assert(!input.action('crouch') && !input.action('prone'));
 assert(input.actionPressed('prone') && input.actionReleased('prone'));
-input._onKeyDown({ code: 'KeyF', preventDefault() {} });
+input._onKeyDown(keyEvent('KeyF'));
 assert(!input.action('flashlight'), 'DOM events wait for the next snapshot');
 input.beginFrame();
 for (let fixedRead = 0; fixedRead < 4; fixedRead++) assert(input.actionPressed('flashlight'));
-input._onKeyDown({ code: 'KeyF', repeat: true, preventDefault() {} });
-input._onKeyDown({ code: 'Tab', preventDefault() {} });
-input._onWheel({ target: input.canvas, deltaY: -1 });
+input._onKeyDown(keyEvent('KeyF', true));
+input._onKeyDown(keyEvent('Tab'));
+input._onWheel(fixture<WheelEvent>({ target: input.canvas, deltaY: -1 }));
 input.beginFrame();
 assert(
   input.action('flashlight') && !input.actionPressed('flashlight'),

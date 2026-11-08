@@ -1,91 +1,99 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { PerspectiveCamera } from 'three';
+import { Vector3 } from 'three';
 
 import { CONTROL_REFERENCE, bindingLabels, bindingLabel } from '../../src/core/bindings.ts';
+import type { EngineContext } from '../../src/core/context.ts';
+import type { EngineEventMap } from '../../src/core/events.ts';
 import { Input } from '../../src/core/input.ts';
-import { HealController } from '../../src/player/heal.ts';
-import { Health } from '../../src/player/health.ts';
+import type { PlayerSystem } from '../../src/player/index.ts';
 import { HEALING } from '../../src/player/tuning.ts';
+import { AmmoPanel } from '../../src/ui/ammo.ts';
+import { Compass, ScoreBar } from '../../src/ui/compass.ts';
 import { CONTROL_SECTIONS } from '../../src/ui/controls.ts';
+import { Crosshair } from '../../src/ui/crosshair.ts';
+import { DamageArcs } from '../../src/ui/damage.ts';
+import { HealthFx } from '../../src/ui/health.ts';
+import { Hitmarkers } from '../../src/ui/hitmarkers.ts';
 import { UiSystem } from '../../src/ui/index.ts';
+import { Killfeed } from '../../src/ui/killfeed.ts';
+import { MarketCountdown } from '../../src/ui/market.ts';
+import { Minimap } from '../../src/ui/minimap.ts';
+import { Prompt, Banner } from '../../src/ui/prompts.ts';
+import type { WeaponId } from '../../src/weapons/defs.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
+import { createTestContext, createTestInput } from '../lib/context.ts';
+import type { TestProviders } from '../lib/context.ts';
+import { fixture as partialFixture } from '../lib/fixture.ts';
+import {
+  initializePlayer,
+  setPlayerMotion,
+  presentationViewmodel,
+  initializeWeaponStates,
+  inertProjectileSim,
+} from '../lib/player-fixture.ts';
 
-const noop = () => {};
+const noop = (): void => {};
 
 // Real input/controller/weapons in engine update order; only presentation is inert.
-function fixture(activeId = 'rifle') {
+type HealEvent = EngineEventMap['player:heal'] & { name: 'player:heal' };
+interface HealFixture {
+  weapons: WeaponSystem;
+  player: PlayerSystem;
+  input: Input;
+  ctx: EngineContext;
+  events: HealEvent[];
+}
+function fixture(activeId: WeaponId = 'rifle'): HealFixture {
   const weapons = new WeaponSystem();
-  const input = new Input({}, {});
+  const input = createTestInput();
   input.down.add('KeyH');
-  const events = [];
-  const ctx = {
-    input,
-    config: {},
-    time: { elapsed: 0, raw: 0, scale: 1 },
-    camera: new PerspectiveCamera(),
-    events: { emit: (name, payload) => events.push({ name, ...payload }) },
-    peek: (id) => (id === 'weapons' ? weapons : id === 'player' ? player : null),
-  };
-  const player = {
-    ctx,
-    controlEnabled: true,
-    health: new Health(ctx, null),
-    movement: { jumped: false },
-    horizontalSpeed: 0,
-    stance: 'stand',
-    state: 'stand',
-    setAdsProgress: noop,
-    get dead() {
-      return this.health.dead;
-    },
-    cancelHeal: (reason) => player.healCtrl.cancel(reason),
-  };
-  player.healCtrl = new HealController(player);
+  const events: HealEvent[] = [];
+  const providers: TestProviders = { weapons };
+  const ctx = createTestContext({ input, providers });
+  const player = initializePlayer(ctx);
+  providers.player = player;
+  player.setAdsProgress = noop;
   player.health.value = 40;
+  ctx.events.on('player:heal', (payload): void => {
+    events.push({ name: 'player:heal', ...payload });
+  });
   weapons.ctx = ctx;
   weapons.player = player;
-  weapons.sim = { stats: { live: 0, fired: 0 } };
-  weapons.stats = {};
-  weapons.viewmodel = {
-    adsT: 0,
-    stopClip() {
-      this.clipName = null;
-    },
-    play(name) {
-      this.clipName = name;
-    },
-    holdBandage: noop,
-    endBandage: noop,
-    setBandageProgress: noop,
-    holdGrenade: noop,
-  };
-  for (const id of ['rifle', 'pistol'])
-    weapons.states.set(id, {
-      def: {
-        id,
-        magSize: 30,
-        reserve: 90,
-        modes: ['semi'],
-        spreadHip: 1,
-        spreadAds: 0.1,
-        spreadDecay: 1,
-      },
-      mag: 30,
-      chambered: true,
-      reserve: 90,
-      mode: 'semi',
-    });
+  weapons.sim = inertProjectileSim(ctx);
+  weapons.stats = { tris: 0, drawCalls: 0, live: 0, fired: 0 };
+  weapons.viewmodel = presentationViewmodel(ctx);
+  initializeWeaponStates(weapons, {
+    magSize: 30,
+    reserve: 90,
+    modes: ['semi'],
+    spreadHip: 1,
+    spreadAds: 0.1,
+    spreadDecay: 1,
+  });
   weapons.activeId = activeId;
   weapons.owned = new Set(['rifle', 'pistol']);
   assert.equal(player.healCtrl.tryStart(), true);
   return { weapons, player, input, ctx, events };
 }
 
+class RecordingPrompt extends Prompt {
+  value: Parameters<Prompt['set']>[0] | null = null;
+  override set(p: Parameters<Prompt['set']>[0]): void {
+    super.set(p);
+    this.value = p;
+  }
+  override clear(): void {
+    super.clear();
+    this.value = null;
+  }
+  override update(): void {}
+}
+
 for (const request of ['Digit1', 'Digit2', 'Tab', 'wheel-up', 'wheel-down']) {
   for (const elapsed of [1, HEALING.duration - 0.01])
-    test(`${request} cancels at ${elapsed}s`, () => {
+    void test(`${request} cancels at ${elapsed}s`, (): void => {
       const { weapons, player, input, ctx, events } = fixture(
         request === 'Digit1' ? 'pistol' : 'rifle'
       );
@@ -95,25 +103,34 @@ for (const request of ['Digit1', 'Digit2', 'Tab', 'wheel-up', 'wheel-down']) {
       player.healCtrl.update(1 / 60);
       weapons.update(1 / 60, ctx);
       assert.deepEqual([player.health.value, player.healCtrl.bandages], [40, 2]);
-      assert.equal(events.filter((e) => e.name === 'player:heal').at(-1).phase, 'cancel');
+      assert.equal(events.filter((e): boolean => e.name === 'player:heal').at(-1)?.phase, 'cancel');
       assert.equal(weapons._switchTo, request === 'Digit1' ? 'rifle' : 'pistol');
     });
 }
 
 for (const ending of ['release', 'complete', 'grenade'])
-  test(`prompt ownership on ${ending}`, () => {
+  void test(`prompt ownership on ${ending}`, (): void => {
     const { weapons, player, input, ctx } = fixture();
     const ui = new UiSystem();
     ui.ctx = ctx;
-    ui.fps = { textContent: '— FPS' };
-    ui.state = { healing: true, bandages: 2, healProgress: 0.3 };
+    ui.fpsText = '— FPS';
+    ui.state = partialFixture<UiSystem['state']>({
+      healing: true,
+      bandages: 2,
+      healProgress: 0.3,
+      marketIn: 0,
+    });
     ui._lastRaw = 0;
     ui.hudTarget = ui.hudVisible = 1;
     ui._blipCount = 0;
     ui._blipView = [];
-    player.getHudState = () => ({
+    player.getHudState = (): ReturnType<PlayerSystem['getHudState']> => ({
       health: player.health.value,
       maxHealth: player.health.max,
+      dead: false,
+      maxArmour: player.health.maxArmour,
+      suppression: 0,
+      position: player.position,
       armour: player.health.armour,
       bandages: player.healCtrl.bandages,
       healing: player.healCtrl.active,
@@ -126,48 +143,54 @@ for (const ending of ['release', 'complete', 'grenade'])
       ads: false,
       airborne: false,
     });
-    ui._playerPos = () => ({ x: 0, z: 0 });
+    ui._playerPos = (): Vector3 => new Vector3();
     ui._collectBlips = noop;
-    for (const name of [
-      'menu',
-      'gameOver',
-      'shop',
-      'crosshair',
-      'hit',
-      'arcs',
-      'health',
-      'ammo',
-      'killfeed',
-      'scoreBar',
-      'banner',
-      'marketCountdown',
-      'radio',
-      'compass',
-    ])
-      ui[name] = { update: noop };
-    for (const name of ['chromeLayer', 'centreLayer']) ui[name] = { style: { setProperty: noop } };
-    ui.minimap = { bakeDone: true, draw: noop };
-    ui.prompt = {
-      value: null,
-      set(p) {
-        this.value = p;
-      },
-      clear() {
-        this.value = null;
-      },
-      update: noop,
-    };
+    ui.menu = partialFixture<UiSystem['menu']>({ open: false, update: noop });
+    ui.gameOver = partialFixture<UiSystem['gameOver']>({ update: noop });
+    ui.shop = partialFixture<UiSystem['shop']>({ update: noop });
+    ui.radio = partialFixture<UiSystem['radio']>({ update: noop });
+    ui.crosshair = new Crosshair();
+    ui.hit = new Hitmarkers();
+    ui.arcs = new DamageArcs();
+    ui.health = new HealthFx();
+    ui.ammo = new AmmoPanel();
+    ui.killfeed = new Killfeed();
+    ui.scoreBar = new ScoreBar();
+    ui.banner = new Banner();
+    ui.marketCountdown = new MarketCountdown(0);
+    ui.compass = new Compass();
+    ui.crosshair.update =
+      ui.hit.update =
+      ui.arcs.update =
+      ui.health.update =
+      ui.ammo.update =
+      ui.killfeed.update =
+      ui.scoreBar.update =
+      ui.banner.update =
+      ui.marketCountdown.update =
+      ui.compass.update =
+        noop;
+    for (const name of ['chromeLayer', 'centreLayer'] as const)
+      ui[name] = partialFixture<HTMLElement & { _ows: Map<string, string> }>({
+        _ows: new Map(),
+        style: partialFixture<CSSStyleDeclaration>({ setProperty: noop }),
+      });
+    ui.minimap = new Minimap(ctx.rng);
+    ui.minimap.bakeDone = true;
+    const prompt = new RecordingPrompt();
+    ui.prompt = prompt;
     weapons.ui = ui;
     ui.lateUpdate(1 / 60, ctx);
-    assert.equal(ui.prompt.value.text, 'BANDAGING');
-    const bandageKey = ui.prompt.value.key;
+    assert.ok(prompt.value);
+    assert.equal(prompt.value.text, 'BANDAGING');
+    const bandageKey = prompt.value.key;
 
     if (ending === 'release') input.down.delete('KeyH');
     else if (ending === 'complete') player.healCtrl.elapsed = HEALING.duration - 0.01;
     else input._pressed.add('KeyG');
     player.healCtrl.update(1 / 60);
     weapons.update(1 / 60, ctx);
-    if (ending === 'grenade') assert.equal(ui.prompt.value.text, 'LONG THROW');
+    if (ending === 'grenade') assert.equal(prompt.value?.text, 'LONG THROW');
     ui.lateUpdate(1 / 60, ctx);
     input._pressed.clear();
     for (let i = 0; i < 60; i++) {
@@ -181,21 +204,17 @@ for (const ending of ['release', 'complete', 'grenade'])
     );
     if (ending === 'grenade') {
       assert.equal(weapons.grenadeEquipped, true);
-      assert.equal(ui.prompt.value?.text, 'LONG THROW');
-    } else assert.equal(ui.prompt.value, null);
+      assert.equal(prompt.value?.text, 'LONG THROW');
+    } else assert.equal(prompt.value, null);
     assert.equal(bandageKey, bindingLabel('heal'));
   });
 
-test('bandaging continues and completes while walking', () => {
+void test('bandaging continues and completes while walking', (): void => {
   const { weapons, player, input, ctx, events } = fixture();
   input.down.add('KeyW');
-  player.horizontalSpeed = 3;
-  player.sprinting =
-    player.tacticalSprint =
-    player.sliding =
-    player.mantling =
-    player.airborne =
-      false;
+  player.movement.horizontalSpeed = 3;
+  for (const motion of ['sprinting', 'tacticalSprint', 'sliding', 'mantling', 'airborne'] as const)
+    setPlayerMotion(player, motion, false);
   for (let second = 1; second <= HEALING.duration; second++) {
     player.healCtrl.update(1);
     weapons.update(1, ctx);
@@ -208,36 +227,45 @@ test('bandaging continues and completes while walking', () => {
   assert.equal(player.healCtrl.active, false);
   assert.deepEqual([player.health.value, player.healCtrl.bandages], [90, 1]);
   assert.deepEqual(
-    events.filter((e) => e.name === 'player:heal').map((e) => e.phase),
+    events.filter((e): boolean => e.name === 'player:heal').map((e): string => e.phase),
     ['start', 'complete']
   );
 });
 
-for (const motion of ['sprinting', 'tacticalSprint', 'sliding', 'mantling', 'airborne', 'jumped']) {
-  test(`bandage reference movement cancellation: ${motion}`, () => {
+for (const motion of [
+  'sprinting',
+  'tacticalSprint',
+  'sliding',
+  'mantling',
+  'airborne',
+  'jumped',
+] as const) {
+  void test(`bandage reference movement cancellation: ${motion}`, (): void => {
     const { player, events } = fixture();
     if (motion === 'jumped') player.movement.jumped = true;
-    else player[motion] = true;
+    else setPlayerMotion(player, motion, true);
     player.healCtrl.update(1);
     assert.equal(player.healCtrl.active, false);
     assert.deepEqual([player.health.value, player.healCtrl.bandages], [40, 2]);
-    assert.equal(events.filter((e) => e.name === 'player:heal').at(-1).reason, 'move');
+    assert.equal(events.filter((e): boolean => e.name === 'player:heal').at(-1)?.reason, 'move');
   });
 }
 
-test('menu advertises the actual heal binding', () => {
-  const bandage = CONTROL_SECTIONS.flatMap((section) => section.controls).find((control) =>
-    control.description.startsWith('Bandage (')
-  );
+void test('menu advertises the actual heal binding', (): void => {
+  const bandage = CONTROL_SECTIONS.flatMap(
+    (section): (typeof section.controls)[number][] => section.controls
+  ).find((control): boolean => control.description.startsWith('Bandage ('));
   assert.ok(bandage);
   assert.deepEqual(bandage.keys, bindingLabels('heal'));
   assert.ok(!bandage.keys.includes(bindingLabel('radio')));
   assert.equal(bandage.description, `Bandage (hold ${HEALING.duration}s)`);
 });
 
-test('canonical bandage metadata describes movement interruptions', () => {
+void test('canonical bandage metadata describes movement interruptions', (): void => {
+  const heal = CONTROL_REFERENCE.find((row): boolean => row.action === 'heal');
+  assert.ok(heal);
   assert.match(
-    CONTROL_REFERENCE.find((row) => row.action === 'heal').behavior,
+    heal.behavior,
     /health damage.*sprint, jump\/fall, slide and mantle.*Walking alone is allowed/
   );
 });

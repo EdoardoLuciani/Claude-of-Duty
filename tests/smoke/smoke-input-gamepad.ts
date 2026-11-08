@@ -1,3 +1,5 @@
+import { createTestContext } from '../lib/context.ts';
+import { fixture } from '../lib/fixture.ts';
 // Disabled native input must not leak held or stale axes into actual Player consumers.
 import assert from 'node:assert/strict';
 
@@ -11,22 +13,24 @@ const pads = [{ axes: [1, -1, 1, -1] }];
 Object.defineProperty(globalThis, 'navigator', {
   configurable: true,
   value: {
-    getGamepads() {
+    getGamepads(): typeof pads {
       polls++;
       return pads;
     },
   },
 });
 try {
-  const input = new Input({}, { sensitivity: 0.002, invertY: false });
+  const input = new Input(fixture<HTMLCanvasElement>({}), { sensitivity: 0.002, invertY: false });
   const player = new PlayerSystem();
-  const ctx = { input, config: { adsSensScale: 0.7 }, time: { frame: 0, elapsed: 0, dt: 1 / 60 } };
+  const ctx = createTestContext({ input });
+  ctx.config.adsSensScale = 0.7;
+  ctx.time.dt = 1 / 60;
   player.ctx = ctx;
   player.movement = new Movement(ctx, player);
   const movement = player.movement;
   const neutral = { moveX: 0, moveY: 0, lookX: 0, lookY: 0 };
   const held = { moveX: 1, moveY: -1, lookX: 1, lookY: -1 };
-  function frame(enabled) {
+  function frame(enabled: boolean): void {
     input.enabled = enabled;
     ctx.time.frame++;
     ctx.time.elapsed += ctx.time.dt;
@@ -41,7 +45,7 @@ try {
     assert.equal(movement.pitch, pitch);
     input.endFrame();
   }
-  function assertNeutral(yaw, pitch, expectedPolls) {
+  function assertNeutral(yaw: number, pitch: number, expectedPolls: number): void {
     assert.equal(polls, expectedPolls, 'native polling respects the enabled state');
     assert.deepEqual(input.stick, neutral, 'all four axes, including stale values, are cleared');
     assert.equal(movement.cmd.moveX, 0);
@@ -52,7 +56,7 @@ try {
     assert.equal(movement.pitch, pitch);
     assert(movement.yawRate === 0);
   }
-  Object.assign(input.stick, held); // stale values must also clear on first disabled frame
+  input.stick = { ...held }; // stale values must also clear on first disabled frame
   frame(false);
   assertNeutral(0, 0, 0);
   frame(false);
@@ -86,5 +90,5 @@ try {
   );
 } finally {
   if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator);
-  else delete globalThis.navigator;
+  else Reflect.deleteProperty(globalThis, 'navigator');
 }

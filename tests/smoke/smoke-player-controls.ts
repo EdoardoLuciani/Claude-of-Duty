@@ -1,31 +1,60 @@
-/** Player consumers of canonical controls, exercised in fixed/update input phase order. */
 import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
 
+/** Player consumers of canonical controls, exercised in fixed/update input phase order. */
+import type { EngineContext } from '../../src/core/context.ts';
+import type { EngineEventMap } from '../../src/core/events.ts';
 import { Input } from '../../src/core/input.ts';
+import { StaticWorld } from '../../src/physics/bvh.ts';
+import { CharacterController } from '../../src/physics/character.ts';
 import { CameraRig } from '../../src/player/camera.ts';
 import { HealController } from '../../src/player/heal.ts';
 import { Health } from '../../src/player/health.ts';
 import { PlayerSystem } from '../../src/player/index.ts';
+import { LedgeProbe } from '../../src/player/mantle.ts';
 import { LEDGE_NONE } from '../../src/player/mantle.ts';
 import { Movement } from '../../src/player/movement.ts';
 import { FLASHLIGHT, HEALING, MOVE } from '../../src/player/tuning.ts';
+import { WeaponSystem } from '../../src/weapons/index.ts';
+import { createTestContext } from '../lib/context.ts';
+import { fixture as partialFixture } from '../lib/fixture.ts';
 
 // Real player, movement, health and input; only collision and weapon presentation are inert.
-function fixture() {
-  const input = new Input({}, { sensitivity: 0.002, invertY: false });
+interface FrameOptions {
+  down?: string[];
+  up?: string[];
+  steps?: number;
+  dt?: number;
+}
+type HealEvent = EngineEventMap['player:heal'] & { name: 'player:heal' };
+interface PlayerFixture {
+  input: Input;
+  player: PlayerSystem;
+  ctx: EngineContext;
+  events: HealEvent[];
+  frame: (options?: FrameOptions) => void;
+}
+function fixture(): PlayerFixture {
+  const input = new Input(partialFixture<HTMLCanvasElement>({}), {
+    sensitivity: 0.002,
+    invertY: false,
+  });
   const player = new PlayerSystem();
-  const events = [];
-  const weapons = { beginHeal: () => true, endHeal() {}, setHealProgress() {} };
-  const ctx = {
-    input,
-    config: { fov: 75, adsFovScale: 0.62, adsSensScale: 0.7 },
-    time: { elapsed: 0, frame: 0, dt: 1 / 60, fixed: 1 / 120, alpha: 1 },
-    camera: new THREE.PerspectiveCamera(),
-    events: { emit: (name, payload) => events.push({ name, ...payload }) },
-    peek: (id) => (id === 'weapons' ? weapons : id === 'player' ? player : null),
-  };
+  const events: HealEvent[] = [];
+  const weapons = new WeaponSystem();
+  weapons.beginHeal = (): boolean => true;
+  weapons.endHeal = (): void => {};
+  weapons.setHealProgress = (): void => {};
+  const ctx = createTestContext({ input, providers: { weapons, player } });
+  ctx.config.fov = 75;
+  ctx.config.adsFovScale = 0.62;
+  ctx.config.adsSensScale = 0.7;
+  ctx.time.dt = 1 / 60;
+  ctx.time.alpha = 1;
+  ctx.events.on('player:heal', (payload): void => {
+    events.push({ name: 'player:heal', ...payload });
+  });
   player.ctx = ctx;
   player.movement = new Movement(ctx, player);
   player.rig = new CameraRig(ctx);
@@ -33,28 +62,24 @@ function fixture() {
   player.healCtrl = new HealController(player);
   player.flashlightOn = false;
   player.flashlight = new THREE.SpotLight();
-  player.movement.probe = { probe: () => LEDGE_NONE };
-  player.movement.character = {
-    position: new THREE.Vector3(),
-    velocity: new THREE.Vector3(),
-    grounded: true,
-    groundNormal: new THREE.Vector3(0, 1, 0),
-    groundFriction: 1,
-    groundSurfaceName: 'concrete',
-    lastMoveBlocked: false,
-    touchingCeiling: false,
-    landingSpeed: 0,
-    canFit: () => true,
-    move(x, y, z) {
-      this.position.add(new THREE.Vector3(x, y, z));
-      this.grounded = this.position.y <= 0;
-      if (this.grounded) {
-        this.position.y = 0;
-        this.velocity.y = 0;
-      }
-    },
+  player.movement.probe = new LedgeProbe(null);
+  player.movement.probe.probe = (): typeof LEDGE_NONE => LEDGE_NONE;
+  const character = new CharacterController(new StaticWorld());
+  character.grounded = true;
+  character.canFit = (): boolean => true;
+  character.move = (x, y, z): number => {
+    character.position.x += x;
+    character.position.y += y;
+    character.position.z += z;
+    character.grounded = character.position.y <= 0;
+    if (character.grounded) {
+      character.position.y = 0;
+      character.velocity.y = 0;
+    }
+    return Math.hypot(x, y, z);
   };
-  function frame({ down = [], up = [], steps = 2, dt = 1 / 60 } = {}) {
+  player.movement.character = character;
+  function frame({ down = [], up = [], steps = 2, dt = 1 / 60 }: FrameOptions = {}): void {
     for (const code of down) input._pendingDown.add(code);
     for (const code of up) input._pendingUp.add(code);
     ctx.time.frame++;
@@ -203,7 +228,10 @@ for (const steps of [1, 3]) {
     'walking hold completes exactly once'
   );
   for (let i = 0; i < 10; i++) frame();
-  assert.equal(events.filter((e) => e.name === 'player:heal' && e.phase === 'complete').length, 1);
+  assert.equal(
+    events.filter((e): boolean => e.name === 'player:heal' && e.phase === 'complete').length,
+    1
+  );
   assert.deepEqual(
     [player.health.value, player.bandages],
     [90, 1],
@@ -223,7 +251,7 @@ for (const request of ['KeyI', 'Digit1', 'Digit2', 'Tab', 'wheel-up', 'wheel-dow
     `${request} interrupts completion from the real snapshot`
   );
   assert.deepEqual([player.health.value, player.bandages], [40, 2]);
-  assert.equal(events.filter((e) => e.name === 'player:heal').at(-1).reason, 'interrupt');
+  assert.equal(events.filter((e): boolean => e.name === 'player:heal').at(-1)?.reason, 'interrupt');
 }
 for (const motion of ['sprint', 'jump']) {
   const { player, events, frame } = fixture();
@@ -238,7 +266,7 @@ for (const motion of ['sprint', 'jump']) {
     `${motion} interrupts after fixed movement, before completion`
   );
   assert.deepEqual([player.health.value, player.bandages], [40, 2]);
-  assert.equal(events.filter((e) => e.name === 'player:heal').at(-1).reason, 'move');
+  assert.equal(events.filter((e): boolean => e.name === 'player:heal').at(-1)?.reason, 'move');
   if (motion === 'jump') {
     assert.equal(player.movement.jumped, false, 'update drains the jump event before heal');
     assert.equal(player.airborne, true, 'airborne guard still prevents final-frame healing');

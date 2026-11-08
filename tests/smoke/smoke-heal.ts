@@ -1,6 +1,3 @@
-import { ACTIONS, Input } from '../../src/core/input.ts';
-import { Rng } from '../../src/core/rng.ts';
-import { HealController } from '../../src/player/heal.ts';
 /**
  * Node smoke test for bandage healing — no browser.
  *
@@ -10,13 +7,27 @@ import { HealController } from '../../src/player/heal.ts';
  *
  *   node tests/smoke/smoke-heal.ts
  */
+import assert from 'node:assert/strict';
+
+import type { EngineEventMap } from '../../src/core/events.ts';
+import { ACTIONS, Input } from '../../src/core/input.ts';
+import { Rng } from '../../src/core/rng.ts';
 import { Health } from '../../src/player/health.ts';
+import type { PlayerSystem } from '../../src/player/index.ts';
 import { HEALING, HEALTH } from '../../src/player/tuning.ts';
-import { WEAPON_IDS } from '../../src/weapons/defs.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
+import { createTestContext } from '../lib/context.ts';
+import { fixture } from '../lib/fixture.ts';
+import {
+  initializePlayer,
+  setPlayerMotion,
+  presentationViewmodel,
+  initializeWeaponStates,
+  inertProjectileSim,
+} from '../lib/player-fixture.ts';
 
 let failures = 0;
-const check = (name, cond) => {
+const check = (name: string, cond: boolean): void => {
   if (cond) console.log(`  ok  ${name}`);
   else {
     failures++;
@@ -24,13 +35,8 @@ const check = (name, cond) => {
   }
 };
 
-function makeHealth() {
-  const ctx = {
-    time: { elapsed: 0 },
-    camera: { rotation: { y: 0 }, position: { x: 0, y: 0, z: 0 } },
-    events: { emit() {} },
-  };
-  return new Health(ctx, null);
+function makeHealth(): Health {
+  return new Health(createTestContext(), null);
 }
 
 {
@@ -57,91 +63,78 @@ function makeHealth() {
   check('overflow reaches health', dealt === 25 && hp.value === 75);
 }
 
-function makePlayer() {
-  const events = [];
-  const input = {
+class HealingWeapons extends WeaponSystem {
+  begun = 0;
+  ended = 0;
+  progress = 0;
+  busy = false;
+  override beginHeal(): boolean {
+    if (this.busy) return false;
+    this.begun++;
+    return true;
+  }
+  override endHeal(): void {
+    this.ended++;
+  }
+  override setHealProgress(p: number): void {
+    this.progress = p;
+  }
+}
+type HealEvent = EngineEventMap['player:heal'] & { type: 'player:heal' };
+function makePlayer(): {
+  player: PlayerSystem;
+  input: SemanticInput;
+  weapons: HealingWeapons;
+  events: HealEvent[];
+} {
+  const events: HealEvent[] = [];
+  const input: SemanticInput = {
     frozen: false,
     enabled: true,
     fire: false,
     firePressed: false,
     ads: false,
+    wheel: 0,
     _held: false,
-    _pressed: false,
-    _actionsPressed: new Set(),
-    action(name) {
+    _healPressed: false,
+    _actionsPressed: new Set<string>(),
+    action(name): boolean {
       return name === 'heal' && this._held;
     },
-    actionPressed(name) {
-      return (name === 'heal' && this._pressed) || this._actionsPressed.has(name);
+    actionPressed(name): boolean {
+      return (name === 'heal' && this._healPressed) || this._actionsPressed.has(name);
     },
   };
-  const weapons = {
-    begun: 0,
-    ended: 0,
-    progress: 0,
-    busy: false,
-    beginHeal() {
-      if (this.busy) return false;
-      this.begun++;
-      return true;
-    },
-    endHeal() {
-      this.ended++;
-    },
-    setHealProgress(p) {
-      this.progress = p;
-    },
-  };
-  const ctx = {
-    time: { elapsed: 0, scale: 1 },
-    input,
-    events: {
-      emit(type, p) {
-        events.push({
-          type,
-          phase: p?.phase,
-          amount: p?.amount,
-          reason: p?.reason,
-          health: p?.health,
-          bandages: p?.bandages,
-        });
-      },
-      on() {
-        return () => {};
-      },
-    },
-    peek(id) {
-      if (id === 'weapons') return weapons;
-      if (id === 'audio') return { playUi() {} };
-      return null;
-    },
-    camera: { rotation: { y: 0 }, position: { x: 0, y: 1.6, z: 0 } },
-  };
-  const player = {
-    ctx,
-    controlEnabled: true,
-    sprinting: false,
-    tacticalSprint: false,
-    sliding: false,
-    mantling: false,
-    airborne: false,
-    movement: { jumped: false },
-    health: new Health(ctx, null),
-    get dead() {
-      return this.health.dead;
-    },
-  };
-  player.healCtrl = new HealController(player);
+  const weapons = new HealingWeapons();
+  const ctx = createTestContext({ input: fixture<Input>(input), providers: { weapons } });
+  ctx.camera.position.y = 1.6;
+  ctx.events.on('player:heal', (p): void => {
+    events.push({ type: 'player:heal', ...p });
+  });
+  const player = initializePlayer(ctx);
   return { player, input, weapons, events };
+}
+interface SemanticInput {
+  frozen: boolean;
+  enabled: boolean;
+  fire: boolean;
+  firePressed: boolean;
+  ads: boolean;
+  wheel: number;
+  _held: boolean;
+  _healPressed: boolean;
+  _actionsPressed: Set<string>;
+  action(name: string): boolean;
+  actionPressed(name: string): boolean;
 }
 
 {
   const { player, input, weapons, events } = makePlayer();
   player.health.value = 40;
-  input._pressed = true;
+  input._healPressed = true;
   input._held = true;
   player.healCtrl.update(0);
-  input._pressed = false;
+  input._healPressed = false;
   check('starts while injured with a bandage', player.healCtrl.active && weapons.begun === 1);
   player.healCtrl.update(1.5);
   check(
@@ -156,15 +149,15 @@ function makePlayer() {
   );
   check(
     'cancel event fired',
-    events.some((e) => e.type === 'player:heal' && e.phase === 'cancel')
+    events.some((e): boolean => e.type === 'player:heal' && e.phase === 'cancel')
   );
   input._held = true;
-  input._pressed = false;
+  input._healPressed = false;
   player.healCtrl.update(0);
   check('holding after cancel does not restart', !player.healCtrl.active);
-  input._pressed = true;
+  input._healPressed = true;
   player.healCtrl.update(0);
-  input._pressed = false;
+  input._healPressed = false;
   check(
     'fresh press restarts with no saved progress',
     player.healCtrl.active && player.healCtrl.progress === 0
@@ -176,11 +169,13 @@ function makePlayer() {
   );
   check(
     'completion is atomic',
-    events.some((e) => e.type === 'player:heal' && e.phase === 'complete' && e.amount === 50)
+    events.some(
+      (e): boolean => e.type === 'player:heal' && e.phase === 'complete' && e.amount === 50
+    )
   );
   check('weapon presentation ended on complete', weapons.ended >= 2);
   input._held = true;
-  input._pressed = false;
+  input._healPressed = false;
   player.healCtrl.update(0);
   check(
     'holding after complete does not spend another',
@@ -191,10 +186,10 @@ function makePlayer() {
 {
   const { player, input } = makePlayer();
   player.health.value = 40;
-  input._pressed = true;
+  input._healPressed = true;
   input._held = true;
   player.healCtrl.update(0);
-  input._pressed = false;
+  input._healPressed = false;
   player.healCtrl.elapsed = 2.99;
   player.healCtrl.progress = 2.99 / HEALING.duration;
   input.fire = true;
@@ -220,10 +215,10 @@ for (const request of [
 ]) {
   const { player, input, events } = makePlayer();
   player.health.value = 40;
-  input._pressed = true;
+  input._healPressed = true;
   input._held = true;
   player.healCtrl.update(0);
-  input._pressed = false;
+  input._healPressed = false;
   player.healCtrl.elapsed = HEALING.duration - 0.01;
   if (request.startsWith('wheel')) input.wheel = request === 'wheel-up' ? 1 : -1;
   else input._actionsPressed.add(request);
@@ -241,10 +236,10 @@ for (const request of [
 for (const guard of ['release', 'frozen', 'disabled', 'dead']) {
   const { player, input, events } = makePlayer();
   player.health.value = 40;
-  input._pressed = true;
+  input._healPressed = true;
   input._held = true;
   player.healCtrl.update(0);
-  input._pressed = false;
+  input._healPressed = false;
   if (guard === 'release') input._held = false;
   if (guard === 'frozen') input.frozen = true;
   if (guard === 'disabled') input.enabled = false;
@@ -263,10 +258,10 @@ for (const guard of ['release', 'frozen', 'disabled', 'dead']) {
 for (const request of ['flashlight', 'use', 'slot3']) {
   const { player, input, events } = makePlayer();
   player.health.value = 40;
-  input._pressed = true;
+  input._healPressed = true;
   input._held = true;
   player.healCtrl.update(0);
-  input._pressed = false;
+  input._healPressed = false;
   input._actionsPressed.add(request);
   player.healCtrl.update(HEALING.duration);
   check(
@@ -277,21 +272,28 @@ for (const request of ['flashlight', 'use', 'slot3']) {
   );
 }
 
-for (const motion of ['sprinting', 'tacticalSprint', 'sliding', 'mantling', 'airborne', 'jumped']) {
+for (const motion of [
+  'sprinting',
+  'tacticalSprint',
+  'sliding',
+  'mantling',
+  'airborne',
+  'jumped',
+] as const) {
   const { player, input, events } = makePlayer();
   player.health.value = 40;
-  input._pressed = true;
+  input._healPressed = true;
   input._held = true;
   if (motion === 'jumped') player.movement.jumped = true;
-  else player[motion] = true;
+  else setPlayerMotion(player, motion, true);
   player.healCtrl.update(0);
   check(`${motion} prevents starting`, !player.healCtrl.active);
   if (motion === 'jumped') player.movement.jumped = false;
-  else player[motion] = false;
+  else setPlayerMotion(player, motion, false);
   player.healCtrl.update(0);
-  input._pressed = false;
+  input._healPressed = false;
   if (motion === 'jumped') player.movement.jumped = true;
-  else player[motion] = true;
+  else setPlayerMotion(player, motion, true);
   player.healCtrl.update(HEALING.duration);
   check(
     `${motion} wins over completion and preserves health/item`,
@@ -306,7 +308,7 @@ for (const motion of ['sprinting', 'tacticalSprint', 'sliding', 'mantling', 'air
 {
   const { player, input } = makePlayer();
   player.health.value = 100;
-  input._pressed = true;
+  input._healPressed = true;
   input._held = true;
   player.healCtrl.update(0);
   check('full health cannot start', !player.healCtrl.active);
@@ -324,27 +326,27 @@ for (const motion of ['sprinting', 'tacticalSprint', 'sliding', 'mantling', 'air
 {
   const { player, input, weapons } = makePlayer();
   player.health.value = 40;
-  input._pressed = true;
+  input._healPressed = true;
   input._held = true;
   player.healCtrl.update(0);
-  input._pressed = false;
-  player.sprinting = true;
+  input._healPressed = false;
+  setPlayerMotion(player, 'sprinting', true);
   player.healCtrl.update(0);
   check(
     'sprint cancels and keeps the bandage',
     !player.healCtrl.active && player.healCtrl.bandages === 2 && player.health.value === 40
   );
-  player.sprinting = false;
-  input._pressed = true;
+  setPlayerMotion(player, 'sprinting', false);
+  input._healPressed = true;
   player.healCtrl.update(0);
-  input._pressed = false;
-  player.airborne = true;
+  input._healPressed = false;
+  setPlayerMotion(player, 'airborne', true);
   player.healCtrl.update(0);
   check('jump/airborne cancels', !player.healCtrl.active);
-  player.airborne = false;
-  input._pressed = true;
+  setPlayerMotion(player, 'airborne', false);
+  input._healPressed = true;
   player.healCtrl.update(0);
-  input._pressed = false;
+  input._healPressed = false;
   player.controlEnabled = false;
   player.healCtrl.update(0);
   check(
@@ -357,10 +359,10 @@ for (const motion of ['sprinting', 'tacticalSprint', 'sliding', 'mantling', 'air
 {
   const { player, input } = makePlayer();
   player.health.value = 40;
-  input._pressed = true;
+  input._healPressed = true;
   input._held = true;
   player.healCtrl.update(0);
-  input._pressed = false;
+  input._healPressed = false;
   player.healCtrl.update(1);
   const before = player.healCtrl.progress;
   player.health.addArmour(50);
@@ -395,128 +397,50 @@ for (const motion of ['sprinting', 'tacticalSprint', 'sliding', 'mantling', 'air
 }
 
 {
-  const vm = {
-    anchor: { visible: true },
-    clip: null,
-    clipName: null,
-    clipT: 0,
-    boltHold: 0,
-    adsT: 0,
-    adsTarget: 0,
-    play(name) {
-      this.clipName = name;
-      this.clip = { name, duration: 1 };
-    },
-    stopClip() {
-      this.clip = null;
-      this.clipName = null;
-    },
-    holdGrenade() {},
-    endGrenade() {},
-    holdRadio() {},
-    endRadio() {},
-    holdBandage() {
-      this._bandage = 1;
-    },
-    endBandage() {
-      this._bandage = 0;
-    },
-    setBandageProgress(p) {
-      this._bp = p;
-    },
-    setActive() {},
-    addRecoil() {},
-    muzzleWorld() {
-      return { x: 0, y: 0, z: 0 };
-    },
-  };
-  const input = {
-    fire: false,
-    firePressed: false,
-    wheel: 0,
-    frozen: false,
-    enabled: true,
-    ads: false,
-    actionPressed() {
-      return false;
-    },
-    pressed() {
-      return false;
-    },
-    held() {
-      return false;
-    },
-  };
-  const player = {
-    dead: false,
-    controlEnabled: true,
-    sprinting: false,
-    stance: 'stand',
-    airborne: false,
-    state: 'stand',
-    horizontalSpeed: 0,
-    adsRequested: false,
-    cancelHeal() {
-      wp.endHeal();
-    },
-    setAdsProgress() {},
-  };
   const wp = new WeaponSystem();
-  wp.ctx = {
-    time: { elapsed: 0, scale: 1 },
-    camera: {
-      position: { x: 0, y: 1.6, z: 0 },
-      quaternion: { x: 0, y: 0, z: 0, w: 1 },
-      updateMatrixWorld() {},
-    },
-    scene: { add() {} },
-    events: { emit() {} },
-    peek(id) {
-      return id === 'player' ? player : undefined;
-    },
-    input,
+  const input = new Input(fixture<HTMLCanvasElement>({}), { sensitivity: 0.002, invertY: false });
+  const ctx = createTestContext({ input });
+  ctx.camera.position.y = 1.6;
+  const player = initializePlayer(ctx);
+  player.cancelHeal = (): boolean => {
+    wp.endHeal();
+    return true;
   };
+  player.setAdsProgress = (): void => {};
+  wp.ctx = ctx;
   wp.rng = new Rng(1);
-  wp.sim = { spawn() {}, clear() {}, stats: { live: 0, fired: 0 } };
+  wp.sim = inertProjectileSim(ctx);
   wp.stats = { tris: 0, drawCalls: 0, live: 0, fired: 0 };
+  const vm = presentationViewmodel(ctx);
   wp.viewmodel = vm;
   wp.player = player;
-  for (const id of WEAPON_IDS) {
-    wp.states.set(id, {
-      def: {
-        id,
-        label: id,
-        magSize: 30,
-        reserve: 90,
-        modes: ['auto'],
-        rpm: 700,
-        recoil: { patternLength: 1 },
-      },
-      mag: 30,
-      chambered: true,
-      reserve: 90,
-      mode: 'auto',
-      modeIndex: 0,
-    });
-  }
+  initializeWeaponStates(wp, {
+    label: 'test',
+    magSize: 30,
+    reserve: 90,
+    modes: ['auto'],
+    rpm: 700,
+  });
   wp.activeId = 'rifle';
   wp.owned = new Set(['rifle', 'smg', 'pistol']);
 
   check('idle weapons can begin heal', wp.canBeginHeal() === true);
-  check('beginHeal stows the gun', wp.beginHeal() === true && wp.healing && vm._bandage === 1);
+  check('beginHeal stows the gun', wp.beginHeal() === true && wp.healing && vm._bandageState === 1);
   check('cannot overlap a second heal', wp.canBeginHeal() === false);
   check('fire blocked while healing', wp.canFire() === false);
-  wp.states.get('rifle').chambered = false;
+  const rifle = wp.states.get('rifle');
+  assert.ok(rifle);
+  rifle.chambered = false;
   wp.tryFire();
   check('tryFire cancels healing', wp.healing === false);
-  wp.states.get('rifle').chambered = true;
+  rifle.chambered = true;
   wp.beginHeal();
   wp.reload();
   check('reload cancels healing', wp.healing === false);
   wp.beginHeal();
   wp.inspect();
   check('inspect cancels healing', wp.healing === false);
-  const s = wp.states.get('rifle');
+  const s = rifle;
   s.mag = 10;
   s.reserve = 80;
   wp.viewmodel.play('reloadTac');
@@ -532,7 +456,7 @@ for (const motion of ['sprinting', 'tacticalSprint', 'sliding', 'mantling', 'air
 }
 
 {
-  const input = new Input({}, { sensitivity: 0.002 });
+  const input = new Input(fixture<HTMLCanvasElement>({}), { sensitivity: 0.002, invertY: false });
   check(
     'radio and bandage controls are X and H',
     ACTIONS.radio.includes('KeyX') && ACTIONS.heal.includes('KeyH')
@@ -544,26 +468,27 @@ for (const motion of ['sprinting', 'tacticalSprint', 'sliding', 'mantling', 'air
   check('X activates the radio only', input.action('radio') && !input.action('heal'));
   input.down.clear();
   let n = 0;
-  const ev = (code) => ({
-    code,
-    ctrlKey: false,
-    metaKey: false,
-    altKey: false,
-    preventDefault() {
-      n++;
-    },
-  });
+  const ev = (code: string): KeyboardEvent =>
+    fixture<KeyboardEvent>({
+      code,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+      preventDefault(): void {
+        n++;
+      },
+    });
   input.pointerLocked = false;
   input._gameplayFocus = false;
   n = 0;
-  input._preventBrowserShortcut(ev('Tab'), true);
+  input._preventBrowserShortcut(ev('Tab'));
   check('unlocked Tab is not swallowed', n === 0);
   n = 0;
-  input._preventBrowserShortcut(ev('Space'), true);
+  input._preventBrowserShortcut(ev('Space'));
   check('unlocked Space is not swallowed', n === 0);
   input._gameplayFocus = true;
   n = 0;
-  input._preventBrowserShortcut(ev('Tab'), true);
+  input._preventBrowserShortcut(ev('Tab'));
   check('gameplay Tab is swallowed', n === 1);
 }
 
