@@ -80,7 +80,7 @@
           reload.focus();
         };
         const entryError = event => {
-          // Vite relocates the entry into <head> and drops its source id.
+          // The bundler relocates the entry into <head> and drops its source id.
           if (event.target instanceof HTMLScriptElement && event.target.type === 'module' && event.target.src)
             fail('Unable to load the game. Check your connection and reload.');
         };

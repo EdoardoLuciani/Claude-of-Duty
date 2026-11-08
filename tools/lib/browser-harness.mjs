@@ -1,7 +1,8 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import net from 'node:net';
-import { dirname, resolve } from 'node:path';
+import { homedir } from 'node:os';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { chromium } from 'playwright';
@@ -31,8 +32,17 @@ export function portOpen(port, host = '127.0.0.1') {
   });
 }
 
-/** Start one HMR-free Vite server unless the requested port is already owned. */
-export async function ensureViteServer({
+/** Bun binary: `bun run` exposes it via npm_execpath without putting it on PATH; plain
+ *  `node` runs fall back to the installer's default location, then PATH. */
+const INSTALLED_BUN = join(process.env.BUN_INSTALL ?? join(homedir(), '.bun'), 'bin', 'bun');
+const BUN = basename(process.env.npm_execpath ?? '').startsWith('bun')
+  ? process.env.npm_execpath
+  : existsSync(INSTALLED_BUN)
+    ? INSTALLED_BUN
+    : 'bun';
+
+/** Start one HMR-free Bun dev (or preview) server unless the requested port is already owned. */
+export async function ensureDevServer({
   port = 5173,
   root = REPO_ROOT,
   attempts = 160,
@@ -44,8 +54,8 @@ export async function ensureViteServer({
   if (await portOpen(port)) return null;
 
   const server = spawn(
-    resolve(root, 'node_modules/.bin/vite'),
-    [...(preview ? ['preview'] : []), '--port', String(port), '--strictPort'],
+    BUN,
+    ['build/bun.mjs', preview ? 'preview' : 'dev', '--port', String(port)],
     {
       cwd: root,
       stdio,
@@ -58,8 +68,10 @@ export async function ensureViteServer({
     startupError = error;
   });
   server.once('exit', (code, signal) => {
-    if (code !== null && code !== 0) startupError = new Error(`vite exited with code ${code}`);
-    else if (signal && signal !== 'SIGTERM') startupError = new Error(`vite exited on ${signal}`);
+    if (code !== null && code !== 0)
+      startupError = new Error(`dev server exited with code ${code}`);
+    else if (signal && signal !== 'SIGTERM')
+      startupError = new Error(`dev server exited on ${signal}`);
   });
 
   for (let i = 0; i < attempts; i++) {
@@ -69,7 +81,7 @@ export async function ensureViteServer({
   }
 
   if (server.exitCode === null && server.signalCode === null) server.kill();
-  throw startupError ?? new Error(`vite failed to start on port ${port}`);
+  throw startupError ?? new Error(`dev server failed to start on port ${port}`);
 }
 
 /** Shared console/device-validation error collection; fixture assertions stay local. */
@@ -93,7 +105,7 @@ export function collectBrowserErrors(
   });
 }
 
-export function stopViteServer(server) {
+export function stopDevServer(server) {
   if (server?.exitCode === null && server.signalCode === null) server.kill();
 }
 

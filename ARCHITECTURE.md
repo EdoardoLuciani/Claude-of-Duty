@@ -6,7 +6,7 @@ Read this before changing a subsystem. Workflow and validation: [AGENTS.md](AGEN
 ## Ownership and subsystem API
 
 Own only your assigned subsystem. Shared/lead-owned: `src/core/`, `src/main.ts`,
-`src/dev/`, `tools/`, `vite.config.js`. Coordinate changes across owners.
+`src/dev/`, `tools/`, `build/bun.mjs`, `build/bun-plugin.mjs`, `bunfig.toml`. Coordinate changes across owners.
 Use `ctx.get(id)` rather than importing other subsystems. The existing constant
 coupling `ai` → `weapons` is an exception.
 
@@ -362,7 +362,7 @@ Node GLTFExporter cook preserves the runtime joint/attribute format. The
 the spent hull. Missing/stale/corrupt authoring products fail, never trigger Blender
 or a procedural fallback. Content hashing covers shared sources and all runtime
 products; missing outputs force a full restage. Atomic writes and the cache lock
-remain. Vite dev/build runs it after the Blender steps; preview uses existing `dist`.
+remain. Bun dev/build runs it after the Blender steps; preview uses existing `dist`.
 
 M4/MCX/P320/EVOLYS/MPX/AX338/M590 use generated GLBs and weapon-owned adapters
 under `src/weapons/`; procedural player-weapon exports are retired. M590 is a
@@ -401,7 +401,7 @@ synthetic blast layers. Radio owns aircraft pose/pass lifetime; audio owns sourc
 cleanup. Radio textures supplement intentional electronic tones. Do not invent
 ambient human/tactical actors.
 Tactical contact/reload/outgoing-grenade speech uses required offline-generated,
-locally bundled Opus recordings with source hashes, prompts and processing in
+local Opus recordings (`public/audio/samples/`) with source hashes, prompts and processing in
 `src/audio/samples/callouts/provenance.json`; authoring/rights notes live in
 `assets/audio/tactical-callouts/README.md`. No runtime TTS or credential access.
 Reached-segment bullet near-misses, material-mapped casing drops, family-matched dry

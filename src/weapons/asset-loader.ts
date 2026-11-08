@@ -16,7 +16,8 @@ const sessions = new WeakMap<FeatureRenderer, LoaderSession>();
 function sessionFor(renderer: FeatureRenderer): LoaderSession {
   const existing = sessions.get(renderer);
   if (existing) return existing;
-  const decoder = new KTX2Loader().setWorkerLimit(2);
+  // Basis transcoder files are served from three's libs at /basis/ (build/bun.mjs).
+  const decoder = new KTX2Loader().setTranscoderPath('/basis/').setWorkerLimit(2);
   // Our strict native Renderer has no isWebGPURenderer flag. Use the public
   // worker config rather than detectSupport()'s WebGL renderer branch.
   decoder.workerConfig = {

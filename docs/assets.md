@@ -20,10 +20,9 @@ when changing authored assets.
   runtime algorithms (especially world collision/navigation); runtime should not
   need to run an offline builder.
 
-`public/models/` holds assets delivered by public URL. Weapons instead use static
-Vite imports of cooked GLBs in `assets/`; the world uses a content-hashed manifest.
-These delivery mechanisms intentionally remain distinct. Do not move or hand-edit
-runtime products to change a model.
+`public/models/` holds assets delivered by fixed public URL, including the cooked
+weapon GLBs in `public/models/weapons/` (`build/models.mjs` writes them there); the
+world uses a content-hashed manifest. Do not hand-edit runtime products to change a model.
 
 ## Weapons: shape, finish, animation and checks
 

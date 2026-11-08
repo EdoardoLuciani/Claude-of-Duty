@@ -7,10 +7,10 @@ import { join } from 'node:path';
 
 import {
   REPO_ROOT,
-  ensureViteServer,
+  ensureDevServer,
   launchChromium,
   parseArgs,
-  stopViteServer,
+  stopDevServer,
 } from './lib/browser-harness.mjs';
 import { combatLane } from './lib/combat-fixture.js';
 import { waitForGame } from './lib/native-render.mjs';
@@ -87,7 +87,7 @@ const full = existsSync(cache)
   : null;
 let server, browser, report;
 try {
-  server = await ensureViteServer({ port, preview: !!args.production });
+  server = await ensureDevServer({ port, preview: !!args.production });
   assert(
     server,
     'profile requires its own server; choose an unused --port to bind results to this checkout'
@@ -542,6 +542,6 @@ try {
   try {
     await browser?.close();
   } finally {
-    stopViteServer(server);
+    stopDevServer(server);
   }
 }

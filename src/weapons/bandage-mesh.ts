@@ -1,4 +1,3 @@
-/// <reference types="vite/client" />
 import * as THREE from 'three';
 import type { Material } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -20,9 +19,7 @@ export async function loadBandage(): Promise<{
   tail: BandageMesh;
   dispose(): void;
 }> {
-  const gltf = await new GLTFLoader().loadAsync(
-    `${import.meta.env.BASE_URL}models/player/bandage.glb`
-  );
+  const gltf = await new GLTFLoader().loadAsync('/models/player/bandage.glb');
 
   const wrap = gltf.scene.getObjectByName('Bandage_wrap');
   const body = gltf.scene.getObjectByName('Bandage_roll');

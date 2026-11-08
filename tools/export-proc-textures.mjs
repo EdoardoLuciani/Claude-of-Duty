@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Bake soldier PBR tiles and FX atlases to PNG so boot does not spend ~1 s
- * on CPU noise. Runtime loads public/models/proc/; Vite generates missing or
+ * on CPU noise. Runtime loads public/models/proc/; dev/build generate missing or
  * stale files before serving/building the game.
  */
 import { createHash } from 'node:crypto';

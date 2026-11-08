@@ -12,10 +12,7 @@ import { buildEquipClips, buildMagazineClips } from './clips.ts';
 import { smootherstep } from './mathx.ts';
 import { configureMCXFinishes } from './mcx-finishes.ts';
 
-export const MCX_URL = new URL(
-  '../../assets/weapons/mcx-virtus/mcx-virtus.runtime.glb',
-  import.meta.url
-).href;
+export const MCX_URL = '/models/weapons/mcx-virtus.runtime.glb';
 const ALIASES: Record<string, string> = {
   reloadTac: 'Reload_Tactical',
   reloadEmpty: 'Reload_Empty',

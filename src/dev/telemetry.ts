@@ -546,7 +546,6 @@ interface RenderSnapshot {
 declare global {
   interface Window {
     __TELEMETRY__?: TelemetryApi;
-    __BUILD_REVISION__?: string;
   }
 }
 
@@ -782,7 +781,7 @@ export class TelemetrySystem {
       path: location.pathname,
       transform: xform ? Array.from(xform.elements) : null,
       provenance: collectProvenance({
-        revision: stringField(this.ctx.config, 'revision') ?? window.__BUILD_REVISION__,
+        revision: stringField(this.ctx.config, 'revision'),
       }),
     };
   }
