@@ -146,7 +146,7 @@ for (const [equip, first, second] of [
   const { wp, shots } = makeHarness();
   assert(wp.equipSecondary('shotgun') && wp.tryFire());
   assert.equal(shots.fired, 8, 'one shotgun shell spawns eight pellets');
-  assert.equal(wp._pendingShots.length, 1, 'pellets still produce one accepted-shot event');
+  assert.equal(wp._pendingShots, 1, 'pellets still produce one accepted-shot event');
 }
 {
   const { wp } = makeHarness();

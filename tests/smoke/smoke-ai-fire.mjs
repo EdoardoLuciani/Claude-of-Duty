@@ -734,6 +734,14 @@ for (const reason of [
     assert.ok(times.at(-1) - times[resumed] >= 1 / COMBAT.fireRate - 1e-9, `${name}: banked round`);
   }
 
+  // The magazine's last round does not also start the reload in its frame.
+  {
+    const { a, step } = shooter({ rng: endless, ammo: 1 });
+    assert.equal(step(DT), 1);
+    assert.equal(a.ammo, 0);
+    assert.equal(a.animator.reloading, false, 'reload waits for a later frame');
+  }
+
   // Overload: a 1 s hitch fires at most maxShotsPerFrame rounds; no backlog.
   {
     const { a, step } = shooter({ rng: endless, ammo: 1e6, magSize: 1e6 });

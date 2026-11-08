@@ -3087,8 +3087,14 @@ export class Agent {
       return;
     }
     this._muzzleBlocked = false;
-    // A long frame may owe more than one round; the bound drops the rest.
-    for (let n = 0; n < COMBAT.maxShotsPerFrame && this._fireRound(dt); n++);
+    // A long frame may owe more than one round; the bound drops the rest. Only
+    // a round that is already due re-enters, so an emptied magazine still
+    // reloads on a later frame rather than with its last shot.
+    for (
+      let n = 1;
+      this._fireRound(dt) && n < COMBAT.maxShotsPerFrame && this.fireCooldown <= 0;
+      n++
+    );
   }
 
   /** Fire one round if every gate allows it; false ends this frame's fire. */
