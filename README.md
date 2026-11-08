@@ -20,7 +20,11 @@ required. Bun installs dependencies from `bun.lock`, type-checks (`bun check`) a
 formats (`bun fmt`); packages are cached in `~/.bun/install/cache`, so warm
 reinstalls are near-instant. Node runs Vite, Oxlint, the `node:test` smoke runner and all tools; Node-run
 tools and smoke tests load migrated `.ts` modules using native type stripping.
-Runtime TypeScript uses explicit `.ts` imports and is checked by `bun run typecheck`
+Runtime source, every `tests/**/*.ts` script, and converted test helpers use explicit
+`.ts` imports and share strict checking through `bun run typecheck`. Node runs tests
+directly with erasable TypeScript syntax—no loader, build step or Bun test runtime.
+The second, type-aware lint pass covers runtime source, tests and typed test helpers;
+shared JavaScript authoring APIs consumed by tests have adjacent `.d.ts` declarations.
 (`noUncheckedIndexedAccess` status: [triage and plan](docs/no-unchecked-indexed-access.md)).
 `bun run lint` requires explicit return types on every TypeScript function, method,
 getter and callback (including contextually typed functions and functions returning
@@ -33,6 +37,11 @@ assertions (including `as unknown as T`), as well as explicit `any` and unsafe
 assignment, argument, call, member access and return. Numeric enum assignments
 must use enum members rather than unchecked numbers. Runtime boundaries must
 validate unknown data; owned records should be constructed with their full type.
+For Node-only browser/native fakes, prefer real instances and shared typed fixtures.
+Issue [#621](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/621) approved one
+exception: only `tests/lib/fixture.ts` may assert its checked `Partial<T>` as `T`.
+Its proxy throws on unexpected missing-member reads; explicitly listed optional
+members may be absent. No other test file relaxes the unsafe-assertion rule.
 Regular lint rules cover `src/`, `build/`, `tools/`, and `tests/`. Missing return annotations
 fail CI's lint step, not the typecheck itself. The narrow declaration additions in
 `src/render/three-types.d.ts` describe APIs verified against the pinned Three.js
