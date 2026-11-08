@@ -190,8 +190,8 @@ try {
         const maxOffset = Math.max(0, Math.min(offsetCap, (opening.w - 0.64) / 2 - 0.08));
         const offsets = maxOffset > 0.08 ? [-maxOffset, 0, maxOffset] : [0];
         for (const offset of offsets) {
-          const from = coordinates(opening.from);
-          const to = coordinates(opening.to);
+          const from: [number, number, number] = [...opening.from];
+          const to: [number, number, number] = [...opening.to];
           const axis = opening.side === 0 || opening.side === 2 ? 0 : 2;
           from[axis] += offset;
           to[axis] += offset;

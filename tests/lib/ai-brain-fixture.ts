@@ -4,6 +4,7 @@ import { Animator } from '../../src/ai/animator.ts';
 import type { BakedCoverPoint } from '../../src/ai/nav-format.ts';
 import { RIG } from '../../src/ai/rig.ts';
 import { Rng } from '../../src/core/rng.ts';
+import { isMesh } from '../../src/core/three-guards.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { Health } from '../../src/player/health.ts';
 import { PlayerSystem } from '../../src/player/index.ts';
@@ -92,11 +93,10 @@ export function midpointRng(): Rng {
 }
 
 export function disposeMesh(object: THREE.Object3D): void {
-  if (!(object instanceof THREE.Mesh)) return;
-  const geometry: unknown = object.geometry;
-  if (geometry instanceof THREE.BufferGeometry) geometry.dispose();
-  const material: unknown = object.material;
+  if (!isMesh(object)) return;
+  object.geometry.dispose();
+  const material = object.material;
   if (Array.isArray(material)) {
-    for (const entry of material) if (entry instanceof THREE.Material) entry.dispose();
-  } else if (material instanceof THREE.Material) material.dispose();
+    for (const entry of material) entry.dispose();
+  } else material.dispose();
 }

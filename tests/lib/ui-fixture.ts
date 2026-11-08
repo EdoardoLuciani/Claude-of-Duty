@@ -262,7 +262,4 @@ export class UiInput extends Input {
   }
 }
 
-/** Capture identity for temporary overrides without rebinding the saved method. */
-export function captureMethod<T, K extends keyof T>(owner: T, key: K): T[K] {
-  return owner[key];
-}
+export { captureMethod } from './render-fixture.ts';

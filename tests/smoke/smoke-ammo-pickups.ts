@@ -280,98 +280,24 @@ function matricesMatch(pickups: AmmoPickups): void {
   assert.equal(cleared.at(-1), 'ammo');
   pickups.update(0.2);
   assert.equal(pickups._nearest, first);
-  const block =
-    (apply: () => void, restore: () => void): (() => void) =>
-    (): void => {
-      apply();
-      pickups.update(0.5);
-      assert.equal(pickups._nearest, null);
-      assert.equal(owner.state.reserve, 0);
-      restore();
-    };
-  for (const checkBlock of [
-    block(
-      (): void => {
-        intel.blocked = true;
-      },
-      (): void => {
-        intel.blocked = false;
-      }
-    ),
-    block(
-      (): void => {
-        owner.disabled = true;
-      },
-      (): void => {
-        owner.disabled = false;
-      }
-    ),
-    block(
-      (): void => {
-        owner.grenadeEquipped = true;
-      },
-      (): void => {
-        owner.grenadeEquipped = false;
-      }
-    ),
-    block(
-      (): void => {
-        owner.radioEquipped = true;
-      },
-      (): void => {
-        owner.radioEquipped = false;
-      }
-    ),
-    block(
-      (): void => {
-        input.frozen = true;
-      },
-      (): void => {
-        input.frozen = false;
-      }
-    ),
-    block(
-      (): void => {
-        input.enabled = false;
-      },
-      (): void => {
-        input.enabled = true;
-      }
-    ),
-    block(
-      (): void => {
-        h.player.dead = true;
-      },
-      (): void => {
-        h.player.dead = false;
-      }
-    ),
-    block(
-      (): void => {
-        h.player.controlEnabled = false;
-      },
-      (): void => {
-        h.player.controlEnabled = true;
-      }
-    ),
-    block(
-      (): void => {
-        ctx.time.scale = 0;
-      },
-      (): void => {
-        ctx.time.scale = 1;
-      }
-    ),
-    block(
-      (): void => {
-        h.player.healCtrl.active = true;
-      },
-      (): void => {
-        h.player.healCtrl.active = false;
-      }
-    ),
-  ])
-    checkBlock();
+  const block = <T, K extends keyof T>(target: T, key: K, value: T[K]): void => {
+    const previous = target[key];
+    target[key] = value;
+    pickups.update(0.5);
+    assert.equal(pickups._nearest, null);
+    assert.equal(owner.state.reserve, 0);
+    target[key] = previous;
+  };
+  block(intel, 'blocked', true);
+  block(owner, 'disabled', true);
+  block(owner, 'grenadeEquipped', true);
+  block(owner, 'radioEquipped', true);
+  block(input, 'frozen', true);
+  block(input, 'enabled', false);
+  block(h.player, 'dead', true);
+  block(h.player, 'controlEnabled', false);
+  block(ctx.time, 'scale', 0);
+  block(h.player.healCtrl, 'active', true);
   pickups.update(0.45);
   assert.equal(owner.state.reserve, 45);
   assert.equal(pickups.items.length, 0);
