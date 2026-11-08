@@ -29,8 +29,10 @@ Standalone attachments: [EXPS3-0](../../assets/attachments/eotech-exps3-0/README
 - Build factory-empty into an absolute `--output` scratch directory first.
   `--render` is optional; `--quick` changes preview samples/resolution only.
 - Shared review-arm appearance and versioned hand calibration are read-only
-  inputs, not exported duplicate arms. Missing inputs fail. Refit calibration
-  separately and intentionally, never automatically during a normal rebuild.
+  inputs, not exported duplicate arms. `review_hands.py` owns the shared EVOLYS/MPX
+  review-arm baker; each caller supplies its own basis, controls and clips.
+  Missing inputs fail. Refit calibration separately and intentionally, never
+  automatically during a normal rebuild.
 - Save editable components/modifiers/sparse poses before preparing runtime copies.
   Preserve each weapon's own UV strategy, sampling lattice, fractional endpoints,
   STEP visibility and reset channels; local guides record exceptions.
