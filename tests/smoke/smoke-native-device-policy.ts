@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { runInThisContext } from 'node:vm';
 
 import { collectBrowserErrors } from '../../tools/lib/browser-harness.ts';
 import { assertHardwareDevice, verifyPreviewNative } from '../../tools/lib/native-render.ts';
@@ -7,16 +8,23 @@ import { assertHardwareDevice, verifyPreviewNative } from '../../tools/lib/nativ
 for (const vendor of ['intel', 'nvidia', 'amd', 'apple']) {
   const device = { vendor, architecture: 'test', fallback: false };
   assert.equal(assertHardwareDevice(device, ''), device, 'correctness is not vendor-specific');
-  assert.throws(() => assertHardwareDevice({ ...device, fallback: true }, ''), /hardware WebGPU/);
-  assert.throws(() => assertHardwareDevice(device, '1002:7550!'), /explicitly selected AMD/);
+  assert.throws(
+    (): unknown => assertHardwareDevice({ ...device, fallback: true }, ''),
+    /hardware WebGPU/
+  );
+  assert.throws(
+    (): unknown => assertHardwareDevice(device, '1002:7550!'),
+    /explicitly selected AMD/
+  );
 }
 assertHardwareDevice({ vendor: 'amd', architecture: 'rdna-4', fallback: false }, '1002:7550!');
 assert.throws(
-  () => assertHardwareDevice({ vendor: 'amd', architecture: 'rdna-4', fallback: true }, ''),
+  (): unknown =>
+    assertHardwareDevice({ vendor: 'amd', architecture: 'rdna-4', fallback: true }, ''),
   /hardware WebGPU/
 );
 assert.throws(
-  () => assertHardwareDevice({ vendor: 'intel', architecture: 'test' }, ''),
+  (): unknown => assertHardwareDevice({ vendor: 'intel', architecture: 'test' }, ''),
   /hardware WebGPU/
 );
 
@@ -24,8 +32,17 @@ const previous = globalThis.window;
 try {
   const adapterInfo = { vendor: 'amd', architecture: 'rdna-4', isFallbackAdapter: false };
   const backend = { isWebGPUBackend: true, device: { adapterInfo } };
-  globalThis.window = { __PREVIEW_RENDERER__: { backend } };
-  const page = { evaluate: (fn) => fn() };
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    writable: true,
+    value: { __PREVIEW_RENDERER__: { backend } },
+  });
+  const page = {
+    async evaluate(fn: string | (() => unknown)): Promise<unknown> {
+      const value: unknown = typeof fn === 'string' ? runInThisContext(fn) : fn();
+      return value;
+    },
+  };
   assert.deepEqual(await verifyPreviewNative(page), {
     vendor: 'amd',
     architecture: 'rdna-4',
@@ -37,18 +54,25 @@ try {
   adapterInfo.isFallbackAdapter = true;
   await assert.rejects(verifyPreviewNative(page), /hardware WebGPU/);
 } finally {
-  globalThis.window = previous;
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    writable: true,
+    value: previous,
+  });
 }
 // Shared plumbing preserves the preview's stricter message gate, while other
 // analytic fixtures may retain their separately reported informational warnings.
 for (const validationMessages of [false, true]) {
   const page = new EventEmitter(),
-    errors = [],
-    warnings = [];
+    errors: string[] = [],
+    warnings: string[] = [];
   collectBrowserErrors(page, errors, { warnings, validationMessages });
   page.emit('pageerror', new Error('page failure'));
-  page.emit('console', { type: () => 'error', text: () => 'console failure' });
-  page.emit('console', { type: () => 'warning', text: () => 'THREE.TSL: diagnostic' });
+  page.emit('console', { type: (): string => 'error', text: (): string => 'console failure' });
+  page.emit('console', {
+    type: (): string => 'warning',
+    text: (): string => 'THREE.TSL: diagnostic',
+  });
   assert.deepEqual(
     errors,
     validationMessages

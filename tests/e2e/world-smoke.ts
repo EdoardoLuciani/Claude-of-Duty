@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+import type { WorldSystem } from '../../src/world/index.ts';
 import {
   ensureViteServer,
   launchChromium,
@@ -16,9 +17,13 @@ const browser = await launchChromium({
   args: ['--ignore-gpu-blocklist', '--mute-audio'],
 });
 const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
-const errors = [];
-page.on('pageerror', (error) => errors.push(error.message));
-page.on('console', (message) => message.type() === 'error' && errors.push(message.text()));
+const errors: string[] = [];
+page.on('pageerror', (error): void => {
+  errors.push(error.message);
+});
+page.on('console', (message): void => {
+  if (message.type() === 'error') errors.push(message.text());
+});
 
 try {
   await page.goto(`http://127.0.0.1:${port}/?capture=1&lockstep=1`, {
@@ -26,29 +31,52 @@ try {
     timeout: 90000,
   });
   await waitForGame(page, { timeout: 90000 });
-  const expected = JSON.parse(
-    readFileSync(new URL('../../public/models/world/level.json', import.meta.url))
+  const expected: unknown = JSON.parse(
+    readFileSync(new URL('../../public/models/world/level.json', import.meta.url), 'utf8')
   );
-  const assets = await page.evaluate(
-    async () => (await window.__ENGINE__.ctx.get('models').worldPrefetch).meta.assets
-  );
-  assert.deepEqual(assets, expected.assets, 'world smoke must exercise this checkout’s assets');
-  const result = await page.evaluate(() => {
+  const assets = await page.evaluate(async (): Promise<unknown> => {
     const engine = window.__ENGINE__;
+    if (!engine) throw Error('engine not ready');
+    return (await engine.ctx.get('models').worldPrefetch).meta.assets;
+  });
+  assert(expected && typeof expected === 'object' && 'assets' in expected);
+  assert.deepEqual(assets, expected.assets, 'world smoke must exercise this checkout’s assets');
+  interface TraversalResult {
+    name: string;
+    progress: number;
+    passed: boolean;
+  }
+  interface SmokeResult {
+    stats: WorldSystem['stats'];
+    physicsTris: number;
+    buildings: number;
+    bulbs: number;
+    lamps: number;
+    spawns: { tag: string; ground: number; delta: number }[];
+    roundTripError: number;
+    enemySpawns: { pickFail: number; pickUnder: number };
+    doorTraversal: TraversalResult[];
+    aiOpenings: { name: string; walkable: boolean; expected: boolean }[];
+  }
+  const result = await page.evaluate((): SmokeResult => {
+    const engine = window.__ENGINE__;
+    if (!engine) throw Error('engine not ready');
     const world = engine.ctx.get('world');
     const physics = engine.ctx.get('physics');
-    const spawns = world.spawnPoints.map((spawn) => {
-      const ground = physics.groundHeight(
-        spawn.position.x,
-        spawn.position.z,
-        spawn.position.y + 0.5
-      );
-      return {
-        tag: spawn.tag,
-        ground,
-        delta: Math.abs(ground - spawn.position.y),
-      };
-    });
+    const spawns = world.spawnPoints.map(
+      (spawn): { tag: string; ground: number; delta: number } => {
+        const ground = physics.groundHeight(
+          spawn.position.x,
+          spawn.position.z,
+          spawn.position.y + 0.5
+        );
+        return {
+          tag: spawn.tag,
+          ground,
+          delta: Math.abs(ground - spawn.position.y),
+        };
+      }
+    );
     const level = world.worldToLevel(12.5, 3.25, -8.75);
     const roundTrip = world.levelToWorld(level.x, level.y, level.z);
 
@@ -64,7 +92,11 @@ try {
       }
     }
 
-    const traverse = (name, fromLevel, toLevel) => {
+    const traverse = (
+      name: string,
+      fromLevel: [number, number, number],
+      toLevel: [number, number, number]
+    ): TraversalResult => {
       const from = world.levelToWorld(...fromLevel);
       const to = world.levelToWorld(...toLevel);
       const dx = to.x - from.x;
@@ -93,17 +125,73 @@ try {
       physics.removeCharacter(character);
       return { name, progress, passed: progress >= required };
     };
-    const doorTraversal = [];
-    const aiOpenings = [];
-    for (const building of world.buildings) {
+    interface Opening {
+      kind: string;
+      side: number;
+      w: number;
+      from: [number, number, number];
+      to: [number, number, number];
+    }
+    function coordinates(value: unknown): [number, number, number] {
+      if (!Array.isArray(value) || value.length !== 3) throw Error('invalid opening coordinates');
+      const values: unknown[] = value;
+      const [x, y, z] = values;
+      if (typeof x !== 'number' || typeof y !== 'number' || typeof z !== 'number')
+        throw Error('invalid opening coordinates');
+      return [x, y, z];
+    }
+    function readBuilding(value: unknown): { spec: { id: string }; traversable: Opening[] } {
+      if (
+        !value ||
+        typeof value !== 'object' ||
+        !('spec' in value) ||
+        !value.spec ||
+        typeof value.spec !== 'object' ||
+        !('id' in value.spec) ||
+        typeof value.spec.id !== 'string' ||
+        !('traversable' in value) ||
+        !Array.isArray(value.traversable)
+      )
+        throw Error('invalid traversal metadata');
+      const entries: unknown[] = value.traversable;
+      const traversable = entries.map((entry): Opening => {
+        if (
+          !entry ||
+          typeof entry !== 'object' ||
+          !('kind' in entry) ||
+          typeof entry.kind !== 'string' ||
+          !('side' in entry) ||
+          typeof entry.side !== 'number' ||
+          !('w' in entry) ||
+          typeof entry.w !== 'number' ||
+          !('from' in entry) ||
+          !('to' in entry)
+        )
+          throw Error('invalid opening metadata');
+        return {
+          kind: entry.kind,
+          side: entry.side,
+          w: entry.w,
+          from: coordinates(entry.from),
+          to: coordinates(entry.to),
+        };
+      });
+      return { spec: { id: value.spec.id }, traversable };
+    }
+    if (!world.buildings || !world.bulbs || !world.lamps || !ai.grid)
+      throw Error('world not ready');
+    const doorTraversal: TraversalResult[] = [];
+    const aiOpenings: SmokeResult['aiOpenings'] = [];
+    for (const candidate of world.buildings) {
+      const building = readBuilding(candidate);
       for (let index = 0; index < building.traversable.length; index++) {
         const opening = building.traversable[index];
         const offsetCap = opening.kind === 'door' ? 0.1 : 0.25;
         const maxOffset = Math.max(0, Math.min(offsetCap, (opening.w - 0.64) / 2 - 0.08));
         const offsets = maxOffset > 0.08 ? [-maxOffset, 0, maxOffset] : [0];
         for (const offset of offsets) {
-          const from = opening.from.slice();
-          const to = opening.to.slice();
+          const from = coordinates(opening.from);
+          const to = coordinates(opening.to);
           const axis = opening.side === 0 || opening.side === 2 ? 0 : 2;
           from[axis] += offset;
           to[axis] += offset;

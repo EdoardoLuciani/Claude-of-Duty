@@ -2,16 +2,20 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 
 import * as THREE from 'three';
-import { MeshStandardNodeMaterial } from 'three/webgpu';
+import { MeshStandardNodeMaterial, TextureNode, AttributeNode, type Node } from 'three/webgpu';
+import type { NodeBuilder } from 'three/webgpu';
 
+import { EventBus } from '../../src/core/registry.ts';
 import { Health } from '../../src/player/health.ts';
 import { createArmBlood, addArmBloodCoordinates } from '../../src/weapons/arm-blood.ts';
+import { fixture } from '../lib/fixture.ts';
 
 const blood = createArmBlood();
 const again = createArmBlood();
 assert.equal(blood.amount.value, 0, 'full-health arms start clean');
 assert.deepEqual(blood.texture.image.data, again.texture.image.data, 'mask is deterministic');
 const { data, width, height } = blood.texture.image;
+assert(data);
 assert.equal(
   createHash('sha256').update(data).digest('hex'),
   '85aa5bbbe08695b80be5223fb50a87a78d997ced48a230b68cabbcfaf7521ed6',
@@ -23,7 +27,7 @@ let stained = 0,
   mottled = 0;
 for (let y = 0; y < height; y++) {
   for (let x = 0; x < width; x++) {
-    const alpha = data[(y * width + x) * 4];
+    const alpha: number = data[(y * width + x) * 4];
     if (alpha > 32) stained++;
     if (alpha === 0) clean++;
     const i = (y * width + x) * 4;
@@ -45,18 +49,16 @@ assert(wet > 0 && wet < stained * 0.75, 'wet highlights are sparse, not a glossy
 assert(mottled > stained * 0.2, 'dense stains retain varied clot/soak colour');
 assert.equal(width, 256, 'satellite droplets have enough texel resolution');
 let snapshots = 0;
+const events = new EventBus();
+events.on('player:health', (payload): void => {
+  snapshots++;
+  blood.setHealthFraction(payload.fraction);
+});
 const hp = new Health(
   {
     camera: new THREE.PerspectiveCamera(),
     time: { elapsed: 0 },
-    events: {
-      emit(type, payload) {
-        if (type === 'player:health') {
-          snapshots++;
-          blood.setHealthFraction(payload.fraction);
-        }
-      },
-    },
+    events,
   },
   null
 );
@@ -94,16 +96,24 @@ const material = new MeshStandardNodeMaterial();
 blood.decorate(material);
 assert(material.colorNode?.isNode, 'native graph modifies authored albedo');
 assert(material.roughnessNode?.isNode, 'native graph modifies authored roughness');
-const nodes = new Set();
-material.colorNode.traverse((node) => nodes.add(node));
-material.roughnessNode.traverse((node) => nodes.add(node));
+const nodes = new Set<Node>();
+material.colorNode.traverse((node): void => {
+  nodes.add(node);
+});
+material.roughnessNode.traverse((node): void => {
+  nodes.add(node);
+});
 assert(nodes.has(blood.amount), 'both native graphs share the live health uniform');
 assert(
-  [...nodes].some((node) => node.isTextureNode && node.value === blood.texture),
+  [...nodes].some((node): boolean => node instanceof TextureNode && node.value === blood.texture),
   'graph samples the owned mask'
 );
 assert(
-  [...nodes].some((node) => node.getAttributeName?.() === 'armBloodPosition'),
+  [...nodes].some(
+    (node): boolean =>
+      node instanceof AttributeNode &&
+      node.getAttributeName(fixture<NodeBuilder>({})) === 'armBloodPosition'
+  ),
   'graph uses independent bind coordinates'
 );
 for (const [injury, limit] of [
@@ -133,7 +143,7 @@ const key = material.customProgramCacheKey();
 blood.setHealthFraction(0.1);
 assert.equal(material.customProgramCacheKey(), key, 'no shader permutations on damage/healing');
 
-const source = new THREE.Mesh(new THREE.BufferGeometry());
+const source = new THREE.SkinnedMesh(new THREE.BufferGeometry());
 source.geometry.setAttribute(
   'position',
   new THREE.Float32BufferAttribute([0.03, 0.01, 0.1, -0.03, 0.02, 0.4], 3)
@@ -162,7 +172,9 @@ assert.deepEqual(
   'bind coordinates are unaffected by arm scale'
 );
 let disposed = 0;
-blood.texture.addEventListener('dispose', () => disposed++);
+blood.texture.addEventListener('dispose', (): void => {
+  disposed++;
+});
 blood.texture.dispose();
 assert.equal(disposed, 1, 'mask GPU resource is disposed');
 again.texture.dispose();

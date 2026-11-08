@@ -1,40 +1,81 @@
+import type { Page } from 'playwright';
+
 import { trackNodeBuilders } from '../../src/dev/native-builds.ts';
 import { packedReadback } from './native-readback.js';
 
+export interface NativePage {
+  evaluate(expression: string | (() => unknown)): Promise<unknown>;
+}
+interface ReadyPage extends NativePage {
+  waitForFunction(
+    predicate: () => boolean,
+    arg: null,
+    options: { timeout: number }
+  ): Promise<unknown>;
+}
+export interface NativeDevice {
+  vendor: string;
+  architecture: string;
+  fallback?: boolean;
+}
+function readDevice(value: unknown): NativeDevice {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    !('vendor' in value) ||
+    typeof value.vendor !== 'string' ||
+    !('architecture' in value) ||
+    typeof value.architecture !== 'string' ||
+    !('fallback' in value) ||
+    typeof value.fallback !== 'boolean'
+  ) {
+    throw new Error('invalid native adapter information');
+  }
+  return { vendor: value.vendor, architecture: value.architecture, fallback: value.fallback };
+}
+
 /** Fail on the actual boot dialog, rather than spending the readiness timeout. */
-export async function waitForGame(page, { timeout = 120000 } = {}) {
+export async function waitForGame(
+  page: ReadyPage,
+  { timeout = 120000 } = {}
+): Promise<NativeDevice> {
   await page.waitForFunction(
-    () => window.__READY__ === true || !!document.getElementById('engine-failure'),
+    (): boolean => window.__READY__ === true || !!document.getElementById('engine-failure'),
     null,
     { timeout }
   );
-  const error = await page.evaluate(() => document.getElementById('engine-failure')?.textContent);
-  if (error) throw new Error(error);
+  const error = await page.evaluate(
+    (): string | null | undefined => document.getElementById('engine-failure')?.textContent
+  );
+  if (typeof error === 'string' && error) throw new Error(error);
   return verifyNative(page);
 }
 
 /** Correctness gates accept any hardware adapter unless explicitly pinned. */
-export function assertHardwareDevice(device, selected = '') {
+export function assertHardwareDevice<T extends NativeDevice>(device: T, selected = ''): T {
   if (device.fallback !== false) throw new Error('hardware WebGPU adapter required');
   if (selected === '1002:7550!' && (device.vendor !== 'amd' || device.architecture !== 'rdna-4'))
     throw new Error('explicitly selected AMD RDNA 4 adapter required');
   return device;
 }
 
-export async function verifyPreviewNative(page) {
-  const device = await page.evaluate(() => {
+export async function verifyPreviewNative(page: NativePage): Promise<NativeDevice> {
+  const device = readDevice(
+    await page.evaluate(`(() => {
     const r = window.__PREVIEW_RENDERER__;
     if (!r?.backend.isWebGPUBackend) throw new Error('native WebGPU required');
     const a = r.backend.device.adapterInfo;
     return { vendor: a.vendor, architecture: a.architecture, fallback: a.isFallbackAdapter };
-  });
+  })()`)
+  );
   return assertHardwareDevice(device, process.env.MESA_VK_DEVICE_SELECT);
 }
 
-export async function verifyNative(page) {
+export async function verifyNative(page: NativePage): Promise<NativeDevice> {
   // Serialize the self-contained observer through Playwright, also on builds
   // which do not serve development module URLs. No runtime renderer interception.
-  const device = await page.evaluate(`(() => {
+  const device = readDevice(
+    await page.evaluate(`(() => {
     const trackNodeBuilders = ${trackNodeBuilders.toString()};
     const r = window.__ENGINE__.ctx.get('render').renderer;
     if (!r.backend.isWebGPUBackend) throw new Error('native WebGPU required');
@@ -49,7 +90,8 @@ export async function verifyNative(page) {
         object: builder.object?.name, scene: object.scene?.name, pass: object.passId });
     } });
     return { vendor: a.vendor, architecture: a.architecture, fallback: a.isFallbackAdapter };
-  })()`);
+  })()`)
+  );
   assertHardwareDevice(device, process.env.MESA_VK_DEVICE_SELECT);
   console.log('Actual native device:', device);
   return device;
@@ -57,7 +99,11 @@ export async function verifyNative(page) {
 
 /** Read the actual native final output under the normal DOM HUD. Swapchain-only
  * screenshots can be black under headless Vulkan even though rendering works. */
-export async function captureNative(page, path, options = {}) {
+export async function captureNative(
+  page: NativePage & Pick<Page, 'screenshot'>,
+  path: string,
+  options: NonNullable<Parameters<Page['screenshot']>[0]> = {}
+): Promise<void> {
   await page.evaluate(`(async () => {
     const packedReadback = ${packedReadback.toString()};
     const r = window.__ENGINE__.ctx.get('render');
@@ -85,6 +131,6 @@ export async function captureNative(page, path, options = {}) {
   try {
     await page.screenshot({ ...options, path });
   } finally {
-    await page.evaluate(() => document.getElementById('native-test-capture')?.remove());
+    await page.evaluate((): void => document.getElementById('native-test-capture')?.remove());
   }
 }

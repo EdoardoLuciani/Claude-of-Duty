@@ -2,15 +2,27 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 
 import { Fn, context, storage, vec2, vec3, vec4, float } from 'three/tsl';
-import { WGSLNodeBuilder, StorageBufferAttribute } from 'three/webgpu';
+import {
+  WebGLCoordinateSystem,
+  WGSLNodeBuilder,
+  StorageBufferAttribute,
+  Object3D,
+  Node,
+  type Renderer,
+  type Backend,
+} from 'three/webgpu';
 
 import { SURFACES_TSL } from '../../src/materials/surfaces-index-tsl.ts';
+import { fixture } from '../lib/fixture.ts';
 
 // Native WGSL captured before removing redundant scalar wrappers. Pin all seven
 // packed channels, including typed vector splats: spelling a splat as a JS value
 // can change native constant sharing even when the resulting pixels are equal.
 // Intentional surface/Three upgrades must review and refresh these baselines.
-const expected = {
+function hasBuild(value: object): value is { build(): void } {
+  return 'build' in value && typeof value.build === 'function';
+}
+const expected: Record<string, string> = {
   concrete: '3b0926084ccacc250bcb1e3862c3bcf0629b49a52fc3bb82c83a3d67536f5c06',
   concrete_floor: '3b0926084ccacc250bcb1e3862c3bcf0629b49a52fc3bb82c83a3d67536f5c06',
   brick: '1aef05f9175f901f8b5cf7350e0ee98128df0e927986f4578308e1360e33b081',
@@ -34,26 +46,38 @@ const expected = {
 assert.deepEqual(Object.keys(SURFACES_TSL), Object.keys(expected));
 for (const [name, surface] of Object.entries(SURFACES_TSL)) {
   const output = storage(new StorageBufferAttribute(7, 1), 'float', 7);
-  const compute = Fn(() => {
+  const compute = Fn((): void => {
     const s = surface(vec2(0.3, 0.6), float(2), vec3(1), vec3(0), vec4(1));
     const a = s.get('albedo');
+    assert('x' in a && a.x instanceof Node);
+    assert('y' in a && a.y instanceof Node);
+    assert('z' in a && a.z instanceof Node);
     const channels = [
       a.x,
       a.y,
       a.z,
-      ...['height', 'rough', 'metal', 'ao'].map((key) => s.get(key)),
+      ...['height', 'rough', 'metal', 'ao'].map((key): Node => s.get(key)),
     ];
     for (const [index, channel] of channels.entries()) output.element(index).assign(channel);
   })().compute(1);
-  const builder = new WGSLNodeBuilder(null, {
-    contextNode: context(),
-    backend: { capabilities: { getUniformBufferLimit: () => 65536 }, compatibilityMode: false },
-    debug: { diagnostics: { keywords: false } },
-    hasFeature: () => false,
-    getRenderTarget: () => null,
-  });
+  const builder = new WGSLNodeBuilder(
+    new Object3D(),
+    fixture<Renderer>({
+      // Match the original offline stub's non-WebGPU coordinate branch (not a live renderer).
+      coordinateSystem: WebGLCoordinateSystem,
+      contextNode: context(),
+      backend: fixture<
+        Backend & { capabilities: { getUniformBufferLimit(): number }; compatibilityMode: boolean }
+      >({ capabilities: { getUniformBufferLimit: (): number => 65536 }, compatibilityMode: false }),
+      debug: fixture<Renderer['debug']>({ diagnostics: { keywords: false } }),
+      hasFeature: (): boolean => false,
+      getRenderTarget: (): null => null,
+    })
+  );
   builder.compute = compute;
+  assert(hasBuild(builder));
   builder.build();
+  assert('computeShader' in builder && typeof builder.computeShader === 'string');
   if (process.env.DUMP_CHARACTERIZATION) console.log(`${name}\n${builder.computeShader}`);
   assert.equal(
     createHash('sha256').update(builder.computeShader).digest('hex'),

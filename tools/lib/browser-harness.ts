@@ -1,30 +1,30 @@
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess, type StdioOptions } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import net from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { chromium } from 'playwright';
+import { chromium, type Browser, type LaunchOptions } from 'playwright';
 
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-export function parseArgs(argv = process.argv.slice(2)) {
+export function parseArgs(argv = process.argv.slice(2)): Record<string, string | boolean> {
   return Object.fromEntries(
-    argv.map((arg) => {
+    argv.map((arg): [string, string | boolean] => {
       const match = arg.match(/^--([^=]+)(?:=(.*))?$/);
       return match ? [match[1], match[2] ?? true] : [arg, true];
     })
   );
 }
 
-export function portOpen(port, host = '127.0.0.1') {
-  return new Promise((resolveOpen) => {
-    const socket = net.connect({ port, host }, () => {
+export function portOpen(port: number, host = '127.0.0.1'): Promise<boolean> {
+  return new Promise((resolveOpen): void => {
+    const socket = net.connect({ port, host }, (): void => {
       socket.destroy();
       resolveOpen(true);
     });
-    socket.once('error', () => resolveOpen(false));
-    socket.setTimeout(400, () => {
+    socket.once('error', (): void => resolveOpen(false));
+    socket.setTimeout(400, (): void => {
       socket.destroy();
       resolveOpen(false);
     });
@@ -32,6 +32,15 @@ export function portOpen(port, host = '127.0.0.1') {
 }
 
 /** Start one HMR-free Vite server unless the requested port is already owned. */
+interface ViteServerOptions {
+  port?: number;
+  root?: string;
+  attempts?: number;
+  intervalMs?: number;
+  stdio?: StdioOptions;
+  noHmr?: boolean;
+  preview?: boolean;
+}
 export async function ensureViteServer({
   port = 5173,
   root = REPO_ROOT,
@@ -40,7 +49,7 @@ export async function ensureViteServer({
   stdio = 'ignore',
   noHmr = true,
   preview = false,
-} = {}) {
+}: ViteServerOptions = {}): Promise<ChildProcess | null> {
   if (await portOpen(port)) return null;
 
   const server = spawn(
@@ -53,18 +62,20 @@ export async function ensureViteServer({
       env: noHmr ? { ...process.env, OW_NO_HMR: '1' } : process.env,
     }
   );
-  let startupError = null;
-  server.once('error', (error) => {
+  let startupError: Error | null = null;
+  server.once('error', (error): void => {
     startupError = error;
   });
-  server.once('exit', (code, signal) => {
+  server.once('exit', (code, signal): void => {
     if (code !== null && code !== 0) startupError = new Error(`vite exited with code ${code}`);
     else if (signal && signal !== 'SIGTERM') startupError = new Error(`vite exited on ${signal}`);
   });
 
   for (let i = 0; i < attempts; i++) {
     if (startupError) break;
-    await new Promise((resolveWait) => setTimeout(resolveWait, intervalMs));
+    await new Promise<void>((resolveWait): void => {
+      setTimeout(resolveWait, intervalMs);
+    });
     if (await portOpen(port)) return server;
   }
 
@@ -73,13 +84,31 @@ export async function ensureViteServer({
 }
 
 /** Shared console/device-validation error collection; fixture assertions stay local. */
+interface BrowserConsoleMessage {
+  text(): string;
+  type(): string;
+}
+interface BrowserErrorSource {
+  on(event: 'pageerror', listener: (error: Error) => void): unknown;
+  on(event: 'console', listener: (message: BrowserConsoleMessage) => void): unknown;
+}
 export function collectBrowserErrors(
-  page,
-  errors,
-  { warnings = null, echo = false, validationMessages = false } = {}
-) {
-  page.on('pageerror', (error) => errors.push(error.message));
-  page.on('console', (message) => {
+  page: BrowserErrorSource,
+  errors: string[],
+  {
+    warnings = null,
+    echo = false,
+    validationMessages = false,
+  }: {
+    warnings?: string[] | null;
+    echo?: boolean;
+    validationMessages?: boolean;
+  } = {}
+): void {
+  page.on('pageerror', (error): void => {
+    errors.push(error.message);
+  });
+  page.on('console', (message): void => {
     const value = message.text();
     if (
       message.type() === 'error' ||
@@ -93,13 +122,13 @@ export function collectBrowserErrors(
   });
 }
 
-export function stopViteServer(server) {
+export function stopViteServer(server: ChildProcess | null | undefined): void {
   if (server?.exitCode === null && server.signalCode === null) server.kill();
 }
 
 /** Metal on macOS, D3D11 on Windows, Vulkan on Linux with a DRM node. Empty
  *  in CI (no /dev/dri) so Chromium keeps SwiftShader. */
-function gpuAngleArgs() {
+function gpuAngleArgs(): string[] {
   if (process.platform === 'darwin') return ['--use-angle=metal'];
   if (process.platform === 'win32') return ['--use-angle=d3d11'];
   if (existsSync('/dev/dri/renderD128')) {
@@ -114,7 +143,10 @@ function gpuAngleArgs() {
  * are temporarily out of sync (common after bun install in headless CI).
  */
 // Current gameplay/previews are native-only. Legacy comparison callers opt out.
-export async function launchChromium({ webgpu = true, ...options } = {}) {
+export async function launchChromium({
+  webgpu = true,
+  ...options
+}: LaunchOptions & { webgpu?: boolean } = {}): Promise<Browser> {
   const launch = {
     ...options,
     args: [
@@ -139,8 +171,8 @@ export async function launchChromium({ webgpu = true, ...options } = {}) {
     '/usr/bin/chromium',
     '/usr/bin/google-chrome-stable',
     '/usr/bin/google-chrome',
-  ].filter(Boolean);
-  const executablePath = candidates.find((path) => existsSync(path));
+  ].filter((path): path is string => typeof path === 'string');
+  const executablePath = candidates.find((path): boolean => existsSync(path));
   if (!executablePath) return chromium.launch(launch); // retain Playwright's useful install error
   return chromium.launch({ ...launch, executablePath });
 }

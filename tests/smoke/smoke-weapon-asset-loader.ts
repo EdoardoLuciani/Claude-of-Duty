@@ -1,48 +1,83 @@
 import assert from 'node:assert/strict';
 
-import { CompressedTexture } from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { CompressedTexture, Group } from 'three';
+import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { WorkerPool } from 'three/examples/jsm/utils/WorkerPool.js';
 
 import { disposeWeaponLoader, loadWeaponGLTF } from '../../src/weapons/asset-loader.ts';
+import { fixture } from '../lib/fixture.ts';
+import { captureMethod } from '../lib/render-fixture.ts';
 
 const saved = {
   fetch: globalThis.fetch,
-  parseGLTF: GLTFLoader.prototype.parseAsync,
-  parseTexture: KTX2Loader.prototype.parse,
-  init: KTX2Loader.prototype.init,
-  dispose: KTX2Loader.prototype.dispose,
-  postMessage: WorkerPool.prototype.postMessage,
+  parseGLTF: captureMethod(GLTFLoader.prototype, 'parseAsync'),
+  parseTexture: captureMethod(KTX2Loader.prototype, 'parse'),
+  init: captureMethod(KTX2Loader.prototype, 'init'),
+  dispose: captureMethod(KTX2Loader.prototype, 'dispose'),
+  postMessage: captureMethod(WorkerPool.prototype, 'postMessage'),
 };
-const pending = () => {
-  let resolve, reject;
-  const promise = new Promise((yes, no) => {
+interface Pending<T> {
+  promise: Promise<T>;
+  resolve(value: T | PromiseLike<T>): void;
+  reject(reason?: unknown): void;
+}
+function pending<T>(): Pending<T> {
+  let resolve: Pending<T>['resolve'] = (): never => {
+    throw Error('pending promise not initialized');
+  };
+  let reject: Pending<T>['reject'] = (): never => {
+    throw Error('pending promise not initialized');
+  };
+  const promise = new Promise<T>((yes, no): void => {
     resolve = yes;
     reject = no;
   });
   return { promise, resolve, reject };
-};
-const tick = () => new Promise((resolve) => setImmediate(resolve));
-const renderer = { hasFeature: (name) => name === 'texture-compression-bc' };
-const downloads = new Map(),
-  jobs = [],
-  parsers = [],
-  decoders = new Set();
+}
+const tick = (): Promise<void> =>
+  new Promise((resolve): void => {
+    setImmediate(resolve);
+  });
+const renderer = { hasFeature: (name: string): boolean => name === 'texture-compression-bc' };
+const downloads = new Map<string, Pending<Response>>(),
+  jobs: (Pending<MessageEvent<unknown>> & { id: number })[] = [],
+  parsers: number[] = [],
+  decoders = new Set<KTX2Loader>();
+function gltf(
+  id: number,
+  texture?: CompressedTexture | null
+): GLTF & { id: number; texture?: CompressedTexture | null } {
+  return {
+    id,
+    ...(texture === undefined ? {} : { texture }),
+    scene: new Group(),
+    scenes: [],
+    animations: [],
+    cameras: [],
+    asset: {},
+    parser: fixture<GLTF['parser']>({}),
+    userData: {},
+  };
+}
 let initializations = 0,
   disposals = 0,
   lateTextureDisposals = 0,
   initFailure = false;
-let lateScope;
-const buffer = (id) => new Uint8Array([id]).buffer;
+let lateScope: KTX2Loader | undefined;
+const buffer = (id: number): ArrayBuffer => new Uint8Array([id]).buffer;
 try {
-  globalThis.fetch = (url, { signal }) => {
-    const request = pending();
-    signal.addEventListener('abort', () => request.reject(new Error('aborted')), { once: true });
+  globalThis.fetch = (url, options): Promise<Response> => {
+    const request = pending<Response>();
+    assert(options?.signal);
+    options.signal.addEventListener('abort', (): void => request.reject(new Error('aborted')), {
+      once: true,
+    });
+    assert(typeof url === 'string');
     downloads.set(url, request);
     return request.promise;
   };
-  KTX2Loader.prototype.init = function () {
+  KTX2Loader.prototype.init = function (): Promise<void> {
     if (!this.transcoderPending) {
       initializations++;
       decoders.add(this);
@@ -54,55 +89,74 @@ try {
     }
     return this.transcoderPending;
   };
-  WorkerPool.prototype.postMessage = function (message) {
-    const job = pending();
+  WorkerPool.prototype.postMessage = function (message: unknown): Promise<MessageEvent<unknown>> {
+    assert(
+      message &&
+        typeof message === 'object' &&
+        'buffer' in message &&
+        message.buffer instanceof ArrayBuffer
+    );
+    const job = pending<MessageEvent<unknown>>();
     jobs.push({ id: new Uint8Array(message.buffer)[0], ...job });
     return job.promise;
   };
-  KTX2Loader.prototype.parse = function (data, onLoad, onError) {
+  KTX2Loader.prototype.parse = function (data, onLoad, onError): void {
     void this.init()
-      .then(() => this.workerPool.postMessage({ buffer: data }))
-      .then((event) => {
+      .then((): Promise<MessageEvent<unknown>> => this.workerPool.postMessage({ buffer: data }))
+      .then((event: MessageEvent<unknown>): void => {
         // Like the pinned loader, destructure success data before inspecting errors.
-        const { faces } = event.data.data;
+        const reply = event.data;
+        assert(reply && typeof reply === 'object' && 'data' in reply);
+        const payload = reply.data;
+        assert(payload && typeof payload === 'object' && 'faces' in payload);
+        const { faces } = payload;
         assert(faces);
-        const texture = new CompressedTexture();
-        texture.addEventListener('dispose', () => lateTextureDisposals++);
-        onLoad(texture);
+        const texture = new CompressedTexture([], 1, 1);
+        texture.addEventListener('dispose', (): void => {
+          lateTextureDisposals++;
+        });
+        onLoad?.(texture);
       })
       .catch(onError);
   };
-  KTX2Loader.prototype.dispose = function () {
+  KTX2Loader.prototype.dispose = function (): void {
     disposals++;
   };
-  GLTFLoader.prototype.parseAsync = async function (data, path) {
+  GLTFLoader.prototype.parseAsync = async function (data, path): Promise<GLTF> {
+    assert(data instanceof ArrayBuffer);
     const id = new Uint8Array(data)[0];
     assert.equal(path, '/models/');
     parsers.push(id);
     const textures = this.ktx2Loader;
+    assert(textures);
     if (id === 9) {
       // Non-textured diagnostics never start Basis.
-      return { id };
+      return gltf(id);
     }
-    const image = new Promise((resolve) => textures.parse(data, resolve, () => resolve(null)));
+    const image = new Promise<CompressedTexture | null>((resolve): void =>
+      textures.parse(data, resolve, (): void => resolve(null))
+    );
     if (id === 3) {
       lateScope = textures;
       await tick(); // Start decoding before geometry fails.
       throw new Error('bad geometry');
     }
     const texture = await image; // GLTFLoader swallows image errors into null.
-    return { id, texture };
+    return gltf(id, texture);
   };
-  const respond = (id, ok = true) =>
-    downloads.get(`/models/${id}.glb`).resolve({
-      ok,
-      status: ok ? 200 : 404,
-      arrayBuffer: async () => buffer(id),
-    });
-  const complete = (id, error = null) => {
-    const job = jobs.find((job) => job.id === id);
+  const respond = (id: number, ok = true): void => {
+    const download = downloads.get(`/models/${id}.glb`);
+    assert(download);
+    download.resolve(new Response(buffer(id), { status: ok ? 200 : 404 }));
+  };
+  const complete = (id: number, error: string | null = null): void => {
+    const job = jobs.find((job): boolean => job.id === id);
     assert(job, `texture task ${id} started`);
-    job.resolve({ data: error ? { type: 'error', error } : { data: { faces: [] } } });
+    job.resolve(
+      new MessageEvent('message', {
+        data: error ? { type: 'error', error } : { data: { faces: [] } },
+      })
+    );
   };
 
   const first = loadWeaponGLTF(renderer, '/models/1.glb');
@@ -142,22 +196,25 @@ try {
   await rejected;
   await tick();
   assert.equal(lateTextureDisposals, 1, 'discard textures completed after geometry rejection');
-  let lateError;
+  assert(lateScope);
+  let lateError: unknown;
   lateScope.parse(
     buffer(30),
-    () => assert.fail('closed scope loaded texture'),
-    (error) => {
+    (): never => assert.fail('closed scope loaded texture'),
+    (error: unknown): void => {
       lateError = error;
     }
   );
+  assert(lateError instanceof Error);
   assert.match(lateError.message, /scope closed/);
-  assert(!jobs.some((job) => job.id === 30));
+  assert(!jobs.some((job): boolean => job.id === 30));
   const requested = downloads.size;
   lateScope.load(
     '/late.ktx2',
-    () => assert.fail('closed scope loaded image'),
+    (): never => assert.fail('closed scope loaded image'),
     undefined,
-    (error) => {
+    (error: unknown): void => {
+      assert(error instanceof Error);
       assert.match(error.message, /scope closed/);
     }
   );
@@ -168,7 +225,7 @@ try {
   const brokenTexture = loadWeaponGLTF(renderer, '/models/5.glb');
   const textureRejected = assert.rejects(
     brokenTexture,
-    (error) => error === 'original transcode error'
+    (error: unknown): boolean => error === 'original transcode error'
   );
   respond(5);
   await tick();

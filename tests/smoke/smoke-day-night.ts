@@ -1,19 +1,27 @@
 import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
+import { uniform } from 'three/tsl';
+import { MeshStandardNodeMaterial } from 'three/webgpu';
 
+import type { Agent } from '../../src/ai/agent.ts';
 import { AiSystem } from '../../src/ai/index.ts';
 import { FxSystem } from '../../src/fx/index.ts';
 import { MaterialSystemNode } from '../../src/materials/index.ts';
+import { Health } from '../../src/player/health.ts';
 import { PlayerSystem } from '../../src/player/index.ts';
 import { FLASHLIGHT } from '../../src/player/tuning.ts';
 import { RenderSystem } from '../../src/render/index-webgpu.ts';
+import { IndirectFill } from '../../src/render/indirect-webgpu.ts';
 import { MOON_ILLUMINANCE_NIGHT } from '../../src/sky/atmosphere.ts';
 import { Celestial } from '../../src/sky/celestial.ts';
 import { SkySystem } from '../../src/sky/index.ts';
 import { CLOCK } from '../../src/sky/tuning.ts';
 import { WorldSystem } from '../../src/world/index.ts';
 import { OUTAGE, tickStreetlightOutage } from '../../src/world/lighting.ts';
+import { createTestContext } from '../lib/context.ts';
+import { fixture } from '../lib/fixture.ts';
+import { captureMethod } from '../lib/render-fixture.ts';
 
 assert.equal(MOON_ILLUMINANCE_NIGHT, 0.03);
 assert.equal(CLOCK.startHour, 16.5);
@@ -33,21 +41,29 @@ assert.equal(tickStreetlightOutage(state, 0.02, 23), 1, 'three full dark minutes
 assert.equal(tickStreetlightOutage(state, 1600, 21), 1, 'next night does not retrigger');
 
 // Clock update uses scaled dt, wraps midnight, and stops on death.
-const player = { dead: false };
-const ctx = { camera: new THREE.PerspectiveCamera(), time: { elapsed: 0 }, peek: () => player };
-const sky = Object.assign(Object.create(SkySystem.prototype), {
+const playerHealth = fixture<Health>({ dead: false });
+const player = fixture<PlayerSystem>({
+  get dead(): boolean {
+    return playerHealth.dead;
+  },
+});
+const ctx = createTestContext({ providers: { player } });
+const sky = fixture<SkySystem>({
+  update: captureMethod(SkySystem.prototype, 'update'),
+  _skyDirty: false,
+  _envDirty: false,
   hour: CLOCK.startHour,
   timeRate: CLOCK.hoursPerSecond,
-  shared: {
-    uCloudParams: { value: new THREE.Vector4() },
-    uStarParams: { value: new THREE.Vector4() },
-    uFogDrift: { value: new THREE.Vector3() },
-  },
-  cloudShadowAt: () => 1,
+  shared: fixture<SkySystem['shared']>({
+    uCloudParams: uniform(new THREE.Vector4()),
+    uStarParams: uniform(new THREE.Vector4()),
+    uFogDrift: uniform(new THREE.Vector3()),
+  }),
+  cloudShadowAt: (): number => 1,
   _cloudOcclusion: 1,
   _envAge: 0,
-  _applyLightIntensities() {},
-  _updateCelestial() {},
+  _applyLightIntensities(): void {},
+  _updateCelestial(): void {},
 });
 sky.update(0, ctx);
 assert.equal(sky.hour, 16.5, 'pause/shop scaled dt freezes clock');
@@ -55,10 +71,10 @@ sky.update(600, ctx);
 assert.ok(Math.abs(sky.hour - 1.5) < 1e-10);
 sky.update(100, ctx);
 assert.ok(Math.abs(sky.hour - 3) < 1e-10, 'clock continues toward dawn');
-player.dead = true;
+playerHealth.dead = true;
 sky.update(100, ctx);
 assert.equal(sky.hour, 3);
-player.dead = false;
+playerHealth.dead = false;
 sky.timeRate = 0;
 sky.update(100, ctx);
 assert.equal(sky.hour, 3, 'capture default zero rate holds explicit time');
@@ -68,22 +84,25 @@ const moon = new THREE.DirectionalLight(0xaabbff, 0),
   sun = new THREE.DirectionalLight(0xffeeaa, 3);
 const keyProxy = new THREE.DirectionalLight(),
   secondaryProxy = new THREE.DirectionalLight();
-const skyLights = Object.assign(new SkySystem(), {
-  keyLight: moon,
-  sunLight: sun,
-  moonLight: moon,
-  _cloudOcclusion: 1,
+const skyLights = new SkySystem();
+skyLights.keyLight = moon;
+skyLights.sunLight = sun;
+skyLights.moonLight = moon;
+skyLights._cloudOcclusion = 1;
+skyLights.shared = fixture<SkySystem['shared']>({
+  uKeyDir: uniform(skyLights.keyDirection),
+  uKeyIrr: uniform(new THREE.Vector3()),
 });
-skyLights.shared = {
-  uKeyDir: { value: skyLights.keyDirection },
-  uKeyIrr: { value: new THREE.Vector3() },
-};
+const providers = { sky: skyLights };
+const lightingCtx = createTestContext({ providers });
 let shadowSetups = 0;
-const render = Object.assign(Object.create(RenderSystem.prototype), {
+const render = fixture<RenderSystem>({
+  _syncSun: captureMethod(RenderSystem.prototype, '_syncSun'),
+  _lightsReady: false,
   _skyKey: keyProxy,
   _skySecondary: secondaryProxy,
-  indirect: { sunDir: { value: new THREE.Vector3() } },
-  _setupShadows(light) {
+  indirect: new IndirectFill(lightingCtx),
+  _setupShadows(light): void {
     assert.equal(light, keyProxy);
     shadowSetups++;
   },
@@ -99,7 +118,7 @@ for (const key of [moon, sun, moon]) {
     skyLights.keyDirection.distanceTo(key.position.clone().sub(key.target.position).normalize()) <
       1e-12
   );
-  render._syncSun({ get: () => skyLights });
+  render._syncSun(lightingCtx);
   assert.equal(render.activeSun, keyProxy, 'handoffs retain the shader light identity');
   assert.equal(render.sunDir, skyLights.keyDirection);
   assert.equal(render.indirect.sunDir.value, skyLights.keyDirection);
@@ -125,7 +144,7 @@ assert.equal(shadowSetups, 1);
   skyLights._applyLightIntensities();
   assert.equal(skyLights.keyLight, moon);
   const key = skyLights.keyDirection.clone();
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1));
+  const mesh = new THREE.SkinnedMesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshBasicMaterial());
   mesh.geometry.computeBoundingSphere();
   mesh.position.set(0, 20, 0);
   mesh.updateMatrixWorld(true);
@@ -134,18 +153,24 @@ assert.equal(shadowSetups, 1);
   camera.position.copy(shadow).add(new THREE.Vector3(0, 2, 6));
   camera.lookAt(shadow);
   camera.updateMatrixWorld(true);
-  const a = { mesh, position: mesh.position, radius: 0.34, height: 2, alive: true };
-  const ai = Object.assign(Object.create(AiSystem.prototype), {
+  const a = fixture<Agent>({ mesh, position: mesh.position, radius: 0.34, height: 2, alive: true });
+  const ai = fixture<AiSystem>({
+    _sky: null,
+    _sunDirection: captureMethod(AiSystem.prototype, '_sunDirection'),
+    _updateRelevance: captureMethod(AiSystem.prototype, '_updateRelevance'),
+    canRollback: captureMethod(AiSystem.prototype, 'canRollback'),
     agents: [a],
-    ctx: { camera, peek: () => skyLights },
-    _phys: { staticWorld: { dirty: false } },
+    ctx: createTestContext({ camera, providers }),
+    phys: fixture<NonNullable<AiSystem['_phys']>>({
+      staticWorld: fixture<NonNullable<AiSystem['_phys']>['staticWorld']>({ dirty: false }),
+    }),
     _frustum: new THREE.Frustum(),
     _mvp: new THREE.Matrix4(),
     _sphere: new THREE.Sphere(),
     _sweep: new THREE.Sphere(),
     _sun: new THREE.Vector3(),
-    _lodStats: {},
-    stats: {},
+    _lodStats: fixture<AiSystem['_lodStats']>({}),
+    stats: fixture<AiSystem['stats']>({}),
   });
   const originalSun = celestial.sun.clone();
   skyLights.keyDirection.copy(originalSun); // negative control: former astronomical direction
@@ -164,10 +189,13 @@ assert.equal(shadowSetups, 1);
   mesh.geometry.dispose();
   mesh.material.dispose();
 }
-const materials = Object.assign(new MaterialSystemNode(), {
-  _shared: { keyDir: { value: null }, keyColor: { value: new THREE.Vector3() } },
+
+const materials = new MaterialSystemNode();
+materials._shared = fixture<NonNullable<MaterialSystemNode['_shared']>>({
+  keyDir: uniform(new THREE.Vector3()),
+  keyColor: uniform(new THREE.Vector3()),
 });
-materials.update(0, { peek: (id) => (id === 'sky' ? skyLights : render) });
+materials.update(0, lightingCtx);
 assert.equal(materials._shared.keyDir.value, skyLights.keyDirection);
 // The key uses the placed light (including its near-horizon clamp), not the
 // distinct astronomical sun/moon directions used by sky discs and atmosphere.
@@ -178,7 +206,7 @@ assert(skyLights.keyDirection.y > 0);
 assert.equal(materials._shared.keyDir.value, skyLights.shared.uKeyDir.value);
 moon.intensity = 0;
 skyLights._applyLightIntensities();
-render._syncSun({ get: () => skyLights });
+render._syncSun(lightingCtx);
 assert.equal(render.activeSun.intensity, 0, 'zero owned key stays dark');
 assert.equal('sun' in render, false);
 skyLights.keyLight = moon;
@@ -186,7 +214,9 @@ sun.intensity = 3;
 
 // FX runs before render synchronization: emitted data must use this tick's
 // authored key, not yesterday's proxy value. Preview stubs retain a fallback.
-const fx = Object.assign(Object.create(FxSystem.prototype), {
+const fx = fixture<FxSystem>({
+  _syncLighting: captureMethod(FxSystem.prototype, '_syncLighting'),
+  _viewAttached: false,
   render,
   layers: [],
   _sunView: new THREE.Vector3(),
@@ -196,7 +226,7 @@ const fx = Object.assign(Object.create(FxSystem.prototype), {
   _upView: new THREE.Vector3(),
   _fog: new THREE.Vector4(),
 });
-const fxCtx = { camera: ctx.camera, scene: new THREE.Scene(), peek: () => skyLights };
+const fxCtx = createTestContext({ camera: ctx.camera, providers });
 keyProxy.intensity = 4.3;
 fx._syncLighting(fxCtx);
 assert.equal(fx._sunFactor, 0, 'dark authored key wins over stale bright proxy');
@@ -204,7 +234,7 @@ skyLights.keyLight = sun;
 fx._syncLighting(fxCtx);
 assert.equal(fx._sunFactor, sun.intensity / 4.3);
 assert.equal(fx._sunCol.x, sun.color.r * sun.intensity);
-fx._syncLighting({ ...fxCtx, peek: () => null });
+fx._syncLighting(createTestContext({ camera: fxCtx.camera, scene: fxCtx.scene }));
 assert.equal(fx._sunFactor, 1, 'isolated FX preview can use its render stub');
 
 // Native applies the legacy renderer practical gain (.55) in the world owner.
@@ -215,11 +245,14 @@ lamp.userData.owNightIntensity = 14;
 const bulb = new THREE.PointLight();
 bulb.userData.owDayIntensity = 1;
 bulb.userData.owNightIntensity = 22;
-const world = Object.assign(Object.create(WorldSystem.prototype), {
-  ctx: { peek: () => ({ sunAltitude: -1 }) },
+const nightCtx = createTestContext({ providers: { sky: fixture<SkySystem>({ sunAltitude: -1 }) } });
+const world = fixture<WorldSystem>({
+  setStreetlightPower: captureMethod(WorldSystem.prototype, 'setStreetlightPower'),
+  _updateLights: captureMethod(WorldSystem.prototype, '_updateLights'),
+  ctx: nightCtx,
   lamps: [lamp],
   bulbs: [bulb],
-  lampLens: { emissiveIntensity: 0 },
+  lampLens: new MeshStandardNodeMaterial({ emissiveIntensity: 0 }),
   _lampMix: -1,
   _lampPower: -1,
 });
@@ -228,16 +261,18 @@ assert.equal(lamp.intensity, 14 * 0.55);
 assert.equal(bulb.intensity, 22 * 0.55);
 world.setStreetlightPower(0);
 assert.equal(lamp.intensity, 0);
-assert.equal(world.lampLens.emissiveIntensity, 0);
+assert.equal(world.lampLens!.emissiveIntensity, 0);
 assert.equal(bulb.intensity, 22 * 0.55);
 assert.equal(lamp.visible, true, 'power cut does not remove a shader light slot');
 world.setStreetlightPower(1);
 assert.equal(lamp.intensity, 14 * 0.55);
 
 // Toggle keeps the spot/shadow slot, follows camera, and refuses a dead player.
-const p = Object.assign(Object.create(PlayerSystem.prototype), {
+const p = fixture<PlayerSystem>({
+  setFlashlightEnabled: captureMethod(PlayerSystem.prototype, 'setFlashlightEnabled'),
+  lateUpdate: captureMethod(PlayerSystem.prototype, 'lateUpdate'),
   ctx,
-  health: { dead: false },
+  health: new Health(ctx, null),
   flashlightOn: false,
   flashlight: new THREE.SpotLight(FLASHLIGHT.color, 0),
 });

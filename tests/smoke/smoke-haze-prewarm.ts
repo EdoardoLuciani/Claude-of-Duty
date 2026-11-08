@@ -1,9 +1,15 @@
 import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
+import type { Renderer } from 'three/webgpu';
 
 import { HazeSystem } from '../../src/fx/haze.ts';
-const geometry = new THREE.PlaneGeometry();
+import { fixture } from '../lib/fixture.ts';
+import { captureMethod } from '../lib/render-fixture.ts';
+const plane = new THREE.PlaneGeometry();
+const geometry = new THREE.InstancedBufferGeometry();
+THREE.BufferGeometry.prototype.copy.call(geometry, plane);
+plane.dispose();
 geometry.setDrawRange(2, 9);
 geometry.instanceCount = 7;
 const material = new THREE.MeshBasicMaterial(),
@@ -12,33 +18,35 @@ mesh.visible = false;
 const scene = new THREE.Scene();
 scene.add(mesh);
 const camera = new THREE.PerspectiveCamera(),
-  target = {},
-  original = {};
-const haze = Object.assign(Object.create(HazeSystem.prototype), {
+  target = new THREE.RenderTarget(),
+  original = new THREE.RenderTarget();
+const haze = fixture<HazeSystem>({
+  prewarm: captureMethod(HazeSystem.prototype, 'prewarm'),
+  render: captureMethod(HazeSystem.prototype, 'render'),
   rt: target,
   scene,
-  layer: { mesh, geometry },
+  layer: fixture<HazeSystem['layer']>({ mesh, geometry }),
   _live: false,
 });
-let current = original,
-  alpha = 0.4,
+let current: THREE.RenderTarget | null = original;
+let alpha = 0.4,
   fail = false,
   draws = 0;
 const color = new THREE.Color(0.1, 0.2, 0.3),
   saved = color.clone();
-const renderer = {
-  getRenderTarget: () => current,
-  setRenderTarget: (value) => {
+const renderer = fixture<Renderer>({
+  getRenderTarget: (): THREE.RenderTarget | null => current,
+  setRenderTarget: (value): void => {
     current = value;
   },
-  getClearColor: (out) => out.copy(color),
-  getClearAlpha: () => alpha,
-  setClearColor: (value, a = alpha) => {
+  getClearColor: (out): THREE.Color => out.copy(color),
+  getClearAlpha: (): number => alpha,
+  setClearColor: (value, a = alpha): void => {
     color.set(value);
     alpha = a;
   },
-  clear() {},
-  render(s, c) {
+  clear(): void {},
+  render(s, c): void {
     draws++;
     assert.equal(current, target);
     assert.equal(s, scene);
@@ -48,19 +56,22 @@ const renderer = {
     assert.equal(mesh.visible, true);
     if (fail) throw new Error('intentional haze warm failure');
   },
-};
+});
 for (const graph of [false, true])
   for (const bad of [false, true]) {
     fail = bad;
     const draw = graph
-      ? async () => {
+      ? async (): ReturnType<
+          import('../../src/render/index-webgpu.ts').RenderSystem['_warmGraph']
+        > => {
           await Promise.resolve();
           haze.render(renderer, camera);
+          return { ms: 0, geometries: 1, frameUnchanged: true };
         }
       : null;
     const result = await haze.prewarm(renderer, camera, draw);
     assert.equal(result.ok, !bad);
-    if (bad) assert.match(result.error, /intentional haze warm failure/);
+    if (bad) assert.match(result.error ?? '', /intentional haze warm failure/);
     assert.equal(current, original);
     assert.deepEqual(color, saved);
     assert.equal(alpha, 0.4);
