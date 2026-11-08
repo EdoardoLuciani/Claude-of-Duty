@@ -25,7 +25,7 @@ export async function testNav(platforms: readonly (readonly [number, number, num
     if (geometry instanceof THREE.BufferGeometry) geometry.dispose();
     const material: unknown = o.material;
     if (Array.isArray(material)) {
-      for (const entry: unknown of material) if (entry instanceof THREE.Material) entry.dispose();
+      for (const entry of material) if (entry instanceof THREE.Material) entry.dispose();
     } else if (material instanceof THREE.Material) material.dispose();
   });
   return SurfaceNav.load(bake.buffer, physics);
