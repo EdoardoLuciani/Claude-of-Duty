@@ -3,8 +3,6 @@ import math
 import bpy
 from mathutils import Vector, Quaternion, Matrix
 
-FPS=120
-
 def eq(e):return Quaternion((1,0,0),e[0])@Quaternion((0,1,0),e[1])@Quaternion((0,0,1),e[2])
 
 def author_review_hands(root,rig,hand_controls,all_parts,clips,*,basis,label):
