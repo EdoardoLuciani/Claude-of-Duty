@@ -144,7 +144,6 @@ export class AiSystem {
   declare grid: SurfaceNav | null;
   declare cover: CoverMap | null;
   declare inspect: boolean;
-  declare debugLog: boolean;
   declare forcePopulate: boolean;
   declare _wave: number;
   declare _waveTotal: number;
@@ -230,7 +229,6 @@ export class AiSystem {
     this.grid = null;
     this.cover = null;
     this.inspect = false;
-    this.debugLog = false;
     /** dev: force the garrison to spawn even in deterministic capture runs */
     this.forcePopulate = false;
     /** Wave director: the boot garrison is wave 1; every time the field goes
@@ -1293,15 +1291,6 @@ export class AiSystem {
           const f = Math.max(0.001, this.corpseTtl - a.deadTime);
           a.group.scale.setScalar((a.scale ?? 1) * f);
         }
-        if (this.debugLog && a.ragdoll && !a._loggedDoll && a.deadTime > 1.2) {
-          a._loggedDoll = true;
-          const b = a.ragdoll.aabb;
-          console.info(
-            `[ai] ragdoll ${a.id} settled: ${(b.maxx - b.minx).toFixed(2)} x ` +
-              `${(b.maxy - b.miny).toFixed(2)} x ${(b.maxz - b.minz).toFixed(2)} m ` +
-              `at y=${b.miny.toFixed(2)} sleeping=${a.ragdoll.sleeping}`
-          );
-        }
       }
     }
     this._updateGrenades(dt);
@@ -1840,12 +1829,6 @@ export class AiSystem {
       placedPositions.push(pos.clone());
       this._stagedAgents = this._stagedAgents ?? [];
       this._stagedAgents.push(a);
-      if (this.debugLog) {
-        console.info(
-          `[ai] staged ${variant} at ${pos.x.toFixed(1)},${pos.y.toFixed(2)},${pos.z.toFixed(1)} ` +
-            `d=${cam.position.distanceTo(pos).toFixed(1)}m`
-        );
-      }
     }
 
     // One man already down, handed to the ragdoll solver with the round's

@@ -21,7 +21,7 @@ import {
   makeClosest,
 } from './math.ts';
 import { Ballistics, type ActorRegionImpact } from './penetration.ts';
-import { Ragdoll, humanoidSpec, specFromSkeleton } from './ragdoll.ts';
+import { Ragdoll, specFromSkeleton } from './ragdoll.ts';
 import { RigidBody, RigidBodyWorld } from './rigidbody.ts';
 import type { RigidBodyOptions } from './rigidbody.ts';
 import type { SurfaceName } from './surfaces.ts';
@@ -1443,15 +1443,3 @@ function segmentHitsAabb(
   hi = Math.min(hi, Math.max(t0, t1));
   return hi >= Math.max(0, lo) && lo <= len;
 }
-
-export {
-  LAYER,
-  MASK,
-  SURFACE,
-  SURFACE_NAMES,
-  SURFACE_PROPS,
-  humanoidSpec,
-  CharacterController,
-  RigidBody,
-  Ragdoll,
-};

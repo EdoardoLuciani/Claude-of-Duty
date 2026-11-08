@@ -5,7 +5,6 @@ import { PMREMGenerator } from 'three/webgpu';
 import type { Renderer, Node } from 'three/webgpu';
 
 import type { SystemId, EngineContext } from '../core/context.ts';
-import { applyDefinedPatch } from '../core/patch.ts';
 import type { RenderSystem } from '../render/index-webgpu.ts';
 import { createAtmosphereNodes, createRaymarchSky, createSkyViewLookup } from './atmosphere-tsl.ts';
 import {
@@ -68,11 +67,6 @@ interface SkyWeather {
   windSpeed: number;
   windAngle: number;
   horizonMurk: number;
-}
-interface SkyWeatherPatch extends Partial<SkyWeather> {
-  fogDensity?: number;
-  fogHeight?: number;
-  shaftGain?: number;
 }
 interface SkyFog {
   scatter: number;
@@ -402,12 +396,6 @@ export class SkySystem {
   get timeOfDay(): number {
     return this.hour;
   }
-  get sunDirection(): THREE.Vector3 {
-    return this.celestial.sun;
-  }
-  get moonDirection(): THREE.Vector3 {
-    return this.celestial.moon;
-  }
   get sunAltitude(): number {
     return this.celestial.sunAlt;
   }
@@ -446,31 +434,6 @@ export class SkySystem {
           `knee=${this.shared.uSkyRolloff.value.x.toFixed(3)}`
       );
     }
-    return this;
-  }
-
-  /** Hours of sky time per second of wall clock. 0 freezes the sun. */
-  setTimeRate(hoursPerSecond: number): this {
-    this.timeRate = hoursPerSecond || 0;
-    return this;
-  }
-
-  setWeather(patch: SkyWeatherPatch = {}): this {
-    const { fogDensity, fogHeight, shaftGain, ...weather } = patch;
-    applyDefinedPatch(this.weather, weather);
-    if (fogDensity !== undefined) {
-      const k = fogDensity;
-      this._fog.scatter = 3.6e-3 * k;
-      this._fog.extinction = 1.45e-3 * k;
-    }
-    if (fogHeight !== undefined) this._fog.heightScale = fogHeight;
-    if (shaftGain !== undefined) this._fog.shaftGain = shaftGain;
-    this._applyWeather();
-    this._applyFog();
-    // Turbidity is baked into all three LUTs, so it needs the static bake too.
-    if (patch.turbidity !== undefined) this.luts.bakeStatic(this.renderer);
-    this._skyDirty = true;
-    this._envDirty = true;
     return this;
   }
 

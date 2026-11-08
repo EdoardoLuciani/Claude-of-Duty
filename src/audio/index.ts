@@ -890,9 +890,6 @@ export class AudioSystem {
   setBusVolume(bus: BusName, v: number): void {
     this.mixer?.setBusVolume(bus, v);
   }
-  setAmbienceIntensity(v: number): void {
-    if (this.ambience) this.ambience.intensity = clamp(v, 0, 3);
-  }
 
   _onIntelOperation(e: { active?: boolean }): void {
     this._intelOperating = e.active === true;

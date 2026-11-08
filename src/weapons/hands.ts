@@ -3,7 +3,6 @@ import * as THREE from 'three';
 import { bindArmAsset, type ArmAsset } from './arm-asset.ts';
 import { createArmControls } from './arm-controls.ts';
 import { HAND_POSES, HAND_POSE_EASE } from './hand-poses.ts';
-export { HAND_POSES } from './hand-poses.ts';
 
 // Gameplay owns contact/IK; Blender owns the skin and authored contact poses.
 const THUMB = { l0: 0.05, l1: 0.032, r1: 0.0102, r2: 0.0078 };

@@ -235,7 +235,7 @@ export class RenderSystem {
     const options: PipelineOptions = {
       gtao: this.q.gtao,
       taa: this.q.taa,
-      bloomStrength: this.q.bloom ? this.settings.bloomStrength : 0,
+      bloomStrength: this.settings.bloomStrength,
       bloomThreshold: this.settings.bloomThreshold,
       grade: this.grade,
       // Postprocessing draws with an orthographic fullscreen camera. Its

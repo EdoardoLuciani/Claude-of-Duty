@@ -73,7 +73,7 @@ export class PixiAmmoView {
     // Build per-frame label strings only when their source value changes.
     if (ammo !== this.lastAmmo) this.label(this.current, String((this.lastAmmo = ammo)));
     if (reserve !== this.lastReserve) this.label(this.reserve, `/ ${(this.lastReserve = reserve)}`);
-    this.label(this.name, s.weaponName ?? s.name ?? 'M4A1', 166);
+    this.label(this.name, s.weaponName ?? 'M4A1', 166);
     if (mode !== this.lastMode) this.label(this.mode, (this.lastMode = mode).toUpperCase());
     const color = ammo === 0 ? RED : ammo / mag <= 0.34 ? AMBER : INK;
     if (this.current.tint !== color) {

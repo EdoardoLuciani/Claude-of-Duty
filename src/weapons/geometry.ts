@@ -172,4 +172,3 @@ export function triCount(geo: THREE.BufferGeometry): number {
 }
 
 /** Re-exported so dev probes can reach the same THREE instance. */
-export { THREE };

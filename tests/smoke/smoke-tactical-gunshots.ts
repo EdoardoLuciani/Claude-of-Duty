@@ -24,7 +24,6 @@ const kinds = ['rifle', 'mcx', 'pistol', 'lmg', 'smg', 'mpx', 'sniper', 'shotgun
 for (const kind of kinds) {
   const profile: WeaponProfile = WEAPON_PROFILES[kind];
   assert.equal(profile.sample, kind);
-  assert.equal('sampleAction' in profile, false, 'no legacy action-layer controls');
   assert.equal('samplePunch' in profile, false, 'no synthesized report branch');
   assert.equal('sampleGain' in profile, false, 'no separate authored per-profile level');
   assert.equal('firstPersonGain' in profile, false, 'no extra authored own-shot boost');

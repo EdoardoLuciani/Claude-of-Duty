@@ -60,15 +60,6 @@ interface RagdollBounds {
   maxy: number;
   maxz: number;
 }
-interface CapsuleOut {
-  ax: number;
-  ay: number;
-  az: number;
-  bx: number;
-  by: number;
-  bz: number;
-  r: number;
-}
 interface SkeletonSpecOptions {
   mass?: number;
   stubLength?: number;
@@ -914,20 +905,6 @@ export class Ragdoll {
     a.maxx = maxx;
     a.maxy = maxy;
     a.maxz = maxz;
-  }
-
-  /** World-space capsule of bone i: writes head/tail/radius into `out`. */
-  getBoneCapsule(i: number, out: CapsuleOut): CapsuleOut {
-    const a = this.boneHead[i],
-      c = this.boneTail[i];
-    out.ax = this.px[a];
-    out.ay = this.py[a];
-    out.az = this.pz[a];
-    out.bx = this.px[c];
-    out.by = this.py[c];
-    out.bz = this.pz[c];
-    out.r = this.boneRadius[i];
-    return out;
   }
 
   /**

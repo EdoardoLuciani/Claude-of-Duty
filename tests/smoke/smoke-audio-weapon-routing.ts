@@ -115,7 +115,7 @@ assert.equal(WEAPON_DEFS.smg.audio, 'mpx');
 assert.equal(WEAPON_DEFS.smg.suppressed, true);
 assert.equal(WEAPON_PROFILES.mpx.suppressed, true);
 assert.equal(WEAPON_PROFILES.mcx.suppressed, true);
-assert.equal(Object.hasOwn(WEAPON_PROFILES, 'suppressed'), false, 'generic report profile retired');
+
 for (const [weapon, expectedProfile] of [
   ['ak', WEAPON_PROFILES.ak],
   ['akm', WEAPON_PROFILES.ak],

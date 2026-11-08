@@ -445,10 +445,6 @@ export class UiSystem {
     this.prompt.clear();
   }
 
-  setHudVisible(v: boolean): void {
-    this.hudTarget = v ? 1 : 0;
-  }
-
   installStartGate(): void {
     this.startGate = new StartGate(this.ctx.engine);
   }
@@ -616,7 +612,7 @@ export class UiSystem {
     this.hit.update(dt);
     this.arcs.update(dt, rx, rz, fx, fz);
     this.health.update(dt, s);
-    this.ammo.update(dt, s, rawElapsed);
+    this.ammo.update(s, rawElapsed);
     this.killfeed.update(dt);
     this.scoreBar.update(s);
     if (s.healing) {

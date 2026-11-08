@@ -304,7 +304,6 @@ export function installShotApi(
     if (shot.time !== undefined) engine.ctx.peek('sky')?.setTimeOfDay?.(shot.time);
     shot.apply?.(engine, readShotOptions(options));
 
-    engine.events.emit('shot:applied', { name, shot });
     return { applied: name, pos: shot.pos, fov: shot.fov ?? engine.config.fov };
   };
 

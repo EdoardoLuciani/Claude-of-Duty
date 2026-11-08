@@ -832,5 +832,3 @@ function rotZ(q: THREE.Quaternion, x: number, y: number, z: number): number {
 
 /** Shared closest-point record; `closestPtPointTriangle` writes b* into it. */
 const _cpt = makeClosest();
-
-export { rotX, rotY, rotZ, integrateQuaternion };

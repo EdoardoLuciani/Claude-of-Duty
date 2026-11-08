@@ -591,11 +591,6 @@ export class WeaponSystem {
     return this._sinceShot < 0.12;
   }
 
-  /** Current spread cone half-angle in degrees — the crosshair should use this. */
-  get spreadDegrees(): number {
-    return this._spread;
-  }
-
   muzzleWorld(out: THREE.Vector3): THREE.Vector3 {
     return this.viewmodel.muzzleWorld(out ?? this._tmp);
   }
@@ -1588,7 +1583,7 @@ export class WeaponSystem {
       // Auto-reload on a dry trigger pull, like every modern shooter.
       if (input.firePressed && st.empty) this.reload();
     } else if (this.debugMode && !this.disabled && player?.dead !== true) {
-      this._runDebug(ctx);
+      this._runDebug();
       st.trigger = this._sinceShot < 0.09;
     } else {
       st.trigger = false;
@@ -1837,8 +1832,7 @@ export class WeaponSystem {
     return true;
   }
 
-  _runDebug(ctx: EngineContext): void {
-    void ctx;
+  _runDebug(): void {
     this._debugFrame = (this._debugFrame ?? 0) + 1;
     const frames = this._scriptFrames;
     if (!frames) return;

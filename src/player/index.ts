@@ -774,9 +774,6 @@ export class PlayerSystem {
   get sliding(): boolean {
     return this.movement.sliding;
   }
-  get slideProgress(): number {
-    return this.movement.slideProgress;
-  }
   get grounded(): boolean {
     return this.movement.grounded;
   }
@@ -786,35 +783,14 @@ export class PlayerSystem {
   get mantling(): boolean {
     return this.movement.mantleMotion.active || this.movement.climbMotion.active;
   }
-  get leanAmount(): number {
-    return this.movement.leanAmount;
-  }
-  get eyeHeight(): number {
-    return this.rig.eye;
-  }
-  get adsProgress(): number {
-    return this.adsAmount;
-  }
-  get viewKick(): CameraRig['viewKick'] {
-    return this.rig.viewKick;
-  }
   get height(): number {
     return STANCE[this.movement.stance].height;
-  }
-  get maxHealth(): number {
-    return this.health.max;
-  }
-  get healthFraction(): number {
-    return this.health.fraction;
   }
   get dead(): boolean {
     return this.health.dead;
   }
   get suppression(): number {
     return this.health.suppression;
-  }
-  get bobPhase(): number {
-    return this.rig.bobPhase;
   }
 
   /** `weapons` owns the ADS curve; hand it over and everything else follows. */

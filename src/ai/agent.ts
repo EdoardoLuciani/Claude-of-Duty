@@ -357,7 +357,6 @@ export class Agent {
   declare hudX?: number;
   declare hudZ?: number;
   declare hudFade?: number;
-  declare _loggedDoll?: boolean;
 
   constructor(ai: AiSystem, opts: AgentOptions = {}) {
     this.ai = ai;
@@ -3354,12 +3353,6 @@ export class Agent {
       // wide radius: a tight one dumps all of it into whichever light bone is
       // nearest and whips the limb across the street
       rd.applyImpulse(point.x, point.y, point.z, impulse.x, impulse.y, impulse.z, 0.85);
-    }
-    if (this.ai.debugLog) {
-      console.info(
-        `[ai] ragdoll ${rd.boneCount} bones / ${rd.particleCount} particles, ` +
-          `mask=${rd.mask} tris=${rd.world?.triCount}`
-      );
     }
     return rd;
   }

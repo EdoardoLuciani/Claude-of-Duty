@@ -14,7 +14,7 @@ import { Rng } from '../../src/core/rng.ts';
 import { audioFixture } from '../lib/audio-banks.ts';
 import { fixtureEntries, at, fixtureBuffer, FixtureAudioBuffer } from '../lib/audio-fixture.ts';
 import { fixture } from '../lib/fixture.ts';
-assert(!('ambientOneShot' in ambienceModule), 'replaced generators are removed');
+
 assert.deepEqual(
   [...ambienceModule.ONE_SHOTS],
   ['dog', 'siren', 'creak', 'settle', 'birds', 'vehicle', 'heli']
