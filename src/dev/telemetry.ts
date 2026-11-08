@@ -357,17 +357,21 @@ function pushWorst<K extends string, T extends Record<K, number | null>>(
     return false;
   }
   // The first record seeds the scan (as before, including NaN timings); a zero-capacity
-  // list rejects everything.
-  let min = -1;
-  let least = 0;
-  for (const [i, item] of list.entries()) {
+  // list rejects everything. Runs per hitch, so the scan keeps a manual index.
+  const [first] = list;
+  if (!first) return true;
+  let min = 0;
+  let least = first[key] ?? 0;
+  let i = 0;
+  for (const item of list) {
     const value = item[key] ?? 0;
-    if (min < 0 || value < least) {
+    if (value < least) {
       min = i;
       least = value;
     }
+    i++;
   }
-  if (min < 0 || (rec[key] ?? 0) <= least) return true;
+  if ((rec[key] ?? 0) <= least) return true;
   list[min] = rec;
   return false;
 }

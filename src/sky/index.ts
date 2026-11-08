@@ -14,6 +14,7 @@ import {
   SUN_ILLUMINANCE_TOP,
   MOON_ILLUMINANCE_NIGHT,
   transmittanceToSpace,
+  type RGB,
 } from './atmosphere.ts';
 import { BakePass, hdrTarget } from './bake.ts';
 import { Celestial } from './celestial.ts';
@@ -124,7 +125,10 @@ const SUN_KEY_GAIN = 1.55;
 const SKY_AMBIENT_FRACTION = 0.15;
 
 /** Cool night hue for the published ambient — moonlight after the Purkinje shift. */
-const NIGHT_AMBIENT_HUE: readonly [number, number, number] = [0.35, 0.5, 1.0];
+const NIGHT_AMBIENT_HUE: Readonly<RGB> = [0.35, 0.5, 1.0];
+/** Sun key tint and Purkinje-shifted moonlight, scaled by transmittance each frame. */
+const SUN_TINT: Readonly<RGB> = [1.0, 0.975, 0.94];
+const MOON_COOL: Readonly<RGB> = [0.66, 0.8, 1.0];
 
 /** Atmosphere/LUTs, astronomy, clouds, fog and PMREM ownership.
  * Public and render integration contracts: ARCHITECTURE.md.
@@ -561,7 +565,7 @@ export class SkySystem {
     // snaps off at sunset instead of dimming through the last half degree.
     const discS = THREE.MathUtils.clamp(0.5 + muS / (2 * 0.004654), 0, 1);
     transmittanceToSpace(Math.max(muS, 0.0008), mie, this._sunT);
-    const tint: readonly [number, number, number] = [1.0, 0.975, 0.94];
+    const tint = SUN_TINT;
     const T = this._sunT;
     // The key is the disc PLUS its aureole: raising the transmittance to a power
     // below one keeps the ordering and hue direction while pulling the
@@ -607,7 +611,7 @@ export class SkySystem {
     transmittanceToSpace(Math.max(muM, 0.0008), mie, this._moonT);
     const MT = this._moonT;
     // Moonlight reads cool because scotopic vision peaks blue (Purkinje shift).
-    const cool: readonly [number, number, number] = [0.66, 0.8, 1.0];
+    const cool = MOON_COOL;
     const mr = MT[0] * cool[0];
     const mg = MT[1] * cool[1];
     const mb = MT[2] * cool[2];

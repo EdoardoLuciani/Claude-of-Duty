@@ -148,26 +148,15 @@ export class IntelSystem {
       priority: 0.5,
     };
     this._kit = makeKit(ctx.get('materials'));
-    this._pool = Array.from(
-      { length: INTEL.aliveMax },
-      (): {
-        id: string;
-        x: number;
-        y: number;
-        z: number;
-        group: THREE.Group & { lid: THREE.Group };
-        open: number;
-        pulse: { x: number; y: number; z: number; radius: 12 };
-      } => ({
-        id: '',
-        x: 0,
-        y: 0,
-        z: 0,
-        group: makeCrate(this._kit),
-        open: 0,
-        pulse: { x: 0, y: 0, z: 0, radius: INTEL.pulseRadius },
-      })
-    );
+    this._pool = Array.from({ length: INTEL.aliveMax }, (): IntelCache => ({
+      id: '',
+      x: 0,
+      y: 0,
+      z: 0,
+      group: makeCrate(this._kit),
+      open: 0,
+      pulse: { x: 0, y: 0, z: 0, radius: INTEL.pulseRadius },
+    }));
     this._off = [];
     const on = <K extends keyof IntelEventMap>(
       type: K,
@@ -192,13 +181,7 @@ export class IntelSystem {
     h.pulseTime = this.ctx.time.elapsed;
     h.pulses.length = this._alive.length;
     let i = 0;
-    for (const cache of this._alive) {
-      const slot = cache.pulse;
-      slot.x = cache.x;
-      slot.y = cache.y;
-      slot.z = cache.z;
-      h.pulses[i++] = slot;
-    }
+    for (const cache of this._alive) h.pulses[i++] = cache.pulse;
     return h;
   }
 
@@ -369,6 +352,9 @@ export class IntelSystem {
     cache.x = marker.x;
     cache.y = marker.y;
     cache.z = marker.z;
+    cache.pulse.x = marker.x;
+    cache.pulse.y = marker.y;
+    cache.pulse.z = marker.z;
     cache.group.visible = true;
     cache.group.position.set(cache.x, cache.y, cache.z);
     // Keep the authored footprint; arbitrary yaw can put a corner through furniture.
@@ -468,7 +454,7 @@ export class IntelSystem {
   reset(): void {
     this._interrupt();
     this._clearPrompt();
-    for (let last = this._alive.at(-1); last; last = this._alive.at(-1)) this._despawn(last);
+    for (const cache of this._alive.slice()) this._despawn(cache);
     this._used.clear();
     this.secured = 0;
     this._beepAt = this._announceAt = this._lastWave = 0;

@@ -1128,7 +1128,6 @@ export const IMPACTS = {
   rubber: (fx: ImpactFx, p: Vec3Like, n: Vec3Like, i: Vec3Like): void => soft(fx, p, n, i, true),
 } satisfies Record<SurfaceName, ImpactRecipe>;
 
-/** Dispatch on surface name; unknown surfaces fall back to concrete. */
 /** Exit spall travels out of the far face; it never paints an entry crater. */
 export function spawnExit(
   fx: ImpactFx,
@@ -1172,6 +1171,7 @@ export function spawnExit(
   }
 }
 
+/** Dispatch on surface name; unknown runtime surfaces fall back to concrete. */
 export function spawnImpact(
   fx: ImpactFx,
   point: Vec3Like,

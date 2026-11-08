@@ -16,7 +16,7 @@ export const SUN_ILLUMINANCE_TOP = 128000 / SCENE_LUX; // 5.12
  */
 export const MOON_ILLUMINANCE_NIGHT = 0.03;
 
-type RGB = [number, number, number];
+export type RGB = [number, number, number];
 
 export const ATMO = {
   groundRadiusMM: 6.36,

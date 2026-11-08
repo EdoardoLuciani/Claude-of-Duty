@@ -70,7 +70,7 @@ const CONTACT_URLS = {
   ...EXPLOSION_URLS,
 };
 type ContactKind = keyof typeof CONTACT_URLS;
-/** Round-robin indices are kept modulo the bank size; a miss means a stale index. */
+/** Round-robin indices are kept modulo the bank size; a miss means an unloaded slot. */
 function loaded(buffers: readonly AudioBuffer[], index: number, label: string): AudioBuffer {
   const buffer = buffers[index];
   if (!buffer) throw new RangeError(`[audio] ${label} recording ${index} is not loaded`);
@@ -413,7 +413,7 @@ export class WeaponSampleBank {
       const farIndex = this.indices[farKind] ?? 0;
       this.indices[farKind] = (farIndex + 1) % farChoices.length;
       const far = actx.createBufferSource();
-      far.buffer = farChoices[farIndex]!;
+      far.buffer = loaded(farChoices, farIndex, farKind);
       far.playbackRate.value = 1;
       const closeWeight = Math.cos((mix * Math.PI) / 2);
       const farWeight = Math.sin((mix * Math.PI) / 2) * (REPORT_DISTANT_MATCH[farKind] ?? 1);

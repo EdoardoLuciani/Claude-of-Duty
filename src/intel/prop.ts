@@ -31,27 +31,23 @@ export function makeKit(materials?: IntelMaterials): IntelKit {
     owned.push(mat);
     return mat;
   };
-  const body = surface('metal_painted', 0x889577, 0.8, 0.15);
-  const metal = surface('metal_rust', 0x777c75, 0.5, 0.9);
-  const circuit = surface('metal_painted', 0x40895d, 0.7, 0.1);
-  const components = surface('rubber', 0x343a37, 0.85, 0);
-  const traces = surface('metal_brushed', 0xc2a35b, 0.4, 1);
-  const beacon = new THREE.MeshBasicNodeMaterial({ color: 0xff0802 });
-  const leds = new THREE.MeshBasicNodeMaterial({ color: 0x53ffb1 });
+  const base = {
+    body: surface('metal_painted', 0x889577, 0.8, 0.15),
+    metal: surface('metal_rust', 0x777c75, 0.5, 0.9),
+    circuit: surface('metal_painted', 0x40895d, 0.7, 0.1),
+    components: surface('rubber', 0x343a37, 0.85, 0),
+    traces: surface('metal_brushed', 0xc2a35b, 0.4, 1),
+    beacon: new THREE.MeshBasicNodeMaterial({ color: 0xff0802 }),
+    leds: new THREE.MeshBasicNodeMaterial({ color: 0x53ffb1 }),
+  };
   // The lid reuses the body finishes; `label` is added below when a canvas exists.
   const mats: Record<string, THREE.Material> = {
-    body,
-    metal,
-    circuit,
-    components,
-    traces,
-    beacon,
-    leds,
-    lid: body,
-    lidMetal: metal,
-    lining: components,
+    ...base,
+    lid: base.body,
+    lidMetal: base.metal,
+    lining: base.components,
   };
-  owned.push(beacon, leds);
+  owned.push(base.beacon, base.leds);
   const parts: Record<string, THREE.BufferGeometry[]> = {};
   const add = (kind: string, geo: THREE.BufferGeometry): void => {
     (parts[kind] ??= []).push(geo);
