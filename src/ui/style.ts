@@ -73,12 +73,7 @@ const CSS = `
   user-select: none;
 }
 
-.ow-hud .lbl {
-  font-size: calc(10.5px * var(--k));
-  letter-spacing: .2em;
-  color: var(--ink-2);
-  text-shadow: var(--sh);
-}
+
 .ow-layer { position:absolute; inset:0; }
 /* ================================================================== menu */
 .ow-menu {
@@ -400,8 +395,6 @@ const CSS = `
   letter-spacing:.22em; color:var(--ink-3); text-shadow:var(--sh);
 }
 
-/* ============================================================== fadeouts */
-.ow-hidden { display:none !important; }
 
 /* ============================================================== radio */
 .ow-radio {
