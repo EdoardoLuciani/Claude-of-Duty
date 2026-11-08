@@ -3087,20 +3087,32 @@ export class Agent {
       return;
     }
     this._muzzleBlocked = false;
+    // A long frame may owe more than one round; the bound drops the rest. Only
+    // a round that is already due re-enters, so an emptied magazine still
+    // reloads on a later frame rather than with its last shot.
+    for (
+      let n = 1;
+      this._fireRound(dt) && n < COMBAT.maxShotsPerFrame && this.fireCooldown <= 0;
+      n++
+    );
+  }
+
+  /** Fire one round if every gate allows it; false ends this frame's fire. */
+  _fireRound(dt: number): boolean {
     if (this.ammo <= 0) {
       this.animator.reload(this.variantName === 'irregular' ? 2.9 : 2.35);
       this.ai.emitReload(this);
       this.ammo = this.magSize;
-      return;
+      return false;
     }
     if (this.burstLeft <= 0) {
-      if (this.burstCooldown > 0) return;
+      if (this.burstCooldown > 0) return false;
       this.burstLeft = this.rng.int(COMBAT.burstMin, COMBAT.burstMax);
       this.burstCooldown =
         this.rng.range(COMBAT.burstGapMin, COMBAT.burstGapMax) +
         this.suppression * COMBAT.burstGapSuppress;
     }
-    if (this.fireCooldown > 0) return;
+    if (this.fireCooldown > 0) return false;
 
     const an = this.animator;
     const origin = an.muzzleWorld;
@@ -3113,13 +3125,18 @@ export class Agent {
       this.ai.stats.friendlyHolds++;
       this._friendlyBlock += dt;
       if (this._friendlyBlock >= FRIENDLY_HOLD) this._breakFriendlyPeek();
-      return;
+      return false;
     }
     this._friendlyBlock = 0;
-    this.fireCooldown = 1 / this.fireRate;
+    // Overshoot of a cooldown that ran out during this frame carries into the
+    // next round, so cadence does not depend on frame rate. Older idle time
+    // (a burst gap, a block, a reload) does not bank rounds.
+    const carry = this.fireCooldown > -dt ? this.fireCooldown : 0;
+    this.fireCooldown = 1 / this.fireRate + carry;
     this.burstLeft--;
     this.ammo--;
     an.fire(1);
+    return true;
   }
 
   _shotBlockedByFriend(origin: THREE.Vector3, dir: THREE.Vector3): boolean {
