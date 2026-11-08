@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Build every generated runtime asset, skipping steps whose inputs are unchanged.
  * Blender 5.2.2 and gltfpack 1.3 are needed only when a Blender step is stale.
@@ -6,13 +6,13 @@
  *
  * Player arms run first, then the bandage, which re-saves player-arms.blend.
  * Every weapon loads that blend, so arm changes rebuild all weapons. The EXPS3
- * sight and soldiers are independent. The Node-only stages (procedural textures,
+ * sight and soldiers are independent. The Bun stages (procedural textures,
  * soldier/spent-hull staging, world generation) keep their own caches.
  *
  * Input hashes live in .cache/assets/, outside node_modules so `bun ci` keeps them.
- * Usage: node tools/build-assets.mjs [--force]   Env: BLENDER, GLTFPACK tool paths.
+ * Usage: bun tools/build-assets.ts [--force]   Env: BLENDER, GLTFPACK tool paths.
  */
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn, spawnSync, type StdioOptions } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   closeSync,
@@ -31,7 +31,21 @@ import { fileURLToPath } from 'node:url';
 
 import { REVISION } from 'three';
 
-import { GLTFPACK_FLAGS, GLTFPACK_VERSION, MODEL_COOKS } from '../build/models.mjs';
+import {
+  GLTFPACK_FLAGS,
+  GLTFPACK_VERSION,
+  MODEL_COOKS,
+  isModelId,
+  type ModelId,
+} from '../build/models.ts';
+
+interface AssetStep {
+  id: string;
+  inputs: string[];
+  outputs: string[];
+  salt?: string[];
+  commands: Array<[string, ...string[]]>;
+}
 import {
   ASSET_ROOT as SOLDIERS,
   BLENDER_VERSION,
@@ -49,7 +63,7 @@ const CORES = availableParallelism();
 const JOBS = Math.max(1, Math.min(4, Math.floor(CORES / 4)));
 const THREADS = String(Math.max(1, Math.floor(CORES / JOBS)));
 
-const blender = (script) => [
+const blender = (script: string): [string, ...string[]] => [
   BLENDER,
   '-b',
   '-t',
@@ -59,14 +73,14 @@ const blender = (script) => [
   '--python',
   script,
 ];
-const node = (...args) => [process.execPath, ...args];
+const bun = (...args: string[]): [string, ...string[]] => [process.execPath, ...args];
 /** Hand-authored JSON beside the generated products; manifest.json is a product. */
-const authoredJson = (dir) =>
+const authoredJson = (dir: string): string[] =>
   readdirSync(join(ROOT, dir))
-    .filter((file) => file.endsWith('.json') && file !== 'manifest.json')
-    .map((file) => `${dir}/${file}`);
+    .filter((file): boolean => file.endsWith('.json') && file !== 'manifest.json')
+    .map((file): string => `${dir}/${file}`);
 
-const ARMS = {
+const ARMS: AssetStep = {
   id: 'arms',
   inputs: [
     'tools/blender/player_arms.py',
@@ -81,22 +95,23 @@ const ARMS = {
   commands: [blender('tools/blender/player_arms.py'), blender('tools/blender/player_bandage.py')],
 };
 
-const SOLDIER_STEP = {
+const SOLDIER_STEP: AssetStep = {
   id: 'soldiers',
   inputs: [...SOLDIER_INPUTS],
   salt: [REVISION],
   outputs: ['assets/soldiers/manifest.json'],
-  commands: [node('tools/blender/soldiers/export.mjs', '--output', SOLDIERS)],
+  // Keep the Blender authoring CLI on Node; only the parent orchestration moves to Bun.
+  commands: [['node', 'tools/blender/soldiers/export.mjs', '--output', SOLDIERS]],
 };
 
 // Shared Blender sources imported beyond a weapon's own tooling directory.
-const SHARED_TOOLS = {
+const SHARED_TOOLS: Partial<Record<ModelId, string[]>> = {
   evolys: ['tools/blender/review_hands.py'],
   mpx: ['tools/blender/review_hands.py'],
 };
 
 /** One Blender build plus its gltfpack cook for a MODEL_COOKS entry. */
-function cookStep(id, salt) {
+function cookStep(id: ModelId, salt: string[]): AssetStep {
   const { directory, source, output } = MODEL_COOKS[id];
   const standalone = id === 'exps3';
   const tools = standalone
@@ -110,24 +125,24 @@ function cookStep(id, salt) {
     outputs: [`${directory}/${source}`, output],
     commands: [
       blender(standalone ? tools[0] : `tools/blender/${id}/build.py`),
-      node('build/models.mjs', id),
+      bun('build/models.ts', id),
     ],
   };
 }
 
-function listFiles(path) {
+function listFiles(path: string): string[] {
   const abs = join(ROOT, path);
   if (!statSync(abs).isDirectory()) return [path];
   return readdirSync(abs, { recursive: true, withFileTypes: true })
     .filter(
-      (entry) =>
+      (entry): boolean =>
         entry.isFile() && !entry.name.endsWith('.md') && !entry.parentPath.includes('__pycache__')
     )
-    .map((entry) => relative(ROOT, join(entry.parentPath, entry.name)).split(sep).join('/'))
+    .map((entry): string => relative(ROOT, join(entry.parentPath, entry.name)).split(sep).join('/'))
     .sort();
 }
 
-function inputHash(step) {
+function inputHash(step: AssetStep): string {
   const hash = createHash('sha256').update([RECIPE, step.id, ...(step.salt ?? [])].join('\0'));
   for (const path of step.inputs.flatMap(listFiles))
     // CRLF checkouts alone must not trigger a Blender rebuild.
@@ -140,7 +155,7 @@ function inputHash(step) {
 }
 
 let blenderChecked = false;
-function checkBlender() {
+function checkBlender(): void {
   if (blenderChecked) return;
   blenderChecked = true;
   const result = spawnSync(BLENDER, ['--version'], { encoding: 'utf8' });
@@ -156,22 +171,22 @@ function checkBlender() {
     );
 }
 
-const run = ([command, ...args], stdio) =>
-  new Promise((done) => {
+const run = ([command, ...args]: [string, ...string[]], stdio: StdioOptions): Promise<number> =>
+  new Promise((done): void => {
     const child = spawn(command, args, { cwd: ROOT, stdio });
-    child.on('error', () => done(1));
-    child.on('exit', (code) => done(code ?? 1));
+    child.on('error', (): void => done(1));
+    child.on('exit', (code): void => done(code ?? 1));
   });
 
 let failed = false;
-async function build(step) {
+async function build(step: AssetStep): Promise<void> {
   const hash = inputHash(step);
   const stamp = join(CACHE, `${step.id}.sha256`);
   if (
     !FORCE &&
     existsSync(stamp) &&
     readFileSync(stamp, 'utf8') === hash &&
-    step.outputs.every((file) => existsSync(join(ROOT, file)))
+    step.outputs.every((file): boolean => existsSync(join(ROOT, file)))
   ) {
     console.log(`[assets] ${step.id}: up to date`);
     return;
@@ -199,19 +214,24 @@ async function build(step) {
 }
 
 /** Build steps on JOBS workers; stops starting new steps after a failure. */
-async function pool(steps) {
+async function pool(steps: AssetStep[]): Promise<void> {
   const queue = [...steps];
   await Promise.all(
-    Array.from({ length: JOBS }, async () => {
-      while (queue.length && !failed) await build(queue.shift());
+    Array.from({ length: JOBS }, async (): Promise<void> => {
+      while (!failed) {
+        const step = queue.shift();
+        if (!step) break;
+        await build(step);
+      }
     })
   );
 }
 
-const stage = (file, ...args) => run(node(join(ROOT, 'tools', file), ...args), 'inherit');
+const stage = (file: string, ...args: string[]): Promise<number> =>
+  run(bun(join(ROOT, 'tools', file), ...args), 'inherit');
 const force = FORCE ? ['--force'] : [];
-// The Node-only world build is independent of Blender assets; run it alongside.
-const stages = [stage('export-world.mjs', ...force)];
+// The Bun world build is independent of Blender assets; run it alongside.
+const stages = [stage('export-world.ts', ...force)];
 if (!process.env.OW_SKIP_ASSETS) {
   mkdirSync(CACHE, { recursive: true });
   // Weapons load the arms blend, so they wait for it and hash its inputs.
@@ -220,12 +240,13 @@ if (!process.env.OW_SKIP_ASSETS) {
     const armsHash = inputHash(ARMS);
     await pool(
       Object.keys(MODEL_COOKS)
-        .filter((id) => id !== 'exps3')
-        .map((id) => cookStep(id, [armsHash]))
+        .filter(isModelId)
+        .filter((id): boolean => id !== 'exps3')
+        .map((id): AssetStep => cookStep(id, [armsHash]))
     );
   }
   if (!failed)
-    stages.push(stage('export-proc-textures.mjs', ...force), stage('export-models.mjs', ...force));
+    stages.push(stage('export-proc-textures.ts', ...force), stage('export-models.ts', ...force));
 }
 const codes = await Promise.all(stages);
 process.exit(failed ? 1 : (codes.find(Boolean) ?? 0));

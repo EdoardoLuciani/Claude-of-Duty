@@ -1333,7 +1333,9 @@ export function buildGate(A) {
   for (const lx of [-0.6, 0.6]) {
     const sx = bags.x + Math.cos(bags.ry) * lx;
     const sz = bags.z - Math.sin(bags.ry) * lx;
-    const skirt = keyedRng('bag-skirt', sx, sz); // own stream: gate edits never re-roll it
+    // Authored identity, not trig-derived coordinates: V8 and JavaScriptCore
+    // can differ by one ULP, which would otherwise hash to a different stream.
+    const skirt = keyedRng('bag-skirt', 'gate', lx);
     groundSkirt(A, skirt, sx, bagY, sz, 0.44, {
       pebbles: skirt.int(1, 3),
       key: 'sand',

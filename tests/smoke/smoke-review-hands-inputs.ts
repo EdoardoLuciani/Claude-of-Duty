@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { stripTypeScriptTypes } from 'node:module';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 
-import { GLTFPACK_FLAGS, GLTFPACK_VERSION, MODEL_COOKS } from '../../build/models.mjs';
+import { GLTFPACK_FLAGS, GLTFPACK_VERSION, MODEL_COOKS } from '../../build/models.ts';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
-const source = readFileSync(join(root, 'tools/build-assets.mjs'), 'utf8');
+const source = readFileSync(join(root, 'tools/build-assets.ts'), 'utf8');
 // Exercise the real cook-step/input-hash functions without launching asset builds.
 const definitions = source.slice(
   source.indexOf('const SHARED_TOOLS'),
@@ -17,7 +18,7 @@ const definitions = source.slice(
 assert(definitions.includes('function cookStep') && definitions.includes('function inputHash'));
 function hash(id: string, changed = ''): string {
   const result: unknown = runInNewContext(
-    `${definitions}\ninputHash(cookStep(${JSON.stringify(id)}, []));`,
+    `${stripTypeScriptTypes(definitions)}\ninputHash(cookStep(${JSON.stringify(id)}, []));`,
     {
       ROOT: root,
       RECIPE: 'test',
@@ -27,7 +28,7 @@ function hash(id: string, changed = ''): string {
       // Calibration and arm salts are independent of the tooling dependency under test.
       authoredJson: (): string[] => [],
       blender: (script: string): string[] => ['blender', script],
-      node: (...args: string[]): string[] => ['node', ...args],
+      bun: (...args: string[]): string[] => ['bun', ...args],
       createHash,
       join,
       relative,

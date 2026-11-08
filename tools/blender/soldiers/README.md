@@ -2,7 +2,7 @@
 
 `vanguard`, `irregular` and `breacher` are supported; unknown names and rifle
 styles fail explicitly. Python owns geometry; dev/build generate the ignored
-products in `assets/soldiers/` (via `tools/build-assets.mjs`). `bun run models`
+products in `assets/soldiers/` (via `tools/build-assets.ts`). `bun run models`
 validates and stages GLB/JSON into the ignored `public/models/soldiers/` directory. No mesh
 product is an authoring input.
 
