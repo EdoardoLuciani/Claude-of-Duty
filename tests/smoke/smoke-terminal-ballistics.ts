@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /** Behavioural contract: one trajectory owns collisions, damage and feedback. */
 import assert from 'node:assert/strict';
 

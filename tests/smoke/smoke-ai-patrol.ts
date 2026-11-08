@@ -5,7 +5,7 @@ import * as THREE from 'three';
 /**
  * Headless regressions for issue 274: patrol/search recovery after route failure.
  *
- *   node tests/smoke/smoke-ai-patrol.ts
+ *   bun test ./tests/smoke/smoke-ai-patrol.ts
  */
 import type { Agent } from '../../src/ai/agent.ts';
 import { STATE, PATH_OUTCOME, EVIDENCE, SEARCH_DURATION } from '../../src/ai/agent.ts';

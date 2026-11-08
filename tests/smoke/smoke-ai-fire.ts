@@ -8,7 +8,7 @@ import * as THREE from 'three';
  * Combat fire must not stall forever on failed/deferred navigation or
  * cover waits. Assert shots and wait bounds, not just wantFire.
  *
- *   node tests/smoke/smoke-ai-fire.ts
+ *   bun test ./tests/smoke/smoke-ai-fire.ts
  */
 import type { Agent } from '../../src/ai/agent.ts';
 import {

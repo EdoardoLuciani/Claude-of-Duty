@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { stripTypeScriptTypes } from 'node:module';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 
+import { Transpiler } from 'bun';
+
 import { GLTFPACK_FLAGS, GLTFPACK_VERSION, MODEL_COOKS } from '../../build/models.ts';
+
+const transpiler = new Transpiler({ loader: 'ts', target: 'bun' });
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const source = readFileSync(join(root, 'tools/build-assets.ts'), 'utf8');
@@ -18,7 +21,7 @@ const definitions = source.slice(
 assert(definitions.includes('function cookStep') && definitions.includes('function inputHash'));
 function hash(id: string, changed = ''): string {
   const result: unknown = runInNewContext(
-    `${stripTypeScriptTypes(definitions)}\ninputHash(cookStep(${JSON.stringify(id)}, []));`,
+    `${transpiler.transformSync(definitions)}\ninputHash(cookStep(${JSON.stringify(id)}, []));`,
     {
       ROOT: root,
       RECIPE: 'test',

@@ -1,11 +1,11 @@
 /**
- * Node smoke test for bandage healing — no browser.
+ * Bun smoke test for bandage healing — no browser.
  *
  * Replaces passive regen with hold-to-heal consumables. Covers the contract
  * in issue #287: no waiting refill, cancel preserves the item, completion
  * heals and consumes once, armour-only hits do not cancel, health damage does.
  *
- *   node tests/smoke/smoke-heal.ts
+ *   bun test ./tests/smoke/smoke-heal.ts
  */
 import assert from 'node:assert/strict';
 

@@ -17,7 +17,7 @@ class WorkerErrorEvent extends Event implements ErrorEvent {
   }
 }
 
-/** Node transport for the production browser worker, with optional protocol recording. */
+/** Bun's Node-compatible transport for the production browser worker, with optional protocol recording. */
 export class NativeWorker extends EventTarget implements Worker {
   readonly messages: ClientMessage[] = [];
   readonly results: Extract<WorkerMessage, { type: 'result' }>[] = [];

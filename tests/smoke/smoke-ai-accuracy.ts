@@ -5,7 +5,7 @@ import * as THREE from 'three';
 /**
  * Deterministic accuracy / reaction baselines for issue 276.
  *
- *   node tests/smoke/smoke-ai-accuracy.ts
+ *   bun test ./tests/smoke/smoke-ai-accuracy.ts
  */
 import type { Agent } from '../../src/ai/agent.ts';
 import { STATE } from '../../src/ai/agent.ts';

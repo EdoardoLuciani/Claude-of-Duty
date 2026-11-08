@@ -1,7 +1,7 @@
 /**
- * Node smoke test for telemetry archives — no browser.
+ * Bun smoke test for telemetry archives — no browser.
  *
- *   node tests/smoke/smoke-telemetry.ts
+ *   bun test ./tests/smoke/smoke-telemetry.ts
  */
 import assert from 'node:assert/strict';
 import { gunzipSync } from 'node:zlib';
@@ -73,9 +73,12 @@ const check = (name: string, cond: boolean, extra = ''): void => {
   recorder.ctx = createTestContext({ providers: { models } });
   const first = (recorder.meta = telemetryMeta('code-A'));
   const fetch = globalThis.fetch;
-  globalThis.fetch = (): never => {
-    throw new Error('must not request deployment B');
-  };
+  globalThis.fetch = Object.assign(
+    (): never => {
+      throw new Error('must not request deployment B');
+    },
+    { preconnect: fetch.preconnect }
+  );
   try {
     recorder._fillWorldProvenance();
     recorder.meta = telemetryMeta('next-session');

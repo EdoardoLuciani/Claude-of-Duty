@@ -5,7 +5,7 @@ import * as THREE from 'three';
 /**
  * Headless regressions for issue 267.
  *
- *   node tests/smoke/smoke-ai-combat.ts
+ *   bun test ./tests/smoke/smoke-ai-combat.ts
  */
 import { bakePhysicsNav } from '#worldgen/nav-bake';
 

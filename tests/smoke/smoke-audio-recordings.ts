@@ -62,11 +62,14 @@ actx.decodeAudioData = (bytes): Promise<AudioBuffer> =>
 const bank = new WeaponSampleBank(actx);
 const fetch = globalThis.fetch;
 try {
-  globalThis.fetch = async (input): Promise<Response> => {
-    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-    fetched.push(relative(url));
-    return new Response(new TextEncoder().encode(relative(url)));
-  };
+  globalThis.fetch = Object.assign(
+    async (input: Parameters<typeof fetch>[0]): Promise<Response> => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      fetched.push(relative(url));
+      return new Response(new TextEncoder().encode(relative(url)));
+    },
+    { preconnect: fetch.preconnect }
+  );
   const loading = bank.load();
   await new Promise((resolve): NodeJS.Immediate => setImmediate(resolve));
   assert.equal(pending.length, 375);

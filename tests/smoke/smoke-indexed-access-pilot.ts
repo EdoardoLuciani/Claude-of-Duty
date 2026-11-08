@@ -2,7 +2,7 @@
  * Issue 602 pilot: indexed reads made explicit for noUncheckedIndexedAccess keep
  * accepting valid inputs and fail (or report absence) at the original boundary.
  *
- *   node tests/smoke/smoke-indexed-access-pilot.ts
+ *   bun test ./tests/smoke/smoke-indexed-access-pilot.ts
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

@@ -31,7 +31,7 @@ const params = new URLSearchParams(location.search);
 const capture = params.get('capture') === '1';
 // Deterministic shutter for the pixel gate: the engine does not schedule its own
 // frames, the driver advances exactly N of them through window.__PUMP__. Opt-in,
-// because tools that measure real frame pacing (tools/perf.mjs) need the loop to
+// because tools that measure real frame pacing (tools/perf.ts) need the loop to
 // free-run. See the long comment in src/dev/shots.ts.
 const lockstep = capture && params.get('lockstep') === '1';
 

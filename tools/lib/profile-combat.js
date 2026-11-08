@@ -1,4 +1,4 @@
-// Browser-only diagnostic fixture; injected into the served checkout by profile.mjs.
+// Browser-only diagnostic fixture; injected into the served checkout by profile.ts.
 // Normal AI sensing/navigation/fire and real weapon/physics/FX paths. Large finite
 // HP pools keep both sides alive, without disabling damage, suppression or hit FX.
 export function createCombatProfile(engine, combatLane, { realtime = false, agents = 5 } = {}) {

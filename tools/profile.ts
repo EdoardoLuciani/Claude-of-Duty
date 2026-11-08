@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /** Sustained living-combat baseline; fixture/measurement limits live below. */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -14,7 +14,29 @@ import {
 } from './lib/browser-harness.ts';
 import { combatLane } from './lib/combat-fixture.ts';
 import { waitForGame } from './lib/native-render.ts';
-import { createCombatProfile, validateCombatProfile } from './lib/profile-combat.js';
+import {
+  createCombatProfile,
+  validateCombatProfile,
+  type CombatReport,
+} from './lib/profile-combat.js';
+import type { FrameSample, GpuSample, ProfileStage, Distribution } from './lib/profile-types.ts';
+
+interface ProfileResult {
+  samples: FrameSample[];
+  combat: CombatReport | null;
+  failure: string | null;
+  gpuFailure: string | null;
+  gpuSamples: GpuSample[] | null;
+  worker: unknown;
+  stages: Array<
+    Omit<ProfileStage, 'ms' | 'calls'> & { ms: number[] | null; calls: number[] }
+  > | null;
+  timeOrigin: number;
+  simulationSeconds: number | null;
+  hardware: unknown;
+  internal: unknown;
+  prewarm: Window['__PREWARM__'];
+}
 
 const args = parseArgs();
 const out = String(args.out ?? '/tmp/combat-profile.json');
@@ -41,7 +63,7 @@ const options = [
   'production',
 ];
 assert(
-  Object.keys(args).every((key) => options.includes(key)),
+  Object.keys(args).every((key): boolean => options.includes(key)),
   `Supported options: ${options.join(', ')}`
 );
 const port = Number(args.port ?? 8080),
@@ -54,7 +76,7 @@ const quality = String(args.quality ?? 'high'),
   agents = Number(args.agents ?? 5);
 assert([5, 12].includes(agents), 'agents must be 5 or 12');
 assert(
-  !args['query-trial'] || ['base', 'repeat'].includes(args['query-trial']),
+  !args['query-trial'] || ['base', 'repeat'].includes(String(args['query-trial'])),
   'query-trial must be base or repeat'
 );
 assert(Number.isInteger(port) && port > 0 && port <= 65535, 'invalid port');
@@ -64,7 +86,9 @@ assert(
 );
 assert(Number.isInteger(warmup) && warmup >= 0 && warmup <= 600, 'warmup must be 0..600 frames');
 assert(
-  [width, height].every((n) => Number.isInteger(n) && n > 0) && Number.isFinite(dpr) && dpr > 0,
+  [width, height].every((n): boolean => Number.isInteger(n) && n > 0) &&
+    Number.isFinite(dpr) &&
+    dpr > 0,
   'invalid resolution'
 );
 assert(['low', 'medium', 'high', 'ultra'].includes(quality), 'invalid quality');
@@ -80,12 +104,16 @@ const dirty = !!execFileSync('git', ['status', '--porcelain'], {
 const cache = join(process.env.HOME ?? '', '.cache/ms-playwright');
 const full = existsSync(cache)
   ? readdirSync(cache)
-      .filter((name) => /^chromium-\d+$/.test(name))
-      .sort((a, b) => Number(b.slice(9)) - Number(a.slice(9)))
-      .map((name) => join(cache, name, 'chrome-linux64/chrome'))
+      .filter((name): boolean => /^chromium-\d+$/.test(name))
+      .sort((a, b): number => Number(b.slice(9)) - Number(a.slice(9)))
+      .map((name): string => join(cache, name, 'chrome-linux64/chrome'))
       .find(existsSync)
   : null;
-let server, browser, report;
+let server: Awaited<ReturnType<typeof ensureDevServer>> | undefined;
+let browser: Awaited<ReturnType<typeof launchChromium>> | undefined;
+let report:
+  | { revision: string; dirty: boolean; summary: unknown; failure?: string | null }
+  | undefined;
 try {
   server = await ensureDevServer({ port, preview: !!args.production });
   assert(
@@ -94,7 +122,7 @@ try {
   );
   browser = await launchChromium({
     headless: true,
-    executablePath: args.executable ?? full ?? undefined,
+    ...(args.executable || full ? { executablePath: String(args.executable ?? full) } : {}),
     args: [
       '--ignore-gpu-blocklist',
       '--mute-audio',
@@ -103,9 +131,11 @@ try {
   });
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: dpr });
   page.setDefaultTimeout(180000);
-  const errors = [];
-  page.on('pageerror', (e) => errors.push(e.message));
-  page.on('console', (m) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e): void => {
+    errors.push(e.message);
+  });
+  page.on('console', (m): void => {
     if (m.type() === 'error') errors.push(m.text());
   });
   const start = performance.now();
@@ -115,8 +145,9 @@ try {
   );
   await waitForGame(page);
   if (args['query-trial'])
-    await page.evaluate(async (mode) => {
-      const nav = window.__ENGINE__.ctx.get('ai').grid;
+    await page.evaluate(async (mode): Promise<void> => {
+      const nav = window.__ENGINE__?.ctx.get('ai').grid;
+      if (!nav?.worker) throw new Error('navigation worker unavailable');
       nav.repeatState = mode === 'repeat';
       await nav.worker.start(); // both conditions start a fresh worker/proof cache
     }, args['query-trial']);
@@ -126,7 +157,7 @@ try {
     create: ${createCombatProfile.toString()} };`,
   });
   const cdp = args['cpu-profile'] ? await page.context().newCDPSession(page) : null;
-  let clock = null;
+  let clock: Array<{ name: string; value: number }> | null = null;
   if (cdp) {
     await cdp.send('Performance.enable');
     clock = (await cdp.send('Performance.getMetrics')).metrics;
@@ -135,57 +166,72 @@ try {
     await cdp.send('Profiler.start');
   }
   const result = await page.evaluate(
-    async ({ frames, warmup, detail, gpu, realtime, agents }) => {
-      const engine = window.__ENGINE__,
-        r = engine.ctx.get('render'),
-        renderer = r.renderer;
-      engine.ctx.get('ai').grid.worker.collectSamples = true;
+    async ({ frames, warmup, detail, gpu, realtime, agents }): Promise<ProfileResult> => {
+      const engine = window.__ENGINE__;
+      if (!engine) throw new Error('engine not ready');
+      const r = engine.ctx.get('render'),
+        renderer = r.renderer,
+        backend = renderer.backend;
+      if (!('device' in backend) || !(backend.device instanceof GPUDevice))
+        throw new Error('native GPU device unavailable');
+      const device = backend.device;
+      const ai = engine.ctx.get('ai');
+      if (!ai.grid?.worker) throw new Error('navigation worker unavailable');
+      ai.grid.worker.collectSamples = true;
       const api = window.__PROFILE__,
-        captureStep = engine.step;
-      let fixture = null,
-        measuredElapsed = null;
-      const samples = []; // waitForGame already installed __NATIVE_BUILDS__.
-      const stages = [],
-        restores = [];
+        captureStep = Object.getOwnPropertyDescriptor(engine, 'step');
+      let fixture: ReturnType<typeof createCombatProfile> | null = null;
+      let measuredElapsed: number | null = null;
+      const samples: FrameSample[] = []; // waitForGame already installed __NATIVE_BUILDS__.
+      const stages: ProfileStage[] = [];
+      const restores: Array<() => void> = [];
       let sampleIndex = -1;
-      const observe = (owner, id, phase, countOnly = false) => {
-        const original = owner?.[phase];
+      const observe = <T extends object, K extends keyof T & string>(
+        owner: T | null | undefined,
+        id: string,
+        phase: K,
+        countOnly = false
+      ): void => {
+        if (!owner) return;
+        const original = owner[phase];
         if (typeof original !== 'function') return;
         const owned = Object.hasOwn(owner, phase);
         const ms = countOnly ? null : new Float64Array(frames),
           calls = new Uint16Array(frames);
         stages.push({ id, phase, countOnly, ms, calls });
-        const observed = function () {
-          const start = countOnly ? 0 : performance.now();
-          try {
-            return original.apply(this, arguments);
-          } finally {
-            if (sampleIndex >= 0) {
-              if (!countOnly) ms[sampleIndex] += performance.now() - start;
-              calls[sampleIndex]++;
+        const observed = new Proxy(original, {
+          apply(target, receiver, args): unknown {
+            const start = countOnly ? 0 : performance.now();
+            try {
+              return Reflect.apply(target, receiver, args);
+            } finally {
+              if (sampleIndex >= 0) {
+                if (ms) ms[sampleIndex] += performance.now() - start;
+                calls[sampleIndex]++;
+              }
             }
-          }
-        };
+          },
+        });
         owner[phase] = observed;
-        restores.push(() => {
+        restores.push((): void => {
           if (owner[phase] === observed) {
             if (owned) owner[phase] = original;
-            else delete owner[phase];
+            else Reflect.deleteProperty(owner, phase);
           }
         });
       };
-      const gpuSamples = [],
-        tracked = renderer.backend.trackTimestamp;
-      let gpuPending = null,
-        gpuFailure = null,
-        gpuClosed = false;
+      const gpuSamples: GpuSample[] = [];
+      const tracked = backend.trackTimestamp;
+      let gpuPending: Promise<void> | null = null;
+      let gpuFailure: string | null = null;
+      let gpuClosed = false;
       const weapons = engine.ctx.get('weapons');
-      const render = r.render,
-        renderOwned = Object.hasOwn(r, 'render');
-      let renderMs = 0,
-        last = null,
-        failure = null;
-      const observedRender = function (...args) {
+      const render = r.render.bind(r),
+        originalRender = Object.getOwnPropertyDescriptor(r, 'render');
+      let renderMs = 0;
+      let last: FrameSample | null = null;
+      let failure: string | null = null;
+      const observedRender = function (this: typeof r, ...args: Parameters<typeof render>): void {
         const start = performance.now();
         try {
           return render.apply(this, args);
@@ -194,14 +240,14 @@ try {
         }
       };
       const deadline = performance.now() + 180000;
-      const tick = () =>
-        new Promise((resolve, reject) => {
-          const frame = requestAnimationFrame((now) => {
+      const tick = (): Promise<{ now: number; callbackAt: number }> =>
+        new Promise((resolve, reject): void => {
+          const frame = requestAnimationFrame((now): void => {
             clearTimeout(timer);
             resolve({ now, callbackAt: performance.now() });
           });
           const timer = setTimeout(
-            () => {
+            (): void => {
               cancelAnimationFrame(frame);
               reject(new Error('combat profile exceeded 180s deadline'));
             },
@@ -210,20 +256,33 @@ try {
         });
       try {
         fixture = api.create(engine, api.combatLane, { realtime, agents });
-        if (gpu && !renderer.backend.device.features.has('timestamp-query'))
+        if (gpu && !device.features.has('timestamp-query'))
           throw new Error('native GPU timestamp queries unavailable');
         if (realtime) {
-          engine.step = Object.getPrototypeOf(engine).step;
+          const prototype: unknown = Object.getPrototypeOf(engine);
+          if (
+            !prototype ||
+            typeof prototype !== 'object' ||
+            !('step' in prototype) ||
+            typeof prototype.step !== 'function'
+          )
+            throw new Error('engine step unavailable');
+          const step = prototype.step;
+          engine.step = function (now?: number): void {
+            Reflect.apply(step, this, [now]);
+          };
           engine._last = performance.now();
         }
         if (detail) {
           for (const sys of engine.registry.ordered)
-            for (const phase of ['fixedUpdate', 'update', 'lateUpdate'])
+            for (const phase of ['fixedUpdate', 'update', 'lateUpdate'] as const) {
+              if (!('id' in sys.constructor) || typeof sys.constructor.id !== 'string')
+                throw new Error('subsystem id unavailable');
               observe(sys, sys.constructor.id, phase);
-          const ai = engine.ctx.get('ai');
-          for (const phase of ['canAttach', 'project', 'lineOfWalk', 'findPath'])
+            }
+          for (const phase of ['canAttach', 'project', 'lineOfWalk', 'findPath'] as const)
             observe(ai.grid, 'nav', phase);
-          for (const phase of ['pick', 'peekOffset']) observe(ai.cover, 'cover', phase);
+          for (const phase of ['pick', 'peekOffset'] as const) observe(ai.cover, 'cover', phase);
           observe(ai.grid._probe, 'attachment-controller', 'move', true);
           for (const actor of ai.agents)
             observe(actor, `actor-${actor.id}`, '_pickObservationPoints');
@@ -243,7 +302,9 @@ try {
             break;
           } // collect the last measured frame's full interval
           if (i === 0) measuredElapsed = engine.time.elapsed;
-          const actionFrame = i < 0 ? -1 : (engine.time.elapsed - measuredElapsed) * 60;
+          if (i >= 0 && measuredElapsed === null) throw new Error('measurement clock unavailable');
+          const actionFrame =
+            i < 0 || measuredElapsed === null ? -1 : (engine.time.elapsed - measuredElapsed) * 60;
           fixture.before(i, realtime ? actionFrame : i);
           // Snapshot scalars: engine.step() mutates these counters through Three's
           // renderer. The deltas below are not same-value operands (DeepScan).
@@ -262,9 +323,11 @@ try {
             const frame = renderer.info.frame,
               measured = i;
             gpuPending = Promise.all(
-              ['render', 'compute'].map((type) => renderer.resolveTimestampsAsync(type))
+              (['render', 'compute'] as const).map((type): Promise<number | undefined> =>
+                renderer.resolveTimestampsAsync(type)
+              )
             )
-              .then(([renderMs, computeMs]) => {
+              .then(([renderMs, computeMs]): void => {
                 if (measured >= 0 && !gpuClosed)
                   gpuSamples.push({
                     i: measured,
@@ -275,10 +338,15 @@ try {
                     computeMs: computeMs ?? null,
                   });
               })
-              .catch((error) => {
-                if (!gpuClosed) gpuFailure = String(error?.message ?? error);
+              .catch((error: unknown): void => {
+                if (!gpuClosed)
+                  gpuFailure = String(
+                    error && typeof error === 'object' && 'message' in error
+                      ? (error.message ?? error)
+                      : error
+                  );
               })
-              .finally(() => {
+              .finally((): void => {
                 gpuPending = null;
               });
           }
@@ -294,7 +362,7 @@ try {
               cpuMs,
               renderMs,
               gameMs: cpuMs - renderMs,
-              ...(detail
+              ...(activity && stepActivity
                 ? {
                     playerShots: stepActivity.playerShots - activity.playerShots,
                     aiShots: stepActivity.aiShots - activity.aiShots,
@@ -314,47 +382,56 @@ try {
           fixture.after();
         }
       } catch (error) {
-        failure = String(error?.message ?? error);
+        failure = String(
+          error && typeof error === 'object' && 'message' in error
+            ? (error.message ?? error)
+            : error
+        );
       } finally {
-        let drainTimer;
+        let drainTimer: ReturnType<typeof setTimeout> | undefined;
         try {
           if (gpuPending)
             await Promise.race([
               gpuPending,
-              new Promise((resolve, reject) => {
+              new Promise<never>((_resolve, reject): void => {
                 drainTimer = setTimeout(
-                  () => reject(new Error('GPU timestamp drain exceeded deadline')),
+                  (): void => reject(new Error('GPU timestamp drain exceeded deadline')),
                   Math.max(0, Math.min(5000, deadline - performance.now()))
                 );
               }),
             ]);
         } catch (error) {
-          gpuFailure ??= String(error?.message ?? error);
+          gpuFailure ??= String(
+            error && typeof error === 'object' && 'message' in error
+              ? (error.message ?? error)
+              : error
+          );
         } finally {
           clearTimeout(drainTimer);
           gpuClosed = true;
           renderer.backend.trackTimestamp = tracked;
           sampleIndex = -1;
           if (r.render === observedRender) {
-            if (renderOwned) r.render = render;
-            else delete r.render;
+            if (originalRender) Object.defineProperty(r, 'render', originalRender);
+            else Reflect.deleteProperty(r, 'render');
           }
           for (const restore of restores) restore();
-          engine.step = captureStep;
+          if (captureStep) Object.defineProperty(engine, 'step', captureStep);
+          else Reflect.deleteProperty(engine, 'step');
           fixture?.dispose();
         }
       }
       const simulationSeconds =
         measuredElapsed === null ? null : engine.time.elapsed - measuredElapsed;
       if (realtime && fixture) fixture.report.simulationSeconds = simulationSeconds;
-      const a = renderer.backend.device.adapterInfo;
+      const a = device.adapterInfo;
       return {
         samples,
         combat: fixture?.report ?? null,
         failure: failure ?? gpuFailure,
         gpuFailure,
         gpuSamples: gpu ? gpuSamples : null,
-        worker: (() => {
+        worker: ((): unknown => {
           const ai = engine.ctx.get('ai'),
             w = ai.grid?.worker;
           return w
@@ -365,9 +442,9 @@ try {
                 profiling: w.profile,
                 incomplete: w.jobs.size,
                 pendingDecisions: Array.from(w.scopes.values())
-                  .filter((s) => s.waiting)
-                  .map((s) => {
-                    const a = ai.agents.find((a) => a.id === s.actor);
+                  .filter((s): boolean => s.waiting)
+                  .map((s): unknown => {
+                    const a = ai.agents.find((a): boolean => a.id === s.actor);
                     return {
                       actor: s.actor,
                       kind: s.kind,
@@ -382,7 +459,7 @@ try {
                       searchPending: a?._searchPending ?? null,
                     };
                   }),
-                pendingJobs: Array.from(w.jobs.values(), (j) => ({
+                pendingJobs: Array.from(w.jobs.values(), (j): unknown => ({
                   actor: j.scope.actor,
                   ageMs: performance.now() - j.sent,
                 })),
@@ -392,7 +469,7 @@ try {
             : null;
         })(),
         stages: detail
-          ? stages.map((s) => ({
+          ? stages.map((s): NonNullable<ProfileResult['stages']>[number] => ({
               ...s,
               ms: s.ms ? Array.from(s.ms) : null,
               calls: Array.from(s.calls),
@@ -428,10 +505,15 @@ try {
     );
     await cdp.detach();
   }
-  const distribution = (values) => {
-    assert(values.length && values.every(Number.isFinite), 'missing timing samples');
-    const sorted = values.sort((a, b) => a - b);
-    const at = (p) =>
+  const distribution = (values: Array<number | null>): Distribution => {
+    assert(values.length, 'missing timing samples');
+    const sorted = values
+      .map((value): number => {
+        assert(typeof value === 'number' && Number.isFinite(value), 'missing timing samples');
+        return value;
+      })
+      .sort((a, b): number => a - b);
+    const at = (p: number): number =>
       +sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))].toFixed(3);
     return { p50: at(0.5), p95: at(0.95), p99: at(0.99), max: at(1) };
   };
@@ -441,17 +523,26 @@ try {
     try {
       assert.deepEqual(errors, []);
       validateCombatProfile(result.combat);
-      const frameTimeMs = distribution(result.samples.map((s) => s.dt));
-      const callbackIntervalMs = distribution(result.samples.map((s) => s.callbackIntervalMs));
-      const hitches = result.samples.filter(
-        (s) => s.dt > Math.max(2 * frameTimeMs.p50, frameTimeMs.p50 + 8)
+      const samples = result.samples.map(
+        (s): FrameSample & { dt: number; callbackIntervalMs: number } => {
+          assert(
+            typeof s.dt === 'number' && typeof s.callbackIntervalMs === 'number',
+            'missing frame intervals'
+          );
+          return { ...s, dt: s.dt, callbackIntervalMs: s.callbackIntervalMs };
+        }
       );
-      const callbackHitches = result.samples.filter(
-        (s) =>
+      const frameTimeMs = distribution(samples.map((s): number => s.dt));
+      const callbackIntervalMs = distribution(samples.map((s): number => s.callbackIntervalMs));
+      const hitches = samples.filter(
+        (s): boolean => s.dt > Math.max(2 * frameTimeMs.p50, frameTimeMs.p50 + 8)
+      );
+      const callbackHitches = samples.filter(
+        (s): boolean =>
           s.callbackIntervalMs > Math.max(2 * callbackIntervalMs.p50, callbackIntervalMs.p50 + 8)
       );
       if (args.gpu) {
-        assert(result.gpuSamples.length, 'missing GPU timestamp samples');
+        assert(result.gpuSamples?.length, 'missing GPU timestamp samples');
         for (const s of result.gpuSamples) {
           assert(
             s.renderFrame === s.frame && Number.isFinite(s.renderMs),
@@ -462,14 +553,17 @@ try {
         }
       }
       const passSums = result.gpuSamples
-        ?.filter((s) => Number.isFinite(s.computeMs))
-        .map((s) => s.renderMs + s.computeMs);
+        ?.filter((s): boolean => s.computeMs !== null && Number.isFinite(s.computeMs))
+        .map((s): number => {
+          assert(typeof s.renderMs === 'number' && typeof s.computeMs === 'number');
+          return s.renderMs + s.computeMs;
+        });
       summary = {
         frameTimeMs,
         callbackIntervalMs,
-        cpuStepMs: distribution(result.samples.map((s) => s.cpuMs)),
-        cpuRenderSubmitMs: distribution(result.samples.map((s) => s.renderMs)),
-        cpuGameMs: distribution(result.samples.map((s) => s.gameMs)),
+        cpuStepMs: distribution(samples.map((s): number => s.cpuMs)),
+        cpuRenderSubmitMs: distribution(samples.map((s): number => s.renderMs)),
+        cpuGameMs: distribution(samples.map((s): number => s.gameMs)),
         gpuTimeMs: null,
         gpuTimeSource: 'unavailable: complete GPU frame/presentation timing not measured',
         gpuSampleCount: result.gpuSamples?.length ?? null,
@@ -478,20 +572,22 @@ try {
           ? 'native timestamp render + compute pass sums; excludes copies, queue wait and presentation'
           : null,
         cpuBudgetMs: 1000 / 60,
-        cpuBudgetMissCount: result.samples.filter((s) => s.cpuMs > 1000 / 60).length,
-        nodeBuilders: result.samples.reduce((sum, s) => sum + s.nodeBuilders, 0),
+        cpuBudgetMissCount: samples.filter((s): boolean => s.cpuMs > 1000 / 60).length,
+        nodeBuilders: samples.reduce((sum, s): number => sum + s.nodeBuilders, 0),
         hitchCount: hitches.length,
-        worstHitches: hitches.sort((a, b) => b.dt - a.dt).slice(0, 15),
+        worstHitches: hitches.sort((a, b): number => b.dt - a.dt).slice(0, 15),
         callbackHitchCount: callbackHitches.length,
         worstCallbackHitches: callbackHitches
-          .sort((a, b) => b.callbackIntervalMs - a.callbackIntervalMs)
+          .sort((a, b): number => b.callbackIntervalMs - a.callbackIntervalMs)
           .slice(0, 15),
       };
     } catch (error) {
-      failure = String(error?.message ?? error);
+      failure = String(
+        error && typeof error === 'object' && 'message' in error ? (error.message ?? error) : error
+      );
     }
   }
-  report = {
+  const receipt = {
     revision,
     dirty,
     browserExecutable: args.executable ?? full ?? 'Playwright default',
@@ -513,6 +609,7 @@ try {
     summary,
     errors,
   };
+  report = receipt;
   // Write failed/partial runs too; never leave a stale success or invent missing intervals.
   writeFileSync(out, JSON.stringify(report, null, 2));
   console.log(
@@ -532,10 +629,15 @@ try {
     )
   );
   if (failure !== null) throw new Error(failure);
-  await page.evaluate(() => window.__ENGINE__.dispose());
+  await page.evaluate(async (): Promise<void> => {
+    if (!window.__ENGINE__) throw new Error('engine not ready');
+    await window.__ENGINE__.dispose();
+  });
 } catch (error) {
   report ??= { revision, dirty, summary: null };
-  report.failure ??= String(error?.stack ?? error);
+  report.failure ??= String(
+    error && typeof error === 'object' && 'stack' in error ? (error.stack ?? error) : error
+  );
   writeFileSync(out, JSON.stringify(report, null, 2));
   throw error;
 } finally {

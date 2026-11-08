@@ -1,6 +1,6 @@
+import { test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { test } from 'node:test';
 
 import * as THREE from 'three';
 
@@ -27,7 +27,7 @@ const consumers = [
   (g: THREE.BufferGeometry): unknown => mergePrimitives([new THREE.SkinnedMesh(g)]),
 ];
 
-await test('raw triangle counts cannot exceed their backing buffer or consume a free slot', (): void => {
+test('raw triangle counts cannot exceed their backing buffer or consume a free slot', (): void => {
   const world = new StaticWorld();
   const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
   const id = world.addTriangles(positions, 1, 'concrete');
@@ -50,7 +50,7 @@ await test('raw triangle counts cannot exceed their backing buffer or consume a 
   assert.equal(world.triCount, 2);
 });
 
-await test('geometry consumers reject indices that cannot address a vertex', (): void => {
+test('geometry consumers reject indices that cannot address a vertex', (): void => {
   for (const consume of consumers) {
     for (const index of [
       [0, 1, 3],
@@ -79,7 +79,7 @@ await test('geometry consumers reject indices that cannot address a vertex', ():
   }
 });
 
-await test('instance counts cannot read missing matrices or create phantom collision', (): void => {
+test('instance counts cannot read missing matrices or create phantom collision', (): void => {
   const mesh = new THREE.InstancedMesh(triangle(), new THREE.MeshBasicMaterial(), 1);
   mesh.count = 0;
   assert.equal(bakeMesh(mesh), null);
@@ -94,7 +94,7 @@ await test('instance counts cannot read missing matrices or create phantom colli
   assert.equal(bakeMesh(mesh)?.count, 1);
 });
 
-await test('parallel geometry attributes must cover the vertices that will be read', (): void => {
+test('parallel geometry attributes must cover the vertices that will be read', (): void => {
   const g = triangle();
   g.setAttribute('normal', new THREE.Float32BufferAttribute([0, 0, 1], 3));
   assert.throws((): unknown => bakeMasks(g), /normal/);
@@ -117,7 +117,7 @@ await test('parallel geometry attributes must cover the vertices that will be re
   );
 });
 
-await test('primitive merging rejects absent or empty indexed inputs before allocating', (): void => {
+test('primitive merging rejects absent or empty indexed inputs before allocating', (): void => {
   assert.throws((): unknown => mergePrimitives([]), /primitive/);
   assert.throws((): unknown => mergePrimitives([new THREE.SkinnedMesh(triangle())]), /index/);
   const empty = triangle().setIndex([]);
@@ -128,7 +128,7 @@ await test('primitive merging rejects absent or empty indexed inputs before allo
   assert.equal(merged.getAttribute('position').count, 6);
 });
 
-await test('ragdoll parent indices are checked before conversion to Int32', (): void => {
+test('ragdoll parent indices are checked before conversion to Int32', (): void => {
   const head: [number, number, number] = [0, 0, 0];
   const tail: [number, number, number] = [0, 1, 0];
   const bone = { name: 'root', head, tail };
@@ -138,7 +138,7 @@ await test('ragdoll parent indices are checked before conversion to Int32', (): 
   assert.equal(new Ragdoll(null, { bones: [bone] }).boneCount, 1);
 });
 
-await test('noise table sizes must be positive integers without consuming RNG on rejection', (): void => {
+test('noise table sizes must be positive integers without consuming RNG on rejection', (): void => {
   for (const size of [0, -1, 1.5, NaN, Infinity]) {
     const rng = new Rng(624);
     assert.throws((): Noise1 => new Noise1(rng, size), /noise.*size/i);
@@ -163,7 +163,7 @@ await test('noise table sizes must be positive integers without consuming RNG on
   );
 });
 
-await test('space classification requires a horizon and fits its fixed median scratch', (): void => {
+test('space classification requires a horizon and fits its fixed median scratch', (): void => {
   for (const length of [0, 1, 18, 34]) {
     assert.throws((): unknown => classifySpace(new Float64Array(length), 40), /probe/);
   }
@@ -183,7 +183,7 @@ await test('space classification requires a horizon and fits its fixed median sc
   });
 });
 
-await test('valid mask bytes and RNG order retain their pre-audit characterization', (): void => {
+test('valid mask bytes and RNG order retain their pre-audit characterization', (): void => {
   const g = new THREE.BoxGeometry();
   bakeMasks(g, { rng: new Rng(624) });
   const colors = g.getAttribute('color').array;

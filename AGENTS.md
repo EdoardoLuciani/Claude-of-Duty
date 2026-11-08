@@ -19,7 +19,7 @@ before subsystem changes: it owns directory assignments, APIs and event contract
 
 ```sh
 bun ci                 # preferred clean install
-bun run test           # node:test runs tests/smoke/ scripts in parallel
+bun run test           # Bun runs tests/smoke/ scripts in isolated parallel processes
 bun run lint           # oxlint src tools tests --deny-warnings
 bun run build          # must pass
 bun run world:validate # required when world/prop assets change

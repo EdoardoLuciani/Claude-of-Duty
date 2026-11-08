@@ -50,7 +50,7 @@ const run = (s: AttachmentQueries): unknown =>
 // of test latency, and prove every success/error/cancellation clears its timer.
 const realSet = globalThis.setTimeout,
   realClear = globalThis.clearTimeout;
-const deadlines = new Map<Parameters<typeof clearTimeout>[0], () => void>();
+const deadlines = new Map<unknown, () => void>();
 function captureTimeout(
   fn: (...args: unknown[]) => void,
   delay?: number,
@@ -65,7 +65,8 @@ function captureTimeout(
 }
 const timeoutMock = mock.method(globalThis, 'setTimeout', captureTimeout);
 globalThis.clearTimeout = (timer): void => {
-  if (!deadlines.delete(timer)) realClear(timer);
+  if (!deadlines.delete(timer))
+    realClear(typeof timer === 'object' && timer !== null ? Number(timer) : timer);
 };
 try {
   for (const mode of [

@@ -3,7 +3,7 @@
  * one ragdoll per death. Physics no longer auto-discovers visuals or listens
  * for actor:death.
  *
- *   node tests/smoke/smoke-physics-registration.ts
+ *   bun test ./tests/smoke/smoke-physics-registration.ts
  */
 import assert from 'node:assert/strict';
 

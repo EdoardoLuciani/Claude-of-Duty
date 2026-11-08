@@ -1,6 +1,6 @@
 /**
  * Issue 278: ordinary small-arms fire must not emit tracers.
- *   node tests/smoke/smoke-small-arms-tracers.ts
+ *   bun test ./tests/smoke/smoke-small-arms-tracers.ts
  */
 import assert from 'node:assert/strict';
 

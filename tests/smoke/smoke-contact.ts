@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 
 /**
- * Node smoke test for contact-minimap rules — no browser.
+ * Bun smoke test for contact-minimap rules — no browser.
  *
- *   node tests/smoke/smoke-contact.ts
+ *   bun test ./tests/smoke/smoke-contact.ts
  */
 import type { Agent } from '../../src/ai/agent.ts';
 import { FIRE_JITTER, LOS_RANGE, hudContact, fireJitter } from '../../src/ai/contact.ts';

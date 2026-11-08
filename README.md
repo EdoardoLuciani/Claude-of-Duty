@@ -21,14 +21,19 @@ formats (`bun fmt`), bundles and serves the game (`build/bun.ts`; the dev server
 reads its plugin from `bunfig.toml`); packages are cached in `~/.bun/install/cache`, so warm
 reinstalls are near-instant. Bun also runs the checked TypeScript asset orchestrator,
 world exporter, procedural-texture exporter, model staging and gltfpack cook, plus
-the remaining JavaScript world validator. Node still runs Oxlint, the `node:test`
-smoke runner, Blender soldier authoring and browser capture/profile tools.
+the remaining JavaScript world validator. Browser capture/profile entry points and
+the complete test suite also run on Bun. Node remains required for Oxlint's launcher
+and Blender soldier authoring.
 Runtime source, every `tests/**/*.ts` script, converted helpers and the migrated
 CLI tools use explicit `.ts` imports and share strict checking through
-`bun run typecheck`. The build entry points have a separate `build/tsconfig.json`
-check so Bun's server globals do not change browser or Node-test types. Both projects
-use the same strict compiler options and type-aware lint rules. Node runs tests
-directly with erasable TypeScript syntax—no loader, build step or Bun test runtime.
+`bun run typecheck`. Build entry points and tests have separate `build/tsconfig.json`
+and `tests/tsconfig.json` projects so Bun globals do not change browser types. All
+three projects share strict compiler options and type-aware lint rules.
+`bun run test` uses Bun's test runner with one isolated Bun test process per smoke
+script, bounded near one per physical core, plus the fixture unit tests. The 30-second
+per-script hang guard remains; simulation limits and behavioral assertions are unchanged.
+Run one script with `bun test ./tests/smoke/smoke-health-events.ts`. Test mocks and worker
+transport may use Bun's Node-compatible APIs; no test process requires the Node binary.
 The second, type-aware lint pass covers runtime source, tests, build entry points and typed tools;
 shared JavaScript authoring APIs consumed by tests have `.d.ts` contracts in
 `tests/types/`. Package import aliases select those contracts for checking and the
@@ -46,7 +51,7 @@ assertions (including `as unknown as T`), as well as explicit `any` and unsafe
 assignment, argument, call, member access and return. Numeric enum assignments
 must use enum members rather than unchecked numbers. Runtime boundaries must
 validate unknown data; owned records should be constructed with their full type.
-For Node-only browser/native fakes, prefer real instances and shared typed fixtures.
+For test-only browser/native fakes, prefer real instances and shared typed fixtures.
 Issue [#621](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/621) approved one
 exception: only `tests/lib/fixture.ts` may assert its checked `Partial<T>` as `T`.
 Its proxy throws on unexpected missing-member reads; explicitly listed optional
@@ -176,9 +181,9 @@ Tests are not final human visual acceptance; see each asset's remaining limits.
 
 ## Diagnostics
 
-- `node tools/capture.mjs`: named gameplay screenshot. Use final-output captures,
+- `bun tools/capture.ts`: named gameplay screenshot. Use final-output captures,
   not old intermediate-target PNGs, for appearance review.
-- `node tools/profile.mjs`: sustained living-combat frame/CPU percentiles and hitches.
+- `bun tools/profile.ts`: sustained living-combat frame/CPU percentiles and hitches.
   GPU timestamps are unavailable; node-builder activity is not GPU compilation time.
   Historical WebGL results are not current WebGPU performance evidence. No universal
   cross-hardware frame-time threshold applies; compare matched runs only.
@@ -191,7 +196,7 @@ performance acceptance.
 
 The material-graph, FX-recipe, physics-geometry and audio-recording smoke hashes
 are **characterization**, not the definition of correct behavior. To inspect a
-failure, run e.g. `DUMP_CHARACTERIZATION=1 node tests/smoke/smoke-fx-recipes.ts > /tmp/fx-current.txt`.
+failure, run e.g. `DUMP_CHARACTERIZATION=1 bun tests/smoke/smoke-fx-recipes.ts > /tmp/fx-current.txt`.
 Run the same test/seed with the previous implementation and pinned dependencies;
 diff the dumps (WGSL, ordered payloads/RNG, query histories or recording order).
 Review the change against the behavioral assertions and any required visual checks

@@ -190,10 +190,13 @@ try {
     version: 2,
     assets: { visual: 'visual', collision: 'collision', nav: 'nav.gz' },
   };
-  globalThis.fetch = async (input): Promise<Response> => {
-    const url = input instanceof Request ? input.url : String(input);
-    return url.endsWith('level.json') ? Response.json(meta) : new Response(null, { status: 503 });
-  };
+  globalThis.fetch = Object.assign(
+    async (input: Parameters<typeof fetch>[0]): Promise<Response> => {
+      const url = input instanceof Request ? input.url : String(input);
+      return url.endsWith('level.json') ? Response.json(meta) : new Response(null, { status: 503 });
+    },
+    { preconnect: fetch.preconnect }
+  );
   await assert.rejects(models._prefetchWorld(), /HTTP 503/, 'retain the real load failure');
   meta = { version: 2, assets: { visual: 'visual', collision: 'collision' } };
   await assert.rejects(models._prefetchWorld(), /missing navigation asset/);
