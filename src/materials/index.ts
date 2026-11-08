@@ -298,5 +298,3 @@ export class MaterialSystemNode {
 }
 
 export { MaterialSystemNode as MaterialSystem };
-export { bakeMasks } from './masks.ts';
-export { LIBRARY, resolveName } from './library.ts';

@@ -32,6 +32,7 @@ import {
   SK_TOP_R,
   SK_GROUND_ALBEDO,
   SK_PI,
+  ISO_PHASE,
 } from './atmosphere-tsl.ts';
 import { hdrTarget, floatTarget, BakePass } from './bake.ts';
 
@@ -43,7 +44,6 @@ const MS_STEPS = 20;
 const SQRT_SAMPLES = 8;
 const TS_STEPS = 40;
 const AMBIENT_TAPS = 64;
-const ISO_PHASE = 1 / (4 * SK_PI);
 
 type Vec3Fn = (a: Node<'vec3'>, b: Node<'vec3'>) => Node<'vec3'>;
 type RaymarchFn = (
