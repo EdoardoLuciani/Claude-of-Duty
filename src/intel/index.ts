@@ -51,27 +51,43 @@ export class IntelSystem {
   declare market: MarketSystem;
   declare physics: PhysicsSystem;
   declare markers: IntelMarker[];
-  declare _recent: string[];
+  _recent: string[] = [];
   declare _yaw: number;
-  declare _used: Set<string>;
-  declare _alive: IntelCache[];
-  declare _aim: THREE.Vector3;
-  declare _forward: THREE.Vector3;
-  declare _anchor: THREE.Vector3;
-  declare _soundAt: THREE.Vector3;
-  declare _sparkOffset: THREE.Vector3;
-  declare _sparkPayload: IntelEventMap['intel:spark'];
-  declare _operationPayload: IntelEventMap['intel:operation'];
-  declare _prompt: IntelPrompt;
-  declare _hud: IntelHud;
-  declare _spawnPayload: IntelEventMap['intel:spawn'];
-  declare _noisePayload: IntelEventMap['intel:noise'];
-  declare _securePayload: IntelEventMap['intel:secured'];
-  declare _availablePayload: IntelEventMap['intel:available'];
-  declare _beepOptions: Parameters<AudioSystem['play']>[2];
+  _used: Set<string> = new Set();
+  _alive: IntelCache[] = [];
+  _aim: THREE.Vector3 = new THREE.Vector3();
+  _forward: THREE.Vector3 = new THREE.Vector3();
+  _anchor: THREE.Vector3 = new THREE.Vector3();
+  _soundAt: THREE.Vector3 = new THREE.Vector3();
+  _sparkOffset: THREE.Vector3 = new THREE.Vector3(0.13, 0.245, 0.06);
+  _sparkPayload: IntelEventMap['intel:spark'] = { position: new THREE.Vector3() };
+  _operationPayload: IntelEventMap['intel:operation'] = {
+    active: false,
+    position: new THREE.Vector3(),
+  };
+  _prompt: IntelPrompt = { key: bindingLabel('use'), text: 'Secure intel', sub: '', progress: 0 };
+  _hud: IntelHud = { holding: false, progress: 0, secured: 0, pulses: [], pulseTime: 0 };
+  _spawnPayload: IntelEventMap['intel:spawn'] = { id: '', position: new THREE.Vector3() };
+  _noisePayload: IntelEventMap['intel:noise'] = {
+    position: new THREE.Vector3(),
+    loudness: INTEL.pryLoudness,
+  };
+  _securePayload: IntelEventMap['intel:secured'] = {
+    id: '',
+    position: new THREE.Vector3(),
+    credits: INTEL.credits,
+  };
+  _availablePayload: IntelEventMap['intel:available'] = { count: 0 };
+  _beepOptions: Parameters<AudioSystem['play']>[2] = {
+    gain: INTEL.lureGain,
+    occlusion: 0,
+    maxDist: INTEL.lureRadius,
+    bus: 'ui',
+    priority: 0.5,
+  };
   declare _kit: ReturnType<typeof makeKit>;
   declare _pool: IntelCache[];
-  declare _off: Array<() => void>;
+  _off: Array<() => void> = [];
   declare _holding: IntelCache | null;
   declare _hold: number;
   declare _sparkAt: number;
@@ -96,7 +112,6 @@ export class IntelSystem {
     this.physics = ctx.get('physics');
     const world = ctx.get('world');
     this.markers = world.intelMarkers;
-    this._recent = [];
     if (!ctx.config.deterministic) {
       try {
         const saved: unknown = JSON.parse(
@@ -121,32 +136,6 @@ export class IntelSystem {
     const origin = world.levelToWorld(0, 0, 0);
     const forward = world.levelToWorld(0, 0, -1);
     this._yaw = Math.atan2(origin.x - forward.x, origin.z - forward.z);
-    this._used = new Set();
-    this._alive = [];
-    this._aim = new THREE.Vector3();
-    this._forward = new THREE.Vector3();
-    this._anchor = new THREE.Vector3();
-    this._soundAt = new THREE.Vector3();
-    this._sparkOffset = new THREE.Vector3(0.13, 0.245, 0.06);
-    this._sparkPayload = { position: new THREE.Vector3() };
-    this._operationPayload = { active: false, position: new THREE.Vector3() };
-    this._prompt = { key: bindingLabel('use'), text: 'Secure intel', sub: '', progress: 0 };
-    this._hud = { holding: false, progress: 0, secured: 0, pulses: [], pulseTime: 0 };
-    this._spawnPayload = { id: '', position: new THREE.Vector3() };
-    this._noisePayload = { position: new THREE.Vector3(), loudness: INTEL.pryLoudness };
-    this._securePayload = {
-      id: '',
-      position: new THREE.Vector3(),
-      credits: INTEL.credits,
-    };
-    this._availablePayload = { count: 0 };
-    this._beepOptions = {
-      gain: INTEL.lureGain,
-      occlusion: 0,
-      maxDist: INTEL.lureRadius,
-      bus: 'ui',
-      priority: 0.5,
-    };
     this._kit = makeKit(ctx.get('materials'));
     this._pool = Array.from({ length: INTEL.aliveMax }, (): IntelCache => ({
       id: '',
@@ -157,7 +146,6 @@ export class IntelSystem {
       open: 0,
       pulse: { x: 0, y: 0, z: 0, radius: INTEL.pulseRadius },
     }));
-    this._off = [];
     const on = <K extends keyof IntelEventMap>(
       type: K,
       fn: (event: IntelEventMap[K]) => void

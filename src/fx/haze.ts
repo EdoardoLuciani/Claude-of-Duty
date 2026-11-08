@@ -32,13 +32,13 @@ function isColorTextureNode(node: Node<'vec4'>): node is ColorTextureNode {
   );
 }
 export class HazeSystem {
-  declare scene: THREE.Scene;
+  scene: THREE.Scene = new THREE.Scene();
   declare layer: InstanceType<typeof ParticleLayer>;
-  declare uStrength: ReturnType<typeof uniform<'vec2'>>;
-  declare uActive: ReturnType<typeof uniform<'float'>>;
+  uStrength: ReturnType<typeof uniform<'vec2'>> = uniform(new THREE.Vector2(0.013, 0));
+  uActive: ReturnType<typeof uniform<'float'>> = uniform(0);
   declare _camera: THREE.Camera | null | undefined;
   declare _live: boolean;
-  declare distortTexNode: ReturnType<typeof uniformTexture>;
+  distortTexNode: ReturnType<typeof uniformTexture> = uniformTexture(_placeholder());
 
   enabled: boolean = true;
   rt: THREE.RenderTarget | null = null;
@@ -48,7 +48,6 @@ export class HazeSystem {
   _warpColor: ColorTextureNode | null = null;
 
   constructor(o: HazeOptions) {
-    this.scene = new THREE.Scene();
     this.scene.matrixAutoUpdate = false;
 
     this.layer = new ParticleLayer({
@@ -63,10 +62,6 @@ export class HazeSystem {
     this.scene.add(this.layer.mesh);
     this.layer.mesh.visible = true; // visibility is driven by instanceCount
 
-    this.uStrength = uniform(new THREE.Vector2(0.013, 0));
-    this.uActive = uniform(0);
-
-    this.distortTexNode = uniformTexture(_placeholder());
     this.distortTexNode.name = 'fx-distort-sample';
   }
 

@@ -64,7 +64,7 @@ type StaticCollisionWorld = Pick<
 >;
 
 export class RigidBody {
-  declare id: number;
+  id: number = _nextId++;
   declare shape: BodyShape;
   declare hx: number;
   declare hy: number;
@@ -110,7 +110,6 @@ export class RigidBody {
   probeRadius: number = Infinity;
 
   constructor(opts: RigidBodyOptions = {}) {
-    this.id = _nextId++;
     this.shape = opts.shape ?? 'box';
 
     const hx = opts.halfExtents?.x ?? opts.halfExtents?.[0] ?? 0.1;

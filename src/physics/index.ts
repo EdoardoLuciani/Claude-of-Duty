@@ -137,7 +137,7 @@ export interface ColliderOptions {
   center?: THREE.Vector3;
 }
 export class Collider {
-  declare id: number;
+  id: number = _colliderId++;
   declare shape: 'capsule' | 'sphere' | 'box';
   declare radius: number;
   declare hx: number;
@@ -166,7 +166,6 @@ export class Collider {
   inverse: THREE.Matrix4 = new THREE.Matrix4();
 
   constructor(opts: ColliderOptions) {
-    this.id = _colliderId++;
     this.shape = opts.shape ?? 'capsule';
     this.radius = opts.radius ?? 0.2;
     this.hx = opts.hx ?? 0.2;
@@ -285,17 +284,17 @@ interface ImpactRecord {
 }
 
 export class PhysicsSystem {
-  declare staticWorld: StaticWorld;
+  staticWorld: StaticWorld = new StaticWorld();
   declare bodies: RigidBodyWorld;
   declare ballistics: Ballistics;
   declare ctx: PhysicsContext;
   declare rng: Rng;
-  declare _onExplosion: (event: {
+  _onExplosion: (event: {
     position: THREE.Vector3;
     radius: number;
     damage: number;
     impulse?: number;
-  }) => void;
+  }) => void = (e): void => this.explode(e);
 
   static readonly id = 'physics';
   static readonly deps: SystemId[] = [];
@@ -347,7 +346,6 @@ export class PhysicsSystem {
   _rayCount: number = 0;
 
   constructor() {
-    this.staticWorld = new StaticWorld();
     this.bodies = new RigidBodyWorld(this.staticWorld, UNITS.gravity);
     this.ballistics = new Ballistics(this);
 
@@ -375,7 +373,6 @@ export class PhysicsSystem {
     this.rng = ctx.rng.fork();
     this.ballistics.rng = this.rng;
 
-    this._onExplosion = (e): void => this.explode(e);
     ctx.events.on('explosion', this._onExplosion);
   }
 

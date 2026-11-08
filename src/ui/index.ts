@@ -97,17 +97,17 @@ export class UiSystem {
   root!: HTMLElement;
   centreLayer!: HTMLElement;
   chromeLayer!: HTMLElement;
-  health!: HealthFx;
-  arcs!: DamageArcs;
-  crosshair!: Crosshair;
-  hit!: Hitmarkers;
+  health: HealthFx = new HealthFx();
+  arcs: DamageArcs = new DamageArcs();
+  crosshair: Crosshair = new Crosshair();
+  hit: Hitmarkers = new Hitmarkers();
   minimap!: Minimap;
-  compass!: Compass;
-  scoreBar!: ScoreBar;
-  killfeed!: Killfeed;
-  ammo!: AmmoPanel;
-  prompt!: Prompt;
-  banner!: Banner;
+  compass: Compass = new Compass();
+  scoreBar: ScoreBar = new ScoreBar();
+  killfeed: Killfeed = new Killfeed();
+  ammo: AmmoPanel = new AmmoPanel();
+  prompt: Prompt = new Prompt();
+  banner: Banner = new Banner();
   menu!: PauseMenu;
   startGate: StartGate | null = null;
   pixiHud: PixiHud | null = null;
@@ -118,25 +118,25 @@ export class UiSystem {
   _fpsSince: number | null = null;
   _fpsFrames = 0;
   fpsText = '— FPS';
-  state!: HudState;
-  k!: number;
-  vw!: number;
-  vh!: number;
-  hudVisible!: number;
+  state: HudState = { ...HUD_DEFAULTS };
+  k: number = 1;
+  vw: number = 1920;
+  vh: number = 1080;
+  hudVisible: number = 1;
   hudTarget!: number;
   _lastRaw!: number;
   _hadPointerLock!: boolean;
   _marketJustClosed!: boolean;
-  _healPrompt!: boolean;
-  _bakeFrame!: number;
-  _pos!: THREE.Vector3;
-  _tmp!: THREE.Vector3;
-  _blips!: Blip[];
-  _blipCount!: number;
-  _blipView!: Blip[];
+  _healPrompt: boolean = false;
+  _bakeFrame: number = 0;
+  _pos: THREE.Vector3 = new THREE.Vector3();
+  _tmp: THREE.Vector3 = new THREE.Vector3();
+  _blips: Blip[] = new Array<Blip>(MAX_BLIPS);
+  _blipCount: number = 0;
+  _blipView: Blip[] = [];
   _mmState?: MinimapFrame;
   _promptOwner?: unknown;
-  _unsubs!: (() => void)[];
+  _unsubs: (() => void)[] = [];
 
   async init(ctx: UiContext): Promise<void> {
     this.ctx = ctx;
@@ -150,18 +150,8 @@ export class UiSystem {
     this.centreLayer = el('div', 'ow-layer', this.root);
     this.chromeLayer = el('div', 'ow-layer', this.root);
 
-    this.health = new HealthFx();
     this.rng.fork(); // Keep the minimap's noise stream unchanged after removing damage popups.
-    this.arcs = new DamageArcs();
-    this.crosshair = new Crosshair();
-    this.hit = new Hitmarkers();
     this.minimap = new Minimap(this.rng.fork());
-    this.compass = new Compass();
-    this.scoreBar = new ScoreBar();
-    this.killfeed = new Killfeed();
-    this.ammo = new AmmoPanel();
-    this.prompt = new Prompt();
-    this.banner = new Banner();
     this.menu = new PauseMenu(this.root, ctx);
     this.gameOver = new GameOverScreen(this.root, ctx, (): void => {
       if (this.startGate) this.startGate.restart();
@@ -174,27 +164,13 @@ export class UiSystem {
     this.marketCountdown = new MarketCountdown(ctx.get('market').delay);
     this.radio = new RadioPanel(this.chromeLayer, ctx);
 
-    this.state = { ...HUD_DEFAULTS };
-
-    this.k = 1;
-    this.vw = 1920;
-    this.vh = 1080;
-    this.hudVisible = 1;
     this.hudTarget = 1;
     this._lastRaw = ctx.time.raw;
     this._hadPointerLock = false;
     this._marketJustClosed = false; // one frame after the shop closes
-    this._healPrompt = false;
-    this._bakeFrame = 0;
 
-    this._pos = new THREE.Vector3();
-    this._tmp = new THREE.Vector3();
-    this._blips = new Array<Blip>(MAX_BLIPS);
     for (let i = 0; i < MAX_BLIPS; i++) this._blips[i] = { x: 0, z: 0, kind: 'enemy', heading: 0 };
-    this._blipCount = 0;
-    this._blipView = [];
 
-    this._unsubs = [];
     const on = <K extends EngineEventName>(
       type: K,
       fn: (event: EngineEventMap[K]) => void

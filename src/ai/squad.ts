@@ -35,7 +35,7 @@ interface PeekDeath {
 }
 
 export class Squad {
-  id!: number;
+  id: number = _nextSquad++;
   rng!: SquadRng;
   members: SquadAgent[] = [];
   ai: SquadAI | null = null;
@@ -74,7 +74,6 @@ export class Squad {
   elevationStatus: string | null = 'waiting';
 
   constructor(rng: SquadRng) {
-    this.id = _nextSquad++;
     this.rng = rng;
   }
 

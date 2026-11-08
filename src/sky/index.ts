@@ -134,43 +134,77 @@ export class SkySystem {
   declare ctx: SkyContext;
   declare render: SkyRender;
   declare renderer: Renderer;
-  declare celestial: Celestial;
-  declare hour: number;
+  celestial: Celestial = new Celestial();
+  hour: number = CLOCK.startHour;
   declare timeRate: number;
-  declare weather: SkyWeather;
-  declare _fog: SkyFog;
+  // ---- weather / atmosphere state ---------------------------------------
+  weather: SkyWeather = {
+    /** Aerosol multiplier. 1 clear, 2-3 hazy, 5 dust storm. */
+    turbidity: 1.35,
+    cloudCoverage: 0.3,
+    cloudDensity: 1.9,
+    cirrusCoverage: 0.21,
+    cirrusOpacity: 0.3,
+    windSpeed: 0.0042, // km/s at the cloud deck (~4 m/s)
+    windAngle: 0.7,
+    horizonMurk: 0.13,
+  };
+  /** Ground fog. `scatter` and `extinction` are intentionally independent. */
+  _fog: SkyFog = {
+    scatter: 3.6e-3, // 1/m at the fog base
+    extinction: 1.45e-3, // 1/m at the fog base
+    heightScale: 18.0,
+    baseY: -2.0,
+    maxDistance: 900.0,
+    shaftGain: 2.6,
+    ambientGain: 0.22,
+    noise: 0.55,
+    noiseScale: 0.045,
+    phaseForward: 0.76,
+    phaseBackward: -0.36,
+    phaseBackWeight: 0.34,
+    extinctionTint: new THREE.Vector3(0.94, 1.02, 1.24),
+  };
   declare shared: SkyShared;
   declare luts: SkyLuts;
   declare raymarchSky: ReturnType<typeof createRaymarchSky>;
   declare skyScreen: ReturnType<typeof createSkySample>;
   declare dome: THREE.Mesh;
   declare envPass: BakePass;
-  declare sunLight: THREE.DirectionalLight;
-  declare moonLight: THREE.DirectionalLight;
+  // ---- lights -----------------------------------------------------------
+  // The renderer takes over shadowing for whichever directional light is
+  // brightest, so castShadow stays off: its cascades beat three's single
+  // shadow frustum by a mile.
+  sunLight: THREE.DirectionalLight = new THREE.DirectionalLight(0xffffff, 4.0);
+  moonLight: THREE.DirectionalLight = new THREE.DirectionalLight(0x9fc0ff, 0.0);
   declare keyLight: THREE.DirectionalLight;
-  declare envEquirect: ReturnType<typeof hdrTarget>;
+  // ---- IBL --------------------------------------------------------------
+  // 512x256 equirect -> PMREM, baked from the *same* shader and uniform nodes
+  // as the visible sky, so the IBL can never disagree with it.
+  envEquirect: ReturnType<typeof hdrTarget> = hdrTarget(512, 256, { name: 'sky-equirect' });
   declare pmrem: PMREMGenerator;
-  declare _pmremTarget: ReturnType<PMREMGenerator['fromEquirectangular']> | null;
-  declare envMap: THREE.Texture | null;
+  _pmremTarget: ReturnType<PMREMGenerator['fromEquirectangular']> | null = null;
+  envMap: THREE.Texture | null = null;
   declare volumetrics: ReturnType<typeof createVolumetricNodes>;
-  declare ambientColor: THREE.Color;
-  declare indirectScale: number;
-  declare _beamLuminance: number;
-  declare _sunT: [number, number, number];
-  declare _moonT: [number, number, number];
-  declare _envSunDir: THREE.Vector3;
-  declare _envMoonDir: THREE.Vector3;
-  declare _skySunDir: THREE.Vector3;
-  declare _skyMoonDir: THREE.Vector3;
-  declare _tmp: THREE.Vector3;
-  declare _cloudOcclusion: number;
-  declare _cloudOccTarget: number;
-  declare _baseSunIntensity: number;
-  declare _envAge: number;
-  declare _skyDirty: boolean;
-  declare _envDirty: boolean;
-  declare _cloudTime: number;
-  declare _occParams: SkyOccParams;
+  // ---- bookkeeping ------------------------------------------------------
+  ambientColor: THREE.Color = new THREE.Color(0, 0, 0);
+  indirectScale: number = 1;
+  _beamLuminance: number = 0;
+  _sunT: [number, number, number] = [0, 0, 0];
+  _moonT: [number, number, number] = [0, 0, 0];
+  _envSunDir: THREE.Vector3 = new THREE.Vector3(0, -1, 0);
+  _envMoonDir: THREE.Vector3 = new THREE.Vector3(0, -1, 0);
+  _skySunDir: THREE.Vector3 = new THREE.Vector3(0, -1, 0);
+  _skyMoonDir: THREE.Vector3 = new THREE.Vector3(0, -1, 0);
+  _tmp: THREE.Vector3 = new THREE.Vector3();
+  _cloudOcclusion: number = 1;
+  _cloudOccTarget: number = 1;
+  _baseSunIntensity: number = 0;
+  _envAge: number = 1e9;
+  _skyDirty: boolean = true;
+  _envDirty: boolean = true;
+  _cloudTime: number = 0;
+  _occParams: SkyOccParams = { coverage: 0, density: 0, windX: 0, windZ: 0, time: 0 };
   declare _offRestart: (() => void) | null;
 
   static readonly id = 'sky';
@@ -193,39 +227,7 @@ export class SkySystem {
     }
     const q = ctx.config.q;
 
-    this.celestial = new Celestial();
-    this.hour = CLOCK.startHour;
     this.timeRate = ctx.config.deterministic ? 0 : CLOCK.hoursPerSecond;
-
-    // ---- weather / atmosphere state ---------------------------------------
-    this.weather = {
-      /** Aerosol multiplier. 1 clear, 2-3 hazy, 5 dust storm. */
-      turbidity: 1.35,
-      cloudCoverage: 0.3,
-      cloudDensity: 1.9,
-      cirrusCoverage: 0.21,
-      cirrusOpacity: 0.3,
-      windSpeed: 0.0042, // km/s at the cloud deck (~4 m/s)
-      windAngle: 0.7,
-      horizonMurk: 0.13,
-    };
-
-    /** Ground fog. `scatter` and `extinction` are intentionally independent. */
-    this._fog = {
-      scatter: 3.6e-3, // 1/m at the fog base
-      extinction: 1.45e-3, // 1/m at the fog base
-      heightScale: 18.0,
-      baseY: -2.0,
-      maxDistance: 900.0,
-      shaftGain: 2.6,
-      ambientGain: 0.22,
-      noise: 0.55,
-      noiseScale: 0.045,
-      phaseForward: 0.76,
-      phaseBackward: -0.36,
-      phaseBackWeight: 0.34,
-      extinctionTint: new THREE.Vector3(0.94, 1.02, 1.24),
-    };
 
     // ---- shared uniform nodes --------------------------------------------
     // Every pass, the background and the environment material reference these
@@ -319,18 +321,12 @@ export class SkySystem {
     // QuadMesh writes native texture UVs; PMREM reads the same equirect convention.
     this.envPass = new BakePass('sky-env', skyEnv(dirFromEquirectUv(uv())));
 
-    // ---- lights -----------------------------------------------------------
-    // The renderer takes over shadowing for whichever directional light is
-    // brightest, so castShadow stays off: its cascades beat three's single
-    // shadow frustum by a mile.
-    this.sunLight = new THREE.DirectionalLight(0xffffff, 4.0);
     this.sunLight.name = 'sky-sun';
     this.sunLight.castShadow = false;
     this.sunLight.target.name = 'sky-sun-target';
     ctx.scene.add(this.sunLight, this.sunLight.target);
     r.addLight(this.sunLight, { range: 1e9, priority: 10 });
 
-    this.moonLight = new THREE.DirectionalLight(0x9fc0ff, 0.0);
     this.moonLight.name = 'sky-moon';
     this.moonLight.castShadow = false;
     ctx.scene.add(this.moonLight, this.moonLight.target);
@@ -338,14 +334,8 @@ export class SkySystem {
 
     this.keyLight = this.sunLight;
 
-    // ---- IBL --------------------------------------------------------------
-    // 512x256 equirect -> PMREM, baked from the *same* shader and uniform nodes
-    // as the visible sky, so the IBL can never disagree with it.
-    this.envEquirect = hdrTarget(512, 256, { name: 'sky-equirect' });
     this.envEquirect.texture.mapping = THREE.EquirectangularReflectionMapping;
     this.pmrem = new PMREMGenerator(this.renderer);
-    this._pmremTarget = null;
-    this.envMap = null;
 
     // ---- volumetrics ------------------------------------------------------
     // A node factory, not a registered pass: the WebGPU frame graph has no pass
@@ -357,26 +347,6 @@ export class SkySystem {
       steps: Math.max(8, steps),
       march: q.volumetrics,
     });
-
-    // ---- bookkeeping ------------------------------------------------------
-    this.ambientColor = new THREE.Color(0, 0, 0);
-    this.indirectScale = 1;
-    this._beamLuminance = 0;
-    this._sunT = [0, 0, 0];
-    this._moonT = [0, 0, 0];
-    this._envSunDir = new THREE.Vector3(0, -1, 0);
-    this._envMoonDir = new THREE.Vector3(0, -1, 0);
-    this._skySunDir = new THREE.Vector3(0, -1, 0);
-    this._skyMoonDir = new THREE.Vector3(0, -1, 0);
-    this._tmp = new THREE.Vector3();
-    this._cloudOcclusion = 1;
-    this._cloudOccTarget = 1;
-    this._baseSunIntensity = 0;
-    this._envAge = 1e9;
-    this._skyDirty = true;
-    this._envDirty = true;
-    this._cloudTime = 0;
-    this._occParams = { coverage: 0, density: 0, windX: 0, windZ: 0, time: 0 };
 
     this._applyWeather();
     this._applyFog();

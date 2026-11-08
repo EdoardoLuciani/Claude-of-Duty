@@ -135,66 +135,109 @@ export class AiSystem {
   private readonly _ladderQueue = new Map<number, Agent[]>();
   declare ctx: EngineContext;
   declare rng: Rng;
-  declare root: THREE.Group;
+  root: THREE.Group = new THREE.Group();
   declare materials: SoldierMaterialsNode;
   declare ground: GroundShadows;
-  declare _variants: Map<string, AiVariant>;
-  declare agents: AiActor[];
-  declare squads: Squad[];
-  declare grid: SurfaceNav | null;
-  declare cover: CoverMap | null;
-  declare inspect: boolean;
-  declare forcePopulate: boolean;
-  declare _wave: number;
-  declare _waveTotal: number;
-  declare _waveRemaining: number;
-  declare _wavePending: boolean;
-  declare _nextWaveAt: number;
-  declare _waveState: {
+  _variants: Map<string, AiVariant> = new Map();
+  agents: AiActor[] = [];
+  squads: Squad[] = [];
+  grid: SurfaceNav | null = null;
+  cover: CoverMap | null = null;
+  inspect: boolean = false;
+  /** dev: force the garrison to spawn even in deterministic capture runs */
+  forcePopulate: boolean = false;
+  /** Wave director: the boot garrison is wave 1; every time the field goes
+   *  quiet the next wave arrives after a short beat. Unlimited by design. */
+  _wave: number = 0;
+  _waveTotal: number = 0;
+  _waveRemaining: number = 0;
+  _wavePending: boolean = false;
+  _nextWaveAt: number = 0;
+  _waveState: {
     number: number;
     remaining: number;
     total: number;
     incoming: boolean;
     nextIn: number;
+  } = {
+    number: 0,
+    remaining: 0,
+    total: 0,
+    incoming: false,
+    nextIn: 0,
   };
-  declare waveDelay: number;
-  declare _hudList: AiActor[];
-  declare _lastHeardPing: number;
-  declare corpseTtl: number;
-  declare stats: AiStats;
-  declare _v: THREE.Vector3;
-  declare _v2: THREE.Vector3;
-  declare _v3: THREE.Vector3;
-  declare _probe: GroundProbe;
-  declare _fireEvent: EngineEventMap['weapon:fire'] & {
+  /** Seconds of silence before the next wave lands. Longer than the market
+   *  grace period (10 s, see MARKET_DELAY in market/index.js): the shop
+   *  opens mid-countdown and freezing time on open holds what remains. */
+  waveDelay: number = 20;
+  _hudList: AiActor[] = [];
+  _lastHeardPing: number = -Infinity;
+  /** Seconds a corpse stays before it despawns (shrinks and is removed). */
+  corpseTtl: number = 30;
+  stats: AiStats = {
+    agents: 0,
+    alive: 0,
+    navMs: 0,
+    coverPts: 0,
+    walkable: 0,
+    friendlyHolds: 0,
+    grenadeHolds: 0,
+    pathsDeferred: 0,
+  };
+  /* scratch */
+  _v: THREE.Vector3 = new THREE.Vector3();
+  _v2: THREE.Vector3 = new THREE.Vector3();
+  _v3: THREE.Vector3 = new THREE.Vector3();
+  _probe: GroundProbe = { y: 0, nx: 0, ny: 1, nz: 0, hit: false };
+  _fireEvent: EngineEventMap['weapon:fire'] & {
     intensity: number;
     light: number;
     flashScale: number;
+  } = {
+    actor: null,
+    weapon: 'ai_rifle',
+    origin: new THREE.Vector3(),
+    dir: new THREE.Vector3(),
+    seed: 0,
+    // Sprites and light are gained SEPARATELY: see _flashGain/_flashLight.
+    // The sprites have to read as fire at 25 m; the punctual light must not
+    // turn the shooter into the brightest object in the frame.
+    intensity: 0.12,
+    light: 0.006,
+    // Size is gained separately from radiance: a 0.12-intensity flash scaled
+    // geometrically by 0.12 is 3 mm across and invisible at 20 m.
+    flashScale: 0.8,
   };
-  declare _shellEvent: EngineEventMap['weapon:shell'];
-  declare _grenades: {
+  _shellEvent: EngineEventMap['weapon:shell'] = {
+    position: new THREE.Vector3(),
+    velocity: new THREE.Vector3(),
+  };
+  _grenades: {
     body: ReturnType<PhysicsSystem['addRigidBody']>;
     mesh: ReturnType<typeof grenadeMesh>;
     fuse: number;
     agent: Agent;
-  }[];
-  declare _grenadeArc: GrenadeArc;
-  declare _grenadePoint: THREE.Vector3;
-  declare _grenadeStep: THREE.Vector3;
-  declare _pathBudget: number;
-  declare pathsPerFrame: number;
-  declare lastPathOutcome: string | null;
-  declare lastPathResFloor: number;
-  declare lastPathReason: string | null;
+  }[] = [];
+  _grenadeArc: GrenadeArc = { dx: 0, dz: 0, dist: 0, vy: 0, vh: 0, tAir: 0, y: 0, valid: false };
+  _grenadePoint: THREE.Vector3 = new THREE.Vector3();
+  _grenadeStep: THREE.Vector3 = new THREE.Vector3();
+  /* ---- frame budgets and LOD state (see _updateRelevance / requestPath) ---- */
+  _pathBudget: number = 0;
+  /** Shared solve budget, including endpoint checks. Serve deferred actors
+   *  round-robin before fresh requests; entering combat must not burst solves. */
+  pathsPerFrame: number = 2;
+  lastPathOutcome: string | null = null;
+  lastPathResFloor: number = NaN;
+  lastPathReason: string | null = null;
   declare lastPathStartSurface: number;
   declare lastPathGoalSurface: number;
-  declare _pathCursor: number;
-  declare _frustum: THREE.Frustum;
-  declare _mvp: THREE.Matrix4;
-  declare _sphere: THREE.Sphere;
-  declare _sweep: THREE.Sphere;
-  declare _sun: THREE.Vector3;
-  declare _lodStats: { irrelevant: number };
+  _pathCursor: number = 0;
+  _frustum: THREE.Frustum = new THREE.Frustum();
+  _mvp: THREE.Matrix4 = new THREE.Matrix4();
+  _sphere: THREE.Sphere = new THREE.Sphere();
+  _sweep: THREE.Sphere = new THREE.Sphere();
+  _sun: THREE.Vector3 = new THREE.Vector3(0, 1, 0);
+  _lodStats: { irrelevant: number } = { irrelevant: 0 };
   declare _loadedVariants: Map<string, SoldierRecord>;
   declare _prewarmed: AiPrewarm | null;
   declare _off: Array<() => void>;
@@ -209,7 +252,6 @@ export class AiSystem {
   async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
     this.rng = ctx.rng.fork();
-    this.root = new THREE.Group();
     this.root.name = 'ai';
     ctx.scene.add(this.root);
 
@@ -223,90 +265,9 @@ export class AiSystem {
     // Contact occlusion under every actor. Without it the cast shadow alone
     // leaves them hovering: see grounding.js.
     this.ground = new GroundShadows(this.root, 16);
-    this._variants = new Map();
-    this.agents = [];
-    this.squads = [];
-    this.grid = null;
-    this.cover = null;
-    this.inspect = false;
-    /** dev: force the garrison to spawn even in deterministic capture runs */
-    this.forcePopulate = false;
-    /** Wave director: the boot garrison is wave 1; every time the field goes
-     *  quiet the next wave arrives after a short beat. Unlimited by design. */
-    this._wave = 0;
-    this._waveTotal = 0;
-    this._waveRemaining = 0;
-    this._wavePending = false;
-    this._nextWaveAt = 0;
-    this._waveState = {
-      number: 0,
-      remaining: 0,
-      total: 0,
-      incoming: false,
-      nextIn: 0,
-    };
-    /** Seconds of silence before the next wave lands. Longer than the market
-     *  grace period (10 s, see MARKET_DELAY in market/index.js): the shop
-     *  opens mid-countdown and freezing time on open holds what remains. */
-    this.waveDelay = 20;
-    this._hudList = [];
-    this._lastHeardPing = -Infinity;
-    /** Seconds a corpse stays before it despawns (shrinks and is removed). */
-    this.corpseTtl = 30;
-    this.stats = {
-      agents: 0,
-      alive: 0,
-      navMs: 0,
-      coverPts: 0,
-      walkable: 0,
-      friendlyHolds: 0,
-      grenadeHolds: 0,
-      pathsDeferred: 0,
-    };
 
-    /* scratch */
-    this._v = new THREE.Vector3();
-    this._v2 = new THREE.Vector3();
-    this._v3 = new THREE.Vector3();
-    this._probe = { y: 0, nx: 0, ny: 1, nz: 0, hit: false };
-    this._fireEvent = {
-      actor: null,
-      weapon: 'ai_rifle',
-      origin: new THREE.Vector3(),
-      dir: new THREE.Vector3(),
-      seed: 0,
-      // Sprites and light are gained SEPARATELY: see _flashGain/_flashLight.
-      // The sprites have to read as fire at 25 m; the punctual light must not
-      // turn the shooter into the brightest object in the frame.
-      intensity: 0.12,
-      light: 0.006,
-      // Size is gained separately from radiance: a 0.12-intensity flash scaled
-      // geometrically by 0.12 is 3 mm across and invisible at 20 m.
-      flashScale: 0.8,
-    };
-    this._shellEvent = { position: new THREE.Vector3(), velocity: new THREE.Vector3() };
-    this._grenades = [];
-    this._grenadeArc = { dx: 0, dz: 0, dist: 0, vy: 0, vh: 0, tAir: 0, y: 0, valid: false };
-    this._grenadePoint = new THREE.Vector3();
-    this._grenadeStep = new THREE.Vector3();
-
-    /* ---- frame budgets and LOD state (see _updateRelevance / requestPath) ---- */
-    this._pathBudget = 0;
-    /** Shared solve budget, including endpoint checks. Serve deferred actors
-     *  round-robin before fresh requests; entering combat must not burst solves. */
-    this.pathsPerFrame = 2;
     this.stats.pathsDeferred = 0;
-    this.lastPathOutcome = null;
-    this.lastPathResFloor = NaN;
-    this.lastPathReason = null;
     this.lastPathStartSurface = this.lastPathGoalSurface = 0;
-    this._pathCursor = 0;
-    this._frustum = new THREE.Frustum();
-    this._mvp = new THREE.Matrix4();
-    this._sphere = new THREE.Sphere();
-    this._sweep = new THREE.Sphere();
-    this._sun = new THREE.Vector3(0, 1, 0);
-    this._lodStats = { irrelevant: 0 };
 
     this._wireEvents(ctx);
     console.info(

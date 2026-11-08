@@ -117,7 +117,7 @@ interface LiveGrenade {
 export class WeaponSystem {
   declare ctx: EngineContext;
   declare rng: Rng;
-  declare mats: ReticleMaterials;
+  mats: ReticleMaterials = new ReticleMaterials();
   private _viewmodel: ViewModel | null = null;
   private _sim: ProjectileSim | null = null;
   private _pickups: AmmoPickups | null = null;
@@ -287,7 +287,6 @@ export class WeaponSystem {
   async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
     this.rng = ctx.rng.fork();
-    this.mats = new ReticleMaterials();
     this._sim = new ProjectileSim(ctx);
     this._viewmodel = new Viewmodel(ctx, this.mats);
     await this.viewmodel.loadArms();

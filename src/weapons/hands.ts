@@ -88,7 +88,7 @@ export class Arm {
   scale!: number;
   l1!: number;
   l2!: number;
-  root!: THREE.Object3D;
+  root: THREE.Object3D = new THREE.Object3D();
   shoulder!: THREE.Vector3;
   pole!: THREE.Vector3;
   pose!: string;
@@ -125,7 +125,6 @@ export class Arm {
     this.scale = opts.scale ?? 1;
     this.l1 = (opts.upper ?? 0.33) * this.scale;
     this.l2 = (opts.fore ?? 0.3) * this.scale;
-    this.root = new THREE.Object3D();
     this.root.name = side < 0 ? 'arm-left' : 'arm-right';
     this.shoulder = new THREE.Vector3(
       side * (opts.shoulderX ?? 0.19),

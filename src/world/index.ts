@@ -39,11 +39,11 @@ export class WorldSystem {
   declare rng: Rng;
   declare materials: EngineSystems['materials'];
   declare renderSystem: EngineSystems['render'] | null;
-  declare _mats: Map<keyof typeof PALETTE, WorldMaterial>;
-  declare meshes: WorldMesh[] | null;
-  declare collisionMeshes: WorldMesh[] | null;
-  declare lodGroups: WorldMesh[] | null;
-  declare _v: THREE.Vector3;
+  _mats: Map<keyof typeof PALETTE, WorldMaterial> = new Map();
+  meshes: WorldMesh[] | null = [];
+  collisionMeshes: WorldMesh[] | null = [];
+  lodGroups: WorldMesh[] | null = [];
+  _v: THREE.Vector3 = new THREE.Vector3();
   declare root: THREE.Group;
   declare collisionRoot: THREE.Group;
   declare _xform: THREE.Matrix4;
@@ -74,11 +74,6 @@ export class WorldSystem {
     this.materials = ctx.get('materials');
     this.renderSystem = ctx.peek('render');
     this.materials.setGroundLevel?.(0);
-    this._mats = new Map();
-    this.meshes = [];
-    this.collisionMeshes = [];
-    this.lodGroups = [];
-    this._v = new THREE.Vector3();
 
     const started = performance.now();
     const { meta, visual, collision } = await ctx.get('models').worldPrefetch;

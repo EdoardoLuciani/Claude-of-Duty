@@ -64,8 +64,8 @@ export class FxSystem {
   declare render: EngineSystems['render'] | null;
   declare _physics: EngineSystems['physics'] | null;
   declare _audio: EngineSystems['audio'] | null;
-  declare gravity: number;
-  declare now: number;
+  gravity: number = UNITS.gravity;
+  now: number = 0;
   declare _atlas: { texture: THREE.Texture; cols: number; size: number };
   declare _decalAtlas: {
     albedo: THREE.Texture;
@@ -81,11 +81,12 @@ export class FxSystem {
   declare layers: ParticleLayer[];
   declare viewAdd: ParticleLayer;
   declare viewLit: ParticleLayer;
-  declare _viewAttached: boolean;
+  _viewAttached: boolean = false;
   declare decals: DecalSystem;
   declare hazeSys: HazeSystem;
   declare lights: LightPool;
-  declare viewLights: LightPool | null;
+  /** Mirrored pool inside viewScene; built with the view layers on first use. */
+  viewLights: LightPool | null = null;
   declare shells: ShellSystem;
   declare ambience: Ambience;
   declare _ambTop: THREE.Vector3;
@@ -124,8 +125,6 @@ export class FxSystem {
     this.render = ctx.peek('render');
     this._physics = ctx.peek('physics');
     this._audio = ctx.peek('audio');
-    this.gravity = UNITS.gravity;
-    this.now = 0;
 
     const q = ctx.config.q;
     const budget = q.particleBudget ?? 6000;
@@ -179,7 +178,6 @@ export class FxSystem {
     this.viewLit = mk(viewLit, 'lit', 10);
     this.viewAdd.uniforms.uSoftEnable.value.x = 0;
     this.viewLit.uniforms.uSoftEnable.value.x = 0;
-    this._viewAttached = false;
 
     this.decals = new DecalSystem({
       capacity: q.decalBudget ?? 128,
@@ -198,8 +196,6 @@ export class FxSystem {
 
     this.lights = new LightPool(ctx.scene, 4);
     if (this.render?.addLight) this.lights.register(this.render);
-    /** Mirrored pool inside viewScene; built with the view layers on first use. */
-    this.viewLights = null;
 
     this.shells = new ShellSystem(this, await loadSpentHullGeometry());
     ctx.scene.add(this.shells.mesh, this.shells.hullMesh);

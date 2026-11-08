@@ -18,8 +18,13 @@ export class GameOverScreen {
   declare title: HTMLElement;
   declare summary: HTMLElement;
   declare button: HTMLButtonElement;
-  declare _click: () => void;
-  declare _key: (event: KeyboardEvent) => void;
+  _click: () => void = (): void => this.restart();
+  _key: (event: KeyboardEvent) => void = (e): void => {
+    if (!this.active || this.elapsed < this.delay) return;
+    if (e.code !== 'Enter' && e.code !== 'Space') return;
+    e.preventDefault();
+    this.restart();
+  };
   active: boolean = false;
   elapsed: number = 0;
   shown: number = 0;
@@ -37,13 +42,6 @@ export class GameOverScreen {
     this.button = el('button', 'ow-gameover-button', panel, 'NEW GAME');
     el('div', 'ow-gameover-hint', panel, 'ENTER / SPACE');
 
-    this._click = (): void => this.restart();
-    this._key = (e): void => {
-      if (!this.active || this.elapsed < this.delay) return;
-      if (e.code !== 'Enter' && e.code !== 'Space') return;
-      e.preventDefault();
-      this.restart();
-    };
     this.button.addEventListener('click', this._click);
     addEventListener('keydown', this._key);
     setStyle(this.root, 'display', 'none');

@@ -62,7 +62,9 @@ export class PlayerSystem {
   declare rig: CameraRig;
   declare health: Health;
   declare healCtrl: HealController;
-  declare _deathLook: THREE.PerspectiveCamera;
+  // A Camera's lookAt uses -Z as forward; a plain Object3D uses +Z and would
+  // make the final quaternion face exactly away from the corpse.
+  _deathLook: THREE.PerspectiveCamera = new THREE.PerspectiveCamera();
   declare ctx: PlayerContext;
   declare physics: PlayerPhysics;
   declare rng: Rng;
@@ -185,11 +187,7 @@ export class PlayerSystem {
   };
   _offEvents: Array<() => void> = [];
 
-  constructor() {
-    // A Camera's lookAt uses -Z as forward; a plain Object3D uses +Z and would
-    // make the final quaternion face exactly away from the corpse.
-    this._deathLook = new THREE.PerspectiveCamera();
-  }
+  constructor() {}
 
   async init(ctx: PlayerContext): Promise<void> {
     this.ctx = ctx;

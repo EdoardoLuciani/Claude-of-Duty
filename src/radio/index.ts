@@ -160,23 +160,18 @@ export class RadioSystem {
   static readonly deps: SystemId[] = ['world'];
   ctx!: RadioContext;
   _world!: EngineSystems['world'];
-  _physics!: EngineSystems['physics'] | null;
+  _physics: EngineSystems['physics'] | null = null;
   _player: EngineSystems['player'] | null = null;
-  _audio!: EngineSystems['audio'] | null;
-  active!: Strike[];
-  _warmed!: boolean;
-  _off!: (() => void)[];
+  _audio: EngineSystems['audio'] | null = null;
+  /** Active strikes: { plane, bombs, drops, travel, start, dir } */
+  active: Strike[] = [];
+  _warmed: boolean = false;
+  _off: (() => void)[] = [];
 
   async init(ctx: RadioContext): Promise<void> {
     this.ctx = ctx;
     this._world = ctx.get('world');
-    this._physics = null;
     this._player = null;
-    this._audio = null;
-    /** Active strikes: { plane, bombs, drops, travel, start, dir } */
-    this.active = [];
-    this._warmed = false;
-    this._off = [];
     this._off.push(ctx.events.on('game:restart', (): void => this.clearStrike()));
   }
 

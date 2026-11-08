@@ -768,7 +768,9 @@ export class CoverMap {
   grid!: SurfaceNav | null;
   physics!: NavPhysics;
   points!: NavCoverPoint[];
-  _candidates!: (NavCoverPoint | null)[];
+  _candidates: (NavCoverPoint | null)[] = new Array<NavCoverPoint | null>(
+    TACTICS.coverCandidates
+  ).fill(null);
   byComponent: Map<number, NavCoverPoint[]> = new Map();
   _v: THREE.Vector3 = new THREE.Vector3();
   _v2: THREE.Vector3 = new THREE.Vector3();
@@ -786,7 +788,6 @@ export class CoverMap {
       if (!list) this.byComponent.set(p.component, (list = []));
       list.push(p);
     }
-    this._candidates = new Array<NavCoverPoint | null>(TACTICS.coverCandidates).fill(null);
   }
   pick(
     pos: THREE.Vector3,

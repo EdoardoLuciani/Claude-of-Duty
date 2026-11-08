@@ -247,10 +247,15 @@ const ambientNode = (
 
 export class SkyLuts {
   declare shared: SkyLutShared;
-  declare transmittanceRt: ReturnType<typeof floatTarget>;
-  declare multiScatterRt: ReturnType<typeof hdrTarget>;
-  declare skyViewRt: ReturnType<typeof hdrTarget>;
-  declare ambientRt: ReturnType<typeof hdrTarget>;
+  transmittanceRt: ReturnType<typeof floatTarget> = floatTarget(256, 64, {
+    name: 'sky-transmittance',
+  });
+  multiScatterRt: ReturnType<typeof hdrTarget> = hdrTarget(32, 32, { name: 'sky-multiscatter' });
+  // 384x192 rather than Hillaire's 192x108: one texel is then under a degree
+  // of azimuth, the difference between a readable warm band around a low sun
+  // and a visibly interpolated smear.
+  skyViewRt: ReturnType<typeof hdrTarget> = hdrTarget(384, 192, { name: 'sky-view' });
+  ambientRt: ReturnType<typeof hdrTarget> = hdrTarget(2, 1, { name: 'sky-ambient' });
   declare transmittancePass: BakePass;
   declare multiScatterPass: BakePass;
   declare skyViewPass: BakePass;
@@ -259,13 +264,6 @@ export class SkyLuts {
   constructor(shared: SkyLutShared) {
     this.shared = shared;
 
-    this.transmittanceRt = floatTarget(256, 64, { name: 'sky-transmittance' });
-    this.multiScatterRt = hdrTarget(32, 32, { name: 'sky-multiscatter' });
-    // 384x192 rather than Hillaire's 192x108: one texel is then under a degree
-    // of azimuth, the difference between a readable warm band around a low sun
-    // and a visibly interpolated smear.
-    this.skyViewRt = hdrTarget(384, 192, { name: 'sky-view' });
-    this.ambientRt = hdrTarget(2, 1, { name: 'sky-ambient' });
     this.skyViewRt.texture.wrapS = RepeatWrapping;
 
     shared.transmittanceTex = this.transmittanceRt.texture;

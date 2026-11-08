@@ -143,7 +143,7 @@ const SLEEP_TIME = 0.6;
 let _nextRagdollId = 1;
 
 export class Ragdoll {
-  declare id: number;
+  id: number = _nextRagdollId++;
   declare world: RagdollWorld | null;
   declare gravity: number;
   declare iterations: number;
@@ -202,7 +202,6 @@ export class Ragdoll {
   _ss: ReturnType<typeof makeClosest> = makeClosest();
 
   constructor(world: RagdollWorld | null, opts: RagdollOptions = {}) {
-    this.id = _nextRagdollId++;
     this.world = world;
     this.gravity = opts.gravity ?? -20.6;
     this.iterations = opts.iterations ?? 6;

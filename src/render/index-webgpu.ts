@@ -64,41 +64,56 @@ function copyDirectional(target: DirectionalLight, source: DirectionalLight): vo
 export class RenderSystem {
   declare ctx: EngineContext;
   declare q: EngineContext['config']['q'];
-  declare _warmAbort: AbortController;
+  _warmAbort: AbortController = new AbortController();
   declare renderer: Renderer;
-  declare screenSize: { width: number; height: number };
-  declare displaySize: { width: number; height: number };
-  declare passes: PostPass[];
-  declare lights: RegisteredLight[];
-  declare _lightPositionGroup: ReturnType<typeof sharedUniformGroup>;
-  declare _lightUniformGroups: Map<GroupedPositionNode, import('three/webgpu').UniformGroupNode>;
-  declare grade: ReturnType<typeof createGradeLut>;
-  declare settings: RenderSettings;
-  declare _exposure: number;
-  declare _exposureTarget: number;
-  declare _metering: boolean;
-  declare _meterReady: boolean;
-  declare _meterElapsed: number;
-  declare _graph: RenderGraph | null;
-  declare _meterPass: ReturnType<typeof createHdrMeter> | null;
-  declare _lightsReady: boolean;
-  declare _size: Vector2;
-  declare _skyKey: DirectionalLight;
-  declare _skySecondary: DirectionalLight;
+  screenSize: { width: number; height: number } = { width: 1, height: 1 };
+  displaySize: { width: number; height: number } = { width: 1, height: 1 };
+  passes: PostPass[] = [];
+  lights: RegisteredLight[] = [];
+  // Share the public world-space light/target uniforms. View positions are now
+  // camera-dependent Fn nodes; leave their internal uniforms owned by Three.
+  _lightPositionGroup: ReturnType<typeof sharedUniformGroup> = sharedUniformGroup(
+    'owLightPositions',
+    0,
+    'render'
+  );
+  _lightUniformGroups: Map<GroupedPositionNode, import('three/webgpu').UniformGroupNode> =
+    new Map();
+  grade: ReturnType<typeof createGradeLut> = createGradeLut('default');
+  settings: RenderSettings = {
+    bloomStrength: 0.14,
+    bloomThreshold: 1.6,
+    exposureBias: 0,
+    exposureKey: 1.06,
+    autoExposure: true,
+  };
+  _exposure: number = 1;
+  _exposureTarget: number = 1;
+  _metering: boolean = false;
+  _meterReady: boolean = false;
+  _meterElapsed: number = 0;
+  _graph: RenderGraph | null = null;
+  _meterPass: ReturnType<typeof createHdrMeter> | null = null;
+  _lightsReady: boolean = false;
+  _size: Vector2 = new Vector2();
+  // Sky lights remain authored data. Render through stable key/secondary IDs
+  // so a sun/moon handoff changes values, not every lit shader's topology.
+  _skyKey: DirectionalLight = new DirectionalLight(0xffffff, 0);
+  _skySecondary: DirectionalLight = new DirectionalLight(0xffffff, 0);
   declare indirect: IndirectFill;
   declare activeSun: DirectionalLight;
   declare sunDir: Vector3;
-  declare viewSun: DirectionalLight;
-  declare viewFill: DirectionalLight;
-  declare _viewFillDirection: Vector3;
-  declare _viewLightPosition: Vector3;
-  declare _viewToLight: Vector3;
-  declare _viewVisibility: number;
-  declare _viewVisibilityFrame: number | null;
-  declare _viewProbePosition: Vector3;
-  declare _viewProbeWorld: unknown;
-  declare _viewProbeVersion: number;
-  declare _viewSkyVisibility: number;
+  viewSun: DirectionalLight = new DirectionalLight(0xffffff, 0);
+  viewFill: DirectionalLight = new DirectionalLight(0xffffff, 0);
+  _viewFillDirection: Vector3 = new Vector3().fromArray(VIEW_LIGHTING.fillDirection).normalize();
+  _viewLightPosition: Vector3 = new Vector3();
+  _viewToLight: Vector3 = new Vector3();
+  _viewVisibility: number = 1;
+  _viewVisibilityFrame: number | null = null;
+  _viewProbePosition: Vector3 = new Vector3(Infinity, Infinity, Infinity);
+  _viewProbeWorld: unknown = null;
+  _viewProbeVersion: number = -1;
+  _viewSkyVisibility: number = 1;
   declare _viewSkyDirections: Vector3[];
   declare viewPracticals: Array<{
     light: PointLight;
@@ -107,7 +122,7 @@ export class RenderSystem {
     irradiance: number;
   }>;
   declare viewLightLevel: number;
-  declare _fogFrame: UniformNode<'float', number>;
+  _fogFrame: UniformNode<'float', number> = uniform(0);
   declare _volumeShadow: ReturnType<typeof createVolumetricShadow> | null;
   declare depthTexture: Texture | null;
   declare velocityTexture: Texture | null;
@@ -128,8 +143,6 @@ export class RenderSystem {
     this.q = ctx.config.q;
     // Sky is registered before init; its stable direction exists before its GPU resources.
     this.sunDir = ctx.get('sky').keyDirection;
-    this._warmAbort = new AbortController();
-    this._fogFrame = uniform(0);
     this.renderer = await createWebGpuRenderer(ctx.canvas, (error): void => {
       if (this._disposing) return;
       this._warmAbort.abort(error);
@@ -139,54 +152,14 @@ export class RenderSystem {
     this.renderer.setClearColor(0, 0);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = PCFShadowMap;
-    this.screenSize = { width: 1, height: 1 };
-    this.displaySize = { width: 1, height: 1 };
-    this.passes = [];
-    this.lights = [];
-    // Share the public world-space light/target uniforms. View positions are now
-    // camera-dependent Fn nodes; leave their internal uniforms owned by Three.
-    this._lightPositionGroup = sharedUniformGroup('owLightPositions', 0, 'render');
-    this._lightUniformGroups = new Map();
-    this.grade = createGradeLut('default');
-    this.settings = {
-      bloomStrength: 0.14,
-      bloomThreshold: 1.6,
-      exposureBias: 0,
-      exposureKey: 1.06,
-      autoExposure: true,
-    };
-    this._exposure = 1;
-    this._exposureTarget = 1;
-    this._metering = false;
-    this._meterReady = false;
-    this._meterElapsed = 0;
-    this._graph = null;
-    this._meterPass = null;
-    this._lightsReady = false;
-    this._size = new Vector2();
-    // Sky lights remain authored data. Render through stable key/secondary IDs
-    // so a sun/moon handoff changes values, not every lit shader's topology.
-    this._skyKey = new DirectionalLight(0xffffff, 0);
-    this._skySecondary = new DirectionalLight(0xffffff, 0);
     this._skyKey.name = 'ow-world-key';
     this._skySecondary.name = 'ow-world-secondary';
     ctx.scene.add(this._skyKey, this._skyKey.target, this._skySecondary, this._skySecondary.target);
     this.indirect = new IndirectFill(ctx);
     this.indirect.sunDir.value = this.sunDir;
     this.activeSun = this._skyKey;
-    this.viewSun = new DirectionalLight(0xffffff, 0);
-    this.viewFill = new DirectionalLight(0xffffff, 0);
     this.viewSun.name = 'ow-view-world-key';
     this.viewFill.name = 'ow-view-readability';
-    this._viewFillDirection = new Vector3().fromArray(VIEW_LIGHTING.fillDirection).normalize();
-    this._viewLightPosition = new Vector3();
-    this._viewToLight = new Vector3();
-    this._viewVisibility = 1;
-    this._viewVisibilityFrame = null;
-    this._viewProbePosition = new Vector3(Infinity, Infinity, Infinity);
-    this._viewProbeWorld = null;
-    this._viewProbeVersion = -1;
-    this._viewSkyVisibility = 1;
     this._viewSkyDirections = Array.from({ length: VIEW_LIGHTING.skySamples }, (_, i): Vector3 => {
       const y = (i + 0.5) / VIEW_LIGHTING.skySamples;
       const radius = Math.sqrt(1 - y * y),
