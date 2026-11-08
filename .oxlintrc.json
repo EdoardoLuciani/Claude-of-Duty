@@ -1,5 +1,11 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "overrides": [
+    {
+      "files": ["tests/lib/fixture.ts"],
+      "rules": { "typescript/no-unsafe-type-assertion": "off" }
+    }
+  ],
   "rules": {
     "typescript/explicit-function-return-type": [
       "error",

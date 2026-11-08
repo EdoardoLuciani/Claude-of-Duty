@@ -19,8 +19,8 @@ import {
   launchChromium,
   parseArgs,
   stopDevServer,
-} from './lib/browser-harness.mjs';
-import { captureNative } from './lib/native-render.mjs';
+} from './lib/browser-harness.ts';
+import { captureNative } from './lib/native-render.ts';
 
 const args = parseArgs();
 

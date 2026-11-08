@@ -11,9 +11,9 @@ import {
   launchChromium,
   parseArgs,
   stopDevServer,
-} from './lib/browser-harness.mjs';
-import { combatLane } from './lib/combat-fixture.js';
-import { waitForGame } from './lib/native-render.mjs';
+} from './lib/browser-harness.ts';
+import { combatLane } from './lib/combat-fixture.ts';
+import { waitForGame } from './lib/native-render.ts';
 import { createCombatProfile, validateCombatProfile } from './lib/profile-combat.js';
 
 const args = parseArgs();

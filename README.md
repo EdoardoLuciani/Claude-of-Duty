@@ -21,7 +21,14 @@ formats (`bun fmt`), bundles and serves the game (`build/bun.mjs`; the dev serve
 reads its plugin from `bunfig.toml`); packages are cached in `~/.bun/install/cache`, so warm
 reinstalls are near-instant. Node runs Oxlint, the `node:test` smoke runner and all tools; Node-run
 tools and smoke tests load migrated `.ts` modules using native type stripping.
-Runtime TypeScript uses explicit `.ts` imports and is checked by `bun run typecheck`
+Runtime source, every `tests/**/*.ts` script, and converted test helpers use explicit
+`.ts` imports and share strict checking through `bun run typecheck`. Node runs tests
+directly with erasable TypeScript syntax—no loader, build step or Bun test runtime.
+The second, type-aware lint pass covers runtime source, tests and typed test helpers;
+shared JavaScript authoring APIs consumed by tests have `.d.ts` contracts in
+`tests/types/`. Package import aliases select those contracts for checking and the
+unchanged JavaScript modules at runtime, keeping declaration-only edits out of world
+asset provenance hashes.
 (`noUncheckedIndexedAccess` status: [triage and plan](docs/no-unchecked-indexed-access.md)).
 `bun run lint` requires explicit return types on every TypeScript function, method,
 getter and callback (including contextually typed functions and functions returning
@@ -34,6 +41,11 @@ assertions (including `as unknown as T`), as well as explicit `any` and unsafe
 assignment, argument, call, member access and return. Numeric enum assignments
 must use enum members rather than unchecked numbers. Runtime boundaries must
 validate unknown data; owned records should be constructed with their full type.
+For Node-only browser/native fakes, prefer real instances and shared typed fixtures.
+Issue [#621](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/621) approved one
+exception: only `tests/lib/fixture.ts` may assert its checked `Partial<T>` as `T`.
+Its proxy throws on unexpected missing-member reads; explicitly listed optional
+members may be absent. No other test file relaxes the unsafe-assertion rule.
 Regular lint rules cover `src/`, `build/`, `tools/`, and `tests/`. Missing return annotations
 fail CI's lint step, not the typecheck itself. The narrow declaration additions in
 `src/render/three-types.d.ts` describe APIs verified against the pinned Three.js
@@ -172,7 +184,7 @@ performance acceptance.
 
 The material-graph, FX-recipe, physics-geometry and audio-recording smoke hashes
 are **characterization**, not the definition of correct behavior. To inspect a
-failure, run e.g. `DUMP_CHARACTERIZATION=1 node tests/smoke/smoke-fx-recipes.mjs > /tmp/fx-current.txt`.
+failure, run e.g. `DUMP_CHARACTERIZATION=1 node tests/smoke/smoke-fx-recipes.ts > /tmp/fx-current.txt`.
 Run the same test/seed with the previous implementation and pinned dependencies;
 diff the dumps (WGSL, ordered payloads/RNG, query histories or recording order).
 Review the change against the behavioral assertions and any required visual checks
