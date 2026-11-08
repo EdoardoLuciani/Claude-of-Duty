@@ -596,8 +596,9 @@ export class TelemetrySystem {
   declare _restoreEnabled: boolean | null;
   declare _restoreControl: boolean | null;
   declare _nativeBuilds: ReturnType<typeof trackNodeBuilders> | null;
-  declare _startElapsed: number;
-  declare _startRaw: number;
+  /** Unset until start(); events recorded during boot read as time zero. */
+  declare _startElapsed: number | undefined;
+  declare _startRaw: number | undefined;
   declare _stopElapsed: number | null;
   declare _stopRaw: number | null;
   declare _nextPlayerRaw: number;
@@ -1237,12 +1238,12 @@ export class TelemetrySystem {
 
   _time(): number | null {
     const now = this._stopElapsed ?? this.ctx.time.elapsed;
-    return n3(now - this._startElapsed);
+    return n3(now - (this._startElapsed ?? now));
   }
 
   _rawTime(): number | null {
     const now = this._stopRaw ?? this.ctx.time.raw;
-    return n3(now - this._startRaw);
+    return n3(now - (this._startRaw ?? now));
   }
 
   _fillWorldProvenance(): void {
@@ -1854,6 +1855,8 @@ export class TelemetrySystem {
     this.badge.textContent = `● REC ${raw.toFixed(0)}s${hitches ? ` · ${hitches} HITCH${hitches === 1 ? '' : 'ES'}` : ''} · F7 MARK · F8 EXPORT`;
   }
 
+  // Engine teardown disposes every system, even one whose init never ran or failed.
+  /* oxlint-disable typescript/no-unnecessary-condition */
   dispose(): void {
     this._nativeBuilds?.dispose();
     if (this._noteMark) {
@@ -1866,8 +1869,9 @@ export class TelemetrySystem {
     removeEventListener('visibilitychange', this._onVisibility);
     removeEventListener('keydown', this._onKey, true);
     removeEventListener('beforeunload', this._onBeforeUnload);
-    this.badge.remove();
-    this._note.remove();
+    this.badge?.remove();
+    this._note?.remove();
     if (window.__TELEMETRY__ === this.api) delete window.__TELEMETRY__;
   }
+  /* oxlint-enable typescript/no-unnecessary-condition */
 }

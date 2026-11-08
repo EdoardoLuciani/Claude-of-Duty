@@ -305,18 +305,21 @@ export class WorldSystem {
     return this.queries.ladderAt(x, y, z);
   }
 
+  // Engine teardown disposes every system, even one whose init never ran or failed.
+  /* oxlint-disable typescript/no-unnecessary-condition */
   dispose(): void {
     this._offRestart?.();
     const geometries = new Set<THREE.BufferGeometry>();
     for (const mesh of this.meshes ?? []) geometries.add(mesh.geometry);
     for (const mesh of this.collisionMeshes ?? []) geometries.add(mesh.geometry);
-    for (const geometry of geometries) geometry.dispose();
-    this.root.parent?.remove(this.root);
-    this._collisionMaterial.dispose();
+    for (const geometry of geometries) geometry?.dispose();
+    this.root?.parent?.remove(this.root);
+    this._collisionMaterial?.dispose();
     this.bulbs = null;
     this.lamps = null;
     this.meshes = null;
     this.collisionMeshes = null;
     this.lodGroups = null;
   }
+  /* oxlint-enable typescript/no-unnecessary-condition */
 }

@@ -243,7 +243,7 @@ export class AiSystem {
   declare _off: Array<() => void>;
   declare _planningAlive?: Set<number>;
   declare _sky: SkySystem | null;
-  declare _stagedAgents: AiActor[];
+  _stagedAgents: AiActor[] = [];
   declare _phys: PhysicsSystem | null;
 
   static readonly id = 'ai';
@@ -1830,27 +1830,30 @@ export class AiSystem {
     return this.stats;
   }
 
+  // Engine teardown disposes every system, even one whose init never ran or failed.
+  /* oxlint-disable typescript/no-unnecessary-condition */
   dispose(): void {
-    for (const off of this._off) off();
+    for (const off of this._off ?? []) off();
     for (const a of this.agents) a.dispose();
     this.agents.length = 0;
-    this.ladderClaims.clear();
-    this._ladderQueue.clear();
+    this.ladderClaims?.clear();
+    this._ladderQueue?.clear();
     this.squads.length = 0;
     for (const g of this._grenades) {
-      this.phys.removeRigidBody(g.body);
+      this.phys?.removeRigidBody(g.body);
       this.root.remove(g.mesh);
     }
     this._grenades.length = 0;
-    this.ground.dispose();
+    this.ground?.dispose();
     this.grid?.dispose();
     this.grid = null;
     this.cover = null;
     for (const v of this._variants.values()) v.geometry.dispose();
     this._variants.clear();
-    this.materials.dispose();
+    this.materials?.dispose();
     this.root.parent?.remove(this.root);
   }
+  /* oxlint-enable typescript/no-unnecessary-condition */
 }
 
 export { VARIANTS, STATE };

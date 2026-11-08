@@ -1541,6 +1541,8 @@ export class Viewmodel {
     return out;
   }
 
+  // Engine teardown disposes every system, even one whose init never ran or failed.
+  /* oxlint-disable typescript/no-unnecessary-condition */
   dispose(): void {
     for (const w of this.weapons.values()) {
       w.animation.dispose();
@@ -1549,10 +1551,10 @@ export class Viewmodel {
     this.weapons.clear();
     this.armL.dispose();
     this.armR.dispose();
-    this.armAsset.dispose();
+    this.armAsset?.dispose();
     // Radio geometry is instance-owned; the grenade's geometry is shared with
     // world projectiles and must not be released with the arm skin.
-    this.radio.traverse((o): void => {
+    this.radio?.traverse((o): void => {
       if (isMesh(o)) o.geometry.dispose();
     });
     for (const material of this._propMaterials.values()) material.dispose();
@@ -1562,13 +1564,14 @@ export class Viewmodel {
     this.bandageAsset?.wrap.removeFromParent();
     this.bandageAsset?.tail.removeFromParent();
     for (const g of this._reticleGeo) g.dispose();
-    this.scopeMask.geometry.dispose();
-    this.scopeMask.material.dispose();
-    this.scopeReticle.geometry.dispose();
-    this.scopeReticle.material.dispose();
-    this.radio.removeFromParent();
+    this.scopeMask?.geometry.dispose();
+    this.scopeMask?.material.dispose();
+    this.scopeReticle?.geometry.dispose();
+    this.scopeReticle?.material.dispose();
+    this.radio?.removeFromParent();
     this.anchor.removeFromParent();
   }
+  /* oxlint-enable typescript/no-unnecessary-condition */
 }
 
 export type ViewModel = Viewmodel;

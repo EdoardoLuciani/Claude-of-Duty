@@ -110,7 +110,7 @@ export class FxSystem {
   declare _scriptPeriod: number;
   declare stats: { spawned: number; decals: number; live: number };
   declare _sunFactor: number;
-  declare _sunW: { x: number; y: number; z: number };
+  _sunW: { x: number; y: number; z: number } = { x: 0, y: 1, z: 0 };
   declare _suppressDecals: boolean;
   declare _targetSupport: number | undefined;
   declare _target: FxTargetFrame | undefined;
@@ -1245,8 +1245,10 @@ export class FxSystem {
     for (const e of this._script) if (e.t > from && e.t <= to) e.fn();
   }
 
+  // Engine teardown disposes every system, even one whose init never ran or failed.
+  /* oxlint-disable typescript/no-unnecessary-condition */
   dispose(): void {
-    for (const off of this._off) off();
+    for (const off of this._off ?? []) off();
     this._off = [];
     for (const l of [this.lit, this.add, this.motes, this.viewAdd, this.viewLit]) {
       l.mesh.parent?.remove(l.mesh);
@@ -1254,8 +1256,7 @@ export class FxSystem {
     }
     this.decals.mesh.parent?.remove(this.decals.mesh);
     this.decals.dispose();
-    // Dispose may follow an init that failed before the async shell load.
-    if ((this.shells as ShellSystem | undefined) !== undefined) {
+    if (this.shells) {
       this.shells.mesh.parent?.remove(this.shells.mesh);
       this.shells.hullMesh.parent?.remove(this.shells.hullMesh);
       this.shells.dispose();
@@ -1270,6 +1271,7 @@ export class FxSystem {
     this._decalAtlas.orm.dispose();
     disposeQuadSource();
   }
+  /* oxlint-enable typescript/no-unnecessary-condition */
 }
 
 const _axisX = new THREE.Vector3(1, 0, 0);

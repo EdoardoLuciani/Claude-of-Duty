@@ -778,6 +778,10 @@ export class PlayerSystem {
   get mantling(): boolean {
     return this.movement.mantleMotion.active || this.movement.climbMotion.active;
   }
+  /** Used by the browser combat-profile fixture (tools/lib/profile-combat.js). */
+  get eyeHeight(): number {
+    return this.rig.eye;
+  }
   get height(): number {
     return STANCE[this.movement.stance].height;
   }
@@ -1011,11 +1015,13 @@ export class PlayerSystem {
     };
   }
 
+  // Engine teardown disposes every system, even one whose init never ran or failed.
+  /* oxlint-disable typescript/no-unnecessary-condition */
   dispose(): void {
-    for (const off of this._offEvents) off();
+    for (const off of this._offEvents) off?.();
     this._offEvents.length = 0;
     if (this.hitbox) {
-      this.physics.removeCollider(this.hitbox);
+      this.physics?.removeCollider(this.hitbox);
       this.hitbox = null;
     }
     this.ctx.scene.remove(this.flashlight, this.flashlight.target);
@@ -1023,6 +1029,7 @@ export class PlayerSystem {
     this._unregisterPass?.();
     this.lowHealthPass?.dispose();
     this.lowHealthPass = null;
-    this.movement.dispose();
+    this.movement?.dispose();
   }
+  /* oxlint-enable typescript/no-unnecessary-condition */
 }

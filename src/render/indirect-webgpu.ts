@@ -242,8 +242,9 @@ export class IndirectFill {
     this.roomCount.value = count;
     // Usually shader setup follows this call. Also handle an already-compiled
     // early variant: pack its allocated arrays and invalidate the binding once.
-    this.roomBoxes.updateBuffer();
-    this.roomHeights.updateBuffer();
+    // Typed as present, but a uniform array has no packed value until it compiles.
+    if ((this.roomBoxes.value as unknown) !== null) this.roomBoxes.updateBuffer();
+    if ((this.roomHeights.value as unknown) !== null) this.roomHeights.updateBuffer();
     this.roomGroup.needsUpdate = true;
     this._roomsReady = true;
     console.info(`[render] indirect gate: ${count} interior volumes`);

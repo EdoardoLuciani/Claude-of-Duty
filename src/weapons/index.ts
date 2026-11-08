@@ -152,7 +152,7 @@ export class WeaponSystem {
   declare stats: WeaponStats;
   _magPools: Map<WeaponId, DroppedMagazine[]> = new Map();
   declare _tubeLoop: boolean;
-  declare _debugFrame: number;
+  _debugFrame: number = 0;
   declare _scriptFrames: number[] | null;
   declare radioSys: EngineSystems['radio'] | null;
 
@@ -1842,12 +1842,14 @@ export class WeaponSystem {
     }
   }
 
+  // Engine teardown disposes every system, even one whose init never ran or failed.
+  /* oxlint-disable typescript/no-unnecessary-condition */
   async dispose(): Promise<void> {
-    const renderer = this.ctx.peek('render')?.renderer;
+    const renderer = this.ctx?.peek('render')?.renderer;
     if (renderer) await disposeWeaponLoader(renderer);
     // Deferred mounts must finish before their viewmodel is destroyed (HMR/init failure).
     await this._restTask?.catch((): void => {});
-    for (const off of this._off) off();
+    for (const off of this._off ?? []) off();
     this._sim?.clear();
     this._clearGrenades();
     for (const p of this._droppedMags) {
@@ -1858,8 +1860,9 @@ export class WeaponSystem {
     this._pickups?.dispose();
     this._pickups = null;
     this._viewmodel?.dispose();
-    this.mats.dispose();
+    this.mats?.dispose();
   }
+  /* oxlint-enable typescript/no-unnecessary-condition */
 }
 
 function requiredTuning(value: number | undefined, name: string): number {

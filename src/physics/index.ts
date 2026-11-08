@@ -1398,9 +1398,10 @@ export class PhysicsSystem {
     }
   }
 
+  // Engine teardown disposes every system, even one whose init never ran or failed.
+  /* oxlint-disable typescript/no-unnecessary-condition */
   dispose(): void {
-    // Standalone instances (workers, nav bake, tests) are never initialized.
-    (this.ctx as PhysicsContext | undefined)?.events.off('explosion', this._onExplosion);
+    this.ctx?.events.off('explosion', this._onExplosion);
     this.bodies.clear();
     for (const rd of this.ragdolls) rd.dispose();
     this.ragdolls.length = 0;
@@ -1408,6 +1409,7 @@ export class PhysicsSystem {
     this.colliders.length = 0;
     this.staticWorld.dispose();
   }
+  /* oxlint-enable typescript/no-unnecessary-condition */
 }
 
 function segmentHitsAabb(
