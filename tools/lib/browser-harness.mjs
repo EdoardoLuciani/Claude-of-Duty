@@ -31,8 +31,8 @@ export function portOpen(port, host = '127.0.0.1') {
   });
 }
 
-// `bun run` exposes its binary here without putting it on PATH.
-const BUN = basename(process.env.npm_execpath ?? '').startsWith('bun')
+/** Bun binary: `bun run` exposes it via npm_execpath without putting it on PATH. */
+export const BUN = basename(process.env.npm_execpath ?? '').startsWith('bun')
   ? process.env.npm_execpath
   : 'bun';
 

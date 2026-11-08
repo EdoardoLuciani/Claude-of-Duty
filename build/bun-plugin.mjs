@@ -1,14 +1,8 @@
 /**
- * Source transforms shared by the Bun dev server (bunfig.toml) and `build/bun.mjs build`.
- * Sources stay valid raw ES modules, so Node smoke tests import them unchanged:
- *  - `new URL('<literal>', import.meta.url)` (also in three's KTX2Loader) becomes a hashed
- *    file import. A `.ts` target (worker or worklet) is first bundled into one ES module.
- *  - `import.meta.glob?.('<pattern>')` becomes a map of every match's hashed URL; raw Node
- *    sees no glob, so callers fall back to file URLs.
- *  - `window.__BUILD_REVISION__` becomes the Git revision; dev ignores plugin `define`s.
- * Rewritten URLs resolve against the page: dev asset URLs are root-relative, and dev HMR
- * modules see a file:// import.meta.url. Builds therefore use publicPath '/'.
- * Dev builds nested bundles once per load: restart `bun run dev` after worker edits.
+ * Source transforms for the Bun dev server (bunfig.toml) and `build/bun.mjs build`; sources
+ * stay raw ES modules that Node smoke tests import unchanged. Rewritten URLs resolve against
+ * the page (dev HMR sees a file:// import.meta.url), so builds use publicPath '/'.
+ * Dev bundles workers/worklets once per load: restart `bun run dev` after editing them.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -41,14 +35,12 @@ function gitRevision() {
  * A subprocess, because Bun 1.4.4 deadlocks on Bun.build() inside a plugin callback.
  */
 async function bundleNested(entry, minify) {
-  const args = [
-    'build',
-    entry,
-    '--target=browser',
-    '--format=esm',
-    ...(minify ? ['--minify'] : []),
-  ];
-  const child = Bun.spawn([process.execPath, ...args], { stdout: 'pipe', stderr: 'pipe' });
+  const child = Bun.spawn(
+    [process.execPath, 'build', entry, '--target=browser', '--format=esm'].concat(
+      minify ? ['--minify'] : []
+    ),
+    { stdout: 'pipe', stderr: 'pipe' }
+  );
   const [code, stdout, stderr] = await Promise.all([
     child.exited,
     new Response(child.stdout).text(),
@@ -63,10 +55,10 @@ export default {
   name: 'claude-of-duty',
   setup(build) {
     const revision = JSON.stringify(gitRevision());
-    const minify = build.config?.minify === true;
-    // Emitted under the entry's name with a .js extension, hashed like any other asset.
+    const minify = !!build.config.minify;
+    // `ow-bundle:<entry>.js` names the emitted asset; it loads from <entry>.ts.
     build.onResolve({ filter: /^ow-bundle:/ }, ({ path }) => ({
-      path: path.slice('ow-bundle:'.length).replace(/\.ts$/, '.js'),
+      path: path.slice('ow-bundle:'.length),
       namespace: 'ow-bundle',
     }));
     build.onLoad({ filter: /.*/, namespace: 'ow-bundle' }, async ({ path }) => ({
@@ -84,6 +76,7 @@ export default {
         );
         return `__asset${imports.length - 1}`;
       };
+      // `new URL('<literal>', import.meta.url)` -> hashed file; .ts targets are bundled first.
       text = text
         .replace(URL_PATTERN, (match, spec) => {
           const file = resolve(dir, spec);
@@ -92,15 +85,19 @@ export default {
             console.warn(`[bundle] ${relative(ROOT, file)} missing; left unbundled`);
             return match;
           }
-          return `new URL(${importUrl(file.endsWith('.ts') ? `ow-bundle:${file}` : file)}, location.href)`;
+          return `new URL(${importUrl(file.endsWith('.ts') ? `ow-bundle:${file.slice(0, -3)}.js` : file)}, location.href)`;
         })
+        // `import.meta.glob?.('<pattern>')` -> { './match': hashedUrl }; raw Node gets undefined.
         .replace(GLOB_PATTERN, (_, pattern) => {
           const entries = [...new Bun.Glob(pattern).scanSync({ cwd: dir })].sort().map((file) => {
-            const key = `./${relative(dir, resolve(dir, file)).split('\\').join('/')}`;
-            return `${JSON.stringify(key)}: new URL(${importUrl(resolve(dir, file))}, location.href).href`;
+            // Scan results keep the pattern's './' prefix; normalise to Vite-style keys.
+            const path = resolve(dir, file);
+            const key = `./${relative(dir, path).replaceAll('\\', '/')}`;
+            return `${JSON.stringify(key)}: new URL(${importUrl(path)}, location.href).href`;
           });
           return `{ ${entries.join(', ')} }`;
         })
+        // Dev ignores plugin `define`s, so stamp the revision here for both modes.
         .replaceAll('window.__BUILD_REVISION__', revision);
       // Same line as the source's first line keeps sourcemap line numbers.
       return { contents: imports.join(' ') + text, loader: path.endsWith('.ts') ? 'ts' : 'js' };

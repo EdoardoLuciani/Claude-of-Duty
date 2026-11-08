@@ -32,14 +32,10 @@ function runAssetTasks() {
   }
 }
 
-/** Static file under `dir`, or null; refuses paths that escape it. */
-function staticFile(dir, pathname) {
-  const path = normalize(join(dir, decodeURIComponent(pathname)));
-  return path.startsWith(dir + sep) ? Bun.file(path) : null;
-}
-
+/** Static file under `dir`; refuses paths that escape it. */
 async function serveStatic(dir, request) {
-  const file = staticFile(dir, new URL(request.url).pathname);
+  const path = normalize(join(dir, decodeURIComponent(new URL(request.url).pathname)));
+  const file = path.startsWith(dir + sep) ? Bun.file(path) : null;
   return file && (await file.exists())
     ? new Response(file)
     : new Response('Not found', { status: 404 });

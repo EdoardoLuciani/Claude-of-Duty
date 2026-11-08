@@ -7,6 +7,7 @@ import { basename, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
+import { BUN } from '../../tools/lib/browser-harness.mjs';
 import { AUDIO_BANKS } from '../lib/audio-banks.mjs';
 
 const root = new URL('../../src/audio/samples/', import.meta.url);
@@ -115,10 +116,8 @@ assert.equal(bank.loaded, 0);
 const outdir = mkdtempSync(join(tmpdir(), 'ow-recordings-'));
 globalThis.location = { href: `${pathToFileURL(outdir).href}/` };
 try {
-  const execpath = process.env.npm_execpath ?? '';
-  const bun = basename(execpath).startsWith('bun') ? execpath : 'bun';
   const source = (path) => JSON.stringify(fileURLToPath(new URL(path, import.meta.url)));
-  execFileSync(bun, [
+  execFileSync(BUN, [
     '-e',
     `import plugin from ${source('../../build/bun-plugin.mjs')};
     const result = await Bun.build({ entrypoints: [${source('../../src/audio/recordings.ts')}],
