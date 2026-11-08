@@ -31,7 +31,7 @@ demo/
 .tmp-rend/
 revcrops/
 
-# Generated models, including the world (tools/build-assets.mjs).
+# Generated models, including the world (tools/build-assets.ts).
 public/models/
 
 # Blender/gltfpack products, rebuilt by `bun run build`/`bun run dev` when their

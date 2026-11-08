@@ -14,12 +14,9 @@ import { writeFileSync, mkdirSync, renameSync, readFileSync, rmSync, existsSync 
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import type { Object3D } from 'three';
-
 import { RIG } from '../src/ai/rig.ts';
 import { VARIANTS } from '../src/ai/soldier.ts';
 import { isRecord } from '../src/core/guards.ts';
-import { parseSoldierMetadata } from '../src/core/model-metadata.ts';
 import {
   loadCommittedSoldiers,
   soldierInputPaths,
@@ -47,10 +44,6 @@ function writeAtomic(file: string, data: string | Uint8Array): void {
   const tmp = `${file}.tmp-${process.pid}`;
   writeFileSync(tmp, data);
   renameSync(tmp, file);
-}
-
-async function writeGLB(scene: Object3D, file: string): Promise<void> {
-  writeAtomic(file, await exportGlb(scene));
 }
 
 const sleep = (ms: number): Promise<void> =>
@@ -145,17 +138,11 @@ function stageSoldier({
   glb,
   json,
   meta,
-}: {
-  name: string;
-  glb: Uint8Array;
-  json: Uint8Array;
-  meta: unknown;
-}): void {
-  const metadata = parseSoldierMetadata(meta);
+}: ReturnType<typeof loadCommittedSoldiers>[number]): void {
   writeAtomic(join(OUT, 'soldiers', `${name}.glb`), glb);
   writeAtomic(join(OUT, 'soldiers', `${name}.json`), json);
   console.log(
-    `[models] staged ${name}: ${(metadata.stats.triangles / 1000).toFixed(1)}k tris, ` +
+    `[models] staged ${name}: ${(meta.stats.triangles / 1000).toFixed(1)}k tris, ` +
       `${(glb.length / 1024).toFixed(0)} KB glb`
   );
 }
@@ -227,7 +214,7 @@ await withLock(async (): Promise<void> => {
 
   for (const product of soldiers) stageSoldier(product);
   const hull = buildSpentHull();
-  await writeGLB(hull, join(OUT, 'fx/spent12g.glb'));
+  writeAtomic(join(OUT, 'fx/spent12g.glb'), await exportGlb(hull));
   hull.geometry.dispose();
   hull.material.dispose();
 
