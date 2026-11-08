@@ -103,15 +103,23 @@ for (const [index, name] of SURFACE_NAMES.entries()) assert.equal(SURFACE[name],
 // Mapped listener buckets must preserve arbitrary property keys as Map did.
 const bus = new EventBus<Record<PropertyKey, unknown>>();
 const received: unknown[] = [];
-for (const key of ['__proto__', 'constructor', 'normal', Symbol('event')]) {
+const symbolKey = Symbol('event');
+// Keep each key/payload pair correlated through the bus's tuple-based API.
+const channels: ([string, unknown] | [symbol, unknown])[] = [
+  ['__proto__', '__proto__'],
+  ['constructor', 'constructor'],
+  ['normal', 'normal'],
+  [symbolKey, symbolKey],
+];
+for (const channel of channels) {
+  const [key] = channel;
   const off = bus.on(key, (payload): number => received.push(payload));
-  if (typeof key === 'symbol') bus.emit(key, key);
-  else bus.emit(key, key);
+  bus.emit(...channel);
   assert.equal(received.at(-1), key);
   off();
   const length = received.length;
-  if (typeof key === 'symbol') bus.emit(key, 'ignored');
-  else bus.emit(key, 'ignored');
+  channel[1] = 'ignored';
+  bus.emit(...channel);
   assert.equal(received.length, length);
 }
 let once = 0;

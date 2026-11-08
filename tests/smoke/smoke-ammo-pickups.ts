@@ -251,10 +251,8 @@ function matricesMatch(pickups: AmmoPickups): void {
     const listener = (): void => {
       disposed.push(resource);
     };
-    if (resource instanceof THREE.InstancedMesh) resource.addEventListener('dispose', listener);
-    else if (resource instanceof THREE.BufferGeometry)
-      resource.addEventListener('dispose', listener);
-    else resource.addEventListener('dispose', listener);
+    const dispatcher: THREE.EventDispatcher<{ dispose: object }> = resource;
+    dispatcher.addEventListener('dispose', listener);
   }
   pickups.dispose();
   assert.equal(disposed.length, 12, 'all four instance buffers, geometries and materials disposed');
