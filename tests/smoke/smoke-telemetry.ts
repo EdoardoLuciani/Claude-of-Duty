@@ -217,7 +217,11 @@ const archiveDir = mkdtempSync(join(tmpdir(), 'cod-telemetry-'));
 try {
   const archive = join(archiveDir, 'telemetry.tgz');
   writeFileSync(archive, tgz);
-  const extract = (name: string): Buffer => spawnSync('tar', ['-xzOf', archive, name]).stdout;
+  const extract = (name: string): Buffer => {
+    const result = spawnSync('tar', ['-xzOf', archive, name]);
+    assert.equal(result.status, 0, `tar failed: ${result.error?.message ?? String(result.stderr)}`);
+    return result.stdout;
+  };
   check('tgz roundtrip json', extract('telemetry.json').equals(Buffer.from(json)));
   check('tgz roundtrip jpeg', extract('marks/001.jpg').equals(Buffer.from(jpeg)));
 } finally {
