@@ -1,11 +1,6 @@
 import assert from 'node:assert/strict';
 
-import {
-  DEFAULT_BINDINGS,
-  CONTROL_REFERENCE,
-  bindingLabels,
-  bindingLabel,
-} from '../../src/core/bindings.ts';
+import { DEFAULT_BINDINGS, bindingLabels, bindingLabel } from '../../src/core/bindings.ts';
 import type { ActionId } from '../../src/core/bindings.ts';
 import { CONTROL_SECTIONS } from '../../src/ui/controls.ts';
 import { PauseMenu } from '../../src/ui/menu.ts';
@@ -84,12 +79,6 @@ assert.ok(
   ),
   'no detailed-help presentation'
 );
-for (const row of CONTROL_REFERENCE) {
-  assert.ok(
-    !nodes.some((node): boolean => node.textContent === `${row.label} — ${row.behavior}`),
-    'full behavior paragraphs are not relocated'
-  );
-}
 for (const control of controls) {
   assert.ok(control.description.length < 80, 'descriptions stay concise');
   assert.ok(

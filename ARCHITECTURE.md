@@ -43,10 +43,9 @@ Direct registration is `registry.add(id, instance)`; the engine's registry check
 the same ID/instance relationship. A standalone `Registry` promises only lifecycle
 hooks unless given an explicit provider map. Registration also invalidates ordering
 and hook caches.
-`src/core/bindings.ts` owns static physical defaults, action IDs, binding labels and
-action-backed contextual control reference. Input snapshots actions; gameplay
-consumers own state machines. UI adapts this metadata into the existing pause
-reference and adds native DOM help. F toggles flashlight; hold T interacts.
+`src/core/bindings.ts` owns static physical defaults, action IDs and binding labels.
+Input snapshots actions; gameplay consumers own state machines. `src/ui/controls.ts`
+builds the pause reference from binding labels and adds native DOM help. F toggles flashlight; hold T interacts.
 Tab and wheel are independent cycle requests, not guaranteed successful swaps.
 Rebinding is deferred.
 `src/core/events.ts` owns the typed event payload map used by `EventBus`.
