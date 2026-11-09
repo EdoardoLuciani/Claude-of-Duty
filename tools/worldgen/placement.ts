@@ -17,43 +17,29 @@ export interface ClearanceBox extends RectXZ {
   y1?: number;
 }
 
-import { PLACEMENTS } from './level/placements/index.ts';
+type Vec3 = [number, number, number];
+/** Authored row: [prototype, id, position, rotationDeg, scale, masks?]. An id without
+ * a `/` is shorthand for `prototype/id`; a scalar scale is uniform. */
+export type PlacementRow = [string, string, Vec3, Vec3, number | Vec3, InstanceMasks?];
 
-/** Validate authored records before any world geometry is generated. */
-export function validatePlacements(placements: Placement[]): void {
-  const ids = new Set<string>();
-  for (const placement of placements) {
-    for (const key of Object.keys(placement)) {
-      if (!['id', 'prototype', 'position', 'rotationDeg', 'scale', 'masks'].includes(key)) {
-        throw new Error(`[world] ${placement.id ?? '<unknown>'} has unknown field ${key}`);
-      }
-    }
-    if (typeof placement.id !== 'string' || !placement.id)
-      throw new Error('[world] placement needs an id');
-    if (ids.has(placement.id)) throw new Error(`[world] duplicate placement id ${placement.id}`);
-    ids.add(placement.id);
-    if (typeof placement.prototype !== 'string' || !placement.prototype) {
-      throw new Error(`[world] ${placement.id} needs a prototype`);
-    }
-    for (const key of ['position', 'rotationDeg', 'scale'] as const) {
-      if (
-        !Array.isArray(placement[key]) ||
-        placement[key].length !== 3 ||
-        !placement[key].every(Number.isFinite)
-      ) {
-        throw new Error(`[world] ${placement.id}.${key} must contain three finite numbers`);
-      }
-    }
-    if (
-      placement.masks != null &&
-      (!Array.isArray(placement.masks) ||
-        placement.masks.length !== 3 ||
-        !placement.masks.every(Number.isFinite))
-    )
-      throw new Error(`[world] ${placement.id}.masks must contain three finite numbers`);
-  }
+import { PLACEMENT_ROWS } from './level/placements/index.ts';
+
+const PLACEMENTS = PLACEMENT_ROWS.map(
+  ([prototype, id, position, rotationDeg, scale, masks]): Placement => ({
+    id: id.includes('/') ? id : `${prototype}/${id}`,
+    prototype,
+    position,
+    rotationDeg,
+    scale: typeof scale === 'number' ? [scale, scale, scale] : scale,
+    ...(masks ? { masks } : {}),
+  })
+);
+// Row shapes are type-checked; identity is the one invariant types cannot express.
+const ids = new Set<string>();
+for (const { id } of PLACEMENTS) {
+  if (ids.has(id)) throw new Error(`[world] duplicate placement id ${id}`);
+  ids.add(id);
 }
-validatePlacements(PLACEMENTS);
 
 const position = new THREE.Vector3();
 const rotation = new THREE.Euler();
