@@ -19,26 +19,6 @@ export class ReticleMaterials {
     return material;
   }
 
-  // Additive light cannot darken the sky; a separate keyline keeps the dot legible.
-  reticleOutline(opacity = 0.8): Material {
-    const key = `reticleOutline:${opacity}`;
-    return (
-      this.cache.get(key) ??
-      this.own(
-        key,
-        new MeshBasicNodeMaterial({
-          color: 0x14060a,
-          transparent: true,
-          opacity,
-          depthWrite: false,
-          depthTest: true,
-          side: DoubleSide,
-          toneMapped: false,
-        })
-      )
-    );
-  }
-
   reticle(color = 0xff2a12, intensity = 6.5): Material {
     const key = `reticle:${color}:${intensity}`;
     return (
