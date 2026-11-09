@@ -159,7 +159,9 @@ assert.deepEqual(
 assert(calls.every((c): boolean => c[1]?.level === 0.9));
 audio.running = true;
 audio.field = fixture<SpatialField>({});
-audio.mixer = fixtureMixer(actx);
+const dryMixer = fixtureMixer(actx);
+dryMixer.duck = (): never => assert.fail('dry fire must not duck the mix');
+audio.mixer = dryMixer;
 for (const id of ['rifle', 'pistol', 'smg', 'sniper', 'shotgun'] as const) {
   audio._onFire({
     weapon: { id },
