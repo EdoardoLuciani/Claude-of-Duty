@@ -27,7 +27,7 @@ def build_animations(parts):
 
 
     def start_clip(name,end):
-        clips[name]={'frames':[0,end],'duration':end/60,'loop':name=='Idle','events':[]}
+        clips[name]={'frames':[0,end],'duration':end/60,'events':[]}
         for obj in parts:
             obj.animation_data_create();obj.animation_data.action=None
             for track in obj.animation_data.nla_tracks:track.mute=True
@@ -66,9 +66,8 @@ def build_animations(parts):
             ad.action=None;track.mute=True
 
 
-    start_clip('Idle',120)
-    key(rig,30,(0,0,.0006),(.1,.12,0));key(rig,90,(0,0,-.0006),(-.1,-.12,0))
-    end_clip('Idle',120)
+    start_clip('Idle',0)  # single rest pose; procedural sway owns idle motion
+    end_clip('Idle',0)
     start_clip('Fire',48)
     for f,loc,rot in [(2,(-.014,0,.001),(0,-2.3,-.45)),(5,(-.009,0,.002),(0,-1.4,.2)),(12,(.001,0,0),(0,.15,0)),(20,(0,0,0),(0,0,0))]:key(rig,f,loc,rot)
     for f,x in [(1,0),(4,-.068),(7,-.066),(11,0)]:key(bolt,f,(x,0,0))

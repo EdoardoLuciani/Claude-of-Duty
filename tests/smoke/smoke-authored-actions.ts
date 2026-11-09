@@ -20,11 +20,10 @@ import { createAuthoredRig } from '../../src/weapons/authored-rig.ts';
 // Gesture precedence, interrupted firing, last-shot choice and clock boundaries.
 const samples: [string, number][] = [];
 const state = {
-  idleTime: 0,
   fireTime: 0,
   _sample: (...args: [string, number]): number => samples.push(args),
 };
-const clips = { Fire: { duration: 0.1 }, Idle: { duration: 2 } };
+const clips = { Fire: { duration: 0.1 } };
 const sample = (dt: number, name: string | null, time: number, empty = false): string | undefined =>
   sampleAuthoredFire(state, clips, dt, name, time, empty);
 assert.equal(sample(0.025, 'reloadEmpty', 0.6, true), 'Reload_Empty');
@@ -32,14 +31,13 @@ assert.deepEqual(samples.pop(), ['Reload_Empty', 0.6]);
 assert.equal(sample(0.025, null, 0, true), undefined);
 assert.deepEqual(samples.pop(), ['Last_Shot', 0.05]);
 sample(0.05, null, 0);
-assert.deepEqual(samples.pop(), ['Idle', 0.1], 'fire duration is an exclusive boundary');
+assert.deepEqual(samples.pop(), ['Idle', 0], 'fire duration is an exclusive boundary');
 state.fireTime = 0;
 sample(0.02, null, 0);
 assert.deepEqual(samples.pop(), ['Fire', 0.02]);
 state.fireTime = Infinity;
-state.idleTime = 2.25;
-sample(0, 'unknown', 0);
-assert.deepEqual(samples.pop(), ['Idle', 0.25]);
+sample(2.25, 'unknown', 0.5);
+assert.deepEqual(samples.pop(), ['Idle', 0], 'Idle is a single pose');
 assert.equal(sample(0, 'draw', 0.3), 'Draw');
 assert.equal(sample(0, 'holster', 0.4), 'Holster');
 

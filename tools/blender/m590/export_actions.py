@@ -88,8 +88,9 @@ def validate_export(doc, binary, clips):
         for sampler in animation['samplers']:
             assert abs(doc['accessors'][sampler['input']]['max'][0] - duration) < 1e-7
         for channel in animation['channels']:
-            if channel['target']['path'] == 'scale':
-                sampler = animation['samplers'][channel['sampler']]
+            sampler = animation['samplers'][channel['sampler']]
+            # One-key curves are always baked with our LINEAR fallback; one key cannot interpolate.
+            if channel['target']['path'] == 'scale' and doc['accessors'][sampler['input']]['count'] > 1:
                 assert sampler['interpolation'] == 'STEP'
                 if doc['nodes'][channel['target']['node']]['name'] == 'shell_insert' and animation['name'].startswith('Reload'):
                     appear, hide = ((.44, .70) if animation['name'] == 'Reload_Empty' else (.34, .84))

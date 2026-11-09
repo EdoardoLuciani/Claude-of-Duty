@@ -10,10 +10,9 @@
     "Idle": {
       "frames": [
         0,
-        120
+        0
       ],
-      "duration": 2.0,
-      "loop": true,
+      "duration": 0.0,
       "events": []
     },
     "Fire": {
@@ -22,7 +21,6 @@
         48
       ],
       "duration": 0.8,
-      "loop": false,
       "events": [
         {
           "time": 0.0333,
@@ -40,7 +38,6 @@
         156
       ],
       "duration": 2.6,
-      "loop": false,
       "events": [
         {
           "time": 0.48333333333333334,
@@ -58,7 +55,6 @@
         198
       ],
       "duration": 3.3,
-      "loop": false,
       "events": [
         {
           "time": 0.48333333333333334,
@@ -80,7 +76,6 @@
         240
       ],
       "duration": 4.0,
-      "loop": false,
       "events": []
     },
     "Stock_Fold": {
@@ -89,7 +84,6 @@
         120
       ],
       "duration": 2.0,
-      "loop": false,
       "events": []
     }
   },

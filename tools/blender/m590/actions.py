@@ -46,7 +46,7 @@ def author_actions(root,asset,rig,parts,forend,bolt,trigger,shell):
         for j in range(2):
             o=cs[f'thumb_{j}'];o.rotation_quaternion=quat(eq((-p['thumb'][j],0,0)));o.keyframe_insert('rotation_quaternion',frame=f)
     def begin(name,duration):
-        clips[name]={'frames':[0,duration*FPS],'duration':duration,'loop':name=='Idle','events':[]}
+        clips[name]={'frames':[0,duration*FPS],'duration':duration,'events':[]}
         for o in all_parts:
             o.animation_data_create();o.animation_data.action=None
             for t in o.animation_data.nla_tracks:t.mute=True
@@ -84,7 +84,7 @@ def author_actions(root,asset,rig,parts,forend,bolt,trigger,shell):
     def follow_forend(t,z):
         key(forend,t,(0,0,z));key(bolt,t,(0,0,z))
         pose('left',t,Vector(ref['grips']['left']['pos'])+Vector((0,0,z)))
-    begin('Idle',2);finish('Idle')
+    begin('Idle',0);finish('Idle')  # single rest pose
     d=.45;begin('Pump',d)
     for t in samples(d,[.32*d,.55*d,.82*d]):
         z=path(t/d,[(0,(0,)),(.32,(stroke,)),(.55,(stroke,)),(.82,(0,)),(1,(0,))])[0]

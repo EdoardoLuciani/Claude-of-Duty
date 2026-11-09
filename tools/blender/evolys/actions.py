@@ -57,7 +57,7 @@ def author_actions(root,asset,rig,parts,belt,belt_pos):
             pb.scale=(load,)*3
             for prop in ('location','rotation_quaternion','scale'):pb.keyframe_insert(prop,frame=time*FPS,group=pb.name)
     def begin(name,duration):
-        clips[name]={'frames':[0,duration*FPS],'duration':duration,'loop':name=='Idle','events':[]}
+        clips[name]={'frames':[0,duration*FPS],'duration':duration,'events':[]}
         for o in all_parts:
             o.animation_data_create();o.animation_data.action=None
             for t in o.animation_data.nla_tracks:t.mute=True
@@ -83,7 +83,7 @@ def author_actions(root,asset,rig,parts,belt,belt_pos):
         p=copy.deepcopy(ref['sides']['right']['grip']);p['fingers'][0]=[-.05,.10,.15];p['fingerSpread'][0]=.22;return p
     def contact(name,time,pos=None):
         data=ref[name];pose('left',time,pos or data['pos'],Quaternion((data['quaternion'][3],*data['quaternion'][:3])),data['pose'])
-    begin('Idle',2);key(bolt,0,(0,0,.050));key(bolt,2,(0,0,.050));finish('Idle')
+    begin('Idle',0);key(bolt,0,(0,0,.050));finish('Idle')  # single rest pose
     duration=60/700
     for name in ('Fire','Last_Shot'):
         begin(name,duration)

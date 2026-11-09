@@ -78,7 +78,8 @@ def validate_export(path, clips):
             assert abs(accessor['max'][0]-duration)<1e-7,(animation['name'],accessor['max'])
         for channel in animation['channels']:
             sampler=animation['samplers'][channel['sampler']]
-            if channel['target']['path']=='scale':
+            # One-key curves are always baked with our LINEAR fallback; one key cannot interpolate.
+            if channel['target']['path']=='scale' and doc['accessors'][sampler['input']]['count']>1:
                 assert sampler['interpolation']=='STEP',(animation['name'],channel)
             elif sampler['interpolation']=='STEP':
                 accessor=doc['accessors'][sampler['output']]

@@ -16,27 +16,23 @@ export function requiredNode(root: THREE.Object3D, name: string): THREE.Object3D
 type AuthoredClips = Readonly<Record<string, { readonly duration: number }>>;
 
 /**
- * three infers a clip's duration from its last key. gltfpack 1.3 with `-af 0` reduces a
- * wholly constant clip to one key at t=0, so a still Idle loads as 0 s. Restore only that
- * collapsed hold; every other clip must keep its authored length, so lost or drifted
- * animation fails at load instead of playing wrong (or dividing by zero).
+ * three infers a clip's duration from its last key, which must match the authored length
+ * so lost or drifted animation fails at load instead of playing wrong. Idle is a single
+ * pose authored as 0 s.
  */
-export function applyAuthoredDuration(
+export function checkAuthoredDuration(
   clip: THREE.AnimationClip,
   authored: AuthoredClips,
   rigName: string
 ): void {
-  const expected = hasOwn(authored, clip.name) ? authored[clip.name].duration : 0;
-  if (!(expected > 0)) throw new Error(`[${rigName}] no authored duration for ${clip.name}`);
-  if (
-    clip.name === 'Idle' &&
-    clip.tracks.length > 0 &&
-    clip.tracks.every((track): boolean => track.times.length === 1 && track.times[0] === 0)
-  )
-    clip.duration = expected;
+  const expected = hasOwn(authored, clip.name) ? authored[clip.name].duration : NaN;
+  // Only the Idle pose may be 0 s; a 0 s gesture would load as a clip that never plays.
+  if (!(expected > 0 || (expected === 0 && clip.name === 'Idle')))
+    throw new Error(`[${rigName}] no authored duration for ${clip.name}`);
+  if (clip.tracks.length === 0) throw new Error(`[${rigName}] ${clip.name} has no tracks`);
   // Key times are float32: allow one float32 step of rounding (it grows with the length),
   // never less than 1e-6. The inverted comparison also rejects NaN.
-  else if (!(Math.abs(clip.duration - expected) <= Math.max(1e-6, expected * 2 ** -23)))
+  if (!(Math.abs(clip.duration - expected) <= Math.max(1e-6, expected * 2 ** -23)))
     throw new Error(`[${rigName}] ${clip.name} lasts ${clip.duration} s, authored ${expected} s`);
 }
 
@@ -56,7 +52,7 @@ export function authoredModel(
   const animations = required.map((name): THREE.AnimationClip => {
     const clip = gltf.animations.find((clip): boolean => clip.name === name);
     if (!clip) throw new Error(`[${rigName}] missing ${name} clip`);
-    applyAuthoredDuration(clip, authored, rigName);
+    checkAuthoredDuration(clip, authored, rigName);
     return clip;
   });
   const point = (name: string): [number, number, number] => {

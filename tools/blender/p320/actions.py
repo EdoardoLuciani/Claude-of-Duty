@@ -61,7 +61,7 @@ def author_actions(root,asset,rig,parts,mag,spare,slide,barrel,trigger,catch,rou
         for j in range(2):
             o=cs[f'thumb_{j}'];o.rotation_quaternion=quat(eq((-p['thumb'][j],0,0)));o.keyframe_insert('rotation_quaternion',frame=f)
     def begin(name,end):
-        clips[name]={'frames':[0,end],'duration':end/60,'loop':name=='Idle','events':[]}
+        clips[name]={'frames':[0,end],'duration':end/60,'events':[]}
         for o in all_parts:
             o.animation_data_create();o.animation_data.action=None
             for t in o.animation_data.nla_tracks:t.mute=True
@@ -93,9 +93,8 @@ def author_actions(root,asset,rig,parts,mag,spare,slide,barrel,trigger,catch,rou
         p=copy.deepcopy(ref['sides']['right']['grip'])
         p['fingers'][0]=[-.05,.10,.15];p['fingerSpread'][0]=.32
         return p
-    begin('Idle',120)
-    for f,z,a in [(30,.00025,.10),(90,-.00025,-.10)]:key(rig,f,(0,0,z),(a,0,0))
-    finish('Idle',120)
+    begin('Idle',0)  # single rest pose; procedural sway owns idle motion
+    finish('Idle',0)
     for name,locked in [('Fire',False),('Last_Shot',True)]:
         begin(name,12)
         if locked:

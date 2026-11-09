@@ -26,7 +26,6 @@ export interface AuthoredRig {
   hands: Record<HandSide, AuthoredHand>;
   poseQ: THREE.Quaternion;
   name: string | null;
-  idleTime: number;
   fireTime: number;
   _sample(name: string, time: number): void;
   fire(): void;
@@ -57,7 +56,6 @@ export function createAuthoredRig(model: RigModel): AuthoredRig {
     hands: discoverAuthoredHands((name): THREE.Object3D => requiredNode(root, name)),
     poseQ: new THREE.Quaternion(),
     name: null,
-    idleTime: 0,
     fireTime: Infinity,
     _sample(name: string, time: number): void {
       sampleAuthoredPose(this, name, time);

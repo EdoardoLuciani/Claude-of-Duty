@@ -105,18 +105,10 @@ export function createM590Animation(model: M590Model): WeaponAnimation {
     },
 
     fire(): void {}, // Reactive recoil and the gameplay Pump clip own discharge.
-    reset(): void {
-      this.idleTime = 0;
-      this._sample('Idle', 0);
-    },
 
-    update(dt: number, clipName: string | null, clipTime: number): void {
-      this.idleTime += dt;
+    update(_dt: number, clipName: string | null, clipTime: number): void {
       const gesture = clipName ? ALIASES[clipName] : undefined;
-      this._sample(
-        gesture ?? 'Idle',
-        gesture ? clipTime : this.idleTime % manifest.clips.Idle.duration
-      );
+      this._sample(gesture ?? 'Idle', gesture ? clipTime : 0);
     },
 
     dispose(): void {

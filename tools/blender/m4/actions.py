@@ -45,7 +45,7 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,head,handle,trigger,cover
         for j in range(2):
             o=cs[f'thumb_{j}'];o.rotation_quaternion=quat(eq((-p['thumb'][j],0,0)));o.keyframe_insert('rotation_quaternion',frame=f)
     def begin(name,duration):
-        clips[name]={'frames':[0,duration*FPS],'duration':duration,'loop':name=='Idle','events':[]}
+        clips[name]={'frames':[0,duration*FPS],'duration':duration,'events':[]}
         for o in all_parts:
             o.animation_data_create();o.animation_data.action=None
             for t in o.animation_data.nla_tracks:t.mute=True
@@ -69,8 +69,7 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,head,handle,trigger,cover
         p=copy.deepcopy(ref['sides'][side]['grip']);p['fingers']=[[.15,.25,.18],[.20,.30,.20],[.25,.32,.24],[.32,.36,.27]];p['thumb']=[.12,.20];return p
     def indexed():
         p=copy.deepcopy(ref['sides']['right']['grip']);p['fingers'][0]=[-.05,.10,.15];p['fingerSpread'][0]=.22;return p
-    begin('Idle',2)
-    finish('Idle')
+    begin('Idle',0);finish('Idle')  # single rest pose
     for name,locked in [('Fire',False),('Last_Shot',True)]:
         begin(name,.075)
         # Existing reactive viewmodel/camera recoil remains unchanged. Blender
