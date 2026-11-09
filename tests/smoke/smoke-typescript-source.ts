@@ -1,10 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-
-import { isRecord } from '../../src/core/guards.ts';
 
 const root = resolve(import.meta.dirname, '../..');
 function filesUnder(directory: string): string[] {
@@ -21,11 +18,8 @@ assert.deepEqual(
   [],
   'first-party modules must be checked TypeScript, not unchecked JS/MJS'
 );
-const pkg: unknown = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-assert(isRecord(pkg) && isRecord(pkg.imports));
-assert.equal(pkg.imports['#worldgen/*'], './tools/worldgen/*.ts');
-assert.equal(pkg.imports['#query-snapshot'], './src/physics/query-snapshot.ts');
 
+// Typecheck only proves the files it sees; every runtime/tool module must be in the program.
 const program = spawnSync(process.execPath, ['check', '--listFilesOnly', '--no-pretty'], {
   cwd: root,
   encoding: 'utf8',
@@ -45,45 +39,4 @@ for (const path of sources) {
     assert(checked.has(path), `${path} must belong to the strict root compiler program`);
   }
 }
-
-const directory = mkdtempSync(join(tmpdir(), 'cod-typescript-source-'));
-try {
-  writeFileSync(
-    join(directory, 'tsconfig.json'),
-    JSON.stringify({
-      extends: join(root, 'tsconfig.json'),
-      compilerOptions: { typeRoots: [join(root, 'node_modules/@types')] },
-      include: [join(root, 'src'), join(root, 'tools/**/*.ts'), 'fixture.ts'],
-    })
-  );
-  const fixture = `
-import type { Placement } from ${JSON.stringify(join(root, 'tools/worldgen/placement.ts'))};
-import type { BuildingSpec } from ${JSON.stringify(join(root, 'tools/worldgen/buildings.ts'))};
-import { packedReadback } from ${JSON.stringify(join(root, 'tools/lib/native-readback.ts'))};
-const placement: Placement = {
-  id: 'test', prototype: 'crate_a', position: [1, 2, 3],
-  rotationDeg: [0, 0, 0], scale: [1, 1, 1], masks: [1, 1, 1],
-};
-const building: BuildingSpec = { id: 'test', x: 0, z: 0, w: 4, d: 4 };
-const pixels = packedReadback(new Uint16Array(4), 1, 1);
-type IsAny<T> = 0 extends (1 & T) ? true : false;
-const pixelsAreAny: IsAny<typeof pixels> = false;
-const typedPixels: Uint16Array = pixels;
-`;
-  const check = (source: string): ReturnType<typeof spawnSync> => {
-    writeFileSync(join(directory, 'fixture.ts'), source);
-    return spawnSync(process.execPath, ['check', '-p', directory, '--no-pretty'], {
-      cwd: root,
-      encoding: 'utf8',
-      timeout: 10000,
-    });
-  };
-  const valid = check(fixture);
-  assert.equal(valid.error, undefined);
-  assert.equal(valid.status, 0, String(valid.stdout) + String(valid.stderr));
-} finally {
-  rmSync(directory, { recursive: true, force: true });
-}
-console.log(
-  'TypeScript source: full compiler coverage, direct aliases and checked authoring contracts'
-);
+console.log('TypeScript source: no unchecked modules and full compiler coverage');

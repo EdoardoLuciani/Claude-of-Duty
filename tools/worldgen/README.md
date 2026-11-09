@@ -6,7 +6,7 @@ Runtime behavior belongs to `src/world/`.
 
 - `level/layout.ts`: streets, buildings, rooms, gates and set pieces.
 - `level/config.ts`: transform/spawns; `level/intel.ts`: intel drop sites.
-- `level/placements/`: data-only prop transforms, grouped by area.
+- `level/placements/`: data-only prop transforms, one `PlacementRow` per line, grouped by area.
 - `props.ts`/`dressing.ts`: props; `buildings.ts`/`kit.ts`: construction.
 - `interiors.ts`: attached details; `ground.ts`/`dressing.ts`: ground/cables.
 - [Runtime palette](../../src/world/palette.ts): surface appearance.

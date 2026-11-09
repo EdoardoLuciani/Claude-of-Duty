@@ -4,7 +4,7 @@ import { MeshBasicNodeMaterial, MeshPhysicalNodeMaterial } from 'three/webgpu';
 import type { Node, UniformNode } from 'three/webgpu';
 
 import { hasOwn } from '../core/guards.ts';
-import { clamp, clamp01, damp, lerp } from '../core/math.ts';
+import { Spring, TAU, clamp, clamp01, damp, lerp, smootherstep } from '../core/math.ts';
 import { loadArmAsset } from './arm-asset.ts';
 import { createWeaponMaterial } from './asset-material.ts';
 import { createWeaponAnimation } from './authored-animation.ts';
@@ -20,12 +20,12 @@ import {
 import { makeSampleResult } from './clips.ts';
 import type { Clip } from './clips.ts';
 import type { WeaponDef } from './defs.ts';
-import { triCount, mergeAll } from './geometry.ts';
+import { triCount } from './geometry.ts';
 import { grenadeMesh } from './grenade-mesh.ts';
 import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from './grip-contacts.ts';
 import { Arm } from './hands.ts';
 import type { ReticleMaterials } from './materials-tsl.ts';
-import { Spring, Spring3, Noise1, smootherstep, wrapPi, TAU } from './mathx.ts';
+import { Spring3, Noise1, wrapPi } from './mathx.ts';
 import { radioMesh, radioScreenTexture } from './radio-mesh.ts';
 import type {
   ClipResult,
@@ -283,11 +283,7 @@ export class Viewmodel {
   shoulderL: THREE.Vector3 = new THREE.Vector3(-0.2, -0.22, 0.02);
   // ---- reticle ----------------------------------------------------------
   reticle: THREE.Object3D = new THREE.Object3D();
-  declare _reticleGeo: THREE.BufferGeometry[];
   declare dotCore: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
-  declare dotHalo: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
-  declare dotRim: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
-  declare dotRing: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
   scopeOverlay: THREE.Object3D = new THREE.Object3D();
   declare scopeMask: THREE.Mesh<THREE.BufferGeometry, MeshBasicNodeMaterial>;
   declare scopeReticle: THREE.Mesh<THREE.BufferGeometry, MeshBasicNodeMaterial>;
@@ -317,18 +313,20 @@ export class Viewmodel {
   clipResult: ClipResult = makeSampleResult();
   clipT: number = 0;
   debugFrozen: boolean = false;
-  jumpSpring: Spring = new Spring(5.5, 0.5);
-  landSpring: Spring = new Spring(7.5, 0.55);
-  lag: Spring3 = new Spring3(5.4, 0.46);
-  lagRot: Spring3 = new Spring3(6.2, 0.42);
+  // Frequencies/damping are fitted to the previous one-step-per-frame response at 60 Hz.
+  jumpSpring: Spring = new Spring(4.9, 0.75);
+  landSpring: Spring = new Spring(6.35, 0.87);
+  lag: Spring3 = new Spring3(5.1, 0.62);
+  lagRot: Spring3 = new Spring3(5.85, 0.61);
   lowReadyT: number = 0;
   noise: Noise1[] = [];
   noiseRates: number[] = [0.13, 0.19, 0.271, 0.083, 0.117, 0.163];
   noiseT: number = 0;
   onClipEvent: ((name: string, clipName: string) => void) | null = null;
-  recPos: Spring3 = new Spring3(9, 0.42);
-  recRot: Spring3 = new Spring3(9, 0.42);
-  settle: Spring3 = new Spring3(2.2, 0.7);
+  // Frequency and damping come from the weapon's recoil definition on every shot.
+  recPos: Spring3 = new Spring3();
+  recRot: Spring3 = new Spring3();
+  settle: Spring3 = new Spring3(2.05, 0.77);
   sprintT: number = 0;
   triggerT: number = 0;
 
@@ -371,39 +369,13 @@ export class Viewmodel {
 
     this.reticle.name = 'ow-reticle';
     this.anchor.add(this.reticle);
-    /** Unit-radius reticle layers scale together by angular size in _updateReticle.
-     * Keep core radiance below AgX's desaturating shoulder; halo/ring convey emission.
-     * The halo stays tight. A normally blended dark rim preserves contrast against bright sky,
-     * which additive layers alone cannot provide.
-     */
-    const core = new THREE.CircleGeometry(1, 32);
-    const halo = new THREE.CircleGeometry(1.6, 32);
-    const rim = new THREE.RingGeometry(1, 1.42, 32, 1);
-    const RING_SEGS = 12;
-    const ringArcs = [];
-    for (let i = 0; i < RING_SEGS; i++) {
-      const a0 = (i / RING_SEGS) * TAU;
-      ringArcs.push(new THREE.RingGeometry(2.98, 3.42, 4, 1, a0, (TAU / RING_SEGS) * 0.56));
-    }
-    const ring = mergeAll(ringArcs)!;
-    this._reticleGeo = [core, halo, rim, ring];
-    this.dotCore = new THREE.Mesh(core, mats.reticle(0xff1206, 0.95));
-    this.dotHalo = new THREE.Mesh(halo, mats.reticle(0xff2a0c, 0.34));
-    this.dotRim = new THREE.Mesh(rim, mats.reticleOutline(0.85));
-    this.dotRing = new THREE.Mesh(ring, mats.reticle(0xff1206, 0.95 * 0.5));
-    this.dotHalo.renderOrder = 19;
-    this.dotRim.renderOrder = 20;
-    this.dotRing.renderOrder = 20;
+    // Unit-radius dot, scaled by its published angular size in _updateReticle.
+    this.dotCore = new THREE.Mesh(new THREE.CircleGeometry(1, 32), mats.reticle(0xff1206, 0.95));
     this.dotCore.renderOrder = 21;
-    this.reticle.add(this.dotHalo);
-    this.reticle.add(this.dotRim);
-    this.reticle.add(this.dotRing);
+    this.dotCore.frustumCulled = false;
+    this.dotCore.userData.owNoPrepass = true;
+    this.dotCore.castShadow = false;
     this.reticle.add(this.dotCore);
-    for (const m of [this.dotCore, this.dotHalo, this.dotRim, this.dotRing]) {
-      m.frustumCulled = false;
-      m.userData.owNoPrepass = true;
-      m.castShadow = false;
-    }
 
     this.scopeOverlay.name = 'ow-scope';
     this.scopeOverlay.visible = false;
@@ -1026,27 +998,27 @@ export class Viewmodel {
     // Aiming braces the weapon: less travel, faster return.
     const scale = lerp(1, 0.54, ads) * (first ? 1.18 : 1);
     const jitter = 0.86 + this.rng.float() * 0.3;
-    this.recPos.f = r.freq;
+    this.recPos.freq = r.freq;
     this.recPos.damping = r.damping;
-    this.recRot.f = r.freq * 0.92;
+    this.recRot.freq = r.freq * 0.92;
     this.recRot.damping = r.damping;
     // A velocity impulse of v0 on a spring of angular frequency w peaks at
     // roughly v0/w, so the kick amplitudes below are in real metres/radians.
-    const wp = TAU * this.recPos.f;
-    const wr = TAU * this.recRot.f;
-    this.recPos.kick(
+    const wp = TAU * this.recPos.freq;
+    const wr = TAU * this.recRot.freq;
+    this.recPos.impulse(
       this.rng.signed() * r.kickBack * 0.2 * scale * wp,
       r.kickUp * scale * jitter * wp,
       r.kickBack * scale * jitter * wp
     );
-    this.recRot.kick(
+    this.recRot.impulse(
       (pitch * 5.5 + r.pitch * 1.4) * scale * jitter * wr,
       (-yaw * 4.5 - this.rng.signed() * r.yaw * 0.8) * scale * wr,
       (this.rng.signed() * 0.4 + 0.6) * r.roll * scale * wr
     );
     // Slow settling drift after a burst — the muzzle keeps wandering a little.
-    const ws = TAU * this.settle.f;
-    this.settle.kick(
+    const ws = TAU * this.settle.freq;
+    this.settle.impulse(
       this.rng.signed() * 0.0012 * scale * ws,
       0.0018 * scale * ws,
       this.rng.signed() * 0.003 * scale * ws
@@ -1054,11 +1026,11 @@ export class Viewmodel {
   }
 
   jump(): void {
-    this.jumpSpring.kick(-1.2);
+    this.jumpSpring.impulse(-1.2);
   }
 
   land(speed: number = 3): void {
-    this.landSpring.kick(clamp(speed * 0.45, 0.4, 3.4));
+    this.landSpring.impulse(clamp(speed * 0.45, 0.4, 3.4));
   }
 
   /** Load authored skins before adding weapons (which fits contact poses). */
@@ -1221,8 +1193,8 @@ export class Viewmodel {
 
     this.jumpSpring.step(dt, 0);
     this.landSpring.step(dt, 0);
-    py -= this.landSpring.x * 0.014 + this.jumpSpring.x * 0.006;
-    rx -= this.landSpring.x * 0.05;
+    py -= this.landSpring.value * 0.014 + this.jumpSpring.value * 0.006;
+    rx -= this.landSpring.value * 0.05;
 
     const res = this.clipResult;
     if (this.clip) {
@@ -1404,9 +1376,6 @@ export class Viewmodel {
       this.reticle.visible = false;
       return;
     }
-    // Dot-only is an optic-specific setting, not a change to other weapons.
-    const dotOnly = optic.reticle === 'dot';
-    this.dotHalo.visible = this.dotRim.visible = this.dotRing.visible = !dotOnly;
     // Optic axis and lens centre, both in camera space. The weapon group is a
     // child of the rig which is a child of the anchor, so camera space is just
     // the rig transform applied to the weapon-local values — no inverses, no
@@ -1436,37 +1405,18 @@ export class Viewmodel {
     this.reticle.visible = true;
     this.reticle.position.copy(_v2);
     this.reticle.lookAt(this.anchor.getWorldPosition(_v));
-    if (dotOnly) {
-      // Published angular diameter, independent of eye distance/stance. Below
-      // pixel resolution, use an explicit small readability floor rather than
-      // the legacy halo, black outline or oversized segmented ring.
-      // MOA belongs to the target/world view, not the independently framed
-      // weapon camera. Narrowing weapon FOV must not magnify the dot.
-      const worldTan = Math.tan((this.ctx.camera.fov * Math.PI) / 360);
-      const viewTan = Math.tan((this.ctx.viewCamera.fov * Math.PI) / 360);
-      const angularR = Math.tan(((optic.dotMoa ?? 0) * Math.PI) / (180 * 120)) / worldTan;
-      const height = this.ctx.get('render')?.screenSize.height ?? this.ctx.canvas.height;
-      this.dotCore.scale.setScalar(
-        s * viewTan * Math.max(angularR, (optic.minDotPixels ?? 0) / height)
-      );
-      this.dotCore.material.opacity = alpha * (optic.dotOpacity ?? 1);
-      return;
-    }
-    /** Legacy circle-dot blends fixed hip/ADS angular radii; only the dot-only branch above
-     * applies a pixel-readability floor. Scale the ring independently to preserve a fine centre.
-     * Additive dot opacity leaves targets visible; the normally blended rim supplies sky contrast.
-     */
-    const coreR = s * lerp(0.0012, 0.0016, ads);
-    this.dotCore.scale.setScalar(coreR);
-    this.dotRim.scale.setScalar(coreR);
-    this.dotHalo.scale.setScalar(coreR);
-    this.dotRing.scale.setScalar(coreR * 1.6);
-    this.dotCore.material.opacity = alpha * 0.62;
-    this.dotRim.material.opacity = alpha * 0.55;
-    this.dotRing.material.opacity = alpha * 0.65;
-    // The halo is a bloom seed, not a glow: 6% at 1.6x the core radius adds ~1 px
-    // of soft falloff and nothing else.
-    this.dotHalo.material.opacity = alpha * 0.06;
+    // Published angular diameter, independent of eye distance/stance. Below
+    // pixel resolution, use the optic's explicit small readability floor.
+    // MOA belongs to the target/world view, not the independently framed
+    // weapon camera. Narrowing weapon FOV must not magnify the dot.
+    const worldTan = Math.tan((this.ctx.camera.fov * Math.PI) / 360);
+    const viewTan = Math.tan((this.ctx.viewCamera.fov * Math.PI) / 360);
+    const angularR = Math.tan(((optic.dotMoa ?? 0) * Math.PI) / (180 * 120)) / worldTan;
+    const height = this.ctx.get('render')?.screenSize.height ?? this.ctx.canvas.height;
+    this.dotCore.scale.setScalar(
+      s * viewTan * Math.max(angularR, (optic.minDotPixels ?? 0) / height)
+    );
+    this.dotCore.material.opacity = alpha * (optic.dotOpacity ?? 1);
   }
 
   _updateScope(w: WeaponEntry, ads: number): void {
@@ -1563,7 +1513,7 @@ export class Viewmodel {
     this.bandageAsset?.roll.removeFromParent();
     this.bandageAsset?.wrap.removeFromParent();
     this.bandageAsset?.tail.removeFromParent();
-    for (const g of this._reticleGeo) g.dispose();
+    this.dotCore.geometry.dispose();
     this.scopeMask?.geometry.dispose();
     this.scopeMask?.material.dispose();
     this.scopeReticle?.geometry.dispose();

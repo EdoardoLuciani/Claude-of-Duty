@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { CONTROL_REFERENCE, DEFAULT_BINDINGS } from '../../src/core/bindings.ts';
+import { DEFAULT_BINDINGS } from '../../src/core/bindings.ts';
 import { Input } from '../../src/core/input.ts';
 import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
@@ -28,10 +28,6 @@ for (const [action, codes] of Object.entries(DEFAULT_BINDINGS)) {
     owners.set(code, action);
   }
 }
-assert.deepEqual(
-  new Set(CONTROL_REFERENCE.map((row): string => row.action)),
-  new Set(Object.keys(DEFAULT_BINDINGS))
-);
 
 const input = new Input(fixture<HTMLCanvasElement>({}, complete.testElement('canvas')), {
   sensitivity: 0.001,

@@ -17,15 +17,12 @@ import { MovementWorker } from '../lib/ai-movement-fixture.ts';
 import { NativeWorker } from '../lib/attachment-worker-fixture.ts';
 import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
+import { FLOOR, addTriangles } from '../lib/static-world.ts';
 
 const turn = (): Promise<void> => new Promise((resolve): NodeJS.Timeout => setTimeout(resolve, 0));
 function makeWorld(): StaticWorld {
   const world = new StaticWorld();
-  world.addTriangles(
-    new Float32Array([-3, 0, -3, -3, 0, 3, 3, 0, 3, 3, 0, 3, 3, 0, -3, -3, 0, -3]),
-    2,
-    'concrete'
-  );
+  addTriangles(world, FLOOR, 'concrete');
   world.build();
   return world;
 }

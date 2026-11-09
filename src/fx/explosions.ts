@@ -1,5 +1,6 @@
 import type { Vector3Like as Vec3Like } from 'three';
 
+import { TAU } from '../core/math.ts';
 import { P } from './atlas.ts';
 import type { FxSystem } from './index.ts';
 import { resetSpawn, setSpawnColorRamp, setSpawnPosition, setSpawnVelocity } from './particles.ts';
@@ -26,8 +27,6 @@ type ExplosionFx = Pick<
  *   0.1-2 s  smoke column that keeps rising and dissipating long after the fire
  *            has gone out, which is what makes the aftermath read
  */
-
-const TWO_PI = Math.PI * 2;
 
 export function explode(fx: ExplosionFx, o: ExplosionOptions): boolean {
   const rng = fx.rng;
@@ -73,7 +72,7 @@ export function explode(fx: ExplosionFx, o: ExplosionOptions): boolean {
     s.delay = rng.range(0, 0.06);
     s.drag = rng.range(2.6, 4.2);
     s.gravity = 2.2; // buoyant
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     s.spin = rng.signed() * 2.2;
     s.r0 = 1;
     s.g0 = rng.range(0.7, 0.92);
@@ -107,7 +106,7 @@ export function explode(fx: ExplosionFx, o: ExplosionOptions): boolean {
     s.delay = rng.range(0.03, 0.16);
     s.drag = 1.9;
     s.gravity = 0.9;
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     s.spin = rng.signed() * 0.9;
     setSpawnColorRamp(s, 0.1, 0.095, 0.09, 0.19, 0.185, 0.18);
     s.alpha = rng.range(0.55, 0.85);
@@ -140,7 +139,7 @@ export function explode(fx: ExplosionFx, o: ExplosionOptions): boolean {
   // ---- ground dust ring ---------------------------------------------------
   const nRing = Math.round(11 * q) + 5;
   for (let i = 0; i < nRing; i++) {
-    const a = (i / nRing) * TWO_PI + rng.range(-0.2, 0.2);
+    const a = (i / nRing) * TAU + rng.range(-0.2, 0.2);
     const dx = Math.cos(a);
     const dz = Math.sin(a);
     const sp = rng.range(4, 9) * (R / 4);
@@ -154,7 +153,7 @@ export function explode(fx: ExplosionFx, o: ExplosionOptions): boolean {
     s.life = rng.range(0.9, 1.8);
     s.drag = rng.range(2.4, 3.6);
     s.gravity = -0.5;
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     s.spin = rng.signed() * 1;
     setSpawnColorRamp(s, 0.42, 0.36, 0.29, 0.34, 0.3, 0.25);
     s.alpha = rng.range(0.4, 0.7);
@@ -180,7 +179,7 @@ export function explode(fx: ExplosionFx, o: ExplosionOptions): boolean {
     s.life = rng.range(0.7, 1.8);
     s.drag = 0.4;
     s.gravity = -19;
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     s.spin = rng.signed() * 26;
     setSpawnColorRamp(s, 0.24, 0.21, 0.18, 0.2, 0.18, 0.16);
     s.alphaCurve = 0.3;

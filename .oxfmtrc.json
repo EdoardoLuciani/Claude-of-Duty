@@ -26,6 +26,7 @@
     "assets/**",
     "src/weapons/hand-poses.ts",
     "src/weapons/bandage-path.ts",
+    "tools/worldgen/level/placements/**",
     "public/**",
     "dist/**",
     "shots/**",

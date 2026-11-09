@@ -1,9 +1,9 @@
 import type { DataTexture } from 'three';
 
-import { clamp01 } from '../../src/core/math.ts';
+import { TAU, clamp01, smoothstep } from '../../src/core/math.ts';
 import type { Rng } from '../../src/core/rng.ts';
 import { makeTexture } from '../../src/fx/atlas.ts';
-import { Noise, smoothstep, encodeSrgb } from '../../src/fx/noise.ts';
+import { Noise, encodeSrgb } from '../../src/fx/noise.ts';
 
 /** Offline particle/decal atlas authoring; never imported by runtime systems. */
 const ATLAS_COLS = 4;
@@ -267,8 +267,6 @@ const PARTICLE_PAINTERS: ParticlePainter[] = [
 /*  decal tiles                                                              */
 /* ========================================================================= */
 
-const TWO_PI = Math.PI * 2;
-
 /* ------------------------------------------------------------------------- */
 /*  bullet holes                                                             */
 /* ------------------------------------------------------------------------- */
@@ -346,9 +344,9 @@ function radialSpall(n: Noise, ang: number, r: number, seed: number, count: numb
     const len = 0.24 + 0.52 * h2;
     if (r > len) continue;
     // uneven spacing: a real spall pattern is never evenly spoked
-    const a0 = ((k + (h - 0.5) * 1.5) / count) * TWO_PI + seed;
+    const a0 = ((k + (h - 0.5) * 1.5) / count) * TAU + seed;
     let d = ang - a0;
-    d -= TWO_PI * Math.round(d / TWO_PI);
+    d -= TAU * Math.round(d / TAU);
     const wob = (n.fbm(r * 7.5 + k * 3.3, seed + k * 1.7, 3) - 0.5) * 0.5;
     // constant-ish physical width, tapering to nothing at the tip
     const w = 0.03 * (1 - r / len) + 0.006;

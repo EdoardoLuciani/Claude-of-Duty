@@ -3,13 +3,13 @@ import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Renderer } from 'three/webgpu';
 
 import manifest from '../../assets/weapons/mcx-virtus/manifest.json' with { type: 'json' };
+import { smootherstep } from '../core/math.ts';
 import { isSkinnedMesh } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { disposeAuthoredMixer } from './authored-actions.ts';
 import { authoredModel, type AuthoredModelData, type AuthoredNodes } from './authored-model.ts';
 import { buildEquipClips, buildMagazineClips } from './clips.ts';
-import { smootherstep } from './mathx.ts';
 import { configureMCXFinishes } from './mcx-finishes.ts';
 
 export const MCX_URL = '/models/weapons/mcx-virtus.runtime.glb';

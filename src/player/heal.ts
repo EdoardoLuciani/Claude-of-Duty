@@ -213,7 +213,9 @@ export class HealController {
       input.actionPressed?.('radio') ||
       input.actionPressed?.('pause') ||
       input.actionPressed?.('inspect') ||
-      input.actionPressed?.('swapWeapon') ||
+      input.actionPressed?.('slot1') ||
+      input.actionPressed?.('slot2') ||
+      input.actionPressed?.('cycleWeapon') ||
       input.wheel
     );
   }

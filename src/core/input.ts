@@ -6,20 +6,10 @@
  * the transition happened — read them in update(), not fixedUpdate().
  */
 
-import { DEFAULT_BINDINGS } from './bindings.ts';
-
-/** Temporary compatibility group for healing/telemetry; not another binding authority. */
-export const ACTIONS = {
-  ...DEFAULT_BINDINGS,
-  swapWeapon: [
-    ...DEFAULT_BINDINGS.slot1,
-    ...DEFAULT_BINDINGS.slot2,
-    ...DEFAULT_BINDINGS.cycleWeapon,
-  ],
-} as const;
+import { DEFAULT_BINDINGS, type ActionId } from './bindings.ts';
 
 /**
- * Every key code the game binds, directly or via ACTIONS. Used to swallow
+ * Every key code the game binds. Used to swallow
  * browser shortcuts that collide with gameplay: crouch is Ctrl, so while the
  * game owns input a plain "Ctrl + W" (close tab), "Ctrl + Q" (quit Firefox),
  * "Ctrl + E" (search) or "Ctrl + A" (select all) fires the moment the player
@@ -295,23 +285,23 @@ export class Input {
     this.stick.lookY = curve(dz(pad.axes[3] ?? 0));
   }
 
-  _actionIn(name: keyof typeof ACTIONS, snapshot: ReadonlySet<string>): boolean {
-    for (const code of ACTIONS[name]) if (snapshot.has(code)) return true;
+  _actionIn(name: ActionId, snapshot: ReadonlySet<string>): boolean {
+    for (const code of DEFAULT_BINDINGS[name]) if (snapshot.has(code)) return true;
     return false;
   }
 
   /** True while any key/button bound to the action is held. Wheel remains Input.wheel. */
-  action(name: keyof typeof ACTIONS): boolean {
+  action(name: ActionId): boolean {
     return this._actionIn(name, this.down);
   }
 
   /** Per-physical-binding edges, preserving alias behavior; movement owns union-held stance edges. */
-  actionPressed(name: keyof typeof ACTIONS): boolean {
+  actionPressed(name: ActionId): boolean {
     return this._actionIn(name, this._pressed);
   }
 
   /** Any bound key/button released this frame. */
-  actionReleased(name: keyof typeof ACTIONS): boolean {
+  actionReleased(name: ActionId): boolean {
     return this._actionIn(name, this._released);
   }
 

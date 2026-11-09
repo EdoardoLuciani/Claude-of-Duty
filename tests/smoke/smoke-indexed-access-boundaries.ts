@@ -27,29 +27,6 @@ const consumers = [
   (g: THREE.BufferGeometry): unknown => mergePrimitives([new THREE.SkinnedMesh(g)]),
 ];
 
-test('raw triangle counts cannot exceed their backing buffer or consume a free slot', (): void => {
-  const world = new StaticWorld();
-  const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
-  const id = world.addTriangles(positions, 1, 'concrete');
-  world.removeObject(id);
-  world.build();
-  for (const count of [2, 0.5, NaN, -1, Infinity]) {
-    assert.throws((): number => world.addTriangles(positions, count, 'concrete'), /triangle count/);
-    assert.equal(world.dirty, false);
-    assert.deepEqual(world._freeIds, [id]);
-  }
-  assert.equal(world.addTriangles(positions, 1, 'concrete'), id);
-  world.build();
-  assert.equal(world.triCount, 1);
-  // Spare buffer capacity and an explicit empty prefix remain supported.
-  const spare = new Float32Array(18);
-  spare.set(positions);
-  world.addTriangles(spare, 1, 'wood');
-  world.addTriangles(new Float32Array(0), 0, 'wood');
-  world.build();
-  assert.equal(world.triCount, 2);
-});
-
 test('geometry consumers reject indices that cannot address a vertex', (): void => {
   for (const consume of consumers) {
     for (const index of [

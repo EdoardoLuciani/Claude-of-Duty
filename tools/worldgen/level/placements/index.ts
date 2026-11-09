@@ -1,4 +1,4 @@
-import type { Placement } from '../../placement.ts';
+import type { PlacementRow } from '../../placement.ts';
 import { eastSide } from './east-side.ts';
 import { interiors } from './interiors.ts';
 import { market } from './market.ts';
@@ -8,7 +8,7 @@ import { southStreet } from './south-street.ts';
 import { westSide } from './west-side.ts';
 
 // Keep authored order: generation and support diagnostics consume this sequence.
-export const PLACEMENTS: Placement[] = [
+export const PLACEMENT_ROWS: PlacementRow[] = [
   ...eastSide,
   ...interiors,
   ...market,

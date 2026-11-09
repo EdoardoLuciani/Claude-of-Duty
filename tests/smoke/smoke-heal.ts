@@ -9,8 +9,9 @@
  */
 import assert from 'node:assert/strict';
 
+import { DEFAULT_BINDINGS } from '../../src/core/bindings.ts';
 import type { EngineEventMap } from '../../src/core/events.ts';
-import { ACTIONS, Input } from '../../src/core/input.ts';
+import { Input } from '../../src/core/input.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { Health } from '../../src/player/health.ts';
 import type { PlayerSystem } from '../../src/player/index.ts';
@@ -213,7 +214,9 @@ for (const request of [
   'grenade',
   'radio',
   'pause',
-  'swapWeapon',
+  'slot1',
+  'slot2',
+  'cycleWeapon',
   'wheel-up',
   'wheel-down',
 ]) {
@@ -469,7 +472,7 @@ for (const motion of [
   });
   check(
     'radio and bandage controls are X and H',
-    ACTIONS.radio.includes('KeyX') && ACTIONS.heal.includes('KeyH')
+    DEFAULT_BINDINGS.radio.includes('KeyX') && DEFAULT_BINDINGS.heal.includes('KeyH')
   );
   input.down.add('KeyH');
   check('H activates healing only', input.action('heal') && !input.action('radio'));
