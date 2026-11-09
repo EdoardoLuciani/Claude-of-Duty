@@ -73,20 +73,7 @@ export const WEAPON_PROFILES = {
   lmg: { sample: 'lmg', distantSample: 'lmg-distant' },
 } satisfies Record<string, WeaponProfile>;
 
-/** Map whatever the weapons subsystem calls its guns onto a profile. */
-export function resolveProfile(name?: string | null): WeaponProfile | null {
-  if (!name) return WEAPON_PROFILES.rifle;
-  const k = String(name).toLowerCase();
-  if (hasOwn(WEAPON_PROFILES, k)) return WEAPON_PROFILES[k];
-  if (/mcx|virtus/.test(k)) return WEAPON_PROFILES.mcx;
-  if (/mpx/.test(k)) return WEAPON_PROFILES.mpx;
-  // No generic suppressed recording: unknown suppressed identities stay silent.
-  if (/suppress|silenc/.test(k)) return null;
-  if (/ak|7\.?62|akm|scar/.test(k)) return WEAPON_PROFILES.ak;
-  if (/mp5|mp7|smg|ump|vector|uzi/.test(k)) return WEAPON_PROFILES.smg;
-  if (/pistol|glock|m19|deagle|handgun|sidearm/.test(k)) return WEAPON_PROFILES.pistol;
-  if (/shot|pump|12g|benelli|spas/.test(k)) return WEAPON_PROFILES.shotgun;
-  if (/snip|dmr|awp|barrett|338|intervention|marksman/.test(k)) return WEAPON_PROFILES.sniper;
-  if (/lmg|mg4|m249|pkm|saw|minigun/.test(k)) return WEAPON_PROFILES.lmg;
-  return WEAPON_PROFILES.rifle;
+/** Weapon ids/audio keys name their profile; AI rifles and unknown ids use the rifle report. */
+export function resolveProfile(name?: string | null): WeaponProfile {
+  return name && hasOwn(WEAPON_PROFILES, name) ? WEAPON_PROFILES[name] : WEAPON_PROFILES.rifle;
 }

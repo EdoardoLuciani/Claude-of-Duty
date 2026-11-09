@@ -64,7 +64,8 @@ Run `bun run format` to write formatting; `bun run format:check` checks it in CI
 Both use `bun fmt` from the pinned Bun, which reads the Oxfmt-format `.oxfmtrc.json`.
 The command scope is in `package.json`; style and exclusions are in `.oxfmtrc.json`.
 Generated files, assets, reports, lockfiles, shared skills and protected workflow/
-agent instructions are excluded. Python, shell and SVG are not formatted.
+agent instructions are excluded, as are one-row-per-record data tables (hand poses,
+bandage path, world placements). Python, shell and SVG are not formatted.
 
 Import sorting respects comment partitions, but bound imports can cross bare
 side-effect imports. Preserve intentional evaluation boundaries and fix exposed

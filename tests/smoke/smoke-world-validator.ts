@@ -37,22 +37,20 @@ try {
   assert.equal(good.status, 0, good.stdout + good.stderr);
   assert.match(good.stdout, /\[world:validate\] ok/);
 
+  // Schema errors come from the runtime parser; cross-record errors are aggregated.
+  const malformed = run({ ...baseline, transform: [1, 2] });
+  assert.equal(malformed.status, 1);
+  assert.match(malformed.stderr, /does not match the runtime schema.*world transform matrix/);
+  const spawn = { id: 'duplicate', tag: 'a', position: [0, 0, 0], forward: [0, 0, 1], yaw: 0 };
   const broken = run({
     ...baseline,
-    transform: [1, 2],
     bounds: { min: [2, 0, 0], max: [1, 1, 1] },
-    spawns: [
-      { id: 'duplicate', position: [0, 0], forward: [0, 0, 1], yaw: 'invalid' },
-      { id: 'duplicate', position: [0, 0, 0], forward: [0, 0, 1], yaw: 0 },
-    ],
+    spawns: [spawn, spawn],
   });
   assert.equal(broken.status, 1);
   for (const message of [
-    'manifest.transform must be an array of length 16',
     'manifest bounds are inverted on axis 0',
-    'manifest.spawns[0].position must be an array of length 3',
-    'manifest.spawns[0].yaw must be finite',
-    'duplicate spawn id/tag "duplicate"',
+    'duplicate spawn id "duplicate"',
   ])
     assert(broken.stderr.includes(message), message);
 

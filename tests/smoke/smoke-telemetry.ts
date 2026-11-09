@@ -4,7 +4,10 @@
  *   bun test ./tests/smoke/smoke-telemetry.ts
  */
 import assert from 'node:assert/strict';
-import { gunzipSync } from 'node:zlib';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import Info from 'three/src/renderers/common/Info.js';
 import WebGPUBackend from 'three/src/renderers/webgpu/WebGPUBackend.js';
@@ -16,7 +19,6 @@ import { ModelSystem } from '../../src/core/models.ts';
 import {
   TelemetrySystem,
   collectProvenance,
-  extractTar,
   hitchVerdict,
   packTgz,
 } from '../../src/dev/telemetry.ts';
@@ -210,9 +212,21 @@ const tgz = await packTgz([
   { name: 'marks/001.jpg', data: jpeg },
 ]);
 check('tgz is gzip', tgz[0] === 0x1f && tgz[1] === 0x8b);
-const fromGz = extractTar(gunzipSync(tgz));
-check('tgz roundtrip json', Buffer.from(fromGz['telemetry.json']).equals(Buffer.from(json)));
-check('tgz roundtrip jpeg', Buffer.from(fromGz['marks/001.jpg']).equals(Buffer.from(jpeg)));
+// The archive must open with the system tar, which is what users extract it with.
+const archiveDir = mkdtempSync(join(tmpdir(), 'cod-telemetry-'));
+try {
+  const archive = join(archiveDir, 'telemetry.tgz');
+  writeFileSync(archive, tgz);
+  const extract = (name: string): Buffer => {
+    const result = spawnSync('tar', ['-xzOf', archive, name]);
+    assert.equal(result.status, 0, `tar failed: ${result.error?.message ?? String(result.stderr)}`);
+    return result.stdout;
+  };
+  check('tgz roundtrip json', extract('telemetry.json').equals(Buffer.from(json)));
+  check('tgz roundtrip jpeg', extract('marks/001.jpg').equals(Buffer.from(jpeg)));
+} finally {
+  rmSync(archiveDir, { recursive: true, force: true });
+}
 
 check(
   'missing provenance is unknown',

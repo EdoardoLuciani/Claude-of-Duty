@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 
+import { DEFAULT_BINDINGS, type ActionId } from '../core/bindings.ts';
 import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName } from '../core/events.ts';
+import { hasOwn } from '../core/guards.ts';
 import { STANCE } from '../player/tuning.ts';
 import {
   entries,
@@ -232,24 +234,9 @@ type TelemetrySnapshot = {
 
 const PLAYER_HZ = 10;
 const ENEMY_HZ = 5;
-const ACTIONS = [
-  'forward',
-  'back',
-  'left',
-  'right',
-  'jump',
-  'crouch',
-  'prone',
-  'sprint',
-  'reload',
-  'use',
-  'leanLeft',
-  'leanRight',
-  'swapWeapon',
-  'grenade',
-  'radio',
-  'heal',
-] as const;
+const ACTIONS = Object.keys(DEFAULT_BINDINGS).filter((name): name is ActionId =>
+  hasOwn(DEFAULT_BINDINGS, name)
+);
 const EVENTS = [
   'weapon:fire',
   'weapon:reload',
@@ -394,12 +381,21 @@ function entityId(v: unknown): string | null {
   return stringField(v, 'name');
 }
 
+const ENTITY_FIELDS: ReadonlySet<string> = new Set(['actor', 'shooter', 'target', 'source']);
+function recordField(key: string, value: unknown): unknown {
+  if (value == null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') return n3(value);
+  if (value instanceof THREE.Vector3) return vec(value);
+  if (key === 'weapon') return weaponId(value);
+  return ENTITY_FIELDS.has(key) ? entityId(value) : undefined;
+}
+
 function isInstancedMesh(mesh: THREE.Object3D): mesh is THREE.InstancedMesh<THREE.BufferGeometry> {
   return mesh instanceof THREE.InstancedMesh;
 }
 
 const TAR_BLOCK = 512;
-const SCHEMA = 4;
+const SCHEMA = 5;
 const shotName = (i: number): string => `marks/${String(i + 1).padStart(3, '0')}.jpg`;
 
 function buildingId(
@@ -443,23 +439,6 @@ function tarHeader(name: string, size: number): Uint8Array<ArrayBuffer> {
   for (let i = 0; i < TAR_BLOCK; i++) sum += h[i];
   put(148, `${sum.toString(8).padStart(6, '0')}\0 `, 8);
   return h;
-}
-
-export function extractTar(buf: Uint8Array): Record<string, Uint8Array> {
-  const files: Record<string, Uint8Array> = {};
-  const text = new TextDecoder();
-  let offset = 0;
-  while (offset + TAR_BLOCK <= buf.length) {
-    const name = text.decode(buf.subarray(offset, offset + 100)).replace(/\0.*$/, '');
-    if (!name) break;
-    const size = parseInt(text.decode(buf.subarray(offset + 124, offset + 136)), 8);
-    offset += TAR_BLOCK;
-    files[name] = buf.subarray(offset, offset + size);
-    offset += size;
-    const pad = (TAR_BLOCK - (size % TAR_BLOCK)) % TAR_BLOCK;
-    if (pad) offset += pad;
-  }
-  return files;
 }
 
 function buildTar(files: Array<{ name: string; data: Uint8Array }>): Uint8Array<ArrayBuffer> {
@@ -1269,176 +1248,14 @@ export class TelemetrySystem {
   }
 
   _recordEvent<K extends EngineEventName>(type: K, e: EngineEventMap[K]): void;
+  /** Events are projected generically: entities and weapons become ids, vectors rounded
+   * triples, numbers millimetre-rounded; other objects (meshes, bodies) are dropped. */
   _recordEvent(...[type, e]: EventTuple): void {
     if (!this.recording) return;
-    let data;
-    switch (type) {
-      case 'weapon:fire':
-        data = {
-          shooter: entityId(e.actor),
-          weapon: weaponId(e.weapon),
-          origin: vec(e.origin),
-          dir: vec(e.dir),
-          seed: e.seed,
-        };
-        break;
-      case 'shot:resolved':
-        data = {
-          shooter: entityId(e.shooter),
-          weapon: weaponId(e.weapon),
-          from: vec(e.from),
-          to: vec(e.to),
-          result: e.result,
-          target: entityId(e.target),
-          part: e.part ?? null,
-          damage: n3(e.damage),
-          pellet: e.pellet ?? 0,
-          shot: e.shot,
-          stopReason: e.stopReason,
-        };
-        break;
-      case 'bullet:impact':
-        data = {
-          point: vec(e.point),
-          normal: vec(e.normal),
-          incident: vec(e.incident),
-          surface: e.surface,
-          damage: n3(e.damage),
-          exit: !!e.exit,
-          target: entityId(e.actor),
-          part: e.part ?? null,
-        };
-        break;
-      case 'weapon:reload':
-        data = {
-          actor: entityId(e.actor) ?? 'player',
-          weapon: weaponId(e.weapon),
-          phase: e.phase,
-        };
-        break;
-      case 'damage:dealt':
-        data = {
-          target: entityId(e.target),
-          source: entityId(e.source),
-          amount: n3(e.amount),
-          point: vec(e.point),
-          headshot: !!e.headshot,
-          killed: !!e.killed,
-          explosion: !!e.explosion,
-        };
-        break;
-      case 'damage:taken':
-        data = {
-          amount: n3(e.amount),
-          health: n3(e.health),
-          armour: n3(e.armour),
-          absorbed: n3(e.armourAbsorbed),
-          plateBreak: !!e.plateBreak,
-          from: vec(e.from),
-        };
-        break;
-      case 'actor:death':
-        data = { actor: entityId(e.actor), point: vec(e.point), impulse: vec(e.impulse) };
-        break;
-      case 'player:state':
-        data = {
-          state: e.state ?? null,
-          stance: e.stance,
-          sprinting: !!e.sprinting,
-          tacticalSprint: !!e.tacticalSprint,
-          sliding: !!e.sliding,
-          mantling: !!e.mantling,
-          grounded: !!e.grounded,
-          ads: !!e.ads,
-        };
-        break;
-      case 'player:footstep':
-        data = {
-          position: vec(e.position),
-          surface: e.surface,
-          running: !!e.running,
-          speed: n3(e.speed),
-          stance: e.stance,
-        };
-        break;
-      case 'player:jump':
-      case 'player:respawn':
-      case 'ammo:pickup':
-        data = {
-          position: vec(e.position),
-          amount: 'amount' in e ? e.amount : null,
-          weapon: weaponId('weapon' in e ? e.weapon : null),
-        };
-        break;
-      case 'player:mantle':
-        data = { kind: e.kind, height: n3(e.height) };
-        break;
-      case 'player:land':
-        data = { position: vec(e.position), velocity: n3(e.velocity), surface: e.surface };
-        break;
-      case 'player:death':
-        data = { position: vec(e.position), from: vec(e.from), amount: n3(e.amount) };
-        break;
-      case 'player:heal':
-        data = {
-          phase: e.phase,
-          amount: n3(e.amount),
-          health: n3(e.health),
-          bandages: e.bandages,
-          reason: e.reason,
-        };
-        break;
-      case 'explosion':
-        data = {
-          position: vec(e.position),
-          radius: n3(e.radius),
-          damage: n3(e.damage),
-          source: entityId(e.source),
-        };
-        break;
-      case 'wave:start':
-        data = { wave: e.wave, enemies: e.enemies, squads: e.squads };
-        break;
-      case 'wave:complete':
-        data = { wave: e.wave, nextWave: e.nextWave, delay: n3(e.delay) };
-        break;
-      case 'score:change':
-        data = {
-          score: e.score,
-          delta: e.delta,
-          reason: e.reason,
-          kills: e.kills,
-        };
-        break;
-      case 'market:open':
-        data = { wave: e.wave };
-        break;
-      case 'market:close':
-      case 'game:restart':
-        data = { source: e.source ?? null };
-        break;
-      case 'hud:heard':
-        data = { bearing: n3(e.bearing) };
-        break;
-      case 'hud:search':
-        data = { bearing: n3(e.bearing), sector: e.sector, remaining: e.remaining };
-        break;
-      case 'radio:strike':
-        data = { position: vec(e.position) };
-        break;
-      case 'ai:bark':
-        data = {
-          kind: e.kind,
-          position: vec(e.position),
-          actor: e.voice ? `ai:${e.voice}` : null,
-        };
-        break;
-      case 'engine:error':
-        data = { system: e.system, method: e.method, message: e.message };
-        break;
-      default:
-        data = {};
-        break;
+    const data: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(e)) {
+      const recorded = recordField(key, value);
+      if (recorded !== undefined) data[key] = recorded;
     }
     this._push(type, data);
   }
@@ -1460,8 +1277,6 @@ export class TelemetrySystem {
     const input = ctx.input;
     const actions = [];
     for (const name of ACTIONS) if (input.action(name)) actions.push(name);
-    if (input.fire) actions.push('fire');
-    if (input.ads) actions.push('ads');
     input.moveVector(this._move);
     const wave = ai.getWaveState();
     const info = render.renderer.info;

@@ -118,15 +118,13 @@ assert.equal(WEAPON_PROFILES.mcx.suppressed, true);
 
 for (const [weapon, expectedProfile] of [
   ['ak', WEAPON_PROFILES.ak],
-  ['akm', WEAPON_PROFILES.ak],
   ['smg', WEAPON_PROFILES.smg],
-  ['mp5', WEAPON_PROFILES.smg],
   ['mpx', WEAPON_PROFILES.mpx],
   ['mcx', WEAPON_PROFILES.mcx],
   ['ai_rifle', WEAPON_PROFILES.rifle],
 ] as const) {
   for (const distance of [0, 70, 180]) {
-    // Compatibility aliases enter through untyped callers, not gameplay event types.
+    // Bare profile keys enter through untyped callers, not gameplay event types.
     Reflect.apply(audio._onFire.bind(audio), audio, [
       { weapon, origin: new Vector3(distance, 0, 0) },
     ]);
@@ -135,8 +133,6 @@ for (const [weapon, expectedProfile] of [
   }
 }
 for (const weapon of [
-  'suppressed',
-  'silenced-test',
   { id: 'mp5', suppressed: true },
   { id: 'rifle', suppressed: true },
 ]) {
@@ -148,10 +144,8 @@ for (const weapon of [
     'removed generic routes stay silent, never borrow another report'
   );
 }
-assert.equal(resolveProfile('suppressed'), null);
-assert.equal(resolveProfile('silenced-test'), null);
-assert.equal(resolveProfile('mcx-suppressed'), WEAPON_PROFILES.mcx);
-assert.equal(resolveProfile('mpx-suppressed'), WEAPON_PROFILES.mpx);
+assert.equal(resolveProfile(null), WEAPON_PROFILES.rifle);
+assert.equal(resolveProfile('ai_rifle'), WEAPON_PROFILES.rifle);
 console.log(
   'Actual firearm routing: all seven definitions, recorded AK at every range, dedicated MCX/MPX, unsupported generic-suppressed requests silent'
 );

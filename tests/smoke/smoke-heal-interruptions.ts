@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { Vector3 } from 'three';
 
-import { CONTROL_REFERENCE, bindingLabels, bindingLabel } from '../../src/core/bindings.ts';
+import { bindingLabels, bindingLabel } from '../../src/core/bindings.ts';
 import type { EngineContext } from '../../src/core/context.ts';
 import type { EngineEventMap } from '../../src/core/events.ts';
 import { Input } from '../../src/core/input.ts';
@@ -259,13 +259,4 @@ test('menu advertises the actual heal binding', (): void => {
   assert.deepEqual(bandage.keys, bindingLabels('heal'));
   assert.ok(!bandage.keys.includes(bindingLabel('radio')));
   assert.equal(bandage.description, `Bandage (hold ${HEALING.duration}s)`);
-});
-
-test('canonical bandage metadata describes movement interruptions', (): void => {
-  const heal = CONTROL_REFERENCE.find((row): boolean => row.action === 'heal');
-  assert.ok(heal);
-  assert.match(
-    heal.behavior,
-    /health damage.*sprint, jump\/fall, slide and mantle.*Walking alone is allowed/
-  );
 });

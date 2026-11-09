@@ -20,7 +20,7 @@ import {
 import { makeSampleResult } from './clips.ts';
 import type { Clip } from './clips.ts';
 import type { WeaponDef } from './defs.ts';
-import { triCount, mergeAll } from './geometry.ts';
+import { triCount } from './geometry.ts';
 import { grenadeMesh } from './grenade-mesh.ts';
 import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from './grip-contacts.ts';
 import { Arm } from './hands.ts';
@@ -283,11 +283,7 @@ export class Viewmodel {
   shoulderL: THREE.Vector3 = new THREE.Vector3(-0.2, -0.22, 0.02);
   // ---- reticle ----------------------------------------------------------
   reticle: THREE.Object3D = new THREE.Object3D();
-  declare _reticleGeo: THREE.BufferGeometry[];
   declare dotCore: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
-  declare dotHalo: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
-  declare dotRim: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
-  declare dotRing: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
   scopeOverlay: THREE.Object3D = new THREE.Object3D();
   declare scopeMask: THREE.Mesh<THREE.BufferGeometry, MeshBasicNodeMaterial>;
   declare scopeReticle: THREE.Mesh<THREE.BufferGeometry, MeshBasicNodeMaterial>;
@@ -371,39 +367,13 @@ export class Viewmodel {
 
     this.reticle.name = 'ow-reticle';
     this.anchor.add(this.reticle);
-    /** Unit-radius reticle layers scale together by angular size in _updateReticle.
-     * Keep core radiance below AgX's desaturating shoulder; halo/ring convey emission.
-     * The halo stays tight. A normally blended dark rim preserves contrast against bright sky,
-     * which additive layers alone cannot provide.
-     */
-    const core = new THREE.CircleGeometry(1, 32);
-    const halo = new THREE.CircleGeometry(1.6, 32);
-    const rim = new THREE.RingGeometry(1, 1.42, 32, 1);
-    const RING_SEGS = 12;
-    const ringArcs = [];
-    for (let i = 0; i < RING_SEGS; i++) {
-      const a0 = (i / RING_SEGS) * TAU;
-      ringArcs.push(new THREE.RingGeometry(2.98, 3.42, 4, 1, a0, (TAU / RING_SEGS) * 0.56));
-    }
-    const ring = mergeAll(ringArcs)!;
-    this._reticleGeo = [core, halo, rim, ring];
-    this.dotCore = new THREE.Mesh(core, mats.reticle(0xff1206, 0.95));
-    this.dotHalo = new THREE.Mesh(halo, mats.reticle(0xff2a0c, 0.34));
-    this.dotRim = new THREE.Mesh(rim, mats.reticleOutline(0.85));
-    this.dotRing = new THREE.Mesh(ring, mats.reticle(0xff1206, 0.95 * 0.5));
-    this.dotHalo.renderOrder = 19;
-    this.dotRim.renderOrder = 20;
-    this.dotRing.renderOrder = 20;
+    // Unit-radius dot, scaled by its published angular size in _updateReticle.
+    this.dotCore = new THREE.Mesh(new THREE.CircleGeometry(1, 32), mats.reticle(0xff1206, 0.95));
     this.dotCore.renderOrder = 21;
-    this.reticle.add(this.dotHalo);
-    this.reticle.add(this.dotRim);
-    this.reticle.add(this.dotRing);
+    this.dotCore.frustumCulled = false;
+    this.dotCore.userData.owNoPrepass = true;
+    this.dotCore.castShadow = false;
     this.reticle.add(this.dotCore);
-    for (const m of [this.dotCore, this.dotHalo, this.dotRim, this.dotRing]) {
-      m.frustumCulled = false;
-      m.userData.owNoPrepass = true;
-      m.castShadow = false;
-    }
 
     this.scopeOverlay.name = 'ow-scope';
     this.scopeOverlay.visible = false;
@@ -1404,9 +1374,6 @@ export class Viewmodel {
       this.reticle.visible = false;
       return;
     }
-    // Dot-only is an optic-specific setting, not a change to other weapons.
-    const dotOnly = optic.reticle === 'dot';
-    this.dotHalo.visible = this.dotRim.visible = this.dotRing.visible = !dotOnly;
     // Optic axis and lens centre, both in camera space. The weapon group is a
     // child of the rig which is a child of the anchor, so camera space is just
     // the rig transform applied to the weapon-local values — no inverses, no
@@ -1436,37 +1403,18 @@ export class Viewmodel {
     this.reticle.visible = true;
     this.reticle.position.copy(_v2);
     this.reticle.lookAt(this.anchor.getWorldPosition(_v));
-    if (dotOnly) {
-      // Published angular diameter, independent of eye distance/stance. Below
-      // pixel resolution, use an explicit small readability floor rather than
-      // the legacy halo, black outline or oversized segmented ring.
-      // MOA belongs to the target/world view, not the independently framed
-      // weapon camera. Narrowing weapon FOV must not magnify the dot.
-      const worldTan = Math.tan((this.ctx.camera.fov * Math.PI) / 360);
-      const viewTan = Math.tan((this.ctx.viewCamera.fov * Math.PI) / 360);
-      const angularR = Math.tan(((optic.dotMoa ?? 0) * Math.PI) / (180 * 120)) / worldTan;
-      const height = this.ctx.get('render')?.screenSize.height ?? this.ctx.canvas.height;
-      this.dotCore.scale.setScalar(
-        s * viewTan * Math.max(angularR, (optic.minDotPixels ?? 0) / height)
-      );
-      this.dotCore.material.opacity = alpha * (optic.dotOpacity ?? 1);
-      return;
-    }
-    /** Legacy circle-dot blends fixed hip/ADS angular radii; only the dot-only branch above
-     * applies a pixel-readability floor. Scale the ring independently to preserve a fine centre.
-     * Additive dot opacity leaves targets visible; the normally blended rim supplies sky contrast.
-     */
-    const coreR = s * lerp(0.0012, 0.0016, ads);
-    this.dotCore.scale.setScalar(coreR);
-    this.dotRim.scale.setScalar(coreR);
-    this.dotHalo.scale.setScalar(coreR);
-    this.dotRing.scale.setScalar(coreR * 1.6);
-    this.dotCore.material.opacity = alpha * 0.62;
-    this.dotRim.material.opacity = alpha * 0.55;
-    this.dotRing.material.opacity = alpha * 0.65;
-    // The halo is a bloom seed, not a glow: 6% at 1.6x the core radius adds ~1 px
-    // of soft falloff and nothing else.
-    this.dotHalo.material.opacity = alpha * 0.06;
+    // Published angular diameter, independent of eye distance/stance. Below
+    // pixel resolution, use the optic's explicit small readability floor.
+    // MOA belongs to the target/world view, not the independently framed
+    // weapon camera. Narrowing weapon FOV must not magnify the dot.
+    const worldTan = Math.tan((this.ctx.camera.fov * Math.PI) / 360);
+    const viewTan = Math.tan((this.ctx.viewCamera.fov * Math.PI) / 360);
+    const angularR = Math.tan(((optic.dotMoa ?? 0) * Math.PI) / (180 * 120)) / worldTan;
+    const height = this.ctx.get('render')?.screenSize.height ?? this.ctx.canvas.height;
+    this.dotCore.scale.setScalar(
+      s * viewTan * Math.max(angularR, (optic.minDotPixels ?? 0) / height)
+    );
+    this.dotCore.material.opacity = alpha * (optic.dotOpacity ?? 1);
   }
 
   _updateScope(w: WeaponEntry, ads: number): void {
@@ -1563,7 +1511,7 @@ export class Viewmodel {
     this.bandageAsset?.roll.removeFromParent();
     this.bandageAsset?.wrap.removeFromParent();
     this.bandageAsset?.tail.removeFromParent();
-    for (const g of this._reticleGeo) g.dispose();
+    this.dotCore.geometry.dispose();
     this.scopeMask?.geometry.dispose();
     this.scopeMask?.material.dispose();
     this.scopeReticle?.geometry.dispose();
