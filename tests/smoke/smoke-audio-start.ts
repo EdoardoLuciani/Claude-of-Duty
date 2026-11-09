@@ -1,11 +1,9 @@
 import assert from 'node:assert/strict';
 
 import { AudioSystem } from '../../src/audio/index.ts';
-import type { Mixer } from '../../src/audio/mixer.ts';
-import { TentRadio } from '../../src/audio/music.ts';
+import { TentRadio, type TentRadioMixer } from '../../src/audio/music.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { createAudioContext } from '../lib/audio-fixture.ts';
-import { fixture } from '../lib/fixture.ts';
 
 // No standard Web Audio API means optional audio stays disabled, even if an
 // obsolete prefixed constructor is present. Never build a second graph.
@@ -31,7 +29,12 @@ try {
   assert.equal(audio._starting, null);
   assert.equal(await audio.start(), false);
   audio.dispose();
-  const radio = new TentRadio(createAudioContext(), fixture<Mixer>({}), new Rng(1));
+  const mixer: TentRadioMixer = {
+    bus(): never {
+      throw Error('unavailable radio must not access the mixer');
+    },
+  };
+  const radio = new TentRadio(createAudioContext(), mixer, new Rng(1));
   assert.equal(await radio.warm(), null);
   await radio.start();
   assert.equal(radio.playing, false);

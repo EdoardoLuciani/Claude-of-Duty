@@ -154,9 +154,11 @@ async function renderBed(sampleRate: number, rng: Rng): Promise<AudioBuffer | nu
   return buf;
 }
 
+export type TentRadioMixer = Pick<Mixer, 'bus'>;
+
 export class TentRadio {
   actx: BaseAudioContext;
-  mixer: Mixer;
+  mixer: TentRadioMixer;
   rng: Rng;
   _lfoG?: GainNode | null;
   _buf: AudioBuffer | null = null;
@@ -166,7 +168,7 @@ export class TentRadio {
   _lfo: OscillatorNode | null = null;
   playing: boolean = false;
 
-  constructor(actx: BaseAudioContext, mixer: Mixer, rng: Rng) {
+  constructor(actx: BaseAudioContext, mixer: TentRadioMixer, rng: Rng) {
     this.actx = actx;
     this.mixer = mixer;
     this.rng = rng;

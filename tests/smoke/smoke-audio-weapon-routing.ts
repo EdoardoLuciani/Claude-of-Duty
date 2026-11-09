@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { Vector3 } from 'three';
 
 import { AudioSystem } from '../../src/audio/index.ts';
-import type { Mixer } from '../../src/audio/mixer.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import type { SpatialField } from '../../src/audio/spatial.ts';
 import type { WeaponProfile } from '../../src/audio/types.ts';
@@ -15,6 +14,7 @@ import {
   FixtureAudioBuffer,
   type FixtureBufferSource,
   fixtureEntries,
+  fixtureMixer,
   fixtureBuffer,
 } from '../lib/audio-fixture.ts';
 import { fixture } from '../lib/fixture.ts';
@@ -42,7 +42,7 @@ audio.running = true;
 audio.actx = actx;
 audio.samples = samples;
 audio.rng = new Rng(1);
-audio.mixer = fixture<Mixer>({ duck(): void {} });
+audio.mixer = fixtureMixer(actx);
 audio.field = fixture<SpatialField>({
   listenerPos: { x: 0, y: 0, z: 0 },
   distanceTo: (x): number => Math.abs(x),

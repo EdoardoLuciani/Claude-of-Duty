@@ -10,7 +10,6 @@ import {
   calloutBank,
 } from '../../src/audio/callouts.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
-import type { Mixer } from '../../src/audio/mixer.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import provenance from '../../src/audio/samples/callouts/provenance.json' with { type: 'json' };
 import type { SpatialField } from '../../src/audio/spatial.ts';
@@ -18,7 +17,13 @@ import type { AudioVoice } from '../../src/audio/types.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { audioFixture } from '../lib/audio-banks.ts';
-import { fixtureEntries, at, fixtureBuffer, FixtureAudioBuffer } from '../lib/audio-fixture.ts';
+import {
+  fixtureEntries,
+  at,
+  fixtureBuffer,
+  FixtureAudioBuffer,
+  fixtureMixer,
+} from '../lib/audio-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
 
@@ -209,7 +214,7 @@ firing.field = fixture<SpatialField>({
   listenerPos: { x: 0, y: 0, z: 0 },
   distanceTo: (): number => 10,
 });
-firing.mixer = fixture<Mixer>({ duck(): void {} });
+firing.mixer = fixtureMixer(actx);
 firing._playAt = (): boolean => true;
 firing.bark = (): never => {
   throw Error('gunfire fabricated tactical intent');

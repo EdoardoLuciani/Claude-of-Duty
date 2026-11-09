@@ -10,7 +10,7 @@ import {
   nearMissGain,
 } from '../../src/audio/combat.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
-import type { Mixer, BusName } from '../../src/audio/mixer.ts';
+import type { BusName } from '../../src/audio/mixer.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import provenance from '../../src/audio/samples/combat/provenance.json' with { type: 'json' };
 import type { SpatialField } from '../../src/audio/spatial.ts';
@@ -23,6 +23,7 @@ import { WeaponSystem } from '../../src/weapons/index.ts';
 import { audioFixture } from '../lib/audio-banks.ts';
 import {
   fixtureEntries,
+  fixtureMixer,
   fixtureKeys,
   at,
   fixtureBuffer,
@@ -158,7 +159,9 @@ assert.deepEqual(
 assert(calls.every((c): boolean => c[1]?.level === 0.9));
 audio.running = true;
 audio.field = fixture<SpatialField>({});
-audio.mixer = fixture<Mixer>({});
+const dryMixer = fixtureMixer(actx);
+dryMixer.duck = (): never => assert.fail('dry fire must not duck the mix');
+audio.mixer = dryMixer;
 for (const id of ['rifle', 'pistol', 'smg', 'sniper', 'shotgun'] as const) {
   audio._onFire({
     weapon: { id },
