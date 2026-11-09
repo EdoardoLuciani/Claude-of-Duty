@@ -8,7 +8,7 @@ ignored, except weapon manifests that code imports. Imports must not build objec
 Start with the [asset/world editing map](../../docs/assets.md). Each weapon has
 one tooling directory here: `m4/`, `mcx/`, `p320/`, `evolys/`, `mpx/`, `ax338/`,
 `m590/`. Its `build.py` and `check.py` sit beside its geometry, animation and export
-helpers. Where applicable, `actions.py` authors clips and `hand-reference.mjs`
+helpers. Where applicable, `actions.py` authors clips and `hand-reference.ts`
 explicitly refits calibration; MCX authors clips in `animations.py` and has no
 separate hand-calibration stage. Run commands from the repository root.
 

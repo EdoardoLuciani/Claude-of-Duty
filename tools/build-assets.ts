@@ -51,7 +51,7 @@ import {
   BLENDER_VERSION,
   SOURCE_INPUTS as SOLDIER_INPUTS,
   canonicalText,
-} from './blender/soldiers/export.mjs';
+} from './blender/soldiers/export.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CACHE = join(ROOT, '.cache', 'assets');
@@ -100,14 +100,17 @@ const SOLDIER_STEP: AssetStep = {
   inputs: [...SOLDIER_INPUTS],
   salt: [REVISION],
   outputs: ['assets/soldiers/manifest.json'],
-  // Keep the Blender authoring CLI on Node; only the parent orchestration moves to Bun.
-  commands: [['node', 'tools/blender/soldiers/export.mjs', '--output', SOLDIERS]],
+  commands: [bun('tools/blender/soldiers/export.ts', '--output', SOLDIERS)],
 };
 
-// Shared Blender sources imported beyond a weapon's own tooling directory.
+// Shared authoring sources outside a weapon's own tooling directory.
 const SHARED_TOOLS: Partial<Record<ModelId, string[]>> = {
-  evolys: ['tools/blender/review_hands.py'],
-  mpx: ['tools/blender/review_hands.py'],
+  m4: ['tools/blender/hand-reference.ts'],
+  p320: ['tools/blender/hand-reference.ts'],
+  m590: ['tools/blender/hand-reference.ts'],
+  ax338: ['tools/blender/hand-reference.ts'],
+  evolys: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
+  mpx: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
 };
 const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
   exps3: ['tools/blender/exps3.py', 'tools/blender/exps3_bake.py'],

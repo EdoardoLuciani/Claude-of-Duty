@@ -139,7 +139,7 @@ export class Arm {
     this.setPose(opts.pose ?? 'wrap');
   }
 
-  attachAsset(asset: ArmAsset): void {
+  attachAsset(asset: Pick<ArmAsset, 'meshes'>): void {
     bindArmAsset(this, asset);
   }
 

@@ -1,25 +1,27 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 // Offline input for Blender controls. Runtime uses these exact fitted poses.
 import { mkdirSync, writeFileSync } from 'node:fs';
 
-import * as THREE from 'three';
-
 import { Arm } from '../../../src/weapons/hands.ts';
-const basis = (finger, back) => {
-  const z = new THREE.Vector3(...finger).negate().normalize();
-  const y = new THREE.Vector3(...back)
-    .addScaledVector(z, -new THREE.Vector3(...back).dot(z))
-    .normalize();
-  return new THREE.Quaternion().setFromRotationMatrix(
-    new THREE.Matrix4().makeBasis(new THREE.Vector3().crossVectors(y, z), y, z)
-  );
-};
-const grips = {
+import {
+  basis,
+  handPose,
+  type GripFrame,
+  type Side,
+  type HandSideReference,
+  type HandContact,
+  type GripOptions,
+} from '../hand-reference.ts';
+
+const grips: Record<Side, GripFrame> = {
   right: { pos: [0.035, -0.035, 0.099], finger: [0.15, 0.35, -0.92], back: [1, 0.03, 0.04] },
   left: { pos: [-0.089, 0.022, -0.292], finger: [0.9, -0.1, -0.436], back: [-0.14, -0.985, 0.001] },
 };
-const result = { grips, sides: {} };
-for (const [side, g] of Object.entries(grips)) {
+const sides: Partial<Record<Side, HandSideReference>> = {};
+const contacts: Partial<Record<'pouch' | 'feed' | 'charging', HandContact>> = {};
+const result = { grips, sides };
+for (const side of ['right', 'left'] as const) {
+  const g = grips[side];
   const arm = new Arm(side === 'left' ? -1 : 1, { scale: side === 'left' ? 0.97 : 1 });
   arm.hand.position.fromArray(g.pos);
   arm.hand.quaternion.copy(basis(g.finger, g.back));
@@ -47,10 +49,10 @@ for (const [side, g] of Object.entries(grips)) {
   );
   result.sides[side] = {
     quaternion: arm.hand.quaternion.toArray(),
-    grip: structuredClone(arm.poses.evolys),
+    grip: structuredClone(handPose(arm, 'evolys')),
   };
 }
-for (const [name, g, pose, contacts] of [
+for (const [name, g, pose, target] of [
   [
     'pouch',
     { pos: [-0.094, -0.195, -0.1], finger: [0.1, 0.98, -0.15], back: [-1, 0, 0] },
@@ -69,17 +71,21 @@ for (const [name, g, pose, contacts] of [
     'pinch',
     { index: [0.045, 0.073, -0.075], thumb: [0.049, 0.064, -0.081], thumbPole: [1, 0, 0] },
   ],
-]) {
+] satisfies Array<['pouch' | 'feed' | 'charging', GripFrame, string, GripOptions]>) {
   const arm = new Arm(-1, { scale: 0.97 });
   arm.hand.position.fromArray(g.pos);
   arm.hand.quaternion.copy(basis(g.finger, g.back));
   arm.setPose(pose);
-  arm.fitGrip(name, contacts);
-  result[name] = { pos: g.pos, quaternion: arm.hand.quaternion.toArray(), pose: arm.poses[name] };
+  arm.fitGrip(name, target);
+  contacts[name] = {
+    pos: g.pos,
+    quaternion: arm.hand.quaternion.toArray(),
+    pose: handPose(arm, name),
+  };
 }
 mkdirSync(new URL('../../../assets/weapons/fn-evolys-762/', import.meta.url), { recursive: true });
 writeFileSync(
   new URL('../../../assets/weapons/fn-evolys-762/hand-reference.json', import.meta.url),
-  JSON.stringify(result, null, 2) + '\n'
+  JSON.stringify({ ...result, ...contacts }, null, 2) + '\n'
 );
 console.log('EVOLYS hand reference written; rebuild Blender actions after edits.');

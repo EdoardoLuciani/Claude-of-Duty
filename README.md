@@ -22,8 +22,9 @@ reads its plugin from `bunfig.toml`); packages are cached in `~/.bun/install/cac
 reinstalls are near-instant. Bun also runs the checked TypeScript asset orchestrator,
 world exporter, procedural-texture exporter, model staging and gltfpack cook, plus
 the remaining JavaScript world validator. Browser capture/profile entry points and
-the complete test suite also run on Bun. Node remains required for Oxlint's launcher
-and Blender soldier authoring.
+the complete test suite also run on Bun. The checked soldier authoring/cook pipeline
+and weapon hand-reference tools run on Bun too; Blender still owns geometry and clips.
+Node remains required for Oxlint's launcher.
 Runtime source, every `tests/**/*.ts` script, converted helpers and the migrated
 CLI tools use explicit `.ts` imports and share strict checking through
 `bun run typecheck`. Build entry points and tests have separate `build/tsconfig.json`

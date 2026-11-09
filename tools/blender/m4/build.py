@@ -64,7 +64,7 @@ def build(output, render=False, quick=False):
     manifest = {
         'asset': 'M4A1 Block II | RIS II FSP / MaTech / FH556RC / LMT SOPMOD',
         'units': 'metres', 'clips': clips, 'stats': stats, 'textureResolution': 1024,
-        'source': 'tools/blender/m4/build.py + tools/blender/m4/ + tools/blender/m4/hand-reference.mjs',
+        'source': 'tools/blender/m4/build.py + tools/blender/m4/ + tools/blender/m4/hand-reference.ts',
         'notes': [
             'Generated from Python; blend, GLB, maps and manifest are products.',
             'Visual reconstruction, not manufacturing geometry or a scan.',

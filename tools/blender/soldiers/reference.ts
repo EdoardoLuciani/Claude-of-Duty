@@ -6,7 +6,25 @@ import { fileURLToPath } from 'node:url';
 import { RIG, GRIP_R, GRIP_L, BORE_DIR, BORE_ORIGIN } from '../../../src/ai/rig.ts';
 import { VARIANTS, MATERIAL_SLOTS, SOLDIER_MATERIALS } from '../../../src/ai/soldier.ts';
 
-export function soldierReference() {
+export function soldierReference(): {
+  version: number;
+  rig: {
+    names: typeof RIG.names;
+    parent: typeof RIG.parent;
+    bindPos: number[][];
+    tail: number[][];
+    length: typeof RIG.length;
+    worldMatrices: number[][];
+    inverseBinds: number[][];
+    gripR: typeof GRIP_R;
+    gripL: typeof GRIP_L;
+    boreDir: typeof BORE_DIR;
+    boreOrigin: typeof BORE_ORIGIN;
+  };
+  variants: typeof VARIANTS;
+  slots: typeof MATERIAL_SLOTS;
+  materials: typeof SOLDIER_MATERIALS;
+} {
   const { bones, skeleton } = RIG.createSkeleton();
   try {
     return {
@@ -14,11 +32,11 @@ export function soldierReference() {
       rig: {
         names: RIG.names,
         parent: RIG.parent,
-        bindPos: RIG.bindPos.map((v) => v.toArray()),
-        tail: RIG.tail.map((v) => v.toArray()),
+        bindPos: RIG.bindPos.map((v): number[] => v.toArray()),
+        tail: RIG.tail.map((v): number[] => v.toArray()),
         length: RIG.length,
-        worldMatrices: bones.map((b) => b.matrixWorld.toArray()),
-        inverseBinds: skeleton.boneInverses.map((m) => m.toArray()),
+        worldMatrices: bones.map((b): number[] => b.matrixWorld.toArray()),
+        inverseBinds: skeleton.boneInverses.map((m): number[] => m.toArray()),
         gripR: GRIP_R,
         gripL: GRIP_L,
         boreDir: BORE_DIR,
@@ -36,7 +54,7 @@ export function soldierReference() {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const output = process.argv[2];
   if (!output || !path.isAbsolute(output))
-    throw new Error('Usage: node reference.mjs ABS_OUTPUT.json');
+    throw new Error('Usage: bun tools/blender/soldiers/reference.ts ABS_OUTPUT.json');
   fs.mkdirSync(path.dirname(output), { recursive: true });
   fs.writeFileSync(output, `${JSON.stringify(soldierReference(), null, 2)}\n`);
 }

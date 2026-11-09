@@ -1,14 +1,135 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 // Offline fitting inputs. Blender owns the resulting wrist/finger curves.
+import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { GLTFLoader, type GLTFLoaderPlugin } from 'three/addons/loaders/GLTFLoader.js';
 
+import { isRecord } from '../../../src/core/guards.ts';
+import { isSkinnedMesh } from '../../../src/core/three-guards.ts';
 import { Arm } from '../../../src/weapons/hands.ts';
-const loader = new GLTFLoader().register(() => ({
+import {
+  basis,
+  handPose,
+  type GripFrame,
+  type Side,
+  type HandPose,
+  type HandSideReference,
+  type GripOptions,
+} from '../hand-reference.ts';
+type Pose = HandPose & {
+  fingerSpread: number[];
+  thumbBase: THREE.Vector3Tuple;
+  fingerRoll?: number[];
+};
+type FingerPose = Pick<Pose, 'fingers' | 'fingerSpread'>;
+interface TimedPose {
+  t: number;
+  pose: Pose;
+}
+interface Reference {
+  grips: Record<Side, GripFrame>;
+  sides: Partial<Record<Side, Omit<HandSideReference, 'grip'> & { grip: Pose }>>;
+  rightRelease?: Array<{ t: number; pose: FingerPose }>;
+  rightIndexed?: Pose;
+  rightUnwrap?: TimedPose[];
+  rightOpen?: Pose;
+  release?: Array<TimedPose & { pos: number[] }>;
+  magazine?: {
+    pos: THREE.Vector3Tuple;
+    quaternion: THREE.QuaternionTuple;
+    pose: Pose;
+    open?: Pose;
+    grasp?: TimedPose[];
+  };
+  bolt?: { pos: THREE.Vector3Tuple; quaternion: THREE.QuaternionTuple; pose: Pose };
+}
+interface HoldingReference {
+  grips: { right: { pos: THREE.Vector3Tuple } };
+  sides: { right: { grip: Pose; quaternion: THREE.QuaternionTuple } };
+  rightIndexed: Pose;
+  rightOpen: Pose;
+  rightUnwrap: TimedPose[];
+  rightRelease: Array<{ t: number; pose: FingerPose }>;
+}
+interface SkinSamples {
+  mesh: THREE.SkinnedMesh;
+  ids: number[];
+  points: THREE.Vector3[];
+  faces: number[];
+  distal: Uint8Array;
+}
+type Gap = (point: THREE.Vector3) => number;
+function numbers(value: unknown): value is number[] {
+  return (
+    Array.isArray(value) &&
+    value.every((v: unknown): boolean => typeof v === 'number' && Number.isFinite(v))
+  );
+}
+function validateFingerPose(value: unknown): asserts value is FingerPose {
+  assert(
+    isRecord(value) &&
+      Array.isArray(value.fingers) &&
+      value.fingers.length > 0 &&
+      value.fingers.every((v: unknown): boolean => numbers(v) && v.length === 3) &&
+      numbers(value.fingerSpread),
+    'finger pose'
+  );
+}
+function validatePose(value: unknown): asserts value is Pose {
+  validateFingerPose(value);
+  assert(
+    value.fingers.length === 4 &&
+      'thumb' in value &&
+      numbers(value.thumb) &&
+      value.thumb.length === 2 &&
+      'thumbBase' in value &&
+      numbers(value.thumbBase) &&
+      value.thumbBase.length === 3 &&
+      value.fingerSpread.length === 4 &&
+      (!('fingerRoll' in value) || value.fingerRoll === undefined || numbers(value.fingerRoll)),
+    'complete hand pose'
+  );
+}
+function fittedPose(arm: Arm, name: string): Pose {
+  const pose = handPose(arm, name);
+  validatePose(pose);
+  return pose;
+}
+function validateHoldingReference(value: unknown): asserts value is HoldingReference {
+  assert(
+    isRecord(value) &&
+      isRecord(value.grips) &&
+      isRecord(value.grips.right) &&
+      numbers(value.grips.right.pos) &&
+      value.grips.right.pos.length === 3,
+    'holding wrist'
+  );
+  assert(
+    isRecord(value.sides) &&
+      isRecord(value.sides.right) &&
+      numbers(value.sides.right.quaternion) &&
+      value.sides.right.quaternion.length === 4,
+    'holding orientation'
+  );
+  validatePose(value.sides.right.grip);
+  validatePose(value.rightIndexed);
+  validatePose(value.rightOpen);
+  assert(Array.isArray(value.rightUnwrap) && value.rightUnwrap.length > 0, 'holding unwrap');
+  value.rightUnwrap.forEach((row: unknown): void => {
+    assert(isRecord(row) && typeof row.t === 'number' && Number.isFinite(row.t), 'unwrap station');
+    validatePose(row.pose);
+  });
+  assert(Array.isArray(value.rightRelease), 'index release');
+  value.rightRelease.forEach((row: unknown): void => {
+    assert(isRecord(row) && typeof row.t === 'number' && Number.isFinite(row.t), 'release station');
+    validateFingerPose(row.pose);
+  });
+}
+const loader = new GLTFLoader().register((): GLTFLoaderPlugin => ({
   name: 'OFFLINE_TEXTURE',
-  loadTexture: () => Promise.resolve(new THREE.Texture()),
+  loadTexture: (): Promise<THREE.Texture> => Promise.resolve(new THREE.Texture()),
 }));
 const bytes = readFileSync(new URL('../../../public/models/player/arms.glb', import.meta.url));
 const skin = await loader.parseAsync(
@@ -16,14 +137,15 @@ const skin = await loader.parseAsync(
   ''
 );
 skin.scene.updateMatrixWorld(true);
-const meshes = [];
-skin.scene.traverse((o) => {
-  if (o.isSkinnedMesh) meshes.push(o);
+const meshes: THREE.SkinnedMesh[] = [];
+skin.scene.traverse((o): void => {
+  if (isSkinnedMesh(o)) meshes.push(o);
 });
 // Refine the initial joint-axis fit against Blender's real glove vertices.
 // A finger-centre proxy alone misses the thick suede/knuckle silhouette.
-function skinSamples(arm, prefix, distalWeight = 0.025) {
-  const groups = [];
+function skinSamples(arm: Arm, prefix: string, distalWeight = 0.025): SkinSamples[] {
+  assert(arm.skeleton, 'bound arm skeleton');
+  const groups: SkinSamples[] = [];
   for (const mesh of arm.skins) {
     const indices = mesh.geometry.attributes.skinIndex,
       weights = mesh.geometry.attributes.skinWeight;
@@ -37,8 +159,9 @@ function skinSamples(arm, prefix, distalWeight = 0.025) {
           if (name.startsWith('thumb_1') && weights.getComponent(v, k) > distalWeight)
             distal[v] = 1;
         }
-    const faces = [],
-      used = new Set();
+    const faces: number[] = [],
+      used = new Set<number>();
+    assert(mesh.geometry.index, 'indexed arm skin');
     const index = mesh.geometry.index.array;
     for (let i = 0; i < index.length; i += 3) {
       const a = index[i],
@@ -51,7 +174,7 @@ function skinSamples(arm, prefix, distalWeight = 0.025) {
       used.add(c);
     }
     const ids = [...used],
-      points = [];
+      points: THREE.Vector3[] = [];
     for (const id of ids) points[id] = new THREE.Vector3();
     if (ids.length) groups.push({ mesh, ids, points, faces, distal });
   }
@@ -59,19 +182,19 @@ function skinSamples(arm, prefix, distalWeight = 0.025) {
 }
 const samplePoint = new THREE.Vector3();
 function skinCost(
-  arm,
-  groups,
-  signedGap,
-  contact,
+  arm: Arm,
+  groups: SkinSamples[],
+  signedGap: Gap,
+  contact: boolean,
   tipOnly = false,
   contactGap = signedGap,
   contactSide = 0
-) {
+): number {
   arm.updateFlex();
   arm.root.updateMatrixWorld(true);
   let error = 0,
     nearest = Infinity;
-  function measure(point, distal) {
+  function measure(point: THREE.Vector3, distal: number | boolean): void {
     const gap = signedGap(point);
     error += Math.max(0, -0.0003 - gap) ** 2 * 1000;
     if (contact && (!tipOnly || distal) && (!contactSide || point.x * contactSide > 0.01))
@@ -107,19 +230,19 @@ function skinCost(
   return error + (contact ? Math.max(0, nearest - 0.001) ** 2 * (contactSide ? 100 : 10) : 0);
 }
 function refineFingers(
-  arm,
-  pose,
-  signedGap,
+  arm: Arm,
+  pose: Pose,
+  signedGap: Gap,
   contact = true,
   first = 0,
   last = 4,
   contactGap = signedGap,
   minimumCurl = -1.95
-) {
+): void {
   for (let i = first; i < last; i++) {
     const groups = skinSamples(arm, `finger_${i}_`),
       joints = arm.fingers[i].joints;
-    const cost = () => skinCost(arm, groups, signedGap, contact, false, contactGap);
+    const cost = (): number => skinCost(arm, groups, signedGap, contact, false, contactGap);
     for (let pass = 0; pass < (last === 1 ? 8 : 6); pass++)
       for (let j = 0; j < (last === 1 ? 4 : 3); j++) {
         const rotation = j === 3 ? arm.fingers[i].root.rotation : joints[j].rotation,
@@ -148,24 +271,25 @@ function refineFingers(
   }
 }
 function refineThumb(
-  arm,
-  pose,
-  signedGap,
+  arm: Arm,
+  pose: Pose,
+  signedGap: Gap,
   contact = true,
   contactGap = signedGap,
   contactSide = 0
-) {
+): void {
   const groups = skinSamples(arm, 'thumb_', contactSide ? 0.2 : 0.025);
   const root = arm.thumb.root.rotation,
     joints = arm.thumb.joints;
-  const params = [
+  const params: Array<[THREE.Euler, 'x' | 'y' | 'z']> = [
     [root, 'x'],
     [root, 'y'],
     [root, 'z'],
     [joints[0].rotation, 'x'],
     [joints[1].rotation, 'x'],
   ];
-  const cost = () => skinCost(arm, groups, signedGap, contact, true, contactGap, contactSide);
+  const cost = (): number =>
+    skinCost(arm, groups, signedGap, contact, true, contactGap, contactSide);
   for (let pass = 0; pass < 6; pass++)
     for (const [rotation, axis] of params) {
       const center = rotation[axis],
@@ -182,10 +306,10 @@ function refineThumb(
       }
       rotation[axis] = best;
     }
-  pose.thumbBase = root.toArray().slice(0, 3);
-  pose.thumb = joints.map((j) => -j.rotation.x);
+  pose.thumbBase = [root.x, root.y, root.z];
+  pose.thumb = joints.map((j): number => -j.rotation.x);
 }
-function foreendGap(p) {
+function foreendGap(p: THREE.Vector3): number {
   const x = Math.abs(p.x),
     y = Math.abs(p.y - 0.075);
   let gap = Math.max(x - 0.027, y - 0.026, (x + y - 0.04) / Math.SQRT2);
@@ -202,21 +326,24 @@ function foreendGap(p) {
     );
   return gap;
 }
-const basis = (finger, back) => {
-  const z = new THREE.Vector3(...finger).negate().normalize();
-  const y = new THREE.Vector3(...back)
-    .addScaledVector(z, -new THREE.Vector3(...back).dot(z))
-    .normalize();
-  return new THREE.Quaternion().setFromRotationMatrix(
-    new THREE.Matrix4().makeBasis(new THREE.Vector3().crossVectors(y, z), y, z)
-  );
-};
+
 // Generated from the actual curved mesh samples. Export geometry before this
 // offline solve after changing grip-profile.json; runtime never evaluates it.
-const pistolSections = JSON.parse(
-  readFileSync(new URL('../../../assets/weapons/ax338/manifest.json', import.meta.url))
-).contactGeometry.pistolGripSections;
-function pistolGap(p) {
+const manifest: unknown = JSON.parse(
+  readFileSync(new URL('../../../assets/weapons/ax338/manifest.json', import.meta.url), 'utf8')
+);
+assert(isRecord(manifest) && isRecord(manifest.contactGeometry), 'AX338 contact geometry');
+function parseSections(value: unknown): number[][] {
+  assert(
+    Array.isArray(value) &&
+      value.length >= 2 &&
+      value.every((row: unknown): row is number[] => numbers(row) && row.length === 4),
+    'AX338 pistol grip sections'
+  );
+  return value;
+}
+const pistolSections = parseSections(manifest.contactGeometry.pistolGripSections);
+function pistolGap(p: THREE.Vector3): number {
   let i = 0;
   while (i < pistolSections.length - 2 && p.y < pistolSections[i + 1][0]) i++;
   const a = pistolSections[i],
@@ -229,10 +356,10 @@ function pistolGap(p) {
   return Math.max(
     (Math.hypot(p.x / (w + wrap), (p.z - z) / (d + wrap)) - 1) * Math.min(w, d),
     p.y - pistolSections[0][0],
-    pistolSections.at(-1)[0] - p.y
+    pistolSections[pistolSections.length - 1][0] - p.y
   );
 }
-function polygonGap(p, poly, width) {
+function polygonGap(p: THREE.Vector3, poly: number[][], width: number): number {
   let inside = false,
     distance = Infinity;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
@@ -251,7 +378,14 @@ function polygonGap(p, poly, width) {
   }
   return Math.max((inside ? -1 : 1) * Math.sqrt(distance), Math.abs(p.x) - width / 2);
 }
-function roundedGap(p, z0, z1, y0, y1, r) {
+function roundedGap(
+  p: THREE.Vector3,
+  z0: number,
+  z1: number,
+  y0: number,
+  y1: number,
+  r: number
+): number {
   const x = Math.abs(p.z - (z0 + z1) / 2) - (z1 - z0) / 2 + r,
     y = Math.abs(p.y - (y0 + y1) / 2) - (y1 - y0) / 2 + r;
   return Math.hypot(Math.max(x, 0), Math.max(y, 0)) + Math.min(Math.max(x, y), 0) - r;
@@ -287,7 +421,7 @@ const triggerProfile = [
   [0.021, 0.016],
   [0.021, 0.026],
 ];
-function firingClearance(p) {
+function firingClearance(p: THREE.Vector3): number {
   // Conservative broad phase: all of these obstacles fit inside these bounds.
   // Most distal samples are below the guard or lateral to the entire rifle.
   if (Math.abs(p.x) > 0.025) return 0.1;
@@ -307,14 +441,14 @@ function firingClearance(p) {
     polygonGap(p, triggerProfile, 0.005) - 0.0015
   );
 }
-const grips = {
+const grips: Record<Side, GripFrame> = {
   right: { pos: [0.044, -0.021, 0.114], finger: [0.06, 0.04, -0.997], back: [1, 0.03, 0.04] },
   // Support under the moulded panels, within actual hip/ADS arm reach.
   left: { pos: [-0.069, 0.002, -0.205], finger: [0.76, -0.1, -0.64], back: [-0.13, -0.985, 0.001] },
 };
 // Authored holding pose, checked against saved glove skins and neighbouring
 // fingers. Preserve approved wrist/index/thumb; no runtime fitting is added.
-function fitHoldingHand(result) {
+function fitHoldingHand(result: HoldingReference): void {
   const held = result.sides.right.grip;
   held.fingers.splice(1, 3, [2.2625, 0.165, 0.12], [2.15, 0.61, 0.025], [2.45, 0.1, 0.3]);
   held.fingerSpread.splice(1, 3, -0.2025, -0.4, -0.25);
@@ -355,7 +489,7 @@ function fitHoldingHand(result) {
       arm.poses.releaseHolding = row.pose;
       arm.setPose('releaseHolding');
       for (let i = 1; i < 4; i++) arm.fingers[i].root.rotation.z = row.pose.fingerRoll[i];
-      const clearance = (p) =>
+      const clearance = (p: THREE.Vector3): number =>
         Math.min(
           firingClearance(p),
           pistolGap(p) - 0.0025,
@@ -368,10 +502,12 @@ function fitHoldingHand(result) {
       refineFingers(arm, row.pose, clearance, false, 1, 4, clearance, -2.6);
     }
   }
-  result.rightOpen = structuredClone(result.rightUnwrap.at(-1).pose);
+  const finalUnwrap = result.rightUnwrap.at(-1);
+  assert(finalUnwrap);
+  result.rightOpen = structuredClone(finalUnwrap.pose);
 }
 const out = new URL('../../../assets/weapons/ax338/', import.meta.url);
-function writeReference(result) {
+function writeReference(result: HoldingReference): void {
   // release_right() keys only the index. Other controls are unused payload;
   // rightIndexed/rightOpen retain the complete poses needed by full pose keys.
   for (const row of result.rightRelease)
@@ -379,7 +515,8 @@ function writeReference(result) {
   writeFileSync(new URL('hand-reference.json', out), JSON.stringify(result, null, 2) + '\n');
 }
 if (process.argv.includes('--holding-only')) {
-  const result = JSON.parse(readFileSync(new URL('hand-reference.json', out)));
+  const result: unknown = JSON.parse(readFileSync(new URL('hand-reference.json', out), 'utf8'));
+  validateHoldingReference(result);
   fitHoldingHand(result);
   writeReference(result);
   console.log(
@@ -387,8 +524,9 @@ if (process.argv.includes('--holding-only')) {
   );
   process.exit(0);
 }
-const result = { grips, sides: {} };
-for (const [side, g] of Object.entries(grips)) {
+const result: Reference = { grips, sides: {} };
+for (const side of ['right', 'left'] as const) {
+  const g = grips[side];
   const arm = new Arm(side === 'left' ? -1 : 1, { scale: side === 'left' ? 0.97 : 1 });
   arm.attachAsset({ meshes });
   arm.hand.position.fromArray(g.pos);
@@ -407,25 +545,25 @@ for (const [side, g] of Object.entries(grips)) {
   );
   arm.setPose('ax338');
   if (side === 'left') {
-    refineFingers(arm, arm.poses.ax338, foreendGap);
-    refineThumb(arm, arm.poses.ax338, foreendGap);
+    refineFingers(arm, fittedPose(arm, 'ax338'), foreendGap);
+    refineThumb(arm, fittedPose(arm, 'ax338'), foreendGap);
   }
   if (side === 'right') {
     // Fit the index around the aperture, the holding fingers against the grip,
     // and the thumb around the new housing; account for actual padded skins.
-    refineFingers(arm, arm.poses.ax338, firingClearance, false, 0, 1);
-    refineFingers(arm, arm.poses.ax338, firingClearance, true, 1, 4, pistolGap);
-    refineThumb(arm, arm.poses.ax338, firingClearance, true, pistolGap, -1);
+    refineFingers(arm, fittedPose(arm, 'ax338'), firingClearance, false, 0, 1);
+    refineFingers(arm, fittedPose(arm, 'ax338'), firingClearance, true, 1, 4, pistolGap);
+    refineThumb(arm, fittedPose(arm, 'ax338'), firingClearance, true, pistolGap, -1);
   }
   result.sides[side] = {
     quaternion: arm.hand.quaternion.toArray(),
-    grip: structuredClone(arm.poses.ax338),
+    grip: structuredClone(fittedPose(arm, 'ax338')),
   };
   if (side === 'right') {
     // Unhook at MCP first, then unfold the distal joints. Independent linear
     // curl blends sweep the fingertip through the shallow guard's front wall.
     result.rightRelease = [];
-    const start = structuredClone(arm.poses.ax338),
+    const start = structuredClone(fittedPose(arm, 'ax338')),
       indexSamples = skinSamples(arm, 'finger_0_');
     for (let step = 0; step <= 20; step++) {
       const t = step / 20,
@@ -446,7 +584,10 @@ for (const [side, g] of Object.entries(grips)) {
         refineFingers(arm, pose, firingClearance, false, 0, 1);
       result.rightRelease.push({ t, pose });
     }
-    result.rightIndexed = structuredClone(result.rightRelease.at(-1).pose);
+    const finalRelease = result.rightRelease.at(-1);
+    assert(finalRelease);
+    validatePose(finalRelease.pose);
+    result.rightIndexed = structuredClone(finalRelease.pose);
     result.rightUnwrap = [];
     const held = structuredClone(result.rightIndexed),
       holdingSamples = skinSamples(arm, '');
@@ -462,7 +603,7 @@ for (const [side, g] of Object.entries(grips)) {
             j === 0 ? 0.15 : 0.2,
             j === 0 ? first : second
           );
-      pose.thumb = held.thumb.map((v) => THREE.MathUtils.lerp(v, 0.15, t));
+      pose.thumb = held.thumb.map((v): number => THREE.MathUtils.lerp(v, 0.15, t));
       arm.poses.unwrap = pose;
       arm.setPose('unwrap');
       if (step > 0 && skinCost(arm, holdingSamples, firingClearance, false) > 1e-8) {
@@ -471,11 +612,13 @@ for (const [side, g] of Object.entries(grips)) {
       }
       result.rightUnwrap.push({ t, pose });
     }
-    result.rightOpen = structuredClone(result.rightUnwrap.at(-1).pose);
+    const finalUnwrap = result.rightUnwrap.at(-1);
+    assert(finalUnwrap);
+    result.rightOpen = structuredClone(finalUnwrap.pose);
   }
   if (side === 'left') {
     result.release = [];
-    const start = structuredClone(arm.poses.ax338),
+    const start = structuredClone(fittedPose(arm, 'ax338')),
       end = structuredClone(start);
     end.fingers = [
       [0.15, 0.25, 0.18],
@@ -494,7 +637,7 @@ for (const [side, g] of Object.entries(grips)) {
         pose.thumb[j] = THREE.MathUtils.lerp(start.thumb[j], end.thumb[j], t);
       arm.poses.release = pose;
       arm.setPose('release');
-      const pos = g.pos.map((v, i) => v + (i < 2 ? -0.06 * t : 0));
+      const pos = g.pos.map((v, i): number => v + (i < 2 ? -0.06 * t : 0));
       arm.hand.position.fromArray(pos);
       refineFingers(arm, pose, foreendGap, false);
       refineThumb(arm, pose, foreendGap, false);
@@ -502,17 +645,28 @@ for (const [side, g] of Object.entries(grips)) {
     }
   }
 }
-function contact(side, pos, finger, back, target, name) {
+function contact(
+  side: Side,
+  pos: THREE.Vector3Tuple,
+  finger: THREE.Vector3Tuple,
+  back: THREE.Vector3Tuple,
+  target: GripOptions,
+  name: string
+): NonNullable<Reference['bolt']> {
   const arm = new Arm(side === 'left' ? -1 : 1, { scale: side === 'left' ? 0.97 : 1 });
   arm.hand.position.fromArray(pos);
   arm.hand.quaternion.copy(basis(finger, back));
   arm.setPose('wrap');
   arm.fitGrip(name, target);
-  return { pos, quaternion: arm.hand.quaternion.toArray(), pose: structuredClone(arm.poses[name]) };
+  return {
+    pos,
+    quaternion: arm.hand.quaternion.toArray(),
+    pose: structuredClone(fittedPose(arm, name)),
+  };
 }
 // Four fingers wrap the exposed lower body; thumb opposes them across the
 // short axis. The old wrist put finger roots at the receiver, above the grip.
-const magPos = [-0.039, -0.05, 0.026];
+const magPos: THREE.Vector3Tuple = [-0.039, -0.05, 0.026];
 const magQ = basis([0, -0.04, -1], [-1, -0.25, 0]);
 const magArm = new Arm(-1, { scale: 0.97 });
 magArm.attachAsset({ meshes });
@@ -525,7 +679,7 @@ const envelope = new THREE.Box3(
 );
 const point = new THREE.Vector3(),
   near = new THREE.Vector3();
-function gap(joint, local) {
+function gap(joint: THREE.Object3D, local: number[]): number {
   joint.updateWorldMatrix(true, false);
   point.fromArray(local).applyMatrix4(joint.matrixWorld);
   envelope.clampPoint(point, near);
@@ -580,7 +734,7 @@ const floor = new THREE.Box3(
   new THREE.Vector3(-0.019, -0.0435, -0.1285),
   new THREE.Vector3(0.019, -0.0385, -0.0215)
 );
-function boxGap(box, p) {
+function boxGap(box: THREE.Box3, p: THREE.Vector3): number {
   box.clampPoint(p, near);
   return box.containsPoint(p)
     ? -Math.min(
@@ -593,8 +747,8 @@ function boxGap(box, p) {
       )
     : p.distanceTo(near);
 }
-const magGap = (p) => Math.min(boxGap(envelope, p), boxGap(floor, p));
-refineFingers(magArm, magArm.poses.magazine, magGap);
+const magGap = (p: THREE.Vector3): number => Math.min(boxGap(envelope, p), boxGap(floor, p));
+refineFingers(magArm, fittedPose(magArm, 'magazine'), magGap);
 const rear = new THREE.Box3(
   new THREE.Vector3(-0.023, -0.008, -0.023),
   new THREE.Vector3(0.023, 0.062, 0.022)
@@ -603,12 +757,13 @@ const guard = new THREE.Box3(
   new THREE.Vector3(-0.016, -0.025, -0.012),
   new THREE.Vector3(0.016, 0.06, 0.077)
 );
-const magClearance = (p) => Math.min(magGap(p), boxGap(rear, p), boxGap(guard, p));
-refineThumb(magArm, magArm.poses.magazine, magClearance, true, magGap, 1);
+const magClearance = (p: THREE.Vector3): number =>
+  Math.min(magGap(p), boxGap(rear, p), boxGap(guard, p));
+refineThumb(magArm, fittedPose(magArm, 'magazine'), magClearance, true, magGap, 1);
 result.magazine = {
   pos: magPos,
   quaternion: magQ.toArray(),
-  pose: structuredClone(magArm.poses.magazine),
+  pose: structuredClone(fittedPose(magArm, 'magazine')),
 };
 magArm.setPose('magazine');
 magArm.fitGrip('magazineOpen', {
@@ -622,9 +777,9 @@ magArm.fitGrip('magazineOpen', {
   thumbPole: [0, 0, 1],
 });
 magArm.setPose('magazineOpen');
-refineFingers(magArm, magArm.poses.magazineOpen, magGap, false);
-refineThumb(magArm, magArm.poses.magazineOpen, magClearance, false);
-result.magazine.open = structuredClone(magArm.poses.magazineOpen);
+refineFingers(magArm, fittedPose(magArm, 'magazineOpen'), magGap, false);
+refineThumb(magArm, fittedPose(magArm, 'magazineOpen'), magClearance, false);
+result.magazine.open = structuredClone(fittedPose(magArm, 'magazineOpen'));
 result.magazine.grasp = [];
 const open = result.magazine.open,
   closed = result.magazine.pose;
@@ -636,10 +791,8 @@ for (let step = 0; step <= 16; step++) {
   for (let i = 0; i < 4; i++)
     for (let j = 0; j < 3; j++)
       pose.fingers[i][j] = THREE.MathUtils.lerp(open.fingers[i][j], closed.fingers[i][j], t);
-  pose.thumbBase = new THREE.Euler()
-    .setFromQuaternion(openQ.clone().slerp(closedQ, t))
-    .toArray()
-    .slice(0, 3);
+  const rotation = new THREE.Euler().setFromQuaternion(openQ.clone().slerp(closedQ, t));
+  pose.thumbBase = [rotation.x, rotation.y, rotation.z];
   for (let j = 0; j < 2; j++)
     pose.thumb[j] = THREE.MathUtils.lerp(open.thumb[j], closed.thumb[j], t);
   magArm.poses.squeeze = pose;
@@ -656,6 +809,7 @@ result.bolt = contact(
   { index: [0.069, 0.049, 0.057], thumb: [0.055, 0.06, 0.056], thumbPole: [1, 0, 0] },
   'bolt'
 );
+validateHoldingReference(result);
 fitHoldingHand(result);
 mkdirSync(out, { recursive: true });
 writeReference(result);

@@ -9,7 +9,7 @@
 - `export.py`: ordinary joins/native Actions; `studio.py`: fixed review setup.
 
 Hand calibration and shared review arms are read-only; refit separately with
-`node tools/blender/m4/hand-reference.mjs`. Save the editable four-map preview
+`bun tools/blender/m4/hand-reference.ts`. Save the editable four-map preview
 before export preparation. Preserve the smart-project/checkering atlas, not MCX UVs.
 Motion uses the 120 Hz lattice with LINEAR motion and CONSTANT/STEP visibility;
 Draw holds frame 75 at its exact 74.4-frame/.620 s endpoint. Keep explicit TRS

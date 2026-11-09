@@ -135,7 +135,7 @@ export async function loadArmAsset(): Promise<ArmAsset> {
 }
 
 /** Rebind Blender weights to the gameplay contact rig in its neutral pose. */
-export function bindArmAsset(arm: Arm, asset: ArmAsset): void {
+export function bindArmAsset(arm: Arm, asset: Pick<ArmAsset, 'meshes'>): void {
   const controls = arm.controls;
   const oldPose = arm.pose;
   arm.upperPivot.position.set(0, 0, 0.63 * arm.scale);

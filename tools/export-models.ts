@@ -21,7 +21,7 @@ import {
   loadCommittedSoldiers,
   soldierInputPaths,
   soldierProductPaths,
-} from './blender/soldiers/export.mjs';
+} from './blender/soldiers/export.ts';
 import { exportGlb } from './lib/export-glb.ts';
 import { buildSpentHull } from './lib/spent-hull.mjs';
 

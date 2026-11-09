@@ -11,41 +11,62 @@ import { parseArgs } from 'node:util';
 import { REVISION } from 'three';
 
 import { VARIANTS } from '../../../src/ai/soldier.ts';
-import { cookSoldier, validateMetadata } from './cook.mjs';
-import { soldierReference } from './reference.mjs';
+import { isRecord } from '../../../src/core/guards.ts';
+import type { SoldierMetadata } from '../../../src/core/model-metadata.ts';
+import { cookSoldier, validateMetadata } from './cook.ts';
+import { soldierReference } from './reference.ts';
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 export const ASSET_ROOT = path.join(ROOT, 'assets/soldiers');
 export const DEFAULT_SEED = 0x5eed1234;
 export const SOURCE_INPUTS = Object.freeze([
   'tools/blender/soldiers/build.py',
-  'tools/blender/soldiers/reference.mjs',
-  'tools/blender/soldiers/cook.mjs',
-  'tools/blender/soldiers/export.mjs',
+  'tools/blender/soldiers/reference.ts',
+  'tools/blender/soldiers/cook.ts',
+  'tools/blender/soldiers/export.ts',
   'src/ai/rig.ts',
   'src/ai/soldier.ts',
   'src/ai/textures.ts', // CLOTH_TILE is the only external material calibration.
+  'src/core/guards.ts',
+  'src/core/model-metadata.ts',
+  'tools/lib/export-glb.ts',
 ]);
+interface SoldierManifest {
+  version: number;
+  seed: number;
+  inputHash: string;
+  blenderVersion: string;
+  threeRevision: string;
+  files: Record<string, string>;
+}
+interface SoldierProduct {
+  name: string;
+  glb: Buffer;
+  json: Buffer;
+  meta: SoldierMetadata;
+}
 const NAMES = Object.keys(VARIANTS);
 export const BLENDER_VERSION = '5.2.2';
-const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
+const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 // Git may check text out with CRLF; unchanged source/JSON must not require Blender.
-export const canonicalText = (bytes) => Buffer.from(bytes.toString('utf8').replace(/\r\n/g, '\n'));
+export const canonicalText = (bytes: Buffer): Buffer =>
+  Buffer.from(bytes.toString('utf8').replace(/\r\n/g, '\n'));
 
 /** Absolute paths for the parent's cache dependency list; no file access or spawn. */
-export function soldierInputPaths(root = ROOT) {
-  return SOURCE_INPUTS.map((file) => path.join(root, file));
+export function soldierInputPaths(root = ROOT): string[] {
+  return SOURCE_INPUTS.map((file): string => path.join(root, file));
 }
 
 /** Runtime inputs only: normal builds neither read nor hash the large .blend files. */
-export function soldierProductPaths(directory = ASSET_ROOT) {
-  return ['manifest.json', ...NAMES.flatMap((name) => [`${name}.glb`, `${name}.json`])].map(
-    (file) => path.join(directory, file)
-  );
+export function soldierProductPaths(directory = ASSET_ROOT): string[] {
+  return [
+    'manifest.json',
+    ...NAMES.flatMap((name): string[] => [`${name}.glb`, `${name}.json`]),
+  ].map((file): string => path.join(directory, file));
 }
 
 /** LF source text + portable relative names + Three revision, never computed float JSON. */
-export function soldierInputHash(root = ROOT) {
+export function soldierInputHash(root = ROOT): string {
   const hash = createHash('sha256').update(`soldiers-v1\0three:${REVISION}\0`);
   for (const file of SOURCE_INPUTS)
     hash
@@ -56,7 +77,7 @@ export function soldierInputHash(root = ROOT) {
   return hash.digest('hex');
 }
 
-export function validateGLB(glb) {
+export function validateGLB(glb: unknown): asserts glb is Buffer {
   assert(Buffer.isBuffer(glb) && glb.length >= 12, 'GLB header');
   assert.equal(glb.readUInt32LE(0), 0x46546c67, 'GLB magic');
   assert.equal(glb.readUInt32LE(4), 2, 'GLB version');
@@ -64,47 +85,55 @@ export function validateGLB(glb) {
   assert.equal(glb.length % 4, 0, 'GLB alignment');
 }
 
-/** Missing/stale/corrupt products fail; this reader never invokes Blender.
- * @returns {Array<{ name: string, glb: Buffer, json: Buffer, meta: import('../../../src/core/model-metadata.ts').SoldierMetadata }>}
- */
-export function loadCommittedSoldiers(directory = ASSET_ROOT) {
+/** Missing/stale/corrupt products fail; this reader never invokes Blender. */
+export function loadCommittedSoldiers(directory = ASSET_ROOT): SoldierProduct[] {
   try {
-    const manifest = JSON.parse(fs.readFileSync(path.join(directory, 'manifest.json'), 'utf8'));
+    const manifest: unknown = JSON.parse(
+      fs.readFileSync(path.join(directory, 'manifest.json'), 'utf8')
+    );
+    assert(isRecord(manifest), 'soldier manifest object');
     assert.equal(manifest.version, 1, 'manifest version');
     assert(
-      Number.isInteger(manifest.seed) && manifest.seed >= 0 && manifest.seed <= 0xffffffff,
+      typeof manifest.seed === 'number' &&
+        Number.isInteger(manifest.seed) &&
+        manifest.seed >= 0 &&
+        manifest.seed <= 0xffffffff,
       'manifest uint32 seed'
     );
     assert.equal(manifest.inputHash, soldierInputHash(), 'stale source input hash');
     assert.equal(manifest.blenderVersion, BLENDER_VERSION, 'manifest Blender version');
     assert.equal(manifest.threeRevision, REVISION, 'manifest Three revision');
-    const files = NAMES.flatMap((name) => ['blend', 'glb', 'json'].map((ext) => `${name}.${ext}`));
+    const files = NAMES.flatMap((name): string[] =>
+      ['blend', 'glb', 'json'].map((ext): string => `${name}.${ext}`)
+    );
+    assert(isRecord(manifest.files), 'soldier manifest files');
+    const products = manifest.files;
     assert.deepEqual(
       Object.keys(manifest.files).sort(),
       files.sort(),
       'complete exact soldier catalog'
     );
-    for (const hash of Object.values(manifest.files))
-      assert(/^[a-f0-9]{64}$/.test(hash), 'product SHA256');
-    return NAMES.map((name) => {
+    for (const hash of Object.values(products))
+      assert(typeof hash === 'string' && /^[a-f0-9]{64}$/.test(hash), 'product SHA256');
+    return NAMES.map((name): SoldierProduct => {
       const glb = fs.readFileSync(path.join(directory, `${name}.glb`));
       const json = canonicalText(fs.readFileSync(path.join(directory, `${name}.json`)));
-      assert.equal(sha256(glb), manifest.files[`${name}.glb`], `${name} GLB hash`);
-      assert.equal(sha256(json), manifest.files[`${name}.json`], `${name} metadata hash`);
+      assert.equal(sha256(glb), products[`${name}.glb`], `${name} GLB hash`);
+      assert.equal(sha256(json), products[`${name}.json`], `${name} metadata hash`);
       validateGLB(glb);
-      const meta = JSON.parse(json.toString('utf8'));
+      const meta: unknown = JSON.parse(json.toString('utf8'));
       validateMetadata(meta, name);
       return { name, glb, json, meta };
     });
   } catch (cause) {
     throw new Error(
-      `Invalid committed soldiers in ${directory}: ${cause.message}. Regenerate: node tools/blender/soldiers/export.mjs --output ${directory}`,
+      `Invalid committed soldiers in ${directory}: ${cause instanceof Error ? cause.message : String(cause)}. Regenerate: bun tools/blender/soldiers/export.ts --output ${directory}`,
       { cause }
     );
   }
 }
 
-function run(blender, args) {
+function run(blender: string, args: string[]): string {
   const result = spawnSync(blender, args, { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
   if (result.error || result.status !== 0) {
     throw new Error(
@@ -114,7 +143,7 @@ function run(blender, args) {
   return result.stdout;
 }
 
-function atomicWrite(file, bytes) {
+function atomicWrite(file: string, bytes: string | Uint8Array): void {
   const temporary = `${file}.tmp-${randomUUID()}`;
   try {
     fs.writeFileSync(temporary, bytes, { flag: 'wx' });
@@ -129,14 +158,18 @@ export async function exportSoldiers({
   output,
   seed = DEFAULT_SEED,
   blender = process.env.BLENDER ?? 'blender',
-}) {
+}: {
+  output: string | undefined;
+  seed?: number | undefined;
+  blender?: string | undefined;
+}): Promise<SoldierManifest> {
   assert(typeof output === 'string' && path.isAbsolute(output), '--output must be absolute');
   assert(Number.isInteger(seed) && seed >= 0 && seed <= 0xffffffff, 'seed must be uint32');
   fs.mkdirSync(output, { recursive: true });
   const marker = path.join(output, 'manifest.json');
   // A failed authoring attempt must not leave a success marker for the new family.
   fs.rmSync(marker, { force: true });
-  let temporary;
+  let temporary: string | undefined;
   try {
     const version = run(blender, ['--version']).split('\n')[0].trim();
     assert(
@@ -147,7 +180,7 @@ export async function exportSoldiers({
     temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'cod-soldiers-'));
     const reference = path.join(temporary, 'reference.json');
     fs.writeFileSync(reference, JSON.stringify(soldierReference()));
-    const manifest = {
+    const manifest: SoldierManifest = {
       version: 1,
       seed,
       inputHash,
@@ -176,13 +209,16 @@ export async function exportSoldiers({
         '--seed',
         String(seed),
       ]);
-      const data = JSON.parse(fs.readFileSync(path.join(directory, `${name}.mesh.json`), 'utf8'));
+      const data: unknown = JSON.parse(
+        fs.readFileSync(path.join(directory, `${name}.mesh.json`), 'utf8')
+      );
+      assert(isRecord(data), 'authoring payload object');
       assert.equal(data.name, name, 'authoring variant');
       assert.equal(data.seed, seed, 'authoring seed');
       const { glb, meta } = await cookSoldier(data);
       validateGLB(glb);
       fs.writeFileSync(path.join(directory, `${name}.glb`), glb);
-      // Match the existing Node exporter metadata bytes (no trailing newline).
+      // Preserve canonical metadata bytes (no trailing newline).
       fs.writeFileSync(path.join(directory, `${name}.json`), JSON.stringify(meta, null, 2));
       for (const ext of ['blend', 'glb', 'json']) {
         const file = `${name}.${ext}`;
