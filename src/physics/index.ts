@@ -86,10 +86,6 @@ interface ExplosionEvent {
   impulse?: number;
 }
 
-function isCollisionMesh(object: THREE.Object3D): object is THREE.Mesh | THREE.InstancedMesh {
-  return object instanceof THREE.Mesh;
-}
-
 function makePublicHit(): PhysicsHit {
   return {
     hit: false,
@@ -213,20 +209,6 @@ export class Collider {
     this.az = this.bz = z;
     if (r !== undefined) this.radius = r;
     this.shape = 'sphere';
-    return this;
-  }
-
-  /** Box proxy driven by an Object3D's world matrix. */
-  setFromObject(obj: THREE.Object3D, hx?: number, hy?: number, hz?: number): this {
-    obj.updateWorldMatrix(true, false);
-    this.matrix.copy(obj.matrixWorld);
-    this.inverse.copy(this.matrix).invert();
-    if (hx !== undefined && hy !== undefined && hz !== undefined) {
-      this.hx = hx;
-      this.hy = hy;
-      this.hz = hz;
-    }
-    this.shape = 'box';
     return this;
   }
 
@@ -391,38 +373,6 @@ export class PhysicsSystem {
     const id = this.staticWorld.addMesh(mesh, surfaceType, mask, opts);
     if (id >= 0) this._explicitStatics++;
     return id;
-  }
-
-  /** Register every Mesh under an Object3D. Returns the handle list. */
-  addStaticGroup(
-    root: THREE.Object3D,
-    surfaceType?: SurfaceName | number,
-    opts: StaticOptions = {}
-  ): number[] {
-    const ids: number[] = [];
-    root.updateWorldMatrix(true, true);
-    const registered = this._explicitStatics;
-    try {
-      root.traverse((o: THREE.Object3D): void => {
-        if (!isCollisionMesh(o)) return;
-        if (o.userData.collision === false || o.userData.noCollision) return;
-        const metadataSurface: unknown = o.userData.surface;
-        const resolvedSurface =
-          surfaceType === undefined
-            ? metadataSurface === undefined
-              ? undefined
-              : surfaceIndex(metadataSurface)
-            : surfaceType;
-        const id = this.addStatic(o, resolvedSurface, opts);
-        if (id >= 0) ids.push(id);
-      });
-    } catch (error) {
-      // A failed group returns no handles: do not leave unreachable partial registrations.
-      for (let i = ids.length - 1; i >= 0; i--) this.removeStatic(ids[i]);
-      this._explicitStatics = registered;
-      throw error;
-    }
-    return ids;
   }
 
   removeStatic(handle: number | THREE.Mesh | THREE.InstancedMesh): boolean {

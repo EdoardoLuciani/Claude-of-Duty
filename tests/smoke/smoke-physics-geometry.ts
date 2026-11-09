@@ -19,6 +19,7 @@ import {
 import { Ragdoll, humanoidSpec } from '../../src/physics/ragdoll.ts';
 import { RigidBody, RigidBodyWorld } from '../../src/physics/rigidbody.ts';
 import { LAYER, MASK } from '../../src/physics/surfaces.ts';
+import { addTriangles } from '../lib/static-world.ts';
 
 const rng = new Rng(0x51a7);
 const scalar = (): number => rng.signed() * 4;
@@ -194,7 +195,7 @@ const identity = new THREE.Matrix4().elements;
 assert.equal(rayObb(0, 0, 0, 1, 0, 0, identity, 1, 1, 1, 10), 0);
 assert.equal(rayObbFar(0, 0, 0, 1, 0, 0, identity, 1, 1, 1, 10), 1);
 const plane = new StaticWorld();
-plane.addTriangles(new Float32Array([1, -2, -2, 1, 2, -2, 1, 0, 2]), 1, 'concrete');
+addTriangles(plane, [1, -2, -2, 1, 2, -2, 1, 0, 2], 'concrete');
 plane.build();
 assert.equal(plane.queryAabb(1, -2, -2, 1, 2, 2, MASK.ALL), 1, 'AABB overlap is inclusive');
 assert.equal(plane.queryAabb(1, -2, -2, 1, 2, 2, LAYER.DEBRIS), 0, 'AABB queries retain masks');

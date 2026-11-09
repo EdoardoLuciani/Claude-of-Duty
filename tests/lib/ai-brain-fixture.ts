@@ -1,8 +1,10 @@
 import * as THREE from 'three';
 
 import { Animator } from '../../src/ai/animator.ts';
+import { AiSystem } from '../../src/ai/index.ts';
 import type { BakedCoverPoint } from '../../src/ai/nav-format.ts';
 import { RIG } from '../../src/ai/rig.ts';
+import type { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { isMesh } from '../../src/core/three-guards.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
@@ -81,6 +83,28 @@ export class BrainPlayer extends PlayerSystem {
     this.movement = new Movement(this.ctx, this);
     this.health = new Health(this.ctx, null);
   }
+
+  /** Fit the torso capsule to the test pose and height (production uses STANCE heights and lean). */
+  fitHitbox(): void {
+    const r = this.hitbox.radius,
+      p = this.testPosition;
+    this.hitbox.setSegment(p.x, p.y + r, p.z, p.x, p.y + Math.max(r, this.testHeight - r), p.z, r);
+  }
+}
+
+/** Real AiSystem wired to test physics and an optional player at a fixed 60 Hz step. */
+export function brainAi(
+  physics: PhysicsSystem,
+  player: BrainPlayer | null,
+  events?: EventBus
+): AiSystem {
+  const ai = new AiSystem();
+  ai.ctx = createTestContext({
+    ...(events ? { events } : {}),
+    providers: { physics, ...(player ? { player } : {}) },
+  });
+  ai.ctx.time.dt = 1 / 60;
+  return ai;
 }
 
 export function midpointRng(): Rng {

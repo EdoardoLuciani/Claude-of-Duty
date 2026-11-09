@@ -22,6 +22,7 @@ import { makeAgent, makeAi as fixtureAi } from '../lib/agent-fixture.ts';
 import {
   midpointRng,
   BrainPlayer,
+  brainAi,
   brainPhysics,
   brainAnimator,
   coverPoint,
@@ -35,46 +36,14 @@ phys.ctx = createTestContext({ events });
 phys.ctx.time.dt = 1 / 60;
 const rng = midpointRng();
 
-function makePlayer({
-  height = 1.78,
-  stance = 'stand',
-}: { height?: number; stance?: 'stand' | 'crouch' | 'prone' } = {}): BrainPlayer {
+function makePlayer(height = 1.78, stance: BrainPlayer['testStance'] = 'stand'): BrainPlayer {
   const player = new BrainPlayer(phys, height);
   player.testStance = stance;
-  player.hitbox.owner = player;
-  const r = 0.3;
-  player.hitbox.setSegment(0, r, 0, 0, Math.max(r, height - r), 0, r);
+  player.fitHitbox();
   return player;
 }
 
-function makeAi(player: BrainPlayer | null): AiSystem {
-  const ai = new AiSystem();
-  ai.ctx = createTestContext({
-    events,
-    providers: { physics: phys, ...(player ? { player } : {}) },
-  });
-  ai.ctx.time.dt = 1 / 60;
-  ai._phys = phys;
-  ai._v = new THREE.Vector3();
-  ai._v2 = new THREE.Vector3();
-  ai._v3 = new THREE.Vector3();
-  ai.cover = null;
-  ai.grid = null;
-  ai.agents = [];
-  ai.squads = [];
-  ai._grenades = [];
-  ai.stats = {
-    agents: 0,
-    alive: 0,
-    navMs: 0,
-    coverPts: 0,
-    walkable: 0,
-    friendlyHolds: 0,
-    grenadeHolds: 0,
-    pathsDeferred: 0,
-  };
-  return ai;
-}
+const makeAi = (player: BrainPlayer | null): AiSystem => brainAi(phys, player, events);
 
 function fireAt(
   ai: AiSystem,
@@ -170,10 +139,10 @@ for (const s of [
   { stance: 'prone', height: 0.7, through: 0.35, above: 1.35 },
   { stance: 'slide', height: 1.12, through: 0.55, above: 1.6 },
 ]) {
-  const player = makePlayer({
-    height: s.height,
-    stance: s.stance === 'stand' || s.stance === 'prone' ? s.stance : 'crouch',
-  });
+  const player = makePlayer(
+    s.height,
+    s.stance === 'stand' || s.stance === 'prone' ? s.stance : 'crouch'
+  );
   const ai = makeAi(player);
   const body = ai.playerPosition(new THREE.Vector3());
   assert.ok(body.y < s.height + 0.01, `${s.stance} body y=${body.y}`);

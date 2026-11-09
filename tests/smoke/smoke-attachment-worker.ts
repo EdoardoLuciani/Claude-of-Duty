@@ -14,6 +14,7 @@ import type { PhysicsSystem } from '../../src/physics/index.ts';
 import { MASK } from '../../src/physics/surfaces.ts';
 import { MovementWorker } from '../lib/ai-movement-fixture.ts';
 import { fixture } from '../lib/fixture.ts';
+import { FLOOR, addTriangles } from '../lib/static-world.ts';
 
 const world = new StaticWorld(),
   controller = new CharacterController(world);
@@ -272,17 +273,11 @@ const endpointResults = [];
 for (const change of ['controller-config', 'world-identity']) {
   const makeWorld = (wall: boolean): StaticWorld => {
     const w = new StaticWorld();
-    w.addTriangles(
-      new Float32Array([-3, 0, -3, -3, 0, 3, 3, 0, 3, 3, 0, 3, 3, 0, -3, -3, 0, -3]),
-      2,
-      'concrete'
-    );
+    addTriangles(w, FLOOR, 'concrete');
     if (wall)
-      w.addTriangles(
-        new Float32Array([
-          0.25, 0, -2, 0.25, 0, 2, 0.25, 3, 2, 0.25, 3, 2, 0.25, 3, -2, 0.25, 0, -2,
-        ]),
-        2,
+      addTriangles(
+        w,
+        [0.25, 0, -2, 0.25, 0, 2, 0.25, 3, 2, 0.25, 3, 2, 0.25, 3, -2, 0.25, 0, -2],
         'concrete'
       );
     w.build();
@@ -441,11 +436,7 @@ assert.equal(stalled.ready, false);
 // Bounded live-origin prefixes are the same motor oracle, not a shorter
 // rejection budget. Any undecided walk must be delegated, including successes.
 const floor = new StaticWorld();
-floor.addTriangles(
-  new Float32Array([-3, 0, -3, -3, 0, 3, 3, 0, 3, 3, 0, 3, 3, 0, -3, -3, 0, -3]),
-  2,
-  'concrete'
-);
+addTriangles(floor, FLOOR, 'concrete');
 floor.build();
 const physics = fixture<PhysicsSystem>({
   staticWorld: floor,
