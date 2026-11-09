@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { Assembler } from '#worldgen/builder';
 import { registerProps } from '#worldgen/props';
 
-import { buildGate, registerDressingProps } from '../../tools/worldgen/dressing.js';
+import { buildGate, registerDressingProps } from '../../tools/worldgen/dressing.ts';
 
 // V8 and JavaScriptCore differ by one ULP here. A computed coordinate must not
 // become an element identity: hashing its decimal string rerolls the dust/debris.

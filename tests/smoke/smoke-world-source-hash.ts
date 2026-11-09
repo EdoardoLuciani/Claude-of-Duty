@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { worldSourceHash } from '../../tools/worldgen/source-hash.js';
+import { worldSourceHash } from '../../tools/worldgen/source-hash.ts';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const directory = mkdtempSync(join(tmpdir(), 'cod-world-source-hash-'));

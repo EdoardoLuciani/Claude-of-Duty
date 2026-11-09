@@ -5,27 +5,21 @@
   "license": "ISC",
   "type": "module",
   "imports": {
-    "#worldgen/*": {
-      "types": "./tests/types/worldgen/*.d.ts",
-      "default": "./tools/worldgen/*.js"
-    },
-    "#query-snapshot": {
-      "types": "./tests/types/query-snapshot.d.ts",
-      "default": "./src/physics/query-snapshot.js"
-    }
+    "#worldgen/*": "./tools/worldgen/*.ts",
+    "#query-snapshot": "./src/physics/query-snapshot.ts"
   },
   "scripts": {
     "assets": "bun tools/build-assets.ts",
     "models": "bun tools/export-models.ts",
     "models:cook": "bun build/models.ts",
     "world": "bun tools/export-world.ts",
-    "world:validate": "bun tools/validate-world-assets.mjs",
+    "world:validate": "bun tools/validate-world-assets.ts",
     "world:smoke": "bun tests/e2e/world-smoke.ts",
     "test": "bun tools/export-world.ts && bun tools/test.ts",
     "typecheck": "bun check && bun check -p build && bun check -p tests",
     "format": "bun fmt src build tools tests docs README.md ARCHITECTURE.md prompt.md index.html tsconfig.json .oxlintrc.json .oxfmtrc.json package.json",
     "format:check": "bun run format --check",
-    "lint": "bun --bun run oxlint src build tools tests --deny-warnings && bun --bun run oxlint --type-aware src tests build tools --ignore-pattern '**/*.js' --ignore-pattern '**/*.mjs' --deny-warnings",
+    "lint": "bun --bun run oxlint src build tools tests --deny-warnings && bun --bun run oxlint --type-aware src tests build tools --deny-warnings",
     "dev": "bun build/bun.ts dev",
     "prebuild": "bun run typecheck && bun run lint",
     "build": "bun build/bun.ts build",

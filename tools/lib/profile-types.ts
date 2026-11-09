@@ -2,7 +2,7 @@ import type { TimestampQuery } from 'three';
 import 'three/src/renderers/common/Backend.js';
 
 import type { combatLane } from './combat-fixture.ts';
-import type { createCombatProfile } from './profile-combat.js';
+import type { createCombatProfile } from './profile-combat.ts';
 
 // Verified against the pinned Three r187 common Backend implementation.
 declare module 'three/src/renderers/common/Backend.js' {

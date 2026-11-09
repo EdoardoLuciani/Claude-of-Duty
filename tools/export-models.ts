@@ -23,7 +23,7 @@ import {
   soldierProductPaths,
 } from './blender/soldiers/export.ts';
 import { exportGlb } from './lib/export-glb.ts';
-import { buildSpentHull } from './lib/spent-hull.mjs';
+import { buildSpentHull } from './lib/spent-hull.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'public', 'models');
@@ -151,7 +151,7 @@ function modelSourceHash(): string {
   const files = [
     'tools/export-models.ts',
     'tools/lib/export-glb.ts',
-    'tools/lib/spent-hull.mjs',
+    'tools/lib/spent-hull.ts',
     'src/weapons/geometry.ts',
     'src/weapons/defs.ts',
     'src/weapons/mathx.ts',

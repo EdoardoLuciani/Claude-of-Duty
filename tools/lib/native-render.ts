@@ -1,7 +1,7 @@
 import type { Page } from 'playwright';
 
 import { trackNodeBuilders } from '../../src/dev/native-builds.ts';
-import { packedReadback } from './native-readback.js';
+import { packedReadback } from './native-readback.ts';
 
 export interface NativePage {
   evaluate(expression: string | (() => unknown)): Promise<unknown>;

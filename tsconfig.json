@@ -11,11 +11,9 @@
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
     "isolatedModules": true,
-    "allowJs": true,
-    "checkJs": false,
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "skipLibCheck": true
   },
-  "include": ["src", "tools/*.ts", "tools/lib/**/*.ts", "tools/blender/**/*.ts"]
+  "include": ["src", "tools/**/*.ts"]
 }

@@ -152,9 +152,9 @@ Only explicit `sheetThickness` authorizes single-sided penetration; missing exit
 stop as `unknown-thickness`, overlapping solids as `overlapping-solids`.
 No nominal fallback or layered-solid approximation.
 
-JS in `tools/worldgen/` is world-authoring authority. Map-specific layout,
+Checked TypeScript in `tools/worldgen/` is world-authoring authority. Map-specific layout,
 configuration, intel sites and free-standing prop transforms live in `level/`;
-`level/placements/` is data-only, while `placement.js` owns validation, placement
+`level/placements/` is data-only, while `placement.ts` owns validation, placement
 execution and clutter clearance. The [world editing map](tools/worldgen/README.md)
 connects content, geometry and baking. `bun run world` builds meshes and cooks collision
 with meshoptimizer from the canonical instance buckets. Visual-only bucket

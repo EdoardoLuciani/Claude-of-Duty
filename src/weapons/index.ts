@@ -45,13 +45,13 @@ export const MAX_SHOTS_PER_FRAME = 3;
 /** s — must exceed the flight time of any LONG throw so it lands before it
  *  goes off. A 30 m/s heave aimed straight up stays airborne ~3.2 s under
  *  the world's -20.6 gravity, so anything shorter airbursts mid-arc.
- *  Shared with the AI throw (ai/index.js). */
+ *  Shared with the AI throw (ai/index.ts). */
 export const GRENADE_FUSE = 3.5;
 /** Carpet-bomb strikes: one per life, up to 3 with market purchases. */
 const CARPET_STRIKES_PER_LIFE = 1;
 const CARPET_STRIKES_MAX = 3;
 // M67-style blast: ~4 m kill radius, wounds out to 10 m. Shared with the AI
-// grenades (ai/index.js imports these) so player and enemy blasts match.
+// grenades (ai/index.ts imports these) so player and enemy blasts match.
 export const GRENADE_RADIUS = 10; // m
 export const GRENADE_DAMAGE = 250;
 const GRENADE_SPEED = 15; // m/s — SHORT throw keeps roughly today's reach

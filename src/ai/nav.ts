@@ -27,7 +27,7 @@ const EXTENTS = Object.freeze({ x: 1.2, y: INFANTRY.stepHeight, z: 1.2 });
 const MAX_NODES = 24000,
   MAX_PATH = 2048;
 import type { PhysicsSystem } from '../physics/index.ts';
-import { canStand, checkAttachment, WALK_STEP } from './attachment.js';
+import { canStand, checkAttachment, WALK_STEP } from './attachment.ts';
 type NavController = ReturnType<PhysicsSystem['createCharacter']>;
 type NavPhysics = Pick<
   PhysicsSystem,

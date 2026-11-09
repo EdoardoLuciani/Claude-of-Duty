@@ -14,7 +14,7 @@ import type {
 
 // Keep worker globals local: the application tsconfig also includes DOM types.
 const post = (message: WorkerMessage): void => self.postMessage(message);
-import { canStand, checkAttachment } from './attachment.js';
+import { canStand, checkAttachment } from './attachment.ts';
 import { LADDER, LadderMotor } from './ladder.ts';
 
 let nav: AttachmentOracle | undefined;
