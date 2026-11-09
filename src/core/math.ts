@@ -35,6 +35,7 @@ export function smootherstep(a: number, b: number, x: number): number {
   return t * t * t * (t * (t * 6 - 15) + 10);
 }
 
+// 40 sub-steps cover the engine's 0.1 s frame clamp without dropping time.
 const SPRING_SUB_DT = 1 / 360;
 
 /**
@@ -78,7 +79,7 @@ export class Spring {
     const c = 2 * this.damping * w;
     let remaining = dt;
     let guard = 0;
-    while (remaining > 1e-7 && guard++ < 24) {
+    while (remaining > 1e-7 && guard++ < 40) {
       const h = remaining > SPRING_SUB_DT ? SPRING_SUB_DT : remaining;
       remaining -= h;
       this.velocity += (-k * (this.value - target) - c * this.velocity) * h;

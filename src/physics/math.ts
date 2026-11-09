@@ -456,6 +456,7 @@ export function segTriangleClosest(
 
 // Shared solve results; single-threaded and allocation-free.
 let sphereB = 0;
+let sphereC = 0;
 let sphereSq = 0;
 const cyl = { m: 0, n: 0, A: 0, B: 0, C: 0 };
 
@@ -476,7 +477,8 @@ function sphereRoots(
     my = oy - cy,
     mz = oz - cz;
   sphereB = mx * dx + my * dy + mz * dz;
-  const disc = sphereB * sphereB - (mx * mx + my * my + mz * mz - r * r);
+  sphereC = mx * mx + my * my + mz * mz - r * r;
+  const disc = sphereB * sphereB - sphereC;
   if (disc < 0) return false;
   sphereSq = Math.sqrt(disc);
   return true;
@@ -497,6 +499,8 @@ export function raySphere(
   maxDist: number
 ): number {
   if (!sphereRoots(ox, oy, oz, dx, dy, dz, cx, cy, cz, r)) return -1;
+  // Outside and moving away: rounding in b² - c can otherwise yield a t = 0 hit.
+  if (sphereC > 0 && sphereB > 0) return -1;
   let t = -sphereB - sphereSq;
   if (t < 0) t = -sphereB + sphereSq; // origin inside
   return t < 0 || t > maxDist ? -1 : t;
