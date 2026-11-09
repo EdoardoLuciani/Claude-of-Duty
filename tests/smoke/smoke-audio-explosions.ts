@@ -9,7 +9,6 @@ import {
   explosionDistanceGain,
 } from '../../src/audio/explosions.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
-import type { Mixer } from '../../src/audio/mixer.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import type { SpatialField } from '../../src/audio/spatial.ts';
 import type { AudioVoice } from '../../src/audio/types.ts';
@@ -17,6 +16,7 @@ import { Rng } from '../../src/core/rng.ts';
 import { audioFixture } from '../lib/audio-banks.ts';
 import {
   fixtureEntries,
+  fixtureMixer,
   fixtureKeys,
   fixtureBuffer,
   FixtureAudioBuffer,
@@ -161,7 +161,7 @@ for (const kind of ['grenade', 'bomb'] as const) {
 let played: Parameters<AudioSystem['_playAt']> | undefined;
 audio.running = true;
 audio.field = fixture<SpatialField>({ distanceTo: (): number => 30 });
-audio.mixer = fixture<Mixer>({ duck(): void {} });
+audio.mixer = fixtureMixer(actx);
 audio._playAt = (...args): boolean => {
   played = args;
   return true;
