@@ -168,36 +168,6 @@ export class StaticWorld {
     return id;
   }
 
-  /** Register raw world-space triangles (Float32Array, 9 floats each). */
-  addTriangles(
-    positions: Float32Array,
-    count: number,
-    surface: number | SurfaceName,
-    mask = LAYER.STATIC,
-    name = 'raw'
-  ): number {
-    const s = surfaceIndex(surface);
-    if (!Number.isInteger(count) || count < 0 || count > positions.length / 9)
-      throw new RangeError('[physics] triangle count must fit the position buffer');
-    const id = this._freeIds.length ? this._freeIds.pop()! : this.objects.length;
-    const surfaces = new Uint8Array(count);
-    surfaces.fill(s);
-    this.objects[id] = {
-      id,
-      name,
-      mesh: null,
-      surface: s,
-      surfaces,
-      mask,
-      tris: positions,
-      triCount: count,
-      alive: true,
-      userData: null,
-    };
-    this.dirty = true;
-    return id;
-  }
-
   removeObject(id: number): boolean {
     const o = this.objects[id];
     if (!o || !o.alive) return false;
