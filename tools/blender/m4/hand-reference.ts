@@ -22,7 +22,6 @@ const grips: Record<Side, GripFrame> = {
 };
 type SideReference = HandSideReference & { release?: HandPose };
 const sides: Partial<Record<Side, SideReference>> = {};
-const result = { grips, sides };
 for (const side of ['right', 'left'] as const) {
   const g = grips[side];
   const arm = new Arm(side === 'left' ? -1 : 1, { scale: side === 'left' ? 0.97 : 1 });
@@ -102,6 +101,6 @@ const chargingContact = {
 };
 writeFileSync(
   new URL('../../../assets/weapons/m4a1-block-ii/hand-reference.json', import.meta.url),
-  JSON.stringify({ ...result, magazine, charging: chargingContact }, null, 2) + '\n'
+  JSON.stringify({ grips, sides, magazine, charging: chargingContact }, null, 2) + '\n'
 );
 console.log('M4 hand control seed written; rebuild Blender actions after editing.');

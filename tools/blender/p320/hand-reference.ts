@@ -19,7 +19,6 @@ const grips: Record<Side, GripFrame> = {
 };
 type SideReference = HandSideReference & { release?: HandPose };
 const sides: Partial<Record<Side, SideReference>> = {};
-const result = { grips, sides };
 for (const side of ['right', 'left'] as const) {
   const g = grips[side];
   const arm = new Arm(side === 'left' ? -1 : 1, { scale: side === 'left' ? 0.97 : 1 });
@@ -90,6 +89,6 @@ const magazine = {
 };
 writeFileSync(
   new URL('../../../assets/weapons/p320-compact/hand-reference.json', import.meta.url),
-  JSON.stringify({ ...result, magazine }, null, 2) + '\n'
+  JSON.stringify({ grips, sides, magazine }, null, 2) + '\n'
 );
 console.log('P320 contact seed written; rebuild Blender actions after changing this file.');

@@ -30,8 +30,8 @@ bun run build
 ```
 
 The explicit author command stages the complete family before publishing
-`<name>.blend`, `<name>.glb`, `<name>.json` and the final `manifest.json`. Node's
-existing GLTFExporter encodes newly generated mesh data, preserving canonical
+`<name>.blend`, `<name>.glb`, `<name>.json` and the final `manifest.json`.
+Three.js GLTFExporter encodes newly generated mesh data, preserving canonical
 joint order, FLOAT colors and four weights without Blender exporter hooks or GLB
 repair. The five weapon sockets derive from the authored rifle frame.
 
