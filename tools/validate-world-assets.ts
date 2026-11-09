@@ -10,7 +10,8 @@ import { createLadderDescriptors } from '../src/ai/ladder.ts';
 import type { ExpectedNav } from '../src/ai/nav-format.ts';
 import { unpackNav, NAV_VERSION } from '../src/ai/nav-format.ts';
 import { isRecord } from '../src/core/guards.ts';
-import type { WorldLadder } from '../src/core/model-metadata.ts';
+import { parseWorldManifest } from '../src/core/model-metadata.ts';
+import type { WorldLadder, WorldManifest } from '../src/core/model-metadata.ts';
 import { SURFACE_NAMES } from '../src/physics/surfaces.ts';
 import { PALETTE } from '../src/world/palette.ts';
 import { worldSourceHash } from './worldgen/source-hash.ts';
@@ -65,27 +66,6 @@ const surfaces: ReadonlySet<unknown> = new Set(SURFACE_NAMES);
 const fail = (message: string): number => errors.push(message);
 const finite = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value);
-
-function requireArray(
-  value: unknown,
-  length: number | undefined,
-  label: string
-): value is unknown[] {
-  if (!Array.isArray(value) || (length !== undefined && value.length !== length)) {
-    fail(`${label} must be an array${length === undefined ? '' : ` of length ${length}`}`);
-    return false;
-  }
-  return true;
-}
-
-function requireVector(value: unknown, label: string): value is number[] {
-  if (!requireArray(value, 3, label)) return false;
-  if (!value.every(finite)) {
-    fail(`${label} must contain only finite numbers`);
-    return false;
-  }
-  return true;
-}
 
 function parseGlbGzip(file: string | null, kind: string): GlbAsset | null {
   if (!file) return null;
@@ -328,18 +308,19 @@ try {
   process.exit(1);
 }
 
-if (manifest.version !== 1 && manifest.version !== 2) {
-  fail(`unsupported manifest version ${String(manifest.version)}`);
+// The runtime parser owns the schema; this tool adds cross-record and product checks.
+let meta: WorldManifest | null = null;
+try {
+  meta = parseWorldManifest(manifest);
+} catch (error) {
+  fail(`manifest does not match the runtime schema: ${errorMessage(error)}`);
 }
-if (manifest.version === 2) {
-  const expectedSourceHash = worldSourceHash(ROOT);
-  if (manifest.sourceHash !== expectedSourceHash) {
-    fail(
-      `manifest sourceHash is ${describe(manifest.sourceHash ?? '<missing>')}, expected ${expectedSourceHash}; run bun run world`
-    );
-  }
+const expectedSourceHash = worldSourceHash(ROOT);
+if (manifest.sourceHash !== expectedSourceHash) {
+  fail(
+    `manifest sourceHash is ${describe(manifest.sourceHash ?? '<missing>')}, expected ${expectedSourceHash}; run bun run world`
+  );
 }
-if (!manifest.assets || typeof manifest.assets !== 'object') fail('manifest.assets is required');
 
 const manifestDir = dirname(manifestPath);
 const resolveAsset = (kind: string): string | null => {
@@ -351,119 +332,45 @@ const resolveAsset = (kind: string): string | null => {
   return join(manifestDir, name);
 };
 
-if (
-  requireArray(manifest.transform, 16, 'manifest.transform') &&
-  !manifest.transform.every(finite)
-) {
-  fail('manifest.transform must contain only finite numbers');
+function requireUnique(ids: unknown[], label: string): void {
+  const seen = new Set<string>();
+  ids.forEach((id: unknown, index: number): void => {
+    if (typeof id !== 'string' || !id.trim()) fail(`${label}[${index}] needs a non-empty id`);
+    else if (seen.has(id)) fail(`duplicate ${label} id "${id}"`);
+    else seen.add(id);
+  });
 }
-const bounds = object(manifest.bounds);
-if (!bounds) {
-  fail('manifest.bounds is required');
-} else if (
-  requireVector(bounds.min, 'manifest.bounds.min') &&
-  requireVector(bounds.max, 'manifest.bounds.max')
-) {
+
+if (meta) {
+  const { bounds, WORLD, spawns, lights, volumes, query } = meta;
   for (let i = 0; i < 3; i++) {
     if (bounds.min[i] > bounds.max[i]) fail(`manifest bounds are inverted on axis ${i}`);
   }
-}
-
-const spawnIds = new Set<string>();
-const intelMarkers = object(object(manifest.WORLD)?.MARKERS)?.INTEL;
-if (!Array.isArray(intelMarkers) || intelMarkers.length !== 14) {
-  fail(
-    `WORLD.MARKERS.INTEL must contain 14 authored points, found ${array(intelMarkers)?.length ?? 0}`
+  const intel = WORLD?.MARKERS?.INTEL ?? [];
+  if (intel.length !== 14)
+    fail(`WORLD.MARKERS.INTEL must contain 14 authored points, found ${intel.length}`);
+  requireUnique(
+    intel.map((marker): string => marker.id),
+    'intel marker'
   );
-} else {
-  const intelIds = new Set<string>();
-  intelMarkers.forEach((value: unknown, index: number): void => {
-    const marker = object(value);
-    requireVector(marker?.position, `WORLD.MARKERS.INTEL[${index}].position`);
-    if (typeof marker?.id !== 'string' || !marker.id.trim()) {
-      fail(`WORLD.MARKERS.INTEL[${index}] needs a non-empty id`);
-    } else if (intelIds.has(marker.id)) fail(`duplicate intel marker "${marker.id}"`);
-    else intelIds.add(marker.id);
+  if (!spawns.length) fail('manifest.spawns must be a non-empty array');
+  requireUnique(
+    array(manifest.spawns)!.map((spawn): unknown => object(spawn)?.id),
+    'spawn'
+  );
+  requireUnique(
+    (array(manifest.buildings) ?? []).map(
+      (building): unknown => object(object(building)?.spec)?.id
+    ),
+    'building'
+  );
+  lights.forEach((light, index): void => {
+    if (!['interior', 'street'].includes(light.kind))
+      fail(`manifest.lights[${index}] has invalid kind`);
   });
-}
-
-if (!Array.isArray(manifest.spawns) || manifest.spawns.length === 0) {
-  fail('manifest.spawns must be a non-empty array');
-} else {
-  manifest.spawns.forEach((value: unknown, index: number): void => {
-    const spawn = object(value);
-    requireVector(spawn?.position, `manifest.spawns[${index}].position`);
-    if (!finite(spawn?.yaw)) fail(`manifest.spawns[${index}].yaw must be finite`);
-    if (manifest.version === 2) requireVector(spawn?.forward, `manifest.spawns[${index}].forward`);
-    const id = spawn?.id ?? spawn?.tag;
-    if (typeof id !== 'string' || !id.trim())
-      fail(`manifest.spawns[${index}] needs a non-empty id/tag`);
-    else if (spawnIds.has(id)) fail(`duplicate spawn id/tag "${id}"`);
-    else spawnIds.add(id);
-  });
-}
-
-const buildingIds = new Set<string>();
-if (!Array.isArray(manifest.buildings)) {
-  fail('manifest.buildings must be an array');
-} else {
-  manifest.buildings.forEach((value: unknown, index: number): void => {
-    const building = object(value);
-    const id = building?.id ?? object(building?.spec)?.id;
-    if (typeof id !== 'string' || !id) fail(`manifest.buildings[${index}] needs an id`);
-    else if (buildingIds.has(id)) fail(`duplicate building id "${id}"`);
-    else buildingIds.add(id);
-  });
-}
-
-const legacyLights = object(manifest.lights);
-if (manifest.version === 1) {
-  if (
-    !manifest.lights ||
-    !Array.isArray(legacyLights?.interiors) ||
-    !Array.isArray(legacyLights?.lamps)
-  ) {
-    fail('manifest.lights must contain interiors and lamps arrays');
-  } else {
-    for (const kind of ['interiors', 'lamps']) {
-      array(legacyLights?.[kind])!.forEach((value: unknown, index: number): void => {
-        const light = object(value);
-        if (![light?.x, light?.y, light?.z].every(finite)) {
-          fail(`manifest.lights.${kind}[${index}] needs finite x/y/z coordinates`);
-        }
-      });
-    }
-  }
-} else {
-  if (!Array.isArray(manifest.lights)) fail('manifest.lights must be an array in version 2');
-  else
-    manifest.lights.forEach((value: unknown, index: number): void => {
-      const light = object(value);
-      requireVector(light?.position, `manifest.lights[${index}].position`);
-      requireVector(light?.color, `manifest.lights[${index}].color`);
-      if (typeof light?.kind !== 'string' || !['interior', 'street'].includes(light.kind))
-        fail(`manifest.lights[${index}] has invalid kind`);
-      if (![light?.range, light?.priority, light?.day, light?.night].every(finite)) {
-        fail(`manifest.lights[${index}] has invalid runtime settings`);
-      }
-    });
-  if (!Array.isArray(manifest.volumes)) fail('manifest.volumes must be an array in version 2');
-  const query = object(manifest.query);
-  const street = object(query?.street);
-  if (
-    !street ||
-    !['halfWidth', 'kerb', 'walkH', 'zMin', 'zMax'].every((key): boolean => finite(street[key]))
-  ) {
-    fail('manifest.query.street is invalid');
-  }
-  if (!Array.isArray(query?.alleys)) fail('manifest.query.alleys must be an array');
-  else
-    array(query?.alleys)!.forEach((value: unknown, index: number): void => {
-      const alley = object(value);
-      if (!Array.isArray(alley?.rect) || alley.rect.length !== 4 || !alley.rect.every(finite)) {
-        fail(`manifest.query.alleys[${index}].rect must contain four finite numbers`);
-      }
-    });
+  if (!volumes) fail('manifest.volumes must be an array');
+  if (!query?.street) fail('manifest.query.street is invalid');
+  if (!query?.alleys) fail('manifest.query.alleys must be an array');
 }
 
 async function parseNavGzip(
