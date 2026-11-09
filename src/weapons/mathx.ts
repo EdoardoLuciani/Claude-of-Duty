@@ -6,18 +6,10 @@
  * mutates its target or returns a scalar. No `new` inside update().
  */
 
-import { clamp01 } from '../core/math.ts';
-
-export const TAU = Math.PI * 2;
+import { Spring, TAU } from '../core/math.ts';
 
 interface SignedRng {
   signed(): number;
-}
-
-/** 5th-order smootherstep — zero 1st AND 2nd derivative at both ends. */
-export function smootherstep(a: number, b: number, x: number): number {
-  const t = clamp01((x - a) / (b - a || 1e-6));
-  return t * t * t * (t * (t * 6 - 15) + 10);
 }
 
 /** Slight overshoot ease used for mag slaps and bolt releases. */
@@ -31,89 +23,45 @@ export function easeOutCubic(t: number): number {
   return 1 - p * p * p;
 }
 
-/**
- * Critically-ish damped spring on a scalar. `f` is the natural frequency in Hz,
- * `z` the damping ratio (1 = no overshoot, 0.5 = lively, >1 = sluggish).
- * Semi-implicit integration so it stays stable at large dt.
- */
-export class Spring {
-  f: number;
-  z: number;
-  x: number;
-  target: number;
-
-  v: number = 0;
-
-  constructor(f = 12, z = 1, value = 0) {
-    this.f = f;
-    this.z = z;
-    this.x = value;
-    this.target = value;
-  }
-
-  set(v: number): this {
-    this.x = v;
-    this.v = 0;
-    this.target = v;
-    return this;
-  }
-
-  /** Instantaneous velocity kick — the recoil impulse path. */
-  kick(dv: number): this {
-    this.v += dv;
-    return this;
-  }
-
-  step(dt: number, target = this.target): number {
-    this.target = target;
-    const w = TAU * this.f;
-    // Semi-implicit Euler: solve for v(n+1) then integrate x with it.
-    const denom = 1 + 2 * this.z * w * dt + w * w * dt * dt;
-    this.v = (this.v + w * w * dt * (target - this.x)) / denom;
-    this.x += this.v * dt;
-    return this.x;
-  }
-}
-
 /** Three independent springs sharing frequency/damping — position or euler. */
 export class Spring3 {
   a: Spring;
   b: Spring;
   c: Spring;
 
-  constructor(f = 12, z = 1) {
-    this.a = new Spring(f, z);
-    this.b = new Spring(f, z);
-    this.c = new Spring(f, z);
+  constructor(freq = 12, damping = 1) {
+    this.a = new Spring(freq, damping);
+    this.b = new Spring(freq, damping);
+    this.c = new Spring(freq, damping);
   }
 
-  set f(v: number) {
-    this.a.f = this.b.f = this.c.f = v;
+  set freq(v: number) {
+    this.a.freq = this.b.freq = this.c.freq = v;
   }
 
-  get f(): number {
-    return this.a.f;
+  get freq(): number {
+    return this.a.freq;
   }
 
   set damping(v: number) {
-    this.a.z = this.b.z = this.c.z = v;
+    this.a.damping = this.b.damping = this.c.damping = v;
   }
 
   get damping(): number {
-    return this.a.z;
+    return this.a.damping;
   }
 
-  kick(x: number, y: number, z: number): this {
-    this.a.kick(x);
-    this.b.kick(y);
-    this.c.kick(z);
+  impulse(x: number, y: number, z: number): this {
+    this.a.impulse(x);
+    this.b.impulse(y);
+    this.c.impulse(z);
     return this;
   }
 
   reset(): this {
-    this.a.set(0);
-    this.b.set(0);
-    this.c.set(0);
+    this.a.reset();
+    this.b.reset();
+    this.c.reset();
     return this;
   }
 
@@ -125,15 +73,15 @@ export class Spring3 {
   }
 
   get x(): number {
-    return this.a.x;
+    return this.a.value;
   }
 
   get y(): number {
-    return this.b.x;
+    return this.b.value;
   }
 
   get z(): number {
-    return this.c.x;
+    return this.c.value;
   }
 }
 

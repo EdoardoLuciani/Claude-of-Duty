@@ -1,25 +1,9 @@
 /**
- * Scalar maths + spring integrators used by the player controller.
- *
- * Everything here is allocation-free after construction and framerate
- * independent: the springs sub-step internally so a 8 ms physics tick and a
- * 33 ms hitch produce the same visible motion.
+ * Player-controller response helpers. Allocation-free after construction and
+ * framerate independent (the shared Spring sub-steps internally).
  */
 
-import { clamp01 } from '../core/math.ts';
-
-export const TAU = Math.PI * 2;
-
-export function smoothstep(t: number): number {
-  t = clamp01(t);
-  return t * t * (3 - 2 * t);
-}
-
-/** C2-continuous ease — used for rooted mantle curves where velocity must not pop. */
-export function smootherstep(t: number): number {
-  t = clamp01(t);
-  return t * t * t * (t * (t * 6 - 15) + 10);
-}
+import { Spring } from '../core/math.ts';
 
 /**
  * Exponential approach with a real time constant. `tau` is the 63 % time, so
@@ -43,69 +27,6 @@ export function hashNoise(x: number, seed = 0): number {
   };
   const u = f * f * (3 - 2 * f);
   return h(xi) * (1 - u) + h(xi + 1) * u;
-}
-
-const MAX_SUB_DT = 1 / 360;
-
-/**
- * Damped harmonic oscillator, driven by frequency (Hz) and damping ratio.
- *   zeta < 1  under-damped, overshoots — good for punchy recoil
- *   zeta = 1  critically damped, fastest non-overshooting — good for FOV/ADS
- * `impulse()` injects velocity (the physical way to kick a spring), `set()`
- * displaces it instantly.
- */
-export class Spring {
-  declare freq: number;
-  declare damping: number;
-  declare value: number;
-
-  velocity: number = 0;
-  target: number = 0;
-
-  constructor(freq = 8, damping = 0.7, value = 0) {
-    this.freq = freq;
-    this.damping = damping;
-    this.value = value;
-  }
-
-  reset(value = 0): this {
-    this.value = value;
-    this.velocity = 0;
-    return this;
-  }
-
-  impulse(v: number): this {
-    this.velocity += v;
-    return this;
-  }
-
-  set(v: number): this {
-    this.value = v;
-    return this;
-  }
-
-  step(dt: number): number {
-    if (dt <= 0) return this.value;
-    const w = TAU * this.freq;
-    const k = w * w;
-    const c = 2 * this.damping * w;
-    // Sub-step so a stiff spring stays stable through a dropped frame.
-    let remaining = dt;
-    let guard = 0;
-    while (remaining > 1e-7 && guard++ < 24) {
-      const h = remaining > MAX_SUB_DT ? MAX_SUB_DT : remaining;
-      remaining -= h;
-      const a = -k * (this.value - this.target) - c * this.velocity;
-      this.velocity += a * h;
-      this.value += this.velocity * h;
-    }
-    // Kill denormal ringing so idle frames are bit-stable for capture.
-    if (Math.abs(this.value - this.target) < 1e-7 && Math.abs(this.velocity) < 1e-6) {
-      this.value = this.target;
-      this.velocity = 0;
-    }
-    return this.value;
-  }
 }
 
 /**

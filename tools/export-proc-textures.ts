@@ -28,6 +28,7 @@ const INPUTS = [
   'src/fx/atlas.ts',
   'tools/lib/fx-atlas.ts',
   'src/fx/noise.ts',
+  'src/core/math.ts',
   'src/core/rng.ts',
 ];
 

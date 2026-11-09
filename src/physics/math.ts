@@ -454,6 +454,36 @@ export function segTriangleClosest(
   return best;
 }
 
+// Shared solve results; single-threaded and allocation-free.
+let sphereB = 0;
+let sphereC = 0;
+let sphereSq = 0;
+const cyl = { m: 0, n: 0, A: 0, B: 0, C: 0 };
+
+/** Ray vs sphere as t = -sphereB ∓ sphereSq; false when the ray misses. */
+function sphereRoots(
+  ox: number,
+  oy: number,
+  oz: number,
+  dx: number,
+  dy: number,
+  dz: number,
+  cx: number,
+  cy: number,
+  cz: number,
+  r: number
+): boolean {
+  const mx = ox - cx,
+    my = oy - cy,
+    mz = oz - cz;
+  sphereB = mx * dx + my * dy + mz * dz;
+  sphereC = mx * mx + my * my + mz * mz - r * r;
+  const disc = sphereB * sphereB - sphereC;
+  if (disc < 0) return false;
+  sphereSq = Math.sqrt(disc);
+  return true;
+}
+
 /** Ray vs sphere. Returns entry distance or -1. */
 export function raySphere(
   ox: number,
@@ -468,19 +498,51 @@ export function raySphere(
   r: number,
   maxDist: number
 ): number {
-  const mx = ox - cx,
-    my = oy - cy,
-    mz = oz - cz;
-  const b = mx * dx + my * dy + mz * dz;
-  const c = mx * mx + my * my + mz * mz - r * r;
-  if (c > 0 && b > 0) return -1;
-  const disc = b * b - c;
-  if (disc < 0) return -1;
-  const sq = Math.sqrt(disc);
-  let t = -b - sq;
-  if (t < 0) t = -b + sq; // origin inside
-  if (t < 0 || t > maxDist) return -1;
-  return t;
+  if (!sphereRoots(ox, oy, oz, dx, dy, dz, cx, cy, cz, r)) return -1;
+  // Outside and moving away: rounding in b² - c can otherwise yield a t = 0 hit.
+  if (sphereC > 0 && sphereB > 0) return -1;
+  let t = -sphereB - sphereSq;
+  if (t < 0) t = -sphereB + sphereSq; // origin inside
+  return t < 0 || t > maxDist ? -1 : t;
+}
+
+/**
+ * Ray vs the infinite cylinder around segment a..b. Fills `cyl`: the axial
+ * parameter at t is n + t·m and the radial roots solve A t² + B t + C = 0.
+ * Returns false for a degenerate segment.
+ */
+function solveCylinder(
+  ox: number,
+  oy: number,
+  oz: number,
+  dx: number,
+  dy: number,
+  dz: number,
+  ax: number,
+  ay: number,
+  az: number,
+  abx: number,
+  aby: number,
+  abz: number,
+  r: number
+): boolean {
+  const abab = abx * abx + aby * aby + abz * abz;
+  if (abab < EPS) return false;
+  const aox = ox - ax,
+    aoy = oy - ay,
+    aoz = oz - az;
+  const m = (cyl.m = (abx * dx + aby * dy + abz * dz) / abab);
+  const n = (cyl.n = (abx * aox + aby * aoy + abz * aoz) / abab);
+  const qx = dx - abx * m,
+    qy = dy - aby * m,
+    qz = dz - abz * m;
+  const sx = aox - abx * n,
+    sy = aoy - aby * n,
+    sz = aoz - abz * n;
+  cyl.A = qx * qx + qy * qy + qz * qz;
+  cyl.B = 2 * (qx * sx + qy * sy + qz * sz);
+  cyl.C = sx * sx + sy * sy + sz * sz - r * r;
+  return true;
 }
 
 /**
@@ -503,27 +565,9 @@ export function rayCapsule(
   r: number,
   maxDist: number
 ): number {
-  const abx = bx - ax,
-    aby = by - ay,
-    abz = bz - az;
-  const aox = ox - ax,
-    aoy = oy - ay,
-    aoz = oz - az;
-  const abd = abx * dx + aby * dy + abz * dz;
-  const abo = abx * aox + aby * aoy + abz * aoz;
-  const abab = abx * abx + aby * aby + abz * abz;
-  if (abab < EPS) return raySphere(ox, oy, oz, dx, dy, dz, ax, ay, az, r, maxDist);
-  const m = abd / abab;
-  const n = abo / abab;
-  const qx = dx - abx * m,
-    qy = dy - aby * m,
-    qz = dz - abz * m;
-  const sx = aox - abx * n,
-    sy = aoy - aby * n,
-    sz = aoz - abz * n;
-  const A = qx * qx + qy * qy + qz * qz;
-  const B = 2 * (qx * sx + qy * sy + qz * sz);
-  const C = sx * sx + sy * sy + sz * sz - r * r;
+  if (!solveCylinder(ox, oy, oz, dx, dy, dz, ax, ay, az, bx - ax, by - ay, bz - az, r))
+    return raySphere(ox, oy, oz, dx, dy, dz, ax, ay, az, r, maxDist);
+  const { m, n, A, B, C } = cyl;
   let best = -1;
   if (A > EPS) {
     const disc = B * B - 4 * A * C;
@@ -546,32 +590,6 @@ export function rayCapsule(
   return best;
 }
 
-/** Far intersection of a ray with a sphere. Returns distance or -1. */
-function raySphereFar(
-  ox: number,
-  oy: number,
-  oz: number,
-  dx: number,
-  dy: number,
-  dz: number,
-  cx: number,
-  cy: number,
-  cz: number,
-  r: number,
-  maxDist: number
-): number {
-  const mx = ox - cx,
-    my = oy - cy,
-    mz = oz - cz;
-  const b = mx * dx + my * dy + mz * dz;
-  const c = mx * mx + my * my + mz * mz - r * r;
-  const disc = b * b - c;
-  if (disc < 0) return -1;
-  const t = -b + Math.sqrt(disc);
-  if (t < 0 || t > maxDist) return -1;
-  return t;
-}
-
 /** Last ray/capsule intersection. Origin may be on or inside the surface. */
 export function rayCapsuleFar(
   ox: number,
@@ -592,27 +610,14 @@ export function rayCapsuleFar(
   const abx = bx - ax,
     aby = by - ay,
     abz = bz - az;
-  const abab = abx * abx + aby * aby + abz * abz;
-  if (abab < EPS) return raySphereFar(ox, oy, oz, dx, dy, dz, ax, ay, az, r, maxDist);
-
   const EPS_T = 1e-4;
   let best = -1;
-  const aox = ox - ax,
-    aoy = oy - ay,
-    aoz = oz - az;
-  const abd = abx * dx + aby * dy + abz * dz;
-  const abo = abx * aox + aby * aoy + abz * aoz;
-  const m = abd / abab;
-  const n = abo / abab;
-  const qx = dx - abx * m,
-    qy = dy - aby * m,
-    qz = dz - abz * m;
-  const sx = aox - abx * n,
-    sy = aoy - aby * n,
-    sz = aoz - abz * n;
-  const A = qx * qx + qy * qy + qz * qz;
-  const B = 2 * (qx * sx + qy * sy + qz * sz);
-  const C = sx * sx + sy * sy + sz * sz - r * r;
+  if (!solveCylinder(ox, oy, oz, dx, dy, dz, ax, ay, az, abx, aby, abz, r)) {
+    if (!sphereRoots(ox, oy, oz, dx, dy, dz, ax, ay, az, r)) return -1;
+    const t = -sphereB + sphereSq;
+    return t < 0 || t > maxDist ? -1 : t;
+  }
+  const { m, n, A, B, C } = cyl;
   if (A > EPS) {
     const disc = B * B - 4 * A * C;
     if (disc >= 0) {
@@ -621,10 +626,7 @@ export function rayCapsuleFar(
       for (let root = 0; root < 2; root++) {
         const t = (root === 0 ? -B - sq : -B + sq) * inv;
         const k = n + t * m;
-        if (k >= 0 && k <= 1) {
-          if (t <= EPS_T || t > maxDist) continue;
-          if (t > best) best = t;
-        }
+        if (k >= 0 && k <= 1 && t > EPS_T && t <= maxDist && t > best) best = t;
       }
     }
   }
@@ -633,21 +635,12 @@ export function rayCapsuleFar(
     const cx = cap === 0 ? ax : bx;
     const cy = cap === 0 ? ay : by;
     const cz = cap === 0 ? az : bz;
-    const mx = ox - cx,
-      my = oy - cy,
-      mz = oz - cz;
-    const b = mx * dx + my * dy + mz * dz;
-    const c = mx * mx + my * my + mz * mz - r * r;
-    const disc = b * b - c;
-    if (disc < 0) continue;
-    const sq = Math.sqrt(disc);
+    if (!sphereRoots(ox, oy, oz, dx, dy, dz, cx, cy, cz, r)) continue;
     for (let root = 0; root < 2; root++) {
-      const t = root === 0 ? -b - sq : -b + sq;
+      const t = root === 0 ? -sphereB - sphereSq : -sphereB + sphereSq;
       if (t <= EPS_T || t > maxDist) continue;
-      const px = ox + dx * t,
-        py = oy + dy * t,
-        pz = oz + dz * t;
-      const projection = (px - cx) * abx + (py - cy) * aby + (pz - cz) * abz;
+      const projection =
+        (ox + dx * t - cx) * abx + (oy + dy * t - cy) * aby + (oz + dz * t - cz) * abz;
       if (cap === 0 ? projection > 0 : projection < 0) continue;
       if (t > best) best = t;
     }

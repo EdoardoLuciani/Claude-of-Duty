@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 
 import { hasOwn } from '../core/guards.ts';
+import { smoothstep } from '../core/math.ts';
 interface NoiseRandom {
   float(): number;
   int(min: number, max: number): number;
@@ -97,11 +98,6 @@ export class TileNoise {
 const srgb = (v: number): number => {
   const c = v <= 0 ? 0 : v >= 1 ? 1 : v;
   return (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055) * 255;
-};
-
-const smooth = (e0: number, e1: number, x: number): number => {
-  const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
-  return t * t * (3 - 2 * t);
 };
 
 const mix = (a: number, b: number, t: number): number => a + (b - a) * t;
@@ -303,12 +299,12 @@ export const CAMO = {
  * Distance from the centre of a repeating cell, in cell units: 0 on the line,
  * 0.5 half a cell away. Everything below draws THIN features with `ridgeLine`,
  * whose width is stated in cell units — the trap here is writing
- * `smooth(0.5, 0.47, d)`, which is 1 over 94 % of the cell and turns a seam into
+ * `smoothstep(0.5, 0.47, d)`, which is 1 over 94 % of the cell and turns a seam into
  * a flat offset plus a full-surface ripple. That is what made the cloth read as
  * corduroy instead of ripstop.
  */
 const cellDist = (x: number): number => Math.abs((((x % 1) + 1) % 1) - 0.5);
-const ridgeLine = (d: number, w: number): number => smooth(w, 0, d);
+const ridgeLine = (d: number, w: number): number => smoothstep(w, 0, d);
 
 /**
  * Garment-scale relief for the base cloth tile: felled panel seams with their
@@ -329,7 +325,7 @@ function garmentRelief(nz: TileNoise, u: number, v: number): number {
   const onSeam = Math.max(ridgeLine(sa, 0.02), ridgeLine(sb, 0.014));
   h += onSeam * (0.5 + 0.5 * Math.sin((u + v) * 520)) * 0.26;
   // pocket-edge creases: a coarse rectangular lattice, only sometimes present
-  const gate = smooth(0.55, 0.72, nz.fbm(u + 1.7, v + 2.3, 3, 2));
+  const gate = smoothstep(0.55, 0.72, nz.fbm(u + 1.7, v + 2.3, 3, 2));
   const pu = cellDist(u * 3.5 + 0.31);
   const pv = cellDist(v * 3.0 + 0.17);
   h -= gate * Math.max(ridgeLine(pu, 0.012), ridgeLine(pv, 0.014)) * 0.55;
@@ -451,27 +447,27 @@ export function camoTexel(nz: TileNoise, cfg: CamoConfig, u: number, v: number, 
   // narrow transition bands: printed camo has hard edges between families, and
   // a soft ramp is exactly what averages to flat tan at distance
   let col = cfg.base;
-  col = mix3(col, cfg.pale, smooth(0.535, 0.585, a));
-  col = mix3(col, cfg.olive, smooth(0.555, 0.605, b) * 0.9);
-  col = mix3(col, cfg.mid, smooth(0.515, 0.565, c));
-  col = mix3(col, cfg.dark, smooth(0.605, 0.655, d));
+  col = mix3(col, cfg.pale, smoothstep(0.535, 0.585, a));
+  col = mix3(col, cfg.olive, smoothstep(0.555, 0.605, b) * 0.9);
+  col = mix3(col, cfg.mid, smoothstep(0.515, 0.565, c));
+  col = mix3(col, cfg.dark, smoothstep(0.605, 0.655, d));
 
   // ---- fine 3 cm pixel/dot layer, low amplitude ---------------------------
-  const f1 = smooth(0.4, 0.6, nz.fbm(u + 3.7, v + 1.3, 24, 2, 0.35));
-  const f2 = smooth(0.52, 0.7, nz.n2(u + 7.1, v + 2.9, 48));
+  const f1 = smoothstep(0.4, 0.6, nz.fbm(u + 3.7, v + 1.3, 24, 2, 0.35));
+  const f2 = smoothstep(0.52, 0.7, nz.n2(u + 7.1, v + 2.9, 48));
   const fine = 0.88 + 0.26 * f1 - 0.12 * f2;
 
   const h = garmentRelief(nz, u, v);
   out.h = h;
   // sun bleaching on the crowns of the folds, dye pooling in the creases
-  const bleach = 1 + 0.05 * smooth(-0.2, 0.9, h);
+  const bleach = 1 + 0.05 * smoothstep(-0.2, 0.9, h);
   out.r = col[0] * fine * bleach;
   out.g = col[1] * fine * bleach;
   out.b = col[2] * fine * bleach * 0.99;
   // matte ripstop: 0.86-0.95, roughest where the nap is raised
-  out.rough = 0.905 - 0.045 * smooth(-0.6, 0.8, h) + 0.035 * (nz.fbm(u, v, 9, 3) - 0.5);
+  out.rough = 0.905 - 0.045 * smoothstep(-0.6, 0.8, h) + 0.035 * (nz.fbm(u, v, 9, 3) - 0.5);
   out.metal = 0;
-  out.ao = 0.82 + 0.18 * smooth(-0.7, 0.7, h);
+  out.ao = 0.82 + 0.18 * smoothstep(-0.7, 0.7, h);
 }
 
 /** Offline texture sets and their owned bake resources. */
@@ -549,7 +545,7 @@ export class SoldierMaterials {
         // PALS ribbing: 6 mm ribs, but only across the patches of the tile that
         // are webbing rather than plain cordura
         const rib = cellDist(v * 44);
-        const ribGate = smooth(0.52, 0.7, nz.fbm(u + 8.3, v, 5, 2));
+        const ribGate = smoothstep(0.52, 0.7, nz.fbm(u + 8.3, v, 5, 2));
         h += ribGate * (ridgeLine(rib, 0.3) - 0.5) * 0.3;
         // binding tape + bar-tacks on the hem rows (every 1/3 tile ~ 87 mm)
         const st = cellDist(v * 3);
@@ -567,9 +563,9 @@ export class SoldierMaterials {
         out.r = mix(out.r, 0.335 * KIT_CAL, thr);
         out.g = mix(out.g, 0.32 * KIT_CAL, thr);
         out.b = mix(out.b, 0.278 * KIT_CAL, thr);
-        out.rough = 0.79 - 0.13 * smooth(-0.4, 0.9, h) + 0.05 * (nz.fbm(u + 2, v, 11, 2) - 0.5);
+        out.rough = 0.79 - 0.13 * smoothstep(-0.4, 0.9, h) + 0.05 * (nz.fbm(u + 2, v, 11, 2) - 0.5);
         out.metal = 0;
-        out.ao = 0.8 + 0.2 * smooth(-0.5, 1.0, h);
+        out.ao = 0.8 + 0.2 * smoothstep(-0.5, 1.0, h);
       },
       aniso,
       1.15
@@ -591,7 +587,7 @@ export class SoldierMaterials {
         // laminate grain + abrasion
         const grain = nz.fbm(u, v, 90, 3);
         h += (grain - 0.5) * 0.24;
-        const scuff = smooth(0.62, 0.86, nz.ridge(u * 0.7, v * 2.4, 22, 3));
+        const scuff = smoothstep(0.62, 0.86, nz.ridge(u * 0.7, v * 2.4, 22, 3));
         h -= scuff * 0.18;
         out.h = h;
         // Macro value variation. A carrier is the one part of the kit that is
@@ -607,9 +603,9 @@ export class SoldierMaterials {
         out.g = base * 1.0;
         out.b = base * 0.93;
         // ground-in dust and grease darken the low panels
-        out.r = mix(out.r, out.r * 0.66, smooth(0.44, 0.68, soil));
-        out.g = mix(out.g, out.g * 0.64, smooth(0.44, 0.68, soil));
-        out.b = mix(out.b, out.b * 0.6, smooth(0.44, 0.68, soil));
+        out.r = mix(out.r, out.r * 0.66, smoothstep(0.44, 0.68, soil));
+        out.g = mix(out.g, out.g * 0.64, smoothstep(0.44, 0.68, soil));
+        out.b = mix(out.b, out.b * 0.6, smoothstep(0.44, 0.68, soil));
         // scuffs abrade to a paler, rougher grey
         out.r = mix(out.r, 0.283 * KIT_CAL, scuff * 0.7);
         out.g = mix(out.g, 0.274 * KIT_CAL, scuff * 0.7);
@@ -618,12 +614,12 @@ export class SoldierMaterials {
         // around it, and rougher again where it has been abraded
         out.rough =
           0.59 +
-          0.06 * smooth(-0.5, 0.7, -h) +
+          0.06 * smoothstep(-0.5, 0.7, -h) +
           0.09 * scuff +
-          0.05 * smooth(0.44, 0.68, soil) +
+          0.05 * smoothstep(0.44, 0.68, soil) +
           0.025 * (nz.fbm(u, v + 5.1, 13, 2) - 0.5);
         out.metal = 0;
-        out.ao = 0.82 + 0.18 * smooth(-0.7, 0.7, h);
+        out.ao = 0.82 + 0.18 * smoothstep(-0.7, 0.7, h);
       },
       aniso,
       1.05
@@ -640,11 +636,11 @@ export class SoldierMaterials {
         // Fitzpatrick IV base; per-instance tint shifts it
         const base = [0.295, 0.199, 0.148];
         const flush = [0.33, 0.186, 0.142];
-        let col = mix3(base, flush, smooth(0.4, 0.75, macro));
+        let col = mix3(base, flush, smoothstep(0.4, 0.75, macro));
         // stubble / beard shadow band handled by vertex colour; here just
         // follicle speckle
         const st = nz.fbm(u * 1.3, v * 1.3, 110, 2);
-        col = mix3(col, [0.115, 0.086, 0.074], smooth(0.62, 0.72, st) * 0.5);
+        col = mix3(col, [0.115, 0.086, 0.074], smoothstep(0.62, 0.72, st) * 0.5);
         out.r = col[0];
         out.g = col[1];
         out.b = col[2];
@@ -662,9 +658,9 @@ export class SoldierMaterials {
       (u, v, out): void => {
         // moulded pebble stipple + parting-line sheen
         const stip = nz.fbm(u, v, 128, 3);
-        const peb = smooth(0.45, 0.62, nz.fbm(u, v, 64, 2));
+        const peb = smoothstep(0.45, 0.62, nz.fbm(u, v, 64, 2));
         out.h = (stip - 0.5) * 0.6 + peb * 0.35;
-        const scr = smooth(0.86, 1.0, nz.ridge(u * 0.6, v * 3.0, 26, 2));
+        const scr = smoothstep(0.86, 1.0, nz.ridge(u * 0.6, v * 3.0, 26, 2));
         const v0 = 0.052 * (0.9 + 0.2 * nz.fbm(u, v, 8, 2));
         out.r = mix(v0 * 1.02, 0.2, scr * 0.5);
         out.g = mix(v0, 0.195, scr * 0.5);
@@ -682,8 +678,8 @@ export class SoldierMaterials {
       size,
       (u, v, out): void => {
         const grain = nz.fbm(u * 0.25, v * 3.0, 90, 3);
-        const scratch = smooth(0.8, 1.0, nz.ridge(u * 0.3, v * 6.0, 40, 3));
-        const pits = smooth(0.72, 0.9, nz.fbm(u, v, 190, 2));
+        const scratch = smoothstep(0.8, 1.0, nz.ridge(u * 0.3, v * 6.0, 40, 3));
+        const pits = smoothstep(0.72, 0.9, nz.fbm(u, v, 190, 2));
         out.h = (grain - 0.5) * 0.35 + scratch * 0.5 - pits * 0.45;
         const base = 0.055 + 0.02 * grain;
         // bare steel where the finish has rubbed through
@@ -760,7 +756,7 @@ export class SoldierMaterials {
         const cu = Math.abs(((((u * cellsU) % 1) + 1) % 1) - 0.5);
         const cv = Math.abs(((((v * cellsV) % 1) + 1) % 1) - 0.5);
         const over = Math.sin((u * cellsU + v * cellsV) * Math.PI) > 0;
-        let h = (over ? smooth(0.5, 0.1, cu) : smooth(0.5, 0.1, cv)) * 0.7 - 0.25;
+        let h = (over ? smoothstep(0.5, 0.1, cu) : smoothstep(0.5, 0.1, cv)) * 0.7 - 0.25;
         h += (nz.fbm(u, v, 140, 2) - 0.5) * 0.22;
         out.h = h;
         // the resin on the crowns of the weave is markedly smoother
