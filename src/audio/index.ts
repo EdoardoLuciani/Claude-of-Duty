@@ -989,8 +989,8 @@ export class AudioSystem {
     const w = p.weapon;
     const name = typeof w === 'string' ? w : (w?.audio ?? w?.id);
     const profile = resolveProfile(name);
-    // Removing the unused generic fallback must not substitute an unsuppressed report.
-    if (!profile || (w && typeof w === 'object' && w.suppressed && !profile.suppressed)) return;
+    // A suppressed weapon without its own suppressed recording stays silent.
+    if (w && typeof w === 'object' && w.suppressed && !profile.suppressed) return;
 
     if (p.empty) {
       this._playDry(
