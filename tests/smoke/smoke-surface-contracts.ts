@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { BoxGeometry, Group, Mesh, MeshBasicMaterial } from 'three';
+import { BoxGeometry, Mesh, MeshBasicMaterial } from 'three';
 
 import { isRecord } from '../../src/core/guards.ts';
 import { parseWorldManifest } from '../../src/core/model-metadata.ts';
@@ -39,8 +39,6 @@ const geometry = new BoxGeometry();
 const material = new MeshBasicMaterial();
 material.name = 'steel_panel';
 const mesh = new Mesh(geometry, material);
-const group = new Group();
-group.add(mesh);
 const physics = new PhysicsSystem();
 const world = physics.staticWorld;
 assert.equal(bakeMesh(mesh)?.uniformSurface, SURFACE.metal, 'inference remains supported');

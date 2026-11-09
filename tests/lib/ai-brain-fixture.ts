@@ -84,7 +84,7 @@ export class BrainPlayer extends PlayerSystem {
     this.health = new Health(this.ctx, null);
   }
 
-  /** Fit the torso capsule to the test pose, as the production player does. */
+  /** Fit the torso capsule to the test pose and height (production uses STANCE heights and lean). */
   fitHitbox(): void {
     const r = this.hitbox.radius,
       p = this.testPosition;

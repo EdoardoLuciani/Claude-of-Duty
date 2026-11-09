@@ -6,7 +6,7 @@ import { bakePhysicsNav } from '#worldgen/nav-bake';
 
 import type { Agent } from '../../src/ai/agent.ts';
 import { AttachmentQueries, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.ts';
-import { AiSystem } from '../../src/ai/index.ts';
+import type { AiSystem } from '../../src/ai/index.ts';
 import type { BakedCoverPoint } from '../../src/ai/nav-format.ts';
 import { CoverMap, SurfaceNav } from '../../src/ai/nav.ts';
 import type { NavRoute } from '../../src/ai/nav.ts';
@@ -52,7 +52,6 @@ function fixture(
   player.fitHitbox();
   const ai = makeAi();
   ai.ctx = createTestContext({ providers: { player } });
-  ai.playerPosition = AiSystem.prototype.playerPosition.bind(ai);
   const a = makeAgent({ ai, phys, yaw: 0 });
   ai.agents.push(a);
   return {

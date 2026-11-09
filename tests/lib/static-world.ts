@@ -14,5 +14,7 @@ export function addTriangles(
 ): number {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  return world.addMesh(new THREE.Mesh(geometry), surface);
+  const id = world.addMesh(new THREE.Mesh(geometry), surface);
+  if (id < 0) throw new Error('[test] triangle fixture has no usable triangles');
+  return id;
 }
