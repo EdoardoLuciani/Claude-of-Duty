@@ -20,7 +20,7 @@ const scene = new THREE.Scene(),
 scene.add(existing);
 const render = fixture<RenderSystem>(
   {
-    renderer: fixture<RenderSystem['renderer']>({}, complete.testRenderer()),
+    renderer: complete.testRenderer(),
     _graph: null,
     patchMaterials(): void {},
     async _warmGraph(): ReturnType<RenderSystem['_warmGraph']> {
@@ -44,33 +44,26 @@ const render = fixture<RenderSystem>(
 );
 const ai = new AiSystem();
 ai.ctx = createTestContext({ scene, camera: new THREE.PerspectiveCamera(), providers: { render } });
-ai.variant = (): AiVariant =>
-  fixture<AiVariant>(
-    { geometry, material },
-    {
-      get geometry(): never {
-        return complete.unavailable('geometry');
-      },
-      get weapon(): never {
-        return complete.unavailable('weapon');
-      },
-      get stats(): never {
-        return complete.unavailable('stats');
-      },
-      get variant(): never {
-        return complete.unavailable('variant');
-      },
-      get material(): never {
-        return complete.unavailable('material');
-      },
-      get parts(): never {
-        return complete.unavailable('parts');
-      },
-    }
-  );
+ai.variant = (): AiVariant => ({
+  geometry,
+  material,
+  get weapon(): never {
+    return complete.unavailable('weapon');
+  },
+  get stats(): never {
+    return complete.unavailable('stats');
+  },
+  get variant(): never {
+    return complete.unavailable('variant');
+  },
+  get parts(): never {
+    return complete.unavailable('parts');
+  },
+});
 ai.rng = fixture<AiSystem['rng']>(
   {
     fork: (): never => assert.fail('warmup must not create an Agent or consume RNG'),
+    u32: (): never => assert.fail('warmup must not create an Agent or consume RNG'),
   },
   new complete.Rng(1)
 );
@@ -79,7 +72,7 @@ const early = await ai.prewarmMaterials();
 assert.equal(early.ok, false);
 assert.equal(ai._prewarmed, null);
 assert.equal(calls, 0, 'init must not falsely cache prewarm before native graph creation');
-render._graph = fixture<NonNullable<RenderSystem['_graph']>>({}, complete.testGraph());
+render._graph = complete.testGraph();
 const warm = await ai.prewarmMaterials();
 assert.equal(warm.ok, true);
 assert(warm.graphWarm);

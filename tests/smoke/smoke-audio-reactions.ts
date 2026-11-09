@@ -6,14 +6,12 @@ import { CalloutPlayer } from '../../src/audio/callouts.ts';
 import { AudioSystem } from '../../src/audio/index.ts';
 import { REACTION_URLS, reactionBank } from '../../src/audio/reactions.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
-import type { SpatialField } from '../../src/audio/spatial.ts';
 import type { AudioVoice } from '../../src/audio/types.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { audioFixture } from '../lib/audio-banks.ts';
 import { fixtureEntries, at, fixtureBuffer, FixtureAudioBuffer } from '../lib/audio-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 import * as complete from '../lib/fixture-targets.ts';
-import { fixture } from '../lib/fixture.ts';
 
 const { actx, sources } = audioFixture(0);
 const bank = new WeaponSampleBank(actx),
@@ -51,12 +49,7 @@ audio._playAt = (kind, x, y, z, opts): boolean => {
   return true;
 };
 audio._lastReactionEnd = 10;
-audio._callouts = new CalloutPlayer(
-  actx,
-  fixture<SpatialField>({}, complete.testSpatialField()),
-  bank,
-  rng
-);
+audio._callouts = new CalloutPlayer(actx, complete.testSpatialField(), bank, rng);
 audio._callouts.play = (): boolean => true;
 audio._callouts.stop = (): void => {};
 audio._callouts.forget = (): void => {};

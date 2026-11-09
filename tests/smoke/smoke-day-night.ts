@@ -24,166 +24,8 @@ import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 import { captureMethod } from '../lib/render-fixture.ts';
 
-assert.equal(MOON_ILLUMINANCE_NIGHT, 0.03);
-assert.equal(CLOCK.startHour, 16.5);
-assert.equal(CLOCK.hoursPerSecond * 600, 9);
-const state = { elapsed: -1 };
-assert.equal(tickStreetlightOutage(state, 1, 20.99), 1);
-assert.equal(state.elapsed, -1);
-assert.equal(tickStreetlightOutage(state, 1 / 60, 21), 1);
-assert.equal(state.elapsed, 0);
-assert.equal(tickStreetlightOutage(state, 0.4, 21), 0, 'flicker drops power');
-assert.equal(tickStreetlightOutage(state, 0.35, 21), 1, 'flicker restores power');
-state.elapsed = OUTAGE.flickerSeconds;
-assert.equal(tickStreetlightOutage(state, 0, 21), 0);
-assert.equal(tickStreetlightOutage(state, 0, 21), 0, 'pause does not age outage');
-assert.equal(tickStreetlightOutage(state, 179.99, 23), 0);
-assert.equal(tickStreetlightOutage(state, 0.02, 23), 1, 'three full dark minutes then restore');
-assert.equal(tickStreetlightOutage(state, 1600, 21), 1, 'next night does not retrigger');
-
-// Clock update uses scaled dt, wraps midnight, and stops on death.
-const playerHealth = fixture<Health>({ dead: false }, complete.testHealth());
-const player = fixture<PlayerSystem>(
-  {
-    get dead(): boolean {
-      return playerHealth.dead;
-    },
-  },
-  complete.testPlayer()
-);
-const ctx = createTestContext({ providers: { player } });
-const sky = fixture<SkySystem>(
-  {
-    update: captureMethod(SkySystem.prototype, 'update'),
-    _skyDirty: false,
-    _envDirty: false,
-    hour: CLOCK.startHour,
-    timeRate: CLOCK.hoursPerSecond,
-    shared: fixture<SkySystem['shared']>(
-      {
-        uCloudParams: uniform(new THREE.Vector4()),
-        uStarParams: uniform(new THREE.Vector4()),
-        uFogDrift: uniform(new THREE.Vector3()),
-      },
-      {
-        get uMieScale(): never {
-          return complete.unavailable('uMieScale');
-        },
-        get uViewPos(): never {
-          return complete.unavailable('uViewPos');
-        },
-        get uSunDir(): never {
-          return complete.unavailable('uSunDir');
-        },
-        get uMoonDir(): never {
-          return complete.unavailable('uMoonDir');
-        },
-        get uSunIrradiance(): never {
-          return complete.unavailable('uSunIrradiance');
-        },
-        get uMoonIrradiance(): never {
-          return complete.unavailable('uMoonIrradiance');
-        },
-        get uSunDiscRadiance(): never {
-          return complete.unavailable('uSunDiscRadiance');
-        },
-        get uMoonDiscRadiance(): never {
-          return complete.unavailable('uMoonDiscRadiance');
-        },
-        get uSunAltitude(): never {
-          return complete.unavailable('uSunAltitude');
-        },
-        get uMoonAltitude(): never {
-          return complete.unavailable('uMoonAltitude');
-        },
-        get uMoonRelAz(): never {
-          return complete.unavailable('uMoonRelAz');
-        },
-        get uDisc(): never {
-          return complete.unavailable('uDisc');
-        },
-        get uGroundAlbedo(): never {
-          return complete.unavailable('uGroundAlbedo');
-        },
-        get uHorizonMurk(): never {
-          return complete.unavailable('uHorizonMurk');
-        },
-        get uSkyRolloff(): never {
-          return complete.unavailable('uSkyRolloff');
-        },
-        get uStarParams(): never {
-          return complete.unavailable('uStarParams');
-        },
-        get uCelestial(): never {
-          return complete.unavailable('uCelestial');
-        },
-        get uCloudParams(): never {
-          return complete.unavailable('uCloudParams');
-        },
-        get uCloudParams2(): never {
-          return complete.unavailable('uCloudParams2');
-        },
-        get uFog(): never {
-          return complete.unavailable('uFog');
-        },
-        get uFog2(): never {
-          return complete.unavailable('uFog2');
-        },
-        get uFogExt(): never {
-          return complete.unavailable('uFogExt');
-        },
-        get uPhase(): never {
-          return complete.unavailable('uPhase');
-        },
-        get uKeyDir(): never {
-          return complete.unavailable('uKeyDir');
-        },
-        get uKeyIrr(): never {
-          return complete.unavailable('uKeyIrr');
-        },
-        get uFogDrift(): never {
-          return complete.unavailable('uFogDrift');
-        },
-      }
-    ),
-    cloudShadowAt: (): number => 1,
-    _cloudOcclusion: 1,
-    _envAge: 0,
-    _applyLightIntensities(): void {},
-    _updateCelestial(): void {},
-  },
-  new complete.SkySystem()
-);
-sky.update(0, ctx);
-assert.equal(sky.hour, 16.5, 'pause/shop scaled dt freezes clock');
-sky.update(600, ctx);
-assert.ok(Math.abs(sky.hour - 1.5) < 1e-10);
-sky.update(100, ctx);
-assert.ok(Math.abs(sky.hour - 3) < 1e-10, 'clock continues toward dawn');
-playerHealth.dead = true;
-sky.update(100, ctx);
-assert.equal(sky.hour, 3);
-playerHealth.dead = false;
-sky.timeRate = 0;
-sky.update(100, ctx);
-assert.equal(sky.hour, 3, 'capture default zero rate holds explicit time');
-
-// Zero owned directional light is authoritative: no daytime fallback.
-const moon = new THREE.DirectionalLight(0xaabbff, 0),
-  sun = new THREE.DirectionalLight(0xffeeaa, 3);
-const keyProxy = new THREE.DirectionalLight(),
-  secondaryProxy = new THREE.DirectionalLight();
-const skyLights = new SkySystem();
-skyLights.keyLight = moon;
-skyLights.sunLight = sun;
-skyLights.moonLight = moon;
-skyLights._cloudOcclusion = 1;
-skyLights.shared = fixture<SkySystem['shared']>(
-  {
-    uKeyDir: uniform(skyLights.keyDirection),
-    uKeyIrr: uniform(new THREE.Vector3()),
-  },
-  {
+function skySharedTarget(): SkySystem['shared'] {
+  return {
     get uMieScale(): never {
       return complete.unavailable('uMieScale');
     },
@@ -262,7 +104,90 @@ skyLights.shared = fixture<SkySystem['shared']>(
     get uFogDrift(): never {
       return complete.unavailable('uFogDrift');
     },
-  }
+  };
+}
+
+assert.equal(MOON_ILLUMINANCE_NIGHT, 0.03);
+assert.equal(CLOCK.startHour, 16.5);
+assert.equal(CLOCK.hoursPerSecond * 600, 9);
+const state = { elapsed: -1 };
+assert.equal(tickStreetlightOutage(state, 1, 20.99), 1);
+assert.equal(state.elapsed, -1);
+assert.equal(tickStreetlightOutage(state, 1 / 60, 21), 1);
+assert.equal(state.elapsed, 0);
+assert.equal(tickStreetlightOutage(state, 0.4, 21), 0, 'flicker drops power');
+assert.equal(tickStreetlightOutage(state, 0.35, 21), 1, 'flicker restores power');
+state.elapsed = OUTAGE.flickerSeconds;
+assert.equal(tickStreetlightOutage(state, 0, 21), 0);
+assert.equal(tickStreetlightOutage(state, 0, 21), 0, 'pause does not age outage');
+assert.equal(tickStreetlightOutage(state, 179.99, 23), 0);
+assert.equal(tickStreetlightOutage(state, 0.02, 23), 1, 'three full dark minutes then restore');
+assert.equal(tickStreetlightOutage(state, 1600, 21), 1, 'next night does not retrigger');
+
+// Clock update uses scaled dt, wraps midnight, and stops on death.
+const playerHealth = fixture<Health>({ dead: false }, complete.testHealth());
+const player = fixture<PlayerSystem>(
+  {
+    get dead(): boolean {
+      return playerHealth.dead;
+    },
+  },
+  complete.testPlayer()
+);
+const ctx = createTestContext({ providers: { player } });
+const sky = fixture<SkySystem>(
+  {
+    update: captureMethod(SkySystem.prototype, 'update'),
+    _skyDirty: false,
+    _envDirty: false,
+    hour: CLOCK.startHour,
+    timeRate: CLOCK.hoursPerSecond,
+    shared: fixture<SkySystem['shared']>(
+      {
+        uCloudParams: uniform(new THREE.Vector4()),
+        uStarParams: uniform(new THREE.Vector4()),
+        uFogDrift: uniform(new THREE.Vector3()),
+      },
+      skySharedTarget()
+    ),
+    cloudShadowAt: (): number => 1,
+    _cloudOcclusion: 1,
+    _envAge: 0,
+    _applyLightIntensities(): void {},
+    _updateCelestial(): void {},
+  },
+  new complete.SkySystem()
+);
+sky.update(0, ctx);
+assert.equal(sky.hour, 16.5, 'pause/shop scaled dt freezes clock');
+sky.update(600, ctx);
+assert.ok(Math.abs(sky.hour - 1.5) < 1e-10);
+sky.update(100, ctx);
+assert.ok(Math.abs(sky.hour - 3) < 1e-10, 'clock continues toward dawn');
+playerHealth.dead = true;
+sky.update(100, ctx);
+assert.equal(sky.hour, 3);
+playerHealth.dead = false;
+sky.timeRate = 0;
+sky.update(100, ctx);
+assert.equal(sky.hour, 3, 'capture default zero rate holds explicit time');
+
+// Zero owned directional light is authoritative: no daytime fallback.
+const moon = new THREE.DirectionalLight(0xaabbff, 0),
+  sun = new THREE.DirectionalLight(0xffeeaa, 3);
+const keyProxy = new THREE.DirectionalLight(),
+  secondaryProxy = new THREE.DirectionalLight();
+const skyLights = new SkySystem();
+skyLights.keyLight = moon;
+skyLights.sunLight = sun;
+skyLights.moonLight = moon;
+skyLights._cloudOcclusion = 1;
+skyLights.shared = fixture<SkySystem['shared']>(
+  {
+    uKeyDir: uniform(skyLights.keyDirection),
+    uKeyIrr: uniform(new THREE.Vector3()),
+  },
+  skySharedTarget()
 );
 const providers = { sky: skyLights };
 const lightingCtx = createTestContext({ providers });

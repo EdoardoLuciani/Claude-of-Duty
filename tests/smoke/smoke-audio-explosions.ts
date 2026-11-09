@@ -148,7 +148,7 @@ audio.field = fixture<SpatialField>(
     distanceTo: (): number => 70,
     acquire(options): ReturnType<SpatialField['acquire']> {
       acquired = options;
-      return fixture<NonNullable<ReturnType<SpatialField['acquire']>>>({}, complete.testEmitter());
+      return complete.testEmitter();
     },
     hold(): void {},
   },

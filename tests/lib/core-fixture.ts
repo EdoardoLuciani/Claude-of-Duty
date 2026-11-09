@@ -2,7 +2,7 @@ import { createConfig } from '../../src/core/config.ts';
 import { Engine } from '../../src/core/engine.ts';
 import { Registry } from '../../src/core/registry.ts';
 import type { Subsystem } from '../../src/core/registry.ts';
-import * as complete from './fixture-targets.ts';
+import * as complete from './dom-fixture.ts';
 import { fixture } from './fixture.ts';
 
 /** Synthetic lifecycle systems use the generic registry, not runtime provider IDs. */

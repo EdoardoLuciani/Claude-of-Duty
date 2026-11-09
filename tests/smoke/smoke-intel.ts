@@ -249,8 +249,8 @@ async function harness(
   const base = createTestContext({
     providers,
     input,
-    engine: fixture<EngineContext['engine']>({}, complete.testEngine()),
-    canvas: fixture<HTMLCanvasElement>({}, complete.testElement('canvas')),
+    engine: complete.testEngine(),
+    canvas: complete.testElement('canvas'),
   });
   base.config.deterministic = deterministic;
   base.time.elapsed = 10;
@@ -932,7 +932,7 @@ for (const emission of [
   let stopped = 0;
   audioSystem._intelOperating = true;
   audioSystem._intelAlarm = {
-    node: fixture<GainNode>({}, complete.testGain()),
+    node: complete.testGain(),
     stop(): void {
       stopped++;
     },

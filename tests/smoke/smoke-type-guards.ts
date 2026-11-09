@@ -17,7 +17,7 @@ import { SURFACE, SURFACE_NAMES } from '../../src/physics/surfaces.ts';
 import { createFogCompute } from '../../src/render/fog-compute-webgpu.ts';
 import { isLightingContext } from '../../src/render/indirect-webgpu.ts';
 import { setClass, setStyle } from '../../src/ui/util.ts';
-import * as complete from '../lib/fixture-targets.ts';
+import * as complete from '../lib/dom-fixture.ts';
 import { fixture } from '../lib/fixture.ts';
 import { FixtureImageBitmap, installImageBitmapFixture } from '../lib/image-bitmap.ts';
 

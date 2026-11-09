@@ -42,6 +42,39 @@ test('fixture installs accessors lazily and preserves their target receiver', ()
   assert.equal(reads, 1);
 });
 
+test('fixture accessor setters use the same target receiver as getters', (): void => {
+  const controls: Partial<Controls> = {
+    get value(): number {
+      return this.untouched ?? 0;
+    },
+    set value(value: number) {
+      this.untouched = value;
+    },
+  };
+  const target = new Controls();
+  const installed = fixture(controls, target);
+  installed.value = 9;
+  assert.equal(installed.value, 9);
+  assert.equal(target.untouched, 9);
+  assert.equal(controls.untouched, undefined);
+});
+
+test('fixture rejects writes to getter-only and readonly overrides', (): void => {
+  for (const controls of [
+    {
+      get value(): number {
+        return 7;
+      },
+    },
+    Object.freeze({ value: 7 }),
+  ]) {
+    const installed = fixture(controls, new Controls());
+    assert.throws((): void => {
+      installed.value = 9;
+    }, /Cannot set fixture member value/);
+  }
+});
+
 test('complete throwing implementations retain explicit unsupported-operation failures', (): void => {
   const target = {
     value: 1,

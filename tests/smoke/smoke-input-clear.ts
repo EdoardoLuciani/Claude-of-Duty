@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import { DEFAULT_BINDINGS } from '../../src/core/bindings.ts';
 import { Input } from '../../src/core/input.ts';
-import * as complete from '../lib/fixture-targets.ts';
+import * as complete from '../lib/dom-fixture.ts';
 import { fixture } from '../lib/fixture.ts';
 
 function keyEvent(code: string, repeat = false): KeyboardEvent {
@@ -29,7 +29,7 @@ for (const [action, codes] of Object.entries(DEFAULT_BINDINGS)) {
   }
 }
 
-const input = new Input(fixture<HTMLCanvasElement>({}, complete.testElement('canvas')), {
+const input = new Input(complete.testElement('canvas'), {
   sensitivity: 0.001,
   invertY: false,
 });

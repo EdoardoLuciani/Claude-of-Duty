@@ -49,7 +49,7 @@ interface WeaponHarness {
   shots: { live: number; fired: number; impacts: number };
 }
 function makeHarness(): WeaponHarness {
-  const input = new Input(fixture<HTMLCanvasElement>({}, complete.testElement('canvas')), {
+  const input = new Input(complete.testElement('canvas'), {
     sensitivity: 1,
     invertY: false,
   });

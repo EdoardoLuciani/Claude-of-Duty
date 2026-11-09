@@ -56,7 +56,7 @@ system.viewmodel = fixture<WeaponSystem['viewmodel']>(
 );
 system.rng = new Rng(1);
 system.rng.signed = (): never => assert.fail('warmup consumed gameplay RNG');
-const graph = fixture<NonNullable<RenderSystem['_graph']>>({}, complete.testGraph());
+const graph = complete.testGraph();
 const render = fixture<RenderSystem>(
   {
     _graph: graph,
@@ -141,10 +141,7 @@ failedSystem.pickups = system.pickups;
 failedSystem._restTask = Promise.resolve();
 failedSystem._droppedMags = system._droppedMags;
 failedSystem._magPools = system._magPools;
-const body = fixture<NonNullable<(typeof system._droppedMags)[number]['body']>>(
-  {},
-  new complete.RigidBody()
-);
+const body = new complete.RigidBody();
 system._droppedMags[0].body = body;
 failedSystem.physics = fixture<PhysicsSystem>(
   {

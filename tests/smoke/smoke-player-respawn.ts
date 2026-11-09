@@ -4,7 +4,6 @@ import * as THREE from 'three';
 
 import { AiSystem } from '../../src/ai/index.ts';
 /** Respawn must publish the reset damage capsule before nested restart consumers run. */
-import type { SurfaceNav } from '../../src/ai/nav.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { StaticWorld } from '../../src/physics/bvh.ts';
 import { CharacterController } from '../../src/physics/character.ts';
@@ -20,7 +19,6 @@ import { HEALTH, HEALING, STANCE } from '../../src/player/tuning.ts';
 import { WorldSystem } from '../../src/world/index.ts';
 import { createTestContext } from '../lib/context.ts';
 import * as complete from '../lib/fixture-targets.ts';
-import { fixture as partialFixture } from '../lib/fixture.ts';
 
 interface RespawnFixture {
   player: PlayerSystem;
@@ -74,7 +72,7 @@ function fixture(dead: boolean, stance: PlayerStance): RespawnFixture {
   const ai = new AiSystem();
   ai.ctx = ctx;
   // Native navigation is never queried when perSquad is zero; only readiness is used.
-  ai.grid = partialFixture<SurfaceNav>({}, complete.testNav());
+  ai.grid = complete.testNav();
   ai._v3 = new THREE.Vector3();
   const placementOrigins: THREE.Vector3[] = [];
   ai.playerPosition = function (out, sample): THREE.Vector3 {

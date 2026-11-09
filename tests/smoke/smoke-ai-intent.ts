@@ -16,13 +16,11 @@ import {
   isBannedCover,
   pickSquadAnchors,
 } from '../../src/ai/intent.ts';
-import type { SurfaceNav } from '../../src/ai/nav.ts';
 import { Squad } from '../../src/ai/squad.ts';
 import { WorldSystem } from '../../src/world/index.ts';
 import { makeAgent, makeAi } from '../lib/agent-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 import * as complete from '../lib/fixture-targets.ts';
-import { fixture } from '../lib/fixture.ts';
 
 assert.equal(PEEK_DEATHS_NEEDED, 2);
 assert.equal(PLANT_HOLD, 3);
@@ -259,7 +257,7 @@ assert.equal(squad.peekTokens, 1, 'last wrapper can still peek');
 
 const world = new WorldSystem();
 world.spawnPoints = [{ position: new THREE.Vector3(0, 0, 30), yaw: 0, tag: 'test' }];
-const emptySpawn = makeAi(fixture<SurfaceNav>({}, complete.testNav()));
+const emptySpawn = makeAi(complete.testNav());
 emptySpawn.ctx = createTestContext({ providers: { world } });
 emptySpawn._v3 = new THREE.Vector3();
 emptySpawn.playerPosition = (out): THREE.Vector3 => out.set(0, 0, 0);

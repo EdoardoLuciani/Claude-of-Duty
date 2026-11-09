@@ -9,7 +9,6 @@ import {
   Object3D,
   Node,
   type Renderer,
-  type Backend,
 } from 'three/webgpu';
 
 import { SURFACES_TSL } from '../../src/materials/surfaces-index-tsl.ts';
@@ -68,18 +67,7 @@ for (const [name, surface] of Object.entries(SURFACES_TSL)) {
         // Match the original offline stub's non-WebGPU coordinate branch (not a live renderer).
         coordinateSystem: WebGLCoordinateSystem,
         contextNode: context(),
-        backend: fixture<
-          Backend & {
-            capabilities: { getUniformBufferLimit(): number };
-            compatibilityMode: boolean;
-          }
-        >(
-          {
-            capabilities: { getUniformBufferLimit: (): number => 65536 },
-            compatibilityMode: false,
-          },
-          complete.testCapableBackend()
-        ),
+        backend: complete.testCapableBackend(),
         debug: fixture<Renderer['debug']>(
           { diagnostics: { keywords: false } },
           {

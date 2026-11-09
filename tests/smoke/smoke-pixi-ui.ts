@@ -31,6 +31,41 @@ import {
   captureMethod,
 } from '../lib/ui-fixture.ts';
 
+function hudModelsTarget(): Parameters<PixiHud['update']>[7] {
+  return {
+    get hit(): never {
+      return complete.unavailable('hit');
+    },
+    get arcs(): never {
+      return complete.unavailable('arcs');
+    },
+    get compass(): never {
+      return complete.unavailable('compass');
+    },
+    get ammo(): never {
+      return complete.unavailable('ammo');
+    },
+    get fpsText(): never {
+      return complete.unavailable('fpsText');
+    },
+    get prompt(): never {
+      return complete.unavailable('prompt');
+    },
+    get banner(): never {
+      return complete.unavailable('banner');
+    },
+    get scoreBar(): never {
+      return complete.unavailable('scoreBar');
+    },
+    get killfeed(): never {
+      return complete.unavailable('killfeed');
+    },
+    get marketCountdown(): never {
+      return complete.unavailable('marketCountdown');
+    },
+  };
+}
+
 const restoreDocument = installUiDocument();
 const game = new THREE.Renderer(
   new THREE.WebGPUBackend({ canvas: document.createElement('canvas') })
@@ -38,10 +73,7 @@ const game = new THREE.Renderer(
 await assert.rejects(
   initPixiRenderer(
     new WebGPURenderer(),
-    fixture<THREE.Renderer>(
-      { backend: fixture<THREE.Renderer['backend']>({}, complete.testBackend()) },
-      complete.testRenderer()
-    ),
+    fixture<THREE.Renderer>({ backend: complete.testBackend() }, complete.testRenderer()),
     document.createElement('canvas'),
     1,
     1
@@ -64,11 +96,7 @@ try {
     ),
   });
   await assert.rejects(
-    PixiHud.create(
-      fixture<HTMLElement>({}, complete.testElement('div')),
-      fixture<HTMLElement>({}, complete.testElement('div')),
-      game
-    ),
+    PixiHud.create(complete.testElement('div'), complete.testElement('div'), game),
     /constructor failed/
   );
   assert.equal(DOMAdapter.get(), adapter, 'constructor failure restores adapter');
@@ -256,7 +284,7 @@ try {
   await assert.rejects(
     PixiHud.create(
       fixture<HTMLElement>({ clientWidth: 1, clientHeight: 1 }, complete.testElement('div')),
-      fixture<HTMLElement>({}, complete.testElement('div')),
+      complete.testElement('div'),
       initializedGame
     ),
     /HUD init failed/
@@ -310,41 +338,7 @@ for (const failure of [null, 'injury', 'stage', 'renderer']) {
     new Minimap(new Rng(1)),
     {},
     0,
-    fixture<Parameters<PixiHud['update']>[7]>(
-      {},
-      {
-        get hit(): never {
-          return complete.unavailable('hit');
-        },
-        get arcs(): never {
-          return complete.unavailable('arcs');
-        },
-        get compass(): never {
-          return complete.unavailable('compass');
-        },
-        get ammo(): never {
-          return complete.unavailable('ammo');
-        },
-        get fpsText(): never {
-          return complete.unavailable('fpsText');
-        },
-        get prompt(): never {
-          return complete.unavailable('prompt');
-        },
-        get banner(): never {
-          return complete.unavailable('banner');
-        },
-        get scoreBar(): never {
-          return complete.unavailable('scoreBar');
-        },
-        get killfeed(): never {
-          return complete.unavailable('killfeed');
-        },
-        get marketCountdown(): never {
-          return complete.unavailable('marketCountdown');
-        },
-      }
-    )
+    hudModelsTarget()
   );
   assert.equal(renderers, 1, 'disposed HUD cannot draw or destroy twice');
 }
@@ -442,41 +436,7 @@ const hiddenFrame = (): void =>
     new Minimap(new Rng(1)),
     {},
     0,
-    fixture<Parameters<PixiHud['update']>[7]>(
-      {},
-      {
-        get hit(): never {
-          return complete.unavailable('hit');
-        },
-        get arcs(): never {
-          return complete.unavailable('arcs');
-        },
-        get compass(): never {
-          return complete.unavailable('compass');
-        },
-        get ammo(): never {
-          return complete.unavailable('ammo');
-        },
-        get fpsText(): never {
-          return complete.unavailable('fpsText');
-        },
-        get prompt(): never {
-          return complete.unavailable('prompt');
-        },
-        get banner(): never {
-          return complete.unavailable('banner');
-        },
-        get scoreBar(): never {
-          return complete.unavailable('scoreBar');
-        },
-        get killfeed(): never {
-          return complete.unavailable('killfeed');
-        },
-        get marketCountdown(): never {
-          return complete.unavailable('marketCountdown');
-        },
-      }
-    )
+    hudModelsTarget()
   );
 try {
   Object.defineProperty(globalThis, 'devicePixelRatio', { value: 1, configurable: true });

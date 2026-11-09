@@ -4,6 +4,7 @@
  */
 export function fixture<T extends object>(members: Partial<T>, target: T): T {
   for (const key of Reflect.ownKeys(members)) {
+    const setter = Object.getOwnPropertyDescriptor(members, key)?.set?.bind(target);
     const descriptor: PropertyDescriptor = {
       configurable: true,
       enumerable: true,
@@ -12,6 +13,10 @@ export function fixture<T extends object>(members: Partial<T>, target: T): T {
         return value;
       },
       set(value: unknown): void {
+        if (setter) {
+          setter(value);
+          return;
+        }
         if (!Reflect.set(members, key, value))
           throw new TypeError(`Cannot set fixture member ${String(key)}`);
       },

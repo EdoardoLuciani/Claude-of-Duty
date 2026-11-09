@@ -405,7 +405,7 @@ for (const motion of [
 
 {
   const wp = new WeaponSystem();
-  const input = new Input(fixture<HTMLCanvasElement>({}, complete.testElement('canvas')), {
+  const input = new Input(complete.testElement('canvas'), {
     sensitivity: 0.002,
     invertY: false,
   });
@@ -466,7 +466,7 @@ for (const motion of [
 }
 
 {
-  const input = new Input(fixture<HTMLCanvasElement>({}, complete.testElement('canvas')), {
+  const input = new Input(complete.testElement('canvas'), {
     sensitivity: 0.002,
     invertY: false,
   });

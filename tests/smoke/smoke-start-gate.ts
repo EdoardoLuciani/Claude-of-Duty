@@ -4,7 +4,7 @@ import { PlayerSystem } from '../../src/player/index.ts';
 import { StartGate } from '../../src/ui/start.ts';
 import { createTestContext } from '../lib/context.ts';
 import { createCoreFixture } from '../lib/core-fixture.ts';
-import * as complete from '../lib/fixture-targets.ts';
+import * as complete from '../lib/dom-fixture.ts';
 import { fixture } from '../lib/fixture.ts';
 
 const listeners = new Map<string, EventListenerOrEventListenerObject>();
@@ -31,7 +31,7 @@ function createElement<K extends keyof HTMLElementDeprecatedTagNameMap>(
 function createElement(tag: string): HTMLElement;
 function createElement(tag: string): HTMLElement {
   const members = {
-    style: fixture<CSSStyleDeclaration>({}, complete.testStyle()),
+    style: complete.testStyle(),
     onclick: null,
     setAttribute(): void {},
     append(): void {},
@@ -135,7 +135,7 @@ function createStartFixture(visible = true): {
   assert(button);
   const click = (): void => {
     assert(button.onclick);
-    button.onclick(fixture<PointerEvent>({}, complete.testPointerEvent()));
+    button.onclick(complete.testPointerEvent());
   };
   const lock = (): void => {
     pointerLockElement = engine.canvas;

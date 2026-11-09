@@ -255,7 +255,7 @@ const grid = fixture<SurfaceNav>(
   },
   complete.testNav()
 );
-const cover = new CoverMap(grid, fixture<PhysicsSystem>({}, new complete.PhysicsSystem()));
+const cover = new CoverMap(grid, new complete.PhysicsSystem());
 cover.protects = (): true => true;
 cover.peekOffset = (): number => 0;
 const pick = (): ReturnType<CoverMap['pick']> =>
@@ -530,47 +530,44 @@ probe._probe.move = function (...args): number {
 probe.worker = fixture<AttachmentQueries>(
   {
     active: true,
-    current: fixture<NonNullable<AttachmentQueries['current']>>(
-      {},
-      {
-        get actor(): never {
-          return complete.unavailable('actor');
-        },
-        get kind(): never {
-          return complete.unavailable('kind');
-        },
-        get proofs(): never {
-          return complete.unavailable('proofs');
-        },
-        get started(): never {
-          return complete.unavailable('started');
-        },
-        get frame(): never {
-          return complete.unavailable('frame');
-        },
-        get waiting(): never {
-          return complete.unavailable('waiting');
-        },
-        get gapFrames(): never {
-          return complete.unavailable('gapFrames');
-        },
-        get attempts(): never {
-          return complete.unavailable('attempts');
-        },
-        get lastFrame(): never {
-          return complete.unavailable('lastFrame');
-        },
-        get pending(): never {
-          return complete.unavailable('pending');
-        },
-        get unsent(): never {
-          return complete.unavailable('unsent');
-        },
-        get used(): never {
-          return complete.unavailable('used');
-        },
-      }
-    ),
+    current: {
+      get actor(): never {
+        return complete.unavailable('actor');
+      },
+      get kind(): never {
+        return complete.unavailable('kind');
+      },
+      get proofs(): never {
+        return complete.unavailable('proofs');
+      },
+      get started(): never {
+        return complete.unavailable('started');
+      },
+      get frame(): never {
+        return complete.unavailable('frame');
+      },
+      get waiting(): never {
+        return complete.unavailable('waiting');
+      },
+      get gapFrames(): never {
+        return complete.unavailable('gapFrames');
+      },
+      get attempts(): never {
+        return complete.unavailable('attempts');
+      },
+      get lastFrame(): never {
+        return complete.unavailable('lastFrame');
+      },
+      get pending(): never {
+        return complete.unavailable('pending');
+      },
+      get unsent(): never {
+        return complete.unavailable('unsent');
+      },
+      get used(): never {
+        return complete.unavailable('used');
+      },
+    },
     request(): false {
       delegated = true;
       return false;

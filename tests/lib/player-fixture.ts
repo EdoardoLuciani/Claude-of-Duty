@@ -7,7 +7,6 @@ import { HealController } from '../../src/player/heal.ts';
 import { Health } from '../../src/player/health.ts';
 import { PlayerSystem } from '../../src/player/index.ts';
 import { Movement } from '../../src/player/movement.ts';
-import type { ArmAsset } from '../../src/weapons/arm-asset.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { Clip } from '../../src/weapons/clips.ts';
 import { buildRecoilPattern, WEAPON_DEFS, WEAPON_IDS } from '../../src/weapons/defs.ts';
@@ -16,18 +15,12 @@ import { WeaponSystem } from '../../src/weapons/index.ts';
 import { ReticleMaterials } from '../../src/weapons/materials-tsl.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import * as complete from './fixture-targets.ts';
-import { fixture } from './fixture.ts';
 
 /** Real viewmodel state, with rendering/hand presentation held inert by each test. */
 export function presentationViewmodel(ctx: EngineContext, calls: string[] = []): Viewmodel {
   const vm = new Viewmodel(ctx, new ReticleMaterials());
   // Arms load asynchronously in init; presentation tests only touch the blood overlay.
-  vm.armAsset = fixture<ArmAsset>(
-    {
-      blood: fixture<ArmAsset['blood']>({ setHealthFraction(): void {} }, complete.testArmBlood()),
-    },
-    complete.testArmAsset()
-  );
+  vm.armAsset = complete.testArmAsset();
   vm.play = (name: string): number => {
     vm.clip = new Clip(name, 1, {});
     vm.clipT = 0;

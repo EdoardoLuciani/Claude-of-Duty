@@ -1,6 +1,5 @@
 import { Mixer } from '../../src/audio/mixer.ts';
 import { Rng } from '../../src/core/rng.ts';
-import { fixture } from './fixture.ts';
 
 export class FixtureAudioParam implements AudioParam {
   value: number;
@@ -206,13 +205,19 @@ export class CompleteAudioContext extends EventTarget implements AudioContext {
     return unsupportedAudio();
   }
   createGain(): FixtureGainNode {
-    return new FixtureGainNode(this);
+    const node = new FixtureGainNode(this);
+    this.gains.push(node);
+    return node;
   }
   createBufferSource(): FixtureBufferSource {
-    return new FixtureBufferSource(this);
+    const source = new FixtureBufferSource(this);
+    this.sources.push(source);
+    return source;
   }
   createOscillator(): FixtureOscillator {
-    return new FixtureOscillator(this);
+    const source = new FixtureOscillator(this);
+    this.oscillators.push(source);
+    return source;
   }
   createBiquadFilter(): BiquadFilterNode {
     return new FixtureBiquad(this);
@@ -253,58 +258,24 @@ export class CompleteAudioContext extends EventTarget implements AudioContext {
   }
 }
 
-export type FixtureAudioContext = Omit<
-  AudioContext,
-  'currentTime' | 'state' | 'createGain' | 'createBufferSource' | 'createOscillator'
-> & {
-  currentTime: number;
-  state: AudioContextState;
-  sources: FixtureBufferSource[];
-  gains: FixtureGainNode[];
-  oscillators: FixtureOscillator[];
-  createGain(): FixtureGainNode;
-  createBufferSource(): FixtureBufferSource;
-  createOscillator(): FixtureOscillator;
-};
+type TrackedAudioContext = Pick<
+  CompleteAudioContext,
+  | 'currentTime'
+  | 'state'
+  | 'sources'
+  | 'gains'
+  | 'oscillators'
+  | 'createGain'
+  | 'createBufferSource'
+  | 'createOscillator'
+>;
+export type FixtureAudioContext = Omit<AudioContext, keyof TrackedAudioContext> &
+  TrackedAudioContext;
 
 /** Tracks only the native graph operations exercised by these audio recipes. */
 export function createAudioContext(currentTime = 0): FixtureAudioContext {
-  const actx: FixtureAudioContext = fixture<FixtureAudioContext>(
-    {
-      currentTime,
-      sampleRate: 48000,
-      state: 'running',
-      sources: [],
-      gains: [],
-      oscillators: [],
-      createGain(): FixtureGainNode {
-        const node = new FixtureGainNode(actx);
-        actx.gains.push(node);
-        return node;
-      },
-      createBufferSource(): FixtureBufferSource {
-        const source = new FixtureBufferSource(actx);
-        actx.sources.push(source);
-        return source;
-      },
-      createOscillator(): FixtureOscillator {
-        const source = new FixtureOscillator(actx);
-        actx.oscillators.push(source);
-        return source;
-      },
-      createBiquadFilter(): BiquadFilterNode {
-        return new FixtureBiquad(actx);
-      },
-      createDynamicsCompressor(): DynamicsCompressorNode {
-        return new FixtureCompressor(actx);
-      },
-      close(): Promise<void> {
-        actx.state = 'closed';
-        return Promise.resolve();
-      },
-    },
-    new CompleteAudioContext()
-  );
+  const actx = new CompleteAudioContext();
+  actx.currentTime = currentTime;
   return actx;
 }
 

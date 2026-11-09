@@ -3,13 +3,11 @@ import { createHash } from 'node:crypto';
 
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial, TextureNode, AttributeNode, type Node } from 'three/webgpu';
-import type { NodeBuilder } from 'three/webgpu';
 
 import { EventBus } from '../../src/core/registry.ts';
 import { Health } from '../../src/player/health.ts';
 import { createArmBlood, addArmBloodCoordinates } from '../../src/weapons/arm-blood.ts';
 import * as complete from '../lib/fixture-targets.ts';
-import { fixture } from '../lib/fixture.ts';
 
 const blood = createArmBlood();
 const again = createArmBlood();
@@ -113,8 +111,7 @@ assert(
   [...nodes].some(
     (node): boolean =>
       node instanceof AttributeNode &&
-      node.getAttributeName(fixture<NodeBuilder>({}, complete.testNodeBuilder())) ===
-        'armBloodPosition'
+      node.getAttributeName(complete.testNodeBuilder()) === 'armBloodPosition'
   ),
   'graph uses independent bind coordinates'
 );

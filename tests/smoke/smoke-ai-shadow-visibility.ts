@@ -77,39 +77,36 @@ for (const height of [0.2, 1, 1.78]) {
               _sweep: new Sphere(),
               _sun: new Vector3(),
               _lodStats: { irrelevant: 0 },
-              stats: fixture<AiSystem['stats']>(
-                {},
-                {
-                  get agents(): never {
-                    return complete.unavailable('agents');
-                  },
-                  get alive(): never {
-                    return complete.unavailable('alive');
-                  },
-                  get navMs(): never {
-                    return complete.unavailable('navMs');
-                  },
-                  get coverPts(): never {
-                    return complete.unavailable('coverPts');
-                  },
-                  get walkable(): never {
-                    return complete.unavailable('walkable');
-                  },
-                  get friendlyHolds(): never {
-                    return complete.unavailable('friendlyHolds');
-                  },
-                  get grenadeHolds(): never {
-                    return complete.unavailable('grenadeHolds');
-                  },
-                  get pathsDeferred(): never {
-                    return complete.unavailable('pathsDeferred');
-                  },
-                }
-              ),
+              stats: {
+                get agents(): never {
+                  return complete.unavailable('agents');
+                },
+                get alive(): never {
+                  return complete.unavailable('alive');
+                },
+                get navMs(): never {
+                  return complete.unavailable('navMs');
+                },
+                get coverPts(): never {
+                  return complete.unavailable('coverPts');
+                },
+                get walkable(): never {
+                  return complete.unavailable('walkable');
+                },
+                get friendlyHolds(): never {
+                  return complete.unavailable('friendlyHolds');
+                },
+                get grenadeHolds(): never {
+                  return complete.unavailable('grenadeHolds');
+                },
+                get pathsDeferred(): never {
+                  return complete.unavailable('pathsDeferred');
+                },
+              },
               _frustum: fixture<Frustum>(
                 {
                   setFromProjectionMatrix(): Frustum {
-                    return fixture<Frustum>({}, new complete.THREE.Frustum());
+                    return new complete.THREE.Frustum();
                   },
                   intersectsSphere(s: Sphere): boolean {
                     calls.push([...s.center.toArray(), s.radius]);

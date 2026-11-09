@@ -121,7 +121,7 @@ for (const fail of [false, true]) {
     sentinel = new Scene();
   scene.add(sentinel);
   const render = new RenderSystem();
-  render.renderer = fixture<Renderer>({}, complete.testRenderer());
+  render.renderer = complete.testRenderer();
   render.patchMaterials = (stage): void => {
     assert(stage);
     assert.equal(stage.parent, scene);
@@ -169,7 +169,7 @@ for (const fail of [false, true]) {
 }
 assert.deepEqual(await new FxSystem().prewarmMaterials(), { ok: false, reason: 'no renderer' });
 for (const renderer of [
-  fixture<Renderer>({}, complete.testRenderer()),
+  complete.testRenderer(),
   fixture<Renderer>(
     {
       async compileAsync(): Promise<void> {

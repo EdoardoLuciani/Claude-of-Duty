@@ -1,6 +1,5 @@
 import { createTestContext } from '../lib/context.ts';
-import * as complete from '../lib/fixture-targets.ts';
-import { fixture } from '../lib/fixture.ts';
+import * as complete from '../lib/dom-fixture.ts';
 // Disabled native input must not leak held or stale axes into actual Player consumers.
 import assert from 'node:assert/strict';
 
@@ -21,7 +20,7 @@ Object.defineProperty(globalThis, 'navigator', {
   },
 });
 try {
-  const input = new Input(fixture<HTMLCanvasElement>({}, complete.testElement('canvas')), {
+  const input = new Input(complete.testElement('canvas'), {
     sensitivity: 0.002,
     invertY: false,
   });
