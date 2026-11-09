@@ -28,8 +28,8 @@ bun run dev            # local server; not needed for CI-only work
 ```
 
 - Tests and build must pass from a clean install: no missing imports/exports or
-  assets available only on another branch. Do not weaken/delete tests to pass CI.
-  If a test is wrong, fix it and explain why in the PR.
+  assets available only on another branch. If a test is wrong, fix it and explain
+  why in the PR.
 - Use `bun run format` and `bun run format:check` (`bun fmt`); scope and exclusions
   are documented in README.md. All first-party runtime, test, tool and world-authoring
   ES modules use checked `.ts` source.
