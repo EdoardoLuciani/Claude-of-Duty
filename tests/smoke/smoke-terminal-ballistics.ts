@@ -76,11 +76,13 @@ function wall(
 function actor(
   f: BallisticsFixture,
   x: number,
-  layer = f.phys.LAYER.ACTOR,
-  radius = 0.1,
-  owner: unknown = {},
-  part = 'torso',
-  damageScale = 1
+  {
+    layer = f.phys.LAYER.ACTOR,
+    radius = 0.1,
+    owner = {},
+    part = 'torso',
+    damageScale = 1,
+  }: { layer?: number; radius?: number; owner?: unknown; part?: string; damageScale?: number } = {}
 ): ReturnType<PhysicsSystem['addCollider']> {
   const c = f.phys.addCollider({ layer, owner, part, damageScale, surface: 'flesh', radius });
   c.setSegment(x, 0.3, 0, x, 1.5, 0, radius);
@@ -140,7 +142,7 @@ function fire(
 {
   const f = fixture();
   wall(f, 'plaster', 0.34, 2, { ballisticSurface: 'concrete' });
-  actor(f, 4, f.phys.LAYER.PLAYER);
+  actor(f, 4, { layer: f.phys.LAYER.PLAYER });
   const shot = fire(f);
   assert.equal(shot.stopReason, 'blocked');
   assert.equal(shot.impacts.length, 1);
@@ -152,7 +154,7 @@ function fire(
 {
   const f = fixture();
   wall(f, 'fabric', 0.25, 2, { ballisticSurface: 'sand' });
-  actor(f, 4, f.phys.LAYER.PLAYER);
+  actor(f, 4, { layer: f.phys.LAYER.PLAYER });
   const shot = fire(f);
   assert.equal(shot.stopReason, 'blocked', 'sandbag fill stops the round');
   assert.equal(shot.impacts[0].surface, 'fabric', 'cloth still drives its visible impact');
@@ -161,9 +163,9 @@ function fire(
 for (const layerName of ['PLAYER', 'ACTOR'] as const) {
   const f = fixture();
   wall(f, 'wood', 0.05);
-  const c = actor(f, 4, f.phys.LAYER[layerName]);
+  const c = actor(f, 4, { layer: f.phys.LAYER[layerName] });
   const shooter = {};
-  actor(f, 0, f.phys.LAYER[layerName], 0.3, shooter);
+  actor(f, 0, { layer: f.phys.LAYER[layerName], radius: 0.3, owner: shooter });
   const shot = fire(f, { shooter });
   assert.equal(
     f.damage.length,
@@ -296,7 +298,7 @@ for (const overlap of ['none', 'masonry', 'bone']) {
 // A thick body consumes energy before the wall behind it can receive a hole.
 {
   const f = fixture();
-  actor(f, 2, f.phys.LAYER.PLAYER, 0.3);
+  actor(f, 2, { layer: f.phys.LAYER.PLAYER, radius: 0.3 });
   wall(f, 'wood', 0.02, 4);
   const shot = fire(f);
   assert.equal(f.damage.length, 1);
@@ -392,7 +394,7 @@ for (const dynamic of [false, true]) {
   f.events.on('damage:dealt', (e): void => {
     if (e.target === first.owner) {
       f.phys.removeCollider(second);
-      actor(f, 3, f.phys.LAYER.ACTOR, 0.5);
+      actor(f, 3, { radius: 0.5 });
     }
   });
   fire(f, { penetration: 2 });
@@ -406,8 +408,8 @@ for (const dynamic of [false, true]) {
 {
   const f = fixture();
   const a = makeAgent({ alive: true });
-  actor(f, 4, f.phys.LAYER.ACTOR, 0.2, a);
-  actor(f, 4, f.phys.LAYER.ACTOR, 0.1, a, 'head', 3);
+  actor(f, 4, { radius: 0.2, owner: a });
+  actor(f, 4, { radius: 0.1, owner: a, part: 'head', damageScale: 3 });
   let applied = 0;
   a.applyDamage = (amount): void => {
     applied += amount;
@@ -433,8 +435,13 @@ for (const dynamic of [false, true]) {
 for (const obstruction of ['concrete', 'wood', 'range', 'body', 'deflect', 'none']) {
   const f = fixture(),
     owner = {};
-  actor(f, 2, f.phys.LAYER.ACTOR, obstruction === 'body' ? 0.3 : 0.05, owner, 'arm', 0.65);
-  actor(f, 4, f.phys.LAYER.ACTOR, 0.1, owner, 'head', 4);
+  actor(f, 2, {
+    radius: obstruction === 'body' ? 0.3 : 0.05,
+    owner,
+    part: 'arm',
+    damageScale: 0.65,
+  });
+  actor(f, 4, { radius: 0.1, owner, part: 'head', damageScale: 4 });
   if (obstruction === 'concrete') wall(f, 'concrete', 0.2, 3);
   if (obstruction === 'wood') wall(f, 'wood', 0.02, 3);
   const shot = fire(f, {
@@ -469,9 +476,9 @@ for (const obstruction of ['concrete', 'wood', 'range', 'body', 'deflect', 'none
 {
   const f = fixture(),
     owner = {};
-  const arm = actor(f, 2, f.phys.LAYER.ACTOR, 0.08, owner, 'arm', 0.65);
+  const arm = actor(f, 2, { radius: 0.08, owner, part: 'arm', damageScale: 0.65 });
   arm.setSegment(2, 0.5, 0, 2, 1.5, 0, 0.08);
-  const head = actor(f, 2.5, f.phys.LAYER.ACTOR, 0.08, owner, 'head', 4);
+  const head = actor(f, 2.5, { radius: 0.08, owner, part: 'head', damageScale: 4 });
   head.setSegment(2.5, 0.5, 0, 2.5, 1.5, 0, 0.08);
   fire(f, { penetration: 2 });
   const instant = f.damage.pop();
@@ -505,9 +512,9 @@ for (const kind of [
 ]) {
   const f = fixture(),
     owner = {};
-  actor(f, 2, f.phys.LAYER.ACTOR, kind === 'body' ? 0.3 : 0.05, owner, 'arm', 0.65);
+  actor(f, 2, { radius: kind === 'body' ? 0.3 : 0.05, owner, part: 'arm', damageScale: 0.65 });
   const headX = kind === 'layers' ? 20 : 4;
-  actor(f, headX, f.phys.LAYER.ACTOR, 0.1, owner, 'head', 4);
+  actor(f, headX, { radius: 0.1, owner, part: 'head', damageScale: 4 });
   if (kind === 'wood' || kind === 'exhausted' || kind === 'actors')
     wall(f, 'wood', kind === 'exhausted' ? 0.3 : 0.02, kind === 'actors' ? 5 : 3);
   if (kind === 'concrete') wall(f, 'concrete', 0.2, 3);
@@ -576,8 +583,8 @@ for (const kind of [
 {
   const f = fixture(),
     owner = {};
-  actor(f, 2, f.phys.LAYER.ACTOR, 0.05, owner, 'arm', 0.65);
-  const head = actor(f, 4, f.phys.LAYER.ACTOR, 0.1, owner, 'head', 4);
+  actor(f, 2, { radius: 0.05, owner, part: 'arm', damageScale: 0.65 });
+  const head = actor(f, 4, { radius: 0.1, owner, part: 'head', damageScale: 4 });
   wall(f, 'wood', 0.02, 2.6);
   wall(f, 'wood', 0.02, 3.4);
   const scatter = [0, 0, 400, 0, -800, 0];
@@ -612,8 +619,8 @@ for (const kind of [
 {
   const f = fixture(),
     owner = {};
-  actor(f, 2, f.phys.LAYER.ACTOR, 0.05, owner, 'arm', 0.65);
-  const head = actor(f, 4, f.phys.LAYER.ACTOR, 0.1, owner, 'head', 4);
+  actor(f, 2, { radius: 0.05, owner, part: 'arm', damageScale: 0.65 });
+  const head = actor(f, 4, { radius: 0.1, owner, part: 'head', damageScale: 4 });
   const sim = new ProjectileSim(projectileContext(f, false));
   sim.spawn(round({ penetration: 2 }));
   for (let i = 0; i < 3; i++) sim.fixedUpdate(1 / 120);
@@ -635,10 +642,10 @@ for (const kind of [
   const f = fixture(),
     owner = {},
     other = {};
-  actor(f, 2, f.phys.LAYER.ACTOR, 0.05, owner, 'arm', 0.65);
-  actor(f, 4, f.phys.LAYER.ACTOR, 0.1, owner, 'head', 4);
-  const firstOther = actor(f, 3, f.phys.LAYER.ACTOR, 0.05, other);
-  const lastOther = actor(f, 5, f.phys.LAYER.ACTOR, 0.05, other);
+  actor(f, 2, { radius: 0.05, owner, part: 'arm', damageScale: 0.65 });
+  actor(f, 4, { radius: 0.1, owner, part: 'head', damageScale: 4 });
+  const firstOther = actor(f, 3, { radius: 0.05, owner: other });
+  const lastOther = actor(f, 5, { radius: 0.05, owner: other });
   f.events.on('damage:dealt', (e): void => {
     if (e.target === owner) {
       f.phys.removeCollider(firstOther);
@@ -663,19 +670,10 @@ for (const kind of [
 for (const cleanup of ['clear', 'recycle', 'expiry']) {
   const f = fixture(),
     owner = {};
-  actor(f, 2, f.phys.LAYER.ACTOR, 0.05, owner, 'arm', 0.65);
-  actor(f, 4, f.phys.LAYER.ACTOR, 0.1, owner, 'head', 4);
+  actor(f, 2, { radius: 0.05, owner, part: 'arm', damageScale: 0.65 });
+  actor(f, 4, { radius: 0.1, owner, part: 'head', damageScale: 4 });
   const sim = new ProjectileSim(projectileContext(f, false));
-  const opts = {
-    origin: v(),
-    dir: v(1, 0),
-    speed: 100,
-    dragK: 0,
-    maxRange: 20,
-    damage: 40,
-    penetration: 2,
-    dropoff: 1,
-  };
+  const opts = round({ penetration: 2 });
   const p = sim.spawn(opts);
   assert(p);
   const oldShot = p.shot;
@@ -710,19 +708,9 @@ for (const cleanup of ['clear', 'recycle', 'expiry']) {
     resolved = { ...e };
   });
   const shooter = new PlayerSystem();
-  actor(f, 0, f.phys.LAYER.PLAYER, 0.3, shooter);
+  actor(f, 0, { layer: f.phys.LAYER.PLAYER, radius: 0.3, owner: shooter });
   const sim = new ProjectileSim(projectileContext(f, true));
-  sim.spawn({
-    origin: v(),
-    dir: v(1, 0),
-    speed: 100,
-    dragK: 0,
-    damage: 40,
-    penetration: 0.9,
-    dropoff: 0.5,
-    maxRange: 20,
-    shooter,
-  });
+  sim.spawn(round({ dropoff: 0.5, shooter }));
   for (let i = 0; i < 120 && sim.live.length; i++) sim.fixedUpdate(1 / 120);
   assert.equal(f.damage.length, 1);
   assert.equal(f.damage[0].target, target.owner);
@@ -741,7 +729,7 @@ function timedFlight(
 ): { step: number; hit: BallisticsFixture['damage'][number]; speed: number } {
   const f = fixture();
   if (covered) wall(f, 'wood', 0.02);
-  actor(f, 100, f.phys.LAYER.ACTOR, 0.3);
+  actor(f, 100, { radius: 0.3 });
   const sim = new ProjectileSim(projectileContext(f, false));
   const p = sim.spawn(round({ speed: 800, dragK, maxRange: 200, dropoff: 0.5 }));
   assert(p);
@@ -783,10 +771,10 @@ function timedFlight(
   f.phys.ballistics.rng = { gauss: (): number => (++draws % 2 ? 50 : 0) };
   const z = -(8 - 2.025) * 0.03 * (0.05 / (0.32 * 0.9)) * 50;
   const owner = {},
-    target = actor(f, 8, f.phys.LAYER.ACTOR, 0.1, owner);
+    target = actor(f, 8, { radius: 0.1, owner });
   target.setSegment(8, 0.3, z, 8, 1.5, z, 0.1);
   // A later capsule of the same actor must not cause a second damage event.
-  const extra = actor(f, 10, f.phys.LAYER.ACTOR, 0.1, owner);
+  const extra = actor(f, 10, { radius: 0.1, owner });
   const path = fire(f, { emit: false }).segments.at(-1);
   assert(path);
   const t = (10 - path.from.x) / (path.to.x - path.from.x);
@@ -888,7 +876,7 @@ for (const noDamage of [false, true]) {
   const f = fixture();
   wall(f, 'wood', 0.05);
   const player = { isPlayer: true };
-  actor(f, 4, f.phys.LAYER.PLAYER, 0.1, player);
+  actor(f, 4, { layer: f.phys.LAYER.PLAYER, radius: 0.1, owner: player });
   const ai = new AiSystem();
   applyDefinedPatch(ai, {
     _phys: f.phys,
@@ -921,7 +909,7 @@ for (const noDamage of [false, true]) {
     },
     ['staged']
   );
-  actor(f, 0, f.phys.LAYER.ACTOR, 0.3, agent);
+  actor(f, 0, { radius: 0.3, owner: agent });
   ai.onAgentFire(agent, v(), v(1, 0));
   assert.equal(f.damage.length, noDamage ? 0 : 1);
   if (!noDamage) assert.ok(f.damage[0].amount < 17);
@@ -1012,7 +1000,7 @@ for (const friendly of [true, false]) {
   });
   a._muzzleOk = (): boolean => true;
   const target = makeAgent({ alive: true, team: friendly ? 1 : 0, position: v(8, 0, -1.6) });
-  const c = actor(f, 8, f.phys.LAYER.ACTOR, 0.12, target);
+  const c = actor(f, 8, { radius: 0.12, owner: target });
   // Scatter at the wood exit is dz/dx = -.03 * (.05 / (.32 * .9)) * 50.
   const z = -(8 - 2.025) * 0.03 * (0.05 / (0.32 * 0.9)) * 50;
   c.setSegment(8, 0.3, z, 8, 1.5, z, 0.12);

@@ -86,7 +86,7 @@ export class BrainPlayer extends PlayerSystem {
 
   /** Fit the torso capsule to the test pose, as the production player does. */
   fitHitbox(): void {
-    const r = 0.3,
+    const r = this.hitbox.radius,
       p = this.testPosition;
     this.hitbox.setSegment(p.x, p.y + r, p.z, p.x, p.y + Math.max(r, this.testHeight - r), p.z, r);
   }
@@ -104,7 +104,6 @@ export function brainAi(
     providers: { physics, ...(player ? { player } : {}) },
   });
   ai.ctx.time.dt = 1 / 60;
-  ai._phys = physics;
   return ai;
 }
 
