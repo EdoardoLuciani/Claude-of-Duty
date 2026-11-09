@@ -78,9 +78,11 @@ function actor(
   x: number,
   layer = f.phys.LAYER.ACTOR,
   radius = 0.1,
-  owner: unknown = {}
+  owner: unknown = {},
+  part = 'torso',
+  damageScale = 1
 ): ReturnType<PhysicsSystem['addCollider']> {
-  const c = f.phys.addCollider({ layer, owner, part: 'torso', surface: 'flesh', radius });
+  const c = f.phys.addCollider({ layer, owner, part, damageScale, surface: 'flesh', radius });
   c.setSegment(x, 0.3, 0, x, 1.5, 0, radius);
   return c;
 }
@@ -103,6 +105,21 @@ function boxProxy(
     const c = f.phys.addCollider({ shape: 'box', surface, hx, hy, hz });
     c.setMatrix(new THREE.Matrix4().makeTranslation(2, 1, 0));
   }
+}
+type RoundOptions = Parameters<ProjectileSim['spawn']>[0];
+/** Straight, drag-free 100 m/s round along +X; tests override only what they probe. */
+function round(opts: Partial<RoundOptions> = {}): RoundOptions {
+  return {
+    origin: v(),
+    dir: v(1, 0),
+    speed: 100,
+    dragK: 0,
+    maxRange: 20,
+    damage: 40,
+    penetration: 0.9,
+    dropoff: 1,
+    ...opts,
+  };
 }
 function fire(
   f: BallisticsFixture,
@@ -390,9 +407,7 @@ for (const dynamic of [false, true]) {
   const f = fixture();
   const a = makeAgent({ alive: true });
   actor(f, 4, f.phys.LAYER.ACTOR, 0.2, a);
-  const head = actor(f, 4, f.phys.LAYER.ACTOR, 0.1, a);
-  head.part = 'head';
-  head.damageScale = 3;
+  actor(f, 4, f.phys.LAYER.ACTOR, 0.1, a, 'head', 3);
   let applied = 0;
   a.applyDamage = (amount): void => {
     applied += amount;
@@ -418,12 +433,8 @@ for (const dynamic of [false, true]) {
 for (const obstruction of ['concrete', 'wood', 'range', 'body', 'deflect', 'none']) {
   const f = fixture(),
     owner = {};
-  const arm = actor(f, 2, f.phys.LAYER.ACTOR, obstruction === 'body' ? 0.3 : 0.05, owner);
-  arm.part = 'arm';
-  arm.damageScale = 0.65;
-  const head = actor(f, 4, f.phys.LAYER.ACTOR, 0.1, owner);
-  head.part = 'head';
-  head.damageScale = 4;
+  actor(f, 2, f.phys.LAYER.ACTOR, obstruction === 'body' ? 0.3 : 0.05, owner, 'arm', 0.65);
+  actor(f, 4, f.phys.LAYER.ACTOR, 0.1, owner, 'head', 4);
   if (obstruction === 'concrete') wall(f, 'concrete', 0.2, 3);
   if (obstruction === 'wood') wall(f, 'wood', 0.02, 3);
   const shot = fire(f, {
@@ -458,29 +469,16 @@ for (const obstruction of ['concrete', 'wood', 'range', 'body', 'deflect', 'none
 {
   const f = fixture(),
     owner = {};
-  const arm = actor(f, 2, f.phys.LAYER.ACTOR, 0.08, owner);
+  const arm = actor(f, 2, f.phys.LAYER.ACTOR, 0.08, owner, 'arm', 0.65);
   arm.setSegment(2, 0.5, 0, 2, 1.5, 0, 0.08);
-  arm.part = 'arm';
-  arm.damageScale = 0.65;
-  const head = actor(f, 2.5, f.phys.LAYER.ACTOR, 0.08, owner);
+  const head = actor(f, 2.5, f.phys.LAYER.ACTOR, 0.08, owner, 'head', 4);
   head.setSegment(2.5, 0.5, 0, 2.5, 1.5, 0, 0.08);
-  head.part = 'head';
-  head.damageScale = 4;
   fire(f, { penetration: 2 });
   const instant = f.damage.pop();
   assert(instant);
   assert.equal(instant.part, 'head');
   const sim = new ProjectileSim(projectileContext(f, false));
-  sim.spawn({
-    origin: v(),
-    dir: v(1, 0),
-    speed: 100,
-    dragK: 0,
-    maxRange: 20,
-    damage: 40,
-    penetration: 2,
-    dropoff: 1,
-  });
+  sim.spawn(round({ penetration: 2 }));
   for (let i = 0; i < 3; i++) sim.fixedUpdate(1 / 120);
   assert.equal(f.damage.length, 0, 'arm contact waits only for the local actor extent');
   sim.fixedUpdate(1 / 120);
@@ -507,13 +505,9 @@ for (const kind of [
 ]) {
   const f = fixture(),
     owner = {};
-  const arm = actor(f, 2, f.phys.LAYER.ACTOR, kind === 'body' ? 0.3 : 0.05, owner);
-  arm.part = 'arm';
-  arm.damageScale = 0.65;
+  actor(f, 2, f.phys.LAYER.ACTOR, kind === 'body' ? 0.3 : 0.05, owner, 'arm', 0.65);
   const headX = kind === 'layers' ? 20 : 4;
-  const head = actor(f, headX, f.phys.LAYER.ACTOR, 0.1, owner);
-  head.part = 'head';
-  head.damageScale = 4;
+  actor(f, headX, f.phys.LAYER.ACTOR, 0.1, owner, 'head', 4);
   if (kind === 'wood' || kind === 'exhausted' || kind === 'actors')
     wall(f, 'wood', kind === 'exhausted' ? 0.3 : 0.02, kind === 'actors' ? 5 : 3);
   if (kind === 'concrete') wall(f, 'concrete', 0.2, 3);
@@ -535,16 +529,7 @@ for (const kind of [
   f.events.on('shot:resolved', (e): void => {
     resolved = { ...e, to: e.to.clone() };
   });
-  const p = sim.spawn({
-    origin: v(),
-    dir: v(1, 0),
-    speed: 100,
-    dragK: 0,
-    maxRange: opts.maxDist,
-    damage: 40,
-    penetration: opts.penetration,
-    dropoff: 1,
-  });
+  const p = sim.spawn(round({ maxRange: opts.maxDist, penetration: opts.penetration }));
   assert(p);
   while (tick < 120 && p.alive) {
     tick++;
@@ -591,12 +576,8 @@ for (const kind of [
 {
   const f = fixture(),
     owner = {};
-  const arm = actor(f, 2, f.phys.LAYER.ACTOR, 0.05, owner);
-  arm.part = 'arm';
-  arm.damageScale = 0.65;
-  const head = actor(f, 4, f.phys.LAYER.ACTOR, 0.1, owner);
-  head.part = 'head';
-  head.damageScale = 4;
+  actor(f, 2, f.phys.LAYER.ACTOR, 0.05, owner, 'arm', 0.65);
+  const head = actor(f, 4, f.phys.LAYER.ACTOR, 0.1, owner, 'head', 4);
   wall(f, 'wood', 0.02, 2.6);
   wall(f, 'wood', 0.02, 3.4);
   const scatter = [0, 0, 400, 0, -800, 0];
@@ -615,16 +596,7 @@ for (const kind of [
   draws = 0;
   f.segments.length = 0;
   const sim = new ProjectileSim(projectileContext(f, false));
-  sim.spawn({
-    origin: v(),
-    dir: v(1, 0),
-    speed: 100,
-    dragK: 0,
-    maxRange: 20,
-    damage: 40,
-    penetration: 2,
-    dropoff: 1,
-  });
+  sim.spawn(round({ penetration: 2 }));
   for (let i = 0; i < 120 && sim.live.length; i++) sim.fixedUpdate(1 / 120);
   assert.ok(
     f.segments.some((s): boolean => s.to.z < -0.2),
@@ -640,23 +612,10 @@ for (const kind of [
 {
   const f = fixture(),
     owner = {};
-  const arm = actor(f, 2, f.phys.LAYER.ACTOR, 0.05, owner);
-  arm.part = 'arm';
-  arm.damageScale = 0.65;
-  const head = actor(f, 4, f.phys.LAYER.ACTOR, 0.1, owner);
-  head.part = 'head';
-  head.damageScale = 4;
+  actor(f, 2, f.phys.LAYER.ACTOR, 0.05, owner, 'arm', 0.65);
+  const head = actor(f, 4, f.phys.LAYER.ACTOR, 0.1, owner, 'head', 4);
   const sim = new ProjectileSim(projectileContext(f, false));
-  sim.spawn({
-    origin: v(),
-    dir: v(1, 0),
-    speed: 100,
-    dragK: 0,
-    maxRange: 20,
-    damage: 40,
-    penetration: 2,
-    dropoff: 1,
-  });
+  sim.spawn(round({ penetration: 2 }));
   for (let i = 0; i < 3; i++) sim.fixedUpdate(1 / 120);
   head.setSegment(6, 0.3, 0, 6, 1.5, 0, 0.1);
   for (let i = 0; i < 3; i++) sim.fixedUpdate(1 / 120);
@@ -676,12 +635,8 @@ for (const kind of [
   const f = fixture(),
     owner = {},
     other = {};
-  const arm = actor(f, 2, f.phys.LAYER.ACTOR, 0.05, owner);
-  arm.part = 'arm';
-  arm.damageScale = 0.65;
-  const head = actor(f, 4, f.phys.LAYER.ACTOR, 0.1, owner);
-  head.part = 'head';
-  head.damageScale = 4;
+  actor(f, 2, f.phys.LAYER.ACTOR, 0.05, owner, 'arm', 0.65);
+  actor(f, 4, f.phys.LAYER.ACTOR, 0.1, owner, 'head', 4);
   const firstOther = actor(f, 3, f.phys.LAYER.ACTOR, 0.05, other);
   const lastOther = actor(f, 5, f.phys.LAYER.ACTOR, 0.05, other);
   f.events.on('damage:dealt', (e): void => {
@@ -691,16 +646,7 @@ for (const kind of [
     }
   });
   const sim = new ProjectileSim(projectileContext(f, false));
-  sim.spawn({
-    origin: v(),
-    dir: v(1, 0),
-    speed: 100,
-    dragK: 0,
-    maxRange: 20,
-    damage: 40,
-    penetration: 2,
-    dropoff: 1,
-  });
+  sim.spawn(round({ penetration: 2 }));
   for (let i = 0; i < 120 && sim.live.length; i++) sim.fixedUpdate(1 / 120);
   assert.equal(f.damage.length, 2);
   assert.equal(f.damage[0].part, 'head');
@@ -717,12 +663,8 @@ for (const kind of [
 for (const cleanup of ['clear', 'recycle', 'expiry']) {
   const f = fixture(),
     owner = {};
-  const arm = actor(f, 2, f.phys.LAYER.ACTOR, 0.05, owner);
-  arm.part = 'arm';
-  arm.damageScale = 0.65;
-  const head = actor(f, 4, f.phys.LAYER.ACTOR, 0.1, owner);
-  head.part = 'head';
-  head.damageScale = 4;
+  actor(f, 2, f.phys.LAYER.ACTOR, 0.05, owner, 'arm', 0.65);
+  actor(f, 4, f.phys.LAYER.ACTOR, 0.1, owner, 'head', 4);
   const sim = new ProjectileSim(projectileContext(f, false));
   const opts = {
     origin: v(),
@@ -801,16 +743,7 @@ function timedFlight(
   if (covered) wall(f, 'wood', 0.02);
   actor(f, 100, f.phys.LAYER.ACTOR, 0.3);
   const sim = new ProjectileSim(projectileContext(f, false));
-  const p = sim.spawn({
-    origin: v(),
-    dir: v(1, 0),
-    speed: 800,
-    dragK,
-    maxRange: 200,
-    damage: 40,
-    penetration: 0.9,
-    dropoff: 0.5,
-  });
+  const p = sim.spawn(round({ speed: 800, dragK, maxRange: 200, dropoff: 0.5 }));
   assert(p);
   let step = 0;
   while (!f.damage.length && step < 120) {
@@ -863,16 +796,7 @@ function timedFlight(
   const summaries: EngineEventMap['shot:resolved'][] = [];
   f.events.on('shot:resolved', (e): number => summaries.push({ ...e, to: e.to.clone() }));
   const sim = new ProjectileSim(projectileContext(f, true));
-  const p = sim.spawn({
-    origin: v(),
-    dir: v(1, 0),
-    speed: 100,
-    dragK: 0,
-    maxRange: 20,
-    damage: 40,
-    penetration: 0.9,
-    dropoff: 1,
-  });
+  const p = sim.spawn(round());
   assert(p);
   for (let i = 0; i < 120 && p.alive; i++) sim.fixedUpdate(1 / 120);
   assert.equal(f.damage.length, 1, 'scatter reaches the off-lane actor once');
@@ -887,16 +811,7 @@ function timedFlight(
     'summary owns a copy across pooled resolver reuse'
   );
   const oldShot = p.shot;
-  sim.spawn({
-    origin: v(),
-    dir: v(1, 0),
-    speed: 100,
-    dragK: 0,
-    maxRange: 20,
-    damage: 40,
-    penetration: 0.9,
-    dropoff: 1,
-  });
+  sim.spawn(round());
   for (let i = 0; i < 120 && sim.live.length; i++) sim.fixedUpdate(1 / 120);
   assert.equal(f.damage.length, 2, 'pool reuse resets previously contacted actors');
   assert.notEqual(f.damage[1].shot, oldShot);
@@ -909,16 +824,7 @@ function timedFlight(
   wall(f, 'foliage', 1.5, 2);
   actor(f, 4);
   const sim = new ProjectileSim(projectileContext(f, false));
-  const p = sim.spawn({
-    origin: v(),
-    dir: v(1, 0),
-    speed: 100,
-    dragK: 0,
-    maxRange: 20,
-    damage: 40,
-    penetration: 2,
-    dropoff: 1,
-  });
+  const p = sim.spawn(round({ penetration: 2 }));
   assert(p);
   sim.fixedUpdate(1 / 120);
   sim.fixedUpdate(1 / 120);
@@ -945,16 +851,7 @@ function timedFlight(
   f.events.on('shot:resolved', (e): void => {
     reason = e.stopReason;
   });
-  sim.spawn({
-    origin: v(),
-    dir: v(1, 0),
-    speed: 100,
-    dragK: 0,
-    maxRange: 20,
-    damage: 40,
-    penetration: 2,
-    dropoff: 1,
-  });
+  sim.spawn(round({ penetration: 2 }));
   for (let i = 0; i < 120 && sim.live.length; i++) sim.fixedUpdate(1 / 120);
   assert.equal(f.effects.filter((e): boolean => !e.exit).length, 6);
   assert.equal(f.damage.length, 0);
@@ -966,16 +863,7 @@ function timedFlight(
   wall(f, 'wood', 0.02);
   actor(f, 15);
   const sim = new ProjectileSim(projectileContext(f, false));
-  sim.spawn({
-    origin: v(),
-    dir: v(1, 0),
-    speed: 100,
-    dragK: 0,
-    maxRange: 10,
-    damage: 40,
-    penetration: 0.9,
-    dropoff: 1,
-  });
+  sim.spawn(round({ maxRange: 10 }));
   for (let i = 0; i < 120 && sim.live.length; i++) sim.fixedUpdate(1 / 120);
   assert.equal(f.damage.length, 0, 'continuation cannot exceed the original range');
   assert.ok(f.segments.every((s): boolean => s.to.x <= 10.00001));

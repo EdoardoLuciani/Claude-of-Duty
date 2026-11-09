@@ -17,8 +17,9 @@ import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { makeAgent } from '../lib/agent-fixture.ts';
-import { BrainPlayer, brainAnimator } from '../lib/ai-brain-fixture.ts';
+import { BrainPlayer, brainAi, brainAnimator } from '../lib/ai-brain-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
+import { addTriangles } from '../lib/static-world.ts';
 
 const DT = 1 / 60;
 const SEEDS = [0x51eed01, 0xa11e5, 0xc0ffee];
@@ -37,45 +38,15 @@ function mean(xs: number[]): number {
   return xs.reduce((s, x): number => s + x, 0) / xs.length;
 }
 
-function makePlayer(stance: 'stand' | 'crouch' | 'prone' = 'stand', world = phys): BrainPlayer {
-  const height = HEIGHT[stance];
-  const player = new BrainPlayer(world, height);
+function makePlayer(stance: BrainPlayer['testStance'] = 'stand', world = phys): BrainPlayer {
+  const player = new BrainPlayer(world, HEIGHT[stance]);
   player.testStance = stance;
-  player.hitbox.owner = player;
-  syncHitbox(player);
+  player.fitHitbox();
   return player;
 }
 
-function syncHitbox(player: BrainPlayer): void {
-  const r = 0.3,
-    h = player.height,
-    p = player.position;
-  player.hitbox.setSegment(p.x, p.y + r, p.z, p.x, p.y + Math.max(r, h - r), p.z, r);
-}
-
 function makeAi(player: BrainPlayer, world = phys): AiSystem {
-  const ai = new AiSystem();
-  ai.ctx = createTestContext({
-    events,
-    providers: { physics: world, ...(player ? { player } : {}) },
-  });
-  ai.ctx.time.dt = DT;
-  ai._phys = world;
-  ai._v = new THREE.Vector3();
-  ai.cover = null;
-  ai.grid = null;
-  ai.agents = [];
-  ai.stats = {
-    agents: 0,
-    alive: 0,
-    navMs: 0,
-    coverPts: 0,
-    walkable: 0,
-    friendlyHolds: 0,
-    grenadeHolds: 0,
-    pathsDeferred: 0,
-  };
-  ai.playerPosition = AiSystem.prototype.playerPosition.bind(ai);
+  const ai = brainAi(world, player, events);
   ai.emitReload = (): void => {};
   return ai;
 }
@@ -285,7 +256,7 @@ function runEncounter(
   while (t < 2.4) {
     if (vx) {
       player.position.x += vx * DT;
-      syncHitbox(player);
+      player.fitHitbox();
     }
     tickSenseThink(a, DT);
     tickFire(a, DT);
@@ -371,12 +342,10 @@ inRange('ttfs 10m with firstBurst', spawnTtfs, BASELINE.ttfsSpawn[10]);
 /* 5. world occlusion */
 {
   const world = new PhysicsSystem();
-  world.staticWorld.addTriangles(
-    new Float32Array([-2, 0, 5, 2, 0, 5, 2, 2.4, 5, -2, 0, 5, 2, 2.4, 5, -2, 2.4, 5]),
-    2,
-    'concrete',
-    world.LAYER.STATIC,
-    'wall'
+  addTriangles(
+    world.staticWorld,
+    [-2, 0, 5, 2, 0, 5, 2, 2.4, 5, -2, 0, 5, 2, 2.4, 5, -2, 2.4, 5],
+    'concrete'
   );
   world.staticWorld.build();
   const player = makePlayer('stand', world);

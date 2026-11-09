@@ -49,7 +49,7 @@ function fixture(
   const phys = physicsFor(scene),
     player = new BrainPlayer(phys, height);
   player.position.set(0, 0, 10);
-  player.hitbox.setSegment(0, 0.3, 10, 0, Math.max(0.3, height - 0.3), 10, 0.3);
+  player.fitHitbox();
   const ai = makeAi();
   ai.ctx = createTestContext({ providers: { player } });
   ai.playerPosition = AiSystem.prototype.playerPosition.bind(ai);
