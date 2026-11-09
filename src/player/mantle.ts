@@ -5,9 +5,8 @@
 
 import * as THREE from 'three';
 
-import { DEG, clamp01 } from '../core/math.ts';
+import { DEG, clamp01, smootherstep, smoothstep } from '../core/math.ts';
 import type { SurfaceName } from '../physics/surfaces.ts';
-import { smootherstep, smoothstep } from './springs.ts';
 import { MOVE } from './tuning.ts';
 
 export const LEDGE_NONE = 0;
@@ -309,41 +308,40 @@ export class MantleMotion {
 
   /** Up first, then in — the shape of pulling yourself onto a roof. */
   _evalMantle(u: number): void {
-    const rise = smootherstep(clamp01(u / 0.62));
-    const settle = smootherstep(clamp01((u - 0.58) / 0.42));
+    const rise = smootherstep(0, 0.62, u);
+    const settle = smootherstep(0.58, 1, u);
     const peak = this.topY + 0.06;
     let y = this.startY + (peak - this.startY) * rise;
     y += (this.landY - peak) * settle;
 
     // 18 % of the horizontal travel happens during the rise (hands reaching in),
     // the rest once the hips clear the lip.
-    const lead = smoothstep(clamp01(u / 0.62)) * 0.18;
-    const pull = smootherstep(clamp01((u - 0.42) / 0.58)) * 0.82;
+    const lead = smoothstep(0, 0.62, u) * 0.18;
+    const pull = smootherstep(0.42, 1, u) * 0.82;
     const h = clamp01(lead + pull);
     this.px = this.startX + (this.landX - this.startX) * h;
     this.pz = this.startZ + (this.landZ - this.startZ) * h;
     this.py = y;
 
     // Camera: dip as the arms load, ride up with a shoulder roll, tiny settle.
-    const load = Math.sin(clamp01(u / 0.34) * Math.PI) * (1 - smoothstep(clamp01((u - 0.5) / 0.5)));
+    const load = Math.sin(clamp01(u / 0.34) * Math.PI) * (1 - smoothstep(0.5, 1, u));
     this.camY = -0.075 * load + 0.03 * Math.sin(clamp01((u - 0.55) / 0.45) * Math.PI);
     this.camForward = 0.05 * Math.sin(clamp01(u) * Math.PI);
-    this.camPitch = -5.2 * DEG * load + 2.1 * DEG * smoothstep(clamp01((u - 0.6) / 0.4));
+    this.camPitch = -5.2 * DEG * load + 2.1 * DEG * smoothstep(0.6, 1, u);
     this.camRoll = this.side * 3.2 * DEG * Math.sin(clamp01(u) * Math.PI);
   }
 
   /** A single low arc that carries momentum through — a hurdle, not a climb. */
   _evalVault(u: number): void {
-    const h = smoothstep(u);
+    const h = smoothstep(0, 1, u);
     this.px = this.startX + (this.landX - this.startX) * h;
     this.pz = this.startZ + (this.landZ - this.startZ) * h;
 
     const clearance = this.topY + 0.14;
-    const upT = clamp01(u / 0.42);
-    const downT = clamp01((u - 0.42) / 0.58);
-    let y = this.startY + (clearance - this.startY) * smootherstep(upT);
-    y += (this.landY - clearance) * smootherstep(downT) * (u > 0.42 ? 1 : 0);
-    this.py = y;
+    this.py =
+      this.startY +
+      (clearance - this.startY) * smootherstep(0, 0.42, u) +
+      (this.landY - clearance) * smootherstep(0.42, 1, u);
 
     const arc = Math.sin(clamp01(u) * Math.PI);
     this.camY = -0.045 * arc;

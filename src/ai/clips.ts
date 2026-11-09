@@ -3,9 +3,9 @@
  * Blend delta arrays; locomotion counter-rotates spine and pelvis around stance.
  */
 
+import { TAU } from '../core/math.ts';
 import type { LadderDirection, LadderPhase } from './ladder.ts';
 
-const TAU = Math.PI * 2;
 const sin = Math.sin;
 const cos = Math.cos;
 /** smooth positive lobe used for knee/ankle curves */

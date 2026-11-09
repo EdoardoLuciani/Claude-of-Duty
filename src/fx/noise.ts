@@ -149,11 +149,6 @@ export class Noise {
   }
 }
 
-export function smoothstep(a: number, b: number, x: number): number {
-  const t = clamp01((x - a) / (b - a || 1e-6));
-  return t * t * (3 - 2 * t);
-}
-
 /** sRGB encode for atlases sampled as sRGB textures. */
 export function encodeSrgb(v: number): number {
   v = clamp01(v);
