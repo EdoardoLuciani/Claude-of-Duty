@@ -11,7 +11,7 @@ import {
   queryIdentity,
   LADDER_QUERY_MAX_MOVES,
 } from '../../src/ai/attachment-types.ts';
-import { canStand, checkAttachment } from '../../src/ai/attachment.js';
+import { canStand, checkAttachment } from '../../src/ai/attachment.ts';
 import { INFANTRY } from '../../src/ai/capabilities.ts';
 import {
   LADDER,

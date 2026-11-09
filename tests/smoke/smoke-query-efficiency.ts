@@ -4,7 +4,7 @@ import * as THREE from 'three';
 
 import { AttachmentQueries, NAV_PENDING } from '../../src/ai/attachment-queries.ts';
 import type { AttachmentOracle, ClientMessage } from '../../src/ai/attachment-types.ts';
-import { checkAttachment, canStand } from '../../src/ai/attachment.js';
+import { checkAttachment, canStand } from '../../src/ai/attachment.ts';
 import type { SurfaceNav } from '../../src/ai/nav.ts';
 import { StaticWorld } from '../../src/physics/bvh.ts';
 import { CharacterController } from '../../src/physics/character.ts';

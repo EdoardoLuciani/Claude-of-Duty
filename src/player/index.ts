@@ -778,7 +778,7 @@ export class PlayerSystem {
   get mantling(): boolean {
     return this.movement.mantleMotion.active || this.movement.climbMotion.active;
   }
-  /** Used by the browser combat-profile fixture (tools/lib/profile-combat.js). */
+  /** Used by the browser combat-profile fixture (tools/lib/profile-combat.ts). */
   get eyeHeight(): number {
     return this.rig.eye;
   }
@@ -882,7 +882,10 @@ export class PlayerSystem {
    * harness hands us — it passes the camera transform); `rot` may be a
    * THREE.Euler, an object with `.y`, or a yaw in radians.
    */
-  teleport(eyeOrPos: THREE.Vector3, rot: THREE.Euler | { x?: number; y?: number } | number): void {
+  teleport(
+    eyeOrPos: THREE.Vector3Like,
+    rot: THREE.Euler | { x?: number; y?: number } | number
+  ): void {
     const eyeH = STANCE.stand.eye;
     const feetY = eyeOrPos.y - eyeH;
     if (typeof rot === 'number') {

@@ -2,7 +2,7 @@ import type { Vector3, Vector3Like } from 'three';
 
 import type { StaticWorld } from '../physics/bvh.ts';
 import type { CharacterController } from '../physics/character.ts';
-import { querySnapshot } from '../physics/query-snapshot.js';
+import { querySnapshot } from '../physics/query-snapshot.ts';
 import { AttachmentConnection, ATTACHMENT_DEADLINE_MS } from './attachment-connection.ts';
 import { parseSnapshotCopy, parseQueryKey, queryIdentity } from './attachment-types.ts';
 import type {

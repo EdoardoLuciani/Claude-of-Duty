@@ -340,7 +340,7 @@ export function installShotApi(
    * applies the shot, the screenshot RPC itself). The number of frames that fit
    * inside those round trips is wall-clock dependent, so `engine.time.frame` at
    * the moment the shutter fires drifted 10-20 frames run to run. Everything
-   * phase-locked to the absolute frame index — TAA jitter (render/index.js:1067),
+   * phase-locked to the absolute frame index — TAA jitter (render/index.ts:1067),
    * GTAO / contact-shadow noise rotation (`frame % 64`), exposure
    * adaptation, and the cadence of every scripted transient — therefore resolved
    * differently on every run. That, not any subsystem clock read, is what made

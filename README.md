@@ -20,13 +20,12 @@ It installs dependencies from `bun.lock`, type-checks (`bun check`),
 formats (`bun fmt`), bundles and serves the game (`build/bun.ts`; the dev server
 reads its plugin from `bunfig.toml`); packages are cached in `~/.bun/install/cache`, so warm
 reinstalls are near-instant. Bun also runs the checked TypeScript asset orchestrator,
-world exporter, procedural-texture exporter, model staging and gltfpack cook, plus
-the remaining JavaScript world validator. Browser capture/profile entry points and
-the complete test suite also run on Bun. The checked soldier authoring/cook pipeline
+world exporter/validator, procedural-texture exporter, model staging and gltfpack cook.
+Browser capture/profile entry points and the complete test suite also run on Bun. The checked soldier authoring/cook pipeline
 and weapon hand-reference tools run on Bun too; Blender still owns geometry and clips.
 `bun run lint` forces both Oxlint passes to Bun; Node.js is not a project prerequisite.
-Runtime source, every `tests/**/*.ts` script, converted helpers and the migrated
-CLI tools use explicit `.ts` imports and share strict checking through
+All first-party ES modules—runtime source, tests, world-authoring code/data and
+tools—use TypeScript, explicit `.ts` imports and strict checking through
 `bun run typecheck`. Build entry points and tests have separate `build/tsconfig.json`
 and `tests/tsconfig.json` projects so Bun globals do not change browser types. All
 three projects share strict compiler options and type-aware lint rules.
@@ -35,16 +34,13 @@ script, bounded near one per physical core, plus the fixture unit tests. The 30-
 per-script hang guard remains; simulation limits and behavioral assertions are unchanged.
 Run one script with `bun test ./tests/smoke/smoke-health-events.ts`. Test mocks and worker
 transport may use Bun's Node-compatible APIs; no test process requires the Node binary.
-The second, type-aware lint pass covers runtime source, tests, build entry points and typed tools;
-shared JavaScript authoring APIs consumed by tests have `.d.ts` contracts in
-`tests/types/`. Package import aliases select those contracts for checking and the
-unchanged JavaScript modules at runtime, keeping declaration-only edits out of world
-asset provenance hashes.
+Both lint passes cover all first-party source, tests, build entry points and tools.
+Package import aliases resolve directly to checked source implementations; there are
+no unchecked JavaScript authoring modules or parallel test-only declaration contracts.
 (`noUncheckedIndexedAccess` status: [triage and plan](docs/no-unchecked-indexed-access.md)).
 `bun run lint` requires explicit return types on every TypeScript function, method,
 getter and callback (including contextually typed functions and functions returning
-functions). Constructors and setters have no return annotation; JavaScript helpers
-are outside this rule.
+functions). Constructors and setters have no return annotation.
 The compiler also checks implicit missing returns, missing `override` modifiers,
 switch fallthrough, and exact optional properties: omit unset patch fields rather
 than writing `undefined` over required defaults. Lint rejects floating/misused promises and unsafe narrowing
@@ -57,12 +53,10 @@ Issue [#621](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/621) approv
 exception: only `tests/lib/fixture.ts` may assert its checked `Partial<T>` as `T`.
 Its proxy throws on unexpected missing-member reads; explicitly listed optional
 members may be absent. No other test file relaxes the unsafe-assertion rule.
-Regular lint rules cover `src/`, `build/`, `tools/`, and `tests/`. Missing return annotations
-fail CI's lint step, not the typecheck itself. The narrow declaration additions in
-`src/render/three-types.d.ts` describe APIs verified against the pinned Three.js
-source; review them alongside the Three/@types upgrade checks.
-`bun run build` runs typecheck and lint first via `prebuild`. Remaining JavaScript
-helpers run alongside TypeScript; broad `checkJs` adoption is deferred.
+Missing return annotations fail CI's lint step, not the typecheck itself. The narrow
+declaration additions in `src/render/three-types.d.ts` describe APIs verified against
+the pinned Three.js source; review them alongside the Three/@types upgrade checks.
+`bun run build` runs typecheck and lint first via `prebuild`.
 
 ### Formatting
 

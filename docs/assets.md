@@ -71,10 +71,10 @@ Start in [`tools/worldgen/`](../tools/worldgen/) for level layout, configuration
 intel sites and explicit placement records. This is the world source—not
 `assets/world/` or a Blender backup.
 
-- **Prop shape:** [`props.js`](../tools/worldgen/props.js); dressing-only prototypes
-  also live in [`dressing.js`](../tools/worldgen/dressing.js).
-- **Building construction:** [`buildings.js`](../tools/worldgen/buildings.js),
-  [`kit.js`](../tools/worldgen/kit.js) and [`interiors.js`](../tools/worldgen/interiors.js).
+- **Prop shape:** [`props.ts`](../tools/worldgen/props.ts); dressing-only prototypes
+  also live in [`dressing.ts`](../tools/worldgen/dressing.ts).
+- **Building construction:** [`buildings.ts`](../tools/worldgen/buildings.ts),
+  [`kit.ts`](../tools/worldgen/kit.ts) and [`interiors.ts`](../tools/worldgen/interiors.ts).
 - **Appearance palette:** [`src/world/palette.ts`](../src/world/palette.ts), shared
   by authoring and runtime materials.
 - **Compile:** `bun run world`; then `bun run world:validate` and
@@ -92,7 +92,7 @@ intel sites and explicit placement records. This is the world source—not
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
 | Arms and bandage            | [`player_arms.py`](../tools/blender/player_arms.py), [`player_bandage.py`](../tools/blender/player_bandage.py); [asset contract](../assets/player/arms/README.md) | Follow the asset's Blender commands; review in engine  | `assets/player/arms/`, `public/models/player/`, generated poses/paths in `src/weapons/`; loaded by weapon arm/bandage adapters |
 | Soldiers                    | [`tools/blender/soldiers/`](../tools/blender/soldiers/); [asset contract](../assets/soldiers/README.md). Runtime RIG/registry/surfaces remain in `src/ai/`        | Explicit Blender author/cook; `bun run models` stages  | Generated `assets/soldiers/` products stage to ignored `public/models/soldiers/*.glb` + JSON; loaded by `ModelSystem` and AI   |
-| Spent shotgun hull          | [`tools/lib/spent-hull.mjs`](../tools/lib/spent-hull.mjs)                                                                                                         | `bun run models`; review in engine                     | `public/models/fx/spent12g.glb`, consumed by FX                                                                                |
+| Spent shotgun hull          | [`tools/lib/spent-hull.ts`](../tools/lib/spent-hull.ts)                                                                                                           | `bun run models`; review in engine                     | `public/models/fx/spent12g.glb`, consumed by FX                                                                                |
 | Procedural textures         | [`tools/export-proc-textures.ts`](../tools/export-proc-textures.ts) and its declared AI/FX inputs                                                                 | `bun tools/export-proc-textures.ts`; `bun run test`    | Generated `public/models/proc/`, consumed by AI materials and FX                                                               |
 | Standalone EXPS3 attachment | [`exps3.py`](../tools/blender/exps3.py), [`exps3_bake.py`](../tools/blender/exps3_bake.py); [asset contract](../assets/attachments/eotech-exps3-0/README.md)      | Asset Blender commands; `bun run models:cook -- exps3` | `assets/attachments/eotech-exps3-0/`; cooked attachment is not yet wired into gameplay                                         |
 

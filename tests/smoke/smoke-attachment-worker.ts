@@ -4,7 +4,7 @@ import * as THREE from 'three';
 
 import { AttachmentQueries, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/attachment-queries.ts';
 import type { AttachmentOracle } from '../../src/ai/attachment-types.ts';
-import { canStand, checkAttachment } from '../../src/ai/attachment.js';
+import { canStand, checkAttachment } from '../../src/ai/attachment.ts';
 import type { BakedCoverPoint } from '../../src/ai/nav-format.ts';
 import type { NavCache } from '../../src/ai/nav.ts';
 import { CoverMap, SurfaceNav } from '../../src/ai/nav.ts';

@@ -167,7 +167,7 @@ export class AiSystem {
     nextIn: 0,
   };
   /** Seconds of silence before the next wave lands. Longer than the market
-   *  grace period (10 s, see MARKET_DELAY in market/index.js): the shop
+   *  grace period (10 s, see MARKET_DELAY in market/index.ts): the shop
    *  opens mid-countdown and freezing time on open holds what remains. */
   waveDelay: number = 20;
   _hudList: AiActor[] = [];

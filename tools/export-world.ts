@@ -27,9 +27,9 @@ import { NAV_VERSION } from '../src/ai/nav-format.ts';
 import { isRecord } from '../src/core/guards.ts';
 import type { MaterialOptions } from '../src/materials/index.ts';
 import { exportGlb } from './lib/export-glb.ts';
-import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from './worldgen/level/config.js';
-import { buildCollision } from './worldgen/pack.js';
-import { worldSourceHash } from './worldgen/source-hash.js';
+import { LEVEL_TX, LEVEL_TZ, LEVEL_YAW } from './worldgen/level/config.ts';
+import { buildCollision } from './worldgen/pack.ts';
+import { worldSourceHash } from './worldgen/source-hash.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const { values: args } = parseArgs({
@@ -249,7 +249,7 @@ await withLock(async (): Promise<void> => {
   if (cacheReady()) console.log('[world] up to date');
   else await compileWorld();
   await run(process.execPath, [
-    resolve(ROOT, 'tools/validate-world-assets.mjs'),
+    resolve(ROOT, 'tools/validate-world-assets.ts'),
     `--manifest=${join(OUT, 'level.json')}`,
   ]);
 });

@@ -19,7 +19,7 @@ import {
   createCombatProfile,
   validateCombatProfile,
   type CombatReport,
-} from './lib/profile-combat.js';
+} from './lib/profile-combat.ts';
 import type { FrameSample, GpuSample, ProfileStage, Distribution } from './lib/profile-types.ts';
 
 interface ProfileResult {
