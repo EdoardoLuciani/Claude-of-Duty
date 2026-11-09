@@ -1,5 +1,6 @@
 import type { Vector3Like as Vec3Like } from 'three';
 
+import { TAU } from '../core/math.ts';
 import type { SurfaceName } from '../physics/surfaces.ts';
 import { P, D } from './atlas.ts';
 import type { FxSystem } from './index.ts';
@@ -59,8 +60,6 @@ interface BulletHoleOptions {
   haloScale?: number;
   haloLife?: number;
 }
-
-const TWO_PI = Math.PI * 2;
 
 /** Scratch for the bounce raycast; never allocated per spark. */
 const RAY_O = { x: 0, y: 0, z: 0 };
@@ -161,7 +160,7 @@ const INTEL_SPARK = { life: 0.22, size: 0.008, kelvin: 6000, intensity: 1.6, dra
 /** Tiny short-circuit spray; no bullet decal, dust cloud or extra point light. */
 export function spawnIntelSparks(fx: ImpactFx, point: Vec3Like): void {
   for (let i = 0; i < 4; i++) {
-    const angle = fx.rng.range(0, TWO_PI);
+    const angle = fx.rng.range(0, TAU);
     spark(
       fx,
       point.x,
@@ -188,7 +187,7 @@ function bulletHole(fx: ImpactFx, p: Vec3Like, n: Vec3Like, o: BulletHoleOptions
     life: o.life ?? 90,
     // Per-instance roll and mirror: the tile has asymmetric spall cracks, so
     // this is what stops a walked burst from being N copies of one sprite.
-    roll: rng.float() * TWO_PI,
+    roll: rng.float() * TAU,
     flip: rng.float() < 0.5,
     depth: Math.max(0.03, size * 0.85),
     maxAngle: o.maxAngle ?? 62,
@@ -203,7 +202,7 @@ function bulletHole(fx: ImpactFx, p: Vec3Like, n: Vec3Like, o: BulletHoleOptions
     life: o.haloLife ?? 40,
     opacity: rng.range(0.08, 0.15) * (sooty ? 0.8 : 1),
     fade: 0.4,
-    roll: rng.float() * TWO_PI,
+    roll: rng.float() * TAU,
     maxAngle: 74,
   });
 }
@@ -263,7 +262,7 @@ function concrete(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: numb
       band === 0 ? rng.range(0.22, 0.4) : band === 1 ? rng.range(0.5, 0.85) : rng.range(1.1, 1.8);
     s.drag = band === 0 ? rng.range(5, 7) : rng.range(2.6, 4.0);
     s.gravity = -0.7;
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     s.spin = rng.signed() * 1.5;
     // Warm ochre mortar dust carrying the host's albedo hue, split into a sun
     // side and a shadow side: a full stop of lambert between the sub-puffs
@@ -299,7 +298,7 @@ function concrete(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: numb
     s.life = rng.range(0.18, 0.32);
     s.drag = rng.range(6, 9);
     s.gravity = -1.2;
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     s.spin = rng.signed() * 2.2;
     setSpawnColorRamp(s, 0.58, 0.475, 0.34, 0.47, 0.38, 0.27);
     s.alpha = rng.range(0.35, 0.6);
@@ -323,7 +322,7 @@ function concrete(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: numb
     s.life = rng.range(0.5, 1.0);
     s.drag = 0.35;
     s.gravity = -19;
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     s.spin = rng.signed() * 22;
     setSpawnColorRamp(s, 0.5, 0.48, 0.45, 0.42, 0.4, 0.38);
     s.i0 = 1;
@@ -377,7 +376,7 @@ function concrete(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: numb
     s.life = rng.range(1.7, 2.9);
     s.drag = 1.5;
     s.gravity = 0.28; // buoyant
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     s.spin = rng.signed() * 0.5;
     setSpawnColorRamp(s, 0.55, 0.49, 0.4, 0.46, 0.41, 0.34);
     s.alpha = rng.range(0.28, 0.46);
@@ -430,7 +429,7 @@ function plaster(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: numbe
       band === 0 ? rng.range(0.25, 0.45) : band === 1 ? rng.range(0.7, 1.2) : rng.range(1.4, 2.2);
     s.drag = band === 0 ? rng.range(5, 7) : rng.range(2.6, 3.8);
     s.gravity = -0.55;
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     s.spin = rng.signed() * 1.2;
     // Lime plaster over mud brick: the dust is the host's OWN ochre, not a pale
     // neutral, and it carries a full stop of lambert between the sub-puffs
@@ -458,7 +457,7 @@ function plaster(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: numbe
     s.life = rng.range(0.5, 0.9);
     s.drag = 0.5;
     s.gravity = -19;
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     s.spin = rng.signed() * 18;
     setSpawnColorRamp(s, 0.72, 0.65, 0.52, 0.64, 0.575, 0.46);
     s.alphaCurve = 0.25;
@@ -480,7 +479,7 @@ function plaster(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: numbe
     s.life = rng.range(0.18, 0.3);
     s.drag = rng.range(6, 9);
     s.gravity = -1.1;
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     s.spin = rng.signed() * 2.2;
     setSpawnColorRamp(s, 0.77, 0.66, 0.485, 0.65, 0.55, 0.4);
     s.alpha = rng.range(0.35, 0.6);
@@ -619,7 +618,7 @@ function metal(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number)
     s.life = rng.range(0.6, 1.1);
     s.drag = 2.4;
     s.gravity = 0.4;
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     s.spin = rng.signed() * 1.4;
     setSpawnColorRamp(s, 0.2, 0.19, 0.18, 0.26, 0.25, 0.24);
     s.alpha = rng.range(0.3, 0.5);
@@ -638,7 +637,7 @@ function metal(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number)
       tile: D.SCRAPE,
       size: rng.range(0.16, 0.28),
       life: 70,
-      roll: rng.float() * TWO_PI,
+      roll: rng.float() * TAU,
     });
   } else {
     bulletHole(fx, p, n, {
@@ -676,7 +675,7 @@ function wood(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number):
     s.life = rng.range(0.6, 1.2);
     s.drag = 0.8;
     s.gravity = -18;
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     s.spin = rng.signed() * 26;
     setSpawnColorRamp(s, 0.44, 0.3, 0.16, 0.36, 0.24, 0.13);
     s.alphaCurve = 0.25;
@@ -699,7 +698,7 @@ function wood(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number):
     s.life = rng.range(0.45, 0.9);
     s.drag = 3.4;
     s.gravity = -0.9;
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     s.spin = rng.signed() * 1.4;
     setSpawnColorRamp(s, 0.46, 0.34, 0.2, 0.38, 0.28, 0.17);
     s.alpha = rng.range(0.5, 0.8);
@@ -737,7 +736,7 @@ function ground(fx: ImpactFx, p: Vec3Like, n: Vec3Like, e: number, sand: boolean
     s.life = rng.range(0.8, 1.5);
     s.drag = rng.range(2.2, 3.2);
     s.gravity = -1.6;
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     s.spin = rng.signed() * 1.1;
     setSpawnColorRamp(s, cr, cg, cb, cr * 0.85, cg * 0.85, cb * 0.85);
     s.alpha = rng.range(0.6, 0.95);
@@ -761,7 +760,7 @@ function ground(fx: ImpactFx, p: Vec3Like, n: Vec3Like, e: number, sand: boolean
     s.life = rng.range(0.6, 1.2);
     s.drag = sand ? 1.4 : 0.5;
     s.gravity = -19;
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     s.spin = rng.signed() * 20;
     setSpawnColorRamp(s, cr * 0.8, cg * 0.8, cb * 0.8, cr * 0.7, cg * 0.7, cb * 0.7);
     s.alphaCurve = 0.3;
@@ -812,7 +811,7 @@ function glass(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like): void {
     s.life = rng.range(0.7, 1.4);
     s.drag = 0.6;
     s.gravity = -19;
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     s.spin = rng.signed() * 30;
     setSpawnColorRamp(s, 0.72, 0.8, 0.84, 0.6, 0.68, 0.72);
     s.alpha = 0.85;
@@ -847,7 +846,7 @@ function glass(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like): void {
     s.life = rng.range(0.35, 0.7);
     s.drag = 4.2;
     s.gravity = -3;
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     setSpawnColorRamp(s, 0.8, 0.86, 0.9, 0.7, 0.76, 0.8);
     s.alpha = 0.5;
     s.alphaCurve = 1.6;
@@ -859,7 +858,7 @@ function glass(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like): void {
     tile: rng.float() < 0.5 ? D.GLASS_CRACK : D.HOLE_GLASS,
     size: rng.range(0.3, 0.55),
     life: 120,
-    roll: rng.float() * TWO_PI,
+    roll: rng.float() * TAU,
     maxAngle: 40,
   });
 }
@@ -925,7 +924,7 @@ function water(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number)
     s.life = rng.range(0.5, 0.9);
     s.drag = 3.4;
     s.gravity = -1.4;
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     setSpawnColorRamp(s, 0.78, 0.83, 0.86, 0.7, 0.75, 0.78);
     s.alpha = 0.4;
     s.alphaCurve = 1.7;
@@ -967,7 +966,7 @@ function flesh(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, e: number)
     s.life = rng.range(0.3, 0.62);
     s.drag = rng.range(4.5, 6.5);
     s.gravity = -3.2;
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     s.spin = rng.signed() * 2;
     setSpawnColorRamp(s, 0.34, 0.035, 0.03, 0.16, 0.016, 0.014);
     s.alpha = rng.range(0.6, 0.95);
@@ -1019,7 +1018,7 @@ function foliage(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like): void {
     s.life = rng.range(0.8, 1.6);
     s.drag = 2.2;
     s.gravity = -8;
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     s.spin = rng.signed() * 16;
     setSpawnColorRamp(s, 0.14, 0.22, 0.08, 0.11, 0.17, 0.06);
     s.alphaCurve = 0.4;
@@ -1050,7 +1049,7 @@ function soft(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, rubber: boo
     s.life = rng.range(0.4, 0.8);
     s.drag = 3.8;
     s.gravity = -1.2;
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     s.spin = rng.signed() * 1.5;
     if (rubber) {
       setSpawnColorRamp(s, 0.1, 0.095, 0.09, 0.08, 0.078, 0.075);
@@ -1075,7 +1074,7 @@ function soft(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, rubber: boo
     s.life = rng.range(0.6, 1.2);
     s.drag = 2.4;
     s.gravity = -14;
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     s.spin = rng.signed() * 18;
     if (rubber) {
       s.r0 = 0.09;
@@ -1098,7 +1097,7 @@ function soft(fx: ImpactFx, p: Vec3Like, n: Vec3Like, inc: Vec3Like, rubber: boo
     tile: D.TEAR,
     size: rng.range(0.09, 0.15),
     life: 80,
-    roll: rng.float() * TWO_PI,
+    roll: rng.float() * TAU,
   });
 }
 
@@ -1164,7 +1163,7 @@ export function spawnExit(
     s.b0 = s.b1 = wood ? 0.14 : 0.48;
     s.alpha = chip ? 1 : 0.45;
     s.soft = 0.04;
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     s.spin = rng.signed() * 8;
     s.seed = rng.float();
     fx.emitLit(s);

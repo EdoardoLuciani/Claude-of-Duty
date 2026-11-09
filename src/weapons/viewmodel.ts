@@ -327,8 +327,9 @@ export class Viewmodel {
   noiseRates: number[] = [0.13, 0.19, 0.271, 0.083, 0.117, 0.163];
   noiseT: number = 0;
   onClipEvent: ((name: string, clipName: string) => void) | null = null;
-  recPos: Spring3 = new Spring3(9, 0.42);
-  recRot: Spring3 = new Spring3(9, 0.42);
+  // Frequency and damping come from the weapon's recoil definition on every shot.
+  recPos: Spring3 = new Spring3();
+  recRot: Spring3 = new Spring3();
   settle: Spring3 = new Spring3(2.05, 0.77);
   sprintT: number = 0;
   triggerT: number = 0;
