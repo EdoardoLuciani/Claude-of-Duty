@@ -6,7 +6,7 @@ import { Input } from '../../src/core/input.ts';
 import { applyDefinedPatch } from '../../src/core/patch.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
-import { fixture } from './fixture.ts';
+import { testElement } from './dom-fixture.ts';
 
 export type TestProviders = Partial<EngineSystems>;
 export type TestContextOptions = Partial<Omit<EngineContext, 'get' | 'peek' | 'has'>> & {
@@ -49,10 +49,10 @@ export function createTestContext(options: TestContextOptions = {}): EngineConte
   };
 }
 
-/** Node-friendly real Input; canvas operations fail unless explicitly supplied. */
+/** Bun-friendly real Input backed by a DOM canvas unless explicitly supplied. */
 export function createTestInput(
   overrides: Partial<Input> = {},
-  canvas: HTMLCanvasElement = fixture<HTMLCanvasElement>({})
+  canvas: HTMLCanvasElement = testElement('canvas')
 ): Input {
   const input = new Input(canvas, createConfig({ deterministic: true }));
   applyDefinedPatch(input, overrides);

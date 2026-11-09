@@ -13,6 +13,7 @@ import {
 } from 'three/webgpu';
 
 import { SURFACES_TSL } from '../../src/materials/surfaces-index-tsl.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 // Native WGSL captured before removing redundant scalar wrappers. Pin all seven
@@ -62,17 +63,48 @@ for (const [name, surface] of Object.entries(SURFACES_TSL)) {
   })().compute(1);
   const builder = new WGSLNodeBuilder(
     new Object3D(),
-    fixture<Renderer>({
-      // Match the original offline stub's non-WebGPU coordinate branch (not a live renderer).
-      coordinateSystem: WebGLCoordinateSystem,
-      contextNode: context(),
-      backend: fixture<
-        Backend & { capabilities: { getUniformBufferLimit(): number }; compatibilityMode: boolean }
-      >({ capabilities: { getUniformBufferLimit: (): number => 65536 }, compatibilityMode: false }),
-      debug: fixture<Renderer['debug']>({ diagnostics: { keywords: false } }),
-      hasFeature: (): boolean => false,
-      getRenderTarget: (): null => null,
-    })
+    fixture<Renderer>(
+      {
+        // Match the original offline stub's non-WebGPU coordinate branch (not a live renderer).
+        coordinateSystem: WebGLCoordinateSystem,
+        contextNode: context(),
+        backend: fixture<
+          Backend & {
+            capabilities: { getUniformBufferLimit(): number };
+            compatibilityMode: boolean;
+          }
+        >(
+          {
+            capabilities: { getUniformBufferLimit: (): number => 65536 },
+            compatibilityMode: false,
+          },
+          complete.testCapableBackend()
+        ),
+        debug: fixture<Renderer['debug']>(
+          { diagnostics: { keywords: false } },
+          {
+            get checkShaderErrors(): never {
+              return complete.unavailable('checkShaderErrors');
+            },
+            get diagnostics(): never {
+              return complete.unavailable('diagnostics');
+            },
+            get onNodeBuilderCreated(): never {
+              return complete.unavailable('onNodeBuilderCreated');
+            },
+            get onShaderError(): never {
+              return complete.unavailable('onShaderError');
+            },
+            get getShaderAsync(): never {
+              return complete.unavailable('getShaderAsync');
+            },
+          }
+        ),
+        hasFeature: (): boolean => false,
+        getRenderTarget: (): null => null,
+      },
+      complete.testRenderer()
+    )
   );
   builder.compute = compute;
   assert(hasBuild(builder));

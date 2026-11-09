@@ -24,6 +24,7 @@ import type { SurfaceNav } from '../../src/ai/nav.ts';
 import { Squad } from '../../src/ai/squad.ts';
 import { makeAgent, makeAi, makeRng } from '../lib/agent-fixture.ts';
 import { brainPhysics, brainAnimator } from '../lib/ai-brain-fixture.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 import { testNav } from '../lib/test-nav.ts';
 
@@ -405,19 +406,25 @@ const hidden = new THREE.Vector3(10, 0, 1);
 for (const answer of [NAV_PENDING, NAV_CANCELLED] as const) {
   const a = makeSearchAgent({ state: STATE.ALERT, lastKnown: seen.clone(), lastKnownAge: 1 });
   const cancelled: string[] = [];
-  a.ai.grid = fixture<SurfaceNav>({
-    project: (): number => 1,
-    sampleGround: (): number => 0,
-    components: new Map([[1, 1]]),
-    worker: fixture<AttachmentQueries>({
-      pending: false,
-      active: false,
-      run: <T>(_actor: number, _kind: string, fn: () => T): T => fn(),
-      cancel: (key): void => {
-        cancelled.push(key);
-      },
-    }),
-  });
+  a.ai.grid = fixture<SurfaceNav>(
+    {
+      project: (): number => 1,
+      sampleGround: (): number => 0,
+      components: new Map([[1, 1]]),
+      worker: fixture<AttachmentQueries>(
+        {
+          pending: false,
+          active: false,
+          run: <T>(_actor: number, _kind: string, fn: () => T): T => fn(),
+          cancel: (key): void => {
+            cancelled.push(key);
+          },
+        },
+        complete.testQueries()
+      ),
+    },
+    complete.testNav()
+  );
   let attempts = 0,
     moves = 0,
     failures = 0;

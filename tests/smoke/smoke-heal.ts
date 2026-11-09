@@ -17,6 +17,7 @@ import type { PlayerSystem } from '../../src/player/index.ts';
 import { HEALING, HEALTH } from '../../src/player/tuning.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import { createTestContext } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 import {
   initializePlayer,
@@ -106,7 +107,10 @@ function makePlayer(): {
     },
   };
   const weapons = new HealingWeapons();
-  const ctx = createTestContext({ input: fixture<Input>(input), providers: { weapons } });
+  const ctx = createTestContext({
+    input: fixture<Input>(input, complete.createTestInput()),
+    providers: { weapons },
+  });
   ctx.camera.position.y = 1.6;
   ctx.events.on('player:heal', (p): void => {
     events.push({ type: 'player:heal', ...p });
@@ -398,7 +402,10 @@ for (const motion of [
 
 {
   const wp = new WeaponSystem();
-  const input = new Input(fixture<HTMLCanvasElement>({}), { sensitivity: 0.002, invertY: false });
+  const input = new Input(fixture<HTMLCanvasElement>({}, complete.testElement('canvas')), {
+    sensitivity: 0.002,
+    invertY: false,
+  });
   const ctx = createTestContext({ input });
   ctx.camera.position.y = 1.6;
   const player = initializePlayer(ctx);
@@ -456,7 +463,10 @@ for (const motion of [
 }
 
 {
-  const input = new Input(fixture<HTMLCanvasElement>({}), { sensitivity: 0.002, invertY: false });
+  const input = new Input(fixture<HTMLCanvasElement>({}, complete.testElement('canvas')), {
+    sensitivity: 0.002,
+    invertY: false,
+  });
   check(
     'radio and bandage controls are X and H',
     ACTIONS.radio.includes('KeyX') && ACTIONS.heal.includes('KeyH')
@@ -469,15 +479,18 @@ for (const motion of [
   input.down.clear();
   let n = 0;
   const ev = (code: string): KeyboardEvent =>
-    fixture<KeyboardEvent>({
-      code,
-      ctrlKey: false,
-      metaKey: false,
-      altKey: false,
-      preventDefault(): void {
-        n++;
+    fixture<KeyboardEvent>(
+      {
+        code,
+        ctrlKey: false,
+        metaKey: false,
+        altKey: false,
+        preventDefault(): void {
+          n++;
+        },
       },
-    });
+      complete.testKeyboardEvent()
+    );
   input.pointerLocked = false;
   input._gameplayFocus = false;
   n = 0;

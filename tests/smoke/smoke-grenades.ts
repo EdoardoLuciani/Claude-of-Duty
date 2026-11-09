@@ -27,6 +27,7 @@ import {
 } from '../../src/weapons/index.ts';
 import { WorldSystem } from '../../src/world/index.ts';
 import { createTestContext } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 import {
   initializePlayer,
@@ -71,7 +72,7 @@ const input = {
   },
 };
 
-const ctx = createTestContext({ input: fixture<Input>(input) });
+const ctx = createTestContext({ input: fixture<Input>(input, complete.createTestInput()) });
 ctx.camera.position.set(0, 1.6, 0);
 const player = initializePlayer(ctx);
 player.rig.eyePosition.set(0, 1.6, 0);

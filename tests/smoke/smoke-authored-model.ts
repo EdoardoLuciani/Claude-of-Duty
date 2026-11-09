@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import { authoredModel, checkAuthoredDuration } from '../../src/weapons/authored-model.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 // Real three clips; duration is inferred from the keys, as GLTFLoader does.
@@ -65,10 +66,13 @@ const scene = new THREE.Group();
 const rig = new THREE.Object3D();
 rig.name = 'TEST_RIG';
 scene.add(rig);
-const gltf = fixture<GLTF>({
-  scene,
-  animations: [collapsed('Idle'), clip('Fire', track([0, Math.fround(authored.Fire.duration)]))],
-});
+const gltf = fixture<GLTF>(
+  {
+    scene,
+    animations: [collapsed('Idle'), clip('Fire', track([0, Math.fround(authored.Fire.duration)]))],
+  },
+  complete.testGLTF()
+);
 const { animations } = authoredModel(gltf, 'TEST_RIG', ['Idle', 'Fire'], authored);
 assert.deepEqual(
   animations.map((c): [string, number] => [c.name, c.duration]),

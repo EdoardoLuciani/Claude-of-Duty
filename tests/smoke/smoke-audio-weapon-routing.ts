@@ -17,6 +17,7 @@ import {
   fixtureEntries,
   fixtureBuffer,
 } from '../lib/audio-fixture.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 // Exercise the real event-definition seam and sample bank, with no synthesis nodes.
@@ -42,11 +43,14 @@ audio.running = true;
 audio.actx = actx;
 audio.samples = samples;
 audio.rng = new Rng(1);
-audio.mixer = fixture<Mixer>({ duck(): void {} });
-audio.field = fixture<SpatialField>({
-  listenerPos: { x: 0, y: 0, z: 0 },
-  distanceTo: (x): number => Math.abs(x),
-});
+audio.mixer = fixture<Mixer>({ duck(): void {} }, complete.testMixer());
+audio.field = fixture<SpatialField>(
+  {
+    listenerPos: { x: 0, y: 0, z: 0 },
+    distanceTo: (x): number => Math.abs(x),
+  },
+  complete.testSpatialField()
+);
 type Seen = { profile: WeaponProfile | undefined; path: string; buffers: string[] };
 const captureState: { seen: Seen | null } = { seen: null };
 function capture(

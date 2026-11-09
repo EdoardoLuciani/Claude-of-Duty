@@ -15,16 +15,20 @@ import type { UiSystem } from '../../src/ui/index.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import { audioFixture } from '../lib/audio-banks.ts';
 import { fixtureEntries, fixtureBuffer, FixtureAudioBuffer } from '../lib/audio-fixture.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 const { actx, sources } = audioFixture();
 const oscillators = actx.oscillators;
 const bank = new WeaponSampleBank(actx),
   rng = new Rng(474),
-  noNoise = fixture<NoiseBank>({
-    source(): never {
-      throw Error('replaced procedural radio noise');
+  noNoise = fixture<NoiseBank>(
+    {
+      source(): never {
+        throw Error('replaced procedural radio noise');
+      },
     },
-  });
+    complete.testNoiseBank()
+  );
 for (const [key, urls] of fixtureEntries(RADIO_URLS))
   bank.hitBuffers[key] = urls.map(
     (_, index): FixtureAudioBuffer => new FixtureAudioBuffer({ key, index, duration: 0.3 })
@@ -79,7 +83,7 @@ w.audio.playUi = (id): boolean => {
   calls.push(id);
   return true;
 };
-w.ui = fixture<UiSystem>({ clearPrompt(): void {}, setPrompt(): void {} });
+w.ui = fixture<UiSystem>({ clearPrompt(): void {}, setPrompt(): void {} }, new complete.UiSystem());
 w._selectRequest(1);
 assert.equal(w.carpetBombs, 1);
 assert.deepEqual(

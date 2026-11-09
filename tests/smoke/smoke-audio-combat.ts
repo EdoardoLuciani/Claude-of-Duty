@@ -29,6 +29,7 @@ import {
   FixtureAudioBuffer,
 } from '../lib/audio-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 assert.equal(
@@ -157,8 +158,8 @@ assert.deepEqual(
 );
 assert(calls.every((c): boolean => c[1]?.level === 0.9));
 audio.running = true;
-audio.field = fixture<SpatialField>({});
-audio.mixer = fixture<Mixer>({});
+audio.field = fixture<SpatialField>({}, complete.testSpatialField());
+audio.mixer = fixture<Mixer>({}, complete.testMixer());
 for (const id of ['rifle', 'pistol', 'smg', 'sniper', 'shotgun'] as const) {
   audio._onFire({
     weapon: { id },
@@ -173,7 +174,10 @@ for (const id of ['rifle', 'pistol', 'smg', 'sniper', 'shotgun'] as const) {
 }
 // Keep reached-segment ownership, shot deduplication and local-shooter rejection.
 const nearCalls: Parameters<AudioSystem['_playAt']>[] = [];
-audio.field = fixture<SpatialField>({ listenerPos: { x: 0, y: 1.6, z: 0 } });
+audio.field = fixture<SpatialField>(
+  { listenerPos: { x: 0, y: 1.6, z: 0 } },
+  complete.testSpatialField()
+);
 audio._playAt = (...args): boolean => {
   nearCalls.push(args);
   return true;

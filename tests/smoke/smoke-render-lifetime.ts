@@ -12,6 +12,7 @@ import {
 
 import { RenderSystem } from '../../src/render/index-webgpu.ts';
 import { createWorldViewPipeline } from '../../src/render/webgpu-pipeline.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 import { captureMethod, renderFixture } from '../lib/render-fixture.ts';
 
@@ -91,12 +92,15 @@ let finish = (): void => {
 const pending = new Promise<void>((resolve): void => {
   finish = resolve;
 });
-const owner = fixture<RenderSystem>({
-  _graph: make(),
-  _metering: true,
-  _meterTask: pending,
-  _meterPass: null,
-});
+const owner = fixture<RenderSystem>(
+  {
+    _graph: make(),
+    _metering: true,
+    _meterTask: pending,
+    _meterPass: null,
+  },
+  new complete.RenderSystem()
+);
 RenderSystem.prototype._releaseGraph.call(owner);
 const next = make(),
   activeHook = captureMethod(view, 'onBeforeRender');

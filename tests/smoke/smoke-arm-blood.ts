@@ -8,6 +8,7 @@ import type { NodeBuilder } from 'three/webgpu';
 import { EventBus } from '../../src/core/registry.ts';
 import { Health } from '../../src/player/health.ts';
 import { createArmBlood, addArmBloodCoordinates } from '../../src/weapons/arm-blood.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 const blood = createArmBlood();
@@ -112,7 +113,8 @@ assert(
   [...nodes].some(
     (node): boolean =>
       node instanceof AttributeNode &&
-      node.getAttributeName(fixture<NodeBuilder>({})) === 'armBloodPosition'
+      node.getAttributeName(fixture<NodeBuilder>({}, complete.testNodeBuilder())) ===
+        'armBloodPosition'
   ),
   'graph uses independent bind coordinates'
 );

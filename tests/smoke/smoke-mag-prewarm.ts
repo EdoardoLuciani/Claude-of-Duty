@@ -12,6 +12,7 @@ import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import type { WeaponEntry } from '../../src/weapons/runtime-types.ts';
 import { createTestContext } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 const geometry = new THREE.BoxGeometry(),
@@ -37,46 +38,55 @@ let calls = 0,
     throw Error('warmup resolver missing');
   };
 const flashlight = new THREE.SpotLight();
-const weapon = fixture<WeaponEntry>({ id: 'rifle', group, parts: { magazine }, magLen: 0.15 });
+const weapon = fixture<WeaponEntry>(
+  { id: 'rifle', group, parts: { magazine }, magLen: 0.15 },
+  complete.testWeaponEntry()
+);
 const system = new WeaponSystem();
 system._droppedMags = [];
-system.viewmodel = fixture<WeaponSystem['viewmodel']>({
-  radio,
-  scopeOverlay,
-  reticle,
-  grenade,
-  weapons: new Map([['rifle', weapon]]),
-});
+system.viewmodel = fixture<WeaponSystem['viewmodel']>(
+  {
+    radio,
+    scopeOverlay,
+    reticle,
+    grenade,
+    weapons: new Map([['rifle', weapon]]),
+  },
+  complete.testViewmodel()
+);
 system.rng = new Rng(1);
 system.rng.signed = (): never => assert.fail('warmup consumed gameplay RNG');
-const graph = fixture<NonNullable<RenderSystem['_graph']>>({});
-const render = fixture<RenderSystem>({
-  _graph: graph,
-  patchMaterials(): void {},
-  prewarmLightShadow(light): ReturnType<RenderSystem['_warmGraph']> {
-    assert.equal(light, flashlight, 'hidden pickups and magazines need flashlight variants');
-    return render._warmGraph();
+const graph = fixture<NonNullable<RenderSystem['_graph']>>({}, complete.testGraph());
+const render = fixture<RenderSystem>(
+  {
+    _graph: graph,
+    patchMaterials(): void {},
+    prewarmLightShadow(light): ReturnType<RenderSystem['_warmGraph']> {
+      assert.equal(light, flashlight, 'hidden pickups and magazines need flashlight variants');
+      return render._warmGraph();
+    },
+    _warmGraph(): ReturnType<RenderSystem['_warmGraph']> {
+      calls++;
+      assert.equal(scene.children.length, 3);
+      assert.equal(system.pickups.items.length, 0);
+      assert.equal(system.pickups._nextId, 1);
+      assert(scene.children.every((o): boolean => o.visible));
+      assert(
+        scopeOverlay.visible && reticle.visible && grenade.visible,
+        'hidden optics/grenade ancestors must be warmed'
+      );
+      return new Promise<Awaited<ReturnType<RenderSystem['_warmGraph']>>>((resolve): void => {
+        finish = resolve;
+      });
+    },
   },
-  _warmGraph(): ReturnType<RenderSystem['_warmGraph']> {
-    calls++;
-    assert.equal(scene.children.length, 3);
-    assert.equal(system.pickups.items.length, 0);
-    assert.equal(system.pickups._nextId, 1);
-    assert(scene.children.every((o): boolean => o.visible));
-    assert(
-      scopeOverlay.visible && reticle.visible && grenade.visible,
-      'hidden optics/grenade ancestors must be warmed'
-    );
-    return new Promise<Awaited<ReturnType<RenderSystem['_warmGraph']>>>((resolve): void => {
-      finish = resolve;
-    });
-  },
-});
+  new complete.RenderSystem()
+);
 system.ctx = createTestContext({
   scene,
   viewScene,
   viewCamera: new THREE.PerspectiveCamera(),
-  providers: { player: fixture<PlayerSystem>({ flashlight }), render },
+  providers: { player: fixture<PlayerSystem>({ flashlight }, complete.testPlayer()), render },
 });
 system.pickups = new AmmoPickups(system);
 let loaded = (): void => {
@@ -131,11 +141,17 @@ failedSystem.pickups = system.pickups;
 failedSystem._restTask = Promise.resolve();
 failedSystem._droppedMags = system._droppedMags;
 failedSystem._magPools = system._magPools;
-const body = fixture<NonNullable<(typeof system._droppedMags)[number]['body']>>({});
+const body = fixture<NonNullable<(typeof system._droppedMags)[number]['body']>>(
+  {},
+  new complete.RigidBody()
+);
 system._droppedMags[0].body = body;
-failedSystem.physics = fixture<PhysicsSystem>({
-  removeRigidBody: (): never => assert.fail('warmup removed live debris'),
-});
+failedSystem.physics = fixture<PhysicsSystem>(
+  {
+    removeRigidBody: (): never => assert.fail('warmup removed live debris'),
+  },
+  new complete.PhysicsSystem()
+);
 const failure = new Error('intentional warmup failure');
 let failures = 0;
 render._warmGraph = async (): ReturnType<RenderSystem['_warmGraph']> => {
@@ -149,24 +165,33 @@ await assert.rejects(failed, (error: unknown): boolean => error === failure);
 assert.equal(failedSystem.prewarmMaterials(), failed, 'failed boot work stays failed');
 assert.equal(failures, 1, 'failed warmup must not retry during gameplay');
 // The coordinator, not the weapon operation, owns status/error presentation.
-render.renderer = fixture<THREE.Renderer>({
-  getRenderTarget: (): null => null,
-  setRenderTarget(): void {},
-});
+render.renderer = fixture<THREE.Renderer>(
+  {
+    getRenderTarget: (): null => null,
+    setRenderTarget(): void {},
+  },
+  complete.testRenderer()
+);
 const cases: [WeaponSystem, boolean][] = [
   [system, true],
   [failedSystem, false],
 ];
 for (const [provider, ok] of cases) {
   const summary = await prewarm(
-    fixture<Engine>({
-      error: null,
-      camera: new THREE.PerspectiveCamera(),
-      scene,
-      viewScene,
-      ctx: system.ctx,
-      registry: fixture<Engine['registry']>({ ordered: [provider] }),
-    })
+    fixture<Engine>(
+      {
+        error: null,
+        camera: new THREE.PerspectiveCamera(),
+        scene,
+        viewScene,
+        ctx: system.ctx,
+        registry: fixture<Engine['registry']>(
+          { ordered: [provider] },
+          new complete.Registry<complete.EngineSystems>()
+        ),
+      },
+      complete.testEngine()
+    )
   );
   assert(summary.hooks);
   assert.equal(summary.ok, ok);

@@ -30,6 +30,7 @@ import type { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { WorldSystem } from '../../src/world/index.ts';
 import { createTestContext, createTestInput } from '../lib/context.ts';
 import type { TestProviders } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 import { UiInput, UiPlayer, deleteGlobal, captureMethod } from '../lib/ui-fixture.ts';
 
@@ -248,8 +249,8 @@ async function harness(
   const base = createTestContext({
     providers,
     input,
-    engine: fixture<EngineContext['engine']>({}),
-    canvas: fixture<HTMLCanvasElement>({}),
+    engine: fixture<EngineContext['engine']>({}, complete.testEngine()),
+    canvas: fixture<HTMLCanvasElement>({}, complete.testElement('canvas')),
   });
   base.config.deterministic = deterministic;
   base.time.elapsed = 10;
@@ -258,7 +259,7 @@ async function harness(
   const sounds: string[] = [];
   const emitted: IntelRecord[] = [];
   const ui = new IntelUi();
-  ui.menu = fixture<PauseMenu>({ open: false });
+  ui.menu = fixture<PauseMenu>({ open: false }, complete.testPauseMenu());
   const audio = new AudioSystem();
   audio.play = (kind: string): boolean => {
     sounds.push(kind);
@@ -664,7 +665,7 @@ for (const [reason, discovery, setBlock] of [
       true,
       (): void => {
         ctx.weapons = new WeaponSystem();
-        ctx.weapons.viewmodel = fixture<Viewmodel>({ clipName });
+        ctx.weapons.viewmodel = fixture<Viewmodel>({ clipName }, complete.testViewmodel());
       },
     ]
   ),
@@ -931,7 +932,7 @@ for (const emission of [
   let stopped = 0;
   audioSystem._intelOperating = true;
   audioSystem._intelAlarm = {
-    node: fixture<GainNode>({}),
+    node: fixture<GainNode>({}, complete.testGain()),
     stop(): void {
       stopped++;
     },
@@ -945,13 +946,47 @@ for (const emission of [
 audioSystem.dispose();
 const particles: Parameters<Parameters<typeof spawnIntelSparks>[0]['emitAdd']>[0][] = [];
 spawnIntelSparks(
-  fixture<Parameters<typeof spawnIntelSparks>[0]>({
-    rng: new Rng(9),
-    emitAdd(p): number {
-      particles.push({ ...p });
-      return particles.length;
+  fixture<Parameters<typeof spawnIntelSparks>[0]>(
+    {
+      rng: new Rng(9),
+      emitAdd(p): number {
+        particles.push({ ...p });
+        return particles.length;
+      },
     },
-  }),
+    {
+      get rng(): never {
+        return complete.unavailable('rng');
+      },
+      get ctx(): never {
+        return complete.unavailable('ctx');
+      },
+      get pScale(): never {
+        return complete.unavailable('pScale');
+      },
+      get emitAdd(): never {
+        return complete.unavailable('emitAdd');
+      },
+      get emitLit(): never {
+        return complete.unavailable('emitLit');
+      },
+      get physics(): never {
+        return complete.unavailable('physics');
+      },
+      get addDecal(): never {
+        return complete.unavailable('addDecal');
+      },
+      get haze(): never {
+        return complete.unavailable('haze');
+      },
+      get sunWorld(): never {
+        return complete.unavailable('sunWorld');
+      },
+      get bloodSpatterBehind(): never {
+        return complete.unavailable('bloodSpatterBehind');
+      },
+    }
+  ),
   { x: 1, y: 2, z: 3 }
 );
 assert.equal(particles.length, 4);

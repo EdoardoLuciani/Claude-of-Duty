@@ -9,6 +9,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import { ModelSystem } from '../../src/core/models.ts';
 import { createTestContext } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 const delay = (ms: number): Promise<void> =>
@@ -37,7 +38,7 @@ const onUnhandled = (reason: unknown): number => unhandled.push(reason);
 process.on('unhandledRejection', onUnhandled);
 
 const models = new ModelSystem();
-models.loader = fixture<GLTFLoader>({ load(): void {} });
+models.loader = fixture<GLTFLoader>({ load(): void {} }, new complete.GLTFLoader());
 await models.init(createTestContext());
 await delay(60);
 process.off('unhandledRejection', onUnhandled);

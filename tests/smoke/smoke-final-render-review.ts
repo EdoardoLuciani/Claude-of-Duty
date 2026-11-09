@@ -21,6 +21,7 @@ import { RenderSystem } from '../../src/render/index-webgpu.ts';
 import { createHdrMeter } from '../../src/render/meter-webgpu.ts';
 import { warmFrame } from '../../src/render/warm-frame.ts';
 import { createTestContext } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 import { captureMethod } from '../lib/render-fixture.ts';
 
@@ -29,38 +30,47 @@ const order: string[] = [],
   error = console.error;
 console.error = (): void => {};
 try {
-  const engine = fixture<Engine>({
-    dispose: captureMethod(Engine.prototype, 'dispose'),
-    stop(): void {},
-    _onResize(): void {},
-    input: fixture<Engine['input']>({ detach(): void {} }),
-    events: fixture<Engine['events']>({
-      clear(): void {
-        order.push('events');
-      },
-    }),
-    registry: fixture<Engine['registry']>({
-      ordered: [
+  const engine = fixture<Engine>(
+    {
+      dispose: captureMethod(Engine.prototype, 'dispose'),
+      stop(): void {},
+      _onResize(): void {},
+      input: fixture<Engine['input']>({ detach(): void {} }, complete.createTestInput()),
+      events: fixture<Engine['events']>(
         {
-          dispose(): void {
-            order.push('last');
+          clear(): void {
+            order.push('events');
           },
         },
+        new complete.EventBus()
+      ),
+      registry: fixture<Engine['registry']>(
         {
-          dispose(): void {
-            order.push('sync');
-            throw Error('sync');
-          },
+          ordered: [
+            {
+              dispose(): void {
+                order.push('last');
+              },
+            },
+            {
+              dispose(): void {
+                order.push('sync');
+                throw Error('sync');
+              },
+            },
+            {
+              async dispose(): Promise<void> {
+                order.push('async');
+                throw Error('async');
+              },
+            },
+          ],
         },
-        {
-          async dispose(): Promise<void> {
-            order.push('async');
-            throw Error('async');
-          },
-        },
-      ],
-    }),
-  });
+        new complete.Registry<complete.EngineSystems>()
+      ),
+    },
+    complete.testEngine()
+  );
   globalThis.removeEventListener = (): void => {};
   await assert.rejects(
     engine.dispose(),
@@ -180,76 +190,95 @@ try {
     camera,
     viewCamera: camera.clone(),
     time: { elapsed: 0, raw: 0, dt: 0, fixed: 0, alpha: 0, scale: 1, frame: 42 },
-    engine: fixture<Engine>({
-      fail(_system, _method, e): void {
-        failed = e;
+    engine: fixture<Engine>(
+      {
+        fail(_system, _method, e): void {
+          failed = e;
+        },
       },
-    }),
+      complete.testEngine()
+    ),
   });
-  owner.renderer = fixture<Renderer>({
-    ...rendererProps,
-    xr: fixture<Renderer['xr']>({ enabled: true }),
-    shadowMap: { enabled: true, transmitted: false, type: 1 },
-    toneMapping: 4,
-    outputColorSpace: 'original',
-    getMRT: (): MRTNode => {
-      assert(mrt);
-      return mrt;
+  owner.renderer = fixture<Renderer>(
+    {
+      ...rendererProps,
+      xr: fixture<Renderer['xr']>({ enabled: true }, complete.testRenderer().xr),
+      shadowMap: { enabled: true, transmitted: false, type: 1 },
+      toneMapping: 4,
+      outputColorSpace: 'original',
+      getMRT: (): MRTNode => {
+        assert(mrt);
+        return mrt;
+      },
+      setMRT: (value): Renderer => {
+        mrt = value;
+        return owner.renderer;
+      },
+      getRenderObjectFunction: (): ReturnType<Renderer['getRenderObjectFunction']> => renderObject,
+      setRenderObjectFunction: (value): void => {
+        renderObject = value;
+      },
+      getRenderTarget: (): RenderTarget | null => target,
+      setRenderTarget: (t): void => {
+        target = t;
+      },
+      getClearColor: (c): Color => c.copy(clear),
+      getClearAlpha: (): number => alpha,
+      setClearColor(c, a = alpha): void {
+        clear = new Color(c);
+        alpha = a;
+      },
     },
-    setMRT: (value): Renderer => {
-      mrt = value;
-      return owner.renderer;
-    },
-    getRenderObjectFunction: (): ReturnType<Renderer['getRenderObjectFunction']> => renderObject,
-    setRenderObjectFunction: (value): void => {
-      renderObject = value;
-    },
-    getRenderTarget: (): RenderTarget | null => target,
-    setRenderTarget: (t): void => {
-      target = t;
-    },
-    getClearColor: (c): Color => c.copy(clear),
-    getClearAlpha: (): number => alpha,
-    setClearColor(c, a = alpha): void {
-      clear = new Color(c);
-      alpha = a;
-    },
-  });
+    complete.testRenderer()
+  );
   owner._warmAbort = new AbortController();
   owner._tagPrepassMesh = owner._tagViewMesh = (): void => {};
   const passes = Array.from({ length: 3 }, (): import('three/webgpu').PassNode =>
-    fixture<import('three/webgpu').PassNode>({ opaque: true, transparent: false })
+    fixture<import('three/webgpu').PassNode>(
+      { opaque: true, transparent: false },
+      new complete.THREE.PassNode(
+        'color',
+        new complete.THREE.Scene(),
+        new complete.THREE.PerspectiveCamera()
+      )
+    )
   );
-  owner._graph = fixture<NonNullable<RenderSystem['_graph']>>({
-    prePass: passes[0],
-    worldPass: passes[1],
-    viewPass: passes[2],
-    taaPass: fixture<NonNullable<NonNullable<RenderSystem['_graph']>['taaPass']>>({
-      setSize(): void {},
-      clearViewOffset(): void {
-        camera.clearViewOffset();
+  owner._graph = fixture<NonNullable<RenderSystem['_graph']>>(
+    {
+      prePass: passes[0],
+      worldPass: passes[1],
+      viewPass: passes[2],
+      taaPass: fixture<NonNullable<NonNullable<RenderSystem['_graph']>['taaPass']>>(
+        {
+          setSize(): void {},
+          clearViewOffset(): void {
+            camera.clearViewOffset();
+          },
+        },
+        complete.testTaa()
+      ),
+      render(): void {
+        camera.setViewOffset(640, 320, 0.5, 0.5, 640, 320);
+        owner.renderer.toneMapping = 0;
+        owner.renderer.outputColorSpace = 'changed';
+        owner.renderer.xr.enabled = false;
+        owner.renderer.setClearColor(0, 0);
+        owner.renderer.shadowMap.enabled = false;
+        for (const key of booleanRendererKeys) owner.renderer[key] = !rendererProps[key];
+        owner.renderer.contextNode = context();
+        owner.renderer.lighting = new Lighting();
+        owner.renderer.setMRT(createMrt({}));
+        owner.renderer.setRenderObjectFunction((): void => {});
+        scene.name = 'prepass';
+        scene.overrideMaterial = mesh.material;
+        scene.background = new Color();
+        camera.layers.set(1);
+        owner.ctx.viewCamera.layers.set(3);
+        throw Error('injected draw failure');
       },
-    }),
-    render(): void {
-      camera.setViewOffset(640, 320, 0.5, 0.5, 640, 320);
-      owner.renderer.toneMapping = 0;
-      owner.renderer.outputColorSpace = 'changed';
-      owner.renderer.xr.enabled = false;
-      owner.renderer.setClearColor(0, 0);
-      owner.renderer.shadowMap.enabled = false;
-      for (const key of booleanRendererKeys) owner.renderer[key] = !rendererProps[key];
-      owner.renderer.contextNode = context();
-      owner.renderer.lighting = new Lighting();
-      owner.renderer.setMRT(createMrt({}));
-      owner.renderer.setRenderObjectFunction((): void => {});
-      scene.name = 'prepass';
-      scene.overrideMaterial = mesh.material;
-      scene.background = new Color();
-      camera.layers.set(1);
-      owner.ctx.viewCamera.layers.set(3);
-      throw Error('injected draw failure');
     },
-  });
+    complete.testGraph()
+  );
   const warm = owner._warmGraph();
   fireFrame();
   await assert.rejects(warm, /injected draw failure/);
@@ -294,19 +323,22 @@ for (let i = 0; i < pixels.length; i += 4) {
   pixels[i] = DataUtils.toHalfFloat(-1);
   pixels[i + 1] = DataUtils.toHalfFloat(1);
 }
-const renderer = fixture<Renderer>({
-  xr: fixture<Renderer['xr']>({ enabled: false }),
-  toneMapping: 0,
-  outputColorSpace: 'srgb-linear',
-  getRenderTarget: (): RenderTarget | null => target,
-  setRenderTarget: (t): void => {
-    target = t;
+const renderer = fixture<Renderer>(
+  {
+    xr: fixture<Renderer['xr']>({ enabled: false }, complete.testRenderer().xr),
+    toneMapping: 0,
+    outputColorSpace: 'srgb-linear',
+    getRenderTarget: (): RenderTarget | null => target,
+    setRenderTarget: (t): void => {
+      target = t;
+    },
+    render(): void {},
+    async readRenderTargetPixelsAsync(): Promise<Uint16Array | Float32Array> {
+      return pixels;
+    },
   },
-  render(): void {},
-  async readRenderTargetPixelsAsync(): Promise<Uint16Array | Float32Array> {
-    return pixels;
-  },
-});
+  complete.testRenderer()
+);
 const meter = createHdrMeter(renderer, new Texture(), new Texture()),
   warn = console.warn;
 try {

@@ -21,6 +21,7 @@ import { buildMagazineClips, buildManifestClips } from '../../src/weapons/clips.
 import { WorldSystem } from '../../src/world/index.ts';
 import { audioFixture } from '../lib/audio-banks.ts';
 import { createTestContext } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 /* ---- metadata vec3: exactly three finite coordinates ----------------------- */
@@ -122,14 +123,17 @@ for (const build of [buildManifestClips, buildMagazineClips])
 /* ---- audio: series wiring and round-robin bank reads ------------------------ */
 const wired: [string, string][] = [];
 const audioNode = (name: string): AudioNode & { name: string } => {
-  const node = fixture<AudioNode & { name: string }>({
-    name,
-    connect(next: AudioNode | AudioParam): AudioNode {
-      assert('name' in next && typeof next.name === 'string');
-      wired.push([name, next.name]);
-      return node;
+  const node = fixture<AudioNode & { name: string }>(
+    {
+      name,
+      connect(next: AudioNode | AudioParam): AudioNode {
+        assert('name' in next && typeof next.name === 'string');
+        wired.push([name, next.name]);
+        return node;
+      },
     },
-  });
+    complete.testAudioNode()
+  );
   return node;
 };
 const [n1, n2, n3] = ['a', 'b', 'c'].map(audioNode);
@@ -143,8 +147,8 @@ const { actx } = audioFixture(0);
 const bank = new WeaponSampleBank(actx);
 const kind = WEAPON_PROFILES.rifle.sample;
 bank.buffers[kind] = [
-  fixture<AudioBuffer>({ duration: 0.4 }),
-  fixture<AudioBuffer>({ duration: 0.5 }),
+  fixture<AudioBuffer>({ duration: 0.4 }, new complete.FixtureAudioBuffer()),
+  fixture<AudioBuffer>({ duration: 0.5 }, new complete.FixtureAudioBuffer()),
 ];
 const rng = new Rng(1);
 bank.shot(WEAPON_PROFILES.rifle, rng);
@@ -159,14 +163,17 @@ assert.throws(
 const added: THREE.Object3D[] = [];
 const emitted: string[] = [];
 const radioWorld = (bounds: THREE.Box3): WorldSystem =>
-  fixture<WorldSystem>({
-    bounds,
-    spawn: (): WorldSystem['spawnPoints'][number] => ({
-      yaw: 0.3,
-      position: new THREE.Vector3(),
-      tag: 'test',
-    }),
-  });
+  fixture<WorldSystem>(
+    {
+      bounds,
+      spawn: (): WorldSystem['spawnPoints'][number] => ({
+        yaw: 0.3,
+        position: new THREE.Vector3(),
+        tag: 'test',
+      }),
+    },
+    new complete.WorldSystem()
+  );
 const radio = new RadioSystem();
 radio.ctx = createTestContext();
 radio.ctx.scene.add = (...objects): THREE.Scene => {

@@ -11,6 +11,7 @@ import { VARIANTS } from '../../src/ai/soldier.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { makeHitRecord } from '../../src/physics/math.ts';
 import { createTestContext } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 import { synthetic, loadMap, addAccessCases } from '../lib/nav240/fixtures.ts';
 import { execute, canConnect } from '../lib/nav240/harness.ts';
@@ -18,14 +19,17 @@ import { execute, canConnect } from '../lib/nav240/harness.ts';
 const f = synthetic(),
   geometry = new THREE.BoxGeometry(),
   material = new THREE.MeshBasicMaterial();
-const ai = fixture<AiSystem>({
-  ctx: createTestContext({ providers: { physics: f.physics } }),
-  root: new THREE.Group(),
-  rng: new Rng(305),
-  agents: [],
-  grid: null,
-  cover: null,
-});
+const ai = fixture<AiSystem>(
+  {
+    ctx: createTestContext({ providers: { physics: f.physics } }),
+    root: new THREE.Group(),
+    rng: new Rng(305),
+    agents: [],
+    grid: null,
+    cover: null,
+  },
+  complete.makeAi()
+);
 for (const [name, variant] of Object.entries(VARIANTS)) {
   ai.variant = (): AiVariant => ({
     geometry,

@@ -7,24 +7,28 @@ import { AttachmentQueries, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/atta
 import type { ClientMessage } from '../../src/ai/attachment-types.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { makeAgent, makeAi, makeRng } from '../lib/agent-fixture.ts';
+import * as targets from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 import { testNav } from '../lib/test-nav.ts';
 
 function fakeWorker(): Worker {
   const messages: ClientMessage[] = [];
-  return fixture<Worker>({
-    onmessage: null,
-    onerror: null,
-    onmessageerror: null,
-    postMessage(this: Worker, message: ClientMessage): void {
-      messages.push(structuredClone(message));
-      if (message.type === 'init')
-        queueMicrotask((): void => {
-          this.onmessage?.call(this, new MessageEvent('message', { data: { type: 'ready' } }));
-        });
+  return fixture<Worker>(
+    {
+      onmessage: null,
+      onerror: null,
+      onmessageerror: null,
+      postMessage(this: Worker, message: ClientMessage): void {
+        messages.push(structuredClone(message));
+        if (message.type === 'init')
+          queueMicrotask((): void => {
+            this.onmessage?.call(this, new MessageEvent('message', { data: { type: 'ready' } }));
+          });
+      },
+      terminate(): void {},
     },
-    terminate(): void {},
-  });
+    new targets.TestWorker()
+  );
 }
 const nav = await testNav(),
   oracle = await testNav();

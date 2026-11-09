@@ -19,6 +19,7 @@ import { RIG } from '../../src/ai/rig.ts';
 import type { EngineEventMap } from '../../src/core/events.ts';
 import { makeAgent } from '../lib/agent-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 type Footstep = {
@@ -79,7 +80,10 @@ function soldier(lod = false): {
     animator,
     group,
     lodIrrelevant: lod,
-    controller: fixture<NonNullable<Agent['controller']>>({ groundSurfaceName: SURFACE }),
+    controller: fixture<NonNullable<Agent['controller']>>(
+      { groundSurfaceName: SURFACE },
+      new complete.CharacterController(new complete.StaticWorld())
+    ),
     ctx,
   });
 

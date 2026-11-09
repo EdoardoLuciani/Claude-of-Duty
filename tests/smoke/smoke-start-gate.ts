@@ -4,6 +4,7 @@ import { PlayerSystem } from '../../src/player/index.ts';
 import { StartGate } from '../../src/ui/start.ts';
 import { createTestContext } from '../lib/context.ts';
 import { createCoreFixture } from '../lib/core-fixture.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 const listeners = new Map<string, EventListenerOrEventListenerObject>();
@@ -30,7 +31,7 @@ function createElement<K extends keyof HTMLElementDeprecatedTagNameMap>(
 function createElement(tag: string): HTMLElement;
 function createElement(tag: string): HTMLElement {
   const members = {
-    style: fixture<CSSStyleDeclaration>({}),
+    style: fixture<CSSStyleDeclaration>({}, complete.testStyle()),
     onclick: null,
     setAttribute(): void {},
     append(): void {},
@@ -40,27 +41,30 @@ function createElement(tag: string): HTMLElement {
   let node: HTMLElement;
   switch (tag) {
     case 'dialog': {
-      const dialog = fixture<HTMLDialogElement>({
-        ...members,
-        open: false,
-        showModal(): void {
-          dialog.open = true;
+      const dialog = fixture<HTMLDialogElement>(
+        {
+          ...members,
+          open: false,
+          showModal(): void {
+            dialog.open = true;
+          },
+          close(): void {
+            dialog.open = false;
+          },
         },
-        close(): void {
-          dialog.open = false;
-        },
-      });
+        complete.testElement('dialog')
+      );
       node = dialog;
       break;
     }
     case 'button':
-      node = fixture<HTMLButtonElement>(members);
+      node = fixture<HTMLButtonElement>(members, complete.testElement('button'));
       break;
     case 'p':
-      node = fixture<HTMLParagraphElement>(members);
+      node = fixture<HTMLParagraphElement>(members, complete.testElement('p'));
       break;
     case 'h1':
-      node = fixture<HTMLHeadingElement>(members);
+      node = fixture<HTMLHeadingElement>(members, complete.testElement('h1'));
       break;
     default:
       throw new Error(`Unexpected test element: ${tag}`);
@@ -69,19 +73,22 @@ function createElement(tag: string): HTMLElement {
   return node;
 }
 let pointerLockElement: Element | null = null;
-globalThis.document = fixture<Document>({
-  get pointerLockElement(): Element | null {
-    return pointerLockElement;
+globalThis.document = fixture<Document>(
+  {
+    get pointerLockElement(): Element | null {
+      return pointerLockElement;
+    },
+    createElement,
+    body: fixture<HTMLElement>({ append(): void {} }, complete.testElement('div')),
+    addEventListener(type: string, fn: EventListenerOrEventListenerObject | null): void {
+      if (fn) listeners.set(type, fn);
+    },
+    removeEventListener(type: string): void {
+      listeners.delete(type);
+    },
   },
-  createElement,
-  body: fixture<HTMLElement>({ append(): void {} }),
-  addEventListener(type: string, fn: EventListenerOrEventListenerObject | null): void {
-    if (fn) listeners.set(type, fn);
-  },
-  removeEventListener(type: string): void {
-    listeners.delete(type);
-  },
-});
+  complete.testDocument()
+);
 function dispatch(type: string): void {
   const listener = listeners.get(type);
   assert(listener);
@@ -128,7 +135,7 @@ function createStartFixture(visible = true): {
   assert(button);
   const click = (): void => {
     assert(button.onclick);
-    button.onclick(fixture<PointerEvent>({}));
+    button.onclick(fixture<PointerEvent>({}, complete.testPointerEvent()));
   };
   const lock = (): void => {
     pointerLockElement = engine.canvas;

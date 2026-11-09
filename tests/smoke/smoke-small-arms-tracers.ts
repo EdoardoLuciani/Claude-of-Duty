@@ -19,6 +19,7 @@ import type { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { makeAgent } from '../lib/agent-fixture.ts';
 import { ArmedWeaponSystem } from '../lib/ballistics-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 for (const id of WEAPON_IDS) {
@@ -30,23 +31,26 @@ for (const id of WEAPON_IDS) {
 }
 
 let clipName: string | null = null;
-const vm = fixture<Viewmodel>({
-  get clipName(): string | null {
-    return clipName;
+const vm = fixture<Viewmodel>(
+  {
+    get clipName(): string | null {
+      return clipName;
+    },
+    play(name): number {
+      clipName = name;
+      return 1;
+    },
+    stopClip(): void {
+      clipName = null;
+    },
+    syncToCamera(): void {},
+    muzzleWorld(out): THREE.Vector3 {
+      return out;
+    },
+    addRecoil(): void {},
   },
-  play(name): number {
-    clipName = name;
-    return 1;
-  },
-  stopClip(): void {
-    clipName = null;
-  },
-  syncToCamera(): void {},
-  muzzleWorld(out): THREE.Vector3 {
-    return out;
-  },
-  addRecoil(): void {},
-});
+  complete.testViewmodel()
+);
 
 function makeRifle(seed: number): ArmedWeaponSystem {
   const wp = new ArmedWeaponSystem();
@@ -69,12 +73,15 @@ function makeRifle(seed: number): ArmedWeaponSystem {
 
 function fireRifle(wp: ArmedWeaponSystem): Array<boolean | undefined> {
   const spawned: Array<boolean | undefined> = [];
-  wp.sim = fixture<ProjectileSim>({
-    spawn(o): null {
-      spawned.push(o.tracer);
-      return null;
+  wp.sim = fixture<ProjectileSim>(
+    {
+      spawn(o): null {
+        spawned.push(o.tracer);
+        return null;
+      },
     },
-  });
+    complete.testProjectileSim()
+  );
   wp._spread = 1.2;
   for (let i = 0; i < 9; i++) {
     wp.state.chambered = true;
@@ -170,7 +177,10 @@ const agent = makeAgent({
   lastFired: -Infinity,
   fireX: 0,
   fireZ: 0,
-  animator: fixture<Animator>({ ejectWorld: new THREE.Vector3(0.2, 1.2, 8) }),
+  animator: fixture<Animator>(
+    { ejectWorld: new THREE.Vector3(0.2, 1.2, 8) },
+    complete.makeAgent().animator
+  ),
 });
 
 {
@@ -194,12 +204,15 @@ const agent = makeAgent({
   audio.ctx = createTestContext();
   audio.rng = new Rng(1);
   audio.rng.float = (): number => 0;
-  audio.field = fixture<NonNullable<AudioSystem['field']>>({
-    listenerPos: { x: 0, y: 1.36, z: 0 },
-    distanceTo(x, y, z): number {
-      return Math.hypot(x, y - 1.36, z);
+  audio.field = fixture<NonNullable<AudioSystem['field']>>(
+    {
+      listenerPos: { x: 0, y: 1.36, z: 0 },
+      distanceTo(x, y, z): number {
+        return Math.hypot(x, y - 1.36, z);
+      },
     },
-  });
+    complete.testSpatialField()
+  );
   audio._budget.whizz = 0;
   audio._whizzShots = new Float64Array(64);
   audio._whizzCursor = 0;
@@ -213,8 +226,11 @@ const agent = makeAgent({
     meanFree: 0,
     ceiling: 0,
   };
-  audio.actx = fixture<AudioContext>({ currentTime: 0 });
-  audio.mixer = fixture<NonNullable<AudioSystem['mixer']>>({ duck(): void {} });
+  audio.actx = fixture<AudioContext>({ currentTime: 0 }, complete.createAudioContext());
+  audio.mixer = fixture<NonNullable<AudioSystem['mixer']>>(
+    { duck(): void {} },
+    complete.testMixer()
+  );
   audio._playAt = (kind): boolean => {
     plays.push(kind);
     return true;

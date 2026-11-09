@@ -13,19 +13,26 @@ import { CharacterController } from '../../src/physics/character.ts';
 import type { PhysicsSystem } from '../../src/physics/index.ts';
 import { MASK } from '../../src/physics/surfaces.ts';
 import { MovementWorker } from '../lib/ai-movement-fixture.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 const world = new StaticWorld(),
   controller = new CharacterController(world);
-const nav = fixture<SurfaceNav>({
-  physics: fixture<PhysicsSystem>({
-    staticWorld: world,
-    gravity: -20,
-    MASK: { ...MASK, CHARACTER: 259 },
-  }),
-  _probe: controller,
-  repeatState: true,
-});
+const nav = fixture<SurfaceNav>(
+  {
+    physics: fixture<PhysicsSystem>(
+      {
+        staticWorld: world,
+        gravity: -20,
+        MASK: { ...MASK, CHARACTER: 259 },
+      },
+      new complete.PhysicsSystem()
+    ),
+    _probe: controller,
+    repeatState: true,
+  },
+  complete.testNav()
+);
 const worker = new MovementWorker();
 const service = new AttachmentQueries(nav, { workerFactory: (): MovementWorker => worker });
 await service.start();
@@ -234,17 +241,20 @@ const points = [0, 2].map((x): BakedCoverPoint => ({
   component: 1,
   claimed: -1,
 }));
-const grid = fixture<SurfaceNav>({
-  worker: service,
-  coverPoints: points,
-  components: new Map([[1, 1]]),
-  walkingComponents: new Map([[1, 1]]),
-  project(p, out, _cache, goal): number {
-    out.copy(p);
-    return !goal || service.request(p, { x: p.x + 0.2, y: p.y, z: p.z }, 0.36, 1.8, 80) ? 1 : 0;
+const grid = fixture<SurfaceNav>(
+  {
+    worker: service,
+    coverPoints: points,
+    components: new Map([[1, 1]]),
+    walkingComponents: new Map([[1, 1]]),
+    project(p, out, _cache, goal): number {
+      out.copy(p);
+      return !goal || service.request(p, { x: p.x + 0.2, y: p.y, z: p.z }, 0.36, 1.8, 80) ? 1 : 0;
+    },
   },
-});
-const cover = new CoverMap(grid, fixture<PhysicsSystem>({}));
+  complete.testNav()
+);
+const cover = new CoverMap(grid, fixture<PhysicsSystem>({}, new complete.PhysicsSystem()));
 cover.protects = (): true => true;
 cover.peekOffset = (): number => 0;
 const pick = (): ReturnType<CoverMap['pick']> =>
@@ -288,72 +298,97 @@ for (const change of ['controller-config', 'world-identity']) {
     w.build();
     return w;
   };
-  const physics = fixture<PhysicsSystem>({
-    staticWorld: makeWorld(false),
-    gravity: -20,
-    MASK: { ...MASK, CHARACTER: 259 },
-    checkCapsule(a, b, r, m): boolean {
-      return (
-        physics.staticWorld.overlapCapsule(
-          a.x,
-          a.y,
-          a.z,
-          b.x,
-          b.y,
-          b.z,
-          r,
-          m ?? physics.MASK.CHARACTER,
-          0
-        ) === 0
-      );
+  const physics = fixture<PhysicsSystem>(
+    {
+      staticWorld: makeWorld(false),
+      gravity: -20,
+      MASK: { ...MASK, CHARACTER: 259 },
+      checkCapsule(a, b, r, m): boolean {
+        return (
+          physics.staticWorld.overlapCapsule(
+            a.x,
+            a.y,
+            a.z,
+            b.x,
+            b.y,
+            b.z,
+            r,
+            m ?? physics.MASK.CHARACTER,
+            0
+          ) === 0
+        );
+      },
     },
-  });
+    new complete.PhysicsSystem()
+  );
   const endpoint = new THREE.Vector3(0.5, 0.008, 0),
     source = new THREE.Vector3(0, 0.008, 0),
     output = new THREE.Vector3();
-  const grid = fixture<SurfaceNav>({
-    project(...args): ReturnType<SurfaceNav['project']> {
-      return SurfaceNav.prototype.project.apply(this, args);
+  const grid = fixture<SurfaceNav>(
+    {
+      project(...args): ReturnType<SurfaceNav['project']> {
+        return SurfaceNav.prototype.project.apply(this, args);
+      },
+      canStand(...args): ReturnType<SurfaceNav['canStand']> {
+        return SurfaceNav.prototype.canStand.apply(this, args);
+      },
+      canAttach(...args): ReturnType<SurfaceNav['canAttach']> {
+        return SurfaceNav.prototype.canAttach.apply(this, args);
+      },
+      _checkAttachment(...args): ReturnType<SurfaceNav['_checkAttachment']> {
+        return SurfaceNav.prototype._checkAttachment.apply(this, args);
+      },
+      worker: null,
+      repeatState: true,
+      physics,
+      _probe: new CharacterController(physics.staticWorld),
+      _p0: new THREE.Vector3(),
+      _p1: new THREE.Vector3(),
+      _source: new THREE.Vector3(),
+      meta: {},
+      components: new Map([[1, 1]]),
+      walkingComponents: new Map([[1, 1]]),
+      stats: fixture<SurfaceNav['stats'] & AttachmentOracle['stats']>(
+        { endpointChecks: 0, cacheHits: 0 },
+        {
+          get polygons(): never {
+            return complete.unavailable('polygons');
+          },
+          get queries(): never {
+            return complete.unavailable('queries');
+          },
+          get queryMs(): never {
+            return complete.unavailable('queryMs');
+          },
+          get endpointChecks(): never {
+            return complete.unavailable('endpointChecks');
+          },
+          get cacheHits(): never {
+            return complete.unavailable('cacheHits');
+          },
+        }
+      ),
+      query: fixture<SurfaceNav['query']>(
+        {
+          findNearestPoly: (): ReturnType<SurfaceNav['query']['findNearestPoly']> => ({
+            success: true,
+            status: 0,
+            nearestRef: 1,
+            nearestPoint: endpoint,
+            isOverPoly: true,
+          }),
+          closestPointOnPoly: (): ReturnType<SurfaceNav['query']['closestPointOnPoly']> => ({
+            success: true,
+            status: 0,
+            isPointOverPoly: true,
+            closestPoint: endpoint,
+          }),
+        },
+        complete.testQuery()
+      ),
     },
-    canStand(...args): ReturnType<SurfaceNav['canStand']> {
-      return SurfaceNav.prototype.canStand.apply(this, args);
-    },
-    canAttach(...args): ReturnType<SurfaceNav['canAttach']> {
-      return SurfaceNav.prototype.canAttach.apply(this, args);
-    },
-    _checkAttachment(...args): ReturnType<SurfaceNav['_checkAttachment']> {
-      return SurfaceNav.prototype._checkAttachment.apply(this, args);
-    },
-    worker: null,
-    repeatState: true,
-    physics,
-    _probe: new CharacterController(physics.staticWorld),
-    _p0: new THREE.Vector3(),
-    _p1: new THREE.Vector3(),
-    _source: new THREE.Vector3(),
-    meta: {},
-    components: new Map([[1, 1]]),
-    walkingComponents: new Map([[1, 1]]),
-    stats: fixture<SurfaceNav['stats'] & AttachmentOracle['stats']>(
-      { endpointChecks: 0, cacheHits: 0 },
-      ['repeatedStates', 'savedMoves']
-    ),
-    query: fixture<SurfaceNav['query']>({
-      findNearestPoly: (): ReturnType<SurfaceNav['query']['findNearestPoly']> => ({
-        success: true,
-        status: 0,
-        nearestRef: 1,
-        nearestPoint: endpoint,
-        isOverPoly: true,
-      }),
-      closestPointOnPoly: (): ReturnType<SurfaceNav['query']['closestPointOnPoly']> => ({
-        success: true,
-        status: 0,
-        isPointOverPoly: true,
-        closestPoint: endpoint,
-      }),
-    }),
-  });
+    complete.testNav()
+  );
   grid.worker = new AttachmentQueries(grid, {
     workerFactory: (): MovementWorker => new MovementWorker(),
   });
@@ -447,28 +482,50 @@ floor.addTriangles(
   'concrete'
 );
 floor.build();
-const physics = fixture<PhysicsSystem>({
-  staticWorld: floor,
-  gravity: -20,
-  MASK: { ...MASK, CHARACTER: 259 },
-  checkCapsule: (a, b, r, m): boolean =>
-    floor.overlapCapsule(a.x, a.y, a.z, b.x, b.y, b.z, r, m ?? 259, 0) === 0,
-});
-const probe = fixture<SurfaceNav>({
-  physics,
-  _probe: new CharacterController(floor),
-  _p0: new THREE.Vector3(),
-  _p1: new THREE.Vector3(),
-  canStand,
-  repeatState: true,
-  stats: fixture<SurfaceNav['stats'] & AttachmentOracle['stats']>({ endpointChecks: 0 }, [
-    'repeatedStates',
-    'savedMoves',
-  ]),
-  canAttach(...args): ReturnType<SurfaceNav['canAttach']> {
-    return SurfaceNav.prototype.canAttach.apply(this, args);
+const physics = fixture<PhysicsSystem>(
+  {
+    staticWorld: floor,
+    gravity: -20,
+    MASK: { ...MASK, CHARACTER: 259 },
+    checkCapsule: (a, b, r, m): boolean =>
+      floor.overlapCapsule(a.x, a.y, a.z, b.x, b.y, b.z, r, m ?? 259, 0) === 0,
   },
-});
+  new complete.PhysicsSystem()
+);
+const probe = fixture<SurfaceNav>(
+  {
+    physics,
+    _probe: new CharacterController(floor),
+    _p0: new THREE.Vector3(),
+    _p1: new THREE.Vector3(),
+    canStand,
+    repeatState: true,
+    stats: fixture<SurfaceNav['stats'] & AttachmentOracle['stats']>(
+      { endpointChecks: 0 },
+      {
+        get polygons(): never {
+          return complete.unavailable('polygons');
+        },
+        get queries(): never {
+          return complete.unavailable('queries');
+        },
+        get queryMs(): never {
+          return complete.unavailable('queryMs');
+        },
+        get endpointChecks(): never {
+          return complete.unavailable('endpointChecks');
+        },
+        get cacheHits(): never {
+          return complete.unavailable('cacheHits');
+        },
+      }
+    ),
+    canAttach(...args): ReturnType<SurfaceNav['canAttach']> {
+      return SurfaceNav.prototype.canAttach.apply(this, args);
+    },
+  },
+  complete.testNav()
+);
 let moves = 0,
   unknown = 0,
   fast = 0,
@@ -479,14 +536,57 @@ probe._probe.move = function (...args): number {
   moves++;
   return move.apply(this, args);
 };
-probe.worker = fixture<AttachmentQueries>({
-  active: true,
-  current: fixture<NonNullable<AttachmentQueries['current']>>({}, ['origin']),
-  request(): false {
-    delegated = true;
-    return false;
+probe.worker = fixture<AttachmentQueries>(
+  {
+    active: true,
+    current: fixture<NonNullable<AttachmentQueries['current']>>(
+      {},
+      {
+        get actor(): never {
+          return complete.unavailable('actor');
+        },
+        get kind(): never {
+          return complete.unavailable('kind');
+        },
+        get proofs(): never {
+          return complete.unavailable('proofs');
+        },
+        get started(): never {
+          return complete.unavailable('started');
+        },
+        get frame(): never {
+          return complete.unavailable('frame');
+        },
+        get waiting(): never {
+          return complete.unavailable('waiting');
+        },
+        get gapFrames(): never {
+          return complete.unavailable('gapFrames');
+        },
+        get attempts(): never {
+          return complete.unavailable('attempts');
+        },
+        get lastFrame(): never {
+          return complete.unavailable('lastFrame');
+        },
+        get pending(): never {
+          return complete.unavailable('pending');
+        },
+        get unsent(): never {
+          return complete.unavailable('unsent');
+        },
+        get used(): never {
+          return complete.unavailable('used');
+        },
+      }
+    ),
+    request(): false {
+      delegated = true;
+      return false;
+    },
   },
-});
+  complete.testQueries()
+);
 for (const x of [0, 0.0001, 0.1199999, 0.12, 0.1200001, 0.2, 1])
   for (const y of [0.008, 0.1, 0.4])
     for (const steps of [0, 1, 2, 80]) {

@@ -20,6 +20,7 @@ import { CLOCK } from '../../src/sky/tuning.ts';
 import { WorldSystem } from '../../src/world/index.ts';
 import { OUTAGE, tickStreetlightOutage } from '../../src/world/lighting.ts';
 import { createTestContext } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 import { captureMethod } from '../lib/render-fixture.ts';
 
@@ -41,30 +42,118 @@ assert.equal(tickStreetlightOutage(state, 0.02, 23), 1, 'three full dark minutes
 assert.equal(tickStreetlightOutage(state, 1600, 21), 1, 'next night does not retrigger');
 
 // Clock update uses scaled dt, wraps midnight, and stops on death.
-const playerHealth = fixture<Health>({ dead: false });
-const player = fixture<PlayerSystem>({
-  get dead(): boolean {
-    return playerHealth.dead;
+const playerHealth = fixture<Health>({ dead: false }, complete.testHealth());
+const player = fixture<PlayerSystem>(
+  {
+    get dead(): boolean {
+      return playerHealth.dead;
+    },
   },
-});
+  complete.testPlayer()
+);
 const ctx = createTestContext({ providers: { player } });
-const sky = fixture<SkySystem>({
-  update: captureMethod(SkySystem.prototype, 'update'),
-  _skyDirty: false,
-  _envDirty: false,
-  hour: CLOCK.startHour,
-  timeRate: CLOCK.hoursPerSecond,
-  shared: fixture<SkySystem['shared']>({
-    uCloudParams: uniform(new THREE.Vector4()),
-    uStarParams: uniform(new THREE.Vector4()),
-    uFogDrift: uniform(new THREE.Vector3()),
-  }),
-  cloudShadowAt: (): number => 1,
-  _cloudOcclusion: 1,
-  _envAge: 0,
-  _applyLightIntensities(): void {},
-  _updateCelestial(): void {},
-});
+const sky = fixture<SkySystem>(
+  {
+    update: captureMethod(SkySystem.prototype, 'update'),
+    _skyDirty: false,
+    _envDirty: false,
+    hour: CLOCK.startHour,
+    timeRate: CLOCK.hoursPerSecond,
+    shared: fixture<SkySystem['shared']>(
+      {
+        uCloudParams: uniform(new THREE.Vector4()),
+        uStarParams: uniform(new THREE.Vector4()),
+        uFogDrift: uniform(new THREE.Vector3()),
+      },
+      {
+        get uMieScale(): never {
+          return complete.unavailable('uMieScale');
+        },
+        get uViewPos(): never {
+          return complete.unavailable('uViewPos');
+        },
+        get uSunDir(): never {
+          return complete.unavailable('uSunDir');
+        },
+        get uMoonDir(): never {
+          return complete.unavailable('uMoonDir');
+        },
+        get uSunIrradiance(): never {
+          return complete.unavailable('uSunIrradiance');
+        },
+        get uMoonIrradiance(): never {
+          return complete.unavailable('uMoonIrradiance');
+        },
+        get uSunDiscRadiance(): never {
+          return complete.unavailable('uSunDiscRadiance');
+        },
+        get uMoonDiscRadiance(): never {
+          return complete.unavailable('uMoonDiscRadiance');
+        },
+        get uSunAltitude(): never {
+          return complete.unavailable('uSunAltitude');
+        },
+        get uMoonAltitude(): never {
+          return complete.unavailable('uMoonAltitude');
+        },
+        get uMoonRelAz(): never {
+          return complete.unavailable('uMoonRelAz');
+        },
+        get uDisc(): never {
+          return complete.unavailable('uDisc');
+        },
+        get uGroundAlbedo(): never {
+          return complete.unavailable('uGroundAlbedo');
+        },
+        get uHorizonMurk(): never {
+          return complete.unavailable('uHorizonMurk');
+        },
+        get uSkyRolloff(): never {
+          return complete.unavailable('uSkyRolloff');
+        },
+        get uStarParams(): never {
+          return complete.unavailable('uStarParams');
+        },
+        get uCelestial(): never {
+          return complete.unavailable('uCelestial');
+        },
+        get uCloudParams(): never {
+          return complete.unavailable('uCloudParams');
+        },
+        get uCloudParams2(): never {
+          return complete.unavailable('uCloudParams2');
+        },
+        get uFog(): never {
+          return complete.unavailable('uFog');
+        },
+        get uFog2(): never {
+          return complete.unavailable('uFog2');
+        },
+        get uFogExt(): never {
+          return complete.unavailable('uFogExt');
+        },
+        get uPhase(): never {
+          return complete.unavailable('uPhase');
+        },
+        get uKeyDir(): never {
+          return complete.unavailable('uKeyDir');
+        },
+        get uKeyIrr(): never {
+          return complete.unavailable('uKeyIrr');
+        },
+        get uFogDrift(): never {
+          return complete.unavailable('uFogDrift');
+        },
+      }
+    ),
+    cloudShadowAt: (): number => 1,
+    _cloudOcclusion: 1,
+    _envAge: 0,
+    _applyLightIntensities(): void {},
+    _updateCelestial(): void {},
+  },
+  new complete.SkySystem()
+);
 sky.update(0, ctx);
 assert.equal(sky.hour, 16.5, 'pause/shop scaled dt freezes clock');
 sky.update(600, ctx);
@@ -89,24 +178,109 @@ skyLights.keyLight = moon;
 skyLights.sunLight = sun;
 skyLights.moonLight = moon;
 skyLights._cloudOcclusion = 1;
-skyLights.shared = fixture<SkySystem['shared']>({
-  uKeyDir: uniform(skyLights.keyDirection),
-  uKeyIrr: uniform(new THREE.Vector3()),
-});
+skyLights.shared = fixture<SkySystem['shared']>(
+  {
+    uKeyDir: uniform(skyLights.keyDirection),
+    uKeyIrr: uniform(new THREE.Vector3()),
+  },
+  {
+    get uMieScale(): never {
+      return complete.unavailable('uMieScale');
+    },
+    get uViewPos(): never {
+      return complete.unavailable('uViewPos');
+    },
+    get uSunDir(): never {
+      return complete.unavailable('uSunDir');
+    },
+    get uMoonDir(): never {
+      return complete.unavailable('uMoonDir');
+    },
+    get uSunIrradiance(): never {
+      return complete.unavailable('uSunIrradiance');
+    },
+    get uMoonIrradiance(): never {
+      return complete.unavailable('uMoonIrradiance');
+    },
+    get uSunDiscRadiance(): never {
+      return complete.unavailable('uSunDiscRadiance');
+    },
+    get uMoonDiscRadiance(): never {
+      return complete.unavailable('uMoonDiscRadiance');
+    },
+    get uSunAltitude(): never {
+      return complete.unavailable('uSunAltitude');
+    },
+    get uMoonAltitude(): never {
+      return complete.unavailable('uMoonAltitude');
+    },
+    get uMoonRelAz(): never {
+      return complete.unavailable('uMoonRelAz');
+    },
+    get uDisc(): never {
+      return complete.unavailable('uDisc');
+    },
+    get uGroundAlbedo(): never {
+      return complete.unavailable('uGroundAlbedo');
+    },
+    get uHorizonMurk(): never {
+      return complete.unavailable('uHorizonMurk');
+    },
+    get uSkyRolloff(): never {
+      return complete.unavailable('uSkyRolloff');
+    },
+    get uStarParams(): never {
+      return complete.unavailable('uStarParams');
+    },
+    get uCelestial(): never {
+      return complete.unavailable('uCelestial');
+    },
+    get uCloudParams(): never {
+      return complete.unavailable('uCloudParams');
+    },
+    get uCloudParams2(): never {
+      return complete.unavailable('uCloudParams2');
+    },
+    get uFog(): never {
+      return complete.unavailable('uFog');
+    },
+    get uFog2(): never {
+      return complete.unavailable('uFog2');
+    },
+    get uFogExt(): never {
+      return complete.unavailable('uFogExt');
+    },
+    get uPhase(): never {
+      return complete.unavailable('uPhase');
+    },
+    get uKeyDir(): never {
+      return complete.unavailable('uKeyDir');
+    },
+    get uKeyIrr(): never {
+      return complete.unavailable('uKeyIrr');
+    },
+    get uFogDrift(): never {
+      return complete.unavailable('uFogDrift');
+    },
+  }
+);
 const providers = { sky: skyLights };
 const lightingCtx = createTestContext({ providers });
 let shadowSetups = 0;
-const render = fixture<RenderSystem>({
-  _syncSun: captureMethod(RenderSystem.prototype, '_syncSun'),
-  _lightsReady: false,
-  _skyKey: keyProxy,
-  _skySecondary: secondaryProxy,
-  indirect: new IndirectFill(lightingCtx),
-  _setupShadows(light): void {
-    assert.equal(light, keyProxy);
-    shadowSetups++;
+const render = fixture<RenderSystem>(
+  {
+    _syncSun: captureMethod(RenderSystem.prototype, '_syncSun'),
+    _lightsReady: false,
+    _skyKey: keyProxy,
+    _skySecondary: secondaryProxy,
+    indirect: new IndirectFill(lightingCtx),
+    _setupShadows(light): void {
+      assert.equal(light, keyProxy);
+      shadowSetups++;
+    },
   },
-});
+  new complete.RenderSystem()
+);
 render.activeSun = keyProxy;
 for (const key of [moon, sun, moon]) {
   key.position.set(key === moon ? -3 : 4, 8, 2);
@@ -153,25 +327,37 @@ assert.equal(shadowSetups, 1);
   camera.position.copy(shadow).add(new THREE.Vector3(0, 2, 6));
   camera.lookAt(shadow);
   camera.updateMatrixWorld(true);
-  const a = fixture<Agent>({ mesh, position: mesh.position, radius: 0.34, height: 2, alive: true });
-  const ai = fixture<AiSystem>({
-    _sky: null,
-    _sunDirection: captureMethod(AiSystem.prototype, '_sunDirection'),
-    _updateRelevance: captureMethod(AiSystem.prototype, '_updateRelevance'),
-    canRollback: captureMethod(AiSystem.prototype, 'canRollback'),
-    agents: [a],
-    ctx: createTestContext({ camera, providers }),
-    phys: fixture<NonNullable<AiSystem['_phys']>>({
-      staticWorld: fixture<NonNullable<AiSystem['_phys']>['staticWorld']>({ dirty: false }),
-    }),
-    _frustum: new THREE.Frustum(),
-    _mvp: new THREE.Matrix4(),
-    _sphere: new THREE.Sphere(),
-    _sweep: new THREE.Sphere(),
-    _sun: new THREE.Vector3(),
-    _lodStats: fixture<AiSystem['_lodStats']>({}),
-    stats: fixture<AiSystem['stats']>({}),
-  });
+  const a = fixture<Agent>(
+    { mesh, position: mesh.position, radius: 0.34, height: 2, alive: true },
+    complete.makeAgent()
+  );
+  const ai = fixture<AiSystem>(
+    {
+      _sky: null,
+      _sunDirection: captureMethod(AiSystem.prototype, '_sunDirection'),
+      _updateRelevance: captureMethod(AiSystem.prototype, '_updateRelevance'),
+      canRollback: captureMethod(AiSystem.prototype, 'canRollback'),
+      agents: [a],
+      ctx: createTestContext({ camera, providers }),
+      phys: fixture<NonNullable<AiSystem['_phys']>>(
+        {
+          staticWorld: fixture<NonNullable<AiSystem['_phys']>['staticWorld']>(
+            { dirty: false },
+            new complete.StaticWorld()
+          ),
+        },
+        new complete.PhysicsSystem()
+      ),
+      _frustum: new THREE.Frustum(),
+      _mvp: new THREE.Matrix4(),
+      _sphere: new THREE.Sphere(),
+      _sweep: new THREE.Sphere(),
+      _sun: new THREE.Vector3(),
+      _lodStats: { irrelevant: 0 },
+      stats: complete.makeAi().stats,
+    },
+    complete.makeAi()
+  );
   const originalSun = celestial.sun.clone();
   skyLights.keyDirection.copy(originalSun); // negative control: former astronomical direction
   ai._updateRelevance(ai.ctx);
@@ -191,10 +377,29 @@ assert.equal(shadowSetups, 1);
 }
 
 const materials = new MaterialSystemNode();
-materials._shared = fixture<NonNullable<MaterialSystemNode['_shared']>>({
-  keyDir: uniform(new THREE.Vector3()),
-  keyColor: uniform(new THREE.Vector3()),
-});
+materials._shared = fixture<NonNullable<MaterialSystemNode['_shared']>>(
+  {
+    keyDir: uniform(new THREE.Vector3()),
+    keyColor: uniform(new THREE.Vector3()),
+  },
+  {
+    get detailNormal(): never {
+      return complete.unavailable('detailNormal');
+    },
+    get detailAlbedo(): never {
+      return complete.unavailable('detailAlbedo');
+    },
+    get macro(): never {
+      return complete.unavailable('macro');
+    },
+    get keyDir(): never {
+      return complete.unavailable('keyDir');
+    },
+    get keyColor(): never {
+      return complete.unavailable('keyColor');
+    },
+  }
+);
 materials.update(0, lightingCtx);
 assert.equal(materials._shared.keyDir.value, skyLights.keyDirection);
 // The key uses the placed light (including its near-horizon clamp), not the
@@ -214,18 +419,21 @@ sun.intensity = 3;
 
 // FX runs before render synchronization: emitted data must use this tick's
 // authored key, not yesterday's proxy value. Preview stubs retain a fallback.
-const fx = fixture<FxSystem>({
-  _syncLighting: captureMethod(FxSystem.prototype, '_syncLighting'),
-  _viewAttached: false,
-  render,
-  layers: [],
-  _sunView: new THREE.Vector3(),
-  _sunCol: new THREE.Vector3(),
-  _ambTop: new THREE.Vector3(),
-  _ambBot: new THREE.Vector3(),
-  _upView: new THREE.Vector3(),
-  _fog: new THREE.Vector4(),
-});
+const fx = fixture<FxSystem>(
+  {
+    _syncLighting: captureMethod(FxSystem.prototype, '_syncLighting'),
+    _viewAttached: false,
+    render,
+    layers: [],
+    _sunView: new THREE.Vector3(),
+    _sunCol: new THREE.Vector3(),
+    _ambTop: new THREE.Vector3(),
+    _ambBot: new THREE.Vector3(),
+    _upView: new THREE.Vector3(),
+    _fog: new THREE.Vector4(),
+  },
+  new complete.FxSystem()
+);
 const fxCtx = createTestContext({ camera: ctx.camera, providers });
 keyProxy.intensity = 4.3;
 fx._syncLighting(fxCtx);
@@ -245,17 +453,22 @@ lamp.userData.owNightIntensity = 14;
 const bulb = new THREE.PointLight();
 bulb.userData.owDayIntensity = 1;
 bulb.userData.owNightIntensity = 22;
-const nightCtx = createTestContext({ providers: { sky: fixture<SkySystem>({ sunAltitude: -1 }) } });
-const world = fixture<WorldSystem>({
-  setStreetlightPower: captureMethod(WorldSystem.prototype, 'setStreetlightPower'),
-  _updateLights: captureMethod(WorldSystem.prototype, '_updateLights'),
-  ctx: nightCtx,
-  lamps: [lamp],
-  bulbs: [bulb],
-  lampLens: new MeshStandardNodeMaterial({ emissiveIntensity: 0 }),
-  _lampMix: -1,
-  _lampPower: -1,
+const nightCtx = createTestContext({
+  providers: { sky: fixture<SkySystem>({ sunAltitude: -1 }, new complete.SkySystem()) },
 });
+const world = fixture<WorldSystem>(
+  {
+    setStreetlightPower: captureMethod(WorldSystem.prototype, 'setStreetlightPower'),
+    _updateLights: captureMethod(WorldSystem.prototype, '_updateLights'),
+    ctx: nightCtx,
+    lamps: [lamp],
+    bulbs: [bulb],
+    lampLens: new MeshStandardNodeMaterial({ emissiveIntensity: 0 }),
+    _lampMix: -1,
+    _lampPower: -1,
+  },
+  new complete.WorldSystem()
+);
 world.setStreetlightPower(1);
 assert.equal(lamp.intensity, 14 * 0.55);
 assert.equal(bulb.intensity, 22 * 0.55);
@@ -268,14 +481,17 @@ world.setStreetlightPower(1);
 assert.equal(lamp.intensity, 14 * 0.55);
 
 // Toggle keeps the spot/shadow slot, follows camera, and refuses a dead player.
-const p = fixture<PlayerSystem>({
-  setFlashlightEnabled: captureMethod(PlayerSystem.prototype, 'setFlashlightEnabled'),
-  lateUpdate: captureMethod(PlayerSystem.prototype, 'lateUpdate'),
-  ctx,
-  health: new Health(ctx, null),
-  flashlightOn: false,
-  flashlight: new THREE.SpotLight(FLASHLIGHT.color, 0),
-});
+const p = fixture<PlayerSystem>(
+  {
+    setFlashlightEnabled: captureMethod(PlayerSystem.prototype, 'setFlashlightEnabled'),
+    lateUpdate: captureMethod(PlayerSystem.prototype, 'lateUpdate'),
+    ctx,
+    health: new Health(ctx, null),
+    flashlightOn: false,
+    flashlight: new THREE.SpotLight(FLASHLIGHT.color, 0),
+  },
+  complete.testPlayer()
+);
 p.flashlight.castShadow = true;
 p.setFlashlightEnabled(true);
 assert.equal(p.flashlight.intensity, FLASHLIGHT.intensity);

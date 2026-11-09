@@ -18,6 +18,7 @@ import { Movement } from '../../src/player/movement.ts';
 import { FLASHLIGHT, HEALING, MOVE } from '../../src/player/tuning.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import { createTestContext } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture as partialFixture } from '../lib/fixture.ts';
 
 // Real player, movement, health and input; only collision and weapon presentation are inert.
@@ -36,7 +37,7 @@ interface PlayerFixture {
   frame: (options?: FrameOptions) => void;
 }
 function fixture(): PlayerFixture {
-  const input = new Input(partialFixture<HTMLCanvasElement>({}), {
+  const input = new Input(partialFixture<HTMLCanvasElement>({}, complete.testElement('canvas')), {
     sensitivity: 0.002,
     invertY: false,
   });

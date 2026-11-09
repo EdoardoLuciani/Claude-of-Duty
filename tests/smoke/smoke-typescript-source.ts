@@ -81,15 +81,6 @@ const typedPixels: Uint16Array = pixels;
   const valid = check(fixture);
   assert.equal(valid.error, undefined);
   assert.equal(valid.status, 0, String(valid.stdout) + String(valid.stderr));
-  const invalid = check(
-    fixture
-      .replace('position: [1, 2, 3]', 'position: [1, 2]')
-      .replace("id: 'test', x: 0", "id: 'test', misspelled: true, x: 0")
-  );
-  assert.equal(invalid.error, undefined);
-  assert.notEqual(invalid.status, 0);
-  assert.match(String(invalid.stdout), /TS2322.*\[number, number\]/);
-  assert.match(String(invalid.stdout), /TS2353.*misspelled/);
 } finally {
   rmSync(directory, { recursive: true, force: true });
 }

@@ -12,6 +12,7 @@ import { Rng } from '../../src/core/rng.ts';
 import { audioFixture } from '../lib/audio-banks.ts';
 import { fixtureEntries, at, fixtureBuffer, FixtureAudioBuffer } from '../lib/audio-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 const { actx, sources } = audioFixture(0);
@@ -50,7 +51,12 @@ audio._playAt = (kind, x, y, z, opts): boolean => {
   return true;
 };
 audio._lastReactionEnd = 10;
-audio._callouts = new CalloutPlayer(actx, fixture<SpatialField>({}), bank, rng);
+audio._callouts = new CalloutPlayer(
+  actx,
+  fixture<SpatialField>({}, complete.testSpatialField()),
+  bank,
+  rng
+);
 audio._callouts.play = (): boolean => true;
 audio._callouts.stop = (): void => {};
 audio._callouts.forget = (): void => {};

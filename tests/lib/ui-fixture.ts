@@ -9,173 +9,39 @@ import { Health } from '../../src/player/health.ts';
 import { PlayerSystem } from '../../src/player/index.ts';
 import { Movement } from '../../src/player/movement.ts';
 import { PixiHud } from '../../src/ui/pixi-hud.ts';
-import { fixture } from './fixture.ts';
+import { testDocument, testElement } from './dom-fixture.ts';
 
-interface UiElementState {
-  focused: boolean;
-  removed: boolean;
-  _owText?: string;
-  _ows?: Map<string, string>;
-  _owc?: Map<string, boolean>;
-}
-
-function elementStyle(): CSSStyleDeclaration {
-  return fixture<CSSStyleDeclaration>({
-    width: '',
-    height: '',
-    cssText: '',
-    touchAction: '',
-    setProperty(): void {},
-  });
-}
-
-function elementClasses(): DOMTokenList {
-  const tokens = new Set<string>();
-  return fixture<DOMTokenList>({
-    toggle(token: string, force?: boolean): boolean {
-      const present = force ?? !tokens.has(token);
-      if (present) tokens.add(token);
-      else tokens.delete(token);
-      return present;
-    },
-    contains(token: string): boolean {
-      return tokens.has(token);
-    },
-  });
-}
-
-function isElement(node: Node): node is Element {
-  return node.nodeType === 1;
-}
-
-/** Minimal native members are checked; unimplemented DOM dependencies fail on access. */
-function uiElement(tag: string, ownerDocument: Document): HTMLElement {
-  const children: Element[] = [];
-  const attributes = new Map<string, Attr>();
-  const members: Partial<HTMLElement & UiElementState> = {
-    nodeType: 1,
-    tagName: tag.toUpperCase(),
-    id: '',
-    className: '',
-    textContent: '',
-    tabIndex: -1,
-    focused: false,
-    removed: false,
-    hidden: false,
-    clientWidth: 100,
-    clientHeight: 100,
-    style: elementStyle(),
-    classList: elementClasses(),
-    ownerDocument,
-    children: fixture<HTMLCollection>({
-      get length(): number {
-        return children.length;
-      },
-      item(index: number): Element | null {
-        return children[index] ?? null;
-      },
-      namedItem(name: string): Element | null {
-        return (
-          children.find(
-            (child): boolean => child.id === name || child.getAttribute('name') === name
-          ) ?? null
-        );
-      },
-      [Symbol.iterator](): ArrayIterator<Element> {
-        return children.values();
-      },
-    }),
-    attributes: fixture<NamedNodeMap>({
-      get length(): number {
-        return attributes.size;
-      },
-      item(index: number): Attr | null {
-        return [...attributes.values()][index] ?? null;
-      },
-      getNamedItem(name: string): Attr | null {
-        return attributes.get(name) ?? null;
-      },
-      [Symbol.iterator](): MapIterator<Attr> {
-        return attributes.values();
-      },
-    }),
-    appendChild<T extends Node>(child: T): T {
-      assert(isElement(child), 'UI fixture only supports element children');
-      children.push(child);
-      return child;
-    },
-    setAttribute(name: string, value: string): void {
-      attributes.set(name, fixture<Attr>({ name, value }));
-    },
-    getAttribute(name: string): string | null {
-      return attributes.get(name)?.value ?? null;
-    },
-    getRootNode(): Document {
-      return ownerDocument;
-    },
-    addEventListener(): void {},
-    removeEventListener(): void {},
-    focus(): void {
-      this.focused = true;
-    },
-    remove(): void {
-      this.removed = true;
-    },
-  };
-  const optional: readonly ['_owText', '_ows', '_owc'] = ['_owText', '_ows', '_owc'];
-  if (tag === 'canvas') {
-    return fixture<HTMLCanvasElement & UiElementState>(
-      {
-        ...members,
-        width: 0,
-        height: 0,
-        getContext(): null {
-          return null;
-        },
-      },
-      optional
-    );
-  }
-  if (tag === 'input') {
-    return fixture<HTMLInputElement & UiElementState>(
-      {
-        ...members,
-        value: '0',
-        type: 'text',
-        min: '',
-        max: '',
-        step: '',
-      },
-      optional
-    );
-  }
-  if (tag === 'button') {
-    return fixture<HTMLButtonElement & UiElementState>(
-      { ...members, type: 'button', value: '0' },
-      optional
-    );
-  }
-  return fixture<HTMLElement & UiElementState>(members, optional);
-}
-
+/** Real DOM elements with explicit layout and focus/removal recording. */
 export function installUiDocument(): () => void {
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'document');
-  // Preserve Document's tag-specific API while checking each supported specialization above.
+  const documentFixture = testDocument();
+  const nativeCreate = documentFixture.createElement.bind(documentFixture);
   function createElement<K extends keyof HTMLElementTagNameMap>(tag: K): HTMLElementTagNameMap[K];
   function createElement<K extends keyof HTMLElementDeprecatedTagNameMap>(
     tag: K
   ): HTMLElementDeprecatedTagNameMap[K];
   function createElement(tag: string): HTMLElement;
   function createElement(tag: string): HTMLElement {
-    return uiElement(tag, documentFixture);
+    const element = nativeCreate(tag);
+    const state = Object.assign(element, { focused: false, removed: false });
+    const focus = element.focus.bind(element);
+    const remove = element.remove.bind(element);
+    element.focus = (): void => {
+      state.focused = true;
+      focus();
+    };
+    element.remove = (): void => {
+      state.removed = true;
+      remove();
+    };
+    Object.defineProperties(element, {
+      clientWidth: { configurable: true, value: 100 },
+      clientHeight: { configurable: true, value: 100 },
+    });
+    return element;
   }
-  const documentFixture: Document = fixture<Document>({
-    createElement,
-    exitPointerLock(): void {},
-    getElementById: (): null => null,
-    addEventListener(): void {},
-    removeEventListener(): void {},
-  });
+  documentFixture.createElement = createElement;
+  documentFixture.exitPointerLock = (): void => {};
   Object.defineProperty(globalThis, 'document', {
     configurable: true,
     writable: true,
@@ -251,7 +117,7 @@ export class UiPlayer extends PlayerSystem {
 
 export class UiInput extends Input {
   constructor() {
-    super(fixture<HTMLCanvasElement>({}), { sensitivity: 0.002, invertY: false });
+    super(testElement('canvas'), { sensitivity: 0.002, invertY: false });
   }
   get use(): boolean {
     return this.down.has('KeyT');

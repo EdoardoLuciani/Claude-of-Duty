@@ -20,6 +20,7 @@ import { Rng } from '../../src/core/rng.ts';
 import { audioFixture } from '../lib/audio-banks.ts';
 import { fixtureEntries, at, fixtureBuffer, FixtureAudioBuffer } from '../lib/audio-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 const { actx, sources } = audioFixture();
@@ -77,34 +78,40 @@ type EmitterRecord = {
 const emitters: EmitterRecord[] = [],
   requests: Parameters<SpatialField['acquire']>[0][] = [];
 let refuse = false;
-const field = fixture<SpatialField>({
-  distanceTo: (x, y, z): number => Math.hypot(x, y, z),
-  acquire(options): Emitter | null {
-    requests.push(options);
-    if (refuse) return null;
-    const record: EmitterRecord = {
-      detached: false,
-      position: { x: 0, y: 0, z: 0 },
-      emitter: fixture<Emitter>({
-        detach(): void {
-          record.detached = true;
-        },
-        moveTo(x, y, z): void {
-          record.position = { x, y, z };
-        },
-      }),
-    };
-    emitters.push(record);
-    return record.emitter;
+const field = fixture<SpatialField>(
+  {
+    distanceTo: (x, y, z): number => Math.hypot(x, y, z),
+    acquire(options): Emitter | null {
+      requests.push(options);
+      if (refuse) return null;
+      const record: EmitterRecord = {
+        detached: false,
+        position: { x: 0, y: 0, z: 0 },
+        emitter: fixture<Emitter>(
+          {
+            detach(): void {
+              record.detached = true;
+            },
+            moveTo(x, y, z): void {
+              record.position = { x, y, z };
+            },
+          },
+          complete.testEmitter()
+        ),
+      };
+      emitters.push(record);
+      return record.emitter;
+    },
+    hold(em, node, end): void {
+      const record = emitters.find((item): boolean => item.emitter === em);
+      assert(record);
+      record.node = node;
+      record.end = end;
+    },
+    dispose(): void {},
   },
-  hold(em, node, end): void {
-    const record = emitters.find((item): boolean => item.emitter === em);
-    assert(record);
-    record.node = node;
-    record.end = end;
-  },
-  dispose(): void {},
-});
+  complete.testSpatialField()
+);
 const player = new CalloutPlayer(actx, field, bank, rng);
 const pos = new Vector3(3, 0, 4);
 assert.equal(player.play('spot', { x: 56, y: 0, z: 0 }, 0), false);
@@ -205,11 +212,14 @@ firing.running = true;
 firing.actx = actx;
 firing.rng = new Rng(1);
 firing.rng.float = (): number => 0;
-firing.field = fixture<SpatialField>({
-  listenerPos: { x: 0, y: 0, z: 0 },
-  distanceTo: (): number => 10,
-});
-firing.mixer = fixture<Mixer>({ duck(): void {} });
+firing.field = fixture<SpatialField>(
+  {
+    listenerPos: { x: 0, y: 0, z: 0 },
+    distanceTo: (): number => 10,
+  },
+  complete.testSpatialField()
+);
+firing.mixer = fixture<Mixer>({ duck(): void {} }, complete.testMixer());
 firing._playAt = (): boolean => true;
 firing.bark = (): never => {
   throw Error('gunfire fabricated tactical intent');

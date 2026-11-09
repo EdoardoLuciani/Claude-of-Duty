@@ -29,6 +29,7 @@ import { Movement } from '../../src/player/movement.ts';
 import type { RenderSystem } from '../../src/render/index-webgpu.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import { createTestContext, createTestInput } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 function telemetryMeta(revision: string): NonNullable<TelemetrySystem['meta']> {
@@ -62,10 +63,13 @@ const check = (name: string, cond: boolean, extra = ''): void => {
 {
   let resolve: ((value: WorldPrefetch) => void) | undefined;
   const recorder = new TelemetrySystem();
-  const meta = fixture<WorldManifest>({
-    sourceHash: 'loaded-A',
-    assets: { visual: 'visual-A', collision: 'collision-A', nav: 'nav-A' },
-  });
+  const meta = fixture<WorldManifest>(
+    {
+      sourceHash: 'loaded-A',
+      assets: { visual: 'visual-A', collision: 'collision-A', nav: 'nav-A' },
+    },
+    complete.testManifest()
+  );
   const models = new ModelSystem();
   models.worldPrefetch = new Promise((r): void => {
     resolve = r;
@@ -83,7 +87,7 @@ const check = (name: string, cond: boolean, extra = ''): void => {
     recorder._fillWorldProvenance();
     recorder.meta = telemetryMeta('next-session');
     assert(resolve);
-    resolve(fixture<WorldPrefetch & { then?: undefined }>({ meta }, ['then']));
+    resolve(fixture<WorldPrefetch & { then?: undefined }>({ meta }, complete.testPrefetch()));
     await recorder._provenanceReady;
     assert(typeof first.provenance.world === 'object');
     assert.equal(first.provenance.world.sourceHash, 'loaded-A');
@@ -126,9 +130,15 @@ const check = (name: string, cond: boolean, extra = ''): void => {
       ai,
       game: new GameSystem(),
       market: new MarketSystem(),
-      render: fixture<RenderSystem>({
-        renderer: fixture<Renderer>({ info: new Info(), backend: new WebGPUBackend() }),
-      }),
+      render: fixture<RenderSystem>(
+        {
+          renderer: fixture<Renderer>(
+            { info: new Info(), backend: new WebGPUBackend() },
+            complete.testRenderer()
+          ),
+        },
+        new complete.RenderSystem()
+      ),
     },
   });
   recorder.ctx.time.frame = 1;

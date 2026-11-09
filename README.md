@@ -48,11 +48,12 @@ assertions (including `as unknown as T`), as well as explicit `any` and unsafe
 assignment, argument, call, member access and return. Numeric enum assignments
 must use enum members rather than unchecked numbers. Runtime boundaries must
 validate unknown data; owned records should be constructed with their full type.
-For test-only browser/native fakes, prefer real instances and shared typed fixtures.
-Issue [#621](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/621) approved one
-exception: only `tests/lib/fixture.ts` may assert its checked `Partial<T>` as `T`.
-Its proxy throws on unexpected missing-member reads; explicitly listed optional
-members may be absent. No other test file relaxes the unsafe-assertion rule.
+For test-only browser/native fakes, use real instances or complete typed implementations.
+`tests/lib/fixture.ts` applies checked overrides to a required complete target; it does
+not assert partial objects as full interfaces. All test helpers use the same unsafe-
+assertion lint rule, without a fixture exception. DOM fixtures use a test-only Happy DOM
+implementation without leaving its browser globals installed; unsupported audio/GPU
+operations fail explicitly instead of requesting native devices.
 Missing return annotations fail CI's lint step, not the typecheck itself. The narrow
 declaration additions in `src/render/three-types.d.ts` describe APIs verified against
 the pinned Three.js source; review them alongside the Three/@types upgrade checks.

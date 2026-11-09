@@ -2,10 +2,6 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "overrides": [
     {
-      "files": ["tests/lib/fixture.ts"],
-      "rules": { "typescript/no-unsafe-type-assertion": "off" }
-    },
-    {
       "files": ["tests/**", "tools/**", "build/**"],
       "rules": {
         "typescript/no-unnecessary-condition": "off",

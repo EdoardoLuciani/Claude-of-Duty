@@ -18,6 +18,7 @@ import { RenderSystem } from '../../src/render/index-webgpu.ts';
 import { WorldSystem } from '../../src/world/index.ts';
 import { createTestContext } from '../lib/context.ts';
 import { addLifecycle, createCoreFixture } from '../lib/core-fixture.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 for (const failure of [null, 'compile', 'returned', 'thrown']) {
@@ -31,19 +32,22 @@ for (const failure of [null, 'compile', 'returned', 'thrown']) {
   let calls = 0,
     done = false;
   let release: (() => void) | undefined;
-  const renderer = fixture<Renderer>({
-    get info(): never {
-      throw Error('native warmup must not read a WebGL program counter');
+  const renderer = fixture<Renderer>(
+    {
+      get info(): never {
+        throw Error('native warmup must not read a WebGL program counter');
+      },
+      getRenderTarget: (): RenderTarget | null => target,
+      setRenderTarget: (value): void => {
+        target = value;
+      },
+      async compileAsync(): Promise<void> {
+        calls++;
+        if (failure === 'compile') throw Error('compile failure');
+      },
     },
-    getRenderTarget: (): RenderTarget | null => target,
-    setRenderTarget: (value): void => {
-      target = value;
-    },
-    async compileAsync(): Promise<void> {
-      calls++;
-      if (failure === 'compile') throw Error('compile failure');
-    },
-  });
+    complete.testRenderer()
+  );
   const { engine, registry } = createCoreFixture();
   engine.camera = camera;
   engine.viewCamera = camera;
@@ -117,7 +121,7 @@ for (const fail of [false, true]) {
     sentinel = new Scene();
   scene.add(sentinel);
   const render = new RenderSystem();
-  render.renderer = fixture<Renderer>({});
+  render.renderer = fixture<Renderer>({}, complete.testRenderer());
   render.patchMaterials = (stage): void => {
     assert(stage);
     assert.equal(stage.parent, scene);
@@ -165,12 +169,15 @@ for (const fail of [false, true]) {
 }
 assert.deepEqual(await new FxSystem().prewarmMaterials(), { ok: false, reason: 'no renderer' });
 for (const renderer of [
-  fixture<Renderer>({}),
-  fixture<Renderer>({
-    async compileAsync(): Promise<void> {
-      throw Error('native compile rejection');
+  fixture<Renderer>({}, complete.testRenderer()),
+  fixture<Renderer>(
+    {
+      async compileAsync(): Promise<void> {
+        throw Error('native compile rejection');
+      },
     },
-  }),
+    complete.testRenderer()
+  ),
 ]) {
   const fx = new FxSystem();
   const render = new RenderSystem();
@@ -179,13 +186,16 @@ for (const renderer of [
   fx.ctx = createTestContext();
   fx._viewAttached = true;
   for (const key of ['lit', 'add', 'motes'] satisfies (keyof FxSystem)[]) {
-    fx[key] = fixture<FxSystem['lit']>({ mesh: new Mesh() });
+    fx[key] = fixture<FxSystem['lit']>({ mesh: new Mesh() }, complete.testParticleLayer());
   }
-  fx.decals = fixture<FxSystem['decals']>({ mesh: new Mesh() });
-  fx.shells = fixture<FxSystem['shells']>({
-    mesh: new InstancedMesh(undefined, undefined, 1),
-    hullMesh: new InstancedMesh(undefined, undefined, 1),
-  });
+  fx.decals = fixture<FxSystem['decals']>({ mesh: new Mesh() }, complete.testDecals());
+  fx.shells = fixture<FxSystem['shells']>(
+    {
+      mesh: new InstancedMesh(undefined, undefined, 1),
+      hullMesh: new InstancedMesh(undefined, undefined, 1),
+    },
+    complete.testShells()
+  );
   await assert.rejects(
     (): ReturnType<FxSystem['prewarmMaterials']> => fx.prewarmMaterials(),
     /compileAsync|native compile rejection/

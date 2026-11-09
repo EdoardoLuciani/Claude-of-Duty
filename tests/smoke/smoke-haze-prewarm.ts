@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import type { Renderer } from 'three/webgpu';
 
 import { HazeSystem } from '../../src/fx/haze.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 import { captureMethod } from '../lib/render-fixture.ts';
 const plane = new THREE.PlaneGeometry();
@@ -20,43 +21,49 @@ scene.add(mesh);
 const camera = new THREE.PerspectiveCamera(),
   target = new THREE.RenderTarget(),
   original = new THREE.RenderTarget();
-const haze = fixture<HazeSystem>({
-  prewarm: captureMethod(HazeSystem.prototype, 'prewarm'),
-  render: captureMethod(HazeSystem.prototype, 'render'),
-  rt: target,
-  scene,
-  layer: fixture<HazeSystem['layer']>({ mesh, geometry }),
-  _live: false,
-});
+const haze = fixture<HazeSystem>(
+  {
+    prewarm: captureMethod(HazeSystem.prototype, 'prewarm'),
+    render: captureMethod(HazeSystem.prototype, 'render'),
+    rt: target,
+    scene,
+    layer: fixture<HazeSystem['layer']>({ mesh, geometry }, complete.testParticleLayer()),
+    _live: false,
+  },
+  new complete.HazeSystem({ capacity: 16, cols: 1, atlas: new complete.THREE.Texture() })
+);
 let current: THREE.RenderTarget | null = original;
 let alpha = 0.4,
   fail = false,
   draws = 0;
 const color = new THREE.Color(0.1, 0.2, 0.3),
   saved = color.clone();
-const renderer = fixture<Renderer>({
-  getRenderTarget: (): THREE.RenderTarget | null => current,
-  setRenderTarget: (value): void => {
-    current = value;
+const renderer = fixture<Renderer>(
+  {
+    getRenderTarget: (): THREE.RenderTarget | null => current,
+    setRenderTarget: (value): void => {
+      current = value;
+    },
+    getClearColor: (out): THREE.Color => out.copy(color),
+    getClearAlpha: (): number => alpha,
+    setClearColor: (value, a = alpha): void => {
+      color.set(value);
+      alpha = a;
+    },
+    clear(): void {},
+    render(s, c): void {
+      draws++;
+      assert.equal(current, target);
+      assert.equal(s, scene);
+      assert.equal(c, camera);
+      assert.equal(geometry.drawRange.count, 0);
+      assert.equal(geometry.instanceCount, 1);
+      assert.equal(mesh.visible, true);
+      if (fail) throw new Error('intentional haze warm failure');
+    },
   },
-  getClearColor: (out): THREE.Color => out.copy(color),
-  getClearAlpha: (): number => alpha,
-  setClearColor: (value, a = alpha): void => {
-    color.set(value);
-    alpha = a;
-  },
-  clear(): void {},
-  render(s, c): void {
-    draws++;
-    assert.equal(current, target);
-    assert.equal(s, scene);
-    assert.equal(c, camera);
-    assert.equal(geometry.drawRange.count, 0);
-    assert.equal(geometry.instanceCount, 1);
-    assert.equal(mesh.visible, true);
-    if (fail) throw new Error('intentional haze warm failure');
-  },
-});
+  complete.testRenderer()
+);
 for (const graph of [false, true])
   for (const bad of [false, true]) {
     fail = bad;

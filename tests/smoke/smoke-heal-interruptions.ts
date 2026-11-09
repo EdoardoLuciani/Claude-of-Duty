@@ -25,6 +25,7 @@ import type { WeaponId } from '../../src/weapons/defs.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import { createTestContext, createTestInput } from '../lib/context.ts';
 import type { TestProviders } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture as partialFixture } from '../lib/fixture.ts';
 import {
   initializePlayer,
@@ -114,12 +115,15 @@ for (const ending of ['release', 'complete', 'grenade'])
     const ui = new UiSystem();
     ui.ctx = ctx;
     ui.fpsText = '— FPS';
-    ui.state = partialFixture<UiSystem['state']>({
-      healing: true,
-      bandages: 2,
-      healProgress: 0.3,
-      marketIn: 0,
-    });
+    ui.state = partialFixture<UiSystem['state']>(
+      {
+        healing: true,
+        bandages: 2,
+        healProgress: 0.3,
+        marketIn: 0,
+      },
+      new UiSystem().state
+    );
     ui._lastRaw = 0;
     ui.hudTarget = ui.hudVisible = 1;
     ui._blipCount = 0;
@@ -145,10 +149,13 @@ for (const ending of ['release', 'complete', 'grenade'])
     });
     ui._playerPos = (): Vector3 => new Vector3();
     ui._collectBlips = noop;
-    ui.menu = partialFixture<UiSystem['menu']>({ open: false, update: noop });
-    ui.gameOver = partialFixture<UiSystem['gameOver']>({ update: noop });
-    ui.shop = partialFixture<UiSystem['shop']>({ update: noop });
-    ui.radio = partialFixture<UiSystem['radio']>({ update: noop });
+    ui.menu = partialFixture<UiSystem['menu']>(
+      { open: false, update: noop },
+      complete.testPauseMenu()
+    );
+    ui.gameOver = partialFixture<UiSystem['gameOver']>({ update: noop }, complete.testGameOver());
+    ui.shop = partialFixture<UiSystem['shop']>({ update: noop }, complete.testMarketOverlay());
+    ui.radio = partialFixture<UiSystem['radio']>({ update: noop }, complete.testRadioPanel());
     ui.crosshair = new Crosshair();
     ui.hit = new Hitmarkers();
     ui.arcs = new DamageArcs();
@@ -171,10 +178,13 @@ for (const ending of ['release', 'complete', 'grenade'])
       ui.compass.update =
         noop;
     for (const name of ['chromeLayer', 'centreLayer'] as const)
-      ui[name] = partialFixture<HTMLElement & { _ows: Map<string, string> }>({
-        _ows: new Map(),
-        style: partialFixture<CSSStyleDeclaration>({ setProperty: noop }),
-      });
+      ui[name] = partialFixture<HTMLElement & { _ows: Map<string, string> }>(
+        {
+          _ows: new Map(),
+          style: partialFixture<CSSStyleDeclaration>({ setProperty: noop }, complete.testStyle()),
+        },
+        Object.assign(complete.testElement('div'), { _ows: new Map<string, string>() })
+      );
     ui.minimap = new Minimap(ctx.rng);
     ui.minimap.bakeDone = true;
     const prompt = new RecordingPrompt();

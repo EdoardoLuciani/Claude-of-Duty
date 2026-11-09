@@ -27,6 +27,7 @@ import { PlayerSystem } from '../../src/player/index.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { makeAgent } from '../lib/agent-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture as checkedFixture } from '../lib/fixture.ts';
 
 const v = (x = 0, y = 1, z = 0): THREE.Vector3 => new THREE.Vector3(x, y, z);
@@ -246,22 +247,25 @@ for (const body of [false, true]) {
 for (const overlap of ['none', 'masonry', 'bone']) {
   const f = fixture();
   f.phys.ragdolls.push(
-    checkedFixture<Ragdoll>({
-      actor: {},
-      boneCount: overlap === 'bone' ? 2 : 1,
-      boneHead: new Int32Array([0, 2]),
-      boneTail: new Int32Array([1, 3]),
-      boneRadius: new Float32Array([0.1, 0.05]),
-      px: new Float64Array([2, 2, 2, 2]),
-      py: new Float64Array([0.3, 1.5, 0.3, 1.5]),
-      pz: new Float64Array([0, 0, 0, 0]),
-      aabb: { minx: 1.9, maxx: 2.1, miny: 0.2, maxy: 1.6, minz: -0.1, maxz: 0.1 },
-      spec: [
-        { name: 'torso', head: [2, 0.3, 0], tail: [2, 1.5, 0] },
-        { name: 'arm', head: [2, 0.3, 0], tail: [2, 1.5, 0] },
-      ],
-      applyImpulse(): void {},
-    })
+    checkedFixture<Ragdoll>(
+      {
+        actor: {},
+        boneCount: overlap === 'bone' ? 2 : 1,
+        boneHead: new Int32Array([0, 2]),
+        boneTail: new Int32Array([1, 3]),
+        boneRadius: new Float32Array([0.1, 0.05]),
+        px: new Float64Array([2, 2, 2, 2]),
+        py: new Float64Array([0.3, 1.5, 0.3, 1.5]),
+        pz: new Float64Array([0, 0, 0, 0]),
+        aabb: { minx: 1.9, maxx: 2.1, miny: 0.2, maxy: 1.6, minz: -0.1, maxz: 0.1 },
+        spec: [
+          { name: 'torso', head: [2, 0.3, 0], tail: [2, 1.5, 0] },
+          { name: 'arm', head: [2, 0.3, 0], tail: [2, 1.5, 0] },
+        ],
+        applyImpulse(): void {},
+      },
+      new complete.Ragdoll(null)
+    )
   );
   if (overlap === 'masonry') wall(f, 'concrete', 0.1);
   actor(f, 4);
@@ -1024,14 +1028,21 @@ for (const noDamage of [false, true]) {
       weaponDamage: 17,
       ...(noDamage
         ? {
-            staged: checkedFixture<NonNullable<Parameters<AiSystem['onAgentFire']>[0]['staged']>>({
-              noDamage: true,
-            }),
+            staged: checkedFixture<NonNullable<Parameters<AiSystem['onAgentFire']>[0]['staged']>>(
+              {
+                noDamage: true,
+              },
+              {
+                get heading(): never {
+                  return complete.unavailable('heading');
+                },
+              }
+            ),
           }
         : {}),
-      animator: checkedFixture<Animator>({ ejectWorld: v() }),
+      animator: checkedFixture<Animator>({ ejectWorld: v() }, complete.makeAgent().animator),
     },
-    ['staged']
+    complete.makeAgent()
   );
   actor(f, 0, f.phys.LAYER.ACTOR, 0.3, agent);
   ai.onAgentFire(agent, v(), v(1, 0));
@@ -1078,7 +1089,35 @@ for (const friendly of [true, false]) {
   applyDefinedPatch(ai, {
     _phys: f.phys,
     agents: [],
-    stats: checkedFixture<AiSystem['stats']>({ friendlyHolds: 0 }),
+    stats: checkedFixture<AiSystem['stats']>(
+      { friendlyHolds: 0 },
+      {
+        get agents(): never {
+          return complete.unavailable('agents');
+        },
+        get alive(): never {
+          return complete.unavailable('alive');
+        },
+        get navMs(): never {
+          return complete.unavailable('navMs');
+        },
+        get coverPts(): never {
+          return complete.unavailable('coverPts');
+        },
+        get walkable(): never {
+          return complete.unavailable('walkable');
+        },
+        get friendlyHolds(): never {
+          return complete.unavailable('friendlyHolds');
+        },
+        get grenadeHolds(): never {
+          return complete.unavailable('grenadeHolds');
+        },
+        get pathsDeferred(): never {
+          return complete.unavailable('pathsDeferred');
+        },
+      }
+    ),
     _fireEvent: {
       actor: null,
       weapon: 'ai_rifle',
@@ -1109,18 +1148,21 @@ for (const friendly of [true, false]) {
     burstLeft: 3,
     burstCooldown: 0,
     fireCooldown: 0,
-    rng: checkedFixture<Rng>({ gauss: (): number => 0 }),
+    rng: checkedFixture<Rng>({ gauss: (): number => 0 }, new complete.Rng(1)),
     weaponDamage: 40,
-    animator: checkedFixture<Animator>({
-      reloading: false,
-      vaulting: false,
-      muzzleWorld: v(),
-      muzzleDir: v(1, 0),
-      ejectWorld: v(),
-      fire: (): void => {
-        recoil++;
+    animator: checkedFixture<Animator>(
+      {
+        reloading: false,
+        vaulting: false,
+        muzzleWorld: v(),
+        muzzleDir: v(1, 0),
+        ejectWorld: v(),
+        fire: (): void => {
+          recoil++;
+        },
       },
-    }),
+      complete.makeAgent().animator
+    ),
   });
   a._muzzleOk = (): boolean => true;
   const target = makeAgent({ alive: true, team: friendly ? 1 : 0, position: v(8, 0, -1.6) });
@@ -1166,7 +1208,10 @@ for (const friendly of [true, false]) {
   const audio = new AudioSystem();
   applyDefinedPatch(audio, {
     running: true,
-    field: checkedFixture<NonNullable<AudioSystem['field']>>({ listenerPos: v(10) }),
+    field: checkedFixture<NonNullable<AudioSystem['field']>>(
+      { listenerPos: v(10) },
+      complete.testSpatialField()
+    ),
     _whizzShots: new Float64Array(64),
     _whizzCursor: 0,
     _playAt: (): boolean => {
@@ -1217,11 +1262,14 @@ for (const friendly of [true, false]) {
     pScale: 1,
     stats: { spawned: 0, decals: 0, live: 0 },
     emitLit: (s): number => particles.push({ ...s }),
-    decals: checkedFixture<NonNullable<FxSystem['decals']>>({
-      add: (): never => {
-        throw new Error('exit cannot paint an entry crater');
+    decals: checkedFixture<NonNullable<FxSystem['decals']>>(
+      {
+        add: (): never => {
+          throw new Error('exit cannot paint an entry crater');
+        },
       },
-    }),
+      complete.testDecals()
+    ),
   });
   fx.onImpact({
     point: v(),

@@ -15,6 +15,7 @@ import type { PhysicsSystem } from '../../src/physics/index.ts';
 import { MASK } from '../../src/physics/surfaces.ts';
 import { MovementWorker } from '../lib/ai-movement-fixture.ts';
 import { NativeWorker } from '../lib/attachment-worker-fixture.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 const turn = (): Promise<void> => new Promise((resolve): NodeJS.Timeout => setTimeout(resolve, 0));
@@ -30,15 +31,21 @@ function makeWorld(): StaticWorld {
 }
 function makeNav(): SurfaceNav {
   const world = makeWorld();
-  return fixture<SurfaceNav>({
-    physics: fixture<PhysicsSystem>({
-      staticWorld: world,
-      gravity: -20,
-      MASK: { ...MASK, CHARACTER: 259 },
-    }),
-    _probe: new CharacterController(world),
-    repeatState: true,
-  });
+  return fixture<SurfaceNav>(
+    {
+      physics: fixture<PhysicsSystem>(
+        {
+          staticWorld: world,
+          gravity: -20,
+          MASK: { ...MASK, CHARACTER: 259 },
+        },
+        new complete.PhysicsSystem()
+      ),
+      _probe: new CharacterController(world),
+      repeatState: true,
+    },
+    complete.testNav()
+  );
 }
 
 const from = new Vector3(),

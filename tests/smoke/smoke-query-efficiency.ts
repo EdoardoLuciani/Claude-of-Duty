@@ -9,6 +9,7 @@ import type { SurfaceNav } from '../../src/ai/nav.ts';
 import { StaticWorld } from '../../src/physics/bvh.ts';
 import { CharacterController } from '../../src/physics/character.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 const world = new StaticWorld();
@@ -35,14 +36,17 @@ const stats: SurfaceNav['stats'] & AttachmentOracle['stats'] = {
   queryMs: 0,
   cacheHits: 0,
 };
-const nav = fixture<SurfaceNav>({
-  physics,
-  _probe: new CharacterController(world),
-  _p0: new THREE.Vector3(),
-  _p1: new THREE.Vector3(),
-  canStand,
-  stats,
-});
+const nav = fixture<SurfaceNav>(
+  {
+    physics,
+    _probe: new CharacterController(world),
+    _p0: new THREE.Vector3(),
+    _p1: new THREE.Vector3(),
+    canStand,
+    stats,
+  },
+  complete.testNav()
+);
 const a = new THREE.Vector3(0, 0.008, 0),
   b = new THREE.Vector3(1.5, 0.008, 0);
 let moves = 0;
@@ -143,20 +147,19 @@ assert.equal(
   true
 );
 
-class QueryWorker {
+class QueryWorker extends complete.TestWorker {
   messages: ClientMessage[] = [];
-  onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
-  postMessage(message: ClientMessage): void {
+  override onmessage: ((event: MessageEvent<unknown>) => void) | null = null;
+  override postMessage(message: ClientMessage): void {
     this.messages.push(message);
     if (message.type === 'init')
       queueMicrotask((): void => {
         this.onmessage?.(new MessageEvent('message', { data: { type: 'ready' } }));
       });
   }
-  terminate(): void {}
 }
 const service = new AttachmentQueries(nav, {
-  workerFactory: (): Worker => fixture<Worker>(new QueryWorker()),
+  workerFactory: (): Worker => new QueryWorker(),
 });
 await service.start();
 const target = new THREE.Vector3(2, 0.008, 0);

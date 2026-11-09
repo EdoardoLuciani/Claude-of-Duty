@@ -2,17 +2,21 @@ import assert from 'node:assert/strict';
 
 import { CONTROL_REFERENCE, DEFAULT_BINDINGS } from '../../src/core/bindings.ts';
 import { Input } from '../../src/core/input.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 function keyEvent(code: string, repeat = false): KeyboardEvent {
-  return fixture<KeyboardEvent>({
-    code,
-    repeat,
-    ctrlKey: false,
-    metaKey: false,
-    altKey: false,
-    preventDefault(): void {},
-  });
+  return fixture<KeyboardEvent>(
+    {
+      code,
+      repeat,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+      preventDefault(): void {},
+    },
+    complete.testKeyboardEvent()
+  );
 }
 
 // Keep canonical coverage/conflict checks without a second literal binding table.
@@ -29,7 +33,10 @@ assert.deepEqual(
   new Set(Object.keys(DEFAULT_BINDINGS))
 );
 
-const input = new Input(fixture<HTMLCanvasElement>({}), { sensitivity: 0.001, invertY: false });
+const input = new Input(fixture<HTMLCanvasElement>({}, complete.testElement('canvas')), {
+  sensitivity: 0.001,
+  invertY: false,
+});
 input.pointerLocked = true;
 input._gameplayFocus = true;
 input.gamepadIndex = 2;
@@ -72,7 +79,7 @@ assert.equal(input.frozen, false);
 // via repeat. Its release must not generate a gameplay release edge either.
 input._onKeyDown(keyEvent('Space', true));
 input._onKeyUp(keyEvent('Space'));
-input._onMouseUp(fixture<MouseEvent>({ button: 0 }));
+input._onMouseUp(fixture<MouseEvent>({ button: 0 }, complete.testMouseEvent()));
 input.beginFrame();
 assert.equal(input.actionPressed('jump'), false);
 assert.equal(input.actionReleased('jump'), false);
@@ -88,9 +95,13 @@ assert.equal(input.wheel, 0);
 // New physical actions work normally; clearing is a one-time handoff, not a
 // new input mode or pointer-lock policy.
 input._onKeyDown(keyEvent('Space'));
-input._onMouseDown(fixture<MouseEvent>({ target: input.canvas, button: 0 }));
-input._onMouseMove(fixture<MouseEvent>({ movementX: 5, movementY: -2 }));
-input._onWheel(fixture<WheelEvent>({ target: input.canvas, deltaY: -1 }));
+input._onMouseDown(
+  fixture<MouseEvent>({ target: input.canvas, button: 0 }, complete.testMouseEvent())
+);
+input._onMouseMove(fixture<MouseEvent>({ movementX: 5, movementY: -2 }, complete.testMouseEvent()));
+input._onWheel(
+  fixture<WheelEvent>({ target: input.canvas, deltaY: -1 }, complete.testWheelEvent())
+);
 input.beginFrame();
 assert.equal(input.actionPressed('jump'), true);
 assert.equal(input.firePressed, true);
@@ -120,7 +131,9 @@ input.beginFrame();
 for (let fixedRead = 0; fixedRead < 4; fixedRead++) assert(input.actionPressed('flashlight'));
 input._onKeyDown(keyEvent('KeyF', true));
 input._onKeyDown(keyEvent('Tab'));
-input._onWheel(fixture<WheelEvent>({ target: input.canvas, deltaY: -1 }));
+input._onWheel(
+  fixture<WheelEvent>({ target: input.canvas, deltaY: -1 }, complete.testWheelEvent())
+);
 input.beginFrame();
 assert(
   input.action('flashlight') && !input.actionPressed('flashlight'),

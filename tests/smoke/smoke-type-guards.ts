@@ -17,6 +17,7 @@ import { SURFACE, SURFACE_NAMES } from '../../src/physics/surfaces.ts';
 import { createFogCompute } from '../../src/render/fog-compute-webgpu.ts';
 import { isLightingContext } from '../../src/render/indirect-webgpu.ts';
 import { setClass, setStyle } from '../../src/ui/util.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 import { FixtureImageBitmap, installImageBitmapFixture } from '../lib/image-bitmap.ts';
 
@@ -188,19 +189,25 @@ let styles = 0,
   classes = 0;
 const element = fixture<Parameters<typeof setStyle>[0]>(
   {
-    style: fixture<CSSStyleDeclaration>({
-      setProperty(): void {
-        styles++;
+    style: fixture<CSSStyleDeclaration>(
+      {
+        setProperty(): void {
+          styles++;
+        },
       },
-    }),
-    classList: fixture<DOMTokenList>({
-      toggle(): boolean {
-        classes++;
-        return true;
+      complete.testStyle()
+    ),
+    classList: fixture<DOMTokenList>(
+      {
+        toggle(): boolean {
+          classes++;
+          return true;
+        },
       },
-    }),
+      complete.testClasses()
+    ),
   },
-  ['_ows', '_owc']
+  complete.testElement('div')
 );
 for (const key of ['color', 'constructor', '__proto__']) {
   setStyle(element, key, 'red');

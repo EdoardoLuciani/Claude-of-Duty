@@ -2,12 +2,16 @@ import { createConfig } from '../../src/core/config.ts';
 import { Engine } from '../../src/core/engine.ts';
 import { Registry } from '../../src/core/registry.ts';
 import type { Subsystem } from '../../src/core/registry.ts';
+import * as complete from './fixture-targets.ts';
 import { fixture } from './fixture.ts';
 
 /** Synthetic lifecycle systems use the generic registry, not runtime provider IDs. */
 export function createCoreFixture(): { engine: Engine; registry: Registry } {
   const engine = new Engine({
-    canvas: fixture<HTMLCanvasElement>({ clientWidth: 1280, clientHeight: 720 }),
+    canvas: fixture<HTMLCanvasElement>(
+      { clientWidth: 1280, clientHeight: 720 },
+      complete.testElement('canvas')
+    ),
     config: createConfig({ fov: 80, deterministic: true, sensitivity: 0.001 }),
   });
   const registry = new Registry();

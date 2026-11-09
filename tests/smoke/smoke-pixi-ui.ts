@@ -22,6 +22,7 @@ import { setHudTextResolution } from '../../src/ui/pixi-type.ts';
 import { Prompt, Banner } from '../../src/ui/prompts.ts';
 import type { RadioPanel } from '../../src/ui/radio.ts';
 import type { StartGate } from '../../src/ui/start.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 import {
   createRetainedHud,
@@ -37,7 +38,10 @@ const game = new THREE.Renderer(
 await assert.rejects(
   initPixiRenderer(
     new WebGPURenderer(),
-    fixture<THREE.Renderer>({ backend: fixture<THREE.Renderer['backend']>({}) }),
+    fixture<THREE.Renderer>(
+      { backend: fixture<THREE.Renderer['backend']>({}, complete.testBackend()) },
+      complete.testRenderer()
+    ),
     document.createElement('canvas'),
     1,
     1
@@ -50,14 +54,21 @@ try {
   Object.defineProperty(globalThis, 'document', {
     configurable: true,
     writable: true,
-    value: fixture<Document>({
-      createElement(): never {
-        throw Error('constructor failed');
+    value: fixture<Document>(
+      {
+        createElement(): never {
+          throw Error('constructor failed');
+        },
       },
-    }),
+      complete.testDocument()
+    ),
   });
   await assert.rejects(
-    PixiHud.create(fixture<HTMLElement>({}), fixture<HTMLElement>({}), game),
+    PixiHud.create(
+      fixture<HTMLElement>({}, complete.testElement('div')),
+      fixture<HTMLElement>({}, complete.testElement('div')),
+      game
+    ),
     /constructor failed/
   );
   assert.equal(DOMAdapter.get(), adapter, 'constructor failure restores adapter');
@@ -79,7 +90,122 @@ const init = captureMethod(WebGPURenderer.prototype, 'init'),
   destroy = captureMethod(WebGPURenderer.prototype, 'destroy'),
   warn = console.warn;
 try {
-  const device = fixture<GPUDevice>({ adapterInfo: fixture<GPUAdapterInfo>({ vendor: 'test' }) });
+  const device = fixture<GPUDevice>(
+    {
+      adapterInfo: fixture<GPUAdapterInfo>(
+        { vendor: 'test' },
+        {
+          get vendor(): never {
+            return complete.unavailable('vendor');
+          },
+          get architecture(): never {
+            return complete.unavailable('architecture');
+          },
+          get device(): never {
+            return complete.unavailable('device');
+          },
+          get description(): never {
+            return complete.unavailable('description');
+          },
+          get isFallbackAdapter(): never {
+            return complete.unavailable('isFallbackAdapter');
+          },
+          get subgroupMaxSize(): never {
+            return complete.unavailable('subgroupMaxSize');
+          },
+          get subgroupMinSize(): never {
+            return complete.unavailable('subgroupMinSize');
+          },
+        }
+      ),
+    },
+    {
+      get addEventListener(): never {
+        return complete.unavailable('addEventListener');
+      },
+      get removeEventListener(): never {
+        return complete.unavailable('removeEventListener');
+      },
+      get features(): never {
+        return complete.unavailable('features');
+      },
+      get limits(): never {
+        return complete.unavailable('limits');
+      },
+      get adapterInfo(): never {
+        return complete.unavailable('adapterInfo');
+      },
+      get queue(): never {
+        return complete.unavailable('queue');
+      },
+      get destroy(): never {
+        return complete.unavailable('destroy');
+      },
+      get createBuffer(): never {
+        return complete.unavailable('createBuffer');
+      },
+      get createTexture(): never {
+        return complete.unavailable('createTexture');
+      },
+      get createSampler(): never {
+        return complete.unavailable('createSampler');
+      },
+      get importExternalTexture(): never {
+        return complete.unavailable('importExternalTexture');
+      },
+      get createBindGroupLayout(): never {
+        return complete.unavailable('createBindGroupLayout');
+      },
+      get createPipelineLayout(): never {
+        return complete.unavailable('createPipelineLayout');
+      },
+      get createBindGroup(): never {
+        return complete.unavailable('createBindGroup');
+      },
+      get createShaderModule(): never {
+        return complete.unavailable('createShaderModule');
+      },
+      get createComputePipeline(): never {
+        return complete.unavailable('createComputePipeline');
+      },
+      get createRenderPipeline(): never {
+        return complete.unavailable('createRenderPipeline');
+      },
+      get createComputePipelineAsync(): never {
+        return complete.unavailable('createComputePipelineAsync');
+      },
+      get createRenderPipelineAsync(): never {
+        return complete.unavailable('createRenderPipelineAsync');
+      },
+      get createCommandEncoder(): never {
+        return complete.unavailable('createCommandEncoder');
+      },
+      get createRenderBundleEncoder(): never {
+        return complete.unavailable('createRenderBundleEncoder');
+      },
+      get createQuerySet(): never {
+        return complete.unavailable('createQuerySet');
+      },
+      get lost(): never {
+        return complete.unavailable('lost');
+      },
+      get pushErrorScope(): never {
+        return complete.unavailable('pushErrorScope');
+      },
+      get popErrorScope(): never {
+        return complete.unavailable('popErrorScope');
+      },
+      get onuncapturederror(): never {
+        return complete.unavailable('onuncapturederror');
+      },
+      get dispatchEvent(): never {
+        return complete.unavailable('dispatchEvent');
+      },
+      get label(): never {
+        return complete.unavailable('label');
+      },
+    }
+  );
   class Device {
     static [Symbol.hasInstance](candidate: unknown): boolean {
       return candidate === device;
@@ -129,8 +255,8 @@ try {
   console.warn = (): void => {};
   await assert.rejects(
     PixiHud.create(
-      fixture<HTMLElement>({ clientWidth: 1, clientHeight: 1 }),
-      fixture<HTMLElement>({}),
+      fixture<HTMLElement>({ clientWidth: 1, clientHeight: 1 }, complete.testElement('div')),
+      fixture<HTMLElement>({}, complete.testElement('div')),
       initializedGame
     ),
     /HUD init failed/
@@ -184,7 +310,41 @@ for (const failure of [null, 'injury', 'stage', 'renderer']) {
     new Minimap(new Rng(1)),
     {},
     0,
-    fixture<Parameters<PixiHud['update']>[7]>({})
+    fixture<Parameters<PixiHud['update']>[7]>(
+      {},
+      {
+        get hit(): never {
+          return complete.unavailable('hit');
+        },
+        get arcs(): never {
+          return complete.unavailable('arcs');
+        },
+        get compass(): never {
+          return complete.unavailable('compass');
+        },
+        get ammo(): never {
+          return complete.unavailable('ammo');
+        },
+        get fpsText(): never {
+          return complete.unavailable('fpsText');
+        },
+        get prompt(): never {
+          return complete.unavailable('prompt');
+        },
+        get banner(): never {
+          return complete.unavailable('banner');
+        },
+        get scoreBar(): never {
+          return complete.unavailable('scoreBar');
+        },
+        get killfeed(): never {
+          return complete.unavailable('killfeed');
+        },
+        get marketCountdown(): never {
+          return complete.unavailable('marketCountdown');
+        },
+      }
+    )
   );
   assert.equal(renderers, 1, 'disposed HUD cannot draw or destroy twice');
 }
@@ -194,11 +354,14 @@ ui.pixiHud = createRetainedHud();
 ui.pixiHud.dispose = (): never => {
   throw Error('Pixi cleanup failed');
 };
-ui.startGate = fixture<StartGate>({
-  dispose(): void {
-    cleaned.push('start');
+ui.startGate = fixture<StartGate>(
+  {
+    dispose(): void {
+      cleaned.push('start');
+    },
   },
-});
+  complete.testStartGate()
+);
 ui._unsubs = [
   (): void => {
     cleaned.push('events');
@@ -209,26 +372,38 @@ ui.minimap = new Minimap(new Rng(1));
 ui.minimap.dispose = (): void => {
   cleaned.push('minimap');
 };
-ui.menu = fixture<PauseMenu>({
-  dispose(): void {
-    cleaned.push('menu');
+ui.menu = fixture<PauseMenu>(
+  {
+    dispose(): void {
+      cleaned.push('menu');
+    },
   },
-});
-ui.gameOver = fixture<GameOverScreen>({
-  dispose(): void {
-    cleaned.push('gameOver');
+  complete.testPauseMenu()
+);
+ui.gameOver = fixture<GameOverScreen>(
+  {
+    dispose(): void {
+      cleaned.push('gameOver');
+    },
   },
-});
-ui.shop = fixture<MarketOverlay>({
-  dispose(): void {
-    cleaned.push('shop');
+  complete.testGameOver()
+);
+ui.shop = fixture<MarketOverlay>(
+  {
+    dispose(): void {
+      cleaned.push('shop');
+    },
   },
-});
-ui.radio = fixture<RadioPanel>({
-  dispose(): void {
-    cleaned.push('radio');
+  complete.testMarketOverlay()
+);
+ui.radio = fixture<RadioPanel>(
+  {
+    dispose(): void {
+      cleaned.push('radio');
+    },
   },
-});
+  complete.testRadioPanel()
+);
 ui.root = document.createElement('div');
 ui.root.remove = (): void => {
   cleaned.push('root');
@@ -267,7 +442,41 @@ const hiddenFrame = (): void =>
     new Minimap(new Rng(1)),
     {},
     0,
-    fixture<Parameters<PixiHud['update']>[7]>({})
+    fixture<Parameters<PixiHud['update']>[7]>(
+      {},
+      {
+        get hit(): never {
+          return complete.unavailable('hit');
+        },
+        get arcs(): never {
+          return complete.unavailable('arcs');
+        },
+        get compass(): never {
+          return complete.unavailable('compass');
+        },
+        get ammo(): never {
+          return complete.unavailable('ammo');
+        },
+        get fpsText(): never {
+          return complete.unavailable('fpsText');
+        },
+        get prompt(): never {
+          return complete.unavailable('prompt');
+        },
+        get banner(): never {
+          return complete.unavailable('banner');
+        },
+        get scoreBar(): never {
+          return complete.unavailable('scoreBar');
+        },
+        get killfeed(): never {
+          return complete.unavailable('killfeed');
+        },
+        get marketCountdown(): never {
+          return complete.unavailable('marketCountdown');
+        },
+      }
+    )
   );
 try {
   Object.defineProperty(globalThis, 'devicePixelRatio', { value: 1, configurable: true });

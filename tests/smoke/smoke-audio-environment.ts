@@ -13,6 +13,7 @@ import type { AudioVoice } from '../../src/audio/types.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { audioFixture } from '../lib/audio-banks.ts';
 import { fixtureEntries, at, fixtureBuffer, FixtureAudioBuffer } from '../lib/audio-fixture.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 assert.deepEqual(
@@ -39,7 +40,10 @@ audio.running = true;
 audio.actx = actx;
 audio.samples = bank;
 audio.rng = rng;
-audio.field = fixture<SpatialField>({ listenerPos: { x: 0, y: 1.6, z: 0 } });
+audio.field = fixture<SpatialField>(
+  { listenerPos: { x: 0, y: 1.6, z: 0 } },
+  complete.testSpatialField()
+);
 const calls: Parameters<AudioSystem['_playAt']>[] = [];
 audio._playAt = (...a): boolean => {
   calls.push(a);

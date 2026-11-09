@@ -158,6 +158,101 @@ class FixtureAudioWorkletNode extends FixtureAudioNode implements AudioWorkletNo
   port = new MessageChannel().port1;
 }
 
+function unsupportedAudio(): never {
+  throw new Error('Test audio operation is not implemented');
+}
+
+class FixtureDestination extends FixtureAudioNode implements AudioDestinationNode {
+  maxChannelCount = 2;
+}
+class FixturePanner extends FixtureAudioNode implements PannerNode {
+  coneInnerAngle = 360;
+  coneOuterAngle = 360;
+  coneOuterGain = 0;
+  distanceModel: DistanceModelType = 'inverse';
+  maxDistance = 10000;
+  panningModel: PanningModelType = 'HRTF';
+  refDistance = 1;
+  rolloffFactor = 1;
+  orientationX = new FixtureAudioParam(1);
+  orientationY = new FixtureAudioParam();
+  orientationZ = new FixtureAudioParam();
+  positionX = new FixtureAudioParam();
+  positionY = new FixtureAudioParam();
+  positionZ = new FixtureAudioParam();
+  setOrientation = unsupportedAudio;
+  setPosition = unsupportedAudio;
+}
+
+/** Complete browser contract: unsupported native operations throw rather than
+ * becoming an unchecked partial AudioContext. */
+export class CompleteAudioContext extends EventTarget implements AudioContext {
+  currentTime = 0;
+  sampleRate = 48000;
+  state: AudioContextState = 'running';
+  baseLatency = 0;
+  outputLatency = 0;
+  renderQuantumSize = 128;
+  sinkId = '';
+  destination = new FixtureDestination(this);
+  sources: FixtureBufferSource[] = [];
+  gains: FixtureGainNode[] = [];
+  oscillators: FixtureOscillator[] = [];
+  onstatechange: AudioContext['onstatechange'] = null;
+  get audioWorklet(): AudioWorklet {
+    return unsupportedAudio();
+  }
+  get listener(): AudioListener {
+    return unsupportedAudio();
+  }
+  createGain(): FixtureGainNode {
+    return new FixtureGainNode(this);
+  }
+  createBufferSource(): FixtureBufferSource {
+    return new FixtureBufferSource(this);
+  }
+  createOscillator(): FixtureOscillator {
+    return new FixtureOscillator(this);
+  }
+  createBiquadFilter(): BiquadFilterNode {
+    return new FixtureBiquad(this);
+  }
+  createDynamicsCompressor(): DynamicsCompressorNode {
+    return new FixtureCompressor(this);
+  }
+  createPanner(): PannerNode {
+    return new FixturePanner(this);
+  }
+  createBuffer(channels: number, length: number, sampleRate: number): AudioBuffer {
+    if (channels !== 2 || sampleRate !== this.sampleRate) return unsupportedAudio();
+    return new FixtureAudioBuffer({ duration: length / sampleRate });
+  }
+  createAnalyser = unsupportedAudio;
+  createChannelMerger = unsupportedAudio;
+  createChannelSplitter = unsupportedAudio;
+  createConstantSource = unsupportedAudio;
+  createConvolver = unsupportedAudio;
+  createDelay = unsupportedAudio;
+  createIIRFilter = unsupportedAudio;
+  createMediaElementSource = unsupportedAudio;
+  createMediaStreamDestination = unsupportedAudio;
+  createMediaStreamSource = unsupportedAudio;
+  createMediaStreamTrackSource = unsupportedAudio;
+  createPeriodicWave = unsupportedAudio;
+  createScriptProcessor = unsupportedAudio;
+  createStereoPanner = unsupportedAudio;
+  createWaveShaper = unsupportedAudio;
+  decodeAudioData = unsupportedAudio;
+  getOutputTimestamp = unsupportedAudio;
+  resume = unsupportedAudio;
+  setSinkId = unsupportedAudio;
+  suspend = unsupportedAudio;
+  close(): Promise<void> {
+    this.state = 'closed';
+    return Promise.resolve();
+  }
+}
+
 export type FixtureAudioContext = Omit<
   AudioContext,
   'currentTime' | 'state' | 'createGain' | 'createBufferSource' | 'createOscillator'
@@ -174,40 +269,42 @@ export type FixtureAudioContext = Omit<
 
 /** Tracks only the native graph operations exercised by these audio recipes. */
 export function createAudioContext(currentTime = 0): FixtureAudioContext {
-  const actx: FixtureAudioContext = fixture<FixtureAudioContext>({
-    currentTime,
-    sampleRate: 48000,
-    state: 'running',
-    destination: fixture<AudioDestinationNode>({}),
-    sources: [],
-    gains: [],
-    oscillators: [],
-    createGain(): FixtureGainNode {
-      const node = new FixtureGainNode(actx);
-      actx.gains.push(node);
-      return node;
+  const actx: FixtureAudioContext = fixture<FixtureAudioContext>(
+    {
+      currentTime,
+      sampleRate: 48000,
+      state: 'running',
+      sources: [],
+      gains: [],
+      oscillators: [],
+      createGain(): FixtureGainNode {
+        const node = new FixtureGainNode(actx);
+        actx.gains.push(node);
+        return node;
+      },
+      createBufferSource(): FixtureBufferSource {
+        const source = new FixtureBufferSource(actx);
+        actx.sources.push(source);
+        return source;
+      },
+      createOscillator(): FixtureOscillator {
+        const source = new FixtureOscillator(actx);
+        actx.oscillators.push(source);
+        return source;
+      },
+      createBiquadFilter(): BiquadFilterNode {
+        return new FixtureBiquad(actx);
+      },
+      createDynamicsCompressor(): DynamicsCompressorNode {
+        return new FixtureCompressor(actx);
+      },
+      close(): Promise<void> {
+        actx.state = 'closed';
+        return Promise.resolve();
+      },
     },
-    createBufferSource(): FixtureBufferSource {
-      const source = new FixtureBufferSource(actx);
-      actx.sources.push(source);
-      return source;
-    },
-    createOscillator(): FixtureOscillator {
-      const source = new FixtureOscillator(actx);
-      actx.oscillators.push(source);
-      return source;
-    },
-    createBiquadFilter(): BiquadFilterNode {
-      return new FixtureBiquad(actx);
-    },
-    createDynamicsCompressor(): DynamicsCompressorNode {
-      return new FixtureCompressor(actx);
-    },
-    close(): Promise<void> {
-      actx.state = 'closed';
-      return Promise.resolve();
-    },
-  });
+    new CompleteAudioContext()
+  );
   return actx;
 }
 

@@ -1,4 +1,5 @@
 import { createTestContext } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 // Disabled native input must not leak held or stale axes into actual Player consumers.
 import assert from 'node:assert/strict';
@@ -20,7 +21,10 @@ Object.defineProperty(globalThis, 'navigator', {
   },
 });
 try {
-  const input = new Input(fixture<HTMLCanvasElement>({}), { sensitivity: 0.002, invertY: false });
+  const input = new Input(fixture<HTMLCanvasElement>({}, complete.testElement('canvas')), {
+    sensitivity: 0.002,
+    invertY: false,
+  });
   const player = new PlayerSystem();
   const ctx = createTestContext({ input });
   ctx.config.adsSensScale = 0.7;

@@ -10,7 +10,7 @@ import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import { createTestContext } from '../lib/context.ts';
 import type { TestProviders } from '../lib/context.ts';
-import { fixture } from '../lib/fixture.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { UiInput, UiPlayer } from '../lib/ui-fixture.ts';
 
 type PromptData = Parameters<UiSystem['setPrompt']>[0];
@@ -322,19 +322,21 @@ function matricesMatch(pickups: AmmoPickups): void {
   const { pickups, ctx } = harness();
   const a = pickups.spawn({ x: 2, y: 0, z: 0 });
   const b = pickups.spawn({ x: 3, y: 0, z: 0 });
-  const renderer = fixture<THREE.WebGLRenderer>({});
+  const renderer = complete.testRenderer();
   const material = new THREE.MeshBasicMaterial();
   const markRendered = (): void => {
     ctx.camera.layers.set(1);
     for (const mesh of pickups._batches.slice(0, 3))
-      mesh.onAfterRender(
+      // Three's callback declaration still names WebGLRenderer, but production
+      // supplies the WebGPU renderer. Exercise that actual runtime contract.
+      Reflect.apply(mesh.onAfterRender.bind(mesh), mesh, [
         renderer,
         ctx.scene,
         ctx.camera,
         mesh.geometry,
         material,
-        new THREE.Group()
-      );
+        new THREE.Group(),
+      ]);
     pickups._syncVisuals();
   };
   const flags = (slot: number): number[] =>
@@ -345,7 +347,14 @@ function matricesMatch(pickups: AmmoPickups): void {
   const shadow = new THREE.PerspectiveCamera();
   shadow.layers.set(1);
   for (const mesh of pickups._batches.slice(0, 3))
-    mesh.onAfterRender(renderer, ctx.scene, shadow, mesh.geometry, material, new THREE.Group());
+    Reflect.apply(mesh.onAfterRender.bind(mesh), mesh, [
+      renderer,
+      ctx.scene,
+      shadow,
+      mesh.geometry,
+      material,
+      new THREE.Group(),
+    ]);
   pickups._syncVisuals();
   assert.deepEqual(flags(a.slot), [0, 0, 0], 'shadow callbacks cannot validate velocity history');
   markRendered();

@@ -19,6 +19,7 @@ import type { PlayerStance } from '../../src/player/tuning.ts';
 import { HEALTH, HEALING, STANCE } from '../../src/player/tuning.ts';
 import { WorldSystem } from '../../src/world/index.ts';
 import { createTestContext } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture as partialFixture } from '../lib/fixture.ts';
 
 interface RespawnFixture {
@@ -73,7 +74,7 @@ function fixture(dead: boolean, stance: PlayerStance): RespawnFixture {
   const ai = new AiSystem();
   ai.ctx = ctx;
   // Native navigation is never queried when perSquad is zero; only readiness is used.
-  ai.grid = partialFixture<SurfaceNav>({});
+  ai.grid = partialFixture<SurfaceNav>({}, complete.testNav());
   ai._v3 = new THREE.Vector3();
   const placementOrigins: THREE.Vector3[] = [];
   ai.playerPosition = function (out, sample): THREE.Vector3 {

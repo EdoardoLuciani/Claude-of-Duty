@@ -21,6 +21,7 @@ import {
   fixtureBuffer,
   FixtureAudioBuffer,
 } from '../lib/audio-fixture.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 assert(
@@ -142,14 +143,17 @@ assert.equal(
 );
 let acquired: Parameters<SpatialField['acquire']>[0] | undefined;
 audio.running = true;
-audio.field = fixture<SpatialField>({
-  distanceTo: (): number => 70,
-  acquire(options): ReturnType<SpatialField['acquire']> {
-    acquired = options;
-    return fixture<NonNullable<ReturnType<SpatialField['acquire']>>>({});
+audio.field = fixture<SpatialField>(
+  {
+    distanceTo: (): number => 70,
+    acquire(options): ReturnType<SpatialField['acquire']> {
+      acquired = options;
+      return fixture<NonNullable<ReturnType<SpatialField['acquire']>>>({}, complete.testEmitter());
+    },
+    hold(): void {},
   },
-  hold(): void {},
-});
+  complete.testSpatialField()
+);
 for (const kind of ['grenade', 'bomb'] as const) {
   assert(audio._playAt('explosion', 0, 0, -70, { explosionKind: kind }, 'weapons'));
   assert(acquired);
@@ -160,8 +164,8 @@ for (const kind of ['grenade', 'bomb'] as const) {
 }
 let played: Parameters<AudioSystem['_playAt']> | undefined;
 audio.running = true;
-audio.field = fixture<SpatialField>({ distanceTo: (): number => 30 });
-audio.mixer = fixture<Mixer>({ duck(): void {} });
+audio.field = fixture<SpatialField>({ distanceTo: (): number => 30 }, complete.testSpatialField());
+audio.mixer = fixture<Mixer>({ duck(): void {} }, complete.testMixer());
 audio._playAt = (...args): boolean => {
   played = args;
   return true;

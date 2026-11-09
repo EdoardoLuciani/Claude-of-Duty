@@ -24,6 +24,7 @@ import {
 } from '../lib/ai-brain-fixture.ts';
 import { NativeWorker } from '../lib/attachment-worker-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture as partialFixture } from '../lib/fixture.ts';
 import { loadMap, physicsFor } from '../lib/nav240/fixtures.ts';
 
@@ -451,7 +452,10 @@ for (const deferred of [false, true]) {
   const ai = makeAi(grid),
     from = v(8.182, 9.598, -1.093);
   let pick = coverPoint({ x: 13.188, y: 9.573, z: 3.48 });
-  ai.cover = partialFixture<CoverMap>({ pick: (): BakedCoverPoint => pick, release(): void {} });
+  ai.cover = partialFixture<CoverMap>(
+    { pick: (): BakedCoverPoint => pick, release(): void {} },
+    complete.testCover()
+  );
   const a = makeAgent({
     ai,
     phys: map.physics,

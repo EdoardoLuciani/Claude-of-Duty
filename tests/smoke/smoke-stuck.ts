@@ -5,6 +5,7 @@ import { Vector3 } from 'three';
 
 import type { SurfaceNav } from '../../src/ai/nav.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 import { makeWalker } from '../lib/nav240/harness.ts';
 import { testNav } from '../lib/test-nav.ts';
@@ -91,17 +92,20 @@ assert.equal(a.recoveryAttempts, 3, 'stationary failed routes get a bounded phys
 assert.equal(a.recoveryOutcome, 'moving');
 assert.equal(a.recoveries.length, 0);
 a._tickNoProgress(3.1);
-a.ai.grid = fixture<SurfaceNav>({
-  project(): number {
-    return 0;
+a.ai.grid = fixture<SurfaceNav>(
+  {
+    project(): number {
+      return 0;
+    },
+    sampleGround(): number {
+      return 0;
+    },
+    canAttach(): boolean {
+      return false;
+    },
   },
-  sampleGround(): number {
-    return 0;
-  },
-  canAttach(): boolean {
-    return false;
-  },
-});
+  complete.testNav()
+);
 a.pathObjective = 'patrol';
 a._recoveryWait = 0;
 a._tickNoProgress(3.1);

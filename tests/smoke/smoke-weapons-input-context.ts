@@ -25,6 +25,7 @@ import type { WeaponEntry } from '../../src/weapons/runtime-types.ts';
 import type { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { ArmedWeaponSystem, weaponState } from '../lib/ballistics-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 import { FRAME_SOURCES } from '../lib/frame-sources.ts';
 
@@ -48,7 +49,10 @@ interface WeaponHarness {
   shots: { live: number; fired: number; impacts: number };
 }
 function makeHarness(): WeaponHarness {
-  const input = new Input(fixture<HTMLCanvasElement>({}), { sensitivity: 1, invertY: false });
+  const input = new Input(fixture<HTMLCanvasElement>({}, complete.testElement('canvas')), {
+    sensitivity: 1,
+    invertY: false,
+  });
   input._pollGamepad = (): void => {};
   for (const method of ['pressed', 'held', 'released'] as const) {
     input[method] = (): never => {
@@ -74,12 +78,15 @@ function makeHarness(): WeaponHarness {
     return true;
   };
   wp.player = player;
-  wp.ui = fixture<UiSystem>({
-    setPrompt(prompt, owner): void {
-      prompts.push({ ...prompt, owner });
+  wp.ui = fixture<UiSystem>(
+    {
+      setPrompt(prompt, owner): void {
+        prompts.push({ ...prompt, owner });
+      },
+      clearPrompt(): void {},
     },
-    clearPrompt(): void {},
-  });
+    new complete.UiSystem()
+  );
   wp.ctx = createTestContext({
     input,
     scene: new THREE.Scene(),
@@ -92,14 +99,17 @@ function makeHarness(): WeaponHarness {
   // so counting them measures real trigger output. `update()` copies
   // `sim.stats.fired` back into `wp.stats.fired` every frame.
   const shots = { live: 0, fired: 0, impacts: 0 };
-  wp.sim = fixture<ProjectileSim>({
-    spawn(): null {
-      shots.fired++;
-      return null;
+  wp.sim = fixture<ProjectileSim>(
+    {
+      spawn(): null {
+        shots.fired++;
+        return null;
+      },
+      clear(): void {},
+      stats: shots,
     },
-    clear(): void {},
-    stats: shots,
-  });
+    complete.testProjectileSim()
+  );
   wp.stats = { tris: 0, drawCalls: 0, live: 0, fired: 0 };
   wp.physics = new PhysicsSystem();
   const addRigidBody = wp.physics.addRigidBody.bind(wp.physics);
@@ -107,49 +117,61 @@ function makeHarness(): WeaponHarness {
     bodies.push(options);
     return addRigidBody(options);
   };
-  wp.viewmodel = fixture<Viewmodel>({
-    anchor: new THREE.Object3D(),
-    weapons: new Map(
-      WEAPON_IDS.map((id): [WeaponId, WeaponEntry] => [id, fixture<WeaponEntry>({ id })])
-    ),
-    syncToCamera(): void {},
-    grenadeReleaseWorld(out): THREE.Vector3 {
-      return out.copy(wp._throwOrigin());
+  wp.viewmodel = fixture<Viewmodel>(
+    {
+      anchor: new THREE.Object3D(),
+      weapons: new Map(
+        WEAPON_IDS.map((id): [WeaponId, WeaponEntry] => [
+          id,
+          fixture<WeaponEntry>({ id }, complete.testWeaponEntry()),
+        ])
+      ),
+      syncToCamera(): void {},
+      grenadeReleaseWorld(out): THREE.Vector3 {
+        return out.copy(wp._throwOrigin());
+      },
+      armAsset: fixture<Viewmodel['armAsset']>(
+        {
+          blood: fixture<Viewmodel['armAsset']['blood']>(
+            { setHealthFraction(): void {} },
+            complete.testArmBlood()
+          ),
+        },
+        complete.testArmAsset()
+      ),
+      active: null,
+      clip: null,
+      get clipName(): string | null {
+        return this.clip?.name ?? null;
+      },
+      adsT: 0,
+      setActive(): null {
+        return null;
+      },
+      stopClip(): void {
+        this.clip = null;
+      },
+      play(name): number {
+        this.clip = new Clip(name, 1, {});
+        clips.push(name);
+        return 1;
+      },
+      holdGrenade(): void {},
+      cookGrenade(): void {},
+      throwGrenade(): void {},
+      endGrenade(): void {},
+      holdRadio(): void {},
+      endRadio(): void {},
+      setRadioScreen(): void {},
+      holdBandage(): void {},
+      endBandage(): void {},
+      addRecoil(): void {},
+      muzzleWorld(out): THREE.Vector3 {
+        return out.set(0, 0, 0);
+      },
     },
-    armAsset: fixture<Viewmodel['armAsset']>({
-      blood: fixture<Viewmodel['armAsset']['blood']>({ setHealthFraction(): void {} }),
-    }),
-    active: null,
-    clip: null,
-    get clipName(): string | null {
-      return this.clip?.name ?? null;
-    },
-    adsT: 0,
-    setActive(): null {
-      return null;
-    },
-    stopClip(): void {
-      this.clip = null;
-    },
-    play(name): number {
-      this.clip = new Clip(name, 1, {});
-      clips.push(name);
-      return 1;
-    },
-    holdGrenade(): void {},
-    cookGrenade(): void {},
-    throwGrenade(): void {},
-    endGrenade(): void {},
-    holdRadio(): void {},
-    endRadio(): void {},
-    setRadioScreen(): void {},
-    holdBandage(): void {},
-    endBandage(): void {},
-    addRecoil(): void {},
-    muzzleWorld(out): THREE.Vector3 {
-      return out.set(0, 0, 0);
-    },
-  });
+    complete.testViewmodel()
+  );
   for (const id of WEAPON_IDS) wp.states.set(id, wp._makeState(id));
   const frame = ({ down = [], up = [], wheel = 0, dt = 1 / 60 }: FrameOptions = {}): void => {
     for (const code of down) input._pendingDown.add(code);
@@ -610,7 +632,7 @@ for (const gate of ['frozen', 'disabled']) {
   assert.equal(wp._triggerLatched, true);
   if (gate === 'frozen') input.frozen = true;
   else input.enabled = false;
-  input._onMouseUp(fixture<MouseEvent>({ button: 0 }));
+  input._onMouseUp(fixture<MouseEvent>({ button: 0 }, complete.testMouseEvent()));
   assert.equal(input.fire, true, `${gate} handler drops the physical release`);
   for (let i = 0; i < 30; i++) frame();
   assert.equal(wp._triggerLatched, false, `${gate} frames break the pull`);
@@ -659,12 +681,15 @@ for (const gate of ['frozen', 'disabled']) {
 {
   const { wp, tap, prompts } = makeHarness();
   let strikes = 0;
-  wp.radioSys = fixture<RadioSystem>({
-    callStrike(): boolean {
-      strikes++;
-      return true;
+  wp.radioSys = fixture<RadioSystem>(
+    {
+      callStrike(): boolean {
+        strikes++;
+        return true;
+      },
     },
-  });
+    new complete.RadioSystem()
+  );
   tap('KeyX', 'Digit1');
   assert(wp.radioEquipped && strikes === 0, 'opening frame does not immediately select a request');
   tap('Digit2');

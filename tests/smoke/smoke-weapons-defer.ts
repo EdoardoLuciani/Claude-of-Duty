@@ -5,34 +5,38 @@ import { WEAPON_IDS } from '../../src/weapons/defs.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import type { AuthoredWeaponModel, WeaponEntry } from '../../src/weapons/runtime-types.ts';
 import type { Viewmodel } from '../../src/weapons/viewmodel.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 function makeWp(): WeaponSystem {
   const wp = new WeaponSystem();
   const weapons = new Map<import('../../src/weapons/defs.ts').WeaponId, WeaponEntry>([
-    ['rifle', fixture<WeaponEntry>({ id: 'rifle' })],
-    ['pistol', fixture<WeaponEntry>({ id: 'pistol' })],
+    ['rifle', fixture<WeaponEntry>({ id: 'rifle' }, complete.testWeaponEntry())],
+    ['pistol', fixture<WeaponEntry>({ id: 'pistol' }, complete.testWeaponEntry())],
   ]);
-  wp.viewmodel = fixture<Viewmodel>({
-    anchor: fixture<Viewmodel['anchor']>({ visible: true }),
-    weapons,
-    addWeapon(record): WeaponEntry {
-      const entry = fixture<WeaponEntry>({ id: record.id, tris: 12 });
-      weapons.set(record.id, entry);
-      return entry;
+  wp.viewmodel = fixture<Viewmodel>(
+    {
+      anchor: fixture<Viewmodel['anchor']>({ visible: true }, new complete.THREE.Object3D()),
+      weapons,
+      addWeapon(record): WeaponEntry {
+        const entry = fixture<WeaponEntry>({ id: record.id, tris: 12 }, complete.testWeaponEntry());
+        weapons.set(record.id, entry);
+        return entry;
+      },
+      setActive(id): WeaponEntry | null {
+        const entry = weapons.get(id) ?? null;
+        this.active = entry;
+        return entry;
+      },
+      play(): number {
+        return 1;
+      },
+      stopClip(): void {},
+      endGrenade(): void {},
+      endRadio(): void {},
     },
-    setActive(id): WeaponEntry | null {
-      const entry = weapons.get(id) ?? null;
-      this.active = entry;
-      return entry;
-    },
-    play(): number {
-      return 1;
-    },
-    stopClip(): void {},
-    endGrenade(): void {},
-    endRadio(): void {},
-  });
+    complete.testViewmodel()
+  );
   wp.stats = { tris: 0, drawCalls: 0, live: 0, fired: 0 };
   for (const id of WEAPON_IDS) wp.states.set(id, wp._makeState(id));
   return wp;
@@ -42,7 +46,7 @@ function makeWp(): WeaponSystem {
   const wp = makeWp();
   assert.equal(wp.equipSecondary('smg'), false, 'unmounted MPX cannot be bought');
   assert(wp.owns('pistol') && !wp.owns('smg'));
-  wp.viewmodel.weapons.set('smg', fixture<WeaponEntry>({ id: 'smg' }));
+  wp.viewmodel.weapons.set('smg', fixture<WeaponEntry>({ id: 'smg' }, complete.testWeaponEntry()));
   assert.equal(wp.equipSecondary('smg'), true, 'mounted MPX replaces the pistol');
   assert(wp.owns('smg') && !wp.owns('pistol'));
 }
@@ -66,7 +70,9 @@ function makeWp(): WeaponSystem {
   assert.equal(wp.equipPrimary('lmg'), false);
   assert(wp.owns('rifle') && !wp.owns('lmg'));
   assert(resolve);
-  resolve(fixture<AuthoredWeaponModel & { then?: undefined }>({ id: 'lmg' }, ['then']));
+  resolve(
+    fixture<AuthoredWeaponModel & { then?: undefined }>({ id: 'lmg' }, complete.testWeaponModel())
+  );
   await wp._restTask;
   assert.equal(settled, true);
   assert.equal(wp.stats.tris, 12);
@@ -97,7 +103,7 @@ function makeWp(): WeaponSystem {
 
 {
   const wp = makeWp();
-  wp.viewmodel.weapons.set('lmg', fixture<WeaponEntry>({ id: 'lmg' }));
+  wp.viewmodel.weapons.set('lmg', fixture<WeaponEntry>({ id: 'lmg' }, complete.testWeaponEntry()));
   assert.equal(wp.equipPrimary('lmg'), true);
   assert(wp.owns('lmg') && !wp.owns('rifle'));
   assert.equal(wp.activeId, 'lmg');
@@ -109,7 +115,7 @@ function makeWp(): WeaponSystem {
     throw new Error('mount failed');
   };
   wp._restTask = wp._mountRest(['lmg'], async (): Promise<AuthoredWeaponModel> =>
-    fixture<AuthoredWeaponModel & { then?: undefined }>({ id: 'lmg' }, ['then'])
+    fixture<AuthoredWeaponModel & { then?: undefined }>({ id: 'lmg' }, complete.testWeaponModel())
   );
   await assert.rejects(wp._restTask, /mount failed/, 'mount errors still reject the deferred task');
   assert.equal(wp.equipPrimary('lmg'), false);

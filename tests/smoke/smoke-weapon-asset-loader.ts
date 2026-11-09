@@ -6,6 +6,7 @@ import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { WorkerPool } from 'three/examples/jsm/utils/WorkerPool.js';
 
 import { disposeWeaponLoader, loadWeaponGLTF } from '../../src/weapons/asset-loader.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 import { captureMethod } from '../lib/render-fixture.ts';
 
@@ -56,7 +57,7 @@ function gltf(
     animations: [],
     cameras: [],
     asset: {},
-    parser: fixture<GLTF['parser']>({}),
+    parser: fixture<GLTF['parser']>({}, complete.testGLTFParser()),
     userData: {},
   };
 }

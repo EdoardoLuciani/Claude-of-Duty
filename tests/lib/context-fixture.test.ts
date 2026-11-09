@@ -8,6 +8,7 @@ import { PhysicsSystem } from '../../src/physics/index.ts';
 import { makeAgent, makeAi, makeRng } from './agent-fixture.ts';
 import { createContext, createInput } from './context.ts';
 import type { TestProviders } from './context.ts';
+import * as complete from './fixture-targets.ts';
 import { fixture } from './fixture.ts';
 
 test('context fixture retains provider identity and fails on missing dependencies', (): void => {
@@ -28,12 +29,26 @@ test('context fixture retains provider identity and fails on missing dependencie
   const ai = makeAi();
   providers.ai = ai;
   assert.equal(context.get('ai'), ai);
-  const checked = fixture<{ value: number; optional?: string }>({ value: 1 }, ['optional']);
+  const checked = fixture<{ value: number; optional?: string }>(
+    { value: 1 },
+    {
+      get value(): never {
+        return complete.unavailable('value');
+      },
+    }
+  );
   assert.equal(checked.value, 1);
   assert.equal(checked.optional, undefined);
   checked.value = 2;
   assert.equal(checked.value, 2);
-  const incomplete = fixture<{ required: number }>({});
+  const incomplete = fixture<{ required: number }>(
+    {},
+    {
+      get required(): never {
+        return complete.unavailable('required');
+      },
+    }
+  );
   assert.throws((): number => incomplete.required, /missing member required/);
 });
 

@@ -7,6 +7,7 @@ import { buildWorld } from '#worldgen/build';
 import { Assembler } from '#worldgen/builder';
 import { BUILDINGS } from '#worldgen/level/layout';
 
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 const box = new THREE.Box3();
@@ -32,7 +33,10 @@ function emitted(): Map<string, Piece> {
     out.set(k, e);
   };
   const A = new Assembler({
-    materials: { get: (name): THREE.Material => fixture<THREE.Material>({ name }) },
+    materials: {
+      get: (name): THREE.Material =>
+        fixture<THREE.Material>({ name }, new complete.THREE.MeshBasicMaterial()),
+    },
   });
   // Record merged pieces without merging them: nothing reads the batches here.
   A.add = (key, geo, matrix): Assembler => (record(key, geo, matrix), A);

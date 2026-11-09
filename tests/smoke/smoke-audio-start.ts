@@ -5,6 +5,7 @@ import type { Mixer } from '../../src/audio/mixer.ts';
 import { TentRadio } from '../../src/audio/music.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { createAudioContext } from '../lib/audio-fixture.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 // No standard Web Audio API means optional audio stays disabled, even if an
@@ -31,7 +32,11 @@ try {
   assert.equal(audio._starting, null);
   assert.equal(await audio.start(), false);
   audio.dispose();
-  const radio = new TentRadio(createAudioContext(), fixture<Mixer>({}), new Rng(1));
+  const radio = new TentRadio(
+    createAudioContext(),
+    fixture<Mixer>({}, complete.testMixer()),
+    new Rng(1)
+  );
   assert.equal(await radio.warm(), null);
   await radio.start();
   assert.equal(radio.playing, false);

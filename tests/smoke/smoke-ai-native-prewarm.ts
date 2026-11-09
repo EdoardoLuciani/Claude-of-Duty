@@ -6,6 +6,7 @@ import { AiSystem, type AiVariant } from '../../src/ai/index.ts';
 import { VARIANTS } from '../../src/ai/soldier.ts';
 import type { RenderSystem } from '../../src/render/index-webgpu.ts';
 import { createTestContext } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 const material = new THREE.MeshStandardNodeMaterial(),
@@ -17,37 +18,68 @@ material.addEventListener('dispose', (): number => disposed++);
 const scene = new THREE.Scene(),
   existing = new THREE.Object3D();
 scene.add(existing);
-const render = fixture<RenderSystem>({
-  renderer: fixture<RenderSystem['renderer']>({}),
-  _graph: null,
-  patchMaterials(): void {},
-  async _warmGraph(): ReturnType<RenderSystem['_warmGraph']> {
-    calls++;
-    assert.equal(scene.children.length, 2);
-    const holder = scene.children[1],
-      skins = holder.children.filter((o): o is THREE.SkinnedMesh => o instanceof THREE.SkinnedMesh);
-    assert.equal(skins.length, Object.keys(VARIANTS).length);
-    for (const mesh of skins) {
-      assert.equal(mesh.geometry, geometry, 'borrow actual model geometry');
-      assert.equal(mesh.material, material, 'one material draws all surface groups');
-      assert(mesh.castShadow && mesh.receiveShadow, 'compile actual receiving/casting variants');
-      assert.equal(mesh.frustumCulled, false);
-    }
-    return { ms: 0, geometries: 0, frameUnchanged: true };
+const render = fixture<RenderSystem>(
+  {
+    renderer: fixture<RenderSystem['renderer']>({}, complete.testRenderer()),
+    _graph: null,
+    patchMaterials(): void {},
+    async _warmGraph(): ReturnType<RenderSystem['_warmGraph']> {
+      calls++;
+      assert.equal(scene.children.length, 2);
+      const holder = scene.children[1],
+        skins = holder.children.filter(
+          (o): o is THREE.SkinnedMesh => o instanceof THREE.SkinnedMesh
+        );
+      assert.equal(skins.length, Object.keys(VARIANTS).length);
+      for (const mesh of skins) {
+        assert.equal(mesh.geometry, geometry, 'borrow actual model geometry');
+        assert.equal(mesh.material, material, 'one material draws all surface groups');
+        assert(mesh.castShadow && mesh.receiveShadow, 'compile actual receiving/casting variants');
+        assert.equal(mesh.frustumCulled, false);
+      }
+      return { ms: 0, geometries: 0, frameUnchanged: true };
+    },
   },
-});
+  new complete.RenderSystem()
+);
 const ai = new AiSystem();
 ai.ctx = createTestContext({ scene, camera: new THREE.PerspectiveCamera(), providers: { render } });
-ai.variant = (): AiVariant => fixture<AiVariant>({ geometry, material });
-ai.rng = fixture<AiSystem['rng']>({
-  fork: (): never => assert.fail('warmup must not create an Agent or consume RNG'),
-});
+ai.variant = (): AiVariant =>
+  fixture<AiVariant>(
+    { geometry, material },
+    {
+      get geometry(): never {
+        return complete.unavailable('geometry');
+      },
+      get weapon(): never {
+        return complete.unavailable('weapon');
+      },
+      get stats(): never {
+        return complete.unavailable('stats');
+      },
+      get variant(): never {
+        return complete.unavailable('variant');
+      },
+      get material(): never {
+        return complete.unavailable('material');
+      },
+      get parts(): never {
+        return complete.unavailable('parts');
+      },
+    }
+  );
+ai.rng = fixture<AiSystem['rng']>(
+  {
+    fork: (): never => assert.fail('warmup must not create an Agent or consume RNG'),
+  },
+  new complete.Rng(1)
+);
 
 const early = await ai.prewarmMaterials();
 assert.equal(early.ok, false);
 assert.equal(ai._prewarmed, null);
 assert.equal(calls, 0, 'init must not falsely cache prewarm before native graph creation');
-render._graph = fixture<NonNullable<RenderSystem['_graph']>>({});
+render._graph = fixture<NonNullable<RenderSystem['_graph']>>({}, complete.testGraph());
 const warm = await ai.prewarmMaterials();
 assert.equal(warm.ok, true);
 assert(warm.graphWarm);

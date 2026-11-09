@@ -14,6 +14,7 @@ import { observeFriendlyDamage } from '../../tools/lib/combat-fixture.ts';
 import { makeAgent, makeAi } from '../lib/agent-fixture.ts';
 import { brainPhysics, brainAnimator, coverPoint } from '../lib/ai-brain-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 
 function fighter(state: AiState = 'combat'): Agent {
@@ -106,17 +107,20 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
 // A walkable peek with no firing lane is a failure, not a fallback exposure.
 {
   const p = coverPoint({ x: 0, y: 0, z: 0, dx: 0, dz: 1, high: true, component: 1, claimed: -1 });
-  const grid = fixture<SurfaceNav>({
-    coverPoints: [p],
-    walkingComponents: new Map([[1, 1]]),
-    worker: null,
-    components: new Map([[1, 1]]),
-    project(pos, out): number {
-      out.copy(pos);
-      return 1;
+  const grid = fixture<SurfaceNav>(
+    {
+      coverPoints: [p],
+      walkingComponents: new Map([[1, 1]]),
+      worker: null,
+      components: new Map([[1, 1]]),
+      project(pos, out): number {
+        out.copy(pos);
+        return 1;
+      },
+      lineOfWalk: (): boolean => true,
     },
-    lineOfWalk: (): boolean => true,
-  });
+    complete.testNav()
+  );
   const phys = brainPhysics(false);
   const cover = new CoverMap(grid, phys),
     out = new THREE.Vector3(),
@@ -384,14 +388,17 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
   sq.ai = climber.ai;
   const point = coverPoint({ x: 8, y: 3.5, z: 12, high: true });
   let picks = 0;
-  sq.ai.cover = fixture<CoverMap>({
-    pick(_from, _target, opts): BakedCoverPoint {
-      picks++;
-      assert.equal(opts?.elevated, true);
-      return point;
+  sq.ai.cover = fixture<CoverMap>(
+    {
+      pick(_from, _target, opts): BakedCoverPoint {
+        picks++;
+        assert.equal(opts?.elevated, true);
+        return point;
+      },
+      release(): void {},
     },
-    release(): void {},
-  });
+    complete.testCover()
+  );
   climber._goTo = function (p): true {
     this.path = [this.position.clone(), new THREE.Vector3().copy(p)];
     this.pathLen = 2;
@@ -438,22 +445,25 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
   a.position.set(0.02, 0, 0);
   a._positionPlan = { center, state: a.state, investigate: false };
   a._shotBlockedByFriend = (): boolean => false;
-  a.ai.grid = fixture<SurfaceNav>({
-    worker: null,
-    components: new Map([[1, 1]]),
-    project(p, out): number {
-      out.copy(p);
-      return 1;
+  a.ai.grid = fixture<SurfaceNav>(
+    {
+      worker: null,
+      components: new Map([[1, 1]]),
+      project(p, out): number {
+        out.copy(p);
+        return 1;
+      },
+      sampleGround(x, z, y, out): number {
+        out.set(x, y, z);
+        return 1;
+      },
+      lineOfWalk(from): true {
+        walks.push(from.clone());
+        return true;
+      },
     },
-    sampleGround(x, z, y, out): number {
-      out.set(x, y, z);
-      return 1;
-    },
-    lineOfWalk(from): true {
-      walks.push(from.clone());
-      return true;
-    },
-  });
+    complete.testNav()
+  );
   let routes = 0;
   a.ai.requestPath = (from): number => {
     routes++;
@@ -473,11 +483,14 @@ for (const reason of ['reload', 'vault', 'suppression', 'muzzle', 'unacquired', 
 for (const admitted of [true, false]) {
   const a = fighter(),
     destination = new THREE.Vector3(2, 0, 0);
-  a.ai.grid = fixture<SurfaceNav>({
-    worker: null,
-    project: (): number => 0,
-    sampleGround: (): number => 0,
-  });
+  a.ai.grid = fixture<SurfaceNav>(
+    {
+      worker: null,
+      project: (): number => 0,
+      sampleGround: (): number => 0,
+    },
+    complete.testNav()
+  );
   a.moveTarget.copy(a.position);
   a._positionPlan = { center: a.position.clone(), state: a.state, investigate: false };
   a._pickObservationPoints = (): void => {
@@ -527,15 +540,18 @@ for (const admitted of [true, false]) {
   a._searchOrigin.set(0, 1.2, 8);
   a.lastKnown.set(0.1, 1.2, 8);
   a._searchPending = true;
-  a.ai.grid = fixture<SurfaceNav>({
-    worker: null,
-    project: (): number => 1,
-    components: new Map([[1, 1]]),
-    sampleGround(x, z, y): number {
-      sampled.push([x, y, z]);
-      return 0;
+  a.ai.grid = fixture<SurfaceNav>(
+    {
+      worker: null,
+      project: (): number => 1,
+      components: new Map([[1, 1]]),
+      sampleGround(x, z, y): number {
+        sampled.push([x, y, z]);
+        return 0;
+      },
     },
-  });
+    complete.testNav()
+  );
   a._buildSearchCandidates();
   assert.deepEqual(
     sampled[0],

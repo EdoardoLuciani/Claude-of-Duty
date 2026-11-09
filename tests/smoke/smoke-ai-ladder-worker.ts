@@ -31,6 +31,7 @@ import {
   type MutableLadderDescriptor,
 } from '../lib/ai-movement-fixture.ts';
 import { NativeWorker } from '../lib/attachment-worker-fixture.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 import { ladderProfiles, ladderCursor as zero, reverseCursor } from '../lib/ladder-fixture.ts';
 import { loadMap } from '../lib/nav240/fixtures.ts';
@@ -72,7 +73,10 @@ const probe = new CharacterController(f.physics.staticWorld, {
   stepHeight: INFANTRY.stepHeight,
   slopeLimit: INFANTRY.slopeRadians,
 });
-const nav = fixture<SurfaceNav>({ physics: f.physics, _probe: probe, repeatState: true });
+const nav = fixture<SurfaceNav>(
+  { physics: f.physics, _probe: probe, repeatState: true },
+  complete.testNav()
+);
 probe.move =
   probe.setPosition =
   probe.probeGround =

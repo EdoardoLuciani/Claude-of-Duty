@@ -16,6 +16,7 @@ import type { EngineSystems } from '../../src/core/context.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { makeAgent } from '../lib/agent-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
+import * as complete from '../lib/fixture-targets.ts';
 import { fixture } from '../lib/fixture.ts';
 import { makeWalker } from '../lib/nav240/harness.ts';
 import { testNav } from '../lib/test-nav.ts';
@@ -41,20 +42,26 @@ const camera = new PerspectiveCamera(60, 1, 0.1, 100);
 const sky = { keyDirection: new Vector3(0, 1, 0) };
 Object.assign(
   a.ai,
-  fixture<Partial<AiSystem>>({
-    ctx: createTestContext({
-      camera,
-      providers: { sky: fixture<EngineSystems['sky']>(sky), physics: phys },
-    }),
-    _phys: phys,
-    _frustum: new Frustum(),
-    _mvp: new Matrix4(),
-    _sphere: new Sphere(),
-    _sweep: new Sphere(),
-    _sun: new Vector3(),
-    canRollback: AiSystem.prototype.canRollback.bind(a.ai),
-    _sunDirection: AiSystem.prototype._sunDirection.bind(a.ai),
-  })
+  fixture<Partial<AiSystem>>(
+    {
+      ctx: createTestContext({
+        camera,
+        providers: {
+          sky: fixture<EngineSystems['sky']>(sky, new complete.SkySystem()),
+          physics: phys,
+        },
+      }),
+      _phys: phys,
+      _frustum: new Frustum(),
+      _mvp: new Matrix4(),
+      _sphere: new Sphere(),
+      _sweep: new Sphere(),
+      _sun: new Vector3(),
+      canRollback: AiSystem.prototype.canRollback.bind(a.ai),
+      _sunDirection: AiSystem.prototype._sunDirection.bind(a.ai),
+    },
+    {}
+  )
 );
 a.ctx = a.ai.ctx;
 function look(x: number, y: number, z: number, tx: number, ty: number, tz: number): void {
