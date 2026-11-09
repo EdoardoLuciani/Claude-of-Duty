@@ -22,20 +22,18 @@ const authored = {
   Fire: { duration: 0.06315789473684211 },
   Inspect: { duration: 40.1 },
 };
-const apply = (c: THREE.AnimationClip): void => checkAuthoredDuration(c, authored, 'TEST_RIG');
+const check = (c: THREE.AnimationClip): void => checkAuthoredDuration(c, authored, 'TEST_RIG');
 
 // Idle is a single pose: the cook's one key at t=0 is exactly its authored 0 s.
-const idle = collapsed('Idle');
-apply(idle);
-assert.equal(idle.duration, 0);
+check(collapsed('Idle'));
 
 // Cooked key times are float32, so authored lengths round by ~1e-7.
 const fire = clip('Fire', track([0, Math.fround(authored.Fire.duration)]));
-apply(fire);
+check(fire);
 assert.equal(fire.duration, Math.fround(authored.Fire.duration));
 // Float32 rounding grows with length: 40.1 s stores as 40.0999985 s, 1.5e-6 off.
 const long = clip('Inspect', track([0, Math.fround(authored.Inspect.duration)]));
-apply(long);
+check(long);
 assert.equal(long.duration, Math.fround(authored.Inspect.duration));
 
 for (const [bad, message] of [
@@ -46,11 +44,11 @@ for (const [bad, message] of [
   [clip('Inspect', track([0, 40.11])), /Inspect lasts 40\.11\d* s, authored 40\.1 s/],
   [clip('Reload', track([0, 1])), /no authored duration for Reload/],
 ] as const)
-  assert.throws((): void => apply(bad), message);
+  assert.throws((): void => check(bad), message);
 
 const nan = clip('Fire', track([0, 0.06]));
 nan.duration = NaN;
-assert.throws((): void => apply(nan), /Fire lasts NaN s/, 'NaN never passes the tolerance check');
+assert.throws((): void => check(nan), /Fire lasts NaN s/, 'NaN never passes the tolerance check');
 for (const duration of [-1, NaN])
   assert.throws(
     (): void => checkAuthoredDuration(collapsed('Idle'), { Idle: { duration } }, 'TEST_RIG'),

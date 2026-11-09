@@ -69,8 +69,7 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,head,handle,trigger,cover
         p=copy.deepcopy(ref['sides'][side]['grip']);p['fingers']=[[.15,.25,.18],[.20,.30,.20],[.25,.32,.24],[.32,.36,.27]];p['thumb']=[.12,.20];return p
     def indexed():
         p=copy.deepcopy(ref['sides']['right']['grip']);p['fingers'][0]=[-.05,.10,.15];p['fingerSpread'][0]=.22;return p
-    begin('Idle',0)  # single rest pose
-    finish('Idle')
+    begin('Idle',0);finish('Idle')  # single rest pose
     for name,locked in [('Fire',False),('Last_Shot',True)]:
         begin(name,.075)
         # Existing reactive viewmodel/camera recoil remains unchanged. Blender

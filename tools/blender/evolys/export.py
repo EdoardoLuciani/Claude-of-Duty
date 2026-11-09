@@ -104,7 +104,7 @@ def validate_export(path, clips):
             assert all(a<b for a,b in zip(times,times[1:]))
         for channel in animation['channels']:
             sampler=animation['samplers'][channel['sampler']]
-            # A one-key pose (Idle) has nothing to interpolate; the exporter labels it LINEAR.
+            # One-key curves are always baked with our LINEAR fallback; one key cannot interpolate.
             if channel['target']['path']=='scale' and doc['accessors'][sampler['input']]['count']>1:
                 assert sampler['interpolation']=='STEP'
     return raw,doc

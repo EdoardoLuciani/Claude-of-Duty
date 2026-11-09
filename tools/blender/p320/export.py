@@ -87,7 +87,7 @@ def export_asset(asset, coords, output):
     for animation in doc['animations']:
         for channel in animation['channels']:
             sampler = animation['samplers'][channel['sampler']]
-            # A one-key pose (Idle) has nothing to interpolate; the exporter labels it LINEAR.
+            # One-key curves are always baked with our LINEAR fallback; one key cannot interpolate.
             if channel['target']['path'] == 'scale' and doc['accessors'][sampler['input']]['count'] > 1:
                 assert sampler['interpolation'] == 'STEP'
     primitives = [p for node in doc['nodes'] if 'mesh' in node
