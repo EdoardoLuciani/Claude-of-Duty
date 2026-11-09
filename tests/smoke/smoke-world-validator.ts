@@ -12,8 +12,9 @@ import { isRecord } from '../../src/core/guards.ts';
 const root = resolve(import.meta.dirname, '../..');
 const world = join(root, 'public/models/world');
 const baseline: unknown = JSON.parse(readFileSync(join(world, 'level.json'), 'utf8'));
-assert(isRecord(baseline) && isRecord(baseline.assets));
+assert(isRecord(baseline) && isRecord(baseline.assets) && isRecord(baseline.stats));
 const assets = baseline.assets;
+const stats = baseline.stats;
 const directory = mkdtempSync(join(tmpdir(), 'cod-world-validator-'));
 try {
   for (const kind of ['visual', 'collision', 'nav']) {
@@ -61,7 +62,11 @@ try {
     assert.match(invalidRoot.stderr, /expected a manifest object/);
   }
 
-  const withVisual = (json: unknown): SpawnSyncReturns<string> => {
+  const withGlb = (
+    kind: 'visual' | 'collision',
+    json: unknown,
+    assetStats: unknown = stats
+  ): SpawnSyncReturns<string> => {
     const text = Buffer.from(JSON.stringify(json));
     const padded = Buffer.alloc(Math.ceil(text.length / 4) * 4, 0x20);
     text.copy(padded);
@@ -74,15 +79,15 @@ try {
     padded.copy(glb, 20);
     const compressed = gzipSync(glb);
     const hash = createHash('sha256').update(compressed).digest('hex').slice(0, 12);
-    const name = `invalid-visual.${hash}.glb.gz`;
+    const name = `invalid-${kind}.${hash}.glb.gz`;
     writeFileSync(join(directory, name), compressed);
-    return run({ ...baseline, assets: { ...assets, visual: name } });
+    return run({ ...baseline, assets: { ...assets, [kind]: name }, stats: assetStats });
   };
-  const invalidGlbRoot = withVisual(null);
+  const invalidGlbRoot = withGlb('visual', null);
   assert.equal(invalidGlbRoot.status, 1);
   assert.match(invalidGlbRoot.stderr, /expected a glTF object/);
 
-  const invalidGeometry = withVisual({
+  const invalidGeometry = withGlb('visual', {
     nodes: [
       {
         mesh: 0,
@@ -99,7 +104,7 @@ try {
   assert.match(invalidGeometry.stderr, /not divisible by three/);
   assert.match(invalidGeometry.stderr, /inconsistent GPU instance accessor counts/);
 
-  const invalidRecords = withVisual({
+  const invalidRecords = withGlb('visual', {
     nodes: [null, { mesh: 0 }],
     meshes: [{ primitives: [null] }],
   });
@@ -107,6 +112,39 @@ try {
   assert.match(invalidRecords.stderr, /invalid glTF node 0/);
   assert.match(invalidRecords.stderr, /primitive 0 is invalid/);
   assert.doesNotMatch(invalidRecords.stderr, /TypeError/);
+
+  for (const kind of ['visual', 'collision'] as const) {
+    const mesh: { primitives: unknown } = { primitives: [] };
+    const fixture = {
+      asset: { version: '2.0' },
+      nodes: [
+        {
+          mesh: 0,
+          extras: {
+            palette: 'concrete',
+            collision: false,
+            surface: 'concrete',
+            ballisticSurface: 'concrete',
+            sheetThickness: 0,
+          },
+        },
+      ],
+      meshes: [mesh],
+    };
+    const assetStats =
+      kind === 'visual'
+        ? { ...stats, drawCalls: 1, staticTris: 0, instTris: 0, instances: 0 }
+        : { ...stats, collideTris: 0 };
+    if (kind === 'visual') {
+      const emptyPrimitives = withGlb(kind, fixture, assetStats);
+      assert.equal(emptyPrimitives.status, 0, emptyPrimitives.stdout + emptyPrimitives.stderr);
+    }
+    mesh.primitives = 'corrupt';
+    const invalidPrimitives = withGlb(kind, fixture, assetStats);
+    assert.equal(invalidPrimitives.status, 1, invalidPrimitives.stdout + invalidPrimitives.stderr);
+    assert(invalidPrimitives.stderr.includes(`${kind} node 0 primitives must be an array`));
+    if (kind === 'visual') assert.doesNotMatch(invalidPrimitives.stderr, /manifest stats\./);
+  }
 } finally {
   rmSync(directory, { recursive: true, force: true });
 }

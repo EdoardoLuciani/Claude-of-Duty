@@ -199,9 +199,14 @@ function inspectVisual(asset: GlbAsset | null): VisualStats | null {
       fail(`${label} references missing mesh ${describe(node.mesh)}`);
       continue;
     }
+    const primitives = array(mesh.primitives);
+    if (!primitives) {
+      fail(`${label} primitives must be an array`);
+      continue;
+    }
     let triangles = 0;
-    for (let i = 0; i < (array(mesh.primitives)?.length ?? 0); i++) {
-      triangles += primitiveTriangles(gltf, array(mesh.primitives)?.[i], `${label} primitive ${i}`);
+    for (let i = 0; i < primitives.length; i++) {
+      triangles += primitiveTriangles(gltf, primitives[i], `${label} primitive ${i}`);
     }
 
     const attrs = object(object(node.extensions)?.EXT_mesh_gpu_instancing)?.attributes;
@@ -257,9 +262,14 @@ function inspectCollision(asset: GlbAsset | null): CollisionStats | null {
       fail(`${label} references missing mesh ${describe(node.mesh)}`);
       continue;
     }
+    const primitives = array(mesh.primitives);
+    if (!primitives) {
+      fail(`${label} primitives must be an array`);
+      continue;
+    }
     let triangles = 0;
-    for (let i = 0; i < (array(mesh.primitives)?.length ?? 0); i++) {
-      const primitive = indexed(mesh.primitives, i);
+    for (let i = 0; i < primitives.length; i++) {
+      const primitive = indexed(primitives, i);
       if (!primitive) {
         fail(`${label} primitive ${i} is invalid`);
         continue;

@@ -20,6 +20,7 @@ export function worldSourceHash(root: string): string {
     join(root, 'src/core/config.ts'),
     join(root, 'src/core/rng.ts'),
     join(root, 'src/core/geometry-validation.ts'),
+    join(root, 'src/core/three-guards.ts'),
     join(root, 'src/world/palette.ts'),
     join(root, 'src/ai/nav.ts'),
     join(root, 'src/ai/attachment.ts'),
