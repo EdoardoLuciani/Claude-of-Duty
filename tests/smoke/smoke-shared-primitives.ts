@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { NoiseBank } from '../../src/audio/dsp.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { SP, resetSpawn, setSpawnPosition, setSpawnVelocity } from '../../src/fx/particles.ts';
+import { FixtureAudioParam } from '../lib/audio-fixture.ts';
 import { fixture } from '../lib/fixture.ts';
 
 const spawn = resetSpawn();
@@ -36,7 +37,7 @@ const context = fixture<BaseAudioContext>({
     });
   },
   createBufferSource(): AudioBufferSourceNode {
-    return fixture<AudioBufferSourceNode>({ playbackRate: fixture<AudioParam>({ value: 1 }) });
+    return fixture<AudioBufferSourceNode>({ playbackRate: new FixtureAudioParam(1) });
   },
 });
 const parent = new Rng(0x5eed);
