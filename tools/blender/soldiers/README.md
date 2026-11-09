@@ -15,7 +15,7 @@ wood-tone laminate furniture, a curved magazine, gas tube and iron sights.
 ## Author and cook the complete family
 
 ```sh
-node tools/blender/soldiers/export.mjs --output /absolute/scratch/soldiers
+bun tools/blender/soldiers/export.ts --output /absolute/scratch/soldiers
 # Optional: --seed 0x5eed1234 --blender /absolute/path/to/blender
 ```
 
@@ -37,9 +37,9 @@ directory. Blend binary bytes may differ between runs; runtime GLB/JSON bytes
 are deterministic on the tested host. Manifest differences may therefore include
 blend hashes, but contain no timestamps or absolute authoring/output paths.
 
-### Node reader boundary
+### Bun reader boundary
 
-`export.mjs` exports these direct Node APIs for the parent exporter:
+`export.ts` exports these direct Bun APIs for the parent exporter:
 
 - `loadCommittedSoldiers(directory = ASSET_ROOT)` returns
   `[{ name, glb: Buffer, json: Buffer, meta }]` for the entire registry.
@@ -68,14 +68,14 @@ four-joint weights, canonical 25-bone indices, complete disjoint surfaces and
 mesh statistics before allocating Three resources. It disposes owned geometry,
 materials and skeleton even when encoding fails. This is a deliberate exception
 to the weapon guide's stock Blender glTF boundary: Python owns generation;
-Node GLTFExporter preserves canonical bone order, tiny weights and float colors.
+Bun GLTFExporter preserves canonical bone order, tiny weights and float colors.
 There are no stock-export repairs, exporter hooks or runtime material adapters.
 
 ## Inspect the intermediate authoring payload
 
 ```sh
 E=/tmp/soldier-review
-node tools/blender/soldiers/reference.mjs "$E/reference.json"
+bun tools/blender/soldiers/reference.ts "$E/reference.json"
 for V in vanguard irregular breacher; do
   blender -b -t 2 --python-exit-code 1 --python tools/blender/soldiers/build.py -- \
     --reference "$E/reference.json" --output "$E/$V-a" --variant "$V" --seed 1592594996
@@ -87,7 +87,7 @@ done
 # Also build/check each variant with seeds 0, 1 and 4294967295.
 ```
 
-`reference.mjs` computes only public runtime rig/registry/material calibration;
+`reference.ts` computes only public runtime rig/registry/material calibration;
 its import does not create soldier geometry or write files. `build.py` also has
 no import-time scene mutation. Its explicit CLI starts factory-empty and saves
 named, editable native components with bevel/normal/skin modifiers and the
@@ -115,7 +115,7 @@ Preview materials are intentionally approximate and are not runtime materials.
 Positions use 10-micrometre authoring quantization, UVs and source corner normals
 use 1e-4 quantization (normals renormalized), weights use 1e-6, then float32 packing.
 Canonical native topology/corner ordering removes Blender primitive enumeration
-noise. JSON integers express canonical U16 joint indices; the Node cook must
+noise. JSON integers express canonical U16 joint indices; the Bun cook must
 select U16/U32 element indices according to vertex count. No stock glTF export,
 repair, runtime adapter, or tiny-weight pruning is involved.
 

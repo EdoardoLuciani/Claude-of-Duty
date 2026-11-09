@@ -1,6 +1,6 @@
 """Parametric native soldier authoring. Native editable components -> actor-space mesh payload.
 
-Blender owns geometry; reference.mjs owns rig/registry/material tile calibration.
+Blender owns geometry; reference.ts owns rig/registry/material tile calibration.
 The JSON is temporary Node GLTFExporter input, NOT a Blender glTF export.
 """
 import argparse

@@ -67,4 +67,11 @@ assert.doesNotMatch(
   readFileSync(join(root, 'tools/blender/mpx/actions.py'), 'utf8'),
   /from evolys\b|import evolys\b/
 );
-console.log('review arms: shared helper invalidates its consumers, not unrelated weapon tooling');
+for (const id of ['m4', 'p320', 'm590', 'ax338', 'evolys', 'mpx']) {
+  assert.notEqual(
+    hash(id),
+    hash(id, 'tools/blender/hand-reference.ts'),
+    `${id} tracks shared calibration code`
+  );
+}
+console.log('review arms: shared helpers invalidate their consumers, not unrelated weapon tooling');

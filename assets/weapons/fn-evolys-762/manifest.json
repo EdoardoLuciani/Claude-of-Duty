@@ -175,5 +175,5 @@
     "barrelCrown": -0.5126887835703001,
     "muzzle": -0.5745908372827804
   },
-  "source": "tools/blender/evolys/build.py + tools/blender/evolys/export.py + tools/blender/evolys/finish_atlas.py + tools/blender/evolys/actions.py + tools/blender/evolys/hand-reference.mjs"
+  "source": "tools/blender/evolys/build.py + tools/blender/evolys/export.py + tools/blender/evolys/finish_atlas.py + tools/blender/evolys/actions.py + tools/blender/evolys/hand-reference.ts"
 }

@@ -75,7 +75,7 @@ def build(output, render=False, quick=False):
     stats = export_asset(asset, coords, output)
     manifest={'asset':'SIG P320 Nitron Compact | early-production visual reconstruction','units':'metres','blender_forward':'+Y','gltf_forward':'-Z','clips':clips,'stats':stats,
      'textureResolutions':ATLAS_RESOLUTIONS,'geometry':'One rigidly weighted mechanical skin; lettering/traction baked from retained high source','handAnimation':'Blender wrist and finger controls; shared runtime skins and shoulder IK',
-     'source':'tools/blender/p320/build.py + tools/blender/p320/ + tools/blender/p320/actions.py + tools/blender/p320/hand-reference.mjs',
+     'source':'tools/blender/p320/build.py + tools/blender/p320/ + tools/blender/p320/actions.py + tools/blender/p320/hand-reference.ts',
      'notes':['Original non-functional game art, not a dimensionally exact replica.','No downloaded models or textures.','No endorsement by SIG SAUER.']}
     (output/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     print('P320_EXPORT_COMPLETE',json.dumps(stats))

@@ -355,7 +355,7 @@ color space and sampler state match, avoiding duplicate WebGPU uploads for UV1.
 `tools/blender/soldiers/` owns seeded, parametric soldier geometry from an empty
 Blender scene. An explicit reference bridge reads the runtime RIG, variant registry
 and material scales; it does not duplicate IK or consume old mesh products. A final
-Node GLTFExporter cook preserves the runtime joint/attribute format. The
+Bun GLTFExporter cook preserves the runtime joint/attribute format. The
 `assets/soldiers/` products are generated during dev/build, not committed.
 
 `tools/export-models.ts` validates/stages those generated soldiers and generates

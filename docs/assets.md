@@ -28,7 +28,7 @@ world uses a content-hashed manifest. Do not hand-edit runtime products to chang
 
 Each weapon's build entry point, checks and helpers now share one directory.
 `build.py` orchestrates authoring; `check.py` checks the saved Blender scene.
-Where present, `actions.py` authors clips and `hand-reference.mjs` explicitly
+Where present, `actions.py` authors clips and `hand-reference.ts` explicitly
 regenerates calibration. MCX authors clips in `animations.py`, with no separate
 hand-calibration stage. Calibration is never an automatic normal-build step.
 
