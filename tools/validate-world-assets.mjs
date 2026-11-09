@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /** Validate generated runtime world assets without regenerating them. */
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';

@@ -15,8 +15,8 @@ bun run build
 bun run build:ci     # CI build: generates the world, skips Blender/model assets
 ```
 
-Node.js 26.x and Bun (version pinned by `packageManager` in `package.json`) are
-required. Bun installs dependencies from `bun.lock`, type-checks (`bun check`),
+Bun (version pinned by `packageManager` in `package.json`) is required.
+It installs dependencies from `bun.lock`, type-checks (`bun check`),
 formats (`bun fmt`), bundles and serves the game (`build/bun.ts`; the dev server
 reads its plugin from `bunfig.toml`); packages are cached in `~/.bun/install/cache`, so warm
 reinstalls are near-instant. Bun also runs the checked TypeScript asset orchestrator,
@@ -24,7 +24,7 @@ world exporter, procedural-texture exporter, model staging and gltfpack cook, pl
 the remaining JavaScript world validator. Browser capture/profile entry points and
 the complete test suite also run on Bun. The checked soldier authoring/cook pipeline
 and weapon hand-reference tools run on Bun too; Blender still owns geometry and clips.
-Node remains required for Oxlint's launcher.
+`bun run lint` forces both Oxlint passes to Bun; Node.js is not a project prerequisite.
 Runtime source, every `tests/**/*.ts` script, converted helpers and the migrated
 CLI tools use explicit `.ts` imports and share strict checking through
 `bun run typecheck`. Build entry points and tests have separate `build/tsconfig.json`
