@@ -234,9 +234,8 @@ type TelemetrySnapshot = {
 
 const PLAYER_HZ = 10;
 const ENEMY_HZ = 5;
-// Fire/ADS are recorded from the resolved input (gamepad triggers included).
-const ACTIONS = Object.keys(DEFAULT_BINDINGS).filter(
-  (name): name is ActionId => hasOwn(DEFAULT_BINDINGS, name) && name !== 'fire' && name !== 'ads'
+const ACTIONS = Object.keys(DEFAULT_BINDINGS).filter((name): name is ActionId =>
+  hasOwn(DEFAULT_BINDINGS, name)
 );
 const EVENTS = [
   'weapon:fire',
@@ -1278,8 +1277,6 @@ export class TelemetrySystem {
     const input = ctx.input;
     const actions = [];
     for (const name of ACTIONS) if (input.action(name)) actions.push(name);
-    if (input.fire) actions.push('fire');
-    if (input.ads) actions.push('ads');
     input.moveVector(this._move);
     const wave = ai.getWaveState();
     const info = render.renderer.info;

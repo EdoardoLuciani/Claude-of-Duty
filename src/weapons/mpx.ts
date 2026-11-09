@@ -89,8 +89,7 @@ export function makeMPXModel(gltf: GLTF): MPXModel {
         apertureR: 0.01,
         windowW: 0.018,
         windowH: 0.018,
-        // Six-pixel minimum diameter makes the 2 MOA dot easier to see without a halo or ring.
-        reticle: 'dot',
+        // Six-pixel minimum diameter makes the 2 MOA dot easier to see.
         dotMoa: 2,
         minDotPixels: 6,
         dotOpacity: 0.9,
@@ -142,7 +141,6 @@ type MPXModel = AuthoredModelData<
       apertureR: number;
       windowW: number;
       windowH: number;
-      reticle: string;
       dotMoa: number;
       minDotPixels: number;
       dotOpacity: number;

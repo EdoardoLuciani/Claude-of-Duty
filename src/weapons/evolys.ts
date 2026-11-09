@@ -49,7 +49,6 @@ export function makeEvolysModel(gltf: GLTF): EvolysModel {
         windowW: 0.0098,
         windowH: 0.0058,
         // Size the RMR aiming dot against the world, not the enlarged weapon window.
-        reticle: 'dot',
         dotMoa: 3.25,
         minDotPixels: 5,
         dotOpacity: 0.9,
@@ -90,7 +89,6 @@ type EvolysModel = AuthoredModelData<
       apertureR: number;
       windowW: number;
       windowH: number;
-      reticle: string;
       dotMoa: number;
       minDotPixels: number;
       dotOpacity: number;

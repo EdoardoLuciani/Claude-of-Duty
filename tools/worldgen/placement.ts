@@ -2,14 +2,16 @@ import * as THREE from 'three';
 
 import type { Assembler } from './builder.ts';
 import type { TraversableOpening } from './buildings.ts';
+import { PLACEMENT_ROWS } from './level/placements/index.ts';
 import type { InstanceMasks, RectXZ } from './util.ts';
 
+type Vec3 = [number, number, number];
 export interface Placement {
   id: string;
   prototype: string;
-  position: [number, number, number];
-  rotationDeg: [number, number, number];
-  scale: [number, number, number];
+  position: Vec3;
+  rotationDeg: Vec3;
+  scale: Vec3;
   masks?: InstanceMasks;
 }
 export interface ClearanceBox extends RectXZ {
@@ -17,12 +19,9 @@ export interface ClearanceBox extends RectXZ {
   y1?: number;
 }
 
-type Vec3 = [number, number, number];
 /** Authored row: [prototype, id, position, rotationDeg, scale, masks?]. An id without
  * a `/` is shorthand for `prototype/id`; a scalar scale is uniform. */
 export type PlacementRow = [string, string, Vec3, Vec3, number | Vec3, InstanceMasks?];
-
-import { PLACEMENT_ROWS } from './level/placements/index.ts';
 
 const PLACEMENTS = PLACEMENT_ROWS.map(
   ([prototype, id, position, rotationDeg, scale, masks]): Placement => ({
