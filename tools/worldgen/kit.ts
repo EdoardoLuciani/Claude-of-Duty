@@ -25,11 +25,8 @@ import {
 
 export interface GeometrySink {
   cache: Assembler['cache'];
-  has: Assembler['has'];
   add(...args: Parameters<Assembler['add']>): void;
   addOnce(...args: Parameters<Assembler['addOnce']>): void;
-  put(...args: Parameters<Assembler['put']>): void;
-  putS(...args: Parameters<Assembler['putS']>): void;
 }
 export interface FacadeSpec extends WallPanelOptions {
   w: number;

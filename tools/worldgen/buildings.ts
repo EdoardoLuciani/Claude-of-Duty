@@ -167,7 +167,7 @@ export interface BuildingInfo {
   terraces?: Terrace[];
   roofSpec?: BuildingSpec;
   floorY: number[];
-  floorYs?: number[];
+  floorYs: number[];
   roofY: number;
   top: number;
   traversable: TraversableOpening[];
@@ -296,11 +296,8 @@ function occupiedFloorCount(spec: BuildingSpec): number {
 function sinkAdds(A: Assembler): GeometrySink {
   return {
     cache: (id: string, fn: () => THREE.BufferGeometry): THREE.BufferGeometry => A.cache(id, fn),
-    has: (id: string): boolean => A.has(id),
     add(): void {},
     addOnce(): void {},
-    put(): void {},
-    putS(): void {},
   };
 }
 /**
@@ -445,6 +442,7 @@ export function buildBuilding(A: Assembler, spec: BuildingSpec): BuildingInfo {
   const info: BuildingInfo = {
     spec,
     floorY: [],
+    floorYs: [0],
     balconies: [],
     roofY: 0,
     windows: [],
@@ -472,9 +470,8 @@ export function buildBuilding(A: Assembler, spec: BuildingSpec): BuildingInfo {
   info.terraces = [];
   // Full floor datum up front: a facade needs every floor height — including
   // the roof — to know which bays an exterior stair crosses.
-  info.floorYs! = [0];
   for (let f = 0; f < floors; f++)
-    info.floorYs!.push(info.floorYs![f] + (f === 0 ? groundH : upperH));
+    info.floorYs.push(info.floorYs[f] + (f === 0 ? groundH : upperH));
   for (let f = 0; f < floors; f++) {
     const h = f === 0 ? groundH : upperH;
     const fs = floorSpec(spec, f);
@@ -596,8 +593,8 @@ function stairReservedBays(
 ): Set<number> {
   const set = new Set<number>();
   if (!spec.exteriorStairs?.length) return set;
-  const fy = info.floorYs![f];
-  const fyNext = info.floorYs![f + 1];
+  const fy = info.floorYs[f];
+  const fyNext = info.floorYs[f + 1];
   for (const fl of spec.exteriorStairs) {
     if (fl.side !== side) continue;
     const g = exteriorFlight(info, fl);
@@ -1115,8 +1112,8 @@ function interiorSlab(
 }
 
 function exteriorFlight(info: BuildingInfo, fl: ExteriorStair): FlightInfo {
-  const fromY = info.floorYs![fl.fromFloor ?? 0] ?? 0;
-  const toY = info.floorYs![fl.toFloor ?? 1] ?? info.floorYs![info.floorYs!.length - 1];
+  const fromY = info.floorYs[fl.fromFloor ?? 0] ?? 0;
+  const toY = info.floorYs[fl.toFloor ?? 1] ?? info.floorYs[info.floorYs.length - 1];
   const steps = Math.max(6, Math.round((toY - fromY) / 0.19));
   const run = fl.run ?? 0.275;
   const sw = fl.w ?? 1.05;

@@ -14,10 +14,6 @@ interface StaticGroup {
   parts: THREE.BufferGeometry[];
   solidCount: number;
 }
-function isInstancedMesh(object: THREE.Mesh): object is THREE.InstancedMesh {
-  return object instanceof THREE.InstancedMesh;
-}
-
 const INSTANCE_COLLISION_RATIO = 0.12;
 const STATIC_COLLISION_RATIO = 0.22;
 const STATIC_FABRIC_COLLISION_RATIO = 0.02;
@@ -102,11 +98,12 @@ export async function buildCollision(
   function geometryFor(object: THREE.Mesh): THREE.BufferGeometry {
     let geometry = simplified.get(object.geometry);
     if (geometry) return geometry;
-    const ratio = isInstancedMesh(object)
-      ? INSTANCE_COLLISION_RATIO
-      : object.userData.surface === 'fabric'
-        ? STATIC_FABRIC_COLLISION_RATIO
-        : STATIC_COLLISION_RATIO;
+    const ratio =
+      object instanceof THREE.InstancedMesh
+        ? INSTANCE_COLLISION_RATIO
+        : object.userData.surface === 'fabric'
+          ? STATIC_FABRIC_COLLISION_RATIO
+          : STATIC_COLLISION_RATIO;
     geometry = simplifyGeometry(object.geometry, ratio);
     if (!geometry.getAttribute('_solid')) {
       geometry.setAttribute('_solid', new THREE.Float32BufferAttribute(solidIds(geometry).ids, 1));
@@ -124,7 +121,7 @@ export async function buildCollision(
     const ballisticSurface: unknown = object.userData.ballisticSurface ?? surface;
     const sheetThickness: unknown = object.userData.sheetThickness ?? 0;
     const groupKey = `${String(surface)}|${String(ballisticSurface)}|${String(sheetThickness)}`;
-    if (isInstancedMesh(object)) {
+    if (object instanceof THREE.InstancedMesh) {
       const mesh = new THREE.InstancedMesh(geometry, material, object.count);
       mesh.name = `collide_${object.name}`;
       mesh.userData = { surface, ballisticSurface, sheetThickness };

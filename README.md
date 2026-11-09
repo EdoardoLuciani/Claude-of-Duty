@@ -53,10 +53,9 @@ Issue [#621](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/621) approv
 exception: only `tests/lib/fixture.ts` may assert its checked `Partial<T>` as `T`.
 Its proxy throws on unexpected missing-member reads; explicitly listed optional
 members may be absent. No other test file relaxes the unsafe-assertion rule.
-Regular lint rules cover `src/`, `build/`, `tools/`, and `tests/`. Missing return annotations
-fail CI's lint step, not the typecheck itself. The narrow declaration additions in
-`src/render/three-types.d.ts` describe APIs verified against the pinned Three.js
-source; review them alongside the Three/@types upgrade checks.
+Missing return annotations fail CI's lint step, not the typecheck itself. The narrow
+declaration additions in `src/render/three-types.d.ts` describe APIs verified against
+the pinned Three.js source; review them alongside the Three/@types upgrade checks.
 `bun run build` runs typecheck and lint first via `prebuild`.
 
 ### Formatting
