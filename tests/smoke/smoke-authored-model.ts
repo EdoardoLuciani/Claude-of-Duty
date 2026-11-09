@@ -54,6 +54,11 @@ for (const duration of [-1, NaN])
     (): void => checkAuthoredDuration(collapsed('Idle'), { Idle: { duration } }, 'TEST_RIG'),
     /no authored duration for Idle/
   );
+assert.throws(
+  (): void => checkAuthoredDuration(collapsed('Fire'), { Fire: { duration: 0 } }, 'TEST_RIG'),
+  /no authored duration for Fire/,
+  'only Idle may be a 0 s pose'
+);
 
 // authoredModel normalizes every required clip before an adapter sees it.
 const scene = new THREE.Group();

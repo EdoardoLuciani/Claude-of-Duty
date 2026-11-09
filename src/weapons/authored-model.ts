@@ -26,7 +26,9 @@ export function checkAuthoredDuration(
   rigName: string
 ): void {
   const expected = hasOwn(authored, clip.name) ? authored[clip.name].duration : NaN;
-  if (!(expected >= 0)) throw new Error(`[${rigName}] no authored duration for ${clip.name}`);
+  // Only the Idle pose may be 0 s; a 0 s gesture would load as a clip that never plays.
+  if (!(expected > 0 || (expected === 0 && clip.name === 'Idle')))
+    throw new Error(`[${rigName}] no authored duration for ${clip.name}`);
   if (clip.tracks.length === 0) throw new Error(`[${rigName}] ${clip.name} has no tracks`);
   // Key times are float32: allow one float32 step of rounding (it grows with the length),
   // never less than 1e-6. The inverted comparison also rejects NaN.
