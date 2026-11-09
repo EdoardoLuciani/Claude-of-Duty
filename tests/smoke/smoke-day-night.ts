@@ -41,7 +41,7 @@ assert.equal(tickStreetlightOutage(state, 0.02, 23), 1, 'three full dark minutes
 assert.equal(tickStreetlightOutage(state, 1600, 21), 1, 'next night does not retrigger');
 
 // Clock update uses scaled dt, wraps midnight, and stops on death.
-const playerHealth = fixture<Health>({ dead: false });
+const playerHealth = new Health(createTestContext(), null);
 const player = fixture<PlayerSystem>({
   get dead(): boolean {
     return playerHealth.dead;

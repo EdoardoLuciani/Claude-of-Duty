@@ -20,6 +20,7 @@ import { GRADE_PRESETS, createGradeLut } from '../../src/render/lut.ts';
 import { buildMagazineClips, buildManifestClips } from '../../src/weapons/clips.ts';
 import { WorldSystem } from '../../src/world/index.ts';
 import { audioFixture } from '../lib/audio-banks.ts';
+import { FixtureAudioBuffer } from '../lib/audio-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
 
@@ -143,8 +144,8 @@ const { actx } = audioFixture(0);
 const bank = new WeaponSampleBank(actx);
 const kind = WEAPON_PROFILES.rifle.sample;
 bank.buffers[kind] = [
-  fixture<AudioBuffer>({ duration: 0.4 }),
-  fixture<AudioBuffer>({ duration: 0.5 }),
+  new FixtureAudioBuffer({ duration: 0.4 }),
+  new FixtureAudioBuffer({ duration: 0.5 }),
 ];
 const rng = new Rng(1);
 bank.shot(WEAPON_PROFILES.rifle, rng);
