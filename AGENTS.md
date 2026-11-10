@@ -14,6 +14,9 @@ before subsystem changes: it owns directory assignments, APIs and event contract
 - Use conventional commits: `feat(weapons): ...`, `fix(player): ...`, `chore: ...`.
 - Prefer the smallest direct implementation. No speculative frameworks, factories,
   DI or unrelated refactors. Ask before disproportionate line/complexity growth.
+- When you change a contract described in ARCHITECTURE.md or README.md, update it.
+  Describe current behavior only: no history of removed things, no numbers copied
+  from code.
 
 ## Tests
 
@@ -29,14 +32,16 @@ before subsystem changes: it owns directory assignments, APIs and event contract
 ```sh
 bun ci                 # preferred clean install
 bun run test           # Bun runs tests/smoke/ scripts in isolated parallel processes
-bun run lint           # type-aware Oxlint runs on Bun; warnings fail
-bun run build          # must pass
+bun run typecheck      # src, tools, build and tests
+bun run lint           # type-aware Oxlint; warnings fail
+bun run build:ci       # CI build (runs typecheck + lint); skips Blender assets
+bun run build          # full build; re-bakes stale Blender models (slow)
 bun run world:validate # required when world/prop assets change
 bun run world          # compile world source and cook collision
 bun run dev            # local server; not needed for CI-only work
 ```
 
-- Tests and build must pass from a clean install: no missing imports/exports or
+- Tests and `build:ci` must pass from a clean install: no missing imports/exports or
   assets available only on another branch. If a test is wrong, fix it and explain
   why in the PR.
 - Use `bun run format` and `bun run format:check` (`bun fmt`); scope and exclusions
@@ -45,7 +50,7 @@ bun run dev            # local server; not needed for CI-only work
 - No new runtime dependencies without approval. Approved: `three` and pinned
   `@recast-navigation/core` + `@recast-navigation/wasm` for offline-baked navigation.
 - Avoid hot-path allocations; keep draw calls/state changes low. Put tuning in
-  weapon/world data, not scattered literals. Weapon changes must consider both
+  `tuning.ts` modules or weapon/world data, not scattered literals. Weapon changes must consider both
   definitions and animation/handling code in `src/weapons/`.
 - Never commit secrets/API keys/`auth.json`-style files or log credential values.
 
@@ -56,12 +61,11 @@ GLBs. World source lives in `tools/worldgen/`; meshoptimizer cooks collision in
 Bun. Dev/build/tests generate missing or stale world assets; products are ignored,
 not committed. Change world source, never hand-edit `public/models/world/**`.
 
-`AGENTS.md`, `.github/workflows/*` and package manifests are protected: changes
-require human review and must be minimal and intentional. Do not modify these
-without a specific issue requirement:
-- `dist/`, `shots/`, `node_modules/` (generated/ignored).
-- `public/models/world/**` (generated only via world source).
-- `.agents/skills/` (shared Pi/OpenCode skills).
+`AGENTS.md`, `.github/workflows/*` and package manifests need human review: change
+them only when an issue requires it, minimally. Never edit generated or shared paths:
+`dist/`, `shots/`, `node_modules/`, `public/models/world/**` and `.agents/skills/`
+(shared Pi/OpenCode skills).
 
-Shared/lead-owned code is listed in ARCHITECTURE.md; coordinate before crossing
-subsystem ownership. All runtime assets/WASM stay local, with no new network dependency.
+Subsystems talk through `ctx.get(id)`; see ARCHITECTURE.md before changing
+`src/core/` or another subsystem's API. All runtime assets/WASM stay local, with no
+new network dependency.

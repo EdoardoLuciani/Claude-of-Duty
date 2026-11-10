@@ -4,10 +4,8 @@ Start here to find an editing location. Asset-specific READMEs own detailed
 commands, references and acceptance limits; this index does not replace them.
 Run commands from the repository root after `bun ci`.
 
-Dedicated weapon-model, bandage and FX presentation sweeps are retired; their
-checks remain in Git history. `bun run test` runs the remaining regressions, not
-replacement asset-acceptance coverage. Use Blender checks and in-engine review
-when changing authored assets.
+`bun run test` is not asset acceptance: use Blender checks and in-engine review when
+changing authored assets.
 
 ## Three purposeful homes
 
@@ -26,7 +24,7 @@ world uses a content-hashed manifest. Do not hand-edit runtime products to chang
 
 ## Weapons: shape, finish, animation and checks
 
-Each weapon's build entry point, checks and helpers now share one directory.
+Each weapon's build entry point, checks and helpers share one directory.
 `build.py` orchestrates authoring; `check.py` checks the saved Blender scene.
 Where present, `actions.py` authors clips and `hand-reference.ts` explicitly
 regenerates calibration. MCX authors clips in `animations.py`, with no separate
