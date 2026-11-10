@@ -48,7 +48,7 @@ export const FALL_BANK: Record<SurfaceName, FoleyKind> = {
   water: 'fall-water',
 };
 /** Per-gait mix; unknown gaits fall back to the always-present walk level. */
-type GaitMix = { walk: number; [gait: string]: number };
+type GaitMix = { walk: number; [gait: string]: number | undefined };
 const GAIT_LEVEL: GaitMix = { walk: 0.62, run: 1, sprint: 1.25, crouch: 0.42, land: 1.3 };
 const GEAR_LEVEL: GaitMix = { walk: 0.25, run: 0.7, sprint: 1, crouch: 0.08, land: 1 };
 export const FOLEY_MIX = {

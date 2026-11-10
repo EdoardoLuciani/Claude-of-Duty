@@ -103,6 +103,21 @@ test('primitive merging rejects absent or empty indexed inputs before allocating
   const merged = mergePrimitives([new THREE.SkinnedMesh(g), new THREE.SkinnedMesh(g)]);
   assert.deepEqual(Array.from(merged.getIndex()?.array ?? []), [0, 1, 2, 3, 4, 5]);
   assert.equal(merged.getAttribute('position').count, 6);
+
+  // Each primitive references a different slice of the same accessor buffer.
+  const shared = [9, 9, 9, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, 8, 8];
+  const primitive = (index: number[]): THREE.SkinnedMesh =>
+    new THREE.SkinnedMesh(
+      new THREE.BufferGeometry()
+        .setAttribute('position', new THREE.Float32BufferAttribute(shared, 3))
+        .setIndex(index)
+    );
+  const sliced = mergePrimitives([primitive([1, 2, 3]), primitive([2, 3, 4])]);
+  assert.deepEqual(Array.from(sliced.getIndex()?.array ?? []), [0, 1, 2, 3, 4, 5]);
+  assert.deepEqual(Array.from(sliced.getAttribute('position').array), [
+    ...shared.slice(3, 12),
+    ...shared.slice(6, 15),
+  ]);
 });
 
 test('ragdoll parent indices are checked before conversion to Int32', (): void => {

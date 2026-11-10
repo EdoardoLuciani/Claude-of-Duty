@@ -99,6 +99,17 @@ assert.throws(
 );
 assert.deepEqual(state(rng), before, 'missing cues reject before RNG consumption');
 assert.equal(sources.length, count, 'missing cues never create or schedule a source');
+bank.hitBuffers['step-concrete-walk'] = [new FixtureAudioBuffer()];
+bank.hitBuffers.gear = [new FixtureAudioBuffer()];
+for (const gait of ['walk', 'unknown']) {
+  const start = sources.length;
+  bank.step(rng, { gait });
+  assert.equal(sources.length - start, gait === 'walk' ? 2 : 1, 'unknown gait omits gear');
+}
+const start = sources.length;
+bank.step(rng, { gait: 'unknown', gear: 0.5 });
+assert.equal(sources.length - start, 2, 'explicit gear remains available for an unknown gait');
+
 console.log(
   'Shared natural-rate playback preserves exact takes, RNG, gain, scheduling, sends and tails'
 );

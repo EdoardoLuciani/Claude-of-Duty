@@ -9,7 +9,7 @@ import type { createArmBlood } from './arm-blood.ts';
 
 /** Equal-sized authored tiles stay separate layers: no atlas seams or UV remapping. */
 function armTextureArray(maps: THREE.Texture[], srgb: boolean): THREE.DataArrayTexture {
-  const first = maps[0].image;
+  const first = maps[0]?.image;
   if (!isImageBitmap(first) || !first.width || !first.height)
     throw new Error('Player arms: missing texture image');
   const { width, height } = first;
@@ -43,7 +43,8 @@ export function createArmSurfaceMaterial(
   sources: THREE.MeshPhysicalMaterial[],
   blood: ReturnType<typeof createArmBlood>
 ): MeshPhysicalNodeMaterial {
-  const first = sources[0];
+  const first = sources.at(0);
+  if (!first) throw new Error('Player arms: no authored surfaces');
   for (const source of sources) {
     if (
       !source.isMeshPhysicalMaterial ||
@@ -81,8 +82,10 @@ export function createArmSurfaceMaterial(
   material.metalnessMap = null;
   const surface = varying(attribute('armSurface', 'float')).setInterpolation('flat');
   const choose = <T extends 'float' | 'vec2' | 'vec3'>(values: Node<T>[]): Node<T> => {
-    let result = values[0];
-    for (let i = 1; i < values.length; i++) result = surface.equal(i).select(values[i], result);
+    let result = values.at(0);
+    if (!result) throw new Error('Player arms: no authored surface factors');
+    for (const [i, value] of values.entries())
+      if (i > 0) result = surface.equal(i).select(value, result);
     return result;
   };
   const sample = (map: THREE.Texture, channel: number): TextureNode<'vec4'> =>

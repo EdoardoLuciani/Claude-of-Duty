@@ -155,9 +155,9 @@ function array<T>(value: unknown, parse: (item: unknown) => T): T[] {
   return value.map((item: unknown): T => parse(item));
 }
 function vec3(value: unknown): ModelVec3 {
-  const v = array(value, number);
-  if (v.length !== 3) throw new Error('[models] expected three metadata coordinates');
-  return [v[0], v[1], v[2]];
+  if (!Array.isArray(value) || value.length !== 3)
+    throw new Error('[models] expected three metadata coordinates');
+  return [number(value[0]), number(value[1]), number(value[2])];
 }
 function optional<T>(value: unknown, parse: (item: unknown) => T): T | undefined {
   return value === undefined ? undefined : parse(value);

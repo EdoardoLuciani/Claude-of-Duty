@@ -362,7 +362,7 @@ export class WeaponSampleBank {
       end = Math.max(end, splash.end);
     }
     const gearLevel = o.gear ?? FOLEY_MIX.gear[gait];
-    if (gearLevel > 0) {
+    if (gearLevel !== undefined && gearLevel > 0) {
       const gear = this.hit('gear', rng, { when, level: gearLevel * FOLEY_MIX.gearLevel });
       gear.node.connect(out);
       end = Math.max(end, gear.end);

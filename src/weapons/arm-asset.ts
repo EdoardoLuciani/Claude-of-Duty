@@ -24,8 +24,9 @@ export async function loadArmAsset(): Promise<ArmAsset> {
   gltf.scene.traverse((object): void => {
     if (object instanceof THREE.SkinnedMesh) meshes.push(object as ArmSkinnedMesh);
   });
-  if (!meshes.length) throw new Error('Player arms: no deformation meshes in arms.glb');
-  const names = meshes[0].skeleton.bones.map((bone): string => bone.name);
+  const first = meshes.at(0);
+  if (!first) throw new Error('Player arms: no deformation meshes in arms.glb');
+  const names = first.skeleton.bones.map((bone): string => bone.name);
   const sources: THREE.MeshPhysicalMaterial[] = [];
   const pieces: THREE.BufferGeometry[] = [];
   for (const mesh of meshes) {
@@ -46,7 +47,8 @@ export async function loadArmAsset(): Promise<ArmAsset> {
       : [{ start: 0, count: index.count, materialIndex: 0 }];
     const range = mesh.geometry.drawRange;
     for (const group of groups) {
-      const source = materials[group.materialIndex ?? 0];
+      const source = materials[group.materialIndex ?? 0] as THREE.Material | undefined;
+      if (!source) throw new Error(`Player arms: missing group material on ${mesh.name}`);
       const start = Math.max(0, range.start, group.start);
       const end = Math.min(index.count, range.start + range.count, group.start + group.count);
       if (!source.visible || end <= start) continue;
@@ -75,7 +77,7 @@ export async function loadArmAsset(): Promise<ArmAsset> {
   if (!geometry) throw new Error('Player arms: incompatible deformation geometry');
   const merged = new THREE.SkinnedMesh(geometry, material);
   merged.name = 'Player_arm';
-  merged.skeleton = meshes[0].skeleton;
+  merged.skeleton = first.skeleton;
   const skeletons = new Set(meshes.map((mesh): THREE.Skeleton => mesh.skeleton));
   // The merged source retains just one skeleton for bone-name validation. Each
   // gameplay hand still creates its own skeleton and transformed geometry below.
@@ -136,6 +138,8 @@ export async function loadArmAsset(): Promise<ArmAsset> {
 
 /** Rebind Blender weights to the gameplay contact rig in its neutral pose. */
 export function bindArmAsset(arm: Arm, asset: Pick<ArmAsset, 'meshes'>): void {
+  const first = asset.meshes.at(0);
+  if (!first) throw new Error('Player arms: no deformation meshes to bind');
   const controls = arm.controls;
   const oldPose = arm.pose;
   arm.upperPivot.position.set(0, 0, 0.63 * arm.scale);
@@ -157,7 +161,7 @@ export function bindArmAsset(arm: Arm, asset: Pick<ArmAsset, 'meshes'>): void {
     arm.scale,
     arm.scale
   );
-  const names = asset.meshes[0].skeleton.bones.map((b): string => b.name);
+  const names = first.skeleton.bones.map((b): string => b.name);
   const bones = names.map((name: string): THREE.Bone<THREE.Object3DEventMap> => {
     const control = controls[name] as THREE.Bone | undefined;
     if (!control) throw new Error(`Player arms: unknown Blender bone ${name}`);
