@@ -9,32 +9,31 @@ import { worldSourceHash } from '../../tools/worldgen/source-hash.ts';
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const directory = mkdtempSync(join(tmpdir(), 'cod-world-source-hash-'));
 try {
-  for (const path of ['src', 'tools/worldgen', 'tools/export-world.ts', 'tools/lib/export-glb.ts'])
+  for (const path of [
+    'package.json',
+    'src',
+    'tools/worldgen',
+    'tools/lib',
+    'tools/export-world.ts',
+  ])
     cpSync(join(root, path), join(directory, path), { recursive: true });
+  // Direct, `#worldgen` alias, transitive and URL-loaded worker inputs.
+  for (const file of [
+    'src/core/config.ts',
+    'tools/lib/export-glb.ts',
+    'src/core/three-guards.ts',
+    'src/ai/tuning.ts',
+    'src/core/math.ts',
+    'src/ai/attachment-worker.ts',
+  ]) {
+    const before = worldSourceHash(directory);
+    appendFileSync(join(directory, file), '\n');
+    assert.notEqual(worldSourceHash(directory), before, `${file} invalidates the world bake`);
+  }
   const before = worldSourceHash(directory);
-  appendFileSync(join(directory, 'src/core/config.ts'), '\n');
-  assert.notEqual(
-    worldSourceHash(directory),
-    before,
-    'core config changes invalidate the world bake'
-  );
-  const afterConfig = worldSourceHash(directory);
-  appendFileSync(join(directory, 'tools/lib/export-glb.ts'), '\n');
-  assert.notEqual(
-    worldSourceHash(directory),
-    afterConfig,
-    'the shared GLB exporter invalidates the world bake'
-  );
-  const afterExporter = worldSourceHash(directory);
-  appendFileSync(join(directory, 'src/core/three-guards.ts'), '\n');
-  assert.notEqual(
-    worldSourceHash(directory),
-    afterExporter,
-    'shared mesh-guard changes invalidate collision and navigation products'
-  );
+  appendFileSync(join(directory, 'src/main.ts'), '\n');
+  assert.equal(worldSourceHash(directory), before, 'unrelated runtime code keeps the bake');
 } finally {
   rmSync(directory, { recursive: true, force: true });
 }
-console.log(
-  'world source hash: config, exporter and mesh-guard changes invalidate cached products'
-);
+console.log('world source hash: every imported world input invalidates cached products');

@@ -41,5 +41,5 @@ Use `bun run world -- --out=/tmp/world-review` for isolated output.
 Commit source only, not generated assets. `--force` rebuilds unchanged inputs and
 `--check` verifies a fresh rebuild against the local outputs. Paths/source bytes affect provenance;
 compare physical payloads separately from expected hash changes. `source-hash.ts`
-covers recursive JS/TS and the exporter. Other model families retain their own
+hashes every first-party module the exporter imports (including workers). Other model families retain their own
 pipelines. See [ARCHITECTURE.md](../../ARCHITECTURE.md) for runtime contracts.

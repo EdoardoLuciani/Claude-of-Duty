@@ -4,7 +4,6 @@
  * on CPU noise. Runtime loads public/models/proc/; dev/build generate missing or
  * stale files before serving/building the game.
  */
-import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,6 +14,7 @@ import { SoldierMaterials } from '../src/ai/textures.ts';
 import { isRecord } from '../src/core/guards.ts';
 import { Rng } from '../src/core/rng.ts';
 import { buildDecalAtlas, buildParticleAtlas } from './lib/fx-atlas.ts';
+import { hashFiles, sourceClosure } from './lib/source-hash.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'public', 'models', 'proc');
@@ -22,25 +22,8 @@ const STAMP = join(ROOT, 'node_modules', '.cache', 'claude-of-duty-proc.hash');
 const SEED = 0x5eed1234;
 const force = process.argv.includes('--force');
 
-const INPUTS = [
-  'tools/export-proc-textures.ts',
-  'src/ai/textures.ts',
-  'src/fx/atlas.ts',
-  'tools/lib/fx-atlas.ts',
-  'src/fx/noise.ts',
-  'src/core/math.ts',
-  'src/core/rng.ts',
-];
-
 function sourceHash(): string {
-  const hash = createHash('sha256');
-  for (const file of INPUTS) {
-    hash.update(file);
-    hash.update('\0');
-    hash.update(readFileSync(join(ROOT, file)));
-    hash.update('\0');
-  }
-  return hash.digest('hex').slice(0, 16);
+  return hashFiles(ROOT, sourceClosure(ROOT, ['tools/export-proc-textures.ts']));
 }
 
 function writePng(file: string, data: unknown, size: number): void {

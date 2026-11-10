@@ -1,44 +1,6 @@
-import { createHash } from 'node:crypto';
-import { readFileSync, readdirSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { hashFiles, sourceClosure } from '../lib/source-hash.ts';
 
-function filesUnder(directory: string): string[] {
-  const result = [];
-  for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) result.push(...filesUnder(path));
-    else if (entry.name.endsWith('.js') || entry.name.endsWith('.ts')) result.push(path);
-  }
-  return result;
-}
-
+/** Every first-party module the world exporter executes, including workers. */
 export function worldSourceHash(root: string): string {
-  const files = [
-    ...filesUnder(join(root, 'tools/worldgen')),
-    join(root, 'tools/export-world.ts'),
-    join(root, 'tools/lib/export-glb.ts'),
-    join(root, 'src/core/config.ts'),
-    join(root, 'src/core/rng.ts'),
-    join(root, 'src/core/geometry-validation.ts'),
-    join(root, 'src/core/three-guards.ts'),
-    join(root, 'src/world/palette.ts'),
-    join(root, 'src/ai/nav.ts'),
-    join(root, 'src/ai/attachment.ts'),
-    join(root, 'src/ai/attachment-types.ts'),
-    join(root, 'src/ai/attachment-queries.ts'),
-    join(root, 'src/ai/attachment-connection.ts'),
-    join(root, 'src/ai/attachment-worker.ts'),
-    join(root, 'src/ai/ladder.ts'),
-    join(root, 'src/ai/nav-format.ts'),
-    join(root, 'src/ai/capabilities.ts'),
-    ...filesUnder(join(root, 'src/physics')),
-  ].sort();
-  const hash = createHash('sha256');
-  for (const file of files) {
-    hash.update(relative(root, file));
-    hash.update('\0');
-    hash.update(readFileSync(file));
-    hash.update('\0');
-  }
-  return hash.digest('hex').slice(0, 16);
+  return hashFiles(root, sourceClosure(root, ['tools/export-world.ts']));
 }
