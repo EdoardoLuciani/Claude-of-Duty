@@ -3,7 +3,17 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+import {
+  BASE_ATTACHMENTS,
+  configureWeaponAttachments,
+  makeRMRModel,
+  mountAttachments,
+  releaseAttachmentMount,
+  type AttachmentConfig,
+} from '../../src/weapons/attachments.ts';
 import { authoredModel, checkAuthoredDuration } from '../../src/weapons/authored-model.ts';
+import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
+import type { WeaponEntry, WeaponModelRecord } from '../../src/weapons/runtime-types.ts';
 import { fixture } from '../lib/fixture.ts';
 
 // Real three clips; duration is inferred from the keys, as GLTFLoader does.
@@ -81,4 +91,82 @@ assert.throws(
   (): unknown => authoredModel(gltf, 'TEST_RIG', ['Idle', 'Fire', 'Inspect'], authored),
   /missing Inspect clip/
 );
-console.log('authored clip durations: Idle pose accepted, drift and lost motion rejected');
+// Repeated mount/remove borrows one asset, restores base datums/tuning and
+// leaves no orphan glass/socket. Preview uses the identical mount solver.
+{
+  const weaponScene = new THREE.Group();
+  const root = new THREE.Object3D();
+  weaponScene.add(root);
+  const socket = new THREE.Object3D();
+  socket.name = 'MOUNT_optic';
+  socket.position.set(0, 0.1036, -0.067);
+  root.add(socket);
+  const assetScene = new THREE.Group();
+  const base = new THREE.Object3D();
+  base.name = 'MOUNT_base';
+  const sight = new THREE.Object3D();
+  sight.name = 'SOCKET_sight';
+  sight.position.set(0, 0.0425072, -0.018);
+  const geometry = new THREE.BoxGeometry(0.02, 0.01, 0.001);
+  const lens = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial());
+  assetScene.add(base, sight, lens);
+  const asset = makeRMRModel(fixture<GLTF>({ scene: assetScene }));
+  let disposed = 0;
+  geometry.addEventListener('dispose', (): void => {
+    disposed++;
+  });
+  const model = fixture<Extract<WeaponModelRecord, { id: 'rifle' }>>({
+    id: 'rifle',
+    scene: weaponScene,
+    root,
+    nodes: fixture<Extract<WeaponModelRecord, { id: 'rifle' }>['nodes']>({
+      sight: [0, 0.1395, 0.034],
+      muzzle: [0, 0.075, -0.5],
+    }),
+  });
+  const entry = fixture<WeaponEntry>({
+    id: 'rifle',
+    model,
+    group: weaponScene,
+    def: { ...WEAPON_DEFS.rifle },
+    attachments: BASE_ATTACHMENTS,
+    attachmentGroup: new THREE.Group(),
+    sight: new THREE.Vector3(),
+    muzzle: new THREE.Vector3(),
+    optic: null,
+  });
+  const config: AttachmentConfig = { optic: 'rmr', muzzle: null, rail: null };
+  for (let i = 0; i < 8; i++) {
+    // Mounting while the authored root is posed must not bake its current pose.
+    root.rotation.x = i * 0.1;
+    configureWeaponAttachments(entry, config, asset);
+    assert.equal(root.children.length, 2);
+    assert(entry.sight.distanceTo(new THREE.Vector3(0, 0.1461072, -0.085)) < 1e-8);
+    assert.deepEqual(entry.optic?.center, entry.sight.toArray());
+    assert.equal(entry.def.eyeRelief, 0.125);
+    assert.equal(entry.def.adsFovScale, 0.62);
+    assert.equal(entry.def.adsSensScale, 0.62);
+    const preview = mountAttachments(model, config, asset);
+    assert.deepEqual(preview.sight.toArray(), entry.sight.toArray());
+    const previewLens = preview.group.children[0].children[2];
+    assert(previewLens instanceof THREE.Mesh);
+    assert.equal(previewLens.geometry, geometry);
+    releaseAttachmentMount(preview.group);
+    const oldMount = entry.attachmentGroup;
+    configureWeaponAttachments(entry, BASE_ATTACHMENTS, asset);
+    assert.equal(oldMount.parent, null);
+    assert.equal(oldMount.children.length, 0);
+    assert.equal(entry.attachmentGroup.children.length, 0);
+    assert.equal(entry.optic, null);
+    assert.deepEqual(entry.sight.toArray(), model.nodes.sight);
+    assert.deepEqual(entry.muzzle.toArray(), model.nodes.muzzle);
+    assert.equal(entry.def.eyeRelief, WEAPON_DEFS.rifle.eyeRelief);
+    assert.equal(entry.def.adsFovScale, undefined);
+    assert.equal(entry.def.adsSensScale, undefined);
+    assert.equal(entry.def.suppressed, false);
+    assert.equal(disposed, 0, 'instances must not dispose borrowed geometry');
+  }
+  asset.dispose();
+  assert.equal(disposed, 1, 'asset owner releases shared geometry exactly once');
+}
+console.log('authored models: clip durations and shared attachment mount lifetime OK');

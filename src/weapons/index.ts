@@ -7,6 +7,14 @@ import { DEG, lerp } from '../core/math.ts';
 import { Rng } from '../core/rng.ts';
 import { AmmoPickups } from './ammo-pickups.ts';
 import { disposeWeaponLoader } from './asset-loader.ts';
+import {
+  BASE_ATTACHMENTS,
+  configureWeaponAttachments,
+  isAttachmentConfig,
+  loadRMR,
+  type AttachmentConfig,
+  type RMRModel,
+} from './attachments.ts';
 import { ProjectileSim, dropAt } from './ballistics.ts';
 import {
   WEAPON_DEFS,
@@ -142,6 +150,7 @@ export class WeaponSystem {
   set pickups(value: AmmoPickups | null) {
     this._pickups = value;
   }
+  private _rmr: RMRModel | null = null;
   _restTask: Promise<void> | null = null;
   declare player: EngineSystems['player'] | null;
   declare fx: EngineSystems['fx'] | null;
@@ -301,9 +310,15 @@ export class WeaponSystem {
     const renderer = ctx.get('render').renderer;
     const load = (id: WeaponId): Promise<WeaponModelRecord> => loadWeapon(id, renderer);
     try {
+      this._rmr = await loadRMR(renderer);
       const records = await Promise.all(spawn.map(load));
       for (let i = 0; i < spawn.length; i++) {
-        tris += this.viewmodel.addWeapon(records[i], this._requireState(spawn[i]).def).tris;
+        tris += this.viewmodel.addWeapon(
+          records[i],
+          this._requireState(spawn[i]).def,
+          this._requireState(spawn[i]).attachments,
+          this._rmr
+        ).tris;
       }
       this._restTask = (async (): Promise<void> => {
         try {
@@ -365,6 +380,7 @@ export class WeaponSystem {
     const def = { ...WEAPON_DEFS[id] };
     return {
       def,
+      attachments: BASE_ATTACHMENTS,
       pattern: buildRecoilPattern(def, Rng),
       mag: def.magSize,
       chambered: true,
@@ -375,11 +391,28 @@ export class WeaponSystem {
   }
 
   /** Read-only market inspection; never mounts or animates the equipped model. */
-  async createInspectionModel(id: WeaponId): Promise<ReturnType<typeof createWeaponInspection>> {
+  async createInspectionModel(
+    id: WeaponId,
+    config: AttachmentConfig = this._requireState(id).attachments
+  ): Promise<ReturnType<typeof createWeaponInspection>> {
     await this._restTask;
     const entry = this.viewmodel.weapons.get(id);
     if (!entry) throw new Error(`[weapons] inspection unavailable: ${id}`);
-    return createWeaponInspection(entry);
+    return createWeaponInspection(entry, config, this._rmr);
+  }
+
+  /** Synchronous, outside the frame loop; reject changes to unowned/unloaded guns. */
+  setAttachments(id: WeaponId, config: AttachmentConfig): boolean {
+    if (!this.owned.has(id) || !isAttachmentConfig(config, id)) return false;
+    const entry = this.viewmodel.weapons.get(id);
+    if (!entry || (config.optic === 'rmr' && !this._rmr)) return false;
+    configureWeaponAttachments(entry, config, this._rmr);
+    this._requireState(id).attachments = entry.attachments;
+    if (this.activeId === id) {
+      this.viewmodel.reticle.visible = false;
+      this.viewmodel.scopeOverlay.visible = false;
+    }
+    return true;
   }
 
   _hasMesh(id: WeaponId): boolean {
@@ -405,7 +438,12 @@ export class WeaponSystem {
     for (let i = 0; i < ids.length; i++) {
       const record = records[i];
       if (!record) continue;
-      tris += this.viewmodel.addWeapon(record, this._requireState(ids[i]).def).tris;
+      tris += this.viewmodel.addWeapon(
+        record,
+        this._requireState(ids[i]).def,
+        this._requireState(ids[i]).attachments,
+        this._rmr
+      ).tris;
     }
     this.stats.tris += tris;
   }
@@ -425,9 +463,13 @@ export class WeaponSystem {
   private async _prewarmMaterials(render: EngineSystems['render']): Promise<WeaponWarmupReport> {
     const visible: Array<[THREE.Object3D, boolean]> = [];
     let pickup;
+    let attachment: THREE.Group | undefined;
     try {
       // Deferred assets must finish before the loading screen is released.
       await this._restTask;
+      // Warm the removable glass even when the starting M4 uses irons.
+      attachment = this._rmr?.scene.clone(true);
+      if (attachment) this.viewmodel.rig.add(attachment);
       const groups = [...this.viewmodel.weapons.values()].map((w): THREE.Object3D => w.group);
       groups.push(
         this.viewmodel.radio,
@@ -435,6 +477,7 @@ export class WeaponSystem {
         this.viewmodel.reticle,
         this.viewmodel.scopeOverlay
       );
+      if (attachment) groups.push(attachment);
       for (const group of groups) {
         visible.push([group, group.visible]);
         group.visible = true;
@@ -464,6 +507,8 @@ export class WeaponSystem {
     } finally {
       for (const [group, value] of visible) group.visible = value;
       pickup?.removeFromParent();
+      attachment?.removeFromParent();
+      attachment?.traverse((node): void => node.dispose());
     }
   }
 
@@ -1860,6 +1905,8 @@ export class WeaponSystem {
     this._pickups?.dispose();
     this._pickups = null;
     this._viewmodel?.dispose();
+    this._rmr?.dispose();
+    this._rmr = null;
     this.mats?.dispose();
   }
   /* oxlint-enable typescript/no-unnecessary-condition */

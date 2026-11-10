@@ -1,6 +1,7 @@
 import type * as THREE from 'three';
 
 import type { EngineContext, EngineSystems } from '../core/context.ts';
+import type { AttachmentConfig } from './attachments.ts';
 import type { loadAX338 } from './ax338.ts';
 import type { Clip, ClipSample } from './clips.ts';
 import type { WeaponDef, WeaponId, WeaponMode } from './defs.ts';
@@ -14,6 +15,7 @@ import type { loadP320 } from './p320.ts';
 
 export interface WeaponState {
   def: WeaponDef;
+  attachments: AttachmentConfig;
   pattern: Float32Array;
   mag: number;
   chambered: boolean;
@@ -78,6 +80,8 @@ export interface WeaponNodes {
 export type WeaponModelRecord = AuthoredWeaponModel;
 export interface WeaponEntry {
   id: WeaponId;
+  attachments: AttachmentConfig;
+  attachmentGroup: THREE.Group;
   def: WeaponDef;
   model: WeaponModelRecord;
   group: THREE.Object3D;

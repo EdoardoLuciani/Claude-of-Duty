@@ -39,8 +39,14 @@ export const GLTFPACK_FLAGS = [
 ];
 // Opt assets in here after validating their adapters and visual/animation fidelity.
 // Simplification is model-specific, never a blanket default for all models.
-// `output` is repo-relative: weapons are served from public/, standalone attachments are not wired yet.
+// `output` is repo-relative; runtime-mounted weapons/attachments are served from public/.
 export const MODEL_COOKS = {
+  rmr: {
+    directory: 'assets/attachments/trijicon-rmr',
+    source: 'rmr.glb',
+    output: 'public/models/attachments/rmr.runtime.glb',
+    flags: [],
+  },
   m590: {
     directory: 'assets/weapons/m590',
     source: 'm590.glb',

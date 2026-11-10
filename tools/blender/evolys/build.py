@@ -14,6 +14,7 @@ from mathutils import Matrix, Vector
 
 ROOT=Path(__file__).resolve().parents[3]
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from rmr.geometry import build_rmr
 from evolys.actions import author_actions
 from evolys.export import consolidate_static_surfaces, prepare_export_actions, validate_export
 from evolys.finish_atlas import bake_finish_atlas
@@ -268,28 +269,8 @@ def build(output, render=False, quick=False):
     cyl('Receiver logo medallion',(-.026,.110,.080),.007,.0003,mark,body,'X',32,0)
     text('FN',(-.0265,.107,.084),.004,-1)
     # Red dot only: no folded iron bases, pivots or leaves.
-    # RMR RM06/RM33: known external dimensions; lens contour remains inferred.
     optic_z=-.052;rail_top=rail_y+.002
-    # RM33 lists 0.768 inch rail-to-RMR optical axis. Its 13.21 mm overall
-    # height includes the side clamps BELOW the rail top, not a tall solid riser.
-    mount_top=rail_top+.768*.0254-.014
-    box('RM33 low mount',(0,(rail_top+mount_top)/2,optic_z),(.028,mount_top-rail_top,.04521),black,optic,.0008)
-    for side in (-1,1):
-        clamp=box('RM33 clamp',(side*.014765,mount_top-.01321/2,optic_z),(.004,.01321,.04521),black,optic,.0008)
-        for z in (optic_z-.012,optic_z+.012):
-            cut(clamp,cyl('CUT RM33 recessed screw',(side*.016,rail_top-.002,z),.0038,.010,None,None,'X',24,0))
-            cyl('RM33 screw',(side*.0153,rail_top-.002,z),.0035,.0025,bright,optic,'X',24)
-    box('RMR electronics base',(0,mount_top+.004,optic_z),(.02642,.008,.04572),black,optic,.0012)
-    # Characteristic twin-eared hood, a real clear window (not a solid rectangle).
-    outer=[(-.01397,mount_top+.003),(-.01397,mount_top+.020),(-.0108,mount_top+.0254),(-.006,mount_top+.0225),(0,mount_top+.021),( .006,mount_top+.0225),(.0108,mount_top+.0254),(.01397,mount_top+.020),(.01397,mount_top+.003)]
-    verts=[(x,y,z) for z in (optic_z-.021,optic_z-.014) for x,y in outer];n=len(outer)
-    hood=mesh('RMR forged hood',verts,[tuple(range(n-1,-1,-1)),tuple(range(n,2*n))]+[(i,(i+1)%n,(i+1)%n+n,i+n) for i in range(n)],black,optic,.0007)
-    cut(hood,box('CUT RMR clear window',(0,mount_top+.014,optic_z-.018),(.020,.012,.025),None,None,.0022))
-    box('RMR thin coated lens',(0,mount_top+.014,optic_z-.018),(.0198,.0118,.00035),glass,optic,.0014)
-    for side in (-1,1):
-        cyl('RMR brightness button',(side*.0132,mount_top+.006,optic_z+.002),.0035,.0015,rubber,optic,'X',24)
-        text('Trijicon',(side*.01327,mount_top+.006,optic_z+.014),.0026,side,optic)
-    cyl('RMR battery lid',(0,mount_top+.0085,optic_z+.011),.008,.001,steel,optic,'Y',32)
+    sight_y=build_rmr(box,cyl,mesh,cut,text,optic,rail_top,optic_z,black,bright,rubber,steel,glass)
     # Soft 100-round pouch with a rigid mounting lid and shallow seam relief.
     for parent in (pouch,spare):
         box('Pouch fabric body',(-.023,-.048,-.166),(.108,.107,.125),canvas,parent,.008)
@@ -370,7 +351,7 @@ def build(output, render=False, quick=False):
         if obj.type=='MESH':
             for loop in obj.data.uv_layers.active.data:
                 loop.uv=tuple(round(float(value)*16384)/16384 for value in loop.uv)
-    for name,pos,parent in [('SOCKET_muzzle',(0,.075,crown),rig),('SOCKET_ejection',(.031,.103,-.078),rig),('SOCKET_sight',(0,mount_top+.014,optic_z-.018),rig),('SOCKET_pouch',(-.023,-.048,-.166),rig)]:empty(name,pos,parent)
+    for name,pos,parent in [('SOCKET_muzzle',(0,.075,crown),rig),('SOCKET_ejection',(.031,.103,-.078),rig),('SOCKET_sight',(0,sight_y,optic_z-.018),rig),('SOCKET_pouch',(-.023,-.048,-.166),rig)]:empty(name,pos,parent)
     bpy.context.view_layer.update()
     clips=author_actions(ROOT,asset,rig,[rig,cover,charging,bolt,trigger,pouch,spare],belt,belt_pos)
     for o in bpy.data.objects:

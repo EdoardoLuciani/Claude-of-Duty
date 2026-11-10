@@ -16,6 +16,8 @@ import { RadioSystem } from './radio/index.ts';
 import { RenderSystem } from './render/index-webgpu.ts';
 import { SkySystem } from './sky/index.ts';
 import { UiSystem } from './ui/index.ts';
+import { isAttachmentConfig } from './weapons/attachments.ts';
+import { isWeaponId } from './weapons/defs.ts';
 import { WeaponSystem } from './weapons/index.ts';
 import { WorldSystem } from './world/index.ts';
 
@@ -117,6 +119,19 @@ try {
     showFailure(`BOOT FAILURE\n${message}`);
   }
   throw err;
+}
+
+// Debug/capture configuration is narrowed once, before native material warmup.
+if (params.has('attachmentOptic')) {
+  const id = params.get('attachmentWeapon') ?? 'rifle';
+  const optic = params.get('attachmentOptic');
+  const config = { optic: optic === 'none' ? null : optic, muzzle: null, rail: null };
+  if (
+    !isWeaponId(id) ||
+    !isAttachmentConfig(config, id) ||
+    !engine.ctx.get('weapons').setAttachments(id, config)
+  )
+    console.warn('[weapons] ignored invalid/unavailable attachment configuration');
 }
 
 // Capture tooling is not part of the normal game path. Loading it only on

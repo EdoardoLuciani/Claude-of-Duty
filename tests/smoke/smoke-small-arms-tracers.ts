@@ -13,6 +13,7 @@ import type { EngineEventMap, EngineEventName } from '../../src/core/events.ts';
 import { EventBus } from '../../src/core/registry.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
+import { BASE_ATTACHMENTS } from '../../src/weapons/attachments.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { WEAPON_DEFS, WEAPON_IDS, buildRecoilPattern } from '../../src/weapons/defs.ts';
 import type { Viewmodel } from '../../src/weapons/viewmodel.ts';
@@ -57,6 +58,7 @@ function makeRifle(seed: number): ArmedWeaponSystem {
   const def = { ...WEAPON_DEFS.rifle };
   wp.states.set('rifle', {
     def,
+    attachments: BASE_ATTACHMENTS,
     pattern: buildRecoilPattern(def, Rng),
     mag: def.magSize,
     chambered: true,

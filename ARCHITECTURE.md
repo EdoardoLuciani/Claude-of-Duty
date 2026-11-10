@@ -317,7 +317,7 @@ and runtime consumers. Weapon authoring entry points and checks live together in
 `tools/blender/<weapon>/build.py` and `check.py`; asset products and runtime
 adapters retain their separate ownership.
 
-`weapons.createInspectionModel(id)` returns an independent rest-pose scene and
+`weapons.createInspectionModel(id, config?)` returns an independent rest-pose scene and
 `dispose()` for the market's single demand-rendered WebGPU studio. Cloned transforms,
 skeletons and mixers are inspection-owned, with skeleton cleanup delegated to the
 authored animation adapter; geometry, materials and maps are borrowed from gameplay
@@ -376,6 +376,27 @@ check authored data against that schema rather than inferring its contract from
 current values. Keep internal state keyed by `WeaponId`; narrow DOM/URL/debug
 strings with `isWeaponId` at entry. Authored models carry literal adapter IDs,
 and the loader table checks complete ID coverage and per-ID adapter returns.
+`WeaponState.attachments` is an immutable `{ optic, muzzle, rail }` snapshot;
+null slots retain the authored base weapon (including existing integrated optics/
+suppressors). `src/weapons/attachments.ts` owns the finite catalog, boundary
+validation and common gameplay/inspection mount solver. This increment supports
+`optic: 'rmr'` on the M4; muzzle/rail catalogs are empty. No attachment economy yet.
+`weapons.setAttachments(id, config)` changes an owned, loaded weapon synchronously
+outside the frame loop. It stages/validates before replacing the old mount and
+resolves sight/OpticData, muzzle and effective handling/suppression on the state's
+private definition; frame-time reticle, ADS and fire-event consumers allocate nothing.
+The M4's `MOUNT_optic` is an authored rail-contact transform under its weapon rig.
+Attachment `MOUNT_base` and `SOCKET_sight` define mounting and aiming in metres;
+instances follow the authored weapon animation. RMR geometry is shared source
+with EVOLYS, with a standalone high riser to clear the M4's fixed front sight.
+The weapon system owns one loaded attachment asset and disposes it after the
+viewmodel; mounts/inspection clones own transforms only and never release shared
+geometry/materials/maps. Inspection defaults to the stored config or accepts an
+explicit config without mutating gameplay. Prewarm includes the attachment glass
+even when the initial M4 uses irons. Debug URL input is narrowed in `main.ts`:
+`?attachmentOptic=rmr` (M4 by default), `attachmentOptic=none` for base;
+`attachmentWeapon` must pass `isWeaponId` and compatibility/ownership checks.
+
 The market UI derives its item contract from `MarketSystem.getHudState()`.
 `weapons.ammo` always returns one complete snapshot, including `inMag: 0` when
 there is no active state. `mag` includes the chamber; `inMag` excludes it.
