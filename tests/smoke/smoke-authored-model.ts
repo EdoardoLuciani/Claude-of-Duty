@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+import type { RenderSystem } from '../../src/render/index-webgpu.ts';
 import {
   BASE_ATTACHMENTS,
   configureWeaponAttachments,
@@ -11,7 +12,10 @@ import {
 } from '../../src/weapons/attachments.ts';
 import { authoredModel, checkAuthoredDuration } from '../../src/weapons/authored-model.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
+import { ReticleMaterials } from '../../src/weapons/materials-tsl.ts';
 import type { WeaponEntry, WeaponModelRecord } from '../../src/weapons/runtime-types.ts';
+import { Viewmodel } from '../../src/weapons/viewmodel.ts';
+import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
 
 // Real three clips; duration is inferred from the keys, as GLTFLoader does.
@@ -110,7 +114,12 @@ assert.throws(
   assetScene.add(base, sight, lens);
   const asset = makeRMRModel(fixture<GLTF>({ scene: assetScene }));
   let disposed = 0;
+  let ownerDisposed = false;
+  asset.scene.addEventListener('dispose', (): void => {
+    ownerDisposed = true;
+  });
   geometry.addEventListener('dispose', (): void => {
+    assert(ownerDisposed, 'release retained warm object records before shared geometry');
     disposed++;
   });
   const model = fixture<Extract<WeaponModelRecord, { id: 'rifle' }>>({
@@ -161,6 +170,41 @@ assert.throws(
     assert.equal(entry.def.suppressed, false);
     assert.equal(disposed, 0, 'instances must not dispose borrowed geometry');
   }
+  const materials = new ReticleMaterials();
+  const viewmodel = new Viewmodel(
+    createTestContext({
+      providers: { render: fixture<RenderSystem>({ screenSize: { width: 1920, height: 1080 } }) },
+    }),
+    materials
+  );
+  root.rotation.set(0, 0, 0);
+  configureWeaponAttachments(entry, config, asset);
+  viewmodel.rig.position.set(0, 0, -entry.def.eyeRelief).sub(entry.sight);
+  viewmodel._updateReticle(entry, 1);
+  assert(viewmodel.reticle.visible, 'settled mounted optic shows its dot');
+  root.position.y = 0.1;
+  root.updateMatrix();
+  viewmodel._updateReticle(entry, 1);
+  assert.equal(
+    viewmodel.reticle.visible,
+    false,
+    'authored draw moving the lens away hides the dot'
+  );
+  root.rotation.x = 0.2;
+  root.updateMatrix();
+  const axis = new THREE.Vector3(0, Math.sin(0.2), -Math.cos(0.2));
+  const expectedDot = axis.multiplyScalar(entry.def.eyeRelief);
+  viewmodel.rig.position.copy(expectedDot).sub(entry.sight.clone().applyMatrix4(root.matrix));
+  viewmodel._updateReticle(entry, 1);
+  assert(viewmodel.reticle.visible, 'eye aligned with the posed optic sees the dot');
+  assert(
+    viewmodel.reticle.position.distanceTo(expectedDot) < 1e-10,
+    'dot follows the authored optical axis'
+  );
+  configureWeaponAttachments(entry, BASE_ATTACHMENTS, asset);
+  viewmodel.dispose();
+  materials.dispose();
+  assert.equal(ownerDisposed, false, 'warm source survives mounted-instance disposal');
   asset.dispose();
   assert.equal(disposed, 1, 'asset owner releases shared geometry exactly once');
 }

@@ -66,8 +66,10 @@ export function makeRMRModel(gltf: GLTF): {
     mount,
     sight,
     dispose(): void {
+      scene.removeFromParent();
       const geometries = new Set<THREE.BufferGeometry>();
       scene.traverse((node): void => {
+        node.dispose();
         if (isMesh(node)) geometries.add(node.geometry);
       });
       for (const geometry of geometries) geometry.dispose();

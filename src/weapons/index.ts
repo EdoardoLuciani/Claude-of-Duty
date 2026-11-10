@@ -467,8 +467,8 @@ export class WeaponSystem {
     try {
       // Deferred assets must finish before the loading screen is released.
       await this._restTask;
-      // Warm the removable glass even when the starting M4 uses irons.
-      attachment = this._rmr?.scene.clone(true);
+      // The owned source retains warm shader variants between mounted instances.
+      attachment = this._rmr?.scene;
       if (attachment) this.viewmodel.rig.add(attachment);
       const groups = [...this.viewmodel.weapons.values()].map((w): THREE.Object3D => w.group);
       groups.push(
@@ -508,7 +508,6 @@ export class WeaponSystem {
       for (const [group, value] of visible) group.visible = value;
       pickup?.removeFromParent();
       attachment?.removeFromParent();
-      attachment?.traverse((node): void => node.dispose());
     }
   }
 

@@ -1391,12 +1391,16 @@ export class Viewmodel {
       this.reticle.visible = false;
       return;
     }
-    // Optic axis and lens centre, both in camera space. The weapon group is a
-    // child of the rig which is a child of the anchor, so camera space is just
-    // the rig transform applied to the weapon-local values — no inverses, no
-    // allocation.
-    _v.fromArray(optic.center).applyQuaternion(this.rig.quaternion).add(this.rig.position);
-    _v3.set(0, 0, -1).applyQuaternion(this.rig.quaternion).normalize();
+    _v.fromArray(optic.center);
+    _v3.set(0, 0, -1);
+    // Mounted optics follow the animated authored root; integrated optic data
+    // retains its existing weapon-space convention.
+    if (w.attachments.optic !== null) {
+      _v.applyMatrix4(w.model.root.matrix);
+      _v3.transformDirection(w.model.root.matrix);
+    }
+    _v.applyQuaternion(this.rig.quaternion).add(this.rig.position);
+    _v3.applyQuaternion(this.rig.quaternion).normalize();
 
     // Where the axis ray from the eye crosses the lens plane.
     const s = _v.dot(_v3);
