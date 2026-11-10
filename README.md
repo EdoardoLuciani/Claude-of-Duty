@@ -26,9 +26,11 @@ and weapon hand-reference tools run on Bun too; Blender still owns geometry and 
 `bun run lint` forces type-aware Oxlint to Bun; Node.js is not a project prerequisite.
 All first-party ES modules—runtime source, tests, world-authoring code/data and
 tools—use TypeScript, explicit `.ts` imports and strict checking through
-`bun run typecheck`. Tools/build entry points and tests have separate `tools/tsconfig.json`
-and `tests/tsconfig.json` projects so Node/Bun globals do not change browser types. All
-three projects share strict compiler options and type-aware lint rules.
+`bun run typecheck`. The root `tsconfig.json` checks the browser game (`src/`); each
+folder that runs on Bun (`tools/`, `build/`, `tests/`) has an identical `tsconfig.json`
+adding Node/Bun types, so those globals never reach browser code. Editors and type-aware
+lint find a file's config by folder, so a new Bun-side folder copies one of those files.
+All projects share strict compiler options and type-aware lint rules.
 `bun run test` uses Bun's test runner with one isolated Bun test process per smoke
 script, bounded near one per physical core, plus the fixture unit tests. The 30-second
 per-script hang guard remains; simulation limits and behavioral assertions are unchanged.

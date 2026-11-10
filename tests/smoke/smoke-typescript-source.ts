@@ -38,10 +38,12 @@ function programFiles(args: string[]): string[] {
     .split(/\r?\n/)
     .map((path): string => resolve(root, path));
 }
-const checked = new Set([...programFiles([]), ...programFiles(['-p', 'tools'])]);
+const checked = new Set(
+  [[], ['-p', 'tools'], ['-p', 'build']].flatMap((args): string[] => programFiles(args))
+);
 for (const path of sources) {
   if (/\/(src|tools|build)\//.test(path) && path.endsWith('.ts')) {
-    assert(checked.has(path), `${path} must belong to the strict root or tools program`);
+    assert(checked.has(path), `${path} must belong to a strict compiler program`);
   }
 }
 console.log('TypeScript source: no unchecked modules and full compiler coverage');

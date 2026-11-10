@@ -16,7 +16,7 @@
     "world:validate": "bun tools/validate-world-assets.ts",
     "world:smoke": "bun tests/e2e/world-smoke.ts",
     "test": "bun tools/export-world.ts && bun tools/test.ts",
-    "typecheck": "bun check && bun check -p tools && bun check -p tests",
+    "typecheck": "bun check && bun check -p tools && bun check -p build && bun check -p tests",
     "format": "bun fmt src build tools tests docs README.md ARCHITECTURE.md prompt.md index.html tsconfig.json .oxlintrc.json .oxfmtrc.json package.json",
     "format:check": "bun run format --check",
     "lint": "bun --bun run oxlint --type-aware src build tools tests --deny-warnings",
