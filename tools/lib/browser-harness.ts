@@ -45,22 +45,27 @@ export const BUN = basename(NPM_EXECPATH).startsWith('bun')
 interface DevServerOptions {
   port?: number;
   root?: string;
-  attempts?: number;
+  startupTimeoutMs?: number;
   intervalMs?: number;
   stdio?: StdioOptions;
   noHmr?: boolean;
   preview?: boolean;
 }
-/** Start one HMR-free Bun dev (or preview) server unless the requested port is already owned. */
+/** Start one HMR-free Bun dev (or preview) server unless the requested port is already owned.
+ * Dev generates assets before listening, so allow minutes and show build progress.
+ * OW_STARTUP_TIMEOUT_MS overrides the default 15-minute startup deadline. */
 export async function ensureDevServer({
   port = 5173,
   root = REPO_ROOT,
-  attempts = 160,
+  startupTimeoutMs = Number(process.env.OW_STARTUP_TIMEOUT_MS ?? 15 * 60 * 1000),
   intervalMs = 250,
-  stdio = 'ignore',
+  // Keep capture/profile JSON on stdout; asset/server progress goes to stderr.
+  stdio = ['ignore', 2, 2],
   noHmr = true,
   preview = false,
 }: DevServerOptions = {}): Promise<ChildProcess | null> {
+  if (!Number.isFinite(startupTimeoutMs) || startupTimeoutMs <= 0)
+    throw new RangeError('startupTimeoutMs / OW_STARTUP_TIMEOUT_MS must be positive and finite');
   if (await portOpen(port)) return null;
 
   const server = spawn(BUN, ['build/bun.ts', preview ? 'preview' : 'dev', '--port', String(port)], {
@@ -74,22 +79,25 @@ export async function ensureDevServer({
     startupError = error;
   });
   server.once('exit', (code, signal): void => {
-    if (code !== null && code !== 0)
-      startupError = new Error(`dev server exited with code ${code}`);
-    else if (signal && signal !== 'SIGTERM')
-      startupError = new Error(`dev server exited on ${signal}`);
+    startupError = new Error(
+      signal ? `dev server exited on ${signal}` : `dev server exited with code ${code}`
+    );
   });
 
-  for (let i = 0; i < attempts; i++) {
-    if (startupError) break;
+  const deadline = performance.now() + startupTimeoutMs;
+  while (!startupError && performance.now() < deadline) {
     await new Promise<void>((resolveWait): void => {
-      setTimeout(resolveWait, intervalMs);
+      setTimeout(resolveWait, Math.min(intervalMs, Math.max(0, deadline - performance.now())));
     });
-    if (await portOpen(port)) return server;
+    if (startupError) break;
+    if (performance.now() < deadline && (await portOpen(port))) return server;
   }
 
   if (server.exitCode === null && server.signalCode === null) server.kill();
-  throw startupError ?? new Error(`dev server failed to start on port ${port}`);
+  throw (
+    startupError ??
+    new Error(`dev server failed to start on port ${port} after ${startupTimeoutMs} ms`)
+  );
 }
 
 /** Shared console/device-validation error collection; fixture assertions stay local. */
