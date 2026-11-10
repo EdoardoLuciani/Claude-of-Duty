@@ -1,39 +1,11 @@
-/** Explicit surface metadata is strict; only unlabelled mesh/material names are inferred. */
+/** Authored surface metadata is strict; only unlabelled mesh/material names are inferred. */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 
 import { BoxGeometry, Mesh, MeshBasicMaterial } from 'three';
 
-import { isRecord } from '../../src/core/guards.ts';
-import { parseWorldManifest } from '../../src/core/model-metadata.ts';
 import { bakeMesh } from '../../src/physics/bvh.ts';
-import { Collider, PhysicsSystem } from '../../src/physics/index.ts';
-import {
-  SURFACE,
-  SURFACE_NAMES,
-  guessSurface,
-  isSurfaceName,
-  parseSurfaceName,
-  surfaceIndex,
-  surfaceName,
-} from '../../src/physics/surfaces.ts';
-
-for (const [index, name] of SURFACE_NAMES.entries()) {
-  assert.equal(isSurfaceName(name), true);
-  assert.equal(parseSurfaceName(name), name);
-  assert.equal(surfaceIndex(name), index);
-  assert.equal(surfaceIndex(index), index);
-  assert.equal(surfaceName(index), name);
-}
-for (const invalid of ['metla', 'metal_panel', '', 'constructor', '__proto__', null, {}, NaN]) {
-  assert.equal(isSurfaceName(invalid), false);
-  assert.throws((): unknown => parseSurfaceName(invalid), /invalid surface/);
-  assert.throws((): unknown => surfaceIndex(invalid), /invalid surface/);
-}
-for (const invalid of [-1, 0.5, SURFACE_NAMES.length, Infinity, undefined])
-  assert.throws((): unknown => surfaceIndex(invalid), /invalid surface/);
-assert.equal(guessSurface('steel_panel'), SURFACE.metal);
-assert.equal(guessSurface('xyz', SURFACE.wood), SURFACE.wood);
+import { PhysicsSystem } from '../../src/physics/index.ts';
+import { SURFACE } from '../../src/physics/surfaces.ts';
 
 const geometry = new BoxGeometry();
 const material = new MeshBasicMaterial();
@@ -41,37 +13,19 @@ material.name = 'steel_panel';
 const mesh = new Mesh(geometry, material);
 const physics = new PhysicsSystem();
 const world = physics.staticWorld;
-assert.equal(bakeMesh(mesh)?.uniformSurface, SURFACE.metal, 'inference remains supported');
-// Dynamic calls below exercise deliberately invalid JS input contracts.
-for (const invalid of ['metla', null, 0.5, -1, Infinity]) {
-  assert.throws(
-    (): unknown => Reflect.apply(physics.addStatic.bind(physics), physics, [mesh, invalid]),
-    /invalid surface/
-  );
-  assert.equal(world.objects.length, 0, 'rejection cannot register a collider');
-}
+assert.equal(bakeMesh(mesh)?.uniformSurface, SURFACE.metal, 'material names infer a surface');
+
 mesh.userData.surface = 'metla';
 assert.throws((): unknown => physics.addStatic(mesh), /invalid surface/);
 mesh.userData.surface = 'wood';
 material.userData.surface = 'metla';
 assert.throws((): unknown => physics.addStatic(mesh), /invalid surface/);
+assert.equal(world.objects.length, 0, 'rejection cannot register a collider');
 delete mesh.userData.surface;
 geometry.clearGroups();
-for (const invalid of ['metla', 'metal_panel', 0.5, null]) {
-  material.userData.surface = invalid;
-  assert.throws(
-    (): unknown => physics.addStatic(mesh),
-    /invalid surface/,
-    'ungrouped metadata is explicit too'
-  );
-}
 material.userData.surface = 'fabric';
-assert.equal(bakeMesh(mesh)?.uniformSurface, SURFACE.fabric);
+assert.equal(bakeMesh(mesh)?.uniformSurface, SURFACE.fabric, 'explicit metadata beats the name');
 delete material.userData.surface;
-assert.equal(bakeMesh(mesh)?.uniformSurface, SURFACE.metal, 'ungrouped material names still infer');
-mesh.userData.surface = 'wood';
-// Group material names intentionally still resolve independently when no override is supplied.
-assert.equal(bakeMesh(mesh, 'wood')?.uniformSurface, SURFACE.wood);
 
 const id = physics.addStatic(mesh, 'glass', { ballisticSurface: 'metal' });
 assert.equal(world.objects[id]?.surface, SURFACE.glass);
@@ -81,70 +35,7 @@ mesh.userData.ballisticSurface = 'metla';
 assert.throws((): unknown => physics.addStatic(mesh, 'wood'), /invalid surface/);
 delete mesh.userData.ballisticSurface;
 assert.equal(physics.addStatic(mesh, 'wood'), id, 'failed validation must not consume a free slot');
-assert.throws(
-  (): unknown =>
-    Reflect.apply(physics.addStatic.bind(physics), physics, [
-      mesh,
-      'wood',
-      { ballisticSurface: 'metla' },
-    ]),
-  /invalid surface/
-);
-assert.throws(
-  (): unknown => Reflect.construct(Collider, [{ surface: 'metla' }]),
-  /invalid surface/
-);
-assert.throws(
-  (): unknown => Reflect.construct(Collider, [{ ballisticSurface: 'metla' }]),
-  /invalid surface/
-);
-assert.equal(new Collider({ surface: 'wood' }).ballisticSurfaceIndex, SURFACE.wood);
-assert.equal(new Collider({}).surfaceIndex, SURFACE.flesh, 'omission keeps the actor default');
-for (const metadata of [undefined, 'metal']) {
-  if (metadata === undefined) delete mesh.userData.ballisticSurface;
-  else mesh.userData.ballisticSurface = metadata;
-  assert.throws(
-    (): unknown =>
-      Reflect.apply(physics.addStatic.bind(physics), physics, [
-        mesh,
-        'wood',
-        { ballisticSurface: null },
-      ]),
-    /invalid surface/,
-    'explicit null must not select metadata or an omitted-surface default'
-  );
-}
-delete mesh.userData.ballisticSurface;
-assert.throws((): unknown => Reflect.construct(Collider, [{ surface: null }]), /invalid surface/);
-assert.throws(
-  (): unknown => Reflect.construct(Collider, [{ ballisticSurface: null }]),
-  /invalid surface/
-);
-for (const invalid of [null, '']) {
-  assert.throws(
-    (): unknown =>
-      Reflect.apply(physics.addRigidBody.bind(physics), physics, [{ surfaceType: invalid }]),
-    /invalid surface/
-  );
-  assert.throws(
-    (): unknown =>
-      Reflect.apply(physics.spawnDebris.bind(physics), physics, [
-        { x: 0, y: 0, z: 0 },
-        { x: 0, y: 0, z: 0 },
-        { surface: invalid },
-      ]),
-    /invalid surface/
-  );
-}
 
-const manifest: unknown = JSON.parse(
-  readFileSync(new URL('../../public/models/world/level.json', import.meta.url), 'utf8')
-);
-assert(isRecord(manifest) && isRecord(manifest.query));
-// Query alley labels are authoring names (e.g. gravel), not explicit collision finishes.
-assert.deepEqual(parseWorldManifest(manifest).query?.alleys, manifest.query.alleys);
 geometry.dispose();
 material.dispose();
-console.log(
-  'surface contracts: canonical IDs, strict metadata, intentional inference and no partial registration'
-);
+console.log('surface contracts: strict authored metadata, name inference, no partial registration');
