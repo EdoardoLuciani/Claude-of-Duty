@@ -1,8 +1,7 @@
 import { spawn, type ChildProcess, type StdioOptions } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import net from 'node:net';
-import { homedir } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { chromium, type Browser, type LaunchOptions } from 'playwright';
@@ -32,15 +31,8 @@ export function portOpen(port: number, host = '127.0.0.1'): Promise<boolean> {
   });
 }
 
-/** Bun binary: `bun run` exposes it via npm_execpath without putting it on PATH; plain
- *  `node` runs fall back to the installer's default location, then PATH. */
-const INSTALLED_BUN = join(process.env.BUN_INSTALL ?? join(homedir(), '.bun'), 'bin', 'bun');
-const NPM_EXECPATH = process.env.npm_execpath ?? '';
-export const BUN = basename(NPM_EXECPATH).startsWith('bun')
-  ? NPM_EXECPATH
-  : existsSync(INSTALLED_BUN)
-    ? INSTALLED_BUN
-    : 'bun';
+/** First-party tools and their subprocesses use the same active Bun binary. */
+export const BUN = process.execPath;
 
 interface DevServerOptions {
   port?: number;
