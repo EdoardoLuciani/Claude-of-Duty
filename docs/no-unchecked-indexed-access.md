@@ -110,12 +110,7 @@ allocated ≈1.6 MB, because it creates an iterator per call. Per-frame function
 the optimizing tiers immediately. Only loops whose index is otherwise unused should be
 converted.
 
-Tests: `tests/smoke/smoke-indexed-access-pilot.ts` covers valid inputs, plus short,
-long, non-numeric and non-array coordinates; wrapped, negative and empty spawn lists;
-the preset key set and LUT size; mapped and unmapped magazine events; and missing manifest
-clips. `smoke-search-assist.ts` adds the full finite bearing range and non-finite rejection.
-Against the original source, every valid-input assertion passes; only the new
-absence/fail-fast assertions fail.
+Tests: `smoke-search-assist.ts` covers the full finite bearing range and non-finite rejection.
 
 ## Small-subsystem pass
 
