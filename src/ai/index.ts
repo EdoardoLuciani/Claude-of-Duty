@@ -1071,16 +1071,16 @@ export class AiSystem {
 
     phys.publishBullet(shot);
     if (ctx.has('telemetry')) {
-      const hit = shot.impacts.find((i): unknown => !i.exit && i.actor) ?? shot.impacts[0];
+      const hit = shot.impacts.find((i): unknown => !i.exit && i.actor) ?? shot.impacts.at(0);
       ctx.events.emit('shot:resolved', {
         shooter: agent,
         weapon: 'ai_rifle',
         from: origin,
-        to: hit.point,
-        result: isPlayerActor(hit.actor) ? 'player' : 'impact',
-        target: hit.actor ?? null,
-        part: hit.part ?? null,
-        damage: hit.amount,
+        to: hit?.point ?? shot.end,
+        result: isPlayerActor(hit?.actor) ? 'player' : hit ? 'impact' : 'range',
+        target: hit?.actor ?? null,
+        part: hit?.part ?? null,
+        damage: hit?.amount ?? 0,
         shot: shot.shot,
         stopReason: shot.stopReason,
       });

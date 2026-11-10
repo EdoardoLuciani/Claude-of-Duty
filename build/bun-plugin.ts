@@ -1,15 +1,31 @@
 /**
  * Bundles `new URL('<file>.ts', import.meta.url)` targets (the attachment worker and the
  * energy worklet) into one hashed ES module each, for the dev server (bunfig.toml) and
- * `build/bun.ts build`. Sources stay raw ES modules that Bun smoke tests import unchanged.
+ * `build/bun.ts build`. Also injects a fixed Git revision for telemetry in both modes.
+ * Sources stay raw ES modules that Bun smoke tests import unchanged.
  * URLs resolve against the page because dev HMR sees a file:// import.meta.url.
  * Dev bundles each target once per load: restart `bun run dev` after editing one.
  */
+import { execFileSync, type ExecFileSyncOptionsWithStringEncoding } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 
 import type { BunPlugin, OnLoadResult, OnResolveResult } from 'bun';
 
 const PATTERN = /new URL\(\s*'([^']+)\.ts',\s*import\.meta\.url\s*\)/g;
+const REVISION = ((): string => {
+  const options: ExecFileSyncOptionsWithStringEncoding = {
+    cwd: resolve(import.meta.dirname, '..'),
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  };
+  try {
+    const head = execFileSync('git', ['rev-parse', 'HEAD'], options).trim();
+    const dirty = execFileSync('git', ['status', '--porcelain'], options).trim();
+    return head + (dirty ? '+dirty' : '');
+  } catch {
+    return 'unknown'; // Source archives need not include Git metadata or the Git binary.
+  }
+})();
 
 /** A subprocess, because Bun 1.4.4 deadlocks on Bun.build() inside a plugin callback. */
 async function bundle(entry: string, minify: boolean): Promise<string> {
@@ -50,8 +66,9 @@ const plugin: BunPlugin = {
       })
     );
     build.onLoad({ filter: /[\\/]src[\\/].*\.ts$/ }, async ({ path }): Promise<OnLoadResult> => {
-      const text = await Bun.file(path).text();
-      if (!text.includes('import.meta.url')) return undefined;
+      const source = await Bun.file(path).text();
+      // Bun 1.4.4's HTML dev server ignores build.config.define; share this transform instead.
+      const text = source.replaceAll('import.meta.BUILD_REVISION', JSON.stringify(REVISION));
       const imports: string[] = [];
       const contents = text.replace(PATTERN, (match: string, spec: string): string => {
         const asset = `ow-bundle:${resolve(dirname(path), spec)}.js`;
@@ -62,7 +79,9 @@ const plugin: BunPlugin = {
         return `new URL(${name}, location.href${breaks})`;
       });
       // Prepended on the first source line, again keeping line numbers.
-      return imports.length ? { contents: imports.join(' ') + contents, loader: 'ts' } : undefined;
+      return imports.length || contents !== source
+        ? { contents: imports.join(' ') + contents, loader: 'ts' }
+        : undefined;
     });
   },
 };

@@ -5,9 +5,9 @@
  * OW_SKIP_ASSETS=1 (`bun run build:ci`) skips Blender/model assets, but builds the world.
  *
  * Player arms run first, then the bandage, which re-saves player-arms.blend.
- * Every weapon loads that blend, so arm changes rebuild all weapons. Standalone
- * attachments and soldiers are independent. The Bun stages (procedural textures,
- * soldier/spent-hull staging, world generation) keep their own caches.
+ * Every weapon loads that blend, so arm changes rebuild all weapons. Then weapons,
+ * independent attachments and soldiers share one bounded pool. The Bun stages
+ * (procedural textures, soldier/spent-hull staging, world generation) keep their own caches.
  *
  * Input hashes live in .cache/assets/, outside node_modules so `bun ci` keeps them.
  * Usage: bun tools/build-assets.ts [--force]   Env: BLENDER, GLTFPACK tool paths.
@@ -242,21 +242,19 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (!process.env.OW_SKIP_ASSETS) {
     mkdirSync(CACHE, { recursive: true });
     // Weapons load the arms blend, so they wait for it and hash its inputs.
-    await pool([
-      ARMS,
-      ...Object.keys(STANDALONE_TOOLS)
-        .filter(isModelId)
-        .map((id): AssetStep => cookStep(id, [])),
-      SOLDIER_STEP,
-    ]);
+    await build(ARMS);
     if (!failed) {
       const armsHash = inputHash(ARMS);
-      await pool(
-        Object.keys(MODEL_COOKS)
+      await pool([
+        ...Object.keys(MODEL_COOKS)
           .filter(isModelId)
           .filter((id): boolean => !Object.hasOwn(STANDALONE_TOOLS, id))
-          .map((id): AssetStep => cookStep(id, [armsHash]))
-      );
+          .map((id): AssetStep => cookStep(id, [armsHash])),
+        ...Object.keys(STANDALONE_TOOLS)
+          .filter(isModelId)
+          .map((id): AssetStep => cookStep(id, [])),
+        SOLDIER_STEP,
+      ]);
     }
     if (!failed)
       stages.push(stage('export-proc-textures.ts', ...force), stage('export-models.ts', ...force));

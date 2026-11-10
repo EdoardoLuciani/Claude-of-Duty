@@ -729,7 +729,7 @@ export class TelemetrySystem {
       path: location.pathname,
       transform: xform ? Array.from(xform.elements) : null,
       provenance: collectProvenance({
-        revision: stringField(this.ctx.config, 'revision'),
+        revision: stringField(this.ctx.config, 'revision') ?? import.meta.BUILD_REVISION,
       }),
     };
   }
