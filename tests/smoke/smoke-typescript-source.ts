@@ -19,24 +19,31 @@ assert.deepEqual(
   'first-party modules must be checked TypeScript, not unchecked JS/MJS'
 );
 
-// Typecheck only proves the files it sees; every runtime/tool module must be in the program.
-const program = spawnSync(process.execPath, ['check', '--listFilesOnly', '--no-pretty'], {
-  cwd: root,
-  encoding: 'utf8',
-  timeout: 10000,
-  maxBuffer: 4 * 1024 * 1024,
-});
-assert.equal(program.error, undefined);
-assert.equal(program.status, 0, program.stdout + program.stderr);
-const checked = new Set(
-  program.stdout
+// Typecheck only proves the files it sees; every runtime/tool module must be in a program.
+function programFiles(args: string[]): string[] {
+  const program = spawnSync(
+    process.execPath,
+    ['check', ...args, '--listFilesOnly', '--no-pretty'],
+    {
+      cwd: root,
+      encoding: 'utf8',
+      timeout: 10000,
+      maxBuffer: 4 * 1024 * 1024,
+    }
+  );
+  assert.equal(program.error, undefined);
+  assert.equal(program.status, 0, program.stdout + program.stderr);
+  return program.stdout
     .trim()
     .split(/\r?\n/)
-    .map((path): string => resolve(root, path))
+    .map((path): string => resolve(root, path));
+}
+const checked = new Set(
+  [[], ['-p', 'tools'], ['-p', 'build']].flatMap((args): string[] => programFiles(args))
 );
 for (const path of sources) {
-  if (/\/(src|tools)\//.test(path) && path.endsWith('.ts')) {
-    assert(checked.has(path), `${path} must belong to the strict root compiler program`);
+  if (/\/(src|tools|build)\//.test(path) && path.endsWith('.ts')) {
+    assert(checked.has(path), `${path} must belong to a strict compiler program`);
   }
 }
 console.log('TypeScript source: no unchecked modules and full compiler coverage');

@@ -1,7 +1,7 @@
 /**
  * Bundles `new URL('<file>.ts', import.meta.url)` targets (the attachment worker and the
  * energy worklet) into one hashed ES module each, for the dev server (bunfig.toml) and
- * `build/bun.ts build`. Sources stay raw ES modules that Node smoke tests import unchanged.
+ * `build/bun.ts build`. Sources stay raw ES modules that Bun smoke tests import unchanged.
  * URLs resolve against the page because dev HMR sees a file:// import.meta.url.
  * Dev bundles each target once per load: restart `bun run dev` after editing one.
  */
@@ -14,9 +14,14 @@ const PATTERN = /new URL\(\s*'([^']+)\.ts',\s*import\.meta\.url\s*\)/g;
 /** A subprocess, because Bun 1.4.4 deadlocks on Bun.build() inside a plugin callback. */
 async function bundle(entry: string, minify: boolean): Promise<string> {
   const child = Bun.spawn(
-    [process.execPath, 'build', entry, '--target=browser', '--format=esm'].concat(
-      minify ? ['--minify'] : []
-    ),
+    [
+      process.execPath,
+      'build',
+      entry,
+      '--target=browser',
+      '--format=esm',
+      ...(minify ? ['--minify'] : []),
+    ],
     { stdout: 'pipe', stderr: 'pipe' }
   );
   const [code, stdout, stderr] = await Promise.all([
@@ -50,10 +55,11 @@ const plugin: BunPlugin = {
       const imports: string[] = [];
       const contents = text.replace(PATTERN, (match: string, spec: string): string => {
         const asset = `ow-bundle:${resolve(dirname(path), spec)}.js`;
-        imports.push(`import __bundle${imports.length} from ${JSON.stringify(asset)};`);
+        const name = `__bundle${imports.length}`;
+        imports.push(`import ${name} from ${JSON.stringify(asset)};`);
         // Keep the match's line breaks so later lines (and sourcemaps) stay aligned.
         const breaks = '\n'.repeat(match.split('\n').length - 1);
-        return `new URL(__bundle${imports.length - 1}, location.href${breaks})`;
+        return `new URL(${name}, location.href${breaks})`;
       });
       // Prepended on the first source line, again keeping line numbers.
       return imports.length ? { contents: imports.join(' ') + contents, loader: 'ts' } : undefined;

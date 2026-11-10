@@ -2,14 +2,6 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 
-// tools/ typechecks against Node types only; these are the Bun runtime APIs used.
-declare const Bun: {
-  Transpiler: new (options: { loader: 'ts' }) => {
-    scanImports(code: string): { path: string }[];
-  };
-  resolveSync(specifier: string, parent: string): string;
-};
-
 const transpiler = new Bun.Transpiler({ loader: 'ts' });
 // Workers are module entries that static import scanning cannot see.
 const URL_ENTRY = /new URL\(\s*'(\.\.?\/[^']+\.ts)',\s*import\.meta\.url\s*\)/g;

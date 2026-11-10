@@ -23,18 +23,20 @@ reinstalls are near-instant. Bun also runs the checked TypeScript asset orchestr
 world exporter/validator, procedural-texture exporter, model staging and gltfpack cook.
 Browser capture/profile entry points and the complete test suite also run on Bun. The checked soldier authoring/cook pipeline
 and weapon hand-reference tools run on Bun too; Blender still owns geometry and clips.
-`bun run lint` forces both Oxlint passes to Bun; Node.js is not a project prerequisite.
+`bun run lint` forces type-aware Oxlint to Bun; Node.js is not a project prerequisite.
 All first-party ES modules—runtime source, tests, world-authoring code/data and
 tools—use TypeScript, explicit `.ts` imports and strict checking through
-`bun run typecheck`. Build entry points and tests have separate `build/tsconfig.json`
-and `tests/tsconfig.json` projects so Bun globals do not change browser types. All
-three projects share strict compiler options and type-aware lint rules.
+`bun run typecheck`. The root `tsconfig.json` checks the browser game (`src/`); each
+folder that runs on Bun (`tools/`, `build/`, `tests/`) has an identical `tsconfig.json`
+adding Node/Bun types, so those globals never reach browser code. Editors and type-aware
+lint find a file's config by folder, so a new Bun-side folder copies one of those files.
+All projects share strict compiler options and type-aware lint rules.
 `bun run test` uses Bun's test runner with one isolated Bun test process per smoke
 script, bounded near one per physical core, plus the fixture unit tests. The 30-second
 per-script hang guard remains; simulation limits and behavioral assertions are unchanged.
 Run one script with `bun test ./tests/smoke/smoke-health-events.ts`. Test mocks and worker
 transport may use Bun's Node-compatible APIs; no test process requires the Node binary.
-Both lint passes cover all first-party source, tests, build entry points and tools.
+The lint pass covers all first-party source, tests, build entry points and tools.
 Package import aliases resolve directly to checked source implementations; there are
 no unchecked JavaScript authoring modules or parallel test-only declaration contracts.
 (`noUncheckedIndexedAccess` status: [triage and plan](docs/no-unchecked-indexed-access.md)).

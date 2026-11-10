@@ -5,9 +5,8 @@ import { execFileSync } from 'node:child_process';
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, extname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT = resolve(import.meta.dirname, '..');
 export const GLTFPACK_VERSION = 'gltfpack 1.3';
 // Preserve named mechanics and authored timing. Float positions/UVs avoid
 // dequantization wrapper nodes and texture-transform clones in the runtime.
@@ -106,12 +105,8 @@ export function isModelId(value: string): value is ModelId {
   return Object.hasOwn(MODEL_COOKS, value);
 }
 
-export function cookModel(
-  { input, output, flags = [] }: { input: string; output: string; flags?: string[] },
-  encoder = process.env.GLTFPACK ?? 'gltfpack'
-): void {
-  input = resolve(input);
-  output = resolve(output);
+function cookModel(input: string, output: string, flags: string[]): void {
+  const encoder = process.env.GLTFPACK ?? 'gltfpack';
   assert.notEqual(input, output, 'never overwrite the native authoring export');
   assert.equal(extname(output), '.glb', 'runtime output must be a self-contained GLB');
   const version = execFileSync(encoder, ['-v'], { encoding: 'utf8' }).trim();
@@ -134,7 +129,7 @@ export function cookModel(
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (import.meta.main) {
   const [id, directory] = process.argv.slice(2);
   assert(process.argv.length <= 4, 'usage: bun run models:cook -- [model-id [asset-directory]]');
   const ids = id ? [id] : Object.keys(MODEL_COOKS);
@@ -143,12 +138,12 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       isModelId(name),
       `unknown model ${name}; available: ${Object.keys(MODEL_COOKS).join(', ')}`
     );
-    const model = MODEL_COOKS[name],
-      dir = resolve(directory ?? join(ROOT, model.directory));
-    cookModel({
-      input: join(dir, model.source),
-      output: directory ? join(dir, basename(model.output)) : join(ROOT, model.output),
-      flags: model.flags,
-    });
+    const model = MODEL_COOKS[name];
+    const dir = resolve(directory ?? join(ROOT, model.directory));
+    cookModel(
+      join(dir, model.source),
+      directory ? join(dir, basename(model.output)) : join(ROOT, model.output),
+      model.flags
+    );
   }
 }
