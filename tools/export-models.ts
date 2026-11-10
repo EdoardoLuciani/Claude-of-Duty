@@ -9,7 +9,7 @@
  * Runtime retains canonical RIG joints, FLOAT attributes and nine surface groups.
  */
 
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { writeFileSync, mkdirSync, renameSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +23,7 @@ import {
   soldierProductPaths,
 } from './blender/soldiers/export.ts';
 import { exportGlb } from './lib/export-glb.ts';
+import { hashFiles, sourceClosure } from './lib/source-hash.ts';
 import { buildSpentHull } from './lib/spent-hull.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -148,25 +149,13 @@ function stageSoldier({
 }
 
 function modelSourceHash(): string {
-  const files = [
-    'tools/export-models.ts',
-    'tools/lib/export-glb.ts',
-    'tools/lib/spent-hull.ts',
-    'src/weapons/geometry.ts',
-    'src/weapons/defs.ts',
-    'src/weapons/mathx.ts',
-    ...soldierInputPaths().map((file): string => relative(ROOT, file)),
-    ...soldierProductPaths().map((file): string => relative(ROOT, file)),
-    'src/core/rng.ts',
-  ].sort();
-  const hash = createHash('sha256');
-  for (const file of files) {
-    hash.update(file);
-    hash.update('\0');
-    hash.update(readFileSync(join(ROOT, file)));
-    hash.update('\0');
-  }
-  return hash.digest('hex').slice(0, 16);
+  const files = new Set([
+    ...sourceClosure(ROOT, ['tools/export-models.ts']),
+    ...[...soldierInputPaths(), ...soldierProductPaths()].map((file): string =>
+      relative(ROOT, file)
+    ),
+  ]);
+  return hashFiles(ROOT, [...files]);
 }
 
 function assertInputsStable(expected: string): void {
