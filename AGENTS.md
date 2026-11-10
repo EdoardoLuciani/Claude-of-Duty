@@ -15,6 +15,15 @@ before subsystem changes: it owns directory assignments, APIs and event contract
 - Prefer the smallest direct implementation. No speculative frameworks, factories,
   DI or unrelated refactors. Ask before disproportionate line/complexity growth.
 
+## Tests
+
+- Add tests sparingly: only for a fixed bug or an invariant that could silently
+  break. Extend an existing script before adding a new one.
+- Never test types, impossible inputs, source text or one-off migrations, and
+  never add test-only exports to `src/`.
+- Test lines count as growth: a test diff larger than its source diff needs a
+  reason in the PR.
+
 ## Commands and invariants
 
 ```sh
