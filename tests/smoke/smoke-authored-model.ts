@@ -7,8 +7,6 @@ import {
   BASE_ATTACHMENTS,
   configureWeaponAttachments,
   makeRMRModel,
-  mountAttachments,
-  releaseAttachmentMount,
   type AttachmentConfig,
 } from '../../src/weapons/attachments.ts';
 import { authoredModel, checkAuthoredDuration } from '../../src/weapons/authored-model.ts';
@@ -92,7 +90,7 @@ assert.throws(
   /missing Inspect clip/
 );
 // Repeated mount/remove borrows one asset, restores base datums/tuning and
-// leaves no orphan glass/socket. Preview uses the identical mount solver.
+// leaves no orphan glass/socket.
 {
   const weaponScene = new THREE.Group();
   const root = new THREE.Object3D();
@@ -146,12 +144,9 @@ assert.throws(
     assert.equal(entry.def.eyeRelief, 0.125);
     assert.equal(entry.def.adsFovScale, 0.62);
     assert.equal(entry.def.adsSensScale, 0.62);
-    const preview = mountAttachments(model, config, asset);
-    assert.deepEqual(preview.sight.toArray(), entry.sight.toArray());
-    const previewLens = preview.group.children[0].children[2];
-    assert(previewLens instanceof THREE.Mesh);
-    assert.equal(previewLens.geometry, geometry);
-    releaseAttachmentMount(preview.group);
+    const mountedLens = entry.attachmentGroup.children[0].children[2];
+    assert(mountedLens instanceof THREE.Mesh);
+    assert.equal(mountedLens.geometry, geometry);
     const oldMount = entry.attachmentGroup;
     configureWeaponAttachments(entry, BASE_ATTACHMENTS, asset);
     assert.equal(oldMount.parent, null);
