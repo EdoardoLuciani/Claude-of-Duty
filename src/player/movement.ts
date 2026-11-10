@@ -6,10 +6,11 @@
 import * as THREE from 'three';
 
 import type { EngineContext, EngineSystems } from '../core/context.ts';
+import { clamp, clamp01, lerp } from '../core/math.ts';
 import type { CharacterController } from '../physics/character.ts';
 import type { SurfaceName } from '../physics/surfaces.ts';
 import { LedgeProbe, MantleMotion, LEDGE_NONE, LEDGE_VAULT } from './mantle.ts';
-import { clamp, clamp01, approach, lerp } from './springs.ts';
+import { approach } from './springs.ts';
 import { STANCE, MOVE, GRAVITY, JUMP_SPEED, FOOTSTEP } from './tuning.ts';
 import type { PlayerStance } from './tuning.ts';
 

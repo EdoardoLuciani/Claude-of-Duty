@@ -77,6 +77,7 @@ export class StartGate {
     // before all reset listeners and the actual control handoff have completed.
     this.suspend();
     this.engine.events.emit('game:restart', { source: 'game-over' });
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- restart listeners may end the run or fail
     if (this.ended || this.engine.error) return;
     // A reset prepares a run, but does not authorize entering it. Keep the
     // same explicit Start handoff as initial boot, even with a retained lock.
@@ -95,7 +96,7 @@ export class StartGate {
     }
     try {
       const request = this.engine.canvas.requestPointerLock();
-      request?.catch((): void => {
+      request.catch((): void => {
         if (generation === this.generation) this.lockDenied();
       });
     } catch {

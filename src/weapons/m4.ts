@@ -18,31 +18,12 @@ import { buildManifestClips, type Clip } from './clips.ts';
 import { configureM4Finishes } from './m4-finishes.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
-export const M4_URL = new URL(
-  '../../assets/weapons/m4a1-block-ii/m4a1-block-ii.runtime.glb',
-  import.meta.url
-).href;
+export const M4_URL = '/models/weapons/m4a1-block-ii.runtime.glb';
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES)];
 
 export function makeM4Model(gltf: GLTF): M4Model {
   const scene = gltf.scene;
-  const { root, animations, point } = authoredModel(gltf, 'M4_RIG', REQUIRED, scene);
-  // Only gltfpack's observed wholly constant, single-key Idle loses its end.
-  // Never repair a moving clip or conceal a damaged authored endpoint.
-  for (const clip of animations) {
-    const authored = Object.entries(manifest.clips).find(([name]): boolean => name === clip.name);
-    if (!authored) throw new Error(`[M4_RIG] unknown ${clip.name} clip`);
-    const duration = authored[1].duration;
-    if (
-      clip.name === 'Idle' &&
-      clip.duration === 0 &&
-      clip.tracks.length > 0 &&
-      clip.tracks.every((track): boolean => track.times.length === 1 && track.times[0] === 0)
-    )
-      clip.duration = duration;
-    else if (Math.abs(clip.duration - duration) > 1e-6)
-      throw new Error(`[M4_RIG] invalid ${clip.name} duration ${clip.duration}`);
-  }
+  const { root, animations, point } = authoredModel(gltf, 'M4_RIG', REQUIRED, manifest.clips);
   const model = {
     id: 'rifle' as const,
     label: 'M4A1',

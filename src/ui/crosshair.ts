@@ -1,4 +1,5 @@
-import { clamp, clamp01, damp, ease } from './util.ts';
+import { clamp, clamp01, damp } from '../core/math.ts';
+import { ease } from './util.ts';
 
 /** Four-blade reticle in HUD pixels at k=1: gap = base + move*MOVE + fire kick + flinch.
  * Spring kick overshoots on recovery. ADS hides it over 70 ms; weapons own optic reticles.

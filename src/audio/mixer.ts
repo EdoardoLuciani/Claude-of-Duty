@@ -4,8 +4,9 @@
  */
 
 import { hasOwn } from '../core/guards.ts';
+import { clamp } from '../core/math.ts';
 import type { Rng } from '../core/rng.ts';
-import { biquad, gain, clamp, osc } from './dsp.ts';
+import { biquad, gain, osc } from './dsp.ts';
 import { IR_SPECS, generateIR, type SpaceName } from './ir.ts';
 export type BusName = keyof typeof BUS_DEFS;
 interface MixerBus {
@@ -23,9 +24,11 @@ interface ReverbSpace {
   gain: GainNode;
   live: boolean;
 }
+type TinnitusNode = AudioNode & { stop?: (when?: number) => void };
 interface TinnitusVoice {
   g: GainNode;
-  nodes: (AudioNode & { stop?: (when?: number) => void })[];
+  /** The first node is the source whose `ended` event owns cleanup. */
+  nodes: [TinnitusNode, ...TinnitusNode[]];
   until: number;
 }
 interface PendingConcussion {
@@ -91,9 +94,7 @@ export class Mixer {
   static prepare(actx: BaseAudioContext): Promise<void> {
     let ready = preparedContexts.get(actx);
     if (!ready) {
-      ready = import('./energy-worklet.ts?worker&url').then(({ default: url }): Promise<void> =>
-        actx.audioWorklet.addModule(url)
-      );
+      ready = actx.audioWorklet.addModule(new URL('./energy-worklet.ts', import.meta.url).href);
       preparedContexts.set(actx, ready);
     }
     return ready;
@@ -241,8 +242,8 @@ export class Mixer {
         console.warn('[audio] IR generation failed for', name, err);
         continue;
       }
-      const g = gain(actx, this.spaceWeights[name] ?? 0);
-      const live = (this.spaceWeights[name] ?? 0) > 0.012;
+      const g = gain(actx, this.spaceWeights[name]);
+      const live = this.spaceWeights[name] > 0.012;
       if (live) this.sendLP.connect(conv);
       conv.connect(g);
       g.connect(this.reverbReturn);
@@ -301,7 +302,6 @@ export class Mixer {
     const t = this.actx.currentTime;
     const apply = (name: BusName, scale: number): void => {
       const b = this.buses[name];
-      if (!b) return;
       const a = clamp(amount * scale, 0, 0.92);
       if (a <= b.duckAmount + 0.01) return; // an existing deeper duck wins
       b.duckAmount = a;
@@ -495,7 +495,6 @@ export class Mixer {
   setBusVolume(name: BusName, v: number): void {
     if (!hasOwn(this.buses, name)) return;
     const b = this.buses[name];
-    if (!b) return;
     b.volume = clamp(v, 0, 2);
     this._setBusLevel(b, 0.05);
   }
@@ -523,7 +522,6 @@ export class Mixer {
       this._tin = null;
     }
     for (const space of Object.values(this.spaces)) {
-      if (!space) continue;
       space.conv.disconnect();
       space.conv.buffer = null;
       space.gain.disconnect();

@@ -11,7 +11,7 @@ TypeScript builder; visual differences are intentional, not a pixel-perfect port
 - **Breacher:** bare helmet, parked goggles, hard half-mask and full carrier.
 
 `src/ai/rig.ts` and `soldier.ts` remain the rig, variant and surface authorities.
-`reference.mjs` serializes that calibration explicitly. Geometry generation reads
+`reference.ts` serializes that calibration explicitly. Geometry generation reads
 no old GLB, blend or cached mesh. Editable blends are review products, not fallback
 inputs; put lasting edits into the recipe. Runtime IK, animation, textures,
 materials, hitboxes and AI logic retain their existing owners.
@@ -20,18 +20,18 @@ materials, hitboxes and AI logic retain their existing owners.
 
 ```sh
 # First author into an empty absolute scratch directory:
-node tools/blender/soldiers/export.mjs --output /tmp/soldier-review
+bun tools/blender/soldiers/export.ts --output /tmp/soldier-review
 # Optional --seed 0x5eed1234 --blender /absolute/path/to/blender
 # After structural, in-engine material and pose review, regenerate canonical files:
-node tools/blender/soldiers/export.mjs --output "$(pwd)/assets/soldiers"
-npm run models
-npm test
-npm run build
+bun tools/blender/soldiers/export.ts --output "$(pwd)/assets/soldiers"
+bun run models
+bun run test
+bun run build
 ```
 
 The explicit author command stages the complete family before publishing
-`<name>.blend`, `<name>.glb`, `<name>.json` and the final `manifest.json`. Node's
-existing GLTFExporter encodes newly generated mesh data, preserving canonical
+`<name>.blend`, `<name>.glb`, `<name>.json` and the final `manifest.json`.
+Three.js GLTFExporter encodes newly generated mesh data, preserving canonical
 joint order, FLOAT colors and four weights without Blender exporter hooks or GLB
 repair. The five weapon sockets derive from the authored rifle frame.
 
@@ -39,11 +39,10 @@ The manifest binds declared source content, Three revision and product hashes.
 Source text and JSON hashes normalize LF/CRLF; binary hashes remain exact.
 Changing a declared recipe/calibration input requires regeneration. Missing,
 stale or corrupt products fail visibly rather than silently rebuilding/falling
-back. Normal `npm ci`, build and play **do not require Blender**: the locked model
-exporter stages committed GLB/JSON to ignored public URLs. It does not read blends.
+back. Products are ignored, not committed: `bun run dev` / `bun run build`
+regenerate them when inputs change, then stage GLB/JSON to ignored public URLs.
 
 Same-host repeated generation is checked; blend bytes need not match and there
 is no cross-platform bitwise or old-pixel guarantee. Rig/skin/surface/socket
 contracts, runtime material acceptance and real animation/ladder clearance checks
-remain required. Commit the recipe and reviewed generated products together;
-never hand-edit the manifest or runtime files.
+remain required. Commit the recipe; never hand-edit the manifest or runtime files.

@@ -1,0 +1,3 @@
+# Bun's HTML dev server (`bun run dev`) reads its bundler plugins only from here.
+[serve.static]
+plugins = ["./build/bun-plugin.ts"]

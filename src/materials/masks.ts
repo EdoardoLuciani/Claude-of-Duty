@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 
+import { validateTriangleGeometry } from '../core/geometry-validation.ts';
 import type { Rng } from '../core/rng.ts';
 
 /** Curvature masks: convex wear, concave grime/AO. Writes color RGB as
@@ -58,14 +59,14 @@ export function bakeMasks(
     rng = null,
   } = opts;
 
+  if (!geometry.hasAttribute('position')) return geometry;
   const pos = geometry.getAttribute('position');
-  if (!pos) return geometry;
-  let nrm = geometry.getAttribute('normal');
-  if (!nrm) {
-    geometry.computeVertexNormals();
-    nrm = geometry.getAttribute('normal');
-  }
+  validateTriangleGeometry(geometry, '[materials] bakeMasks');
+  if (!geometry.hasAttribute('normal')) geometry.computeVertexNormals();
+  const nrm = geometry.getAttribute('normal');
   const count = pos.count;
+  if (!Number.isInteger(nrm.itemSize) || nrm.itemSize < 3 || nrm.count !== count)
+    throw new Error('[materials] normal must contain one xyz normal per position vertex');
   const index = geometry.getIndex();
   const idx = index ? index.array : null;
   const triCount = idx ? idx.length / 3 : count / 3;

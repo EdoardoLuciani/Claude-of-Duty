@@ -229,7 +229,3 @@ export function grenadeMesh(): THREE.Group {
   g.add(prep(new THREE.Mesh(ringGeo, ringMat)));
   return g;
 }
-
-export function grenadeMaterials(): MeshStandardNodeMaterial[] {
-  return [bodyMat, spoonMat, steelMat, ringMat, bandMat];
-}

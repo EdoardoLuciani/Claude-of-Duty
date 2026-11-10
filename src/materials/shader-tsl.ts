@@ -476,7 +476,7 @@ export function createSurfaceNodeMaterial(
 
     const vertical = smoothstep(0.34, 0.72, abs(worldN.y)).oneMinus();
     const sAxis = worldP.z.mul(worldN.x).sub(worldP.x.mul(worldN.z));
-    if (p.patch?.[0] > 0) {
+    if (p.patch[0] > 0) {
       const cell = vec2(sAxis, worldP.y)
         .div(Math.max(p.patch[1], 0.4))
         .add(mac2.rg.sub(0.5).mul(0.35));
@@ -625,7 +625,7 @@ export function createSurfaceNodeMaterial(
       metalness = metalness.mul(float(1).sub(grime.mul(0.8))).toVar();
       occlusion = occlusion.mul(float(1).sub(v.b.mul(p.wear[2]))).toVar();
     }
-    if (p.cloth?.[1] < 1) {
+    if (p.cloth[1] < 1) {
       const underside = smoothstep(-0.7, 0.1, worldN.y).oneMinus();
       color = color.mul(mix(1, p.cloth[1], underside)).toVar();
       roughness = clamp(roughness.add(underside.mul(0.05)), 0, 1).toVar();
@@ -662,7 +662,7 @@ export function createSurfaceNodeMaterial(
   mat.roughnessNode = channels.rough.mul(materialRoughness);
   mat.metalnessNode = channels.metal.mul(materialMetalness);
   mat.aoNode = channels.ao;
-  if (p.cloth?.[0] > 0 && shared.keyDir && shared.keyColor) {
+  if (p.cloth[0] > 0 && shared.keyDir && shared.keyColor) {
     // Authored backlight approximation, not physical transmission: this emissive
     // term uses orientation/cavity AO, but does not sample direct-light shadows.
     // Keep opaque sleeves separate; shared sun/moon uniforms follow the sky.

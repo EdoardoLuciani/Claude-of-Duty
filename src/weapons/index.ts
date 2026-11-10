@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { bindingLabel } from '../core/bindings.ts';
 import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 import type { ReloadPhase } from '../core/events.ts';
+import { DEG, lerp } from '../core/math.ts';
 import { Rng } from '../core/rng.ts';
 import { AmmoPickups } from './ammo-pickups.ts';
 import { disposeWeaponLoader } from './asset-loader.ts';
@@ -27,7 +28,6 @@ import { grenadeMesh } from './grenade-mesh.ts';
 import { createWeaponInspection } from './inspection.ts';
 import { loadWeapon } from './loaders.ts';
 import { ReticleMaterials } from './materials-tsl.ts';
-import { lerp, DEG } from './mathx.ts';
 import { MCX_EJECT_DELAY } from './mcx.ts';
 import { MPX_EJECT_DELAY } from './mpx.ts';
 import { P320_EJECT_DELAY } from './p320.ts';
@@ -38,16 +38,20 @@ import type { ViewModel } from './viewmodel.ts';
 const GRENADES_PER_LIFE = 2;
 const GRENADES_MAX = 6; // bought at the market, +1 per pack
 const SLOT_IDS = [...PRIMARY_IDS, ...SECONDARY_IDS];
+/** Catch-up bound for held AUTO/BURST fire within one frame. The engine clamps
+ *  dt to 0.1 s, which needs at most two 1100 rpm rounds; due rounds beyond the
+ *  bound are dropped rather than banked into later frames. */
+export const MAX_SHOTS_PER_FRAME = 3;
 /** s — must exceed the flight time of any LONG throw so it lands before it
  *  goes off. A 30 m/s heave aimed straight up stays airborne ~3.2 s under
  *  the world's -20.6 gravity, so anything shorter airbursts mid-arc.
- *  Shared with the AI throw (ai/index.js). */
+ *  Shared with the AI throw (ai/index.ts). */
 export const GRENADE_FUSE = 3.5;
 /** Carpet-bomb strikes: one per life, up to 3 with market purchases. */
 const CARPET_STRIKES_PER_LIFE = 1;
 const CARPET_STRIKES_MAX = 3;
 // M67-style blast: ~4 m kill radius, wounds out to 10 m. Shared with the AI
-// grenades (ai/index.js imports these) so player and enemy blasts match.
+// grenades (ai/index.ts imports these) so player and enemy blasts match.
 export const GRENADE_RADIUS = 10; // m
 export const GRENADE_DAMAGE = 250;
 const GRENADE_SPEED = 15; // m/s — SHORT throw keeps roughly today's reach
@@ -113,7 +117,7 @@ interface LiveGrenade {
 export class WeaponSystem {
   declare ctx: EngineContext;
   declare rng: Rng;
-  declare mats: ReticleMaterials;
+  mats: ReticleMaterials = new ReticleMaterials();
   private _viewmodel: ViewModel | null = null;
   private _sim: ProjectileSim | null = null;
   private _pickups: AmmoPickups | null = null;
@@ -138,7 +142,7 @@ export class WeaponSystem {
   set pickups(value: AmmoPickups | null) {
     this._pickups = value;
   }
-  declare _restTask: Promise<void>;
+  _restTask: Promise<void> | null = null;
   declare player: EngineSystems['player'] | null;
   declare fx: EngineSystems['fx'] | null;
   declare physics: EngineSystems['physics'] | null;
@@ -146,10 +150,9 @@ export class WeaponSystem {
   declare ui: EngineSystems['ui'] | null;
   declare _off: Array<() => void>;
   declare stats: WeaponStats;
-  declare _magPools: Map<WeaponId, DroppedMagazine[]>;
+  _magPools: Map<WeaponId, DroppedMagazine[]> = new Map();
   declare _tubeLoop: boolean;
-  declare _fireSeed: number;
-  declare _debugFrame: number;
+  _debugFrame: number = 0;
   declare _scriptFrames: number[] | null;
   declare radioSys: EngineSystems['radio'] | null;
 
@@ -218,7 +221,10 @@ export class WeaponSystem {
     caseRadius: 0.00495,
     spin: 0,
   };
+  /** Rounds fired since the last lateUpdate; `_shotSeeds[i]` is round i's seed.
+   *  The seed slots are reused, so a firing frame allocates nothing. */
   _pendingShots: number = 0;
+  _shotSeeds: number[] = [];
   // Deferred shell ejections (a case leaves the port a few ms after the shot).
   _shellQueue: Array<{ t: number; weapon: WeaponId | null }> = [];
   _droppedMags: DroppedMagazine[] = [];
@@ -281,7 +287,6 @@ export class WeaponSystem {
   async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
     this.rng = ctx.rng.fork();
-    this.mats = new ReticleMaterials();
     this._sim = new ProjectileSim(ctx);
     this._viewmodel = new Viewmodel(ctx, this.mats);
     await this.viewmodel.loadArms();
@@ -323,13 +328,13 @@ export class WeaponSystem {
     this.ui = ctx.peek('ui');
     this._off = [];
     const armBlood = this.viewmodel.armAsset.blood;
-    armBlood.setHealthFraction(this.player?.health?.fraction ?? 1);
+    armBlood.setHealthFraction(this.player?.health.fraction ?? 1);
     // Health snapshots already account for armour absorption and actual healing.
     this._off.push(
       ctx.events.on('player:health', (e): void => armBlood.setHealthFraction(e.fraction))
     );
     this._off.push(
-      ctx.events.on('player:land', (e): void => this.viewmodel.land(Math.abs(e.velocity ?? 3)))
+      ctx.events.on('player:land', (e): void => this.viewmodel.land(Math.abs(e.velocity)))
     );
     this._off.push(ctx.events.on('player:jump', (): void => this.viewmodel.jump()));
     this._off.push(ctx.events.on('player:death', (): void => this._onPlayerDeath()));
@@ -338,7 +343,7 @@ export class WeaponSystem {
         this._resetHandEquipment();
         this.carpetBombs = CARPET_STRIKES_PER_LIFE;
         this.grenades = GRENADES_PER_LIFE;
-        this.ui?.clearPrompt?.();
+        this.ui?.clearPrompt();
         this._setDeathDisabled(false);
       })
     );
@@ -430,16 +435,15 @@ export class WeaponSystem {
         this.viewmodel.reticle,
         this.viewmodel.scopeOverlay
       );
-      for (const group of groups)
-        if (group) {
-          visible.push([group, group.visible]);
-          group.visible = true;
-          render.patchMaterials(group);
-        }
+      for (const group of groups) {
+        visible.push([group, group.visible]);
+        group.visible = true;
+        render.patchMaterials(group);
+      }
       // Discarded magazines need world depth/lighting/shadow variants, not the
       // view shader. Pool creation consumes no body, item ID or gameplay RNG.
       for (const weapon of this.viewmodel.weapons.values()) {
-        if (weapon.parts.magazine && !this._magPools?.has(weapon.id)) this._magProxy(weapon);
+        if (weapon.parts.magazine && !this._magPools.has(weapon.id)) this._magProxy(weapon);
       }
       for (const { group } of this._droppedMags) {
         visible.push([group, group.visible]);
@@ -585,13 +589,8 @@ export class WeaponSystem {
     return this._sinceShot < 0.12;
   }
 
-  /** Current spread cone half-angle in degrees — the crosshair should use this. */
-  get spreadDegrees(): number {
-    return this._spread;
-  }
-
   muzzleWorld(out: THREE.Vector3): THREE.Vector3 {
-    return this.viewmodel.muzzleWorld(out ?? this._tmp);
+    return this.viewmodel.muzzleWorld(out);
   }
 
   /**
@@ -605,7 +604,7 @@ export class WeaponSystem {
     if (!s) return h;
     const a = this.ammo;
     const vm = this._viewmodel;
-    h.name = s.def.label ?? s.def.id;
+    h.name = s.def.label;
     h.mode = s.mode;
     // `a.mag` counts the chambered round, so a topped-off rifle is 31. The HUD
     // draws one pip per round against magSize, so clamp the *display* to the
@@ -647,7 +646,7 @@ export class WeaponSystem {
 
   /** Reset the complete loadout and transient combat state for a fresh run. */
   resetForNewGame(): void {
-    this._viewmodel?.armAsset?.blood.setHealthFraction(1);
+    this._viewmodel?.armAsset.blood.setHealthFraction(1);
     for (const s of this.states.values()) {
       s.mag = s.def.magSize;
       s.chambered = true;
@@ -671,7 +670,7 @@ export class WeaponSystem {
     this._resetHandEquipment();
     this.grenades = GRENADES_PER_LIFE;
     this.carpetBombs = CARPET_STRIKES_PER_LIFE;
-    this.ui?.clearPrompt?.();
+    this.ui?.clearPrompt();
     this._clearGrenades();
     for (const p of this._droppedMags) {
       p.group.visible = false;
@@ -681,13 +680,14 @@ export class WeaponSystem {
     }
     this.owned = new Set(['rifle', 'pistol']);
     this.activeId = 'rifle';
-    this.player?.clearFireVibe?.();
-    if (this.viewmodel) {
-      this.viewmodel.anchor.visible = true;
-      this.viewmodel.stopClip();
-      this.viewmodel.setActive(this.activeId);
-      this.viewmodel.adsT = 0;
-      this.viewmodel.play('draw');
+    this.player?.clearFireVibe();
+    const vm = this._viewmodel;
+    if (vm) {
+      vm.anchor.visible = true;
+      vm.stopClip();
+      vm.setActive(this.activeId);
+      vm.adsT = 0;
+      vm.play('draw');
     }
   }
 
@@ -710,7 +710,7 @@ export class WeaponSystem {
     this._tubeLoop = false;
     // A burst queued on the outgoing gun must not resume when it comes back.
     this._burstLeft = 0;
-    this.player?.clearFireVibe?.();
+    this.player?.clearFireVibe();
     this.viewmodel.play('holster');
     return true;
   }
@@ -785,24 +785,24 @@ export class WeaponSystem {
   beginHeal(): boolean {
     if (!this.canBeginHeal()) return false;
     this.healing = true;
-    this._viewmodel?.stopClip?.();
-    this._viewmodel?.holdBandage?.();
+    this._viewmodel?.stopClip();
+    this._viewmodel?.holdBandage();
     return true;
   }
 
   setHealProgress(p: number): void {
-    this._viewmodel?.setBandageProgress?.(p);
+    this._viewmodel?.setBandageProgress(p);
   }
 
   endHeal(): void {
     if (!this.healing) return;
     this.healing = false;
-    this._viewmodel?.endBandage?.();
+    this._viewmodel?.endBandage();
   }
 
   _interruptHeal(reason: string): void {
     if (!this.healing) return;
-    this.player?.cancelHeal?.(reason);
+    this.player?.cancelHeal(reason);
   }
 
   canFire(): boolean {
@@ -825,7 +825,7 @@ export class WeaponSystem {
     if (this.grenadeEquipped || this.radioEquipped || this.healing) return false;
     if (!s.chambered) {
       // Physical empty-trigger feedback; do not emit a shot/muzzle flash or alert AI.
-      this.audio?.play?.('dryfire', null, { dryWeapon: s.def.id });
+      this.audio?.play('dryfire', null, { dryWeapon: s.def.id });
       this._fireTimer = 0.25;
       return false;
     }
@@ -850,7 +850,7 @@ export class WeaponSystem {
 
     // ---- aim: zeroed bore + a spread cone ----
     const cam = this.ctx.camera;
-    this.viewmodel.syncToCamera?.(); // gameplay pose; overlay is applied after lateUpdate
+    this.viewmodel.syncToCamera(); // gameplay pose; overlay is applied after lateUpdate
     cam.updateMatrixWorld();
     this._camDir.set(0, 0, -1).applyQuaternion(cam.quaternion).normalize();
     this._right.set(1, 0, 0).applyQuaternion(cam.quaternion);
@@ -922,12 +922,11 @@ export class WeaponSystem {
       );
     }
     const vibe = def.fireVibe;
-    p?.addFireVibe?.(vibe?.amp ?? 1, vibe?.duration, vibe?.adsScale);
+    p?.addFireVibe(vibe.amp, vibe.duration, vibe.adsScale);
     this._spread = Math.min(def.spreadMax, this._spread + def.spreadPerShot);
     this._sinceShot = 0;
     this.stats.fired++;
-    this._pendingShots++;
-    this._fireSeed = seed;
+    this._shotSeeds[this._pendingShots++] = seed;
 
     if (boltAction) {
       this._fireTimer = def.boltTime ?? 1.1;
@@ -1030,7 +1029,7 @@ export class WeaponSystem {
         this.cooking = false;
         this._cookAction = null;
         this._cookTime = 0;
-        this.ui?.clearPrompt?.();
+        this.ui?.clearPrompt();
         break;
       case 'end':
         if (isReload) {
@@ -1155,7 +1154,6 @@ export class WeaponSystem {
   _magProxy(w: NonNullable<ViewModel['active']>): DroppedMagazine | null {
     const magazine = w.parts.magazine;
     if (!magazine) return null;
-    if (!this._magPools) this._magPools = new Map();
     let pool = this._magPools.get(w.id);
     if (!pool) {
       pool = [];
@@ -1231,7 +1229,7 @@ export class WeaponSystem {
         // Arming interrupts a reload in progress, like a weapon switch does.
         if (this.reloading) this._viewmodel?.stopClip();
         this._viewmodel?.holdGrenade();
-        this.ui?.setPrompt?.({
+        this.ui?.setPrompt({
           key: bindingLabel('fire'),
           text: 'LONG THROW',
           sub: `${bindingLabel('ads')} SHORT THROW · ${bindingLabel('grenade')} STOWS`,
@@ -1256,7 +1254,7 @@ export class WeaponSystem {
       this._cookTime = 0;
       this.grenadeEquipped = false;
       this._viewmodel?.endGrenade();
-      this.ui?.clearPrompt?.();
+      this.ui?.clearPrompt();
       this.ctx.events.emit('explosion', {
         kind: 'grenade',
         position: this._boomPos.copy(this._throwOrigin()),
@@ -1304,7 +1302,7 @@ export class WeaponSystem {
     this.healing = false;
     this._viewmodel?.endGrenade();
     this._viewmodel?.endRadio();
-    this._viewmodel?.endBandage?.();
+    this._viewmodel?.endBandage();
   }
 
   /** Stow the equipped grenade back into the pouch, unspent and unthrown. */
@@ -1312,7 +1310,7 @@ export class WeaponSystem {
     if (!this.grenadeEquipped) return;
     this.grenadeEquipped = false;
     this._viewmodel?.endGrenade();
-    this.ui?.clearPrompt?.();
+    this.ui?.clearPrompt();
   }
 
   /** Eye position pushed a little along the view; the grenade leaves from here. */
@@ -1334,7 +1332,7 @@ export class WeaponSystem {
   ): void {
     const mesh = grenadeMesh();
     this.ctx.scene.add(mesh);
-    const body = this.physics?.addRigidBody?.({
+    const body = this.physics?.addRigidBody({
       shape: 'sphere',
       radius: 0.05,
       mass: 0.42,
@@ -1371,8 +1369,8 @@ export class WeaponSystem {
       },
       fuse
     );
-    player?.addTrauma?.(long ? 0.11 : 0.05);
-    this.audio?.playUi?.('grenade_throw', long ? 0.8 : 0.6);
+    player?.addTrauma(long ? 0.11 : 0.05);
+    this.audio?.playUi('grenade_throw', long ? 0.8 : 0.6);
   }
 
   /** Dying with a live grenade in hand drops it, still cooking, at your feet. */
@@ -1457,7 +1455,7 @@ export class WeaponSystem {
       if (this.reloading) this._viewmodel?.stopClip();
       this._viewmodel?.holdRadio();
       this._viewmodel?.setRadioScreen(this.carpetBombs);
-      this.audio?.playUi?.('radio_open', 0.9);
+      this.audio?.playUi('radio_open', 0.9);
       return;
     }
     if (!this.radioEquipped) return;
@@ -1474,8 +1472,8 @@ export class WeaponSystem {
   _selectRequest(n: number): void {
     if (n === 1) {
       if (this.carpetBombs <= 0) {
-        this.audio?.playUi?.('radio_denied', 0.9);
-        this.ui?.setPrompt?.({
+        this.audio?.playUi('radio_denied', 0.9);
+        this.ui?.setPrompt({
           key: bindingLabel('slot1'),
           text: 'NO CHARGES',
           sub: 'BUY CARPET BOMB STRIKES AT THE MARKET',
@@ -1484,17 +1482,17 @@ export class WeaponSystem {
       }
       this.carpetBombs--;
       this.radioSys ??= this.ctx.peek('radio');
-      if (!this.radioSys?.callStrike?.()) {
+      if (!this.radioSys?.callStrike()) {
         this.carpetBombs++;
-        this.audio?.playUi?.('radio_denied', 0.9);
+        this.audio?.playUi('radio_denied', 0.9);
         return;
       }
       this._stowRadio();
       // The accepted radio:strike event owns the UI/audio acknowledgment once.
       return;
     }
-    this.audio?.playUi?.('radio_denied', 0.9);
-    this.ui?.setPrompt?.({
+    this.audio?.playUi('radio_denied', 0.9);
+    this.ui?.setPrompt({
       key: bindingLabel(n === 2 ? 'slot2' : 'slot3'),
       text: 'TOP-SECRET',
       sub: 'REQUEST LOCKED BY HIGHER AUTHORITY',
@@ -1505,7 +1503,7 @@ export class WeaponSystem {
     if (!this.radioEquipped) return;
     this.radioEquipped = false;
     this._viewmodel?.endRadio();
-    this.ui?.clearPrompt?.();
+    this.ui?.clearPrompt();
   }
 
   update(dt: number, ctx: EngineContext): void {
@@ -1533,7 +1531,7 @@ export class WeaponSystem {
       player?.dead !== true &&
       player?.controlEnabled !== false &&
       !input.frozen &&
-      input.enabled !== false &&
+      input.enabled &&
       this.debugMode === null;
     // The selector latch lives only while the pull is continuously live: a
     // frozen/disabled input gate drops the physical release, so a non-live
@@ -1578,24 +1576,27 @@ export class WeaponSystem {
       }
       if (input.actionPressed('cycleWeapon')) this.nextWeapon();
       if (input.wheel) this.nextWeapon();
-      this._runTrigger(dt, input.fire, input.firePressed, def, s);
+      this._runTrigger(input.fire, input.firePressed, def, s);
       st.trigger = input.fire && this.canFire();
       // Auto-reload on a dry trigger pull, like every modern shooter.
       if (input.firePressed && st.empty) this.reload();
     } else if (this.debugMode && !this.disabled && player?.dead !== true) {
-      this._runDebug(ctx);
+      this._runDebug();
       st.trigger = this._sinceShot < 0.09;
     } else {
       st.trigger = false;
     }
+    // A cooldown that ran out this frame may credit its overshoot only to a
+    // round fired in this same frame; idle or gated time never banks shots.
+    if (this._fireTimer < 0) this._fireTimer = 0;
 
     // Push the ADS curve to the player so camera FOV / move speed follow it.
-    player?.setAdsProgress?.(this.disabled ? 0 : this.viewmodel.adsT);
+    player?.setAdsProgress(this.disabled ? 0 : this.viewmodel.adsT);
     if (player) {
-      const cfg = this.ctx.config ?? {};
-      const worldFov = cfg.adsFovScale ?? 0.62;
+      const cfg = this.ctx.config;
+      const worldFov = cfg.adsFovScale;
       player.adsFovScale = def.adsFovScale ?? worldFov;
-      player.adsSensScale = def.adsSensScale ?? cfg.adsSensScale ?? 0.62;
+      player.adsSensScale = def.adsSensScale ?? cfg.adsSensScale;
     }
     this._updateGrenade(dt, input, live);
     this._updateRadio(input, live);
@@ -1605,14 +1606,12 @@ export class WeaponSystem {
     this.stats.fired = this.sim.stats.fired;
   }
 
-  /** Fire-mode state machine. */
-  _runTrigger(
-    dt: number,
-    held: boolean,
-    pressed: boolean,
-    def: WeaponState['def'],
-    s: WeaponState
-  ): void {
+  /**
+   * Fire-mode state machine. Held AUTO and queued BURST rounds add their
+   * interval to the timer instead of resetting it, so the remainder of a frame
+   * counts toward the next round and cadence does not depend on frame rate.
+   */
+  _runTrigger(held: boolean, pressed: boolean, def: WeaponState['def'], s: WeaponState): void {
     // A new mode needs a fresh press. Either release or press clears the latch,
     // so a release missed while paused/frozen cannot strand the next press,
     // even when another gate refuses that press's shot.
@@ -1620,16 +1619,25 @@ export class WeaponSystem {
     if (this._triggerLatched) return;
     switch (s.mode) {
       case 'auto':
-        if (held) this.tryFire();
+        for (let n = 0; held && n < MAX_SHOTS_PER_FRAME && this._fireTimer <= 0; n++) {
+          const carry = this._fireTimer;
+          if (!this.tryFire()) break;
+          this._fireTimer += carry;
+        }
         break;
       case 'burst':
         if (pressed && this._burstLeft === 0 && this._burstCooldown <= 0) {
           this._burstLeft = requiredTuning(def.burstCount, 'burstCount');
         }
-        if (this._burstLeft > 0 && this._fireTimer <= 0) {
+        for (
+          let n = 0;
+          this._burstLeft > 0 && n < MAX_SHOTS_PER_FRAME && this._fireTimer <= 0;
+          n++
+        ) {
+          const carry = this._fireTimer;
           if (this.tryFire()) {
             this._burstLeft--;
-            this._fireTimer = 60 / requiredTuning(def.burstRpm, 'burstRpm');
+            this._fireTimer = 60 / requiredTuning(def.burstRpm, 'burstRpm') + carry;
             if (this._burstLeft === 0)
               this._burstCooldown = requiredTuning(def.burstDelay, 'burstDelay');
           } else {
@@ -1672,8 +1680,8 @@ export class WeaponSystem {
       vm.muzzleWorld(this._firePayload.origin);
       vm.boreDir(this._firePayload.dir);
       if (def) this._firePayload.weapon = def;
-      this._firePayload.seed = this._fireSeed >>> 0;
       for (let i = 0; i < this._pendingShots; i++) {
+        this._firePayload.seed = this._shotSeeds[i];
         ctx.events.emit('weapon:fire', this._firePayload);
       }
       this._pendingShots = 0;
@@ -1703,7 +1711,7 @@ export class WeaponSystem {
       ctx.events.emit('weapon:shell', this._shellPayload);
     }
 
-    this.player?.applyFireVibe?.(vm.anchor);
+    this.player?.applyFireVibe(vm.anchor);
 
     // ---- retire dropped magazines --------------------------------------
     if (this._droppedMags.length) {
@@ -1770,7 +1778,7 @@ export class WeaponSystem {
     // A two-frame tail overlaps flash lifetimes across the uncertain grab window:
     // --settle controls grabFrame, but harness rAF and screenshot RPC can drift.
     if (kind === 'fire') {
-      const grab = Math.round(opts?.grabFrame ?? 90);
+      const grab = Math.round(opts.grabFrame ?? 90);
       const frames = [grab - 26, grab - 19, grab - 12];
       for (let f = grab - 6; f <= grab + 18; f += 2) frames.push(f);
       this._scriptFrames = frames.filter((f): boolean => f >= 2);
@@ -1799,7 +1807,7 @@ export class WeaponSystem {
       this._throwReleased = true; // the grenade is out — a late release is a no-op
       this.grenadeEquipped = false;
       this._viewmodel?.endGrenade();
-      this.ui?.clearPrompt?.();
+      this.ui?.clearPrompt();
     } else if (this.grenadeEquipped && !this.cooking) {
       this._stowGrenade();
     } else if (this.radioEquipped) {
@@ -1813,7 +1821,7 @@ export class WeaponSystem {
     // shootable the moment the shop closes.
     this.viewmodel.stopClip();
     this.viewmodel.setActive(id);
-    this.player?.clearFireVibe?.();
+    this.player?.clearFireVibe();
     this._shotIndex = 0;
     this._spread = 0;
     this._fireTimer = 0;
@@ -1822,9 +1830,8 @@ export class WeaponSystem {
     return true;
   }
 
-  _runDebug(ctx: EngineContext): void {
-    void ctx;
-    this._debugFrame = (this._debugFrame ?? 0) + 1;
+  _runDebug(): void {
+    this._debugFrame = this._debugFrame + 1;
     const frames = this._scriptFrames;
     if (!frames) return;
     for (const f of frames) {
@@ -1835,6 +1842,8 @@ export class WeaponSystem {
     }
   }
 
+  // Engine teardown disposes every system, even one whose init never ran or failed.
+  /* oxlint-disable typescript/no-unnecessary-condition */
   async dispose(): Promise<void> {
     const renderer = this.ctx?.peek('render')?.renderer;
     if (renderer) await disposeWeaponLoader(renderer);
@@ -1853,6 +1862,7 @@ export class WeaponSystem {
     this._viewmodel?.dispose();
     this.mats?.dispose();
   }
+  /* oxlint-enable typescript/no-unnecessary-condition */
 }
 
 function requiredTuning(value: number | undefined, name: string): number {

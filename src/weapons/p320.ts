@@ -18,16 +18,13 @@ import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
 import { buildMagazineClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
-export const P320_URL = new URL(
-  '../../assets/weapons/p320-compact/p320-compact.runtime.glb',
-  import.meta.url
-).href;
+export const P320_URL = '/models/weapons/p320-compact.runtime.glb';
 export const P320_EJECT_DELAY = 2 / 60;
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES)];
 
 export function makeP320Model(gltf: GLTF): P320Model {
   const scene = gltf.scene;
-  const { root, animations, point } = authoredModel(gltf, 'P320_RIG', REQUIRED, scene);
+  const { root, animations, point } = authoredModel(gltf, 'P320_RIG', REQUIRED, manifest.clips);
   const model = {
     id: 'pistol' as const,
     label: 'P320 Compact',

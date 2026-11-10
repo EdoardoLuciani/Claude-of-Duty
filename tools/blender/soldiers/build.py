@@ -1,7 +1,7 @@
 """Parametric native soldier authoring. Native editable components -> actor-space mesh payload.
 
-Blender owns geometry; reference.mjs owns rig/registry/material tile calibration.
-The JSON is temporary Node GLTFExporter input, NOT a Blender glTF export.
+Blender owns geometry; reference.ts owns rig/registry/material tile calibration.
+The JSON is temporary Three.js GLTFExporter input, NOT a Blender glTF export.
 """
 import argparse
 import json
@@ -548,7 +548,7 @@ def build(reference, output, variant, seed):
     bpy.context.view_layer.update()
     mesh = packed_mesh(r)
     count = len(mesh['position'])//3
-    # JSON integers retain exact U16 joints and U16/U32 indices; Node chooses the typed accessor.
+    # JSON integers retain exact U16 joints and U16/U32 indices; the cook chooses the typed accessor.
     assert len(reference['rig']['names']) <= 65535
     assert all(0 <= i < count for i in mesh['index'])
     assert len(mesh['index'])//3 <= 25700, len(mesh['index'])//3

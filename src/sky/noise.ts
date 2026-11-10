@@ -118,5 +118,3 @@ export const fbm3 = (octaves: number): FnNode<[Vector3 | Node<'vec3'>], Node<'fl
     }
     return s.div(max(n, 1e-4));
   });
-
-export { rot2 };

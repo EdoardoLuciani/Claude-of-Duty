@@ -152,12 +152,12 @@ interface LiveLadder {
 
 export class Agent {
   declare route: NavRoute;
-  declare ladder: LiveLadder | null;
+  ladder: LiveLadder | null = null;
   private readonly _ladderHit = makeHitRecord();
   private readonly _ladderPath = [new THREE.Vector3(), new THREE.Vector3()] as const;
   declare ai: AiSystem;
   declare ctx: EngineContext;
-  declare id: number;
+  id: number = _nextId++;
   declare pathPending: boolean;
   declare hasMoveTarget: boolean;
   declare _searchUntil: number;
@@ -173,7 +173,7 @@ export class Agent {
   declare pathGoalSurface: number;
   declare vaultVersion: number;
   declare ragdoll: ReturnType<PhysicsSystem['createRagdoll']> | null;
-  declare deadTime: number;
+  declare deadTime: number | undefined;
   declare rng: Rng;
   declare variantName: string;
   declare def: AiVariant;
@@ -181,7 +181,7 @@ export class Agent {
   declare bones: ReturnType<typeof RIG.createSkeleton>['bones'];
   declare skeleton: THREE.Skeleton;
   declare mesh: THREE.SkinnedMesh;
-  declare group: THREE.Group;
+  group: THREE.Group = new THREE.Group();
   declare mass: number;
   declare position: THREE.Vector3;
   declare yaw: number;
@@ -191,140 +191,151 @@ export class Agent {
   declare height: number;
   declare radius: number;
   declare controller: ReturnType<PhysicsSystem['createCharacter']> | null;
-  declare velocity: THREE.Vector3;
-  declare grounded: boolean;
-  declare colliders: ReturnType<PhysicsSystem['addCollider']>[];
-  declare health: number;
-  declare maxHealth: number;
-  declare alive: boolean;
-  declare state: AiState;
-  declare stateTime: number;
+  velocity: THREE.Vector3 = new THREE.Vector3();
+  grounded: boolean = true;
+  colliders: ReturnType<PhysicsSystem['addCollider']>[] = [];
+  health: number = 100;
+  maxHealth: number = 100;
+  alive: boolean = true;
+  state: AiState = STATE.IDLE;
+  stateTime: number = 0;
   declare squad: Squad | null;
   declare team: number;
   declare silentDeath: boolean;
   declare eyeHeight: number;
-  declare viewRange: number;
-  declare viewCos: number;
-  declare awareness: number;
-  declare hasTarget: boolean;
-  declare targetVisible: boolean;
-  declare targetSample: number;
-  declare target: THREE.Vector3 | null;
-  declare lastKnown: THREE.Vector3;
-  declare lastKnownAge: number;
-  declare lastKnownKind: string | null;
-  declare visualAge: number;
-  declare lastSeen: number;
-  declare lastFired: number;
+  viewRange: number = COMBAT.viewRange;
+  viewCos: number = Math.cos((COMBAT.viewConeDeg * Math.PI) / 180 / 2);
+  awareness: number = 0; // 0..1 build-up before the target is acknowledged
+  hasTarget: boolean = false;
+  targetVisible: boolean = false;
+  targetSample: number = -1; // 0 chest, 1 head, 2 upper body; diagnostic only
+  target: THREE.Vector3 | null = null;
+  lastKnown: THREE.Vector3 = new THREE.Vector3();
+  lastKnownAge: number = Infinity;
+  lastKnownKind: string | null = null;
+  visualAge: number = Infinity; // independent of hearing, reports and HUD sightings
+  lastSeen: number = -Infinity;
+  lastFired: number = -Infinity;
   declare lastSeenX: number;
   declare lastSeenZ: number;
   declare fireX: number;
   declare fireZ: number;
-  declare searchPoint: THREE.Vector3;
-  declare _searchCand: THREE.Vector3[];
-  declare _searchOrigin: THREE.Vector3;
-  declare _searchReached: boolean;
-  declare searchOutcome: string | null;
-  declare suppression: number;
-  declare _suppressedShots: Float64Array;
-  declare _suppressedCursor: number;
-  declare alertness: number;
-  declare _impactCooldown: number;
-  declare _positionScores: Float64Array;
-  declare _laneBlockedTime: number;
-  declare _repositioning: boolean;
-  declare _repositionUntil: number;
-  declare _positionRetry: number;
-  declare weaponRange: number;
+  searchPoint: THREE.Vector3 = new THREE.Vector3();
+  _searchCand: THREE.Vector3[] = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+  _searchOrigin: THREE.Vector3 = new THREE.Vector3();
+  _searchReached: boolean = false;
+  searchOutcome: string | null = null;
+  suppression: number = 0;
+  // Cover the 96 live projectile slots plus instantaneous AI rounds.
+  _suppressedShots: Float64Array = new Float64Array(128);
+  _suppressedCursor: number = 0;
+  alertness: number = 0;
+  _impactCooldown: number = 0;
+  _positionScores: Float64Array = new Float64Array(SEARCH_CANDIDATES);
+  _laneBlockedTime: number = 0;
+  _repositioning: boolean = false;
+  _repositionUntil: number = 0;
+  _positionRetry: number = 0;
+  weaponRange: number = COMBAT.viewRange;
   declare fireRate: number;
-  declare burstLeft: number;
-  declare fireCooldown: number;
+  burstLeft: number = 0;
+  fireCooldown: number = 0;
   declare burstCooldown: number;
-  declare magSize: number;
+  magSize: number = COMBAT.magSize;
   declare ammo: number;
-  declare spread: number;
-  declare weaponDamage: number;
-  declare aimTarget: THREE.Vector3;
-  declare aimWeight: number;
-  declare wantFire: boolean;
-  declare peeking: boolean;
+  spread: number = COMBAT.spread;
+  weaponDamage: number = COMBAT.damage;
+  aimTarget: THREE.Vector3 = new THREE.Vector3();
+  aimWeight: number = 0;
+  wantFire: boolean = false;
+  peeking: boolean = false;
   declare peekTimer: number;
   declare grenadeCooldown: number;
-  declare hasGrenade: boolean;
-  declare role: string;
-  declare wrapWait: number;
-  declare _wrapDone: boolean;
-  declare _friendlyBlock: number;
-  declare _muzzleBlocked: boolean;
-  declare fireBlock: string | null;
-  declare _relocWait: number;
-  declare _peekWait: number;
-  declare _coverHold: number;
-  declare _coverCheck: number;
-  declare _engaging: boolean;
-  declare _engageHold: number;
-  declare _engageCooldown: number;
-  declare combatAction: string | null;
-  declare coverFailure: string | null;
-  declare _combatClock: number;
-  declare _failedCoverIndex: number;
-  declare _failedCovers: {
+  hasGrenade: boolean = true;
+  role: string = 'pin';
+  wrapWait: number = 0;
+  _wrapDone: boolean = false;
+  _friendlyBlock: number = 0;
+  _muzzleBlocked: boolean = false;
+  fireBlock: string | null = null;
+  _relocWait: number = 0;
+  _peekWait: number = 0;
+  _coverHold: number = 0;
+  _coverCheck: number = 0;
+  _engaging: boolean = false;
+  _engageHold: number = 0;
+  _engageCooldown: number = 0;
+  combatAction: string | null = null;
+  coverFailure: string | null = null;
+  _combatClock: number = 0;
+  _failedCoverIndex: number = 0;
+  _failedCovers: {
     x: number;
     y: number;
     z: number;
     until: number;
     threat: THREE.Vector3;
-  }[];
-  declare _peekTravel: number;
-  declare _elevatedRouteChecked: boolean;
-  declare _peekSettle: number;
-  declare path: THREE.Vector3[];
-  declare pathLen: number;
-  declare pathIndex: number;
-  declare repathTimer: number;
+  }[] = Array.from(
+    { length: 6 },
+    (): { x: number; y: number; z: number; until: number; threat: THREE.Vector3 } => ({
+      x: 0,
+      y: 0,
+      z: 0,
+      until: 0,
+      threat: new THREE.Vector3(),
+    })
+  );
+  _peekTravel: number = 0;
+  _elevatedRouteChecked: boolean = false;
+  _peekSettle: number = 0;
+  path: THREE.Vector3[] = [];
+  pathLen: number = 0;
+  pathIndex: number = 0;
+  repathTimer: number = 0;
   declare moveTarget: THREE.Vector3;
-  declare desiredSpeed: number;
-  declare speed: number;
-  declare crouch: boolean;
-  declare cover: BakedCoverPoint | null;
-  declare coverPos: THREE.Vector3;
-  declare _coverPathMax: number;
-  declare firePos: THREE.Vector3;
-  declare _returning: boolean;
-  declare _peekFail: number;
+  desiredSpeed: number = 0;
+  speed: number = 0;
+  crouch: boolean = false;
+  cover: BakedCoverPoint | null = null;
+  coverPos: THREE.Vector3 = new THREE.Vector3();
+  _coverPathMax: number = Infinity;
+  firePos: THREE.Vector3 = new THREE.Vector3();
+  _returning: boolean = false;
+  _peekFail: number = 0;
   declare patrolPoints: THREE.Vector3[] | null;
-  declare patrolIndex: number;
-  declare stuckTimer: number;
-  declare stuckHits: number;
-  declare noProgressTime: number;
+  patrolIndex: number = 0;
+  stuckTimer: number = 0;
+  stuckHits: number = 0;
+  noProgressTime: number = 0;
   declare _progressPos: THREE.Vector3;
-  declare vaultCooldown: number;
-  declare vaultT: number;
-  declare vaultFrom: THREE.Vector3;
-  declare vaultTo: THREE.Vector3;
-  declare vaultOutcome: string | null;
-  declare recoveryOutcome: string | null;
-  declare recoveryAttempts: number;
-  declare _recovering: boolean;
-  declare _recoveryTime: number;
-  declare _recoveryWait: number;
-  declare _noRouteTime: number;
-  declare _recoveryCount: number;
+  vaultCooldown: number = 0;
+  vaultT: number = -1;
+  vaultFrom: THREE.Vector3 = new THREE.Vector3();
+  vaultTo: THREE.Vector3 = new THREE.Vector3();
+  vaultOutcome: string | null = null;
+  recoveryOutcome: string | null = null;
+  recoveryAttempts: number = 0;
+  _recovering: boolean = false;
+  _recoveryTime: number = 0;
+  _recoveryWait: number = 0;
+  _noRouteTime: number = 0;
+  _recoveryCount: number = 0;
   declare _recoveryOrigin: THREE.Vector3;
   declare _safePosition: THREE.Vector3;
-  declare _safeNav: SurfaceNav | null;
-  declare _safeSurface: number;
-  declare _safeVersion: number;
-  declare relocations: number;
-  declare lastRollback: { t: number; from: THREE.Vector3Tuple; to: THREE.Vector3Tuple } | null;
-  declare _pendingDest: THREE.Vector3;
-  declare pathOutcome: string | null;
-  declare pathObjective: string | null;
-  declare pathReqFloor: number;
-  declare pathResFloor: number;
-  declare _failWait: number;
-  declare _failStreak: number;
-  declare _holdMove: boolean;
+  _safeNav: SurfaceNav | null = null;
+  _safeSurface: number = 0;
+  _safeVersion: number = -1;
+  relocations: number = 0;
+  lastRollback: { t: number; from: THREE.Vector3Tuple; to: THREE.Vector3Tuple } | null = null;
+  /** Destination of a path request deferred by the frame budget. */
+  _pendingDest: THREE.Vector3 = new THREE.Vector3();
+  pathOutcome: string | null = null;
+  pathObjective: string | null = null;
+  pathReqFloor: number = NaN;
+  pathResFloor: number = NaN;
+  _failWait: number = 0;
+  _failStreak: number = 0;
+  _holdMove: boolean = false;
   declare lodIrrelevant: boolean;
   declare _animSkip: number;
   declare _animAccum: number;
@@ -340,10 +351,10 @@ export class Agent {
   declare _stepPayload: EngineEventMap['ai:footstep'];
   declare clip: string;
   declare _searchPending: boolean;
-  declare _searchGeometry: Float64Array;
+  _searchGeometry: Float64Array = new Float64Array(24);
   declare _searchGeometryCount: number;
   declare _waitingNav: boolean;
-  declare _repositionAdmitted: boolean;
+  _repositionAdmitted: boolean = false;
   declare _positionPlan:
     | { investigate: boolean; state: AiState; center: THREE.Vector3; retryAt?: number }
     | null
@@ -357,17 +368,15 @@ export class Agent {
   declare hudX?: number;
   declare hudZ?: number;
   declare hudFade?: number;
-  declare _loggedDoll?: boolean;
 
   constructor(ai: AiSystem, opts: AgentOptions = {}) {
     this.ai = ai;
     this.ctx = ai.ctx;
-    this.id = _nextId++;
     this.rng = ai.rng.fork();
     this.variantName = opts.variant ?? 'vanguard';
     const def = ai.variant(this.variantName);
     this.def = def;
-    this.scale = def.variant.scale ?? 1;
+    this.scale = def.variant.scale;
 
     const { bones, skeleton, root } = RIG.createSkeleton();
     this.bones = bones;
@@ -377,7 +386,6 @@ export class Agent {
     this.mesh.receiveShadow = true;
     this.mesh.frustumCulled = true;
     this.mesh.userData.agent = this;
-    this.group = new THREE.Group();
     this.group.name = `enemy${this.id}`;
     this.group.add(root);
     this.group.add(this.mesh);
@@ -420,8 +428,6 @@ export class Agent {
           slopeLimit: INFANTRY.slopeRadians,
         })
       : null;
-    this.velocity = new THREE.Vector3();
-    this.grounded = true;
     const navCache = (): NavCache => ({
       nav: null,
       version: -1,
@@ -434,7 +440,6 @@ export class Agent {
     this.navStart = navCache();
     this.navGoal = navCache();
 
-    this.colliders = [];
     if (phys) {
       for (const [part, a, b, r, dmg] of HITBOXES) {
         const c = phys.addCollider({
@@ -451,11 +456,6 @@ export class Agent {
       }
     }
 
-    this.health = 100;
-    this.maxHealth = 100;
-    this.alive = true;
-    this.state = STATE.IDLE;
-    this.stateTime = 0;
     this.squad = opts.squad ?? null;
     this.team = opts.team ?? 1;
     // Player death creates a visual-only corpse through this same ragdoll path;
@@ -463,139 +463,23 @@ export class Agent {
     this.silentDeath = opts.silentDeath === true;
 
     this.eyeHeight = RIG.eyeHeight * this.scale;
-    this.viewRange = COMBAT.viewRange;
-    this.viewCos = Math.cos((COMBAT.viewConeDeg * Math.PI) / 180 / 2);
-    this.awareness = 0; // 0..1 build-up before the target is acknowledged
-    this.hasTarget = false;
-    this.targetVisible = false;
-    this.targetSample = -1; // 0 chest, 1 head, 2 upper body; diagnostic only
-    this.target = null;
-    this.lastKnown = new THREE.Vector3();
-    this.lastKnownAge = Infinity;
-    this.lastKnownKind = null;
-    this.visualAge = Infinity; // independent of hearing, reports and HUD sightings
-    this.lastSeen = -Infinity;
-    this.lastFired = -Infinity;
     this.lastSeenX = this.position.x;
     this.lastSeenZ = this.position.z;
     this.fireX = this.position.x;
     this.fireZ = this.position.z;
-    this.searchPoint = new THREE.Vector3();
-    this._searchCand = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
-    this._searchOrigin = new THREE.Vector3();
-    this._searchGeometry = new Float64Array(24);
-    this._searchReached = false;
-    this.searchOutcome = null;
-    this.suppression = 0;
-    // Cover the 96 live projectile slots plus instantaneous AI rounds.
-    this._suppressedShots = new Float64Array(128);
-    this._suppressedCursor = 0;
-    this.alertness = 0;
-    this._impactCooldown = 0;
-    this._positionScores = new Float64Array(SEARCH_CANDIDATES);
-    this._laneBlockedTime = 0;
-    this._repositioning = false;
-    this._repositionAdmitted = false;
-    this._repositionUntil = 0;
-    this._positionRetry = 0;
 
-    this.weaponRange = COMBAT.viewRange;
     this.fireRate = this.variantName === 'irregular' ? COMBAT.fireRateIrregular : COMBAT.fireRate;
-    this.burstLeft = 0;
-    this.fireCooldown = 0;
     this.burstCooldown = this.rng.range(COMBAT.firstBurstMin, COMBAT.firstBurstMax);
-    this.magSize = COMBAT.magSize;
     this.ammo = this.magSize;
-    this.spread = COMBAT.spread;
-    this.weaponDamage = COMBAT.damage;
-    this.aimTarget = new THREE.Vector3();
-    this.aimWeight = 0;
-    this.wantFire = false;
-    this.peeking = false;
     this.peekTimer = this.rng.range(0.5, 2.5);
     this.grenadeCooldown = this.rng.range(9, 22);
-    this.hasGrenade = true;
-    this.role = 'pin';
-    this.wrapWait = 0;
-    this._wrapDone = false;
-    this._friendlyBlock = 0;
-    this._muzzleBlocked = false;
-    this.fireBlock = null;
-    this._relocWait = 0;
-    this._peekWait = 0;
-    this._coverHold = 0;
-    this._coverCheck = 0;
-    this._engaging = false;
-    this._engageHold = 0;
-    this._engageCooldown = 0;
-    this.combatAction = null;
-    this.coverFailure = null;
-    this._combatClock = 0;
-    this._failedCoverIndex = 0;
-    this._failedCovers = Array.from(
-      { length: 6 },
-      (): { x: number; y: number; z: number; until: number; threat: THREE.Vector3 } => ({
-        x: 0,
-        y: 0,
-        z: 0,
-        until: 0,
-        threat: new THREE.Vector3(),
-      })
-    );
-    this._peekTravel = 0;
-    this._elevatedRouteChecked = false;
-    this._peekSettle = 0;
 
-    this.path = [];
     this.route = { points: this.path, ladderSteps: [] };
-    this.ladder = null;
-    this.pathLen = 0;
-    this.pathIndex = 0;
-    this.repathTimer = 0;
     this.moveTarget = new THREE.Vector3().copy(this.position);
-    this.desiredSpeed = 0;
-    this.speed = 0;
-    this.crouch = false;
-    this.cover = null;
-    this.coverPos = new THREE.Vector3();
-    this._coverPathMax = Infinity;
-    this.firePos = new THREE.Vector3();
-    this._returning = false;
-    this._peekFail = 0;
     this.patrolPoints = opts.patrol ?? null;
-    this.patrolIndex = 0;
-    this.stuckTimer = 0;
-    this.stuckHits = 0;
-    this.noProgressTime = 0;
     this._progressPos = new THREE.Vector3().copy(this.position);
-    this.vaultCooldown = 0;
-    this.vaultT = -1;
-    this.vaultFrom = new THREE.Vector3();
-    this.vaultTo = new THREE.Vector3();
-    this.vaultOutcome = null;
-    this.recoveryOutcome = null;
-    this.recoveryAttempts = 0;
-    this._recovering = false;
-    this._recoveryTime = 0;
-    this._recoveryWait = 0;
-    this._noRouteTime = 0;
-    this._recoveryCount = 0;
     this._recoveryOrigin = this.position.clone();
     this._safePosition = this.position.clone();
-    this._safeNav = null;
-    this._safeSurface = 0;
-    this._safeVersion = -1;
-    this.relocations = 0;
-    this.lastRollback = null;
-    /** Destination of a path request deferred by the frame budget. */
-    this._pendingDest = new THREE.Vector3();
-    this.pathOutcome = null;
-    this.pathObjective = null;
-    this.pathReqFloor = NaN;
-    this.pathResFloor = NaN;
-    this._failWait = 0;
-    this._failStreak = 0;
-    this._holdMove = false;
     this._clearSearch();
 
     /** set by AiSystem._updateRelevance: nothing this actor does reaches a pixel */
@@ -676,7 +560,7 @@ export class Agent {
   _sense(dt: number): void {
     this.visualAge += dt;
     this.targetSample = -1;
-    const disabled = this.ai.ctx?.peek?.('player')?.hitbox?.enabled === false;
+    const disabled = this.ai.ctx.peek('player')?.hitbox?.enabled === false;
     let player = disabled ? null : this.ai.playerPosition(this._v3);
     if (!player) {
       this.targetVisible = false;
@@ -693,12 +577,11 @@ export class Agent {
     // Each fallback must pass its own cone/range/LOS; awareness advances ONCE.
     for (let sample = 0; sample < 3; sample++) {
       if (sample) player = this.ai.playerPosition(this._v3, sample);
-      if (!player) break;
       const to = this._dir.copy(player).sub(eye);
       dist = to.length();
       const dot = (fx * to.x + fz * to.z) / Math.max(dist, 0.001);
       if (dist >= this.viewRange || (dot <= cone && dist >= COMBAT.closeAcquire)) continue;
-      visible = !this.phys || this.phys.lineOfSight(eye, player, this.phys.MASK.SIGHT);
+      visible = this.phys.lineOfSight(eye, player, this.phys.MASK.SIGHT);
       if (visible) {
         this.targetSample = sample;
         break;
@@ -1093,6 +976,7 @@ export class Agent {
           this.hasMoveTarget = false;
           this._failWait = PATH_FAIL_WAIT_MAX;
         } else {
+          // oxlint-disable-next-line typescript/no-unnecessary-condition -- _pickNextPatrol() may queue a path
           this.desiredSpeed = this.hasMoveTarget || this.pathPending ? 1.35 : 0;
         }
         break;
@@ -1615,6 +1499,7 @@ export class Agent {
         this._wrapDone = true;
         this.role = 'hold';
       }
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- _fallbackStuck() may clear the path
       return this.pathPending || this.wantFire;
     }
     // A route already installed by the shared budget is success. Do not solve again.
@@ -1633,6 +1518,7 @@ export class Agent {
       return true;
     }
     // Created this tick, so the give-up above cannot have elapsed yet.
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- _goOffAxis() may queue a path
     if (this.pathPending) {
       this.wantFire = false;
       return true;
@@ -1684,7 +1570,7 @@ export class Agent {
     this._searchCount = 0;
     this._positionScores.fill(Infinity);
     const grid = this.ai.grid;
-    if (!grid || !this.phys) return;
+    if (!grid) return;
     const start = grid.project(from, this._v2);
     if (!start) return;
     const component = grid.components.get(start);
@@ -1977,7 +1863,7 @@ export class Agent {
     this.aimWeight = 0.55;
     this.wantFire = false;
 
-    if (!sq?.peekHolders?.size) {
+    if (!sq?.peekHolders.size) {
       this._peekWait += dt;
       if (this._peekWait >= PEEK_WAIT_GIVE_UP) {
         this._abandonMove(target, dist);
@@ -2679,8 +2565,8 @@ export class Agent {
     const sq = this.squad;
     const reported =
       sq?.elevated === this && (!this.hasTarget || this.lastKnownKind !== EVIDENCE.VISUAL);
-    const look = reported && sq ? sq.contact : this.lastKnown;
-    if (engaged && (reported && sq ? sq.contactAge : this.lastKnownAge) < 8) {
+    const look = reported ? sq.contact : this.lastKnown;
+    if (engaged && (reported ? sq.contactAge : this.lastKnownAge) < 8) {
       this.targetYaw = Math.atan2(look.x - this.position.x, look.z - this.position.z);
     } else if (this.speed > 0.2) {
       this.targetYaw = Math.atan2(this._steer.x, this._steer.z);
@@ -2792,7 +2678,7 @@ export class Agent {
       !this.controller ||
       this._safeVersion !== grid.physics.staticWorld.version ||
       this.position.distanceToSquared(this._safePosition) < 0.25 ||
-      !this.ai.canRollback?.(this, this._safePosition) ||
+      !this.ai.canRollback(this, this._safePosition) ||
       !grid.canStand(this._safePosition, this.radius, this.height)
     )
       return false;
@@ -3087,39 +2973,53 @@ export class Agent {
       return;
     }
     this._muzzleBlocked = false;
+    // A long frame may owe more than one round; the bound drops the rest. Only
+    // a round that is already due re-enters, so an emptied magazine still
+    // reloads on a later frame rather than with its last shot.
+    for (
+      let n = 1;
+      this._fireRound(dt) && n < COMBAT.maxShotsPerFrame && this.fireCooldown <= 0;
+      n++
+    );
+  }
+
+  /** Fire one round if every gate allows it; false ends this frame's fire. */
+  _fireRound(dt: number): boolean {
     if (this.ammo <= 0) {
       this.animator.reload(this.variantName === 'irregular' ? 2.9 : 2.35);
       this.ai.emitReload(this);
       this.ammo = this.magSize;
-      return;
+      return false;
     }
     if (this.burstLeft <= 0) {
-      if (this.burstCooldown > 0) return;
+      if (this.burstCooldown > 0) return false;
       this.burstLeft = this.rng.int(COMBAT.burstMin, COMBAT.burstMax);
       this.burstCooldown =
         this.rng.range(COMBAT.burstGapMin, COMBAT.burstGapMax) +
         this.suppression * COMBAT.burstGapSuppress;
     }
-    if (this.fireCooldown > 0) return;
+    if (this.fireCooldown > 0) return false;
 
     const an = this.animator;
     const origin = an.muzzleWorld;
     const dir = this._muzzleDir.copy(an.muzzleDir);
     applySpread(dir, this.rng, this.spread * (1 + this.suppression * COMBAT.suppressSpread));
-    if (
-      this._shotBlockedByFriend(origin, dir) ||
-      this.ai.onAgentFire(this, origin, dir) === false
-    ) {
+    if (this._shotBlockedByFriend(origin, dir) || !this.ai.onAgentFire(this, origin, dir)) {
       this.ai.stats.friendlyHolds++;
       this._friendlyBlock += dt;
       if (this._friendlyBlock >= FRIENDLY_HOLD) this._breakFriendlyPeek();
-      return;
+      return false;
     }
     this._friendlyBlock = 0;
-    this.fireCooldown = 1 / this.fireRate;
+    // Overshoot of a cooldown that ran out during this frame carries into the
+    // next round, so cadence does not depend on frame rate. Older idle time
+    // (a burst gap, a block, a reload) does not bank rounds.
+    const carry = this.fireCooldown > -dt ? this.fireCooldown : 0;
+    this.fireCooldown = 1 / this.fireRate + carry;
     this.burstLeft--;
     this.ammo--;
     an.fire(1);
+    return true;
   }
 
   _shotBlockedByFriend(origin: THREE.Vector3, dir: THREE.Vector3): boolean {
@@ -3154,20 +3054,17 @@ export class Agent {
       }
     }
     if (!blocked) return false;
-    if (phys) {
-      const wall = phys.raycast(
-        origin.x,
-        origin.y,
-        origin.z,
-        dir.x,
-        dir.y,
-        dir.z,
-        bestT - 0.08,
-        phys.MASK.WORLD
-      );
-      if (wall.hit) return false;
-    }
-    return true;
+    const wall = phys.raycast(
+      origin.x,
+      origin.y,
+      origin.z,
+      dir.x,
+      dir.y,
+      dir.z,
+      bestT - 0.08,
+      phys.MASK.WORLD
+    );
+    return !wall.hit;
   }
 
   _breakFriendlyPeek(): void {
@@ -3274,7 +3171,7 @@ export class Agent {
     this.ai.cover?.release(this.id);
     if (this.controller) this.phys.removeCharacter(this.controller);
     this.controller = null;
-    for (const c of this.colliders) this.phys?.removeCollider(c);
+    for (const c of this.colliders) this.phys.removeCollider(c);
     this.colliders.length = 0;
 
     // Impulse is N·s, and the ragdoll turns it into a velocity change on the
@@ -3285,7 +3182,7 @@ export class Agent {
       .copy(dir ?? this._v.set(0, 0, 1))
       .normalize()
       .multiplyScalar(Math.min(5.5, 1.5 + amount * 0.02));
-    const hitPoint = point ?? this._v.copy(this.position).setY(this.position.y + 1.2);
+    const hitPoint = point;
 
     // Own the hand-off: build the capsule spec from the *live* animated pose,
     // hand it to the solver and let it drive the skeleton from here.
@@ -3313,7 +3210,6 @@ export class Agent {
     point: THREE.Vector3
   ): import('../physics/ragdoll.ts').Ragdoll | null {
     const phys = this.phys;
-    if (!phys) return null;
     // Fat capsules that start half-buried in the floor tunnel straight through
     // it: the contact normal flips once a bone's axis is on the far side. Lift
     // the pose clear of the ground for the one frame it takes to build the doll,
@@ -3333,17 +3229,9 @@ export class Agent {
     this.group.position.y -= lift;
     this.group.updateMatrixWorld(true);
     if (!rd) return null;
-    if (impulse && point) {
-      // wide radius: a tight one dumps all of it into whichever light bone is
-      // nearest and whips the limb across the street
-      rd.applyImpulse(point.x, point.y, point.z, impulse.x, impulse.y, impulse.z, 0.85);
-    }
-    if (this.ai.debugLog) {
-      console.info(
-        `[ai] ragdoll ${rd.boneCount} bones / ${rd.particleCount} particles, ` +
-          `mask=${rd.mask} tris=${rd.world?.triCount}`
-      );
-    }
+    // wide radius: a tight one dumps all of it into whichever light bone is
+    // nearest and whips the limb across the street
+    rd.applyImpulse(point.x, point.y, point.z, impulse.x, impulse.y, impulse.z, 0.85);
     return rd;
   }
 
@@ -3433,16 +3321,16 @@ export class Agent {
     this._cancelRouteProof();
     this._endPeek();
     this._clearSearch();
-    this.ai?.cover?.release(this.id);
+    this.ai.cover?.release(this.id);
     this.cover = null;
     this.alive = false;
     this.wantFire = false;
     this.hasMoveTarget = this.pathPending = false;
-    if (this.controller) this.phys?.removeCharacter(this.controller);
+    if (this.controller) this.phys.removeCharacter(this.controller);
     this.controller = null;
-    for (const c of this.colliders) this.phys?.removeCollider(c);
+    for (const c of this.colliders) this.phys.removeCollider(c);
     this.colliders.length = 0;
-    if (this.ragdoll) this.phys?.removeRagdoll(this.ragdoll);
+    if (this.ragdoll) this.phys.removeRagdoll(this.ragdoll);
     this.ragdoll = null;
     this.group.parent?.remove(this.group);
   }

@@ -1,10 +1,11 @@
 import type { AiCalloutKind, ReloadPhase } from '../core/events.ts';
 import { hasOwn } from '../core/guards.ts';
+import { clamp } from '../core/math.ts';
 import type { Rng } from '../core/rng.ts';
 import { AIRCRAFT_URLS } from './aircraft.ts';
 import { CALLOUT_URLS, CALLOUT_MIX, calloutBank } from './callouts.ts';
 import { COMBAT_URLS, type CombatKind } from './combat.ts';
-import { clamp, gain, series } from './dsp.ts';
+import { gain, series } from './dsp.ts';
 import {
   ENVIRONMENT_URLS,
   ENVIRONMENT_GAIN,
@@ -29,7 +30,7 @@ import type { AudioVoice, SampleKind, SampleOptions, WeaponProfile } from './typ
 import { REPORT_DISTANT_MATCH, reportDistantMix } from './weapons.ts';
 
 /*
- * Legacy firearm bank: PRIVATE local-only review Opus delivery copies, bundled by Vite.
+ * Legacy firearm bank: PRIVATE local-only review Opus delivery copies, served from public/.
  * Float WAV masters remain offline authoring inputs, not runtime imports.
  * Operator authorized local commits; commercial derivatives are NOT cleared
  * for public Git distribution or upload.
@@ -70,6 +71,13 @@ const CONTACT_URLS = {
   ...EXPLOSION_URLS,
 };
 type ContactKind = keyof typeof CONTACT_URLS;
+/** Round-robin indices are kept modulo the bank size; a miss means an unloaded slot. */
+function loaded(buffers: readonly AudioBuffer[], index: number, label: string): AudioBuffer {
+  const buffer = buffers.at(index);
+  if (!buffer) throw new RangeError(`[audio] ${label} recording ${index} is not loaded`);
+  return buffer;
+}
+
 export class WeaponSampleBank {
   actx: BaseAudioContext;
   buffers: Partial<Record<SampleKind, AudioBuffer[]>> = {};
@@ -153,7 +161,7 @@ export class WeaponSampleBank {
         ? rng.u32() % choices.length
         : (previous + 1 + (rng.u32() % Math.max(1, choices.length - 1))) % choices.length;
     indices[kind] = index;
-    return choices[index];
+    return loaded(choices, index, kind);
   }
 
   nextAircraft(rng: Rng): AudioBuffer {
@@ -162,7 +170,7 @@ export class WeaponSampleBank {
       this.aircraftIndex < 0
         ? rng.u32() % this.aircraftBuffers.length
         : (this.aircraftIndex + 1) % this.aircraftBuffers.length;
-    return this.aircraftBuffers[this.aircraftIndex];
+    return loaded(this.aircraftBuffers, this.aircraftIndex, 'aircraft');
   }
 
   /** Natural-rate finite cues share scheduling, but callers retain take/RNG policy. */
@@ -340,7 +348,7 @@ export class WeaponSampleBank {
   step(rng: Rng, o: FoleyOptions = {}): AudioVoice {
     const when = o.when ?? this.actx.currentTime;
     const gait = o.gait ?? 'walk';
-    const pair = STEP_BANK[o.surface ?? 'concrete'] ?? STEP_BANK.concrete;
+    const pair = STEP_BANK[o.surface ?? 'concrete'];
     const fast = gait === 'run' || gait === 'sprint' || gait === 'land';
     const level = (o.level ?? 1) * (FOLEY_MIX.gait[gait] ?? FOLEY_MIX.gait.walk) * FOLEY_MIX.step;
     const out = gain(this.actx, level);
@@ -353,7 +361,7 @@ export class WeaponSampleBank {
       splash.node.connect(out);
       end = Math.max(end, splash.end);
     }
-    const gearLevel = o.gear ?? FOLEY_MIX.gear[gait] ?? FOLEY_MIX.gear.walk;
+    const gearLevel = o.gear ?? FOLEY_MIX.gear[gait];
     if (gearLevel > 0) {
       const gear = this.hit('gear', rng, { when, level: gearLevel * FOLEY_MIX.gearLevel });
       gear.node.connect(out);
@@ -363,7 +371,7 @@ export class WeaponSampleBank {
   }
 
   fall(rng: Rng, o: FoleyOptions = {}): AudioVoice {
-    const voice = this.hit(FALL_BANK[o.surface ?? 'concrete'] ?? FALL_BANK.concrete, rng, {
+    const voice = this.hit(FALL_BANK[o.surface ?? 'concrete'], rng, {
       when: o.when,
       level: (o.level ?? 1) * FOLEY_MIX.fall,
     });
@@ -386,7 +394,7 @@ export class WeaponSampleBank {
     if (!choices?.length) throw new Error(`[audio] ${kind} recordings are not loaded`);
     const index = this.indices[kind] ?? 0;
     this.indices[kind] = (index + 1) % choices.length;
-    const buffer = choices[index];
+    const buffer = loaded(choices, index, kind);
     const actx = this.actx;
     const t0 = o.when ?? actx.currentTime;
     const src = actx.createBufferSource();
@@ -406,7 +414,7 @@ export class WeaponSampleBank {
       const farIndex = this.indices[farKind] ?? 0;
       this.indices[farKind] = (farIndex + 1) % farChoices.length;
       const far = actx.createBufferSource();
-      far.buffer = farChoices[farIndex]!;
+      far.buffer = loaded(farChoices, farIndex, farKind);
       far.playbackRate.value = 1;
       const closeWeight = Math.cos((mix * Math.PI) / 2);
       const farWeight = Math.sin((mix * Math.PI) / 2) * (REPORT_DISTANT_MATCH[farKind] ?? 1);

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 
+import { TAU } from '../core/math.ts';
 import { P } from './atlas.ts';
 import type { FxSystem } from './index.ts';
 import { resetSpawn, setSpawnColorRamp, setSpawnPosition, setSpawnVelocity } from './particles.ts';
@@ -9,7 +10,6 @@ import { V, cone } from './util.ts';
  * columns share the bounded emitter pool used by explosions.
  */
 
-const TWO_PI = Math.PI * 2;
 const MAX_EMITTERS = 24;
 
 class Emitter {
@@ -71,12 +71,12 @@ export class Ambience {
   }
 
   _acquire(): Emitter {
-    let oldest = null;
+    let oldest = this.emitters[0];
     for (const e of this.emitters) {
       if (!e.active) return e;
-      if (!oldest || e.age / e.duration > oldest.age / oldest.duration) oldest = e;
+      if (e.age / e.duration > oldest.age / oldest.duration) oldest = e;
     }
-    return oldest!;
+    return oldest;
   }
 
   /** Finite-duration smoke column (explosions, burning wreck). */
@@ -119,7 +119,7 @@ export class Ambience {
     s.delay = -rng.float() * dt;
     s.drag = 0.75;
     s.gravity = 0.42; // buoyant, keeps accelerating upward
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     s.spin = rng.signed() * 0.35;
     const d = e.dark;
     setSpawnColorRamp(s, d, d * 0.97, d * 0.94, d * 1.9, d * 1.86, d * 1.8);

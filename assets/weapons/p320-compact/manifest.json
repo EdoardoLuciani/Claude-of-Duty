@@ -7,10 +7,9 @@
     "Idle": {
       "frames": [
         0,
-        120
+        0
       ],
-      "duration": 2.0,
-      "loop": true,
+      "duration": 0.0,
       "events": []
     },
     "Fire": {
@@ -19,7 +18,6 @@
         12
       ],
       "duration": 0.2,
-      "loop": false,
       "events": [
         {
           "time": 0,
@@ -37,7 +35,6 @@
         12
       ],
       "duration": 0.2,
-      "loop": false,
       "events": [
         {
           "time": 0,
@@ -55,7 +52,6 @@
         144
       ],
       "duration": 2.4,
-      "loop": false,
       "events": [
         {
           "time": 0.4666666666666667,
@@ -73,7 +69,6 @@
         162
       ],
       "duration": 2.7,
-      "loop": false,
       "events": [
         {
           "time": 0.4666666666666667,
@@ -95,7 +90,6 @@
         198
       ],
       "duration": 3.3,
-      "loop": false,
       "events": []
     },
     "Draw": {
@@ -104,7 +98,6 @@
         30
       ],
       "duration": 0.5,
-      "loop": false,
       "events": []
     },
     "Holster": {
@@ -113,19 +106,18 @@
         24
       ],
       "duration": 0.4,
-      "loop": false,
       "events": []
     }
   },
   "stats": {
     "triangles": 20212,
-    "vertices": 43320,
+    "vertices": 43319,
     "meshes": 1,
     "primitives": 1,
     "materials": 1,
     "textureImages": 4,
     "joints": 9,
-    "bytes": 5532644
+    "bytes": 5403924
   },
   "textureResolutions": {
     "base": 1024,
@@ -135,7 +127,7 @@
   },
   "geometry": "One rigidly weighted mechanical skin; lettering/traction baked from retained high source",
   "handAnimation": "Blender wrist and finger controls; shared runtime skins and shoulder IK",
-  "source": "tools/blender/p320_compact.py + tools/blender/p320/ + tools/blender/p320_actions.py + tools/p320-hand-reference.mjs",
+  "source": "tools/blender/p320/build.py + tools/blender/p320/ + tools/blender/p320/actions.py + tools/blender/p320/hand-reference.ts",
   "notes": [
     "Original non-functional game art, not a dimensionally exact replica.",
     "No downloaded models or textures.",

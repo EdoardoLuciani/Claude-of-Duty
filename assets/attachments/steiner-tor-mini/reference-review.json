@@ -1,0 +1,65 @@
+{
+  "asset": "Steiner TOR Mini, green visible laser, 7003, black",
+  "sources": [
+    {
+      "publisher": "Steiner official store",
+      "url": "https://store.steiner-optics.com/products/tor-mini",
+      "establishes": [
+        "Type III hard-anodized machined aluminum housing and rail mount",
+        "Green 7003 uses a 520 nm direct diode",
+        "Ambidextrous pressure pads, bottom battery cap and adjustment screws",
+        "Reference photographs listed below"
+      ]
+    },
+    {
+      "publisher": "Steiner TOR Mini User Guide",
+      "url": "https://www.steiner-optics.com/sites/default/files/content/downloads/2024-03/Steiner%20TOR%20Mini%20User%20Manuel.pdf",
+      "establishes": [
+        "Printed page 7: 2.1 x 1.3 x 1.2 inches, 60 g with battery, 520 +/-10 nm green version",
+        "Printed pages 3 and 7: one 1/3N battery, bottom battery cap",
+        "Printed page 8: Picatinny/Weaver-style pistol rail clamp, captive slotted screws, six rail-bar positions",
+        "Printed page 9: operate with mount facing up",
+        "Printed page 10: windage and elevation adjustments"
+      ],
+      "accessNote": "Direct binary download returned HTTP 403 on this host; the web retrieval tool extracted the 14-page official PDF. No local PDF checksum is claimed."
+    }
+  ],
+  "photographs": [
+    {
+      "url": "https://store.steiner-optics.com/cdn/shop/products/TOR_MINI_SIDE_1.png?v=1618851458",
+      "view": "Right side, fixed jaw and windage screw",
+      "use": "Longitudinal silhouette, boot and pressure pad, cap, brand proportions"
+    },
+    {
+      "url": "https://store.steiner-optics.com/cdn/shop/products/TOR_MINI_SIDE_2.png?v=1618851458",
+      "view": "Left side, captive clamp screws",
+      "use": "Clamp profile, slot heads, lower battery extension and rear pad"
+    },
+    {
+      "url": "https://store.steiner-optics.com/cdn/shop/products/TOR_MINI_ANGLED_1.png?v=1618851458",
+      "view": "Front-left upper quarter",
+      "use": "Open channel, indexing bores, inset rail-bed pads, recessed aperture"
+    },
+    {
+      "url": "https://store.steiner-optics.com/cdn/shop/products/TOR_MINI_ANGLED_3.png?v=1618851458",
+      "view": "Rear-left upper quarter",
+      "use": "Rear bridge, boot taper, pressure-pad diamond relief"
+    }
+  ],
+  "photoRights": "Reference photography remains its owners' material. Not committed, packed into Blender, used as photographic textures or shipped in GLBs. Original geometry, seeded procedural finishes and reconstructed vector marks only. Steiner identifies the depicted subject, not endorsement.",
+  "dimensions": {
+    "authority": "Manufacturer's nominal envelope, not a measured scan or CAD",
+    "inchEnvelopeLWH": [2.1, 1.3, 1.2],
+    "convertedMmLWH": [53.34, 33.02, 30.48],
+    "note": "The manual's rounded centimetre equivalents (5.3 x 3.3 x 3.0) are not additional precision. Local shapes, mounting plane and emitter position are photo-inferred art datums."
+  },
+  "limitations": [
+    "Visual-review candidate, not final human AAA acceptance or manufacturer CAD.",
+    "No calibrated end-on, underside or teardown reference. Hidden internals, exact rail tolerances and battery threads are not reconstructed.",
+    "Body relief, boot curvature, pad diamond depth, small fasteners and typography are photo approximations, not certified dimensions.",
+    "SOCKET_mount and SOCKET_laser are explicit but provisional art datums; actual seating and clearance require weapon-by-weapon integration checks.",
+    "Manufacturer documents mount-up operation. This asset does not establish unrestricted side/top mounting or compatibility with every weapon rail.",
+    "Recessed window uses an opaque coated-surface PBR approximation; no real laser optics, transmitted beam or emission is baked into the asset.",
+    "No flashlight changes, beam/dot rendering, switches, zeroing, AI effects, weapon-stat changes, shop integration or runtime attachment logic."
+  ]
+}

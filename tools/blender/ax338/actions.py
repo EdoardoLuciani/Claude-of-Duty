@@ -47,7 +47,7 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,trigger):
             o=cs[f'thumb_{j}'];o.rotation_quaternion=quat(eq((-p['thumb'][j],0,0)));o.keyframe_insert('rotation_quaternion',frame=f)
     def begin(name,duration):
         right_ranges.clear()
-        clips[name]={'frames':[0,duration*FPS],'duration':duration,'loop':name=='Idle','events':[]}
+        clips[name]={'frames':[0,duration*FPS],'duration':duration,'events':[]}
         for o in all_parts:
             o.animation_data_create();o.animation_data.action=None
             for t in o.animation_data.nla_tracks:t.mute=True
@@ -84,7 +84,7 @@ def author_actions(root,asset,rig,parts,mag,spare,bolt,trigger):
         for row in ref['rightUnwrap']:
             t=1-row['t'] if closing else row['t']
             pose('right',first+(last-first)*t,p=row['pose'],holding_only=True)
-    begin('Idle',2);finish('Idle')
+    begin('Idle',0);finish('Idle')  # single rest pose
     for name in ('Fire','Last_Shot'):
         begin(name,.12)
         # A manually operated rifle does not reciprocate its bolt on discharge.

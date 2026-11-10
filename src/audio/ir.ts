@@ -3,8 +3,8 @@
  * and regular slap/flutter repeats for street and corridor reverberation.
  */
 
+import { clamp } from '../core/math.ts';
 import type { Rng } from '../core/rng.ts';
-import { clamp } from './dsp.ts';
 export interface IRSpec {
   seconds: number;
   rt60: number;
@@ -165,8 +165,8 @@ export function generateIR(actx: BaseAudioContext, rng: Rng, spec: IRSpec): Audi
     }
 
     /* ---- discrete early reflections ------------------------------ */
-    for (let k = 0; k < spec.taps.length; k++) {
-      const tt = (spec.predelay + spec.taps[k]) * wob * rng.range(0.97, 1.03);
+    for (const [k, tap] of spec.taps.entries()) {
+      const tt = (spec.predelay + tap) * wob * rng.range(0.97, 1.03);
       const idx = Math.floor(tt * sr);
       if (idx >= len - 8) continue;
       // 1/r falloff plus per-bounce wall absorption.
@@ -233,6 +233,8 @@ export function classifySpace(
   out?: SpaceWeights
 ): SpaceWeights {
   const horiz = hits.length - 1;
+  if (!Number.isInteger(horiz) || horiz < 1 || horiz > SORT.length)
+    throw new RangeError('[audio] space probes require 1–16 horizontal distances and one ceiling');
   let sum = 0,
     close = 0,
     minD = maxDist,

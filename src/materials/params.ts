@@ -1,4 +1,4 @@
-/** Shared authored material defaults for both the legacy and TSL paths. */
+/** Shared authored material defaults for the TSL surface library. */
 import type { SurfaceParams } from './shader-tsl.ts';
 
 export const DEFAULT_PARAMS: SurfaceParams = {

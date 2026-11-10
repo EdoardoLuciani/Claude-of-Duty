@@ -103,6 +103,8 @@ def validate_export(path, clips):
             assert times[0]==0 and times[-1]==expected
             assert all(a<b for a,b in zip(times,times[1:]))
         for channel in animation['channels']:
-            if channel['target']['path']=='scale':
-                assert animation['samplers'][channel['sampler']]['interpolation']=='STEP'
+            sampler=animation['samplers'][channel['sampler']]
+            # One-key curves are always baked with our LINEAR fallback; one key cannot interpolate.
+            if channel['target']['path']=='scale' and doc['accessors'][sampler['input']]['count']>1:
+                assert sampler['interpolation']=='STEP'
     return raw,doc

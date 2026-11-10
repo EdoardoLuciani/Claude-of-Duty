@@ -134,9 +134,7 @@ export class ShellSystem {
     mat.name = 'fx-brass';
     this.material = mat;
 
-    this.mesh = new THREE.InstancedMesh(geo, mat, CAPACITY) as THREE.InstancedMesh & {
-      dispose(): void;
-    };
+    this.mesh = new THREE.InstancedMesh(geo, mat, CAPACITY);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.frustumCulled = false;
     this.mesh.castShadow = false;
@@ -160,12 +158,14 @@ export class ShellSystem {
     this.hullMesh.userData.owProbe = true;
 
     for (let i = 0; i < CAPACITY; i++) {
+      const proxy = new THREE.Object3D();
+      proxy.matrixAutoUpdate = false;
       this.slots.push({
         shotgun: false,
         alive: false,
         age: 0,
         body: null,
-        proxy: new THREE.Object3D(),
+        proxy,
         // fallback integration when physics is absent
         pos: new THREE.Vector3(),
         vel: new THREE.Vector3(),
@@ -175,7 +175,6 @@ export class ShellSystem {
         lengthScale: 1,
         radiusScale: 1,
       });
-      this.slots[i].proxy.matrixAutoUpdate = false;
     }
   }
 
@@ -246,7 +245,7 @@ export class ShellSystem {
         object3D: slot.proxy,
         onImpact: this._onImpact,
       });
-      if (slot.body) slot.body.userData = slot;
+      slot.body.userData = slot;
     }
     return slot;
   }
@@ -304,8 +303,10 @@ export class ShellSystem {
     let count = 0;
     let brassCount = 0,
       hullCount = 0;
-    for (let i = 0; i < this.slots.length; i++) {
-      const slot = this.slots[i];
+    // Manual index: `.entries()` allocates per iteration on this per-frame path.
+    let i = -1;
+    for (const slot of this.slots) {
+      i++;
       if (!slot.alive) continue;
       slot.age += dt;
       if (slot.age > LIFETIME) {
@@ -337,8 +338,9 @@ export class ShellSystem {
     }
     this._lastCount = count;
     // Write instance matrices; dead slots collapse to zero scale.
-    for (let i = 0; i < this.slots.length; i++) {
-      const slot = this.slots[i];
+    i = -1;
+    for (const slot of this.slots) {
+      i++;
       // Overwrite BOTH matrices, including a recycled slot's former variant.
       for (let variant = 0; variant < 2; variant++) {
         const mesh = variant === 0 ? this.mesh : this.hullMesh;

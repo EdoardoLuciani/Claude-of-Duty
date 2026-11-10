@@ -1,25 +1,24 @@
 # Runtime model cooking
 
-`models.mjs` is the shared offline gltfpack build stage. Regeneration is explicit;
-ordinary dev/build/CI uses committed runtime GLBs, with no encoder requirement.
-Native Blender exports remain authoring references. No metadata sidecars are
+`models.ts` is the checked TypeScript gltfpack build stage, run with Bun. `bun run dev` / `bun run build`
+cook stale models through `tools/build-assets.ts`; `bun run build:ci` skips
+these model cooks but generates missing or stale Bun world assets. Runtime and native exports are ignored build products. No metadata sidecars are
 emitted: settings and opt-in profiles live in `MODEL_COOKS`/`GLTFPACK_FLAGS`.
 
 Install native **gltfpack 1.3 with BasisU support** from the
 [official release](https://github.com/zeux/meshoptimizer/releases/tag/v1.3), then:
 
 ```sh
-GLTFPACK=/absolute/path/gltfpack npm run models:cook -- p320
-# All registered profiles (seven weapons and standalone EXPS3):
-npm run models:cook
+GLTFPACK=/absolute/path/gltfpack bun run models:cook -- p320
+# All registered profiles (seven weapons, standalone EXPS3 and TOR Mini):
+bun run models:cook
 # Use the same profile on a scratch native export:
-npm run models:cook -- p320 /tmp/p320-review
+bun run models:cook -- p320 /tmp/p320-review
 ```
 
 The encoder writes to a temporary directory before replacing the destination.
 Runtime outputs use `.runtime.glb`; their container is still GLB, regardless of
-embedded texture formats. The generic `cookModel({ input, output, flags })` function
-can also be imported by other build stages.
+embedded texture formats.
 
 To opt in another model, register its source directory, native export, runtime
 output and any model-specific flags in `MODEL_COOKS`. Wire its loader to the
@@ -38,5 +37,7 @@ AX338 keeps full geometry where simplification damaged panel detail.
 M590 keeps its shell separate from the mechanical skin, with exact STEP visibility;
 its source checker narrowly bounds one approved shared-glove contact below 30 µm.
 EXPS3 uses a tighter error limit to preserve its optical
-opening; its cooked attachment is not yet wired into gameplay. Other models are
-not converted by these profiles.
+opening; its cooked attachment is not yet wired into gameplay. TOR Mini preserves
+its native geometry without simplification and also remains standalone; see its
+[asset review/commands](../assets/attachments/steiner-tor-mini/README.md). Other models
+are not converted by these profiles.

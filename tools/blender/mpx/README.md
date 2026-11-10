@@ -8,8 +8,9 @@
 - `geometry.py`: receiver finish separation preserving packed corner normals.
 
 Hand calibration and shared arms are read-only. Refit separately with
-`node tools/blender/mpx/hand-reference.mjs`. Shared EVOLYS review-hand helpers are
-not weapon-local. Save editable components/sparse actions before runtime joins.
+`bun tools/blender/mpx/hand-reference.ts`. Shared review-arm baking lives in
+[`../review_hands.py`](../review_hands.py), independent of EVOLYS tooling.
+Save editable components/sparse actions before runtime joins.
 Keep the smart-project atlas, original UV0 grain and padded 4×4 UV1 finish tiles.
 Body lenses stay optical; solid polymer covers retain original cap pivots and
 closed occlusion. The unused clear-cap finish tile remains reserved.

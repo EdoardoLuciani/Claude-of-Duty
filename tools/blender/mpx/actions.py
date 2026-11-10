@@ -7,7 +7,7 @@ import json
 import math
 import bpy
 from mathutils import Vector, Quaternion, Matrix
-from evolys.actions import author_review_hands
+from review_hands import author_review_hands
 
 C = Matrix(((0, 0, -1), (-1, 0, 0), (0, 1, 0)))
 CI = C.inverted()
@@ -85,7 +85,7 @@ def author_actions(root, asset, rig, parts, mag, spare, bolt, trigger, release, 
             p['fingerSpread'] = [(1-u)*x+u*y for x,y in zip(a[3]['fingerSpread'],b[3]['fingerSpread'])]
             pose('left',t,gm.inverted() @ pos,gm.to_quaternion().inverted() @ q,p)
     def begin(name, duration):
-        clips[name] = {'frames': [0, duration * FPS], 'duration': duration, 'loop': name == 'Idle', 'events': []}
+        clips[name] = {'frames': [0, duration * FPS], 'duration': duration, 'events': []}
         for o in all_parts:
             o.animation_data_create(); o.animation_data.action = None
             for t in o.animation_data.nla_tracks: t.mute = True
@@ -106,7 +106,7 @@ def author_actions(root, asset, rig, parts, mag, spare, bolt, trigger, release, 
             track = ad.nla_tracks.new(); track.name = name; strip = track.strips.new(name, 0, action)
             strip.action_frame_start = 0; strip.action_frame_end = math.ceil(clips[name]['frames'][1]); strip.extrapolation = 'HOLD'; strip.blend_type = 'REPLACE'
             ad.action = None; track.mute = True
-    begin('Idle', 2); finish('Idle')
+    begin('Idle', 0); finish('Idle')  # single rest pose
     duration = 60 / 950
     for name, locked in [('Fire', False), ('Last_Shot', True)]:
         begin(name, duration)

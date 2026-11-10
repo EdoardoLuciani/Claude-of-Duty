@@ -2,6 +2,8 @@
  * Inject RNG; build reusable buffers/curves once. Each voice owns a top gain for teardown.
  */
 
+import { clamp } from '../core/math.ts';
+
 export const SPEED_OF_SOUND = 343; // m/s, 20 C dry air
 type NoiseKind = 'white' | 'pink';
 type Curve = Float32Array<ArrayBuffer>;
@@ -206,10 +208,14 @@ export function osc(
   return o;
 }
 
+const chain = (prev: AudioNode, node: AudioNode): AudioNode => {
+  prev.connect(node);
+  return node;
+};
+
 /** Connect a list of nodes head-to-tail; returns the last one. */
 export function series(...nodes: [AudioNode, ...AudioNode[]]): AudioNode {
-  for (let i = 0; i < nodes.length - 1; i++) nodes[i].connect(nodes[i + 1]);
-  return nodes[nodes.length - 1]!;
+  return nodes.reduce(chain);
 }
 
 const CURVE_CACHE = new Map<string, Curve>();
@@ -280,10 +286,6 @@ export function struckResonator(
   }
   src.start(t0, src._offset, exciteDur + 0.02);
   return out;
-}
-
-export function clamp(v: number, lo: number, hi: number): number {
-  return v < lo ? lo : v > hi ? hi : v;
 }
 
 /** Air absorption: how much high end survives `dist` metres of atmosphere. */

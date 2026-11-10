@@ -14,7 +14,7 @@ playable-snapshot/
 perf-candidate/
 perf-cand2/
 
-# Capture output — 780 MB of PNGs (regenerate with tools/capture.mjs).
+# Capture output (regenerate with tools/capture.ts).
 shots/
 
 # Arm maps are packed in the authoring .blend and runtime GLB; reviews regenerate.
@@ -31,9 +31,22 @@ demo/
 .tmp-rend/
 revcrops/
 
-# Generated models; the committed world/proc tiles are the exception.
-public/models/*
-!public/models/world/
-!public/models/world/**
-!public/models/proc/
-!public/models/proc/**
+# Generated models, including the world (tools/build-assets.ts).
+public/models/
+
+# Blender/gltfpack products, rebuilt by `bun run build`/`bun run dev` when their
+# inputs change. Weapon manifest.json stays committed: weapon code imports it.
+assets/weapons/*/*.blend
+assets/weapons/*/*.glb
+assets/weapons/*/*.png
+assets/weapons/*/textures/
+assets/attachments/*/*.blend
+assets/attachments/*/*.glb
+assets/attachments/*/*.png
+assets/attachments/*/manifest.json
+assets/player/arms/*.blend
+assets/player/arms/manifest.json
+assets/soldiers/*.blend
+assets/soldiers/*.glb
+assets/soldiers/*.json
+.cache/

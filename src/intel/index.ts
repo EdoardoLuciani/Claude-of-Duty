@@ -25,6 +25,8 @@ interface IntelCache {
   z: number;
   group: ReturnType<typeof makeCrate>;
   open: number;
+  /** HUD pulse owned by this pooled cache, so live caches never outnumber pulses. */
+  pulse: IntelHud['pulses'][number];
 }
 interface IntelPrompt {
   key: string;
@@ -49,28 +51,43 @@ export class IntelSystem {
   declare market: MarketSystem;
   declare physics: PhysicsSystem;
   declare markers: IntelMarker[];
-  declare _recent: string[];
+  _recent: string[] = [];
   declare _yaw: number;
-  declare _used: Set<string>;
-  declare _alive: IntelCache[];
-  declare _aim: THREE.Vector3;
-  declare _forward: THREE.Vector3;
-  declare _anchor: THREE.Vector3;
-  declare _soundAt: THREE.Vector3;
-  declare _sparkOffset: THREE.Vector3;
-  declare _sparkPayload: IntelEventMap['intel:spark'];
-  declare _operationPayload: IntelEventMap['intel:operation'];
-  declare _prompt: IntelPrompt;
-  declare _hud: IntelHud;
-  declare _pulseSlots: IntelHud['pulses'];
-  declare _spawnPayload: IntelEventMap['intel:spawn'];
-  declare _noisePayload: IntelEventMap['intel:noise'];
-  declare _securePayload: IntelEventMap['intel:secured'];
-  declare _availablePayload: IntelEventMap['intel:available'];
-  declare _beepOptions: Parameters<AudioSystem['play']>[2];
+  _used: Set<string> = new Set();
+  _alive: IntelCache[] = [];
+  _aim: THREE.Vector3 = new THREE.Vector3();
+  _forward: THREE.Vector3 = new THREE.Vector3();
+  _anchor: THREE.Vector3 = new THREE.Vector3();
+  _soundAt: THREE.Vector3 = new THREE.Vector3();
+  _sparkOffset: THREE.Vector3 = new THREE.Vector3(0.13, 0.245, 0.06);
+  _sparkPayload: IntelEventMap['intel:spark'] = { position: new THREE.Vector3() };
+  _operationPayload: IntelEventMap['intel:operation'] = {
+    active: false,
+    position: new THREE.Vector3(),
+  };
+  _prompt: IntelPrompt = { key: bindingLabel('use'), text: 'Secure intel', sub: '', progress: 0 };
+  _hud: IntelHud = { holding: false, progress: 0, secured: 0, pulses: [], pulseTime: 0 };
+  _spawnPayload: IntelEventMap['intel:spawn'] = { id: '', position: new THREE.Vector3() };
+  _noisePayload: IntelEventMap['intel:noise'] = {
+    position: new THREE.Vector3(),
+    loudness: INTEL.pryLoudness,
+  };
+  _securePayload: IntelEventMap['intel:secured'] = {
+    id: '',
+    position: new THREE.Vector3(),
+    credits: INTEL.credits,
+  };
+  _availablePayload: IntelEventMap['intel:available'] = { count: 0 };
+  _beepOptions: Parameters<AudioSystem['play']>[2] = {
+    gain: INTEL.lureGain,
+    occlusion: 0,
+    maxDist: INTEL.lureRadius,
+    bus: 'ui',
+    priority: 0.5,
+  };
   declare _kit: ReturnType<typeof makeKit>;
   declare _pool: IntelCache[];
-  declare _off: Array<() => void>;
+  _off: Array<() => void> = [];
   declare _holding: IntelCache | null;
   declare _hold: number;
   declare _sparkAt: number;
@@ -95,11 +112,10 @@ export class IntelSystem {
     this.physics = ctx.get('physics');
     const world = ctx.get('world');
     this.markers = world.intelMarkers;
-    this._recent = [];
     if (!ctx.config.deterministic) {
       try {
         const saved: unknown = JSON.parse(
-          globalThis.localStorage?.getItem('ow:intel-sites:v1') ?? '[]'
+          globalThis.localStorage.getItem('ow:intel-sites:v1') ?? '[]'
         );
         if (Array.isArray(saved)) {
           const ids: unknown[] = saved;
@@ -120,61 +136,16 @@ export class IntelSystem {
     const origin = world.levelToWorld(0, 0, 0);
     const forward = world.levelToWorld(0, 0, -1);
     this._yaw = Math.atan2(origin.x - forward.x, origin.z - forward.z);
-    this._used = new Set();
-    this._alive = [];
-    this._aim = new THREE.Vector3();
-    this._forward = new THREE.Vector3();
-    this._anchor = new THREE.Vector3();
-    this._soundAt = new THREE.Vector3();
-    this._sparkOffset = new THREE.Vector3(0.13, 0.245, 0.06);
-    this._sparkPayload = { position: new THREE.Vector3() };
-    this._operationPayload = { active: false, position: new THREE.Vector3() };
-    this._prompt = { key: bindingLabel('use'), text: 'Secure intel', sub: '', progress: 0 };
-    this._hud = { holding: false, progress: 0, secured: 0, pulses: [], pulseTime: 0 };
-    this._pulseSlots = Array.from(
-      { length: INTEL.aliveMax },
-      (): { x: number; y: number; z: number; radius: 12 } => ({
-        x: 0,
-        y: 0,
-        z: 0,
-        radius: INTEL.pulseRadius,
-      })
-    );
-    this._spawnPayload = { id: '', position: new THREE.Vector3() };
-    this._noisePayload = { position: new THREE.Vector3(), loudness: INTEL.pryLoudness };
-    this._securePayload = {
-      id: '',
-      position: new THREE.Vector3(),
-      credits: INTEL.credits,
-    };
-    this._availablePayload = { count: 0 };
-    this._beepOptions = {
-      gain: INTEL.lureGain,
-      occlusion: 0,
-      maxDist: INTEL.lureRadius,
-      bus: 'ui',
-      priority: 0.5,
-    };
     this._kit = makeKit(ctx.get('materials'));
-    this._pool = Array.from(
-      { length: INTEL.aliveMax },
-      (): {
-        id: string;
-        x: number;
-        y: number;
-        z: number;
-        group: THREE.Group & { lid: THREE.Group };
-        open: number;
-      } => ({
-        id: '',
-        x: 0,
-        y: 0,
-        z: 0,
-        group: makeCrate(this._kit),
-        open: 0,
-      })
-    );
-    this._off = [];
+    this._pool = Array.from({ length: INTEL.aliveMax }, (): IntelCache => ({
+      id: '',
+      x: 0,
+      y: 0,
+      z: 0,
+      group: makeCrate(this._kit),
+      open: 0,
+      pulse: { x: 0, y: 0, z: 0, radius: INTEL.pulseRadius },
+    }));
     const on = <K extends keyof IntelEventMap>(
       type: K,
       fn: (event: IntelEventMap[K]) => void
@@ -197,14 +168,8 @@ export class IntelSystem {
     h.secured = this.secured;
     h.pulseTime = this.ctx.time.elapsed;
     h.pulses.length = this._alive.length;
-    for (let i = 0; i < this._alive.length; i++) {
-      const slot = this._pulseSlots[i];
-      const cache = this._alive[i];
-      slot.x = cache.x;
-      slot.y = cache.y;
-      slot.z = cache.z;
-      h.pulses[i] = slot;
-    }
+    let i = 0;
+    for (const cache of this._alive) h.pulses[i++] = cache.pulse;
     return h;
   }
 
@@ -304,7 +269,7 @@ export class IntelSystem {
       ctx.time.scale > 0 &&
       !ctx.input.frozen &&
       ctx.input.enabled &&
-      !ctx.peek('ui')?.menu?.open &&
+      !ctx.peek('ui')?.menu.open &&
       !this.market.open
     );
   }
@@ -315,7 +280,7 @@ export class IntelSystem {
     return (
       this._canDiscover() &&
       !this.player.mantling &&
-      !this.player.healCtrl?.active &&
+      !this.player.healCtrl.active &&
       !ctx.input.fire &&
       !ctx.input.ads &&
       (ctx.peek('weapons')?.canBeginHeal() ?? true)
@@ -351,7 +316,7 @@ export class IntelSystem {
     if (
       this.ctx.config.deterministic ||
       this.player.dead ||
-      !Number.isInteger(e?.wave) ||
+      !Number.isInteger(e.wave) ||
       e.wave <= this._lastWave
     )
       return;
@@ -375,6 +340,9 @@ export class IntelSystem {
     cache.x = marker.x;
     cache.y = marker.y;
     cache.z = marker.z;
+    cache.pulse.x = marker.x;
+    cache.pulse.y = marker.y;
+    cache.pulse.z = marker.z;
     cache.group.visible = true;
     cache.group.position.set(cache.x, cache.y, cache.z);
     // Keep the authored footprint; arbitrary yaw can put a corner through furniture.
@@ -388,7 +356,7 @@ export class IntelSystem {
       this._recent.push(cache.id);
       if (this._recent.length > INTEL.recentSites) this._recent.shift();
       try {
-        globalThis.localStorage?.setItem('ow:intel-sites:v1', JSON.stringify(this._recent));
+        globalThis.localStorage.setItem('ow:intel-sites:v1', JSON.stringify(this._recent));
       } catch {
         /* keep the same preference for restarts when storage is blocked */
       }
@@ -474,7 +442,7 @@ export class IntelSystem {
   reset(): void {
     this._interrupt();
     this._clearPrompt();
-    while (this._alive.length) this._despawn(this._alive[this._alive.length - 1]);
+    for (const cache of this._alive.slice()) this._despawn(cache);
     this._used.clear();
     this.secured = 0;
     this._beepAt = this._announceAt = this._lastWave = 0;
@@ -486,7 +454,9 @@ export class IntelSystem {
   /** Compile pooled props at boot without spawning, consuming RNG or drawing. */
   async prewarmMaterials(ctx: IntelContext = this.ctx): Promise<{ ok: true }> {
     const render = ctx.get('render');
-    const group = this._pool[0].group;
+    const first = this._pool.at(0);
+    if (!first) throw new Error('[intel] prewarm needs a pooled cache');
+    const group = first.group;
     const parent = group.parent,
       visible = group.visible;
     group.visible = true;

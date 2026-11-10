@@ -33,7 +33,7 @@ type M590Model = AuthoredModelData<
   };
 };
 
-export const M590_URL = new URL('../../assets/weapons/m590/m590.runtime.glb', import.meta.url).href;
+export const M590_URL = '/models/weapons/m590.runtime.glb';
 const ALIASES: Record<string, string> = manifest.aliases;
 
 export function makeM590Model(gltf: GLTF): M590Model {
@@ -42,6 +42,7 @@ export function makeM590Model(gltf: GLTF): M590Model {
     gltf,
     'M590_RIG',
     ['Idle', ...Object.values(ALIASES)],
+    manifest.clips,
     scene
   );
   const converted = convertWeaponScene(scene, (_source, material): void => {
@@ -104,18 +105,10 @@ export function createM590Animation(model: M590Model): WeaponAnimation {
     },
 
     fire(): void {}, // Reactive recoil and the gameplay Pump clip own discharge.
-    reset(): void {
-      this.idleTime = 0;
-      this._sample('Idle', 0);
-    },
 
-    update(dt: number, clipName: string | null, clipTime: number): void {
-      this.idleTime += dt;
+    update(_dt: number, clipName: string | null, clipTime: number): void {
       const gesture = clipName ? ALIASES[clipName] : undefined;
-      this._sample(
-        gesture ?? 'Idle',
-        gesture ? clipTime : this.idleTime % manifest.clips.Idle.duration
-      );
+      this._sample(gesture ?? 'Idle', gesture ? clipTime : 0);
     },
 
     dispose(): void {

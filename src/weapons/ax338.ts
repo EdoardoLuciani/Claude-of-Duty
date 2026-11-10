@@ -17,23 +17,13 @@ import { createAuthoredRig } from './authored-rig.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
-export const AX338_URL = new URL('../../assets/weapons/ax338/ax338.runtime.glb', import.meta.url)
-  .href;
+export const AX338_URL = '/models/weapons/ax338.runtime.glb';
 const ALIASES = { ...MAGAZINE_ALIASES, cycle: 'Bolt_Cycle' };
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
 
 export function makeAX338Model(gltf: GLTF): AX338Model {
   const scene = gltf.scene;
-  const { root, animations, point } = authoredModel(gltf, 'AX338_RIG', REQUIRED, scene);
-  // glTF infers duration from keys; gltfpack folds the wholly constant Idle to
-  // t=0. Restore only that authored hold, never normalize moving clip timing.
-  const idle = animations.find((clip): boolean => clip.name === 'Idle');
-  if (
-    idle?.duration === 0 &&
-    idle.tracks.length > 0 &&
-    idle.tracks.every((track): boolean => track.times.length === 1 && track.times[0] === 0)
-  )
-    idle.duration = manifest.clips.Idle.duration;
+  const { root, animations, point } = authoredModel(gltf, 'AX338_RIG', REQUIRED, manifest.clips);
   const model = {
     id: 'sniper' as const,
     label: 'AX-338',

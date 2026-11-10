@@ -5,7 +5,6 @@ import { PMREMGenerator } from 'three/webgpu';
 import type { Renderer, Node } from 'three/webgpu';
 
 import type { SystemId, EngineContext } from '../core/context.ts';
-import { applyDefinedPatch } from '../core/patch.ts';
 import type { RenderSystem } from '../render/index-webgpu.ts';
 import { createAtmosphereNodes, createRaymarchSky, createSkyViewLookup } from './atmosphere-tsl.ts';
 import {
@@ -14,6 +13,7 @@ import {
   SUN_ILLUMINANCE_TOP,
   MOON_ILLUMINANCE_NIGHT,
   transmittanceToSpace,
+  type RGB,
 } from './atmosphere.ts';
 import { BakePass, hdrTarget } from './bake.ts';
 import { Celestial } from './celestial.ts';
@@ -68,11 +68,6 @@ interface SkyWeather {
   windAngle: number;
   horizonMurk: number;
 }
-interface SkyWeatherPatch extends Partial<SkyWeather> {
-  fogDensity?: number;
-  fogHeight?: number;
-  shaftGain?: number;
-}
 interface SkyFog {
   scatter: number;
   extinction: number;
@@ -124,7 +119,10 @@ const SUN_KEY_GAIN = 1.55;
 const SKY_AMBIENT_FRACTION = 0.15;
 
 /** Cool night hue for the published ambient — moonlight after the Purkinje shift. */
-const NIGHT_AMBIENT_HUE = [0.35, 0.5, 1.0];
+const NIGHT_AMBIENT_HUE: Readonly<RGB> = [0.35, 0.5, 1.0];
+/** Sun key tint and Purkinje-shifted moonlight, scaled by transmittance each frame. */
+const SUN_TINT: Readonly<RGB> = [1.0, 0.975, 0.94];
+const MOON_COOL: Readonly<RGB> = [0.66, 0.8, 1.0];
 
 /** Atmosphere/LUTs, astronomy, clouds, fog and PMREM ownership.
  * Public and render integration contracts: ARCHITECTURE.md.
@@ -136,43 +134,77 @@ export class SkySystem {
   declare ctx: SkyContext;
   declare render: SkyRender;
   declare renderer: Renderer;
-  declare celestial: Celestial;
-  declare hour: number;
+  celestial: Celestial = new Celestial();
+  hour: number = CLOCK.startHour;
   declare timeRate: number;
-  declare weather: SkyWeather;
-  declare _fog: SkyFog;
+  // ---- weather / atmosphere state ---------------------------------------
+  weather: SkyWeather = {
+    /** Aerosol multiplier. 1 clear, 2-3 hazy, 5 dust storm. */
+    turbidity: 1.35,
+    cloudCoverage: 0.3,
+    cloudDensity: 1.9,
+    cirrusCoverage: 0.21,
+    cirrusOpacity: 0.3,
+    windSpeed: 0.0042, // km/s at the cloud deck (~4 m/s)
+    windAngle: 0.7,
+    horizonMurk: 0.13,
+  };
+  /** Ground fog. `scatter` and `extinction` are intentionally independent. */
+  _fog: SkyFog = {
+    scatter: 3.6e-3, // 1/m at the fog base
+    extinction: 1.45e-3, // 1/m at the fog base
+    heightScale: 18.0,
+    baseY: -2.0,
+    maxDistance: 900.0,
+    shaftGain: 2.6,
+    ambientGain: 0.22,
+    noise: 0.55,
+    noiseScale: 0.045,
+    phaseForward: 0.76,
+    phaseBackward: -0.36,
+    phaseBackWeight: 0.34,
+    extinctionTint: new THREE.Vector3(0.94, 1.02, 1.24),
+  };
   declare shared: SkyShared;
   declare luts: SkyLuts;
   declare raymarchSky: ReturnType<typeof createRaymarchSky>;
   declare skyScreen: ReturnType<typeof createSkySample>;
   declare dome: THREE.Mesh;
   declare envPass: BakePass;
-  declare sunLight: THREE.DirectionalLight;
-  declare moonLight: THREE.DirectionalLight;
+  // ---- lights -----------------------------------------------------------
+  // The renderer takes over shadowing for whichever directional light is
+  // brightest, so castShadow stays off: its cascades beat three's single
+  // shadow frustum by a mile.
+  sunLight: THREE.DirectionalLight = new THREE.DirectionalLight(0xffffff, 4.0);
+  moonLight: THREE.DirectionalLight = new THREE.DirectionalLight(0x9fc0ff, 0.0);
   declare keyLight: THREE.DirectionalLight;
-  declare envEquirect: ReturnType<typeof hdrTarget>;
+  // ---- IBL --------------------------------------------------------------
+  // 512x256 equirect -> PMREM, baked from the *same* shader and uniform nodes
+  // as the visible sky, so the IBL can never disagree with it.
+  envEquirect: ReturnType<typeof hdrTarget> = hdrTarget(512, 256, { name: 'sky-equirect' });
   declare pmrem: PMREMGenerator;
-  declare _pmremTarget: ReturnType<PMREMGenerator['fromEquirectangular']> | null;
-  declare envMap: THREE.Texture | null;
+  _pmremTarget: ReturnType<PMREMGenerator['fromEquirectangular']> | null = null;
+  envMap: THREE.Texture | null = null;
   declare volumetrics: ReturnType<typeof createVolumetricNodes>;
-  declare ambientColor: THREE.Color;
-  declare indirectScale: number;
-  declare _beamLuminance: number;
-  declare _sunT: [number, number, number];
-  declare _moonT: [number, number, number];
-  declare _envSunDir: THREE.Vector3;
-  declare _envMoonDir: THREE.Vector3;
-  declare _skySunDir: THREE.Vector3;
-  declare _skyMoonDir: THREE.Vector3;
-  declare _tmp: THREE.Vector3;
-  declare _cloudOcclusion: number;
-  declare _cloudOccTarget: number;
-  declare _baseSunIntensity: number;
-  declare _envAge: number;
-  declare _skyDirty: boolean;
-  declare _envDirty: boolean;
-  declare _cloudTime: number;
-  declare _occParams: SkyOccParams;
+  // ---- bookkeeping ------------------------------------------------------
+  ambientColor: THREE.Color = new THREE.Color(0, 0, 0);
+  indirectScale: number = 1;
+  _beamLuminance: number = 0;
+  _sunT: [number, number, number] = [0, 0, 0];
+  _moonT: [number, number, number] = [0, 0, 0];
+  _envSunDir: THREE.Vector3 = new THREE.Vector3(0, -1, 0);
+  _envMoonDir: THREE.Vector3 = new THREE.Vector3(0, -1, 0);
+  _skySunDir: THREE.Vector3 = new THREE.Vector3(0, -1, 0);
+  _skyMoonDir: THREE.Vector3 = new THREE.Vector3(0, -1, 0);
+  _tmp: THREE.Vector3 = new THREE.Vector3();
+  _cloudOcclusion: number = 1;
+  _cloudOccTarget: number = 1;
+  _baseSunIntensity: number = 0;
+  _envAge: number = 1e9;
+  _skyDirty: boolean = true;
+  _envDirty: boolean = true;
+  _cloudTime: number = 0;
+  _occParams: SkyOccParams = { coverage: 0, density: 0, windX: 0, windZ: 0, time: 0 };
   declare _offRestart: (() => void) | null;
 
   static readonly id = 'sky';
@@ -195,39 +227,7 @@ export class SkySystem {
     }
     const q = ctx.config.q;
 
-    this.celestial = new Celestial();
-    this.hour = CLOCK.startHour;
     this.timeRate = ctx.config.deterministic ? 0 : CLOCK.hoursPerSecond;
-
-    // ---- weather / atmosphere state ---------------------------------------
-    this.weather = {
-      /** Aerosol multiplier. 1 clear, 2-3 hazy, 5 dust storm. */
-      turbidity: 1.35,
-      cloudCoverage: 0.3,
-      cloudDensity: 1.9,
-      cirrusCoverage: 0.21,
-      cirrusOpacity: 0.3,
-      windSpeed: 0.0042, // km/s at the cloud deck (~4 m/s)
-      windAngle: 0.7,
-      horizonMurk: 0.13,
-    };
-
-    /** Ground fog. `scatter` and `extinction` are intentionally independent. */
-    this._fog = {
-      scatter: 3.6e-3, // 1/m at the fog base
-      extinction: 1.45e-3, // 1/m at the fog base
-      heightScale: 18.0,
-      baseY: -2.0,
-      maxDistance: 900.0,
-      shaftGain: 2.6,
-      ambientGain: 0.22,
-      noise: 0.55,
-      noiseScale: 0.045,
-      phaseForward: 0.76,
-      phaseBackward: -0.36,
-      phaseBackWeight: 0.34,
-      extinctionTint: new THREE.Vector3(0.94, 1.02, 1.24),
-    };
 
     // ---- shared uniform nodes --------------------------------------------
     // Every pass, the background and the environment material reference these
@@ -321,18 +321,12 @@ export class SkySystem {
     // QuadMesh writes native texture UVs; PMREM reads the same equirect convention.
     this.envPass = new BakePass('sky-env', skyEnv(dirFromEquirectUv(uv())));
 
-    // ---- lights -----------------------------------------------------------
-    // The renderer takes over shadowing for whichever directional light is
-    // brightest, so castShadow stays off: its cascades beat three's single
-    // shadow frustum by a mile.
-    this.sunLight = new THREE.DirectionalLight(0xffffff, 4.0);
     this.sunLight.name = 'sky-sun';
     this.sunLight.castShadow = false;
     this.sunLight.target.name = 'sky-sun-target';
     ctx.scene.add(this.sunLight, this.sunLight.target);
     r.addLight(this.sunLight, { range: 1e9, priority: 10 });
 
-    this.moonLight = new THREE.DirectionalLight(0x9fc0ff, 0.0);
     this.moonLight.name = 'sky-moon';
     this.moonLight.castShadow = false;
     ctx.scene.add(this.moonLight, this.moonLight.target);
@@ -340,14 +334,8 @@ export class SkySystem {
 
     this.keyLight = this.sunLight;
 
-    // ---- IBL --------------------------------------------------------------
-    // 512x256 equirect -> PMREM, baked from the *same* shader and uniform nodes
-    // as the visible sky, so the IBL can never disagree with it.
-    this.envEquirect = hdrTarget(512, 256, { name: 'sky-equirect' });
     this.envEquirect.texture.mapping = THREE.EquirectangularReflectionMapping;
     this.pmrem = new PMREMGenerator(this.renderer);
-    this._pmremTarget = null;
-    this.envMap = null;
 
     // ---- volumetrics ------------------------------------------------------
     // A node factory, not a registered pass: the WebGPU frame graph has no pass
@@ -359,26 +347,6 @@ export class SkySystem {
       steps: Math.max(8, steps),
       march: q.volumetrics,
     });
-
-    // ---- bookkeeping ------------------------------------------------------
-    this.ambientColor = new THREE.Color(0, 0, 0);
-    this.indirectScale = 1;
-    this._beamLuminance = 0;
-    this._sunT = [0, 0, 0];
-    this._moonT = [0, 0, 0];
-    this._envSunDir = new THREE.Vector3(0, -1, 0);
-    this._envMoonDir = new THREE.Vector3(0, -1, 0);
-    this._skySunDir = new THREE.Vector3(0, -1, 0);
-    this._skyMoonDir = new THREE.Vector3(0, -1, 0);
-    this._tmp = new THREE.Vector3();
-    this._cloudOcclusion = 1;
-    this._cloudOccTarget = 1;
-    this._baseSunIntensity = 0;
-    this._envAge = 1e9;
-    this._skyDirty = true;
-    this._envDirty = true;
-    this._cloudTime = 0;
-    this._occParams = { coverage: 0, density: 0, windX: 0, windZ: 0, time: 0 };
 
     this._applyWeather();
     this._applyFog();
@@ -397,12 +365,6 @@ export class SkySystem {
 
   get timeOfDay(): number {
     return this.hour;
-  }
-  get sunDirection(): THREE.Vector3 {
-    return this.celestial.sun;
-  }
-  get moonDirection(): THREE.Vector3 {
-    return this.celestial.moon;
   }
   get sunAltitude(): number {
     return this.celestial.sunAlt;
@@ -430,43 +392,18 @@ export class SkySystem {
     this._updateCelestial();
     this._bakeSky();
     this._bakeEnv();
-    if (this.ctx.config.deterministic === true) {
+    if (this.ctx.config.deterministic) {
       const c = this.celestial;
       const sc = this.sunLight.color;
       console.info(
         `[sky] t=${this.hour.toFixed(2)} sunAlt=${((c.sunAlt * 180) / Math.PI).toFixed(1)} ` +
           `sunI=${this.sunLight.intensity.toFixed(3)} sunCol=${sc.r.toFixed(2)},${sc.g.toFixed(2)},${sc.b.toFixed(2)} ` +
-          `moonI=${this.moonLight.intensity.toFixed(4)} beamLum=${(this._beamLuminance ?? 0).toFixed(3)} ` +
+          `moonI=${this.moonLight.intensity.toFixed(4)} beamLum=${this._beamLuminance.toFixed(3)} ` +
           `amb=${this.ambientColor.r.toFixed(3)},${this.ambientColor.g.toFixed(3)},${this.ambientColor.b.toFixed(3)} ` +
           `indirect=${this.indirectScale.toFixed(2)} ` +
           `knee=${this.shared.uSkyRolloff.value.x.toFixed(3)}`
       );
     }
-    return this;
-  }
-
-  /** Hours of sky time per second of wall clock. 0 freezes the sun. */
-  setTimeRate(hoursPerSecond: number): this {
-    this.timeRate = hoursPerSecond || 0;
-    return this;
-  }
-
-  setWeather(patch: SkyWeatherPatch = {}): this {
-    const { fogDensity, fogHeight, shaftGain, ...weather } = patch;
-    applyDefinedPatch(this.weather, weather);
-    if (fogDensity !== undefined) {
-      const k = fogDensity;
-      this._fog.scatter = 3.6e-3 * k;
-      this._fog.extinction = 1.45e-3 * k;
-    }
-    if (fogHeight !== undefined) this._fog.heightScale = fogHeight;
-    if (shaftGain !== undefined) this._fog.shaftGain = shaftGain;
-    this._applyWeather();
-    this._applyFog();
-    // Turbidity is baked into all three LUTs, so it needs the static bake too.
-    if (patch.turbidity !== undefined) this.luts.bakeStatic(this.renderer);
-    this._skyDirty = true;
-    this._envDirty = true;
     return this;
   }
 
@@ -561,7 +498,7 @@ export class SkySystem {
     // snaps off at sunset instead of dimming through the last half degree.
     const discS = THREE.MathUtils.clamp(0.5 + muS / (2 * 0.004654), 0, 1);
     transmittanceToSpace(Math.max(muS, 0.0008), mie, this._sunT);
-    const tint = [1.0, 0.975, 0.94];
+    const tint = SUN_TINT;
     const T = this._sunT;
     // The key is the disc PLUS its aureole: raising the transmittance to a power
     // below one keeps the ordering and hue direction while pulling the
@@ -607,7 +544,7 @@ export class SkySystem {
     transmittanceToSpace(Math.max(muM, 0.0008), mie, this._moonT);
     const MT = this._moonT;
     // Moonlight reads cool because scotopic vision peaks blue (Purkinje shift).
-    const cool = [0.66, 0.8, 1.0];
+    const cool = MOON_COOL;
     const mr = MT[0] * cool[0];
     const mg = MT[1] * cool[1];
     const mb = MT[2] * cool[2];
@@ -726,11 +663,7 @@ export class SkySystem {
     this._pmremTarget = this.pmrem.fromEquirectangular(this.envEquirect.texture, this._pmremTarget);
     this._pmremTarget.texture.name = 'sky-env';
     this.envMap = this._pmremTarget.texture;
-    if (this.render.setEnvMap) this.render.setEnvMap(this.envMap);
-    else {
-      this.ctx.scene.environment = this.envMap;
-      this.ctx.viewScene.environment = this.envMap;
-    }
+    this.render.setEnvMap(this.envMap);
 
     this._envSunDir.copy(this.celestial.sun);
     this._envMoonDir.copy(this.celestial.moon);
@@ -755,8 +688,8 @@ export class SkySystem {
     this.pmrem.dispose();
     this.ctx.scene.remove(this.sunLight, this.sunLight.target);
     this.ctx.scene.remove(this.moonLight, this.moonLight.target);
-    this.render.removeLight?.(this.sunLight);
-    this.render.removeLight?.(this.moonLight);
+    this.render.removeLight(this.sunLight);
+    this.render.removeLight(this.moonLight);
     this.sunLight.dispose();
     this.moonLight.dispose();
   }

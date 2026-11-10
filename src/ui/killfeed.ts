@@ -1,4 +1,5 @@
-import { Pool, ease, clamp01 } from './util.ts';
+import { clamp01 } from '../core/math.ts';
+import { Pool, ease } from './util.ts';
 
 export const KILLFEED_CAPACITY = 6;
 

@@ -129,7 +129,9 @@ export function updateViewLighting(r: RenderLightingState, ctx: ViewLightingCont
     if (light.distance > 0) attenuation *= Math.max(0, 1 - (distance / light.distance) ** 4) ** 2;
     const irradiance = light.intensity * attenuation;
     const score = irradiance * Math.max(light.color.r, light.color.g, light.color.b);
-    let slot = r.viewPracticals[0];
+    // Replace the weakest pooled slot; the first slot seeds the scan.
+    let slot = r.viewPracticals.at(0);
+    if (!slot) continue;
     for (const candidate of r.viewPracticals) if (candidate.score < slot.score) slot = candidate;
     if (score <= slot.score) continue;
     r._viewToLight.divideScalar(Math.max(distance, 1e-6));

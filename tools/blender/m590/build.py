@@ -429,7 +429,7 @@ def build(output, render=False, quick=False):
     manifest={'asset':'Mossberg 590A1 Tactical SKU50774 (2016) / 18.5-inch / 6+1 / ghost ring / fixed synthetic stock / tri-rail',
         'status':'Provisional runtime review prototype; strict 1:1 and final human visual/gameplay approval pending',
         'units':'metres','blenderForward':'+Y','blenderUp':'+Z','runtimeBasis':'-Z forward / +Y up / +X right; no adapter basis transform',
-        'source':'tools/blender/m590/build.py + tools/blender/m590/ + tools/blender/m590/actions.py + tools/blender/m590/hand-reference.mjs','stats':stats,'clips':clips,
+        'source':'tools/blender/m590/build.py + tools/blender/m590/ + tools/blender/m590/actions.py + tools/blender/m590/hand-reference.ts','stats':stats,'clips':clips,
         'aliases':{'pump':'Pump','reloadTac':'Reload_Tactical','reloadEmpty':'Reload_Empty','inspect':'Inspect','draw':'Draw','holster':'Holster'},
         'textures':{'resolution':1024,'packed':True,'embedded':True,'method':'UV0 original albedo/normal; UV1 padded scalar finish atlas; exact linear vertex colours; no photographic inputs'},
         'dimensions':{'sourceBounds':bounds,'caseLength':.07,'rimRadius':.01105,'barrelLength':BARREL,'exposedBarrelLength':-.194-muzzle_z,'overallLength':OAL,'lengthOfPull':LOP,'nominalBarrelInches':18.5,

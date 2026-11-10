@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 
+import { DEFAULT_BINDINGS, type ActionId } from '../core/bindings.ts';
 import type { SystemId, EngineContext, EngineSystems } from '../core/context.ts';
 import type { EngineEventMap, EngineEventName } from '../core/events.ts';
+import { hasOwn } from '../core/guards.ts';
 import { STANCE } from '../player/tuning.ts';
 import {
   entries,
@@ -232,24 +234,9 @@ type TelemetrySnapshot = {
 
 const PLAYER_HZ = 10;
 const ENEMY_HZ = 5;
-const ACTIONS = [
-  'forward',
-  'back',
-  'left',
-  'right',
-  'jump',
-  'crouch',
-  'prone',
-  'sprint',
-  'reload',
-  'use',
-  'leanLeft',
-  'leanRight',
-  'swapWeapon',
-  'grenade',
-  'radio',
-  'heal',
-] as const;
+const ACTIONS = Object.keys(DEFAULT_BINDINGS).filter((name): name is ActionId =>
+  hasOwn(DEFAULT_BINDINGS, name)
+);
 const EVENTS = [
   'weapon:fire',
   'weapon:reload',
@@ -356,9 +343,22 @@ function pushWorst<K extends string, T extends Record<K, number | null>>(
     list.push(rec);
     return false;
   }
+  // The first record seeds the scan (as before, including NaN timings); a zero-capacity
+  // list rejects everything. Runs per hitch, so the scan keeps a manual index.
+  const first = list.at(0);
+  if (!first) return true;
   let min = 0;
-  for (let i = 1; i < list.length; i++) if ((list[i][key] ?? 0) < (list[min][key] ?? 0)) min = i;
-  if ((rec[key] ?? 0) <= (list[min][key] ?? 0)) return true;
+  let least = first[key] ?? 0;
+  let i = 0;
+  for (const item of list) {
+    const value = item[key] ?? 0;
+    if (value < least) {
+      min = i;
+      least = value;
+    }
+    i++;
+  }
+  if ((rec[key] ?? 0) <= least) return true;
   list[min] = rec;
   return false;
 }
@@ -381,12 +381,21 @@ function entityId(v: unknown): string | null {
   return stringField(v, 'name');
 }
 
+const ENTITY_FIELDS: ReadonlySet<string> = new Set(['actor', 'shooter', 'target', 'source']);
+function recordField(key: string, value: unknown): unknown {
+  if (value == null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') return n3(value);
+  if (value instanceof THREE.Vector3) return vec(value);
+  if (key === 'weapon') return weaponId(value);
+  return ENTITY_FIELDS.has(key) ? entityId(value) : undefined;
+}
+
 function isInstancedMesh(mesh: THREE.Object3D): mesh is THREE.InstancedMesh<THREE.BufferGeometry> {
   return mesh instanceof THREE.InstancedMesh;
 }
 
 const TAR_BLOCK = 512;
-const SCHEMA = 4;
+const SCHEMA = 5;
 const shotName = (i: number): string => `marks/${String(i + 1).padStart(3, '0')}.jpg`;
 
 function buildingId(
@@ -430,23 +439,6 @@ function tarHeader(name: string, size: number): Uint8Array<ArrayBuffer> {
   for (let i = 0; i < TAR_BLOCK; i++) sum += h[i];
   put(148, `${sum.toString(8).padStart(6, '0')}\0 `, 8);
   return h;
-}
-
-export function extractTar(buf: Uint8Array): Record<string, Uint8Array> {
-  const files: Record<string, Uint8Array> = {};
-  const text = new TextDecoder();
-  let offset = 0;
-  while (offset + TAR_BLOCK <= buf.length) {
-    const name = text.decode(buf.subarray(offset, offset + 100)).replace(/\0.*$/, '');
-    if (!name) break;
-    const size = parseInt(text.decode(buf.subarray(offset + 124, offset + 136)), 8);
-    offset += TAR_BLOCK;
-    files[name] = buf.subarray(offset, offset + size);
-    offset += size;
-    const pad = (TAR_BLOCK - (size % TAR_BLOCK)) % TAR_BLOCK;
-    if (pad) offset += pad;
-  }
-  return files;
 }
 
 function buildTar(files: Array<{ name: string; data: Uint8Array }>): Uint8Array<ArrayBuffer> {
@@ -533,45 +525,44 @@ interface RenderSnapshot {
 declare global {
   interface Window {
     __TELEMETRY__?: TelemetryApi;
-    __BUILD_REVISION__?: string;
   }
 }
 
 export class TelemetrySystem {
   declare ctx: EngineContext;
-  declare recording: boolean;
-  declare exported: boolean;
-  declare playerSamples: ReturnType<TelemetrySystem['_playerSample']>[];
-  declare enemySamples: ReturnType<TelemetrySystem['_enemySample']>[];
-  declare events: TelemetryEvent[];
-  declare markers: TelemetryMark[];
-  declare _off: Array<() => void>;
-  declare _enemyState: Map<number, string>;
-  declare _contacts: Map<number, string>;
-  declare _move: { x: number; y: number };
-  declare _maxAlive: number;
-  declare _lastBadgeAt: number;
-  declare hitches: HitchRecord[];
-  declare longTasks: LongTaskRecord[];
-  declare _hitchDropped: number;
-  declare _taskDropped: number;
-  declare _frameEma: number;
-  declare _lastFrameWall: number | null;
-  declare _startWall: number;
+  recording: boolean = false;
+  exported: boolean = false;
+  playerSamples: ReturnType<TelemetrySystem['_playerSample']>[] = [];
+  enemySamples: ReturnType<TelemetrySystem['_enemySample']>[] = [];
+  events: TelemetryEvent[] = [];
+  markers: TelemetryMark[] = [];
+  _off: Array<() => void> = [];
+  _enemyState: Map<number, string> = new Map();
+  _contacts: Map<number, string> = new Map();
+  _move: { x: number; y: number } = { x: 0, y: 0 };
+  _maxAlive: number = 0;
+  _lastBadgeAt: number = -Infinity;
+  hitches: HitchRecord[] = [];
+  longTasks: LongTaskRecord[] = [];
+  _hitchDropped: number = 0;
+  _taskDropped: number = 0;
+  _frameEma: number = 16.7;
+  _lastFrameWall: number | null = null;
+  _startWall: number = 0;
   declare _resumedAt: number | null;
-  declare _prevInfo: RenderSnapshot | null;
-  declare _loafObs: PerformanceObserver | null;
-  declare _observers: string | null;
-  declare _shots: Array<Blob | undefined>;
-  declare _grabQueue: TelemetryMark[];
-  declare _grabbing: Promise<void> | null;
-  declare _noteMark: TelemetryMark | null;
-  declare _offscreen: HTMLCanvasElement | null;
-  declare _raycaster: THREE.Raycaster;
-  declare _v: THREE.Vector3;
-  declare _v2: THREE.Vector3;
-  declare _box: THREE.Box3;
-  declare _mat: THREE.Matrix4;
+  _prevInfo: RenderSnapshot | null = null;
+  _loafObs: PerformanceObserver | null = null;
+  _observers: string | null = null;
+  _shots: Array<Blob | undefined> = [];
+  _grabQueue: TelemetryMark[] = [];
+  _grabbing: Promise<void> | null = null;
+  _noteMark: TelemetryMark | null = null;
+  _offscreen: HTMLCanvasElement | null = null;
+  _raycaster: THREE.Raycaster = new THREE.Raycaster();
+  _v: THREE.Vector3 = new THREE.Vector3();
+  _v2: THREE.Vector3 = new THREE.Vector3();
+  _box: THREE.Box3 = new THREE.Box3();
+  _mat: THREE.Matrix4 = new THREE.Matrix4();
   declare badge: HTMLDivElement;
   declare _onKey: (event: KeyboardEvent) => void;
   declare _onBeforeUnload: (event: BeforeUnloadEvent) => void;
@@ -584,8 +575,9 @@ export class TelemetrySystem {
   declare _restoreEnabled: boolean | null;
   declare _restoreControl: boolean | null;
   declare _nativeBuilds: ReturnType<typeof trackNodeBuilders> | null;
-  declare _startElapsed: number;
-  declare _startRaw: number;
+  /** Unset until start(); events recorded during boot read as time zero. */
+  declare _startElapsed: number | undefined;
+  declare _startRaw: number | undefined;
   declare _stopElapsed: number | null;
   declare _stopRaw: number | null;
   declare _nextPlayerRaw: number;
@@ -597,39 +589,7 @@ export class TelemetrySystem {
 
   async init(ctx: EngineContext): Promise<void> {
     this.ctx = ctx;
-    this.recording = false;
-    this.exported = false;
-    this.playerSamples = [];
-    this.enemySamples = [];
-    this.events = [];
-    this.markers = [];
-    this._off = [];
-    this._enemyState = new Map();
-    this._contacts = new Map();
-    this._move = { x: 0, y: 0 };
-    this._maxAlive = 0;
-    this._lastBadgeAt = -Infinity;
-    this.hitches = [];
-    this.longTasks = [];
-    this._hitchDropped = 0;
-    this._taskDropped = 0;
-    this._frameEma = 16.7;
-    this._lastFrameWall = null;
-    this._startWall = 0;
     this._resumedAt = null;
-    this._prevInfo = null;
-    this._loafObs = null;
-    this._observers = null;
-    this._shots = [];
-    this._grabQueue = [];
-    this._grabbing = null;
-    this._noteMark = null;
-    this._offscreen = null;
-    this._raycaster = new THREE.Raycaster();
-    this._v = new THREE.Vector3();
-    this._v2 = new THREE.Vector3();
-    this._box = new THREE.Box3();
-    this._mat = new THREE.Matrix4();
 
     for (const type of EVENTS) {
       this._off.push(ctx.events.on(type, (e): void => this._recordEvent(type, e)));
@@ -769,7 +729,7 @@ export class TelemetrySystem {
       path: location.pathname,
       transform: xform ? Array.from(xform.elements) : null,
       provenance: collectProvenance({
-        revision: stringField(this.ctx.config, 'revision') ?? window.__BUILD_REVISION__,
+        revision: stringField(this.ctx.config, 'revision') ?? import.meta.BUILD_REVISION,
       }),
     };
   }
@@ -882,7 +842,7 @@ export class TelemetrySystem {
   } | null {
     this._raycaster.far = 24;
     this._raycaster.set(origin, dir);
-    const hit = this._raycaster.intersectObjects(world?.meshes ?? [], false)[0];
+    const hit = this._raycaster.intersectObjects(world?.meshes ?? [], false).at(0);
     if (!hit) return null;
     const mesh = hit.object;
     let normal = null;
@@ -900,7 +860,7 @@ export class TelemetrySystem {
       normal = [n3(this._v.x), n3(this._v.y), n3(this._v.z)];
     }
     return {
-      mesh: mesh.name ?? null,
+      mesh: mesh.name,
       palette: field(mesh.userData, 'palette') ?? null,
       instanceGroup:
         mesh instanceof THREE.InstancedMesh
@@ -1104,7 +1064,7 @@ export class TelemetrySystem {
 
   /** Last frame's resource counters, so a hitch can show what jumped inside it. */
   _snapInfo(): void {
-    const info = this.ctx.peek('render')?.renderer?.info;
+    const info = this.ctx.peek('render')?.renderer.info;
     if (!info) return;
     this._prevInfo = {
       programs: programCount(info),
@@ -1133,12 +1093,12 @@ export class TelemetrySystem {
     heapMb: number | null;
     dHeapMb: number | null;
   } {
-    const info = this.ctx.peek('render')?.renderer?.info;
+    const info = this.ctx.peek('render')?.renderer.info;
     const prev = this._prevInfo;
     const programs = programCount(info);
     const nodeBuilders = this._nativeBuilds?.count ?? null;
-    const geometries = info?.memory?.geometries ?? null;
-    const textures = info?.memory?.textures ?? null;
+    const geometries = info?.memory.geometries ?? null;
+    const textures = info?.memory.textures ?? null;
     const heap = heapMb();
     return {
       render: {
@@ -1162,7 +1122,7 @@ export class TelemetrySystem {
   _startObservers(): void {
     this._stopObservers(); // `__TELEMETRY__.start()` twice must not leave two observers
     this._observers = null;
-    const types = globalThis.PerformanceObserver?.supportedEntryTypes ?? [];
+    const types = globalThis.PerformanceObserver.supportedEntryTypes;
     const type = ['long-animation-frame', 'longtask'].find((name): boolean => types.includes(name));
     if (!type) return; // no observer at all: tier 1 still records the gaps
     try {
@@ -1288,176 +1248,14 @@ export class TelemetrySystem {
   }
 
   _recordEvent<K extends EngineEventName>(type: K, e: EngineEventMap[K]): void;
+  /** Events are projected generically: entities and weapons become ids, vectors rounded
+   * triples, numbers millimetre-rounded; other objects (meshes, bodies) are dropped. */
   _recordEvent(...[type, e]: EventTuple): void {
     if (!this.recording) return;
-    let data;
-    switch (type) {
-      case 'weapon:fire':
-        data = {
-          shooter: entityId(e.actor),
-          weapon: weaponId(e.weapon),
-          origin: vec(e.origin),
-          dir: vec(e.dir),
-          seed: e.seed ?? null,
-        };
-        break;
-      case 'shot:resolved':
-        data = {
-          shooter: entityId(e.shooter),
-          weapon: weaponId(e.weapon),
-          from: vec(e.from),
-          to: vec(e.to),
-          result: e.result ?? null,
-          target: entityId(e.target),
-          part: e.part ?? null,
-          damage: n3(e.damage),
-          pellet: e.pellet ?? 0,
-          shot: e.shot ?? null,
-          stopReason: e.stopReason ?? null,
-        };
-        break;
-      case 'bullet:impact':
-        data = {
-          point: vec(e.point),
-          normal: vec(e.normal),
-          incident: vec(e.incident),
-          surface: e.surface ?? null,
-          damage: n3(e.damage),
-          exit: !!e.exit,
-          target: entityId(e.actor),
-          part: e.part ?? null,
-        };
-        break;
-      case 'weapon:reload':
-        data = {
-          actor: entityId(e.actor) ?? 'player',
-          weapon: weaponId(e.weapon),
-          phase: e.phase ?? null,
-        };
-        break;
-      case 'damage:dealt':
-        data = {
-          target: entityId(e.target),
-          source: entityId(e.source),
-          amount: n3(e.amount),
-          point: vec(e.point),
-          headshot: !!e.headshot,
-          killed: !!e.killed,
-          explosion: !!e.explosion,
-        };
-        break;
-      case 'damage:taken':
-        data = {
-          amount: n3(e.amount),
-          health: n3(e.health),
-          armour: n3(e.armour),
-          absorbed: n3(e.armourAbsorbed),
-          plateBreak: !!e.plateBreak,
-          from: vec(e.from),
-        };
-        break;
-      case 'actor:death':
-        data = { actor: entityId(e.actor), point: vec(e.point), impulse: vec(e.impulse) };
-        break;
-      case 'player:state':
-        data = {
-          state: e.state ?? null,
-          stance: e.stance ?? null,
-          sprinting: !!e.sprinting,
-          tacticalSprint: !!e.tacticalSprint,
-          sliding: !!e.sliding,
-          mantling: !!e.mantling,
-          grounded: !!e.grounded,
-          ads: !!e.ads,
-        };
-        break;
-      case 'player:footstep':
-        data = {
-          position: vec(e.position),
-          surface: e.surface ?? null,
-          running: !!e.running,
-          speed: n3(e.speed),
-          stance: e.stance ?? null,
-        };
-        break;
-      case 'player:jump':
-      case 'player:respawn':
-      case 'ammo:pickup':
-        data = {
-          position: vec(e.position),
-          amount: 'amount' in e ? e.amount : null,
-          weapon: weaponId('weapon' in e ? e.weapon : null),
-        };
-        break;
-      case 'player:mantle':
-        data = { kind: e.kind ?? null, height: n3(e.height) };
-        break;
-      case 'player:land':
-        data = { position: vec(e.position), velocity: n3(e.velocity), surface: e.surface ?? null };
-        break;
-      case 'player:death':
-        data = { position: vec(e.position), from: vec(e.from), amount: n3(e.amount) };
-        break;
-      case 'player:heal':
-        data = {
-          phase: e.phase,
-          amount: n3(e.amount),
-          health: n3(e.health),
-          bandages: e.bandages,
-          reason: e.reason,
-        };
-        break;
-      case 'explosion':
-        data = {
-          position: vec(e.position),
-          radius: n3(e.radius),
-          damage: n3(e.damage),
-          source: entityId(e.source),
-        };
-        break;
-      case 'wave:start':
-        data = { wave: e.wave ?? null, enemies: e.enemies ?? null, squads: e.squads ?? null };
-        break;
-      case 'wave:complete':
-        data = { wave: e.wave ?? null, nextWave: e.nextWave ?? null, delay: n3(e.delay) };
-        break;
-      case 'score:change':
-        data = {
-          score: e.score ?? null,
-          delta: e.delta ?? null,
-          reason: e.reason ?? null,
-          kills: e.kills ?? null,
-        };
-        break;
-      case 'market:open':
-        data = { wave: e.wave ?? null };
-        break;
-      case 'market:close':
-      case 'game:restart':
-        data = { source: e.source ?? null };
-        break;
-      case 'hud:heard':
-        data = { bearing: n3(e.bearing) };
-        break;
-      case 'hud:search':
-        data = { bearing: n3(e.bearing), sector: e.sector ?? null, remaining: e.remaining ?? null };
-        break;
-      case 'radio:strike':
-        data = { position: vec(e.position) };
-        break;
-      case 'ai:bark':
-        data = {
-          kind: e.kind ?? null,
-          position: vec(e.position),
-          actor: e.voice ? `ai:${e.voice}` : null,
-        };
-        break;
-      case 'engine:error':
-        data = { system: e.system ?? null, method: e.method ?? null, message: e.message ?? null };
-        break;
-      default:
-        data = {};
-        break;
+    const data: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(e)) {
+      const recorded = recordField(key, value);
+      if (recorded !== undefined) data[key] = recorded;
     }
     this._push(type, data);
   }
@@ -1479,8 +1277,6 @@ export class TelemetrySystem {
     const input = ctx.input;
     const actions = [];
     for (const name of ACTIONS) if (input.action(name)) actions.push(name);
-    if (input.fire) actions.push('fire');
-    if (input.ads) actions.push('ads');
     input.moveVector(this._move);
     const wave = ai.getWaveState();
     const info = render.renderer.info;
@@ -1489,15 +1285,15 @@ export class TelemetrySystem {
       t: this._time(),
       raw: this._rawTime(),
       frame: ctx.time.frame,
-      position: vec(p.feetPosition ?? p.position),
+      position: vec(p.feetPosition),
       eye: vec(ctx.camera.position),
       velocity: vec(p.velocity),
-      yaw: n3(p.yaw ?? ctx.camera.rotation.y),
+      yaw: n3(p.yaw),
       pitch: n3(ctx.camera.rotation.x),
       fov: n3(ctx.camera.fov),
       state: p.state ?? null,
-      stance: p.stance ?? null,
-      grounded: p.grounded ?? null,
+      stance: p.stance,
+      grounded: p.grounded,
       sprinting: !!p.sprinting,
       tacticalSprint: !!p.tacticalSprint,
       sliding: !!p.sliding,
@@ -1509,13 +1305,13 @@ export class TelemetrySystem {
       bandages: p.bandages,
       healing: p.healCtrl.active,
       healProgress: n3(p.healCtrl.progress),
-      weapon: w.activeId ?? null,
+      weapon: w.activeId,
       mode: ws?.mode ?? null,
       ammo: ws?.mag ?? null,
       reserve: ws?.reserve ?? null,
       reloading: !!w.reloading,
-      ads: (w.adsProgress ?? 0) > 0.5,
-      grenades: w.grenades ?? null,
+      ads: w.adsProgress > 0.5,
+      grenades: w.grenades,
       actions,
       move: [n3(this._move.x), n3(this._move.y)],
       look: [n3(input.look.x), n3(input.look.y)],
@@ -1597,7 +1393,7 @@ export class TelemetrySystem {
         state: a.state,
         stateTime: n3(a.stateTime),
         squad: a.squad?.id ?? null,
-        role: a.role ?? null,
+        role: a.role,
         crouch: !!a.crouch,
         peeking: !!a.peeking,
         wantFire: !!a.wantFire,
@@ -1609,7 +1405,7 @@ export class TelemetrySystem {
         visualAge: n3(a.visualAge),
         combatAction: a.combatAction ?? null,
         contactKind: a.lastKnownKind ?? null,
-        targetSample: a.targetSample ?? -1,
+        targetSample: a.targetSample,
         observationSearch: !!a._observationSearch,
         coverFailure: a.coverFailure ?? null,
         elevatedRole: a.squad?.elevated === a,
@@ -1619,16 +1415,16 @@ export class TelemetrySystem {
         cover: a.cover ? [n3(a.cover.x), n3(a.cover.y), n3(a.cover.z)] : null,
         coverPosition: a.cover ? vec(a.coverPos) : null,
         moveTarget: a.hasMoveTarget ? vec(a.moveTarget) : null,
-        pathLength: a.pathLen ?? 0,
-        pathIndex: a.pathIndex ?? 0,
+        pathLength: a.pathLen,
+        pathIndex: a.pathIndex,
         pathRequest: a.pathOutcome ? vec(a._pendingDest) : null,
         waypoint: a.hasMoveTarget ? vec(a.path[a.pathIndex]) : null,
         path: a.hasMoveTarget ? a.path.slice(a.pathIndex, a.pathLen).map(vec) : null,
         vault: a.vaultOutcome ?? null,
         vaultT: n3(a.vaultT),
         recovery: a.recoveryOutcome ?? null,
-        recoveryAttempts: a.recoveryAttempts ?? 0,
-        relocations: a.relocations ?? 0,
+        recoveryAttempts: a.recoveryAttempts,
+        relocations: a.relocations,
         rollback: a.lastRollback ?? null,
         searchTravelUntil: n3(a._searchTravelUntil),
         searchUntil: n3(a._searchUntil),
@@ -1728,9 +1524,9 @@ export class TelemetrySystem {
     const files = [
       { name: 'telemetry.json', data: new TextEncoder().encode(JSON.stringify(this.snapshot())) },
     ];
-    for (let i = 0; i < this.markers.length; i++) {
+    for (const [i, marker] of this.markers.entries()) {
       const blob = this._shots[i];
-      const name = this.markers[i].screenshot;
+      const name = marker.screenshot;
       if (!blob || !name) continue;
       files.push({
         name,
@@ -1773,7 +1569,7 @@ export class TelemetrySystem {
 
   _captureJpeg(): Promise<Blob | null> {
     const src = this.ctx.canvas;
-    if (!src?.width || !src.height) return Promise.resolve(null);
+    if (!src.width || !src.height) return Promise.resolve(null);
     const w = Math.max(1, src.width >> 1);
     const h = Math.max(1, src.height >> 1);
     let off = this._offscreen;
@@ -1834,16 +1630,14 @@ export class TelemetrySystem {
     if (this._noteMark) this._closeNote();
     this._noteMark = mark;
     const input = this.ctx.input;
-    if (input) {
-      this._restoreFrozen = input.frozen;
-      this._restoreEnabled = input.enabled;
-      input.frozen = true;
-      input.enabled = false;
-    }
+    this._restoreFrozen = input.frozen;
+    this._restoreEnabled = input.enabled;
+    input.frozen = true;
+    input.enabled = false;
     const player = this.ctx.peek('player');
     if (player) {
       this._restoreControl = player.controlEnabled;
-      player.setControlEnabled?.(false);
+      player.setControlEnabled(false);
     }
     this._noteInput.value = mark.note || '';
     this._note.style.display = '';
@@ -1856,11 +1650,9 @@ export class TelemetrySystem {
     this._noteMark = null;
     this._note.style.display = 'none';
     const input = this.ctx.input;
-    if (input) {
-      input.frozen = this._restoreFrozen ?? false;
-      input.enabled = this._restoreEnabled ?? true;
-    }
-    this.ctx.peek('player')?.setControlEnabled?.(this._restoreControl ?? true);
+    input.frozen = this._restoreFrozen ?? false;
+    input.enabled = this._restoreEnabled ?? true;
+    this.ctx.peek('player')?.setControlEnabled(this._restoreControl ?? true);
     this._updateBadge(true);
   }
 
@@ -1878,6 +1670,8 @@ export class TelemetrySystem {
     this.badge.textContent = `● REC ${raw.toFixed(0)}s${hitches ? ` · ${hitches} HITCH${hitches === 1 ? '' : 'ES'}` : ''} · F7 MARK · F8 EXPORT`;
   }
 
+  // Engine teardown disposes every system, even one whose init never ran or failed.
+  /* oxlint-disable typescript/no-unnecessary-condition */
   dispose(): void {
     this._nativeBuilds?.dispose();
     if (this._noteMark) {
@@ -1894,4 +1688,5 @@ export class TelemetrySystem {
     this._note?.remove();
     if (window.__TELEMETRY__ === this.api) delete window.__TELEMETRY__;
   }
+  /* oxlint-enable typescript/no-unnecessary-condition */
 }

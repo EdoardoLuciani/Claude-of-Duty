@@ -16,7 +16,8 @@ const sessions = new WeakMap<FeatureRenderer, LoaderSession>();
 function sessionFor(renderer: FeatureRenderer): LoaderSession {
   const existing = sessions.get(renderer);
   if (existing) return existing;
-  const decoder = new KTX2Loader().setWorkerLimit(2);
+  // Basis transcoder files are served from three's libs at /basis/ (build/bun.ts).
+  const decoder = new KTX2Loader().setTranscoderPath('/basis/').setWorkerLimit(2);
   // Our strict native Renderer has no isWebGPURenderer flag. Use the public
   // worker config rather than detectSupport()'s WebGL renderer branch.
   decoder.workerConfig = {
@@ -152,6 +153,7 @@ async function parseGLTF(decoder: KTX2Loader, data: ArrayBuffer, path: string): 
       .setMeshoptDecoder(MeshoptDecoder)
       .setKTX2Loader(textures)
       .parseAsync(data, path);
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- set by the KTX2 loader callback
     if (textureFailed) throw textureFailure;
     completed = true;
     return gltf;

@@ -17,9 +17,7 @@ export interface ArmAsset {
 
 /** Owned by a Viewmodel, never a global cache: disposal/restart stays local. */
 export async function loadArmAsset(): Promise<ArmAsset> {
-  const gltf = await new GLTFLoader().loadAsync(
-    `${(import.meta as ImportMeta & { env: { BASE_URL: string } }).env.BASE_URL}models/player/arms.glb`
-  );
+  const gltf = await new GLTFLoader().loadAsync('/models/player/arms.glb');
   gltf.scene.updateMatrixWorld(true);
   const meshes: ArmSkinnedMesh[] = [];
   const blood = createArmBlood();
@@ -38,7 +36,7 @@ export async function loadArmAsset(): Promise<ArmAsset> {
       throw new Error('Player arms: inconsistent exported bone order');
     const index = mesh.geometry.index;
     if (!index) throw new Error('Player arms: expected indexed Blender geometry');
-    if (!mesh.geometry.getAttribute('skinWeight') || !mesh.geometry.getAttribute('skinIndex'))
+    if (!mesh.geometry.hasAttribute('skinWeight') || !mesh.geometry.hasAttribute('skinIndex'))
       throw new Error(`Player arms: missing skin data on ${mesh.name}`);
     const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     // Match native submissions: arrays select indexed groups; a single material
@@ -51,7 +49,7 @@ export async function loadArmAsset(): Promise<ArmAsset> {
       const source = materials[group.materialIndex ?? 0];
       const start = Math.max(0, range.start, group.start);
       const end = Math.min(index.count, range.start + range.count, group.start + group.count);
-      if (!source?.visible || end <= start) continue;
+      if (!source.visible || end <= start) continue;
       const surface = sources.length;
       if (!(source instanceof THREE.MeshPhysicalMaterial))
         throw new Error('Player arms: expected physical material');
@@ -71,7 +69,8 @@ export async function loadArmAsset(): Promise<ArmAsset> {
   }
   if (!pieces.length) throw new Error('Player arms: no rendered deformation surfaces');
   const material = createArmSurfaceMaterial(sources, blood);
-  const geometry = mergeGeometries(pieces, false);
+  // three returns null for incompatible attribute sets; its types omit that.
+  const geometry = mergeGeometries(pieces, false) as THREE.BufferGeometry | null;
   for (const piece of pieces) piece.dispose();
   if (!geometry) throw new Error('Player arms: incompatible deformation geometry');
   const merged = new THREE.SkinnedMesh(geometry, material);
@@ -94,7 +93,7 @@ export async function loadArmAsset(): Promise<ArmAsset> {
   }
   const images = new Set<{ close(): void }>();
   for (const texture of textures) {
-    if (isClosable(texture.source?.data)) images.add(texture.source.data);
+    if (isClosable(texture.source.data)) images.add(texture.source.data);
     texture.dispose();
   }
   for (const image of images) image.close();
@@ -124,7 +123,7 @@ export async function loadArmAsset(): Promise<ArmAsset> {
       for (const m of materials) m.dispose();
       const images = new Set<{ close(): void }>();
       for (const t of textures) {
-        if (isClosable(t.source?.data)) images.add(t.source.data);
+        if (isClosable(t.source.data)) images.add(t.source.data);
         t.dispose();
       }
       // Texture clones can share decoded ImageBitmaps. GPU disposal does not
@@ -136,7 +135,7 @@ export async function loadArmAsset(): Promise<ArmAsset> {
 }
 
 /** Rebind Blender weights to the gameplay contact rig in its neutral pose. */
-export function bindArmAsset(arm: Arm, asset: ArmAsset): void {
+export function bindArmAsset(arm: Arm, asset: Pick<ArmAsset, 'meshes'>): void {
   const controls = arm.controls;
   const oldPose = arm.pose;
   arm.upperPivot.position.set(0, 0, 0.63 * arm.scale);
@@ -160,7 +159,7 @@ export function bindArmAsset(arm: Arm, asset: ArmAsset): void {
   );
   const names = asset.meshes[0].skeleton.bones.map((b): string => b.name);
   const bones = names.map((name: string): THREE.Bone<THREE.Object3DEventMap> => {
-    const control = controls[name];
+    const control = controls[name] as THREE.Bone | undefined;
     if (!control) throw new Error(`Player arms: unknown Blender bone ${name}`);
     return control;
   });

@@ -1,0 +1,115 @@
+#!/usr/bin/env bun
+/**
+ * Bake soldier PBR tiles and FX atlases to PNG so boot does not spend ~1 s
+ * on CPU noise. Runtime loads public/models/proc/; dev/build generate missing or
+ * stale files before serving/building the game.
+ */
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { PNG } from 'pngjs';
+
+import { SoldierMaterials } from '../src/ai/textures.ts';
+import { isRecord } from '../src/core/guards.ts';
+import { Rng } from '../src/core/rng.ts';
+import { buildDecalAtlas, buildParticleAtlas } from './lib/fx-atlas.ts';
+import { hashFiles, sourceClosure } from './lib/source-hash.ts';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const OUT = join(ROOT, 'public', 'models', 'proc');
+const STAMP = join(ROOT, 'node_modules', '.cache', 'claude-of-duty-proc.hash');
+const SEED = 0x5eed1234;
+const force = process.argv.includes('--force');
+
+function sourceHash(): string {
+  return hashFiles(ROOT, sourceClosure(ROOT, ['tools/export-proc-textures.ts']));
+}
+
+function writePng(file: string, data: unknown, size: number): void {
+  if (!(data instanceof Uint8Array) || data.length !== size * size * 4)
+    throw new Error(`[proc] invalid RGBA bytes for ${file}`);
+  const png = new PNG({ width: size, height: size });
+  png.data.set(data);
+  writeFileSync(file, PNG.sync.write(png));
+}
+
+function cacheReady(hash: string): boolean {
+  if (force) return false;
+  if (!existsSync(STAMP) || readFileSync(STAMP, 'utf8').trim() !== hash) return false;
+  const manPath = join(OUT, 'manifest.json');
+  if (!existsSync(manPath)) return false;
+  try {
+    const man: unknown = JSON.parse(readFileSync(manPath, 'utf8'));
+    if (!isRecord(man) || !Array.isArray(man.sets) || !Array.isArray(man.details)) return false;
+    const sets: unknown[] = man.sets;
+    const details: unknown[] = man.details;
+    for (const name of sets) {
+      if (typeof name !== 'string') return false;
+      for (const kind of ['albedo', 'orm', 'normal']) {
+        if (!existsSync(join(OUT, `ai-${name}-${kind}.png`))) return false;
+      }
+    }
+    for (const name of details) {
+      if (typeof name !== 'string') return false;
+      if (!existsSync(join(OUT, `ai-detail-${name}.png`))) return false;
+    }
+    for (const size of [512, 1024]) {
+      if (!existsSync(join(OUT, `fx-particles-${size}.png`))) return false;
+      for (const kind of ['albedo', 'normal', 'orm']) {
+        if (!existsSync(join(OUT, `fx-decals-${size}-${kind}.png`))) return false;
+      }
+    }
+  } catch {
+    return false;
+  }
+  return true;
+}
+
+const hash = sourceHash();
+if (cacheReady(hash)) {
+  console.log(`[proc] up to date (${hash})`);
+  process.exit(0);
+}
+
+const t0 = performance.now();
+rmSync(STAMP, { force: true });
+rmSync(OUT, { recursive: true, force: true });
+mkdirSync(OUT, { recursive: true });
+
+const rng = new Rng(SEED);
+const mats = new SoldierMaterials(rng.fork(), {
+  size: 512,
+  anisotropy: 8,
+  camo: ['arid', 'woodland', 'urban'],
+});
+const sets = Object.keys(mats.sets);
+const details = Object.keys(mats.details);
+for (const name of sets) {
+  const set = mats.sets[name];
+  writePng(join(OUT, `ai-${name}-albedo.png`), set.albedo.image.data, 512);
+  writePng(join(OUT, `ai-${name}-orm.png`), set.orm.image.data, 512);
+  writePng(join(OUT, `ai-${name}-normal.png`), set.normal.image.data, 512);
+}
+for (const name of details) {
+  writePng(join(OUT, `ai-detail-${name}.png`), mats.details[name].image.data, 512);
+}
+
+for (const size of [512, 1024]) {
+  const fxRng = new Rng(SEED);
+  const particles = buildParticleAtlas(fxRng.fork(), size);
+  const decals = buildDecalAtlas(fxRng.fork(), size);
+  writePng(join(OUT, `fx-particles-${size}.png`), particles.texture.image.data, size);
+  writePng(join(OUT, `fx-decals-${size}-albedo.png`), decals.albedo.image.data, size);
+  writePng(join(OUT, `fx-decals-${size}-normal.png`), decals.normal.image.data, size);
+  writePng(join(OUT, `fx-decals-${size}-orm.png`), decals.orm.image.data, size);
+}
+
+const manifest = { sets, details, camoStats: mats.camoStats };
+writeFileSync(join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
+mkdirSync(dirname(STAMP), { recursive: true });
+writeFileSync(STAMP, hash + '\n');
+console.log(
+  `[proc] ${sets.length} soldier sets + ${details.length} details + fx 512/1024 in ` +
+    `${(performance.now() - t0).toFixed(0)}ms (${hash})`
+);

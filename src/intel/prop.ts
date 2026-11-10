@@ -31,7 +31,7 @@ export function makeKit(materials?: IntelMaterials): IntelKit {
     owned.push(mat);
     return mat;
   };
-  const mats: Record<string, THREE.Material> = {
+  const base = {
     body: surface('metal_painted', 0x889577, 0.8, 0.15),
     metal: surface('metal_rust', 0x777c75, 0.5, 0.9),
     circuit: surface('metal_painted', 0x40895d, 0.7, 0.1),
@@ -40,10 +40,14 @@ export function makeKit(materials?: IntelMaterials): IntelKit {
     beacon: new THREE.MeshBasicNodeMaterial({ color: 0xff0802 }),
     leds: new THREE.MeshBasicNodeMaterial({ color: 0x53ffb1 }),
   };
-  mats.lid = mats.body;
-  mats.lidMetal = mats.metal;
-  mats.lining = mats.components;
-  owned.push(mats.beacon, mats.leds);
+  // The lid reuses the body finishes; `label` is added below when a canvas exists.
+  const mats: Record<string, THREE.Material> = {
+    ...base,
+    lid: base.body,
+    lidMetal: base.metal,
+    lining: base.components,
+  };
+  owned.push(base.beacon, base.leds);
   const parts: Record<string, THREE.BufferGeometry[]> = {};
   const add = (kind: string, geo: THREE.BufferGeometry): void => {
     (parts[kind] ??= []).push(geo);
@@ -103,11 +107,12 @@ export function makeKit(materials?: IntelMaterials): IntelKit {
   for (const x of [0.13, 0.16, 0.19]) box('leds', 0.009, 0.004, 0.012, x, 0.217, 0.12);
   const geos: Record<string, THREE.BufferGeometry> = {};
   const lidKinds = new Set(['lid', 'lidMetal', 'lining', 'label', 'beacon']);
-  for (const kind of Object.keys(parts)) {
-    geos[kind] = mergeGeometries(parts[kind]!)!;
-    for (const part of parts[kind]) part.dispose();
-    materials?.bakeMasks(geos[kind], { wear: 0.6, grime: 0.65, upWear: 0.04 });
-    if (lidKinds.has(kind)) geos[kind].translate(0, -0.38, 0.23);
+  for (const [kind, list] of Object.entries(parts)) {
+    const geo = mergeGeometries(list);
+    geos[kind] = geo;
+    for (const part of list) part.dispose();
+    materials?.bakeMasks(geo, { wear: 0.6, grime: 0.65, upWear: 0.04 });
+    if (lidKinds.has(kind)) geo.translate(0, -0.38, 0.23);
   }
   if (typeof document !== 'undefined') {
     const label = document.createElement('canvas');

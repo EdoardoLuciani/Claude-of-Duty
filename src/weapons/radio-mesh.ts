@@ -50,7 +50,7 @@ export function radioScreenTexture(count = 1): THREE.Texture {
     g.font = '700 19px ui-monospace, monospace';
     g.fillText(text, 14, y);
     if (count !== null) {
-      g.fillStyle = countColor ?? color;
+      g.fillStyle = countColor;
       g.font = '700 16px ui-monospace, monospace';
       g.fillText(count, 204, y + 1);
     }

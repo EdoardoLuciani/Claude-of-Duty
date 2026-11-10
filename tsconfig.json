@@ -3,7 +3,7 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "types": ["vite/client"],
+    "types": [],
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "strict": true,
     "exactOptionalPropertyTypes": true,
@@ -11,12 +11,9 @@
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
     "isolatedModules": true,
-    "allowJs": true,
-    "checkJs": false,
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "skipLibCheck": true
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist", "tools", "tests"]
+  "include": ["src"]
 }

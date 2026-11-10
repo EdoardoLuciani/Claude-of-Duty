@@ -40,5 +40,5 @@ Google disclaims ownership of generated original content; applicable terms/law
 still govern distribution. No exclusive copyright or third-party clearance is
 guaranteed. Keep provenance and require public-repository/commercial-game rights
 review; other audio banks may have different rights. No voice model or commercial
-reaction master is redistributed. Run `npm test` and `npm run build`; listen to
+reaction master is redistributed. Run `bun run test` and `bun run build`; listen to
 every take, reaction pairing and speech intelligibility under gunfire.

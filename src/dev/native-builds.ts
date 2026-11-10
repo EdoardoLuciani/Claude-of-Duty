@@ -15,7 +15,7 @@ export function trackNodeBuilders(
     !!renderer.debug;
   let count: number | null = supported ? 0 : null;
   let active = true;
-  const previous = renderer?.debug?.onNodeBuilderCreated ?? null;
+  const previous = renderer?.debug.onNodeBuilderCreated ?? null;
   function observe(this: unknown, builder: NodeBuilder, object: unknown): unknown {
     if (active && count !== null) count++;
     const result = previous?.call(this, builder, object);

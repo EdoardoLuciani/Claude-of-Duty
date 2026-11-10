@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import type { SystemId, EngineContext } from './context.ts';
+import { validateTriangleGeometry } from './geometry-validation.ts';
 import { parseSoldierMetadata, parseWorldManifest, parseWorldAssets } from './model-metadata.ts';
 import type { SoldierRecord, WorldPrefetch } from './model-metadata.ts';
 /** Loads cached soldier GLBs/metadata and the cooked world; player weapons own their adapters. */
@@ -125,10 +126,11 @@ export class ModelSystem {
     gltf.scene.traverse((node: THREE.Object3D): void => {
       if (isSkinnedMesh(node)) meshes.push(node);
     });
-    if (!meshes.length) throw new Error(`[models] ${name}.glb: no skinned mesh`);
+    const first = meshes.at(0);
+    if (!first) throw new Error(`[models] ${name}.glb: no skinned mesh`);
 
-    const geometry = meshes.length === 1 ? meshes[0].geometry : mergePrimitives(meshes);
-    const boneNames = (meshes[0].skeleton?.bones ?? []).map((bone): string => bone.name);
+    const geometry = meshes.length === 1 ? first.geometry : mergePrimitives(meshes);
+    const boneNames = first.skeleton.bones.map((bone): string => bone.name);
 
     const record = {
       // `name` is what the JSON METADATA claims the variant is (validated by
@@ -140,7 +142,7 @@ export class ModelSystem {
       slots: meta.slots,
       boneNames,
       weapon: meta.weapon,
-      stats: meta.stats ?? { vertices: 0, triangles: 0 },
+      stats: meta.stats,
       variant: meta.variant,
     };
     return record;
@@ -167,9 +169,14 @@ interface PrimitiveSlice {
  * reproduces the original authored vertex array exactly.
  */
 export function mergePrimitives(meshes: THREE.SkinnedMesh[]): THREE.BufferGeometry {
+  const first = meshes.at(0);
+  if (!first) throw new Error('[models] cannot merge an empty primitive list');
   const parts = meshes.map((m): PrimitiveSlice => {
     const g = m.geometry;
-    const index = g.getIndex()!;
+    const index = g.getIndex();
+    if (!index || index.count === 0)
+      throw new Error('[models] primitive must have a nonempty triangle index');
+    validateTriangleGeometry(g, '[models] mergePrimitives');
     const src = index.array;
     let lo = Infinity;
     let hi = -1;
@@ -183,12 +190,15 @@ export function mergePrimitives(meshes: THREE.SkinnedMesh[]): THREE.BufferGeomet
   const totalVerts = parts.reduce((s, p): number => s + p.count, 0);
   const totalIdx = parts.reduce((s, p): number => s + p.index.count, 0);
 
-  const first = meshes[0]!;
   const attrNames = Object.keys(first.geometry.attributes);
   const out = new THREE.BufferGeometry();
   for (const name of attrNames) {
-    const a0 = first.geometry.attributes[name]!;
+    const a0 = first.geometry.attributes[name];
     const itemSize = a0.itemSize;
+    if (!Number.isInteger(itemSize) || itemSize < 1)
+      throw new Error(
+        `[models] primitive attribute '${name}' must have a positive integer item size`
+      );
     const source = a0.array;
     const ArrayCtor =
       source instanceof Float32Array
@@ -211,7 +221,9 @@ export function mergePrimitives(meshes: THREE.SkinnedMesh[]): THREE.BufferGeomet
     const arr = new ArrayCtor(totalVerts * itemSize);
     let off = 0;
     for (const p of parts) {
-      const a = p.g.attributes[name]!;
+      const a = p.g.attributes[name] as (typeof p.g.attributes)[string] | undefined;
+      if (!a || a.itemSize !== itemSize || a.count < p.lo + p.count)
+        throw new Error(`[models] primitive attribute '${name}' does not cover its vertex slice`);
       const n = p.count * itemSize;
       // Copy the primitive's own slice of the shared buffer (indices are
       // absolute, so the used range is [lo, lo+count)).
@@ -234,9 +246,9 @@ export function mergePrimitives(meshes: THREE.SkinnedMesh[]): THREE.BufferGeomet
   out.setIndex(new THREE.BufferAttribute(idxArr, 1));
 
   let start = 0;
-  for (let i = 0; i < parts.length; i++) {
-    out.addGroup(start, parts[i].index.count, i);
-    start += parts[i].index.count;
+  for (const [i, p] of parts.entries()) {
+    out.addGroup(start, p.index.count, i);
+    start += p.index.count;
   }
   return out;
 }

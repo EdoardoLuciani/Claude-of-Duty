@@ -1,5 +1,6 @@
 import type { Vector3Like as Vec3Like } from 'three';
 
+import { TAU } from '../core/math.ts';
 import { P } from './atlas.ts';
 import type { FxSystem } from './index.ts';
 import { resetSpawn, setSpawnColorRamp, setSpawnPosition, setSpawnVelocity } from './particles.ts';
@@ -52,8 +53,6 @@ interface MuzzleOptions {
   lightPos?: Vec3Like;
 }
 
-const TWO_PI = Math.PI * 2;
-
 /** Bore-axis frame + the lobe direction, reused every shot (never allocate). */
 const BORE = { tx: 0, ty: 0, tz: 0, bx: 0, by: 0, bz: 0 };
 const LOBE = { x: 0, y: 0, z: 0 };
@@ -69,7 +68,6 @@ export function screenAngle(
   dz: number
 ): number {
   const cam = view ? fx.ctx.viewCamera : fx.ctx.camera;
-  if (!cam) return 0;
   cam.updateMatrixWorld();
   const m = cam.matrixWorldInverse.elements;
   const vx = m[0] * dx + m[4] * dy + m[8] * dz;
@@ -80,7 +78,7 @@ export function screenAngle(
 /** Per-class signature; unknown weapons use rifle. `light` is reference peak candela.
  * World spill applies a separate gain and cutoff; the view flash scales against REF_LIGHT.
  */
-export const MUZZLE_PROFILES: Record<string, MuzzleProfile> = {
+export const MUZZLE_PROFILES = {
   rifle: { scale: 1.0, lobes: 3, jet: 1.0, light: 200, smoke: 1.0, temp: 1.0, sparks: 8 },
   carbine: { scale: 0.92, lobes: 3, jet: 0.9, light: 175, smoke: 0.9, temp: 1.02, sparks: 7 },
   smg: { scale: 0.78, lobes: 3, jet: 0.75, light: 135, smoke: 0.7, temp: 1.05, sparks: 6 },
@@ -89,7 +87,9 @@ export const MUZZLE_PROFILES: Record<string, MuzzleProfile> = {
   sniper: { scale: 1.35, lobes: 3, jet: 1.6, light: 290, smoke: 1.4, temp: 0.95, sparks: 10 },
   lmg: { scale: 1.15, lobes: 4, jet: 1.1, light: 235, smoke: 1.2, temp: 0.98, sparks: 9 },
   suppressed: { scale: 0.34, lobes: 2, jet: 0.4, light: 36, smoke: 1.6, temp: 1.1, sparks: 2 },
-};
+} satisfies Record<string, MuzzleProfile>;
+/** Substring-match order (declaration order), hoisted so per-shot lookup allocates nothing. */
+const PROFILE_ENTRIES: ReadonlyArray<[string, MuzzleProfile]> = Object.entries(MUZZLE_PROFILES);
 
 /** The `light` a rifle carries, i.e. the reference the view flash is scaled on. */
 const REF_LIGHT = MUZZLE_PROFILES.rifle.light;
@@ -101,7 +101,7 @@ function profileFor(weapon?: string | MuzzleWeapon): MuzzleProfile {
     typeof weapon === 'string' ? weapon : (weapon.class ?? weapon.id ?? weapon.kind ?? weapon.name);
   if (!key) return MUZZLE_PROFILES.rifle;
   const k = String(key).toLowerCase();
-  for (const name in MUZZLE_PROFILES) if (k.includes(name)) return MUZZLE_PROFILES[name];
+  for (const [name, profile] of PROFILE_ENTRIES) if (k.includes(name)) return profile;
   return MUZZLE_PROFILES.rifle;
 }
 
@@ -158,7 +158,7 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   s.i1 = 4.5 * gain;
   s.alphaCurve = 0.7;
   s.soft = 0.15;
-  s.rot = rng.float() * TWO_PI; // per-shot roll: the churn never repeats
+  s.rot = rng.float() * TAU; // per-shot roll: the churn never repeats
   s.spin = rng.signed() * 3.0;
   s.seed = rng.float();
   emitAdd(s);
@@ -176,7 +176,7 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   s.i1 = 6 * gain;
   s.alphaCurve = 0.6;
   s.soft = 0.12;
-  s.rot = rng.float() * TWO_PI;
+  s.rot = rng.float() * TAU;
   s.spin = rng.signed() * 4.0;
   s.seed = rng.float();
   emitAdd(s);
@@ -185,11 +185,11 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   basis(BORE, d.x, d.y, d.z);
   // Keep 3-4 unevenly spaced tongues.
   const ports = Math.min(4, Math.max(3, prof.lobes + (rng.float() < 0.45 ? 1 : 0)));
-  const rollBase = rng.float() * TWO_PI;
+  const rollBase = rng.float() * TAU;
   const weak = rng.int(0, ports - 1); // one port always gets less gas
   const big = rng.int(0, ports - 1); // and one always gets the long tongue
   for (let i = 0; i < ports; i++) {
-    const roll = rollBase + (i / ports) * TWO_PI + rng.signed() * 0.55;
+    const roll = rollBase + (i / ports) * TAU + rng.signed() * 0.55;
     const pitch = rng.range(0.4, 0.85); // 23-49 degrees off the bore
     const cp = Math.cos(pitch);
     const sp = Math.sin(pitch);
@@ -297,7 +297,7 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     const size0 = (0.018 + 0.016 * rng.float()) * sc;
     const size1 = (0.075 + 0.07 * rng.float()) * sc * (0.7 + prof.smoke * 0.5);
     const tile = i % 2 ? P.SMOKE_B : P.WISP;
-    const rot = rng.float() * TWO_PI;
+    const rot = rng.float() * TAU;
     const spin = rng.signed() * 2.2;
     const seed = rng.float();
     const delay = 0.012 + rng.float() * 0.022;
@@ -363,7 +363,7 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
     s.delay = rng.range(0, 0.05);
     s.drag = 2.6;
     s.gravity = 0.36;
-    s.rot = rng.float() * TWO_PI;
+    s.rot = rng.float() * TAU;
     s.spin = rng.signed() * 1.6;
     setSpawnColorRamp(s, 0.5, 0.49, 0.47, 0.42, 0.41, 0.4);
     s.alpha = rng.range(0.1, 0.2) * (0.6 + prof.smoke * 0.5) * emberGain;
@@ -379,22 +379,20 @@ export function muzzleFlash(fx: MuzzleFx, o: MuzzleOptions): MuzzleProfile {
   // Rifle reference peak is 36 cd before lightGain, with a 5*sc metre cutoff: Three's window
   // (1-(d/cutoff)^4)^2 / d^2 confines the warm pool without bleaching distant walls.
   // A 0.09 s lifetime and 16/s decay retain spill across successive frames.
-  if (fx.lights) {
-    const lp = o.lightPos ?? p;
-    fx.lights.flash(
-      lp.x + d.x * 0.1,
-      lp.y + d.y * 0.1,
-      lp.z + d.z * 0.1,
-      cr,
-      cg,
-      cb,
-      prof.light * lightGain * 0.18,
-      0.09,
-      16,
-      5 * sc,
-      2
-    );
-  }
+  const lp = o.lightPos ?? p;
+  fx.lights.flash(
+    lp.x + d.x * 0.1,
+    lp.y + d.y * 0.1,
+    lp.z + d.z * 0.1,
+    cr,
+    cg,
+    cb,
+    prof.light * lightGain * 0.18,
+    0.09,
+    16,
+    5 * sc,
+    2
+  );
 
   // The weapon lives in viewScene and needs its own light; world spill cannot reach it.
   if (view) {

@@ -52,7 +52,12 @@ export function sectorBearing(dx: number, dz: number): number {
 }
 
 export function sectorLabel(bearing: number): (typeof SECTORS)[number] {
-  return SECTORS[Math.round((((bearing % 360) + 360) % 360) / 45) % 8];
+  const sector = SECTORS[Math.round((((bearing % 360) + 360) % 360) / 45) % 8] as
+    | (typeof SECTORS)[number]
+    | undefined;
+  // Every finite bearing lands in 0..7; NaN/Infinity would emit an unlabeled cue.
+  if (sector === undefined) throw new RangeError(`[search-assist] non-finite bearing ${bearing}`);
+  return sector;
 }
 
 /** Scan wave enemies and maybe emit a cue. `now` is ctx.time.elapsed. */
@@ -69,8 +74,7 @@ export function tickSearchAssist(
   let best = Infinity;
   const ox = origin.x;
   const oz = origin.z;
-  for (let i = 0; i < agents.length; i++) {
-    const a = agents[i];
+  for (const a of agents) {
     if (!a.alive || a.staged || a.silentDeath || a.team === 0) continue;
     remaining++;
     if (

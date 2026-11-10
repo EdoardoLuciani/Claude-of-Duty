@@ -29,7 +29,7 @@ export async function prewarm(
     renderer.setRenderTarget(scratch);
     // Each subsystem can reach hidden material variants without spawning an
     // actor, altering the clock, or rendering a gameplay frame.
-    for (const system of engine.registry.ordered ?? []) {
+    for (const system of engine.registry.ordered) {
       if (engine.error) break;
       if (typeof system.prewarmMaterials !== 'function') continue;
       // Real registry entries validate metadata at registration. Isolated warmup

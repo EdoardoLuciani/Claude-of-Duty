@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 
 import { isClosable } from '../core/guards.ts';
+import { clamp01 } from '../core/math.ts';
 import { loadPngTexture } from '../core/pngtex.ts';
 import type { Rng } from '../core/rng.ts';
-import { Noise, clamp01 } from './noise.ts';
+import { Noise } from './noise.ts';
 
 /** Runtime atlas layout/loaders. Particle/decal generation lives in tools/lib. */
 export const P = {
@@ -81,27 +82,32 @@ export async function loadFxAtlases(size: number): Promise<{
     loadPngTexture(`/models/proc/fx-decals-${size}-normal.png`, { srgb: false, aniso, wrap }),
     loadPngTexture(`/models/proc/fx-decals-${size}-orm.png`, { srgb: false, aniso, wrap }),
   ]);
-  const textures = results
-    .filter(
-      (result): result is PromiseFulfilledResult<THREE.Texture> => result.status === 'fulfilled'
-    )
-    .map((result): THREE.Texture => result.value);
-  const failed = results.find(
-    (result): result is PromiseRejectedResult => result.status === 'rejected'
-  );
-  if (failed) {
-    for (const texture of textures) {
-      texture.dispose();
-      const image: unknown = texture.source.data;
-      if (isClosable(image)) image.close();
-    }
-    throw failed.reason;
+  const [texture, albedo, normal, orm] = results;
+  if (
+    texture.status === 'fulfilled' &&
+    albedo.status === 'fulfilled' &&
+    normal.status === 'fulfilled' &&
+    orm.status === 'fulfilled'
+  )
+    return {
+      particles: { texture: texture.value, cols: ATLAS_COLS, size },
+      decals: {
+        albedo: albedo.value,
+        normal: normal.value,
+        orm: orm.value,
+        cols: ATLAS_COLS,
+        size,
+      },
+    };
+  // A load was rejected: release the decoded textures and rethrow the first failure.
+  for (const result of results) {
+    if (result.status === 'rejected') continue;
+    result.value.dispose();
+    const image: unknown = result.value.source.data;
+    if (isClosable(image)) image.close();
   }
-  const [texture, albedo, normal, orm] = textures;
-  return {
-    particles: { texture, cols: ATLAS_COLS, size },
-    decals: { albedo, normal, orm, cols: ATLAS_COLS, size },
-  };
+  throw results.find((result): result is PromiseRejectedResult => result.status === 'rejected')
+    ?.reason;
 }
 
 /**

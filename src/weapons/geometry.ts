@@ -17,11 +17,11 @@ function normalizeAttributes(geo: THREE.BufferGeometry): THREE.BufferGeometry {
   for (const name of Object.keys(geo.attributes)) {
     if (!KEEP_ATTRS.includes(name)) geo.deleteAttribute(name);
   }
-  if (!geo.getAttribute('uv')) {
+  if (!geo.hasAttribute('uv')) {
     const n = geo.getAttribute('position').count;
     geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 2), 2));
   }
-  if (!geo.getAttribute('normal')) geo.computeVertexNormals();
+  if (!geo.hasAttribute('normal')) geo.computeVertexNormals();
   geo.morphAttributes = {};
   geo.clearGroups();
   return geo;
@@ -154,7 +154,8 @@ export function mergeAll(
       g.getIndex() ? g.toNonIndexed() : g
   );
   for (const g of nonIndexed) normalizeAttributes(g);
-  const merged = mergeGeometries(nonIndexed, false);
+  // three returns null for incompatible attribute sets; its types omit that.
+  const merged = mergeGeometries(nonIndexed, false) as THREE.BufferGeometry | null;
   for (let i = 0; i < clean.length; i++) {
     if (nonIndexed[i] !== clean[i]) nonIndexed[i].dispose();
     clean[i].dispose();
@@ -172,4 +173,3 @@ export function triCount(geo: THREE.BufferGeometry): number {
 }
 
 /** Re-exported so dev probes can reach the same THREE instance. */
-export { THREE };

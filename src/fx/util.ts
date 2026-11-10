@@ -4,6 +4,8 @@
  * not create 60 Vector3s.
  */
 
+import { clamp } from '../core/math.ts';
+
 interface VectorTriple {
   x: number;
   y: number;
@@ -213,5 +215,3 @@ export function discOn<T extends VectorTriple>(
   out.z = B.tz * cx + B.bz * cy;
   return out;
 }
-
-export const clamp = (v: number, a: number, b: number): number => (v < a ? a : v > b ? b : v);

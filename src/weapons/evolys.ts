@@ -18,26 +18,12 @@ import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
-export const EVOLYS_URL = new URL(
-  '../../assets/weapons/fn-evolys-762/fn-evolys-762.runtime.glb',
-  import.meta.url
-).href;
+export const EVOLYS_URL = '/models/weapons/fn-evolys-762.runtime.glb';
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES)];
 
 export function makeEvolysModel(gltf: GLTF): EvolysModel {
   const scene = gltf.scene;
-  const { root, animations, point } = authoredModel(gltf, 'EVOLYS_RIG', REQUIRED, scene);
-  // gltfpack retains constant channels but reduces their keys to t=0. Idle is
-  // entirely constant, so recover its authored duration from the weapon source.
-  for (const clip of animations) {
-    if (
-      clip.name === 'Idle' &&
-      clip.duration === 0 &&
-      clip.tracks.length > 0 &&
-      clip.tracks.every((track): boolean => track.times.length === 1 && track.times[0] === 0)
-    )
-      clip.duration = Math.fround(manifest.clips.Idle.duration);
-  }
+  const { root, animations, point } = authoredModel(gltf, 'EVOLYS_RIG', REQUIRED, manifest.clips);
   const sight = point('SOCKET_sight');
   const model = {
     id: 'lmg' as const,
@@ -63,7 +49,6 @@ export function makeEvolysModel(gltf: GLTF): EvolysModel {
         windowW: 0.0098,
         windowH: 0.0058,
         // Size the RMR aiming dot against the world, not the enlarged weapon window.
-        reticle: 'dot',
         dotMoa: 3.25,
         minDotPixels: 5,
         dotOpacity: 0.9,
@@ -104,7 +89,6 @@ type EvolysModel = AuthoredModelData<
       apertureR: number;
       windowW: number;
       windowH: number;
-      reticle: string;
       dotMoa: number;
       minDotPixels: number;
       dotOpacity: number;
@@ -145,7 +129,6 @@ export function createEvolysAnimation(model: EvolysModel): WeaponAnimation {
 
     reset(): void {
       this.fireTime = Infinity;
-      this.idleTime = 0;
       this._sample('Idle', 0);
       this._beltVisibility(lastRounds, false);
     },

@@ -18,8 +18,7 @@ import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
-export const MPX_URL = new URL('../../assets/weapons/sig-mpx/mpx.runtime.glb', import.meta.url)
-  .href;
+export const MPX_URL = '/models/weapons/mpx.runtime.glb';
 export const MPX_EJECT_DELAY = 0.025;
 const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES)];
 
@@ -62,16 +61,13 @@ export function makeMPXModel(gltf: GLTF): MPXModel {
       }
     }
   scene.updateMatrixWorld(true);
-  const { root, animations, point } = authoredModel(gltf, 'MPX_RIG', REQUIRED, scene);
-  const idle = animations.find((clip): boolean => clip.name === 'Idle');
-  // gltfpack deduplicates the wholly constant Idle to t=0. glTF has no
-  // explicit clip duration; retain only this observed authored two-second hold.
-  if (
-    idle?.duration === 0 &&
-    idle.tracks.length > 0 &&
-    idle.tracks.every((track): boolean => track.times.length === 1 && track.times[0] === 0)
-  )
-    idle.duration = manifest.clips.Idle.duration;
+  const { root, animations, point } = authoredModel(
+    gltf,
+    'MPX_RIG',
+    REQUIRED,
+    manifest.clips,
+    scene
+  );
   const model = {
     id: 'smg' as const,
     label: 'SIG MPX',
@@ -93,8 +89,7 @@ export function makeMPXModel(gltf: GLTF): MPXModel {
         apertureR: 0.01,
         windowW: 0.018,
         windowH: 0.018,
-        // Six-pixel minimum diameter makes the 2 MOA dot easier to see without a halo or ring.
-        reticle: 'dot',
+        // Six-pixel minimum diameter makes the 2 MOA dot easier to see.
         dotMoa: 2,
         minDotPixels: 6,
         dotOpacity: 0.9,
@@ -146,7 +141,6 @@ type MPXModel = AuthoredModelData<
       apertureR: number;
       windowW: number;
       windowH: number;
-      reticle: string;
       dotMoa: number;
       minDotPixels: number;
       dotOpacity: number;

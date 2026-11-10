@@ -6,20 +6,10 @@
  * the transition happened — read them in update(), not fixedUpdate().
  */
 
-import { DEFAULT_BINDINGS } from './bindings.ts';
-
-/** Temporary compatibility group for healing/telemetry; not another binding authority. */
-export const ACTIONS = {
-  ...DEFAULT_BINDINGS,
-  swapWeapon: [
-    ...DEFAULT_BINDINGS.slot1,
-    ...DEFAULT_BINDINGS.slot2,
-    ...DEFAULT_BINDINGS.cycleWeapon,
-  ],
-} as const;
+import { DEFAULT_BINDINGS, type ActionId } from './bindings.ts';
 
 /**
- * Every key code the game binds, directly or via ACTIONS. Used to swallow
+ * Every key code the game binds. Used to swallow
  * browser shortcuts that collide with gameplay: crouch is Ctrl, so while the
  * game owns input a plain "Ctrl + W" (close tab), "Ctrl + Q" (quit Firefox),
  * "Ctrl + E" (search) or "Ctrl + A" (select all) fires the moment the player
@@ -131,7 +121,7 @@ export class Input {
     // An unhandled rejection there shows up as a page error in the harness, so
     // swallow it: failing to lock is not a game error.
     try {
-      const p = this.canvas.requestPointerLock?.();
+      const p = this.canvas.requestPointerLock();
       void Promise.resolve(p).catch((): void => {});
     } catch {
       /* not eligible — keep running unlocked */
@@ -199,8 +189,8 @@ export class Input {
   _onMouseMove(e: MouseEvent): void {
     if (!this.enabled || !this.pointerLocked || this.frozen) return;
     // movementX/Y is already relative and unaffected by cursor clamping.
-    this._rawLook.x += e.movementX ?? 0;
-    this._rawLook.y += e.movementY ?? 0;
+    this._rawLook.x += e.movementX;
+    this._rawLook.y += e.movementY;
   }
 
   _onWheel(e: WheelEvent): void {
@@ -277,7 +267,8 @@ export class Input {
       this.stick.moveX = this.stick.moveY = this.stick.lookX = this.stick.lookY = 0;
       return;
     }
-    const pads = navigator.getGamepads?.() ?? [];
+    // Node smoke tests (and some embedded browsers) lack the Gamepad API.
+    const pads = (navigator as Partial<Navigator>).getGamepads?.() ?? [];
     const pad =
       pads[this.gamepadIndex ?? 0] ??
       pads.find((candidate): candidate is Gamepad => candidate !== null);
@@ -294,25 +285,23 @@ export class Input {
     this.stick.lookY = curve(dz(pad.axes[3] ?? 0));
   }
 
-  _actionIn(name: keyof typeof ACTIONS, snapshot: ReadonlySet<string>): boolean {
-    const codes = ACTIONS[name];
-    if (!codes) return false;
-    for (const code of codes) if (snapshot.has(code)) return true;
+  _actionIn(name: ActionId, snapshot: ReadonlySet<string>): boolean {
+    for (const code of DEFAULT_BINDINGS[name]) if (snapshot.has(code)) return true;
     return false;
   }
 
   /** True while any key/button bound to the action is held. Wheel remains Input.wheel. */
-  action(name: keyof typeof ACTIONS): boolean {
+  action(name: ActionId): boolean {
     return this._actionIn(name, this.down);
   }
 
   /** Per-physical-binding edges, preserving alias behavior; movement owns union-held stance edges. */
-  actionPressed(name: keyof typeof ACTIONS): boolean {
+  actionPressed(name: ActionId): boolean {
     return this._actionIn(name, this._pressed);
   }
 
   /** Any bound key/button released this frame. */
-  actionReleased(name: keyof typeof ACTIONS): boolean {
+  actionReleased(name: ActionId): boolean {
     return this._actionIn(name, this._released);
   }
 
