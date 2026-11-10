@@ -7,7 +7,7 @@ import { ensureDevServer, launchChromium, stopDevServer } from '../../tools/lib/
 import { waitForGame } from '../../tools/lib/native-render.ts';
 
 const port = Number(process.env.PORT ?? 5173);
-const server = await ensureDevServer({ port, attempts: 120 });
+const server = await ensureDevServer({ port });
 const browser = await launchChromium({
   headless: true,
   args: ['--ignore-gpu-blocklist', '--mute-audio'],

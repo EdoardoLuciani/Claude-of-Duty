@@ -188,8 +188,6 @@ export class PlayerSystem {
   };
   _offEvents: Array<() => void> = [];
 
-  constructor() {}
-
   async init(ctx: PlayerContext): Promise<void> {
     this.ctx = ctx;
     this.physics = ctx.get('physics');

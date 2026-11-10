@@ -45,7 +45,7 @@ type ReloadState = {
   yaw: number;
 };
 
-const server = await ensureDevServer({ port: PORT, attempts: 120 });
+const server = await ensureDevServer({ port: PORT });
 let browser: Awaited<ReturnType<typeof launchChromium>> | undefined;
 const logs: string[] = [];
 let failed: Error | null = null;

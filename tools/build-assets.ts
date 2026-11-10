@@ -51,6 +51,7 @@ import {
   BLENDER_VERSION,
   SOURCE_INPUTS as SOLDIER_INPUTS,
   canonicalText,
+  soldierProductPaths,
 } from './blender/soldiers/export.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -95,11 +96,11 @@ const ARMS: AssetStep = {
   commands: [blender('tools/blender/player_arms.py'), blender('tools/blender/player_bandage.py')],
 };
 
-const SOLDIER_STEP: AssetStep = {
+export const SOLDIER_STEP: AssetStep = {
   id: 'soldiers',
   inputs: [...SOLDIER_INPUTS],
   salt: [REVISION],
-  outputs: ['assets/soldiers/manifest.json'],
+  outputs: soldierProductPaths().map((file): string => relative(ROOT, file)),
   commands: [bun('tools/blender/soldiers/export.ts', '--output', SOLDIERS)],
 };
 
@@ -233,30 +234,33 @@ async function pool(steps: AssetStep[]): Promise<void> {
 
 const stage = (file: string, ...args: string[]): Promise<number> =>
   run(bun(join(ROOT, 'tools', file), ...args), 'inherit');
-const force = FORCE ? ['--force'] : [];
-// The Bun world build is independent of Blender assets; run it alongside.
-const stages = [stage('export-world.ts', ...force)];
-if (!process.env.OW_SKIP_ASSETS) {
-  mkdirSync(CACHE, { recursive: true });
-  // Weapons load the arms blend, so they wait for it and hash its inputs.
-  await pool([
-    ARMS,
-    ...Object.keys(STANDALONE_TOOLS)
-      .filter(isModelId)
-      .map((id): AssetStep => cookStep(id, [])),
-    SOLDIER_STEP,
-  ]);
-  if (!failed) {
-    const armsHash = inputHash(ARMS);
-    await pool(
-      Object.keys(MODEL_COOKS)
+// Importing recipes must not launch asset builds or exit the caller.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const force = FORCE ? ['--force'] : [];
+  // The Bun world build is independent of Blender assets; run it alongside.
+  const stages = [stage('export-world.ts', ...force)];
+  if (!process.env.OW_SKIP_ASSETS) {
+    mkdirSync(CACHE, { recursive: true });
+    // Weapons load the arms blend, so they wait for it and hash its inputs.
+    await pool([
+      ARMS,
+      ...Object.keys(STANDALONE_TOOLS)
         .filter(isModelId)
-        .filter((id): boolean => !Object.hasOwn(STANDALONE_TOOLS, id))
-        .map((id): AssetStep => cookStep(id, [armsHash]))
-    );
+        .map((id): AssetStep => cookStep(id, [])),
+      SOLDIER_STEP,
+    ]);
+    if (!failed) {
+      const armsHash = inputHash(ARMS);
+      await pool(
+        Object.keys(MODEL_COOKS)
+          .filter(isModelId)
+          .filter((id): boolean => !Object.hasOwn(STANDALONE_TOOLS, id))
+          .map((id): AssetStep => cookStep(id, [armsHash]))
+      );
+    }
+    if (!failed)
+      stages.push(stage('export-proc-textures.ts', ...force), stage('export-models.ts', ...force));
   }
-  if (!failed)
-    stages.push(stage('export-proc-textures.ts', ...force), stage('export-models.ts', ...force));
+  const codes = await Promise.all(stages);
+  process.exit(failed ? 1 : (codes.find(Boolean) ?? 0));
 }
-const codes = await Promise.all(stages);
-process.exit(failed ? 1 : (codes.find(Boolean) ?? 0));
