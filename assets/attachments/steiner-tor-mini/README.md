@@ -3,7 +3,7 @@
 Original reference-backed **green 7003** reconstruction; visual-review candidate,
 not manufacturer CAD or final human visual acceptance. No flashlight or gameplay
 changes. References, photo rights and known approximations: [reference-review.json](reference-review.json).
-Measured build/render evidence and open acceptance items: [REVIEW.md](REVIEW.md).
+Open: human visual acceptance and mounting on a weapon.
 The optimized target is **5,924 triangles** (down from 9,978), one opaque material,
 with the same 2K map resolution. Detailed high source remains in the blend.
 

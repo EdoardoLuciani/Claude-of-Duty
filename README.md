@@ -31,7 +31,7 @@ boundaries. In tests, prefer real instances and shared typed fixtures; only
 
 `bun run test` runs each smoke script in its own Bun process (30 s hang guard);
 run one with `bun test ./tests/smoke/smoke-health-events.ts`.
-(`noUncheckedIndexedAccess` status: [triage and plan](docs/no-unchecked-indexed-access.md).)
+`noUncheckedIndexedAccess` is off; enablement plan: [#657](https://github.com/EdoardoLuciani/Claude-of-Duty/issues/657).
 `bun run build` runs typecheck and lint first via `prebuild`.
 
 ### Formatting

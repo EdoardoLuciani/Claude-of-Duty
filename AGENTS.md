@@ -14,6 +14,9 @@ before subsystem changes: it owns directory assignments, APIs and event contract
 - Use conventional commits: `feat(weapons): ...`, `fix(player): ...`, `chore: ...`.
 - Prefer the smallest direct implementation. No speculative frameworks, factories,
   DI or unrelated refactors. Ask before disproportionate line/complexity growth.
+- When you change a contract described in ARCHITECTURE.md or README.md, update it.
+  Describe current behavior only: no history of removed things, no numbers copied
+  from code.
 
 ## Tests
 
