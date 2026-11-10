@@ -552,7 +552,7 @@ interface RecoilDefinition {
   recoil: {
     patternLength: number;
     patternSeed: number;
-    climbShape: number[];
+    climbShape: WeaponDef['recoil']['climbShape'];
     pitch: number;
     yaw: number;
     drift: number;
