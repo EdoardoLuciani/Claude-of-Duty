@@ -15,5 +15,11 @@ jobs:
           bun-version-file: package.json
       - run: bun ci
       - run: bun run format:check
+      # Generated world; export-world.ts rebuilds it when its source hash differs.
+      - uses: actions/cache@v4
+        with:
+          path: public/models/world
+          key: world-${{ hashFiles('tools/**/*.ts', 'src/**/*.ts') }}
+          restore-keys: world-
       - run: bun run build:ci # prebuild runs typecheck and lint; skips Blender assets
       - run: bun run test

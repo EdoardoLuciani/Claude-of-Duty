@@ -18,8 +18,7 @@ bun run models:cook -- p320 /tmp/p320-review
 
 The encoder writes to a temporary directory before replacing the destination.
 Runtime outputs use `.runtime.glb`; their container is still GLB, regardless of
-embedded texture formats. The generic `cookModel({ input, output, flags })` function
-can also be imported by other build stages.
+embedded texture formats.
 
 To opt in another model, register its source directory, native export, runtime
 output and any model-specific flags in `MODEL_COOKS`. Wire its loader to the

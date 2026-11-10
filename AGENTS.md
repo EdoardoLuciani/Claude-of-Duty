@@ -20,7 +20,7 @@ before subsystem changes: it owns directory assignments, APIs and event contract
 ```sh
 bun ci                 # preferred clean install
 bun run test           # Bun runs tests/smoke/ scripts in isolated parallel processes
-bun run lint           # both Oxlint passes run on Bun; warnings fail
+bun run lint           # type-aware Oxlint runs on Bun; warnings fail
 bun run build          # must pass
 bun run world:validate # required when world/prop assets change
 bun run world          # compile world source and cook collision
