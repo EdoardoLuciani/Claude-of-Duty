@@ -59,15 +59,13 @@ export class WeaponLaser {
     scene.add(this.mesh);
   }
 
-  update(
+  /** Capture gameplay aim before the camera/viewmodel's cosmetic firing overlay. */
+  updateAim(
     camera: THREE.PerspectiveCamera,
-    viewCamera: THREE.PerspectiveCamera,
     def: WeaponDef,
-    emitter: THREE.Object3D,
     muzzle: THREE.Vector3,
     physics: EngineSystems['physics'],
-    owner: unknown,
-    height: number
+    owner: unknown
   ): void {
     // Match tryFire's unspread, zeroed bore. This is a sight aid, not a predictor
     // of random spread/penetration or the round's curved flight beyond its zero.
@@ -80,7 +78,16 @@ export class WeaponLaser {
     this.direction.copy(this.end).sub(muzzle).normalize();
     const aim = physics.raycast(muzzle, this.direction, def.maxRange, MASK.BULLET, owner);
     this.end.copy(aim.point); // pooled query results must be copied before the next query
+  }
 
+  update(
+    camera: THREE.PerspectiveCamera,
+    viewCamera: THREE.PerspectiveCamera,
+    emitter: THREE.Object3D,
+    physics: EngineSystems['physics'],
+    owner: unknown,
+    height: number
+  ): void {
     emitter.getWorldPosition(this.origin);
     // The model is rendered with the separate first-person FOV. Map its apparent
     // emitter to the world projection so the ribbon starts on the actual lens.

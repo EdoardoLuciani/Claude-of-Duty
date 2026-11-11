@@ -5,6 +5,7 @@ import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { LAYER } from '../../src/physics/surfaces.ts';
+import { CameraRig } from '../../src/player/camera.ts';
 import type { RenderSystem } from '../../src/render/index-webgpu.ts';
 import {
   BASE_ATTACHMENTS,
@@ -378,6 +379,13 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   const viewCamera = camera.clone();
   const emitter = new THREE.Object3D();
   emitter.position.set(0.04, 0, -0.2);
+  const anchor = new THREE.Object3D();
+  anchor.add(emitter);
+  const context = createTestContext({ camera, viewCamera });
+  const rig = new CameraRig(context);
+  rig.fov = camera.fov;
+  rig.fireVibe = 1;
+  rig.fireVibeTime = 0.07;
   const muzzle = new THREE.Vector3(0, 0, -0.3);
   const actor = physics.addCollider({
     shape: 'sphere',
@@ -394,8 +402,16 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   });
   const positions = laser.geometry.getAttribute('position');
   const dot = new THREE.Vector3();
-  const update = (): void => {
-    laser.update(camera, viewCamera, WEAPON_DEFS.rifle, emitter, muzzle, physics, null, 1080);
+  const update = (firingShake = 0): void => {
+    context.config.firingShake = firingShake;
+    rig.applyTo(camera);
+    viewCamera.position.copy(camera.position);
+    viewCamera.quaternion.copy(camera.quaternion);
+    anchor.position.copy(camera.position);
+    anchor.quaternion.copy(camera.quaternion);
+    laser.updateAim(camera, WEAPON_DEFS.rifle, muzzle, physics, null);
+    rig.applyFireVibe(camera, viewCamera, anchor);
+    laser.update(camera, viewCamera, emitter, physics, null, 1080);
     dot.set(0, 0, 0);
     for (let i = 4; i < 8; i++) dot.add(new THREE.Vector3().fromBufferAttribute(positions, i));
     dot.multiplyScalar(0.25);
@@ -416,6 +432,17 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   actor.enabled = false;
   update();
   assert(Math.abs(dot.z + 9) < 0.01, 'spot stops on world collision behind the AI');
+  const unshakenSpot = dot.clone();
+  const unshakenEmitter = emitter.getWorldPosition(new THREE.Vector3());
+  update(1);
+  assert(
+    dot.distanceTo(unshakenSpot) < 1e-5,
+    'cosmetic firing shake preserves the ballistic target'
+  );
+  assert(
+    emitter.getWorldPosition(new THREE.Vector3()).distanceTo(unshakenEmitter) > 1e-5,
+    'the rendered emitter still follows cosmetic firing shake'
+  );
   assert.equal(laser.geometry.getAttribute('position'), positions, 'updates reuse the same buffer');
   physics.colliders.length = 0;
   update();

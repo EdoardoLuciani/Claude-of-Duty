@@ -39,7 +39,7 @@ Products (ignored, reproducibly generated):
 - `tor-mini.blend`: hidden `SOURCE_HIGH` detailed components, visible optimized
   `TOR_MINI_body`, packed maps, named sockets and studio cameras.
 - `tor-mini.glb`: native self-contained glTF export, one opaque material/primitive.
-- `public/models/attachments/laser.runtime.glb` (or `tor-mini.runtime.glb` with the
+- `public/models/attachments/laser.runtime.glb` (or `laser.runtime.glb` with the
   scratch-directory cook above): shared gltfpack meshopt/KTX2 cook; the authored target
   is already reduced, so cooking does not simplify its geometry further.
 - `tor-mini-{base-color,normal,orm}.png`: unique 2048² PBR atlas. ORM has R=1,

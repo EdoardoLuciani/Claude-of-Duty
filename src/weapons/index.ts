@@ -1818,35 +1818,37 @@ export class WeaponSystem {
       ctx.events.emit('weapon:shell', this._shellPayload);
     }
 
+    const laser = this._laser;
+    const emitter = vm.active?.laserEmitter;
+    const def = this.current;
+    const physics = this.physics;
+    const showLaser =
+      laser &&
+      emitter &&
+      def &&
+      physics &&
+      !this.disabled &&
+      !this.player?.dead &&
+      !this.grenadeEquipped &&
+      !this.radioEquipped &&
+      !this.healing;
+    if (laser) laser.mesh.visible = false;
+    if (showLaser) {
+      vm.muzzleWorld(this._muzzle);
+      laser.updateAim(ctx.camera, def, this._muzzle, physics, this.player);
+    }
+
     this.player?.applyFireVibe(vm.anchor);
 
-    const laser = this._laser;
-    if (laser) {
-      laser.mesh.visible = false;
-      const emitter = vm.active?.laserEmitter;
-      const def = this.current;
-      if (
-        emitter &&
-        def &&
-        this.physics &&
-        !this.disabled &&
-        !this.player?.dead &&
-        !this.grenadeEquipped &&
-        !this.radioEquipped &&
-        !this.healing
-      ) {
-        vm.muzzleWorld(this._muzzle);
-        laser.update(
-          ctx.camera,
-          ctx.viewCamera,
-          def,
-          emitter,
-          this._muzzle,
-          this.physics,
-          this.player,
-          ctx.get('render').screenSize.height
-        );
-      }
+    if (showLaser) {
+      laser.update(
+        ctx.camera,
+        ctx.viewCamera,
+        emitter,
+        physics,
+        this.player,
+        ctx.get('render').screenSize.height
+      );
     }
 
     // ---- retire dropped magazines --------------------------------------
