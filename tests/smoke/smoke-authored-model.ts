@@ -96,38 +96,6 @@ assert.throws(
   (): unknown => authoredModel(gltf, 'TEST_RIG', ['Idle', 'Fire', 'Inspect'], authored),
   /missing Inspect clip/
 );
-// EVOLYS no longer supplies integrated optic data when its adapter loads irons.
-{
-  const scene = new THREE.Group();
-  const root = new THREE.Group();
-  root.name = 'EVOLYS_RIG';
-  scene.add(root);
-  for (const name of [
-    'SOCKET_muzzle',
-    'SOCKET_ejection',
-    'SOCKET_sight',
-    'SOCKET_pouch',
-    'trigger',
-    'IRON_sights',
-  ]) {
-    const node = new THREE.Object3D();
-    node.name = name;
-    root.add(node);
-  }
-  const model = makeEvolysModel(
-    fixture<GLTF>({
-      scene,
-      animations: Object.entries(evolysManifest.clips).map(([name, info]): THREE.AnimationClip =>
-        clip(name, track(info.duration ? [0, info.duration] : [0]))
-      ),
-    })
-  );
-  for (const ironSights of [true, false, true]) {
-    const mounted = mountAttachments(model, { ...BASE_ATTACHMENTS, ironSights }, {});
-    assert.equal(mounted.optic, null, 'base EVOLYS must never produce a floating RMR reticle');
-    assert.equal(root.getObjectByName('IRON_sights')?.visible, ironSights);
-  }
-}
 // Shared glass remains a single thin-alpha surface, even if source art uses transmission.
 for (const id of ['rmr', 'acog', 'scope'] as const) {
   const scene = new THREE.Group();
@@ -303,5 +271,37 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   assert.equal(ownerDisposed, false, 'warm source survives mounted-instance disposal');
   asset.dispose();
   assert.equal(disposed, 1, 'asset owner releases shared geometry exactly once');
+}
+// EVOLYS no longer supplies integrated optic data when its adapter loads irons.
+{
+  const scene = new THREE.Group();
+  const root = new THREE.Group();
+  root.name = 'EVOLYS_RIG';
+  scene.add(root);
+  for (const name of [
+    'SOCKET_muzzle',
+    'SOCKET_ejection',
+    'SOCKET_sight',
+    'SOCKET_pouch',
+    'trigger',
+    'IRON_sights',
+  ]) {
+    const node = new THREE.Object3D();
+    node.name = name;
+    root.add(node);
+  }
+  const model = makeEvolysModel(
+    fixture<GLTF>({
+      scene,
+      animations: Object.entries(evolysManifest.clips).map(([name, info]): THREE.AnimationClip =>
+        clip(name, track(info.duration ? [0, info.duration] : [0]))
+      ),
+    })
+  );
+  for (const ironSights of [true, false, true]) {
+    const mounted = mountAttachments(model, { ...BASE_ATTACHMENTS, ironSights }, {});
+    assert.equal(mounted.optic, null, 'base EVOLYS must never produce a floating RMR reticle');
+    assert.equal(root.getObjectByName('IRON_sights')?.visible, ironSights);
+  }
 }
 console.log('authored models: clip durations and shared attachment mount lifetime OK');
