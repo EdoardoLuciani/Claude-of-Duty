@@ -121,11 +121,10 @@ const SHARED_TOOLS: Partial<Record<ModelId, string[]>> = {
 // the saved source also catches geometry, UV, finish and packed-texture changes.
 const OPTIC_SOURCES = {
   acog: 'assets/weapons/mcx-virtus/mcx-virtus.blend',
-  scope: 'assets/weapons/ax338/ax338.blend',
 };
 const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
   acog: ['tools/blender/optics.py', OPTIC_SOURCES.acog],
-  scope: ['tools/blender/optics.py', OPTIC_SOURCES.scope],
+  scope: ['tools/blender/scope'],
   rmr: ['tools/blender/rmr'],
   exps3: ['tools/blender/exps3.py', 'tools/blender/exps3_bake.py'],
   tor_mini: ['tools/blender/tor_mini'],
@@ -143,11 +142,12 @@ function cookStep(id: ModelId, salt: string[]): AssetStep {
     outputs: [
       `${directory}/${source}`,
       output,
-      // Downstream optic extraction requires these even when GLBs are cached.
-      ...(id === 'mcx' ? [OPTIC_SOURCES.acog] : id === 'ax338' ? [OPTIC_SOURCES.scope] : []),
+      // Editable products used by optic extraction and attachment-fit checks.
+      ...(id === 'mcx' ? [OPTIC_SOURCES.acog] : []),
+      ...(id === 'scope' ? [`${directory}/scope.blend`] : []),
     ],
     commands: [
-      id === 'acog' || id === 'scope'
+      id === 'acog'
         ? [...blender('tools/blender/optics.py'), '--', id]
         : blender(id === 'exps3' ? tools[0] : `tools/blender/${id}/build.py`),
       bun('build/models.ts', id),
@@ -274,11 +274,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
           .map((id): AssetStep => cookStep(id, [armsHash])),
         ...Object.keys(STANDALONE_TOOLS)
           .filter(isModelId)
-          .filter((id): boolean => id !== 'acog' && id !== 'scope')
+          .filter((id): boolean => id !== 'acog')
           .map((id): AssetStep => cookStep(id, [])),
         SOLDIER_STEP,
       ]);
-      if (!failed) await pool([cookStep('acog', []), cookStep('scope', [])]);
+      if (!failed) await pool([cookStep('acog', [])]);
     }
     if (!failed)
       stages.push(stage('export-proc-textures.ts', ...force), stage('export-models.ts', ...force));

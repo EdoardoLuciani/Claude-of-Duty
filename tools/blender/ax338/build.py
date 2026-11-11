@@ -35,7 +35,7 @@ def build(output,render=False,quick=False):
     def empty(name,loc=(0,0,0),parent=None):
         o=bpy.data.objects.new(name,None);asset.objects.link(o);o.location=xyz(loc);o.parent=parent;o.empty_display_size=.01;bpy.context.view_layer.update();return o
     rig=empty('AX338_RIG');body=empty('receiver',parent=rig);hg=empty('handguard',parent=rig)
-    stock=empty('stock',parent=rig);optic=empty('optic',parent=rig)
+    stock=empty('stock',parent=rig);irons=empty('IRON_sights',parent=rig)
     bolt=empty('bolt',(0,.075,.050),rig);trigger=empty('trigger',(0,.049,.016),rig)
     mag=empty('magazine',parent=rig);spare=empty('magazine_spare',parent=rig)
     mag_rounds=empty('magazine_round',parent=mag);spare_rounds=empty('magazine_spare_round',parent=spare)
@@ -81,8 +81,6 @@ def build(output,render=False,quick=False):
     brass=material('07 | cartridge brass',(.53,.35,.12),1,.32)
     copper=material('08 | projectile jacket',(.34,.17,.075),1,.32)
     mark=material('09 | laser markings',(.60,.57,.47),0,.88)
-    glass=material('10 | RMR coated lens',(.03,.10,.12),0,.14)
-    glass.surface_render_method='DITHERED';glass.node_tree.nodes.get('Principled BSDF').inputs['Alpha'].default_value=.13
 
     # Geometry is authored in game metres, converted only at the Blender boundary.
     def finish(o,name,mat=black,parent=body,bevel=.0005,smooth=False):
@@ -312,51 +310,27 @@ def build(output,render=False,quick=False):
         for x in (-.007,.007):
             turned('Visible .338 cartridge',x,.057,[(-.027,.0074),(-.077,.0073),(-.087,.0056),(-.098,.0043),(-.1205,.0007)],brass,rounds,24)
     box('Magazine latch',(0,-.037,.008),(.010,.016,.012),steel,body,.001)
-    # Older PM II LP 5-25x56, 417 mm overall / 34 mm central tube.
-    # Its exact mount relief, turrets and hidden contours remain photo-inferred.
-    axis=.159;rear=.087;front=rear-.417
-    turned('PM II scope housing',0,axis,[(rear,.020),(rear-.006,.021),(rear-.064,.021),(rear-.081,.018),(-.150,.017),(-.265,.031), (front,.031)],black,optic,64)
-    for z,r,length in [(.043,.022,.021),(.004,.018,.015),(-.320,.032,.009)]:
-        cyl('Scope knurled ring',(0,axis,z),r,length,black,optic,'Z',64)
-        for i in range(48):
-            a=i*math.tau/48
-            cyl('Ring grip ridge',(math.sin(a)*r,axis+math.cos(a)*r,z),.0006,length*.85,steel,optic,'Z',8,0)
-    for z in (-.024,-.154):
-        saddle=cyl('34 mm mount ring',(0,axis,z),.023,.019,black,optic,'Z',48)
-        cut(saddle,cyl('CUT ring bore',(0,axis,z),.0172,.030,None,None,'Z',48,0))
-        box('AI one-piece ring pedestal',(0,.137,z),(.037,.034,.028),black,optic,.0007)
-        for side in (-1,1):
-            box('Ring clamp ear',(side*.020,axis,z),(.007,.014,.023),black,optic,.0007)
-            fastener('Ring clamp screw',side*.024,axis,z,.0028,optic)
-    box('AI mount base',(0,.126,-.089),(.040,.011,.177),black,optic,.0007)
+    # Rail-mounted aperture/post irons, independent of optional optics. Feet sit
+    # on the .118 m Picatinny tooth tops; a 595 mm radius shares one aim line.
+    sight_y=.151;rear=.055;front=-.540
+    for z in (rear,front):
+        box('Iron rail foot',(0,.1205,z),(.026,.005,.025),black,irons,.0006)
+        cyl('Iron clamp crossbolt',(0,.119,z),.002,.032,steel,irons,'X',24)
+        cyl('Iron pivot',(0,.126,z),.0035,.023,steel,irons,'X',24)
+    box('Rear aperture stalk',(0,.135,rear),(.006,.020,.004),steel,irons,.0004)
+    aperture=cyl('Rear open aperture',(0,sight_y,rear),.007,.004,steel,irons,'Z',48)
+    cut(aperture,cyl('CUT aperture',(0,sight_y,rear),.0023,.010,None,None,'Z',48,0))
+    box('Front sight post',(0,(.126+sight_y)/2,front),(.0018,sight_y-.126,.002),steel,irons,.0001)
     for side in (-1,1):
-        for z in (-.024,-.154):fastener('Mount rail nut',side*.021,.125,z,.004,optic)
-    cyl('Elevation drum',(0,axis+.022,-.087),.020,.035,black,optic,'Y',48)
-    cyl('Elevation cap',(0,axis+.041,-.087),.018,.006,black,optic,'Y',48)
-    # Real relief on the controls; numeric typography/layout is inferred, not an
-    # exact reticle/turret calibration or a claim of a particular specimen serial.
-    for i in range(24):
-        a=i*math.tau/24
-        cyl('Elevation knurl',(math.sin(a)*.020,axis+.023,-.087+math.cos(a)*.020),.0007,.011,black,optic,'Y',8,0)
-    for i in range(12):
-        a=i*math.tau/12
-        bpy.ops.object.text_add(location=xyz((math.sin(a)*.0203,axis+.029,-.087+math.cos(a)*.0203)))
-        o=bpy.context.object;o.data.body=str(i*2);o.data.size=.0026;o.data.align_x='CENTER'
-        right=xyz((math.cos(a),0,-math.sin(a)));up=xyz((0,1,0))
-        o.rotation_euler=Matrix((right,up,right.cross(up))).transposed().to_euler()
-        active(o);bpy.ops.object.convert(target='MESH');finish(o,'Elevation graduation',mark,optic,0)
-    for side in (-1,1):
-        cyl('Windage and parallax',(side*.025,axis,-.087),.016,.023,black,optic,'X',48)
-        cyl('Turret cap',(side*.038,axis,-.087),.015,.004,black,optic,'X',48)
-    for z,r in [(front-.0002,.028),(rear+.0002,.018)]:
-        cyl('Recessed optical glass',(0,axis,z),r,.0005,glass,optic,'Z',64,0)
+        box('Front sight guard',(side*.008,.139,front),(.003,.035,.005),steel,irons,.0006)
     for side in (-1,1):
         text('ACCURACY INTERNATIONAL',(side*.0211,.091,-.116),.0032,side)
         text('AX338  .338 LAPUA MAG',(side*.0211,.064,-.103),.0026,side)
-        text('SCHMIDT & BENDER',(side*.0212,axis-.004,.058),.003,side,optic)
-        for i in range(8):
-            text(str(i*5),(side*.0379,axis+.009-i*.002,-.094),.0018,side,optic)
-    for name,pos in [('SOCKET_muzzle',(0,.075,muzzle)),('SOCKET_ejection',(.027,.081,-.035)),('SOCKET_sight',(0,axis,rear)),('SOCKET_magazine',(0,.080,-.075))]:empty(name,pos,rig)
+    for name,pos in [('SOCKET_muzzle',(0,.075,muzzle)),('SOCKET_ejection',(.027,.081,-.035)),('SOCKET_sight',(0,sight_y,rear)),('SOCKET_magazine',(0,.080,-.075)),
+                     ('MOUNT_optic',(0,.118,-.089)),('MOUNT_muzzle',(0,.075,crown)),('MOUNT_rail',(.027,.075,-.455))]:empty(name,pos,rig)
+    # Future side-rail datum: its local +Y is the outward contact normal. No
+    # laser/suppressor model or behavior is present until #671/#670 land.
+    bpy.data.objects['MOUNT_rail'].rotation_euler=(0,math.pi/2,0)
     # Source and runtime share identical UVs and atlas regions; never save an
     # untextured DCC source and unwrap only the GLB after saving it.
     for o in list(asset.objects):
@@ -384,7 +358,7 @@ def build(output,render=False,quick=False):
     scene.render.engine='BLENDER_EEVEE';scene.eevee.taa_render_samples=12 if quick else 48;scene.eevee.use_raytracing=False
     scene.render.resolution_x=800 if quick else 1600;scene.render.resolution_y=450 if quick else 900;scene.render.resolution_percentage=100;scene.render.film_transparent=True;scene.view_settings.view_transform='AgX'
     scene['clips']=json.dumps(clips)
-    bpy.data.texts.new('START HERE').write('EARLY AX338 / PM II LP / GENERATED REVIEW PREVIEW\nEdit tools/blender/ax338/, not this product.\nNot a scan or manufacturer CAD. Read-only inputs, edit map and fidelity limits: asset README.md.\nNine weapon/wrist/finger NLA clips; shared review skins are not exported.\nSelect matching NLA tracks on all controls and review arms. 120 fps.\nGeometry remains separate editable components; runtime export joins copies.\nRegeneration overwrites manual edits; no saved-weapon input or automatic hand refit.\n')
+    bpy.data.texts.new('START HERE').write('EARLY AX338 / REMOVABLE RAIL IRONS / GENERATED REVIEW PREVIEW\nEdit tools/blender/ax338/, not this product.\nNot a scan or manufacturer CAD. Read-only inputs, edit map and fidelity limits: asset README.md.\nNine weapon/wrist/finger NLA clips; shared review skins are not exported.\nSelect matching NLA tracks on all controls and review arms. 120 fps.\nGeometry remains separate editable components; runtime export joins copies.\nRegeneration overwrites manual edits; no saved-weapon input or automatic hand refit.\n')
     bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'ax338.blend'),compress=True)
     if render:
         (OUT/'renders').mkdir(exist_ok=True)
@@ -403,7 +377,7 @@ def build(output,render=False,quick=False):
         contact_boxes.append({'part':o.name,'min':[round(min(p[i] for p in points),8) for i in range(3)],'max':[round(max(p[i] for p in points),8) for i in range(3)]})
     # Consolidation operates after source save and only on runtime geometry.
     consolidate_finishes(asset,rough,albedo,normal,OUT)
-    for parent in (body,hg,stock,optic,bolt,trigger,mag,spare,mag_rounds,spare_rounds):
+    for parent in (body,hg,stock,irons,bolt,trigger,mag,spare,mag_rounds,spare_rounds):
         objects=[o for o in list(asset.objects) if o.type=='MESH' and o.parent==parent]
         if not objects:continue
         for o in objects:
@@ -413,15 +387,15 @@ def build(output,render=False,quick=False):
         bpy.ops.object.join();o=bpy.context.object;o.name=parent.name+'_mesh'
     prepare_export_actions([rig,bolt,trigger,mag,spare]+controls,clips)
     # Retain ordinary per-parent meshes: only bolt/trigger move independently.
-    # The optic keeps its true transparent lens material; magazines stay independent.
+    # Removable irons and magazines retain independent assembly ownership.
     bpy.ops.object.select_all(action='DESELECT')
     for o in asset.objects:o.select_set(True)
     bpy.context.view_layer.objects.active=rig
     bpy.ops.export_scene.gltf(filepath=str(OUT/'ax338.glb'),export_format='GLB',use_selection=True,export_animations=True,export_animation_mode='ACTIONS',export_merge_animation='NLA_TRACK',export_frame_range=False,export_force_sampling=False,export_optimize_animation_keep_anim_object=True,export_sampling_interpolation_fallback='LINEAR',export_extras=True,export_yup=True,export_cameras=False,export_lights=False)
     stats=validate_export(OUT/'ax338.glb',clips)
-    manifest={'asset':'Early AX338 / Dark Earth / factory brake / PM II LP 5-25x56 / no bipod','units':'metres','clips':clips,'stats':stats,'textureResolution':1024,'contactGeometry':{'magazine':contact_boxes,'pistolGripSections':grip_sections},'dimensions':{'barrel':.6858,'overall':1.250,'barrelFace':breech,'barrelCrown':crown,'muzzle':muzzle,'butt':butt,'scopeLength':.417,'scopeTubeDiameter':.034,'magazineBodyHeight':.105,'magazineDepth':.104,'magazineThickness':.034,'magazineHeight':.1125},'source':'tools/blender/ax338/build.py + tools/blender/ax338/actions.py + tools/blender/ax338/export.py; calibration stage: tools/blender/ax338/hand-reference.ts'}
+    manifest={'asset':'Early AX338 / Dark Earth / factory brake / removable rail irons / no optional attachments','units':'metres','clips':clips,'stats':stats,'textureResolution':1024,'contactGeometry':{'magazine':contact_boxes,'pistolGripSections':grip_sections},'dimensions':{'barrel':.6858,'overall':1.250,'barrelFace':breech,'barrelCrown':crown,'muzzle':muzzle,'butt':butt,'ironSightRadius':rear-front,'ironSightHeight':sight_y,'magazineBodyHeight':.105,'magazineDepth':.104,'magazineThickness':.034,'magazineHeight':.1125},'source':'tools/blender/ax338/build.py + tools/blender/ax338/actions.py + tools/blender/ax338/export.py; calibration stage: tools/blender/ax338/hand-reference.ts'}
     (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
-    assert stats['triangles']<150000 and stats['primitives']==11 and stats['materials']==2 and stats['images']==3 and stats['bytes']<=15*1024*1024,stats
+    assert stats['triangles']<150000 and stats['primitives']==10 and stats['materials']==1 and stats['images']==3 and stats['bytes']<=15*1024*1024,stats
     print('AX338 export:',json.dumps(stats))
     for name in ('ax338_surface.png','ax338_roughness.png','ax338_normal.png','ax338_finishes.png'):(OUT/name).unlink(missing_ok=True)
 

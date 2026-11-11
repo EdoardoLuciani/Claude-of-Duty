@@ -398,13 +398,15 @@ resolves sight/OpticData, muzzle and effective handling/suppression on the state
 private definition; frame-time reticle, ADS and fire-event consumers allocate nothing.
 The M4's `MOUNT_optic` is an authored rail-contact transform under its weapon rig.
 Attachment `MOUNT_base` and `SOCKET_sight` define mounting and aiming in metres;
-instances follow the authored weapon animation. RMR geometry is shared source
-with EVOLYS, with a standalone high riser to clear the M4's fixed front sight.
-ACOG and PM II are extracted from freshly built MCX/AX338 editable Blender sources
-by `tools/blender/optics.py`; the asset pipeline builds those weapons before extracting
-and cooking the standalone GLBs. Their original geometry, UVs and packed maps are
-retained, with identity rail-contact datums and no weapon animation. Source weapon
-optics are not removed until their conversion issues. Glass retains thin alpha,
+instances follow the authored weapon animation. RMR uses the standalone
+`tools/blender/rmr/` source, with a high riser to clear the M4's fixed front sight.
+ACOG is extracted from freshly built MCX editable source by `tools/blender/optics.py`;
+the pipeline builds the MCX before extraction. PM II has its own canonical source,
+`tools/blender/scope/build.py`, and builds independently of the AX338. The AX338 is
+an iron-sight base with removable irons and verified RMR/ACOG/PM II mounts. Both
+optics retain original geometry, UVs and packed maps, identity rail-contact datums
+and no weapon animation. MCX retains its integrated ACOG until its conversion.
+Glass retains thin alpha,
 with no transmission pass. Scope mask, gun hiding and mil scale use mounted
 `OpticData`, not the weapon class.
 The weapon system owns one loaded asset per optic and disposes them after the
