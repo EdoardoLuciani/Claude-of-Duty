@@ -41,6 +41,18 @@ export const GLTFPACK_FLAGS = [
 // Simplification is model-specific, never a blanket default for all models.
 // `output` is repo-relative; runtime-mounted weapons/attachments are served from public/.
 export const MODEL_COOKS = {
+  acog: {
+    directory: 'assets/attachments/trijicon-acog',
+    source: 'acog.glb',
+    output: 'public/models/attachments/acog.runtime.glb',
+    flags: [],
+  },
+  scope: {
+    directory: 'assets/attachments/schmidt-bender-pm-ii',
+    source: 'scope.glb',
+    output: 'public/models/attachments/scope.runtime.glb',
+    flags: [],
+  },
   rmr: {
     directory: 'assets/attachments/trijicon-rmr',
     source: 'rmr.glb',

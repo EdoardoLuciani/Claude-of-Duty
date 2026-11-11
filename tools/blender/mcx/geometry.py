@@ -585,7 +585,12 @@ def build_geometry(materials):
     bpy.context.view_layer.update()
     build_receiver()
     build_handguard()
+    before_optic = set(asset.objects)
     build_optic()
+    # Preserve the complete assembly (including generic screw/mark names) for
+    # the standalone optic export, without changing the weapon's rigid parents.
+    for obj in set(asset.objects) - before_optic:
+        obj['sharedOptic'] = 'acog'
     build_suppressor()
     build_charging_handle()
     build_stock()

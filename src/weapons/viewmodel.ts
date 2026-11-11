@@ -12,7 +12,7 @@ import {
   configureWeaponAttachments,
   releaseAttachmentMount,
   type AttachmentConfig,
-  type RMRModel,
+  type OpticModels,
 } from './attachments.ts';
 import { createWeaponAnimation } from './authored-animation.ts';
 import { loadBandage } from './bandage-mesh.ts';
@@ -506,7 +506,7 @@ export class Viewmodel {
     model: WeaponModelRecord,
     def: WeaponDef,
     config: AttachmentConfig = BASE_ATTACHMENTS,
-    rmr: RMRModel | null = null
+    optics: OpticModels = {}
   ): WeaponEntry {
     let tris = 0;
     const meshes: THREE.Mesh[] = [];
@@ -560,7 +560,7 @@ export class Viewmodel {
       this._fitSupportHand(entry);
       this._fitGripContacts(entry);
     }
-    configureWeaponAttachments(entry, config, rmr);
+    configureWeaponAttachments(entry, config, optics);
     this.weapons.set(model.id, entry);
     return entry;
   }

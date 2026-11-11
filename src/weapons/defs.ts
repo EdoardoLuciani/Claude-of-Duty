@@ -72,6 +72,8 @@ export interface WeaponDef {
   hipRot: TuningVector;
   adsCant: TuningVector;
   eyeRelief: number;
+  /** Only verified weapon/optic fits are enabled; conversion issues add the others. */
+  opticEyeRelief?: Partial<Record<import('./attachments.ts').OpticId, number>>;
   sprintPos: TuningVector;
   sprintRot: TuningVector;
   lowReadyPos: TuningVector;
@@ -213,6 +215,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     adsCant: [0, 0, 0.004],
     // Bring the eye closer to open the rear aperture; its bore and aim datum stay authored.
     eyeRelief: 0.03,
+    opticEyeRelief: { rmr: 0.125, acog: 0.11, scope: 0.09 },
     /* Sprint: gun dropped and angled across the body, muzzle down-left.
      * Carried over by the same delta as the hip pose so the blend does not
      * translate the weapon 90 mm sideways on the way into a sprint. */

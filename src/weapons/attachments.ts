@@ -9,10 +9,12 @@ import { requiredNode } from './authored-model.ts';
 import { WEAPON_DEFS, type WeaponId } from './defs.ts';
 import type { OpticData, WeaponEntry, WeaponModelRecord } from './runtime-types.ts';
 
+export type OpticId = 'rmr' | 'acog' | 'scope';
+
 /** Null means the authored base weapon, not a separately purchasable component.
  * Muzzle/rail catalogs are intentionally empty until their assets are implemented. */
 export interface AttachmentConfig {
-  readonly optic: 'rmr' | null;
+  readonly optic: OpticId | null;
   readonly muzzle: null;
   readonly rail: null;
 }
@@ -27,7 +29,9 @@ export function isAttachmentConfig(value: unknown, id: WeaponId): value is Attac
   if (typeof value !== 'object' || value === null) return false;
   return (
     'optic' in value &&
-    (value.optic === null || (value.optic === 'rmr' && id === 'rifle')) &&
+    (value.optic === null ||
+      ((value.optic === 'rmr' || value.optic === 'acog' || value.optic === 'scope') &&
+        WEAPON_DEFS[id].opticEyeRelief?.[value.optic] !== undefined)) &&
     'muzzle' in value &&
     value.muzzle === null &&
     'rail' in value &&
@@ -35,15 +39,36 @@ export function isAttachmentConfig(value: unknown, id: WeaponId): value is Attac
   );
 }
 
-const RMR = {
-  eyeRelief: 0.125,
-  adsFovScale: 0.62,
-  adsSensScale: 0.62,
-  optic: { apertureR: 0.0055, dotMoa: 3.25, minDotPixels: 5, dotOpacity: 0.9 },
+const OPTICS: Record<
+  OpticId,
+  {
+    adsFovScale: number;
+    adsSensScale: number;
+    optic: Omit<OpticData, 'center'>;
+  }
+> = {
+  rmr: {
+    adsFovScale: 0.62,
+    adsSensScale: 0.62,
+    optic: { apertureR: 0.0055, dotMoa: 3.25, minDotPixels: 5, dotOpacity: 0.9 },
+  },
+  acog: {
+    adsFovScale: 0.28,
+    adsSensScale: 0.28,
+    optic: { kind: 'scope', reticle: 'chevron', apertureR: 0.0137 },
+  },
+  scope: {
+    adsFovScale: 0.25,
+    adsSensScale: 0.25,
+    optic: { kind: 'scope', reticle: 'p4fl' },
+  },
 };
 
 /** One owned asset; mounted/inspection instances borrow its geometry and finishes. */
-export function makeRMRModel(gltf: GLTF): {
+export function makeOpticModel(
+  gltf: GLTF,
+  id: OpticId
+): {
   scene: THREE.Group;
   mount: THREE.Vector3;
   sight: THREE.Vector3;
@@ -54,11 +79,20 @@ export function makeRMRModel(gltf: GLTF): {
   const mount = requiredNode(scene, 'MOUNT_base').getWorldPosition(new THREE.Vector3());
   const sight = requiredNode(scene, 'SOCKET_sight').getWorldPosition(new THREE.Vector3());
   const finishes = convertWeaponScene(scene, (source, material): void => {
-    if (source.name.startsWith('10 |')) {
+    if (source.name.startsWith(id === 'acog' ? '11 |' : '10 |')) {
+      // The overlay owns the magnified picture: retain thin alpha, never a
+      // second full-scene transmission pass through attachment glass.
+      material.transmission = 0;
       material.transparent = true;
-      material.opacity = 0.13;
+      material.opacity = id === 'acog' ? 0.1 : 0.13;
       material.depthWrite = false;
       material.side = THREE.DoubleSide;
+      if (id === 'acog') {
+        material.color.setRGB(0.035, 0.075, 0.085);
+        material.metalness = 0;
+        material.roughness = 0.12;
+        material.specularIntensity = 0.25;
+      }
     }
   });
   return {
@@ -77,10 +111,17 @@ export function makeRMRModel(gltf: GLTF): {
     },
   };
 }
-export type RMRModel = ReturnType<typeof makeRMRModel>;
+export type OpticModel = ReturnType<typeof makeOpticModel>;
+export type OpticModels = Partial<Record<OpticId, OpticModel>>;
 
-export async function loadRMR(renderer: Pick<Renderer, 'hasFeature'>): Promise<RMRModel> {
-  return makeRMRModel(await loadWeaponGLTF(renderer, '/models/attachments/rmr.runtime.glb'));
+export async function loadOptic(
+  renderer: Pick<Renderer, 'hasFeature'>,
+  id: OpticId
+): Promise<OpticModel> {
+  return makeOpticModel(
+    await loadWeaponGLTF(renderer, `/models/attachments/${id}.runtime.glb`),
+    id
+  );
 }
 
 export function releaseAttachmentMount(group: THREE.Group): void {
@@ -93,7 +134,7 @@ export function releaseAttachmentMount(group: THREE.Group): void {
 export function mountAttachments(
   model: WeaponModelRecord,
   config: AttachmentConfig,
-  rmr: RMRModel | null
+  optics: OpticModels
 ): {
   group: THREE.Group;
   sight: THREE.Vector3;
@@ -105,8 +146,9 @@ export function mountAttachments(
   group.name = 'attachments';
   const sight = new THREE.Vector3().fromArray(model.nodes.sight);
   let optic: OpticData | null = 'opticGlass' in model.nodes ? model.nodes.opticGlass : null;
-  if (config.optic === 'rmr') {
-    if (!rmr) throw new Error('[weapons] RMR asset unavailable');
+  if (config.optic !== null) {
+    const asset = optics[config.optic];
+    if (!asset) throw new Error(`[weapons] ${config.optic} asset unavailable`);
     const mount = requiredNode(model.scene, 'MOUNT_optic');
     // Full authored mount transform, including orientation; asset mount is its origin.
     model.scene.updateMatrixWorld(true);
@@ -114,13 +156,13 @@ export function mountAttachments(
       .copy(model.root.matrixWorld)
       .invert()
       .multiply(mount.matrixWorld);
-    const instance = rmr.scene.clone(true);
-    instance.position.sub(rmr.mount);
+    const instance = asset.scene.clone(true);
+    instance.position.sub(asset.mount);
     instance.updateMatrix();
     instance.applyMatrix4(transform);
     group.add(instance);
-    sight.copy(rmr.sight).sub(rmr.mount).applyMatrix4(transform);
-    optic = { ...RMR.optic, center: sight.toArray() };
+    sight.copy(asset.sight).sub(asset.mount).applyMatrix4(transform);
+    optic = { ...OPTICS[config.optic].optic, center: sight.toArray() };
   }
   return { group, sight, optic };
 }
@@ -130,9 +172,9 @@ export function mountAttachments(
 export function configureWeaponAttachments(
   entry: WeaponEntry,
   config: AttachmentConfig,
-  rmr: RMRModel | null
+  optics: OpticModels
 ): void {
-  const mounted = mountAttachments(entry.model, config, rmr);
+  const mounted = mountAttachments(entry.model, config, optics);
   releaseAttachmentMount(entry.attachmentGroup);
   entry.attachmentGroup = mounted.group;
   entry.model.root.add(mounted.group);
@@ -141,10 +183,14 @@ export function configureWeaponAttachments(
   entry.optic = mounted.optic;
   entry.muzzle.fromArray(entry.model.nodes.muzzle);
   const base = WEAPON_DEFS[entry.id];
-  entry.def.eyeRelief = config.optic === 'rmr' ? RMR.eyeRelief : base.eyeRelief;
+  const attached = config.optic === null ? null : OPTICS[config.optic];
+  entry.def.eyeRelief =
+    config.optic === null
+      ? base.eyeRelief
+      : (base.opticEyeRelief?.[config.optic] ?? base.eyeRelief);
   entry.def.suppressed = base.suppressed ?? false;
-  const fov = config.optic === 'rmr' ? RMR.adsFovScale : base.adsFovScale;
-  const sensitivity = config.optic === 'rmr' ? RMR.adsSensScale : base.adsSensScale;
+  const fov = attached ? attached.adsFovScale : base.adsFovScale;
+  const sensitivity = attached ? attached.adsSensScale : base.adsSensScale;
   if (fov === undefined) delete entry.def.adsFovScale;
   else entry.def.adsFovScale = fov;
   if (sensitivity === undefined) delete entry.def.adsSensScale;
