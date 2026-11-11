@@ -195,12 +195,14 @@ rail_teeth=[o for o in bpy.data.objects if o.type=='MESH' and o.name.startswith(
 assert any(abs(max(p.y for p in points(o.name))-.118)<.000001 for o in rail_teeth)
 iron_tree=surface(iron_meshes)
 mounted={}
-for optic_id,folder in [('rmr','trijicon-rmr'),('acog','trijicon-acog'),('scope','schmidt-bender-pm-ii')]:
-    path=ROOT/'assets/attachments'/folder/(optic_id+'.blend')
+for optic_id,folder in [('rmr','trijicon-rmr'),('acog','trijicon-acog'),('scope','schmidt-bender-pm-ii'),('exps3','eotech-exps3-0')]:
+    path=ROOT/'assets/attachments'/folder/(('exps3-0' if optic_id=='exps3' else optic_id)+'.blend')
     with bpy.data.libraries.load(str(path)) as (source,target):target.objects=source.objects
     objects=[o for o in target.objects if o is not None]
     base=next(o for o in objects if o.name.split('.')[0]=='MOUNT_base')
     root=base.parent
+    # EXPS3 retains hidden high-poly bake authority beside its runtime root.
+    if optic_id=='exps3':objects=[root,*root.children_recursive]
     meshes=[o for o in objects if o.type=='MESH']
     assert not any(o.animation_data for o in objects),(optic_id,'standalone optic contains weapon animation')
     for o in objects:scene.collection.objects.link(o)
@@ -216,11 +218,21 @@ for optic_id,folder in [('rmr','trijicon-rmr'),('acog','trijicon-acog'),('scope'
     assert bool(hits)==(optic_id=='scope'),(optic_id,'opticClashes must match actual iron intersections',len(hits))
     # Contact plane is authored at zero; the ACOG's projecting clamp screw is
     # intentionally below its shoe. Verify the actual foot, not that screw.
-    foot_name={'rmr':'Riser side','acog':'ACOG rail shoe','scope':'AI mount base'}[optic_id]
-    feet=[o for o in meshes if o.name.startswith(foot_name)]
-    assert feet,(optic_id,'missing mount foot')
-    v,_=geometry(feet,transform)
-    assert abs(min(p.z for p in v)-.118)<.00011,(optic_id,'optic not seated on rail')
+    if optic_id=='exps3':
+        # Baked EXPS3 body includes projecting clamp jaws. Probe the actual
+        # flat saddle underside, not the lowest jaw or the glass/housing bounds.
+        for x in (-.007,0,.007):
+            for y in (.069,.089,.109):
+                contact=mounted[optic_id].ray_cast(Vector((x,y,.115)),Vector((0,0,1)),.005)[0]
+                assert contact is not None and abs(contact.z-.118)<1e-7,'EXPS3 saddle not seated'
+        fixed=[o for o in body_meshes if not o.name.startswith('Rail tooth')]
+        assert not mounted[optic_id].overlap(surface(fixed)),'EXPS3 crosses non-mating body'
+    else:
+        foot_name={'rmr':'Riser side','acog':'ACOG rail shoe','scope':'AI mount base'}[optic_id]
+        feet=[o for o in meshes if o.name.startswith(foot_name)]
+        assert feet,(optic_id,'missing mount foot')
+        v,_=geometry(feet,transform)
+        assert abs(min(p.z for p in v)-.118)<.00011,(optic_id,'optic not seated on rail')
     print('AX338_OPTIC_FIT',optic_id,'iron triangle contacts',len(hits))
 
 bolt_parts=[o for o in bpy.data.objects if o.type=='MESH' and o.parent==bolt]
@@ -234,7 +246,10 @@ for name,info in manifest['clips'].items():
         for optic_id,target in mounted.items():
             assert not moving.overlap(target),(name,frame,optic_id,'bolt hits optic')
         assert not moving.overlap(iron_tree),(name,frame,'bolt hits irons')
-        # Actual deformed review glove/sleeve, sampled at 24 Hz plus endpoints.
+        # EXPS3 also checks both actual deformed review arms at native 120 Hz.
+        moving=surface(hands,evaluated=True)
+        assert not moving.overlap(mounted['exps3']),(name,frame,'exps3','hand/sleeve hits optic')
+        # Existing optics retain their 24 Hz plus endpoint hand sweep.
         if frame%5==0 or frame==math.ceil(info['duration']*120):
             hand_poses+=1;moving=surface(hands,evaluated=True)
             for optic_id,target in mounted.items():
@@ -250,4 +265,4 @@ for angle in range(181):
     for optic_id,target in mounted.items():
         assert not moving.overlap(target),(angle,optic_id,'folding stock hits optic')
     assert not moving.overlap(iron_tree),(angle,'folding stock hits irons')
-print('AX338_ATTACHMENT_CLEARANCE_OK:',mechanical_poses,'120 Hz bolt poses;',hand_poses,'24 Hz deformed-hand poses; 181 stock fold poses; rmr/acog/scope and irons')
+print('AX338_ATTACHMENT_CLEARANCE_OK:',mechanical_poses,'120 Hz bolt poses;',hand_poses,'24 Hz deformed-hand poses; 181 stock fold poses; rmr/acog/scope/exps3 and irons; EXPS3 hands at native 120 Hz')

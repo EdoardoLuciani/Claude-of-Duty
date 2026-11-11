@@ -173,6 +173,14 @@ Removing an optic restores base handling but leaves the chosen iron-sight settin
 For debug/capture, use `?attachmentOptic=rmr`, `acog`, `scope` or `none`, with
 `attachmentIrons=installed|removed` (installed by default), or
 `bun tools/capture.ts --shot=ads --optic=scope --irons=removed --out=/tmp/m4-scope-ads.png`.
+The shared EXPS3-0 (`optic: 'exps3'`) is currently verified **only on AX338**,
+with a nonmagnified 68 MOA ring / 1 MOA dot. Use
+`bun tools/capture.ts --weapon=sniper --optic=exps3 --shot=ads`; it acquires AX338
+after readiness before configuring it. The plain boot URL recognizes `exps3` but
+cannot equip an unowned AX338; it does not bypass ownership or deferred loading.
+Other weapons reject it until their physical fits are corrected; this is partial
+#685 work, not all-seven completion. See the [EXPS3 fit blockers and authoring checks](assets/attachments/eotech-exps3-0/README.md).
+
 The M4 also supports `rail: 'laser'` (Steiner TOR Mini), independently of optics.
 It adds a green beam and surface dot, with **no stat changes** or AI light reaction.
 The dot follows the unspread aim ray and respects emitter occlusion; it does not

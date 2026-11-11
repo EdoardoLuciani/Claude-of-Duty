@@ -10,7 +10,7 @@ import { requiredNode } from './authored-model.ts';
 import { WEAPON_DEFS, type WeaponId } from './defs.ts';
 import type { OpticData, WeaponEntry, WeaponModelRecord } from './runtime-types.ts';
 
-export const OPTIC_IDS = ['rmr', 'acog', 'scope'] as const;
+export const OPTIC_IDS = ['rmr', 'acog', 'scope', 'exps3'] as const;
 export type OpticId = (typeof OPTIC_IDS)[number];
 export type RailId = 'laser';
 
@@ -57,6 +57,11 @@ const OPTICS: Record<
     optic: Omit<OpticData, 'center'>;
   }
 > = {
+  exps3: {
+    adsFovScale: 1,
+    adsSensScale: 1,
+    optic: { apertureR: 0.011, dotMoa: 1, ringMoa: 68, minDotPixels: 2, dotOpacity: 0.9 },
+  },
   rmr: {
     adsFovScale: 0.62,
     adsSensScale: 0.62,

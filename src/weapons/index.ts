@@ -536,6 +536,7 @@ export class WeaponSystem {
         this.viewmodel.radio,
         this.viewmodel.grenade,
         this.viewmodel.reticle,
+        this.viewmodel.reticleRing,
         this.viewmodel.scopeOverlay
       );
       groups.push(...attachments);

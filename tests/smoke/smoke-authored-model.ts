@@ -112,7 +112,7 @@ assert.throws(
   /missing Inspect clip/
 );
 // Shared glass remains a single thin-alpha surface, even if source art uses transmission.
-for (const id of ['rmr', 'acog', 'scope'] as const) {
+for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
   const scene = new THREE.Group();
   for (const name of ['MOUNT_base', 'SOCKET_sight']) {
     const node = new THREE.Object3D();
@@ -130,6 +130,9 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   assert.equal(lens.material.depthWrite, false);
   asset.dispose();
 }
+// Only physically checked fits are selectable; future base conversions stay rejected.
+for (const id of ['rifle', 'mcx', 'pistol', 'lmg', 'smg', 'shotgun', 'sniper'] as const)
+  assert.equal(isAttachmentConfig({ ...BASE_ATTACHMENTS, optic: 'exps3' }, id), id === 'sniper');
 // Repeated mount/remove borrows one asset, restores base datums/tuning and
 // leaves no orphan glass/socket.
 {
@@ -155,7 +158,7 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   const lens = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial());
   assetScene.add(base, sight, lens);
   const asset = makeOpticModel(fixture<GLTF>({ scene: assetScene }), 'rmr');
-  const optics = { rmr: asset, acog: asset, scope: asset };
+  const optics = { rmr: asset, acog: asset, scope: asset, exps3: asset };
   let disposed = 0;
   let ownerDisposed = false;
   asset.scene.addEventListener('dispose', (): void => {
@@ -307,6 +310,55 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     assert.equal(viewmodel.scopeOverlay.visible, false);
     assert(weaponScene.visible, 'removing the scope restores visible irons even while aiming');
   }
+  const sniper = fixture<WeaponEntry>({
+    ...entry,
+    id: 'sniper',
+    model: fixture<Extract<WeaponModelRecord, { id: 'sniper' }>>({
+      id: 'sniper',
+      scene: weaponScene,
+      root,
+      opticMountRest: model.opticMountRest,
+      nodes: fixture<Extract<WeaponModelRecord, { id: 'sniper' }>['nodes']>({
+        sight: model.nodes.sight,
+        muzzle: model.nodes.muzzle,
+      }),
+    }),
+    def: { ...WEAPON_DEFS.sniper },
+  });
+  configureWeaponAttachments(
+    sniper,
+    { ...BASE_ATTACHMENTS, optic: 'exps3', ironSights: false },
+    optics
+  );
+  assert.equal(sniper.def.adsFovScale, 1, 'EXPS3 does not magnify the world');
+  assert.equal(sniper.def.adsSensScale, 1);
+  assert.equal(sniper.optic?.dotMoa, 1);
+  assert.equal(sniper.optic.ringMoa, 68);
+  viewmodel.rig.position.set(0, 0, -sniper.def.eyeRelief).sub(sniper.sight);
+  viewmodel._updateScope(sniper, 1);
+  assert.equal(viewmodel.scopeOverlay.visible, false);
+  viewmodel._updateReticle(sniper, 1);
+  assert(viewmodel.reticle.visible && viewmodel.reticleRing.visible);
+  const expectedRadius =
+    (sniper.def.eyeRelief *
+      Math.tan((viewmodel.ctx.viewCamera.fov * Math.PI) / 360) *
+      Math.tan((68 * Math.PI) / (180 * 120))) /
+    Math.tan((viewmodel.ctx.camera.fov * Math.PI) / 360);
+  assert(Math.abs(viewmodel.reticleRing.scale.x - expectedRadius) < 1e-10);
+  root.position.x = 0.1;
+  root.updateMatrix();
+  viewmodel._updateReticle(sniper, 1);
+  assert.equal(viewmodel.reticle.visible, false, 'no floating EXPS3 ring outside the lens');
+  root.position.x = 0;
+  root.updateMatrix();
+  configureWeaponAttachments(sniper, { ...BASE_ATTACHMENTS, ironSights: false }, optics);
+  assert.equal(
+    irons.visible,
+    false,
+    'removing EXPS3 does not reinstall independently removed irons'
+  );
+  assert.equal(sniper.optic, null);
+  assert.equal(sniper.def.eyeRelief, WEAPON_DEFS.sniper.eyeRelief);
   configureWeaponAttachments(entry, config, optics);
   viewmodel.rig.position.set(0, 0, -entry.def.eyeRelief).sub(entry.sight);
   viewmodel._updateReticle(entry, 1);

@@ -105,7 +105,7 @@ export const MODEL_COOKS = {
   exps3: {
     directory: 'assets/attachments/eotech-exps3-0',
     source: 'exps3-0.glb',
-    output: 'assets/attachments/eotech-exps3-0/exps3-0.runtime.glb',
+    output: 'public/models/attachments/exps3.runtime.glb',
     // The P320 error limit clips the rounded optical opening on this smaller asset.
     flags: ['-si', '0.50', '-se', '0.0002', '-sp'],
   },
