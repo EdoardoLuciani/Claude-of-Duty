@@ -8,13 +8,13 @@ import bpy
 def consolidate_static_surfaces(asset):
     """Join only nonmoving assemblies, after saving the editable source.
 
-    Receiver, handguard and optic share the rig's transform in every clip.
-    Blender's native exporter batches their identical material slots; the lens
-    remains its own transparent primitive. The rotated stock keeps its native
+    Receiver and handguard share the rig's transform in every clip.
+    Blender's native exporter batches their identical material slots. The irons
+    stay independently removable. The rotated stock keeps its native
     local tessellation and normals without a bind-space conversion. Mechanisms,
     pouches and belt are untouched.
     """
-    objects=[bpy.data.objects[name] for name in ('receiver_mesh','handguard_mesh','optic_mesh')]
+    objects=[bpy.data.objects[name] for name in ('receiver_mesh','handguard_mesh')]
     rig=bpy.data.objects['EVOLYS_RIG']
     for obj in objects:
         assert obj.name in asset.objects and not obj.animation_data

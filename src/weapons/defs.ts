@@ -346,7 +346,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     },
     fireVibe: { amp: 0.88, duration: 0.058, adsScale: 0.4 },
     adsTime: 0.32,
-    viewFov: 0.48, // Readable RMR window while retaining its existing eye/arm placement.
+    viewFov: 0.7, // Open rear aperture and readable front post, without optic zoom.
     drawTime: 0.75,
     holsterTime: 0.5,
     // Forward support grip clears the pouch; a less-bladed shoulder keeps
@@ -356,7 +356,9 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     hipPos: [0.118, -0.185, -0.3],
     hipRot: [-0.074, 0.081, -0.135],
     adsCant: [0, 0, 0.004],
-    eyeRelief: 0.125,
+    eyeRelief: 0.03,
+    opticEyeRelief: { rmr: 0.125, acog: 0.11, scope: 0.09 },
+    removableIrons: { opticClashes: ['scope'] }, // PM II crosses the front iron assembly.
     sprintPos: [0.09, -0.29, -0.285],
     sprintRot: [-0.42, 0.62, 0.22],
     lowReadyPos: [0.108, -0.305, -0.295],

@@ -1,5 +1,5 @@
 {
-  "asset": "FN EVOLYS 7.62 / revised stock / RMR RM06 RM33 / 100-round pouch / no irons / no bipod",
+  "asset": "FN EVOLYS 7.62 / revised stock / removable rail irons / 100-round pouch / no optic / no bipod",
   "units": "metres",
   "clips": {
     "Idle": {
@@ -147,11 +147,11 @@
     }
   },
   "stats": {
-    "triangles": 53059,
+    "triangles": 51351,
     "primitives": 10,
-    "materials": 2,
+    "materials": 1,
     "images": 3,
-    "bytes": 7718180
+    "bytes": 7548952
   },
   "textureResolution": 1024,
   "belt": {

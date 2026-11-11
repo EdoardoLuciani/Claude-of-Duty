@@ -4,7 +4,7 @@ import numpy as np
 
 
 def bake_finish_atlas(asset, output):
-    """Bake the ten source finishes into two 1024 maps on a second UV set.
+    """Bake the nine opaque source finishes into two 1024 maps on a second UV set.
 
     Each 256-pixel tile has an eight-pixel gutter and a 240-pixel interior.
     Base/rough micro-noise is conservatively area-filtered; the original normal
@@ -13,7 +13,7 @@ def bake_finish_atlas(asset, output):
     """
     resolution=1024
     materials=sorted({slot.material for obj in asset.objects if obj.type=='MESH' for slot in obj.material_slots if slot.material},key=lambda mat:mat.name)
-    assert len(materials)==10 and all(mat.name.startswith(f'{i+1:02d} |') for i,mat in enumerate(materials))
+    assert len(materials)==9 and all(mat.name.startswith(f'{i+1:02d} |') for i,mat in enumerate(materials))
     bounds={mat:np.array([[np.inf,np.inf],[-np.inf,-np.inf]]) for mat in materials}
     for obj in asset.objects:
         if obj.type!='MESH':continue
@@ -61,25 +61,22 @@ def bake_finish_atlas(asset, output):
         im.colorspace_settings.name='sRGB' if srgb else 'Non-Color'
         im.pixels.foreach_set(pixels.ravel());im.filepath_raw=str(output/(name+'.png'));im.file_format='PNG';im.save();im.pack();return im
     base_image=image('evolys_finish_base',base,True);orm_image=image('evolys_finish_orm',orm,False)
-    def material(name,alpha):
+    def material(name):
         mat=bpy.data.materials.new(name);mat.use_nodes=True;ns=mat.node_tree.nodes;links=mat.node_tree.links;shader=ns.get('Principled BSDF')
         uv=ns.new('ShaderNodeUVMap');uv.uv_map='FinishUV'
         tex=ns.new('ShaderNodeTexImage');tex.image=base_image;links.new(uv.outputs['UV'],tex.inputs['Vector']);links.new(tex.outputs['Color'],shader.inputs['Base Color'])
         tex=ns.new('ShaderNodeTexImage');tex.image=orm_image;links.new(uv.outputs['UV'],tex.inputs['Vector']);sep=ns.new('ShaderNodeSeparateColor');links.new(tex.outputs['Color'],sep.inputs[0]);links.new(sep.outputs[1],shader.inputs['Roughness']);links.new(sep.outputs[2],shader.inputs['Metallic'])
         uv=ns.new('ShaderNodeUVMap');uv.uv_map='UVMap';tex=ns.new('ShaderNodeTexImage');tex.image=bpy.data.images['evolys_normal'];links.new(uv.outputs['UV'],tex.inputs['Vector']);normal=ns.new('ShaderNodeNormalMap');normal.inputs['Strength'].default_value=.25;links.new(tex.outputs['Color'],normal.inputs['Color']);links.new(normal.outputs[0],shader.inputs['Normal'])
-        shader.inputs['Alpha'].default_value=alpha
-        if alpha<1:mat.surface_render_method='DITHERED'
         return mat
-    opaque=material('01 | baked opaque finishes',1);lens=material('10 | baked RMR coated lens',.13)
+    opaque=material('01 | baked opaque finishes')
     for obj in asset.objects:
         if obj.type!='MESH':continue
-        mesh=obj.data;uv=mesh.uv_layers[0].data;finish=mesh.uv_layers.new(name='FinishUV').data;indices=[]
+        mesh=obj.data;uv=mesh.uv_layers[0].data;finish=mesh.uv_layers.new(name='FinishUV').data
         for face in mesh.polygons:
             mat=mesh.materials[face.material_index];index=materials.index(mat);lo,hi=bounds[mat]
             origin=np.array([(index%4)*tile+padding,(index//4)*tile+padding])
             for loop in face.loop_indices:finish[loop].uv=(origin+(np.array(uv[loop].uv)-lo)/(hi-lo)*span)/resolution
-            indices.append(1 if mat.name.startswith('10 |') else 0)
-        mesh.materials.clear();mesh.materials.append(opaque);mesh.materials.append(lens)
-        for face,index in zip(mesh.polygons,indices):face.material_index=index
+        mesh.materials.clear();mesh.materials.append(opaque)
+        for face in mesh.polygons:face.material_index=0
         mesh.uv_layers.active_index=0
 
