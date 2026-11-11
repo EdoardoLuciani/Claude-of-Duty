@@ -28,6 +28,7 @@ def build_geometry(materials):
         o=bpy.data.objects.new(name,None);asset.objects.link(o);o.parent=parent;o.location=xyz(loc);o.empty_display_size=.008;return o
     rig=empty('M4_RIG');body=empty('receiver',parent=rig)
     guard_root=empty('handguard',parent=body);stock_root=empty('stock',parent=body)
+    irons_root=empty('IRON_sights',parent=body);low_block=empty('GASBLOCK_low',parent=body)
     mag=empty('magazine',parent=rig);spare=empty('magazine_spare',parent=rig)
     bolt=empty('bolt',parent=rig);head=empty('bolt_head',(0,.075,-.1015),bolt);handle=empty('charging_handle',parent=rig)
     trigger=empty('trigger',(0,.0455,-.0055),rig)
@@ -270,6 +271,7 @@ def build_geometry(materials):
     cut(core,box('CUT',(0,.102,-.297),(.031,.055,.065),None,None,.001))
     # F-marked A2 base, forged yoke, round gas boss and protected front post.
     GAS=-.297
+    before_front=set(asset.objects)
     tube('A2 gas boss',(0,BORE,GAS),.0132,.00835,.047,steel)
     # Cast A-frame with a real triangular through-window.
     tower=profile('A2 tower casting',[(GAS+.022,.065),(GAS+.022,.086),(GAS+.006,.112),(GAS-.007,.135),(GAS-.018,.137),(GAS-.022,.134),(GAS-.022,.065)],.0218,steel,bevel=.0008,rounded=True)
@@ -290,6 +292,14 @@ def build_geometry(materials):
     tube('Gas tube',(0,.0899,-.307+GAS_TUBE_LEN/2),.00165,.0007,GAS_TUBE_LEN,burnished,sides=24)
     gas_socket=box('A2 gas-tube socket',(0,.0895,GAS-.005),(.0065,.005,.020),steel,bevel=.00012)
     cut(gas_socket,cyl('CUT',(0,.0899,GAS-.005),.00180,.026,None,None,'Z',24,0))
+    for obj in set(asset.objects)-before_front:
+        if obj.name!='Gas tube':obj.parent=irons_root;obj.matrix_parent_inverse=irons_root.matrix_world.inverted()
+    # Replacement collar and bored tube seat retain the gas system without the tower.
+    tube('Low-profile gas collar',(0,BORE,GAS),.0125,.00835,.032,steel,low_block)
+    seat=box('Low-profile gas tube seat',(0,.086,GAS-.005),(.013,.014,.020),steel,low_block,.0005)
+    cut(seat,cyl('CUT',(0,BORE,GAS),.00835,.040,None,None,'Z',48,0))
+    cut(seat,cyl('CUT',(0,.0899,GAS-.005),.00180,.026,None,None,'Z',24,0))
+    for obj in low_block.children:obj.hide_render=True
     # SureFire nominal 66.04 mm; metric catalog conflict is disclosed in README.md.
     FH_LEN=.06604;FH_REAR=CROWN+.013;FH_TIP=FH_REAR-FH_LEN
     for name,z0,z1,r in [('FH556RC mounting shank',FH_REAR-.018,FH_REAR,.0114),('FH556RC suppressor bearing',FH_REAR-.034,FH_REAR-.018,.0119)]:
@@ -334,6 +344,7 @@ def build_geometry(materials):
     for y in np.arange(-.030,.087,.0045):box('Buttpad traction',(0,float(y),.284),(.020 if y<.027 else .050,.0014,.001),rubber,bevel=.00015)
 
     # MaTech: seated steel base, range wedge, windage drum, open peep and stalk.
+    before_rear=set(asset.objects)
     box('MaTech rail base',(0,.109,.023),(.033,.011,.050),steel,bevel=.0008)
     for x in (-.015,.015):box('MaTech clamp',(x,.1065,.023),(.006,.007,.044),steel,bevel=.0006)
     profile('MaTech ranging wedge',[(-.002,.111),(.035,.111),(.033,.126),(.025,.128),(.016,.120),(-.002,.118)],.020,steel,bevel=.0007)
@@ -346,6 +357,8 @@ def build_geometry(materials):
     cup=mesh('MaTech open aperture',verts,faces,steel,bevel=0,rounded=True)
     cyl('MaTech windage drum',(.018,.121,.028),.0044,.0055,steel,axis='X',sides=32)
     for y in (.112,.114,.116):box('MaTech thumb traction',(-.012,y,.002),(.008,.0005,.011),steel,bevel=.0001)
+    for obj in set(asset.objects)-before_rear:
+        obj.parent=irons_root;obj.matrix_parent_inverse=irons_root.matrix_world.inverted()
 
     # Standard USGI metal magazine; complete shape is photo-informed, not PMAG-sized.
     mag_stations=[(.054,-.078,.031),(.022,-.078,.031),(-.010,-.079,.031),(-.035,-.081,.031),(-.060,-.085,.031),(-.079,-.090,.0305),(-.095,-.094,.030)]
@@ -400,7 +413,7 @@ def build_geometry(materials):
     for word,loc in [('SAFE',(-.0176,.050,.053)),('SEMI',(-.0176,.058,.035)),('AUTO',(-.0176,.049,.004))]:text(word,loc,.0022)
     text('DANIEL DEFENSE',( -.0198,.084,-.400),.0024,mat=marking)
     text('M4A1 RIS II FSP',(-.0198,.080,-.400),.0020,mat=marking)
-    for n,y in [('200',.113),('300',.115),('400',.117),('450',.119),('500',.121),('550',.123),('600',.125)]:text(n,(-.0103,y,.019),.0016)
+    for n,y in [('200',.113),('300',.115),('400',.117),('450',.119),('500',.121),('550',.123),('600',.125)]:text(n,(-.0103,y,.019),.0016,parent=irons_root)
     text('OKAY',(-.01255,-.052,-.094),.0023,mat=magmat,parent=mag)
     for name,pos in [('MOUNT_optic',(0,BORE+.0286,-.067)),('SOCKET_muzzle',(0,BORE,FH_TIP)),('SOCKET_ejection',(.023,.081,-.052)),('SOCKET_sight',(0,SIGHT_Y,.034)),('SOCKET_front_post',(0,SIGHT_Y,GAS-.007)),('SOCKET_bolt_face',(0,BORE,BOLT_FACE)),('SOCKET_barrel_crown',(0,BORE,CROWN))]:empty(name,pos,rig)
     # Conform markings to the actual shaped surface, not a floating label plane.
@@ -443,5 +456,5 @@ def build_geometry(materials):
         if o.type=='MESH' and o.parent in (mag,round_live):
             clone=o.copy();clone.data=o.data;asset.objects.link(clone);clone.parent=spare if o.parent==mag else round_spare;clone.name=o.name+' | spare'
     parts=[rig,bolt,head,handle,trigger,cover,release,mag,spare,case,round_live,round_spare]
-    parents=[body,guard_root,stock_root,bolt,head,handle,trigger,cover,release,mag,spare,case,round_live,round_spare]
+    parents=[body,guard_root,stock_root,irons_root,low_block,bolt,head,handle,trigger,cover,release,mag,spare,case,round_live,round_spare]
     return asset,parts,parents,(front_post,front_tip,stalk,cup)

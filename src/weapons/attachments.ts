@@ -15,11 +15,13 @@ export type OpticId = 'rmr' | 'acog' | 'scope';
  * Muzzle/rail catalogs are intentionally empty until their assets are implemented. */
 export interface AttachmentConfig {
   readonly optic: OpticId | null;
+  readonly ironSights: boolean;
   readonly muzzle: null;
   readonly rail: null;
 }
 export const BASE_ATTACHMENTS: AttachmentConfig = Object.freeze({
   optic: null,
+  ironSights: true,
   muzzle: null,
   rail: null,
 });
@@ -32,6 +34,10 @@ export function isAttachmentConfig(value: unknown, id: WeaponId): value is Attac
     (value.optic === null ||
       ((value.optic === 'rmr' || value.optic === 'acog' || value.optic === 'scope') &&
         WEAPON_DEFS[id].opticEyeRelief?.[value.optic] !== undefined)) &&
+    'ironSights' in value &&
+    typeof value.ironSights === 'boolean' &&
+    (value.ironSights || id === 'rifle') &&
+    !(id === 'rifle' && value.optic === 'scope' && value.ironSights) &&
     'muzzle' in value &&
     value.muzzle === null &&
     'rail' in value &&
@@ -140,15 +146,20 @@ export function mountAttachments(
   sight: THREE.Vector3;
   optic: OpticData | null;
 } {
+  const { optic: opticId, ironSights } = config;
   if (!isAttachmentConfig(config, model.id))
-    throw new Error(`[weapons] incompatible attachments: ${model.id}`);
+    throw new Error(
+      `[weapons] incompatible attachments: ${model.id}, optic=${opticId}, ironSights=${ironSights}`
+    );
+  const irons = model.id === 'rifle' ? requiredNode(model.scene, 'IRON_sights') : null;
+  const gasBlock = model.id === 'rifle' ? requiredNode(model.scene, 'GASBLOCK_low') : null;
   const group = new THREE.Group();
   group.name = 'attachments';
   const sight = new THREE.Vector3().fromArray(model.nodes.sight);
   let optic: OpticData | null = 'opticGlass' in model.nodes ? model.nodes.opticGlass : null;
-  if (config.optic !== null) {
-    const asset = optics[config.optic];
-    if (!asset) throw new Error(`[weapons] ${config.optic} asset unavailable`);
+  if (opticId !== null) {
+    const asset = optics[opticId];
+    if (!asset) throw new Error(`[weapons] ${opticId} asset unavailable`);
     const mount = requiredNode(model.scene, 'MOUNT_optic');
     // Full authored mount transform, including orientation; asset mount is its origin.
     model.scene.updateMatrixWorld(true);
@@ -162,7 +173,11 @@ export function mountAttachments(
     instance.applyMatrix4(transform);
     group.add(instance);
     sight.copy(asset.sight).sub(asset.mount).applyMatrix4(transform);
-    optic = { ...OPTICS[config.optic].optic, center: sight.toArray() };
+    optic = { ...OPTICS[opticId].optic, center: sight.toArray() };
+  }
+  if (irons && gasBlock) {
+    irons.visible = ironSights;
+    gasBlock.visible = !ironSights;
   }
   return { group, sight, optic };
 }

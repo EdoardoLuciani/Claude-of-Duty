@@ -15,6 +15,7 @@ import {
   type AttachmentConfig,
   type OpticModels,
 } from './attachments.ts';
+import { requiredNode } from './authored-model.ts';
 import { ProjectileSim, dropAt } from './ballistics.ts';
 import {
   WEAPON_DEFS,
@@ -472,6 +473,14 @@ export class WeaponSystem {
       for (const asset of Object.values(this._optics)) {
         attachments.push(asset.scene);
         this.viewmodel.rig.add(asset.scene);
+      }
+      const rifle = this.viewmodel.weapons.get('rifle');
+      if (rifle) {
+        for (const name of ['IRON_sights', 'GASBLOCK_low']) {
+          const node = requiredNode(rifle.model.scene, name);
+          visible.push([node, node.visible]);
+          node.visible = true;
+        }
       }
       const groups = [...this.viewmodel.weapons.values()].map((w): THREE.Object3D => w.group);
       groups.push(

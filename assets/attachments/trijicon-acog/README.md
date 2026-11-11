@@ -6,11 +6,5 @@ surface textures. Edit the canonical weapon Python geometry/materials, not gener
 `.blend`/GLB products. `bun run build` builds the source weapon before extraction,
 then cooks the standalone local GLB via `build/models.ts`.
 
-`MOUNT_base` is the identity rail-contact transform; `SOCKET_sight` is the ocular
-axis in metres. Runtime frame is +Y up / −Z forward. The assembly includes its
-mount. Glass uses the existing thin-alpha readability policy, not transmission;
-the gameplay overlay owns the magnified sight picture. Magnification/reticle live
-in `src/weapons/attachments.ts`, per-weapon eye relief in `src/weapons/defs.ts`.
-
-M4 mounting is enabled here; the other six fits remain owned by their conversion
-issues (#662–#667). The original integrated optics are intentionally unchanged.
+Mount/sight datums, glass policy, tuning ownership and supported weapon/iron-sight
+combinations follow the [shared attachment contract](../../../ARCHITECTURE.md#models).

@@ -169,13 +169,15 @@ function listFiles(path: string): string[] {
 
 function inputHash(step: AssetStep): string {
   const hash = createHash('sha256').update([RECIPE, step.id, ...(step.salt ?? [])].join('\0'));
-  for (const path of step.inputs.flatMap(listFiles))
-    // CRLF checkouts alone must not trigger a Blender rebuild.
+  for (const path of step.inputs.flatMap(listFiles)) {
+    const bytes = readFileSync(join(ROOT, path));
+    // Normalize text checkouts without decoding the binary Blender dependencies.
     hash
       .update(path)
       .update('\0')
-      .update(canonicalText(readFileSync(join(ROOT, path))))
+      .update(path.endsWith('.blend') ? bytes : canonicalText(bytes))
       .update('\0');
+  }
   return hash.digest('hex');
 }
 

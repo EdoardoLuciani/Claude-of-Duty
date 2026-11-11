@@ -19,7 +19,12 @@ const geometry = new THREE.BoxGeometry(),
 const magazine = new THREE.Group();
 magazine.add(new THREE.Mesh(geometry, material));
 const group = new THREE.Group();
-group.add(magazine);
+const irons = new THREE.Group();
+irons.name = 'IRON_sights';
+const gasBlock = new THREE.Group();
+gasBlock.name = 'GASBLOCK_low';
+gasBlock.visible = false;
+group.add(magazine, irons, gasBlock);
 group.visible = false;
 const radio = new THREE.Group();
 radio.visible = false;
@@ -37,7 +42,13 @@ let calls = 0,
     throw Error('warmup resolver missing');
   };
 const flashlight = new THREE.SpotLight();
-const weapon = fixture<WeaponEntry>({ id: 'rifle', group, parts: { magazine }, magLen: 0.15 });
+const weapon = fixture<WeaponEntry>({
+  id: 'rifle',
+  group,
+  parts: { magazine },
+  magLen: 0.15,
+  model: fixture<WeaponEntry['model']>({ scene: group }),
+});
 const system = new WeaponSystem();
 system._droppedMags = [];
 system.viewmodel = fixture<WeaponSystem['viewmodel']>({
@@ -59,6 +70,7 @@ const render = fixture<RenderSystem>({
   },
   _warmGraph(): ReturnType<RenderSystem['_warmGraph']> {
     calls++;
+    assert(irons.visible && gasBlock.visible, 'warm both independent iron-sight variants');
     assert.equal(scene.children.length, 3);
     assert.equal(system.pickups.items.length, 0);
     assert.equal(system.pickups._nextId, 1);
@@ -110,6 +122,8 @@ assert.equal(system.prewarmMaterials(), pending, 'completed work stays cached');
 assert.equal(calls, 1, 'completion never repeats native warmup');
 assert.equal(radio.visible, false);
 assert.equal(group.visible, false);
+assert(irons.visible);
+assert.equal(gasBlock.visible, false);
 assert.equal(scopeOverlay.visible || reticle.visible, false);
 assert.equal(grenade.visible, false);
 assert.equal(scene.children.length, 2, 'temporary ammo visual was removed');

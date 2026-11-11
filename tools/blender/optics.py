@@ -29,9 +29,9 @@ assert objects, 'Missing authored optic assembly; rebuild the source weapon'
 # Convert MCX's +X-forward Blender frame to the same -Z-forward game frame as
 # the M4/AX338. Both standalone rail-contact datums become the identity origin.
 mount = Vector((-.081, 0, .046)) if ACOG else Vector((0, .089, .1205))
-sight = Vector((-.149, 0, .087)) if ACOG else Vector((0, -.087, .159))
 rotation = Matrix.Rotation(math.pi / 2, 4, 'Z') if ACOG else Matrix.Identity(4)
 transform = rotation @ Matrix.Translation(-mount) @ rig.matrix_world.inverted()
+sight = transform @ bpy.data.objects['SOCKET_sight'].matrix_world.translation
 # Evaluate modifiers before discarding the weapon; keep its original packed
 # surface maps and UVs, with no animation, skin or weapon-only resource retained.
 depsgraph = bpy.context.evaluated_depsgraph_get()
@@ -49,7 +49,7 @@ for obj in list(scene.objects):
     if obj != root and obj not in meshes:
         bpy.data.objects.remove(obj, do_unlink=True)
 for name, position in [('MOUNT_base', Vector((0, 0, 0))),
-                       ('SOCKET_sight', rotation.to_3x3() @ (sight - mount))]:
+                       ('SOCKET_sight', sight)]:
     obj = bpy.data.objects.new(name, None)
     scene.collection.objects.link(obj)
     obj.parent = root
