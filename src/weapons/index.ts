@@ -12,8 +12,8 @@ import {
   configureWeaponAttachments,
   isAttachmentConfig,
   loadOptic,
+  OPTIC_IDS,
   type AttachmentConfig,
-  type OpticId,
   type OpticModels,
 } from './attachments.ts';
 import { requiredNode } from './authored-model.ts';
@@ -313,20 +313,16 @@ export class WeaponSystem {
     const load = (id: WeaponId): Promise<WeaponModelRecord> => loadWeapon(id, renderer);
     // Optics load alongside the spawn weapons. A failed optic only makes that
     // attachment unavailable; the base weapons and their irons remain usable.
-    const optic = async (id: OpticId): Promise<void> => {
+    const optics = OPTIC_IDS.map(async (id): Promise<void> => {
       try {
         this._optics[id] = await loadOptic(renderer, id);
       } catch (err: unknown) {
         console.error(`[weapons] optic load failed for ${id}`, err);
       }
-    };
+    });
     try {
-      const [records] = await Promise.all([
-        Promise.all(spawn.map(load)),
-        optic('rmr'),
-        optic('acog'),
-        optic('scope'),
-      ]);
+      const records = await Promise.all(spawn.map(load));
+      await Promise.all(optics);
       for (let i = 0; i < spawn.length; i++) {
         tris += this.viewmodel.addWeapon(
           records[i],
