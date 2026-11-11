@@ -16,12 +16,13 @@ import { Movement } from '../../src/player/movement.ts';
 import type { RadioSystem } from '../../src/radio/index.ts';
 import type { UiSystem } from '../../src/ui/index.ts';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
+import { BASE_ATTACHMENTS } from '../../src/weapons/attachments.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { Clip } from '../../src/weapons/clips.ts';
 import { WEAPON_IDS } from '../../src/weapons/defs.ts';
 import type { WeaponId } from '../../src/weapons/defs.ts';
 import { GRENADE_FUSE, MAX_SHOTS_PER_FRAME } from '../../src/weapons/index.ts';
-import type { WeaponEntry } from '../../src/weapons/runtime-types.ts';
+import type { WeaponEntry, WeaponModelRecord } from '../../src/weapons/runtime-types.ts';
 import type { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { ArmedWeaponSystem, weaponState } from '../lib/ballistics-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
@@ -193,6 +194,38 @@ for (const [equip, first, second] of [
   wp.resetForNewGame();
   assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
   assert.equal(wp.activeId, 'rifle');
+}
+// Attachments belong to the gun: dropping it or restarting returns the base build.
+{
+  type RifleModel = Extract<WeaponModelRecord, { id: 'rifle' }>;
+  const { wp } = makeHarness();
+  const scene = new THREE.Group();
+  const irons = Object.assign(new THREE.Object3D(), { name: 'IRON_sights' });
+  scene.add(irons, Object.assign(new THREE.Object3D(), { name: 'GASBLOCK_low' }));
+  Object.assign(wp.viewmodel, {
+    reticle: new THREE.Object3D(),
+    scopeOverlay: new THREE.Object3D(),
+  });
+  Object.assign(wp.viewmodel.weapons.get('rifle') ?? {}, {
+    model: fixture<RifleModel>({
+      id: 'rifle',
+      scene,
+      root: scene,
+      nodes: fixture<RifleModel['nodes']>({ sight: [0, 0.14, 0.03], muzzle: [0, 0.07, -0.5] }),
+    }),
+    def: weaponState(wp, 'rifle').def,
+    attachmentGroup: new THREE.Group(),
+    sight: new THREE.Vector3(),
+    muzzle: new THREE.Vector3(),
+  });
+  for (const drop of [(): boolean => wp.equipPrimary('lmg'), (): void => wp.resetForNewGame()]) {
+    wp.resetForNewGame();
+    assert(wp.setAttachments('rifle', { ...BASE_ATTACHMENTS, ironSights: false }));
+    assert(!irons.visible);
+    drop();
+    assert.equal(weaponState(wp, 'rifle').attachments, BASE_ATTACHMENTS);
+    assert(irons.visible, 'the mounted build is reset, not only the stored config');
+  }
 }
 {
   const { wp, shots } = makeHarness();
