@@ -3,16 +3,19 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+import evolysManifest from '../../assets/weapons/fn-evolys-762/manifest.json' with { type: 'json' };
 import type { RenderSystem } from '../../src/render/index-webgpu.ts';
 import {
   BASE_ATTACHMENTS,
   configureWeaponAttachments,
   isAttachmentConfig,
   makeOpticModel,
+  mountAttachments,
   type AttachmentConfig,
 } from '../../src/weapons/attachments.ts';
 import { authoredModel, checkAuthoredDuration } from '../../src/weapons/authored-model.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
+import { makeEvolysModel } from '../../src/weapons/evolys.ts';
 import { ReticleMaterials } from '../../src/weapons/materials-tsl.ts';
 import type { WeaponEntry, WeaponModelRecord } from '../../src/weapons/runtime-types.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
@@ -322,5 +325,37 @@ for (const optic of [null, 'rmr', 'acog', 'scope'] as const) {
   assert.equal(ownerDisposed, false, 'warm source survives mounted-instance disposal');
   asset.dispose();
   assert.equal(disposed, 1, 'asset owner releases shared geometry exactly once');
+}
+// EVOLYS no longer supplies integrated optic data when its adapter loads irons.
+{
+  const scene = new THREE.Group();
+  const root = new THREE.Group();
+  root.name = 'EVOLYS_RIG';
+  scene.add(root);
+  for (const name of [
+    'SOCKET_muzzle',
+    'SOCKET_ejection',
+    'SOCKET_sight',
+    'SOCKET_pouch',
+    'trigger',
+    'IRON_sights',
+  ]) {
+    const node = new THREE.Object3D();
+    node.name = name;
+    root.add(node);
+  }
+  const model = makeEvolysModel(
+    fixture<GLTF>({
+      scene,
+      animations: Object.entries(evolysManifest.clips).map(([name, info]): THREE.AnimationClip =>
+        clip(name, track(info.duration ? [0, info.duration] : [0]))
+      ),
+    })
+  );
+  for (const ironSights of [true, false, true]) {
+    const mounted = mountAttachments(model, { ...BASE_ATTACHMENTS, ironSights }, {});
+    assert.equal(mounted.optic, null, 'base EVOLYS must never produce a floating RMR reticle');
+    assert.equal(root.getObjectByName('IRON_sights')?.visible, ironSights);
+  }
 }
 console.log('authored models: clip durations and shared attachment mount lifetime OK');

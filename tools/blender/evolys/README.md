@@ -17,11 +17,19 @@ preserve held endpoint samples, matching NLA names and TRS resets.
 
 ## Ordinary rigid export (current)
 
-Receiver/handguard/optic join as static surfaces. Stock, bolt, handle, feed cover
+Receiver/handguard join as static surfaces. `IRON_sights` remains independently
+removable; there is no integrated optic or lens. `SOCKET_sight` owns the rear
+aperture centre, aligned with `SOCKET_front_post`. `MOUNT_optic` is the rail-contact
+frame; `MOUNT_muzzle` and `MOUNT_rail` reserve future catalog datums only.
+Stock, bolt, handle, feed cover
 and trigger remain ordinary meshes in their original local/control frames.
 Only the eight-joint belt is skinned; both pouches have independent STEP ownership.
 Keep 12.7 mm belt pitch, separate finish tiles and persistent runtime round masks.
 The registered cook uses shared gltfpack flags without added simplification.
+`check.py` requires freshly generated shared optic blends and checks actual
+mounted RMR/ACOG/PM II surfaces against irons and animated cover, charging handle,
+stock, belt and deformed shared hands at 120 Hz. PM II crosses the front iron;
+RMR/ACOG retain both irons. No suppressor/laser or stock-fold fit is validated.
 
 ## Approved UV precision exception
 

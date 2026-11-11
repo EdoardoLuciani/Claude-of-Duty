@@ -14,7 +14,6 @@ from mathutils import Matrix, Vector
 
 ROOT=Path(__file__).resolve().parents[3]
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from rmr.geometry import build_rmr
 from evolys.actions import author_actions
 from evolys.export import consolidate_static_surfaces, prepare_export_actions, validate_export
 from evolys.finish_atlas import bake_finish_atlas
@@ -34,7 +33,7 @@ def build(output, render=False, quick=False):
     def empty(name,loc=(0,0,0),parent=None):
         o=bpy.data.objects.new(name,None);asset.objects.link(o);o.location=xyz(loc);o.parent=parent;o.empty_display_size=.01;bpy.context.view_layer.update();return o
     rig=empty('EVOLYS_RIG');body=empty('receiver',parent=rig);hg=empty('handguard',parent=rig)
-    stock=empty('stock',parent=rig);optic=empty('optic',parent=rig)
+    stock=empty('stock',parent=rig);irons=empty('IRON_sights',parent=rig)
     cover=empty('feed_cover',(-.025,.060,-.215),rig)
     charging=empty('charging_handle',parent=rig);bolt=empty('bolt',parent=rig);trigger=empty('trigger',(0,.003,-.020),rig)
     pouch=empty('pouch',parent=rig);spare=empty('pouch_spare',parent=rig)
@@ -81,8 +80,6 @@ def build(output, render=False, quick=False):
     brass=material('07 | cartridge brass',(.53,.35,.12),1,.32)
     copper=material('08 | projectile jacket',(.34,.17,.075),1,.32)
     mark=material('09 | laser markings',(.60,.57,.47),0,.88)
-    glass=material('10 | RMR coated lens',(.03,.10,.12),0,.14)
-    glass.surface_render_method='DITHERED';glass.node_tree.nodes.get('Principled BSDF').inputs['Alpha'].default_value=.13
 
     # Geometry is authored in game metres, converted only at the Blender boundary.
     def finish(o,name,mat=black,parent=body,bevel=.0005,smooth=False):
@@ -268,9 +265,29 @@ def build(output, render=False, quick=False):
     # A small reference-informed FN cartouche; no specimen serial or invented label.
     cyl('Receiver logo medallion',(-.026,.110,.080),.007,.0003,mark,body,'X',32,0)
     text('FN',(-.0265,.107,.084),.004,-1)
-    # Red dot only: no folded iron bases, pivots or leaves.
-    optic_z=-.052;rail_top=rail_y+.002
-    sight_y=build_rmr(box,cyl,mesh,cut,text,optic,rail_top,optic_z,black,bright,rubber,steel,glass)
+    # Rail-mounted removable irons. The rear aperture and front post tip own
+    # one axis; neither belongs to the separately mounted optic assembly.
+    rail_top=rail_y+.002;sight_y=rail_top+.026
+    rear_z=.105-3*.01005;front_z=.105-46*.01005
+    for z in (rear_z,front_z):
+        box('Iron rail foot',(0,rail_top+.002,z),(.025,.004,.022),black,irons,.0006)
+        for side in (-1,1):
+            box('Iron rail clamp',(side*.012,rail_top-.001,z),(.003,.006,.016),steel,irons,.0004)
+        cyl('Iron cross bolt',(0,rail_top+.002,z),.0018,.030,bright,irons,'X',24)
+    box('Rear aperture pedestal',(0,rail_top+.0135,rear_z),(.008,.019,.006),black,irons,.0005)
+    aperture=cyl('Rear aperture',(0,sight_y,rear_z),.004,.003,steel,irons,sides=48)
+    cut(aperture,cyl('CUT rear aperture',(0,sight_y,rear_z),.0012,.010,None,None,sides=48,bevel=0))
+    box('Front post pedestal',(0,rail_top+.010,front_z),(.010,.012,.008),black,irons,.0006)
+    box('Front sight post',(0,sight_y-.005,front_z),(.0018,.010,.002),steel,irons,.0001)
+    for side in (-1,1):
+        box('Front protective ear',(side*.007,rail_top+.017,front_z),(.003,.026,.006),black,irons,.0007)
+    empty('SOCKET_front_post',(0,sight_y,front_z),rig)
+    # Identity rail-contact frame; optics supply their own riser/base and sight.
+    empty('MOUNT_optic',(0,rail_top,.105-30*.01005),rig)
+    # Future catalog datums only: no suppressor/laser assets are fitted here.
+    empty('MOUNT_muzzle',(0,.075,crown),rig)
+    rail_mount=empty('MOUNT_rail',(.0275,.075,-.300),rig)
+    rail_mount.rotation_euler=(C@Matrix.Rotation(-math.pi/2,3,'Z')@C.inverted()).to_euler()
     # Soft 100-round pouch with a rigid mounting lid and shallow seam relief.
     for parent in (pouch,spare):
         box('Pouch fabric body',(-.023,-.048,-.166),(.108,.107,.125),canvas,parent,.008)
@@ -323,7 +340,7 @@ def build(output, render=False, quick=False):
     bpy.ops.object.join();belt_mesh=bpy.context.object;belt_mesh.name='belt_mesh';belt_mesh.parent=belt
     mod=belt_mesh.modifiers.new('Rigid linked belt','ARMATURE');mod.object=belt
     # Consolidate only parts sharing a rigid transform, preserving all hinge nodes.
-    for parent in (body,hg,stock,optic,cover,charging,bolt,trigger,pouch,spare):
+    for parent in (body,hg,stock,irons,cover,charging,bolt,trigger,pouch,spare):
         objects=[o for o in list(asset.objects) if o.type=='MESH' and o.parent==parent]
         if not objects:continue
         for o in objects:
@@ -351,7 +368,7 @@ def build(output, render=False, quick=False):
         if obj.type=='MESH':
             for loop in obj.data.uv_layers.active.data:
                 loop.uv=tuple(round(float(value)*16384)/16384 for value in loop.uv)
-    for name,pos,parent in [('SOCKET_muzzle',(0,.075,crown),rig),('SOCKET_ejection',(.031,.103,-.078),rig),('SOCKET_sight',(0,sight_y,optic_z-.018),rig),('SOCKET_pouch',(-.023,-.048,-.166),rig)]:empty(name,pos,parent)
+    for name,pos,parent in [('SOCKET_muzzle',(0,.075,crown),rig),('SOCKET_ejection',(.031,.103,-.078),rig),('SOCKET_sight',(0,sight_y,rear_z),rig),('SOCKET_pouch',(-.023,-.048,-.166),rig)]:empty(name,pos,parent)
     bpy.context.view_layer.update()
     clips=author_actions(ROOT,asset,rig,[rig,cover,charging,bolt,trigger,pouch,spare],belt,belt_pos)
     for o in bpy.data.objects:
@@ -373,7 +390,7 @@ def build(output, render=False, quick=False):
     if quick:scene.eevee.taa_render_samples=12
     scene.render.film_transparent=True;scene.view_settings.view_transform='AgX'
     scene['clips']=json.dumps(clips)
-    notes=bpy.data.texts.new('START HERE');notes.write('FN EVOLYS 7.62 / CURRENT STOCK / RMR / NO BIPOD\nOriginal game art, not a scan or certified CAD. Reference/photo caveats are in README.md.\nEight weapon/wrist/finger clips at 120 fps; belt_rig is a single batched skinned linked belt.\nShared review skins are not exported. Runtime ammunition controls belt-tail visibility.\nPacked original PBR maps. Select matching NLA tracks on every control and arm for review.\nGenerated preview: edit tools/blender/evolys/build.py and evolys/export.py; calibration and shared review arms are read-only inputs. Regeneration overwrites manual edits.\n')
+    notes=bpy.data.texts.new('START HERE');notes.write('FN EVOLYS 7.62 / CURRENT STOCK / REMOVABLE IRONS / NO BIPOD\nOriginal game art, not a scan or certified CAD. Reference/photo caveats are in README.md.\nEight weapon/wrist/finger clips at 120 fps; belt_rig is a single batched skinned linked belt.\nShared review skins are not exported. Runtime ammunition controls belt-tail visibility.\nPacked original PBR maps. Select matching NLA tracks on every control and arm for review.\nGenerated preview: edit tools/blender/evolys/build.py and evolys/export.py; calibration and shared review arms are read-only inputs. Regeneration overwrites manual edits.\n')
     bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'fn-evolys-762.blend'))
     if render:
         (OUT/'renders').mkdir(exist_ok=True)
@@ -390,7 +407,7 @@ def build(output, render=False, quick=False):
     raw,doc=validate_export(OUT/'fn-evolys-762.glb',clips)
     primitives=[p for n in doc['nodes'] if 'mesh' in n for p in doc['meshes'][n['mesh']]['primitives']]
     stats={'triangles':sum(doc['accessors'][p['indices']]['count']//3 for p in primitives),'primitives':len(primitives),'materials':len(doc['materials']),'images':len(doc['images']),'bytes':len(raw)}
-    manifest={'asset':'FN EVOLYS 7.62 / revised stock / RMR RM06 RM33 / 100-round pouch / no irons / no bipod','units':'metres','clips':clips,'stats':stats,'textureResolution':1024,'belt':{'rounds':8,'pitch':.0127,'fireDuration':60/700,'rig':'belt_rig'},'dimensions':{'barrel':.406,'retractedOverall':.948,'barrelFace':breech,'barrelCrown':barrel_end,'muzzle':crown},'source':'tools/blender/evolys/build.py + tools/blender/evolys/export.py + tools/blender/evolys/finish_atlas.py + tools/blender/evolys/actions.py + tools/blender/evolys/hand-reference.ts'}
+    manifest={'asset':'FN EVOLYS 7.62 / revised stock / removable rail irons / 100-round pouch / no optic / no bipod','units':'metres','clips':clips,'stats':stats,'textureResolution':1024,'belt':{'rounds':8,'pitch':.0127,'fireDuration':60/700,'rig':'belt_rig'},'dimensions':{'barrel':.406,'retractedOverall':.948,'barrelFace':breech,'barrelCrown':barrel_end,'muzzle':crown},'source':'tools/blender/evolys/build.py + tools/blender/evolys/export.py + tools/blender/evolys/finish_atlas.py + tools/blender/evolys/actions.py + tools/blender/evolys/hand-reference.ts'}
     (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     assert stats['triangles']<150000 and stats['primitives']<=48 and stats['materials']<=18 and stats['images']==3 and len(raw)<=15*1024*1024,stats
     print('EVOLYS export:',json.dumps(stats))

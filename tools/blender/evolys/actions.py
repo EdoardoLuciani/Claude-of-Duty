@@ -14,6 +14,21 @@ def xyz(v):return C@Vector(v)
 def quat(q):return (C@q.to_matrix()@CI).to_quaternion()
 def eq(e):return Quaternion((1,0,0),e[0])@Quaternion((0,1,0),e[1])@Quaternion((0,0,1),e[2])
 
+def charging_contact_reference(action,duration):
+    """Original neighboring wrist-z keys keep the calibrated charging stroke.
+
+    A released waypoint must not change AUTO_CLAMPED handles inside .82–.88.
+    Game -Z is Blender +Y; the five original keys reproduce those handles.
+    """
+    reference=action.copy()
+    curve=next(c for layer in reference.layers for strip in layer.strips for bag in strip.channelbags for c in bag.fcurves if c.data_path=='location' and c.array_index==1)
+    curve.keyframe_points.clear()
+    for fraction,z in ((.77,-.16),(.80,-.075),(.82,-.068),(.88,-.003),(.93,-.003)):
+        point=curve.keyframe_points.insert(fraction*duration*FPS,-z)
+        point.interpolation='BEZIER';point.handle_left_type='AUTO_CLAMPED';point.handle_right_type='AUTO_CLAMPED'
+    curve.update()
+    return reference,curve
+
 def author_actions(root,asset,rig,parts,belt,belt_pos):
     scene=bpy.context.scene
     ref=json.loads((root/'assets/weapons/fn-evolys-762/hand-reference.json').read_text())
@@ -127,20 +142,35 @@ def author_actions(root,asset,rig,parts,belt,belt_pos):
         if empty:
             for k,z in [(0,.050),(.80,.050),(.88,.065),(.93,.050),(1,.050)]:key(bolt,k*d,(0,0,z))
             for k,z in [(0,0),(.82,0),(.88,.065),(.93,0),(1,0)]:key(charging,k*d,(0,0,z))
-            pose('left',.80*d,[.13,.17,-.075],p=relaxed('left'))
-            contact('charging',.82*d);contact('charging',.88*d,[.123,.135,-.003]);pose('left',.93*d,[.14,.16,-.003],p=relaxed('left'))
-            # Cross above the receiver, then lower onto the forward grip;
-            # never cut diagonally through the installed pouch on return.
-            pose('left',.955*d,[.02,.19,-.21],p=relaxed('left'))
-            pose('left',.975*d,[-.085,.10,-.32],p=relaxed('left'))
+            # Carry the released hand behind the optic, palm vertical and
+            # fingers down, instead of stretching above the sight/shoulder line.
+            passage=Quaternion((0,0,math.sqrt(.5),math.sqrt(.5)))
+            pose('left',.785*d,[-.20,.02,.14],q=passage,p=relaxed('left'))
+            pose('left',.805*d,[.20,.02,.14],q=passage,p=relaxed('left'))
+            contact('charging',.82*d);contact('charging',.88*d,[.123,.135,-.003])
+            pose('left',.91*d,[.20,.02,.14],q=passage,p=relaxed('left'))
+            pose('left',.94*d,[-.20,.02,.14],q=passage,p=relaxed('left'))
+            pose('left',.97*d,[-.24,.022,-.35],q=passage,p=relaxed('left'))
         else:
             key(bolt,0,(0,0,.050));key(bolt,d,(0,0,.050))
-            pose('left',.90*d,[-.11,.085,-.32],p=relaxed('left'))
+            # Retract fully outboard before returning alongside a long optic.
+            pose('left',.81*d,[-.24,.095,-.16],p=relaxed('left'))
+            pose('left',.90*d,[-.24,.085,-.35],p=relaxed('left'))
         pose('left',.985*d)
         clips[name]['beltClearTime']=.23*d;clips[name]['beltInsertTime']=insert*d
         clips[name]['events']=[{'time':.02*d,'event':'start'},{'time':out*d,'event':'magout'},{'time':insert*d,'event':'magin'}]
         if empty:clips[name]['events'] += [{'time':.88*d,'event':'charge'},{'time':.93*d,'event':'boltrelease'}]
         clips[name]['events'].append({'time':.995*d,'event':'end'});finish(name)
+        if empty:
+            action=next(t for t in hand_controls['left']['wrist'].animation_data.nla_tracks if t.name==name).strips[0].action
+            reference,expected=charging_contact_reference(action,d)
+            curve=next(c for layer in action.layers for strip in layer.strips for bag in strip.channelbags for c in bag.fcurves if c.data_path=='location' and c.array_index==1)
+            start=min(curve.keyframe_points,key=lambda p:abs(p.co.x-.82*d*FPS))
+            end=min(curve.keyframe_points,key=lambda p:abs(p.co.x-.88*d*FPS))
+            start.handle_right_type='FREE';start.handle_right=expected.keyframe_points[2].handle_right
+            end.handle_left_type='FREE';end.handle_left=expected.keyframe_points[3].handle_left
+            curve.update();bpy.data.actions.remove(reference)
+
     begin('Inspect',3.6)
     for t,loc,rot in [(.45,(-.02,.065,-.12),(-10,-40,12)),(1.20,(-.02,.065,-.12),(-10,-40,12)),(1.95,(-.03,.06,-.13),(6,40,-12)),(2.75,(-.03,.06,-.13),(6,40,-12)),(3.45,(0,0,0),(0,0,0))]:key(rig,t,loc,rot)
     for t in (.2,.9,1.8,3.2):pose('right',t,p=indexed())
