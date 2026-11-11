@@ -40,6 +40,7 @@ def build(output, render=False, quick=False):
     forend=empty('forend',parent=rig);bolt=empty('bolt',(0,.068,breech_z+.024),rig)
     trigger=empty('trigger',(0,.022,-.002),rig);shell=empty('shell_insert',parent=rig)
     empty('DATUM_closed_breech',(0,.068,breech_z),rig)
+    empty('DATUM_barrel_crown',(0,.068,muzzle_z),rig)
     empty('DATUM_trigger_face',trigger_patch,rig)
     empty('DATUM_butt_center',(0,butt_y,butt_z),rig)
     bpy.context.view_layer.update()
@@ -181,6 +182,10 @@ def build(output, render=False, quick=False):
     # Nominal barrel is closed-breech to muzzle; exposed portion starts at receiver nose.
     tube('Heavy barrel',(0,.068,(muzzle_z+breech_z)/2),.0129,.0093,BARREL)
     tube('Barrel crown',(0,.068,muzzle_z+.002),.0129,.0093,.004)
+    # Permanent 12g adapter: sleeve overlaps the barrel, with an open bore and
+    # a forward contact face for the future suppressor (not a suppressor itself).
+    tube('12g adapter collar',(0,.068,muzzle_z+.004),.0155,.01305,.008,sides=32)
+    tube('12g adapter nose',(0,.068,muzzle_z-.006),.0145,.0093,.012,sides=32)
     tube('Magazine tube',(0,.0348,(-.175+muzzle_z+.012)/2),.013,.0095,-muzzle_z-.012-.175)
     cyl('Threaded clean-out cap',(0,.0348,muzzle_z+.022),.0142,.020,steel,axis='Z')
     for i in range(16):
@@ -207,6 +212,29 @@ def build(output, render=False, quick=False):
         active(front_base);m=front_base.modifiers.new('Connected protective shroud','BOOLEAN');m.object=cheek;m.operation='UNION'
         while list(front_base.modifiers).index(m)>0:bpy.ops.object.modifier_move_up(modifier=m.name)
         bpy.ops.object.modifier_apply(modifier=m.name);bpy.data.objects.remove(cheek,do_unlink=True)
+    # See-through receiver rail: the fixed ghost ring and its bore stay below
+    # the bridge. Forward paired feet seat on the receiver, never on the pump.
+    # The long top supports both PM II ring stations without a floating clamp.
+    for x in (-.0115,.0115):
+        for z in (-.176,-.135):
+            rings=[]
+            for end in (z-.005,z+.005):
+                bottom=[(px,seat.ray_cast(Vector((px,.100,end)),Vector((0,-1,0)),.030)[0].y-.00005,end) for px in [x-.0025+i*.0005 for i in range(11)]]
+                rings.append(bottom+[(px,.112,end) for px,_,_ in reversed(bottom)])
+            loft('Optic rail receiver foot',rings,receiver_finish,bevel=.0001,rounded=False)
+    box('Optic rail bridge',(0,.1135,-.140),(.021,.003,.190),receiver_finish,bevel=.0003)
+    for i in range(18):
+        z=-.04905-i*.0107
+        section=[(-.008,.115),(.008,.115),(.0105,.117),(.0105,.118),(-.0105,.118),(-.0105,.117)]
+        loft('Optic Picatinny lug',[[(x,y,z+s*.0025) for x,y in section] for s in (-1,1)],receiver_finish,bevel=.00015,rounded=False)
+    mounts={
+        'optic':{'pos':[0,.118,-.140],'rot':[0,0,0],'parent':'receiver'},
+        'muzzle':{'pos':[0,.068,muzzle_z-.012],'rot':[0,0,0],'parent':'receiver'},
+        'rail':{'pos':[.028,.0355,-.460],'rot':[0,0,-math.pi/2],'parent':'forend'},
+    }
+    for name,data in mounts.items():
+        mount=empty('MOUNT_'+name,data['pos'],forend if name=='rail' else body)
+        mount.rotation_euler=(C@Matrix.Rotation(data['rot'][2],3,'Z')@C.inverted()).to_euler()
     # Fixed conventional stock, neck/comb/toe loft; no pistol grip or adjustable tube.
     guard=profile('Metal trigger guard',smooth_rows([(-.050,.022),(-.027,.022),(.014,.022),(.023,.017),(.025,.006),(.022,-.005),(.014,-.012),(-.005,-.016),(-.022,-.015),(-.035,-.011),(-.042,-.003),(-.044,.005)],True),.010,bevel=.0006)
     cut(guard,profile('CUT trigger window',smooth_rows([(-.040,.018),(-.022,.019),(.011,.019),(.018,.015),(.019,.006),(.016,-.003),(.009,-.009),(-.005,-.0125),(-.021,-.0115),(-.030,-.008),(-.036,-.002),(-.039,.005)],True),.028,None,None,0),True)
@@ -297,7 +325,7 @@ def build(output, render=False, quick=False):
     cyl('Brass shell head',(0,0,-.006),.010,.012,brass,shell,axis='Z')
     cyl('Shell rim',(0,0,-.001),.01105,.002,brass,shell,axis='Z')
     cyl('Shell primer',(0,0,.0001),.0026,.0002,wear,shell,axis='Z',sides=16)
-    sockets={'muzzle':[0,.068,muzzle_z],'ejection':[.0205,.063,-.132],'sight':[0,.096,-.058],
+    sockets={'muzzle':[0,.068,muzzle_z-.012],'ejection':[.0205,.063,-.132],'sight':[0,.096,-.058],
              'loading':[0,.024,-.068],'chamber':[0,.068,breech_z]}
     for name,pos in sockets.items():empty('SOCKET_'+name,pos,rig)
     def surface_uv(o):
@@ -388,6 +416,8 @@ def build(output, render=False, quick=False):
             # sub-millimetre rubber/rib edges in the evaluated runtime copy.
             if mod.type=='BEVEL' and clone.name.startswith(('Rubber buttpad','Forend grip rib')):
                 mod.segments=2
+            if mod.type=='BEVEL' and clone.name.startswith(('Optic Picatinny lug','Optic rail receiver foot')):
+                mod.segments=1
             bpy.ops.object.modifier_apply(modifier=mod.name)
         surface_uv(clone)
     consolidate_finishes(list(export.objects), rough, OUT)
@@ -421,7 +451,7 @@ def build(output, render=False, quick=False):
     triangles=sum(j['accessors'][p['indices']]['count']//3 for n in j['nodes'] if 'mesh' in n for p in j['meshes'][n['mesh']]['primitives'])
     stats={'triangleInstances':triangles,'primitives':sum(len(m['primitives']) for m in j['meshes']),
            'materials':len(j['materials']),'images':len(j['images']),'bytes':len(raw)}
-    assert triangles<73000 and stats['primitives']==2 and stats['materials']==1 and stats['images']==3 and len(raw)<=12*1024*1024,stats
+    assert triangles<76000 and stats['primitives']==2 and stats['materials']==1 and stats['images']==3 and len(raw)<=12*1024*1024,stats
     pose('Idle')
     vertices=[C.inverted().to_4x4()@rig.matrix_world.inverted()@o.matrix_world@v.co for o in asset.objects if o.type=='MESH' and o.parent!=shell for v in o.data.vertices]
     bounds=[[min(v[i] for v in vertices) for i in range(3)],[max(v[i] for v in vertices) for i in range(3)]]
@@ -433,16 +463,19 @@ def build(output, render=False, quick=False):
         'aliases':{'pump':'Pump','reloadTac':'Reload_Tactical','reloadEmpty':'Reload_Empty','inspect':'Inspect','draw':'Draw','holster':'Holster'},
         'textures':{'resolution':1024,'packed':True,'embedded':True,'method':'UV0 original albedo/normal; UV1 padded scalar finish atlas; exact linear vertex colours; no photographic inputs'},
         'dimensions':{'sourceBounds':bounds,'caseLength':.07,'rimRadius':.01105,'barrelLength':BARREL,'exposedBarrelLength':-.194-muzzle_z,'overallLength':OAL,'lengthOfPull':LOP,'nominalBarrelInches':18.5,
-                      'triggerFace':list(trigger_patch),'buttCenter':[0,butt_y,butt_z],'closedBreech':[0,.068,breech_z]},
+                      'triggerFace':list(trigger_patch),'buttCenter':[0,butt_y,butt_z],'closedBreech':[0,.068,breech_z],'barrelCrown':[0,.068,muzzle_z]},
         'reference':{'manufacturer':'O.F. Mossberg & Sons','model':'590A1 Tactical','sku':'50774','year':2016,'stock':'fixed black synthetic, no positions',
                      'specification':'https://resources.mossberg.com/hubfs/press_releases/Mossberg-Introduces-7-Shot-Versions-of-590A1-and-590-PR-1-4-2016-FINAL.pdf',
                      'photoCatalog':'https://resources.mossberg.com/hubfs/eBook_PDF/Mossberg-2016-NewProducts.pdf','photoPage':2,'photoSide':'right/ejection'},
-        'sockets':sockets,
+        'sockets':sockets,'mounts':mounts,
         'ejectionDirection':[.84,.42,.28],'mechanism':{'stroke':ref['pump']['stroke'],'boltRest':[0,.068,breech_z+.024],'triggerPivot':[0,.022,-.002],'triggerPull':-.28},
         'shell':{'caseLen':.07,'rimR':.01105},'fxClass':'shotgun','opticGlass':None,'contactWindows':ref['contactWindows'],
         'notes':['Manufacturer nominal barrel/OAL/LOP anchors; local exterior profile estimates from catalog photograph, not manufacturing CAD.',
                  'No exported arms, spent case, optic, baked shot recoil, or gameplay balance changes.',
-                 'shell_insert is not a detachable magazine; adapter owns visibility from authored scale.']}
+                 'shell_insert is not a detachable magazine; adapter owns visibility from authored scale.',
+                 'Fixed ghost-ring irons remain below a see-through receiver optic rail; no removable irons.',
+                 '12g adapter and moving tri-rail datums are future suppressor/laser seats only; those runtime catalogs are empty.',
+                 'SOCKET_muzzle emits at the adapter exit/MOUNT_muzzle; DATUM_barrel_crown preserves the original factory barrel measurement.']}
     (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     print('M590_EXPORT_STATS',json.dumps(stats))
 

@@ -7,6 +7,7 @@ import type { RenderSystem } from '../../src/render/index-webgpu.ts';
 import {
   BASE_ATTACHMENTS,
   configureWeaponAttachments,
+  isAttachmentConfig,
   makeOpticModel,
   type AttachmentConfig,
 } from '../../src/weapons/attachments.ts';
@@ -111,6 +112,15 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   assert(lens.material.transparent);
   assert.equal(lens.material.depthWrite, false);
   asset.dispose();
+}
+// M590 optics must work with its fixed irons; removal is never a fallback.
+assert(isAttachmentConfig(BASE_ATTACHMENTS, 'shotgun'));
+for (const optic of [null, 'rmr', 'acog', 'scope'] as const) {
+  assert(isAttachmentConfig({ ...BASE_ATTACHMENTS, optic }, 'shotgun'));
+  assert.equal(
+    isAttachmentConfig({ ...BASE_ATTACHMENTS, optic, ironSights: false }, 'shotgun'),
+    false
+  );
 }
 // Repeated mount/remove borrows one asset, restores base datums/tuning and
 // leaves no orphan glass/socket.

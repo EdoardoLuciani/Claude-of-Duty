@@ -47,14 +47,14 @@ def pick(prefix):return [o for o in meshes if o.name.startswith(prefix)]
 def nearest(bvh,p):return bvh.find_nearest(Vector(p))[3]
 pose('Idle')
 assert rig.location.length<1e-8 and rig.rotation_quaternion.angle<1e-8 and (rig.scale-Vector((1,1,1))).length<1e-8
-controls=[o for o in asset.objects if o.type=='EMPTY' and not o.name.startswith(('SOCKET_','DATUM_'))]
+controls=[o for o in asset.objects if o.type=='EMPTY' and not o.name.startswith(('SOCKET_','DATUM_','MOUNT_'))]
 # Manufacturer nominal anchors, checked on evaluated exterior and physical datums.
 dim=manifest['dimensions'];assert manifest['reference']['sku']=='50774'
-assert abs((point(bpy.data.objects['DATUM_closed_breech'])-point(bpy.data.objects['SOCKET_muzzle'])).length-18.5*.0254)<1e-6
+assert abs((point(bpy.data.objects['DATUM_closed_breech'])-point(bpy.data.objects['DATUM_barrel_crown'])).length-18.5*.0254)<1e-6
 assert abs((point(bpy.data.objects['DATUM_trigger_face'])-point(bpy.data.objects['DATUM_butt_center'])).length-13.875*.0254)<1e-6
 exterior=[];deps=bpy.context.evaluated_depsgraph_get()
 for o in meshes:
-    if o.parent.name=='shell_insert':continue
+    if o.parent.name=='shell_insert' or o.name.startswith('12g adapter'):continue
     ev=o.evaluated_get(deps);data=ev.to_mesh();exterior.extend((CI@rig.matrix_world.inverted()@ev.matrix_world@v.co).z for v in data.vertices);ev.to_mesh_clear()
 assert abs(max(exterior)-min(exterior)-39.5*.0254)<.0002,'manufacturer nominal OAL'
 print('M590_MANUFACTURER_ANCHORS_OK: SKU50774; OAL',max(exterior)-min(exterior),'barrel469.9mm; LOP352.425mm; local photo estimates not certified CAD')
@@ -98,7 +98,7 @@ while pending:
     if i in visited:continue
     visited.add(i);pending.extend(adjacency[i]-visited)
 assert len(visited)==len(adjacency),'connected front base/shroud topology'
-front_shroud=tree([front_base]);muzzle_z=manifest['sockets']['muzzle'][2]
+front_shroud=tree([front_base]);muzzle_z=manifest['dimensions']['barrelCrown'][2]
 for side in (-1,1):
     hit=front_shroud.ray_cast(Vector((side*.05,.0845,muzzle_z+.019)),Vector((-side,0,0)),.05)[0]
     assert hit is not None and abs(hit.x)>.0075,('front cheek/base slit',side,hit)
@@ -282,4 +282,8 @@ for name in ('Reload_Tactical','Reload_Empty'):
         overlaps=tree(glove).overlap(receiver);skin_poses+=1
         assert not overlaps,(name,frame,'actual left glove/sleeve intersects receiver',[o.name for o in glove if tree([o]).overlap(receiver)])
 pose('Idle')
+# Mount checks append actual shared source optics only after the original
+# mechanism/skin gates, so they cannot alter those source selections.
+from m590.mounts import check_mounts
+check_mounts(ROOT,manifest,rig,meshes,review,pose,tree,point,CI)
 print('M590_SOURCE_OK:',len(meshes),'editable component meshes;',len(controls),'native controls;',poses,'120Hz mechanism/contact poses;',len(seen),'distinct strokes;',skin_poses,'actual deformed glove clearance poses; rear clearance',minimum*1000,'mm; wrist/shell drift',max_drift*1000,'mm')

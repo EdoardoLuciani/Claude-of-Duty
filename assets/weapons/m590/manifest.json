@@ -7,11 +7,11 @@
   "runtimeBasis": "-Z forward / +Y up / +X right; no adapter basis transform",
   "source": "tools/blender/m590/build.py + tools/blender/m590/ + tools/blender/m590/actions.py + tools/blender/m590/hand-reference.ts",
   "stats": {
-    "triangleInstances": 72206,
+    "triangleInstances": 75842,
     "primitives": 2,
     "materials": 1,
     "images": 3,
-    "bytes": 11805576
+    "bytes": 12262576
   },
   "clips": {
     "Idle": {
@@ -152,11 +152,11 @@
       [
         -0.02800000086426735,
         -0.1136000007390976,
-        -0.6552884578704834
+        -0.6672884821891785
       ],
       [
         0.02800000086426735,
-        0.11012499779462814,
+        0.11800000071525574,
         0.3480115234851837
       ]
     ],
@@ -181,6 +181,11 @@
       0,
       0.068,
       -0.18538847632074762
+    ],
+    "barrelCrown": [
+      0,
+      0.068,
+      -0.6552884763207476
     ]
   },
   "reference": {
@@ -198,7 +203,7 @@
     "muzzle": [
       0,
       0.068,
-      -0.6552884763207476
+      -0.6672884763207476
     ],
     "ejection": [
       0.0205,
@@ -220,6 +225,47 @@
       0.068,
       -0.18538847632074762
     ]
+  },
+  "mounts": {
+    "optic": {
+      "pos": [
+        0,
+        0.118,
+        -0.14
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "parent": "receiver"
+    },
+    "muzzle": {
+      "pos": [
+        0,
+        0.068,
+        -0.6672884763207476
+      ],
+      "rot": [
+        0,
+        0,
+        0
+      ],
+      "parent": "receiver"
+    },
+    "rail": {
+      "pos": [
+        0.028,
+        0.0355,
+        -0.46
+      ],
+      "rot": [
+        0,
+        0,
+        -1.5707963267948966
+      ],
+      "parent": "forend"
+    }
   },
   "ejectionDirection": [
     0.84,
@@ -307,6 +353,9 @@
   "notes": [
     "Manufacturer nominal barrel/OAL/LOP anchors; local exterior profile estimates from catalog photograph, not manufacturing CAD.",
     "No exported arms, spent case, optic, baked shot recoil, or gameplay balance changes.",
-    "shell_insert is not a detachable magazine; adapter owns visibility from authored scale."
+    "shell_insert is not a detachable magazine; adapter owns visibility from authored scale.",
+    "Fixed ghost-ring irons remain below a see-through receiver optic rail; no removable irons.",
+    "12g adapter and moving tri-rail datums are future suppressor/laser seats only; those runtime catalogs are empty.",
+    "SOCKET_muzzle emits at the adapter exit/MOUNT_muzzle; DATUM_barrel_crown preserves the original factory barrel measurement."
   ]
 }
