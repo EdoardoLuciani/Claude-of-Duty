@@ -76,6 +76,14 @@ def build(output, render=False, quick=False):
     manifest={'asset':'SIG P320 Nitron Compact | early-production visual reconstruction','units':'metres','blender_forward':'+Y','gltf_forward':'-Z','clips':clips,'stats':stats,
      'textureResolutions':ATLAS_RESOLUTIONS,'geometry':'One rigidly weighted mechanical skin; lettering/traction baked from retained high source','handAnimation':'Blender wrist and finger controls; shared runtime skins and shoulder IK',
      'source':'tools/blender/p320/build.py + tools/blender/p320/ + tools/blender/p320/actions.py + tools/blender/p320/hand-reference.ts',
+     'attachments':{
+      'optic':{'mount':'MOUNT_optic','parent':'slide','railContact':[0,.066,-.003],
+               'railLength':.180,'fixedIrons':True,'ironSightHeight':.0537,
+               'support':'Recessed plate and see-through cantilever rail; clears the ejection port'},
+      'muzzle':{'mount':'MOUNT_muzzle','parent':'barrel','position':[0,.037,-.1445],
+                'status':'Future datum only; suppressor asset/clearance not verified'},
+      'rail':{'mount':'MOUNT_rail','parent':'frame','position':[0,.002,-.105],
+              'status':'Existing integral accessory rail; future datum only, laser not verified'}},
      'notes':['Original non-functional game art, not a dimensionally exact replica.','No downloaded models or textures.','No endorsement by SIG SAUER.']}
     (output/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     print('P320_EXPORT_COMPLETE',json.dumps(stats))

@@ -3,11 +3,14 @@
  * Deterministic native-WebGPU screenshot harness.
  * Usage: bun tools/capture.ts --shot=hero --out=/tmp/hero.png
  *        bun tools/capture.ts --reload --out=/tmp/reload
+ *        bun tools/capture.ts --weapon=pistol --optic=scope --shot=ads --out=/tmp/p320.png
  */
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 import type { Engine } from '../src/core/engine.ts';
+import type { AttachmentConfig } from '../src/weapons/attachments.ts';
+import { isWeaponId, WEAPON_DEFS } from '../src/weapons/defs.ts';
 import {
   ensureDevServer,
   launchChromium,
@@ -26,8 +29,32 @@ const OUT = resolve(String(args.out ?? (RELOAD ? 'shots/reload' : `shots/${SHOT}
 const TIMEOUT = Number(args.timeout ?? 90000);
 // Let temporal effects, streaming and LOD settle before capture.
 const SETTLE = Number(args.settle ?? 90);
-if (args.optic === 'scope' && args.irons !== 'removed')
-  throw new Error('The M4 PM II scope requires --irons=removed.');
+const WEAPON = String(args.weapon ?? 'rifle');
+if (!isWeaponId(WEAPON)) throw new Error(`Unknown weapon: ${WEAPON}`);
+const OPTIC = args.optic;
+if (args.irons !== undefined && args.irons !== 'installed' && args.irons !== 'removed')
+  throw new Error(`Unknown iron-sight configuration: ${args.irons}`);
+if (
+  OPTIC !== undefined &&
+  OPTIC !== 'none' &&
+  OPTIC !== 'rmr' &&
+  OPTIC !== 'acog' &&
+  OPTIC !== 'scope'
+)
+  throw new Error(`Unknown optic: ${OPTIC}`);
+if (
+  OPTIC &&
+  OPTIC !== 'none' &&
+  args.irons !== 'removed' &&
+  WEAPON_DEFS[WEAPON].removableIrons?.opticClashes.includes(OPTIC)
+)
+  throw new Error(`${WEAPON} with ${args.optic} requires --irons=removed.`);
+const ATTACHMENTS: AttachmentConfig = {
+  optic: OPTIC === undefined || OPTIC === 'none' ? null : OPTIC,
+  ironSights: args.irons !== 'removed',
+  muzzle: null,
+  rail: null,
+};
 
 // Self-contained functions serialized by Playwright into the browser.
 function pump(frames: number): Promise<number> {
@@ -76,7 +103,8 @@ try {
   try {
     const attachmentQuery =
       (args.optic ? `&attachmentOptic=${encodeURIComponent(String(args.optic))}` : '') +
-      (args.irons ? `&attachmentIrons=${encodeURIComponent(String(args.irons))}` : '');
+      (args.irons ? `&attachmentIrons=${encodeURIComponent(String(args.irons))}` : '') +
+      `&attachmentWeapon=${encodeURIComponent(WEAPON)}`;
     await page.goto(
       `http://127.0.0.1:${PORT}/?capture=1&lockstep=1&shot=${encodeURIComponent(SHOT)}${attachmentQuery}`,
       {
@@ -85,6 +113,27 @@ try {
       }
     );
     await page.waitForFunction('window.__READY__ === true', null, { timeout: TIMEOUT });
+    if (args.weapon || OPTIC || args.irons)
+      await page.evaluate(
+        ({ id, config }): void => {
+          const weapons = window.__ENGINE__?.ctx.get('weapons');
+          if (!weapons) throw new Error('weapons not ready');
+          // Non-starting weapons are loaded by readiness, but URL configuration
+          // before warmup can reject them because they are not owned yet.
+          if (!weapons.owns(id)) {
+            const equipped =
+              id === 'pistol' || id === 'smg' || id === 'shotgun'
+                ? weapons.equipSecondary(id)
+                : weapons.equipPrimary(id);
+            if (!equipped) throw new Error(`Cannot acquire ${id}`);
+          }
+          if (!weapons.setAttachments(id, config)) throw new Error(`Cannot configure ${id}`);
+        },
+        {
+          id: WEAPON,
+          config: ATTACHMENTS,
+        }
+      );
     if (args.list) {
       const shots: unknown = await page.evaluate('Object.keys(window.__SHOTS__ ?? {})');
       console.log(JSON.stringify(shots, null, 2));
@@ -103,6 +152,22 @@ try {
         },
         { s: SHOT, settle: SETTLE }
       );
+      if (args.weapon)
+        await page.evaluate(
+          ({ id, shot }): void => {
+            const e = window.__ENGINE__;
+            if (!e) throw new Error('engine not ready');
+            const weapons = e.ctx.get('weapons');
+            // The named debug pose selects the reference rifle; switch afterwards
+            // while retaining its settled hip/ADS state.
+            if (!weapons.setWeaponImmediate(id)) throw new Error(`Cannot equip ${id}`);
+            if (shot === 'ads') {
+              e.camera.fov = e.config.fov * (weapons.current?.adsFovScale ?? e.config.adsFovScale);
+              e.camera.updateProjectionMatrix();
+            }
+          },
+          { id: WEAPON, shot: SHOT }
+        );
       logs.push(`[shot] ${JSON.stringify(applied)}`);
       if (RELOAD) {
         await page.evaluate(pump, SETTLE);

@@ -3,6 +3,8 @@ blender -b assets/weapons/p320-compact/p320-compact.blend --python-exit-code 1 -
 """
 import json
 import math
+import sys
+from pathlib import Path
 import bpy
 from mathutils import Matrix, Vector
 s=bpy.context.scene;clips=json.loads(s['clips'])
@@ -87,4 +89,8 @@ for o in bpy.data.collections['P320 | editable weapon'].objects:
     if o.type!='MESH':continue
     assert len(o.data.polygons)>0,o.name
     assert max((Vector(o.bound_box[6])-Vector(o.bound_box[0])).length,0)>.00001,o.name
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from attachments import check_mounts, check_sight_emission
+check_sight_emission(surface)
+check_mounts(clips)
 print(f'P320_BLENDER_OK: 8 synchronized actions, wrists {maximum*1000:.4f} mm, mechanical skin/source matrix error {skin_error:.9f}, packed atlases, {marked_area/total_area:.1%} lettering UV1, rigid weights and discrete magazines')

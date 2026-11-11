@@ -30,6 +30,10 @@ export function makeP320Model(gltf: GLTF): P320Model {
     label: 'P320 Compact',
     scene,
     root,
+    opticMountRest: new THREE.Matrix4()
+      .copy(root.matrixWorld)
+      .invert()
+      .multiply(requiredNode(root, 'MOUNT_optic').matrixWorld),
     animations,
     handPoses: { left: handReference.sides.left.grip, right: handReference.sides.right.grip },
     nodes: {

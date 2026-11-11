@@ -62,7 +62,7 @@ def build_surfaces(asset, sources):
 
 
 def emphasize_marks(surfaces):
-    """Give existing UV islands carrying lettering/ribs extra texel density."""
+    """Preserve lettering/ribs and sub-millimetre SIGLITE insets in the atlas."""
     from mathutils.bvhtree import BVHTree
     for surface, sources in surfaces:
         mesh = surface.data
@@ -97,6 +97,11 @@ def emphasize_marks(surfaces):
                 if face is not None and distance < .004:
                     island = root(face)
                     priority[island] = max(priority.get(island, 1), factor)
+        # A luminous cap otherwise occupies less than one texel after packing:
+        # its entire emission can disappear when new rail islands shift the layout.
+        for face in mesh.polygons:
+            if mesh.materials[face.material_index].name.startswith('SIGLITE |'):
+                priority[root(face.index)] = max(priority.get(root(face.index), 1), 8)
         for face in mesh.polygons:
             factor = priority.get(root(face.index), 1)
             for loop in face.loop_indices:
