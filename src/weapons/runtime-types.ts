@@ -55,6 +55,7 @@ export interface OpticData {
   center: number[];
   apertureR?: number;
   dotMoa?: number;
+  ringMoa?: number;
   minDotPixels?: number;
   dotOpacity?: number;
 }

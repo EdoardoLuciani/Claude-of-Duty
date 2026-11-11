@@ -36,11 +36,11 @@
   "photoRights": "Photographs remain their owners’ reference material. They are not committed, embedded in the Blender file, used as textures, or shipped in the GLB. Original geometry, finishes, warning text and vector mark reconstruction only; EOTECH identifies the reference subject, not endorsement.",
   "limitations": [
     "Original reference-backed game art, not manufacturer CAD, a scan, or claimed final human visual acceptance.",
-    "48.2mm optical centre above the existing art datum and30x22mm clear opening are provisionally inferred from registered photos. Manufacturer specs do not certify these datums. Confirm actual mounting/rail seating and M4 ADS/co-witness separately.",
+    "48.2mm optical centre above the original art zero (43.4mm above the QD saddle contact) and 30x22mm clear opening are inferred from registered photos. Manufacturer specs do not certify these datums. AX338 fit is checked; other gameplay fits remain blocked as documented in README.md.",
     "Window curvature, internal holographic laminate/laser, hidden battery internals, exact fastener threads and detailed mount tolerances are not reconstructed.",
     "Public photos are not calibrated views; silhouettes and apparent small features do not certify all dimensions or surface finish.",
     "Glass uses a single neutral AR-tinted PBR approximation for front glass and rear laminate; a spectral AR coating and real hologram are not simulated.",
-    "No price, purchase rules, mounted gameplay model, ADS/reticle implementation, stat effects or default-M4 change in this asset-first PR."
+    "No price/purchase rules or default-weapon changes. Shared gameplay integration is partial: AX338 only; see README.md for unsupported fits."
   ],
   "historicalReview": "Frozen photo-registration profiles, initial-build comparisons and isolated rendering measurements are archived in Git at c4c62f10:assets/attachments/eotech-exps3-0/reference-review.json. They describe historical products, not current acceptance. Current product data lives in manifest.json.",
   "authoringNotes": {
