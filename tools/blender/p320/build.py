@@ -82,8 +82,8 @@ def build(output, render=False, quick=False):
                'support':'Recessed plate and see-through cantilever rail; clears the ejection port'},
       'muzzle':{'mount':'MOUNT_muzzle','parent':'barrel','position':[0,.037,-.1445],
                 'status':'Future datum only; suppressor asset/clearance not verified'},
-      'rail':{'mount':'MOUNT_rail','parent':'frame','position':[0,.002,-.105],
-              'status':'Existing integral accessory rail; future datum only, laser not verified'}},
+      'rail':{'mount':'MOUNT_rail','parent':'frame','position':[0,.002,-.122],
+              'status':'TOR Mini on a 14 mm extended game-fit frame rail; fifth slot supports the forward seat'}},
      'notes':['Original non-functional game art, not a dimensionally exact replica.','No downloaded models or textures.','No endorsement by SIG SAUER.']}
     (output/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     print('P320_EXPORT_COMPLETE',json.dumps(stats))

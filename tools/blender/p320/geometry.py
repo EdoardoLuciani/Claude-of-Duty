@@ -196,9 +196,10 @@ def build_geometry(asset):
     cut(guard,inner)
     for z in [-.001,-.004,-.007,-.010,-.013]:
         rounded_cut(guard,(0,.0686,z),(.021,.0015,.0010),.0003)
-    # Compact accessory rail: lower trapezoid and four slots.
-    rail=profile('Frame | integral accessory rail',[(.069,.014),(.127,.014),(.127,.002),(.071,.002)],.021,polymer,body,.0005)
-    for y in (.081,.093,.105,.117):rounded_cut(rail,(0,y,.0017),(.026,.0042,.006),.0003)
+    # Game-fit accessory rail: 14 mm forward extension and a fifth slot
+    # support the TOR Mini ahead of the reload hand; not a factory frame.
+    rail=profile('Frame | integral accessory rail',[(.069,.014),(.141,.014),(.141,.002),(.071,.002)],.021,polymer,body,.0005)
+    for y in (.081,.093,.105,.117,.129):rounded_cut(rail,(0,y,.0017),(.026,.0042,.006),.0003)
     for side in (-1,1):
         text('SIGSAUER',(side*.0161,-.004 if side==-1 else -.028,-.036),.0042,side,body,polymer,.00012)
         # Compact-medium molding under the dust cover, not a bright white label.
@@ -303,10 +304,10 @@ def build_geometry(asset):
                             ('SOCKET_sight',(0,-.033,.0537),rig),
                             ('MOUNT_optic',(0,.003,.066),slide),
                             ('MOUNT_muzzle',(0,.1445,.037),barrel),
-                            ('MOUNT_rail',(0,.105,.002),body)]:
+                            ('MOUNT_rail',(0,.122,.002),body)]:
         # Keep authored world coordinates under offset pivots.
         o=empty(name,parent=parent);o.matrix_parent_inverse=parent.matrix_world.inverted();o.location=pos
-        if name=='MOUNT_rail':o.rotation_euler.y=math.pi  # bottom rail, outward -Z
+        # TOR Mini body sits below the frame rail; +Z points into the seat.
         if name=='MOUNT_muzzle':o.rotation_euler.x=-math.pi/2  # outward +Y (game -Z)
 
     # Union the molded frame pieces so the grip neck and rail are not visibly

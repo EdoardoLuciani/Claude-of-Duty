@@ -84,13 +84,13 @@ assert mount.parent==bpy.data.objects['EVOLYS_RIG']
 mp=CI@mount.matrix_world.translation
 assert abs(mp.x)<1e-6 and abs(mp.y-rail_top)<1e-6 and abs(mp.z-(.105-30*.01005))<1e-6
 assert Vector(mount.rotation_euler).length<1e-6,'optic mount orientation'
-# Future datums are checked only as authored frames, NOT as nonexistent fits.
+# Muzzle remains a future datum; the rail seats the shared TOR Mini.
 muzzle=CI@bpy.data.objects['MOUNT_muzzle'].matrix_world.translation
 assert (muzzle-CI@bpy.data.objects['SOCKET_muzzle'].matrix_world.translation).length<1e-6
 rail=bpy.data.objects['MOUNT_rail']
-assert (CI@rail.matrix_world.translation-Vector((.0275,.075,-.300))).length<1e-6
+assert (CI@rail.matrix_world.translation-Vector((.0345,.110,-.395))).length<1e-6
 normal=CI@rail.matrix_world.to_3x3()@C@Vector((0,1,0))
-assert (normal-Vector((1,0,0))).length<1e-6
+assert (normal-Vector((-1,0,0))).length<1e-6
 belt=bpy.data.objects['belt_rig'];sample('Fire',0)
 start=belt.pose.bones['belt_3'].matrix.translation.copy();sample('Fire',.060)
 end=belt.pose.bones['belt_3'].matrix.translation.copy();assert abs((end-start).length-.0127)<.0002
@@ -197,5 +197,10 @@ for name,info in clips.items():
             for optic_id,target in optics.items():
                 assert not tree.overlap(target),(name,frame,obj.name,optic_id,'attachment collision')
             assert not tree.overlap(fixed_irons),(name,frame,obj.name,'iron collision')
-print(f'EVOLYS_ATTACHMENT_CLEARANCE_OK: {poses} native poses, rmr/acog with irons, scope with irons removed; cover, charging, stock, belt and deformed hands; future muzzle/rail DATUMS ONLY')
+print(f'EVOLYS_ATTACHMENT_CLEARANCE_OK: {poses} native poses, rmr/acog with irons, scope with irons removed; cover, charging, stock, belt and deformed hands; muzzle remains a future datum; TOR Mini checked separately')
 print('EVOLYS_CHECK_OK: mesh envelope, barrel, vents, packed maps, aligned removable irons, closed stock joints, one-pitch native feed, belt/solid clearance, enclosed tail and synchronized DCC wrists/skins')
+
+# Actual shared rail attachment, independent of the optic catalog.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tor_mini.mounts import check_laser_mount
+check_laser_mount('evolys')

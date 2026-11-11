@@ -284,10 +284,20 @@ def build(output, render=False, quick=False):
     empty('SOCKET_front_post',(0,sight_y,front_z),rig)
     # Identity rail-contact frame; optics supply their own riser/base and sight.
     empty('MOUNT_optic',(0,rail_top,.105-30*.01005),rig)
-    # Future catalog datums only: no suppressor/laser assets are fitted here.
+    # The TOR Mini seats on a short right-side M-LOK/Picatinny adapter.
     empty('MOUNT_muzzle',(0,.075,crown),rig)
-    rail_mount=empty('MOUNT_rail',(.0275,.075,-.300),rig)
-    rail_mount.rotation_euler=(C@Matrix.Rotation(-math.pi/2,3,'Z')@C.inverted()).to_euler()
+    rail_mount=empty('MOUNT_rail',(.0345,.110,-.395),hg)
+    rail_mount.rotation_euler=(C@Matrix.Rotation(math.pi/2,3,'Z')@C.inverted()).to_euler()
+    # A thin inboard offset plate stays behind the clamp jaws and bolts to
+    # the real bore-height side interface, not to an empty point above it.
+    for z in (-.413,-.379):
+        box('Laser rail offset bracket',(.025,.0925,z),(.005,.049,.006),black,hg,.0004)
+    box('Laser rail adapter web',(.030,.110,-.395),(.005,.014,.055),black,hg,.0004)
+    for i in range(5):
+        z=-.415+i*.010
+        box('Laser rail adapter tooth',(.0325,.110,z),(.004,.020,.0052),steel,hg,.0003)
+    for z in (-.413,-.379):
+        cyl('Laser rail adapter screw',(.027,.075,z),.002,.004,steel,hg,'X',24)
     # Soft 100-round pouch with a rigid mounting lid and shallow seam relief.
     for parent in (pouch,spare):
         box('Pouch fabric body',(-.023,-.048,-.166),(.108,.107,.125),canvas,parent,.008)

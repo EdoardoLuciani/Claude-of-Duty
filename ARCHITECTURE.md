@@ -422,9 +422,13 @@ even when the initial M4 uses irons. Debug URL input is narrowed in `main.ts`:
 `attachmentIrons=installed|removed` selects irons independently; PM II requires
 `?attachmentOptic=scope&attachmentIrons=removed`. `attachmentWeapon` must pass
 `isWeaponId` and compatibility/ownership checks.
-`attachmentRail=laser|none` selects the M4's right-rail module. Its authored
+`attachmentRail=laser|none` selects the TOR Mini on all seven weapons. Their authored
 `MOUNT_rail` and TOR Mini `SOCKET_mount`/`SOCKET_laser` keep mounting independent
-of the optic. Gameplay and inspection borrow the same single-material asset.
+of the optic. P320 uses its frame bone (not the slide); M590 uses fixed forward
+magazine-tube clamps (not the pump); the other adapters follow their fixed
+handguard/receiver assemblies. MCX/MPX retain their integrated optics and cans,
+without depending on their open base conversions. Gameplay and inspection borrow
+the same single-material asset.
 Weapons own one retained world mesh for the green beam and surface dot (one draw,
 no light/decal, no per-frame allocation); boot warms it even with no module mounted.
 Two pooled `MASK.BULLET` queries find the unspread, zeroed muzzle aim and clip the

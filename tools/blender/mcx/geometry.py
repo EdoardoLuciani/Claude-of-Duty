@@ -6,7 +6,7 @@ local to build_geometry; importing this module creates no scene objects.
 import math
 
 import bpy
-from mathutils import Vector
+from mathutils import Matrix, Vector
 import numpy as np
 
 def build_geometry(materials):
@@ -600,5 +600,14 @@ def build_geometry(materials):
     # Named attachment / integration sockets; adapter hand contacts follow the fit.
     for name,loc,parent in [('SOCKET_muzzle',(.512,0,0),rig),('SOCKET_ejection',(-.018,-.030,.004),rig),('SOCKET_grip_R',(-.139,0,-.099),rig),('SOCKET_grip_L',(.171,0,-.028),rig),('SOCKET_magazine',(.004,0,-.042),mag),('SOCKET_sight',(-.149,0,.087),rig)]:
         empty(name,loc,parent)
+
+    # Right-side rail ahead of the support hand; integrated ACOG/can stay intact.
+    rail = empty('MOUNT_rail', (.221, -.038, 0), body)
+    rail.rotation_euler = Matrix(((0,1,0),(0,0,1),(1,0,0))).to_euler()
+    box('Laser rail adapter web',(.221,-.031,0),(.055,.010,.014),coating)
+    for i in range(5):
+        box('Laser rail adapter tooth',(.201+i*.010,-.036,0),(.0052,.004,.020),anodized)
+    for x in (.201,.241):
+        cylinder('Laser rail adapter screw',(x,-.0358,0),.002,.004,steel,'Y')
 
     return asset, [rig, mag, spare, bolt, handle, trigger, cover, stock, case, release]

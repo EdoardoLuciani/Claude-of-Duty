@@ -26,3 +26,11 @@ Use `-- --output /tmp/mcx-review` for scratch builds. Normal builds use committe
 assets. World-magazine drops remain unavailable because the adapter lacks
 `magazineBody`; independent transfer geometry remains. Historical optimization
 measurements are in Git history, not evidence of an FPS improvement.
+
+## TOR Mini rail (#686)
+
+A short authored right-side Picatinny adapter enables the shared optional laser,
+independently of the existing integrated optic and suppressor. No base conversion
+or dependency on the still-open #662/#663 issues is introduced. Receiver ownership
+keeps it clear of moving controls and stock; hands/animations remain unchanged.
+See the [mount table, source sweep and limitations](../../attachments/steiner-tor-mini/README.md#weapon-mounting-686).

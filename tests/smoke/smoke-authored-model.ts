@@ -16,7 +16,7 @@ import {
   type AttachmentConfig,
 } from '../../src/weapons/attachments.ts';
 import { authoredModel, checkAuthoredDuration } from '../../src/weapons/authored-model.ts';
-import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
+import { WEAPON_DEFS, WEAPON_IDS } from '../../src/weapons/defs.ts';
 import { WeaponLaser } from '../../src/weapons/laser.ts';
 import { ReticleMaterials } from '../../src/weapons/materials-tsl.ts';
 import type { WeaponEntry, WeaponModelRecord } from '../../src/weapons/runtime-types.ts';
@@ -243,11 +243,38 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   const laser = makeLaserModel(fixture<GLTF>({ scene: laserScene }));
   const laserConfig: AttachmentConfig = { ...BASE_ATTACHMENTS, rail: 'laser' };
   assert(isAttachmentConfig(laserConfig, 'rifle'));
-  assert.equal(
-    isAttachmentConfig(laserConfig, 'pistol'),
-    false,
-    'unverified rail fits stay disabled'
-  );
+  for (const id of WEAPON_IDS) {
+    assert(isAttachmentConfig(laserConfig, id), `${id} accepts its verified rail fit`);
+    const railModel = fixture<WeaponModelRecord>({ ...model });
+    railModel.id = id;
+    const weapon = fixture<WeaponEntry>({
+      ...entry,
+      id,
+      model: railModel,
+      def: { ...WEAPON_DEFS[id] },
+      attachmentGroup: new THREE.Group(),
+      railGroup: new THREE.Group(),
+    });
+    const base = { ...weapon.def, suppressed: WEAPON_DEFS[id].suppressed ?? false };
+    configureWeaponAttachments(weapon, laserConfig, optics, laser);
+    assert.deepEqual(weapon.def, base, `${id}: laser has no handling/ballistic modifiers`);
+    assert.equal(weapon.railGroup.parent, railMount);
+    assert(weapon.laserEmitter);
+    const previous = weapon.laserEmitter.getWorldPosition(new THREE.Vector3());
+    railMount.position.z += 0.089;
+    const moved = weapon.laserEmitter.getWorldPosition(new THREE.Vector3());
+    assert(Math.abs(previous.distanceTo(moved) - 0.089) < 1e-8, 'emitter follows moving rail');
+    railMount.position.z -= 0.089;
+    if (WEAPON_DEFS[id].removableIrons) {
+      const noIrons = { ...laserConfig, ironSights: false };
+      assert(isAttachmentConfig(noIrons, id), 'laser selection is independent of irons');
+      configureWeaponAttachments(weapon, noIrons, optics, laser);
+      assert(weapon.laserEmitter);
+    }
+    configureWeaponAttachments(weapon, BASE_ATTACHMENTS, optics, laser);
+    assert.equal(weapon.laserEmitter, null);
+    assert.equal(railMount.children.length, 0, `${id}: removal leaves no rail instance`);
+  }
   for (let i = 0; i < 3; i++) {
     const before = { ...entry.def };
     configureWeaponAttachments(entry, laserConfig, optics, laser);

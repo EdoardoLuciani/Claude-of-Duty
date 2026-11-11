@@ -28,3 +28,11 @@ Use `--output /tmp/mpx-review` for scratch builds. The registered cook retains
 material boundaries and 16-bit colors; do not adopt more aggressive optic-rim
 simplification. The source map records the UV-repeatability limitation.
 Historical representation/storage comparisons remain in Git, not an FPS claim.
+
+## TOR Mini rail (#686)
+
+A short authored right-side Picatinny adapter enables the shared optional laser,
+independently of the existing integrated optic and suppressor. No base conversion
+or dependency on the still-open #662/#663 issues is introduced. Receiver ownership
+keeps it clear of moving controls and stock; hands/animations remain unchanged.
+See the [mount table, source sweep and limitations](../../attachments/steiner-tor-mini/README.md#weapon-mounting-686).

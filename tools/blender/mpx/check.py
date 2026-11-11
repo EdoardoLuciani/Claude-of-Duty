@@ -3,6 +3,8 @@ blender -b assets/weapons/sig-mpx/mpx.blend --python-exit-code 1 --python tools/
 """
 import json
 import math
+import sys
+from pathlib import Path
 import bpy
 from mathutils import Vector, Matrix
 from mathutils.bvhtree import BVHTree
@@ -189,3 +191,8 @@ for o in scene.objects:
     for vertex in o.data.vertices:
         assert all(math.isfinite(v) for v in vertex.co), o.name
 print('MPX saved source: maps/datums/slots/seams/port, mounted trigger, reference-mag silhouette, decals, attached solid polymer optic covers, eight native control/shared-review-arm clips and retained/empty reload events verified; human animation/gameplay approval pending')
+
+# Actual shared rail attachment, independent of the optic catalog.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tor_mini.mounts import check_laser_mount
+check_laser_mount('mpx')

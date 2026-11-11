@@ -10,7 +10,7 @@ import struct
 import sys
 
 import bpy
-from mathutils import Vector
+from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
 import numpy as np
 
@@ -619,6 +619,15 @@ def build(output, render=False, quick=False):
                      'grip_right':(-.045,0,-.103),'grip_left':(.209,0,-.017),
                      'magazine':(.069,0,-.065)}.items():
         empty('SOCKET_'+name,loc,rig)
+
+    # Right M-LOK/Picatinny adapter, forward of the support-hand grip.
+    rail = empty('MOUNT_rail', (.295, -.037, 0), body)
+    rail.rotation_euler = Matrix(((0,1,0),(0,0,1),(1,0,0))).to_euler()
+    box('Laser rail adapter web',(.295,-.030,0),(.055,.010,.014),alloy)
+    for i in range(5):
+        box('Laser rail adapter tooth',(.275+i*.010,-.035,0),(.0052,.004,.020),steel)
+    for x in (.275,.315):
+        cyl('Laser rail adapter screw',(x,-.0348,0),.002,.004,steel,'Y')
 
     # Stage 3: surface-fitted markings and original component atlas UVs.
     # Project original text mesh vertices onto their declared physical surface, not

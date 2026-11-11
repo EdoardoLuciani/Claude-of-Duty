@@ -3,6 +3,8 @@ blender -b assets/weapons/mcx-virtus/mcx-virtus.blend \
   --python tools/blender/mcx/check.py
 Checks are independent of the authoring script; no source rebuild or save.
 """
+import sys
+from pathlib import Path
 import bpy
 from mathutils import Vector
 from mathutils.geometry import convex_hull_2d
@@ -223,3 +225,8 @@ for step in range(129*2,157*2+1):
 pose('Idle', 0)
 print(f'MCX_STOCK_HANDLE_CLEARANCE_OK: moving stock/hinge >= {minimum_separation["moving_stock"]*1000:.3f} mm; fixed rear plate >= {minimum_separation["rear_plate"]*1000:.3f} mm; full clips/midframes/folded rack')
 print(f'MCX_GEOMETRY_OK: moving parts clear/attached, rounded receiver/grip, MAG800 envelope {length*1000:.3f} mm, TA31F/SRD762Ti dimensions')
+
+# Actual shared rail attachment, independent of the optic catalog.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tor_mini.mounts import check_laser_mount
+check_laser_mount('mcx')

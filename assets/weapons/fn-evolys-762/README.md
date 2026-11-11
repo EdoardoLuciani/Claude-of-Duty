@@ -21,12 +21,14 @@ ACOG fit with irons installed; PM II crosses the front sight and requires irons
 removed (`opticClashes: ['scope']`). Eye relief is weapon/optic tuning, not a
 change to the shared optic geometry. A bare rail with no optic/irons remains valid.
 
-`MOUNT_muzzle` reserves the existing flash-hider exit on the bore axis (-Z forward).
-`MOUNT_rail` reserves a right-side mounting plane at (0.0275, 0.075, -0.300),
-4 mm outboard of the handguard shell/M-LOK interface, with local +Y pointing
-outboard (+X). No side-rail adapter geometry is authored. These are **future
-datums only**: suppressor and laser catalogs are absent (#670/#671); no fit or
-animated clearance is claimed for nonexistent attachments. The authored stock is rigid; there is no fold clip.
+`MOUNT_muzzle` reserves the existing flash-hider exit on the bore axis (−Z
+forward); no future suppressor fit is claimed. TOR Mini (#686) uses a right-side
+Picatinny segment at `[.0345, .110, −.395]`, on a two-leg offset bracket bolted
+to the bore-height side interface. The upper-right position clears the original
+support thumb, sights, optics and cover; the two narrow legs preserve the
+handguard's checked vent rays. Local +Y points inward so the body sits outboard.
+The handguard owns the rail; the stock is rigid with no authored fold clip.
+See the [shared laser checks and limits](../../attachments/steiner-tor-mini/README.md#weapon-mounting-686).
 
 Run from the repository root with Blender 5.2.2 and gltfpack 1.3:
 

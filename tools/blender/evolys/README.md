@@ -20,7 +20,8 @@ preserve held endpoint samples, matching NLA names and TRS resets.
 Receiver/handguard join as static surfaces. `IRON_sights` remains independently
 removable; there is no integrated optic or lens. `SOCKET_sight` owns the rear
 aperture centre, aligned with `SOCKET_front_post`. `MOUNT_optic` is the rail-contact
-frame; `MOUNT_muzzle` and `MOUNT_rail` reserve future catalog datums only.
+frame; `MOUNT_muzzle` remains a future datum. `MOUNT_rail` seats TOR Mini on
+a two-leg upper-right offset bracket; the existing side interface owns its feet.
 Stock, bolt, handle, feed cover
 and trigger remain ordinary meshes in their original local/control frames.
 Only the eight-joint belt is skinned; both pouches have independent STEP ownership.
@@ -29,7 +30,8 @@ The registered cook uses shared gltfpack flags without added simplification.
 `check.py` requires freshly generated shared optic blends and checks actual
 mounted RMR/ACOG/PM II surfaces against irons and animated cover, charging handle,
 stock, belt and deformed shared hands at 120 Hz. PM II crosses the front iron;
-RMR/ACOG retain both irons. No suppressor/laser or stock-fold fit is validated.
+RMR/ACOG retain both irons. The common TOR Mini checker adds all-clip 120 Hz laser/hand/emitter checks.
+No future suppressor or authored stock-fold fit is certified.
 
 ## Approved UV precision exception
 

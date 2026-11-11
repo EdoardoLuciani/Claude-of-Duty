@@ -47,24 +47,27 @@ stations. It neither rides on nor extends into the pump stroke.
 | --- | --- | --- |
 | `MOUNT_optic` | `[0, .118, -.140]`, identity | receiver |
 | `MOUNT_muzzle` | `[0, .068, -.6672884763]`, identity | receiver; adapter forward face |
-| `MOUNT_rail` | `[.028, .0355, -.460]`, −90° about Z | forend; right tri-rail, follows all 89 mm of travel |
+| `MOUNT_rail` | `[0, .009, -.590]`, identity | receiver; fixed forward magazine-tube clamp rail |
 
-Mount +Y is the rail outward normal and −Z remains forward. The base
+Mount +Y points into the rail seat and −Z remains forward. The base
 `SOCKET_muzzle` emits at the adapter exit, coincident with `MOUNT_muzzle`;
 `DATUM_barrel_crown` preserves the original factory barrel measurement and front
-sight references. The open-bore 12g adapter is permanent seating hardware, not a suppressor. Suppressor/laser runtime
-catalogs are empty (#670/#671); these two future datums are **not** model-fit or
-hand-clearance certification for nonexistent attachments.
+sight references. The open-bore 12g adapter is permanent seating hardware, not a suppressor. The suppressor seat remains a future datum, not a fit certificate. TOR Mini
+(#686) instead uses two fixed tube clamps at z=−.580/−.605 and a supported short
+underside rail, ahead of the pump and behind the clean-out cap. It remains fixed
+through all 89 mm of pump travel; no forend geometry or hand calibration changed.
+Its source sweep checks actual TOR surfaces/hands at all 739 clip poses (120 Hz).
+See the [shared laser checks and limits](../../attachments/steiner-tor-mini/README.md#weapon-mounting-686).
 
 `fits.optic` enables RMR / ACOG / PM II with eye relief .120 / .100 / .085 m respectively.
 `check.py` requires freshly generated shared optic `.blend` products (normal
 `bun run assets` builds them). `mounts.py` appends those actual meshes and checks
 four rail contacts per optic, fixed-iron clearance, the open ghost-ring line,
-receiver-foot seating, adapter bore/face, moving rail ownership, and both evaluated
+receiver-foot seating, adapter bore/face, fixed laser-rail ownership, and both evaluated
 hands/mechanisms/visible insertion hull across all seven clips at 120 Hz.
 Draw, holster, pump/fire handling, both reloads and inspect keep their original
 controls, contacts and timings; reactive shot recoil moves the assembled weapon.
-The added rail/adapter raise the export triangle budget to 76k without adding a
+The added rail/adapter and tube-clamp rail raise the export triangle budget to 79k without adding a
 material, image or primitive.
 
 ### Review limitation (#667)

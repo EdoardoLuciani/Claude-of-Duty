@@ -230,11 +230,19 @@ def build(output, render=False, quick=False):
     mounts={
         'optic':{'pos':[0,.118,-.140],'rot':[0,0,0],'parent':'receiver'},
         'muzzle':{'pos':[0,.068,muzzle_z-.012],'rot':[0,0,0],'parent':'receiver'},
-        'rail':{'pos':[.028,.0355,-.460],'rot':[0,0,-math.pi/2],'parent':'forend'},
+        'rail':{'pos':[0,.009,-.590],'rot':[0,0,0],'parent':'receiver'},
     }
     for name,data in mounts.items():
-        mount=empty('MOUNT_'+name,data['pos'],forend if name=='rail' else body)
+        mount=empty('MOUNT_'+name,data['pos'],body)
         mount.rotation_euler=(C@Matrix.Rotation(data['rot'][2],3,'Z')@C.inverted()).to_euler()
+    # Fixed magazine-tube clamps, ahead of the pump and behind the clean-out
+    # cap. The short underside rail never follows the moving forend.
+    for z in (-.580,-.605):
+        tube('Laser rail tube clamp',(0,.0348,z),.016,.01295,.008,steel,sides=24)
+        cyl('Laser rail clamp screw',(.015,.0348,z),.002,.004,steel,axis='X',sides=24)
+    box('Laser rail adapter web',(0,.0165,-.590),(.014,.009,.055),steel)
+    for i in range(5):
+        box('Laser rail adapter tooth',(0,.011,-.610+i*.010),(.020,.004,.0052),steel,bevel=.0003)
     # Fixed conventional stock, neck/comb/toe loft; no pistol grip or adjustable tube.
     guard=profile('Metal trigger guard',smooth_rows([(-.050,.022),(-.027,.022),(.014,.022),(.023,.017),(.025,.006),(.022,-.005),(.014,-.012),(-.005,-.016),(-.022,-.015),(-.035,-.011),(-.042,-.003),(-.044,.005)],True),.010,bevel=.0006)
     cut(guard,profile('CUT trigger window',smooth_rows([(-.040,.018),(-.022,.019),(.011,.019),(.018,.015),(.019,.006),(.016,-.003),(.009,-.009),(-.005,-.0125),(-.021,-.0115),(-.030,-.008),(-.036,-.002),(-.039,.005)],True),.028,None,None,0),True)
@@ -451,7 +459,7 @@ def build(output, render=False, quick=False):
     triangles=sum(j['accessors'][p['indices']]['count']//3 for n in j['nodes'] if 'mesh' in n for p in j['meshes'][n['mesh']]['primitives'])
     stats={'triangleInstances':triangles,'primitives':sum(len(m['primitives']) for m in j['meshes']),
            'materials':len(j['materials']),'images':len(j['images']),'bytes':len(raw)}
-    assert triangles<76000 and stats['primitives']==2 and stats['materials']==1 and stats['images']==3 and len(raw)<=12*1024*1024,stats
+    assert triangles<79000 and stats['primitives']==2 and stats['materials']==1 and stats['images']==3 and len(raw)<=12*1024*1024,stats
     pose('Idle')
     vertices=[C.inverted().to_4x4()@rig.matrix_world.inverted()@o.matrix_world@v.co for o in asset.objects if o.type=='MESH' and o.parent!=shell for v in o.data.vertices]
     bounds=[[min(v[i] for v in vertices) for i in range(3)],[max(v[i] for v in vertices) for i in range(3)]]
@@ -474,7 +482,7 @@ def build(output, render=False, quick=False):
                  'No exported arms, spent case, optic, baked shot recoil, or gameplay balance changes.',
                  'shell_insert is not a detachable magazine; adapter owns visibility from authored scale.',
                  'Fixed ghost-ring irons remain below a see-through receiver optic rail; no removable irons.',
-                 '12g adapter and moving tri-rail datums are future suppressor/laser seats only; those runtime catalogs are empty.',
+                 '12g adapter reserves the future suppressor seat; TOR Mini uses a fixed forward magazine-tube clamp rail.',
                  'SOCKET_muzzle emits at the adapter exit/MOUNT_muzzle; DATUM_barrel_crown preserves the original factory barrel measurement.']}
     (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     print('M590_EXPORT_STATS',json.dumps(stats))

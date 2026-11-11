@@ -110,14 +110,14 @@
     }
   },
   "stats": {
-    "triangles": 26482,
-    "vertices": 58778,
+    "triangles": 26712,
+    "vertices": 59408,
     "meshes": 1,
     "primitives": 1,
     "materials": 1,
     "textureImages": 4,
     "joints": 9,
-    "bytes": 6200336
+    "bytes": 6256544
   },
   "textureResolutions": {
     "base": 1024,
@@ -158,9 +158,9 @@
       "position": [
         0,
         0.002,
-        -0.105
+        -0.122
       ],
-      "status": "Existing integral accessory rail; future datum only, laser not verified"
+      "status": "TOR Mini on a 14 mm extended game-fit frame rail; fifth slot supports the forward seat"
     }
   },
   "notes": [

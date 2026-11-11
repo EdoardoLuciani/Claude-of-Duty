@@ -1,6 +1,6 @@
 """Checks actual shared optic meshes, not proxy attachment envelopes.
 
-Suppressor/laser catalogs are absent: only their future datums are checked.
+Suppressor remains a future datum; the TOR Mini has separate sampled checks.
 Optic clamps intentionally seat over the rail teeth. The bridge, receiver
 supports and all other weapon/hand surfaces remain strict collision checks.
 """
@@ -60,7 +60,7 @@ def check_mounts(root, manifest, rig, meshes, review, pose, tree, point, basis):
     assert face is not None and abs(face.z - muzzle.z) < 1e-7
 
     # Cached BVHs are in rig space. Receiver hardware must remain rigid in
-    # that frame throughout every clip, while the tri-rail follows the pump.
+    # that frame throughout every clip, while the laser rail stays on the fixed magazine-tube clamps.
     receiver_mount = rig.matrix_world.inverted() @ mounts['optic'].matrix_world
     optics = {}
     for optic, directory, stations in (
@@ -118,10 +118,10 @@ def check_mounts(root, manifest, rig, meshes, review, pose, tree, point, basis):
             pose(name, min(frame / 120, clip['duration']))
             mounted = rig.matrix_world.inverted() @ mounts['optic'].matrix_world
             assert all(abs(mounted[i][j] - receiver_mount[i][j]) < 2e-7 for i in range(4) for j in range(4)), (name, frame, 'receiver mount moved relative to cached hardware')
-            stroke = (basis.to_3x3() @ bpy.data.objects['forend'].location).z
+            # The fixed tube-mounted laser does not inherit pump travel.
             # Inverting the animated rig adds up to 1.011e-7 m of float32
             # error during Inspect; keep the same two-step numerical bound.
-            assert (point(mounts['rail']) - Vector((.028, .0355, -.460 + stroke))).length < 2e-7
+            assert (point(mounts['rail']) - Vector((0, .009, -.590))).length < 2e-7
             visible = [o for o in moving if o.parent.name != 'shell_insert' or o.parent.scale.x > .5]
             moving_tree = tree(visible + hands)
             assert not additions.overlap(moving_tree), (name, frame, 'new rail/adapter crosses mechanism or hand')
@@ -129,4 +129,4 @@ def check_mounts(root, manifest, rig, meshes, review, pose, tree, point, basis):
                 assert not optic_tree.overlap(moving_tree), (optic, name, frame, 'mounted optic crosses mechanism or hand')
             count += 1
     pose('Idle')
-    print('M590_ATTACHMENT_CLEARANCE_OK:', count, '120Hz poses; all three real optics; both hands, pump, bolt, trigger and visible insertion shell; future muzzle/rail datums only, no suppressor/laser fit claim')
+    print('M590_ATTACHMENT_CLEARANCE_OK:', count, '120Hz poses; all three real optics; both hands, pump, bolt, trigger and visible insertion shell; muzzle remains a future datum; TOR Mini checked separately')

@@ -99,7 +99,7 @@ intel sites and explicit placement records. This is the world source—not
 The standalone [TOR Mini laser](../assets/attachments/steiner-tor-mini/README.md)
 is authored by [`tools/blender/tor_mini/`](../tools/blender/tor_mini/), with native
 Blender validation and `bun run models:cook -- tor_mini`. It is generated alongside
-the EXPS3, independently of player arms, and is not wired into gameplay yet.
+the EXPS3, independently of player arms, and uses the shared gameplay/inspection rail path on all seven weapons.
 
 Normal `bun run dev` / `bun run build` (and `bun run assets`) run
 `tools/build-assets.ts`: arms and bandage, each weapon and its cook, standalone

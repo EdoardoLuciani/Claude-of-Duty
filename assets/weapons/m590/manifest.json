@@ -7,11 +7,11 @@
   "runtimeBasis": "-Z forward / +Y up / +X right; no adapter basis transform",
   "source": "tools/blender/m590/build.py + tools/blender/m590/ + tools/blender/m590/actions.py + tools/blender/m590/hand-reference.ts",
   "stats": {
-    "triangleInstances": 75842,
+    "triangleInstances": 78210,
     "primitives": 2,
     "materials": 1,
     "images": 3,
-    "bytes": 12262576
+    "bytes": 12542092
   },
   "clips": {
     "Idle": {
@@ -255,16 +255,16 @@
     },
     "rail": {
       "pos": [
-        0.028,
-        0.0355,
-        -0.46
+        0,
+        0.009,
+        -0.59
       ],
       "rot": [
         0,
         0,
-        -1.5707963267948966
+        0
       ],
-      "parent": "forend"
+      "parent": "receiver"
     }
   },
   "ejectionDirection": [
@@ -355,7 +355,7 @@
     "No exported arms, spent case, optic, baked shot recoil, or gameplay balance changes.",
     "shell_insert is not a detachable magazine; adapter owns visibility from authored scale.",
     "Fixed ghost-ring irons remain below a see-through receiver optic rail; no removable irons.",
-    "12g adapter and moving tri-rail datums are future suppressor/laser seats only; those runtime catalogs are empty.",
+    "12g adapter reserves the future suppressor seat; TOR Mini uses a fixed forward magazine-tube clamp rail.",
     "SOCKET_muzzle emits at the adapter exit/MOUNT_muzzle; DATUM_barrel_crown preserves the original factory barrel measurement."
   ]
 }

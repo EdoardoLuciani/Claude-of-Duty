@@ -327,10 +327,15 @@ def build(output,render=False,quick=False):
         text('ACCURACY INTERNATIONAL',(side*.0211,.091,-.116),.0032,side)
         text('AX338  .338 LAPUA MAG',(side*.0211,.064,-.103),.0026,side)
     for name,pos in [('SOCKET_muzzle',(0,.075,muzzle)),('SOCKET_ejection',(.027,.081,-.035)),('SOCKET_sight',(0,sight_y,rear)),('SOCKET_magazine',(0,.080,-.075)),
-                     ('MOUNT_optic',(0,.118,-.089)),('MOUNT_muzzle',(0,.075,crown)),('MOUNT_rail',(.027,.075,-.455))]:empty(name,pos,rig)
-    # Future side-rail datum: its local +Y is the outward contact normal. No
-    # laser/suppressor model or behavior is present until #671/#670 land.
-    bpy.data.objects['MOUNT_rail'].rotation_euler=(0,math.pi/2,0)
+                     ('MOUNT_optic',(0,.118,-.089)),('MOUNT_muzzle',(0,.075,crown)),('MOUNT_rail',(.038,.075,-.455))]:empty(name,pos,rig)
+    # TOR Mini's body is below its local seat: +Z points into this side rail.
+    bpy.data.objects['MOUNT_rail'].rotation_euler=(0,-math.pi/2,0)
+    box('Laser rail adapter web',(.031,.075,-.455),(.010,.014,.055),black,hg,.0004)
+    for i in range(5):
+        box('Laser rail adapter tooth',(.036,.075,-.475+i*.010),(.004,.020,.0052),steel,hg,.0003)
+    for z in (-.475,-.435):
+        cyl('Laser rail adapter screw',(.0358,.075,z),.002,.004,steel,hg,'X',24)
+
     # Source and runtime share identical UVs and atlas regions; never save an
     # untextured DCC source and unwrap only the GLB after saving it.
     for o in list(asset.objects):
