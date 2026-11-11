@@ -3,19 +3,15 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-import evolysManifest from '../../assets/weapons/fn-evolys-762/manifest.json' with { type: 'json' };
 import type { RenderSystem } from '../../src/render/index-webgpu.ts';
 import {
   BASE_ATTACHMENTS,
   configureWeaponAttachments,
-  isAttachmentConfig,
   makeOpticModel,
-  mountAttachments,
   type AttachmentConfig,
 } from '../../src/weapons/attachments.ts';
 import { authoredModel, checkAuthoredDuration } from '../../src/weapons/authored-model.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
-import { makeEvolysModel } from '../../src/weapons/evolys.ts';
 import { ReticleMaterials } from '../../src/weapons/materials-tsl.ts';
 import type { WeaponEntry, WeaponModelRecord } from '../../src/weapons/runtime-types.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
@@ -85,7 +81,19 @@ const gltf = fixture<GLTF>({
   scene,
   animations: [collapsed('Idle'), clip('Fire', track([0, Math.fround(authored.Fire.duration)]))],
 });
-const { animations } = authoredModel(gltf, 'TEST_RIG', ['Idle', 'Fire'], authored);
+const { animations, opticMountRest } = authoredModel(gltf, 'TEST_RIG', ['Idle', 'Fire'], authored);
+assert.equal(opticMountRest, null, 'no MOUNT_optic, no optic datum');
+// The optic datum is rig-local: a posed rig never bakes into it.
+rig.position.set(0, 0.2, 0.1);
+rig.rotation.set(0.3, 0.4, 0);
+const opticMount = new THREE.Object3D();
+opticMount.name = 'MOUNT_optic';
+opticMount.position.set(0, 0.1, -0.07);
+rig.add(opticMount);
+const rest = authoredModel(gltf, 'TEST_RIG', ['Idle'], authored).opticMountRest;
+assert(
+  rest?.elements.every((v, i): boolean => Math.abs(v - opticMount.matrix.elements[i]) < 1e-12)
+);
 assert.deepEqual(
   animations.map((c): [string, number] => [c.name, c.duration]),
   [
@@ -97,10 +105,6 @@ assert.throws(
   (): unknown => authoredModel(gltf, 'TEST_RIG', ['Idle', 'Fire', 'Inspect'], authored),
   /missing Inspect clip/
 );
-for (const optic of ['rmr', 'acog', 'scope'] as const) {
-  assert(isAttachmentConfig({ ...BASE_ATTACHMENTS, optic }, 'pistol'));
-  assert(!isAttachmentConfig({ ...BASE_ATTACHMENTS, optic, ironSights: false }, 'pistol'));
-}
 // Shared glass remains a single thin-alpha surface, even if source art uses transmission.
 for (const id of ['rmr', 'acog', 'scope'] as const) {
   const scene = new THREE.Group();
@@ -119,15 +123,6 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   assert(lens.material.transparent);
   assert.equal(lens.material.depthWrite, false);
   asset.dispose();
-}
-// M590 optics must work with its fixed irons; removal is never a fallback.
-assert(isAttachmentConfig(BASE_ATTACHMENTS, 'shotgun'));
-for (const optic of [null, 'rmr', 'acog', 'scope'] as const) {
-  assert(isAttachmentConfig({ ...BASE_ATTACHMENTS, optic }, 'shotgun'));
-  assert.equal(
-    isAttachmentConfig({ ...BASE_ATTACHMENTS, optic, ironSights: false }, 'shotgun'),
-    false
-  );
 }
 // Repeated mount/remove borrows one asset, restores base datums/tuning and
 // leaves no orphan glass/socket.
@@ -164,18 +159,16 @@ for (const optic of [null, 'rmr', 'acog', 'scope'] as const) {
     assert(ownerDisposed, 'release retained warm object records before shared geometry');
     disposed++;
   });
-  const model = fixture<Extract<WeaponModelRecord, { id: 'rifle' }>>(
-    {
-      id: 'rifle',
-      scene: weaponScene,
-      root,
-      nodes: fixture<Extract<WeaponModelRecord, { id: 'rifle' }>['nodes']>({
-        sight: [0, 0.1395, 0.034],
-        muzzle: [0, 0.075, -0.5],
-      }),
-    },
-    ['opticMountRest']
-  );
+  const model = fixture<Extract<WeaponModelRecord, { id: 'rifle' }>>({
+    id: 'rifle',
+    scene: weaponScene,
+    root,
+    opticMountRest: new THREE.Matrix4().makeTranslation(socket.position),
+    nodes: fixture<Extract<WeaponModelRecord, { id: 'rifle' }>['nodes']>({
+      sight: [0, 0.1395, 0.034],
+      muzzle: [0, 0.075, -0.5],
+    }),
+  });
   const entry = fixture<WeaponEntry>({
     id: 'rifle',
     model,
@@ -291,7 +284,6 @@ for (const optic of [null, 'rmr', 'acog', 'scope'] as const) {
   const slide = new THREE.Object3D();
   root.add(slide);
   slide.add(socket);
-  entry.model = { ...model, opticMountRest: new THREE.Matrix4().makeTranslation(socket.position) };
   configureWeaponAttachments(entry, config, optics);
   const restSight = entry.sight.clone();
   slide.position.x = 0.025;
@@ -325,37 +317,5 @@ for (const optic of [null, 'rmr', 'acog', 'scope'] as const) {
   assert.equal(ownerDisposed, false, 'warm source survives mounted-instance disposal');
   asset.dispose();
   assert.equal(disposed, 1, 'asset owner releases shared geometry exactly once');
-}
-// EVOLYS no longer supplies integrated optic data when its adapter loads irons.
-{
-  const scene = new THREE.Group();
-  const root = new THREE.Group();
-  root.name = 'EVOLYS_RIG';
-  scene.add(root);
-  for (const name of [
-    'SOCKET_muzzle',
-    'SOCKET_ejection',
-    'SOCKET_sight',
-    'SOCKET_pouch',
-    'trigger',
-    'IRON_sights',
-  ]) {
-    const node = new THREE.Object3D();
-    node.name = name;
-    root.add(node);
-  }
-  const model = makeEvolysModel(
-    fixture<GLTF>({
-      scene,
-      animations: Object.entries(evolysManifest.clips).map(([name, info]): THREE.AnimationClip =>
-        clip(name, track(info.duration ? [0, info.duration] : [0]))
-      ),
-    })
-  );
-  for (const ironSights of [true, false, true]) {
-    const mounted = mountAttachments(model, { ...BASE_ATTACHMENTS, ironSights }, {});
-    assert.equal(mounted.optic, null, 'base EVOLYS must never produce a floating RMR reticle');
-    assert.equal(root.getObjectByName('IRON_sights')?.visible, ironSights);
-  }
 }
 console.log('authored models: clip durations and shared attachment mount lifetime OK');

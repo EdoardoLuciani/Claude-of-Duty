@@ -30,7 +30,7 @@ export function makeMCXModel(gltf: GLTF): MCXModel {
   scene.rotation.y = Math.PI / 2;
   scene.position.set(0, 0.07, -0.14);
   scene.add(gltf.scene);
-  const { root, animations, point } = authoredModel(
+  const { root, opticMountRest, animations, point } = authoredModel(
     gltf,
     'MCX_RIG',
     ['Idle', 'Fire', ...Object.values(ALIASES)],
@@ -42,6 +42,7 @@ export function makeMCXModel(gltf: GLTF): MCXModel {
     id: 'mcx' as const,
     scene,
     root,
+    opticMountRest,
     animations,
     nodes: {
       muzzle: point('SOCKET_muzzle'),

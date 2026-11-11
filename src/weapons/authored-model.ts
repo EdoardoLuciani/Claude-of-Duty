@@ -44,11 +44,17 @@ export function authoredModel(
   scene: THREE.Object3D = gltf.scene
 ): {
   root: THREE.Object3D;
+  opticMountRest: THREE.Matrix4 | null;
   animations: THREE.AnimationClip[];
   point: (name: string) => [number, number, number];
 } {
   scene.updateMatrixWorld(true);
   const root = requiredNode(scene, rigName);
+  // Capture the optic mount before any clip poses a slide, cover or bolt under it.
+  const mount = root.getObjectByName('MOUNT_optic');
+  const opticMountRest = mount
+    ? new THREE.Matrix4().copy(root.matrixWorld).invert().multiply(mount.matrixWorld)
+    : null;
   const animations = required.map((name): THREE.AnimationClip => {
     const clip = gltf.animations.find((clip): boolean => clip.name === name);
     if (!clip) throw new Error(`[${rigName}] missing ${name} clip`);
@@ -59,7 +65,7 @@ export function authoredModel(
     const p = requiredNode(root, name).getWorldPosition(new THREE.Vector3());
     return [p.x, p.y, p.z];
   };
-  return { root, animations, point };
+  return { root, opticMountRest, animations, point };
 }
 
 /** Common adapter product; each weapon retains its exact nodes and hand poses. */
@@ -70,8 +76,8 @@ export interface AuthoredModelData<
   id: Id;
   scene: THREE.Group;
   root: THREE.Object3D;
-  /** Immutable rig-local mounting datum for mechanisms that move during play. */
-  readonly opticMountRest?: THREE.Matrix4;
+  /** Rig-local `MOUNT_optic` at load (rest pose); null when the weapon has no optic mount. */
+  readonly opticMountRest: THREE.Matrix4 | null;
   animations: THREE.AnimationClip[];
   nodes: Nodes;
   shell: { caseLen: number; rimR: number };

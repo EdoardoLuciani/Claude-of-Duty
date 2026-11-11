@@ -60,8 +60,7 @@ export function makeMPXModel(gltf: GLTF): MPXModel {
         }
       }
     }
-  scene.updateMatrixWorld(true);
-  const { root, animations, point } = authoredModel(
+  const { root, opticMountRest, animations, point } = authoredModel(
     gltf,
     'MPX_RIG',
     REQUIRED,
@@ -73,6 +72,7 @@ export function makeMPXModel(gltf: GLTF): MPXModel {
     label: 'SIG MPX',
     scene,
     root,
+    opticMountRest,
     animations,
     reactiveFire: true,
     handPoses: { left: handReference.sides.left.grip, right: handReference.sides.right.grip },

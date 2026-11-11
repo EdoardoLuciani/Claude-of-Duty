@@ -24,16 +24,18 @@ const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(MAGAZINE_ALIASES
 
 export function makeP320Model(gltf: GLTF): P320Model {
   const scene = gltf.scene;
-  const { root, animations, point } = authoredModel(gltf, 'P320_RIG', REQUIRED, manifest.clips);
+  const { root, opticMountRest, animations, point } = authoredModel(
+    gltf,
+    'P320_RIG',
+    REQUIRED,
+    manifest.clips
+  );
   const model = {
     id: 'pistol' as const,
     label: 'P320 Compact',
     scene,
     root,
-    opticMountRest: new THREE.Matrix4()
-      .copy(root.matrixWorld)
-      .invert()
-      .multiply(requiredNode(root, 'MOUNT_optic').matrixWorld),
+    opticMountRest,
     animations,
     handPoses: { left: handReference.sides.left.grip, right: handReference.sides.right.grip },
     nodes: {

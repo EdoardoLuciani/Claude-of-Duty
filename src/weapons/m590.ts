@@ -38,14 +38,13 @@ const ALIASES: Record<string, string> = manifest.aliases;
 
 export function makeM590Model(gltf: GLTF): M590Model {
   const scene = gltf.scene;
-  const { root, animations, point } = authoredModel(
+  const { root, opticMountRest, animations, point } = authoredModel(
     gltf,
     'M590_RIG',
     ['Idle', ...Object.values(ALIASES)],
     manifest.clips,
     scene
   );
-  for (const name of ['MOUNT_optic', 'MOUNT_muzzle', 'MOUNT_rail']) requiredNode(root, name);
   const converted = convertWeaponScene(scene, (_source, material): void => {
     for (const value of Object.values(material as object)) {
       if (value instanceof THREE.Texture) value.anisotropy = 8;
@@ -57,6 +56,7 @@ export function makeM590Model(gltf: GLTF): M590Model {
     fxClass: manifest.fxClass,
     scene,
     root,
+    opticMountRest,
     animations,
     reactiveFire: true,
     handPoses: { left: handReference.sides.left.grip, right: handReference.sides.right.grip },
