@@ -488,6 +488,8 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     hipRot: [-0.05, 0.078, -0.125],
     adsCant: [0, 0, 0.003],
     eyeRelief: 0.28,
+    // Shared optics sit above the fixed ghost ring on the see-through receiver rail.
+    opticEyeRelief: { rmr: 0.12, acog: 0.1, scope: 0.085 },
     sprintPos: [0.09, -0.27, -0.28],
     sprintRot: [-0.42, 0.58, 0.2],
     lowReadyPos: [0.11, -0.29, -0.29],

@@ -45,6 +45,7 @@ export function makeM590Model(gltf: GLTF): M590Model {
     manifest.clips,
     scene
   );
+  for (const name of ['MOUNT_optic', 'MOUNT_muzzle', 'MOUNT_rail']) requiredNode(root, name);
   const converted = convertWeaponScene(scene, (_source, material): void => {
     for (const value of Object.values(material as object)) {
       if (value instanceof THREE.Texture) value.anisotropy = 8;

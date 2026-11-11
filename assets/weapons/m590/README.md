@@ -2,8 +2,9 @@
 
 SKU50774 (2016): 18.5-inch barrel, 6+1, ghost rings, fixed synthetic stock and
 tri-rail forend. Strict fidelity and final visual/gameplay acceptance are unapproved.
-Nominal barrel/OAL/LOP are .4699 / 1.0033 / .352425 m. Photo-derived LOP disagrees;
-published dimensions take precedence. The 89 mm pump stroke is provisional.
+Nominal factory barrel/OAL/LOP are .4699 / 1.0033 / .352425 m. Photo-derived LOP
+disagrees; published dimensions take precedence. The permanent 12g adapter adds
+12 mm forward of the original crown. The 89 mm pump stroke is provisional.
 
 [Shared workflow](../../../tools/blender/README.md)
 
@@ -33,6 +34,51 @@ exact file/topology hashes and two glove faces against the stock, with an absolu
 30 µm signed-distance ceiling. It is not a general tolerance or triangle skip.
 Other intersections still fail. Shoulder offsets and firing-hand calibration are
 presentation compromises, not anatomical approval. Preserve AgX color management.
+
+## Fixed irons and attachment seats
+
+The default is bare ghost-ring irons: no optic/glass, suppressor or laser.
+`removableIrons` stays unset. A see-through receiver bridge supports all three
+shared optics above the fixed rear ring; its paired feet follow the receiver
+roof and leave the iron bore open. The 190 mm rail supports both PM II ring
+stations. It neither rides on nor extends into the pump stroke.
+
+| Datum | Runtime metres / orientation | Ownership |
+| --- | --- | --- |
+| `MOUNT_optic` | `[0, .118, -.140]`, identity | receiver |
+| `MOUNT_muzzle` | `[0, .068, -.6672884763]`, identity | receiver; adapter forward face |
+| `MOUNT_rail` | `[.028, .0355, -.460]`, −90° about Z | forend; right tri-rail, follows all 89 mm of travel |
+
+Mount +Y is the rail outward normal and −Z remains forward. The base
+`SOCKET_muzzle` emits at the adapter exit, coincident with `MOUNT_muzzle`;
+`DATUM_barrel_crown` preserves the original factory barrel measurement and front
+sight references. The open-bore 12g adapter is permanent seating hardware, not a suppressor. Suppressor/laser runtime
+catalogs are empty (#670/#671); these two future datums are **not** model-fit or
+hand-clearance certification for nonexistent attachments.
+
+`opticEyeRelief` enables RMR / ACOG / PM II at .120 / .100 / .085 m respectively.
+`check.py` requires freshly generated shared optic `.blend` products (normal
+`bun run assets` builds them). `mounts.py` appends those actual meshes and checks
+four rail contacts per optic, fixed-iron clearance, the open ghost-ring line,
+receiver-foot seating, adapter bore/face, moving rail ownership, and both evaluated
+hands/mechanisms/visible insertion hull across all seven clips at 120 Hz.
+Draw, holster, pump/fire handling, both reloads and inspect keep their original
+controls, contacts and timings; reactive shot recoil moves the assembled weapon.
+The added rail/adapter raise the export triangle budget to 76k without adding a
+material, image or primitive.
+
+### Review limitation (#667)
+
+The available regenerated shared-arm product does not match the historical
+`clearance.py` raw `.blend` SHA256 or its pinned evaluated-glove topology hash.
+The unchanged baseline and changed weapon both stop at Idle frame 0 with
+`unreviewed shared-arm input`; a temporary raw-byte-hash-only diagnostic then
+stops at `unreviewed glove topology`. Neither pin, contact region nor 30 µm bound
+has been changed. A full `check.py` pass is **not** claimed. Independent comparison
+found both complete evaluated hands and topology bit-identical to the available
+baseline across all 739 clip poses; that is regression evidence, not certification
+against the unavailable historically approved hand product. Resolve this shared
+input provenance separately before claiming the original right-hand certificate.
 
 For play review, buy/equip the secondary and inspect fire/ADS/reload/transitions.
 Historical optimization measurements and external review locations are in Git;
