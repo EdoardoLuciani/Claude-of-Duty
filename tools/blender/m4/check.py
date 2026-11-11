@@ -150,6 +150,10 @@ assert attached(pick('USGI floorplate'),pick('USGI formed aluminum body')),'maga
 # Include the fasteners in the handguard exterior, not a shell-only envelope.
 guard=pick('RIS II')
 lo,hi=bounds(guard);near(hi[2]-lo[2],.31115);near(hi[0]-lo[0],.056642);near(hi[1]-lo[1],.05715)
+rail=bpy.data.objects['MOUNT_rail']
+assert (CI@rail.matrix_world.translation-Vector((.0285,.075,-.250))).length<1e-6,'right-rail contact datum moved'
+assert (CI@(rail.matrix_world.to_3x3()@Vector((0,0,-1)))-Vector((1,0,0))).length<1e-6,'laser body must sit outboard'
+assert (CI@(rail.matrix_world.to_3x3()@Vector((0,1,0)))-Vector((0,0,-1))).length<1e-6,'laser must face forward'
 front=bpy.data.objects['SOCKET_front_post'];sight=bpy.data.objects['SOCKET_sight']
 f=CI@front.matrix_world.translation;s=CI@sight.matrix_world.translation
 near(f.x,s.x,.00001);near(f.y,s.y,.00001)

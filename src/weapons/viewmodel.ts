@@ -13,6 +13,7 @@ import {
   releaseAttachmentMount,
   type AttachmentConfig,
   type OpticModels,
+  type LaserModel,
 } from './attachments.ts';
 import { createWeaponAnimation } from './authored-animation.ts';
 import { loadBandage } from './bandage-mesh.ts';
@@ -506,7 +507,8 @@ export class Viewmodel {
     model: WeaponModelRecord,
     def: WeaponDef,
     config: AttachmentConfig = BASE_ATTACHMENTS,
-    optics: OpticModels = {}
+    optics: OpticModels = {},
+    laser: LaserModel | null = null
   ): WeaponEntry {
     let tris = 0;
     const meshes: THREE.Mesh[] = [];
@@ -529,6 +531,8 @@ export class Viewmodel {
       id: model.id,
       attachments: BASE_ATTACHMENTS,
       attachmentGroup: new THREE.Group(),
+      railGroup: new THREE.Group(),
+      laserEmitter: null,
       mountedOptic: null,
       def,
       model,
@@ -561,7 +565,7 @@ export class Viewmodel {
       this._fitSupportHand(entry);
       this._fitGripContacts(entry);
     }
-    configureWeaponAttachments(entry, config, optics);
+    configureWeaponAttachments(entry, config, optics, laser);
     this.weapons.set(model.id, entry);
     return entry;
   }
@@ -1518,6 +1522,7 @@ export class Viewmodel {
   dispose(): void {
     for (const w of this.weapons.values()) {
       releaseAttachmentMount(w.attachmentGroup);
+      releaseAttachmentMount(w.railGroup);
       w.animation.dispose();
       for (const m of w.meshes) m.geometry.dispose();
     }

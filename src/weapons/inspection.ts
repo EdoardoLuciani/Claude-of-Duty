@@ -7,6 +7,7 @@ import {
   releaseAttachmentMount,
   type AttachmentConfig,
   type OpticModels,
+  type LaserModel,
 } from './attachments.ts';
 import { createWeaponAnimation } from './authored-animation.ts';
 import type { WeaponEntry } from './runtime-types.ts';
@@ -15,7 +16,8 @@ import type { WeaponEntry } from './runtime-types.ts';
 export function createWeaponInspection(
   entry: WeaponEntry,
   config: AttachmentConfig = entry.attachments,
-  optics: OpticModels = {}
+  optics: OpticModels = {},
+  laser: LaserModel | null = null
 ): {
   scene: THREE.Group;
   dispose(): void;
@@ -35,7 +37,10 @@ export function createWeaponInspection(
   // The gameplay scene may contain a mounted instance; replace the cloned mount.
   const previous = root.getObjectByName('attachments');
   if (isGroup(previous)) releaseAttachmentMount(previous);
-  const mounted = mountAttachments(model, config, optics);
+  const previousRail = root.getObjectByName('rail_attachment');
+  if (isGroup(previousRail)) releaseAttachmentMount(previousRail);
+  const mounted = mountAttachments(model, config, optics, laser);
+  mounted.railParent.add(mounted.railGroup);
   mounted.parent.add(mounted.group);
   const animation = createWeaponAnimation(model, entry.def);
   animation.update(0, null, 0, false, true, entry.def.magSize);
@@ -45,6 +50,7 @@ export function createWeaponInspection(
     dispose(): void {
       scene.removeFromParent();
       releaseAttachmentMount(mounted.group);
+      releaseAttachmentMount(mounted.railGroup);
       // The authored animation owns its cloned skeletons (as it does in gameplay).
       animation.dispose();
       scene.traverse((node): void => {

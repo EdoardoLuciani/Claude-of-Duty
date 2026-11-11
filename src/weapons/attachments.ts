@@ -12,13 +12,12 @@ import type { OpticData, WeaponEntry, WeaponModelRecord } from './runtime-types.
 export const OPTIC_IDS = ['rmr', 'acog', 'scope'] as const;
 export type OpticId = (typeof OPTIC_IDS)[number];
 
-/** Null means the authored base weapon, not a separately purchasable component.
- * Muzzle/rail catalogs are intentionally empty until their assets are implemented. */
+/** Null means the authored base weapon, not a separately purchasable component. */
 export interface AttachmentConfig {
   readonly optic: OpticId | null;
   readonly ironSights: boolean;
   readonly muzzle: null;
-  readonly rail: null;
+  readonly rail: 'laser' | null;
 }
 export const BASE_ATTACHMENTS: AttachmentConfig = Object.freeze({
   optic: null,
@@ -46,7 +45,7 @@ export function isAttachmentConfig(value: unknown, id: WeaponId): value is Attac
     'muzzle' in value &&
     value.muzzle === null &&
     'rail' in value &&
-    value.rail === null
+    (value.rail === null || (value.rail === 'laser' && WEAPON_DEFS[id].laserRail === true))
   );
 }
 
@@ -125,6 +124,38 @@ export function makeOpticModel(
 export type OpticModel = ReturnType<typeof makeOpticModel>;
 export type OpticModels = Partial<Record<OpticId, OpticModel>>;
 
+/** TOR Mini has its own authored mount/emitter datums, not an optic sight. */
+export function makeLaserModel(gltf: GLTF): {
+  scene: THREE.Group;
+  mount: THREE.Vector3;
+  dispose(): void;
+} {
+  const scene = gltf.scene;
+  scene.updateMatrixWorld(true);
+  const mount = requiredNode(scene, 'SOCKET_mount').getWorldPosition(new THREE.Vector3());
+  requiredNode(scene, 'SOCKET_laser');
+  const finishes = convertWeaponScene(scene);
+  return {
+    scene,
+    mount,
+    dispose(): void {
+      scene.removeFromParent();
+      const geometries = new Set<THREE.BufferGeometry>();
+      scene.traverse((node): void => {
+        node.dispose();
+        if (isMesh(node)) geometries.add(node.geometry);
+      });
+      for (const geometry of geometries) geometry.dispose();
+      disposeWeaponMaterials(finishes);
+    },
+  };
+}
+export type LaserModel = ReturnType<typeof makeLaserModel>;
+
+export async function loadLaser(renderer: Pick<Renderer, 'hasFeature'>): Promise<LaserModel> {
+  return makeLaserModel(await loadWeaponGLTF(renderer, '/models/attachments/laser.runtime.glb'));
+}
+
 export async function loadOptic(
   renderer: Pick<Renderer, 'hasFeature'>,
   id: OpticId
@@ -156,9 +187,13 @@ export function ironSightNodes(
 export function mountAttachments(
   model: WeaponModelRecord,
   config: AttachmentConfig,
-  optics: OpticModels
+  optics: OpticModels,
+  laser: LaserModel | null = null
 ): {
   group: THREE.Group;
+  railGroup: THREE.Group;
+  railParent: THREE.Object3D;
+  laserEmitter: THREE.Object3D | null;
   parent: THREE.Object3D;
   mountedOptic: WeaponEntry['mountedOptic'];
   sight: THREE.Vector3;
@@ -169,6 +204,19 @@ export function mountAttachments(
     throw new Error(
       `[weapons] incompatible attachments: ${model.id}, optic=${opticId}, ironSights=${ironSights}`
     );
+  // Validate every requested asset/datum before changing any installed visibility.
+  const railGroup = new THREE.Group();
+  railGroup.name = 'rail_attachment';
+  let railParent = model.root;
+  let laserEmitter: THREE.Object3D | null = null;
+  if (config.rail === 'laser') {
+    if (!laser) throw new Error('[weapons] laser asset unavailable');
+    railParent = requiredNode(model.root, 'MOUNT_rail');
+    const instance = laser.scene.clone(true);
+    instance.position.sub(laser.mount);
+    laserEmitter = requiredNode(instance, 'SOCKET_laser');
+    railGroup.add(instance);
+  }
   const irons = ironSightNodes(model);
   const group = new THREE.Group();
   group.name = 'attachments';
@@ -199,7 +247,7 @@ export function mountAttachments(
     irons.installed.visible = ironSights;
     if (irons.removed) irons.removed.visible = !ironSights;
   }
-  return { group, parent, mountedOptic, sight, optic };
+  return { group, parent, mountedOptic, sight, optic, railGroup, railParent, laserEmitter };
 }
 
 /** Commit a fully staged mount atomically. The effective definition is shared by
@@ -207,10 +255,15 @@ export function mountAttachments(
 export function configureWeaponAttachments(
   entry: WeaponEntry,
   config: AttachmentConfig,
-  optics: OpticModels
+  optics: OpticModels,
+  laser: LaserModel | null = null
 ): void {
-  const mounted = mountAttachments(entry.model, config, optics);
+  const mounted = mountAttachments(entry.model, config, optics, laser);
   releaseAttachmentMount(entry.attachmentGroup);
+  releaseAttachmentMount(entry.railGroup);
+  entry.railGroup = mounted.railGroup;
+  entry.laserEmitter = mounted.laserEmitter;
+  mounted.railParent.add(mounted.railGroup);
   entry.attachmentGroup = mounted.group;
   entry.mountedOptic = mounted.mountedOptic;
   mounted.parent.add(mounted.group);

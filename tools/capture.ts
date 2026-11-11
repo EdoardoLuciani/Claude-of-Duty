@@ -32,6 +32,11 @@ const SETTLE = Number(args.settle ?? 90);
 const WEAPON = String(args.weapon ?? 'rifle');
 if (!isWeaponId(WEAPON)) throw new Error(`Unknown weapon: ${WEAPON}`);
 const OPTIC = args.optic;
+const RAIL = args.rail;
+if (RAIL !== undefined && RAIL !== 'none' && RAIL !== 'laser')
+  throw new Error(`Unknown rail module: ${RAIL}`);
+if (RAIL === 'laser' && WEAPON_DEFS[WEAPON].laserRail !== true)
+  throw new Error(`${WEAPON} has no verified laser mount.`);
 if (args.irons !== undefined && args.irons !== 'installed' && args.irons !== 'removed')
   throw new Error(`Unknown iron-sight configuration: ${args.irons}`);
 if (
@@ -53,7 +58,7 @@ const ATTACHMENTS: AttachmentConfig = {
   optic: OPTIC === undefined || OPTIC === 'none' ? null : OPTIC,
   ironSights: args.irons !== 'removed',
   muzzle: null,
-  rail: null,
+  rail: RAIL === 'laser' ? 'laser' : null,
 };
 
 // Self-contained functions serialized by Playwright into the browser.
@@ -104,6 +109,7 @@ try {
     const attachmentQuery =
       (args.optic ? `&attachmentOptic=${encodeURIComponent(String(args.optic))}` : '') +
       (args.irons ? `&attachmentIrons=${encodeURIComponent(String(args.irons))}` : '') +
+      (RAIL ? `&attachmentRail=${encodeURIComponent(String(RAIL))}` : '') +
       `&attachmentWeapon=${encodeURIComponent(WEAPON)}`;
     await page.goto(
       `http://127.0.0.1:${PORT}/?capture=1&lockstep=1&shot=${encodeURIComponent(SHOT)}${attachmentQuery}`,
@@ -113,7 +119,7 @@ try {
       }
     );
     await page.waitForFunction('window.__READY__ === true', null, { timeout: TIMEOUT });
-    if (args.weapon || OPTIC || args.irons)
+    if (args.weapon || OPTIC || args.irons || RAIL)
       await page.evaluate(
         ({ id, config }): void => {
           const weapons = window.__ENGINE__?.ctx.get('weapons');
