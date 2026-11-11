@@ -195,7 +195,7 @@ for (const [equip, first, second] of [
   assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
   assert.equal(wp.activeId, 'rifle');
 }
-// Attachments belong to the gun: dropping it or restarting returns the base build.
+// Swapped-out and restarted weapons lose their attachments.
 {
   type RifleModel = Extract<WeaponModelRecord, { id: 'rifle' }>;
   const { wp } = makeHarness();
@@ -206,7 +206,9 @@ for (const [equip, first, second] of [
     reticle: new THREE.Object3D(),
     scopeOverlay: new THREE.Object3D(),
   });
-  Object.assign(wp.viewmodel.weapons.get('rifle') ?? {}, {
+  const rifle = wp.viewmodel.weapons.get('rifle');
+  assert(rifle);
+  Object.assign(rifle, {
     model: fixture<RifleModel>({
       id: 'rifle',
       scene,
