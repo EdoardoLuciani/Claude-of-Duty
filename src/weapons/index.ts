@@ -417,6 +417,15 @@ export class WeaponSystem {
     return true;
   }
 
+  /** Attachments belong to the gun: dropping it or restarting returns the base build. */
+  _resetAttachments(id: WeaponId): void {
+    const state = this._requireState(id);
+    if (state.attachments === BASE_ATTACHMENTS) return;
+    state.attachments = BASE_ATTACHMENTS;
+    const entry = this._viewmodel?.weapons.get(id);
+    if (entry) configureWeaponAttachments(entry, BASE_ATTACHMENTS, this._optics);
+  }
+
   _hasMesh(id: WeaponId): boolean {
     const map = this._viewmodel?.weapons;
     return !map || map.has(id);
@@ -560,7 +569,8 @@ export class WeaponSystem {
   _equipSlot(id: WeaponId, slot: readonly WeaponId[]): boolean {
     if (!slot.includes(id) || this.owned.has(id)) return false;
     if (!this._hasMesh(id)) return false;
-    for (const weapon of slot) if (weapon !== id) this.owned.delete(weapon);
+    for (const weapon of slot)
+      if (weapon !== id && this.owned.delete(weapon)) this._resetAttachments(weapon);
     this.owned.add(id);
     const s = this.states.get(id);
     if (s) {
@@ -703,7 +713,8 @@ export class WeaponSystem {
   /** Reset the complete loadout and transient combat state for a fresh run. */
   resetForNewGame(): void {
     this._viewmodel?.armAsset.blood.setHealthFraction(1);
-    for (const s of this.states.values()) {
+    for (const [id, s] of this.states) {
+      this._resetAttachments(id);
       s.mag = s.def.magSize;
       s.chambered = true;
       s.reserve = s.def.reserve;
