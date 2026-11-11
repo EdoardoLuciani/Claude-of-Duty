@@ -529,6 +529,7 @@ export class Viewmodel {
       id: model.id,
       attachments: BASE_ATTACHMENTS,
       attachmentGroup: new THREE.Group(),
+      mountedOptic: null,
       def,
       model,
       group,
@@ -1393,11 +1394,13 @@ export class Viewmodel {
     }
     _v.fromArray(optic.center);
     _v3.set(0, 0, -1);
-    // Mounted optics follow the animated authored root; integrated optic data
-    // retains its existing weapon-space convention.
-    if (w.attachments.optic !== null) {
-      _v.applyMatrix4(w.model.root.matrix);
-      _v3.transformDirection(w.model.root.matrix);
+    // Mounted glass can live on an animated slide/bone, not just the rig.
+    // Integrated optic data retains its existing weapon-space convention.
+    if (w.mountedOptic) {
+      w.mountedOptic.mount.updateWorldMatrix(true, false);
+      _m.copy(w.group.matrixWorld).invert().multiply(w.mountedOptic.mount.matrixWorld);
+      _v.copy(w.mountedOptic.sight).applyMatrix4(_m);
+      _v3.transformDirection(_m);
     }
     _v.applyQuaternion(this.rig.quaternion).add(this.rig.position);
     _v3.applyQuaternion(this.rig.quaternion).normalize();

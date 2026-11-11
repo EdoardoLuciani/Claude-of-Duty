@@ -422,6 +422,9 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     hipRot: [-0.05, 0.066, -0.115],
     adsCant: [0, 0, 0.003],
     eyeRelief: 0.34,
+    // Long-relief game fit: compensate each ocular's distance from the slide
+    // mount to retain the iron-sight wrist extension, not a rifle-to-face pose.
+    opticEyeRelief: { rmr: 0.394, acog: 0.308, scope: 0.2 },
     sprintPos: [0.09, -0.25, -0.28],
     sprintRot: [-0.42, 0.5, 0.14],
     lowReadyPos: [0.1, -0.26, -0.32],

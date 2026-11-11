@@ -121,6 +121,18 @@ def build_geometry(asset):
     rounded_cut(shroud,(0,.036,.022),(.022,.165,.035),.0015)
     # Front face has independent barrel and guide rod openings, not a black decal.
     cut(shroud,cyl('CUT',(0,.127,.037),.00765,.017,None,None,'Y',64,0))
+    # Browning tilt raises the barrel inside the retracted slide's front face.
+    cut(shroud,cyl('CUT',(0,.127,.040),.00765,.017,None,None,'Y',64,0))
+    # Optics-ready pocket, closed by the permanently authored support plate.
+    rounded_cut(shroud,(0,.003,.050),(.020,.057,.0024),.0005)
+    box('Optic plate | recessed foot',(0,.003,.0498),(.0198,.0568,.002),steel,slide,.0003)
+    # See-through cantilever rail supports the PM II's 177 mm mounting foot.
+    # Its open centre preserves the fixed SIGLITE ray below the rail deck.
+    for side in (-1,1):
+        box('Optic bridge | side support',(side*.009,.003,.0565),(.004,.056,.012),steel,slide,.0004)
+    box('Optic bridge | rail deck',(0,.003,.064),(.0212,.180,.004),steel,slide,.0004)
+    for y in (-.077,-.067,-.057,-.047,-.037,-.027,-.017,-.007,.003,.013,.023,.033,.043,.053,.063,.073,.083):
+        rounded_cut(bpy.data.objects['Optic bridge | rail deck'],(0,y,.066),(.024,.004,.002),.0002)
     cut(shroud,cyl('CUT',(0,.127,.025),.0044,.017,None,None,'Y',48,0))
     rounded_cut(shroud,(.009,.049,.045),(.023,.032,.021),.0010)
     for side in (-1,1):
@@ -209,7 +221,19 @@ def build_geometry(asset):
 
     # Moving barrel and guide rod are visible in both muzzle and open-slide poses.
     tube('Barrel | crowned muzzle',(0,.070,.037),.0068,.0044,.119)
-    tube('Barrel | crown lip',(0,.1298,.037),.00685,.00465,.0010)
+    tube('Barrel | threaded extension',(0,.1365,.037),.00635,.0044,.014)
+    # External helical thread is visual game art, not a manufacturing profile.
+    vertices=[];faces=[];steps=240
+    for i in range(steps+1):
+        angle=i*math.tau/20
+        y=.1305+i/steps*.012
+        for radius,dy in ((.00635,-.00035),(.00695,0),(.00635,.00035)):
+            vertices.append((math.cos(angle)*radius,y+dy,.037+math.sin(angle)*radius))
+        if i:
+            for j in range(2):
+                k=(i-1)*3+j;faces.append((k,k+3,k+4,k+1))
+    mesh('Barrel | external muzzle thread',vertices,faces,barrel_mat,barrel,0,True)
+    tube('Barrel | crown lip',(0,.1438,.037),.00635,.00465,.0010)
     box('Barrel | chamber hood',(0,.049,.041),(.019,.031,.013),barrel_mat,barrel,.0007)
     cyl('Guide rod | front cap',(0,.121,.025),.0036,.018,barrel_mat,body,'Y')
     cyl('Guide rod | exposed shaft',(0,.053,.025),.0022,.116,steel,body,'Y')
@@ -275,10 +299,15 @@ def build_geometry(asset):
         cyl('SIGLITE | white annulus',(x,y,z),r,.00016,white,slide,'Y',32,0)
         cyl('SIGLITE | luminous inset',(x,y-.00010,z),r*.43,.0001,tritium,slide,'Y',24,0)
     # Sockets exported in game axes via glTF +Y-up conversion.
-    for name,pos,parent in [('SOCKET_muzzle',(0,.131,.037),barrel),('SOCKET_ejection',(.015,.048,.042),slide),
-                            ('SOCKET_sight',(0,-.033,.0537),rig)]:
+    for name,pos,parent in [('SOCKET_muzzle',(0,.1445,.037),barrel),('SOCKET_ejection',(.015,.048,.042),slide),
+                            ('SOCKET_sight',(0,-.033,.0537),rig),
+                            ('MOUNT_optic',(0,.003,.066),slide),
+                            ('MOUNT_muzzle',(0,.1445,.037),barrel),
+                            ('MOUNT_rail',(0,.105,.002),body)]:
         # Keep authored world coordinates under offset pivots.
         o=empty(name,parent=parent);o.matrix_parent_inverse=parent.matrix_world.inverted();o.location=pos
+        if name=='MOUNT_rail':o.rotation_euler.y=math.pi  # bottom rail, outward -Z
+        if name=='MOUNT_muzzle':o.rotation_euler.x=-math.pi/2  # outward +Y (game -Z)
 
     # Union the molded frame pieces so the grip neck and rail are not visibly
     # assembled from intersecting slabs. Preserve the sculpted grip's smooth faces.

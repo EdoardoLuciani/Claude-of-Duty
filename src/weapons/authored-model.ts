@@ -70,6 +70,8 @@ export interface AuthoredModelData<
   id: Id;
   scene: THREE.Group;
   root: THREE.Object3D;
+  /** Immutable rig-local mounting datum for mechanisms that move during play. */
+  readonly opticMountRest?: THREE.Matrix4;
   animations: THREE.AnimationClip[];
   nodes: Nodes;
   shell: { caseLen: number; rimR: number };

@@ -7,6 +7,7 @@ import type { RenderSystem } from '../../src/render/index-webgpu.ts';
 import {
   BASE_ATTACHMENTS,
   configureWeaponAttachments,
+  isAttachmentConfig,
   makeOpticModel,
   type AttachmentConfig,
 } from '../../src/weapons/attachments.ts';
@@ -93,6 +94,10 @@ assert.throws(
   (): unknown => authoredModel(gltf, 'TEST_RIG', ['Idle', 'Fire', 'Inspect'], authored),
   /missing Inspect clip/
 );
+for (const optic of ['rmr', 'acog', 'scope'] as const) {
+  assert(isAttachmentConfig({ ...BASE_ATTACHMENTS, optic }, 'pistol'));
+  assert(!isAttachmentConfig({ ...BASE_ATTACHMENTS, optic, ironSights: false }, 'pistol'));
+}
 // Shared glass remains a single thin-alpha surface, even if source art uses transmission.
 for (const id of ['rmr', 'acog', 'scope'] as const) {
   const scene = new THREE.Group();
@@ -147,15 +152,18 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     assert(ownerDisposed, 'release retained warm object records before shared geometry');
     disposed++;
   });
-  const model = fixture<Extract<WeaponModelRecord, { id: 'rifle' }>>({
-    id: 'rifle',
-    scene: weaponScene,
-    root,
-    nodes: fixture<Extract<WeaponModelRecord, { id: 'rifle' }>['nodes']>({
-      sight: [0, 0.1395, 0.034],
-      muzzle: [0, 0.075, -0.5],
-    }),
-  });
+  const model = fixture<Extract<WeaponModelRecord, { id: 'rifle' }>>(
+    {
+      id: 'rifle',
+      scene: weaponScene,
+      root,
+      nodes: fixture<Extract<WeaponModelRecord, { id: 'rifle' }>['nodes']>({
+        sight: [0, 0.1395, 0.034],
+        muzzle: [0, 0.075, -0.5],
+      }),
+    },
+    ['opticMountRest']
+  );
   const entry = fixture<WeaponEntry>({
     id: 'rifle',
     model,
@@ -174,7 +182,8 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     // Mounting while the authored root is posed must not bake its current pose.
     root.rotation.x = i * 0.1;
     configureWeaponAttachments(entry, config, optics);
-    assert.equal(root.children.length, 4);
+    assert.equal(root.children.length, 3);
+    assert.equal(entry.attachmentGroup.parent, socket, 'instance follows its authored mount');
     assert.equal(irons.visible, config.ironSights);
     assert.equal(ironsRemoved.visible, !config.ironSights);
     assert(entry.sight.distanceTo(new THREE.Vector3(0, 0.1461072, -0.085)) < 1e-8);
@@ -195,6 +204,7 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     assert.equal(oldMount.children.length, 0);
     assert.equal(entry.attachmentGroup.children.length, 0);
     assert.equal(entry.optic, null);
+    assert.equal(entry.mountedOptic, null);
     assert(irons.visible);
     assert.equal(ironsRemoved.visible, false);
     assert.deepEqual(entry.sight.toArray(), model.nodes.sight);
@@ -232,8 +242,10 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     assert.equal(viewmodel.maskUniforms.uSniper.value, optic === 'scope' ? 1 : 0);
     assert.equal(viewmodel.reticleUniforms.uChevron.value, optic === 'acog' ? 1 : 0);
     const mount = entry.attachmentGroup;
+    const liveOptic = entry.mountedOptic;
     assert.throws((): void => configureWeaponAttachments(entry, config, {}), /unavailable/);
     assert.equal(entry.attachmentGroup, mount, 'failed staging preserves the current optic');
+    assert.equal(entry.mountedOptic, liveOptic, 'failed staging preserves the live reticle datum');
     configureWeaponAttachments(entry, BASE_ATTACHMENTS, optics);
     viewmodel._updateScope(entry, 1);
     assert.equal(viewmodel.scopeOverlay.visible, false);
@@ -262,6 +274,39 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     viewmodel.reticle.position.distanceTo(expectedDot) < 1e-10,
     'dot follows the authored optical axis'
   );
+  root.position.set(0, 0, 0);
+  root.rotation.set(0, 0, 0);
+  const slide = new THREE.Object3D();
+  root.add(slide);
+  slide.add(socket);
+  entry.model = { ...model, opticMountRest: new THREE.Matrix4().makeTranslation(socket.position) };
+  configureWeaponAttachments(entry, config, optics);
+  const restSight = entry.sight.clone();
+  slide.position.x = 0.025;
+  slide.rotation.y = 0.12;
+  root.rotation.z = 0.08;
+  weaponScene.updateMatrixWorld(true);
+  const liveSight = sight.position.clone().applyMatrix4(socket.matrixWorld);
+  const liveAxis = new THREE.Vector3(0, 0, -1).transformDirection(socket.matrixWorld);
+  const liveDot = liveAxis.clone().multiplyScalar(entry.def.eyeRelief);
+  viewmodel.rig.position.copy(liveDot).sub(liveSight);
+  viewmodel._updateReticle(entry, 1);
+  assert(viewmodel.reticle.visible, 'dot follows the animated slide and rotated rig');
+  assert(viewmodel.reticle.position.distanceTo(liveDot) < 1e-10);
+  assert(entry.sight.equals(restSight), 'live reticle must not move the rest ADS datum');
+  configureWeaponAttachments(entry, BASE_ATTACHMENTS, optics);
+  slide.position.z = 0.027;
+  configureWeaponAttachments(entry, config, optics);
+  assert(entry.sight.equals(restSight), 'attaching while locked open retains the rest ADS datum');
+  slide.position.z = 0;
+  weaponScene.updateMatrixWorld(true);
+  const instanceSight = entry.attachmentGroup.getObjectByName('SOCKET_sight');
+  assert(instanceSight);
+  assert(instanceSight.getWorldPosition(new THREE.Vector3()).distanceTo(liveSight) < 1e-10);
+  const clone = weaponScene.clone(true);
+  const clonedMount = clone.getObjectByName('MOUNT_optic');
+  assert(clonedMount?.getObjectByName('attachments'), 'inspection clone retains mount ancestry');
+  assert.notEqual(clonedMount, socket);
   configureWeaponAttachments(entry, BASE_ATTACHMENTS, optics);
   viewmodel.dispose();
   materials.dispose();

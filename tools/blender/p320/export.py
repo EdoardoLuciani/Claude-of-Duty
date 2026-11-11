@@ -84,6 +84,9 @@ def export_asset(asset, coords, output):
     raw = (output / 'p320-compact.glb').read_bytes()
     length = struct.unpack_from('<I', raw, 12)[0]
     doc = json.loads(raw[20:20 + length])
+    nodes = {node['name']: index for index, node in enumerate(doc['nodes']) if 'name' in node}
+    for mount, part in [('MOUNT_optic', 'slide'), ('MOUNT_muzzle', 'barrel'), ('MOUNT_rail', 'frame')]:
+        assert nodes[mount] in doc['nodes'][nodes[part]].get('children', []), (mount, 'lost moving bone parent')
     for animation in doc['animations']:
         for channel in animation['channels']:
             sampler = animation['samplers'][channel['sampler']]

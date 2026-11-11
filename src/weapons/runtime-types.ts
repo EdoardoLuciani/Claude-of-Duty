@@ -82,6 +82,7 @@ export interface WeaponEntry {
   id: WeaponId;
   attachments: AttachmentConfig;
   attachmentGroup: THREE.Group;
+  mountedOptic: { mount: THREE.Object3D; sight: THREE.Vector3 } | null;
   def: WeaponDef;
   model: WeaponModelRecord;
   group: THREE.Object3D;

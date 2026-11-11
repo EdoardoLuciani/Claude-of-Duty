@@ -36,7 +36,7 @@ export function createWeaponInspection(
   const previous = root.getObjectByName('attachments');
   if (isGroup(previous)) releaseAttachmentMount(previous);
   const mounted = mountAttachments(model, config, optics);
-  root.add(mounted.group);
+  mounted.parent.add(mounted.group);
   const animation = createWeaponAnimation(model, entry.def);
   animation.update(0, null, 0, false, true, entry.def.magSize);
   scene.updateMatrixWorld(true);

@@ -67,7 +67,7 @@ def build_skin(asset, parts, clips):
     mod.object = arm
     # Keep native names and sockets under the corresponding moving bone.
     for obj in list(asset.objects):
-        if not obj.name.startswith('SOCKET_') or obj.parent not in controls:
+        if not obj.name.startswith(('SOCKET_', 'MOUNT_')) or obj.parent not in controls:
             continue
         world = obj.matrix_world.copy()
         parent = obj.parent

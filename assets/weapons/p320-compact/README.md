@@ -1,7 +1,9 @@
 # P320 Compact
 
-Early Nitron Compact, curved trigger, SIGLITE irons and flush 15-round magazine.
-Original game art, not a certified replica.
+Nitron Compact game base, curved trigger, fixed SIGLITE irons, threaded barrel
+and flush 15-round magazine. The optics-ready slide/cantilever rail is an original
+universal game-fit adaptation, not a factory early-production configuration or a
+certified replica.
 
 [Shared workflow](../../../tools/blender/README.md) ·
 [Runtime cook](../../../build/README.md)
@@ -28,3 +30,55 @@ The registered cook is lossy; inspect lettering, highlights, reloads and idle
 before further simplification. KTX2/meshopt decoders stay local; RGBA8 fallback
 does not retain compressed-texture memory savings. Use compatible AgX OCIO,
 never exposure compensation. Historical measurements/exceptions remain in Git.
+
+## Attachment contract (#666)
+
+The base has no glass, reticle, suppressor or laser. SIGLITE irons are fixed:
+`removableIrons` stays unset and every supported optic must clear the installed
+irons. A recessed slide plate supports an open-centre cantilever rail. Its 180 mm
+length supports the shared PM II's 177 mm mounting foot (ring pedestals at ±65 mm)
+and the ACOG's 96 mm shoe; the shared RMR retains its existing high riser.
+This deliberately oversized universal support is not a real pistol recommendation.
+
+Game-space mount datums in metres (native Blender uses +Y forward, +Z up):
+
+| Datum | Position | Owner / orientation |
+| --- | --- | --- |
+| `MOUNT_optic` | `[0, .066, -.003]` | slide; identity rail contact |
+| `MOUNT_muzzle` | `[0, .037, -.1445]` | tilting barrel; contact normal points forward |
+| `MOUNT_rail` | `[0, .002, -.105]` | frame; contact normal points down on the existing accessory rail |
+
+The rail underside is at .062 m, above the .0537 m iron aim ray and .056 m rear
+sight top. Side supports end before the ejection port. The thread travels with the
+barrel, not the slide; the enlarged upper muzzle opening clears barrel tilt.
+`check.py` loads the available shared optic Blender sources and checks mounted
+weapon/hand intersections, thread/slide clearance, iron ray and ejection corridor
+across all eight clips. Rail/optic-foot seating is intentional contact. These are
+sampled external-fit checks, not collision-free internal operating geometry.
+SIGLITE islands reserve extra UV0 density within the same 1024² atlas: otherwise
+sub-texel luminous caps can disappear when added geometry repacks the UVs. The
+checker samples baked green emission at all three actual inset centres.
+
+The adapter caches the optic mount's **rest** rig-local transform, so changing an
+optic during slide lockback cannot move the settled ADS datum. Mounted geometry
+and the RMR's live optical axis follow the actual animated slide, including in
+independent market inspection clones. Hands, authored action timing, mechanical
+skin and ammunition events are unchanged.
+
+Pistol eye relief is measured from each shared `SOCKET_sight`, not from the slide:
+RMR .394 m, ACOG .308 m, PM II .200 m. The differing rear ocular offsets leave the
+slide at approximately the original -.373 m ADS extension for all three, rather
+than pulling the handgun up to the face or fully extending the elbows. These are
+**game long-eye-relief fits**, not claims about real TA31/PM II exit pupils. The
+current runtime renders magnified sights with its common scope overlay and hides
+the gun at full ADS; geometry-visible ADS review is needed in addition to a full
+ADS screenshot to verify the arm/sight relationship. Native WebGPU review at
+1600×1000 verified -.372827 m rig Z for every fit, with right-arm reach
+.5943–.5947 m against a .630 m limit (base irons .6019 m). Independent inspection
+clones reset a locked-open source to loaded rest without mutating gameplay.
+
+Suppressor (#670) and laser (#671) are not in the runtime catalog. Their datums
+are future integration points only: no can/sight-height, muzzle-device fit or
+laser/hand clearance is claimed. Recheck these when the shared assets and final
+muzzle/rail orientation contracts land; suppressor-height irons may still be
+needed. Do not enable absent attachments or infer clearance from an empty mount.

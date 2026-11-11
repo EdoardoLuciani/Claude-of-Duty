@@ -159,6 +159,8 @@ export function mountAttachments(
   optics: OpticModels
 ): {
   group: THREE.Group;
+  parent: THREE.Object3D;
+  mountedOptic: WeaponEntry['mountedOptic'];
   sight: THREE.Vector3;
   optic: OpticData | null;
 } {
@@ -170,6 +172,8 @@ export function mountAttachments(
   const irons = ironSightNodes(model);
   const group = new THREE.Group();
   group.name = 'attachments';
+  let parent = model.root;
+  let mountedOptic: WeaponEntry['mountedOptic'] = null;
   const sight = new THREE.Vector3().fromArray(model.nodes.sight);
   let optic: OpticData | null = 'opticGlass' in model.nodes ? model.nodes.opticGlass : null;
   if (opticId !== null) {
@@ -178,23 +182,24 @@ export function mountAttachments(
     const mount = requiredNode(model.scene, 'MOUNT_optic');
     // Full authored mount transform, including orientation; asset mount is its origin.
     model.scene.updateMatrixWorld(true);
-    const transform = new THREE.Matrix4()
-      .copy(model.root.matrixWorld)
-      .invert()
-      .multiply(mount.matrixWorld);
+    const transform =
+      model.opticMountRest ??
+      new THREE.Matrix4().copy(model.root.matrixWorld).invert().multiply(mount.matrixWorld);
     const instance = asset.scene.clone(true);
     instance.position.sub(asset.mount);
-    instance.updateMatrix();
-    instance.applyMatrix4(transform);
+    // Keep the instance in mount-local space so slide/cover/bone animation
+    // remains authoritative. Only the ADS datum is resolved in rig space.
+    parent = mount;
     group.add(instance);
-    sight.copy(asset.sight).sub(asset.mount).applyMatrix4(transform);
+    mountedOptic = { mount, sight: asset.sight.clone().sub(asset.mount) };
+    sight.copy(mountedOptic.sight).applyMatrix4(transform);
     optic = { ...OPTICS[opticId].optic, center: sight.toArray() };
   }
   if (irons) {
     irons.installed.visible = ironSights;
     if (irons.removed) irons.removed.visible = !ironSights;
   }
-  return { group, sight, optic };
+  return { group, parent, mountedOptic, sight, optic };
 }
 
 /** Commit a fully staged mount atomically. The effective definition is shared by
@@ -207,7 +212,8 @@ export function configureWeaponAttachments(
   const mounted = mountAttachments(entry.model, config, optics);
   releaseAttachmentMount(entry.attachmentGroup);
   entry.attachmentGroup = mounted.group;
-  entry.model.root.add(mounted.group);
+  entry.mountedOptic = mounted.mountedOptic;
+  mounted.parent.add(mounted.group);
   entry.attachments = Object.freeze({ ...config });
   entry.sight.copy(mounted.sight);
   entry.optic = mounted.optic;
