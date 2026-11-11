@@ -398,8 +398,8 @@ resolves sight/OpticData, muzzle and effective handling/suppression on the state
 private definition; frame-time reticle, ADS and fire-event consumers allocate nothing.
 The M4's `MOUNT_optic` is an authored rail-contact transform under its weapon rig.
 Attachment `MOUNT_base` and `SOCKET_sight` define mounting and aiming in metres;
-instances follow the authored weapon animation. RMR geometry is shared source
-with EVOLYS, with a standalone high riser to clear the M4's fixed front sight.
+instances follow the authored weapon animation. RMR uses the standalone
+`tools/blender/rmr/` source, with a high riser to clear the M4's fixed front sight.
 ACOG is extracted from freshly built MCX editable source by `tools/blender/optics.py`;
 the pipeline builds the MCX before extraction. PM II has its own canonical source,
 `tools/blender/scope/build.py`, and builds independently of the AX338. The AX338 is
