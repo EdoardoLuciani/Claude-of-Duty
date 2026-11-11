@@ -173,6 +173,13 @@ Removing an optic restores base handling but leaves the chosen iron-sight settin
 For debug/capture, use `?attachmentOptic=rmr`, `acog`, `scope` or `none`, with
 `attachmentIrons=installed|removed` (installed by default), or
 `bun tools/capture.ts --shot=ads --optic=scope --irons=removed --out=/tmp/m4-scope-ads.png`.
+The M4 also supports `rail: 'laser'` (Steiner TOR Mini), independently of optics.
+It adds a green beam and surface dot, with **no stat changes** or AI light reaction.
+The dot follows the unspread aim ray and respects emitter occlusion; it does not
+predict random spread, penetration or bullet drop over the full trajectory.
+Use `?attachmentRail=laser` or `bun tools/capture.ts --shot=weapon --rail=laser`;
+`attachmentRail=none`/`rail: null` removes it. `tools/profile.ts --rail=laser|none`
+provides matched performance captures.
 
 M4/P320 are the starting weapons; MCX, EVOLYS, MPX and AX338 are shop options.
 The day/night clock

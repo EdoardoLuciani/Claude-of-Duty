@@ -1,8 +1,7 @@
 # Steiner TOR Mini laser module
 
 Original reference-backed **green 7003** reconstruction; visual-review candidate,
-not manufacturer CAD or final human visual acceptance. No flashlight or gameplay
-changes. References, photo rights and known approximations: [reference-review.json](reference-review.json).
+not manufacturer CAD or final human visual acceptance. No flashlight. References, photo rights and known approximations: [reference-review.json](reference-review.json).
 Measured build/render evidence and open acceptance items: [REVIEW.md](REVIEW.md).
 The optimized target is **5,924 triangles** (down from 9,978), one opaque material,
 with the same 2K map resolution. Detailed high source remains in the blend.
@@ -25,8 +24,11 @@ blender /tmp/tor-mini-review/tor-mini.blend
 
 `--quick` changes render samples/resolution only, not geometry, atlas or export.
 Without `--output`, products go into this directory. Normal dev/build generates
-and cooks the attachment independently of player arms; the resulting attachment
-is **not loaded into gameplay**. Build source is
+and cooks the attachment independently of player arms to
+`public/models/attachments/laser.runtime.glb`. The M4 can mount it via
+`weapons.setAttachments('rifle', { optic: null, ironSights: true, muzzle: null, rail: 'laser' })`.
+The shared runtime mount uses `SOCKET_mount` and keeps `SOCKET_laser` as the emitter;
+weapons own beam/dot rendering, with no stat changes or AI-perception effects. Build source is
 [`tools/blender/tor_mini/build.py`](../../../tools/blender/tor_mini/build.py);
 [`bake.py`](../../../tools/blender/tor_mini/bake.py) owns atlas preparation.
 No downloaded mesh, old blend, reference-photo texture or network input is needed
@@ -37,7 +39,8 @@ Products (ignored, reproducibly generated):
 - `tor-mini.blend`: hidden `SOURCE_HIGH` detailed components, visible optimized
   `TOR_MINI_body`, packed maps, named sockets and studio cameras.
 - `tor-mini.glb`: native self-contained glTF export, one opaque material/primitive.
-- `tor-mini.runtime.glb`: shared gltfpack meshopt/KTX2 cook; the authored target
+- `public/models/attachments/laser.runtime.glb` (or `tor-mini.runtime.glb` with the
+  scratch-directory cook above): shared gltfpack meshopt/KTX2 cook; the authored target
   is already reduced, so cooking does not simplify its geometry further.
 - `tor-mini-{base-color,normal,orm}.png`: unique 2048² PBR atlas. ORM has R=1,
   G=roughness, B=metallic, with **no baked studio lighting or AO**.

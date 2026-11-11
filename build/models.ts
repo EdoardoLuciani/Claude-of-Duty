@@ -98,7 +98,7 @@ export const MODEL_COOKS = {
   tor_mini: {
     directory: 'assets/attachments/steiner-tor-mini',
     source: 'tor-mini.glb',
-    output: 'assets/attachments/steiner-tor-mini/tor-mini.runtime.glb',
+    output: 'public/models/attachments/laser.runtime.glb',
     // Preserve the small aperture, screw slots and pressure-pad silhouettes.
     flags: [],
   },

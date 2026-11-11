@@ -217,6 +217,8 @@ for (const [equip, first, second] of [
     }),
     def: weaponState(wp, 'rifle').def,
     attachmentGroup: new THREE.Group(),
+    railGroup: new THREE.Group(),
+    laserEmitter: null,
     sight: new THREE.Vector3(),
     muzzle: new THREE.Vector3(),
   });

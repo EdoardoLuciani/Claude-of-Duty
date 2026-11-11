@@ -380,7 +380,8 @@ and the loader table checks complete ID coverage and per-ID adapter returns.
 null slots retain the authored base weapon (including existing integrated optics/
 suppressors). `src/weapons/attachments.ts` owns the finite catalog, boundary
 validation and common gameplay/inspection mount solver. The M4 supports
-`optic: 'rmr' | 'acog' | 'scope'`; muzzle/rail catalogs are empty. No attachment economy yet.
+`optic: 'rmr' | 'acog' | 'scope'` and `rail: 'laser'` (TOR Mini); the muzzle catalog
+is empty. No attachment economy yet.
 `ironSights` is an independent boolean, installed by default. `WeaponDef.removableIrons`
 enables removal: the authored `IRON_sights` node is hidden and an optional
 `IRON_sights_removed` part is shown instead (the M4's low-profile gas block preserves
@@ -418,6 +419,16 @@ even when the initial M4 uses irons. Debug URL input is narrowed in `main.ts`:
 `attachmentIrons=installed|removed` selects irons independently; PM II requires
 `?attachmentOptic=scope&attachmentIrons=removed`. `attachmentWeapon` must pass
 `isWeaponId` and compatibility/ownership checks.
+`attachmentRail=laser|none` selects the M4's right-rail module. Its authored
+`MOUNT_rail` and TOR Mini `SOCKET_mount`/`SOCKET_laser` keep mounting independent
+of the optic. Gameplay and inspection borrow the same single-material asset.
+Weapons own one retained world mesh for the green beam and surface dot (one draw,
+no light/decal, no per-frame allocation); boot warms it even with no module mounted.
+Two pooled `MASK.BULLET` queries find the unspread, zeroed muzzle aim and clip the
+emitter ray against world/actors without damage or effects. The dot is a straight-ray
+aim aid, not a prediction of random spread, penetration or curved bullet flight.
+It has no spread/handling modifiers or AI-perception effects (#505). Flashlight
+(#506) retains its separate spotlight/lifetime; both use -Z-forward emitter datums.
 
 The market UI derives its item contract from `MarketSystem.getHudState()`.
 `weapons.ammo` always returns one complete snapshot, including `inMag: 0` when

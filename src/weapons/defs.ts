@@ -76,6 +76,8 @@ export interface WeaponDef {
   eyeRelief: number;
   /** Only verified weapon/optic fits are enabled; conversion issues add the others. */
   opticEyeRelief?: Partial<Record<OpticId, number>>;
+  /** Verified authored side-rail fit for the TOR Mini. No handling modifiers. */
+  laserRail?: boolean;
   /** Authored `IRON_sights` can be removed (an optional `IRON_sights_removed` part replaces
    * it); `opticClashes` lists optics that only fit with the irons removed. */
   removableIrons?: { opticClashes: readonly OpticId[] };
@@ -220,6 +222,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     adsCant: [0, 0, 0.004],
     // Bring the eye closer to open the rear aperture; its bore and aim datum stay authored.
     eyeRelief: 0.03,
+    laserRail: true,
     opticEyeRelief: { rmr: 0.125, acog: 0.11, scope: 0.09 },
     removableIrons: { opticClashes: ['scope'] }, // PM II crosses the A2 tower and rear aperture
     /* Sprint: gun dropped and angled across the body, muzzle down-left.

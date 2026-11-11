@@ -122,15 +122,20 @@ try {
 }
 
 // Debug/capture configuration is narrowed once, before native material warmup.
-if (params.has('attachmentOptic') || params.has('attachmentIrons')) {
+if (
+  params.has('attachmentOptic') ||
+  params.has('attachmentIrons') ||
+  params.has('attachmentRail')
+) {
   const id = params.get('attachmentWeapon') ?? 'rifle';
   const optic = params.get('attachmentOptic') ?? 'none';
   const irons = params.get('attachmentIrons') ?? 'installed';
+  const rail = params.get('attachmentRail') ?? 'none';
   const config = {
     optic: optic === 'none' ? null : optic,
     ironSights: irons === 'installed' ? true : irons === 'removed' ? false : irons,
     muzzle: null,
-    rail: null,
+    rail: rail === 'none' ? null : rail,
   };
   if (
     !isWeaponId(id) ||
@@ -138,7 +143,7 @@ if (params.has('attachmentOptic') || params.has('attachmentIrons')) {
     !engine.ctx.get('weapons').setAttachments(id, config)
   )
     console.warn(
-      `[weapons] invalid/unavailable attachment configuration: optic=${optic}, irons=${irons}`
+      `[weapons] invalid/unavailable attachment configuration: optic=${optic}, irons=${irons}, rail=${rail}`
     );
 }
 

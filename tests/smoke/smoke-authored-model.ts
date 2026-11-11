@@ -3,15 +3,20 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+import { PhysicsSystem } from '../../src/physics/index.ts';
+import { LAYER } from '../../src/physics/surfaces.ts';
 import type { RenderSystem } from '../../src/render/index-webgpu.ts';
 import {
   BASE_ATTACHMENTS,
   configureWeaponAttachments,
   makeOpticModel,
+  makeLaserModel,
+  isAttachmentConfig,
   type AttachmentConfig,
 } from '../../src/weapons/attachments.ts';
 import { authoredModel, checkAuthoredDuration } from '../../src/weapons/authored-model.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
+import { WeaponLaser } from '../../src/weapons/laser.ts';
 import { ReticleMaterials } from '../../src/weapons/materials-tsl.ts';
 import type { WeaponEntry, WeaponModelRecord } from '../../src/weapons/runtime-types.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
@@ -176,6 +181,8 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     def: { ...WEAPON_DEFS.rifle },
     attachments: BASE_ATTACHMENTS,
     attachmentGroup: new THREE.Group(),
+    railGroup: new THREE.Group(),
+    laserEmitter: null,
     sight: new THREE.Vector3(),
     muzzle: new THREE.Vector3(),
     optic: null,
@@ -187,7 +194,7 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     // Mounting while the authored root is posed must not bake its current pose.
     root.rotation.x = i * 0.1;
     configureWeaponAttachments(entry, config, optics);
-    assert.equal(root.children.length, 3);
+    assert.equal(root.children.length, 4);
     assert.equal(entry.attachmentGroup.parent, socket, 'instance follows its authored mount');
     assert.equal(irons.visible, config.ironSights);
     assert.equal(ironsRemoved.visible, !config.ironSights);
@@ -220,6 +227,49 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     assert.equal(entry.def.suppressed, false);
     assert.equal(disposed, 0, 'instances must not dispose borrowed geometry');
   }
+  const railMount = new THREE.Object3D();
+  railMount.name = 'MOUNT_rail';
+  railMount.position.set(0.0285, 0.075, -0.25);
+  railMount.rotation.z = Math.PI / 2;
+  root.add(railMount);
+  const laserScene = new THREE.Group();
+  const laserBase = new THREE.Object3D();
+  laserBase.name = 'SOCKET_mount';
+  const emitter = new THREE.Object3D();
+  emitter.name = 'SOCKET_laser';
+  emitter.position.set(0, -0.0105, -0.02518);
+  laserScene.add(laserBase, emitter);
+  const laser = makeLaserModel(fixture<GLTF>({ scene: laserScene }));
+  const laserConfig: AttachmentConfig = { ...BASE_ATTACHMENTS, rail: 'laser' };
+  assert(isAttachmentConfig(laserConfig, 'rifle'));
+  assert.equal(
+    isAttachmentConfig(laserConfig, 'pistol'),
+    false,
+    'unverified rail fits stay disabled'
+  );
+  for (let i = 0; i < 3; i++) {
+    const before = { ...entry.def };
+    configureWeaponAttachments(entry, laserConfig, optics, laser);
+    assert.deepEqual(entry.def, before, 'rail module changes no weapon stats');
+    assert.equal(entry.railGroup.parent, railMount);
+    assert(entry.laserEmitter);
+    assert.notEqual(entry.laserEmitter, emitter, 'instances borrow art, not transforms');
+    const rail = entry.railGroup;
+    configureWeaponAttachments(entry, { ...laserConfig, optic: 'rmr' }, optics, laser);
+    assert.equal(entry.attachmentGroup.parent, socket);
+    assert.equal(entry.railGroup.parent, railMount, 'optic and rail have independent parents');
+    assert.equal(rail.parent, null);
+    configureWeaponAttachments(entry, BASE_ATTACHMENTS, optics, laser);
+    assert.equal(entry.laserEmitter, null);
+    assert.equal(railMount.children.length, 0, 'removing the laser leaves no mounted mesh');
+    const previousConfig = entry.attachments;
+    assert.throws(
+      (): void => configureWeaponAttachments(entry, laserConfig, optics),
+      /unavailable/
+    );
+    assert.equal(entry.attachments, previousConfig, 'failed staging preserves the configuration');
+  }
+  laser.dispose();
   configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, ironSights: false }, optics);
   assert.equal(entry.optic, null);
   assert.equal(irons.visible, false, 'irons can be removed without mounting an optic');
@@ -318,4 +368,59 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   asset.dispose();
   assert.equal(disposed, 1, 'asset owner releases shared geometry exactly once');
 }
-console.log('authored models: clip durations and shared attachment mount lifetime OK');
+// Laser uses the bullet mask/query without publishing damage; AI wins over the
+// wall behind it, moving/disabling that collider immediately moves the spot.
+{
+  const physics = new PhysicsSystem();
+  const scene = new THREE.Scene();
+  const laser = new WeaponLaser(scene);
+  const camera = new THREE.PerspectiveCamera(70, 1, 0.01, 500);
+  const viewCamera = camera.clone();
+  const emitter = new THREE.Object3D();
+  emitter.position.set(0.04, 0, -0.2);
+  const muzzle = new THREE.Vector3(0, 0, -0.3);
+  const actor = physics.addCollider({
+    shape: 'sphere',
+    radius: 0.5,
+    center: new THREE.Vector3(0, 0, -5),
+    layer: LAYER.ACTOR,
+  });
+  physics.addCollider({
+    shape: 'sphere',
+    radius: 1,
+    center: new THREE.Vector3(0, 0, -10),
+    layer: LAYER.STATIC,
+    surface: 'concrete',
+  });
+  const positions = laser.geometry.getAttribute('position');
+  const dot = new THREE.Vector3();
+  const update = (): void => {
+    laser.update(camera, viewCamera, WEAPON_DEFS.rifle, emitter, muzzle, physics, null, 1080);
+    dot.set(0, 0, 0);
+    for (let i = 4; i < 8; i++) dot.add(new THREE.Vector3().fromBufferAttribute(positions, i));
+    dot.multiplyScalar(0.25);
+  };
+  update();
+  assert(laser.mesh.visible);
+  assert(Math.abs(dot.z + 4.5) < 0.01, 'spot stops on the AI surface');
+  const occluder = physics.addCollider({
+    shape: 'sphere',
+    radius: 0.01,
+    center: new THREE.Vector3(0.035, 0, -0.7),
+    layer: LAYER.STATIC,
+    surface: 'metal',
+  });
+  update();
+  assert(Math.abs(dot.z + 0.69) < 0.02, 'emitter obstruction clips a clear muzzle aim');
+  occluder.enabled = false;
+  actor.enabled = false;
+  update();
+  assert(Math.abs(dot.z + 9) < 0.01, 'spot stops on world collision behind the AI');
+  assert.equal(laser.geometry.getAttribute('position'), positions, 'updates reuse the same buffer');
+  physics.colliders.length = 0;
+  update();
+  assert.equal(laser.geometry.drawRange.count, 6, 'a miss draws only the beam, no floating dot');
+  laser.dispose();
+  assert.equal(scene.children.length, 0);
+}
+console.log('authored models: clip durations, attachment lifetime and laser queries OK');
