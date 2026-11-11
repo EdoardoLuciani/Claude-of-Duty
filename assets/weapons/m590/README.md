@@ -56,7 +56,12 @@ sight references. The open-bore 12g adapter is permanent seating hardware, not a
 (#686) instead uses two fixed tube clamps at z=−.580/−.605 and a supported short
 underside rail, ahead of the pump and behind the clean-out cap. It remains fixed
 through all 89 mm of pump travel; no forend geometry or hand calibration changed.
-Its source sweep checks actual TOR surfaces/hands at all 739 clip poses (120 Hz).
+The independent laser sweep checks actual TOR surfaces/hands at 739 poses
+(120 Hz), but **runtime `laserRail` compatibility remains disabled**. The full
+`check.py` stops at the shared-arm certificate before its mount/optic gates;
+the independent sweep cannot establish those later gates. Retained hardware is
+staged pending authorized input/certificate resolution and a full check pass;
+no hash or clearance tolerance is waived.
 See the [shared laser checks and limits](../../attachments/steiner-tor-mini/README.md#weapon-mounting-686).
 
 `fits.optic` enables RMR / ACOG / PM II with eye relief .120 / .100 / .085 m respectively.

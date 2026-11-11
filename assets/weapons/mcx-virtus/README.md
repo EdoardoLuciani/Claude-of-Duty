@@ -29,8 +29,10 @@ measurements are in Git history, not evidence of an FPS improvement.
 
 ## TOR Mini rail (#686)
 
-A short authored right-side Picatinny adapter enables the shared optional laser,
-independently of the existing integrated optic and suppressor. No base conversion
-or dependency on the still-open #662/#663 issues is introduced. Receiver ownership
-keeps it clear of moving controls and stock; hands/animations remain unchanged.
+A short authored right-side Picatinny adapter is **staged, with `laserRail`
+disabled**. Native mechanism/optic/suppressor checks have no DCC review hands;
+the browser .2/.5/.8 snapshots do not verify the intervening runtime-hand paths.
+Full-motion review of relevant clips and transitions is required before enabling
+the shared laser. No hand/animation retarget, base conversion or dependency on
+still-open #662/#663 is introduced; integrated optics/can remain unchanged.
 See the [mount table, source sweep and limitations](../../attachments/steiner-tor-mini/README.md#weapon-mounting-686).

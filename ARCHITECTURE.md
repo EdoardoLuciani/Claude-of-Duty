@@ -422,7 +422,11 @@ even when the initial M4 uses irons. Debug URL input is narrowed in `main.ts`:
 `attachmentIrons=installed|removed` selects irons independently; PM II requires
 `?attachmentOptic=scope&attachmentIrons=removed`. `attachmentWeapon` must pass
 `isWeaponId` and compatibility/ownership checks.
-`attachmentRail=laser|none` selects the TOR Mini on all seven weapons. Their authored
+`attachmentRail=laser|none` selects the TOR Mini on M4, P320, EVOLYS, AX338 and MPX.
+Issue #686 targets all seven, but M590 and MCX remain disabled: M590 awaits
+authorized shared-arm input resolution and its full authoring gates; MCX awaits
+full-motion runtime-hand verification. Their authored rails are staged, not
+available through configuration/debug tooling. The authored
 `MOUNT_rail` and TOR Mini `SOCKET_mount`/`SOCKET_laser` keep mounting independent
 of the optic. P320 uses its frame bone (not the slide); M590 uses fixed forward
 magazine-tube clamps (not the pump); the other adapters follow their fixed

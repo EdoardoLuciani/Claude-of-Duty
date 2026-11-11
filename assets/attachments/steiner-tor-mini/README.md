@@ -25,7 +25,7 @@ blender /tmp/tor-mini-review/tor-mini.blend
 `--quick` changes render samples/resolution only, not geometry, atlas or export.
 Without `--output`, products go into this directory. Normal dev/build generates
 and cooks the attachment independently of player arms to
-`public/models/attachments/laser.runtime.glb`. All seven weapons use the same rail configuration API, for example
+`public/models/attachments/laser.runtime.glb`. Compatible weapons use the same rail configuration API, for example
 `weapons.setAttachments('rifle', { optic: null, ironSights: true, muzzle: null, rail: 'laser' })`.
 The shared runtime mount uses `SOCKET_mount` and keeps `SOCKET_laser` as the emitter;
 weapons own beam/dot rendering, with no stat changes or AI-perception effects. Build source is
@@ -78,6 +78,14 @@ contains no camera-aim or bullet-zero assumption.
 
 ## Weapon mounting (#686)
 
+**Partial implementation:** the target is all seven weapons, but runtime laser
+compatibility is enabled only for M4, P320, EVOLYS, AX338 and MPX. M590 and MCX
+hardware/checks are retained as staged authoring work; their `laserRail` flags
+are disabled and API/debug/capture configuration rejects `rail: 'laser'`.
+M590 requires authorized shared-arm input resolution and a complete authoring
+check pass. MCX requires full-motion runtime-hand verification, including the
+intervals and transitions between the existing selected-pose snapshots.
+
 The module is optional and independent of optics/irons. `rail: null` removes it;
 removing an optic does not remove the laser. No statistics, AI perception, beam
 zeroing or emitter-occlusion semantics change. Gameplay and market inspection
@@ -88,15 +96,15 @@ The module body is **below** its local mount: local +Y points **into** the seat,
 not out of the weapon. Side mounts therefore retain forward −Z but turn the
 body outward. These are authored game-fit adaptations, not certified hardware.
 
-| Weapon | Rail seat | Owner / physical support |
-| --- | --- | --- |
-| M4A1 | `[.0285, .075, −.250]` | Existing right RIS II rail; fit unchanged |
-| P320 | `[0, .002, −.122]` | Frame bone, not slide; integral game-fit rail extended 14 mm with fifth slot |
-| EVOLYS | `[.0345, .110, −.395]` | Handguard; two-leg upper-right offset bracket bolted at the existing side interface |
-| M590 | `[0, .009, −.590]` | Receiver; two fixed magazine-tube clamps ahead of the entire pump stroke |
-| AX338 | `[.038, .075, −.455]` | Fixed right KeySlot/Picatinny adapter, ahead of hand/bolt/folding stock |
-| MCX VIRTUS | `[.038, .070, −.361]` | Receiver; forward right adapter, integrated ACOG/SRD762Ti retained |
-| SIG MPX | `[.037, 0, −.295]` | Receiver; forward right adapter with short supported overhang, ROMEO4T/SRD9 retained |
+| Weapon | Availability | Rail seat | Owner / physical support |
+| --- | --- | --- | --- |
+| M4A1 | Enabled | `[.0285, .075, −.250]` | Existing right RIS II rail; fit unchanged |
+| P320 | Enabled | `[0, .002, −.122]` | Frame bone, not slide; integral game-fit rail extended 14 mm with fifth slot |
+| EVOLYS | Enabled | `[.0345, .110, −.395]` | Handguard; two-leg upper-right offset bracket bolted at the existing side interface |
+| M590 | Staged / disabled | `[0, .009, −.590]` | Receiver; two fixed magazine-tube clamps ahead of the entire pump stroke |
+| AX338 | Enabled | `[.038, .075, −.455]` | Fixed right KeySlot/Picatinny adapter, ahead of hand/bolt/folding stock |
+| MCX VIRTUS | Staged / disabled | `[.038, .070, −.361]` | Receiver; forward right adapter, integrated ACOG/SRD762Ti retained |
+| SIG MPX | Enabled | `[.037, 0, −.295]` | Receiver; forward right adapter with short supported overhang, ROMEO4T/SRD9 retained |
 
 P320's rail extension is an explicit deviation from the Compact factory frame.
 The module nose sits a few millimetres ahead of its barrel exit, below the bore;
@@ -109,25 +117,34 @@ actual editable TOR/weapon/optic surfaces. It checks forward direction, rail
 contact, emitter clearance and intersections over every clip at 120 Hz, including
 fractional endpoints; AX338 also sweeps its stock hinge through 181 positions.
 Only bounded mating rail/clamp contacts are exempt, not hands or mechanisms.
-MCX has no DCC review arms: its runtime-owned hands require separate browser
-review. Sampling is not continuous-clearance or human visual certification.
-M590's unrelated historical shared-arm hash certificate remains unresolved
-(see its asset README); the laser-only sweep can be run independently:
+MCX has no DCC review arms: its runtime-owned hands still require full-motion
+review; the existing .2/.5/.8 snapshots do not verify intervening paths.
+Sampling is not continuous-clearance or human visual certification. M590's
+historical shared-arm hash certificate remains unresolved (see its asset README).
+Its full check stops before mount/optic gates; the independent laser-only sweep
+does not establish those later gates or justify enabling compatibility:
+
 
 ```sh
 blender -b assets/weapons/m590/m590.blend --python-exit-code 1 \
   --python tools/blender/tor_mini/mounts.py -- m590
-bun tools/capture.ts --port=5186 --weapon=shotgun --rail=laser --shot=weapon --out=/tmp/m590-laser.png
+bun tools/capture.ts --port=5186 --weapon=smg --rail=laser --shot=weapon --out=/tmp/mpx-laser.png
 # Also use --shot=ads, --reload, and the existing market inspection controls.
 ```
 
-MCX/MPX support does not depend on their open base-conversion issues #662/#663.
+The authored MCX/MPX integrations do not depend on their open base-conversion issues #662/#663.
 Their existing integrated suppressors are included in native fit checks. Other
 weapons' `MOUNT_muzzle` datums do **not** certify any future suppressor (#670):
 there is no standalone muzzle catalog/asset to fit, and future geometry must be
 rechecked rather than inferred from an estimated cylinder or an empty datum.
 
 ## Review standard
+
+Strict native browser receipts remain failed on two TSL inline `Fn()` return
+errors. The `rail: null` M4 control ran on the **changed branch**, not unmodified
+`7cb4fbf`; it establishes reproduction without an installed laser only, not
+baseline attribution or a harmless-error waiver. No unmodified-base control was
+performed. Issue #686 is not complete or merge-ready.
 
 Compare silhouette and feature placement against **both manufacturer side views**,
 then use the front/rear quarters to check the open channel, screw heads, aperture,

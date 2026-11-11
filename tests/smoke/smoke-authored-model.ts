@@ -244,7 +244,11 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   const laserConfig: AttachmentConfig = { ...BASE_ATTACHMENTS, rail: 'laser' };
   assert(isAttachmentConfig(laserConfig, 'rifle'));
   for (const id of WEAPON_IDS) {
-    assert(isAttachmentConfig(laserConfig, id), `${id} accepts its verified rail fit`);
+    const supportsLaser = WEAPON_DEFS[id].fits?.rail?.laser !== undefined;
+    assert.equal(isAttachmentConfig(laserConfig, id), supportsLaser, `${id}: rail availability`);
+    assert(isAttachmentConfig(BASE_ATTACHMENTS, id), `${id}: base configuration remains valid`);
+    if (!supportsLaser) continue;
+    // Shared solver fixtures do not certify each weapon's authored hierarchy.
     const railModel = fixture<WeaponModelRecord>({ ...model });
     railModel.id = id;
     const weapon = fixture<WeaponEntry>({

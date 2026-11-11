@@ -153,7 +153,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     hipRot: [-0.05, 0.081, -0.135],
     adsCant: [0, 0, 0],
     eyeRelief: 0.11,
-    fits: { rail: { laser: {} } },
+    // No laser fit: its authored rail is staged pending full-motion runtime-hand verification.
     sprintPos: [0.09, -0.275, -0.275],
     sprintRot: [-0.4, 0.6, 0.2],
     lowReadyPos: [0.112, -0.29, -0.289],
@@ -506,9 +506,9 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     adsCant: [0, 0, 0.003],
     eyeRelief: 0.28,
     // Shared optics sit above the fixed ghost ring on the see-through receiver rail.
+    // No laser fit: full authoring gates await authorized shared-arm input resolution.
     fits: {
       optic: { rmr: { eyeRelief: 0.12 }, acog: { eyeRelief: 0.1 }, scope: { eyeRelief: 0.085 } },
-      rail: { laser: {} },
     },
     sprintPos: [0.09, -0.27, -0.28],
     sprintRot: [-0.42, 0.58, 0.2],
