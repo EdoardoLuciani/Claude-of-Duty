@@ -23,12 +23,18 @@ const REQUIRED = ['Idle', 'Fire', 'Last_Shot', ...Object.values(ALIASES)];
 
 export function makeAX338Model(gltf: GLTF): AX338Model {
   const scene = gltf.scene;
-  const { root, animations, point } = authoredModel(gltf, 'AX338_RIG', REQUIRED, manifest.clips);
+  const { root, opticMountRest, animations, point } = authoredModel(
+    gltf,
+    'AX338_RIG',
+    REQUIRED,
+    manifest.clips
+  );
   const model = {
     id: 'sniper' as const,
     label: 'AX-338',
     scene,
     root,
+    opticMountRest,
     animations,
     reactiveFire: true,
     handPoses: { left: handReference.sides.left.grip, right: handReference.sides.right.grip },

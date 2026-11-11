@@ -180,11 +180,10 @@ export function mountAttachments(
     const asset = optics[opticId];
     if (!asset) throw new Error(`[weapons] ${opticId} asset unavailable`);
     const mount = requiredNode(model.scene, 'MOUNT_optic');
-    // Full authored mount transform, including orientation; asset mount is its origin.
-    model.scene.updateMatrixWorld(true);
-    const transform =
-      model.opticMountRest ??
-      new THREE.Matrix4().copy(model.root.matrixWorld).invert().multiply(mount.matrixWorld);
+    // Rest-pose mount transform, including orientation; asset mount is its origin.
+    // Never read the live pose: a slide or bolt may be mid-animation here.
+    const transform = model.opticMountRest;
+    if (!transform) throw new Error(`[weapons] ${model.id} has no optic mount`);
     const instance = asset.scene.clone(true);
     instance.position.sub(asset.mount);
     // Keep the instance in mount-local space so slide/cover/bone animation
