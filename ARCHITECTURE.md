@@ -376,11 +376,20 @@ check authored data against that schema rather than inferring its contract from
 current values. Keep internal state keyed by `WeaponId`; narrow DOM/URL/debug
 strings with `isWeaponId` at entry. Authored models carry literal adapter IDs,
 and the loader table checks complete ID coverage and per-ID adapter returns.
-`WeaponState.attachments` is an immutable `{ optic, muzzle, rail }` snapshot;
+`WeaponState.attachments` is an immutable `{ optic, ironSights, muzzle, rail }` snapshot;
 null slots retain the authored base weapon (including existing integrated optics/
 suppressors). `src/weapons/attachments.ts` owns the finite catalog, boundary
-validation and common gameplay/inspection mount solver. This increment supports
-`optic: 'rmr'` on the M4; muzzle/rail catalogs are empty. No attachment economy yet.
+validation and common gameplay/inspection mount solver. The M4 supports
+`optic: 'rmr' | 'acog' | 'scope'`; muzzle/rail catalogs are empty. No attachment economy yet.
+`ironSights` is an independent boolean, installed by default. Only the M4 currently
+supports removal: its `IRON_sights` assembly is replaced by `GASBLOCK_low`, preserving
+the gas system. PM II requires removed irons to clear the A2 tower and rear aperture;
+incompatible combinations are rejected, never silently changed. With neither optic
+nor irons, ADS retains the base aim datum without a reticle. Removing an optic does
+not reinstall independently removed irons; `BASE_ATTACHMENTS` restores both.
+Optics own magnification, sensitivity and reticle; `WeaponDef.opticEyeRelief` owns
+per-weapon/optic eye relief and enables verified fits. Other weapons' conversion
+issues add their mount points/fit data; null retains their current integrated optic.
 `weapons.setAttachments(id, config)` changes an owned, loaded weapon synchronously
 outside the frame loop. It stages/validates before replacing the old mount and
 resolves sight/OpticData, muzzle and effective handling/suppression on the state's
@@ -389,13 +398,22 @@ The M4's `MOUNT_optic` is an authored rail-contact transform under its weapon ri
 Attachment `MOUNT_base` and `SOCKET_sight` define mounting and aiming in metres;
 instances follow the authored weapon animation. RMR geometry is shared source
 with EVOLYS, with a standalone high riser to clear the M4's fixed front sight.
-The weapon system owns one loaded attachment asset and disposes it after the
+ACOG and PM II are extracted from freshly built MCX/AX338 editable Blender sources
+by `tools/blender/optics.py`; the asset pipeline builds those weapons before extracting
+and cooking the standalone GLBs. Their original geometry, UVs and packed maps are
+retained, with identity rail-contact datums and no weapon animation. Source weapon
+optics are not removed until their conversion issues. Glass retains thin alpha,
+with no transmission pass. Scope mask, gun hiding and mil scale use mounted
+`OpticData`, not the weapon class.
+The weapon system owns one loaded asset per optic and disposes them after the
 viewmodel; mounts/inspection clones own transforms only and never release shared
 geometry/materials/maps. Inspection defaults to the stored config or accepts an
 explicit config without mutating gameplay. Prewarm includes the attachment glass
 even when the initial M4 uses irons. Debug URL input is narrowed in `main.ts`:
-`?attachmentOptic=rmr` (M4 by default), `attachmentOptic=none` for base;
-`attachmentWeapon` must pass `isWeaponId` and compatibility/ownership checks.
+`?attachmentOptic=rmr`, `acog` or `scope` (M4 by default), `attachmentOptic=none` for no optic.
+`attachmentIrons=installed|removed` selects irons independently; PM II requires
+`?attachmentOptic=scope&attachmentIrons=removed`. `attachmentWeapon` must pass
+`isWeaponId` and compatibility/ownership checks.
 
 The market UI derives its item contract from `MarketSystem.getHudState()`.
 `weapons.ammo` always returns one complete snapshot, including `inMag: 0` when

@@ -113,11 +113,16 @@ export const SHOTS: Record<string, ShotDefinition> = {
   ads: {
     pos: [6, 1.7, 10],
     look: [-2, 1.8, -2],
-    // 80 * adsFovScale 0.62 = 49.6; keep the harness frame identical to the
-    // zoom the player actually sees at full ADS.
-    fov: 50,
     time: 16.5,
-    apply: (e): string | undefined => e.ctx.peek('weapons')?.debugPose('ads'),
+    apply: (e): string | undefined => {
+      const weapons = e.ctx.peek('weapons');
+      const pose = weapons?.debugPose('ads');
+      // Capture freezes player FOV updates; use the mounted optic's effective
+      // magnification instead of the old fixed red-dot framing.
+      e.camera.fov = e.config.fov * (weapons?.current?.adsFovScale ?? e.config.adsFovScale);
+      e.camera.updateProjectionMatrix();
+      return pose;
+    },
     doc: 'Aiming down sights — optic alignment, depth of field, reticle.',
   },
   muzzle: {
@@ -305,7 +310,7 @@ export function installShotApi(
     if (shot.time !== undefined) engine.ctx.peek('sky')?.setTimeOfDay(shot.time);
     shot.apply?.(engine, readShotOptions(options));
 
-    return { applied: name, pos: shot.pos, fov: shot.fov ?? engine.config.fov };
+    return { applied: name, pos: shot.pos, fov: cam.fov };
   };
 
   if (capture) {

@@ -122,16 +122,24 @@ try {
 }
 
 // Debug/capture configuration is narrowed once, before native material warmup.
-if (params.has('attachmentOptic')) {
+if (params.has('attachmentOptic') || params.has('attachmentIrons')) {
   const id = params.get('attachmentWeapon') ?? 'rifle';
-  const optic = params.get('attachmentOptic');
-  const config = { optic: optic === 'none' ? null : optic, muzzle: null, rail: null };
+  const optic = params.get('attachmentOptic') ?? 'none';
+  const irons = params.get('attachmentIrons') ?? 'installed';
+  const config = {
+    optic: optic === 'none' ? null : optic,
+    ironSights: irons === 'installed' ? true : irons === 'removed' ? false : irons,
+    muzzle: null,
+    rail: null,
+  };
   if (
     !isWeaponId(id) ||
     !isAttachmentConfig(config, id) ||
     !engine.ctx.get('weapons').setAttachments(id, config)
   )
-    console.warn('[weapons] ignored invalid/unavailable attachment configuration');
+    console.warn(
+      `[weapons] invalid/unavailable attachment configuration: optic=${optic}, irons=${irons}`
+    );
 }
 
 // Capture tooling is not part of the normal game path. Loading it only on

@@ -26,6 +26,8 @@ const OUT = resolve(String(args.out ?? (RELOAD ? 'shots/reload' : `shots/${SHOT}
 const TIMEOUT = Number(args.timeout ?? 90000);
 // Let temporal effects, streaming and LOD settle before capture.
 const SETTLE = Number(args.settle ?? 90);
+if (args.optic === 'scope' && args.irons !== 'removed')
+  throw new Error('The M4 PM II scope requires --irons=removed.');
 
 // Self-contained functions serialized by Playwright into the browser.
 function pump(frames: number): Promise<number> {
@@ -72,9 +74,9 @@ try {
     logs.push(`[pageerror] ${e.message}\n${e.stack ?? ''}`);
   });
   try {
-    const attachmentQuery = args.optic
-      ? `&attachmentOptic=${encodeURIComponent(String(args.optic))}`
-      : '';
+    const attachmentQuery =
+      (args.optic ? `&attachmentOptic=${encodeURIComponent(String(args.optic))}` : '') +
+      (args.irons ? `&attachmentIrons=${encodeURIComponent(String(args.irons))}` : '');
     await page.goto(
       `http://127.0.0.1:${PORT}/?capture=1&lockstep=1&shot=${encodeURIComponent(SHOT)}${attachmentQuery}`,
       {

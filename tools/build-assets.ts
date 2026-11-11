@@ -117,7 +117,15 @@ const SHARED_TOOLS: Partial<Record<ModelId, string[]>> = {
   ],
   mpx: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
 };
+// These products are rebuilt from canonical Python before extraction. Hashing
+// the saved source also catches geometry, UV, finish and packed-texture changes.
+const OPTIC_SOURCES = {
+  acog: 'assets/weapons/mcx-virtus/mcx-virtus.blend',
+  scope: 'assets/weapons/ax338/ax338.blend',
+};
 const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
+  acog: ['tools/blender/optics.py', OPTIC_SOURCES.acog],
+  scope: ['tools/blender/optics.py', OPTIC_SOURCES.scope],
   rmr: ['tools/blender/rmr'],
   exps3: ['tools/blender/exps3.py', 'tools/blender/exps3_bake.py'],
   tor_mini: ['tools/blender/tor_mini'],
@@ -132,9 +140,16 @@ function cookStep(id: ModelId, salt: string[]): AssetStep {
     inputs: [...tools, ...authoredJson(directory)],
     // Only this model's cook settings, so one profile edit rebuilds one model.
     salt: [...salt, JSON.stringify(MODEL_COOKS[id]), ...GLTFPACK_FLAGS, GLTFPACK_VERSION],
-    outputs: [`${directory}/${source}`, output],
+    outputs: [
+      `${directory}/${source}`,
+      output,
+      // Downstream optic extraction requires these even when GLBs are cached.
+      ...(id === 'mcx' ? [OPTIC_SOURCES.acog] : id === 'ax338' ? [OPTIC_SOURCES.scope] : []),
+    ],
     commands: [
-      blender(id === 'exps3' ? tools[0] : `tools/blender/${id}/build.py`),
+      id === 'acog' || id === 'scope'
+        ? [...blender('tools/blender/optics.py'), '--', id]
+        : blender(id === 'exps3' ? tools[0] : `tools/blender/${id}/build.py`),
       bun('build/models.ts', id),
     ],
   };
@@ -154,13 +169,15 @@ function listFiles(path: string): string[] {
 
 function inputHash(step: AssetStep): string {
   const hash = createHash('sha256').update([RECIPE, step.id, ...(step.salt ?? [])].join('\0'));
-  for (const path of step.inputs.flatMap(listFiles))
-    // CRLF checkouts alone must not trigger a Blender rebuild.
+  for (const path of step.inputs.flatMap(listFiles)) {
+    const bytes = readFileSync(join(ROOT, path));
+    // Normalize text checkouts without decoding the binary Blender dependencies.
     hash
       .update(path)
       .update('\0')
-      .update(canonicalText(readFileSync(join(ROOT, path))))
+      .update(path.endsWith('.blend') ? bytes : canonicalText(bytes))
       .update('\0');
+  }
   return hash.digest('hex');
 }
 
@@ -257,9 +274,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
           .map((id): AssetStep => cookStep(id, [armsHash])),
         ...Object.keys(STANDALONE_TOOLS)
           .filter(isModelId)
+          .filter((id): boolean => id !== 'acog' && id !== 'scope')
           .map((id): AssetStep => cookStep(id, [])),
         SOLDIER_STEP,
       ]);
+      if (!failed) await pool([cookStep('acog', []), cookStep('scope', [])]);
     }
     if (!failed)
       stages.push(stage('export-proc-textures.ts', ...force), stage('export-models.ts', ...force));

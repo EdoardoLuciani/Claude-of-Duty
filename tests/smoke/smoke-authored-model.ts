@@ -7,7 +7,7 @@ import type { RenderSystem } from '../../src/render/index-webgpu.ts';
 import {
   BASE_ATTACHMENTS,
   configureWeaponAttachments,
-  makeRMRModel,
+  makeOpticModel,
   type AttachmentConfig,
 } from '../../src/weapons/attachments.ts';
 import { authoredModel, checkAuthoredDuration } from '../../src/weapons/authored-model.ts';
@@ -93,6 +93,25 @@ assert.throws(
   (): unknown => authoredModel(gltf, 'TEST_RIG', ['Idle', 'Fire', 'Inspect'], authored),
   /missing Inspect clip/
 );
+// Shared glass remains a single thin-alpha surface, even if source art uses transmission.
+for (const id of ['rmr', 'acog', 'scope'] as const) {
+  const scene = new THREE.Group();
+  for (const name of ['MOUNT_base', 'SOCKET_sight']) {
+    const node = new THREE.Object3D();
+    node.name = name;
+    scene.add(node);
+  }
+  const source = new THREE.MeshPhysicalMaterial({ transmission: 0.97 });
+  source.name = id === 'acog' ? '11 | coated optic lens' : '10 | coated lens';
+  const lens = new THREE.Mesh(new THREE.PlaneGeometry(), source);
+  scene.add(lens);
+  const asset = makeOpticModel(fixture<GLTF>({ scene }), id);
+  assert.equal(lens.material.transmission, 0);
+  assert.equal(lens.material.opacity, id === 'acog' ? 0.1 : 0.13);
+  assert(lens.material.transparent);
+  assert.equal(lens.material.depthWrite, false);
+  asset.dispose();
+}
 // Repeated mount/remove borrows one asset, restores base datums/tuning and
 // leaves no orphan glass/socket.
 {
@@ -103,6 +122,11 @@ assert.throws(
   socket.name = 'MOUNT_optic';
   socket.position.set(0, 0.1036, -0.067);
   root.add(socket);
+  const irons = new THREE.Group();
+  irons.name = 'IRON_sights';
+  const gasBlock = new THREE.Group();
+  gasBlock.name = 'GASBLOCK_low';
+  root.add(irons, gasBlock);
   const assetScene = new THREE.Group();
   const base = new THREE.Object3D();
   base.name = 'MOUNT_base';
@@ -112,7 +136,8 @@ assert.throws(
   const geometry = new THREE.BoxGeometry(0.02, 0.01, 0.001);
   const lens = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial());
   assetScene.add(base, sight, lens);
-  const asset = makeRMRModel(fixture<GLTF>({ scene: assetScene }));
+  const asset = makeOpticModel(fixture<GLTF>({ scene: assetScene }), 'rmr');
+  const optics = { rmr: asset, acog: asset, scope: asset };
   let disposed = 0;
   let ownerDisposed = false;
   asset.scene.addEventListener('dispose', (): void => {
@@ -142,26 +167,36 @@ assert.throws(
     muzzle: new THREE.Vector3(),
     optic: null,
   });
-  const config: AttachmentConfig = { optic: 'rmr', muzzle: null, rail: null };
-  for (let i = 0; i < 8; i++) {
+  const config: AttachmentConfig = { ...BASE_ATTACHMENTS, optic: 'rmr' };
+  for (let i = 0; i < 9; i++) {
+    const optic = (['rmr', 'acog', 'scope'] as const)[i % 3];
+    const config: AttachmentConfig = { ...BASE_ATTACHMENTS, optic, ironSights: optic !== 'scope' };
     // Mounting while the authored root is posed must not bake its current pose.
     root.rotation.x = i * 0.1;
-    configureWeaponAttachments(entry, config, asset);
-    assert.equal(root.children.length, 2);
+    configureWeaponAttachments(entry, config, optics);
+    assert.equal(root.children.length, 4);
+    assert.equal(irons.visible, config.ironSights);
+    assert.equal(gasBlock.visible, !config.ironSights);
     assert(entry.sight.distanceTo(new THREE.Vector3(0, 0.1461072, -0.085)) < 1e-8);
     assert.deepEqual(entry.optic?.center, entry.sight.toArray());
-    assert.equal(entry.def.eyeRelief, 0.125);
-    assert.equal(entry.def.adsFovScale, 0.62);
-    assert.equal(entry.def.adsSensScale, 0.62);
+    assert.equal(entry.def.eyeRelief, WEAPON_DEFS.rifle.opticEyeRelief?.[optic]);
+    assert.equal(entry.def.adsFovScale, optic === 'rmr' ? 0.62 : optic === 'acog' ? 0.28 : 0.25);
+    assert.equal(entry.def.adsSensScale, entry.def.adsFovScale);
+    assert.equal(
+      entry.optic?.reticle,
+      optic === 'acog' ? 'chevron' : optic === 'scope' ? 'p4fl' : undefined
+    );
     const mountedLens = entry.attachmentGroup.children[0].children[2];
     assert(mountedLens instanceof THREE.Mesh);
     assert.equal(mountedLens.geometry, geometry);
     const oldMount = entry.attachmentGroup;
-    configureWeaponAttachments(entry, BASE_ATTACHMENTS, asset);
+    configureWeaponAttachments(entry, BASE_ATTACHMENTS, optics);
     assert.equal(oldMount.parent, null);
     assert.equal(oldMount.children.length, 0);
     assert.equal(entry.attachmentGroup.children.length, 0);
     assert.equal(entry.optic, null);
+    assert(irons.visible);
+    assert.equal(gasBlock.visible, false);
     assert.deepEqual(entry.sight.toArray(), model.nodes.sight);
     assert.deepEqual(entry.muzzle.toArray(), model.nodes.muzzle);
     assert.equal(entry.def.eyeRelief, WEAPON_DEFS.rifle.eyeRelief);
@@ -170,6 +205,17 @@ assert.throws(
     assert.equal(entry.def.suppressed, false);
     assert.equal(disposed, 0, 'instances must not dispose borrowed geometry');
   }
+  configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, ironSights: false }, optics);
+  assert.equal(entry.optic, null);
+  assert.equal(irons.visible, false, 'irons can be removed without mounting an optic');
+  assert(gasBlock.visible);
+  const bareMount = entry.attachmentGroup;
+  assert.throws(
+    (): void => configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, optic: 'scope' }, optics),
+    /incompatible attachments/
+  );
+  assert.equal(entry.attachmentGroup, bareMount);
+  assert.equal(irons.visible, false, 'rejected optic/irons combination preserves visibility');
   const materials = new ReticleMaterials();
   const viewmodel = new Viewmodel(
     createTestContext({
@@ -178,7 +224,22 @@ assert.throws(
     materials
   );
   root.rotation.set(0, 0, 0);
-  configureWeaponAttachments(entry, config, asset);
+  for (const optic of ['acog', 'scope'] as const) {
+    configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, optic, ironSights: false }, optics);
+    viewmodel._updateScope(entry, 1);
+    assert(viewmodel.scopeOverlay.visible, 'mounted scope shows the overlay on a carbine');
+    assert.equal(weaponScene.visible, false, 'mounted scope hides the gun at full ADS');
+    assert.equal(viewmodel.maskUniforms.uSniper.value, optic === 'scope' ? 1 : 0);
+    assert.equal(viewmodel.reticleUniforms.uChevron.value, optic === 'acog' ? 1 : 0);
+    const mount = entry.attachmentGroup;
+    assert.throws((): void => configureWeaponAttachments(entry, config, {}), /unavailable/);
+    assert.equal(entry.attachmentGroup, mount, 'failed staging preserves the current optic');
+    configureWeaponAttachments(entry, BASE_ATTACHMENTS, optics);
+    viewmodel._updateScope(entry, 1);
+    assert.equal(viewmodel.scopeOverlay.visible, false);
+    assert(weaponScene.visible, 'removing the scope restores visible irons even while aiming');
+  }
+  configureWeaponAttachments(entry, config, optics);
   viewmodel.rig.position.set(0, 0, -entry.def.eyeRelief).sub(entry.sight);
   viewmodel._updateReticle(entry, 1);
   assert(viewmodel.reticle.visible, 'settled mounted optic shows its dot');
@@ -201,7 +262,7 @@ assert.throws(
     viewmodel.reticle.position.distanceTo(expectedDot) < 1e-10,
     'dot follows the authored optical axis'
   );
-  configureWeaponAttachments(entry, BASE_ATTACHMENTS, asset);
+  configureWeaponAttachments(entry, BASE_ATTACHMENTS, optics);
   viewmodel.dispose();
   materials.dispose();
   assert.equal(ownerDisposed, false, 'warm source survives mounted-instance disposal');

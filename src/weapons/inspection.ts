@@ -6,7 +6,7 @@ import {
   mountAttachments,
   releaseAttachmentMount,
   type AttachmentConfig,
-  type RMRModel,
+  type OpticModels,
 } from './attachments.ts';
 import { createWeaponAnimation } from './authored-animation.ts';
 import type { WeaponEntry } from './runtime-types.ts';
@@ -15,7 +15,7 @@ import type { WeaponEntry } from './runtime-types.ts';
 export function createWeaponInspection(
   entry: WeaponEntry,
   config: AttachmentConfig = entry.attachments,
-  rmr: RMRModel | null = null
+  optics: OpticModels = {}
 ): {
   scene: THREE.Group;
   dispose(): void;
@@ -35,7 +35,7 @@ export function createWeaponInspection(
   // The gameplay scene may contain a mounted instance; replace the cloned mount.
   const previous = root.getObjectByName('attachments');
   if (isGroup(previous)) releaseAttachmentMount(previous);
-  const mounted = mountAttachments(model, config, rmr);
+  const mounted = mountAttachments(model, config, optics);
   root.add(mounted.group);
   const animation = createWeaponAnimation(model, entry.def);
   animation.update(0, null, 0, false, true, entry.def.magSize);

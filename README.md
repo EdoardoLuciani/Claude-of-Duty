@@ -164,10 +164,15 @@ disabled. In the focused 3D view, arrows rotate, +/- zoom and Home resets.
 Toolbar buttons also provide zoom and reset. Inspection never spends credits:
 use the explicit Buy/Swap button to purchase supplies or weapons.
 Inspection previews each weapon's current attachment configuration. The M4 starts
-with irons and supports the shared RMR via `weapons.setAttachments()`; separate
-attachment purchases are not implemented yet. For debug/capture, use
-`?attachmentOptic=rmr` or `?attachmentOptic=none` (base M4), or
-`bun tools/capture.ts --shot=ads --optic=rmr --out=/tmp/m4-rmr-ads.png`.
+with irons and supports the shared RMR, ACOG (chevron) and PM II scope (P4FL)
+via `weapons.setAttachments()`; separate attachment purchases are not implemented yet.
+M4 iron sights are controlled independently by `ironSights` in the complete attachment
+config. Removing them swaps the A2/front and rear assemblies for a low-profile gas
+block; reinstalling them restores the original irons. PM II requires removed irons.
+Removing an optic restores base handling but leaves the chosen iron-sight setting.
+For debug/capture, use `?attachmentOptic=rmr`, `acog`, `scope` or `none`, with
+`attachmentIrons=installed|removed` (installed by default), or
+`bun tools/capture.ts --shot=ads --optic=scope --irons=removed --out=/tmp/m4-scope-ads.png`.
 
 M4/P320 are the starting weapons; MCX, EVOLYS, MPX and AX338 are shop options.
 The day/night clock
