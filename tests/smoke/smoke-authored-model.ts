@@ -81,7 +81,19 @@ const gltf = fixture<GLTF>({
   scene,
   animations: [collapsed('Idle'), clip('Fire', track([0, Math.fround(authored.Fire.duration)]))],
 });
-const { animations } = authoredModel(gltf, 'TEST_RIG', ['Idle', 'Fire'], authored);
+const { animations, opticMountRest } = authoredModel(gltf, 'TEST_RIG', ['Idle', 'Fire'], authored);
+assert.equal(opticMountRest, null, 'no MOUNT_optic, no optic datum');
+// The optic datum is rig-local: a posed rig never bakes into it.
+rig.position.set(0, 0.2, 0.1);
+rig.rotation.set(0.3, 0.4, 0);
+const opticMount = new THREE.Object3D();
+opticMount.name = 'MOUNT_optic';
+opticMount.position.set(0, 0.1, -0.07);
+rig.add(opticMount);
+const rest = authoredModel(gltf, 'TEST_RIG', ['Idle'], authored).opticMountRest;
+assert(
+  rest?.elements.every((v, i): boolean => Math.abs(v - opticMount.matrix.elements[i]) < 1e-12)
+);
 assert.deepEqual(
   animations.map((c): [string, number] => [c.name, c.duration]),
   [

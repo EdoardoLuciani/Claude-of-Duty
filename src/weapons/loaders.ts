@@ -1,7 +1,7 @@
 import type { Renderer } from 'three/webgpu';
 
 import { loadAX338 } from './ax338.ts';
-import { isWeaponId } from './defs.ts';
+import { isWeaponId, WEAPON_DEFS } from './defs.ts';
 import type { WeaponId } from './defs.ts';
 import { loadEvolys } from './evolys.ts';
 import { loadM4 } from './m4.ts';
@@ -24,11 +24,14 @@ const LOADERS: {
 };
 
 /** Gameplay and preview mount the same required authored assets. */
-export function loadWeapon(
+export async function loadWeapon(
   id: string,
   renderer: Pick<Renderer, 'hasFeature'>
 ): Promise<WeaponModelRecord> {
-  return isWeaponId(id)
-    ? LOADERS[id](renderer)
-    : Promise.reject(new Error(`[weapons] unknown weapon ${id}`));
+  if (!isWeaponId(id)) throw new Error(`[weapons] unknown weapon ${id}`);
+  const model = await LOADERS[id](renderer);
+  // Fail this weapon's load, not the batch it is mounted with.
+  if (WEAPON_DEFS[id].opticEyeRelief && !model.opticMountRest)
+    throw new Error(`[weapons] ${id} accepts optics but has no MOUNT_optic`);
+  return model;
 }

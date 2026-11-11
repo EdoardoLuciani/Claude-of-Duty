@@ -508,8 +508,6 @@ export class Viewmodel {
     config: AttachmentConfig = BASE_ATTACHMENTS,
     optics: OpticModels = {}
   ): WeaponEntry {
-    if (def.opticEyeRelief && !model.opticMountRest)
-      throw new Error(`[weapons] ${model.id} accepts optics but has no MOUNT_optic`);
     let tris = 0;
     const meshes: THREE.Mesh[] = [];
     const animation = createWeaponAnimation(model, def);

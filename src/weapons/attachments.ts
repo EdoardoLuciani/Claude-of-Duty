@@ -183,8 +183,8 @@ export function mountAttachments(
     // Never read the live pose: a slide or bolt may be mid-animation here.
     const transform = model.opticMountRest;
     if (!transform) throw new Error(`[weapons] ${model.id} has no optic mount`);
-    // Look the node up per scene: inspection mounts on a cloned scene.
-    const mount = requiredNode(model.scene, 'MOUNT_optic');
+    // Look the node up under this rig, where the datum was captured: inspection mounts on a clone.
+    const mount = requiredNode(model.root, 'MOUNT_optic');
     const instance = asset.scene.clone(true);
     instance.position.sub(asset.mount);
     // Keep the instance in mount-local space so slide/cover/bone animation
