@@ -41,19 +41,12 @@ export function makeAX338Model(gltf: GLTF): AX338Model {
       gripL: handReference.grips.left,
       magSeat: { pos: point('SOCKET_magazine'), rot: [0, 0, 0] },
       triggerPivot: { pos: point('trigger'), rot: [0, 0, 0] },
-      opticGlass: { kind: 'scope', center: point('SOCKET_sight'), reticle: 'p4fl' },
       handguard: { axis: [0, 0.075, 0], dir: [0, 0, 1], r: 0.027, z0: -0.175, z1: -0.581 },
     },
     shell: { caseLen: 0.0697, rimR: 0.0074 },
     magSize: { len: manifest.dimensions.magazineHeight },
   };
-  const converted = convertWeaponScene(scene, (source, material): void => {
-    if (source.name.startsWith('10 |')) {
-      material.transparent = true;
-      material.opacity = 0.13;
-      material.depthWrite = false;
-      material.side = THREE.DoubleSide;
-    }
+  const converted = convertWeaponScene(scene, (_source, material): void => {
     for (const value of Object.values(material as object)) {
       if (value instanceof THREE.Texture) value.anisotropy = 8;
     }
@@ -72,7 +65,6 @@ type AX338Model = AuthoredModelData<
   AuthoredNodes & {
     magSeat: { pos: [number, number, number]; rot: number[] };
     triggerPivot: { pos: [number, number, number]; rot: number[] };
-    opticGlass: { kind: string; center: [number, number, number]; reticle: string };
     handguard: { axis: number[]; dir: number[]; r: number; z0: number; z1: number };
   }
 > & {

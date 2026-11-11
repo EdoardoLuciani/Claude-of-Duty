@@ -1,5 +1,5 @@
 {
-  "asset": "Early AX338 / Dark Earth / factory brake / PM II LP 5-25x56 / no bipod",
+  "asset": "Early AX338 / Dark Earth / factory brake / removable rail irons / no optional attachments",
   "units": "metres",
   "clips": {
     "Idle": {
@@ -162,11 +162,11 @@
     }
   },
   "stats": {
-    "triangles": 100697,
-    "primitives": 11,
-    "materials": 2,
+    "triangles": 77986,
+    "primitives": 10,
+    "materials": 1,
     "images": 3,
-    "bytes": 12602020
+    "bytes": 11116036
   },
   "textureResolution": 1024,
   "contactGeometry": {
@@ -718,8 +718,8 @@
     "barrelCrown": -0.7958,
     "muzzle": -0.87,
     "butt": 0.38,
-    "scopeLength": 0.417,
-    "scopeTubeDiameter": 0.034,
+    "ironSightRadius": 0.5950000000000001,
+    "ironSightHeight": 0.151,
     "magazineBodyHeight": 0.105,
     "magazineDepth": 0.104,
     "magazineThickness": 0.034,

@@ -24,8 +24,6 @@ for o in bpy.data.collections['AX338 | authored components'].objects:
     if o.type=='MESH' and o.parent and o.parent.name not in ('magazine_spare','magazine_spare_round'):
         all_points.extend(CI@(o.matrix_world@v.co) for v in o.data.vertices)
 z=[p.z for p in all_points];assert abs(max(z)-min(z)-1.250)<.00001,(min(z),max(z))
-scope=points('PM II scope housing');z=[p.z for p in scope]
-assert abs(max(z)-min(z)-.417)<.00001
 # Geometry-derived magazine envelopes must match the editable saved meshes,
 # not a separately invented wrist/contact proxy.
 for entry in manifest['contactGeometry']['magazine']:
@@ -155,4 +153,101 @@ for clip,time in [('Idle',0),('Fire',.055),('Last_Shot',.055),('Reload_Tactical'
 print('Actual distal middle/ring/little grip contact: maximum gap',round(maximum_grasp_gap*1000,3),'mm')
 select('Idle')
 assert (bolt.location-rest).length<.00001 and bolt.rotation_quaternion.angle<.00001
-print('AX338 saved source: measured barrel/overall/scope, source UV/packed maps, measured magazine/cartridge fit and connected butt guides, true KeySlot, native 60-degree/100 mm bolt and synchronized wrist skins passed')
+print('AX338 saved source: measured barrel/overall, source UV/packed maps, measured magazine/cartridge fit and connected butt guides, true KeySlot, native 60-degree/100 mm bolt and synchronized wrist skins passed')
+
+# Standalone optics use their rail-contact origins, exactly as the runtime mount
+# solver does. Read freshly generated editable products, never a copied rifle optic.
+select('Idle')
+assert 'optic' not in bpy.data.objects and not any('optical glass' in o.name for o in rig.children_recursive)
+irons=bpy.data.objects['IRON_sights']
+iron_meshes=[o for o in irons.children if o.type=='MESH']
+assert iron_meshes and all(o.parent==irons for o in iron_meshes)
+def geometry(objects,transform=None,evaluated=False):
+    vertices=[];faces=[];deps=bpy.context.evaluated_depsgraph_get()
+    inverse=rig.matrix_world.inverted()
+    for o in objects:
+        ev=o.evaluated_get(deps) if evaluated else None
+        mesh=ev.to_mesh() if ev else o.data
+        matrix=transform@o.matrix_world if transform is not None else inverse@o.matrix_world
+        offset=len(vertices);vertices.extend(matrix@v.co for v in mesh.vertices)
+        mesh.calc_loop_triangles()
+        faces.extend(tuple(offset+i for i in face.vertices) for face in mesh.loop_triangles)
+        if ev:ev.to_mesh_clear()
+    return vertices,faces
+def surface(objects,transform=None,evaluated=False):
+    v,f=geometry(objects,transform,evaluated)
+    return BVHTree.FromPolygons(v,f,all_triangles=True)
+def datum(name):return CI@(rig.matrix_world.inverted()@bpy.data.objects[name].matrix_world.translation)
+def near(a,b):assert (Vector(a)-Vector(b)).length<.000001,(a,b)
+near(datum('MOUNT_optic'),(0,.118,-.089))
+near(datum('MOUNT_muzzle'),(0,.075,-.7958))
+near(datum('MOUNT_rail'),(.027,.075,-.455))
+near(datum('SOCKET_sight'),(0,.151,.055))
+rear=surface([bpy.data.objects['Rear open aperture']])
+origin=Vector((0,-.070,.151));direction=Vector((0,1,0))
+assert rear.ray_cast(origin,direction,.020)[0] is None,'rear aperture blocked'
+body_meshes=[o for o in rig.children_recursive if o.type=='MESH' and o not in iron_meshes]
+assert surface(body_meshes).ray_cast(origin,direction,.609)[0] is None,'base iron sight line obstructed'
+post=points('Front sight post');near((0,max(p.y for p in post),min(p.z for p in post)+.001),(0,.151,-.540))
+for foot in [o for o in iron_meshes if o.name.startswith('Iron rail foot')]:
+    assert abs(min(p.y for p in points(foot.name))-.118)<.000001,'floating iron foot'
+rail_teeth=[o for o in bpy.data.objects if o.type=='MESH' and o.name.startswith('Rail tooth')]
+assert any(abs(max(p.y for p in points(o.name))-.118)<.000001 for o in rail_teeth)
+iron_tree=surface(iron_meshes)
+mounted={}
+for optic_id,folder in [('rmr','trijicon-rmr'),('acog','trijicon-acog'),('scope','schmidt-bender-pm-ii')]:
+    path=ROOT/'assets/attachments'/folder/(optic_id+'.blend')
+    with bpy.data.libraries.load(str(path)) as (source,target):target.objects=source.objects
+    objects=[o for o in target.objects if o is not None]
+    base=next(o for o in objects if o.name.split('.')[0]=='MOUNT_base')
+    root=base.parent
+    meshes=[o for o in objects if o.type=='MESH']
+    assert not any(o.animation_data for o in objects),(optic_id,'standalone optic contains weapon animation')
+    for o in objects:scene.collection.objects.link(o)
+    bpy.context.view_layer.update()
+    mount=rig.matrix_world.inverted()@bpy.data.objects['MOUNT_optic'].matrix_world
+    transform=mount@Matrix.Translation(-base.matrix_world.translation)
+    mounted[optic_id]=surface(meshes,transform)
+    if optic_id=='scope':
+        housing=[o for o in meshes if o.name.startswith('PM II scope housing')]
+        v,_=geometry(housing,transform)
+        assert abs(max(p.y for p in v)-min(p.y for p in v)-.417)<.000001,'standalone PM II length changed'
+    hits=iron_tree.overlap(mounted[optic_id])
+    assert bool(hits)==(optic_id=='scope'),(optic_id,'opticClashes must match actual iron intersections',len(hits))
+    # Contact plane is authored at zero; the ACOG's projecting clamp screw is
+    # intentionally below its shoe. Verify the actual foot, not that screw.
+    foot_name={'rmr':'Riser side','acog':'ACOG rail shoe','scope':'AI mount base'}[optic_id]
+    feet=[o for o in meshes if o.name.startswith(foot_name)]
+    assert feet,(optic_id,'missing mount foot')
+    v,_=geometry(feet,transform)
+    assert abs(min(p.z for p in v)-.118)<.00011,(optic_id,'optic not seated on rail')
+    print('AX338_OPTIC_FIT',optic_id,'iron triangle contacts',len(hits))
+
+bolt_parts=[o for o in bpy.data.objects if o.type=='MESH' and o.parent==bolt]
+stock=bpy.data.objects['stock'];stock_parts=[o for o in stock.children if o.type=='MESH']
+hands=[o for o in bpy.data.objects if o.type=='MESH' and o.name.startswith(('AX338_left_','AX338_right_'))]
+mechanical_poses=0;hand_poses=0
+for name,info in manifest['clips'].items():
+    for frame in range(math.ceil(info['duration']*120)+1):
+        select(name,min(frame/120,info['duration']));mechanical_poses+=1
+        moving=surface(bolt_parts)
+        for optic_id,target in mounted.items():
+            assert not moving.overlap(target),(name,frame,optic_id,'bolt hits optic')
+        assert not moving.overlap(iron_tree),(name,frame,'bolt hits irons')
+        # Actual deformed review glove/sleeve, sampled at 24 Hz plus endpoints.
+        if frame%5==0 or frame==math.ceil(info['duration']*120):
+            hand_poses+=1;moving=surface(hands,evaluated=True)
+            for optic_id,target in mounted.items():
+                assert not moving.overlap(target),(name,frame,optic_id,'hand/sleeve hits optic')
+            assert not moving.overlap(iron_tree),(name,frame,'hand/sleeve hits irons')
+select('Idle')
+# The rifle has no authored fold clip: separately sweep the stock's actual left
+# hinge through 180 degrees at 1-degree intervals, without inventing an action.
+pivot=Vector((-.019,-.1165,.0445))
+for angle in range(181):
+    transform=Matrix.Translation(pivot)@Matrix.Rotation(-math.radians(angle),4,'Z')@Matrix.Translation(-pivot)
+    moving=surface(stock_parts,transform)
+    for optic_id,target in mounted.items():
+        assert not moving.overlap(target),(angle,optic_id,'folding stock hits optic')
+    assert not moving.overlap(iron_tree),(angle,'folding stock hits irons')
+print('AX338_ATTACHMENT_CLEARANCE_OK:',mechanical_poses,'120 Hz bolt poses;',hand_poses,'24 Hz deformed-hand poses; 181 stock fold poses; rmr/acog/scope and irons')
