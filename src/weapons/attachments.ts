@@ -9,7 +9,8 @@ import { requiredNode } from './authored-model.ts';
 import { WEAPON_DEFS, type WeaponId } from './defs.ts';
 import type { OpticData, WeaponEntry, WeaponModelRecord } from './runtime-types.ts';
 
-export type OpticId = 'rmr' | 'acog' | 'scope';
+export const OPTIC_IDS = ['rmr', 'acog', 'scope'] as const;
+export type OpticId = (typeof OPTIC_IDS)[number];
 
 /** Null means the authored base weapon, not a separately purchasable component.
  * Muzzle/rail catalogs are intentionally empty until their assets are implemented. */
