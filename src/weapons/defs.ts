@@ -76,10 +76,9 @@ export interface WeaponDef {
   eyeRelief: number;
   /** Only verified weapon/optic fits are enabled; conversion issues add the others. */
   opticEyeRelief?: Partial<Record<OpticId, number>>;
-  /** Authored `IRON_sights` can be removed; an optional `IRON_sights_removed` part replaces it. */
-  removableIrons?: boolean;
-  /** Optics that physically clash with this weapon's installed irons. */
-  opticsWithoutIrons?: readonly OpticId[];
+  /** Authored `IRON_sights` can be removed (an optional `IRON_sights_removed` part replaces
+   * it); `opticClashes` lists optics that only fit with the irons removed. */
+  removableIrons?: { opticClashes: readonly OpticId[] };
   sprintPos: TuningVector;
   sprintRot: TuningVector;
   lowReadyPos: TuningVector;
@@ -222,8 +221,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     // Bring the eye closer to open the rear aperture; its bore and aim datum stay authored.
     eyeRelief: 0.03,
     opticEyeRelief: { rmr: 0.125, acog: 0.11, scope: 0.09 },
-    removableIrons: true,
-    opticsWithoutIrons: ['scope'], // PM II crosses the A2 tower and rear aperture
+    removableIrons: { opticClashes: ['scope'] }, // PM II crosses the A2 tower and rear aperture
     /* Sprint: gun dropped and angled across the body, muzzle down-left.
      * Carried over by the same delta as the hip pose so the blend does not
      * translate the weapon 90 mm sideways on the way into a sprint. */

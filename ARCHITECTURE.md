@@ -384,9 +384,9 @@ validation and common gameplay/inspection mount solver. The M4 supports
 `ironSights` is an independent boolean, installed by default. `WeaponDef.removableIrons`
 enables removal: the authored `IRON_sights` node is hidden and an optional
 `IRON_sights_removed` part is shown instead (the M4's low-profile gas block preserves
-the gas system). `WeaponDef.opticsWithoutIrons` lists optics that clash with installed
-irons (M4: PM II crosses the A2 tower and rear aperture); incompatible combinations
-are rejected, never silently changed. With neither optic
+the gas system). Its `opticClashes` lists optics that only fit with the irons removed
+(M4: PM II crosses the A2 tower and rear aperture); incompatible combinations are
+rejected, never silently changed. With neither optic
 nor irons, ADS retains the base aim datum without a reticle. Removing an optic does
 not reinstall independently removed irons; `BASE_ATTACHMENTS` restores both.
 Optics own magnification, sensitivity and reticle; `WeaponDef.opticEyeRelief` owns

@@ -10,6 +10,7 @@ import { disposeWeaponLoader } from './asset-loader.ts';
 import {
   BASE_ATTACHMENTS,
   configureWeaponAttachments,
+  ironSightNodes,
   isAttachmentConfig,
   loadOptic,
   type AttachmentConfig,
@@ -475,9 +476,8 @@ export class WeaponSystem {
       }
       // Both iron-sight states of every removable assembly must be warm.
       for (const w of this.viewmodel.weapons.values()) {
-        if (WEAPON_DEFS[w.id].removableIrons !== true) continue;
-        for (const name of ['IRON_sights', 'IRON_sights_removed']) {
-          const node = w.model.scene.getObjectByName(name);
+        const irons = ironSightNodes(w.model);
+        for (const node of irons ? [irons.installed, irons.removed] : []) {
           if (!node) continue;
           visible.push([node, node.visible]);
           node.visible = true;

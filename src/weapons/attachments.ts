@@ -36,11 +36,11 @@ export function isAttachmentConfig(value: unknown, id: WeaponId): value is Attac
         WEAPON_DEFS[id].opticEyeRelief?.[value.optic] !== undefined)) &&
     'ironSights' in value &&
     typeof value.ironSights === 'boolean' &&
-    (value.ironSights || WEAPON_DEFS[id].removableIrons === true) &&
+    (value.ironSights || WEAPON_DEFS[id].removableIrons !== undefined) &&
     !(
       value.ironSights &&
       value.optic !== null &&
-      WEAPON_DEFS[id].opticsWithoutIrons?.includes(value.optic) === true
+      WEAPON_DEFS[id].removableIrons?.opticClashes.includes(value.optic) === true
     ) &&
     'muzzle' in value &&
     value.muzzle === null &&
@@ -140,6 +140,17 @@ export function releaseAttachmentMount(group: THREE.Group): void {
   group.clear();
 }
 
+/** Iron-sight nodes of a weapon whose irons can be removed; null when they are fixed. */
+export function ironSightNodes(
+  model: WeaponModelRecord
+): { installed: THREE.Object3D; removed: THREE.Object3D | undefined } | null {
+  if (!WEAPON_DEFS[model.id].removableIrons) return null;
+  return {
+    installed: requiredNode(model.scene, 'IRON_sights'),
+    removed: model.scene.getObjectByName('IRON_sights_removed'),
+  };
+}
+
 /** Shared gameplay/inspection mount solver, run only when configuration changes. */
 export function mountAttachments(
   model: WeaponModelRecord,
@@ -155,9 +166,7 @@ export function mountAttachments(
     throw new Error(
       `[weapons] incompatible attachments: ${model.id}, optic=${opticId}, ironSights=${ironSights}`
     );
-  const removable = WEAPON_DEFS[model.id].removableIrons === true;
-  const irons = removable ? requiredNode(model.scene, 'IRON_sights') : null;
-  const replacement = irons ? model.scene.getObjectByName('IRON_sights_removed') : undefined;
+  const irons = ironSightNodes(model);
   const group = new THREE.Group();
   group.name = 'attachments';
   const sight = new THREE.Vector3().fromArray(model.nodes.sight);
@@ -180,8 +189,10 @@ export function mountAttachments(
     sight.copy(asset.sight).sub(asset.mount).applyMatrix4(transform);
     optic = { ...OPTICS[opticId].optic, center: sight.toArray() };
   }
-  if (irons) irons.visible = ironSights;
-  if (replacement) replacement.visible = !ironSights;
+  if (irons) {
+    irons.installed.visible = ironSights;
+    if (irons.removed) irons.removed.visible = !ironSights;
+  }
   return { group, sight, optic };
 }
 
