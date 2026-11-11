@@ -11,7 +11,7 @@ generated. Ordinary static/mechanical meshes retain eight native clips,
 independent magazines/rounds and exact iron surfaces. One physical material reads
 linear vertex tint and UV finish data; keep the four original 1024² maps.
 The 2.2 mm rear bore, 2.60 mm post and green tip are authored geometry.
-`IRON_sights` retains the original front/rear assemblies; `GASBLOCK_low` supplies
+`IRON_sights` retains the original front/rear assemblies; `IRON_sights_removed` supplies
 the replacement collar and bored gas-tube seat when irons are independently removed.
 See the [attachment contract](../../../ARCHITECTURE.md#models) for supported combinations.
 Runtime ADS uses 30 mm eye relief and 42° weapon FOV, a readability trade-off,

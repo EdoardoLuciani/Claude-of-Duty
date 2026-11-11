@@ -22,7 +22,7 @@ const group = new THREE.Group();
 const irons = new THREE.Group();
 irons.name = 'IRON_sights';
 const gasBlock = new THREE.Group();
-gasBlock.name = 'GASBLOCK_low';
+gasBlock.name = 'IRON_sights_removed';
 gasBlock.visible = false;
 group.add(magazine, irons, gasBlock);
 group.visible = false;

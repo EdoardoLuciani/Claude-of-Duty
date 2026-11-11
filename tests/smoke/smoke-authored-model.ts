@@ -125,7 +125,7 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   const irons = new THREE.Group();
   irons.name = 'IRON_sights';
   const gasBlock = new THREE.Group();
-  gasBlock.name = 'GASBLOCK_low';
+  gasBlock.name = 'IRON_sights_removed';
   root.add(irons, gasBlock);
   const assetScene = new THREE.Group();
   const base = new THREE.Object3D();

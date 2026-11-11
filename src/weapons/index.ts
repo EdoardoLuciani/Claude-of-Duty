@@ -15,7 +15,6 @@ import {
   type AttachmentConfig,
   type OpticModels,
 } from './attachments.ts';
-import { requiredNode } from './authored-model.ts';
 import { ProjectileSim, dropAt } from './ballistics.ts';
 import {
   WEAPON_DEFS,
@@ -474,10 +473,12 @@ export class WeaponSystem {
         attachments.push(asset.scene);
         this.viewmodel.rig.add(asset.scene);
       }
-      const rifle = this.viewmodel.weapons.get('rifle');
-      if (rifle) {
-        for (const name of ['IRON_sights', 'GASBLOCK_low']) {
-          const node = requiredNode(rifle.model.scene, name);
+      // Both iron-sight states of every removable assembly must be warm.
+      for (const w of this.viewmodel.weapons.values()) {
+        if (WEAPON_DEFS[w.id].removableIrons !== true) continue;
+        for (const name of ['IRON_sights', 'IRON_sights_removed']) {
+          const node = w.model.scene.getObjectByName(name);
+          if (!node) continue;
           visible.push([node, node.visible]);
           node.visible = true;
         }
