@@ -60,7 +60,6 @@ export function makeMPXModel(gltf: GLTF): MPXModel {
         }
       }
     }
-  scene.updateMatrixWorld(true);
   const { root, opticMountRest, animations, point } = authoredModel(
     gltf,
     'MPX_RIG',
