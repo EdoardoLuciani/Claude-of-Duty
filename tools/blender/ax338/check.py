@@ -251,7 +251,7 @@ for name,info in manifest['clips'].items():
         assert not moving.overlap(mounted['exps3']),(name,frame,'exps3','hand/sleeve hits optic')
         # Existing optics retain their 24 Hz plus endpoint hand sweep.
         if frame%5==0 or frame==math.ceil(info['duration']*120):
-            hand_poses+=1;moving=surface(hands,evaluated=True)
+            hand_poses+=1
             for optic_id,target in mounted.items():
                 assert not moving.overlap(target),(name,frame,optic_id,'hand/sleeve hits optic')
             assert not moving.overlap(iron_tree),(name,frame,'hand/sleeve hits irons')
