@@ -402,7 +402,7 @@ def build_geometry(materials):
     text('M4A1 RIS II FSP',(-.0198,.080,-.400),.0020,mat=marking)
     for n,y in [('200',.113),('300',.115),('400',.117),('450',.119),('500',.121),('550',.123),('600',.125)]:text(n,(-.0103,y,.019),.0016)
     text('OKAY',(-.01255,-.052,-.094),.0023,mat=magmat,parent=mag)
-    for name,pos in [('SOCKET_muzzle',(0,BORE,FH_TIP)),('SOCKET_ejection',(.023,.081,-.052)),('SOCKET_sight',(0,SIGHT_Y,.034)),('SOCKET_front_post',(0,SIGHT_Y,GAS-.007)),('SOCKET_bolt_face',(0,BORE,BOLT_FACE)),('SOCKET_barrel_crown',(0,BORE,CROWN))]:empty(name,pos,rig)
+    for name,pos in [('MOUNT_optic',(0,BORE+.0286,-.067)),('SOCKET_muzzle',(0,BORE,FH_TIP)),('SOCKET_ejection',(.023,.081,-.052)),('SOCKET_sight',(0,SIGHT_Y,.034)),('SOCKET_front_post',(0,SIGHT_Y,GAS-.007)),('SOCKET_bolt_face',(0,BORE,BOLT_FACE)),('SOCKET_barrel_crown',(0,BORE,CROWN))]:empty(name,pos,rig)
     # Conform markings to the actual shaped surface, not a floating label plane.
     from mathutils.bvhtree import BVHTree
     for o in list(asset.objects):

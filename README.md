@@ -163,8 +163,11 @@ interactive 3D previews. Drag to orbit around the weapon and scroll to zoom; pan
 disabled. In the focused 3D view, arrows rotate, +/- zoom and Home resets.
 Toolbar buttons also provide zoom and reset. Inspection never spends credits:
 use the explicit Buy/Swap button to purchase supplies or weapons.
-This first customization increment previews the current authored configurations;
-separate attachment purchases and iron-sight-only defaults are not implemented yet.
+Inspection previews each weapon's current attachment configuration. The M4 starts
+with irons and supports the shared RMR via `weapons.setAttachments()`; separate
+attachment purchases are not implemented yet. For debug/capture, use
+`?attachmentOptic=rmr` or `?attachmentOptic=none` (base M4), or
+`bun tools/capture.ts --shot=ads --optic=rmr --out=/tmp/m4-rmr-ads.png`.
 
 M4/P320 are the starting weapons; MCX, EVOLYS, MPX and AX338 are shop options.
 The day/night clock

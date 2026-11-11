@@ -7,6 +7,13 @@ import { hasOwn } from '../core/guards.ts';
 import { Spring, TAU, clamp, clamp01, damp, lerp, smootherstep } from '../core/math.ts';
 import { loadArmAsset } from './arm-asset.ts';
 import { createWeaponMaterial } from './asset-material.ts';
+import {
+  BASE_ATTACHMENTS,
+  configureWeaponAttachments,
+  releaseAttachmentMount,
+  type AttachmentConfig,
+  type RMRModel,
+} from './attachments.ts';
 import { createWeaponAnimation } from './authored-animation.ts';
 import { loadBandage } from './bandage-mesh.ts';
 import {
@@ -495,7 +502,12 @@ export class Viewmodel {
   }
 
   /** Mount a required authored GLB and its weapon-local animation adapter. */
-  addWeapon(model: WeaponModelRecord, def: WeaponDef): WeaponEntry {
+  addWeapon(
+    model: WeaponModelRecord,
+    def: WeaponDef,
+    config: AttachmentConfig = BASE_ATTACHMENTS,
+    rmr: RMRModel | null = null
+  ): WeaponEntry {
     let tris = 0;
     const meshes: THREE.Mesh[] = [];
     const animation = createWeaponAnimation(model, def);
@@ -515,6 +527,8 @@ export class Viewmodel {
 
     const entry: WeaponEntry = {
       id: model.id,
+      attachments: BASE_ATTACHMENTS,
+      attachmentGroup: new THREE.Group(),
       def,
       model,
       group,
@@ -546,6 +560,7 @@ export class Viewmodel {
       this._fitSupportHand(entry);
       this._fitGripContacts(entry);
     }
+    configureWeaponAttachments(entry, config, rmr);
     this.weapons.set(model.id, entry);
     return entry;
   }
@@ -1376,12 +1391,16 @@ export class Viewmodel {
       this.reticle.visible = false;
       return;
     }
-    // Optic axis and lens centre, both in camera space. The weapon group is a
-    // child of the rig which is a child of the anchor, so camera space is just
-    // the rig transform applied to the weapon-local values — no inverses, no
-    // allocation.
-    _v.fromArray(optic.center).applyQuaternion(this.rig.quaternion).add(this.rig.position);
-    _v3.set(0, 0, -1).applyQuaternion(this.rig.quaternion).normalize();
+    _v.fromArray(optic.center);
+    _v3.set(0, 0, -1);
+    // Mounted optics follow the animated authored root; integrated optic data
+    // retains its existing weapon-space convention.
+    if (w.attachments.optic !== null) {
+      _v.applyMatrix4(w.model.root.matrix);
+      _v3.transformDirection(w.model.root.matrix);
+    }
+    _v.applyQuaternion(this.rig.quaternion).add(this.rig.position);
+    _v3.applyQuaternion(this.rig.quaternion).normalize();
 
     // Where the axis ray from the eye crosses the lens plane.
     const s = _v.dot(_v3);
@@ -1495,6 +1514,7 @@ export class Viewmodel {
   /* oxlint-disable typescript/no-unnecessary-condition */
   dispose(): void {
     for (const w of this.weapons.values()) {
+      releaseAttachmentMount(w.attachmentGroup);
       w.animation.dispose();
       for (const m of w.meshes) m.geometry.dispose();
     }

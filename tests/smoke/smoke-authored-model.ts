@@ -3,7 +3,19 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+import type { RenderSystem } from '../../src/render/index-webgpu.ts';
+import {
+  BASE_ATTACHMENTS,
+  configureWeaponAttachments,
+  makeRMRModel,
+  type AttachmentConfig,
+} from '../../src/weapons/attachments.ts';
 import { authoredModel, checkAuthoredDuration } from '../../src/weapons/authored-model.ts';
+import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
+import { ReticleMaterials } from '../../src/weapons/materials-tsl.ts';
+import type { WeaponEntry, WeaponModelRecord } from '../../src/weapons/runtime-types.ts';
+import { Viewmodel } from '../../src/weapons/viewmodel.ts';
+import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
 
 // Real three clips; duration is inferred from the keys, as GLTFLoader does.
@@ -81,4 +93,119 @@ assert.throws(
   (): unknown => authoredModel(gltf, 'TEST_RIG', ['Idle', 'Fire', 'Inspect'], authored),
   /missing Inspect clip/
 );
-console.log('authored clip durations: Idle pose accepted, drift and lost motion rejected');
+// Repeated mount/remove borrows one asset, restores base datums/tuning and
+// leaves no orphan glass/socket.
+{
+  const weaponScene = new THREE.Group();
+  const root = new THREE.Object3D();
+  weaponScene.add(root);
+  const socket = new THREE.Object3D();
+  socket.name = 'MOUNT_optic';
+  socket.position.set(0, 0.1036, -0.067);
+  root.add(socket);
+  const assetScene = new THREE.Group();
+  const base = new THREE.Object3D();
+  base.name = 'MOUNT_base';
+  const sight = new THREE.Object3D();
+  sight.name = 'SOCKET_sight';
+  sight.position.set(0, 0.0425072, -0.018);
+  const geometry = new THREE.BoxGeometry(0.02, 0.01, 0.001);
+  const lens = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial());
+  assetScene.add(base, sight, lens);
+  const asset = makeRMRModel(fixture<GLTF>({ scene: assetScene }));
+  let disposed = 0;
+  let ownerDisposed = false;
+  asset.scene.addEventListener('dispose', (): void => {
+    ownerDisposed = true;
+  });
+  geometry.addEventListener('dispose', (): void => {
+    assert(ownerDisposed, 'release retained warm object records before shared geometry');
+    disposed++;
+  });
+  const model = fixture<Extract<WeaponModelRecord, { id: 'rifle' }>>({
+    id: 'rifle',
+    scene: weaponScene,
+    root,
+    nodes: fixture<Extract<WeaponModelRecord, { id: 'rifle' }>['nodes']>({
+      sight: [0, 0.1395, 0.034],
+      muzzle: [0, 0.075, -0.5],
+    }),
+  });
+  const entry = fixture<WeaponEntry>({
+    id: 'rifle',
+    model,
+    group: weaponScene,
+    def: { ...WEAPON_DEFS.rifle },
+    attachments: BASE_ATTACHMENTS,
+    attachmentGroup: new THREE.Group(),
+    sight: new THREE.Vector3(),
+    muzzle: new THREE.Vector3(),
+    optic: null,
+  });
+  const config: AttachmentConfig = { optic: 'rmr', muzzle: null, rail: null };
+  for (let i = 0; i < 8; i++) {
+    // Mounting while the authored root is posed must not bake its current pose.
+    root.rotation.x = i * 0.1;
+    configureWeaponAttachments(entry, config, asset);
+    assert.equal(root.children.length, 2);
+    assert(entry.sight.distanceTo(new THREE.Vector3(0, 0.1461072, -0.085)) < 1e-8);
+    assert.deepEqual(entry.optic?.center, entry.sight.toArray());
+    assert.equal(entry.def.eyeRelief, 0.125);
+    assert.equal(entry.def.adsFovScale, 0.62);
+    assert.equal(entry.def.adsSensScale, 0.62);
+    const mountedLens = entry.attachmentGroup.children[0].children[2];
+    assert(mountedLens instanceof THREE.Mesh);
+    assert.equal(mountedLens.geometry, geometry);
+    const oldMount = entry.attachmentGroup;
+    configureWeaponAttachments(entry, BASE_ATTACHMENTS, asset);
+    assert.equal(oldMount.parent, null);
+    assert.equal(oldMount.children.length, 0);
+    assert.equal(entry.attachmentGroup.children.length, 0);
+    assert.equal(entry.optic, null);
+    assert.deepEqual(entry.sight.toArray(), model.nodes.sight);
+    assert.deepEqual(entry.muzzle.toArray(), model.nodes.muzzle);
+    assert.equal(entry.def.eyeRelief, WEAPON_DEFS.rifle.eyeRelief);
+    assert.equal(entry.def.adsFovScale, undefined);
+    assert.equal(entry.def.adsSensScale, undefined);
+    assert.equal(entry.def.suppressed, false);
+    assert.equal(disposed, 0, 'instances must not dispose borrowed geometry');
+  }
+  const materials = new ReticleMaterials();
+  const viewmodel = new Viewmodel(
+    createTestContext({
+      providers: { render: fixture<RenderSystem>({ screenSize: { width: 1920, height: 1080 } }) },
+    }),
+    materials
+  );
+  root.rotation.set(0, 0, 0);
+  configureWeaponAttachments(entry, config, asset);
+  viewmodel.rig.position.set(0, 0, -entry.def.eyeRelief).sub(entry.sight);
+  viewmodel._updateReticle(entry, 1);
+  assert(viewmodel.reticle.visible, 'settled mounted optic shows its dot');
+  root.position.y = 0.1;
+  root.updateMatrix();
+  viewmodel._updateReticle(entry, 1);
+  assert.equal(
+    viewmodel.reticle.visible,
+    false,
+    'authored draw moving the lens away hides the dot'
+  );
+  root.rotation.x = 0.2;
+  root.updateMatrix();
+  const axis = new THREE.Vector3(0, Math.sin(0.2), -Math.cos(0.2));
+  const expectedDot = axis.multiplyScalar(entry.def.eyeRelief);
+  viewmodel.rig.position.copy(expectedDot).sub(entry.sight.clone().applyMatrix4(root.matrix));
+  viewmodel._updateReticle(entry, 1);
+  assert(viewmodel.reticle.visible, 'eye aligned with the posed optic sees the dot');
+  assert(
+    viewmodel.reticle.position.distanceTo(expectedDot) < 1e-10,
+    'dot follows the authored optical axis'
+  );
+  configureWeaponAttachments(entry, BASE_ATTACHMENTS, asset);
+  viewmodel.dispose();
+  materials.dispose();
+  assert.equal(ownerDisposed, false, 'warm source survives mounted-instance disposal');
+  asset.dispose();
+  assert.equal(disposed, 1, 'asset owner releases shared geometry exactly once');
+}
+console.log('authored models: clip durations and shared attachment mount lifetime OK');

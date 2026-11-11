@@ -72,8 +72,11 @@ try {
     logs.push(`[pageerror] ${e.message}\n${e.stack ?? ''}`);
   });
   try {
+    const attachmentQuery = args.optic
+      ? `&attachmentOptic=${encodeURIComponent(String(args.optic))}`
+      : '';
     await page.goto(
-      `http://127.0.0.1:${PORT}/?capture=1&lockstep=1&shot=${encodeURIComponent(SHOT)}`,
+      `http://127.0.0.1:${PORT}/?capture=1&lockstep=1&shot=${encodeURIComponent(SHOT)}${attachmentQuery}`,
       {
         waitUntil: 'domcontentloaded',
         timeout: TIMEOUT,

@@ -8,6 +8,7 @@ import { Health } from '../../src/player/health.ts';
 import { PlayerSystem } from '../../src/player/index.ts';
 import { Movement } from '../../src/player/movement.ts';
 import type { ArmAsset } from '../../src/weapons/arm-asset.ts';
+import { BASE_ATTACHMENTS } from '../../src/weapons/attachments.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { Clip } from '../../src/weapons/clips.ts';
 import { buildRecoilPattern, WEAPON_DEFS, WEAPON_IDS } from '../../src/weapons/defs.ts';
@@ -78,6 +79,7 @@ export function initializeWeaponStates(
     const def: WeaponDef = { ...WEAPON_DEFS[id], ...patch };
     weapons.states.set(id, {
       def,
+      attachments: BASE_ATTACHMENTS,
       pattern: buildRecoilPattern(def, Rng),
       mag: def.magSize,
       chambered: true,
