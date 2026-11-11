@@ -381,10 +381,12 @@ null slots retain the authored base weapon (including existing integrated optics
 suppressors). `src/weapons/attachments.ts` owns the finite catalog, boundary
 validation and common gameplay/inspection mount solver. The M4 supports
 `optic: 'rmr' | 'acog' | 'scope'`; muzzle/rail catalogs are empty. No attachment economy yet.
-`ironSights` is an independent boolean, installed by default. Only the M4 currently
-supports removal: its `IRON_sights` assembly is replaced by `GASBLOCK_low`, preserving
-the gas system. PM II requires removed irons to clear the A2 tower and rear aperture;
-incompatible combinations are rejected, never silently changed. With neither optic
+`ironSights` is an independent boolean, installed by default. `WeaponDef.removableIrons`
+enables removal: the authored `IRON_sights` node is hidden and an optional
+`IRON_sights_removed` part is shown instead (the M4's low-profile gas block preserves
+the gas system). Its `opticClashes` lists optics that only fit with the irons removed
+(M4: PM II crosses the A2 tower and rear aperture); incompatible combinations are
+rejected, never silently changed. With neither optic
 nor irons, ADS retains the base aim datum without a reticle. Removing an optic does
 not reinstall independently removed irons; `BASE_ATTACHMENTS` restores both.
 Optics own magnification, sensitivity and reticle; `WeaponDef.opticEyeRelief` owns

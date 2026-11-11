@@ -124,9 +124,9 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   root.add(socket);
   const irons = new THREE.Group();
   irons.name = 'IRON_sights';
-  const gasBlock = new THREE.Group();
-  gasBlock.name = 'GASBLOCK_low';
-  root.add(irons, gasBlock);
+  const ironsRemoved = new THREE.Group();
+  ironsRemoved.name = 'IRON_sights_removed';
+  root.add(irons, ironsRemoved);
   const assetScene = new THREE.Group();
   const base = new THREE.Object3D();
   base.name = 'MOUNT_base';
@@ -176,7 +176,7 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     configureWeaponAttachments(entry, config, optics);
     assert.equal(root.children.length, 4);
     assert.equal(irons.visible, config.ironSights);
-    assert.equal(gasBlock.visible, !config.ironSights);
+    assert.equal(ironsRemoved.visible, !config.ironSights);
     assert(entry.sight.distanceTo(new THREE.Vector3(0, 0.1461072, -0.085)) < 1e-8);
     assert.deepEqual(entry.optic?.center, entry.sight.toArray());
     assert.equal(entry.def.eyeRelief, WEAPON_DEFS.rifle.opticEyeRelief?.[optic]);
@@ -196,7 +196,7 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     assert.equal(entry.attachmentGroup.children.length, 0);
     assert.equal(entry.optic, null);
     assert(irons.visible);
-    assert.equal(gasBlock.visible, false);
+    assert.equal(ironsRemoved.visible, false);
     assert.deepEqual(entry.sight.toArray(), model.nodes.sight);
     assert.deepEqual(entry.muzzle.toArray(), model.nodes.muzzle);
     assert.equal(entry.def.eyeRelief, WEAPON_DEFS.rifle.eyeRelief);
@@ -208,7 +208,7 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, ironSights: false }, optics);
   assert.equal(entry.optic, null);
   assert.equal(irons.visible, false, 'irons can be removed without mounting an optic');
-  assert(gasBlock.visible);
+  assert(ironsRemoved.visible);
   const bareMount = entry.attachmentGroup;
   assert.throws(
     (): void => configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, optic: 'scope' }, optics),

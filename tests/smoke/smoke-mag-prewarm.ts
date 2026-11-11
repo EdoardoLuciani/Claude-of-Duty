@@ -21,10 +21,10 @@ magazine.add(new THREE.Mesh(geometry, material));
 const group = new THREE.Group();
 const irons = new THREE.Group();
 irons.name = 'IRON_sights';
-const gasBlock = new THREE.Group();
-gasBlock.name = 'GASBLOCK_low';
-gasBlock.visible = false;
-group.add(magazine, irons, gasBlock);
+const ironsRemoved = new THREE.Group();
+ironsRemoved.name = 'IRON_sights_removed';
+ironsRemoved.visible = false;
+group.add(magazine, irons, ironsRemoved);
 group.visible = false;
 const radio = new THREE.Group();
 radio.visible = false;
@@ -47,7 +47,7 @@ const weapon = fixture<WeaponEntry>({
   group,
   parts: { magazine },
   magLen: 0.15,
-  model: fixture<WeaponEntry['model']>({ scene: group }),
+  model: fixture<WeaponEntry['model']>({ id: 'rifle', scene: group }),
 });
 const system = new WeaponSystem();
 system._droppedMags = [];
@@ -70,7 +70,7 @@ const render = fixture<RenderSystem>({
   },
   _warmGraph(): ReturnType<RenderSystem['_warmGraph']> {
     calls++;
-    assert(irons.visible && gasBlock.visible, 'warm both independent iron-sight variants');
+    assert(irons.visible && ironsRemoved.visible, 'warm both independent iron-sight variants');
     assert.equal(scene.children.length, 3);
     assert.equal(system.pickups.items.length, 0);
     assert.equal(system.pickups._nextId, 1);
@@ -123,7 +123,7 @@ assert.equal(calls, 1, 'completion never repeats native warmup');
 assert.equal(radio.visible, false);
 assert.equal(group.visible, false);
 assert(irons.visible);
-assert.equal(gasBlock.visible, false);
+assert.equal(ironsRemoved.visible, false);
 assert.equal(scopeOverlay.visible || reticle.visible, false);
 assert.equal(grenade.visible, false);
 assert.equal(scene.children.length, 2, 'temporary ammo visual was removed');

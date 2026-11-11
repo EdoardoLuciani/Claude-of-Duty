@@ -28,7 +28,7 @@ def build_geometry(materials):
         o=bpy.data.objects.new(name,None);asset.objects.link(o);o.parent=parent;o.location=xyz(loc);o.empty_display_size=.008;return o
     rig=empty('M4_RIG');body=empty('receiver',parent=rig)
     guard_root=empty('handguard',parent=body);stock_root=empty('stock',parent=body)
-    irons_root=empty('IRON_sights',parent=body);low_block=empty('GASBLOCK_low',parent=body)
+    irons_root=empty('IRON_sights',parent=body);low_block=empty('IRON_sights_removed',parent=body)
     mag=empty('magazine',parent=rig);spare=empty('magazine_spare',parent=rig)
     bolt=empty('bolt',parent=rig);head=empty('bolt_head',(0,.075,-.1015),bolt);handle=empty('charging_handle',parent=rig)
     trigger=empty('trigger',(0,.0455,-.0055),rig)

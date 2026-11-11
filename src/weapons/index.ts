@@ -10,12 +10,12 @@ import { disposeWeaponLoader } from './asset-loader.ts';
 import {
   BASE_ATTACHMENTS,
   configureWeaponAttachments,
+  ironSightNodes,
   isAttachmentConfig,
   loadOptic,
   type AttachmentConfig,
   type OpticModels,
 } from './attachments.ts';
-import { requiredNode } from './authored-model.ts';
 import { ProjectileSim, dropAt } from './ballistics.ts';
 import {
   WEAPON_DEFS,
@@ -483,10 +483,11 @@ export class WeaponSystem {
         attachments.push(asset.scene);
         this.viewmodel.rig.add(asset.scene);
       }
-      const rifle = this.viewmodel.weapons.get('rifle');
-      if (rifle) {
-        for (const name of ['IRON_sights', 'GASBLOCK_low']) {
-          const node = requiredNode(rifle.model.scene, name);
+      // Both iron-sight states of every removable assembly must be warm.
+      for (const w of this.viewmodel.weapons.values()) {
+        const irons = ironSightNodes(w.model);
+        for (const node of irons ? [irons.installed, irons.removed] : []) {
+          if (!node) continue;
           visible.push([node, node.visible]);
           node.visible = true;
         }
