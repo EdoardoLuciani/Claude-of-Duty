@@ -393,7 +393,7 @@ not reinstall independently removed irons; `BASE_ATTACHMENTS` restores both.
 Optics own magnification, sensitivity and reticle. `WeaponDef.fits` has one shape per
 slot: a partial record keyed by attachment id whose entry enables that verified fit
 and holds its data (`fits.optic[id].eyeRelief`; `fits.rail.laser` is empty). Validation
-and the load-time `MOUNT_<slot>` guard read only these keys, never per-slot flags.
+and the load-time `MOUNT_<slot>` guard read these keys.
 Other weapons' conversion issues add their mount points/fit data; null retains their
 current integrated optic.
 `weapons.setAttachments(id, config)` changes an owned, loaded weapon synchronously

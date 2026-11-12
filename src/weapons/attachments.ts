@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Renderer } from 'three/webgpu';
 
+import { hasOwn } from '../core/guards.ts';
 import { isMesh } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
@@ -29,10 +30,7 @@ export const BASE_ATTACHMENTS: AttachmentConfig = Object.freeze({
 
 /** One rule for every slot: null keeps the base weapon; an id needs a fit record entry. */
 function hasFit(fits: object | undefined, value: unknown): boolean {
-  return (
-    value === null ||
-    (typeof value === 'string' && fits !== undefined && Object.hasOwn(fits, value))
-  );
+  return value === null || (typeof value === 'string' && fits !== undefined && hasOwn(fits, value));
 }
 
 /** Narrow URL/debug input once; reject unsupported slots and incompatible weapons. */

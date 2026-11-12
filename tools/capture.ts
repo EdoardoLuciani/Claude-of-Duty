@@ -9,8 +9,8 @@ import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 import type { Engine } from '../src/core/engine.ts';
-import type { AttachmentConfig } from '../src/weapons/attachments.ts';
-import { isWeaponId, WEAPON_DEFS } from '../src/weapons/defs.ts';
+import { isAttachmentConfig, type AttachmentConfig } from '../src/weapons/attachments.ts';
+import { isWeaponId } from '../src/weapons/defs.ts';
 import {
   ensureDevServer,
   launchChromium,
@@ -33,33 +33,20 @@ const WEAPON = String(args.weapon ?? 'rifle');
 if (!isWeaponId(WEAPON)) throw new Error(`Unknown weapon: ${WEAPON}`);
 const OPTIC = args.optic;
 const RAIL = args.rail;
-if (RAIL !== undefined && RAIL !== 'none' && RAIL !== 'laser')
-  throw new Error(`Unknown rail module: ${RAIL}`);
-if (RAIL === 'laser' && WEAPON_DEFS[WEAPON].fits?.rail?.laser === undefined)
-  throw new Error(`${WEAPON} has no verified laser mount.`);
 if (args.irons !== undefined && args.irons !== 'installed' && args.irons !== 'removed')
   throw new Error(`Unknown iron-sight configuration: ${args.irons}`);
-if (
-  OPTIC !== undefined &&
-  OPTIC !== 'none' &&
-  OPTIC !== 'rmr' &&
-  OPTIC !== 'acog' &&
-  OPTIC !== 'scope'
-)
-  throw new Error(`Unknown optic: ${OPTIC}`);
-if (
-  OPTIC &&
-  OPTIC !== 'none' &&
-  args.irons !== 'removed' &&
-  WEAPON_DEFS[WEAPON].removableIrons?.opticClashes.includes(OPTIC)
-)
-  throw new Error(`${WEAPON} with ${args.optic} requires --irons=removed.`);
-const ATTACHMENTS: AttachmentConfig = {
+const requested: unknown = {
   optic: OPTIC === undefined || OPTIC === 'none' ? null : OPTIC,
   ironSights: args.irons !== 'removed',
   muzzle: null,
-  rail: RAIL === 'laser' ? 'laser' : null,
+  rail: RAIL === undefined || RAIL === 'none' ? null : RAIL,
 };
+// The game's own rule: unknown ids, unverified fits and iron clashes are all rejected.
+if (!isAttachmentConfig(requested, WEAPON))
+  throw new Error(
+    `${WEAPON} does not accept optic=${OPTIC ?? 'none'}, irons=${args.irons ?? 'installed'}, rail=${RAIL ?? 'none'}.`
+  );
+const ATTACHMENTS: AttachmentConfig = requested;
 
 // Self-contained functions serialized by Playwright into the browser.
 function pump(frames: number): Promise<number> {
