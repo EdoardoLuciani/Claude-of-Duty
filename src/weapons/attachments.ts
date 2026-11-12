@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Renderer } from 'three/webgpu';
 
+import { hasOwn, isRecord } from '../core/guards.ts';
 import { isMesh } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
@@ -11,13 +12,14 @@ import type { OpticData, WeaponEntry, WeaponModelRecord } from './runtime-types.
 
 export const OPTIC_IDS = ['rmr', 'acog', 'scope'] as const;
 export type OpticId = (typeof OPTIC_IDS)[number];
+export type RailId = 'laser';
 
 /** Null means the authored base weapon, not a separately purchasable component. */
 export interface AttachmentConfig {
   readonly optic: OpticId | null;
   readonly ironSights: boolean;
   readonly muzzle: null;
-  readonly rail: 'laser' | null;
+  readonly rail: RailId | null;
 }
 export const BASE_ATTACHMENTS: AttachmentConfig = Object.freeze({
   optic: null,
@@ -26,26 +28,24 @@ export const BASE_ATTACHMENTS: AttachmentConfig = Object.freeze({
   rail: null,
 });
 
+/** One rule for every slot: null keeps the base weapon; an id needs a fit record entry. */
+function hasFit(fits: object | undefined, value: unknown): boolean {
+  return value === null || (typeof value === 'string' && fits !== undefined && hasOwn(fits, value));
+}
+
 /** Narrow URL/debug input once; reject unsupported slots and incompatible weapons. */
 export function isAttachmentConfig(value: unknown, id: WeaponId): value is AttachmentConfig {
-  if (typeof value !== 'object' || value === null) return false;
+  // A missing slot reads as undefined, which every check below rejects.
+  if (!isRecord(value)) return false;
+  const { optic, ironSights, muzzle, rail } = value;
+  const { fits, removableIrons } = WEAPON_DEFS[id];
   return (
-    'optic' in value &&
-    (value.optic === null ||
-      ((value.optic === 'rmr' || value.optic === 'acog' || value.optic === 'scope') &&
-        WEAPON_DEFS[id].opticEyeRelief?.[value.optic] !== undefined)) &&
-    'ironSights' in value &&
-    typeof value.ironSights === 'boolean' &&
-    (value.ironSights || WEAPON_DEFS[id].removableIrons !== undefined) &&
-    !(
-      value.ironSights &&
-      value.optic !== null &&
-      WEAPON_DEFS[id].removableIrons?.opticClashes.includes(value.optic) === true
-    ) &&
-    'muzzle' in value &&
-    value.muzzle === null &&
-    'rail' in value &&
-    (value.rail === null || (value.rail === 'laser' && WEAPON_DEFS[id].laserRail === true))
+    hasFit(fits?.optic, optic) &&
+    hasFit(fits?.rail, rail) &&
+    muzzle === null &&
+    typeof ironSights === 'boolean' &&
+    (ironSights || removableIrons !== undefined) &&
+    !(ironSights && removableIrons?.opticClashes.some((clash): boolean => clash === optic))
   );
 }
 
@@ -276,7 +276,7 @@ export function configureWeaponAttachments(
   entry.def.eyeRelief =
     config.optic === null
       ? base.eyeRelief
-      : (base.opticEyeRelief?.[config.optic] ?? base.eyeRelief);
+      : (base.fits?.optic?.[config.optic]?.eyeRelief ?? base.eyeRelief);
   entry.def.suppressed = base.suppressed ?? false;
   const fov = attached ? attached.adsFovScale : base.adsFovScale;
   const sensitivity = attached ? attached.adsSensScale : base.adsSensScale;

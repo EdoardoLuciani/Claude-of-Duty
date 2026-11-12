@@ -1,5 +1,6 @@
 import type { Renderer } from 'three/webgpu';
 
+import { requiredNode } from './authored-model.ts';
 import { loadAX338 } from './ax338.ts';
 import { isWeaponId, WEAPON_DEFS } from './defs.ts';
 import type { WeaponId } from './defs.ts';
@@ -31,7 +32,7 @@ export async function loadWeapon(
   if (!isWeaponId(id)) throw new Error(`[weapons] unknown weapon ${id}`);
   const model = await LOADERS[id](renderer);
   // Fail this weapon's load, not the batch it is mounted with.
-  if (WEAPON_DEFS[id].opticEyeRelief && !model.opticMountRest)
-    throw new Error(`[weapons] ${id} accepts optics but has no MOUNT_optic`);
+  for (const slot of Object.keys(WEAPON_DEFS[id].fits ?? {}))
+    requiredNode(model.root, `MOUNT_${slot}`);
   return model;
 }

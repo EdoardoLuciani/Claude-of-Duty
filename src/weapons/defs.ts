@@ -2,7 +2,7 @@
  * zeroRange is the sight-line crossing; learned sightline recoil is separate from random spread.
  */
 
-import type { OpticId } from './attachments.ts';
+import type { OpticId, RailId } from './attachments.ts';
 
 export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx'] as const;
 export type WeaponId = (typeof WEAPON_IDS)[number];
@@ -74,10 +74,12 @@ export interface WeaponDef {
   hipRot: TuningVector;
   adsCant: TuningVector;
   eyeRelief: number;
-  /** Only verified weapon/optic fits are enabled; conversion issues add the others. */
-  opticEyeRelief?: Partial<Record<OpticId, number>>;
-  /** Verified authored side-rail fit for the TOR Mini. No handling modifiers. */
-  laserRail?: boolean;
+  /** Verified fits per attachment slot: a key enables that attachment on this weapon
+   * and holds its fit data. Unverified fits stay absent; no handling modifiers. */
+  fits?: {
+    optic?: Partial<Record<OpticId, { eyeRelief: number }>>;
+    rail?: Partial<Record<RailId, Record<string, never>>>;
+  };
   /** Authored `IRON_sights` can be removed (an optional `IRON_sights_removed` part replaces
    * it); `opticClashes` lists optics that only fit with the irons removed. */
   removableIrons?: { opticClashes: readonly OpticId[] };
@@ -222,8 +224,10 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     adsCant: [0, 0, 0.004],
     // Bring the eye closer to open the rear aperture; its bore and aim datum stay authored.
     eyeRelief: 0.03,
-    laserRail: true,
-    opticEyeRelief: { rmr: 0.125, acog: 0.11, scope: 0.09 },
+    fits: {
+      optic: { rmr: { eyeRelief: 0.125 }, acog: { eyeRelief: 0.11 }, scope: { eyeRelief: 0.09 } },
+      rail: { laser: {} },
+    },
     removableIrons: { opticClashes: ['scope'] }, // PM II crosses the A2 tower and rear aperture
     /* Sprint: gun dropped and angled across the body, muzzle down-left.
      * Carried over by the same delta as the hip pose so the blend does not
@@ -360,7 +364,9 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     hipRot: [-0.074, 0.081, -0.135],
     adsCant: [0, 0, 0.004],
     eyeRelief: 0.03,
-    opticEyeRelief: { rmr: 0.125, acog: 0.11, scope: 0.09 },
+    fits: {
+      optic: { rmr: { eyeRelief: 0.125 }, acog: { eyeRelief: 0.11 }, scope: { eyeRelief: 0.09 } },
+    },
     removableIrons: { opticClashes: ['scope'] }, // PM II crosses the front iron assembly.
     sprintPos: [0.09, -0.29, -0.285],
     sprintRot: [-0.42, 0.62, 0.22],
@@ -429,7 +435,9 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     eyeRelief: 0.34,
     // Long-relief game fit: compensate each ocular's distance from the slide
     // mount to retain the iron-sight wrist extension, not a rifle-to-face pose.
-    opticEyeRelief: { rmr: 0.394, acog: 0.308, scope: 0.2 },
+    fits: {
+      optic: { rmr: { eyeRelief: 0.394 }, acog: { eyeRelief: 0.308 }, scope: { eyeRelief: 0.2 } },
+    },
     sprintPos: [0.09, -0.25, -0.28],
     sprintRot: [-0.42, 0.5, 0.14],
     lowReadyPos: [0.1, -0.26, -0.32],
@@ -494,7 +502,9 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     adsCant: [0, 0, 0.003],
     eyeRelief: 0.28,
     // Shared optics sit above the fixed ghost ring on the see-through receiver rail.
-    opticEyeRelief: { rmr: 0.12, acog: 0.1, scope: 0.085 },
+    fits: {
+      optic: { rmr: { eyeRelief: 0.12 }, acog: { eyeRelief: 0.1 }, scope: { eyeRelief: 0.085 } },
+    },
     sprintPos: [0.09, -0.27, -0.28],
     sprintRot: [-0.42, 0.58, 0.2],
     lowReadyPos: [0.11, -0.29, -0.29],
@@ -552,7 +562,9 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     hipRot: [-0.055, 0.078, -0.13],
     adsCant: [0, 0, 0],
     eyeRelief: 0.07,
-    opticEyeRelief: { rmr: 0.125, acog: 0.11, scope: 0.09 },
+    fits: {
+      optic: { rmr: { eyeRelief: 0.125 }, acog: { eyeRelief: 0.11 }, scope: { eyeRelief: 0.09 } },
+    },
     removableIrons: { opticClashes: ['scope'] }, // PM II ocular crosses the rear aperture
     sprintPos: [0.088, -0.31, -0.3],
     sprintRot: [-0.46, 0.66, 0.22],

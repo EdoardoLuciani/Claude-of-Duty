@@ -390,9 +390,12 @@ the gas system). Its `opticClashes` lists optics that only fit with the irons re
 rejected, never silently changed. With neither optic
 nor irons, ADS retains the base aim datum without a reticle. Removing an optic does
 not reinstall independently removed irons; `BASE_ATTACHMENTS` restores both.
-Optics own magnification, sensitivity and reticle; `WeaponDef.opticEyeRelief` owns
-per-weapon/optic eye relief and enables verified fits. Other weapons' conversion
-issues add their mount points/fit data; null retains their current integrated optic.
+Optics own magnification, sensitivity and reticle. `WeaponDef.fits` has one shape per
+slot: a partial record keyed by attachment id whose entry enables that verified fit
+and holds its data (`fits.optic[id].eyeRelief`; `fits.rail.laser` is empty). Validation
+and the load-time `MOUNT_<slot>` guard read these keys.
+Other weapons' conversion issues add their mount points/fit data; null retains their
+current integrated optic.
 `weapons.setAttachments(id, config)` changes an owned, loaded weapon synchronously
 outside the frame loop. It stages/validates before replacing the old mount and
 resolves sight/OpticData, muzzle and effective handling/suppression on the state's
