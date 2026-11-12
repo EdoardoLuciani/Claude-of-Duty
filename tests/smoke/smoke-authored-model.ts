@@ -201,7 +201,7 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     assert.equal(ironsRemoved.visible, !config.ironSights);
     assert(entry.sight.distanceTo(new THREE.Vector3(0, 0.1461072, -0.085)) < 1e-8);
     assert.deepEqual(entry.optic?.center, entry.sight.toArray());
-    assert.equal(entry.def.eyeRelief, WEAPON_DEFS.rifle.opticEyeRelief?.[optic]);
+    assert.equal(entry.def.eyeRelief, WEAPON_DEFS.rifle.fits?.optic?.[optic]?.eyeRelief);
     assert.equal(entry.def.adsFovScale, optic === 'rmr' ? 0.62 : optic === 'acog' ? 0.28 : 0.25);
     assert.equal(entry.def.adsSensScale, entry.def.adsFovScale);
     assert.equal(

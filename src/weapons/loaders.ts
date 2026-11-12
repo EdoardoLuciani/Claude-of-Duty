@@ -31,7 +31,8 @@ export async function loadWeapon(
   if (!isWeaponId(id)) throw new Error(`[weapons] unknown weapon ${id}`);
   const model = await LOADERS[id](renderer);
   // Fail this weapon's load, not the batch it is mounted with.
-  if (WEAPON_DEFS[id].opticEyeRelief && !model.opticMountRest)
-    throw new Error(`[weapons] ${id} accepts optics but has no MOUNT_optic`);
+  for (const [slot, fits] of Object.entries(WEAPON_DEFS[id].fits ?? {}))
+    if (Object.keys(fits).length > 0 && !model.root.getObjectByName(`MOUNT_${slot}`))
+      throw new Error(`[weapons] ${id} accepts ${slot} attachments but has no MOUNT_${slot}`);
   return model;
 }

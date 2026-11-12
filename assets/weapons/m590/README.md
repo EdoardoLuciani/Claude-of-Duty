@@ -56,7 +56,7 @@ sight references. The open-bore 12g adapter is permanent seating hardware, not a
 catalogs are empty (#670/#671); these two future datums are **not** model-fit or
 hand-clearance certification for nonexistent attachments.
 
-`opticEyeRelief` enables RMR / ACOG / PM II at .120 / .100 / .085 m respectively.
+`fits.optic` enables RMR / ACOG / PM II with eye relief .120 / .100 / .085 m respectively.
 `check.py` requires freshly generated shared optic `.blend` products (normal
 `bun run assets` builds them). `mounts.py` appends those actual meshes and checks
 four rail contacts per optic, fixed-iron clearance, the open ghost-ring line,

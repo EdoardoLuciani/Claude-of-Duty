@@ -35,7 +35,7 @@ const OPTIC = args.optic;
 const RAIL = args.rail;
 if (RAIL !== undefined && RAIL !== 'none' && RAIL !== 'laser')
   throw new Error(`Unknown rail module: ${RAIL}`);
-if (RAIL === 'laser' && WEAPON_DEFS[WEAPON].laserRail !== true)
+if (RAIL === 'laser' && WEAPON_DEFS[WEAPON].fits?.rail?.laser === undefined)
   throw new Error(`${WEAPON} has no verified laser mount.`);
 if (args.irons !== undefined && args.irons !== 'installed' && args.irons !== 'removed')
   throw new Error(`Unknown iron-sight configuration: ${args.irons}`);
