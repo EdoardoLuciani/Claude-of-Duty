@@ -29,8 +29,8 @@ measurements are in Git history, not evidence of an FPS improvement.
 
 ## TOR Mini rail (#686)
 
-A short authored right-side Picatinny adapter is **staged, with `laserRail`
-disabled**. Native mechanism/optic/suppressor checks have no DCC review hands;
+A short authored right-side Picatinny adapter is **staged, with no
+`fits.rail.laser` entry**. Native mechanism/optic/suppressor checks have no DCC review hands;
 the browser .2/.5/.8 snapshots do not verify the intervening runtime-hand paths.
 Full-motion review of relevant clips and transitions is required before enabling
 the shared laser. No hand/animation retarget, base conversion or dependency on

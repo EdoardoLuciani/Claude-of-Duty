@@ -80,8 +80,8 @@ contains no camera-aim or bullet-zero assumption.
 
 **Partial implementation:** the target is all seven weapons, but runtime laser
 compatibility is enabled only for M4, P320, EVOLYS, AX338 and MPX. M590 and MCX
-hardware/checks are retained as staged authoring work; their `laserRail` flags
-are disabled and API/debug/capture configuration rejects `rail: 'laser'`.
+hardware/checks are retained as staged authoring work; they have no
+`fits.rail.laser` entry, so API/debug/capture configuration rejects `rail: 'laser'`.
 M590 requires authorized shared-arm input resolution and a complete authoring
 check pass. MCX requires full-motion runtime-hand verification, including the
 intervals and transitions between the existing selected-pose snapshots.

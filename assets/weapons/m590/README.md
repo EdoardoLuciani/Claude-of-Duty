@@ -57,7 +57,7 @@ sight references. The open-bore 12g adapter is permanent seating hardware, not a
 underside rail, ahead of the pump and behind the clean-out cap. It remains fixed
 through all 89 mm of pump travel; no forend geometry or hand calibration changed.
 The independent laser sweep checks actual TOR surfaces/hands at 739 poses
-(120 Hz), but **runtime `laserRail` compatibility remains disabled**. The full
+(120 Hz), but **it has no runtime `fits.rail.laser` entry yet**. The full
 `check.py` stops at the shared-arm certificate before its mount/optic gates;
 the independent sweep cannot establish those later gates. Retained hardware is
 staged pending authorized input/certificate resolution and a full check pass;
