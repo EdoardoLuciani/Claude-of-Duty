@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Renderer } from 'three/webgpu';
 
-import { hasOwn } from '../core/guards.ts';
+import { hasOwn, isRecord } from '../core/guards.ts';
 import { isMesh } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
@@ -35,9 +35,8 @@ function hasFit(fits: object | undefined, value: unknown): boolean {
 
 /** Narrow URL/debug input once; reject unsupported slots and incompatible weapons. */
 export function isAttachmentConfig(value: unknown, id: WeaponId): value is AttachmentConfig {
-  if (typeof value !== 'object' || value === null) return false;
-  if (!('optic' in value && 'ironSights' in value && 'muzzle' in value && 'rail' in value))
-    return false;
+  // A missing slot reads as undefined, which every check below rejects.
+  if (!isRecord(value)) return false;
   const { optic, ironSights, muzzle, rail } = value;
   const { fits, removableIrons } = WEAPON_DEFS[id];
   return (
