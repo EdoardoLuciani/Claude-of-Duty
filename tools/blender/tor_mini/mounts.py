@@ -25,13 +25,19 @@ PROFILES = {
 }
 
 
-def geometry(obj, transform):
+def geometry(obj, transform, group=None):
     evaluated = obj.evaluated_get(bpy.context.evaluated_depsgraph_get())
     mesh = evaluated.to_mesh()
     mesh.calc_loop_triangles()
     matrix = transform @ evaluated.matrix_world
     vertices = [matrix @ v.co for v in mesh.vertices]
-    faces = [tuple(t.vertices) for t in mesh.loop_triangles]
+    if group is None:
+        faces = [tuple(t.vertices) for t in mesh.loop_triangles]
+    else:
+        index = obj.vertex_groups[group].index
+        selected = {v.index for v in mesh.vertices if any(g.group == index and g.weight > .5 for g in v.groups)}
+        faces = [tuple(t.vertices) for t in mesh.loop_triangles if all(i in selected for i in t.vertices)]
+        assert faces, (obj.name, group, 'missing authored hardware surfaces')
     evaluated.to_mesh_clear()
     return vertices, faces
 
@@ -54,6 +60,21 @@ def check_laser_mount(weapon):
         'authored hands' in c.name or 'review hands' in c.name for c in o.users_collection)]
     if weapon != 'mcx':
         assert hands, (weapon, 'missing deformed review hands')
+    # EVOLYS joins the actual support parts into its handguard; the authored
+    # vertex group preserves their identity without treating the whole guard as new.
+    hardware_sources = []
+    if weapon == 'evolys':
+        hardware_sources = [(bpy.data.objects['handguard_mesh'], 'LASER_mount_hardware')]
+    elif weapon == 'mpx':
+        hardware_sources = [(o, None) for o in weapon_meshes if o.name.startswith('Laser rail ')]
+        assert hardware_sources, (weapon, 'missing laser support hardware')
+    hardware_vertices, hardware_faces = [], []
+    for obj, group in hardware_sources:
+        points, triangles = geometry(obj, mount.matrix_world.inverted(), group)
+        offset = len(hardware_vertices)
+        hardware_vertices.extend(points)
+        hardware_faces.extend(tuple(offset + i for i in triangle) for triangle in triangles)
+    hardware = tree(hardware_vertices, hardware_faces) if hardware_faces else None
     path = ROOT / 'assets/attachments/steiner-tor-mini/tor-mini.blend'
     assert path.exists(), f'Build shared TOR Mini first: {path}'
     with bpy.data.libraries.load(str(path), link=False) as (source, loaded):
@@ -122,10 +143,13 @@ def check_laser_mount(weapon):
                     # Broad phase covers both the real module and its forward
                     # emission corridor; only overlapping surfaces need a BVH.
                     low, high = (-.018, -.028, -.032), (.018, 1.026, .007)
-                    if any(max(p[i] for p in bounds) < low[i] or min(p[i] for p in bounds) > high[i] for i in range(3)):
+                    check_hardware = hardware is not None and obj in hands
+                    if not check_hardware and any(max(p[i] for p in bounds) < low[i] or min(p[i] for p in bounds) > high[i] for i in range(3)):
                         continue
                     points, triangles = geometry(obj, inverse)
                     target = tree(points, triangles)
+                    if check_hardware:
+                        assert not hardware.overlap(target), (weapon, name, sample, obj.name, 'laser support hardware intersects hand')
                     assert target.ray_cast(emission, forward, 1.0)[0] is None, (weapon, name, sample, obj.name, 'blocked emitter')
                     overlaps = laser.overlap(target)
                     for laser_face, weapon_face in overlaps:

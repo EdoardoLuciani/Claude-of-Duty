@@ -100,7 +100,7 @@ body outward. These are authored game-fit adaptations, not certified hardware.
 | --- | --- | --- | --- |
 | M4A1 | Enabled | `[.0285, .075, −.250]` | Existing right RIS II rail; fit unchanged |
 | P320 | Enabled | `[0, .002, −.122]` | Frame bone, not slide; integral game-fit rail extended 14 mm with fifth slot |
-| EVOLYS | Enabled | `[.0345, .110, −.395]` | Handguard; two-leg upper-right offset bracket bolted at the existing side interface |
+| EVOLYS | Enabled | `[0, .0165924, −.363725]` | Handguard; direct reference-backed underside Picatinny rail, no side bracket |
 | M590 | Staged / disabled | `[0, .009, −.590]` | Receiver; two fixed magazine-tube clamps ahead of the entire pump stroke |
 | AX338 | Enabled | `[.038, .075, −.455]` | Fixed right KeySlot/Picatinny adapter, ahead of hand/bolt/folding stock |
 | MCX VIRTUS | Staged / disabled | `[.038, .070, −.361]` | Receiver; forward right adapter, integrated ACOG/SRD762Ti retained |
@@ -110,7 +110,11 @@ P320's rail extension is an explicit deviation from the Compact factory frame.
 The module nose sits a few millimetres ahead of its barrel exit, below the bore;
 barrel/slide/hand motion is unchanged. M590's laser deliberately does **not**
 move with the forend: its clamps grip the fixed tube between the pump and end cap.
-No hand calibration or animation was retargeted to make these fits pass.
+EVOLYS intentionally recalibrates its support hold 23 mm rearward and 16 mm lower
+and stages release/regrip below the rail; feed/pouch/charging beats stay intact.
+Its lower rail and actual module are checked against both evaluated hands.
+The MPX hardware-versus-hand check still exposes unresolved adapter contacts;
+its earlier module-only fit evidence is not full hand-clearance acceptance.
 
 Each changed weapon's `check.py` calls `tools/blender/tor_mini/mounts.py` against
 actual editable TOR/weapon/optic surfaces. It checks forward direction, rail

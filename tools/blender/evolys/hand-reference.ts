@@ -15,7 +15,7 @@ import {
 
 const grips: Record<Side, GripFrame> = {
   right: { pos: [0.035, -0.035, 0.099], finger: [0.15, 0.35, -0.92], back: [1, 0.03, 0.04] },
-  left: { pos: [-0.089, 0.022, -0.292], finger: [0.9, -0.1, -0.436], back: [-0.14, -0.985, 0.001] },
+  left: { pos: [-0.089, 0.006, -0.269], finger: [0.98, -0.1, -0.15], back: [-0.14, -0.985, 0.001] },
 };
 const sides: Partial<Record<Side, HandSideReference>> = {};
 const contacts: Partial<Record<'pouch' | 'feed' | 'charging', HandContact>> = {};
@@ -27,7 +27,7 @@ for (const side of ['right', 'left'] as const) {
   arm.hand.quaternion.copy(basis(g.finger, g.back));
   arm.setPose(side === 'right' ? 'gripLmg' : 'clamp');
   if (side === 'left')
-    arm.fitToCylinder(arm.hand.position, arm.hand.quaternion, [0, 0.075, 0], [0, 0, 1], 0.027, {
+    arm.fitToCylinder(arm.hand.position, arm.hand.quaternion, [0, 0.046, 0], [0, 0, 1], 0.04, {
       clearance: 0.0015,
       poseName: 'evolys',
     });
@@ -45,7 +45,17 @@ for (const side of ['right', 'left'] as const) {
           ],
           spread: [0, 0.6, 0.62, 0.64],
         }
-      : { thumb: [-0.028, 0.089, -0.318], thumbPole: [0, 0, -1] }
+      : {
+          thumb: [-0.028, 0.083, -0.295],
+          thumbPole: [0, 0, -1],
+          // Actual glove pads seated on the molded cover; MCP joints retain the wrap.
+          fingers: [
+            [0.43958333333333344, 1.2572669717467817, 0.653756570215048],
+            [0.58125, 1.2292782105865987, 1.4092133249936407],
+            [0.6166666666666667, 1.1931026791286827, 1.2199692257351586],
+            [0.6166666666666667, 1.1820840291368757, 0.36712387667080193],
+          ],
+        }
   );
   result.sides[side] = {
     quaternion: arm.hand.quaternion.toArray(),

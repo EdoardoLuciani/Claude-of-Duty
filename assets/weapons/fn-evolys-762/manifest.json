@@ -147,11 +147,11 @@
     }
   },
   "stats": {
-    "triangles": 52783,
+    "triangles": 54083,
     "primitives": 10,
     "materials": 1,
     "images": 3,
-    "bytes": 7642356
+    "bytes": 7781412
   },
   "textureResolution": 1024,
   "belt": {
