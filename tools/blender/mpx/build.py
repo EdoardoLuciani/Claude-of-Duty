@@ -623,7 +623,9 @@ def build(output, render=False, quick=False):
     # Right M-LOK/Picatinny adapter, forward of the support-hand grip.
     rail = empty('MOUNT_rail', (.295, -.037, 0), body)
     rail.rotation_euler = Matrix(((0,1,0),(0,0,1),(1,0,0))).to_euler()
-    box('Laser rail adapter web',(.295,-.030,0),(.055,.010,.014),alloy)
+    web=box('Laser rail adapter web',(.2975,-.030,0),(.050,.010,.014),alloy)
+    # Relieve the rear inboard corner, retaining the flange beneath the first tooth.
+    cut(web,box('CUT laser adapter grip relief',(.2775,-.024,0),(.015,.018,.020),None,None,0))
     for i in range(5):
         box('Laser rail adapter tooth',(.275+i*.010,-.035,0),(.0052,.004,.020),steel)
     for x in (.275,.315):
