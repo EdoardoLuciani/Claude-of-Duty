@@ -32,6 +32,9 @@ const scopeOverlay = new THREE.Group();
 scopeOverlay.visible = false;
 const reticle = new THREE.Group();
 reticle.visible = false;
+const reticleRing = new THREE.Mesh(new THREE.RingGeometry(0.84, 1), material);
+reticleRing.visible = false;
+reticle.add(reticleRing);
 const grenade = new THREE.Group();
 grenade.visible = false;
 const scene = new THREE.Scene(),
@@ -55,6 +58,7 @@ system.viewmodel = fixture<WeaponSystem['viewmodel']>({
   radio,
   scopeOverlay,
   reticle,
+  reticleRing,
   grenade,
   weapons: new Map([['rifle', weapon]]),
 });
@@ -76,7 +80,7 @@ const render = fixture<RenderSystem>({
     assert.equal(system.pickups._nextId, 1);
     assert(scene.children.every((o): boolean => o.visible));
     assert(
-      scopeOverlay.visible && reticle.visible && grenade.visible,
+      scopeOverlay.visible && reticle.visible && reticleRing.visible && grenade.visible,
       'hidden optics/grenade ancestors must be warmed'
     );
     return new Promise<Awaited<ReturnType<RenderSystem['_warmGraph']>>>((resolve): void => {
@@ -126,6 +130,7 @@ assert(irons.visible);
 assert.equal(ironsRemoved.visible, false);
 assert.equal(scopeOverlay.visible || reticle.visible, false);
 assert.equal(grenade.visible, false);
+assert.equal(reticleRing.visible, false);
 assert.equal(scene.children.length, 2, 'temporary ammo visual was removed');
 for (const p of system._droppedMags) {
   assert.equal(p.group.visible, false);
@@ -193,6 +198,7 @@ assert.equal(group.visible, false);
 assert(system._droppedMags.every((p): boolean => !p.group.visible));
 assert.equal(scopeOverlay.visible || reticle.visible, false);
 assert.equal(grenade.visible, false);
+assert.equal(reticleRing.visible, false);
 assert.equal(system._droppedMags[0].body, body);
 assert.equal(scene.children.length, 2);
 assert.equal(system.pickups.items.length, 0);

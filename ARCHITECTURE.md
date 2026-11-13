@@ -379,7 +379,10 @@ and the loader table checks complete ID coverage and per-ID adapter returns.
 `WeaponState.attachments` is an immutable `{ optic, ironSights, muzzle, rail }` snapshot;
 null slots retain the authored base weapon (including existing integrated optics/
 suppressors). `src/weapons/attachments.ts` owns the finite catalog, boundary
-validation and common gameplay/inspection mount solver. The M4 supports
+validation and common gameplay/inspection mount solver. The EXPS3 (`exps3`) shares this catalog/solver and the native collimated reticle
+path (68 MOA ring / 1 MOA dot, 1x world FOV/sensitivity); only AX338 currently has
+a verified fit. Other weapons reject it; unresolved physical fits and #662/#663
+are documented in its asset README. The M4 supports
 `optic: 'rmr' | 'acog' | 'scope'` and `rail: 'laser'` (TOR Mini); the muzzle catalog
 is empty. No attachment economy yet.
 `ironSights` is an independent boolean, installed by default. `WeaponDef.removableIrons`

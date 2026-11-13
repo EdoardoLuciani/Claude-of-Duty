@@ -291,6 +291,8 @@ export class Viewmodel {
   shoulderL: THREE.Vector3 = new THREE.Vector3(-0.2, -0.22, 0.02);
   // ---- reticle ----------------------------------------------------------
   reticle: THREE.Object3D = new THREE.Object3D();
+  declare reticleRing: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
+  declare dotMaterial: THREE.Material;
   declare dotCore: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
   scopeOverlay: THREE.Object3D = new THREE.Object3D();
   declare scopeMask: THREE.Mesh<THREE.BufferGeometry, MeshBasicNodeMaterial>;
@@ -378,12 +380,23 @@ export class Viewmodel {
     this.reticle.name = 'ow-reticle';
     this.anchor.add(this.reticle);
     // Unit-radius dot, scaled by its published angular size in _updateReticle.
-    this.dotCore = new THREE.Mesh(new THREE.CircleGeometry(1, 32), mats.reticle(0xff1206, 0.95));
+    this.dotMaterial = mats.reticle(0xff1206, 0.95);
+    this.dotCore = new THREE.Mesh(new THREE.CircleGeometry(1, 32), this.dotMaterial);
     this.dotCore.renderOrder = 21;
     this.dotCore.frustumCulled = false;
     this.dotCore.userData.owNoPrepass = true;
     this.dotCore.castShadow = false;
     this.reticle.add(this.dotCore);
+    this.reticleRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.84, 1, 96),
+      mats.reticle(0xff1206, 6.5)
+    );
+    this.reticleRing.renderOrder = 21;
+    this.reticleRing.frustumCulled = false;
+    this.reticleRing.userData.owNoPrepass = true;
+    this.reticleRing.castShadow = false;
+    this.reticleRing.visible = false;
+    this.reticle.add(this.reticleRing);
 
     this.scopeOverlay.name = 'ow-scope';
     this.scopeOverlay.visible = false;
@@ -1420,7 +1433,16 @@ export class Viewmodel {
     const offX = _v2.x - _v.x;
     const offY = _v2.y - _v.y;
     const off = Math.hypot(offX, offY);
-    const apertureR = optic.apertureR ?? 0.01;
+    // Keep the entire projected ring inside the clear bore during sway/draw.
+    const worldTan = Math.tan((this.ctx.camera.fov * Math.PI) / 360);
+    const viewTan = Math.tan((this.ctx.viewCamera.fov * Math.PI) / 360);
+    const ringAngularR = Math.tan(((optic.ringMoa ?? 0) * Math.PI) / (180 * 120));
+    const ringRadius = (s * viewTan * ringAngularR) / worldTan;
+    const apertureR = (optic.apertureR ?? 0.01) - ringRadius;
+    if (apertureR <= 0) {
+      this.reticle.visible = false;
+      return;
+    }
     let alpha = 1 - smootherstep(apertureR * 0.5, apertureR * 1.05, off);
     alpha *= lerp(0.55, 1, ads); // brighter once the eye is behind the glass
 
@@ -1435,14 +1457,16 @@ export class Viewmodel {
     // pixel resolution, use the optic's explicit small readability floor.
     // MOA belongs to the target/world view, not the independently framed
     // weapon camera. Narrowing weapon FOV must not magnify the dot.
-    const worldTan = Math.tan((this.ctx.camera.fov * Math.PI) / 360);
-    const viewTan = Math.tan((this.ctx.viewCamera.fov * Math.PI) / 360);
     const angularR = Math.tan(((optic.dotMoa ?? 0) * Math.PI) / (180 * 120)) / worldTan;
     const height = this.ctx.get('render')?.screenSize.height ?? this.ctx.canvas.height;
     this.dotCore.scale.setScalar(
       s * viewTan * Math.max(angularR, (optic.minDotPixels ?? 0) / height)
     );
+    this.dotCore.material =
+      optic.ringMoa === undefined ? this.dotMaterial : this.reticleRing.material;
     this.dotCore.material.opacity = alpha * (optic.dotOpacity ?? 1);
+    this.reticleRing.visible = optic.ringMoa !== undefined;
+    this.reticleRing.scale.setScalar(ringRadius);
   }
 
   _updateScope(w: WeaponEntry, ads: number): void {
@@ -1542,6 +1566,7 @@ export class Viewmodel {
     this.bandageAsset?.wrap.removeFromParent();
     this.bandageAsset?.tail.removeFromParent();
     this.dotCore.geometry.dispose();
+    this.reticleRing.geometry.dispose();
     this.scopeMask?.geometry.dispose();
     this.scopeMask?.material.dispose();
     this.scopeReticle?.geometry.dispose();
