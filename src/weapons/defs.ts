@@ -153,7 +153,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     hipRot: [-0.05, 0.081, -0.135],
     adsCant: [0, 0, 0],
     eyeRelief: 0.11,
-    // No laser fit: its authored rail is staged pending full-motion runtime-hand verification.
+    fits: { rail: { laser: {} } },
     sprintPos: [0.09, -0.275, -0.275],
     sprintRot: [-0.4, 0.6, 0.2],
     lowReadyPos: [0.112, -0.29, -0.289],

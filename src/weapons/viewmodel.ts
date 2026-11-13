@@ -1357,19 +1357,9 @@ export class Viewmodel {
       finger = res.lhand.finger;
       back = res.lhand.back;
       pose = res.lhand.pose;
-      // Clip keys that hold the weapon (return beats, and the whole pump stroke)
-      // carry the generic wrap label; restore the fitted contact pose whenever the
-      // hand is on the support grip — at rest, or riding the forend's travel.
-      if (pose === 'wrap' || pose === 'clamp') {
-        if (
-          Math.abs(pos[0] - gL.pos[0]) +
-            Math.abs(pos[1] - gL.pos[1]) +
-            Math.abs(pos[2] - gL.pos[2]) <
-          1e-5
-        ) {
-          pose = w.lhandPose;
-        }
-      }
+      // Grip labels use the fitted fingers during the approach too. Waiting for
+      // exact wrist contact made the generic-to-fitted curl cross the rail.
+      if (pose === 'wrap' || pose === 'clamp') pose = w.lhandPose;
     }
     this._handPosL.set(pos[0], pos[1], pos[2]);
     handBasis(this._handQuatL, finger, back);

@@ -89,6 +89,11 @@ def check_laser_mount(weapon):
     laser = tree(vertices, faces)
     emission = base.matrix_world.inverted() @ emitter.matrix_world.translation
     forward = Vector((0, 1, 0))
+    if weapon == 'mcx':
+        inverse = mount.matrix_world.inverted()
+        sight = inverse @ bpy.data.objects['SOCKET_sight'].matrix_world.translation
+        sight_direction = (inverse.to_3x3() @ rig.matrix_world.to_3x3() @ Vector((1,0,0))).normalized()
+        assert laser.ray_cast(sight,sight_direction,1)[0] is None, 'MCX laser blocks ACOG sight line'
     # Independent optics share the same authored contact frame. Integrated
     # MCX/MPX optics and suppressors are already part of weapon_meshes.
     optics = []

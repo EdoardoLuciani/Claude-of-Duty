@@ -79,12 +79,12 @@ contains no camera-aim or bullet-zero assumption.
 ## Weapon mounting (#686)
 
 **Partial implementation:** the target is all seven weapons, but runtime laser
-compatibility is enabled only for M4, P320, EVOLYS, AX338 and MPX. M590 and MCX
-hardware/checks are retained as staged authoring work; they have no
-`fits.rail.laser` entry, so API/debug/capture configuration rejects `rail: 'laser'`.
-M590 requires authorized shared-arm input resolution and a complete authoring
-check pass. MCX requires full-motion runtime-hand verification, including the
-intervals and transitions between the existing selected-pose snapshots.
+compatibility is enabled for M4, P320, EVOLYS, AX338, MPX and MCX. M590
+hardware/checks remain staged, with no `fits.rail.laser` entry, so API/debug/capture
+configuration rejects its `rail: 'laser'`. M590 requires authorized shared-arm
+input resolution and a complete authoring check pass. MPX remains acceptance-blocked
+by its disclosed hardware/glove collision; MCX's corrected fit has full sampled
+runtime-hand evidence rather than only selected-pose snapshots.
 
 The module is optional and independent of optics/irons. `rail: null` removes it;
 removing an optic does not remove the laser. No statistics, AI perception, beam
@@ -103,7 +103,7 @@ body outward. These are authored game-fit adaptations, not certified hardware.
 | EVOLYS | Enabled | `[0, .0165924, −.363725]` | Handguard; direct reference-backed underside Picatinny rail, no side bracket |
 | M590 | Staged / disabled | `[0, .009, −.590]` | Receiver; two fixed magazine-tube clamps ahead of the entire pump stroke |
 | AX338 | Enabled | `[.038, .075, −.455]` | Fixed right KeySlot/Picatinny adapter, ahead of hand/bolt/folding stock |
-| MCX VIRTUS | Staged / disabled | `[.038, .070, −.361]` | Receiver; forward right adapter, integrated ACOG/SRD762Ti retained |
+| MCX VIRTUS | Enabled | `[.03064, .10247, −.361]` | Receiver; upper-right chamfer adapter, integrated ACOG/SRD762Ti retained |
 | SIG MPX | Enabled | `[.037, 0, −.295]` | Receiver; forward right adapter with short supported overhang, ROMEO4T/SRD9 retained |
 
 P320's rail extension is an explicit deviation from the Compact factory frame.
@@ -121,8 +121,12 @@ actual editable TOR/weapon/optic surfaces. It checks forward direction, rail
 contact, emitter clearance and intersections over every clip at 120 Hz, including
 fractional endpoints; AX338 also sweeps its stock hinge through 181 positions.
 Only bounded mating rail/clamp contacts are exempt, not hands or mechanisms.
-MCX has no DCC review arms: its runtime-owned hands still require full-motion
-review; the existing .2/.5/.8 snapshots do not verify intervening paths.
+MCX still has no DCC review arms. Its corrected upper-right chamfer fit instead
+has a native-WebGPU sweep of actual runtime-deformed arms: 5,051 poses at 120 Hz,
+including complete clips, returns and cancellation transitions, against the real
+adapter and cooked laser plus the hand/emitter corridor. Fitted draw fingers and
+a lowered post-charge return resolve the motion crossings. See the
+[MCX receipt and limits](../../weapons/mcx-virtus/README.md#tor-mini-rail-686).
 Sampling is not continuous-clearance or human visual certification. M590's
 historical shared-arm hash certificate remains unresolved (see its asset README).
 Its full check stops before mount/optic gates; the independent laser-only sweep

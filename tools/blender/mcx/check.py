@@ -226,6 +226,21 @@ pose('Idle', 0)
 print(f'MCX_STOCK_HANDLE_CLEARANCE_OK: moving stock/hinge >= {minimum_separation["moving_stock"]*1000:.3f} mm; fixed rear plate >= {minimum_separation["rear_plate"]*1000:.3f} mm; full clips/midframes/folded rack')
 print(f'MCX_GEOMETRY_OK: moving parts clear/attached, rounded receiver/grip, MAG800 envelope {length*1000:.3f} mm, TA31F/SRD762Ti dimensions')
 
+# The rotated adapter must actually seat on the upper handguard, not float
+# above it to avoid the glove. Six rays span both screw stations on real faces.
+pose('Idle', 0)
+mount = objects['MOUNT_rail']
+guard = bvh('Hollow octagonal VIRTUS handguard')
+inward = (mount.matrix_world.to_3x3() @ Vector((0,0,1))).normalized()
+for station in (-.020,.020):
+    for across in (-.004,0,.004):
+        origin = mount.matrix_world @ Vector((across,station,.005))
+        hit = guard.ray_cast(origin,inward,.02)
+        assert hit[0] is not None and .0065 < hit[3] <= .007, ('laser adapter backing not seated',station,across,hit[3])
+for obj in asset.objects:
+    if obj.type == 'MESH' and obj.name.startswith('Laser rail '):
+        assert bvh(obj.name).ray_cast(sight,Vector((1,0,0)),1)[0] is None, ('laser hardware blocks ACOG',obj.name)
+
 # Actual shared rail attachment, independent of the optic catalog.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tor_mini.mounts import check_laser_mount
