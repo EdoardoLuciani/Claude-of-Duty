@@ -6,7 +6,11 @@ import { AudioSystem } from '../../src/audio/index.ts';
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
 import type { SpatialField } from '../../src/audio/spatial.ts';
 import type { WeaponProfile } from '../../src/audio/types.ts';
-import { WEAPON_PROFILES, resolveProfile } from '../../src/audio/weapons.ts';
+import {
+  SUPPRESSED_WEAPON_PROFILES,
+  WEAPON_PROFILES,
+  resolveProfile,
+} from '../../src/audio/weapons.ts';
 import { Rng } from '../../src/core/rng.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import {
@@ -30,7 +34,10 @@ actx.createBufferSource = (): FixtureBufferSource => {
 };
 const audio = new AudioSystem(),
   samples = new WeaponSampleBank(actx);
-const profiles: WeaponProfile[] = Object.values(WEAPON_PROFILES);
+const profiles: WeaponProfile[] = [
+  ...Object.values(WEAPON_PROFILES),
+  ...Object.values(SUPPRESSED_WEAPON_PROFILES),
+];
 for (const profile of profiles) {
   samples.buffers[profile.sample] = [new FixtureAudioBuffer({ duration: 3, kind: profile.sample })];
   if (profile.distantSample)
@@ -65,7 +72,14 @@ function capture(
   assert.equal(voice.node.gain.value, 1, 'no per-profile boost');
   return true;
 }
+let dryFires = 0;
 audio._playDry = (kind, options, bus, send): boolean => {
+  if (kind === 'dryfire') {
+    assert.equal(bus, 'weapons');
+    assert.equal(send, 0.15);
+    dryFires++;
+    return true;
+  }
   assert.equal(kind, 'shot');
   assert.equal(bus, 'weapons');
   assert.equal(send, 0);
@@ -94,27 +108,30 @@ function expectedBanks(profile: WeaponProfile, distance: number): string[] {
 for (const [id, key] of fixtureEntries(expected)) {
   const def = WEAPON_DEFS[id],
     original = JSON.stringify(def);
+  const weapon = { ...def };
   for (const distance of [0, 20, 45, 70, 140, 300]) {
-    captureState.seen = null;
-    audio._onFire({
-      weapon: def,
-      origin: new Vector3(distance, 0, 0),
-      actor: null,
-      dir: new Vector3(),
-      seed: 0,
-    });
-    const seen = latestCapture();
-    assert(seen);
-    assert.equal(seen.profile, WEAPON_PROFILES[key], `${id}: real definition selects ${key}`);
-    assert.equal(seen.path, distance ? 'spatial' : 'dry');
-    assert.deepEqual(seen.buffers, expectedBanks(WEAPON_PROFILES[key], distance));
+    for (const suppressed of [false, true, false]) {
+      weapon.suppressed = suppressed;
+      const expectedProfile = suppressed ? SUPPRESSED_WEAPON_PROFILES[key] : WEAPON_PROFILES[key];
+      captureState.seen = null;
+      audio._onFire({
+        weapon,
+        origin: new Vector3(distance, 0, 0),
+        actor: null,
+        dir: new Vector3(),
+        seed: 0,
+      });
+      const seen = latestCapture();
+      assert(seen);
+      assert.equal(seen.profile, expectedProfile, `${id}: next shot follows suppression state`);
+      assert.equal(seen.path, distance ? 'spatial' : 'dry');
+      assert.deepEqual(seen.buffers, expectedBanks(expectedProfile, distance));
+    }
   }
   assert.equal(JSON.stringify(def), original, 'routing does not mutate definitions');
 }
 assert.equal(WEAPON_DEFS.smg.audio, 'mpx');
 assert.equal(WEAPON_DEFS.smg.suppressed, true);
-assert.equal(WEAPON_PROFILES.mpx.suppressed, true);
-assert.equal(WEAPON_PROFILES.mcx.suppressed, true);
 
 for (const [weapon, expectedProfile] of [
   ['ak', WEAPON_PROFILES.ak],
@@ -134,7 +151,7 @@ for (const [weapon, expectedProfile] of [
 }
 for (const weapon of [
   { id: 'mp5', suppressed: true },
-  { id: 'rifle', suppressed: true },
+  { id: 'ak', suppressed: true },
 ]) {
   captureState.seen = null;
   Reflect.apply(audio._onFire.bind(audio), audio, [{ weapon, origin: new Vector3(0, 0, 0) }]);
@@ -144,10 +161,20 @@ for (const weapon of [
     'removed generic routes stay silent, never borrow another report'
   );
 }
+// Empty triggers remain mechanical clicks, even for an unsupported suppressed report.
+audio._onFire({
+  weapon: { id: 'ai_rifle', audio: 'ak', suppressed: true },
+  origin: new Vector3(),
+  actor: null,
+  dir: new Vector3(),
+  seed: 0,
+  empty: true,
+});
+assert.equal(dryFires, 1);
 assert.equal(resolveProfile(null), WEAPON_PROFILES.rifle);
 assert.equal(resolveProfile('ai_rifle'), WEAPON_PROFILES.rifle);
 console.log(
-  'Actual firearm routing: all seven definitions, recorded AK at every range, dedicated MCX/MPX, unsupported generic-suppressed requests silent'
+  'All seven firearm banks switch on the next shot at every range; unsupported suppressed reports stay silent, empty triggers still click'
 );
 
 function latestCapture(): Seen | null {

@@ -38,6 +38,8 @@ import { REPORT_DISTANT_MATCH, reportDistantMix } from './weapons.ts';
  * recordings have separate provenance under samples/hits/ and samples/reloads/;
  * see the audio asset contract in ARCHITECTURE.md. The replacement AK reports
  * have separate owner-requested public provenance in samples/ak-provenance.json.
+ * The #668 MCX/MPX replacements and all suppressed reports are cleared edited
+ * derivatives documented in samples/weapon-reports-provenance.json.
  */
 const URLS = {
   mpx: recordingUrls('mpx', 3),
@@ -46,7 +48,23 @@ const URLS = {
   'lmg-distant': recordingUrls('lmg-distant', 2),
   'sniper-distant': recordingUrls('sniper-distant', 2),
   'shotgun-distant': recordingUrls('shotgun-distant', 2),
-  mcx: recordingUrls('mcx', 2),
+  mcx: recordingUrls('mcx', 3),
+  'mcx-distant': recordingUrls('mcx-distant', 2),
+  'mpx-distant': recordingUrls('mpx-distant', 2),
+  'rifle-suppressed': recordingUrls('rifle-suppressed', 3),
+  'rifle-suppressed-distant': recordingUrls('rifle-suppressed-distant', 2),
+  'mcx-suppressed': recordingUrls('mcx-suppressed', 3),
+  'mcx-suppressed-distant': recordingUrls('mcx-suppressed-distant', 2),
+  'mpx-suppressed': recordingUrls('mpx-suppressed', 3),
+  'mpx-suppressed-distant': recordingUrls('mpx-suppressed-distant', 2),
+  'lmg-suppressed': recordingUrls('lmg-suppressed', 3),
+  'lmg-suppressed-distant': recordingUrls('lmg-suppressed-distant', 2),
+  'sniper-suppressed': recordingUrls('sniper-suppressed', 3),
+  'sniper-suppressed-distant': recordingUrls('sniper-suppressed-distant', 2),
+  'pistol-suppressed': recordingUrls('pistol-suppressed', 3),
+  'pistol-suppressed-distant': recordingUrls('pistol-suppressed-distant', 2),
+  'shotgun-suppressed': recordingUrls('shotgun-suppressed', 3),
+  'shotgun-suppressed-distant': recordingUrls('shotgun-suppressed-distant', 2),
   rifle: recordingUrls('rifle', 3),
   sniper: recordingUrls('sniper', 3),
   ak: recordingUrls('ak', 3),

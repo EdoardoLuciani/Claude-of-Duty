@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 
 import { WeaponSampleBank } from '../../src/audio/samples.ts';
+import reports from '../../src/audio/samples/weapon-reports-provenance.json' with { type: 'json' };
 import { AUDIO_BANKS } from '../lib/audio-banks.ts';
 import {
   fixtureBuffer,
@@ -72,22 +73,27 @@ try {
   );
   const loading = bank.load();
   await new Promise((resolve): NodeJS.Immediate => setImmediate(resolve));
-  assert.equal(pending.length, 375);
+  assert.equal(pending.length, 415);
   // Completing decodes backwards must not reorder the takes or their initial cursors.
   for (const finish of pending.reverse()) finish();
-  assert.equal(await loading, 375);
+  assert.equal(await loading, 415);
 } finally {
   globalThis.fetch = fetch;
 }
 assert.equal(
   hash('fetch-order', fetched),
-  'ee24c46687630e01e3e2ff6632d4103e6e95e25a35b5bf6cbbcf654a67381964',
+  '261baab45f3f80d9cc1b390fb2cc51130f2cd78752d4eb8ac838f7e6fcba3768',
   'fetch-order characterization changed; inspect with DUMP_CHARACTERIZATION=1'
 );
 const localFiles = readdirSync(root, { recursive: true, encoding: 'utf8' }).filter(
   (name): boolean => name.endsWith('.opus')
 );
 assert.deepEqual([...fetched].sort(), localFiles.sort(), 'every local recording is loaded once');
+for (const [name, recording] of Object.entries(reports.files)) {
+  const bytes = readFileSync(new URL(`${name}.opus`, root));
+  assert.equal(createHash('sha256').update(bytes).digest('hex'), recording.sha256, name);
+  assert(recording.monoEnergy > 1e-7, `${name}: authored shot must not be silent`);
+}
 for (const [banks] of AUDIO_BANKS) {
   for (const [kind, urls] of fixtureEntries(banks)) {
     const reload = urls[0].includes('/reloads/');
@@ -136,5 +142,5 @@ assert(
 assert.equal(bank.loaded, 0);
 
 console.log(
-  '375 unchanged ordered recordings: raw Node, reverse decode completion, disposal and local files'
+  '415 ordered recordings: reverse decode completion, disposal and every local recording loaded once'
 );

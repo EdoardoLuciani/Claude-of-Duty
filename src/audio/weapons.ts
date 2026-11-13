@@ -25,9 +25,18 @@ export const REPORT_DISTANT_MATCH: Readonly<Partial<Record<SampleKind, number>>>
   'lmg-distant': 2.5570276651449104,
   'sniper-distant': 1.5367612937080013,
   'shotgun-distant': 1.0058342240905216,
+  'mcx-distant': 4.638364372163911,
+  'mpx-distant': 2.9392426759981736,
+  'rifle-suppressed-distant': 2.51440895009536,
+  'mcx-suppressed-distant': 1.4367943598112103,
+  'mpx-suppressed-distant': 4.971637544315163,
+  'lmg-suppressed-distant': 2.102934980347829,
+  'sniper-suppressed-distant': 4.2461471762645395,
+  'pistol-suppressed-distant': 4.75485386586677,
+  'shotgun-suppressed-distant': 2.537453457313371,
 };
 
-/** Equal-power perspective transition; own and same-source suppressed shots bypass it. */
+/** Equal-power perspective transition; head-locked own shots bypass it. */
 export function reportDistantMix(
   distance: number,
   profile?: WeaponProfile,
@@ -62,18 +71,35 @@ export function reportDistanceGain(
 
 /** All profiles select complete recordings; there are no synthetic report fallbacks. */
 export const WEAPON_PROFILES = {
-  mcx: { sample: 'mcx', suppressed: true },
+  mcx: { sample: 'mcx', distantSample: 'mcx-distant' },
   rifle: { sample: 'rifle', distantSample: 'rifle-distant' },
   ak: { sample: 'ak', distantSample: 'ak-distant' },
   smg: { sample: 'smg' },
-  mpx: { sample: 'mpx', suppressed: true },
+  mpx: { sample: 'mpx', distantSample: 'mpx-distant' },
   pistol: { sample: 'pistol', distantSample: 'pistol-distant' },
   shotgun: { sample: 'shotgun', distantSample: 'shotgun-distant' },
   sniper: { sample: 'sniper', distantSample: 'sniper-distant' },
   lmg: { sample: 'lmg', distantSample: 'lmg-distant' },
 } satisfies Record<string, WeaponProfile>;
 
-/** Weapon ids/audio keys name their profile; AI rifles and unknown ids use the rifle report. */
-export function resolveProfile(name?: string | null): WeaponProfile {
+/** Approved donor substitutions are explicit banks, never runtime missing-sample fallbacks.
+ * Actual models, calibre compromises and rights: samples/weapon-reports-provenance.json. */
+export const SUPPRESSED_WEAPON_PROFILES = {
+  rifle: { sample: 'rifle-suppressed', distantSample: 'rifle-suppressed-distant' },
+  mcx: { sample: 'mcx-suppressed', distantSample: 'mcx-suppressed-distant' },
+  mpx: { sample: 'mpx-suppressed', distantSample: 'mpx-suppressed-distant' },
+  smg: { sample: 'mpx-suppressed', distantSample: 'mpx-suppressed-distant' },
+  lmg: { sample: 'lmg-suppressed', distantSample: 'lmg-suppressed-distant' },
+  sniper: { sample: 'sniper-suppressed', distantSample: 'sniper-suppressed-distant' },
+  pistol: { sample: 'pistol-suppressed', distantSample: 'pistol-suppressed-distant' },
+  shotgun: { sample: 'shotgun-suppressed', distantSample: 'shotgun-suppressed-distant' },
+} satisfies Record<string, WeaponProfile>;
+
+/** Read the effective weapon state on every shot; unsupported suppressed identities stay silent. */
+export function resolveProfile(name?: string | null, suppressed = false): WeaponProfile | null {
+  if (suppressed)
+    return name && hasOwn(SUPPRESSED_WEAPON_PROFILES, name)
+      ? SUPPRESSED_WEAPON_PROFILES[name]
+      : null;
   return name && hasOwn(WEAPON_PROFILES, name) ? WEAPON_PROFILES[name] : WEAPON_PROFILES.rifle;
 }

@@ -6,6 +6,7 @@ import reference from '../../src/audio/samples/reference.json' with { type: 'jso
 import type { SampleKind, WeaponProfile } from '../../src/audio/types.ts';
 import {
   REPORT_DISTANT_MATCH,
+  SUPPRESSED_WEAPON_PROFILES,
   WEAPON_PROFILES,
   reportDistanceGain,
   reportDistantMix,
@@ -20,10 +21,12 @@ import {
   fixtureBuffer,
 } from '../lib/audio-fixture.ts';
 
-const kinds = ['rifle', 'mcx', 'pistol', 'lmg', 'smg', 'mpx', 'sniper', 'shotgun', 'ak'] as const;
-for (const kind of kinds) {
-  const profile: WeaponProfile = WEAPON_PROFILES[kind];
-  assert.equal(profile.sample, kind);
+const profiles: WeaponProfile[] = [
+  ...Object.values(WEAPON_PROFILES),
+  ...Object.values(SUPPRESSED_WEAPON_PROFILES),
+];
+for (const profile of profiles) {
+  const kind = profile.sample;
   assert.equal('samplePunch' in profile, false, 'no synthesized report branch');
   assert.equal('sampleGain' in profile, false, 'no separate authored per-profile level');
   assert.equal('firstPersonGain' in profile, false, 'no extra authored own-shot boost');
@@ -49,12 +52,27 @@ for (const kind of kinds) {
       return new FixtureAudioBuffer({ duration, index: i });
     });
   }
-  const variants = kind === 'mcx' ? 2 : 3;
+  const variants = 3;
+  if (profile.distantSample) {
+    const meanEnergy = (bank: SampleKind, count: number): number => {
+      let energy = 0;
+      for (let i = 1; i <= count; i++) {
+        const name = `${bank}-${i}`;
+        assert(hasOwn(reference.files, name));
+        const take = reference.files[name];
+        assert('monoEnergy' in take && take.monoEnergy > 0, `${name}: non-silent report`);
+        energy += take.monoEnergy;
+      }
+      return energy / count;
+    };
+    const expected = Math.sqrt(meanEnergy(kind, variants) / meanEnergy(profile.distantSample, 2));
+    assert(Math.abs(distantMatch(profile) - expected) < 1e-12, `${kind}: full-bank energy match`);
+  }
   const buffers = readVariants(kind, variants);
   bank.buffers[kind] = buffers;
   if (profile.distantSample)
     bank.buffers[profile.distantSample] = readVariants(profile.distantSample, 2);
-  else assert.equal(profile.distantSample, undefined, 'no unsuppressed substitute for MCX');
+
   const rng = new Rng(1);
   rng.range = (a, b): number => (a + b) / 2;
   for (let i = 0; i < variants + 1; i++) {
@@ -74,7 +92,7 @@ for (const kind of kinds) {
     assert(voice.end >= when + fixtureBuffer(source.buffer).duration);
     assert.equal(voice.send, 0, 'complete reports use recorded decay, no added reverb');
   }
-  assert.equal(filters, 0, 'no player high/low-pass, including suppressed MCX');
+  assert.equal(filters, 0, 'no player high/low-pass, including suppressed reports');
   const audio = new AudioSystem();
   audio.actx = ctx;
   audio.samples = bank;
