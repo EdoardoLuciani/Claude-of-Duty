@@ -435,8 +435,10 @@ The authored
 `MOUNT_rail` and TOR Mini `SOCKET_mount`/`SOCKET_laser` keep mounting independent
 of the optic. P320 uses its frame bone (not the slide); M590 uses fixed forward
 magazine-tube clamps (not the pump); the other adapters follow their fixed
-handguard/receiver assemblies. MCX/MPX retain their integrated optics and cans,
-without depending on their open base conversions. Gameplay and inspection borrow
+handguard/receiver assemblies. MPX's four-tooth side adapter clears the support
+hand; its load-time native-basis conversion preserves canonical attachment locals
+rather than rebasing the borrowed laser mesh. MCX/MPX retain their integrated optics
+and cans, without depending on their open base conversions. Gameplay and inspection borrow
 the same single-material asset.
 Weapons own one retained world mesh for the green beam and surface dot (one draw,
 no light/decal, no per-frame allocation); boot warms it even with no module mounted.

@@ -623,12 +623,13 @@ def build(output, render=False, quick=False):
     # Right M-LOK/Picatinny adapter, forward of the support-hand grip.
     rail = empty('MOUNT_rail', (.295, -.037, 0), body)
     rail.rotation_euler = Matrix(((0,1,0),(0,0,1),(1,0,0))).to_euler()
-    web=box('Laser rail adapter web',(.2975,-.030,0),(.050,.010,.014),alloy)
-    # Relieve the rear inboard corner, retaining the flange beneath the first tooth.
-    cut(web,box('CUT laser adapter grip relief',(.2775,-.024,0),(.015,.018,.020),None,None,0))
-    for i in range(5):
-        box('Laser rail adapter tooth',(.275+i*.010,-.035,0),(.0052,.004,.020),steel)
-    for x in (.275,.315):
+    # The TOR's clamp starts at x=.2855: the former rear tooth/flange added no
+    # clamp support and crossed the departing glove. Keep four supported teeth.
+    box('Laser rail adapter web',(.30075,-.0295,0),(.0435,.011,.014),alloy)
+    for i in range(4):
+        box('Laser rail adapter tooth',(.285+i*.010,-.035,0),(.0052,.004,.020),steel)
+    # Both anchors stay inside the last real M-LOK slot, not past the guard end.
+    for x in (.282,.289):
         cyl('Laser rail adapter screw',(x,-.0348,0),.002,.004,steel,'Y')
 
     # Stage 3: surface-fitted markings and original component atlas UVs.

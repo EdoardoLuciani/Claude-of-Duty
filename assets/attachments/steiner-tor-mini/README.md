@@ -82,9 +82,9 @@ contains no camera-aim or bullet-zero assumption.
 compatibility is enabled for M4, P320, EVOLYS, AX338, MPX and MCX. M590
 hardware/checks remain staged, with no `fits.rail.laser` entry, so API/debug/capture
 configuration rejects its `rail: 'laser'`. M590 requires authorized shared-arm
-input resolution and a complete authoring check pass. MPX remains acceptance-blocked
-by its disclosed hardware/glove collision; MCX's corrected fit has full sampled
-runtime-hand evidence rather than only selected-pose snapshots.
+input resolution and a complete authoring check pass. MPX's corrected four-tooth
+adapter and attachment-frame conversion pass native and sampled runtime-hand
+checks; MCX also has full sampled runtime-hand evidence rather than only snapshots.
 
 The module is optional and independent of optics/irons. `rail: null` removes it;
 removing an optic does not remove the laser. No statistics, AI perception, beam
@@ -104,7 +104,7 @@ body outward. These are authored game-fit adaptations, not certified hardware.
 | M590 | Staged / disabled | `[0, .009, −.590]` | Receiver; two fixed magazine-tube clamps ahead of the entire pump stroke |
 | AX338 | Enabled | `[.038, .075, −.455]` | Fixed right KeySlot/Picatinny adapter, ahead of hand/bolt/folding stock |
 | MCX VIRTUS | Enabled | `[.03064, .10247, −.361]` | Receiver; upper-right chamfer adapter, integrated ACOG/SRD762Ti retained |
-| SIG MPX | Enabled | `[.037, 0, −.295]` | Receiver; forward right adapter with short supported overhang, ROMEO4T/SRD9 retained |
+| SIG MPX | Enabled | `[.037, 0, −.295]` | Receiver; four-tooth right adapter, two anchors in the last M-LOK slot, ROMEO4T/SRD9 retained |
 
 P320's rail extension is an explicit deviation from the Compact factory frame.
 The module nose sits a few millimetres ahead of its barrel exit, below the bore;
@@ -113,8 +113,13 @@ move with the forend: its clamps grip the fixed tube between the pump and end ca
 EVOLYS intentionally recalibrates its support hold 23 mm rearward and 16 mm lower
 and stages release/regrip below the rail; feed/pouch/charging beats stay intact.
 Its lower rail and actual module are checked against both evaluated hands.
-The MPX hardware-versus-hand check still exposes unresolved adapter contacts;
-its earlier module-only fit evidence is not full hand-clearance acceptance.
+MPX removes the unused rear tooth/flange that crossed the glove, retaining four
+full teeth under the TOR clamp and backing seated on actual handguard lands.
+Both anchors remain in the last real slot. Its native check passes 998 poses;
+a native-WebGPU fixture passes 4,096 actual runtime-hand poses including returns,
+cancellations and last-shot lockback. The normalized runtime/inspection mount
+preserves the shared attachment frame, keeping the module/emitter bore-forward.
+See the [MPX fit and limits](../../weapons/sig-mpx/README.md#tor-mini-rail-686).
 
 Each changed weapon's `check.py` calls `tools/blender/tor_mini/mounts.py` against
 actual editable TOR/weapon/optic surfaces. It checks forward direction, rail

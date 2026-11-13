@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+import mpxManifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: 'json' };
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { LAYER } from '../../src/physics/surfaces.ts';
 import { CameraRig } from '../../src/player/camera.ts';
@@ -12,6 +13,8 @@ import {
   configureWeaponAttachments,
   makeOpticModel,
   makeLaserModel,
+  mountAttachments,
+  releaseAttachmentMount,
   isAttachmentConfig,
   type AttachmentConfig,
 } from '../../src/weapons/attachments.ts';
@@ -19,6 +22,7 @@ import { authoredModel, checkAuthoredDuration } from '../../src/weapons/authored
 import { WEAPON_DEFS, WEAPON_IDS } from '../../src/weapons/defs.ts';
 import { WeaponLaser } from '../../src/weapons/laser.ts';
 import { ReticleMaterials } from '../../src/weapons/materials-tsl.ts';
+import { makeMPXModel } from '../../src/weapons/mpx.ts';
 import type { WeaponEntry, WeaponModelRecord } from '../../src/weapons/runtime-types.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { createTestContext } from '../lib/context.ts';
@@ -301,6 +305,65 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     );
     assert.equal(entry.attachments, previousConfig, 'failed staging preserves the configuration');
   }
+  // MPX rebases native +X geometry, but shared attachments keep canonical locals.
+  const nativeScene = new THREE.Group(),
+    nativeRoot = new THREE.Group();
+  nativeRoot.name = 'MPX_RIG';
+  nativeScene.add(nativeRoot);
+  for (const name of ['muzzle', 'ejection', 'sight', 'magazine']) {
+    const node = new THREE.Object3D();
+    node.name = `SOCKET_${name}`;
+    nativeRoot.add(node);
+  }
+  const nativeMount = new THREE.Object3D();
+  nativeMount.name = 'MOUNT_rail';
+  nativeMount.position.set(0.295, 0, 0.037);
+  nativeMount.quaternion.setFromRotationMatrix(
+    new THREE.Matrix4().makeBasis(
+      new THREE.Vector3(0, 1, 0),
+      new THREE.Vector3(0, 0, -1),
+      new THREE.Vector3(-1, 0, 0)
+    )
+  );
+  nativeRoot.add(nativeMount);
+  const mpx = makeMPXModel(
+    fixture<GLTF>({
+      scene: nativeScene,
+      animations: Object.entries(mpxManifest.clips).map(([name, data]): THREE.AnimationClip => {
+        const times = data.duration ? [0, data.duration] : [0];
+        return clip(
+          name,
+          new THREE.VectorKeyframeTrack(
+            'MPX_RIG.position',
+            times,
+            new Array<number>(times.length * 3).fill(0)
+          )
+        );
+      }),
+    })
+  );
+  const mounted = mountAttachments(mpx, laserConfig, {}, laser);
+  mounted.railParent.add(mounted.railGroup);
+  for (const yaw of [0, 0.3]) {
+    nativeRoot.rotation.y = yaw;
+    nativeScene.updateMatrixWorld(true);
+    const direction = new THREE.Vector3(0, 0, -1).transformDirection(
+      mounted.laserEmitter!.matrixWorld
+    );
+    assert(
+      direction.distanceTo(new THREE.Vector3(0, 0, -1).applyQuaternion(nativeRoot.quaternion)) <
+        1e-10,
+      'MPX laser points along the posed bore, not upward'
+    );
+    assert(
+      mounted
+        .laserEmitter!.getWorldPosition(new THREE.Vector3())
+        .distanceTo(new THREE.Vector3(0.0475, 0, -0.32018).applyQuaternion(nativeRoot.quaternion)) <
+        1e-8,
+      'MPX attachment keeps its authored side seat'
+    );
+  }
+  releaseAttachmentMount(mounted.railGroup);
   laser.dispose();
   configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, ironSights: false }, optics);
   assert.equal(entry.optic, null);

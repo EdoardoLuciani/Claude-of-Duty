@@ -68,6 +68,19 @@ for x in (.119,.148,.190,.232,.274):
     assert hg.ray_cast(Vector((x,-.06,-.001)),Vector((0,1,0)),.12)[0] is None, (x,'closed M-LOK slot')
 # Solid lands between slots still exist; test at a web with two distinct walls.
 assert hg.ray_cast(Vector((.129,-.06,-.001)),Vector((0,1,0)),.12)[0] is not None
+# Both adapter anchors pass through a real slot, with the backing actually
+# seated on its upper/lower wall lands (not screws/rail floating past the guard).
+backing = tree('Laser rail adapter web')
+anchors = [o for o in scene.objects if o.name.startswith('Laser rail adapter screw')]
+assert len(anchors) == 2, 'laser adapter requires both anchors'
+for screw in anchors:
+    p = screw.matrix_world.translation
+    assert hg.ray_cast(Vector((p.x,-.06,p.z)),Vector((0,1,0)),.12)[0] is None, ('laser anchor outside slot opening',screw.name)
+    for z in (p.z-.006,p.z+.006):
+        guard_hit = hg.ray_cast(Vector((p.x,-.04,z)),Vector((0,1,0)),.02)[0]
+        plate_hit = backing.ray_cast(Vector((p.x,0,z)),Vector((0,-1,0)),.06)[0]
+        assert guard_hit is not None and plate_hit is not None, ('unsupported laser adapter',screw.name,z)
+        assert -.001 < guard_hit.y-plate_hit.y <= .0001, ('laser backing not seated',screw.name,z,guard_hit.y-plate_hit.y)
 # Regression: the previous full-ellipse upper left a visible flank seam gap.
 upper = tree('MPX continuous rounded upper')
 lower = tree('Lower receiver shoulder')

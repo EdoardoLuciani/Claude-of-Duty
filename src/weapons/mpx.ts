@@ -44,6 +44,13 @@ export function makeMPXModel(gltf: GLTF): MPXModel {
     }
     o.updateMatrix();
   });
+  // Geometry/control locals were rebased above; attachment locals are shared
+  // canonical assets, not MPX geometry. Preserve that frame at the slot boundary.
+  const railMount = scene.getObjectByName('MOUNT_rail');
+  if (railMount) {
+    railMount.quaternion.multiply(basis);
+    railMount.updateMatrix();
+  }
   for (const clip of gltf.animations)
     for (const track of clip.tracks) {
       // GLTFLoader shares accessor arrays across clips/constant controls. Never
