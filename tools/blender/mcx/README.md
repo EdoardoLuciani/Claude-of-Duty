@@ -7,11 +7,18 @@
 - `geometry.py`: assemblies/pivots/sockets; `animations.py`: six clips/events.
 - `export.py`: surface projection/export; `finishes.py`: pigment/scalar packing.
 - `studio.py`: fixed review cameras/lights.
+- `runtime-hands.ts`: offline sampling of actual `Viewmodel`/`MCXAnimation` controls.
+- `review_hands.py`: shared review-skin baking, paired clip selection and runtime parity.
 
 Metres, +X forward, −Y ejection side. Preserve names, sockets and event timing.
 The 10 cm repeating rest-space planar UVs are for shared detail, not unique atlases.
 Save editable Idle/modifiers before deterministic triangulation/runtime preparation.
-Sample motion at 60 Hz with LINEAR keys, CONSTANT/STEP visibility and explicit resets.
+Export the weapon before appending review arms, then reopen the untouched source
+and bake the sampled runtime matrices. Bun and generated shared arm products are
+required; no previous weapon blend/GLB is a fallback build input. Runtime weapon
+code, core math/guards and dependency-lock changes invalidate this bake cache.
+Weapon motion remains 60 Hz; review skins have 120 Hz LINEAR keys, including
+fractional endpoints. Preserve CONSTANT/STEP visibility and explicit resets.
 One single-influence mechanical skin retains original helper controls; magazines
 and showcase case remain independent. No exporter hooks or GLB repair.
 

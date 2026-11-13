@@ -58,14 +58,13 @@ def check_laser_mount(weapon):
     weapon_meshes = [o for o in bpy.data.collections[collection].objects if o.type == 'MESH']
     hands = [o for o in scene.objects if o.type == 'MESH' and any(
         'authored hands' in c.name or 'review hands' in c.name for c in o.users_collection)]
-    if weapon != 'mcx':
-        assert hands, (weapon, 'missing deformed review hands')
+    assert hands, (weapon, 'missing deformed review hands')
     # EVOLYS joins the actual support parts into its handguard; the authored
     # vertex group preserves their identity without treating the whole guard as new.
     hardware_sources = []
     if weapon == 'evolys':
         hardware_sources = [(bpy.data.objects['handguard_mesh'], 'LASER_mount_hardware')]
-    elif weapon == 'mpx':
+    elif weapon in ('mpx','mcx'):
         hardware_sources = [(o, None) for o in weapon_meshes if o.name.startswith('Laser rail ')]
         assert hardware_sources, (weapon, 'missing laser support hardware')
     hardware_vertices, hardware_faces = [], []
@@ -117,6 +116,9 @@ def check_laser_mount(weapon):
             optics.extend(o for o in optic_base.parent.children_recursive if o.type == 'MESH')
             optic_objects.extend(target.objects)
     clips = json.loads(scene['clips'])
+    if weapon == 'mcx':
+        from mcx.review_hands import review_tracks, select_review_clip
+        clips = {track['name']:{'duration':track['times'][-1]} for track in review_tracks()}
     count = 0
     contact = False
     try:
@@ -125,11 +127,14 @@ def check_laser_mount(weapon):
             # use a 120 Hz sweep plus exact fractional endpoints.
             rate = 120
             duration = clip['duration']
-            for o in scene.objects:
-                if o.animation_data:
-                    o.animation_data.action = None
-                    for track in o.animation_data.nla_tracks:
-                        track.mute = track.name != name
+            if weapon == 'mcx':
+                select_review_clip(name)
+            else:
+                for o in scene.objects:
+                    if o.animation_data:
+                        o.animation_data.action = None
+                        for track in o.animation_data.nla_tracks:
+                            track.mute = track.name != name
             for sample in range(math.ceil(duration * rate) + 1):
                 frame = min(sample / rate, duration) * scene.render.fps
                 scene.frame_set(math.floor(frame), subframe=frame % 1)

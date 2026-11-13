@@ -364,7 +364,11 @@ products; missing outputs force a full restage. Atomic writes and the cache lock
 remain. Bun dev/build runs it after the Blender steps; preview uses existing `dist`.
 
 M4/MCX/P320/EVOLYS/MPX/AX338/M590 use generated GLBs and weapon-owned adapters
-under `src/weapons/`; procedural player-weapon exports are retired. M590 is a
+under `src/weapons/`; procedural player-weapon exports are retired. All seven editable
+weapon scenes include shared review-only arm skins, never duplicate weapon-GLB arms.
+MCX exports its weapon first, then bakes real runtime control matrices into its
+saved source at 120 Hz; runtime hand-code changes invalidate that authoring cache.
+Its source checks compare evaluated skins against embedded runtime vertex receipts. M590 is a
 provisional in-game review prototype, not strict 1:1/final visual acceptance.
 Its seven event-only Clips sample one native mixer; `shell_insert` uses authored
 STEP-scale visibility owned/reset by the adapter, never detachable-magazine

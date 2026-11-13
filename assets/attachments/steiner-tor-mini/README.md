@@ -121,11 +121,12 @@ actual editable TOR/weapon/optic surfaces. It checks forward direction, rail
 contact, emitter clearance and intersections over every clip at 120 Hz, including
 fractional endpoints; AX338 also sweeps its stock hinge through 181 positions.
 Only bounded mating rail/clamp contacts are exempt, not hands or mechanisms.
-MCX still has no DCC review arms. Its corrected upper-right chamfer fit instead
-has a native-WebGPU sweep of actual runtime-deformed arms: 5,051 poses at 120 Hz,
-including complete clips, returns and cancellation transitions, against the real
-adapter and cooked laser plus the hand/emitter corridor. Fitted draw fingers and
-a lowered post-charge return resolve the motion crossings. See the
+MCX now includes runtime-driven DCC review arms: 1,656 sampled source poses across
+nine tracks check both arms, support hardware, module and emitter, with evaluated
+skin parity against actual runtime references. This complements the earlier native
+WebGPU sweep of 5,051 runtime poses, including returns/cancellation transitions,
+against the real adapter and cooked laser plus the hand/emitter corridor. Fitted
+draw fingers and a lowered post-charge return resolve the motion crossings. See the
 [MCX receipt and limits](../../weapons/mcx-virtus/README.md#tor-mini-rail-686).
 Sampling is not continuous-clearance or human visual certification. M590's
 historical shared-arm hash certificate remains unresolved (see its asset README).

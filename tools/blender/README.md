@@ -32,7 +32,9 @@ Standalone attachments: [EXPS3-0](../../assets/attachments/eotech-exps3-0/README
 - Shared review-arm appearance and versioned hand calibration are read-only
   inputs, not exported duplicate arms. `review_hands.py` owns the shared EVOLYS/MPX
   review-arm baker; each caller supplies its own basis, controls and clips.
-  Missing inputs fail. Refit calibration separately and intentionally, never
+  MCX's local `runtime-hands.ts` / `review_hands.py` instead bake actual runtime
+  matrices after exporting the weapon; source parity and attachment checks include
+  those skins. See its asset README for paired clip selection. Missing inputs fail. Refit calibration separately and intentionally, never
   automatically during a normal rebuild.
 - Save editable components/modifiers/sparse poses before preparing runtime copies.
   Preserve each weapon's own UV strategy, sampling lattice, fractional endpoints,

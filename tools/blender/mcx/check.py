@@ -241,7 +241,11 @@ for obj in asset.objects:
     if obj.type == 'MESH' and obj.name.startswith('Laser rail '):
         assert bvh(obj.name).ray_cast(sight,Vector((1,0,0)),1)[0] is None, ('laser hardware blocks ACOG',obj.name)
 
-# Actual shared rail attachment, independent of the optic catalog.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+# Compare evaluated shared skins against the embedded real-runtime receipts.
+from mcx.review_hands import check_review_hands
+check_review_hands()
+
+# Actual shared rail attachment, independent of the optic catalog.
 from tor_mini.mounts import check_laser_mount
 check_laser_mount('mcx')

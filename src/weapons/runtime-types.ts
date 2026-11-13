@@ -149,8 +149,9 @@ export interface ViewPoseKey {
 }
 export type ViewmodelContext = Pick<
   EngineContext,
-  'scene' | 'camera' | 'viewScene' | 'viewCamera' | 'canvas' | 'rng'
+  'scene' | 'camera' | 'viewScene' | 'viewCamera' | 'rng'
 > & {
+  canvas: Pick<HTMLCanvasElement, 'height'>;
   get(id: 'render'): Pick<EngineSystems['render'], 'screenSize'> | null;
 };
 export type ClipResult = ClipSample;
