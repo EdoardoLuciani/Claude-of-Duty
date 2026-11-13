@@ -466,9 +466,15 @@ handling uses the foley bus; the pin cue is silent pending a suitable recording,
 and cooking the fuse has no synthetic warning beep. Empty
 triggers play a click without emitting a shot, muzzle flash or AI-hearing evidence.
 All firearm reports, including close/distant AK and background gunfire, use required
-recordings without synthetic reinforcement. MCX/MPX select explicit suppressed
-recordings; unsupported generic-suppressed requests stay silent rather than using
-another gun's report. Remaining synthesis is intentional UI/electronic feedback,
+recordings without synthetic reinforcement. All seven player weapons have explicit
+unsuppressed/suppressed close/distant banks; audio selects from the effective
+fire-event weapon's `suppressed` value on every shot, not a fixed audio-profile flag.
+Approved substitute donor models and calibre compromises (including MCX's provisional
+5.56 sources for the game's .300 BLK) are recorded with publication clearance in
+`src/audio/samples/weapon-reports-provenance.json`. Unsupported suppressed identities
+stay silent; missing/decode-failed banks never borrow another report. Current integrated
+MCX/MPX suppressors and defaults remain until muzzle-attachment conversion.
+Remaining synthesis is intentional UI/electronic feedback,
 healing-completion cues, tinnitus and shop music/reverb. Other spoken intents remain deferred.
 
 `models.getSoldier(name)` returns `{ name, geometry, slots, boneNames, weapon,

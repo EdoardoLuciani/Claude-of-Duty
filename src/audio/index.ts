@@ -988,10 +988,6 @@ export class AudioSystem {
       mixer = this.mixer!;
     const w = p.weapon;
     const name = typeof w === 'string' ? w : (w?.audio ?? w?.id);
-    const profile = resolveProfile(name);
-    // A suppressed weapon without its own suppressed recording stays silent.
-    if (w && typeof w === 'object' && w.suppressed && !profile.suppressed) return;
-
     if (p.empty) {
       this._playDry(
         'dryfire',
@@ -1001,6 +997,9 @@ export class AudioSystem {
       );
       return;
     }
+
+    const profile = resolveProfile(name, typeof w === 'object' && w !== null && !!w.suppressed);
+    if (!profile) return;
 
     const o = p.origin;
     const x = o.x,
