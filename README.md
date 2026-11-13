@@ -37,6 +37,7 @@ per-script hang guard remains; simulation limits and behavioral assertions are u
 Run one script with `bun test ./tests/smoke/smoke-health-events.ts`. Test mocks and worker
 transport may use Bun's Node-compatible APIs; no test process requires the Node binary.
 The lint pass covers all first-party source, tests, build entry points and tools.
+Unused lint suppressions fail the pass; Oxlint's `--fix` can remove stale `oxlint-disable` directives.
 Package import aliases resolve directly to checked source implementations; there are
 no unchecked JavaScript authoring modules or parallel test-only declaration contracts.
 (`noUncheckedIndexedAccess` status: [triage and plan](docs/no-unchecked-indexed-access.md)).
