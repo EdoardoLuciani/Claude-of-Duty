@@ -29,13 +29,13 @@
     "shot": "bun tools/capture.ts"
   },
   "dependencies": {
-    "@recast-navigation/core": "0.43.1",
+    "@recast-navigation/core": "0.44.0",
     "@recast-navigation/wasm": "0.44.0",
     "pixi.js": "8.22.0",
     "three": "0.187.0"
   },
   "devDependencies": {
-    "@recast-navigation/generators": "0.43.1",
+    "@recast-navigation/generators": "0.44.0",
     "@types/bun": "^1.4.4",
     "@types/node": "^26",
     "@types/pngjs": "^6.0.5",
