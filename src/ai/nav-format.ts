@@ -6,7 +6,7 @@ import { isRecord, isNumberArray, isNumber } from './validation.ts';
 export const NAV_VERSION = 2;
 export const NAV_LADDER_FLAG = 2,
   NAV_LINK_RADIUS = 0.7;
-export const NAV_ENGINE = 'recast-navigation@0.43.1';
+export const NAV_ENGINE = 'recast-navigation@0.44.0';
 export const NAV_PROFILE = Object.freeze({
   radius: INFANTRY.navRadius,
   height: INFANTRY.height * INFANTRY.maxScale,
