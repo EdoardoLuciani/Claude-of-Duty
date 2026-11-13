@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@recast-navigation/core": "0.43.1",
-    "@recast-navigation/wasm": "0.43.1",
+    "@recast-navigation/wasm": "0.44.0",
     "pixi.js": "8.22.0",
     "three": "0.187.0"
   },
