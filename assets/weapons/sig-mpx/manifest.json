@@ -1,15 +1,15 @@
 {
-  "status": "Geometry/materials approved; Gate 3 native animation/gameplay candidate \u2014 human review pending",
-  "asset": "SIG MPX 8 inch / ROMEO4T 1.41 inch mount / MIL-SRD9-MPX / 30-round magazine / folded irons",
+  "status": "Base conversion candidate \u2014 human visual/animation/gameplay review pending",
+  "asset": "SIG MPX 8 inch / open 9mm crown and thread protector / 30-round magazine / removable deployed irons",
   "units": "metres",
   "blenderForward": "+X",
   "blenderUp": "+Z",
   "stats": {
-    "triangleInstances": 79572,
+    "triangleInstances": 68745,
     "primitives": 16,
-    "materials": 3,
+    "materials": 1,
     "images": 3,
-    "bytes": 8424036
+    "bytes": 7359076
   },
   "clips": {
     "Idle": {
@@ -196,20 +196,20 @@
     "nominalBarrel": 0.2032,
     "barrelBreech": 0.109,
     "barrelCrown": 0.3122,
-    "suppressorEnvelope": [
-      0.175,
-      0.035
+    "muzzle": 0.3182,
+    "ironAxis": 0.074,
+    "rearAperture": 0.0036,
+    "opticMount": [
+      0.025,
+      0,
+      0.044
     ],
-    "suppressorStart": 0.30419999999999997,
-    "muzzle": 0.47919999999999996,
-    "opticAperture": 0.02,
-    "railToOpticalAxis": 0.035814,
-    "opticClosedLength": 0.0855,
-    "opticHousingLength": 0.07,
-    "opticLensSpacing": 0.064,
-    "opticRimDiameter": 0.027
+    "muzzleMount": [
+      0.3162,
+      0,
+      0
+    ]
   },
-  "opticDepthAuthority": "85.5mm overall/20mm aperture published; housing/rim proportions drawing-supported; lens seats/64mm spacing inferred, not manufacturer optical data",
   "notes": [
     "Reference-supported assembly, not proof that the hero photograph depicts this barrel.",
     "Depths, relief, magazine translucency and typography remain inferred.",

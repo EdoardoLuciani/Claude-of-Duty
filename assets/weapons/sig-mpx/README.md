@@ -1,72 +1,82 @@
 # SIG MPX
 
-Black select-fire 8-inch MPX, deployed stock, ROMEO4T and MPX-specific SRD9.
-Solid 1.5 mm polymer cap lids are approved; closed lids intentionally occlude
-the optic. General animation/gameplay/optic human acceptance remains outstanding.
-Original art, not a certified replica.
+Black select-fire 8-inch MPX with deployed removable irons, a bare 9mm barrel
+crown/thread protector and no optional attachment installed. The integrated
+ROMEO4T and MPX-specific SRD9 are removed. Original reference-informed game art,
+not a certified replica; human visual/animation/gameplay acceptance is pending.
 
 [Source map](../../../tools/blender/mpx/README.md) ·
 [Shared workflow](../../../tools/blender/README.md)
 
-The adapter converts +X-forward/+Z-up/−Y-right once and samples eight clips.
-Ordinary meshes preserve actual cap pivots, mechanisms, independent magazines and
-rounds. Preserve lockback, cancellation, chamber accounting and pooled ejection.
-Three materials retain original finish colors and UV0 grain, with UV1 finish tiles.
-Body lenses stay at 2% opacity; the world-sized 2 MOA dot has a six-pixel floor.
-Hand calibration/review-arm inputs are read-only. Normal builds use local assets.
+The adapter converts +X-forward/+Z-up/−Y-right once and samples eight clips with
+unchanged timelines/events and calibrated grip endpoints. Draw/holster support-hand
+approaches move below/outboard of the PM II; holster releases early and returns
+after the objective clears. Ordinary meshes retain independent mechanisms,
+magazines and rounds.
+Preserve lockback, cancellation, chamber accounting, shared hand calibration and
+pooled ejection. One opaque material retains original finish colors and UV0 grain;
+UV1 keeps the original 15 finish-tile indices, including reserved retired finishes.
+No ROMEO lens, cap, glass policy or built-in reticle remains in the runtime model.
 
 Run from the repository root with Blender 5.2.2 and gltfpack 1.3:
 
 ```sh
 blender -b -t 2 --python-exit-code 1 --python tools/blender/mpx/build.py
+# Build the catalog attachments with bun run assets before running source checks.
 blender -b -t 2 assets/weapons/sig-mpx/mpx.blend \
   --python-exit-code 1 --python tools/blender/mpx/check.py
 bun run models:cook -- mpx
 ```
 
 Use `--output /tmp/mpx-review` for scratch builds. The registered cook retains
-material boundaries and 16-bit colors; do not adopt more aggressive optic-rim
-simplification. The source map records the UV-repeatability limitation.
-Historical representation/storage comparisons remain in Git, not an FPS claim.
+material boundaries and 16-bit colors. The source map records the narrow
+UV-repeatability limitation; export success is not human visual acceptance.
 
-## TOR Mini rail (#686)
+## Base sights and verified fits (#663)
 
-A short authored right-side Picatinny adapter enables the shared optional laser,
-independently of the existing integrated optic and suppressor. The adapter stays
-on the base weapon; `rail: 'laser'` installs the TOR Mini and `rail: null` removes
-only the module. API/debug/capture and independent inspection share the same solver;
-attachment purchase/customization UI remains separate work.
+All coordinates below are source Blender metres (+X forward, +Z up).
+The 203.2mm barrel extends from x=.109 to .3122, with a real open 9.4mm crown.
+`SOCKET_muzzle` is x=.3182 at the thread protector's end. Base firing is
+unsuppressed; only the configured shared suppressor selects suppressed audio/FX.
 
-The corrected 43.5 mm backing and four full teeth remove the unused rear flange/
-tooth that intersected the support glove during tactical reload and holster.
-The TOR's clamp begins at source x=.2855, ahead of that removed tooth. Two modeled
-anchors now pass through the last actual M-LOK slot instead of placing one beyond
-the handguard end. Four real-surface rays verify backing contact on the slot's
-upper/lower lands. This is authored game-fit hardware, not factory/CAD certification.
-Hands, calibration and all eight animation/event timelines remain unchanged.
+`IRON_sights` owns both deployed clamps, hinges and leaves. The rear 3.6mm peep
+at x=−.079 and front blade at x=.284 share z=.074. Base ADS uses this rear datum,
+60mm eye relief and a .7 weapon-FOV ratio, not the removed ROMEO optical axis.
+`IRON_sights_removed` retains the same hardware folded flat. Removal/reinstallation
+is independent of optic selection; no optic and no irons is valid, with no reticle.
 
-The MPX adapter's load-time +X-to-−Z conversion now preserves the shared attachment's
-local frame. Conjugating that frame like weapon geometry previously turned the
-module/emitter upward. The corrected slot is bore-forward in gameplay and inspection,
-without a per-frame offset, weapon-specific laser renderer or handling bonus.
+| Slot | Authored datum | Enabled catalog fits |
+| --- | --- | --- |
+| Optic | `MOUNT_optic` [.025, 0, .044], rail-contact plane | RMR: .125m eye relief; ACOG: .11m; PM II: .09m |
+| Muzzle | `MOUNT_muzzle` [.3162, 0, 0], bore-forward | shared `suppressor` |
+| Rail | `MOUNT_rail` [.295, −.037, 0], bore-forward | TOR Mini `laser` |
 
-The full native check passes **998 poses at 120 Hz**, including fractional fire
-endpoints, actual adapter/laser surfaces, both deformed hands, emitter corridor
-and integrated optic/suppressor. A separate native-WebGPU fixture passes **4,096
-runtime poses**, including hip/ADS clips, firing, last-shot lockback, returns,
-sprint/low-ready/ADS transitions and gesture cancellation. Both arms clear native
-hardware, cooked adapter-region geometry and the cooked laser; the emitter axis
-remains bore-forward throughout. These finite samples are not continuous clearance
-or final human animation/gameplay approval.
+Optic and muzzle frames rotate Blender +Y forward onto weapon +X. The adapter
+preserves canonical shared-attachment locals at **all three** mount boundaries.
+RMR/ACOG work with deployed irons. PM II intersects the rear deployed sight and
+requires irons removed (`opticClashes: ['scope']`); its housing clears the folded
+front hardware. The forward sight clamp remains supported on the last real teeth.
 
-A full-game native-WebGPU run also checks optional equip/removal, actual firing,
-both reloads, ADS/inspect, independent inspection alignment, switching/beam cleanup
-and restoration. No page/console/TSL/GPU-validation errors were collected; ordinary
-material-deprecation, zero-draw and canvas-format warnings remain disclosed.
-No base conversion or dependency on the still-open #662/#663 issues is introduced;
-the integrated ROMEO4T/SRD9, original sight datum and weapon handling are retained.
+The can replaces `MUZZLE_device` (thread protector) with
+`MUZZLE_device_removed` (authored adapter sleeve). The sleeve bridges the crown
+to the shared rear mount with .2mm radial envelope clearance. The shared asset
+retains its 236×44mm SRD762Ti-inspired exterior but now has a **10.4mm-clear
+GAME-FIT endcap/shadow annulus** and an open rear sleeve. This is explicitly not
+manufacturer-approved 9mm SRD762Ti compatibility or a physical baffle redesign;
+see the [shared caliber decision](../../attachments/sig-srd762ti/README.md).
+
+The right-side laser adapter retains its 43.5mm backing, four supported teeth and
+two anchors through the last M-LOK slot. The existing strict TOR check samples
+998 poses at 120Hz with actual hardware, emitter corridor and both deformed arms.
+The MPX check additionally verifies actual catalog seating, iron clashes, both iron
+states, concurrent slots, fixed surfaces, all eight clips' mechanisms/deformed
+hands at 120Hz, 181 stock-fold poses and 39 charging-handle positions. These finite
+samples are not continuous clearance or final gameplay approval. The stock and
+charging sweeps are independent mechanical checks, not new gameplay animations.
 
 ```sh
-bun tools/capture.ts --weapon=smg --rail=laser --shot=weapon --out=/tmp/mpx-laser.png
+bun tools/capture.ts --port=5175 --weapon=smg --shot=weapon --out=/tmp/mpx-base.png
+bun tools/capture.ts --port=5175 --weapon=smg --shot=ads --out=/tmp/mpx-irons.png
+bun tools/capture.ts --port=5175 --weapon=smg --optic=scope --irons=removed --shot=ads --out=/tmp/mpx-scope.png
+bun tools/capture.ts --port=5175 --weapon=smg --rail=laser --muzzle=suppressor --shot=weapon --out=/tmp/mpx-attachments.png
 ```
-See the [mount table, source sweep and limitations](../../attachments/steiner-tor-mini/README.md#weapon-mounting-686).

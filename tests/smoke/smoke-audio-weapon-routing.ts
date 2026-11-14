@@ -131,7 +131,18 @@ for (const [id, key] of fixtureEntries(expected)) {
   assert.equal(JSON.stringify(def), original, 'routing does not mutate definitions');
 }
 assert.equal(WEAPON_DEFS.smg.audio, 'mpx');
-assert.equal(WEAPON_DEFS.smg.suppressed, true);
+audio._onFire({
+  weapon: WEAPON_DEFS.smg,
+  origin: new Vector3(),
+  actor: null,
+  dir: new Vector3(),
+  seed: 0,
+});
+assert.equal(
+  latestCapture()?.profile,
+  WEAPON_PROFILES.mpx,
+  'base MPX uses its unsuppressed recording'
+);
 
 for (const [weapon, expectedProfile] of [
   ['ak', WEAPON_PROFILES.ak],

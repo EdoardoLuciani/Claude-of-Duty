@@ -250,7 +250,6 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     label: 'SIG MPX',
     class: 'smg',
     audio: 'mpx',
-    suppressed: true,
     caliber: '9x19',
     rpm: 950,
     modes: ['auto', 'semi'],
@@ -291,20 +290,23 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     },
     fireVibe: { amp: 0.72, duration: 0.048, adsScale: 0.4 },
     adsTime: 0.185,
-    viewFov: 0.145, // Large housing without a near-eye tunnel; weapon-only 8.7°.
+    viewFov: 0.7, // Open irons, matching the rifle iron-sight weapon FOV.
     drawTime: 0.52,
     holsterTime: 0.34,
-    // Keep the existing reactive hip pose; the suppressor socket is at its exit.
+    // Preserve the reactive hip pose; the base muzzle ends at its thread protector.
     firingShoulderZ: 0.12, // MPX inspection must not stretch a behind-eye arm.
-    adsFiringShoulderZ: 0.28, // Farther ADS eye needs a body anchor behind the wrist.
+    adsFiringShoulderZ: 0.28, // Keep the established ADS shoulder anchor behind the wrist.
     hipPos: [0.111, -0.163, -0.288],
     hipRot: [-0.05, 0.072, -0.131],
     adsCant: [0, 0, 0.005],
-    // Eye distance controls perspective, weapon FOV independently controls size.
-    // 85.5 mm is the CLOSED overall envelope, not the optical tube length.
-    // ADS translation remains solved from the real optical-axis socket.
-    eyeRelief: 0.28,
-    fits: { rail: { laser: {} } },
+    // Aim through the deployed rear peep, not the removed ROMEO4T optical axis.
+    eyeRelief: 0.06,
+    fits: {
+      optic: { rmr: { eyeRelief: 0.125 }, acog: { eyeRelief: 0.11 }, scope: { eyeRelief: 0.09 } },
+      muzzle: { suppressor: {} },
+      rail: { laser: {} },
+    },
+    removableIrons: { opticClashes: ['scope'] },
     sprintPos: [0.088, -0.24, -0.262],
     sprintRot: [-0.38, 0.58, 0.19],
     lowReadyPos: [0.108, -0.252, -0.276],

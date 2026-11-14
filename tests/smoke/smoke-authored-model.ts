@@ -331,6 +331,19 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     )
   );
   nativeRoot.add(nativeMount);
+  // Optic/muzzle boundaries share canonical attachment locals after MPX rebasing.
+  for (const name of ['MOUNT_optic', 'MOUNT_muzzle']) {
+    const mount = new THREE.Object3D();
+    mount.name = name;
+    mount.position.set(0.04, 0.044, 0);
+    mount.rotation.y = -Math.PI / 2;
+    nativeRoot.add(mount);
+  }
+  for (const name of ['IRON_sights', 'IRON_sights_removed', 'MUZZLE_device']) {
+    const node = new THREE.Group();
+    node.name = name;
+    nativeRoot.add(node);
+  }
   const mpx = makeMPXModel(
     fixture<GLTF>({
       scene: nativeScene,
@@ -367,6 +380,26 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
       'MPX attachment keeps its authored side seat'
     );
   }
+  assert(!('opticGlass' in mpx.nodes), 'base MPX must not retain a ROMEO reticle');
+  for (const name of ['MOUNT_optic', 'MOUNT_muzzle']) {
+    const mount = nativeScene.getObjectByName(name)!;
+    const forward = new THREE.Vector3(0, 0, -1).transformDirection(mount.matrixWorld);
+    assert(
+      forward.distanceTo(new THREE.Vector3(0, 0, -1).applyQuaternion(nativeRoot.quaternion)) <
+        1e-10,
+      `${name}: shared attachment stays bore-forward after MPX basis conversion`
+    );
+  }
+  for (const optic of ['rmr', 'acog', 'scope'] as const) {
+    assert.equal(isAttachmentConfig({ ...BASE_ATTACHMENTS, optic }, 'smg'), optic !== 'scope');
+    assert(
+      isAttachmentConfig(
+        { ...BASE_ATTACHMENTS, optic, ironSights: false, muzzle: 'suppressor', rail: 'laser' },
+        'smg'
+      )
+    );
+  }
+  assert(isAttachmentConfig({ ...BASE_ATTACHMENTS, ironSights: false }, 'smg'));
   releaseAttachmentMounts(mounted);
   laser.dispose();
   configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, ironSights: false }, optics);
