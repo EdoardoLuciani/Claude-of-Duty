@@ -63,7 +63,6 @@ export interface WeaponNodes {
   muzzle: number[];
   eject: number[];
   ejectDir?: number[];
-  opticGlass?: OpticData | null;
   magSeat: { pos: number[]; rot: number[] };
   gripR: GripData;
   gripL: GripData;

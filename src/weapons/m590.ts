@@ -18,12 +18,7 @@ import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
-type M590Model = AuthoredModelData<
-  'shotgun',
-  AuthoredNodes & {
-    opticGlass: null;
-  }
-> & {
+type M590Model = AuthoredModelData<'shotgun', AuthoredNodes> & {
   label: string;
   fxClass: string;
   reactiveFire: boolean;
@@ -69,7 +64,6 @@ export function makeM590Model(gltf: GLTF): M590Model {
       gripL: handReference.grips.left,
       // Legacy below-mouth helper, not a detachable magazine or hull control.
       magSeat: { pos: [0, -0.039, -0.068], rot: [1.2, 0, 0] },
-      opticGlass: null,
     },
     shell: manifest.shell,
     magSize: { len: manifest.shell.caseLen },

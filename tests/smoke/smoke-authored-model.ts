@@ -96,17 +96,6 @@ const gltf = fixture<GLTF>({
 });
 const { animations, opticMountRest } = authoredModel(gltf, 'TEST_RIG', ['Idle', 'Fire'], authored);
 assert.equal(opticMountRest, null, 'no MOUNT_optic, no optic datum');
-// The optic datum is rig-local: a posed rig never bakes into it.
-rig.position.set(0, 0.2, 0.1);
-rig.rotation.set(0.3, 0.4, 0);
-const opticMount = new THREE.Object3D();
-opticMount.name = 'MOUNT_optic';
-opticMount.position.set(0, 0.1, -0.07);
-rig.add(opticMount);
-const rest = authoredModel(gltf, 'TEST_RIG', ['Idle'], authored).opticMountRest;
-assert(
-  rest?.elements.every((v, i): boolean => Math.abs(v - opticMount.matrix.elements[i]) < 1e-12)
-);
 assert.deepEqual(
   animations.map((c): [string, number] => [c.name, c.duration]),
   [
@@ -270,7 +259,7 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
       muzzleGroup: new THREE.Group(),
       muzzleSocket: null,
     });
-    const base = { ...weapon.def, suppressed: WEAPON_DEFS[id].suppressed ?? false };
+    const base = { ...weapon.def, suppressed: false };
     configureWeaponAttachments(weapon, laserConfig, { ...optics, laser });
     assert.deepEqual(weapon.def, base, `${id}: laser has no handling/ballistic modifiers`);
     assert.equal(weapon.railGroup.parent, railMount);
@@ -342,7 +331,6 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
       ),
     })
   );
-  assert(!('opticGlass' in nativeMCX.nodes), 'base MCX has no integrated reticle/glass');
   const mcxMounted = mountAttachments(nativeMCX, config, optics);
   nativeMCX.scene.updateMatrixWorld(true);
   const mcxExpected = asset.sight.clone().applyMatrix4(mcxMount.matrixWorld);
@@ -426,7 +414,6 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
       'MPX attachment keeps its authored side seat'
     );
   }
-  assert(!('opticGlass' in mpx.nodes), 'base MPX must not retain a ROMEO reticle');
   for (const name of ['MOUNT_optic', 'MOUNT_muzzle']) {
     const mount = nativeScene.getObjectByName(name)!;
     const forward = new THREE.Vector3(0, 0, -1).transformDirection(mount.matrixWorld);

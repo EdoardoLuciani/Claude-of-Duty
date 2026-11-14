@@ -381,10 +381,10 @@ current values. Keep internal state keyed by `WeaponId`; narrow DOM/URL/debug
 strings with `isWeaponId` at entry. Authored models carry literal adapter IDs,
 and the loader table checks complete ID coverage and per-ID adapter returns.
 `WeaponState.attachments` is an immutable `{ optic, ironSights, muzzle, rail }` snapshot;
-null slots retain the authored base weapon (including existing integrated optics/
-suppressors). `src/weapons/attachments.ts` owns the finite catalog (`rmr | acog | scope`
-optics, TOR Mini `laser`, M4/MCX/MPX `suppressor`), boundary validation, asset loading and
-the common gameplay/inspection mount solver. No attachment economy yet.
+null slots retain the authored iron-sight base weapon. `src/weapons/attachments.ts` owns
+the finite catalog (`rmr | acog | scope` optics, TOR Mini `laser`, M4/MCX/MPX `suppressor`),
+boundary validation, asset loading and the common gameplay/inspection mount solver.
+No attachment economy yet.
 `WeaponDef.fits` has one shape per slot: a partial record keyed by attachment id whose
 entry enables that verified fit and holds its data (`fits.optic[id].eyeRelief`; rail and
 muzzle entries are empty). `isAttachmentConfig()` is the single compatibility rule for
@@ -404,10 +404,11 @@ the frame loop. `mountAttachments()` validates every asset and datum first, then
 one group per slot under the weapon's authored `MOUNT_optic`/`MOUNT_rail`/`MOUNT_muzzle`
 (empty slots stay detached) and switches the replaced base parts (`IRON_sights`,
 `MUZZLE_device` with optional `MUZZLE_device_removed`). Instances follow the authored
-parent and animation, never a baked live pose; the ADS datum uses the captured rest-pose
-optic mount. The commit resolves sight/`OpticData`, laser emitter, muzzle socket and the
-effective private definition (eye relief, ADS FOV/sensitivity, `suppressed` from either an
-integrated can or a mounted suppressor), which fire-event audio/FX read unchanged.
+parent and animation, never a baked live pose; the ADS datum uses the rest-pose optic mount
+captured in the same weapon frame as the authored sight/muzzle points. The commit
+resolves sight/`OpticData`, laser emitter, muzzle socket and the effective private
+definition (eye relief, ADS FOV/sensitivity, `suppressed` from a mounted suppressor),
+which fire-event audio/FX read unchanged.
 Frame-time reticle, ADS, laser and fire consumers allocate nothing.
 
 Optic assets define `MOUNT_base` and `SOCKET_sight` in metres; rigid attachments define

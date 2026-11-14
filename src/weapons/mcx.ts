@@ -37,10 +37,6 @@ export function makeMCXModel(gltf: GLTF): MCXModel {
     manifest.clips,
     scene
   );
-  // Unlike rebased weapons, MCX retains a native +X rig under this wrapper.
-  // ADS uses weapon-frame points; resolve the cached rest mount in that same
-  // frame once, never from the live animated rig or a mounted instance.
-  if (opticMountRest) opticMountRest.premultiply(scene.matrix);
   const sight = point('SOCKET_sight');
   const model = {
     id: 'mcx' as const,
