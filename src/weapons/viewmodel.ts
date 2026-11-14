@@ -521,7 +521,6 @@ export class Viewmodel {
       meshes.push(node);
       tris += triCount(node.geometry);
     });
-    const n: WeaponNodes = model.nodes;
     // Adapters expose only detachable, cartridge-free magazine shells here.
     const parts = { magazine: animation.magazineBody };
 
@@ -546,7 +545,7 @@ export class Viewmodel {
       sight: new THREE.Vector3().fromArray(model.nodes.sight),
       eject: new THREE.Vector3().fromArray(model.nodes.eject),
       ejectDir: new THREE.Vector3().fromArray(model.nodes.ejectDir).normalize(),
-      optic: n.opticGlass ?? null,
+      optic: null,
       gripR: model.nodes.gripR,
       gripL: model.nodes.gripL,
       magLen: model.magSize.len,

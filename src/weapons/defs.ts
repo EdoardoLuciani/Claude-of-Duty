@@ -21,8 +21,7 @@ export interface WeaponDef {
   class: WeaponClass;
   caliber: string;
   audio?: string;
-  /** Authored: integrated can (MCX/MPX until their base conversions). At runtime the
-   * private definition also carries a mounted suppressor. */
+  /** Resolved on the private runtime definition from a mounted suppressor; never authored. */
   suppressed?: boolean;
   rpm: number;
   modes: [WeaponMode, ...WeaponMode[]];

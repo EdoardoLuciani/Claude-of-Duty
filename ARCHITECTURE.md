@@ -381,8 +381,7 @@ current values. Keep internal state keyed by `WeaponId`; narrow DOM/URL/debug
 strings with `isWeaponId` at entry. Authored models carry literal adapter IDs,
 and the loader table checks complete ID coverage and per-ID adapter returns.
 `WeaponState.attachments` is an immutable `{ optic, ironSights, muzzle, rail }` snapshot;
-null slots retain the authored base weapon (including existing integrated optics/
-suppressors). `src/weapons/attachments.ts` owns the finite catalog (`rmr | acog | scope`
+null slots retain the authored iron-sight base weapon. `src/weapons/attachments.ts` owns the finite catalog (`rmr | acog | scope`
 optics, TOR Mini `laser`, M4/MCX/MPX `suppressor`), boundary validation, asset loading and
 the common gameplay/inspection mount solver. No attachment economy yet.
 `WeaponDef.fits` has one shape per slot: a partial record keyed by attachment id whose
@@ -406,8 +405,8 @@ one group per slot under the weapon's authored `MOUNT_optic`/`MOUNT_rail`/`MOUNT
 `MUZZLE_device` with optional `MUZZLE_device_removed`). Instances follow the authored
 parent and animation, never a baked live pose; the ADS datum uses the captured rest-pose
 optic mount. The commit resolves sight/`OpticData`, laser emitter, muzzle socket and the
-effective private definition (eye relief, ADS FOV/sensitivity, `suppressed` from either an
-integrated can or a mounted suppressor), which fire-event audio/FX read unchanged.
+effective private definition (eye relief, ADS FOV/sensitivity, `suppressed` from a mounted
+suppressor), which fire-event audio/FX read unchanged.
 Frame-time reticle, ADS, laser and fire consumers allocate nothing.
 
 Optic assets define `MOUNT_base` and `SOCKET_sight` in metres; rigid attachments define

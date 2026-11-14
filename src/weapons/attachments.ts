@@ -296,7 +296,7 @@ export function mountAttachments(
   const irons = ironSightNodes(model);
   let mountedOptic: WeaponEntry['mountedOptic'] = null;
   const sight = new THREE.Vector3().fromArray(model.nodes.sight);
-  let optic: OpticData | null = 'opticGlass' in model.nodes ? model.nodes.opticGlass : null;
+  let optic: OpticData | null = null;
   if (opticId !== null && opticAsset && opticSlot.parent) {
     // Only the ADS datum is resolved in rig space, from the rest-pose mount transform
     // (including orientation). Never the live pose: a slide or bolt may be mid-animation.
@@ -358,8 +358,7 @@ export function configureWeaponAttachments(
     config.optic === null
       ? base.eyeRelief
       : (base.fits?.optic?.[config.optic]?.eyeRelief ?? base.eyeRelief);
-  // MCX/MPX integrated cans keep the authored flag until their base conversions.
-  entry.def.suppressed = (base.suppressed ?? false) || config.muzzle === 'suppressor';
+  entry.def.suppressed = config.muzzle === 'suppressor';
   const fov = attached ? attached.adsFovScale : base.adsFovScale;
   const sensitivity = attached ? attached.adsSensScale : base.adsSensScale;
   if (fov === undefined) delete entry.def.adsFovScale;

@@ -50,11 +50,9 @@ export function authoredModel(
 } {
   scene.updateMatrixWorld(true);
   const root = requiredNode(scene, rigName);
-  // Capture the optic mount before any clip poses a slide, cover or bolt under it.
-  const mount = root.getObjectByName('MOUNT_optic');
-  const opticMountRest = mount
-    ? new THREE.Matrix4().copy(root.matrixWorld).invert().multiply(mount.matrixWorld)
-    : null;
+  // Capture the optic mount before any clip poses a slide, cover or bolt under it,
+  // in the same weapon frame as point() (including any native-axis wrapper).
+  const opticMountRest = root.getObjectByName('MOUNT_optic')?.matrixWorld.clone() ?? null;
   const animations = required.map((name): THREE.AnimationClip => {
     const clip = gltf.animations.find((clip): boolean => clip.name === name);
     if (!clip) throw new Error(`[${rigName}] missing ${name} clip`);
@@ -76,7 +74,7 @@ export interface AuthoredModelData<
   id: Id;
   scene: THREE.Group;
   root: THREE.Object3D;
-  /** Rig-local `MOUNT_optic` at load (rest pose); null when the weapon has no optic mount. */
+  /** Weapon-frame `MOUNT_optic` at load (rest pose), like `point()`; null without a mount. */
   readonly opticMountRest: THREE.Matrix4 | null;
   animations: THREE.AnimationClip[];
   nodes: Nodes;
