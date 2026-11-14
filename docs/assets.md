@@ -108,7 +108,7 @@ firing-hand clearance; its extended integrated-sight top rail supports RMR/ACOG/
 independent of the optional laser on fixed magazine-tube clamps (#686).
 
 The dedicated [.338 suppressor](../assets/attachments/suppressor-338/README.md)
-is authored in `tools/blender/suppressor-338/`, with its own `suppressor338`
+is authored in `tools/blender/suppressor338/`, with its own `suppressor338`
 cook/catalog ID and AX338-only muzzle fit. Its saved bore/socket checks and
 `tools/blender/ax338/muzzle.py` clearance sweep are separate from the shared SRD762Ti.
 
