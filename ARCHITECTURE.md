@@ -364,7 +364,11 @@ products; missing outputs force a full restage. Atomic writes and the cache lock
 remain. Bun dev/build runs it after the Blender steps; preview uses existing `dist`.
 
 M4/MCX/P320/EVOLYS/MPX/AX338/M590 use generated GLBs and weapon-owned adapters
-under `src/weapons/`; procedural player-weapon exports are retired. M590 is a
+under `src/weapons/`; procedural player-weapon exports are retired. All seven editable
+weapon scenes include shared review-only arm skins, never duplicate weapon-GLB arms.
+MCX exports its weapon first, then bakes real runtime control matrices into its
+saved source at 120 Hz; runtime hand-code changes invalidate that authoring cache.
+Its source checks compare evaluated skins against embedded runtime vertex receipts. M590 is a
 provisional in-game review prototype, not strict 1:1/final visual acceptance.
 Its seven event-only Clips sample one native mixer; `shell_insert` uses authored
 STEP-scale visibility owned/reset by the adapter, never detachable-magazine
@@ -422,9 +426,22 @@ even when the initial M4 uses irons. Debug URL input is narrowed in `main.ts`:
 `attachmentIrons=installed|removed` selects irons independently; PM II requires
 `?attachmentOptic=scope&attachmentIrons=removed`. `attachmentWeapon` must pass
 `isWeaponId` and compatibility/ownership checks.
-`attachmentRail=laser|none` selects the M4's right-rail module. Its authored
+`attachmentRail=laser|none` selects the TOR Mini on all seven weapons.
+M590's lower-stock wrist relief removes its former glove contact; the complete
+source gate now requires zero firing-skin crossings, with no pinned-file contact
+exception. Its AIMPRO-style low integrated rear-sight rail supports RMR/ACOG,
+not the PM II's wider ring spacing, and leaves the fixed-tube laser seat independent. MCX uses an upper-right chamfer-mounted
+adapter, fitted draw fingers and a lowered post-charge hand return; actual runtime
+skins were checked across complete sampled clips/transitions, not only snapshots.
+The authored
 `MOUNT_rail` and TOR Mini `SOCKET_mount`/`SOCKET_laser` keep mounting independent
-of the optic. Gameplay and inspection borrow the same single-material asset.
+of the optic. P320 uses its frame bone (not the slide); M590 uses fixed forward
+magazine-tube clamps (not the pump); the other adapters follow their fixed
+handguard/receiver assemblies. MPX's four-tooth side adapter clears the support
+hand; its load-time native-basis conversion preserves canonical attachment locals
+rather than rebasing the borrowed laser mesh. MCX/MPX retain their integrated optics
+and cans, without depending on their open base conversions. Gameplay and inspection borrow
+the same single-material asset.
 Weapons own one retained world mesh for the green beam and surface dot (one draw,
 no light/decal, no per-frame allocation); boot warms it even with no module mounted.
 Two pooled `MASK.BULLET` queries find the unspread, zeroed muzzle aim and clip the

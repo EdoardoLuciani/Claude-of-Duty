@@ -286,7 +286,11 @@ export class MCXAnimation {
       baseQ = this.magQ;
       weight = smootherstep(0.1, 0.32, t) * (1 - smootherstep(1.95, 2.35, t));
     }
-    if (weight <= 0) return;
+    const returnDrop =
+      this.gesture === 'reloadEmpty'
+        ? 0.05 * smootherstep(2.7, 2.9, t) * (1 - smootherstep(3.12, 3.28, t))
+        : 0;
+    if (weight <= 0 && returnDrop === 0) return;
     // Ignore visibility scale during off-screen magazine handoffs: the wrist
     // follows a rigid part, never a collapsing zero-scale transform.
     this.partMatrix.compose(part.position, part.quaternion, ONE);
@@ -302,6 +306,9 @@ export class MCXAnimation {
       .multiply(this.inverseQ)
       .multiply(baseQ);
     pos.lerp(this.target, weight);
+    // Align the released glove below the rail, then raise it onto the support
+    // grip. The latch contact and all authored mechanism/event beats stay put.
+    pos.y -= returnDrop;
     quat.slerp(this.targetQ, weight);
   }
 

@@ -46,7 +46,7 @@ Game-space mount datums in metres (native Blender uses +Y forward, +Z up):
 | --- | --- | --- |
 | `MOUNT_optic` | `[0, .066, -.003]` | slide; identity rail contact |
 | `MOUNT_muzzle` | `[0, .037, -.1445]` | tilting barrel; contact normal points forward |
-| `MOUNT_rail` | `[0, .002, -.105]` | frame; contact normal points down on the existing accessory rail |
+| `MOUNT_rail` | `[0, .002, -.122]` | frame; local +Y points into the underside seat; frame-owned TOR Mini |
 
 The rail underside is at .062 m, above the .0537 m iron aim ray and .056 m rear
 sight top. Side supports end before the ejection port. The thread travels with the
@@ -77,8 +77,12 @@ ADS screenshot to verify the arm/sight relationship. Native WebGPU review at
 .5943–.5947 m against a .630 m limit (base irons .6019 m). Independent inspection
 clones reset a locked-open source to loaded rest without mutating gameplay.
 
-Suppressor (#670) and laser (#671) are not in the runtime catalog. Their datums
-are future integration points only: no can/sight-height, muzzle-device fit or
-laser/hand clearance is claimed. Recheck these when the shared assets and final
-muzzle/rail orientation contracts land; suppressor-height irons may still be
-needed. Do not enable absent attachments or infer clearance from an empty mount.
+TOR Mini (#686) uses an explicitly extended game-fit integral frame rail: its
+front advances 14 mm to native +Y=.141 and a fifth cross-slot at .129 supports the
+module's forward seat. This is not a factory Compact frame. The nose projects a
+few millimetres ahead of the barrel but remains below its bore/slide path; it
+never follows the slide. The source sweep tests actual deformed hands at 120 Hz,
+including the early tactical/empty reload intervals missed by a coarser sweep.
+See the [shared laser mount contract](../../attachments/steiner-tor-mini/README.md#weapon-mounting-686).
+The future suppressor datum (#670) is not a fit certificate; no standalone muzzle
+asset exists to validate its geometry, can/sight height or combined clearance.

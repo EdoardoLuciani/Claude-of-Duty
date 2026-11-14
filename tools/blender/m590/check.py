@@ -11,7 +11,6 @@ from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
 ROOT=Path(__file__).resolve().parents[3]
 sys.path.insert(0,str(ROOT/'tools/blender'))
-from m590.clearance import RightGloveStockException
 ref=json.loads((ROOT/'assets/weapons/m590/hand-reference.json').read_text())
 manifest=json.loads((ROOT/'assets/weapons/m590/manifest.json').read_text())
 scene=bpy.context.scene;rig=bpy.data.objects['M590_RIG'];CI=Matrix(((1,0,0),(0,0,1),(0,-1,0))).to_4x4()
@@ -102,11 +101,9 @@ front_shroud=tree([front_base]);muzzle_z=manifest['dimensions']['barrelCrown'][2
 for side in (-1,1):
     hit=front_shroud.ray_cast(Vector((side*.05,.0845,muzzle_z+.019)),Vector((-side,0,0)),.05)[0]
     assert hit is not None and abs(hit.x)>.0075,('front cheek/base slit',side,hit)
-foot=tree(pick('Ghost ring foot'))
-floor=foot.ray_cast(Vector((0,.12,-.095)),Vector((0,-1,0)),.05)[0]
-edge=foot.ray_cast(Vector((.007,.12,-.095)),Vector((0,-1,0)),.05)[0]
-assert floor is not None and edge is not None and .0005<edge.y-floor.y<.0015,'shallow rear sight bed'
-assert len(pick('Rear sight toe mounting head'))==1,'visible toe mounting head'
+assert len(pick('Ghost ring aperture'))==1 and len(pick('Ghost ring pedestal'))==1, 'single integrated rear sight'
+assert len(pick('Rear sight protective ear'))==2, 'paired integrated rear protection'
+assert len(pick('Rear sight elevation head'))==1 and len(pick('Rear sight windage head'))==1, 'modeled sight adjustment heads'
 for lug in pick('Side Picatinny lug'):
     bvh=tree([lug]);centre=CI@lug.matrix_world@sum((v.co for v in lug.data.vertices),Vector())/len(lug.data.vertices)
     side=1 if centre.x>0 else -1
@@ -116,7 +113,7 @@ for lug in pick('Side Picatinny lug'):
     assert neck is not None and head is not None and outer is not None
     assert abs(neck.x)<.019 and abs(head.x)>.024 and abs(outer.x-.028*side)<.0001,('side rail inward head/neck relief',lug.name,neck,head,outer)
 assert len(pick('Side Picatinny lug'))==14,'unchanged seven lugs per side'
-print('M590_REFERENCE_DETAILS_OK: connected bilateral front skirts; shallow rear bed/toe head; 14 inward side-lug necks')
+print('M590_REFERENCE_DETAILS_OK: connected bilateral front skirts; integrated rear ghost ring/adjusters; 14 inward side-lug necks')
 # F1 regression: the metal button must be seated on evaluated receiver/tang support,
 # not merely close to its own metadata or a floating bounding box.
 safety_objects=pick('Tang safety');ridges=pick('Safety traction ridge')
@@ -205,17 +202,15 @@ assert nearest(tree(pick('Bolt face')),dim['closedBreech'])<1e-6,'barrel datum i
 # while the proximal glove/thumb crossed the stock. Test all evaluated shared
 # glove, reinforcement, knuckle, cuff and sleeve triangles, not bone capsules.
 # The moving trigger is intentionally a contact surface (index flexes on Pump);
-# the stock, receiver/tang and guard remain strict except the documented,
-# operator-approved <=30um coarse-glove contact at the stock neck.
+# the stock, receiver/tang and guard are strict, including the relieved neck.
+# No raw shared-arm file pin, topology allowlist or penetration exemption.
 right_skin=[o for o in review.objects if o.type=='MESH' and o.name.startswith('M590_right_')]
 assert len(right_skin)==5
-firing_vertices,firing_faces,firing_owners=geometry(pick('Conventional synthetic stock')+pick('590A1 receiver forging')+pick('Rear tang')+pick('Metal trigger guard'))
+firing_vertices,firing_faces,_=geometry(pick('Conventional synthetic stock')+pick('590A1 receiver forging')+pick('Rear tang')+pick('Metal trigger guard'))
 firing_fixed=BVHTree.FromPolygons(firing_vertices,firing_faces,all_triangles=True)
 stock_vertices,stock_faces,_=geometry(pick('Conventional synthetic stock'))
 stock_edges=Counter((face[i],face[(i+1)%3]) for face in stock_faces for i in range(3))
-assert all(count==1 and stock_edges[(b,a)]==1 for (a,b),count in stock_edges.items()),'depth certificate requires closed consistently oriented stock'
-firing_stock=BVHTree.FromPolygons(stock_vertices,stock_faces,all_triangles=True)
-right_exception=RightGloveStockException(ROOT/'assets/player/arms/player-arms.blend')
+assert all(count==1 and stock_edges[(b,a)]==1 for (a,b),count in stock_edges.items()),'closed consistently oriented stock'
 right_poses=0
 for name,clip in manifest['clips'].items():
     for frame in range(math.ceil(clip['duration']*120)+1):
@@ -223,12 +218,10 @@ for name,clip in manifest['clips'].items():
         for skin in right_skin:
             vertices,faces,_=geometry([skin])
             overlaps=BVHTree.FromPolygons(vertices,faces,all_triangles=True).overlap(firing_fixed)
-            if overlaps:
-                try:right_exception.check(skin.name,vertices,faces,overlaps,firing_owners,firing_stock)
-                except AssertionError as error:raise AssertionError((name,frame,str(error))) from error
+            assert not overlaps,(name,frame,skin.name,'right skin intersects stock/receiver/guard',len(overlaps))
         right_poses+=1
 pose('Idle')
-print('M590_RIGHT_SKIN_CLEARANCE_OK:',right_poses,'120Hz poses across all seven clips; approved neck-contact poses',right_exception.poses,'; sampled depth mm',right_exception.maximum_sample*1000,'; certified upper bound mm',right_exception.maximum_bound*1000,'; all other crossings forbidden')
+print('M590_RIGHT_SKIN_CLEARANCE_OK:',right_poses,'120Hz poses across all seven clips; all five right skins; zero crossings, no exceptions')
 # Rigid mechanism sweep in rig-space against the fixed receiver and barrel.
 fixed=tree(pick('590A1 receiver forging')+pick('Heavy barrel')+pick('Barrel crown'))
 minimum=math.inf;poses=0;seen=set();skin_poses=0
@@ -287,3 +280,8 @@ pose('Idle')
 from m590.mounts import check_mounts
 check_mounts(ROOT,manifest,rig,meshes,review,pose,tree,point,CI)
 print('M590_SOURCE_OK:',len(meshes),'editable component meshes;',len(controls),'native controls;',poses,'120Hz mechanism/contact poses;',len(seen),'distinct strokes;',skin_poses,'actual deformed glove clearance poses; rear clearance',minimum*1000,'mm; wrist/shell drift',max_drift*1000,'mm')
+
+# Actual shared rail attachment, independent of the optic catalog.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tor_mini.mounts import check_laser_mount
+check_laser_mount('m590')

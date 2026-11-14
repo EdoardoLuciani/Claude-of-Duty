@@ -284,10 +284,20 @@ def build(output, render=False, quick=False):
     empty('SOCKET_front_post',(0,sight_y,front_z),rig)
     # Identity rail-contact frame; optics supply their own riser/base and sight.
     empty('MOUNT_optic',(0,rail_top,.105-30*.01005),rig)
-    # Future catalog datums only: no suppressor/laser assets are fitted here.
+    # FN's studio profile shows a direct underside rail below the molded covers.
+    lower_y=zy(0,336)[1]
+    box('Lower Picatinny spine',(0,lower_y+.007,-.300375),(.016,.008,.15595),fde,hg,.0002)
+    section=[(-.008,lower_y+.003),(.008,lower_y+.003),(.0106,lower_y+.001),
+             (.0106,lower_y),(-.0106,lower_y),(-.0106,lower_y+.001)]
+    for i in range(16):
+        z=-.225-i*.01005
+        vertices=[(x,y,z+side*.0026) for side in (-1,1) for x,y in section]
+        faces=[tuple(range(5,-1,-1)),tuple(range(6,12))]
+        faces.extend((j,(j+1)%6,(j+1)%6+6,j+6) for j in range(6))
+        mesh('Lower Picatinny tooth',vertices,faces,fde,hg,.0002)
     empty('MOUNT_muzzle',(0,.075,crown),rig)
-    rail_mount=empty('MOUNT_rail',(.0275,.075,-.300),rig)
-    rail_mount.rotation_euler=(C@Matrix.Rotation(-math.pi/2,3,'Z')@C.inverted()).to_euler()
+    # Identity keeps the emitter forward and the body below its contact datum.
+    empty('MOUNT_rail',(0,lower_y,-.363725),hg)
     # Soft 100-round pouch with a rigid mounting lid and shallow seam relief.
     for parent in (pouch,spare):
         box('Pouch fabric body',(-.023,-.048,-.166),(.108,.107,.125),canvas,parent,.008)
@@ -346,6 +356,9 @@ def build(output, render=False, quick=False):
         for o in objects:
             active(o);bpy.ops.object.transform_apply(location=False,rotation=False,scale=True)
             assert o.data.polygons,'Unexpected empty geometry: '+o.name
+            if o.name.startswith('Lower Picatinny '):
+                group=o.vertex_groups.new(name='LASER_mount_hardware')
+                group.add(list(range(len(o.data.vertices))),1,'REPLACE')
             if not o.data.uv_layers:
                 o.data.uv_layers.new(name='UVMap')
                 bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.uv.smart_project(angle_limit=1.15,island_margin=.01);bpy.ops.object.mode_set(mode='OBJECT')

@@ -106,6 +106,14 @@ export const SOLDIER_STEP: AssetStep = {
 
 // Shared authoring sources outside a weapon's own tooling directory.
 const SHARED_TOOLS: Partial<Record<ModelId, string[]>> = {
+  mcx: [
+    'src/weapons',
+    'src/core/math.ts',
+    'src/core/rng.ts',
+    'src/core/guards.ts',
+    'src/core/three-guards.ts',
+    'bun.lock',
+  ],
   m4: ['tools/blender/hand-reference.ts'],
   p320: ['tools/blender/hand-reference.ts'],
   m590: ['tools/blender/hand-reference.ts'],

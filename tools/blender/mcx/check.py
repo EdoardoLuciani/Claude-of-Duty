@@ -3,6 +3,8 @@ blender -b assets/weapons/mcx-virtus/mcx-virtus.blend \
   --python tools/blender/mcx/check.py
 Checks are independent of the authoring script; no source rebuild or save.
 """
+import sys
+from pathlib import Path
 import bpy
 from mathutils import Vector
 from mathutils.geometry import convex_hull_2d
@@ -223,3 +225,27 @@ for step in range(129*2,157*2+1):
 pose('Idle', 0)
 print(f'MCX_STOCK_HANDLE_CLEARANCE_OK: moving stock/hinge >= {minimum_separation["moving_stock"]*1000:.3f} mm; fixed rear plate >= {minimum_separation["rear_plate"]*1000:.3f} mm; full clips/midframes/folded rack')
 print(f'MCX_GEOMETRY_OK: moving parts clear/attached, rounded receiver/grip, MAG800 envelope {length*1000:.3f} mm, TA31F/SRD762Ti dimensions')
+
+# The rotated adapter must actually seat on the upper handguard, not float
+# above it to avoid the glove. Six rays span both screw stations on real faces.
+pose('Idle', 0)
+mount = objects['MOUNT_rail']
+guard = bvh('Hollow octagonal VIRTUS handguard')
+inward = (mount.matrix_world.to_3x3() @ Vector((0,0,1))).normalized()
+for station in (-.020,.020):
+    for across in (-.004,0,.004):
+        origin = mount.matrix_world @ Vector((across,station,.005))
+        hit = guard.ray_cast(origin,inward,.02)
+        assert hit[0] is not None and .0065 < hit[3] <= .007, ('laser adapter backing not seated',station,across,hit[3])
+for obj in asset.objects:
+    if obj.type == 'MESH' and obj.name.startswith('Laser rail '):
+        assert bvh(obj.name).ray_cast(sight,Vector((1,0,0)),1)[0] is None, ('laser hardware blocks ACOG',obj.name)
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+# Compare evaluated shared skins against the embedded real-runtime receipts.
+from mcx.review_hands import check_review_hands
+check_review_hands()
+
+# Actual shared rail attachment, independent of the optic catalog.
+from tor_mini.mounts import check_laser_mount
+check_laser_mount('mcx')

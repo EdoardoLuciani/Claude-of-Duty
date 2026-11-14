@@ -1,5 +1,5 @@
 {
-  "asset": "Mossberg 590A1 Tactical SKU50774 (2016) / 18.5-inch / 6+1 / ghost ring / fixed synthetic stock / tri-rail",
+  "asset": "Mossberg 590A1 Tactical SKU50774 base / 18.5-inch / 6+1 / AIMPRO-style integrated sight rail / fixed synthetic stock / tri-rail",
   "status": "Provisional runtime review prototype; strict 1:1 and final human visual/gameplay approval pending",
   "units": "metres",
   "blenderForward": "+Y",
@@ -7,11 +7,11 @@
   "runtimeBasis": "-Z forward / +Y up / +X right; no adapter basis transform",
   "source": "tools/blender/m590/build.py + tools/blender/m590/ + tools/blender/m590/actions.py + tools/blender/m590/hand-reference.ts",
   "stats": {
-    "triangleInstances": 75842,
+    "triangleInstances": 78770,
     "primitives": 2,
     "materials": 1,
     "images": 3,
-    "bytes": 12262576
+    "bytes": 12475204
   },
   "clips": {
     "Idle": {
@@ -156,7 +156,7 @@
       ],
       [
         0.02800000086426735,
-        0.11800000071525574,
+        0.10599999874830246,
         0.3480115234851837
       ]
     ],
@@ -230,8 +230,8 @@
     "optic": {
       "pos": [
         0,
-        0.118,
-        -0.14
+        0.091,
+        -0.13419599999999998
       ],
       "rot": [
         0,
@@ -255,16 +255,16 @@
     },
     "rail": {
       "pos": [
-        0.028,
-        0.0355,
-        -0.46
+        0,
+        0.009,
+        -0.575
       ],
       "rot": [
         0,
         0,
-        -1.5707963267948966
+        0
       ],
-      "parent": "forend"
+      "parent": "receiver"
     }
   },
   "ejectionDirection": [
@@ -354,8 +354,8 @@
     "Manufacturer nominal barrel/OAL/LOP anchors; local exterior profile estimates from catalog photograph, not manufacturing CAD.",
     "No exported arms, spent case, optic, baked shot recoil, or gameplay balance changes.",
     "shell_insert is not a detachable magazine; adapter owns visibility from authored scale.",
-    "Fixed ghost-ring irons remain below a see-through receiver optic rail; no removable irons.",
-    "12g adapter and moving tri-rail datums are future suppressor/laser seats only; those runtime catalogs are empty.",
+    "Low receiver rail with integrated rear ghost ring; no removable irons.",
+    "12g adapter reserves the future suppressor seat; TOR Mini uses a fixed forward magazine-tube clamp rail.",
     "SOCKET_muzzle emits at the adapter exit/MOUNT_muzzle; DATUM_barrel_crown preserves the original factory barrel measurement."
   ]
 }

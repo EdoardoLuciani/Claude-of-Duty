@@ -29,56 +29,70 @@ Use `--output /tmp/m590-review` for scratch builds. Preserve one mixer,
 event-only gameplay bridge, pump-owned casing ejection, authored shell visibility,
 cancellation/reset and 6+1 accounting. Keep full right-arm skin checks.
 
-The approved shared-glove tessellation exception lives in `clearance.py`:
-exact file/topology hashes and two glove faces against the stock, with an absolute
-30 µm signed-distance ceiling. It is not a general tolerance or triangle skip.
-Other intersections still fail. Shoulder offsets and firing-hand calibration are
-presentation compromises, not anatomical approval. Preserve AgX color management.
+All five firing-arm skins now require **zero crossings** against the stock,
+receiver/tang and trigger guard. A 0.10 mm inward relief at the lower stock wrist
+removes the former two-face glove contact. The old raw-file/topology-pinned 30 µm
+exception is retired, not repinned or widened; restoring the old stock fails at
+Idle frame 0. Shared arms/calibration and all seven animation tracks are unchanged.
+Shoulder offsets remain presentation compromises, not anatomical approval.
+Preserve AgX color management.
 
-## Fixed irons and attachment seats
+## Integrated rear sight and attachment seats
 
-The default is bare ghost-ring irons: no optic/glass, suppressor or laser.
-`removableIrons` stays unset. A see-through receiver bridge supports all three
-shared optics above the fixed rear ring; its paired feet follow the receiver
-roof and leave the iron bore open. The 190 mm rail supports both PM II ring
-stations. It neither rides on nor extends into the pump stroke.
+The default has the integrated ghost-ring irons and no optic/glass, suppressor or
+laser. `removableIrons` stays unset. The receiver now carries an **AIMPRO-style
+low rail with an integrated rear ghost ring**, replacing both the factory rear
+assembly and the former tall bridge. This is an aftermarket game-art configuration,
+not the original SKU50774 sight assembly or manufacturer CAD certification.
+
+[Reference photos and published 4-inch/eight-slot description](https://jerkingthetrigger.com/2013/10/29/aimpro-tactical-ghost-ring-rail/)
+show a receiver-hugging base, recessed fasteners and a protected rear aperture.
+Our 101.6 mm rail section has eight slots, four modeled screw heads/shanks with
+receiver bores, and a continuous underside following the actual receiver roof.
+Its contact plane is **27 mm lower** than the former bridge. The original .096 m
+iron sightline, front blade/shroud, barrel/OAL/LOP anchors and safety are retained.
+Local outlines and screw stations are photo-derived estimates, not engineering drawings.
 
 | Datum | Runtime metres / orientation | Ownership |
 | --- | --- | --- |
-| `MOUNT_optic` | `[0, .118, -.140]`, identity | receiver |
+| `MOUNT_optic` | `[0, .091, -.134196]`, identity | receiver; low eight-slot rail |
 | `MOUNT_muzzle` | `[0, .068, -.6672884763]`, identity | receiver; adapter forward face |
-| `MOUNT_rail` | `[.028, .0355, -.460]`, −90° about Z | forend; right tri-rail, follows all 89 mm of travel |
+| `MOUNT_rail` | `[0, .009, -.575]`, identity | receiver; fixed forward magazine-tube clamp rail |
 
-Mount +Y is the rail outward normal and −Z remains forward. The base
-`SOCKET_muzzle` emits at the adapter exit, coincident with `MOUNT_muzzle`;
-`DATUM_barrel_crown` preserves the original factory barrel measurement and front
-sight references. The open-bore 12g adapter is permanent seating hardware, not a suppressor. Suppressor/laser runtime
-catalogs are empty (#670/#671); these two future datums are **not** model-fit or
-hand-clearance certification for nonexistent attachments.
+`fits.optic` enables **RMR / ACOG** with .120 / .100 m eye relief. The PM II fit is
+removed: its approximately 128 mm ring spacing cannot seat on this compact rail.
+The actual RMR/ACOG meshes pass four foot-contact rays each and strict checks
+against the receiver base, integrated sight, weapon, hands and moving parts.
+Nine real-surface rays check continuous base seating; the ghost-ring bore stays open.
 
-`fits.optic` enables RMR / ACOG / PM II with eye relief .120 / .100 / .085 m respectively.
-`check.py` requires freshly generated shared optic `.blend` products (normal
-`bun run assets` builds them). `mounts.py` appends those actual meshes and checks
-four rail contacts per optic, fixed-iron clearance, the open ghost-ring line,
-receiver-foot seating, adapter bore/face, moving rail ownership, and both evaluated
-hands/mechanisms/visible insertion hull across all seven clips at 120 Hz.
-Draw, holster, pump/fire handling, both reloads and inspect keep their original
-controls, contacts and timings; reactive shot recoil moves the assembled weapon.
-The added rail/adapter raise the export triangle budget to 76k without adding a
-material, image or primitive.
+## Optional TOR Mini (#686)
 
-### Review limitation (#667)
+The shared laser is a separate optional asset. `rail: 'laser'` installs it;
+`rail: null` removes the module while leaving the base weapon's tube clamps/rail.
+No purchase/customization UI or handling bonus is added. Mount +Y points into
+the seat and −Z stays forward; gameplay and independent inspection share the solver.
 
-The available regenerated shared-arm product does not match the historical
-`clearance.py` raw `.blend` SHA256 or its pinned evaluated-glove topology hash.
-The unchanged baseline and changed weapon both stop at Idle frame 0 with
-`unreviewed shared-arm input`; a temporary raw-byte-hash-only diagnostic then
-stops at `unreviewed glove topology`. Neither pin, contact region nor 30 µm bound
-has been changed. A full `check.py` pass is **not** claimed. Independent comparison
-found both complete evaluated hands and topology bit-identical to the available
-baseline across all 739 clip poses; that is regression evidence, not certification
-against the unavailable historically approved hand product. Resolve this shared
-input provenance separately before claiming the original right-hand certificate.
+Two clamps at z=−.572/−.590 support the short underside rail on the fixed magazine
+tube, ahead of the moving forend and clear of the cap fluting/barrel lug. Eight
+radial rays verify actual tube seating; the web is supported at both clamps.
+All support hardware remains fixed through the provisional 89 mm pump stroke.
+`check.py` runs the complete source gates, not just the isolated laser sweep:
+**739 poses at 120 Hz** cover both deformed hands, mechanisms, visible insertion
+hull, supported optics, laser hardware/module and emitter corridor. A native-WebGPU
+fixture additionally checks **10,194 runtime poses** across irons/RMR/ACOG,
+including hip/ADS pump, reloads, draw/holster, inspect, recoil, transitions,
+returns and cancellation. Actual skins clear native/cooked laser hardware,
+the relieved stock neck, integrated top rail/sight and the selected optic.
+
+The open-bore 12g muzzle adapter remains permanent seating hardware, **not** a
+suppressor. `SOCKET_muzzle` stays at its exit, while `DATUM_barrel_crown` retains
+the factory measurement. The suppressor seat is still a future datum, not a fit.
+See the [shared laser contract](../../attachments/steiner-tor-mini/README.md#weapon-mounting-686).
+
+Draw, holster, pump/fire, both reloads and inspect keep their original controls,
+contacts and timings; reactive recoil moves the assembly. Export stays below 79k
+triangles, with two primitives, one material and three images. Finite sampled
+checks are not continuous clearance, strict 1:1 fidelity or final human approval.
 
 For play review, buy/equip the secondary and inspect fire/ADS/reload/transitions.
 Historical optimization measurements and external review locations are in Git;

@@ -88,8 +88,8 @@
     }
   },
   "stats": {
-    "triangles": 59860,
-    "vertices": 32448,
+    "triangles": 60500,
+    "vertices": 32784,
     "meshes": 4,
     "material_slots": 8
   },
@@ -103,6 +103,7 @@
     "Generated from tools/blender/mcx/. Python is the authoring authority.",
     "Reference-backed visual exterior, not manufacturing geometry or licensed SIG art.",
     "Named sockets and rigid-part clips; hands, audio and live casing physics are runtime-owned.",
+    "Review-only shared skins bake actual runtime poses at 120 Hz in the editable blend, never the weapon GLB.",
     "Visibility is authored CONSTANT; motion LINEAR at 60 Hz. Stock Actions export, no GLB rewriting.",
     "Export-only corner pigment and scalar finish lookup; UV0 albedo/normal detail retained. Roughness grain reduced to its mean.",
     "One opaque material; MCX adapter selects exact fine/polymer/rubber/fiber normal strengths and fiber emission from UV1 finish identity. Lens remains separate."

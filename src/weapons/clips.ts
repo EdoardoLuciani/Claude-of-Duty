@@ -213,7 +213,8 @@ export function buildEquipClips(
         p: v3(hgP[0] - 0.02, hgP[1] - 0.09, hgP[2] + 0.06),
         finger: wrapFinger,
         back: wrapBack,
-        pose: 'open',
+        // Curl before approaching the rail; extended fingers crossed its backing.
+        pose: 'clamp',
       },
       { t: 0.6 * drawT, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap', ease: 'out' },
       { t: drawT, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap' },

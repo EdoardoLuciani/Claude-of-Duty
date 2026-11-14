@@ -40,7 +40,7 @@ All positions below are game-frame metres, +Y up / −Z forward, under `AX338_RI
 | `SOCKET_sight` | `[0, .151, .055]` | Rear aperture centre; front post tip `[0, .151, −.540]`, 595 mm sight radius |
 | `MOUNT_optic` | `[0, .118, −.089]` | Identity orientation; actual top-rail tooth contact plane |
 | `MOUNT_muzzle` | `[0, .075, −.7958]` | Future barrel-crown contact; factory brake remains the base part |
-| `MOUNT_rail` | `[.027, .075, −.455]` | Future right-side contact; local +Y points outward (+X), −Z stays forward |
+| `MOUNT_rail` | `[.038, .075, −.455]` | Right-side KeySlot/Picatinny adapter; local +Y points inward (−X), −Z stays forward |
 
 Irons are one removable `IRON_sights` assembly; no replacement part is needed.
 RMR and ACOG clear installed irons. PM II crosses the rear aperture (301 actual
@@ -58,9 +58,11 @@ rotates the stock around its physical left hinge through 180°; this is a geomet
 clearance check, not an authored gameplay fold action. These sampled checks do
 not certify continuous clearance or factory fidelity.
 
-Suppressor/laser catalogs are absent until #670/#671. Their datums are preparatory,
-not proof of attachment fit, removal behavior, emitter placement or suppression.
-No suppressor/laser geometry, runtime behavior or validation is claimed here.
+TOR Mini (#686) seats on the authored short right-side adapter ahead of the
+support hand. Its shared checker sweeps all clips at 120 Hz plus the separate
+181-position stock fold, including actual hands, bolt and all three optics.
+See the [shared laser contract](../../attachments/steiner-tor-mini/README.md#weapon-mounting-686).
+The future suppressor datum is not proof of a nonexistent muzzle asset's fit.
 
 **Full right-hand DCC acceptance still fails.** The frozen authoring baseline
 measured 252 violations / 474 poses, maximum 7.041641 mm against a 1 mm allowance;

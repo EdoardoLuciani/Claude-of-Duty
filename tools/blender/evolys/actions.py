@@ -98,6 +98,8 @@ def author_actions(root,asset,rig,parts,belt,belt_pos):
         p=copy.deepcopy(ref['sides']['right']['grip']);p['fingers'][0]=[-.05,.10,.15];p['fingerSpread'][0]=.22;return p
     def contact(name,time,pos=None):
         data=ref[name];pose('left',time,pos or data['pos'],Quaternion((data['quaternion'][3],*data['quaternion'][:3])),data['pose'])
+    release=Vector(ref['grips']['left']['pos'])+Vector((0,-.065,0))
+    outboard=[-.26,release.y,release.z]
     begin('Idle',0);key(bolt,0,(0,0,.050));finish('Idle')  # single rest pose
     duration=60/700
     for name in ('Fire','Last_Shot'):
@@ -122,7 +124,10 @@ def author_actions(root,asset,rig,parts,belt,belt_pos):
         for k,loc,s in [(0,(-.08,-.25,.06),0),(.40,(-.08,-.25,.06),1),(.49,(-.045,-.12,.02),1),(.57,(0,0,0),1),(.995,(0,0,0),1),(1,(0,0,0),0)]:key(spare,k*d,loc,scale=s)
         for k,load in [(0,0 if empty else 1),(.23,0),(.69,0),(.70,1),(1,1)]:bone_pose(k*d,load=load)
         for k in (.08,.40,.75,.94):pose('right',k*d,p=indexed())
-        pose('left',.08*d,[-.10,.035,-.230],p=relaxed('left'))
+        # Keep the fingers curled until below and outboard of the lower rail.
+        pose('left',.025*d,release)
+        pose('left',.05*d,outboard)
+        pose('left',.08*d,[-.26,.035,-.230],p=relaxed('left'))
         contact('feed',.16*d);contact('feed',.23*d,[-.15,.083,-.19])
         pose('left',.245*d,[-.175,-.06,-.12],p=relaxed('left'))
         contact('pouch',.265*d,[-.17,-.215,-.10])
@@ -149,13 +154,15 @@ def author_actions(root,asset,rig,parts,belt,belt_pos):
             pose('left',.805*d,[.20,.02,.14],q=passage,p=relaxed('left'))
             contact('charging',.82*d);contact('charging',.88*d,[.123,.135,-.003])
             pose('left',.91*d,[.20,.02,.14],q=passage,p=relaxed('left'))
-            pose('left',.94*d,[-.20,.02,.14],q=passage,p=relaxed('left'))
-            pose('left',.97*d,[-.24,.022,-.35],q=passage,p=relaxed('left'))
+            pose('left',.94*d,[-.26,.02,.14],q=passage,p=relaxed('left'))
         else:
             key(bolt,0,(0,0,.050));key(bolt,d,(0,0,.050))
             # Retract fully outboard before returning alongside a long optic.
             pose('left',.81*d,[-.24,.095,-.16],p=relaxed('left'))
             pose('left',.90*d,[-.24,.085,-.35],p=relaxed('left'))
+        pose('left',(.955 if empty else .94)*d,outboard,p=relaxed('left'))
+        pose('left',.97*d,outboard)
+        pose('left',.98*d,release)
         pose('left',.985*d)
         clips[name]['beltClearTime']=.23*d;clips[name]['beltInsertTime']=insert*d
         clips[name]['events']=[{'time':.02*d,'event':'start'},{'time':out*d,'event':'magout'},{'time':insert*d,'event':'magin'}]
@@ -174,12 +181,14 @@ def author_actions(root,asset,rig,parts,belt,belt_pos):
     begin('Inspect',3.6)
     for t,loc,rot in [(.45,(-.02,.065,-.12),(-10,-40,12)),(1.20,(-.02,.065,-.12),(-10,-40,12)),(1.95,(-.03,.06,-.13),(6,40,-12)),(2.75,(-.03,.06,-.13),(6,40,-12)),(3.45,(0,0,0),(0,0,0))]:key(rig,t,loc,rot)
     for t in (.2,.9,1.8,3.2):pose('right',t,p=indexed())
-    for t,pos in [(.35,[-.16,-.10,-.23]),(.8,[-.17,-.17,-.17]),(2.9,[-.17,-.17,-.17]),(3.1,[-.17,.055,-.30]),(3.45,ref['grips']['left']['pos'])]:pose('left',t,pos,p=relaxed('left') if t<3.4 else None)
+    pose('left',.05,release)
+    pose('left',.12,outboard)
+    for t,pos in [(.35,[-.26,-.10,-.23]),(.8,[-.26,-.17,-.17]),(2.9,[-.26,-.17,-.17]),(3.1,outboard),(3.28,outboard),(3.38,release),(3.45,ref['grips']['left']['pos'])]:pose('left',t,pos,p=relaxed('left') if t<3.2 else None)
     key(bolt,0,(0,0,.050));key(bolt,3.6,(0,0,.050));clips['Inspect']['events']=[{'time':3.582,'event':'end'}];finish('Inspect')
     for name,d,drawing in [('Draw',.75,True),('Holster',.5,False)]:
         begin(name,d)
         for k,a in ([(0,1),(.25,.78),(.78,.04),(.93,0),(1,0)] if drawing else [(0,0),(.2,.08),(.75,.8),(1,1)]):
-            key(rig,k*d,(.025*a,-.15*a,.24*a),(-22*a,20*a,12*a));pos=Vector(ref['grips']['left']['pos'])+Vector((-.05*a,-.055*a,.035*a))
+            key(rig,k*d,(.025*a,-.15*a,.24*a),(-22*a,20*a,12*a));pos=Vector(ref['grips']['left']['pos'])+Vector((-.08*a,-.055*a,0))
             pose('left',k*d,pos,p=relaxed('left') if a>.2 else None);pose('right',k*d,p=indexed() if a>.2 else None)
         key(bolt,0,(0,0,.050));key(bolt,d,(0,0,.050));clips[name]['events']=[{'time':.995*d,'event':'end'}];finish(name)
     # Shared review skins are baked from these controls, never exported.

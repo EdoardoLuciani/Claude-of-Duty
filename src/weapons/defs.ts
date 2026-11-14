@@ -153,6 +153,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     hipRot: [-0.05, 0.081, -0.135],
     adsCant: [0, 0, 0],
     eyeRelief: 0.11,
+    fits: { rail: { laser: {} } },
     sprintPos: [0.09, -0.275, -0.275],
     sprintRot: [-0.4, 0.6, 0.2],
     lowReadyPos: [0.112, -0.29, -0.289],
@@ -299,6 +300,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     // 85.5 mm is the CLOSED overall envelope, not the optical tube length.
     // ADS translation remains solved from the real optical-axis socket.
     eyeRelief: 0.28,
+    fits: { rail: { laser: {} } },
     sprintPos: [0.088, -0.24, -0.262],
     sprintRot: [-0.38, 0.58, 0.19],
     lowReadyPos: [0.108, -0.252, -0.276],
@@ -366,6 +368,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     eyeRelief: 0.03,
     fits: {
       optic: { rmr: { eyeRelief: 0.125 }, acog: { eyeRelief: 0.11 }, scope: { eyeRelief: 0.09 } },
+      rail: { laser: {} },
     },
     removableIrons: { opticClashes: ['scope'] }, // PM II crosses the front iron assembly.
     sprintPos: [0.09, -0.29, -0.285],
@@ -437,6 +440,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     // mount to retain the iron-sight wrist extension, not a rifle-to-face pose.
     fits: {
       optic: { rmr: { eyeRelief: 0.394 }, acog: { eyeRelief: 0.308 }, scope: { eyeRelief: 0.2 } },
+      rail: { laser: {} },
     },
     sprintPos: [0.09, -0.25, -0.28],
     sprintRot: [-0.42, 0.5, 0.14],
@@ -501,9 +505,11 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     hipRot: [-0.05, 0.078, -0.125],
     adsCant: [0, 0, 0.003],
     eyeRelief: 0.28,
-    // Shared optics sit above the fixed ghost ring on the see-through receiver rail.
+    // Low integrated-sight rail: RMR/ACOG only; PM II's two rings exceed its span.
+    // The optional TOR Mini stays on the fixed forward magazine-tube clamps.
     fits: {
-      optic: { rmr: { eyeRelief: 0.12 }, acog: { eyeRelief: 0.1 }, scope: { eyeRelief: 0.085 } },
+      optic: { rmr: { eyeRelief: 0.12 }, acog: { eyeRelief: 0.1 } },
+      rail: { laser: {} },
     },
     sprintPos: [0.09, -0.27, -0.28],
     sprintRot: [-0.42, 0.58, 0.2],
@@ -564,6 +570,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     eyeRelief: 0.07,
     fits: {
       optic: { rmr: { eyeRelief: 0.125 }, acog: { eyeRelief: 0.11 }, scope: { eyeRelief: 0.09 } },
+      rail: { laser: {} },
     },
     removableIrons: { opticClashes: ['scope'] }, // PM II ocular crosses the rear aperture
     sprintPos: [0.088, -0.31, -0.3],

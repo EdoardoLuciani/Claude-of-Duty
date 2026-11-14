@@ -30,7 +30,10 @@ Each weapon's build entry point, checks and helpers now share one directory.
 `build.py` orchestrates authoring; `check.py` checks the saved Blender scene.
 Where present, `actions.py` authors clips and `hand-reference.ts` explicitly
 regenerates calibration. MCX authors clips in `animations.py`, with no separate
-hand-calibration stage. Calibration is never an automatic normal-build step.
+hand-calibration stage. Its `runtime-hands.ts` samples actual runtime posing for
+`review_hands.py` to bake shared review-only skins after weapon export. This does
+not rewrite authored hand tuning/calibration. Calibration is never an automatic
+normal-build step.
 
 | Weapon | Authoring tools                                     | Products, references and full commands                    | Runtime adapter                         |
 | ------ | --------------------------------------------------- | --------------------------------------------------------- | --------------------------------------- |
@@ -99,7 +102,10 @@ intel sites and explicit placement records. This is the world source—not
 The standalone [TOR Mini laser](../assets/attachments/steiner-tor-mini/README.md)
 is authored by [`tools/blender/tor_mini/`](../tools/blender/tor_mini/), with native
 Blender validation and `bun run models:cook -- tor_mini`. It is generated alongside
-the EXPS3, independently of player arms, and is not wired into gameplay yet.
+the EXPS3, independently of player arms, and uses the shared gameplay/inspection
+rail path on all seven weapons. M590's full source checks now use strict zero-crossing
+firing-hand clearance; its low integrated-sight top rail supports RMR/ACOG only,
+independent of the optional laser on fixed magazine-tube clamps (#686).
 
 Normal `bun run dev` / `bun run build` (and `bun run assets`) run
 `tools/build-assets.ts`: arms and bandage, each weapon and its cook, standalone

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+import mpxManifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: 'json' };
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { LAYER } from '../../src/physics/surfaces.ts';
 import { CameraRig } from '../../src/player/camera.ts';
@@ -12,13 +13,16 @@ import {
   configureWeaponAttachments,
   makeOpticModel,
   makeLaserModel,
+  mountAttachments,
+  releaseAttachmentMount,
   isAttachmentConfig,
   type AttachmentConfig,
 } from '../../src/weapons/attachments.ts';
 import { authoredModel, checkAuthoredDuration } from '../../src/weapons/authored-model.ts';
-import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
+import { WEAPON_DEFS, WEAPON_IDS } from '../../src/weapons/defs.ts';
 import { WeaponLaser } from '../../src/weapons/laser.ts';
 import { ReticleMaterials } from '../../src/weapons/materials-tsl.ts';
+import { makeMPXModel } from '../../src/weapons/mpx.ts';
 import type { WeaponEntry, WeaponModelRecord } from '../../src/weapons/runtime-types.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { createTestContext } from '../lib/context.ts';
@@ -243,11 +247,42 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   const laser = makeLaserModel(fixture<GLTF>({ scene: laserScene }));
   const laserConfig: AttachmentConfig = { ...BASE_ATTACHMENTS, rail: 'laser' };
   assert(isAttachmentConfig(laserConfig, 'rifle'));
-  assert.equal(
-    isAttachmentConfig(laserConfig, 'pistol'),
-    false,
-    'unverified rail fits stay disabled'
-  );
+  for (const id of WEAPON_IDS) {
+    const supportsLaser = WEAPON_DEFS[id].fits?.rail?.laser !== undefined;
+    assert.equal(isAttachmentConfig(laserConfig, id), supportsLaser, `${id}: rail availability`);
+    assert(isAttachmentConfig(BASE_ATTACHMENTS, id), `${id}: base configuration remains valid`);
+    if (!supportsLaser) continue;
+    // Shared solver fixtures do not certify each weapon's authored hierarchy.
+    const railModel = fixture<WeaponModelRecord>({ ...model });
+    railModel.id = id;
+    const weapon = fixture<WeaponEntry>({
+      ...entry,
+      id,
+      model: railModel,
+      def: { ...WEAPON_DEFS[id] },
+      attachmentGroup: new THREE.Group(),
+      railGroup: new THREE.Group(),
+    });
+    const base = { ...weapon.def, suppressed: WEAPON_DEFS[id].suppressed ?? false };
+    configureWeaponAttachments(weapon, laserConfig, optics, laser);
+    assert.deepEqual(weapon.def, base, `${id}: laser has no handling/ballistic modifiers`);
+    assert.equal(weapon.railGroup.parent, railMount);
+    assert(weapon.laserEmitter);
+    const previous = weapon.laserEmitter.getWorldPosition(new THREE.Vector3());
+    railMount.position.z += 0.089;
+    const moved = weapon.laserEmitter.getWorldPosition(new THREE.Vector3());
+    assert(Math.abs(previous.distanceTo(moved) - 0.089) < 1e-8, 'emitter follows moving rail');
+    railMount.position.z -= 0.089;
+    if (WEAPON_DEFS[id].removableIrons) {
+      const noIrons = { ...laserConfig, ironSights: false };
+      assert(isAttachmentConfig(noIrons, id), 'laser selection is independent of irons');
+      configureWeaponAttachments(weapon, noIrons, optics, laser);
+      assert(weapon.laserEmitter);
+    }
+    configureWeaponAttachments(weapon, BASE_ATTACHMENTS, optics, laser);
+    assert.equal(weapon.laserEmitter, null);
+    assert.equal(railMount.children.length, 0, `${id}: removal leaves no rail instance`);
+  }
   for (let i = 0; i < 3; i++) {
     const before = { ...entry.def };
     configureWeaponAttachments(entry, laserConfig, optics, laser);
@@ -270,6 +305,65 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     );
     assert.equal(entry.attachments, previousConfig, 'failed staging preserves the configuration');
   }
+  // MPX rebases native +X geometry, but shared attachments keep canonical locals.
+  const nativeScene = new THREE.Group(),
+    nativeRoot = new THREE.Group();
+  nativeRoot.name = 'MPX_RIG';
+  nativeScene.add(nativeRoot);
+  for (const name of ['muzzle', 'ejection', 'sight', 'magazine']) {
+    const node = new THREE.Object3D();
+    node.name = `SOCKET_${name}`;
+    nativeRoot.add(node);
+  }
+  const nativeMount = new THREE.Object3D();
+  nativeMount.name = 'MOUNT_rail';
+  nativeMount.position.set(0.295, 0, 0.037);
+  nativeMount.quaternion.setFromRotationMatrix(
+    new THREE.Matrix4().makeBasis(
+      new THREE.Vector3(0, 1, 0),
+      new THREE.Vector3(0, 0, -1),
+      new THREE.Vector3(-1, 0, 0)
+    )
+  );
+  nativeRoot.add(nativeMount);
+  const mpx = makeMPXModel(
+    fixture<GLTF>({
+      scene: nativeScene,
+      animations: Object.entries(mpxManifest.clips).map(([name, data]): THREE.AnimationClip => {
+        const times = data.duration ? [0, data.duration] : [0];
+        return clip(
+          name,
+          new THREE.VectorKeyframeTrack(
+            'MPX_RIG.position',
+            times,
+            new Array<number>(times.length * 3).fill(0)
+          )
+        );
+      }),
+    })
+  );
+  const mounted = mountAttachments(mpx, laserConfig, {}, laser);
+  mounted.railParent.add(mounted.railGroup);
+  for (const yaw of [0, 0.3]) {
+    nativeRoot.rotation.y = yaw;
+    nativeScene.updateMatrixWorld(true);
+    const direction = new THREE.Vector3(0, 0, -1).transformDirection(
+      mounted.laserEmitter!.matrixWorld
+    );
+    assert(
+      direction.distanceTo(new THREE.Vector3(0, 0, -1).applyQuaternion(nativeRoot.quaternion)) <
+        1e-10,
+      'MPX laser points along the posed bore, not upward'
+    );
+    assert(
+      mounted
+        .laserEmitter!.getWorldPosition(new THREE.Vector3())
+        .distanceTo(new THREE.Vector3(0.0475, 0, -0.32018).applyQuaternion(nativeRoot.quaternion)) <
+        1e-8,
+      'MPX attachment keeps its authored side seat'
+    );
+  }
+  releaseAttachmentMount(mounted.railGroup);
   laser.dispose();
   configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, ironSights: false }, optics);
   assert.equal(entry.optic, null);
@@ -289,6 +383,28 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     }),
     materials
   );
+  // Grip approaches must not blend through generic fingers on wrist arrival.
+  const approach = viewmodel.clipResult;
+  approach.active = true;
+  approach.lhand.weight = 1;
+  approach.lhand.pos = [0, -0.1, -0.1];
+  approach.lhand.finger = [0, 0, -1];
+  approach.lhand.back = [0, 1, 0];
+  const held = fixture<WeaponEntry>({
+    ...entry,
+    gripR: { pos: [0.03, -0.01, 0.08] },
+    gripL: { pos: [-0.07, 0.04, -0.24] },
+    rhandPose: 'gripRifle',
+    lhandPose: 'clamp',
+    animation: fixture<WeaponEntry['animation']>({}, ['handTarget', 'leftPose', 'applyHands']),
+  });
+  for (const pose of ['wrap', 'clamp']) {
+    approach.lhand.pose = pose;
+    viewmodel._solveHands(held, approach);
+    assert.equal(viewmodel.armL.pose, held.lhandPose, 'fit fingers before wrist contact');
+  }
+  approach.active = false;
+  approach.lhand.weight = 0;
   root.rotation.set(0, 0, 0);
   for (const optic of ['acog', 'scope'] as const) {
     configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, optic, ironSights: false }, optics);

@@ -1,6 +1,7 @@
 """Independent saved-mesh/action checks, not regeneration from tuning values."""
 import json
 import math
+import sys
 from pathlib import Path
 import bpy
 from mathutils import Matrix, Vector
@@ -181,7 +182,7 @@ def datum(name):return CI@(rig.matrix_world.inverted()@bpy.data.objects[name].ma
 def near(a,b):assert (Vector(a)-Vector(b)).length<.000001,(a,b)
 near(datum('MOUNT_optic'),(0,.118,-.089))
 near(datum('MOUNT_muzzle'),(0,.075,-.7958))
-near(datum('MOUNT_rail'),(.027,.075,-.455))
+near(datum('MOUNT_rail'),(.038,.075,-.455))
 near(datum('SOCKET_sight'),(0,.151,.055))
 rear=surface([bpy.data.objects['Rear open aperture']])
 origin=Vector((0,-.070,.151));direction=Vector((0,1,0))
@@ -251,3 +252,8 @@ for angle in range(181):
         assert not moving.overlap(target),(angle,optic_id,'folding stock hits optic')
     assert not moving.overlap(iron_tree),(angle,'folding stock hits irons')
 print('AX338_ATTACHMENT_CLEARANCE_OK:',mechanical_poses,'120 Hz bolt poses;',hand_poses,'24 Hz deformed-hand poses; 181 stock fold poses; rmr/acog/scope and irons')
+
+# Actual shared rail attachment, independent of the optic catalog.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tor_mini.mounts import check_laser_mount
+check_laser_mount('ax338')

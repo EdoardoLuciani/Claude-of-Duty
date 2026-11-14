@@ -84,13 +84,25 @@ assert mount.parent==bpy.data.objects['EVOLYS_RIG']
 mp=CI@mount.matrix_world.translation
 assert abs(mp.x)<1e-6 and abs(mp.y-rail_top)<1e-6 and abs(mp.z-(.105-30*.01005))<1e-6
 assert Vector(mount.rotation_euler).length<1e-6,'optic mount orientation'
-# Future datums are checked only as authored frames, NOT as nonexistent fits.
+# Muzzle remains a future datum; the rail seats the shared TOR Mini.
 muzzle=CI@bpy.data.objects['MOUNT_muzzle'].matrix_world.translation
 assert (muzzle-CI@bpy.data.objects['SOCKET_muzzle'].matrix_world.translation).length<1e-6
 rail=bpy.data.objects['MOUNT_rail']
-assert (CI@rail.matrix_world.translation-Vector((.0275,.075,-.300))).length<1e-6
+lower_y=.075+(219-336)*(.948/1899)
+assert (CI@rail.matrix_world.translation-Vector((0,lower_y,-.363725))).length<1e-6
 normal=CI@rail.matrix_world.to_3x3()@C@Vector((0,1,0))
-assert (normal-Vector((1,0,0))).length<1e-6
+assert (normal-Vector((0,1,0))).length<1e-6
+# Actual underside teeth and the recoil-key slot, not just a floating mount datum.
+for z in [-.225-i*.01005 for i in range(16)]:
+    origin=hg.matrix_world.inverted()@(C@Vector((0,lower_y-.01,z)))
+    direction=hg.matrix_world.inverted().to_3x3()@(C@Vector((0,1,0)))
+    hit=bvh.ray_cast(origin,direction,.02)[0]
+    assert hit is not None and abs((CI@(hg.matrix_world@hit)).y-lower_y)<1e-6,'missing lower rail tooth'
+for x in (-.00265,.00265):
+    for z in (-.370725-.0021,-.370725+.0021):
+        origin=hg.matrix_world.inverted()@(C@Vector((x,lower_y-.01,z)))
+        hit=bvh.ray_cast(origin,direction,.02)[0]
+        assert hit is not None and abs((CI@(hg.matrix_world@hit)).y-(lower_y+.003))<1e-6,'recoil key is not over a supported rail slot'
 belt=bpy.data.objects['belt_rig'];sample('Fire',0)
 start=belt.pose.bones['belt_3'].matrix.translation.copy();sample('Fire',.060)
 end=belt.pose.bones['belt_3'].matrix.translation.copy();assert abs((end-start).length-.0127)<.0002
@@ -185,17 +197,48 @@ for optic_id,folder in [('rmr','trijicon-rmr'),('acog','trijicon-acog'),('scope'
 # Check all clips on the native 120 Hz lattice, including exact endpoints.
 # The stock is rigid (there is no authored fold clip). Preserve its geometry;
 # cover/charging/belt and BOTH actual deformed shared review arms are swept.
-poses=0
+poses=0;free_poses=0
+pouch_surfaces=[bpy.data.objects[n] for n in ('pouch_mesh','pouch_spare_mesh')]
 moving=[bpy.data.objects[n] for n in ('feed_cover_mesh','charging_handle_mesh','stock_mesh','belt_mesh')]
 hands=[o for o in scene.objects if o.type=='MESH' and o.name.startswith('EVOLYS_') and 'ARMATURE' in {m.type for m in o.modifiers}]
 assert hands,'missing actual shared review hands'
+# A collision-free attachment is not enough if the support hold floats or enters the pouch.
+guard_tree=rig_tree([hg]);pouch_tree=rig_tree([bpy.data.objects['pouch_mesh']])
+for obj in hands:
+    if not obj.name.startswith('EVOLYS_left_'):continue
+    assert not rig_tree([obj]).overlap(pouch_tree),(obj.name,'support hold crosses pouch')
+    if not obj.name.endswith('Charcoal_woven_glove_skin'):continue
+    evaluated=obj.evaluated_get(bpy.context.evaluated_depsgraph_get());mesh=evaluated.to_mesh()
+    try:
+        inverse=rig.matrix_world.inverted()
+        for finger in range(4):
+            ids=[v.index for v in obj.data.vertices if any(g.weight>.5 and obj.vertex_groups[g.group].name==f'finger_{finger}_2' for g in v.groups)]
+            gap=min(guard_tree.find_nearest(inverse@evaluated.matrix_world@mesh.vertices[i].co)[3] for i in ids)
+            assert gap<.0045,(finger,gap,'support fingertip floats off handguard')
+    finally:evaluated.to_mesh_clear()
+print('EVOLYS_SUPPORT_HOLD_OK: actual distal glove contact and no Idle pouch intersection')
 for name,info in clips.items():
     for frame in range(math.ceil(info['duration']*120)+1):
-        sample(name,min(frame/120,info['duration']));poses+=1
+        time=min(frame/120,info['duration']);sample(name,time);poses+=1
+        # Exclude intentional pouch grips and inherited early feed-approach contact.
+        free_hand=name in ('Draw','Holster','Inspect') or (name.startswith('Reload_') and (time<=.10*info['duration'] or time>=.90*info['duration']))
+        pouch_trees=[]
+        if free_hand:
+            free_poses+=1
+            pouch_trees=[(obj.name,rig_tree([obj])) for obj in pouch_surfaces if min(obj.matrix_world.to_scale())>.5]
         for obj in moving+hands:
             tree=rig_tree([obj])
+            if obj in hands:
+                for pouch_name,target in pouch_trees:
+                    assert not tree.overlap(target),(name,frame,obj.name,pouch_name,'free hand crosses visible pouch')
             for optic_id,target in optics.items():
                 assert not tree.overlap(target),(name,frame,obj.name,optic_id,'attachment collision')
             assert not tree.overlap(fixed_irons),(name,frame,obj.name,'iron collision')
-print(f'EVOLYS_ATTACHMENT_CLEARANCE_OK: {poses} native poses, rmr/acog with irons, scope with irons removed; cover, charging, stock, belt and deformed hands; future muzzle/rail DATUMS ONLY')
+print('EVOLYS_FREE_HAND_CLEARANCE_OK:',free_poses,'native free-motion poses; both hands against visible pouch instances')
+print(f'EVOLYS_ATTACHMENT_CLEARANCE_OK: {poses} native poses, rmr/acog with irons, scope with irons removed; cover, charging, stock, belt and deformed hands; muzzle remains a future datum; TOR Mini checked separately')
 print('EVOLYS_CHECK_OK: mesh envelope, barrel, vents, packed maps, aligned removable irons, closed stock joints, one-pitch native feed, belt/solid clearance, enclosed tail and synchronized DCC wrists/skins')
+
+# Actual shared rail attachment, independent of the optic catalog.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tor_mini.mounts import check_laser_mount
+check_laser_mount('evolys')
