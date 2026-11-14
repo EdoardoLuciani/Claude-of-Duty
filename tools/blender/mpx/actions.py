@@ -178,8 +178,9 @@ def author_actions(root, asset, rig, parts, mag, spare, bolt, trigger, release, 
         g = ref['grips']['left']['pos']; gp = ref['sides']['left']['grip']
         gq = Quaternion((ref['sides']['left']['quaternion'][3],*ref['sides']['left']['quaternion'][:3]))
         r = ref['restLeft']; rq = Quaternion((r['quaternion'][3],*r['quaternion'][:3]))
-        approach = list(Vector(g)+Vector((-.035,-.035,.05)))
-        keys = [(0,r['pos'],rq,r['pose']),(.30*d,r['pos'],rq,r['pose']),(.70*d,approach,gq,r['pose']),(.90*d,g,gq,r['pose']),(.98*d,g,gq,gp),(d,g,gq,gp)] if drawing else [(0,g,gq,gp),(.12*d,g,gq,gp),(.35*d,approach,gq,r['pose']),(.70*d,r['pos'],rq,r['pose']),(d,r['pos'],rq,r['pose'])]
+        # Approach below/outboard of the PM II objective, then seat the unchanged grip.
+        approach = list(Vector(g)+Vector((-.13,-.095,.05) if drawing else (-.27,-.18,.05)))
+        keys = [(0,r['pos'],rq,r['pose']),(.30*d,r['pos'],rq,r['pose']),(.70*d,approach,gq,r['pose']),(.90*d,g,gq,r['pose']),(.98*d,g,gq,gp),(d,g,gq,gp)] if drawing else [(0,g,gq,gp),(.03*d,g,gq,gp),(.28*d,approach,gq,r['pose']),(.60*d,approach,gq,r['pose']),(.95*d,r['pos'],rq,r['pose']),(d,r['pos'],rq,r['pose'])]
         free_left_path(keys)
         clips[name]['events'] = [{'time': d-.0001, 'event': 'end'}]; finish(name)
     author_review_hands(root, rig, hands, all_parts, clips, basis=C, label='MPX')

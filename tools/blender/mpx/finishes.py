@@ -8,13 +8,11 @@ def consolidate_finishes(objects, output, orm, normal):
 
     Reflectance is exact per-corner linear colour, not an averaged black finish.
     Only the subtle procedural roughness/normal grain is reduced to 248px per
-    finish. Geometry lettering, normals and optical policies are independent.
+    finish. Geometry lettering and normals remain independent.
     """
-    # Reserve the original clear-cap calibration tile even though solid lids use
-    # the existing polymer finish; every unaffected finish keeps its exact UVs/maps.
-    sources = sorted({m for obj in objects if obj.type == 'MESH'
-                      for m in obj.data.materials if m}
-                     | {bpy.data.materials['12 | clear protective caps']}, key=lambda m: m.name)
+    # Keep all original tile indices even after dropping the integrated optic/can.
+    # Existing receiver, hand and magazine finish UVs must not move.
+    sources = sorted((m for m in bpy.data.materials if m.name[:2].isdigit()), key=lambda m: m.name)
     assert len(sources) == 15
     size, tile, pad = 1024, 256, 4
 
@@ -72,31 +70,25 @@ def consolidate_finishes(objects, output, orm, normal):
 
     orm_atlas = image('mpx-finish-orm', packed_orm)
     normal_atlas = image('mpx-finish-normal', packed_normal)
-    materials = {}
-    for category, source in [('opaque', sources[0]), ('optical', sources[10]),
-                             ('interior', sources[14])]:
-        result = source.copy()
-        result.name = 'MPX | consolidated opaque finishes' if category == 'opaque' else source.name
-        nodes, links = result.node_tree.nodes, result.node_tree.links
-        p = nodes.get('Principled BSDF')
-        p.inputs['Metallic'].default_value = 1
-        mix = next(n for n in nodes if n.type == 'MIX')
-        color = nodes.new('ShaderNodeVertexColor'); color.layer_name = 'finish_color'
-        links.new(color.outputs['Color'], mix.inputs[7])
-        uv = nodes.new('ShaderNodeUVMap'); uv.uv_map = 'finish_uv'
-        for node in nodes:
-            if node.type == 'TEX_IMAGE' and node.image in (orm, normal):
-                node.image = orm_atlas if node.image == orm else normal_atlas
-                links.new(uv.outputs['UV'], node.inputs['Vector'])
-            elif node.type == 'MATH':
-                node.inputs[1].default_value = 1
-            elif node.type == 'NORMAL_MAP':
-                node.inputs['Strength'].default_value = 1
-        # Only body lenses use the optical pass; solid lids use ordinary polymer.
-        # Absorptive interiors retain their exact independent environment policy.
-        sep = next(n for n in nodes if n.type == 'SEPARATE_COLOR')
-        links.new(sep.outputs['Blue'], p.inputs['Metallic'])
-        materials[category] = result
+    result = sources[0].copy()
+    result.name = 'MPX | consolidated opaque finishes'
+    nodes, links = result.node_tree.nodes, result.node_tree.links
+    p = nodes.get('Principled BSDF')
+    p.inputs['Metallic'].default_value = 1
+    mix = next(n for n in nodes if n.type == 'MIX')
+    color = nodes.new('ShaderNodeVertexColor'); color.layer_name = 'finish_color'
+    links.new(color.outputs['Color'], mix.inputs[7])
+    uv = nodes.new('ShaderNodeUVMap'); uv.uv_map = 'finish_uv'
+    for node in nodes:
+        if node.type == 'TEX_IMAGE' and node.image in (orm, normal):
+            node.image = orm_atlas if node.image == orm else normal_atlas
+            links.new(uv.outputs['UV'], node.inputs['Vector'])
+        elif node.type == 'MATH':
+            node.inputs[1].default_value = 1
+        elif node.type == 'NORMAL_MAP':
+            node.inputs['Strength'].default_value = 1
+    sep = next(n for n in nodes if n.type == 'SEPARATE_COLOR')
+    links.new(sep.outputs['Blue'], p.inputs['Metallic'])
 
     for obj in objects:
         if obj.type != 'MESH': continue
@@ -108,13 +100,12 @@ def consolidate_finishes(objects, output, orm, normal):
         old = list(mesh.materials)
         finishes = [old[face.material_index] for face in mesh.polygons]
         mesh.materials.clear()
-        for material in materials.values(): mesh.materials.append(material)
+        mesh.materials.append(result)
         for face in mesh.polygons:
             source = finishes[face.index]
             assert source is not None, (obj.name, face.index, 'unassigned finish')
             index = sources.index(source)
-            category = 'optical' if index == 10 else 'interior' if index == 14 else 'opaque'
-            face.material_index = list(materials).index(category)
+            face.material_index = 0
             for loop in face.loop_indices:
                 uv = uv0.data[loop].uv
                 uv1.data[loop].uv = ((index % 4 * tile + pad + uv.x * count) / size,

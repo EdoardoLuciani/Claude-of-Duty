@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 import bpy
 from mathutils import Matrix, Vector
+from mathutils.bvhtree import BVHTree
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from suppressor.geometry import build_suppressor
@@ -126,6 +127,15 @@ bpy.ops.object.join()
 o = bpy.context.object
 o.name = 'suppressor_mesh'
 o.parent = root
+bpy.context.view_layer.update()
+# 10.2mm clear gauge: a 9mm projectile plus at least .6mm radial margin.
+# This verifies the authored endcap/shadow/mount only, not physical baffles.
+vertices = [o.matrix_world @ v.co for v in o.data.vertices]
+bore = BVHTree.FromPolygons(vertices, [tuple(p.vertices) for p in o.data.polygons])
+offsets = [(0, 0)] + [(r*math.cos(i*math.tau/32), r*math.sin(i*math.tau/32))
+                      for r in (.0025, .0045, .0051) for i in range(32)]
+for x, z in offsets:
+    assert bore.ray_cast(Vector((x, .237, z)), Vector((0,-1,0)), .238)[0] is None, 'universal game-fit bore obstructed'
 bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'suppressor.blend'))
 bpy.ops.export_scene.gltf(filepath=str(OUT/'suppressor.glb'), export_format='GLB',
                           export_animations=False, export_extras=True, export_yup=True)

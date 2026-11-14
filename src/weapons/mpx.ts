@@ -46,10 +46,12 @@ export function makeMPXModel(gltf: GLTF): MPXModel {
   });
   // Geometry/control locals were rebased above; attachment locals are shared
   // canonical assets, not MPX geometry. Preserve that frame at the slot boundary.
-  const railMount = scene.getObjectByName('MOUNT_rail');
-  if (railMount) {
-    railMount.quaternion.multiply(basis);
-    railMount.updateMatrix();
+  for (const name of ['MOUNT_optic', 'MOUNT_muzzle', 'MOUNT_rail']) {
+    const mount = scene.getObjectByName(name);
+    if (mount) {
+      mount.quaternion.multiply(basis);
+      mount.updateMatrix();
+    }
   }
   for (const clip of gltf.animations)
     for (const track of clip.tracks) {
@@ -91,41 +93,11 @@ export function makeMPXModel(gltf: GLTF): MPXModel {
       gripR: handReference.grips.right,
       gripL: handReference.grips.left,
       magSeat: { pos: point('SOCKET_magazine'), rot: [0, 0, 0] },
-      opticGlass: {
-        center: point('SOCKET_sight'),
-        apertureR: 0.01,
-        windowW: 0.018,
-        windowH: 0.018,
-        // Six-pixel minimum diameter makes the 2 MOA dot easier to see.
-        dotMoa: 2,
-        minDotPixels: 6,
-        dotOpacity: 0.9,
-      },
     },
     shell: { caseLen: 0.0192, rimR: 0.00478 },
     magSize: { len: 0.192 },
   };
-  const converted = convertWeaponScene(scene, (source, material): void => {
-    // Keep authored reflectance; only optical sheets/interior have view-pass policies.
-    if (source.name.startsWith('11 |')) {
-      // World colour is already behind the separate weapon pass. Use one
-      // faint coating per optical sheet, not a foggy stack of solid discs or
-      // transmission sampling a viewmodel-only render target.
-      material.transparent = true;
-      // Only the body lenses remain transparent; solid caps need no selector.
-      material.opacity = 0.02;
-      material.clearcoat = 0.25;
-      material.depthWrite = false;
-      material.side = THREE.DoubleSide;
-      material.forceSinglePass = true;
-      material.transmission = 0;
-      material.specularIntensity = 0.03;
-      material.envMapIntensity = 0.05;
-    } else if (source.name.startsWith('15 |')) {
-      // Absorptive interior coating, not the reflective exterior alloy.
-      material.specularIntensity = 0.02;
-      material.envMapIntensity = 0.03;
-    }
+  const converted = convertWeaponScene(scene, (_source, material): void => {
     for (const value of Object.values(material as object)) {
       if (value instanceof THREE.Texture) value.anisotropy = 8;
     }
@@ -143,15 +115,6 @@ type MPXModel = AuthoredModelData<
   'smg',
   AuthoredNodes & {
     magSeat: { pos: [number, number, number]; rot: number[] };
-    opticGlass: {
-      center: [number, number, number];
-      apertureR: number;
-      windowW: number;
-      windowH: number;
-      dotMoa: number;
-      minDotPixels: number;
-      dotOpacity: number;
-    };
   }
 > & {
   label: string;

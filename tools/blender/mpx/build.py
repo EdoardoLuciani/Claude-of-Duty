@@ -19,7 +19,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from mpx.actions import author_actions
 from mpx.animations import prepare_export_actions
 from mpx.finishes import consolidate_finishes
-from mpx.geometry import separate_receiver_finishes
 
 
 def build(output, render=False, quick=False):
@@ -57,7 +56,7 @@ def build(output, render=False, quick=False):
 
 
     rig = empty('MPX_RIG')
-    rig['status'] = 'Geometry/materials approved; Gate 3 animation/gameplay review pending'
+    rig['status'] = 'Base conversion candidate; human visual/animation/gameplay review pending'
     rig['coordinate_system'] = 'metres; Blender +X forward, +Z up, -Y right/ejection side'
     body = empty('receiver', parent=rig)
     mag = empty('magazine', parent=rig)
@@ -253,27 +252,10 @@ def build(output, render=False, quick=False):
         cut(o, c)
 
 
-    def tube(name, loc, r, inside, length, mat=steel, parent=body, interior=None):
+    def tube(name, loc, r, inside, length, mat=steel, parent=body):
         o = cyl(name, loc, r, length, mat, parent=parent, sides=48)
         cut(o, cyl('CUT', loc, inside, length+.005, None, parent=None, sides=48, bevel=0))
-        if interior:
-            interior_index = len(o.data.materials)
-            o.data.materials.append(interior)
-            for face in o.data.polygons:
-                # Cylinder data is X-axis aligned and centred locally. Only inward
-                # radial faces get the optical finish; exterior/rim geometry stays.
-                if face.normal.dot(Vector((0, face.center.y, face.center.z))) < -1e-6:
-                    face.material_index = interior_index
-            o['interior_material'] = interior.name
         return o
-
-
-    def optical_sheet(name, loc, r, mat, parent=body, sides=48):
-        # One physical surface per lens, not front/back alpha layers of a solid disc.
-        verts = [loc] + [(loc[0], loc[1]+r*math.cos(a), loc[2]+r*math.sin(a))
-                        for a in np.linspace(0, 2*math.pi, sides, endpoint=False)]
-        faces = [(0, i+1, (i+1) % sides+1) for i in range(sides)]
-        return mesh(name, verts, faces, mat, parent, bevel=0)
 
 
     def screw(loc, r=.0026, parent=body, axis='Y'):
@@ -425,20 +407,20 @@ def build(output, render=False, quick=False):
     for x in np.arange(-.103,.300,.010):
         profile('Picatinny rail tooth', [(x-.003,.040),(x+.003,.040),(x+.003,.044),
                                       (x-.003,.044)], .021, alloy, bevel=.00035)
-    # Visible external barrel envelope only, accurate nominal endpoint convention.
+    # Full 8-inch exterior including the formerly hidden, open 9mm crown.
     breech = .109
     barrel_end = breech+.2032
-    cyl('External barrel', ((breech+barrel_end)/2,0,0), .0076, .2032, steel, bevel=.00015)
+    tube('External barrel', ((breech+barrel_end)/2,0,0), .0076, .0047, .2032)
     cyl('External barrel shoulder', (.141,0,0), .0105, .043, steel, bevel=.0003)
-    # SRD9-MPX 175 x35mm with mount. No baffles or working attachment threads.
-    can_start = barrel_end-.008
-    can_end = can_start+.175
-    can = cyl('SRD9 MPX titanium exterior', ((can_start+can_end)/2,0,0), .0175, .175, canmat, sides=64, bevel=.0008)
-    cut(can, cyl('CUT', (can_end,0,0), .0048, .009, None, parent=None, sides=32, bevel=0))
-    for x,r in [(can_start+.004,.0177),(can_start+.013,.0176),(can_end-.004,.0176)]:
-        cyl('Suppressor end collar', (x,0,0), r, .004, canmat, sides=48, bevel=.0004)
-    text('SIG SAUER SRD9',(can_start+.030,-.01751,-.0018),.0036,-1,surface=can)
-    text('9mm',(can_start+.092,-.01751,-.0018),.0036,-1,surface=can)
+    device = empty('MUZZLE_device', parent=body)
+    tube('Muzzle thread protector', (barrel_end,0,0), .0105, .0077, .012, steel, device)
+    adapter = empty('MUZZLE_device_removed', parent=body)
+    tube('MPX suppressor adapter sleeve', (barrel_end+.001,0,0), .0093, .0077, .018, steel, adapter)
+    adapter.hide_render = True
+    adapter.hide_viewport = True
+    # Game-fit direct-thread adapter, not factory hardware or internal engineering.
+    muzzle_mount = empty('MOUNT_muzzle', (barrel_end+.004,0,0), body)
+    muzzle_mount.rotation_euler.z = -math.pi/2
 
     # Photo-registered 30-round curved magazine. Cross-sections follow the curve's
     # tangent instead of remaining horizontal and making an oversized flat slab.
@@ -542,80 +524,35 @@ def build(output, render=False, quick=False):
         for i in range(4):
             box('Charging handle traction',(-.103+i*.002,side*.030,.037),(.001,.0014,.006),steel,handle,.0002)
 
-    # Folded factory backup sights. No new gameplay toggle.
-    for x in (-.079,.276):
-        box('Folded iron rail clamp',(x,0,.047),(.028,.029,.010),steel,bevel=.0015)
-        cyl('Folded sight hinge',(x+.005,0,.054),.0048,.030,steel,'Y')
-        box('Folded sight leaf',(x-.003,0,.054),(.024,.017,.004),steel,bevel=.0012)
-        screw((x,-.016,.048),.003)
-
-    # Non-PRO ROMEO4T. Real 20mm aperture / 1.41in rail-to-axis mount convention.
-    optic_x=.074
-    optic_axis=.044+.035814
-    mount=profile('ROMEO4T 1.41in skeletal mount',[(optic_x-.022,.045),(optic_x+.023,.045),
-        (optic_x+.020,.056),(optic_x+.016,.064),(optic_x-.017,.064),(optic_x-.021,.056)],.025,steel,bevel=.0009)
-    opening(mount,(optic_x,0,.055),(.031,.050,.009),.002)
-    box('Optic cross bolt clamp',(optic_x,-.017,.048),(.035,.006,.006),steel,bevel=.001)
-    screw((optic_x,-.021,.048),.0038)
-    # SIG's ~85mm dimension spans the closed covers, not the bare tube. The
-    # manual's side/end drawings support these exterior proportions; the 70mm
-    # bare housing and 64mm flat-sheet spacing are game-art inferences, NOT lens
-    # measurements or an optical prescription. Keep the published 20mm aperture.
-    optic_length=.070
-    optic_body=tube('ROMEO4T main housing',(optic_x,0,optic_axis),.013,.0104,optic_length,alloy,interior=optic_interior)
-    optic_body['optical_depth_authority']='Inferred lens seats; exterior proportions from original ROMEO4T manual pp12-13'
-    for x in (optic_x-optic_length/2+.003,optic_x+optic_length/2-.003):
-        tube('Objective and ocular rim',(x,0,optic_axis),.0135,.0102,.006,alloy,interior=optic_interior)
-        optical_sheet('Coated optical lens',(x,0,optic_axis),.010,glass)
-    box('Solar panel housing',(optic_x,0,optic_axis+.014),(.045,.020,.004),alloy,bevel=.001)
-    box('Solar panel',(optic_x,0,optic_axis+.0162),(.037,.015,.0008),solar,bevel=.0004)
-    for x in np.linspace(optic_x-.016,optic_x+.016,5):
-        box('Solar cell separation',(x,0,optic_axis+.0167),(.0003,.014,.00015),steel,bevel=0)
-    # Asymmetric battery cap and rubber two-button saddle from the product references.
-    # Manual pp12-13 and the original top photo support a ~26mm diameter but
-    # only ~6mm cap thickness (drawing-derived, not published dimensions). Keep
-    # the outer face/overall width; extend the smaller neck to the thin cap.
-    cyl('ROMEO4T battery cap neck',(optic_x+.014,-.016,optic_axis),.0115,.0104,alloy,'Y')
-    cyl('ROMEO4T battery cap',(optic_x+.014,-.0239,optic_axis),.013,.006,alloy,'Y')
-    for i in range(16):
-        a=i*2*math.pi/16
-        box('Battery cap knurl',(optic_x+.014+math.cos(a)*.0125,-.027,optic_axis+math.sin(a)*.0125),
-            (.0014,.0008,.0014),steel,bevel=.0002)
-    box('ROMEO4T button saddle',(optic_x,.015,optic_axis),(.041,.005,.018),alloy,bevel=.002)
-    for x,label in [(optic_x-.010,'+'),(optic_x+.010,'-')]:
-        button=box('Rubber brightness button',(x,.0183,optic_axis),(.014,.002,.012),rubber,bevel=.002)
-        text(label,(x+.002,.0194,optic_axis-.002),.005,1,mat=polymer,surface=button)
-    text('ROMEO4T',(optic_x+.022,.0146,optic_axis+.008),.0040,1,surface=optic_body)
-    # Both covers are constructed closed around a real attached lower hinge, then
-    # rotated as complete rigid assemblies. The previous arms ended inside the bore.
+    # Deployed factory-style backup sights; removed state retains folded hardware.
+    irons = empty('IRON_sights', parent=body)
+    folded = empty('IRON_sights_removed', parent=body)
+    for parent in (irons, folded):
+        for x in (-.079,.284):
+            box('Iron rail clamp',(x,0,.047),(.028,.029,.010),steel,parent,.0015)
+            cyl('Iron sight hinge',(x+.005,0,.054),.0048,.030,steel,'Y',parent)
+            screw((x,-.016,.048),.003,parent)
+            if parent == folded:
+                box('Folded sight leaf',(x-.003,0,.054),(.024,.017,.004),steel,parent,.0012)
+            else:
+                box('Deployed sight stalk',(x,0,.062),(.006,.008,.019),steel,parent,.0006)
+    # Open rear peep and slender front blade meet at the authored aim datum.
+    tube('Rear iron aperture',(-.079,0,.074),.005,.0018,.003,steel,irons)
+    box('Front iron post',(.284,0,.070),(.003,.0016,.008),steel,irons,.0001)
     for side in (-1,1):
-        tag='front' if side==1 else 'rear'
-        tube('Threaded cover mounting collar',(optic_x+side*(optic_length/2+.0002),0,optic_axis),
-             .0135,.0105,.008,polymer,interior=polymer)
-        x=optic_x+side*(optic_length/2+.0045)
-        hinge=Vector((x,0,optic_axis-.0129))
-        cyl('Fixed '+tag+' lens hinge pin',tuple(hinge),.0018,.021,steel,'Y')
-        pivot=empty('lens_cap_'+tag,tuple(hinge),body)
-        bpy.context.view_layer.update()
-        cap_x=x+side*.0015
-        tube('Open '+tag+' lens cap rim',(cap_x,0,optic_axis),.0137,.011,.0035,polymer,pivot,interior=polymer)
-        # Solid polymer prototype: real front/back lid faces join the existing
-        # cap skin without relying on a material-sidedness change.
-        cyl('Open '+tag+' solid lens cap',(cap_x,0,optic_axis),.011,.0015,polymer,
-            parent=pivot,sides=40,bevel=0)
-        box(tag+' lens cap hinge bridge',(cap_x,0,optic_axis-.012),(.0035,.015,.006),polymer,pivot,.0006)
-        cyl(tag+' lens cap hinge barrel',tuple(hinge),.0025,.010,polymer,'Y',pivot)
-        pivot.rotation_euler.y=side*math.radians(120)
-        pivot['hinge_origin']=list(hinge)
-        pivot['open_angle_degrees']=side*120
+        box('Front iron guard',(.284,side*.007,.070),(.006,.003,.018),steel,irons,.0007)
+    folded.hide_render = True
+    folded.hide_viewport = True
+    optic_mount = empty('MOUNT_optic', (.025,0,.044), body)
+    optic_mount.rotation_euler.z = -math.pi/2
 
     # Sparse local polished nicks rather than uniform silver wireframes.
     for loc,dims in [((.108,-.025,.022),(.005,.0003,.0005)),((.256,-.024,.024),(.009,.0003,.0004)),
                      ((-.087,-.024,.034),(.004,.0002,.0006)),((.076,-.024,-.075),(.006,.0003,.0004))]:
         box('Localized handling nick',loc,dims,wear,bevel=.0001)
 
-    for name,loc in {'muzzle':(can_end,0,0),'barrel_crown':(barrel_end,0,0),'breech':(breech,0,0),
-                     'ejection':(.070,-.027,.010),'sight':(optic_x,0,optic_axis),
+    for name,loc in {'muzzle':(barrel_end+.006,0,0),'barrel_crown':(barrel_end,0,0),'breech':(breech,0,0),
+                     'ejection':(.070,-.027,.010),'sight':(-.079,0,.074),'front_post':(.284,0,.074),
                      'grip_right':(-.045,0,-.103),'grip_left':(.209,0,-.017),
                      'magazine':(.069,0,-.065)}.items():
         empty('SOCKET_'+name,loc,rig)
@@ -722,7 +659,7 @@ def build(output, render=False, quick=False):
     scene.frame_set(0)
     bpy.context.view_layer.update()
     notes.write('GENERATED PREVIEW: edit tools/blender/mpx/; rebuild from Python.\n'
-                'Geometry/materials approved. Gate 3 animation/gameplay review pending.\n'
+                'Base conversion candidate; human visual/animation/gameplay review pending.\n'
                 'Eight native weapon/wrist/finger clips; select matching NLA tracks on controls and review arms.\n'
                 'Shared review skins are not exported; runtime uses shared IK and live casing pools.\n'
                 'Original packed 1K PBR maps; photo-inferred depths/typography, not manufacturing CAD.\n'
@@ -751,9 +688,13 @@ def build(output, render=False, quick=False):
     # Merge only mesh copies sharing a rigid parent; original source remains editable.
     export=bpy.data.collections.new('EXPORT | evaluated copies')
     scene.collection.children.link(export)
+    folded.hide_viewport = False
+    adapter.hide_viewport = False
+    bpy.context.view_layer.update()
     copy_by_source={}
     for o in list(asset.objects):
         clone=o.copy()
+        clone.hide_render = False
         if o.data: clone.data=o.data.copy()
         export.objects.link(clone); clone.parent=None; clone.matrix_world=o.matrix_world.copy()
         copy_by_source[o]=clone
@@ -790,7 +731,6 @@ def build(output, render=False, quick=False):
             source.name='SOURCE_'+source.name
             clone.name=source.name.removeprefix('SOURCE_')
     prepare_export_actions(list(export.objects), clips)
-    separate_receiver_finishes(export)
     bpy.ops.object.select_all(action='DESELECT')
     for o in export.objects: o.select_set(True)
     bpy.context.view_layer.objects.active=copy_by_source[rig]
@@ -831,20 +771,17 @@ def build(output, render=False, quick=False):
     stats={'triangleInstances':triangles,'primitives':sum(len(m['primitives']) for m in j['meshes']),
            'materials':len(j.get('materials',[])),'images':len(j.get('images',[])),'bytes':len(raw)}
     assert triangles<80000,stats
-    assert stats['primitives']==16 and stats['materials']==3 and stats['images']==3 and len(raw)<=10*1024*1024,stats
+    assert stats['primitives']==16 and stats['materials']==1 and stats['images']==3 and len(raw)<=10*1024*1024,stats
     # Stage 7: separate manifest metadata (the GLB remains read-only).
-    manifest={'status':'Geometry/materials approved; Gate 3 native animation/gameplay candidate — human review pending',
-        'asset':'SIG MPX 8 inch / ROMEO4T 1.41 inch mount / MIL-SRD9-MPX / 30-round magazine / folded irons',
+    manifest={'status':'Base conversion candidate — human visual/animation/gameplay review pending',
+        'asset':'SIG MPX 8 inch / open 9mm crown and thread protector / 30-round magazine / removable deployed irons',
         'units':'metres','blenderForward':'+X','blenderUp':'+Z','stats':stats,'clips':clips,
         'source':'tools/blender/mpx/build.py + tools/blender/mpx/animations.py + tools/blender/mpx/actions.py',
         'runtimeBasis':'GLB +X forward / +Y up / +Z right; adapter rotates basis +90 degrees around Y once',
         'textures':{'resolution':1024,'packed':True,'embedded':True,'method':'original deterministic surface maps; no photographic inputs'},
         'dimensions':{'nominalBarrel':.2032,'barrelBreech':breech,'barrelCrown':barrel_end,
-                      'suppressorEnvelope':[.175,.035],'suppressorStart':can_start,'muzzle':can_end,
-                      'opticAperture':.020,'railToOpticalAxis':.035814,
-                      'opticClosedLength':.0855,'opticHousingLength':optic_length,
-                      'opticLensSpacing':optic_length-.006,'opticRimDiameter':.027},
-        'opticDepthAuthority':'85.5mm overall/20mm aperture published; housing/rim proportions drawing-supported; lens seats/64mm spacing inferred, not manufacturer optical data',
+                      'muzzle':barrel_end+.006,'ironAxis':.074,'rearAperture':.0036,
+                      'opticMount':[.025,0,.044],'muzzleMount':[barrel_end+.004,0,0]},
         'notes':['Reference-supported assembly, not proof that the hero photograph depicts this barrel.',
                  'Depths, relief, magazine translucency and typography remain inferred.',
                  'No functional internals, certified pixel parity, or AAA visual sign-off.',

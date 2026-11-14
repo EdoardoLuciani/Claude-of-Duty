@@ -383,7 +383,7 @@ and the loader table checks complete ID coverage and per-ID adapter returns.
 `WeaponState.attachments` is an immutable `{ optic, ironSights, muzzle, rail }` snapshot;
 null slots retain the authored base weapon (including existing integrated optics/
 suppressors). `src/weapons/attachments.ts` owns the finite catalog (`rmr | acog | scope`
-optics, TOR Mini `laser`, M4/MCX `suppressor`), boundary validation, asset loading and
+optics, TOR Mini `laser`, M4/MCX/MPX `suppressor`), boundary validation, asset loading and
 the common gameplay/inspection mount solver. No attachment economy yet.
 `WeaponDef.fits` has one shape per slot: a partial record keyed by attachment id whose
 entry enables that verified fit and holds its data (`fits.optic[id].eyeRelief`; rail and
@@ -419,8 +419,8 @@ installed exit for ballistics, flash, smoke and tracers; casing ejection stays a
 `SOCKET_ejection`. Attachments carry no ballistic/handling modifiers.
 Prewarm includes every loaded attachment and both iron/muzzle base states.
 Inspection defaults to the stored config or accepts an explicit config without mutating
-gameplay. MCX is an iron-sight base with verified catalog fits; MPX retains its
-integrated optic and can until its base conversion.
+gameplay. MCX and MPX are iron-sight bases with verified catalog fits; neither
+retains an integrated optic or suppressor.
 Per-weapon mount datums, clearances and fitting decisions live in each weapon's
 `assets/weapons/*/README.md` and each attachment's `assets/attachments/*/README.md`;
 Blender sources are under `tools/blender/` (`rmr/`, `acog/`, `scope/`, `suppressor/`).
@@ -477,9 +477,8 @@ fire-event weapon's `suppressed` value on every shot, not a fixed audio-profile 
 Approved substitute donor models and calibre compromises (including MCX's provisional
 5.56 sources for the game's .300 BLK) are recorded with publication clearance in
 `src/audio/samples/weapon-reports-provenance.json`. Unsupported suppressed identities
-stay silent; missing/decode-failed banks never borrow another report. The integrated
-MPX suppressor/default remains until muzzle-attachment conversion;
-MCX firing reports now follow its removable muzzle configuration.
+stay silent; missing/decode-failed banks never borrow another report. MCX and MPX
+firing reports follow their removable muzzle configurations.
 Remaining synthesis is intentional UI/electronic feedback,
 healing-completion cues, tinnitus and shop music/reverb. Other spoken intents remain deferred.
 

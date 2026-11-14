@@ -5,16 +5,16 @@
 
 - `build.py`: geometry/maps/studio/stages; `actions.py`: eight actions/hands/events.
 - `animations.py`: runtime sampling/reset; `finishes.py`: finish colors/tiles.
-- `geometry.py`: receiver finish separation preserving packed corner normals.
 
 Hand calibration and shared arms are read-only. Refit separately with
 `bun tools/blender/mpx/hand-reference.ts`. Shared review-arm baking lives in
 [`../review_hands.py`](../review_hands.py), independent of EVOLYS tooling.
 Save editable components/sparse actions before runtime joins.
 Keep the smart-project atlas, original UV0 grain and padded 4×4 UV1 finish tiles.
-Body lenses stay optical; solid polymer covers retain original cap pivots and
-closed occlusion. The unused clear-cap finish tile remains reserved.
-Opaque, optical and absorptive interior sorting policies stay separate.
+The base has no optical surfaces. Deployed and folded irons, thread protector
+and suppressor adapter each retain a separate rigid visibility owner. The original
+15 finish tiles stay reserved so surviving finishes keep their atlas positions.
+Attachment frames preserve shared canonical locals during the adapter basis change.
 
 Ordinary meshes retain original local frames: do not rebase them to reduce draws.
 Mechanisms follow original animated parents; magazines/rounds remain independent.
