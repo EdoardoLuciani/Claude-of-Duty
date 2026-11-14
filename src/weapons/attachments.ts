@@ -3,9 +3,13 @@ import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Renderer } from 'three/webgpu';
 
 import { hasOwn, isRecord } from '../core/guards.ts';
-import { isMesh } from '../core/three-guards.ts';
+import { isGroup, isMesh } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
-import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
+import {
+  convertWeaponScene,
+  disposeWeaponMaterials,
+  type WeaponSceneMaterials,
+} from './asset-material.ts';
 import { requiredNode } from './authored-model.ts';
 import { WEAPON_DEFS, type WeaponId } from './defs.ts';
 import type { OpticData, WeaponEntry, WeaponModelRecord } from './runtime-types.ts';
@@ -56,24 +60,50 @@ const OPTICS: Record<
     adsFovScale: number;
     adsSensScale: number;
     optic: Omit<OpticData, 'center'>;
+    /** Lens material (by source-name prefix): the overlay owns the magnified picture,
+     * so glass keeps thin alpha and never adds a full-scene transmission pass. */
+    glass: {
+      prefix: string;
+      opacity: number;
+      tint?: { rgb: [number, number, number]; roughness: number; specularIntensity: number };
+    };
   }
 > = {
   rmr: {
     adsFovScale: 0.62,
     adsSensScale: 0.62,
     optic: { apertureR: 0.0055, dotMoa: 3.25, minDotPixels: 5, dotOpacity: 0.9 },
+    glass: { prefix: '10 |', opacity: 0.13 },
   },
   acog: {
     adsFovScale: 0.28,
     adsSensScale: 0.28,
     optic: { kind: 'scope', reticle: 'chevron', apertureR: 0.0137 },
+    glass: {
+      prefix: '11 |',
+      opacity: 0.1,
+      tint: { rgb: [0.035, 0.075, 0.085], roughness: 0.12, specularIntensity: 0.25 },
+    },
   },
   scope: {
     adsFovScale: 0.25,
     adsSensScale: 0.25,
     optic: { kind: 'scope', reticle: 'p4fl' },
+    glass: { prefix: '10 |', opacity: 0.13 },
   },
 };
+
+/** The owned asset releases shared geometry and finishes; instances never do. */
+function disposeAttachmentAsset(scene: THREE.Group, finishes: WeaponSceneMaterials): void {
+  scene.removeFromParent();
+  const geometries = new Set<THREE.BufferGeometry>();
+  scene.traverse((node): void => {
+    node.dispose();
+    if (isMesh(node)) geometries.add(node.geometry);
+  });
+  for (const geometry of geometries) geometry.dispose();
+  disposeWeaponMaterials(finishes);
+}
 
 /** One owned asset; mounted/inspection instances borrow its geometry and finishes. */
 export function makeOpticModel(
@@ -89,49 +119,33 @@ export function makeOpticModel(
   scene.updateMatrixWorld(true);
   const mount = requiredNode(scene, 'MOUNT_base').getWorldPosition(new THREE.Vector3());
   const sight = requiredNode(scene, 'SOCKET_sight').getWorldPosition(new THREE.Vector3());
+  const { glass } = OPTICS[id];
   const finishes = convertWeaponScene(scene, (source, material): void => {
-    if (source.name.startsWith(id === 'acog' ? '11 |' : '10 |')) {
-      // The overlay owns the magnified picture: retain thin alpha, never a
-      // second full-scene transmission pass through attachment glass.
-      material.transmission = 0;
-      material.transparent = true;
-      material.opacity = id === 'acog' ? 0.1 : 0.13;
-      material.depthWrite = false;
-      material.side = THREE.DoubleSide;
-      if (id === 'acog') {
-        material.color.setRGB(0.035, 0.075, 0.085);
-        material.metalness = 0;
-        material.roughness = 0.12;
-        material.specularIntensity = 0.25;
-      }
+    if (!source.name.startsWith(glass.prefix)) return;
+    material.transmission = 0;
+    material.transparent = true;
+    material.opacity = glass.opacity;
+    material.depthWrite = false;
+    material.side = THREE.DoubleSide;
+    if (glass.tint) {
+      material.color.setRGB(...glass.tint.rgb);
+      material.metalness = 0;
+      material.roughness = glass.tint.roughness;
+      material.specularIntensity = glass.tint.specularIntensity;
     }
   });
-  return {
-    scene,
-    mount,
-    sight,
-    dispose(): void {
-      scene.removeFromParent();
-      const geometries = new Set<THREE.BufferGeometry>();
-      scene.traverse((node): void => {
-        node.dispose();
-        if (isMesh(node)) geometries.add(node.geometry);
-      });
-      for (const geometry of geometries) geometry.dispose();
-      disposeWeaponMaterials(finishes);
-    },
-  };
+  return { scene, mount, sight, dispose: (): void => disposeAttachmentAsset(scene, finishes) };
 }
-export type OpticModel = ReturnType<typeof makeOpticModel>;
-export type OpticModels = Partial<Record<OpticId, OpticModel>>;
+type OpticModel = ReturnType<typeof makeOpticModel>;
 
-/** Owned rigid attachment; instances borrow its geometry and converted finishes. */
+/** Owned rigid attachment with an authored `SOCKET_mount` origin and an output socket. */
 function makeRigidAttachment(
   gltf: GLTF,
   output: string
 ): {
   scene: THREE.Group;
   mount: THREE.Vector3;
+  output: string;
   dispose(): void;
 } {
   const scene = gltf.scene;
@@ -139,58 +153,90 @@ function makeRigidAttachment(
   const mount = requiredNode(scene, 'SOCKET_mount').getWorldPosition(new THREE.Vector3());
   requiredNode(scene, output);
   const finishes = convertWeaponScene(scene);
-  return {
-    scene,
-    mount,
-    dispose(): void {
-      scene.removeFromParent();
-      const geometries = new Set<THREE.BufferGeometry>();
-      scene.traverse((node): void => {
-        node.dispose();
-        if (isMesh(node)) geometries.add(node.geometry);
-      });
-      for (const geometry of geometries) geometry.dispose();
-      disposeWeaponMaterials(finishes);
-    },
-  };
+  return { scene, mount, output, dispose: (): void => disposeAttachmentAsset(scene, finishes) };
 }
-export type LaserModel = ReturnType<typeof makeRigidAttachment>;
-export type SuppressorModel = ReturnType<typeof makeRigidAttachment>;
+type RigidAttachmentModel = ReturnType<typeof makeRigidAttachment>;
 
-export function makeLaserModel(gltf: GLTF): LaserModel {
+/** TOR Mini: `SOCKET_laser` is the beam emitter. */
+export function makeLaserModel(gltf: GLTF): RigidAttachmentModel {
   return makeRigidAttachment(gltf, 'SOCKET_laser');
 }
 
-export function makeSuppressorModel(gltf: GLTF): SuppressorModel {
+/** Suppressor: `SOCKET_muzzle` is the endcap bore exit. */
+export function makeSuppressorModel(gltf: GLTF): RigidAttachmentModel {
   return makeRigidAttachment(gltf, 'SOCKET_muzzle');
 }
 
-export async function loadSuppressor(
+/** Loaded assets keyed by attachment id; a missing entry makes that attachment unavailable. */
+export type AttachmentAssets = Partial<
+  Record<OpticId, OpticModel> & Record<RailId | MuzzleId, RigidAttachmentModel>
+>;
+
+/** Load every attachment in parallel; a failure only makes that attachment unavailable. */
+export async function loadAttachments(
   renderer: Pick<Renderer, 'hasFeature'>
-): Promise<SuppressorModel> {
-  return makeSuppressorModel(
-    await loadWeaponGLTF(renderer, '/models/attachments/suppressor.runtime.glb')
+): Promise<AttachmentAssets> {
+  const assets: AttachmentAssets = {};
+  const load = async (id: string, install: (gltf: GLTF) => void): Promise<void> => {
+    try {
+      install(await loadWeaponGLTF(renderer, `/models/attachments/${id}.runtime.glb`));
+    } catch (err: unknown) {
+      console.error(`[weapons] ${id} attachment load failed`, err);
+    }
+  };
+  await Promise.all([
+    ...OPTIC_IDS.map((id): Promise<void> =>
+      load(id, (gltf): void => {
+        assets[id] = makeOpticModel(gltf, id);
+      })
+    ),
+    load('laser', (gltf): void => {
+      assets.laser = makeLaserModel(gltf);
+    }),
+    load('suppressor', (gltf): void => {
+      assets.suppressor = makeSuppressorModel(gltf);
+    }),
+  ]);
+  return assets;
+}
+
+/** Whether every installed slot's asset loaded; fit validity is `isAttachmentConfig`. */
+export function hasAttachmentAssets(config: AttachmentConfig, assets: AttachmentAssets): boolean {
+  return (
+    (config.optic === null || assets[config.optic] !== undefined) &&
+    (config.rail === null || assets[config.rail] !== undefined) &&
+    (config.muzzle === null || assets[config.muzzle] !== undefined)
   );
 }
 
-export async function loadLaser(renderer: Pick<Renderer, 'hasFeature'>): Promise<LaserModel> {
-  return makeLaserModel(await loadWeaponGLTF(renderer, '/models/attachments/laser.runtime.glb'));
+const SLOTS = ['optic', 'rail', 'muzzle'] as const;
+
+/** Mounted instance groups, one per slot; an empty group has no parent. */
+interface AttachmentMounts {
+  attachmentGroup: THREE.Group;
+  railGroup: THREE.Group;
+  muzzleGroup: THREE.Group;
 }
 
-export async function loadOptic(
-  renderer: Pick<Renderer, 'hasFeature'>,
-  id: OpticId
-): Promise<OpticModel> {
-  return makeOpticModel(
-    await loadWeaponGLTF(renderer, `/models/attachments/${id}.runtime.glb`),
-    id
-  );
-}
-
-export function releaseAttachmentMount(group: THREE.Group): void {
+function releaseAttachmentMount(group: THREE.Group): void {
   group.removeFromParent();
   group.traverse((node): void => node.dispose());
   group.clear();
+}
+
+/** Release instance transforms only; geometry/finishes stay with the owned assets. */
+export function releaseAttachmentMounts(mounts: AttachmentMounts): void {
+  releaseAttachmentMount(mounts.attachmentGroup);
+  releaseAttachmentMount(mounts.railGroup);
+  releaseAttachmentMount(mounts.muzzleGroup);
+}
+
+/** Release the mounts copied along with a configured weapon scene clone. */
+export function releaseClonedMounts(root: THREE.Object3D): void {
+  for (const slot of SLOTS) {
+    const group = root.getObjectByName(`${slot}_attachment`);
+    if (isGroup(group)) releaseAttachmentMount(group);
+  }
 }
 
 /** Iron-sight nodes of a weapon whose irons can be removed; null when they are fixed. */
@@ -204,22 +250,34 @@ export function ironSightNodes(
   };
 }
 
-/** Shared gameplay/inspection mount solver, run only when configuration changes. */
+/** Stage a rigid rail/muzzle instance for the weapon's authored `MOUNT_<slot>`. */
+function stageRigid(
+  model: WeaponModelRecord,
+  slot: 'rail' | 'muzzle',
+  id: RailId | MuzzleId | null,
+  assets: AttachmentAssets
+): { group: THREE.Group; parent: THREE.Object3D | null; output: THREE.Object3D | null } {
+  const group = new THREE.Group();
+  group.name = `${slot}_attachment`;
+  if (id === null) return { group, parent: null, output: null };
+  const asset = assets[id];
+  if (!asset) throw new Error(`[weapons] ${id} asset unavailable`);
+  const parent = requiredNode(model.root, `MOUNT_${slot}`);
+  const instance = asset.scene.clone(true);
+  instance.position.sub(asset.mount);
+  group.add(instance);
+  return { group, parent, output: requiredNode(instance, asset.output) };
+}
+
+/** Shared gameplay/inspection mount solver, run only when configuration changes.
+ * Every asset/datum is validated before anything is attached or hidden. */
 export function mountAttachments(
   model: WeaponModelRecord,
   config: AttachmentConfig,
-  optics: OpticModels,
-  laser: LaserModel | null = null,
-  suppressor: SuppressorModel | null = null
-): {
-  group: THREE.Group;
-  railGroup: THREE.Group;
-  railParent: THREE.Object3D;
+  assets: AttachmentAssets
+): AttachmentMounts & {
   laserEmitter: THREE.Object3D | null;
-  muzzleGroup: THREE.Group;
-  muzzleParent: THREE.Object3D;
   muzzleSocket: THREE.Object3D | null;
-  parent: THREE.Object3D;
   mountedOptic: WeaponEntry['mountedOptic'];
   sight: THREE.Vector3;
   optic: OpticData | null;
@@ -229,44 +287,21 @@ export function mountAttachments(
     throw new Error(
       `[weapons] incompatible attachments: ${model.id}, optic=${opticId}, ironSights=${ironSights}`
     );
-  // Validate every requested asset/datum before changing any installed visibility.
-  const railGroup = new THREE.Group();
-  railGroup.name = 'rail_attachment';
-  let railParent = model.root;
-  let laserEmitter: THREE.Object3D | null = null;
-  if (config.rail === 'laser') {
-    if (!laser) throw new Error('[weapons] laser asset unavailable');
-    railParent = requiredNode(model.root, 'MOUNT_rail');
-    const instance = laser.scene.clone(true);
-    instance.position.sub(laser.mount);
-    laserEmitter = requiredNode(instance, 'SOCKET_laser');
-    railGroup.add(instance);
-  }
-  const muzzleGroup = new THREE.Group();
-  muzzleGroup.name = 'muzzle_attachment';
-  let muzzleParent = model.root;
-  let muzzleSocket: THREE.Object3D | null = null;
+  const rail = stageRigid(model, 'rail', config.rail, assets);
+  const muzzle = stageRigid(model, 'muzzle', config.muzzle, assets);
   const baseDevice =
     config.muzzle !== null || WEAPON_DEFS[model.id].fits?.muzzle
       ? requiredNode(model.root, 'MUZZLE_device')
       : null;
-  if (config.muzzle === 'suppressor') {
-    if (!suppressor) throw new Error('[weapons] suppressor asset unavailable');
-    muzzleParent = requiredNode(model.root, 'MOUNT_muzzle');
-    const instance = suppressor.scene.clone(true);
-    instance.position.sub(suppressor.mount);
-    muzzleSocket = requiredNode(instance, 'SOCKET_muzzle');
-    muzzleGroup.add(instance);
-  }
   const irons = ironSightNodes(model);
-  const group = new THREE.Group();
-  group.name = 'attachments';
-  let parent = model.root;
+  const attachmentGroup = new THREE.Group();
+  attachmentGroup.name = 'optic_attachment';
+  let opticParent: THREE.Object3D | null = null;
   let mountedOptic: WeaponEntry['mountedOptic'] = null;
   const sight = new THREE.Vector3().fromArray(model.nodes.sight);
   let optic: OpticData | null = 'opticGlass' in model.nodes ? model.nodes.opticGlass : null;
   if (opticId !== null) {
-    const asset = optics[opticId];
+    const asset = assets[opticId];
     if (!asset) throw new Error(`[weapons] ${opticId} asset unavailable`);
     // Rest-pose mount transform, including orientation; asset mount is its origin.
     // Never read the live pose: a slide or bolt may be mid-animation here.
@@ -278,12 +313,16 @@ export function mountAttachments(
     instance.position.sub(asset.mount);
     // Keep the instance in mount-local space so slide/cover/bone animation
     // remains authoritative. Only the ADS datum is resolved in rig space.
-    parent = mount;
-    group.add(instance);
+    opticParent = mount;
+    attachmentGroup.add(instance);
     mountedOptic = { mount, sight: asset.sight.clone().sub(asset.mount) };
     sight.copy(mountedOptic.sight).applyMatrix4(transform);
     optic = { ...OPTICS[opticId].optic, center: sight.toArray() };
   }
+  // Staging succeeded: attach instances and switch the replaced base parts.
+  opticParent?.add(attachmentGroup);
+  rail.parent?.add(rail.group);
+  muzzle.parent?.add(muzzle.group);
   if (irons) {
     irons.installed.visible = ironSights;
     if (irons.removed) irons.removed.visible = !ironSights;
@@ -294,17 +333,14 @@ export function mountAttachments(
     if (adapter) adapter.visible = config.muzzle !== null;
   }
   return {
-    group,
-    parent,
+    attachmentGroup,
+    railGroup: rail.group,
+    muzzleGroup: muzzle.group,
+    laserEmitter: rail.output,
+    muzzleSocket: muzzle.output,
     mountedOptic,
     sight,
     optic,
-    railGroup,
-    railParent,
-    laserEmitter,
-    muzzleGroup,
-    muzzleParent,
-    muzzleSocket,
   };
 }
 
@@ -313,23 +349,16 @@ export function mountAttachments(
 export function configureWeaponAttachments(
   entry: WeaponEntry,
   config: AttachmentConfig,
-  optics: OpticModels,
-  laser: LaserModel | null = null,
-  suppressor: SuppressorModel | null = null
+  assets: AttachmentAssets
 ): void {
-  const mounted = mountAttachments(entry.model, config, optics, laser, suppressor);
-  releaseAttachmentMount(entry.attachmentGroup);
-  releaseAttachmentMount(entry.railGroup);
-  releaseAttachmentMount(entry.muzzleGroup);
-  entry.muzzleGroup = mounted.muzzleGroup;
-  entry.muzzleSocket = mounted.muzzleSocket;
-  if (mounted.muzzleSocket) mounted.muzzleParent.add(mounted.muzzleGroup);
+  const mounted = mountAttachments(entry.model, config, assets);
+  releaseAttachmentMounts(entry);
+  entry.attachmentGroup = mounted.attachmentGroup;
   entry.railGroup = mounted.railGroup;
+  entry.muzzleGroup = mounted.muzzleGroup;
   entry.laserEmitter = mounted.laserEmitter;
-  mounted.railParent.add(mounted.railGroup);
-  entry.attachmentGroup = mounted.group;
+  entry.muzzleSocket = mounted.muzzleSocket;
   entry.mountedOptic = mounted.mountedOptic;
-  mounted.parent.add(mounted.group);
   entry.attachments = Object.freeze({ ...config });
   entry.sight.copy(mounted.sight);
   entry.optic = mounted.optic;
@@ -339,9 +368,8 @@ export function configureWeaponAttachments(
     config.optic === null
       ? base.eyeRelief
       : (base.fits?.optic?.[config.optic]?.eyeRelief ?? base.eyeRelief);
-  // Legacy integrated cans remain until their base-weapon conversion lands.
-  entry.def.suppressed = base.suppressed ?? false;
-  entry.def.attachments = entry.attachments;
+  // MCX/MPX integrated cans keep the authored flag until their base conversions.
+  entry.def.suppressed = (base.suppressed ?? false) || config.muzzle === 'suppressor';
   const fov = attached ? attached.adsFovScale : base.adsFovScale;
   const sensitivity = attached ? attached.adsSensScale : base.adsSensScale;
   if (fov === undefined) delete entry.def.adsFovScale;

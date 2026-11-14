@@ -4,11 +4,10 @@ import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { isGroup } from '../core/three-guards.ts';
 import {
   mountAttachments,
-  releaseAttachmentMount,
+  releaseAttachmentMounts,
+  releaseClonedMounts,
+  type AttachmentAssets,
   type AttachmentConfig,
-  type OpticModels,
-  type LaserModel,
-  type SuppressorModel,
 } from './attachments.ts';
 import { createWeaponAnimation } from './authored-animation.ts';
 import type { WeaponEntry } from './runtime-types.ts';
@@ -17,9 +16,7 @@ import type { WeaponEntry } from './runtime-types.ts';
 export function createWeaponInspection(
   entry: WeaponEntry,
   config: AttachmentConfig = entry.attachments,
-  optics: OpticModels = {},
-  laser: LaserModel | null = null,
-  suppressor: SuppressorModel | null = null
+  assets: AttachmentAssets = {}
 ): {
   scene: THREE.Group;
   dispose(): void;
@@ -36,17 +33,9 @@ export function createWeaponInspection(
     materials: new Set<THREE.Material>(),
     textures: new Set<THREE.Texture>(),
   };
-  // The gameplay scene may contain a mounted instance; replace the cloned mount.
-  const previous = root.getObjectByName('attachments');
-  if (isGroup(previous)) releaseAttachmentMount(previous);
-  const previousRail = root.getObjectByName('rail_attachment');
-  if (isGroup(previousRail)) releaseAttachmentMount(previousRail);
-  const previousMuzzle = root.getObjectByName('muzzle_attachment');
-  if (isGroup(previousMuzzle)) releaseAttachmentMount(previousMuzzle);
-  const mounted = mountAttachments(model, config, optics, laser, suppressor);
-  if (mounted.muzzleSocket) mounted.muzzleParent.add(mounted.muzzleGroup);
-  mounted.railParent.add(mounted.railGroup);
-  mounted.parent.add(mounted.group);
+  // The gameplay scene may contain mounted instances; replace the cloned mounts.
+  releaseClonedMounts(root);
+  const mounted = mountAttachments(model, config, assets);
   const animation = createWeaponAnimation(model, entry.def);
   animation.update(0, null, 0, false, true, entry.def.magSize);
   scene.updateMatrixWorld(true);
@@ -54,9 +43,7 @@ export function createWeaponInspection(
     scene,
     dispose(): void {
       scene.removeFromParent();
-      releaseAttachmentMount(mounted.group);
-      releaseAttachmentMount(mounted.railGroup);
-      releaseAttachmentMount(mounted.muzzleGroup);
+      releaseAttachmentMounts(mounted);
       // The authored animation owns its cloned skeletons (as it does in gameplay).
       animation.dispose();
       scene.traverse((node): void => {

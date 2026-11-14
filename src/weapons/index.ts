@@ -12,14 +12,10 @@ import {
   configureWeaponAttachments,
   ironSightNodes,
   isAttachmentConfig,
-  loadOptic,
-  loadLaser,
-  loadSuppressor,
-  OPTIC_IDS,
+  hasAttachmentAssets,
+  loadAttachments,
   type AttachmentConfig,
-  type OpticModels,
-  type LaserModel,
-  type SuppressorModel,
+  type AttachmentAssets,
 } from './attachments.ts';
 import { ProjectileSim, dropAt } from './ballistics.ts';
 import {
@@ -157,9 +153,7 @@ export class WeaponSystem {
   set pickups(value: AmmoPickups | null) {
     this._pickups = value;
   }
-  private _optics: OpticModels = {};
-  private _laserAsset: LaserModel | null = null;
-  private _suppressorAsset: SuppressorModel | null = null;
+  private _attachments: AttachmentAssets = {};
   private _laser: WeaponLaser | null = null;
   _restTask: Promise<void> | null = null;
   declare player: EngineSystems['player'] | null;
@@ -319,41 +313,19 @@ export class WeaponSystem {
     let tris = 0;
     const renderer = ctx.get('render').renderer;
     const load = (id: WeaponId): Promise<WeaponModelRecord> => loadWeapon(id, renderer);
-    // Optics load alongside the spawn weapons. A failed optic only makes that
+    // Attachments load alongside the spawn weapons. A failed asset only makes that
     // attachment unavailable; the base weapons and their irons remain usable.
     this._laser = new WeaponLaser(ctx.scene);
-    const laser = loadLaser(renderer)
-      .then((asset): void => {
-        this._laserAsset = asset;
-      })
-      .catch((err: unknown): void => {
-        console.error('[weapons] laser load failed', err);
-      });
-    const suppressor = loadSuppressor(renderer)
-      .then((asset): void => {
-        this._suppressorAsset = asset;
-      })
-      .catch((err: unknown): void => {
-        console.error('[weapons] suppressor load failed', err);
-      });
-    const optics = OPTIC_IDS.map(async (id): Promise<void> => {
-      try {
-        this._optics[id] = await loadOptic(renderer, id);
-      } catch (err: unknown) {
-        console.error(`[weapons] optic load failed for ${id}`, err);
-      }
-    });
+    const attachments = loadAttachments(renderer);
     try {
       const records = await Promise.all(spawn.map(load));
-      await Promise.all([...optics, laser, suppressor]);
+      this._attachments = await attachments;
       for (let i = 0; i < spawn.length; i++) {
         tris += this.viewmodel.addWeapon(
           records[i],
           this._requireState(spawn[i]).def,
           this._requireState(spawn[i]).attachments,
-          this._optics,
-          this._laserAsset,
-          this._suppressorAsset
+          this._attachments
         ).tris;
       }
       this._restTask = (async (): Promise<void> => {
@@ -434,33 +406,15 @@ export class WeaponSystem {
     await this._restTask;
     const entry = this.viewmodel.weapons.get(id);
     if (!entry) throw new Error(`[weapons] inspection unavailable: ${id}`);
-    return createWeaponInspection(
-      entry,
-      config,
-      this._optics,
-      this._laserAsset,
-      this._suppressorAsset
-    );
+    return createWeaponInspection(entry, config, this._attachments);
   }
 
   /** Synchronous, outside the frame loop; reject changes to unowned/unloaded guns. */
   setAttachments(id: WeaponId, config: AttachmentConfig): boolean {
     if (!this.owned.has(id) || !isAttachmentConfig(config, id)) return false;
     const entry = this.viewmodel.weapons.get(id);
-    if (
-      !entry ||
-      (config.optic !== null && !this._optics[config.optic]) ||
-      (config.rail !== null && !this._laserAsset) ||
-      (config.muzzle !== null && !this._suppressorAsset)
-    )
-      return false;
-    configureWeaponAttachments(
-      entry,
-      config,
-      this._optics,
-      this._laserAsset,
-      this._suppressorAsset
-    );
+    if (!entry || !hasAttachmentAssets(config, this._attachments)) return false;
+    configureWeaponAttachments(entry, config, this._attachments);
     this._requireState(id).attachments = entry.attachments;
     if (this.activeId === id) {
       this.viewmodel.reticle.visible = false;
@@ -476,14 +430,7 @@ export class WeaponSystem {
     if (state.attachments === BASE_ATTACHMENTS) return;
     state.attachments = BASE_ATTACHMENTS;
     const entry = this._viewmodel?.weapons.get(id);
-    if (entry)
-      configureWeaponAttachments(
-        entry,
-        BASE_ATTACHMENTS,
-        this._optics,
-        this._laserAsset,
-        this._suppressorAsset
-      );
+    if (entry) configureWeaponAttachments(entry, BASE_ATTACHMENTS, this._attachments);
     if (id === this.activeId && this._laser) this._laser.mesh.visible = false;
   }
 
@@ -514,9 +461,7 @@ export class WeaponSystem {
         record,
         this._requireState(ids[i]).def,
         this._requireState(ids[i]).attachments,
-        this._optics,
-        this._laserAsset,
-        this._suppressorAsset
+        this._attachments
       ).tris;
     }
     this.stats.tris += tris;
@@ -542,17 +487,9 @@ export class WeaponSystem {
       // Deferred assets must finish before the loading screen is released.
       await this._restTask;
       // The owned source retains warm shader variants between mounted instances.
-      for (const asset of Object.values(this._optics)) {
+      for (const asset of Object.values(this._attachments)) {
         attachments.push(asset.scene);
         this.viewmodel.rig.add(asset.scene);
-      }
-      if (this._laserAsset) {
-        attachments.push(this._laserAsset.scene);
-        this.viewmodel.rig.add(this._laserAsset.scene);
-      }
-      if (this._suppressorAsset) {
-        attachments.push(this._suppressorAsset.scene);
-        this.viewmodel.rig.add(this._suppressorAsset.scene);
       }
       if (this._laser) {
         visible.push([this._laser.mesh, this._laser.mesh.visible]);
@@ -2040,12 +1977,8 @@ export class WeaponSystem {
     this._viewmodel?.dispose();
     this._laser?.dispose();
     this._laser = null;
-    this._laserAsset?.dispose();
-    this._laserAsset = null;
-    this._suppressorAsset?.dispose();
-    this._suppressorAsset = null;
-    for (const asset of Object.values(this._optics)) asset.dispose();
-    this._optics = {};
+    for (const asset of Object.values(this._attachments)) asset.dispose();
+    this._attachments = {};
     this.mats?.dispose();
   }
   /* oxlint-enable typescript/no-unnecessary-condition */

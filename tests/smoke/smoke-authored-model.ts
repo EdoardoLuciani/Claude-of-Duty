@@ -15,7 +15,7 @@ import {
   makeLaserModel,
   makeSuppressorModel,
   mountAttachments,
-  releaseAttachmentMount,
+  releaseAttachmentMounts,
   isAttachmentConfig,
   type AttachmentConfig,
 } from '../../src/weapons/attachments.ts';
@@ -203,7 +203,7 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     // Mounting while the authored root is posed must not bake its current pose.
     root.rotation.x = i * 0.1;
     configureWeaponAttachments(entry, config, optics);
-    assert.equal(root.children.length, 5);
+    assert.equal(root.children.length, 4, 'empty slot groups stay detached');
     assert.equal(entry.attachmentGroup.parent, socket, 'instance follows its authored mount');
     assert.equal(irons.visible, config.ironSights);
     assert.equal(ironsRemoved.visible, !config.ironSights);
@@ -268,12 +268,8 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
       muzzleGroup: new THREE.Group(),
       muzzleSocket: null,
     });
-    const base = {
-      ...weapon.def,
-      suppressed: WEAPON_DEFS[id].suppressed ?? false,
-      attachments: laserConfig,
-    };
-    configureWeaponAttachments(weapon, laserConfig, optics, laser);
+    const base = { ...weapon.def, suppressed: WEAPON_DEFS[id].suppressed ?? false };
+    configureWeaponAttachments(weapon, laserConfig, { ...optics, laser });
     assert.deepEqual(weapon.def, base, `${id}: laser has no handling/ballistic modifiers`);
     assert.equal(weapon.railGroup.parent, railMount);
     assert(weapon.laserEmitter);
@@ -285,26 +281,26 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     if (WEAPON_DEFS[id].removableIrons) {
       const noIrons = { ...laserConfig, ironSights: false };
       assert(isAttachmentConfig(noIrons, id), 'laser selection is independent of irons');
-      configureWeaponAttachments(weapon, noIrons, optics, laser);
+      configureWeaponAttachments(weapon, noIrons, { ...optics, laser });
       assert(weapon.laserEmitter);
     }
-    configureWeaponAttachments(weapon, BASE_ATTACHMENTS, optics, laser);
+    configureWeaponAttachments(weapon, BASE_ATTACHMENTS, { ...optics, laser });
     assert.equal(weapon.laserEmitter, null);
     assert.equal(railMount.children.length, 0, `${id}: removal leaves no rail instance`);
   }
   for (let i = 0; i < 3; i++) {
-    const before = { ...entry.def, attachments: laserConfig };
-    configureWeaponAttachments(entry, laserConfig, optics, laser);
+    const before = { ...entry.def };
+    configureWeaponAttachments(entry, laserConfig, { ...optics, laser });
     assert.deepEqual(entry.def, before, 'rail module changes no weapon stats');
     assert.equal(entry.railGroup.parent, railMount);
     assert(entry.laserEmitter);
     assert.notEqual(entry.laserEmitter, emitter, 'instances borrow art, not transforms');
     const rail = entry.railGroup;
-    configureWeaponAttachments(entry, { ...laserConfig, optic: 'rmr' }, optics, laser);
+    configureWeaponAttachments(entry, { ...laserConfig, optic: 'rmr' }, { ...optics, laser });
     assert.equal(entry.attachmentGroup.parent, socket);
     assert.equal(entry.railGroup.parent, railMount, 'optic and rail have independent parents');
     assert.equal(rail.parent, null);
-    configureWeaponAttachments(entry, BASE_ATTACHMENTS, optics, laser);
+    configureWeaponAttachments(entry, BASE_ATTACHMENTS, { ...optics, laser });
     assert.equal(entry.laserEmitter, null);
     assert.equal(railMount.children.length, 0, 'removing the laser leaves no mounted mesh');
     const previousConfig = entry.attachments;
@@ -351,8 +347,7 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
       }),
     })
   );
-  const mounted = mountAttachments(mpx, laserConfig, {}, laser);
-  mounted.railParent.add(mounted.railGroup);
+  const mounted = mountAttachments(mpx, laserConfig, { laser });
   for (const yaw of [0, 0.3]) {
     nativeRoot.rotation.y = yaw;
     nativeScene.updateMatrixWorld(true);
@@ -372,7 +367,7 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
       'MPX attachment keeps its authored side seat'
     );
   }
-  releaseAttachmentMount(mounted.railGroup);
+  releaseAttachmentMounts(mounted);
   laser.dispose();
   configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, ironSights: false }, optics);
   assert.equal(entry.optic, null);
@@ -417,11 +412,10 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   const suppressed: AttachmentConfig = { ...BASE_ATTACHMENTS, muzzle: 'suppressor' };
   viewmodel.active = entry;
   for (let i = 0; i < 3; i++) {
-    configureWeaponAttachments(entry, suppressed, optics, null, can);
+    configureWeaponAttachments(entry, suppressed, { ...optics, suppressor: can });
     assert.equal(baseDevice.visible, false);
     assert.equal(entry.muzzleGroup.parent, muzzleMount);
-    assert.equal(entry.def.attachments, entry.attachments);
-    assert.equal(entry.def.suppressed, false, 'M4 suppression comes from config, not a fixed flag');
+    assert(entry.def.suppressed, 'a mounted can suppresses the effective definition');
     root.rotation.x += 0.1;
     muzzleMount.position.z -= 0.01;
     muzzleMount.updateWorldMatrix(true, false);
@@ -437,6 +431,7 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     assert.equal(installed.children.length, 0);
     assert.equal(muzzleMount.children.length, 0);
     assert.equal(entry.muzzleSocket, null);
+    assert.equal(entry.def.suppressed, false, 'removal restores the unsuppressed M4');
     assert(baseDevice.visible);
     assert(
       viewmodel
@@ -541,7 +536,10 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   assert(instanceSight.getWorldPosition(new THREE.Vector3()).distanceTo(liveSight) < 1e-10);
   const clone = weaponScene.clone(true);
   const clonedMount = clone.getObjectByName('MOUNT_optic');
-  assert(clonedMount?.getObjectByName('attachments'), 'inspection clone retains mount ancestry');
+  assert(
+    clonedMount?.getObjectByName('optic_attachment'),
+    'inspection clone retains mount ancestry'
+  );
   assert.notEqual(clonedMount, socket);
   configureWeaponAttachments(entry, BASE_ATTACHMENTS, optics);
   viewmodel.dispose();
