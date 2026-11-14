@@ -107,6 +107,7 @@ export const SOLDIER_STEP: AssetStep = {
 // Shared authoring sources outside a weapon's own tooling directory.
 const SHARED_TOOLS: Partial<Record<ModelId, string[]>> = {
   mcx: [
+    'tools/blender/suppressor/geometry.py',
     'src/weapons',
     'src/core/math.ts',
     'src/core/rng.ts',
@@ -131,6 +132,7 @@ const OPTIC_SOURCES = {
   acog: 'assets/weapons/mcx-virtus/mcx-virtus.blend',
 };
 const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
+  suppressor: ['tools/blender/suppressor'],
   acog: ['tools/blender/optics.py', OPTIC_SOURCES.acog],
   scope: ['tools/blender/scope'],
   rmr: ['tools/blender/rmr'],

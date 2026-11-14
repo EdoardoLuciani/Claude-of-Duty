@@ -14,10 +14,12 @@ import {
   isAttachmentConfig,
   loadOptic,
   loadLaser,
+  loadSuppressor,
   OPTIC_IDS,
   type AttachmentConfig,
   type OpticModels,
   type LaserModel,
+  type SuppressorModel,
 } from './attachments.ts';
 import { ProjectileSim, dropAt } from './ballistics.ts';
 import {
@@ -157,6 +159,7 @@ export class WeaponSystem {
   }
   private _optics: OpticModels = {};
   private _laserAsset: LaserModel | null = null;
+  private _suppressorAsset: SuppressorModel | null = null;
   private _laser: WeaponLaser | null = null;
   _restTask: Promise<void> | null = null;
   declare player: EngineSystems['player'] | null;
@@ -326,6 +329,13 @@ export class WeaponSystem {
       .catch((err: unknown): void => {
         console.error('[weapons] laser load failed', err);
       });
+    const suppressor = loadSuppressor(renderer)
+      .then((asset): void => {
+        this._suppressorAsset = asset;
+      })
+      .catch((err: unknown): void => {
+        console.error('[weapons] suppressor load failed', err);
+      });
     const optics = OPTIC_IDS.map(async (id): Promise<void> => {
       try {
         this._optics[id] = await loadOptic(renderer, id);
@@ -335,14 +345,15 @@ export class WeaponSystem {
     });
     try {
       const records = await Promise.all(spawn.map(load));
-      await Promise.all([...optics, laser]);
+      await Promise.all([...optics, laser, suppressor]);
       for (let i = 0; i < spawn.length; i++) {
         tris += this.viewmodel.addWeapon(
           records[i],
           this._requireState(spawn[i]).def,
           this._requireState(spawn[i]).attachments,
           this._optics,
-          this._laserAsset
+          this._laserAsset,
+          this._suppressorAsset
         ).tris;
       }
       this._restTask = (async (): Promise<void> => {
@@ -423,7 +434,13 @@ export class WeaponSystem {
     await this._restTask;
     const entry = this.viewmodel.weapons.get(id);
     if (!entry) throw new Error(`[weapons] inspection unavailable: ${id}`);
-    return createWeaponInspection(entry, config, this._optics, this._laserAsset);
+    return createWeaponInspection(
+      entry,
+      config,
+      this._optics,
+      this._laserAsset,
+      this._suppressorAsset
+    );
   }
 
   /** Synchronous, outside the frame loop; reject changes to unowned/unloaded guns. */
@@ -433,10 +450,17 @@ export class WeaponSystem {
     if (
       !entry ||
       (config.optic !== null && !this._optics[config.optic]) ||
-      (config.rail !== null && !this._laserAsset)
+      (config.rail !== null && !this._laserAsset) ||
+      (config.muzzle !== null && !this._suppressorAsset)
     )
       return false;
-    configureWeaponAttachments(entry, config, this._optics, this._laserAsset);
+    configureWeaponAttachments(
+      entry,
+      config,
+      this._optics,
+      this._laserAsset,
+      this._suppressorAsset
+    );
     this._requireState(id).attachments = entry.attachments;
     if (this.activeId === id) {
       this.viewmodel.reticle.visible = false;
@@ -452,7 +476,14 @@ export class WeaponSystem {
     if (state.attachments === BASE_ATTACHMENTS) return;
     state.attachments = BASE_ATTACHMENTS;
     const entry = this._viewmodel?.weapons.get(id);
-    if (entry) configureWeaponAttachments(entry, BASE_ATTACHMENTS, this._optics, this._laserAsset);
+    if (entry)
+      configureWeaponAttachments(
+        entry,
+        BASE_ATTACHMENTS,
+        this._optics,
+        this._laserAsset,
+        this._suppressorAsset
+      );
     if (id === this.activeId && this._laser) this._laser.mesh.visible = false;
   }
 
@@ -484,7 +515,8 @@ export class WeaponSystem {
         this._requireState(ids[i]).def,
         this._requireState(ids[i]).attachments,
         this._optics,
-        this._laserAsset
+        this._laserAsset,
+        this._suppressorAsset
       ).tris;
     }
     this.stats.tris += tris;
@@ -518,14 +550,22 @@ export class WeaponSystem {
         attachments.push(this._laserAsset.scene);
         this.viewmodel.rig.add(this._laserAsset.scene);
       }
+      if (this._suppressorAsset) {
+        attachments.push(this._suppressorAsset.scene);
+        this.viewmodel.rig.add(this._suppressorAsset.scene);
+      }
       if (this._laser) {
         visible.push([this._laser.mesh, this._laser.mesh.visible]);
         this._laser.mesh.visible = true;
       }
-      // Both iron-sight states of every removable assembly must be warm.
+      // Both removable iron/muzzle states must be warm before runtime swaps.
       for (const w of this.viewmodel.weapons.values()) {
         const irons = ironSightNodes(w.model);
-        for (const node of irons ? [irons.installed, irons.removed] : []) {
+        for (const node of [
+          ...(irons ? [irons.installed, irons.removed] : []),
+          w.model.root.getObjectByName('MUZZLE_device'),
+          w.model.root.getObjectByName('MUZZLE_device_removed'),
+        ]) {
           if (!node) continue;
           visible.push([node, node.visible]);
           node.visible = true;
@@ -2002,6 +2042,8 @@ export class WeaponSystem {
     this._laser = null;
     this._laserAsset?.dispose();
     this._laserAsset = null;
+    this._suppressorAsset?.dispose();
+    this._suppressorAsset = null;
     for (const asset of Object.values(this._optics)) asset.dispose();
     this._optics = {};
     this.mats?.dispose();

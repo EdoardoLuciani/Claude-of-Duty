@@ -998,7 +998,12 @@ export class AudioSystem {
       return;
     }
 
-    const profile = resolveProfile(name, typeof w === 'object' && w !== null && !!w.suppressed);
+    const profile = resolveProfile(
+      name,
+      typeof w === 'object' &&
+        w !== null &&
+        (w.attachments?.muzzle === 'suppressor' || !!w.suppressed)
+    );
     if (!profile) return;
 
     const o = p.origin;

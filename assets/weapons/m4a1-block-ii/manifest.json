@@ -147,11 +147,11 @@
     }
   },
   "stats": {
-    "triangles": 91929,
-    "primitives": 20,
+    "triangles": 92697,
+    "primitives": 22,
     "materials": 1,
-    "meshes": 18,
-    "bytes": 10008440,
+    "meshes": 20,
+    "bytes": 10065636,
     "images": 4
   },
   "textureResolution": 1024,
