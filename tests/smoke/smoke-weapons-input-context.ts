@@ -204,7 +204,6 @@ for (const [equip, first, second] of [
   const irons = Object.assign(new THREE.Object3D(), { name: 'IRON_sights' });
   scene.add(
     irons,
-    Object.assign(new THREE.Object3D(), { name: 'GASBLOCK_low' }),
     Object.assign(new THREE.Object3D(), { name: 'MUZZLE_device' }),
     Object.assign(new THREE.Object3D(), { name: 'MOUNT_optic' })
   );
