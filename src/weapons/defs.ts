@@ -82,9 +82,9 @@ export interface WeaponDef {
     rail?: Partial<Record<RailId, Record<string, never>>>;
     muzzle?: Partial<Record<MuzzleId, Record<string, never>>>;
   };
-  /** Authored `IRON_sights` can be removed (an optional `IRON_sights_removed` part replaces
-   * it); `opticClashes` lists optics that only fit with the irons removed. */
-  removableIrons?: { opticClashes: readonly OpticId[] };
+  /** Authored `IRON_sights` are hidden whenever an optic is mounted (an optional
+   * `IRON_sights_removed` part replaces them); unset keeps fixed irons under an optic. */
+  removableIrons?: true;
   sprintPos: TuningVector;
   sprintRot: TuningVector;
   lowReadyPos: TuningVector;
@@ -157,7 +157,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
       muzzle: { suppressor: {} },
       rail: { laser: {} },
     },
-    removableIrons: { opticClashes: ['scope'] }, // PM II ocular crosses the deployed rear leaf.
+    removableIrons: true,
     sprintPos: [0.09, -0.275, -0.275],
     sprintRot: [-0.4, 0.6, 0.2],
     lowReadyPos: [0.112, -0.29, -0.289],
@@ -234,7 +234,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
       optic: { rmr: { eyeRelief: 0.125 }, acog: { eyeRelief: 0.11 }, scope: { eyeRelief: 0.09 } },
       rail: { laser: {} },
     },
-    removableIrons: { opticClashes: ['scope'] }, // PM II crosses the A2 tower and rear aperture
+    removableIrons: true,
     /* Sprint: gun dropped and angled across the body, muzzle down-left.
      * Carried over by the same delta as the hip pose so the blend does not
      * translate the weapon 90 mm sideways on the way into a sprint. */
@@ -307,7 +307,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
       muzzle: { suppressor: {} },
       rail: { laser: {} },
     },
-    removableIrons: { opticClashes: ['scope'] },
+    removableIrons: true,
     sprintPos: [0.088, -0.24, -0.262],
     sprintRot: [-0.38, 0.58, 0.19],
     lowReadyPos: [0.108, -0.252, -0.276],
@@ -377,7 +377,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
       optic: { rmr: { eyeRelief: 0.125 }, acog: { eyeRelief: 0.11 }, scope: { eyeRelief: 0.09 } },
       rail: { laser: {} },
     },
-    removableIrons: { opticClashes: ['scope'] }, // PM II crosses the front iron assembly.
+    removableIrons: true,
     sprintPos: [0.09, -0.29, -0.285],
     sprintRot: [-0.42, 0.62, 0.22],
     lowReadyPos: [0.108, -0.305, -0.295],
@@ -579,7 +579,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
       optic: { rmr: { eyeRelief: 0.125 }, acog: { eyeRelief: 0.11 }, scope: { eyeRelief: 0.09 } },
       rail: { laser: {} },
     },
-    removableIrons: { opticClashes: ['scope'] }, // PM II ocular crosses the rear aperture
+    removableIrons: true,
     sprintPos: [0.088, -0.31, -0.3],
     sprintRot: [-0.46, 0.66, 0.22],
     lowReadyPos: [0.11, -0.32, -0.31],

@@ -380,20 +380,18 @@ check authored data against that schema rather than inferring its contract from
 current values. Keep internal state keyed by `WeaponId`; narrow DOM/URL/debug
 strings with `isWeaponId` at entry. Authored models carry literal adapter IDs,
 and the loader table checks complete ID coverage and per-ID adapter returns.
-`WeaponState.attachments` is an immutable `{ optic, ironSights, muzzle, rail }` snapshot;
-null slots retain the authored iron-sight base weapon. `src/weapons/attachments.ts` owns
+`WeaponState.attachments` is an immutable `{ optic, muzzle, rail }` snapshot; null slots
+retain the authored base weapon, and `optic: null` aims through its iron sights. `src/weapons/attachments.ts` owns
 the finite catalog (`rmr | acog | scope` optics, TOR Mini `laser`, M4/MCX/MPX `suppressor`),
 boundary validation, asset loading and the common gameplay/inspection mount solver.
 No attachment economy yet.
 `WeaponDef.fits` has one shape per slot: a partial record keyed by attachment id whose
 entry enables that verified fit and holds its data (`fits.optic[id].eyeRelief`; rail and
 muzzle entries are empty). `isAttachmentConfig()` is the single compatibility rule for
-gameplay, URL/debug input and capture tooling. `ironSights` is an independent boolean,
-installed by default; `WeaponDef.removableIrons` hides `IRON_sights` and shows an optional
-`IRON_sights_removed` part, and its `opticClashes` lists optics that only fit with the
-irons removed. Incompatible combinations are rejected, never silently changed. Removing an
-optic does not reinstall removed irons; `BASE_ATTACHMENTS` restores both. With neither
-optic nor irons, ADS retains the base aim datum without a reticle.
+gameplay, URL/debug input and capture tooling; unverified fits are rejected, never silently
+changed. Irons are not a separate choice: with `WeaponDef.removableIrons`, any mounted optic
+hides `IRON_sights` and shows an optional `IRON_sights_removed` part, and removing the optic
+restores them. Weapons without it keep fixed irons, which every fitted optic must clear.
 
 `loadAttachments()` returns one `AttachmentAssets` record keyed by attachment id; a failed
 load only leaves that id absent (unavailable), never blocks the base weapons. The weapon
@@ -428,9 +426,8 @@ Blender sources are under `tools/blender/` (`rmr/`, `acog/`, `scope/`, `suppress
 
 Debug URL input is narrowed in `main.ts`: `attachmentWeapon` (default M4) must pass
 `isWeaponId` plus compatibility/ownership checks; `attachmentOptic=rmr|acog|scope|none`,
-`attachmentIrons=installed|removed`, `attachmentRail=laser|none` and
-`attachmentMuzzle=suppressor|none` select each slot independently (PM II on the M4 requires
-`attachmentIrons=removed`). `tools/capture.ts` uses the same validator.
+`attachmentRail=laser|none` and `attachmentMuzzle=suppressor|none` select each slot
+independently. `tools/capture.ts` uses the same validator.
 Weapons own one retained world mesh for the green beam and surface dot (one draw,
 no light/decal, no per-frame allocation); boot warms it even with no module mounted.
 Two pooled `MASK.BULLET` queries find the unspread, zeroed muzzle aim and clip the

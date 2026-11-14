@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import { bindingLabel } from '../../src/core/bindings.ts';
 import { Input } from '../../src/core/input.ts';
@@ -16,7 +17,7 @@ import { Movement } from '../../src/player/movement.ts';
 import type { RadioSystem } from '../../src/radio/index.ts';
 import type { UiSystem } from '../../src/ui/index.ts';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
-import { BASE_ATTACHMENTS } from '../../src/weapons/attachments.ts';
+import { BASE_ATTACHMENTS, makeOpticModel } from '../../src/weapons/attachments.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { Clip } from '../../src/weapons/clips.ts';
 import { WEAPON_IDS } from '../../src/weapons/defs.ts';
@@ -204,8 +205,14 @@ for (const [equip, first, second] of [
   scene.add(
     irons,
     Object.assign(new THREE.Object3D(), { name: 'GASBLOCK_low' }),
-    Object.assign(new THREE.Object3D(), { name: 'MUZZLE_device' })
+    Object.assign(new THREE.Object3D(), { name: 'MUZZLE_device' }),
+    Object.assign(new THREE.Object3D(), { name: 'MOUNT_optic' })
   );
+  const opticScene = new THREE.Group();
+  for (const name of ['MOUNT_base', 'SOCKET_sight'])
+    opticScene.add(Object.assign(new THREE.Object3D(), { name }));
+  const rmr = makeOpticModel(fixture<GLTF>({ scene: opticScene }), 'rmr');
+  Object.assign(wp, { _attachments: { rmr } });
   Object.assign(wp.viewmodel, {
     reticle: new THREE.Object3D(),
     scopeOverlay: new THREE.Object3D(),
@@ -217,6 +224,7 @@ for (const [equip, first, second] of [
       id: 'rifle',
       scene,
       root: scene,
+      opticMountRest: new THREE.Matrix4(),
       nodes: fixture<RifleModel['nodes']>({ sight: [0, 0.14, 0.03], muzzle: [0, 0.07, -0.5] }),
     }),
     def: weaponState(wp, 'rifle').def,
@@ -229,8 +237,8 @@ for (const [equip, first, second] of [
   });
   for (const drop of [(): boolean => wp.equipPrimary('lmg'), (): void => wp.resetForNewGame()]) {
     wp.resetForNewGame();
-    assert(wp.setAttachments('rifle', { ...BASE_ATTACHMENTS, ironSights: false }));
-    assert(!irons.visible);
+    assert(wp.setAttachments('rifle', { ...BASE_ATTACHMENTS, optic: 'rmr' }));
+    assert(!irons.visible, 'a mounted optic replaces the removable irons');
     drop();
     assert.equal(weaponState(wp, 'rifle').attachments, BASE_ATTACHMENTS);
     assert(irons.visible, 'the mounted build is reset, not only the stored config');
