@@ -193,16 +193,35 @@ def build(output, render=False, quick=False):
         box('Cap fluting',(.0142*math.cos(a),.0348+.0142*math.sin(a),muzzle_z+.046),(.001,.001,.010),steel,bevel=.0001)
     box('Barrel lug',(0,.052,muzzle_z+.100),(.020,.030,.024),bevel=.002)
     cyl('Barrel lug screw',(0,.052,muzzle_z+.100),.003,.025,steel,axis='X')
-    # Factory ghost ring at receiver rear, ramp-mounted post near the muzzle.
-    rear_foot=profile('Ghost ring foot',smooth_rows([(-.122,.084),(-.047,.084),(-.047,.088),(-.057,.091),(-.080,.0905),(-.107,.0895),(-.121,.088)],True),.020,bevel=.0004)
-    # Owner 02:30 / 03:21 and companion 00:36 show a shallow bed and toe head.
-    # Relief widths/depths are visual estimates, not adjustment/manufacturing data.
-    cut(rear_foot,profile('CUT rear sight bed',[(-.108,.0887),(-.073,.0897),(-.073,.100),(-.108,.100)],.011,None,None,.0003),True)
-    cut(rear_foot,cyl('CUT rear sight toe recess',(0,.090,-.115),.0034,.0036,None,None,'Y',32,0))
-    cyl('Rear sight toe mounting head',(0,.0884,-.115),.0026,.0007,steel,axis='Y')
-    ghost=tube('Ghost ring aperture',(0,.096,-.058),.0075,.0048,.0055,axis='Z')
-    # Side silhouettes are protective ears; neither their crest nor the photo crest defines the sightline.
-    for x in (-.010,.010):profile('Rear sight protective ear',smooth_rows([(-.115,.087),(-.050,.087),(-.047,.099),(-.047,.107),(-.050,.110),(-.057,.109),(-.064,.104),(-.068,.097),(-.087,.093),(-.110,.091)],True),.0025,x=x,bevel=.0004)
+    # AIMPRO-style integrated rail/rear sight, not a bridge over the factory ring.
+    # Reference: jerkingthetrigger.com/2013/10/29/aimpro-tactical-ghost-ring-rail/
+    # Published 4-inch/eight-slot section; local profiles and screw stations are
+    # photo-derived game art, not an AIMPRO CAD or original-SKU factory certificate.
+    rail_front=-.190;rail_rear=rail_front+.1016;rail_middle=(rail_front+rail_rear)/2
+    rail_pitch=.010008;rail_top=.091;base_top=.0865
+    base_rings=[]
+    for z in (rail_front,-.040):
+        bottom=[(x,seat.ray_cast(Vector((x,.100,z)),Vector((0,-1,0)),.03)[0].y-.00005,z) for x in (-.0105,0,.0105)]
+        base_rings.append(bottom+[(x,base_top,z) for x,_,_ in reversed(bottom)])
+    rail_base=loft('Optic rail receiver base',base_rings,receiver_finish,bevel=.0001,rounded=False)
+    section=[(-.0078,base_top),(.0078,base_top),(.0106,.0886),(.0106,rail_top),(-.0106,rail_top),(-.0106,.0886)]
+    for i in range(9):  # Nine teeth bound eight cross slots.
+        z=rail_middle+(i-4)*rail_pitch
+        loft('Optic Picatinny lug',[[(x,y,z+s*.002388) for x,y in section] for s in (-1,1)],receiver_finish,bevel=.00010,rounded=False)
+    for z in (-.174,-.144,-.104,-.075):
+        cut(rail_base,cyl('CUT rail screw pocket',(0,.086,z),.0028,.008,None,None,'Y',12,0))
+        cut(receiver,cyl('CUT receiver tapped seat',(0,.084,z),.0015,.004,None,None,'Y',12,0))
+        head=cyl('Optic rail mounting screw',(0,.0857,z),.0026,.0016,steel,axis='Y',sides=16,bevel=.0001)
+        head.modifiers['Selective edge radius'].segments=1
+        cyl('Optic rail screw shank',(0,.0835,z),.0014,.003,steel,axis='Y',sides=8,bevel=0)
+        cut(head,box('CUT rail screw drive',(0,.0865,z),(.0036,.0006,.00065),None,None,0))
+    rail_base.modifiers['Selective edge radius'].segments=1
+    box('Ghost ring pedestal',(0,.0877,-.058),(.012,.0024,.026),steel,bevel=.0004)
+    tube('Ghost ring aperture',(0,.096,-.058),.0075,.0048,.0055,axis='Z')
+    cyl('Rear sight elevation head',(0,.089,-.067),.0026,.0012,steel,axis='Y',sides=24)
+    cyl('Rear sight windage head',(.0063,.0885,-.058),.0015,.001,steel,axis='X',sides=24)
+    for x in (-.010,.010):
+        profile('Rear sight protective ear',[(-.079,base_top),(-.079,.094),(-.064,.104),(-.060,.106),(-.045,.106),(-.040,.101),(-.040,base_top)],.0025,steel,x=x,bevel=.0004)
     # Connected low skirts/base from owner 08:20-25, retaining both protective
     # cheeks and the central blade. Exact transverse spacing remains inferred.
     front_base=profile('Front sight pedestal',[(muzzle_z+.060,.080),(muzzle_z+.009,.080),(muzzle_z+.010,.084),(muzzle_z+.027,.084),(muzzle_z+.029,.090),(muzzle_z+.039,.090)],.019,bevel=.0005)
@@ -212,44 +231,33 @@ def build(output, render=False, quick=False):
         active(front_base);m=front_base.modifiers.new('Connected protective shroud','BOOLEAN');m.object=cheek;m.operation='UNION'
         while list(front_base.modifiers).index(m)>0:bpy.ops.object.modifier_move_up(modifier=m.name)
         bpy.ops.object.modifier_apply(modifier=m.name);bpy.data.objects.remove(cheek,do_unlink=True)
-    # See-through receiver rail: the fixed ghost ring and its bore stay below
-    # the bridge. Forward paired feet seat on the receiver, never on the pump.
-    # The long top supports both PM II ring stations without a floating clamp.
-    for x in (-.0115,.0115):
-        for z in (-.176,-.135):
-            rings=[]
-            for end in (z-.005,z+.005):
-                bottom=[(px,seat.ray_cast(Vector((px,.100,end)),Vector((0,-1,0)),.030)[0].y-.00005,end) for px in [x-.0025+i*.0005 for i in range(11)]]
-                rings.append(bottom+[(px,.112,end) for px,_,_ in reversed(bottom)])
-            loft('Optic rail receiver foot',rings,receiver_finish,bevel=.0001,rounded=False)
-    box('Optic rail bridge',(0,.1135,-.140),(.021,.003,.190),receiver_finish,bevel=.0003)
-    for i in range(18):
-        z=-.04905-i*.0107
-        section=[(-.008,.115),(.008,.115),(.0105,.117),(.0105,.118),(-.0105,.118),(-.0105,.117)]
-        loft('Optic Picatinny lug',[[(x,y,z+s*.0025) for x,y in section] for s in (-1,1)],receiver_finish,bevel=.00015,rounded=False)
+    laser_z=-.575  # Full fixture clears the cap fluting, ahead of pump travel.
     mounts={
-        'optic':{'pos':[0,.118,-.140],'rot':[0,0,0],'parent':'receiver'},
+        'optic':{'pos':[0,rail_top,rail_middle+rail_pitch/2],'rot':[0,0,0],'parent':'receiver'},
         'muzzle':{'pos':[0,.068,muzzle_z-.012],'rot':[0,0,0],'parent':'receiver'},
-        'rail':{'pos':[0,.009,-.590],'rot':[0,0,0],'parent':'receiver'},
+        'rail':{'pos':[0,.009,laser_z],'rot':[0,0,0],'parent':'receiver'},
     }
     for name,data in mounts.items():
         mount=empty('MOUNT_'+name,data['pos'],body)
         mount.rotation_euler=(C@Matrix.Rotation(data['rot'][2],3,'Z')@C.inverted()).to_euler()
     # Fixed magazine-tube clamps, ahead of the pump and behind the clean-out
     # cap. The short underside rail never follows the moving forend.
-    for z in (-.580,-.605):
+    # Keep the rear clamp just forward of the barrel lug as well.
+    for z in (laser_z+.003,laser_z-.015):
         tube('Laser rail tube clamp',(0,.0348,z),.016,.01295,.008,steel,sides=24)
         cyl('Laser rail clamp screw',(.015,.0348,z),.002,.004,steel,axis='X',sides=24)
-    box('Laser rail adapter web',(0,.0165,-.590),(.014,.009,.055),steel)
+    box('Laser rail adapter web',(0,.0165,laser_z),(.014,.009,.055),steel)
     for i in range(5):
-        box('Laser rail adapter tooth',(0,.011,-.610+i*.010),(.020,.004,.0052),steel,bevel=.0003)
+        box('Laser rail adapter tooth',(0,.011,laser_z-.020+i*.010),(.020,.004,.0052),steel,bevel=.0003)
     # Fixed conventional stock, neck/comb/toe loft; no pistol grip or adjustable tube.
     guard=profile('Metal trigger guard',smooth_rows([(-.050,.022),(-.027,.022),(.014,.022),(.023,.017),(.025,.006),(.022,-.005),(.014,-.012),(-.005,-.016),(-.022,-.015),(-.035,-.011),(-.042,-.003),(-.044,.005)],True),.010,bevel=.0006)
     cut(guard,profile('CUT trigger window',smooth_rows([(-.040,.018),(-.022,.019),(.011,.019),(.018,.015),(.019,.006),(.016,-.003),(.009,-.009),(-.005,-.0125),(-.021,-.0115),(-.030,-.008),(-.036,-.002),(-.039,.005)],True),.028,None,None,0),True)
     profile('Curved trigger',smooth_rows([(-.002,.022),(-.005,.017),(-.006,.010),(-.008,.005),(-.012,.001),(-.015,-.0005),(-.012,.000),(-.009,.0015),(-.005,.005),(-.003,.011),(.001,.022)],True),.0045,wear,trigger,.00015)
     stock_rings=[]
     # Explicit crest, shallow comb valley and narrower wrist termination, traced from the unwarped photo.
-    stock_profile=[(.025,.076,.022,.040),(.042,.065,.005,.032),(.057,.053,-.021,.033),(.068,.044,-.040,.034),(.081,.0365,-.0361,.035),(.094,.038,-.0322,.037),(.108,.041,-.028,.039),(.126,.039,-.028,.043),(.180,.035,-.046,.046),(.240,.031,-.072,.047),(.310,.027,-.103,.048)]
+    # 0.10 mm inward lower-wrist relief removes the coarse-glove neck contact;
+    # shared hands/calibration stay unchanged, with no tessellation exemption.
+    stock_profile=[(.025,.076,.022,.040),(.042,.065,.005,.032),(.057,.053,-.021,.033),(.068,.044,-.040,.034),(.081,.0365,-.0360,.035),(.094,.038,-.0321,.037),(.108,.041,-.028,.039),(.126,.039,-.028,.043),(.180,.035,-.046,.046),(.240,.031,-.072,.047),(.310,.027,-.103,.048)]
     # First ring follows the actual receiver polygon AND its angled mating plane.
     # Preserve its corners; do not bridge the old gap with an added filler or stock offset.
     seam_ring=[]
@@ -464,7 +472,7 @@ def build(output, render=False, quick=False):
     vertices=[C.inverted().to_4x4()@rig.matrix_world.inverted()@o.matrix_world@v.co for o in asset.objects if o.type=='MESH' and o.parent!=shell for v in o.data.vertices]
     bounds=[[min(v[i] for v in vertices) for i in range(3)],[max(v[i] for v in vertices) for i in range(3)]]
     ref=json.loads((ROOT/'assets/weapons/m590/hand-reference.json').read_text())
-    manifest={'asset':'Mossberg 590A1 Tactical SKU50774 (2016) / 18.5-inch / 6+1 / ghost ring / fixed synthetic stock / tri-rail',
+    manifest={'asset':'Mossberg 590A1 Tactical SKU50774 base / 18.5-inch / 6+1 / AIMPRO-style integrated sight rail / fixed synthetic stock / tri-rail',
         'status':'Provisional runtime review prototype; strict 1:1 and final human visual/gameplay approval pending',
         'units':'metres','blenderForward':'+Y','blenderUp':'+Z','runtimeBasis':'-Z forward / +Y up / +X right; no adapter basis transform',
         'source':'tools/blender/m590/build.py + tools/blender/m590/ + tools/blender/m590/actions.py + tools/blender/m590/hand-reference.ts','stats':stats,'clips':clips,

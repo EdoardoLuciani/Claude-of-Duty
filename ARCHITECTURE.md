@@ -426,9 +426,11 @@ even when the initial M4 uses irons. Debug URL input is narrowed in `main.ts`:
 `attachmentIrons=installed|removed` selects irons independently; PM II requires
 `?attachmentOptic=scope&attachmentIrons=removed`. `attachmentWeapon` must pass
 `isWeaponId` and compatibility/ownership checks.
-`attachmentRail=laser|none` selects the TOR Mini on M4, P320, EVOLYS, AX338, MPX and MCX.
-Issue #686 targets all seven, but M590 remains disabled pending authorized shared-arm
-input resolution and its full authoring gates. MCX uses an upper-right chamfer-mounted
+`attachmentRail=laser|none` selects the TOR Mini on all seven weapons.
+M590's lower-stock wrist relief removes its former glove contact; the complete
+source gate now requires zero firing-skin crossings, with no pinned-file contact
+exception. Its AIMPRO-style low integrated rear-sight rail supports RMR/ACOG,
+not the PM II's wider ring spacing, and leaves the fixed-tube laser seat independent. MCX uses an upper-right chamfer-mounted
 adapter, fitted draw fingers and a lowered post-charge hand return; actual runtime
 skins were checked across complete sampled clips/transitions, not only snapshots.
 The authored

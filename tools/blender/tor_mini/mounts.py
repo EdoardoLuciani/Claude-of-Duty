@@ -64,7 +64,7 @@ def check_laser_mount(weapon):
     hardware_sources = []
     if weapon == 'evolys':
         hardware_sources = [(bpy.data.objects['handguard_mesh'], 'LASER_mount_hardware')]
-    elif weapon in ('mpx','mcx'):
+    elif weapon in ('mpx','mcx','m590'):
         hardware_sources = [(o, None) for o in weapon_meshes if o.name.startswith('Laser rail ')]
         assert hardware_sources, (weapon, 'missing laser support hardware')
     hardware_vertices, hardware_faces = [], []
@@ -99,6 +99,8 @@ def check_laser_mount(weapon):
     optic_objects = []
     if weapon not in ('mcx', 'mpx'):
         for optic, folder in (('rmr', 'trijicon-rmr'), ('acog', 'trijicon-acog'), ('scope', 'schmidt-bender-pm-ii')):
+            if weapon == 'm590' and optic == 'scope':
+                continue  # Its compact integrated rail does not support both PM II rings.
             source_path = ROOT / 'assets/attachments' / folder / (optic + '.blend')
             assert source_path.exists(), f'Build shared optic first: {source_path}'
             with bpy.data.libraries.load(str(source_path), link=False) as (source, target):

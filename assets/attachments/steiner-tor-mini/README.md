@@ -78,13 +78,13 @@ contains no camera-aim or bullet-zero assumption.
 
 ## Weapon mounting (#686)
 
-**Partial implementation:** the target is all seven weapons, but runtime laser
-compatibility is enabled for M4, P320, EVOLYS, AX338, MPX and MCX. M590
-hardware/checks remain staged, with no `fits.rail.laser` entry, so API/debug/capture
-configuration rejects its `rail: 'laser'`. M590 requires authorized shared-arm
-input resolution and a complete authoring check pass. MPX's corrected four-tooth
-adapter and attachment-frame conversion pass native and sampled runtime-hand
-checks; MCX also has full sampled runtime-hand evidence rather than only snapshots.
+Runtime laser compatibility is enabled for **all seven weapons** through
+`fits.rail.laser`. M590 now passes the complete authoring gates with strict
+zero-crossing firing-hand checks, not a repinned shared-arm exception. Its compact
+integrated-sight top rail supports RMR/ACOG, not PM II; the separate underside
+laser seat is independent. MPX's corrected adapter/frame and MCX's fitted hand
+motion also have complete sampled native/runtime evidence rather than snapshots.
+Finite sampling and remaining cross-feature/browser acceptance limits still apply.
 
 The module is optional and independent of optics/irons. `rail: null` removes it;
 removing an optic does not remove the laser. No statistics, AI perception, beam
@@ -101,7 +101,7 @@ body outward. These are authored game-fit adaptations, not certified hardware.
 | M4A1 | Enabled | `[.0285, .075, −.250]` | Existing right RIS II rail; fit unchanged |
 | P320 | Enabled | `[0, .002, −.122]` | Frame bone, not slide; integral game-fit rail extended 14 mm with fifth slot |
 | EVOLYS | Enabled | `[0, .0165924, −.363725]` | Handguard; direct reference-backed underside Picatinny rail, no side bracket |
-| M590 | Staged / disabled | `[0, .009, −.590]` | Receiver; two fixed magazine-tube clamps ahead of the entire pump stroke |
+| M590 | Enabled | `[0, .009, −.575]` | Receiver; two fixed magazine-tube clamps ahead of the entire pump stroke, clear of cap fluting/barrel lug |
 | AX338 | Enabled | `[.038, .075, −.455]` | Fixed right KeySlot/Picatinny adapter, ahead of hand/bolt/folding stock |
 | MCX VIRTUS | Enabled | `[.03064, .10247, −.361]` | Receiver; upper-right chamfer adapter, integrated ACOG/SRD762Ti retained |
 | SIG MPX | Enabled | `[.037, 0, −.295]` | Receiver; four-tooth right adapter, two anchors in the last M-LOK slot, ROMEO4T/SRD9 retained |
@@ -134,9 +134,14 @@ against the real adapter and cooked laser plus the hand/emitter corridor. Fitted
 draw fingers and a lowered post-charge return resolve the motion crossings. See the
 [MCX receipt and limits](../../weapons/mcx-virtus/README.md#tor-mini-rail-686).
 Sampling is not continuous-clearance or human visual certification. M590's
-historical shared-arm hash certificate remains unresolved (see its asset README).
-Its full check stops before mount/optic gates; the independent laser-only sweep
-does not establish those later gates or justify enabling compatibility:
+0.10 mm lower-wrist relief removes the former coarse-glove contact; its old
+file/topology-pinned exception is retired in favor of strict zero crossings.
+Its full source check now reaches and passes mechanism, hand, RMR/ACOG and TOR
+checks across 739 poses. Native-WebGPU sampling adds 10,194 actual runtime poses
+across irons/RMR/ACOG, against hardware/module/emitter, the native/cooked relieved
+stock neck and top rail/sight, and the selected optic.
+See the [M590 contract and reference](../../weapons/m590/README.md).
+The isolated sweep remains available for diagnostics, not a substitute for full checks:
 
 
 ```sh

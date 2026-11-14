@@ -505,10 +505,11 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     hipRot: [-0.05, 0.078, -0.125],
     adsCant: [0, 0, 0.003],
     eyeRelief: 0.28,
-    // Shared optics sit above the fixed ghost ring on the see-through receiver rail.
-    // No laser fit: full authoring gates await authorized shared-arm input resolution.
+    // Low integrated-sight rail: RMR/ACOG only; PM II's two rings exceed its span.
+    // The optional TOR Mini stays on the fixed forward magazine-tube clamps.
     fits: {
-      optic: { rmr: { eyeRelief: 0.12 }, acog: { eyeRelief: 0.1 }, scope: { eyeRelief: 0.085 } },
+      optic: { rmr: { eyeRelief: 0.12 }, acog: { eyeRelief: 0.1 } },
+      rail: { laser: {} },
     },
     sprintPos: [0.09, -0.27, -0.28],
     sprintRot: [-0.42, 0.58, 0.2],

@@ -1,8 +1,8 @@
 """Checks actual shared optic meshes, not proxy attachment envelopes.
 
 Suppressor remains a future datum; the TOR Mini has separate sampled checks.
-Optic clamps intentionally seat over the rail teeth. The bridge, receiver
-supports and all other weapon/hand surfaces remain strict collision checks.
+Optic clamps intentionally seat over the rail teeth. The receiver-hugging base,
+integrated rear sight and all other weapon/hand surfaces remain strict for optics.
 """
 import math
 import bpy
@@ -25,29 +25,60 @@ def check_mounts(root, manifest, rig, meshes, review, pose, tree, point, basis):
         assert (mount.scale - Vector((1, 1, 1))).length < 1e-7
     rail = [o for o in meshes if o.name.startswith(('Optic rail', 'Optic Picatinny'))]
     adapter = [o for o in meshes if o.name.startswith('12g adapter')]
-    assert len(adapter) == 2 and len(rail) == 23
-    additions = tree(rail + adapter)
-    fixed = [o for o in meshes if o.parent.name == 'receiver' and o not in rail + adapter]
-    feet = [o for o in rail if o.name.startswith('Optic rail receiver foot')]
+    assert len(adapter) == 2
+    laser_hardware = [o for o in meshes if o.name.startswith('Laser rail ')]
+    assert laser_hardware and all(o.parent.name == 'receiver' for o in laser_hardware)
+    additions = tree(rail + adapter + laser_hardware + [o for o in meshes if o.name.startswith(('Ghost ring', 'Rear sight'))])
+    fixed = [o for o in meshes if o.parent.name == 'receiver' and o not in rail + adapter + laser_hardware]
+    tube = tree([o for o in fixed if o.name == 'Magazine tube'])
+    clamp_parts = [o for o in laser_hardware if o.name.startswith('Laser rail tube clamp')]
+    assert len(clamp_parts) == 2
+    clamps = tree(clamp_parts)
+    web = tree([o for o in laser_hardware if o.name == 'Laser rail adapter web'])
+    assert not tree(laser_hardware).overlap(tree([o for o in fixed if o.name != 'Magazine tube'])), 'tube rail crosses non-seating weapon surfaces'
+    for z in (point(o).z for o in clamp_parts):
+        centre = Vector((0, .0348, z))
+        for direction in (Vector((1,0,0)), Vector((-1,0,0)), Vector((0,1,0)), Vector((0,-1,0))):
+            inner = clamps.ray_cast(centre, direction, .03)[0]
+            outer = tube.ray_cast(centre + direction * .02, -direction, .02)[0]
+            assert inner is not None and outer is not None, 'missing tube/clamp seating surface'
+            assert -.00010 < (inner - outer).dot(direction) < .00002, 'tube clamp not seated'
+        bottom = clamps.ray_cast(Vector((0,0,z)), Vector((0,1,0)), .03)[0]
+        upper = web.ray_cast(centre, Vector((0,-1,0)), .03)[0]
+        lower = web.ray_cast(Vector((0,0,z)), Vector((0,1,0)), .03)[0]
+        assert bottom is not None and upper is not None and lower is not None
+        assert lower.y < bottom.y < upper.y, 'rail web unsupported by tube clamp'
+    print('M590_LASER_SUPPORT_OK: two fixed tube clamps; eight radial seating rays; web supported at both clamps')
+    base = [o for o in rail if o.name == 'Optic rail receiver base']
+    fasteners = [o for o in rail if o.name.startswith(('Optic rail mounting screw', 'Optic rail screw shank'))]
     seating_teeth = [o for o in rail if o.name.startswith('Optic Picatinny lug')]
-    assert not tree([o for o in rail if o not in feet]).overlap(tree(fixed)), 'optic bridge crosses fixed weapon/irons'
+    rear_sight = [o for o in fixed if o.name.startswith(('Ghost ring', 'Rear sight'))]
+    assert len(base) == 1 and len(fasteners) == 8 and len(seating_teeth) == 9, 'integrated eight-slot rail hardware'
+    assert not tree(seating_teeth).overlap(tree(fixed)), 'rail teeth cross fixed weapon/irons'
     barrel = [o for o in fixed if o.name.startswith(('Heavy barrel', 'Barrel crown'))]
     assert not tree(adapter).overlap(tree([o for o in fixed if o not in barrel])), 'adapter crosses non-seating surfaces'
     receiver = [o for o in fixed if o.name.startswith('590A1 receiver forging')]
-    assert not tree(feet).overlap(tree([o for o in fixed if o not in receiver])), 'rail feet cross non-seating surfaces'
+    assert not tree(base + fasteners).overlap(tree([o for o in fixed if o not in receiver + rear_sight])), 'rail base crosses non-seating surfaces'
     receiver_tree = tree(receiver)
-    for foot in feet:
-        vertices = [basis @ rig.matrix_world.inverted() @ foot.matrix_world @ v.co for v in foot.data.vertices]
-        centre = sum(vertices, Vector()) / len(vertices)
-        for dx in (-.0015, 0, .0015):
-            for dz in (-.003, 0, .003):
-                x, z = centre.x + dx, centre.z + dz
-                underside = tree([foot]).ray_cast(Vector((x, .080, z)), Vector((0, 1, 0)), .04)[0]
-                roof = receiver_tree.ray_cast(Vector((x, .100, z)), Vector((0, -1, 0)), .03)[0]
-                assert underside is not None and roof is not None
-                assert -.00015 < underside.y - roof.y < .00015, 'receiver rail foot not seated'
+    base_tree = tree(base)
+    gaps = []
+    for x in (-.008, 0, .008):
+        for z in (-.182, -.130, -.048):
+            underside = base_tree.ray_cast(Vector((x, .080, z)), Vector((0, 1, 0)), .02)[0]
+            roof = receiver_tree.ray_cast(Vector((x, .100, z)), Vector((0, -1, 0)), .03)[0]
+            assert underside is not None and roof is not None
+            gap = underside.y - roof.y
+            assert -.00015 < gap < .00015, 'receiver rail base not seated'
+            gaps.append(gap)
+    print('M590_INTEGRATED_RAIL_OK: eight slots; four modeled fasteners; nine continuous-base seating rays; gaps mm', [g * 1000 for g in gaps])
+    tooth_z = []
+    for tooth in seating_teeth:
+        z = [(basis @ rig.matrix_world.inverted() @ tooth.matrix_world @ v.co).z for v in tooth.data.vertices]
+        tooth_z.append((min(z) + max(z)) / 2)
+    tooth_z.sort()
+    assert all(abs(b - a - .010008) < 1e-7 for a, b in zip(tooth_z, tooth_z[1:])), 'rail slot pitch'
     # Preserve the whole ghost-ring opening, including four off-axis rays.
-    irons_and_rail = tree(rail + [o for o in meshes if o.name.startswith('Ghost ring')])
+    irons_and_rail = tree(rail + rear_sight)
     for x, dy in ((0, 0), (.004, 0), (-.004, 0), (0, .004), (0, -.004)):
         assert irons_and_rail.ray_cast(Vector((x, .096 + dy, .020)), Vector((0, 0, -1)), .620)[0] is None
     # The adapter bore stays 18.6 mm open; datum is the actual front face.
@@ -64,9 +95,8 @@ def check_mounts(root, manifest, rig, meshes, review, pose, tree, point, basis):
     receiver_mount = rig.matrix_world.inverted() @ mounts['optic'].matrix_world
     optics = {}
     for optic, directory, stations in (
-        ('rmr', 'trijicon-rmr', (7, 10)),
-        ('acog', 'trijicon-acog', (5, 12)),
-        ('scope', 'schmidt-bender-pm-ii', (2, 14)),
+        ('rmr', 'trijicon-rmr', (3, 6)),
+        ('acog', 'trijicon-acog', (1, 8)),
     ):
         source = root / 'assets/attachments' / directory / (optic + '.blend')
         assert source.exists(), f'Rebuild the shared {optic} source before M590 checks: {source}'
@@ -99,10 +129,10 @@ def check_mounts(root, manifest, rig, meshes, review, pose, tree, point, basis):
         gaps = []
         rail_tree = tree(rail)
         for station in stations:
-            z = -.04905 - station * .0107
+            z = tooth_z[station]
             for x in (-.009, .009):
-                top = rail_tree.ray_cast(Vector((x, .125, z)), Vector((0, -1, 0)), .02)[0]
-                bottom = optic_tree.ray_cast(Vector((x, .110, z)), Vector((0, 1, 0)), .02)[0]
+                top = rail_tree.ray_cast(Vector((x, .098, z)), Vector((0, -1, 0)), .02)[0]
+                bottom = optic_tree.ray_cast(Vector((x, .087, z)), Vector((0, 1, 0)), .02)[0]
                 assert top is not None and bottom is not None, (optic, 'unsupported foot', station, x)
                 gap = bottom.y - top.y
                 assert -.0006 < gap < .00015, (optic, 'unseated foot', gap)
@@ -121,7 +151,7 @@ def check_mounts(root, manifest, rig, meshes, review, pose, tree, point, basis):
             # The fixed tube-mounted laser does not inherit pump travel.
             # Inverting the animated rig adds up to 1.011e-7 m of float32
             # error during Inspect; keep the same two-step numerical bound.
-            assert (point(mounts['rail']) - Vector((0, .009, -.590))).length < 2e-7
+            assert (point(mounts['rail']) - Vector(manifest['mounts']['rail']['pos'])).length < 2e-7
             visible = [o for o in moving if o.parent.name != 'shell_insert' or o.parent.scale.x > .5]
             moving_tree = tree(visible + hands)
             assert not additions.overlap(moving_tree), (name, frame, 'new rail/adapter crosses mechanism or hand')
@@ -129,4 +159,4 @@ def check_mounts(root, manifest, rig, meshes, review, pose, tree, point, basis):
                 assert not optic_tree.overlap(moving_tree), (optic, name, frame, 'mounted optic crosses mechanism or hand')
             count += 1
     pose('Idle')
-    print('M590_ATTACHMENT_CLEARANCE_OK:', count, '120Hz poses; all three real optics; both hands, pump, bolt, trigger and visible insertion shell; muzzle remains a future datum; TOR Mini checked separately')
+    print('M590_ATTACHMENT_CLEARANCE_OK:', count, '120Hz poses; both supported real optics; both hands, pump, bolt, trigger and visible insertion shell; muzzle remains a future datum; TOR Mini checked separately')

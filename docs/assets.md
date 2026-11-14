@@ -103,8 +103,9 @@ The standalone [TOR Mini laser](../assets/attachments/steiner-tor-mini/README.md
 is authored by [`tools/blender/tor_mini/`](../tools/blender/tor_mini/), with native
 Blender validation and `bun run models:cook -- tor_mini`. It is generated alongside
 the EXPS3, independently of player arms, and uses the shared gameplay/inspection
-rail path on M4, P320, EVOLYS, AX338, MPX and MCX. The M590 authored rail remains staged
-with runtime compatibility disabled pending its acceptance gates (#686).
+rail path on all seven weapons. M590's full source checks now use strict zero-crossing
+firing-hand clearance; its low integrated-sight top rail supports RMR/ACOG only,
+independent of the optional laser on fixed magazine-tube clamps (#686).
 
 Normal `bun run dev` / `bun run build` (and `bun run assets`) run
 `tools/build-assets.ts`: arms and bandage, each weapon and its cook, standalone
