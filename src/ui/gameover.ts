@@ -83,10 +83,6 @@ export class GameOverScreen {
   update(rawDt: number): void {
     if (this.active) this.elapsed += rawDt;
     const ready = this.active && this.elapsed >= this.delay;
-    if (ready && !this.root.open) {
-      setStyle(this.root, 'display', ''); // Initial focus needs a rendered dialog.
-      this.root.showModal();
-    }
     this.shown = damp(this.shown, ready ? 1 : 0, ready ? 5.5 : 12, rawDt);
     if (this.shown < 0.004) {
       setStyle(this.root, 'display', 'none');
@@ -94,6 +90,7 @@ export class GameOverScreen {
       return;
     }
     setStyle(this.root, 'display', '');
+    if (ready && !this.root.open) this.root.showModal(); // Initial focus needs a rendered dialog.
     setStyle(this.root, 'pointer-events', ready ? 'auto' : 'none');
     setStyle(this.root, 'opacity', ease.outQuad(this.shown).toFixed(3));
     const y = (1 - ease.outCubic(this.shown)) * 18;

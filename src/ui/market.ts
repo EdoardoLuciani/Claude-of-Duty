@@ -63,8 +63,9 @@ export class MarketOverlay {
     this.root = el('dialog', 'ow-market ow-dialog', parent);
     this.root.setAttribute('aria-labelledby', 'ow-market-title');
     // Esc (native cancel) closes the dialog; route it through the same skip path.
+    // `close` is queued, so ignore a stale event if the shop has reopened since.
     this.root.onclose = (): void => {
-      if (this.active) this.skip();
+      if (this.active && !this.root.open) this.skip();
     };
     const panel = el('div', 'ow-market-panel', this.root);
 

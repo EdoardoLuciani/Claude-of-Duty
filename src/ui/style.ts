@@ -77,7 +77,7 @@ const CSS = `
 .ow-layer { position:absolute; inset:0; }
 /* Native modal overlays: drop UA dialog chrome; each overlay draws its own scrim. */
 .ow-dialog {
-  margin:0; padding:0; border:0; color:inherit;
+  border:0; color:inherit; /* .ow-hud * already resets margin/padding. */
   width:auto; height:auto; max-width:none; max-height:none;
 }
 .ow-dialog::backdrop { background:transparent; }
