@@ -382,83 +382,54 @@ strings with `isWeaponId` at entry. Authored models carry literal adapter IDs,
 and the loader table checks complete ID coverage and per-ID adapter returns.
 `WeaponState.attachments` is an immutable `{ optic, ironSights, muzzle, rail }` snapshot;
 null slots retain the authored base weapon (including existing integrated optics/
-suppressors). `src/weapons/attachments.ts` owns the finite catalog, boundary
-validation and common gameplay/inspection mount solver. The M4 supports
-`optic: 'rmr' | 'acog' | 'scope'`, `rail: 'laser'` (TOR Mini) and
-`muzzle: 'suppressor'`. No attachment economy yet. Suppressor fits remain M4-only;
-9 mm, .338 and 12 gauge require bore/mount variants, not runtime scaling
-([asset decisions](assets/attachments/sig-srd762ti/README.md)).
-`ironSights` is an independent boolean, installed by default. `WeaponDef.removableIrons`
-enables removal: the authored `IRON_sights` node is hidden and an optional
-`IRON_sights_removed` part is shown instead (the M4's low-profile gas block preserves
-the gas system). Its `opticClashes` lists optics that only fit with the irons removed
-(M4: PM II crosses the A2 tower and rear aperture); incompatible combinations are
-rejected, never silently changed. With neither optic
-nor irons, ADS retains the base aim datum without a reticle. Removing an optic does
-not reinstall independently removed irons; `BASE_ATTACHMENTS` restores both.
-Optics own magnification, sensitivity and reticle. `WeaponDef.fits` has one shape per
-slot: a partial record keyed by attachment id whose entry enables that verified fit
-and holds its data (`fits.optic[id].eyeRelief`; `fits.rail.laser` and
-`fits.muzzle.suppressor` are empty). Validation
-and the load-time `MOUNT_<slot>` guard read these keys.
-Other weapons' conversion issues add their mount points/fit data; null retains their
-current integrated optic.
-`weapons.setAttachments(id, config)` changes an owned, loaded weapon synchronously
-outside the frame loop. It stages/validates before replacing the old mount and
-resolves sight/OpticData, the live muzzle socket and effective handling on the state's
-private definition. That definition carries the immutable attachment snapshot for fire-event
-consumers: audio/FX read `attachments.muzzle`; the old `suppressed` flag only preserves
-MCX/MPX integrated cans until their base conversions. Frame-time consumers allocate nothing.
-The shared suppressor's `SOCKET_mount` is its rear seating plane, with -Z bore forward,
-+Y up and unit scale. `SOCKET_muzzle` is its endcap exit. Weapon `MOUNT_muzzle`
-transforms own fitting/orientation; `MUZZLE_device` hides while the can is installed,
-with optional `MUZZLE_device_removed` showing a thread adapter instead. Mounts/inspection
-clones follow the authored parent, never a baked live pose. M4 uses a 1/2-28 to 5/8-24
-sleeve rather than putting a direct-thread can over its SureFire flash hider.
-`viewmodel.muzzleWorld()` reads the installed exit for ballistics, flash, smoke and
-tracers; casing ejection remains at `SOCKET_ejection`. No ballistic/handling modifiers.
-`tools/blender/suppressor/` owns standalone authoring and shares exterior geometry with
-the legacy MCX, without depending on a generated MCX product.
-The M4's `MOUNT_optic` is an authored rail-contact transform under its weapon rig.
-Attachment `MOUNT_base` and `SOCKET_sight` define mounting and aiming in metres;
-instances follow the authored weapon animation. RMR uses the standalone
-`tools/blender/rmr/` source, with a high riser to clear the M4's fixed front sight.
-ACOG is extracted from freshly built MCX editable source by `tools/blender/optics.py`;
-the pipeline builds the MCX before extraction. PM II has its own canonical source,
-`tools/blender/scope/build.py`, and builds independently of the AX338. The AX338 is
-an iron-sight base with removable irons and verified RMR/ACOG/PM II mounts. Both
-optics retain original geometry, UVs and packed maps, identity rail-contact datums
-and no weapon animation. MCX retains its integrated ACOG until its conversion.
-Glass retains thin alpha,
-with no transmission pass. Scope mask, gun hiding and mil scale use mounted
-`OpticData`, not the weapon class.
-The weapon system owns one loaded asset per optic and disposes them after the
-viewmodel; mounts/inspection clones own transforms only and never release shared
-geometry/materials/maps. Inspection defaults to the stored config or accepts an
-explicit config without mutating gameplay. Prewarm includes the attachment glass
-even when the initial M4 uses irons. Debug URL input is narrowed in `main.ts`:
-`?attachmentOptic=rmr`, `acog` or `scope` (M4 by default), `attachmentOptic=none` for no optic.
-`attachmentIrons=installed|removed` selects irons independently; PM II requires
-`?attachmentOptic=scope&attachmentIrons=removed`. `attachmentWeapon` must pass
-`isWeaponId` and compatibility/ownership checks.
-`attachmentRail=laser|none` selects the TOR Mini on all seven weapons.
-`attachmentMuzzle=suppressor|none` selects the M4 can independently of optic/rail/irons;
-`tools/capture.ts --muzzle=suppressor|none` uses the same validator.
-M590's lower-stock wrist relief removes its former glove contact; the complete
-source gate now requires zero firing-skin crossings, with no pinned-file contact
-exception. Its AIMPRO-style low integrated rear-sight rail supports RMR/ACOG,
-not the PM II's wider ring spacing, and leaves the fixed-tube laser seat independent. MCX uses an upper-right chamfer-mounted
-adapter, fitted draw fingers and a lowered post-charge hand return; actual runtime
-skins were checked across complete sampled clips/transitions, not only snapshots.
-The authored
-`MOUNT_rail` and TOR Mini `SOCKET_mount`/`SOCKET_laser` keep mounting independent
-of the optic. P320 uses its frame bone (not the slide); M590 uses fixed forward
-magazine-tube clamps (not the pump); the other adapters follow their fixed
-handguard/receiver assemblies. MPX's four-tooth side adapter clears the support
-hand; its load-time native-basis conversion preserves canonical attachment locals
-rather than rebasing the borrowed laser mesh. MCX/MPX retain their integrated optics
-and cans, without depending on their open base conversions. Gameplay and inspection borrow
-the same single-material asset.
+suppressors). `src/weapons/attachments.ts` owns the finite catalog (`rmr | acog | scope`
+optics, TOR Mini `laser`, M4-only `suppressor`), boundary validation, asset loading and
+the common gameplay/inspection mount solver. No attachment economy yet.
+`WeaponDef.fits` has one shape per slot: a partial record keyed by attachment id whose
+entry enables that verified fit and holds its data (`fits.optic[id].eyeRelief`; rail and
+muzzle entries are empty). `isAttachmentConfig()` is the single compatibility rule for
+gameplay, URL/debug input and capture tooling. `ironSights` is an independent boolean,
+installed by default; `WeaponDef.removableIrons` hides `IRON_sights` and shows an optional
+`IRON_sights_removed` part, and its `opticClashes` lists optics that only fit with the
+irons removed. Incompatible combinations are rejected, never silently changed. Removing an
+optic does not reinstall removed irons; `BASE_ATTACHMENTS` restores both. With neither
+optic nor irons, ADS retains the base aim datum without a reticle.
+
+`loadAttachments()` returns one `AttachmentAssets` record keyed by attachment id; a failed
+load only leaves that id absent (unavailable), never blocks the base weapons. The weapon
+system owns those assets and disposes them after the viewmodel; mounts and inspection
+clones own transforms only and never release shared geometry/materials/maps.
+`weapons.setAttachments(id, config)` changes an owned, loaded weapon synchronously outside
+the frame loop. `mountAttachments()` validates every asset and datum first, then attaches
+one group per slot under the weapon's authored `MOUNT_optic`/`MOUNT_rail`/`MOUNT_muzzle`
+(empty slots stay detached) and switches the replaced base parts (`IRON_sights`,
+`MUZZLE_device` with optional `MUZZLE_device_removed`). Instances follow the authored
+parent and animation, never a baked live pose; the ADS datum uses the captured rest-pose
+optic mount. The commit resolves sight/`OpticData`, laser emitter, muzzle socket and the
+effective private definition (eye relief, ADS FOV/sensitivity, `suppressed` from either an
+integrated can or a mounted suppressor), which fire-event audio/FX read unchanged.
+Frame-time reticle, ADS, laser and fire consumers allocate nothing.
+
+Optic assets define `MOUNT_base` and `SOCKET_sight` in metres; rigid attachments define
+`SOCKET_mount` plus an output socket (`SOCKET_laser` emitter, `SOCKET_muzzle` endcap exit),
+-Z forward, +Y up, unit scale. Optic catalog data owns magnification, sensitivity, reticle
+and glass (thin alpha, no transmission pass); scope mask, gun hiding and mil scale use
+the mounted `OpticData`, not the weapon class. `viewmodel.muzzleWorld()` reads the
+installed exit for ballistics, flash, smoke and tracers; casing ejection stays at
+`SOCKET_ejection`. Attachments carry no ballistic/handling modifiers.
+Prewarm includes every loaded attachment and both iron/muzzle base states.
+Inspection defaults to the stored config or accepts an explicit config without mutating
+gameplay. MCX/MPX retain their integrated optics and cans until their base conversions.
+Per-weapon mount datums, clearances and fitting decisions live in each weapon's
+`assets/weapons/*/README.md` and each attachment's `assets/attachments/*/README.md`;
+Blender sources are under `tools/blender/` (RMR, `scope/`, `suppressor/`; ACOG is extracted
+from the MCX build by `tools/blender/optics.py`).
+
+Debug URL input is narrowed in `main.ts`: `attachmentWeapon` (default M4) must pass
+`isWeaponId` plus compatibility/ownership checks; `attachmentOptic=rmr|acog|scope|none`,
+`attachmentIrons=installed|removed`, `attachmentRail=laser|none` and
+`attachmentMuzzle=suppressor|none` select each slot independently (PM II on the M4 requires
+`attachmentIrons=removed`). `tools/capture.ts` uses the same validator.
 Weapons own one retained world mesh for the green beam and surface dot (one draw,
 no light/decal, no per-frame allocation); boot warms it even with no module mounted.
 Two pooled `MASK.BULLET` queries find the unspread, zeroed muzzle aim and clip the

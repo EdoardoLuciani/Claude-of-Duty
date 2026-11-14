@@ -2,7 +2,7 @@
  * zeroRange is the sight-line crossing; learned sightline recoil is separate from random spread.
  */
 
-import type { AttachmentConfig, MuzzleId, OpticId, RailId } from './attachments.ts';
+import type { MuzzleId, OpticId, RailId } from './attachments.ts';
 
 export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx'] as const;
 export type WeaponId = (typeof WEAPON_IDS)[number];
@@ -21,10 +21,9 @@ export interface WeaponDef {
   class: WeaponClass;
   caliber: string;
   audio?: string;
-  /** Legacy integrated can, removed by the weapon's base conversion. */
+  /** Authored: integrated can (MCX/MPX until their base conversions). At runtime the
+   * private definition also carries a mounted suppressor. */
   suppressed?: boolean;
-  /** Resolved runtime snapshot; never authored in WEAPON_DEFS. */
-  attachments?: AttachmentConfig;
   rpm: number;
   modes: [WeaponMode, ...WeaponMode[]];
   burstCount?: number;

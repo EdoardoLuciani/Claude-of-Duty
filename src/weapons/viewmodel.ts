@@ -10,11 +10,9 @@ import { createWeaponMaterial } from './asset-material.ts';
 import {
   BASE_ATTACHMENTS,
   configureWeaponAttachments,
-  releaseAttachmentMount,
+  releaseAttachmentMounts,
   type AttachmentConfig,
-  type OpticModels,
-  type LaserModel,
-  type SuppressorModel,
+  type AttachmentAssets,
 } from './attachments.ts';
 import { createWeaponAnimation } from './authored-animation.ts';
 import { loadBandage } from './bandage-mesh.ts';
@@ -508,9 +506,7 @@ export class Viewmodel {
     model: WeaponModelRecord,
     def: WeaponDef,
     config: AttachmentConfig = BASE_ATTACHMENTS,
-    optics: OpticModels = {},
-    laser: LaserModel | null = null,
-    suppressor: SuppressorModel | null = null
+    assets: AttachmentAssets = {}
   ): WeaponEntry {
     let tris = 0;
     const meshes: THREE.Mesh[] = [];
@@ -568,7 +564,7 @@ export class Viewmodel {
       this._fitSupportHand(entry);
       this._fitGripContacts(entry);
     }
-    configureWeaponAttachments(entry, config, optics, laser, suppressor);
+    configureWeaponAttachments(entry, config, assets);
     this.weapons.set(model.id, entry);
     return entry;
   }
@@ -1514,9 +1510,7 @@ export class Viewmodel {
   /* oxlint-disable typescript/no-unnecessary-condition */
   dispose(): void {
     for (const w of this.weapons.values()) {
-      releaseAttachmentMount(w.attachmentGroup);
-      releaseAttachmentMount(w.muzzleGroup);
-      releaseAttachmentMount(w.railGroup);
+      releaseAttachmentMounts(w);
       w.animation.dispose();
       for (const m of w.meshes) m.geometry.dispose();
     }
