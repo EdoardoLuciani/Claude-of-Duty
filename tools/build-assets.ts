@@ -157,6 +157,7 @@ function cookStep(id: ModelId, salt: string[]): AssetStep {
       ...(id === 'mcx' ? [`${directory}/mcx-virtus.blend`] : []),
       ...(id === 'acog' ? [`${directory}/acog.blend`] : []),
       ...(id === 'scope' ? [`${directory}/scope.blend`] : []),
+      ...(id === 'suppressor9mm' ? [`${directory}/suppressor9mm.blend`] : []),
     ],
     commands: [
       blender(id === 'exps3' ? tools[0] : `tools/blender/${id}/build.py`),
