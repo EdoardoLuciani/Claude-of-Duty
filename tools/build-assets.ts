@@ -127,6 +127,7 @@ const SHARED_TOOLS: Partial<Record<ModelId, string[]>> = {
 };
 const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
   suppressor: ['tools/blender/suppressor'],
+  suppressor12g: ['tools/blender/suppressor12g'],
   acog: [
     'tools/blender/acog',
     'tools/blender/mcx/primitives.py',
@@ -156,6 +157,7 @@ function cookStep(id: ModelId, salt: string[]): AssetStep {
       ...(id === 'mcx' ? [`${directory}/mcx-virtus.blend`] : []),
       ...(id === 'acog' ? [`${directory}/acog.blend`] : []),
       ...(id === 'scope' ? [`${directory}/scope.blend`] : []),
+      ...(id === 'suppressor12g' ? [`${directory}/suppressor12g.blend`] : []),
     ],
     commands: [
       blender(id === 'exps3' ? tools[0] : `tools/blender/${id}/build.py`),

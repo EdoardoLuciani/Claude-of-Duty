@@ -17,7 +17,7 @@ import type { OpticData, WeaponEntry, WeaponModelRecord } from './runtime-types.
 const OPTIC_IDS = ['rmr', 'acog', 'scope'] as const;
 export type OpticId = (typeof OPTIC_IDS)[number];
 export type RailId = 'laser';
-export type MuzzleId = 'suppressor';
+export type MuzzleId = 'suppressor' | 'suppressor12g';
 
 /** Null means the authored base weapon (`optic: null` aims through its irons). */
 export interface AttachmentConfig {
@@ -184,6 +184,7 @@ export async function loadAttachments(
     ),
     load('laser', makeLaserModel),
     load('suppressor', makeSuppressorModel),
+    load('suppressor12g', makeSuppressorModel),
   ]);
   return assets;
 }
@@ -278,10 +279,9 @@ export function mountAttachments(
   const opticSlot = stageMount(model, 'optic', opticId, opticAsset);
   const rail = stageMount(model, 'rail', config.rail, config.rail && assets[config.rail]);
   const muzzle = stageMount(model, 'muzzle', config.muzzle, config.muzzle && assets[config.muzzle]);
-  const baseDevice =
-    config.muzzle !== null || WEAPON_DEFS[model.id].fits?.muzzle
-      ? requiredNode(model.root, 'MUZZLE_device')
-      : null;
+  // Some weapons have only permanent seating hardware, with no replaced device.
+  const baseDevice = model.root.getObjectByName('MUZZLE_device');
+  const adapter = model.root.getObjectByName('MUZZLE_device_removed');
   const irons = ironSightNodes(model);
   let mountedOptic: WeaponEntry['mountedOptic'] = null;
   const sight = new THREE.Vector3().fromArray(model.nodes.sight);
@@ -307,11 +307,8 @@ export function mountAttachments(
     irons.installed.visible = opticId === null;
     if (irons.removed) irons.removed.visible = opticId !== null;
   }
-  if (baseDevice) {
-    baseDevice.visible = config.muzzle === null;
-    const adapter = model.root.getObjectByName('MUZZLE_device_removed');
-    if (adapter) adapter.visible = config.muzzle !== null;
-  }
+  if (baseDevice) baseDevice.visible = config.muzzle === null;
+  if (adapter) adapter.visible = config.muzzle !== null;
   return {
     attachmentGroup: opticSlot.group,
     railGroup: rail.group,
@@ -348,7 +345,7 @@ export function configureWeaponAttachments(
     config.optic === null
       ? base.eyeRelief
       : (base.fits?.optic?.[config.optic]?.eyeRelief ?? base.eyeRelief);
-  entry.def.suppressed = config.muzzle === 'suppressor';
+  entry.def.suppressed = config.muzzle !== null;
   const fov = attached ? attached.adsFovScale : base.adsFovScale;
   const sensitivity = attached ? attached.adsSensScale : base.adsSensScale;
   if (fov === undefined) delete entry.def.adsFovScale;

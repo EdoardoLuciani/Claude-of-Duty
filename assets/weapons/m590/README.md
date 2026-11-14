@@ -86,7 +86,7 @@ the relieved stock neck, integrated top rail/sight and the selected optic.
 
 The open-bore 12g muzzle adapter remains permanent seating hardware, **not** a
 suppressor. `SOCKET_muzzle` stays at its exit, while `DATUM_barrel_crown` retains
-the factory measurement. The suppressor seat is still a future datum, not a fit.
+the factory measurement. The separate `suppressor12g` fit now uses this exact seat (#715); see below.
 See the [shared laser contract](../../attachments/steiner-tor-mini/README.md#weapon-mounting-686).
 
 Draw, holster, pump/fire, both reloads and inspect keep their original controls,
@@ -97,3 +97,21 @@ checks are not continuous clearance, strict 1:1 fidelity or final human approval
 For play review, buy/equip the secondary and inspect fire/ADS/reload/transitions.
 Historical optimization measurements and external review locations are in Git;
 storage reductions do not imply an FPS gain or final visual acceptance.
+
+## Optional large-bore suppressor (#715)
+
+`muzzle: 'suppressor12g'` mounts the new standalone
+[12g expansion can](../../attachments/12g-suppressor/README.md), not the shared
+rifle SRD762Ti. Its 220 mm extension puts the active exit at
+`[0, .068, -.8872884763]`. Both adapter pieces remain permanent: there is no
+removable `MUZZLE_device`, and clearing the slot restores the original adapter
+exit. All eight pellets, FX and tracer segments consume the shared active muzzle;
+no spread/count/damage or audio-bank changes.
+
+The can clears the blade/cheeks, tube cap, lug and TOR Mini/clamps, but its wide
+body intentionally occludes the low ghost-ring sightline. Fixed irons remain
+unchanged; use the existing RMR/ACOG fits when suppressing, with no automatic
+optic selection or eye-relief change. `muzzle.py`, appended to `check.py`, adds
+actual can/TOR Mini mesh and 120 Hz full-clip deformed-hand/mechanism checks.
+The rail/optic source and fitting checks are untouched. See the can README for
+bore/spread bounds, commands and finite-sampling limits.

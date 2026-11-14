@@ -1,6 +1,6 @@
 """Checks actual shared optic meshes, not proxy attachment envelopes.
 
-Suppressor remains a future datum; the TOR Mini has separate sampled checks.
+The dedicated 12g suppressor and TOR Mini have separate sampled checks.
 Optic clamps intentionally seat over the rail teeth. The receiver-hugging base,
 integrated rear sight and all other weapon/hand surfaces remain strict for optics.
 """
@@ -159,4 +159,4 @@ def check_mounts(root, manifest, rig, meshes, review, pose, tree, point, basis):
                 assert not optic_tree.overlap(moving_tree), (optic, name, frame, 'mounted optic crosses mechanism or hand')
             count += 1
     pose('Idle')
-    print('M590_ATTACHMENT_CLEARANCE_OK:', count, '120Hz poses; both supported real optics; both hands, pump, bolt, trigger and visible insertion shell; muzzle remains a future datum; TOR Mini checked separately')
+    print('M590_ATTACHMENT_CLEARANCE_OK:', count, '120Hz poses; both supported real optics; both hands, pump, bolt, trigger and visible insertion shell; dedicated 12g suppressor and TOR Mini checked separately')

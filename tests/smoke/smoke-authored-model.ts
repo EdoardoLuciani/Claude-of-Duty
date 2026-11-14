@@ -478,6 +478,33 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     );
     assert.equal(canDisposed, 0, 'removal never disposes borrowed geometry');
   }
+  // M590 retains its permanent adapter: a muzzle fit need not replace a base device.
+  baseDevice.removeFromParent();
+  const shotgun = fixture<WeaponEntry>({
+    ...entry,
+    id: 'shotgun',
+    model: fixture<Extract<WeaponModelRecord, { id: 'shotgun' }>>({ ...model, id: 'shotgun' }),
+    def: { ...WEAPON_DEFS.shotgun },
+  });
+  const adapter = new THREE.Group();
+  adapter.name = '12g permanent adapter';
+  root.add(adapter);
+  const shotgunConfig: AttachmentConfig = { ...BASE_ATTACHMENTS, muzzle: 'suppressor12g' };
+  assert(isAttachmentConfig(shotgunConfig, 'shotgun'));
+  assert(!isAttachmentConfig(suppressed, 'shotgun'), 'rifle can is not a 12g fit');
+  assert(!isAttachmentConfig(shotgunConfig, 'rifle'), '12g can is not a rifle fit');
+  configureWeaponAttachments(shotgun, shotgunConfig, { suppressor12g: can });
+  assert(shotgun.def.suppressed, 'every non-null muzzle id enables suppression');
+  assert.deepEqual(shotgun.def, { ...WEAPON_DEFS.shotgun, suppressed: true });
+  assert.equal(shotgun.muzzleGroup.parent, muzzleMount);
+  assert(shotgun.muzzleSocket);
+  assert(adapter.visible && adapter.parent === root);
+  configureWeaponAttachments(shotgun, BASE_ATTACHMENTS, {});
+  assert.equal(shotgun.muzzleSocket, null);
+  assert.equal(shotgun.def.suppressed, false);
+  assert.equal(muzzleMount.children.length, 0);
+  assert(adapter.visible && adapter.parent === root, 'removal preserves permanent hardware');
+  root.add(baseDevice);
   // MCX is an unsuppressed iron-sight base. Each accepted optic can coexist
   // with the can/laser, and clearing the config must restore bare tuning/parts.
   const mcx = fixture<WeaponEntry>({
