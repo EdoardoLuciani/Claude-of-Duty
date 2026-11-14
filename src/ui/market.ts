@@ -40,7 +40,7 @@ function targetCard(target: EventTarget | null): HTMLElement | null {
 export class MarketOverlay {
   ctx: MarketContext;
   market: MarketApi;
-  root: HTMLElement;
+  root: HTMLDialogElement;
   waveLine: HTMLElement;
   credits: HTMLElement;
   _onClick: (event: MouseEvent) => void;
@@ -60,12 +60,21 @@ export class MarketOverlay {
     this.ctx = ctx;
     this.market = ctx.get('market');
 
-    this.root = el('div', 'ow-market', parent);
+    this.root = el('dialog', 'ow-market ow-dialog', parent);
+    this.root.setAttribute('aria-labelledby', 'ow-market-title');
+    // Esc (native cancel) closes the dialog; route it through the same skip path.
+    this.root.onclose = (): void => {
+      if (this.active) this.skip();
+    };
     const panel = el('div', 'ow-market-panel', this.root);
 
     const head = el('div', 'ow-market-head', panel);
     this.waveLine = el('div', 'ow-market-wave', head, '');
-    el('div', 'ow-market-title', head, 'SUPPLY MARKET');
+    const title = el('div', 'ow-market-title', head, 'SUPPLY MARKET');
+    title.id = 'ow-market-title';
+    // Start focus on the title: focusing the first card would preview it.
+    title.tabIndex = -1;
+    title.autofocus = true;
     const cred = el('div', 'ow-market-cred', head);
     this.credits = el('b', null, cred, '000000');
     el('i', null, cred, 'CREDITS');
@@ -137,10 +146,6 @@ export class MarketOverlay {
         e.preventDefault();
         e.target.click();
       }
-      if (e.code === 'Escape') {
-        e.preventDefault();
-        this.skip();
-      }
     };
     this.root.addEventListener('click', this._onClick);
     this.root.addEventListener('mouseover', this._onOver);
@@ -192,11 +197,14 @@ export class MarketOverlay {
     for (const row of this.cards) setClass(row.card, 'inspecting', false);
     this.inspection.active = true;
     this.inspection.controls.enabled = false;
+    setStyle(this.root, 'display', ''); // Initial focus needs a rendered dialog.
+    this.root.showModal();
     document.exitPointerLock();
   }
 
   hide(): void {
     this.active = false;
+    this.root.close();
     this._hoverId = null;
     this._selectedId = null;
     this.inspection.hide();
