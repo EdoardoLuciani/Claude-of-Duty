@@ -43,10 +43,9 @@ All positions below are game-frame metres, +Y up / −Z forward, under `AX338_RI
 | `MOUNT_rail` | `[.038, .075, −.455]` | Right-side KeySlot/Picatinny adapter; local +Y points inward (−X), −Z stays forward |
 
 Irons are one removable `IRON_sights` assembly; no replacement part is needed.
-RMR and ACOG clear installed irons. PM II crosses the rear aperture (301 actual
-triangle contacts in the reference check), so `opticClashes: ['scope']` requires
-removing them. Removing both optic and irons is valid and retains the base sight
-datum with no reticle. Base ADS uses the common unscoped FOV/sensitivity; mounted
+RMR and ACOG clear installed irons; PM II crosses the rear aperture (301 actual
+triangle contacts in the reference check). Any mounted optic hides the irons at
+runtime, so neither case shows them together. Base ADS uses the common unscoped FOV/sensitivity; mounted
 optics own magnification. Per-optic eye relief is RMR 125 mm / ACOG 110 mm / PM II
 90 mm; base irons use 70 mm.
 

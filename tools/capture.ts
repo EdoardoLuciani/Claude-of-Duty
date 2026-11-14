@@ -34,18 +34,15 @@ if (!isWeaponId(WEAPON)) throw new Error(`Unknown weapon: ${WEAPON}`);
 const OPTIC = args.optic;
 const RAIL = args.rail;
 const MUZZLE = args.muzzle;
-if (args.irons !== undefined && args.irons !== 'installed' && args.irons !== 'removed')
-  throw new Error(`Unknown iron-sight configuration: ${args.irons}`);
 const requested: unknown = {
   optic: OPTIC === undefined || OPTIC === 'none' ? null : OPTIC,
-  ironSights: args.irons !== 'removed',
   muzzle: MUZZLE === undefined || MUZZLE === 'none' ? null : MUZZLE,
   rail: RAIL === undefined || RAIL === 'none' ? null : RAIL,
 };
-// The game's own rule: unknown ids, unverified fits and iron clashes are all rejected.
+// The game's own rule: unknown ids and unverified fits are rejected.
 if (!isAttachmentConfig(requested, WEAPON))
   throw new Error(
-    `${WEAPON} does not accept optic=${OPTIC ?? 'none'}, irons=${args.irons ?? 'installed'}, rail=${RAIL ?? 'none'}, muzzle=${MUZZLE ?? 'none'}.`
+    `${WEAPON} does not accept optic=${OPTIC ?? 'none'}, rail=${RAIL ?? 'none'}, muzzle=${MUZZLE ?? 'none'}.`
   );
 const ATTACHMENTS: AttachmentConfig = requested;
 
@@ -96,7 +93,6 @@ try {
   try {
     const attachmentQuery =
       (args.optic ? `&attachmentOptic=${encodeURIComponent(String(args.optic))}` : '') +
-      (args.irons ? `&attachmentIrons=${encodeURIComponent(String(args.irons))}` : '') +
       (RAIL ? `&attachmentRail=${encodeURIComponent(String(RAIL))}` : '') +
       (MUZZLE ? `&attachmentMuzzle=${encodeURIComponent(String(MUZZLE))}` : '') +
       `&attachmentWeapon=${encodeURIComponent(WEAPON)}`;
@@ -108,7 +104,7 @@ try {
       }
     );
     await page.waitForFunction('window.__READY__ === true', null, { timeout: TIMEOUT });
-    if (args.weapon || OPTIC || args.irons || RAIL || MUZZLE)
+    if (args.weapon || OPTIC || RAIL || MUZZLE)
       await page.evaluate(
         ({ id, config }): void => {
           const weapons = window.__ENGINE__?.ctx.get('weapons');

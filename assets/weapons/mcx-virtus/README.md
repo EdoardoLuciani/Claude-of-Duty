@@ -122,7 +122,7 @@ hinge-supported open rear aperture and deployed front post/protective ears;
 `IRON_sights_removed` contains the original folded leaves. Rear aperture center
 and front post tip are both at native Z=77 mm, separated by 382 mm. The 5 mm
 rear bore and base eye relief of 60 mm provide an open, centered sight picture.
-Removing irons with no optic is valid and shows folded leaves without a reticle.
+Any mounted optic shows the folded leaves instead; removing it redeploys them.
 
 Native Blender coordinates are metres, +X forward, +Z up. All mounts follow the
 receiver and preserve unit scale; their local +Y is rifle-forward (glTF -Z).

@@ -42,8 +42,8 @@ unsuppressed; only the configured shared suppressor selects suppressed audio/FX.
 `IRON_sights` owns both deployed clamps, hinges and leaves. The rear 3.6mm peep
 at x=−.079 and front blade at x=.284 share z=.074. Base ADS uses this rear datum,
 60mm eye relief and a .7 weapon-FOV ratio, not the removed ROMEO optical axis.
-`IRON_sights_removed` retains the same hardware folded flat. Removal/reinstallation
-is independent of optic selection; no optic and no irons is valid, with no reticle.
+`IRON_sights_removed` retains the same hardware folded flat; any mounted optic folds
+the irons, and removing it redeploys them.
 
 | Slot | Authored datum | Enabled catalog fits |
 | --- | --- | --- |
@@ -53,8 +53,8 @@ is independent of optic selection; no optic and no irons is valid, with no retic
 
 Optic and muzzle frames rotate Blender +Y forward onto weapon +X. The adapter
 preserves canonical shared-attachment locals at **all three** mount boundaries.
-RMR/ACOG work with deployed irons. PM II intersects the rear deployed sight and
-requires irons removed (`opticClashes: ['scope']`); its housing clears the folded
+RMR/ACOG clear the deployed irons; PM II intersects the rear deployed sight. Any
+mounted optic hides the irons at runtime, and the PM II housing clears the folded
 front hardware. The forward sight clamp remains supported on the last real teeth.
 
 The can replaces `MUZZLE_device` (thread protector) with
@@ -77,6 +77,6 @@ charging sweeps are independent mechanical checks, not new gameplay animations.
 ```sh
 bun tools/capture.ts --port=5175 --weapon=smg --shot=weapon --out=/tmp/mpx-base.png
 bun tools/capture.ts --port=5175 --weapon=smg --shot=ads --out=/tmp/mpx-irons.png
-bun tools/capture.ts --port=5175 --weapon=smg --optic=scope --irons=removed --shot=ads --out=/tmp/mpx-scope.png
+bun tools/capture.ts --port=5175 --weapon=smg --optic=scope --shot=ads --out=/tmp/mpx-scope.png
 bun tools/capture.ts --port=5175 --weapon=smg --rail=laser --muzzle=suppressor --shot=weapon --out=/tmp/mpx-attachments.png
 ```

@@ -190,14 +190,14 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   const config: AttachmentConfig = { ...BASE_ATTACHMENTS, optic: 'rmr' };
   for (let i = 0; i < 9; i++) {
     const optic = (['rmr', 'acog', 'scope'] as const)[i % 3];
-    const config: AttachmentConfig = { ...BASE_ATTACHMENTS, optic, ironSights: optic !== 'scope' };
+    const config: AttachmentConfig = { ...BASE_ATTACHMENTS, optic };
     // Mounting while the authored root is posed must not bake its current pose.
     root.rotation.x = i * 0.1;
     configureWeaponAttachments(entry, config, optics);
     assert.equal(root.children.length, 4, 'empty slot groups stay detached');
     assert.equal(entry.attachmentGroup.parent, socket, 'instance follows its authored mount');
-    assert.equal(irons.visible, config.ironSights);
-    assert.equal(ironsRemoved.visible, !config.ironSights);
+    assert.equal(irons.visible, false, 'a mounted optic replaces the removable irons');
+    assert(ironsRemoved.visible);
     assert(entry.sight.distanceTo(new THREE.Vector3(0, 0.1461072, -0.085)) < 1e-8);
     assert.deepEqual(entry.optic?.center, entry.sight.toArray());
     assert.equal(entry.def.eyeRelief, WEAPON_DEFS.rifle.fits?.optic?.[optic]?.eyeRelief);
@@ -269,12 +269,6 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     const moved = weapon.laserEmitter.getWorldPosition(new THREE.Vector3());
     assert(Math.abs(previous.distanceTo(moved) - 0.089) < 1e-8, 'emitter follows moving rail');
     railMount.position.z -= 0.089;
-    if (WEAPON_DEFS[id].removableIrons) {
-      const noIrons = { ...laserConfig, ironSights: false };
-      assert(isAttachmentConfig(noIrons, id), 'laser selection is independent of irons');
-      configureWeaponAttachments(weapon, noIrons, { ...optics, laser });
-      assert(weapon.laserEmitter);
-    }
     configureWeaponAttachments(weapon, BASE_ATTACHMENTS, { ...optics, laser });
     assert.equal(weapon.laserEmitter, null);
     assert.equal(railMount.children.length, 0, `${id}: removal leaves no rail instance`);
@@ -423,28 +417,7 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
       `${name}: shared attachment stays bore-forward after MPX basis conversion`
     );
   }
-  for (const optic of ['rmr', 'acog', 'scope'] as const) {
-    assert.equal(isAttachmentConfig({ ...BASE_ATTACHMENTS, optic }, 'smg'), optic !== 'scope');
-    assert(
-      isAttachmentConfig(
-        { ...BASE_ATTACHMENTS, optic, ironSights: false, muzzle: 'suppressor', rail: 'laser' },
-        'smg'
-      )
-    );
-  }
-  assert(isAttachmentConfig({ ...BASE_ATTACHMENTS, ironSights: false }, 'smg'));
   releaseAttachmentMounts(mounted);
-  configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, ironSights: false }, optics);
-  assert.equal(entry.optic, null);
-  assert.equal(irons.visible, false, 'irons can be removed without mounting an optic');
-  assert(ironsRemoved.visible);
-  const bareMount = entry.attachmentGroup;
-  assert.throws(
-    (): void => configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, optic: 'scope' }, optics),
-    /incompatible attachments/
-  );
-  assert.equal(entry.attachmentGroup, bareMount);
-  assert.equal(irons.visible, false, 'rejected optic/irons combination preserves visibility');
   const materials = new ReticleMaterials();
   const viewmodel = new Viewmodel(
     createTestContext({
@@ -518,17 +491,11 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     def: { ...WEAPON_DEFS.mcx },
   });
   for (const optic of ['rmr', 'acog', 'scope'] as const) {
-    const config: AttachmentConfig = {
-      optic,
-      ironSights: optic !== 'scope',
-      muzzle: 'suppressor',
-      rail: 'laser',
-    };
-    assert(isAttachmentConfig(config, 'mcx'));
+    const config: AttachmentConfig = { optic, muzzle: 'suppressor', rail: 'laser' };
     configureWeaponAttachments(mcx, config, { ...optics, suppressor: can, laser });
     assert.equal(mcx.def.suppressed, true);
     assert.equal(mcx.def.eyeRelief, WEAPON_DEFS.mcx.fits?.optic?.[optic]?.eyeRelief);
-    assert.equal(irons.visible, config.ironSights);
+    assert.equal(irons.visible, false);
     assert.equal(baseDevice.visible, false);
     configureWeaponAttachments(mcx, BASE_ATTACHMENTS, optics);
     assert.equal(mcx.optic, null);
@@ -537,11 +504,6 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     assert.equal(mcx.def.eyeRelief, WEAPON_DEFS.mcx.eyeRelief);
     assert(irons.visible && !ironsRemoved.visible && baseDevice.visible);
   }
-  assert(!isAttachmentConfig({ ...BASE_ATTACHMENTS, optic: 'scope' }, 'mcx'));
-  configureWeaponAttachments(mcx, { ...BASE_ATTACHMENTS, ironSights: false }, optics);
-  assert.equal(mcx.optic, null);
-  assert(!irons.visible && ironsRemoved.visible);
-  configureWeaponAttachments(mcx, BASE_ATTACHMENTS, optics);
   viewmodel.active = null;
   laser.dispose();
   can.dispose();
@@ -570,7 +532,7 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   approach.lhand.weight = 0;
   root.rotation.set(0, 0, 0);
   for (const optic of ['acog', 'scope'] as const) {
-    configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, optic, ironSights: false }, optics);
+    configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, optic }, optics);
     viewmodel._updateScope(entry, 1);
     assert(viewmodel.scopeOverlay.visible, 'mounted scope shows the overlay on a carbine');
     assert.equal(weaponScene.visible, false, 'mounted scope hides the gun at full ADS');

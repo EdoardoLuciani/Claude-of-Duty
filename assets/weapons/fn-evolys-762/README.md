@@ -14,13 +14,13 @@ skinned. Both pouches retain STEP ownership. Preserve eight clips, event timing,
 Ordinary rebuilds consume saved hand calibration and shared review arms.
 Refit intentionally with `bun tools/blender/evolys/hand-reference.ts`.
 `IRON_sights` owns both iron assemblies; `SOCKET_sight` is the rear aperture centre, aligned with the
-front post tip. Removing irons leaves the bare rail, without replacement parts.
+front post tip. A mounted optic hides them, leaving the bare rail without replacement parts.
 
 `MOUNT_optic` is an identity rail-contact frame on tooth 30 (z = -0.19650 m),
 forward of the calibrated charging-hand sweep. Shared RMR and
-ACOG fit with irons installed; PM II crosses the front sight and requires irons
-removed (`opticClashes: ['scope']`). Eye relief is weapon/optic tuning, not a
-change to the shared optic geometry. A bare rail with no optic/irons remains valid.
+ACOG clear the irons; PM II crosses the front sight. Any mounted optic hides the
+irons at runtime. Eye relief is weapon/optic tuning, not a change to the shared
+optic geometry.
 
 `MOUNT_muzzle` reserves the existing flash-hider exit on the bore axis (−Z
 forward); no future suppressor fit is claimed. TOR Mini (#686) mounts directly

@@ -167,13 +167,10 @@ use the explicit Buy/Swap button to purchase supplies or weapons.
 Inspection previews each weapon's current attachment configuration. The M4 starts
 with irons and supports the shared RMR, ACOG (chevron) and PM II scope (P4FL)
 via `weapons.setAttachments()`; separate attachment purchases are not implemented yet.
-M4 iron sights are controlled independently by `ironSights` in the complete attachment
-config. Removing them swaps the A2/front and rear assemblies for a low-profile gas
-block; reinstalling them restores the original irons. PM II requires removed irons.
-Removing an optic restores base handling but leaves the chosen iron-sight setting.
-For debug/capture, use `?attachmentOptic=rmr`, `acog`, `scope` or `none`, with
-`attachmentIrons=installed|removed` (installed by default), or
-`bun tools/capture.ts --shot=ads --optic=scope --irons=removed --out=/tmp/m4-scope-ads.png`.
+M4 iron sights are not a separate choice: mounting any optic swaps the A2/front and
+rear assemblies for a low-profile gas block, and removing the optic restores the irons
+and base handling. For debug/capture, use `?attachmentOptic=rmr`, `acog`, `scope` or
+`none`, or `bun tools/capture.ts --shot=ads --optic=scope --out=/tmp/m4-scope-ads.png`.
 The M4 also supports `rail: 'laser'` (Steiner TOR Mini), independently of optics.
 It adds a green beam and surface dot, with **no stat changes** or AI light reaction.
 The dot follows the unspread aim ray and respects emitter occlusion; it does not

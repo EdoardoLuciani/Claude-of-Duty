@@ -26,7 +26,7 @@ blender /tmp/tor-mini-review/tor-mini.blend
 Without `--output`, products go into this directory. Normal dev/build generates
 and cooks the attachment independently of player arms to
 `public/models/attachments/laser.runtime.glb`. Compatible weapons use the same rail configuration API, for example
-`weapons.setAttachments('rifle', { optic: null, ironSights: true, muzzle: null, rail: 'laser' })`.
+`weapons.setAttachments('rifle', { optic: null, muzzle: null, rail: 'laser' })`.
 The shared runtime mount uses `SOCKET_mount` and keeps `SOCKET_laser` as the emitter;
 weapons own beam/dot rendering, with no stat changes or AI-perception effects. Build source is
 [`tools/blender/tor_mini/build.py`](../../../tools/blender/tor_mini/build.py);

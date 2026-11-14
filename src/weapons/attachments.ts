@@ -19,16 +19,14 @@ export type OpticId = (typeof OPTIC_IDS)[number];
 export type RailId = 'laser';
 export type MuzzleId = 'suppressor';
 
-/** Null means the authored base weapon, not a separately purchasable component. */
+/** Null means the authored base weapon (`optic: null` aims through its irons). */
 export interface AttachmentConfig {
   readonly optic: OpticId | null;
-  readonly ironSights: boolean;
   readonly muzzle: MuzzleId | null;
   readonly rail: RailId | null;
 }
 export const BASE_ATTACHMENTS: AttachmentConfig = Object.freeze({
   optic: null,
-  ironSights: true,
   muzzle: null,
   rail: null,
 });
@@ -42,16 +40,9 @@ function hasFit(fits: object | undefined, value: unknown): boolean {
 export function isAttachmentConfig(value: unknown, id: WeaponId): value is AttachmentConfig {
   // A missing slot reads as undefined, which every check below rejects.
   if (!isRecord(value)) return false;
-  const { optic, ironSights, muzzle, rail } = value;
-  const { fits, removableIrons } = WEAPON_DEFS[id];
-  return (
-    hasFit(fits?.optic, optic) &&
-    hasFit(fits?.rail, rail) &&
-    hasFit(fits?.muzzle, muzzle) &&
-    typeof ironSights === 'boolean' &&
-    (ironSights || removableIrons !== undefined) &&
-    !(ironSights && removableIrons?.opticClashes.some((clash): boolean => clash === optic))
-  );
+  const { optic, muzzle, rail } = value;
+  const { fits } = WEAPON_DEFS[id];
+  return hasFit(fits?.optic, optic) && hasFit(fits?.rail, rail) && hasFit(fits?.muzzle, muzzle);
 }
 
 const OPTICS: Record<
@@ -280,11 +271,9 @@ export function mountAttachments(
   sight: THREE.Vector3;
   optic: OpticData | null;
 } {
-  const { optic: opticId, ironSights } = config;
+  const { optic: opticId } = config;
   if (!isAttachmentConfig(config, model.id))
-    throw new Error(
-      `[weapons] incompatible attachments: ${model.id}, optic=${opticId}, ironSights=${ironSights}`
-    );
+    throw new Error(`[weapons] incompatible attachments: ${model.id} ${JSON.stringify(config)}`);
   const opticAsset = opticId && assets[opticId];
   const opticSlot = stageMount(model, 'optic', opticId, opticAsset);
   const rail = stageMount(model, 'rail', config.rail, config.rail && assets[config.rail]);
@@ -314,8 +303,9 @@ export function mountAttachments(
   rail.parent?.add(rail.group);
   muzzle.parent?.add(muzzle.group);
   if (irons) {
-    irons.installed.visible = ironSights;
-    if (irons.removed) irons.removed.visible = !ironSights;
+    // A mounted optic replaces removable irons; fixed irons stay under it.
+    irons.installed.visible = opticId === null;
+    if (irons.removed) irons.removed.visible = opticId !== null;
   }
   if (baseDevice) {
     baseDevice.visible = config.muzzle === null;
