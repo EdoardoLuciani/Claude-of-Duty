@@ -114,4 +114,4 @@ def check_mounts(clips):
                 bridge = tree([o for o in sources if o.name.startswith(('Optic plate |', 'Optic bridge |'))])
                 assert bridge.ray_cast(origin, direction, .13)[0] is None, 'fixed iron sight ray blocked'
             samples += 1
-    print(f'P320_MOUNTS_OK: {samples} clip samples x 3 optics, fixed iron ray, thread/slide and hand clearances; muzzle/rail datums only (no suppressor/laser assets)')
+    print(f'P320_MOUNTS_OK: {samples} clip samples x 3 optics, fixed iron ray, thread/slide and hand clearances; optic sweep (muzzle/laser sweeps run separately)')

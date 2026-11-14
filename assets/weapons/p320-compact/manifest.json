@@ -110,14 +110,14 @@
     }
   },
   "stats": {
-    "triangles": 26712,
-    "vertices": 59408,
-    "meshes": 1,
-    "primitives": 1,
+    "triangles": 28050,
+    "vertices": 61218,
+    "meshes": 3,
+    "primitives": 3,
     "materials": 1,
     "textureImages": 4,
     "joints": 9,
-    "bytes": 6256544
+    "bytes": 6367332
   },
   "textureResolutions": {
     "base": 1024,
@@ -148,9 +148,9 @@
       "position": [
         0,
         0.037,
-        -0.1445
+        -0.132
       ],
-      "status": "Future datum only; suppressor asset/clearance not verified"
+      "status": "Compact 9mm booster fit; suppressor9mm; thread protector/exposed thread switch"
     },
     "rail": {
       "mount": "MOUNT_rail",

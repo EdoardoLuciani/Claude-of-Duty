@@ -41,6 +41,12 @@ export const GLTFPACK_FLAGS = [
 // Simplification is model-specific, never a blanket default for all models.
 // `output` is repo-relative; runtime-mounted weapons/attachments are served from public/.
 export const MODEL_COOKS = {
+  suppressor9mm: {
+    directory: 'assets/attachments/compact-9mm',
+    source: 'suppressor9mm.glb',
+    output: 'public/models/attachments/suppressor9mm.runtime.glb',
+    flags: [],
+  },
   suppressor338: {
     directory: 'assets/attachments/suppressor-338',
     source: 'suppressor338.glb',

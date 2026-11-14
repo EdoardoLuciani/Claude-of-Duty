@@ -35,9 +35,12 @@ def build_surfaces(asset, sources):
             dissolve.angle_limit = math.radians(0.5)
             dissolve.delimit = {'NORMAL', 'MATERIAL'}
             bpy.ops.object.modifier_apply(modifier=dissolve.name)
-            reduce = obj.modifiers.new('Baked bevel reduction', 'DECIMATE')
-            reduce.ratio = 0.45
-            bpy.ops.object.modifier_apply(modifier=reduce.name)
+            # Collapsing this narrow helical ribbon grows its crest beyond
+            # the authored radius and into the booster's receiving sleeve.
+            if not source.name.startswith('Barrel | external muzzle thread'):
+                reduce = obj.modifiers.new('Baked bevel reduction', 'DECIMATE')
+                reduce.ratio = 0.45
+                bpy.ops.object.modifier_apply(modifier=reduce.name)
             low.append(obj)
         active(low[0])
         for obj in low:
