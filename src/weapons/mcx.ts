@@ -37,6 +37,10 @@ export function makeMCXModel(gltf: GLTF): MCXModel {
     manifest.clips,
     scene
   );
+  // Unlike rebased weapons, MCX retains a native +X rig under this wrapper.
+  // ADS uses weapon-frame points; resolve the cached rest mount in that same
+  // frame once, never from the live animated rig or a mounted instance.
+  if (opticMountRest) opticMountRest.premultiply(scene.matrix);
   const sight = point('SOCKET_sight');
   const model = {
     id: 'mcx' as const,
@@ -68,32 +72,14 @@ export function makeMCXModel(gltf: GLTF): MCXModel {
         z1: -0.3882,
       },
       magSeat: { pos: point('SOCKET_magazine'), rot: [0, 0, 0] },
-      opticGlass: { kind: 'scope', reticle: 'chevron', center: sight, apertureR: 0.0137 },
     },
     shell: { caseLen: 0.0348, rimR: 0.0048 },
     magSize: { len: 0.18 },
   };
-  // Keep authored PBR instead of remapping the Blender material names to the
-  // procedural weapon library. Thin alpha lenses avoid a second full-scene
-  // transmission pass; the gameplay scope supplies the magnified sight picture.
   const converted = convertWeaponScene(
     scene,
     (original, material): void => {
-      // Intentional scope approximation, not exposure calibration: the gameplay
-      // scope supplies the sight picture. Keep its established thin-alpha tint
-      // instead of adding a second full-scene transmission pass.
-      if (Number.parseInt(original.name, 10) === 11) {
-        material.transmission = 0;
-        material.color.setRGB(0.035, 0.075, 0.085);
-        material.transparent = true;
-        material.opacity = 0.1;
-        material.depthWrite = false;
-        material.metalness = 0;
-        material.roughness = 0.12;
-        material.specularIntensity = 0.25;
-      } else if (original.name === 'MCX | opaque finishes') {
-        configureMCXFinishes(material);
-      }
+      if (original.name === 'MCX | opaque finishes') configureMCXFinishes(material);
     },
     true
   );
@@ -139,12 +125,6 @@ type MCXModel = AuthoredModelData<
       z1: number;
     };
     magSeat: { pos: [number, number, number]; rot: number[] };
-    opticGlass: {
-      kind: string;
-      reticle: string;
-      center: [number, number, number];
-      apertureR: number;
-    };
   }
 >;
 type MCXDefinition = Parameters<typeof buildEquipClips>[1];
@@ -290,7 +270,16 @@ export class MCXAnimation {
       this.gesture === 'reloadEmpty'
         ? 0.05 * smootherstep(2.7, 2.9, t) * (1 - smootherstep(3.12, 3.28, t))
         : 0;
-    if (weight <= 0 && returnDrop === 0) return;
+    // Route the released glove below the optic instead of sweeping through
+    // its rail seat on the way to/from the outboard charging latch. Full latch
+    // contact, magazine handoff and all authored mechanism times stay unchanged.
+    const chargeDrop =
+      this.gesture === 'reloadEmpty'
+        ? 0.09 *
+          (smootherstep(1.98, 2.04, t) * (1 - smootherstep(2.2, 2.28, t)) +
+            smootherstep(2.7, 2.85, t) * (1 - smootherstep(3.0, 3.12, t)))
+        : 0;
+    if (weight <= 0 && returnDrop === 0 && chargeDrop === 0) return;
     // Ignore visibility scale during off-screen magazine handoffs: the wrist
     // follows a rigid part, never a collapsing zero-scale transform.
     this.partMatrix.compose(part.position, part.quaternion, ONE);
@@ -308,7 +297,7 @@ export class MCXAnimation {
     pos.lerp(this.target, weight);
     // Align the released glove below the rail, then raise it onto the support
     // grip. The latch contact and all authored mechanism/event beats stay put.
-    pos.y -= returnDrop;
+    pos.y -= returnDrop + chargeDrop;
     quat.slerp(this.targetQ, weight);
   }
 

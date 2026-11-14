@@ -110,13 +110,12 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     class: 'carbine',
     caliber: '.300 BLK',
     audio: 'mcx',
-    suppressed: true,
     rpm: 800,
     modes: ['auto', 'semi'],
     magSize: 30,
     reserve: 180,
     fireAnimationSpeed: 2.5, // finish carrier return before the next 75 ms shot
-    // Suppressed subsonic game load: more drop than the M4, not a reskinned 5.56.
+    // Subsonic game load: more drop than the M4, not a reskinned 5.56.
     muzzleVelocity: 305,
     damage: 39,
     penetration: 0.82,
@@ -147,16 +146,19 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     },
     fireVibe: { amp: 0.82, duration: 0.055, adsScale: 0.38 },
     adsTime: 0.26,
-    adsFovScale: 0.28,
-    adsSensScale: 0.28,
     viewFov: 0.86,
     drawTime: 0.62,
     holsterTime: 0.4,
     hipPos: [0.118, -0.192, -0.3],
     hipRot: [-0.05, 0.081, -0.135],
     adsCant: [0, 0, 0],
-    eyeRelief: 0.11,
-    fits: { rail: { laser: {} } },
+    eyeRelief: 0.06,
+    fits: {
+      optic: { rmr: { eyeRelief: 0.125 }, acog: { eyeRelief: 0.11 }, scope: { eyeRelief: 0.09 } },
+      muzzle: { suppressor: {} },
+      rail: { laser: {} },
+    },
+    removableIrons: { opticClashes: ['scope'] }, // PM II ocular crosses the deployed rear leaf.
     sprintPos: [0.09, -0.275, -0.275],
     sprintRot: [-0.4, 0.6, 0.2],
     lowReadyPos: [0.112, -0.29, -0.289],

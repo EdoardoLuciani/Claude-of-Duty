@@ -4,8 +4,10 @@
 [Asset and commands](../../../assets/weapons/mcx-virtus/README.md)
 
 - `build.py`: stages/paths; `materials.py`: seeded maps and finishes.
-- `geometry.py`: assemblies/pivots/sockets; `animations.py`: six clips/events.
+- `geometry.py`: base irons/muzzle, attachment mounts, assemblies/pivots/sockets; `animations.py`: six clips/events.
 - `export.py`: surface projection/export; `finishes.py`: pigment/scalar packing.
+- `primitives.py`: exact exterior helpers shared with the standalone ACOG.
+- `fits.py`: actual catalog surface/hand/mechanism clearance sweep.
 - `studio.py`: fixed review cameras/lights.
 - `runtime-hands.ts`: offline sampling of actual `Viewmodel`/`MCXAnimation` controls.
 - `review_hands.py`: shared review-skin baking, paired clip selection and runtime parity.
@@ -24,8 +26,8 @@ and showcase case remain independent. No exporter hooks or GLB repair.
 
 Opaque pigments use per-corner colors; UV1 selects padded 64² scalar tiles.
 Original UV0 albedo/full-normal pixels remain; roughness grain uses its source
-mean. Two materials separate opaque finishes and glass. The MCX adapter preserves
-per-finish normal strengths/fiber emission and glass overrides; do not compensate
+mean. The base weapon has one opaque material and no glass. The MCX adapter preserves
+per-finish normal strengths with canonical tile IDs, including absent optional finishes; do not compensate
 with lighting. Original source materials remain editable in the saved blend.
 The registered cook adds `-si 0.65 -se 0.0002 -sp -vc 16`; keep named helpers.
 The absent `magazineBody` still prevents world-magazine drops. Storage/draw counts
