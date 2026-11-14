@@ -182,6 +182,16 @@ Use `?attachmentRail=laser` or `bun tools/capture.ts --shot=weapon --rail=laser`
 `attachmentRail=none`/`rail: null` removes it. `tools/profile.ts --rail=laser|none`
 provides matched performance captures.
 
+The M4 also supports `muzzle: 'suppressor'`: a shared SRD762Ti exterior with an
+M4 thread adapter. It replaces the base flash hider and moves projectile/flash/smoke
+origins to the can's endcap; audio and flash follow the configuration on the next shot.
+It changes no handling or ballistic stats. Use `?attachmentMuzzle=suppressor` or
+`bun tools/capture.ts --shot=weapon --muzzle=suppressor --out=/tmp/m4-suppressed.png`;
+`attachmentMuzzle=none`/`muzzle: null` restores the flash hider. Market inspection
+matches the stored config; no attachment purchase is added. Other muzzle fits stay
+unavailable pending their authored checks and caliber-specific variants
+([fit/size decision](assets/attachments/sig-srd762ti/README.md)).
+
 M4/P320 are the starting weapons; MCX, EVOLYS, MPX and AX338 are shop options.
 The day/night clock
 starts at 16:30 and advances nine hours per ten active minutes. Pause/shop freeze

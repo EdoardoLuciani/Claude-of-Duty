@@ -83,6 +83,8 @@ export interface WeaponEntry {
   attachments: AttachmentConfig;
   attachmentGroup: THREE.Group;
   railGroup: THREE.Group;
+  muzzleGroup: THREE.Group;
+  muzzleSocket: THREE.Object3D | null;
   laserEmitter: THREE.Object3D | null;
   mountedOptic: { mount: THREE.Object3D; sight: THREE.Vector3 } | null;
   def: WeaponDef;
@@ -94,7 +96,6 @@ export interface WeaponEntry {
   animation: WeaponAnimation;
   clips: Record<string, Clip>;
   sight: THREE.Vector3;
-  muzzle: THREE.Vector3;
   eject: THREE.Vector3;
   ejectDir: THREE.Vector3;
   optic: OpticData | null;

@@ -300,6 +300,9 @@ def build_geometry(materials):
     cut(seat,cyl('CUT',(0,BORE,GAS),.00835,.040,None,None,'Z',48,0))
     cut(seat,cyl('CUT',(0,.0899,GAS-.005),.00180,.026,None,None,'Z',24,0))
     for obj in low_block.children:obj.hide_render=True
+    # Removable flash hider; the barrel thread stays on the receiver.
+    muzzle_device=empty('MUZZLE_device',parent=rig)
+    before_muzzle=set(asset.objects)
     # SureFire nominal 66.04 mm; metric catalog conflict is disclosed in README.md.
     FH_LEN=.06604;FH_REAR=CROWN+.013;FH_TIP=FH_REAR-FH_LEN
     for name,z0,z1,r in [('FH556RC mounting shank',FH_REAR-.018,FH_REAR,.0114),('FH556RC suppressor bearing',FH_REAR-.034,FH_REAR-.018,.0119)]:
@@ -311,6 +314,12 @@ def build_geometry(materials):
         for z,r in [(FH_REAR-.030,.0119),(FH_REAR-.043,.0109),(FH_TIP+.001,.0101),(FH_TIP,.0098)]:
             rings.append([(math.cos(a+d)*radius,BORE+math.sin(a+d)*radius,z) for radius,d in [(r,-.33),(r,.33),(r-.003,.33),(r-.003,-.33)]])
         loft('FH556RC tine',rings,steel,bevel=.0003,rounded=True)
+    for obj in set(asset.objects)-before_muzzle:
+        obj.parent=muzzle_device;obj.matrix_parent_inverse=muzzle_device.matrix_world.inverted()
+    # Thread adapter: 1/2-28 barrel to the shared can's 5/8-24 rear seat.
+    empty('MOUNT_muzzle',(0,BORE,CROWN+.013),rig)
+    muzzle_adapter=empty('MUZZLE_device_removed',parent=rig)
+    tube('M4 thread adapter',(0,BORE,CROWN+.0065),.0079375,.0064,.013,steel,muzzle_adapter)
     # A2 grip has varying rounded sections, a backstrap and its characteristic ledge.
     rings=[]
     for y,z,rx,rz in [(.034,.035,.0155,.023),(.015,.040,.016,.023),(-.012,.052,.0167,.024),(-.040,.064,.0168,.025),(-.064,.073,.016,.024),(-.075,.077,.0155,.023)]:
@@ -460,5 +469,5 @@ def build_geometry(materials):
     rail_mount=empty('MOUNT_rail',(.0285,BORE,-.250),guard_root)
     rail_mount.rotation_euler.y=-math.pi/2
     parts=[rig,bolt,head,handle,trigger,cover,release,mag,spare,case,round_live,round_spare]
-    parents=[body,guard_root,stock_root,irons_root,low_block,bolt,head,handle,trigger,cover,release,mag,spare,case,round_live,round_spare]
+    parents=[body,muzzle_device,muzzle_adapter,guard_root,stock_root,irons_root,low_block,bolt,head,handle,trigger,cover,release,mag,spare,case,round_live,round_spare]
     return asset,parts,parents,(front_post,front_tip,stalk,cup)

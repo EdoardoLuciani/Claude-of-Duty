@@ -3,6 +3,7 @@ import type { Vector3 } from 'three';
 import type { SurfaceName } from '../physics/surfaces.ts';
 import type { PlayerState } from '../player/index.ts';
 import type { PlayerStance } from '../player/tuning.ts';
+import type { AttachmentConfig } from '../weapons/attachments.ts';
 import type { WeaponClass, WeaponId } from '../weapons/defs.ts';
 
 /** Gameplay and AI identities are closed; compact descriptors must identify a weapon. */
@@ -12,6 +13,7 @@ export interface EventWeaponDescriptor {
   class?: WeaponClass;
   audio?: string;
   suppressed?: boolean;
+  attachments?: AttachmentConfig;
 }
 export type EventWeapon = EventWeaponId | EventWeaponDescriptor | null;
 /** Mechanical beats also cover post-shot manual actions; end is hand settle only. */

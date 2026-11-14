@@ -2,7 +2,7 @@
  * zeroRange is the sight-line crossing; learned sightline recoil is separate from random spread.
  */
 
-import type { OpticId, RailId } from './attachments.ts';
+import type { AttachmentConfig, MuzzleId, OpticId, RailId } from './attachments.ts';
 
 export const WEAPON_IDS = ['rifle', 'smg', 'pistol', 'lmg', 'shotgun', 'sniper', 'mcx'] as const;
 export type WeaponId = (typeof WEAPON_IDS)[number];
@@ -21,7 +21,10 @@ export interface WeaponDef {
   class: WeaponClass;
   caliber: string;
   audio?: string;
+  /** Legacy integrated can, removed by the weapon's base conversion. */
   suppressed?: boolean;
+  /** Resolved runtime snapshot; never authored in WEAPON_DEFS. */
+  attachments?: AttachmentConfig;
   rpm: number;
   modes: [WeaponMode, ...WeaponMode[]];
   burstCount?: number;
@@ -79,6 +82,7 @@ export interface WeaponDef {
   fits?: {
     optic?: Partial<Record<OpticId, { eyeRelief: number }>>;
     rail?: Partial<Record<RailId, Record<string, never>>>;
+    muzzle?: Partial<Record<MuzzleId, Record<string, never>>>;
   };
   /** Authored `IRON_sights` can be removed (an optional `IRON_sights_removed` part replaces
    * it); `opticClashes` lists optics that only fit with the irons removed. */
@@ -226,6 +230,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     // Bring the eye closer to open the rear aperture; its bore and aim datum stay authored.
     eyeRelief: 0.03,
     fits: {
+      muzzle: { suppressor: {} },
       optic: { rmr: { eyeRelief: 0.125 }, acog: { eyeRelief: 0.11 }, scope: { eyeRelief: 0.09 } },
       rail: { laser: {} },
     },

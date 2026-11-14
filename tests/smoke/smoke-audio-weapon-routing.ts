@@ -12,6 +12,7 @@ import {
   resolveProfile,
 } from '../../src/audio/weapons.ts';
 import { Rng } from '../../src/core/rng.ts';
+import { BASE_ATTACHMENTS } from '../../src/weapons/attachments.ts';
 import { WEAPON_DEFS } from '../../src/weapons/defs.ts';
 import {
   audioFixture,
@@ -108,10 +109,10 @@ function expectedBanks(profile: WeaponProfile, distance: number): string[] {
 for (const [id, key] of fixtureEntries(expected)) {
   const def = WEAPON_DEFS[id],
     original = JSON.stringify(def);
-  const weapon = { ...def };
+  const weapon = { ...def, suppressed: false, attachments: BASE_ATTACHMENTS };
   for (const distance of [0, 20, 45, 70, 140, 300]) {
     for (const suppressed of [false, true, false]) {
-      weapon.suppressed = suppressed;
+      weapon.attachments = { ...BASE_ATTACHMENTS, muzzle: suppressed ? 'suppressor' : null };
       const expectedProfile = suppressed ? SUPPRESSED_WEAPON_PROFILES[key] : WEAPON_PROFILES[key];
       captureState.seen = null;
       audio._onFire({

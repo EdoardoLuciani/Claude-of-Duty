@@ -24,6 +24,7 @@ interface MuzzleProfile {
 interface MuzzleWeapon {
   id?: string;
   suppressed?: boolean;
+  attachments?: { readonly muzzle: 'suppressor' | null };
   class?: string;
   kind?: string;
   name?: string;
@@ -96,7 +97,11 @@ const REF_LIGHT = MUZZLE_PROFILES.rifle.light;
 
 function profileFor(weapon?: string | MuzzleWeapon): MuzzleProfile {
   if (!weapon) return MUZZLE_PROFILES.rifle;
-  if (typeof weapon !== 'string' && weapon.suppressed) return MUZZLE_PROFILES.suppressed;
+  if (
+    typeof weapon !== 'string' &&
+    (weapon.attachments?.muzzle === 'suppressor' || weapon.suppressed)
+  )
+    return MUZZLE_PROFILES.suppressed;
   const key =
     typeof weapon === 'string' ? weapon : (weapon.class ?? weapon.id ?? weapon.kind ?? weapon.name);
   if (!key) return MUZZLE_PROFILES.rifle;
