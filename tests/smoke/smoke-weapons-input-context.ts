@@ -201,7 +201,11 @@ for (const [equip, first, second] of [
   const { wp } = makeHarness();
   const scene = new THREE.Group();
   const irons = Object.assign(new THREE.Object3D(), { name: 'IRON_sights' });
-  scene.add(irons, Object.assign(new THREE.Object3D(), { name: 'GASBLOCK_low' }));
+  scene.add(
+    irons,
+    Object.assign(new THREE.Object3D(), { name: 'GASBLOCK_low' }),
+    Object.assign(new THREE.Object3D(), { name: 'MUZZLE_device' })
+  );
   Object.assign(wp.viewmodel, {
     reticle: new THREE.Object3D(),
     scopeOverlay: new THREE.Object3D(),
@@ -218,9 +222,10 @@ for (const [equip, first, second] of [
     def: weaponState(wp, 'rifle').def,
     attachmentGroup: new THREE.Group(),
     railGroup: new THREE.Group(),
+    muzzleGroup: new THREE.Group(),
+    muzzleSocket: null,
     laserEmitter: null,
     sight: new THREE.Vector3(),
-    muzzle: new THREE.Vector3(),
   });
   for (const drop of [(): boolean => wp.equipPrimary('lmg'), (): void => wp.resetForNewGame()]) {
     wp.resetForNewGame();

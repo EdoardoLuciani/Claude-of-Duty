@@ -14,6 +14,7 @@ import {
   type AttachmentConfig,
   type OpticModels,
   type LaserModel,
+  type SuppressorModel,
 } from './attachments.ts';
 import { createWeaponAnimation } from './authored-animation.ts';
 import { loadBandage } from './bandage-mesh.ts';
@@ -508,7 +509,8 @@ export class Viewmodel {
     def: WeaponDef,
     config: AttachmentConfig = BASE_ATTACHMENTS,
     optics: OpticModels = {},
-    laser: LaserModel | null = null
+    laser: LaserModel | null = null,
+    suppressor: SuppressorModel | null = null
   ): WeaponEntry {
     let tris = 0;
     const meshes: THREE.Mesh[] = [];
@@ -532,6 +534,8 @@ export class Viewmodel {
       attachments: BASE_ATTACHMENTS,
       attachmentGroup: new THREE.Group(),
       railGroup: new THREE.Group(),
+      muzzleGroup: new THREE.Group(),
+      muzzleSocket: null,
       laserEmitter: null,
       mountedOptic: null,
       def,
@@ -544,7 +548,6 @@ export class Viewmodel {
       clips: animation.clips(),
       // the sight point and its axis, in weapon space
       sight: new THREE.Vector3().fromArray(model.nodes.sight),
-      muzzle: new THREE.Vector3().fromArray(model.nodes.muzzle),
       eject: new THREE.Vector3().fromArray(model.nodes.eject),
       ejectDir: new THREE.Vector3().fromArray(model.nodes.ejectDir).normalize(),
       optic: n.opticGlass ?? null,
@@ -565,7 +568,7 @@ export class Viewmodel {
       this._fitSupportHand(entry);
       this._fitGripContacts(entry);
     }
-    configureWeaponAttachments(entry, config, optics, laser);
+    configureWeaponAttachments(entry, config, optics, laser, suppressor);
     this.weapons.set(model.id, entry);
     return entry;
   }
@@ -1473,12 +1476,12 @@ export class Viewmodel {
     vcam.quaternion.copy(this.anchor.quaternion);
   }
 
-  /** Muzzle position in WORLD space (for the flash and the shell). */
+  /** Active bore exit in world space for projectiles, flash, smoke and tracers. */
   muzzleWorld(out: THREE.Vector3): THREE.Vector3 {
     const w = this.active;
     if (!w) return out.set(0, 0, 0);
     w.group.updateMatrixWorld();
-    return requiredSocket(w.model.root, 'SOCKET_muzzle').getWorldPosition(out);
+    return (w.muzzleSocket ?? requiredSocket(w.model.root, 'SOCKET_muzzle')).getWorldPosition(out);
   }
 
   ejectWorld(out: THREE.Vector3): THREE.Vector3 {
@@ -1512,6 +1515,7 @@ export class Viewmodel {
   dispose(): void {
     for (const w of this.weapons.values()) {
       releaseAttachmentMount(w.attachmentGroup);
+      releaseAttachmentMount(w.muzzleGroup);
       releaseAttachmentMount(w.railGroup);
       w.animation.dispose();
       for (const m of w.meshes) m.geometry.dispose();

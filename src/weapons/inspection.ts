@@ -8,6 +8,7 @@ import {
   type AttachmentConfig,
   type OpticModels,
   type LaserModel,
+  type SuppressorModel,
 } from './attachments.ts';
 import { createWeaponAnimation } from './authored-animation.ts';
 import type { WeaponEntry } from './runtime-types.ts';
@@ -17,7 +18,8 @@ export function createWeaponInspection(
   entry: WeaponEntry,
   config: AttachmentConfig = entry.attachments,
   optics: OpticModels = {},
-  laser: LaserModel | null = null
+  laser: LaserModel | null = null,
+  suppressor: SuppressorModel | null = null
 ): {
   scene: THREE.Group;
   dispose(): void;
@@ -39,7 +41,10 @@ export function createWeaponInspection(
   if (isGroup(previous)) releaseAttachmentMount(previous);
   const previousRail = root.getObjectByName('rail_attachment');
   if (isGroup(previousRail)) releaseAttachmentMount(previousRail);
-  const mounted = mountAttachments(model, config, optics, laser);
+  const previousMuzzle = root.getObjectByName('muzzle_attachment');
+  if (isGroup(previousMuzzle)) releaseAttachmentMount(previousMuzzle);
+  const mounted = mountAttachments(model, config, optics, laser, suppressor);
+  if (mounted.muzzleSocket) mounted.muzzleParent.add(mounted.muzzleGroup);
   mounted.railParent.add(mounted.railGroup);
   mounted.parent.add(mounted.group);
   const animation = createWeaponAnimation(model, entry.def);
@@ -51,6 +56,7 @@ export function createWeaponInspection(
       scene.removeFromParent();
       releaseAttachmentMount(mounted.group);
       releaseAttachmentMount(mounted.railGroup);
+      releaseAttachmentMount(mounted.muzzleGroup);
       // The authored animation owns its cloned skeletons (as it does in gameplay).
       animation.dispose();
       scene.traverse((node): void => {

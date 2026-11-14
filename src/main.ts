@@ -125,16 +125,18 @@ try {
 if (
   params.has('attachmentOptic') ||
   params.has('attachmentIrons') ||
-  params.has('attachmentRail')
+  params.has('attachmentRail') ||
+  params.has('attachmentMuzzle')
 ) {
   const id = params.get('attachmentWeapon') ?? 'rifle';
   const optic = params.get('attachmentOptic') ?? 'none';
   const irons = params.get('attachmentIrons') ?? 'installed';
   const rail = params.get('attachmentRail') ?? 'none';
+  const muzzle = params.get('attachmentMuzzle') ?? 'none';
   const config = {
     optic: optic === 'none' ? null : optic,
     ironSights: irons === 'installed' ? true : irons === 'removed' ? false : irons,
-    muzzle: null,
+    muzzle: muzzle === 'none' ? null : muzzle,
     rail: rail === 'none' ? null : rail,
   };
   if (
@@ -143,7 +145,7 @@ if (
     !engine.ctx.get('weapons').setAttachments(id, config)
   )
     console.warn(
-      `[weapons] invalid/unavailable attachment configuration: optic=${optic}, irons=${irons}, rail=${rail}`
+      `[weapons] invalid/unavailable attachment configuration: optic=${optic}, irons=${irons}, rail=${rail}, muzzle=${muzzle}`
     );
 }
 

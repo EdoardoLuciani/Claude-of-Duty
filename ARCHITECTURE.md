@@ -384,8 +384,10 @@ and the loader table checks complete ID coverage and per-ID adapter returns.
 null slots retain the authored base weapon (including existing integrated optics/
 suppressors). `src/weapons/attachments.ts` owns the finite catalog, boundary
 validation and common gameplay/inspection mount solver. The M4 supports
-`optic: 'rmr' | 'acog' | 'scope'` and `rail: 'laser'` (TOR Mini); the muzzle catalog
-is empty. No attachment economy yet.
+`optic: 'rmr' | 'acog' | 'scope'`, `rail: 'laser'` (TOR Mini) and
+`muzzle: 'suppressor'`. No attachment economy yet. Suppressor fits remain M4-only;
+9 mm, .338 and 12 gauge require bore/mount variants, not runtime scaling
+([asset decisions](assets/attachments/sig-srd762ti/README.md)).
 `ironSights` is an independent boolean, installed by default. `WeaponDef.removableIrons`
 enables removal: the authored `IRON_sights` node is hidden and an optional
 `IRON_sights_removed` part is shown instead (the M4's low-profile gas block preserves
@@ -396,14 +398,27 @@ nor irons, ADS retains the base aim datum without a reticle. Removing an optic d
 not reinstall independently removed irons; `BASE_ATTACHMENTS` restores both.
 Optics own magnification, sensitivity and reticle. `WeaponDef.fits` has one shape per
 slot: a partial record keyed by attachment id whose entry enables that verified fit
-and holds its data (`fits.optic[id].eyeRelief`; `fits.rail.laser` is empty). Validation
+and holds its data (`fits.optic[id].eyeRelief`; `fits.rail.laser` and
+`fits.muzzle.suppressor` are empty). Validation
 and the load-time `MOUNT_<slot>` guard read these keys.
 Other weapons' conversion issues add their mount points/fit data; null retains their
 current integrated optic.
 `weapons.setAttachments(id, config)` changes an owned, loaded weapon synchronously
 outside the frame loop. It stages/validates before replacing the old mount and
-resolves sight/OpticData, muzzle and effective handling/suppression on the state's
-private definition; frame-time reticle, ADS and fire-event consumers allocate nothing.
+resolves sight/OpticData, the live muzzle socket and effective handling on the state's
+private definition. That definition carries the immutable attachment snapshot for fire-event
+consumers: audio/FX read `attachments.muzzle`; the old `suppressed` flag only preserves
+MCX/MPX integrated cans until their base conversions. Frame-time consumers allocate nothing.
+The shared suppressor's `SOCKET_mount` is its rear seating plane, with -Z bore forward,
++Y up and unit scale. `SOCKET_muzzle` is its endcap exit. Weapon `MOUNT_muzzle`
+transforms own fitting/orientation; `MUZZLE_device` hides while the can is installed,
+with optional `MUZZLE_device_removed` showing a thread adapter instead. Mounts/inspection
+clones follow the authored parent, never a baked live pose. M4 uses a 1/2-28 to 5/8-24
+sleeve rather than putting a direct-thread can over its SureFire flash hider.
+`viewmodel.muzzleWorld()` reads the installed exit for ballistics, flash, smoke and
+tracers; casing ejection remains at `SOCKET_ejection`. No ballistic/handling modifiers.
+`tools/blender/suppressor/` owns standalone authoring and shares exterior geometry with
+the legacy MCX, without depending on a generated MCX product.
 The M4's `MOUNT_optic` is an authored rail-contact transform under its weapon rig.
 Attachment `MOUNT_base` and `SOCKET_sight` define mounting and aiming in metres;
 instances follow the authored weapon animation. RMR uses the standalone
@@ -427,6 +442,8 @@ even when the initial M4 uses irons. Debug URL input is narrowed in `main.ts`:
 `?attachmentOptic=scope&attachmentIrons=removed`. `attachmentWeapon` must pass
 `isWeaponId` and compatibility/ownership checks.
 `attachmentRail=laser|none` selects the TOR Mini on all seven weapons.
+`attachmentMuzzle=suppressor|none` selects the M4 can independently of optic/rail/irons;
+`tools/capture.ts --muzzle=suppressor|none` uses the same validator.
 M590's lower-stock wrist relief removes its former glove contact; the complete
 source gate now requires zero firing-skin crossings, with no pinned-file contact
 exception. Its AIMPRO-style low integrated rear-sight rail supports RMR/ACOG,

@@ -13,6 +13,7 @@ import {
   configureWeaponAttachments,
   makeOpticModel,
   makeLaserModel,
+  makeSuppressorModel,
   mountAttachments,
   releaseAttachmentMount,
   isAttachmentConfig,
@@ -148,7 +149,9 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   irons.name = 'IRON_sights';
   const ironsRemoved = new THREE.Group();
   ironsRemoved.name = 'IRON_sights_removed';
-  root.add(irons, ironsRemoved);
+  const baseDevice = new THREE.Group();
+  baseDevice.name = 'MUZZLE_device';
+  root.add(irons, ironsRemoved, baseDevice);
   const assetScene = new THREE.Group();
   const base = new THREE.Object3D();
   base.name = 'MOUNT_base';
@@ -187,9 +190,10 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     attachments: BASE_ATTACHMENTS,
     attachmentGroup: new THREE.Group(),
     railGroup: new THREE.Group(),
+    muzzleGroup: new THREE.Group(),
+    muzzleSocket: null,
     laserEmitter: null,
     sight: new THREE.Vector3(),
-    muzzle: new THREE.Vector3(),
     optic: null,
   });
   const config: AttachmentConfig = { ...BASE_ATTACHMENTS, optic: 'rmr' };
@@ -199,7 +203,7 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     // Mounting while the authored root is posed must not bake its current pose.
     root.rotation.x = i * 0.1;
     configureWeaponAttachments(entry, config, optics);
-    assert.equal(root.children.length, 4);
+    assert.equal(root.children.length, 5);
     assert.equal(entry.attachmentGroup.parent, socket, 'instance follows its authored mount');
     assert.equal(irons.visible, config.ironSights);
     assert.equal(ironsRemoved.visible, !config.ironSights);
@@ -225,7 +229,6 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     assert(irons.visible);
     assert.equal(ironsRemoved.visible, false);
     assert.deepEqual(entry.sight.toArray(), model.nodes.sight);
-    assert.deepEqual(entry.muzzle.toArray(), model.nodes.muzzle);
     assert.equal(entry.def.eyeRelief, WEAPON_DEFS.rifle.eyeRelief);
     assert.equal(entry.def.adsFovScale, undefined);
     assert.equal(entry.def.adsSensScale, undefined);
@@ -262,8 +265,14 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
       def: { ...WEAPON_DEFS[id] },
       attachmentGroup: new THREE.Group(),
       railGroup: new THREE.Group(),
+      muzzleGroup: new THREE.Group(),
+      muzzleSocket: null,
     });
-    const base = { ...weapon.def, suppressed: WEAPON_DEFS[id].suppressed ?? false };
+    const base = {
+      ...weapon.def,
+      suppressed: WEAPON_DEFS[id].suppressed ?? false,
+      attachments: laserConfig,
+    };
     configureWeaponAttachments(weapon, laserConfig, optics, laser);
     assert.deepEqual(weapon.def, base, `${id}: laser has no handling/ballistic modifiers`);
     assert.equal(weapon.railGroup.parent, railMount);
@@ -284,7 +293,7 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     assert.equal(railMount.children.length, 0, `${id}: removal leaves no rail instance`);
   }
   for (let i = 0; i < 3; i++) {
-    const before = { ...entry.def };
+    const before = { ...entry.def, attachments: laserConfig };
     configureWeaponAttachments(entry, laserConfig, optics, laser);
     assert.deepEqual(entry.def, before, 'rail module changes no weapon stats');
     assert.equal(entry.railGroup.parent, railMount);
@@ -383,6 +392,62 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     }),
     materials
   );
+  // The active socket follows a transformed/animated mount, not a baked offset.
+  const muzzleMount = new THREE.Object3D();
+  muzzleMount.name = 'MOUNT_muzzle';
+  muzzleMount.position.set(0, 0.075, -0.44);
+  muzzleMount.rotation.y = 0.13;
+  const baseSocket = new THREE.Object3D();
+  baseSocket.name = 'SOCKET_muzzle';
+  baseSocket.position.fromArray(model.nodes.muzzle);
+  root.add(muzzleMount, baseSocket);
+  const canScene = new THREE.Group();
+  const canMount = new THREE.Object3D();
+  canMount.name = 'SOCKET_mount';
+  const canExit = new THREE.Object3D();
+  canExit.name = 'SOCKET_muzzle';
+  canExit.position.z = -0.236;
+  const canMesh = new THREE.Mesh(new THREE.CylinderGeometry(), new THREE.MeshStandardMaterial());
+  canScene.add(canMount, canExit, canMesh);
+  const can = makeSuppressorModel(fixture<GLTF>({ scene: canScene }));
+  let canDisposed = 0;
+  canMesh.geometry.addEventListener('dispose', (): void => {
+    canDisposed++;
+  });
+  const suppressed: AttachmentConfig = { ...BASE_ATTACHMENTS, muzzle: 'suppressor' };
+  viewmodel.active = entry;
+  for (let i = 0; i < 3; i++) {
+    configureWeaponAttachments(entry, suppressed, optics, null, can);
+    assert.equal(baseDevice.visible, false);
+    assert.equal(entry.muzzleGroup.parent, muzzleMount);
+    assert.equal(entry.def.attachments, entry.attachments);
+    assert.equal(entry.def.suppressed, false, 'M4 suppression comes from config, not a fixed flag');
+    root.rotation.x += 0.1;
+    muzzleMount.position.z -= 0.01;
+    muzzleMount.updateWorldMatrix(true, false);
+    const expected = canExit.position.clone().applyMatrix4(muzzleMount.matrixWorld);
+    assert(viewmodel.muzzleWorld(new THREE.Vector3()).distanceTo(expected) < 1e-10);
+    assert.notEqual(entry.muzzleSocket, canExit, 'instances own their transforms');
+    const installed = entry.muzzleGroup;
+    assert.throws((): void => configureWeaponAttachments(entry, suppressed, optics), /unavailable/);
+    assert.equal(entry.muzzleGroup, installed, 'failed staging retains the mounted can');
+    assert.equal(baseDevice.visible, false);
+    configureWeaponAttachments(entry, BASE_ATTACHMENTS, optics);
+    assert.equal(installed.parent, null);
+    assert.equal(installed.children.length, 0);
+    assert.equal(muzzleMount.children.length, 0);
+    assert.equal(entry.muzzleSocket, null);
+    assert(baseDevice.visible);
+    assert(
+      viewmodel
+        .muzzleWorld(new THREE.Vector3())
+        .distanceTo(baseSocket.getWorldPosition(new THREE.Vector3())) < 1e-10
+    );
+    assert.equal(canDisposed, 0, 'removal never disposes borrowed geometry');
+  }
+  viewmodel.active = null;
+  can.dispose();
+  assert.equal(canDisposed, 1, 'the asset owns shared geometry exactly once');
   // Grip approaches must not blend through generic fingers on wrist arrival.
   const approach = viewmodel.clipResult;
   approach.active = true;

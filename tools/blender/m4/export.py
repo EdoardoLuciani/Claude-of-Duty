@@ -39,7 +39,7 @@ def export_asset(output, asset, parents, separate, clips):
     # Count both magazines/cartridge instances even when glTF deduplicates buffers.
     primitives=[p for node in doc['nodes'] if 'mesh' in node for p in doc['meshes'][node['mesh']]['primitives']]
     stats={'triangles':sum(doc['accessors'][p['indices']]['count']//3 for p in primitives),'primitives':len(primitives),'materials':len(doc['materials']),'meshes':len(doc['meshes']),'bytes':path.stat().st_size,'images':len(doc['images'])}
-    assert stats['triangles']<=92500 and stats['primitives']==20 and stats['materials']==1 and stats['bytes']<=13000000 and stats['images']==4,stats
+    assert stats['triangles']<=92800 and stats['primitives']==22 and stats['materials']==1 and stats['bytes']<=13000000 and stats['images']==4,stats
     assert {animation['name'] for animation in doc['animations']} == set(clips)
     for animation in doc['animations']:
         duration=clips[animation['name']]['duration']

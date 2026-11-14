@@ -125,6 +125,18 @@ for (const weapon of [...fixtureKeys(MUZZLE_PROFILES), 'unknown' as const]) {
     });
   }
 }
+// A mounted can changes the very next flash without changing the base weapon definition.
+for (const suppressed of [false, true, false]) {
+  const { fx } = recorder(0xabcd, 0.8);
+  assert.equal(
+    muzzleFlash(fx, {
+      position: point,
+      direction: incident,
+      weapon: { class: 'carbine', attachments: { muzzle: suppressed ? 'suppressor' : null } },
+    }),
+    suppressed ? MUZZLE_PROFILES.suppressed : MUZZLE_PROFILES.carbine
+  );
+}
 for (const [name, options] of Object.entries({
   default: {},
   staged: { flightTime: 0.3, warm: 0.7 },

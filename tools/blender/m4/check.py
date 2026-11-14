@@ -176,6 +176,12 @@ face=CI@bpy.data.objects['SOCKET_bolt_face'].matrix_world.translation
 crown=CI@bpy.data.objects['SOCKET_barrel_crown'].matrix_world.translation
 near((face-crown).length,.3683,.00001)
 flash=pick('FH556RC');lo,hi=bounds(flash);near(hi[2]-lo[2],.06604)
+assert all(o.parent.name=='MUZZLE_device' for o in flash),'flash hider must remove as one assembly'
+muzzle=bpy.data.objects['MOUNT_muzzle']
+seat=CI@rig.matrix_world.inverted()@muzzle.matrix_world
+assert (seat.translation-Vector((0,.075,crown.z+.013))).length<1e-6,'muzzle seat must meet the barrel shoulder'
+assert (seat.to_3x3()@Vector((0,1,0))-Vector((0,0,-1))).length<1e-6,'suppressor must point down the bore'
+assert not tree(pick('Muzzle thread')).overlap(tree(pick('M4 thread adapter'))),'adapter must clear barrel threads'
 # The nominal gauge is clear inside the rail. Allow the disclosed polygon chord
 # tolerance (.1 mm diameter), not a silent change to the published 29.210 mm.
 guard_tree=tree(guard);radius=.014555

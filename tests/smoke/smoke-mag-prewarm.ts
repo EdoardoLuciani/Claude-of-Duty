@@ -24,7 +24,12 @@ irons.name = 'IRON_sights';
 const ironsRemoved = new THREE.Group();
 ironsRemoved.name = 'IRON_sights_removed';
 ironsRemoved.visible = false;
-group.add(magazine, irons, ironsRemoved);
+const muzzleDevice = new THREE.Group();
+muzzleDevice.name = 'MUZZLE_device';
+const muzzleAdapter = new THREE.Group();
+muzzleAdapter.name = 'MUZZLE_device_removed';
+muzzleAdapter.visible = false;
+group.add(magazine, irons, ironsRemoved, muzzleDevice, muzzleAdapter);
 group.visible = false;
 const radio = new THREE.Group();
 radio.visible = false;
@@ -47,7 +52,7 @@ const weapon = fixture<WeaponEntry>({
   group,
   parts: { magazine },
   magLen: 0.15,
-  model: fixture<WeaponEntry['model']>({ id: 'rifle', scene: group }),
+  model: fixture<WeaponEntry['model']>({ id: 'rifle', scene: group, root: group }),
 });
 const system = new WeaponSystem();
 system._droppedMags = [];
@@ -71,6 +76,7 @@ const render = fixture<RenderSystem>({
   _warmGraph(): ReturnType<RenderSystem['_warmGraph']> {
     calls++;
     assert(irons.visible && ironsRemoved.visible, 'warm both independent iron-sight variants');
+    assert(muzzleDevice.visible && muzzleAdapter.visible, 'warm both muzzle states');
     assert.equal(scene.children.length, 3);
     assert.equal(system.pickups.items.length, 0);
     assert.equal(system.pickups._nextId, 1);
@@ -114,6 +120,7 @@ assert.equal(scene.children.length, 0);
 loaded();
 await Promise.resolve();
 assert.equal(calls, 1);
+assert.equal(muzzleAdapter.visible, true, 'muzzle adapter remains warm until completion');
 const graphWarm = { ms: 12, geometries: 8, frameUnchanged: true };
 finish(graphWarm);
 const report = await pending;
@@ -124,6 +131,8 @@ assert.equal(radio.visible, false);
 assert.equal(group.visible, false);
 assert(irons.visible);
 assert.equal(ironsRemoved.visible, false);
+assert(muzzleDevice.visible);
+assert.equal(muzzleAdapter.visible, false, 'restore the base muzzle after warmup');
 assert.equal(scopeOverlay.visible || reticle.visible, false);
 assert.equal(grenade.visible, false);
 assert.equal(scene.children.length, 2, 'temporary ammo visual was removed');
@@ -188,6 +197,8 @@ for (const [provider, ok] of cases) {
   else assert.deepEqual(summary.hooks.weapons, { ok: false, reason: failure.message });
 }
 assert.equal(failures, 1);
+assert(muzzleDevice.visible);
+assert.equal(muzzleAdapter.visible, false, 'failed warmup restores the muzzle too');
 assert.equal(radio.visible, false);
 assert.equal(group.visible, false);
 assert(system._droppedMags.every((p): boolean => !p.group.visible));
