@@ -42,8 +42,8 @@ unsuppressed; only the configured shared suppressor selects suppressed audio/FX.
 `IRON_sights` owns both deployed clamps, hinges and leaves. The rear 3.6mm peep
 at x=−.079 and front blade at x=.284 share z=.074. Base ADS uses this rear datum,
 60mm eye relief and a .7 weapon-FOV ratio, not the removed ROMEO optical axis.
-`IRON_sights_removed` retains the same hardware folded flat. Removal/reinstallation
-is independent of optic selection; no optic and no irons is valid, with no reticle.
+`IRON_sights_removed` retains the same hardware folded flat; any mounted optic folds
+the irons, and removing it redeploys them.
 
 | Slot | Authored datum | Enabled catalog fits |
 | --- | --- | --- |

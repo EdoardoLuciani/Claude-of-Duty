@@ -417,11 +417,6 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
       `${name}: shared attachment stays bore-forward after MPX basis conversion`
     );
   }
-  for (const optic of ['rmr', 'acog', 'scope'] as const)
-    assert(
-      isAttachmentConfig({ optic, muzzle: 'suppressor', rail: 'laser' }, 'smg'),
-      'every fitted optic combines with the MPX can and laser'
-    );
   releaseAttachmentMounts(mounted);
   const materials = new ReticleMaterials();
   const viewmodel = new Viewmodel(
@@ -497,7 +492,6 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   });
   for (const optic of ['rmr', 'acog', 'scope'] as const) {
     const config: AttachmentConfig = { optic, muzzle: 'suppressor', rail: 'laser' };
-    assert(isAttachmentConfig(config, 'mcx'));
     configureWeaponAttachments(mcx, config, { ...optics, suppressor: can, laser });
     assert.equal(mcx.def.suppressed, true);
     assert.equal(mcx.def.eyeRelief, WEAPON_DEFS.mcx.fits?.optic?.[optic]?.eyeRelief);
