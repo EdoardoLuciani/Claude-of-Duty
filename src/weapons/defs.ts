@@ -579,6 +579,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     fits: {
       optic: { rmr: { eyeRelief: 0.125 }, acog: { eyeRelief: 0.11 }, scope: { eyeRelief: 0.09 } },
       rail: { laser: {} },
+      muzzle: { suppressor338: {} },
     },
     removableIrons: true,
     sprintPos: [0.088, -0.31, -0.3],
