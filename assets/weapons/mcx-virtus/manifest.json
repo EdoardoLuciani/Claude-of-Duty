@@ -1,6 +1,6 @@
 {
   "asset": "MCX VIRTUS .300 BLK",
-  "optic": "ACOG 4x32 (TA31F / TA51)",
+  "optic": "removable iron sights",
   "units": "metres",
   "blender_forward": "+X",
   "gltf_up": "+Y",
@@ -88,10 +88,10 @@
     }
   },
   "stats": {
-    "triangles": 60500,
-    "vertices": 32784,
-    "meshes": 4,
-    "material_slots": 8
+    "triangles": 43536,
+    "vertices": 23428,
+    "meshes": 17,
+    "material_slots": 17
   },
   "textures": {
     "resolution": 1024,
@@ -106,6 +106,6 @@
     "Review-only shared skins bake actual runtime poses at 120 Hz in the editable blend, never the weapon GLB.",
     "Visibility is authored CONSTANT; motion LINEAR at 60 Hz. Stock Actions export, no GLB rewriting.",
     "Export-only corner pigment and scalar finish lookup; UV0 albedo/normal detail retained. Roughness grain reduced to its mean.",
-    "One opaque material; MCX adapter selects exact fine/polymer/rubber/fiber normal strengths and fiber emission from UV1 finish identity. Lens remains separate."
+    "One opaque material; MCX adapter selects exact fine/polymer/rubber normal strengths from stable UV1 finish identity. No integrated glass or suppressor."
   ]
 }

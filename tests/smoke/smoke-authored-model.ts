@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+import mcxManifest from '../../assets/weapons/mcx-virtus/manifest.json' with { type: 'json' };
 import mpxManifest from '../../assets/weapons/sig-mpx/manifest.json' with { type: 'json' };
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { LAYER } from '../../src/physics/surfaces.ts';
@@ -23,6 +24,7 @@ import { authoredModel, checkAuthoredDuration } from '../../src/weapons/authored
 import { WEAPON_DEFS, WEAPON_IDS } from '../../src/weapons/defs.ts';
 import { WeaponLaser } from '../../src/weapons/laser.ts';
 import { ReticleMaterials } from '../../src/weapons/materials-tsl.ts';
+import { makeMCXModel } from '../../src/weapons/mcx.ts';
 import { makeMPXModel } from '../../src/weapons/mpx.ts';
 import type { WeaponEntry, WeaponModelRecord } from '../../src/weapons/runtime-types.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
@@ -310,6 +312,50 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     );
     assert.equal(entry.attachments, previousConfig, 'failed staging preserves the configuration');
   }
+  // MCX retains its translated/rotated native frame. Cached ADS must agree
+  // with real mounted glass, and remounting during a rig pose must not bake it.
+  const mcxScene = new THREE.Group(),
+    mcxRoot = new THREE.Group();
+  mcxRoot.name = 'MCX_RIG';
+  mcxScene.add(mcxRoot);
+  for (const name of ['muzzle', 'ejection', 'sight', 'magazine']) {
+    const node = new THREE.Object3D();
+    node.name = `SOCKET_${name}`;
+    mcxRoot.add(node);
+  }
+  const mcxMount = new THREE.Object3D();
+  mcxMount.name = 'MOUNT_optic';
+  mcxMount.position.set(-0.036, 0.046, 0);
+  mcxMount.rotation.y = -Math.PI / 2;
+  mcxRoot.add(mcxMount);
+  const mcxIrons = new THREE.Group();
+  mcxIrons.name = 'IRON_sights';
+  mcxRoot.add(mcxIrons);
+  const mcxDevice = new THREE.Group();
+  mcxDevice.name = 'MUZZLE_device';
+  mcxRoot.add(mcxDevice);
+  const nativeMCX = makeMCXModel(
+    fixture<GLTF>({
+      scene: mcxScene,
+      animations: Object.entries(mcxManifest.clips).map(([name, data]): THREE.AnimationClip =>
+        clip(name, track(data.duration ? [0, data.duration] : [0]))
+      ),
+    })
+  );
+  assert(!('opticGlass' in nativeMCX.nodes), 'base MCX has no integrated reticle/glass');
+  const mcxMounted = mountAttachments(nativeMCX, config, optics);
+  nativeMCX.scene.updateMatrixWorld(true);
+  const mcxExpected = asset.sight.clone().applyMatrix4(mcxMount.matrixWorld);
+  assert(
+    mcxMounted.sight.distanceTo(mcxExpected) < 1e-10,
+    'MCX ADS includes native wrapper basis/offset'
+  );
+  releaseAttachmentMounts(mcxMounted);
+  mcxRoot.rotation.y = 0.3;
+  const mcxPosed = mountAttachments(nativeMCX, config, optics);
+  assert(mcxPosed.sight.distanceTo(mcxExpected) < 1e-10, 'MCX remount preserves rest ADS');
+  assert.equal(mcxPosed.attachmentGroup.parent, mcxMount, 'MCX art still follows the live rig');
+  releaseAttachmentMounts(mcxPosed);
   // MPX rebases native +X geometry, but shared attachments keep canonical locals.
   const nativeScene = new THREE.Group(),
     nativeRoot = new THREE.Group();
@@ -401,7 +447,6 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   }
   assert(isAttachmentConfig({ ...BASE_ATTACHMENTS, ironSights: false }, 'smg'));
   releaseAttachmentMounts(mounted);
-  laser.dispose();
   configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, ironSights: false }, optics);
   assert.equal(entry.optic, null);
   assert.equal(irons.visible, false, 'irons can be removed without mounting an optic');
@@ -473,7 +518,45 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     );
     assert.equal(canDisposed, 0, 'removal never disposes borrowed geometry');
   }
+  // MCX is an unsuppressed iron-sight base. Each accepted optic can coexist
+  // with the can/laser, and clearing the config must restore bare tuning/parts.
+  const mcx = fixture<WeaponEntry>({
+    ...entry,
+    id: 'mcx',
+    model: fixture<Extract<WeaponModelRecord, { id: 'mcx' }>>({
+      ...model,
+      id: 'mcx',
+      nodes: nativeMCX.nodes,
+    }),
+    def: { ...WEAPON_DEFS.mcx },
+  });
+  for (const optic of ['rmr', 'acog', 'scope'] as const) {
+    const config: AttachmentConfig = {
+      optic,
+      ironSights: optic !== 'scope',
+      muzzle: 'suppressor',
+      rail: 'laser',
+    };
+    assert(isAttachmentConfig(config, 'mcx'));
+    configureWeaponAttachments(mcx, config, { ...optics, suppressor: can, laser });
+    assert.equal(mcx.def.suppressed, true);
+    assert.equal(mcx.def.eyeRelief, WEAPON_DEFS.mcx.fits?.optic?.[optic]?.eyeRelief);
+    assert.equal(irons.visible, config.ironSights);
+    assert.equal(baseDevice.visible, false);
+    configureWeaponAttachments(mcx, BASE_ATTACHMENTS, optics);
+    assert.equal(mcx.optic, null);
+    assert.equal(mcx.def.suppressed, false);
+    assert.equal(mcx.def.adsFovScale, undefined);
+    assert.equal(mcx.def.eyeRelief, WEAPON_DEFS.mcx.eyeRelief);
+    assert(irons.visible && !ironsRemoved.visible && baseDevice.visible);
+  }
+  assert(!isAttachmentConfig({ ...BASE_ATTACHMENTS, optic: 'scope' }, 'mcx'));
+  configureWeaponAttachments(mcx, { ...BASE_ATTACHMENTS, ironSights: false }, optics);
+  assert.equal(mcx.optic, null);
+  assert(!irons.visible && ironsRemoved.visible);
+  configureWeaponAttachments(mcx, BASE_ATTACHMENTS, optics);
   viewmodel.active = null;
+  laser.dispose();
   can.dispose();
   assert.equal(canDisposed, 1, 'the asset owns shared geometry exactly once');
   // Grip approaches must not blend through generic fingers on wrist arrival.

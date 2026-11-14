@@ -62,7 +62,7 @@ def build(output, render=False, quick=False):
     stats = export_asset(asset, parts, output)
     manifest = {
         'asset': 'MCX VIRTUS .300 BLK',
-        'optic': bpy.data.objects['receiver']['optic'],
+        'optic': 'removable iron sights',
         'units': 'metres',
         'blender_forward': '+X',
         'gltf_up': '+Y',
@@ -83,7 +83,7 @@ def build(output, render=False, quick=False):
             'Review-only shared skins bake actual runtime poses at 120 Hz in the editable blend, never the weapon GLB.',
             'Visibility is authored CONSTANT; motion LINEAR at 60 Hz. Stock Actions export, no GLB rewriting.',
             'Export-only corner pigment and scalar finish lookup; UV0 albedo/normal detail retained. Roughness grain reduced to its mean.',
-            'One opaque material; MCX adapter selects exact fine/polymer/rubber/fiber normal strengths and fiber emission from UV1 finish identity. Lens remains separate.',
+            'One opaque material; MCX adapter selects exact fine/polymer/rubber normal strengths from stable UV1 finish identity. No integrated glass or suppressor.',
         ],
     }
     (output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
