@@ -38,10 +38,11 @@ Do **not** scale this rifle can indiscriminately:
 - P320 (9 mm) uses the separate [`suppressor9mm` compact booster can](../compact-9mm/README.md)
   (#714); this fixed rifle direct-thread model is not a P320 fit.
 - M590 (12 gauge) needs a dedicated large-bore model and adapter, not a stretched
-  7.62 can. No current fit is enabled.
+  7.62 can. Its dedicated [suppressor12g](../12g-suppressor/README.md) now supplies
+  that fit (#715); this rifle ID remains incompatible with M590.
 
-The .338 and pistol cans have separate catalog entries; this rifle model is never
-substituted for either. Unverified combinations
+The .338, pistol and shotgun cans have separate catalog entries; this rifle model
+is never substituted for them. Unverified combinations
 are rejected by the common fit validator. No damage, velocity, recoil, accuracy,
 AI-hearing or handling modifiers are introduced, and no shop purchase is added.
 The existing suppressed flash recipe and the #668 recordings are presentation only.

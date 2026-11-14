@@ -123,3 +123,9 @@ and `--force` rebuilds all. These products are ignored, not committed; weapon
 because code imports them. World products, including `level.json`, are also ignored.
 `bun run build:ci` skips Blender/model assets but generates missing or stale world
 products; `bun run test` prepares the world before launching tests.
+
+The M590's separate [`suppressor12g`](../assets/attachments/12g-suppressor/README.md)
+is authored in `tools/blender/suppressor12g/` and cooked with
+`bun run models:cook -- suppressor12g`. Its permanent adapter seat, large-bore
+clearance and intentional iron-sight occlusion are owned by that asset and
+`tools/blender/m590/muzzle.py`, not the shared rifle suppressor recipe.

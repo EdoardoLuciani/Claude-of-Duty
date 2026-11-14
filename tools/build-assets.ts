@@ -129,6 +129,7 @@ const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
   suppressor: ['tools/blender/suppressor'],
   suppressor9mm: ['tools/blender/suppressor9mm'],
   suppressor338: ['tools/blender/suppressor-338'],
+  suppressor12g: ['tools/blender/suppressor12g'],
   acog: [
     'tools/blender/acog',
     'tools/blender/mcx/primitives.py',
@@ -160,6 +161,7 @@ function cookStep(id: ModelId, salt: string[]): AssetStep {
       ...(id === 'scope' ? [`${directory}/scope.blend`] : []),
       ...(id === 'suppressor9mm' ? [`${directory}/suppressor9mm.blend`] : []),
       ...(id === 'suppressor338' ? [`${directory}/suppressor338.blend`] : []),
+      ...(id === 'suppressor12g' ? [`${directory}/suppressor12g.blend`] : []),
     ],
     commands: [
       blender(

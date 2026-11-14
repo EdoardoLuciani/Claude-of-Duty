@@ -285,3 +285,7 @@ print('M590_SOURCE_OK:',len(meshes),'editable component meshes;',len(controls),'
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tor_mini.mounts import check_laser_mount
 check_laser_mount('m590')
+
+# Dedicated large-bore can; independent of the receiver's optic/rail fit seam.
+from m590.muzzle import check_muzzle
+check_muzzle(ROOT,manifest,rig,meshes,review,pose,tree,point,CI)
