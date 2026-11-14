@@ -316,10 +316,13 @@ export class WeaponSystem {
     // Attachments load alongside the spawn weapons. A failed asset only makes that
     // attachment unavailable; the base weapons and their irons remain usable.
     this._laser = new WeaponLaser(ctx.scene);
-    const attachments = loadAttachments(renderer);
+    // Store as soon as loaded so dispose() releases them even if a spawn weapon fails.
+    const attachments = loadAttachments(renderer).then((assets): void => {
+      this._attachments = assets;
+    });
     try {
       const records = await Promise.all(spawn.map(load));
-      this._attachments = await attachments;
+      await attachments;
       for (let i = 0; i < spawn.length; i++) {
         tris += this.viewmodel.addWeapon(
           records[i],
