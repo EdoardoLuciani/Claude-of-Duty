@@ -84,9 +84,15 @@ assert mount.parent==bpy.data.objects['EVOLYS_RIG']
 mp=CI@mount.matrix_world.translation
 assert abs(mp.x)<1e-6 and abs(mp.y-rail_top)<1e-6 and abs(mp.z-(.105-30*.01005))<1e-6
 assert Vector(mount.rotation_euler).length<1e-6,'optic mount orientation'
-# Muzzle remains a future datum; the rail seats the shared TOR Mini.
-muzzle=CI@bpy.data.objects['MOUNT_muzzle'].matrix_world.translation
-assert (muzzle-CI@bpy.data.objects['SOCKET_muzzle'].matrix_world.translation).length<1e-6
+# Rear seating plane at the barrel crown, distinct from the base hider exit.
+muzzle_mount=bpy.data.objects['MOUNT_muzzle']
+muzzle=CI@muzzle_mount.matrix_world.translation
+assert muzzle_mount.parent==bpy.data.objects['EVOLYS_RIG']
+assert (muzzle-Vector((0,.075,manifest['dimensions']['barrelCrown']))).length<1e-6
+assert (CI@muzzle_mount.matrix_world.to_3x3()@Vector((0,1,0))-Vector((0,0,-1))).length<1e-6
+assert (muzzle_mount.matrix_world.to_scale()-Vector((1,1,1))).length<1e-6
+assert bpy.data.objects['MUZZLE_device_mesh'].parent==bpy.data.objects['MUZZLE_device']
+assert bpy.data.objects['MUZZLE_device_removed_mesh'].parent==bpy.data.objects['MUZZLE_device_removed']
 rail=bpy.data.objects['MOUNT_rail']
 lower_y=.075+(219-336)*(.948/1899)
 assert (CI@rail.matrix_world.translation-Vector((0,lower_y,-.363725))).length<1e-6
@@ -173,27 +179,50 @@ def rig_tree(objects):
         faces.extend(tuple(offset+i for i in tri.vertices) for tri in mesh.loop_triangles)
         evaluated.to_mesh_clear()
     return BVHTree.FromPolygons(vertices,faces,all_triangles=True)
-fixed_irons=rig_tree([irons]);rail_tree=rig_tree([bpy.data.objects['receiver_mesh']]);optics={}
-for optic_id,folder in [('rmr','trijicon-rmr'),('acog','trijicon-acog'),('scope','schmidt-bender-pm-ii')]:
-    path=ROOT/'assets/attachments'/folder/(optic_id+'.blend')
-    assert path.exists(),f'Rebuild shared {optic_id} before EVOLYS fit checks: {path}'
+fixed_irons=rig_tree([irons]);rail_tree=rig_tree([bpy.data.objects['receiver_mesh']]);attachments={}
+bpy.data.objects['MUZZLE_device_removed'].hide_viewport=False
+bpy.context.view_layer.update()
+for attachment_id,folder,seat,base_name,filename in [
+    ('rmr','trijicon-rmr',mount,'MOUNT_base','rmr'),
+    ('acog','trijicon-acog',mount,'MOUNT_base','acog'),
+    ('scope','schmidt-bender-pm-ii',mount,'MOUNT_base','scope'),
+    ('suppressor','sig-srd762ti',muzzle_mount,'SOCKET_mount','suppressor'),
+    ('laser','steiner-tor-mini',rail,'SOCKET_mount','tor-mini')]:
+    path=ROOT/'assets/attachments'/folder/(filename+'.blend')
+    assert path.exists(),f'Rebuild shared {attachment_id} before EVOLYS fit checks: {path}'
     with bpy.data.libraries.load(str(path),link=False) as (source,target):
         target.objects=source.objects
     objects=target.objects
-    base=next(o for o in objects if o.name.startswith('MOUNT_base'))
+    base=next(o for o in objects if o.name.startswith(base_name))
     meshes=[o for o in objects if o.type=='MESH']
     for obj in objects:scene.collection.objects.link(obj)
     bpy.context.view_layer.update()
-    transform=mount.matrix_world@base.matrix_world.inverted()
+    transform=seat.matrix_world@base.matrix_world.inverted()
     matrices={obj:transform@obj.matrix_world for obj in meshes}
     for obj,matrix in matrices.items():obj.parent=None;obj.matrix_world=matrix
-    bpy.context.view_layer.update();optics[optic_id]=rig_tree(meshes)
-    # Clamps straddle the rail-contact plane; test actual rail/foot surfaces,
-    # not whether a bevel happens to leave a vertex exactly on that plane.
-    assert optics[optic_id].overlap(rail_tree),(optic_id,'no rail contact')
-    clash=bool(optics[optic_id].overlap(fixed_irons))
-    assert clash==(optic_id=='scope'),(optic_id,'update evidence-based opticClashes',clash)
+    bpy.context.view_layer.update();attachments[attachment_id]=rig_tree(meshes)
+    if base_name=='MOUNT_base':
+        # Clamps straddle the rail-contact plane; test actual rail/foot surfaces.
+        assert attachments[attachment_id].overlap(rail_tree),(attachment_id,'no rail contact')
+        clash=bool(attachments[attachment_id].overlap(fixed_irons))
+        assert clash==(attachment_id=='scope'),(attachment_id,'update evidence-based opticClashes',clash)
+    if attachment_id=='suppressor':
+        exit=next(o for o in objects if o.name.startswith('SOCKET_muzzle'))
+        position=CI@(rig.matrix_world.inverted()@transform@exit.matrix_world).translation
+        assert (position-(muzzle+Vector((0,0,-.236)))).length<1e-6,'mounted can exit'
+        can=attachments[attachment_id]
+        for obj in (hg,bpy.data.objects['receiver_mesh'],bpy.data.objects['MUZZLE_device_removed_mesh'],irons):
+            assert not can.overlap(rig_tree([obj])),(obj.name,'suppressor hits fixed surface')
+        # 7.8 mm gauge clears the actual adapter and unchanged shared endcap.
+        adapter_tree=rig_tree([bpy.data.objects['MUZZLE_device_removed_mesh']])
+        for i in range(33):
+            angle=i*math.tau/32;radius=.0039 if i<32 else 0
+            origin=C@(position+Vector((radius*math.cos(angle),radius*math.sin(angle),-.001)))
+            for tree in (can,adapter_tree):
+                assert tree.ray_cast(origin,C@Vector((0,0,1)),.237)[0] is None,'blocked mounted bore'
     for obj in objects:bpy.data.objects.remove(obj,do_unlink=True)
+for other in ('rmr','acog','scope','laser'):
+    assert not attachments['suppressor'].overlap(attachments[other]),(other,'suppressor slot collision')
 # Check all clips on the native 120 Hz lattice, including exact endpoints.
 # The stock is rigid (there is no authored fold clip). Preserve its geometry;
 # cover/charging/belt and BOTH actual deformed shared review arms are swept.
@@ -231,11 +260,11 @@ for name,info in clips.items():
             if obj in hands:
                 for pouch_name,target in pouch_trees:
                     assert not tree.overlap(target),(name,frame,obj.name,pouch_name,'free hand crosses visible pouch')
-            for optic_id,target in optics.items():
-                assert not tree.overlap(target),(name,frame,obj.name,optic_id,'attachment collision')
+            for attachment_id,target in attachments.items():
+                assert not tree.overlap(target),(name,frame,obj.name,attachment_id,'attachment collision')
             assert not tree.overlap(fixed_irons),(name,frame,obj.name,'iron collision')
 print('EVOLYS_FREE_HAND_CLEARANCE_OK:',free_poses,'native free-motion poses; both hands against visible pouch instances')
-print(f'EVOLYS_ATTACHMENT_CLEARANCE_OK: {poses} native poses, rmr/acog with irons, scope with irons removed; cover, charging, stock, belt and deformed hands; muzzle remains a future datum; TOR Mini checked separately')
+print(f'EVOLYS_ATTACHMENT_CLEARANCE_OK: {poses} native poses, rmr/acog with irons, scope with irons removed, SRD762Ti and TOR Mini; cover, charging, stock, belt and both deformed hands; bipod N/A (not authored), sprint uses the same rigid mount')
 print('EVOLYS_CHECK_OK: mesh envelope, barrel, vents, packed maps, aligned removable irons, closed stock joints, one-pitch native feed, belt/solid clearance, enclosed tail and synchronized DCC wrists/skins')
 
 # Actual shared rail attachment, independent of the optic catalog.
