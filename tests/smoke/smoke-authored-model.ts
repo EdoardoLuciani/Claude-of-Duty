@@ -478,6 +478,7 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     );
     assert.equal(canDisposed, 0, 'removal never disposes borrowed geometry');
   }
+  assert(isAttachmentConfig({ ...suppressed, rail: 'laser' }, 'lmg'));
   // MCX is an unsuppressed iron-sight base. Each accepted optic can coexist
   // with the can/laser, and clearing the config must restore bare tuning/parts.
   const mcx = fixture<WeaponEntry>({

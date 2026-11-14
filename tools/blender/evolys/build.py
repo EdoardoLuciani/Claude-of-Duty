@@ -34,6 +34,7 @@ def build(output, render=False, quick=False):
         o=bpy.data.objects.new(name,None);asset.objects.link(o);o.location=xyz(loc);o.parent=parent;o.empty_display_size=.01;bpy.context.view_layer.update();return o
     rig=empty('EVOLYS_RIG');body=empty('receiver',parent=rig);hg=empty('handguard',parent=rig)
     stock=empty('stock',parent=rig);irons=empty('IRON_sights',parent=rig)
+    device=empty('MUZZLE_device',parent=rig);adapter=empty('MUZZLE_device_removed',parent=rig)
     cover=empty('feed_cover',(-.025,.060,-.215),rig)
     charging=empty('charging_handle',parent=rig);bolt=empty('bolt',parent=rig);trigger=empty('trigger',(0,.003,-.020),rig)
     pouch=empty('pouch',parent=rig);spare=empty('pouch_spare',parent=rig)
@@ -204,12 +205,17 @@ def build(output, render=False, quick=False):
     cyl('Regulator knob',(0,.044,-.435),.009,.014,bright,hg,sides=24)
     cyl('Short stroke piston',(0,.048,-.316),.004,.205,steel,hg,sides=20)
     crown=zy(1956,219)[0];hider=abs(crown-barrel_end)
-    h=cyl('Flash hider',(0,.075,(crown+barrel_end)/2),.0112,hider,steel,hg,sides=40)
+    h=cyl('Flash hider',(0,.075,(crown+barrel_end)/2),.0112,hider,steel,device,sides=40)
     cut(h,cyl('CUT bore',(0,.075,(crown+barrel_end)/2),.0041,hider+.004,None,None,sides=32,bevel=0))
     for i in range(4):
         ang=i*math.pi/2;x=math.sin(ang)*.01;y=.075+math.cos(ang)*.01
         cutter=box('CUT flash slot',(x,y,crown+.016),(.004,.006,.026),None,None,.0008);cutter.rotation_euler.y=ang;cut(h,cutter)
-    cyl('Muzzle shoulder',(0,.075,barrel_end+.005),.013,.014,steel,hg,sides=32)
+    cyl('Muzzle shoulder',(0,.075,barrel_end+.005),.013,.014,steel,device,sides=32)
+    # Exterior game-fit sleeve, not a certified FN thread specification. Its
+    # 18.6 mm OD clears the unchanged SRD762Ti's 19 mm rear opening.
+    sleeve=cyl('EVOLYS suppressor adapter',(0,.075,barrel_end-.008),.0093,.016,steel,adapter,sides=40)
+    cut(sleeve,cyl('CUT adapter bore',(0,.075,barrel_end-.008),.0041,.020,None,None,sides=32,bevel=0))
+    adapter.hide_render=True;adapter.hide_viewport=True
     # Revised 2024 M4-type stock with the actual broad cheek shell, latch, open web.
     cyl('Buffer extension',(0,.075,.228),.014,.262,steel,stock,sides=40)
     cyl('Receiver castle nut',(0,.075,.110),.016,.011,steel,stock,sides=32)
@@ -295,7 +301,7 @@ def build(output, render=False, quick=False):
         faces=[tuple(range(5,-1,-1)),tuple(range(6,12))]
         faces.extend((j,(j+1)%6,(j+1)%6+6,j+6) for j in range(6))
         mesh('Lower Picatinny tooth',vertices,faces,fde,hg,.0002)
-    empty('MOUNT_muzzle',(0,.075,crown),rig)
+    empty('MOUNT_muzzle',(0,.075,barrel_end),rig)
     # Identity keeps the emitter forward and the body below its contact datum.
     empty('MOUNT_rail',(0,lower_y,-.363725),hg)
     # Soft 100-round pouch with a rigid mounting lid and shallow seam relief.
@@ -350,7 +356,7 @@ def build(output, render=False, quick=False):
     bpy.ops.object.join();belt_mesh=bpy.context.object;belt_mesh.name='belt_mesh';belt_mesh.parent=belt
     mod=belt_mesh.modifiers.new('Rigid linked belt','ARMATURE');mod.object=belt
     # Consolidate only parts sharing a rigid transform, preserving all hinge nodes.
-    for parent in (body,hg,stock,irons,cover,charging,bolt,trigger,pouch,spare):
+    for parent in (body,hg,stock,irons,device,adapter,cover,charging,bolt,trigger,pouch,spare):
         objects=[o for o in list(asset.objects) if o.type=='MESH' and o.parent==parent]
         if not objects:continue
         for o in objects:
@@ -413,6 +419,7 @@ def build(output, render=False, quick=False):
     prepare_export_actions(asset, clips)
     bake_finish_atlas(asset, OUT)
     consolidate_static_surfaces(asset)
+    adapter.hide_viewport=False
     bpy.ops.object.select_all(action='DESELECT')
     for o in asset.objects:o.select_set(True)
     bpy.context.view_layer.objects.active=rig
