@@ -107,6 +107,11 @@ rail path on all seven weapons. M590's full source checks now use strict zero-cr
 firing-hand clearance; its low integrated-sight top rail supports RMR/ACOG only,
 independent of the optional laser on fixed magazine-tube clamps (#686).
 
+The dedicated [.338 suppressor](../assets/attachments/suppressor-338/README.md)
+is authored in `tools/blender/suppressor-338/`, with its own `suppressor338`
+cook/catalog ID and AX338-only muzzle fit. Its saved bore/socket checks and
+`tools/blender/ax338/muzzle.py` clearance sweep are separate from the shared SRD762Ti.
+
 Normal `bun run dev` / `bun run build` (and `bun run assets`) run
 `tools/build-assets.ts`: arms and bandage, each weapon and its cook, standalone
 attachments and soldiers in Blender, then procedural textures and soldier/hull

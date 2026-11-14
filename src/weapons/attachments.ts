@@ -17,7 +17,7 @@ import type { OpticData, WeaponEntry, WeaponModelRecord } from './runtime-types.
 const OPTIC_IDS = ['rmr', 'acog', 'scope'] as const;
 export type OpticId = (typeof OPTIC_IDS)[number];
 export type RailId = 'laser';
-export type MuzzleId = 'suppressor';
+export type MuzzleId = 'suppressor' | 'suppressor338';
 
 /** Null means the authored base weapon (`optic: null` aims through its irons). */
 export interface AttachmentConfig {
@@ -184,6 +184,7 @@ export async function loadAttachments(
     ),
     load('laser', makeLaserModel),
     load('suppressor', makeSuppressorModel),
+    load('suppressor338', makeSuppressorModel),
   ]);
   return assets;
 }
@@ -348,7 +349,7 @@ export function configureWeaponAttachments(
     config.optic === null
       ? base.eyeRelief
       : (base.fits?.optic?.[config.optic]?.eyeRelief ?? base.eyeRelief);
-  entry.def.suppressed = config.muzzle === 'suppressor';
+  entry.def.suppressed = config.muzzle !== null;
   const fov = attached ? attached.adsFovScale : base.adsFovScale;
   const sensitivity = attached ? attached.adsSensScale : base.adsSensScale;
   if (fov === undefined) delete entry.def.adsFovScale;
