@@ -513,10 +513,10 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     hipRot: [-0.05, 0.078, -0.125],
     adsCant: [0, 0, 0.003],
     eyeRelief: 0.28,
-    // Low integrated-sight rail: RMR/ACOG only; PM II's two rings exceed its span.
+    // Extended integrated-sight rail seats RMR/ACOG and both PM II pedestals.
     // The optional TOR Mini stays on the fixed forward magazine-tube clamps.
     fits: {
-      optic: { rmr: { eyeRelief: 0.12 }, acog: { eyeRelief: 0.1 } },
+      optic: { rmr: { eyeRelief: 0.12 }, acog: { eyeRelief: 0.1 }, scope: { eyeRelief: 0.09 } },
       rail: { laser: {} },
     },
     sprintPos: [0.09, -0.27, -0.28],
