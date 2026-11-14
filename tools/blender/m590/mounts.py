@@ -120,8 +120,8 @@ def check_mounts(root, manifest, rig, meshes, review, pose, tree, point, basis):
         bpy.context.view_layer.update()
         surfaces = [o for o in loaded.objects if o.type == 'MESH']
         optic_tree = tree(surfaces)
-        # Only the mating teeth are exempt: bridge and receiver feet must
-        # clear every optic, just like the fixed irons and remaining body.
+        # Only mating teeth may contact an optic; the receiver base,
+        # integrated sight and remaining body must stay clear.
         assert not optic_tree.overlap(tree([o for o in meshes if o not in seating_teeth])), (optic, 'fixed irons/body/rail support conflict')
         expected_sight = mounts['optic'].matrix_world @ relative_sight
         assert (sight.matrix_world.translation - expected_sight).length < 1e-7

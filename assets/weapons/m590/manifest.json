@@ -354,7 +354,7 @@
     "Manufacturer nominal barrel/OAL/LOP anchors; local exterior profile estimates from catalog photograph, not manufacturing CAD.",
     "No exported arms, spent case, optic, baked shot recoil, or gameplay balance changes.",
     "shell_insert is not a detachable magazine; adapter owns visibility from authored scale.",
-    "Fixed ghost-ring irons remain below a see-through receiver optic rail; no removable irons.",
+    "Low receiver rail with integrated rear ghost ring; no removable irons.",
     "12g adapter reserves the future suppressor seat; TOR Mini uses a fixed forward magazine-tube clamp rail.",
     "SOCKET_muzzle emits at the adapter exit/MOUNT_muzzle; DATUM_barrel_crown preserves the original factory barrel measurement."
   ]
