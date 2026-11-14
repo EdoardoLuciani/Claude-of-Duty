@@ -99,8 +99,6 @@ def check_laser_mount(weapon):
     optic_objects = []
     if weapon not in ('mcx', 'mpx'):
         for optic, folder in (('rmr', 'trijicon-rmr'), ('acog', 'trijicon-acog'), ('scope', 'schmidt-bender-pm-ii')):
-            if weapon == 'm590' and optic == 'scope':
-                continue  # Its compact integrated rail does not support both PM II rings.
             source_path = ROOT / 'assets/attachments' / folder / (optic + '.blend')
             assert source_path.exists(), f'Build shared optic first: {source_path}'
             with bpy.data.libraries.load(str(source_path), link=False) as (source, target):

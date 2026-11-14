@@ -53,7 +53,7 @@ def check_mounts(root, manifest, rig, meshes, review, pose, tree, point, basis):
     fasteners = [o for o in rail if o.name.startswith(('Optic rail mounting screw', 'Optic rail screw shank'))]
     seating_teeth = [o for o in rail if o.name.startswith('Optic Picatinny lug')]
     rear_sight = [o for o in fixed if o.name.startswith(('Ghost ring', 'Rear sight'))]
-    assert len(base) == 1 and len(fasteners) == 8 and len(seating_teeth) == 9, 'integrated eight-slot rail hardware'
+    assert len(base) == 1 and len(fasteners) == 8 and len(seating_teeth) == 17, 'extended sixteen-slot rail hardware'
     assert not tree(seating_teeth).overlap(tree(fixed)), 'rail teeth cross fixed weapon/irons'
     barrel = [o for o in fixed if o.name.startswith(('Heavy barrel', 'Barrel crown'))]
     assert not tree(adapter).overlap(tree([o for o in fixed if o not in barrel])), 'adapter crosses non-seating surfaces'
@@ -70,7 +70,18 @@ def check_mounts(root, manifest, rig, meshes, review, pose, tree, point, basis):
             gap = underside.y - roof.y
             assert -.00015 < gap < .00015, 'receiver rail base not seated'
             gaps.append(gap)
-    print('M590_INTEGRATED_RAIL_OK: eight slots; four modeled fasteners; nine continuous-base seating rays; gaps mm', [g * 1000 for g in gaps])
+    print('M590_INTEGRATED_RAIL_OK: sixteen slots; four modeled fasteners; nine continuous-base seating rays; gaps mm', [g * 1000 for g in gaps])
+    barrel_tree = tree(barrel)
+    barrel_gaps = []
+    for z in (-.245, -.225, -.200):
+        for x in (-.008, 0, .008):
+            underside = base_tree.ray_cast(Vector((x, .081, z)), Vector((0, 1, 0)), .01)[0]
+            crown = barrel_tree.ray_cast(Vector((x, .090, z)), Vector((0, -1, 0)), .03)[0]
+            assert underside is not None and crown is not None, ('cantilever/barrel surface missing', x, z)
+            gap = underside.y - crown.y
+            assert gap > .0005, ('cantilever crosses barrel', x, z, gap)
+            barrel_gaps.append(gap)
+    print('M590_CANTILEVER_BARREL_OK: nine paired surface rays; minimum gap mm', min(barrel_gaps) * 1000)
     tooth_z = []
     for tooth in seating_teeth:
         z = [(basis @ rig.matrix_world.inverted() @ tooth.matrix_world @ v.co).z for v in tooth.data.vertices]
@@ -95,8 +106,9 @@ def check_mounts(root, manifest, rig, meshes, review, pose, tree, point, basis):
     receiver_mount = rig.matrix_world.inverted() @ mounts['optic'].matrix_world
     optics = {}
     for optic, directory, stations in (
-        ('rmr', 'trijicon-rmr', (3, 6)),
-        ('acog', 'trijicon-acog', (1, 8)),
+        ('rmr', 'trijicon-rmr', (6, 9)),
+        ('acog', 'trijicon-acog', (4, 11)),
+        ('scope', 'schmidt-bender-pm-ii', (0, 2, 13, 15)),
     ):
         source = root / 'assets/attachments' / directory / (optic + '.blend')
         assert source.exists(), f'Rebuild the shared {optic} source before M590 checks: {source}'
@@ -137,8 +149,46 @@ def check_mounts(root, manifest, rig, meshes, review, pose, tree, point, basis):
                 gap = bottom.y - top.y
                 assert -.0006 < gap < .00015, (optic, 'unseated foot', gap)
                 gaps.append(gap)
+        if optic == 'scope':
+            # Both complete 28 mm pedestals must be within the actual tooth
+            # envelope, not the former nominal four-inch backing length.
+            def points(objects):
+                result = []
+                deps = bpy.context.evaluated_depsgraph_get()
+                for obj in objects:
+                    evaluated = obj.evaluated_get(deps)
+                    data = evaluated.to_mesh()
+                    transform = basis @ rig.matrix_world.inverted() @ evaluated.matrix_world
+                    result.extend(transform @ v.co for v in data.vertices)
+                    evaluated.to_mesh_clear()
+                return result
+            pedestals = [o for o in surfaces if o.name.startswith('AI one-piece ring pedestal')]
+            assert len(pedestals) == 2
+            footprints = [points([o]) for o in pedestals]
+            centres = sorted((min(p.z for p in foot) + max(p.z for p in foot)) / 2 for foot in footprints)
+            assert abs(centres[1] - centres[0] - .130) < 1e-7, 'PM II cross-bolt spacing'
+            tooth_points = points(seating_teeth)
+            for footprint in footprints:
+                assert min(p.z for p in tooth_points) < min(p.z for p in footprint)
+                assert max(p.z for p in tooth_points) > max(p.z for p in footprint)
+            ears = [o for o in rear_sight if o.name.startswith('Rear sight protective ear')]
+            mount_base = [o for o in surfaces if o.name.startswith('AI mount base')]
+            housing = [o for o in surfaces if o.name.startswith('PM II scope housing')]
+            ear_tree = tree(ears)
+            def separation(objects):
+                surface = tree(objects)
+                return min([ear_tree.find_nearest(p)[3] for p in points(objects)] + [surface.find_nearest(p)[3] for p in points(ears)])
+            base_gap = separation(mount_base)
+            # Include ocular knurling/ridges, not just the smooth tube: those
+            # protrusions are closer to the retained ears than the housing.
+            tube_gap = separation([o for o in surfaces if o not in mount_base + pedestals])
+            assert base_gap > .00049 and tube_gap > .0024, ('PM II fixed-ear clearance', base_gap, tube_gap)
+            front_sight = tree([o for o in meshes if o.name.startswith('Front sight')])
+            objective_gap = min(front_sight.find_nearest(p)[3] for p in points(housing))
+            assert objective_gap > .15, ('objective/front sight clearance', objective_gap)
+            print('M590_PMII_FIT_OK: full pedestal envelopes; 130 mm cross-bolt spacing; sampled mesh distances mm: base/ears', base_gap * 1000, 'scope upper/ears', tube_gap * 1000, 'housing/front sight', objective_gap * 1000)
         optics[optic] = optic_tree
-        print('M590_OPTIC_SEAT_OK:', optic, 'sight', tuple(point(sight)), 'four foot gaps mm', [g * 1000 for g in gaps])
+        print('M590_OPTIC_SEAT_OK:', optic, 'sight', tuple(point(sight)), 'foot gaps mm', [g * 1000 for g in gaps])
 
     moving = [o for o in meshes if o.parent.name in ('forend', 'bolt', 'trigger', 'shell_insert')]
     hands = [o for o in review.objects if o.type == 'MESH']
@@ -159,4 +209,4 @@ def check_mounts(root, manifest, rig, meshes, review, pose, tree, point, basis):
                 assert not optic_tree.overlap(moving_tree), (optic, name, frame, 'mounted optic crosses mechanism or hand')
             count += 1
     pose('Idle')
-    print('M590_ATTACHMENT_CLEARANCE_OK:', count, '120Hz poses; both supported real optics; both hands, pump, bolt, trigger and visible insertion shell; muzzle remains a future datum; TOR Mini checked separately')
+    print('M590_ATTACHMENT_CLEARANCE_OK:', count, '120Hz poses; RMR/ACOG/PM II real optics; both hands, pump, bolt, trigger and visible insertion shell; muzzle remains a future datum; TOR Mini checked separately')

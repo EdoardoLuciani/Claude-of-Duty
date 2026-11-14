@@ -104,7 +104,7 @@ is authored by [`tools/blender/tor_mini/`](../tools/blender/tor_mini/), with nat
 Blender validation and `bun run models:cook -- tor_mini`. It is generated alongside
 the EXPS3, independently of player arms, and uses the shared gameplay/inspection
 rail path on all seven weapons. M590's full source checks now use strict zero-crossing
-firing-hand clearance; its low integrated-sight top rail supports RMR/ACOG only,
+firing-hand clearance; its extended integrated-sight top rail supports RMR/ACOG/PM II,
 independent of the optional laser on fixed magazine-tube clamps (#686).
 
 Normal `bun run dev` / `bun run build` (and `bun run assets`) run
