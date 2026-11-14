@@ -274,7 +274,7 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
       muzzleGroup: new THREE.Group(),
       muzzleSocket: null,
     });
-    const base = { ...weapon.def, suppressed: WEAPON_DEFS[id].suppressed ?? false };
+    const base = { ...weapon.def, suppressed: false };
     configureWeaponAttachments(weapon, laserConfig, { ...optics, laser });
     assert.deepEqual(weapon.def, base, `${id}: laser has no handling/ballistic modifiers`);
     assert.equal(weapon.railGroup.parent, railMount);

@@ -114,7 +114,7 @@ const CATALOG = [
     step: 1,
     max: 1,
     slot: 'primary',
-    blurb: '.300 BLK · suppressed · ACOG',
+    blurb: 'Carbine · .300 BLK',
   },
   {
     id: 'lmg',

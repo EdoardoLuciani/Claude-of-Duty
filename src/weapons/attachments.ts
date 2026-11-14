@@ -298,7 +298,7 @@ export function mountAttachments(
   const sight = new THREE.Vector3().fromArray(model.nodes.sight);
   let optic: OpticData | null = null;
   if (opticId !== null && opticAsset && opticSlot.parent) {
-    // Only the ADS datum is resolved in rig space, from the rest-pose mount transform
+    // Only the ADS datum is resolved in the weapon frame, from the rest-pose mount transform
     // (including orientation). Never the live pose: a slide or bolt may be mid-animation.
     const transform = model.opticMountRest;
     if (!transform) throw new Error(`[weapons] ${model.id} has no optic mount`);
