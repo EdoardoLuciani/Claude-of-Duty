@@ -1,9 +1,4 @@
-"""Extract the shared ACOG from the freshly generated editable MCX source.
-
-Run after the MCX build: blender -b --python tools/blender/optics.py -- acog
-No old GLB or hand-edited .blend is an authoring input. build-assets.ts builds the
-canonical Python sources first and hashes their saved Blender product here.
-"""
+"""Build standalone ACOG from source, never a generated weapon blend/GLB."""
 import math
 import sys
 from pathlib import Path
@@ -11,26 +6,31 @@ from pathlib import Path
 import bpy
 from mathutils import Matrix, Vector
 
-ROOT = Path(__file__).resolve().parents[2]
-ID = sys.argv[sys.argv.index('--') + 1]
-assert ID == 'acog'
-SOURCE = ROOT / 'assets/weapons/mcx-virtus/mcx-virtus.blend'
+ROOT = Path(__file__).resolve().parents[3]
+ID = 'acog'
 OUT = ROOT / 'assets/attachments/trijicon-acog'
 OUT.mkdir(parents=True, exist_ok=True)
-bpy.ops.wm.open_mainfile(filepath=str(SOURCE))
+(OUT / 'textures').mkdir(exist_ok=True)
+sys.path.insert(0, str(ROOT / 'tools/blender'))
+from acog.geometry import build_acog
+from mcx.materials import build_materials
+from mcx.export import prepare_surfaces
+bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
-scene.frame_set(0)
-bpy.context.view_layer.update()
-rig = bpy.data.objects['MCX_RIG']
-objects = [o for o in scene.objects if o.type in ('MESH', 'FONT') and
-           o.get('sharedOptic') == 'acog']
-assert objects, 'Missing authored optic assembly; rebuild the source weapon'
+scene.unit_settings.system = 'METRIC'
+asset = bpy.data.collections.new('ACOG | authored components')
+scene.collection.children.link(asset)
+rig = bpy.data.objects.new('ACOG_source', None)
+asset.objects.link(rig)
+build_acog(asset, rig, build_materials(OUT))
+prepare_surfaces(asset)
+objects = [o for o in asset.objects if o.type in ('MESH', 'FONT')]
 # Convert MCX's +X-forward Blender frame to the same -Z-forward game frame as
 # the other weapons. The standalone rail-contact datum becomes identity.
 mount = Vector((-.081, 0, .046))
 rotation = Matrix.Rotation(math.pi / 2, 4, 'Z')
 transform = rotation @ Matrix.Translation(-mount) @ rig.matrix_world.inverted()
-sight = transform @ bpy.data.objects['SOCKET_sight'].matrix_world.translation
+sight = transform @ Vector((-.149, 0, .087))
 # Evaluate modifiers before discarding the weapon; keep its original packed
 # surface maps and UVs, with no animation, skin or weapon-only resource retained.
 depsgraph = bpy.context.evaluated_depsgraph_get()

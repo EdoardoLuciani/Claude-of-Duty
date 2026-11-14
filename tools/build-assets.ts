@@ -108,6 +108,7 @@ export const SOLDIER_STEP: AssetStep = {
 const SHARED_TOOLS: Partial<Record<ModelId, string[]>> = {
   mcx: [
     'tools/blender/suppressor/geometry.py',
+    'tools/blender/acog/geometry.py',
     'src/weapons',
     'src/core/math.ts',
     'src/core/rng.ts',
@@ -126,14 +127,15 @@ const SHARED_TOOLS: Partial<Record<ModelId, string[]>> = {
   ],
   mpx: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
 };
-// These products are rebuilt from canonical Python before extraction. Hashing
-// the saved source also catches geometry, UV, finish and packed-texture changes.
-const OPTIC_SOURCES = {
-  acog: 'assets/weapons/mcx-virtus/mcx-virtus.blend',
-};
 const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
   suppressor: ['tools/blender/suppressor'],
-  acog: ['tools/blender/optics.py', OPTIC_SOURCES.acog],
+  acog: [
+    'tools/blender/acog',
+    'tools/blender/mcx/primitives.py',
+    'tools/blender/mcx/materials.py',
+    'tools/blender/mcx/export.py',
+    'tools/blender/mcx/finishes.py',
+  ],
   scope: ['tools/blender/scope'],
   rmr: ['tools/blender/rmr'],
   exps3: ['tools/blender/exps3.py', 'tools/blender/exps3_bake.py'],
@@ -153,13 +155,12 @@ function cookStep(id: ModelId, salt: string[]): AssetStep {
       `${directory}/${source}`,
       output,
       // Editable products used by optic extraction and attachment-fit checks.
-      ...(id === 'mcx' ? [OPTIC_SOURCES.acog] : []),
+      ...(id === 'mcx' ? [`${directory}/mcx-virtus.blend`] : []),
+      ...(id === 'acog' ? [`${directory}/acog.blend`] : []),
       ...(id === 'scope' ? [`${directory}/scope.blend`] : []),
     ],
     commands: [
-      id === 'acog'
-        ? [...blender('tools/blender/optics.py'), '--', id]
-        : blender(id === 'exps3' ? tools[0] : `tools/blender/${id}/build.py`),
+      blender(id === 'exps3' ? tools[0] : `tools/blender/${id}/build.py`),
       bun('build/models.ts', id),
     ],
   };
@@ -284,11 +285,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
           .map((id): AssetStep => cookStep(id, [armsHash])),
         ...Object.keys(STANDALONE_TOOLS)
           .filter(isModelId)
-          .filter((id): boolean => id !== 'acog')
           .map((id): AssetStep => cookStep(id, [])),
         SOLDIER_STEP,
       ]);
-      if (!failed) await pool([cookStep('acog', [])]);
     }
     if (!failed)
       stages.push(stage('export-proc-textures.ts', ...force), stage('export-models.ts', ...force));
