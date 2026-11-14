@@ -316,7 +316,7 @@ export class WeaponSystem {
     // Attachments load alongside the spawn weapons. A failed asset only makes that
     // attachment unavailable; the base weapons and their irons remain usable.
     this._laser = new WeaponLaser(ctx.scene);
-    // Store as soon as loaded so dispose() releases them even if a spawn weapon fails.
+    // Stored before init settles (see catch) so dispose() releases them even if a spawn weapon fails.
     const attachments = loadAttachments(renderer).then((assets): void => {
       this._attachments = assets;
     });
@@ -339,6 +339,8 @@ export class WeaponSystem {
         }
       })();
     } catch (error) {
+      // Never rejects; settle it so a following dispose() owns every loaded asset.
+      await attachments;
       await disposeWeaponLoader(renderer);
       throw error;
     }

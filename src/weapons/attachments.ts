@@ -204,6 +204,8 @@ export function hasAttachmentAssets(config: AttachmentConfig, assets: Attachment
   );
 }
 
+const SLOTS = ['optic', 'rail', 'muzzle'] as const;
+
 /** Mounted instance groups, one per slot; an empty group has no parent. */
 interface AttachmentMounts {
   attachmentGroup: THREE.Group;
@@ -226,7 +228,7 @@ export function releaseAttachmentMounts(mounts: AttachmentMounts): void {
 
 /** Release the mounts copied along with a configured weapon scene clone. */
 export function releaseClonedMounts(root: THREE.Object3D): void {
-  for (const slot of ['optic', 'rail', 'muzzle']) {
+  for (const slot of SLOTS) {
     const group = root.getObjectByName(`${slot}_attachment`);
     if (isGroup(group)) releaseAttachmentMount(group);
   }
@@ -244,24 +246,25 @@ export function ironSightNodes(
 }
 
 /** Stage one slot's instance for the weapon's authored `MOUNT_<slot>`, with the asset's
- * mount datum at its origin. Mount-local instances keep slide/cover/bone animation
- * authoritative. Nothing is attached here. */
+ * mount datum at its origin, and resolve the instance's output socket (if any).
+ * Mount-local instances keep slide/cover/bone animation authoritative. Nothing is attached here. */
 function stageMount(
   model: WeaponModelRecord,
-  slot: 'optic' | 'rail' | 'muzzle',
-  id: string | null,
-  asset: { scene: THREE.Group; mount: THREE.Vector3 } | null | undefined
-): { group: THREE.Group; parent: THREE.Object3D | null; instance: THREE.Object3D | null } {
+  slot: (typeof SLOTS)[number],
+  id: OpticId | RailId | MuzzleId | null,
+  asset: { scene: THREE.Group; mount: THREE.Vector3; output?: string } | null | undefined
+): { group: THREE.Group; parent: THREE.Object3D | null; socket: THREE.Object3D | null } {
   const group = new THREE.Group();
   group.name = `${slot}_attachment`;
-  if (id === null) return { group, parent: null, instance: null };
+  if (id === null) return { group, parent: null, socket: null };
   if (!asset) throw new Error(`[weapons] ${id} asset unavailable`);
   // Look the node up under this rig, not the source: inspection mounts on a clone.
   const parent = requiredNode(model.root, `MOUNT_${slot}`);
   const instance = asset.scene.clone(true);
   instance.position.sub(asset.mount);
   group.add(instance);
-  return { group, parent, instance };
+  const socket = asset.output === undefined ? null : requiredNode(instance, asset.output);
+  return { group, parent, socket };
 }
 
 /** Shared gameplay/inspection mount solver, run only when configuration changes.
@@ -283,15 +286,9 @@ export function mountAttachments(
       `[weapons] incompatible attachments: ${model.id}, optic=${opticId}, ironSights=${ironSights}`
     );
   const opticAsset = opticId && assets[opticId];
-  const railAsset = config.rail && assets[config.rail];
-  const muzzleAsset = config.muzzle && assets[config.muzzle];
   const opticSlot = stageMount(model, 'optic', opticId, opticAsset);
-  const rail = stageMount(model, 'rail', config.rail, railAsset);
-  const muzzle = stageMount(model, 'muzzle', config.muzzle, muzzleAsset);
-  const laserEmitter =
-    rail.instance && railAsset ? requiredNode(rail.instance, railAsset.output) : null;
-  const muzzleSocket =
-    muzzle.instance && muzzleAsset ? requiredNode(muzzle.instance, muzzleAsset.output) : null;
+  const rail = stageMount(model, 'rail', config.rail, config.rail && assets[config.rail]);
+  const muzzle = stageMount(model, 'muzzle', config.muzzle, config.muzzle && assets[config.muzzle]);
   const baseDevice =
     config.muzzle !== null || WEAPON_DEFS[model.id].fits?.muzzle
       ? requiredNode(model.root, 'MUZZLE_device')
@@ -329,8 +326,8 @@ export function mountAttachments(
     attachmentGroup: opticSlot.group,
     railGroup: rail.group,
     muzzleGroup: muzzle.group,
-    laserEmitter,
-    muzzleSocket,
+    laserEmitter: rail.socket,
+    muzzleSocket: muzzle.socket,
     mountedOptic,
     sight,
     optic,
