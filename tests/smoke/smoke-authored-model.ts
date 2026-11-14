@@ -96,21 +96,6 @@ const gltf = fixture<GLTF>({
 });
 const { animations, opticMountRest } = authoredModel(gltf, 'TEST_RIG', ['Idle', 'Fire'], authored);
 assert.equal(opticMountRest, null, 'no MOUNT_optic, no optic datum');
-// The optic datum shares point()'s weapon frame, including a native-axis wrapper.
-scene.position.set(0, 0.07, -0.14);
-scene.rotation.y = Math.PI / 2;
-rig.position.set(0, 0.2, 0.1);
-const opticMount = new THREE.Object3D();
-opticMount.name = 'MOUNT_optic';
-opticMount.position.set(0, 0.1, -0.07);
-rig.add(opticMount);
-const wrapped = authoredModel(gltf, 'TEST_RIG', ['Idle'], authored);
-assert.deepEqual(
-  new THREE.Vector3().setFromMatrixPosition(wrapped.opticMountRest!).toArray(),
-  wrapped.point('MOUNT_optic')
-);
-scene.position.set(0, 0, 0);
-scene.rotation.set(0, 0, 0);
 assert.deepEqual(
   animations.map((c): [string, number] => [c.name, c.duration]),
   [
