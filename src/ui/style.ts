@@ -75,6 +75,12 @@ const CSS = `
 
 
 .ow-layer { position:absolute; inset:0; }
+/* Native modal overlays: drop UA dialog chrome; each overlay draws its own scrim. */
+.ow-dialog {
+  border:0; color:inherit; /* .ow-hud * already resets margin/padding. */
+  width:auto; height:auto; max-width:none; max-height:none;
+}
+.ow-dialog::backdrop { background:transparent; }
 /* ================================================================== menu */
 .ow-menu {
   position:absolute; inset:0; pointer-events:auto;
@@ -286,6 +292,7 @@ const CSS = `
   font-family:var(--fd); font-size:calc(28px * var(--k)); font-weight:700; letter-spacing:.24em;
   color:var(--ink); text-shadow:var(--sh-o2); line-height:1.05;
 }
+.ow-market-title:focus { outline:none; } /* Neutral initial focus, not a control. */
 .ow-market-cred {
   margin-top:calc(var(--u) * 2.4); display:flex; flex-direction:column; align-items:center; gap:calc(var(--u) * .4);
 }
