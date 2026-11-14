@@ -8,9 +8,7 @@ import math
 import bpy
 from mathutils import Matrix, Vector
 import numpy as np
-from suppressor.geometry import build_suppressor
 from mcx.primitives import create_primitives
-from acog.geometry import build_acog
 
 def build_geometry(materials):
     asset = bpy.data.collections.new("MCX VIRTUS | authored components")
@@ -52,6 +50,9 @@ def build_geometry(materials):
     stock = empty('stock_hinge', (-.183, .016, .007), rig)
     case = empty('spent_case', parent=rig)
     release = empty('bolt_release', (-.072, .027, -.045), rig)
+    irons = empty('IRON_sights', parent=body)
+    folded = empty('IRON_sights_removed', parent=body)
+    muzzle = empty('MUZZLE_device', parent=body)
 
     active, finish, box, profile, loft, forging, cylinder, ellipsoid, cut, opening, tube, cord, screw, text = create_primitives(asset, body, materials)
 
@@ -179,7 +180,8 @@ def build_geometry(materials):
             tube_obj = cylinder('QD sling socket',(.067,side*.027,-.004),.0065,.003,steel,'Y')
             cut(tube_obj,cylinder('CUT',(.067,side*.027,-.004),.0044,.008,None,'Y',None,24,0))
         # Barrel/gas exterior silhouettes only. The accessory is not a functional model.
-        cylinder('Barrel under vented guard',(.1643,0,0),.0087,.2286,steel)
+        # Full 228.6 mm exterior includes the 4.6 mm threaded end below.
+        cylinder('Barrel under vented guard',(.162,0,0),.0087,.224,steel)
         cylinder('Gas system silhouette',(.146,0,.022),.0036,.168,steel)
         box('Gas block silhouette',(.233,0,.006),(.014,.023,.029),steel)
         # Rail pitches/land shapes are visual reference details, not machinable rail data.
@@ -188,9 +190,19 @@ def build_geometry(materials):
             x=-.168+i*.010
             profile('Picatinny rail tooth',[(x,.040),(x+.0012,.046),(x+.006,.046),(x+.0072,.040)],.027,coating,bevel=.00035)
         for x in (-.15,.232):
-            box('Folded backup sight base',(x,0,.049),(.030,.030,.007),steel)
+            box('Backup sight base',(x,0,.049),(.030,.030,.007),steel)
             cylinder('Backup sight hinge',(x+.004,0,.055),.006,.034,steel,'Y')
-            box('Folded backup sight leaf',(x-.006,0,.056),(.019,.014,.004),polymer)
+            box('Folded backup sight leaf',(x-.006,0,.056),(.019,.014,.004),polymer,folded)
+            if x < 0:
+                # Hinge-supported aperture leaf: an actual open bore, not glass.
+                box('Rear sight leaf stalk',(x+.004,0,.063),(.004,.010,.017),polymer,irons)
+                tube('Rear sight aperture',(x+.004,0,.077),.007,.0025,.003,steel,irons)
+            else:
+                box('Front sight leaf',(x+.004,0,.063),(.004,.014,.017),polymer,irons)
+                box('Front sight post',(x+.004,0,.073),(.002,.0018,.008),steel,irons,bevel=.0001)
+                for side in (-1,1):
+                    box('Front sight protective ear',(x+.004,side*.008,.074),(.004,.003,.020),polymer,irons)
+
             for side in (-1,1): screw(x+.004,side*.018,.055,.003)
 
     def build_charging_handle():
@@ -315,21 +327,30 @@ def build_geometry(materials):
     bpy.context.view_layer.update()
     build_receiver()
     build_handguard()
-    before_optic = set(asset.objects)
-    build_acog(asset, body, materials)
-    # Preserve the complete assembly (including generic screw/mark names) for
-    # the standalone optic export, without changing the weapon's rigid parents.
-    for obj in set(asset.objects) - before_optic:
-        obj['sharedOptic'] = 'acog'
-    build_suppressor(asset, cylinder, opening, finish, tube, text, ceramic, rubber)
+    # The 9-inch barrel ends at its 5/8-24 direct-thread shoulder. An open
+    # three-prong game-fit flash hider replaces the former integrated can.
+    tube('Muzzle thread',(.2763,0,0),.00794,.0041,.0046,steel)
+    tube('Base muzzle collar',(.281,0,0),.0105,.0080,.014,steel,muzzle)
+    tube('Base muzzle throat',(.289,0,0),.0105,.0041,.004,steel,muzzle)
+    for i in range(3):
+        angle = i*math.tau/3
+        prong = box('Base muzzle prong',(.303,math.cos(angle)*.008,math.sin(angle)*.008),
+                    (.028,.004,.005),steel,muzzle,.0005)
+        prong.rotation_euler.x = angle
     build_charging_handle()
     build_stock()
     build_magazines()
     build_casing()
 
     # Named attachment / integration sockets; adapter hand contacts follow the fit.
-    for name,loc,parent in [('SOCKET_muzzle',(.512,0,0),rig),('SOCKET_ejection',(-.018,-.030,.004),rig),('SOCKET_grip_R',(-.139,0,-.099),rig),('SOCKET_grip_L',(.171,0,-.028),rig),('SOCKET_magazine',(.004,0,-.042),mag),('SOCKET_sight',(-.149,0,.087),rig)]:
+    for name,loc,parent in [('SOCKET_muzzle',(.317,0,0),rig),('SOCKET_ejection',(-.018,-.030,.004),rig),('SOCKET_grip_R',(-.139,0,-.099),rig),('SOCKET_grip_L',(.171,0,-.028),rig),('SOCKET_magazine',(.004,0,-.042),mag),('SOCKET_sight',(-.146,0,.077),rig),('SOCKET_front_post',(.236,0,.077),rig)]:
         empty(name,loc,parent)
+
+    # Rail contact frames: attachment Blender +Y maps to rifle +X; +Z stays up.
+    # Shift optics 45 mm forward from the old ACOG seat to clear the deployed rear leaf.
+    for name, loc in [('MOUNT_optic',(-.036,0,.046)),('MOUNT_muzzle',(.274,0,0))]:
+        mount = empty(name,loc,body)
+        mount.rotation_euler.z = -math.pi/2
 
     # Game-fit adapter seats on the upper-right handguard chamfer (11:15 slope).
     # The vertical side seat crossed the live support glove. Rotate the entire

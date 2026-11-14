@@ -53,4 +53,4 @@ assets/soldiers/*.json
 .cache/
 
 # Standalone ACOG packed source maps.
-assets/attachments/*/textures/
+assets/attachments/trijicon-acog/textures/

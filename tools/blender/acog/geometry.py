@@ -96,4 +96,3 @@ def build_acog(asset, body, materials):
     text('ACOG',(-.052,-.0228,.079),.0032)
     text('MADE IN USA',(-.054,-.0117,.063),.0019)
     text('Trijicon',(-.026,.022,.086),.003,1)
-

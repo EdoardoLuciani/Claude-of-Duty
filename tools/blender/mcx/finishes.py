@@ -1,6 +1,7 @@
 """Export-only finish consolidation; keep editable materials and repeating UV0."""
 import bpy
 import numpy as np
+from mcx.materials import FINISHES
 
 FINISH_LOOKUP_SIZE = 64
 
@@ -12,9 +13,8 @@ def consolidate_finishes(asset, output):
     adapter. Keep full normal XYZ and repeating UV0, not an averaged grain atlas.
     Only glass needs an independent material/pass.
     """
-    sources = sorted({material for obj in asset.objects if obj.type == 'MESH'
-                      for material in obj.data.materials if material}, key=lambda m: m.name)
-    assert len(sources) == 13
+    # Keep canonical tile identities even when optional optic finishes are absent.
+    sources = [bpy.data.materials[finish[0]] for finish in FINISHES.values()]
     rough = bpy.data.images['roughness_variation']
     values = np.empty(len(rough.pixels), dtype=np.float32)
     rough.pixels.foreach_get(values)
@@ -44,7 +44,6 @@ def consolidate_finishes(asset, output):
 
     categories = {
         'opaque': (sources[0], .02),
-        'glass': (sources[10], 0),
     }
     materials = {}
     for category, (source, strength) in categories.items():

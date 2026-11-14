@@ -31,7 +31,7 @@ mount = Vector((-.081, 0, .046))
 rotation = Matrix.Rotation(math.pi / 2, 4, 'Z')
 transform = rotation @ Matrix.Translation(-mount) @ rig.matrix_world.inverted()
 sight = transform @ Vector((-.149, 0, .087))
-# Evaluate modifiers before discarding the weapon; keep its original packed
+# Evaluate modifiers before discarding construction helpers; keep the original packed
 # surface maps and UVs, with no animation, skin or weapon-only resource retained.
 depsgraph = bpy.context.evaluated_depsgraph_get()
 root = bpy.data.objects.new(ID.upper(), None)

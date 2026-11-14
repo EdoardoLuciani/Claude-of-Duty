@@ -107,8 +107,6 @@ export const SOLDIER_STEP: AssetStep = {
 // Shared authoring sources outside a weapon's own tooling directory.
 const SHARED_TOOLS: Partial<Record<ModelId, string[]>> = {
   mcx: [
-    'tools/blender/suppressor/geometry.py',
-    'tools/blender/acog/geometry.py',
     'src/weapons',
     'src/core/math.ts',
     'src/core/rng.ts',
@@ -154,7 +152,7 @@ function cookStep(id: ModelId, salt: string[]): AssetStep {
     outputs: [
       `${directory}/${source}`,
       output,
-      // Editable products used by optic extraction and attachment-fit checks.
+      // Editable products used by authoring and attachment-fit checks.
       ...(id === 'mcx' ? [`${directory}/mcx-virtus.blend`] : []),
       ...(id === 'acog' ? [`${directory}/acog.blend`] : []),
       ...(id === 'scope' ? [`${directory}/scope.blend`] : []),

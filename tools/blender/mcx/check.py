@@ -73,40 +73,34 @@ for frame in (0, 25, 60, 90, 120):
     assert bvh('Length adjustment latch').overlap(bvh('Stock upper spine')), f'latch detaches at fold {frame}'
 
 pose('Idle', 0)
-assert objects['receiver']['optic'] == 'ACOG 4x32 (TA31F / TA51)'
-assert 'Compact optic housing' not in objects and 'Brightness dial' not in objects, 'old red dot removed'
-for name in ['ACOG tapered prism housing', 'ACOG ocular', 'ACOG collector cradle', 'ACOG red fiber collector']:
-    assert name in objects and objects[name].type == 'MESH', name
-assert bvh('ACOG tapered prism housing').overlap(bvh('ACOG integral mounting foot')), 'housing attached to integral foot'
-mount_shoe = bvh('ACOG rail shoe')
-assert mount_shoe.overlap(bvh('ACOG integral mounting foot')), 'optic foot seated on TA51 shoe'
-assert any(mount_shoe.overlap(bvh(o.name)) for o in asset.objects
-           if o.name.startswith('Picatinny rail tooth')), 'TA51 shoe seated on rifle rail'
-assert bvh('ACOG red fiber collector').overlap(bvh('ACOG collector cradle')), 'collector seated on cradle'
-# The enlarged optic must not intersect the folded rear sight.
-for name in ['ACOG tapered prism housing', 'ACOG ocular', 'ACOG ocular rubber rim']:
-    assert not bvh(name).overlap(bvh('Folded backup sight base')), f'{name} clips rear sight'
+assert not any(o.get('sharedOptic') or o.name.startswith(('ACOG','Suppressor')) for o in asset.objects), 'no integrated accessories'
+assert not any(m.name.startswith('11 |') for o in asset.objects if o.type == 'MESH' for m in o.data.materials if m), 'no base glass'
 sight = objects['SOCKET_sight'].matrix_world.translation
-assert (sight - Vector((-.149, 0, .087))).length < 1e-6, 'sight socket at TA31F ocular axis'
+front = objects['SOCKET_front_post'].matrix_world.translation
+assert abs(sight.y-front.y) < 1e-6 and abs(sight.z-front.z) < 1e-6, 'aligned base irons'
+assert objects['Rear sight aperture'].parent == objects['IRON_sights']
+assert objects['Front sight post'].parent == objects['IRON_sights']
+assert all(o.parent == objects['IRON_sights_removed'] for o in asset.objects if o.name.startswith('Folded backup sight leaf'))
+rear = bvh('Rear sight aperture')
+for y,z in [(0,0),(.0015,0),(-.0015,0),(0,.0015),(0,-.0015)]:
+    assert rear.ray_cast(sight+Vector((-.02,y,z)),Vector((1,0,0)),.04)[0] is None, 'open rear aperture'
+assert rear.ray_cast(sight+Vector((-.02,.003,0)),Vector((1,0,0)),.04)[0] is not None, 'aperture rim'
+post = mesh_world('Front sight post')[0]
+assert abs(max(v.z for v in post)-sight.z) < 1e-6, 'post tip on sight axis'
+for obj in asset.objects:
+    if obj.type == 'MESH' and obj.parent not in (objects['IRON_sights'],objects['IRON_sights_removed']):
+        assert bvh(obj.name).ray_cast(sight+Vector((.005,0,0)),Vector((1,0,0)),.37)[0] is None, ('obstructed iron line',obj.name)
+# The bare muzzle has a real bore and the entire device is replaceable.
+assert all(o.parent == objects['MUZZLE_device'] for o in asset.objects if o.name.startswith('Base muzzle '))
+for obj in asset.objects:
+    if obj.type == 'MESH' and obj.name.startswith(('Base muzzle ','Muzzle thread')):
+        assert bvh(obj.name).ray_cast(Vector((.270,0,0)),Vector((1,0,0)),.06)[0] is None, ('blocked bore',obj.name)
+assert (objects['SOCKET_muzzle'].matrix_world.translation-Vector((.317,0,0))).length < 1e-6
 
-# Independent exterior-dimension checks against the cited manufacturer specs.
-# The TA31F height excludes the accessory TA51 shoe/knobs (see fidelity notes).
 def extent(names):
     vertices = [v for name in names for v in mesh_world(name)[0]]
     return Vector(tuple(max(v[i] for v in vertices)-min(v[i] for v in vertices) for i in range(3)))
 
-mount_prefixes = ('ACOG rail shoe', 'ACOG rail clamp', 'ACOG mount crossbolt',
-                  'ACOG slotted thumbscrew', 'ACOG thumbscrew knurl')
-optic = [o.name for o in asset.objects if o.type == 'MESH'
-         and o.name.startswith('ACOG') and not o.name.startswith(mount_prefixes)]
-size = extent(optic)
-for actual, expected in zip(size, (.15189, .0508, .05842)):
-    assert abs(actual-expected) <= .001, f'TA31F exterior spec: {size}'
-suppressor = [o.name for o in asset.objects if o.type == 'MESH'
-              and (o.name.startswith('Suppressor') or o.name == 'Recessed suppressor endcap')]
-size = extent(suppressor)
-for actual, expected in zip(size, (.236, .044, .044)):
-    assert abs(actual-expected) <= .001, f'SRD762Ti exterior spec: {size}'
 assert abs(extent(['Hollow octagonal VIRTUS handguard']).x-.2032) <= .001, '8-inch PDW nominal exterior length'
 guard_shell = bvh('Hollow octagonal VIRTUS handguard')
 assert guard_shell.ray_cast(Vector((.093,-.06,-.023)), Vector((0,1,0)))[0] is None, 'diagonal vent must be open'
@@ -224,7 +218,7 @@ for step in range(129*2,157*2+1):
     stock_handle_clearance(f'folded rack {step/2}')
 pose('Idle', 0)
 print(f'MCX_STOCK_HANDLE_CLEARANCE_OK: moving stock/hinge >= {minimum_separation["moving_stock"]*1000:.3f} mm; fixed rear plate >= {minimum_separation["rear_plate"]*1000:.3f} mm; full clips/midframes/folded rack')
-print(f'MCX_GEOMETRY_OK: moving parts clear/attached, rounded receiver/grip, MAG800 envelope {length*1000:.3f} mm, TA31F/SRD762Ti dimensions')
+print(f'MCX_GEOMETRY_OK: moving parts clear/attached, rounded receiver/grip, MAG800 envelope {length*1000:.3f} mm, open aligned irons and base muzzle')
 
 # The rotated adapter must actually seat on the upper handguard, not float
 # above it to avoid the glove. Six rays span both screw stations on real faces.
@@ -249,3 +243,6 @@ check_review_hands()
 # Actual shared rail attachment, independent of the optic catalog.
 from tor_mini.mounts import check_laser_mount
 check_laser_mount('mcx')
+
+from mcx.fits import check_attachment_fits
+check_attachment_fits()
