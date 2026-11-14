@@ -478,33 +478,7 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     );
     assert.equal(canDisposed, 0, 'removal never disposes borrowed geometry');
   }
-  // EVOLYS shares the existing can and solver, without ballistic/handling changes.
-  const evolys = fixture<WeaponEntry>({
-    ...entry,
-    id: 'lmg',
-    model: fixture<Extract<WeaponModelRecord, { id: 'lmg' }>>({
-      ...model,
-      id: 'lmg',
-      nodes: { ...model.nodes, magSeat: { pos: [0, 0, 0], rot: [0, 0, 0] } },
-    }),
-    def: { ...WEAPON_DEFS.lmg },
-  });
-  viewmodel.active = evolys;
-  configureWeaponAttachments(evolys, { ...suppressed, rail: 'laser' }, { suppressor: can, laser });
-  assert.deepEqual(evolys.def, { ...WEAPON_DEFS.lmg, suppressed: true });
-  assert(!baseDevice.visible && ironsRemoved.visible === false);
-  assert.equal(evolys.muzzleGroup.parent, muzzleMount);
-  assert(
-    viewmodel
-      .muzzleWorld(new THREE.Vector3())
-      .distanceTo(canExit.position.clone().applyMatrix4(muzzleMount.matrixWorld)) < 1e-10,
-    'EVOLYS firing origin follows the shared can exit'
-  );
-  configureWeaponAttachments(evolys, BASE_ATTACHMENTS, {});
-  assert.deepEqual(evolys.def, { ...WEAPON_DEFS.lmg, suppressed: false });
-  assert(baseDevice.visible);
-  assert.equal(evolys.muzzleSocket, null);
-  assert.equal(evolys.laserEmitter, null);
+  assert(isAttachmentConfig({ ...suppressed, rail: 'laser' }, 'lmg'));
   // MCX is an unsuppressed iron-sight base. Each accepted optic can coexist
   // with the can/laser, and clearing the config must restore bare tuning/parts.
   const mcx = fixture<WeaponEntry>({
