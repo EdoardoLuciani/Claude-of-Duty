@@ -120,10 +120,11 @@ for (const label of ['Mouse Sensitivity', 'Field Of View', 'Firing Camera Shake'
 }
 menu.show();
 assert.equal(ctx.time.scale, 0);
-assert('focused' in menu.resumeBtn);
-assert.equal(menu.resumeBtn.focused, true);
+assert.equal(menu.root.open, true, 'pause menu is a native modal');
+assert.equal(menu.resumeBtn.autofocus, true, 'modal opens on Resume');
 menu.show(); // idempotent: do not overwrite the pre-pause scale
 menu.close();
+assert.equal(menu.root.open, false);
 assert.equal(ctx.time.scale, 0.5);
 assert.equal(locks, 1);
 assert.deepEqual(controlChanges, [false, true]);

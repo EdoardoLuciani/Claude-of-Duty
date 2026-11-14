@@ -375,6 +375,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     eyeRelief: 0.03,
     fits: {
       optic: { rmr: { eyeRelief: 0.125 }, acog: { eyeRelief: 0.11 }, scope: { eyeRelief: 0.09 } },
+      muzzle: { suppressor: {} },
       rail: { laser: {} },
     },
     removableIrons: true,
@@ -448,6 +449,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     fits: {
       optic: { rmr: { eyeRelief: 0.394 }, acog: { eyeRelief: 0.308 }, scope: { eyeRelief: 0.2 } },
       rail: { laser: {} },
+      muzzle: { suppressor9mm: {} },
     },
     sprintPos: [0.09, -0.25, -0.28],
     sprintRot: [-0.42, 0.5, 0.14],
@@ -512,10 +514,10 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     hipRot: [-0.05, 0.078, -0.125],
     adsCant: [0, 0, 0.003],
     eyeRelief: 0.28,
-    // Low integrated-sight rail: RMR/ACOG only; PM II's two rings exceed its span.
+    // Extended integrated-sight rail seats RMR/ACOG and both PM II pedestals.
     // The optional TOR Mini stays on the fixed forward magazine-tube clamps.
     fits: {
-      optic: { rmr: { eyeRelief: 0.12 }, acog: { eyeRelief: 0.1 } },
+      optic: { rmr: { eyeRelief: 0.12 }, acog: { eyeRelief: 0.1 }, scope: { eyeRelief: 0.09 } },
       rail: { laser: {} },
       muzzle: { suppressor12g: {} },
     },
@@ -579,6 +581,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     fits: {
       optic: { rmr: { eyeRelief: 0.125 }, acog: { eyeRelief: 0.11 }, scope: { eyeRelief: 0.09 } },
       rail: { laser: {} },
+      muzzle: { suppressor338: {} },
     },
     removableIrons: true,
     sprintPos: [0.088, -0.31, -0.3],

@@ -11,6 +11,7 @@ certified replica.
 Sources live in `tools/blender/p320/`: `build.py` stages geometry/materials,
 `surfaces.py` and `color_uv.py` own bake surfaces/lettering UVs, `skin.py` owns
 nine rigid bones, and `actions.py`/`export.py` own eight clips and 60 Hz export.
+The mechanical skin and two ordinary barrel-owned muzzle-state meshes share the atlas.
 The blend retains editable high bake sources. Native and cooked exports use one
 physical material and four 1024² maps; color uses UV1, other maps UV0.
 Preserve STEP magazines, sockets, events, hand contacts and runtime slide overrides.
@@ -45,7 +46,7 @@ Game-space mount datums in metres (native Blender uses +Y forward, +Z up):
 | Datum | Position | Owner / orientation |
 | --- | --- | --- |
 | `MOUNT_optic` | `[0, .066, -.003]` | slide; identity rail contact |
-| `MOUNT_muzzle` | `[0, .037, -.1445]` | tilting barrel; contact normal points forward |
+| `MOUNT_muzzle` | `[0, .037, -.132]` | tilting barrel; -Z forward, +Y up, unit scale |
 | `MOUNT_rail` | `[0, .002, -.122]` | frame; local +Y points into the underside seat; frame-owned TOR Mini |
 
 The rail underside is at .062 m, above the .0537 m iron aim ray and .056 m rear
@@ -84,5 +85,40 @@ few millimetres ahead of the barrel but remains below its bore/slide path; it
 never follows the slide. The source sweep tests actual deformed hands at 120 Hz,
 including the early tactical/empty reload intervals missed by a coarser sweep.
 See the [shared laser mount contract](../../attachments/steiner-tor-mini/README.md#weapon-mounting-686).
-The future suppressor datum (#670) is not a fit certificate; no standalone muzzle
-asset exists to validate its geometry, can/sight height or combined clearance.
+
+## Compact 9mm suppressor (#714)
+
+The separate `suppressor9mm` catalog entry loads the original
+[compact booster can](../../attachments/compact-9mm/README.md), not the shared
+SRD762Ti rifle exterior. `fits.muzzle` enables only this verified pistol fit.
+`MOUNT_muzzle` now uses the shared attachment frame (the former future-datum
+contact-normal rotation was not a suppressor orientation). Its rear seat advances over the exposed barrel thread at native +Y=.132 m,
+not the crown-tip base exit at .1445 m. It remains under the
+**barrel bone**, never the frame or slide. `MUZZLE_device` owns the removable
+thread-protector sleeve; `MUZZLE_device_removed` owns the exposed helical thread.
+Both are ordinary meshes under the same animated barrel and share the existing
+atlas. The barrel tube/crown stays in the mechanical skin. The narrow thread ribbon
+retains its authored geometry: bevel decimation had enlarged its crest and
+would intersect the booster receiving bore. Common mount/remove
+logic switches the two states; no motion, hand tuning, stats or audio banks change.
+
+The can is 135 mm long and at most 28.4 mm across. In loaded rest its top is
+51.2 mm above the rig origin, leaving **2.5 mm below** the fixed SIGLITE 53.7 mm
+aim ray. No raised sights, hidden irons or altered ADS position are needed.
+The RMR/ACOG/PM II optical rays also clear it. During the actual Browning tilt
+and empty lockback the bore moves, as it should; this is not a claim that a
+locked-open handgun retains a live firing sight picture.
+
+`check.py` includes the asset-owned `suppressor.py` sweep: 1172 poses at 120 Hz
+across all eight clips (Idle, Fire, Last_Shot, Reload_Tactical, Reload_Empty,
+Inspect, Draw, Holster), including exact endpoints. It verifies the invariant
+barrel-relative mount matrix, intersections against the **evaluated mechanical
+skin**, all ten deformed mesh components belonging to both shared arms/hands,
+three mounted optics, TOR Mini and its emitter ray. It also ray-tests loaded-rest
+iron/optic sightlines. Editable sparse source controls are not used as a proxy
+for subframe mechanical-skin motion. Source checks are sampled external-fit
+proofs, not internal booster engineering or continuous collision certification.
+
+Build the compact can and shared optics/laser first (`bun run assets`), then run
+the Blender check above. Native WebGPU before/after hip, iron ADS and RMR ADS
+captures and runtime exit/part-switch checks supplement the source sweep.

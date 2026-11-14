@@ -34,7 +34,7 @@ switches normally. Removing the can restores the original adapter-exit socket.
 The broad coaxial expansion chamber deliberately **occludes the low .096 m
 iron sightline** (can top .110 m). The front blade, cheeks and ghost ring stay
 physically unchanged/clear, but irons are not a usable aiming view with this can.
-Use the already verified RMR/ACOG fits for an unobstructed aiming view; the game
+Use the verified RMR/ACOG/PM II fits for an unobstructed aiming view; the game
 does not silently install an optic, hide fixed sights or adjust eye relief.
 This is an explicit game-art compromise rather than a new elevated-sight model.
 
@@ -49,8 +49,9 @@ checks the front blade/cheeks, magazine cap, lug and fixed TOR Mini clamps, then
 sweeps both evaluated review-hand skins, full provisional 89 mm pump stroke,
 bolt/trigger and visible shell at 120 Hz through all seven clips, including exact
 fractional endpoints. It also verifies the stationary receiver-owned exit and
-intentional iron-line occlusion. Finite sampled source checks do not certify
-continuous clearance or all runtime IK/recoil transitions.
+intentional iron-line occlusion. The combined rail/suppressor check verifies all
+three mounted optic meshes and sight rays, including the PM II. Finite sampled
+source checks do not certify continuous clearance or all runtime IK/recoil transitions.
 
 ## Rebuild and check
 

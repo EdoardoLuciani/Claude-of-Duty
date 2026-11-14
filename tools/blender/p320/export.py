@@ -102,6 +102,8 @@ def export_asset(asset, coords, output):
         'materials': len(doc['materials']), 'textureImages': len(doc['images']),
         'joints': len(doc['skins'][0]['joints']), 'bytes': len(raw),
     }
-    assert stats['primitives'] == 1 and stats['materials'] == 1, stats
+    assert stats['primitives'] == 3 and stats['materials'] == 1, stats
+    for name in ('MUZZLE_device', 'MUZZLE_device_removed'):
+        assert nodes[name] in doc['nodes'][nodes['barrel']].get('children', []), name
     assert stats['triangles'] < 30000, stats
     return stats

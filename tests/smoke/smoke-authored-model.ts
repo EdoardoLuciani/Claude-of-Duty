@@ -478,6 +478,7 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     );
     assert.equal(canDisposed, 0, 'removal never disposes borrowed geometry');
   }
+  assert(isAttachmentConfig({ ...suppressed, rail: 'laser' }, 'lmg'));
   // M590 retains its permanent adapter: a muzzle fit need not replace a base device.
   baseDevice.removeFromParent();
   const shotgun = fixture<WeaponEntry>({
@@ -531,6 +532,62 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     assert.equal(mcx.def.eyeRelief, WEAPON_DEFS.mcx.eyeRelief);
     assert(irons.visible && !ironsRemoved.visible && baseDevice.visible);
   }
+  // A separate pistol asset must still resolve suppression and the live exit,
+  // and restore the barrel's thread protector when removed.
+  const pistol = fixture<WeaponEntry>({
+    ...entry,
+    id: 'pistol',
+    model: fixture<Extract<WeaponModelRecord, { id: 'pistol' }>>({ ...model, id: 'pistol' }),
+    def: { ...WEAPON_DEFS.pistol },
+  });
+  const exposed = new THREE.Group();
+  exposed.name = 'MUZZLE_device_removed';
+  root.add(exposed);
+  const pistolConfig: AttachmentConfig = { ...BASE_ATTACHMENTS, muzzle: 'suppressor9mm' };
+  assert(isAttachmentConfig(pistolConfig, 'pistol'));
+  assert(!isAttachmentConfig(suppressed, 'pistol'), 'the rifle can is not a pistol fit');
+  viewmodel.active = pistol;
+  configureWeaponAttachments(pistol, pistolConfig, { suppressor9mm: can });
+  assert(pistol.def.suppressed && exposed.visible && !baseDevice.visible);
+  muzzleMount.rotation.x += 0.061;
+  muzzleMount.updateWorldMatrix(true, false);
+  assert(
+    viewmodel
+      .muzzleWorld(new THREE.Vector3())
+      .distanceTo(canExit.position.clone().applyMatrix4(muzzleMount.matrixWorld)) < 1e-10
+  );
+  configureWeaponAttachments(pistol, BASE_ATTACHMENTS, {});
+  assert(!pistol.def.suppressed && !exposed.visible && baseDevice.visible);
+  // AX338 owns a separate calibre fit, but uses the same muzzle/output contract.
+  const sniper = fixture<WeaponEntry>({
+    ...entry,
+    id: 'sniper',
+    model: fixture<Extract<WeaponModelRecord, { id: 'sniper' }>>({
+      id: 'sniper',
+      scene: model.scene,
+      root: model.root,
+      opticMountRest: model.opticMountRest,
+      nodes: fixture<Extract<WeaponModelRecord, { id: 'sniper' }>['nodes']>({
+        sight: model.nodes.sight,
+        muzzle: model.nodes.muzzle,
+      }),
+    }),
+    def: { ...WEAPON_DEFS.sniper },
+  });
+  const config338: AttachmentConfig = { optic: 'scope', muzzle: 'suppressor338', rail: 'laser' };
+  assert(!isAttachmentConfig(config338, 'mcx'), 'the .338 fit is not a shared SRD762Ti fit');
+  assert(!isAttachmentConfig(suppressed, 'sniper'), 'AX338 rejects the smaller shared can');
+  canExit.position.z = -0.28;
+  viewmodel.active = sniper;
+  configureWeaponAttachments(sniper, config338, { ...optics, suppressor338: can, laser });
+  assert(sniper.def.suppressed, 'every fitted muzzle id enables suppression');
+  assert(!baseDevice.visible && !irons.visible);
+  assert.equal(sniper.muzzleGroup.parent, muzzleMount);
+  const exit338 = canExit.position.clone().applyMatrix4(muzzleMount.matrixWorld);
+  assert(viewmodel.muzzleWorld(new THREE.Vector3()).distanceTo(exit338) < 1e-10);
+  configureWeaponAttachments(sniper, BASE_ATTACHMENTS, optics);
+  assert(baseDevice.visible && irons.visible, 'removal restores the AX338 brake and irons');
+  assert(!sniper.def.suppressed && sniper.muzzleSocket === null);
   viewmodel.active = null;
   laser.dispose();
   can.dispose();

@@ -46,11 +46,12 @@ def check_muzzle(root, manifest, rig, meshes, review, pose, tree, point, basis):
     assert not can.overlap(tree(fixed)), 'can intersects fixed weapon/sights/cap/lug/clamps'
     # The wide expansion chamber deliberately occludes the low ghost-ring line.
     assert can.ray_cast(Vector((0, .096, -.64)), Vector((0, 0, -1)), .3)[0] is not None
-    for optic in ('rmr', 'acog'):
+    for optic in ('rmr', 'acog', 'scope'):
         collection = bpy.data.collections['M590 check | mounted ' + optic]
+        assert not can.overlap(tree([o for o in collection.objects if o.type == 'MESH'])), (optic, 'can intersects optic')
         sight = next(o for o in collection.objects if o.name.startswith('SOCKET_sight'))
         assert can.ray_cast(point(sight), Vector((0, 0, -1)), 1)[0] is None, (optic, 'can blocks optic sightline')
-    print('M590_SUPPRESSOR12G_SIGHTLINE: low irons occluded; actual RMR/ACOG sight rays clear; no sight auto-switch or tuning changes')
+    print('M590_SUPPRESSOR12G_SIGHTLINE: low irons occluded; actual RMR/ACOG/PM II meshes and sight rays clear; no sight auto-switch or tuning changes')
     # Include the real optional TOR Mini, not just its permanent clamp hardware.
     laser_source = root/'assets/attachments/steiner-tor-mini/tor-mini.blend'
     with bpy.data.libraries.load(str(laser_source), link=False) as (available, laser):

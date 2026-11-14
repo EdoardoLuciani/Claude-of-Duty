@@ -12,7 +12,6 @@ import { PixiHud } from '../../src/ui/pixi-hud.ts';
 import { fixture } from './fixture.ts';
 
 interface UiElementState {
-  focused: boolean;
   removed: boolean;
   _owText?: string;
   _ows?: Map<string, string>;
@@ -59,7 +58,6 @@ function uiElement(tag: string, ownerDocument: Document): HTMLElement {
     className: '',
     textContent: '',
     tabIndex: -1,
-    focused: false,
     removed: false,
     hidden: false,
     clientWidth: 100,
@@ -115,9 +113,7 @@ function uiElement(tag: string, ownerDocument: Document): HTMLElement {
     },
     addEventListener(): void {},
     removeEventListener(): void {},
-    focus(): void {
-      this.focused = true;
-    },
+    focus(): void {},
     remove(): void {
       this.removed = true;
     },
@@ -145,6 +141,21 @@ function uiElement(tag: string, ownerDocument: Document): HTMLElement {
         min: '',
         max: '',
         step: '',
+      },
+      optional
+    );
+  }
+  if (tag === 'dialog') {
+    return fixture<HTMLDialogElement & UiElementState>(
+      {
+        ...members,
+        open: false,
+        showModal(): void {
+          this.open = true;
+        },
+        close(): void {
+          this.open = false;
+        },
       },
       optional
     );

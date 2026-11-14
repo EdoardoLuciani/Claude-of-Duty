@@ -257,3 +257,6 @@ print('AX338_ATTACHMENT_CLEARANCE_OK:',mechanical_poses,'120 Hz bolt poses;',han
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tor_mini.mounts import check_laser_mount
 check_laser_mount('ax338')
+
+from ax338.muzzle import check_muzzle
+check_muzzle()

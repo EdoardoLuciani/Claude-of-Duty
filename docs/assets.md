@@ -104,8 +104,13 @@ is authored by [`tools/blender/tor_mini/`](../tools/blender/tor_mini/), with nat
 Blender validation and `bun run models:cook -- tor_mini`. It is generated alongside
 the EXPS3, independently of player arms, and uses the shared gameplay/inspection
 rail path on all seven weapons. M590's full source checks now use strict zero-crossing
-firing-hand clearance; its low integrated-sight top rail supports RMR/ACOG only,
+firing-hand clearance; its extended integrated-sight top rail supports RMR/ACOG/PM II,
 independent of the optional laser on fixed magazine-tube clamps (#686).
+
+The dedicated [.338 suppressor](../assets/attachments/suppressor-338/README.md)
+is authored in `tools/blender/suppressor-338/`, with its own `suppressor338`
+cook/catalog ID and AX338-only muzzle fit. Its saved bore/socket checks and
+`tools/blender/ax338/muzzle.py` clearance sweep are separate from the shared SRD762Ti.
 
 Normal `bun run dev` / `bun run build` (and `bun run assets`) run
 `tools/build-assets.ts`: arms and bandage, each weapon and its cook, standalone

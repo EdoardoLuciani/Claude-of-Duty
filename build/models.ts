@@ -47,6 +47,18 @@ export const MODEL_COOKS = {
     output: 'public/models/attachments/suppressor12g.runtime.glb',
     flags: [],
   },
+  suppressor9mm: {
+    directory: 'assets/attachments/compact-9mm',
+    source: 'suppressor9mm.glb',
+    output: 'public/models/attachments/suppressor9mm.runtime.glb',
+    flags: [],
+  },
+  suppressor338: {
+    directory: 'assets/attachments/suppressor-338',
+    source: 'suppressor338.glb',
+    output: 'public/models/attachments/suppressor338.runtime.glb',
+    flags: [],
+  },
   suppressor: {
     directory: 'assets/attachments/sig-srd762ti',
     source: 'suppressor.glb',

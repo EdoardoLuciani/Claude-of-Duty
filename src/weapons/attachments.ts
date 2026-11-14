@@ -17,7 +17,7 @@ import type { OpticData, WeaponEntry, WeaponModelRecord } from './runtime-types.
 const OPTIC_IDS = ['rmr', 'acog', 'scope'] as const;
 export type OpticId = (typeof OPTIC_IDS)[number];
 export type RailId = 'laser';
-export type MuzzleId = 'suppressor' | 'suppressor12g';
+export type MuzzleId = 'suppressor' | 'suppressor9mm' | 'suppressor338' | 'suppressor12g';
 
 /** Null means the authored base weapon (`optic: null` aims through its irons). */
 export interface AttachmentConfig {
@@ -184,6 +184,8 @@ export async function loadAttachments(
     ),
     load('laser', makeLaserModel),
     load('suppressor', makeSuppressorModel),
+    load('suppressor9mm', makeSuppressorModel),
+    load('suppressor338', makeSuppressorModel),
     load('suppressor12g', makeSuppressorModel),
   ]);
   return assets;
