@@ -34,12 +34,13 @@ Do **not** scale this rifle can indiscriminately:
   10.2mm gauge through all three. This is not manufacturer-approved 9mm SRD762Ti
   compatibility, rated hardware, or a redesign/certification of physical baffles.
   External shape, socket transforms, catalog id and runtime asset URL are unchanged.
-- P320 (9 mm) still needs a pistol-appropriate booster/mount; a fixed rifle direct-thread fit is not
-  verified for its moving barrel.
+- P320 (9 mm) uses the separate [`suppressor9mm` compact booster can](../compact-9mm/README.md)
+  (#714); this fixed rifle direct-thread model is not a P320 fit.
 - M590 (12 gauge) needs a dedicated large-bore model and adapter, not a stretched
   7.62 can. No current fit is enabled.
 
-The .338, pistol and shotgun variants are not catalog entries yet. Unverified combinations
+The pistol has its own catalog entry; this rifle model is never substituted for it.
+Unverified .338/shotgun combinations
 are rejected by the common fit validator. No damage, velocity, recoil, accuracy,
 AI-hearing or handling modifiers are introduced, and no shop purchase is added.
 The existing suppressed flash recipe and the #668 recordings are presentation only.

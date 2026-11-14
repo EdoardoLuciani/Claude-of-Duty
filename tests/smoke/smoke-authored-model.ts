@@ -504,6 +504,32 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     assert.equal(mcx.def.eyeRelief, WEAPON_DEFS.mcx.eyeRelief);
     assert(irons.visible && !ironsRemoved.visible && baseDevice.visible);
   }
+  // A separate pistol asset must still resolve suppression and the live exit,
+  // and restore the barrel's thread protector when removed.
+  const pistol = fixture<WeaponEntry>({
+    ...entry,
+    id: 'pistol',
+    model: fixture<Extract<WeaponModelRecord, { id: 'pistol' }>>({ ...model, id: 'pistol' }),
+    def: { ...WEAPON_DEFS.pistol },
+  });
+  const exposed = new THREE.Group();
+  exposed.name = 'MUZZLE_device_removed';
+  root.add(exposed);
+  const pistolConfig: AttachmentConfig = { ...BASE_ATTACHMENTS, muzzle: 'suppressor9mm' };
+  assert(isAttachmentConfig(pistolConfig, 'pistol'));
+  assert(!isAttachmentConfig(suppressed, 'pistol'), 'the rifle can is not a pistol fit');
+  viewmodel.active = pistol;
+  configureWeaponAttachments(pistol, pistolConfig, { suppressor9mm: can });
+  assert(pistol.def.suppressed && exposed.visible && !baseDevice.visible);
+  muzzleMount.rotation.x += 0.061;
+  muzzleMount.updateWorldMatrix(true, false);
+  assert(
+    viewmodel
+      .muzzleWorld(new THREE.Vector3())
+      .distanceTo(canExit.position.clone().applyMatrix4(muzzleMount.matrixWorld)) < 1e-10
+  );
+  configureWeaponAttachments(pistol, BASE_ATTACHMENTS, {});
+  assert(!pistol.def.suppressed && !exposed.visible && baseDevice.visible);
   viewmodel.active = null;
   laser.dispose();
   can.dispose();

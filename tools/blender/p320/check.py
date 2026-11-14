@@ -99,3 +99,6 @@ print(f'P320_BLENDER_OK: 8 synchronized actions, wrists {maximum*1000:.4f} mm, m
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tor_mini.mounts import check_laser_mount
 check_laser_mount('p320')
+
+from p320.suppressor import check_suppressor
+check_suppressor(clips)

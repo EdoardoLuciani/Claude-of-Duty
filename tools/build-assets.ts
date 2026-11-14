@@ -127,6 +127,7 @@ const SHARED_TOOLS: Partial<Record<ModelId, string[]>> = {
 };
 const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
   suppressor: ['tools/blender/suppressor'],
+  suppressor9mm: ['tools/blender/suppressor9mm'],
   acog: [
     'tools/blender/acog',
     'tools/blender/mcx/primitives.py',

@@ -80,8 +80,8 @@ def build(output, render=False, quick=False):
       'optic':{'mount':'MOUNT_optic','parent':'slide','railContact':[0,.066,-.003],
                'railLength':.180,'fixedIrons':True,'ironSightHeight':.0537,
                'support':'Recessed plate and see-through cantilever rail; clears the ejection port'},
-      'muzzle':{'mount':'MOUNT_muzzle','parent':'barrel','position':[0,.037,-.1445],
-                'status':'Future datum only; suppressor asset/clearance not verified'},
+      'muzzle':{'mount':'MOUNT_muzzle','parent':'barrel','position':[0,.037,-.132],
+                'status':'Compact 9mm booster fit; suppressor9mm; thread protector/exposed thread switch'},
       'rail':{'mount':'MOUNT_rail','parent':'frame','position':[0,.002,-.122],
               'status':'TOR Mini on a 14 mm extended game-fit frame rail; fifth slot supports the forward seat'}},
      'notes':['Original non-functional game art, not a dimensionally exact replica.','No downloaded models or textures.','No endorsement by SIG SAUER.']}

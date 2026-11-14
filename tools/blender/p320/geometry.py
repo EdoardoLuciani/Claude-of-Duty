@@ -223,6 +223,11 @@ def build_geometry(asset):
     # Moving barrel and guide rod are visible in both muzzle and open-slide poses.
     tube('Barrel | crowned muzzle',(0,.070,.037),.0068,.0044,.119)
     tube('Barrel | threaded extension',(0,.1365,.037),.00635,.0044,.014)
+    protector = empty('MUZZLE_device', parent=barrel)
+    exposed = empty('MUZZLE_device_removed', parent=barrel)
+    bpy.context.view_layer.update()
+    tube('Thread protector | nitrided sleeve',(0,.1365,.037),.0074,.00705,.014,
+         barrel_mat,protector)
     # External helical thread is visual game art, not a manufacturing profile.
     vertices=[];faces=[];steps=240
     for i in range(steps+1):
@@ -233,7 +238,7 @@ def build_geometry(asset):
         if i:
             for j in range(2):
                 k=(i-1)*3+j;faces.append((k,k+3,k+4,k+1))
-    mesh('Barrel | external muzzle thread',vertices,faces,barrel_mat,barrel,0,True)
+    mesh('Barrel | external muzzle thread',vertices,faces,barrel_mat,exposed,0,True)
     tube('Barrel | crown lip',(0,.1438,.037),.00635,.00465,.0010)
     box('Barrel | chamber hood',(0,.049,.041),(.019,.031,.013),barrel_mat,barrel,.0007)
     cyl('Guide rod | front cap',(0,.121,.025),.0036,.018,barrel_mat,body,'Y')
@@ -303,12 +308,11 @@ def build_geometry(asset):
     for name,pos,parent in [('SOCKET_muzzle',(0,.1445,.037),barrel),('SOCKET_ejection',(.015,.048,.042),slide),
                             ('SOCKET_sight',(0,-.033,.0537),rig),
                             ('MOUNT_optic',(0,.003,.066),slide),
-                            ('MOUNT_muzzle',(0,.1445,.037),barrel),
+                            ('MOUNT_muzzle',(0,.132,.037),barrel),
                             ('MOUNT_rail',(0,.122,.002),body)]:
         # Keep authored world coordinates under offset pivots.
         o=empty(name,parent=parent);o.matrix_parent_inverse=parent.matrix_world.inverted();o.location=pos
-        # TOR Mini body sits below the frame rail; +Z points into the seat.
-        if name=='MOUNT_muzzle':o.rotation_euler.x=-math.pi/2  # outward +Y (game -Z)
+        # Identity muzzle frame: native +Y forward becomes glTF -Z forward.
 
     # Union the molded frame pieces so the grip neck and rail are not visibly
     # assembled from intersecting slabs. Preserve the sculpted grip's smooth faces.
