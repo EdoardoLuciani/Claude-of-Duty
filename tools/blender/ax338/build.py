@@ -36,6 +36,8 @@ def build(output,render=False,quick=False):
         o=bpy.data.objects.new(name,None);asset.objects.link(o);o.location=xyz(loc);o.parent=parent;o.empty_display_size=.01;bpy.context.view_layer.update();return o
     rig=empty('AX338_RIG');body=empty('receiver',parent=rig);hg=empty('handguard',parent=rig)
     stock=empty('stock',parent=rig);irons=empty('IRON_sights',parent=rig)
+    muzzle_device=empty('MUZZLE_device',parent=rig)
+    muzzle_adapter=empty('MUZZLE_device_removed',parent=rig)
     bolt=empty('bolt',(0,.075,.050),rig);trigger=empty('trigger',(0,.049,.016),rig)
     mag=empty('magazine',parent=rig);spare=empty('magazine_spare',parent=rig)
     mag_rounds=empty('magazine_round',parent=mag);spare_rounds=empty('magazine_spare_round',parent=spare)
@@ -291,11 +293,14 @@ def build(output,render=False,quick=False):
         profile('Rail tooth',[(float(z),.113),(float(z),.118),(float(z)+.0052,.118),(float(z)+.0052,.113)],.021,steel,hg,bevel=.00025)
     # Barrel external profile and factory high-efficiency open brake.
     turned('27 inch barrel',0,.075,[(breech,.016),(breech-.070,.015),(hg1,.012),(crown,.011)],steel,body,48)
-    brake=turned('Factory brake',0,.075,[(crown,.011),(crown-.012,.014),(muzzle+.004,.014),(muzzle,.012)],steel,body,48)
+    brake=turned('Factory brake',0,.075,[(crown,.011),(crown-.012,.014),(muzzle+.004,.014),(muzzle,.012)],steel,muzzle_device,48)
     cut(brake,cyl('CUT brake axial passage',(0,.075,(muzzle+crown)/2),.0052,.080,None,None,'Z',32,0))
     for z in (crown-.026,crown-.050):
         cut(brake,box('CUT lateral brake port',(0,.075,z),(.060,.014,.016),None,None,.002))
-    cyl('Brake lock nut',(0,.075,crown-.007),.015,.006,black,body,'Z',40)
+    cyl('Brake lock nut',(0,.075,crown-.007),.015,.006,black,muzzle_device,'Z',40)
+    # Separate open M18x1.5-to-can sleeve, shown only with the brake removed.
+    adapter=turned('338 threaded adapter',0,.075,[(crown,.011),(crown-.003,.0115),(crown-.020,.0115)],steel,muzzle_adapter,48)
+    cut(adapter,cyl('CUT adapter bore',(0,.075,crown-.010),.0055,.024,None,None,'Z',48,0))
     # Ten-round double-row magazine; two separate authored transfer controls.
     for parent,rounds in ((mag,mag_rounds),(spare,spare_rounds)):
         # 105 x 104 x 34 mm provisional envelope; CIP COAL is 95.61 mm.
@@ -382,7 +387,7 @@ def build(output,render=False,quick=False):
         contact_boxes.append({'part':o.name,'min':[round(min(p[i] for p in points),8) for i in range(3)],'max':[round(max(p[i] for p in points),8) for i in range(3)]})
     # Consolidation operates after source save and only on runtime geometry.
     consolidate_finishes(asset,rough,albedo,normal,OUT)
-    for parent in (body,hg,stock,irons,bolt,trigger,mag,spare,mag_rounds,spare_rounds):
+    for parent in (body,hg,stock,irons,muzzle_device,muzzle_adapter,bolt,trigger,mag,spare,mag_rounds,spare_rounds):
         objects=[o for o in list(asset.objects) if o.type=='MESH' and o.parent==parent]
         if not objects:continue
         for o in objects:
@@ -400,7 +405,7 @@ def build(output,render=False,quick=False):
     stats=validate_export(OUT/'ax338.glb',clips)
     manifest={'asset':'Early AX338 / Dark Earth / factory brake / removable rail irons / no optional attachments','units':'metres','clips':clips,'stats':stats,'textureResolution':1024,'contactGeometry':{'magazine':contact_boxes,'pistolGripSections':grip_sections},'dimensions':{'barrel':.6858,'overall':1.250,'barrelFace':breech,'barrelCrown':crown,'muzzle':muzzle,'butt':butt,'ironSightRadius':rear-front,'ironSightHeight':sight_y,'magazineBodyHeight':.105,'magazineDepth':.104,'magazineThickness':.034,'magazineHeight':.1125},'source':'tools/blender/ax338/build.py + tools/blender/ax338/actions.py + tools/blender/ax338/export.py; calibration stage: tools/blender/ax338/hand-reference.ts'}
     (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
-    assert stats['triangles']<150000 and stats['primitives']==10 and stats['materials']==1 and stats['images']==3 and stats['bytes']<=15*1024*1024,stats
+    assert stats['triangles']<150000 and stats['primitives']==12 and stats['materials']==1 and stats['images']==3 and stats['bytes']<=15*1024*1024,stats
     print('AX338 export:',json.dumps(stats))
     for name in ('ax338_surface.png','ax338_roughness.png','ax338_normal.png','ax338_finishes.png'):(OUT/name).unlink(missing_ok=True)
 

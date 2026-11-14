@@ -195,18 +195,19 @@ def build(output, render=False, quick=False):
     cyl('Barrel lug screw',(0,.052,muzzle_z+.100),.003,.025,steel,axis='X')
     # AIMPRO-style integrated rail/rear sight, not a bridge over the factory ring.
     # Reference: jerkingthetrigger.com/2013/10/29/aimpro-tactical-ghost-ring-rail/
-    # Published 4-inch/eight-slot section; local profiles and screw stations are
-    # photo-derived game art, not an AIMPRO CAD or original-SKU factory certificate.
-    rail_front=-.190;rail_rear=rail_front+.1016;rail_middle=(rail_front+rail_rear)/2
-    rail_pitch=.010008;rail_top=.091;base_top=.0865
-    base_rings=[]
-    for z in (rail_front,-.040):
+    # Scout-style game-art extension for the PM II, not AIMPRO manufacturer CAD.
+    # Keep receiver screw seats and fixed ghost-ring ears; cantilever grows forward.
+    rail_front=-.2472;rail_pitch=.010008;rail_top=.091;base_top=.0865
+    base_rings=[[(x,y,rail_front) for x,y in (
+        (-.0105,.083),(0,.083),(.0105,.083),
+        (.0105,base_top),(0,base_top),(-.0105,base_top))]]
+    for z in (-.190,-.040):
         bottom=[(x,seat.ray_cast(Vector((x,.100,z)),Vector((0,-1,0)),.03)[0].y-.00005,z) for x in (-.0105,0,.0105)]
         base_rings.append(bottom+[(x,base_top,z) for x,_,_ in reversed(bottom)])
     rail_base=loft('Optic rail receiver base',base_rings,receiver_finish,bevel=.0001,rounded=False)
     section=[(-.0078,base_top),(.0078,base_top),(.0106,.0886),(.0106,rail_top),(-.0106,rail_top),(-.0106,.0886)]
-    for i in range(9):  # Nine teeth bound eight cross slots.
-        z=rail_middle+(i-4)*rail_pitch
+    for i in range(17):  # 164.904 mm of teeth fully supports both 28 mm pedestals.
+        z=rail_front+.002388+i*rail_pitch
         loft('Optic Picatinny lug',[[(x,y,z+s*.002388) for x,y in section] for s in (-1,1)],receiver_finish,bevel=.00010,rounded=False)
     for z in (-.174,-.144,-.104,-.075):
         cut(rail_base,cyl('CUT rail screw pocket',(0,.086,z),.0028,.008,None,None,'Y',12,0))
@@ -233,7 +234,7 @@ def build(output, render=False, quick=False):
         bpy.ops.object.modifier_apply(modifier=m.name);bpy.data.objects.remove(cheek,do_unlink=True)
     laser_z=-.575  # Full fixture clears the cap fluting, ahead of pump travel.
     mounts={
-        'optic':{'pos':[0,rail_top,rail_middle+rail_pitch/2],'rot':[0,0,0],'parent':'receiver'},
+        'optic':{'pos':[0,rail_top,-.168],'rot':[0,0,0],'parent':'receiver'},
         'muzzle':{'pos':[0,.068,muzzle_z-.012],'rot':[0,0,0],'parent':'receiver'},
         'rail':{'pos':[0,.009,laser_z],'rot':[0,0,0],'parent':'receiver'},
     }
@@ -467,7 +468,7 @@ def build(output, render=False, quick=False):
     triangles=sum(j['accessors'][p['indices']]['count']//3 for n in j['nodes'] if 'mesh' in n for p in j['meshes'][n['mesh']]['primitives'])
     stats={'triangleInstances':triangles,'primitives':sum(len(m['primitives']) for m in j['meshes']),
            'materials':len(j['materials']),'images':len(j['images']),'bytes':len(raw)}
-    assert triangles<79000 and stats['primitives']==2 and stats['materials']==1 and stats['images']==3 and len(raw)<=12*1024*1024,stats
+    assert triangles<80000 and stats['primitives']==2 and stats['materials']==1 and stats['images']==3 and len(raw)<=12*1024*1024,stats
     pose('Idle')
     vertices=[C.inverted().to_4x4()@rig.matrix_world.inverted()@o.matrix_world@v.co for o in asset.objects if o.type=='MESH' and o.parent!=shell for v in o.data.vertices]
     bounds=[[min(v[i] for v in vertices) for i in range(3)],[max(v[i] for v in vertices) for i in range(3)]]

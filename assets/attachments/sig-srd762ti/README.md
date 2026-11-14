@@ -27,7 +27,8 @@ manufacturer-approved hardware or internal baffle engineering.
 
 Do **not** scale this rifle can indiscriminately:
 - 5.56/.300 BLK/7.62 can share this exterior once each authored fit is verified.
-- .338 remains unverified; its muzzle, adapter and bore requirements need separate authoring.
+- .338 uses the separately authored [AX338 can](../suppressor-338/README.md)
+  (`suppressor338`, #713); SRD762Ti is never scaled/reused for that fit.
 - MPX (#663) uses an approved universal **GAME-FIT** compromise: the same
   236×44mm exterior with a 10.4mm open endcap and shadow annulus, and an open
   19mm rear sleeve receiving its authored adapter. The native build ray-tests a
@@ -39,8 +40,8 @@ Do **not** scale this rifle can indiscriminately:
 - M590 (12 gauge) needs a dedicated large-bore model and adapter, not a stretched
   7.62 can. No current fit is enabled.
 
-The pistol has its own catalog entry; this rifle model is never substituted for it.
-Unverified .338/shotgun combinations
+The .338 and pistol cans have separate catalog entries; this rifle model is never
+substituted for either. Unverified combinations
 are rejected by the common fit validator. No damage, velocity, recoil, accuracy,
 AI-hearing or handling modifiers are introduced, and no shop purchase is added.
 The existing suppressed flash recipe and the #668 recordings are presentation only.

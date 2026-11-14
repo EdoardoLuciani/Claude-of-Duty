@@ -17,7 +17,7 @@ type InvertButton = [HTMLButtonElement, boolean];
  */
 export class PauseMenu {
   ctx: MenuContext;
-  root: HTMLElement;
+  root: HTMLDialogElement;
   rows: HTMLElement;
   sens: SliderApi;
   fov: SliderApi;
@@ -32,11 +32,16 @@ export class PauseMenu {
 
   constructor(parent: HTMLElement, ctx: MenuContext) {
     this.ctx = ctx;
-    this.root = el('div', 'ow-menu', parent);
+    this.root = el('dialog', 'ow-menu ow-dialog', parent);
+    this.root.setAttribute('aria-labelledby', 'ow-menu-title');
+    // Esc stays owned by the pause binding, which toggles this menu itself.
+    this.root.setAttribute('closedby', 'none');
+    this.root.oncancel = (event): void => event.preventDefault();
     const layout = el('div', 'ow-menu-layout', this.root);
     const inner = el('div', 'ow-menu-inner', layout);
 
     const h = el('h1', null, inner, 'Paused');
+    h.id = 'ow-menu-title';
     h.textContent = 'PAUSED';
     el('div', 'sub', inner, 'Claude of Duty — TACTICAL OPERATIONS');
     el('div', 'rule', inner);
@@ -94,6 +99,7 @@ export class PauseMenu {
     const btns = el('div', 'ow-btns', inner);
     this.resumeBtn = el('button', 'ow-btn primary', btns, 'Resume');
     this.resumeBtn.type = 'button';
+    this.resumeBtn.autofocus = true;
     this.resumeBtn.addEventListener('click', (): void => this.close());
     const reset = el('button', 'ow-btn', btns, 'Defaults');
     reset.type = 'button';
@@ -204,7 +210,7 @@ export class PauseMenu {
     this.open = true;
     this.syncFromConfig();
     setStyle(this.root, 'display', '');
-    this.resumeBtn.focus();
+    this.root.showModal();
     document.exitPointerLock();
     this._prevScale = this.ctx.time.scale;
     this.ctx.time.scale = 0;
@@ -215,6 +221,7 @@ export class PauseMenu {
   close(): void {
     if (!this.open) return;
     this.open = false;
+    this.root.close(); // Leave the top layer before re-locking; update() still fades it out.
     this.ctx.time.scale = this._prevScale ?? 1;
     this.ctx.peek('player')?.setControlEnabled(true);
     this.ctx.input.requestPointerLock();

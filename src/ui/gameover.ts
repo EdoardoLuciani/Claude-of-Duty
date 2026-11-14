@@ -13,7 +13,7 @@ interface RunSummary {
 export class GameOverScreen {
   declare ctx: unknown;
   declare onRestart: (() => void) | null;
-  declare root: HTMLElement;
+  declare root: HTMLDialogElement;
   declare eyebrow: HTMLElement;
   declare title: HTMLElement;
   declare summary: HTMLElement;
@@ -33,13 +33,18 @@ export class GameOverScreen {
   constructor(parent: HTMLElement, ctx: unknown, onRestart: (() => void) | null) {
     this.ctx = ctx;
     this.onRestart = onRestart;
-    this.root = el('div', 'ow-gameover', parent);
+    this.root = el('dialog', 'ow-gameover ow-dialog', parent);
+    this.root.setAttribute('aria-labelledby', 'ow-gameover-title');
+    this.root.setAttribute('closedby', 'none'); // Only NEW GAME leaves this screen.
+    this.root.oncancel = (event): void => event.preventDefault();
     const panel = el('div', 'ow-gameover-panel', this.root);
     this.eyebrow = el('div', 'ow-gameover-eyebrow', panel, 'MISSION STATUS');
     this.title = el('div', 'ow-gameover-title', panel, 'KILLED IN ACTION');
+    this.title.id = 'ow-gameover-title';
     el('div', 'ow-gameover-rule', panel);
     this.summary = el('div', 'ow-gameover-sub', panel, 'SCORE 000000 · WAVE 1');
     this.button = el('button', 'ow-gameover-button', panel, 'NEW GAME');
+    this.button.autofocus = true;
     el('div', 'ow-gameover-hint', panel, 'ENTER / SPACE');
 
     this.button.addEventListener('click', this._click);
@@ -64,6 +69,7 @@ export class GameOverScreen {
     // Start owns the next frame and suspends normal HUD updates. Do not leave
     // the previous run's summary visible behind its modal while awaiting input.
     this.shown = 0;
+    this.root.close();
     setStyle(this.root, 'display', 'none');
     setStyle(this.root, 'pointer-events', 'none');
   }
@@ -84,6 +90,7 @@ export class GameOverScreen {
       return;
     }
     setStyle(this.root, 'display', '');
+    if (ready && !this.root.open) this.root.showModal(); // Initial focus needs a rendered dialog.
     setStyle(this.root, 'pointer-events', ready ? 'auto' : 'none');
     setStyle(this.root, 'opacity', ease.outQuad(this.shown).toFixed(3));
     const y = (1 - ease.outCubic(this.shown)) * 18;
