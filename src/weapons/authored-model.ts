@@ -79,7 +79,8 @@ export function rebaseNativeWeapon(gltf: GLTF, origin: readonly number[] = [0, 0
     }
     o.updateMatrix();
   });
-  const rootNames = new Set([...roots].map((o): string => o.name));
+  // GLTFLoader targets unnamed nodes by uuid.
+  const rootNames = new Set([...roots].map((o): string => o.name || o.uuid));
   for (const clip of gltf.animations)
     for (const track of clip.tracks) {
       const { nodeName, propertyName } = THREE.PropertyBinding.parseTrackName(track.name);

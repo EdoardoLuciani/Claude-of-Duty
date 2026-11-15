@@ -185,6 +185,8 @@ def bake_export_actions(objects,clips):
                 group = sorted((c for c in curves if c.data_path==path),key=lambda c:c.array_index)
                 if all(p.interpolation in ('LINEAR','CONSTANT') for c in group for p in c.keyframe_points): continue
                 values = [[c.evaluate(f) for c in group] for f in frames]
+                # Component-wise curves leave the unit sphere between poses; export unit keys.
+                if path=='rotation_quaternion': values = [list(Quaternion(r).normalized()) for r in values]
                 constant = all(max(r[i] for r in values)-min(r[i] for r in values) < 1e-4 for i in range(len(group)))
                 indices = [0,len(values)-1] if constant else range(len(values))
                 for i,curve in enumerate(group):
