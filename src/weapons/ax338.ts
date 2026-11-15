@@ -39,12 +39,9 @@ export function makeAX338Model(gltf: GLTF): AX338Model {
     reactiveFire: true,
     handPoses: { left: handReference.sides.left.grip, right: handReference.sides.right.grip },
     nodes: {
-      muzzle: point('SOCKET_muzzle'),
       eject: point('SOCKET_ejection'),
       sight: point('SOCKET_sight'),
       ejectDir: [0.88, 0.4, 0.22],
-      magSeat: { pos: point('SOCKET_magazine'), rot: [0, 0, 0] },
-      triggerPivot: { pos: point('trigger'), rot: [0, 0, 0] },
     },
     shell: { caseLen: 0.0697, rimR: 0.0074 },
     magSize: { len: manifest.dimensions.magazineHeight },
@@ -63,13 +60,7 @@ export async function loadAX338(renderer: Pick<Renderer, 'hasFeature'>): Promise
 
 /** Blender owns mechanisms and wrist/finger choreography; the existing recoil,
  * shared arm skin, upper/forearm IK and ammunition/event system remain in charge. */
-type AX338Model = AuthoredModelData<
-  'sniper',
-  AuthoredNodes & {
-    magSeat: { pos: [number, number, number]; rot: number[] };
-    triggerPivot: { pos: [number, number, number]; rot: number[] };
-  }
-> & {
+type AX338Model = AuthoredModelData<'sniper', AuthoredNodes> & {
   label: string;
   reactiveFire: boolean;
   handPoses: {

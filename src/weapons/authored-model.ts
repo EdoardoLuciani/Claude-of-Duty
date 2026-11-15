@@ -152,9 +152,7 @@ export interface AuthoredModelData<
 }
 
 export interface AuthoredNodes {
-  muzzle: [number, number, number];
   eject: [number, number, number];
   sight: [number, number, number];
   ejectDir: number[];
-  magSeat: { pos: number[]; rot: number[] };
 }

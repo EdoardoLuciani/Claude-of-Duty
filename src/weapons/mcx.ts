@@ -43,11 +43,9 @@ export function makeMCXModel(gltf: GLTF): MCXModel {
     animations,
     handPoses: { left: handReference.sides.left.grip, right: handReference.sides.right.grip },
     nodes: {
-      muzzle: point('SOCKET_muzzle'),
       eject: point('SOCKET_ejection'),
       sight: point('SOCKET_sight'),
       ejectDir: [1, 0.35, 0.35] as [number, number, number],
-      magSeat: { pos: point('SOCKET_magazine'), rot: [0, 0, 0] },
     },
     shell: { caseLen: 0.0348, rimR: 0.0048 },
     magSize: { len: 0.18 },
@@ -66,12 +64,7 @@ export async function loadMCX(renderer: Pick<Renderer, 'hasFeature'>): Promise<M
   return makeMCXModel(await loadWeaponGLTF(renderer, MCX_URL));
 }
 
-type MCXModel = AuthoredModelData<
-  'mcx',
-  AuthoredNodes & {
-    magSeat: { pos: [number, number, number]; rot: number[] };
-  }
-> & {
+type MCXModel = AuthoredModelData<'mcx', AuthoredNodes> & {
   handPoses: {
     left: typeof handReference.sides.left.grip;
     right: typeof handReference.sides.right.grip;

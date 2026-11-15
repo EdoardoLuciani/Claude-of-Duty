@@ -136,7 +136,7 @@ function makeHarness(): WeaponHarness {
       this.clip = null;
     },
     play(name): number {
-      this.clip = new Clip(name, 1, {});
+      this.clip = new Clip(name, 1);
       clips.push(name);
       return 1;
     },

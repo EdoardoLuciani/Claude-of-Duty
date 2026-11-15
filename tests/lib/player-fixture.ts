@@ -26,7 +26,7 @@ export function presentationViewmodel(ctx: EngineContext, calls: string[] = []):
     blood: fixture<ArmAsset['blood']>({ setHealthFraction(): void {} }),
   });
   vm.play = (name: string): number => {
-    vm.clip = new Clip(name, 1, {});
+    vm.clip = new Clip(name, 1);
     vm.clipT = 0;
     return 1;
   };

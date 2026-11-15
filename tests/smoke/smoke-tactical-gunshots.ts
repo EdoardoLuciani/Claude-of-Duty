@@ -6,8 +6,8 @@ import reference from '../../src/audio/samples/reference.json' with { type: 'jso
 import type { SampleKind, WeaponProfile } from '../../src/audio/types.ts';
 import {
   REPORT_DISTANT_MATCH,
-  SUPPRESSED_WEAPON_PROFILES,
   WEAPON_PROFILES,
+  resolveProfile,
   reportDistanceGain,
   reportDistantMix,
 } from '../../src/audio/weapons.ts';
@@ -23,7 +23,10 @@ import {
 
 const profiles: WeaponProfile[] = [
   ...Object.values(WEAPON_PROFILES),
-  ...Object.values(SUPPRESSED_WEAPON_PROFILES),
+  ...Object.keys(WEAPON_PROFILES).flatMap((name): WeaponProfile[] => {
+    const profile = resolveProfile(name, true);
+    return profile ? [profile] : [];
+  }),
 ];
 for (const profile of profiles) {
   const kind = profile.sample;

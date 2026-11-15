@@ -36,7 +36,6 @@ interface MovementInput {
   crouchPressed: boolean;
   pronePressed: boolean;
   sprintHeld: boolean;
-  sprintPressed: boolean;
   leanL: boolean;
   leanR: boolean;
   ads: boolean;
@@ -62,7 +61,7 @@ interface MovementContext {
     EngineContext['input'],
     'moveVector' | 'action' | 'actionStarted' | 'stick' | 'ads' | 'enabled'
   >;
-  time: Pick<EngineContext['time'], 'elapsed' | 'frame' | 'fixed'>;
+  time: Pick<EngineContext['time'], 'elapsed' | 'fixed'>;
   peek(id: 'world'): Pick<EngineSystems['world'], 'ladderAt'> | null;
 }
 type MovementPhysics = Pick<
@@ -142,7 +141,6 @@ export class Movement {
     crouchPressed: false,
     pronePressed: false,
     sprintHeld: false,
-    sprintPressed: false,
     leanL: false,
     leanR: false,
     ads: false,
@@ -264,7 +262,6 @@ export class Movement {
       cmd.crouchPressed = false;
       cmd.pronePressed = false;
       cmd.sprintHeld = false;
-      cmd.sprintPressed = false;
       cmd.leanL = false;
       cmd.leanR = false;
       cmd.ads = false;
@@ -291,7 +288,6 @@ export class Movement {
     cmd.crouchPressed ||= input.actionStarted('crouch') || (crouch && !prev.crouch);
     cmd.pronePressed ||= input.actionStarted('prone') || (prone && !prev.prone);
     cmd.sprintHeld = sprint;
-    cmd.sprintPressed = sprintPressed;
     cmd.leanL = input.action('leanLeft');
     cmd.leanR = input.action('leanRight');
     cmd.ads = input.ads;
@@ -320,7 +316,6 @@ export class Movement {
     cmd.jump = false;
     cmd.crouchPressed = false;
     cmd.pronePressed = false;
-    cmd.sprintPressed = false;
   }
 
   _step(h: number): void {

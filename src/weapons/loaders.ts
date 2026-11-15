@@ -32,6 +32,7 @@ export async function loadWeapon(
   if (!isWeaponId(id)) throw new Error(`[weapons] unknown weapon ${id}`);
   const model = await LOADERS[id](renderer);
   // Fail this weapon's load, not the batch it is mounted with.
+  requiredNode(model.root, 'SOCKET_muzzle');
   for (const slot of Object.keys(WEAPON_DEFS[id].fits ?? {}))
     requiredNode(model.root, `MOUNT_${slot}`);
   return model;

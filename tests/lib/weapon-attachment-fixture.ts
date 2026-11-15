@@ -54,7 +54,7 @@ export function mountableWeapon(
     scene,
     root: scene,
     opticMountRest: new THREE.Matrix4(),
-    nodes: fixture<WeaponModelRecord['nodes']>({ sight: [0, 0.14, 0.03], muzzle: [0, 0.07, -0.5] }),
+    nodes: fixture<WeaponModelRecord['nodes']>({ sight: [0, 0.14, 0.03] }),
   });
   // The record union rejects a WeaponId-typed literal; assign it on the fixture instead.
   model.id = id;

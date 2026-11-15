@@ -60,7 +60,7 @@ for px,py in [(92,206),(105,238),(190,253),(220,253),(300,256),(380,246)]:
     s=.948/(1956-57);origin=stock_mesh.matrix_world.inverted()@(C@Vector((-.06,.075+(219-py)*s,(805-px)*s)))
     direction=stock_mesh.matrix_world.inverted().to_3x3()@(C@Vector((1,0,0)))
     assert stock_bvh.ray_cast(origin,direction,.12)[0] is not None,('daylight gap in stock carrier',px,py)
-# Real rear bore and front post, not an old optic/glass datum.
+# The aim datum is the real rear bore and front post.
 sight=CI@bpy.data.objects['SOCKET_sight'].matrix_world.translation
 front=CI@bpy.data.objects['SOCKET_front_post'].matrix_world.translation
 assert abs(sight.x)<1e-6 and abs(front.x)<1e-6 and abs(front.y-sight.y)<1e-6

@@ -51,7 +51,6 @@ try {
     assert.equal(movement.cmd.moveX, 0);
     assert.equal(movement.cmd.moveY, 0);
     assert.equal(movement.cmd.sprintHeld, false);
-    assert.equal(movement.cmd.sprintPressed, false);
     assert.equal(movement.yaw, yaw);
     assert.equal(movement.pitch, pitch);
     assert(movement.yawRate === 0);
@@ -67,7 +66,6 @@ try {
   assert.equal(movement.cmd.moveX, 1 / Math.sqrt(2));
   assert.equal(movement.cmd.moveY, 1 / Math.sqrt(2));
   assert.equal(movement.cmd.sprintHeld, true);
-  assert.equal(movement.cmd.sprintPressed, true);
   assert.equal(movement.yaw, -3.1 / 60);
   assert.equal(movement.pitch, 3.1 / 60);
   const yaw = movement.yaw,

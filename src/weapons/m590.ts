@@ -55,12 +55,9 @@ export function makeM590Model(gltf: GLTF): M590Model {
     reactiveFire: true,
     handPoses: { left: handReference.sides.left.grip, right: handReference.sides.right.grip },
     nodes: {
-      muzzle: point('SOCKET_muzzle'),
       eject: point('SOCKET_ejection'),
       sight: point('SOCKET_sight'),
       ejectDir: manifest.ejectionDirection,
-      // Legacy below-mouth helper, not a detachable magazine or hull control.
-      magSeat: { pos: [0, -0.039, -0.068], rot: [1.2, 0, 0] },
     },
     shell: manifest.shell,
     magSize: { len: manifest.shell.caseLen },

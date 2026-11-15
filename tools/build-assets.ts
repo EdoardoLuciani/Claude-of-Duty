@@ -112,11 +112,7 @@ const SHARED_TOOLS: Partial<Record<ModelId, string[]>> = {
   p320: ['tools/blender/hand-reference.ts'],
   m590: ['tools/blender/hand-reference.ts'],
   ax338: ['tools/blender/hand-reference.ts'],
-  evolys: [
-    'tools/blender/rmr/geometry.py',
-    'tools/blender/review_hands.py',
-    'tools/blender/hand-reference.ts',
-  ],
+  evolys: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
   mpx: ['tools/blender/review_hands.py', 'tools/blender/hand-reference.ts'],
 };
 const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
@@ -141,9 +137,11 @@ const STANDALONE_TOOLS: Partial<Record<ModelId, string[]>> = {
 function cookStep(id: ModelId, salt: string[]): AssetStep {
   const { directory, source, output } = MODEL_COOKS[id];
   const tools = STANDALONE_TOOLS[id] ?? [`tools/blender/${id}`, ...(SHARED_TOOLS[id] ?? [])];
+  // Rail-bearing models import the shared Picatinny profile; suppressor cans do not.
+  const rail = tools.includes('tools/blender/can.py') ? [] : ['tools/blender/picatinny.py'];
   return {
     id,
-    inputs: [...tools, 'tools/blender/picatinny.py', ...authoredJson(directory)],
+    inputs: [...tools, ...rail, ...authoredJson(directory)],
     // Only this model's cook settings, so one profile edit rebuilds one model.
     salt: [...salt, JSON.stringify(MODEL_COOKS[id]), ...GLTFPACK_FLAGS, GLTFPACK_VERSION],
     // The editable .blend is used by authoring and attachment-fit checks.
