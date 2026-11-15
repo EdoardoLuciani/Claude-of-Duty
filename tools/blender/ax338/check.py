@@ -196,16 +196,12 @@ rail_teeth=[o for o in bpy.data.objects if o.type=='MESH' and o.name.startswith(
 assert any(abs(max(p.y for p in points(o.name))-.118)<.000001 for o in rail_teeth)
 iron_tree=surface(iron_meshes)
 mounted={}
-for optic_id,folder in [('rmr','trijicon-rmr'),('acog','trijicon-acog'),('scope','schmidt-bender-pm-ii')]:
-    path=ROOT/'assets/attachments'/folder/(optic_id+'.blend')
-    with bpy.data.libraries.load(str(path)) as (source,target):target.objects=source.objects
-    objects=[o for o in target.objects if o is not None]
-    base=next(o for o in objects if o.name.split('.')[0]=='MOUNT_base')
-    root=base.parent
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import attachment_source
+for optic_id in attachment_source.OPTICS:
+    objects,base=attachment_source.load(optic_id)
     meshes=[o for o in objects if o.type=='MESH']
     assert not any(o.animation_data for o in objects),(optic_id,'standalone optic contains weapon animation')
-    for o in objects:scene.collection.objects.link(o)
-    bpy.context.view_layer.update()
     mount=rig.matrix_world.inverted()@bpy.data.objects['MOUNT_optic'].matrix_world
     transform=mount@Matrix.Translation(-base.matrix_world.translation)
     mounted[optic_id]=surface(meshes,transform)

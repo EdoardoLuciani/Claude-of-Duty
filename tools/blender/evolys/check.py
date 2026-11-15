@@ -182,31 +182,20 @@ def rig_tree(objects):
 fixed_irons=rig_tree([irons]);rail_tree=rig_tree([bpy.data.objects['receiver_mesh']]);attachments={}
 bpy.data.objects['MUZZLE_device_removed'].hide_viewport=False
 bpy.context.view_layer.update()
-for attachment_id,folder,seat,base_name,filename in [
-    ('rmr','trijicon-rmr',mount,'MOUNT_base','rmr'),
-    ('acog','trijicon-acog',mount,'MOUNT_base','acog'),
-    ('scope','schmidt-bender-pm-ii',mount,'MOUNT_base','scope'),
-    ('suppressor','sig-srd762ti',muzzle_mount,'SOCKET_mount','suppressor'),
-    ('laser','steiner-tor-mini',rail,'SOCKET_mount','tor-mini')]:
-    path=ROOT/'assets/attachments'/folder/(filename+'.blend')
-    assert path.exists(),f'Rebuild shared {attachment_id} before EVOLYS fit checks: {path}'
-    with bpy.data.libraries.load(str(path),link=False) as (source,target):
-        target.objects=source.objects
-    objects=target.objects
-    base=next(o for o in objects if o.name.startswith(base_name))
+import attachment_source
+for attachment_id,seat in [('rmr',mount),('acog',mount),('scope',mount),('srd762ti',muzzle_mount),('laser',rail)]:
+    objects,base=attachment_source.load(attachment_id)
     meshes=[o for o in objects if o.type=='MESH']
-    for obj in objects:scene.collection.objects.link(obj)
-    bpy.context.view_layer.update()
     transform=seat.matrix_world@base.matrix_world.inverted()
     matrices={obj:transform@obj.matrix_world for obj in meshes}
     for obj,matrix in matrices.items():obj.parent=None;obj.matrix_world=matrix
     bpy.context.view_layer.update();attachments[attachment_id]=rig_tree(meshes)
-    if base_name=='MOUNT_base':
+    if attachment_id in attachment_source.OPTICS:
         # Clamps straddle the rail-contact plane; test actual rail/foot surfaces.
         assert attachments[attachment_id].overlap(rail_tree),(attachment_id,'no rail contact')
         clash=bool(attachments[attachment_id].overlap(fixed_irons))
         assert clash==(attachment_id=='scope'),(attachment_id,'update evidence-based opticClashes',clash)
-    if attachment_id=='suppressor':
+    if attachment_id=='srd762ti':
         exit=next(o for o in objects if o.name.startswith('SOCKET_muzzle'))
         position=CI@(rig.matrix_world.inverted()@transform@exit.matrix_world).translation
         assert (position-(muzzle+Vector((0,0,-.236)))).length<1e-6,'mounted can exit'
@@ -222,7 +211,7 @@ for attachment_id,folder,seat,base_name,filename in [
                 assert tree.ray_cast(origin,C@Vector((0,0,1)),.237)[0] is None,'blocked mounted bore'
     for obj in objects:bpy.data.objects.remove(obj,do_unlink=True)
 for other in ('rmr','acog','scope','laser'):
-    assert not attachments['suppressor'].overlap(attachments[other]),(other,'suppressor slot collision')
+    assert not attachments['srd762ti'].overlap(attachments[other]),(other,'suppressor slot collision')
 # Check all clips on the native 120 Hz lattice, including exact endpoints.
 # The stock is rigid (there is no authored fold clip). Preserve its geometry;
 # cover/charging/belt and BOTH actual deformed shared review arms are swept.

@@ -88,9 +88,9 @@ See the [shared laser mount contract](../../attachments/steiner-tor-mini/README.
 
 ## Compact 9mm suppressor (#714)
 
-The separate `suppressor9mm` catalog entry loads the original
+The P320's `suppressor` fit names the `suppressor9mm` can model: the original
 [compact booster can](../../attachments/compact-9mm/README.md), not the shared
-SRD762Ti rifle exterior. `fits.muzzle` enables only this verified pistol fit.
+SRD762Ti rifle exterior.
 `MOUNT_muzzle` now uses the shared attachment frame (the former future-datum
 contact-normal rotation was not a suppressor orientation). Its rear seat advances over the exposed barrel thread at native +Y=.132 m,
 not the crown-tip base exit at .1445 m. It remains under the

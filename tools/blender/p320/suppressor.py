@@ -1,35 +1,9 @@
 """P320-owned compact booster fit: actual source surfaces and deformed hands."""
 import math
-from pathlib import Path
 import bpy
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
-from .attachments import optic_geometry
-
-ROOT = Path(__file__).resolve().parents[3]
-
-
-def load_geometry(path, mount_name, output_name):
-    assert path.exists(), 'Build attachment first: ' + str(path)
-    with bpy.data.libraries.load(str(path), link=False) as (source, loaded):
-        loaded.objects = source.objects
-    for obj in loaded.objects:
-        bpy.context.scene.collection.objects.link(obj)
-    bpy.context.view_layer.update()
-    base = next(o for o in loaded.objects if o.name.startswith(mount_name))
-    output = next(o for o in loaded.objects if o.name.startswith(output_name))
-    inverse = base.matrix_world.inverted()
-    point = inverse @ output.matrix_world.translation
-    vertices, faces = [], []
-    for obj in loaded.objects:
-        if obj.type != 'MESH':
-            continue
-        offset = len(vertices)
-        vertices.extend(inverse @ obj.matrix_world @ v.co for v in obj.data.vertices)
-        faces.extend(tuple(offset+i for i in p.vertices) for p in obj.data.polygons)
-    for obj in loaded.objects:
-        bpy.data.objects.remove(obj, do_unlink=True)
-    return vertices, faces, point
+from .attachments import attachment_geometry, optic_geometry
 
 
 def check_suppressor(clips):
@@ -41,13 +15,11 @@ def check_suppressor(clips):
         obj = bpy.data.objects[name]
         assert obj.parent == arm and obj.parent_type == 'BONE' and obj.parent_bone == 'barrel'
         assert obj.children, name + ' must own switchable geometry'
-    vertices, faces, exit = load_geometry(
-        ROOT/'assets/attachments/compact-9mm/suppressor9mm.blend', 'SOCKET_mount', 'SOCKET_muzzle')
+    vertices, faces, exit = attachment_geometry('suppressor9mm', 'SOCKET_muzzle')
     assert (exit-Vector((0, .135, 0))).length < 1e-6
     can = BVHTree.FromPolygons(vertices, faces)
     optics = optic_geometry()
-    laser_vertices, laser_faces, emitter = load_geometry(
-        ROOT/'assets/attachments/steiner-tor-mini/tor-mini.blend', 'SOCKET_mount', 'SOCKET_laser')
+    laser_vertices, laser_faces, emitter = attachment_geometry('laser', 'SOCKET_laser')
     # Test the evaluated mechanical skin used by runtime, not the sparse
     # editable controls (their subframe interpolation differs from the bake).
     sources = [bpy.data.objects['P320_surface'],
@@ -104,10 +76,8 @@ def check_suppressor(clips):
                 direction = (inverse.to_3x3() @ rig.matrix_world.to_3x3() @ Vector((0, 1, 0))).normalized()
                 assert can.ray_cast(ray, direction, 1)[0] is None, 'can blocks fixed SIGLITE aim ray'
                 # Every supported optic's actual optical datum, not its housing bounds.
-                for id, directory in [('rmr', 'trijicon-rmr'), ('acog', 'trijicon-acog'), ('scope', 'schmidt-bender-pm-ii')]:
-                    if sample != 0:
-                        continue
-                    _, _, sight = load_geometry(ROOT/'assets/attachments'/directory/(id+'.blend'), 'MOUNT_base', 'SOCKET_sight')
+                for id in ('rmr', 'acog', 'scope') if sample == 0 else ():
+                    _, _, sight = attachment_geometry(id, 'SOCKET_sight')
                     transform = inverse @ bpy.data.objects['MOUNT_optic'].matrix_world
                     assert can.ray_cast(transform @ sight, (transform.to_3x3() @ Vector((0, 1, 0))).normalized(), 1)[0] is None, id + ' sightline blocked'
             count += 1

@@ -1,11 +1,10 @@
 """Physical checks against the available shared optics, never absent slot assets."""
-from pathlib import Path
 import bpy
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 from mathutils.geometry import barycentric_transform
 
-ROOT = Path(__file__).resolve().parents[3]
+import attachment_source
 
 
 def tree(objects, depsgraph=None):
@@ -21,31 +20,27 @@ def tree(objects, depsgraph=None):
     return BVHTree.FromPolygons(vertices, faces)
 
 
+def attachment_geometry(id, output=None):
+    """Mesh vertices/faces of a built attachment in its datum frame, plus the datum-frame
+    position of its `output` socket; the loaded objects are removed again."""
+    objects, base = attachment_source.load(id)
+    inverse = base.matrix_world.inverted()
+    vertices, faces = [], []
+    for obj in objects:
+        if obj.type != 'MESH':
+            continue
+        start = len(vertices)
+        transform = inverse @ obj.matrix_world
+        vertices.extend(transform @ v.co for v in obj.data.vertices)
+        faces.extend(tuple(start + i for i in p.vertices) for p in obj.data.polygons)
+    point = output and inverse @ attachment_source.named(objects, output).matrix_world.translation
+    for obj in objects:
+        bpy.data.objects.remove(obj, do_unlink=True)
+    return vertices, faces, point
+
+
 def optic_geometry():
-    result = {}
-    for id, directory in [('rmr', 'trijicon-rmr'), ('acog', 'trijicon-acog'),
-                          ('scope', 'schmidt-bender-pm-ii')]:
-        path = ROOT / 'assets/attachments' / directory / (id + '.blend')
-        assert path.exists(), 'Build the available shared optic first: ' + str(path)
-        with bpy.data.libraries.load(str(path), link=False) as (source, loaded):
-            loaded.objects = source.objects
-        for obj in loaded.objects:
-            bpy.context.scene.collection.objects.link(obj)
-        bpy.context.view_layer.update()
-        base = next(o for o in loaded.objects if o.name.startswith('MOUNT_base'))
-        inverse = base.matrix_world.inverted()
-        vertices, faces = [], []
-        for obj in loaded.objects:
-            if obj.type != 'MESH':
-                continue
-            start = len(vertices)
-            transform = inverse @ obj.matrix_world
-            vertices.extend(transform @ v.co for v in obj.data.vertices)
-            faces.extend(tuple(start + i for i in p.vertices) for p in obj.data.polygons)
-        result[id] = vertices, faces
-        for obj in loaded.objects:
-            bpy.data.objects.remove(obj, do_unlink=True)
-    return result
+    return {id: attachment_geometry(id)[:2] for id in attachment_source.OPTICS}
 
 
 def check_sight_emission(surface):

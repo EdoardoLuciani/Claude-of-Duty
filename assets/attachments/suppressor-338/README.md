@@ -26,18 +26,16 @@ exit is `[0, .075, −1.0758]` in the rifle frame, 205.8 mm beyond the base exit
 
 ## Catalog decision
 
-Use separate `suppressor338` ID and `/models/attachments/suppressor338.runtime.glb`.
-Keep `suppressor` and SRD762Ti unchanged. A market item can therefore map directly
-to one asset and finite verified fit without a weapon-dependent asset lookup.
-Only AX338 (`sniper`) enables this fit. All non-null accepted muzzle IDs resolve
-suppression generically; no damage, handling, audio-bank or stat changes.
+`suppressor338` is a can model (`/models/attachments/suppressor338.runtime.glb`),
+not a player-facing id: AX338's `fits.muzzle.suppressor` names it, so the market
+sells one `suppressor` and each weapon mounts its verified calibre can. Only AX338
+(`sniper`) uses this model. Every suppressor fit resolves suppression generically; no damage, handling, audio-bank or stat changes.
 
 ## Build and check
 
 ```sh
+# Builds and runs the 10.6 mm bore gauge (shared tools/blender/can.py):
 blender -b -t 2 --python-exit-code 1 --python tools/blender/suppressor338/build.py
-blender -b -t 2 assets/attachments/suppressor-338/suppressor338.blend \
-  --python-exit-code 1 --python tools/blender/suppressor338/check.py
 bun run models:cook -- suppressor338
 # Build AX338, TOR Mini and all standalone optics first (bun run assets):
 blender -b -t 2 assets/weapons/ax338/ax338.blend --python-exit-code 1 \
@@ -63,10 +61,10 @@ contact acceptance as passing based on a passing new-muzzle sweep.
 
 ```sh
 bun tools/capture.ts --port=5713 --weapon=sniper --optic=scope --rail=laser \
-  --muzzle=suppressor338 --shot=weapon --out=/tmp/ax338-suppressed.png
+  --muzzle=suppressor --shot=weapon --out=/tmp/ax338-suppressed.png
 ```
 
-URL equivalent: `?attachmentWeapon=sniper&attachmentOptic=scope&attachmentRail=laser&attachmentMuzzle=suppressor338`.
+URL equivalent: `?attachmentWeapon=sniper&attachmentOptic=scope&attachmentRail=laser&attachmentMuzzle=suppressor`.
 Use `--muzzle=none` / `attachmentMuzzle=none` to restore the brake. URL and capture
 support use the common fit validator; no alternate asset or runtime scale tuning.
 Ballistics, muzzle flash/smoke and tracer consumers retain the shared installed

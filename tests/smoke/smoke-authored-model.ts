@@ -12,6 +12,7 @@ import type { RenderSystem } from '../../src/render/index-webgpu.ts';
 import {
   BASE_ATTACHMENTS,
   configureWeaponAttachments,
+  hasAttachmentAssets,
   makeOpticModel,
   makeLaserModel,
   makeSuppressorModel,
@@ -28,7 +29,6 @@ import { makeMCXModel } from '../../src/weapons/mcx.ts';
 import { makeMPXModel } from '../../src/weapons/mpx.ts';
 import type { WeaponEntry, WeaponModelRecord } from '../../src/weapons/runtime-types.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
-import { fixtureKeys } from '../lib/audio-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
 
@@ -451,7 +451,7 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   const suppressed: AttachmentConfig = { ...BASE_ATTACHMENTS, muzzle: 'suppressor' };
   viewmodel.active = entry;
   for (let i = 0; i < 3; i++) {
-    configureWeaponAttachments(entry, suppressed, { ...optics, suppressor: can });
+    configureWeaponAttachments(entry, suppressed, { ...optics, srd762ti: can });
     assert.equal(baseDevice.visible, false);
     assert.equal(entry.muzzleGroup.parent, muzzleMount);
     assert(entry.def.suppressed, 'a mounted can suppresses the effective definition');
@@ -493,7 +493,7 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
   });
   for (const optic of ['rmr', 'acog', 'scope'] as const) {
     const config: AttachmentConfig = { optic, muzzle: 'suppressor', rail: 'laser' };
-    configureWeaponAttachments(mcx, config, { ...optics, suppressor: can, laser });
+    configureWeaponAttachments(mcx, config, { ...optics, srd762ti: can, laser });
     assert.equal(mcx.def.suppressed, true);
     assert.equal(mcx.def.eyeRelief, WEAPON_DEFS.mcx.fits?.optic?.[optic]?.eyeRelief);
     assert.equal(irons.visible, false);
@@ -505,33 +505,47 @@ for (const id of ['rmr', 'acog', 'scope'] as const) {
     assert.equal(mcx.def.eyeRelief, WEAPON_DEFS.mcx.eyeRelief);
     assert(irons.visible && !ironsRemoved.visible && baseDevice.visible);
   }
-  // Every fitted can follows the same contract. The M590 keeps only permanent
-  // adapter hardware, so mounting must not require a replaceable MUZZLE_device.
-  baseDevice.removeFromParent();
+  // One suppressor id mounts each weapon's own calibre can. Permanent muzzle
+  // hardware (M590) stays visible; a removable device swaps for its stand-in.
   const exposed = new THREE.Group();
   exposed.name = 'MUZZLE_device_removed';
+  exposed.visible = false;
   root.add(exposed);
-  const cans = { suppressor: can, suppressor9mm: can, suppressor338: can, suppressor12g: can };
   for (const id of WEAPON_IDS) {
-    for (const muzzle of fixtureKeys(WEAPON_DEFS[id].fits?.muzzle ?? {})) {
-      const config: AttachmentConfig = { ...BASE_ATTACHMENTS, muzzle };
-      const muzzleModel = fixture<WeaponModelRecord>({ ...model });
-      muzzleModel.id = id;
-      const weapon = fixture<WeaponEntry>({
-        ...entry,
-        id,
-        model: muzzleModel,
-        def: { ...WEAPON_DEFS[id] },
-      });
-      viewmodel.active = weapon;
-      configureWeaponAttachments(weapon, config, cans);
-      assert(weapon.def.suppressed && exposed.visible, `${muzzle} suppresses ${id}`);
-      const exit = canExit.position.clone().applyMatrix4(muzzleMount.matrixWorld);
-      assert(viewmodel.muzzleWorld(new THREE.Vector3()).distanceTo(exit) < 1e-10);
-      configureWeaponAttachments(weapon, BASE_ATTACHMENTS, {});
-      assert(!weapon.def.suppressed && !exposed.visible && weapon.muzzleSocket === null);
-    }
+    const fit = WEAPON_DEFS[id].fits?.muzzle?.suppressor;
+    assert.equal(isAttachmentConfig(suppressed, id), fit !== undefined, `${id}: availability`);
+    if (!fit) continue;
+    const muzzleModel = fixture<WeaponModelRecord>({ ...model });
+    muzzleModel.id = id;
+    const weapon = fixture<WeaponEntry>({
+      ...entry,
+      id,
+      model: muzzleModel,
+      def: { ...WEAPON_DEFS[id] },
+    });
+    viewmodel.active = weapon;
+    // Only the fitted model is loaded, so mounting must resolve that can.
+    const cans = { [fit.model]: can };
+    assert(hasAttachmentAssets(id, suppressed, cans), `${id}: ${fit.model} resolves`);
+    configureWeaponAttachments(weapon, suppressed, cans);
+    const removable = WEAPON_DEFS[id].removableMuzzleDevice === true;
+    assert.deepEqual(weapon.def, { ...WEAPON_DEFS[id], suppressed: true }, id);
+    assert.equal(baseDevice.visible, !removable, `${id}: base device`);
+    assert.equal(exposed.visible, removable, `${id}: removed stand-in`);
+    const exit = canExit.position.clone().applyMatrix4(muzzleMount.matrixWorld);
+    assert(viewmodel.muzzleWorld(new THREE.Vector3()).distanceTo(exit) < 1e-10);
+    configureWeaponAttachments(weapon, BASE_ATTACHMENTS, {});
+    assert(baseDevice.visible && !exposed.visible && !weapon.def.suppressed);
+    assert.equal(muzzleMount.children.length, 0, `${id}: removal leaves no muzzle instance`);
   }
+  // A removable device missing from the authored model fails before anything mounts.
+  baseDevice.removeFromParent();
+  viewmodel.active = entry;
+  assert.throws(
+    (): void => configureWeaponAttachments(entry, suppressed, { srd762ti: can }),
+    /missing MUZZLE_device/
+  );
+  assert.equal(muzzleMount.children.length, 0);
   root.add(baseDevice);
   viewmodel.active = null;
   laser.dispose();

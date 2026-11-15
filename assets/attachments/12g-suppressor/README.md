@@ -17,17 +17,16 @@ endcap exit `[0, 0, -.220]` in runtime coordinates. M590 uses its existing
 an installed exit of `[0, .068, -.8872884763]` in weapon space. No runtime
 scale/offset tuning and no M590 rail/optic authoring changes are needed.
 
-Catalog ID **`suppressor12g`** is intentionally separate from the existing
-`suppressor` SRD762Ti. Only `WEAPON_DEFS.shotgun.fits.muzzle.suppressor12g` is
-enabled here. No other variant IDs or fits are introduced. All non-null muzzle
-IDs use the existing suppressed flag/audio/flash behavior. No stat, damage,
+The player-facing muzzle id stays `suppressor`; `WEAPON_DEFS.shotgun.fits.muzzle.suppressor`
+names this **`suppressor12g`** can model (its cook id and runtime GLB), so the shotgun
+never mounts the SRD762Ti. Every suppressor fit uses the existing suppressed
+flag/audio/flash behavior. No stat, damage,
 eight-pellet count, spread, velocity, handling or report-bank changes.
 
 Both original 12g adapter pieces remain **permanent**, mounted or removed.
-There is no `MUZZLE_device` to hide: the common solver now permits an absent
-removable base device, while still requiring the authored mount and output
-socket. Any authored removable device/alternate adapter on other weapons still
-switches normally. Removing the can restores the original adapter-exit socket.
+M590 leaves `removableMuzzleDevice` unset, so there is no `MUZZLE_device` to hide;
+the solver still requires the authored mount and output socket. Weapons that set
+the flag must author `MUZZLE_device` and switch it normally. Removing the can restores the original adapter-exit socket.
 
 ## Clearance and sightline decision
 
@@ -56,22 +55,21 @@ source checks do not certify continuous clearance or all runtime IK/recoil trans
 ## Rebuild and check
 
 ```sh
+# Builds and runs the 7 degree shot-envelope gauge (shared tools/blender/can.py):
 blender -b -t 2 --python-exit-code 1 --python tools/blender/suppressor12g/build.py
-blender -b -t 2 assets/attachments/12g-suppressor/suppressor12g.blend \
-  --python-exit-code 1 --python tools/blender/suppressor12g/check.py
 bun run models:cook -- suppressor12g
 # Build shared optics/laser and M590 first (bun run assets), then all source gates:
 blender -b -t 2 assets/weapons/m590/m590.blend --python-exit-code 1 \
   --python tools/blender/m590/check.py
 bun tools/capture.ts --port=5715 --weapon=shotgun --rail=laser \
-  --muzzle=suppressor12g --shot=weapon --out=/tmp/m590-can-hip.png
+  --muzzle=suppressor --shot=weapon --out=/tmp/m590-can-hip.png
 bun tools/capture.ts --port=5715 --weapon=shotgun --rail=laser \
-  --muzzle=suppressor12g --shot=ads --out=/tmp/m590-can-irons.png
+  --muzzle=suppressor --shot=ads --out=/tmp/m590-can-irons.png
 ```
 
 `build.py -- --output /absolute/scratch` supports isolated source/export review.
 `bun run assets` registers authoring and cooking; generated `.blend`/GLBs are
 ignored products. Runtime URL: `/models/attachments/suppressor12g.runtime.glb`.
 Gameplay, inspection and URL/capture configuration share the existing validator
-and mount solver; `attachmentMuzzle=suppressor12g&attachmentWeapon=shotgun` needs
+and mount solver; `attachmentMuzzle=suppressor&attachmentWeapon=shotgun` needs
 no new parsing path. Existing #705 shotgun-suppressed banks are reused unchanged.

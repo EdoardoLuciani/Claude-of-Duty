@@ -10,10 +10,10 @@ not a simulation or certification of internal spring/booster operation.
 
 ## Catalog and frame
 
-`suppressor9mm` is a **separate muzzle ID** with its own local runtime GLB.
-The existing `suppressor` ID retains the shared rifle SRD762Ti. Only P320 is
-verified/enabled for this pistol can; it does not enable any other weapon fit.
-All muzzle IDs use the common suppression flag/exit path. No damage, handling,
+`suppressor9mm` is a **can model** with its own local runtime GLB; the P320's
+`fits.muzzle.suppressor` names it, so the player-facing id stays `suppressor` while
+the pistol never mounts the shared rifle SRD762Ti. Only P320 uses this can.
+Every suppressor fit uses the common suppression flag/exit path. No damage, handling,
 audio-bank or economy changes accompany the model.
 
 Metres; native Blender +Y forward / +Z up, glTF -Z forward / +Y up, unit scale:
@@ -39,9 +39,9 @@ bun run models:cook -- suppressor9mm
 bun run assets
 blender -b -t 4 assets/weapons/p320-compact/p320-compact.blend \
   --python-exit-code 1 --python tools/blender/p320/check.py
-bun tools/capture.ts --port=5714 --weapon=pistol --muzzle=suppressor9mm \
+bun tools/capture.ts --port=5714 --weapon=pistol --muzzle=suppressor \
   --rail=laser --shot=weapon --out=/tmp/p320-can.png
-bun tools/capture.ts --port=5714 --weapon=pistol --muzzle=suppressor9mm \
+bun tools/capture.ts --port=5714 --weapon=pistol --muzzle=suppressor \
   --shot=ads --out=/tmp/p320-can-irons.png
 ```
 
