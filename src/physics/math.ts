@@ -581,7 +581,11 @@ export function rayCapsule(
       }
     }
   } else if (C <= 0) {
-    best = 0; // ray parallel to axis and already inside the cylinder
+    const sx = ox - (n < 0 ? ax : bx),
+      sy = oy - (n < 0 ? ay : by),
+      sz = oz - (n < 0 ? az : bz);
+    // Axial origins inside the finite cylinder or either cap retain t = 0.
+    if ((n >= 0 && n <= 1) || sx * sx + sy * sy + sz * sz <= r * r) best = 0;
   }
   const t1 = raySphere(ox, oy, oz, dx, dy, dz, ax, ay, az, r, maxDist);
   if (t1 >= 0 && (best < 0 || t1 < best)) best = t1;

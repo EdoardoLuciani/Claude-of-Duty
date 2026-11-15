@@ -177,18 +177,9 @@ export class UiSystem {
     ): number => this._unsubs.push(ctx.events.on(type, fn));
 
     on('weapon:fire', (e): void => {
+      if (!this._isPlayerTarget(e.actor)) return;
       const recoil = 'recoil' in e && typeof e.recoil === 'number' ? e.recoil : 1;
       this.crosshair.onFire(recoil);
-    });
-
-    on('weapon:reload', (e): void => {
-      const s = this.state;
-      if (e.phase === 'start') {
-        s.reloading = true;
-        s.reloadProgress = 0;
-      } else if (e.phase === 'end') {
-        s.reloading = false;
-      }
     });
 
     on('damage:dealt', (e): void => {
@@ -220,22 +211,13 @@ export class UiSystem {
     });
 
     on('damage:taken', (e): void => {
-      this.state.health = e.health;
       this._tmp.copy(e.from).sub(this._playerPos());
       // HUD only: audio owns all health/armour sound layers from this event.
       if (e.armourAbsorbed > 0) this.health.onArmour(e.armourAbsorbed, e.plateBreak);
       if (e.amount > 0) this.hurt(e.amount, this._tmp.x, this._tmp.z);
     });
 
-    on('score:change', (e): void => {
-      this.state.score = e.score;
-    });
-
     on('wave:start', (e): void => {
-      this.state.wave = e.wave;
-      this.state.enemiesRemaining = e.enemies;
-      this.state.waveTotal = e.enemies;
-      this.state.waveIncoming = false;
       if (e.wave > 1) {
         this.banner.show(`Wave ${e.wave}`, `${e.enemies} HOSTILES INBOUND`, 2.1);
         this.sfx('objective', 0.6);
@@ -243,9 +225,6 @@ export class UiSystem {
     });
 
     on('wave:complete', (e): void => {
-      this.state.enemiesRemaining = 0;
-      this.state.waveIncoming = true;
-      this.state.nextWaveIn = e.delay;
       const points = Math.max(1, e.wave) * 250;
       // The shop opens after a 10 s grace period (see MARKET_DELAY), so the
       // banner has the moment to itself before the countdown takes over.
@@ -296,13 +275,6 @@ export class UiSystem {
       this.sfx('compass_ping', 0.45);
     });
 
-    on('player:state', (e): void => {
-      const s = this.state;
-      s.ads = e.ads;
-      s.sprint = e.sprinting;
-      s.crouch = e.stance === 'crouch' || e.stance === 'prone';
-    });
-
     // Clear the combat chrome while the world camera cranes into the death
     // shot; leaving ammo, crosshair and minimap over it defeats the cinematic.
     on('player:death', (): void => {
@@ -341,11 +313,6 @@ export class UiSystem {
     });
 
     on('game:restart', (): void => {
-      this.state.score = 0;
-      this.state.wave = 1;
-      this.state.enemiesRemaining = 0;
-      this.state.waveIncoming = false;
-      this.state.nextWaveIn = 0;
       this.banner.clear();
       this.killfeed.clear();
       this.arcs.clear();
@@ -363,7 +330,7 @@ export class UiSystem {
 
   /* ------------------------------------------------------------- helpers -- */
 
-  /** True when a damage actor handle identifies the local player. */
+  /** True when an actor handle identifies the local player. */
   _isPlayerTarget(t: unknown): boolean {
     if (!t) return false;
     return (
