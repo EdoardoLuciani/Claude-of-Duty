@@ -4,11 +4,13 @@ import type { Vector3Like } from 'three';
 import { Vector3 } from 'three';
 
 import { AttachmentQueries } from '../../src/ai/attachment-queries.ts';
+import type { WorkerMessage } from '../../src/ai/attachment-types.ts';
 import { createLadderDescriptors, ladderMoveBudget } from '../../src/ai/ladder.ts';
 import type { NavMetadata, ExpectedNav } from '../../src/ai/nav-format.ts';
 import { unpackNav, packNav, NAV_LINK_RADIUS } from '../../src/ai/nav-format.ts';
 import type { NavRoute, NavCache } from '../../src/ai/nav.ts';
 import { SurfaceNav, NAV_PENDING, NAV_CANCELLED } from '../../src/ai/nav.ts';
+import { makeAgent, makeAi } from '../lib/agent-fixture.ts';
 import { mutableLadder, type MutableLadderDescriptor } from '../lib/ai-movement-fixture.ts';
 import { NativeWorker } from '../lib/attachment-worker-fixture.ts';
 import { ladderProfiles } from '../lib/ladder-fixture.ts';
@@ -73,8 +75,10 @@ const profiles = ladderProfiles();
 let proofCount = 0;
 const nativeSolve = nav.query.findPath.bind(nav.query);
 let graphSolves = 0;
+const graphActors: number[] = [];
 nav.query.findPath = (...args): ReturnType<SurfaceNav['query']['findPath']> => {
   graphSolves++;
+  if (service.current) graphActors.push(service.current.actor);
   return nativeSolve(...args);
 };
 let actor = 0;
@@ -117,8 +121,8 @@ try {
           assert.ok(graphSolves <= 1, 'no second graph planner for ladder legs');
           assert.equal(
             nav.stats.queries,
-            counted + (result === NAV_PENDING ? 0 : 1),
-            'pending does not spend a completed solve'
+            counted + (result === NAV_PENDING && graphSolves === 0 ? 0 : 1),
+            'only endpoint waits are free; pending graph work spends a solve'
           );
           assert.ok(immediateMoves <= 1, 'at most existing one-move live-origin prefix');
           assert.notEqual(result, NAV_CANCELLED);
@@ -212,6 +216,104 @@ try {
   assert.equal(result, 0);
   assert.equal(nav.lastReason, 'disconnected');
   assert.deepEqual(out, { points: [], ladderSteps: [] });
+
+  // Hold real worker replies across frames, first at endpoints, then after the
+  // graph search. Three pending actors must share the same two-solve budget.
+  service.clear();
+  const ai = makeAi(nav),
+    d = descriptors[0],
+    goal = v(d.points[3]).addScaledVector(v(d.normal), 0.2);
+  ai.agents = Array.from({ length: 3 }, (): ReturnType<typeof makeAgent> => {
+    const a = makeAgent({ ai, id: ++actor });
+    a.position.copy(d.points[0]).addScaledVector(v(d.normal), 0.2);
+    a._pendingDest.copy(d.points[3]).addScaledVector(v(d.normal), -0.6);
+    a.pathPending = true;
+    a.path.push(new Vector3(123, 456, 789));
+    a.route.ladderSteps.push({ entryIndex: 0, exitIndex: 0, ladderId: 999, direction: 'down' });
+    return a;
+  });
+  const ownedRoutes = ai.agents.map(
+    (
+      a
+    ): {
+      snapshot: string;
+      point: Vector3;
+      steps: NavRoute['ladderSteps'];
+      step: NavRoute['ladderSteps'][number];
+    } => ({
+      snapshot: JSON.stringify(a.route),
+      point: a.path[0],
+      steps: a.route.ladderSteps,
+      step: a.route.ladderSteps[0],
+    })
+  );
+  const receive = service.receive.bind(service),
+    held: WorkerMessage[] = [];
+  service.receive = (message): void => {
+    held.push(message);
+  };
+  graphSolves = 0;
+  ai._servePendingPaths();
+  assert.equal(graphSolves, 0, 'endpoint-only pending does not run the graph');
+  assert.equal(ai._pathBudget, 2, 'endpoint-only pending leaves the budget intact');
+  assert(ai.agents.every((a): boolean => a.pathPending));
+  assert.equal(service.jobs.size, 3, 'each edge goal waits on its endpoint proof');
+  // Supersede those edge goals with immediately attached ladder endpoints.
+  service.clear();
+  for (const a of ai.agents) a._pendingDest.copy(goal);
+  graphActors.length = 0;
+  for (let frame = 0; frame < 3; frame++) {
+    ai._pathBudget = ai.pathsPerFrame;
+    graphSolves = 0;
+    ai._servePendingPaths();
+    assert.equal(graphSolves, 2, 'pending ladder replies cannot bypass two solves/frame');
+    assert.equal(ai._pathBudget, 0);
+    for (const [i, a] of ai.agents.entries()) {
+      const old = ownedRoutes[i];
+      assert(a.pathPending);
+      assert.equal(JSON.stringify(a.route), old.snapshot, 'pending preserves all route data');
+      assert.equal(a.path[0], old.point);
+      assert.equal(a.route.ladderSteps, old.steps);
+      assert.equal(a.route.ladderSteps[0], old.step);
+    }
+  }
+  assert.deepEqual(
+    graphActors,
+    [...ai.agents, ...ai.agents].map((a): number => a.id),
+    'round-robin retries include every actor while proofs are held'
+  );
+  assert.ok(
+    [...service.jobs.values()].some(
+      (job): boolean => !Array.isArray(job.key) && job.key.kind === 'ladder'
+    ),
+    'real ladder proofs are pending'
+  );
+  const deadline = performance.now() + 10000;
+  while (
+    !held.some((message): boolean => message.type === 'result' && service.jobs.has(message.id))
+  ) {
+    assert.ok(performance.now() < deadline, 'real worker replies arrive while held');
+    await new Promise((resolve): NodeJS.Timeout => setTimeout(resolve, 1));
+  }
+  service.receive = receive;
+  for (const message of held) receive(message);
+  let admitted = 0;
+  while (ai.agents.some((a): boolean => a.pathPending)) {
+    ai._pathBudget = ai.pathsPerFrame;
+    graphSolves = 0;
+    ai._servePendingPaths();
+    assert.ok(graphSolves <= 2, 'reply admission still shares the frame budget');
+    const completed = ai.agents.filter((a): boolean => !a.pathPending).length;
+    assert.ok(completed - admitted <= 2, 'no more than two routes admitted per frame');
+    admitted = completed;
+    assert.ok(performance.now() < deadline, 'all scheduled actors eventually admit');
+    await new Promise((resolve): NodeJS.Timeout => setTimeout(resolve, 1));
+  }
+  assert.equal(admitted, 3);
+  for (const a of ai.agents) {
+    assert.equal(a.route.ladderSteps[0].ladderId, d.id);
+    assert.deepEqual(a.path[a.pathLen - 1], goal);
+  }
 } finally {
   nav._probe.move = originalFoot;
   nav._checkAttachment = originalOracle;

@@ -552,7 +552,8 @@ export class SurfaceNav {
     }
     this.startSurface = this.project(from, this._a, actor?.navStart);
     this.goalSurface = this.project(to, this._b, actor?.navGoal, true);
-    let n = 0;
+    let n = 0,
+      graphSearched = false;
     const staged = this.staged;
     staged.ladderSteps.length = 0;
     const components = steps ? this.components : this.walkingComponents;
@@ -561,6 +562,7 @@ export class SurfaceNav {
       this.lastOutcome = 'unreachable';
       this.lastReason = 'disconnected';
       if (components.get(this.startSurface) === components.get(this.goalSurface)) {
+        graphSearched = true;
         const path = this.query.findPath(this.startSurface, this.goalSurface, this._a, this._b, {
           maxPathPolys: MAX_PATH,
           filter: steps ? this.routeFilter : this.query.defaultFilter,
@@ -726,9 +728,9 @@ export class SurfaceNav {
         }
       }
     } else if (this.startSurface) this.lastReason = 'goal-attachment';
-    // An unfinished endpoint proof has not spent a path solve. Preserve the
-    // two completed-attempts/frame contract used by callers and diagnostics.
-    if (this.worker?.pending) this.stats.queries--;
+    // Endpoint-only waits are free; a graph search still spent a solve even
+    // when a later ladder/attachment proof prevents publishing its result.
+    if (this.worker?.pending && !graphSearched) this.stats.queries--;
     this.stats.queryMs = performance.now() - started;
     return n;
   }

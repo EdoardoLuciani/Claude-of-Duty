@@ -1336,14 +1336,17 @@ export class AiSystem {
       actor && out === actor.path
         ? grid.findRoute(from, dest, actor.route, actor)
         : grid.findPath(from, dest, out, actor);
+    const queries = grid.stats.queries;
     const n = grid.worker ? grid.worker.run(actor?.id ?? -1, 'path', solve, from) : solve();
+    // Charge graph work before deferring publication for unfinished proofs.
+    if (grid.stats.queries > queries || (n !== NAV_PENDING && n !== NAV_CANCELLED))
+      this._pathBudget--;
     if (n === NAV_PENDING || n === NAV_CANCELLED) {
       this.stats.pathsDeferred++;
       this.lastPathOutcome = PATH_OUTCOME.DEFERRED;
       this.lastPathReason = n === NAV_PENDING ? 'attachment-pending' : 'attachment-superseded';
       return -1;
     }
-    this._pathBudget--;
     this.lastPathOutcome = this.grid.lastOutcome;
     this.lastPathReason = this.grid.lastReason;
     this.lastPathResFloor = this.grid.resolvedFloor;
