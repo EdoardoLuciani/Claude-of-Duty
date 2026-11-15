@@ -250,7 +250,6 @@ for angle in range(181):
 print('AX338_ATTACHMENT_CLEARANCE_OK:',mechanical_poses,'120 Hz bolt poses;',hand_poses,'24 Hz deformed-hand poses; 181 stock fold poses; rmr/acog/scope and irons')
 
 # Actual shared rail attachment, independent of the optic catalog.
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tor_mini.mounts import check_laser_mount
 check_laser_mount('ax338')
 

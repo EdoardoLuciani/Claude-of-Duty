@@ -168,7 +168,6 @@ from tor_mini.mounts import check_laser_mount
 check_laser_mount('mpx')
 
 # Mount every actual shared asset; do not substitute proxy attachment bounds.
-ROOT = Path(__file__).resolve().parents[3]
 rig = bpy.data.objects['MPX_RIG']
 weapon = [o for o in bpy.data.collections['MPX | editable exterior components'].objects if o.type == 'MESH']
 hands = [o for o in scene.objects if o.type == 'MESH' and any('authored hands' in c.name for c in o.users_collection)]

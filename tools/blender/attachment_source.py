@@ -1,4 +1,5 @@
-"""Built attachment sources for weapon fit checks: one id -> .blend/datum table and loader.
+"""Built attachment sources for weapon fit checks: one id -> .blend table and loader.
+Optics seat on `MOUNT_base`; rigid attachments on `SOCKET_mount`.
 
 Build the attachment first (`bun run assets`); checks read its editable `.blend`.
 """
@@ -9,14 +10,14 @@ import bpy
 ROOT = Path(__file__).resolve().parents[2]
 OPTICS = ('rmr', 'acog', 'scope')
 SOURCES = {
-    'rmr': ('trijicon-rmr/rmr.blend', 'MOUNT_base'),
-    'acog': ('trijicon-acog/acog.blend', 'MOUNT_base'),
-    'scope': ('schmidt-bender-pm-ii/scope.blend', 'MOUNT_base'),
-    'laser': ('steiner-tor-mini/tor-mini.blend', 'SOCKET_mount'),
-    'srd762ti': ('sig-srd762ti/suppressor.blend', 'SOCKET_mount'),
-    'suppressor9mm': ('compact-9mm/suppressor9mm.blend', 'SOCKET_mount'),
-    'suppressor338': ('suppressor-338/suppressor338.blend', 'SOCKET_mount'),
-    'suppressor12g': ('12g-suppressor/suppressor12g.blend', 'SOCKET_mount'),
+    'rmr': 'trijicon-rmr/rmr.blend',
+    'acog': 'trijicon-acog/acog.blend',
+    'scope': 'schmidt-bender-pm-ii/scope.blend',
+    'laser': 'steiner-tor-mini/tor-mini.blend',
+    'srd762ti': 'sig-srd762ti/suppressor.blend',
+    'suppressor9mm': 'compact-9mm/suppressor9mm.blend',
+    'suppressor338': 'suppressor-338/suppressor338.blend',
+    'suppressor12g': '12g-suppressor/suppressor12g.blend',
 }
 
 
@@ -28,8 +29,7 @@ def named(objects, name):
 def load(id, names=None):
     """Append a built attachment's objects (only `names`, if given) to the scene.
     Returns (objects, datum), where the datum is its weapon-mount base."""
-    file, datum = SOURCES[id]
-    path = ROOT/'assets/attachments'/file
+    path = ROOT/'assets/attachments'/SOURCES[id]
     assert path.exists(), f'Build {id} before weapon fit checks: {path}'
     with bpy.data.libraries.load(str(path), link=False) as (source, loaded):
         loaded.objects = [n for n in source.objects if names is None or n in names]
@@ -37,7 +37,7 @@ def load(id, names=None):
     for obj in objects:
         bpy.context.scene.collection.objects.link(obj)
     bpy.context.view_layer.update()
-    return objects, named(objects, datum)
+    return objects, named(objects, 'MOUNT_base' if id in OPTICS else 'SOCKET_mount')
 
 
 def seat(id, mount, names=None):

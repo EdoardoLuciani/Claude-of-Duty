@@ -40,7 +40,8 @@ def attachment_geometry(id, output=None):
 
 
 def optic_geometry():
-    return {id: attachment_geometry(id)[:2] for id in attachment_source.OPTICS}
+    """Each optic's datum-frame (vertices, faces, sight point)."""
+    return {id: attachment_geometry(id, 'SOCKET_sight') for id in attachment_source.OPTICS}
 
 
 def check_sight_emission(surface):
@@ -95,7 +96,7 @@ def check_mounts(clips):
             hand_tree = tree(hands, bpy.context.evaluated_depsgraph_get())
             eject = bpy.data.objects['SOCKET_ejection'].matrix_world.translation
             direction = (slide.matrix_world.to_3x3() @ Vector((.82, -.24, .52))).normalized()
-            for id, (vertices, faces) in optics.items():
+            for id, (vertices, faces, _) in optics.items():
                 mounted = BVHTree.FromPolygons([mount.matrix_world @ v for v in vertices], faces)
                 assert not weapon.overlap(mounted), (name, frame, id, 'optic/weapon collision')
                 assert not hand_tree.overlap(mounted), (name, frame, id, 'optic/hand collision')

@@ -37,7 +37,7 @@ Use the verified RMR/ACOG/PM II fits for an unobstructed aiming view; the game
 does not silently install an optic, hide fixed sights or adjust eye relief.
 This is an explicit game-art compromise rather than a new elevated-sight model.
 
-`check.py` fires 288 mesh rays from an 18.6 mm rear shot envelope at a conservative
+The build's shared bore gauge (`can.assert_clear`) fires 288 mesh rays from an 18.6 mm rear shot envelope at a conservative
 7 degree half-angle through the entire 220 mm length. Runtime's worst rest
 spread is 1.2 × 1.15 × 2.2 × 2 = 6.072 degrees; the accumulated spread cap is
 2.1 degrees. The check exceeds both without changing any tuning. Runtime

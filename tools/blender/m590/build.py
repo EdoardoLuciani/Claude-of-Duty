@@ -491,7 +491,7 @@ def build(output, render=False, quick=False):
                  'No exported arms, spent case, optic, baked shot recoil, or gameplay balance changes.',
                  'shell_insert is not a detachable magazine; adapter owns visibility from authored scale.',
                  'Low receiver rail with integrated rear ghost ring; no removable irons.',
-                 '12g adapter remains permanent with the separate suppressor12g fit; TOR Mini uses a fixed forward magazine-tube clamp rail.',
+                 '12g adapter remains permanent under the suppressor fit (suppressor12g can); TOR Mini uses a fixed forward magazine-tube clamp rail.',
                  'SOCKET_muzzle emits at the adapter exit/MOUNT_muzzle; DATUM_barrel_crown preserves the original factory barrel measurement.']}
     (OUT/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     print('M590_EXPORT_STATS',json.dumps(stats))

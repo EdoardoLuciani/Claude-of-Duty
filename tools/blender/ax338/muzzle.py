@@ -5,11 +5,15 @@ No bipod exists in this source: this does not certify a future bipod fit.
 """
 import json
 import math
+import sys
+from pathlib import Path
 
 import bpy
 from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
 
+# Also runnable standalone on the saved AX338 scene.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import attachment_source
 
 

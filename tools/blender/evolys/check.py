@@ -184,20 +184,17 @@ bpy.data.objects['MUZZLE_device_removed'].hide_viewport=False
 bpy.context.view_layer.update()
 import attachment_source
 for attachment_id,seat in [('rmr',mount),('acog',mount),('scope',mount),('srd762ti',muzzle_mount),('laser',rail)]:
-    objects,base=attachment_source.load(attachment_id)
+    objects=attachment_source.seat(attachment_id,seat)
     meshes=[o for o in objects if o.type=='MESH']
-    transform=seat.matrix_world@base.matrix_world.inverted()
-    matrices={obj:transform@obj.matrix_world for obj in meshes}
-    for obj,matrix in matrices.items():obj.parent=None;obj.matrix_world=matrix
-    bpy.context.view_layer.update();attachments[attachment_id]=rig_tree(meshes)
+    attachments[attachment_id]=rig_tree(meshes)
     if attachment_id in attachment_source.OPTICS:
         # Clamps straddle the rail-contact plane; test actual rail/foot surfaces.
         assert attachments[attachment_id].overlap(rail_tree),(attachment_id,'no rail contact')
         clash=bool(attachments[attachment_id].overlap(fixed_irons))
         assert clash==(attachment_id=='scope'),(attachment_id,'update evidence-based opticClashes',clash)
     if attachment_id=='srd762ti':
-        exit=next(o for o in objects if o.name.startswith('SOCKET_muzzle'))
-        position=CI@(rig.matrix_world.inverted()@transform@exit.matrix_world).translation
+        exit=attachment_source.named(objects,'SOCKET_muzzle')
+        position=CI@(rig.matrix_world.inverted()@exit.matrix_world).translation
         assert (position-(muzzle+Vector((0,0,-.236)))).length<1e-6,'mounted can exit'
         can=attachments[attachment_id]
         for obj in (hg,bpy.data.objects['receiver_mesh'],bpy.data.objects['MUZZLE_device_removed_mesh'],irons):
@@ -210,7 +207,7 @@ for attachment_id,seat in [('rmr',mount),('acog',mount),('scope',mount),('srd762
             for tree in (can,adapter_tree):
                 assert tree.ray_cast(origin,C@Vector((0,0,1)),.237)[0] is None,'blocked mounted bore'
     for obj in objects:bpy.data.objects.remove(obj,do_unlink=True)
-for other in ('rmr','acog','scope','laser'):
+for other in (*attachment_source.OPTICS,'laser'):
     assert not attachments['srd762ti'].overlap(attachments[other]),(other,'suppressor slot collision')
 # Check all clips on the native 120 Hz lattice, including exact endpoints.
 # The stock is rigid (there is no authored fold clip). Preserve its geometry;

@@ -53,21 +53,11 @@ for face, index in zip(mesh.polygons, materials):
     face.material_index = index
     face.use_smooth = len(face.vertices) == 4 and face.index < (len(stations)-1)*2*N
 # Raised shallow identification follows the side tangent, not the bore/endcap.
-bpy.ops.object.text_add(location=(.0421, .080, -.004))
-label = bpy.context.object
-label.name = '12g identification'
-label.data.body = '12 GA / EXPANSION'
-label.data.size = .004
-label.data.extrude = .000015
-label.rotation_euler = (math.pi/2, 0, math.pi/2)
-label.data.materials.append(mark)
-bpy.ops.object.convert(target='MESH')
-label.parent = root
+can.text('12g identification', '12 GA / EXPANSION', (.0421, .080, -.004), .004, mark, root, .000015)
 
 # 18.6 mm shot envelope at the seat, expanding at 7 degrees half-angle.
 # Runtime's worst rest spread is 1.2*1.15*2.2*2 = 6.072 degrees;
 # post-shot spreadMax is 2.1. This deliberately exceeds both, without tuning them.
-can.assert_clear('12g', (0, .00465, .0093), .220, rays=96, start=0, half_angle=7)
-tree, _ = can.bore()
+tree, _ = can.assert_clear('12g', (0, .00465, .0093), .220, rays=96, half_angle=7)
 assert tree.ray_cast(Vector((.039, .23, 0)), Vector((0, -1, 0)), .02)[0] is not None, 'real open annular endcap'
 can.export(root, out, 'suppressor12g', .220)

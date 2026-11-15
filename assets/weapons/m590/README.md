@@ -109,7 +109,7 @@ the relieved stock neck, integrated top rail/sight and the selected optic.
 
 The open-bore 12g muzzle adapter remains permanent seating hardware, **not** a
 suppressor. `SOCKET_muzzle` stays at its exit, while `DATUM_barrel_crown` retains
-the factory measurement. The separate `suppressor12g` fit now uses this exact seat (#715); see below.
+the factory measurement. The `suppressor` fit (can model `suppressor12g`) uses this exact seat (#715); see below.
 See the [shared laser contract](../../attachments/steiner-tor-mini/README.md#weapon-mounting-686).
 
 Draw, holster, pump/fire, both reloads and inspect keep their original controls,
@@ -125,7 +125,7 @@ storage reductions do not imply an FPS gain or final visual acceptance.
 
 ## Optional large-bore suppressor (#715)
 
-`muzzle: 'suppressor12g'` mounts the new standalone
+`muzzle: 'suppressor'` mounts the M590's `suppressor12g` model, the standalone
 [12g expansion can](../../attachments/12g-suppressor/README.md), not the shared
 rifle SRD762Ti. Its 220 mm extension puts the active exit at
 `[0, .068, -.8872884763]`. Both adapter pieces remain permanent: there is no

@@ -1,9 +1,6 @@
 """Original compact 9mm pistol can with a visible booster, not a scaled rifle can."""
-import math
 import sys
 from pathlib import Path
-
-import bpy
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import can
@@ -42,16 +39,7 @@ tube('Piston | rear seating sleeve', 0, .009, .0085, .00705, steel)
 tube('Piston | exposed waist', .009, .018, .0078, .00705, steel)
 tube('Booster | rear retaining ring', .008, .010, .010, .00705, edge)
 tube('Booster | housing', .018, .033, .0115, .0052, coat)
-for i in range(12):
-    angle = i * math.tau / 12
-    bpy.ops.mesh.primitive_cube_add(size=1, location=(math.cos(angle)*.0115, .0255, math.sin(angle)*.0115))
-    obj = bpy.context.object
-    obj.name = 'Booster | radial grip %02d' % i
-    obj.dimensions = (.0015, .011, .0015)
-    obj.rotation_euler.y = -angle
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    obj.parent = root
-    obj.data.materials.append(steel)
+can.ring('Booster | radial grip', 12, .0115, .0255, (.0015, .011, .0015), steel, root)
 tube('Can | rear shoulder', .033, .037, .0132, .0052, edge)
 tube('Can | compact body', .037, .130, .014, .0052, coat)
 for y in (.041, .119, .127):

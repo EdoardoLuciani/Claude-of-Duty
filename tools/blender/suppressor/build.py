@@ -23,16 +23,11 @@ def active(o):
     bpy.context.view_layer.objects.active = o
 
 
-def finish(o, name, mat, bevel=0):
+def finish(o, name, mat):
     o.name = name
     o.data.materials.append(mat)
     active(o)
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    if bevel:
-        mod = o.modifiers.new('Machined edges', 'BEVEL')
-        mod.width = bevel
-        mod.segments = 2
-        bpy.ops.object.modifier_apply(modifier=mod.name)
     return o
 
 

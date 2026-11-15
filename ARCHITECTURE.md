@@ -426,7 +426,9 @@ gameplay. MCX and MPX are iron-sight bases with verified catalog fits; neither
 retains an integrated optic or suppressor.
 Per-weapon mount datums, clearances and fitting decisions live in each weapon's
 `assets/weapons/*/README.md` and each attachment's `assets/attachments/*/README.md`;
-Blender sources are under `tools/blender/` (`rmr/`, `acog/`, `scope/`, `suppressor/`).
+Blender sources are under `tools/blender/` (`rmr/`, `acog/`, `scope/`, `tor_mini/`, and the
+`suppressor*/` cans sharing `can.py`); weapon fit checks load built attachments through
+`attachment_source.py`.
 
 Debug URL input is narrowed in `main.ts`: `attachmentWeapon` (default M4) must pass
 `isWeaponId` plus compatibility/ownership checks; `attachmentOptic=rmr|acog|scope|none`,
