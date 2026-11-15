@@ -12,7 +12,6 @@ import {
   rebaseNativeWeapon,
   requiredNode,
   type AuthoredModelData,
-  type AuthoredNodes,
 } from './authored-model.ts';
 import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
@@ -63,7 +62,7 @@ export async function loadMPX(renderer: Pick<Renderer, 'hasFeature'>): Promise<M
 
 /** Samples the actual Blender curves, including fingers. Upper/forearm IK is
  * the only runtime solve; wrists and finger contact are not reconstructed. */
-type MPXModel = AuthoredModelData<'smg', AuthoredNodes> & {
+type MPXModel = AuthoredModelData<'smg'> & {
   label: string;
   reactiveFire: boolean;
   handPoses: {

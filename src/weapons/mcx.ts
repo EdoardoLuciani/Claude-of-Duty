@@ -13,7 +13,6 @@ import {
   rebaseNativeWeapon,
   requiredNode,
   type AuthoredModelData,
-  type AuthoredNodes,
 } from './authored-model.ts';
 import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
 import { buildMagazineClips, type Clip } from './clips.ts';
@@ -64,7 +63,7 @@ export async function loadMCX(renderer: Pick<Renderer, 'hasFeature'>): Promise<M
   return makeMCXModel(await loadWeaponGLTF(renderer, MCX_URL));
 }
 
-type MCXModel = AuthoredModelData<'mcx', AuthoredNodes> & {
+type MCXModel = AuthoredModelData<'mcx'> & {
   handPoses: {
     left: typeof handReference.sides.left.grip;
     right: typeof handReference.sides.right.grip;

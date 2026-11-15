@@ -10,7 +10,7 @@ export class Clip {
   duration: number;
   events: ClipEvent[];
 
-  constructor(name: string, duration: number, events: ClipEvent[] = []) {
+  constructor(name: string, duration: number, events: ClipEvent[]) {
     this.name = name;
     this.duration = duration;
     this.events = events;

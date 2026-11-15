@@ -8,17 +8,12 @@ import { isSkinnedMesh } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { disposeAuthoredMixer } from './authored-actions.ts';
-import {
-  authoredModel,
-  requiredNode,
-  type AuthoredModelData,
-  type AuthoredNodes,
-} from './authored-model.ts';
+import { authoredModel, requiredNode, type AuthoredModelData } from './authored-model.ts';
 import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
 
-type M590Model = AuthoredModelData<'shotgun', AuthoredNodes> & {
+type M590Model = AuthoredModelData<'shotgun'> & {
   label: string;
   fxClass: string;
   reactiveFire: boolean;

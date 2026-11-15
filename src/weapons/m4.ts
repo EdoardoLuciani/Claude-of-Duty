@@ -7,12 +7,7 @@ import manifest from '../../assets/weapons/m4a1-block-ii/manifest.json' with { t
 import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene } from './asset-material.ts';
 import { sampleAuthoredFire, MAGAZINE_ALIASES } from './authored-actions.ts';
-import {
-  authoredModel,
-  requiredNode,
-  type AuthoredModelData,
-  type AuthoredNodes,
-} from './authored-model.ts';
+import { authoredModel, requiredNode, type AuthoredModelData } from './authored-model.ts';
 import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 import { configureM4Finishes } from './m4-finishes.ts';
@@ -61,7 +56,7 @@ export async function loadM4(renderer: Pick<Renderer, 'hasFeature'>): Promise<M4
 
 /** Blender owns mechanisms and wrist/finger choreography; the existing recoil,
  * shared arm skin, upper/forearm IK and ammunition/event system remain in charge. */
-type M4Model = AuthoredModelData<'rifle', AuthoredNodes> & {
+type M4Model = AuthoredModelData<'rifle'> & {
   label: string;
   reactiveFire: boolean;
   handPoses: {

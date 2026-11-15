@@ -7,12 +7,7 @@ import manifest from '../../assets/weapons/ax338/manifest.json' with { type: 'js
 import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene } from './asset-material.ts';
 import { sampleAuthoredAction, sampleAuthoredFire, MAGAZINE_ALIASES } from './authored-actions.ts';
-import {
-  authoredModel,
-  requiredNode,
-  type AuthoredModelData,
-  type AuthoredNodes,
-} from './authored-model.ts';
+import { authoredModel, requiredNode, type AuthoredModelData } from './authored-model.ts';
 import { createAuthoredRig } from './authored-rig.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
@@ -60,7 +55,7 @@ export async function loadAX338(renderer: Pick<Renderer, 'hasFeature'>): Promise
 
 /** Blender owns mechanisms and wrist/finger choreography; the existing recoil,
  * shared arm skin, upper/forearm IK and ammunition/event system remain in charge. */
-type AX338Model = AuthoredModelData<'sniper', AuthoredNodes> & {
+type AX338Model = AuthoredModelData<'sniper'> & {
   label: string;
   reactiveFire: boolean;
   handPoses: {

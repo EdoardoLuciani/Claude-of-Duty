@@ -23,10 +23,9 @@ import {
 
 const profiles: WeaponProfile[] = [
   ...Object.values(WEAPON_PROFILES),
-  ...Object.keys(WEAPON_PROFILES).flatMap((name): WeaponProfile[] => {
-    const profile = resolveProfile(name, true);
-    return profile ? [profile] : [];
-  }),
+  ...Object.keys(WEAPON_PROFILES).flatMap(
+    (name): WeaponProfile | never[] => resolveProfile(name, true) ?? []
+  ),
 ];
 for (const profile of profiles) {
   const kind = profile.sample;

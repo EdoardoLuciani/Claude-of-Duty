@@ -8,12 +8,7 @@ import { hasOwn } from '../core/guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
 import { sampleAuthoredFire, MAGAZINE_ALIASES, disposeAuthoredMixer } from './authored-actions.ts';
-import {
-  authoredModel,
-  requiredNode,
-  type AuthoredModelData,
-  type AuthoredNodes,
-} from './authored-model.ts';
+import { authoredModel, requiredNode, type AuthoredModelData } from './authored-model.ts';
 import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
 import { buildManifestClips, type Clip } from './clips.ts';
 import type { WeaponAnimation } from './runtime-types.ts';
@@ -61,7 +56,7 @@ export async function loadEvolys(renderer: Pick<Renderer, 'hasFeature'>): Promis
 /** Native Blender mechanism/belt/hand tracks, under shared ADS/sway/recoil.
  * Only ammunition-tail visibility is runtime-driven. No per-shot belt objects,
  * new textures, duplicate cases, frame allocations or second animation rig. */
-type EvolysModel = AuthoredModelData<'lmg', AuthoredNodes> & {
+type EvolysModel = AuthoredModelData<'lmg'> & {
   label: string;
   reactiveFire: boolean;
   handPoses: {
