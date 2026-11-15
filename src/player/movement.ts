@@ -58,7 +58,10 @@ interface ClimbMotion {
   nz: number;
 }
 interface MovementContext {
-  input: Pick<EngineContext['input'], 'moveVector' | 'action' | 'stick' | 'ads'>;
+  input: Pick<
+    EngineContext['input'],
+    'moveVector' | 'action' | 'actionStarted' | 'stick' | 'ads' | 'enabled'
+  >;
   time: Pick<EngineContext['time'], 'elapsed' | 'frame' | 'fixed'>;
   peek(id: 'world'): Pick<EngineSystems['world'], 'ladderAt'> | null;
 }
@@ -124,7 +127,6 @@ export class Movement {
   _footLeft: boolean = false;
   _footHold: number = 0;
   _tacSprintRequested: boolean = false;
-  _edgeFrame: number = -1;
   /** One-shot flags consumed (and cleared) by PlayerSystem each frame. */
   jumped: boolean = false;
   slideStarted: boolean = false;
@@ -254,7 +256,7 @@ export class Movement {
     const input = this.ctx.input;
     const prev = this._prevHeld;
 
-    if (!this.controlEnabled) {
+    if (!this.controlEnabled || !input.enabled) {
       cmd.moveX = 0;
       cmd.moveY = 0;
       cmd.jump = false;
@@ -267,6 +269,8 @@ export class Movement {
       cmd.leanR = false;
       cmd.ads = false;
       prev.jump = prev.crouch = prev.prone = prev.sprint = false;
+      this._jumpBuffer = 0;
+      this._tacSprintRequested = false;
       return;
     }
 
@@ -279,12 +283,15 @@ export class Movement {
     const prone = input.action('prone');
     const sprint = input.action('sprint') || Math.abs(this.ctx.input.stick.moveY) > 0.92;
 
-    cmd.jump = jump && !prev.jump;
+    const jumpPressed = input.actionStarted('jump') || (jump && !prev.jump);
+    const sprintPressed = sprint && !prev.sprint;
+    // Keep discrete requests through zero-step frames until physics consumes them.
+    cmd.jump ||= jumpPressed;
     cmd.jumpHeld = jump;
-    cmd.crouchPressed = crouch && !prev.crouch;
-    cmd.pronePressed = prone && !prev.prone;
+    cmd.crouchPressed ||= input.actionStarted('crouch') || (crouch && !prev.crouch);
+    cmd.pronePressed ||= input.actionStarted('prone') || (prone && !prev.prone);
     cmd.sprintHeld = sprint;
-    cmd.sprintPressed = sprint && !prev.sprint;
+    cmd.sprintPressed = sprintPressed;
     cmd.leanL = input.action('leanLeft');
     cmd.leanR = input.action('leanRight');
     cmd.ads = input.ads;
@@ -294,8 +301,8 @@ export class Movement {
     prev.prone = prone;
     prev.sprint = sprint;
 
-    if (cmd.jump) this._jumpBuffer = MOVE.jumpBuffer;
-    if (cmd.sprintPressed) {
+    if (jumpPressed) this._jumpBuffer = MOVE.jumpBuffer;
+    if (sprintPressed) {
       const now = this.ctx.time.elapsed;
       if (now - this._lastSprintPress < MOVE.tacSprintTapWindow && this._tacSprintLock <= 0) {
         this._tacSprintRequested = true;
@@ -305,24 +312,20 @@ export class Movement {
   }
 
   step(h: number): void {
-    const c = this.character;
-    if (!c) return;
+    if (!this.character) return;
+    this._step(h);
+    // Consume once per physics step, including rooted/climbing early returns.
+    // Held inputs remain available to every substep.
     const cmd = this.cmd;
+    cmd.jump = false;
+    cmd.crouchPressed = false;
+    cmd.pronePressed = false;
+    cmd.sprintPressed = false;
+  }
 
-    // A rendered frame contains 0..N fixed steps but only ever *one* key press.
-    // Edge flags are therefore consumed by the first substep of the frame; the
-    // rest see them cleared. (Without this a 60 fps frame runs two substeps and
-    // toggles crouch twice — i.e. never crouches, and cancels a slide on the
-    // same step that started it.)
-    const frame = this.ctx.time.frame;
-    if (frame !== this._edgeFrame) {
-      this._edgeFrame = frame;
-    } else {
-      cmd.jump = false;
-      cmd.crouchPressed = false;
-      cmd.pronePressed = false;
-      cmd.sprintPressed = false;
-    }
+  _step(h: number): void {
+    const c = this._character;
+    const cmd = this.cmd;
 
     this.prevPosition.copy(this.position);
     this.stateTime += h;

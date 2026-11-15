@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { FIXED_DT } from '../../src/core/config.ts';
 import type { FrameHook, Subsystem } from '../../src/core/registry.ts';
 import { addLifecycle, createCoreFixture } from '../lib/core-fixture.ts';
+import { fixture } from '../lib/fixture.ts';
 
 // Default-off preserves existing callers/capture pumps. Suspension keeps input,
 // raw-time UI, rendering and first-render readiness alive, not gameplay hooks.
@@ -66,14 +67,19 @@ assert.equal(completed, 1, 'a successful waiting render is ready, not active');
 // Activation clears both the snapshot and unsnapshotted Start intents. It does
 // not silently enable input, change capture freeze, or synthesize an extra tick.
 engine.input.down.add('Mouse0');
-engine.input._pendingDown.add('Space');
+engine.input.pointerLocked = true;
+engine.input._onKeyDown(
+  fixture<KeyboardEvent>({ code: 'Space', repeat: false, preventDefault(): void {} })
+);
 engine.input._pendingWheel = 1;
 engine.input._rawLook.x = 100;
 engine.input.enabled = false;
 engine.input.frozen = true;
 engine.setGameplaySuspended(false);
 assert.equal(engine.input.fire, false);
-assert.equal(engine.input._pendingDown.size, 0);
+engine.input.beginFrame();
+assert.equal(engine.input.actionStarted('jump'), false);
+assert.equal(engine.input.action('jump'), false);
 assert.equal(engine.input._pendingWheel, 0);
 assert.equal(engine.input._rawLook.x, 0);
 assert.equal(engine.input.enabled, false);

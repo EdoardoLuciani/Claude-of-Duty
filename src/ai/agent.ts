@@ -518,7 +518,11 @@ export class Agent {
       this._drive(0);
       return;
     }
+    if (this.lastKnownAge < 1e6) this.lastKnownAge += dt;
     if (this.ladder) {
+      // Perception is suspended, but retained visual acquisition still expires.
+      this.visualAge += dt;
+      if (this.visualAge > TACTICS.visualMemory) this.hasTarget = false;
       this._moveLadder(dt);
       this._drive(dt);
       return;
@@ -538,7 +542,6 @@ export class Agent {
     this.peekTimer -= dt;
     this.repathTimer -= dt;
     this.vaultCooldown -= dt;
-    if (this.lastKnownAge < 1e6) this.lastKnownAge += dt;
 
     // a path the frame budget deferred: ask again before anything else does
     if (this.pathPending) this._goTo(this._pendingDest);
@@ -622,7 +625,7 @@ export class Agent {
     this._v.set(pos.x + Math.cos(ang) * err, pos.y, pos.z + Math.sin(ang) * err);
     this._noteEvidence(this._v, kind, 0);
     // hearing alone never grants a target; it turns the head and the body
-    this.awareness = Math.min(0.85, this.awareness + strength * 0.5);
+    if (this.awareness < 0.85) this.awareness = Math.min(0.85, this.awareness + strength * 0.5);
     if (this.state === STATE.IDLE || this.state === STATE.PATROL) this._setState(STATE.ALERT);
   }
 
@@ -2234,6 +2237,8 @@ export class Agent {
     const l = this.ladder,
       c = this.controller;
     if (!l || !c || dt <= 0) return;
+    this.targetVisible = false;
+    this.targetSample = -1;
     this.position.copy(c.position);
     this.wantFire = false;
     this.aimWeight = 0;
