@@ -23,9 +23,10 @@ import {
 } from '../../src/weapons/attachments.ts';
 import { authoredModel, checkAuthoredDuration } from '../../src/weapons/authored-model.ts';
 import { WEAPON_DEFS, WEAPON_IDS } from '../../src/weapons/defs.ts';
+import { Arm } from '../../src/weapons/hands.ts';
 import { WeaponLaser } from '../../src/weapons/laser.ts';
 import { ReticleMaterials } from '../../src/weapons/materials-tsl.ts';
-import { makeMCXModel } from '../../src/weapons/mcx.ts';
+import { createMCXAnimation, makeMCXModel } from '../../src/weapons/mcx.ts';
 import { makeMPXModel } from '../../src/weapons/mpx.ts';
 import type { WeaponEntry, WeaponModelRecord } from '../../src/weapons/runtime-types.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
@@ -321,14 +322,83 @@ for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
   const mcxDevice = new THREE.Group();
   mcxDevice.name = 'MUZZLE_device';
   mcxRoot.add(mcxDevice);
+  const handPosition = new THREE.Vector3(0.04, -0.02, -0.25);
+  const handRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.2, 0.3, -0.1));
+  const frameRotation = new THREE.Quaternion().setFromAxisAngle(
+    new THREE.Vector3(0, 1, 0),
+    Math.PI / 2
+  );
+  const inverseFrame = frameRotation.clone().invert();
+  const nativeHandRotation = inverseFrame.clone().multiply(handRotation).multiply(frameRotation);
+  for (const prefix of ['L', 'R']) {
+    for (const name of [
+      `hand_${prefix}`,
+      ...Array.from({ length: 4 }, (_, i): string[] =>
+        ['root', '0', '1', '2'].map((joint): string => `${prefix}_finger_${i}_${joint}`)
+      ).flat(),
+      ...['thumb_base', 'thumb_0', 'thumb_1'].map((joint): string => `${prefix}_${joint}`),
+    ]) {
+      const node = new THREE.Object3D();
+      node.name = name;
+      if (name.startsWith('hand_')) {
+        node.position
+          .copy(handPosition)
+          .sub(new THREE.Vector3(0, 0.07, -0.14))
+          .applyQuaternion(inverseFrame);
+        node.quaternion.copy(nativeHandRotation);
+      }
+      mcxRoot.add(node);
+    }
+  }
+  for (const name of ['magazine', 'magazine_spare', 'bolt', 'MECH_bolt', 'spent_case']) {
+    const node = new THREE.Object3D();
+    node.name = name;
+    mcxRoot.add(node);
+  }
+  const fingerValues = new Float32Array(nativeHandRotation.toArray());
   const nativeMCX = makeMCXModel(
     fixture<GLTF>({
       scene: mcxScene,
-      animations: Object.entries(mcxManifest.clips).map(([name, data]): THREE.AnimationClip =>
-        clip(name, track(data.duration ? [0, data.duration] : [0]))
-      ),
+      animations: Object.entries(mcxManifest.clips).map(([name, data]): THREE.AnimationClip => {
+        const times = data.duration ? [0, data.duration] : [0];
+        return clip(
+          name,
+          new THREE.VectorKeyframeTrack(
+            'MCX_RIG.position',
+            times,
+            times.flatMap((): number[] => [0, 0, 0])
+          ),
+          new THREE.QuaternionKeyframeTrack('L_finger_0_root.quaternion', [0], fingerValues)
+        );
+      }),
     })
   );
+  const animation = createMCXAnimation(nativeMCX, WEAPON_DEFS.mcx);
+  const target = new THREE.Vector3(),
+    rotation = new THREE.Quaternion();
+  animation.handTarget?.('left', target, rotation);
+  assert(
+    target.distanceTo(handPosition) < 1e-7,
+    'native MCX wrists include frame origin exactly once'
+  );
+  assert(rotation.angleTo(handRotation) < 1e-7, 'native MCX wrist orientation is in game space');
+  const armL = new Arm(-1),
+    armR = new Arm(1);
+  for (const name of ['draw', 'holster', 'reloadTac', 'reloadEmpty', 'inspect']) {
+    animation.update(0, name, 0, false);
+    animation.applyHands?.(armL, armR);
+    const actual = armL.fingers[0].root.quaternion.toArray();
+    assert(
+      actual.every((value, i): boolean => Math.abs(value - handRotation.toArray()[i]) < 1e-7),
+      'shared accessor finger tracks rebase once across every native clip'
+    );
+    assert.equal(
+      animation.clips()[name].weapon,
+      null,
+      'MCX equip motion uses native actions, not additive tracks'
+    );
+  }
+  animation.dispose();
   const mcxMounted = mountAttachments(nativeMCX, config, optics);
   nativeMCX.scene.updateMatrixWorld(true);
   const mcxExpected = asset.sight.clone().applyMatrix4(mcxMount.matrixWorld);
@@ -567,7 +637,7 @@ for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
     gripL: { pos: [-0.07, 0.04, -0.24] },
     rhandPose: 'gripRifle',
     lhandPose: 'clamp',
-    animation: fixture<WeaponEntry['animation']>({}, ['handTarget', 'leftPose', 'applyHands']),
+    animation: fixture<WeaponEntry['animation']>({}, ['handTarget', 'applyHands']),
   });
   for (const pose of ['wrap', 'clamp']) {
     approach.lhand.pose = pose;

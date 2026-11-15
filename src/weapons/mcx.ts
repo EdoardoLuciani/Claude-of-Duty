@@ -2,71 +2,75 @@ import * as THREE from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Renderer } from 'three/webgpu';
 
+import handReference from '../../assets/weapons/mcx-virtus/hand-reference.json' with { type: 'json' };
 import manifest from '../../assets/weapons/mcx-virtus/manifest.json' with { type: 'json' };
-import { smootherstep } from '../core/math.ts';
 import { isSkinnedMesh } from '../core/three-guards.ts';
 import { loadWeaponGLTF } from './asset-loader.ts';
 import { convertWeaponScene, disposeWeaponMaterials } from './asset-material.ts';
-import { disposeAuthoredMixer } from './authored-actions.ts';
-import { authoredModel, type AuthoredModelData, type AuthoredNodes } from './authored-model.ts';
-import { buildEquipClips, buildMagazineClips } from './clips.ts';
+import { disposeAuthoredMixer, MAGAZINE_ALIASES } from './authored-actions.ts';
+import {
+  authoredModel,
+  requiredNode,
+  type AuthoredModelData,
+  type AuthoredNodes,
+} from './authored-model.ts';
+import { createAuthoredRig, sampleAuthoredPose } from './authored-rig.ts';
+import { buildMagazineClips, type Clip } from './clips.ts';
+import type { WeaponDef } from './defs.ts';
 import { configureMCXFinishes } from './mcx-finishes.ts';
+import type { WeaponAnimation } from './runtime-types.ts';
 
 export const MCX_URL = '/models/weapons/mcx-virtus.runtime.glb';
-const ALIASES: Record<string, string> = {
-  reloadTac: 'Reload_Tactical',
-  reloadEmpty: 'Reload_Empty',
-  inspect: 'Inspect',
-};
 const SHOT_START = 2 / 60;
 export const MCX_EJECT_DELAY = 4 / 60 - SHOT_START;
-const ONE = new THREE.Vector3(1, 1, 1);
 
-// Authored +X forward/+Y up/+Z right -> game -Z forward/+Y up/+X right.
-// Move the origin to the shooting-hand web, not the Blender chamber origin.
+// Source +X forward -> game -Z forward; retain the authored mechanical skin frame.
 export function makeMCXModel(gltf: GLTF): MCXModel {
   const scene = new THREE.Group();
   scene.name = 'mcx-coordinate-frame';
   scene.rotation.y = Math.PI / 2;
   scene.position.set(0, 0.07, -0.14);
   scene.add(gltf.scene);
+  // Finger controls are copied onto the game-basis shared arm rig. Rebase them
+  // once, not per frame; wrists and geometry retain the MCX source frame.
+  const inverse = scene.quaternion.clone().invert();
+  const fingerControl = (name: string): boolean => /^[LR]_(finger_|thumb_)/.test(name);
+  gltf.scene.traverse((object): void => {
+    if (fingerControl(object.name))
+      object.quaternion.premultiply(scene.quaternion).multiply(inverse);
+  });
+  for (const clip of gltf.animations)
+    for (const track of clip.tracks) {
+      if (!fingerControl(track.name) || !track.name.endsWith('.quaternion')) continue;
+      const values = track.values.slice();
+      track.values = values;
+      for (let i = 0; i < values.length; i += 4) {
+        const x = values[i];
+        values[i] = values[i + 2];
+        values[i + 2] = -x;
+      }
+    }
   const { root, opticMountRest, animations, point } = authoredModel(
     gltf,
     'MCX_RIG',
-    ['Idle', 'Fire', ...Object.values(ALIASES)],
+    ['Idle', 'Fire', ...Object.values(MAGAZINE_ALIASES)],
     manifest.clips,
     scene
   );
-  const sight = point('SOCKET_sight');
   const model = {
     id: 'mcx' as const,
     scene,
     root,
     opticMountRest,
     animations,
+    handPoses: { left: handReference.sides.left.grip, right: handReference.sides.right.grip },
     nodes: {
       muzzle: point('SOCKET_muzzle'),
       eject: point('SOCKET_ejection'),
-      sight,
+      sight: point('SOCKET_sight'),
       ejectDir: [1, 0.35, 0.35] as [number, number, number],
-      // Wrist targets (not the palm-centred Blender sockets); same glove rig as M4.
-      gripR: {
-        pos: [0.0351, -0.012, 0.086] as [number, number, number],
-        finger: [0.15, 0.35, -0.92] as [number, number, number],
-        back: [1, 0.03, 0.04] as [number, number, number],
-      },
-      gripL: {
-        pos: [-0.073, 0.04, -0.243] as [number, number, number],
-        finger: [0.7, -0.1, -0.71] as [number, number, number],
-        back: [-0.14, -0.985, 0.001] as [number, number, number],
-      },
-      handguard: {
-        axis: [0, 0.07, 0] as [number, number, number],
-        dir: [0, 0, 1] as [number, number, number],
-        r: 0.026,
-        z0: -0.185,
-        z1: -0.3882,
-      },
+      gripR: handReference.grips.right,
+      gripL: handReference.grips.left,
       magSeat: { pos: point('SOCKET_magazine'), rot: [0, 0, 0] },
     },
     shell: { caseLen: 0.0348, rimR: 0.0048 },
@@ -86,231 +90,88 @@ export async function loadMCX(renderer: Pick<Renderer, 'hasFeature'>): Promise<M
   return makeMCXModel(await loadWeaponGLTF(renderer, MCX_URL));
 }
 
-function handQuaternion(
-  finger: [number, number, number],
-  back: [number, number, number]
-): THREE.Quaternion {
-  const z = new THREE.Vector3(...finger).negate().normalize();
-  const y = new THREE.Vector3(...back)
-    .addScaledVector(z, -new THREE.Vector3(...back).dot(z))
-    .normalize();
-  const x = new THREE.Vector3().crossVectors(y, z).normalize();
-  return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
-}
-
-/** Baked rigid-part animation under the shared movement/ADS/arm rig. */
 type MCXModel = AuthoredModelData<
   'mcx',
   AuthoredNodes & {
-    ejectDir: [number, number, number];
-    gripR: {
-      pos: [number, number, number];
-      finger: [number, number, number];
-      back: [number, number, number];
-    };
-    gripL: {
-      pos: [number, number, number];
-      finger: [number, number, number];
-      back: [number, number, number];
-    };
-    handguard: {
-      axis: [number, number, number];
-      dir: [number, number, number];
-      r: number;
-      z0: number;
-      z1: number;
-    };
     magSeat: { pos: [number, number, number]; rot: number[] };
   }
->;
-type MCXDefinition = Parameters<typeof buildEquipClips>[1];
-export class MCXAnimation {
-  model!: MCXModel;
-  def!: MCXDefinition;
-  fireSpeed!: number;
-  root!: THREE.Object3D;
-  frame!: THREE.Group;
-  inverseFrame!: THREE.Matrix4;
-  frameQ!: THREE.Quaternion;
-  inverseQ!: THREE.Quaternion;
-  mixer!: THREE.AnimationMixer;
-  magazine!: THREE.Object3D;
-  spare!: THREE.Object3D;
-  bolt!: THREE.Object3D;
-  boltBone!: THREE.Object3D;
-  private skeletons = new Set<THREE.Skeleton>();
-  charging!: THREE.Object3D;
-  poseQ = new THREE.Quaternion();
-  magQ: THREE.Quaternion = handQuaternion([0.1, 0.72, -0.68], [-0.86, 0.34, -0.38]);
-  chargeQ: THREE.Quaternion = handQuaternion([0.55, 0.2, 0.81], [-0.2, 0.94, -0.27]);
-  name: string | null = null;
-  fireTime!: number;
-  gesture!: string | null;
-  gestureTime!: number;
-  actions: Record<string, THREE.AnimationAction> = {};
-  poseMatrix: THREE.Matrix4 = new THREE.Matrix4();
-  partMatrix: THREE.Matrix4 = new THREE.Matrix4();
-  target: THREE.Vector3 = new THREE.Vector3();
-  targetQ: THREE.Quaternion = new THREE.Quaternion();
-  // Fit-only contacts follow the revised magazine seat and OEM latch bow.
-  magPoint: THREE.Vector3 = new THREE.Vector3(-0.007, -0.16, -0.039);
-  chargePoint: THREE.Vector3 = new THREE.Vector3(-0.184, 0.02, -0.05);
+> & {
+  handPoses: {
+    left: typeof handReference.sides.left.grip;
+    right: typeof handReference.sides.right.grip;
+  };
+};
 
-  constructor(model: MCXModel, def: MCXDefinition) {
-    this.model = model;
-    this.def = def;
-    if (!('fireAnimationSpeed' in def) || typeof def.fireAnimationSpeed !== 'number')
-      throw new Error('MCX: missing authored fire animation speed');
-    this.fireSpeed = def.fireAnimationSpeed;
-    this.root = model.root;
-    this.frame = model.scene;
-    this.frame.updateMatrix();
-    this.inverseFrame = this.frame.matrix.clone().invert();
-    this.frameQ = this.frame.quaternion.clone();
-    this.inverseQ = this.frameQ.clone().invert();
-    this.mixer = new THREE.AnimationMixer(this.root);
-    for (const source of model.animations) {
-      // The single showcase casing must not replay under the gun on every
-      // shot. Live fire emits independent .300 cases via the existing FX pool.
-      const tracks = source.tracks.filter((t): boolean => !t.name.startsWith('spent_case.'));
-      const clip = new THREE.AnimationClip(source.name, source.duration, tracks);
-      const action = this.mixer.clipAction(clip);
-      action.setLoop(THREE.LoopOnce, 1);
-      action.clampWhenFinished = true;
-      this.actions[source.name] = action;
-    }
-    this.magazine = this.root.getObjectByName('magazine')!;
-    this.spare = this.root.getObjectByName('magazine_spare')!;
-    this.bolt = this.root.getObjectByName('bolt')!;
-    this.boltBone = this.root.getObjectByName('MECH_bolt')!;
-    this.root.traverse((object): void => {
-      if (isSkinnedMesh(object)) this.skeletons.add(object.skeleton);
-    });
-    this.charging = this.root.getObjectByName('charging_handle')!;
-    this.root.getObjectByName('spent_case')!.visible = false;
-    this.reset();
-  }
-
-  clips(): { [x: string]: import('./clips.ts').Clip } {
-    return {
-      ...buildEquipClips(this.model.nodes, this.def),
-      ...buildMagazineClips(ALIASES, manifest.clips),
-    };
-  }
-
-  _sample(name: string, time: number): void {
-    if (this.name !== name) {
-      if (this.name) this.actions[this.name].stop();
-      this.actions[name].reset().play();
-      this.name = name;
-    }
-    const action = this.actions[name];
-    action.paused = false;
-    action.time = Math.fround(Math.min(time, action.getClip().duration));
-    this.mixer.update(0);
-    this.root.updateMatrix();
-    this.poseMatrix.copy(this.frame.matrix).multiply(this.root.matrix).multiply(this.inverseFrame);
-    this.poseQ.copy(this.frameQ).multiply(this.root.quaternion).multiply(this.inverseQ);
-    this.magazine.visible = this.magazine.scale.x > 0.5;
-    this.spare.visible = this.spare.scale.x > 0.5;
-  }
-
-  fire(): void {
-    this.fireTime = SHOT_START;
-  }
-
-  reset(): void {
-    this.fireTime = Infinity;
-    this.gesture = null;
-    this.gestureTime = 0;
-    this._sample('Idle', 0);
-    // Mixer property caching may skip an unchanged Idle value after our
-    // out-of-band empty-state override; reset both contact and visible skin.
-    this.bolt.position.x = 0;
-    this.boltBone.position.x = 0;
-  }
-
-  update(dt: number, clipName: string, clipTime: number, empty: boolean): void {
-    this.fireTime += dt * this.fireSpeed;
-    this.gesture = ALIASES[clipName] ? clipName : null;
-    this.gestureTime = clipTime;
-    if (this.gesture) this._sample(ALIASES[clipName], clipTime);
-    else if (this.fireTime < this.actions.Fire.getClip().duration)
-      this._sample('Fire', this.fireTime);
-    else this._sample('Idle', 0);
-    if (empty && !this.gesture && this.fireTime >= 7 / 60) {
-      this.bolt.position.x = -0.068;
-      this.boltBone.position.x = this.bolt.position.x;
-    }
-    this.frame.updateMatrixWorld(true);
-  }
-
-  handTarget(side: 'left' | 'right', pos: THREE.Vector3, quat: THREE.Quaternion): void {
-    pos.applyMatrix4(this.poseMatrix);
-    quat.premultiply(this.poseQ);
-    if (side !== 'left' || !this.gesture?.startsWith('reload')) return;
-    const t = this.gestureTime;
-    let part, point, baseQ, weight;
-    if (this.gesture === 'reloadEmpty' && t > 2.0) {
-      part = this.charging;
-      point = this.chargePoint;
-      baseQ = this.chargeQ;
-      weight = smootherstep(2.02, 2.28, t) * (1 - smootherstep(2.7, 3.12, t));
-    } else {
-      part = t < 64 / 60 ? this.magazine : this.spare;
-      point = this.magPoint;
-      baseQ = this.magQ;
-      weight = smootherstep(0.1, 0.32, t) * (1 - smootherstep(1.95, 2.35, t));
-    }
-    const returnDrop =
-      this.gesture === 'reloadEmpty'
-        ? 0.05 * smootherstep(2.7, 2.9, t) * (1 - smootherstep(3.12, 3.28, t))
-        : 0;
-    // Route the released glove below the optic instead of sweeping through
-    // its rail seat on the way to/from the outboard charging latch. Full latch
-    // contact, magazine handoff and all authored mechanism times stay unchanged.
-    const chargeDrop =
-      this.gesture === 'reloadEmpty'
-        ? 0.09 *
-          (smootherstep(1.98, 2.04, t) * (1 - smootherstep(2.2, 2.28, t)) +
-            smootherstep(2.7, 2.85, t) * (1 - smootherstep(3.0, 3.12, t)))
-        : 0;
-    if (weight <= 0 && returnDrop === 0 && chargeDrop === 0) return;
-    // Ignore visibility scale during off-screen magazine handoffs: the wrist
-    // follows a rigid part, never a collapsing zero-scale transform.
-    this.partMatrix.compose(part.position, part.quaternion, ONE);
-    this.target
-      .copy(point)
-      .applyMatrix4(this.partMatrix)
-      .applyMatrix4(this.root.matrix)
-      .applyMatrix4(this.frame.matrix);
-    this.targetQ
-      .copy(this.frameQ)
-      .multiply(this.root.quaternion)
-      .multiply(part.quaternion)
-      .multiply(this.inverseQ)
-      .multiply(baseQ);
-    pos.lerp(this.target, weight);
-    // Align the released glove below the rail, then raise it onto the support
-    // grip. The latch contact and all authored mechanism/event beats stay put.
-    pos.y -= returnDrop + chargeDrop;
-    quat.slerp(this.targetQ, weight);
-  }
-
-  get leftPose(): 'pinch' | null {
-    if (
-      this.gesture?.startsWith('reload') &&
-      this.gestureTime > 0.2 &&
-      this.gestureTime < (this.gesture === 'reloadEmpty' ? 2.9 : 2.15)
-    )
-      return 'pinch';
-    return null;
-  }
-
-  dispose(): void {
-    disposeAuthoredMixer(this);
-    for (const skeleton of this.skeletons) skeleton.dispose();
-    this.skeletons.clear();
-    disposeWeaponMaterials(this.model);
-  }
+/** Native Blender wrists/fingers and mechanisms under shared movement/ADS/arm IK. */
+export function createMCXAnimation(model: MCXModel, def: WeaponDef): WeaponAnimation {
+  const rig = createAuthoredRig(model);
+  const node = (name: string): THREE.Object3D => requiredNode(rig.root, name);
+  const magazine = node('magazine');
+  const spare = node('magazine_spare');
+  const bolt = node('bolt');
+  const boltBone = node('MECH_bolt');
+  const frame = model.scene;
+  frame.updateMatrix();
+  const inverse = frame.quaternion.clone().invert();
+  const speed = def.fireAnimationSpeed;
+  if (speed === undefined) throw new Error('MCX: missing authored fire animation speed');
+  const skeletons = new Set<THREE.Skeleton>();
+  rig.root.traverse((object): void => {
+    if (isSkinnedMesh(object)) skeletons.add(object.skeleton);
+  });
+  // Runtime FX owns independent casings; the source showcase casing stays hidden.
+  node('spent_case').visible = false;
+  const animation = {
+    ...rig,
+    clips(): Record<string, Clip> {
+      return buildMagazineClips(MAGAZINE_ALIASES, manifest.clips);
+    },
+    _sample(name: string, time: number): void {
+      sampleAuthoredPose(this, name, Math.fround(time));
+      this.poseQ.premultiply(frame.quaternion).multiply(inverse);
+      magazine.visible = magazine.scale.x > 0.5;
+      spare.visible = spare.scale.x > 0.5;
+    },
+    handTarget(
+      side: 'left' | 'right',
+      position: THREE.Vector3,
+      quaternion: THREE.Quaternion
+    ): void {
+      const hand = this.hands[side].wrist;
+      position.copy(hand.position).applyMatrix4(this.root.matrix).applyMatrix4(frame.matrix);
+      quaternion
+        .copy(frame.quaternion)
+        .multiply(this.root.quaternion)
+        .multiply(hand.quaternion)
+        .multiply(inverse);
+    },
+    fire(): void {
+      this.fireTime = SHOT_START;
+    },
+    reset(): void {
+      this.fireTime = Infinity;
+      this._sample('Idle', 0);
+      bolt.position.x = 0;
+      boltBone.position.x = 0;
+    },
+    update(dt: number, clipName: string | null, clipTime: number, empty: boolean): void {
+      this.fireTime += dt * speed;
+      const gesture = clipName === null ? undefined : MAGAZINE_ALIASES[clipName];
+      if (gesture) this._sample(gesture, clipTime);
+      else if (this.fireTime < manifest.clips.Fire.duration) this._sample('Fire', this.fireTime);
+      else this._sample('Idle', 0);
+      if (empty && !gesture && this.fireTime >= 7 / 60) {
+        bolt.position.x = -0.068;
+        boltBone.position.x = bolt.position.x;
+      }
+      frame.updateMatrixWorld(true);
+    },
+    dispose(): void {
+      disposeAuthoredMixer(this);
+      for (const skeleton of skeletons) skeleton.dispose();
+      disposeWeaponMaterials(model);
+    },
+  };
+  animation.reset();
+  return animation;
 }

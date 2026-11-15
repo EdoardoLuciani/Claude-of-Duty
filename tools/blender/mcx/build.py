@@ -8,7 +8,6 @@ See tools/blender/mcx/README.md for the editing/build process.
 import argparse
 import json
 from pathlib import Path
-import subprocess
 import sys
 
 import bpy
@@ -20,7 +19,7 @@ from mcx.export import export_asset, prepare_surfaces
 from mcx.geometry import build_geometry
 from mcx.finishes import FINISH_LOOKUP_SIZE
 from mcx.materials import TEXTURE_SIZE, build_materials
-from mcx.review_hands import author_review_hands
+from mcx.hands import author_hands
 from mcx.studio import build_studio
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -43,6 +42,12 @@ def build(output, render=False, quick=False):
     asset, parts = build_geometry(materials)
     prepare_surfaces(asset)
     rest, clips = build_animations(parts)
+    select_clip(parts, clips, 'Idle')
+    controls = author_hands(ROOT,asset,parts,clips)
+    parts += controls
+    select_clip(parts, clips, 'Idle')
+    for obj in controls:
+        rest[obj.name] = (obj.location.copy(),obj.rotation_quaternion.copy(),obj.scale.copy())
     cameras = [(name,camera.name) for name,camera in build_studio(quick)]
 
     scene['clips'] = json.dumps(clips)
@@ -79,20 +84,14 @@ def build(output, render=False, quick=False):
         'notes': [
             'Generated from tools/blender/mcx/. Python is the authoring authority.',
             'Reference-backed visual exterior, not manufacturing geometry or licensed SIG art.',
-            'Named sockets and rigid-part clips; hands, audio and live casing physics are runtime-owned.',
-            'Review-only shared skins bake actual runtime poses at 120 Hz in the editable blend, never the weapon GLB.',
-            'Visibility is authored CONSTANT; motion LINEAR at 60 Hz. Stock Actions export, no GLB rewriting.',
+            'Named sockets, mechanisms and wrist/finger controls are Blender-authored; shared arm IK, audio and casing physics are runtime-owned.',
+            'Shared review-only arm skins are excluded from the weapon GLB.',
+            'Visibility is authored CONSTANT; mechanism and wrist/finger motion use native LINEAR Actions. No GLB rewriting.',
             'Export-only corner pigment and scalar finish lookup; UV0 albedo/normal detail retained. Roughness grain reduced to its mean.',
             'One opaque material; MCX adapter selects exact fine/polymer/rubber normal strengths from stable UV1 finish identity. No integrated glass or suppressor.',
         ],
     }
     (output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
-    # Sample the freshly exported model through the real runtime, then reopen
-    # the untouched editable source. Review geometry never enters the GLB cook.
-    subprocess.run(['bun',str(Path(__file__).with_name('runtime-hands.ts')),str(output)],cwd=ROOT,check=True)
-    bpy.ops.wm.open_mainfile(filepath=str(output/'mcx-virtus.blend'))
-    author_review_hands(ROOT,output)
-    bpy.ops.wm.save_as_mainfile(filepath=str(output/'mcx-virtus.blend'))
     if render:
         scene = bpy.context.scene
         for name,camera in cameras:

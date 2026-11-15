@@ -122,7 +122,6 @@ export interface WeaponAnimation {
   magazineBody?: THREE.Object3D;
   poseQ: THREE.Quaternion;
   handTarget?(side: 'left' | 'right', position: THREE.Vector3, quaternion: THREE.Quaternion): void;
-  leftPose?: string | null;
   applyHands?(left: Arm, right: Arm): void;
 }
 export interface ViewState {

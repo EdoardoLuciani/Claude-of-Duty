@@ -105,11 +105,13 @@ def build_animations(parts):
 
 def select_clip(parts, clips, name, frame=0):
     scene = bpy.context.scene
-    for obj in parts:
-        for track in obj.animation_data.nla_tracks:
-            track.mute = track.name != name
+    for obj in scene.objects:
+        if obj.animation_data:
+            obj.animation_data.action = None
+            for track in obj.animation_data.nla_tracks:
+                track.mute = track.name != name
     scene.frame_start = 0
-    scene.frame_end = clips[name]["frames"][1]
+    scene.frame_end = math.ceil(clips[name]["frames"][1])
     scene.frame_set(frame)
 
 def restore_rest(parts, rest):
@@ -117,5 +119,8 @@ def restore_rest(parts, rest):
         for track in obj.animation_data.nla_tracks:
             track.mute = True
         obj.animation_data.action = None
-        obj.location, obj.rotation_euler, obj.scale = rest[obj.name]
+        location,rotation,scale = rest[obj.name]
+        obj.location = location; obj.scale = scale
+        if obj.rotation_mode == 'QUATERNION': obj.rotation_quaternion = rotation
+        else: obj.rotation_euler = rotation
     bpy.context.view_layer.update()

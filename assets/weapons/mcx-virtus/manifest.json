@@ -85,6 +85,22 @@
       ],
       "duration": 2.0,
       "events": []
+    },
+    "Draw": {
+      "frames": [
+        0,
+        37.2
+      ],
+      "duration": 0.62,
+      "events": []
+    },
+    "Holster": {
+      "frames": [
+        0,
+        24.0
+      ],
+      "duration": 0.4,
+      "events": []
     }
   },
   "stats": {
@@ -102,9 +118,9 @@
   "notes": [
     "Generated from tools/blender/mcx/. Python is the authoring authority.",
     "Reference-backed visual exterior, not manufacturing geometry or licensed SIG art.",
-    "Named sockets and rigid-part clips; hands, audio and live casing physics are runtime-owned.",
-    "Review-only shared skins bake actual runtime poses at 120 Hz in the editable blend, never the weapon GLB.",
-    "Visibility is authored CONSTANT; motion LINEAR at 60 Hz. Stock Actions export, no GLB rewriting.",
+    "Named sockets, mechanisms and wrist/finger controls are Blender-authored; shared arm IK, audio and casing physics are runtime-owned.",
+    "Shared review-only arm skins are excluded from the weapon GLB.",
+    "Visibility is authored CONSTANT; mechanism and wrist/finger motion use native LINEAR Actions. No GLB rewriting.",
     "Export-only corner pigment and scalar finish lookup; UV0 albedo/normal detail retained. Roughness grain reduced to its mean.",
     "One opaque material; MCX adapter selects exact fine/polymer/rubber normal strengths from stable UV1 finish identity. No integrated glass or suppressor."
   ]

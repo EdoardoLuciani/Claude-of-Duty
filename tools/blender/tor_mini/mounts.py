@@ -98,9 +98,6 @@ def check_laser_mount(weapon):
             optics.extend(o for o in objects if o.type == 'MESH')
             optic_objects.extend(objects)
     clips = json.loads(scene['clips'])
-    if weapon == 'mcx':
-        from mcx.review_hands import review_tracks, select_review_clip
-        clips = {track['name']:{'duration':track['times'][-1]} for track in review_tracks()}
     count = 0
     contact = False
     try:
@@ -109,14 +106,11 @@ def check_laser_mount(weapon):
             # use a 120 Hz sweep plus exact fractional endpoints.
             rate = 120
             duration = clip['duration']
-            if weapon == 'mcx':
-                select_review_clip(name)
-            else:
-                for o in scene.objects:
-                    if o.animation_data:
-                        o.animation_data.action = None
-                        for track in o.animation_data.nla_tracks:
-                            track.mute = track.name != name
+            for o in scene.objects:
+                if o.animation_data:
+                    o.animation_data.action = None
+                    for track in o.animation_data.nla_tracks:
+                        track.mute = track.name != name
             for sample in range(math.ceil(duration * rate) + 1):
                 frame = min(sample / rate, duration) * scene.render.fps
                 scene.frame_set(math.floor(frame), subframe=frame % 1)

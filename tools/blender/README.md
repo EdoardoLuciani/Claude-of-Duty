@@ -9,8 +9,8 @@ Start with the [asset/world editing map](../../docs/assets.md). Each weapon has
 one tooling directory here: `m4/`, `mcx/`, `p320/`, `evolys/`, `mpx/`, `ax338/`,
 `m590/`. Its `build.py` and `check.py` sit beside its geometry, animation and export
 helpers. Where applicable, `actions.py` authors clips and `hand-reference.ts`
-explicitly refits calibration; MCX authors clips in `animations.py` and has no
-separate hand-calibration stage. Run commands from the repository root.
+explicitly refits calibration. MCX's `animations.py` authors its mechanisms and
+`hands.py` authors its wrist/finger and equip actions. Run commands from the repository root.
 
 Committed manifests may retain source-path notes from an older export; use the
 current asset README commands below rather than historical paths embedded in products.
@@ -59,12 +59,10 @@ Finite source samples and browser captures do not replace final human approval.
 - Build factory-empty into an absolute `--output` scratch directory first.
   `--render` is optional; `--quick` changes preview samples/resolution only.
 - Shared review-arm appearance and versioned hand calibration are read-only
-  inputs, not exported duplicate arms. `review_hands.py` owns the shared EVOLYS/MPX
-  review-arm baker; each caller supplies its own basis, controls and clips.
-  MCX's local `runtime-hands.ts` / `review_hands.py` instead bake actual runtime
-  matrices after exporting the weapon; source parity and attachment checks include
-  those skins. See its asset README for paired clip selection. Missing inputs fail. Refit calibration separately and intentionally, never
-  automatically during a normal rebuild.
+  inputs, not exported duplicate arms. `review_hands.py` owns the shared
+  EVOLYS/MPX/MCX review-arm baker; each caller supplies its own basis, controls and
+  clips. Source attachment checks include those skins. Missing inputs fail. Refit
+  calibration separately and intentionally, never automatically during a normal rebuild.
 - Save editable components/modifiers/sparse poses before preparing runtime copies.
   Preserve each weapon's own UV strategy, sampling lattice, fractional endpoints,
   STEP visibility and reset channels; local guides record exceptions.

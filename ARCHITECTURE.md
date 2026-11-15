@@ -249,9 +249,11 @@ metadata. Rigid assemblies use ordinary meshes (EVOLYS skins only its belt); kee
 moving controls and magazines independent. The M590 is a provisional review
 prototype; its event-only clips share one mixer and shell insertion uses adapter-owned
 visibility, while damage and ammunition accounting stay in the common weapon system.
-Editable weapon scenes include review-only arm skins, never duplicate weapon-GLB
-arms. MCX bakes runtime control matrices into its source; hand-code changes invalidate
-that cache, and source checks compare evaluated skins with runtime vertex receipts.
+All seven weapons export Blender-authored wrist/finger controls and sample them
+through the shared authored rig; upper/forearm IK remains runtime-owned. Editable
+weapon scenes include review-only arm skins, never duplicate weapon-GLB arms.
+Explicit hand-calibration tools update checked-in authoring data; normal builds
+consume that data without executing gameplay or rewriting calibration.
 
 `src/weapons/defs.ts` owns the tuning schema, IDs, slots and fire modes; check data
 against the schema. Key internal state by `WeaponId`; narrow DOM/URL/debug strings

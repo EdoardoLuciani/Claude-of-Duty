@@ -3,7 +3,6 @@ import * as TSL from 'three/tsl';
 import { MeshBasicNodeMaterial, MeshPhysicalNodeMaterial } from 'three/webgpu';
 import type { Node, UniformNode } from 'three/webgpu';
 
-import { hasOwn } from '../core/guards.ts';
 import { Spring, TAU, clamp, clamp01, damp, lerp, smootherstep } from '../core/math.ts';
 import { loadArmAsset } from './arm-asset.ts';
 import { createWeaponMaterial } from './asset-material.ts';
@@ -29,7 +28,6 @@ import type { Clip } from './clips.ts';
 import type { WeaponDef } from './defs.ts';
 import { triCount } from './geometry.ts';
 import { grenadeMesh } from './grenade-mesh.ts';
-import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from './grip-contacts.ts';
 import { Arm } from './hands.ts';
 import type { ReticleMaterials } from './materials-tsl.ts';
 import { Spring3, Noise1, wrapPi } from './mathx.ts';
@@ -40,7 +38,6 @@ import type {
   ViewState,
   WeaponEntry,
   WeaponModelRecord,
-  WeaponNodes,
   ViewmodelContext,
 } from './runtime-types.ts';
 import { SNIPER_RETICLE, sniperMradScale, sniperReticleCoverage } from './sniper-reticle.ts';
@@ -557,73 +554,14 @@ export class Viewmodel {
       gripL: model.nodes.gripL,
       magLen: model.magSize.len,
       shell: model.shell,
-      lhandPose: model.id === 'lmg' ? 'wrap' : 'clamp',
-      rhandPose:
-        model.id === 'lmg' ? 'gripLmg' : model.id === 'shotgun' ? 'gripShotgun' : 'gripRifle',
+      lhandPose: `support:${model.id}`,
+      rhandPose: `grip:${model.id}`,
     };
-    if ('handPoses' in model) {
-      entry.rhandPose = `grip:${model.id}`;
-      entry.lhandPose = `support:${model.id}`;
-      this.armR.poses[entry.rhandPose] = model.handPoses.right;
-      this.armL.poses[entry.lhandPose] = model.handPoses.left;
-    } else {
-      this._fitSupportHand(entry);
-      this._fitGripContacts(entry);
-    }
+    this.armR.poses[entry.rhandPose] = model.handPoses.right;
+    this.armL.poses[entry.lhandPose] = model.handPoses.left;
     configureWeaponAttachments(entry, config, assets);
     this.weapons.set(model.id, entry);
     return entry;
-  }
-
-  // Refine the baseline poses against weapon-specific thumb/trigger targets.
-  _fitGripContacts(w: WeaponEntry): void {
-    if (!hasOwn(GRIP_CONTACTS, w.id)) return;
-    const contact = GRIP_CONTACTS[w.id];
-    this.armR.hand.position.fromArray(w.gripR.pos);
-    handBasis(
-      this.armR.hand.quaternion,
-      w.gripR.finger ?? [0, -0.35, -0.94],
-      w.gripR.back ?? [0.95, 0.25, 0.18]
-    );
-    this.armR.setPose(w.rhandPose);
-    w.rhandPose = `grip:${w.id}`;
-    this.armR.fitGrip(w.rhandPose, {
-      thumb: vec3(contact.rightThumb),
-      index: vec3(contact.trigger),
-      fingers: 'rightFingers' in contact ? contact.rightFingers : undefined,
-      spread: FIRING_FINGER_SPREAD,
-    });
-    this.armL.hand.position.fromArray(w.gripL.pos);
-    handBasis(
-      this.armL.hand.quaternion,
-      w.gripL.finger ?? [0.82, 0.5, -0.28],
-      w.gripL.back ?? [-0.5, 0.32, -0.8]
-    );
-    this.armL.setPose(w.lhandPose);
-    this.armL.fitGrip(w.lhandPose, {
-      thumb: vec3(contact.leftThumb),
-      thumbPole: 'leftThumbPole' in contact ? vec3(contact.leftThumbPole) : [-1, 0, 0],
-      fingers: 'leftFingers' in contact ? contact.leftFingers : undefined,
-      spread: 'leftSpread' in contact ? contact.leftSpread : undefined,
-    });
-  }
-
-  // MCX retains fitted support-hand posing; weapon AO belongs to the authored asset.
-  _fitSupportHand(w: WeaponEntry): void {
-    const nodes: WeaponNodes = w.model.nodes;
-    const hg = nodes.supportContact ?? nodes.handguard;
-    const gL = w.gripL;
-    if (!hg) return;
-    this._handPosL.fromArray(gL.pos);
-    handBasis(this._handQuatL, gL.finger ?? [0.82, 0.5, -0.28], gL.back ?? [-0.5, 0.32, -0.8]);
-    const poseName = `clamp:${w.id}`;
-    this.armL.setPose('clamp');
-    this.armL.fitToCylinder(this._handPosL, this._handQuatL, vec3(hg.axis), vec3(hg.dir), hg.r, {
-      clearance: 0.001,
-      poseName,
-    });
-    w.lhandPose = poseName;
-    this.armL.setPose(poseName);
   }
 
   setActive(id: WeaponEntry['id']): WeaponEntry | null {
@@ -641,7 +579,6 @@ export class Viewmodel {
     this.settle.reset();
     if (w.parts.magazine) w.parts.magazine.visible = true;
     this.armR.setPose(w.rhandPose);
-    // The FITTED clamp for this weapon, not the authored one — see _fitSupportHand.
     this.armL.setPose(w.lhandPose);
     return w;
   }
@@ -1058,7 +995,7 @@ export class Viewmodel {
     this.landSpring.impulse(clamp(speed * 0.45, 0.4, 3.4));
   }
 
-  /** Load authored skins before adding weapons (which fits contact poses). */
+  /** Load shared skins before adding weapons and their calibrated hand poses. */
   async loadArms(): Promise<void> {
     this.armAsset = await loadArmAsset();
     this.armR.attachAsset(this.armAsset);
@@ -1371,7 +1308,6 @@ export class Viewmodel {
     this._handPosL.set(pos[0], pos[1], pos[2]);
     handBasis(this._handQuatL, finger, back);
     w.animation.handTarget?.('left', this._handPosL, this._handQuatL);
-    pose = w.animation.leftPose ?? pose;
     if (pose !== this.armL.pose) this.armL.setPose(pose, 0.1);
     this.armL.solve(this._handPosL, this._handQuatL);
     w.animation.applyHands?.(this.armL, this.armR);
@@ -1578,9 +1514,4 @@ function requiredSocket(root: THREE.Object3D, name: string): THREE.Object3D {
   const socket = root.getObjectByName(name);
   if (!socket) throw new Error(`[weapons] missing ${name}`);
   return socket;
-}
-
-function vec3(value: readonly number[]): [number, number, number] {
-  if (value.length !== 3) throw new Error('[weapons] expected a three-component node');
-  return [value[0], value[1], value[2]];
 }

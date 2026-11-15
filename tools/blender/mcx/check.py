@@ -236,7 +236,7 @@ for obj in asset.objects:
         assert bvh(obj.name).ray_cast(sight,Vector((1,0,0)),1)[0] is None, ('laser hardware blocks ACOG',obj.name)
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-# Compare evaluated shared skins against the embedded real-runtime receipts.
+# Validate native hand controls, review skins and the hidden-magazine transition.
 from mcx.review_hands import check_review_hands
 check_review_hands()
 

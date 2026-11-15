@@ -5,7 +5,7 @@ from mathutils import Vector, Quaternion, Matrix
 
 def eq(e):return Quaternion((1,0,0),e[0])@Quaternion((0,1,0),e[1])@Quaternion((0,0,1),e[2])
 
-def author_review_hands(root,rig,hand_controls,all_parts,clips,*,basis,label):
+def author_review_hands(root,rig,hand_controls,all_parts,clips,*,basis,label,frame_step=2):
     """Bake review-only player arms in the caller's weapon coordinate basis."""
     source_basis=Matrix(((1,0,0),(0,0,-1),(0,1,0)))
     C=basis;CI=C.inverted()
@@ -56,8 +56,12 @@ def author_review_hands(root,rig,hand_controls,all_parts,clips,*,basis,label):
         for arm in arms.values():
             arm.animation_data_create();arm.animation_data.action=bpy.data.actions.new(name+' | '+arm.name)
             for t in arm.animation_data.nla_tracks:t.mute=True
-        for f in range(0,math.ceil(info['frames'][1])+1,2):
-            scene.frame_set(f)
+        end=info['frames'][1]
+        frames=range(0,math.ceil(end)+1,2) if frame_step==2 else (
+            min(sample*frame_step,end) for sample in range(math.ceil(end/frame_step)+1)
+        )
+        for f in frames:
+            scene.frame_set(math.floor(f),subframe=f%1)
             for side,arm in arms.items():
                 current=game_matrices(side);s=Matrix.Diagonal((-1,1,1,1) if side=='right' else (.97,.97,.97,1));transform=orientation.to_4x4()@s;desired={}
                 for pb in arm.pose.bones:desired[pb.name]=transform.inverted()@(cm@current[pb.name]@bind[side][pb.name].inverted()@cmi)@s@pb.bone.matrix_local

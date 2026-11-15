@@ -1,7 +1,7 @@
 import { clamp01, lerp, smootherstep } from '../core/math.ts';
 import { easeOutBack, easeOutCubic } from './mathx.ts';
 
-/** Event timelines plus the MCX's additive draw/holster tracks. */
+/** Event timelines and optional additive pose tracks. */
 
 type Vec3 = [number, number, number];
 type Ease = 'linear' | 'smooth' | 'out' | 'back';
@@ -37,18 +37,6 @@ export interface ClipSample {
   pos: Vec3;
   rot: Vec3;
   lhand: HandSample;
-}
-interface ClipWeaponDef {
-  drawTime: number;
-  holsterTime: number;
-}
-interface WeaponNodes {
-  gripL: HandNode;
-}
-interface HandNode {
-  pos: Vec3;
-  finger?: Vec3;
-  back?: Vec3;
 }
 type Blend = (a: ClipKey, b: ClipKey, weight: number, out: ClipSample) => void;
 
@@ -187,61 +175,4 @@ export function makeSampleResult(): ClipSample {
     rot: [0, 0, 0],
     lhand: { pos: [0, 0, 0], finger: [0, 0, 0], back: [0, 0, 0], pose: 'wrap', weight: 0 },
   };
-}
-
-const v3 = (x: number, y: number, z: number): Vec3 => [x, y, z];
-
-/** MCX retains additive draw/holster; its other clips are authored. */
-export function buildEquipClips(
-  nodes: Pick<WeaponNodes, 'gripL'>,
-  def: ClipWeaponDef
-): Record<string, Clip> {
-  const hgP = nodes.gripL.pos;
-  const wrapFinger = nodes.gripL.finger ?? v3(0.82, 0.5, -0.28);
-  const wrapBack = nodes.gripL.back ?? v3(-0.5, 0.32, -0.8);
-  const drawT = def.drawTime;
-  const draw = new Clip('draw', drawT, {
-    weapon: [
-      { t: 0, p: v3(0.05, -0.3, 0.14), r: v3(-0.85, 0.5, 0.55) },
-      { t: 0.55 * drawT, p: v3(0.01, -0.03, 0.02), r: v3(-0.1, 0.06, 0.06), ease: 'out' },
-      { t: 0.78 * drawT, p: v3(-0.004, 0.008, -0.006), r: v3(0.04, -0.02, -0.02) },
-      { t: drawT, p: v3(0, 0, 0), r: v3(0, 0, 0), ease: 'out' },
-    ],
-    lhand: [
-      {
-        t: 0,
-        p: v3(hgP[0] - 0.02, hgP[1] - 0.09, hgP[2] + 0.06),
-        finger: wrapFinger,
-        back: wrapBack,
-        // Curl before approaching the rail; extended fingers crossed its backing.
-        pose: 'clamp',
-      },
-      { t: 0.6 * drawT, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap', ease: 'out' },
-      { t: drawT, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap' },
-    ],
-    events: [{ t: 0.995 * drawT, name: 'end' }],
-  });
-
-  const holT = def.holsterTime;
-  const holster = new Clip('holster', holT, {
-    weapon: [
-      { t: 0, p: v3(0, 0, 0), r: v3(0, 0, 0) },
-      { t: 0.25 * holT, p: v3(0.004, 0.014, -0.01), r: v3(0.08, -0.04, -0.05) },
-      { t: holT, p: v3(0.05, -0.32, 0.15), r: v3(-0.9, 0.55, 0.6), ease: 'out' },
-    ],
-    lhand: [
-      { t: 0, p: hgP, finger: wrapFinger, back: wrapBack, pose: 'wrap' },
-      {
-        t: holT,
-        p: v3(hgP[0] - 0.02, hgP[1] - 0.1, hgP[2] + 0.07),
-        finger: wrapFinger,
-        back: wrapBack,
-        pose: 'open',
-        ease: 'out',
-      },
-    ],
-    events: [{ t: 0.995 * holT, name: 'end' }],
-  });
-
-  return { draw, holster };
 }
