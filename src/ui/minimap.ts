@@ -192,15 +192,15 @@ export class Minimap {
     const STEP = 0.5;
     g.fillStyle = STREET;
     for (let lz = -64; lz < 54; lz += STEP) {
-      let run = -1;
+      let run: number | null = null;
       for (let lx = -44; lx <= 44 + STEP; lx += STEP) {
         const cxw = ox + lx * xx + (lz + STEP * 0.5) * zx;
         const czw = oz + lx * xz + (lz + STEP * 0.5) * zz;
         const open = lx <= 44 && world.isOpen(cxw, czw, 0);
-        if (open && run < 0) run = lx;
-        else if (!open && run >= 0) {
+        if (open && run === null) run = lx;
+        else if (!open && run !== null) {
           g.fillRect(run, lz, lx - run, STEP * 1.16);
-          run = -1;
+          run = null;
         }
       }
     }
