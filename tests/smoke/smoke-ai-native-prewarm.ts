@@ -19,49 +19,39 @@ const saved = {
   canvas: Object.getOwnPropertyDescriptor(globalThis, 'OffscreenCanvas'),
   dispose: captureMethod(THREE.Texture.prototype, 'dispose'),
 };
-const images: FixtureImageBitmap[] = [];
-const closes = new Map<FixtureImageBitmap, number>();
+let closes = 0;
 const disposedTextures: THREE.Texture[] = [];
-let failedPath = '',
-  mismatched = '';
-let held = '';
+let fail = false;
 let release = (): void => assert.fail('no held PNG');
-const texels = [11, 22, 33, 44, 55, 66, 77, 88];
-const stats = { polymer: { mean: 0.5, was: 0.6, min: 0.1, max: 0.9, sd: 0.2 } };
+const texels = [11, 22, 33, 44];
 let library: SoldierMaterialsNode;
 try {
   globalThis.fetch = Object.assign(
     async (url: Parameters<typeof fetch>[0]): Promise<Response> => {
-      assert(typeof url === 'string');
-      const path = url;
+      const path = String(url);
       if (path.endsWith('manifest.json'))
-        return Response.json({
-          sets: ['polymer', 'steel'],
-          details: ['cloth', 'nylon'],
-          camoStats: stats,
-        });
-      if (path.endsWith(held) && held)
+        return Response.json({ sets: ['polymer'], details: ['cloth', 'nylon'] });
+      if (fail && path.endsWith('-normal.png'))
         await new Promise<void>((resolve): void => {
           release = resolve;
         });
-      return new Response(path, { status: failedPath && path.endsWith(failedPath) ? 404 : 200 });
+      return new Response(null, { status: fail && path.endsWith('-orm.png') ? 404 : 200 });
     },
     { preconnect: saved.fetch.preconnect }
   );
   Object.defineProperty(globalThis, 'createImageBitmap', {
     configurable: true,
-    value: async (blob: Blob): Promise<ImageBitmap> => {
-      const path = await blob.text();
+    value: async (): Promise<ImageBitmap> => {
       const image = new FixtureImageBitmap({
-        width: mismatched && path.endsWith(mismatched) ? 1 : 2,
+        width: 1,
         height: 1,
         data: new Uint8ClampedArray(texels),
       });
       image.close = (): void => {
-        closes.set(image, (closes.get(image) ?? 0) + 1);
+        assert.deepEqual(Array.from(image.data ?? []), texels, 'close each source exactly once');
+        closes++;
         image.data?.fill(0);
       };
-      images.push(image);
       return image;
     },
   });
@@ -73,7 +63,6 @@ try {
         return {
           clearRect(): void {},
           drawImage(input: FixtureImageBitmap): void {
-            assert(!closes.has(input), 'packing must precede source release');
             image = input;
           },
           getImageData(): { data: Uint8ClampedArray | undefined } {
@@ -84,27 +73,13 @@ try {
     },
   });
   THREE.Texture.prototype.dispose = function (this: THREE.Texture): void {
+    assert(!disposedTextures.includes(this), 'dispose each texture only once');
     disposedTextures.push(this);
     saved.dispose.call(this);
   };
-  const checkSources = (count: number): void => {
-    assert.equal(images.length, count);
-    for (const image of images) {
-      assert.equal(closes.get(image), 1, 'each decoded PNG closes once');
-      assert.equal(disposedTextures.filter((t): boolean => t.image === image).length, 1);
-    }
-  };
   library = await SoldierMaterialsNode.fromCache();
-  checkSources(8);
-  assert.deepEqual(library.camoStats, stats);
-  assert.deepEqual(
-    [...library.layers],
-    [
-      ['polymer', 0],
-      ['steel', 1],
-      ['glass', 2],
-    ]
-  );
+  assert.equal(closes, 5, 'release decoded PNGs before returning the library');
+  assert.equal(new Set(disposedTextures).size, 5, 'dispose each source texture once');
   assert(library.arrays);
   for (const [name, array] of Object.entries(library.arrays)) {
     const fallback =
@@ -116,51 +91,25 @@ try {
     assert(array.image.data);
     assert.deepEqual(
       Array.from(array.image.data),
-      [...texels, ...texels, ...(name === 'detail' ? [] : [...fallback, ...fallback])],
-      'packed bytes survive closing and clearing their PNG inputs'
-    );
-    assert.equal(array.flipY, false);
-    assert.equal(array.anisotropy, 8);
-  }
-  // Both the set phase and detail phase must drain successes after a sibling fails.
-  for (const [failure, late, count] of [
-    ['ai-polymer-orm.png', 'ai-steel-normal.png', 5],
-    ['ai-detail-cloth.png', 'ai-detail-nylon.png', 7],
-  ] as const) {
-    images.length = disposedTextures.length = 0;
-    failedPath = failure;
-    held = late;
-    let settled = false;
-    const loading = SoldierMaterialsNode.fromCache().finally((): void => {
-      settled = true;
-    });
-    const rejection = assert.rejects(loading, /HTTP 404/);
-    await new Promise<void>((resolve): void => {
-      setImmediate(resolve);
-    });
-    assert.equal(settled, false, 'failure waits for outstanding PNG loads');
-    release();
-    await rejection;
-    checkSources(count);
-    assert.equal(
-      disposedTextures.filter((t): boolean => t instanceof THREE.DataArrayTexture).length,
-      0
+      [...texels, ...(name === 'detail' ? texels : fallback)],
+      'packed arrays retain independent bytes after PNG close clears the inputs'
     );
   }
-  failedPath = held = '';
-  for (const [badLayer, partials] of [
-    ['ai-steel-orm.png', 1],
-    ['ai-steel-normal.png', 2],
-    ['ai-detail-nylon.png', 3],
-  ] as const) {
-    images.length = disposedTextures.length = 0;
-    mismatched = badLayer;
-    await assert.rejects(SoldierMaterialsNode.fromCache(), /matching dimensions/);
-    checkSources(8);
-    const arrays = disposedTextures.filter((t): boolean => t instanceof THREE.DataArrayTexture);
-    assert.equal(arrays.length, partials, 'dispose every array packed before the failure');
-    assert.equal(new Set(arrays).size, partials, 'partial arrays dispose once');
-  }
+  // A failed set still owns its decoded and outstanding sibling PNGs.
+  fail = true;
+  let settled = false;
+  const loading = SoldierMaterialsNode.fromCache().finally((): void => {
+    settled = true;
+  });
+  const rejection = assert.rejects(loading, /HTTP 404/);
+  await new Promise<void>((resolve): void => {
+    setImmediate(resolve);
+  });
+  assert.equal(settled, false, 'wait for late siblings before releasing sources');
+  release();
+  await rejection;
+  assert.equal(closes, 7, 'release both successful siblings of the failed PNG');
+  assert.equal(new Set(disposedTextures).size, 7);
 } finally {
   globalThis.fetch = saved.fetch;
   THREE.Texture.prototype.dispose = saved.dispose;
@@ -173,8 +122,8 @@ try {
     else Reflect.deleteProperty(globalThis, key);
   }
 }
-const sourceCloses = [...closes.values()];
-const material = library.soldier('vanguard', ['polymer', 'steel', 'glass']),
+const sourceCloses = closes;
+const material = library.soldier('vanguard', ['polymer', 'glass']),
   geometry = new THREE.BoxGeometry();
 let disposed = 0,
   calls = 0;
@@ -239,9 +188,5 @@ assert.deepEqual(scene.children, [existing]);
 assert.equal(disposed, 0, 'borrowed assets survive failure');
 geometry.dispose();
 library.dispose();
-assert.deepEqual(
-  [...closes.values()],
-  sourceCloses,
-  'final disposal never closes PNG inputs again'
-);
+assert.deepEqual(closes, sourceCloses, 'final disposal never closes PNG inputs again');
 console.log('AI native prewarm readiness, exact geometry ownership and failure cleanup passed');

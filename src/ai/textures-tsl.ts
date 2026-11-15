@@ -151,16 +151,10 @@ export class SoldierMaterialsNode {
     if (!response.ok) throw new Error(`[ai] proc manifest HTTP ${response.status}`);
     const data: unknown = await response.json();
     const manifest = parseManifest(data);
-    const sources: Texture[] = [];
     const pending: Promise<Texture>[] = [];
     const arrays: DataArrayTexture[] = [];
     const load = (name: string, srgb: boolean): Promise<Texture> => {
-      const promise = loadPngTexture(`${base}/${name}.png`, { srgb, aniso: anisotropy }).then(
-        (texture): Texture => {
-          sources.push(texture);
-          return texture;
-        }
-      );
+      const promise = loadPngTexture(`${base}/${name}.png`, { srgb, aniso: anisotropy });
       pending.push(promise);
       return promise;
     };
@@ -211,10 +205,10 @@ export class SoldierMaterialsNode {
     } finally {
       // Packing copies pixels. Drain late successes before releasing every input,
       // including siblings that were never installed in a complete texture set.
-      await Promise.allSettled(pending);
-      for (const texture of sources) {
-        texture.dispose();
-        const image = texture.image;
+      for (const result of await Promise.allSettled(pending)) {
+        if (result.status !== 'fulfilled') continue;
+        result.value.dispose();
+        const image = result.value.image;
         if (isClosable(image)) image.close();
       }
     }
