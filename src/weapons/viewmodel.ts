@@ -1383,7 +1383,7 @@ export class Viewmodel {
   muzzleWorld(out: THREE.Vector3): THREE.Vector3 {
     const w = this.active;
     if (!w) return out.set(0, 0, 0);
-    w.group.updateMatrixWorld();
+    // getWorldPosition refreshes only the socket's ancestor chain, not the whole rig.
     return w.muzzleSocket.getWorldPosition(out);
   }
 
