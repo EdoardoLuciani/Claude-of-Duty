@@ -49,7 +49,14 @@ export function mountableWeapon(
   | 'mountedOptic'
   | 'sight'
 > {
-  const scene = datums('IRON_sights', 'MUZZLE_device', 'MOUNT_optic', 'MOUNT_rail', 'MOUNT_muzzle');
+  const scene = datums(
+    'IRON_sights',
+    'MUZZLE_device',
+    'MOUNT_optic',
+    'MOUNT_rail',
+    'MOUNT_muzzle',
+    'SOCKET_muzzle'
+  );
   const model = fixture<WeaponModelRecord>({
     scene,
     root: scene,
@@ -64,7 +71,7 @@ export function mountableWeapon(
     attachmentGroup: new THREE.Group(),
     railGroup: new THREE.Group(),
     muzzleGroup: new THREE.Group(),
-    muzzleSocket: null,
+    muzzleSocket: requiredNode(scene, 'SOCKET_muzzle'),
     laserEmitter: null,
     mountedOptic: null,
     sight: new THREE.Vector3(),

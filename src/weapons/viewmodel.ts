@@ -14,6 +14,7 @@ import {
   type AttachmentAssets,
 } from './attachments.ts';
 import { createWeaponAnimation } from './authored-animation.ts';
+import { requiredNode } from './authored-model.ts';
 import { loadBandage } from './bandage-mesh.ts';
 import {
   BANDAGE_PATH,
@@ -530,7 +531,7 @@ export class Viewmodel {
       attachmentGroup: new THREE.Group(),
       railGroup: new THREE.Group(),
       muzzleGroup: new THREE.Group(),
-      muzzleSocket: null,
+      muzzleSocket: requiredNode(model.root, 'SOCKET_muzzle'),
       laserEmitter: null,
       mountedOptic: null,
       def,
@@ -1382,15 +1383,15 @@ export class Viewmodel {
   muzzleWorld(out: THREE.Vector3): THREE.Vector3 {
     const w = this.active;
     if (!w) return out.set(0, 0, 0);
-    w.group.updateMatrixWorld();
-    return (w.muzzleSocket ?? requiredSocket(w.model.root, 'SOCKET_muzzle')).getWorldPosition(out);
+    // getWorldPosition refreshes only the socket's ancestor chain, not the whole rig.
+    return w.muzzleSocket.getWorldPosition(out);
   }
 
   ejectWorld(out: THREE.Vector3): THREE.Vector3 {
     const w = this.active;
     if (!w) return out.set(0, 0, 0);
     w.group.updateMatrixWorld();
-    return requiredSocket(w.model.root, 'SOCKET_ejection').getWorldPosition(out);
+    return requiredNode(w.model.root, 'SOCKET_ejection').getWorldPosition(out);
   }
 
   ejectVelocity(out: THREE.Vector3, speed = 2.6): THREE.Vector3 {
@@ -1461,10 +1462,4 @@ function isRadioScreen(
     screen.geometry instanceof THREE.BufferGeometry &&
     screen.material instanceof MeshPhysicalNodeMaterial
   );
-}
-
-function requiredSocket(root: THREE.Object3D, name: string): THREE.Object3D {
-  const socket = root.getObjectByName(name);
-  if (!socket) throw new Error(`[weapons] missing ${name}`);
-  return socket;
 }

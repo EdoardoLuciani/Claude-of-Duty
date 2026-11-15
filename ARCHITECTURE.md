@@ -315,8 +315,9 @@ stats. Frame-time reticle, ADS, laser and fire consumers allocate nothing.
 Optics define `MOUNT_base` and `SOCKET_sight`; rigid attachments define
 `SOCKET_mount` plus `SOCKET_laser` or `SOCKET_muzzle`, in metres, -Z forward,
 +Y up, unit scale. Catalog `OpticData` owns magnification, sensitivity, reticle,
-glass and scope presentation, not weapon class. `viewmodel.muzzleWorld()` reads
-the installed exit for ballistics/FX; ejection stays at `SOCKET_ejection`.
+glass and scope presentation, not weapon class. Mounting resolves the active bore
+exit (a can's endcap, else the weapon's `SOCKET_muzzle`) once; `viewmodel.muzzleWorld()`
+reads it for ballistics/FX; ejection stays at `SOCKET_ejection`.
 Prewarm covers every loaded attachment and both iron/muzzle base states.
 
 Per-weapon datums/clearances live in `assets/weapons/*/README.md` and

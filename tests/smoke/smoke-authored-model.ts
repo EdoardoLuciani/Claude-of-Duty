@@ -133,7 +133,10 @@ assert.throws(
   ironsRemoved.name = 'IRON_sights_removed';
   const baseDevice = new THREE.Group();
   baseDevice.name = 'MUZZLE_device';
-  root.add(irons, ironsRemoved, baseDevice);
+  const baseSocket = new THREE.Object3D();
+  baseSocket.name = 'SOCKET_muzzle';
+  baseSocket.position.set(0, 0.075, -0.5);
+  root.add(irons, ironsRemoved, baseDevice, baseSocket);
   const assetScene = datums('MOUNT_base', 'SOCKET_sight');
   const sight = requiredNode(assetScene, 'SOCKET_sight');
   sight.position.set(0, 0.0425072, -0.018);
@@ -168,7 +171,7 @@ assert.throws(
     // Mounting while the authored root is posed must not bake its current pose.
     root.rotation.x = i * 0.1;
     configureWeaponAttachments(entry, config, optics);
-    assert.equal(root.children.length, 4, 'empty slot groups stay detached');
+    assert.equal(root.children.length, 5, 'empty slot groups stay detached');
     assert.equal(entry.attachmentGroup.parent, socket, 'instance follows its authored mount');
     assert.equal(irons.visible, false, 'a mounted optic replaces the removable irons');
     assert(ironsRemoved.visible);
@@ -453,9 +456,8 @@ assert.throws(
   muzzleMount.name = 'MOUNT_muzzle';
   muzzleMount.position.set(0, 0.075, -0.44);
   muzzleMount.rotation.y = 0.13;
-  const baseSocket = new THREE.Object3D();
-  baseSocket.name = 'SOCKET_muzzle';
-  baseSocket.position.set(0, 0.075, -0.5);
+  // Re-append the base socket after MOUNT_muzzle, as authored rigs order them, so a
+  // stale can endcap (same name, under the mount) would be found first.
   root.add(muzzleMount, baseSocket);
   const canScene = datums('SOCKET_mount', 'SOCKET_muzzle');
   const canExit = requiredNode(canScene, 'SOCKET_muzzle');
@@ -488,14 +490,9 @@ assert.throws(
     assert.equal(installed.parent, null);
     assert.equal(installed.children.length, 0);
     assert.equal(muzzleMount.children.length, 0);
-    assert.equal(entry.muzzleSocket, null);
+    assert.equal(entry.muzzleSocket, baseSocket, 'removal restores the weapon bore exit');
     assert.equal(entry.def.suppressed, false, 'removal restores the unsuppressed M4');
     assert(baseDevice.visible);
-    assert(
-      viewmodel
-        .muzzleWorld(new THREE.Vector3())
-        .distanceTo(baseSocket.getWorldPosition(new THREE.Vector3())) < 1e-10
-    );
     assert.equal(canDisposed, 0, 'removal never disposes borrowed geometry');
   }
   // One suppressor id mounts each weapon's own calibre can. Permanent muzzle

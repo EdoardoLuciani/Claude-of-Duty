@@ -365,7 +365,9 @@ export function configureWeaponAttachments(
   entry.railGroup = mounted.railGroup;
   entry.muzzleGroup = mounted.muzzleGroup;
   entry.laserEmitter = mounted.laserEmitter;
-  entry.muzzleSocket = mounted.muzzleSocket;
+  // Resolve the bore exit once per change, after the old can (whose endcap shares the
+  // weapon socket's name and precedes it under MOUNT_muzzle) is released.
+  entry.muzzleSocket = mounted.muzzleSocket ?? requiredNode(entry.model.root, 'SOCKET_muzzle');
   entry.mountedOptic = mounted.mountedOptic;
   entry.attachments = Object.freeze({ ...config });
   entry.sight.copy(mounted.sight);
