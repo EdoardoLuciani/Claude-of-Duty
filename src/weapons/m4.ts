@@ -43,11 +43,8 @@ export function makeM4Model(gltf: GLTF): M4Model {
       eject: point('SOCKET_ejection'),
       sight: point('SOCKET_sight'),
       ejectDir: [0.86, 0.44, 0.26],
-      gripR: handReference.grips.right,
-      gripL: handReference.grips.left,
       magSeat: { pos: [0, 0.054, -0.078], rot: [0, 0, 0] },
       triggerPivot: { pos: point('trigger'), rot: [0, 0, 0] },
-      handguard: { axis: [0, 0.075, 0], dir: [0, 0, 1], r: 0.0286, z0: -0.133, z1: -0.44415 },
     },
     shell: { caseLen: 0.0447, rimR: 0.00478 },
     magSize: { len: 0.16 },
@@ -71,7 +68,6 @@ type M4Model = AuthoredModelData<
   'rifle',
   AuthoredNodes & {
     triggerPivot: { pos: [number, number, number]; rot: number[] };
-    handguard: { axis: number[]; dir: number[]; r: number; z0: number; z1: number };
   }
 > & {
   label: string;

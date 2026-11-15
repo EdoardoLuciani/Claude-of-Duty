@@ -60,8 +60,6 @@ export function makeM590Model(gltf: GLTF): M590Model {
       eject: point('SOCKET_ejection'),
       sight: point('SOCKET_sight'),
       ejectDir: manifest.ejectionDirection,
-      gripR: handReference.grips.right,
-      gripL: handReference.grips.left,
       // Legacy below-mouth helper, not a detachable magazine or hull control.
       magSeat: { pos: [0, -0.039, -0.068], rot: [1.2, 0, 0] },
     },

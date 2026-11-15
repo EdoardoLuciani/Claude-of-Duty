@@ -69,8 +69,6 @@ export function makeMCXModel(gltf: GLTF): MCXModel {
       eject: point('SOCKET_ejection'),
       sight: point('SOCKET_sight'),
       ejectDir: [1, 0.35, 0.35] as [number, number, number],
-      gripR: handReference.grips.right,
-      gripL: handReference.grips.left,
       magSeat: { pos: point('SOCKET_magazine'), rot: [0, 0, 0] },
     },
     shell: { caseLen: 0.0348, rimR: 0.0048 },

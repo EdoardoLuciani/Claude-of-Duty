@@ -87,7 +87,5 @@ export interface AuthoredNodes {
   eject: [number, number, number];
   sight: [number, number, number];
   ejectDir: number[];
-  gripR: { pos: number[]; finger: number[]; back: number[] };
-  gripL: { pos: number[]; finger: number[]; back: number[] };
   magSeat: { pos: number[]; rot: number[] };
 }

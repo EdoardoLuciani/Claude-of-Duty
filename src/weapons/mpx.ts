@@ -90,8 +90,6 @@ export function makeMPXModel(gltf: GLTF): MPXModel {
       eject: point('SOCKET_ejection'),
       sight: point('SOCKET_sight'),
       ejectDir: [0.82, 0.52, 0.24],
-      gripR: handReference.grips.right,
-      gripL: handReference.grips.left,
       magSeat: { pos: point('SOCKET_magazine'), rot: [0, 0, 0] },
     },
     shell: { caseLen: 0.0192, rimR: 0.00478 },
