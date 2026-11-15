@@ -3,6 +3,7 @@
  * Deterministic native-WebGPU screenshot harness.
  * Usage: bun tools/capture.ts --shot=hero --out=/tmp/hero.png
  *        bun tools/capture.ts --reload --out=/tmp/reload
+ *        bun tools/capture.ts --weapon=mcx --clip=reloadEmpty --at=2.5 --out=/tmp/mcx-charge.png
  *        bun tools/capture.ts --weapon=pistol --muzzle=suppressor --shot=ads --out=/tmp/p320.png
  */
 import { mkdirSync } from 'node:fs';
@@ -17,14 +18,22 @@ import {
   parseArgs,
   stopDevServer,
 } from './lib/browser-harness.ts';
-import { captureNative } from './lib/native-render.ts';
+import { advanceClipTo, captureNative } from './lib/native-render.ts';
 
 const args = parseArgs();
 const PORT = Number(args.port ?? 5173);
 const W = Number(args.w ?? 1920);
 const H = Number(args.h ?? 1080);
 const RELOAD = !!args.reload;
-const SHOT = RELOAD ? 'weapon' : String(args.shot ?? 'default');
+const CLIP = typeof args.clip === 'string' ? args.clip : undefined;
+const AT = Number(args.at);
+if (args.clip !== undefined || args.at !== undefined) {
+  if (!CLIP || typeof args.at !== 'string' || !args.at.trim() || !Number.isFinite(AT) || AT < 0)
+    throw new Error('Use --clip=<gesture> with --at=<non-negative seconds>');
+  if (RELOAD || args.list)
+    throw new Error('--clip/--at cannot be combined with --reload or --list');
+}
+const SHOT = RELOAD ? 'weapon' : String(args.shot ?? (CLIP ? 'weapon' : 'default'));
 const OUT = resolve(String(args.out ?? (RELOAD ? 'shots/reload' : `shots/${SHOT}.png`)));
 const TIMEOUT = Number(args.timeout ?? 90000);
 // Let temporal effects, streaming and LOD settle before capture.
@@ -152,7 +161,14 @@ try {
           { id: WEAPON, shot: SHOT }
         );
       logs.push(`[shot] ${JSON.stringify(applied)}`);
-      if (RELOAD) {
+      if (CLIP) {
+        await page.evaluate(pump, SETTLE);
+        const clip = await page.evaluate(advanceClipTo, { name: CLIP, at: AT });
+        await page.evaluate(present, 2);
+        mkdirSync(dirname(OUT), { recursive: true });
+        await captureNative(page, OUT);
+        console.log(JSON.stringify({ ok: true, out: OUT, shot: SHOT, clip, w: W, h: H }, null, 2));
+      } else if (RELOAD) {
         await page.evaluate(pump, SETTLE);
         const started = await page.evaluate((): ReloadStart => {
           const e = window.__ENGINE__;

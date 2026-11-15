@@ -27,6 +27,27 @@ build/check commands, declared inputs, references and acceptance limits:
 Standalone attachments: [EXPS3-0](../../assets/attachments/eotech-exps3-0/README.md),
 [TOR Mini laser](../../assets/attachments/steiner-tor-mini/README.md).
 
+## Build timing and profiling
+
+`tools/build-assets.ts` reports each Blender invocation and gltfpack cook
+separately, including failures, in both the console and `.cache/assets/<id>.log`.
+The final `built in` line is the asset's total elapsed time. Concurrent asset
+workers overlap: adding their durations does not give whole-build wall time.
+
+To locate expensive functions inside Blender, use Python's built-in profiler
+on a scratch export (after generating the shared inputs required by that asset):
+
+```sh
+blender -b --python-exit-code 1 --python-expr \
+  "import cProfile, runpy, sys; script='tools/blender/m4/build.py'; sys.argv=[script, '--', '--output', '/tmp/m4-profile']; cProfile.run('runpy.run_path(script, run_name=\"__main__\")', '/tmp/m4.prof')"
+python -c "import pstats; pstats.Stats('/tmp/m4.prof').strip_dirs().sort_stats('cumulative').print_stats(25)"
+```
+
+Change the script and scratch paths for another asset. This profiles the Blender
+build, not the separate gltfpack cook. Profiling adds overhead; compare equivalent
+inputs and pool contention. Use the supported profiler rather than patching
+Blender operator classes, which may be immutable.
+
 ## Common Picatinny interface
 
 `picatinny.py` owns the nominal MIL-STD-1913 profile (1999 Figure 1 / Figure 2):

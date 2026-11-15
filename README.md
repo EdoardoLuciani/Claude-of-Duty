@@ -179,7 +179,15 @@ Tests are not final human visual acceptance; see each asset's remaining limits.
 ## Diagnostics
 
 - `bun tools/capture.ts`: named gameplay screenshot. Use final-output captures,
-  not old intermediate-target PNGs, for appearance review.
+  not old intermediate-target PNGs, for appearance review. For a specific weapon
+  gesture, use e.g. `--weapon=mcx --clip=reloadEmpty --at=2.5 --out=/tmp/mcx-charge.png`.
+  This poses the viewmodel clip directly, not a gameplay reload/ammunition test;
+  gesture names are the playable aliases (`reloadEmpty`, `inspect`, `draw`, etc.).
+  It steps the real clip clock to the first sampled pose at/after `--at`, reports
+  requested/actual seconds and stepped frames, and fails if the clip stops,
+  changes or its clock stalls. The target must be inside the clip; `--at=0`
+  captures its first stepped pose. Grenade, radio and bandage poses are rejected;
+  use a weapon shot instead. Do not combine with `--reload` or `--list`.
 - `bun tools/profile.ts`: sustained living-combat frame/CPU percentiles and hitches.
   GPU timestamps are unavailable; node-builder activity is not GPU compilation time.
   Compare matched runs only; there is no cross-hardware frame-time threshold.
