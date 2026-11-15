@@ -30,7 +30,7 @@ Use `--output /tmp/p320-review --render --quick` for scratch source builds.
 The registered cook is lossy; inspect lettering, highlights, reloads and idle
 before further simplification. KTX2/meshopt decoders stay local; RGBA8 fallback
 does not retain compressed-texture memory savings. Use compatible AgX OCIO,
-never exposure compensation. Historical measurements/exceptions remain in Git.
+never exposure compensation.
 
 ## Attachment contract (#666)
 
@@ -70,16 +70,12 @@ See the [shared laser mount contract](../../attachments/steiner-tor-mini/README.
 The P320's `suppressor` fit names the `suppressor9mm` can model: the original
 [compact booster can](../../attachments/compact-9mm/README.md), not the shared
 SRD762Ti rifle exterior.
-`MOUNT_muzzle` now uses the shared attachment frame (the former future-datum
-contact-normal rotation was not a suppressor orientation). Its rear seat advances over the exposed barrel thread at native +Y=.132 m,
-not the crown-tip base exit at .1445 m. It remains under the
-**barrel bone**, never the frame or slide. `MUZZLE_device` owns the removable
-thread-protector sleeve; `MUZZLE_device_removed` owns the exposed helical thread.
-Both are ordinary meshes under the same animated barrel and share the existing
-atlas. The barrel tube/crown stays in the mechanical skin. The narrow thread ribbon
-retains its authored geometry: bevel decimation had enlarged its crest and
-would intersect the booster receiving bore. Common mount/remove
-logic switches the two states; no motion, hand tuning, stats or audio banks change.
+The muzzle seat follows the tilting barrel, never the frame or slide.
+`MUZZLE_device` owns the removable thread protector; `MUZZLE_device_removed`
+owns the exposed helical thread. Both are ordinary meshes under the barrel bone
+and share its atlas; the barrel tube/crown stays in the mechanical skin.
+Preserve the thread geometry: bevel decimation can enlarge its crest into the
+booster receiving bore. The common solver switches the two states.
 
 The can is 135 mm long and at most 28.4 mm across. In loaded rest its top is
 51.2 mm above the rig origin, leaving **2.5 mm below** the fixed SIGLITE 53.7 mm

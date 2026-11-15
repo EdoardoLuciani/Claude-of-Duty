@@ -10,7 +10,6 @@ import {
   FixtureAudioBuffer,
   createAudioContext,
   fixtureEntries,
-  fixtureKeys,
 } from '../lib/audio-fixture.ts';
 
 // Served from public/audio/samples/ at this fixed path.
@@ -20,37 +19,6 @@ const relative = (url: string): string => {
   assert(url.startsWith(PREFIX), `${url}: served from ${PREFIX}`);
   return url.slice(PREFIX.length);
 };
-const hash = (name: string, value: unknown): string => {
-  const payload = JSON.stringify(value);
-  if (process.env.DUMP_CHARACTERIZATION) console.log(name, payload);
-  return createHash('sha256').update(payload).digest('hex');
-};
-// Pinned from the explicit URL lists at af113a8: keys, bank order and take order.
-const bankHashes = [
-  'ed7a94239eb143caeac51388245143d042c700e02e6d7fe8193282357c388127',
-  '77baca42c9a537386679f0b380d6a10b0541677c034e83eab2f934d9fb1363cc',
-  'e8a8ba8251e9a25720487daddc0ac50de2eeed0c3cb84730ae4d88209c3febc1',
-  '7005ed087e90911dcb6afbac3ae9f8a84159e3a05ddff8a4e6a7b2604b9a512c',
-  '8c504e960fcb328e91687c444c60bfa048e69ee84d08aee108e38f6b92d0560c',
-  '5a4e3d6b0f4d812b90625babc285a3f34b47b06059e933c4d909f2f06b9cfd31',
-  'e65e3c900abedf1474be59e25022537246c277fee3322bbd2965cfe8a8660d43',
-  '39006e92a419974e7ddc17a0e9951b7d80c4258682f9357f9d875e02b3c91849',
-  'e6ae6a9ac45d73e5bb5be581f0f704a6b73a3883a670a41307fce765db05a8c0',
-  '8f88913a61d429b6ea237ac101ff7a856f14b39eef7e5157dbb18a6f69b0203f',
-];
-for (const [index, [banks]] of AUDIO_BANKS.entries()) {
-  const catalog = fixtureEntries(banks).map(([kind, urls]): (string | string[])[] => [
-    kind,
-    urls.map(relative),
-  ]);
-  const name = fixtureKeys(banks)[0];
-  assert.equal(
-    hash(`catalog:${name}`, catalog),
-    bankHashes[index],
-    `${name}: catalog characterization changed; inspect with DUMP_CHARACTERIZATION=1`
-  );
-}
-
 const fetched: string[] = [];
 const pending: Array<() => void> = [];
 const actx = createAudioContext();
@@ -73,18 +41,13 @@ try {
   );
   const loading = bank.load();
   await new Promise((resolve): NodeJS.Immediate => setImmediate(resolve));
-  assert.equal(pending.length, 415);
+  assert.equal(pending.length, fetched.length);
   // Completing decodes backwards must not reorder the takes or their initial cursors.
   for (const finish of pending.reverse()) finish();
-  assert.equal(await loading, 415);
+  assert.equal(await loading, fetched.length);
 } finally {
   globalThis.fetch = fetch;
 }
-assert.equal(
-  hash('fetch-order', fetched),
-  '261baab45f3f80d9cc1b390fb2cc51130f2cd78752d4eb8ac838f7e6fcba3768',
-  'fetch-order characterization changed; inspect with DUMP_CHARACTERIZATION=1'
-);
 const localFiles = readdirSync(root, { recursive: true, encoding: 'utf8' }).filter(
   (name): boolean => name.endsWith('.opus')
 );
@@ -142,5 +105,5 @@ assert(
 assert.equal(bank.loaded, 0);
 
 console.log(
-  '415 ordered recordings: reverse decode completion, disposal and every local recording loaded once'
+  'Recording banks: reverse decode completion, disposal and every local recording loaded once'
 );

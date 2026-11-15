@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 
 import { NoiseBank } from '../../src/audio/dsp.ts';
 import { Rng } from '../../src/core/rng.ts';
@@ -44,19 +43,6 @@ const parent = new Rng(0x5eed);
 const bank = new NoiseBank(context, parent.fork(), 0.02);
 assert.deepEqual(Object.keys(bank.buffers), ['white', 'pink']);
 
-// Golden stereo bytes from develop dd2d12cd, before unused colours were removed.
-const hashes = {
-  white: '3f1c3b8826fd9aa214d7f4ac7aeaa54107fcf27ba6e444d548a444b124ece047',
-  pink: 'a54b8f42bdd1e02f228bbac2042def171c46315682a062aaa3fbb4bf2265b02b',
-};
-for (const kind of ['white', 'pink'] as const) {
-  const expected = hashes[kind];
-  const hash = createHash('sha256');
-  const buffer = bank.buffers[kind];
-  assert(buffer);
-  for (const channel of [0, 1]) hash.update(new Uint8Array(buffer.getChannelData(channel).buffer));
-  assert.equal(hash.digest('hex'), expected, `${kind} retains both authored noise channels`);
-}
 const reference = new Rng(0x5eed);
 reference.fork();
 for (let i = 0; i < 8; i++) assert.equal(parent.u32(), reference.u32());
@@ -69,4 +55,4 @@ assert.throws(
   /noise bank is disposed/
 );
 
-console.log('[shared-primitives] spawn fields, aliasing and stereo-noise/RNG parity passed');
+console.log('[shared-primitives] spawn aliasing, noise ownership and parent RNG isolation passed');

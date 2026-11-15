@@ -26,8 +26,7 @@ bun run models:cook -- mcx
 
 Use `-- --output /tmp/mcx-review` for scratch builds. Normal dev/build uses generated
 products at the canonical asset paths. World-magazine drops remain unavailable because the adapter lacks
-`magazineBody`; independent transfer geometry remains. Historical optimization
-measurements are in Git history, not evidence of an FPS improvement.
+`magazineBody`; independent transfer geometry remains.
 
 ## Blender-authored hands
 
@@ -65,7 +64,7 @@ collision certification or final human animation approval.
 
 The optional laser is enabled by `fits.rail.laser`. Its game-fit Picatinny adapter
 seats on the existing upper-right handguard chamfer, canted approximately 36.25°
-upward from the former vertical side seat. The backing, five teeth and screws
+upward from vertical. The backing, five teeth and screws
 move together; six actual-surface rays verify backing contact at both screw
 stations. The native check also preserves the iron sight line and checks the
 actual module/support hardware against mechanisms and both
@@ -85,12 +84,9 @@ See the [mount table, source sweep and limitations](../../attachments/steiner-to
 
 ## Iron-sight base and attachment fits (#662)
 
-The ACOG was extracted into `tools/blender/acog/` **before** removing its integrated
-assembly (see the [equivalence receipts](../../attachments/trijicon-acog/README.md)).
-No weapon build or generated MCX file is now needed for the shared ACOG.
-The base has no optic, glass, scope mask, chevron or suppressor. Its unsuppressed
-report uses the #668 MCX bank; installing/removing the can drives the effective
-`suppressed` flag without changing ammunition or handling tuning.
+The base has no optic, glass or suppressor. Standalone optics and the SRD762Ti
+use the shared [attachment contract](../../../ARCHITECTURE.md#models).
+Installing/removing the can changes the effective suppression state, not handling.
 
 The existing backup bases/hinges remain on the rail. `IRON_sights` contains a
 hinge-supported open rear aperture and deployed front post/protective ears;
@@ -114,12 +110,11 @@ The empty-reload glove approaches and leaves the outboard charging latch via a
 90 mm lowered clearance arc, rather than crossing the three shared optic bodies.
 Full latch contact, magazine transfer and mechanism/event times remain unchanged.
 
-The optic seat is 45 mm forward of the former integrated ACOG seat to clear the
-raised rear leaf. Each shared optic's physical mount contacts real rail teeth.
+Each shared optic's physical mount contacts real rail teeth ahead of the raised rear leaf.
 The base muzzle has an open throat and three prongs under `MUZZLE_device`; the
 entire device hides with the can installed. The 5/8-24 thread stays on the barrel.
 Bare exit is X=.317 m; mounted exit is X=.510 m, exactly at the shared endcap,
-not the legacy socket 2 mm ahead. No runtime attachment scaling or offsets.
+with no runtime attachment scaling or offsets.
 These are authored exterior game fits, not certified manufacturer hardware.
 
 `check.py` checks mechanisms, stock, magazines and native hand controls, plus

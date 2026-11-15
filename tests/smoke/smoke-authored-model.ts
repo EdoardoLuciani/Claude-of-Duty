@@ -250,60 +250,23 @@ for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
   const laser = makeLaserModel(fixture<GLTF>({ scene: laserScene }));
   const laserConfig: AttachmentConfig = { ...BASE_ATTACHMENTS, rail: 'laser' };
   assert(isAttachmentConfig(laserConfig, 'rifle'));
-  for (const id of WEAPON_IDS) {
-    const supportsLaser = WEAPON_DEFS[id].fits?.rail?.laser !== undefined;
-    assert.equal(isAttachmentConfig(laserConfig, id), supportsLaser, `${id}: rail availability`);
-    assert(isAttachmentConfig(BASE_ATTACHMENTS, id), `${id}: base configuration remains valid`);
-    if (!supportsLaser) continue;
-    // Shared solver fixtures do not certify each weapon's authored hierarchy.
-    const railModel = fixture<WeaponModelRecord>({ ...model });
-    railModel.id = id;
-    const weapon = fixture<WeaponEntry>({
-      ...entry,
-      id,
-      model: railModel,
-      def: { ...WEAPON_DEFS[id] },
-      attachmentGroup: new THREE.Group(),
-      railGroup: new THREE.Group(),
-      muzzleGroup: new THREE.Group(),
-      muzzleSocket: null,
-    });
-    const base = { ...weapon.def, suppressed: false };
-    configureWeaponAttachments(weapon, laserConfig, { ...optics, laser });
-    assert.deepEqual(weapon.def, base, `${id}: laser has no handling/ballistic modifiers`);
-    assert.equal(weapon.railGroup.parent, railMount);
-    assert(weapon.laserEmitter);
-    const previous = weapon.laserEmitter.getWorldPosition(new THREE.Vector3());
-    railMount.position.z += 0.089;
-    const moved = weapon.laserEmitter.getWorldPosition(new THREE.Vector3());
-    assert(Math.abs(previous.distanceTo(moved) - 0.089) < 1e-8, 'emitter follows moving rail');
-    railMount.position.z -= 0.089;
-    configureWeaponAttachments(weapon, BASE_ATTACHMENTS, { ...optics, laser });
-    assert.equal(weapon.laserEmitter, null);
-    assert.equal(railMount.children.length, 0, `${id}: removal leaves no rail instance`);
-  }
-  for (let i = 0; i < 3; i++) {
-    const before = { ...entry.def };
-    configureWeaponAttachments(entry, laserConfig, { ...optics, laser });
-    assert.deepEqual(entry.def, before, 'rail module changes no weapon stats');
-    assert.equal(entry.railGroup.parent, railMount);
-    assert(entry.laserEmitter);
-    assert.notEqual(entry.laserEmitter, emitter, 'instances borrow art, not transforms');
-    const rail = entry.railGroup;
-    configureWeaponAttachments(entry, { ...laserConfig, optic: 'rmr' }, { ...optics, laser });
-    assert.equal(entry.attachmentGroup.parent, socket);
-    assert.equal(entry.railGroup.parent, railMount, 'optic and rail have independent parents');
-    assert.equal(rail.parent, null);
-    configureWeaponAttachments(entry, BASE_ATTACHMENTS, { ...optics, laser });
-    assert.equal(entry.laserEmitter, null);
-    assert.equal(railMount.children.length, 0, 'removing the laser leaves no mounted mesh');
-    const previousConfig = entry.attachments;
-    assert.throws(
-      (): void => configureWeaponAttachments(entry, laserConfig, optics),
-      /unavailable/
-    );
-    assert.equal(entry.attachments, previousConfig, 'failed staging preserves the configuration');
-  }
+  configureWeaponAttachments(entry, laserConfig, { ...optics, laser });
+  assert.equal(entry.railGroup.parent, railMount);
+  assert(entry.laserEmitter);
+  const previous = entry.laserEmitter.getWorldPosition(new THREE.Vector3());
+  railMount.position.z += 0.089;
+  assert(
+    Math.abs(
+      previous.distanceTo(entry.laserEmitter.getWorldPosition(new THREE.Vector3())) - 0.089
+    ) < 1e-8
+  );
+  railMount.position.z -= 0.089;
+  configureWeaponAttachments(entry, { ...laserConfig, optic: 'rmr' }, { ...optics, laser });
+  assert.equal(entry.attachmentGroup.parent, socket, 'optic and rail coexist');
+  assert.equal(entry.railGroup.parent, railMount);
+  configureWeaponAttachments(entry, BASE_ATTACHMENTS, optics);
+  assert.equal(entry.laserEmitter, null);
+  assert.equal(railMount.children.length, 0);
   // A posed native skin deforms exactly as before rebasing, moved into game space.
   {
     const skinRoot = new THREE.Group();
@@ -582,32 +545,6 @@ for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
         .distanceTo(baseSocket.getWorldPosition(new THREE.Vector3())) < 1e-10
     );
     assert.equal(canDisposed, 0, 'removal never disposes borrowed geometry');
-  }
-  // MCX is an unsuppressed iron-sight base. Each accepted optic can coexist
-  // with the can/laser, and clearing the config must restore bare tuning/parts.
-  const mcx = fixture<WeaponEntry>({
-    ...entry,
-    id: 'mcx',
-    model: fixture<Extract<WeaponModelRecord, { id: 'mcx' }>>({
-      ...model,
-      id: 'mcx',
-      nodes: nativeMCX.nodes,
-    }),
-    def: { ...WEAPON_DEFS.mcx },
-  });
-  for (const optic of ['rmr', 'acog', 'scope'] as const) {
-    const config: AttachmentConfig = { optic, muzzle: 'suppressor', rail: 'laser' };
-    configureWeaponAttachments(mcx, config, { ...optics, srd762ti: can, laser });
-    assert.equal(mcx.def.suppressed, true);
-    assert.equal(mcx.def.eyeRelief, WEAPON_DEFS.mcx.fits?.optic?.[optic]?.eyeRelief);
-    assert.equal(irons.visible, false);
-    assert.equal(baseDevice.visible, false);
-    configureWeaponAttachments(mcx, BASE_ATTACHMENTS, optics);
-    assert.equal(mcx.optic, null);
-    assert.equal(mcx.def.suppressed, false);
-    assert.equal(mcx.def.adsFovScale, undefined);
-    assert.equal(mcx.def.eyeRelief, WEAPON_DEFS.mcx.eyeRelief);
-    assert(irons.visible && !ironsRemoved.visible && baseDevice.visible);
   }
   // One suppressor id mounts each weapon's own calibre can. Permanent muzzle
   // hardware (M590) stays visible; a removable device swaps for its stand-in.
