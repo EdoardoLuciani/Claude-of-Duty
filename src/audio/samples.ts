@@ -108,16 +108,22 @@ export class WeaponSampleBank {
   reloadBuffers: Partial<Record<ReloadKind, AudioBuffer[]>> = {};
   reloadIndices: Partial<Record<ReloadKind, number>> = {};
   loaded: number = 0;
+  private _disposed: boolean = false;
 
   constructor(actx: BaseAudioContext) {
     this.actx = actx;
   }
 
+  private _assertAlive(): void {
+    if (this._disposed) throw new Error('[audio] sample bank disposed');
+  }
+
   async load(): Promise<number> {
+    this._assertAlive();
     const jobs = this._loadBank(URLS, this.buffers, this.indices, 0);
     jobs.push(
       this._loadBuffer(HEARTBEAT_URL).then((buffer): void => {
-        this.heartbeatBuffer = buffer;
+        if (!this._disposed) this.heartbeatBuffer = buffer;
       })
     );
     this.aircraftBuffers = new Array<AudioBuffer>(AIRCRAFT_URLS.length);
@@ -130,19 +136,24 @@ export class WeaponSampleBank {
     // Finish all decodes before start() tears down a failed bank.
     for (const result of await Promise.allSettled(jobs))
       if (result.status === 'rejected') throw result.reason;
+    this._assertAlive();
     return this.loaded;
   }
 
   async _loadBuffer(url: string): Promise<AudioBuffer> {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`[audio] failed to load ${url}: HTTP ${response.status}`);
-    const buffer = await this.actx.decodeAudioData(await response.arrayBuffer());
+    const data = await response.arrayBuffer();
+    this._assertAlive();
+    const buffer = await this.actx.decodeAudioData(data);
+    this._assertAlive();
     this.loaded++;
     return buffer;
   }
 
   private async _loadInto(buffers: AudioBuffer[], index: number, url: string): Promise<void> {
-    buffers[index] = await this._loadBuffer(url);
+    const buffer = await this._loadBuffer(url);
+    if (!this._disposed) buffers[index] = buffer;
   }
 
   private _loadBank<K extends string>(
@@ -505,6 +516,7 @@ export class WeaponSampleBank {
   }
 
   dispose(): void {
+    this._disposed = true;
     for (const buffers of Object.values(this.buffers)) buffers.length = 0;
     this.buffers = {};
     this.indices = {};

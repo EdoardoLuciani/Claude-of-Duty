@@ -942,7 +942,7 @@ for (const emission of [
   assert.equal(audioSystem._intelAlarm, null, type);
   assert.equal(audioSystem._intelOperating, false, type);
 }
-audioSystem.dispose();
+await audioSystem.dispose();
 const particles: Parameters<Parameters<typeof spawnIntelSparks>[0]['emitAdd']>[0][] = [];
 spawnIntelSparks(
   fixture<Parameters<typeof spawnIntelSparks>[0]>({

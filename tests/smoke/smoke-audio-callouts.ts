@@ -198,7 +198,7 @@ assert(CALLOUT_MIX.spacing > 0);
 actx.close = async (): Promise<void> => {
   actx.state = 'closed';
 };
-audio.dispose();
+await audio.dispose();
 assert.equal(audio._callouts, null);
 audio.bark = (): never => {
   throw Error('disposed audio retained its listener');

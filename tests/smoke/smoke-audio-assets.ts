@@ -59,6 +59,50 @@ try {
     assert.deepEqual(bank.reloadBuffers, {});
     assert.deepEqual(bank.reloadIndices, {});
   }
+  const actx = createAudioContext();
+  const submitted = Promise.withResolvers<void>();
+  const decoded = Array.from(
+    { length: total },
+    (): ReturnType<typeof Promise.withResolvers<AudioBuffer>> =>
+      Promise.withResolvers<AudioBuffer>()
+  );
+  let decodes = 0;
+  actx.decodeAudioData = (): Promise<AudioBuffer> => {
+    const job = decoded[decodes++];
+    if (decodes === total) submitted.resolve();
+    return job.promise;
+  };
+  const disposed = new WeaponSampleBank(actx);
+  let settled = false;
+  const loading = assert.rejects(disposed.load(), /sample bank disposed/).then((): void => {
+    settled = true;
+  });
+  await submitted.promise;
+  const retained = [
+    disposed.buffers.rifle,
+    disposed.hitBuffers.gear,
+    disposed.reloadBuffers['ar-out'],
+    disposed.aircraftBuffers,
+  ];
+  disposed.dispose();
+  for (const job of decoded.slice(0, -1)) job.resolve(new FixtureAudioBuffer());
+  await new Promise<void>((resolve): void => {
+    setImmediate(resolve);
+  });
+  assert.equal(settled, false, 'disposal still drains every submitted decode');
+  decoded[total - 1].resolve(new FixtureAudioBuffer());
+  await loading;
+  assert.equal(disposed.loaded, 0);
+  assert.equal(disposed.heartbeatBuffer, null);
+  assert.deepEqual(disposed.buffers, {});
+  assert.deepEqual(disposed.hitBuffers, {});
+  assert.deepEqual(disposed.reloadBuffers, {});
+  assert(
+    retained.every((buffers): boolean => buffers?.length === 0),
+    'late decodes cannot repopulate retained arrays'
+  );
+  await assert.rejects(disposed.load(), /sample bank disposed/);
+
   const missing = new WeaponSampleBank(createAudioContext());
   missing.buffers.rifle = [new FixtureAudioBuffer({ duration: 0.2 })];
   assert.throws(

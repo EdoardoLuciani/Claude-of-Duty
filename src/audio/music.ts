@@ -167,6 +167,8 @@ export class TentRadio {
   _gain: GainNode | null = null;
   _lfo: OscillatorNode | null = null;
   playing: boolean = false;
+  private _disposed: boolean = false;
+  private _request: number = 0;
 
   constructor(actx: BaseAudioContext, mixer: TentRadioMixer, rng: Rng) {
     this.actx = actx;
@@ -176,9 +178,11 @@ export class TentRadio {
 
   /** Kick off the offline render; first `start()` awaits this. */
   warm(): Promise<AudioBuffer | null> {
+    if (this._disposed) return Promise.resolve(null);
     if (this._warm) return this._warm;
     this._warm = renderBed(this.actx.sampleRate, this.rng)
       .then((buf): AudioBuffer | null => {
+        if (this._disposed) return null;
         this._buf = buf;
         return buf;
       })
@@ -190,8 +194,10 @@ export class TentRadio {
   }
 
   async start(): Promise<void> {
-    if (this.playing) return;
+    if (this._disposed || this.playing) return;
+    const request = this._request;
     if (!this._buf) await this.warm();
+    if (request !== this._request) return;
     // oxlint-disable-next-line typescript/no-unnecessary-condition -- warm() and other callers race across the await
     if (!this._buf || this.playing) return;
     this.playing = true;
@@ -220,6 +226,7 @@ export class TentRadio {
   }
 
   stop(): void {
+    this._request++;
     if (!this.playing) return;
     this.playing = false;
     const t = this.actx.currentTime;
@@ -268,6 +275,7 @@ export class TentRadio {
   }
 
   dispose(): void {
+    this._disposed = true;
     this.stop();
     this._buf = null;
     this._warm = null;
