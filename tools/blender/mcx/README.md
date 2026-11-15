@@ -19,6 +19,8 @@ Export the weapon before appending review arms, then reopen the untouched source
 and bake the sampled runtime matrices. Bun and generated shared arm products are
 required; no previous weapon blend/GLB is a fallback build input. Runtime weapon
 code, core math/guards and dependency-lock changes invalidate this bake cache.
+Embedded runtime vertex receipts are losslessly compressed and line-wrapped;
+Blender text insertion is quadratic in line length, so never embed a megabyte-long JSON line.
 Weapon motion remains 60 Hz; review skins have 120 Hz LINEAR keys, including
 fractional endpoints. Preserve CONSTANT/STEP visibility and explicit resets.
 One single-influence mechanical skin retains original helper controls; magazines

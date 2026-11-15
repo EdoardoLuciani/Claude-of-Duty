@@ -2,6 +2,7 @@
 import base64
 import json
 import math
+import zlib
 from array import array
 
 import bpy
@@ -102,8 +103,11 @@ def author_review_hands(root, output):
             indices.append((point_index,index))
         assert indices, ('missing runtime skin references',obj.name)
         metadata['vertices'][obj.name] = indices
-    metadata['reference'] = base64.b64encode(reference.tobytes()).decode('ascii')
-    bpy.data.texts.new(TEXT).write(json.dumps(metadata))
+    # Blender Text.write is quadratic in line length. Compress the receipts and
+    # wrap them in short JSON lines without losing any reference precision.
+    encoded = base64.b64encode(zlib.compress(reference.tobytes())).decode('ascii')
+    metadata['reference'] = [encoded[i:i+120] for i in range(0,len(encoded),120)]
+    bpy.data.texts.new(TEXT).write(json.dumps(metadata,indent=2))
     bpy.context.scene['review_hands'] = 'Runtime Viewmodel/MCXAnimation, 120 Hz, hip stance without sway; Idle_ADS; Draw/Holster are review-only. Stock_Fold retains Idle hands.'
     bpy.data.texts.new('MCX hand review - START HERE').write(
         'Review-only shared skins, never exported in the weapon GLB.\n'
@@ -137,7 +141,7 @@ def select_review_clip(name):
 
 def check_review_hands():
     metadata = json.loads(bpy.data.texts[TEXT].as_string())
-    reference = array('f'); reference.frombytes(base64.b64decode(metadata['reference']))
+    reference = array('f'); reference.frombytes(zlib.decompress(base64.b64decode(''.join(metadata['reference']))))
     collection = bpy.data.collections[LABEL]
     arms = [obj for obj in collection.objects if obj.type == 'ARMATURE']
     assert len(arms) == 2, 'both runtime review arms are required'
