@@ -545,7 +545,6 @@ export class Viewmodel {
       sight: new THREE.Vector3().fromArray(model.nodes.sight),
       eject: new THREE.Vector3().fromArray(model.nodes.eject),
       ejectDir: new THREE.Vector3().fromArray(model.nodes.ejectDir).normalize(),
-      optic: null,
       magLen: model.magSize.len,
       shell: model.shell,
       lhandPose: `support:${model.id}`,
@@ -1283,13 +1282,12 @@ export class Viewmodel {
    * an angle.
    */
   _updateReticle(w: WeaponEntry, ads: number): void {
-    const optic = w.optic;
-    if (!optic || optic.kind === 'scope' || !w.mountedOptic) {
+    if (!w.mountedOptic || w.mountedOptic.optic.kind === 'scope') {
       this.reticle.visible = false;
       return;
     }
     // Mounted glass can live on an animated slide/bone, not just the rig.
-    const { mount, sight } = w.mountedOptic;
+    const { mount, sight, optic } = w.mountedOptic;
     mount.updateWorldMatrix(true, false);
     _m.copy(w.group.matrixWorld).invert().multiply(mount.matrixWorld);
     _v.copy(sight).applyMatrix4(_m);
@@ -1346,7 +1344,7 @@ export class Viewmodel {
     // Holster 'end' calls setActive() earlier in this same update(). Always
     // drive visibility from the live weapon so we don't undig the one we hid.
     if (this.active) w = this.active;
-    const optic = w.optic;
+    const optic = w.mountedOptic?.optic;
     const scoped = optic?.kind === 'scope';
     const accessory = this._grenadeState || this._radioState || this._bandageState;
     this.scopeOverlay.visible = scoped && ads > 0.85 && !accessory;

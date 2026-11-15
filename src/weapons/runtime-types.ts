@@ -52,7 +52,8 @@ export interface WeaponEntry {
   muzzleGroup: THREE.Group;
   muzzleSocket: THREE.Object3D | null;
   laserEmitter: THREE.Object3D | null;
-  mountedOptic: { mount: THREE.Object3D; sight: THREE.Vector3 } | null;
+  /** Mounted optic: live parent, mount-local sight datum and catalog presentation. */
+  mountedOptic: { mount: THREE.Object3D; sight: THREE.Vector3; optic: OpticData } | null;
   def: WeaponDef;
   model: WeaponModelRecord;
   group: THREE.Object3D;
@@ -64,7 +65,6 @@ export interface WeaponEntry {
   sight: THREE.Vector3;
   eject: THREE.Vector3;
   ejectDir: THREE.Vector3;
-  optic: OpticData | null;
   magLen: number;
   shell?: { caseLen: number; rimR: number };
   lhandPose: string;

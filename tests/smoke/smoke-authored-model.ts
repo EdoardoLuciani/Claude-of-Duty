@@ -22,6 +22,7 @@ import {
   authoredModel,
   checkAuthoredDuration,
   rebaseNativeWeapon,
+  requiredNode,
 } from '../../src/weapons/authored-model.ts';
 import { WEAPON_DEFS, WEAPON_IDS } from '../../src/weapons/defs.ts';
 import { Arm } from '../../src/weapons/hands.ts';
@@ -33,7 +34,12 @@ import type { WeaponEntry, WeaponModelRecord } from '../../src/weapons/runtime-t
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
-import { datums, opticAsset, rigidAsset } from '../lib/weapon-attachment-fixture.ts';
+import {
+  datums,
+  mountableWeapon,
+  opticAsset,
+  rigidAsset,
+} from '../lib/weapon-attachment-fixture.ts';
 
 // Real three clips; duration is inferred from the keys, as GLTFLoader does.
 const track = (times: number[]): THREE.VectorKeyframeTrack =>
@@ -128,15 +134,11 @@ assert.throws(
   const baseDevice = new THREE.Group();
   baseDevice.name = 'MUZZLE_device';
   root.add(irons, ironsRemoved, baseDevice);
-  const assetScene = new THREE.Group();
-  const base = new THREE.Object3D();
-  base.name = 'MOUNT_base';
-  const sight = new THREE.Object3D();
-  sight.name = 'SOCKET_sight';
+  const assetScene = datums('MOUNT_base', 'SOCKET_sight');
+  const sight = requiredNode(assetScene, 'SOCKET_sight');
   sight.position.set(0, 0.0425072, -0.018);
   const geometry = new THREE.BoxGeometry(0.02, 0.01, 0.001);
-  const lens = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial());
-  assetScene.add(base, sight, lens);
+  assetScene.add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial()));
   const asset = opticAsset(assetScene);
   const optics = { rmr: asset, acog: asset, scope: asset, exps3: asset };
   let disposed = 0;
@@ -154,18 +156,11 @@ assert.throws(
     }),
   });
   const entry = fixture<WeaponEntry>({
+    ...mountableWeapon('rifle'),
     id: 'rifle',
     model,
     group: weaponScene,
     def: { ...WEAPON_DEFS.rifle },
-    attachments: BASE_ATTACHMENTS,
-    attachmentGroup: new THREE.Group(),
-    railGroup: new THREE.Group(),
-    muzzleGroup: new THREE.Group(),
-    muzzleSocket: null,
-    laserEmitter: null,
-    sight: new THREE.Vector3(),
-    optic: null,
   });
   const config: AttachmentConfig = { ...BASE_ATTACHMENTS, optic: 'rmr' };
   for (let i = 0; i < 9; i++) {
@@ -191,7 +186,6 @@ assert.throws(
     assert.equal(oldMount.parent, null);
     assert.equal(oldMount.children.length, 0);
     assert.equal(entry.attachmentGroup.children.length, 0);
-    assert.equal(entry.optic, null);
     assert.equal(entry.mountedOptic, null);
     assert(irons.visible);
     assert.equal(ironsRemoved.visible, false);
@@ -208,7 +202,7 @@ assert.throws(
   railMount.rotation.z = Math.PI / 2;
   root.add(railMount);
   const laserScene = datums('SOCKET_mount', 'SOCKET_laser');
-  laserScene.getObjectByName('SOCKET_laser')?.position.set(0, -0.0105, -0.02518);
+  requiredNode(laserScene, 'SOCKET_laser').position.set(0, -0.0105, -0.02518);
   const laser = rigidAsset('SOCKET_laser', laserScene);
   const laserConfig: AttachmentConfig = { ...BASE_ATTACHMENTS, rail: 'laser' };
   assert(isAttachmentConfig(laserConfig, 'rifle'));
@@ -465,8 +459,7 @@ assert.throws(
   baseSocket.position.fromArray(model.nodes.muzzle);
   root.add(muzzleMount, baseSocket);
   const canScene = datums('SOCKET_mount', 'SOCKET_muzzle');
-  const canExit = canScene.getObjectByName('SOCKET_muzzle');
-  assert(canExit);
+  const canExit = requiredNode(canScene, 'SOCKET_muzzle');
   canExit.position.z = -0.236;
   const canMesh = new THREE.Mesh(new THREE.CylinderGeometry(), new THREE.MeshStandardMaterial());
   canScene.add(canMesh);

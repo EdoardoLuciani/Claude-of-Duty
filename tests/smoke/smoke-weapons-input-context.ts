@@ -312,7 +312,7 @@ for (const [primary, first, second] of [
     group: new THREE.Group(),
     clips: buildManifestClips({ reloadTac: 'Reload_Tactical' }, m590Manifest.clips),
     sight: new THREE.Vector3(),
-    optic: null,
+    mountedOptic: null,
     animation: fixture<WeaponEntry['animation']>({ reset(): void {}, update(): void {} }),
   });
   wp.viewmodel = vm;

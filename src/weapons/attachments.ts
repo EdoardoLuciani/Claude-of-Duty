@@ -302,7 +302,6 @@ export function mountAttachments(
   muzzleSocket: THREE.Object3D | null;
   mountedOptic: WeaponEntry['mountedOptic'];
   sight: THREE.Vector3;
-  optic: OpticData | null;
 } {
   const { optic: opticId } = config;
   if (!isAttachmentConfig(config, model.id))
@@ -319,7 +318,6 @@ export function mountAttachments(
   const replaced = { optic: replacedNodes(model, 'optic'), muzzle: replacedNodes(model, 'muzzle') };
   let mountedOptic: WeaponEntry['mountedOptic'] = null;
   const sight = new THREE.Vector3().fromArray(model.nodes.sight);
-  let optic: OpticData | null = null;
   if (opticId !== null && opticAsset && opticSlot.parent) {
     // Only the ADS datum is resolved in the weapon frame, from the rest-pose mount transform
     // (including orientation). Never the live pose: a slide or bolt may be mid-animation.
@@ -328,9 +326,9 @@ export function mountAttachments(
     mountedOptic = {
       mount: opticSlot.parent,
       sight: opticAsset.sight.clone().sub(opticAsset.mount).add(opticSlot.group.position),
+      optic: OPTICS[opticId].optic,
     };
     sight.copy(mountedOptic.sight).applyMatrix4(transform);
-    optic = OPTICS[opticId].optic;
   }
   // Staging succeeded: attach instances and switch the replaced base parts.
   opticSlot.parent?.add(opticSlot.group);
@@ -351,7 +349,6 @@ export function mountAttachments(
     muzzleSocket: muzzle.socket,
     mountedOptic,
     sight,
-    optic,
   };
 }
 
@@ -372,7 +369,6 @@ export function configureWeaponAttachments(
   entry.mountedOptic = mounted.mountedOptic;
   entry.attachments = Object.freeze({ ...config });
   entry.sight.copy(mounted.sight);
-  entry.optic = mounted.optic;
   const base = WEAPON_DEFS[entry.id];
   const attached = config.optic === null ? null : OPTICS[config.optic];
   entry.def.eyeRelief =

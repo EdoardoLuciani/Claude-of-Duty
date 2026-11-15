@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 import { BASE_ATTACHMENTS, type AttachmentAssets } from '../../src/weapons/attachments.ts';
+import { requiredNode } from '../../src/weapons/authored-model.ts';
 import type { WeaponId } from '../../src/weapons/defs.ts';
 import type { WeaponEntry, WeaponModelRecord } from '../../src/weapons/runtime-types.ts';
 import { fixture } from './fixture.ts';
@@ -15,10 +16,8 @@ export function datums(...names: string[]): THREE.Group {
 }
 
 function datum(scene: THREE.Object3D, name: string): THREE.Vector3 {
-  const node = scene.getObjectByName(name);
-  if (!node) throw new Error(`fixture asset is missing ${name}`);
   scene.updateMatrixWorld(true);
-  return node.getWorldPosition(new THREE.Vector3());
+  return requiredNode(scene, name).getWorldPosition(new THREE.Vector3());
 }
 
 /** Owned optic record without a GLB: `MOUNT_base` and `SOCKET_sight` datums. */
@@ -49,7 +48,6 @@ export function mountableWeapon(
   | 'laserEmitter'
   | 'mountedOptic'
   | 'sight'
-  | 'optic'
 > {
   const scene = datums('IRON_sights', 'MUZZLE_device', 'MOUNT_optic', 'MOUNT_rail', 'MOUNT_muzzle');
   const model = fixture<WeaponModelRecord>({
@@ -58,6 +56,7 @@ export function mountableWeapon(
     opticMountRest: new THREE.Matrix4(),
     nodes: fixture<WeaponModelRecord['nodes']>({ sight: [0, 0.14, 0.03], muzzle: [0, 0.07, -0.5] }),
   });
+  // The record union rejects a WeaponId-typed literal; assign it on the fixture instead.
   model.id = id;
   return {
     model,
@@ -69,6 +68,5 @@ export function mountableWeapon(
     laserEmitter: null,
     mountedOptic: null,
     sight: new THREE.Vector3(),
-    optic: null,
   };
 }
