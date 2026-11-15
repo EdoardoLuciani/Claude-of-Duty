@@ -530,7 +530,7 @@ export class Viewmodel {
       attachmentGroup: new THREE.Group(),
       railGroup: new THREE.Group(),
       muzzleGroup: new THREE.Group(),
-      muzzleSocket: null,
+      muzzleSocket: requiredSocket(model.root, 'SOCKET_muzzle'),
       laserEmitter: null,
       mountedOptic: null,
       def,
@@ -1383,7 +1383,7 @@ export class Viewmodel {
     const w = this.active;
     if (!w) return out.set(0, 0, 0);
     w.group.updateMatrixWorld();
-    return (w.muzzleSocket ?? requiredSocket(w.model.root, 'SOCKET_muzzle')).getWorldPosition(out);
+    return w.muzzleSocket.getWorldPosition(out);
   }
 
   ejectWorld(out: THREE.Vector3): THREE.Vector3 {

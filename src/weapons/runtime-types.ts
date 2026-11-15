@@ -50,7 +50,8 @@ export interface WeaponEntry {
   attachmentGroup: THREE.Group;
   railGroup: THREE.Group;
   muzzleGroup: THREE.Group;
-  muzzleSocket: THREE.Object3D | null;
+  /** Active bore exit: a mounted can's endcap, else the weapon's own `SOCKET_muzzle`. */
+  muzzleSocket: THREE.Object3D;
   laserEmitter: THREE.Object3D | null;
   /** Mounted optic: live parent, mount-local sight datum and catalog presentation. */
   mountedOptic: { mount: THREE.Object3D; sight: THREE.Vector3; optic: OpticData } | null;

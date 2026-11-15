@@ -299,7 +299,7 @@ export function mountAttachments(
   assets: AttachmentAssets
 ): AttachmentMounts & {
   laserEmitter: THREE.Object3D | null;
-  muzzleSocket: THREE.Object3D | null;
+  muzzleSocket: THREE.Object3D;
   mountedOptic: WeaponEntry['mountedOptic'];
   sight: THREE.Vector3;
 } {
@@ -315,6 +315,8 @@ export function mountAttachments(
   // isAttachmentConfig guarantees a fitted can for any installed muzzle.
   const can = fittedCan(model.id, config.muzzle) ?? null;
   const muzzle = stageMount(model, 'muzzle', can, can && assets[can]);
+  // Resolve the bore exit here, not per shot: a mounted can's endcap, else the weapon's own.
+  const muzzleSocket = muzzle.socket ?? requiredNode(model.root, 'SOCKET_muzzle');
   const replaced = { optic: replacedNodes(model, 'optic'), muzzle: replacedNodes(model, 'muzzle') };
   let mountedOptic: WeaponEntry['mountedOptic'] = null;
   const sight = new THREE.Vector3().fromArray(model.nodes.sight);
@@ -346,7 +348,7 @@ export function mountAttachments(
     railGroup: rail.group,
     muzzleGroup: muzzle.group,
     laserEmitter: rail.socket,
-    muzzleSocket: muzzle.socket,
+    muzzleSocket,
     mountedOptic,
     sight,
   };
