@@ -141,8 +141,6 @@ export interface SoldierMaterialOptions {
 
 /** Committed procedural GLB maps, no WebGL material or shader dependency. */
 export class SoldierMaterialsNode {
-  declare sets: Record<string, SoldierTextureSet>;
-  declare details: Record<string, Texture>;
   declare camoStats: Record<string, CamoStats>;
 
   static async fromCache({
@@ -153,44 +151,73 @@ export class SoldierMaterialsNode {
     if (!response.ok) throw new Error(`[ai] proc manifest HTTP ${response.status}`);
     const data: unknown = await response.json();
     const manifest = parseManifest(data);
-    const load = (name: string, srgb: boolean): Promise<Texture> =>
-      loadPngTexture(`${base}/${name}.png`, { srgb, aniso: anisotropy });
-    const sets: Record<string, SoldierTextureSet> = {};
-    await Promise.all(
-      (manifest.sets ?? []).map(async (name): Promise<void> => {
-        const [albedo, orm, normal] = await Promise.all([
-          load(`ai-${name}-albedo`, true),
-          load(`ai-${name}-orm`, false),
-          load(`ai-${name}-normal`, false),
-        ]);
-        sets[name] = { albedo, orm, normal };
-      })
-    );
-    const details: Record<string, Texture> = {};
-    await Promise.all(
-      (manifest.details ?? []).map(async (name): Promise<void> => {
-        details[name] = await load(`ai-detail-${name}`, false);
-      })
-    );
-    const library = new SoldierMaterialsNode(sets, details, manifest.camoStats ?? {});
-    const names = Object.keys(sets);
-    library.layers = new Map([...names, 'glass'].map((name, i): [string, number] => [name, i]));
-    const maps = (field: keyof SoldierTextureSet): (Texture | null)[] => [
-      ...names.map((name): Texture => sets[name][field]),
-      null,
-    ];
-    library.arrays = {
-      albedo: soldierTextureArray(maps('albedo'), [255, 255, 255, 255], true, anisotropy),
-      orm: soldierTextureArray(maps('orm'), [255, 255, 0, 255], false, anisotropy),
-      normal: soldierTextureArray(maps('normal'), [128, 128, 255, 255], false, anisotropy),
-      detail: soldierTextureArray(
-        [details.cloth, details.nylon],
-        [128, 128, 255, 128],
-        false,
-        anisotropy
-      ),
+    const sources: Texture[] = [];
+    const pending: Promise<Texture>[] = [];
+    const arrays: DataArrayTexture[] = [];
+    const load = (name: string, srgb: boolean): Promise<Texture> => {
+      const promise = loadPngTexture(`${base}/${name}.png`, { srgb, aniso: anisotropy }).then(
+        (texture): Texture => {
+          sources.push(texture);
+          return texture;
+        }
+      );
+      pending.push(promise);
+      return promise;
     };
-    return library;
+    const pack = (
+      maps: (Texture | null)[],
+      fallback: [number, number, number, number],
+      srgb: boolean
+    ): DataArrayTexture => {
+      const array = soldierTextureArray(maps, fallback, srgb, anisotropy);
+      arrays.push(array);
+      return array;
+    };
+    try {
+      const sets: Record<string, SoldierTextureSet> = {};
+      await Promise.all(
+        (manifest.sets ?? []).map(async (name): Promise<void> => {
+          const [albedo, orm, normal] = await Promise.all([
+            load(`ai-${name}-albedo`, true),
+            load(`ai-${name}-orm`, false),
+            load(`ai-${name}-normal`, false),
+          ]);
+          sets[name] = { albedo, orm, normal };
+        })
+      );
+      const details: Record<string, Texture> = {};
+      await Promise.all(
+        (manifest.details ?? []).map(async (name): Promise<void> => {
+          details[name] = await load(`ai-detail-${name}`, false);
+        })
+      );
+      const library = new SoldierMaterialsNode(manifest.camoStats ?? {});
+      const names = Object.keys(sets);
+      library.layers = new Map([...names, 'glass'].map((name, i): [string, number] => [name, i]));
+      const maps = (field: keyof SoldierTextureSet): (Texture | null)[] => [
+        ...names.map((name): Texture => sets[name][field]),
+        null,
+      ];
+      library.arrays = {
+        albedo: pack(maps('albedo'), [255, 255, 255, 255], true),
+        orm: pack(maps('orm'), [255, 255, 0, 255], false),
+        normal: pack(maps('normal'), [128, 128, 255, 255], false),
+        detail: pack([details.cloth, details.nylon], [128, 128, 255, 128], false),
+      };
+      return library;
+    } catch (error) {
+      for (const array of arrays) array.dispose();
+      throw error;
+    } finally {
+      // Packing copies pixels. Drain late successes before releasing every input,
+      // including siblings that were never installed in a complete texture set.
+      await Promise.allSettled(pending);
+      for (const texture of sources) {
+        texture.dispose();
+        const image = texture.image;
+        if (isClosable(image)) image.close();
+      }
+    }
   }
 
   bakeMs: number = 0;
@@ -199,13 +226,7 @@ export class SoldierMaterialsNode {
   surfaceTables: DataTexture[] = [];
   arrays: Record<'albedo' | 'orm' | 'normal' | 'detail', DataArrayTexture> | null = null;
 
-  constructor(
-    sets: Record<string, SoldierTextureSet>,
-    details: Record<string, Texture>,
-    camoStats: Record<string, CamoStats> = {}
-  ) {
-    this.sets = sets;
-    this.details = details;
+  constructor(camoStats: Record<string, CamoStats> = {}) {
     this.camoStats = camoStats;
   }
 
@@ -278,18 +299,6 @@ export class SoldierMaterialsNode {
     this.arrays = null;
     for (const table of this.surfaceTables) table.dispose();
     this.surfaceTables.length = 0;
-    for (const set of Object.values(this.sets)) {
-      for (const texture of [set.albedo, set.orm, set.normal]) {
-        texture.dispose();
-        const image = texture.image;
-        if (isClosable(image)) image.close();
-      }
-    }
-    for (const texture of Object.values(this.details)) {
-      texture.dispose();
-      const image = texture.image;
-      if (isClosable(image)) image.close();
-    }
     this.combined.clear();
   }
 }
