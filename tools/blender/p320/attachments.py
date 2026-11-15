@@ -73,7 +73,17 @@ def check_sight_emission(surface):
             pixel = (int(uv.y * base.size[1]) * base.size[0] + int(uv.x * base.size[0])) * 4
             red, green, _ = base.pixels[pixel:pixel + 3]
             assert green <= red * 1.2, ('SIGLITE green bleeds onto rear housing', x, red, green)
-    print('P320_SIGLITE_OK: three green inset centres and neutral rear sight housing')
+            rim = surface.matrix_world @ Vector((x, -.03648, z + .0008))
+            hit, _, face, _ = geometry.ray_cast(rim + normal * .002, -normal, .006)
+            assert hit is not None, 'missing projected upper SIGLITE ring'
+            polygon = surface.data.polygons[face]
+            vertices = [surface.matrix_world @ surface.data.vertices[i].co for i in polygon.vertices]
+            coords = [Vector((*surface.data.uv_layers[0].data[i].uv, 0)) for i in polygon.loop_indices]
+            uv = barycentric_transform(hit, *vertices, *coords)
+            pixel = (int(uv.y * height) * width + int(uv.x * width)) * 4
+            blue = bpy.data.images['P320_normal'].pixels[pixel + 2]
+            assert blue > .5, ('SIGLITE upper ring normal faces inward', x, blue)
+    print('P320_SIGLITE_OK: three green inset centres, neutral housing and front-facing upper rings')
 
 
 def check_mounts(clips):

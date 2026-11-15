@@ -54,8 +54,8 @@ clips. These are sampled external-fit checks, not collision-free internal
 operating geometry. Hands, authored action timing and ammunition events are unchanged.
 SIGLITE rings and luminous insets are baked onto the sight faces, with extra
 host-island UV density in the same atlas. They have no overlapping runtime caps.
-The checker samples green emission at all three projected inset centres and
-checks that the rear sight housing stays neutral rather than picking up green.
+The checker samples green emission at all three projected inset centres,
+neutral rear sight housing and front-facing upper-ring normals.
 
 TOR Mini (#686) uses an explicitly extended game-fit integral frame rail: its
 front advances 14 mm to native +Y=.141 and a fifth cross-slot at .129 supports the
