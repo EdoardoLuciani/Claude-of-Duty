@@ -3,6 +3,7 @@
 # Please see the documentation for all configuration options:
 # https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 
+# Manual check: 2026-11-13. PRs target develop.
 version: 2
 updates:
   - package-ecosystem: "bun" # See documentation for possible values
