@@ -2,9 +2,9 @@
 import math
 import bpy
 
-# These shallow traction ribs are projected into the normal atlas, not rendered.
+# Shallow details are baked onto their host instead of overlapping it at runtime.
 BAKE_ONLY = ('Mark |', 'Magazine release | ribs', 'Takedown lever | traction',
-             'Slide catch | serration')
+             'Slide catch | serration', 'SIGLITE |')
 
 
 def active(obj):
@@ -94,17 +94,12 @@ def emphasize_marks(surfaces):
         for source in sources:
             if not source.name.startswith(BAKE_ONLY):
                 continue
-            factor = 4
+            factor = 8 if source.name.startswith('SIGLITE |') else 4
             for vertex in source.data.vertices:
                 _, _, face, distance = tree.find_nearest(source.matrix_world @ vertex.co)
                 if face is not None and distance < .004:
                     island = root(face)
                     priority[island] = max(priority.get(island, 1), factor)
-        # A luminous cap otherwise occupies less than one texel after packing:
-        # its entire emission can disappear when new rail islands shift the layout.
-        for face in mesh.polygons:
-            if mesh.materials[face.material_index].name.startswith('SIGLITE |'):
-                priority[root(face.index)] = max(priority.get(root(face.index), 1), 8)
         for face in mesh.polygons:
             factor = priority.get(root(face.index), 1)
             for loop in face.loop_indices:
