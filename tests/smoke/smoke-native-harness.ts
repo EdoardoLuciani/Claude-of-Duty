@@ -4,7 +4,12 @@ import { runInThisContext } from 'node:vm';
 import { chromium, type LaunchOptions } from 'playwright';
 
 import { launchChromium } from '../../tools/lib/browser-harness.ts';
-import { waitForGame, verifyNative, captureNative } from '../../tools/lib/native-render.ts';
+import {
+  advanceClipTo,
+  waitForGame,
+  verifyNative,
+  captureNative,
+} from '../../tools/lib/native-render.ts';
 import { captureMethod } from '../lib/render-fixture.ts';
 
 // Exercise launcher options without requiring a GPU/browser on CPU CI.
@@ -44,6 +49,8 @@ interface NativeObservation {
 }
 const nativeWindow: {
   __READY__: boolean;
+  __LOCKSTEP__?: boolean;
+  __PUMP__?: (frames?: number) => Promise<number>;
   __ENGINE__?: { ctx: { get(): object } };
   __NATIVE_BUILDS__: number;
   __NATIVE_BUILD_INFO__: object[];
@@ -186,6 +193,55 @@ try {
   assert.equal(mip, 3);
   assert.equal(disposed, 5);
   assert.equal(removed, 2, 'overlay removed on successful/failed screenshot');
+
+  // Serialize the actual browser helper: varying frame deltas must not turn
+  // render-frame counts into guessed simulation seconds or capture Idle at t=0.
+  let frames = 0;
+  let mode: 'playing' | 'ended' | 'stalled' = 'playing';
+  const vm = {
+    clip: null as { name: string; duration: number } | null,
+    clipName: null as string | null,
+    clipT: 0,
+    play(name: string): number {
+      this.clip = { name, duration: 3.3 };
+      this.clipName = name;
+      this.clipT = 0;
+      frames = 0;
+      return this.clip.duration;
+    },
+  };
+  nativeWindow.__LOCKSTEP__ = true;
+  nativeWindow.__ENGINE__!.ctx.get = (): object => ({ activeId: 'mcx', viewmodel: vm });
+  const deltas = [1 / 30, 1 / 90, 1 / 45];
+  nativeWindow.__PUMP__ = async (count = 1): Promise<number> => {
+    assert.equal(count, 1, 'clip clock is observed after each engine frame');
+    if (mode !== 'stalled') vm.clipT += deltas[frames % deltas.length]!;
+    frames++;
+    if (mode === 'ended') {
+      vm.clip = null;
+      vm.clipName = null;
+    }
+    return frames;
+  };
+  const advance = (at: number): Promise<unknown> =>
+    page.evaluate(`(${advanceClipTo.toString()})(${JSON.stringify({ name: 'reloadEmpty', at })})`);
+  const at = 0.105;
+  const pose = await advance(at);
+  assert.deepEqual(pose, {
+    weapon: 'mcx',
+    clip: 'reloadEmpty',
+    duration: 3.3,
+    requestedTime: at,
+    actualTime: vm.clipT,
+    frames: 5,
+  });
+  assert(vm.clipT >= at && vm.clipT < at + Math.max(...deltas));
+  await advance(0);
+  assert.equal(frames, 1, 'zero requests the first stepped clip pose, not the adapter reset');
+  mode = 'ended';
+  await assert.rejects(advance(0.1), /ended or changed before capture/);
+  mode = 'stalled';
+  await assert.rejects(advance(0.1), /clock did not advance/);
 } finally {
   Reflect.deleteProperty(globalThis, 'document');
   Reflect.deleteProperty(globalThis, 'window');

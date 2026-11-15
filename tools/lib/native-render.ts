@@ -97,6 +97,45 @@ export async function verifyNative(page: NativePage): Promise<NativeDevice> {
   return device;
 }
 
+/** Self-contained browser function: pass to page.evaluate, without module closures.
+ * Step to the first sampled pose at/after the requested time, never infer a frame rate. */
+export async function advanceClipTo({ name, at }: { name: string; at: number }): Promise<{
+  weapon: string;
+  clip: string;
+  duration: number;
+  requestedTime: number;
+  actualTime: number;
+  frames: number;
+}> {
+  const weapons = window.__ENGINE__?.ctx.get('weapons');
+  const pump = window.__PUMP__;
+  if (!weapons || !window.__LOCKSTEP__ || !pump)
+    throw new Error('clip capture requires a ready lockstep game and capture pump');
+  const vm = weapons.viewmodel;
+  const weapon = weapons.activeId;
+  const duration = vm.play(name);
+  const clip = vm.clip;
+  if (!clip || clip.name !== name || duration <= 0) throw new Error(`Cannot play clip: ${name}`);
+  if (!Number.isFinite(at) || at < 0 || at >= duration)
+    throw new Error(`--at must be inside ${name}: 0 <= time < ${duration}s`);
+  let frames = 0;
+  for (;;) {
+    const previousTime = vm.clipT;
+    // Even --at=0 needs a stepped pose: play() initially resets the adapter to Idle.
+    await pump(1);
+    frames++;
+    if (weapons.activeId !== weapon || vm.clip !== clip || vm.clipName !== name)
+      throw new Error(
+        `Clip ${name} ended or changed before capture at ${at}s (active: ${vm.clipName ?? 'none'})`
+      );
+    const actualTime = vm.clipT;
+    if (!Number.isFinite(actualTime) || actualTime <= previousTime)
+      throw new Error(`Clip ${name} clock did not advance: ${previousTime}s -> ${actualTime}s`);
+    if (actualTime >= at)
+      return { weapon, clip: name, duration, requestedTime: at, actualTime, frames };
+  }
+}
+
 /** Read the actual native final output under the normal DOM HUD. Swapchain-only
  * screenshots can be black under headless Vulkan even though rendering works. */
 export async function captureNative(

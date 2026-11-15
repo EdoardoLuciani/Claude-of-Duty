@@ -24,6 +24,7 @@ import {
   rmSync,
   statSync,
   writeFileSync,
+  writeSync,
 } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
@@ -236,7 +237,26 @@ async function build(step: AssetStep): Promise<void> {
   const fd = openSync(log, 'w');
   let code = 0;
   try {
-    for (const command of step.commands) if ((code = await run(command, ['ignore', fd, fd]))) break;
+    for (const command of step.commands) {
+      const python = command.indexOf('--python');
+      const label =
+        python >= 0
+          ? `Blender ${command[python + 1]}`
+          : command[1] === 'build/models.ts'
+            ? 'gltfpack cook'
+            : (command[1] ?? command[0]);
+      const prefix = `[assets] ${step.id}: ${label}`;
+      const started = `${prefix}: starting`;
+      console.log(started);
+      writeSync(fd, `${started}\n`);
+      const commandStart = performance.now();
+      code = await run(command, ['ignore', fd, fd]);
+      const elapsed = ((performance.now() - commandStart) / 1000).toFixed(2);
+      const finished = `${prefix}: ${code ? `FAILED (exit ${code})` : 'finished'} in ${elapsed}s`;
+      console.log(finished);
+      writeSync(fd, `${finished}\n`);
+      if (code) break;
+    }
   } finally {
     closeSync(fd);
   }
