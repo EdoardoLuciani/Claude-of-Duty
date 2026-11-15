@@ -414,6 +414,8 @@ wp._onClipEvent('grenade:release', 'grenadeThrow');
 assert.equal(bodies.length, 2, 'the next spent grenade releases exactly once');
 assert.equal(wp.grenades, 0);
 wp._onClipEvent('grenade:done', 'grenadeThrow');
+assert.equal(wp.canFire(), true, 'firing resumes after the next throw');
+assert.equal(wp.grenadeEquipped, false, 'no phantom grenade left behind');
 resetLive();
 
 // ---- death mid-throw releases the spent grenade instead of vanishing it -----
