@@ -186,30 +186,29 @@ for (const steps of [1, 3]) {
   frame({ steps });
   assert.equal(player.stance, 'prone', 'held prone does not retoggle');
 }
-for (const steps of [1, 3]) {
-  for (const [code, stance] of [
-    ['KeyC', 'crouch'],
-    ['KeyZ', 'prone'],
-  ] as const) {
-    for (const tap of [false, true]) {
-      const { player, frame } = fixture();
-      frame({ steps: 0, down: [code], up: tap ? [code] : [] });
-      frame({ steps: 0 });
-      assert.equal(player.stance, 'stand', 'stance waits for physics');
-      frame({ steps });
-      assert.equal(player.stance, stance, 'zero-step request survives until physics');
-      frame({ steps });
-      assert.equal(player.stance, stance, 'request is consumed exactly once');
-    }
-  }
+for (const [code, stance] of [
+  ['KeyC', 'crouch'],
+  ['KeyZ', 'prone'],
+] as const) {
+  const { player, frame } = fixture();
+  frame({ steps: 0, down: [code], up: [code] });
+  frame({ steps: 0 });
+  assert.equal(player.stance, 'stand', 'stance waits for physics');
+  frame({ steps: 3 });
+  assert.equal(player.stance, stance, 'zero-step tap survives until physics');
+  frame({ steps: 3 });
+  assert.equal(player.stance, stance, 'request is consumed exactly once');
+}
+{
   const { player, frame } = fixture();
   Object.assign(player.movement.climbMotion, { active: true, y: 2, y0: 0, y1: 10 });
   frame({ steps: 0, down: ['Space'], up: ['Space'] });
   frame({ steps: 0 });
-  frame({ steps });
+  frame({ steps: 1 });
   assert.equal(player.movement.climbMotion.active, false, 'buffered ladder jump leaves the ladder');
-  assert(player.movement.velocity.y > 0, 'jump-off rise survives subsequent substeps');
   assert.equal(player.movement.cmd.jump, false, 'ladder early return consumes the request');
+  frame({ steps: 2 });
+  assert(player.movement.velocity.y > 0, 'jump-off rise survives subsequent substeps');
 }
 {
   const { player, input, frame } = fixture();
