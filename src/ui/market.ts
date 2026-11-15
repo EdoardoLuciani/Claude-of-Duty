@@ -306,10 +306,11 @@ export class MarketOverlay {
   }
 
   _preview(id: string): void {
-    const item = this.market.getHudState().items.find((it): boolean => it.id === id);
+    const state = this.market.getHudState();
+    const item = state.items.find((it): boolean => it.id === id);
     if (!item) return;
     for (const row of this.cards) setClass(row.card, 'inspecting', row.card.dataset.item === id);
-    const build = this.market.getHudState().build;
+    const build = state.build;
     const config = isWeaponId(item.id)
       ? build?.id === item.id
         ? build.config
@@ -320,8 +321,7 @@ export class MarketOverlay {
     void this.inspection.select(item.id, item.label, config);
   }
 
-  _updateBuild(): void {
-    const state = this.market.getHudState();
+  _updateBuild(state = this.market.getHudState()): void {
     const build = state.build;
     this.buildPanel.hidden = !build;
     if (!build) return;
@@ -386,8 +386,8 @@ export class MarketOverlay {
     setStyle(this.root, 'opacity', this.shown.toFixed(3));
 
     this.inspection.update();
-    this._updateBuild();
     const s = this.market.getHudState();
+    this._updateBuild(s);
     this._pulse = Math.max(0, this._pulse - rawDt * 3);
     const cred = String(Math.max(0, Math.round(s.credits))).padStart(6, '0');
     setText(this.credits, cred);
