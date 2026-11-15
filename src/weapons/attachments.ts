@@ -161,7 +161,7 @@ export function makeSuppressorModel(gltf: GLTF): RigidAttachmentModel {
   return makeRigidAttachment(gltf, 'SOCKET_muzzle');
 }
 
-/** Loaded assets keyed by attachment id; a missing entry makes that attachment unavailable. */
+/** Loaded assets keyed by optic/rail id or can model; a missing entry makes it unavailable. */
 export type AttachmentAssets = Partial<
   Record<OpticId, OpticModel> & Record<RailId | CanModel, RigidAttachmentModel>
 >;
@@ -191,9 +191,9 @@ export async function loadAttachments(
   return assets;
 }
 
-/** The can model a weapon mounts for a muzzle id; undefined without that fit. */
-function fittedCan(id: WeaponId, muzzle: MuzzleId): CanModel | undefined {
-  return WEAPON_DEFS[id].fits?.muzzle?.[muzzle]?.model;
+/** The can model a weapon mounts for a muzzle id; null without a muzzle, undefined without that fit. */
+function fittedCan(id: WeaponId, muzzle: MuzzleId | null): CanModel | null | undefined {
+  return muzzle && WEAPON_DEFS[id].fits?.muzzle?.[muzzle]?.model;
 }
 
 /** Whether every installed slot's asset loaded; fit validity is `isAttachmentConfig`. */
@@ -202,7 +202,7 @@ export function hasAttachmentAssets(
   config: AttachmentConfig,
   assets: AttachmentAssets
 ): boolean {
-  const can = config.muzzle && fittedCan(id, config.muzzle);
+  const can = fittedCan(id, config.muzzle);
   return [config.optic, config.rail, can].every(
     (key): boolean => key === null || (key !== undefined && assets[key] !== undefined)
   );
@@ -242,12 +242,17 @@ const REPLACED = {
   optic: ['removableIrons', 'IRON_sights'],
   muzzle: ['removableMuzzleDevice', 'MUZZLE_device'],
 } as const;
+/** Slots whose mounted attachment may replace an authored base part. */
+export const REPLACED_SLOTS = [
+  'optic',
+  'muzzle',
+] as const satisfies readonly (keyof typeof REPLACED)[];
 
 /** Base part a mounted optic/muzzle replaces, with its optional `<name>_removed` stand-in;
  * null when the weapon keeps it (fixed irons, permanent muzzle hardware). */
 export function replacedNodes(
   model: WeaponModelRecord,
-  slot: keyof typeof REPLACED
+  slot: (typeof REPLACED_SLOTS)[number]
 ): { installed: THREE.Object3D; removed: THREE.Object3D | undefined } | null {
   const [flag, name] = REPLACED[slot];
   if (!WEAPON_DEFS[model.id][flag]) return null;
@@ -263,7 +268,7 @@ export function replacedNodes(
 function stageMount(
   model: WeaponModelRecord,
   slot: (typeof SLOTS)[number],
-  id: OpticId | RailId | MuzzleId | null,
+  id: keyof AttachmentAssets | null,
   asset: { scene: THREE.Group; mount: THREE.Vector3; output?: string } | null | undefined
 ): { group: THREE.Group; parent: THREE.Object3D | null; socket: THREE.Object3D | null } {
   const group = new THREE.Group();
@@ -298,8 +303,9 @@ export function mountAttachments(
   const opticAsset = opticId && assets[opticId];
   const opticSlot = stageMount(model, 'optic', opticId, opticAsset);
   const rail = stageMount(model, 'rail', config.rail, config.rail && assets[config.rail]);
-  const can = config.muzzle && fittedCan(model.id, config.muzzle);
-  const muzzle = stageMount(model, 'muzzle', config.muzzle, can && assets[can]);
+  // isAttachmentConfig guarantees a fitted can for any installed muzzle.
+  const can = fittedCan(model.id, config.muzzle) ?? null;
+  const muzzle = stageMount(model, 'muzzle', can, can && assets[can]);
   const replaced = { optic: replacedNodes(model, 'optic'), muzzle: replacedNodes(model, 'muzzle') };
   let mountedOptic: WeaponEntry['mountedOptic'] = null;
   const sight = new THREE.Vector3().fromArray(model.nodes.sight);
@@ -321,7 +327,7 @@ export function mountAttachments(
   rail.parent?.add(rail.group);
   muzzle.parent?.add(muzzle.group);
   // Fixed irons and permanent muzzle hardware stay under a mounted attachment.
-  for (const slot of ['optic', 'muzzle'] as const) {
+  for (const slot of REPLACED_SLOTS) {
     const nodes = replaced[slot];
     if (!nodes) continue;
     nodes.installed.visible = config[slot] === null;

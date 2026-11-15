@@ -10,6 +10,7 @@ import { disposeWeaponLoader } from './asset-loader.ts';
 import {
   BASE_ATTACHMENTS,
   configureWeaponAttachments,
+  REPLACED_SLOTS,
   replacedNodes,
   isAttachmentConfig,
   hasAttachmentAssets,
@@ -502,7 +503,7 @@ export class WeaponSystem {
       }
       // Both removable iron/muzzle states must be warm before runtime swaps.
       for (const w of this.viewmodel.weapons.values()) {
-        for (const slot of ['optic', 'muzzle'] as const) {
+        for (const slot of REPLACED_SLOTS) {
           const nodes = replacedNodes(w.model, slot);
           for (const node of nodes ? [nodes.installed, nodes.removed] : []) {
             if (!node) continue;

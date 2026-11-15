@@ -398,8 +398,8 @@ restores them. Weapons without it keep fixed irons, which every fitted optic mus
 `MUZZLE_device_removed` adapter; without it (M590) permanent muzzle hardware stays under
 the can. Both flags make the named node required, so a missing part fails at load.
 
-`loadAttachments()` returns one `AttachmentAssets` record keyed by attachment id; a failed
-load only leaves that id absent (unavailable), never blocks the base weapons. The weapon
+`loadAttachments()` returns one `AttachmentAssets` record keyed by optic/rail id or can model;
+a failed load only leaves that key absent (unavailable), never blocks the base weapons. The weapon
 system owns those assets and disposes them after the viewmodel; mounts and inspection
 clones own transforms only and never release shared geometry/materials/maps.
 `weapons.setAttachments(id, config)` changes an owned, loaded weapon synchronously outside

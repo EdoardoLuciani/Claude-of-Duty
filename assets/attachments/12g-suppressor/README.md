@@ -1,6 +1,6 @@
 # Dedicated 12-gauge expansion suppressor (#715)
 
-Authoring authority: `tools/blender/suppressor12g/{build,check}.py`. This is a
+Authoring authority: `tools/blender/suppressor12g/build.py` (shared `tools/blender/can.py`). This is a
 new game-art model, **not a scaled SRD762Ti**, licensed/manufacturer hardware,
 or a claim of physically certified baffles or shotgun ammunition compatibility.
 A stepped 220 mm expansion shell reaches 84 mm diameter, with a narrow tapered
