@@ -173,19 +173,12 @@ print('EVOLYS_CHARGING_CONTACT_OK: original wrist trajectory and held wrist/fing
 # trees stay in weapon-rig space while each moving surface follows its clip.
 sample('Idle',0)
 rig=bpy.data.objects['EVOLYS_RIG']
+import attachment_source
 def rig_tree(objects):
-    vertices=[];faces=[];inverse=rig.matrix_world.inverted()
-    for obj in objects:
-        evaluated=obj.evaluated_get(bpy.context.evaluated_depsgraph_get())
-        mesh=evaluated.to_mesh();mesh.calc_loop_triangles();offset=len(vertices)
-        vertices.extend(inverse@evaluated.matrix_world@v.co for v in mesh.vertices)
-        faces.extend(tuple(offset+i for i in tri.vertices) for tri in mesh.loop_triangles)
-        evaluated.to_mesh_clear()
-    return BVHTree.FromPolygons(vertices,faces,all_triangles=True)
+    return attachment_source.surface(objects,rig.matrix_world.inverted())
 fixed_irons=rig_tree([irons]);rail_tree=rig_tree([bpy.data.objects['receiver_mesh']]);attachments={}
 bpy.data.objects['MUZZLE_device_removed'].hide_viewport=False
 bpy.context.view_layer.update()
-import attachment_source
 for attachment_id,seat in [('rmr',mount),('acog',mount),('scope',mount),('exps3',mount),('srd762ti',muzzle_mount),('laser',rail)]:
     objects=attachment_source.seat(attachment_id,seat)
     meshes=[o for o in objects if o.type=='MESH']
