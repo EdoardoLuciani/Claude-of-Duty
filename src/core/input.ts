@@ -7,6 +7,13 @@
  */
 
 import { DEFAULT_BINDINGS, type ActionId } from './bindings.ts';
+import { hasOwn } from './guards.ts';
+
+const ACTION_BY_BINDING = new Map<string, ActionId>();
+for (const name of Object.keys(DEFAULT_BINDINGS)) {
+  if (!hasOwn(DEFAULT_BINDINGS, name)) continue;
+  for (const code of DEFAULT_BINDINGS[name]) ACTION_BY_BINDING.set(code, name);
+}
 
 /**
  * Every key code the game binds. Used to swallow
@@ -46,8 +53,9 @@ export class Input {
   down: Set<string> = new Set(); // codes currently held
   _pressed: Set<string> = new Set(); // went down this frame
   _released: Set<string> = new Set(); // went up this frame
-  _pendingDown: Set<string> = new Set();
-  _pendingUp: Set<string> = new Set();
+  _pendingCodes: string[] = [];
+  _pendingStates: boolean[] = [];
+  _started: Set<ActionId> = new Set(); // union-held action rising edges
   /** Accumulated pointer delta for this frame, in radians after sensitivity. */
   look: Point2 = { x: 0, y: 0 };
   _rawLook: Point2 = { x: 0, y: 0 };
@@ -155,7 +163,7 @@ export class Input {
       return;
     }
     if (e.repeat) return;
-    this._pendingDown.add(e.code);
+    this._queueTransition(e.code, true);
   }
 
   _onKeyUp(e: KeyboardEvent): void {
@@ -165,7 +173,7 @@ export class Input {
     // on keydown.
     this._preventBrowserShortcut(e);
     if (this.frozen) return;
-    this._pendingUp.add(e.code);
+    this._queueTransition(e.code, false);
   }
 
   _onMouseDown(e: MouseEvent): void {
@@ -178,12 +186,12 @@ export class Input {
     // Only the game canvas re-locks the pointer: clicking DOM UI (menus, the
     // supply market) must not grab the cursor mid-interaction.
     if (!this.pointerLocked && e.button === 0) this.requestPointerLock();
-    this._pendingDown.add(`Mouse${e.button}`);
+    this._queueTransition(`Mouse${e.button}`, true);
   }
 
   _onMouseUp(e: MouseEvent): void {
     if (!this.enabled || this.frozen) return;
-    this._pendingUp.add(`Mouse${e.button}`);
+    this._queueTransition(`Mouse${e.button}`, false);
   }
 
   _onMouseMove(e: MouseEvent): void {
@@ -211,10 +219,12 @@ export class Input {
     // Discard not-yet-snapshotted gameplay presses, but keep the modal Escape
     // intent if the browser delivers pointerlockchange before beginFrame().
     const pause = DEFAULT_BINDINGS.pause[0];
-    const pausePending = this._pendingDown.has(pause);
-    this._pendingDown.clear();
-    if (pausePending) this._pendingDown.add(pause);
-    for (const code of this.down) this._pendingUp.add(code);
+    const pausePending = this._pendingCodes.some(
+      (code, index): boolean => code === pause && this._pendingStates[index]
+    );
+    this._pendingCodes.length = this._pendingStates.length = 0;
+    if (pausePending) this._queueTransition(pause, true);
+    for (const code of this.down) this._queueTransition(code, false);
     this._pendingWheel = 0;
     this._rawLook.x = 0;
     this._rawLook.y = 0;
@@ -225,28 +235,37 @@ export class Input {
     this.down.clear();
     this._pressed.clear();
     this._released.clear();
-    this._pendingDown.clear();
-    this._pendingUp.clear();
+    this._pendingCodes.length = this._pendingStates.length = 0;
+    this._started.clear();
     this.look.x = this.look.y = this._rawLook.x = this._rawLook.y = 0;
     this.wheel = this._pendingWheel = 0;
     this.stick.moveX = this.stick.moveY = this.stick.lookX = this.stick.lookY = 0;
+  }
+
+  _queueTransition(code: string, held: boolean): void {
+    this._pendingCodes.push(code);
+    this._pendingStates.push(held);
   }
 
   beginFrame(): void {
     this._pressed.clear();
     this._released.clear();
 
-    for (const code of this._pendingDown) {
-      if (!this.down.has(code)) {
-        this.down.add(code);
-        this._pressed.add(code);
+    this._started.clear();
+    for (let i = 0; i < this._pendingCodes.length; i++) {
+      const code = this._pendingCodes[i];
+      if (this._pendingStates[i]) {
+        if (!this.down.has(code)) {
+          const action = ACTION_BY_BINDING.get(code);
+          if (action && !this.action(action)) this._started.add(action);
+          this.down.add(code);
+          this._pressed.add(code);
+        }
+      } else if (this.down.delete(code)) {
+        this._released.add(code);
       }
     }
-    for (const code of this._pendingUp) {
-      if (this.down.delete(code)) this._released.add(code);
-    }
-    this._pendingDown.clear();
-    this._pendingUp.clear();
+    this._pendingCodes.length = this._pendingStates.length = 0;
 
     const s = this.config.sensitivity;
     this.look.x = this.frozen ? 0 : this._rawLook.x * s;
@@ -298,6 +317,11 @@ export class Input {
   /** Per-physical-binding edges, preserving alias behavior; movement owns union-held stance edges. */
   actionPressed(name: ActionId): boolean {
     return this._actionIn(name, this._pressed);
+  }
+
+  /** Union-held rising edge: alias presses while the action is held do not restart it. */
+  actionStarted(name: ActionId): boolean {
+    return this._started.has(name);
   }
 
   /** Any bound key/button released this frame. */

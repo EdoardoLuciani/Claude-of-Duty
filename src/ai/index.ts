@@ -1158,8 +1158,6 @@ export class AiSystem {
     const body = phys.addRigidBody({
       shape: 'sphere',
       radius: GRENADE.radius,
-      // CCD must use this sphere's size, not the default box half-extents.
-      halfExtents: { x: GRENADE.radius, y: GRENADE.radius, z: GRENADE.radius },
       mass: 0.42,
       // Keep free-flight drag consistent with the safety prediction.
       linearDamping: 0,
