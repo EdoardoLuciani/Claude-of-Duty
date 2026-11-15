@@ -42,27 +42,26 @@ export function checkAuthoredDuration(
  * geometry, skins and curves. `origin` is the source origin's game-space position.
  * Attachment mounts keep their canonical game-basis locals.
  */
-export function rebaseNativeWeapon(
-  gltf: GLTF,
-  origin: readonly [number, number, number] = [0, 0, 0]
-): void {
+export function rebaseNativeWeapon(gltf: GLTF, origin: readonly number[] = [0, 0, 0]): void {
   const scene = gltf.scene;
   const basis = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
   const inverse = basis.clone().invert(),
-    offset = new THREE.Vector3(...origin),
+    offset = new THREE.Vector3().fromArray(origin),
     roots = new Set(scene.children),
     geometries = new Set<THREE.BufferGeometry>(),
     skeletons = new Set<THREE.Skeleton>();
   // Skin matrices follow the same change of frame: bone/mesh world W becomes
   // frame * W * rotation^-1, so bind matrices and bone inverses are conjugated too.
   const rotation = new THREE.Matrix4().makeRotationFromQuaternion(basis),
-    frame = new THREE.Matrix4().compose(offset, basis, new THREE.Vector3(1, 1, 1)),
+    frame = new THREE.Matrix4().makeTranslation(offset).multiply(rotation),
     rotationInverse = rotation.clone().invert(),
     frameInverse = frame.clone().invert();
   scene.traverse((o): void => {
     o.position.applyQuaternion(basis);
     if (roots.has(o)) o.position.add(offset);
     o.quaternion.premultiply(basis).multiply(inverse);
+    // Attachment locals are shared canonical game-basis assets, not weapon geometry.
+    if (o.name.startsWith('MOUNT_')) o.quaternion.multiply(basis);
     const x = o.scale.x;
     o.scale.x = o.scale.z;
     o.scale.z = x;
@@ -80,15 +79,6 @@ export function rebaseNativeWeapon(
     }
     o.updateMatrix();
   });
-  // Geometry/control locals were rebased above; attachment locals are shared
-  // canonical assets, not weapon geometry. Preserve that frame at the slot boundary.
-  for (const name of ['MOUNT_optic', 'MOUNT_muzzle', 'MOUNT_rail']) {
-    const mount = scene.getObjectByName(name);
-    if (mount) {
-      mount.quaternion.multiply(basis);
-      mount.updateMatrix();
-    }
-  }
   const rootNames = new Set([...roots].map((o): string => o.name));
   for (const clip of gltf.animations)
     for (const track of clip.tracks) {

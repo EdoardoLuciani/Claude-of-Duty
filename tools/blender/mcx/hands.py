@@ -6,19 +6,23 @@ import math
 
 import bpy
 from mathutils import Matrix, Quaternion, Vector
-from review_hands import author_review_hands
+from mcx.animations import CHARGE, FPS, MAG_OUT, SPARE_IN
+from review_hands import author_review_hands, eq
 
-# Game -Z forward -> source +X forward; the runtime places the source origin here.
+# Game -Z forward -> source +X forward. The manifest records RUNTIME_ORIGIN, the
+# game-space position of the source origin, for the runtime rebase.
 C = Matrix(((0,0,-1),(-1,0,0),(0,1,0)))
 CI = C.inverted()
-ORIGIN = Vector((0,.07,-.14))
+RUNTIME_ORIGIN = (0,.07,-.14)
+ORIGIN = Vector(RUNTIME_ORIGIN)
 FRAME = Matrix.Translation(ORIGIN) @ CI.to_4x4()
 GLTF_TO_SOURCE = Matrix.Rotation(math.pi/2,4,'X')
-FPS = 60
 
 
-def eq(e):
-    return Quaternion((1,0,0),e[0]) @ Quaternion((0,1,0),e[1]) @ Quaternion((0,0,1),e[2])
+def fcurves(action):
+    for layer in action.layers:
+        for strip in layer.strips:
+            for bag in strip.channelbags: yield from bag.fcurves
 
 
 def native(q):
@@ -52,15 +56,16 @@ def author_hands(root,asset,parts,clips):
     def curl(other):
         return {**grip['left'],'fingers':other['fingers'],'thumb':other['thumb'],'thumbBase':other['thumbBase']}
     pinch,opened = curl(ref['pinch']),curl(ref['open'])
-    def game(pos): return C @ (Vector(pos)-ORIGIN)
-    def held(side): return game(ref['grips'][side]['pos']),native(Quaternion((ref['sides'][side]['quaternion'][3],*ref['sides'][side]['quaternion'][:3])))
+    held = {side:(C @ (Vector(ref['grips'][side]['pos'])-ORIGIN),native(Quaternion((ref['sides'][side]['quaternion'][3],*ref['sides'][side]['quaternion'][:3])))) for side in hands}
+    rest = held['left'][0]
     def key(obj,prop,value,f):
-        if prop=='rotation_quaternion': value.make_compatible(obj.rotation_quaternion)
         setattr(obj,prop,value); obj.keyframe_insert(prop,frame=f)
+    def wrist(side,t,pos=None,q=None):
+        key(hands[side]['wrist'],'location',pos if pos is not None else held[side][0],t*FPS)
+        key(hands[side]['wrist'],'rotation_quaternion',q if q is not None else held[side][1],t*FPS)
     def pose(side,t,pos=None,q=None,p=None):
-        cs = hands[side]; f = t*FPS; rest_pos,rest_q = held(side); p = p or grip[side]
-        key(cs['wrist'],'location',pos if pos is not None else rest_pos,f)
-        key(cs['wrist'],'rotation_quaternion',q if q is not None else rest_q,f)
+        cs = hands[side]; f = t*FPS; p = p or grip[side]
+        wrist(side,t,pos,q)
         for i in range(4):
             key(cs[f'finger_{i}_root'],'rotation_quaternion',native(eq((0,p['fingerSpread'][i],0))),f)
             for j in range(3): key(cs[f'finger_{i}_{j}'],'rotation_quaternion',native(eq((-p['fingers'][i][j],0,0))),f)
@@ -74,8 +79,11 @@ def author_hands(root,asset,parts,clips):
         rotation = part.rotation_euler.to_quaternion()
         return Matrix.LocRotScale(part.location,rotation,Vector((1,1,1))) @ (GLTF_TO_SOURCE @ grasp[0]),rotation @ native(grasp[1])
     def follow(part,grasp,first,last):
+        # The pinch holds through the window; only the wrist rides the part.
         for f in range(first,last+1):
-            pos,q = contact(part,grasp,f); pose('left',f/FPS,pos,q,pinch)
+            pos,q = contact(part,grasp,f)
+            if f in (first,last): pose('left',f/FPS,pos,q,pinch)
+            else: wrist('left',f/FPS,pos,q)
     def lowered(pos,amount): return pos+C @ Vector((0,-amount,0))
 
     def begin(name):
@@ -86,16 +94,19 @@ def author_hands(root,asset,parts,clips):
             for track in obj.animation_data.nla_tracks: track.mute = True
         for side in hands: pose(side,0); pose(side,clips[name]['duration'])
     def interpolate(action,out):
+        # Each quaternion key takes the hemisphere nearest the previous key in time.
+        rotation = sorted((c for c in fcurves(action) if c.data_path=='rotation_quaternion'),key=lambda c:c.array_index)
+        for k in range(1,len(rotation[0].keyframe_points) if rotation else 0):
+            if sum(c.keyframe_points[k].co.y*c.keyframe_points[k-1].co.y for c in rotation) < 0:
+                for c in rotation: c.keyframe_points[k].co.y *= -1
         # BEZIER poses; `out` frames start a cubic ease-out (fast leave, soft arrival).
-        for layer in action.layers:
-            for strip in layer.strips:
-                for bag in strip.channelbags:
-                    for curve in bag.fcurves:
-                        for point in curve.keyframe_points:
-                            eased = any(abs(point.co.x-f) < 1e-3 for f in out)
-                            point.interpolation = 'CUBIC' if eased else 'BEZIER'
-                            if eased: point.easing = 'EASE_OUT'
-                            point.handle_left_type = 'AUTO_CLAMPED'; point.handle_right_type = 'AUTO_CLAMPED'
+        for curve in fcurves(action):
+            for point in curve.keyframe_points:
+                eased = any(abs(point.co.x-f) < 1e-3 for f in out)
+                point.interpolation = 'CUBIC' if eased else 'BEZIER'
+                if eased: point.easing = 'EASE_OUT'
+                point.handle_left_type = 'AUTO_CLAMPED'; point.handle_right_type = 'AUTO_CLAMPED'
+            curve.update()
     def finish(name,out=()):
         for obj in controls:
             ad = obj.animation_data; action = ad.action; interpolate(action,out)
@@ -131,20 +142,19 @@ def author_hands(root,asset,parts,clips):
 
     for name in clips:
         begin(name)
-        rest,_ = held('left')
         if name.startswith('Reload'):
             empty = name=='Reload_Empty'
             # Reach the magazine, ride it out and the spare in, then release.
             pose('left',.1)
-            follow(mag,magazine,20,61)
-            follow(spare,magazine,64,117)
+            follow(mag,magazine,*MAG_OUT)
+            follow(spare,magazine,*SPARE_IN)
             if empty:
                 # Stay below the optic until the latch clears it rearward, ride
                 # the rest of its stroke, then return low to the handguard.
-                approach,_ = contact(handle,latch,132)
-                pose('left',2.2,lowered(approach,.09),None,pinch)
-                follow(handle,latch,137,162)
-                pose('left',2.88,lowered(approach.lerp(rest,.5),.12),None,pinch)
+                approach,turned = contact(handle,latch,CHARGE[0]+3)
+                pose('left',(CHARGE[0]+3)/FPS,lowered(approach,.09),turned,pinch)
+                follow(handle,latch,CHARGE[0]+8,CHARGE[1]+5)
+                pose('left',2.88,lowered(approach.lerp(rest,.5),.12),turned.slerp(held['left'][1],.5),pinch)
                 pose('left',3.05,lowered(rest,.05))
                 pose('left',3.25)
             else:
@@ -155,34 +165,30 @@ def author_hands(root,asset,parts,clips):
         elif name=='Holster':
             offset = C @ Vector((-.02,-.1,.07))
             pose('left',.08,rest+offset*.5)
-            pose('left',.18,rest+offset*.85,None,opened)
-            pose('left',.4,rest+offset,None,opened)
+            pose('left',.18,rest+offset*.85,p=opened)
+            pose('left',.4,rest+offset,p=opened)
         finish(name,(0,) if name=='Draw' else ())
     author_review_hands(root,rig,hands,parts+controls,clips,basis=C,label='MCX',frame_step=.5)
     return controls
 
 
-def bake_export_actions(rig,controls,clips):
-    """Export the editable BEZIER poses on the LINEAR frame lattice, like M4.
+def bake_export_actions(objects,clips):
+    """Export editable BEZIER/CUBIC curves on the LINEAR frame lattice, like M4.
 
-    Runs after the .blend is saved. Mechanism clips are already per-frame
-    LINEAR; only hand controls and the rig's equip actions are baked here.
+    Runs after the .blend is saved; per-frame LINEAR and CONSTANT curves are kept.
     """
-    for obj in [rig,*controls]:
+    for obj in objects:
         for track in obj.animation_data.nla_tracks:
-            if obj==rig and track.name not in ('Draw','Holster'): continue
             end = clips[track.name]['frames'][1]; frames = range(math.ceil(end)+1)
-            for layer in track.strips[0].action.layers:
-                for strip in layer.strips:
-                    for bag in strip.channelbags:
-                        for path in ('location','rotation_quaternion','rotation_euler','scale'):
-                            curves = sorted((c for c in bag.fcurves if c.data_path==path),key=lambda c:c.array_index)
-                            if not curves: continue
-                            values = [[c.evaluate(f) for c in curves] for f in frames]
-                            constant = all(max(r[i] for r in values)-min(r[i] for r in values) < 1e-4 for i in range(len(curves)))
-                            indices = [0,len(values)-1] if constant else range(len(values))
-                            for i,curve in enumerate(curves):
-                                curve.keyframe_points.clear(); curve.keyframe_points.add(len(indices))
-                                curve.keyframe_points.foreach_set('co',[x for k in indices for x in (min(frames[k],end),values[k][i])])
-                                for point in curve.keyframe_points: point.interpolation = 'LINEAR'
-                                curve.update()
+            curves = list(fcurves(track.strips[0].action))
+            for path in {c.data_path for c in curves}:
+                group = sorted((c for c in curves if c.data_path==path),key=lambda c:c.array_index)
+                if all(p.interpolation in ('LINEAR','CONSTANT') for c in group for p in c.keyframe_points): continue
+                values = [[c.evaluate(f) for c in group] for f in frames]
+                constant = all(max(r[i] for r in values)-min(r[i] for r in values) < 1e-4 for i in range(len(group)))
+                indices = [0,len(values)-1] if constant else range(len(values))
+                for i,curve in enumerate(group):
+                    curve.keyframe_points.clear(); curve.keyframe_points.add(len(indices))
+                    curve.keyframe_points.foreach_set('co',[x for k in indices for x in (min(frames[k],end),values[k][i])])
+                    for point in curve.keyframe_points: point.interpolation = 'LINEAR'
+                    curve.update()

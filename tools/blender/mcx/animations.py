@@ -8,6 +8,10 @@ import bpy
 from mathutils import Vector
 
 FPS = 60
+# Reload beats (frames) the support glove rides in hands.py.
+MAG_OUT = (20, 61)  # released magazine travels out; hidden from frame 63
+SPARE_IN = (64, 117)  # spare appears and seats
+CHARGE = (129, 157)  # charging-latch stroke
 
 def build_animations(parts):
     rig, mag, spare, bolt, handle, trigger, cover, stock, case, release = parts
@@ -84,13 +88,13 @@ def build_animations(parts):
     for name,end,empty_reload in [('Reload_Tactical',156,False),('Reload_Empty',198,True)]:
         start_clip(name,end)
         for f,loc,rot in [(18,(-.025,0,.009),(-20,-8,5)),(42,(-.037,0,-.006),(-27,-9,7)),(95,(-.03,0,-.01),(-22,-7,5)),(122,(-.018,0,0),(-15,-4,3)),(end-12,(0,0,0),(0,0,0))]:key(rig,f,loc,rot)
-        for f,loc,rot,s in [(20,(0,0,0),(0,0,0),1),(29,(.003,0,-.022),(0,3,0),1),(43,(.012,-.015,-.12),(8,12,-4),1),(61,(.045,-.09,-.30),(24,30,-18),1),(63,(.05,-.11,-.37),(30,37,-20),0),(end-2,(0,0,0),(0,0,0),0)]:key(mag,f,loc,rot,s)
-        for f,loc,rot,s in [(62,(.015,-.06,-.35),(15,-18,-10),0),(64,(.015,-.06,-.29),(15,-18,-10),1),(83,(.008,-.025,-.15),(8,-12,-5),1),(102,(.001,0,-.034),(0,-2,0),1),(111,(0,0,.004),(0,0,0),1),(117,(0,0,0),(0,0,0),1),(end-1,(0,0,0),(0,0,0),1)]:key(spare,f,loc,rot,s)
+        for f,loc,rot,s in [(MAG_OUT[0],(0,0,0),(0,0,0),1),(29,(.003,0,-.022),(0,3,0),1),(43,(.012,-.015,-.12),(8,12,-4),1),(MAG_OUT[1],(.045,-.09,-.30),(24,30,-18),1),(63,(.05,-.11,-.37),(30,37,-20),0),(end-2,(0,0,0),(0,0,0),0)]:key(mag,f,loc,rot,s)
+        for f,loc,rot,s in [(62,(.015,-.06,-.35),(15,-18,-10),0),(SPARE_IN[0],(.015,-.06,-.29),(15,-18,-10),1),(83,(.008,-.025,-.15),(8,-12,-5),1),(102,(.001,0,-.034),(0,-2,0),1),(111,(0,0,.004),(0,0,0),1),(SPARE_IN[1],(0,0,0),(0,0,0),1),(end-1,(0,0,0),(0,0,0),1)]:key(spare,f,loc,rot,s)
         # Swap identical meshes on the final frame, avoiding duplicate coplanar mags.
         key(mag,end-1,scale=0)
         if empty_reload:
-            for f,x in [(0,-.068),(129,-.068),(145,-.075),(155,-.075),(161,0)]:key(bolt,f,(x,0,0))
-            for f,x in [(129,0),(145,-.075),(151,-.075),(157,0)]:key(handle,f,(x,0,0))
+            for f,x in [(0,-.068),(CHARGE[0],-.068),(145,-.075),(155,-.075),(161,0)]:key(bolt,f,(x,0,0))
+            for f,x in [(CHARGE[0],0),(145,-.075),(151,-.075),(CHARGE[1],0)]:key(handle,f,(x,0,0))
         clips[name]['events']=[{'time':29/60,'event':'magazine_out'},{'time':111/60,'event':'magazine_in'}]
         if empty_reload:clips[name]['events'].append({'time':161/60,'event':'bolt_forward'})
         end_clip(name,end)

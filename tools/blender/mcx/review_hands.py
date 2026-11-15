@@ -32,7 +32,8 @@ def check_review_hands():
         controls += [bpy.data.objects[prefix+'_'+joint] for joint in ('thumb_base','thumb_0','thumb_1')]
     for obj in controls+arms:
         assert {track.name for track in obj.animation_data.nla_tracks}==clips, ('missing native hand clip',obj.name)
-        assert all(track.strips[0].action.name==track.name+' | '+obj.name for track in obj.animation_data.nla_tracks), ('foreign hand action',obj.name)
+    actions = [track.strips[0].action.name for obj in controls+arms for track in obj.animation_data.nla_tracks]
+    assert len(set(actions))==len(actions), 'hand clips share an action'
     asset = bpy.data.collections['MCX VIRTUS | authored components']
     assert all(obj.name not in asset.objects for obj in collection.objects), 'review skins entered weapon export'
     # A STEP-hidden old magazine must not collapse the following wrist to its

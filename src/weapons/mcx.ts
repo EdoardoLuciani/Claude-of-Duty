@@ -27,7 +27,7 @@ export const MCX_EJECT_DELAY = 4 / 60 - SHOT_START;
 
 export function makeMCXModel(gltf: GLTF): MCXModel {
   // Source +X forward; the game origin is the shooting-hand web, not the chamber.
-  rebaseNativeWeapon(gltf, [0, 0.07, -0.14]);
+  rebaseNativeWeapon(gltf, manifest.runtime_origin);
   const scene = gltf.scene;
   const { root, opticMountRest, animations, point } = authoredModel(
     gltf,
