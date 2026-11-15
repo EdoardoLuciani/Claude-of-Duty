@@ -323,8 +323,12 @@ skeletons and mixers are inspection-owned, with skeleton cleanup delegated to th
 authored animation adapter; geometry, materials and maps are borrowed from gameplay
 and must not be disposed by the caller. UI drops the clone on selection,
 close/restart/error and releases its renderer/environment at teardown. Controls use
-DOM input, not the paused simulation clock. Only explicit Buy/Swap buttons
-purchase; selecting or inspecting an item never changes loadout or credits.
+DOM input, not the paused simulation clock. Weapon cards select a market-owned draft;
+slot controls pass its explicit config to inspection, including same-weapon changes.
+Changing attachments preserves the inspection angle; stale async clones are released.
+Only explicit Buy Build/Apply Changes confirms weapon purchases; supply Buy buttons
+remain immediate. Cancel/close/restart/error discard the draft and release previews.
+Selecting or inspecting an item never changes loadout or credits.
 Non-weapon market items use the exhaustive local artwork map in
 `src/ui/market-art.ts`. Image selection invalidates pending weapon clones and hides
 3D-only controls; image errors leave purchases usable. Weapon-model failures affect

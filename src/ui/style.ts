@@ -274,7 +274,21 @@ const CSS = `
 .ow-market-inspect-art { display:block; width:100%; height:100%; object-fit:contain; background:#171a19; }
 .ow-market-inspect-canvas[hidden], .ow-market-inspect-art[hidden], .ow-market-inspect-3d[hidden] { display:none; }
 .ow-market-inspect-status, .ow-market-inspect-help { font-size:calc(10px * var(--k)); color:var(--ink-2); line-height:1.6; }
-.ow-market-inspect-status { min-height:3.2em; padding-top:calc(var(--u) * 2); }
+.ow-market-inspect-status { min-height:1.6em; padding-top:calc(var(--u) * 2); }
+.ow-market-inspection:has(.ow-market-build:not([hidden])) .ow-market-inspect-view { height:calc(220px * var(--k)); }
+.ow-market-build { border-top:1px solid var(--hair-2); margin-top:calc(var(--u) * 2); padding-top:calc(var(--u) * 2); }
+.ow-market-build[hidden] { display:none; }
+.ow-market-build h3 { margin:0 0 calc(var(--u) * 2); }
+.ow-market-build-slot { display:grid; grid-template-columns:4em minmax(0, 1fr) 3em; align-items:center; gap:calc(var(--u) * 1.5); margin:calc(var(--u) * 1.5) 0; font-size:calc(10px * var(--k)); color:var(--ink-2); }
+.ow-market-build select { min-width:0; width:100%; color:var(--ink); background:#171c21; border:1px solid var(--hair-2); padding:calc(var(--u) * 1.5); font:inherit; color-scheme:dark; }
+.ow-market-build-cost { text-align:right; font-family:var(--fm); }
+.ow-market-build-base { font-size:calc(10px * var(--k)); color:var(--ink-2); }
+.ow-market-build-warning { color:var(--amber); font-size:calc(10px * var(--k)); line-height:1.5; }
+.ow-market-build-total { display:flex; justify-content:space-between; gap:calc(var(--u) * 2); margin-top:calc(var(--u) * 2); padding-top:calc(var(--u) * 2); border-top:1px solid var(--hair-2); font-size:calc(12px * var(--k)); color:var(--amber); }
+.ow-market-build-actions { display:flex; gap:calc(var(--u) * 2); }
+.ow-market-build-actions button { flex:1; margin:0; }
+.ow-market-build-cancel { color:var(--ink-2); background:transparent; border:1px solid var(--hair-2); font:inherit; font-size:calc(10px * var(--k)); cursor:pointer; }
+.ow-market-build select:focus-visible, .ow-market-build-actions button:focus-visible { outline:2px solid var(--amber); outline-offset:3px; }
 .ow-market-inspect-tools { display:flex; flex-wrap:wrap; gap:calc(var(--u) * 1); }
 .ow-market-inspect-tools button { border:1px solid var(--hair-2); padding:calc(var(--u) * 1.5); color:var(--ink); background:rgba(255,255,255,.04); cursor:pointer; font:inherit; font-size:calc(9px * var(--k)); }
 .ow-market-card.inspecting { box-shadow:inset 0 0 0 1px var(--amber); }

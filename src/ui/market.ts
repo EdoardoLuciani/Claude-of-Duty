@@ -1,6 +1,12 @@
 import type { EngineContext } from '../core/context.ts';
 import { damp } from '../core/math.ts';
 import type { MarketSystem } from '../market/index.ts';
+import {
+  BASE_ATTACHMENTS,
+  isAttachmentConfig,
+  type AttachmentConfig,
+} from '../weapons/attachments.ts';
+import { isWeaponId } from '../weapons/defs.ts';
 import { marketIcon } from './market-icons.ts';
 import { MarketInspection } from './market-inspection.ts';
 import { el, setText, setStyle, setClass } from './util.ts';
@@ -10,6 +16,12 @@ type MarketAction = MarketItem['action'];
 type MarketSlot = MarketItem['slot'];
 type MarketApi = MarketSystem;
 type MarketContext = Pick<EngineContext, 'get' | 'peek'>;
+interface BuildControl {
+  slot: keyof AttachmentConfig;
+  select: HTMLSelectElement;
+  options: Array<{ id: string; option: HTMLOptionElement }>;
+  cost: HTMLElement;
+}
 interface MarketCard {
   card: HTMLElement;
   btn: HTMLButtonElement;
@@ -34,7 +46,7 @@ function targetCard(target: EventTarget | null): HTMLElement | null {
 }
 
 /** Between-wave shop animates on raw wall time while simulation is frozen.
- * Cards select inspections; only explicit purchase buttons buy. SKIP/Esc leaves;
+ * Weapon cards open a draft; supplies buy immediately. SKIP/Esc leaves;
  * number keys do not buy.
  */
 export class MarketOverlay {
@@ -48,6 +60,13 @@ export class MarketOverlay {
   _onKey: (event: KeyboardEvent) => void;
   _onFocus: (event: FocusEvent) => void;
   inspection: MarketInspection;
+  buildPanel: HTMLElement;
+  buildControls: BuildControl[] = [];
+  baseCost: HTMLElement;
+  buildTotal: HTMLElement;
+  buildStatus: HTMLElement;
+  discardWarning: HTMLElement;
+  confirm: HTMLButtonElement;
   _selectedId: string | null = null;
   cards: MarketCard[] = [];
   active: boolean = false;
@@ -83,6 +102,72 @@ export class MarketOverlay {
     const body = el('div', 'ow-market-body', panel);
     const catalog = el('div', 'ow-market-catalog', body);
     this.inspection = new MarketInspection(body, ctx.get('weapons'));
+    this.buildPanel = el('section', 'ow-market-build', this.inspection.root);
+    this.buildPanel.hidden = true;
+    this.buildPanel.setAttribute('aria-label', 'Weapon customization');
+    el('h3', 'ow-market-sec-l', this.buildPanel, 'CUSTOMIZE BUILD');
+    for (const slot of ['optic', 'muzzle', 'rail'] as const) {
+      const row = el('label', 'ow-market-build-slot', this.buildPanel);
+      el('span', null, row, slot.toUpperCase());
+      const select = el('select', null, row);
+      select.setAttribute('aria-label', `${slot} attachment`);
+      const none = el('option', null, select, slot === 'optic' ? 'Iron sights · free' : 'None');
+      none.value = '';
+      const options: BuildControl['options'] = [];
+      for (const offer of this.market.getHudState().attachments) {
+        if (offer.slot !== slot) continue;
+        const option = el('option', null, select, `${offer.label} · ${offer.cost}`);
+        option.value = offer.id;
+        options.push({ id: offer.id, option });
+      }
+      const cost = el('span', 'ow-market-build-cost', row);
+      this.buildControls.push({ slot, select, options, cost });
+      select.onchange = (): void => {
+        const build = this.market.getHudState().build;
+        if (!build) return;
+        const config: unknown = { ...build.config, [slot]: select.value || null };
+        if (isAttachmentConfig(config, build.id) && this.market.setBuild(config))
+          this._preview(build.id);
+        this._updateBuild();
+      };
+    }
+    el(
+      'p',
+      'ow-market-inspect-help',
+      this.buildPanel,
+      'Optics replace removable iron sights. Laser and suppressor add no handling or damage bonuses.'
+    );
+    this.baseCost = el('div', 'ow-market-build-base', this.buildPanel);
+    this.discardWarning = el('p', 'ow-market-build-warning', this.buildPanel);
+    const total = el('div', 'ow-market-build-total', this.buildPanel);
+    el('span', null, total, 'TOTAL');
+    this.buildTotal = el('b', null, total, '0');
+    this.buildStatus = el('p', 'ow-market-inspect-help', this.buildPanel);
+    this.buildStatus.setAttribute('role', 'status');
+    const actions = el('div', 'ow-market-build-actions', this.buildPanel);
+    this.confirm = el('button', 'ow-market-buy', actions, 'BUY BUILD');
+    this.confirm.type = 'button';
+    this.confirm.onclick = (): void => {
+      if (!this.market.confirmBuild()) {
+        this.ctx.peek('ui')?.sfx('market_deny', 0.75);
+        return;
+      }
+      this._pulse = 1;
+      this.ctx.peek('ui')?.sfx('market_buy', 0.9);
+      this._updateBuild();
+    };
+    const cancel = el('button', 'ow-market-build-cancel', actions, 'CANCEL');
+    cancel.type = 'button';
+    cancel.onclick = (): void => {
+      const id = this._selectedId;
+      this.market.cancelBuild();
+      this._selectedId = null;
+      this._updateBuild();
+      if (id) {
+        this._preview(id);
+        this.cards.find((row): boolean => row.card.dataset.item === id)?.card.focus();
+      }
+    };
     const items = this.market.getHudState().items;
     let secN = 1,
       lastSlot: MarketSlot | '' = '',
@@ -104,12 +189,7 @@ export class MarketOverlay {
     const skip = el('button', 'ow-market-skip', foot, 'SKIP ▸');
     skip.type = 'button';
     skip.addEventListener('click', (): void => this.skip());
-    el(
-      'div',
-      'ow-market-hint',
-      foot,
-      'ESC SKIP · SELECT AN ITEM TO INSPECT · BUY / SWAP TO PURCHASE'
-    );
+    el('div', 'ow-market-hint', foot, 'ESC SKIP · SELECT A WEAPON TO CUSTOMIZE · CONFIRM TO APPLY');
 
     this._onClick = (e: MouseEvent): void => {
       const card = targetCard(e.target);
@@ -118,9 +198,14 @@ export class MarketOverlay {
         .getHudState()
         .items.find((it): boolean => it.id === card.dataset.item);
       if (!item) return;
+      if (isWeaponId(item.id)) {
+        if (this._selectedId !== item.id) this.market.beginBuild(item.id);
+      } else this.market.cancelBuild();
       this._selectedId = item.id;
       this._preview(item.id);
-      if (e.target instanceof Element && e.target.closest('.ow-market-buy')) this._buy(item.id);
+      this._updateBuild();
+      if (!isWeaponId(item.id) && e.target instanceof Element && e.target.closest('.ow-market-buy'))
+        this._buy(item.id);
     };
     this._onOver = (e: MouseEvent): void => {
       if (!this.active) return;
@@ -183,7 +268,12 @@ export class MarketOverlay {
 
     const btn = el('button', 'ow-market-buy', card, 'BUY');
     btn.type = 'button';
-    btn.setAttribute('aria-label', `Purchase ${item.label} for ${item.cost} credits`);
+    btn.setAttribute(
+      'aria-label',
+      isWeaponId(item.id)
+        ? `Customize ${item.label}`
+        : `Purchase ${item.label} for ${item.cost} credits`
+    );
     this.cards.push({ card, btn, count, pips, fill });
     return card;
   }
@@ -195,6 +285,8 @@ export class MarketOverlay {
     this.wave = wave;
     this._hoverId = null;
     this._selectedId = null;
+    this.market.cancelBuild();
+    this._updateBuild();
     for (const row of this.cards) setClass(row.card, 'inspecting', false);
     this.inspection.active = true;
     this.inspection.controls.enabled = false;
@@ -208,14 +300,64 @@ export class MarketOverlay {
     this.root.close();
     this._hoverId = null;
     this._selectedId = null;
+    this.market.cancelBuild();
+    this.buildPanel.hidden = true;
     this.inspection.hide();
   }
 
   _preview(id: string): void {
-    const item = this.market.getHudState().items.find((it): boolean => it.id === id);
+    const state = this.market.getHudState();
+    const item = state.items.find((it): boolean => it.id === id);
     if (!item) return;
     for (const row of this.cards) setClass(row.card, 'inspecting', row.card.dataset.item === id);
-    void this.inspection.select(item.id, item.label);
+    const build = state.build;
+    const config = isWeaponId(item.id)
+      ? build?.id === item.id
+        ? build.config
+        : this.inspection.weapons.owns(item.id)
+          ? this.inspection.weapons.getAttachments(item.id)
+          : BASE_ATTACHMENTS
+      : undefined;
+    void this.inspection.select(item.id, item.label, config);
+  }
+
+  _updateBuild(state = this.market.getHudState()): void {
+    const build = state.build;
+    this.buildPanel.hidden = !build;
+    if (!build) return;
+    let discarded = '';
+    for (const control of this.buildControls) {
+      const line = build.slots.find((entry): boolean => entry.slot === control.slot);
+      if (!line) continue;
+      const value = build.config[control.slot] ?? '';
+      if (control.select.value !== value) control.select.value = value;
+      for (const entry of control.options) {
+        const offer = state.attachments.find((item): boolean => item.id === entry.id);
+        if (entry.option.hidden !== !offer?.compatible) entry.option.hidden = !offer?.compatible;
+        if (entry.option.disabled !== !offer?.available) entry.option.disabled = !offer?.available;
+      }
+      setText(control.cost, line.cost ? `+${line.cost}` : '0');
+      if (line.discarded) discarded += `${discarded ? ' · ' : ''}${line.discarded}`;
+    }
+    setText(
+      this.baseCost,
+      build.owned ? 'Base weapon · owned' : `Base weapon · ${build.baseCost} credits`
+    );
+    setText(this.discardWarning, discarded ? `On confirm, discard ${discarded}. No refund.` : '');
+    this.discardWarning.hidden = !discarded;
+    setText(this.buildTotal, `${build.total} CREDITS`);
+    setText(this.confirm, build.owned ? 'APPLY CHANGES' : 'BUY BUILD');
+    this.confirm.disabled = !build.canConfirm;
+    setText(
+      this.buildStatus,
+      !build.available
+        ? 'This build is unavailable: weapon or attachment failed to load.'
+        : !build.affordable
+          ? 'Not enough credits. Edit the build or cancel.'
+          : !build.changed
+            ? 'No changes to apply.'
+            : 'Nothing is spent until you confirm.'
+    );
   }
 
   skip(): void {
@@ -245,6 +387,7 @@ export class MarketOverlay {
 
     this.inspection.update();
     const s = this.market.getHudState();
+    this._updateBuild(s);
     this._pulse = Math.max(0, this._pulse - rawDt * 3);
     const cred = String(Math.max(0, Math.round(s.credits))).padStart(6, '0');
     setText(this.credits, cred);
@@ -261,15 +404,11 @@ export class MarketOverlay {
       setText(row.count, gun ? '' : it.unit === 'pct' ? `${it.level}%` : `${units}/${cap}`);
       if (row.fill) setStyle(row.fill, 'transform', `scaleX(${(it.level / 100).toFixed(3)})`);
       for (let p = 0; p < row.pips.length; p++) setClass(row.pips[p], 'on', p < units);
-      setText(row.btn, ACTION_LABEL[it.action]);
-      row.btn.disabled = !it.affordable;
+      setText(row.btn, gun ? 'CUSTOMIZE' : ACTION_LABEL[it.action]);
+      row.btn.disabled = !gun && !it.affordable;
       setClass(row.card, 'on', it.action === 'equipped');
       setClass(row.card, 'capped', it.action === 'max');
-      setClass(
-        row.card,
-        'broke',
-        !it.affordable && it.action !== 'equipped' && it.action !== 'max'
-      );
+      setClass(row.card, 'broke', !gun && !it.affordable && it.action !== 'max');
     }
   }
 
