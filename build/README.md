@@ -18,7 +18,9 @@ bun run models:cook -- p320 /tmp/p320-review
 
 The encoder writes to a temporary directory before replacing the destination.
 Runtime outputs use `.runtime.glb`; their container is still GLB, regardless of
-embedded texture formats.
+embedded texture formats. Textures use UASTC quality 8 at their authored resolutions.
+Each cook gets one quarter of the available CPUs (at least one thread), sharing
+the CPU budget with the asset pipeline's bounded model pool.
 
 To opt in another model, register its source directory, native export, runtime
 output and any model-specific flags in `MODEL_COOKS`. Wire its loader to the

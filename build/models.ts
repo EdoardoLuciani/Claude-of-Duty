@@ -3,11 +3,13 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync, statSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { availableParallelism, tmpdir } from 'node:os';
 import { basename, dirname, extname, join, resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname, '..');
 export const GLTFPACK_VERSION = 'gltfpack 1.3';
+// Up to four asset workers cook concurrently; leave each a share of the CPUs.
+const ENCODING_THREADS = Math.max(1, Math.floor(availableParallelism() / 4));
 // Preserve named mechanics and authored timing. Float positions/UVs avoid
 // dequantization wrapper nodes and texture-transform clones in the runtime.
 export const GLTFPACK_FLAGS = [
@@ -33,9 +35,9 @@ export const GLTFPACK_FLAGS = [
   '-cc',
   '-tu',
   '-tq',
-  '10',
+  '8',
   '-tj',
-  '1',
+  String(ENCODING_THREADS),
 ];
 // Opt assets in here after validating their adapters and visual/animation fidelity.
 // Simplification is model-specific, never a blanket default for all models.
