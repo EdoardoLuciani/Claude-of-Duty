@@ -150,9 +150,17 @@ export class RigidBody {
     for (let i = 0; i < this.probeCount; i++) {
       if (this.probes[i * 4 + 3] < this.probeRadius) this.probeRadius = this.probes[i * 4 + 3];
     }
-    /** Bounding radius used for broadphase and CCD substep sizing. */
-    this.boundRadius = Math.hypot(hx, hy, hz);
-    this.minExtent = Math.min(hx, hy, hz);
+    // Shape dimensions own broadphase bounds and the CCD core size.
+    if (this.shape === 'sphere') {
+      this.boundRadius = this.radius;
+      this.minExtent = this.radius;
+    } else if (this.shape === 'capsule') {
+      this.boundRadius = this.halfHeight + this.radius;
+      this.minExtent = this.radius;
+    } else {
+      this.boundRadius = Math.hypot(hx, hy, hz);
+      this.minExtent = Math.min(hx, hy, hz);
+    }
 
     if (opts.position) this.position.copy(opts.position);
     if (opts.quaternion) this.quaternion.copy(opts.quaternion);

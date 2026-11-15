@@ -174,6 +174,32 @@ const axial = [...axialRay, 10] as const;
 assert.equal(rayCapsule(...axial), 0);
 assert.equal(rayCapsuleFar(...axial), 2);
 assert.equal(rayCapsuleFar(...axialRay, 1.999), -1, 'exit must be reached');
+for (const end of [-1, 1]) {
+  for (const direction of [-1, 1]) {
+    for (const [x, capOffset, expected] of [
+      [0, 0.5, 0],
+      [0, 1, 0],
+      [0.75, 0.5, 0],
+      [0.6, 0.8, 0],
+      [0.75, 0.875, -1],
+      [0, 1.2, -1],
+    ] as const) {
+      assert.equal(
+        rayCapsule(x, end * (1 + capOffset), 0, 0, direction, 0, 0, -1, 0, 0, 1, 0, 1, 0.1),
+        expected,
+        `short axial ray: end=${end}, direction=${direction}, cap=(${x}, ${capOffset})`
+      );
+    }
+  }
+  const outside = [0, end * 10, 0, 0, -end, 0, 0, -1, 0, 0, 1, 0, 1] as const;
+  assert.equal(rayCapsule(...outside, 10), 8, 'axial entry must be at the finite cap');
+  assert.equal(rayCapsule(...outside, 1), -1, 'unreached axial cap must not hit');
+  assert.equal(
+    rayCapsule(0, end * 10, 0, 0, end, 0, 0, -1, 0, 0, 1, 0, 1, 10),
+    -1,
+    'axial ray pointing away from the capsule must not hit'
+  );
+}
 const sideRay = [-3, 0, 0, 1, 0, 0, 0, -1, 0, 0, 1, 0, 1, 10] as const;
 assert.equal(rayCapsule(...sideRay), 2);
 assert.equal(rayCapsuleFar(...sideRay), 4);
@@ -206,6 +232,52 @@ for (const query of ['raycast', 'raycastAny'] as const) {
     'max distance is exclusive'
   );
   assert.equal(plane[query](0, 0, 0, 1, 0, 0, 1.000001, MASK.ALL, hit), true);
+}
+
+// A fast 50 mm sphere clears a 60 mm ledge gap, but not a 40 mm gap.
+// Supplying redundant box dimensions must not change either trajectory.
+for (const gap of [0.06, 0.04]) {
+  const ledge = new StaticWorld();
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2, 0.2));
+  mesh.position.set(0.25, 0, gap + 0.1);
+  ledge.addMesh(mesh, 'concrete');
+  ledge.build();
+  const positions: number[][] = [];
+  for (const halfExtents of [undefined, { x: 0.05, y: 0.05, z: 0.05 }]) {
+    const simulation = new RigidBodyWorld(ledge, 0);
+    const sphere = simulation.add(
+      new RigidBody({
+        shape: 'sphere',
+        radius: 0.05,
+        ...(halfExtents ? { halfExtents } : {}),
+        velocity: { x: 60, y: 0, z: 0 },
+        linearDamping: 0,
+      })
+    );
+    simulation.step(1 / 120);
+    assert.equal(sphere.position.x < 0.3, gap < 0.05, 'CCD uses the sphere radius');
+    positions.push(sphere.position.toArray());
+  }
+  assert.deepEqual(positions[0], positions[1], 'sphere motion is independent of box extents');
+}
+// Shape-sized broadphase bounds must include large spheres and rotated capsule caps.
+for (const shape of ['sphere', 'capsule'] as const) {
+  const contactWorld = new StaticWorld();
+  const x = shape === 'sphere' ? 0.29 : 0.64;
+  addTriangles(contactWorld, [x, -2, -2, x, 0, 2, x, 2, -2], 'concrete');
+  contactWorld.build();
+  const simulation = new RigidBodyWorld(contactWorld, 0);
+  const body = simulation.add(
+    new RigidBody({
+      shape,
+      radius: shape === 'sphere' ? 0.3 : 0.05,
+      halfHeight: 0.6,
+      quaternion: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2),
+    })
+  );
+  assert.equal(body.minExtent, body.radius, `${shape} CCD core uses the radius`);
+  simulation.step(1 / 120);
+  assert(body.position.x < 0, `${shape} end contact must reach the discrete solver`);
 }
 
 const bodies = new RigidBodyWorld(world);

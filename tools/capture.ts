@@ -109,16 +109,8 @@ try {
         ({ id, config }): void => {
           const weapons = window.__ENGINE__?.ctx.get('weapons');
           if (!weapons) throw new Error('weapons not ready');
-          // Non-starting weapons are loaded by readiness, but URL configuration
-          // before warmup can reject them because they are not owned yet.
-          if (!weapons.owns(id)) {
-            const equipped =
-              id === 'pistol' || id === 'smg' || id === 'shotgun'
-                ? weapons.equipSecondary(id)
-                : weapons.equipPrimary(id);
-            if (!equipped) throw new Error(`Cannot acquire ${id}`);
-          }
-          if (!weapons.setAttachments(id, config)) throw new Error(`Cannot configure ${id}`);
+          // Acquires a non-starting weapon (URL config before warmup rejects unowned ones).
+          if (!weapons.applyBuild(id, config)) throw new Error(`Cannot acquire/configure ${id}`);
         },
         {
           id: WEAPON,

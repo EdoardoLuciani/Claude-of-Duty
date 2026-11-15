@@ -11,15 +11,16 @@ import type { PlayerSystem } from '../player/index.ts';
 import {
   BASE_ATTACHMENTS,
   isAttachmentConfig,
+  SLOTS,
   type AttachmentConfig,
 } from '../weapons/attachments.ts';
 import type { WeaponId } from '../weapons/defs.ts';
 import type { WeaponSystem } from '../weapons/index.ts';
-import { ATTACHMENT_CATALOG } from './attachments.ts';
+import { ATTACHMENT_CATALOG, ATTACHMENT_OFFERS } from './attachments.ts';
 
 type MarketItemId = WeaponId | 'ammo' | 'grenade' | 'armour' | 'bandage' | 'carpet';
 type MarketSlot = 'kit' | 'secondary' | 'primary' | 'strike';
-type MarketAction = 'buy' | 'swap' | 'equipped' | 'max';
+type MarketAction = 'buy' | 'equipped' | 'max';
 interface HudItem {
   id: MarketItemId;
   label: string;
@@ -66,8 +67,8 @@ interface HudState {
  *  holds whatever countdown remains. */
 export const MARKET_DELAY = 10;
 
-/** Catalog order is the shop layout. `slot` picks the button verb:
- *  kits/strikes BUY (MAX at cap); guns SWAP / EQUIPPED. */
+/** Catalog order is the shop layout. Kits/strikes BUY (MAX at cap);
+ *  guns are bought as builds (`beginBuild`/`confirmBuild`), EQUIPPED when owned. */
 const CATALOG = [
   {
     id: 'ammo',
@@ -196,7 +197,7 @@ export class MarketSystem {
     available: false,
     changed: false,
     canConfirm: false,
-    slots: (['optic', 'muzzle', 'rail'] as const).map((slot): HudBuildSlot => ({
+    slots: SLOTS.map((slot): HudBuildSlot => ({
       slot,
       cost: 0,
       discarded: null,
@@ -305,8 +306,8 @@ export class MarketSystem {
     this.ctx.events.emit('market:close', {});
   }
 
-  /** Buy one unit when the shop is open and the player can afford it. */
-  buy(itemId: MarketItemId): boolean {
+  /** Buy one supply unit when the shop is open and affordable; weapons are bought as builds. */
+  buy(itemId: Exclude<MarketItemId, WeaponId>): boolean {
     if (!this.open) return false;
     const item = CATALOG.find((c): boolean => c.id === itemId);
     if (!item || this._level(itemId) >= item.max || this.credits < item.cost) return false;
@@ -315,10 +316,7 @@ export class MarketSystem {
     else if (itemId === 'bandage') {
       if (!this.player.addBandages(item.step)) return false;
     } else if (itemId === 'ammo') this.weapons.refillAmmo();
-    else if (itemId === 'carpet') this.weapons.addCarpetBombs(item.step);
-    else if (itemId === 'pistol' || itemId === 'shotgun' || itemId === 'smg') {
-      if (!this.weapons.equipSecondary(itemId)) return false;
-    } else if (!this.weapons.equipPrimary(itemId)) return false;
+    else this.weapons.addCarpetBombs(item.step);
     this.credits -= item.cost;
     return true;
   }
@@ -326,10 +324,8 @@ export class MarketSystem {
   /** One draft, never an inventory: changing selection discards the previous draft. */
   beginBuild(id: WeaponId): boolean {
     if (!this.open) return false;
-    this._pending = {
-      id,
-      config: this.weapons.owns(id) ? this.weapons.getAttachments(id) : BASE_ATTACHMENTS,
-    };
+    // Unowned guns hold the base build, so this is always the starting point.
+    this._pending = { id, config: this.weapons.getAttachments(id) };
     return true;
   }
 
@@ -361,7 +357,7 @@ export class MarketSystem {
     h.id = id;
     h.config = config;
     h.owned = this.weapons.owns(id);
-    const current = h.owned ? this.weapons.getAttachments(id) : BASE_ATTACHMENTS;
+    const current = this.weapons.getAttachments(id);
     h.baseCost = 0;
     if (!h.owned) for (const item of CATALOG) if (item.id === id) h.baseCost = item.cost;
     h.total = h.baseCost;
@@ -369,13 +365,11 @@ export class MarketSystem {
     for (const line of h.slots) {
       const selected = config[line.slot];
       const previous = current[line.slot];
-      line.cost = 0;
-      line.discarded = null;
-      if (selected !== previous) h.changed = true;
-      for (const entry of ATTACHMENT_CATALOG) {
-        if (entry.id === selected && selected !== previous) line.cost = entry.cost;
-        if (selected !== previous && entry.id === previous) line.discarded = entry.label;
-      }
+      const changed = selected !== previous;
+      // New attachments are charged; replaced or removed ones are discarded without refund.
+      line.cost = changed && selected ? ATTACHMENT_OFFERS[selected].cost : 0;
+      line.discarded = changed && previous ? ATTACHMENT_OFFERS[previous].label : null;
+      h.changed ||= changed;
       h.total += line.cost;
     }
     h.available = this.weapons.canConfigure(id, config);
@@ -405,7 +399,7 @@ export class MarketSystem {
       it.level = lvl;
       it.affordable = lvl < it.max && this.credits >= it.cost;
       const gun = it.slot === 'primary' || it.slot === 'secondary';
-      it.action = gun ? (lvl >= it.max ? 'equipped' : 'swap') : lvl >= it.max ? 'max' : 'buy';
+      it.action = lvl < it.max ? 'buy' : gun ? 'equipped' : 'max';
     }
     this._updateBuild();
     return h;

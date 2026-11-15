@@ -210,7 +210,11 @@ export function hasAttachmentAssets(
   );
 }
 
-const SLOTS = ['optic', 'rail', 'muzzle'] as const;
+export const SLOTS = [
+  'optic',
+  'muzzle',
+  'rail',
+] as const satisfies readonly (keyof AttachmentConfig)[];
 
 /** Mounted instance groups, one per slot; an empty group has no parent. */
 interface AttachmentMounts {

@@ -432,7 +432,7 @@ for (const dynamic of [false, true]) {
 }
 
 // Region selection is bounded by the resolved path, not the original ray.
-for (const obstruction of ['concrete', 'wood', 'range', 'body', 'deflect', 'none']) {
+for (const obstruction of ['concrete', 'wood', 'range', 'axial-range', 'body', 'deflect', 'none']) {
   const f = fixture(),
     owner = {};
   actor(f, 2, {
@@ -441,11 +441,12 @@ for (const obstruction of ['concrete', 'wood', 'range', 'body', 'deflect', 'none
     part: 'arm',
     damageScale: 0.65,
   });
-  actor(f, 4, { radius: 0.1, owner, part: 'head', damageScale: 4 });
+  const head = actor(f, 4, { radius: 0.1, owner, part: 'head', damageScale: 4 });
+  if (obstruction === 'axial-range') head.setSegment(4, 1, 0, 4.2, 1, 0, 0.1);
   if (obstruction === 'concrete') wall(f, 'concrete', 0.2, 3);
   if (obstruction === 'wood') wall(f, 'wood', 0.02, 3);
   const shot = fire(f, {
-    maxDist: obstruction === 'range' ? 3 : 20,
+    maxDist: obstruction === 'range' || obstruction === 'axial-range' ? 3 : 20,
     rng: obstruction === 'deflect' ? { gauss: (): number => 100 } : null,
   });
   assert.equal(f.damage.length, 1, 'one damage event per actor');
