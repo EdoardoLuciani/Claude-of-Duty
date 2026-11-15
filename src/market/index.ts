@@ -367,9 +367,8 @@ export class MarketSystem {
       const previous = current[line.slot];
       const changed = selected !== previous;
       // New attachments are charged; replaced or removed ones are discarded without refund.
-      line.cost = changed && selected ? (ATTACHMENT_OFFERS.get(selected)?.cost ?? 0) : 0;
-      line.discarded =
-        changed && previous ? (ATTACHMENT_OFFERS.get(previous)?.label ?? null) : null;
+      line.cost = changed && selected ? ATTACHMENT_OFFERS[selected].cost : 0;
+      line.discarded = changed && previous ? ATTACHMENT_OFFERS[previous].label : null;
       h.changed ||= changed;
       h.total += line.cost;
     }

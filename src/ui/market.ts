@@ -1,7 +1,7 @@
 import type { EngineContext } from '../core/context.ts';
 import { damp } from '../core/math.ts';
 import type { MarketSystem } from '../market/index.ts';
-import { isAttachmentConfig, SLOTS, type AttachmentConfig } from '../weapons/attachments.ts';
+import { isAttachmentConfig, SLOTS } from '../weapons/attachments.ts';
 import { isWeaponId } from '../weapons/defs.ts';
 import { marketIcon } from './market-icons.ts';
 import { MarketInspection } from './market-inspection.ts';
@@ -9,12 +9,10 @@ import { el, setText, setStyle, setClass } from './util.ts';
 
 type MarketItem = ReturnType<MarketSystem['getHudState']>['items'][number];
 type MarketOffer = ReturnType<MarketSystem['getHudState']>['attachments'][number];
-type MarketAction = MarketItem['action'];
 type MarketSlot = MarketItem['slot'];
 type MarketApi = MarketSystem;
 type MarketContext = Pick<EngineContext, 'get' | 'peek'>;
 interface BuildControl {
-  slot: keyof AttachmentConfig;
   select: HTMLSelectElement;
   // Pooled HUD offers: read in place every frame, never looked up.
   options: Array<{ offer: MarketOffer; option: HTMLOptionElement }>;
@@ -27,11 +25,6 @@ interface MarketCard {
   pips: HTMLElement[];
   fill: HTMLElement | null;
 }
-const ACTION_LABEL: Record<MarketAction, string> = {
-  buy: 'BUY',
-  equipped: 'EQUIPPED',
-  max: 'MAX',
-};
 const SECTION: Record<MarketSlot, string> = {
   kit: 'RESUPPLY',
   secondary: 'SECONDARY',
@@ -118,7 +111,7 @@ export class MarketOverlay {
         options.push({ offer, option });
       }
       const cost = el('span', 'ow-market-build-cost', row);
-      this.buildControls.push({ slot, select, options, cost });
+      this.buildControls.push({ select, options, cost });
       select.onchange = (): void => {
         const build = this.market.getHudState().build;
         if (!build) return;
@@ -321,7 +314,7 @@ export class MarketOverlay {
       const control = this.buildControls[i];
       const line = build.slots.at(i);
       if (!line) continue;
-      const value = build.config[control.slot] ?? '';
+      const value = build.config[line.slot] ?? '';
       if (control.select.value !== value) control.select.value = value;
       for (const { offer, option } of control.options) {
         if (option.hidden !== !offer.compatible) option.hidden = !offer.compatible;
@@ -395,7 +388,7 @@ export class MarketOverlay {
       setText(row.count, gun ? '' : it.unit === 'pct' ? `${it.level}%` : `${units}/${cap}`);
       if (row.fill) setStyle(row.fill, 'transform', `scaleX(${(it.level / 100).toFixed(3)})`);
       for (let p = 0; p < row.pips.length; p++) setClass(row.pips[p], 'on', p < units);
-      setText(row.btn, gun ? 'CUSTOMIZE' : ACTION_LABEL[it.action]);
+      setText(row.btn, gun ? 'CUSTOMIZE' : it.action === 'max' ? 'MAX' : 'BUY');
       row.btn.disabled = !gun && !it.affordable;
       setClass(row.card, 'on', it.action === 'equipped');
       setClass(row.card, 'capped', it.action === 'max');

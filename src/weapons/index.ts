@@ -14,6 +14,7 @@ import {
   replacedNodes,
   isAttachmentConfig,
   hasAttachmentAssets,
+  SLOTS,
   loadAttachments,
   type AttachmentConfig,
   type AttachmentAssets,
@@ -427,10 +428,8 @@ export class WeaponSystem {
    * so a rejected build never drops the old gun. */
   applyBuild(id: WeaponId, config: AttachmentConfig): boolean {
     if (this.owns(id)) return this.setAttachments(id, config);
-    if (!this._hasMesh(id)) return false;
-    // Unowned guns already hold the base build.
+    if (!this._configureAttachments(id, config)) return false;
     const state = this._requireState(id);
-    if (config !== state.attachments && !this._configureAttachments(id, config)) return false;
     const primary: readonly WeaponId[] = PRIMARY_IDS;
     for (const weapon of primary.includes(id) ? PRIMARY_IDS : SECONDARY_IDS)
       if (weapon !== id && this.owned.delete(weapon)) this._resetAttachments(weapon);
@@ -449,7 +448,9 @@ export class WeaponSystem {
 
   _configureAttachments(id: WeaponId, config: AttachmentConfig): boolean {
     if (!this.canConfigure(id, config)) return false;
-    const entry = this.viewmodel.weapons.get(id);
+    const current = this._requireState(id).attachments;
+    if (SLOTS.every((slot): boolean => config[slot] === current[slot])) return true;
+    const entry = this._viewmodel?.weapons.get(id);
     if (!entry) return false;
     configureWeaponAttachments(entry, config, this._attachments);
     this._requireState(id).attachments = entry.attachments;

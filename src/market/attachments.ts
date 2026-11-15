@@ -1,21 +1,16 @@
 import type { AttachmentConfig } from '../weapons/attachments.ts';
 
-/** Prices belong to the market; verified fits and assets belong to weapons. */
-export const ATTACHMENT_CATALOG = [
-  { id: 'rmr', slot: 'optic', label: 'Red dot', cost: 250 },
-  { id: 'acog', slot: 'optic', label: 'ACOG', cost: 400 },
-  { id: 'scope', slot: 'optic', label: 'Scope', cost: 500 },
-  { id: 'suppressor', slot: 'muzzle', label: 'Suppressor', cost: 350 },
-  { id: 'laser', slot: 'rail', label: 'Laser', cost: 200 },
-] as const satisfies readonly {
-  id: NonNullable<AttachmentConfig[keyof AttachmentConfig]>;
-  slot: keyof AttachmentConfig;
-  label: string;
-  cost: number;
-}[];
+type AttachmentId = NonNullable<AttachmentConfig[keyof AttachmentConfig]>;
 
-/** Catalog entry by attachment id, for pricing a slot change. */
-export const ATTACHMENT_OFFERS = new Map<
-  NonNullable<AttachmentConfig[keyof AttachmentConfig]>,
-  (typeof ATTACHMENT_CATALOG)[number]
->(ATTACHMENT_CATALOG.map((entry): [typeof entry.id, typeof entry] => [entry.id, entry]));
+/** Prices belong to the market; verified fits and assets belong to weapons.
+ * Keyed by id so every attachment must have a price; declaration order is the shop order. */
+export const ATTACHMENT_OFFERS = {
+  rmr: { id: 'rmr', slot: 'optic', label: 'Red dot', cost: 250 },
+  acog: { id: 'acog', slot: 'optic', label: 'ACOG', cost: 400 },
+  scope: { id: 'scope', slot: 'optic', label: 'Scope', cost: 500 },
+  suppressor: { id: 'suppressor', slot: 'muzzle', label: 'Suppressor', cost: 350 },
+  laser: { id: 'laser', slot: 'rail', label: 'Laser', cost: 200 },
+} as const satisfies {
+  [K in AttachmentId]: { id: K; slot: keyof AttachmentConfig; label: string; cost: number };
+};
+export const ATTACHMENT_CATALOG = Object.values(ATTACHMENT_OFFERS);
