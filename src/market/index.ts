@@ -35,8 +35,6 @@ interface HudItem {
 }
 interface HudBuildSlot {
   slot: keyof AttachmentConfig;
-  id: AttachmentConfig[keyof AttachmentConfig];
-  label: string;
   cost: number;
   discarded: string | null;
 }
@@ -200,8 +198,6 @@ export class MarketSystem {
     canConfirm: false,
     slots: (['optic', 'muzzle', 'rail'] as const).map((slot): HudBuildSlot => ({
       slot,
-      id: null,
-      label: 'None',
       cost: 0,
       discarded: null,
     })),
@@ -373,16 +369,11 @@ export class MarketSystem {
     for (const line of h.slots) {
       const selected = config[line.slot];
       const previous = current[line.slot];
-      line.id = selected;
-      line.label = 'None';
       line.cost = 0;
       line.discarded = null;
       if (selected !== previous) h.changed = true;
       for (const entry of ATTACHMENT_CATALOG) {
-        if (entry.id === selected) {
-          line.label = entry.label;
-          if (selected !== previous) line.cost = entry.cost;
-        }
+        if (entry.id === selected && selected !== previous) line.cost = entry.cost;
         if (selected !== previous && entry.id === previous) line.discarded = entry.label;
       }
       h.total += line.cost;
