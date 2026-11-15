@@ -28,7 +28,8 @@ let library: SoldierMaterialsNode;
 try {
   globalThis.fetch = Object.assign(
     async (url: Parameters<typeof fetch>[0]): Promise<Response> => {
-      const path = String(url);
+      assert(typeof url === 'string');
+      const path = url;
       if (path.endsWith('manifest.json'))
         return Response.json({ sets: ['polymer'], details: ['cloth', 'nylon'] });
       if (fail && path.endsWith('-normal.png'))
