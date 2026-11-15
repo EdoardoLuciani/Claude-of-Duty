@@ -167,6 +167,7 @@ def export_asset(asset, parts, output):
         export_animations=True,
         export_animation_mode='ACTIONS',
         export_merge_animation='NLA_TRACK',
+        export_anim_single_armature=False,
         export_force_sampling=False,
         export_frame_range=False,
         export_optimize_animation_keep_anim_object=True,

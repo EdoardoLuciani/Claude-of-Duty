@@ -3,7 +3,7 @@ import type * as THREE from 'three';
 import type { EngineContext, EngineSystems } from '../core/context.ts';
 import type { AttachmentConfig } from './attachments.ts';
 import type { loadAX338 } from './ax338.ts';
-import type { Clip, ClipSample } from './clips.ts';
+import type { Clip } from './clips.ts';
 import type { WeaponDef, WeaponId, WeaponMode } from './defs.ts';
 import type { loadEvolys } from './evolys.ts';
 import type { Arm } from './hands.ts';
@@ -123,7 +123,6 @@ export interface WeaponAnimation {
   magazineBody?: THREE.Object3D;
   poseQ: THREE.Quaternion;
   handTarget?(side: 'left' | 'right', position: THREE.Vector3, quaternion: THREE.Quaternion): void;
-  leftPose?: string | null;
   applyHands?(left: Arm, right: Arm): void;
 }
 export interface ViewState {
@@ -156,4 +155,3 @@ export type ViewmodelContext = Pick<
   canvas: Pick<HTMLCanvasElement, 'height'>;
   get(id: 'render'): Pick<EngineSystems['render'], 'screenSize'> | null;
 };
-export type ClipResult = ClipSample;

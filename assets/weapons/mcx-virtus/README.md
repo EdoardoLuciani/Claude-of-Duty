@@ -8,8 +8,9 @@ are shared attachments, not integrated geometry. Original art; dimensions and fi
 [Shared workflow](../../../tools/blender/README.md)
 
 Python is authority; native blend/GLB/maps/manifest and cooked runtime GLB are
-generated. The adapter converts +X-forward/+Y-up and samples six native clips;
-draw/holster, shared arms, mounted optics and pooled cases remain runtime-owned.
+generated. The adapter converts the native coordinate frame and samples authored
+mechanism, wrist/finger and equip actions. Shared upper/forearm IK, mounted optics
+and pooled cases remain runtime-owned.
 Preserve STEP magazine visibility, attachment seating and reload/fold clearance.
 The opaque finish uses vertex pigments and a stable canonical UV1 scalar lookup,
 with original UV0 detail maps; no glass remains in the base weapon. Do not compensate with lighting.
@@ -28,31 +29,25 @@ products at the canonical asset paths. World-magazine drops remain unavailable b
 `magazineBody`; independent transfer geometry remains. Historical optimization
 measurements are in Git history, not evidence of an FPS improvement.
 
-## Runtime-driven Blender review hands
+## Blender-authored hands
 
-The saved source includes `MCX | authored hands (shared appearance)`: two armatures
-and ten shared skin meshes. These are review-only; the weapon GLB is exported
-**before** they are appended. Gameplay continues to use the single shared arm asset.
-No new runtime animation or separate IK implementation is introduced.
+`hand-reference.ts` explicitly calibrates grip/finger poses into the checked-in
+`hand-reference.json`. `hands.py` authors wrist/finger, draw and holster actions in
+Blender. Normal builds read that calibration without executing gameplay or
+rewriting authoring inputs. Refit intentionally after changing contact geometry:
 
-`runtime-hands.ts` loads the freshly exported weapon/shared arm GLBs and samples
-actual `Viewmodel`, `MCXAnimation`, fitted fingers, shoulder/elbow solving and skin
-binding offline in Bun. Image decoding/rendering is unnecessary for these poses.
-`review_hands.py` bakes the sampled matrices into native NLA actions at 120 Hz,
-with mirrored right-hand binding, left-hand scale and fractional endpoints.
-Normal asset builds prepare the shared arms first; direct Blender builds require
-Bun plus the generated `player-arms.blend` and `/models/player/arms.glb` products.
-Generated bridge files live under ignored `review/`; the saved blend embeds its
-runtime vertex receipts and does not need that directory to run `check.py`.
+```sh
+bun tools/blender/mcx/hand-reference.ts
+```
 
-Nine selectable tracks: `Idle`, `Fire`, `Reload_Tactical`, `Reload_Empty`,
-`Inspect`, `Stock_Fold`, `Draw`, `Holster`, `Idle_ADS`. Fire uses native clip time
-(gameplay runs its mechanism animation faster). Stock_Fold retains the runtime
-Idle hold; it is not a new gameplay folding gesture. Draw/Holster and Idle_ADS
-pair with the weapon's Idle track. Hip stance is deterministic, without procedural
-sway/bob; these clips do not represent every possible live movement/transition.
+The saved source includes `MCX | authored hands (shared appearance)`. The shared
+review-arm baker poses these skins from the same native controls exported to the
+game; the skins themselves remain excluded from the weapon GLB. Native actions
+drive wrists/fingers through the shared runtime rig; upper/forearm IK responds to
+the live stance. The MCX adapter preserves its translated native frame and
+converts finger-control rotations into the shared game basis once on load.
 
-In Blender's Python console, set the checkout path and select a paired clip:
+Select a paired mechanism/hand clip in Blender's Python console:
 
 ```py
 import sys
@@ -61,17 +56,10 @@ from mcx.review_hands import select_review_clip
 select_review_clip('Reload_Empty')
 ```
 
-This enables matching weapon/arm NLA tracks and sets the timeline. The blend's
-`MCX hand review - START HERE` text lists the same entry points. Rebuild after
-runtime hand-code changes; the asset cache tracks runtime weapon sources and
-core math/guards. No committed hand-tuning/calibration file is rewritten.
-
-`check.py` compares 120 evaluated skin points per pose against embedded runtime
-references over all **1,656 poses**, and runs the real TOR/adapter/emitter checks
-against both review arms across all nine tracks. Maximum measured skin drift is
-**0.0033 mm**, bounded at 0.005 mm: the stock glTF exporter omits tiny influences
-that remain in the shared Blender source weights. These are finite pose/vertex
-checks, not continuous geometric or final human animation certification.
+`check.py` validates native controls, shared review-skin exclusion and wrist
+continuity across hidden magazine states, then sweeps mechanisms and deformed
+hands against catalog attachment surfaces. Source sampling is not continuous
+collision certification or final human animation approval.
 
 ## TOR Mini rail (#686)
 
@@ -84,24 +72,11 @@ actual module/support hardware against mechanisms and both
 review arms across 1,656 source poses, including Draw/Holster and Idle_ADS.
 This is an authored game-fit adapter, not a factory accessory/CAD claim.
 
-The original vertical adapter intersected the runtime support glove. Hardware
-placement alone also left brief draw and post-charge return crossings. Draw now
-approaches with fitted grip fingers; after releasing the charging latch, the
-empty-reload hand aligns below the rail before rising onto the support grip.
-Authored mechanism/contact event times are unchanged. This adapter and the authored contact/event times are retained by the #662 base
-conversion below.
-
-A native-WebGPU runtime fixture sampled the actual `Viewmodel`, `MCXAnimation`
-and shared deformed arm skins at 120 Hz: **5,051 poses**, covering hip/ADS draw,
-holster, both reloads, inspect, firing/empty return, ADS/sprint/low-ready transitions
-and gesture cancellation into holster/draw. Both arms clear the real adapter
-surfaces and cooked module; the emitter ray clears the hands. These finite
-samples are not continuous clearance or final human animation approval. A separate
-full-game WebGPU run also equipped/removed the laser and captured actual firing,
-empty-reload return and inspect with no collected page/console/TSL/GPU-validation
-errors. Material-deprecation, zero-draw and canvas-format warnings remain disclosed;
-this does not attribute or waive earlier strict-browser failures elsewhere in #686.
-The source scene now also contains runtime-driven DCC review arms as described below.
+The authored empty-reload hand passes below the rail before returning to the
+support grip. Source checks sample all native clips, including draw/holster, and
+preserve the adapter seat, emitter clearance, magazine transfer and mechanism
+beats. Live movement/ADS and interruption behavior must also be reviewed in the
+runtime; the saved review scene is not a substitute for that validation.
 
 ```sh
 bun tools/capture.ts --weapon=mcx --rail=laser --shot=weapon --out=/tmp/mcx-laser.png
@@ -147,13 +122,9 @@ Bare exit is X=.317 m; mounted exit is X=.510 m, exactly at the shared endcap,
 not the legacy socket 2 mm ahead. No runtime attachment scaling or offsets.
 These are authored exterior game fits, not certified manufacturer hardware.
 
-`check.py` retains the mechanism/stock, magazine and runtime-hand parity gates.
-It also checks the open aligned iron bore/post, base bore, mounts, real optic
-seating, declared iron clash, every optic together with suppressor/laser, and
-catalog surfaces against the six mechanism/review gestures plus draw, holster
-and base ADS over 1,656 native 120 Hz poses. Source review hands represent the
-base configuration; mounted-optic ADS changes camera-relative arm solving, so
-source sampling alone is not certification of every live ADS transition.
-Engine hip/ADS screenshots for base, RMR, ACOG, PM II, suppressor and laser are
-captured separately; rendering and finite samples do not replace final human
-visual/animation approval.
+`check.py` checks mechanisms, stock, magazines and native hand controls, plus
+iron/muzzle bores, real optic seating, declared iron clashes and catalog surfaces
+against the native clips with shared review skins. Mounted-optic ADS and live
+movement change upper/forearm solving; source sampling alone does not certify
+all runtime transitions. Engine hip/ADS, reload and inspect captures remain
+separate from the finite source checks and final human visual approval.

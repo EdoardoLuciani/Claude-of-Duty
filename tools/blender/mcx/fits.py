@@ -1,4 +1,4 @@
-"""Actual catalog surfaces against MCX mechanisms and runtime-driven review hands.
+"""Actual catalog surfaces against MCX mechanisms and authored review hands.
 
 Finite 120 Hz source samples, not continuous collision or human visual acceptance.
 """

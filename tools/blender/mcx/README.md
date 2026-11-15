@@ -4,31 +4,34 @@
 [Asset and commands](../../../assets/weapons/mcx-virtus/README.md)
 
 - `build.py`: stages/paths; `materials.py`: seeded maps and finishes.
-- `geometry.py`: base irons/muzzle, attachment mounts, assemblies/pivots/sockets; `animations.py`: six clips/events.
+- `geometry.py`: irons/muzzle, attachment mounts, assemblies/pivots/sockets.
+- `animations.py`: mechanical clips/events; `hands.py`: native wrist/finger and equip actions.
+- `hand-reference.ts`: explicit offline grip calibration, saved beside the asset.
 - `export.py`: surface projection/export; `finishes.py`: pigment/scalar packing.
-- `primitives.py`: exact exterior helpers shared with the standalone ACOG.
-- `fits.py`: actual catalog surface/hand/mechanism clearance sweep.
+- `primitives.py`: exterior helpers shared with the standalone ACOG.
+- `fits.py`: catalog surface/hand/mechanism clearance sweep.
 - `studio.py`: fixed review cameras/lights.
-- `runtime-hands.ts`: offline sampling of actual `Viewmodel`/`MCXAnimation` controls.
-- `review_hands.py`: shared review-skin baking, paired clip selection and runtime parity.
+- `review_hands.py`: native clip selection and hand-control checks.
+- `../review_hands.py`: shared appearance-only review-arm baking.
 
 Metres, +X forward, −Y ejection side. Preserve names, sockets and event timing.
-The 10 cm repeating rest-space planar UVs are for shared detail, not unique atlases.
+The repeating rest-space planar UVs are shared detail, not unique atlases.
 Save editable Idle/modifiers before deterministic triangulation/runtime preparation.
-Export the weapon before appending review arms, then reopen the untouched source
-and bake the sampled runtime matrices. Bun and generated shared arm products are
-required; no previous weapon blend/GLB is a fallback build input. Runtime weapon
-code, core math/guards and dependency-lock changes invalidate this bake cache.
-Weapon motion remains 60 Hz; review skins have 120 Hz LINEAR keys, including
-fractional endpoints. Preserve CONSTANT/STEP visibility and explicit resets.
-One single-influence mechanical skin retains original helper controls; magazines
-and showcase case remain independent. No exporter hooks or GLB repair.
+The build consumes checked-in hand calibration and shared arm appearance; it does
+not execute gameplay or rewrite calibration. Exported wrists/fingers drive the
+shared runtime arm rig, with upper/forearm IK solved at runtime. Review skins are
+excluded from the weapon GLB. Preserve fractional endpoints, LINEAR motion,
+CONSTANT/STEP visibility and explicit resets. Hidden magazine scales must not
+collapse wrist contact trajectories.
 
-Opaque pigments use per-corner colors; UV1 selects padded 64² scalar tiles.
+The single-influence mechanical skin retains its original helper controls;
+magazines and showcase case remain independent. The adapter preserves the native
+coordinate frame and rebases finger rotations once on load. No exporter hooks or
+GLB repair.
+
+Opaque pigments use per-corner colors; UV1 selects padded scalar tiles.
 Original UV0 albedo/full-normal pixels remain; roughness grain uses its source
-mean. The base weapon has one opaque material and no glass. The MCX adapter preserves
-per-finish normal strengths with canonical tile IDs, including absent optional finishes; do not compensate
-with lighting. Original source materials remain editable in the saved blend.
-The registered cook adds `-si 0.65 -se 0.0002 -sp -vc 16`; keep named helpers.
-The absent `magazineBody` still prevents world-magazine drops. Storage/draw counts
-do not establish FPS improvement; historical measurements remain in Git.
+mean. The base weapon has one opaque material and no glass. The MCX adapter
+preserves per-finish normal strengths with canonical tile IDs; do not compensate
+with lighting. Source materials remain editable in the saved blend.
+Geometry simplification and encoding settings live in `build/models.ts`.

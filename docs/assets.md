@@ -27,11 +27,10 @@ world uses a content-hashed manifest. Do not hand-edit runtime products to chang
 Each weapon's build entry point, checks and helpers share one directory.
 `build.py` orchestrates authoring; `check.py` checks the saved Blender scene.
 Where present, `actions.py` authors clips and `hand-reference.ts` explicitly
-regenerates calibration. MCX authors clips in `animations.py`, with no separate
-hand-calibration stage. Its `runtime-hands.ts` samples actual runtime posing for
-`review_hands.py` to bake shared review-only skins after weapon export. This does
-not rewrite authored hand tuning/calibration. Calibration is never an automatic
-normal-build step.
+regenerates calibration. MCX uses `animations.py` for mechanisms and `hands.py`
+for wrist/finger and equip actions. All seven weapons export native hand controls;
+shared review-only arm skins remain excluded from weapon GLBs. Calibration is
+never an automatic normal-build step.
 
 | Weapon | Authoring tools                                     | Products, references and full commands                    | Runtime adapter                         |
 | ------ | --------------------------------------------------- | --------------------------------------------------------- | --------------------------------------- |
