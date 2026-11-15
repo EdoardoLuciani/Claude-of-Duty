@@ -174,6 +174,32 @@ const axial = [...axialRay, 10] as const;
 assert.equal(rayCapsule(...axial), 0);
 assert.equal(rayCapsuleFar(...axial), 2);
 assert.equal(rayCapsuleFar(...axialRay, 1.999), -1, 'exit must be reached');
+for (const end of [-1, 1]) {
+  for (const direction of [-1, 1]) {
+    for (const [x, capOffset, expected] of [
+      [0, 0.5, 0],
+      [0, 1, 0],
+      [0.75, 0.5, 0],
+      [0.6, 0.8, 0],
+      [0.75, 0.875, -1],
+      [0, 1.2, -1],
+    ] as const) {
+      assert.equal(
+        rayCapsule(x, end * (1 + capOffset), 0, 0, direction, 0, 0, -1, 0, 0, 1, 0, 1, 0.1),
+        expected,
+        `short axial ray: end=${end}, direction=${direction}, cap=(${x}, ${capOffset})`
+      );
+    }
+  }
+  const outside = [0, end * 10, 0, 0, -end, 0, 0, -1, 0, 0, 1, 0, 1] as const;
+  assert.equal(rayCapsule(...outside, 10), 8, 'axial entry must be at the finite cap');
+  assert.equal(rayCapsule(...outside, 1), -1, 'unreached axial cap must not hit');
+  assert.equal(
+    rayCapsule(0, end * 10, 0, 0, end, 0, 0, -1, 0, 0, 1, 0, 1, 10),
+    -1,
+    'axial ray pointing away from the capsule must not hit'
+  );
+}
 const sideRay = [-3, 0, 0, 1, 0, 0, 0, -1, 0, 0, 1, 0, 1, 10] as const;
 assert.equal(rayCapsule(...sideRay), 2);
 assert.equal(rayCapsuleFar(...sideRay), 4);
