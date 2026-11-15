@@ -92,7 +92,7 @@ def check_laser_mount(weapon):
     # MCX/MPX optics and suppressors are already part of weapon_meshes.
     optics = []
     optic_objects = []
-    if weapon not in ('mcx', 'mpx'):
+    if weapon not in ('mcx', 'mpx', 'p320'):
         for optic in attachment_source.OPTICS:
             objects = attachment_source.seat(optic, bpy.data.objects['MOUNT_optic'], weapon=weapon)
             optics.extend(o for o in objects if o.type == 'MESH')

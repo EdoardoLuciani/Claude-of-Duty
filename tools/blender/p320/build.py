@@ -77,9 +77,6 @@ def build(output, render=False, quick=False):
      'textureResolutions':ATLAS_RESOLUTIONS,'geometry':'One rigidly weighted mechanical skin; lettering/traction baked from retained high source','handAnimation':'Blender wrist and finger controls; shared runtime skins and shoulder IK',
      'source':'tools/blender/p320/build.py + tools/blender/p320/ + tools/blender/p320/actions.py + tools/blender/p320/hand-reference.ts',
      'attachments':{
-      'optic':{'mount':'MOUNT_optic','parent':'slide','railContact':[0,.066,-.003],
-               'railLength':.180,'fixedIrons':True,'ironSightHeight':.0537,
-               'support':'Recessed plate and see-through cantilever rail; clears the ejection port'},
       'muzzle':{'mount':'MOUNT_muzzle','parent':'barrel','position':[0,.037,-.132],
                 'status':'Compact 9mm booster fit; suppressor9mm; thread protector/exposed thread switch'},
       'rail':{'mount':'MOUNT_rail','parent':'frame','position':[0,.002,-.122],
