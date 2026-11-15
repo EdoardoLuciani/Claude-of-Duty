@@ -193,8 +193,10 @@ export async function loadAttachments(
 
 /** Whether every installed slot's asset loaded; fit validity is `isAttachmentConfig`. */
 export function hasAttachmentAssets(config: AttachmentConfig, assets: AttachmentAssets): boolean {
-  return [config.optic, config.rail, config.muzzle].every(
-    (id): boolean => id === null || assets[id] !== undefined
+  return (
+    (config.optic === null || assets[config.optic] !== undefined) &&
+    (config.rail === null || assets[config.rail] !== undefined) &&
+    (config.muzzle === null || assets[config.muzzle] !== undefined)
   );
 }
 
