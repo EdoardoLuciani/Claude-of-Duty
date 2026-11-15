@@ -211,8 +211,6 @@ export class AudioSystem {
   bank: NoiseBank | null = null;
   samples: WeaponSampleBank | null = null;
   _starting: Promise<boolean> | null = null;
-  private _disposed: boolean = false;
-  private _closing: Promise<void> = Promise.resolve();
   deafness: number = 0;
   /* preallocated scratch — update() allocates nothing */
   _probeDirs: Vec3Like[] = [];
@@ -302,8 +300,8 @@ export class AudioSystem {
    * unavailable (no AudioContext, blocked autoplay, headless renderer, ...).
    */
   async start(): Promise<boolean> {
-    if (this._disposed || this.failed) return false;
     if (this.running) return true;
+    if (this.failed) return false;
     // A pointer gesture and a menu/API call can land in the same task. Without
     // this guard both calls build complete graphs, doubling every ambience bed
     // and leaving one graph orphaned — exactly the kind of noisy, muddy mix that
@@ -317,10 +315,6 @@ export class AudioSystem {
     }
   }
 
-  private _startupCancelled(): boolean {
-    return this._disposed || this.failed;
-  }
-
   async _startGraph(): Promise<boolean> {
     try {
       const AC = (globalThis as Partial<typeof globalThis>).AudioContext;
@@ -329,19 +323,17 @@ export class AudioSystem {
       this.actx = actx;
 
       await Mixer.prepare(actx);
-      if (this._startupCancelled()) return false;
 
       // Preserve the shared deterministic noise used by finite synthesized events.
       this.bank = new NoiseBank(actx, this.rng.fork(), 9.6);
       const samples = (this.samples = new WeaponSampleBank(actx));
       await samples.load();
-      if (this._startupCancelled()) return false;
       const mixer = (this.mixer = new Mixer(actx, this.rng.fork(), {}));
       mixer.energyMix.onprocessorerror = (): void => {
         console.error('[audio] energy processor failed; disabling audio');
         this.stats.errors++;
         this.failed = true;
-        void this._teardown();
+        this._teardown();
       };
       mixer.buildReverbs();
       this.field = new SpatialField(actx, mixer, this.ctx);
@@ -353,65 +345,47 @@ export class AudioSystem {
       mixer.setSpace(this._space, 0.001);
 
       if (actx.state === 'suspended') await actx.resume();
-      if (this._startupCancelled()) return false;
       this.running = true;
       this.stats.started = true;
       this.stats.contextState = actx.state;
       console.info(`[audio] online @ ${actx.sampleRate} Hz`);
       return true;
     } catch (err) {
-      if (!this._disposed) {
-        console.warn('[audio] disabled:', err instanceof Error ? err.message : err);
-        this.failed = true;
-      }
-      await this._teardown();
+      console.warn('[audio] disabled:', err instanceof Error ? err.message : err);
+      this.failed = true;
+      this._teardown();
       return false;
     }
   }
 
-  _teardown(): Promise<void> {
+  _teardown(): void {
     this._onIntelOperation({ active: false });
     this._lastReactionEnd = -99;
     this._callouts?.reset();
     this._callouts = null;
     this._stopAircraft(true);
-    for (const resource of [
-      this.tentRadio,
-      this.ambience,
-      this.field,
-      this.mixer,
-      this.samples,
-      this.bank,
-    ]) {
-      try {
-        resource?.dispose();
-      } catch {
-        /* Continue releasing the remaining graph. */
-      }
-    }
-    if (this.actx && this.actx.state !== 'closed') {
-      try {
-        this._closing = this.actx.close().catch((): void => {});
-      } catch {
-        /* Context closure may fail after native teardown. */
-      }
+    try {
+      this.tentRadio?.dispose();
+      this.ambience?.dispose();
+      this.field?.dispose();
+      this.mixer?.dispose();
+      this.samples?.dispose();
+      this.bank?.dispose();
+      if (this.actx && this.actx.state !== 'closed') void this.actx.close();
+    } catch {
+      /* nothing useful to do */
     }
     this.tentRadio = this.ambience = this.field = this.mixer = this.samples = this.bank = null;
     this.actx = null;
     this.running = false;
-    this.stats.started = false;
-    return this._closing;
   }
 
-  async dispose(): Promise<void> {
-    this._disposed = true;
+  dispose(): void {
     this._disarmGesture();
     for (const off of this._offs) off();
     this._offs.length = 0;
-    const closing = this._teardown();
+    this._teardown();
     if (typeof window !== 'undefined' && window.__AUDIO__ === this) delete window.__AUDIO__;
-    // Native worklet/decode/resume work cannot be cancelled; drain it before teardown ends.
-    await Promise.all([this._starting, closing]);
   }
 
   update(dt: number, ctx: AudioRuntimeContext): void {
@@ -500,7 +474,7 @@ export class AudioSystem {
     if (this.stats.errors === 40) {
       console.error('[audio] too many errors — disabling audio');
       this.failed = true;
-      void this._teardown();
+      this._teardown();
     }
   }
 
