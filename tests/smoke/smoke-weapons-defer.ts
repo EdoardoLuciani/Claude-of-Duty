@@ -1,6 +1,7 @@
 /** Bun smoke: deferred mounts must not sell ghosts. */
 import assert from 'node:assert/strict';
 
+import { BASE_ATTACHMENTS } from '../../src/weapons/attachments.ts';
 import { WEAPON_IDS } from '../../src/weapons/defs.ts';
 import { WeaponSystem } from '../../src/weapons/index.ts';
 import type { AuthoredWeaponModel, WeaponEntry } from '../../src/weapons/runtime-types.ts';
@@ -40,10 +41,10 @@ function makeWp(): WeaponSystem {
 
 {
   const wp = makeWp();
-  assert.equal(wp.equipSecondary('smg'), false, 'unmounted MPX cannot be bought');
+  assert.equal(wp.applyBuild('smg', BASE_ATTACHMENTS), false, 'unmounted MPX cannot be bought');
   assert(wp.owns('pistol') && !wp.owns('smg'));
   wp.viewmodel.weapons.set('smg', fixture<WeaponEntry>({ id: 'smg' }));
-  assert.equal(wp.equipSecondary('smg'), true, 'mounted MPX replaces the pistol');
+  assert.equal(wp.applyBuild('smg', BASE_ATTACHMENTS), true, 'mounted MPX replaces the pistol');
   assert(wp.owns('smg') && !wp.owns('pistol'));
 }
 
@@ -63,20 +64,24 @@ function makeWp(): WeaponSystem {
   });
   await Promise.resolve();
   assert.equal(settled, false, 'deferred task remains pending until load completes');
-  assert.equal(wp.equipPrimary('lmg'), false);
+  assert.equal(wp.applyBuild('lmg', BASE_ATTACHMENTS), false);
   assert(wp.owns('rifle') && !wp.owns('lmg'));
   assert(resolve);
   resolve(fixture<AuthoredWeaponModel & { then?: undefined }>({ id: 'lmg' }, ['then']));
   await wp._restTask;
   assert.equal(settled, true);
   assert.equal(wp.stats.tris, 12);
-  assert.equal(wp.equipPrimary('lmg'), true, 'resolved task has mounted the loaded weapon');
+  assert.equal(
+    wp.applyBuild('lmg', BASE_ATTACHMENTS),
+    true,
+    'resolved task has mounted the loaded weapon'
+  );
   assert(wp.owns('lmg') && !wp.owns('rifle'));
 }
 
 {
   const wp = makeWp();
-  assert.equal(wp.equipPrimary('lmg'), false);
+  assert.equal(wp.applyBuild('lmg', BASE_ATTACHMENTS), false);
   assert(wp.owns('rifle') && !wp.owns('lmg'));
   assert.equal(wp.activeId, 'rifle');
   assert.equal(wp.setWeapon('lmg'), false);
@@ -90,7 +95,7 @@ function makeWp(): WeaponSystem {
   await wp._restTask; // Load failure still resolves the task; it must not sell a ghost.
   assert.equal(wp.viewmodel.weapons.has('lmg'), false);
   assert.equal(wp.stats.tris, 0);
-  assert.equal(wp.equipPrimary('lmg'), false);
+  assert.equal(wp.applyBuild('lmg', BASE_ATTACHMENTS), false);
   assert(wp.owns('rifle') && !wp.owns('lmg'));
   assert.equal(wp.activeId, 'rifle');
 }
@@ -98,7 +103,7 @@ function makeWp(): WeaponSystem {
 {
   const wp = makeWp();
   wp.viewmodel.weapons.set('lmg', fixture<WeaponEntry>({ id: 'lmg' }));
-  assert.equal(wp.equipPrimary('lmg'), true);
+  assert.equal(wp.applyBuild('lmg', BASE_ATTACHMENTS), true);
   assert(wp.owns('lmg') && !wp.owns('rifle'));
   assert.equal(wp.activeId, 'lmg');
 }
@@ -112,7 +117,7 @@ function makeWp(): WeaponSystem {
     fixture<AuthoredWeaponModel & { then?: undefined }>({ id: 'lmg' }, ['then'])
   );
   await assert.rejects(wp._restTask, /mount failed/, 'mount errors still reject the deferred task');
-  assert.equal(wp.equipPrimary('lmg'), false);
+  assert.equal(wp.applyBuild('lmg', BASE_ATTACHMENTS), false);
   assert(wp.owns('rifle') && !wp.owns('lmg'));
 }
 
@@ -122,13 +127,6 @@ function makeWp(): WeaponSystem {
     assert.equal(wp.setWeapon(id), false, 'debug/DOM strings must be validated');
     assert.equal(wp.setWeaponImmediate(id), false);
   }
-  // Deliberately invalid JS inputs must bypass the static slot contract.
-  assert.equal(
-    Reflect.apply(wp.equipPrimary.bind(wp), wp, ['pistol']),
-    false,
-    'JS callers still get runtime slot validation'
-  );
-  assert.equal(Reflect.apply(wp.equipSecondary.bind(wp), wp, ['rifle']), false);
   assert.equal(wp.activeId, 'rifle');
   assert.deepEqual([...wp.owned], ['rifle', 'pistol']);
 }

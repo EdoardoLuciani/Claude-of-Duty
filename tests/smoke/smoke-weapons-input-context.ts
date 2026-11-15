@@ -166,25 +166,18 @@ function makeHarness(): WeaponHarness {
 }
 
 // Retain the real loadout boundary without separate per-weapon fake rigs.
-for (const [equip, first, second] of [
-  ['equipPrimary', 'lmg', 'sniper'],
-  ['equipSecondary', 'smg', 'shotgun'],
+for (const [primary, first, second] of [
+  [true, 'lmg', 'sniper'],
+  [false, 'smg', 'shotgun'],
 ] as const) {
   const { wp } = makeHarness();
   assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
-  assert(
-    (equip === 'equipPrimary' ? wp.equipPrimary(first) : wp.equipSecondary(first)) &&
-      !(equip === 'equipPrimary' ? wp.equipPrimary(first) : wp.equipSecondary(first)),
-    'cannot rebuy the equipped weapon'
-  );
-  assert.deepEqual(wp.weaponIds, equip === 'equipPrimary' ? [first, 'pistol'] : ['rifle', first]);
+  assert(wp.applyBuild(first, BASE_ATTACHMENTS), 'a new gun replaces its own slot');
+  assert.deepEqual(wp.weaponIds, primary ? [first, 'pistol'] : ['rifle', first]);
   wp.state.mag = 1;
   assert(wp.reload());
-  assert(
-    (equip === 'equipPrimary' ? wp.equipPrimary(second) : wp.equipSecondary(second)) &&
-      !wp.owns(first)
-  );
-  assert.deepEqual(wp.weaponIds, equip === 'equipPrimary' ? [second, 'pistol'] : ['rifle', second]);
+  assert(wp.applyBuild(second, BASE_ATTACHMENTS) && !wp.owns(first));
+  assert.deepEqual(wp.weaponIds, primary ? [second, 'pistol'] : ['rifle', second]);
   assert(!wp.reloading && wp.tryFire(), 'mid-reload purchase is immediately usable');
   weaponState(wp, first).reserve = 0;
   wp.state.reserve = 1;
@@ -234,7 +227,10 @@ for (const [equip, first, second] of [
     laserEmitter: null,
     sight: new THREE.Vector3(),
   });
-  for (const drop of [(): boolean => wp.equipPrimary('lmg'), (): void => wp.resetForNewGame()]) {
+  for (const drop of [
+    (): boolean => wp.applyBuild('lmg', BASE_ATTACHMENTS),
+    (): void => wp.resetForNewGame(),
+  ]) {
     wp.resetForNewGame();
     assert(wp.setAttachments('rifle', { ...BASE_ATTACHMENTS, optic: 'rmr' }));
     assert(!irons.visible, 'a mounted optic replaces the removable irons');
@@ -245,13 +241,13 @@ for (const [equip, first, second] of [
 }
 {
   const { wp, shots } = makeHarness();
-  assert(wp.equipSecondary('shotgun') && wp.tryFire());
+  assert(wp.applyBuild('shotgun', BASE_ATTACHMENTS) && wp.tryFire());
   assert.equal(shots.fired, 8, 'one shotgun shell spawns eight pellets');
   assert.equal(wp._pendingShots, 1, 'pellets still produce one accepted-shot event');
 }
 {
   const { wp } = makeHarness();
-  assert(wp.equipPrimary('sniper') && wp.tryFire());
+  assert(wp.applyBuild('sniper', BASE_ATTACHMENTS) && wp.tryFire());
   assert(
     !wp.state.chambered && !wp.tryFire() && !wp.setWeapon('pistol'),
     'bolt cycle blocks fire/switch'
