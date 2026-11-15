@@ -19,6 +19,7 @@ import { Rng } from '../../src/core/rng.ts';
 import { PhysicsSystem } from '../../src/physics/index.ts';
 import { RigidBody } from '../../src/physics/rigidbody.ts';
 import { RadioSystem, CARPET } from '../../src/radio/index.ts';
+import { BASE_ATTACHMENTS } from '../../src/weapons/attachments.ts';
 import {
   WeaponSystem,
   GRENADE_RADIUS,
@@ -85,7 +86,10 @@ physics.addRigidBody = (opts): RigidBody => {
     velocity: new THREE.Vector3(opts.velocity.x, opts.velocity.y, opts.velocity.z),
     fuse: 0,
   });
-  return new RigidBody({ ...opts, position: new THREE.Vector3(0, 1.6, 0) });
+  const body = new RigidBody({ ...opts, position: new THREE.Vector3(0, 1.6, 0) });
+  assert.equal(body.boundRadius, 0.05, 'player grenades use their sphere bounds');
+  assert.equal(body.minExtent, 0.05, 'player grenades do not inherit box-sized CCD');
+  return body;
 };
 physics.removeRigidBody = (): void => {};
 const wp = new WeaponSystem();
@@ -138,16 +142,16 @@ assert.equal(wp._switchTo, 'pistol');
 wp.setWeaponImmediate('pistol');
 assert.equal(wp.nextWeapon(), true);
 assert.equal(wp._switchTo, 'rifle');
-wp.equipPrimary('lmg');
+wp.applyBuild('lmg', BASE_ATTACHMENTS);
 wp.setWeaponImmediate('pistol');
 pressDigit(1);
 assert.equal(wp._switchTo, 'lmg', '1 follows the primary slot after a purchase');
-wp.equipPrimary('rifle');
-wp.equipSecondary('smg');
+wp.applyBuild('rifle', BASE_ATTACHMENTS);
+wp.applyBuild('smg', BASE_ATTACHMENTS);
 wp.setWeaponImmediate('rifle');
 pressDigit(2);
 assert.equal(wp._switchTo, 'smg', '2 follows the MPX secondary');
-wp.equipSecondary('shotgun');
+wp.applyBuild('shotgun', BASE_ATTACHMENTS);
 wp.setWeaponImmediate('rifle');
 pressDigit(2);
 assert.equal(wp._switchTo, 'shotgun', '2 follows the shotgun secondary');

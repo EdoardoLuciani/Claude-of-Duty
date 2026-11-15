@@ -190,6 +190,35 @@ for (const dist of [10, 25, 50] as const) {
   if (dist === 10) acquire10 = t;
 }
 
+// Automatic-fire hearing must not reset stronger visual acquisition progress.
+{
+  const player = makePlayer();
+  const ai = makeAi(player);
+  const a = makeShooter(ai, 70, new Rng(1));
+  let spots = 0;
+  const off = events.on('ai:bark', (e): void => {
+    if (e.kind === 'spot' && e.voice === a.id) spots++;
+  });
+  const origin = ai.playerPosition(new THREE.Vector3());
+  for (let i = 0; i < 20; i++) a.hear(origin, 180, 'gunfire');
+  assert.equal(a.awareness, 0.85, 'hearing alone is capped below acquisition');
+  assert.equal(a.hasTarget, false);
+  let nextReport = 0;
+  for (let t = 0; t < 0.5; t += DT) {
+    a._sense(DT);
+    if (t >= nextReport) {
+      const before: number = a.awareness;
+      a.hear(origin, 180, 'gunfire');
+      assert.ok(a.awareness >= before, 'gunfire cannot lower awareness');
+      nextReport += 60 / 800;
+    }
+  }
+  assert.equal(a.hasTarget, true, 'interleaved sight and automatic fire still acquire');
+  assert.equal(spots, 1, 'ongoing visual contact emits one acquisition bark');
+  off();
+  phys.removeCollider(player.hitbox);
+}
+
 /* 2. dispersion */
 function spreadRate(
   dist: number,
