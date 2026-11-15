@@ -1,4 +1,4 @@
-"""Physical checks against the available shared optics, never absent slot assets."""
+"""Physical checks for the fixed irons and remaining attachment mounts."""
 import math
 import bpy
 from mathutils import Vector
@@ -40,11 +40,6 @@ def attachment_geometry(id, output=None):
     return vertices, faces, point
 
 
-def optic_geometry():
-    """Each optic's datum-frame (vertices, faces, sight point)."""
-    return {id: attachment_geometry(id, 'SOCKET_sight') for id in attachment_source.OPTICS}
-
-
 def check_sight_emission(surface):
     """Sample the baked map through each real front-facing inset, not its bounds."""
     atlas = bpy.data.images['P320_emission']
@@ -68,18 +63,11 @@ def check_sight_emission(surface):
 def check_mounts(clips):
     scene = bpy.context.scene
     rig = bpy.data.objects['P320_RIG']
-    slide = bpy.data.objects['slide']
-    mount = bpy.data.objects['MOUNT_optic']
-    for obj, part in [(mount, 'slide'), (bpy.data.objects['MOUNT_muzzle'], 'barrel'),
+    for obj, part in [(bpy.data.objects['MOUNT_muzzle'], 'barrel'),
                       (bpy.data.objects['MOUNT_rail'], 'frame')]:
         assert obj.parent_type == 'BONE' and obj.parent_bone == part, (obj.name, 'must export under mechanical bone')
-    optics = optic_geometry()
-    sources = [o for o in bpy.data.collections['P320 | high bake source (not exported)'].objects if o.type == 'MESH']
-    # Rail/foot contact is intentional; no other optic/weapon intersection is.
-    body = [o for o in sources if not o.name.startswith(('Mark |', 'Optic bridge | rail deck'))]
     shroud = bpy.data.objects['Slide | chamfered Nitron shell']
     thread = bpy.data.objects['Barrel | external muzzle thread']
-    hands = [o for o in bpy.data.collections['P320 | authored hands (shared appearance)'].objects if o.type == 'MESH']
     samples = 0
     for name, info in clips.items():
         for obj in scene.objects:
@@ -94,22 +82,10 @@ def check_mounts(clips):
             scene.frame_set(math.floor(frame),subframe=frame%1)
             bpy.context.view_layer.update()
             assert not tree([shroud]).overlap(tree([thread])), (name, frame, 'thread/slide')
-            weapon = tree(body)
-            hand_tree = tree(hands, bpy.context.evaluated_depsgraph_get())
-            eject = bpy.data.objects['SOCKET_ejection'].matrix_world.translation
-            direction = (slide.matrix_world.to_3x3() @ Vector((.82, -.24, .52))).normalized()
-            for id, (vertices, faces, _) in optics.items():
-                mounted = BVHTree.FromPolygons([mount.matrix_world @ v for v in vertices], faces)
-                assert not weapon.overlap(mounted), (name, frame, id, 'optic/weapon collision')
-                assert not hand_tree.overlap(mounted), (name, frame, id, 'optic/hand collision')
-                # Conservative 9.56 mm casing envelope along the authored ejection axis.
-                for offset in ((0,0,0),(.00478,0,0),(-.00478,0,0),(0,0,.00478),(0,0,-.00478)):
-                    assert mounted.ray_cast(eject + Vector(offset), direction, .10)[0] is None, (name, frame, id, 'ejection corridor blocked')
             if name == 'Idle':
-                # Ray from the rear aim datum to the front blade through the bridge.
+                # The bare slide must stay below the fixed SIGLITE aim ray.
                 origin = rig.matrix_world @ Vector((0, -.026, .0537))
                 direction = (rig.matrix_world.to_3x3() @ Vector((0, 1, 0))).normalized()
-                bridge = tree([o for o in sources if o.name.startswith(('Optic plate |', 'Optic bridge |'))])
-                assert bridge.ray_cast(origin, direction, .13)[0] is None, 'fixed iron sight ray blocked'
+                assert tree([shroud]).ray_cast(origin, direction, .13)[0] is None, 'fixed iron sight ray blocked'
             samples += 1
-    print(f'P320_MOUNTS_OK: {samples} 120Hz clip samples x {len(optics)} optics, fixed iron ray, thread/slide and hand clearances; optic sweep (muzzle/laser sweeps run separately)')
+    print(f'P320_MOUNTS_OK: {samples} 120Hz clip samples; fixed iron ray and thread/slide clearance (muzzle/laser sweeps run separately)')

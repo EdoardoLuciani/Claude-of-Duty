@@ -128,11 +128,12 @@ M4 iron sights are not a separate choice: mounting any optic swaps the A2/front 
 rear assemblies for a low-profile gas block, and removing the optic restores the irons
 and base handling. For debug/capture, use `?attachmentOptic=rmr`, `acog`, `scope` or
 `none`, or `bun tools/capture.ts --shot=ads --optic=scope --out=/tmp/m4-scope-ads.png`.
-All seven weapons also support the shared EXPS3-0 holographic sight (350 credits):
+All weapons except P320 also support the shared EXPS3-0 holographic sight (350 credits):
 `optic: 'exps3'`, `?attachmentOptic=exps3`, or
 `bun tools/capture.ts --weapon=rifle --optic=exps3 --shot=ads`.
 It uses a 68 MOA ring / 1 MOA dot with the red dot's 0.62 ADS FOV/sensitivity scale.
-Mounted optics replace removable irons automatically; P320/M590 keep their fixed irons.
+Mounted optics replace removable irons automatically; M590 keeps its fixed irons.
+P320 is irons-only and supports the laser and suppressor.
 The [EXPS3 asset contract](assets/attachments/eotech-exps3-0/README.md) describes
 shared Picatinny geometry, clearance checks and visual limitations.
 

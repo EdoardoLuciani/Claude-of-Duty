@@ -322,10 +322,13 @@ export class MarketOverlay {
       if (!line) continue;
       const value = build.config[line.slot] ?? '';
       if (control.select.value !== value) control.select.value = value;
+      let compatible = false;
       for (const { offer, option } of control.options) {
+        compatible ||= offer.compatible;
         if (option.hidden !== !offer.compatible) option.hidden = !offer.compatible;
         if (option.disabled !== !offer.available) option.disabled = !offer.available;
       }
+      control.select.disabled = !compatible;
       setText(control.cost, line.cost ? `+${line.cost}` : '0');
       if (line.discarded) discarded += `${discarded ? ' · ' : ''}${line.discarded}`;
     }

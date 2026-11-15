@@ -48,7 +48,7 @@ After `bun run assets`, run:
 blender -b -t 2 --python-exit-code 1 --python tools/blender/check_picatinny.py
 ```
 
-This reads the actual generated meshes: fourteen weapon interfaces, five clamp
+This reads the actual generated meshes: thirteen weapon interfaces, five clamp
 assemblies, independent profile/pitch/depth rays and an inset slotted solid that
 rejects penetration rather than exempting the entire mating rail. Then run each
 weapon's `check.py` for surrounding geometry, mechanisms, hands and combined slots.

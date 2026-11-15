@@ -319,7 +319,8 @@ the installed exit for ballistics/FX; ejection stays at `SOCKET_ejection`.
 Attachments change no ballistic/handling stats. Prewarm covers every loaded
 attachment and both iron/muzzle base states. Inspection accepts an explicit config
 or defaults to the stored one without mutating gameplay. MCX/MPX are iron-sight bases
-with shared optics and removable suppressors.
+with shared optics and removable suppressors. P320 keeps fixed iron sights with no
+optic mount or optic fits; its optional laser and compact suppressor remain independent.
 
 Per-weapon datums/clearances live in `assets/weapons/*/README.md` and
 `assets/attachments/*/README.md`. Blender fit checks load built attachments through

@@ -419,6 +419,26 @@ Object.assign(weapons, {
 });
 market.openShop();
 market.credits = 1350;
+assert(market.beginBuild('pistol'));
+assert(
+  market
+    .getHudState()
+    .attachments.filter((offer): boolean => offer.slot === 'optic')
+    .every((offer): boolean => !offer.compatible),
+  'pistol offers no optic customization'
+);
+for (const optic of ['rmr', 'acog', 'scope', 'exps3'] as const)
+  assert(!market.setBuild({ ...BASE_ATTACHMENTS, optic }), `${optic} cannot replace pistol irons`);
+assert(
+  market.setBuild({ optic: null, rail: 'laser', muzzle: 'suppressor' }),
+  'pistol laser and suppressor remain compatible together'
+);
+assert.deepEqual(
+  weapons.getAttachments('pistol'),
+  BASE_ATTACHMENTS,
+  'draft preserves pistol irons'
+);
+market.cancelBuild();
 const redDotLaser = { ...BASE_ATTACHMENTS, optic: 'rmr', rail: 'laser' } as const;
 assert(market.beginBuild('rifle') && market.setBuild(redDotLaser));
 assert.equal(market.getHudState().build?.total, 450, 'owned gun charges attachments only');

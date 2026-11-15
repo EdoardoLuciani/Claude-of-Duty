@@ -48,6 +48,6 @@ bun tools/capture.ts --port=5714 --weapon=pistol --muzzle=suppressor \
 Generated Blender/native GLB/cooked products stay ignored. The cook preserves
 geometry without simplification. The P320-owned
 [fit and sightline contract](../../weapons/p320-compact/README.md#compact-9mm-suppressor-714)
-checks all eight clips at 120 Hz, both actual deformed hands, slide/frame,
-three optics and TOR Mini. Loaded-rest SIGLITE sightline clears the top of the
+checks all eight clips at 120 Hz, both actual deformed hands, slide/frame
+and TOR Mini. Loaded-rest SIGLITE sightline clears the top of the
 can by 2.5 mm; no raised sights or runtime sightline workaround is needed.

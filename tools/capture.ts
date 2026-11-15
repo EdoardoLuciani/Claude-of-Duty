@@ -3,7 +3,7 @@
  * Deterministic native-WebGPU screenshot harness.
  * Usage: bun tools/capture.ts --shot=hero --out=/tmp/hero.png
  *        bun tools/capture.ts --reload --out=/tmp/reload
- *        bun tools/capture.ts --weapon=pistol --optic=scope --shot=ads --out=/tmp/p320.png
+ *        bun tools/capture.ts --weapon=pistol --muzzle=suppressor --shot=ads --out=/tmp/p320.png
  */
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';

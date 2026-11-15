@@ -110,14 +110,14 @@
     }
   },
   "stats": {
-    "triangles": 23378,
-    "vertices": 47471,
+    "triangles": 22192,
+    "vertices": 43804,
     "meshes": 3,
     "primitives": 3,
     "materials": 1,
     "textureImages": 4,
     "joints": 9,
-    "bytes": 5470428
+    "bytes": 5385996
   },
   "textureResolutions": {
     "base": 1024,
@@ -129,19 +129,6 @@
   "handAnimation": "Blender wrist and finger controls; shared runtime skins and shoulder IK",
   "source": "tools/blender/p320/build.py + tools/blender/p320/ + tools/blender/p320/actions.py + tools/blender/p320/hand-reference.ts",
   "attachments": {
-    "optic": {
-      "mount": "MOUNT_optic",
-      "parent": "slide",
-      "railContact": [
-        0,
-        0.066,
-        -0.003
-      ],
-      "railLength": 0.18,
-      "fixedIrons": true,
-      "ironSightHeight": 0.0537,
-      "support": "Recessed plate and see-through cantilever rail; clears the ejection port"
-    },
     "muzzle": {
       "mount": "MOUNT_muzzle",
       "parent": "barrel",

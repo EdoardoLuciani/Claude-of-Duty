@@ -124,20 +124,6 @@ def build_geometry(asset):
     cut(shroud,cyl('CUT',(0,.127,.037),.00765,.017,None,None,'Y',64,0))
     # Browning tilt raises the barrel inside the retracted slide's front face.
     cut(shroud,cyl('CUT',(0,.127,.040),.00765,.017,None,None,'Y',64,0))
-    # Optics-ready pocket, closed by the permanently authored support plate.
-    rounded_cut(shroud,(0,.003,.050),(.020,.057,.0024),.0005)
-    box('Optic plate | recessed foot',(0,.003,.0498),(.0198,.0568,.002),steel,slide,.0003)
-    # See-through cantilever rail supports the PM II's 177 mm mounting foot.
-    # Its open centre preserves the fixed SIGLITE ray below the rail deck.
-    for side in (-1,1):
-        box('Optic bridge | side support',(side*.0065,.003,.0565),(.002,.056,.012),steel,slide,.0003)
-    for outline, spans in [
-        (picatinny.section(.066,.061,slot=True), [(-.087,.093)]),
-        (picatinny.section(.066,.061), picatinny.lands(-.087,.093,.003)),
-    ]:
-        for a,b in spans:
-            vertices,faces=picatinny.prism(outline,a,b)
-            mesh('Optic bridge | rail deck',vertices,faces,steel,slide,0)
     cut(shroud,cyl('CUT',(0,.127,.025),.0044,.017,None,None,'Y',48,0))
     rounded_cut(shroud,(.009,.049,.045),(.023,.032,.021),.0010)
     for side in (-1,1):
@@ -312,7 +298,6 @@ def build_geometry(asset):
     # Sockets exported in game axes via glTF +Y-up conversion.
     for name,pos,parent in [('SOCKET_muzzle',(0,.1445,.037),barrel),('SOCKET_ejection',(.015,.048,.042),slide),
                             ('SOCKET_sight',(0,-.033,.0537),rig),
-                            ('MOUNT_optic',(0,.003,.066),slide),
                             ('MOUNT_muzzle',(0,.132,.037),barrel),
                             ('MOUNT_rail',(0,.122,.002),body)]:
         # Keep authored world coordinates under offset pivots.

@@ -3,7 +3,7 @@ import math
 import bpy
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
-from .attachments import attachment_geometry, optic_geometry
+from .attachments import attachment_geometry
 
 
 def check_suppressor(clips):
@@ -18,7 +18,6 @@ def check_suppressor(clips):
     vertices, faces, exit = attachment_geometry('suppressor9mm', 'SOCKET_muzzle')
     assert (exit-Vector((0, .135, 0))).length < 1e-6
     can = BVHTree.FromPolygons(vertices, faces)
-    optics = optic_geometry()
     laser_vertices, laser_faces, emitter = attachment_geometry('laser', 'SOCKET_laser')
     # Test the evaluated mechanical skin used by runtime, not the sparse
     # editable controls (their subframe interpolation differs from the bake).
@@ -62,10 +61,6 @@ def check_suppressor(clips):
                                              [tuple(p.vertices) for p in mesh.polygons])
                 assert not can.overlap(target), (name, sample, obj.name, 'can intersection')
                 evaluated.to_mesh_clear()
-            for id, (points, polygons, _) in optics.items():
-                transform = inverse @ bpy.data.objects['MOUNT_optic'].matrix_world
-                target = BVHTree.FromPolygons([transform @ p for p in points], polygons)
-                assert not can.overlap(target), (name, sample, id, 'can/optic')
             transform = inverse @ bpy.data.objects['MOUNT_rail'].matrix_world
             laser = BVHTree.FromPolygons([transform @ p for p in laser_vertices], laser_faces)
             assert not can.overlap(laser), (name, sample, 'can/TOR Mini')
@@ -75,11 +70,5 @@ def check_suppressor(clips):
                 ray = inverse @ rig.matrix_world @ Vector((0, -.026, .0537))
                 direction = (inverse.to_3x3() @ rig.matrix_world.to_3x3() @ Vector((0, 1, 0))).normalized()
                 assert can.ray_cast(ray, direction, 1)[0] is None, 'can blocks fixed SIGLITE aim ray'
-            if name == 'Idle' and sample == 0:
-                # Every supported optic's actual optical datum, not its housing bounds.
-                optic_mount = inverse @ bpy.data.objects['MOUNT_optic'].matrix_world
-                forward = (optic_mount.to_3x3() @ Vector((0, 1, 0))).normalized()
-                for id, (_, _, sight) in optics.items():
-                    assert can.ray_cast(optic_mount @ sight, forward, 1)[0] is None, id + ' sightline blocked'
             count += 1
-    print('P320_SUPPRESSOR_OK:', count, 'poses at 120Hz; barrel parent, weapon/slide, both hands, three optics, TOR Mini/emitter; loaded-rest iron and optic aim rays')
+    print('P320_SUPPRESSOR_OK:', count, 'poses at 120Hz; barrel parent, weapon/slide, both hands, TOR Mini/emitter; loaded-rest iron aim ray')

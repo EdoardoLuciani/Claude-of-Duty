@@ -471,15 +471,8 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     hipRot: [-0.05, 0.066, -0.115],
     adsCant: [0, 0, 0.003],
     eyeRelief: 0.34,
-    // Long-relief game fit: compensate each ocular's distance from the slide
-    // mount to retain the iron-sight wrist extension, not a rifle-to-face pose.
+    // Fixed iron sights; only the under-barrel laser and compact can are supported.
     fits: {
-      optic: {
-        rmr: { eyeRelief: 0.394 },
-        acog: { eyeRelief: 0.308 },
-        scope: { eyeRelief: 0.2 },
-        exps3: { eyeRelief: 0.353 },
-      },
       rail: { laser: {} },
       muzzle: { suppressor: { model: 'suppressor9mm' } },
     },

@@ -1,6 +1,6 @@
 # EOTECH EXPS3-0 attachment
 
-Shared gameplay optic on all seven weapons, with a 68 MOA ring / 1 MOA dot
+Shared gameplay optic on all weapons except P320, with a 68 MOA ring / 1 MOA dot
 and the red dot's 0.62 ADS zoom. `tools/blender/exps3.py` owns geometry/export;
 `exps3_bake.py` owns the atlas. Blend/native GLB/maps/manifest and cooked runtime
 GLB are generated products. References, rights and visual limitations live in
@@ -42,9 +42,8 @@ verifies every clamp and weapon rail against the same profile.
 | Weapon / API id | EXPS3 eye relief |
 | --- | --- |
 | M4A1 / `rifle`, MCX / `mcx`, MPX / `smg`, EVOLYS / `lmg`, M590 / `shotgun`, AX338 / `sniper` | 200 mm |
-| P320 / `pistol` | 353 mm (preserves the extended pistol hold) |
 
-Mounted optics replace removable irons automatically; P320/M590 retain fixed irons.
+Mounted optics replace removable irons automatically; M590 retains fixed irons.
 EXPS3 uses the existing market build/ownership path (350 credits), gameplay solver
 and inspection preview. `?attachmentOptic=exps3` configures the default, owned M4
 at boot; capture tooling uses `applyBuild()`.
