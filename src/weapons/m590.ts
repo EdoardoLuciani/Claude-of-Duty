@@ -37,8 +37,7 @@ export function makeM590Model(gltf: GLTF): M590Model {
     gltf,
     'M590_RIG',
     ['Idle', ...Object.values(ALIASES)],
-    manifest.clips,
-    scene
+    manifest.clips
   );
   const converted = convertWeaponScene(scene, (_source, material): void => {
     for (const value of Object.values(material as object)) {

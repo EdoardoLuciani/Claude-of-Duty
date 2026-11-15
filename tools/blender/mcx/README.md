@@ -20,14 +20,16 @@ Save editable Idle/modifiers before deterministic triangulation/runtime preparat
 The build consumes checked-in hand calibration and shared arm appearance; it does
 not execute gameplay or rewrite calibration. Exported wrists/fingers drive the
 shared runtime arm rig, with upper/forearm IK solved at runtime. Review skins are
-excluded from the weapon GLB. Preserve fractional endpoints, LINEAR motion,
-CONSTANT/STEP visibility and explicit resets. Hidden magazine scales must not
-collapse wrist contact trajectories.
+excluded from the weapon GLB. Hands and equip motion are sparse BEZIER poses in
+the saved source; contact windows key the glove on the moving magazine or latch
+every frame. Export bakes them to the LINEAR frame lattice. Preserve fractional
+endpoints, CONSTANT/STEP visibility and explicit resets. Hidden magazine scales
+must not collapse wrist contact trajectories.
 
 The single-influence mechanical skin retains its original helper controls;
-magazines and showcase case remain independent. The adapter preserves the native
-coordinate frame and rebases finger rotations once on load. No exporter hooks or
-GLB repair.
+magazines and showcase case remain independent. The adapter rebases the native
++X-forward scene, skin, curves and origin into game space once on load, like MPX.
+No exporter hooks or GLB repair.
 
 Opaque pigments use per-corner colors; UV1 selects padded scalar tiles.
 Original UV0 albedo/full-normal pixels remain; roughness grain uses its source

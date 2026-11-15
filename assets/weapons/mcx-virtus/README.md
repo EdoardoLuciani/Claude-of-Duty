@@ -8,7 +8,7 @@ are shared attachments, not integrated geometry. Original art; dimensions and fi
 [Shared workflow](../../../tools/blender/README.md)
 
 Python is authority; native blend/GLB/maps/manifest and cooked runtime GLB are
-generated. The adapter converts the native coordinate frame and samples authored
+generated. The adapter rebases the native frame once on load and samples authored
 mechanism, wrist/finger and equip actions. Shared upper/forearm IK, mounted optics
 and pooled cases remain runtime-owned.
 Preserve STEP magazine visibility, attachment seating and reload/fold clearance.
@@ -44,8 +44,8 @@ The saved source includes `MCX | authored hands (shared appearance)`. The shared
 review-arm baker poses these skins from the same native controls exported to the
 game; the skins themselves remain excluded from the weapon GLB. Native actions
 drive wrists/fingers through the shared runtime rig; upper/forearm IK responds to
-the live stance. The MCX adapter preserves its translated native frame and
-converts finger-control rotations into the shared game basis once on load.
+the live stance. The MCX adapter rebases the whole native scene, skin, curves and
+origin into game space once on load, then uses the shared wrist targets.
 
 Select a paired mechanism/hand clip in Blender's Python console:
 

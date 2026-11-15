@@ -6,6 +6,11 @@
   "gltf_up": "+Y",
   "gltf_forward": "+X",
   "gltf_ejection": "+Z",
+  "runtime_origin": [
+    0,
+    0.07,
+    -0.14
+  ],
   "clips": {
     "Idle": {
       "frames": [

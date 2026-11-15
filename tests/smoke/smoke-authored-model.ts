@@ -21,7 +21,11 @@ import {
   isAttachmentConfig,
   type AttachmentConfig,
 } from '../../src/weapons/attachments.ts';
-import { authoredModel, checkAuthoredDuration } from '../../src/weapons/authored-model.ts';
+import {
+  authoredModel,
+  checkAuthoredDuration,
+  rebaseNativeWeapon,
+} from '../../src/weapons/authored-model.ts';
 import { WEAPON_DEFS, WEAPON_IDS } from '../../src/weapons/defs.ts';
 import { Arm } from '../../src/weapons/hands.ts';
 import { WeaponLaser } from '../../src/weapons/laser.ts';
@@ -300,7 +304,39 @@ for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
     );
     assert.equal(entry.attachments, previousConfig, 'failed staging preserves the configuration');
   }
-  // MCX retains its translated/rotated native frame. Cached ADS must agree
+  // A posed native skin deforms exactly as before rebasing, moved into game space.
+  {
+    const skinRoot = new THREE.Group();
+    skinRoot.name = 'SKIN_RIG';
+    skinRoot.position.set(0.1, -0.02, 0.03);
+    skinRoot.rotation.set(0.2, -0.4, 0.1);
+    const bone = new THREE.Bone();
+    bone.position.set(0.05, 0.01, -0.02);
+    skinRoot.add(bone);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute([0.08, 0.02, -0.01], 3));
+    geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute([0, 0, 0, 0], 4));
+    geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute([1, 0, 0, 0], 4));
+    const skin = new THREE.SkinnedMesh(geometry);
+    skin.position.set(-0.01, 0.02, 0);
+    skinRoot.add(skin);
+    const skinScene = new THREE.Group();
+    skinScene.add(skinRoot);
+    skinScene.updateMatrixWorld(true);
+    skin.bind(new THREE.Skeleton([bone]));
+    bone.position.x += 0.03;
+    bone.rotation.set(0.3, 0.2, -0.5);
+    const deformed = (): THREE.Vector3 => {
+      skinScene.updateMatrixWorld(true);
+      return skin.getVertexPosition(0, new THREE.Vector3()).applyMatrix4(skin.matrixWorld);
+    };
+    const expected = deformed()
+      .applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2)
+      .add(new THREE.Vector3(0, 0.07, -0.14));
+    rebaseNativeWeapon(fixture<GLTF>({ scene: skinScene, animations: [] }), [0, 0.07, -0.14]);
+    assert(deformed().distanceTo(expected) < 1e-7, 'rebased skin matches the source deformation');
+  }
+  // MCX rebases its native frame and origin on load. Cached ADS must agree
   // with real mounted glass, and remounting during a rig pose must not bake it.
   const mcxScene = new THREE.Group(),
     mcxRoot = new THREE.Group();
@@ -399,7 +435,7 @@ for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
   const mcxExpected = asset.sight.clone().applyMatrix4(mcxMount.matrixWorld);
   assert(
     mcxMounted.sight.distanceTo(mcxExpected) < 1e-10,
-    'MCX ADS includes native wrapper basis/offset'
+    'MCX ADS includes the native basis/origin'
   );
   releaseAttachmentMounts(mcxMounted);
   mcxRoot.rotation.y = 0.3;

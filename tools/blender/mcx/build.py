@@ -19,7 +19,7 @@ from mcx.export import export_asset, prepare_surfaces
 from mcx.geometry import build_geometry
 from mcx.finishes import FINISH_LOOKUP_SIZE
 from mcx.materials import TEXTURE_SIZE, build_materials
-from mcx.hands import author_hands
+from mcx.hands import RUNTIME_ORIGIN, author_hands, bake_export_actions
 from mcx.studio import build_studio
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -63,6 +63,7 @@ def build(output, render=False, quick=False):
     select_clip(parts, clips, 'Idle')
     bpy.ops.wm.save_as_mainfile(filepath=str(output / 'mcx-virtus.blend'))
 
+    bake_export_actions(parts, clips)
     restore_rest(parts, rest)
     stats = export_asset(asset, parts, output)
     manifest = {
@@ -73,6 +74,7 @@ def build(output, render=False, quick=False):
         'gltf_up': '+Y',
         'gltf_forward': '+X',
         'gltf_ejection': '+Z',
+        'runtime_origin': RUNTIME_ORIGIN,
         'clips': clips,
         'stats': stats,
         'textures': {
