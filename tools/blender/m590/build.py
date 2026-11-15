@@ -198,7 +198,7 @@ def build(output, render=False, quick=False):
     # Reference: jerkingthetrigger.com/2013/10/29/aimpro-tactical-ghost-ring-rail/
     # Scout-style game-art extension for the PM II, not AIMPRO manufacturer CAD.
     # Keep receiver screw seats and fixed ghost-ring ears; cantilever grows forward.
-    rail_front=-.2572076;rail_pitch=picatinny.PITCH;rail_top=.091;base_top=.0865
+    rail_front=-.2572076;rail_top=.091;base_top=.0865
     base_rings=[[(x,y,rail_front) for x,y in (
         (-picatinny.NECK_HALF,.083),(0,.083),(picatinny.NECK_HALF,.083),
         (picatinny.NECK_HALF,base_top),(0,base_top),(-picatinny.NECK_HALF,base_top))]]

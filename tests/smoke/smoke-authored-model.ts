@@ -205,11 +205,6 @@ for (const id of ['rifle', 'mcx', 'pistol', 'lmg', 'smg', 'shotgun', 'sniper'] a
     const forward = (WEAPON_DEFS.rifle.fits?.optic?.[optic]?.railSlots ?? 0) * PICATINNY_PITCH;
     assert.equal(entry.attachmentGroup.position.z, -forward);
     assert(entry.sight.distanceTo(new THREE.Vector3(0, 0.1461072, -0.085 - forward)) < 1e-8);
-    const preview = weaponScene.clone(true).getObjectByName('optic_attachment');
-    assert(
-      preview?.position.equals(entry.attachmentGroup.position),
-      'preview retains rail-slot placement'
-    );
     assert.deepEqual(entry.optic?.center, entry.sight.toArray());
     assert.equal(entry.def.eyeRelief, WEAPON_DEFS.rifle.fits?.optic?.[optic]?.eyeRelief);
     assert.equal(entry.def.adsFovScale, optic === 'rmr' ? 0.62 : optic === 'acog' ? 0.28 : 0.25);

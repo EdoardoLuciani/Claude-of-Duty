@@ -134,7 +134,7 @@ def build():
         for side in (-1,1):
             box('Ring clamp ear',(side*.020,axis,z),(.007,.014,.023),black,optic,.0007)
             fastener('Ring clamp screw',side*.024,axis,z,.0028,optic)
-    base=box('AI mount base',(0,.126,-.089),(.040,.011,.177),black,optic,.0007)
+    box('AI mount base',(0,.126,-.089),(.040,.011,.177),black,optic,.0007)
     for z in (-.024,-.154):
         box('Mount rail clamp',(0,.11825,z),(.031,.0045,.025),black,optic,.0001)
     picatinny.cut_channel([o for o in optic.children if o.name.startswith(('AI mount base','AI one-piece ring pedestal','Mount rail clamp'))],

@@ -454,9 +454,7 @@ def build_geometry(materials):
     for o in list(asset.objects):
         if o.type=='MESH' and o.parent in (mag,round_live):
             clone=o.copy();clone.data=o.data;asset.objects.link(clone);clone.parent=spare if o.parent==mag else round_spare;clone.name=o.name+' | spare'
-    # Right RIS II rail: TOR Mini channel bed, rotated so the body sits outboard.
-    # Place ahead of the support hand and behind the FSP; forward stays -Z.
-    # Keep the TOR Mini ahead of the actual wraparound support hand.
+    # Right RIS II seat: TOR Mini sits outboard, ahead of the support hand and FSP.
     rail_mount=empty('MOUNT_rail',(.028321,BORE,-.250-16*picatinny.PITCH),guard_root)
     rail_mount.rotation_euler.y=-math.pi/2
     parts=[rig,bolt,head,handle,trigger,cover,release,mag,spare,case,round_live,round_spare]
