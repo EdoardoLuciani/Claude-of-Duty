@@ -4,7 +4,7 @@ import type { Assembler } from './builder.ts';
 import { BOX, BOX_SOFT, IDENT, LL } from './kit.ts';
 import { STREET, ALLEYS } from './level/layout.ts';
 import { ALLEY_MOUTHS, groundY } from './queries.ts';
-import { fbm3, keyedRng, patchGeometry, paintMasks } from './util.ts';
+import { fbm3, keyedRng, paintMasks } from './util.ts';
 
 /**
  * WORLD — ground plane, road, kerbs and the stuff wind piles against them.
@@ -64,35 +64,6 @@ export function buildGround(A: Assembler): void {
   A.add('road_dust', road);
   road.dispose();
 
-  // Old tarmac showing through the dust where wheels have polished it: long
-  // patches in the ruts, and a scatter of intact pavement elsewhere.
-  for (let i = 0; i < 30; i++) {
-    const rng = keyedRng('ground-tarmac', i);
-    const rut = rng.float() < 0.62;
-    const x = rut
-      ? (rng.float() < 0.5 ? -1 : 1) * rng.range(1.2, 2.1)
-      : rng.range(-HW + 0.5, HW - 0.5);
-    const z = rng.range(zMin + 2, zMax - 2);
-    // sit just above the local camber, and run along Z where camber is constant
-    const camber = (1 - (x / HW) ** 2) * 0.055 + 0.042;
-    const g = patchGeometry(rng, rng.range(0.45, 1.1), { lobes: 11, wobble: 0.5 });
-    A.addOnce(
-      'asphalt',
-      g,
-      LL(
-        IDENT,
-        x,
-        camber,
-        z,
-        rng.float() * 0.4,
-        1,
-        1,
-        rut ? rng.range(2.0, 4.5) : rng.range(0.7, 1.4)
-      ),
-      { masks: [0.35, 0.25, 0.1] }
-    );
-  }
-
   // ------------------------------------------------------- pavement slabs --
   for (const side of [-1, 1]) {
     const rng = keyedRng('pavement', side);
@@ -146,15 +117,6 @@ export function buildGround(A: Assembler): void {
           }
         );
       }
-      if (!legacyMouth && rng.float() < 0.5) {
-        const g = patchGeometry(rng, rng.range(0.25, 0.7), { lobes: 9, wobble: 0.6 });
-        const px = cx + rng.range(-0.5, 0.5);
-        const pz = z + segLen / 2 + rng.range(-1, 1);
-        const ry = rng.float() * 6.28;
-        if (mouths.some((mouth): boolean => pz > mouth.z0 && pz < mouth.z1)) g.dispose();
-        else
-          A.addOnce('concrete', g, LL(IDENT, px, h + 0.006, pz, ry), { masks: [0.1, 1.0, 0.55] });
-      }
       z += segLen + gap;
     }
   }
@@ -181,10 +143,7 @@ export function buildGround(A: Assembler): void {
   // --------------------------------------------------- material seams --
   // Every place two ground materials meet is otherwise a razor-straight polygon
   // edge with a value step across it — the loudest artefact in any low-angle
-  // shot. A real join is interlocked: the gravel creeps out over the mud, the
-  // mud washes in over the gravel, and loose stones lie across the line. So each
-  // boundary gets a scatter of irregular patches of BOTH materials straddling
-  // it, at 0.6-1.2 m, plus a line of pebbles.
+  // shot. Loose stones lying across the line break it up.
   const seam = (
     ax: number,
     az: number,
@@ -205,35 +164,6 @@ export function buildGround(A: Assembler): void {
       const t = ((i + sr.range(0.15, 0.85)) / n) * len;
       const px = ax + tx * t;
       const pz = az + tz * t;
-      for (const [key, side] of [
-        [keyA, -1],
-        [keyB, 1],
-      ] satisfies [string, number][]) {
-        if (sr.float() < 0.22) continue;
-        const off = side * sr.range(-0.12, 0.62);
-        // Ground each patch at its own position: a seam can straddle surfaces at
-        // different heights (alley overlay vs undulating sand), and a fixed y
-        // leaves patches and stones hovering over the lower side.
-        const qx = px + nxs * off;
-        const qz = pz + nzs * off;
-        const qy = groundY(qx, qz);
-        const g = patchGeometry(sr, sr.range(0.3, 0.62), { lobes: 10, wobble: 0.6 });
-        A.addOnce(
-          key,
-          g,
-          LL(
-            IDENT,
-            qx,
-            qy + 0.006 + sr.range(0, 0.004),
-            qz,
-            sr.float() * 6.28,
-            1,
-            1,
-            sr.range(0.55, 1.0)
-          ),
-          { masks: [0.15, sr.range(0.3, 0.8), sr.range(0.2, 0.5)] }
-        );
-      }
       // loose stones lying across the join
       if (A.has('rock_b')) {
         for (let k = 0; k < sr.int(1, 3); k++) {
@@ -260,10 +190,8 @@ export function buildGround(A: Assembler): void {
       }
     }
   };
-  // The gutter: wind-blown sand and grit piles against the kerb on the road side,
-  // which is what actually hides the value step where the road surface meets the
-  // pavement in a low camera. This is the seam the eye lands on first in any
-  // street-level frame.
+  // The gutter, where the road surface meets the pavement: the seam the eye
+  // lands on first in any street-level frame.
   seam(-HW + 0.08, zMin + 2, -HW + 0.08, zMax - 2, 'sand', 'road_dust');
   seam(HW - 0.08, zMin + 2, HW - 0.08, zMax - 2, 'sand', 'road_dust');
   // the pavement / open-ground line down both sides of the street, and the
@@ -278,49 +206,7 @@ export function buildGround(A: Assembler): void {
     seam(ax1, az0, ax1, az1, a.surface, 'sand');
   }
 
-  // ------------------------------------------- drifts, stains and covers --
-  // Sand blown against the kerbs and building lines: the single cheapest thing
-  // that stops a street reading as a clean box of geometry.
-  for (let i = 0; i < 130; i++) {
-    const rng = keyedRng('ground-drift', i);
-    const side = rng.float() < 0.5 ? -1 : 1;
-    const againstWall = rng.float() < 0.55;
-    const x = againstWall
-      ? side * (STREET.kerb - rng.range(0.05, 0.9))
-      : side * (HW + rng.range(-0.35, 0.5));
-    const z = rng.range(zMin + 2, zMax - 2);
-    // On the road the surface is cambered and rutted, so a flat drift has to sit
-    // above the local crown or it disappears into the tarmac.
-    const y = againstWall
-      ? WH + 0.012
-      : Math.abs(x) < HW
-        ? (1 - (x / HW) ** 2) * 0.055 + 0.05
-        : WH + 0.01;
-    const g = patchGeometry(rng, rng.range(0.35, 1.5), { lobes: 9, wobble: 0.5 });
-    A.addOnce('sand', g, LL(IDENT, x, y, z, rng.float() * 6.28, 1, 1, rng.range(0.5, 1.0)), {
-      masks: [0.15, 0.5, 0.3],
-    });
-  }
-  for (let i = 0; i < 26; i++) {
-    const rng = keyedRng('ground-stain', i);
-    const g = patchGeometry(rng, rng.range(0.5, 1.8), { lobes: 10, wobble: 0.6 });
-    const px = rng.range(-HW + 0.4, HW - 0.4);
-    A.addOnce(
-      'dirt',
-      g,
-      LL(
-        IDENT,
-        px,
-        (1 - (px / HW) ** 2) * 0.055 + 0.048,
-        rng.range(zMin + 3, zMax - 3),
-        rng.float() * 6.28,
-        1,
-        1,
-        rng.range(0.4, 0.9)
-      ),
-      { masks: [0.1, 0.85, 0.5] }
-    );
-  }
+  // ------------------------------------------------------------ covers --
   // manholes and gully gratings
   for (let i = 0; i < 7; i++) {
     const rng = keyedRng('manhole', i);

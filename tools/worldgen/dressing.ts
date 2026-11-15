@@ -23,7 +23,6 @@ import { isOpen, groundY } from './queries.ts';
 import {
   clothGeometry,
   catenaryTube,
-  patchGeometry,
   driftBerm,
   chamferBox,
   fillMasks,
@@ -46,42 +45,15 @@ import {
 const _m = new THREE.Matrix4();
 const _box = new THREE.Box3();
 
-/**
- * A dirt/rubble skirt at the base of a heavy prop.
- *
- * Nothing in the real world meets the ground on a clean line: there is a dust
- * halo where it was dragged into place, grit swept up against it, and a few
- * pebbles that got kicked out. Without this every crate, drum and barrier reads
- * as a decal pasted onto the deck — the single cheapest grounding cue there is.
- */
-export function groundSkirt(
+/** A few pebbles kicked out around the base of a heavy prop. */
+function scatterPebbles(
   A: Assembler,
   rng: Rng,
   x: number,
-  y: number,
   z: number,
   radius: number,
-  opts: { key?: string; grime?: number; ao?: number; pebbles?: number } = {}
+  n: number
 ): void {
-  const r = radius * rng.range(1.15, 1.55);
-  const g = patchGeometry(rng, r, { lobes: 11, wobble: 0.5 });
-  A.addOnce(
-    opts.key ?? 'dirt',
-    g,
-    LL(IDENT, x, y + 0.011 + rng.range(0, 0.005), z, rng.float() * 6.28, 1, 1, rng.range(0.7, 1.0)),
-    { masks: [0.08, opts.grime ?? 0.85, opts.ao ?? 0.55] }
-  );
-  // a second, tighter and darker ring right at the contact line
-  const g2 = patchGeometry(rng, radius * rng.range(0.75, 1.0), { lobes: 9, wobble: 0.35 });
-  A.addOnce(
-    'dirt',
-    g2,
-    LL(IDENT, x, y + 0.018 + rng.range(0, 0.004), z, rng.float() * 6.28, 1, 1, 0.85),
-    {
-      masks: [0.05, 1.0, 0.8],
-    }
-  );
-  const n = opts.pebbles ?? rng.int(4, 8);
   for (let i = 0; i < n; i++) {
     const a = rng.float() * 6.28;
     const rr = radius * rng.range(0.75, 1.5);
@@ -271,9 +243,6 @@ export function registerDressingProps(A: Assembler): Assembler {
 // ================================================================== street ==
 export function dressStreet(A: Assembler): void {
   marketStalls(A);
-  barrierGrounding(A);
-  wreckScorch(A);
-  palmGrounding(A);
   streetLampGrounding(A);
   overheadLines(A);
   facadeHangings(A);
@@ -400,9 +369,9 @@ function streetFloor(A: Assembler): void {
     );
   }
 
-  // ---- 3. tyre tracks polished into the dust along the driving line ----
-  // Two ruts, laid as long overlapping strips so the line wanders instead of
-  // ruling a straight edge down the middle of the frame.
+  // ---- 3. dust ridges thrown up between the wheel tracks ----
+  // Laid in long overlapping runs so the line wanders instead of ruling a
+  // straight edge down the middle of the frame.
   for (const side of [-1, 1]) {
     const rng = keyedRng('street-rut', side);
     let z = zMin + 2;
@@ -410,24 +379,6 @@ function streetFloor(A: Assembler): void {
       const len = rng.range(5.0, 13.0);
       const x = side * rng.range(1.25, 1.95);
       const camber = (1 - (x / HW) ** 2) * 0.055 + 0.038;
-      const g = patchGeometry(rng, 0.34, { lobes: 13, wobble: 0.28 });
-      A.addOnce(
-        'road_rut',
-        g,
-        LL(IDENT, x, camber, z + len / 2, rng.range(-0.03, 0.03), 1, 1, len / 0.68),
-        { masks: [0.55, 0.5, 0.15] }
-      );
-      // a lighter, wider halo of disturbed dust either side of the polished strip
-      if (rng.float() < 0.7) {
-        const hg = patchGeometry(rng, 0.62, { lobes: 11, wobble: 0.4 });
-        A.addOnce(
-          'road_dust',
-          hg,
-          LL(IDENT, x, camber - 0.004, z + len / 2, rng.range(-0.04, 0.04), 1, 1, len / 1.24),
-          { masks: [0.45, 0.15, 0.08] }
-        );
-      }
-      // the fine dust ridge thrown up between the wheels
       if (rng.float() < 0.6) {
         const dg = driftBerm(rng, len * 0.8, 0.3, 0.035, { nz: 3 });
         A.addOnce(
@@ -442,41 +393,6 @@ function streetFloor(A: Assembler): void {
       z += len + rng.range(0.5, 4.0);
     }
   }
-  // a couple of turning scuffs where vehicles have swung across the road
-  for (let i = 0; i < 8; i++) {
-    const rng = keyedRng('street-scuff', i);
-    const z = rng.range(zMin + 5, zMax - 5);
-    const g = patchGeometry(rng, rng.range(0.5, 1.1), { lobes: 12, wobble: 0.5 });
-    const x = rng.range(-HW + 0.6, HW - 0.6);
-    A.addOnce(
-      'asphalt',
-      g,
-      LL(
-        IDENT,
-        x,
-        (1 - (x / HW) ** 2) * 0.055 + 0.04,
-        z,
-        rng.float() * 3.14,
-        1,
-        1,
-        rng.range(1.4, 2.6)
-      ),
-      { masks: [0.45, 0.4, 0.15] }
-    );
-  }
-
-  // Ground the largest authored set pieces with merged dust patches. The prop
-  // transforms themselves live in level/placements/ and are added by placeBaked().
-  for (const [x, z, radius] of [
-    [-3.35, -6.2, 1.1],
-    [-5.1, -2.0, 0.8],
-    [4.9, -11.5, 0.8],
-    [4.75, 6.2, 0.7],
-    [-5.5, 6.2, 0.55],
-    [5.55, -1.2, 0.72],
-    [5.45, -26.5, 0.55],
-  ])
-    groundSkirt(A, keyedRng('set-piece-skirt', x, z), x, groundY(x, z), z, radius, { pebbles: 0 });
 }
 
 // --- market stalls ----------------------------------------------------------
@@ -485,11 +401,6 @@ function marketStalls(A: Assembler): void {
   for (const [x, z, ry, w] of SET_PIECES.stalls) {
     const rng = keyedRng('stall', x, z);
     const y = groundY(x, z);
-    for (const t of [-0.42, 0.42]) {
-      groundSkirt(A, rng, x + Math.cos(ry) * w * t, y, z - Math.sin(ry) * w * t, 0.4, {
-        pebbles: 0,
-      });
-    }
     const width = w * rng.range(1.02, 1.16);
     const depth = rng.range(1.32, 1.6);
     const keys = [rng.pick(canopy), rng.pick(canopy)];
@@ -517,68 +428,13 @@ function marketStalls(A: Assembler): void {
   }
 }
 
-// --- barriers ---------------------------------------------------------------
-function barrierGrounding(A: Assembler): void {
-  for (const [x, z, ry] of SET_PIECES.jerseys) {
-    const rng = keyedRng('jersey-skirt', x, z);
-    const y = groundY(x, z);
-    for (const t of [-0.55, 0.55]) {
-      groundSkirt(A, rng, x + Math.sin(ry) * t * 1.1, y, z + Math.cos(ry) * t * 1.1, 0.52, {
-        pebbles: 0,
-      });
-    }
-  }
-  for (const [x, z, ry] of [
-    [-4.0, 22.0, 0.1],
-    [4.2, 14.5, -0.15],
-    [-4.3, -1.0, 0.05],
-    [4.3, -12.0, 0.2],
-    [-4.1, -30.0, -0.1],
-    [4.0, -37.5, 0.12],
-    [-2.0, -41.0, 1.5],
-  ]) {
-    const rng = keyedRng('barrier-skirt', x, z);
-    const y = groundY(x, z);
-    for (const t of [-0.4, 0.4]) {
-      groundSkirt(A, rng, x + Math.cos(ry) * t, y, z - Math.sin(ry) * t, 0.62, { pebbles: 0 });
-    }
-  }
-}
-
-// --- wrecks -----------------------------------------------------------------
-function wreckScorch(A: Assembler): void {
-  for (const [x, z] of SET_PIECES.wrecks) {
-    const rng = keyedRng('wreck-scorch', x, z);
-    const y = groundY(x, z);
-    const scorch = patchGeometry(rng, rng.range(2.6, 3.4), { lobes: 11, wobble: 0.5 });
-    A.addOnce('asphalt', scorch, LL(IDENT, x, y + 0.008, z, rng.float() * 6.28, 1, 1, 0.7), {
-      masks: [0.05, 1.0, 0.9],
-    });
-  }
-}
-
-// --- palms ------------------------------------------------------------------
-function palmGrounding(A: Assembler): void {
-  for (const [x, z] of SET_PIECES.palms) {
-    if (x === -9 && z === -10.2) continue; // west-alley spawn occupies this palm base
-    const rng = keyedRng('palm-ground', x, z);
-    const y = groundY(x, z);
-    const patch = patchGeometry(rng, rng.range(0.9, 1.4), { lobes: 10, wobble: 0.45 });
-    A.addOnce('dirt', patch, LL(IDENT, x, y + 0.02, z, rng.float() * 6.28), {
-      masks: [0.1, 0.8, 0.5],
-    });
-  }
-}
-
 // --- street lamps -----------------------------------------------------------
 function streetLampGrounding(A: Assembler): void {
   for (const [x, z] of SET_PIECES.lamps) {
-    const rng = keyedRng('lamp-ground', x, z);
     const y = groundY(x, z);
     const ry = x < 0 ? 0 : Math.PI;
     const armX = x + Math.cos(ry) * 0.88;
     const armZ = z - Math.sin(ry) * 0.88;
-    groundSkirt(A, rng, x, y, z, 0.34, { pebbles: 0 });
     A.lampAnchors.push({ x: armX, y: y + 5.3, z: armZ });
   }
 }
@@ -715,10 +571,6 @@ function rubbleDust(A: Assembler): void {
     const rng = keyedRng('rubble', x, z);
     const y = groundY(x, z);
     rubbleMound(A, rng, x, y, z, radius, count, { key: 'concrete' });
-    const patch = patchGeometry(rng, radius * 1.5, { lobes: 12, wobble: 0.4 });
-    A.addOnce('dirt', patch, LL(IDENT, x, y + 0.012, z, rng.float() * 6.28), {
-      masks: [0.1, 0.9, 0.6],
-    });
   }
 }
 
@@ -845,22 +697,6 @@ function dressBuilding(A: Assembler, rng: Rng, info: BuildingInfo): void {
   // ladder climb-out beside it (1.1 m exit + capsule radius).
   const hole = spec.stairHoles?.[info.floorY.length];
   const blocksHole = (b: THREE.Box3): boolean => !!hole && overlapsRect(b, hole, 1.2);
-  // dust and grit blown into the roof corners
-  for (let i = 0; i < 4; i++) {
-    const g = patchGeometry(rng, rng.range(0.6, 1.6), { lobes: 9, wobble: 0.5 });
-    const matrix = LL(
-      IDENT,
-      rng.range(rx0, rx1),
-      roofY + 0.012,
-      rng.range(rz0, rz1),
-      rng.float() * 6.28,
-      1,
-      1,
-      0.7
-    );
-    if (blocksHole(_box.copy(g.boundingBox!).applyMatrix4(matrix))) g.dispose();
-    else A.addOnce('dirt', g, matrix, { masks: [0.1, 0.85, 0.5] });
-  }
   // rooftop laundry line between the parapets
   if (rs.w > 10 && rng.float() < 0.4) {
     const a = [rs.x - rs.w / 2 + 0.4, roofY + 1.0, rng.range(rz0, rz1)];
@@ -1368,21 +1204,16 @@ export function buildGate(A: Assembler): void {
     set: 0.02,
   });
 
-  // Spilled sand along the foot of the ground-level sandbag run, whose bags
-  // are in level/placements/south-street.ts (centre x, z and yaw).
+  // Pebbles along the foot of the ground-level sandbag run, whose bags are in
+  // level/placements/south-street.ts (centre x, z and yaw).
   const bags = { x: -1.9, z: z + 4.6, ry: 0.1 };
-  const bagY = groundY(bags.x, bags.z);
   for (const lx of [-0.6, 0.6]) {
     const sx = bags.x + Math.cos(bags.ry) * lx;
     const sz = bags.z - Math.sin(bags.ry) * lx;
     // Authored identity, not trig-derived coordinates: V8 and JavaScriptCore
     // can differ by one ULP, which would otherwise hash to a different stream.
     const skirt = keyedRng('bag-skirt', 'gate', lx);
-    groundSkirt(A, skirt, sx, bagY, sz, 0.44, {
-      pebbles: skirt.int(1, 3),
-      key: 'sand',
-      grime: 0.7,
-    });
+    scatterPebbles(A, skirt, sx, sz, 0.44, skirt.int(1, 3));
   }
   // spalled corners and a bullet-scarred face
   rubbleMound(A, rng, -span / 2 - 1.0, 0, z + 1.4, 1.2, 16, { key: 'concrete' });
