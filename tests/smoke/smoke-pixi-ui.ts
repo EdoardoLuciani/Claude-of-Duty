@@ -246,7 +246,15 @@ const dprCanvas = dprHud.canvas;
 dprCanvas.width = 1918;
 dprCanvas.height = 1078;
 const dprView = new ViewSystem(dprHud.renderer);
-dprView.init({ canvas: dprCanvas, width: 1918, height: 1078, resolution: 1, autoDensity: true });
+// Keep this CPU-only layout test independent of WebGPU canvas-format discovery.
+dprView.init({
+  canvas: dprCanvas,
+  width: 1918,
+  height: 1078,
+  resolution: 1,
+  autoDensity: true,
+  format: 'bgra8unorm',
+});
 let dprResizes = 0;
 Object.defineProperty(dprHud.renderer, 'resolution', { get: (): number => dprView.resolution });
 Object.defineProperty(dprHud.renderer, 'screen', {
