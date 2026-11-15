@@ -14,6 +14,7 @@ import {
   replacedNodes,
   isAttachmentConfig,
   hasAttachmentAssets,
+  SLOTS,
   loadAttachments,
   type AttachmentConfig,
   type AttachmentAssets,
@@ -28,13 +29,7 @@ import {
   SPREAD_MODS,
   isWeaponId,
 } from './defs.ts';
-import type {
-  WeaponId,
-  WeaponDef,
-  WeaponMode,
-  PrimaryWeaponId,
-  SecondaryWeaponId,
-} from './defs.ts';
+import type { WeaponId, WeaponDef, WeaponMode } from './defs.ts';
 import { grenadeMesh } from './grenade-mesh.ts';
 import { createWeaponInspection } from './inspection.ts';
 import { WeaponLaser } from './laser.ts';
@@ -425,19 +420,32 @@ export class WeaponSystem {
   canConfigure(id: WeaponId, config: AttachmentConfig): boolean {
     return (
       isAttachmentConfig(config, id) &&
-      this._viewmodel?.weapons.has(id) === true &&
+      this._hasMesh(id) &&
       hasAttachmentAssets(id, config, this._attachments)
     );
   }
 
-  /** Market: fit before swapping ownership, so a rejected build never drops the old gun. */
+  /** Market: change an owned gun's attachments, or buy `id` fitted with `config`, replacing
+   * the gun in its slot and refreshing ammo. A new gun is fitted before ownership changes,
+   * so a rejected build never drops the old gun. */
   applyBuild(id: WeaponId, config: AttachmentConfig): boolean {
     if (this.owns(id)) return this.setAttachments(id, config);
-    return this._equipSlot(
-      id,
-      id === 'pistol' || id === 'smg' || id === 'shotgun' ? SECONDARY_IDS : PRIMARY_IDS,
-      config
-    );
+    if (!this._configureAttachments(id, config)) return false;
+    const state = this._requireState(id);
+    const primary: readonly WeaponId[] = PRIMARY_IDS;
+    for (const weapon of primary.includes(id) ? PRIMARY_IDS : SECONDARY_IDS) {
+      if (weapon !== id && this.owned.delete(weapon)) {
+        this._resetAttachments(weapon);
+        this._boltCycles.delete(weapon);
+      }
+    }
+    this.owned.add(id);
+    this._boltCycles.delete(id);
+    state.mag = state.def.magSize;
+    state.chambered = true;
+    state.reserve = state.def.reserve;
+    this.setWeaponImmediate(id);
+    return true;
   }
 
   /** Synchronous, outside the frame loop; reject changes to unowned/unloaded guns. */
@@ -447,10 +455,12 @@ export class WeaponSystem {
 
   _configureAttachments(id: WeaponId, config: AttachmentConfig): boolean {
     if (!this.canConfigure(id, config)) return false;
-    const entry = this.viewmodel.weapons.get(id);
+    const state = this._requireState(id);
+    if (SLOTS.every((slot): boolean => config[slot] === state.attachments[slot])) return true;
+    const entry = this._viewmodel?.weapons.get(id);
     if (!entry) return false;
     configureWeaponAttachments(entry, config, this._attachments);
-    this._requireState(id).attachments = entry.attachments;
+    state.attachments = entry.attachments;
     if (this.activeId === id) {
       this.viewmodel.reticle.visible = false;
       this.viewmodel.scopeOverlay.visible = false;
@@ -608,38 +618,6 @@ export class WeaponSystem {
   /** True when the player owns `id` — non-owned weapons can't be drawn. */
   owns(id: WeaponId): boolean {
     return this.owned.has(id);
-  }
-
-  /** Market: buy a primary weapon, replacing the others in the primary slot. */
-  equipPrimary(id: PrimaryWeaponId): boolean {
-    return this._equipSlot(id, PRIMARY_IDS);
-  }
-
-  /** Market: buy into a weapon slot, replacing the old gun and refreshing ammo. */
-  _equipSlot(id: WeaponId, slot: readonly WeaponId[], config?: AttachmentConfig): boolean {
-    if (!slot.includes(id) || this.owned.has(id)) return false;
-    if (!this._hasMesh(id)) return false;
-    if (config && !this._configureAttachments(id, config)) return false;
-    for (const weapon of slot) {
-      if (weapon !== id && this.owned.delete(weapon)) {
-        this._resetAttachments(weapon);
-        this._boltCycles.delete(weapon);
-      }
-    }
-    this.owned.add(id);
-    this._boltCycles.delete(id);
-    const s = this.states.get(id);
-    if (s) {
-      s.mag = s.def.magSize;
-      s.chambered = true;
-      s.reserve = s.def.reserve;
-    }
-    this.setWeaponImmediate(id);
-    return true;
-  }
-
-  equipSecondary(id: SecondaryWeaponId): boolean {
-    return this._equipSlot(id, SECONDARY_IDS);
   }
 
   /** Fraction 0..1 of total reserve ammo left across owned weapons (market). */

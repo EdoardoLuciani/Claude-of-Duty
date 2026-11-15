@@ -168,25 +168,18 @@ function makeHarness(): WeaponHarness {
 }
 
 // Retain the real loadout boundary without separate per-weapon fake rigs.
-for (const [equip, first, second] of [
-  ['equipPrimary', 'lmg', 'sniper'],
-  ['equipSecondary', 'smg', 'shotgun'],
+for (const [primary, first, second] of [
+  [true, 'lmg', 'sniper'],
+  [false, 'smg', 'shotgun'],
 ] as const) {
   const { wp } = makeHarness();
   assert.deepEqual(wp.weaponIds, ['rifle', 'pistol']);
-  assert(
-    (equip === 'equipPrimary' ? wp.equipPrimary(first) : wp.equipSecondary(first)) &&
-      !(equip === 'equipPrimary' ? wp.equipPrimary(first) : wp.equipSecondary(first)),
-    'cannot rebuy the equipped weapon'
-  );
-  assert.deepEqual(wp.weaponIds, equip === 'equipPrimary' ? [first, 'pistol'] : ['rifle', first]);
+  assert(wp.applyBuild(first, BASE_ATTACHMENTS), 'a new gun replaces its own slot');
+  assert.deepEqual(wp.weaponIds, primary ? [first, 'pistol'] : ['rifle', first]);
   wp.state.mag = 1;
   assert(wp.reload());
-  assert(
-    (equip === 'equipPrimary' ? wp.equipPrimary(second) : wp.equipSecondary(second)) &&
-      !wp.owns(first)
-  );
-  assert.deepEqual(wp.weaponIds, equip === 'equipPrimary' ? [second, 'pistol'] : ['rifle', second]);
+  assert(wp.applyBuild(second, BASE_ATTACHMENTS) && !wp.owns(first));
+  assert.deepEqual(wp.weaponIds, primary ? [second, 'pistol'] : ['rifle', second]);
   assert(!wp.reloading && wp.tryFire(), 'mid-reload purchase is immediately usable');
   weaponState(wp, first).reserve = 0;
   wp.state.reserve = 1;
@@ -236,9 +229,19 @@ for (const [equip, first, second] of [
     laserEmitter: null,
     sight: new THREE.Vector3(),
   });
-  for (const drop of [(): boolean => wp.equipPrimary('lmg'), (): void => wp.resetForNewGame()]) {
+  for (const drop of [
+    (): boolean => wp.applyBuild('lmg', BASE_ATTACHMENTS),
+    (): void => wp.resetForNewGame(),
+  ]) {
     wp.resetForNewGame();
-    assert(wp.setAttachments('rifle', { ...BASE_ATTACHMENTS, optic: 'rmr' }));
+    wp.state.mag = 1;
+    wp.state.reserve = 0;
+    const ammo = wp.ammo;
+    wp.viewmodel.play('inspect');
+    const clip = wp.viewmodel.clip;
+    assert(wp.applyBuild('rifle', { ...BASE_ATTACHMENTS, optic: 'rmr' }));
+    assert.deepEqual(wp.ammo, ammo, 'owned attachment edits do not refill ammo');
+    assert.equal(wp.viewmodel.clip, clip, 'owned attachment edits do not interrupt handling');
     assert(!irons.visible, 'a mounted optic replaces the removable irons');
     drop();
     assert.equal(weaponState(wp, 'rifle').attachments, BASE_ATTACHMENTS);
@@ -247,7 +250,7 @@ for (const [equip, first, second] of [
 }
 {
   const { wp, shots } = makeHarness();
-  assert(wp.equipSecondary('shotgun') && wp.tryFire());
+  assert(wp.applyBuild('shotgun', BASE_ATTACHMENTS) && wp.tryFire());
   assert.equal(shots.fired, 8, 'one shotgun shell spawns eight pellets');
   assert.equal(wp._pendingShots, 1, 'pellets still produce one accepted-shot event');
 }
@@ -315,6 +318,7 @@ for (const interrupt of [
   'purchase before eject',
   'purchase after eject',
   'purchase after chamber',
+  'rejected build',
   'reload',
 ] as const) {
   const { wp, step, events } = timelineHarness();
@@ -329,7 +333,7 @@ for (const interrupt of [
     if (clip === 'cycle' && name === 'chamber') chamberTimes.push(boltTime);
     wp._onClipEvent(name, clip);
   };
-  assert(wp.equipPrimary('sniper'));
+  assert(wp.applyBuild('sniper', BASE_ATTACHMENTS));
   wp.state.reserve = 0;
   const mag = wp.state.mag;
   assert(wp.tryFire());
@@ -341,6 +345,14 @@ for (const interrupt of [
     for (let i = 0; i < 120 && wp._throwing; i++) step();
     assert(!wp._throwing);
     assert(!wp.state.chambered, 'the short throw replaced cycle before its chamber beat');
+  } else if (interrupt === 'rejected build') {
+    for (let i = 0; i < 17; i++) step();
+    const ammo = wp.ammo;
+    const clip = wp.viewmodel.clip;
+    assert(!wp.applyBuild('lmg', { ...BASE_ATTACHMENTS, optic: 'rmr' }));
+    assert(wp.owns('sniper') && !wp.owns('lmg'));
+    assert.deepEqual(wp.ammo, ammo, 'failed configuration leaves ammo unchanged');
+    assert.equal(wp.viewmodel.clip, clip, 'failed configuration leaves the bolt running');
   } else if (interrupt === 'reload') {
     for (let i = 0; i < 17; i++) step();
     wp.viewmodel.stopClip();
@@ -350,7 +362,7 @@ for (const interrupt of [
     const steps =
       interrupt === 'purchase after chamber' ? 40 : interrupt === 'purchase after eject' ? 17 : 0;
     for (let i = 0; i < steps; i++) step();
-    assert(wp.equipSecondary('smg'));
+    assert(wp.applyBuild('smg', BASE_ATTACHMENTS));
     for (let i = 0; i < 10; i++) step();
     assert(wp.setWeapon('sniper'));
     for (let i = 0; i < 60 && wp.activeId !== 'sniper'; i++) step();
@@ -371,6 +383,17 @@ for (const interrupt of [
     'interruption preserves elapsed authored bolt time'
   );
   assert(wp.tryFire(), 'a fresh shot succeeds after the authored cycle');
+}
+
+// New ownership and restart retire stale mechanical state before fresh ammo is used.
+for (const restart of [false, true]) {
+  const { wp, step } = timelineHarness();
+  assert(wp.applyBuild('sniper', BASE_ATTACHMENTS) && wp.tryFire());
+  step();
+  if (restart) wp.resetForNewGame();
+  else assert(wp.applyBuild('lmg', BASE_ATTACHMENTS));
+  assert(wp.applyBuild('sniper', BASE_ATTACHMENTS));
+  assert(wp.canFire() && wp.tryFire(), 'a freshly purchased rifle has no stale bolt lock');
 }
 
 // No completion is injected for a cancelled grenade: the next transaction owns its release.
@@ -403,7 +426,7 @@ for (const [label, nextDt] of FRAME_SOURCES.filter(([name]): boolean =>
 )) {
   for (const empty of [false, true]) {
     const { wp, step } = timelineHarness();
-    assert(wp.equipSecondary('shotgun'));
+    assert(wp.applyBuild('shotgun', BASE_ATTACHMENTS));
     wp.state.mag = 0;
     wp.state.chambered = !empty;
     wp.state.reserve = 4;
