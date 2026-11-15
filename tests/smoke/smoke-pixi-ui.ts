@@ -22,6 +22,8 @@ import { setHudTextResolution } from '../../src/ui/pixi-type.ts';
 import { Prompt, Banner } from '../../src/ui/prompts.ts';
 import type { RadioPanel } from '../../src/ui/radio.ts';
 import type { StartGate } from '../../src/ui/start.ts';
+import type { WorldSystem } from '../../src/world/index.ts';
+import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
 import {
   createRetainedHud,
@@ -31,6 +33,67 @@ import {
 } from '../lib/ui-fixture.ts';
 
 const restoreDocument = installUiDocument();
+
+// Record the one-time terrain bake without a browser canvas or GPU.
+const streetRects: number[][] = [];
+const bakeContext = fixture<CanvasRenderingContext2D>({
+  fillStyle: '',
+  fillRect(x, z, w, h): void {
+    if (z === -64 && h === 0.5 * 1.16) streetRects.push([x, z, w, h]);
+  },
+  setTransform(): void {},
+  strokeRect(): void {},
+  createImageData: (): ImageData =>
+    fixture<ImageData>({ data: new Uint8ClampedArray(64 * 64 * 4) }),
+  putImageData(): void {},
+  createPattern: (): null => null,
+});
+function bakeCanvasContext(contextId: '2d'): CanvasRenderingContext2D;
+function bakeCanvasContext(contextId: 'bitmaprenderer' | 'webgl' | 'webgl2' | 'webgpu'): null;
+function bakeCanvasContext(contextId: string): RenderingContext | null;
+function bakeCanvasContext(contextId: string): RenderingContext | null {
+  return contextId === '2d' ? bakeContext : null;
+}
+const createElement = captureMethod(document, 'createElement');
+Object.defineProperty(document, 'createElement', {
+  configurable: true,
+  value: (): HTMLCanvasElement =>
+    fixture<HTMLCanvasElement>({
+      width: 0,
+      height: 0,
+      getContext: bakeCanvasContext,
+    }),
+});
+try {
+  // Negative (including the first sample), cross-zero, positive and final-boundary runs.
+  const intervals = [
+    [-44, -40],
+    [-2, 2],
+    [5, 8],
+    [42, 44.5],
+  ];
+  const terrain = new Minimap(new Rng(1));
+  const world = fixture<WorldSystem>({
+    buildings: [{ spec: { x: 60, z: 60, w: 2, d: 2 } }],
+    levelToWorld: (x, y, z): THREE.Vector3 => new THREE.Vector3(x, y, z),
+    isOpen: (x, z): boolean =>
+      z === -63.75 && intervals.some(([start, end]): boolean => x >= start && x < end),
+  });
+  const context = createTestContext({ providers: { world } });
+  terrain.tryBake(context);
+  assert(terrain.bakeDone && terrain.baked, 'terrain bake completes');
+  assert.deepEqual(
+    streetRects,
+    intervals.map(([start, end]): number[] => [start, -64, end - start, 0.5 * 1.16]),
+    'street runs retain negative starts and flush the final open boundary sample'
+  );
+  terrain.tryBake(context);
+  assert.equal(streetRects.length, intervals.length, 'completed terrain is not baked again');
+  terrain.dispose();
+} finally {
+  Object.defineProperty(document, 'createElement', { configurable: true, value: createElement });
+}
+
 const game = new THREE.Renderer(
   new THREE.WebGPUBackend({ canvas: document.createElement('canvas') })
 );
