@@ -1,17 +1,12 @@
 import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
-import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-import {
-  BASE_ATTACHMENTS,
-  makeOpticModel,
-  makeLaserModel,
-  makeSuppressorModel,
-} from '../../src/weapons/attachments.ts';
-import type { WeaponEntry, WeaponModelRecord } from '../../src/weapons/runtime-types.ts';
+import { BASE_ATTACHMENTS } from '../../src/weapons/attachments.ts';
+import type { WeaponEntry } from '../../src/weapons/runtime-types.ts';
 import type { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { fixture } from '../lib/fixture.ts';
+import { mountableWeapon, opticAsset, rigidAsset } from '../lib/weapon-attachment-fixture.ts';
 
 /**
  * Bun smoke test for the market and armour systems — no browser.
@@ -374,47 +369,19 @@ check('carpet unbuyable with the shop closed', market.buy('carpet') === false);
 
 // ---- attachment builds: real mounting, no GPU or asset fetch ----------------
 const entries = new Map<WeaponId, WeaponEntry>();
-for (const id of ['rifle', 'lmg'] as const) {
-  const scene = new THREE.Group();
-  for (const name of ['IRON_sights', 'MOUNT_optic', 'MOUNT_rail', 'MOUNT_muzzle', 'MUZZLE_device'])
-    scene.add(Object.assign(new THREE.Object3D(), { name }));
-  const model = {
-    scene,
-    root: scene,
-    opticMountRest: new THREE.Matrix4(),
-    nodes: fixture<Extract<WeaponModelRecord, { id: 'lmg' }>['nodes']>({ sight: [0, 0.14, 0.03] }),
-  };
-  entries.set(
-    id,
-    fixture<WeaponEntry>({
-      id,
-      def: weaponState(id).def,
-      model:
-        id === 'rifle'
-          ? fixture<Extract<WeaponModelRecord, { id: 'rifle' }>>({ ...model, id })
-          : fixture<Extract<WeaponModelRecord, { id: 'lmg' }>>({ ...model, id }),
-      attachments: BASE_ATTACHMENTS,
-      attachmentGroup: new THREE.Group(),
-      railGroup: new THREE.Group(),
-      muzzleGroup: new THREE.Group(),
-      sight: new THREE.Vector3(),
-    })
-  );
-}
+for (const id of ['rifle', 'lmg'] as const)
+  entries.set(id, fixture<WeaponEntry>({ id, def: weaponState(id).def, ...mountableWeapon(id) }));
 weapons.viewmodel = fixture<Viewmodel>({
   weapons: entries,
   reticle: new THREE.Object3D(),
   scopeOverlay: new THREE.Object3D(),
 });
-const opticScene = new THREE.Group();
-for (const name of ['MOUNT_base', 'SOCKET_sight', 'SOCKET_mount', 'SOCKET_laser', 'SOCKET_muzzle'])
-  opticScene.add(Object.assign(new THREE.Object3D(), { name }));
 Object.assign(weapons, {
   _attachments: {
-    rmr: makeOpticModel(fixture<GLTF>({ scene: opticScene }), 'rmr'),
-    acog: makeOpticModel(fixture<GLTF>({ scene: opticScene.clone() }), 'acog'),
-    laser: makeLaserModel(fixture<GLTF>({ scene: opticScene.clone() })),
-    srd762ti: makeSuppressorModel(fixture<GLTF>({ scene: opticScene.clone() })),
+    rmr: opticAsset(),
+    acog: opticAsset(),
+    laser: rigidAsset('SOCKET_laser'),
+    srd762ti: rigidAsset('SOCKET_muzzle'),
   },
 });
 market.openShop();

@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 
 import * as THREE from 'three';
-import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import m590Manifest from '../../assets/weapons/m590/manifest.json' with { type: 'json' };
 import { bindingLabel } from '../../src/core/bindings.ts';
@@ -18,18 +17,19 @@ import { Movement } from '../../src/player/movement.ts';
 import type { RadioSystem } from '../../src/radio/index.ts';
 import type { UiSystem } from '../../src/ui/index.ts';
 import { AmmoPickups } from '../../src/weapons/ammo-pickups.ts';
-import { BASE_ATTACHMENTS, makeLaserModel, makeOpticModel } from '../../src/weapons/attachments.ts';
+import { BASE_ATTACHMENTS } from '../../src/weapons/attachments.ts';
 import { ProjectileSim } from '../../src/weapons/ballistics.ts';
 import { buildManifestClips, Clip } from '../../src/weapons/clips.ts';
 import { WEAPON_IDS } from '../../src/weapons/defs.ts';
 import type { WeaponId } from '../../src/weapons/defs.ts';
 import { GRENADE_FUSE, MAX_SHOTS_PER_FRAME } from '../../src/weapons/index.ts';
-import type { WeaponEntry, WeaponModelRecord } from '../../src/weapons/runtime-types.ts';
+import type { WeaponEntry } from '../../src/weapons/runtime-types.ts';
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { ArmedWeaponSystem, weaponState } from '../lib/ballistics-fixture.ts';
 import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
 import { FRAME_SOURCES } from '../lib/frame-sources.ts';
+import { mountableWeapon, opticAsset, rigidAsset } from '../lib/weapon-attachment-fixture.ts';
 
 interface FrameOptions {
   down?: string[];
@@ -207,47 +207,17 @@ for (const [primary, first, second] of [
 }
 // Mounted laser switches belong to the gun, not the flashlight or active slot.
 {
-  type RifleModel = Extract<WeaponModelRecord, { id: 'rifle' }>;
   const { wp, input, tap, frame, player } = makeHarness();
-  const scene = new THREE.Group();
-  const irons = Object.assign(new THREE.Object3D(), { name: 'IRON_sights' });
-  scene.add(
-    irons,
-    Object.assign(new THREE.Object3D(), { name: 'MUZZLE_device' }),
-    Object.assign(new THREE.Object3D(), { name: 'MOUNT_optic' }),
-    Object.assign(new THREE.Object3D(), { name: 'MOUNT_rail' })
-  );
-  const opticScene = new THREE.Group();
-  for (const name of ['MOUNT_base', 'SOCKET_sight'])
-    opticScene.add(Object.assign(new THREE.Object3D(), { name }));
-  const rmr = makeOpticModel(fixture<GLTF>({ scene: opticScene }), 'rmr');
-  const laserScene = new THREE.Group();
-  for (const name of ['SOCKET_mount', 'SOCKET_laser'])
-    laserScene.add(Object.assign(new THREE.Object3D(), { name }));
-  const laser = makeLaserModel(fixture<GLTF>({ scene: laserScene }));
-  Object.assign(wp, { _attachments: { rmr, laser } });
+  Object.assign(wp, { _attachments: { rmr: opticAsset(), laser: rigidAsset('SOCKET_laser') } });
   Object.assign(wp.viewmodel, {
     reticle: new THREE.Object3D(),
     scopeOverlay: new THREE.Object3D(),
   });
   const rifle = wp.viewmodel.weapons.get('rifle');
   assert(rifle);
-  Object.assign(rifle, {
-    model: fixture<RifleModel>({
-      id: 'rifle',
-      scene,
-      root: scene,
-      opticMountRest: new THREE.Matrix4(),
-      nodes: fixture<RifleModel['nodes']>({ sight: [0, 0.14, 0.03], muzzle: [0, 0.07, -0.5] }),
-    }),
-    def: weaponState(wp, 'rifle').def,
-    attachmentGroup: new THREE.Group(),
-    railGroup: new THREE.Group(),
-    muzzleGroup: new THREE.Group(),
-    muzzleSocket: null,
-    laserEmitter: null,
-    sight: new THREE.Vector3(),
-  });
+  Object.assign(rifle, { def: weaponState(wp, 'rifle').def, ...mountableWeapon('rifle') });
+  const irons = rifle.model.scene.getObjectByName('IRON_sights');
+  assert(irons);
   const config = { ...BASE_ATTACHMENTS, rail: 'laser' } as const;
   assert.equal(wp.state.laserEnabled, false);
   tap('KeyL');

@@ -37,7 +37,6 @@ export type AuthoredWeaponModel = AuthoredModels[WeaponId];
 export interface OpticData {
   kind?: string;
   reticle?: string;
-  center: number[];
   apertureR?: number;
   dotMoa?: number;
   ringMoa?: number;

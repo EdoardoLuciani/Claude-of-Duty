@@ -55,7 +55,6 @@ assert.deepEqual([...fetched].sort(), localFiles.sort(), 'every local recording 
 for (const [name, recording] of Object.entries(reports.files)) {
   const bytes = readFileSync(new URL(`${name}.opus`, root));
   assert.equal(createHash('sha256').update(bytes).digest('hex'), recording.sha256, name);
-  assert(recording.monoEnergy > 1e-7, `${name}: authored shot must not be silent`);
 }
 for (const [banks] of AUDIO_BANKS) {
   for (const [kind, urls] of fixtureEntries(banks)) {

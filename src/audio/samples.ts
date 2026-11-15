@@ -38,7 +38,7 @@ import { REPORT_DISTANT_MATCH, reportDistantMix } from './weapons.ts';
  * recordings have separate provenance under samples/hits/ and samples/reloads/;
  * see the audio asset contract in ARCHITECTURE.md. The replacement AK reports
  * have separate owner-requested public provenance in samples/ak-provenance.json.
- * The #668 MCX/MPX replacements and all suppressed reports are cleared edited
+ * The MCX/MPX reports and all suppressed reports are cleared edited
  * derivatives documented in samples/weapon-reports-provenance.json.
  */
 const URLS = {

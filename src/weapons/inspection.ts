@@ -15,8 +15,8 @@ import type { WeaponEntry } from './runtime-types.ts';
 /** Independent transforms, skeletons and mixers; geometry/maps remain weapon-owned. */
 export function createWeaponInspection(
   entry: WeaponEntry,
-  config: AttachmentConfig = entry.attachments,
-  assets: AttachmentAssets = {}
+  config: AttachmentConfig,
+  assets: AttachmentAssets
 ): {
   scene: THREE.Group;
   dispose(): void;
