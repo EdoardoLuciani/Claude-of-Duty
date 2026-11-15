@@ -55,7 +55,7 @@ const OPTICS: Record<
   {
     adsFovScale: number;
     adsSensScale: number;
-    optic: Omit<OpticData, 'center'>;
+    optic: OpticData;
     /** Lens material (by source-name prefix): the overlay owns the magnified picture,
      * so glass keeps thin alpha and never adds a full-scene transmission pass. */
     glass: {
@@ -108,7 +108,7 @@ function disposeAttachmentAsset(scene: THREE.Group, finishes: WeaponSceneMateria
 }
 
 /** One owned asset; mounted/inspection instances borrow its geometry and finishes. */
-export function makeOpticModel(
+function makeOpticModel(
   gltf: GLTF,
   id: OpticId
 ): {
@@ -140,7 +140,8 @@ export function makeOpticModel(
 }
 type OpticModel = ReturnType<typeof makeOpticModel>;
 
-/** Owned rigid attachment with an authored `SOCKET_mount` origin and an output socket. */
+/** Owned rigid attachment with an authored `SOCKET_mount` origin and an output socket:
+ * `SOCKET_laser` (TOR Mini beam emitter) or `SOCKET_muzzle` (can endcap bore exit). */
 function makeRigidAttachment(
   gltf: GLTF,
   output: string
@@ -158,16 +159,6 @@ function makeRigidAttachment(
   return { scene, mount, output, dispose: (): void => disposeAttachmentAsset(scene, finishes) };
 }
 type RigidAttachmentModel = ReturnType<typeof makeRigidAttachment>;
-
-/** TOR Mini: `SOCKET_laser` is the beam emitter. */
-export function makeLaserModel(gltf: GLTF): RigidAttachmentModel {
-  return makeRigidAttachment(gltf, 'SOCKET_laser');
-}
-
-/** Suppressor: `SOCKET_muzzle` is the endcap bore exit. */
-export function makeSuppressorModel(gltf: GLTF): RigidAttachmentModel {
-  return makeRigidAttachment(gltf, 'SOCKET_muzzle');
-}
 
 /** Loaded assets keyed by optic/rail id or can model; a missing entry makes it unavailable. */
 export type AttachmentAssets = Partial<
@@ -193,8 +184,10 @@ export async function loadAttachments(
     ...OPTIC_IDS.map((id): Promise<void> =>
       load(id, (gltf): OpticModel => makeOpticModel(gltf, id))
     ),
-    load('laser', makeLaserModel),
-    ...CAN_MODELS.map((id): Promise<void> => load(id, makeSuppressorModel)),
+    load('laser', (gltf): RigidAttachmentModel => makeRigidAttachment(gltf, 'SOCKET_laser')),
+    ...CAN_MODELS.map((id): Promise<void> =>
+      load(id, (gltf): RigidAttachmentModel => makeRigidAttachment(gltf, 'SOCKET_muzzle'))
+    ),
   ]);
   return assets;
 }
@@ -309,7 +302,6 @@ export function mountAttachments(
   muzzleSocket: THREE.Object3D | null;
   mountedOptic: WeaponEntry['mountedOptic'];
   sight: THREE.Vector3;
-  optic: OpticData | null;
 } {
   const { optic: opticId } = config;
   if (!isAttachmentConfig(config, model.id))
@@ -326,7 +318,6 @@ export function mountAttachments(
   const replaced = { optic: replacedNodes(model, 'optic'), muzzle: replacedNodes(model, 'muzzle') };
   let mountedOptic: WeaponEntry['mountedOptic'] = null;
   const sight = new THREE.Vector3().fromArray(model.nodes.sight);
-  let optic: OpticData | null = null;
   if (opticId !== null && opticAsset && opticSlot.parent) {
     // Only the ADS datum is resolved in the weapon frame, from the rest-pose mount transform
     // (including orientation). Never the live pose: a slide or bolt may be mid-animation.
@@ -335,9 +326,9 @@ export function mountAttachments(
     mountedOptic = {
       mount: opticSlot.parent,
       sight: opticAsset.sight.clone().sub(opticAsset.mount).add(opticSlot.group.position),
+      optic: OPTICS[opticId].optic,
     };
     sight.copy(mountedOptic.sight).applyMatrix4(transform);
-    optic = { ...OPTICS[opticId].optic, center: sight.toArray() };
   }
   // Staging succeeded: attach instances and switch the replaced base parts.
   opticSlot.parent?.add(opticSlot.group);
@@ -358,7 +349,6 @@ export function mountAttachments(
     muzzleSocket: muzzle.socket,
     mountedOptic,
     sight,
-    optic,
   };
 }
 
@@ -379,7 +369,6 @@ export function configureWeaponAttachments(
   entry.mountedOptic = mounted.mountedOptic;
   entry.attachments = Object.freeze({ ...config });
   entry.sight.copy(mounted.sight);
-  entry.optic = mounted.optic;
   const base = WEAPON_DEFS[entry.id];
   const attached = config.optic === null ? null : OPTICS[config.optic];
   entry.def.eyeRelief =

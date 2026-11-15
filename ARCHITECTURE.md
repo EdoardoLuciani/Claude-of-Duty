@@ -283,19 +283,17 @@ null slots retain the base weapon, and `optic: null` uses irons.
 optics, TOR Mini `laser`, one `suppressor`), validation, loading and the shared
 gameplay/inspection mount solver. `src/market/attachments.ts` owns prices, not
 compatibility. Market holds one unconfirmed build; selecting, inspecting or editing
-never changes gameplay or credits. Only Buy Build/Apply Changes confirms weapon
-purchases; supply Buy buttons remain immediate. Confirmation rechecks credits, shop
-state and asset readiness, then calls `weapons.applyBuild()` before charging.
-New weapons are configured before replacing ownership; unchanged attachments are
-free, removal/replacement gives no refund, and close/restart/error discards the draft.
+never changes gameplay or credits. Confirmation rechecks credits, shop state and
+asset readiness, then calls `weapons.applyBuild()` before charging. New weapons are
+configured before replacing ownership, so a rejected build never drops the old gun.
 
 `WeaponDef.fits` is a per-slot partial record keyed by attachment ID: each entry
 enables a verified fit and holds its data (`fits.optic[id].eyeRelief`, optional
 `railSlots` at `PICATINNY_PITCH`, `fits.muzzle.suppressor.model`; rail entries
 are empty). The player-facing muzzle ID is always `suppressor`; assets are keyed by
-can model (`srd762ti`, `suppressor9mm`, `suppressor338`, `suppressor12g`).
-`isAttachmentConfig()` is the shared compatibility rule for gameplay, URL/debug
-input and captures; reject unverified fits, never silently change them.
+can model. `isAttachmentConfig()` is the shared compatibility rule for gameplay,
+URL/debug input (narrowed once in `main.ts`) and `tools/capture.ts`; reject
+unverified fits, never silently change them.
 `removableIrons` swaps required `IRON_sights` for optional `IRON_sights_removed`
 with any optic; fixed irons stay and must clear it. `removableMuzzleDevice` similarly
 swaps required `MUZZLE_device` for optional `MUZZLE_device_removed`; permanent
@@ -308,39 +306,31 @@ changes an owned, loaded weapon synchronously outside the frame loop.
 `mountAttachments()` validates all assets/datums before attaching groups under
 `MOUNT_optic`/`MOUNT_rail`/`MOUNT_muzzle` and switching base parts via
 `replacedNodes()`. Instances follow authored parents/animation, never a baked live
-pose; ADS uses the rest-pose optic datum in the weapon frame. The commit resolves
-sight/`OpticData`, laser emitter, muzzle socket and the effective private definition
-(eye relief, ADS FOV/sensitivity, `suppressed`) consumed by firing audio/FX.
-Frame-time reticle, ADS, laser and fire consumers allocate nothing.
+pose; ADS uses the rest-pose optic datum in the weapon frame, while the reticle
+follows the live mount. The commit resolves sight/`OpticData`, laser emitter, muzzle
+socket and the effective private definition (eye relief, ADS FOV/sensitivity,
+`suppressed`) consumed by firing audio/FX. Attachments change no ballistic/handling
+stats. Frame-time reticle, ADS, laser and fire consumers allocate nothing.
 
 Optics define `MOUNT_base` and `SOCKET_sight`; rigid attachments define
 `SOCKET_mount` plus `SOCKET_laser` or `SOCKET_muzzle`, in metres, -Z forward,
 +Y up, unit scale. Catalog `OpticData` owns magnification, sensitivity, reticle,
 glass and scope presentation, not weapon class. `viewmodel.muzzleWorld()` reads
 the installed exit for ballistics/FX; ejection stays at `SOCKET_ejection`.
-Attachments change no ballistic/handling stats. Prewarm covers every loaded
-attachment and both iron/muzzle base states. Inspection accepts an explicit config
-or defaults to the stored one without mutating gameplay. MCX/MPX are iron-sight bases
-with shared optics and removable suppressors. P320 keeps fixed iron sights with no
-optic mount or optic fits; its optional laser and compact suppressor remain independent.
+Prewarm covers every loaded attachment and both iron/muzzle base states.
 
 Per-weapon datums/clearances live in `assets/weapons/*/README.md` and
 `assets/attachments/*/README.md`. Blender fit checks load built attachments through
 `attachment_source.py`; cans share `can.py`. `picatinny.py` owns common rail
 geometry, and `check_picatinny.py` checks actual rails/clamps against a slotted gauge.
-EXPS3 uses the live-axis ring/dot path with the red dot's ADS scale.
-Debug input is narrowed in `main.ts`: `attachmentWeapon` must pass ID,
-compatibility and ownership checks; `attachmentOptic=rmr|acog|scope|exps3|none`,
-`attachmentRail=laser|none` and `attachmentMuzzle=suppressor|none` select slots.
-`tools/capture.ts` uses the same validator.
+
 The laser owns one retained beam/dot mesh, no light/decal or per-frame allocation;
 boot warms it even without a module. One pooled bullet-mask query clips the rigid
 -Z emitter ray without damage/effects. Origin and direction share the first-person/world
 FOV mapping and are sampled after firing vibration, without camera-crosshair convergence.
 L toggles per-weapon state across swaps and pause/shop; new mounts start on,
 removal/drop/restart/death switch off. Busy hands hide the beam and block L.
-The dot is not a prediction of spread, penetration or curved flight; it changes no
-stats or AI perception. Flashlight retains separate light ownership.
+The laser changes no AI perception; the flashlight keeps separate light ownership.
 
 `tools/blender/soldiers/` builds seeded parametric soldiers; a Bun GLTFExporter cook
 preserves the runtime joint/attribute format. `tools/export-models.ts` validates and

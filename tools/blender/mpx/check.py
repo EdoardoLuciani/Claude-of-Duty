@@ -172,18 +172,9 @@ rig = bpy.data.objects['MPX_RIG']
 weapon = [o for o in bpy.data.collections['MPX | editable exterior components'].objects if o.type == 'MESH']
 hands = [o for o in scene.objects if o.type == 'MESH' and any('authored hands' in c.name for c in o.users_collection)]
 assert hands, 'missing deformed review skins'
+import attachment_source
+from attachment_source import surface
 
-def surface(objects, transform):
-    vertices, faces = [], []
-    for obj in objects:
-        evaluated = obj.evaluated_get(bpy.context.evaluated_depsgraph_get())
-        data = evaluated.to_mesh()
-        matrix = transform @ evaluated.matrix_world
-        offset = len(vertices)
-        vertices.extend(matrix @ v.co for v in data.vertices)
-        faces.extend(tuple(offset+i for i in p.vertices) for p in data.polygons)
-        evaluated.to_mesh_clear()
-    return BVHTree.FromPolygons(vertices,faces,all_triangles=False)
 
 def select(name, time=0):
     for obj in scene.objects:
@@ -202,7 +193,6 @@ for name in ('IRON_sights_removed','MUZZLE_device_removed'):
 bpy.context.view_layer.update()
 mounted = {}
 loaded = []
-import attachment_source
 for id,slot in [('rmr','optic'),('acog','optic'),('scope','optic'),('exps3','optic'),('srd762ti','muzzle'),('laser','rail')]:
     objects,base = attachment_source.load(id)
     mesh = [o for o in objects if o.type == 'MESH']

@@ -16,19 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 import attachment_source
 import picatinny
-
-
-def surface(objects, transform):
-    vertices,faces=[],[]
-    deps=bpy.context.evaluated_depsgraph_get()
-    for obj in objects:
-        evaluated=obj.evaluated_get(deps);mesh=evaluated.to_mesh();mesh.calc_loop_triangles()
-        offset=len(vertices)
-        vertices.extend(transform@evaluated.matrix_world@v.co for v in mesh.vertices)
-        faces.extend(tuple(offset+i for i in p.vertices) for p in mesh.loop_triangles)
-        evaluated.to_mesh_clear()
-    assert vertices,'missing actual interface meshes'
-    return BVHTree.FromPolygons(vertices,faces,all_triangles=True)
+from attachment_source import surface
 
 
 def hit(tree, origin, direction):

@@ -100,16 +100,13 @@ The standalone [TOR Mini laser](../assets/attachments/steiner-tor-mini/README.md
 is authored by [`tools/blender/tor_mini/`](../tools/blender/tor_mini/), with native
 Blender validation and `bun run models:cook -- tor_mini`. It is generated alongside
 the EXPS3, independently of player arms, and uses the shared gameplay/inspection
-rail path on all seven weapons. M590's full source checks now use strict zero-crossing
-firing-hand clearance; its extended integrated-sight top rail supports RMR/ACOG/PM II/EXPS3,
-independent of the optional laser on fixed magazine-tube clamps (#686).
+rail path on all seven weapons.
 
-The dedicated [.338 suppressor](../assets/attachments/suppressor-338/README.md)
-is authored in `tools/blender/suppressor338/`, with its own `suppressor338`
-cook id and AX338-only can model. Its build-time bore gauge and
-`tools/blender/ax338/muzzle.py` clearance sweep are separate from the shared SRD762Ti.
-All four cans share scene, lathe, bore-gauge and export helpers in `tools/blender/can.py`;
-weapon fit checks load built attachments through `tools/blender/attachment_source.py`.
+Each suppressor can has its own Blender recipe and cook id
+(`tools/blender/suppressor/` for the shared SRD762Ti, `suppressor9mm/`,
+`suppressor338/`, `suppressor12g/`); all share scene, lathe, bore-gauge and export
+helpers in `tools/blender/can.py`. Weapon fit checks load built attachments through
+`tools/blender/attachment_source.py`.
 
 Normal `bun run dev` / `bun run build` (and `bun run assets`) run
 `tools/build-assets.ts`: arms and bandage, each weapon and its cook, standalone
@@ -122,9 +119,3 @@ and `--force` rebuilds all. These products are ignored, not committed; weapon
 because code imports them. World products, including `level.json`, are also ignored.
 `bun run build:ci` skips Blender/model assets but generates missing or stale world
 products; `bun run test` prepares the world before launching tests.
-
-The M590's separate [`suppressor12g`](../assets/attachments/12g-suppressor/README.md)
-is authored in `tools/blender/suppressor12g/` and cooked with
-`bun run models:cook -- suppressor12g`. Its permanent adapter seat, large-bore
-clearance and intentional iron-sight occlusion are owned by that asset and
-`tools/blender/m590/muzzle.py`, not the shared rifle suppressor recipe.

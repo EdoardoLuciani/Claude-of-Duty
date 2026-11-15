@@ -505,8 +505,8 @@ export class Viewmodel {
   addWeapon(
     model: WeaponModelRecord,
     def: WeaponDef,
-    config: AttachmentConfig = BASE_ATTACHMENTS,
-    assets: AttachmentAssets = {}
+    config: AttachmentConfig,
+    assets: AttachmentAssets
   ): WeaponEntry {
     let tris = 0;
     const meshes: THREE.Mesh[] = [];
@@ -545,7 +545,6 @@ export class Viewmodel {
       sight: new THREE.Vector3().fromArray(model.nodes.sight),
       eject: new THREE.Vector3().fromArray(model.nodes.eject),
       ejectDir: new THREE.Vector3().fromArray(model.nodes.ejectDir).normalize(),
-      optic: null,
       magLen: model.magSize.len,
       shell: model.shell,
       lhandPose: `support:${model.id}`,
@@ -1283,21 +1282,16 @@ export class Viewmodel {
    * an angle.
    */
   _updateReticle(w: WeaponEntry, ads: number): void {
-    const optic = w.optic;
-    if (!optic || optic.kind === 'scope') {
+    if (!w.mountedOptic || w.mountedOptic.optic.kind === 'scope') {
       this.reticle.visible = false;
       return;
     }
-    _v.fromArray(optic.center);
-    _v3.set(0, 0, -1);
     // Mounted glass can live on an animated slide/bone, not just the rig.
-    // Integrated optic data retains its existing weapon-space convention.
-    if (w.mountedOptic) {
-      w.mountedOptic.mount.updateWorldMatrix(true, false);
-      _m.copy(w.group.matrixWorld).invert().multiply(w.mountedOptic.mount.matrixWorld);
-      _v.copy(w.mountedOptic.sight).applyMatrix4(_m);
-      _v3.transformDirection(_m);
-    }
+    const { mount, sight, optic } = w.mountedOptic;
+    mount.updateWorldMatrix(true, false);
+    _m.copy(w.group.matrixWorld).invert().multiply(mount.matrixWorld);
+    _v.copy(sight).applyMatrix4(_m);
+    _v3.set(0, 0, -1).transformDirection(_m);
     _v.applyQuaternion(this.rig.quaternion).add(this.rig.position);
     _v3.applyQuaternion(this.rig.quaternion).normalize();
 
@@ -1350,7 +1344,7 @@ export class Viewmodel {
     // Holster 'end' calls setActive() earlier in this same update(). Always
     // drive visibility from the live weapon so we don't undig the one we hid.
     if (this.active) w = this.active;
-    const optic = w.optic;
+    const optic = w.mountedOptic?.optic;
     const scoped = optic?.kind === 'scope';
     const accessory = this._grenadeState || this._radioState || this._bandageState;
     this.scopeOverlay.visible = scoped && ads > 0.85 && !accessory;

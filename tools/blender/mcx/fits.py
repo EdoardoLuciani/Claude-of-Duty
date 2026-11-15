@@ -4,30 +4,17 @@ Finite 120 Hz source samples, not continuous collision or human visual acceptanc
 """
 import bpy
 from mathutils import Vector
-from mathutils.bvhtree import BVHTree
 from mcx.review_hands import review_tracks, select_review_clip
 
 import attachment_source
 
 
-def geometry(obj, inverse):
+def points(obj, inverse):
     evaluated = obj.evaluated_get(bpy.context.evaluated_depsgraph_get())
     mesh = evaluated.to_mesh()
     vertices = [inverse @ evaluated.matrix_world @ v.co for v in mesh.vertices]
-    faces = [tuple(p.vertices) for p in mesh.polygons]
     evaluated.to_mesh_clear()
-    return vertices, faces
-
-
-def tree(objects, inverse):
-    vertices, faces = [], []
-    for obj in objects:
-        points, polygons = geometry(obj, inverse)
-        offset = len(vertices)
-        vertices.extend(points)
-        faces.extend(tuple(offset+i for i in polygon) for polygon in polygons)
-    assert vertices, 'missing fit surfaces'
-    return BVHTree.FromPolygons(vertices, faces)
+    return vertices
 
 
 def check_attachment_fits():
@@ -58,29 +45,29 @@ def check_attachment_fits():
         loaded.extend(objects)
         meshes = [o for o in objects if o.type == 'MESH' and
                   (slot != 'rail' or o.name.startswith('TOR_MINI_body'))]
-        surface = tree(meshes,inverse)
+        surface = attachment_source.surface(meshes,inverse)
         # Only real rail mating faces may contact optics; other receiver,
         # handguard, adapter and base muzzle surfaces must remain disjoint.
         for obj in fixed if slot != 'rail' else []:
             if slot == 'optic' and obj.name.startswith('Picatinny rail tooth'):
                 continue
-            overlap = surface.overlap(tree([obj],inverse))
+            overlap = surface.overlap(attachment_source.surface([obj],inverse))
             if overlap and slot == 'muzzle' and obj.name in ('Barrel under vented guard','Muzzle thread'):
                 # The direct-thread shoulder is intentional coplanar contact,
                 # never permission for the can to cross into the barrel body.
-                weapon_points, _ = geometry(obj,inverse)
-                can_points = [p for mesh in meshes for p in geometry(mesh,inverse)[0]]
+                weapon_points = points(obj,inverse)
+                can_points = [p for mesh in meshes for p in points(mesh,inverse)]
                 assert max(p.x for p in weapon_points) <= .278601
                 assert min(p.x for p in can_points) >= .273999
                 assert obj.name == 'Muzzle thread' or max(p.x for p in weapon_points) <= .274001
             else:
                 assert not overlap, (id,'fixed collision',obj.name)
         if slot == 'optic':
-            clashes = bool(surface.overlap(tree(list(installed.children),inverse)))
+            clashes = bool(surface.overlap(attachment_source.surface(list(installed.children),inverse)))
             assert clashes == (id == 'scope'), (id,'unexpected installed-iron fit',clashes)
-            assert not surface.overlap(tree(list(folded.children),inverse)), (id,'folded leaf collision')
+            assert not surface.overlap(attachment_source.surface(list(folded.children),inverse)), (id,'folded leaf collision')
         elif slot == 'muzzle':
-            assert not surface.overlap(tree(list(installed.children),inverse)), 'can clips irons'
+            assert not surface.overlap(attachment_source.surface(list(installed.children),inverse)), 'can clips irons'
             exit = attachment_source.named(objects, 'SOCKET_muzzle')
             assert (inverse @ exit.matrix_world.translation-Vector((.510,0,0))).length < 1e-6, 'installed exit'
         elif slot == 'rail':
@@ -111,10 +98,10 @@ def check_attachment_fits():
                 state = tuple(round(v,7) for o in moving for row in (inverse@o.matrix_world) for v in row)
                 if state not in checked:
                     checked.add(state)
-                    mechanism = tree(moving,inverse)
+                    mechanism = attachment_source.surface(moving,inverse)
                     for id,surface in attachments:
                         assert not surface.overlap(mechanism), (track['name'],time,id,'mechanism collision')
-                skin = tree(hands,inverse)
+                skin = attachment_source.surface(hands,inverse)
                 for id,surface in attachments:
                     assert not surface.overlap(skin), (track['name'],time,id,'review hand collision')
                 count += 1

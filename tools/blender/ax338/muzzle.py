@@ -10,11 +10,11 @@ from pathlib import Path
 
 import bpy
 from mathutils import Matrix, Vector
-from mathutils.bvhtree import BVHTree
 
 # Also runnable standalone on the saved AX338 scene.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import attachment_source
+from attachment_source import surface
 
 
 def check_muzzle():
@@ -38,19 +38,6 @@ def check_muzzle():
         frame = time*120
         scene.frame_set(int(frame), subframe=frame-int(frame))
         bpy.context.view_layer.update()
-
-    def surface(objects, transform, evaluated=False):
-        vertices, faces = [], []
-        deps = bpy.context.evaluated_depsgraph_get()
-        for obj in objects:
-            ev = obj.evaluated_get(deps) if evaluated else obj
-            mesh = ev.to_mesh() if evaluated else obj.data
-            offset = len(vertices)
-            vertices.extend(transform @ ev.matrix_world @ v.co for v in mesh.vertices)
-            faces.extend(tuple(offset+i for i in p.vertices) for p in mesh.polygons)
-            if evaluated:
-                ev.to_mesh_clear()
-        return BVHTree.FromPolygons(vertices, faces)
 
     def attachment(id, weapon_mount):
         objects, base = attachment_source.load(id)
@@ -93,7 +80,7 @@ def check_muzzle():
             select(clip, min(frame/120, info['duration']))
             inverse = rig.matrix_world.inverted()
             for obj in body+hands:
-                target = surface([obj], inverse, evaluated=True)
+                target = surface([obj], inverse)
                 assert not can.overlap(target), (clip, frame, obj.name, 'can crosses actual surface')
                 # The adapter meets only the barrel's crown plane; it is not
                 # permitted to intersect any other existing weapon/hand surface.

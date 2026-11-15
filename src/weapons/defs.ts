@@ -103,6 +103,14 @@ export function isWeaponId(value: unknown): value is WeaponId {
   return typeof value === 'string' && Object.hasOwn(WEAPON_DEFS, value);
 }
 
+/** Optic eye reliefs shared by every weapon whose rail seats them at the base slot. */
+const OPTIC_FITS = {
+  rmr: { eyeRelief: 0.125 },
+  acog: { eyeRelief: 0.11 },
+  scope: { eyeRelief: 0.09 },
+  exps3: { eyeRelief: 0.2 },
+} satisfies NonNullable<WeaponDef['fits']>['optic'];
+
 export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
   mcx: {
     id: 'mcx',
@@ -154,12 +162,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     adsCant: [0, 0, 0],
     eyeRelief: 0.06,
     fits: {
-      optic: {
-        rmr: { eyeRelief: 0.125 },
-        acog: { eyeRelief: 0.11 },
-        scope: { eyeRelief: 0.09 },
-        exps3: { eyeRelief: 0.2 },
-      },
+      optic: OPTIC_FITS,
       muzzle: { suppressor: { model: 'srd762ti' } },
       rail: { laser: {} },
     },
@@ -239,12 +242,10 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     fits: {
       muzzle: { suppressor: { model: 'srd762ti' } },
       optic: {
-        rmr: { eyeRelief: 0.125 },
-        acog: { eyeRelief: 0.11 },
+        ...OPTIC_FITS,
         // Seven forward rail slots clear the ocular from the charging hand; eye
         // relief grows by the same 70 mm so the ADS hold stays where it was.
         scope: { eyeRelief: 0.16, railSlots: 7 },
-        exps3: { eyeRelief: 0.2 },
       },
       rail: { laser: {} },
     },
@@ -318,12 +319,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     // Aim through the deployed rear peep, not the removed ROMEO4T optical axis.
     eyeRelief: 0.06,
     fits: {
-      optic: {
-        rmr: { eyeRelief: 0.125 },
-        acog: { eyeRelief: 0.11 },
-        scope: { eyeRelief: 0.09 },
-        exps3: { eyeRelief: 0.2 },
-      },
+      optic: OPTIC_FITS,
       muzzle: { suppressor: { model: 'srd762ti' } },
       rail: { laser: {} },
     },
@@ -395,12 +391,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     adsCant: [0, 0, 0.004],
     eyeRelief: 0.03,
     fits: {
-      optic: {
-        rmr: { eyeRelief: 0.125 },
-        acog: { eyeRelief: 0.11 },
-        scope: { eyeRelief: 0.09 },
-        exps3: { eyeRelief: 0.2 },
-      },
+      optic: OPTIC_FITS,
       muzzle: { suppressor: { model: 'srd762ti' } },
       rail: { laser: {} },
     },
@@ -610,12 +601,7 @@ export const WEAPON_DEFS: { [K in WeaponId]: WeaponDef & { id: K } } = {
     adsCant: [0, 0, 0],
     eyeRelief: 0.07,
     fits: {
-      optic: {
-        rmr: { eyeRelief: 0.125 },
-        acog: { eyeRelief: 0.11 },
-        scope: { eyeRelief: 0.09 },
-        exps3: { eyeRelief: 0.2 },
-      },
+      optic: OPTIC_FITS,
       rail: { laser: {} },
       muzzle: { suppressor: { model: 'suppressor338' } },
     },

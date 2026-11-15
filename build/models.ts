@@ -42,49 +42,25 @@ export const GLTFPACK_FLAGS = [
 // Opt assets in here after validating their adapters and visual/animation fidelity.
 // Simplification is model-specific, never a blanket default for all models.
 // `output` is repo-relative; runtime-mounted weapons/attachments are served from public/.
+const attachment = (
+  directory: string,
+  source: string,
+  runtime: string,
+  flags: string[] = []
+): { directory: string; source: string; output: string; flags: string[] } => ({
+  directory: `assets/attachments/${directory}`,
+  source,
+  output: `public/models/attachments/${runtime}.runtime.glb`,
+  flags,
+});
 export const MODEL_COOKS = {
-  suppressor12g: {
-    directory: 'assets/attachments/12g-suppressor',
-    source: 'suppressor12g.glb',
-    output: 'public/models/attachments/suppressor12g.runtime.glb',
-    flags: [],
-  },
-  suppressor9mm: {
-    directory: 'assets/attachments/compact-9mm',
-    source: 'suppressor9mm.glb',
-    output: 'public/models/attachments/suppressor9mm.runtime.glb',
-    flags: [],
-  },
-  suppressor338: {
-    directory: 'assets/attachments/suppressor-338',
-    source: 'suppressor338.glb',
-    output: 'public/models/attachments/suppressor338.runtime.glb',
-    flags: [],
-  },
-  srd762ti: {
-    directory: 'assets/attachments/sig-srd762ti',
-    source: 'suppressor.glb',
-    output: 'public/models/attachments/srd762ti.runtime.glb',
-    flags: [],
-  },
-  acog: {
-    directory: 'assets/attachments/trijicon-acog',
-    source: 'acog.glb',
-    output: 'public/models/attachments/acog.runtime.glb',
-    flags: [],
-  },
-  scope: {
-    directory: 'assets/attachments/schmidt-bender-pm-ii',
-    source: 'scope.glb',
-    output: 'public/models/attachments/scope.runtime.glb',
-    flags: [],
-  },
-  rmr: {
-    directory: 'assets/attachments/trijicon-rmr',
-    source: 'rmr.glb',
-    output: 'public/models/attachments/rmr.runtime.glb',
-    flags: [],
-  },
+  suppressor12g: attachment('12g-suppressor', 'suppressor12g.glb', 'suppressor12g'),
+  suppressor9mm: attachment('compact-9mm', 'suppressor9mm.glb', 'suppressor9mm'),
+  suppressor338: attachment('suppressor-338', 'suppressor338.glb', 'suppressor338'),
+  srd762ti: attachment('sig-srd762ti', 'suppressor.glb', 'srd762ti'),
+  acog: attachment('trijicon-acog', 'acog.glb', 'acog'),
+  scope: attachment('schmidt-bender-pm-ii', 'scope.glb', 'scope'),
+  rmr: attachment('trijicon-rmr', 'rmr.glb', 'rmr'),
   m590: {
     directory: 'assets/weapons/m590',
     source: 'm590.glb',
@@ -121,20 +97,16 @@ export const MODEL_COOKS = {
     output: 'public/models/weapons/mpx.runtime.glb',
     flags: ['-km', '-vc', '16', '-si', '0.7', '-se', '0.0002', '-sp'],
   },
-  tor_mini: {
-    directory: 'assets/attachments/steiner-tor-mini',
-    source: 'tor-mini.glb',
-    output: 'public/models/attachments/laser.runtime.glb',
-    // Preserve the small aperture, screw slots and pressure-pad silhouettes.
-    flags: [],
-  },
-  exps3: {
-    directory: 'assets/attachments/eotech-exps3-0',
-    source: 'exps3-0.glb',
-    output: 'public/models/attachments/exps3.runtime.glb',
-    // The P320 error limit clips the rounded optical opening on this smaller asset.
-    flags: ['-si', '0.50', '-se', '0.0002', '-sp'],
-  },
+  // Preserve the small aperture, screw slots and pressure-pad silhouettes.
+  tor_mini: attachment('steiner-tor-mini', 'tor-mini.glb', 'laser'),
+  // The P320 error limit clips the rounded optical opening on this smaller asset.
+  exps3: attachment('eotech-exps3-0', 'exps3-0.glb', 'exps3', [
+    '-si',
+    '0.50',
+    '-se',
+    '0.0002',
+    '-sp',
+  ]),
   p320: {
     directory: 'assets/weapons/p320-compact',
     source: 'p320-compact.glb',

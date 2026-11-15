@@ -7,6 +7,7 @@ from pathlib import Path
 
 import bpy
 from mathutils import Matrix, Vector
+from mathutils.bvhtree import BVHTree
 
 import picatinny
 
@@ -26,6 +27,24 @@ SOURCES = {
 # Whole forward grooves per weapon fit; mirrors `fits.optic[id].railSlots` in
 # src/weapons/defs.ts, which places the same optic at runtime.
 RAIL_SLOTS = {'m4': {'scope': 7}}
+
+
+def surface(objects, transform):
+    """BVH of the evaluated meshes' rendered triangles in `transform` space (e.g. the
+    inverted rig matrix). Triangles, not polygon fans, keep concave ngons open."""
+    vertices, faces = [], []
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    for obj in objects:
+        evaluated = obj.evaluated_get(depsgraph)
+        mesh = evaluated.to_mesh()
+        mesh.calc_loop_triangles()
+        matrix = transform @ evaluated.matrix_world
+        offset = len(vertices)
+        vertices.extend(matrix @ v.co for v in mesh.vertices)
+        faces.extend(tuple(offset + i for i in t.vertices) for t in mesh.loop_triangles)
+        evaluated.to_mesh_clear()
+    assert vertices, 'missing fit surfaces'
+    return BVHTree.FromPolygons(vertices, faces, all_triangles=True)
 
 
 def named(objects, name):

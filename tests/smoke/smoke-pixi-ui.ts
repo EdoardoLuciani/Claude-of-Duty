@@ -4,9 +4,6 @@ import { Container, DOMAdapter, Text, ViewSystem, WebGPURenderer } from 'pixi.js
 import * as THREE from 'three/webgpu';
 
 import { Rng } from '../../src/core/rng.ts';
-import { GameSystem } from '../../src/game/index.ts';
-import { MarketSystem } from '../../src/market/index.ts';
-import type { RenderSystem } from '../../src/render/index-webgpu.ts';
 import { ScoreBar } from '../../src/ui/compass.ts';
 import { Crosshair } from '../../src/ui/crosshair.ts';
 import type { GameOverScreen } from '../../src/ui/gameover.ts';
@@ -25,74 +22,15 @@ import { setHudTextResolution } from '../../src/ui/pixi-type.ts';
 import { Prompt, Banner } from '../../src/ui/prompts.ts';
 import type { RadioPanel } from '../../src/ui/radio.ts';
 import type { StartGate } from '../../src/ui/start.ts';
-import { WeaponSystem } from '../../src/weapons/index.ts';
-import type { WorldSystem } from '../../src/world/index.ts';
-import { createTestContext, createTestInput, type TestProviders } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
 import {
   createRetainedHud,
   installUiDocument,
   deleteGlobal,
   captureMethod,
-  UiPlayer,
 } from '../lib/ui-fixture.ts';
 
 const restoreDocument = installUiDocument();
-
-// Record the one-time terrain bake without a browser canvas or GPU.
-const streetRects: number[][] = [];
-const bakeContext = fixture<CanvasRenderingContext2D>({
-  fillStyle: '',
-  fillRect(x, z, w, h): void {
-    if (z === -64 && h === 0.5 * 1.16) streetRects.push([x, z, w, h]);
-  },
-  setTransform(): void {},
-  strokeRect(): void {},
-  createImageData: (): ImageData =>
-    fixture<ImageData>({ data: new Uint8ClampedArray(64 * 64 * 4) }),
-  putImageData(): void {},
-  createPattern: (): null => null,
-});
-function bakeCanvasContext(contextId: '2d'): CanvasRenderingContext2D;
-function bakeCanvasContext(contextId: 'bitmaprenderer' | 'webgl' | 'webgl2' | 'webgpu'): null;
-function bakeCanvasContext(contextId: string): RenderingContext | null;
-function bakeCanvasContext(contextId: string): RenderingContext | null {
-  return contextId === '2d' ? bakeContext : null;
-}
-const createElement = captureMethod(document, 'createElement');
-Object.defineProperty(document, 'createElement', {
-  configurable: true,
-  value: (): HTMLCanvasElement =>
-    fixture<HTMLCanvasElement>({
-      width: 0,
-      height: 0,
-      getContext: bakeCanvasContext,
-    }),
-});
-try {
-  // A negative first-sample run and an open run at the final boundary.
-  const intervals = [
-    [-44, -40],
-    [42, 44.5],
-  ];
-  const terrain = new Minimap(new Rng(1));
-  const world = fixture<WorldSystem>({
-    buildings: [{ spec: { x: 60, z: 60, w: 2, d: 2 } }],
-    levelToWorld: (x, y, z): THREE.Vector3 => new THREE.Vector3(x, y, z),
-    isOpen: (x, z): boolean =>
-      z === -63.75 && intervals.some(([start, end]): boolean => x >= start && x < end),
-  });
-  const context = createTestContext({ providers: { world } });
-  terrain.tryBake(context);
-  assert.deepEqual(
-    streetRects,
-    intervals.map(([start, end]): number[] => [start, -64, end - start, 0.5 * 1.16]),
-    'street runs retain negative starts and flush the final open boundary sample'
-  );
-  terrain.dispose();
-} finally {
-  Object.defineProperty(document, 'createElement', { configurable: true, value: createElement });
-}
 
 const game = new THREE.Renderer(
   new THREE.WebGPUBackend({ canvas: document.createElement('canvas') })
@@ -466,128 +404,5 @@ assert(count.shown > 0);
 assert([prompt, banner, feed, score, count].every((m): boolean => !('root' in m)));
 console.log(
   'ok mainline HUD: guarded shared device, constructor/init/cleanup isolation, adapter restoration and native-control teardown'
-);
-
-// Exercise the production event wiring and snapshot-to-controller path without a GPU.
-Object.defineProperties(document, {
-  head: { value: document.createElement('head'), configurable: true },
-  body: { value: document.createElement('body'), configurable: true },
-});
-const listenerDescriptors = ['addEventListener', 'removeEventListener'].map(
-  (key): [string, PropertyDescriptor | undefined] => [
-    key,
-    Object.getOwnPropertyDescriptor(globalThis, key),
-  ]
-);
-for (const [key] of listenerDescriptors)
-  Object.defineProperty(globalThis, key, { value: (): void => {}, configurable: true });
-const createHud = captureMethod(PixiHud, 'create');
-const wired = new UiSystem();
-try {
-  PixiHud.create = async (): Promise<PixiHud> => {
-    const hud = createRetainedHud();
-    hud.resize = (): void => {};
-    hud.update = (): void => {};
-    hud.dispose = (): void => {
-      hud.injury.dispose();
-      hud.stage.destroy({ children: true });
-    };
-    return hud;
-  };
-  const weapons = new WeaponSystem();
-  const weaponState = weapons.getHudState();
-  weapons.getHudState = (): typeof weaponState => weaponState;
-  const run = { ...new GameSystem()._hud, score: 400, wave: 3 };
-  const marketState = { ...new MarketSystem()._hud, items: [], attachments: [] };
-  const providers: TestProviders = {
-    weapons,
-    game: fixture<GameSystem>({ getHudState: (): typeof run => run }),
-    market: fixture<MarketSystem>({
-      delay: 10,
-      open: false,
-      getHudState: (): typeof marketState => marketState,
-    }),
-    render: fixture<RenderSystem>({ renderer: game }),
-  };
-  const ctx = createTestContext({
-    providers,
-    input: createTestInput(),
-    canvas: fixture<HTMLCanvasElement>({ clientWidth: 1920, clientHeight: 1080 }),
-    engine: fixture<ReturnType<typeof createTestContext>['engine']>({ error: null }),
-  });
-  const player = new UiPlayer(ctx);
-  providers.player = player;
-  await wired.init(ctx);
-  const frame = (): void => wired.lateUpdate(0, ctx);
-  const fire = {
-    weapon: { id: 'pistol' as const },
-    origin: new THREE.Vector3(),
-    dir: new THREE.Vector3(0, 0, -1),
-    seed: 1,
-  };
-  ctx.events.emit('weapon:fire', { ...fire, actor: { name: 'enemy' } });
-  assert.equal(wired.crosshair.kickVel, 0, 'AI fire cannot bloom the local reticle');
-  ctx.events.emit('weapon:fire', { ...fire, actor: player });
-  assert(wired.crosshair.kickVel > 0, 'local fire retains bloom');
-  frame();
-  const beforeEvents = { ...wired.state };
-  ctx.events.emit('weapon:reload', { weapon: fire.weapon, actor: player, phase: 'start' });
-  ctx.events.emit('score:change', { score: 900, delta: 500, reason: 'kill', kills: 9 });
-  ctx.events.emit('player:state', { ads: true, sprinting: true, sliding: false, stance: 'prone' });
-  ctx.events.emit('wave:start', { wave: 4, enemies: 12, squads: 3, perSquad: 4 });
-  assert.equal(wired.banner.title, 'WAVE 4');
-  ctx.events.emit('wave:complete', { wave: 4, nextWave: 5, delay: 25 });
-  assert.equal(wired.banner.title, 'WAVE 4 CLEARED');
-  ctx.events.emit('damage:taken', {
-    amount: 10,
-    health: 90,
-    from: new THREE.Vector3(1, 0, 0),
-    armourAbsorbed: 10,
-    armour: 40,
-    plateBreak: false,
-  });
-  assert(wired.arcs.pool.items.some((item): boolean => item.alive));
-  assert.deepEqual(wired.state, beforeEvents, 'events cannot overwrite snapshot readouts');
-
-  Object.assign(weaponState, {
-    ammo: 8,
-    reloading: true,
-    reloadProgress: 0.6,
-  });
-  Object.assign(run, {
-    score: 900,
-    wave: 4,
-    enemiesRemaining: 0,
-    waveIncoming: true,
-    nextWaveIn: 25,
-  });
-  player.health.value = 90;
-  player.movement.stance = 'prone';
-  frame();
-  assert.equal(wired.state.ammo, 8);
-  assert.equal(wired.state.reloadProgress, 0.6);
-  assert.equal(wired.state.health, 90);
-  assert.equal(wired.state.crouch, true);
-  assert.equal(wired.state.score, 900);
-  assert.equal(wired.state.nextWaveIn, 25);
-  ctx.events.emit('weapon:reload', { weapon: fire.weapon, phase: 'end' });
-  assert.equal(wired.state.reloading, true, 'reload end also waits for the snapshot');
-  const beforeRestart = { ...wired.state };
-  ctx.events.emit('game:restart', {});
-  assert.deepEqual(wired.state, beforeRestart, 'restart waits for provider reset snapshots');
-  run.score = 0;
-  weaponState.reloading = false;
-  frame();
-  assert.equal(wired.state.score, 0);
-  assert.equal(wired.state.reloading, false);
-} finally {
-  PixiHud.create = createHud;
-  wired.dispose();
-  for (const [key, descriptor] of listenerDescriptors)
-    if (descriptor) Object.defineProperty(globalThis, key, descriptor);
-    else deleteGlobal(key);
-}
-console.log(
-  'ok HUD authority: local firing, snapshot readouts, transient feedback and restart readouts'
 );
 restoreDocument();

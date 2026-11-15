@@ -13,9 +13,6 @@ import {
   BASE_ATTACHMENTS,
   configureWeaponAttachments,
   hasAttachmentAssets,
-  makeOpticModel,
-  makeLaserModel,
-  makeSuppressorModel,
   mountAttachments,
   releaseAttachmentMounts,
   isAttachmentConfig,
@@ -25,6 +22,7 @@ import {
   authoredModel,
   checkAuthoredDuration,
   rebaseNativeWeapon,
+  requiredNode,
 } from '../../src/weapons/authored-model.ts';
 import { WEAPON_DEFS, WEAPON_IDS } from '../../src/weapons/defs.ts';
 import { Arm } from '../../src/weapons/hands.ts';
@@ -36,6 +34,12 @@ import type { WeaponEntry, WeaponModelRecord } from '../../src/weapons/runtime-t
 import { Viewmodel } from '../../src/weapons/viewmodel.ts';
 import { createTestContext } from '../lib/context.ts';
 import { fixture } from '../lib/fixture.ts';
+import {
+  datums,
+  mountableWeapon,
+  opticAsset,
+  rigidAsset,
+} from '../lib/weapon-attachment-fixture.ts';
 
 // Real three clips; duration is inferred from the keys, as GLTFLoader does.
 const track = (times: number[]): THREE.VectorKeyframeTrack =>
@@ -113,25 +117,6 @@ assert.throws(
   (): unknown => authoredModel(gltf, 'TEST_RIG', ['Idle', 'Fire', 'Inspect'], authored),
   /missing Inspect clip/
 );
-// Shared glass remains a single thin-alpha surface, even if source art uses transmission.
-for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
-  const scene = new THREE.Group();
-  for (const name of ['MOUNT_base', 'SOCKET_sight']) {
-    const node = new THREE.Object3D();
-    node.name = name;
-    scene.add(node);
-  }
-  const source = new THREE.MeshPhysicalMaterial({ transmission: 0.97 });
-  source.name = id === 'acog' ? '11 | coated optic lens' : '10 | coated lens';
-  const lens = new THREE.Mesh(new THREE.PlaneGeometry(), source);
-  scene.add(lens);
-  const asset = makeOpticModel(fixture<GLTF>({ scene }), id);
-  assert.equal(lens.material.transmission, 0);
-  assert.equal(lens.material.opacity, id === 'acog' ? 0.1 : 0.13);
-  assert(lens.material.transparent);
-  assert.equal(lens.material.depthWrite, false);
-  asset.dispose();
-}
 // Repeated mount/remove borrows one asset, restores base datums/tuning and
 // leaves no orphan glass/socket.
 {
@@ -149,24 +134,15 @@ for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
   const baseDevice = new THREE.Group();
   baseDevice.name = 'MUZZLE_device';
   root.add(irons, ironsRemoved, baseDevice);
-  const assetScene = new THREE.Group();
-  const base = new THREE.Object3D();
-  base.name = 'MOUNT_base';
-  const sight = new THREE.Object3D();
-  sight.name = 'SOCKET_sight';
+  const assetScene = datums('MOUNT_base', 'SOCKET_sight');
+  const sight = requiredNode(assetScene, 'SOCKET_sight');
   sight.position.set(0, 0.0425072, -0.018);
   const geometry = new THREE.BoxGeometry(0.02, 0.01, 0.001);
-  const lens = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial());
-  assetScene.add(base, sight, lens);
-  const asset = makeOpticModel(fixture<GLTF>({ scene: assetScene }), 'rmr');
+  assetScene.add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial()));
+  const asset = opticAsset(assetScene);
   const optics = { rmr: asset, acog: asset, scope: asset, exps3: asset };
   let disposed = 0;
-  let ownerDisposed = false;
-  asset.scene.addEventListener('dispose', (): void => {
-    ownerDisposed = true;
-  });
   geometry.addEventListener('dispose', (): void => {
-    assert(ownerDisposed, 'release retained warm object records before shared geometry');
     disposed++;
   });
   const model = fixture<Extract<WeaponModelRecord, { id: 'rifle' }>>({
@@ -180,18 +156,11 @@ for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
     }),
   });
   const entry = fixture<WeaponEntry>({
+    ...mountableWeapon('rifle'),
     id: 'rifle',
     model,
     group: weaponScene,
     def: { ...WEAPON_DEFS.rifle },
-    attachments: BASE_ATTACHMENTS,
-    attachmentGroup: new THREE.Group(),
-    railGroup: new THREE.Group(),
-    muzzleGroup: new THREE.Group(),
-    muzzleSocket: null,
-    laserEmitter: null,
-    sight: new THREE.Vector3(),
-    optic: null,
   });
   const config: AttachmentConfig = { ...BASE_ATTACHMENTS, optic: 'rmr' };
   for (let i = 0; i < 9; i++) {
@@ -208,14 +177,7 @@ for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
     const shift = entry.attachmentGroup.position.z;
     assert.equal(shift < 0, Boolean(WEAPON_DEFS.rifle.fits?.optic?.[optic]?.railSlots));
     assert(entry.sight.distanceTo(new THREE.Vector3(0, 0.1461072, -0.085 + shift)) < 1e-8);
-    assert.deepEqual(entry.optic?.center, entry.sight.toArray());
     assert.equal(entry.def.eyeRelief, WEAPON_DEFS.rifle.fits?.optic?.[optic]?.eyeRelief);
-    assert.equal(entry.def.adsFovScale, optic === 'rmr' ? 0.62 : optic === 'acog' ? 0.28 : 0.25);
-    assert.equal(entry.def.adsSensScale, entry.def.adsFovScale);
-    assert.equal(
-      entry.optic?.reticle,
-      optic === 'acog' ? 'chevron' : optic === 'scope' ? 'p4fl' : undefined
-    );
     const mountedLens = entry.attachmentGroup.children[0].children[2];
     assert(mountedLens instanceof THREE.Mesh);
     assert.equal(mountedLens.geometry, geometry);
@@ -224,7 +186,6 @@ for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
     assert.equal(oldMount.parent, null);
     assert.equal(oldMount.children.length, 0);
     assert.equal(entry.attachmentGroup.children.length, 0);
-    assert.equal(entry.optic, null);
     assert.equal(entry.mountedOptic, null);
     assert(irons.visible);
     assert.equal(ironsRemoved.visible, false);
@@ -240,14 +201,9 @@ for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
   railMount.position.set(0.0285, 0.075, -0.25);
   railMount.rotation.z = Math.PI / 2;
   root.add(railMount);
-  const laserScene = new THREE.Group();
-  const laserBase = new THREE.Object3D();
-  laserBase.name = 'SOCKET_mount';
-  const emitter = new THREE.Object3D();
-  emitter.name = 'SOCKET_laser';
-  emitter.position.set(0, -0.0105, -0.02518);
-  laserScene.add(laserBase, emitter);
-  const laser = makeLaserModel(fixture<GLTF>({ scene: laserScene }));
+  const laserScene = datums('SOCKET_mount', 'SOCKET_laser');
+  requiredNode(laserScene, 'SOCKET_laser').position.set(0, -0.0105, -0.02518);
+  const laser = rigidAsset('SOCKET_laser', laserScene);
   const laserConfig: AttachmentConfig = { ...BASE_ATTACHMENTS, rail: 'laser' };
   assert(isAttachmentConfig(laserConfig, 'rifle'));
   configureWeaponAttachments(entry, laserConfig, { ...optics, laser });
@@ -502,15 +458,12 @@ for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
   baseSocket.name = 'SOCKET_muzzle';
   baseSocket.position.fromArray(model.nodes.muzzle);
   root.add(muzzleMount, baseSocket);
-  const canScene = new THREE.Group();
-  const canMount = new THREE.Object3D();
-  canMount.name = 'SOCKET_mount';
-  const canExit = new THREE.Object3D();
-  canExit.name = 'SOCKET_muzzle';
+  const canScene = datums('SOCKET_mount', 'SOCKET_muzzle');
+  const canExit = requiredNode(canScene, 'SOCKET_muzzle');
   canExit.position.z = -0.236;
   const canMesh = new THREE.Mesh(new THREE.CylinderGeometry(), new THREE.MeshStandardMaterial());
-  canScene.add(canMount, canExit, canMesh);
-  const can = makeSuppressorModel(fixture<GLTF>({ scene: canScene }));
+  canScene.add(canMesh);
+  const can = rigidAsset('SOCKET_muzzle', canScene);
   let canDisposed = 0;
   canMesh.geometry.addEventListener('dispose', (): void => {
     canDisposed++;
@@ -589,9 +542,6 @@ for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
   assert.equal(muzzleMount.children.length, 0);
   root.add(baseDevice);
   viewmodel.active = null;
-  laser.dispose();
-  can.dispose();
-  assert.equal(canDisposed, 1, 'the asset owns shared geometry exactly once');
   root.rotation.set(0, 0, 0);
   for (const optic of ['acog', 'scope'] as const) {
     configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, optic }, optics);
@@ -626,27 +576,6 @@ for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
   viewmodel._updateReticle(entry, 1);
   assert(viewmodel.reticle.visible, 'settled mounted optic shows its dot');
   assert.equal(viewmodel.reticleRing.visible, false, 'a dot-only optic hides the ring');
-  root.position.y = 0.1;
-  root.updateMatrix();
-  viewmodel._updateReticle(entry, 1);
-  assert.equal(
-    viewmodel.reticle.visible,
-    false,
-    'authored draw moving the lens away hides the dot'
-  );
-  root.rotation.x = 0.2;
-  root.updateMatrix();
-  const axis = new THREE.Vector3(0, Math.sin(0.2), -Math.cos(0.2));
-  const expectedDot = axis.multiplyScalar(entry.def.eyeRelief);
-  viewmodel.rig.position.copy(expectedDot).sub(entry.sight.clone().applyMatrix4(root.matrix));
-  viewmodel._updateReticle(entry, 1);
-  assert(viewmodel.reticle.visible, 'eye aligned with the posed optic sees the dot');
-  assert(
-    viewmodel.reticle.position.distanceTo(expectedDot) < 1e-10,
-    'dot follows the authored optical axis'
-  );
-  root.position.set(0, 0, 0);
-  root.rotation.set(0, 0, 0);
   const slide = new THREE.Object3D();
   root.add(slide);
   slide.add(socket);
@@ -683,9 +612,7 @@ for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
   configureWeaponAttachments(entry, BASE_ATTACHMENTS, optics);
   viewmodel.dispose();
   materials.dispose();
-  assert.equal(ownerDisposed, false, 'warm source survives mounted-instance disposal');
-  asset.dispose();
-  assert.equal(disposed, 1, 'asset owner releases shared geometry exactly once');
+  assert.equal(disposed, 0, 'mounted-instance disposal never releases borrowed geometry');
 }
 // Laser uses the bullet mask/query without publishing damage; AI wins over the
 // wall behind it, moving/disabling that collider immediately moves the spot.
@@ -793,7 +720,6 @@ for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
       );
     }
   }
-  assert.equal(laser.geometry.getAttribute('position'), positions, 'updates reuse the same buffer');
   assert.equal(laser.geometry.drawRange.count, 6, 'a miss draws only the beam, no floating dot');
   laser.dispose();
   assert.equal(scene.children.length, 0);

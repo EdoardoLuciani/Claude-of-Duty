@@ -6,9 +6,7 @@ import type { EngineSystems } from '../core/context.ts';
 import { MASK } from '../physics/surfaces.ts';
 
 /** One retained world draw for the beam and surface spot; no lights or decals.
- * Only transforms/attributes change when mounted: the shader is warmed at boot.
- * Flashlight (#506) owns a spotlight, not this unlit ribbon; the authored emitter
- * convention (-Z forward) can be shared without coupling either effect's lifetime. */
+ * Only transforms/attributes change when mounted: the shader is warmed at boot. */
 export class WeaponLaser {
   readonly geometry = new THREE.BufferGeometry();
   readonly material = new MeshBasicNodeMaterial({
