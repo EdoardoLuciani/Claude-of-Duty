@@ -392,11 +392,6 @@ for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
       actual.every((value, i): boolean => Math.abs(value - handRotation.toArray()[i]) < 1e-7),
       'shared accessor finger tracks rebase once across every native clip'
     );
-    assert.equal(
-      animation.clips()[name].weapon,
-      null,
-      'MCX equip motion uses native actions, not additive tracks'
-    );
   }
   animation.dispose();
   const mcxMounted = mountAttachments(nativeMCX, config, optics);
@@ -624,28 +619,6 @@ for (const id of ['rmr', 'acog', 'scope', 'exps3'] as const) {
   laser.dispose();
   can.dispose();
   assert.equal(canDisposed, 1, 'the asset owns shared geometry exactly once');
-  // Grip approaches must not blend through generic fingers on wrist arrival.
-  const approach = viewmodel.clipResult;
-  approach.active = true;
-  approach.lhand.weight = 1;
-  approach.lhand.pos = [0, -0.1, -0.1];
-  approach.lhand.finger = [0, 0, -1];
-  approach.lhand.back = [0, 1, 0];
-  const held = fixture<WeaponEntry>({
-    ...entry,
-    gripR: { pos: [0.03, -0.01, 0.08] },
-    gripL: { pos: [-0.07, 0.04, -0.24] },
-    rhandPose: 'gripRifle',
-    lhandPose: 'clamp',
-    animation: fixture<WeaponEntry['animation']>({}, ['handTarget', 'applyHands']),
-  });
-  for (const pose of ['wrap', 'clamp']) {
-    approach.lhand.pose = pose;
-    viewmodel._solveHands(held, approach);
-    assert.equal(viewmodel.armL.pose, held.lhandPose, 'fit fingers before wrist contact');
-  }
-  approach.active = false;
-  approach.lhand.weight = 0;
   root.rotation.set(0, 0, 0);
   for (const optic of ['acog', 'scope'] as const) {
     configureWeaponAttachments(entry, { ...BASE_ATTACHMENTS, optic }, optics);

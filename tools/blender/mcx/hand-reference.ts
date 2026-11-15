@@ -2,7 +2,6 @@
 // Explicit offline calibration for Blender-authored wrists/fingers, not a build stage.
 import { writeFileSync } from 'node:fs';
 
-import { GRIP_CONTACTS, FIRING_FINGER_SPREAD } from '../../../src/weapons/grip-contacts.ts';
 import { HAND_POSES } from '../../../src/weapons/hand-poses.ts';
 import { Arm } from '../../../src/weapons/hands.ts';
 import {
@@ -18,8 +17,6 @@ const grips: Record<Side, GripFrame> = {
   right: { pos: [0.0351, -0.012, 0.086], finger: [0.15, 0.35, -0.92], back: [1, 0.03, 0.04] },
   left: { pos: [-0.073, 0.04, -0.243], finger: [0.7, -0.1, -0.71], back: [-0.14, -0.985, 0.001] },
 };
-const contact = GRIP_CONTACTS.mcx;
-const vec3 = (value: number[]): [number, number, number] => [value[0]!, value[1]!, value[2]!];
 const sides: Partial<Record<Side, HandSideReference>> = {};
 for (const side of ['right', 'left'] as const) {
   const grip = grips[side];
@@ -33,14 +30,11 @@ for (const side of ['right', 'left'] as const) {
       poseName: 'clamp',
     });
   }
+  // Thumb centres sit one glove radius off the surface; the trigger contact is the palmar pad.
   const options: GripOptions =
     side === 'right'
-      ? {
-          thumb: vec3(contact.rightThumb),
-          index: vec3(contact.trigger),
-          spread: FIRING_FINGER_SPREAD,
-        }
-      : { thumb: vec3(contact.leftThumb), thumbPole: vec3(contact.leftThumbPole) };
+      ? { thumb: [-0.024, 0.04, 0.022], index: [0, 0.019, -0.06], spread: [0, 0.6, 0.62, 0.64] }
+      : { thumb: [-0.022, 0.096, -0.302], thumbPole: [0, 0, -1] };
   arm.fitGrip('mcx', options);
   sides[side] = {
     quaternion: arm.hand.quaternion.toArray(),

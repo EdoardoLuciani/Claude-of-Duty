@@ -23,7 +23,6 @@ import {
   BANDAGE_WIDTH,
   BANDAGE_ELBOW_R,
 } from './bandage-path.ts';
-import { makeSampleResult } from './clips.ts';
 import type { Clip } from './clips.ts';
 import type { WeaponDef } from './defs.ts';
 import { triCount } from './geometry.ts';
@@ -33,7 +32,6 @@ import type { ReticleMaterials } from './materials-tsl.ts';
 import { Spring3, Noise1, wrapPi } from './mathx.ts';
 import { radioMesh, radioScreenTexture } from './radio-mesh.ts';
 import type {
-  ClipResult,
   ViewPoseKey,
   ViewState,
   WeaponEntry,
@@ -315,7 +313,6 @@ export class Viewmodel {
   // clip playback
   clip: Clip | null = null;
   clipPrevT: number = 0;
-  clipResult: ClipResult = makeSampleResult();
   clipT: number = 0;
   debugFrozen: boolean = false;
   // Frequencies/damping are fitted to the previous one-step-per-frame response at 60 Hz.
@@ -598,8 +595,6 @@ export class Viewmodel {
   stopClip(): void {
     this.active?.animation.reset();
     this.clip = null;
-    this.clipResult.active = false;
-    this.clipResult.lhand.weight = 0;
   }
 
   get clipName(): string | null {
@@ -1158,24 +1153,16 @@ export class Viewmodel {
     py -= this.landSpring.value * 0.014 + this.jumpSpring.value * 0.006;
     rx -= this.landSpring.value * 0.05;
 
-    const res = this.clipResult;
     if (this.clip) {
       this.clipT += dt;
       const c = this.clip;
       const tt = clamp(this.clipT, 0, c.duration);
-      c.sample(tt, res);
       // Callbacks may restart this same Clip; keep their reset cursor intact.
       const prevT = this.clipPrevT;
       this.clipPrevT = tt;
       for (const ev of c.events) {
         if (ev.t > prevT && ev.t <= tt) this.onClipEvent?.(ev.name, c.name);
       }
-      px += res.pos[0];
-      py += res.pos[1];
-      pz += res.pos[2];
-      rx += res.rot[0];
-      ry += res.rot[1];
-      rz += res.rot[2];
       // An end callback can start draw (or the next tube reload) immediately.
       // Do not clear that new clip while finishing the previous one.
       if (this.clip === c && this.clipT >= c.duration) {
@@ -1221,7 +1208,7 @@ export class Viewmodel {
 
     // Baked parts must be sampled before solving arms and querying sockets.
     w.animation.update(dt, this.clipName, this.clipT, s.empty, s.magazineLoaded, s.remainingRounds);
-    this._solveHands(w, res);
+    this._solveHands(w);
 
     const fovBase = 60;
     const targetFov = fovBase * lerp(1, def.viewFov, ads);
@@ -1235,7 +1222,7 @@ export class Viewmodel {
     this._updateScope(w, ads);
   }
 
-  _solveHands(w: WeaponEntry, res: ClipResult): void {
+  _solveHands(w: WeaponEntry): void {
     if (this._bandageState) {
       // Raise/stow the authored pose as a unit. Neither elbow nor upper arm
       // participates in the winding motion; only the right forearm and hand do.
@@ -1290,23 +1277,11 @@ export class Viewmodel {
     this.armR.solve(this._handPos, this._handQuat);
     this.armR.setTrigger(this.triggerT);
 
-    // ---- support hand: grip, or wherever the clip puts it ----
+    // ---- support hand: welded to its grip ----
     const gL = w.gripL;
-    let pos = gL.pos;
-    let finger = gL.finger ?? [0.82, 0.5, -0.28];
-    let back = gL.back ?? [-0.5, 0.32, -0.8];
-    let pose = w.lhandPose;
-    if (res.active && res.lhand.weight > 0.5) {
-      pos = res.lhand.pos;
-      finger = res.lhand.finger;
-      back = res.lhand.back;
-      pose = res.lhand.pose;
-      // Grip labels use the fitted fingers during the approach too. Waiting for
-      // exact wrist contact made the generic-to-fitted curl cross the rail.
-      if (pose === 'wrap' || pose === 'clamp') pose = w.lhandPose;
-    }
-    this._handPosL.set(pos[0], pos[1], pos[2]);
-    handBasis(this._handQuatL, finger, back);
+    const pose = w.lhandPose;
+    this._handPosL.fromArray(gL.pos);
+    handBasis(this._handQuatL, gL.finger ?? [0.82, 0.5, -0.28], gL.back ?? [-0.5, 0.32, -0.8]);
     w.animation.handTarget?.('left', this._handPosL, this._handQuatL);
     if (pose !== this.armL.pose) this.armL.setPose(pose, 0.1);
     this.armL.solve(this._handPosL, this._handQuatL);

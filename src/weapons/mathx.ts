@@ -12,17 +12,6 @@ interface SignedRng {
   signed(): number;
 }
 
-/** Slight overshoot ease used for mag slaps and bolt releases. */
-export function easeOutBack(t: number, k = 1.6): number {
-  const p = t - 1;
-  return 1 + p * p * ((k + 1) * p + k);
-}
-
-export function easeOutCubic(t: number): number {
-  const p = 1 - t;
-  return 1 - p * p * p;
-}
-
 /** Three independent springs sharing frequency/damping — position or euler. */
 export class Spring3 {
   a: Spring;

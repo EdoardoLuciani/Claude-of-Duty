@@ -3,7 +3,7 @@ import type * as THREE from 'three';
 import type { EngineContext, EngineSystems } from '../core/context.ts';
 import type { AttachmentConfig } from './attachments.ts';
 import type { loadAX338 } from './ax338.ts';
-import type { Clip, ClipSample } from './clips.ts';
+import type { Clip } from './clips.ts';
 import type { WeaponDef, WeaponId, WeaponMode } from './defs.ts';
 import type { loadEvolys } from './evolys.ts';
 import type { Arm } from './hands.ts';
@@ -154,4 +154,3 @@ export type ViewmodelContext = Pick<
   canvas: Pick<HTMLCanvasElement, 'height'>;
   get(id: 'render'): Pick<EngineSystems['render'], 'screenSize'> | null;
 };
-export type ClipResult = ClipSample;
