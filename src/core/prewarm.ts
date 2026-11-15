@@ -5,10 +5,7 @@ import type { Engine } from './engine.ts';
 /** Strict-WebGPU material warmup; never creates or requests a WebGL context. */
 export async function prewarm(
   engine: Engine,
-  {
-    onProgress = (): void => {},
-    signal,
-  }: { onProgress?: (progress: number) => void; signal?: AbortSignal } = {}
+  { onProgress = (): void => {} }: { onProgress?: (progress: number) => void } = {}
 ): Promise<
   | { ok: boolean; reason: string; hooks?: undefined; ms?: undefined }
   | { ok: boolean; hooks: Record<string, unknown>; ms: number; reason?: undefined }
@@ -33,7 +30,7 @@ export async function prewarm(
     // Each subsystem can reach hidden material variants without spawning an
     // actor, altering the clock, or rendering a gameplay frame.
     for (const system of engine.registry.ordered) {
-      if (engine.error || engine.disposed || signal?.aborted) break;
+      if (engine.error) break;
       if (typeof system.prewarmMaterials !== 'function') continue;
       // Real registry entries validate metadata at registration. Isolated warmup
       // fixtures can omit it; preserve the original property-key coercion.
@@ -57,13 +54,10 @@ export async function prewarm(
     scratch.dispose();
   }
   return {
-    ok:
-      !engine.disposed &&
-      !signal?.aborted &&
-      Object.values(hooks).every(
-        (hook): boolean =>
-          !(typeof hook === 'object' && hook !== null && 'ok' in hook && hook.ok === false)
-      ),
+    ok: Object.values(hooks).every(
+      (hook): boolean =>
+        !(typeof hook === 'object' && hook !== null && 'ok' in hook && hook.ok === false)
+    ),
     hooks,
     ms: Math.round(performance.now() - start),
   };

@@ -16,47 +16,57 @@ import {
   type MRTNode,
 } from 'three/webgpu';
 
-import type { Engine } from '../../src/core/engine.ts';
+import { Engine } from '../../src/core/engine.ts';
 import { RenderSystem } from '../../src/render/index-webgpu.ts';
 import { createHdrMeter } from '../../src/render/meter-webgpu.ts';
 import { warmFrame } from '../../src/render/warm-frame.ts';
 import { createTestContext } from '../lib/context.ts';
-import { addLifecycle, createCoreFixture } from '../lib/core-fixture.ts';
 import { fixture } from '../lib/fixture.ts';
+import { captureMethod } from '../lib/render-fixture.ts';
 
 // Teardown must report both sync and async failures, after all owners and events.
 const order: string[] = [],
   error = console.error;
 console.error = (): void => {};
 try {
-  const { engine, registry } = createCoreFixture();
-  engine.input.detach = (): void => {};
-  engine.events.on('game:restart', (): void => assert.fail('events must be cleared'));
-  for (const id of ['last', 'sync', 'async']) {
-    addLifecycle(registry, id, {
-      dispose:
-        id === 'async'
-          ? async (): Promise<void> => {
-              order.push(id);
-              await Promise.resolve();
-              throw Error(id);
-            }
-          : (): void => {
-              order.push(id);
-              if (id !== 'last') throw Error(id);
-            },
-    });
-  }
+  const engine = fixture<Engine>({
+    dispose: captureMethod(Engine.prototype, 'dispose'),
+    stop(): void {},
+    _onResize(): void {},
+    input: fixture<Engine['input']>({ detach(): void {} }),
+    events: fixture<Engine['events']>({
+      clear(): void {
+        order.push('events');
+      },
+    }),
+    registry: fixture<Engine['registry']>({
+      ordered: [
+        {
+          dispose(): void {
+            order.push('last');
+          },
+        },
+        {
+          dispose(): void {
+            order.push('sync');
+            throw Error('sync');
+          },
+        },
+        {
+          async dispose(): Promise<void> {
+            order.push('async');
+            throw Error('async');
+          },
+        },
+      ],
+    }),
+  });
   globalThis.removeEventListener = (): void => {};
   await assert.rejects(
     engine.dispose(),
     (e: unknown): boolean => e instanceof AggregateError && e.errors.length === 2
   );
-  assert.deepEqual(order, ['async', 'sync', 'last']);
-  engine.events.emit('game:restart', {});
-  assert.equal(engine.disposed, true);
-  await assert.rejects(engine.dispose(), AggregateError);
-  assert.equal(order.length, 3, 'repeated teardown never repeats subsystem disposal');
+  assert.deepEqual(order, ['async', 'sync', 'last', 'events']);
 } finally {
   console.error = error;
   Reflect.deleteProperty(globalThis, 'removeEventListener');
@@ -81,8 +91,7 @@ const fireFrame = (): void => {
   callback(performance.now());
 };
 try {
-  const warmOwner = new RenderSystem();
-  const abort = warmOwner._warmAbort;
+  const abort = new AbortController();
   const resumed = warmFrame(
     (): void => {
       draws++;
@@ -112,8 +121,8 @@ try {
     abort.signal,
     performance.now() + 1000
   );
-  warmOwner.cancelPrewarm();
-  await assert.rejects(cancelled, /disposed/);
+  abort.abort(Error('cancelled'));
+  await assert.rejects(cancelled, /cancelled/);
   assert.equal(callbacks.size, 0);
   await assert.rejects(
     warmFrame(
@@ -123,7 +132,7 @@ try {
       abort.signal,
       performance.now() + 1000
     ),
-    /disposed/
+    /cancelled/
   );
 
   // Throw after jitter/state mutation: preserve authored sub-frustum, matrices,

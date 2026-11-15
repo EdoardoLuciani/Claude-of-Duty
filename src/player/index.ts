@@ -70,7 +70,7 @@ export class PlayerSystem {
   declare rng: Rng;
   declare flashlightOn: boolean;
   declare flashlight: THREE.SpotLight;
-  _unregisterPass: (() => void) | null = null;
+  declare _unregisterPass: (() => void) | null;
   /** Per-weapon ADS overrides, published by `weapons` once a gun is held. */
   declare adsFovScale: number | undefined;
   declare adsSensScale: number | undefined;
@@ -1025,13 +1025,9 @@ export class PlayerSystem {
       this.physics?.removeCollider(this.hitbox);
       this.hitbox = null;
     }
-    if (this.flashlight) {
-      this.flashlight.removeFromParent();
-      this.flashlight.target.removeFromParent();
-      this.flashlight.shadow.dispose();
-    }
+    this.ctx.scene.remove(this.flashlight, this.flashlight.target);
+    this.flashlight.shadow.dispose();
     this._unregisterPass?.();
-    this._unregisterPass = null;
     this.lowHealthPass?.dispose();
     this.lowHealthPass = null;
     this.movement?.dispose();

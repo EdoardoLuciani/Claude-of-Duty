@@ -645,8 +645,6 @@ export class UiSystem {
     this.pixiHud?.resize(w, h, this.k);
   }
 
-  // Engine teardown also visits skipped or partially initialized UI owners.
-  /* oxlint-disable typescript/no-unnecessary-condition */
   dispose(): void {
     // Clear ownership first; a GPU cleanup failure must not skip native controls.
     const pixi = this.pixiHud;
@@ -657,14 +655,13 @@ export class UiSystem {
       this.startGate?.dispose();
       for (const off of this._unsubs) off();
       this._unsubs.length = 0;
-      this.minimap?.dispose();
-      this.menu?.dispose();
-      this.gameOver?.dispose();
-      this.shop?.dispose();
-      this.radio?.dispose();
-      this.root?.remove();
+      this.minimap.dispose();
+      this.menu.dispose();
+      this.gameOver.dispose();
+      this.shop.dispose();
+      this.radio.dispose();
+      this.root.remove();
       removeStyles();
     }
   }
-  /* oxlint-enable typescript/no-unnecessary-condition */
 }

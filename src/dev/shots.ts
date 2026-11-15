@@ -259,7 +259,6 @@ declare global {
   }
 }
 
-/* oxlint-disable typescript/unbound-method -- retain exact callback identity for owned restoration */
 export function installShotApi(
   engine: Engine,
   { capture = false, lockstep = false }: { capture?: boolean; lockstep?: boolean } = {}
@@ -267,20 +266,7 @@ export function installShotApi(
   pump: (frames?: number) => Promise<number>;
   present: (frames?: number) => Promise<number>;
   lockstep: boolean;
-  dispose: () => void;
 } {
-  let disposed = false;
-  const frames = new Set<number>();
-  const pending = new Set<(error: Error) => void>();
-  const originalStep = engine.step;
-  const originalStart = engine.start;
-  const schedule = (callback: () => void): void => {
-    const id = requestAnimationFrame((): void => {
-      frames.delete(id);
-      if (!disposed) callback();
-    });
-    frames.add(id);
-  };
   window.__SHOTS__ = SHOTS;
 
   /**
@@ -288,13 +274,12 @@ export function installShotApi(
    * the shutter. Shots whose subject is a transient (a muzzle flash lives ~52 ms)
    * need it so they can land the event on the captured frame instead of guessing.
    */
-  const applyShot = (
+  window.__APPLY_SHOT__ = (
     name: string,
     options: unknown = {}
   ):
     | { error: string; available: string[]; applied?: undefined; pos?: undefined; fov?: undefined }
     | { applied: string; pos: number[]; fov: number; error?: undefined; available?: undefined } => {
-    if (disposed) throw new Error('Shot API disposed');
     // Untyped harness callers may name any shot.
     const shot = SHOTS[name] as (typeof SHOTS)[string] | undefined;
     if (!shot) return { error: `unknown shot "${name}"`, available: Object.keys(SHOTS) };
@@ -328,8 +313,6 @@ export function installShotApi(
     return { applied: name, pos: shot.pos, fov: cam.fov };
   };
 
-  window.__APPLY_SHOT__ = applyShot;
-
   if (capture) {
     engine.input.frozen = true;
     // Fixed timestep in capture mode so temporal effects converge identically.
@@ -348,13 +331,10 @@ export function installShotApi(
       })(engine.step.bind(engine));
   }
 
-  let renderInfo: ReturnType<typeof shotRenderInfo> | null = null;
-  window.__RENDER_INFO__ = renderInfo;
+  window.__RENDER_INFO__ = null;
+  engine.events.on('resize', (): void => {});
   const snapInfo = (): void => {
-    if (window.__APPLY_SHOT__ === applyShot) {
-      renderInfo = shotRenderInfo(engine);
-      window.__RENDER_INFO__ = renderInfo;
-    }
+    window.__RENDER_INFO__ = shotRenderInfo(engine);
   };
 
   /**
@@ -379,80 +359,64 @@ export function installShotApi(
    */
   if (lockstep) {
     engine.start = function (): void {
-      if (!this.disposed && !this.error) this._running = true;
+      this._running = true;
     };
     window.__LOCKSTEP__ = true;
+
+    /** Advance exactly `n` engine frames, one per rAF so each is presented. */
+    window.__PUMP__ = (n = 1): Promise<number> =>
+      new Promise((resolve, reject): void => {
+        let i = 0;
+        const tick = (): void => {
+          try {
+            engine.step();
+          } catch (err) {
+            reject(err);
+            return;
+          }
+          if (engine.error) {
+            reject(new Error(`engine failure: ${JSON.stringify(engine.error)}`));
+            return;
+          }
+          snapInfo();
+          if (++i >= n) resolve(engine.time.frame);
+          else requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+
+    /** Yield `n` rAFs WITHOUT stepping, so the compositor picks up the last
+     *  rendered frame before the screenshot. Advances no simulation state. */
+    window.__PRESENT__ = (n = 2): Promise<number> =>
+      new Promise((resolve): void => {
+        let i = 0;
+        const tick = (): number | void =>
+          ++i >= n ? resolve(engine.time.frame) : requestAnimationFrame(tick);
+        requestAnimationFrame(tick);
+      });
   } else {
     window.__LOCKSTEP__ = false;
+    // Free-running: the engine drives itself, __PUMP__ just waits out n frames.
+    window.__PUMP__ = (n = 1): Promise<number> =>
+      new Promise((resolve, reject): void => {
+        let i = 0;
+        const tick = (): void => {
+          if (engine.error) {
+            reject(new Error(`engine failure: ${JSON.stringify(engine.error)}`));
+            return;
+          }
+          if (++i >= n) resolve(engine.time.frame);
+          else requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+    window.__PRESENT__ = window.__PUMP__;
     const info = (): void => {
       snapInfo();
-      schedule(info);
+      requestAnimationFrame(info);
     };
-    schedule(info);
+    requestAnimationFrame(info);
   }
 
-  const checkError = (): void => {
-    if (engine.error) throw new Error(`engine failure: ${JSON.stringify(engine.error)}`);
-  };
-  const waitFrames = (n: number, step: boolean): Promise<number> =>
-    new Promise((resolve, reject): void => {
-      if (disposed) {
-        reject(new Error('Shot API disposed'));
-        return;
-      }
-      const fail = (error: Error): void => {
-        pending.delete(fail);
-        reject(error);
-      };
-      pending.add(fail);
-      let i = 0;
-      const tick = (): void => {
-        try {
-          checkError();
-          if (step) engine.step();
-          checkError();
-          if (step) snapInfo();
-          if (++i >= n) {
-            pending.delete(fail);
-            resolve(engine.time.frame);
-          } else schedule(tick);
-        } catch (error) {
-          pending.delete(fail);
-          reject(error);
-        }
-      };
-      schedule(tick);
-    });
-  // Lockstep advances exactly n frames. Presentation only yields to the compositor.
-  const pump = (n = 1): Promise<number> => waitFrames(n, lockstep);
-  const present = lockstep ? (n = 2): Promise<number> => waitFrames(n, false) : pump;
-  window.__PUMP__ = pump;
-  window.__PRESENT__ = present;
-  const installedStep = engine.step;
-  const installedStart = engine.start;
-  return {
-    pump,
-    present,
-    lockstep,
-    dispose(): void {
-      if (disposed) return;
-      disposed = true;
-      for (const id of frames) cancelAnimationFrame(id);
-      frames.clear();
-      for (const reject of pending) reject(new Error('Shot API disposed'));
-      pending.clear();
-      if (engine.step === installedStep) engine.step = originalStep;
-      if (engine.start === installedStart) engine.start = originalStart;
-      if (window.__PUMP__ === pump) delete window.__PUMP__;
-      if (window.__PRESENT__ === present) delete window.__PRESENT__;
-      if (window.__APPLY_SHOT__ === applyShot) {
-        delete window.__APPLY_SHOT__;
-        if (window.__SHOTS__ === SHOTS) delete window.__SHOTS__;
-        if (window.__LOCKSTEP__ === lockstep) delete window.__LOCKSTEP__;
-        if (window.__RENDER_INFO__ === renderInfo) delete window.__RENDER_INFO__;
-      }
-    },
-  };
+  return { pump: window.__PUMP__, present: window.__PRESENT__, lockstep: !!lockstep };
 }
-
-/* oxlint-enable typescript/unbound-method */

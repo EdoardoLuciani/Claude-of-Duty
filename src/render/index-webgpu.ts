@@ -453,18 +453,11 @@ export class RenderSystem {
       this._releaseGraph();
     };
   }
-  /** Stop boot frame waits without releasing resources used by active hooks. */
-  cancelPrewarm(): void {
-    this._disposing = true;
-    this._warmAbort.abort(new Error('Renderer disposed during warmup'));
-  }
-
   _warmGraph(): Promise<{ ms: number; geometries: number; frameUnchanged: boolean }> {
     this._warmTask = this._warmGraphFrames();
     return this._warmTask;
   }
   async _warmGraphFrames(): Promise<{ ms: number; geometries: number; frameUnchanged: boolean }> {
-    this._warmAbort.signal.throwIfAborted();
     const started = performance.now(),
       frame = this.ctx.time.frame;
     const graph = this._graph;
@@ -627,7 +620,8 @@ export class RenderSystem {
     return { ok: true, graphWarm: await this._warmGraph() };
   }
   async dispose(): Promise<void> {
-    this.cancelPrewarm();
+    this._disposing = true;
+    this._warmAbort.abort(new Error('Renderer disposed during warmup'));
     await this._warmTask?.catch((): void => {});
     await this._meterTask?.catch((): void => {});
     this._meterPass?.dispose();
