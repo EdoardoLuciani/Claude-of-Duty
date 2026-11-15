@@ -86,7 +86,10 @@ physics.addRigidBody = (opts): RigidBody => {
     velocity: new THREE.Vector3(opts.velocity.x, opts.velocity.y, opts.velocity.z),
     fuse: 0,
   });
-  return new RigidBody({ ...opts, position: new THREE.Vector3(0, 1.6, 0) });
+  const body = new RigidBody({ ...opts, position: new THREE.Vector3(0, 1.6, 0) });
+  assert.equal(body.boundRadius, 0.05, 'player grenades use their sphere bounds');
+  assert.equal(body.minExtent, 0.05, 'player grenades do not inherit box-sized CCD');
+  return body;
 };
 physics.removeRigidBody = (): void => {};
 const wp = new WeaponSystem();
